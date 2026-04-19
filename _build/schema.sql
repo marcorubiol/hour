@@ -950,8 +950,13 @@ $$;
 COMMENT ON FUNCTION public.handle_new_user() IS
   'Provisions user_profile + personal workspace + owner workspace_membership. System roles are seeded by the workspace_seed_roles trigger in cascade.';
 
--- The actual trigger binding to auth.users is owned by the Supabase auth
--- schema; it is (re)created by the migration runner, not in this file.
+-- Bind the trigger to auth.users. Dropped along with the public schema on
+-- each reset because it depends on public.handle_new_user() (CASCADE drops
+-- dependent triggers). Recreated here so a fresh environment is self-contained.
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
 --------------------------------------------------------------------------------
 -- End of schema.sql
