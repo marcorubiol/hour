@@ -60,14 +60,16 @@ BEGIN
     RAISE EXCEPTION 'Pre-seeded workspace marco-rubiol not found. Re-apply PRE-SEED block first.';
   END IF;
 
-  -- Trigger-created workspace: marco-rubiol-XXXX (suffix added because of slug collision)
+  -- Trigger-created workspace — any workspace Marco owns that is not the
+  -- pre-seeded one. handle_new_user derives the slug from the email local
+  -- part (`marcorubiol` for marcorubiol@gmail.com), which does NOT collide
+  -- with the pre-seeded `marco-rubiol`, so we do not match on slug pattern.
   SELECT w.id INTO v_trigger_ws_id
   FROM public.workspace w
   JOIN public.workspace_membership m ON m.workspace_id = w.id
   WHERE m.user_id = v_user_id
     AND m.role = 'owner'
     AND w.id <> v_pre_seeded_ws_id
-    AND w.slug LIKE 'marco-rubiol-%'
   ORDER BY w.created_at ASC
   LIMIT 1;
 
