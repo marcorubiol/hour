@@ -159,11 +159,15 @@ CREATE TABLE project (
   status          project_status  NOT NULL DEFAULT 'draft',
   start_date      DATE,
   end_date        DATE,
+  custom_fields   JSONB           NOT NULL DEFAULT '{}'::jsonb,
   created_at      TIMESTAMPTZ     NOT NULL DEFAULT now(),
   updated_at      TIMESTAMPTZ     NOT NULL DEFAULT now(),
   deleted_at      TIMESTAMPTZ,
   UNIQUE (organization_id, slug)
 );
+
+COMMENT ON COLUMN project.custom_fields IS
+  'Per-record extensible metadata. See contact.custom_fields for conventions.';
 
 CREATE INDEX idx_project_org ON project (organization_id);
 
@@ -188,13 +192,18 @@ CREATE TABLE contact (
   country         TEXT,
   website         TEXT,
   notes           TEXT,
+  custom_fields   JSONB         NOT NULL DEFAULT '{}'::jsonb,
   created_at      TIMESTAMPTZ   NOT NULL DEFAULT now(),
   updated_at      TIMESTAMPTZ   NOT NULL DEFAULT now(),
   deleted_at      TIMESTAMPTZ
 );
 
-CREATE INDEX idx_contact_org       ON contact (organization_id);
-CREATE INDEX idx_contact_org_email ON contact (organization_id, email);
+COMMENT ON COLUMN contact.custom_fields IS
+  'Per-record extensible metadata. Reserved keys: "sources" (provenance per import batch), "dossier_2026" (PDF enrichment). Prefer namespaced keys to avoid collisions.';
+
+CREATE INDEX idx_contact_org              ON contact (organization_id);
+CREATE INDEX idx_contact_org_email        ON contact (organization_id, email);
+CREATE INDEX idx_contact_custom_fields_gin ON contact USING GIN (custom_fields jsonb_path_ops);
 
 CREATE TRIGGER contact_updated_at
   BEFORE UPDATE ON contact
@@ -267,10 +276,14 @@ CREATE TABLE event (
   status               event_status  NOT NULL DEFAULT 'tentative',
   notes                TEXT,
   external_calendar_id TEXT,
+  custom_fields        JSONB         NOT NULL DEFAULT '{}'::jsonb,
   created_at           TIMESTAMPTZ   NOT NULL DEFAULT now(),
   updated_at           TIMESTAMPTZ   NOT NULL DEFAULT now(),
   deleted_at           TIMESTAMPTZ
 );
+
+COMMENT ON COLUMN event.custom_fields IS
+  'Per-record extensible metadata. See contact.custom_fields for conventions.';
 
 CREATE INDEX idx_event_org_project_starts ON event (organization_id, project_id, starts_at);
 

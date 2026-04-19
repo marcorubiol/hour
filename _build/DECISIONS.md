@@ -212,16 +212,33 @@ Format:
   - Per-tenant schema migrations (add columns per org) — rejected, operational nightmare at SaaS scale, breaks multi-tenant RLS.
 - **Rationale**: Hybrid keeps native columns for universally needed fields (name, email, status, organization_id, etc.) where we need indexing, RLS filtering, and typed joins; puts the genuinely per-tenant stuff in JSONB where it flexes without migrations. The `custom_field_definition` table gives us dynamic form rendering + app-layer validation. GIN on JSONB handles the filtering needs of Phase 1 scale (thousands of rows per org, not millions). When a custom field "graduates" (becomes universal across tenants), it migrates from JSONB to a native column cleanly.
 - **When to implement**: NOT Phase 0 (only Marco + Anouk, no demand). Implement when either (a) the first Phase 1 customer explicitly requests custom fields, or (b) we find ourselves adding native columns for single-tenant needs for the second time. Estimated cost when triggered: ~2 days for schema + RLS + dynamic form rendering.
-- **Prep work done now (Phase 0)**: none yet. Open question — whether to land the 3 `custom_fields` JSONB columns (contact / project / event) now as migration 0005 so adding the definition table and UI later is purely additive, or defer all of it. Pending Marco's decision.
+- **Prep work done now (Phase 0)**: ~~none yet. Open question — whether to land the 3 `custom_fields` JSONB columns (contact / project / event) now as migration 0005 so adding the definition table and UI later is purely additive, or defer all of it. Pending Marco's decision.~~ → **Resolved 2026-04-19 (same day): JSONB columns landed.** See next ADR below.
 - **UI corollary**: the same `form_schema`/definition pattern can drive native-field rendering too, but we won't go that route. Native entities (contact, project, event, rider) get hand-written forms for polished UX; only custom fields are schema-driven. Two form engines, converging at the composition layer.
-- **Status**: Deferred (design firm, implementation not scheduled).
+- **Status**: Partially implemented — JSONB storage columns + GIN index present (migration 0005). `custom_field_definition` table and dynamic UI rendering still deferred to Phase 1 or on-demand.
+
+## [2026-04-19] — Activate `custom_fields jsonb` columns in Phase 0
+- **Decision**: Land migration `0005_custom_fields` now, which adds `custom_fields jsonb NOT NULL DEFAULT '{}'::jsonb` to `contact`, `project`, and `event`, plus a GIN index (`jsonb_path_ops`) on `contact.custom_fields`. The earlier ADR "Custom fields: hybrid JSONB + definition table (deferred implementation)" was marked as prep-work pending; this resolves it: the storage columns ship now, the `custom_field_definition` table and dynamic UI remain deferred.
+- **Context**: The real import dataset (Mostra Igualada 2026 — 4 CSV exports + 1 PDF dossier) introduces two classes of metadata that do not justify native columns:
+  1. **Provenance** — `Número Registre`, raw `Tipologia`, raw `Categoria procedència`, `ingested_at` timestamp. Per-batch, per-source, variable shape across future imports.
+  2. **Qualitative enrichment** — the PDF dossier carries per-programmer `INTERÈS ARTÍSTIC` and `DESCRIPCIÓ` fields that won't exist in the next source.
+   Storing these in `notes` collapses structure; creating columns per source bloats the schema and doesn't scale past the first festival.
+- **Alternatives considered (at this decision point)**:
+  - Store provenance in `notes` as free text — rejected, unsearchable and loses fidelity.
+  - Create dedicated columns (`source_id INT`, `source_name TEXT`, etc.) — rejected, any second festival adds more columns, same anti-pattern the original ADR was trying to avoid.
+  - Defer until Phase 1 — rejected, import-plan.md needs a home for provenance today, not in six months. Refactoring the import in-place later is more expensive than the zero-cost migration now.
+  - Activate only on `contact` — rejected, consistent with the original design that named all three entities; `project` and `event` are also likely to pick up per-tenant metadata (e.g. custom project status codes, external-calendar sync cursors).
+- **Rationale**: The zero-cost bet (one ALTER TABLE per tenant entity, one GIN index) was the gating question in the earlier ADR. The real first import provides the concrete justification to flip the switch. Keeping the `custom_field_definition` table and dynamic UI deferred respects the original ADR's cost/benefit position — tenant-configurable fields are not needed while MaMeMi is the only tenant.
+- **How to apply**: Migration 0005 already applied via Supabase MCP. `_build/schema.sql` reconciled. Import-plan.md §3.5 specifies the JSONB shape (`sources.<source_slug>` namespace for provenance; `dossier_2026` for PDF enrichment).
+- **Consumer conventions**: Always merge with `jsonb ||` (never overwrite). Prefer namespaced keys (`sources.mostra_igualada_2026.*`, never root-level `registre`). Reserved root keys: `sources` and anything ending in `_*` for future internal uses.
+- **Upgrade path**: When the first Phase 1 customer needs tenant-configurable fields, the `custom_field_definition` table + dynamic renderer is purely additive — no changes to the storage columns already in place.
+- **Status**: Firm. Migration applied 2026-04-19.
 
 ## [2026-04-18] — Deferred to kickoff session
 Items NOT yet decided, to address when starting schema work:
 
 - ~~Frontend framework confirmation~~ — resolved 2026-04-19 (Astro + Svelte). See ADR above.
-- ~~Auth flow: magic link only (Phase 0) vs + Google OAuth (Phase 1)~~ — resolved 2026-04-19 (magic-link only). See ADR above.
+- ~~Auth flow: magic link only (Phase 0) vs + Google OAuth (Phase 1)~~ — resolved 2026-04-19 (magic-link only, later superseded by password+TOTP). See ADRs above.
 - ~~Repo under Marco's GitHub user vs new `zerosense` org~~ — resolved 2026-04-19, see entry above.
-- Custom fields: whether to land the 3 `custom_fields` JSONB columns now (Phase 0) as prep — see ADR 2026-04-19 above.
+- ~~Custom fields: whether to land the 3 `custom_fields` JSONB columns now (Phase 0) as prep~~ — resolved 2026-04-19 (landed). See ADR "Activate `custom_fields jsonb` columns in Phase 0" above.
 - Staging deploy frequency: per-PR vs on-merge-only
 - Ableton/Qlab integration depth (read-only metadata vs two-way sync) — Phase 1+ feature
