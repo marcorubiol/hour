@@ -125,7 +125,7 @@ Tasks live per project AND per organization (org-level catch-all, not every task
 ## 8. Auth & sessions
 
 - **Auth provider**: Supabase Auth
-- **Phase 0 flow**: magic link only. No passwords, no OAuth yet.
+- **Phase 0 flow**: email+password as primary method, optional TOTP 2FA (user-enrolled). No OAuth yet. Superseded magic-link-only on 2026-04-19 — see ADR `Auth flow: email+password with optional TOTP 2FA` in DECISIONS.md.
 - **Phase 1 additions**: Google OAuth (for calendar sync), Apple Sign-in (iOS app future).
 - **Session**: JWT, 1h expiry, refresh token 7d. Stored in httpOnly cookie.
 - **Org switching**: user picks active org → Supabase client re-issues session with `current_org_id` claim → RLS picks it up automatically.
@@ -225,7 +225,8 @@ hour/
 │   └── shared/            # types, zod schemas, shared utils
 ├── _build/                # (this folder — specs, ADRs, import plans)
 ├── .github/workflows/     # CI
-├── CLAUDE.md              # project rules (inherits .zerø)
+├── context.md             # project rules (inherits .zerø)
+├── CLAUDE.md              # stub (@context.md) for Claude Code / Cowork
 └── README.md
 ```
 
@@ -281,5 +282,5 @@ Until wired, RLS returns zero rows for authenticated users.
 
 - Visual design (lives in `_methød/design.md`)
 - CSS methodology (lives in `_methød/css.md`)
-- MaMeMi-specific content (lives in `ZS_MaMeMi/CLAUDE.md`)
+- MaMeMi-specific content (lives in `ZS_MaMeMi/context.md`)
 - Phase 1 SaaS pricing / packaging (decided at month 6 checkpoint)

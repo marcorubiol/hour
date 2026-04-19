@@ -8,7 +8,7 @@
 
 ## 1. Why we need a plan (and not just a `COPY`)
 
-The Difusión CRM in `01_STAGE/ZS_MaMeMi/Difusión/` is empty on disk — the "168 leads" referenced in `CLAUDE.md` were an aspirational target, not an existing dataset. The real starting dataset is a **Mostra Igualada 2026 backoffice export**: four paginated CSVs + one PDF of internationally-focused programmers. These will be the first of many heterogeneous sources (other festivals, agendas, mailing lists), so the pipeline needs to be source-agnostic, idempotent, and auditable.
+The Difusión CRM in `01_STAGE/ZS_MaMeMi/Difusión/` is empty on disk — the "168 leads" referenced in `context.md` were an aspirational target, not an existing dataset. The real starting dataset is a **Mostra Igualada 2026 backoffice export**: four paginated CSVs + one PDF of internationally-focused programmers. These will be the first of many heterogeneous sources (other festivals, agendas, mailing lists), so the pipeline needs to be source-agnostic, idempotent, and auditable.
 
 ---
 

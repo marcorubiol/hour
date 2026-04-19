@@ -99,7 +99,13 @@ In the Supabase dashboard:
 
 ### 2.1 Project-level settings (dashboard)
 
-- **Authentication → Providers → Email**: enable Magic Link. Disable Email+Password (Phase 0 is magic-link-only per DECISIONS.md deferred item `Auth flow`).
+- **Authentication → Sign In / Providers → Email** (see DECISIONS.md ADR `Auth flow: email+password with optional TOTP 2FA` 2026-04-19):
+  - Enable email provider: ON
+  - Confirm email: ON (verification email required before first login)
+  - Secure email change: ON
+  - Minimum password length: 8 (raised from default 6)
+  - Password complexity requirements: enabled
+  - Magic Link: optional — may be left ON as a fallback, but the primary flow is email+password + optional TOTP 2FA enrolled via `auth.mfa.enroll()`.
 - **Authentication → URL Configuration**:
   - Site URL: `https://hour.zerosense.studio`
   - Redirect URLs: add `http://localhost:4321/*` for local dev (Astro default port).
@@ -371,7 +377,7 @@ Rule: anything that a third party could misuse if leaked → `wrangler secret pu
 - [ ] Supabase dashboard shows 15 tables + `audit_log`.
 - [ ] `SELECT COUNT(*) FROM pg_policies WHERE schemaname='public'` returns ≥ 40.
 - [ ] R2 bucket `hour-media` exists but is empty.
-- [ ] Auth UI in Supabase sends a magic link to a real inbox (use a personal address).
+- [ ] Auth sign-up creates a user via email+password and sends a confirmation email to a real inbox (use a personal address). Optional TOTP 2FA enrollment available via `auth.mfa.enroll()`.
 - [ ] `git push` on `main` triggers CI → deploy (set up `wrangler deploy` in CI if/when Marco wants auto-deploy; for now it's manual).
 
 When all six checks pass: Phase 0 infra is live. Next up — `import-plan.md` (168 Difusión leads into `contact` + `contact_project`).
