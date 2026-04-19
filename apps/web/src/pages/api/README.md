@@ -24,15 +24,16 @@ Lists `engagement` rows in the current workspace with the linked `person` and
 `project` embedded. RLS + the `current_workspace_id` claim scope visibility;
 this endpoint is a thin PostgREST wrapper, no RPC needed.
 
-Anti-CRM vocabulary: replaces the old `/api/prospects`. Default status is
-`proposed` (was `prospect`). The filter `difusion-2026-27` is no longer a
-project — pass `season=2026-27` (default) to filter engagements by season.
+Anti-CRM vocabulary (reset v2 enum, 2026-04-19): default status is `contacted`.
+Valid values: `contacted, in_conversation, hold, confirmed, declined, dormant,
+recurring`. The filter `difusion-2026-27` is no longer a project — pass
+`season=2026-27` (default) to filter engagements by season.
 
 **Query params** (all optional):
 
 | param          | default        | meaning                                            |
 |----------------|----------------|----------------------------------------------------|
-| `status`       | `proposed`     | `engagement_status` enum, or `any` to disable      |
+| `status`       | `contacted`    | `engagement_status` enum, or `any` to disable      |
 | `project_slug` | `mamemi`       | project slug inside the current workspace          |
 | `season`       | `2026-27`      | matches `custom_fields->>season`, or `any`         |
 | `limit`        | `50` (max 100) | page size                                          |
@@ -42,11 +43,11 @@ project — pass `season=2026-27` (default) to filter engagements by season.
 
 ```json
 {
-  "total": 156,
+  "total": 154,
   "limit": 50,
   "offset": 0,
   "project_slug": "mamemi",
-  "status": "proposed",
+  "status": "contacted",
   "season": "2026-27",
   "items": [
     {
@@ -54,8 +55,7 @@ project — pass `season=2026-27` (default) to filter engagements by season.
       "workspace_id": "…",
       "project_id": "…",
       "person_id": "…",
-      "date_id": null,
-      "status": "proposed",
+      "status": "contacted",
       "role": null,
       "first_contacted_at": null,
       "last_contacted_at": null,
@@ -79,7 +79,6 @@ project — pass `season=2026-27` (default) to filter engagements by season.
         "id": "…",
         "slug": "mamemi",
         "name": "MaMeMi",
-        "type": "show",
         "status": "active"
       }
     }
@@ -91,8 +90,8 @@ project — pass `season=2026-27` (default) to filter engagements by season.
 
 The JWT needs a `current_workspace_id` claim for
 `public.current_workspace_id()` to resolve. That claim is injected by the
-custom access-token hook that reads the caller's `membership` row. Until the
-hook is enabled in **Dashboard → Authentication → Hooks**,
+custom access-token hook that reads the caller's `workspace_membership` row.
+Until the hook is enabled in **Dashboard → Authentication → Hooks**,
 `current_workspace_id()` returns NULL and every RLS policy rejects the
 request, so the endpoint responds with an empty `items` array (not an error).
 
@@ -121,13 +120,13 @@ SELECT e.id, e.status, e.role, e.next_action_at,
          'country', p.country, 'city', p.city
        ) AS person,
        jsonb_build_object(
-         'id', pr.id, 'slug', pr.slug, 'name', pr.name, 'type', pr.type
+         'id', pr.id, 'slug', pr.slug, 'name', pr.name, 'status', pr.status
        ) AS project
 FROM engagement e
 JOIN project pr ON pr.id = e.project_id AND pr.slug = 'mamemi'
 JOIN person  p  ON p.id  = e.person_id
 WHERE e.deleted_at IS NULL
-  AND e.status = 'proposed'
+  AND e.status = 'contacted'
   AND e.custom_fields->>'season' = '2026-27'
 ORDER BY e.next_action_at ASC NULLS LAST, e.updated_at DESC
 LIMIT 5;
