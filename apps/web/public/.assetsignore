@@ -1,0 +1,5 @@
+# Exclude the Worker code from being uploaded as a public static asset.
+# Wrangler bundles `_worker.js/` separately via `main` in wrangler.toml.
+# Without this file, wrangler 3+ aborts the deploy to prevent accidentally
+# exposing server-side code on the CDN.
+_worker.js
