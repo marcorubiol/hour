@@ -242,3 +242,94 @@ Items NOT yet decided, to address when starting schema work:
 - ~~Custom fields: whether to land the 3 `custom_fields` JSONB columns now (Phase 0) as prep~~ — resolved 2026-04-19 (landed). See ADR "Activate `custom_fields jsonb` columns in Phase 0" above.
 - Staging deploy frequency: per-PR vs on-merge-only
 - Ableton/Qlab integration depth (read-only metadata vs two-way sync) — Phase 1+ feature
+
+## [2026-04-19] — Polymorphic core: workspace + project + engagement (supersedes organization/contact/event model)
+- **Decision**: Rewrite the schema around three concentric entities —
+  1. **`workspace`** (replaces `organization`) with `kind` ∈ { `personal`, `team` }. Every user gets a personal workspace by default; teams are workspaces shared by membership.
+  2. **`project`** gains a `type` ∈ { `show`, `release`, `creation_cycle`, `festival_edition` }. Replaces the need for per-artefact tables (no separate `release`, `tour`, `campaign`).
+  3. **`date`** is the universal child of a project with `kind` ∈ { `performance`, `rehearsal`, `residency`, `travel_day`, `press`, `other` }. Replaces `event`.
+ 
+  Contacts are split into a three-layer model:
+  - **`person`** — global, cross-workspace identity (one row per real human, deduped on email).
+  - **`engagement`** — per (person × project × workspace) row carrying the professional relationship (role, status, first_contacted_at, last_contacted_at, provenance). Replaces `contact_project` and the `contact_tier`/`contact_project_status` enums.
+  - **`person_note`** — workspace-scoped note on a person with `visibility` ∈ { `workspace`, `private` }. Enables the "mine vs ours" separation called out in the research (`99-patterns.md §3.1`).
+ 
+  Per-project permissions go through a new **`project_membership`** with `role` ∈ { `lead`, `collaborator`, `viewer` } and `scope text[]` drawn from { `dates`, `engagements`, `documents`, `notes`, `finance` }. The workspace-level `membership` gains a `guest` role for external collaborators scoped to one project only.
+ 
+  Anti-CRM vocabulary becomes canonical: use `date`, `hold`, `letter_of_interest`, `programmer`, `promoter`, `gig`, `engagement`. Prohibited in schema, code, and UI: `lead`, `pipeline`, `funnel`, `conversion`, `deal`, `prospect`. `difusion-2026-27` is **not** a schema entity — it is a filtered view over `date` rows of the MaMeMi show where `date.status ∈ { tentative, held }` and the season matches.
+ 
+- **Context**: Marco uploaded a 10-file research dossier on Hour's target profiles (theatre company, indie band, production company, self-managed band, solo artist, freelance distribution agent, tour technician, manager/booking agent) plus a cross-cutting synthesis. The existing schema — organization / contact / contact_project / event — has **five structural fractures** against what the research shows is actually needed:
+  1. The research (`99-patterns.md §3.1`) documents a clean "mine vs ours" contact split across every profile. The current `contact` table has no concept of visibility scope — anyone with workspace access sees every note on every contact. This is a showstopper for the freelance-distribution and manager/booking-agent profiles, where the contact book *is* the business asset.
+  2. Profiles 5, 6, 7, 8 (solo artist, freelance distribution, tour technician, manager) each work across multiple principals in parallel. They need one identity that can switch or aggregate across workspaces. The current model treats `organization` as the only top-level scope and has no place for a personal workspace. Research §5 calls this the "multi-tenant freelance reality".
+  3. The current `event` table is music-tour-centric. Theatre and dance profiles' calendars mix performances, residencies, rehearsals, travel days, and press days as first-class rows; releases and festival editions share the same calendar primitive. A polymorphic `date` with a `kind` enum is the right generalization (research §8 thesis validation).
+  4. `project` has no `type` discriminator. A show, a record release, a creation cycle, and a festival edition are all "projects" but have different timelines and different child sets. A `type` enum closes this without multiplying entity tables.
+  5. Per-project permissions don't exist — today's `membership` is all-or-nothing per workspace. The research's manager-booking-agent profile (profile 08) needs `guest` collaborators who see exactly one project and nothing else. `project_membership.scope text[]` is the minimal surface that covers this.
+ 
+  Marco's anchor for scope: *"quiero que lo estuvieras escribiendo y pensando como si fuera la primera vez que lo escribas. Si se rompen cosas, se rompen cosas. Es lo menos importante ahora mismo... haz absolutamente todo lo que has dicho incluido la ola 3."* → all three waves (vocabulary rename, polymorphic structure, engagement + private layer) ship in Phase 0 as a single destructive reset. No data to preserve (0 auth.users, 0 real rows — only the `mamemi` organization stub from an earlier manual seed).
+ 
+- **Alternatives considered**:
+  - **Iterative migration (Wave 1 → 2 → 3 across weeks)** — rejected. Marco's explicit instruction was to treat it as a first-write; also, the intermediate states (e.g. `contact` + new `person` coexisting) would double the RLS surface for a stretch of days and invite inconsistencies.
+  - **Keep `organization`, add `personal` as a kind** — rejected. The word "organization" is wrong for a solo artist's personal workspace; the research shows the vocabulary matters to the target audience. Rename to `workspace` is cheap at zero users.
+  - **`campaign` entity for Difusión-2026-27** — rejected. Marco corrected the model: a season's booking outreach is a filter over the show's pending `date` rows, not a separate artefact. Introducing `campaign` would create exactly the duplication the research warns against.
+  - **Keep `event` and add `type` enum** — rejected in favour of renaming to `date`. Theatre/dance vocabulary universally says "fecha" / "date"; "event" in this audience implies a programmer-side listing, which conflates two different concepts.
+  - **Per-entity visibility flags (`note.is_private boolean`)** — rejected in favour of a `visibility` enum on `person_note`. Enum leaves room for `team`/`workspace`/`project`/`private` gradations later; boolean would force a future ALTER.
+  - **Include DIY bands (profile 04 — self-managed band) in Phase 0 import/seed** — rejected per research §10. DIY bands' workflow centres on DAW/streaming/merchandise tooling Hour does not serve. Phase 0 personas are: small-medium theatre/dance/circus company, freelance distribution agent, manager/booking agent, solo artist. Phase 1 re-evaluates DIY bands separately.
+ 
+- **Rationale**:
+  - **Cost is lowest now.** Zero auth.users, zero real data rows. The destructive reset is one MCP migration (`DROP ... CASCADE` + recreate). A month from now the same refactor is a days-long data migration; a quarter from now it is a rewrite.
+  - **Schema encodes the business model.** The three-layer contact split and the personal/team workspace distinction are not implementation details — they are the research's primary finding. Shipping a schema that can't express them would force a rewrite before the first external user.
+  - **Polymorphism via `type` + `kind` enums keeps table count down.** Four project types × one `project` table is still simpler than four parallel tables with shared-but-slightly-different columns. `date.kind` does the same for the calendar layer.
+  - **`scope text[]` on `project_membership` is expressive enough.** Research profile 08 (manager) gave the concrete constraint: "see this one project's dates and engagements, but not finance, and not other projects". A text array of capability tokens checked in RLS helper `has_project_access(project_id, scope)` covers that without adding a capability table.
+  - **Anti-CRM vocabulary is a product decision.** The research profiles (esp. 01 theatre company and 05 solo artist) explicitly reject CRM framing in interviews. Enshrining the vocabulary in the schema makes it impossible to drift: a column called `engagement_status` will get translated to "estado" in the UI, never "stage in the pipeline".
+ 
+- **Table changes (one destructive migration)**:
+  - **CREATE**: `workspace`, `date`, `person`, `engagement`, `person_note`, `project_membership`.
+  - **RENAME/RESHAPE**:
+    - `organization` → `workspace` (add `kind workspace_kind NOT NULL`, drop `type org_type`).
+    - `project` gains `type project_type NOT NULL`; `status` stays.
+    - `membership` gains `guest` as a new `membership_role` value.
+  - **DROP CASCADE**: `contact`, `contact_project`, `event`, `rider`, `file`, `note`, `task`, `crew_assignment`.
+  - **SURVIVE intact**: `audit_log`, `user_profile`, `tag`, `tagging`.
+ 
+- **Enum changes**:
+  - **ADD**: `workspace_kind` (`personal`, `team`), `project_type` (`show`, `release`, `creation_cycle`, `festival_edition`), `date_kind` (`performance`, `rehearsal`, `residency`, `travel_day`, `press`, `other`), `date_status` (`tentative`, `held`, `confirmed`, `cancelled`, `performed`), `engagement_status` (`idea`, `proposed`, `discussing`, `held`, `confirmed`, `cancelled`, `declined`, `performed`, `dormant`), `project_member_role` (`lead`, `collaborator`, `viewer`), `person_note_visibility` (`workspace`, `private`).
+  - **DROP**: `contact_project_status`, `contact_tier`, `event_status`, `event_type`, `file_status`, `linkable_entity`, `notable_entity`, `org_type`, `task_section`.
+  - **ALTER**: `membership_role` gains `guest`. `project_status` stays.
+ 
+- **RLS and auth-hook contract**:
+  - Rename helper `current_org_id()` → `current_workspace_id()`; `current_user_role()` → `current_workspace_role()`. Claim name changes from `current_org_id` → `current_workspace_id` in the JWT; `custom_access_token_hook` updated accordingly.
+  - New helper `has_project_access(project_id uuid, scope text)` reads `project_membership` joined to workspace membership; called from RLS policies on `date`, `engagement`, `person_note`, and future per-project tables.
+  - `person` is **global** (no `workspace_id`); readable to any authenticated user who has at least one `engagement` referencing the person, writable by the user who created the row plus any workspace the person is currently engaged with. (Enforced via policy, not via ownership column.)
+  - `person_note` with `visibility='private'` is readable only by the author; `visibility='workspace'` follows the workspace membership rules.
+ 
+- **Seed after migration**:
+  - One workspace: `Marco Rubiol` (kind=`personal`, slug=`marco-rubiol`). Membership: Marco as owner.
+  - One project inside it: `MaMeMi` (type=`show`, status=`active`, slug=`mamemi`).
+  - The 156 contacts from the Difusión-2026-27 CSV re-seed as `person` rows (global, deduped on email) + `engagement` rows (workspace=Marco Rubiol, project=MaMeMi, status=`proposed`).
+  - `Difusión 2026-27` has **no** row in any table. It is a saved UI filter: project=MaMeMi AND engagement.status IN (`proposed`, `discussing`, `held`) AND season=`2026-27`.
+ 
+- **Impact on existing artefacts**:
+  - `_build/schema.sql` — rewritten from scratch (Task #22).
+  - `_build/rls-policies.sql` — rewritten from scratch (Task #23).
+  - `_build/auth-hooks.sql` — claim renamed `current_org_id` → `current_workspace_id`; read-target table renamed `membership` stays (workspace-level `membership` retains the name).
+  - `_build/ARCHITECTURE.md`, `context.md`, `bootstrap.md` — updated to reflect new model (Task #28).
+  - `scripts/03_load_to_hour.py` — emits `person` + `engagement` pairs instead of `contact` + `contact_project` (Task #26).
+  - `apps/web/src/api/prospects.ts` → rename to `engagements.ts` (Marco applies in Windsurf — Task #27).
+  - db-types.ts regenerated post-migration (Task #27).
+ 
+- **Supersedes**:
+  - **"Multi-tenancy from day one" (2026-04-18)** — the *principle* stands (tenant isolation at DB level from day one), but the tenant column is now `workspace_id`, not `organization_id`, and the JWT claim is `current_workspace_id`. The "2 extra lines per migration" promise holds.
+  - **"Activate `custom_fields jsonb` columns in Phase 0" (2026-04-19)** — JSONB columns carry over onto the new tables: `person.custom_fields`, `project.custom_fields`, `date.custom_fields`. GIN index follows (`person.custom_fields`). `engagement.custom_fields` added for provenance (replaces the old `contact_project` ad-hoc fields).
+ 
+- **Does NOT supersede**:
+  - UUID v7 PK choice — stands.
+  - Stack (Supabase / CF Workers / R2 / Astro+Svelte) — stands.
+  - Auth flow (email+password + optional TOTP) — stands.
+  - Region (eu-central-1) — stands.
+  - Subdomain (hour.zerosense.studio) — stands.
+ 
+- **How to apply**: Tasks #22 → #28 execute in order. Migration is one MCP `apply_migration` call with `DROP ... CASCADE` + full recreate. Rollback plan: none needed (0 real users, 0 real data). If recreation fails, restore from the `initial_schema` + `rls_and_audit` + `hardening_search_paths` + `policy_consolidation_and_fk_indexes` migration chain already in history.
+ 
+- **Research citations**: `research/99-patterns.md` §3.1 (mine vs ours contact split — architectural requirement), §5 (multi-tenant freelance reality — workspace kind=personal|team), §6.1 (Phase 0/1 must-have features), §8 (polymorphic project thesis validation), §10 (headline recommendations, incl. DIY band exclusion from Phase 0).
+ 
+- **Status**: Firm. Scope locked: no DIY-band profile handling in Phase 0, no `campaign` entity, no separate release/tour/festival tables. Wave-by-wave iteration explicitly rejected in favour of a single destructive reset.

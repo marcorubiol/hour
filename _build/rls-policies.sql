@@ -1,169 +1,314 @@
--- Hour — Phase 0 RLS Policies
+-- Hour — Phase 0 RLS Policies (polymorphic redesign)
 -- Target: Supabase Cloud (Postgres 15+)
--- Convention: Default DENY. Separate policies per operation per table.
---             Soft-delete rows (deleted_at IS NOT NULL) hidden from all SELECT.
---             Trash recovery is service-role only in Phase 0.
+-- Convention:
+--   - Default DENY. Separate policies per operation per table.
+--   - Soft-delete rows (deleted_at IS NOT NULL) hidden from all SELECT.
+--   - Trash recovery is service-role only in Phase 0.
+--   - `workspace_id` is the tenant scope everywhere. Claim name in JWT:
+--     `current_workspace_id` (injected by public.custom_access_token_hook).
+--   - Anti-CRM vocabulary: helpers and policies speak of engagements, dates,
+--     persons — never leads, prospects, deals, pipelines.
 -- Generated: 2026-04-19
+-- Supersedes: earlier `current_org_id` / `organization` helper set.
 
 --------------------------------------------------------------------------------
 -- 0. Helper functions (STABLE SECURITY DEFINER)
 --------------------------------------------------------------------------------
 
--- Returns the organization_id from the JWT claim set by org switcher.
-CREATE OR REPLACE FUNCTION current_org_id()
-RETURNS UUID AS $$
-  SELECT (auth.jwt() ->> 'current_org_id')::uuid;
+-- 0.1 current_workspace_id — from JWT claim set by workspace switcher.
+CREATE OR REPLACE FUNCTION current_workspace_id()
+RETURNS uuid AS $$
+  SELECT (auth.jwt() ->> 'current_workspace_id')::uuid;
 $$ LANGUAGE sql STABLE SECURITY DEFINER
 SET search_path = public, extensions, pg_temp;
 
--- Alias for auth.uid() — keeps policy expressions self-documenting.
+COMMENT ON FUNCTION current_workspace_id() IS
+  'Active workspace for this request. Populated by custom_access_token_hook or by an explicit workspace switch.';
+
+
+-- 0.2 current_user_id — alias for auth.uid() for self-documenting policies.
 CREATE OR REPLACE FUNCTION current_user_id()
-RETURNS UUID AS $$
+RETURNS uuid AS $$
   SELECT auth.uid();
 $$ LANGUAGE sql STABLE SECURITY DEFINER
 SET search_path = public, extensions, pg_temp;
 
--- Returns the caller's role in the current organization.
--- NULL if the user has no membership (policies treat NULL as denied).
-CREATE OR REPLACE FUNCTION current_user_role()
+
+-- 0.3 current_workspace_role — caller's role in the active workspace.
+-- NULL if the user has no accepted membership.
+CREATE OR REPLACE FUNCTION current_workspace_role()
 RETURNS membership_role AS $$
-  SELECT role FROM membership
+  SELECT role FROM public.membership
   WHERE user_id = auth.uid()
-    AND organization_id = current_org_id();
+    AND workspace_id = current_workspace_id()
+    AND accepted_at IS NOT NULL;
 $$ LANGUAGE sql STABLE SECURITY DEFINER
 SET search_path = public, extensions, pg_temp;
 
+
+-- 0.4 is_workspace_member — true if caller has accepted membership in ws_id.
+CREATE OR REPLACE FUNCTION is_workspace_member(ws_id uuid)
+RETURNS boolean AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.membership
+    WHERE user_id = auth.uid()
+      AND workspace_id = ws_id
+      AND accepted_at IS NOT NULL
+  );
+$$ LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = public, extensions, pg_temp;
+
+
+-- 0.5 has_project_access — true if caller can access `p_scope` on `p_project_id`.
+-- Gates: (a) non-guest workspace membership grants full project scope,
+--        (b) explicit project_membership row grants scoped access.
+CREATE OR REPLACE FUNCTION has_project_access(p_project_id uuid, p_scope text)
+RETURNS boolean AS $$
+  SELECT EXISTS (
+    -- Path A: non-guest workspace member
+    SELECT 1
+    FROM public.project p
+    JOIN public.membership m ON m.workspace_id = p.workspace_id
+    WHERE p.id = p_project_id
+      AND m.user_id = auth.uid()
+      AND m.accepted_at IS NOT NULL
+      AND m.role IN ('owner','admin','member','viewer')
+      AND p.deleted_at IS NULL
+  )
+  OR EXISTS (
+    -- Path B: guest or explicit project membership with scope token
+    SELECT 1
+    FROM public.project_membership pm
+    WHERE pm.project_id = p_project_id
+      AND pm.user_id = auth.uid()
+      AND p_scope = ANY (pm.scope)
+  );
+$$ LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = public, extensions, pg_temp;
+
+COMMENT ON FUNCTION has_project_access(uuid, text) IS
+  'Access gate for child entities of a project (date, engagement, person_note). Scope tokens: dates, engagements, documents, notes, finance.';
+
+
+-- 0.6 can_edit_project — true if caller has write access to the project.
+-- Viewers and scope-only guests cannot edit.
+CREATE OR REPLACE FUNCTION can_edit_project(p_project_id uuid)
+RETURNS boolean AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.project p
+    JOIN public.membership m ON m.workspace_id = p.workspace_id
+    WHERE p.id = p_project_id
+      AND m.user_id = auth.uid()
+      AND m.accepted_at IS NOT NULL
+      AND m.role IN ('owner','admin','member')
+      AND p.deleted_at IS NULL
+  )
+  OR EXISTS (
+    SELECT 1
+    FROM public.project_membership pm
+    WHERE pm.project_id = p_project_id
+      AND pm.user_id = auth.uid()
+      AND pm.role IN ('lead','collaborator')
+  );
+$$ LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = public, extensions, pg_temp;
+
+
+-- 0.7 can_see_person — true if caller shares at least one engagement with person,
+-- OR is the creator of the person row.
+-- Rationale: `person` is global. A user can only see a person they have a
+-- professional connection to (via any of their workspaces).
+CREATE OR REPLACE FUNCTION can_see_person(p_person_id uuid)
+RETURNS boolean AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.person WHERE id = p_person_id AND created_by = auth.uid()
+  )
+  OR EXISTS (
+    SELECT 1
+    FROM public.engagement e
+    JOIN public.membership m
+      ON m.workspace_id = e.workspace_id
+    WHERE e.person_id = p_person_id
+      AND e.deleted_at IS NULL
+      AND m.user_id = auth.uid()
+      AND m.accepted_at IS NOT NULL
+  );
+$$ LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = public, extensions, pg_temp;
+
+
 --------------------------------------------------------------------------------
--- 1. Enable RLS on all tables (default DENY)
+-- 1. Enable RLS on all tables (default DENY, FORCE on)
 --------------------------------------------------------------------------------
 
-ALTER TABLE organization    ENABLE ROW LEVEL SECURITY;
-ALTER TABLE organization    FORCE ROW LEVEL SECURITY;
+ALTER TABLE workspace            ENABLE ROW LEVEL SECURITY;
+ALTER TABLE workspace            FORCE ROW LEVEL SECURITY;
 
-ALTER TABLE user_profile    ENABLE ROW LEVEL SECURITY;
-ALTER TABLE user_profile    FORCE ROW LEVEL SECURITY;
+ALTER TABLE user_profile         ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_profile         FORCE ROW LEVEL SECURITY;
 
-ALTER TABLE membership      ENABLE ROW LEVEL SECURITY;
-ALTER TABLE membership      FORCE ROW LEVEL SECURITY;
+ALTER TABLE membership           ENABLE ROW LEVEL SECURITY;
+ALTER TABLE membership           FORCE ROW LEVEL SECURITY;
 
-ALTER TABLE project         ENABLE ROW LEVEL SECURITY;
-ALTER TABLE project         FORCE ROW LEVEL SECURITY;
+ALTER TABLE project              ENABLE ROW LEVEL SECURITY;
+ALTER TABLE project              FORCE ROW LEVEL SECURITY;
 
-ALTER TABLE contact         ENABLE ROW LEVEL SECURITY;
-ALTER TABLE contact         FORCE ROW LEVEL SECURITY;
+ALTER TABLE project_membership   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE project_membership   FORCE ROW LEVEL SECURITY;
 
-ALTER TABLE contact_project ENABLE ROW LEVEL SECURITY;
-ALTER TABLE contact_project FORCE ROW LEVEL SECURITY;
+ALTER TABLE date                 ENABLE ROW LEVEL SECURITY;
+ALTER TABLE date                 FORCE ROW LEVEL SECURITY;
 
-ALTER TABLE event           ENABLE ROW LEVEL SECURITY;
-ALTER TABLE event           FORCE ROW LEVEL SECURITY;
+ALTER TABLE person               ENABLE ROW LEVEL SECURITY;
+ALTER TABLE person               FORCE ROW LEVEL SECURITY;
 
-ALTER TABLE task            ENABLE ROW LEVEL SECURITY;
-ALTER TABLE task            FORCE ROW LEVEL SECURITY;
+ALTER TABLE engagement           ENABLE ROW LEVEL SECURITY;
+ALTER TABLE engagement           FORCE ROW LEVEL SECURITY;
 
-ALTER TABLE file            ENABLE ROW LEVEL SECURITY;
-ALTER TABLE file            FORCE ROW LEVEL SECURITY;
+ALTER TABLE person_note          ENABLE ROW LEVEL SECURITY;
+ALTER TABLE person_note          FORCE ROW LEVEL SECURITY;
 
-ALTER TABLE note            ENABLE ROW LEVEL SECURITY;
-ALTER TABLE note            FORCE ROW LEVEL SECURITY;
+ALTER TABLE tag                  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tag                  FORCE ROW LEVEL SECURITY;
 
-ALTER TABLE rider           ENABLE ROW LEVEL SECURITY;
-ALTER TABLE rider           FORCE ROW LEVEL SECURITY;
+ALTER TABLE tagging              ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tagging              FORCE ROW LEVEL SECURITY;
 
-ALTER TABLE crew_assignment ENABLE ROW LEVEL SECURITY;
-ALTER TABLE crew_assignment FORCE ROW LEVEL SECURITY;
-
-ALTER TABLE tag             ENABLE ROW LEVEL SECURITY;
-ALTER TABLE tag             FORCE ROW LEVEL SECURITY;
-
-ALTER TABLE tagging         ENABLE ROW LEVEL SECURITY;
-ALTER TABLE tagging         FORCE ROW LEVEL SECURITY;
-
-ALTER TABLE audit_log       ENABLE ROW LEVEL SECURITY;
-ALTER TABLE audit_log       FORCE ROW LEVEL SECURITY;
+ALTER TABLE audit_log            ENABLE ROW LEVEL SECURITY;
+ALTER TABLE audit_log            FORCE ROW LEVEL SECURITY;
 
 --------------------------------------------------------------------------------
--- 2. user_profile (NOT tenant-scoped)
+-- 2. workspace
 --------------------------------------------------------------------------------
 
--- User sees own profile + profiles of anyone sharing at least one org
--- (powers @mentions, crew lists). Consolidated from two permissive policies.
-CREATE POLICY profile_select ON user_profile
+CREATE POLICY workspace_select ON workspace
   FOR SELECT TO authenticated
   USING (
-    id = current_user_id()
-    OR id IN (
-      SELECT m2.user_id
-      FROM membership m1
-      JOIN membership m2 ON m1.organization_id = m2.organization_id
-      WHERE m1.user_id = current_user_id()
+    deleted_at IS NULL
+    AND is_workspace_member(id)
+  );
+
+CREATE POLICY workspace_update ON workspace
+  FOR UPDATE TO authenticated
+  USING (
+    deleted_at IS NULL
+    AND EXISTS (
+      SELECT 1 FROM membership m
+      WHERE m.workspace_id = workspace.id
+        AND m.user_id = auth.uid()
+        AND m.accepted_at IS NOT NULL
+        AND m.role IN ('owner','admin')
+    )
+  )
+  WITH CHECK (
+    deleted_at IS NULL
+    AND EXISTS (
+      SELECT 1 FROM membership m
+      WHERE m.workspace_id = workspace.id
+        AND m.user_id = auth.uid()
+        AND m.accepted_at IS NOT NULL
+        AND m.role IN ('owner','admin')
     )
   );
 
--- Users edit only their own profile.
-CREATE POLICY profile_update_own ON user_profile
-  FOR UPDATE USING (id = current_user_id())
-  WITH CHECK  (id = current_user_id());
+-- Workspace creation is via handle_new_user trigger (personal) or a
+-- service-role endpoint (team). RLS blocks direct INSERT from clients.
 
--- INSERT: trigger-only (handle_new_user). No user-facing policy.
--- DELETE: service-role only (GDPR flow). No policy.
+-- DELETE is soft-delete via UPDATE deleted_at. No RLS DELETE policy.
 
 --------------------------------------------------------------------------------
--- 3. organization
+-- 3. user_profile
 --------------------------------------------------------------------------------
 
--- All members see their current org (live rows only).
-CREATE POLICY org_select ON organization
-  FOR SELECT USING (
-    id = current_org_id()
-    AND deleted_at IS NULL
+CREATE POLICY user_profile_select_self ON user_profile
+  FOR SELECT TO authenticated
+  USING (user_id = auth.uid());
+
+CREATE POLICY user_profile_select_coworker ON user_profile
+  FOR SELECT TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM membership m1
+      JOIN membership m2 ON m2.workspace_id = m1.workspace_id
+      WHERE m1.user_id = auth.uid()
+        AND m1.accepted_at IS NOT NULL
+        AND m2.user_id = user_profile.user_id
+        AND m2.accepted_at IS NOT NULL
+    )
   );
 
--- Owner/admin can update org settings.
-CREATE POLICY org_update ON organization
-  FOR UPDATE USING (
-    id = current_org_id()
-    AND current_user_role() IN ('owner', 'admin')
-  )
-  WITH CHECK (id = current_org_id());
-
--- Soft-delete restricted to owner via prevent_unauthorized_org_soft_delete trigger (§17).
-
--- INSERT: service-role only (org provisioning). No user-facing policy.
+CREATE POLICY user_profile_update_self ON user_profile
+  FOR UPDATE TO authenticated
+  USING (user_id = auth.uid())
+  WITH CHECK (user_id = auth.uid());
 
 --------------------------------------------------------------------------------
 -- 4. membership
 --------------------------------------------------------------------------------
 
--- Consolidated SELECT: user sees their OWN memberships across ALL orgs (org switcher),
--- and owner/admin sees all memberships in the current org (team management).
+-- Auth-admin read for the access-token hook to mint `current_workspace_id` claim.
+GRANT SELECT ON public.membership TO supabase_auth_admin;
+
+CREATE POLICY auth_admin_read_membership ON membership
+  FOR SELECT TO supabase_auth_admin
+  USING (true);
+
+-- Members of a workspace see all memberships in that workspace.
 CREATE POLICY membership_select ON membership
   FOR SELECT TO authenticated
-  USING (
-    user_id = current_user_id()
-    OR (organization_id = current_org_id() AND current_user_role() IN ('owner','admin'))
-  );
+  USING (is_workspace_member(workspace_id));
 
--- Owner/admin can invite (insert).
+-- Owners / admins can invite new members.
 CREATE POLICY membership_insert ON membership
-  FOR INSERT WITH CHECK (
-    organization_id = current_org_id()
-    AND current_user_role() IN ('owner', 'admin')
+  FOR INSERT TO authenticated
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM membership m
+      WHERE m.workspace_id = membership.workspace_id
+        AND m.user_id = auth.uid()
+        AND m.accepted_at IS NOT NULL
+        AND m.role IN ('owner','admin')
+    )
   );
 
--- Owner/admin can change roles.
+-- Users can update their own row (accept invite, leave, update preferences);
+-- owners/admins can update any membership in their workspace.
 CREATE POLICY membership_update ON membership
-  FOR UPDATE USING (
-    organization_id = current_org_id()
-    AND current_user_role() IN ('owner', 'admin')
+  FOR UPDATE TO authenticated
+  USING (
+    user_id = auth.uid()
+    OR EXISTS (
+      SELECT 1 FROM membership m
+      WHERE m.workspace_id = membership.workspace_id
+        AND m.user_id = auth.uid()
+        AND m.accepted_at IS NOT NULL
+        AND m.role IN ('owner','admin')
+    )
   )
-  WITH CHECK (organization_id = current_org_id());
+  WITH CHECK (
+    user_id = auth.uid()
+    OR EXISTS (
+      SELECT 1 FROM membership m
+      WHERE m.workspace_id = membership.workspace_id
+        AND m.user_id = auth.uid()
+        AND m.accepted_at IS NOT NULL
+        AND m.role IN ('owner','admin')
+    )
+  );
 
--- Owner/admin can remove members.
 CREATE POLICY membership_delete ON membership
-  FOR DELETE USING (
-    organization_id = current_org_id()
-    AND current_user_role() IN ('owner', 'admin')
+  FOR DELETE TO authenticated
+  USING (
+    user_id = auth.uid()   -- self-leave
+    OR EXISTS (
+      SELECT 1 FROM membership m
+      WHERE m.workspace_id = membership.workspace_id
+        AND m.user_id = auth.uid()
+        AND m.accepted_at IS NOT NULL
+        AND m.role IN ('owner','admin')
+    )
   );
 
 --------------------------------------------------------------------------------
@@ -171,490 +316,411 @@ CREATE POLICY membership_delete ON membership
 --------------------------------------------------------------------------------
 
 CREATE POLICY project_select ON project
-  FOR SELECT USING (
-    organization_id = current_org_id()
-    AND deleted_at IS NULL
+  FOR SELECT TO authenticated
+  USING (
+    deleted_at IS NULL
+    AND (
+      is_workspace_member(workspace_id)
+      OR EXISTS (
+        SELECT 1 FROM project_membership pm
+        WHERE pm.project_id = project.id
+          AND pm.user_id = auth.uid()
+      )
+    )
   );
 
 CREATE POLICY project_insert ON project
-  FOR INSERT WITH CHECK (
-    organization_id = current_org_id()
-    AND current_user_role() IN ('owner', 'admin', 'member')
+  FOR INSERT TO authenticated
+  WITH CHECK (
+    workspace_id = current_workspace_id()
+    AND current_workspace_role() IN ('owner','admin','member')
   );
 
 CREATE POLICY project_update ON project
-  FOR UPDATE USING (
-    organization_id = current_org_id()
-    AND current_user_role() IN ('owner', 'admin', 'member')
-  )
-  WITH CHECK (organization_id = current_org_id());
-
--- Soft-delete restricted to owner/admin via prevent_unauthorized_soft_delete trigger (§17).
-
---------------------------------------------------------------------------------
--- 6. contact
---------------------------------------------------------------------------------
-
-CREATE POLICY contact_select ON contact
-  FOR SELECT USING (
-    organization_id = current_org_id()
-    AND deleted_at IS NULL
-  );
-
-CREATE POLICY contact_insert ON contact
-  FOR INSERT WITH CHECK (
-    organization_id = current_org_id()
-    AND current_user_role() IN ('owner', 'admin', 'member')
-  );
-
-CREATE POLICY contact_update ON contact
-  FOR UPDATE USING (
-    organization_id = current_org_id()
-    AND current_user_role() IN ('owner', 'admin', 'member')
-  )
-  WITH CHECK (organization_id = current_org_id());
-
--- Soft-delete restricted to owner/admin via prevent_unauthorized_soft_delete trigger (§17).
-
---------------------------------------------------------------------------------
--- 7. contact_project
---------------------------------------------------------------------------------
-
-CREATE POLICY contact_project_select ON contact_project
-  FOR SELECT USING (
-    organization_id = current_org_id()
-    AND deleted_at IS NULL
-  );
-
-CREATE POLICY contact_project_insert ON contact_project
-  FOR INSERT WITH CHECK (
-    organization_id = current_org_id()
-    AND current_user_role() IN ('owner', 'admin', 'member')
-  );
-
-CREATE POLICY contact_project_update ON contact_project
-  FOR UPDATE USING (
-    organization_id = current_org_id()
-    AND current_user_role() IN ('owner', 'admin', 'member')
-  )
-  WITH CHECK (organization_id = current_org_id());
-
--- Soft-delete restricted to owner/admin via prevent_unauthorized_soft_delete trigger (§17).
-
---------------------------------------------------------------------------------
--- 8. event
---------------------------------------------------------------------------------
-
-CREATE POLICY event_select ON event
-  FOR SELECT USING (
-    organization_id = current_org_id()
-    AND deleted_at IS NULL
-  );
-
-CREATE POLICY event_insert ON event
-  FOR INSERT WITH CHECK (
-    organization_id = current_org_id()
-    AND current_user_role() IN ('owner', 'admin', 'member')
-  );
-
-CREATE POLICY event_update ON event
-  FOR UPDATE USING (
-    organization_id = current_org_id()
-    AND current_user_role() IN ('owner', 'admin', 'member')
-  )
-  WITH CHECK (organization_id = current_org_id());
-
--- Soft-delete restricted to owner/admin via prevent_unauthorized_soft_delete trigger (§17).
-
---------------------------------------------------------------------------------
--- 9. task
---------------------------------------------------------------------------------
-
-CREATE POLICY task_select ON task
-  FOR SELECT USING (
-    organization_id = current_org_id()
-    AND deleted_at IS NULL
-  );
-
-CREATE POLICY task_insert ON task
-  FOR INSERT WITH CHECK (
-    organization_id = current_org_id()
-    AND current_user_role() IN ('owner', 'admin', 'member')
-  );
-
--- Owner/admin: update any task. Member: only tasks assigned to them or unassigned.
-CREATE POLICY task_update ON task
-  FOR UPDATE USING (
-    organization_id = current_org_id()
-    AND (
-      current_user_role() IN ('owner', 'admin')
-      OR (current_user_role() = 'member' AND (assigned_to = current_user_id() OR assigned_to IS NULL))
-    )
-  )
-  WITH CHECK (organization_id = current_org_id());
-
--- task_delete policy removed — identical USING to task_update, redundant via OR.
-
---------------------------------------------------------------------------------
--- 10. file
---------------------------------------------------------------------------------
-
--- Column-level restrictions (member can only change status, not r2_key/filename)
--- enforced at app layer, not RLS.
-
-CREATE POLICY file_select ON file
-  FOR SELECT USING (
-    organization_id = current_org_id()
-    AND deleted_at IS NULL
-  );
-
-CREATE POLICY file_insert ON file
-  FOR INSERT WITH CHECK (
-    organization_id = current_org_id()
-    AND current_user_role() IN ('owner', 'admin', 'member')
-  );
-
-CREATE POLICY file_update ON file
-  FOR UPDATE USING (
-    organization_id = current_org_id()
-    AND current_user_role() IN ('owner', 'admin', 'member')
-  )
-  WITH CHECK (organization_id = current_org_id());
-
--- Soft-delete restricted to owner/admin via prevent_unauthorized_soft_delete trigger (§17).
-
---------------------------------------------------------------------------------
--- 11. note
---------------------------------------------------------------------------------
-
-CREATE POLICY note_select ON note
-  FOR SELECT USING (
-    organization_id = current_org_id()
-    AND deleted_at IS NULL
-  );
-
-CREATE POLICY note_insert ON note
-  FOR INSERT WITH CHECK (
-    organization_id = current_org_id()
-    AND current_user_role() IN ('owner', 'admin', 'member')
-  );
-
--- Consolidated UPDATE: author can always edit their own note;
--- owner/admin can soft-delete a live note. The non-author content-edit case is
--- blocked by the prevent_non_author_note_edit trigger (§17).
-CREATE POLICY note_update ON note
   FOR UPDATE TO authenticated
   USING (
-    organization_id = current_org_id()
-    AND (
-      author_id = current_user_id()
-      OR (deleted_at IS NULL AND current_user_role() IN ('owner','admin'))
+    deleted_at IS NULL
+    AND can_edit_project(id)
+  )
+  WITH CHECK (
+    can_edit_project(id)
+  );
+
+-- DELETE via soft-delete UPDATE; no hard-delete policy.
+
+--------------------------------------------------------------------------------
+-- 6. project_membership
+--------------------------------------------------------------------------------
+
+CREATE POLICY project_membership_select ON project_membership
+  FOR SELECT TO authenticated
+  USING (
+    user_id = auth.uid()
+    OR has_project_access(project_id, 'engagements')
+  );
+
+-- Project leads and workspace owners/admins manage project_membership.
+CREATE POLICY project_membership_write ON project_membership
+  FOR ALL TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM project p
+      JOIN membership m ON m.workspace_id = p.workspace_id
+      WHERE p.id = project_membership.project_id
+        AND m.user_id = auth.uid()
+        AND m.accepted_at IS NOT NULL
+        AND m.role IN ('owner','admin')
+    )
+    OR EXISTS (
+      SELECT 1 FROM project_membership pm
+      WHERE pm.project_id = project_membership.project_id
+        AND pm.user_id = auth.uid()
+        AND pm.role = 'lead'
     )
   )
-  WITH CHECK (organization_id = current_org_id());
-
---------------------------------------------------------------------------------
--- 12. rider
---------------------------------------------------------------------------------
-
-CREATE POLICY rider_select ON rider
-  FOR SELECT USING (
-    organization_id = current_org_id()
-    AND deleted_at IS NULL
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM project p
+      JOIN membership m ON m.workspace_id = p.workspace_id
+      WHERE p.id = project_membership.project_id
+        AND m.user_id = auth.uid()
+        AND m.accepted_at IS NOT NULL
+        AND m.role IN ('owner','admin')
+    )
+    OR EXISTS (
+      SELECT 1 FROM project_membership pm
+      WHERE pm.project_id = project_membership.project_id
+        AND pm.user_id = auth.uid()
+        AND pm.role = 'lead'
+    )
   );
 
-CREATE POLICY rider_insert ON rider
-  FOR INSERT WITH CHECK (
-    organization_id = current_org_id()
-    AND current_user_role() IN ('owner', 'admin', 'member')
+--------------------------------------------------------------------------------
+-- 7. date
+--------------------------------------------------------------------------------
+
+CREATE POLICY date_select ON date
+  FOR SELECT TO authenticated
+  USING (
+    deleted_at IS NULL
+    AND has_project_access(project_id, 'dates')
   );
 
-CREATE POLICY rider_update ON rider
-  FOR UPDATE USING (
-    organization_id = current_org_id()
-    AND current_user_role() IN ('owner', 'admin', 'member')
+CREATE POLICY date_insert ON date
+  FOR INSERT TO authenticated
+  WITH CHECK (
+    workspace_id = current_workspace_id()
+    AND can_edit_project(project_id)
+  );
+
+CREATE POLICY date_update ON date
+  FOR UPDATE TO authenticated
+  USING (
+    deleted_at IS NULL
+    AND can_edit_project(project_id)
   )
-  WITH CHECK (organization_id = current_org_id());
-
--- Soft-delete restricted to owner/admin via prevent_unauthorized_soft_delete trigger (§17).
-
---------------------------------------------------------------------------------
--- 13. crew_assignment
---------------------------------------------------------------------------------
-
-CREATE POLICY crew_select ON crew_assignment
-  FOR SELECT USING (
-    organization_id = current_org_id()
-    AND deleted_at IS NULL
+  WITH CHECK (
+    can_edit_project(project_id)
   );
 
-CREATE POLICY crew_insert ON crew_assignment
-  FOR INSERT WITH CHECK (
-    organization_id = current_org_id()
-    AND current_user_role() IN ('owner', 'admin', 'member')
+--------------------------------------------------------------------------------
+-- 8. person (global, non-tenant-scoped)
+--------------------------------------------------------------------------------
+
+-- Visibility: I can see a person if I'm engaged with them in any of my
+-- workspaces, or if I created the row.
+CREATE POLICY person_select ON person
+  FOR SELECT TO authenticated
+  USING (
+    deleted_at IS NULL
+    AND can_see_person(id)
   );
 
-CREATE POLICY crew_update ON crew_assignment
-  FOR UPDATE USING (
-    organization_id = current_org_id()
-    AND current_user_role() IN ('owner', 'admin', 'member')
+-- Any authenticated user can create a person row (with created_by = self).
+CREATE POLICY person_insert ON person
+  FOR INSERT TO authenticated
+  WITH CHECK (created_by = auth.uid());
+
+-- Anyone who can see a person can update them (dedup / enrich).
+-- Immutability of created_by enforced by guard trigger below.
+CREATE POLICY person_update ON person
+  FOR UPDATE TO authenticated
+  USING (deleted_at IS NULL AND can_see_person(id))
+  WITH CHECK (can_see_person(id));
+
+--------------------------------------------------------------------------------
+-- 9. engagement
+--------------------------------------------------------------------------------
+
+CREATE POLICY engagement_select ON engagement
+  FOR SELECT TO authenticated
+  USING (
+    deleted_at IS NULL
+    AND has_project_access(project_id, 'engagements')
+  );
+
+CREATE POLICY engagement_insert ON engagement
+  FOR INSERT TO authenticated
+  WITH CHECK (
+    workspace_id = current_workspace_id()
+    AND can_edit_project(project_id)
+    AND created_by = auth.uid()
+  );
+
+CREATE POLICY engagement_update ON engagement
+  FOR UPDATE TO authenticated
+  USING (
+    deleted_at IS NULL
+    AND can_edit_project(project_id)
   )
-  WITH CHECK (organization_id = current_org_id());
-
--- Soft-delete restricted to owner/admin via prevent_unauthorized_soft_delete trigger (§17).
+  WITH CHECK (
+    can_edit_project(project_id)
+  );
 
 --------------------------------------------------------------------------------
--- 14. tag
+-- 10. person_note (mine vs ours)
+--------------------------------------------------------------------------------
+
+-- SELECT rules:
+--   visibility = 'workspace' → any workspace member
+--   visibility = 'private'   → author only
+CREATE POLICY person_note_select ON person_note
+  FOR SELECT TO authenticated
+  USING (
+    deleted_at IS NULL
+    AND (
+      (visibility = 'workspace' AND is_workspace_member(workspace_id))
+      OR (visibility = 'private' AND author_id = auth.uid())
+    )
+  );
+
+CREATE POLICY person_note_insert ON person_note
+  FOR INSERT TO authenticated
+  WITH CHECK (
+    workspace_id = current_workspace_id()
+    AND is_workspace_member(workspace_id)
+    AND author_id = auth.uid()
+  );
+
+-- Only the author can update or soft-delete their own notes.
+CREATE POLICY person_note_update ON person_note
+  FOR UPDATE TO authenticated
+  USING (deleted_at IS NULL AND author_id = auth.uid())
+  WITH CHECK (author_id = auth.uid());
+
+--------------------------------------------------------------------------------
+-- 11. tag
 --------------------------------------------------------------------------------
 
 CREATE POLICY tag_select ON tag
-  FOR SELECT USING (organization_id = current_org_id());
+  FOR SELECT TO authenticated
+  USING (is_workspace_member(workspace_id));
 
-CREATE POLICY tag_insert ON tag
-  FOR INSERT WITH CHECK (
-    organization_id = current_org_id()
-    AND current_user_role() IN ('owner', 'admin', 'member')
-  );
-
-CREATE POLICY tag_update ON tag
-  FOR UPDATE USING (
-    organization_id = current_org_id()
-    AND current_user_role() IN ('owner', 'admin')
+CREATE POLICY tag_write ON tag
+  FOR ALL TO authenticated
+  USING (
+    is_workspace_member(workspace_id)
+    AND current_workspace_role() IN ('owner','admin','member')
   )
-  WITH CHECK (organization_id = current_org_id());
-
-CREATE POLICY tag_delete ON tag
-  FOR DELETE USING (
-    organization_id = current_org_id()
-    AND current_user_role() IN ('owner', 'admin')
+  WITH CHECK (
+    workspace_id = current_workspace_id()
+    AND current_workspace_role() IN ('owner','admin','member')
   );
 
 --------------------------------------------------------------------------------
--- 15. tagging
+-- 12. tagging
 --------------------------------------------------------------------------------
 
 CREATE POLICY tagging_select ON tagging
-  FOR SELECT USING (organization_id = current_org_id());
+  FOR SELECT TO authenticated
+  USING (is_workspace_member(workspace_id));
 
-CREATE POLICY tagging_insert ON tagging
-  FOR INSERT WITH CHECK (
-    organization_id = current_org_id()
-    AND current_user_role() IN ('owner', 'admin', 'member')
+CREATE POLICY tagging_write ON tagging
+  FOR ALL TO authenticated
+  USING (
+    is_workspace_member(workspace_id)
+    AND current_workspace_role() IN ('owner','admin','member')
+  )
+  WITH CHECK (
+    workspace_id = current_workspace_id()
+    AND current_workspace_role() IN ('owner','admin','member')
   );
 
--- No UPDATE policy — re-tag = delete + insert.
+--------------------------------------------------------------------------------
+-- 13. audit_log
+--------------------------------------------------------------------------------
 
-CREATE POLICY tagging_delete ON tagging
-  FOR DELETE USING (
-    organization_id = current_org_id()
-    AND current_user_role() IN ('owner', 'admin', 'member')
+-- Members can read their workspace's audit trail. Owners/admins see everything;
+-- others see only their own actions.
+CREATE POLICY audit_log_select_privileged ON audit_log
+  FOR SELECT TO authenticated
+  USING (
+    workspace_id IS NOT NULL
+    AND EXISTS (
+      SELECT 1 FROM membership m
+      WHERE m.workspace_id = audit_log.workspace_id
+        AND m.user_id = auth.uid()
+        AND m.accepted_at IS NOT NULL
+        AND m.role IN ('owner','admin')
+    )
   );
 
---------------------------------------------------------------------------------
--- 16. audit_log (immutable)
---------------------------------------------------------------------------------
+CREATE POLICY audit_log_select_self ON audit_log
+  FOR SELECT TO authenticated
+  USING (actor_id = auth.uid());
 
--- SELECT: owner/admin only.
-CREATE POLICY audit_select ON audit_log
-  FOR SELECT USING (
-    organization_id = current_org_id()
-    AND current_user_role() IN ('owner', 'admin')
-  );
-
--- No INSERT/UPDATE/DELETE policies for authenticated role.
--- Inserts happen exclusively via the SECURITY DEFINER trigger below.
+-- INSERT is via triggers only (SECURITY DEFINER). No policy means no direct client insert.
 
 --------------------------------------------------------------------------------
--- 17. Soft-delete guard triggers
---
--- RLS permissive policies are OR'd by Postgres, so a narrow _delete UPDATE
--- policy cannot restrict what a broader _update policy already permits.
--- These BEFORE UPDATE triggers are the actual enforcement layer.
+-- 14. Guard triggers — immutable columns
 --------------------------------------------------------------------------------
 
--- Guard for 7 standard tenant tables: only owner/admin can set deleted_at.
-CREATE OR REPLACE FUNCTION prevent_unauthorized_soft_delete()
+-- 14.1 prevent workspace_id from changing on tenant-scoped rows
+CREATE OR REPLACE FUNCTION guard_immutable_workspace_id()
 RETURNS TRIGGER AS $$
 BEGIN
-  IF OLD.deleted_at IS NULL
-     AND NEW.deleted_at IS NOT NULL
-     AND current_user_role() NOT IN ('owner', 'admin') THEN
-    RAISE EXCEPTION 'Only owner or admin can soft-delete % rows', TG_TABLE_NAME;
+  IF NEW.workspace_id IS DISTINCT FROM OLD.workspace_id THEN
+    RAISE EXCEPTION 'workspace_id is immutable on %', TG_TABLE_NAME
+      USING ERRCODE = '42501';
   END IF;
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql
 SET search_path = public, pg_temp;
 
-CREATE TRIGGER guard_soft_delete_project
-  BEFORE UPDATE ON project FOR EACH ROW EXECUTE FUNCTION prevent_unauthorized_soft_delete();
-CREATE TRIGGER guard_soft_delete_contact
-  BEFORE UPDATE ON contact FOR EACH ROW EXECUTE FUNCTION prevent_unauthorized_soft_delete();
-CREATE TRIGGER guard_soft_delete_contact_project
-  BEFORE UPDATE ON contact_project FOR EACH ROW EXECUTE FUNCTION prevent_unauthorized_soft_delete();
-CREATE TRIGGER guard_soft_delete_event
-  BEFORE UPDATE ON event FOR EACH ROW EXECUTE FUNCTION prevent_unauthorized_soft_delete();
-CREATE TRIGGER guard_soft_delete_file
-  BEFORE UPDATE ON file FOR EACH ROW EXECUTE FUNCTION prevent_unauthorized_soft_delete();
-CREATE TRIGGER guard_soft_delete_rider
-  BEFORE UPDATE ON rider FOR EACH ROW EXECUTE FUNCTION prevent_unauthorized_soft_delete();
-CREATE TRIGGER guard_soft_delete_crew_assignment
-  BEFORE UPDATE ON crew_assignment FOR EACH ROW EXECUTE FUNCTION prevent_unauthorized_soft_delete();
+CREATE TRIGGER project_guard_ws              BEFORE UPDATE ON project              FOR EACH ROW EXECUTE FUNCTION guard_immutable_workspace_id();
+CREATE TRIGGER date_guard_ws                 BEFORE UPDATE ON date                 FOR EACH ROW EXECUTE FUNCTION guard_immutable_workspace_id();
+CREATE TRIGGER engagement_guard_ws           BEFORE UPDATE ON engagement           FOR EACH ROW EXECUTE FUNCTION guard_immutable_workspace_id();
+CREATE TRIGGER person_note_guard_ws          BEFORE UPDATE ON person_note          FOR EACH ROW EXECUTE FUNCTION guard_immutable_workspace_id();
+CREATE TRIGGER tag_guard_ws                  BEFORE UPDATE ON tag                  FOR EACH ROW EXECUTE FUNCTION guard_immutable_workspace_id();
+CREATE TRIGGER tagging_guard_ws              BEFORE UPDATE ON tagging              FOR EACH ROW EXECUTE FUNCTION guard_immutable_workspace_id();
 
--- NOT attached to: task (member self-delete handled in task_update policy).
--- Note has its own guard: prevent_non_author_note_edit (below).
-
--- Guard for note: non-authors can only transition deleted_at (admin moderation).
--- Cannot rewrite another user's note content. Closes the permissive OR leak
--- between note_update (author-only) and note_delete (author + owner/admin).
-CREATE OR REPLACE FUNCTION prevent_non_author_note_edit()
+-- 14.2 prevent created_by / author_id from changing
+CREATE OR REPLACE FUNCTION guard_immutable_created_by()
 RETURNS TRIGGER AS $$
 BEGIN
-  IF NEW.author_id <> current_user_id()
-     AND (OLD.deleted_at IS NOT DISTINCT FROM NEW.deleted_at) THEN
-    RAISE EXCEPTION 'Only the author can edit note content. Non-authors may only soft-delete (requires owner/admin).';
+  IF NEW.created_by IS DISTINCT FROM OLD.created_by THEN
+    RAISE EXCEPTION 'created_by is immutable on %', TG_TABLE_NAME
+      USING ERRCODE = '42501';
   END IF;
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql
 SET search_path = public, pg_temp;
 
-CREATE TRIGGER prevent_non_author_note_edit
-  BEFORE UPDATE ON note
-  FOR EACH ROW EXECUTE FUNCTION prevent_non_author_note_edit();
+CREATE TRIGGER person_guard_creator     BEFORE UPDATE ON person     FOR EACH ROW EXECUTE FUNCTION guard_immutable_created_by();
+CREATE TRIGGER engagement_guard_creator BEFORE UPDATE ON engagement FOR EACH ROW EXECUTE FUNCTION guard_immutable_created_by();
 
--- Guard for organization: only owner can set deleted_at.
-CREATE OR REPLACE FUNCTION prevent_unauthorized_org_soft_delete()
+CREATE OR REPLACE FUNCTION guard_immutable_author()
 RETURNS TRIGGER AS $$
 BEGIN
-  IF OLD.deleted_at IS NULL
-     AND NEW.deleted_at IS NOT NULL
-     AND current_user_role() <> 'owner' THEN
-    RAISE EXCEPTION 'Only the organization owner can soft-delete the organization';
+  IF NEW.author_id IS DISTINCT FROM OLD.author_id THEN
+    RAISE EXCEPTION 'author_id is immutable on %', TG_TABLE_NAME
+      USING ERRCODE = '42501';
   END IF;
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql
 SET search_path = public, pg_temp;
 
-CREATE TRIGGER guard_soft_delete_organization
-  BEFORE UPDATE ON organization FOR EACH ROW EXECUTE FUNCTION prevent_unauthorized_org_soft_delete();
+CREATE TRIGGER person_note_guard_author BEFORE UPDATE ON person_note FOR EACH ROW EXECUTE FUNCTION guard_immutable_author();
 
 --------------------------------------------------------------------------------
--- 18. Audit trigger function + triggers
---
--- Phase 0 audit scope (deliberately narrow):
---   organization  — all ops
---   membership    — all ops
---   project       — status changes only
---   contact_project — status changes only
---   any tenant table — soft-delete transitions (deleted_at IS NOT NULL)
---
--- Explicitly NOT audited (high-volume, low-value in Phase 0):
---   task, note, tagging, file
+-- 15. Audit log triggers
 --------------------------------------------------------------------------------
 
-CREATE OR REPLACE FUNCTION write_audit_log()
+CREATE OR REPLACE FUNCTION write_audit()
 RETURNS TRIGGER AS $$
 DECLARE
-  v_action TEXT;
-  v_entity_type TEXT;
-  v_entity_id UUID;
-  v_before JSONB := NULL;
-  v_after  JSONB := NULL;
-  v_org_id UUID;
-  should_log BOOLEAN := FALSE;
+  v_ws uuid;
+  v_changes jsonb;
 BEGIN
-  v_entity_type := TG_TABLE_NAME;
-
-  -- organization's own id IS its organization_id
-  IF TG_TABLE_NAME = 'organization' THEN
-    v_org_id := CASE WHEN TG_OP = 'DELETE' THEN OLD.id ELSE NEW.id END;
-  ELSE
-    v_org_id := CASE WHEN TG_OP = 'DELETE' THEN OLD.organization_id ELSE NEW.organization_id END;
-  END IF;
+  -- workspace_id: try NEW then OLD, defaulting to current_workspace_id() for person rows
+  BEGIN
+    v_ws := COALESCE(
+      CASE WHEN TG_OP IN ('INSERT','UPDATE') THEN (to_jsonb(NEW) ->> 'workspace_id')::uuid END,
+      CASE WHEN TG_OP IN ('DELETE','UPDATE') THEN (to_jsonb(OLD) ->> 'workspace_id')::uuid END,
+      current_workspace_id()
+    );
+  EXCEPTION WHEN OTHERS THEN
+    v_ws := current_workspace_id();
+  END;
 
   IF TG_OP = 'INSERT' THEN
-    v_action    := 'insert';
-    v_entity_id := NEW.id;
-    v_after     := to_jsonb(NEW);
-    -- Log all inserts on audited tables.
-    should_log  := TRUE;
-
+    v_changes := to_jsonb(NEW);
   ELSIF TG_OP = 'UPDATE' THEN
-    v_action    := 'update';
-    v_entity_id := NEW.id;
-    v_before    := to_jsonb(OLD);
-    v_after     := to_jsonb(NEW);
-
-    -- Soft-delete transition: always log.
-    IF OLD.deleted_at IS NULL AND NEW.deleted_at IS NOT NULL THEN
-      v_action   := 'soft_delete';
-      should_log := TRUE;
-    -- Status change on project or contact_project: log.
-    ELSIF v_entity_type IN ('project', 'contact_project')
-      AND OLD.status IS DISTINCT FROM NEW.status THEN
-      should_log := TRUE;
-    -- All other updates on organization/membership: log.
-    ELSIF v_entity_type IN ('organization', 'membership') THEN
-      should_log := TRUE;
-    END IF;
-
+    v_changes := jsonb_build_object('before', to_jsonb(OLD), 'after', to_jsonb(NEW));
   ELSIF TG_OP = 'DELETE' THEN
-    -- Hard delete (service-role GDPR purge): log.
-    v_action    := 'hard_delete';
-    v_entity_id := OLD.id;
-    v_before    := to_jsonb(OLD);
-    should_log  := TRUE;
+    v_changes := to_jsonb(OLD);
   END IF;
 
-  IF should_log THEN
-    INSERT INTO audit_log (organization_id, actor_id, action, entity_type, entity_id, before, after)
-    VALUES (v_org_id, auth.uid(), v_action, v_entity_type, v_entity_id, v_before, v_after);
-  END IF;
+  INSERT INTO audit_log (workspace_id, actor_id, entity_type, entity_id, action, changes)
+  VALUES (
+    v_ws,
+    auth.uid(),
+    TG_TABLE_NAME,
+    COALESCE((to_jsonb(NEW) ->> 'id')::uuid, (to_jsonb(OLD) ->> 'id')::uuid),
+    lower(TG_OP),
+    v_changes
+  );
 
-  IF TG_OP = 'DELETE' THEN
-    RETURN OLD;
-  END IF;
-  RETURN NEW;
+  RETURN COALESCE(NEW, OLD);
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER
-SET search_path = public, extensions, pg_temp;
+SET search_path = public, pg_temp;
 
--- Attach audit triggers to scoped tables.
+CREATE TRIGGER workspace_audit          AFTER INSERT OR UPDATE OR DELETE ON workspace          FOR EACH ROW EXECUTE FUNCTION write_audit();
+CREATE TRIGGER project_audit            AFTER INSERT OR UPDATE OR DELETE ON project            FOR EACH ROW EXECUTE FUNCTION write_audit();
+CREATE TRIGGER project_membership_audit AFTER INSERT OR UPDATE OR DELETE ON project_membership FOR EACH ROW EXECUTE FUNCTION write_audit();
+CREATE TRIGGER date_audit               AFTER INSERT OR UPDATE OR DELETE ON date               FOR EACH ROW EXECUTE FUNCTION write_audit();
+CREATE TRIGGER engagement_audit         AFTER INSERT OR UPDATE OR DELETE ON engagement         FOR EACH ROW EXECUTE FUNCTION write_audit();
+CREATE TRIGGER person_audit             AFTER INSERT OR UPDATE OR DELETE ON person             FOR EACH ROW EXECUTE FUNCTION write_audit();
+CREATE TRIGGER person_note_audit        AFTER INSERT OR UPDATE OR DELETE ON person_note        FOR EACH ROW EXECUTE FUNCTION write_audit();
+CREATE TRIGGER membership_audit         AFTER INSERT OR UPDATE OR DELETE ON membership         FOR EACH ROW EXECUTE FUNCTION write_audit();
 
-CREATE TRIGGER audit_organization
-  AFTER INSERT OR UPDATE OR DELETE ON organization
-  FOR EACH ROW EXECUTE FUNCTION write_audit_log();
+--------------------------------------------------------------------------------
+-- 16. Custom access token hook (keeps JWT claim in sync with the rename)
+--------------------------------------------------------------------------------
 
-CREATE TRIGGER audit_membership
-  AFTER INSERT OR UPDATE OR DELETE ON membership
-  FOR EACH ROW EXECUTE FUNCTION write_audit_log();
+-- The hook injects `current_workspace_id` into the JWT at mint time.
+-- Supersedes the earlier `current_org_id` claim. See _build/auth-hooks.sql
+-- for the full function + grants; included here inline for completeness.
+CREATE OR REPLACE FUNCTION public.custom_access_token_hook(event jsonb)
+RETURNS jsonb
+LANGUAGE plpgsql
+STABLE SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_user_id uuid;
+  v_ws_id   uuid;
+  v_claims  jsonb;
+BEGIN
+  v_user_id := (event ->> 'user_id')::uuid;
+  v_claims  := COALESCE(event -> 'claims', '{}'::jsonb);
 
-CREATE TRIGGER audit_project
-  AFTER UPDATE OR DELETE ON project
-  FOR EACH ROW EXECUTE FUNCTION write_audit_log();
+  -- Pick the user's oldest accepted membership as the active workspace.
+  SELECT workspace_id INTO v_ws_id
+  FROM public.membership
+  WHERE user_id = v_user_id
+    AND accepted_at IS NOT NULL
+  ORDER BY accepted_at ASC
+  LIMIT 1;
 
-CREATE TRIGGER audit_contact_project
-  AFTER UPDATE OR DELETE ON contact_project
-  FOR EACH ROW EXECUTE FUNCTION write_audit_log();
+  IF v_ws_id IS NOT NULL THEN
+    v_claims := v_claims || jsonb_build_object('current_workspace_id', v_ws_id);
+  END IF;
 
--- Soft-delete + hard-delete audit on remaining tenant tables.
--- The trigger function's should_log logic filters to only soft-delete transitions
--- and hard deletes, skipping regular updates on these tables.
+  RETURN jsonb_set(event, '{claims}', v_claims);
+END;
+$$;
 
-CREATE TRIGGER audit_contact
-  AFTER UPDATE OR DELETE ON contact
-  FOR EACH ROW EXECUTE FUNCTION write_audit_log();
+REVOKE ALL ON FUNCTION public.custom_access_token_hook(jsonb) FROM PUBLIC, anon, authenticated;
+GRANT  EXECUTE ON FUNCTION public.custom_access_token_hook(jsonb) TO supabase_auth_admin;
 
-CREATE TRIGGER audit_event
-  AFTER UPDATE OR DELETE ON event
-  FOR EACH ROW EXECUTE FUNCTION write_audit_log();
+COMMENT ON FUNCTION public.custom_access_token_hook(jsonb) IS
+  'Supabase Custom Access Token Hook. Injects current_workspace_id claim. Enable in Dashboard → Authentication → Hooks.';
 
-CREATE TRIGGER audit_rider
-  AFTER UPDATE OR DELETE ON rider
-  FOR EACH ROW EXECUTE FUNCTION write_audit_log();
-
-CREATE TRIGGER audit_crew_assignment
-  AFTER UPDATE OR DELETE ON crew_assignment
-  FOR EACH ROW EXECUTE FUNCTION write_audit_log();
+--------------------------------------------------------------------------------
+-- End of rls-policies.sql
+--------------------------------------------------------------------------------

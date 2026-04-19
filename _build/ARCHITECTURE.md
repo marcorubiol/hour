@@ -4,12 +4,13 @@
 > Subdomain: `hour.zerosense.studio`
 > Status: Phase 0 — internal tool for MaMeMi, multi-tenant schema from day one so Phase 1 (SaaS) is config, not rewrite.
 > Owner: Marco Rubiol
+> Data model: polymorphic core (workspace + project + engagement), anti-CRM vocabulary. Rewritten 2026-04-19 — see DECISIONS.md `Polymorphic core`.
 
 ---
 
 ## 1. Purpose
 
-**Phase 0 (6 months).** Ship an internal tool Marco and Anouk use every day to run MaMeMi: Difusión (booking CRM), gigs & tours, crew & tech riders, contacts, tasks. Single organization (`mamemi`), ≤5 users.
+**Phase 0 (6 months).** Ship an internal tool Marco (and eventually Anouk) uses every day to run MaMeMi: Difusión (booking outreach), gigs & tours, crew & tech riders, contacts. Single workspace (`marco-rubiol`, `kind=personal`) with one project (`mamemi`, `type=show`), ≤5 users.
 
 **Phase 1 (decision point at month 6).** If daily usage is real and 3+ external people have asked for the beta, flip the multi-tenant switches and onboard the first 10 orgs. If not, Hour stays private and we lost nothing — we needed this tool anyway.
 
@@ -53,82 +54,102 @@ Each env has its own Supabase project, its own Cloudflare Pages build, its own s
 ## 4. Multi-tenancy model
 
 ### Core rule
-Every tenant-scoped row carries `organization_id UUID NOT NULL`. RLS policies enforce isolation at the database level — **never** trust application code for tenant isolation.
+Every tenant-scoped row carries `workspace_id UUID NOT NULL`. RLS policies enforce isolation at the database level — **never** trust application code for tenant isolation. The tenant is called a **workspace** (not "organization") because it holds both personal setups (`kind='personal'`) and team setups (`kind='team'`) — this matches the multi-hat freelance reality.
 
 ### Entities scope
-- **Tenant-scoped**: organization, membership, project, contact (private), event, task, file, note, rider, crew_assignment. All have `organization_id`.
-- **Global**: user (mirrors `auth.users`), public_entity (shared registry — venues, festivals, promoters publicly known), tag_catalog.
-- **Cross-tenant by invitation**: collaboration_invite (user A invites user B from org Y to project in org X).
+- **Workspace-scoped**: workspace, membership, project, project_membership, date, engagement, person_note, tag, tagging, audit_log. All carry `workspace_id` directly or via their parent.
+- **Global (not workspace-scoped)**: `person` is a shared registry. Anyone in any workspace may reference the same person (e.g. a programmer seen by two booking managers). Privacy comes from `person_note.visibility` (`workspace` vs `private`) and from the workspace-scoped `engagement` row, not from the person row itself.
+- **User-scoped**: `user_profile` (mirrors `auth.users`).
+- **Cross-workspace** relationships are explicit: a user gains access to another workspace via a `membership` row; project-level scoping lives in `project_membership`.
+
+### Polymorphic project
+`project.type` discriminates the kind of work: `show | release | creation_cycle | festival_edition`. Columns are generic (name, description, dates, custom_fields JSONB) so adding a new type is schema-free. Queries filter by `type` when needed.
+
+`engagement` and `date` are the universal children: every engagement points at a project regardless of type; every date (performance, rehearsal, residency…) also points at a project. "Difusión 2026-27" is therefore not a row anywhere — it's a filtered view over `mamemi`'s engagements and pending dates via `season` (a text column on `date`, and `custom_fields->>season` on `engagement`).
 
 ### RLS pattern (standard)
 ```sql
--- Template policy for any tenant-scoped table
-CREATE POLICY tenant_isolation ON <table>
-  USING (organization_id = (auth.jwt() ->> 'current_org_id')::uuid)
-  WITH CHECK (organization_id = (auth.jwt() ->> 'current_org_id')::uuid);
+-- Template policy for any workspace-scoped table (workspace_id is the tenant key)
+CREATE POLICY <name>_ws_read ON <table>
+  FOR SELECT TO authenticated
+  USING (workspace_id = public.current_workspace_id());
+
+CREATE POLICY <name>_ws_write ON <table>
+  FOR ALL TO authenticated
+  USING (workspace_id = public.current_workspace_id()
+         AND public.current_workspace_role() IN ('owner','admin','member'))
+  WITH CHECK (workspace_id = public.current_workspace_id());
 ```
 
-`current_org_id` is set in the JWT when the user picks an org from the switcher. Changing org → re-issue JWT via Supabase session refresh.
+`public.current_workspace_id()` reads the `current_workspace_id` claim from `auth.jwt()`. The claim is injected by `public.custom_access_token_hook(event jsonb)`, which Supabase invokes at sign-in and on each session refresh — it picks the user's first accepted `membership` row. Workspace switching = re-issue the session (Supabase `auth.refreshSession()` with a new active workspace stored in user metadata, then replay the hook).
 
-Role-based refinements (admin vs member vs viewer) are extra policies that check `memberships.role`.
+Role-based refinements (owner / admin / member / viewer / guest) live in extra policies keyed off `public.current_workspace_role()`. Project-level scoping goes through `project_membership.scope TEXT[]` (`dispatch`, `dates`, `riders`, …) with a `has_project_access(project_id, scope)` helper. `person_note.visibility='private'` is readable only by `author_id = auth.uid()`.
 
 ---
 
 ## 5. Identifiers
 
-- **Primary keys**: UUID v7 (time-ordered → good B-tree locality, safe to expose, no hot spots). Generated via `gen_random_uuid()` wrapped for v7 format, or `pg_uuidv7` extension when GA.
-- **User-facing slugs**: `organization.slug`, `project.slug` (auto-generated, editable, unique within parent scope).
+- **Primary keys**: UUID v7 (time-ordered → good B-tree locality, safe to expose, no hot spots). Generated via `public.uuid_generate_v7()` (PL/pgSQL over `pgcrypto::gen_random_bytes`, see `schema.sql` §0). Swap for the `pg_uuidv7` extension or PG18's native `uuidv7()` when available — values are shape-identical.
+- **User-facing slugs**: `workspace.slug` (unique globally), `project.slug` (unique within workspace). Auto-generated from name, editable.
 - **No sequential integer IDs on tenant data** — information leak + tenant-enumeration vector.
 
 ---
 
 ## 6. Phase 0 entity map (summary)
 
-Full schema in `schema.sql`. High-level:
+Full schema in `schema.sql`. Twelve tables, grouped:
 
-- `organization` — tenant root
-- `user` — synced from `auth.users` via trigger
-- `membership` — (user, organization, role)
-- `persona` — view derived from (membership.role + organization.type). No table.
-- `project` — belongs to org; in MaMeMi terms ≈ a show / tour / season
-- `contact` — 3-tier strategy:
-  1. private (org-level, not shared)
-  2. project-tagged (org-level, linked to projects)
-  3. public_entity link (reference to shared registry — opt-in, Phase 1 feature)
-- `event` — gig, rehearsal, meeting, travel. Mirrors Google Calendar (sync both ways later)
-- `task` — with `section` enum (dispatch | queue | ping | deferred | shelf | trace)
-- `file` — metadata row; actual bytes in R2. Stores R2 key, size, mime, uploaded_by
-- `note` — free-form markdown per entity (project, contact, event)
-- `rider` — tech rider document (text + attached files)
+**Tenant + identity**
+- `workspace` — tenant root. Columns: `slug`, `name`, `kind ∈ {personal,team}`, `country`, `timezone`, `settings jsonb`, `custom_fields jsonb`. Pre-seeded: `marco-rubiol` (Marco's personal workspace).
+- `user_profile` — mirrors `auth.users` via `handle_new_user` trigger; owner name, locale, avatar.
+- `membership` — (user_id, workspace_id, role ∈ {owner,admin,member,viewer,guest}, accepted_at).
+
+**Work (polymorphic)**
+- `project` — belongs to workspace; `type ∈ {show,release,creation_cycle,festival_edition}`, `status ∈ {draft,active,archived}`, generic `description`, `starts_on`, `ends_on`, `poster_url`, `custom_fields jsonb`. MaMeMi is `type=show`.
+- `project_membership` — per-user access below workspace level, with a `scope text[]` array (e.g. `{dispatch,dates,riders}`) and `role ∈ {lead,collaborator,viewer}`. Phase 0 unused; ready for Phase 1 collaborator invitations.
+- `date` — universal child of `project`: performance, rehearsal, residency, travel day, press, other. Fields: `starts_at`, `ends_at`, `kind`, `status`, `city`, `country`, `venue_name`, `season text`, `custom_fields jsonb`. Difusión's "pending dates" are `project=mamemi + status∈{tentative,held} + season='2026-27'`.
+
+**People (anti-CRM, 3-layer)**
+- `person` — **global** (no `workspace_id`). Columns: `full_name` (required), `first_name`, `last_name`, `email citext`, `phone`, `organization_name`, `city`, `country`, `title`, `website`, `languages text[]`, `custom_fields jsonb`. Anyone, any workspace, same row.
+- `engagement` — workspace-scoped (person_id, project_id, workspace_id). Captures the relationship in one place: `status ∈ {idea, proposed, discussing, held, confirmed, cancelled, declined, performed, dormant}`, `role` (free text), `date_id` (optional link to a specific date), `first_contacted_at`, `last_contacted_at`, `next_action_at`, `next_action_note`, `custom_fields jsonb` (holds `season`, anything else). Replaces the old `contact_project`; vocabulary is explicitly anti-CRM — no "prospect", "lead", "pipeline", "conversion", "deal", "campaign".
+- `person_note` — free-form notes on a person, workspace-scoped. `visibility ∈ {workspace,private}`; `private` is readable only by `author_id`.
+
+**Tagging + audit**
+- `tag` — workspace-scoped label catalogue (name, color).
+- `tagging` — polymorphic edge. `(entity_type ∈ {person,project,date,engagement}, entity_id, tag_id, workspace_id)`.
+- `audit_log` — append-only. Triggers on `person`, `engagement`, `project`, `date`, `person_note`, `workspace`, `membership`, `project_membership`.
+
+### What moved where (post-reset map)
+| Old entity                  | New home                                                         |
+|----------------------------|------------------------------------------------------------------|
+| `organization`              | `workspace`                                                      |
+| `contact`                   | `person` (global) + `engagement` (workspace-scoped relationship) |
+| `event`                     | `date` (any project type; `kind` enum covers the variants)       |
+| `contact_project`           | `engagement` (+ anti-CRM status enum)                            |
+| `project` (generic)         | `project` with `type` discriminator                              |
+| "difusion-2026-27" (proj.) | A filtered view over `mamemi` engagements/dates, keyed by season |
 
 ### Contacts — Difusión migration
-The 168 existing leads from MaMeMi's current markdown CRM import as `contact` rows in the MaMeMi org, tier "project-tagged" (linked to the MaMeMi project). Migration plan in `import-plan.md`.
+The 156 programmers/festivals from MaMeMi's current markdown CRM + dossier PDF import as `person` rows (global) linked to the `mamemi` project via `engagement` rows with `status='proposed'` and `custom_fields.season='2026-27'`. Source tags preserved via `tagging` (`src:mostra-igualada-2026`, `procedencia:*`, `tipologia:*`). Migration plan + pipeline in `import/` (3-stage normalize→enrich→load). DIY bands are deferred out of Phase 0.
 
 ---
 
-## 7. Tasks — mirror of .zerø taxonomy
+## 7. Tasks — deferred
 
-Tasks in Hour use the same sections Marco already uses in `.zerø`:
+The polymorphic reset dropped the old `task` table. Phase 0 runs without it: the booking-outreach workflow lives in `engagement.next_action_at` + `next_action_note`, and ad-hoc todos live in Marco's `.zerø` TASKS.md.
 
-```
-dispatch → queue → ping → deferred → shelf → trace
-```
-
-Plus date markers (`@on`, `@from`, `@due`) and routines (area-level only, Phase 1).
-
-**Reasoning**: Marco's brain is already wired to this vocabulary. Forcing "todo / doing / done" would be friction.
-
-Tasks live per project AND per organization (org-level catch-all, not every task belongs to a named project).
+When tasks come back (early Phase 1, first external user), the taxonomy stays the same — `dispatch → queue → ping → deferred → shelf → trace` — but the table will be polymorphic by `entity_type` (attach to a project, date, engagement, or sit free at workspace level).
 
 ---
 
 ## 8. Auth & sessions
 
-- **Auth provider**: Supabase Auth
+- **Auth provider**: Supabase Auth.
 - **Phase 0 flow**: email+password as primary method, optional TOTP 2FA (user-enrolled). No OAuth yet. Superseded magic-link-only on 2026-04-19 — see ADR `Auth flow: email+password with optional TOTP 2FA` in DECISIONS.md.
 - **Phase 1 additions**: Google OAuth (for calendar sync), Apple Sign-in (iOS app future).
 - **Session**: JWT, 1h expiry, refresh token 7d. Stored in httpOnly cookie.
-- **Org switching**: user picks active org → Supabase client re-issues session with `current_org_id` claim → RLS picks it up automatically.
+- **Access-token hook**: `public.custom_access_token_hook(event jsonb)` runs at sign-in and on refresh. It looks up the user's first accepted `membership` row, resolves the `workspace_id`, and injects `current_workspace_id` into the JWT claims. `supabase_auth_admin` has `SELECT` on `membership` so the hook can read it. **Manual step**: enable the hook in Supabase dashboard → Authentication → Hooks. Without it, `current_workspace_id()` returns NULL and every RLS policy denies the request.
+- **Workspace switching**: user picks active workspace → app calls `supabase.auth.refreshSession()` after writing the choice into `user_profile` / user metadata → the hook replays and re-issues a JWT with the new `current_workspace_id`. No app-level tenant resolution.
 
 ---
 
@@ -162,8 +183,11 @@ Explicit non-goals — decided now to protect scope:
 
 | Decision | Choice | Why |
 |----------|--------|-----|
-| Tenant key | `organization_id` in JWT claim | Works with Supabase RLS natively, no app-layer tenant resolution |
-| PK type | UUID v7 | Time-ordered, index-friendly, safe to expose, no enumeration risk |
+| Tenant key | `workspace_id` + `current_workspace_id` JWT claim (injected by `custom_access_token_hook`) | Works with Supabase RLS natively, no app-layer tenant resolution. Renamed from `organization_id` to reflect `kind=personal|team`. |
+| Polymorphic core | `workspace + project(type) + engagement` | One schema covers shows, releases, creation cycles, festival editions without per-kind tables. Narrative concerns (like Difusión) become filters, not entities. |
+| Anti-CRM vocabulary | `person`, `engagement`, `proposed`, `next_action_at` | Fits the working reality of a freelance/collective booking manager; rejects funnel/lead/conversion/campaign language. |
+| Person is global | No `workspace_id` on `person` | Real programmers exist once and are seen by many workspaces; privacy lives in `person_note.visibility` and `engagement`, not the person row. |
+| PK type | UUID v7 via PL/pgSQL | Time-ordered, index-friendly, safe to expose, no enumeration risk. `pg_uuidv7` not on Supabase Cloud whitelist. |
 | Media storage | R2 (not Supabase Storage) | Zero egress cost — Supabase Storage egress is the silent killer |
 | Queue | pgmq | Zero new infra. 10k jobs/day ceiling is fine for Phase 0-1. |
 | Frontend | Astro + islands | Static-first is correct when most pages are list/detail views |
@@ -251,29 +275,32 @@ is not.**
 
 | Route | Method | Purpose |
 |-------|--------|---------|
-| `/api/prospects` | GET | contact_project rows joined to contact + tags, filtered by project_slug/status. First end-to-end smoke endpoint. |
+| `/api/engagements` | GET | `engagement` rows with embedded `person` and `project`, filtered by `project_slug` (default `mamemi`), `status` (default `proposed`), `season` (default `2026-27`). Thin PostgREST wrapper; RLS scopes by `current_workspace_id`. Replaces the earlier `/api/prospects`. |
 
 Shared helpers:
 - `src/lib/auth.ts` — JWT extraction from `Authorization` header.
-- `src/lib/supabase.ts` — thin PostgREST client over `fetch`.
+- `src/lib/supabase.ts` — thin PostgREST client over `fetch` (`pgGet`, `pgPostRpc`, `PostgrestError`).
+- `src/lib/db-types.ts` — generated types + convenience aliases `Row<T>`, `Insert<T>`, `Update<T>`, `Enum<T>`, `RpcArgs<T>`, `RpcReturn<T>`. Regenerate with `supabase gen types typescript --project-id lqlyorlccnniybezugme` or the Supabase MCP `generate_typescript_types`.
 
 Convention: every route sets `export const prerender = false`, returns
 `{ error, detail?, hint? }` on failure, and never logs the JWT or body.
 
 Full details + testing recipe: `apps/web/src/pages/api/README.md`.
 
-Open dependency: `current_org_id` JWT claim needs a custom access-token hook
-in Supabase Auth (reads `membership` row at sign-in, injects the claim).
-Until wired, RLS returns zero rows for authenticated users.
+Open dependency: the `current_workspace_id` JWT claim needs the
+`custom_access_token_hook` enabled in Supabase dashboard → Authentication →
+Hooks (function already exists, only the toggle is manual). Until wired, RLS
+returns zero rows for authenticated users.
 
 ---
 
-## 18. Next files in `_build/`
+## 18. Files in `_build/`
 
-- `schema.sql` — full Postgres schema with constraints, indexes, triggers
-- `rls-policies.sql` — RLS policies for every tenant-scoped table
-- `bootstrap.md` — step-by-step: create Supabase project, create Cloudflare Pages project, configure DNS, first deploy, first user
-- `import-plan.md` — 168 leads markdown → `contact` rows mapping
+- `schema.sql` — full Postgres schema (12 tables, polymorphic core)
+- `rls-policies.sql` — RLS helpers + policies + guard/audit triggers + `custom_access_token_hook`
+- `seed.sql` — pre-seed (marco-rubiol workspace + mamemi project) + post-signup CLAIM block
+- `bootstrap.md` — step-by-step: create Supabase project, configure Auth, create CF Worker, configure DNS, first deploy, first user
+- `import-plan.md` — 156 programmers markdown → `person` + `engagement` rows mapping (+ the 3-stage pipeline in `import/`)
 - `adr/` — Architecture Decision Records for anything non-obvious we decide later
 
 ---

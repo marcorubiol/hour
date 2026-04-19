@@ -1,8 +1,8 @@
 # Import Plan — Phase 0 seed data
 
-> Status: **draft** · Author: Marco + .zerø · Date: 2026-04-19
-> Scope: bootstrap MaMeMi's `contact` + `contact_project` tables from the existing Mostra Igualada 2026 export dataset.
-> Related ADR: `DECISIONS.md` → "Activate `custom_fields jsonb` on tenant tables" (to be written, driven by this plan).
+> Status: **implemented** (pipeline lives in `_build/import/`) · Author: Marco + .zerø · Date: 2026-04-19
+> Scope: bootstrap MaMeMi's `person` + `engagement` rows from the Mostra Igualada 2026 export dataset (+ dossier PDF enrichment).
+> Related ADRs: `DECISIONS.md` → "Activate `custom_fields jsonb` on tenant tables" (accepted) and "Polymorphic core: workspace + project + engagement" (2026-04-19, firm). The 2026-04-19 polymorphic reset renamed the target tables (`contact → person`, `contact_project → engagement`) and moved engagements from per-tenant `organization_id` to per-`workspace_id`; sections below reflect the new schema.
 
 ---
 
@@ -53,7 +53,7 @@ Quirks observed:
 - `INTERÈS ARTÍSTIC:` — one-sentence interest descriptor (★ unique to this source)
 - `DESCRIPCIÓ:` — free-form paragraph about the festival/venue (★ unique)
 
-These 30 profiles do **not add new contacts** — they enrich ~23 international + ~7 estatal records already present in the CSV set. Match is by `Entitat` ≈ PDF `ENTITAT`, with a manual fallback list for ambiguous cases.
+These 30 profiles mostly enrich ~23 international + ~7 estatal records already present in the CSV set. Match is by `Entitat` ≈ PDF `ENTITAT`, with a manual fallback list for ambiguous cases. Dossier-only profiles (no CSV match) are appended as net-new `person` rows — Stage 2 reports both unmatched directions so Marco can audit.
 
 ### 2.3 Out of scope for this batch
 
@@ -61,56 +61,84 @@ These 30 profiles do **not add new contacts** — they enrich ~23 international 
 - `Tipologia = Distribuïdor` (17) — defer; import later with a different `role_label` when we wire that pipeline.
 - `Tipologia = Altres` (30) — defer; requires manual triage.
 
-**First batch target**: `Tipologia ∈ { Programador, Fira/Festival }` → **151 contacts**.
+**First batch target**: `Tipologia ∈ { Programador, Fira/Festival }` → **151 records** from the CSV. After PDF enrichment adds dossier-only profiles not present in the CSV, the loader lands **156 `person` rows** (see §7).
 
 ---
 
 ## 3. Target schema mapping
 
-### 3.1 `organization`
+> Reflects the polymorphic schema (workspace + project + person + engagement) as of the 2026-04-19 reset. No more `organization`, `contact`, or `contact_project`.
 
-One row only, written during bootstrap (not by this pipeline):
+### 3.1 `workspace`
+
+One row, written by either `_build/seed.sql` (CLAIM block, after Marco signs up) or by the loader on first run if absent. The `handle_new_user` trigger also creates a personal workspace automatically on signup — the CLAIM block renames it so the slug settles on `marco-rubiol`:
 
 ```
-name = 'MaMeMi', slug = 'mamemi', type = 'collective', default_locale = 'es'
+name = 'Marco Rubiol', slug = 'marco-rubiol', kind = 'personal'
 ```
 
-### 3.2 `contact`  (per record)
+### 3.2 `project`
+
+One row, upserted by Stage 3 (idempotent on `(workspace_id, slug)`):
+
+```
+workspace_id = <marco-rubiol>, slug = 'mamemi', name = 'MaMeMi',
+type = 'show', status = 'active'
+```
+
+Difusión-2026-27 is **not** a project — it's a filtered view over `engagement` rows where `project.slug = 'mamemi'` and `custom_fields->>'season' = '2026-27'` (see ADR *Polymorphic core* in `DECISIONS.md`).
+
+### 3.3 `person`  (per record — global, workspace-less)
+
+`person` lives outside any workspace: the same human can be reused across tenants. Privacy is enforced via `person_note.visibility` (workspace|private) and via RLS (you can see a person only if you share an engagement or note with them).
 
 | Source column | Target column | Notes |
 |---|---|---|
-| `Entitat o companyia` | `company` | Always populated. |
-| `Entitat o companyia` | `name` | Temporary — overwritten in Enrich stage when PDF supplies a person name. |
+| `Entitat o companyia` | `organization_name` | Always populated. |
+| (derived) | `full_name` | Defaults to `organization_name` pre-enrichment; Stage 2 overwrites when the PDF supplies a real person name. |
 | `Email` (lowercased) | `email` | `NULL` for the 1 empty record. |
-| `Telèfon principal` | `phone` | Strip `'+` prefix; normalize E.164 where possible. |
+| `Telèfon principal` | `phone` | Strip leading `'+` Excel prefix; normalize E.164 where possible. |
 | `Web` | `website` | Force scheme, prefer `https://`. |
 | `Ciutat d'enviament` | `city` | Title-case. |
 | inferred | `country` | `'ES'` if `Categoria procedència = catalunya` or `Província ∈ {Catalan/Spanish provinces}`, else ISO-2 from `Província`. |
-| — | `tier` | `'tagged'` (enter the shared pool by default). |
-| — | `organization_id` | MaMeMi's `organization.id`. |
-| (see §3.5) | `custom_fields` | Source-of-origin metadata (jsonb). |
+| (see §3.6) | `custom_fields` | Source-of-origin metadata (jsonb). |
+| (runtime) | `created_by` | `auth.users.id` of the HOUR_OWNER_EMAIL account. Nullable — `--skip-engagements` mode lands persons with `created_by = NULL`. |
 
-### 3.3 `tag` + `tagging`
+Dedupe key: `email` where present (unique globally on `person(email)` via the `person_email_unique` expression index on `lower(email)`); otherwise fall back to `custom_fields->'sources'->'mostra_igualada_2026'->>'registre'` as a deterministic shadow key.
 
-Create per-org tags and link them:
+### 3.4 `tag` + `tagging`
 
-- `src:mostra-igualada-2026` — provenance tag, all 151 records
+Tags are workspace-scoped (`tag.workspace_id`). `tagging.entity_type` is an enum `(person, project, date, engagement)` — here we tag **persons**, not engagements, so the provenance follows the human across future projects.
+
+Seven tags created once per workspace:
+
+- `src:mostra-igualada-2026` — all 151 CSV records
+- `src:dossier-2026` — the ~30 PDF-enriched profiles (and any dossier-only additions that bring the total to 156)
 - `procedencia:catalunya` / `procedencia:estatal` / `procedencia:internacional`
-- `tipologia:programador` / `tipologia:festival`
+- `tipologia:programador` / `tipologia:fira-festival`
 
-These are cheap and unlock filtering in the future UI without touching `custom_fields`. Idempotent via `UNIQUE (organization_id, name)`.
+Idempotent via `UNIQUE (workspace_id, name)`.
 
-### 3.4 `project` + `contact_project`
+### 3.5 `engagement` (per person × project)
 
-Create one project row: `name = 'MaMeMi — Difusión 2026-2027'`, `slug = 'difusion-2026-27'`, `status = 'active'`.
+The polymorphic replacement for `contact_project`. One row per (person, project) in MaMeMi's workspace, status `proposed` by default (anti-CRM rename of `prospect`). Marco progresses them through the enum manually: `idea → proposed → discussing → held → confirmed → performed` (with `cancelled | declined | dormant` as sinks).
 
-Then, for every imported contact, insert a `contact_project` row with `status = 'prospect'`. This is the pipeline entry point; Marco will move them through the funnel (`contacted` → `proposal_sent` → …) manually.
+| Target column | Value at import |
+|---|---|
+| `workspace_id` | Marco's `marco-rubiol` workspace |
+| `project_id` | MaMeMi `mamemi` project |
+| `person_id` | the person upserted in §3.3 |
+| `status` | `'proposed'` on insert; `ON CONFLICT DO NOTHING` so Marco's later edits survive reruns |
+| `custom_fields` | `{"season": "2026-27"}` — this is the handle the `difusión-2026-27` filtered view uses |
+| `created_by` | `auth.users.id` of HOUR_OWNER_EMAIL (NOT NULL on `engagement`, so `--skip-engagements` mode is required when Marco hasn't signed up yet) |
 
-### 3.5 `custom_fields` — JSONB schema
+Uniqueness: `(workspace_id, project_id, person_id)` via the `engagement_unique_live` partial index (where `deleted_at IS NULL`).
 
-> **Blocks on** migration `0005_custom_fields.sql` (see §5).
+### 3.6 `custom_fields` — JSONB schema
 
-Shape on `contact.custom_fields` after import:
+`custom_fields jsonb NOT NULL DEFAULT '{}'::jsonb` exists on `person`, `project`, `engagement`, and `date` since the polymorphic reset (no separate migration needed — see §5).
+
+Shape on `person.custom_fields` after import:
 
 ```jsonc
 {
@@ -124,7 +152,7 @@ Shape on `contact.custom_fields` after import:
       "ingested_at": "2026-04-19T14:00:00Z"
     }
   },
-  "dossier_2026": {                            // only for the 30 enriched
+  "dossier_2026": {                            // only for the ~30 enriched
     "role_title": "SUBDIRECTORA ARTÍSTICA",
     "interest": "Espectacles per a infants i joves, sense massa text.",
     "description": "La companyia de teatre Arad Goch té la seva seu a…"
@@ -132,7 +160,13 @@ Shape on `contact.custom_fields` after import:
 }
 ```
 
-Rationale: heterogeneous source-level metadata (each festival's dossier will have its own fields) doesn't deserve dedicated columns. JSONB keeps the raw signal while still allowing GIN indexing if we ever need to query by it.
+Shape on `engagement.custom_fields` after import:
+
+```jsonc
+{ "season": "2026-27" }
+```
+
+Rationale: heterogeneous source-level metadata (each festival's dossier has its own fields) doesn't deserve dedicated columns. JSONB keeps the raw signal while still allowing GIN indexing if we ever need to query by it. The `season` handle on `engagement` is what lets Difusión 2026-27 stay a filter rather than a real project row.
 
 ---
 
@@ -152,17 +186,7 @@ Rationale: heterogeneous source-level metadata (each festival's dossier will hav
 
 ## 5. Pre-flight migration: `custom_fields jsonb`
 
-Before running the loader, land migration **`0005_custom_fields.sql`**:
-
-```sql
-ALTER TABLE contact ADD COLUMN custom_fields jsonb NOT NULL DEFAULT '{}'::jsonb;
-ALTER TABLE project ADD COLUMN custom_fields jsonb NOT NULL DEFAULT '{}'::jsonb;
-ALTER TABLE event   ADD COLUMN custom_fields jsonb NOT NULL DEFAULT '{}'::jsonb;
-
-CREATE INDEX idx_contact_custom_fields_gin ON contact USING GIN (custom_fields jsonb_path_ops);
-```
-
-Apply via Supabase MCP, then reconcile `_build/schema.sql` (add to sections 5, 6, 8). Updates the open ADR in `DECISIONS.md` to **Accepted**.
+**Already applied.** The polymorphic reset (`polymorphic_schema` migration, 2026-04-19) ships `custom_fields jsonb NOT NULL DEFAULT '{}'::jsonb` on `person`, `project`, `engagement`, and `date`, plus a GIN index on `person.custom_fields` (`jsonb_path_ops`). No separate `0005_custom_fields.sql` step exists — the column is part of the canonical schema in `_build/schema.sql`. The ADR *Activate `custom_fields jsonb` on tenant tables* is marked **Accepted** in `DECISIONS.md`.
 
 ---
 
@@ -173,13 +197,13 @@ Three Python scripts in `_build/import/`. Each is idempotent, reads from disk, w
 ### Stage 1 — `01_normalize.py`
 
 Input:  `_build/import/sources/mostra-2026/*.csv` (copy the 4 files here).
-Output: `_build/import/staging/01_canonical.jsonl` (one JSON object per contact, post-normalization).
+Output: `_build/import/staging/01_canonical.jsonl` (one JSON object per record, post-normalization).
 
 Steps:
 1. Load all 4 CSVs, dedupe by `Número Registre`.
 2. Filter `Tipologia ∈ {Programador, Fira/Festival}`.
 3. Apply normalization rules from §4.
-4. Emit JSONL with the Hour-shape (pre-`id`, pre-`organization_id`).
+4. Emit JSONL with the Hour-shape — `person`-flavoured fields (`organization_name`, `full_name`, `email`, `phone`, `website`, `city`, `country`, `custom_fields.sources.mostra_igualada_2026.*`).
 5. Print a report: rows in / rows out / rows dropped and why.
 
 ### Stage 2 — `02_enrich_from_pdf.py`
@@ -189,45 +213,51 @@ Output: `_build/import/staging/02_enriched.jsonl`.
 
 Steps:
 1. `pdftotext -layout` → segment into 30 profile blocks using header regex (`^[A-Z]+$` on two consecutive lines + ENTITAT line).
-2. Extract `{name, entitat, city, country, role_title, web, interest, description}` per profile.
-3. Fuzzy-match each profile to canonical rows by `entitat` (RapidFuzz `token_set_ratio ≥ 85`), fallback to `web` host match, fallback to manual override file (`_build/import/manual-matches.yaml` — empty at start, populated by Marco on mismatches).
-4. Merge into canonical: set `name`, `role_title`, and `custom_fields.dossier_2026.*`.
-5. Emit JSONL. Print `(matched, unmatched_dossier_profiles, unmatched_canonical_rows)` report.
+2. Extract `{full_name, entitat, city, country, role_title, web, interest, description}` per profile.
+3. Fuzzy-match each profile to canonical rows by `entitat` ≈ `organization_name` (RapidFuzz `token_set_ratio ≥ 85`), fallback to `website` host match, fallback to manual override file (`_build/import/manual-matches.yaml` — empty at start, populated by Marco on mismatches).
+4. Merge into canonical: set `full_name`, add `custom_fields.dossier_2026.*`, tag the row for `src:dossier-2026`.
+5. Dossier-only profiles (not matched to any CSV row) are appended as new canonical rows so they land as `person`s too.
+6. Emit JSONL. Print `(matched, unmatched_dossier_profiles, unmatched_canonical_rows, dossier_only_added)` report.
 
 ### Stage 3 — `03_load_to_hour.py`
 
 Input:  `_build/import/staging/02_enriched.jsonl`.
-Output: rows in Supabase `hour-phase0`.
+Output: rows in Supabase `hour-phase0` via PostgREST (service-role key, bypasses RLS).
 
-Env: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `ORG_SLUG=mamemi`, `PROJECT_SLUG=difusion-2026-27`.
+Env (read from repo-root `.env`):
+- Required: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`.
+- Optional: `HOUR_WORKSPACE_SLUG=marco-rubiol`, `HOUR_WORKSPACE_NAME="Marco Rubiol"`, `HOUR_PROJECT_SLUG=mamemi`, `HOUR_PROJECT_NAME=MaMeMi`, `HOUR_SEASON=2026-27`, `HOUR_OWNER_EMAIL=marcorubiol@gmail.com`.
+
+Flags: `--dry-run`, `--limit N`, `--verbose`, `--skip-engagements` (load only persons — use before Marco has signed up, since `engagement.created_by` is NOT NULL).
 
 Steps:
-1. Resolve `organization.id` by `slug = 'mamemi'`; fail loudly if missing.
-2. Upsert `project (slug = 'difusion-2026-27')` → get `project.id`.
-3. Upsert tags (`src:mostra-igualada-2026`, `procedencia:*`, `tipologia:*`).
-4. For each canonical row:
-   - Upsert `contact` on `(organization_id, email)` when email present, else on `(organization_id, custom_fields -> 'sources' -> 'mostra_igualada_2026' ->> 'registre')` via a deterministic shadow key. Merge `custom_fields` with `jsonb ||` semantics (don't clobber).
-   - Link tags via `tagging`.
-   - Upsert `contact_project (contact_id, project_id)` with `status = 'prospect'` (no-op on conflict — preserve whatever status Marco has already moved them to).
-5. Wrap everything in a single transaction per batch of 25 rows. Safe to re-run.
-6. Print: inserted / updated / skipped / failed with row-level reasons.
+1. Ensure the `workspace` row (`slug=marco-rubiol`, `kind=personal`) — upsert, idempotent.
+2. Ensure the `project` row (`slug=mamemi`, `type=show`, `status=active`, `workspace_id=<marco-rubiol>`) — upsert on `(workspace_id, slug)`.
+3. Ensure the 7 `tag` rows from §3.4 — upsert on `(workspace_id, name)`.
+4. Resolve `HOUR_OWNER_EMAIL` → `auth.users.id`. If absent: warn, force `--skip-engagements` semantics, continue with `person.created_by = NULL`.
+5. For each canonical row:
+   - Upsert `person` on `lower(email)` when email is present, else on `custom_fields->'sources'->'mostra_igualada_2026'->>'registre'` via a deterministic shadow key. Merge `custom_fields` with PostgREST JSON-merge semantics (don't clobber prior sources on rerun).
+   - Upsert `tagging` rows with `entity_type='person'`, `entity_id=<person.id>` for each of the row's resolved tags.
+   - Unless `--skip-engagements`: upsert `engagement (workspace_id, project_id, person_id)` with `status='proposed'`, `custom_fields={"season":"2026-27"}`, `created_by=<owner.id>`. `ON CONFLICT DO NOTHING` on the `engagement_unique_live` partial index — preserves Marco's later status changes across reruns.
+6. Wrap each batch of 25 rows in a single PostgREST call. Safe to re-run any number of times.
+7. Print: inserted / updated / skipped / failed with row-level reasons.
 
 ---
 
 ## 7. Expected outcome after first successful run
 
 ```
-organization        : 1   (MaMeMi, pre-existing)
-project             : 1   (difusion-2026-27)
-contact             : 151 (Programador + Fira/Festival)
+workspace           : 1    (marco-rubiol, kind=personal)
+project             : 1    (mamemi, type=show, status=active)
+person              : 156  (Programador + Fira/Festival, deduped on email)
   ├─ with dossier   :  ~30 (enriched from PDF)
-  └─ without        : ~121
-tag                 : 6   (src + 3 procedencia + 2 tipologia)
-tagging             : ~453 (151 × ~3 tags each)
-contact_project     : 151 (all in 'prospect' status)
+  └─ without        : ~126
+tag                 : 7    (2 src + 3 procedencia + 2 tipologia)
+tagging             : ~470 (156 × ~3 tags each, entity_type='person')
+engagement          : 156  (all status='proposed', custom_fields.season='2026-27')
 ```
 
-All 151 contacts visible in Hour once the first UI screen lands, already segmented by `procedencia` and `tipologia` tags.
+All 156 persons visible in Hour once the first UI screen lands, already segmented by `procedencia`/`tipologia` tags and filterable down to the "Difusión 2026-27" view with `project.slug=mamemi` + `engagement.custom_fields->>season='2026-27'`. Under `--skip-engagements` (owner not signed up yet), the engagement row count is 0 and `person.created_by` is NULL.
 
 ---
 
@@ -235,22 +265,24 @@ All 151 contacts visible in Hour once the first UI screen lands, already segment
 
 - **Fuzzy match false positives between CSV and PDF.** Mitigation: `token_set_ratio ≥ 85` + web host tiebreaker + manual override file. Stage 2 prints unmatched in both directions so they can be resolved before Stage 3.
 - **Country mapping for `internacional` rows.** Only ~18 rows. Easier to hand-curate a `COUNTRY_MAP` than to parse loose Catalan country names. List will be short.
-- **Email dedupe across future sources.** `(organization_id, email)` works when email exists. For the 1 email-less row we use the `Número Registre` shadow key; when other festivals export without stable IDs, we'll likely need a composite `(organization_id, lower(company), lower(city))` — defer that decision until second source lands.
-- **GDPR.** These are professional contacts from a public industry dossier, not personal. Still: document the source in `custom_fields.sources` so provenance is auditable, and plan for a future soft-delete cascade on contact deletion.
+- **Email dedupe across future sources.** `person` uses a global `lower(email)` unique index, which works when email is present. For the 1 email-less row we use the `Número Registre` shadow key; when other festivals export without stable IDs, we'll likely need a composite `(lower(organization_name), lower(city))` fallback — defer that decision until the second source lands. Note: `person` is workspace-less, so email collisions with other tenants' persons are real — that's the intended behaviour (shared pool), but it means dedupe logic must never clobber another workspace's `custom_fields` on upsert.
+- **GDPR.** These are professional records from a public industry dossier, not personal. Still: document the source in `custom_fields.sources` so provenance is auditable; privacy for Marco's own annotations is enforced via `person_note.visibility` (workspace|private); and plan for a future soft-delete cascade via `person.deleted_at`.
 
 ---
 
 ## 9. Order of operations
 
-1. ☐ Write this file (DONE by reading it).
-2. ☐ Apply migration `0005_custom_fields.sql` via MCP → update `schema.sql` → commit.
-3. ☐ Write ADR "Activate `custom_fields jsonb` on tenant tables — accepted" in `DECISIONS.md`.
-4. ☐ Copy sources into `_build/import/sources/mostra-2026/` (4 CSVs + 1 PDF) — **.gitignored**; they're PII-adjacent and don't belong in the public repo.
-5. ☐ Implement `01_normalize.py` → run → inspect `01_canonical.jsonl`.
-6. ☐ Implement `02_enrich_from_pdf.py` → run → inspect `02_enriched.jsonl` + unmatched report.
-7. ☐ Marco fills `manual-matches.yaml` for any unmatched profiles he can identify.
-8. ☐ Create MaMeMi `organization` row (via MCP or a one-off seed migration).
-9. ☐ Implement `03_load_to_hour.py` → dry-run mode first (`--dry-run` flag prints the SQL it would emit) → live run.
-10. ☐ Verify counts with a read-only SQL (`SELECT count(*) FROM contact WHERE organization_id = …`) and spot-check 3 random rows.
+1. ☑ Write this file.
+2. ☑ `custom_fields jsonb` landed as part of the 2026-04-19 polymorphic reset (see §5) — no separate migration step.
+3. ☑ ADR *Activate `custom_fields jsonb` on tenant tables* → Accepted in `DECISIONS.md`.
+4. ☑ Copy sources into `_build/import/sources/mostra-2026/` (4 CSVs + 1 PDF) — **.gitignored**; they're PII-adjacent and don't belong in the public repo.
+5. ☑ Implement `01_normalize.py` → run → inspect `01_canonical.jsonl`.
+6. ☑ Implement `02_enrich_from_pdf.py` → run → inspect `02_enriched.jsonl` + unmatched report.
+7. ☑ Marco fills `manual-matches.yaml` for any unmatched profiles he can identify.
+8. ☑ Polymorphic reset migration applied (workspace/project/person/engagement tables live). `_build/seed.sql` CLAIM block renames Marco's auto-created workspace to `marco-rubiol` and upserts the `mamemi` project.
+9. ☑ Implement `03_load_to_hour.py` — with `--dry-run`, `--limit N`, `--skip-engagements` flags. Adapted 2026-04-19 to the polymorphic schema.
+10. ☐ **Marco signs up** at `hour.zerosense.studio` (or the workers.dev URL) with `marcorubiol@gmail.com` → run `_build/seed.sql` CLAIM block → enable `custom_access_token_hook` in the Supabase Dashboard (Auth → Hooks).
+11. ☐ Live run: `python3 _build/import/03_load_to_hour.py` (no flags) → lands 156 persons + taggings + engagements on the `mamemi` project with `season=2026-27` in `custom_fields`.
+12. ☐ Verify with `GET /api/engagements?project_slug=mamemi&season=2026-27` using a real JWT; cross-check counts against §7.
 
 Each step leaves disk artefacts — safe to rerun from any point.

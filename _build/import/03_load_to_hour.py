@@ -1,50 +1,57 @@
 #!/usr/bin/env python3
 """Stage 3 — load staging/02_enriched.jsonl into Supabase `hour-phase0`.
 
+Adapted 2026-04-19 to the polymorphic schema (workspace + project + engagement).
+Replaces the earlier contact / contact_project model.
+
 Idempotent, safe to rerun. Uses the Supabase Service Role key (bypasses RLS)
 and PostgREST directly over stdlib `urllib` — no third-party deps.
 
 Config:
     Reads the repo-root `.env` (two levels up from this script). Required:
-        SUPABASE_URL                = https://<project-ref>.supabase.co
-        SUPABASE_SERVICE_ROLE_KEY   = eyJ...
+        SUPABASE_URL               = https://<project-ref>.supabase.co
+        SUPABASE_SERVICE_ROLE_KEY  = eyJ...
     Optional (with defaults):
-        HOUR_ORG_SLUG               = mamemi
-        HOUR_ORG_NAME               = MaMeMi
-        HOUR_PROJECT_SLUG           = difusion-2026-27
-        HOUR_PROJECT_NAME           = MaMeMi — Difusión 2026-2027
+        HOUR_WORKSPACE_SLUG = marco-rubiol
+        HOUR_WORKSPACE_NAME = Marco Rubiol
+        HOUR_PROJECT_SLUG   = mamemi
+        HOUR_PROJECT_NAME   = MaMeMi
+        HOUR_SEASON         = 2026-27
+        HOUR_OWNER_EMAIL    = marcorubiol@gmail.com  (resolves engagement.created_by)
 
 Flags:
     --dry-run   : show counts + a sample of each operation without writing.
     --limit N   : process only the first N enriched rows (smoke test).
     --verbose   : print one line per row.
+    --skip-engagements : load only persons (use before the owner has signed up).
 
 What it does:
-    1. Ensure `organization` row exists (mamemi).
-    2. Ensure `project` row exists (difusion-2026-27, active).
-    3. Ensure tag rows exist:
+    1. Ensure `workspace` row exists (marco-rubiol, kind=personal).
+    2. Ensure `project`   row exists (mamemi, type=show, status=active).
+    3. Ensure `tag` rows exist:
          src:mostra-igualada-2026 · src:dossier-2026
          procedencia:{catalunya,estatal,internacional}
          tipologia:{programador,fira-festival}
-    4. For every row in 02_enriched.jsonl:
-       a. Resolve or insert a `contact` row. Lookup key cascade:
-            - (organization_id, email)                         if email present
-            - (organization_id, sources.mostra_igualada_2026.registre)
-            - (organization_id, dossier_2026.order)            dossier-only rows
-       b. Merge `custom_fields` via `existing || new` (JSONB-style),
-          client-side.
-       c. Ensure `tagging` rows for this contact.
-       d. Upsert `contact_project (contact_id, project_id)` with default
-          status='prospect'. On conflict we DO NOT touch `status` — if
-          Marco has already moved someone to 'contacted' etc., we leave it.
+    4. Resolve the owner user from HOUR_OWNER_EMAIL. If absent:
+         - Load persons only (person.created_by is nullable).
+         - Skip engagements + taggings on engagement rows.
+         - Exit with a clear warning.
+    5. For every row in 02_enriched.jsonl:
+       a. Upsert a `person` row (deduped on email; lookup cascade below).
+          custom_fields merge preserves sources across reruns.
+       b. Ensure `tagging` rows on entity_type='person' for that person.
+       c. Upsert `engagement` (workspace_id × project_id × person_id)
+          with status='proposed' (anti-CRM vocabulary replacement for
+          'prospect'). Respects Marco's status changes — ON CONFLICT DO NOTHING.
+          `season` goes onto the row via engagement.custom_fields.
 
-Expected ending state (fresh DB):
-    organization    : 1
-    project         : 1
-    tag             : 7
-    contact         : 156
-    tagging         : ~470
-    contact_project : 156 (all 'prospect' on first run)
+Expected ending state (fresh DB, owner signed in):
+    workspace  : 1 (marco-rubiol)
+    project    : 1 (mamemi)
+    tag        : 7
+    person     : 156
+    tagging    : ~470
+    engagement : 156 (all status='proposed' on first run)
 """
 
 from __future__ import annotations
@@ -83,7 +90,6 @@ def load_env(path: Path) -> dict[str, str]:
         if not m:
             continue
         key, val = m.group(1), m.group(2).strip()
-        # Strip surrounding quotes if present
         if (val.startswith('"') and val.endswith('"')) or (
             val.startswith("'") and val.endswith("'")
         ):
@@ -97,7 +103,8 @@ def load_env(path: Path) -> dict[str, str]:
 # ---------------------------------------------------------------------------
 class Supabase:
     def __init__(self, url: str, service_key: str):
-        self.base = url.rstrip("/") + "/rest/v1"
+        self.rest_base = url.rstrip("/") + "/rest/v1"
+        self.auth_base = url.rstrip("/") + "/auth/v1"
         self.headers = {
             "apikey": service_key,
             "Authorization": f"Bearer {service_key}",
@@ -108,13 +115,12 @@ class Supabase:
     def _req(
         self,
         method: str,
-        path: str,
+        url: str,
         *,
         params: Optional[dict] = None,
         body: Optional[Any] = None,
         prefer: Optional[str] = None,
     ) -> Any:
-        url = self.base + path
         if params:
             url += "?" + urllib.parse.urlencode(params, safe="(),.:*><=-")
         data = None
@@ -133,20 +139,20 @@ class Supabase:
         except urllib.error.HTTPError as e:
             detail = e.read().decode("utf-8", errors="replace")
             raise RuntimeError(
-                f"HTTP {e.code} on {method} {path}  params={params}  body={body}\n  → {detail}"
+                f"HTTP {e.code} on {method} {url}  params={params}\n  → {detail}"
             ) from None
 
     # -- Shorthand helpers -------------------------------------------------
     def select(self, table: str, **filters) -> list[dict]:
-        return self._req("GET", f"/{table}", params=filters) or []
+        return self._req("GET", f"{self.rest_base}/{table}", params=filters) or []
 
     def insert(self, table: str, row: dict | list[dict], *, return_repr: bool = True) -> Any:
         prefer = "return=representation" if return_repr else "return=minimal"
-        return self._req("POST", f"/{table}", body=row, prefer=prefer)
+        return self._req("POST", f"{self.rest_base}/{table}", body=row, prefer=prefer)
 
     def update(self, table: str, patch: dict, **filters) -> Any:
         return self._req(
-            "PATCH", f"/{table}",
+            "PATCH", f"{self.rest_base}/{table}",
             params=filters, body=patch, prefer="return=representation",
         )
 
@@ -161,46 +167,63 @@ class Supabase:
         prefer_parts = ["resolution=merge-duplicates"]
         prefer_parts.append("return=representation" if return_repr else "return=minimal")
         return self._req(
-            "POST", f"/{table}",
+            "POST", f"{self.rest_base}/{table}",
             params={"on_conflict": on_conflict},
             body=rows,
             prefer=",".join(prefer_parts),
         )
 
+    # -- Auth Admin --------------------------------------------------------
+    def find_user_by_email(self, email: str) -> Optional[dict]:
+        """Return the auth.users row for `email` via the Auth Admin API, or None."""
+        # /auth/v1/admin/users?email=... supports exact-match filter
+        url = f"{self.auth_base}/admin/users"
+        resp = self._req("GET", url, params={"email": email})
+        if not resp:
+            return None
+        users = resp.get("users") if isinstance(resp, dict) else resp
+        if not users:
+            return None
+        for u in users:
+            if u.get("email", "").lower() == email.lower():
+                return u
+        return None
+
 
 # ---------------------------------------------------------------------------
-# Ensure organization / project / tags
+# Ensure workspace / project / tags
 # ---------------------------------------------------------------------------
-def ensure_organization(sb: Supabase, slug: str, name: str, *, dry_run: bool) -> str:
-    existing = sb.select("organization", slug=f"eq.{slug}", select="id,name,slug")
+def ensure_workspace(sb: Supabase, slug: str, name: str, *, dry_run: bool) -> str:
+    existing = sb.select("workspace", slug=f"eq.{slug}", select="id,name,slug,kind")
     if existing:
         return existing[0]["id"]
     if dry_run:
-        print(f"  [DRY] would INSERT organization(slug={slug!r}, name={name!r})")
+        print(f"  [DRY] would INSERT workspace(slug={slug!r}, name={name!r}, kind=personal)")
         return "00000000-0000-0000-0000-000000000000"
-    row = sb.insert("organization", {
-        "name": name, "slug": slug, "type": "collective",
-        "default_locale": "es", "timezone": "Europe/Madrid",
+    row = sb.insert("workspace", {
+        "name": name, "slug": slug, "kind": "personal",
+        "country": "ES", "timezone": "Europe/Madrid",
     })
-    print(f"  + organization created: {name} ({slug})")
+    print(f"  + workspace created: {name} ({slug})")
     return row[0]["id"]
 
 
 def ensure_project(
-    sb: Supabase, org_id: str, slug: str, name: str, *, dry_run: bool,
+    sb: Supabase, workspace_id: str, slug: str, name: str, *, dry_run: bool,
 ) -> str:
     existing = sb.select(
         "project",
-        organization_id=f"eq.{org_id}", slug=f"eq.{slug}", select="id,name,slug,status",
+        workspace_id=f"eq.{workspace_id}", slug=f"eq.{slug}",
+        select="id,name,slug,status,type",
     )
     if existing:
         return existing[0]["id"]
     if dry_run:
-        print(f"  [DRY] would INSERT project(slug={slug!r}, name={name!r})")
+        print(f"  [DRY] would INSERT project(slug={slug!r}, name={name!r}, type=show)")
         return "00000000-0000-0000-0000-000000000001"
     row = sb.insert("project", {
-        "organization_id": org_id,
-        "name": name, "slug": slug, "status": "active",
+        "workspace_id": workspace_id,
+        "name": name, "slug": slug, "type": "show", "status": "active",
         "description": "Imported from Mostra Igualada 2026 export + dossier PDF.",
     })
     print(f"  + project created: {name} ({slug})")
@@ -218,10 +241,10 @@ TAG_PLAN = [
 ]
 
 
-def ensure_tags(sb: Supabase, org_id: str, *, dry_run: bool) -> dict[str, str]:
+def ensure_tags(sb: Supabase, workspace_id: str, *, dry_run: bool) -> dict[str, str]:
     """Return {tag_name: tag_id} for the seven known tags."""
     existing = sb.select(
-        "tag", organization_id=f"eq.{org_id}", select="id,name",
+        "tag", workspace_id=f"eq.{workspace_id}", select="id,name",
     )
     by_name = {t["name"]: t["id"] for t in existing}
     to_create = [(n, c) for n, c in TAG_PLAN if n not in by_name]
@@ -232,7 +255,7 @@ def ensure_tags(sb: Supabase, org_id: str, *, dry_run: bool) -> dict[str, str]:
               + ", ".join(n for n, _ in to_create))
         return {**by_name, **{n: f"dry-tag-{n}" for n, _ in to_create}}
     rows = sb.insert("tag", [
-        {"organization_id": org_id, "name": n, "color": c} for n, c in to_create
+        {"workspace_id": workspace_id, "name": n, "color": c} for n, c in to_create
     ])
     for r in rows:
         by_name[r["name"]] = r["id"]
@@ -252,7 +275,7 @@ SLUG_TIPOLOGIA = {
 
 
 def tags_for_row(row: dict) -> list[str]:
-    """Derive the set of tag names to attach to a contact row."""
+    """Derive the set of tag names to attach to a person row."""
     cf = row.get("custom_fields") or {}
     sources = cf.get("sources") or {}
     mostra = sources.get("mostra_igualada_2026") or {}
@@ -272,8 +295,6 @@ def tags_for_row(row: dict) -> list[str]:
 
     if "dossier_2026" in cf:
         names.append("src:dossier-2026")
-        # Dossier rows also know their section (internacional/estatal) even
-        # without a Mostra source — surface it as a procedencia tag.
         section = ((cf["dossier_2026"] or {}).get("section") or "").lower().strip()
         if section in ("estatal", "internacional"):
             proc_tag = f"procedencia:{section}"
@@ -283,14 +304,18 @@ def tags_for_row(row: dict) -> list[str]:
     return names
 
 
-def find_existing_contact(sb: Supabase, org_id: str, row: dict) -> Optional[dict]:
-    """Lookup cascade: email → mostra.registre → dossier.order → None."""
+def find_existing_person(sb: Supabase, row: dict) -> Optional[dict]:
+    """Lookup cascade: email → mostra.registre → dossier.order → None.
+
+    Persons are GLOBAL — no workspace_id filter. Email uniqueness is enforced
+    by a UNIQUE constraint on person.email (citext).
+    """
     email = (row.get("email") or "").strip().lower() or None
     if email:
         hit = sb.select(
-            "contact",
-            organization_id=f"eq.{org_id}", email=f"eq.{email}",
-            select="id,custom_fields", limit="1",
+            "person",
+            email=f"eq.{email}",
+            select="id,custom_fields,full_name", limit="1",
         )
         if hit:
             return hit[0]
@@ -301,8 +326,7 @@ def find_existing_contact(sb: Supabase, org_id: str, row: dict) -> Optional[dict
     reg = mostra.get("registre")
     if reg is not None:
         hit = sb.select(
-            "contact",
-            organization_id=f"eq.{org_id}",
+            "person",
             **{"custom_fields->sources->mostra_igualada_2026->>registre": f"eq.{reg}"},
             select="id,custom_fields", limit="1",
         )
@@ -311,10 +335,9 @@ def find_existing_contact(sb: Supabase, org_id: str, row: dict) -> Optional[dict
 
     dossier = cf.get("dossier_2026") or {}
     order = dossier.get("order")
-    if order is not None and not mostra:  # only meaningful for dossier-only rows
+    if order is not None and not mostra:
         hit = sb.select(
-            "contact",
-            organization_id=f"eq.{org_id}",
+            "person",
             **{"custom_fields->dossier_2026->>order": f"eq.{order}"},
             select="id,custom_fields", limit="1",
         )
@@ -324,10 +347,9 @@ def find_existing_contact(sb: Supabase, org_id: str, row: dict) -> Optional[dict
 
 
 def merge_custom_fields(existing: dict, incoming: dict) -> dict:
-    """Deep-merge existing and incoming custom_fields. Incoming wins on leaf
-    conflicts but we keep existing sub-keys the incoming doesn't touch —
-    equivalent to the JSONB `||` operator nested by one level for `sources`
-    and `dossier_2026` blocks."""
+    """Deep-merge. Incoming wins on leaf conflicts, but sub-keys under
+    `sources` that incoming doesn't touch are preserved (equivalent to the
+    JSONB `||` operator nested by one level for `sources` / `dossier_2026`)."""
     out = dict(existing or {})
     for k, v in (incoming or {}).items():
         if k == "sources" and isinstance(v, dict) and isinstance(out.get("sources"), dict):
@@ -339,59 +361,56 @@ def merge_custom_fields(existing: dict, incoming: dict) -> dict:
     return out
 
 
-def upsert_contact(
-    sb: Supabase, org_id: str, row: dict, *, dry_run: bool,
+def upsert_person(
+    sb: Supabase, owner_user_id: Optional[str], row: dict, *, dry_run: bool,
 ) -> Optional[str]:
-    """Return contact.id, or None in dry-run."""
-    existing = find_existing_contact(sb, org_id, row)
+    """Return person.id, or None in dry-run."""
+    existing = find_existing_person(sb, row)
     incoming_cf = row.get("custom_fields") or {}
     payload: dict[str, Any] = {
-        "name":       row.get("name") or row.get("company") or "(unknown)",
-        "email":      row.get("email"),
-        "phone":      row.get("phone"),
-        "company":    row.get("company"),
-        "role_title": row.get("role_title"),
-        "city":       row.get("city"),
-        "country":    row.get("country"),
-        "website":    row.get("website"),
-        "tier":       "tagged",   # all imported contacts start shared
+        "full_name":         row.get("name") or row.get("company") or "(unknown)",
+        "email":             (row.get("email") or "").strip().lower() or None,
+        "phone":             row.get("phone"),
+        "city":              row.get("city"),
+        "country":           row.get("country"),
+        "website":           row.get("website"),
+        "organization_name": row.get("company"),
+        "title":             row.get("role_title"),
     }
     if existing:
-        # Merge custom_fields so we don't lose previously-stored provenance
         merged_cf = merge_custom_fields(existing.get("custom_fields") or {}, incoming_cf)
         payload["custom_fields"] = merged_cf
         if dry_run:
             return existing["id"]
-        sb.update("contact", payload, id=f"eq.{existing['id']}")
+        sb.update("person", payload, id=f"eq.{existing['id']}")
         return existing["id"]
 
-    # Insert
-    payload["organization_id"] = org_id
     payload["custom_fields"] = incoming_cf
-    # strip None-valued keys to avoid blowing up NOT NULL defaults
+    if owner_user_id:
+        payload["created_by"] = owner_user_id
     payload = {k: v for k, v in payload.items() if v is not None}
     if dry_run:
         return None
-    inserted = sb.insert("contact", payload)
+    inserted = sb.insert("person", payload)
     return inserted[0]["id"]
 
 
 def ensure_taggings(
     sb: Supabase,
-    org_id: str,
-    contact_id: str,
+    workspace_id: str,
+    person_id: str,
     tag_ids: list[str],
     *,
     dry_run: bool,
 ) -> int:
-    """Create missing tagging rows for this contact. Returns number added."""
-    if not tag_ids or not contact_id:
+    """Create missing tagging rows for this person. Returns number added."""
+    if not tag_ids or not person_id:
         return 0
     existing_rows = sb.select(
         "tagging",
-        organization_id=f"eq.{org_id}",
-        entity_type="eq.contact",
-        entity_id=f"eq.{contact_id}",
+        workspace_id=f"eq.{workspace_id}",
+        entity_type="eq.person",
+        entity_id=f"eq.{person_id}",
         select="tag_id",
     )
     existing_set = {r["tag_id"] for r in existing_rows}
@@ -401,40 +420,47 @@ def ensure_taggings(
     if dry_run:
         return len(missing)
     sb.insert("tagging", [
-        {"tag_id": tid, "organization_id": org_id,
-         "entity_type": "contact", "entity_id": contact_id}
+        {"tag_id": tid, "workspace_id": workspace_id,
+         "entity_type": "person", "entity_id": person_id}
         for tid in missing
     ], return_repr=False)
     return len(missing)
 
 
-def ensure_contact_project(
+def ensure_engagement(
     sb: Supabase,
-    org_id: str,
+    workspace_id: str,
     project_id: str,
-    contact_id: str,
+    person_id: str,
+    owner_user_id: str,
+    season: Optional[str],
     *,
     dry_run: bool,
 ) -> bool:
-    """Insert (contact_id, project_id) if not present. Returns True if inserted."""
-    if not contact_id:
+    """Insert engagement if (workspace, project, person) tuple not present.
+    Returns True if inserted. Leaves existing engagement.status untouched on reruns.
+    """
+    if not person_id:
         return False
     hit = sb.select(
-        "contact_project",
-        organization_id=f"eq.{org_id}",
-        contact_id=f"eq.{contact_id}",
+        "engagement",
+        workspace_id=f"eq.{workspace_id}",
         project_id=f"eq.{project_id}",
-        select="contact_id,status", limit="1",
+        person_id=f"eq.{person_id}",
+        select="id,status", limit="1",
     )
     if hit:
-        return False  # leave Marco's funnel state untouched
+        return False
     if dry_run:
         return True
-    sb.insert("contact_project", {
-        "contact_id":      contact_id,
-        "project_id":      project_id,
-        "organization_id": org_id,
-        "status":          "prospect",
+    custom_fields = {"season": season} if season else {}
+    sb.insert("engagement", {
+        "workspace_id": workspace_id,
+        "project_id":   project_id,
+        "person_id":    person_id,
+        "status":       "proposed",   # anti-CRM replacement for 'prospect'
+        "created_by":   owner_user_id,
+        "custom_fields": custom_fields,
     }, return_repr=False)
     return True
 
@@ -450,6 +476,8 @@ def main() -> None:
                     help="Only process the first N enriched rows.")
     ap.add_argument("--verbose", action="store_true",
                     help="Print one line per row processed.")
+    ap.add_argument("--skip-engagements", action="store_true",
+                    help="Load persons + taggings only. Use before the owner has signed up.")
     args = ap.parse_args()
 
     if not ENRICHED_PATH.exists():
@@ -463,22 +491,38 @@ def main() -> None:
             "ERROR: SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set.\n"
             f"       Drop them into {ENV_PATH} (gitignored) or export them."
         )
-    org_slug = env.get("HOUR_ORG_SLUG") or "mamemi"
-    org_name = env.get("HOUR_ORG_NAME") or "MaMeMi"
-    project_slug = env.get("HOUR_PROJECT_SLUG") or "difusion-2026-27"
-    project_name = env.get("HOUR_PROJECT_NAME") or "MaMeMi — Difusión 2026-2027"
+    workspace_slug = env.get("HOUR_WORKSPACE_SLUG") or "marco-rubiol"
+    workspace_name = env.get("HOUR_WORKSPACE_NAME") or "Marco Rubiol"
+    project_slug   = env.get("HOUR_PROJECT_SLUG")   or "mamemi"
+    project_name   = env.get("HOUR_PROJECT_NAME")   or "MaMeMi"
+    season         = env.get("HOUR_SEASON")         or "2026-27"
+    owner_email    = env.get("HOUR_OWNER_EMAIL")    or "marcorubiol@gmail.com"
 
     sb = Supabase(url, key)
     mode = "DRY-RUN" if args.dry_run else "LIVE"
     print(f"== Stage 3 loader ({mode}) ==")
-    print(f"  target : {url}")
-    print(f"  org    : {org_name} ({org_slug})")
-    print(f"  project: {project_name} ({project_slug})")
+    print(f"  target   : {url}")
+    print(f"  workspace: {workspace_name} ({workspace_slug})")
+    print(f"  project  : {project_name} ({project_slug}) type=show")
+    print(f"  season   : {season}")
+    print(f"  owner    : {owner_email}")
     print()
 
-    org_id = ensure_organization(sb, org_slug, org_name, dry_run=args.dry_run)
-    project_id = ensure_project(sb, org_id, project_slug, project_name, dry_run=args.dry_run)
-    tag_ids_by_name = ensure_tags(sb, org_id, dry_run=args.dry_run)
+    workspace_id = ensure_workspace(sb, workspace_slug, workspace_name, dry_run=args.dry_run)
+    project_id   = ensure_project(sb, workspace_id, project_slug, project_name, dry_run=args.dry_run)
+    tag_ids_by_name = ensure_tags(sb, workspace_id, dry_run=args.dry_run)
+
+    # Resolve the owner user.
+    owner_user = sb.find_user_by_email(owner_email)
+    owner_user_id = owner_user["id"] if owner_user else None
+
+    if args.skip_engagements or not owner_user_id:
+        if not owner_user_id:
+            print(f"  ! No auth.users row for {owner_email} — engagements will be skipped.")
+            print(f"    (sign up first, then rerun without --skip-engagements)")
+        args.skip_engagements = True
+    else:
+        print(f"  owner user resolved: {owner_user_id}")
 
     # Load enriched rows
     rows = [
@@ -489,33 +533,39 @@ def main() -> None:
     print()
     print(f"Processing {len(rows)} enriched rows...")
     stats = {
-        "contacts_upserted": 0, "contacts_skipped": 0,
-        "taggings_created":  0,
-        "contact_projects_created": 0,
-        "contact_projects_preserved": 0,
-        "errors": 0,
+        "persons_upserted":     0,
+        "taggings_created":     0,
+        "engagements_created":  0,
+        "engagements_preserved": 0,
+        "engagements_skipped":  0,
+        "errors":               0,
     }
 
     for i, row in enumerate(rows, 1):
         try:
-            contact_id = upsert_contact(sb, org_id, row, dry_run=args.dry_run)
-            stats["contacts_upserted"] += 1
+            person_id = upsert_person(sb, owner_user_id, row, dry_run=args.dry_run)
+            stats["persons_upserted"] += 1
 
             wanted = tags_for_row(row)
             wanted_ids = [tag_ids_by_name[n] for n in wanted if n in tag_ids_by_name]
-            if contact_id:
+            if person_id:
                 stats["taggings_created"] += ensure_taggings(
-                    sb, org_id, contact_id, wanted_ids, dry_run=args.dry_run,
+                    sb, workspace_id, person_id, wanted_ids, dry_run=args.dry_run,
                 )
-                if ensure_contact_project(
-                    sb, org_id, project_id, contact_id, dry_run=args.dry_run,
-                ):
-                    stats["contact_projects_created"] += 1
+                if args.skip_engagements:
+                    stats["engagements_skipped"] += 1
                 else:
-                    stats["contact_projects_preserved"] += 1
+                    if ensure_engagement(
+                        sb, workspace_id, project_id, person_id, owner_user_id,
+                        season, dry_run=args.dry_run,
+                    ):
+                        stats["engagements_created"] += 1
+                    else:
+                        stats["engagements_preserved"] += 1
+
             if args.verbose:
                 name = row.get("name") or row.get("company") or "(unknown)"
-                mark = "✓" if contact_id else "·"
+                mark = "✓" if person_id else "·"
                 print(f"  {mark} [{i:3d}/{len(rows)}] {name[:40]:40s} "
                       f"tags={len(wanted_ids):1d}")
         except Exception as e:

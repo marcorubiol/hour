@@ -22,8 +22,8 @@ That loads ~90% of project context in seconds without depending on what was said
 
 | Tool | Use for | Don't use for |
 |---|---|---|
-| **Claude Code** (CLI preferred, Desktop equivalent) | All code: schema, migrations, features, tests, debugging, refactors. Updating `_build/*.md` during code sessions. | Strategic thinking, cross-app tasks |
-| **Cowork — long chat "Hour — Strategy"** | Strategy, competitive analysis, pricing, planning, architectural thinking out loud. Stays open across weeks. | Code sessions |
+| **Windsurf** (primary code editor since 2026-04-19) | All code: schema, migrations, features, tests, debugging, refactors. Updating `_build/*.md` during code sessions. | Strategic thinking, cross-app tasks |
+| **Cowork — long chat "Hour — Strategy"** | Strategy, competitive analysis, pricing, planning, architectural thinking out loud. Stays open across weeks. Also operates the Supabase MCP for DB migrations. | Code edits inside `apps/` |
 | **Cowork — short ad-hoc chats** | One-off tasks: draft an email, analyze a contract, prepare a meeting briefing. Born, done, discarded. | Anything requiring multi-session context |
 | **Cowork `.zerø` integration** | Daily briefings, tasks, Ørbit, area-level context. | Hour-specific work |
 
@@ -43,26 +43,29 @@ That loads ~90% of project context in seconds without depending on what was said
 
 | File | Purpose | Status |
 |---|---|---|
-| `context.md` | This workflow guide (CLAUDE.md is a stub) | v1.1 — 2026-04-18 |
-| `ARCHITECTURE.md` | Technical stack, multi-tenancy, security, environments | v1 — 2026-04-18 |
+| `context.md` | This workflow guide (CLAUDE.md is a stub) | v1.2 — 2026-04-19 |
+| `ARCHITECTURE.md` | Technical stack, multi-tenancy, security, environments | v1.1 — 2026-04-19 (polymorphic) |
 | `DECISIONS.md` | Chronological log of decisions with rationale | Active — append-only |
 | `COMPETITION.md` | Ares, Bresca, other competitors | v1 — 2026-04-18 |
-| `schema.sql` | Full Postgres schema | To be written — next session |
-| `rls-policies.sql` | RLS policies per tenant-scoped table | To be written — next session |
-| `bootstrap.md` | Step-by-step setup guide (Supabase + CF + DNS) | To be written |
-| `import-plan.md` | Mapping of 168 existing Difusión leads to new schema | To be written |
+| `schema.sql` | Full Postgres schema — 12 tables, polymorphic core | v2 — 2026-04-19 (rewritten from scratch) |
+| `rls-policies.sql` | RLS policies + helpers + audit triggers + access-token hook | v2 — 2026-04-19 (rewritten from scratch) |
+| `seed.sql` | Pre-seed + post-signup claim script for marco-rubiol/mamemi | v1 — 2026-04-19 |
+| `bootstrap.md` | Step-by-step setup guide (Supabase + CF + DNS) | v1 — 2026-04-19 (needs polymorphic refresh) |
+| `import-plan.md` | Mapping 156 Difusión programmers into person + engagement | Implemented via `import/*.py` |
+| `import/` | 3-stage pipeline: `01_normalize.py` → `02_enrich_from_pdf.py` → `03_load_to_hour.py` | Ready; loader supports `--skip-engagements` pre-signup |
 | `adr/` | Extended ADRs for complex decisions (if needed) | Empty |
 
 ---
 
 ## Next session — agenda
 
-Pending for tomorrow's session:
+Ordered checklist to finish Phase 0 bootstrap:
 
-1. Quick review of `ARCHITECTURE.md`, `DECISIONS.md`, `COMPETITION.md` — tweak anything that doesn't fit
-2. Write `schema.sql`: organization, user/membership, project, contact (3-tier), event, task (with Dispatch/Queue/Ping/Deferred/Shelf/Trace sections), file, note, rider
-3. Write `rls-policies.sql` for tenant isolation + role-based refinements
-4. Write `bootstrap.md`: create Supabase project, wire Cloudflare DNS + Pages, first deploy
-5. Start `import-plan.md` for the 168 Difusión leads (source: `ZS_MaMeMi/Difusión/`)
+1. Marco signs up through the Hour app with `marcorubiol@gmail.com` (creates the `auth.users` row + triggers `handle_new_user`).
+2. Apply the CLAIM block in `_build/seed.sql` (Supabase SQL editor or MCP) — attaches Marco as owner of the pre-seeded `marco-rubiol` workspace and deletes the trigger-created duplicate.
+3. Enable `public.custom_access_token_hook` in Supabase dashboard → Authentication → Hooks (the function already exists; only the toggle is manual).
+4. `python3 _build/import/03_load_to_hour.py` (no flags) → loads 156 persons, taggings, and `status='proposed'` engagements on the MaMeMi project with `custom_fields.season = '2026-27'`.
+5. Verify `GET /api/engagements?project_slug=mamemi&season=2026-27` with a real JWT.
+6. Wire `hour.zerosense.studio` custom domain on the CF Worker (Workers & Pages → Settings → Domains & Routes).
 
-Kickoff in Claude Code (CLI) when ready. The repo doesn't exist yet — first code session will `git init` and set up the monorepo.
+All work happens in Windsurf for code changes and Cowork for strategy; `_build/` is the source of truth.
