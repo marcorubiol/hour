@@ -866,21 +866,36 @@ GRANT SELECT ON show_redacted TO authenticated;
 -- 19. Audit triggers
 --------------------------------------------------------------------------------
 
+-- During a cascading workspace DELETE, the parent workspace row is removed
+-- before child tables (workspace_role, workspace_membership, …) fire their
+-- AFTER DELETE audit triggers. Those child audits would try to INSERT
+-- audit_log rows referencing a workspace that no longer exists, violating
+-- the FK. We (a) NULL the workspace_id in the workspace's own DELETE audit,
+-- and (b) verify the workspace still exists before every other audit write —
+-- falling back to NULL if cascade has already swept it.
 CREATE OR REPLACE FUNCTION write_audit()
 RETURNS TRIGGER AS $$
 DECLARE
   v_ws uuid;
   v_changes jsonb;
 BEGIN
-  BEGIN
-    v_ws := COALESCE(
-      CASE WHEN TG_OP IN ('INSERT','UPDATE') THEN (to_jsonb(NEW) ->> 'workspace_id')::uuid END,
-      CASE WHEN TG_OP IN ('DELETE','UPDATE') THEN (to_jsonb(OLD) ->> 'workspace_id')::uuid END,
-      current_workspace_id()
-    );
-  EXCEPTION WHEN OTHERS THEN
-    v_ws := current_workspace_id();
-  END;
+  IF TG_TABLE_NAME = 'workspace' AND TG_OP = 'DELETE' THEN
+    v_ws := NULL;
+  ELSE
+    BEGIN
+      v_ws := COALESCE(
+        CASE WHEN TG_OP IN ('INSERT','UPDATE') THEN (to_jsonb(NEW) ->> 'workspace_id')::uuid END,
+        CASE WHEN TG_OP IN ('DELETE','UPDATE') THEN (to_jsonb(OLD) ->> 'workspace_id')::uuid END,
+        current_workspace_id()
+      );
+    EXCEPTION WHEN OTHERS THEN
+      v_ws := current_workspace_id();
+    END;
+
+    IF v_ws IS NOT NULL AND NOT EXISTS (SELECT 1 FROM public.workspace WHERE id = v_ws) THEN
+      v_ws := NULL;
+    END IF;
+  END IF;
 
   IF TG_OP = 'INSERT' THEN
     v_changes := to_jsonb(NEW);
