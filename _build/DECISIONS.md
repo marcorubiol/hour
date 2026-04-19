@@ -121,11 +121,32 @@ Format:
 - **Rationale**: Marco frames Hour primarily as a *vehicle/product for others*, not as a private creative tool. AGENCY is defined as "the vehicle, work for others" — that matches Hour's ambition. Also aligns with the planned multi-tenant SaaS direction if Phase 1 activates.
 - **Status**: Firm.
 
+## [2026-04-19] — GitHub repo location: personal user, private
+- **Decision**: Repo lives at `github.com/marcorubiol/hour`, private, under Marco's personal GitHub account.
+- **Context**: Milestone 5 (`git init` + first push) reached before a Phase 1 decision on branding or org structure.
+- **Alternatives**: Create a `zerosense` GitHub org now and host the repo there — rejected. The org/brand decision belongs to Phase 1 kickoff, not to the push timing.
+- **Rationale**: GitHub supports lossless repo transfer between user and org (history, issues, PRs, stars all preserved). Creating an org now under pressure from an unrelated milestone would force a premature brand/fiscal decision. Private is obvious for Phase 0 (internal code, no external users).
+- **How to apply at Phase 1**: If Phase 1 activates and a `zerosense` org is created, use GitHub's "Transfer ownership" flow — keeps remote URL redirects active for grace period, no force-push required for clones.
+- **Status**: Firm for Phase 0. Revisit at Phase 1 kickoff.
+
+## [2026-04-19] — UUID v7 generation: PL/pgSQL function, not pg_uuidv7 extension
+- **Decision**: Provide `uuid_generate_v7()` as a PL/pgSQL function built on `pgcrypto.gen_random_bytes()`. Remove `CREATE EXTENSION "pg_uuidv7"` from the first migration.
+- **Context**: Original schema.sql (commit `dbd6eed`) requires the `pg_uuidv7` extension. Verified 2026-04-19 that Supabase Cloud does not whitelist this extension, and Postgres 17 (Supabase current) does not ship native `uuidv7()` (that arrived in PG18).
+- **Alternatives considered**:
+  - Wait for Supabase to whitelist `pg_uuidv7` — rejected, indefinite timeline, blocks deploy.
+  - Wait for Supabase to upgrade to PG18 native `uuidv7()` — rejected, unconfirmed and blocks deploy.
+  - Install the `cem@uuidv7` TLE package from database.dev — rejected, extra dependency for a ~10-line function.
+  - Downgrade to UUID v4 via `uuid_generate_v4()` — rejected, loses index locality benefits already committed to in DECISIONS (2026-04-18 UUID v7 entry).
+  - Use `gen_random_uuid()` (UUID v4) — same objection as above.
+- **Rationale**: A ~10-line PL/pgSQL function using `pgcrypto` produces RFC 9562-compliant UUID v7 values on any Postgres 13+. Performance delta vs C extension is irrelevant at Phase 0 scale (1 org, ≤5 users). When Supabase adds `pg_uuidv7` or upgrades to PG18, swap the function body to call the native implementation — schema, PKs, and all FKs stay untouched because they reference the function name, not the implementation.
+- **How to apply**: First migration creates the function. Schema migrations keep calling `uuid_generate_v7()` as default. Future migration can replace the function body once native support arrives.
+- **Status**: Firm for Phase 0. Revisit when Supabase ships native UUID v7.
+
 ## [2026-04-18] — Deferred to kickoff session
 Items NOT yet decided, to address when starting schema work:
 
 - Frontend framework confirmation (Astro+Svelte recommended, alternatives Next.js or SvelteKit)
 - Auth flow: magic link only (Phase 0) vs + Google OAuth (Phase 1)
-- Repo under Marco's GitHub user vs new `zerosense` org
+- ~~Repo under Marco's GitHub user vs new `zerosense` org~~ — resolved 2026-04-19, see entry above.
 - Staging deploy frequency: per-PR vs on-merge-only
 - Ableton/Qlab integration depth (read-only metadata vs two-way sync) — Phase 1+ feature

@@ -23,8 +23,8 @@ Working name: **Hour**. Brand decision deferred to Phase 1.
 - Project lives in AGENCY (the vehicle / work for others), not STUDIO — Marco's call.
 
 ## Code
-- Local path: *TBD — first code session will `git init` the monorepo here at `03_AGENCY/Hour/` or a sibling folder*.
-- GitHub repo: *TBD — decide between personal user and a future `zerosense` org at kickoff*.
+- Local path: `03_AGENCY/Hour/` (monorepo, `git init` done 2026-04-19, branch `main`).
+- GitHub repo: `https://github.com/marcorubiol/hour` (private, personal user). Transferable to a `zerosense` org if Phase 1 activates.
 - Live site (Phase 0): `hour.zerosense.studio` (not yet deployed).
 - Specs and planning: `_build/` (CLAUDE.md, ARCHITECTURE.md, DECISIONS.md, COMPETITION.md).
 
@@ -33,11 +33,12 @@ Working name: **Hour**. Brand decision deferred to Phase 1.
 - Source of the 168 existing leads to import: `01_STAGE/ZS_MaMeMi/Difusión/`
 
 ## Upcoming milestones
-1. Write `_build/schema.sql` (organization, user/membership, project, 3-tier contact, event, task, file, note, rider).
-2. Write `_build/rls-policies.sql` (tenant isolation + role-based refinements).
-3. Write `_build/bootstrap.md` (Supabase project + CF DNS + Pages + first deploy).
-4. Write `_build/import-plan.md` (map 168 Difusión leads into new schema).
-5. `git init` the monorepo, first deploy to `hour.zerosense.studio`.
+1. ~~Write `_build/schema.sql`~~ — done (commit `dbd6eed`, 15 tables).
+2. ~~Write `_build/rls-policies.sql`~~ — done (commit `dbd6eed`, 18 sections, helpers + ENABLE/FORCE + per-table policies + guard triggers + audit log).
+3. ~~`git init` + push to GitHub~~ — done, repo at `github.com/marcorubiol/hour`.
+4. ~~Write `_build/bootstrap.md`~~ — done 2026-04-19. Pre-flight patch replaces `pg_uuidv7` with PL/pgSQL `uuid_generate_v7()` (extension not on Supabase Cloud whitelist).
+5. **Execute bootstrap steps 1–8** (patch schema, create Supabase project, push migrations, scaffold Astro, first deploy to `hour.zerosense.studio`).
+6. Write `_build/import-plan.md` (map 168 Difusión leads into new schema).
 
 ## Open for next session
-Review `_build/ARCHITECTURE.md`, `_build/DECISIONS.md`, `_build/COMPETITION.md` briefly, then jump into `schema.sql` in Claude Code (CLI).
+Execute `_build/bootstrap.md` top-to-bottom. Step 1 patches `schema.sql` for Supabase's lack of `pg_uuidv7`; steps 2–8 go from empty Supabase account to a live placeholder page at `hour.zerosense.studio`. Marco drives the cloud-side actions (Supabase project creation, CF dashboard, R2 token) since they require his authenticated sessions.
