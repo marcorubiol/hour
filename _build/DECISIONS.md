@@ -476,3 +476,98 @@ Explicit non-goals and schema-ready-but-UI-deferred items. Not addressed in the 
 - **Scope**: Visual editor for `project_membership.permission_grants` / `permission_revokes`. Lets an admin grant "press agent sees money on this one project" or revoke "tour manager can't edit membership on this one tour".
 - **Why deferred**: Schema supports it from day 1 (ADR-006); UI in Phase 0 only edits role presets because the team is Marco + Anouk and they don't need per-person fine-tuning. Phase 0.5 or Phase 1 when external collaborators join.
 - **Trigger to activate**: first external collaborator who needs a permission the role preset doesn't cover.
+
+### D3 — Task entity (Phase 0, pre-UI)
+- **Scope**: `task` table with polymorphic association (`project_id`, `line_id`, `show_id`, `engagement_id` — all nullable, at most one set). `origin` field: `manual | protocol | ai`. Manual tasks ship in Phase 0; protocol-driven tasks (automated from engagement lifecycle rules) in Phase 0.5; AI-suggested tasks in Phase 1+.
+- **Why included in Phase 0**: Without tasks, the Desk view (primary screen) has no actionable content. Tasks are the backbone of the daily workflow for every research profile.
+- **Trigger for protocol layer**: after 3+ months of manual task usage reveals which patterns Marco actually repeats.
+
+### D4 — Communication layer (Phase 1+)
+- **Scope**: Unified communication view (email, text, WhatsApp, calls) contextualised by House/Room/engagement. Filterable by the same sidebar filters as all other lenses. Not a CRM "activity feed" — a conversation view tied to the engagement lifecycle.
+- **Why deferred**: Requires email integration (IMAP or provider API), WhatsApp Business API, call logging. Heavy infrastructure for Phase 0.
+- **Trigger to activate**: Phase 1 kickoff, or when Marco's daily workflow repeatedly requires switching between Hour and Gmail to track the same conversation.
+
+## [2026-04-20] — ADR-008 — Product vocabulary: House · Room · Run · Gig + Desk lens
+- **Context**: Schema entity names (`workspace`, `project`, `line`, `show`) are technically correct but don't resonate with performing-arts professionals. The research across all 8 profiles shows that vocabulary determines whether users feel the tool is "for them" or "borrowed from another sector." A naming session on 2026-04-19/20 explored 15+ alternatives for the 3-level hierarchy (project → line → show), testing each against all 8 research profiles. Key findings: (a) Room fits the show/piece better than the company — theatre people think in shows, not companies; (b) the company/collective level already exists as `workspace` but needed a name; (c) "gig" is the universal word for an individual performance event across all profiles; (d) the primary UI view needed its own name.
+- **Decision**: Four-level product vocabulary mapping to existing schema entities, plus one UI lens name:
+  - **House** = `workspace` = the company, collective, or personal brand. Organisational boundary. Examples: "MaMeMi", "La Veronal", "Marco Rubiol".
+  - **Room** = `project` = the show, piece, album, or production. The creative/commercial unit. Examples: "De què parlem...", "Espectáculo A", "Album 3".
+  - **Run** = `line` = a grouping of gigs within a room. A tour, season, festival circuit, residency block. Examples: "Gira Catalunya primavera", "Festival run summer 2026", "Residència Aarhus".
+  - **Gig** = `show` = a single performance event at a venue on a date. The atomic unit. Examples: "Teatre de l'Aurora, 9 mayo, €2.400".
+  - **Desk** = the primary UI lens (the "Today/Home" view). What's on your plate — tasks, upcoming gigs, pending money, waiting items. Named to extend the house metaphor (House → Room → Desk = where you sit to work).
+- **Vocabulary coherence**: House, Room, and Desk share a spatial/domestic metaphor (the planning space). Run and Gig are action/sector-native words (the execution space). The split is intentional: planning happens inside the house; execution happens outside. Both register types are monosyllabic, physical, and informal.
+- **Alternatives explored and rejected**:
+  - *Project · Line · Show* — technically accurate but generic; "line" means nothing in performing arts vocabulary.
+  - *Project · Block · Show* — "Block" is neutral but cold; no emotional resonance.
+  - *Project · Season · Show* — "Season" doesn't fit short tours or residencies.
+  - *Project · Leg · Show* — "Leg" only works for touring; excludes non-touring profiles.
+  - *Work · Arc · Show* — "Work" is good but "Arc" is too literary for daily use.
+  - *Piece · Wave · Gig* — "Wave" is poetic but operationally unclear.
+  - *Score · Movement · Beat* — too musical; excludes theatre/dance profiles.
+  - *World · Path · Stop* — "World" is grandiose for small projects.
+  - *Desk · Thread · Spot* — "Desk" as top level conflicts with its better fit as the UI lens name.
+  - *Room · Set · Gig* — "Set" has too much technical theatre baggage (stage set, set list, DJ set).
+  - *Room · Run · Show* — "Show" is good but less universal and informal than "Gig"; Marco confirmed "Gig" resonates better.
+  - 3-level model with Room = company — rejected by Marco; Room must be the show/piece, which elevated the workspace to a named entity (House).
+  - Not naming the workspace level — rejected; the sidebar groups rooms by house, so the house needs a label.
+  - *Now* for the primary lens — rejected, too urgent/pressured.
+  - *Home* for the primary lens — rejected, confuses with homepage and with House.
+  - *Plate* for the primary lens — rejected, too informal and not spatial.
+- **Validation against all 8 research profiles**:
+  - Profile 01 (theatre/dance co): House = La Calòrica, Rooms = each piece in repertoire, Runs = tours/seasons, Gigs = performances. ✓
+  - Profile 02 (indie band): House = the band, Room = the album/show project, Runs = tour legs/festival circuits, Gigs = individual concerts. ✓✓ (native vocabulary)
+  - Profile 03 (label/agency): Houses = workspace per artist on roster, Rooms = each artist's active projects, Runs = tour campaigns, Gigs = bookings. ✓
+  - Profile 04 (DIY band): House = the band (single), Room = the show, Run = mini-tour, Gig = the gig. ✓ (excluded from Phase 0 but vocabulary fits)
+  - Profile 05 (solo artist): House = personal brand, Room = each piece/monologue/choreography, Runs = touring blocks, Gigs = dates. ✓
+  - Profile 06 (freelance distributor): Houses = each represented company (COLLABORATING in sidebar), Rooms = shows being distributed, Runs = seasonal campaigns, Gigs = booked dates. ✓✓ (multi-tenant native)
+  - Profile 07 (tour technician): Houses = companies worked for (COLLABORATING), Rooms = shows assigned to, Runs = touring blocks, Gigs = individual show calls. ✓ (also full user, not just invitee)
+  - Profile 08 (manager/booking agent): Houses = workspace per artist, Rooms = each artist's active projects, Runs = tours/festival circuits, Gigs = bookings. ✓
+- **Schema mapping** (no schema changes required — this is a vocabulary layer):
+  - `workspace` → House (UI label, API documentation, user-facing copy)
+  - `project` → Room
+  - `line` → Run
+  - `show` → Gig
+  - Code-level: schema retains technical names (`workspace`, `project`, `line`, `show`). Product vocabulary (House, Room, Run, Gig) appears in UI labels, API documentation, user-facing copy, and onboarding. Internal code may use either; public-facing always uses product vocabulary.
+- **Consequences**:
+  - UI: sidebar groups Rooms under House headers. Lenses (Desk, Calendar, Contacts, Money) respect active House/Room filter.
+  - Onboarding: "Create your first House" → "Add a Room" → "Plan a Run" → "Book a Gig".
+  - Documentation: all user-facing docs use product vocabulary. Technical docs (schema, RLS) keep DB names.
+  - Marketing (Phase 1): vocabulary becomes brand identity — "the tool that speaks your language."
+- **Status**: Firm.
+
+## [2026-04-20] — ADR-009 — UI architecture: single view + filter sidebar + lens tabs
+- **Context**: Traditional SaaS navigation uses separate pages per section (Contacts page, Calendar page, etc.). During UI exploration on 2026-04-19/20, Marco proposed a filter-first model inspired by the WPML Etch plugin he built: the main content area is always "the view," and it changes dynamically based on two axes of control — what type of information you see (lens) and what context you filter by (sidebar). This eliminates the "which page am I on?" problem and makes the sidebar a universal filter rather than navigation.
+- **Decision**: Two-axis UI architecture:
+  1. **Lens** (top bar or tabs): Desk, Calendar, Contacts, Money — determines *what type* of content is displayed. Each lens shows the same data pool through a different presentation. Future lenses (Comms, Archive) can be added without restructuring.
+  2. **Filter** (sidebar): House → Room → Run hierarchy. Selecting a House filters all lenses to that company. Selecting a Room narrows to that show. Selecting a Run narrows to that grouping. Deselecting returns to the panoramic cross-house view.
+  - Filters persist across lens switches. If La Calòrica is selected and you switch from Desk to Calendar, the calendar shows only La Calòrica gigs.
+  - **Desk without filter** = panoramic view of all houses, all rooms, all tasks/gigs/money items. Each item shows its House indicator (colored dot + name) for cross-house context.
+  - **⌘K command palette** is a first-class navigation element from day 1. Must support: switching houses, switching rooms, jumping to a specific gig/person/run, switching lenses, executing actions (create gig, add task). Power users should be able to hide the sidebar entirely and navigate exclusively via ⌘K.
+- **Sidebar structure**:
+  ```
+  MY HOUSES
+    ● MaMeMi
+      Room Espectáculo A     3
+      Room Espectáculo B     2
+  
+  COLLABORATING
+    ● La Veronal
+      Room Pieza X           5
+    ● Company C  [archived]
+      Room Pieza Z           —
+  ```
+  - Houses are grouped by ownership (MY HOUSES = workspace owner/admin, COLLABORATING = member/guest).
+  - Archived houses/rooms are collapsed but accessible (one click to reactivate).
+  - Room count badges show active gig count.
+- **Alternatives considered**:
+  - Separate pages per section (Contacts page, Calendar page, etc.) — rejected, creates "where am I?" confusion and loses the filter-as-context paradigm.
+  - Sidebar as navigation (clicking project opens project page) — rejected by Marco; sidebar must be a filter, not a destination.
+  - No sidebar option — rejected for default, but ⌘K-only mode is supported for power users who prefer minimal UI.
+- **Rationale**: The performing-arts professional works in two modes: (a) "everything at once" (Monday morning, what's on my plate across all houses) and (b) "deep in one company" (today I work for La Calòrica). The filter model supports both without page switches. ⌘K ensures keyboard-first users are never blocked by the UI structure.
+- **Consequences**:
+  - Frontend: single layout component with lens tabs + filter sidebar. Content area re-renders based on active lens + active filter.
+  - State management: filter state (selected house/room/run) lives in URL params or app state, persists across lens switches.
+  - ⌘K: requires an indexed search across houses, rooms, runs, gigs, persons, tasks. Supabase full-text search or client-side index.
+  - Responsive/mobile: sidebar collapses to a filter drawer; ⌘K becomes the primary navigation on mobile.
+  - Performance: panoramic view (no filter) must load efficiently across all houses — requires proper RLS + pagination.
+- **Status**: Firm for the architecture. Lens list (Desk, Calendar, Contacts, Money) is provisional — Comms lens deferred to Phase 1+ (see D4).
