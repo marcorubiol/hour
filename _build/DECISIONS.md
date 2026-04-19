@@ -142,16 +142,34 @@ Format:
 - **How to apply**: First migration creates the function. Schema migrations keep calling `uuid_generate_v7()` as default. Future migration can replace the function body once native support arrives.
 - **Status**: Firm for Phase 0. Revisit when Supabase ships native UUID v7.
 
-## [2026-04-19] — Auth flow: magic-link only for Phase 0
-- **Decision**: Supabase Auth with email magic-link as the only sign-in method. Email+password disabled. OAuth providers (Google, Apple) deferred to Phase 1.
-- **Context**: Phase 0 has ≤5 users (Marco, Anouk, up to 3 collaborators). First-time setup of `hour.zerosense.studio` required an auth choice.
-- **Alternatives considered**:
-  - Email + password — rejected, passwords to remember/rotate for 5 internal users is pure friction.
-  - Magic-link + Google OAuth from day one — rejected, OAuth adds callback URLs, token rotation, and a larger auth surface with no Phase 0 benefit (all 5 users have email).
-  - Passkey/WebAuthn — rejected, Supabase support is still preview-level and it's overkill for an internal tool.
-- **Rationale**: Magic link is zero-friction for trusted small teams. Resend's free tier (3k/month, 100/day) is ~100× what 5 users need. Adding OAuth when external users appear in Phase 1 is a dashboard toggle + config change, not a migration. Session length will be set to 30 days so mobile users don't re-auth daily.
-- **How to apply**: Bootstrap §2.1 enables Magic Link and disables Password in the Supabase dashboard. Site URL = `hour.zerosense.studio`, redirect = `http://localhost:4321/*` for dev.
-- **Status**: Firm for Phase 0. Revisit at Phase 1 kickoff when external users appear.
+## ~~[2026-04-19] — Auth flow: magic-link only for Phase 0~~ (SUPERSEDED same day)
+- ~~**Decision**: Supabase Auth with email magic-link as the only sign-in method. Email+password disabled. OAuth providers (Google, Apple) deferred to Phase 1.~~
+- ~~**Context**: Phase 0 has ≤5 users (Marco, Anouk, up to 3 collaborators). First-time setup of `hour.zerosense.studio` required an auth choice.~~
+- ~~**Alternatives considered**:~~
+  - ~~Email + password — rejected, passwords to remember/rotate for 5 internal users is pure friction.~~
+  - ~~Magic-link + Google OAuth from day one — rejected, OAuth adds callback URLs, token rotation, and a larger auth surface with no Phase 0 benefit (all 5 users have email).~~
+  - ~~Passkey/WebAuthn — rejected, Supabase support is still preview-level and it's overkill for an internal tool.~~
+- ~~**Rationale**: Magic link is zero-friction for trusted small teams. Resend's free tier (3k/month, 100/day) is ~100× what 5 users need. Adding OAuth when external users appear in Phase 1 is a dashboard toggle + config change, not a migration. Session length will be set to 30 days so mobile users don't re-auth daily.~~
+- ~~**How to apply**: Bootstrap §2.1 enables Magic Link and disables Password in the Supabase dashboard. Site URL = `hour.zerosense.studio`, redirect = `http://localhost:4321/*` for dev.~~
+- **Status**: **Superseded 2026-04-19 by "Auth flow: email+password with optional TOTP 2FA"** (below). Marco preferred a traditional account + password flow with opt-in 2FA over magic-link-only.
+
+## [2026-04-19] — Auth flow: email+password with optional TOTP 2FA for Phase 0
+- **Decision**: Supabase Auth with email+password as the primary sign-in method, TOTP (app authenticator) as an optional second factor that users can enroll themselves. OAuth providers (Google, Apple) deferred to Phase 1. Magic-link-only approach (earlier same-day ADR) rejected in favor of this.
+- **Context**: Marco reconsidered the magic-link-only choice on 2026-04-19 during the Phase 0 Supabase dashboard setup. Preference: a traditional "make an account, log in with password, optionally turn on 2FA" flow, which is more familiar for the target Phase 1 audience (non-technical cultural programmers) and removes dependency on email deliverability for every login.
+- **Alternatives considered (this pass)**:
+  - Stay with magic-link-only — rejected, adds friction on every login (check email, click), hard requirement on Resend uptime for day-to-day access.
+  - Password + SMS 2FA — rejected, costs money per SMS, vulnerable to SIM-swap, requires a paid SMS provider (Twilio) that conflicts with Phase 0 zero-cost target.
+  - Password + email OTP as 2FA — rejected, redundant (email is already the account identifier and password recovery channel — adding it as 2FA adds zero real security).
+  - Password + mandatory TOTP from day 1 — rejected for Phase 0, would block Marco/Anouk/collaborators from a simple signup flow; can be escalated to mandatory for admin roles in Phase 1 via AAL2 policies.
+- **Rationale**: Email+password is the most familiar pattern for the target audience. Optional TOTP lets security-conscious users (Marco) harden their account without forcing every collaborator through an enrollment flow on day 1. TOTP specifically (not SMS, not email-OTP) is the industry-standard second factor — free (no SMS cost), phishing-resistant (codes don't leave the user's device), and already familiar to anyone who uses a banking app or GitHub.
+- **How to apply**: Supabase dashboard settings (applied 2026-04-19):
+  - Authentication → Sign In / Providers → Email: `Enable email provider` ON, `Confirm email` ON (verification email required before first login), `Secure email change` ON, `Minimum password length` raised to 8 from default 6, password complexity requirements enabled.
+  - Authentication → Multi-Factor: TOTP enabled. UI in `apps/web/` will later expose self-service enrollment under account settings.
+  - Authentication → URL Configuration: Site URL = `https://hour.zerosense.studio`, Redirect URLs = `https://hour.zerosense.studio/**` + `http://localhost:4321/**`.
+  - Authentication → Sessions: kept at Free-plan defaults (JWT expiry 1h, refresh tokens persistent — time-box and inactivity timeout are Pro-plan features, not needed in Phase 0).
+  - App code (not yet written): `signUp({ email, password })`, `signInWithPassword({ email, password })`, `auth.mfa.enroll()` / `challenge()` / `verify()` for 2FA. No call to `signInWithOtp` unless we later add a magic-link fallback.
+- **Upgrade path at Phase 1**: (a) add OAuth providers (Google, Apple) as additional signup paths, (b) optionally enforce TOTP for admin roles via AAL2 RLS policies on sensitive tables.
+- **Status**: Firm for Phase 0. Revisit if a customer explicitly demands passwordless or SSO in Phase 1.
 
 ## [2026-04-19] — Supabase region: eu-central-1 (Frankfurt)
 - **Decision**: Create the Supabase Cloud project in `eu-central-1` (Frankfurt).
