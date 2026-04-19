@@ -242,7 +242,32 @@ Monorepo via pnpm workspaces. One package per app + shared types.
 
 ---
 
-## 17. Next files in `_build/`
+## 17. API routes (Astro SSR on the Worker)
+
+Location: `apps/web/src/pages/api/*.ts`. All endpoints forward the caller's
+Supabase JWT to PostgREST — **RLS is the access-control boundary; the Worker
+is not.**
+
+| Route | Method | Purpose |
+|-------|--------|---------|
+| `/api/prospects` | GET | contact_project rows joined to contact + tags, filtered by project_slug/status. First end-to-end smoke endpoint. |
+
+Shared helpers:
+- `src/lib/auth.ts` — JWT extraction from `Authorization` header.
+- `src/lib/supabase.ts` — thin PostgREST client over `fetch`.
+
+Convention: every route sets `export const prerender = false`, returns
+`{ error, detail?, hint? }` on failure, and never logs the JWT or body.
+
+Full details + testing recipe: `apps/web/src/pages/api/README.md`.
+
+Open dependency: `current_org_id` JWT claim needs a custom access-token hook
+in Supabase Auth (reads `membership` row at sign-in, injects the claim).
+Until wired, RLS returns zero rows for authenticated users.
+
+---
+
+## 18. Next files in `_build/`
 
 - `schema.sql` — full Postgres schema with constraints, indexes, triggers
 - `rls-policies.sql` — RLS policies for every tenant-scoped table
@@ -252,7 +277,7 @@ Monorepo via pnpm workspaces. One package per app + shared types.
 
 ---
 
-## 18. Out of scope for this doc
+## 19. Out of scope for this doc
 
 - Visual design (lives in `_methød/design.md`)
 - CSS methodology (lives in `_methød/css.md`)

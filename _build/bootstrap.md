@@ -220,23 +220,25 @@ Dashboard → R2 → Create bucket:
 Create an API token (R2 → Manage R2 API tokens) with **Object Read & Write** scoped to `hour-phase0-media`. Store `access_key_id`, `secret_access_key`, and the `endpoint` URL in `.zerø/config/hour-r2-token`.
 
 ### 6.2 DNS for the subdomain
-Dashboard → `zerosense.studio` zone → DNS → Add record. Defer the actual CNAME target until after step 7 (Pages gives you `hour.pages.dev` or similar). Placeholder for now.
+Dashboard → `zerosense.studio` zone → DNS → Add record. With Workers (step 8) CF creates the DNS record automatically the moment you attach the custom domain — no manual CNAME required. Leave this step as a sanity check that the `zerosense.studio` zone is indeed on the same CF account as the Worker.
 
 ---
 
-## 7. Frontend scaffold (Astro + Svelte)
+## 7. Frontend scaffold (Astro + Svelte + Workers)
 
-This is the minimum to have something to deploy. Not the real frontend.
+> We ship on **Cloudflare Workers**, not Pages. `@astrojs/cloudflare` v12 targets Workers by default when `main` + `assets` are defined in `wrangler.toml`. Pages also works, but Workers gives us one deploy model for both static assets and SSR.
 
-```
+Minimum to have something to deploy. Not the real frontend.
+
+```bash
 # from repo root
 pnpm create astro@latest apps/web -- --template minimal --typescript strict --install --no-git
 cd apps/web
-pnpm add -D @astrojs/svelte @astrojs/cloudflare
+pnpm add -D @astrojs/svelte @astrojs/cloudflare wrangler@^4
 pnpm dlx astro add svelte cloudflare
 ```
 
-Edit `apps/web/astro.config.mjs` to target Cloudflare Pages:
+Edit `apps/web/astro.config.mjs`:
 ```js
 import { defineConfig } from 'astro/config';
 import svelte from '@astrojs/svelte';
@@ -244,32 +246,52 @@ import cloudflare from '@astrojs/cloudflare';
 
 export default defineConfig({
   output: 'server',
-  adapter: cloudflare(),
+  adapter: cloudflare({ platformProxy: { enabled: true } }),
   integrations: [svelte()],
+  site: 'https://hour.zerosense.studio',
 });
 ```
 
-Replace `src/pages/index.astro` with a one-liner that proves the pipeline works:
+Create `apps/web/wrangler.toml`:
+```toml
+name = "hour-web"
+compatibility_date = "2025-02-14"
+compatibility_flags = ["nodejs_compat"]
+
+# @astrojs/cloudflare v12 emits the SSR worker at dist/_worker.js and static
+# assets alongside it. Wrangler serves the assets via the CDN binding.
+main = "./dist/_worker.js/index.js"
+assets = { directory = "./dist", binding = "ASSETS" }
+
+[observability]
+enabled = true
+
+# R2 bucket (step 6).
+[[r2_buckets]]
+binding = "MEDIA"
+bucket_name = "hour-media"
+
+# Non-secret public env vars. Secrets go via `wrangler secret put` or the
+# dashboard — NEVER in this file.
+[vars]
+PUBLIC_SUPABASE_URL = "https://<project-ref>.supabase.co"
+PUBLIC_SUPABASE_ANON_KEY = "<publishable key from step 2>"
+```
+
+Exclude the worker bundle from the static asset upload to avoid Wrangler errors:
+```bash
+echo "_worker.js" > apps/web/public/.assetsignore
+```
+
+Placeholder page at `src/pages/index.astro`:
 ```astro
 ---
 const now = new Date().toISOString();
 ---
 <html lang="en">
   <head><title>Hour</title></head>
-  <body>
-    <main>
-      <h1>Hour — Phase 0</h1>
-      <p>Deploy OK at {now}</p>
-    </main>
-  </body>
+  <body><main><h1>Hour — Phase 0</h1><p>Deploy OK at {now}</p></main></body>
 </html>
-```
-
-Test locally:
-```
-cd apps/web
-pnpm dev
-# open http://localhost:4321
 ```
 
 Wire pnpm workspace at repo root — add `pnpm-workspace.yaml`:
@@ -279,38 +301,52 @@ packages:
   - "packages/*"
 ```
 
+Local smoke:
+```bash
+cd apps/web
+pnpm dev           # astro dev at http://localhost:4321
+pnpm run preview   # wrangler dev — runs the built Worker locally
+```
+
 Commit:
 ```
 git add .
-git commit -m "feat(web): astro+svelte scaffold for first deploy"
+git commit -m "feat(web): astro+svelte+workers scaffold for first deploy"
 git push
 ```
 
 ---
 
-## 8. Cloudflare Pages + first deploy
+## 8. Cloudflare Workers + first deploy
 
-Dashboard → Pages → Create → Connect to Git:
-1. Select `marcorubiol/hour`.
-2. Production branch: `main`.
-3. Framework preset: **Astro**.
-4. Build command: `pnpm --filter web build`
-5. Build output directory: `apps/web/dist`
-6. Root directory: leave empty (repo root).
-7. Environment variables (Build + Preview):
-   - `NODE_VERSION` = `22`
-   - `PNPM_VERSION` = `9`
-   - `PUBLIC_SUPABASE_URL` = `<from step 2>`
-   - `PUBLIC_SUPABASE_ANON_KEY` = `<from step 2>`
-8. Save and deploy. First build runs ~2–3 min.
+With the wrangler config above, one command deploys everything:
 
-After build succeeds, Pages gives the project a URL like `hour-xyz.pages.dev`.
+```bash
+cd apps/web
+pnpm run deploy   # equivalent to: astro build && wrangler deploy
+```
+
+Wrangler prompts for CF login on first run and then uploads both the SSR
+worker and the static assets. It prints a URL like
+`https://hour-web.marco-rubiol.workers.dev` — this is the production origin
+until the custom domain is attached.
 
 ### 8.1 Connect the subdomain
-- Pages → Custom domains → Add `hour.zerosense.studio`.
-- CF auto-creates the CNAME in the `zerosense.studio` zone (that's why the zone must be on the same CF account).
-- Wait for SSL cert (30–90 s).
-- Open `https://hour.zerosense.studio` — should show the "Deploy OK" page.
+Dashboard → Workers & Pages → `hour-web` → Settings → Domains & Routes → Add
+Custom Domain → `hour.zerosense.studio`. Because `zerosense.studio` is on the
+same CF account, the CNAME + SSL cert provision automatically in ~60 seconds.
+No DNS work needed.
+
+### 8.2 Env vars / secrets
+Set secrets via CLI (never commit them):
+```bash
+cd apps/web
+wrangler secret put SUPABASE_SERVICE_ROLE_KEY   # service role, server only
+wrangler secret put RESEND_API_KEY              # when email is wired
+```
+
+`PUBLIC_*` values live in `[vars]` of `wrangler.toml` (not secret, visible to
+the browser). Rotate them with `wrangler deploy` after editing the file.
 
 ---
 
@@ -318,28 +354,25 @@ After build succeeds, Pages gives the project a URL like `hour-xyz.pages.dev`.
 
 | Key | Where used | Source | In repo? |
 |---|---|---|---|
-| `PUBLIC_SUPABASE_URL` | browser + server | Supabase dashboard | No — env var |
-| `PUBLIC_SUPABASE_ANON_KEY` | browser + server | Supabase dashboard | No — env var |
-| `SUPABASE_SERVICE_ROLE_KEY` | server only (Pages Functions / Edge) | Supabase dashboard | No — `.zerø/config/` + CF env |
-| `R2_ACCESS_KEY_ID` | server only | CF R2 token | No |
-| `R2_SECRET_ACCESS_KEY` | server only | CF R2 token | No |
-| `R2_BUCKET` | server only | `hour-phase0-media` | No |
-| `R2_ENDPOINT` | server only | CF R2 | No |
-| `RESEND_API_KEY` | server only | Resend | No — add when email flow wired |
+| `PUBLIC_SUPABASE_URL` | browser + server | Supabase dashboard | `wrangler.toml [vars]` |
+| `PUBLIC_SUPABASE_ANON_KEY` | browser + server | Supabase dashboard | `wrangler.toml [vars]` |
+| `SUPABASE_SERVICE_ROLE_KEY` | server only (Worker) | Supabase dashboard | No — `wrangler secret put` + `.zerø/config/` |
+| `MEDIA` (R2 binding) | server only | `wrangler.toml [[r2_buckets]]` | Yes — it's a binding name, not a secret |
+| `RESEND_API_KEY` | server only | Resend | No — `wrangler secret put` when wired |
 | `SENTRY_DSN` | browser + server | Sentry | No — add when observability wired |
 
-Never commit anything from the second column onward. `.gitignore` already covers `.env*`.
+Rule: anything that a third party could misuse if leaked → `wrangler secret put`. Public-read values → `[vars]`.
 
 ---
 
 ## 10. Post-deploy verification checklist
 
-- [ ] `https://hour.zerosense.studio` loads and shows the placeholder page.
+- [ ] `https://<worker>.workers.dev` (or `https://hour.zerosense.studio` once attached) loads and shows the placeholder page.
 - [ ] Supabase dashboard shows 15 tables + `audit_log`.
 - [ ] `SELECT COUNT(*) FROM pg_policies WHERE schemaname='public'` returns ≥ 40.
-- [ ] R2 bucket `hour-phase0-media` exists but is empty.
+- [ ] R2 bucket `hour-media` exists but is empty.
 - [ ] Auth UI in Supabase sends a magic link to a real inbox (use a personal address).
-- [ ] Repo on `main` deploys automatically when pushed.
+- [ ] `git push` on `main` triggers CI → deploy (set up `wrangler deploy` in CI if/when Marco wants auto-deploy; for now it's manual).
 
 When all six checks pass: Phase 0 infra is live. Next up — `import-plan.md` (168 Difusión leads into `contact` + `contact_project`).
 
@@ -349,8 +382,9 @@ When all six checks pass: Phase 0 infra is live. Next up — `import-plan.md` (1
 
 - **Migration order matters** — the filename timestamp prefix (`20260419_0001_...`) is how the CLI sorts. Never rename a migration after it's been pushed.
 - **`FORCE ROW LEVEL SECURITY` also applies to the table owner (postgres role).** The smoke-test step uses `SET LOCAL ROLE` to test isolation; don't panic when the postgres role sees an empty table through the authenticated role.
-- **JWT `current_org_id` claim is not automatic.** Until a JWT hook or Edge Function injects it, every RLS-protected query from a client returns empty. First wiring milestone post-bootstrap.
-- **Cloudflare Pages needs a Node version pin.** Default is old; set `NODE_VERSION=22` (Active LTS through Oct 2027) or builds will fail on modern deps.
-- **Astro + Svelte with Cloudflare adapter** requires `output: 'server'` for Pages Functions. Static-only won't match what we'll need for auth callbacks.
+- **JWT `current_org_id` claim is not automatic.** Until a custom access-token hook injects it from the user's `membership` row, every RLS-protected query from a client returns empty. First wiring milestone post-bootstrap.
+- **`public/.assetsignore`** is mandatory on `@astrojs/cloudflare` v12 + Workers. Without it, wrangler tries to upload `_worker.js` as a static asset and fails with "reserved name".
+- **Wrangler v3 → v4**: the Workers Sites → Static Assets migration completed in wrangler 4.x. Pin `wrangler@^4` in `devDependencies`; sticking on v3 causes `main`/`assets` in `wrangler.toml` to misbehave.
+- **Astro + Svelte with Cloudflare adapter** requires `output: 'server'` for any SSR route (endpoints, auth callbacks, `/api/*`). Static-only won't match what we need.
 - **R2 bucket region**: R2 doesn't expose regions directly — the "auto" location places objects near first access. EU compliance: verify the bucket's actual locations in the dashboard after first uploads.
 - **pg_uuidv7 arrival**: when Supabase ships it, the `uuid_generate_v7()` function can be replaced in a new migration — PKs and existing rows stay valid because values are identical in shape.
