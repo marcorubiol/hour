@@ -1,6 +1,6 @@
 # Import Plan — Phase 0 seed data
 
-> Status: **draft** · Author: Marco + .Zerø · Date: 2026-04-19
+> Status: **draft** · Author: Marco + .zerø · Date: 2026-04-19
 > Scope: bootstrap MaMeMi's `contact` + `contact_project` tables from the existing Mostra Igualada 2026 export dataset.
 > Related ADR: `DECISIONS.md` → "Activate `custom_fields jsonb` on tenant tables" (to be written, driven by this plan).
 

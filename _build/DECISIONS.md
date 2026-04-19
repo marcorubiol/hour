@@ -101,14 +101,14 @@ Format:
   1. **One long Cowork chat "Hour — Strategy"** for strategic thinking, planning, competitive analysis, architecture decisions.
   2. **Claude Code (CLI) in `hour/` repo** for all coding work.
   3. **Short ad-hoc Cowork chats** for one-off tasks (email draft, contract review, meeting briefing).
-  4. **Separate `.Zerø` Cowork integration** for daily briefings, tasks, Ørbit — kept distinct from Hour work.
+  4. **Separate `.zerø` Cowork integration** for daily briefings, tasks, Ørbit — kept distinct from Hour work.
   5. Standard opening instruction for any new chat: *"Read `CLAUDE.md` + `_build/ARCHITECTURE.md` + `_build/DECISIONS.md` + `_build/COMPETITION.md` before responding."*
 - **Context**: Avoid fragmenting knowledge across dozens of chats. Avoid losing context on long threads.
 - **Rationale**: Fewer chats, each with clear purpose. Memory persists in files, not in Claude's memory of any single chat. Any new session can catch up in seconds by reading four markdown files.
 - **Status**: Firm.
 
 ## [2026-04-18] — Project location (physical folder) — initial
-- **Decision**: Phase 0 lives at `/Users/marcorubiol/Zerø System/01_STAGE/ZS_MaMeMi/_build/`. When promoted to its own git repo, move to `02_STUDIO/Hour/` or `04_BACKSTAGE/Hour/` and update `.Zerø` dashboard accordingly.
+- **Decision**: Phase 0 lives at `/Users/marcorubiol/Zerø System/01_STAGE/ZS_MaMeMi/_build/`. When promoted to its own git repo, move to `02_STUDIO/Hour/` or `04_BACKSTAGE/Hour/` and update `.zerø` dashboard accordingly.
 - **Context**: Hour was conceived inside the MaMeMi Difusión problem. By Marco's rule "a project lives where it's born", Hour inherits from STAGE for now.
 - **Alternatives**: Start a fresh folder immediately — rejected, premature separation before we know if Hour outgrows the MaMeMi context.
 - **Rationale**: Keep it simple. One folder for now. Move later if/when Phase 1 activates.

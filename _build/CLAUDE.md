@@ -2,7 +2,7 @@
 
 > Project: **Hour** (working name)
 > Parent: `03_AGENCY/Hour/`
-> Inherits rules from: `.Zerø/CLAUDE.md`, `_METHØD/`, and `03_AGENCY/CLAUDE.md`
+> Inherits rules from: `.zerø/CLAUDE.md`, `_methød/`, and `03_AGENCY/CLAUDE.md`
 
 ---
 
@@ -25,7 +25,7 @@ That loads ~90% of project context in seconds without depending on what was said
 | **Claude Code** (CLI preferred, Desktop equivalent) | All code: schema, migrations, features, tests, debugging, refactors. Updating `_build/*.md` during code sessions. | Strategic thinking, cross-app tasks |
 | **Cowork — long chat "Hour — Strategy"** | Strategy, competitive analysis, pricing, planning, architectural thinking out loud. Stays open across weeks. | Code sessions |
 | **Cowork — short ad-hoc chats** | One-off tasks: draft an email, analyze a contract, prepare a meeting briefing. Born, done, discarded. | Anything requiring multi-session context |
-| **Cowork `.Zerø` integration** | Daily briefings, tasks, Ørbit, area-level context. | Hour-specific work |
+| **Cowork `.zerø` integration** | Daily briefings, tasks, Ørbit, area-level context. | Hour-specific work |
 
 ---
 

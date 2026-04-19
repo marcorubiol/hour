@@ -20,7 +20,7 @@ Local tooling:
 - `wrangler` CLI (`pnpm add -g wrangler`) — needed for R2 and Pages from CLI; optional if doing it all in the CF dashboard
 
 Credentials vault:
-- Marco's `.Zerø/config/` already holds Cloudflare and other API keys. Add Supabase service-role key there after step 2 (never to repo).
+- Marco's `.zerø/config/` already holds Cloudflare and other API keys. Add Supabase service-role key there after step 2 (never to repo).
 
 ---
 
@@ -91,11 +91,11 @@ In the Supabase dashboard:
 
 1. **New project**
    - Name: `hour-phase0`
-   - Database password: generate 32+ chars, store in `.Zerø/config/` as `supabase-db-password`. This is the **postgres** role password, needed for direct SQL connections and migrations.
+   - Database password: generate 32+ chars, store in `.zerø/config/` as `supabase-db-password`. This is the **postgres** role password, needed for direct SQL connections and migrations.
    - **Region: `eu-central-1` (Frankfurt)** — closest to Madrid, EU data residency for GDPR.
    - Plan: Free.
 2. Wait ~2 min for provisioning.
-3. Record the project reference ID (top of Settings → General, looks like `abcdefghijklmno`) — needed for `supabase link`. Store in `.Zerø/config/` as `supabase-project-ref`.
+3. Record the project reference ID (top of Settings → General, looks like `abcdefghijklmno`) — needed for `supabase link`. Store in `.zerø/config/` as `supabase-project-ref`.
 
 ### 2.1 Project-level settings (dashboard)
 
@@ -104,7 +104,7 @@ In the Supabase dashboard:
   - Site URL: `https://hour.zerosense.studio`
   - Redirect URLs: add `http://localhost:4321/*` for local dev (Astro default port).
 - **Database → Extensions**: verify `pgcrypto` and `moddatetime` are listed as *available*. Do NOT enable from UI — migrations will do it.
-- **Settings → API**: copy `Project URL`, `anon public` key, and `service_role` key. Store the service key in `.Zerø/config/supabase-service-key` (never committed).
+- **Settings → API**: copy `Project URL`, `anon public` key, and `service_role` key. Store the service key in `.zerø/config/supabase-service-key` (never committed).
 
 ### 2.2 JWT custom claim for `current_org_id`
 
@@ -217,7 +217,7 @@ Dashboard → R2 → Create bucket:
 - Location: Automatic (or EU if dashboard offers it)
 - No public access — files are served through signed URLs.
 
-Create an API token (R2 → Manage R2 API tokens) with **Object Read & Write** scoped to `hour-phase0-media`. Store `access_key_id`, `secret_access_key`, and the `endpoint` URL in `.Zerø/config/hour-r2-token`.
+Create an API token (R2 → Manage R2 API tokens) with **Object Read & Write** scoped to `hour-phase0-media`. Store `access_key_id`, `secret_access_key`, and the `endpoint` URL in `.zerø/config/hour-r2-token`.
 
 ### 6.2 DNS for the subdomain
 Dashboard → `zerosense.studio` zone → DNS → Add record. Defer the actual CNAME target until after step 7 (Pages gives you `hour.pages.dev` or similar). Placeholder for now.
@@ -320,7 +320,7 @@ After build succeeds, Pages gives the project a URL like `hour-xyz.pages.dev`.
 |---|---|---|---|
 | `PUBLIC_SUPABASE_URL` | browser + server | Supabase dashboard | No — env var |
 | `PUBLIC_SUPABASE_ANON_KEY` | browser + server | Supabase dashboard | No — env var |
-| `SUPABASE_SERVICE_ROLE_KEY` | server only (Pages Functions / Edge) | Supabase dashboard | No — `.Zerø/config/` + CF env |
+| `SUPABASE_SERVICE_ROLE_KEY` | server only (Pages Functions / Edge) | Supabase dashboard | No — `.zerø/config/` + CF env |
 | `R2_ACCESS_KEY_ID` | server only | CF R2 token | No |
 | `R2_SECRET_ACCESS_KEY` | server only | CF R2 token | No |
 | `R2_BUCKET` | server only | `hour-phase0-media` | No |

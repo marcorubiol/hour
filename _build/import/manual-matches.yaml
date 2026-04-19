@@ -1,0 +1,37 @@
+# Manual PDF↔CSV overrides for Stage 2 (02_enrich_from_pdf.py).
+#
+# Format:   <slug>: <registre>
+#   - slug    = normalized+hyphenated form of the PDF profile's ENTITAT_RAW
+#               (lowercase, NFKD-stripped, stopwords {de, del, la, el, els, les,
+#               i, y, per, a, al, en, dels, d} removed, remaining tokens joined
+#               by "-").
+#   - registre= the "registre" value inside
+#               custom_fields.sources.mostra_igualada_2026 of the canonical row.
+#
+# Maintenance: only add entries for PDF profiles whose canonical counterpart is
+# unmistakable but the fuzzy/host strategies miss it (acronyms, local-chapter
+# URLs, host collisions, or different spelling). Run the script to see which
+# profiles still need overrides; unmatched internacional/estatal rows are also
+# printed.
+#
+# 2026-04-19 — initial Phase-0 overrides for the 2026 dossier (5 entries).
+
+# #1  Ffion Bowen — PDF says "OPENING DOORS FESTIVAL", canonical org is
+#     Arad Goch Theatre Company (festival runs under the company brand).
+opening-doors-festival: 207
+
+# #5  Humberto Ferrao — acronym FITIJ too short (<6 chars) to clear the
+#     weak-overlap guard; canonical spells the full name.
+fitij: 111
+
+# #6  Phillippe Coulange — dossier spells it "D'ENSEGNEMENT" (typo for
+#     "D'ENSEIGNEMENT"); canonical is "Ligue de l'enseignement...".
+ligue-ensegnement: 166
+
+# #11 Marco Antonio Saucedo — dossier lists the festival brand; canonical
+#     row is the institution that runs it (Instituto Zacatecano de Cultura).
+saucedo-festival-internacional-zacateca: 249
+
+# #12 Ermanno Nardi — fuzzy & host both pick reg 47 (Luisa Cuttini, sister
+#     contact at same org); semantic row is the org itself, reg 165.
+claps-circuit: 165

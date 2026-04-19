@@ -1,4 +1,4 @@
-> Inherits: `.Zerø/CLAUDE.md` · Method: `_METHØD/`
+> Inherits: `.zerø/CLAUDE.md` · Method: `_methød/`
 > Status: **kept** (valid: live, kept, parked)
 
 # Hour

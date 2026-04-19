@@ -106,9 +106,9 @@ The 168 existing leads from MaMeMi's current markdown CRM import as `contact` ro
 
 ---
 
-## 7. Tasks — mirror of .Zerø taxonomy
+## 7. Tasks — mirror of .zerø taxonomy
 
-Tasks in Hour use the same sections Marco already uses in `.Zerø`:
+Tasks in Hour use the same sections Marco already uses in `.zerø`:
 
 ```
 dispatch → queue → ping → deferred → shelf → trace
@@ -225,7 +225,7 @@ hour/
 │   └── shared/            # types, zod schemas, shared utils
 ├── _build/                # (this folder — specs, ADRs, import plans)
 ├── .github/workflows/     # CI
-├── CLAUDE.md              # project rules (inherits .Zerø)
+├── CLAUDE.md              # project rules (inherits .zerø)
 └── README.md
 ```
 
@@ -254,7 +254,7 @@ Monorepo via pnpm workspaces. One package per app + shared types.
 
 ## 18. Out of scope for this doc
 
-- Visual design (lives in `_METHØD/design.md`)
-- CSS methodology (lives in `_METHØD/css.md`)
+- Visual design (lives in `_methød/design.md`)
+- CSS methodology (lives in `_methød/css.md`)
 - MaMeMi-specific content (lives in `ZS_MaMeMi/CLAUDE.md`)
 - Phase 1 SaaS pricing / packaging (decided at month 6 checkpoint)
