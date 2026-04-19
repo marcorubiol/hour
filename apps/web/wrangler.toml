@@ -1,0 +1,22 @@
+#:schema node_modules/wrangler/config-schema.json
+name = "hour-web"
+compatibility_date = "2025-02-14"
+compatibility_flags = ["nodejs_compat"]
+
+main = "./dist/_worker.js/index.js"
+assets = { directory = "./dist", binding = "ASSETS" }
+
+# Observability: surface Worker logs in the Cloudflare dashboard.
+[observability]
+enabled = true
+
+# R2 bucket binding — media uploads (riders, fichas técnicas, audios, vídeos).
+[[r2_buckets]]
+binding = "MEDIA"
+bucket_name = "hour-media"
+
+# Non-secret public env vars. Secrets (service role key) go in dashboard
+# Settings → Variables and Secrets, never in this file.
+[vars]
+PUBLIC_SUPABASE_URL = "https://lqlyorlccnniybezugme.supabase.co"
+PUBLIC_SUPABASE_ANON_KEY = "sb_publishable_IavZsGp7i04juuafanQk9w_33pFDhNu"

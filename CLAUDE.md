@@ -43,8 +43,9 @@ Working name: **Hour**. Brand decision deferred to Phase 1.
 7. ~~Bootstrap §5 — smoke test RLS from `authenticated` role~~ — done 2026-04-19. Cross-tenant isolation verified (alice→alpha, bob→bravo), audit log fires on insert, test data rolled back.
 8. **Bootstrap §6-8** — Cloudflare DNS + R2 bucket, Astro+Svelte scaffold, CF Pages first deploy. Marco drives (needs CF dashboard + R2 token).
 9. Supabase dashboard config (manual, not MCP-exposed): Auth → Providers → Email = magic link only (password OFF), URL Configuration (Site URL = `https://hour.zerosense.studio`, Redirect = `http://localhost:4321/*`), JWT expiry = 2592000.
-10. Reconcile `_build/schema.sql` and `_build/rls-policies.sql` with applied DB (add `SET search_path` on functions, fold consolidated policies, drop moddatetime).
+10. ~~Reconcile `_build/schema.sql` and `_build/rls-policies.sql` with applied DB~~ — done 2026-04-19 (commit `114b47c`). Source files now match DB: `SET search_path` pinned on all functions, consolidated policies with `TO authenticated`, moddatetime line removed, 9 FK indexes added in new section 16 of schema.sql.
 11. Write `_build/import-plan.md` (map 168 Difusión leads into new schema).
+12. Decide: land the 3 `custom_fields jsonb` columns now (Phase 0 prep) or defer — see ADR 2026-04-19 in `_build/DECISIONS.md`.
 
 ## Open for next session
-Marco to execute bootstrap §6-8 (CF DNS + R2 + Astro scaffold + first deploy) and the three dashboard-only Supabase settings (auth magic link, URL config, JWT expiry). Then kick off CC to sync source `.sql` files with applied DB. DB is production-ready from a schema/RLS standpoint.
+Marco to execute bootstrap §6-8 (CF DNS + R2 + Astro scaffold + first deploy) and the three dashboard-only Supabase settings (auth magic link, URL config, JWT expiry). DB + source files are now fully in sync.
