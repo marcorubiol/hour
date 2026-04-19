@@ -333,3 +333,146 @@ Items NOT yet decided, to address when starting schema work:
 - **Research citations**: `research/99-patterns.md` §3.1 (mine vs ours contact split — architectural requirement), §5 (multi-tenant freelance reality — workspace kind=personal|team), §6.1 (Phase 0/1 must-have features), §8 (polymorphic project thesis validation), §10 (headline recommendations, incl. DIY band exclusion from Phase 0).
  
 - **Status**: Firm. Scope locked: no DIY-band profile handling in Phase 0, no `campaign` entity, no separate release/tour/festival tables. Wave-by-wave iteration explicitly rejected in favour of a single destructive reset.
+
+## [2026-04-19] — ADR-001 — Engagement is a distinct entity from Show
+- **Context**: The polymorphic reset earlier today introduced a single `engagement` row per (person, project, workspace) to carry the booking relationship. A later director review found that "the conversation" and "the actual gig" have different lifecycles: one engagement can produce 0, 1, or N shows (recurring venues, tours, follow-ups, conversations that never materialize). Without an explicit `show` entity, confirmed gigs had no place to live except by overloading `engagement` or `date` with venue/fee columns — conflating two distinct concepts.
+- **Decision**: `engagement` persists and is bound to (person × project × workspace), carrying anti-CRM status. `show` is a separate atomic entity bound to (project, performed_at, venue_id). Holds without a confirmed date live in `engagement` (status=`hold`); holds with a date live in `show` (status=`hold`/`hold_1/2/3`). Shows connect back to their originating engagement through an optional `show.engagement_id uuid null` FK — standalone shows (cold bookings) are valid, engagements without shows are valid.
+- **Alternatives considered**:
+  - Conflate engagement and show into one table — rejected, forces every confirmed gig to overwrite the conversation history; can't model recurring engagements (same programmer, multiple seasons).
+  - Make engagement a child of show (N:1) — rejected, inverts the natural timeline (conversation precedes gig, not the other way around).
+  - Keep engagement only, add venue/fee columns on engagement — rejected, leaves N-shows-per-engagement unrepresentable and pollutes the engagement status enum with execution states (done/invoiced/paid) that belong to the gig.
+- **Rationale**: Two lifecycles, two entities. Engagement status is about conversation state (`contacted, in_conversation, hold, confirmed, declined, dormant, recurring`). Show status is about execution state (`proposed, hold, hold_1/2/3, confirmed, done, invoiced, paid, cancelled`). Clean separation keeps both enums short and meaningful.
+- **Consequences**:
+  - Schema: new `show` table with `engagement_id uuid null` FK. `engagement.date_id` dropped (the linkage now lives on the show side).
+  - RLS: `show` and `engagement` have independent permission checks (`edit:show` vs `edit:engagement`).
+  - Import: the Mostra 2026 loader creates `engagement` rows (status=`contacted`) but no shows. Shows land as Marco confirms dates manually.
+  - UI: two distinct views — "conversaciones" (engagement list) vs "calendario" (show calendar). A show detail view shows the parent engagement if any.
+  - Docs: ARCHITECTURE §6 entity map, import-plan §3.5, bootstrap §4 count.
+- **Status**: Firm.
+
+## [2026-04-19] — ADR-002 — `show.status` with simple and prioritized hold variants
+- **Context**: The performing arts industry uses two distinct "hold" semantics: (a) theatre/dance — a programmer blocks a slot tentatively while they work out the season; two "simple holds" on the same slot can coexist until one resolves; (b) music industry — holds are explicitly ranked (`hold 1`, `hold 2`, `hold 3`) by priority, where the `hold 1` has first right to convert to confirmed. Modelling only one of these two conventions would force Phase 1 music-industry customers (Phase 1 target: solo artists, booking agents) into awkward workarounds, or force theatre users (Phase 0) to pick an arbitrary priority number.
+- **Decision**: Single enum `show_status` with values in lifecycle order: `proposed, hold, hold_1, hold_2, hold_3, confirmed, done, invoiced, paid, cancelled`. `hold` is the simple theatre/dance variant. `hold_1/2/3` covers prioritized music-industry holds. No UNIQUE constraint on `(project_id, performed_at, venue_id)` — two simple holds on the same slot coexist until one resolves. The UI adapts its affordances by workspace settings (`settings.booking_mode ∈ {simple, prioritized}`), but the enum supports both.
+- **Alternatives considered**:
+  - Separate `is_held bool` + `hold_priority int null` columns — rejected, scatters the state across two columns, breaks the clean lifecycle order useful for queries like `WHERE status >= 'confirmed'`.
+  - Per-workspace hold conventions with pluggable enum — rejected, Postgres enums can't be per-tenant without a `text` column that loses type safety.
+  - Two enums (`show_status` + `hold_priority_enum`) — rejected, doubles the state space and makes transitions harder to reason about.
+- **Rationale**: One enum, lifecycle-ordered, covers both conventions without forcing a choice at the schema level. The absence of the unique constraint is what makes simple holds workable — two coexisting holds on the same slot is a valid business state.
+- **Consequences**:
+  - Schema: `show.status` is `show_status` enum with 10 values. No UNIQUE `(project_id, performed_at, venue_id)`.
+  - UI: needs a setting at workspace level to pick the default booking mode; hold pickers and conflict indicators depend on that setting.
+  - Reports: "confirmed or later" queries use `status IN ('confirmed','done','invoiced','paid')`; "any hold" uses `status LIKE 'hold%'` (careful with Postgres enum — use `status IN ('hold','hold_1','hold_2','hold_3')` in practice).
+  - Migration in Phase 1: adding a fourth hold priority (`hold_4`) is a single `ALTER TYPE` — trivial.
+  - Docs: ARCHITECTURE §11 decisions table, bootstrap smoke test.
+- **Status**: Firm.
+
+## [2026-04-19] — ADR-003 — Money lives in three tables (invoice, payment, expense) + `invoice_line` bridge
+- **Context**: An earlier draft put fee columns directly on `show` (`fee_amount`, `fee_currency`) with status flags `invoiced`, `paid`. That shape breaks on three real scenarios: (1) **partial payments** — a booking typically pays 30% advance + 70% on the day; the show can't carry one amount and one paid_at. (2) **Multi-show invoices** — a tour of 8 shows is billed as one invoice with 8 line items; the shows can't each hold a fragment of the invoice. (3) **Tax retentions** — Spanish invoices separate subtotal, IVA (VAT), and IRPF (withholding); the show row would balloon with tax columns that rarely apply.
+- **Decision**: Three first-class tables plus one bridge:
+  - `invoice` — header row (number, issued_on, status, subtotal, vat, irpf, total, payer_person_id). Can reference a project (`project_id null`) or stand alone (workspace-level invoicing).
+  - `invoice_line` — line item (invoice_id, show_id null, description, quantity, unit_amount, line_total generated). Multiple lines per invoice; lines optionally reference shows (tour billing) or describe other work.
+  - `payment` — abono against an invoice (invoice_id, amount, received_on, method, reference). N:1 with invoice — supports advance + rest.
+  - `expense` — cost incurred (category, amount, incurred_on, receipt_url, paid_by_user_id, reimbursed). CHECK constraint: exactly one of `show_id` OR `line_id` is set (never both, never neither) — grounds every expense in a project via the show/line chain.
+  - Fee columns stay on `show` (`fee_amount`, `fee_currency`) as the **intended** price. The `invoice_line.unit_amount` is the **billed** price; they should usually match but can diverge (discount, tax recalc).
+  - Column-level gating for `show.fee_*`: a trigger `guard_show_fee_columns` (BEFORE UPDATE) requires `has_permission('edit:money')` when fee columns change; a SQL view `show_redacted` hides the fee columns when the caller lacks `read:money`. Policy on the base table stays simple (`edit:show`) and the fee gate lives in the trigger — same pattern as the other `guard_*` triggers.
+- **Alternatives considered**:
+  - Fee columns on show + status flags for invoice/paid — rejected, breaks on all three scenarios above.
+  - Single `transaction` table polymorphic by `kind` — rejected, loses the structural difference between an invoice (has tax breakdown) and a payment (has method); polymorphic tables hide shape at the cost of query clarity.
+  - External billing system (Holded/Quaderno) from day 1 — rejected, Phase 0 doesn't justify an external integration; the `_build/ARCHITECTURE.md` §10 already scopes this out.
+- **Rationale**: Three clean entities that map to how a production company actually tracks money. `invoice_line` lets one invoice bill N shows — the tour-as-one-invoice pattern is common enough to deserve schema support. The fee columns on `show` capture "what we agreed on", which is different from "what we billed" and "what was paid" — shadowing all three is necessary for reconciliation.
+- **Consequences**:
+  - Schema: 4 new tables (invoice, invoice_line, payment, expense) + `show.fee_amount` / `show.fee_currency`.
+  - RLS: `read:money` / `edit:money` permissions gate all four tables. `show` read-path has a `show_redacted` view that masks fee when caller lacks `read:money`; write-path has the `guard_show_fee_columns` trigger that blocks fee UPDATE without `edit:money`.
+  - UI: invoice editor supports N lines; payment list hangs off invoice detail; expense list lives on show/line detail with a total roll-up.
+  - Reports: "facturado pero no cobrado" = `SUM(invoice.total - payments)`. "Ingresos reales por proyecto" = `SUM(payments on invoices where invoice.project_id=X)`.
+  - Docs: ARCHITECTURE §6 entity map, bootstrap count, import-plan (not affected — loader doesn't create money rows).
+  - Spanish gestoría integration (Phase 2+): `invoice.number` is free-text so any numbering scheme fits (Holded, manual, custom).
+- **Status**: Firm for Phase 0. Revisit invoice_line shape if Phase 1 needs multi-currency lines within one invoice (currently `invoice.currency` applies to the whole invoice).
+
+## [2026-04-19] — ADR-004 — Reset v2 executes before any real data
+- **Context**: Seven decisions (ADR-001..007) ship as a bundle. They touch tables, enums, RLS helpers, and the import pipeline. The alternative — shipping them incrementally over weeks — would require writing data migrations (rename `contact_project` → `engagement`, add `line`, split show from engagement) that each carry risk and require rollback plans. Current DB state: 0 auth.users, 0 real business rows (only the earlier polymorphic reset's table skeletons; the loader has not run).
+- **Decision**: One destructive reset. `_build/schema.sql` and `_build/rls-policies.sql` are rewritten from scratch (the files become the canonical readable copy of the new DB). The applied migration is `DROP SCHEMA public CASCADE; CREATE SCHEMA public;` followed by the full schema + RLS recreation. Marco signs up after the reset lands, the `custom_access_token_hook` is enabled manually, and only then the 156-contact loader runs against the new schema.
+- **Alternatives considered**:
+  - Incremental migrations — rejected, high coordination cost and no business value while the DB is empty.
+  - Wave-by-wave rollout (rename first, then add tables, then RBAC) — same rejection as above, plus the intermediate states carry inconsistent RLS surfaces for days.
+  - Branch DB and dual-write — rejected, pointless with zero data.
+- **Rationale**: Zero data = zero data loss. The cost of the reset now is one migration; the cost of the same refactor in a month is a multi-day data migration; in a quarter, a rewrite. Ship the reset while the cost is still zero.
+- **Consequences**:
+  - Schema: supersedes parts of the earlier "Polymorphic core" ADR (table set and enums change; the three-layer contact model — person + engagement + person_note — survives unchanged).
+  - Migration: single MCP `apply_migration` call replacing the prior history. No rollback plan needed.
+  - Docs: every artefact under `_build/*` gets a coherent "v2" stamp; README references bump.
+  - Import pipeline: the loader ran pre-flight checks but never executed a real load; this is still the zero-loss window.
+  - Bootstrap §4 table count shifts from 12 to 18.
+- **Status**: Firm. Window closes the moment Marco signs up and runs the loader.
+
+## [2026-04-19] — ADR-005 — `line` as its own table between project and show
+- **Context**: A project is too coarse for many real groupings — a tour of 8 shows across Catalunya + Madrid + Valencia is one project (the MaMeMi show) but three distinct touring batches that each have a budget, a contact at a presenter, and a settlement window. Putting all 8 shows directly under the project loses that grouping; renaming `project` to mean "tour" breaks the polymorphic model. The research dossier profiles (tour manager, manager/booking agent) all manage tour-shaped objects.
+- **Decision**: New table `line`, an optional middle layer: `(id, workspace_id, project_id, name, kind line_kind, territory, status, start_date, end_date, dossier_url, notes, custom_fields)`. `kind ∈ {tour, season, phase, circuit, residency, other}`. Show gets `line_id uuid null FK line` — shows without a line are valid (one-offs). Expense also gets `line_id uuid null FK` but with the CHECK `(show_id IS NOT NULL) XOR (line_id IS NOT NULL)` — an expense grounds in either a show or a line (tour-level hotel bills, season-level insurance), never both.
+- **Alternatives considered**:
+  - Use a tag on show (`tour: "Catalunya primavera 2026"`) — rejected, tags don't carry territory, dates, or dossier; and we already deferred the tag infrastructure to Phase 0.5.
+  - Use `show.custom_fields.tour_name` — rejected, same problem, plus the grouping can't be queried or joined cleanly.
+  - Create `tour`, `season`, `residency` as separate tables — rejected, multiplies schema for one structural pattern.
+- **Rationale**: One table, one discriminator enum, covers all known grouping patterns in live-arts production. Optionality (`line_id nullable`) means small projects don't pay the overhead.
+- **Consequences**:
+  - Schema: new `line` table; `show.line_id` FK; `expense.line_id` FK with XOR CHECK against `show_id`.
+  - RLS: `line` uses `edit:show OR edit:project_meta` — producers can manage lines without being project leads.
+  - UI: a project with any line row shows a "tour/season" tab; without, the project shows flat show list.
+  - Reports: "contribution margin per line" = `sum(invoice_lines on shows of line) - sum(expenses on line) - sum(expenses on shows of line)`.
+  - Docs: ARCHITECTURE §6 entity map, bootstrap count, expense CHECK.
+- **Status**: Firm.
+
+## [2026-04-19] — ADR-006 — Editable role catalog (`workspace_role`) + granular RBAC + per-membership overrides
+- **Context**: The v1 flat `membership_role` enum (`owner, admin, member, viewer, guest`) mixed two concerns: *workspace access level* (can I even enter this tenant?) and *what can I do inside a project* (can I edit shows? see money?). The research profiles (theatre company with external press, solo artist with a distribution collaborator) show real teams need fine-grained permissions per project — a press agent should read engagements but not money; a tour manager should edit shows but not manage memberships. Forcing every case into 5 flat roles misrepresents the real permission surface.
+- **Decision**: Three-layer permission system, all living in the schema from day 1:
+  1. **Workspace-level access (`workspace_membership.role`)**: keeps the flat `membership_role` enum as authority for *workspace entry*. `owner` and `admin` bypass all project-level permission checks (Phase 0: Marco and Anouk are owners and must see everything). The enum **is retained, not superseded** — `workspace_role` **complements** it, not replaces it.
+  2. **Editable role catalog (`workspace_role` table)**: per-workspace list of named roles (`code, label, access_level, permissions text[], is_system bool, archived_at`). 15 system roles seeded on workspace creation via trigger `seed_system_roles_on_workspace` (owner, admin, producer, production_manager, tour_manager, distribution, director, author, technical_director, performer, light_design, sound_design, stage_design, costume_design, press). Users can add custom roles, archive unused ones, edit labels and permissions — even on system roles (system flag only prevents DELETE, not UPDATE).
+  3. **Per-project assignment with overrides (`project_membership`)**: `roles text[]` (codes from `workspace_role` of the same workspace, validated by trigger), `permission_grants text[]` (extra perms on top), `permission_revokes text[]` (perms removed). Effective permissions = `union(role.permissions for role in roles) + grants - revokes`. Phase 0 UI only edits role presets; `permission_grants` / `permission_revokes` are schema-ready for Phase 0.5/1 when external collaborators need fine-tuning.
+
+  Vocabulary of permissions is **closed and hardcoded** (not user-editable): 10 strings across 3 groups — read (`read:money, read:engagement, read:person_note_private, read:internal_notes`), edit (`edit:show, edit:engagement, edit:money, edit:project_meta, edit:membership`), admin (`admin:project`). The `owner` system role holds all 10 listed **explicitly** in its `permissions` array — no `*` wildcard, no magic. Helper `has_permission(project_id, perm)` does an exact-match scan over effective permissions; the only bypass is the workspace owner/admin fallback, which is explicit in the function body.
+- **Alternatives considered**:
+  - Keep the flat enum only — rejected, can't model press-reads-engagement-but-not-money without proliferating roles or adding side tables.
+  - Full policy engine (Casbin / OPA) — rejected, operational overhead for a Phase 0 team of 2.
+  - Wildcard `*` permission for owner — rejected, hides the permission surface behind magic; explicit list is auditable and makes migrations (add a permission) visible.
+  - Make `workspace_role` global (not per-workspace) — rejected, each team wants to name roles their own way ("dramaturg" vs "literary manager"); per-workspace is the right scope.
+- **Rationale**: The 10-permission vocabulary covers every access-control decision the Phase 0 and Phase 1 UI needs to make. `workspace_role` turns the vocabulary into team-editable presets. `project_membership.roles/grants/revokes` gives per-case flexibility without a UI for it yet. The owner/admin bypass keeps the Phase 0 team (Marco + Anouk) from tripping over their own permission checks while still enabling principled fine-grained access for external collaborators later.
+- **Consequences**:
+  - Schema: new `workspace_role` table, new enum `workspace_role_access_level`, `project_membership` refactored (drop role/scope, add roles/grants/revokes).
+  - Triggers: `seed_system_roles_on_workspace` (AFTER INSERT on workspace, 15 rows with explicit permissions) and `validate_project_membership_roles` (BEFORE INSERT/UPDATE on project_membership, rejects unknown or archived codes).
+  - RLS helper: new `has_permission(project_id, perm)` replaces most `current_workspace_role() IN (...)` checks. Explicit workspace owner/admin bypass documented in the function.
+  - UI: Phase 0 only exposes role presets from the catalog; `permission_grants/revokes` exist but are not yet editable.
+  - Auditability: `workspace_role` rows are in `audit_log`; role changes are traceable.
+  - Docs: ARCHITECTURE §6 entity map, bootstrap helper count, plus this ADR as the canonical reference for the permission vocabulary.
+- **Status**: Firm for the schema. UI for per-person overrides explicitly deferred (see "Deferred" section).
+
+## [2026-04-19] — ADR-007 — Drop `project.type`; polymorphism comes from which subentities a project has
+- **Context**: The earlier polymorphic reset added a `project.type` discriminator (`show | release | creation_cycle | festival_edition`). With `line`, `show`, and `date` now first-class children, the type tag becomes redundant: the adaptive UI can already tell what kind of project it is by looking at which child rows exist (any `line` rows → tour/season project; any `show` rows → performance project; only `date` rows → creation cycle; etc.). Maintaining a type tag in parallel with subentity presence creates two sources of truth that can drift (project marked `type=show` but has zero show rows).
+- **Decision**: Drop `project.type` and the `project_type` enum entirely. Polymorphism is **emergent from subentity presence**, not declared up front. The UI inspects which children exist and adapts — "add a show", "add a tour", "log a rehearsal" — based on what the user does, not what the user declared.
+- **Alternatives considered**:
+  - Keep the type tag for quick filtering ("show me all releases") — rejected, the same filter works as "projects with `engagement` but no `show` yet" or via custom_fields conventions; not worth the type-drift risk.
+  - Replace the enum with a view (`project_type_view`) that computes type from children — rejected, adds complexity for a UI affordance that doesn't need SQL-level support.
+  - Keep type as a user-editable text field — rejected, invites inconsistent capitalisation and no-one will fill it out reliably.
+- **Rationale**: Data model follows behaviour. If a project has shows, it's a show project — no additional declaration needed. Lets users mix (a creation cycle that also has a premiere tour without forcing "pick one").
+- **Consequences**:
+  - Schema: `project.type` column and `project_type` enum dropped. The `type` column in earlier migrations will be removed in the reset.
+  - Import: `_build/import/03_load_to_hour.py` no longer passes `type='show'` when upserting the mamemi project. Already flagged for Windsurf adjustment.
+  - RLS: no change — project policies never branched on type.
+  - UI: project detail is a single adaptive view; it shows the "Tour" tab only when `line` rows exist, the "Calendario" tab only when `show` or `date` rows exist, etc.
+  - Partial supersession of the earlier "Polymorphic core" ADR — the three-layer contact model, workspace kind, and date/show split all stand; only the project type discriminator is retired.
+  - Docs: ARCHITECTURE §6 entity map (remove `type` from project description), bootstrap (no `type` in seed SQL), import-plan §3.2.
+- **Status**: Firm.
+
+---
+
+## Deferred
+
+Explicit non-goals and schema-ready-but-UI-deferred items. Not addressed in the 2026-04-19 reset; captured here so they don't get lost.
+
+### D1 — Tasks + Tags (Phase 0.5)
+- **Scope**: `task` entity (polymorphic by `entity_type`, attaches to project/line/show/date/engagement or sits free at workspace level) with the `dispatch → queue → ping → deferred → shelf → trace` taxonomy already established in `_methød/markdown.md`. Tag vocabulary split in three groups: (a) event kinds — already covered by `date.kind` and `show.status`, no new column; (b) work categories — `#creative`, `#admin`, `#logistics`; (c) cross-cutting behaviour triggers — `#billable`, `#contract`, `#urgent`. Per-workspace tag catalog + polymorphic tagging join table restricted by a `taggable_entity` enum.
+- **Why deferred**: Phase 0 runs without tasks (ad-hoc todos live in Marco's `.zerø` _tasks.md and in `engagement.next_action_*` if we add it back). Tags are a Phase 0.5 convenience; reintroducing them now bloats the reset scope.
+- **Trigger to activate**: first external user, or first time Marco repeatedly needs to group persons/projects by a property that custom_fields can't cover cleanly.
+
+### D2 — UI for per-person permission overrides
+- **Scope**: Visual editor for `project_membership.permission_grants` / `permission_revokes`. Lets an admin grant "press agent sees money on this one project" or revoke "tour manager can't edit membership on this one tour".
+- **Why deferred**: Schema supports it from day 1 (ADR-006); UI in Phase 0 only edits role presets because the team is Marco + Anouk and they don't need per-person fine-tuning. Phase 0.5 or Phase 1 when external collaborators join.
+- **Trigger to activate**: first external collaborator who needs a permission the role preset doesn't cover.

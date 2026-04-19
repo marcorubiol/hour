@@ -1,8 +1,10 @@
 # Import Plan — Phase 0 seed data
 
-> Status: **implemented** (pipeline lives in `_build/import/`) · Author: Marco + .zerø · Date: 2026-04-19
+> Status: **implemented** (pipeline lives in `_build/import/`); **needs code
+> adjustment after reset v2** — see §3.4 (drop tag/tagging steps) and §3.5
+> (engagement status default `contacted`). · Author: Marco + .zerø · Date: 2026-04-19
 > Scope: bootstrap MaMeMi's `person` + `engagement` rows from the Mostra Igualada 2026 export dataset (+ dossier PDF enrichment).
-> Related ADRs: `DECISIONS.md` → "Activate `custom_fields jsonb` on tenant tables" (accepted) and "Polymorphic core: workspace + project + engagement" (2026-04-19, firm). The 2026-04-19 polymorphic reset renamed the target tables (`contact → person`, `contact_project → engagement`) and moved engagements from per-tenant `organization_id` to per-`workspace_id`; sections below reflect the new schema.
+> Related ADRs: `DECISIONS.md` → ADR-001 (engagement distinct from show), ADR-007 (no `project.type`), plus the earlier `Activate custom_fields jsonb` and `Polymorphic core` entries. The 2026-04-19 **reset v2** dropped tag/tagging, dropped `project.type`, renamed `membership → workspace_membership`, and shifted `engagement.status` to the anti-CRM enum (default `contacted`); sections below reflect the new schema.
 
 ---
 
@@ -83,8 +85,10 @@ One row, upserted by Stage 3 (idempotent on `(workspace_id, slug)`):
 
 ```
 workspace_id = <marco-rubiol>, slug = 'mamemi', name = 'MaMeMi',
-type = 'show', status = 'active'
+status = 'active'
 ```
+
+`project.type` no longer exists (ADR-007 dropped the discriminator). The loader must **not** set `type` — polymorphism emerges from which subentities the project ends up with (engagement, show, line, date…). `_build/import/03_load_to_hour.py` drops the `type='show'` upsert field as part of the reset-v2 code adjustment.
 
 Difusión-2026-27 is **not** a project — it's a filtered view over `engagement` rows where `project.slug = 'mamemi'` and `custom_fields->>'season' = '2026-27'` (see ADR *Polymorphic core* in `DECISIONS.md`).
 
@@ -104,35 +108,28 @@ Difusión-2026-27 is **not** a project — it's a filtered view over `engagement
 | (see §3.6) | `custom_fields` | Source-of-origin metadata (jsonb). |
 | (runtime) | `created_by` | `auth.users.id` of the HOUR_OWNER_EMAIL account. Nullable — `--skip-engagements` mode lands persons with `created_by = NULL`. |
 
-Dedupe key: `email` where present (unique globally on `person(email)` via the `person_email_unique` expression index on `lower(email)`); otherwise fall back to `custom_fields->'sources'->'mostra_igualada_2026'->>'registre'` as a deterministic shadow key.
+Dedupe key: `email` where present (unique globally on `person(email)` — the column is `extensions.citext`, which is case-insensitive, so the `UNIQUE` constraint is equivalent to a `lower(email)` index); otherwise fall back to `custom_fields->'sources'->'mostra_igualada_2026'->>'registre'` as a deterministic shadow key.
 
-### 3.4 `tag` + `tagging`
+### 3.4 `tag` + `tagging` — **deferred, not part of this import**
 
-Tags are workspace-scoped (`tag.workspace_id`). `tagging.entity_type` is an enum `(person, project, date, engagement)` — here we tag **persons**, not engagements, so the provenance follows the human across future projects.
+The `tag` and `tagging` tables were dropped in reset v2 (2026-04-19). Tag infrastructure is deferred to Phase 0.5 (see DECISIONS.md "Deferred" section). During the Mostra 2026 import, **no tag rows are created**. The provenance that tags used to encode now lives inside `person.custom_fields.sources.mostra_igualada_2026` (see §3.6) — source, tipologia, procedencia, ingested_at are all preserved there as structured JSON.
 
-Seven tags created once per workspace:
-
-- `src:mostra-igualada-2026` — all 151 CSV records
-- `src:dossier-2026` — the ~30 PDF-enriched profiles (and any dossier-only additions that bring the total to 156)
-- `procedencia:catalunya` / `procedencia:estatal` / `procedencia:internacional`
-- `tipologia:programador` / `tipologia:fira-festival`
-
-Idempotent via `UNIQUE (workspace_id, name)`.
+`_build/import/03_load_to_hour.py` drops the tag-creation step (previously step 3 of the Stage 3 workflow) as part of the reset-v2 code adjustment. The seven tag names enumerated in the pre-v2 version of this doc (`src:mostra-igualada-2026`, `procedencia:*`, `tipologia:*`) remain discoverable as `custom_fields` keys — any Phase 0.5 migration that brings tagging back can backfill from there without re-reading the CSVs.
 
 ### 3.5 `engagement` (per person × project)
 
-The polymorphic replacement for `contact_project`. One row per (person, project) in MaMeMi's workspace, status `proposed` by default (anti-CRM rename of `prospect`). Marco progresses them through the enum manually: `idea → proposed → discussing → held → confirmed → performed` (with `cancelled | declined | dormant` as sinks).
+One row per (person, project) in MaMeMi's workspace. Status defaults to **`contacted`** — the first value in the new anti-CRM enum (`contacted, in_conversation, hold, confirmed, declined, dormant, recurring`). Marco progresses them manually: `contacted → in_conversation → hold → confirmed` (with `declined | dormant | recurring` as steady states). Note: `engagement` no longer carries `date_id` — that linkage now lives on `show.engagement_id` (ADR-001), so the loader does not try to attach dates to engagements.
 
 | Target column | Value at import |
 |---|---|
 | `workspace_id` | Marco's `marco-rubiol` workspace |
 | `project_id` | MaMeMi `mamemi` project |
 | `person_id` | the person upserted in §3.3 |
-| `status` | `'proposed'` on insert; `ON CONFLICT DO NOTHING` so Marco's later edits survive reruns |
+| `status` | `'contacted'` on insert; `ON CONFLICT DO NOTHING` so Marco's later edits survive reruns |
 | `custom_fields` | `{"season": "2026-27"}` — this is the handle the `difusión-2026-27` filtered view uses |
-| `created_by` | `auth.users.id` of HOUR_OWNER_EMAIL (NOT NULL on `engagement`, so `--skip-engagements` mode is required when Marco hasn't signed up yet) |
+| `created_by` | `auth.users.id` of HOUR_OWNER_EMAIL. Nullable on the current schema — `--skip-engagements` remains the safer path when Marco hasn't signed up; otherwise use his uid |
 
-Uniqueness: `(workspace_id, project_id, person_id)` via the `engagement_unique_live` partial index (where `deleted_at IS NULL`).
+Uniqueness: `UNIQUE (workspace_id, project_id, person_id)` on the `engagement` table.
 
 ### 3.6 `custom_fields` — JSONB schema
 
@@ -228,19 +225,20 @@ Env (read from repo-root `.env`):
 - Required: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`.
 - Optional: `HOUR_WORKSPACE_SLUG=marco-rubiol`, `HOUR_WORKSPACE_NAME="Marco Rubiol"`, `HOUR_PROJECT_SLUG=mamemi`, `HOUR_PROJECT_NAME=MaMeMi`, `HOUR_SEASON=2026-27`, `HOUR_OWNER_EMAIL=marcorubiol@gmail.com`.
 
-Flags: `--dry-run`, `--limit N`, `--verbose`, `--skip-engagements` (load only persons — use before Marco has signed up, since `engagement.created_by` is NOT NULL).
+Flags: `--dry-run`, `--limit N`, `--verbose`, `--skip-engagements` (load only persons — use before Marco has signed up, so the engagement rows have a real `created_by`).
 
-Steps:
-1. Ensure the `workspace` row (`slug=marco-rubiol`, `kind=personal`) — upsert, idempotent.
-2. Ensure the `project` row (`slug=mamemi`, `type=show`, `status=active`, `workspace_id=<marco-rubiol>`) — upsert on `(workspace_id, slug)`.
-3. Ensure the 7 `tag` rows from §3.4 — upsert on `(workspace_id, name)`.
+Steps (post reset-v2):
+1. Ensure the `workspace` row (`slug=marco-rubiol`, `kind=personal`) — upsert, idempotent. The INSERT path triggers `workspace_seed_roles` in cascade, which seeds 15 rows into `workspace_role`.
+2. Ensure the `project` row (`slug=mamemi`, `status=active`, `workspace_id=<marco-rubiol>`) — upsert on `(workspace_id, slug)`. **Do not set `type`** — the column and `project_type` enum were removed by ADR-007.
+3. *(removed — tag/tagging tables were dropped in reset v2; provenance lives in `person.custom_fields` only. See §3.4.)*
 4. Resolve `HOUR_OWNER_EMAIL` → `auth.users.id`. If absent: warn, force `--skip-engagements` semantics, continue with `person.created_by = NULL`.
 5. For each canonical row:
    - Upsert `person` on `lower(email)` when email is present, else on `custom_fields->'sources'->'mostra_igualada_2026'->>'registre'` via a deterministic shadow key. Merge `custom_fields` with PostgREST JSON-merge semantics (don't clobber prior sources on rerun).
-   - Upsert `tagging` rows with `entity_type='person'`, `entity_id=<person.id>` for each of the row's resolved tags.
-   - Unless `--skip-engagements`: upsert `engagement (workspace_id, project_id, person_id)` with `status='proposed'`, `custom_fields={"season":"2026-27"}`, `created_by=<owner.id>`. `ON CONFLICT DO NOTHING` on the `engagement_unique_live` partial index — preserves Marco's later status changes across reruns.
+   - Unless `--skip-engagements`: upsert `engagement (workspace_id, project_id, person_id)` with `status='contacted'` (anti-CRM default), `custom_fields={"season":"2026-27"}`, `created_by=<owner.id>`. `ON CONFLICT (workspace_id, project_id, person_id) DO NOTHING` — preserves Marco's later status changes across reruns.
 6. Wrap each batch of 25 rows in a single PostgREST call. Safe to re-run any number of times.
 7. Print: inserted / updated / skipped / failed with row-level reasons.
+
+Optional (not yet implemented): Stage 3 could also upsert `venue` rows from `custom_fields.sources.*.address / city / country` when the record represents a performance space. Deferred — Phase 0 imports programmer persons, not venues; `venue` seeding waits until the first real `show` needs one.
 
 ---
 
@@ -248,16 +246,20 @@ Steps:
 
 ```
 workspace           : 1    (marco-rubiol, kind=personal)
-project             : 1    (mamemi, type=show, status=active)
+workspace_role      : 15   (system roles, seeded in cascade by the workspace INSERT)
+project             : 1    (mamemi, status=active, no type column)
 person              : 156  (Programador + Fira/Festival, deduped on email)
   ├─ with dossier   :  ~30 (enriched from PDF)
   └─ without        : ~126
-tag                 : 7    (2 src + 3 procedencia + 2 tipologia)
-tagging             : ~470 (156 × ~3 tags each, entity_type='person')
-engagement          : 156  (all status='proposed', custom_fields.season='2026-27')
+tag / tagging       : 0    (dropped in reset v2; provenance lives in person.custom_fields)
+venue               : 0    (loader does not seed venues in Phase 0)
+engagement          : 156  (all status='contacted', custom_fields.season='2026-27')
+show / date / line  : 0    (Marco creates shows manually as dates confirm)
+invoice* / payment  : 0    (out of scope for this load)
+expense             : 0    (out of scope)
 ```
 
-All 156 persons visible in Hour once the first UI screen lands, already segmented by `procedencia`/`tipologia` tags and filterable down to the "Difusión 2026-27" view with `project.slug=mamemi` + `engagement.custom_fields->>season='2026-27'`. Under `--skip-engagements` (owner not signed up yet), the engagement row count is 0 and `person.created_by` is NULL.
+All 156 persons visible in Hour once the first UI screen lands, already filterable down to the "Difusión 2026-27" view via `project.slug=mamemi` + `engagement.custom_fields->>season='2026-27'`. Under `--skip-engagements` (owner not signed up yet), the engagement row count is 0 and `person.created_by` is NULL. Segmentation by procedencia/tipologia works off `person.custom_fields.sources.mostra_igualada_2026.*` until tag infrastructure lands in Phase 0.5.
 
 ---
 
@@ -273,16 +275,16 @@ All 156 persons visible in Hour once the first UI screen lands, already segmente
 ## 9. Order of operations
 
 1. ☑ Write this file.
-2. ☑ `custom_fields jsonb` landed as part of the 2026-04-19 polymorphic reset (see §5) — no separate migration step.
+2. ☑ `custom_fields jsonb` landed as part of the 2026-04-19 polymorphic reset (and preserved in reset v2) — no separate migration step.
 3. ☑ ADR *Activate `custom_fields jsonb` on tenant tables* → Accepted in `DECISIONS.md`.
 4. ☑ Copy sources into `_build/import/sources/mostra-2026/` (4 CSVs + 1 PDF) — **.gitignored**; they're PII-adjacent and don't belong in the public repo.
 5. ☑ Implement `01_normalize.py` → run → inspect `01_canonical.jsonl`.
 6. ☑ Implement `02_enrich_from_pdf.py` → run → inspect `02_enriched.jsonl` + unmatched report.
 7. ☑ Marco fills `manual-matches.yaml` for any unmatched profiles he can identify.
-8. ☑ Polymorphic reset migration applied (workspace/project/person/engagement tables live). `_build/seed.sql` CLAIM block renames Marco's auto-created workspace to `marco-rubiol` and upserts the `mamemi` project.
-9. ☑ Implement `03_load_to_hour.py` — with `--dry-run`, `--limit N`, `--skip-engagements` flags. Adapted 2026-04-19 to the polymorphic schema.
+8. ☐ **Reset v2 migration applied** (18 tables: workspace/workspace_role/workspace_membership/person/venue/project/project_membership/line/engagement/show/date/person_note/invoice/invoice_line/payment/expense/user_profile/audit_log). `_build/seed.sql` CLAIM block renames Marco's auto-created workspace to `marco-rubiol` and upserts the `mamemi` project (no `type` column).
+9. ☐ **Adjust `03_load_to_hour.py`** for reset v2: drop the tag/tagging step, drop `type='show'` from project upsert, switch engagement status default to `contacted`. (Windsurf task — out of scope for this plan.)
 10. ☐ **Marco signs up** at `hour.zerosense.studio` (or the workers.dev URL) with `marcorubiol@gmail.com` → run `_build/seed.sql` CLAIM block → enable `custom_access_token_hook` in the Supabase Dashboard (Auth → Hooks).
-11. ☐ Live run: `python3 _build/import/03_load_to_hour.py` (no flags) → lands 156 persons + taggings + engagements on the `mamemi` project with `season=2026-27` in `custom_fields`.
+11. ☐ Live run: `python3 _build/import/03_load_to_hour.py` (no flags) → lands 156 persons + 156 engagements (status=`contacted`) on the `mamemi` project with `season=2026-27` in `custom_fields`. No tag/tagging rows.
 12. ☐ Verify with `GET /api/engagements?project_slug=mamemi&season=2026-27` using a real JWT; cross-check counts against §7.
 
 Each step leaves disk artefacts — safe to rerun from any point.

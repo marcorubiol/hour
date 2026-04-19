@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Stage 3 — load staging/02_enriched.jsonl into Supabase `hour-phase0`.
 
-Adapted 2026-04-19 to the polymorphic schema (workspace + project + engagement).
-Replaces the earlier contact / contact_project model.
+Adapted 2026-04-19 to **reset v2**: no `project.type` column (ADR-007),
+no `tag` / `tagging` tables (deferred to Phase 0.5), `engagement.status`
+defaults to `contacted` (anti-CRM enum, ADR-001). Provenance that used to
+be encoded as tags now lives in `person.custom_fields.sources.*`.
 
 Idempotent, safe to rerun. Uses the Supabase Service Role key (bypasses RLS)
 and PostgREST directly over stdlib `urllib` — no third-party deps.
@@ -20,38 +22,35 @@ Config:
         HOUR_OWNER_EMAIL    = marcorubiol@gmail.com  (resolves engagement.created_by)
 
 Flags:
-    --dry-run   : show counts + a sample of each operation without writing.
-    --limit N   : process only the first N enriched rows (smoke test).
-    --verbose   : print one line per row.
+    --dry-run          : show counts + a sample of each operation without writing.
+    --limit N          : process only the first N enriched rows (smoke test).
+    --verbose          : print one line per row.
     --skip-engagements : load only persons (use before the owner has signed up).
 
 What it does:
     1. Ensure `workspace` row exists (marco-rubiol, kind=personal).
-    2. Ensure `project`   row exists (mamemi, type=show, status=active).
-    3. Ensure `tag` rows exist:
-         src:mostra-igualada-2026 · src:dossier-2026
-         procedencia:{catalunya,estatal,internacional}
-         tipologia:{programador,fira-festival}
-    4. Resolve the owner user from HOUR_OWNER_EMAIL. If absent:
+       The INSERT fires `workspace_seed_roles` in cascade, seeding 15 rows
+       in `workspace_role`.
+    2. Ensure `project` row exists (mamemi, status=active). No `type` column.
+    3. Resolve the owner user from HOUR_OWNER_EMAIL. If absent:
          - Load persons only (person.created_by is nullable).
-         - Skip engagements + taggings on engagement rows.
+         - Skip engagements.
          - Exit with a clear warning.
-    5. For every row in 02_enriched.jsonl:
+    4. For every row in 02_enriched.jsonl:
        a. Upsert a `person` row (deduped on email; lookup cascade below).
-          custom_fields merge preserves sources across reruns.
-       b. Ensure `tagging` rows on entity_type='person' for that person.
-       c. Upsert `engagement` (workspace_id × project_id × person_id)
-          with status='proposed' (anti-CRM vocabulary replacement for
-          'prospect'). Respects Marco's status changes — ON CONFLICT DO NOTHING.
-          `season` goes onto the row via engagement.custom_fields.
+          `custom_fields` merge preserves `sources.*` across reruns.
+       b. Unless --skip-engagements: upsert `engagement`
+          (workspace_id × project_id × person_id) with status='contacted'
+          (anti-CRM default). Respects Marco's status changes — ON CONFLICT
+          DO NOTHING. `season` goes into engagement.custom_fields.
 
 Expected ending state (fresh DB, owner signed in):
-    workspace  : 1 (marco-rubiol)
-    project    : 1 (mamemi)
-    tag        : 7
-    person     : 156
-    tagging    : ~470
-    engagement : 156 (all status='proposed' on first run)
+    workspace      : 1   (marco-rubiol)
+    workspace_role : 15  (seeded by trigger)
+    project        : 1   (mamemi, no type column)
+    person         : 156
+    engagement     : 156 (all status='contacted' on first run)
+    tag / tagging  : 0   (dropped in reset v2 — deferred to Phase 0.5)
 """
 
 from __future__ import annotations
@@ -176,7 +175,6 @@ class Supabase:
     # -- Auth Admin --------------------------------------------------------
     def find_user_by_email(self, email: str) -> Optional[dict]:
         """Return the auth.users row for `email` via the Auth Admin API, or None."""
-        # /auth/v1/admin/users?email=... supports exact-match filter
         url = f"{self.auth_base}/admin/users"
         resp = self._req("GET", url, params={"email": email})
         if not resp:
@@ -191,7 +189,7 @@ class Supabase:
 
 
 # ---------------------------------------------------------------------------
-# Ensure workspace / project / tags
+# Ensure workspace / project
 # ---------------------------------------------------------------------------
 def ensure_workspace(sb: Supabase, slug: str, name: str, *, dry_run: bool) -> str:
     existing = sb.select("workspace", slug=f"eq.{slug}", select="id,name,slug,kind")
@@ -204,7 +202,7 @@ def ensure_workspace(sb: Supabase, slug: str, name: str, *, dry_run: bool) -> st
         "name": name, "slug": slug, "kind": "personal",
         "country": "ES", "timezone": "Europe/Madrid",
     })
-    print(f"  + workspace created: {name} ({slug})")
+    print(f"  + workspace created: {name} ({slug})  (15 system roles seeded by trigger)")
     return row[0]["id"]
 
 
@@ -214,101 +212,30 @@ def ensure_project(
     existing = sb.select(
         "project",
         workspace_id=f"eq.{workspace_id}", slug=f"eq.{slug}",
-        select="id,name,slug,status,type",
+        select="id,name,slug,status",
     )
     if existing:
         return existing[0]["id"]
     if dry_run:
-        print(f"  [DRY] would INSERT project(slug={slug!r}, name={name!r}, type=show)")
+        print(f"  [DRY] would INSERT project(slug={slug!r}, name={name!r}, status=active)")
         return "00000000-0000-0000-0000-000000000001"
     row = sb.insert("project", {
         "workspace_id": workspace_id,
-        "name": name, "slug": slug, "type": "show", "status": "active",
+        "name": name, "slug": slug, "status": "active",
         "description": "Imported from Mostra Igualada 2026 export + dossier PDF.",
     })
     print(f"  + project created: {name} ({slug})")
     return row[0]["id"]
 
 
-TAG_PLAN = [
-    ("src:mostra-igualada-2026", "#7a5fff"),
-    ("src:dossier-2026",          "#ff7a5f"),
-    ("procedencia:catalunya",     "#2ecc71"),
-    ("procedencia:estatal",       "#f1c40f"),
-    ("procedencia:internacional", "#3498db"),
-    ("tipologia:programador",     "#9b59b6"),
-    ("tipologia:fira-festival",   "#e74c3c"),
-]
-
-
-def ensure_tags(sb: Supabase, workspace_id: str, *, dry_run: bool) -> dict[str, str]:
-    """Return {tag_name: tag_id} for the seven known tags."""
-    existing = sb.select(
-        "tag", workspace_id=f"eq.{workspace_id}", select="id,name",
-    )
-    by_name = {t["name"]: t["id"] for t in existing}
-    to_create = [(n, c) for n, c in TAG_PLAN if n not in by_name]
-    if not to_create:
-        return by_name
-    if dry_run:
-        print(f"  [DRY] would INSERT {len(to_create)} tags: "
-              + ", ".join(n for n, _ in to_create))
-        return {**by_name, **{n: f"dry-tag-{n}" for n, _ in to_create}}
-    rows = sb.insert("tag", [
-        {"workspace_id": workspace_id, "name": n, "color": c} for n, c in to_create
-    ])
-    for r in rows:
-        by_name[r["name"]] = r["id"]
-    print(f"  + tags created: {len(to_create)} ({', '.join(n for n, _ in to_create)})")
-    return by_name
-
-
 # ---------------------------------------------------------------------------
 # Per-row work
 # ---------------------------------------------------------------------------
-SLUG_TIPOLOGIA = {
-    "programador":  "tipologia:programador",
-    "programadora": "tipologia:programador",
-    "fira/festival": "tipologia:fira-festival",
-    "fira_festival": "tipologia:fira-festival",
-}
-
-
-def tags_for_row(row: dict) -> list[str]:
-    """Derive the set of tag names to attach to a person row."""
-    cf = row.get("custom_fields") or {}
-    sources = cf.get("sources") or {}
-    mostra = sources.get("mostra_igualada_2026") or {}
-    names: list[str] = []
-
-    if mostra:
-        names.append("src:mostra-igualada-2026")
-        proc = (mostra.get("procedencia") or "").lower().strip()
-        if proc in ("catalunya", "estatal", "internacional"):
-            names.append(f"procedencia:{proc}")
-        tipologia = (mostra.get("tipologia") or "").lower().strip()
-        key = tipologia.replace("/", "_").replace(" ", "_")
-        if tipologia in SLUG_TIPOLOGIA:
-            names.append(SLUG_TIPOLOGIA[tipologia])
-        elif key in SLUG_TIPOLOGIA:
-            names.append(SLUG_TIPOLOGIA[key])
-
-    if "dossier_2026" in cf:
-        names.append("src:dossier-2026")
-        section = ((cf["dossier_2026"] or {}).get("section") or "").lower().strip()
-        if section in ("estatal", "internacional"):
-            proc_tag = f"procedencia:{section}"
-            if proc_tag not in names:
-                names.append(proc_tag)
-
-    return names
-
-
 def find_existing_person(sb: Supabase, row: dict) -> Optional[dict]:
     """Lookup cascade: email → mostra.registre → dossier.order → None.
 
     Persons are GLOBAL — no workspace_id filter. Email uniqueness is enforced
-    by a UNIQUE constraint on person.email (citext).
+    by a UNIQUE constraint on person.email (citext, case-insensitive).
     """
     email = (row.get("email") or "").strip().lower() or None
     if email:
@@ -395,38 +322,6 @@ def upsert_person(
     return inserted[0]["id"]
 
 
-def ensure_taggings(
-    sb: Supabase,
-    workspace_id: str,
-    person_id: str,
-    tag_ids: list[str],
-    *,
-    dry_run: bool,
-) -> int:
-    """Create missing tagging rows for this person. Returns number added."""
-    if not tag_ids or not person_id:
-        return 0
-    existing_rows = sb.select(
-        "tagging",
-        workspace_id=f"eq.{workspace_id}",
-        entity_type="eq.person",
-        entity_id=f"eq.{person_id}",
-        select="tag_id",
-    )
-    existing_set = {r["tag_id"] for r in existing_rows}
-    missing = [tid for tid in tag_ids if tid not in existing_set]
-    if not missing:
-        return 0
-    if dry_run:
-        return len(missing)
-    sb.insert("tagging", [
-        {"tag_id": tid, "workspace_id": workspace_id,
-         "entity_type": "person", "entity_id": person_id}
-        for tid in missing
-    ], return_repr=False)
-    return len(missing)
-
-
 def ensure_engagement(
     sb: Supabase,
     workspace_id: str,
@@ -458,7 +353,7 @@ def ensure_engagement(
         "workspace_id": workspace_id,
         "project_id":   project_id,
         "person_id":    person_id,
-        "status":       "proposed",   # anti-CRM replacement for 'prospect'
+        "status":       "contacted",   # anti-CRM default (reset v2 enum)
         "created_by":   owner_user_id,
         "custom_fields": custom_fields,
     }, return_repr=False)
@@ -477,7 +372,7 @@ def main() -> None:
     ap.add_argument("--verbose", action="store_true",
                     help="Print one line per row processed.")
     ap.add_argument("--skip-engagements", action="store_true",
-                    help="Load persons + taggings only. Use before the owner has signed up.")
+                    help="Load persons only. Use before the owner has signed up.")
     args = ap.parse_args()
 
     if not ENRICHED_PATH.exists():
@@ -500,17 +395,16 @@ def main() -> None:
 
     sb = Supabase(url, key)
     mode = "DRY-RUN" if args.dry_run else "LIVE"
-    print(f"== Stage 3 loader ({mode}) ==")
+    print(f"== Stage 3 loader ({mode}) — reset v2 ==")
     print(f"  target   : {url}")
     print(f"  workspace: {workspace_name} ({workspace_slug})")
-    print(f"  project  : {project_name} ({project_slug}) type=show")
+    print(f"  project  : {project_name} ({project_slug})")
     print(f"  season   : {season}")
     print(f"  owner    : {owner_email}")
     print()
 
     workspace_id = ensure_workspace(sb, workspace_slug, workspace_name, dry_run=args.dry_run)
     project_id   = ensure_project(sb, workspace_id, project_slug, project_name, dry_run=args.dry_run)
-    tag_ids_by_name = ensure_tags(sb, workspace_id, dry_run=args.dry_run)
 
     # Resolve the owner user.
     owner_user = sb.find_user_by_email(owner_email)
@@ -533,12 +427,11 @@ def main() -> None:
     print()
     print(f"Processing {len(rows)} enriched rows...")
     stats = {
-        "persons_upserted":     0,
-        "taggings_created":     0,
-        "engagements_created":  0,
+        "persons_upserted":      0,
+        "engagements_created":   0,
         "engagements_preserved": 0,
-        "engagements_skipped":  0,
-        "errors":               0,
+        "engagements_skipped":   0,
+        "errors":                0,
     }
 
     for i, row in enumerate(rows, 1):
@@ -546,12 +439,7 @@ def main() -> None:
             person_id = upsert_person(sb, owner_user_id, row, dry_run=args.dry_run)
             stats["persons_upserted"] += 1
 
-            wanted = tags_for_row(row)
-            wanted_ids = [tag_ids_by_name[n] for n in wanted if n in tag_ids_by_name]
             if person_id:
-                stats["taggings_created"] += ensure_taggings(
-                    sb, workspace_id, person_id, wanted_ids, dry_run=args.dry_run,
-                )
                 if args.skip_engagements:
                     stats["engagements_skipped"] += 1
                 else:
@@ -566,12 +454,11 @@ def main() -> None:
             if args.verbose:
                 name = row.get("name") or row.get("company") or "(unknown)"
                 mark = "✓" if person_id else "·"
-                print(f"  {mark} [{i:3d}/{len(rows)}] {name[:40]:40s} "
-                      f"tags={len(wanted_ids):1d}")
+                print(f"  {mark} [{i:3d}/{len(rows)}] {name[:50]:50s}")
         except Exception as e:
             stats["errors"] += 1
             name = row.get("name") or row.get("company") or "(unknown)"
-            print(f"  ! [{i:3d}/{len(rows)}] {name[:40]:40s} FAILED: {e}")
+            print(f"  ! [{i:3d}/{len(rows)}] {name[:50]:50s} FAILED: {e}")
 
     print()
     print("=" * 60)

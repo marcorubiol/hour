@@ -43,29 +43,32 @@ That loads ~90% of project context in seconds without depending on what was said
 
 | File | Purpose | Status |
 |---|---|---|
-| `context.md` | This workflow guide (CLAUDE.md is a stub) | v1.2 — 2026-04-19 |
-| `ARCHITECTURE.md` | Technical stack, multi-tenancy, security, environments | v1.1 — 2026-04-19 (polymorphic) |
-| `DECISIONS.md` | Chronological log of decisions with rationale | Active — append-only |
+| `context.md` | This workflow guide (CLAUDE.md is a stub) | v1.3 — 2026-04-19 |
+| `ARCHITECTURE.md` | Technical stack, multi-tenancy, security, environments | v1.2 — 2026-04-19 (reset v2) |
+| `DECISIONS.md` | Chronological log of decisions with rationale | Active — append-only (ADR-001..007 added 2026-04-19) |
 | `COMPETITION.md` | Ares, Bresca, other competitors | v1 — 2026-04-18 |
-| `schema.sql` | Full Postgres schema — 12 tables, polymorphic core | v2 — 2026-04-19 (rewritten from scratch) |
-| `rls-policies.sql` | RLS policies + helpers + audit triggers + access-token hook | v2 — 2026-04-19 (rewritten from scratch) |
-| `seed.sql` | Pre-seed + post-signup claim script for marco-rubiol/mamemi | v1 — 2026-04-19 |
-| `bootstrap.md` | Step-by-step setup guide (Supabase + CF + DNS) | v1 — 2026-04-19 (needs polymorphic refresh) |
-| `import-plan.md` | Mapping 156 Difusión programmers into person + engagement | Implemented via `import/*.py` |
-| `import/` | 3-stage pipeline: `01_normalize.py` → `02_enrich_from_pdf.py` → `03_load_to_hour.py` | Ready; loader supports `--skip-engagements` pre-signup |
+| `schema.sql` | Full Postgres schema — 18 tables, reset v2 | v3 — 2026-04-19 (rewritten from scratch) |
+| `rls-policies.sql` | RLS helpers + policies + audit triggers + access-token hook + show_redacted view | v3 — 2026-04-19 (rewritten from scratch) |
+| `seed.sql` | Pre-seed + post-signup claim script for marco-rubiol/mamemi | v1 — 2026-04-19 (may need `membership → workspace_membership` one-liner rename) |
+| `bootstrap.md` | Step-by-step setup guide (Supabase + CF + DNS) | v1.1 — 2026-04-19 (reset v2 refresh) |
+| `import-plan.md` | Mapping 156 Difusión programmers into person + engagement | v1.1 — 2026-04-19 (reset v2 updates). Loader code needs adjustment in Windsurf. |
+| `import/` | 3-stage pipeline: `01_normalize.py` → `02_enrich_from_pdf.py` → `03_load_to_hour.py` | Ready; loader needs reset-v2 adjustment (drop tag/tagging step, drop `type='show'`, status default `contacted`). Supports `--skip-engagements` pre-signup. |
 | `adr/` | Extended ADRs for complex decisions (if needed) | Empty |
 
 ---
 
 ## Next session — agenda
 
-Ordered checklist to finish Phase 0 bootstrap:
+Ordered checklist to finish Phase 0 bootstrap (post reset v2):
 
-1. Marco signs up through the Hour app with `marcorubiol@gmail.com` (creates the `auth.users` row + triggers `handle_new_user`).
-2. Apply the CLAIM block in `_build/seed.sql` (Supabase SQL editor or MCP) — attaches Marco as owner of the pre-seeded `marco-rubiol` workspace and deletes the trigger-created duplicate.
-3. Enable `public.custom_access_token_hook` in Supabase dashboard → Authentication → Hooks (the function already exists; only the toggle is manual).
-4. `python3 _build/import/03_load_to_hour.py` (no flags) → loads 156 persons, taggings, and `status='proposed'` engagements on the MaMeMi project with `custom_fields.season = '2026-27'`.
-5. Verify `GET /api/engagements?project_slug=mamemi&season=2026-27` with a real JWT.
-6. Wire `hour.zerosense.studio` custom domain on the CF Worker (Workers & Pages → Settings → Domains & Routes).
+1. Apply reset v2 migration against `hour-phase0` (MCP `apply_migration` with the content of `schema.sql` followed by `rls-policies.sql`). Verify 18 tables + the 19 helpers listed in `bootstrap.md §4`.
+2. Patch `_build/seed.sql` if it references `membership` (rename to `workspace_membership`) — Windsurf.
+3. Adjust `_build/import/03_load_to_hour.py` for reset v2: drop tag/tagging step, drop `type='show'`, switch engagement status default to `contacted` — Windsurf.
+4. Marco signs up through the Hour app with `marcorubiol@gmail.com` (creates the `auth.users` row + triggers `handle_new_user` → `workspace` → `workspace_seed_roles` cascade, 15 `workspace_role` rows).
+5. Apply the CLAIM block in `_build/seed.sql` — attaches Marco as owner of the pre-seeded `marco-rubiol` workspace and deletes the trigger-created duplicate.
+6. Enable `public.custom_access_token_hook` in Supabase dashboard → Authentication → Hooks.
+7. `python3 _build/import/03_load_to_hour.py` (no flags) → 156 persons + 156 engagements (status=`contacted`, `custom_fields.season='2026-27'`) on the MaMeMi project. No tag rows.
+8. Verify `GET /api/engagements?project_slug=mamemi&season=2026-27` with a real JWT.
+9. Wire `hour.zerosense.studio` custom domain on the CF Worker (Workers & Pages → Settings → Domains & Routes).
 
 All work happens in Windsurf for code changes and Cowork for strategy; `_build/` is the source of truth.

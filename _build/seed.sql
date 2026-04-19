@@ -1,8 +1,9 @@
--- Hour — Phase 0 seed / ownership claim
+-- Hour — Phase 0 seed / ownership claim (reset v2)
 -- Two phases:
---   A. PRE-SEED (already applied via MCP 2026-04-19).
+--   A. PRE-SEED (reference snippet — re-apply once reset v2 lands).
 --      - workspace slug=marco-rubiol (Marco Rubiol, personal, ES)
---      - project  slug=mamemi (MaMeMi, show, active) inside that workspace
+--      - project  slug=mamemi (MaMeMi, status=active) inside that workspace.
+--        NOTE: no `type` column — ADR-007 dropped the project.type discriminator.
 --      - No owner membership yet (awaits Marco's first signup).
 --   B. CLAIM (run ONCE after Marco's first signup via the app).
 --      - Deletes the empty workspace auto-created by handle_new_user trigger.
@@ -10,17 +11,19 @@
 --
 -- Execution: apply the CLAIM block once in Supabase Studio → SQL Editor
 -- (or via MCP apply_migration) AFTER Marco has signed up through the Hour app.
+-- The `workspace_seed_roles` trigger on workspace INSERT takes care of the
+-- 15 system roles automatically.
 
 --------------------------------------------------------------------------------
--- A. PRE-SEED (reference — already applied)
+-- A. PRE-SEED (reference — apply once after reset v2 migration lands)
 --------------------------------------------------------------------------------
 
 -- INSERT INTO public.workspace (slug, name, kind, country, timezone)
 -- VALUES ('marco-rubiol', 'Marco Rubiol', 'personal', 'ES', 'Europe/Madrid')
 -- ON CONFLICT (slug) DO UPDATE SET name = EXCLUDED.name;
 --
--- INSERT INTO public.project (workspace_id, slug, name, type, status, description)
--- SELECT id, 'mamemi', 'MaMeMi', 'show', 'active',
+-- INSERT INTO public.project (workspace_id, slug, name, status, description)
+-- SELECT id, 'mamemi', 'MaMeMi', 'active',
 --        'MaMeMi — the show. Source of the Difusión 2026-27 dates and engagements.'
 -- FROM public.workspace WHERE slug = 'marco-rubiol'
 -- ON CONFLICT (workspace_id, slug) DO UPDATE SET name = EXCLUDED.name;
@@ -60,7 +63,7 @@ BEGIN
   -- Trigger-created workspace: marco-rubiol-XXXX (suffix added because of slug collision)
   SELECT w.id INTO v_trigger_ws_id
   FROM public.workspace w
-  JOIN public.membership m ON m.workspace_id = w.id
+  JOIN public.workspace_membership m ON m.workspace_id = w.id
   WHERE m.user_id = v_user_id
     AND m.role = 'owner'
     AND w.id <> v_pre_seeded_ws_id
@@ -69,12 +72,13 @@ BEGIN
   LIMIT 1;
 
   -- 1. Attach Marco as owner to the pre-seeded workspace (idempotent).
-  INSERT INTO public.membership (workspace_id, user_id, role, accepted_at)
+  INSERT INTO public.workspace_membership (workspace_id, user_id, role, accepted_at)
   VALUES (v_pre_seeded_ws_id, v_user_id, 'owner', now())
   ON CONFLICT (workspace_id, user_id) DO UPDATE
-    SET role = 'owner', accepted_at = COALESCE(public.membership.accepted_at, now());
+    SET role = 'owner', accepted_at = COALESCE(public.workspace_membership.accepted_at, now());
 
-  -- 2. Delete the empty trigger-created workspace (cascades to its membership).
+  -- 2. Delete the empty trigger-created workspace (cascades to its
+  --    workspace_membership + workspace_role rows).
   IF v_trigger_ws_id IS NOT NULL THEN
     DELETE FROM public.workspace WHERE id = v_trigger_ws_id;
     RAISE NOTICE 'Removed duplicate trigger-created workspace %.', v_trigger_ws_id;
@@ -97,10 +101,12 @@ SELECT
   m.role         AS membership_role,
   p.slug         AS project_slug,
   p.name         AS project_name,
-  p.type         AS project_type,
-  p.status       AS project_status
+  p.status       AS project_status,
+  (SELECT count(*) FROM public.workspace_role
+     WHERE workspace_id = w.id AND is_system = true) AS system_roles_count
 FROM auth.users u
-JOIN public.membership m  ON m.user_id = u.id AND m.role = 'owner'
-JOIN public.workspace  w  ON w.id = m.workspace_id AND w.slug = 'marco-rubiol'
-LEFT JOIN public.project p ON p.workspace_id = w.id AND p.slug = 'mamemi' AND p.deleted_at IS NULL
+JOIN public.workspace_membership m ON m.user_id = u.id AND m.role = 'owner'
+JOIN public.workspace            w ON w.id = m.workspace_id AND w.slug = 'marco-rubiol'
+LEFT JOIN public.project         p ON p.workspace_id = w.id AND p.slug = 'mamemi' AND p.deleted_at IS NULL
 WHERE u.email = 'marcorubiol@gmail.com';
+-- Expect: 1 row, system_roles_count = 15.
