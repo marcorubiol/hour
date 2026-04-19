@@ -184,11 +184,26 @@ Format:
 - **Rationale**: Node 22 entered LTS in October 2024, Active support through October 2027. Native top-level `await`, stable `require(esm)`, and V8 12.4 perf improvements. Works out of the box with Astro, Svelte, Supabase SDK, and CF Pages.
 - **Status**: Firm.
 
+## [2026-04-19] — Custom fields: hybrid JSONB + definition table (deferred implementation)
+- **Decision**: Hour will support per-organization custom fields on the main entities (`contact`, `project`, `event`) via a hybrid pattern: a `custom_field_definition` table per org defines schema (name, type, required, options, display order), and each entity carries a `custom_fields jsonb NOT NULL DEFAULT '{}'::jsonb` column that stores values. UI renders form fields dynamically from the definitions. GIN index on the JSONB column when filtering needs it.
+- **Context**: B2B live-performing-arts organizations have widely different metadata needs on contacts and projects (sala vs festival vs programmer require different fields; SGAE/AIE contract flags, aforo, taquilla garantizada, ficha técnica links, etc). Without a custom fields system, users inflate the `notes` free-text field and lose structure, or we get an endless stream of "add column X" requests post-launch.
+- **Alternatives considered**:
+  - Native columns only — rejected, can't anticipate every tenant's needs, leads to bloated schema or escape-valve via `notes`.
+  - Pure JSONB with no definitions — rejected, no validation, no dynamic UI, each org builds its own conventions and the data gets incoherent.
+  - EAV (separate `custom_field` + `custom_field_value` tables) — rejected, join-heavy, N+1 risk, complex queries for a use case that rarely needs relational analytics across custom fields.
+  - Per-tenant schema migrations (add columns per org) — rejected, operational nightmare at SaaS scale, breaks multi-tenant RLS.
+- **Rationale**: Hybrid keeps native columns for universally needed fields (name, email, status, organization_id, etc.) where we need indexing, RLS filtering, and typed joins; puts the genuinely per-tenant stuff in JSONB where it flexes without migrations. The `custom_field_definition` table gives us dynamic form rendering + app-layer validation. GIN on JSONB handles the filtering needs of Phase 1 scale (thousands of rows per org, not millions). When a custom field "graduates" (becomes universal across tenants), it migrates from JSONB to a native column cleanly.
+- **When to implement**: NOT Phase 0 (only Marco + Anouk, no demand). Implement when either (a) the first Phase 1 customer explicitly requests custom fields, or (b) we find ourselves adding native columns for single-tenant needs for the second time. Estimated cost when triggered: ~2 days for schema + RLS + dynamic form rendering.
+- **Prep work done now (Phase 0)**: none yet. Open question — whether to land the 3 `custom_fields` JSONB columns (contact / project / event) now as migration 0005 so adding the definition table and UI later is purely additive, or defer all of it. Pending Marco's decision.
+- **UI corollary**: the same `form_schema`/definition pattern can drive native-field rendering too, but we won't go that route. Native entities (contact, project, event, rider) get hand-written forms for polished UX; only custom fields are schema-driven. Two form engines, converging at the composition layer.
+- **Status**: Deferred (design firm, implementation not scheduled).
+
 ## [2026-04-18] — Deferred to kickoff session
 Items NOT yet decided, to address when starting schema work:
 
 - ~~Frontend framework confirmation~~ — resolved 2026-04-19 (Astro + Svelte). See ADR above.
 - ~~Auth flow: magic link only (Phase 0) vs + Google OAuth (Phase 1)~~ — resolved 2026-04-19 (magic-link only). See ADR above.
 - ~~Repo under Marco's GitHub user vs new `zerosense` org~~ — resolved 2026-04-19, see entry above.
+- Custom fields: whether to land the 3 `custom_fields` JSONB columns now (Phase 0) as prep — see ADR 2026-04-19 above.
 - Staging deploy frequency: per-PR vs on-merge-only
 - Ableton/Qlab integration depth (read-only metadata vs two-way sync) — Phase 1+ feature

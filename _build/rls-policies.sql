@@ -13,13 +13,15 @@
 CREATE OR REPLACE FUNCTION current_org_id()
 RETURNS UUID AS $$
   SELECT (auth.jwt() ->> 'current_org_id')::uuid;
-$$ LANGUAGE sql STABLE SECURITY DEFINER;
+$$ LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = public, extensions, pg_temp;
 
 -- Alias for auth.uid() — keeps policy expressions self-documenting.
 CREATE OR REPLACE FUNCTION current_user_id()
 RETURNS UUID AS $$
   SELECT auth.uid();
-$$ LANGUAGE sql STABLE SECURITY DEFINER;
+$$ LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = public, extensions, pg_temp;
 
 -- Returns the caller's role in the current organization.
 -- NULL if the user has no membership (policies treat NULL as denied).
@@ -28,7 +30,8 @@ RETURNS membership_role AS $$
   SELECT role FROM membership
   WHERE user_id = auth.uid()
     AND organization_id = current_org_id();
-$$ LANGUAGE sql STABLE SECURITY DEFINER;
+$$ LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = public, extensions, pg_temp;
 
 --------------------------------------------------------------------------------
 -- 1. Enable RLS on all tables (default DENY)
@@ -83,14 +86,13 @@ ALTER TABLE audit_log       FORCE ROW LEVEL SECURITY;
 -- 2. user_profile (NOT tenant-scoped)
 --------------------------------------------------------------------------------
 
--- User sees own profile.
-CREATE POLICY profile_select_own ON user_profile
-  FOR SELECT USING (id = current_user_id());
-
--- User sees profiles of anyone sharing at least one org (powers @mentions, crew lists).
-CREATE POLICY profile_select_coworkers ON user_profile
-  FOR SELECT USING (
-    id IN (
+-- User sees own profile + profiles of anyone sharing at least one org
+-- (powers @mentions, crew lists). Consolidated from two permissive policies.
+CREATE POLICY profile_select ON user_profile
+  FOR SELECT TO authenticated
+  USING (
+    id = current_user_id()
+    OR id IN (
       SELECT m2.user_id
       FROM membership m1
       JOIN membership m2 ON m1.organization_id = m2.organization_id
@@ -133,15 +135,13 @@ CREATE POLICY org_update ON organization
 -- 4. membership
 --------------------------------------------------------------------------------
 
--- Policy A: user sees their OWN memberships across ALL orgs (powers org switcher).
-CREATE POLICY membership_select_own ON membership
-  FOR SELECT USING (user_id = current_user_id());
-
--- Policy B: owner/admin sees all memberships in current org (team management).
-CREATE POLICY membership_select_org ON membership
-  FOR SELECT USING (
-    organization_id = current_org_id()
-    AND current_user_role() IN ('owner', 'admin')
+-- Consolidated SELECT: user sees their OWN memberships across ALL orgs (org switcher),
+-- and owner/admin sees all memberships in the current org (team management).
+CREATE POLICY membership_select ON membership
+  FOR SELECT TO authenticated
+  USING (
+    user_id = current_user_id()
+    OR (organization_id = current_org_id() AND current_user_role() IN ('owner','admin'))
   );
 
 -- Owner/admin can invite (insert).
@@ -339,22 +339,16 @@ CREATE POLICY note_insert ON note
     AND current_user_role() IN ('owner', 'admin', 'member')
   );
 
--- Only the author can edit their own note.
+-- Consolidated UPDATE: author can always edit their own note;
+-- owner/admin can soft-delete a live note. The non-author content-edit case is
+-- blocked by the prevent_non_author_note_edit trigger (§17).
 CREATE POLICY note_update ON note
-  FOR UPDATE USING (
+  FOR UPDATE TO authenticated
+  USING (
     organization_id = current_org_id()
-    AND author_id = current_user_id()
-  )
-  WITH CHECK (organization_id = current_org_id());
-
--- Soft-delete: author OR owner/admin.
-CREATE POLICY note_delete ON note
-  FOR UPDATE USING (
-    organization_id = current_org_id()
-    AND deleted_at IS NULL
     AND (
       author_id = current_user_id()
-      OR current_user_role() IN ('owner', 'admin')
+      OR (deleted_at IS NULL AND current_user_role() IN ('owner','admin'))
     )
   )
   WITH CHECK (organization_id = current_org_id());
@@ -489,7 +483,8 @@ BEGIN
   END IF;
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql
+SET search_path = public, pg_temp;
 
 CREATE TRIGGER guard_soft_delete_project
   BEFORE UPDATE ON project FOR EACH ROW EXECUTE FUNCTION prevent_unauthorized_soft_delete();
@@ -521,7 +516,8 @@ BEGIN
   END IF;
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql
+SET search_path = public, pg_temp;
 
 CREATE TRIGGER prevent_non_author_note_edit
   BEFORE UPDATE ON note
@@ -538,7 +534,8 @@ BEGIN
   END IF;
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql
+SET search_path = public, pg_temp;
 
 CREATE TRIGGER guard_soft_delete_organization
   BEFORE UPDATE ON organization FOR EACH ROW EXECUTE FUNCTION prevent_unauthorized_org_soft_delete();
@@ -621,7 +618,8 @@ BEGIN
   END IF;
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public, extensions, pg_temp;
 
 -- Attach audit triggers to scoped tables.
 

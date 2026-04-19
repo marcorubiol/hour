@@ -36,12 +36,11 @@ BEGIN
   );
   RETURN encode(uuid_bytes, 'hex')::uuid;
 END;
-$$ LANGUAGE plpgsql VOLATILE;
+$$ LANGUAGE plpgsql VOLATILE
+SET search_path = extensions, public, pg_temp;
 
 COMMENT ON FUNCTION uuid_generate_v7() IS
   'RFC 9562 UUID v7 — time-ordered. Replace with pg_uuidv7 extension or native uuidv7() when Supabase supports them.';
-
-CREATE EXTENSION IF NOT EXISTS "moddatetime";      -- auto-update updated_at
 
 -- Shared trigger function for updated_at
 CREATE OR REPLACE FUNCTION set_updated_at()
@@ -50,7 +49,8 @@ BEGIN
   NEW.updated_at = now();
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql
+SET search_path = public, pg_temp;
 
 --------------------------------------------------------------------------------
 -- 1. Enums
@@ -122,7 +122,8 @@ BEGIN
   );
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public, pg_temp;
 
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
@@ -236,7 +237,8 @@ BEGIN
 
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql
+SET search_path = public, pg_temp;
 
 CREATE TRIGGER contact_project_validate_org
   BEFORE INSERT OR UPDATE ON contact_project
@@ -443,3 +445,17 @@ CREATE TABLE audit_log (
 CREATE INDEX idx_audit_org        ON audit_log (organization_id);
 CREATE INDEX idx_audit_entity     ON audit_log (entity_type, entity_id);
 CREATE INDEX idx_audit_created_at ON audit_log (organization_id, created_at);
+
+--------------------------------------------------------------------------------
+-- 16. Foreign-key indexes (covers unindexed FKs flagged by Supabase advisors)
+--------------------------------------------------------------------------------
+
+CREATE INDEX IF NOT EXISTS idx_audit_log_actor_id      ON audit_log (actor_id);
+CREATE INDEX IF NOT EXISTS idx_crew_assignment_contact ON crew_assignment (contact_id);
+CREATE INDEX IF NOT EXISTS idx_crew_assignment_user    ON crew_assignment (user_id);
+CREATE INDEX IF NOT EXISTS idx_event_project           ON event (project_id);
+CREATE INDEX IF NOT EXISTS idx_file_uploaded_by        ON file (uploaded_by);
+CREATE INDEX IF NOT EXISTS idx_note_author             ON note (author_id);
+CREATE INDEX IF NOT EXISTS idx_rider_project           ON rider (project_id);
+CREATE INDEX IF NOT EXISTS idx_task_assigned_to        ON task (assigned_to);
+CREATE INDEX IF NOT EXISTS idx_task_project            ON task (project_id);
