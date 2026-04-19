@@ -37,21 +37,47 @@ Working name: **Hour**. Brand decision deferred to Phase 1.
 - Parent MaMeMi context (where Difusión originated): `01_STAGE/ZS_MaMeMi/`
 - Source of the 156 existing programmers/festivals to import: `01_STAGE/ZS_MaMeMi/Difusión/`
 
-## Upcoming milestones
-1. ~~Write `_build/schema.sql`~~ — done, rewritten twice on 2026-04-19 (polymorphic reset → **reset v2**, 18 tables: workspace, user_profile, workspace_membership, workspace_role, person, venue, project, project_membership, line, engagement, show, date, person_note, invoice, invoice_line, payment, expense, audit_log).
-2. ~~Write `_build/rls-policies.sql`~~ — done, rewritten twice on 2026-04-19. Reset v2 adds `has_permission(project_id, perm)` + explicit owner/admin bypass, `show_redacted` view, `guard_show_fee_columns` trigger. Supersedes the flat `current_workspace_role IN (...)` pattern for most per-project checks.
-3. ~~`git init` + push to GitHub~~ — done, repo at `github.com/marcorubiol/hour`.
-4. ~~Write `_build/bootstrap.md`~~ — done 2026-04-19, refreshed for reset v2 (18 tables, 19 helpers).
-5. ~~Bootstrap §2 — create Supabase project `hour-phase0` (eu-central-1, Free)~~ — done 2026-04-19.
-6. ~~Bootstrap §4 — apply initial migrations to Supabase (polymorphic reset)~~ — done 2026-04-19 via MCP.
-7. **Apply reset v2 migration** — MCP `apply_migration` with `schema.sql` + `rls-policies.sql` from `_build/`. Produces 18 tables + 19 helpers + 15-row `workspace_role` seeding on workspace INSERT. Pre-existing polymorphic-reset tables wiped via `DROP SCHEMA public CASCADE` header.
-8. ~~Bootstrap §5 — smoke test RLS from `authenticated` role~~ — done 2026-04-19 under the polymorphic schema. **Re-verify under reset v2** once migration applies (15 system roles, `has_permission` owner bypass, `show_redacted` view visible).
-9. ~~Bootstrap §6-8 — Cloudflare R2 bucket + Astro+Svelte scaffold + first deploy~~ — done 2026-04-19. R2 bucket `hour-media` created via MCP. Monorepo scaffolded with Astro 5.2 + Svelte 5 + @astrojs/cloudflare v12 (Workers mode). Deployed to `hour-web.marco-rubiol.workers.dev`.
-10. **Custom domain** — add `hour.zerosense.studio` in CF Worker Settings → Custom Domains.
-11. **Supabase dashboard config (manual)**: Auth → Sign In / Providers → Email = password ON + email confirm ON + secure email change ON + min password length 8. Auth → Hooks → enable `public.custom_access_token_hook` (injects `current_workspace_id` from the user's first `workspace_membership` row).
-12. ~~Write `_build/import-plan.md` (map 156 Difusión programmers into new schema)~~ — implemented via the 3-stage import pipeline in `_build/import/`. Updated 2026-04-19 for reset v2 (no tag/tagging step, no `type='show'`, engagement status default `contacted`).
-13. **Adjust import loader for reset v2** — `03_load_to_hour.py` needs three edits: drop the tag-creation step, drop `type='show'` from project upsert, change engagement status default to `contacted`. Windsurf task.
-14. **Sign up via the app with `marcorubiol@gmail.com`** → run `_build/seed.sql` (CLAIM block — check for `membership` rename) → run `python3 _build/import/03_load_to_hour.py` (no flag) to land 156 persons + 156 engagements (status=`contacted`) on the `mamemi` project with `season=2026-27` in `custom_fields`.
+## Status — 2026-04-20
 
-## Open for next session
-Reset v2 SQL is regenerated and waits in `_build/`. Nothing is applied yet. Next: (a) review the diff of the 8 regenerated files, (b) apply reset v2 via MCP, (c) patch `seed.sql` and the loader in Windsurf, (d) Marco signs up, (e) run CLAIM + loader, (f) verify `GET /api/engagements?project_slug=mamemi&season=2026-27` with a real JWT.
+Infra y datos **operativos**. Pendiente: primera pantalla (engagements de Difusión 2026-27). A partir de aquí, todo el trabajo está en `apps/web/`.
+
+### DB (aplicada vía MCP)
+- `hour-phase0` en eu-central-1 · Postgres 17 · 18 tablas + `show_redacted` view · 19 helpers · 53 RLS policies (ENABLE + FORCE)
+- Marco es owner de workspace `marco-rubiol` (slug) · 15 system roles seedeados por trigger · proyecto `mamemi` (status=active, sin `type`)
+- Datos reales: **154 persons + 154 engagements** (status=`contacted`, `custom_fields.season='2026-27'`), 30 enriquecidos con dossier 2026
+- Auth hook `custom_access_token_hook` enabled en dashboard (inyecta `current_workspace_id` desde `workspace_membership`)
+- Email+password + Auto-Confirm enabled para el Phase 0 team
+- Migraciones aplicadas (en orden): `reset_v2_schema`, `reset_v2_rls_and_audit`, `reset_v2_fix_audit_on_workspace_delete`, `reset_v2_fix_audit_workspace_existence`, `reset_v2_preseed_marco_rubiol_mamemi`, CLAIM block, `reset_v2_import_batch_01..04`, `reset_v2_restore_default_grants`
+
+### Worker (`hour-web` en Cloudflare)
+- Desplegado en `https://hour-web.marco-rubiol.workers.dev`
+- `GET /api/engagements` actualizado a reset v2 (default `status=contacted`, sin `project.type`)
+- Custom domain `hour.zerosense.studio` **no atado todavía** (10 min de dashboard)
+
+### Smoke tests cerrados
+- Hook inyecta `current_workspace_id` correctamente (probado con MCP `execute_sql` simulando claims)
+- Marco como `authenticated` ve 154 engagements; sin membership: 0 leaks
+- `has_permission` owner bypass verificado
+- Endpoint en prod devuelve 401 correcto sin JWT. End-to-end con JWT real saltado — se probará naturalmente al construir UI
+
+### Source tree
+- Working tree limpio. Últimos commits (12): reset v2 schema/rls, fixes de audit y grants, db-types.ts regenerado, endpoint actualizado, loader (`03_load_to_hour.py`) adaptado a reset v2
+- `_build/schema.sql`, `rls-policies.sql`, `seed.sql`, `bootstrap.md`, `import-plan.md`, `ARCHITECTURE.md`, `DECISIONS.md` todos alineados con el estado aplicado
+
+## Next — primera pantalla de Difusión
+
+Pantalla que liste los 154 engagements del workspace `marco-rubiol` / proyecto `mamemi` / season `2026-27`. Debe:
+- Pedir login (email+password) → Supabase Auth → JWT con `current_workspace_id` (ya lo inyecta el hook)
+- Llamar a `/api/engagements?project_slug=mamemi&season=2026-27&limit=50` con el JWT en `Authorization: Bearer`
+- Listar: person.full_name, person.organization_name, person.city, person.country, engagement.status, engagement.next_action_at
+- Permitir cambiar `status` inline (enum: contacted, in_conversation, hold, confirmed, declined, dormant, recurring)
+- Filtros por: status, procedencia (`person.custom_fields.sources.mostra_igualada_2026.procedencia`), tipologia
+
+Stack ya montado: Astro 5 + Svelte 5 islands + `@astrojs/cloudflare` v12. El login se resuelve con `@supabase/supabase-js` (ya en deps) o fetch directo contra `/auth/v1/token`. RLS ya hace el trabajo de scoping — el cliente no necesita filtrar por workspace.
+
+## Diferido (Phase 0.5 o cuando toque)
+
+- `task` entity + tag vocabulary (ADR-006 Deferred D1)
+- UI de overrides granulares por persona (Deferred D2)
+- `show` / `line` / `invoice` flows (cuando Marco confirme la primera fecha)
+- Custom domain `hour.zerosense.studio`

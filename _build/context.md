@@ -57,18 +57,44 @@ That loads ~90% of project context in seconds without depending on what was said
 
 ---
 
-## Next session — agenda
+## Status — 2026-04-20
 
-Ordered checklist to finish Phase 0 bootstrap (post reset v2):
+Bootstrap de Phase 0 **cerrado**. Todos los pasos 1-8 de la lista anterior están aplicados. DB poblada con datos reales, Worker desplegado, endpoint `/api/engagements` alineado con reset v2. El trabajo de ahora en adelante es producto (UI).
 
-1. Apply reset v2 migration against `hour-phase0` (MCP `apply_migration` with the content of `schema.sql` followed by `rls-policies.sql`). Verify 18 tables + the 19 helpers listed in `bootstrap.md §4`.
-2. Patch `_build/seed.sql` if it references `membership` (rename to `workspace_membership`) — Windsurf.
-3. Adjust `_build/import/03_load_to_hour.py` for reset v2: drop tag/tagging step, drop `type='show'`, switch engagement status default to `contacted` — Windsurf.
-4. Marco signs up through the Hour app with `marcorubiol@gmail.com` (creates the `auth.users` row + triggers `handle_new_user` → `workspace` → `workspace_seed_roles` cascade, 15 `workspace_role` rows).
-5. Apply the CLAIM block in `_build/seed.sql` — attaches Marco as owner of the pre-seeded `marco-rubiol` workspace and deletes the trigger-created duplicate.
-6. Enable `public.custom_access_token_hook` in Supabase dashboard → Authentication → Hooks.
-7. `python3 _build/import/03_load_to_hour.py` (no flags) → 156 persons + 156 engagements (status=`contacted`, `custom_fields.season='2026-27'`) on the MaMeMi project. No tag rows.
-8. Verify `GET /api/engagements?project_slug=mamemi&season=2026-27` with a real JWT.
-9. Wire `hour.zerosense.studio` custom domain on the CF Worker (Workers & Pages → Settings → Domains & Routes).
+### Estado DB (aplicado vía MCP)
+- 18 tablas + `show_redacted` view, 19 helpers, 53 policies RLS FORCE
+- Marco (`fcdc82df-58df-4917-860c-8e3af03900f3`) = owner de workspace `marco-rubiol` · 15 system roles · proyecto `mamemi`
+- **154 persons + 154 engagements** cargados (status=`contacted`, `season=2026-27`), 30 enriquecidos con dossier 2026
+- Auth hook `custom_access_token_hook` enabled · email+password con Auto-Confirm
 
-All work happens in Windsurf for code changes and Cowork for strategy; `_build/` is the source of truth.
+### Estado Worker
+- `hour-web.marco-rubiol.workers.dev` desplegado con la versión post-reset v2
+- `GET /api/engagements` usa default `status=contacted`, embeds person+project sin `type`
+- Custom domain `hour.zerosense.studio` pendiente (cosmético, 10 min)
+
+### Smoke tests pasados vía MCP
+- Hook inyecta `current_workspace_id` ✓
+- Marco como `authenticated` (claims simulados) ve 154 engagements ✓
+- User sin membership ve 0 filas ✓
+- `has_permission` owner bypass ✓
+- Endpoint en prod devuelve 401 sin JWT ✓
+
+### Source tree
+Clean. Commits clave de hoy: schema.sql (DROP SCHEMA + 18 tablas), rls-policies.sql (has_permission + show_redacted view), fixes de audit durante cascade DELETE, restauración de grants Supabase tras CASCADE, db-types.ts regenerado, `/api/engagements` actualizado, loader Python adaptado.
+
+## Next session — primera pantalla
+
+Lista de engagements de Difusión 2026-27 en `apps/web/`. Requisitos completos en `Hour/context.md` → "Next". Resumen:
+- Login con Supabase Auth (email+password) → JWT
+- `GET /api/engagements?project_slug=mamemi&season=2026-27&limit=50` con Bearer JWT
+- Tabla con person, organization, city/country, status, next_action_at
+- Status editable inline (enum anti-CRM de 7 valores)
+- Filtros: status, procedencia, tipologia (ambos en `person.custom_fields.sources.mostra_igualada_2026.*`)
+
+Todo el trabajo en Windsurf bajo `apps/web/src/pages/` y `apps/web/src/components/`. `_build/` se mantiene pero no necesita cambios para la UI.
+
+## Diferido (Phase 0.5+)
+
+- `task` entity + tag vocabulary (DECISIONS.md Deferred D1)
+- UI de `permission_grants` / `permission_revokes` por persona (D2)
+- `show` / `line` / `invoice` flows (cuando confirmes primera fecha real)
