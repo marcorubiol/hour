@@ -30,7 +30,7 @@ DECLARE
 BEGIN
   SELECT workspace_id
     INTO v_workspace_id
-    FROM public.membership
+    FROM public.workspace_membership
    WHERE user_id = v_user_id
      AND accepted_at IS NOT NULL
    ORDER BY accepted_at ASC
@@ -54,11 +54,11 @@ GRANT  EXECUTE ON FUNCTION public.custom_access_token_hook(jsonb)
 
 -- 3. Table privilege + RLS policy so the hook can read membership during
 --    token mint. The hook runs as supabase_auth_admin when invoked by GoTrue.
-GRANT SELECT ON public.membership TO supabase_auth_admin;
+GRANT SELECT ON public.workspace_membership TO supabase_auth_admin;
 
-DROP POLICY IF EXISTS auth_admin_read_membership ON public.membership;
+DROP POLICY IF EXISTS auth_admin_read_membership ON public.workspace_membership;
 CREATE POLICY auth_admin_read_membership
-  ON public.membership
+  ON public.workspace_membership
   FOR SELECT
   TO supabase_auth_admin
   USING (true);

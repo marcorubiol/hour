@@ -537,37 +537,59 @@ Explicit non-goals and schema-ready-but-UI-deferred items. Not addressed in the 
 
 ## [2026-04-20] — ADR-009 — UI architecture: single view + filter sidebar + lens tabs
 - **Context**: Traditional SaaS navigation uses separate pages per section (Contacts page, Calendar page, etc.). During UI exploration on 2026-04-19/20, Marco proposed a filter-first model inspired by the WPML Etch plugin he built: the main content area is always "the view," and it changes dynamically based on two axes of control — what type of information you see (lens) and what context you filter by (sidebar). This eliminates the "which page am I on?" problem and makes the sidebar a universal filter rather than navigation.
-- **Decision**: Two-axis UI architecture:
-  1. **Lens** (top bar or tabs): Desk, Calendar, Contacts, Money — determines *what type* of content is displayed. Each lens shows the same data pool through a different presentation. Future lenses (Comms, Archive) can be added without restructuring.
-  2. **Filter** (sidebar): House → Room → Run hierarchy. Selecting a House filters all lenses to that company. Selecting a Room narrows to that show. Selecting a Run narrows to that grouping. Deselecting returns to the panoramic cross-house view.
-  - Filters persist across lens switches. If La Calòrica is selected and you switch from Desk to Calendar, the calendar shows only La Calòrica gigs.
-  - **Desk without filter** = panoramic view of all houses, all rooms, all tasks/gigs/money items. Each item shows its House indicator (colored dot + name) for cross-house context.
-  - **⌘K command palette** is a first-class navigation element from day 1. Must support: switching houses, switching rooms, jumping to a specific gig/person/run, switching lenses, executing actions (create gig, add task). Power users should be able to hide the sidebar entirely and navigate exclusively via ⌘K.
-- **Sidebar structure**:
+- **Decision**: Two-axis UI architecture with a **dual-mode sidebar** (filter in most lenses, destination in Desk):
+  1. **Lenses** (sidebar, top section): Desk, Calendar, Contacts, Money — determines *what type* of content is displayed. Lenses live in the sidebar (not as top tabs) to allow unlimited future expansion (Comms, Archive, Files, Reports) without layout changes. Each lens shows the same data pool through a different presentation.
+  2. **Sidebar entities** (sidebar, bottom section): flat list of Houses, each containing Rooms. No MY HOUSES / COLLABORATING separation — all houses listed equally regardless of user's role (owner, member, or guest). Role information lives inside house settings, not in navigation. Houses ordered by recent activity or user preference. Archived houses/rooms are collapsed but accessible (one click to reactivate). Room count badges show active gig count.
+  3. **Dual-mode sidebar interaction** — the sidebar behaves differently depending on the active lens:
+     - **Desk + nothing selected** = panoramic view ("Hello Marco, everything on your plate") — tasks, upcoming gigs, pending money, waiting items across all houses. Each item shows its House indicator (colored dot + name).
+     - **Desk + House selected** = **House detail view** — the House's rooms, aggregate stats, recent activity. This is a destination, not a filter.
+     - **Desk + Room selected** = **Room detail view** — the Room's full profile: runs, gigs, assets (riders, dossiers, QLab sessions, Ableton sessions, stage plots, photos, videos), team, about. Assets live here because they belong to the show/piece, not to the company or user. Assets can be Room-level (canonical, used for all gigs) or Gig-level (per-venue adaptations). This is a destination, not a filter.
+     - **Calendar + House selected** = filter — only gigs from that House's rooms.
+     - **Calendar + Room selected** = filter — only gigs from that Room.
+     - **Contacts + House selected** = filter — only persons with engagements in that House.
+     - **Contacts + Room selected** = filter — only persons with engagements in that Room.
+     - **Money + House/Room selected** = filter — only invoices/expenses for that scope.
+     Summary: **Desk treats sidebar selections as destinations (detail views). All other lenses treat sidebar selections as filters.**
+  4. **Filters persist across lens switches** with context adaptation. If MaMeMi Room A is selected and you switch from Desk (showing Room A detail) to Calendar, the calendar shows only Room A's gigs. Switching back to Desk returns to Room A's detail view.
+  5. **⌘K command palette** is a first-class navigation element from day 1. Must support: switching houses, switching rooms, jumping to a specific gig/person/run, switching lenses, executing actions (create gig, add task). Power users should be able to hide the sidebar entirely and navigate exclusively via ⌘K.
+- **Sidebar layout**:
   ```
-  MY HOUSES
-    ● MaMeMi
-      Room Espectáculo A     3
-      Room Espectáculo B     2
-  
-  COLLABORATING
-    ● La Veronal
-      Room Pieza X           5
-    ● Company C  [archived]
-      Room Pieza Z           —
+  Desk            ← active lens (highlighted)
+  Calendar
+  Contacts
+  Money
+  ────────────
+  ● MaMeMi        ← houses, flat list, no ownership grouping
+    Room A    3
+    Room B    2
+  ● Kairos
+    Room C    1
+  ● La Veronal
+    Room X    5
+  ● Co C [arch]
+  ────────────
+  Marco Rubiol
+  ⌘K · search
   ```
-  - Houses are grouped by ownership (MY HOUSES = workspace owner/admin, COLLABORATING = member/guest).
-  - Archived houses/rooms are collapsed but accessible (one click to reactivate).
-  - Room count badges show active gig count.
+- **Room detail view (Desk + Room selected)** has tabs within the content area:
+  - **Work** — runs, gigs, tasks for this room
+  - **Assets** — riders (versioned), dossiers (multi-language), stage/lighting/sound plots, QLab sessions, Ableton sessions, photos, videos, press kit. Each asset tracks: current version, upload date, uploader, last sent (to whom, when). Assets are Room-level by default; Gig-level variants exist for per-venue adaptations (e.g., "Rider adapted for Teatre Lliure").
+  - **Team** — project_membership for this room
+  - **About** — description, tags, creation date, status
+- **Why assets live in Room, not as a lens**: Assets don't have a meaningful cross-house view. Nobody needs "all riders from all companies." A rider belongs to a show. A QLab session belongs to a show. Cross-cutting views (Calendar, Contacts, Money) are lenses; entity-bound content (assets, team) lives inside the entity's detail.
 - **Alternatives considered**:
-  - Separate pages per section (Contacts page, Calendar page, etc.) — rejected, creates "where am I?" confusion and loses the filter-as-context paradigm.
-  - Sidebar as navigation (clicking project opens project page) — rejected by Marco; sidebar must be a filter, not a destination.
-  - No sidebar option — rejected for default, but ⌘K-only mode is supported for power users who prefer minimal UI.
-- **Rationale**: The performing-arts professional works in two modes: (a) "everything at once" (Monday morning, what's on my plate across all houses) and (b) "deep in one company" (today I work for La Calòrica). The filter model supports both without page switches. ⌘K ensures keyboard-first users are never blocked by the UI structure.
+  - Separate pages per section (Contacts page, Calendar page, etc.) — rejected, creates "where am I?" confusion.
+  - Sidebar as pure filter everywhere — rejected; Room detail (assets, team, about) doesn't make sense as filtered Desk content. The Room IS a destination when you need to manage its assets.
+  - Sidebar as pure navigation everywhere — rejected; Calendar filtered by Room is not a "Room calendar page," it's the same calendar with a scope.
+  - Lenses as top tabs instead of sidebar — rejected; tabs don't scale beyond 5-6 items. Sidebar scales to 8+ lenses. Also consolidates all controls in one panel.
+  - MY HOUSES / COLLABORATING grouping in sidebar — rejected by Marco. The user's role doesn't affect how they navigate; all houses are peers in the sidebar.
+  - No sidebar option as default — rejected, but ⌘K-only mode is supported for power users who prefer minimal UI.
+- **Rationale**: The performing-arts professional works in two modes: (a) "everything at once" (Monday morning, what's on my plate across all houses) and (b) "deep in one show" (managing the assets and team of a specific piece). The dual-mode model supports both without page switches. Desk absorbs the "detail page" function, eliminating the need for separate project/show pages. ⌘K ensures keyboard-first users are never blocked by the UI structure.
 - **Consequences**:
-  - Frontend: single layout component with lens tabs + filter sidebar. Content area re-renders based on active lens + active filter.
-  - State management: filter state (selected house/room/run) lives in URL params or app state, persists across lens switches.
-  - ⌘K: requires an indexed search across houses, rooms, runs, gigs, persons, tasks. Supabase full-text search or client-side index.
-  - Responsive/mobile: sidebar collapses to a filter drawer; ⌘K becomes the primary navigation on mobile.
-  - Performance: panoramic view (no filter) must load efficiently across all houses — requires proper RLS + pagination.
-- **Status**: Firm for the architecture. Lens list (Desk, Calendar, Contacts, Money) is provisional — Comms lens deferred to Phase 1+ (see D4).
+  - Frontend: single layout component with sidebar (lenses + houses) and content area. Content area renders based on `(active_lens, selected_entity)` tuple. Desk lens has three render modes: panoramic (nothing selected), house detail, room detail. Other lenses have one render mode each with optional filter.
+  - State management: `(lens, house_id?, room_id?, run_id?)` in URL params. Persists across lens switches. Lens switch preserves entity selection but changes render mode.
+  - Assets: stored in R2, metadata in a future `asset` table (or `file` table) with `room_id` + optional `gig_id`. Versioning is append-only (new version = new row with same `asset_group_id`, latest = highest `version`).
+  - ⌘K: requires indexed search across houses, rooms, runs, gigs, persons, tasks, assets. Supabase full-text search or client-side index.
+  - Responsive/mobile: sidebar collapses to a drawer; ⌘K becomes primary navigation on mobile.
+  - Performance: panoramic Desk (no filter) must load efficiently across all houses — requires proper RLS + pagination.
+- **Status**: Firm for the architecture. Lens list (Desk, Calendar, Contacts, Money) is firm for Phase 0. Future lenses (Comms, Archive) add a sidebar line each — no layout changes needed.

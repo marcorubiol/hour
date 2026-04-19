@@ -1,63 +1,17 @@
 ---
-// Placeholder page for Phase 0 first deploy.
-// Replace with the real app shell once auth + layout land.
-const deployedAt = new Date().toISOString();
+export const prerender = false;
 ---
 
-<!doctype html>
-<html lang="en">
+<html lang="es">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="robots" content="noindex, nofollow" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>Hour</title>
-    <style>
-      :root {
-        color-scheme: light dark;
-        --bg: #0a0a0a;
-        --fg: #f5f5f5;
-        --muted: #8a8a8a;
-      }
-      html, body {
-        margin: 0;
-        padding: 0;
-        background: var(--bg);
-        color: var(--fg);
-        font-family: system-ui, -apple-system, sans-serif;
-        min-height: 100vh;
-      }
-      main {
-        min-height: 100vh;
-        display: grid;
-        place-items: center;
-        padding: 2rem;
-        text-align: center;
-      }
-      h1 {
-        font-size: clamp(2.5rem, 8vw, 5rem);
-        font-weight: 600;
-        margin: 0 0 0.5rem;
-        letter-spacing: -0.03em;
-      }
-      p {
-        color: var(--muted);
-        font-size: 0.95rem;
-        margin: 0.25rem 0;
-      }
-      code {
-        font-family: ui-monospace, Menlo, monospace;
-        font-size: 0.8rem;
-      }
-    </style>
   </head>
   <body>
-    <main>
-      <div>
-        <h1>Hour</h1>
-        <p>Phase 0 — placeholder.</p>
-        <p><code>deployed: {deployedAt}</code></p>
-      </div>
-    </main>
+    <script>
+      window.location.replace(
+        localStorage.getItem('hour_jwt') ? '/difusion' : '/login'
+      );
+    </script>
   </body>
 </html>
