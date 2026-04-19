@@ -8,7 +8,39 @@
 -- 0. Extensions & helpers
 --------------------------------------------------------------------------------
 
-CREATE EXTENSION IF NOT EXISTS "pg_uuidv7";       -- uuid_generate_v7()
+-- UUID v7 generation (RFC 9562) via pgcrypto; no external extension needed.
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
+CREATE OR REPLACE FUNCTION uuid_generate_v7()
+RETURNS uuid AS $$
+DECLARE
+  unix_ts_ms bytea;
+  uuid_bytes bytea;
+BEGIN
+  -- 48-bit Unix timestamp in milliseconds, big-endian
+  unix_ts_ms := substring(
+    int8send((extract(epoch FROM clock_timestamp()) * 1000)::bigint)
+    FROM 3
+  );
+  -- Concatenate timestamp (6 bytes) + 10 random bytes
+  uuid_bytes := unix_ts_ms || gen_random_bytes(10);
+  -- Set version (byte 6, high nibble = 0111)
+  uuid_bytes := set_byte(
+    uuid_bytes, 6,
+    (b'0111' || get_byte(uuid_bytes, 6)::bit(4))::bit(8)::integer
+  );
+  -- Set variant (byte 8, high nibble = 10xx)
+  uuid_bytes := set_byte(
+    uuid_bytes, 8,
+    (b'10' || get_byte(uuid_bytes, 8)::bit(6))::bit(8)::integer
+  );
+  RETURN encode(uuid_bytes, 'hex')::uuid;
+END;
+$$ LANGUAGE plpgsql VOLATILE;
+
+COMMENT ON FUNCTION uuid_generate_v7() IS
+  'RFC 9562 UUID v7 — time-ordered. Replace with pg_uuidv7 extension or native uuidv7() when Supabase supports them.';
+
 CREATE EXTENSION IF NOT EXISTS "moddatetime";      -- auto-update updated_at
 
 -- Shared trigger function for updated_at
