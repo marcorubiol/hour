@@ -64,6 +64,32 @@ Infra y datos **operativos**. Pendiente: primera pantalla (engagements de Difusi
 - Working tree limpio. Últimos commits (12): reset v2 schema/rls, fixes de audit y grants, db-types.ts regenerado, endpoint actualizado, loader (`03_load_to_hour.py`) adaptado a reset v2
 - `_build/schema.sql`, `rls-policies.sql`, `seed.sql`, `bootstrap.md`, `import-plan.md`, `ARCHITECTURE.md`, `DECISIONS.md` todos alineados con el estado aplicado
 
+## Product vocabulary (ADR-008, 2026-04-20)
+
+Four-level naming mapping to schema entities:
+- **House** = `workspace` = company, collective, personal brand
+- **Room** = `project` = show, piece, album, production
+- **Run** = `line` = tour, season, festival circuit, residency block
+- **Gig** = `show` = single performance event
+
+Plus **Desk** = the primary UI lens (the "what's on your plate" view).
+
+Schema retains technical names (`workspace`, `project`, `line`, `show`). Product vocabulary appears in UI, docs, and user-facing copy.
+
+## UI architecture (ADR-009, 2026-04-20)
+
+Single-layout app with two controls:
+- **Lenses** (sidebar top): Desk, Calendar, Contacts, Money. Determines what type of content. Future lenses (Comms, Archive) add a line — no layout change.
+- **Sidebar entities** (sidebar bottom): flat list of Houses → Rooms. No MY/COLLABORATING split.
+
+**Dual-mode sidebar**:
+- **Desk + entity selected** = destination (detail view: House overview, Room profile with assets/team/runs)
+- **Other lenses + entity selected** = filter (Calendar shows only that scope's gigs, etc.)
+
+**Room detail** (Desk + Room) has tabs: Work, Assets, Team, About. Assets include riders (versioned), dossiers, QLab sessions, Ableton sessions, stage plots, photos, videos. Assets are Room-level (canonical) or Gig-level (per-venue adaptations).
+
+**⌘K** is first-class from day 1. Sidebar can be hidden entirely for ⌘K-only navigation.
+
 ## Next — primera pantalla de Difusión
 
 Pantalla que liste los 154 engagements del workspace `marco-rubiol` / proyecto `mamemi` / season `2026-27`. Debe:
@@ -77,7 +103,9 @@ Stack ya montado: Astro 5 + Svelte 5 islands + `@astrojs/cloudflare` v12. El log
 
 ## Diferido (Phase 0.5 o cuando toque)
 
-- `task` entity + tag vocabulary (ADR-006 Deferred D1)
+- `task` entity — polymorphic (project/line/show/engagement), origin: manual/protocol/ai. Manual tasks needed for Desk view. (Deferred D3)
+- Communication layer — unified email/WhatsApp/calls contextualised by House/Room (Deferred D4)
+- `task` tag vocabulary (Deferred D1)
 - UI de overrides granulares por persona (Deferred D2)
 - `show` / `line` / `invoice` flows (cuando Marco confirme la primera fecha)
 - Custom domain `hour.zerosense.studio`
