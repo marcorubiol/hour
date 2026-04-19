@@ -142,11 +142,53 @@ Format:
 - **How to apply**: First migration creates the function. Schema migrations keep calling `uuid_generate_v7()` as default. Future migration can replace the function body once native support arrives.
 - **Status**: Firm for Phase 0. Revisit when Supabase ships native UUID v7.
 
+## [2026-04-19] — Auth flow: magic-link only for Phase 0
+- **Decision**: Supabase Auth with email magic-link as the only sign-in method. Email+password disabled. OAuth providers (Google, Apple) deferred to Phase 1.
+- **Context**: Phase 0 has ≤5 users (Marco, Anouk, up to 3 collaborators). First-time setup of `hour.zerosense.studio` required an auth choice.
+- **Alternatives considered**:
+  - Email + password — rejected, passwords to remember/rotate for 5 internal users is pure friction.
+  - Magic-link + Google OAuth from day one — rejected, OAuth adds callback URLs, token rotation, and a larger auth surface with no Phase 0 benefit (all 5 users have email).
+  - Passkey/WebAuthn — rejected, Supabase support is still preview-level and it's overkill for an internal tool.
+- **Rationale**: Magic link is zero-friction for trusted small teams. Resend's free tier (3k/month, 100/day) is ~100× what 5 users need. Adding OAuth when external users appear in Phase 1 is a dashboard toggle + config change, not a migration. Session length will be set to 30 days so mobile users don't re-auth daily.
+- **How to apply**: Bootstrap §2.1 enables Magic Link and disables Password in the Supabase dashboard. Site URL = `hour.zerosense.studio`, redirect = `http://localhost:4321/*` for dev.
+- **Status**: Firm for Phase 0. Revisit at Phase 1 kickoff when external users appear.
+
+## [2026-04-19] — Supabase region: eu-central-1 (Frankfurt)
+- **Decision**: Create the Supabase Cloud project in `eu-central-1` (Frankfurt).
+- **Context**: First-time Supabase project creation for Hour. Region is effectively immutable — changing later means a full export/import migration.
+- **Alternatives considered**:
+  - `eu-west-3` (Paris) — rejected, latency from Madrid is ~25ms vs Frankfurt's ~35ms, a difference imperceptible to users. Frankfurt has longer Supabase operational history and fewer reported incidents.
+  - `us-east-1` (Virginia) — rejected, GDPR transit risk + 100ms+ latency penalty for zero benefit.
+  - Any non-EU region — rejected, Hour targets European customers and must keep data inside the EU for GDPR.
+- **Rationale**: Frankfurt is Supabase's most-used EU region, with the most mature infra. Latency difference with Paris is negligible. EU data residency satisfies GDPR without extra contractual work.
+- **How to apply at Phase 1**: If customer acquisition reveals a meaningful user base outside Europe, evaluate a second Supabase project in that region rather than migrating the primary one.
+- **Status**: Firm.
+
+## [2026-04-19] — Frontend framework: Astro + Svelte islands
+- **Decision**: Astro as the application shell, Svelte for interactive islands. Cloudflare adapter for deploy. Single Astro app at `apps/web/`.
+- **Context**: First frontend scaffold needed before Cloudflare Pages setup. Framework choice shapes every future component.
+- **Alternatives considered**:
+  - SvelteKit (full SPA) — rejected for Phase 0, worse first paint for list/detail UI, heavier JS payload, overkill when most pages are server-rendered.
+  - Next.js (React) — rejected, ~2× bundle size for equivalent UI, larger dependency surface, and Marco's existing tooling preference is Svelte-side.
+  - HTMX + plain HTML — rejected, too skeletal for Supabase Realtime subscriptions and the drag-drop interactions planned for the task board.
+- **Rationale**: 80% of Hour's UI is list/detail views (contacts, projects, events, tasks). Astro server-renders these by default; Svelte islands add interactivity only where needed (forms, drag-drop, realtime updates). Result: minimal client JS, SEO out of the box, fast first paint. When Phase 1+ needs a heavily interactive sub-app (Gantt-style production timeline, touring calendar), it can be a separate SvelteKit app in the monorepo.
+- **How to apply**: Bootstrap §7 scaffolds `apps/web/` with `astro + @astrojs/svelte + @astrojs/cloudflare`. `output: 'server'` on Pages adapter to support auth callbacks and API routes.
+- **Status**: Firm for Phase 0. Revisit if a sub-app needs full-SPA interactivity.
+
+## [2026-04-19] — Node runtime: 22 LTS
+- **Decision**: Node 22 as the runtime for local dev and Cloudflare Pages builds. Pinned via `NODE_VERSION=22` env var on Pages.
+- **Context**: CF Pages needs an explicit Node version pin; default is old.
+- **Alternatives considered**:
+  - Node 20 LTS — rejected, still valid but more conservative. New project should start on the most recent Active LTS.
+  - Node 24 (Current) — rejected, not LTS, not recommended for production.
+- **Rationale**: Node 22 entered LTS in October 2024, Active support through October 2027. Native top-level `await`, stable `require(esm)`, and V8 12.4 perf improvements. Works out of the box with Astro, Svelte, Supabase SDK, and CF Pages.
+- **Status**: Firm.
+
 ## [2026-04-18] — Deferred to kickoff session
 Items NOT yet decided, to address when starting schema work:
 
-- Frontend framework confirmation (Astro+Svelte recommended, alternatives Next.js or SvelteKit)
-- Auth flow: magic link only (Phase 0) vs + Google OAuth (Phase 1)
+- ~~Frontend framework confirmation~~ — resolved 2026-04-19 (Astro + Svelte). See ADR above.
+- ~~Auth flow: magic link only (Phase 0) vs + Google OAuth (Phase 1)~~ — resolved 2026-04-19 (magic-link only). See ADR above.
 - ~~Repo under Marco's GitHub user vs new `zerosense` org~~ — resolved 2026-04-19, see entry above.
 - Staging deploy frequency: per-PR vs on-merge-only
 - Ableton/Qlab integration depth (read-only metadata vs two-way sync) — Phase 1+ feature

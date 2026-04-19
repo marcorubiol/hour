@@ -298,7 +298,7 @@ Dashboard → Pages → Create → Connect to Git:
 5. Build output directory: `apps/web/dist`
 6. Root directory: leave empty (repo root).
 7. Environment variables (Build + Preview):
-   - `NODE_VERSION` = `20`
+   - `NODE_VERSION` = `22`
    - `PNPM_VERSION` = `9`
    - `PUBLIC_SUPABASE_URL` = `<from step 2>`
    - `PUBLIC_SUPABASE_ANON_KEY` = `<from step 2>`
@@ -350,7 +350,7 @@ When all six checks pass: Phase 0 infra is live. Next up — `import-plan.md` (1
 - **Migration order matters** — the filename timestamp prefix (`20260419_0001_...`) is how the CLI sorts. Never rename a migration after it's been pushed.
 - **`FORCE ROW LEVEL SECURITY` also applies to the table owner (postgres role).** The smoke-test step uses `SET LOCAL ROLE` to test isolation; don't panic when the postgres role sees an empty table through the authenticated role.
 - **JWT `current_org_id` claim is not automatic.** Until a JWT hook or Edge Function injects it, every RLS-protected query from a client returns empty. First wiring milestone post-bootstrap.
-- **Cloudflare Pages needs a Node version pin.** Default is old; set `NODE_VERSION=20` or builds will fail on modern deps.
+- **Cloudflare Pages needs a Node version pin.** Default is old; set `NODE_VERSION=22` (Active LTS through Oct 2027) or builds will fail on modern deps.
 - **Astro + Svelte with Cloudflare adapter** requires `output: 'server'` for Pages Functions. Static-only won't match what we'll need for auth callbacks.
 - **R2 bucket region**: R2 doesn't expose regions directly — the "auto" location places objects near first access. EU compliance: verify the bucket's actual locations in the dashboard after first uploads.
 - **pg_uuidv7 arrival**: when Supabase ships it, the `uuid_generate_v7()` function can be replaced in a new migration — PKs and existing rows stay valid because values are identical in shape.
