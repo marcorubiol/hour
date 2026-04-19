@@ -1,5 +1,5 @@
 /**
- * Generated from Supabase schema on 2026-04-19 (post-polymorphic reset).
+ * Generated from Supabase schema on 2026-04-19 (reset v2).
  * Re-generate with: `supabase gen types typescript --project-id lqlyorlccnniybezugme`
  * or via the Supabase MCP (`generate_typescript_types`).
  *
@@ -69,6 +69,7 @@ export type Database = {
           city: string | null;
           country: string | null;
           created_at: string;
+          created_by: string | null;
           custom_fields: Json;
           deleted_at: string | null;
           ends_at: string | null;
@@ -77,10 +78,12 @@ export type Database = {
           notes: string | null;
           project_id: string;
           season: string | null;
+          show_id: string | null;
           starts_at: string;
           status: Database['public']['Enums']['date_status'];
           title: string | null;
           updated_at: string;
+          venue_id: string | null;
           venue_name: string | null;
           workspace_id: string;
         };
@@ -89,6 +92,7 @@ export type Database = {
           city?: string | null;
           country?: string | null;
           created_at?: string;
+          created_by?: string | null;
           custom_fields?: Json;
           deleted_at?: string | null;
           ends_at?: string | null;
@@ -97,10 +101,12 @@ export type Database = {
           notes?: string | null;
           project_id: string;
           season?: string | null;
+          show_id?: string | null;
           starts_at: string;
           status?: Database['public']['Enums']['date_status'];
           title?: string | null;
           updated_at?: string;
+          venue_id?: string | null;
           venue_name?: string | null;
           workspace_id: string;
         };
@@ -109,6 +115,7 @@ export type Database = {
           city?: string | null;
           country?: string | null;
           created_at?: string;
+          created_by?: string | null;
           custom_fields?: Json;
           deleted_at?: string | null;
           ends_at?: string | null;
@@ -117,10 +124,12 @@ export type Database = {
           notes?: string | null;
           project_id?: string;
           season?: string | null;
+          show_id?: string | null;
           starts_at?: string;
           status?: Database['public']['Enums']['date_status'];
           title?: string | null;
           updated_at?: string;
+          venue_id?: string | null;
           venue_name?: string | null;
           workspace_id?: string;
         };
@@ -130,6 +139,27 @@ export type Database = {
             columns: ['project_id'];
             isOneToOne: false;
             referencedRelation: 'project';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'date_show_id_fkey';
+            columns: ['show_id'];
+            isOneToOne: false;
+            referencedRelation: 'show';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'date_show_id_fkey';
+            columns: ['show_id'];
+            isOneToOne: false;
+            referencedRelation: 'show_redacted';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'date_venue_id_fkey';
+            columns: ['venue_id'];
+            isOneToOne: false;
+            referencedRelation: 'venue';
             referencedColumns: ['id'];
           },
           {
@@ -144,9 +174,8 @@ export type Database = {
       engagement: {
         Row: {
           created_at: string;
-          created_by: string;
+          created_by: string | null;
           custom_fields: Json;
-          date_id: string | null;
           deleted_at: string | null;
           first_contacted_at: string | null;
           id: string;
@@ -162,9 +191,8 @@ export type Database = {
         };
         Insert: {
           created_at?: string;
-          created_by: string;
+          created_by?: string | null;
           custom_fields?: Json;
-          date_id?: string | null;
           deleted_at?: string | null;
           first_contacted_at?: string | null;
           id?: string;
@@ -180,9 +208,8 @@ export type Database = {
         };
         Update: {
           created_at?: string;
-          created_by?: string;
+          created_by?: string | null;
           custom_fields?: Json;
-          date_id?: string | null;
           deleted_at?: string | null;
           first_contacted_at?: string | null;
           id?: string;
@@ -197,13 +224,6 @@ export type Database = {
           workspace_id?: string;
         };
         Relationships: [
-          {
-            foreignKeyName: 'engagement_date_id_fkey';
-            columns: ['date_id'];
-            isOneToOne: false;
-            referencedRelation: 'date';
-            referencedColumns: ['id'];
-          },
           {
             foreignKeyName: 'engagement_person_id_fkey';
             columns: ['person_id'];
@@ -227,40 +247,385 @@ export type Database = {
           },
         ];
       };
-      membership: {
+      expense: {
         Row: {
-          accepted_at: string | null;
+          amount: number;
+          category: Database['public']['Enums']['expense_category'];
           created_at: string;
+          created_by: string | null;
+          currency: string;
+          custom_fields: Json;
+          deleted_at: string | null;
+          description: string;
           id: string;
-          invited_by: string | null;
-          role: Database['public']['Enums']['membership_role'];
+          incurred_on: string;
+          line_id: string | null;
+          notes: string | null;
+          paid_by_user_id: string | null;
+          receipt_url: string | null;
+          reimbursed: boolean;
+          show_id: string | null;
           updated_at: string;
-          user_id: string;
           workspace_id: string;
         };
         Insert: {
-          accepted_at?: string | null;
+          amount: number;
+          category?: Database['public']['Enums']['expense_category'];
           created_at?: string;
+          created_by?: string | null;
+          currency?: string;
+          custom_fields?: Json;
+          deleted_at?: string | null;
+          description: string;
           id?: string;
-          invited_by?: string | null;
-          role?: Database['public']['Enums']['membership_role'];
+          incurred_on?: string;
+          line_id?: string | null;
+          notes?: string | null;
+          paid_by_user_id?: string | null;
+          receipt_url?: string | null;
+          reimbursed?: boolean;
+          show_id?: string | null;
           updated_at?: string;
-          user_id: string;
           workspace_id: string;
         };
         Update: {
-          accepted_at?: string | null;
+          amount?: number;
+          category?: Database['public']['Enums']['expense_category'];
           created_at?: string;
+          created_by?: string | null;
+          currency?: string;
+          custom_fields?: Json;
+          deleted_at?: string | null;
+          description?: string;
           id?: string;
-          invited_by?: string | null;
-          role?: Database['public']['Enums']['membership_role'];
+          incurred_on?: string;
+          line_id?: string | null;
+          notes?: string | null;
+          paid_by_user_id?: string | null;
+          receipt_url?: string | null;
+          reimbursed?: boolean;
+          show_id?: string | null;
           updated_at?: string;
-          user_id?: string;
           workspace_id?: string;
         };
         Relationships: [
           {
-            foreignKeyName: 'membership_workspace_id_fkey';
+            foreignKeyName: 'expense_line_id_fkey';
+            columns: ['line_id'];
+            isOneToOne: false;
+            referencedRelation: 'line';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'expense_show_id_fkey';
+            columns: ['show_id'];
+            isOneToOne: false;
+            referencedRelation: 'show';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'expense_show_id_fkey';
+            columns: ['show_id'];
+            isOneToOne: false;
+            referencedRelation: 'show_redacted';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'expense_workspace_id_fkey';
+            columns: ['workspace_id'];
+            isOneToOne: false;
+            referencedRelation: 'workspace';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      invoice: {
+        Row: {
+          created_at: string;
+          created_by: string | null;
+          currency: string;
+          custom_fields: Json;
+          deleted_at: string | null;
+          due_on: string | null;
+          id: string;
+          irpf_amount: number | null;
+          irpf_pct: number | null;
+          issued_on: string;
+          notes: string | null;
+          number: string | null;
+          payer_person_id: string | null;
+          project_id: string | null;
+          status: Database['public']['Enums']['invoice_status'];
+          subtotal: number;
+          total: number;
+          updated_at: string;
+          vat_amount: number | null;
+          vat_pct: number | null;
+          workspace_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          created_by?: string | null;
+          currency?: string;
+          custom_fields?: Json;
+          deleted_at?: string | null;
+          due_on?: string | null;
+          id?: string;
+          irpf_amount?: number | null;
+          irpf_pct?: number | null;
+          issued_on?: string;
+          notes?: string | null;
+          number?: string | null;
+          payer_person_id?: string | null;
+          project_id?: string | null;
+          status?: Database['public']['Enums']['invoice_status'];
+          subtotal?: number;
+          total?: number;
+          updated_at?: string;
+          vat_amount?: number | null;
+          vat_pct?: number | null;
+          workspace_id: string;
+        };
+        Update: {
+          created_at?: string;
+          created_by?: string | null;
+          currency?: string;
+          custom_fields?: Json;
+          deleted_at?: string | null;
+          due_on?: string | null;
+          id?: string;
+          irpf_amount?: number | null;
+          irpf_pct?: number | null;
+          issued_on?: string;
+          notes?: string | null;
+          number?: string | null;
+          payer_person_id?: string | null;
+          project_id?: string | null;
+          status?: Database['public']['Enums']['invoice_status'];
+          subtotal?: number;
+          total?: number;
+          updated_at?: string;
+          vat_amount?: number | null;
+          vat_pct?: number | null;
+          workspace_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'invoice_payer_person_id_fkey';
+            columns: ['payer_person_id'];
+            isOneToOne: false;
+            referencedRelation: 'person';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'invoice_project_id_fkey';
+            columns: ['project_id'];
+            isOneToOne: false;
+            referencedRelation: 'project';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'invoice_workspace_id_fkey';
+            columns: ['workspace_id'];
+            isOneToOne: false;
+            referencedRelation: 'workspace';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      invoice_line: {
+        Row: {
+          created_at: string;
+          description: string;
+          id: string;
+          invoice_id: string;
+          line_total: number | null;
+          quantity: number;
+          show_id: string | null;
+          unit_amount: number;
+          updated_at: string;
+          workspace_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          description: string;
+          id?: string;
+          invoice_id: string;
+          line_total?: number | null;
+          quantity?: number;
+          show_id?: string | null;
+          unit_amount: number;
+          updated_at?: string;
+          workspace_id: string;
+        };
+        Update: {
+          created_at?: string;
+          description?: string;
+          id?: string;
+          invoice_id?: string;
+          line_total?: number | null;
+          quantity?: number;
+          show_id?: string | null;
+          unit_amount?: number;
+          updated_at?: string;
+          workspace_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'invoice_line_invoice_id_fkey';
+            columns: ['invoice_id'];
+            isOneToOne: false;
+            referencedRelation: 'invoice';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'invoice_line_show_id_fkey';
+            columns: ['show_id'];
+            isOneToOne: false;
+            referencedRelation: 'show';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'invoice_line_show_id_fkey';
+            columns: ['show_id'];
+            isOneToOne: false;
+            referencedRelation: 'show_redacted';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'invoice_line_workspace_id_fkey';
+            columns: ['workspace_id'];
+            isOneToOne: false;
+            referencedRelation: 'workspace';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      line: {
+        Row: {
+          created_at: string;
+          created_by: string | null;
+          custom_fields: Json;
+          deleted_at: string | null;
+          dossier_url: string | null;
+          end_date: string | null;
+          id: string;
+          kind: Database['public']['Enums']['line_kind'];
+          name: string;
+          notes: string | null;
+          project_id: string;
+          start_date: string | null;
+          status: Database['public']['Enums']['line_status'];
+          territory: string | null;
+          updated_at: string;
+          workspace_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          created_by?: string | null;
+          custom_fields?: Json;
+          deleted_at?: string | null;
+          dossier_url?: string | null;
+          end_date?: string | null;
+          id?: string;
+          kind?: Database['public']['Enums']['line_kind'];
+          name: string;
+          notes?: string | null;
+          project_id: string;
+          start_date?: string | null;
+          status?: Database['public']['Enums']['line_status'];
+          territory?: string | null;
+          updated_at?: string;
+          workspace_id: string;
+        };
+        Update: {
+          created_at?: string;
+          created_by?: string | null;
+          custom_fields?: Json;
+          deleted_at?: string | null;
+          dossier_url?: string | null;
+          end_date?: string | null;
+          id?: string;
+          kind?: Database['public']['Enums']['line_kind'];
+          name?: string;
+          notes?: string | null;
+          project_id?: string;
+          start_date?: string | null;
+          status?: Database['public']['Enums']['line_status'];
+          territory?: string | null;
+          updated_at?: string;
+          workspace_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'line_project_id_fkey';
+            columns: ['project_id'];
+            isOneToOne: false;
+            referencedRelation: 'project';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'line_workspace_id_fkey';
+            columns: ['workspace_id'];
+            isOneToOne: false;
+            referencedRelation: 'workspace';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      payment: {
+        Row: {
+          amount: number;
+          created_at: string;
+          created_by: string | null;
+          deleted_at: string | null;
+          id: string;
+          invoice_id: string;
+          method: Database['public']['Enums']['payment_method'];
+          notes: string | null;
+          received_on: string;
+          reference: string | null;
+          updated_at: string;
+          workspace_id: string;
+        };
+        Insert: {
+          amount: number;
+          created_at?: string;
+          created_by?: string | null;
+          deleted_at?: string | null;
+          id?: string;
+          invoice_id: string;
+          method?: Database['public']['Enums']['payment_method'];
+          notes?: string | null;
+          received_on?: string;
+          reference?: string | null;
+          updated_at?: string;
+          workspace_id: string;
+        };
+        Update: {
+          amount?: number;
+          created_at?: string;
+          created_by?: string | null;
+          deleted_at?: string | null;
+          id?: string;
+          invoice_id?: string;
+          method?: Database['public']['Enums']['payment_method'];
+          notes?: string | null;
+          received_on?: string;
+          reference?: string | null;
+          updated_at?: string;
+          workspace_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'payment_invoice_id_fkey';
+            columns: ['invoice_id'];
+            isOneToOne: false;
+            referencedRelation: 'invoice';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'payment_workspace_id_fkey';
             columns: ['workspace_id'];
             isOneToOne: false;
             referencedRelation: 'workspace';
@@ -382,53 +747,69 @@ export type Database = {
       project: {
         Row: {
           created_at: string;
+          created_by: string | null;
           custom_fields: Json;
           deleted_at: string | null;
           description: string | null;
+          dossier_url: string | null;
           ends_on: string | null;
           id: string;
           name: string;
+          notes: string | null;
+          owner_id: string | null;
           poster_url: string | null;
           slug: string;
           starts_on: string | null;
           status: Database['public']['Enums']['project_status'];
-          type: Database['public']['Enums']['project_type'];
           updated_at: string;
           workspace_id: string;
         };
         Insert: {
           created_at?: string;
+          created_by?: string | null;
           custom_fields?: Json;
           deleted_at?: string | null;
           description?: string | null;
+          dossier_url?: string | null;
           ends_on?: string | null;
           id?: string;
           name: string;
+          notes?: string | null;
+          owner_id?: string | null;
           poster_url?: string | null;
           slug: string;
           starts_on?: string | null;
           status?: Database['public']['Enums']['project_status'];
-          type: Database['public']['Enums']['project_type'];
           updated_at?: string;
           workspace_id: string;
         };
         Update: {
           created_at?: string;
+          created_by?: string | null;
           custom_fields?: Json;
           deleted_at?: string | null;
           description?: string | null;
+          dossier_url?: string | null;
           ends_on?: string | null;
           id?: string;
           name?: string;
+          notes?: string | null;
+          owner_id?: string | null;
           poster_url?: string | null;
           slug?: string;
           starts_on?: string | null;
           status?: Database['public']['Enums']['project_status'];
-          type?: Database['public']['Enums']['project_type'];
           updated_at?: string;
           workspace_id?: string;
         };
         Relationships: [
+          {
+            foreignKeyName: 'project_owner_id_fkey';
+            columns: ['owner_id'];
+            isOneToOne: false;
+            referencedRelation: 'workspace_membership';
+            referencedColumns: ['id'];
+          },
           {
             foreignKeyName: 'project_workspace_id_fkey';
             columns: ['workspace_id'];
@@ -443,9 +824,10 @@ export type Database = {
           created_at: string;
           id: string;
           invited_by: string | null;
+          permission_grants: string[];
+          permission_revokes: string[];
           project_id: string;
-          role: Database['public']['Enums']['project_member_role'];
-          scope: string[];
+          roles: string[];
           updated_at: string;
           user_id: string;
         };
@@ -453,9 +835,10 @@ export type Database = {
           created_at?: string;
           id?: string;
           invited_by?: string | null;
+          permission_grants?: string[];
+          permission_revokes?: string[];
           project_id: string;
-          role?: Database['public']['Enums']['project_member_role'];
-          scope?: string[];
+          roles?: string[];
           updated_at?: string;
           user_id: string;
         };
@@ -463,9 +846,10 @@ export type Database = {
           created_at?: string;
           id?: string;
           invited_by?: string | null;
+          permission_grants?: string[];
+          permission_revokes?: string[];
           project_id?: string;
-          role?: Database['public']['Enums']['project_member_role'];
-          scope?: string[];
+          roles?: string[];
           updated_at?: string;
           user_id?: string;
         };
@@ -479,79 +863,101 @@ export type Database = {
           },
         ];
       };
-      tag: {
+      show: {
         Row: {
-          color: string | null;
-          created_at: string;
-          id: string;
-          name: string;
-          updated_at: string;
-          workspace_id: string;
-        };
-        Insert: {
-          color?: string | null;
-          created_at?: string;
-          id?: string;
-          name: string;
-          updated_at?: string;
-          workspace_id: string;
-        };
-        Update: {
-          color?: string | null;
-          created_at?: string;
-          id?: string;
-          name?: string;
-          updated_at?: string;
-          workspace_id?: string;
-        };
-        Relationships: [
-          {
-            foreignKeyName: 'tag_workspace_id_fkey';
-            columns: ['workspace_id'];
-            isOneToOne: false;
-            referencedRelation: 'workspace';
-            referencedColumns: ['id'];
-          },
-        ];
-      };
-      tagging: {
-        Row: {
+          city: string | null;
+          country: string | null;
           created_at: string;
           created_by: string | null;
-          entity_id: string;
-          entity_type: Database['public']['Enums']['taggable_entity'];
+          custom_fields: Json;
+          deleted_at: string | null;
+          engagement_id: string | null;
+          fee_amount: number | null;
+          fee_currency: string | null;
           id: string;
-          tag_id: string;
+          line_id: string | null;
+          notes: string | null;
+          performed_at: string;
+          project_id: string;
+          status: Database['public']['Enums']['show_status'];
+          updated_at: string;
+          venue_id: string | null;
+          venue_name: string | null;
           workspace_id: string;
         };
         Insert: {
+          city?: string | null;
+          country?: string | null;
           created_at?: string;
           created_by?: string | null;
-          entity_id: string;
-          entity_type: Database['public']['Enums']['taggable_entity'];
+          custom_fields?: Json;
+          deleted_at?: string | null;
+          engagement_id?: string | null;
+          fee_amount?: number | null;
+          fee_currency?: string | null;
           id?: string;
-          tag_id: string;
+          line_id?: string | null;
+          notes?: string | null;
+          performed_at: string;
+          project_id: string;
+          status?: Database['public']['Enums']['show_status'];
+          updated_at?: string;
+          venue_id?: string | null;
+          venue_name?: string | null;
           workspace_id: string;
         };
         Update: {
+          city?: string | null;
+          country?: string | null;
           created_at?: string;
           created_by?: string | null;
-          entity_id?: string;
-          entity_type?: Database['public']['Enums']['taggable_entity'];
+          custom_fields?: Json;
+          deleted_at?: string | null;
+          engagement_id?: string | null;
+          fee_amount?: number | null;
+          fee_currency?: string | null;
           id?: string;
-          tag_id?: string;
+          line_id?: string | null;
+          notes?: string | null;
+          performed_at?: string;
+          project_id?: string;
+          status?: Database['public']['Enums']['show_status'];
+          updated_at?: string;
+          venue_id?: string | null;
+          venue_name?: string | null;
           workspace_id?: string;
         };
         Relationships: [
           {
-            foreignKeyName: 'tagging_tag_id_fkey';
-            columns: ['tag_id'];
+            foreignKeyName: 'show_engagement_id_fkey';
+            columns: ['engagement_id'];
             isOneToOne: false;
-            referencedRelation: 'tag';
+            referencedRelation: 'engagement';
             referencedColumns: ['id'];
           },
           {
-            foreignKeyName: 'tagging_workspace_id_fkey';
+            foreignKeyName: 'show_line_id_fkey';
+            columns: ['line_id'];
+            isOneToOne: false;
+            referencedRelation: 'line';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'show_project_id_fkey';
+            columns: ['project_id'];
+            isOneToOne: false;
+            referencedRelation: 'project';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'show_venue_id_fkey';
+            columns: ['venue_id'];
+            isOneToOne: false;
+            referencedRelation: 'venue';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'show_workspace_id_fkey';
             columns: ['workspace_id'];
             isOneToOne: false;
             referencedRelation: 'workspace';
@@ -585,6 +991,65 @@ export type Database = {
           user_id?: string;
         };
         Relationships: [];
+      };
+      venue: {
+        Row: {
+          address: string | null;
+          capacity: number | null;
+          city: string | null;
+          contacts: Json;
+          country: string | null;
+          created_at: string;
+          created_by: string | null;
+          custom_fields: Json;
+          deleted_at: string | null;
+          id: string;
+          name: string;
+          notes: string | null;
+          updated_at: string;
+          workspace_id: string;
+        };
+        Insert: {
+          address?: string | null;
+          capacity?: number | null;
+          city?: string | null;
+          contacts?: Json;
+          country?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          custom_fields?: Json;
+          deleted_at?: string | null;
+          id?: string;
+          name: string;
+          notes?: string | null;
+          updated_at?: string;
+          workspace_id: string;
+        };
+        Update: {
+          address?: string | null;
+          capacity?: number | null;
+          city?: string | null;
+          contacts?: Json;
+          country?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          custom_fields?: Json;
+          deleted_at?: string | null;
+          id?: string;
+          name?: string;
+          notes?: string | null;
+          updated_at?: string;
+          workspace_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'venue_workspace_id_fkey';
+            columns: ['workspace_id'];
+            isOneToOne: false;
+            referencedRelation: 'workspace';
+            referencedColumns: ['id'];
+          },
+        ];
       };
       workspace: {
         Row: {
@@ -628,9 +1093,156 @@ export type Database = {
         };
         Relationships: [];
       };
+      workspace_membership: {
+        Row: {
+          accepted_at: string | null;
+          created_at: string;
+          id: string;
+          invited_by: string | null;
+          role: Database['public']['Enums']['membership_role'];
+          updated_at: string;
+          user_id: string;
+          workspace_id: string;
+        };
+        Insert: {
+          accepted_at?: string | null;
+          created_at?: string;
+          id?: string;
+          invited_by?: string | null;
+          role?: Database['public']['Enums']['membership_role'];
+          updated_at?: string;
+          user_id: string;
+          workspace_id: string;
+        };
+        Update: {
+          accepted_at?: string | null;
+          created_at?: string;
+          id?: string;
+          invited_by?: string | null;
+          role?: Database['public']['Enums']['membership_role'];
+          updated_at?: string;
+          user_id?: string;
+          workspace_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'workspace_membership_workspace_id_fkey';
+            columns: ['workspace_id'];
+            isOneToOne: false;
+            referencedRelation: 'workspace';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      workspace_role: {
+        Row: {
+          access_level: Database['public']['Enums']['workspace_role_access_level'];
+          archived_at: string | null;
+          code: string;
+          created_at: string;
+          id: string;
+          is_system: boolean;
+          label: string;
+          permissions: string[];
+          updated_at: string;
+          workspace_id: string;
+        };
+        Insert: {
+          access_level: Database['public']['Enums']['workspace_role_access_level'];
+          archived_at?: string | null;
+          code: string;
+          created_at?: string;
+          id?: string;
+          is_system?: boolean;
+          label: string;
+          permissions?: string[];
+          updated_at?: string;
+          workspace_id: string;
+        };
+        Update: {
+          access_level?: Database['public']['Enums']['workspace_role_access_level'];
+          archived_at?: string | null;
+          code?: string;
+          created_at?: string;
+          id?: string;
+          is_system?: boolean;
+          label?: string;
+          permissions?: string[];
+          updated_at?: string;
+          workspace_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'workspace_role_workspace_id_fkey';
+            columns: ['workspace_id'];
+            isOneToOne: false;
+            referencedRelation: 'workspace';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
     };
     Views: {
-      [_ in never]: never;
+      show_redacted: {
+        Row: {
+          city: string | null;
+          country: string | null;
+          created_at: string | null;
+          created_by: string | null;
+          custom_fields: Json | null;
+          deleted_at: string | null;
+          engagement_id: string | null;
+          fee_amount: number | null;
+          fee_currency: string | null;
+          id: string | null;
+          line_id: string | null;
+          notes: string | null;
+          performed_at: string | null;
+          project_id: string | null;
+          status: Database['public']['Enums']['show_status'] | null;
+          updated_at: string | null;
+          venue_id: string | null;
+          venue_name: string | null;
+          workspace_id: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'show_engagement_id_fkey';
+            columns: ['engagement_id'];
+            isOneToOne: false;
+            referencedRelation: 'engagement';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'show_line_id_fkey';
+            columns: ['line_id'];
+            isOneToOne: false;
+            referencedRelation: 'line';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'show_project_id_fkey';
+            columns: ['project_id'];
+            isOneToOne: false;
+            referencedRelation: 'project';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'show_venue_id_fkey';
+            columns: ['venue_id'];
+            isOneToOne: false;
+            referencedRelation: 'venue';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'show_workspace_id_fkey';
+            columns: ['workspace_id'];
+            isOneToOne: false;
+            referencedRelation: 'workspace';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
     };
     Functions: {
       can_edit_project: { Args: { p_project_id: string }; Returns: boolean };
@@ -642,44 +1254,58 @@ export type Database = {
         Returns: Database['public']['Enums']['membership_role'];
       };
       custom_access_token_hook: { Args: { event: Json }; Returns: Json };
-      has_project_access: {
-        Args: { p_project_id: string; p_scope: string };
+      has_permission: {
+        Args: { p_perm: string; p_project_id: string };
         Returns: boolean;
       };
       is_workspace_member: { Args: { ws_id: string }; Returns: boolean };
+      project_id_of_expense: { Args: { p_expense_id: string }; Returns: string };
       uuid_generate_v7: { Args: never; Returns: string };
     };
     Enums: {
-      date_kind:
-        | 'performance'
-        | 'rehearsal'
-        | 'residency'
-        | 'travel_day'
-        | 'press'
-        | 'other';
-      date_status:
-        | 'tentative'
-        | 'held'
-        | 'confirmed'
-        | 'cancelled'
-        | 'performed';
+      date_kind: 'rehearsal' | 'residency' | 'travel_day' | 'press' | 'other';
+      date_status: 'tentative' | 'confirmed' | 'cancelled' | 'done';
       engagement_status:
-        | 'idea'
-        | 'proposed'
-        | 'discussing'
-        | 'held'
+        | 'contacted'
+        | 'in_conversation'
+        | 'hold'
         | 'confirmed'
-        | 'cancelled'
         | 'declined'
-        | 'performed'
-        | 'dormant';
+        | 'dormant'
+        | 'recurring';
+      expense_category:
+        | 'travel'
+        | 'lodging'
+        | 'per_diem'
+        | 'freight'
+        | 'production'
+        | 'fees'
+        | 'other';
+      invoice_status: 'draft' | 'issued' | 'paid' | 'cancelled';
+      line_kind: 'tour' | 'season' | 'phase' | 'circuit' | 'residency' | 'other';
+      line_status: 'open' | 'closed' | 'archived';
       membership_role: 'owner' | 'admin' | 'member' | 'viewer' | 'guest';
+      payment_method: 'transfer' | 'card' | 'cash' | 'other';
       person_note_visibility: 'workspace' | 'private';
-      project_member_role: 'lead' | 'collaborator' | 'viewer';
       project_status: 'draft' | 'active' | 'archived';
-      project_type: 'show' | 'release' | 'creation_cycle' | 'festival_edition';
-      taggable_entity: 'person' | 'project' | 'date' | 'engagement';
+      show_status:
+        | 'proposed'
+        | 'hold'
+        | 'hold_1'
+        | 'hold_2'
+        | 'hold_3'
+        | 'confirmed'
+        | 'done'
+        | 'invoiced'
+        | 'paid'
+        | 'cancelled';
       workspace_kind: 'personal' | 'team';
+      workspace_role_access_level:
+        | 'owner'
+        | 'admin'
+        | 'producer'
+        | 'member'
+        | 'viewer';
     };
   };
 };

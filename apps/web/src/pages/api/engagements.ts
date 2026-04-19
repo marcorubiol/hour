@@ -5,12 +5,11 @@
  * project embedded. RLS + the `current_workspace_id` claim decide visibility —
  * this endpoint is a thin PostgREST wrapper, no RPC needed.
  *
- * Anti-CRM vocabulary: the old `/api/prospects` route is replaced. The default
- * status filter is `proposed` (previously `prospect`); pass `status=any` to
- * disable status filtering.
+ * Anti-CRM vocabulary (reset v2 enum, 2026-04-19): status defaults to
+ * `contacted`. Pass `status=any` to disable status filtering.
  *
  * Query params (all optional):
- *   status         engagement_status | 'any' (default: proposed)
+ *   status         engagement_status | 'any' (default: contacted)
  *   project_slug   project slug      (default: mamemi)
  *   season         text (matches custom_fields->>season)
  *                  (default: 2026-27; pass 'any' to disable)
@@ -28,15 +27,13 @@ import { pgGet, PostgrestError, type SupabaseEnv } from '../../lib/supabase.ts';
 export const prerender = false;
 
 const ALLOWED_STATUSES: ReadonlyArray<Enum<'engagement_status'>> = [
-  'idea',
-  'proposed',
-  'discussing',
-  'held',
+  'contacted',
+  'in_conversation',
+  'hold',
   'confirmed',
-  'cancelled',
   'declined',
-  'performed',
   'dormant',
+  'recurring',
 ];
 const ALLOWED_STATUSES_SET = new Set<string>(ALLOWED_STATUSES);
 
@@ -58,10 +55,7 @@ type PersonLite = Pick<
   | 'city'
   | 'website'
 >;
-type ProjectLite = Pick<
-  Row<'project'>,
-  'id' | 'slug' | 'name' | 'type' | 'status'
->;
+type ProjectLite = Pick<Row<'project'>, 'id' | 'slug' | 'name' | 'status'>;
 
 interface EngagementItem extends EngagementRow {
   person: PersonLite | null;
@@ -84,7 +78,7 @@ export const GET: APIRoute = async ({ request, locals, url }) => {
   }
 
   // ---- Parse & validate params --------------------------------------------
-  const rawStatus = url.searchParams.get('status') ?? 'proposed';
+  const rawStatus = url.searchParams.get('status') ?? 'contacted';
   if (rawStatus !== 'any' && !ALLOWED_STATUSES_SET.has(rawStatus)) {
     return json(
       { error: 'invalid_status', allowed: [...ALLOWED_STATUSES, 'any'] },
@@ -106,7 +100,7 @@ export const GET: APIRoute = async ({ request, locals, url }) => {
     [
       '*',
       'person:person_id(id,full_name,email,organization_name,country,city,website)',
-      'project:project_id!inner(id,slug,name,type,status)',
+      'project:project_id!inner(id,slug,name,status)',
     ].join(','),
   );
   search.set('project.slug', `eq.${projectSlug}`);
