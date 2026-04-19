@@ -36,3 +36,10 @@ pnpm-debug.log*
 
 # pnpm temp files (safe to ignore — can appear on interrupted installs)
 _tmp_*
+
+# Import pipeline — raw sources (PII-adjacent) and staging artefacts
+_build/import/sources/
+_build/import/staging/
+_build/import/manual-matches.yaml
+_build/import/.venv/
+_build/import/__pycache__/
