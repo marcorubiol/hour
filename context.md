@@ -103,8 +103,14 @@ Stack ya montado: Astro 5 + Svelte 5 islands + `@astrojs/cloudflare` v12. El log
 
 ## Diferido (Phase 0.5 o cuando toque)
 
-- `task` entity — polymorphic (project/line/show/engagement), origin: manual/protocol/ai. Manual tasks needed for Desk view. (Deferred D3)
-- Communication layer — unified email/WhatsApp/calls contextualised by House/Room (Deferred D4)
+- `task` entity — polymorphic (project/line/show/engagement), origin: manual/protocol/ai. Manual tasks needed for Desk view. Includes task protocols: reusable chains with relative date offsets that auto-generate prep tasks backwards from gig/fair dates (ADR-011). (Deferred D3)
+- Communication layer — unified email/WhatsApp/Telegram/calls contextualised by House/Room (Deferred D4)
+- App mode — PWA installable (desktop + mobile), not web-only. Must feel like a native app. (Deferred D5)
+- Public guest links — shareable URL (no signup required) where external collaborators (technicians, freelancers) can view their assigned gigs/dates/rider. If they choose to sign up, their guest view upgrades to a full `guest` membership with write access. Two tiers: anonymous-read via signed link, authenticated-write via `guest` role. (Deferred D6)
+- Fair intelligence — import attendee lists (CSV or screenshot via AI vision), cross-reference against existing contacts, surface matches and new-contact opportunities. Needs fair entity or date.kind='fair' with attendee junction. (Deferred D7, ADR-012)
+- AI integration — invisible helper philosophy. Contact enrichment, next-action suggestions, data extraction from images/PDFs, email drafting, conflict detection. Inline and contextual, never chatbot. Research pending. (Deferred D8, ADR-013)
+- Kanban view — available in Desk and Contacts lenses as work-mode complement to calendar. Groups by status. (Deferred D9, ADR-010)
+- Timeline view — horizontal/vertical timeline showing cascading task chains from protocol tasks. Depends on D3. (Deferred D10, ADR-010)
 - `task` tag vocabulary (Deferred D1)
 - UI de overrides granulares por persona (Deferred D2)
 - `show` / `line` / `invoice` flows (cuando Marco confirme la primera fecha)

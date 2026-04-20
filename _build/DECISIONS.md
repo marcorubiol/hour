@@ -593,3 +593,97 @@ Explicit non-goals and schema-ready-but-UI-deferred items. Not addressed in the 
   - Responsive/mobile: sidebar collapses to a drawer; ⌘K becomes primary navigation on mobile.
   - Performance: panoramic Desk (no filter) must load efficiently across all houses — requires proper RLS + pagination.
 - **Status**: Firm for the architecture. Lens list (Desk, Calendar, Contacts, Money) is firm for Phase 0. Future lenses (Comms, Archive) add a sidebar line each — no layout changes needed.
+
+## [2026-04-20] — ADR-010 — View modes: calendar primary, kanban and timeline as complementary views
+
+- **Context**: UX research (UX-PATTERNS-RESEARCH.md) showed that no competitor uses kanban for bookings — calendar + table is the validated pattern. However, Marco identifies a real use case: when you sit down to work on difusion, you want a board view of "what needs my attention" organized by status, not by date. Additionally, a timeline view is needed for visualizing task chains that cascade backwards from a date (e.g., a gig on May 5 auto-generates prep tasks going back weeks).
+- **Decision**: Three complementary view modes available within relevant lenses:
+  1. **Calendar** (primary) — the default. Shows dates, gigs, events on a time grid. Status encoded via color (contacted=neutral, in_conversation=warm, hold=amber, confirmed=green, declined=muted, dormant=gray). Minimum views: month + list. Year and week views in Phase 0.5.
+  2. **Kanban/Board** (work mode) — available in Desk and Contacts lenses. Groups engagements/tasks by status columns. For when you sit down to work and need "what do I need to do?" not "what's happening when?". This is a work tool, not the primary navigation.
+  3. **Timeline** (planning mode) — horizontal or vertical timeline showing cascading task chains. When a gig is created on a date, the system generates prep tasks backwards (send dossier → follow up → confirm details → send rider → etc.). Timeline makes these chains visible. Also useful for fair/event preparation chains.
+- **Key principle**: these are views of the same data, not separate sections. Switching view mode doesn't change what data you see — it changes how you see it.
+- **Status**: Firm on calendar as primary. Kanban and timeline are Phase 0.5 — they depend on the `task` entity (D3) which isn't built yet.
+
+## [2026-04-20] — ADR-011 — Automatic task chains from events (protocol tasks)
+
+- **Context**: Marco identifies a core workflow: when a potential gig is placed on May 5, a series of prep tasks should auto-generate backwards from that date (send dossier 8 weeks before, follow up 6 weeks before, confirm tech details 4 weeks before, send rider 2 weeks before, etc.). Same pattern applies to fairs: when a fair date is set, tasks generate for pre-fair outreach, attendee research, post-fair follow-ups.
+- **Decision**: Implement "task protocols" — reusable templates that define chains of tasks with relative date offsets from a trigger event.
+  - A protocol is a named sequence: e.g., "Difusion outreach" = [{task: "Send dossier", offset: -56d}, {task: "Follow up #1", offset: -42d}, {task: "Confirm tech", offset: -28d}, {task: "Send rider", offset: -14d}]
+  - When a gig/date is created or moved, linked protocol tasks recalculate their dates automatically
+  - Protocols are per-Room or per-House (some are show-specific, some are company-wide)
+  - The `task` entity (D3) already specifies `origin: manual/protocol/ai` — protocol tasks have origin=protocol and link back to their source event
+- **Depends on**: D3 (task entity)
+- **Status**: Firm on concept. Protocol structure TBD when D3 is designed.
+
+## [2026-04-20] — ADR-012 — Fair/event intelligence: attendee cross-referencing
+
+- **Context**: When a fair (e.g., Mostra Igualada) approaches, Marco wants to: (1) import the list of attending professionals (CSV or even a screenshot processed by AI), (2) cross-reference against existing contacts in Hour, (3) see matches ("these 15 people you already know are attending"), (4) discover new contacts to reach out to. This is a core difusion workflow.
+- **Decision**: Support fair attendee cross-referencing:
+  - A "fair" is a special type of date/event with an attendee list
+  - Attendee import: CSV upload (structured), image/screenshot upload (AI extraction via vision model)
+  - Cross-reference engine: fuzzy match imported names/organizations against `person` table (name, organization, city)
+  - Output: matched (existing engagement), unmatched (potential new contact), and confidence scores
+  - Matched contacts get a flag: "Attending [Fair Name]" — visible in their engagement record and in the Contacts lens filter
+- **DB implications**: May need a `fair` entity or a `date.kind = 'fair'` with an `attendees` junction table, or simpler: store attendee lists as engagement metadata. TBD during D3/schema work.
+- **Depends on**: AI integration strategy, task entity (D3)
+- **Status**: Concept firm. Implementation design pending.
+
+## [2026-04-20] — ADR-013 — AI integration philosophy: invisible helper, never imposer
+
+- **Context**: Marco wants AI deeply integrated but as a helper — it suggests, automates, surfaces information, but never takes over or forces decisions. Research pending (AI-RESEARCH.md) on how Linear, Notion, Height, Attio, etc. handle this.
+- **Decision**: AI in Hour follows the "invisible helper" principle:
+  - **Suggests, doesn't impose**: AI surfaces suggestions (next action, draft email, contact enrichment) as dismissible hints, never as mandatory steps
+  - **Works in background**: enrichment, classification, summarization happen automatically but results appear as suggestions until confirmed
+  - **Contextual, not chatbot**: AI appears inline where relevant (in an engagement card, in a task, in a contact profile), not as a separate "AI assistant" panel or chat window
+  - **Examples of intended AI use**:
+    - Auto-enrich new contacts (find organization, role, social links from name+email)
+    - Suggest next action on an engagement based on status and time since last contact
+    - Extract structured data from screenshots/PDFs (fair attendee lists, venue specs)
+    - Draft follow-up emails based on engagement context and communication history
+    - Detect scheduling conflicts and suggest alternatives
+    - Summarize communication threads
+  - **What AI should NOT do**: auto-send messages, auto-change statuses, auto-create gigs without confirmation, make decisions on behalf of the user
+- **Status**: Philosophy firm. Feature list and implementation order pending AI research results.
+
+## [2026-04-20] — ADR-014 — Theme: light mode primary, dark mode available
+
+- **Context**: UX research showed dark mode is the industry default in booking/music tools. However, Marco explicitly prefers light mode as primary, with dark mode as a user-selectable option. His product, his call — and it differentiates from the dark-default competitors.
+- **Decision**: Light theme is the default. Dark theme is available as user preference. No system-auto-detection for Phase 0 — explicit toggle.
+- **Status**: Firm.
+
+## [2026-04-20] — ADR-015 — Mobile: creation capabilities for distributors
+
+- **Context**: UX research suggested mobile should be consumption-only. Marco corrects: if the user is a distributor or booking agent on the road (at a fair, in a meeting), they need to create contacts and update engagement statuses from mobile. "Consultation only" is too limiting.
+- **Decision**: Mobile supports creation of core entities (contacts, engagements, status changes, notes, call logs) — not just viewing. Full complex workflows (invoice creation, protocol setup, asset management) remain desktop. Mobile creation is streamlined: minimal fields, smart defaults, expand later on desktop.
+- **Status**: Firm.
+
+## [2026-04-20] — ADR-016 — Calendar is native, not integration-dependent
+
+- **Context**: Integration research (16-integration-ecosystem.md) prioritized Google Calendar sync as #1. Marco corrects: Hour must have its own calendar as a first-class feature. The user shouldn't need Google Calendar — they should have a complete calendar inside Hour. Google Calendar sync is an OPTIONAL integration for people who want it, not the foundation.
+- **Decision**: Hour's calendar is native and self-sufficient. Users can manage all their dates, gigs, rehearsals, travel inside Hour without any external dependency. Google Calendar / .ics sync is available as an optional export/import — not required for core functionality.
+- **Broader principle**: Hour should do everything it needs to do natively. Integrations are bridges to existing workflows, not crutches for missing features. Every integration adds complexity — add only when the value clearly outweighs the cost. "Lo más sencillo del mundo" is the north star.
+- **Status**: Firm.
+
+## [2026-04-20] — ADR-017 — Integration philosophy: simplicity over connectivity
+
+- **Context**: Marco flags that adding integrations isn't always better. The tool should be simple first. Each integration adds UI, settings, edge cases, support burden. The temptation to "connect everything" can destroy the simplicity that makes a tool lovable.
+- **Status**: Firm.
+
+## [2026-04-20] — ADR-018 — Skin-ready architecture (design tokens from day 1)
+
+- **Context**: During design exploration in Stitch (Google) and Claude, Marco produced multiple visual directions: "Analogue" (warm, amber, textured, backstage feel — appeals to technicians), "Modern" (clean, minimal, refined — appeals to distributors/agents), and a Desk mockup with serif headings and warm off-white that sits between both. Marco observes that different user profiles will gravitate toward different aesthetics. A skin/theme selector is inevitable, but premature for Phase 0.
+- **Decision**:
+  1. **All visual properties go through design tokens from day 1**: colors, typography (families, sizes, weights), border-radius, spacing scale, textures/noise, shadow styles, density levels. No hardcoded visual values in components.
+  2. **Launch with ONE skin** (the warm default: light background, serif headings, subtle texture, color-for-state). Light + dark variants of this skin.
+  3. **Skin selector is a Phase 1+ feature**: when user base reaches 30-50 and profile distribution is clear, introduce 2-3 skins (e.g., Backstage/amber for technicians, Studio/clean for distributors, Stage/dark for performers). Can tie to persona selection in onboarding.
+  4. **Technical requirement**: switching skin = swapping a token file. No component changes, no layout changes. CSS custom properties or equivalent.
+- **Rationale**: Preparing costs nothing (good CSS hygiene). Launching multiple skins multiplies testing, screenshots, docs. The token architecture is the investment; the skins are free once it exists.
+- **Status**: Firm on token architecture. Skin selector deferred to Phase 1+.
+- **Decision**: Integrations are evaluated with a high bar:
+  1. Does this eliminate a painful manual step that happens daily? (not weekly, not monthly — daily)
+  2. Can we solve it natively instead? (if yes, prefer native)
+  3. Does it add complexity to the UI? (if yes, it better be worth it)
+  - Phase 0: ZERO integrations. Everything native. Prove the tool works standalone.
+  - Phase 1: Only integrations that early adopters explicitly request after using the tool.
+  - The 5 integrations identified in research (16-integration-ecosystem.md) are a menu of options, not a roadmap. Each one must pass the bar above before building.
+- **Status**: Firm.

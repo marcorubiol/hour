@@ -12,7 +12,7 @@
 
 When starting any new conversation with Claude (any tool), the first instruction should be:
 
-> Read `context.md` + `_build/context.md` + `_build/ARCHITECTURE.md` + `_build/DECISIONS.md` + `_build/COMPETITION.md` before responding.
+> Read `context.md` + `_build/context.md` + `_build/ARCHITECTURE.md` + `_build/DECISIONS.md` + `_build/COMPETITION.md` + `_build/UX-PROPOSALS.md` + `_build/MARKET-PRICING.md` before responding.
 
 That loads ~90% of project context in seconds without depending on what was said in any previous chat.
 
@@ -46,7 +46,14 @@ That loads ~90% of project context in seconds without depending on what was said
 | `context.md` | This workflow guide (CLAUDE.md is a stub) | v1.3 — 2026-04-19 |
 | `ARCHITECTURE.md` | Technical stack, multi-tenancy, security, environments | v1.2 — 2026-04-19 (reset v2) |
 | `DECISIONS.md` | Chronological log of decisions with rationale | Active — append-only (ADR-001..007 added 2026-04-19) |
-| `COMPETITION.md` | Ares, Bresca, other competitors | v1 — 2026-04-18 |
+| `COMPETITION.md` | 20 competitors analyzed with pricing, traction, gap analysis | v2 — 2026-04-20 |
+
+All research files live in `../research/` (see `research/INDEX.md` for full listing):
+- `10-ai-integration-patterns.md` — AI patterns from 14 tools
+- `11-comms-multichannel.md` — WhatsApp/Telegram/email architecture & costs
+- `12-ux-patterns-competitors.md` — UX patterns from 7 competitors
+- `13-market-pricing.md` — Market analysis, pricing (19/49/99€), revenue timeline
+- `14-ux-proposals.md` — 6 app structure proposals
 | `schema.sql` | Full Postgres schema — 18 tables, reset v2 | v3 — 2026-04-19 (rewritten from scratch) |
 | `rls-policies.sql` | RLS helpers + policies + audit triggers + access-token hook + show_redacted view | v3 — 2026-04-19 (rewritten from scratch) |
 | `seed.sql` | Pre-seed + post-signup claim script for marco-rubiol/mamemi | v1 — 2026-04-19 (may need `membership → workspace_membership` one-liner rename) |

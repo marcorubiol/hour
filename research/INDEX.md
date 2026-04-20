@@ -1,27 +1,34 @@
-# Hour — User Research
+# Hour — Research
 
-Deep research on the 8 profiles Hour serves. Each profile is its own document. The last document (`99-patterns.md`) is the cross-cutting synthesis.
+> **Rule:** nothing here is invented. Where data is thin, the doc says so.
 
-> **Rule:** nothing here is invented. Where data is thin, the doc says so. Vocabulary is preserved in the language it is actually used in (ES, CA, EN, FR) — no translation gloss where a translation would distort the term.
+## User Profiles (`profiles/`)
 
-## Profiles
+1. [Small-medium theater / dance / new-circus company](profiles/01-theater-company.md) — 3-15 people, ES/CAT-based, touring EU.
+2. [Indie / jazz / experimental band](profiles/02-band.md) — 5-8 people, 40-80 gigs/year.
+3. [Small music production company](profiles/03-music-production-company.md) — 2-5 people, 5-15 artists.
+4. [Self-managed band](profiles/04-self-managed-band.md) — no manager, no label.
+5. [Solo independent artist](profiles/05-solo-artist.md) — musician, performer, choreographer self-managing.
+6. [Freelance cultural distribution agent](profiles/06-freelance-distribution.md) — sells shows for several companies in parallel.
+7. [Tour technician](profiles/07-tour-technician.md) — sound/lights/polyvalent, works with 2-4 companies in parallel.
+8. [Manager / booking agent](profiles/08-manager-booking-agent.md) — represents multiple artists.
+9. [Cross-cutting patterns](profiles/99-patterns.md) — synthesis: shared, divergent, conflicts, product implications.
 
-1. [Small-medium theater / dance / new-circus company](01-theater-company.md) — 3-15 people, ES/CAT-based, touring EU.
-2. [Indie / jazz / experimental band](02-band.md) — 5-8 people, 40-80 gigs/year.
-3. [Small music production company](03-music-production-company.md) — 2-5 people, 5-15 artists.
-4. [Self-managed band](04-self-managed-band.md) — no manager, no label.
-5. [Solo independent artist](05-solo-artist.md) — musician, performer, choreographer self-managing.
-6. [Freelance cultural distribution agent](06-freelance-distribution.md) — sells shows for several companies in parallel.
-7. [Tour technician](07-tour-technician.md) — sound/lights/polyvalent, works with 2-4 companies in parallel.
-8. [Manager / booking agent](08-manager-booking-agent.md) — represents multiple artists.
+## Product Research (`product/`)
 
-## Synthesis
+10. [AI integration patterns](product/10-ai-integration-patterns.md) — 14 tools analyzed. Natural language, auto-enrichment, follow-up detection. AI as stage manager.
+11. [Multichannel communication](product/11-comms-multichannel.md) — WhatsApp Cloud API, Telegram Bot API, Resend. Costs, architecture, contact timeline UX.
+12. [UX patterns from competitors](product/12-ux-patterns-competitors.md) — 7 tools. Navigation, calendar, status, dark mode. 10 recommendations.
+13. [Market analysis & pricing](product/13-market-pricing.md) — TAM/SAM/SOM, pricing 19/49/99€, revenue timeline, growth model.
+14. [UX/UI app structure proposals](product/14-ux-proposals.md) — 6 proposals (Desk, Timeline, Board, Map, Stage, Rhythm).
+15. [Onboarding & activation patterns](product/15-onboarding-activation.md) — 8 SaaS case studies, anti-patterns, template vs blank canvas, activation metrics. Recommendations for Hour.
+16. [Integration ecosystem](product/16-integration-ecosystem.md) — Tool ecosystem mapping across 9 categories, integration priorities, phased roadmap. 5 key integrations identified.
+17. [Tech rider & production docs](product/17-tech-rider-standards.md) — Document types, formats, versioning patterns. From Marco's direct experience + file review. Open questions pending.
+18. [Multi-country invoicing, legal & i18n](product/18-invoicing-i18n-legal.md) — E-invoicing mandates (ES/FR/DE/IT/BE/NL/UK/PT), intra-community VAT, withholding tax, contracts, currencies, GDPR, i18n. Prioritized roadmap.
+19. [Competitor: Orfeo](product/19-competitor-orfeo.md) — Deep dive on orfeo.pro. SAS founded 2012, Rennes, ~20 people, 600+ French clients, Django+jQuery stack. 10 modules covering planning→invoicing→HR. France-locked (DPAE, sPAIEctacle). Starts at €67/mo. Key gap: no international capability, no modern UX, no self-serve. Hour differentiates via international-first, modern stack, diffusion-focus, lower price.
 
-- [Cross-cutting patterns](99-patterns.md) — what is shared, what diverges, conflicts between profiles, and implications for Hour's product decisions.
+## Scope
 
-## Scope and method
-
-- Sources cited inline with URLs, authors, or institutional references (IETM, On The Move, Circostrada, Pearle, APAP, Tanzmesse, CINARS, ArtsProfessional, Reddit communities, sector blogs, published manuals).
-- When a claim is based on anecdote (Reddit, forum posts, individual blog posts), the doc says so.
-- The object of study is **Europe**, centred on Spain / Catalonia, with France, Germany, Benelux, UK, and Nordics as main touring destinations.
-- Genres covered: theatre (text + physical), contemporary dance, new circus, indie / jazz / experimental music. Mainstream pop-rock-arena touring and classical music are out of scope for this research.
+- Europe, centred on Spain / Catalonia. France, Germany, Benelux, UK, Nordics as touring destinations.
+- Genres: theatre, contemporary dance, new circus, indie/jazz/experimental music.
+- Sources cited inline. Anecdotal claims marked as such.
