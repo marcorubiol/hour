@@ -1,180 +1,203 @@
 ---
+import Base from "../layouts/Base.astro";
+
 export const prerender = false;
 const env = Astro.locals.runtime.env;
 const supabaseUrl = env.PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = env.PUBLIC_SUPABASE_ANON_KEY;
 ---
 
-<!doctype html>
-<html lang="es">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="robots" content="noindex, nofollow" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <title>Hour — Login</title>
-    <style>
-      :root {
-        color-scheme: dark;
-        --bg: #0a0a0a;
-        --fg: #f5f5f5;
-        --muted: #8a8a8a;
-        --border: #2a2a2a;
-        --accent: #e0e0e0;
-        --error: #ef4444;
-        --input-bg: #141414;
-      }
-      html, body {
-        margin: 0;
-        padding: 0;
-        background: var(--bg);
-        color: var(--fg);
-        font-family: system-ui, -apple-system, sans-serif;
-        min-height: 100vh;
-      }
-      main {
-        min-height: 100vh;
+<Base title="Hour — Login">
+  <main class="login">
+    <div class="login__card">
+      <h1 class="login__heading">Hour</h1>
+      <p class="login__subtitle">Phase 0</p>
+
+      <form class="login__form" id="login-form">
+        <label class="login__label" for="email">Email</label>
+        <input
+          class="login__input"
+          type="email"
+          id="email"
+          name="email"
+          required
+          autocomplete="email"
+          autofocus
+        />
+
+        <label class="login__label" for="password">Password</label>
+        <input
+          class="login__input"
+          type="password"
+          id="password"
+          name="password"
+          required
+          autocomplete="current-password"
+        />
+
+        <p class="login__error" id="error-msg"></p>
+
+        <button class="login__submit" type="submit" id="submit-btn">
+          Entrar
+        </button>
+      </form>
+    </div>
+  </main>
+
+  <style>
+    @layer components {
+      .login {
+        min-block-size: 100dvh;
         display: grid;
         place-items: center;
-        padding: 2rem;
+        padding: var(--space-l);
       }
-      .login-card {
-        width: 100%;
-        max-width: 360px;
+
+      .login__card {
+        inline-size: 100%;
+        max-inline-size: 22rem;
       }
-      h1 {
-        font-size: 2rem;
+
+      .login__heading {
+        font-size: var(--h2);
         font-weight: 600;
-        margin: 0 0 0.25rem;
-        letter-spacing: -0.03em;
+        margin-block-end: var(--space-xs);
       }
-      .subtitle {
-        color: var(--muted);
-        font-size: 0.85rem;
-        margin: 0 0 2rem;
+
+      .login__subtitle {
+        color: var(--ink-muted);
+        font-size: var(--text-s);
+        margin-block-end: var(--space-xl);
       }
-      label {
-        display: block;
-        font-size: 0.8rem;
-        color: var(--muted);
-        margin-bottom: 0.35rem;
+
+      .login__form {
+        display: grid;
+        gap: var(--space-s);
+      }
+
+      .login__label {
+        font-size: var(--text-xs);
+        color: var(--ink-muted);
         text-transform: uppercase;
-        letter-spacing: 0.05em;
+        letter-spacing: var(--letter-spacing-wide);
+        margin-block-end: calc(var(--space-xs) * -1);
       }
-      input {
-        width: 100%;
-        padding: 0.65rem 0.75rem;
-        background: var(--input-bg);
-        border: 1px solid var(--border);
-        border-radius: 6px;
-        color: var(--fg);
-        font-size: 0.95rem;
-        font-family: inherit;
-        margin-bottom: 1rem;
-        box-sizing: border-box;
+
+      .login__input {
+        inline-size: 100%;
+        padding: var(--space-s) var(--space-m);
+        background: var(--surface-1);
+        border: var(--border-width) solid var(--border-default);
+        border-radius: var(--radius-s);
+        color: var(--ink-strong);
+        font-size: var(--text-m);
         outline: none;
-        transition: border-color 0.15s;
+        transition: border-color var(--transition-fast);
       }
-      input:focus {
-        border-color: var(--accent);
+
+      .login__input:hover {
+        border-color: var(--border-strong);
       }
-      button {
-        width: 100%;
-        padding: 0.7rem;
-        background: var(--fg);
-        color: var(--bg);
-        border: none;
-        border-radius: 6px;
-        font-size: 0.95rem;
-        font-weight: 500;
-        font-family: inherit;
-        cursor: pointer;
-        transition: opacity 0.15s;
+
+      .login__input:focus-visible {
+        border-color: var(--primary);
+        outline: var(--focus-ring-width) solid var(--focus-ring-color);
+        outline-offset: 1px;
       }
-      button:hover { opacity: 0.9; }
-      button:disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
-      }
-      .error {
-        color: var(--error);
-        font-size: 0.85rem;
-        margin-bottom: 1rem;
+
+      .login__error {
+        color: var(--danger-dark);
+        font-size: var(--text-s);
+        min-block-size: var(--text-s);
         display: none;
       }
-      .error.visible { display: block; }
-    </style>
-  </head>
-  <body>
-    <main>
-      <div class="login-card">
-        <h1>Hour</h1>
-        <p class="subtitle">Phase 0</p>
-
-        <form id="login-form">
-          <label for="email">Email</label>
-          <input type="email" id="email" name="email" required autocomplete="email" autofocus />
-
-          <label for="password">Password</label>
-          <input type="password" id="password" name="password" required autocomplete="current-password" />
-
-          <p class="error" id="error-msg"></p>
-
-          <button type="submit" id="submit-btn">Entrar</button>
-        </form>
-      </div>
-    </main>
-
-    <script define:vars={{ supabaseUrl, supabaseAnonKey }}>
-      // If already logged in, skip to app
-      if (localStorage.getItem('hour_jwt')) {
-        window.location.replace('/difusion');
+      .login__error--visible {
+        display: block;
       }
 
-      const form = document.getElementById('login-form');
-      const btn = document.getElementById('submit-btn');
-      const errorEl = document.getElementById('error-msg');
+      .login__submit {
+        margin-block-start: var(--space-s);
+        padding: var(--space-s) var(--space-m);
+        background: var(--primary);
+        color: var(--ink-on-primary);
+        border-radius: var(--radius-s);
+        font-size: var(--text-m);
+        font-weight: 500;
+        cursor: pointer;
+        transition:
+          background var(--transition-fast),
+          opacity var(--transition-fast);
+      }
 
-      form.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        errorEl.classList.remove('visible');
-        btn.disabled = true;
-        btn.textContent = 'Entrando...';
+      .login__submit:hover {
+        background: var(--primary-hover);
+      }
 
-        const email = form.email.value.trim();
-        const password = form.password.value;
+      .login__submit:focus-visible {
+        outline: var(--focus-ring-width) solid var(--focus-ring-color);
+        outline-offset: var(--focus-ring-offset);
+      }
 
-        try {
-          const res = await fetch(
-            `${supabaseUrl}/auth/v1/token?grant_type=password`,
-            {
-              method: 'POST',
-              headers: {
-                'apikey': supabaseAnonKey,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({ email, password }),
+      .login__submit:disabled {
+        opacity: var(--disabled-opacity);
+        cursor: not-allowed;
+      }
+    }
+  </style>
+
+  <script define:vars={{ supabaseUrl, supabaseAnonKey }}>
+    if (localStorage.getItem("hour_jwt")) {
+      window.location.replace("/difusion");
+    }
+
+    const form = document.getElementById("login-form");
+    const btn = document.getElementById("submit-btn");
+    const errorEl = document.getElementById("error-msg");
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      errorEl.classList.remove("login__error--visible");
+      btn.disabled = true;
+      btn.textContent = "Entrando...";
+
+      const email = form.email.value.trim();
+      const password = form.password.value;
+
+      try {
+        const res = await fetch(
+          `${supabaseUrl}/auth/v1/token?grant_type=password`,
+          {
+            method: "POST",
+            headers: {
+              apikey: supabaseAnonKey,
+              "Content-Type": "application/json",
             },
+            body: JSON.stringify({ email, password }),
+          },
+        );
+
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(
+            body.error_description || body.msg || "Credenciales incorrectas",
           );
-
-          if (!res.ok) {
-            const body = await res.json().catch(() => ({}));
-            throw new Error(body.error_description || body.msg || 'Credenciales incorrectas');
-          }
-
-          const data = await res.json();
-          localStorage.setItem('hour_jwt', data.access_token);
-          localStorage.setItem('hour_refresh', data.refresh_token);
-          localStorage.setItem('hour_expires_at', String(Date.now() + data.expires_in * 1000));
-
-          window.location.replace('/difusion');
-        } catch (err) {
-          errorEl.textContent = err.message;
-          errorEl.classList.add('visible');
-          btn.disabled = false;
-          btn.textContent = 'Entrar';
         }
-      });
-    </script>
-  </body>
-</html>
+
+        const data = await res.json();
+        localStorage.setItem("hour_jwt", data.access_token);
+        localStorage.setItem("hour_refresh", data.refresh_token);
+        localStorage.setItem(
+          "hour_expires_at",
+          String(Date.now() + data.expires_in * 1000),
+        );
+
+        window.location.replace("/difusion");
+      } catch (err) {
+        errorEl.textContent = err.message;
+        errorEl.classList.add("login__error--visible");
+        btn.disabled = false;
+        btn.textContent = "Entrar";
+      }
+    });
+  </script>
+</Base>
