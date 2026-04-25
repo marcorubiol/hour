@@ -9,7 +9,11 @@
 
 @layer tokens {
   :root {
-    color-scheme: light only;
+    /* Phase 0: light. Phase 0.5 flips to "light dark" + light-dark() vars
+       on each color token. Stays as "light" (not "light only") so the
+       browser doesn't repaint native form controls (scrollbar, autofill)
+       in dark when the OS preference is dark — but app stays light. */
+    color-scheme: light;
     --root-font-size: 100%;
 
     /* ============================================================ */
