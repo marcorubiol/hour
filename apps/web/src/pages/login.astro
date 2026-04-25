@@ -40,7 +40,7 @@ const supabaseAnonKey = env.PUBLIC_SUPABASE_ANON_KEY;
         <p class="login__error" id="error-msg"></p>
 
         <button class="btn--primary login__submit" type="submit" id="submit-btn">
-          Entrar
+          Sign in
         </button>
       </form>
     </div>
@@ -82,7 +82,7 @@ const supabaseAnonKey = env.PUBLIC_SUPABASE_ANON_KEY;
 
   <script define:vars={{ supabaseUrl, supabaseAnonKey }}>
     if (localStorage.getItem("hour_jwt")) {
-      window.location.replace("/difusion");
+      window.location.replace("/booking");
     }
 
     const form = document.getElementById("login-form");
@@ -93,7 +93,7 @@ const supabaseAnonKey = env.PUBLIC_SUPABASE_ANON_KEY;
       e.preventDefault();
       errorEl.classList.remove("login__error--visible");
       btn.disabled = true;
-      btn.textContent = "Entrando...";
+      btn.textContent = "Signing in...";
 
       const email = form.email.value.trim();
       const password = form.password.value;
@@ -114,7 +114,7 @@ const supabaseAnonKey = env.PUBLIC_SUPABASE_ANON_KEY;
         if (!res.ok) {
           const body = await res.json().catch(() => ({}));
           throw new Error(
-            body.error_description || body.msg || "Credenciales incorrectas",
+            body.error_description || body.msg || "Wrong credentials",
           );
         }
 
@@ -126,12 +126,12 @@ const supabaseAnonKey = env.PUBLIC_SUPABASE_ANON_KEY;
           String(Date.now() + data.expires_in * 1000),
         );
 
-        window.location.replace("/difusion");
+        window.location.replace("/booking");
       } catch (err) {
         errorEl.textContent = err.message;
         errorEl.classList.add("login__error--visible");
         btn.disabled = false;
-        btn.textContent = "Entrar";
+        btn.textContent = "Sign in";
       }
     });
   </script>

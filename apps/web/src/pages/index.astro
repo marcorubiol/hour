@@ -2,7 +2,7 @@
 export const prerender = false;
 ---
 
-<html lang="es">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <title>Hour</title>
@@ -10,7 +10,7 @@ export const prerender = false;
   <body>
     <script>
       window.location.replace(
-        localStorage.getItem('hour_jwt') ? '/difusion' : '/login'
+        localStorage.getItem("hour_jwt") ? "/booking" : "/login",
       );
     </script>
   </body>

@@ -26,8 +26,7 @@ this endpoint is a thin PostgREST wrapper, no RPC needed.
 
 Anti-CRM vocabulary (reset v2 enum, 2026-04-19): default status is `contacted`.
 Valid values: `contacted, in_conversation, hold, confirmed, declined, dormant,
-recurring`. The filter `difusion-2026-27` is no longer a project — pass
-`season=2026-27` (default) to filter engagements by season.
+recurring`. To filter by season, pass `season=2026-27` (default).
 
 **Query params** (all optional):
 

@@ -4,27 +4,27 @@ import Base from "../layouts/Base.astro";
 export const prerender = false;
 ---
 
-<Base title="Hour — Difusión 2026-27">
+<Base title="Hour — Booking 2026-27">
   <header class="app-header">
     <h1 class="h4">
-      Hour <span class="text--dark-muted">/ Difusión 2026-27</span>
+      Hour <span class="text--dark-muted">/ Booking 2026-27</span>
     </h1>
-    <button class="btn--ghost" id="logout-btn">Salir</button>
+    <button class="btn--ghost" id="logout-btn">Sign out</button>
   </header>
 
   <div class="status-bar" id="status-bar">
-    <span>Cargando...</span>
+    <span>Loading...</span>
   </div>
 
   <div class="table-wrap">
     <table>
       <thead>
         <tr>
-          <th>Nombre</th>
-          <th>Organización</th>
-          <th>Ubicación</th>
-          <th>Estado</th>
-          <th>Próxima acción</th>
+          <th>Name</th>
+          <th>Organization</th>
+          <th>Location</th>
+          <th>Status</th>
+          <th>Next action</th>
         </tr>
       </thead>
       <tbody id="tbody"></tbody>
@@ -34,8 +34,8 @@ export const prerender = false;
   <div class="msg" id="msg" hidden></div>
 
   <div class="pagination" id="pagination" hidden>
-    <button class="btn--ghost" id="prev-btn">Anterior</button>
-    <button class="btn--ghost" id="next-btn">Siguiente</button>
+    <button class="btn--ghost" id="prev-btn">Previous</button>
+    <button class="btn--ghost" id="next-btn">Next</button>
   </div>
 
   <style>
@@ -169,13 +169,13 @@ export const prerender = false;
     const nextBtn = document.getElementById("next-btn");
 
     const STATUS_LABELS = {
-      contacted: "Contactado",
-      in_conversation: "En conversación",
+      contacted: "Contacted",
+      in_conversation: "In conversation",
       hold: "Hold",
-      confirmed: "Confirmado",
-      declined: "Declinado",
+      confirmed: "Confirmed",
+      declined: "Declined",
       dormant: "Dormant",
-      recurring: "Recurrente",
+      recurring: "Recurring",
     };
 
     function showMsg(text, isError = false) {
@@ -188,7 +188,7 @@ export const prerender = false;
     function formatDate(iso) {
       if (!iso) return "—";
       const d = new Date(iso);
-      return d.toLocaleDateString("es-ES", { day: "2-digit", month: "short" });
+      return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short" });
     }
 
     function renderRow(item) {
@@ -216,7 +216,7 @@ export const prerender = false;
     async function load() {
       msgEl.hidden = true;
       tbody.innerHTML = "";
-      statusBar.innerHTML = "<span>Cargando...</span>";
+      statusBar.innerHTML = "<span>Loading...</span>";
 
       try {
         const url = `/api/engagements?status=any&project_slug=mamemi&season=2026-27&limit=${LIMIT}&offset=${offset}`;
@@ -241,12 +241,12 @@ export const prerender = false;
         total = data.total || 0;
 
         statusBar.innerHTML = `
-          <span class="status-bar__count">${total} contactos</span>
-          <span>Mostrando ${offset + 1}-${Math.min(offset + LIMIT, total)}</span>
+          <span class="status-bar__count">${total} contacts</span>
+          <span>Showing ${offset + 1}-${Math.min(offset + LIMIT, total)}</span>
         `;
 
         if (data.items.length === 0) {
-          showMsg("Sin resultados.");
+          showMsg("No results.");
           return;
         }
 

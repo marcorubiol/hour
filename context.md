@@ -1,8 +1,12 @@
 > Inherits: `.zerø/context.md` · Method: `_methød/`
 > Status: **kept** (valid: live, kept, parked)
 
-> **REGLA DEL PROYECTO — leer ANTES de escribir código**
+> **REGLAS FIRMES DEL PROYECTO**
 >
+> **1. Idioma de la UI: inglés.**
+> Todo el copy de Hour (botones, labels, headings, mensajes, status names en UI) está en **inglés** desde Phase 0. Castellano vendrá vía i18n (`es.json`) en Phase 0.5 o Phase 1, según D-PRE-03. Schema, logs, comments del código — todo inglés también. Aplica desde la primera línea de código.
+>
+> **2. Filosofía del sistema.**
 > Antes de tocar una sola línea de código en Hour (CSS, JavaScript, Svelte, HTML, schema, API), leer **`~/Zerø System/_methød/philosophy.md`**.
 >
 > No es lectura recomendada — es la regla de oro del sistema. Cualquier decisión técnica se evalúa contra los 5 principios universales descritos ahí. Si un patrón típico de la industria contradice la filosofía y el contexto del proyecto no lo justifica explícitamente como "isla de pragma", **gana la filosofía**.
