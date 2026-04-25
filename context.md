@@ -17,6 +17,11 @@ Working name: **Hour**. Brand decision deferred to Phase 1.
 - Phase 0 runs entirely within free tiers.
 - Multi-tenant from day one: `workspace_id UUID NOT NULL`, RLS at DB level, JWT `current_workspace_id` claim. Workspace kind = `personal | team`.
 - **Reset v2** (ADR-001..007, 2026-04-19): 18 tables. Polymorphic core is `workspace + project + engagement + show + line + date` — no `project.type` column (ADR-007). Engagement (conversation) distinct from show (atomic gig, ADR-001). Money stack: `invoice + invoice_line + payment + expense` (ADR-003). Editable RBAC: `workspace_role` catalog + `project_membership.roles/grants/revokes` with a 10-permission closed vocabulary (ADR-006). `venue` is its own entity.
+- **URL architecture** (ADR-022, 2026-04-24): three levels — ephemeral session state in `localStorage`, canonical entity URLs (`/h/:workspace-slug/:entity/:slug-or-id`) stable and shareable, view-state URLs via explicit "Copy link" gesture. Path-prefix multi-tenancy (not subdomain in Phase 0). Signed public links for road sheet only in Phase 0 (partial D6).
+- **Road sheet model** (ADR-023, 2026-04-24): not an entity — projection of `show` + junctions, filtered by role. Schema extensions: 5 timeslot columns + 3 jsonb (`logistics`, `hospitality`, `technical`) on `show`; new tables `crew_assignment`, `cast_override`, `asset_version` (with `direction` enum `outbound|inbound|adapted` — captures venue returns and per-venue variants). No state machine. URL `/h/:workspace/gig/:slug/roadsheet` with optional `?role=`. Closes the "Lens Technical" pendiente (top-nav lens dropped).
+- **Slug naming** (ADR-024, 2026-04-24): clean names + hard reject + `previous_slugs text[]` for rename history. GitHub/Slack model. Immutable `id uuid` separate from mutable slug column. Uniqueness scope `(workspace_id, entity_type)`. Industry research of 10 SaaS confirmed nobody uses numeric suffixes as default UX.
+- **CRDT transport** (ADR-025, 2026-04-24): `y-partykit` on Cloudflare Durable Objects for collaborative editing of text-free fields (`show.notes`, `project.notes`). Rejected `y-supabase` (abandoned 2023). Auth gates WebSocket via Supabase JWT + membership check; RLS never sees Yjs binary. Snapshots persisted to `collab_snapshot` table every 30 updates / 60s. Scoped to text fields only — structured fields use Supabase Realtime with last-write-wins.
+- **Full implementation plan**: `_build/ROADMAP.md` (documento vivo, 25 ADRs + 14 D-PRE, fases 0.0 → 1, próximo sprint 13 días). Abrir primero al retomar Hour.
 - Anti-CRM vocabulary: `person` (global, shared), `engagement` (workspace-scoped, status default `contacted`), `show` (atomic performance with hold/hold_1/2/3 lifecycle), `date` (rehearsal / travel_day / press / other), `venue` (recurring physical place). No lead / pipeline / funnel / prospect.
 - Difusión 2026-27 is **not** a project — it's a filtered view over `mamemi` engagements with `custom_fields->>season = '2026-27'`.
 - PKs are UUID v7.
@@ -39,7 +44,7 @@ Working name: **Hour**. Brand decision deferred to Phase 1.
 
 ## Status — 2026-04-20
 
-Infra y datos **operativos**. Pendiente: primera pantalla (engagements de Difusión 2026-27). A partir de aquí, todo el trabajo está en `apps/web/`.
+Infra, datos y **primera pantalla funcional**. Login + lista de engagements desplegados y operativos. Todo el trabajo está en `apps/web/`.
 
 ### DB (aplicada vía MCP)
 - `hour-phase0` en eu-central-1 · Postgres 17 · 18 tablas + `show_redacted` view · 19 helpers · 53 RLS policies (ENABLE + FORCE)
@@ -54,14 +59,22 @@ Infra y datos **operativos**. Pendiente: primera pantalla (engagements de Difusi
 - `GET /api/engagements` actualizado a reset v2 (default `status=contacted`, sin `project.type`)
 - Custom domain `hour.zerosense.studio` **no atado todavía** (10 min de dashboard)
 
+### Frontend (`apps/web/`)
+- **Login** (`/login`): email+password contra Supabase Auth REST API, JWT en localStorage, redirect a `/difusion`
+- **Difusión** (`/difusion`): lista de 154 engagements con nombre, organización, ubicación, status (badges con color), próxima acción. Paginación funcional (50/page). Logout. Redirect a login si JWT ausente o 401.
+- **API** (`/api/engagements`): filtros por status/project_slug/season, paginación limit/offset, PostgREST con RLS, exact count. Tipado con `db-types.ts`.
+- Stack: Astro 5 + vanilla JS inline (Svelte islands aún no usados). Build desplegado en CF Worker.
+- **Pendiente en UI**: cambio de status inline, filtros (status/procedencia/tipología), transición a Svelte components + layout real (sidebar/lenses ADR-009).
+
 ### Smoke tests cerrados
 - Hook inyecta `current_workspace_id` correctamente (probado con MCP `execute_sql` simulando claims)
 - Marco como `authenticated` ve 154 engagements; sin membership: 0 leaks
 - `has_permission` owner bypass verificado
-- Endpoint en prod devuelve 401 correcto sin JWT. End-to-end con JWT real saltado — se probará naturalmente al construir UI
+- Endpoint en prod devuelve 401 correcto sin JWT
+- **End-to-end con JWT real**: login funcional, datos cargando en `/difusion` — verificado en producción
 
 ### Source tree
-- Working tree limpio. Últimos commits (12): reset v2 schema/rls, fixes de audit y grants, db-types.ts regenerado, endpoint actualizado, loader (`03_load_to_hour.py`) adaptado a reset v2
+- Working tree limpio
 - `_build/schema.sql`, `rls-policies.sql`, `seed.sql`, `bootstrap.md`, `import-plan.md`, `ARCHITECTURE.md`, `DECISIONS.md` todos alineados con el estado aplicado
 
 ## Product vocabulary (ADR-008, 2026-04-20)
@@ -90,16 +103,11 @@ Single-layout app with two controls:
 
 **⌘K** is first-class from day 1. Sidebar can be hidden entirely for ⌘K-only navigation.
 
-## Next — primera pantalla de Difusión
+## Next — ver `_build/ROADMAP.md`
 
-Pantalla que liste los 154 engagements del workspace `marco-rubiol` / proyecto `mamemi` / season `2026-27`. Debe:
-- Pedir login (email+password) → Supabase Auth → JWT con `current_workspace_id` (ya lo inyecta el hook)
-- Llamar a `/api/engagements?project_slug=mamemi&season=2026-27&limit=50` con el JWT en `Authorization: Bearer`
-- Listar: person.full_name, person.organization_name, person.city, person.country, engagement.status, engagement.next_action_at
-- Permitir cambiar `status` inline (enum: contacted, in_conversation, hold, confirmed, declined, dormant, recurring)
-- Filtros por: status, procedencia (`person.custom_fields.sources.mostra_igualada_2026.procedencia`), tipologia
+El roadmap completo con fases, decisiones previas obligatorias, MVP y próximo sprint concreto vive en **`_build/ROADMAP.md`** (documento vivo, escrito 2026-04-24).
 
-Stack ya montado: Astro 5 + Svelte 5 islands + `@astrojs/cloudflare` v12. El login se resuelve con `@supabase/supabase-js` (ya en deps) o fetch directo contra `/auth/v1/token`. RLS ya hace el trabajo de scoping — el cliente no necesita filtrar por workspace.
+Resumen en una línea: antes de tocar UI, cerrar las 5 decisiones D-PRE-01 a D-PRE-05 y completar Phase 0.0 (fundación: tokens + primitivos + router + migración road sheet). Luego Phase 0.1 (Plaza + Desk shell) hasta Phase 0.4 (polish + ⌘K + mobile). Phase 0.5 son deferred features. Phase 1 es SaaS readiness.
 
 ## Diferido (Phase 0.5 o cuando toque)
 
@@ -108,7 +116,7 @@ Stack ya montado: Astro 5 + Svelte 5 islands + `@astrojs/cloudflare` v12. El log
 - App mode — PWA installable (desktop + mobile), not web-only. Must feel like a native app. (Deferred D5)
 - Public guest links — shareable URL (no signup required) where external collaborators (technicians, freelancers) can view their assigned gigs/dates/rider. If they choose to sign up, their guest view upgrades to a full `guest` membership with write access. Two tiers: anonymous-read via signed link, authenticated-write via `guest` role. (Deferred D6)
 - Fair intelligence — import attendee lists (CSV or screenshot via AI vision), cross-reference against existing contacts, surface matches and new-contact opportunities. Needs fair entity or date.kind='fair' with attendee junction. (Deferred D7, ADR-012)
-- AI integration — invisible helper philosophy. Contact enrichment, next-action suggestions, data extraction from images/PDFs, email drafting, conflict detection. Inline and contextual, never chatbot. Research pending. (Deferred D8, ADR-013)
+- AI integration — invisible helper philosophy (ADR-013). Two interaction patterns: (1) continuous/invisible — AI fills fields like decision windows (ADR-019), (2) punctual/explicit — user clicks "generate dossier draft" (ADR-020). AI-touched fields get visual marker; high-stakes generation requires accept/dismiss (ADR-021). (Deferred D8)
 - Kanban view — available in Desk and Contacts lenses as work-mode complement to calendar. Groups by status. (Deferred D9, ADR-010)
 - Timeline view — horizontal/vertical timeline showing cascading task chains from protocol tasks. Depends on D3. (Deferred D10, ADR-010)
 - `task` tag vocabulary (Deferred D1)

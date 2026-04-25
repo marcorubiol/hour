@@ -687,3 +687,133 @@ Explicit non-goals and schema-ready-but-UI-deferred items. Not addressed in the 
   - Phase 1: Only integrations that early adopters explicitly request after using the tool.
   - The 5 integrations identified in research (16-integration-ecosystem.md) are a menu of options, not a roadmap. Each one must pass the bar above before building.
 - **Status**: Firm.
+
+## [2026-04-20] — ADR-019 — Decision windows as AI-inferred field, not standalone feature
+
+- **Context**: Explored three creative differentiators for Hour vs the competition. One was "Decision Windows" — the idea that each programmer decides their next season's program at a specific time of year, and Hour could learn that pattern and surface optimal contact timing. Marco's reaction: this isn't a differentiator, it's a basic function of AI-as-helper. The AI should observe when you contacted someone, when they responded, when they closed — and fill in a `decision_window` field automatically. The user sees the data and decides.
+- **Decision**: Decision windows are an AI-inferred field on `person` (or `engagement`), not a standalone feature or selling point. The AI observes contact/response/close patterns over seasons and surfaces the inferred window transparently. The user always sees the reasoning ("based on 2 seasons of contact history, this programmer decides between January and March").
+- **Rejected framing**: Marketing it as a "strategic intelligence" differentiator. It's table stakes for an AI-assisted tool — the AI fills fields, the user decides.
+- **Connects to**: ADR-013 (AI invisible helper philosophy). This is a concrete instance of "AI fills, user confirms."
+- **Status**: Firm on the principle. Implementation deferred until enough seasonal data exists (2+ seasons of engagement history per programmer).
+
+## [2026-04-20] — ADR-020 — "Generate dossier draft" from real data (Show Biography evolution)
+
+- **Context**: The "Show Biography" differentiator (auto-generated history of a show: venues played, dates, press, festivals) resonated with Marco but he identified the real value: not the biography itself, but a **"Create draft ficha/dossier"** button that compiles real Hour data into a first draft of the show's difusion document. The dossier is what gets sent to programmers — today it's manually assembled once a year (if at all).
+- **Decision**: Room detail view (Assets tab) will have a "Generate dossier draft" action that:
+  1. Pulls real data from Hour: gig history (venues, cities, countries, dates), run summaries, engagement stats (X gigs in Y venues across Z countries), notable festivals/venues
+  2. Combines with Room metadata: description, team credits, press links, photos
+  3. Produces an editable first draft (not a final document) that Marco reviews, adjusts, and exports as PDF or shareable link
+  4. The draft updates itself as new gigs are confirmed — but never overwrites manual edits (append-only suggestions: "3 new gigs since last export, add them?")
+- **What this is NOT**: An auto-updating live page (the "biography" concept). It's a **draft generator** — a tool that saves hours of manual dossier assembly. The human always edits the final version.
+- **Rejected alternative**: Structured rider matching (machine-readable rider fields that auto-match venue specs). Marco judged this doesn't work in the real world — technicians work with PDFs and phone calls, not structured data exchange.
+- **Connects to**: ADR-013 (AI as invisible helper — draft generator is the "puntual and explicit" AI pattern, vs decision windows which is the "continuous and invisible" pattern).
+- **Status**: Firm on concept. Implementation depends on having enough gig data in Hour to make the draft meaningful. Phase 0.5 at earliest.
+
+## [2026-04-20] — ADR-021 — AI-touched fields: visual distinction + accept/dismiss UX
+
+- **Context**: Marco identifies that if AI fills a field, the user must be able to see at a glance that it was the AI — not a human — who wrote that value. And depending on context, the user should explicitly accept or dismiss the suggestion before it becomes "real" data.
+- **Decision**: Two tiers of AI contribution, each with its own visual and interaction pattern:
+  1. **Low-stakes enrichment** (contact city inferred from organization, decision window inferred from history): the field shows the AI-suggested value with a **visual marker** (subtle styling distinction — e.g., different text treatment, small indicator icon). The value is usable immediately but visually flagged as "AI-suggested" until the user edits it or explicitly confirms it. No blocking modal, no mandatory accept step. If the user edits the field, the AI marker disappears — the human value replaces it.
+  2. **High-stakes generation** (dossier draft, email draft, bulk status suggestions): requires an **explicit accept/dismiss** action before the content is saved or sent. The generated content appears in a review state — the user reads, edits if needed, and hits accept. Dismiss discards it. Nothing is committed without the user's explicit action.
+- **Visual language**:
+  - AI-suggested values get a consistent visual treatment across the entire app (same marker everywhere — not a different pattern per feature). Exact styling TBD during design phase, but the principle is: **one glance tells you "AI wrote this"**.
+  - Once accepted (explicitly or by editing), the value becomes indistinguishable from human-entered data. No permanent "AI" badge — the point is trust, not traceability.
+  - Data model: fields that support AI suggestions carry an `ai_suggested` metadata flag (in `custom_fields` or a parallel structure). Flag clears on human edit or explicit accept.
+- **Connects to**: ADR-013 (invisible helper), ADR-019 (decision windows as AI-inferred field), ADR-020 (dossier draft as explicit generation).
+- **Status**: Firm on the two-tier principle. Visual design and data model details deferred to implementation.
+
+## [2026-04-24] — ADR-022 — URL architecture: three levels, canonical routes, shareable views
+
+- **Context**: With the composable UI model defined in ADR-009 and refined 2026-04-24 (Plaza + Desk + Views + chip bar + multi-select), any combination of selections is potentially "app state". Open question was how to structure URLs: encode everything (noisy history, frágil sharing) or encode nothing (nothing shareable). The answer is neither — separate what deserves URL from what doesn't. The road sheet (ADR-023) surfaced the question concretely: it needs shareable URLs, including public signed links for external recipients.
+- **Decision — three levels of URL-ness**:
+  1. **Ephemeral session state — NOT in URL.** Plaza/Desk selections, chip bar state, scroll, hover, checkbox-on-hover state. Lives in memory + `localStorage`. If URL-encoded, every click pushes history and sharing URLs becomes fragile.
+  2. **Canonical entity URLs — in URL, stable, shareable.** Each first-class entity has a canonical URL. Opening it reconstructs a reasonable state (selects entity in Plaza/Desk, activates the default lens for that entity type) but does NOT arrange the viewer's previous filters or chip bar. Use: *"mira esto"*.
+  3. **View-state URLs — in URL, but only by explicit gesture.** When the user wants to share a specific filtered view (e.g., "Calendar of Ombra, May 2026, only confirmed"), a **"Copy link"** action serializes the filters into querystring. Never automatic. Master View (see `project_hour_layout_decisions.md`) stays in `localStorage` unless the user explicitly shares its URL.
+- **URL schema**: `/h/:workspace-slug/:entity/:slug-or-id`.
+  - Multi-tenant path prefix `/h/:workspace-slug/` — **not subdomain-per-tenant** in Phase 0. Subdomain can come later if Phase 1 demands.
+  - Entities with canonical URLs in Phase 0: `house` (workspace), `room` (project), `run` (line), `gig` (show), `engagement`, `person`, `venue`, `asset`. Road sheet is a sub-view of `gig`, not its own route (see ADR-023): `/h/:workspace/gig/:slug/roadsheet`.
+  - Slugs: human-readable where meaningful (`ombra/spring-2026-tour`), UUID v7 fallback when none exists. Unique per `(workspace, entity_type)`. Slug collision rules finalized at implementation.
+- **Public access — signed links**: Phase 0 supports signed-token public URLs for road sheet only (partial D6 activation). Format `/public/roadsheet/:signed-token`. Other entities defer to full D6.
+- **Role-aware URLs**: optional `?role=` query param filters visible fields via RLS-backed views. Same URL, different content by viewer role. Mechanism: Postgres RLS policies + read-only views layered on top of ADR-006's 10-permission RBAC.
+- **Rejected alternatives**:
+  - URL-encoding all UI state automatically (history pollution + fragile share URLs).
+  - Subdomain-per-tenant in Phase 0 (cost + DNS complexity without real benefit yet).
+  - Separate route per lens (`/h/:workspace/calendar/:id`) — breaks entity-as-canonical-URL.
+  - Query-string-heavy URLs carrying chip bar multi-select by default (URLs > 400 chars, unreadable).
+- **Connects to**: ADR-006 (RBAC enables role-filtered URLs), ADR-009 (URLs orthogonal to composable sidebar state), ADR-023 (road sheet uses this scheme), D6 deferred (public guest links — partially activated here for road sheet only).
+- **Status**: Firm on the three-level principle and path-prefix multi-tenancy. Slug collision rules, full D6 activation, and Master View sharing-via-URL deferred to implementation.
+
+## [2026-04-24] — ADR-023 — Road sheet: projection over `show` + asset versioning + role-filtered views
+
+- **Context**: Open product question since 2026-04-20: how to model the "hoja de ruta" (per-gig consolidated document with venue specs, load-in/soundcheck/show times, backstage amenities, technical crew, travel + hotel, per diem, etc.). Three competing framings: lens of its own in top nav, part of Assets (Room tab), or detailed Calendar view. Resolved 2026-04-24 through three parallel agent investigations that converged:
+  - **Schema audit** (agent A) of `reset_v2` identified 5 critical gaps that could be closed by extending `show` + two junctions, without a new `road_sheet` entity.
+  - **Industry landscape** (agent B) across Master Tour, Prism.fm, Daysheets, TourPro, RoadOps, Overture, Stagent: no major tool treats road sheet as a first-class entity. Dominant pattern is hybrid — live view as source of truth + PDF export as distributable artifact. Role-based filtering is the norm, not the exception. No tool found uses a formal draft/locked/sent state machine; change propagation is via push-on-change.
+  - **Real practice** (agent C) in MaMeMi / Komunumo / The Place: Marco already operates a distributed road sheet per gig — canonical rider PDF (Room-level), stage plot adapted per venue (Gig-level variant of the canonical), inbound docs returned by the venue (their tech sheet, bar plot), a working `notes.md` checklist, and email/WhatsApp coordination. The road sheet is not a single artifact but a constellation.
+- **Decision — road sheet is NOT an entity**. It is a view composed over `show` + related junctions, filtered by viewer role.
+  - **Extend `show`** with 5 timeslot columns (`load_in_at`, `soundcheck_at`, `show_start_at`, `loadout_at`, `wrap_at` — all `timestamptz`) + 3 consolidated `jsonb` columns (`logistics`, `hospitality`, `technical`) to absorb venue access codes, facilities (dressing rooms, showers), per-diem / catering / dietary, emergency info, merch policy, accommodation, parking notes, visa flags. GIN indexes on the jsonb columns. Rejected the audit agent's alternative of 10-12 explicit columns — jsonb is chosen for schema stability and evolution.
+  - **New table `crew_assignment`**`(id, show_id, person_id, role text, contact_override jsonb, notes text)` — gig-specific crew roster with per-gig override of a `person`'s canonical contact (tour-specific mobile number, backup contact).
+  - **New table `cast_override`**`(id, show_id, person_id, role, replaces_person_id uuid null, reason text)` — gig-specific cast changes (understudy, rotation) without polluting project-wide engagements. **Included in Phase 0** (not deferred).
+  - **New table `asset_version`**`(id, gig_id null, line_id null, room_id null, kind enum, direction enum, adapted_from_id fk null, url text, uploaded_at timestamptz, uploaded_by uuid, notes text)`. `direction` enum: `outbound | inbound | adapted`. Tracks:
+    - Canonical assets at Room level (rider, stage plot) — `direction='outbound'`.
+    - Variants adapted per venue at Gig level — `direction='adapted'` with `adapted_from_id` FK back to canonical.
+    - Inbound assets returned by the venue at Gig level (their tech sheet, bar plot, ContraRider) — `direction='inbound'`.
+    - Export snapshots (road sheet rendered to PDF for distribution) — `kind='roadsheet_snapshot'`, `direction='outbound'`.
+- **No formal state machine**. Drop draft → locked → sent. Industry evidence (ADR-022 research) shows push-on-change is the dominant pattern. "Export PDF" is an explicit user gesture that persists an `asset_version` snapshot; it does not "lock" the underlying data.
+- **Role-based filtering** uses existing ADR-006 RBAC (10-permission + editable role catalog) + Postgres RLS + views. Road sheet is rendered differently for tour manager, performer, technical crew, and external venue viewer. No new permission vocabulary introduced.
+- **UI location**: road sheet is a sub-view of Gig detail, accessed via `/h/:workspace/gig/:slug/roadsheet` (ADR-022). **Not** a top-nav lens.
+- **Top-nav lens "Technical" rejected**. Closes the "Lens Technical y hojas de ruta" pendiente that was open since 2026-04-20. The contents that motivated a possible Technical lens are covered by: road sheet (gig-level, sub-view of Gig), Assets tab (room-level canonical assets), Calendar (timeline). The lens would have duplicated these.
+- **Public external access**: road sheet supports signed public links in Phase 0 (partial D6 activation, per ADR-022). `?role=venue|performer|tech_manager` filters fields for specific shared recipients.
+- **Bidirectional asset flow is explicit**: the inbound `asset_version(direction='inbound')` is a first-class part of the model, not an afterthought. It reflects how venues routinely return their own tech sheets and bar plots.
+- **Rejected alternatives**:
+  - Standalone `road_sheet` table — all three agent voices (schema, market, practice) argued against. Would duplicate data already expressible on `show` + junctions.
+  - State machine with `approved_at` / `approved_by` — market does not do it; Marco does not do it; adds complexity without evidence of need. Approval can emerge later as a jsonb annotation if real need surfaces.
+  - Explicit column-per-field on `show` (~10-12 columns) — schema rigidity without gain over 3 consolidated jsonb with GIN indexes.
+  - Deferring `cast_override` — Marco confirmed it needs to be in Phase 0.
+- **Connects to**: ADR-001 (engagement vs show), ADR-005 (line/run as own table), ADR-006 (RBAC enables role filtering), ADR-009 (UI architecture — sub-view of Gig detail), ADR-022 (URL scheme), D3 deferred (task entity — the `notes.md` checklist pattern implies tasks attached to Gig; integrates cleanly when D3 lands), D6 deferred (public guest links — partially activated here for road sheet only).
+- **Status**: Firm on the principle and the table-level decisions (extend `show`, new junctions, no state machine, role-filtered views). Exact column names, enum values, and internal jsonb schemas finalized at implementation. Migration to be drafted as a single `reset_v2_roadsheet` migration covering all four schema changes.
+
+## [2026-04-24] — ADR-024 — Slug naming: clean names forced + hard reject + rename redirect table
+
+- **Context**: ADR-022 defines URL scheme `/h/:workspace-slug/:entity/:slug` but left slug rules "finalized at implementation". Marco's explicit preference is "clean URLs". Two strategies in tension: auto-dedupe with numeric suffix (`ombra-2`) vs. hard reject on collision (force rename at creation). An agent investigation (2026-04-24) surveyed how GitHub, Linear, Notion, Vercel, Supabase, Airtable, Figma, Cal.com, Slack, and Discord handle this.
+- **Research finding**: **no major SaaS uses numeric-suffix auto-dedupe as its default UX.** Two dominant industry patterns emerged:
+  - Hard reject at creation + redirect-on-rename (GitHub, Vercel, Cal.com, Slack, Notion custom slugs).
+  - Opaque ID + cosmetic name (Supabase, Airtable, Figma, Linear issues, Discord).
+  Numeric suffixes appear only as emergency fallback (Cal.com managed-event → `-personal-{id}`), never as the primary pattern.
+- **Decision**: adopt the **"clean names forced + hard reject + redirect table"** strategy (GitHub/Slack model).
+  1. **Hard reject at creation.** Modal on collision: *"A Room named 'Ombra' already exists. Try 'Ombra 2026' or 'Ombra Tour'."* Suggest candidate names, do not auto-append a number.
+  2. **Rename preserves access.** Each entity stores a `previous_slugs text[]` column. Any old slug resolves to the current entity for at least 12 months (GitHub holds redirects indefinitely; Hour starts at 12 months and extends later if simple).
+  3. **Redirect invalidates on slug reclaim.** When a new entity claims a freed slug, the old redirect stops resolving for the previous holder. Predictable; no dangling reservations.
+  4. **Internal model**: every entity has an immutable `id uuid` primary key. All foreign keys reference `id`, never the slug. The slug is a mutable `text` column plus the `previous_slugs text[]` history. URL resolution: `(workspace_slug, entity_type, slug) → id`, with fallback through `previous_slugs` when the direct match misses.
+  5. **Uniqueness scope**: per `(workspace_id, entity_type)` — not global. Two workspaces can each have a `room/ombra`.
+- **Migration impact** (folds into `reset_v2_roadsheet.sql`): add `slug text NOT NULL` + `previous_slugs text[] NOT NULL DEFAULT '{}'` to `project` (Room), `line` (Run), `show` (Gig), `engagement`, `person`, `venue`, `asset_version`, `workspace`. Partial unique index on `(workspace_id, slug)` per entity table. `slug_generator(name)` SQL function: slugify + collision check within workspace scope; raises exception on collision (hard reject surfaced to UI as modal).
+- **Rejected alternatives**:
+  - Numeric suffix auto-dedupe (Strategy A) — telegraphs "I had an Ombra that failed" in every shared URL; industry rejects it.
+  - Opaque-ID only (Supabase/Airtable model) — sacrifices human readability; Marco explicitly wants clean URLs.
+  - Hybrid slug + opaque-ID tail (Notion/Linear model) — viable fallback if Hour ever regrets clean names; superset migration path, not the default.
+- **Connects to**: ADR-022 (URL scheme — this closes the deferred slug rules).
+- **Status**: Firm on strategy. Implementation details (exact regex for slugify, reserved slugs like `new`/`edit`/`settings`, redirect cache) finalized in Phase 0.0 when the migration ships.
+
+## [2026-04-24] — ADR-025 — CRDT transport for collaborative editing: y-partykit on Cloudflare Durable Objects
+
+- **Context**: ADR-023 road sheet requires collaborative editing of text-free fields (notes, description) without last-write-wins destroying concurrent edits. Tentative plan was Yjs + `y-supabase` + `y-indexeddb`. Agent investigation (2026-04-24) verified the state of the Yjs + Supabase ecosystem and compared alternatives.
+- **Research findings**:
+  - **`y-supabase` is abandoned.** All 12 versions published Feb 4–7 2023, still tagged `-alpha`, GitHub last push 2023-08-17, open issue #9 (2026-03-10) asking about maintenance/transfer has zero maintainer response at 6 weeks. Weekly downloads 640 vs. `yjs` 3.9M. Author explicitly said "nowhere near production ready."
+  - **Supabase has no blessed Yjs pattern.** `pg_crdt` experiment shelved without follow-up; broadcast-as-Yjs-transport still "investigating" after ~4 years.
+  - **PartyKit was acquired by Cloudflare in April 2024.** Now lives at `cloudflare/partykit`. Last push 2026-04-23. 1088 stars, first-class Yjs support (`withYjs` + `YServer`). Runs on Durable Objects — the same runtime Hour's Worker already uses. `y-partykit` weekly downloads 13.5k, maintained by Cloudflare directly.
+- **Decision**: **adopt `y-partykit` on Cloudflare Durable Objects** as Hour's CRDT transport. Architecture:
+  - **One Durable Object per collaborative document** — primarily per road sheet (`workspace_id/show_id/roadsheet`). Name encodes scope. DO persists Yjs state to its own storage + snapshots to Postgres `asset_version` or a dedicated `collab_snapshot` table every N updates.
+  - **Client transport**: `y-partykit/provider` opens a WebSocket to the DO. Svelte island component wraps the input (`<YInput>`, `<YTextarea>`) and binds to a shared `Y.Doc`. `y-indexeddb` mirrors locally so offline edits survive and re-sync on reconnect.
+  - **Authentication at connect time**: `onBeforeConnect` on the DO verifies the Supabase JWT (passed as `params.token`) using `cloudflare-worker-jwt`, then checks workspace membership via Supabase REST (service-role key) before accepting the WebSocket. RLS never sees Yjs binary — it gates the connection, not the doc.
+  - **Awareness/presence** via Yjs awareness protocol on the same channel (not Supabase Presence). Used for "3 personas online + colored border on field in focus" per ROADMAP P10.
+  - **Scope of CRDT**: only text-free fields (`show.notes`, `project.notes`, any jsonb text subfields flagged as collaborative). Structured fields (dates, selects, numbers, enums) stay on plain Supabase Realtime with last-write-wins. CRDT is not a hammer for everything.
+- **Rejected alternatives**:
+  - **`y-supabase`** — abandoned; unfixed concurrency bug (issue #2 "Updates will overwrite each other"); adopting = inheriting an orphaned project.
+  - **Custom relay over Supabase broadcast** — no production open-source example exists; rate limits and message caps; would make Hour the maintainer of a CRDT transport layer (~60-120h + ongoing). Three independent "no" signals.
+  - **HocusPocus** — Node.js only; would require a separate persistent server outside Cloudflare. Breaks Worker-only runtime constraint.
+  - **`y-webrtc`** — P2P, no server persistence, NAT issues, no access control enforcement. Demo-grade.
+  - **`y-websocket` + self-hosted Node** — wrong runtime, adds deploy target.
+  - **Liveblocks Yjs** — fully managed and works, but paid beyond free tier (MAU cap, 8 GB) for overkill value at Hour's Phase 0 scale. Vendor lock.
+  - **`y-durableobjects`** (napolab) — good fallback on same runtime, smaller community than PartyKit, no built-in auth helpers. Drop-in alternative if PartyKit ever goes sideways.
+- **Effort estimate** (Svelte + Supabase dev new to Yjs): ~12-20 h to scaffold the Durable Object, wire auth gate, persist snapshots, and wire the Svelte client with `y-indexeddb`. Split: ~5-8 h in Phase 0.0 (DO scaffold + auth + persistence table schema) and ~8-12 h in Phase 0.2 (first collaborative field live on road sheet).
+- **Connects to**: ADR-023 (road sheet — concrete CRDT path for collaborative fields), ADR-022 (Worker runtime — PartyKit runs inside the same Cloudflare account as `hour-web`).
+- **Status**: Firm on path. Exact DO naming scheme, snapshot frequency, and Postgres persistence column design finalized in Phase 0.0 when the scaffold ships.
