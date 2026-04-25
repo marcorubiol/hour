@@ -1,0 +1,194 @@
+/*
+  Hour — Base stylesheet
+  Cascade layers (declared once, project-wide) + reset + element defaults.
+  Order: first declared = lowest priority. Unlayered styles beat all layers.
+*/
+
+@layer reset, defaults, tokens, layouts, components, components.overrides,
+  utilities, overrides;
+
+@import "./tokens.css";
+
+/* ====== RESET — minimal, modern ====== */
+@layer reset {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  /* Remove default margins; layout owns spacing via tokens */
+  :where(
+    body,
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6,
+    p,
+    figure,
+    blockquote,
+    dl,
+    dd,
+    ul,
+    ol
+  ) {
+    margin: 0;
+  }
+
+  /* Lists used in nav/UI lose markers; semantic prose can re-enable */
+  :where(ul[role="list"], ol[role="list"], nav ul) {
+    list-style: none;
+    padding: 0;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
+  html,
+  body {
+    block-size: 100%;
+  }
+
+  body {
+    line-height: var(--line-height-default);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  img,
+  picture,
+  video,
+  canvas,
+  svg {
+    display: block;
+    max-inline-size: 100%;
+  }
+
+  input,
+  button,
+  textarea,
+  select {
+    font: inherit;
+    color: inherit;
+  }
+
+  button {
+    background: none;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+  }
+
+  /* Browser-default overrides documented in _methød/css.md */
+  :where(cite, address) {
+    font-style: normal;
+  }
+  :where(blockquote) {
+    margin: 0;
+    background: transparent;
+  }
+  :where(fieldset) {
+    border: 0;
+    padding: 0;
+  }
+
+  /* Respect reduced motion */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+/* ====== DEFAULTS — element-level styling using tokens ====== */
+@layer defaults {
+  body {
+    background: var(--surface-1);
+    color: var(--ink-default);
+    font-family: var(--font-sans);
+    font-size: var(--text-m);
+  }
+
+  :where(h1, h2, h3, h4, h5, h6) {
+    color: var(--ink-strong);
+    line-height: var(--line-height-tight);
+    letter-spacing: var(--letter-spacing-tight);
+    text-wrap: balance;
+  }
+
+  :where(h1) {
+    font-size: var(--h1);
+    font-weight: 600;
+  }
+  :where(h2) {
+    font-size: var(--h2);
+    font-weight: 600;
+  }
+  :where(h3) {
+    font-size: var(--h3);
+    font-weight: 600;
+  }
+  :where(h4) {
+    font-size: var(--h4);
+    font-weight: 600;
+  }
+  :where(h5) {
+    font-size: var(--h5);
+    font-weight: 600;
+  }
+  :where(h6) {
+    font-size: var(--h6);
+    font-weight: 600;
+  }
+
+  :where(p) {
+    text-wrap: pretty;
+    max-inline-size: var(--measure);
+  }
+
+  :where(a) {
+    color: var(--primary-dark);
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.2em;
+    transition: color var(--transition-fast);
+  }
+  :where(a):hover {
+    color: var(--primary);
+  }
+
+  :where(:focus-visible) {
+    outline: var(--focus-ring-width) solid var(--focus-ring-color);
+    outline-offset: var(--focus-ring-offset);
+    border-radius: var(--radius-xs);
+  }
+
+  :where(hr) {
+    border: 0;
+    border-block-start: var(--border-width) solid var(--border-subtle);
+    margin-block: var(--space-l);
+  }
+
+  :where(small) {
+    font-size: var(--text-s);
+  }
+
+  :where(code, kbd, samp) {
+    font-family: var(--font-mono);
+    font-size: 0.95em;
+  }
+
+  :where(pre) {
+    font-family: var(--font-mono);
+    font-size: var(--text-s);
+    background: var(--surface-2);
+    padding: var(--space-m);
+    border-radius: var(--radius-m);
+    overflow-x: auto;
+  }
+}
