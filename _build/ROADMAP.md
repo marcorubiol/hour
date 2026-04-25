@@ -396,8 +396,12 @@ Utilidad: herramienta diaria genuina. Puedes ver tu calendario entero, editar ro
 
 Las 14 D-PRE están todas cerradas. Si arrancas ya: **Día 1 abajo**.
 
-**Día 1** — Tokens + base:
-- `tokens.css` + `base.css` + migración `/login` y `/difusion` a tokens + fix tema light.
+**Día 1** — Tokens + base ✓ CERRADO 2026-04-25:
+- `tokens.css` (419 líneas) con three-tier color (base hues / status / contextual), ACSS 4.0 naming exacto, color-mix para shades + transparencias.
+- `base.css` (749 líneas) con cascade layers + defaults semánticos (`:where(body)`, `:where(section:not(section section))`, `:where(body > header)`, inputs, table) + button skeleton `[class*="btn--"]` + badge skeleton + utility classes (`.bg--*`, `.text--*`, `.h1`-`.h6`).
+- `Base.astro` layout. `/login` y `/booking` (renombrado desde `/difusion`) migrados a tokens. Fix scoped CSS para badges dinámicos via JS (`<style is:global>`).
+- Primary terracota `oklch(0.52 0.141 29.7)` (#AB4235). Light theme (D-PRE-01). Color-scheme `light`.
+- Regla del proyecto formalizada: UI en inglés (D-PRE-03 default locale). Filosofía ACSS extrapolada a `_methød/philosophy.md` con sección Svelte 5 explícita.
 
 **Día 2-3** — Primitivos base (6):
 - Button, Input, Chip, Checkbox, Radio, Avatar con estados completos.
