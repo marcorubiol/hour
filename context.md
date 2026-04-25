@@ -1,6 +1,18 @@
 > Inherits: `.zerø/context.md` · Method: `_methød/`
 > Status: **kept** (valid: live, kept, parked)
 
+> **REGLA DEL PROYECTO — leer ANTES de escribir código**
+>
+> Antes de tocar una sola línea de código en Hour (CSS, JavaScript, Svelte, HTML, schema, API), leer **`~/Zerø System/_methød/philosophy.md`**.
+>
+> No es lectura recomendada — es la regla de oro del sistema. Cualquier decisión técnica se evalúa contra los 5 principios universales descritos ahí. Si un patrón típico de la industria contradice la filosofía y el contexto del proyecto no lo justifica explícitamente como "isla de pragma", **gana la filosofía**.
+>
+> Casos comunes que afecta:
+> - CSS: defaults a nivel de selector con `:where()`, no en clases. Modificadores redeclaran CSS variables, no propiedades.
+> - JS / Svelte 5: `$derived` antes que `$state` con `$effect`. Una técnica para todo el dominio.
+> - HTML: elementos semánticos directos, no `<div>` con role.
+> - Tokens: tres categorías (base hues / status / contextual). Naming semántico, no numérico.
+
 # Hour
 
 ## What
