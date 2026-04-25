@@ -1,8 +1,7 @@
 /*
   Hour — Design tokens
-  Two-tier system: primitives (raw values) + semantics (UI roles).
+  Naming follows ACSS 4.x conventions (see _methød/acss-variables.md).
   Color: OKLCH hues + color-mix() for shades and transparencies.
-  Spacing/typography: M base, ratio 1.5, fluid via clamp().
   Theme: light primary (ADR-014, D-PRE-01). Dark mode deferred to Phase 0.5.
 */
 
@@ -10,37 +9,51 @@
   :root {
     color-scheme: light;
 
-    /* ====== PRIMITIVES — base hues ====== */
-    --primary: oklch(0.55 0.17 265); /* blue-indigo, sobrio profesional */
-    --neutral: oklch(0.55 0.012 265); /* gris frío teñido del primary */
-    --base: oklch(0.99 0.004 265); /* off-white, lienzo */
+    /* ============================================================ */
+    /* BASE HUES                                                      */
+    /* Three roles per ACSS: primary (brand) + base (lienzo) +        */
+    /* neutral (greyscale). Plus state hues Hour-specific.            */
+    /* ============================================================ */
 
-    /* PRIMITIVES — semantic state hues */
+    --primary: oklch(0.55 0.17 265); /* blue-indigo */
+    --base: oklch(0.99 0.004 265); /* off-white lienzo */
+    --neutral: oklch(0.55 0.012 265); /* gris frío teñido del primary */
+
     --success: oklch(0.62 0.16 145);
     --warning: oklch(0.75 0.15 75);
     --danger: oklch(0.6 0.21 25);
     --info: oklch(0.65 0.13 220);
 
-    /* ====== SHADES via color-mix ======
-       Pattern: ultra-light → ultra-dark + hover.
-       White mix lifts luminance, black mix sinks it.
-       Change a base hue and the entire ramp recalculates in CSS. */
+    --white: #ffffff;
+    --black: #000000;
+
+    /* ============================================================ */
+    /* SHADES (per ACSS pattern: 7 shades + hover)                    */
+    /* No -main alias — the base hue itself is "main".                */
+    /* ============================================================ */
 
     /* primary */
     --primary-ultra-light: color-mix(in oklch, var(--primary), white 82%);
     --primary-light: color-mix(in oklch, var(--primary), white 55%);
     --primary-semi-light: color-mix(in oklch, var(--primary), white 25%);
-    --primary-main: var(--primary);
     --primary-semi-dark: color-mix(in oklch, var(--primary), black 15%);
     --primary-dark: color-mix(in oklch, var(--primary), black 30%);
     --primary-ultra-dark: color-mix(in oklch, var(--primary), black 50%);
     --primary-hover: color-mix(in oklch, var(--primary), black 10%);
 
+    /* base */
+    --base-ultra-light: var(--base);
+    --base-light: color-mix(in oklch, var(--base), var(--neutral) 3%);
+    --base-semi-light: color-mix(in oklch, var(--base), var(--neutral) 6%);
+    --base-semi-dark: color-mix(in oklch, var(--base), var(--neutral) 12%);
+    --base-dark: color-mix(in oklch, var(--base), var(--neutral) 20%);
+    --base-ultra-dark: color-mix(in oklch, var(--base), var(--neutral) 32%);
+    --base-hover: var(--base-semi-light);
+
     /* neutral */
     --neutral-ultra-light: color-mix(in oklch, var(--neutral), white 88%);
     --neutral-light: color-mix(in oklch, var(--neutral), white 65%);
     --neutral-semi-light: color-mix(in oklch, var(--neutral), white 35%);
-    --neutral-main: var(--neutral);
     --neutral-semi-dark: color-mix(in oklch, var(--neutral), black 20%);
     --neutral-dark: color-mix(in oklch, var(--neutral), black 40%);
     --neutral-ultra-dark: color-mix(in oklch, var(--neutral), black 60%);
@@ -49,43 +62,96 @@
     /* success */
     --success-ultra-light: color-mix(in oklch, var(--success), white 82%);
     --success-light: color-mix(in oklch, var(--success), white 55%);
-    --success-main: var(--success);
-    --success-dark: color-mix(in oklch, var(--success), black 25%);
-    --success-ultra-dark: color-mix(in oklch, var(--success), black 50%);
+    --success-semi-light: color-mix(in oklch, var(--success), white 25%);
+    --success-semi-dark: color-mix(in oklch, var(--success), black 15%);
+    --success-dark: color-mix(in oklch, var(--success), black 30%);
+    --success-ultra-dark: color-mix(in oklch, var(--success), black 55%);
+    --success-hover: color-mix(in oklch, var(--success), black 10%);
 
     /* warning */
     --warning-ultra-light: color-mix(in oklch, var(--warning), white 80%);
     --warning-light: color-mix(in oklch, var(--warning), white 50%);
-    --warning-main: var(--warning);
-    --warning-dark: color-mix(in oklch, var(--warning), black 30%);
-    --warning-ultra-dark: color-mix(in oklch, var(--warning), black 55%);
+    --warning-semi-light: color-mix(in oklch, var(--warning), white 22%);
+    --warning-semi-dark: color-mix(in oklch, var(--warning), black 18%);
+    --warning-dark: color-mix(in oklch, var(--warning), black 32%);
+    --warning-ultra-dark: color-mix(in oklch, var(--warning), black 58%);
+    --warning-hover: color-mix(in oklch, var(--warning), black 10%);
 
     /* danger */
     --danger-ultra-light: color-mix(in oklch, var(--danger), white 82%);
     --danger-light: color-mix(in oklch, var(--danger), white 50%);
-    --danger-main: var(--danger);
-    --danger-dark: color-mix(in oklch, var(--danger), black 25%);
-    --danger-ultra-dark: color-mix(in oklch, var(--danger), black 50%);
+    --danger-semi-light: color-mix(in oklch, var(--danger), white 22%);
+    --danger-semi-dark: color-mix(in oklch, var(--danger), black 15%);
+    --danger-dark: color-mix(in oklch, var(--danger), black 28%);
+    --danger-ultra-dark: color-mix(in oklch, var(--danger), black 52%);
+    --danger-hover: color-mix(in oklch, var(--danger), black 10%);
 
     /* info */
     --info-ultra-light: color-mix(in oklch, var(--info), white 80%);
     --info-light: color-mix(in oklch, var(--info), white 50%);
-    --info-main: var(--info);
-    --info-dark: color-mix(in oklch, var(--info), black 25%);
-    --info-ultra-dark: color-mix(in oklch, var(--info), black 50%);
+    --info-semi-light: color-mix(in oklch, var(--info), white 22%);
+    --info-semi-dark: color-mix(in oklch, var(--info), black 15%);
+    --info-dark: color-mix(in oklch, var(--info), black 28%);
+    --info-ultra-dark: color-mix(in oklch, var(--info), black 52%);
+    --info-hover: color-mix(in oklch, var(--info), black 10%);
 
-    /* ====== SPACING — M base, ratio 1.5, fluid ====== */
+    /* ============================================================ */
+    /* SINGLES — text, heading, body bg                               */
+    /* (ACSS: --text-color → --text-dark by default, etc.)            */
+    /* ============================================================ */
+
+    --text-dark: var(--neutral-dark);
+    --text-dark-muted: color-mix(
+      in oklch,
+      var(--neutral-dark) 75%,
+      transparent
+    );
+    --text-light: var(--base);
+    --text-light-muted: color-mix(in oklch, var(--base) 75%, transparent);
+
+    --text-color: var(--text-dark); /* default */
+    --heading-color: var(--neutral-ultra-dark);
+    --body-bg-color: var(--base);
+
+    /* ============================================================ */
+    /* CONTEXTUAL BACKGROUNDS                                         */
+    /* Use these on container elements; pair with text-* for content. */
+    /* ============================================================ */
+
+    --bg-ultra-light: var(--base);
+    --bg-light: var(--base-semi-light);
+    --bg-dark: var(--neutral-dark);
+    --bg-ultra-dark: var(--neutral-ultra-dark);
+
+    /* ============================================================ */
+    /* SPACING — M base, ratio 1.5, fluid                             */
+    /* ============================================================ */
+
     --space-xs: clamp(0.25rem, 0.22rem + 0.15vw, 0.375rem);
     --space-s: clamp(0.5rem, 0.45rem + 0.25vw, 0.75rem);
-    --space-m: clamp(0.875rem, 0.8rem + 0.4vw, 1.125rem); /* base */
+    --space-m: clamp(0.875rem, 0.8rem + 0.4vw, 1.125rem);
     --space-l: clamp(1.25rem, 1.05rem + 1vw, 1.875rem);
     --space-xl: clamp(1.875rem, 1.5rem + 1.75vw, 2.75rem);
     --space-xxl: clamp(2.75rem, 2.2rem + 2.5vw, 4rem);
 
-    /* ====== TYPOGRAPHY — fluid via clamp() ====== */
+    --gutter: clamp(1rem, 0.5rem + 2vw, 2rem);
+    --content-gap: var(--space-m);
+    --grid-gap: var(--space-m);
+
+    /* ============================================================ */
+    /* TYPOGRAPHY                                                     */
+    /* ============================================================ */
+
+    --text-font-family:
+      system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial,
+      sans-serif;
+    --text-font-weight: 400;
+    --heading-font-family: var(--text-font-family);
+    --heading-font-weight: 600;
+
     --text-xs: clamp(0.7rem, 0.66rem + 0.15vw, 0.75rem);
     --text-s: clamp(0.8rem, 0.76rem + 0.2vw, 0.875rem);
-    --text-m: clamp(0.95rem, 0.92rem + 0.15vw, 1rem); /* base */
+    --text-m: clamp(0.95rem, 0.92rem + 0.15vw, 1rem);
     --text-l: clamp(1.1rem, 1.05rem + 0.25vw, 1.2rem);
     --text-xl: clamp(1.3rem, 1.2rem + 0.5vw, 1.5rem);
     --text-xxl: clamp(1.5rem, 1.35rem + 0.75vw, 1.875rem);
@@ -97,117 +163,152 @@
     --h5: var(--text-l);
     --h6: var(--text-m);
 
-    --line-height-tight: 1.15;
-    --line-height-default: 1.55;
-    --line-height-relaxed: 1.7;
+    --text-line-height: calc(6px + 2ex);
+    --heading-line-height: calc(4px + 2ex);
+    --text-text-wrap: pretty;
+    --heading-text-wrap: balance;
+    --root-font-size: 100%;
 
     --letter-spacing-tight: -0.02em;
     --letter-spacing-default: 0;
     --letter-spacing-wide: 0.05em;
     --letter-spacing-wider: 0.08em;
 
-    --font-sans:
-      system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial,
-      sans-serif;
-    --font-mono:
-      ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
-
     --measure: 65ch;
 
-    /* ====== RADIUS ====== */
-    --radius-xs: 3px;
+    /* ============================================================ */
+    /* RADIUS                                                         */
+    /* ============================================================ */
+
+    --radius: 8px;
+    --radius-m: var(--radius);
     --radius-s: 5px;
-    --radius-m: 8px;
     --radius-l: 12px;
     --radius-xl: 16px;
-    --radius-pill: 9999px;
+    --radius-50: 50%;
+    --radius-circle: 9999px;
+    --radius-none: 0;
 
-    /* ====== TRANSITIONS ====== */
-    --transition-fast: 0.12s ease;
-    --transition-default: 0.18s ease;
-    --transition-slow: 0.3s ease;
+    /* ============================================================ */
+    /* BORDERS                                                        */
+    /* ============================================================ */
 
-    /* ====== SHADOWS ====== */
-    --shadow-s: 0 1px 2px 0
+    --border-width: 1px;
+    --border-style: solid;
+    --border-color-dark: color-mix(in oklch, var(--neutral) 22%, transparent);
+    --border-color-light: color-mix(in oklch, var(--neutral) 12%, transparent);
+    --border: var(--border-width) var(--border-style) var(--border-color-dark);
+    --border-dark: var(--border-width) var(--border-style)
+      var(--border-color-dark);
+    --border-light: var(--border-width) var(--border-style)
+      var(--border-color-light);
+
+    /* ============================================================ */
+    /* DIVIDERS                                                       */
+    /* ============================================================ */
+
+    --divider-size: 1px;
+    --divider-style: solid;
+    --divider-color-dark: var(--border-color-dark);
+    --divider-color-light: var(--border-color-light);
+    --divider: var(--divider-size) var(--divider-style)
+      var(--divider-color-light);
+    --divider-light: var(--divider-size) var(--divider-style)
+      var(--divider-color-light);
+    --divider-dark: var(--divider-size) var(--divider-style)
+      var(--divider-color-dark);
+
+    /* ============================================================ */
+    /* TRANSITIONS                                                    */
+    /* ============================================================ */
+
+    --transition-duration: 0.18s;
+    --transition-timing: ease;
+    --transition-delay: 0s;
+    --transition: all var(--transition-duration) var(--transition-timing)
+      var(--transition-delay);
+
+    /* ============================================================ */
+    /* SHADOWS                                                        */
+    /* ============================================================ */
+
+    --box-shadow-1: 0 1px 2px 0
       color-mix(in oklch, var(--neutral) 30%, transparent);
-    --shadow-m: 0 2px 6px -1px
+    --box-shadow-2: 0 2px 6px -1px
       color-mix(in oklch, var(--neutral) 25%, transparent);
-    --shadow-l: 0 8px 24px -4px
+    --box-shadow-3: 0 8px 24px -4px
       color-mix(in oklch, var(--neutral) 22%, transparent);
 
-    /* ====== BORDERS ====== */
-    --border-width: 1px;
+    /* ============================================================ */
+    /* LINKS                                                          */
+    /* ============================================================ */
 
-    /* ====== LAYOUT ====== */
+    --link-color: var(--primary-dark);
+    --link-color-hover: var(--primary);
+    --link-decoration: underline;
+    --link-decoration-hover: underline;
+    --link-underline-offset: 0.2em;
+    --link-weight: inherit;
+    --link-transition: color var(--transition-duration)
+      var(--transition-timing);
+
+    /* ============================================================ */
+    /* BUTTONS                                                        */
+    /* ============================================================ */
+
+    --btn-padding-block: var(--space-s);
+    --btn-padding-inline: var(--space-m);
+    --btn-line-height: 1.4;
+    --btn-font-size: var(--text-m);
+    --btn-font-weight: 500;
+    --btn-font-family: inherit;
+    --btn-border-width: var(--border-width);
+    --btn-border-style: var(--border-style);
+    --btn-border-radius: var(--radius-s);
+    --btn-radius: var(--btn-border-radius);
+    --btn-text-decoration: none;
+    --btn-text-transform: none;
+
+    /* ============================================================ */
+    /* FOCUS                                                          */
+    /* ============================================================ */
+
+    --focus-color: var(--primary);
+    --focus-width: 2px;
+    --focus-offset: 2px;
+
+    /* ============================================================ */
+    /* SELECTION                                                      */
+    /* ============================================================ */
+
+    --selection-bg: color-mix(in oklch, var(--primary) 25%, transparent);
+    --selection-fg: var(--heading-color);
+
+    /* ============================================================ */
+    /* LAYOUT                                                         */
+    /* ============================================================ */
+
     --content-width: 65rem;
-    --gutter: clamp(1rem, 0.5rem + 2vw, 2rem);
+    --content-width-safe: calc(var(--content-width) + var(--gutter) * 2);
 
-    /* ====== Z-INDEX scale ====== */
+    /* ============================================================ */
+    /* INTERACTIVE STATES                                             */
+    /* ============================================================ */
+
+    --hover-overlay: color-mix(in oklch, var(--neutral) 6%, transparent);
+    --active-overlay: color-mix(in oklch, var(--neutral) 12%, transparent);
+    --disabled-opacity: 0.5;
+
+    /* ============================================================ */
+    /* Z-INDEX scale                                                  */
+    /* ============================================================ */
+
     --z-dropdown: 100;
     --z-sticky: 200;
     --z-modal: 300;
     --z-toast: 400;
-
-    /* ============================================================ */
-    /* SEMANTICS — UI roles (what components actually consume)        */
-    /* ============================================================ */
-
-    /* Surfaces — backgrounds layered by elevation */
-    --surface-1: var(--base);
-    --surface-2: color-mix(in oklch, var(--base), var(--neutral) 4%);
-    --surface-3: color-mix(in oklch, var(--base), var(--neutral) 9%);
-    --surface-inverse: var(--neutral-ultra-dark);
-
-    /* Ink — text colors by emphasis */
-    --ink-strong: var(--neutral-ultra-dark);
-    --ink-default: var(--neutral-dark);
-    --ink-muted: var(--neutral-semi-dark);
-    --ink-subtle: var(--neutral-semi-light);
-    --ink-on-primary: var(--base);
-    --ink-on-inverse: var(--base);
-
-    /* Borders */
-    --border-subtle: color-mix(in oklch, var(--neutral) 12%, transparent);
-    --border-default: color-mix(in oklch, var(--neutral) 22%, transparent);
-    --border-strong: color-mix(in oklch, var(--neutral) 45%, transparent);
-
-    /* Focus */
-    --focus-ring-color: var(--primary);
-    --focus-ring-width: 2px;
-    --focus-ring-offset: 2px;
-
-    /* Selection */
-    --selection-bg: color-mix(in oklch, var(--primary) 25%, transparent);
-    --selection-fg: var(--ink-strong);
-
-    /* Status badges — abstract semantic states reused across domain
-       (engagement.status, invoice.status, gig.status, etc.).
-       Domain mapping happens at the component, not here. */
-    --status-positive-bg: color-mix(in oklch, var(--success) 18%, var(--base));
-    --status-positive-fg: var(--success-ultra-dark);
-
-    --status-warning-bg: color-mix(in oklch, var(--warning) 20%, var(--base));
-    --status-warning-fg: var(--warning-ultra-dark);
-
-    --status-negative-bg: color-mix(in oklch, var(--danger) 18%, var(--base));
-    --status-negative-fg: var(--danger-ultra-dark);
-
-    --status-neutral-bg: color-mix(in oklch, var(--neutral) 12%, var(--base));
-    --status-neutral-fg: var(--neutral-dark);
-
-    --status-info-bg: color-mix(in oklch, var(--info) 18%, var(--base));
-    --status-info-fg: var(--info-ultra-dark);
-
-    --status-accent-bg: color-mix(in oklch, var(--primary) 14%, var(--base));
-    --status-accent-fg: var(--primary-ultra-dark);
-
-    /* Interactive — hover/active feedback layers */
-    --hover-overlay: color-mix(in oklch, var(--neutral) 6%, transparent);
-    --active-overlay: color-mix(in oklch, var(--neutral) 12%, transparent);
-    --disabled-opacity: 0.5;
   }
 
-  /* Selection always uses tokens */
   ::selection {
     background: var(--selection-bg);
     color: var(--selection-fg);

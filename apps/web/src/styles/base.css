@@ -1,6 +1,6 @@
 /*
   Hour — Base stylesheet
-  Cascade layers (declared once, project-wide) + reset + element defaults.
+  Cascade layers + reset + element defaults consuming ACSS-style tokens.
   Order: first declared = lowest priority. Unlayered styles beat all layers.
 */
 
@@ -17,7 +17,6 @@
     box-sizing: border-box;
   }
 
-  /* Remove default margins; layout owns spacing via tokens */
   :where(
     body,
     h1,
@@ -37,7 +36,6 @@
     margin: 0;
   }
 
-  /* Lists used in nav/UI lose markers; semantic prose can re-enable */
   :where(ul[role="list"], ol[role="list"], nav ul) {
     list-style: none;
     padding: 0;
@@ -46,6 +44,7 @@
   html {
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
+    font-size: var(--root-font-size);
   }
 
   html,
@@ -54,7 +53,7 @@
   }
 
   body {
-    line-height: var(--line-height-default);
+    line-height: var(--text-line-height);
     -webkit-font-smoothing: antialiased;
   }
 
@@ -95,7 +94,6 @@
     padding: 0;
   }
 
-  /* Respect reduced motion */
   @media (prefers-reduced-motion: reduce) {
     *,
     *::before,
@@ -106,71 +104,71 @@
   }
 }
 
-/* ====== DEFAULTS — element-level styling using tokens ====== */
+/* ====== DEFAULTS — element-level styling using ACSS-style tokens ====== */
 @layer defaults {
   body {
-    background: var(--surface-1);
-    color: var(--ink-default);
-    font-family: var(--font-sans);
+    background: var(--body-bg-color);
+    color: var(--text-color);
+    font-family: var(--text-font-family);
+    font-weight: var(--text-font-weight);
     font-size: var(--text-m);
+    text-wrap: var(--text-text-wrap);
   }
 
   :where(h1, h2, h3, h4, h5, h6) {
-    color: var(--ink-strong);
-    line-height: var(--line-height-tight);
+    color: var(--heading-color);
+    font-family: var(--heading-font-family);
+    font-weight: var(--heading-font-weight);
+    line-height: var(--heading-line-height);
     letter-spacing: var(--letter-spacing-tight);
-    text-wrap: balance;
+    text-wrap: var(--heading-text-wrap);
   }
 
   :where(h1) {
     font-size: var(--h1);
-    font-weight: 600;
   }
   :where(h2) {
     font-size: var(--h2);
-    font-weight: 600;
   }
   :where(h3) {
     font-size: var(--h3);
-    font-weight: 600;
   }
   :where(h4) {
     font-size: var(--h4);
-    font-weight: 600;
   }
   :where(h5) {
     font-size: var(--h5);
-    font-weight: 600;
   }
   :where(h6) {
     font-size: var(--h6);
-    font-weight: 600;
   }
 
   :where(p) {
-    text-wrap: pretty;
     max-inline-size: var(--measure);
   }
 
   :where(a) {
-    color: var(--primary-dark);
+    color: var(--link-color);
+    font-weight: var(--link-weight);
+    text-decoration: var(--link-decoration);
     text-decoration-thickness: 1px;
-    text-underline-offset: 0.2em;
-    transition: color var(--transition-fast);
+    text-underline-offset: var(--link-underline-offset);
+    transition: var(--link-transition);
   }
   :where(a):hover {
-    color: var(--primary);
+    color: var(--link-color-hover);
+    text-decoration: var(--link-decoration-hover);
   }
 
   :where(:focus-visible) {
-    outline: var(--focus-ring-width) solid var(--focus-ring-color);
-    outline-offset: var(--focus-ring-offset);
-    border-radius: var(--radius-xs);
+    outline: var(--focus-width) solid var(--focus-color);
+    outline-offset: var(--focus-offset);
+    border-radius: var(--radius-s);
   }
 
   :where(hr) {
     border: 0;
-    border-block-start: var(--border-width) solid var(--border-subtle);
+    border-block-start: var(--divider-light);
     margin-block: var(--space-l);
   }
 
@@ -179,14 +177,16 @@
   }
 
   :where(code, kbd, samp) {
-    font-family: var(--font-mono);
+    font-family:
+      ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
     font-size: 0.95em;
   }
 
   :where(pre) {
-    font-family: var(--font-mono);
+    font-family:
+      ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
     font-size: var(--text-s);
-    background: var(--surface-2);
+    background: var(--bg-light);
     padding: var(--space-m);
     border-radius: var(--radius-m);
     overflow-x: auto;

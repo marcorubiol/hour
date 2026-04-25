@@ -47,7 +47,7 @@ export const prerender = false;
         justify-content: space-between;
         gap: var(--space-m);
         padding: var(--space-m) var(--gutter);
-        border-block-end: var(--border-width) solid var(--border-subtle);
+        border-block-end: var(--divider-light);
       }
 
       .app-header__title {
@@ -57,37 +57,38 @@ export const prerender = false;
       }
 
       .app-header__scope {
-        color: var(--ink-muted);
+        color: var(--text-dark-muted);
         font-weight: 400;
       }
 
-      /* ---- Generic ghost button (reused header + pagination) ---- */
+      /* ---- Generic ghost button ---- */
       .btn {
-        font-family: inherit;
+        font-family: var(--btn-font-family);
         font-size: var(--text-s);
+        line-height: var(--btn-line-height);
         padding: var(--space-xs) var(--space-s);
-        border-radius: var(--radius-s);
-        border: var(--border-width) solid transparent;
+        border-radius: var(--btn-border-radius);
+        border: var(--border-width) var(--border-style) transparent;
         cursor: pointer;
         transition:
-          color var(--transition-fast),
-          border-color var(--transition-fast),
-          background var(--transition-fast);
+          color var(--transition-duration),
+          border-color var(--transition-duration),
+          background var(--transition-duration);
       }
 
       .btn--ghost {
-        color: var(--ink-muted);
-        border-color: var(--border-default);
-        background: var(--surface-1);
+        color: var(--text-dark-muted);
+        border-color: var(--border-color-dark);
+        background: var(--bg-ultra-light);
       }
       .btn--ghost:hover {
-        color: var(--ink-strong);
-        border-color: var(--border-strong);
-        background: var(--surface-2);
+        color: var(--heading-color);
+        border-color: var(--neutral-semi-light);
+        background: var(--bg-light);
       }
       .btn--ghost:focus-visible {
-        outline: var(--focus-ring-width) solid var(--focus-ring-color);
-        outline-offset: var(--focus-ring-offset);
+        outline: var(--focus-width) solid var(--focus-color);
+        outline-offset: var(--focus-offset);
       }
       .btn:disabled {
         opacity: var(--disabled-opacity);
@@ -100,14 +101,14 @@ export const prerender = false;
         align-items: center;
         gap: var(--space-m);
         padding: var(--space-s) var(--gutter);
-        border-block-end: var(--border-width) solid var(--border-subtle);
+        border-block-end: var(--divider-light);
         font-size: var(--text-s);
-        color: var(--ink-muted);
+        color: var(--text-dark-muted);
         flex-wrap: wrap;
       }
 
       .status-bar__count {
-        color: var(--ink-strong);
+        color: var(--heading-color);
         font-weight: 500;
       }
 
@@ -125,19 +126,19 @@ export const prerender = false;
 
       .data-table th {
         text-align: start;
-        padding: var(--space-s) var(--space-s);
+        padding: var(--space-s);
         font-size: var(--text-xs);
         text-transform: uppercase;
         letter-spacing: var(--letter-spacing-wider);
-        color: var(--ink-muted);
+        color: var(--text-dark-muted);
         font-weight: 500;
-        border-block-end: var(--border-width) solid var(--border-subtle);
+        border-block-end: var(--divider-light);
         white-space: nowrap;
       }
 
       .data-table td {
-        padding: var(--space-s) var(--space-s);
-        border-block-end: var(--border-width) solid var(--border-subtle);
+        padding: var(--space-s);
+        border-block-end: var(--divider-light);
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -145,58 +146,59 @@ export const prerender = false;
       }
 
       .data-table tr:hover td {
-        background: var(--surface-2);
+        background: var(--bg-light);
       }
 
       .cell--name {
         font-weight: 500;
-        color: var(--ink-strong);
+        color: var(--heading-color);
       }
       .cell--muted {
-        color: var(--ink-muted);
+        color: var(--text-dark-muted);
       }
       .cell--meta {
-        color: var(--ink-muted);
+        color: var(--text-dark-muted);
         font-size: var(--text-s);
       }
 
-      /* ---- Status badge ---- */
+      /* ---- Status badge — engagement.status domain ---- */
       .badge {
         display: inline-block;
         padding: var(--space-xs) var(--space-s);
-        border-radius: var(--radius-pill);
+        border-radius: var(--radius-circle);
         font-size: var(--text-xs);
         font-weight: 500;
-        letter-spacing: var(--letter-spacing-default);
         line-height: 1.4;
       }
 
-      .badge--positive {
-        background: var(--status-positive-bg);
-        color: var(--status-positive-fg);
+      .badge--contacted {
+        background: var(--info-ultra-light);
+        color: var(--info-ultra-dark);
       }
-      .badge--warning {
-        background: var(--status-warning-bg);
-        color: var(--status-warning-fg);
+      .badge--in-conversation {
+        background: var(--warning-ultra-light);
+        color: var(--warning-ultra-dark);
       }
-      .badge--negative {
-        background: var(--status-negative-bg);
-        color: var(--status-negative-fg);
+      .badge--hold {
+        background: var(--neutral-ultra-light);
+        color: var(--neutral-dark);
       }
-      .badge--neutral {
-        background: var(--status-neutral-bg);
-        color: var(--status-neutral-fg);
+      .badge--confirmed {
+        background: var(--success-ultra-light);
+        color: var(--success-ultra-dark);
       }
-      .badge--info {
-        background: var(--status-info-bg);
-        color: var(--status-info-fg);
+      .badge--declined {
+        background: var(--danger-ultra-light);
+        color: var(--danger-ultra-dark);
       }
-      .badge--accent {
-        background: var(--status-accent-bg);
-        color: var(--status-accent-fg);
+      .badge--dormant {
+        background: var(--neutral-ultra-light);
+        color: var(--neutral-semi-dark);
+        opacity: 0.75;
       }
-      .badge--subtle {
-        opacity: 0.65;
+      .badge--recurring {
+        background: var(--primary-ultra-light);
+        color: var(--primary-ultra-dark);
       }
 
       /* ---- Loading / empty / error message ---- */
@@ -204,7 +206,7 @@ export const prerender = false;
         text-align: center;
         padding-block: var(--space-xxl);
         padding-inline: var(--gutter);
-        color: var(--ink-muted);
+        color: var(--text-dark-muted);
       }
       .msg--error {
         color: var(--danger-dark);
@@ -247,19 +249,6 @@ export const prerender = false;
       recurring: "Recurrente",
     };
 
-    /* Domain → semantic mapping. Decoupled from token shades on purpose:
-       same vocabulary ('positive', 'warning', etc.) reusable for invoices,
-       gigs, anything else with state. Subtle tone for dormant. */
-    const STATUS_VARIANT = {
-      contacted: "info",
-      in_conversation: "warning",
-      hold: "neutral",
-      confirmed: "positive",
-      declined: "negative",
-      dormant: "neutral subtle",
-      recurring: "accent",
-    };
-
     function showMsg(text, isError = false) {
       msgEl.textContent = text;
       msgEl.className = isError ? "msg msg--error" : "msg";
@@ -273,21 +262,17 @@ export const prerender = false;
       return d.toLocaleDateString("es-ES", { day: "2-digit", month: "short" });
     }
 
-    function badgeClass(status) {
-      const variants = (STATUS_VARIANT[status] || "neutral").split(" ");
-      return variants.map((v) => `badge--${v}`).join(" ");
-    }
-
     function renderRow(item) {
       const person = item.person || {};
       const loc = [person.city, person.country].filter(Boolean).join(", ");
       const status = item.status || "contacted";
+      const badgeMod = status.replace(/_/g, "-");
       const tr = document.createElement("tr");
       tr.innerHTML = `
         <td class="cell--name">${esc(person.full_name || "—")}</td>
         <td class="cell--muted">${esc(person.organization_name || "—")}</td>
         <td class="cell--meta">${esc(loc || "—")}</td>
-        <td><span class="badge ${badgeClass(status)}">${esc(STATUS_LABELS[status] || status)}</span></td>
+        <td><span class="badge badge--${badgeMod}">${esc(STATUS_LABELS[status] || status)}</span></td>
         <td class="cell--meta">${formatDate(item.next_action_at)}</td>
       `;
       return tr;
