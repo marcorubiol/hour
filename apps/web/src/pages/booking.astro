@@ -73,12 +73,43 @@ export const prerender = false;
         padding-inline: var(--gutter);
       }
 
-      /* Hover on tbody rows */
+      /* Loading / empty / error message */
+      .msg {
+        text-align: center;
+        padding-block: var(--space-xxl);
+        padding-inline: var(--gutter);
+        color: var(--text-dark-muted);
+      }
+      .msg--error {
+        color: var(--danger-dark);
+      }
+
+      /* Pagination */
+      .pagination {
+        display: flex;
+        justify-content: center;
+        gap: var(--space-s);
+        padding-block: var(--space-m);
+        padding-inline: var(--gutter);
+      }
+    }
+  </style>
+
+  <!-- Anything that styles dynamically-rendered tbody content goes global.
+       Astro CSS scoping hashes only elements present at build time; rows
+       inserted via innerHTML in load() do not carry the hash, so scoped
+       selectors would silently fail to match. -->
+  <style is:global>
+    @layer components {
+      /* Cell-content styling for tbody rows (rendered dynamically) */
+      tbody td {
+        max-inline-size: 16rem;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
       tbody tr:hover td {
         background: var(--bg-ultra-light);
       }
-
-      /* Cell modifiers — only override defaults that differ */
       .cell--name {
         font-weight: 500;
         color: var(--heading-color);
@@ -91,14 +122,7 @@ export const prerender = false;
         font-size: var(--text-s);
       }
 
-      td {
-        max-inline-size: 16rem;
-        overflow: hidden;
-        text-overflow: ellipsis;
-      }
-
-      /* Status badges — engagement.status domain.
-         Each modifier ONLY redeclares the badge CSS variables. */
+      /* Status badge modifiers — engagement.status domain */
       .badge--contacted {
         --badge-background: var(--info-ultra-light);
         --badge-color: var(--info-ultra-dark);
@@ -127,26 +151,6 @@ export const prerender = false;
       .badge--recurring {
         --badge-background: var(--primary-ultra-light);
         --badge-color: var(--primary-ultra-dark);
-      }
-
-      /* Loading / empty / error message */
-      .msg {
-        text-align: center;
-        padding-block: var(--space-xxl);
-        padding-inline: var(--gutter);
-        color: var(--text-dark-muted);
-      }
-      .msg--error {
-        color: var(--danger-dark);
-      }
-
-      /* Pagination */
-      .pagination {
-        display: flex;
-        justify-content: center;
-        gap: var(--space-s);
-        padding-block: var(--space-m);
-        padding-inline: var(--gutter);
       }
     }
   </style>
