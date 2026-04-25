@@ -254,6 +254,21 @@ export const prerender = false;
           return;
         }
 
+        // TEMP VISUAL MOCK — overwrite first 7 items with one of each status
+        // so all badge colours appear side-by-side. Remove before deploy.
+        const PREVIEW_STATUSES = [
+          "contacted",
+          "in_conversation",
+          "hold",
+          "confirmed",
+          "declined",
+          "dormant",
+          "recurring",
+        ];
+        data.items.slice(0, PREVIEW_STATUSES.length).forEach((item, i) => {
+          item.status = PREVIEW_STATUSES[i];
+        });
+
         for (const item of data.items) {
           tbody.appendChild(renderRow(item));
         }
