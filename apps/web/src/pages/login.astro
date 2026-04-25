@@ -10,34 +10,36 @@ const supabaseAnonKey = env.PUBLIC_SUPABASE_ANON_KEY;
 <Base title="Hour — Login">
   <main class="login">
     <div class="login__card">
-      <h1 class="login__heading">Hour</h1>
-      <p class="login__subtitle">Phase 0</p>
+      <h1 class="h2">Hour</h1>
+      <p class="text--s text--dark-muted login__subtitle">Phase 0</p>
 
-      <form class="login__form" id="login-form">
-        <label class="login__label" for="email">Email</label>
-        <input
-          class="login__input"
-          type="email"
-          id="email"
-          name="email"
-          required
-          autocomplete="email"
-          autofocus
-        />
+      <form class="form" id="login-form">
+        <div>
+          <label for="email">Email</label>
+          <input
+            type="email"
+            id="email"
+            name="email"
+            required
+            autocomplete="email"
+            autofocus
+          />
+        </div>
 
-        <label class="login__label" for="password">Password</label>
-        <input
-          class="login__input"
-          type="password"
-          id="password"
-          name="password"
-          required
-          autocomplete="current-password"
-        />
+        <div>
+          <label for="password">Password</label>
+          <input
+            type="password"
+            id="password"
+            name="password"
+            required
+            autocomplete="current-password"
+          />
+        </div>
 
         <p class="login__error" id="error-msg"></p>
 
-        <button class="login__submit" type="submit" id="submit-btn">
+        <button class="btn--primary login__submit" type="submit" id="submit-btn">
           Entrar
         </button>
       </form>
@@ -50,7 +52,6 @@ const supabaseAnonKey = env.PUBLIC_SUPABASE_ANON_KEY;
         min-block-size: 100dvh;
         display: grid;
         place-items: center;
-        padding: var(--space-l);
       }
 
       .login__card {
@@ -58,50 +59,8 @@ const supabaseAnonKey = env.PUBLIC_SUPABASE_ANON_KEY;
         max-inline-size: 22rem;
       }
 
-      .login__heading {
-        font-size: var(--h2);
-        margin-block-end: var(--space-xs);
-      }
-
       .login__subtitle {
-        color: var(--text-dark-muted);
-        font-size: var(--text-s);
         margin-block-end: var(--space-xl);
-      }
-
-      .login__form {
-        display: grid;
-        gap: var(--space-s);
-      }
-
-      .login__label {
-        font-size: var(--text-xs);
-        color: var(--text-dark-muted);
-        text-transform: uppercase;
-        letter-spacing: var(--letter-spacing-wide);
-        margin-block-end: calc(var(--space-xs) * -1);
-      }
-
-      .login__input {
-        inline-size: 100%;
-        padding: var(--space-s) var(--space-m);
-        background: var(--bg-ultra-light);
-        border: var(--border);
-        border-radius: var(--radius-s);
-        color: var(--heading-color);
-        font-size: var(--text-m);
-        outline: none;
-        transition: border-color var(--transition-duration);
-      }
-
-      .login__input:hover {
-        border-color: var(--neutral-semi-light);
-      }
-
-      .login__input:focus-visible {
-        border-color: var(--primary);
-        outline: var(--focus-width) solid var(--focus-color);
-        outline-offset: 1px;
       }
 
       .login__error {
@@ -115,32 +74,8 @@ const supabaseAnonKey = env.PUBLIC_SUPABASE_ANON_KEY;
       }
 
       .login__submit {
-        margin-block-start: var(--space-s);
-        padding: var(--btn-padding-block) var(--btn-padding-inline);
-        background: var(--primary);
-        color: var(--text-light);
-        border-radius: var(--btn-border-radius);
-        font-size: var(--btn-font-size);
-        font-weight: var(--btn-font-weight);
-        line-height: var(--btn-line-height);
-        cursor: pointer;
-        transition:
-          background var(--transition-duration) var(--transition-timing),
-          opacity var(--transition-duration) var(--transition-timing);
-      }
-
-      .login__submit:hover {
-        background: var(--primary-hover);
-      }
-
-      .login__submit:focus-visible {
-        outline: var(--focus-width) solid var(--focus-color);
-        outline-offset: var(--focus-offset);
-      }
-
-      .login__submit:disabled {
-        opacity: var(--disabled-opacity);
-        cursor: not-allowed;
+        --btn-width: 100%;
+        margin-block-start: var(--space-xs);
       }
     }
   </style>

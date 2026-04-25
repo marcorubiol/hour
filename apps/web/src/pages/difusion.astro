@@ -6,10 +6,10 @@ export const prerender = false;
 
 <Base title="Hour — Difusión 2026-27">
   <header class="app-header">
-    <h1 class="app-header__title">
-      Hour <span class="app-header__scope">/ Difusión 2026-27</span>
+    <h1 class="h4">
+      Hour <span class="text--dark-muted">/ Difusión 2026-27</span>
     </h1>
-    <button class="btn btn--ghost" id="logout-btn">Salir</button>
+    <button class="btn--ghost" id="logout-btn">Salir</button>
   </header>
 
   <div class="status-bar" id="status-bar">
@@ -17,7 +17,7 @@ export const prerender = false;
   </div>
 
   <div class="table-wrap">
-    <table class="data-table">
+    <table>
       <thead>
         <tr>
           <th>Nombre</th>
@@ -34,121 +34,51 @@ export const prerender = false;
   <div class="msg" id="msg" hidden></div>
 
   <div class="pagination" id="pagination" hidden>
-    <button class="btn btn--ghost" id="prev-btn">Anterior</button>
-    <button class="btn btn--ghost" id="next-btn">Siguiente</button>
+    <button class="btn--ghost" id="prev-btn">Anterior</button>
+    <button class="btn--ghost" id="next-btn">Siguiente</button>
   </div>
 
   <style>
     @layer components {
-      /* ---- App header ---- */
+      /* App header — only what's specific (layout flex + bottom border).
+         Padding-block / padding-inline come from :where(body > header). */
       .app-header {
         display: flex;
         align-items: center;
         justify-content: space-between;
         gap: var(--space-m);
-        padding: var(--space-m) var(--gutter);
-        border-block-end: var(--divider-light);
+        border-block-end: var(--divider);
       }
 
-      .app-header__title {
-        font-size: var(--text-l);
-        font-weight: 600;
-        letter-spacing: var(--letter-spacing-tight);
-      }
-
-      .app-header__scope {
-        color: var(--text-dark-muted);
-        font-weight: 400;
-      }
-
-      /* ---- Generic ghost button ---- */
-      .btn {
-        font-family: var(--btn-font-family);
-        font-size: var(--text-s);
-        line-height: var(--btn-line-height);
-        padding: var(--space-xs) var(--space-s);
-        border-radius: var(--btn-border-radius);
-        border: var(--border-width) var(--border-style) transparent;
-        cursor: pointer;
-        transition:
-          color var(--transition-duration),
-          border-color var(--transition-duration),
-          background var(--transition-duration);
-      }
-
-      .btn--ghost {
-        color: var(--text-dark-muted);
-        border-color: var(--border-color-dark);
-        background: var(--bg-ultra-light);
-      }
-      .btn--ghost:hover {
-        color: var(--heading-color);
-        border-color: var(--neutral-semi-light);
-        background: var(--bg-light);
-      }
-      .btn--ghost:focus-visible {
-        outline: var(--focus-width) solid var(--focus-color);
-        outline-offset: var(--focus-offset);
-      }
-      .btn:disabled {
-        opacity: var(--disabled-opacity);
-        cursor: not-allowed;
-      }
-
-      /* ---- Status bar ---- */
+      /* Status bar */
       .status-bar {
         display: flex;
         align-items: center;
         gap: var(--space-m);
-        padding: var(--space-s) var(--gutter);
-        border-block-end: var(--divider-light);
+        padding-block: var(--space-s);
+        padding-inline: var(--gutter);
+        border-block-end: var(--divider);
         font-size: var(--text-s);
         color: var(--text-dark-muted);
         flex-wrap: wrap;
       }
-
       .status-bar__count {
         color: var(--heading-color);
         font-weight: 500;
       }
 
-      /* ---- Data table ---- */
+      /* Table wrap — only horizontal scroll + gutter */
       .table-wrap {
         overflow-x: auto;
         padding-inline: var(--gutter);
       }
 
-      .data-table {
-        inline-size: 100%;
-        border-collapse: collapse;
-        min-inline-size: 44rem;
+      /* Hover on tbody rows */
+      tbody tr:hover td {
+        background: var(--bg-ultra-light);
       }
 
-      .data-table th {
-        text-align: start;
-        padding: var(--space-s);
-        font-size: var(--text-xs);
-        text-transform: uppercase;
-        letter-spacing: var(--letter-spacing-wider);
-        color: var(--text-dark-muted);
-        font-weight: 500;
-        border-block-end: var(--divider-light);
-        white-space: nowrap;
-      }
-
-      .data-table td {
-        padding: var(--space-s);
-        border-block-end: var(--divider-light);
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        max-inline-size: 16rem;
-      }
-
-      .data-table tr:hover td {
-        background: var(--bg-light);
-      }
-
+      /* Cell modifiers — only override defaults that differ */
       .cell--name {
         font-weight: 500;
         color: var(--heading-color);
@@ -161,47 +91,45 @@ export const prerender = false;
         font-size: var(--text-s);
       }
 
-      /* ---- Status badge — engagement.status domain ---- */
-      .badge {
-        display: inline-block;
-        padding: var(--space-xs) var(--space-s);
-        border-radius: var(--radius-circle);
-        font-size: var(--text-xs);
-        font-weight: 500;
-        line-height: 1.4;
+      td {
+        max-inline-size: 16rem;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
 
+      /* Status badges — engagement.status domain.
+         Each modifier ONLY redeclares the badge CSS variables. */
       .badge--contacted {
-        background: var(--info-ultra-light);
-        color: var(--info-ultra-dark);
+        --badge-background: var(--info-ultra-light);
+        --badge-color: var(--info-ultra-dark);
       }
       .badge--in-conversation {
-        background: var(--warning-ultra-light);
-        color: var(--warning-ultra-dark);
+        --badge-background: var(--warning-ultra-light);
+        --badge-color: var(--warning-ultra-dark);
       }
       .badge--hold {
-        background: var(--neutral-ultra-light);
-        color: var(--neutral-dark);
+        --badge-background: var(--neutral-ultra-light);
+        --badge-color: var(--neutral-dark);
       }
       .badge--confirmed {
-        background: var(--success-ultra-light);
-        color: var(--success-ultra-dark);
+        --badge-background: var(--success-ultra-light);
+        --badge-color: var(--success-ultra-dark);
       }
       .badge--declined {
-        background: var(--danger-ultra-light);
-        color: var(--danger-ultra-dark);
+        --badge-background: var(--danger-ultra-light);
+        --badge-color: var(--danger-ultra-dark);
       }
       .badge--dormant {
-        background: var(--neutral-ultra-light);
-        color: var(--neutral-semi-dark);
+        --badge-background: var(--neutral-ultra-light);
+        --badge-color: var(--neutral-semi-dark);
         opacity: 0.75;
       }
       .badge--recurring {
-        background: var(--primary-ultra-light);
-        color: var(--primary-ultra-dark);
+        --badge-background: var(--primary-ultra-light);
+        --badge-color: var(--primary-ultra-dark);
       }
 
-      /* ---- Loading / empty / error message ---- */
+      /* Loading / empty / error message */
       .msg {
         text-align: center;
         padding-block: var(--space-xxl);
@@ -212,12 +140,13 @@ export const prerender = false;
         color: var(--danger-dark);
       }
 
-      /* ---- Pagination ---- */
+      /* Pagination */
       .pagination {
         display: flex;
         justify-content: center;
         gap: var(--space-s);
-        padding: var(--space-m) var(--gutter);
+        padding-block: var(--space-m);
+        padding-inline: var(--gutter);
       }
     }
   </style>
@@ -272,7 +201,7 @@ export const prerender = false;
         <td class="cell--name">${esc(person.full_name || "—")}</td>
         <td class="cell--muted">${esc(person.organization_name || "—")}</td>
         <td class="cell--meta">${esc(loc || "—")}</td>
-        <td><span class="badge badge--${badgeMod}">${esc(STATUS_LABELS[status] || status)}</span></td>
+        <td><span class="badge--${badgeMod}">${esc(STATUS_LABELS[status] || status)}</span></td>
         <td class="cell--meta">${formatDate(item.next_action_at)}</td>
       `;
       return tr;
