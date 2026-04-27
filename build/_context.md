@@ -79,7 +79,7 @@ Bootstrap de Phase 0 **cerrado**. Todos los pasos 1-8 de la lista anterior está
 ### Estado Worker
 - `hour-web.marco-rubiol.workers.dev` desplegado con la versión post-reset v2
 - `GET /api/engagements` usa default `status=contacted`, embeds person+project sin `type`
-- Custom domain `hour.zerosense.studio` pendiente (cosmético, 10 min)
+- Custom domain `hour.zerosense.studio` atado y sirviendo vía CF (entre 2026-04-20 y 2026-04-25)
 
 ### Smoke tests pasados vía MCP
 - Hook inyecta `current_workspace_id` ✓

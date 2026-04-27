@@ -47,7 +47,7 @@ Working name: **Hour**. Brand decision deferred to Phase 1.
 ## Code
 - Local path: `03_AGENCY/Hour/` (monorepo, `git init` done 2026-04-19, branch `main`).
 - GitHub repo: `https://github.com/marcorubiol/hour` (private, personal user). Transferable to a `zerosense` org if Phase 1 activates.
-- Live site (Phase 0): `hour.zerosense.studio` — **not yet wired**. Worker is live at `https://hour-web.marco-rubiol.workers.dev` (CF Worker `hour-web`, wrangler 4.83.0, first deploy 2026-04-19).
+- Live site (Phase 0): `hour.zerosense.studio` — **wired and serving** (custom domain attached in CF dashboard between 2026-04-20 and 2026-04-25). Worker primary URL: `https://hour-web.marco-rubiol.workers.dev` (CF Worker `hour-web`, wrangler 4.83.0, first deploy 2026-04-19, last deploy 2026-04-20). The custom domain proxies through CF normally — both URLs serve the same content.
 - CF bindings: `MEDIA` → R2 bucket `hour-media` · `ASSETS` → static CDN · `PUBLIC_SUPABASE_URL` + `PUBLIC_SUPABASE_ANON_KEY` in `[vars]`.
 - Supabase project: `hour-phase0` · ref `lqlyorlccnniybezugme` · region `eu-central-1` · URL `https://lqlyorlccnniybezugme.supabase.co`.
 - Specs and planning: `build/` (`_context.md`, `architecture.md`, `competition.md`) plus `_decisions.md` at project root.
@@ -71,7 +71,7 @@ Infra, datos y **primera pantalla funcional**. Login + lista de engagements desp
 ### Worker (`hour-web` en Cloudflare)
 - Desplegado en `https://hour-web.marco-rubiol.workers.dev`
 - `GET /api/engagements` actualizado a reset v2 (default `status=contacted`, sin `project.type`)
-- Custom domain `hour.zerosense.studio` **no atado todavía** (10 min de dashboard)
+- Custom domain `hour.zerosense.studio` atado y sirviendo vía CF (entre 2026-04-20 y 2026-04-25)
 
 ### Frontend (`apps/web/`)
 - **Login** (`/login`): email+password contra Supabase Auth REST API, JWT en localStorage, redirect a `/difusion`
@@ -136,7 +136,6 @@ Resumen en una línea: antes de tocar UI, cerrar las 5 decisiones D-PRE-01 a D-P
 - `task` tag vocabulary (Deferred D1)
 - UI de overrides granulares por persona (Deferred D2)
 - `show` / `line` / `invoice` flows (cuando Marco confirme la primera fecha)
-- Custom domain `hour.zerosense.studio`
 
 ## Dev setup
 
