@@ -40,10 +40,10 @@ _tmp_*
 # Import pipeline — raw sources (PII-adjacent) and staging artefacts.
 # manual-matches.yaml IS committed (it's project logic, not data) — keep it
 # tracked so the matching cascade is reproducible.
-_build/import/sources/
-_build/import/staging/
-_build/import/.venv/
-_build/import/__pycache__/
+build/import/sources/
+build/import/staging/
+build/import/.venv/
+build/import/__pycache__/
 
 # pCloud/FUSE temp files
 .fuse_hidden*
