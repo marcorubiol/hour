@@ -7,11 +7,11 @@
 
 ## What this folder is
 
-`_build/` contains all specs, docs, and planning artifacts for Hour. It is the **shared memory** between Cowork and Claude Code sessions. Chat history is ephemeral. This folder is the source of truth.
+`build/` contains all specs, docs, and planning artifacts for Hour. It is the **shared memory** between Cowork and Claude Code sessions. Chat history is ephemeral. This folder is the source of truth.
 
 When starting any new conversation with Claude (any tool), the first instruction should be:
 
-> Read `_context.md` (Hour root) + `_build/_context.md` + `_build/architecture.md` + `_decisions.md` (Hour root) + `_build/competition.md` before responding.
+> Read `_context.md` (Hour root) + `build/_context.md` + `build/architecture.md` + `_decisions.md` (Hour root) + `build/competition.md` before responding.
 
 That loads ~90% of project context in seconds without depending on what was said in any previous chat.
 
@@ -21,7 +21,7 @@ That loads ~90% of project context in seconds without depending on what was said
 
 | Tool | Use for | Don't use for |
 |---|---|---|
-| **Windsurf** (primary code editor since 2026-04-19) | All code: schema, migrations, features, tests, debugging, refactors. Updating `_build/*.md` during code sessions. | Strategic thinking, cross-app tasks |
+| **Windsurf** (primary code editor since 2026-04-19) | All code: schema, migrations, features, tests, debugging, refactors. Updating `build/*.md` during code sessions. | Strategic thinking, cross-app tasks |
 | **Cowork — long chat "Hour — Strategy"** | Strategy, competitive analysis, pricing, planning, architectural thinking out loud. Stays open across weeks. Also operates the Supabase MCP for DB migrations. | Code edits inside `apps/` |
 | **Cowork — short ad-hoc chats** | One-off tasks: draft an email, analyze a contract, prepare a meeting briefing. Born, done, discarded. | Anything requiring multi-session context |
 | **Cowork `.zerø` integration** | Daily briefings, tasks, Ørbit, area-level context. | Hour-specific work |
@@ -30,7 +30,7 @@ That loads ~90% of project context in seconds without depending on what was said
 
 ## Rules
 
-1. **Memory lives in files, not chats.** Every decision worth keeping → `_decisions.md` (at Hour root). Every competitive fact → `_build/competition.md`. Every architectural choice → `_build/architecture.md`.
+1. **Memory lives in files, not chats.** Every decision worth keeping → `_decisions.md` (at Hour root). Every competitive fact → `build/competition.md`. Every architectural choice → `build/architecture.md`.
 2. **No code in Cowork.** If code needs to change, open Claude Code.
 3. **One strategic Cowork chat at a time.** Don't fragment Hour strategy across multiple threads.
 4. **Claude proposes file updates; Marco approves.** After each significant conversation, Claude asks: *"¿Escribo esto en `_decisions.md` antes de seguir?"*
@@ -100,7 +100,7 @@ Lista de engagements de Difusión 2026-27 en `apps/web/`. Requisitos completos e
 - Status editable inline (enum anti-CRM de 7 valores)
 - Filtros: status, procedencia, tipologia (ambos en `person.custom_fields.sources.mostra_igualada_2026.*`)
 
-Todo el trabajo en Windsurf bajo `apps/web/src/pages/` y `apps/web/src/components/`. `_build/` se mantiene pero no necesita cambios para la UI.
+Todo el trabajo en Windsurf bajo `apps/web/src/pages/` y `apps/web/src/components/`. `build/` se mantiene pero no necesita cambios para la UI.
 
 ## Diferido (Phase 0.5+)
 

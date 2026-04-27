@@ -6,7 +6,7 @@ the Hour schema in Supabase. See `../import-plan.md` for the full spec.
 ## Layout
 
 ```
-_build/import/
+build/import/
 ├── README.md                    this file (committed)
 ├── 01_normalize.py              stage 1: CSV → canonical JSONL (committed)
 ├── 02_enrich_from_pdf.py        stage 2: PDF merge (committed)
@@ -37,11 +37,11 @@ python3 -m venv .venv
 ./.venv/bin/pip install rapidfuzz pypdf
 
 # Stage 1 — CSV → canonical
-python3 _build/import/01_normalize.py
-# → writes _build/import/staging/01_canonical.jsonl (151 rows)
+python3 build/import/01_normalize.py
+# → writes build/import/staging/01_canonical.jsonl (151 rows)
 
 # Stage 2 — PDF dossier merge
-./.venv/bin/python _build/import/02_enrich_from_pdf.py
+./.venv/bin/python build/import/02_enrich_from_pdf.py
 # → writes staging/02_dossier.json  (30 parsed profiles, for audit)
 # → writes staging/02_enriched.jsonl (156 rows: 151 canonical + 5 dossier-only)
 ```

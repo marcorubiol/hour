@@ -26,7 +26,7 @@ Credentials vault:
 
 ## 1. Pre-flight
 
-`_build/schema.sql` and `_build/rls-policies.sql` were rewritten again on
+`build/schema.sql` and `build/rls-policies.sql` were rewritten again on
 2026-04-19 (**reset v2** — supersedes the earlier same-day polymorphic
 reset; see DECISIONS.md ADR-001..007). They are the canonical readable copy
 of the applied database — **18 tables** in `public` (up from 12 in the
@@ -42,7 +42,7 @@ polymorphic reset). No pre-flight patches are needed:
   `move_extensions_out_of_public` to silence the advisor lint).
 
 If you're bootstrapping a fresh Supabase project (staging, dev), copy the
-`_build/*.sql` files into `supabase/migrations/` with timestamped filenames
+`build/*.sql` files into `supabase/migrations/` with timestamped filenames
 (see §3) and run `supabase db push`. They apply cleanly on an empty database.
 
 ---
@@ -104,15 +104,15 @@ supabase link --project-ref <supabase-project-ref>
 # will prompt for the db password from step 2
 ```
 
-Convert the three `_build/*.sql` files into timestamped migrations:
+Convert the three `build/*.sql` files into timestamped migrations:
 
 ```
-cp _build/schema.sql       supabase/migrations/20260419_0001_initial_schema.sql
-cp _build/rls-policies.sql supabase/migrations/20260419_0002_rls_policies.sql
-cp _build/seed.sql         supabase/migrations/20260419_0003_seed.sql   # optional — marco-rubiol + mamemi
+cp build/schema.sql       supabase/migrations/20260419_0001_initial_schema.sql
+cp build/rls-policies.sql supabase/migrations/20260419_0002_rls_policies.sql
+cp build/seed.sql         supabase/migrations/20260419_0003_seed.sql   # optional — marco-rubiol + mamemi
 ```
 
-(Keep the originals in `_build/` as the canonical readable copies. Migrations are append-only snapshots; `_build/` is the design doc. The existing `hour-phase0` project skipped the CLI path — migrations were applied directly via the Supabase MCP; the CLI path is documented here for fresh environments.)
+(Keep the originals in `build/` as the canonical readable copies. Migrations are append-only snapshots; `build/` is the design doc. The existing `hour-phase0` project skipped the CLI path — migrations were applied directly via the Supabase MCP; the CLI path is documented here for fresh environments.)
 
 Commit:
 ```
@@ -395,10 +395,10 @@ Rule: anything that a third party could misuse if leaked → `wrangler secret pu
 - [ ] `SELECT count(*) FROM workspace_role WHERE is_system=true` returns exactly `15 × <workspaces>`.
 - [ ] `SELECT has_permission(<any-project-id>, 'edit:money')` as a workspace owner returns `t` (owner bypass check).
 - [ ] Custom Access Token hook is enabled in Authentication → Hooks → points at `public.custom_access_token_hook`.
-- [ ] Seed CLAIM block in `_build/seed.sql` runs once after Marco's signup: Marco becomes owner of the pre-seeded `marco-rubiol` workspace and the duplicate trigger-created workspace is removed.
+- [ ] Seed CLAIM block in `build/seed.sql` runs once after Marco's signup: Marco becomes owner of the pre-seeded `marco-rubiol` workspace and the duplicate trigger-created workspace is removed.
 - [ ] `git push` on `main` triggers CI → deploy (set up `wrangler deploy` in CI if/when Marco wants auto-deploy; for now it's manual).
 
-When all checks pass: Phase 0 infra is live. Next up — run `python3 _build/import/03_load_to_hour.py` (no flags) to land 156 persons + engagements on the `mamemi` project with `season=2026-27` (status defaults to `contacted`). Tags/taggings are out of scope for Phase 0 — deferred to Phase 0.5 (see DECISIONS.md). Verify the load with `GET /api/engagements?project_slug=mamemi&season=2026-27` using a real JWT.
+When all checks pass: Phase 0 infra is live. Next up — run `python3 build/import/03_load_to_hour.py` (no flags) to land 156 persons + engagements on the `mamemi` project with `season=2026-27` (status defaults to `contacted`). Tags/taggings are out of scope for Phase 0 — deferred to Phase 0.5 (see DECISIONS.md). Verify the load with `GET /api/engagements?project_slug=mamemi&season=2026-27` using a real JWT.
 
 ---
 
@@ -407,7 +407,7 @@ When all checks pass: Phase 0 infra is live. Next up — run `python3 _build/imp
 - **Migration order matters** — the filename timestamp prefix (`20260419_0001_...`) is how the CLI sorts. Never rename a migration after it's been pushed.
 - **`FORCE ROW LEVEL SECURITY` also applies to the table owner (postgres role).** The smoke-test step uses `SET LOCAL ROLE` to test isolation; don't panic when the postgres role sees an empty table through the authenticated role.
 - **JWT `current_workspace_id` claim needs the hook toggle.** `public.custom_access_token_hook` is in the migration but dashboard → Authentication → Hooks must point at it. Until then, every RLS-protected query from an authenticated client returns empty.
-- **Two workspaces after first signup.** `handle_new_user` auto-creates a `<slug>-XXXX`-suffixed workspace even when `marco-rubiol` is pre-seeded (slug collision handled by the trigger). The CLAIM block in `_build/seed.sql` deletes the trigger-created duplicate and makes Marco owner of the pre-seeded one. Run it once, post-signup.
+- **Two workspaces after first signup.** `handle_new_user` auto-creates a `<slug>-XXXX`-suffixed workspace even when `marco-rubiol` is pre-seeded (slug collision handled by the trigger). The CLAIM block in `build/seed.sql` deletes the trigger-created duplicate and makes Marco owner of the pre-seeded one. Run it once, post-signup.
 - **`public/.assetsignore`** is mandatory on `@astrojs/cloudflare` v12 + Workers. Without it, wrangler tries to upload `_worker.js` as a static asset and fails with "reserved name".
 - **Wrangler v3 → v4**: the Workers Sites → Static Assets migration completed in wrangler 4.x. Pin `wrangler@^4` in `devDependencies`; sticking on v3 causes `main`/`assets` in `wrangler.toml` to misbehave.
 - **Astro + Svelte with Cloudflare adapter** requires `output: 'server'` for any SSR route (endpoints, auth callbacks, `/api/*`). Static-only won't match what we need.

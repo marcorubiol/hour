@@ -1,6 +1,6 @@
 # Import Plan — Phase 0 seed data
 
-> Status: **implemented** (pipeline lives in `_build/import/`); **needs code
+> Status: **implemented** (pipeline lives in `build/import/`); **needs code
 > adjustment after reset v2** — see §3.4 (drop tag/tagging steps) and §3.5
 > (engagement status default `contacted`). · Author: Marco + .zerø · Date: 2026-04-19
 > Scope: bootstrap MaMeMi's `person` + `engagement` rows from the Mostra Igualada 2026 export dataset (+ dossier PDF enrichment).
@@ -73,7 +73,7 @@ These 30 profiles mostly enrich ~23 international + ~7 estatal records already p
 
 ### 3.1 `workspace`
 
-One row, written by either `_build/seed.sql` (CLAIM block, after Marco signs up) or by the loader on first run if absent. The `handle_new_user` trigger also creates a personal workspace automatically on signup — the CLAIM block renames it so the slug settles on `marco-rubiol`:
+One row, written by either `build/seed.sql` (CLAIM block, after Marco signs up) or by the loader on first run if absent. The `handle_new_user` trigger also creates a personal workspace automatically on signup — the CLAIM block renames it so the slug settles on `marco-rubiol`:
 
 ```
 name = 'Marco Rubiol', slug = 'marco-rubiol', kind = 'personal'
@@ -88,7 +88,7 @@ workspace_id = <marco-rubiol>, slug = 'mamemi', name = 'MaMeMi',
 status = 'active'
 ```
 
-`project.type` no longer exists (ADR-007 dropped the discriminator). The loader must **not** set `type` — polymorphism emerges from which subentities the project ends up with (engagement, show, line, date…). `_build/import/03_load_to_hour.py` drops the `type='show'` upsert field as part of the reset-v2 code adjustment.
+`project.type` no longer exists (ADR-007 dropped the discriminator). The loader must **not** set `type` — polymorphism emerges from which subentities the project ends up with (engagement, show, line, date…). `build/import/03_load_to_hour.py` drops the `type='show'` upsert field as part of the reset-v2 code adjustment.
 
 Difusión-2026-27 is **not** a project — it's a filtered view over `engagement` rows where `project.slug = 'mamemi'` and `custom_fields->>'season' = '2026-27'` (see ADR *Polymorphic core* in `DECISIONS.md`).
 
@@ -114,7 +114,7 @@ Dedupe key: `email` where present (unique globally on `person(email)` — the co
 
 The `tag` and `tagging` tables were dropped in reset v2 (2026-04-19). Tag infrastructure is deferred to Phase 0.5 (see DECISIONS.md "Deferred" section). During the Mostra 2026 import, **no tag rows are created**. The provenance that tags used to encode now lives inside `person.custom_fields.sources.mostra_igualada_2026` (see §3.6) — source, tipologia, procedencia, ingested_at are all preserved there as structured JSON.
 
-`_build/import/03_load_to_hour.py` drops the tag-creation step (previously step 3 of the Stage 3 workflow) as part of the reset-v2 code adjustment. The seven tag names enumerated in the pre-v2 version of this doc (`src:mostra-igualada-2026`, `procedencia:*`, `tipologia:*`) remain discoverable as `custom_fields` keys — any Phase 0.5 migration that brings tagging back can backfill from there without re-reading the CSVs.
+`build/import/03_load_to_hour.py` drops the tag-creation step (previously step 3 of the Stage 3 workflow) as part of the reset-v2 code adjustment. The seven tag names enumerated in the pre-v2 version of this doc (`src:mostra-igualada-2026`, `procedencia:*`, `tipologia:*`) remain discoverable as `custom_fields` keys — any Phase 0.5 migration that brings tagging back can backfill from there without re-reading the CSVs.
 
 ### 3.5 `engagement` (per person × project)
 
@@ -183,18 +183,18 @@ Rationale: heterogeneous source-level metadata (each festival's dossier has its 
 
 ## 5. Pre-flight migration: `custom_fields jsonb`
 
-**Already applied.** The polymorphic reset (`polymorphic_schema` migration, 2026-04-19) ships `custom_fields jsonb NOT NULL DEFAULT '{}'::jsonb` on `person`, `project`, `engagement`, and `date`, plus a GIN index on `person.custom_fields` (`jsonb_path_ops`). No separate `0005_custom_fields.sql` step exists — the column is part of the canonical schema in `_build/schema.sql`. The ADR *Activate `custom_fields jsonb` on tenant tables* is marked **Accepted** in `DECISIONS.md`.
+**Already applied.** The polymorphic reset (`polymorphic_schema` migration, 2026-04-19) ships `custom_fields jsonb NOT NULL DEFAULT '{}'::jsonb` on `person`, `project`, `engagement`, and `date`, plus a GIN index on `person.custom_fields` (`jsonb_path_ops`). No separate `0005_custom_fields.sql` step exists — the column is part of the canonical schema in `build/schema.sql`. The ADR *Activate `custom_fields jsonb` on tenant tables* is marked **Accepted** in `DECISIONS.md`.
 
 ---
 
 ## 6. Pipeline
 
-Three Python scripts in `_build/import/`. Each is idempotent, reads from disk, writes to disk (except Stage 3 which writes to Supabase). No step is destructive.
+Three Python scripts in `build/import/`. Each is idempotent, reads from disk, writes to disk (except Stage 3 which writes to Supabase). No step is destructive.
 
 ### Stage 1 — `01_normalize.py`
 
-Input:  `_build/import/sources/mostra-2026/*.csv` (copy the 4 files here).
-Output: `_build/import/staging/01_canonical.jsonl` (one JSON object per record, post-normalization).
+Input:  `build/import/sources/mostra-2026/*.csv` (copy the 4 files here).
+Output: `build/import/staging/01_canonical.jsonl` (one JSON object per record, post-normalization).
 
 Steps:
 1. Load all 4 CSVs, dedupe by `Número Registre`.
@@ -205,20 +205,20 @@ Steps:
 
 ### Stage 2 — `02_enrich_from_pdf.py`
 
-Input:  `_build/import/staging/01_canonical.jsonl` + `_build/import/sources/mostra-2026/Mostra Igualada 2026_Dossier Programadors.pdf`.
-Output: `_build/import/staging/02_enriched.jsonl`.
+Input:  `build/import/staging/01_canonical.jsonl` + `build/import/sources/mostra-2026/Mostra Igualada 2026_Dossier Programadors.pdf`.
+Output: `build/import/staging/02_enriched.jsonl`.
 
 Steps:
 1. `pdftotext -layout` → segment into 30 profile blocks using header regex (`^[A-Z]+$` on two consecutive lines + ENTITAT line).
 2. Extract `{full_name, entitat, city, country, role_title, web, interest, description}` per profile.
-3. Fuzzy-match each profile to canonical rows by `entitat` ≈ `organization_name` (RapidFuzz `token_set_ratio ≥ 85`), fallback to `website` host match, fallback to manual override file (`_build/import/manual-matches.yaml` — empty at start, populated by Marco on mismatches).
+3. Fuzzy-match each profile to canonical rows by `entitat` ≈ `organization_name` (RapidFuzz `token_set_ratio ≥ 85`), fallback to `website` host match, fallback to manual override file (`build/import/manual-matches.yaml` — empty at start, populated by Marco on mismatches).
 4. Merge into canonical: set `full_name`, add `custom_fields.dossier_2026.*`, tag the row for `src:dossier-2026`.
 5. Dossier-only profiles (not matched to any CSV row) are appended as new canonical rows so they land as `person`s too.
 6. Emit JSONL. Print `(matched, unmatched_dossier_profiles, unmatched_canonical_rows, dossier_only_added)` report.
 
 ### Stage 3 — `03_load_to_hour.py`
 
-Input:  `_build/import/staging/02_enriched.jsonl`.
+Input:  `build/import/staging/02_enriched.jsonl`.
 Output: rows in Supabase `hour-phase0` via PostgREST (service-role key, bypasses RLS).
 
 Env (read from repo-root `.env`):
@@ -277,14 +277,14 @@ All 156 persons visible in Hour once the first UI screen lands, already filterab
 1. ☑ Write this file.
 2. ☑ `custom_fields jsonb` landed as part of the 2026-04-19 polymorphic reset (and preserved in reset v2) — no separate migration step.
 3. ☑ ADR *Activate `custom_fields jsonb` on tenant tables* → Accepted in `DECISIONS.md`.
-4. ☑ Copy sources into `_build/import/sources/mostra-2026/` (4 CSVs + 1 PDF) — **.gitignored**; they're PII-adjacent and don't belong in the public repo.
+4. ☑ Copy sources into `build/import/sources/mostra-2026/` (4 CSVs + 1 PDF) — **.gitignored**; they're PII-adjacent and don't belong in the public repo.
 5. ☑ Implement `01_normalize.py` → run → inspect `01_canonical.jsonl`.
 6. ☑ Implement `02_enrich_from_pdf.py` → run → inspect `02_enriched.jsonl` + unmatched report.
 7. ☑ Marco fills `manual-matches.yaml` for any unmatched profiles he can identify.
-8. ☐ **Reset v2 migration applied** (18 tables: workspace/workspace_role/workspace_membership/person/venue/project/project_membership/line/engagement/show/date/person_note/invoice/invoice_line/payment/expense/user_profile/audit_log). `_build/seed.sql` CLAIM block renames Marco's auto-created workspace to `marco-rubiol` and upserts the `mamemi` project (no `type` column).
+8. ☐ **Reset v2 migration applied** (18 tables: workspace/workspace_role/workspace_membership/person/venue/project/project_membership/line/engagement/show/date/person_note/invoice/invoice_line/payment/expense/user_profile/audit_log). `build/seed.sql` CLAIM block renames Marco's auto-created workspace to `marco-rubiol` and upserts the `mamemi` project (no `type` column).
 9. ☐ **Adjust `03_load_to_hour.py`** for reset v2: drop the tag/tagging step, drop `type='show'` from project upsert, switch engagement status default to `contacted`. (Windsurf task — out of scope for this plan.)
-10. ☐ **Marco signs up** at `hour.zerosense.studio` (or the workers.dev URL) with `marcorubiol@gmail.com` → run `_build/seed.sql` CLAIM block → enable `custom_access_token_hook` in the Supabase Dashboard (Auth → Hooks).
-11. ☐ Live run: `python3 _build/import/03_load_to_hour.py` (no flags) → lands 156 persons + 156 engagements (status=`contacted`) on the `mamemi` project with `season=2026-27` in `custom_fields`. No tag/tagging rows.
+10. ☐ **Marco signs up** at `hour.zerosense.studio` (or the workers.dev URL) with `marcorubiol@gmail.com` → run `build/seed.sql` CLAIM block → enable `custom_access_token_hook` in the Supabase Dashboard (Auth → Hooks).
+11. ☐ Live run: `python3 build/import/03_load_to_hour.py` (no flags) → lands 156 persons + 156 engagements (status=`contacted`) on the `mamemi` project with `season=2026-27` in `custom_fields`. No tag/tagging rows.
 12. ☐ Verify with `GET /api/engagements?project_slug=mamemi&season=2026-27` using a real JWT; cross-check counts against §7.
 
 Each step leaves disk artefacts — safe to rerun from any point.

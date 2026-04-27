@@ -14,7 +14,7 @@
 
 **Phase 1 (decision point at month 6).** If daily usage is real and 3+ external people have asked for the beta, flip the multi-tenant switches and onboard the first 10 orgs. If not, Hour stays private and we lost nothing — we needed this tool anyway.
 
-This document describes Phase 0. Phase 1 scaling decisions are in `../_build/scale-plan.md` (to be written at month 6).
+This document describes Phase 0. Phase 1 scaling decisions are in `../build/scale-plan.md` (to be written at month 6).
 
 ---
 
@@ -264,7 +264,7 @@ hour/
 │   └── seed.sql           # dev seeds only
 ├── packages/
 │   └── shared/            # types, zod schemas, shared utils
-├── _build/                # (this folder — specs, ADRs, import plans)
+├── build/                # (this folder — specs, ADRs, import plans)
 ├── .github/workflows/     # CI
 ├── _context.md            # project rules (inherits .zerø)
 ├── CLAUDE.md              # stub (@_context.md) for Claude Code / Cowork
@@ -311,7 +311,7 @@ returns zero rows for authenticated users.
 
 ---
 
-## 18. Files in `_build/`
+## 18. Files in `build/`
 
 - `schema.sql` — full Postgres schema (18 tables, reset v2)
 - `rls-policies.sql` — RLS helpers + policies + guard/audit triggers + `custom_access_token_hook`

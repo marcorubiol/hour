@@ -87,7 +87,7 @@ Format:
 - **Status**: Provisional. Confirm at Phase 1 kickoff with real customer conversations.
 
 ## [2026-04-18] — Build workflow — tool choice
-- **Decision**: Claude Code (CLI, per Marco's preference — Desktop is equivalent, same engine) is the primary coding environment. Cowork is for strategy, research, briefings, and cross-app tasks. Memory lives in repo files (`_build/*.md`), never in chat history.
+- **Decision**: Claude Code (CLI, per Marco's preference — Desktop is equivalent, same engine) is the primary coding environment. Cowork is for strategy, research, briefings, and cross-app tasks. Memory lives in repo files (`build/*.md`), never in chat history.
 - **Context**: Project will run for months. Need sustainable AI-collaboration workflow that doesn't depend on remembering what was said in which chat.
 - **Alternatives**: All in Cowork (rejected — loses precision on long code sessions, no native git workflow). All in Claude Code (rejected — Cowork is better for strategic thinking, docs, cross-app tasks).
 - **Rationale**:
@@ -102,21 +102,21 @@ Format:
   2. **Claude Code (CLI) in `hour/` repo** for all coding work.
   3. **Short ad-hoc Cowork chats** for one-off tasks (email draft, contract review, meeting briefing).
   4. **Separate `.zerø` Cowork integration** for daily briefings, tasks, Ørbit — kept distinct from Hour work.
-  5. Standard opening instruction for any new chat: *"Read `CLAUDE.md` + `_build/architecture.md` + `_decisions.md` + `_build/competition.md` before responding."*
+  5. Standard opening instruction for any new chat: *"Read `CLAUDE.md` + `build/architecture.md` + `_decisions.md` + `build/competition.md` before responding."*
 - **Context**: Avoid fragmenting knowledge across dozens of chats. Avoid losing context on long threads.
 - **Rationale**: Fewer chats, each with clear purpose. Memory persists in files, not in Claude's memory of any single chat. Any new session can catch up in seconds by reading four markdown files.
 - **Status**: Firm.
 
 ## [2026-04-18] — Project location (physical folder) — initial
-- **Decision**: Phase 0 lives at `/Users/marcorubiol/Zerø System/01_STAGE/ZS_MaMeMi/_build/`. When promoted to its own git repo, move to `02_STUDIO/Hour/` or `04_BACKSTAGE/Hour/` and update `.zerø` dashboard accordingly.
+- **Decision**: Phase 0 lives at `/Users/marcorubiol/Zerø System/01_STAGE/ZS_MaMeMi/build/`. When promoted to its own git repo, move to `02_STUDIO/Hour/` or `04_BACKSTAGE/Hour/` and update `.zerø` dashboard accordingly.
 - **Context**: Hour was conceived inside the MaMeMi Difusión problem. By Marco's rule "a project lives where it's born", Hour inherits from STAGE for now.
 - **Alternatives**: Start a fresh folder immediately — rejected, premature separation before we know if Hour outgrows the MaMeMi context.
 - **Rationale**: Keep it simple. One folder for now. Move later if/when Phase 1 activates.
 - **Status**: Superseded on 2026-04-18 by the next entry.
 
 ## [2026-04-18] — Project location (updated — supersedes previous)
-- **Decision**: Hour lives at `03_AGENCY/Hour/` with build artifacts under `03_AGENCY/Hour/_build/`. Separated from `ZS_MaMeMi/` the same day it was first scaffolded.
-- **Context**: Marco reflected that bundling Hour inside MaMeMi didn't fit. He created `03_AGENCY/Hour/` and asked to relocate all `_build/` files there.
+- **Decision**: Hour lives at `03_AGENCY/Hour/` with build artifacts under `03_AGENCY/Hour/build/`. Separated from `ZS_MaMeMi/` the same day it was first scaffolded.
+- **Context**: Marco reflected that bundling Hour inside MaMeMi didn't fit. He created `03_AGENCY/Hour/` and asked to relocate all `build/` files there.
 - **Alternatives**: `02_STUDIO/Hour/` (Claude's proposal, by the "project lives where it's born" rule — Hour emerged out of the Difusión problem which lives in STAGE). Rejected by Marco.
 - **Rationale**: Marco frames Hour primarily as a *vehicle/product for others*, not as a private creative tool. AGENCY is defined as "the vehicle, work for others" — that matches Hour's ambition. Also aligns with the planned multi-tenant SaaS direction if Phase 1 activates.
 - **Status**: Firm.
@@ -228,7 +228,7 @@ Format:
   - Defer until Phase 1 — rejected, import-plan.md needs a home for provenance today, not in six months. Refactoring the import in-place later is more expensive than the zero-cost migration now.
   - Activate only on `contact` — rejected, consistent with the original design that named all three entities; `project` and `event` are also likely to pick up per-tenant metadata (e.g. custom project status codes, external-calendar sync cursors).
 - **Rationale**: The zero-cost bet (one ALTER TABLE per tenant entity, one GIN index) was the gating question in the earlier ADR. The real first import provides the concrete justification to flip the switch. Keeping the `custom_field_definition` table and dynamic UI deferred respects the original ADR's cost/benefit position — tenant-configurable fields are not needed while MaMeMi is the only tenant.
-- **How to apply**: Migration 0005 already applied via Supabase MCP. `_build/schema.sql` reconciled. Import-plan.md §3.5 specifies the JSONB shape (`sources.<source_slug>` namespace for provenance; `dossier_2026` for PDF enrichment).
+- **How to apply**: Migration 0005 already applied via Supabase MCP. `build/schema.sql` reconciled. Import-plan.md §3.5 specifies the JSONB shape (`sources.<source_slug>` namespace for provenance; `dossier_2026` for PDF enrichment).
 - **Consumer conventions**: Always merge with `jsonb ||` (never overwrite). Prefer namespaced keys (`sources.mostra_igualada_2026.*`, never root-level `registre`). Reserved root keys: `sources` and anything ending in `_*` for future internal uses.
 - **Upgrade path**: When the first Phase 1 customer needs tenant-configurable fields, the `custom_field_definition` table + dynamic renderer is purely additive — no changes to the storage columns already in place.
 - **Status**: Firm. Migration applied 2026-04-19.
@@ -309,10 +309,10 @@ Items NOT yet decided, to address when starting schema work:
   - `Difusión 2026-27` has **no** row in any table. It is a saved UI filter: project=MaMeMi AND engagement.status IN (`proposed`, `discussing`, `held`) AND season=`2026-27`.
  
 - **Impact on existing artefacts**:
-  - `_build/schema.sql` — rewritten from scratch (Task #22).
-  - `_build/rls-policies.sql` — rewritten from scratch (Task #23).
-  - `_build/auth-hooks.sql` — claim renamed `current_org_id` → `current_workspace_id`; read-target table renamed `membership` stays (workspace-level `membership` retains the name).
-  - `_build/architecture.md`, `_context.md`, `bootstrap.md` — updated to reflect new model (Task #28).
+  - `build/schema.sql` — rewritten from scratch (Task #22).
+  - `build/rls-policies.sql` — rewritten from scratch (Task #23).
+  - `build/auth-hooks.sql` — claim renamed `current_org_id` → `current_workspace_id`; read-target table renamed `membership` stays (workspace-level `membership` retains the name).
+  - `build/architecture.md`, `_context.md`, `bootstrap.md` — updated to reflect new model (Task #28).
   - `scripts/03_load_to_hour.py` — emits `person` + `engagement` pairs instead of `contact` + `contact_project` (Task #26).
   - `apps/web/src/api/prospects.ts` → rename to `engagements.ts` (Marco applies in Windsurf — Task #27).
   - db-types.ts regenerated post-migration (Task #27).
@@ -378,7 +378,7 @@ Items NOT yet decided, to address when starting schema work:
 - **Alternatives considered**:
   - Fee columns on show + status flags for invoice/paid — rejected, breaks on all three scenarios above.
   - Single `transaction` table polymorphic by `kind` — rejected, loses the structural difference between an invoice (has tax breakdown) and a payment (has method); polymorphic tables hide shape at the cost of query clarity.
-  - External billing system (Holded/Quaderno) from day 1 — rejected, Phase 0 doesn't justify an external integration; the `_build/architecture.md` §10 already scopes this out.
+  - External billing system (Holded/Quaderno) from day 1 — rejected, Phase 0 doesn't justify an external integration; the `build/architecture.md` §10 already scopes this out.
 - **Rationale**: Three clean entities that map to how a production company actually tracks money. `invoice_line` lets one invoice bill N shows — the tour-as-one-invoice pattern is common enough to deserve schema support. The fee columns on `show` capture "what we agreed on", which is different from "what we billed" and "what was paid" — shadowing all three is necessary for reconciliation.
 - **Consequences**:
   - Schema: 4 new tables (invoice, invoice_line, payment, expense) + `show.fee_amount` / `show.fee_currency`.
@@ -391,7 +391,7 @@ Items NOT yet decided, to address when starting schema work:
 
 ## [2026-04-19] — ADR-004 — Reset v2 executes before any real data
 - **Context**: Seven decisions (ADR-001..007) ship as a bundle. They touch tables, enums, RLS helpers, and the import pipeline. The alternative — shipping them incrementally over weeks — would require writing data migrations (rename `contact_project` → `engagement`, add `line`, split show from engagement) that each carry risk and require rollback plans. Current DB state: 0 auth.users, 0 real business rows (only the earlier polymorphic reset's table skeletons; the loader has not run).
-- **Decision**: One destructive reset. `_build/schema.sql` and `_build/rls-policies.sql` are rewritten from scratch (the files become the canonical readable copy of the new DB). The applied migration is `DROP SCHEMA public CASCADE; CREATE SCHEMA public;` followed by the full schema + RLS recreation. Marco signs up after the reset lands, the `custom_access_token_hook` is enabled manually, and only then the 156-contact loader runs against the new schema.
+- **Decision**: One destructive reset. `build/schema.sql` and `build/rls-policies.sql` are rewritten from scratch (the files become the canonical readable copy of the new DB). The applied migration is `DROP SCHEMA public CASCADE; CREATE SCHEMA public;` followed by the full schema + RLS recreation. Marco signs up after the reset lands, the `custom_access_token_hook` is enabled manually, and only then the 156-contact loader runs against the new schema.
 - **Alternatives considered**:
   - Incremental migrations — rejected, high coordination cost and no business value while the DB is empty.
   - Wave-by-wave rollout (rename first, then add tables, then RBAC) — same rejection as above, plus the intermediate states carry inconsistent RLS surfaces for days.
@@ -400,7 +400,7 @@ Items NOT yet decided, to address when starting schema work:
 - **Consequences**:
   - Schema: supersedes parts of the earlier "Polymorphic core" ADR (table set and enums change; the three-layer contact model — person + engagement + person_note — survives unchanged).
   - Migration: single MCP `apply_migration` call replacing the prior history. No rollback plan needed.
-  - Docs: every artefact under `_build/*` gets a coherent "v2" stamp; README references bump.
+  - Docs: every artefact under `build/*` gets a coherent "v2" stamp; README references bump.
   - Import pipeline: the loader ran pre-flight checks but never executed a real load; this is still the zero-loss window.
   - Bootstrap §4 table count shifts from 12 to 18.
 - **Status**: Firm. Window closes the moment Marco signs up and runs the loader.
@@ -454,7 +454,7 @@ Items NOT yet decided, to address when starting schema work:
 - **Rationale**: Data model follows behaviour. If a project has shows, it's a show project — no additional declaration needed. Lets users mix (a creation cycle that also has a premiere tour without forcing "pick one").
 - **Consequences**:
   - Schema: `project.type` column and `project_type` enum dropped. The `type` column in earlier migrations will be removed in the reset.
-  - Import: `_build/import/03_load_to_hour.py` no longer passes `type='show'` when upserting the mamemi project. Already flagged for Windsurf adjustment.
+  - Import: `build/import/03_load_to_hour.py` no longer passes `type='show'` when upserting the mamemi project. Already flagged for Windsurf adjustment.
   - RLS: no change — project policies never branched on type.
   - UI: project detail is a single adaptive view; it shows the "Tour" tab only when `line` rows exist, the "Calendario" tab only when `show` or `date` rows exist, etc.
   - Partial supersession of the earlier "Polymorphic core" ADR — the three-layer contact model, workspace kind, and date/show split all stand; only the project type discriminator is retired.

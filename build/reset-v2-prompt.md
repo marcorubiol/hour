@@ -17,13 +17,13 @@ Stack: Supabase Cloud (eu-central-1 Frankfurt) · Cloudflare Workers · R2 · pg
 - `/Users/marcorubiol/Zerø System/_methød/tone.md` — voice (no hype, no superlatives).
 - `/Users/marcorubiol/Zerø System/03_AGENCY/Hour/CLAUDE.md`
 - `/Users/marcorubiol/Zerø System/03_AGENCY/Hour/_context.md`
-- `/Users/marcorubiol/Zerø System/03_AGENCY/Hour/_build/_context.md`
-- `/Users/marcorubiol/Zerø System/03_AGENCY/Hour/_build/architecture.md`
+- `/Users/marcorubiol/Zerø System/03_AGENCY/Hour/build/_context.md`
+- `/Users/marcorubiol/Zerø System/03_AGENCY/Hour/build/architecture.md`
 - `/Users/marcorubiol/Zerø System/03_AGENCY/Hour/_decisions.md`
-- `/Users/marcorubiol/Zerø System/03_AGENCY/Hour/_build/schema.sql` (current v2, to be destroyed and rewritten)
-- `/Users/marcorubiol/Zerø System/03_AGENCY/Hour/_build/rls-policies.sql` (current v2, to be destroyed and rewritten)
-- `/Users/marcorubiol/Zerø System/03_AGENCY/Hour/_build/bootstrap.md`
-- `/Users/marcorubiol/Zerø System/03_AGENCY/Hour/_build/import-plan.md`
+- `/Users/marcorubiol/Zerø System/03_AGENCY/Hour/build/schema.sql` (current v2, to be destroyed and rewritten)
+- `/Users/marcorubiol/Zerø System/03_AGENCY/Hour/build/rls-policies.sql` (current v2, to be destroyed and rewritten)
+- `/Users/marcorubiol/Zerø System/03_AGENCY/Hour/build/bootstrap.md`
+- `/Users/marcorubiol/Zerø System/03_AGENCY/Hour/build/import-plan.md`
 
 ## Decisions closed (director chat, 2026-04-19)
 
@@ -121,7 +121,7 @@ One ADR per decision above. ADR-lite format:
 
 Number the ADRs following the existing sequence in _decisions.md. Cross-reference where relevant (e.g. D6 relates to D1 via engagement permissions).
 
-### Step 2 — Full rewrite of `_build/schema.sql`
+### Step 2 — Full rewrite of `build/schema.sql`
 
 Complete replacement file. Requirements:
 
@@ -137,7 +137,7 @@ Complete replacement file. Requirements:
 - Comments above each table explaining purpose.
 - Preserve v1 style and formatting conventions.
 
-### Step 3 — Full rewrite of `_build/rls-policies.sql`
+### Step 3 — Full rewrite of `build/rls-policies.sql`
 
 Complete replacement file. Requirements:
 
@@ -160,13 +160,13 @@ Complete replacement file. Requirements:
 - `custom_access_token_hook(event jsonb)` — injects `current_workspace_id` claim. Preserve v1 logic.
 - Audit triggers where present in v1 (created_by, updated_at) — keep.
 
-### Step 4 — Update `_build/bootstrap.md` if affected
+### Step 4 — Update `build/bootstrap.md` if affected
 
 Review every step. Update any reference to the old schema (project.type, flat roles, fee on show columns). Keep the two manual items flagged: enable `custom_access_token_hook` in Supabase dashboard, attach custom domain `hour.zerosense.studio`.
 
-### Step 5 — Update `_build/import-plan.md` if affected
+### Step 5 — Update `build/import-plan.md` if affected
 
-Review the 3-stage pipeline (normalize → enrich → load) in `_build/import/`. Confirm it still targets 156 persons + taggings + engagements on project `mamemi` with season=2026-27. Document any field rename or table split that affects the loader.
+Review the 3-stage pipeline (normalize → enrich → load) in `build/import/`. Confirm it still targets 156 persons + taggings + engagements on project `mamemi` with season=2026-27. Document any field rename or table split that affects the loader.
 
 ### Step 6 — Do NOT execute
 
@@ -188,7 +188,7 @@ Marco will review and run the reset manually when ready.
 
 ## Deliverables
 
-Files updated or regenerated in `/Users/marcorubiol/Zerø System/03_AGENCY/Hour/_build/`:
+Files updated or regenerated in `/Users/marcorubiol/Zerø System/03_AGENCY/Hour/build/`:
 
 1. `_decisions.md` — seven ADRs appended.
 2. `schema.sql` — full rewrite.
