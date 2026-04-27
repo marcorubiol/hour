@@ -1,8 +1,7 @@
-# Hour — Phase 0 build workspace
+# Hour — Build workspace
 
-> Project: **Hour** (working name)
-> Parent: `03_AGENCY/Hour/`
-> Inherits rules from: `.zerø/context.md`, `_methød/`, and `03_AGENCY/context.md`
+> Inherits: `.zerø/_system-context.md` · Method: `_methød/`
+> Parent: `Hour/_context.md` · Scope: build artifacts (specs, schema, ADRs, planning)
 
 ---
 
@@ -12,7 +11,7 @@
 
 When starting any new conversation with Claude (any tool), the first instruction should be:
 
-> Read `context.md` + `_build/context.md` + `_build/ARCHITECTURE.md` + `_build/DECISIONS.md` + `_build/COMPETITION.md` + `_build/UX-PROPOSALS.md` + `_build/MARKET-PRICING.md` before responding.
+> Read `_context.md` (Hour root) + `_build/_context.md` + `_build/architecture.md` + `_decisions.md` (Hour root) + `_build/competition.md` before responding.
 
 That loads ~90% of project context in seconds without depending on what was said in any previous chat.
 
@@ -31,22 +30,24 @@ That loads ~90% of project context in seconds without depending on what was said
 
 ## Rules
 
-1. **Memory lives in files, not chats.** Every decision worth keeping → `DECISIONS.md`. Every competitive fact → `COMPETITION.md`. Every architectural choice → `ARCHITECTURE.md`.
+1. **Memory lives in files, not chats.** Every decision worth keeping → `_decisions.md` (at Hour root). Every competitive fact → `_build/competition.md`. Every architectural choice → `_build/architecture.md`.
 2. **No code in Cowork.** If code needs to change, open Claude Code.
 3. **One strategic Cowork chat at a time.** Don't fragment Hour strategy across multiple threads.
-4. **Claude proposes file updates; Marco approves.** After each significant conversation, Claude asks: *"¿Escribo esto en DECISIONS.md antes de seguir?"*
+4. **Claude proposes file updates; Marco approves.** After each significant conversation, Claude asks: *"¿Escribo esto en `_decisions.md` antes de seguir?"*
 5. **Open any new chat with the read-first instruction** (above). Never assume prior chat context persists.
 
 ---
 
 ## Files in this folder
 
+> `_decisions.md` lives at the **project root** (`Hour/_decisions.md`), siblings of `Hour/_context.md` — by convention, project decisions sit at root, not nested in subworkspaces.
+
 | File | Purpose | Status |
 |---|---|---|
-| `context.md` | This workflow guide (CLAUDE.md is a stub) | v1.3 — 2026-04-19 |
-| `ARCHITECTURE.md` | Technical stack, multi-tenancy, security, environments | v1.2 — 2026-04-19 (reset v2) |
-| `DECISIONS.md` | Chronological log of decisions with rationale | Active — append-only (ADR-001..007 added 2026-04-19) |
-| `COMPETITION.md` | 20 competitors analyzed with pricing, traction, gap analysis | v2 — 2026-04-20 |
+| `_context.md` | This workflow guide (CLAUDE.md is a stub) | v1.3 — 2026-04-19 |
+| `architecture.md` | Technical stack, multi-tenancy, security, environments | v1.2 — 2026-04-19 (reset v2) |
+| `competition.md` | 20 competitors analyzed with pricing, traction, gap analysis | v2 — 2026-04-20 |
+| `roadmap.md` | Living implementation plan — phases 0.0 → 1, ADRs, sprints | v1 — 2026-04-24 |
 
 All research files live in `../research/` (see `research/INDEX.md` for full listing):
 - `10-ai-integration-patterns.md` — AI patterns from 14 tools
@@ -54,6 +55,7 @@ All research files live in `../research/` (see `research/INDEX.md` for full list
 - `12-ux-patterns-competitors.md` — UX patterns from 7 competitors
 - `13-market-pricing.md` — Market analysis, pricing (19/49/99€), revenue timeline
 - `14-ux-proposals.md` — 6 app structure proposals
+
 | `schema.sql` | Full Postgres schema — 18 tables, reset v2 | v3 — 2026-04-19 (rewritten from scratch) |
 | `rls-policies.sql` | RLS helpers + policies + audit triggers + access-token hook + show_redacted view | v3 — 2026-04-19 (rewritten from scratch) |
 | `seed.sql` | Pre-seed + post-signup claim script for marco-rubiol/mamemi | v1 — 2026-04-19 (may need `membership → workspace_membership` one-liner rename) |
@@ -91,7 +93,7 @@ Clean. Commits clave de hoy: schema.sql (DROP SCHEMA + 18 tablas), rls-policies.
 
 ## Next session — primera pantalla
 
-Lista de engagements de Difusión 2026-27 en `apps/web/`. Requisitos completos en `Hour/context.md` → "Next". Resumen:
+Lista de engagements de Difusión 2026-27 en `apps/web/`. Requisitos completos en `Hour/_context.md` → "Next". Resumen:
 - Login con Supabase Auth (email+password) → JWT
 - `GET /api/engagements?project_slug=mamemi&season=2026-27&limit=50` con Bearer JWT
 - Tabla con person, organization, city/country, status, next_action_at
@@ -102,6 +104,6 @@ Todo el trabajo en Windsurf bajo `apps/web/src/pages/` y `apps/web/src/component
 
 ## Diferido (Phase 0.5+)
 
-- `task` entity + tag vocabulary (DECISIONS.md Deferred D1)
+- `task` entity + tag vocabulary (`_decisions.md` Deferred D1)
 - UI de `permission_grants` / `permission_revokes` por persona (D2)
 - `show` / `line` / `invoice` flows (cuando confirmes primera fecha real)

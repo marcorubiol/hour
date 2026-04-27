@@ -102,7 +102,7 @@ Format:
   2. **Claude Code (CLI) in `hour/` repo** for all coding work.
   3. **Short ad-hoc Cowork chats** for one-off tasks (email draft, contract review, meeting briefing).
   4. **Separate `.zerø` Cowork integration** for daily briefings, tasks, Ørbit — kept distinct from Hour work.
-  5. Standard opening instruction for any new chat: *"Read `CLAUDE.md` + `_build/ARCHITECTURE.md` + `_build/DECISIONS.md` + `_build/COMPETITION.md` before responding."*
+  5. Standard opening instruction for any new chat: *"Read `CLAUDE.md` + `_build/architecture.md` + `_decisions.md` + `_build/competition.md` before responding."*
 - **Context**: Avoid fragmenting knowledge across dozens of chats. Avoid losing context on long threads.
 - **Rationale**: Fewer chats, each with clear purpose. Memory persists in files, not in Claude's memory of any single chat. Any new session can catch up in seconds by reading four markdown files.
 - **Status**: Firm.
@@ -312,7 +312,7 @@ Items NOT yet decided, to address when starting schema work:
   - `_build/schema.sql` — rewritten from scratch (Task #22).
   - `_build/rls-policies.sql` — rewritten from scratch (Task #23).
   - `_build/auth-hooks.sql` — claim renamed `current_org_id` → `current_workspace_id`; read-target table renamed `membership` stays (workspace-level `membership` retains the name).
-  - `_build/ARCHITECTURE.md`, `context.md`, `bootstrap.md` — updated to reflect new model (Task #28).
+  - `_build/architecture.md`, `_context.md`, `bootstrap.md` — updated to reflect new model (Task #28).
   - `scripts/03_load_to_hour.py` — emits `person` + `engagement` pairs instead of `contact` + `contact_project` (Task #26).
   - `apps/web/src/api/prospects.ts` → rename to `engagements.ts` (Marco applies in Windsurf — Task #27).
   - db-types.ts regenerated post-migration (Task #27).
@@ -378,7 +378,7 @@ Items NOT yet decided, to address when starting schema work:
 - **Alternatives considered**:
   - Fee columns on show + status flags for invoice/paid — rejected, breaks on all three scenarios above.
   - Single `transaction` table polymorphic by `kind` — rejected, loses the structural difference between an invoice (has tax breakdown) and a payment (has method); polymorphic tables hide shape at the cost of query clarity.
-  - External billing system (Holded/Quaderno) from day 1 — rejected, Phase 0 doesn't justify an external integration; the `_build/ARCHITECTURE.md` §10 already scopes this out.
+  - External billing system (Holded/Quaderno) from day 1 — rejected, Phase 0 doesn't justify an external integration; the `_build/architecture.md` §10 already scopes this out.
 - **Rationale**: Three clean entities that map to how a production company actually tracks money. `invoice_line` lets one invoice bill N shows — the tour-as-one-invoice pattern is common enough to deserve schema support. The fee columns on `show` capture "what we agreed on", which is different from "what we billed" and "what was paid" — shadowing all three is necessary for reconciliation.
 - **Consequences**:
   - Schema: 4 new tables (invoice, invoice_line, payment, expense) + `show.fee_amount` / `show.fee_currency`.

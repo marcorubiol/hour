@@ -1,5 +1,6 @@
-> Inherits: `.zerø/context.md` · Method: `_methød/`
+> Inherits: `.zerø/_system-context.md` · Method: `_methød/`
 > Status: **kept** (valid: live, kept, parked)
+> Dev env: pnpm + per-project wrangler. See `_methød/code/dev-environment.md` and `## Dev setup` below.
 
 > **REGLA DEL PROYECTO — leer ANTES de escribir código**
 >
@@ -23,7 +24,7 @@ Working name: **Hour**. Brand decision deferred to Phase 1.
 ## Phase
 **Phase 0 — internal tool for MaMeMi** (Marco + Anouk + ≤5 users, 1 workspace `marco-rubiol`, 1 project `mamemi`). Build is multi-tenant-ready from day one so Phase 1 (SaaS with paying customers) can flip on without a rewrite. Phase 1 decision point: month 6, based on real daily usage and unprompted external demand.
 
-## Key decisions (see `_build/DECISIONS.md` for full log)
+## Key decisions (see `_decisions.md` for full log)
 - Deploys at `hour.zerosense.studio` (subdomain, zero cost). Brand decision deferred to Phase 1.
 - Stack: Supabase Cloud + Cloudflare Workers + R2 + pgmq + Resend + Sentry + Astro/Svelte + pnpm monorepo.
 - Phase 0 runs entirely within free tiers.
@@ -33,7 +34,7 @@ Working name: **Hour**. Brand decision deferred to Phase 1.
 - **Road sheet model** (ADR-023, 2026-04-24): not an entity — projection of `show` + junctions, filtered by role. Schema extensions: 5 timeslot columns + 3 jsonb (`logistics`, `hospitality`, `technical`) on `show`; new tables `crew_assignment`, `cast_override`, `asset_version` (with `direction` enum `outbound|inbound|adapted` — captures venue returns and per-venue variants). No state machine. URL `/h/:workspace/gig/:slug/roadsheet` with optional `?role=`. Closes the "Lens Technical" pendiente (top-nav lens dropped).
 - **Slug naming** (ADR-024, 2026-04-24): clean names + hard reject + `previous_slugs text[]` for rename history. GitHub/Slack model. Immutable `id uuid` separate from mutable slug column. Uniqueness scope `(workspace_id, entity_type)`. Industry research of 10 SaaS confirmed nobody uses numeric suffixes as default UX.
 - **CRDT transport** (ADR-025, 2026-04-24): `y-partykit` on Cloudflare Durable Objects for collaborative editing of text-free fields (`show.notes`, `project.notes`). Rejected `y-supabase` (abandoned 2023). Auth gates WebSocket via Supabase JWT + membership check; RLS never sees Yjs binary. Snapshots persisted to `collab_snapshot` table every 30 updates / 60s. Scoped to text fields only — structured fields use Supabase Realtime with last-write-wins.
-- **Full implementation plan**: `_build/ROADMAP.md` (documento vivo, 25 ADRs + 14 D-PRE, fases 0.0 → 1, próximo sprint 13 días). Abrir primero al retomar Hour.
+- **Full implementation plan**: `_build/roadmap.md` (documento vivo, 25 ADRs + 14 D-PRE, fases 0.0 → 1, próximo sprint 13 días). Abrir primero al retomar Hour.
 - Anti-CRM vocabulary: `person` (global, shared), `engagement` (workspace-scoped, status default `contacted`), `show` (atomic performance with hold/hold_1/2/3 lifecycle), `date` (rehearsal / travel_day / press / other), `venue` (recurring physical place). No lead / pipeline / funnel / prospect.
 - Difusión 2026-27 is **not** a project — it's a filtered view over `mamemi` engagements with `custom_fields->>season = '2026-27'`.
 - PKs are UUID v7.
@@ -48,7 +49,7 @@ Working name: **Hour**. Brand decision deferred to Phase 1.
 - Live site (Phase 0): `hour.zerosense.studio` — **not yet wired**. Worker is live at `https://hour-web.marco-rubiol.workers.dev` (CF Worker `hour-web`, wrangler 4.83.0, first deploy 2026-04-19).
 - CF bindings: `MEDIA` → R2 bucket `hour-media` · `ASSETS` → static CDN · `PUBLIC_SUPABASE_URL` + `PUBLIC_SUPABASE_ANON_KEY` in `[vars]`.
 - Supabase project: `hour-phase0` · ref `lqlyorlccnniybezugme` · region `eu-central-1` · URL `https://lqlyorlccnniybezugme.supabase.co`.
-- Specs and planning: `_build/` (context.md, ARCHITECTURE.md, DECISIONS.md, COMPETITION.md).
+- Specs and planning: `_build/` (`_context.md`, `architecture.md`, `competition.md`) plus `_decisions.md` at project root.
 
 ## Links
 - Parent MaMeMi context (where Difusión originated): `01_STAGE/ZS_MaMeMi/`
@@ -87,7 +88,7 @@ Infra, datos y **primera pantalla funcional**. Login + lista de engagements desp
 
 ### Source tree
 - Working tree limpio
-- `_build/schema.sql`, `rls-policies.sql`, `seed.sql`, `bootstrap.md`, `import-plan.md`, `ARCHITECTURE.md`, `DECISIONS.md` todos alineados con el estado aplicado
+- `_build/schema.sql`, `rls-policies.sql`, `seed.sql`, `bootstrap.md`, `import-plan.md`, `architecture.md`, `_decisions.md` (en root) todos alineados con el estado aplicado
 
 ## Product vocabulary (ADR-008, 2026-04-20)
 
@@ -115,9 +116,9 @@ Single-layout app with two controls:
 
 **⌘K** is first-class from day 1. Sidebar can be hidden entirely for ⌘K-only navigation.
 
-## Next — ver `_build/ROADMAP.md`
+## Next — ver `_build/roadmap.md`
 
-El roadmap completo con fases, decisiones previas obligatorias, MVP y próximo sprint concreto vive en **`_build/ROADMAP.md`** (documento vivo, escrito 2026-04-24).
+El roadmap completo con fases, decisiones previas obligatorias, MVP y próximo sprint concreto vive en **`_build/roadmap.md`** (documento vivo, escrito 2026-04-24).
 
 Resumen en una línea: antes de tocar UI, cerrar las 5 decisiones D-PRE-01 a D-PRE-05 y completar Phase 0.0 (fundación: tokens + primitivos + router + migración road sheet). Luego Phase 0.1 (Plaza + Desk shell) hasta Phase 0.4 (polish + ⌘K + mobile). Phase 0.5 son deferred features. Phase 1 es SaaS readiness.
 
@@ -135,3 +136,9 @@ Resumen en una línea: antes de tocar UI, cerrar las 5 decisiones D-PRE-01 a D-P
 - UI de overrides granulares por persona (Deferred D2)
 - `show` / `line` / `invoice` flows (cuando Marco confirme la primera fecha)
 - Custom domain `hour.zerosense.studio`
+
+## Dev setup
+
+- **Package manager:** pnpm 10.33.0 (pinned via `packageManager` field in root `package.json`). Monorepo with `pnpm-workspace.yaml` listing `apps/*` + `packages/*`.
+- **Wrangler:** local devDependency in `apps/web/package.json` (currently `^4.83.0`). NEVER instalado global. Invocar como `pnpm wrangler <cmd>` desde `apps/web` o vía scripts (`pnpm run deploy`).
+- **Reglas portables:** `_methød/code/dev-environment.md` — léelas antes de añadir un nuevo dev tool al monorepo.

@@ -266,8 +266,8 @@ hour/
 │   └── shared/            # types, zod schemas, shared utils
 ├── _build/                # (this folder — specs, ADRs, import plans)
 ├── .github/workflows/     # CI
-├── context.md             # project rules (inherits .zerø)
-├── CLAUDE.md              # stub (@context.md) for Claude Code / Cowork
+├── _context.md            # project rules (inherits .zerø)
+├── CLAUDE.md              # stub (@_context.md) for Claude Code / Cowork
 └── README.md
 ```
 
@@ -326,5 +326,5 @@ returns zero rows for authenticated users.
 
 - Visual design (lives in `_methød/design.md`)
 - CSS methodology (lives in `_methød/css.md`)
-- MaMeMi-specific content (lives in `ZS_MaMeMi/context.md`)
+- MaMeMi-specific content (lives in `01_STAGE/MüK CIA - MaMeMi/_context.md`)
 - Phase 1 SaaS pricing / packaging (decided at month 6 checkpoint)

@@ -12,14 +12,14 @@ Stack: Supabase Cloud (eu-central-1 Frankfurt) · Cloudflare Workers · R2 · pg
 
 ## Required reading (read in parallel before any work)
 
-- `/Users/marcorubiol/Zerø System/.zerø/context.md` — system rules (Spanish spoken / English in files, never fabricate, take a stance, no groveling).
+- `/Users/marcorubiol/Zerø System/.zerø/_system-context.md` — system rules (Spanish spoken / English in files, never fabricate, take a stance, no groveling).
 - `/Users/marcorubiol/Zerø System/_methød/markdown.md` — file conventions.
 - `/Users/marcorubiol/Zerø System/_methød/tone.md` — voice (no hype, no superlatives).
 - `/Users/marcorubiol/Zerø System/03_AGENCY/Hour/CLAUDE.md`
-- `/Users/marcorubiol/Zerø System/03_AGENCY/Hour/context.md`
-- `/Users/marcorubiol/Zerø System/03_AGENCY/Hour/_build/context.md`
-- `/Users/marcorubiol/Zerø System/03_AGENCY/Hour/_build/ARCHITECTURE.md`
-- `/Users/marcorubiol/Zerø System/03_AGENCY/Hour/_build/DECISIONS.md`
+- `/Users/marcorubiol/Zerø System/03_AGENCY/Hour/_context.md`
+- `/Users/marcorubiol/Zerø System/03_AGENCY/Hour/_build/_context.md`
+- `/Users/marcorubiol/Zerø System/03_AGENCY/Hour/_build/architecture.md`
+- `/Users/marcorubiol/Zerø System/03_AGENCY/Hour/_decisions.md`
 - `/Users/marcorubiol/Zerø System/03_AGENCY/Hour/_build/schema.sql` (current v2, to be destroyed and rewritten)
 - `/Users/marcorubiol/Zerø System/03_AGENCY/Hour/_build/rls-policies.sql` (current v2, to be destroyed and rewritten)
 - `/Users/marcorubiol/Zerø System/03_AGENCY/Hour/_build/bootstrap.md`
@@ -27,7 +27,7 @@ Stack: Supabase Cloud (eu-central-1 Frankfurt) · Cloudflare Workers · R2 · pg
 
 ## Decisions closed (director chat, 2026-04-19)
 
-Seven decisions. Each needs one ADR appended to `_build/DECISIONS.md` in English, ADR-lite format (Context / Decision / Consequences), dated 2026-04-19.
+Seven decisions. Each needs one ADR appended to `_decisions.md` in English, ADR-lite format (Context / Decision / Consequences), dated 2026-04-19.
 
 ### D1 — Engagement is a distinct entity from Show
 
@@ -105,7 +105,7 @@ Eliminate the `project.type` enum. The polymorphism lives in which subentities a
 
 ## Work to produce
 
-### Step 1 — Append seven ADRs to `_build/DECISIONS.md`
+### Step 1 — Append seven ADRs to `_decisions.md`
 
 One ADR per decision above. ADR-lite format:
 
@@ -119,7 +119,7 @@ One ADR per decision above. ADR-lite format:
 **Consequences.** What this unlocks, what it forecloses, what to watch for.
 ```
 
-Number the ADRs following the existing sequence in DECISIONS.md. Cross-reference where relevant (e.g. D6 relates to D1 via engagement permissions).
+Number the ADRs following the existing sequence in _decisions.md. Cross-reference where relevant (e.g. D6 relates to D1 via engagement permissions).
 
 ### Step 2 — Full rewrite of `_build/schema.sql`
 
@@ -190,7 +190,7 @@ Marco will review and run the reset manually when ready.
 
 Files updated or regenerated in `/Users/marcorubiol/Zerø System/03_AGENCY/Hour/_build/`:
 
-1. `DECISIONS.md` — seven ADRs appended.
+1. `_decisions.md` — seven ADRs appended.
 2. `schema.sql` — full rewrite.
 3. `rls-policies.sql` — full rewrite.
 4. `bootstrap.md` — updated if affected.
@@ -200,7 +200,7 @@ No git commits. No remote pushes. Leave the working tree dirty for Marco's revie
 
 ## Open decisions explicitly left for later
 
-Not part of this reset. Capture as TODOs in `_build/DECISIONS.md` under a "Deferred" section if not already there:
+Not part of this reset. Capture as TODOs in `_decisions.md` under a "Deferred" section if not already there:
 
 - **Tasks + Tags (Phase 0.5).** Define `task` entity. Tag vocabulary split in three groups (event kinds already in `date.kind`; work categories like `#creative/#admin/#logistics`; cross-cutting behavior triggers like `#billable/#contract`). Tag schema (per-workspace catalog, polymorphic tagging table, taggeable entities).
 - **UI for permission overrides per person.** Schema supports `permission_grants`/`permission_revokes` in `project_membership` from day 1 but UI in Phase 0 only edits role presets. Full override UI lands in Phase 0.5 or Phase 1 when external collaborators join.
