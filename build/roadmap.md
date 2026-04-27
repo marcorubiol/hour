@@ -295,6 +295,7 @@ Phase 0.2 completa.
 
 ### Trabajo
 1. Lens Contacts — lista searchable + filterable. Detail panel. **Mobile-first**.
+   - **Filtros obligatorios** (no negociable): House, Room, status. Sidebar entity selected = filter (Contacts + House → personas con engagement en esa House; Contacts + Room → personas con engagement en ese Room). ADR-009. Mecanismo schema: junction `engagement(person_id, project_id, workspace_id)`. Filtro por Gig vía `show.engagement_id` cuando aplique.
 2. Lens Money — invoices read-only + detail. Desktop-first.
 3. Room detail tabs: Work · Assets · Team · About.
 4. Endpoints varios.
