@@ -82,7 +82,7 @@ const supabaseAnonKey = env.PUBLIC_SUPABASE_ANON_KEY;
 
   <script define:vars={{ supabaseUrl, supabaseAnonKey }}>
     if (localStorage.getItem("hour_jwt")) {
-      window.location.replace("/difusion");
+      window.location.replace("/booking");
     }
 
     const form = document.getElementById("login-form");
@@ -126,7 +126,7 @@ const supabaseAnonKey = env.PUBLIC_SUPABASE_ANON_KEY;
           String(Date.now() + data.expires_in * 1000),
         );
 
-        window.location.replace("/difusion");
+        window.location.replace("/booking");
       } catch (err) {
         errorEl.textContent = err.message;
         errorEl.classList.add("login__error--visible");

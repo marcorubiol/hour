@@ -42,6 +42,7 @@ Working name: **Hour**. Brand decision deferred to Phase 1.
 - Indicative Phase 1 pricing: 25 / 60 / 120 €/mes, no setup fee, 14-day trial.
 - Coding happens in Windsurf (switched from Claude Code). Strategy happens in Cowork. Memory lives in `build/*.md`, not in chats.
 - Project lives in AGENCY (the vehicle / work for others), not STUDIO — Marco's call.
+- **Palette (semi-firm, evolutionary)**: primary `oklch(0.52 0.141 29.7)` = `#AB4235` (terracotta / brick red, decided 2026-04-25). Light theme (D-PRE-01). Three colour categories: base hues (`primary`, `base`, `neutral`) + status (`info`, `success`, `warning`, `danger`) + contextual (`text-color`, `bg-*`). All shades via `color-mix()` in OKLCH. Will keep evolving as the panel takes shape.
 
 ## Code
 - Local path: `03_AGENCY/Hour/` (monorepo, `git init` done 2026-04-19, branch `main`).
