@@ -91,23 +91,23 @@ Bootstrap de Phase 0 **cerrado**. Todos los pasos 1-8 de la lista anterior está
 ### Source tree
 Clean. Commits clave de hoy: schema.sql (DROP SCHEMA + 18 tablas), rls-policies.sql (has_permission + show_redacted view), fixes de audit durante cascade DELETE, restauración de grants Supabase tras CASCADE, db-types.ts regenerado, `/api/engagements` actualizado, loader Python adaptado.
 
-## Next session — Phase 0.0 infra (post fundación visual + routing)
+## Next session — Phase 0.0 infra (post fundación visual + routing + schema)
 
 Cerrado 2026-05-01:
 - 13/13 primitivos en `$lib/components/` (último: Sidebar desktop static / mobile drawer). Showcase en `/playground`.
 - Plum trial en `--primary` (provisional, ver `_decisions.md` 2026-05-01).
 - ADR-022 re-evaluada con dossier `build/url-architecture-dossier-2026-05-01.md`; addendum cerrado.
 - Routing scaffold día 5: `$lib/reserved-slugs.ts`, `$lib/url-state.ts`, `$lib/stores/{lens,selection}.svelte.ts`, layouts `/h/` (auth) y `/h/[workspace]/` (shell), placeholders entity (`room`, `gig`, `engagement`, `person`).
+- **Schema `reset_v2_roadsheet`** aplicado (commit `dbaf308`, migración 20260501190000). 22 tablas en producción. Show extensions + slug system + crew_assignment + cast_override + asset_version + collab_snapshot. Pasó por DB review independiente. `build/migrations/2026-05-01_reset_v2_roadsheet.sql` es el snapshot canónico. Ver `_decisions.md` 2026-05-01 (3 entradas: person.slug global, backup vía GH Actions, backup priority lowering).
 
 Pendiente Phase 0.0 (orden sugerido por independencia + ROI):
-1. **Schema `reset_v2_roadsheet`** vía MCP Supabase (3-4h) — 5 timeslots + 3 jsonb en `show`, `crew_assignment`, `cast_override`, `asset_version` con `direction`, `audit_log` aplicado a 13 tablas, `venue.timezone`, slug system (`previous_slugs text[]`, `slug_generator()` validando reserved list), `collab_snapshot` para Yjs.
+1. **Backup automatizado vía GitHub Actions** (1-2h) — `supabase db dump` semanal + R2 retención 12 semanas. **NO** Worker cron (CF Workers no corren binarios; ver `_decisions.md` 2026-05-01).
 2. **Testing scaffold** Vitest + Playwright (3-4h) — smoke por capa (component, API, e2e login).
 3. **Real-time wrapper** Supabase Realtime + presence (4-5h).
-4. **PartyServer DO** scaffold + `withYjs` + persistence (5-8h).
+4. **PartyServer DO** scaffold + `withYjs` + persistence (5-8h) — `collab_snapshot` table ya en sitio.
 5. **PWA + offline** Service Worker + IndexedDB + write-queue (10-14h, el grande).
-6. **Backup R2** + cron semanal (2-3h).
 
-Phase 0.1 arranca cuando 1+5 estén cerrados (schema + offline shell). 2/3/4/6 son perpendiculares y se pueden intercalar.
+Phase 0.1 arranca cuando 5 esté cerrado (offline shell). 1/2/3/4 son perpendiculares y se pueden intercalar.
 
 Todo el trabajo en Windsurf/Claude Code bajo `apps/web/src/routes/` y `apps/web/src/lib/`. `build/` se mantiene pero no necesita cambios para la UI.
 

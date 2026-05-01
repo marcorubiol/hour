@@ -59,7 +59,9 @@ Working name: **Hour**. Brand decision deferred to Phase 1.
 
 ## Status — 2026-05-01
 
-Phase 0.0 con la fundación visual + routing **cerrada**. Quedan los bloques de infra (schema roadsheet, real-time, PartyServer DO, PWA/offline, testing, backup) antes de Phase 0.1.
+Phase 0.0 con fundación visual + routing + **schema roadsheet** cerrados. Quedan los bloques de infra runtime (real-time, PartyServer DO, PWA/offline, testing, backup automatizado) antes de Phase 0.1.
+
+DB: **22 tablas** en producción tras `reset_v2_roadsheet` (commit `dbaf308`).
 
 ### Cerrado en sesión 2026-05-01
 - **13/13 primitivos** en `apps/web/src/lib/components/`: Button, LinkButton, Input, Checkbox, Radio, Avatar, Badge, Chip, Select, Dialog, Toast, Tooltip, Menu, Sidebar (desktop static / mobile drawer). Showcase completo en `/playground`.
@@ -73,13 +75,23 @@ Phase 0.0 con la fundación visual + routing **cerrada**. Quedan los bloques de 
   - `apps/web/src/routes/h/[workspace]/+layout.svelte` — shell con Sidebar + lens nav + reserved-slug guard.
   - Placeholders `+page.svelte` en `/h/[workspace]/`, `/room/[slug]`, `/gig/[slug]`, `/engagement/[slug]`, `/person/[slug]`. `run/venue/asset/invoice` diferidos a su Phase.
 
-### Pendiente Phase 0.0 (~30-40h restantes)
-- Schema `reset_v2_roadsheet` (3-4h, vía MCP Supabase)
+### Pendiente Phase 0.0 (~27-37h restantes)
+- ~~Schema `reset_v2_roadsheet`~~ **CERRADO 2026-05-01** (commit `dbaf308`)
+- **Backup automatizado vía GitHub Actions** (1-2h) — no Worker cron (CF Workers no pueden correr `supabase db dump`, restricción técnica descubierta esta sesión). Ver `_decisions.md` 2026-05-01.
 - Real-time wrapper + presence channel (4-5h)
-- PartyServer DO scaffold + `withYjs` + `collab_snapshot` persistence (5-8h)
+- PartyServer DO scaffold + `withYjs` + `collab_snapshot` persistence (5-8h) — `collab_snapshot` table ya en sitio
 - PWA + Service Worker + IndexedDB + write-queue (10-14h)
 - Testing scaffold Vitest + Playwright (3-4h)
-- Backup R2 + cron (2-3h)
+
+**Orden sugerido próxima sesión:** GitHub Actions backup primero (perpendicular, cierra deuda, 1-2h). Después testing scaffold o real-time wrapper (cualquiera, son independientes).
+
+### Cerrado en sesión 2026-05-01 (schema roadsheet)
+- **`reset_v2_roadsheet`** aplicada (migración 20260501190000, commit `dbaf308`). Pasó por DB review independiente (10 SERIOUS items, todos arreglados pre-aplicación).
+- Schema delta: `show` + 5 timeslots + 3 jsonb (logistics/hospitality/technical) + GIN + CHECK orden temporal NULL-safe; `venue.timezone` (D-PRE-10); slug system completo en 7 tablas (slug + `previous_slugs[]` + `slugify()` + `is_reserved_slug()` + `validate_slug()` trigger); 4 tablas nuevas: `crew_assignment`, `cast_override`, `asset_version`, `collab_snapshot` con RLS (`has_permission(project_id, 'edit:show')`), audit triggers, ws-immutability guards.
+- Backfill de 154 personas + 154 engagements con id-suffix anti-colisión. Todos slugs únicos y bien formados. `person.slug` es **GLOBAL UNIQUE** (person no tiene workspace_id — anti-CRM "global, shared"). Ver `_decisions.md` 2026-05-01.
+- Bug `slugify()` cazado en smoke (trim antes de truncar dejaba trailing dash en nombre catalán de 65+ chars). Fix: trim post-substring. Slug afectado reparado.
+- `db-types.ts` regenerado (1903 líneas, las 4 tablas + 2 enums presentes).
+- **Decisión técnica**: `build/schema.sql` y `build/rls-policies.sql` NO reescritos in-place — header con delta apuntando al archivo de migración como source of truth. Consolidación in-place queda como tarea diferida.
 
 ### Cerrado en sesión 2026-05-01 (observability + security tightening)
 - **Sentry full wiring** (`@sentry/sveltekit` 10.51, runtime Workers): `initCloudflareSentryHandle` + `sentryHandle()` en `hooks.server.ts`, `Sentry.init` + `replayIntegration` en `hooks.client.ts`, `experimental.instrumentation.server` + `experimental.tracing.server` en `svelte.config.js`. DSN baked at build time vía `$env/static/public`.
@@ -94,7 +106,7 @@ Phase 0.0 con la fundación visual + routing **cerrada**. Quedan los bloques de 
 ### Open debts (priority-ordered) — backlog para próximas sesiones
 Lista honesta de lo que sé que falta, ordenada por ratio coste/riesgo. **Atacar de arriba abajo.**
 
-1. **[ALTA] Backup Supabase → R2 cron semanal** (1-2h). Hoy hay 154 contactos enriquecidos en producción y cero copias. Riesgo asimétrico clásico — probabilidad baja, impacto altísimo si Supabase tiene incidente o alguien borra una tabla. Plan: script `scripts/backup-to-r2.ts` que corre `supabase db dump` + sube a R2 bucket nuevo `hour-backups`, cron del Worker domingo madrugada, retención 12 semanas.
+1. **[MEDIA] Backup Supabase → R2 cron semanal vía GitHub Actions** (1-2h). Re-evaluado 2026-05-01: bajado de ALTA a MEDIA porque los 154 contactos productivos son **derivables** del CSV original + pipeline `build/import/` (recreables en <30 min). Sigue siendo deuda real: pero el riesgo asimétrico no aplica hasta que haya datos NO derivables (primer crew_assignment manual, primer note humano, primer asset_version subido a mano). Transición a ALTA cuando llegue Phase 0.1-0.2. Plan: GitHub Actions semanal `supabase db dump` + push a R2 bucket `hour-backups`, retención 12 semanas. **NO** Worker cron — CF Workers no pueden ejecutar binarios nativos. Ver `_decisions.md` 2026-05-01.
 2. **[MEDIA] Smoke test e2e Playwright** (45 min). Hoy `pnpm check` y `pnpm build` pasan, pero ningún test funcional. Cada deploy a prod confía en review humano. Mínimo: Playwright `login → /booking carga 154 → logout` que corra antes de `wrangler deploy`. Red de seguridad bajo cambios futuros.
 3. **[MEDIA] Documentar rollback procedure** (15 min). Tag `pre-sveltekit-migration` existe + CF Workers permite rollback desde dashboard, pero ningún sitio dice "si un deploy revienta, hacer X". Una página corta en `build/runbooks/rollback.md`. El día que reviente a las 23:30, importa.
 4. **[BAJA] Cookies httpOnly en lugar de JWT en localStorage** (4-6h). Hoy XSS = sesión exfiltrable. Phase 0 con 5 usuarios conocidos OK; antes de meter primer cliente externo, mover a httpOnly+Secure+SameSite=Strict. Ya flagged en `architecture.md §8` como deuda Phase 1.

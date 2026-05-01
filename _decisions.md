@@ -896,3 +896,35 @@ Triggered by Marco's pre-scaffold doubt (Phase 0.0 day 5). Five alternatives eva
 - **Alternatives considered**: Indigo `oklch(0.50 0.16 282)`, Cobalt `oklch(0.48 0.15 258)`, Violet `oklch(0.50 0.17 295)`, Aubergine `oklch(0.42 0.10 318)`. All sit in the safe hue range 250°–340° (≥40° from each status: danger 25°, warning 75°, success 145°, info 220°).
 - **Rationale**: Plum at 335° is 50° from danger by the long way around — outside every status hue, so primary surfaces stop competing with red/amber/green/blue badges. Keeps the warm/scenic register of the original terracotta (didn't jump to corporate cool blue). All shade derivatives, `--link-color`, `--focus-color`, `--selection-bg` follow automatically via `color-mix()` — single-line token swap, no other code change.
 - **Status**: Provisional. Marco confirmed for now ("we move forward with this") but flagged it's not a brand decision. Re-evaluate when the visual design phase begins (Phase 0.4 polish, or earlier if the brand decision starts crystallizing in Phase 1 prep).
+
+## [2026-05-01] — `person.slug` is GLOBAL UNIQUE (no workspace scoping)
+- **Decision**: `person.slug` is enforced unique globally (`UNIQUE (slug) WHERE deleted_at IS NULL`), not per-workspace. The other 6 sluggable entities (workspace, project, line, show, engagement, venue) keep per-workspace scope.
+- **Context**: Discovered mid-migration apply. `person` has no `workspace_id` column — by ADR-001 / anti-CRM vocabulary, person is "global, shared" (one record per real-world human, referenced from many workspaces via `engagement` + `crew_assignment` + `cast_override`). My initial migration assumed person was tenant-scoped and tried `CREATE UNIQUE INDEX person_slug_uidx ON person (workspace_id, slug)` → `column "workspace_id" does not exist`. The independent DB review missed it too (both of us anchored on the per-workspace pattern shared by the other entities).
+- **Alternatives considered**:
+  - Add `workspace_id` to person to match the others — rejected. Breaks the global-shared model; would force duplicate person rows per workspace.
+  - Junction table `person_workspace_slug(person_id, workspace_id, slug)` to allow workspace-specific renames of the same global person — rejected for Phase 0. Adds complexity, no real use case until multi-workspace operations.
+  - Opaque-id-only URL for person (`/h/[ws]/person/[uuid]`) — rejected. Marco wants clean URLs (ADR-024 spirit).
+- **Rationale**: Global slug matches global model. URL `/h/[any-workspace]/person/centre-cultural` resolves consistently across workspaces — a feature, not a bug. Backfill collision-resolution (id-suffix) already produces 154 globally-unique slugs from the 154 imported persons. If two distinct persons in different workspaces ever share a name in the future, the second to be created gets the id-suffix (same mechanism as backfill).
+- **Status**: Firm for Phase 0. Re-evaluate if Phase 1 multi-workspace operations surface cross-tenant slug rename pain.
+
+## [2026-05-01] — Backup runs in GitHub Actions, not Cloudflare Worker cron
+- **Decision**: Automated Supabase → R2 backup runs as a weekly GitHub Action, not a Cloudflare Worker scheduled handler.
+- **Context**: `roadmap.md` Phase 0.0 originally specified "Worker cron + R2 + retention 12 weeks". Discovered while planning the script: Cloudflare Workers cannot execute native binaries (the runtime is V8/WASM only). `supabase db dump` is a native Go binary. There's no workable way to produce a real `pg_dump` from inside a Worker.
+- **Alternatives considered**:
+  - **Worker that hits Supabase via PostgREST and writes JSON-per-table to R2** — rejected. Captures data but not schema/functions/policies/triggers. Recoverable only if `schema.sql` + migrations stay versioned (they do), but a real `pg_dump` is more honest as a backup artifact.
+  - **launchd on the mac** — rejected. Only runs when the laptop is awake; silent failure mode is too easy.
+  - **GitHub Actions on cron** — chosen. Free for public/private repos under generous quotas (2000 min/mo), `supabase db dump` is just `apt-get install supabase` + a CLI call, push to R2 via `wrangler r2 object put` or `aws-sdk`. Secrets isolated in GH repo settings. Versioned in repo.
+- **Rationale**: Real dump (schema + data + functions), free, versioned, and the failure mode is loud (GitHub mails on cron failures). Trades "everything in CF" for "the right tool for the job".
+- **Status**: Firm. Implementation in next session (1-2h estimate).
+
+## [2026-05-01] — Backup priority lowered ALTA → MEDIA (derived data)
+- **Decision**: Until first non-derivable production data appears, automated backup is MEDIA priority, not ALTA. Re-promotes to ALTA when Phase 0.1-0.2 introduces user-edited content.
+- **Context**: I had flagged "no automated backup of 154 production contacts" as an ALTA-priority asymmetric risk. Marco countered: those 154 came from a CSV + 3-stage pipeline (`build/import/01_normalize.py` → `02_enrich_from_pdf.py` → `03_load_to_hour.py`) that is in the repo. Recoverable in <30 min. The DB right now is **derived state**, not authoritative source.
+- **Alternatives considered**: Keep ALTA-priority manual backups before every migration — rejected as unnecessary friction when source is versioned.
+- **Rationale**: Zero-principle alignment — files survive, derived state is recoverable. Backup-of-derived-data is an anti-pattern when the source pipeline is in version control. The risk asymmetry argument only holds when destruction would lose work that can't be reproduced.
+- **Triggers for re-promotion to ALTA**:
+  - First `crew_assignment` created manually through UI (Phase 0.2 road sheet work).
+  - First `show.notes` or `project.notes` edited via collaborative input (Phase 0.2 CRDT work).
+  - First `asset_version` uploaded to R2 (Phase 0.5+).
+  - Any custom field added to a person beyond the CSV-derived `custom_fields` blob.
+- **Status**: Firm for Phase 0.0 / Phase 0.1 shell. Re-evaluate at every phase gate.
