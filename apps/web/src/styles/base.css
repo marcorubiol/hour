@@ -315,8 +315,6 @@
     display: block;
     font-size: var(--text-xs);
     color: var(--text-dark-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
   }
 
   /* Form layout — :where(form) is too aggressive; use .form when it applies */
@@ -665,6 +663,7 @@
   }
 
   .check__label {
+    font-size: var(--text-m);
     color: var(--text-color);
   }
 
@@ -679,17 +678,282 @@
     color: var(--danger-dark);
   }
 
-  /* Badge skeleton — same pattern as button. Modifiers only redeclare vars. */
-  [class*="badge--"] {
-    display: inline-block;
-    padding-block: var(--badge-padding-block, var(--space-xs));
-    padding-inline: var(--badge-padding-inline, var(--space-s));
-    font-size: var(--badge-font-size, var(--text-xs));
-    font-weight: var(--badge-font-weight, 500);
+  /* Chip skeleton — INTERACTIVE pills (filter pills, removable tags, multi-select).
+     For static visual indicators (status, etc.) use Badge instead.
+     Tones + sizes modify variables only. Border color is derived from text color
+     via color-mix — same hue, sub-tone of the chip palette. Selected overrides. */
+  [class*="chip--"]:where(:not(.chip--none)) {
+    --chip-padding-block: var(--space-xs);
+    --chip-padding-inline: var(--space-s);
+    --chip-font-size: var(--text-xs);
+    --chip-font-weight: 500;
+    --chip-radius: var(--radius-circle);
+    --chip-gap: 0.4em;
+    --chip-border-color: color-mix(
+      in oklch,
+      var(--chip-color),
+      var(--chip-background) 60%
+    );
+
+    display: inline-flex;
+    align-items: center;
+    gap: var(--chip-gap);
+    padding-block: var(--chip-padding-block);
+    padding-inline: var(--chip-padding-inline);
+    font-size: var(--chip-font-size);
+    font-weight: var(--chip-font-weight);
     line-height: 1.4;
-    border-radius: var(--badge-radius, var(--radius-circle));
+    border-radius: var(--chip-radius);
+    background: var(--chip-background);
+    color: var(--chip-color);
+    border: 2px solid var(--chip-border-color);
+    transition: background var(--transition), border-color var(--transition);
+  }
+
+  /* Tones */
+  .chip--neutral {
+    --chip-background: var(--neutral-ultra-light);
+    --chip-color: var(--neutral-ultra-dark);
+  }
+  .chip--primary {
+    --chip-background: var(--primary-ultra-light);
+    --chip-color: var(--primary-ultra-dark);
+  }
+  .chip--info {
+    --chip-background: var(--info-ultra-light);
+    --chip-color: var(--info-ultra-dark);
+  }
+  .chip--success {
+    --chip-background: var(--success-ultra-light);
+    --chip-color: var(--success-ultra-dark);
+  }
+  .chip--warning {
+    --chip-background: var(--warning-ultra-light);
+    --chip-color: var(--warning-ultra-dark);
+  }
+  .chip--danger {
+    --chip-background: var(--danger-ultra-light);
+    --chip-color: var(--danger-ultra-dark);
+  }
+
+  /* Sizes — only xs and m redeclare; s is default. */
+  .chip--xs {
+    --chip-padding-block: 0.1em;
+    --chip-padding-inline: 0.5em;
+  }
+  .chip--m {
+    --chip-padding-block: var(--space-xs);
+    --chip-padding-inline: var(--space-m);
+    --chip-font-size: var(--text-s);
+  }
+
+  /* Inactive filter pill = clearly off (low opacity, no border).
+     Hover = lifted. Selected = full intensity + solid border in the tone color.
+     Only buttons get this treatment — removable chips (<span>) stay full. */
+  button[class*="chip--"]:not(:disabled):not(.chip--selected) {
+    opacity: 0.55;
+    --chip-border-color: transparent;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    button[class*="chip--"]:not(:disabled):not(.chip--selected):hover {
+      opacity: 0.9;
+    }
+  }
+
+  .chip--selected {
+    --chip-border-color: var(--chip-color);
+  }
+
+  /* Interactive (button[class*="chip--"] from onclick prop) */
+  button[class*="chip--"] {
+    cursor: pointer;
+    font-family: inherit;
+  }
+
+  button[class*="chip--"]:focus-visible {
+    outline: var(--focus-width) solid var(--focus-color);
+    outline-offset: 2px;
+  }
+
+  [class*="chip--"]:disabled,
+  .chip--disabled {
+    opacity: var(--disabled-opacity);
+    cursor: not-allowed;
+  }
+
+  /* Lead / tail icon slots — same role as btn__lead/__tail */
+  .chip__lead,
+  .chip__tail {
+    display: inline-flex;
+    align-items: center;
+  }
+
+  /* Remove button (when onRemove passed) */
+  .chip__remove {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    inline-size: 1.2em;
+    block-size: 1.2em;
+    padding: 0;
+    margin-inline-end: -0.2em;
+    font-size: 1.1em;
+    line-height: 1;
+    background: transparent;
+    border: 0;
+    border-radius: 50%;
+    color: inherit;
+    cursor: pointer;
+    opacity: 0.6;
+    transition: opacity var(--transition), background var(--transition);
+  }
+
+  .chip__remove:hover {
+    opacity: 1;
+    background: color-mix(in srgb, currentColor 15%, transparent);
+  }
+
+  .chip__remove:focus-visible {
+    outline: var(--focus-width) solid var(--focus-color);
+    outline-offset: 1px;
+    opacity: 1;
+  }
+
+  /* Badge skeleton — STATIC visual indicators (status pills, type tags, etc.).
+     Cuadradito (--radius-s), no interactive states.
+     Border derived from text color via color-mix — same hue as the badge palette. */
+  [class*="badge--"] {
+    --badge-padding-block: var(--space-xs);
+    --badge-padding-inline: var(--space-s);
+    --badge-font-size: var(--text-xs);
+    --badge-font-weight: 500;
+    --badge-radius: var(--radius-s);
+    --badge-gap: 0.4em;
+    --badge-border-color: color-mix(
+      in oklch,
+      var(--badge-color),
+      var(--badge-background) 60%
+    );
+
+    display: inline-flex;
+    align-items: center;
+    gap: var(--badge-gap);
+    padding-block: var(--badge-padding-block);
+    padding-inline: var(--badge-padding-inline);
+    font-size: var(--badge-font-size);
+    font-weight: var(--badge-font-weight);
+    line-height: 1.4;
+    border-radius: var(--badge-radius);
     background: var(--badge-background);
     color: var(--badge-color);
+    border: 1px solid var(--badge-border-color);
+  }
+
+  /* Tones — background + text color + accent (saturated, for dots/icons that
+     should pop against the muted text). Border is auto-derived. */
+  .badge--neutral {
+    --badge-background: var(--neutral-ultra-light);
+    --badge-color: var(--neutral-ultra-dark);
+    --badge-accent: var(--neutral-dark);
+  }
+  .badge--primary {
+    --badge-background: var(--primary-ultra-light);
+    --badge-color: var(--primary-ultra-dark);
+    --badge-accent: var(--primary);
+  }
+  .badge--info {
+    --badge-background: var(--info-ultra-light);
+    --badge-color: var(--info-ultra-dark);
+    --badge-accent: var(--info);
+  }
+  .badge--success {
+    --badge-background: var(--success-ultra-light);
+    --badge-color: var(--success-ultra-dark);
+    --badge-accent: var(--success);
+  }
+  .badge--warning {
+    --badge-background: var(--warning-ultra-light);
+    --badge-color: var(--warning-ultra-dark);
+    --badge-accent: var(--warning);
+  }
+  .badge--danger {
+    --badge-background: var(--danger-ultra-light);
+    --badge-color: var(--danger-ultra-dark);
+    --badge-accent: var(--danger);
+  }
+
+  /* Sizes — only xs and m redeclare; s is default. */
+  .badge--xs {
+    --badge-padding-block: 0.1em;
+    --badge-padding-inline: 0.5em;
+  }
+  .badge--m {
+    --badge-padding-block: var(--space-xs);
+    --badge-padding-inline: var(--space-m);
+    --badge-font-size: var(--text-s);
+  }
+
+  .badge__lead,
+  .badge__tail {
+    display: inline-flex;
+    align-items: center;
+  }
+
+  /* Avatar skeleton — circle with image or auto-derived initials. */
+  .avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    inline-size: var(--avatar-size);
+    block-size: var(--avatar-size);
+    border-radius: 50%;
+    font-weight: 500;
+    font-size: calc(var(--avatar-size) * 0.4);
+    background: var(--avatar-bg);
+    color: var(--avatar-color);
+    user-select: none;
+    flex-shrink: 0;
+    object-fit: cover;
+    overflow: hidden;
+  }
+
+  .avatar--xs {
+    --avatar-size: 1.5rem;
+  }
+  .avatar--s {
+    --avatar-size: 2rem;
+  }
+  .avatar--m {
+    --avatar-size: 2.5rem;
+  }
+  .avatar--l {
+    --avatar-size: 3rem;
+  }
+
+  .avatar--neutral {
+    --avatar-bg: var(--neutral-ultra-light);
+    --avatar-color: var(--neutral-ultra-dark);
+  }
+  .avatar--primary {
+    --avatar-bg: var(--primary-ultra-light);
+    --avatar-color: var(--primary-ultra-dark);
+  }
+  .avatar--info {
+    --avatar-bg: var(--info-ultra-light);
+    --avatar-color: var(--info-ultra-dark);
+  }
+  .avatar--success {
+    --avatar-bg: var(--success-ultra-light);
+    --avatar-color: var(--success-ultra-dark);
+  }
+  .avatar--warning {
+    --avatar-bg: var(--warning-ultra-light);
+    --avatar-color: var(--warning-ultra-dark);
+  }
+  .avatar--danger {
+    --avatar-bg: var(--danger-ultra-light);
+    --avatar-color: var(--danger-ultra-dark);
   }
 }
 

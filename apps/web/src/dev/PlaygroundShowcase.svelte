@@ -4,6 +4,9 @@
   import Input from '../components/Input.svelte';
   import Checkbox from '../components/Checkbox.svelte';
   import Radio from '../components/Radio.svelte';
+  import Chip from '../components/Chip.svelte';
+  import Badge from '../components/Badge.svelte';
+  import Avatar from '../components/Avatar.svelte';
 
   let counter = $state(0);
   let asyncLoading = $state(false);
@@ -11,6 +14,19 @@
   let priceValue = $state('');
   let agreeChecked = $state(false);
   let selectedColor = $state('primary');
+  let activeFilter = $state<'all' | 'live' | 'kept' | 'parked'>('all');
+  let tags = $state(['draft', 'urgent', '2026-27']);
+
+  function removeTag(tag: string) {
+    tags = tags.filter((t) => t !== tag);
+  }
+  let termsAccepted = $state(false);
+  let termsSubmitAttempted = $state(false);
+  let termsError = $derived(
+    termsSubmitAttempted && !termsAccepted
+      ? 'You must accept to continue.'
+      : undefined
+  );
 
   async function fakeAsync() {
     asyncLoading = true;
@@ -187,8 +203,31 @@
     />
     <Checkbox
       label="I accept the terms"
-      error="You must accept to continue."
+      bind:checked={termsAccepted}
+      error={termsError}
     />
+    <div class="playground__row">
+      <Button
+        size="s"
+        onclick={() => (termsSubmitAttempted = true)}
+      >
+        Try submit
+      </Button>
+      <Button
+        variant="outline"
+        size="s"
+        onclick={() => {
+          termsSubmitAttempted = false;
+          termsAccepted = false;
+        }}
+      >
+        Reset
+      </Button>
+    </div>
+    <p class="text--s text--dark-muted">
+      Click "Try submit" without ticking → error appears. Tick the box → error
+      clears (because the parent re-evaluates).
+    </p>
   </section>
 
   <section class="playground__section">
@@ -232,6 +271,175 @@
   </section>
 
   <section class="playground__section">
+    <h2 class="h3">Badge — tones</h2>
+    <p class="text--s text--dark-muted">
+      Static visual indicators. Square (radius-s), no interactive states.
+    </p>
+    <div class="playground__row">
+      <Badge>Neutral</Badge>
+      <Badge tone="primary">Primary</Badge>
+      <Badge tone="info">Info</Badge>
+      <Badge tone="success">Success</Badge>
+      <Badge tone="warning">Warning</Badge>
+      <Badge tone="danger">Danger</Badge>
+    </div>
+  </section>
+
+  <section class="playground__section">
+    <h2 class="h3">Badge — sizes</h2>
+    <div class="playground__row">
+      <Badge size="xs" tone="primary">XS</Badge>
+      <Badge size="s" tone="primary">S (default)</Badge>
+      <Badge size="m" tone="primary">M</Badge>
+    </div>
+  </section>
+
+  <section class="playground__section">
+    <h2 class="h3">Badge — engagement status (real domain)</h2>
+    <p class="text--s text--dark-muted">
+      Mirrors the pills shown in <code>/booking</code>.
+    </p>
+    <div class="playground__row">
+      <Badge tone="info">Contacted</Badge>
+      <Badge tone="warning">In conversation</Badge>
+      <Badge tone="neutral">Hold</Badge>
+      <Badge tone="success">Confirmed</Badge>
+      <Badge tone="danger">Declined</Badge>
+      <Badge tone="primary">Recurring</Badge>
+    </div>
+  </section>
+
+  <section class="playground__section">
+    <h2 class="h3">Badge — with lead icon (status dot)</h2>
+    <div class="playground__row">
+      <Badge tone="success">
+        {#snippet lead()}<span class="dot" aria-hidden="true"></span>{/snippet}
+        Live
+      </Badge>
+      <Badge tone="info">
+        {#snippet lead()}<span class="dot" aria-hidden="true"></span>{/snippet}
+        Kept
+      </Badge>
+      <Badge tone="neutral">
+        {#snippet lead()}<span class="dot" aria-hidden="true"></span>{/snippet}
+        Parked
+      </Badge>
+      <Badge tone="warning">
+        {#snippet lead()}<span class="dot" aria-hidden="true"></span>{/snippet}
+        Pending
+      </Badge>
+      <Badge tone="danger">
+        {#snippet lead()}<span class="dot" aria-hidden="true"></span>{/snippet}
+        Blocked
+      </Badge>
+    </div>
+  </section>
+
+  <section class="playground__section">
+    <h2 class="h3">Chip — filter pills (interactive, selected)</h2>
+    <div class="playground__row">
+      <Chip
+        tone="neutral"
+        selected={activeFilter === 'all'}
+        onclick={() => (activeFilter = 'all')}
+      >
+        All
+      </Chip>
+      <Chip
+        tone="success"
+        selected={activeFilter === 'live'}
+        onclick={() => (activeFilter = 'live')}
+      >
+        Live
+      </Chip>
+      <Chip
+        tone="info"
+        selected={activeFilter === 'kept'}
+        onclick={() => (activeFilter = 'kept')}
+      >
+        Kept
+      </Chip>
+      <Chip
+        tone="neutral"
+        selected={activeFilter === 'parked'}
+        onclick={() => (activeFilter = 'parked')}
+      >
+        Parked
+      </Chip>
+    </div>
+    <p class="text--s text--dark-muted">
+      Active filter: <code>{activeFilter}</code>
+    </p>
+  </section>
+
+  <section class="playground__section">
+    <h2 class="h3">Chip — removable</h2>
+    <div class="playground__row">
+      {#each tags as tag (tag)}
+        <Chip
+          tone="neutral"
+          onRemove={() => removeTag(tag)}
+          removeLabel={`Remove ${tag}`}
+        >
+          {tag}
+        </Chip>
+      {/each}
+      {#if tags.length === 0}
+        <Button
+          variant="outline"
+          size="s"
+          onclick={() => (tags = ['draft', 'urgent', '2026-27'])}
+        >
+          Reset tags
+        </Button>
+      {/if}
+    </div>
+  </section>
+
+  <section class="playground__section">
+    <h2 class="h3">Avatar — sizes</h2>
+    <div class="playground__row">
+      <Avatar size="xs" name="Marco Rubiol" />
+      <Avatar size="s" name="Marco Rubiol" />
+      <Avatar size="m" name="Marco Rubiol" />
+      <Avatar size="l" name="Marco Rubiol" />
+    </div>
+  </section>
+
+  <section class="playground__section">
+    <h2 class="h3">Avatar — initials & tones</h2>
+    <div class="playground__row">
+      <Avatar name="Marco Rubiol" tone="primary" />
+      <Avatar name="Anouk" tone="success" />
+      <Avatar name="Pau Riba" tone="info" />
+      <Avatar name="MaMeMi" tone="warning" />
+      <Avatar name="X" tone="danger" />
+      <Avatar tone="neutral" />
+    </div>
+  </section>
+
+  <section class="playground__section">
+    <h2 class="h3">Avatar — with image</h2>
+    <div class="playground__row">
+      <Avatar
+        src="https://i.pravatar.cc/150?img=12"
+        alt="Marco"
+        size="m"
+      />
+      <Avatar
+        src="https://i.pravatar.cc/150?img=47"
+        alt="Anouk"
+        size="m"
+      />
+      <Avatar
+        src="https://broken-link.test/missing.png"
+        name="Fallback Person"
+        alt="Broken image fallback (browser shows alt or empty)"
+      />
+    </div>
+  </section>
+
+  <section class="playground__section">
     <h2 class="h3">As form submit</h2>
     <form
       class="form"
@@ -270,6 +478,15 @@
       gap: var(--space-s);
       align-items: center;
       flex-wrap: wrap;
+    }
+
+    /* Status dot — uses --badge-accent declared by each tone. */
+    .dot {
+      inline-size: 0.5em;
+      block-size: 0.5em;
+      background: var(--badge-accent, currentColor);
+      border-radius: 50%;
+      display: inline-block;
     }
   }
 </style>
