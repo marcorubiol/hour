@@ -7,6 +7,11 @@
   import Chip from '../components/Chip.svelte';
   import Badge from '../components/Badge.svelte';
   import Avatar from '../components/Avatar.svelte';
+  import Select from '../components/Select.svelte';
+  import Dialog from '../components/Dialog.svelte';
+  import Toast, { addToast } from '../components/Toast.svelte';
+  import Tooltip from '../components/Tooltip.svelte';
+  import Menu, { type MenuAction } from '../components/Menu.svelte';
 
   let counter = $state(0);
   let asyncLoading = $state(false);
@@ -33,6 +38,38 @@
     await new Promise((r) => setTimeout(r, 1200));
     asyncLoading = false;
   }
+
+  // Select demo state
+  let seasonValue = $state('2026-27');
+  let priorityValue = $state('');
+  let regionValue = $state('eu');
+  const seasons = [
+    { value: '2024-25', label: '2024-25' },
+    { value: '2025-26', label: '2025-26' },
+    { value: '2026-27', label: '2026-27' },
+    { value: '2027-28', label: '2027-28' },
+  ];
+  const priorities = [
+    { value: 'low', label: 'Low' },
+    { value: 'normal', label: 'Normal' },
+    { value: 'high', label: 'High' },
+    { value: 'critical', label: 'Critical', disabled: true },
+  ];
+
+  // Dialog demo state
+  let dialogBasicOpen = $state(false);
+  let dialogConfirmOpen = $state(false);
+  let dialogLargeOpen = $state(false);
+  let dialogResult = $state<string | null>(null);
+
+  // Menu demo
+  const menuItems: MenuAction[] = [
+    { label: 'Edit', onclick: () => addToast({ tone: 'info', message: 'Edit clicked' }) },
+    { label: 'Duplicate', onclick: () => addToast({ tone: 'info', message: 'Duplicate clicked' }) },
+    { label: 'Archive', onclick: () => addToast({ tone: 'warning', message: 'Archived' }) },
+    { label: 'Pin', disabled: true },
+    { label: 'Delete', danger: true, onclick: () => addToast({ tone: 'danger', message: 'Deleted' }) },
+  ];
 </script>
 
 <main class="playground">
@@ -452,7 +489,285 @@
       <Button type="submit" variant="primary">Submit (+10)</Button>
     </form>
   </section>
+
+  <section class="playground__section">
+    <h2 class="h3">Select — basics</h2>
+    <Select
+      label="Season"
+      name="season"
+      options={seasons}
+      bind:value={seasonValue}
+    />
+    <Select
+      label="Priority"
+      name="priority"
+      placeholder="Choose a priority…"
+      options={priorities}
+      bind:value={priorityValue}
+      helper="Critical is reserved for ops issues."
+    />
+    <p class="text--s text--dark-muted">
+      Season: <code>{seasonValue}</code> · Priority:
+      <code>{priorityValue || '(none)'}</code>
+    </p>
+  </section>
+
+  <section class="playground__section">
+    <h2 class="h3">Select — states</h2>
+    <Select
+      label="With error"
+      placeholder="Pick one…"
+      options={seasons}
+      error="This season is closed."
+    />
+    <Select
+      label="Disabled"
+      options={seasons}
+      value="2025-26"
+      disabled
+    />
+    <Select label="Required" options={seasons} required value="" placeholder="Choose…" />
+  </section>
+
+  <section class="playground__section">
+    <h2 class="h3">Select — options via snippet</h2>
+    <Select label="Region" name="region" bind:value={regionValue}>
+      <option value="eu">Europe</option>
+      <option value="na">North America</option>
+      <option value="sa">South America</option>
+      <option value="as">Asia</option>
+      <option value="oc">Oceania</option>
+    </Select>
+    <p class="text--s text--dark-muted">
+      Region: <code>{regionValue}</code>
+    </p>
+  </section>
+
+  <section class="playground__section">
+    <h2 class="h3">Dialog</h2>
+    <p class="text--s text--dark-muted">
+      Native &lt;dialog&gt;. ESC closes, backdrop click closes (toggle in
+      "Confirm"), focus trap is browser-provided.
+    </p>
+    <div class="playground__row">
+      <Button onclick={() => (dialogBasicOpen = true)}>Open basic</Button>
+      <Button variant="outline" onclick={() => (dialogConfirmOpen = true)}>
+        Confirm action
+      </Button>
+      <Button variant="outline" onclick={() => (dialogLargeOpen = true)}>
+        Large
+      </Button>
+    </div>
+    {#if dialogResult}
+      <p class="text--s text--dark-muted">
+        Last decision: <code>{dialogResult}</code>
+      </p>
+    {/if}
+  </section>
+
+  <Dialog bind:open={dialogBasicOpen} title="Engagement details" description="Quick info shown in a modal.">
+    <p>
+      The road sheet for this gig is still pending. Confirm dates and venue
+      contacts before sending the contract.
+    </p>
+    {#snippet actions()}
+      <Button variant="outline" size="s" onclick={() => (dialogBasicOpen = false)}>
+        Close
+      </Button>
+    {/snippet}
+  </Dialog>
+
+  <Dialog
+    bind:open={dialogConfirmOpen}
+    title="Delete engagement?"
+    description="This action cannot be undone."
+    closeOnBackdrop={false}
+    size="s"
+  >
+    <p>
+      The engagement and all attached notes will be removed. This affects 1 row
+      across 2 reports.
+    </p>
+    {#snippet actions()}
+      <Button
+        variant="outline"
+        size="s"
+        onclick={() => {
+          dialogConfirmOpen = false;
+          dialogResult = 'cancelled';
+        }}
+      >
+        Cancel
+      </Button>
+      <Button
+        size="s"
+        onclick={() => {
+          dialogConfirmOpen = false;
+          dialogResult = 'deleted';
+          addToast({ tone: 'danger', title: 'Deleted', message: 'Engagement removed.' });
+        }}
+      >
+        Delete
+      </Button>
+    {/snippet}
+  </Dialog>
+
+  <Dialog bind:open={dialogLargeOpen} title="Long content" size="l">
+    <p>
+      A wider modal for richer content — tables, forms, road-sheet drafts. The
+      panel keeps the same radius and shadow tokens as the small variant.
+    </p>
+    <p>
+      Scroll-lock is applied to <code>html</code> while the dialog is open so
+      the rest of the page stays still.
+    </p>
+    {#snippet actions()}
+      <Button variant="outline" size="s" onclick={() => (dialogLargeOpen = false)}>
+        Done
+      </Button>
+    {/snippet}
+  </Dialog>
+
+  <section class="playground__section">
+    <h2 class="h3">Toast — tones</h2>
+    <p class="text--s text--dark-muted">
+      Stack lives bottom-right (fixed). Auto-dismiss after 4s; click × to remove
+      sooner.
+    </p>
+    <div class="playground__row">
+      <Button
+        size="s"
+        variant="outline"
+        onclick={() =>
+          addToast({ tone: 'info', title: 'Heads up', message: 'New version available.' })}
+      >
+        Info
+      </Button>
+      <Button
+        size="s"
+        variant="outline"
+        onclick={() =>
+          addToast({ tone: 'success', title: 'Saved', message: 'Engagement updated.' })}
+      >
+        Success
+      </Button>
+      <Button
+        size="s"
+        variant="outline"
+        onclick={() =>
+          addToast({ tone: 'warning', title: 'Slow response', message: 'Worker took >2s.' })}
+      >
+        Warning
+      </Button>
+      <Button
+        size="s"
+        variant="outline"
+        onclick={() =>
+          addToast({ tone: 'danger', title: 'Error', message: 'Could not save: 500.' })}
+      >
+        Danger
+      </Button>
+      <Button
+        size="s"
+        variant="outline"
+        onclick={() =>
+          addToast({ tone: 'info', message: 'Sticky message — manual dismiss.', duration: 0 })}
+      >
+        Sticky
+      </Button>
+    </div>
+  </section>
+
+  <section class="playground__section">
+    <h2 class="h3">Tooltip — positions</h2>
+    <p class="text--s text--dark-muted">
+      Hover or focus a button to reveal. Default delay 300ms.
+    </p>
+    <div class="playground__row" style="padding-block: var(--space-l)">
+      <Tooltip text="Above the trigger" position="top">
+        <Button variant="outline" size="s">Top</Button>
+      </Tooltip>
+      <Tooltip text="To the right" position="right">
+        <Button variant="outline" size="s">Right</Button>
+      </Tooltip>
+      <Tooltip text="Below the trigger" position="bottom">
+        <Button variant="outline" size="s">Bottom</Button>
+      </Tooltip>
+      <Tooltip text="To the left" position="left">
+        <Button variant="outline" size="s">Left</Button>
+      </Tooltip>
+      <Tooltip text="No delay" position="top" delay={0}>
+        <Button variant="outline" size="s">Instant</Button>
+      </Tooltip>
+    </div>
+  </section>
+
+  <section class="playground__section">
+    <h2 class="h3">Menu — actions (array)</h2>
+    <p class="text--s text--dark-muted">
+      Arrow keys, Home/End, Esc; click outside closes.
+    </p>
+    <div class="playground__row">
+      <Menu items={menuItems} />
+      <Menu items={menuItems} align="end">
+        {#snippet trigger()}
+          Actions
+          <span aria-hidden="true">▾</span>
+        {/snippet}
+      </Menu>
+    </div>
+  </section>
+
+  <section class="playground__section">
+    <h2 class="h3">Menu — custom items (snippet)</h2>
+    <Menu align="start">
+      {#snippet trigger()}
+        Filter
+        <span aria-hidden="true">▾</span>
+      {/snippet}
+      {#snippet children({ close })}
+        <li role="none">
+          <button
+            type="button"
+            role="menuitem"
+            class="menu__item"
+            onclick={() => {
+              activeFilter = 'all';
+              close();
+            }}
+          >All shows</button>
+        </li>
+        <li role="none">
+          <button
+            type="button"
+            role="menuitem"
+            class="menu__item"
+            onclick={() => {
+              activeFilter = 'live';
+              close();
+            }}
+          >Live only</button>
+        </li>
+        <li role="none">
+          <button
+            type="button"
+            role="menuitem"
+            class="menu__item"
+            onclick={() => {
+              activeFilter = 'kept';
+              close();
+            }}
+          >Kept only</button>
+        </li>
+      {/snippet}
+    </Menu>
+    <p class="text--s text--dark-muted">
+      Filter via menu: <code>{activeFilter}</code>
+    </p>
+  </section>
 </main>
+
+<Toast />
 
 <style>
   @layer components {

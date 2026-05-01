@@ -505,7 +505,8 @@
     opacity: 0.7;
   }
 
-  .field__control > input {
+  .field__control > input,
+  .field__control > select {
     border: none;
     border-radius: 0;
     outline: none;
@@ -515,9 +516,17 @@
   }
 
   .field__control > input:hover,
-  .field__control > input:focus-visible {
+  .field__control > input:focus-visible,
+  .field__control > select:hover,
+  .field__control > select:focus-visible {
     border: none;
     outline: none;
+  }
+
+  /* Native select keeps its chevron via appearance: auto (default).
+     Padding is inherited from the global :where(...select) rule. */
+  .field--select .field__control {
+    overflow: visible; /* allow native dropdown shadow if any */
   }
 
   .field__prefix,
@@ -954,6 +963,306 @@
   .avatar--danger {
     --avatar-bg: var(--danger-ultra-light);
     --avatar-color: var(--danger-ultra-dark);
+  }
+
+  /* Dialog skeleton — native <dialog>. The element itself stays transparent
+     and only acts as the centered container that captures backdrop clicks
+     (e.target === dialog when the click lands on the ::backdrop). The
+     visible surface is .dialog__panel. Modifiers redeclare --dialog-* vars. */
+  .dialog {
+    --dialog-max-width: 32rem;
+    --dialog-radius: var(--radius-l);
+    --dialog-padding: var(--space-l);
+
+    margin: auto;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    max-inline-size: 100%;
+    max-block-size: 100%;
+  }
+
+  .dialog::backdrop {
+    background: color-mix(in srgb, var(--black) 40%, transparent);
+  }
+
+  .dialog__panel {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-m);
+    inline-size: min(90vw, var(--dialog-max-width));
+    padding: var(--dialog-padding);
+    background: var(--base);
+    color: var(--text-color);
+    border-radius: var(--dialog-radius);
+    box-shadow: var(--box-shadow-3);
+  }
+
+  .dialog__header {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+  }
+
+  .dialog__title {
+    font-size: var(--h3);
+  }
+
+  .dialog__description {
+    color: var(--text-dark-muted);
+    font-size: var(--text-s);
+  }
+
+  .dialog__body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-s);
+  }
+
+  .dialog__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--space-s);
+    flex-wrap: wrap;
+  }
+
+  .dialog--s {
+    --dialog-max-width: 24rem;
+  }
+  .dialog--l {
+    --dialog-max-width: 48rem;
+  }
+
+  /* Toast skeleton — fixed region in the bottom-right with a vertical stack.
+     Each .toast--<tone> redeclares --toast-bg / --toast-color / --toast-accent. */
+  .toast-region {
+    position: fixed;
+    inset-block-end: var(--space-m);
+    inset-inline-end: var(--space-m);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-s);
+    z-index: var(--z-toast);
+    pointer-events: none;
+    max-inline-size: min(28rem, calc(100vw - var(--space-l)));
+  }
+
+  [class*="toast--"] {
+    --toast-padding-block: var(--space-s);
+    --toast-padding-inline: var(--space-m);
+    --toast-radius: var(--radius-m);
+    --toast-border-color: color-mix(
+      in oklch,
+      var(--toast-color),
+      var(--toast-bg) 70%
+    );
+
+    pointer-events: auto;
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-s);
+    padding-block: var(--toast-padding-block);
+    padding-inline: var(--toast-padding-inline);
+    background: var(--toast-bg);
+    color: var(--toast-color);
+    border: 1px solid var(--toast-border-color);
+    border-inline-start: 4px solid var(--toast-accent);
+    border-radius: var(--toast-radius);
+    box-shadow: var(--box-shadow-2);
+    font-size: var(--text-s);
+  }
+
+  .toast--info {
+    --toast-bg: var(--info-ultra-light);
+    --toast-color: var(--info-ultra-dark);
+    --toast-accent: var(--info);
+  }
+  .toast--success {
+    --toast-bg: var(--success-ultra-light);
+    --toast-color: var(--success-ultra-dark);
+    --toast-accent: var(--success);
+  }
+  .toast--warning {
+    --toast-bg: var(--warning-ultra-light);
+    --toast-color: var(--warning-ultra-dark);
+    --toast-accent: var(--warning);
+  }
+  .toast--danger {
+    --toast-bg: var(--danger-ultra-light);
+    --toast-color: var(--danger-ultra-dark);
+    --toast-accent: var(--danger);
+  }
+
+  .toast__body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+  }
+
+  .toast__title {
+    font-size: var(--text-s);
+    font-weight: 600;
+    color: inherit;
+  }
+
+  .toast__message {
+    font-size: var(--text-s);
+    color: inherit;
+  }
+
+  .toast__dismiss {
+    flex-shrink: 0;
+    inline-size: 1.5em;
+    block-size: 1.5em;
+    padding: 0;
+    font-size: 1.1em;
+    line-height: 1;
+    background: transparent;
+    border: 0;
+    border-radius: 50%;
+    color: inherit;
+    opacity: 0.6;
+    cursor: pointer;
+    transition: opacity var(--transition), background var(--transition);
+  }
+
+  .toast__dismiss:hover {
+    opacity: 1;
+    background: color-mix(in srgb, currentColor 15%, transparent);
+  }
+
+  .toast__dismiss:focus-visible {
+    outline: var(--focus-width) solid var(--focus-color);
+    outline-offset: 1px;
+    opacity: 1;
+  }
+
+  /* Tooltip skeleton — anchored to a wrapper, positioned via .tooltip--<pos>.
+     Visibility flips with [data-visible]; transitions handle fade. */
+  .tooltip-wrapper {
+    position: relative;
+    display: inline-flex;
+  }
+
+  .tooltip {
+    position: absolute;
+    z-index: var(--z-dropdown);
+    padding-block: var(--space-xs);
+    padding-inline: var(--space-s);
+    background: var(--neutral-ultra-dark);
+    color: var(--text-light);
+    font-size: var(--text-xs);
+    line-height: 1.3;
+    border-radius: var(--radius-s);
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity var(--transition), visibility var(--transition);
+  }
+
+  .tooltip[data-visible] {
+    opacity: 1;
+    visibility: visible;
+  }
+
+  .tooltip--top {
+    inset-block-end: calc(100% + var(--space-xs));
+    inset-inline-start: 50%;
+    transform: translateX(-50%);
+  }
+  .tooltip--bottom {
+    inset-block-start: calc(100% + var(--space-xs));
+    inset-inline-start: 50%;
+    transform: translateX(-50%);
+  }
+  .tooltip--left {
+    inset-inline-end: calc(100% + var(--space-xs));
+    inset-block-start: 50%;
+    transform: translateY(-50%);
+  }
+  .tooltip--right {
+    inset-inline-start: calc(100% + var(--space-xs));
+    inset-block-start: 50%;
+    transform: translateY(-50%);
+  }
+
+  /* Menu skeleton — dropdown anchored to a trigger. Items use [role="menuitem"].
+     Modifiers .menu--start / .menu--end pick the inline alignment. */
+  .menu-wrapper {
+    position: relative;
+    display: inline-flex;
+  }
+
+  .menu {
+    position: absolute;
+    inset-block-start: calc(100% + var(--space-xs));
+    z-index: var(--z-dropdown);
+    min-inline-size: 12rem;
+    margin: 0;
+    padding: var(--space-xs);
+    list-style: none;
+    background: var(--base);
+    border: var(--border);
+    border-radius: var(--radius-m);
+    box-shadow: var(--box-shadow-2);
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+
+  .menu--start {
+    inset-inline-start: 0;
+  }
+  .menu--end {
+    inset-inline-end: 0;
+  }
+
+  .menu li {
+    list-style: none;
+    margin: 0;
+  }
+
+  .menu__item {
+    inline-size: 100%;
+    text-align: start;
+    padding-block: var(--space-xs);
+    padding-inline: var(--space-s);
+    font-size: var(--text-s);
+    color: var(--text-color);
+    background: transparent;
+    border: 0;
+    border-radius: var(--radius-s);
+    text-decoration: none;
+    cursor: pointer;
+    transition: background var(--transition), color var(--transition);
+  }
+
+  .menu__item:hover,
+  .menu__item:focus-visible {
+    background: var(--bg-ultra-light);
+    outline: none;
+    color: var(--heading-color);
+  }
+
+  .menu__item[disabled],
+  .menu__item[aria-disabled="true"] {
+    opacity: var(--disabled-opacity);
+    cursor: not-allowed;
+    background: transparent;
+    color: var(--text-color);
+  }
+
+  .menu__item--danger {
+    color: var(--danger-dark);
+  }
+
+  .menu__item--danger:hover,
+  .menu__item--danger:focus-visible {
+    background: var(--danger-ultra-light);
+    color: var(--danger-ultra-dark);
   }
 }
 
