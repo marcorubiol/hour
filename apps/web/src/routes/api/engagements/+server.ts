@@ -8,23 +8,14 @@
  * Anti-CRM vocabulary (reset v2 enum, 2026-04-19): status defaults to
  * `contacted`. Pass `status=any` to disable status filtering.
  *
- * Query params (all optional):
- *   status         engagement_status | 'any' (default: contacted)
- *   project_slug   project slug      (default: mamemi)
- *   season         text (matches custom_fields->>season)
- *                  (default: 2026-27; pass 'any' to disable)
- *   limit          1..100 (default: 50)
- *   offset         >= 0   (default: 0)
- *
  * Auth: Bearer JWT required. RLS denies anon.
  */
 
-import type { APIRoute } from 'astro';
-import { extractBearer } from '../../lib/auth.ts';
-import type { Enum, Row } from '../../lib/db-types.ts';
-import { pgGet, PostgrestError, type SupabaseEnv } from '../../lib/supabase.ts';
-
-export const prerender = false;
+import type { RequestHandler } from './$types';
+import * as v from 'valibot';
+import { extractBearer } from '$lib/auth';
+import type { Enum, Row } from '$lib/db-types';
+import { pgGet, PostgrestError, type SupabaseEnv } from '$lib/supabase';
 
 const ALLOWED_STATUSES: ReadonlyArray<Enum<'engagement_status'>> = [
   'contacted',
@@ -35,7 +26,36 @@ const ALLOWED_STATUSES: ReadonlyArray<Enum<'engagement_status'>> = [
   'dormant',
   'recurring',
 ];
-const ALLOWED_STATUSES_SET = new Set<string>(ALLOWED_STATUSES);
+
+const QuerySchema = v.object({
+  status: v.optional(
+    v.union([v.literal('any'), v.picklist(ALLOWED_STATUSES)]),
+    'contacted',
+  ),
+  project_slug: v.optional(v.pipe(v.string(), v.minLength(1)), 'mamemi'),
+  season: v.optional(v.string(), '2026-27'),
+  limit: v.optional(
+    v.pipe(
+      v.string(),
+      v.transform((n) => Number(n)),
+      v.number(),
+      v.integer(),
+      v.minValue(1),
+      v.maxValue(100),
+    ),
+    '50',
+  ),
+  offset: v.optional(
+    v.pipe(
+      v.string(),
+      v.transform((n) => Number(n)),
+      v.number(),
+      v.integer(),
+      v.minValue(0),
+    ),
+    '0',
+  ),
+});
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -47,13 +67,7 @@ function json(body: unknown, status = 200): Response {
 type EngagementRow = Row<'engagement'>;
 type PersonLite = Pick<
   Row<'person'>,
-  | 'id'
-  | 'full_name'
-  | 'email'
-  | 'organization_name'
-  | 'country'
-  | 'city'
-  | 'website'
+  'id' | 'full_name' | 'email' | 'organization_name' | 'country' | 'city' | 'website'
 >;
 type ProjectLite = Pick<Row<'project'>, 'id' | 'slug' | 'name' | 'status'>;
 
@@ -62,9 +76,11 @@ interface EngagementItem extends EngagementRow {
   project: ProjectLite | null;
 }
 
-export const GET: APIRoute = async ({ request, locals, url }) => {
-  const env = (locals as unknown as { runtime: { env: SupabaseEnv } }).runtime
-    .env;
+export const GET: RequestHandler = async ({ request, url, platform }) => {
+  if (!platform?.env) {
+    return json({ error: 'platform_unavailable' }, 500);
+  }
+  const env = platform.env as unknown as SupabaseEnv;
 
   const jwt = extractBearer(request);
   if (!jwt) {
@@ -77,23 +93,22 @@ export const GET: APIRoute = async ({ request, locals, url }) => {
     );
   }
 
-  // ---- Parse & validate params --------------------------------------------
-  const rawStatus = url.searchParams.get('status') ?? 'contacted';
-  if (rawStatus !== 'any' && !ALLOWED_STATUSES_SET.has(rawStatus)) {
+  const rawParams = Object.fromEntries(url.searchParams.entries());
+  const parsed = v.safeParse(QuerySchema, rawParams);
+  if (!parsed.success) {
     return json(
-      { error: 'invalid_status', allowed: [...ALLOWED_STATUSES, 'any'] },
+      {
+        error: 'invalid_query',
+        issues: parsed.issues.map((i) => ({
+          path: i.path?.map((p) => p.key).join('.'),
+          message: i.message,
+        })),
+      },
       400,
     );
   }
-  const projectSlug = url.searchParams.get('project_slug') ?? 'mamemi';
-  const season = url.searchParams.get('season') ?? '2026-27';
-  const limit = Math.min(
-    Math.max(Number(url.searchParams.get('limit') ?? 50), 1),
-    100,
-  );
-  const offset = Math.max(Number(url.searchParams.get('offset') ?? 0), 0);
+  const { status, project_slug, season, limit, offset } = parsed.output;
 
-  // ---- Build PostgREST query ---------------------------------------------
   const search = new URLSearchParams();
   search.set(
     'select',
@@ -103,10 +118,10 @@ export const GET: APIRoute = async ({ request, locals, url }) => {
       'project:project_id!inner(id,slug,name,status)',
     ].join(','),
   );
-  search.set('project.slug', `eq.${projectSlug}`);
+  search.set('project.slug', `eq.${project_slug}`);
   search.set('deleted_at', 'is.null');
 
-  if (rawStatus !== 'any') search.set('status', `eq.${rawStatus}`);
+  if (status !== 'any') search.set('status', `eq.${status}`);
   if (season !== 'any') search.set('custom_fields->>season', `eq.${season}`);
 
   search.set('order', 'next_action_at.asc.nullslast,updated_at.desc');
@@ -123,8 +138,8 @@ export const GET: APIRoute = async ({ request, locals, url }) => {
       total: total ?? data.length,
       limit,
       offset,
-      project_slug: projectSlug,
-      status: rawStatus,
+      project_slug,
+      status,
       season,
       items: data,
     });

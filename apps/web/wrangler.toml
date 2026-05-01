@@ -3,8 +3,10 @@ name = "hour-web"
 compatibility_date = "2025-02-14"
 compatibility_flags = ["nodejs_compat"]
 
-main = "./dist/_worker.js/index.js"
-assets = { directory = "./dist", binding = "ASSETS" }
+# SvelteKit's @sveltejs/adapter-cloudflare emits the Worker entry to
+# .svelte-kit/cloudflare/_worker.js and the static assets to .svelte-kit/cloudflare.
+main = "./.svelte-kit/cloudflare/_worker.js"
+assets = { directory = "./.svelte-kit/cloudflare", binding = "ASSETS" }
 
 # Observability: surface Worker logs in the Cloudflare dashboard.
 [observability]
