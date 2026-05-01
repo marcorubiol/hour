@@ -7,7 +7,7 @@ export default {
   kit: {
     adapter: adapter({
       platformProxy: {
-        configPath: 'wrangler.toml',
+        configPath: 'wrangler.jsonc',
         persist: false,
       },
     }),

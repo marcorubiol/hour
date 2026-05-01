@@ -1,0 +1,75 @@
+{
+  // Schema: pulled from the local wrangler install for editor autocomplete.
+  "$schema": "node_modules/wrangler/config-schema.json",
+
+  "name": "hour-web",
+  "compatibility_date": "2025-02-14",
+  "compatibility_flags": ["nodejs_compat"],
+
+  // Smart Placement — Cloudflare picks a colo close to Supabase (eu-central-1
+  // / Frankfurt) instead of the user's edge, reducing the Worker→Postgres
+  // round-trip from ~30-50 ms to ~10-15 ms for users far from Frankfurt.
+  // Free tier, no opt-out cost. Hyperdrive doesn't apply (we use PostgREST
+  // over HTTPS, not direct TCP); Smart Placement is the equivalent that fits
+  // this stack.
+  "placement": {
+    "mode": "smart"
+  },
+
+  // SvelteKit's @sveltejs/adapter-cloudflare emits the Worker entry to
+  // .svelte-kit/cloudflare/_worker.js and the static assets to .svelte-kit/cloudflare.
+  "main": "./.svelte-kit/cloudflare/_worker.js",
+  "assets": {
+    "directory": "./.svelte-kit/cloudflare",
+    "binding": "ASSETS"
+  },
+
+  // Observability: surface Worker logs in the Cloudflare dashboard.
+  "observability": {
+    "enabled": true
+  },
+
+  // R2 bucket binding — media uploads (riders, fichas técnicas, audios, vídeos).
+  "r2_buckets": [
+    {
+      "binding": "MEDIA",
+      "bucket_name": "hour-media"
+    }
+  ],
+
+  // Worker version metadata binding — used by @sentry/sveltekit to tag events
+  // with the deployed version, so Sentry's "regressed in deploy X" works.
+  "version_metadata": {
+    "binding": "CF_VERSION_METADATA"
+  },
+
+  // Non-secret public env vars. Secrets (service role key) go in dashboard
+  // Settings → Variables and Secrets, never in this file.
+  //
+  // Sentry config (PUBLIC_SENTRY_DSN, PUBLIC_SENTRY_ENV) lives in `.env` at
+  // `apps/web/.env`, NOT here. SvelteKit reads `$env/static/public` at build
+  // time and bakes the values into the bundle. wrangler deploy ships the
+  // already-baked bundle, no runtime env needed.
+  "vars": {
+    "PUBLIC_SUPABASE_URL": "https://lqlyorlccnniybezugme.supabase.co",
+    "PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_IavZsGp7i04juuafanQk9w_33pFDhNu"
+  }
+
+  // ── Phase 0.0 Day 10 (ADR-025) — Durable Object scaffold for `y-partyserver`.
+  // Uncomment when the DO handler exists at src/lib/do/roadsheet.ts.
+  //
+  // "durable_objects": {
+  //   "bindings": [
+  //     {
+  //       "name": "ROADSHEET_COLLAB",
+  //       "class_name": "RoadsheetCollab"
+  //     }
+  //   ]
+  // },
+  // "migrations": [
+  //   {
+  //     "tag": "v1-roadsheet-collab",
+  //     "new_sqlite_classes": ["RoadsheetCollab"]
+  //   }
+  // ]
+}

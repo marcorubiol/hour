@@ -48,3 +48,6 @@ build/import/__pycache__/
 
 # pCloud/FUSE temp files
 .fuse_hidden*
+
+# wrangler types — regenerable via `pnpm cf-typegen`
+apps/web/worker-configuration.d.ts

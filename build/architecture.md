@@ -4,7 +4,8 @@
 > Subdomain: `hour.zerosense.studio`
 > Status: Phase 0 — internal tool for MaMeMi, multi-tenant schema from day one so Phase 1 (SaaS) is config, not rewrite.
 > Owner: Marco Rubiol
-> Data model: **reset v2** (2026-04-19) — 18 tables, polymorphic core (workspace + project + engagement + show) with `line`/`venue` primitives and a money stack (invoice/invoice_line/payment/expense). Editable RBAC via `workspace_role` catalog + per-project `project_membership.roles/grants/revokes`. Anti-CRM vocabulary. See DECISIONS.md ADR-001..007.
+> Data model: **reset v2** (2026-04-19) — 18 tables, polymorphic core (workspace + project + engagement + show) with `line`/`venue` primitives and a money stack (invoice/invoice_line/payment/expense). Editable RBAC via `workspace_role` catalog + per-project `project_membership.roles/grants/revokes`. Anti-CRM vocabulary. See `_decisions.md` ADR-001..007.
+> Last reviewed: **2026-05-01** — synced with ADR-026 (frontend migrated Astro → SvelteKit) and ADR-025 (collab transport refined to `y-partyserver`).
 
 ---
 
@@ -22,15 +23,22 @@ This document describes Phase 0. Phase 1 scaling decisions are in `../build/scal
 
 | Layer | Choice | Reason |
 |------|--------|--------|
-| Frontend | **Astro** with islands (Svelte or React for interactive parts) | Static-first, fast, low JS by default, good for content + app hybrid |
-| Backend | **Supabase Cloud** (Postgres 15 + Auth + RLS + Storage metadata + Realtime) | Single operator, RLS handles multi-tenancy natively |
+| Frontend | **SvelteKit 2 + Svelte 5** (runes, snippets) on `@sveltejs/adapter-cloudflare` 7 | Single-runtime app: client routing, `+server.ts` endpoints, `load()` deps, `hooks.server.ts`. Migrated from Astro 5 + islands on 2026-05-01 (ADR-026). |
+| Server-state cache | **TanStack Query** (`@tanstack/svelte-query`) | Stale-while-revalidate, dedupe, invalidation on mutation. Provider in `+layout.svelte`, browser-only. |
+| Form/query validation | **Valibot** 1.0 | Schema validation at every `+server.ts` boundary. Smaller bundle than Zod, fits Worker size budget. |
+| Bundler | **Vite** 6 | SvelteKit's native build pipeline. |
+| Edge runtime | **Cloudflare Worker** `hour-web` (wrangler 4) with **Smart Placement** | Single Worker serves SSR + static assets via `ASSETS` binding. R2 bound as `MEDIA`. Smart Placement co-locates the Worker near Supabase (Frankfurt) to cut Worker→PostgREST round-trips. Hyperdrive doesn't apply — PostgREST is HTTPS, not direct TCP. |
+| Backend | **Supabase Cloud** (Postgres 17 + Auth + RLS + Realtime) | Single operator, RLS handles multi-tenancy natively. Project `hour-phase0` in `eu-central-1`. |
+| Data access | **Thin PostgREST client** (`$lib/supabase.ts`) over `fetch`, no `@supabase/supabase-js` on the Worker | Keeps Worker bundle small; the JWT forwarded to PostgREST makes the RLS boundary explicit. |
 | Media storage | **Cloudflare R2** with signed URLs | Zero egress — critical for media-heavy app (Qlab files, PDFs, riders). Supabase Storage would be ruinous at scale. |
+| Realtime collaboration | **`y-partyserver`** on a native Cloudflare Durable Object (declared in `wrangler.jsonc`) | PartyKit's active successor under Cloudflare; runs in the same runtime. Scoped to text-free fields (ADR-025). |
+| Realtime structured | **Supabase Realtime** | Last-write-wins for structured fields (status, dates, fees). |
 | Queue | **pgmq** on Supabase Postgres | One less moving part. Sufficient to 10k jobs/day. |
-| DNS / Edge | **Cloudflare** (Pages, DNS, Access) | Marco's stack. Free tier covers Phase 0. |
+| DNS / Edge | **Cloudflare** (Workers, DNS, Access) | Marco's stack. Free tier covers Phase 0. |
 | Email | **Resend** (transactional) | Supabase built-in SMTP is dev-only per their docs. |
-| Observability | **Sentry** (errors) + **Axiom** or Cloudflare Logs (HTTP) + Supabase dashboard (DB) | Cheap, good-enough |
-| CI/CD | **GitHub Actions** → Cloudflare Pages | Standard |
-| DB migrations | **Supabase CLI**, versioned in git (`supabase/migrations/*.sql`) | Reproducible environments |
+| Observability | **Sentry SvelteKit** 10.8 (`initCloudflareSentryHandle` server + replay client) tunnelled via `/api/sentry-tunnel` + Supabase dashboard (DB) | Cheap, good-enough; tunnel sidesteps adblockers. |
+| CI/CD | **GitHub Actions** → `wrangler deploy` | Standard. CI scaffold pending Phase 0.0 Day 11. |
+| DB migrations | **Supabase MCP** + raw SQL files in `build/` (`schema.sql`, `rls-policies.sql`, future `reset_v2_roadsheet.sql`) | Phase 0 reality: applied via MCP, source-of-truth lives in `build/`. Supabase CLI versioning revisited in Phase 1. |
 
 ### Assumptions flagged
 
@@ -159,10 +167,11 @@ When tasks come back (early Phase 1, first external user), the taxonomy stays th
 ## 8. Auth & sessions
 
 - **Auth provider**: Supabase Auth.
-- **Phase 0 flow**: email+password as primary method, optional TOTP 2FA (user-enrolled). No OAuth yet. Superseded magic-link-only on 2026-04-19 — see ADR `Auth flow: email+password with optional TOTP 2FA` in DECISIONS.md.
+- **Phase 0 flow**: email+password as primary method, optional TOTP 2FA (user-enrolled). No OAuth yet. Superseded magic-link-only on 2026-04-19 — see ADR `Auth flow: email+password with optional TOTP 2FA` in `_decisions.md`.
 - **Phase 1 additions**: Google OAuth (for calendar sync), Apple Sign-in (iOS app future).
-- **Session**: JWT, 1h expiry, refresh token 7d. Stored in httpOnly cookie.
-- **Access-token hook**: `public.custom_access_token_hook(event jsonb)` runs at sign-in and on refresh. It looks up the user's first accepted `workspace_membership` row, resolves the `workspace_id`, and injects `current_workspace_id` into the JWT claims. `supabase_auth_admin` has `SELECT` on `workspace_membership` so the hook can read it. **Manual step**: enable the hook in Supabase dashboard → Authentication → Hooks. Without it, `current_workspace_id()` returns NULL and every RLS policy denies the request.
+- **Session storage (Phase 0)**: JWT + refresh token + expiry persisted in `localStorage` under `hour_jwt` / `hour_refresh` / `hour_expires_at`. Pragmatic shortcut for Phase 0 (single browser, ≤5 known users); the client posts `Authorization: Bearer <jwt>` to every `/api/*` route, which forwards it to PostgREST. **Phase 1 must move to httpOnly Secure SameSite=Strict cookies** with refresh handled by a dedicated `+server.ts` to remove the XSS exfiltration vector before any external user signs up. Tracked as deuda in `roadmap.md`.
+- **Token lifetime**: JWT 1h, refresh 7d (Supabase defaults).
+- **Access-token hook**: `public.custom_access_token_hook(event jsonb)` runs at sign-in and on refresh. It looks up the user's first accepted `workspace_membership` row, resolves the `workspace_id`, and injects `current_workspace_id` into the JWT claims. `supabase_auth_admin` has `SELECT` on `workspace_membership` so the hook can read it. The hook is **enabled** in Supabase dashboard → Authentication → Hooks (verified 2026-04-20). Without it, `current_workspace_id()` returns NULL and every RLS policy denies the request.
 - **Workspace switching**: user picks active workspace → app calls `supabase.auth.refreshSession()` after writing the choice into `user_profile` / user metadata → the hook replays and re-issues a JWT with the new `current_workspace_id`. No app-level tenant resolution.
 
 ---
@@ -189,7 +198,7 @@ Explicit non-goals — decided now to protect scope:
 - ❌ Mobile apps (Phase 2)
 - ❌ AI features (agents, auto-reply, transcription) — add only when core is boring-stable
 - ❌ Custom reporting / BI dashboards — Metabase on the read replica later
-- ❌ Real-time collaborative editing (Notion-style) — out of scope, use Notion alongside if needed
+- ❌ Live cursor positional presence (Figma-style) — deferred to Phase 0.5; Phase 0.2 ships text-field CRDT (`y-partyserver`) + simplified presence (border + name on focused field), see ADR-025
 
 ---
 
@@ -207,20 +216,21 @@ Explicit non-goals — decided now to protect scope:
 | PK type | UUID v7 via PL/pgSQL | Time-ordered, index-friendly, safe to expose, no enumeration risk. `pg_uuidv7` not on Supabase Cloud whitelist. |
 | Media storage | R2 (not Supabase Storage) | Zero egress cost — Supabase Storage egress is the silent killer |
 | Queue | pgmq | Zero new infra. 10k jobs/day ceiling is fine for Phase 0-1. |
-| Frontend | Astro + islands | Static-first is correct when most pages are list/detail views |
+| Frontend | SvelteKit 2 + Svelte 5 (ADR-026, 2026-05-01) | Single-runtime stack: 95 % of code was already vanilla JS or Svelte; Astro was a 30-LoC SSR envelope. Gains client routing, form actions, `load()` deps, hooks, cross-route stores. |
+| Collab transport | `y-partyserver` on native CF Durable Object (ADR-025) | PartyKit was acquired by Cloudflare; `y-supabase` is abandoned. Same runtime as Hour. |
 | Multi-tenant from day one | Yes | Retrofitting tenancy later is a 6-month rewrite. Cost now: 2 extra lines per migration. |
-| i18n from day one | Yes (ES + EN) | Target market is multilingual European productions. Retrofitting i18n = string-by-string audit hell. |
+| i18n scaffold from day one | Yes (`$lib/i18n.ts` simple `t(key, locale)` + en.json/es.json), content **EN only** in Phase 0 (D-PRE-03) | Wire i18n early so retrofit is mechanical; defer ES content + paraglide-js v2 migration to Phase 1 when copy volume justifies it (currently ~15 strings). Target market is multilingual European productions. |
 | Migrations in git | Yes, from commit 1 | Non-negotiable for two-env setup |
 
-## 12. Critical decisions deferred to kickoff
+## 12. Critical decisions deferred to kickoff — ✓ all closed
 
-Items Marco decides in the kickoff session once specs are reviewed:
+Resolutions (closed by 2026-05-01, kept here as audit trail):
 
-- **Frontend framework confirmation**: Astro is my recommendation. Alternatives: SvelteKit (if SPA feel matters more), Next.js (if team grows and React hiring matters). I lean Astro.
-- **Islands framework**: Svelte vs React inside the Astro shell. Svelte is lighter, React has bigger ecosystem.
-- **Magic link provider**: Resend handles transactional well. If Supabase's default works for Phase 0 dev, skip Resend setup until staging.
-- **Repo location**: GitHub private repo under Marco's user or a new `zerosense` org.
-- **Staging frequency**: deploy every PR vs deploy on merge. I recommend deploy on merge only (Phase 0 doesn't need per-PR previews).
+- **Frontend framework**: SvelteKit 2 + Svelte 5 (ADR-026, 2026-05-01). Astro 5 + islands ran from 2026-04-19 to 2026-04-30; migration triggered by audit showing Astro was a thin SSR envelope around code that was already 95 % Svelte / vanilla JS.
+- **Islands framework**: superseded — single Svelte runtime now.
+- **Auth flow**: email+password with optional TOTP, no OAuth in Phase 0 (`_decisions.md` 2026-04-19). Magic link rejected.
+- **Repo location**: `github.com/marcorubiol/hour` (private, personal user). Transferable to a `zerosense` org if Phase 1 activates.
+- **Staging frequency**: deploy on merge to `main` only. No per-PR previews in Phase 0. Staging Worker (`hour-staging`) deferred until first external tester.
 
 ---
 
@@ -245,7 +255,7 @@ Full scalability plan up to 100k users in `../scale-plan.md` (written at Phase 1
 - **No service-role key in client code.** Only in Edge Functions and server builds.
 - **GDPR**: data in EU region (Supabase Frankfurt). Deletion flow: user requests → soft delete 30d grace → hard delete job. Phase 0 = Marco + Anouk only, no external DPAs needed yet.
 - **Audit log**: `audit_log` table with (actor, action, entity, before, after, ts). Append-only. Read-only for non-admins.
-- **Secrets**: Cloudflare Pages env vars (prod), `.env.local` (dev, gitignored).
+- **Secrets**: Cloudflare Worker `[vars]` in `wrangler.jsonc` for non-secret public values (PUBLIC_SUPABASE_*); Cloudflare dashboard → Settings → Variables and Secrets for service-role keys; `apps/web/.env` for build-time vars consumed by `$env/static/public` (PUBLIC_SENTRY_DSN, PUBLIC_SUPABASE_*) — gitignored, copy from `.env.example`.
 
 ---
 
@@ -254,24 +264,40 @@ Full scalability plan up to 100k users in `../scale-plan.md` (written at Phase 1
 ```
 hour/
 ├── apps/
-│   └── web/               # Astro app
+│   └── web/                          # SvelteKit app
 │       ├── src/
-│       ├── astro.config.mjs
+│       │   ├── app.html
+│       │   ├── hooks.client.ts       # Sentry browser init + replay
+│       │   ├── hooks.server.ts       # initCloudflareSentryHandle + sentryHandle
+│       │   ├── lib/
+│       │   │   ├── components/       # primitives (Button, Input, Sidebar, …)
+│       │   │   ├── auth.ts           # extractBearer
+│       │   │   ├── supabase.ts       # thin PostgREST client (pgGet, pgPostRpc)
+│       │   │   ├── db-types.ts       # generated Supabase types
+│       │   │   └── i18n/             # t(key, locale) + en.json/es.json
+│       │   ├── routes/
+│       │   │   ├── +layout.svelte    # QueryClientProvider
+│       │   │   ├── login/+page.svelte
+│       │   │   ├── booking/+page.svelte
+│       │   │   ├── playground/+page.svelte
+│       │   │   └── api/<name>/+server.ts
+│       │   └── styles/
+│       │       ├── tokens.css        # OKLCH three-tier (base / status / contextual)
+│       │       └── base.css          # cascade layers + skeletons
+│       ├── svelte.config.js          # adapter-cloudflare
+│       ├── vite.config.ts
+│       ├── wrangler.jsonc            # Worker config (DO declared here in Phase 0.0)
 │       └── package.json
-├── supabase/
-│   ├── migrations/        # SQL migrations, versioned
-│   ├── functions/         # Edge Functions
-│   └── seed.sql           # dev seeds only
-├── packages/
-│   └── shared/            # types, zod schemas, shared utils
-├── build/                # (this folder — specs, ADRs, import plans)
-├── .github/workflows/     # CI
-├── _context.md            # project rules (inherits .zerø)
-├── CLAUDE.md              # stub (@_context.md) for Claude Code / Cowork
-└── README.md
+├── build/                            # specs, ADRs, schema, planning (this folder)
+├── research/                         # competitor / pricing / UX research
+├── _context.md                       # project rules (inherits .zerø)
+├── _decisions.md                     # ADR log
+├── CLAUDE.md                         # stub (@_context.md) for Claude Code / Cowork
+├── pnpm-workspace.yaml
+└── package.json
 ```
 
-Monorepo via pnpm workspaces. One package per app + shared types.
+Monorepo via pnpm 10 workspaces. Today: one app (`apps/web`). `packages/shared` to be created when a second app needs shared types.
 
 ---
 
@@ -284,41 +310,51 @@ Monorepo via pnpm workspaces. One package per app + shared types.
 
 ---
 
-## 17. API routes (Astro SSR on the Worker)
+## 17. API routes (SvelteKit endpoints on the Worker)
 
-Location: `apps/web/src/pages/api/*.ts`. All endpoints forward the caller's
-Supabase JWT to PostgREST — **RLS is the access-control boundary; the Worker
-is not.**
+Location: `apps/web/src/routes/api/<name>/+server.ts`. Validation is enforced
+with Valibot at every endpoint boundary. All data endpoints forward the
+caller's Supabase JWT to PostgREST — **RLS is the access-control boundary;
+the Worker is not.**
 
 | Route | Method | Purpose |
 |-------|--------|---------|
-| `/api/engagements` | GET | `engagement` rows with embedded `person` and `project`, filtered by `project_slug` (default `mamemi`), `status` (default `proposed`), `season` (default `2026-27`). Thin PostgREST wrapper; RLS scopes by `current_workspace_id`. Replaces the earlier `/api/prospects`. |
+| `/api/engagements` | GET | `engagement` rows with embedded `person` and `project`, filtered by `project_slug` (default `mamemi`), `status` (default `contacted`, `any` to disable), `season` (default `2026-27`). Thin PostgREST wrapper; RLS scopes by `current_workspace_id`. |
+| `/api/sentry-tunnel` | POST | Forwards Sentry envelopes from the browser SDK to the Sentry ingest host (DSN-derived) so adblockers / Brave Shields / Firefox ETP don't drop them. |
+| `/api/sentry-test` | GET | Smoke endpoint that throws an uncaught error so the server-side Sentry handle captures it. Dev-only by default; `?force=1` allowed in prod. |
+
+Planned (per `roadmap.md` Phase 0.1+): `/api/houses`, `/api/rooms`, `/api/runs`, `/api/gigs`, `/api/gigs/:id/roadsheet`, plus mutations.
 
 Shared helpers:
-- `src/lib/auth.ts` — JWT extraction from `Authorization` header.
-- `src/lib/supabase.ts` — thin PostgREST client over `fetch` (`pgGet`, `pgPostRpc`, `PostgrestError`).
-- `src/lib/db-types.ts` — generated types + convenience aliases `Row<T>`, `Insert<T>`, `Update<T>`, `Enum<T>`, `RpcArgs<T>`, `RpcReturn<T>`. Regenerate with `supabase gen types typescript --project-id lqlyorlccnniybezugme` or the Supabase MCP `generate_typescript_types`.
+- `src/lib/auth.ts` — JWT extraction from `Authorization` header (`extractBearer`).
+- `src/lib/supabase.ts` — thin PostgREST client over `fetch` (`pgGet`, `pgPostRpc`, `PostgrestError`). No `@supabase/supabase-js` on the Worker.
+- `src/lib/db-types.ts` — generated types + convenience aliases `Row<T>`, `Insert<T>`, `Update<T>`, `Enum<T>`, `RpcArgs<T>`, `RpcReturn<T>`. Regenerate via the Supabase MCP `generate_typescript_types` (or `supabase gen types typescript --project-id lqlyorlccnniybezugme`).
 
-Convention: every route sets `export const prerender = false`, returns
-`{ error, detail?, hint? }` on failure, and never logs the JWT or body.
+Conventions:
+- Read `platform.env` from the SvelteKit `RequestHandler` arg to access bindings.
+- Validate query params via Valibot `safeParse`; return `{ error, issues }` on schema violation.
+- Return `{ error, detail?, hint? }` on failure; never log JWT or request body.
+- No `prerender` flag needed (SvelteKit defaults endpoints to dynamic).
 
-Full details + testing recipe: `apps/web/src/pages/api/README.md`.
-
-Open dependency: the `current_workspace_id` JWT claim needs the
-`custom_access_token_hook` enabled in Supabase dashboard → Authentication →
-Hooks (function already exists, only the toggle is manual). Until wired, RLS
-returns zero rows for authenticated users.
+Open dependency: the `custom_access_token_hook` is enabled in Supabase
+dashboard → Authentication → Hooks (verified 2026-04-20). Without it,
+`current_workspace_id()` returns NULL and RLS returns zero rows for
+authenticated users.
 
 ---
 
 ## 18. Files in `build/`
 
+- `_context.md` — workflow guide for this folder (siblings: chats vs files)
+- `architecture.md` — this file
+- `roadmap.md` — living implementation plan (phases 0.0 → 1, ADRs, sprints)
+- `competition.md` — 20 competitors, pricing, gap analysis
 - `schema.sql` — full Postgres schema (18 tables, reset v2)
 - `rls-policies.sql` — RLS helpers + policies + guard/audit triggers + `custom_access_token_hook`
 - `seed.sql` — pre-seed (marco-rubiol workspace + mamemi project) + post-signup CLAIM block
 - `bootstrap.md` — step-by-step: create Supabase project, configure Auth, create CF Worker, configure DNS, first deploy, first user
-- `import-plan.md` — 156 programmers markdown → `person` + `engagement` rows mapping (+ the 3-stage pipeline in `import/`)
-- `adr/` — Architecture Decision Records for anything non-obvious we decide later
+- `import-plan.md` + `import/` — 156 programmers markdown → `person` + `engagement` rows mapping; 3-stage pipeline (normalize → enrich → load)
+- (`_decisions.md` lives at project root, not here — it's the ADR log)
 
 ---
 
