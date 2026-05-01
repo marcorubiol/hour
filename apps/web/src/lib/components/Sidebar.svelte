@@ -27,8 +27,11 @@
 
   let sidebarEl: HTMLElement | undefined = $state();
 
+  // Drawer-semantic close — only acts on mobile, where the sidebar is a
+  // dismissable overlay. On desktop the sidebar is static; navigation inside
+  // it shouldn't hide it. To hide it on desktop, mutate `open` from outside.
   function close() {
-    if (open) {
+    if (open && isMobile()) {
       open = false;
       onclose?.();
     }
