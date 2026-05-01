@@ -743,6 +743,18 @@ Explicit non-goals and schema-ready-but-UI-deferred items. Not addressed in the 
 - **Connects to**: ADR-006 (RBAC enables role-filtered URLs), ADR-009 (URLs orthogonal to composable sidebar state), ADR-023 (road sheet uses this scheme), D6 deferred (public guest links — partially activated here for road sheet only).
 - **Status**: Firm on the three-level principle and path-prefix multi-tenancy. Slug collision rules, full D6 activation, and Master View sharing-via-URL deferred to implementation.
 
+### Addendum 2026-05-01 — re-evaluation before scaffold (closes "implementation finalized")
+
+Triggered by Marco's pre-scaffold doubt (Phase 0.0 day 5). Five alternatives evaluated in `build/url-architecture-dossier-2026-05-01.md`: status quo, subdomain `{w}.hour.app`, drop `/h/` prefix, slug global without entity, Linear-style entity-prefix-id. **Decision unchanged: keep `/h/[workspace]/[entity]/[slug]`.** Three operational closures:
+
+1. **Reserved slugs (~70) listed and enforced.** Categories: router/system, Phase 1 marketing site, conventions, Hour product vocabulary, operational. Source of truth: `apps/web/src/lib/reserved-slugs.ts`. Validation runs (a) client-side in `+layout.svelte` of `/h/[workspace]/` (immediate redirect to `/`), (b) server-side in `slug_generator()` SQL function and at insert/update on `workspace.slug`. Without this list, every new root route in Phase 1 (pricing, docs, blog, signup...) burns a workspace slug retroactively — see Alt C analysis in dossier.
+
+2. **Phase 0.0 entity scope.** Scaffold only `room`, `gig`, `engagement`, `person` placeholders now. Defer `run`, `venue`, `asset`, `invoice` route folders to their respective phases (0.2, 0.3, 0.5).
+
+3. **Migration path to subdomain (Phase 1, not now).** If Phase 1 surfaces vanity workspaces (`mamemi.hour.app`) or marketing-site SEO collisions on the apex, the migration to subdomain is non-destructive: 301 from `/h/{w}/...` → `{w}.hour.app/...`, DB schema untouched, `previous_slugs` unaffected. Estimated cost <1 day on the Worker side (custom domain wildcard + `Host` parsing in `hooks.server.ts`). Documented here so future-self does not re-litigate the path-prefix choice.
+
+**Open**: workspace switching when JWT claim points to a different workspace than the URL (Phase 0.4). Master View URL sharing (D-PRE-05, deferred to Phase 0.4). Public guest links full activation under `/public/[entity]/[token]` (D6, Phase 0.5).
+
 ## [2026-04-24] — ADR-023 — Road sheet: projection over `show` + asset versioning + role-filtered views
 
 - **Context**: Open product question since 2026-04-20: how to model the "hoja de ruta" (per-gig consolidated document with venue specs, load-in/soundcheck/show times, backstage amenities, technical crew, travel + hotel, per diem, etc.). Three competing framings: lens of its own in top nav, part of Assets (Room tab), or detailed Calendar view. Resolved 2026-04-24 through three parallel agent investigations that converged:
