@@ -81,6 +81,31 @@ Phase 0.0 con la fundación visual + routing **cerrada**. Quedan los bloques de 
 - Testing scaffold Vitest + Playwright (3-4h)
 - Backup R2 + cron (2-3h)
 
+### Cerrado en sesión 2026-05-01 (observability + security tightening)
+- **Sentry full wiring** (`@sentry/sveltekit` 10.51, runtime Workers): `initCloudflareSentryHandle` + `sentryHandle()` en `hooks.server.ts`, `Sentry.init` + `replayIntegration` en `hooks.client.ts`, `experimental.instrumentation.server` + `experimental.tracing.server` en `svelte.config.js`. DSN baked at build time vía `$env/static/public`.
+- **Same-origin tunnel** `/api/sentry-tunnel` que reenvía envelopes al ingest host (Firefox ETP/Brave Shields/uBlock bloquearían `*.ingest.sentry.io` directo). Auth vía query string desde el DSN. Verificado en prod.
+- **Source maps upload** (`sentrySvelteKit` plugin Vite + `loadEnv`) — stack traces resuelven a `.ts`/`.svelte` original, no a `app.JS:1:NNNN`.
+- **Smoke routes** `/dev/sentry-test` + `/api/sentry-test` (gated `?force=1` en prod). Verificación cliente + servidor end-to-end OK.
+- **Smart Placement** (`placement.mode=smart` en `wrangler.jsonc`) — Worker co-loca con Supabase Frankfurt, ~3-4× menos round-trip Worker→PostgREST. Hyperdrive descartado: aplica a Postgres TCP, no a PostgREST HTTPS.
+- **SECURITY DEFINER hardening** (Supabase): de las 12 funciones `SECURITY DEFINER` en `public`, helpers de RLS (8) mantienen `authenticated` y revocan `PUBLIC`+`anon`+`service_role`; trigger-only (4 — `handle_new_user`, `seed_system_roles_on_workspace`, `validate_project_membership_roles`, `write_audit`) revocan todo excepto `postgres`. Cierra el vector real (un cliente `authenticated` invocando `write_audit()` directamente para falsificar audit rows). Ver `architecture.md §14`.
+- **Audit log triggers verificados live** en producción: 394 rows del bootstrap + 1 smoke UPDATE = pipeline funcional.
+- **`worker-configuration.d.ts`** generado por `wrangler types` ahora gitignored (regenerable con `pnpm cf-typegen`).
+
+### Open debts (priority-ordered) — backlog para próximas sesiones
+Lista honesta de lo que sé que falta, ordenada por ratio coste/riesgo. **Atacar de arriba abajo.**
+
+1. **[ALTA] Backup Supabase → R2 cron semanal** (1-2h). Hoy hay 154 contactos enriquecidos en producción y cero copias. Riesgo asimétrico clásico — probabilidad baja, impacto altísimo si Supabase tiene incidente o alguien borra una tabla. Plan: script `scripts/backup-to-r2.ts` que corre `supabase db dump` + sube a R2 bucket nuevo `hour-backups`, cron del Worker domingo madrugada, retención 12 semanas.
+2. **[MEDIA] Smoke test e2e Playwright** (45 min). Hoy `pnpm check` y `pnpm build` pasan, pero ningún test funcional. Cada deploy a prod confía en review humano. Mínimo: Playwright `login → /booking carga 154 → logout` que corra antes de `wrangler deploy`. Red de seguridad bajo cambios futuros.
+3. **[MEDIA] Documentar rollback procedure** (15 min). Tag `pre-sveltekit-migration` existe + CF Workers permite rollback desde dashboard, pero ningún sitio dice "si un deploy revienta, hacer X". Una página corta en `build/runbooks/rollback.md`. El día que reviente a las 23:30, importa.
+4. **[BAJA] Cookies httpOnly en lugar de JWT en localStorage** (4-6h). Hoy XSS = sesión exfiltrable. Phase 0 con 5 usuarios conocidos OK; antes de meter primer cliente externo, mover a httpOnly+Secure+SameSite=Strict. Ya flagged en `architecture.md §8` como deuda Phase 1.
+5. **[BAJA] Pasada cosmética de primitivos** (30 min, opcional). Avatar usa template literal para clases mientras Button/Chip usan `[...].filter(Boolean).join(' ')`. Menu línea 55 `open ? close() : openMenu()` mejor como `if/else`. Cosmético — no rompe nada.
+
+**Diferido a Phase 1 con coste asociado** (no acción hasta entonces):
+- **Rate-limit `/api/sentry-tunnel`** vía Cloudflare KV (~30 min cuando importe). CF WAF rate-limit es ahora add-on de pago; KV en Worker free es suficiente. Plan documentado en task tracking.
+- **Leaked Password Protection** (Supabase Pro feature). Toggle de 1 click cuando active el plan Pro al onboardar primer cliente pagante.
+- **paraglide-js v2** para i18n (~2-3h). El `$lib/i18n.ts` simple actual cubre los ~15 strings de Phase 0. Migrar cuando llegue contenido en español o pase de 50 strings.
+- **Sentry source-map auth token rotation policy** — el token actual (`sntryu_...`) en `apps/web/.env` no caduca. Revisar a Phase 1 si se quiere rotar.
+
 ## Status anterior — 2026-04-20
 
 Infra, datos y **primera pantalla funcional**. Login + lista de engagements desplegados y operativos. Todo el trabajo está en `apps/web/`.
