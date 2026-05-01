@@ -2,11 +2,15 @@
   import Button from '../components/Button.svelte';
   import LinkButton from '../components/LinkButton.svelte';
   import Input from '../components/Input.svelte';
+  import Checkbox from '../components/Checkbox.svelte';
+  import Radio from '../components/Radio.svelte';
 
   let counter = $state(0);
   let asyncLoading = $state(false);
   let liveText = $state('');
   let priceValue = $state('');
+  let agreeChecked = $state(false);
+  let selectedColor = $state('primary');
 
   async function fakeAsync() {
     asyncLoading = true;
@@ -163,6 +167,67 @@
     <Input label="Live value" bind:value={liveText} placeholder="Type here" />
     <p class="text--s text--dark-muted">
       Current value: <code>{liveText || '(empty)'}</code>
+    </p>
+  </section>
+
+  <section class="playground__section">
+    <h2 class="h3">Checkbox — basics</h2>
+    <Checkbox label="I accept the terms" />
+    <Checkbox label="Send me updates" checked />
+    <Checkbox label="Indeterminate (e.g. select all)" indeterminate />
+    <Checkbox label="Disabled" disabled />
+    <Checkbox label="Disabled checked" disabled checked />
+  </section>
+
+  <section class="playground__section">
+    <h2 class="h3">Checkbox — with helper / error</h2>
+    <Checkbox
+      label="Enable two-factor auth"
+      helper="Recommended for security."
+    />
+    <Checkbox
+      label="I accept the terms"
+      error="You must accept to continue."
+    />
+  </section>
+
+  <section class="playground__section">
+    <h2 class="h3">Checkbox — interactive (bind)</h2>
+    <Checkbox label="Toggle me" bind:checked={agreeChecked} />
+    <p class="text--s text--dark-muted">
+      Status: <code>{agreeChecked ? 'on' : 'off'}</code>
+    </p>
+  </section>
+
+  <section class="playground__section">
+    <h2 class="h3">Radio — group</h2>
+    <Radio
+      name="palette"
+      value="primary"
+      label="Primary"
+      bind:group={selectedColor}
+    />
+    <Radio
+      name="palette"
+      value="success"
+      label="Success"
+      bind:group={selectedColor}
+    />
+    <Radio
+      name="palette"
+      value="warning"
+      label="Warning"
+      bind:group={selectedColor}
+    />
+    <Radio
+      name="palette"
+      value="danger"
+      label="Danger"
+      bind:group={selectedColor}
+      disabled
+    />
+    <p class="text--s text--dark-muted">
+      Selected: <code>{selectedColor}</code>
     </p>
   </section>
 

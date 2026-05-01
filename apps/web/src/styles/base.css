@@ -564,6 +564,121 @@
     color: var(--danger-dark);
   }
 
+  /* Check skeleton — shared by checkbox and radio.
+     Native input is visually hidden but stays in DOM (focus + a11y).
+     The .check__box is what's drawn; modifier .check--radio rounds it. */
+  .check {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+  }
+
+  .check__row {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-s);
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .check--disabled .check__row {
+    cursor: not-allowed;
+    opacity: var(--disabled-opacity);
+  }
+
+  .check__input {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .check__box {
+    flex-shrink: 0;
+    inline-size: 1.125em;
+    block-size: 1.125em;
+    border: var(--border);
+    border-radius: var(--radius-s);
+    background: var(--base);
+    display: grid;
+    place-items: center;
+    transition: background var(--transition), border-color var(--transition);
+  }
+
+  .check--radio .check__box {
+    border-radius: 50%;
+  }
+
+  .check__row:hover .check__box {
+    border-color: var(--neutral-semi-light);
+  }
+
+  .check__input:focus-visible + .check__box {
+    outline: var(--focus-width) solid var(--focus-color);
+    outline-offset: 2px;
+  }
+
+  .check__input:checked + .check__box {
+    background: var(--primary);
+    border-color: var(--primary);
+  }
+
+  /* Tick mark for checkbox (drawn with two borders rotated) */
+  .check__input[type="checkbox"]:checked + .check__box::after {
+    content: "";
+    inline-size: 0.55em;
+    block-size: 0.3em;
+    border-inline-start: 2px solid var(--text-light);
+    border-block-end: 2px solid var(--text-light);
+    transform: rotate(-45deg) translate(1px, -1px);
+  }
+
+  /* Indeterminate dash */
+  .check__input[type="checkbox"]:indeterminate + .check__box {
+    background: var(--primary);
+    border-color: var(--primary);
+  }
+  .check__input[type="checkbox"]:indeterminate + .check__box::after {
+    content: "";
+    inline-size: 0.6em;
+    block-size: 2px;
+    background: var(--text-light);
+  }
+
+  /* Dot for radio */
+  .check__input[type="radio"]:checked + .check__box::after {
+    content: "";
+    inline-size: 0.5em;
+    block-size: 0.5em;
+    border-radius: 50%;
+    background: var(--text-light);
+  }
+
+  .check--error .check__box {
+    border-color: var(--danger);
+  }
+
+  .check__label {
+    color: var(--text-color);
+  }
+
+  .check__msg {
+    font-size: var(--text-xs);
+    color: var(--text-dark-muted);
+    margin: 0;
+    margin-inline-start: calc(1.125em + var(--space-s));
+  }
+
+  .check--error .check__msg {
+    color: var(--danger-dark);
+  }
+
   /* Badge skeleton — same pattern as button. Modifiers only redeclare vars. */
   [class*="badge--"] {
     display: inline-block;
