@@ -505,6 +505,19 @@
     opacity: 0.7;
   }
 
+  /* Disabled — wrapper picks up the state from the child control via :has().
+     Works for input and select without coordination from the Svelte layer. */
+  .field__control:has(:disabled) {
+    background: var(--bg-ultra-light);
+    border-color: var(--border-color-dark);
+    opacity: var(--disabled-opacity);
+    cursor: not-allowed;
+  }
+
+  .field__control:has(:disabled) > * {
+    cursor: not-allowed;
+  }
+
   .field__control > input,
   .field__control > select {
     border: none;
