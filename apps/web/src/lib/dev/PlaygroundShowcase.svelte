@@ -43,6 +43,12 @@
   let seasonValue = $state('2026-27');
   let priorityValue = $state('');
   let regionValue = $state('eu');
+  let closedSeasonValue = $state('');
+  let closedSeasonError = $derived(
+    closedSeasonValue === '2024-25' || closedSeasonValue === '2025-26'
+      ? 'This season is closed.'
+      : undefined
+  );
   const seasons = [
     { value: '2024-25', label: '2024-25' },
     { value: '2025-26', label: '2025-26' },
@@ -515,10 +521,12 @@
   <section class="playground__section">
     <h2 class="h3">Select — states</h2>
     <Select
-      label="With error"
+      label="With error (pick a closed season)"
       placeholder="Pick one…"
       options={seasons}
-      error="This season is closed."
+      bind:value={closedSeasonValue}
+      error={closedSeasonError}
+      helper="2024-25 and 2025-26 are closed."
     />
     <Select
       label="Disabled"
