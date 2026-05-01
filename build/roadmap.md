@@ -142,10 +142,10 @@ Las 14 D-PRE cerradas ✓ (07 y 14 cerradas 2026-04-24 con research — ver ADR-
    Button, Input, Chip, Checkbox, Radio, Avatar, Badge, Select, Dialog, Toast, Sidebar (colapsable mobile), Tooltip, Menu.
 5. Página `/playground` (dev only) con los 13 en viewports 320px / 768px / 1440px.
 
-**Router + estado (4-5h)**
-6. Estructura `src/pages/h/[workspace]/[entity]/[slug].astro`.
-7. `serializeViewState()` + `hydrateViewState()` (D-PRE-05).
-8. Nanostores compartidas: `$selection`, `$lens`, `$chipBar`, `$presence`.
+**Router + estado (4-5h)** — *actualizado 2026-05-01: post-ADR-026 ya estamos en SvelteKit, así que rutas viven en `src/routes/h/[workspace]/[entity]/[slug]/+page.svelte` (no `src/pages/...astro`); estado compartido en módulos `.svelte.ts` con runes module-level (`let lens = $state(...)` exportado), no nanostores — patrón nativo de Svelte 5 sin dependencia extra.*
+6. Estructura `src/routes/h/[workspace]/[entity]/[slug]/+page.svelte` (+ `+layout.svelte` con shell común). **Pendiente**: validar con un dossier dedicado si el shape `/h/[workspace]/[entity]/[slug]` es el óptimo o procede revisar ADR-022 antes de escribir el scaffold.
+7. `serializeViewState()` + `hydrateViewState()` en `$lib/url-state.ts` (D-PRE-05, truncación 400 chars).
+8. Stores compartidas como `.svelte.ts` con runes module-level: `lens.svelte.ts`, `selection.svelte.ts`, `chipBar.svelte.ts`, `presence.svelte.ts`. Cada uno exporta su `$state`/`$derived` y los helpers para mutarlo.
 
 **Offline + PWA (10-14h)**
 9. `@vite-pwa/astro` + `manifest.webmanifest` + Service Worker con Workbox.
@@ -414,11 +414,11 @@ Las 14 D-PRE están todas cerradas. Si arrancas ya: **Día 1 abajo**.
 **Día 4** — Primitivos composición (3):
 - Badge, Select, Dialog.
 - `serializeViewState` + `hydrateViewState`.
-- Nanostores compartidas.
+- Stores compartidas `.svelte.ts` con runes module-level (post-ADR-026, no nanostores).
 
 **Día 5** — Primitivos avanzados (3):
 - Toast, Tooltip, Menu.
-- Scaffold rutas `src/pages/h/[workspace]/[entity]/[slug].astro`.
+- Scaffold rutas `src/routes/h/[workspace]/[entity]/[slug]/` (post-ADR-026, no Astro pages).
 
 **Día 6** — Sidebar + schema completo:
 - Sidebar (colapsable mobile).
