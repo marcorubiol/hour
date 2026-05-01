@@ -9,6 +9,11 @@ if (PUBLIC_SENTRY_DSN) {
     dsn: PUBLIC_SENTRY_DSN,
     enabled: true,
     environment: PUBLIC_SENTRY_ENV || (dev ? 'phase0-dev' : 'phase0'),
+    // Tunnel envelopes through our own origin so Firefox ETP, Brave Shields,
+    // uBlock Origin, and similar tracking-protection layers don't drop them.
+    // Server-side endpoint at src/routes/api/sentry-tunnel/+server.ts
+    // forwards to the configured Sentry ingest host.
+    tunnel: '/api/sentry-tunnel',
     tracesSampleRate: 0.1,
     sendDefaultPii: true,
     // Replays: 10 % of normal sessions + 100 % of sessions with errors. Free
