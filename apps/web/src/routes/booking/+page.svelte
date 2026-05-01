@@ -1,6 +1,8 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
+  import { derived, writable } from 'svelte/store';
+  import { createQuery } from '@tanstack/svelte-query';
 
   type EngagementItem = {
     id: string;
@@ -12,6 +14,13 @@
       city: string | null;
       country: string | null;
     } | null;
+  };
+
+  type EngagementsResponse = {
+    total: number;
+    limit: number;
+    offset: number;
+    items: EngagementItem[];
   };
 
   const LIMIT = 50;
@@ -34,17 +43,84 @@
     'recurring',
   ];
 
-  let offset = $state(0);
-  let total = $state(0);
-  let items = $state<EngagementItem[]>([]);
-  let loading = $state(true);
-  let errorMsg = $state('');
-
   function clearAuth() {
     localStorage.removeItem('hour_jwt');
     localStorage.removeItem('hour_refresh');
     localStorage.removeItem('hour_expires_at');
   }
+
+  // Pagination state. `writable` (legacy store) so the query options can
+  // derive from it cleanly — `createQuery` from svelte-query v5 takes
+  // `StoreOrVal<options>`, which is the simplest reactive bridge here.
+  const offset = writable(0);
+
+  // Bail out before mounting the query if there's no JWT — saves a 401
+  // round-trip on first paint after logout.
+  onMount(() => {
+    if (!localStorage.getItem('hour_jwt')) {
+      goto('/login', { replaceState: true });
+    }
+  });
+
+  const queryOptions = derived(offset, ($offset) => ({
+    queryKey: [
+      'engagements',
+      {
+        status: 'any',
+        project_slug: 'mamemi',
+        season: '2026-27',
+        limit: LIMIT,
+        offset: $offset,
+      },
+    ] as const,
+    queryFn: async ({ signal }: { signal: AbortSignal }) => {
+      const jwt = localStorage.getItem('hour_jwt');
+      if (!jwt) throw new Error('Missing JWT');
+
+      const url = `/api/engagements?status=any&project_slug=mamemi&season=2026-27&limit=${LIMIT}&offset=${$offset}`;
+      const res = await fetch(url, {
+        signal,
+        headers: { Authorization: `Bearer ${jwt}` },
+      });
+
+      if (res.status === 401) {
+        clearAuth();
+        goto('/login', { replaceState: true });
+        throw new Error('Unauthorized');
+      }
+
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as {
+          detail?: string;
+          error?: string;
+        };
+        throw new Error(body.detail || body.error || `Error ${res.status}`);
+      }
+
+      const data = (await res.json()) as EngagementsResponse;
+
+      // TEMP VISUAL MOCK — overwrite first 7 items with one of each status
+      // so all badge colours appear side-by-side. Remove before deploy.
+      data.items = data.items.map((item, i) =>
+        i < PREVIEW_STATUSES.length ? { ...item, status: PREVIEW_STATUSES[i] } : item,
+      );
+
+      return data;
+    },
+    // Keep showing previous page's data while the next page loads — no flicker
+    // on prev/next clicks. Standard TanStack pattern for paginated lists.
+    placeholderData: (prev: EngagementsResponse | undefined) => prev,
+  }));
+
+  const query = createQuery(queryOptions);
+
+  // Read-side derived state. `$query` auto-subscribes via the store contract.
+  let total = $derived($query.data?.total ?? 0);
+  let items = $derived(($query.data?.items ?? []) as EngagementItem[]);
+  let loading = $derived($query.isPending);
+  let errorMsg = $derived(
+    $query.error instanceof Error ? $query.error.message : '',
+  );
 
   function formatDate(iso: string | null): string {
     if (!iso) return '—';
@@ -63,77 +139,23 @@
     return [item.person.city, item.person.country].filter(Boolean).join(', ') || '—';
   }
 
-  async function load() {
-    loading = true;
-    errorMsg = '';
-
-    const jwt = localStorage.getItem('hour_jwt');
-    if (!jwt) {
-      goto('/login', { replaceState: true });
-      return;
-    }
-
-    try {
-      const url = `/api/engagements?status=any&project_slug=mamemi&season=2026-27&limit=${LIMIT}&offset=${offset}`;
-      const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${jwt}` },
-      });
-
-      if (res.status === 401) {
-        clearAuth();
-        goto('/login', { replaceState: true });
-        return;
-      }
-
-      if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as {
-          detail?: string;
-          error?: string;
-        };
-        throw new Error(body.detail || body.error || `Error ${res.status}`);
-      }
-
-      const data = (await res.json()) as {
-        total?: number;
-        items?: EngagementItem[];
-      };
-      total = data.total ?? 0;
-      const fetched = (data.items ?? []) as EngagementItem[];
-
-      // TEMP VISUAL MOCK — overwrite first 7 items with one of each status
-      // so all badge colours appear side-by-side. Remove before deploy.
-      items = fetched.map((item, i) =>
-        i < PREVIEW_STATUSES.length ? { ...item, status: PREVIEW_STATUSES[i] } : item,
-      );
-    } catch (err) {
-      errorMsg = err instanceof Error ? err.message : String(err);
-      items = [];
-    } finally {
-      loading = false;
-    }
-  }
-
   function logout() {
     clearAuth();
     goto('/login', { replaceState: true });
   }
 
   function prev() {
-    offset = Math.max(0, offset - LIMIT);
-    load();
+    offset.update((o) => Math.max(0, o - LIMIT));
   }
 
   function next() {
-    offset += LIMIT;
-    load();
+    offset.update((o) => o + LIMIT);
   }
 
   let showPagination = $derived(total > LIMIT);
-  let prevDisabled = $derived(offset === 0);
-  let nextDisabled = $derived(offset + LIMIT >= total);
-  let rangeEnd = $derived(Math.min(offset + LIMIT, total));
-
-  onMount(load);
+  let prevDisabled = $derived($offset === 0);
+  let nextDisabled = $derived($offset + LIMIT >= total);
+  let rangeEnd = $derived(Math.min($offset + LIMIT, total));
 </script>
 
 <svelte:head>
@@ -152,7 +174,7 @@
     <span>Loading...</span>
   {:else if !errorMsg}
     <span class="status-bar__count">{total} contacts</span>
-    <span>Showing {offset + 1}-{rangeEnd}</span>
+    <span>Showing {$offset + 1}-{rangeEnd}</span>
   {/if}
 </div>
 
