@@ -23,7 +23,7 @@
     --white: #ffffff;
     --black: #000000;
 
-    --primary: oklch(0.52 0.141 29.7); /* terracotta — #AB4235 */
+    --primary: oklch(0.50 0.14 335); /* plum — ~#9D3F70 — trial */
     --primary-hover: color-mix(in oklch, var(--primary), black 10%);
     --primary-ultra-light: color-mix(in oklch, var(--primary), white 82%);
     --primary-light: color-mix(in oklch, var(--primary), white 55%);
