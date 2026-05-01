@@ -17,8 +17,18 @@ enabled = true
 binding = "MEDIA"
 bucket_name = "hour-media"
 
+# Worker version metadata binding — used by @sentry/sveltekit to tag events
+# with the deployed version, so Sentry's "regressed in deploy X" works.
+[version_metadata]
+binding = "CF_VERSION_METADATA"
+
 # Non-secret public env vars. Secrets (service role key) go in dashboard
 # Settings → Variables and Secrets, never in this file.
+#
+# Sentry config (PUBLIC_SENTRY_DSN, PUBLIC_SENTRY_ENV) lives in `.env` at
+# `apps/web/.env`, NOT here. SvelteKit reads `$env/static/public` at build
+# time and bakes the values into the bundle. wrangler deploy ships the
+# already-baked bundle, no runtime env needed.
 [vars]
 PUBLIC_SUPABASE_URL = "https://lqlyorlccnniybezugme.supabase.co"
 PUBLIC_SUPABASE_ANON_KEY = "sb_publishable_IavZsGp7i04juuafanQk9w_33pFDhNu"

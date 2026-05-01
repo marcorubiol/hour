@@ -15,8 +15,11 @@ declare global {
 
   /**
    * Cloudflare Worker bindings + public env vars declared in wrangler.toml.
-   * Mirrors the bindings block: R2 bucket MEDIA, static assets ASSETS, and
-   * the two PUBLIC_SUPABASE_* vars passed to the runtime.
+   * Mirrors the [vars] + [[r2_buckets]] blocks in wrangler.toml.
+   *
+   * Note: Sentry config (PUBLIC_SENTRY_DSN, PUBLIC_SENTRY_ENV) is NOT here —
+   * those are read from `$env/static/public` at build time, baked into the
+   * bundle, and not present on `event.platform.env`.
    */
   interface Env {
     MEDIA: R2Bucket;

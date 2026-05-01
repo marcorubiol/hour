@@ -12,7 +12,7 @@
     "cf-typegen": "wrangler types"
   },
   "dependencies": {
-    "@sentry/sveltekit": "^9.45.0",
+    "@sentry/sveltekit": "^10.8.0",
     "@sveltejs/adapter-cloudflare": "^7.0.0",
     "@sveltejs/kit": "^2.20.0",
     "@sveltejs/vite-plugin-svelte": "^5.0.3",
