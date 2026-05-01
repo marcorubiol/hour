@@ -877,3 +877,10 @@ Explicit non-goals and schema-ready-but-UI-deferred items. Not addressed in the 
 - **Connects to**: D-PRE-02 (reopens and reverts), D-PRE-03 (i18n migrates from `@astrojs/i18n` to `paraglide-sveltekit`), ADR-022 (URL routing — SvelteKit's `[workspace]/[entity]/[slug]` covers it natively), ADR-009 (sidebar/lens shell — easier under SvelteKit's shared-state model), ADR-025 (CRDT path unchanged but co-located cleaner under hooks.server).
 
 - **Status**: Firm. Implementation in worktree `migrate/sveltekit`; merge to `main` when smoke tests pass and Marco approves.
+
+## [2026-05-01] — Primary color: terracotta → plum
+- **Decision**: Swap `--primary` from `oklch(0.52 0.141 29.7)` (#AB4235 terracotta) to `oklch(0.50 0.14 335)` (~#9D3F70 plum).
+- **Context**: Surfaced while testing the Day 4-5 primitives (Select error state, focus outline, chip--selected) in `/playground`. Terracotta sits 5° from `--danger` (hue 25°), so primary surfaces — focus outline, `btn--primary`, `chip--selected`, link, selection bg — read as error-adjacent. Marco saw it on the Select with `error` and asked for an alternative that doesn't compete with the status palette.
+- **Alternatives considered**: Indigo `oklch(0.50 0.16 282)`, Cobalt `oklch(0.48 0.15 258)`, Violet `oklch(0.50 0.17 295)`, Aubergine `oklch(0.42 0.10 318)`. All sit in the safe hue range 250°–340° (≥40° from each status: danger 25°, warning 75°, success 145°, info 220°).
+- **Rationale**: Plum at 335° is 50° from danger by the long way around — outside every status hue, so primary surfaces stop competing with red/amber/green/blue badges. Keeps the warm/scenic register of the original terracotta (didn't jump to corporate cool blue). All shade derivatives, `--link-color`, `--focus-color`, `--selection-bg` follow automatically via `color-mix()` — single-line token swap, no other code change.
+- **Status**: Provisional. Marco confirmed for now ("we move forward with this") but flagged it's not a brand decision. Re-evaluate when the visual design phase begins (Phase 0.4 polish, or earlier if the brand decision starts crystallizing in Phase 1 prep).
