@@ -1,0 +1,12 @@
+---
+import Base from '../layouts/Base.astro';
+import Showcase from '../dev/PlaygroundShowcase.svelte';
+
+if (!import.meta.env.DEV) {
+  return Astro.redirect('/');
+}
+---
+
+<Base title="Playground — Hour">
+  <Showcase client:load />
+</Base>

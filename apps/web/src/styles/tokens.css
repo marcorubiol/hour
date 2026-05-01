@@ -295,6 +295,7 @@
     --btn-padding-inline: 1.2em;
     --btn-min-width: 0;
     --btn-width: max-content;
+    --btn-gap: 0.5em;
     --btn-line-height: 1.4;
     --btn-font-size: var(--text-m);
     --btn-font-weight: 500;

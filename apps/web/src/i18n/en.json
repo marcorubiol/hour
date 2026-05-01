@@ -1,0 +1,9 @@
+{
+  "app.name": "Hour",
+  "login.phase": "Phase 0",
+  "login.email": "Email",
+  "login.password": "Password",
+  "login.submit": "Sign in",
+  "login.signing_in": "Signing in...",
+  "login.invalid_credentials": "Invalid credentials"
+}
