@@ -4,22 +4,27 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "dev": "astro dev",
-    "build": "astro build",
+    "dev": "vite dev",
+    "build": "vite build",
     "preview": "wrangler dev",
-    "deploy": "astro build && wrangler deploy",
-    "astro": "astro",
+    "deploy": "vite build && wrangler deploy",
+    "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "cf-typegen": "wrangler types"
   },
   "dependencies": {
-    "@astrojs/cloudflare": "^12.2.1",
-    "@astrojs/svelte": "^7.0.4",
-    "astro": "^5.2.5",
-    "svelte": "^5.19.9"
+    "@sentry/sveltekit": "^9.45.0",
+    "@sveltejs/adapter-cloudflare": "^7.0.0",
+    "@sveltejs/kit": "^2.20.0",
+    "@sveltejs/vite-plugin-svelte": "^5.0.3",
+    "@tanstack/svelte-query": "^5.62.0",
+    "svelte": "^5.19.9",
+    "valibot": "^1.0.0"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250214.0",
+    "svelte-check": "^4.1.4",
     "typescript": "^5.7.3",
+    "vite": "^6.0.0",
     "wrangler": "^4.83.0"
   }
 }

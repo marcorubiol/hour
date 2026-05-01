@@ -1,7 +1,7 @@
 # Hour — Roadmap de implementación
 
 > Documento vivo. Se actualiza al cerrar cada fase. Ordenado por dependencias reales, no por deseo.
-> Última actualización: 2026-04-24 (pasada final: 25 ADRs + 14 D-PRE cerradas, research de slug y CRDT integrado, coherencia revisada).
+> Última actualización: 2026-05-01 (ADR-026: migración Astro → SvelteKit; Día 10 reescrito a `y-partyserver` + DO nativo; Phase 0.1 incorpora TanStack Query como server-state cache).
 
 ## 🎯 Qué toca hoy (punto de entrada)
 
@@ -167,29 +167,30 @@ Las 14 D-PRE cerradas ✓ (07 y 14 cerradas 2026-04-24 con research — ver ADR-
     - **Slug system (ADR-024)**: `slug text NOT NULL` + `previous_slugs text[] DEFAULT '{}'` en 8 tablas (`workspace`, `project`, `line`, `show`, `engagement`, `person`, `venue`, `asset_version`). Partial unique index por `(workspace_id, entity_type, slug)`. Función `slug_generator(name)` + trigger de validación.
     - **PartyKit persistence (ADR-025)**: tabla `collab_snapshot(id, target_table, target_id, snapshot bytea, version int, created_at)` para persistir snapshots Yjs desde el Durable Object.
 
-**PartyKit / Durable Object scaffold (5-8h)**
-17. Configurar `partykit.json` + namespace `hour-collab`.
-18. DO handler `src/party/roadsheet.ts` con `YServer` + `withYjs`.
-19. Auth gate `onBeforeConnect`: verificar Supabase JWT + comprobar membership.
-20. Persistence: snapshot a `collab_snapshot` cada 30 updates o 60s (lo que ocurra antes).
-21. Smoke test: dos WebSockets al mismo DO reciben updates del otro, snapshot persistido en DB.
+**PartyServer / Durable Object scaffold (5-8h)** — *actualizado 2026-05-01: PartyKit clásico (con `partykit.json` + CLI propio) deprecado bajo Cloudflare; usamos su sucesor `partyserver` + `y-partyserver`, todo en `wrangler.jsonc` y un solo deploy pipeline.*
+17. Declarar DO `RoadsheetCollab` en `wrangler.jsonc` con migrations (`new_sqlite_classes`).
+18. DO handler `src/lib/do/roadsheet.ts`: `import { Server } from 'partyserver'` + `withYjs(Server)` (mixin de `y-partyserver`). Reemplaza el patrón `partykit/server` + `YServer`.
+19. Auth gate `onBeforeConnect`: validar JWT Supabase + comprobar membership vía service-role REST. RLS gates la conexión, no el doc Yjs.
+20. Persistence: `onLoad` lee último snapshot de `collab_snapshot`; `onSave` con `debounceWait: 60_000` + `debounceMaxWait: 30 updates` escribe el doc Yjs serializado.
+21. Hibernation: el DO se hiberna cuando no hay actividad (changelog 2026-03-04 de `y-partyserver` mantiene tracking de conexiones a través de hibernation). Importante a escala — cientos de road sheets, la mayoría inactivos.
+22. Smoke test: dos WebSockets al mismo DO reciben updates del otro, snapshot persistido en DB tras hibernation.
 
 **Testing scaffold (3-4h)**
-22. Vitest para unit/integration tests.
-23. Playwright para e2e + visual regression.
-24. Al menos un smoke test por capa: component (Button), API (GET /api/engagements), e2e (login flow).
-25. CI placeholder — GitHub Action que corre tests en PR (no bloquea todavía).
+23. Vitest para unit/integration tests.
+24. Playwright para e2e + visual regression.
+25. Al menos un smoke test por capa: component (Button), API (GET /api/engagements), e2e (login flow).
+26. CI placeholder — GitHub Action que corre tests en PR (no bloquea todavía).
 
-**i18n + observabilidad (2h)**
-26. `@astrojs/i18n` configurado + `src/i18n/en.json` vacío + `t()` wrapper.
-27. Sentry integrado con DSN vía env var + error boundaries + route tracking.
+**i18n + observabilidad (2h)** — *actualizado 2026-05-01: `@inlang/paraglide-sveltekit` está deprecada; cuando i18n importe (Phase 1), migrar a `@inlang/paraglide-js@^2`. Phase 0 sigue con `$lib/i18n.ts` simple ya en producción.*
+27. `$lib/i18n.ts` con `t(key, locale)` + `en.json`/`es.json` (ya en sitio post-ADR-026). Mantener hasta Phase 1.
+28. Sentry SvelteKit integrado vía `src/hooks.client.ts` + `src/hooks.server.ts` (ya en sitio post-ADR-026). Activar con `PUBLIC_SENTRY_DSN` env var en wrangler/CF dashboard.
 
 **Backup (2-3h)**
-28. Script `scripts/backup-to-r2.ts` — corre `supabase db dump` + sube a R2 bucket `hour-backups`.
-29. Cron del Worker semanal (domingo madrugada). Retención: 12 semanas.
+29. Script `scripts/backup-to-r2.ts` — corre `supabase db dump` + sube a R2 bucket `hour-backups`.
+30. Cron del Worker semanal (domingo madrugada). Retención: 12 semanas.
 
 ### Definition of done
-- [ ] Ningún valor visual hardcoded en `.astro` o `.svelte`.
+- [ ] Ningún valor visual hardcoded en `.svelte`.
 - [ ] 13 primitivos pasan tests visuales en 3 viewports.
 - [ ] `/h/marco-rubiol/` renderiza shell.
 - [ ] App abre offline con datos cacheados.
@@ -221,11 +222,12 @@ Phase 0.0 completa.
 2. `<Desk>` — sidebar lower. Empty state + tree Runs→Gigs. Desktop-first; mobile polish en 0.4.
 3. `<GigDetail>` — **mobile-first desde día 1**. Panel desktop / fullscreen mobile.
 4. Endpoints: `GET /api/houses`, `GET /api/rooms?house_id=`, `GET /api/runs?project_id=`, `GET /api/gigs?run_id=`, `GET /api/gigs/:id`.
-5. Router activo: `/h/:workspace/`, `/h/:workspace/room/:slug`, `/h/:workspace/gig/:slug` (slug según D-PRE-14).
+5. Router activo: `/h/:workspace/`, `/h/:workspace/room/:slug`, `/h/:workspace/gig/:slug` (slug según D-PRE-14). SvelteKit file-routing nativo `src/routes/h/[workspace]/[entity]/[slug]/+page.svelte`.
 6. Cross-highlight UP.
 7. Writes encolan cuando offline.
 8. Presence badge "N online" en header.
 9. Settings con Master View toggle.
+10. **TanStack Query** (`@tanstack/svelte-query`, ya instalado en Phase 0.0 vía ADR-026) cubre el server-state cache: stale-while-revalidate, dedupe, invalidación por mutación. Cada lista (Houses, Rooms, Runs, Gigs) detrás de un `useQuery`. `+page.server.ts` `load()` precarga + hidrata el caché.
 
 ### Definition of done
 - [ ] Marco abre app desktop + mobile → estado "silencio".

@@ -5,6 +5,7 @@ node_modules/
 # build output
 dist/
 .astro/
+.svelte-kit/
 .wrangler/
 .output/
 

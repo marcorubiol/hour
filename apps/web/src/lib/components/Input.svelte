@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
+  import type { HTMLInputAttributes } from 'svelte/elements';
 
   type InputType =
     | 'text'
@@ -22,7 +23,7 @@
     required?: boolean;
     disabled?: boolean;
     loading?: boolean;
-    autocomplete?: string;
+    autocomplete?: HTMLInputAttributes['autocomplete'];
     autofocus?: boolean;
     oninput?: (event: Event) => void;
     onchange?: (event: Event) => void;

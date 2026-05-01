@@ -817,3 +817,63 @@ Explicit non-goals and schema-ready-but-UI-deferred items. Not addressed in the 
 - **Effort estimate** (Svelte + Supabase dev new to Yjs): ~12-20 h to scaffold the Durable Object, wire auth gate, persist snapshots, and wire the Svelte client with `y-indexeddb`. Split: ~5-8 h in Phase 0.0 (DO scaffold + auth + persistence table schema) and ~8-12 h in Phase 0.2 (first collaborative field live on road sheet).
 - **Connects to**: ADR-023 (road sheet — concrete CRDT path for collaborative fields), ADR-022 (Worker runtime — PartyKit runs inside the same Cloudflare account as `hour-web`).
 - **Status**: Firm on path. Exact DO naming scheme, snapshot frequency, and Postgres persistence column design finalized in Phase 0.0 when the scaffold ships.
+
+## [2026-05-01] — ADR-026 — Migrate from Astro 5 to SvelteKit 2 (reopens D-PRE-02)
+
+- **Context**: D-PRE-02 (closed 2026-04-24) decided "do not migrate to SvelteKit", citing five operational reasons: (1) already on Astro, migration is churn; (2) Astro file-routing covers `/h/[workspace]/[entity]/[slug]` natively; (3) islands hydrate only where there's interaction; (4) CF Worker deploy already works with Astro adapter; (5) collaborative multiuser can be solved with stores inside islands + Realtime + CRDT, no SvelteKit needed. The caveat acknowledged in the same D-PRE-02: "if we eventually need a Figma-style collaborative visual canvas, islands falls short".
+
+  An audit of `apps/web/` on 2026-05-01 revealed that the operational arguments for *not migrating* no longer hold at this size — and the audit caveat applies sooner than projected, because Phase 0.2 road sheet collaboration already needs cross-route shared state, presence, focus tracking and form-action progressive enhancement. These are the cases where SvelteKit cuts the cost in half.
+
+- **Audit findings (`apps/web/` on 2026-05-01)**:
+  - **4 pages**, all SSR (`output: 'server'`, no prerender). Zero SSG, the headline reason for choosing Astro.
+  - **1 layout** (`Base.astro`, 30 LoC) — accepts `title`, renders `<slot/>`. Maps 1:1 to a SvelteKit `+layout.svelte`.
+  - **1 API route** (`/api/engagements`, 141 LoC) — request/response plumbing, helpers (`pgGet`, `pgPostRpc`, `extractBearer`) reusable verbatim.
+  - **5 Svelte components** (Button, Input, LinkButton, Checkbox, Radio) — Svelte 5 runes, reusable verbatim under SvelteKit.
+  - **0 use of**: content collections, `astro:assets`, MDX, view transitions, middleware, prerender, image optimization, dynamic Astro components, slots beyond the trivial layout slot.
+  - **`@astrojs/i18n`** configured with locales `en`/`es`, default `en` no prefix — minimal usage; will be reimplemented under SvelteKit with `@inlang/paraglide-sveltekit` (compile-time, type-safe, tree-shakeable).
+  - **CF deploy**: `@astrojs/cloudflare` adapter with `output: 'server'` and `platformProxy.enabled: true`. The replacement is `@sveltejs/adapter-cloudflare` (first-class; `@sveltejs/adapter-cloudflare-workers` is deprecated). Same `wrangler.toml` bindings (R2 `MEDIA`, env vars, observability, `nodejs_compat`).
+  - **% of UI logic in Astro vs Svelte**: ~5% Astro frontmatter (env access, redirects, layout slot), ~95% vanilla JS or Svelte. Astro is acting as a 30-line SSR envelope around Svelte islands.
+
+- **Decision**: migrate `apps/web/` from Astro 5 to **SvelteKit 2.x with Svelte 5 + `@sveltejs/adapter-cloudflare`**. Reverts D-PRE-02. Done now while the surface area is minimal (4 pages, 1 layout, 1 API route, 5 primitives — all 2026-04-19 to 2026-05-01).
+
+- **What SvelteKit gives that the current setup does not**:
+  1. **Client-side routing.** Plaza → Room → Gig without full-page reload. Today every navigation re-renders from the Worker. This is the most palpable UX delta for any user of Hour.
+  2. **Form actions with progressive enhancement.** Forms work without JS, enrich with JS. Aligns with offline/PWA strategy (Phase 0.0 work). Today this is hand-coded `addEventListener` + `fetch` in each page.
+  3. **`load` functions with dependency tracking.** When data invalidates, dependent queries re-run. Today `/booking.astro` has 150+ lines of fetch+render manual; SvelteKit collapses to ~10 lines + `$page.data`.
+  4. **`hooks.server.ts`** for global auth, cleaner than repeating `Astro.locals.runtime.env` access per endpoint.
+  5. **Cross-route shared stores** without nanostore-cross-island workarounds. Naturalises D-PRE-05 (`$selection`, `$lens`, `$chipBar`, `$presence`).
+  6. **End-to-end types via `$types`** between `+page.server.ts` and `+page.svelte`. Removes manual `db-types.ts` regeneration friction at the route boundary.
+  7. **Smaller bundle** for an interactive shell (~15-30 KB Svelte runtime + route, vs Astro's island-per-component hydration footprint).
+  8. **Streaming SSR** native — quick shell + data-in-streaming, useful for Plaza/Desk.
+
+- **What Astro gives that we lose**: nothing in active use. Content collections, image optimization, MDX, view transitions, prerender — none of these are present in the codebase as of audit.
+
+- **Rejected alternatives**:
+  - **Stay on Astro** — D-PRE-02's position. Reasonable when "migrating is churn" actually meant tearing up dozens of files; today churn is 6-10 hours, no UI rework, no data model change. Trades a one-time cost for permanent friction in routing/state/forms.
+  - **Hybrid (keep Astro shell, add SvelteKit subroute for the dashboard)** — rejected. Two routers, two adapters, two i18n setups. The cost of split exceeds the cost of clean migration at this size.
+  - **Migrate later (Phase 0.2 or after Plaza)** — rejected. Each phase added increases the migration surface. Deferring is a bet that the stack doesn't matter; the audit shows it does.
+
+- **Migration plan** (in worktree `migrate/sveltekit`, branched from main at `pre-sveltekit-migration` tag):
+  1. Scaffold SvelteKit 2 + Svelte 5 + `adapter-cloudflare` + paraglide-sveltekit + Vitest. Drop `@astrojs/*` deps.
+  2. Map `Base.astro` → `+layout.svelte`. Reuse `tokens.css` + `base.css` unchanged.
+  3. Reuse 5 Svelte primitives unchanged.
+  4. Migrate `/login`, `/booking`, `/index`, `/playground` → `+page.svelte` + `+page.server.ts` (where applicable). Replace inline fetch+render with `load()`. The `/booking` 306-LoC page becomes ~80 LoC + a clean Svelte table component.
+  5. Migrate `/api/engagements.ts` → `+server.ts`. Helpers reused verbatim.
+  6. Replace `@astrojs/i18n` with `@inlang/paraglide-sveltekit`. Same locales, same default-no-prefix scheme. Compile-time bundles.
+  7. Update `wrangler.toml` build command (`vite build` instead of `astro build`). Output structure changes (no more `dist/_worker.js/index.js`); same bindings.
+  8. Add Valibot at `+server.ts` boundaries (validate query/body in `/api/engagements`). Schema shared with future endpoints.
+  9. Wire Sentry via `@sentry/sveltekit` with `handleError` in `hooks.client.ts` + `hooks.server.ts`.
+  10. Install `@tanstack/svelte-query` + `QueryClientProvider` in layout — not used in Phase 0 routes (the new `load()` is enough), ready for Plaza/Desk in Phase 0.1 where server-state cache becomes load-bearing.
+  11. Smoke test: `/login` → JWT → `/booking` shows 154 engagements with paging, exactly as before. Deploy to `hour-web` from feature branch.
+  12. Merge to `main` when green.
+
+- **Effort estimate**: ~6-10h focused. Cost is an order of magnitude lower than the value gained (every Phase 0.0-0.4 day is now built on the right substrate).
+
+- **What this changes in the roadmap**:
+  - `roadmap.md` Day 10 of Phase 0.0: replace `partykit.json + y-partykit` with `wrangler.jsonc DO + y-partyserver + withYjs(Server) + hibernation` (separate from this ADR; same edit).
+  - `roadmap.md` Phase 0.1: add bullet on TanStack Query as the server-state cache for Plaza/Desk (no extra work — already wired).
+  - `_context.md` Stack line: `Astro/Svelte` → `SvelteKit + Svelte 5`.
+
+- **Connects to**: D-PRE-02 (reopens and reverts), D-PRE-03 (i18n migrates from `@astrojs/i18n` to `paraglide-sveltekit`), ADR-022 (URL routing — SvelteKit's `[workspace]/[entity]/[slug]` covers it natively), ADR-009 (sidebar/lens shell — easier under SvelteKit's shared-state model), ADR-025 (CRDT path unchanged but co-located cleaner under hooks.server).
+
+- **Status**: Firm. Implementation in worktree `migrate/sveltekit`; merge to `main` when smoke tests pass and Marco approves.

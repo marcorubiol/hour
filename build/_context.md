@@ -91,16 +91,16 @@ Bootstrap de Phase 0 **cerrado**. Todos los pasos 1-8 de la lista anterior está
 ### Source tree
 Clean. Commits clave de hoy: schema.sql (DROP SCHEMA + 18 tablas), rls-policies.sql (has_permission + show_redacted view), fixes de audit durante cascade DELETE, restauración de grants Supabase tras CASCADE, db-types.ts regenerado, `/api/engagements` actualizado, loader Python adaptado.
 
-## Next session — primera pantalla
+## Next session — Phase 0.0 / Día 2-3 en SvelteKit
 
-Lista de engagements de Difusión 2026-27 en `apps/web/`. Requisitos completos en `Hour/_context.md` → "Next". Resumen:
-- Login con Supabase Auth (email+password) → JWT
-- `GET /api/engagements?project_slug=mamemi&season=2026-27&limit=50` con Bearer JWT
-- Tabla con person, organization, city/country, status, next_action_at
-- Status editable inline (enum anti-CRM de 7 valores)
-- Filtros: status, procedencia, tipologia (ambos en `person.custom_fields.sources.mostra_igualada_2026.*`)
+Post-ADR-026 (2026-05-01): el frontend vive en `apps/web/src/routes/` (SvelteKit). Primitivos en `apps/web/src/lib/components/`. Helpers (`auth`, `supabase`, `db-types`, `i18n`) en `apps/web/src/lib/`.
 
-Todo el trabajo en Windsurf bajo `apps/web/src/pages/` y `apps/web/src/components/`. `build/` se mantiene pero no necesita cambios para la UI.
+Pendiente en UI a corto plazo:
+- Cerrar Día 2-3 con primitivos restantes (Avatar, Badge, Select, Dialog, Toast, Tooltip, Menu) en `$lib/components/`.
+- `/playground` (dev) ya carga `Showcase` desde `$lib/dev/PlaygroundShowcase.svelte`.
+- Cambio de status inline + filtros (status/procedencia/tipología) en `/booking`.
+
+Todo el trabajo en Windsurf/Claude Code bajo `apps/web/src/routes/` y `apps/web/src/lib/`. `build/` se mantiene pero no necesita cambios para la UI.
 
 ## Diferido (Phase 0.5+)
 
