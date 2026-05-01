@@ -1,8 +1,23 @@
 -- Hour — Phase 0 Schema (reset v2)
 -- Target: Supabase Cloud (Postgres 15+)
--- Generated: 2026-04-19
--- Supersedes the 2026-04-19 polymorphic reset. See DECISIONS.md ADR-001..007.
--- 18 tables in public.
+-- Generated: 2026-04-19. Last migration: 2026-05-01 (reset_v2_roadsheet).
+-- Supersedes the 2026-04-19 polymorphic reset. See _decisions.md ADR-001..007.
+-- 22 tables in public after 2026-05-01.
+--
+-- DELTA SINCE 2026-04-19 (applied via build/migrations/2026-05-01_reset_v2_roadsheet.sql):
+--   §0 enums: asset_kind, asset_direction
+--   §1 show: + load_in_at, soundcheck_at, show_start_at, loadout_at, wrap_at,
+--            logistics jsonb, hospitality jsonb, technical jsonb (+ GIN, CHECK ordered)
+--   §2 venue: + timezone text
+--   §3 slug system on workspace, project, line, show, engagement, person, venue
+--      (+ slug, previous_slugs[], partial unique indexes, GIN previous_slugs,
+--      slugify(), is_reserved_slug(), validate_slug() trigger). person.slug is
+--      GLOBAL UNIQUE (no workspace_id on person).
+--   §4 new tables: crew_assignment, cast_override, asset_version, collab_snapshot
+--   §6 audit triggers + §7 ws-immutability guards on the 4 new tables.
+-- This file (schema.sql) has NOT been rewritten in-place. Source of truth for
+-- the delta is the migration file. To re-derive a clean schema.sql snapshot,
+-- run pg_dump --schema-only or use the Supabase dashboard schema export.
 --
 -- Convention:
 --   - UUID v7 PKs on every tenant-scoped table.

@@ -1,8 +1,20 @@
 -- Hour — Phase 0 RLS Policies (reset v2)
 -- Target: Supabase Cloud (Postgres 15+)
--- Generated: 2026-04-19
--- Supersedes the 2026-04-19 polymorphic reset. See DECISIONS.md ADR-001..007.
--- 18 tables in public; RLS enabled + forced on all of them.
+-- Generated: 2026-04-19. Last migration: 2026-05-01 (reset_v2_roadsheet).
+-- Supersedes the 2026-04-19 polymorphic reset. See _decisions.md ADR-001..007.
+-- 22 tables in public after 2026-05-01; RLS enabled + forced on all of them.
+--
+-- DELTA SINCE 2026-04-19 (applied via build/migrations/2026-05-01_reset_v2_roadsheet.sql):
+--   New helpers (SECURITY DEFINER, GRANT authenticated only):
+--     project_id_of_show(uuid)
+--     project_id_of_asset_version(uuid, uuid, uuid)
+--   New policies on crew_assignment, cast_override, asset_version, collab_snapshot.
+--     SELECT/INSERT/UPDATE/DELETE follow the show_select pattern:
+--       has_permission(<resolved project_id>, 'edit:show')
+--     except collab_snapshot SELECT (is_workspace_member). All writes to
+--     collab_snapshot land via service_role (BYPASSRLS) — no policy.
+-- This file has NOT been rewritten in-place. See the migration file for the
+-- exact policy bodies as applied.
 --
 -- Permission vocabulary (closed, hardcoded):
 --   read:money, read:engagement, read:person_note_private, read:internal_notes,
