@@ -91,14 +91,23 @@ Bootstrap de Phase 0 **cerrado**. Todos los pasos 1-8 de la lista anterior está
 ### Source tree
 Clean. Commits clave de hoy: schema.sql (DROP SCHEMA + 18 tablas), rls-policies.sql (has_permission + show_redacted view), fixes de audit durante cascade DELETE, restauración de grants Supabase tras CASCADE, db-types.ts regenerado, `/api/engagements` actualizado, loader Python adaptado.
 
-## Next session — Phase 0.0 / Día 2-3 en SvelteKit
+## Next session — Phase 0.0 infra (post fundación visual + routing)
 
-Post-ADR-026 (2026-05-01): el frontend vive en `apps/web/src/routes/` (SvelteKit). Primitivos en `apps/web/src/lib/components/`. Helpers (`auth`, `supabase`, `db-types`, `i18n`) en `apps/web/src/lib/`.
+Cerrado 2026-05-01:
+- 13/13 primitivos en `$lib/components/` (último: Sidebar desktop static / mobile drawer). Showcase en `/playground`.
+- Plum trial en `--primary` (provisional, ver `_decisions.md` 2026-05-01).
+- ADR-022 re-evaluada con dossier `build/url-architecture-dossier-2026-05-01.md`; addendum cerrado.
+- Routing scaffold día 5: `$lib/reserved-slugs.ts`, `$lib/url-state.ts`, `$lib/stores/{lens,selection}.svelte.ts`, layouts `/h/` (auth) y `/h/[workspace]/` (shell), placeholders entity (`room`, `gig`, `engagement`, `person`).
 
-Pendiente en UI a corto plazo:
-- Cerrar Día 2-3 con primitivos restantes (Avatar, Badge, Select, Dialog, Toast, Tooltip, Menu) en `$lib/components/`.
-- `/playground` (dev) ya carga `Showcase` desde `$lib/dev/PlaygroundShowcase.svelte`.
-- Cambio de status inline + filtros (status/procedencia/tipología) en `/booking`.
+Pendiente Phase 0.0 (orden sugerido por independencia + ROI):
+1. **Schema `reset_v2_roadsheet`** vía MCP Supabase (3-4h) — 5 timeslots + 3 jsonb en `show`, `crew_assignment`, `cast_override`, `asset_version` con `direction`, `audit_log` aplicado a 13 tablas, `venue.timezone`, slug system (`previous_slugs text[]`, `slug_generator()` validando reserved list), `collab_snapshot` para Yjs.
+2. **Testing scaffold** Vitest + Playwright (3-4h) — smoke por capa (component, API, e2e login).
+3. **Real-time wrapper** Supabase Realtime + presence (4-5h).
+4. **PartyServer DO** scaffold + `withYjs` + persistence (5-8h).
+5. **PWA + offline** Service Worker + IndexedDB + write-queue (10-14h, el grande).
+6. **Backup R2** + cron semanal (2-3h).
+
+Phase 0.1 arranca cuando 1+5 estén cerrados (schema + offline shell). 2/3/4/6 son perpendiculares y se pueden intercalar.
 
 Todo el trabajo en Windsurf/Claude Code bajo `apps/web/src/routes/` y `apps/web/src/lib/`. `build/` se mantiene pero no necesita cambios para la UI.
 

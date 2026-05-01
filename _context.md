@@ -57,7 +57,31 @@ Working name: **Hour**. Brand decision deferred to Phase 1.
 - Parent MaMeMi context (where Difusión originated): `01_STAGE/ZS_MaMeMi/`
 - Source of the 156 existing programmers/festivals to import: `01_STAGE/ZS_MaMeMi/Difusión/`
 
-## Status — 2026-04-20
+## Status — 2026-05-01
+
+Phase 0.0 con la fundación visual + routing **cerrada**. Quedan los bloques de infra (schema roadsheet, real-time, PartyServer DO, PWA/offline, testing, backup) antes de Phase 0.1.
+
+### Cerrado en sesión 2026-05-01
+- **13/13 primitivos** en `apps/web/src/lib/components/`: Button, LinkButton, Input, Checkbox, Radio, Avatar, Badge, Chip, Select, Dialog, Toast, Tooltip, Menu, Sidebar (desktop static / mobile drawer). Showcase completo en `/playground`.
+- **Plum trial** en `--primary` (`oklch(0.50 0.14 335)` ≈ #9D3F70) — terracotta `#AB4235` chocaba con `--danger` a 5°. Provisional, re-evaluar en visual design phase. Ver `_decisions.md` 2026-05-01.
+- **URL architecture re-evaluada** (dossier `build/url-architecture-dossier-2026-05-01.md`). Cinco alternativas evaluadas; ADR-022 sigue (path-prefix `/h/[workspace]/[entity]/[slug]`) con tres ajustes operativos cerrados en addendum.
+- **Routing scaffold Phase 0.0 día 5**:
+  - `apps/web/src/lib/reserved-slugs.ts` — ~70 slugs reservados + helpers.
+  - `apps/web/src/lib/url-state.ts` — `serializeViewState()` / `hydrateViewState()` base64url + 400 chars (D-PRE-05).
+  - `apps/web/src/lib/stores/lens.svelte.ts` y `selection.svelte.ts` — class + factory + `setContext`/`getContext` (SSR-safe).
+  - `apps/web/src/routes/h/+layout.svelte` — auth guard (JWT en localStorage, redirect login).
+  - `apps/web/src/routes/h/[workspace]/+layout.svelte` — shell con Sidebar + lens nav + reserved-slug guard.
+  - Placeholders `+page.svelte` en `/h/[workspace]/`, `/room/[slug]`, `/gig/[slug]`, `/engagement/[slug]`, `/person/[slug]`. `run/venue/asset/invoice` diferidos a su Phase.
+
+### Pendiente Phase 0.0 (~30-40h restantes)
+- Schema `reset_v2_roadsheet` (3-4h, vía MCP Supabase)
+- Real-time wrapper + presence channel (4-5h)
+- PartyServer DO scaffold + `withYjs` + `collab_snapshot` persistence (5-8h)
+- PWA + Service Worker + IndexedDB + write-queue (10-14h)
+- Testing scaffold Vitest + Playwright (3-4h)
+- Backup R2 + cron (2-3h)
+
+## Status anterior — 2026-04-20
 
 Infra, datos y **primera pantalla funcional**. Login + lista de engagements desplegados y operativos. Todo el trabajo está en `apps/web/`.
 

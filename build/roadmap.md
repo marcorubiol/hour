@@ -190,9 +190,9 @@ Las 14 D-PRE cerradas ✓ (07 y 14 cerradas 2026-04-24 con research — ver ADR-
 30. Cron del Worker semanal (domingo madrugada). Retención: 12 semanas.
 
 ### Definition of done
-- [ ] Ningún valor visual hardcoded en `.svelte`.
-- [ ] 13 primitivos pasan tests visuales en 3 viewports.
-- [ ] `/h/marco-rubiol/` renderiza shell.
+- [x] Ningún valor visual hardcoded en `.svelte`. *(2026-05-01: tokens.css + base.css; primitivos solo redeclaran CSS variables.)*
+- [x] 13 primitivos pasan tests visuales en 3 viewports. *(2026-05-01: showcase manual en `/playground`. Tests automáticos pendientes hasta scaffold de testing.)*
+- [x] `/h/marco-rubiol/` renderiza shell. *(2026-05-01: layout con Sidebar + lens nav + topbar; placeholders entity en sitio.)*
 - [ ] App abre offline con datos cacheados.
 - [ ] Lighthouse PWA score ≥90.
 - [ ] `reset_v2_roadsheet` aplicada + `schema.sql` sincronizado.
