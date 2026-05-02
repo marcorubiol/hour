@@ -1,21 +1,21 @@
-# Hour — Architecture (Phase 0)
+# Hour — Architecture (Phase 0 + 0.9)
 
 > Working name: **Hour**
 > Subdomain: `hour.zerosense.studio`
-> Status: Phase 0 — internal tool for MaMeMi, multi-tenant schema from day one so Phase 1 (SaaS) is config, not rewrite.
+> Status: Phase 0 internal tool → Phase 0.9 private beta hardening gate → Phase 1 SaaS if beta validates demand
 > Owner: Marco Rubiol
-> Data model: **reset v2** (2026-04-19) — 18 tables, polymorphic core (workspace + project + engagement + show) with `line`/`venue` primitives and a money stack (invoice/invoice_line/payment/expense). Editable RBAC via `workspace_role` catalog + per-project `project_membership.roles/grants/revokes`. Anti-CRM vocabulary. See `_decisions.md` ADR-001..007.
-> Last reviewed: **2026-05-01** — synced with ADR-026 (frontend migrated Astro → SvelteKit) and ADR-025 (collab transport refined to `y-partyserver`).
+> Data model: **reset v2 + roadsheet delta** (2026-04-19 + 2026-05-01) — **22 tables**, polymorphic core (workspace + project + engagement + show + line + date) with money stack. Editable RBAC. Anti-CRM vocabulary. See `_decisions.md` ADR-001..007 + ADR-023.
+> Last reviewed: **2026-05-02** — Phase 0.9 gate defined, 22 tables confirmed, environments updated to current reality.
 
 ---
 
 ## 1. Purpose
 
-**Phase 0 (6 months).** Ship an internal tool Marco (and eventually Anouk) uses every day to run MaMeMi: Difusión (booking outreach), gigs & tours, crew & tech riders, contacts. Single workspace (`marco-rubiol`, `kind=personal`) with one project (`mamemi`, `type=show`), ≤5 users.
+**Phase 0 (current).** Internal tool for MaMeMi: Difusión, gigs & tours, crew & riders. Single workspace (`marco-rubiol`), 1 project (`mamemi`), ≤5 users.
 
-**Phase 1 (decision point at month 6).** If daily usage is real and 3+ external people have asked for the beta, flip the multi-tenant switches and onboard the first 10 orgs. If not, Hour stays private and we lost nothing — we needed this tool anyway.
+**Phase 0.9 (hardening gate).** Mandatory before any external known client. Adds: httpOnly cookies, rate limiting, RLS regression suite, restore drill, admin/support minimum, structured logging, health checks, Sentry PII scrub. See §0.9 below.
 
-This document describes Phase 0. Phase 1 scaling decisions are in `../build/scale-plan.md` (to be written at month 6).
+**Phase 1 (public SaaS).** Self-serve onboarding/billing only if assisted beta validates demand. Scaling decisions tracked in `build/roadmap.md`.
 
 ---
 
@@ -51,11 +51,11 @@ This document describes Phase 0. Phase 1 scaling decisions are in `../build/scal
 
 | Env | Subdomain | Supabase project | Purpose |
 |-----|-----------|------------------|---------|
-| Production | `hour.zerosense.studio` | `hour-prod` | Live |
-| Staging | `hour-staging.zerosense.studio` | `hour-staging` | Pre-merge validation, migration rehearsal |
-| Dev (optional) | `hour-dev.zerosense.studio` | local Supabase via CLI | Local development |
+| Production (current) | `hour.zerosense.studio` | `hour-phase0` | Live — Phase 0 internal tool |
+| Staging (deferred) | `hour-staging.zerosense.studio` | `hour-staging` | Pre-merge validation when external testers arrive |
+| Dev | `localhost:5173` | local Supabase via CLI | Local development |
 
-Each env has its own Supabase project, its own Cloudflare Pages build, its own secrets. **No shared DB across envs.**
+**Current reality**: Single production project `hour-phase0` in `eu-central-1`. Staging deferred until first external beta tester. Dev uses `pnpm dev` (Vite) against local Supabase or `hour-phase0` (careful with data).
 
 ---
 
@@ -108,7 +108,7 @@ Per-project access goes through `has_permission(project_id, perm)` (ADR-006) —
 
 ## 6. Phase 0 entity map (summary)
 
-Full schema in `schema.sql`. **18 tables**, grouped:
+Full schema in `migrations/2026-05-01_reset_v2_roadsheet.sql` (canonical current). **22 tables**, grouped:
 
 **Tenant + identity**
 - `workspace` — tenant root. Columns: `slug`, `name`, `kind ∈ {personal,team}`, `country`, `timezone`, `settings jsonb`, `custom_fields jsonb`. Pre-seeded: `marco-rubiol` (Marco's personal workspace).
@@ -140,6 +140,12 @@ Full schema in `schema.sql`. **18 tables**, grouped:
 **Audit**
 - `audit_log` — append-only. Triggers on workspace, workspace_membership, workspace_role, venue, project, project_membership, line, show, date, engagement, person, person_note, invoice, payment, expense.
 
+**Roadsheet (ADR-023, 4 tables added 2026-05-01)**
+- `crew_assignment` — junction `show` × `person` with role, call_time, notes.
+- `cast_override` — per-show overrides of cast defaults (role, person, notes).
+- `asset_version` — versioned assets (riders, dossiers) with `direction` enum (`outbound|inbound|adapted`).
+- `collab_snapshot` — Yjs CRDT snapshots for collaborative editing of text fields.
+
 ### What moved where (reset v2 map)
 | Polymorphic-reset entity / column | Reset-v2 home |
 |---|---|
@@ -169,10 +175,31 @@ When tasks come back (early Phase 1, first external user), the taxonomy stays th
 - **Auth provider**: Supabase Auth.
 - **Phase 0 flow**: email+password as primary method, optional TOTP 2FA (user-enrolled). No OAuth yet. Superseded magic-link-only on 2026-04-19 — see ADR `Auth flow: email+password with optional TOTP 2FA` in `_decisions.md`.
 - **Phase 1 additions**: Google OAuth (for calendar sync), Apple Sign-in (iOS app future).
-- **Session storage (Phase 0)**: JWT + refresh token + expiry persisted in `localStorage` under `hour_jwt` / `hour_refresh` / `hour_expires_at`. Pragmatic shortcut for Phase 0 (single browser, ≤5 known users); the client posts `Authorization: Bearer <jwt>` to every `/api/*` route, which forwards it to PostgREST. **Phase 1 must move to httpOnly Secure SameSite=Strict cookies** with refresh handled by a dedicated `+server.ts` to remove the XSS exfiltration vector before any external user signs up. Tracked as deuda in `roadmap.md`.
+- **Session storage (Phase 0)**: JWT + refresh token + expiry persisted in `localStorage` under `hour_jwt` / `hour_refresh` / `hour_expires_at`. Pragmatic shortcut for Phase 0 (single browser, ≤5 known users); the client posts `Authorization: Bearer <jwt>` to every `/api/*` route, which forwards it to PostgREST. **Phase 0.9 must move to httpOnly Secure SameSite=Strict cookies** before any external user signs up. See §8.5.
 - **Token lifetime**: JWT 1h, refresh 7d (Supabase defaults).
 - **Access-token hook**: `public.custom_access_token_hook(event jsonb)` runs at sign-in and on refresh. It looks up the user's first accepted `workspace_membership` row, resolves the `workspace_id`, and injects `current_workspace_id` into the JWT claims. `supabase_auth_admin` has `SELECT` on `workspace_membership` so the hook can read it. The hook is **enabled** in Supabase dashboard → Authentication → Hooks (verified 2026-04-20). Without it, `current_workspace_id()` returns NULL and every RLS policy denies the request.
 - **Workspace switching**: user picks active workspace → app calls `supabase.auth.refreshSession()` after writing the choice into `user_profile` / user metadata → the hook replays and re-issues a JWT with the new `current_workspace_id`. No app-level tenant resolution.
+
+---
+
+## 8.5. Phase 0.9 — Private beta hardening boundary
+
+Mandatory gate before any external known client. These items move from "deferred" to "blocking":
+
+| Item | What | How | Est |
+|------|------|-----|-----|
+| Session hardening | JWT in localStorage → httpOnly Secure SameSite=Strict cookies | `+server.ts` refresh endpoint, cookie parser in hooks | 4-6h |
+| Rate limiting | `/api/sentry-tunnel` and auth endpoints throttled | Cloudflare KV counters in Worker | 30m |
+| RLS regression suite | Automated tests for isolation guarantees | Vitest + Supabase test DB + seeded fixtures | 3-4h |
+| Restore drill | Documented & tested restore from R2 backup | GitHub Action + `psql` restore to staging | 2-3h |
+| Onboarding/support minimum | Create workspace, invite users, assign roles, diagnose issues | Protected admin routes + workspace management UI | 4-6h |
+| Structured logging | JSON logs with request_id correlation | Pino or similar in Worker hooks | 2h |
+| Health checks | `/health/live` (deps OK) and `/health/ready` (usable) | `+server.ts` endpoints | 30m |
+| Sentry PII scrub | Ensure email/user_id hashed before Sentry ingest | `beforeSend` hook in Sentry init | 1h |
+| Resilience mínimo | Timeouts, retry budget, circuit breaker for Supabase/PostgREST | `$lib/supabase.ts` wrapper with exponential backoff | 3h |
+
+**Trigger**: First external known client (not Marco/Anouk/close collaborators) needs a workspace.
+**Pre-checklist**: All 9 items verified in staging before prod workspace creation.
 
 ---
 

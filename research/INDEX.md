@@ -26,6 +26,7 @@
 17. [Tech rider & production docs](product/17-tech-rider-standards.md) — Document types, formats, versioning patterns. From Marco's direct experience + file review. Open questions pending.
 18. [Multi-country invoicing, legal & i18n](product/18-invoicing-i18n-legal.md) — E-invoicing mandates (ES/FR/DE/IT/BE/NL/UK/PT), intra-community VAT, withholding tax, contracts, currencies, GDPR, i18n. Prioritized roadmap.
 19. [Competitor: Orfeo](product/19-competitor-orfeo.md) — Deep dive on orfeo.pro. SAS founded 2012, Rennes, ~20 people, 600+ French clients, Django+jQuery stack. 10 modules covering planning→invoicing→HR. France-locked (DPAE, sPAIEctacle). Starts at €67/mo. Key gap: no international capability, no modern UX, no self-serve. Hour differentiates via international-first, modern stack, diffusion-focus, lower price.
+20. [Product strategy review](product/20-product-strategy-review.md) — Critical product/UX review and Phase 0 MVP transversal strategy.
 
 ## Scope
 

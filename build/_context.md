@@ -5,6 +5,17 @@
 
 ---
 
+## Current onboarding docs for any AI/person
+
+Read in this order:
+1. Root [`_context.md`](../_context.md) — project context, phase definition, key decisions
+2. [`roadmap.md`](roadmap.md) — living implementation plan
+3. [`architecture.md`](architecture.md) — technical stack, security, environments
+4. Root [`_decisions.md`](../_decisions.md) — ADR log
+5. [`runbooks/rollback.md`](runbooks/rollback.md) — if doing ops
+
+---
+
 ## What this folder is
 
 `build/` contains all specs, docs, and planning artifacts for Hour. It is the **shared memory** between Cowork and Claude Code sessions. Chat history is ephemeral. This folder is the source of truth.
@@ -44,10 +55,12 @@ That loads ~90% of project context in seconds without depending on what was said
 
 | File | Purpose | Status |
 |---|---|---|
-| `_context.md` | This workflow guide (CLAUDE.md is a stub) | v1.3 — 2026-04-19 |
-| `architecture.md` | Technical stack, multi-tenancy, security, environments | v1.2 — 2026-04-19 (reset v2) |
+| `_context.md` | This workflow guide | v1.4 — 2026-05-02 |
+| `architecture.md` | Technical stack, multi-tenancy, security, environments | v1.3 — 2026-05-02 (Phase 0.9 added) |
 | `competition.md` | 20 competitors analyzed with pricing, traction, gap analysis | v2 — 2026-04-20 |
-| `roadmap.md` | Living implementation plan — phases 0.0 → 1, ADRs, sprints | v1 — 2026-04-24 |
+| `roadmap.md` | Living implementation plan — phases 0.0 → 1, ADRs, sprints | v1.1 — 2026-05-02 (Phase 0.9 gate) |
+| `director-prompt.md` | Prompt for strategic conversations with AI director | v2 — 2026-05-02 (stack updated) |
+| `setup.md` | Current setup guide (SvelteKit + Workers + Supabase) | v1 — 2026-05-02 |
 
 All research files live in `../research/` (see `research/INDEX.md` for full listing):
 - `10-ai-integration-patterns.md` — AI patterns from 14 tools
@@ -56,23 +69,31 @@ All research files live in `../research/` (see `research/INDEX.md` for full list
 - `13-market-pricing.md` — Market analysis, pricing (19/49/99€), revenue timeline
 - `14-ux-proposals.md` — 6 app structure proposals
 
-| `schema.sql` | Full Postgres schema — 18 tables, reset v2 | v3 — 2026-04-19 (rewritten from scratch) |
-| `rls-policies.sql` | RLS helpers + policies + audit triggers + access-token hook + show_redacted view | v3 — 2026-04-19 (rewritten from scratch) |
-| `seed.sql` | Pre-seed + post-signup claim script for marco-rubiol/mamemi | v1 — 2026-04-19 (may need `membership → workspace_membership` one-liner rename) |
-| `bootstrap.md` | Step-by-step setup guide (Supabase + CF + DNS) | v1.1 — 2026-04-19 (reset v2 refresh) |
-| `import-plan.md` | Mapping 156 Difusión programmers into person + engagement | v1.1 — 2026-04-19 (reset v2 updates). Loader code needs adjustment in Windsurf. |
-| `import/` | 3-stage pipeline: `01_normalize.py` → `02_enrich_from_pdf.py` → `03_load_to_hour.py` | Ready; loader needs reset-v2 adjustment (drop tag/tagging step, drop `type='show'`, status default `contacted`). Supports `--skip-engagements` pre-signup. |
-| `adr/` | Extended ADRs for complex decisions (if needed) | Empty |
+| `schema.sql` | Base reset v2 schema — partial source of truth | v3 — 2026-04-19 (see migrations for current) |
+| `rls-policies.sql` | RLS helpers + policies + audit triggers — partial source | v3 — 2026-04-19 (see migrations for current) |
+| `seed.sql` | Pre-seed + post-signup claim script for marco-rubiol/mamemi | v1 — 2026-04-19 |
+| `migrations/2026-05-01_reset_v2_roadsheet.sql` | Current schema delta — roadsheet additions | v1 — 2026-05-01 (canonical for current) |
+| `migrations/2026-05-01_post_roadsheet_cleanup.sql` | Post-apply fixes (constraints, grants) | v1 — 2026-05-01 |
+| `runbooks/rollback.md` | Emergency rollback procedures | v1 — 2026-05-02 |
+| `import/` | 3-stage pipeline: `01_normalize.py` → `02_enrich_from_pdf.py` → `03_load_to_hour.py` | Executed 2026-05-01 (154/154 contacts loaded) |
+| `archive/` | Historical prompts and obsolete docs | See `archive/README.md` |
+
+Historical (do not follow):
+| `bootstrap.md` | Astro-based setup — OBSOLETE after ADR-026 | Historical — 2026-04-19 |
+| `reset-v2-prompt.md` | Task prompt for reset v2 | Moved to `archive/` |
 
 ---
 
-## Status — 2026-04-20
+## Status — 2026-05-02
 
-Bootstrap de Phase 0 **cerrado**. Todos los pasos 1-8 de la lista anterior están aplicados. DB poblada con datos reales, Worker desplegado, endpoint `/api/engagements` alineado con reset v2. El trabajo de ahora en adelante es producto (UI).
+**Phase 0.0 foundation closed** — reset v2 + roadsheet schema applied (22 tables). SvelteKit migration complete. 13/13 UI primitives built. Next: Phase 0.1 (Plaza + Desk shell) after hardening items.
+
+### Phase 0.9 gate defined
+No external workspace before: httpOnly cookies, rate limiting, RLS regression suite, restore drill, admin/support minimum, structured logging, health checks.
 
 ### Estado DB (aplicado vía MCP)
-- 18 tablas + `show_redacted` view, 19 helpers, 53 policies RLS FORCE
-- Marco (`fcdc82df-58df-4917-860c-8e3af03900f3`) = owner de workspace `marco-rubiol` · 15 system roles · proyecto `mamemi`
+- **22 tablas** + `show_redacted` view, 19 helpers, 53+ policies RLS FORCE
+- Marco = owner de workspace `marco-rubiol` · 15 system roles · proyecto `mamemi`
 - **154 persons + 154 engagements** cargados (status=`contacted`, `season=2026-27`), 30 enriquecidos con dossier 2026
 - Auth hook `custom_access_token_hook` enabled · email+password con Auto-Confirm
 

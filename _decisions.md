@@ -928,3 +928,75 @@ Triggered by Marco's pre-scaffold doubt (Phase 0.0 day 5). Five alternatives eva
   - First `asset_version` uploaded to R2 (Phase 0.5+).
   - Any custom field added to a person beyond the CSV-derived `custom_fields` blob.
 - **Status**: Firm for Phase 0.0 / Phase 0.1 shell. Re-evaluate at every phase gate.
+
+## [2026-05-02] — Phase 0.9 private beta gate before external known clients
+- **Decision**: No external workspace before Phase 0.9 hardening complete. Phase 0.9 is a mandatory gate, not optional polish.
+- **Context**: Goal changed from "launch SaaS at month 6" to "sell in <12 months, first clients known/assisted". The known clients will be hand-onboarded by Marco, not self-serve. This changes security priorities: external data before self-serve capability.
+- **What Phase 0.9 includes**:
+  - Session hardening: httpOnly Secure SameSite=Strict cookies (XSS mitigation)
+  - Rate limiting: `/api/sentry-tunnel` and auth endpoints via Cloudflare KV
+  - RLS regression suite: automated tests for tenant isolation guarantees
+  - Restore drill: documented & tested restore from R2 backup to staging in <30 min
+  - Admin/support minimum: UI to list workspaces, diagnose memberships, reset slugs
+  - Structured logging: JSON logs with request_id correlation
+  - Health checks: `/health/live` and `/health/ready` endpoints
+  - Sentry PII scrub: hash email/user_id before ingest
+- **Consequences**:
+  - Phase 1 becomes "public/self-serve launch with billing", not "first hardening"
+  - Timeline: Phase 0.9 happens when first external client is identified, not at fixed month
+  - Pricing/self-serve onboarding deferred until Phase 0.9 validates demand
+- **Status**: Firm.
+
+## [2026-05-02] — Documentation source-of-truth cleanup
+- **Decision**: Archive obsolete docs, update file tables, clarify onboarding order.
+- **Changes**:
+  - `bootstrap.md` marked HISTORICAL (Astro-based, pre-ADR-026)
+  - `reset-v2-prompt.md` moved to `build/archive/`
+  - `build/_context.md` file table updated with current migrations as canonical
+  - `director-prompt.md` rewritten for SvelteKit stack and Phase 0.9
+  - Onboarding docs order: `_context.md` → `roadmap.md` → `architecture.md` → `_decisions.md` → `runbooks/rollback.md`
+- **Status**: Procedural, completed.
+
+## [2026-05-02] — `/h/` subtree is client-only (`ssr = false`)
+- **Decision**: `apps/web/src/routes/h/+layout.ts` exports `ssr = false`. The whole authenticated app shell renders client-only.
+- **Context**: The `/h/` subtree is the auth-gated app. JWT lives in `localStorage` (Phase 0 reality, Phase 0.9 will migrate to cookies). The auth guard in `+layout.svelte` runs in `onMount`, so on SSR `localStorage` is unavailable and `authChecked=false` keeps `{#if}` closed — the server renders an empty shell anyway. We were paying for an SSR round-trip whose only output is `<head>` + an empty `<div>`.
+- **Alternatives**: (a) Keep SSR + add `+layout.server.ts` cookie check — rejected, requires migrating session storage to cookies first (Phase 0.9 work, 4-6h). (b) Leave SSR on as default — rejected, wasted edge compute on every `/h/*` request for zero functional benefit.
+- **Rationale**: App is internal, no SEO requirement, no anonymous render path. Client-only matches the app shape. One-line change, easy to revert.
+- **Re-evaluate when**: Phase 0.9 ships httpOnly cookies. Server-side auth guards become possible and SSR can return if there's a concrete UX win (e.g. printable workspace dashboards).
+- **Status**: Firm for Phase 0.
+
+## [2026-05-02] — GitHub Actions weekly Supabase backup → R2
+- **Decision**: `.github/workflows/backup.yml` runs every Sunday 03:00 UTC (and on `workflow_dispatch`). Dumps `public` schema (data + structure + roles) via Supabase CLI, gzips, pushes to R2 bucket `hour-backups/weekly/<UTC-stamp>/` with 12-week retention auto-prune.
+- **Context**: Closes "Open debt #1" — backup automation. Worker cron path was rejected on 2026-05-01 (CF Workers can't execute native binaries). GitHub Actions is the right runner: pre-installed `aws` CLI, free tier covers a 20-min weekly job, secrets management built-in.
+- **Activation pending**: requires four GitHub secrets (`SUPABASE_DB_URL`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_ENDPOINT`) and creation of bucket `hour-backups`. Runbook in `build/runbooks/backup.md`.
+- **Re-evaluate when**: First non-derivable data lands (first manual `crew_assignment`, first uploaded `asset_version`, first human `person_note`). At that point a restore drill becomes ALTA.
+- **Status**: Firm. Workflow committed, awaiting secret provisioning to actually run.
+
+## [2026-05-02] — Playwright smoke as deploy gate scaffold
+- **Decision**: Install `@playwright/test` as devDep. `apps/web/playwright.config.ts` + `apps/web/tests/smoke.spec.ts` cover the critical path: login → `/booking` shows engagements → sign out. Scripts `pnpm test:install` + `pnpm test:smoke`.
+- **Context**: Before today, `pnpm check` and `pnpm build` were the only pre-deploy gates — neither catches functional regressions (and `pnpm check` was actually red on a stale type import this session also fixed). A 30-second smoke is enough to catch login/auth/RLS regressions on every deploy.
+- **Activation pending**: requires a test user with `workspace_membership` in `hour-phase0`, plus `PW_TEST_EMAIL`/`PW_TEST_PASSWORD` in `.env.test` (gitignored). Test auto-skips when env is unset, so CI doesn't break until secrets are wired.
+- **Rationale of "scaffold first, wire later"**: the cost of writing the test now is sunk; the cost of provisioning a test user can be deferred without losing the work.
+- **Re-evaluate when**: Phase 0.2 introduces real-time collab — smoke probably needs to expand to cover multi-user scenarios.
+- **Status**: Firm. Committed scaffold, awaiting test user.
+
+## [2026-05-02] — Fix stale type imports in `/api/engagements`
+- **Decision**: Renamed imports `Enum` → `Enums`, `Row` → `Tables` in `+server.ts`. The `db-types.ts` file (Supabase-generated) exports `Enums<>` and `Tables<>`, not the singular forms used.
+- **Context**: `pnpm check` was failing on these two errors. They predate this session — likely a regression from a `supabase gen types` regeneration that renamed the canonical exports. Build wasn't affected (Vite is more permissive than svelte-check), so the deploy stayed green and the breakage went unnoticed.
+- **Lesson**: `_context.md` claimed `pnpm check` was green; it wasn't. Worth wiring `pnpm check` into the smoke-test pipeline alongside Playwright so CI fails on type drift, not just functional drift.
+- **Status**: Procedural fix.
+
+## [2026-05-02] — ADR-027 — Phase 0 validates an integrated operating base before deep modules
+- **Decision**: Phase 0 should validate Hour as a transversal operating system before deepening any single module. Hour is not "booking-first", "production-first", or "road-sheet-first" as product identity. Booking may be an entry point, but the MVP must prove that House, Room, people, engagements, gigs, venues, assets, road sheets, filters, lenses, and permissions work together coherently.
+- **Context**: Product strategy review on 2026-05-02 identified that Hour's main risk is not whether one module can work, but whether the conceptual map and interrelations make sense for real performing-arts teams. Marco clarified that booking is only one entry leg; production is another critical leg, and the initial MVP must keep the whole system in view to avoid building a structurally wrong product.
+- **Alternatives**: (a) Booking-first MVP — rejected because it could optimize the first entry point while weakening production, road sheet, and cross-lens structure. (b) Production-first MVP — rejected for the same reason. (c) Full-depth modules before beta — rejected because it delays learning and increases scope.
+- **Rationale**: Hour's differentiation is not one isolated feature. Its value comes from connecting relationship memory, dates, production, assets, money, and external sharing around the same operational objects. Phase 0 should therefore be shallow but transversal: enough depth to use, enough breadth to validate the model.
+- **Consequences**:
+  - Roadmap language changes from modular MVPs to transversal MVPs.
+  - Phase 0.1 validates the base map: House → Room → Run/Gig, scope, filters, URLs, and detail.
+  - Phase 0.2 validates dates, road sheet, production and sharing as connected outputs of the same map.
+  - Phase 0.3 completes the four base lenses: Desk, Calendar, Contacts, Money.
+  - Contacts/engagement context should appear earlier as a thin slice even if the full Contacts lens remains in Phase 0.3.
+  - The current vocabulary ADR-008 remains working vocabulary, but `Room` must be validated with real users before final UI-copy lock.
+- **Status**: Firm for Phase 0.
+

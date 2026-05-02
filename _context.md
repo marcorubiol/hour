@@ -22,14 +22,18 @@ Multi-tenant B2B SaaS for live performing arts management. Covers the full funne
 Working name: **Hour**. Brand decision deferred to Phase 1.
 
 ## Phase
-**Phase 0 — internal tool for MaMeMi** (Marco + Anouk + ≤5 users, 1 workspace `marco-rubiol`, 1 project `mamemi`). Build is multi-tenant-ready from day one so Phase 1 (SaaS with paying customers) can flip on without a rewrite. Phase 1 decision point: month 6, based on real daily usage and unprompted external demand.
+**Phase 0 — internal tool for MaMeMi** (Marco + Anouk + ≤5 users, 1 workspace `marco-rubiol`, 1 project `mamemi`). Build is multi-tenant-ready from day one so Phase 1 (SaaS with paying customers) can flip on without a rewrite.
+
+**Phase 0.9 — private beta hardening gate**: mandatory before any external known client. Adds httpOnly sessions, rate limiting, RLS regression tests, restore drill, admin/support minimum, observability and health checks.
+
+**Phase 1 — SaaS readiness/public launch**: self-serve onboarding/billing only if assisted beta validates demand.
 
 ## Key decisions (see `_decisions.md` for full log)
 - Deploys at `hour.zerosense.studio` (subdomain, zero cost). Brand decision deferred to Phase 1.
 - Stack: Supabase Cloud + Cloudflare Workers + R2 + pgmq + Resend + Sentry + **SvelteKit 2 + Svelte 5** + pnpm monorepo (ADR-026, 2026-05-01: migrated from Astro 5 + islands; reverts D-PRE-02).
 - Phase 0 runs entirely within free tiers.
 - Multi-tenant from day one: `workspace_id UUID NOT NULL`, RLS at DB level, JWT `current_workspace_id` claim. Workspace kind = `personal | team`.
-- **Reset v2** (ADR-001..007, 2026-04-19): 18 tables. Polymorphic core is `workspace + project + engagement + show + line + date` — no `project.type` column (ADR-007). Engagement (conversation) distinct from show (atomic gig, ADR-001). Money stack: `invoice + invoice_line + payment + expense` (ADR-003). Editable RBAC: `workspace_role` catalog + `project_membership.roles/grants/revokes` with a 10-permission closed vocabulary (ADR-006). `venue` is its own entity.
+- **Reset v2 + roadsheet delta** (ADR-001..007 + ADR-023, 2026-04-19/2026-05-01): 22 tables. Polymorphic core is `workspace + project + engagement + show + line + date` — no `project.type` column (ADR-007). Engagement (conversation) distinct from show (atomic gig, ADR-001). Money stack: `invoice + invoice_line + payment + expense` (ADR-003). Editable RBAC: `workspace_role` catalog + `project_membership.roles/grants/revokes` with a 10-permission closed vocabulary (ADR-006). `venue` is its own entity.
 - **URL architecture** (ADR-022, 2026-04-24): three levels — ephemeral session state in `localStorage`, canonical entity URLs (`/h/:workspace-slug/:entity/:slug-or-id`) stable and shareable, view-state URLs via explicit "Copy link" gesture. Path-prefix multi-tenancy (not subdomain in Phase 0). Signed public links for road sheet only in Phase 0 (partial D6).
 - **Road sheet model** (ADR-023, 2026-04-24): not an entity — projection of `show` + junctions, filtered by role. Schema extensions: 5 timeslot columns + 3 jsonb (`logistics`, `hospitality`, `technical`) on `show`; new tables `crew_assignment`, `cast_override`, `asset_version` (with `direction` enum `outbound|inbound|adapted` — captures venue returns and per-venue variants). No state machine. URL `/h/:workspace/gig/:slug/roadsheet` with optional `?role=`. Closes the "Lens Technical" pendiente (top-nav lens dropped).
 - **Slug naming** (ADR-024, 2026-04-24): clean names + hard reject + `previous_slugs text[]` for rename history. GitHub/Slack model. Immutable `id uuid` separate from mutable slug column. Uniqueness scope `(workspace_id, entity_type)`. Industry research of 10 SaaS confirmed nobody uses numeric suffixes as default UX.
@@ -40,6 +44,7 @@ Working name: **Hour**. Brand decision deferred to Phase 1.
 - Difusión 2026-27 is **not** a project — it's a filtered view over `mamemi` engagements with `custom_fields->>season = '2026-27'`.
 - PKs are UUID v7.
 - Does NOT build Spanish labor compliance (that's Ares's territory).
+- **Private beta gate (Phase 0.9)**: no external workspace before cookies httpOnly, rate limiting, RLS regression suite, restore drill, admin/support minimum, structured logging, health checks and Sentry PII scrub.
 - Indicative Phase 1 pricing: 25 / 60 / 120 €/mes, no setup fee, 14-day trial.
 - Coding happens in Windsurf (switched from Claude Code). Strategy happens in Cowork. Memory lives in `build/*.md`, not in chats.
 - Project lives in AGENCY (the vehicle / work for others), not STUDIO — Marco's call.
@@ -104,17 +109,28 @@ DB: **22 tablas** en producción tras `reset_v2_roadsheet` (commit `dbaf308`).
 - **Audit log triggers verificados live** en producción: 394 rows del bootstrap + 1 smoke UPDATE = pipeline funcional.
 - **`worker-configuration.d.ts`** generado por `wrangler types` ahora gitignored (regenerable con `pnpm cf-typegen`).
 
+### Cerrado en sesión 2026-05-02 (review pass — items 1-3 del backlog)
+- **`+layout.ts` con `ssr = false`** en la rama `/h/`. La rama es app interna autenticada — SSR no aporta nada (no hay SEO, no hay anonymous render path) y desperdiciaba un round-trip server por request. Una línea. El guard funcional client-side de `+layout.svelte` ya estaba bien (no había flash de chrome porque el `{#if authChecked}` cerraba el render hasta hydrate). Ver `_decisions.md` 2026-05-02.
+- **GitHub Actions backup workflow** `.github/workflows/backup.yml` — schedule semanal Sunday 03:00 UTC + `workflow_dispatch`. Dump triple (data, schema, roles) vía Supabase CLI → gzip → push a R2 `hour-backups/weekly/<UTC-stamp>/` vía AWS CLI S3-compatible. Retención 12 semanas con prune automático. Runbook completo en `build/runbooks/backup.md` con secretos requeridos (`SUPABASE_DB_URL`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_ENDPOINT`) + verificación + restore drill stub. **Pendiente para activar**: crear bucket R2 `hour-backups` + emitir token + setear los 4 secretos en GitHub.
+- **Playwright smoke scaffold** instalado (`@playwright/test 1.59.1` devDep) + `playwright.config.ts` + `tests/smoke.spec.ts` (`login → /booking muestra "<n> contacts" + tbody con filas → sign out`). Scripts `pnpm test:install` (Chromium binary) + `pnpm test:smoke`. Test se auto-skipea si faltan `PW_TEST_EMAIL` + `PW_TEST_PASSWORD`. **Pendiente para activar**: crear user de test con `workspace_membership` en `hour-phase0` + setearlo en `.env.test` local.
+- **Bug fix `+server.ts`** — los imports `Enum` / `Row` del módulo `$lib/db-types` estaban rotos (regresión post-regen de tipos: el archivo exporta `Enums` / `Tables`). `pnpm check` estaba en rojo ANTES de esta sesión (contradice lo que decía el contexto). Fix trivial, ahora `pnpm check` 0 errors / 0 warnings y `pnpm build` ✓.
+
 ### Open debts (priority-ordered) — backlog para próximas sesiones
 Lista honesta de lo que sé que falta, ordenada por ratio coste/riesgo. **Atacar de arriba abajo.**
 
-1. **[MEDIA] Backup Supabase → R2 cron semanal vía GitHub Actions** (1-2h). Re-evaluado 2026-05-01: bajado de ALTA a MEDIA porque los 154 contactos productivos son **derivables** del CSV original + pipeline `build/import/` (recreables en <30 min). Sigue siendo deuda real: pero el riesgo asimétrico no aplica hasta que haya datos NO derivables (primer crew_assignment manual, primer note humano, primer asset_version subido a mano). Transición a ALTA cuando llegue Phase 0.1-0.2. Plan: GitHub Actions semanal `supabase db dump` + push a R2 bucket `hour-backups`, retención 12 semanas. **NO** Worker cron — CF Workers no pueden ejecutar binarios nativos. Ver `_decisions.md` 2026-05-01.
-2. **[MEDIA] Smoke test e2e Playwright** (45 min). Hoy `pnpm check` y `pnpm build` pasan, pero ningún test funcional. Cada deploy a prod confía en review humano. Mínimo: Playwright `login → /booking carga 154 → logout` que corra antes de `wrangler deploy`. Red de seguridad bajo cambios futuros.
-3. **[MEDIA] Documentar rollback procedure** (15 min). Tag `pre-sveltekit-migration` existe + CF Workers permite rollback desde dashboard, pero ningún sitio dice "si un deploy revienta, hacer X". Una página corta en `build/runbooks/rollback.md`. El día que reviente a las 23:30, importa.
-4. **[BAJA] Cookies httpOnly en lugar de JWT en localStorage** (4-6h). Hoy XSS = sesión exfiltrable. Phase 0 con 5 usuarios conocidos OK; antes de meter primer cliente externo, mover a httpOnly+Secure+SameSite=Strict. Ya flagged en `architecture.md §8` como deuda Phase 1.
-5. **[BAJA] Pasada cosmética de primitivos** (30 min, opcional). Avatar usa template literal para clases mientras Button/Chip usan `[...].filter(Boolean).join(' ')`. Menu línea 55 `open ? close() : openMenu()` mejor como `if/else`. Cosmético — no rompe nada.
+1. **[ALTA Phase 0.9] Cookies httpOnly en lugar de JWT en localStorage** (4-6h). Hoy XSS = sesión exfiltrable. Phase 0 con 5 usuarios conocidos OK; antes de meter primer cliente externo (Phase 0.9 gate), mover a httpOnly+Secure+SameSite=Strict.
+2. **[BAJA] Pasada cosmética de primitivos** (30 min, opcional). Avatar usa template literal para clases mientras Button/Chip usan `[...].filter(Boolean).join(' ')`. Menu línea 55 `open ? close() : openMenu()` mejor como `if/else`. Cosmético — no rompe nada.
+
+**Phase 0.9 hardening backlog** (antes de cliente externo conocido):
+- **Rate-limit `/api/sentry-tunnel`** vía Cloudflare KV (~30 min). CF WAF rate-limit es add-on de pago; KV en Worker free es suficiente.
+- **RLS regression suite** — tests automatizados que validan políticas RLS contra escenarios de escape (usuarios sin workspace, cross-workspace leakage, permisos revocados).
+- **Restore drill** — proced documentado y probado para restaurar desde backup R2 a Supabase staging en <30 min.
+- **Admin/support minimum** — UI básica para listar workspaces, diagnosticar memberships, resetear slugs.
+- **Structured logging** — formato JSON para logs Worker, correlación por request_id.
+- **Health checks** — endpoints `/health/live` (dependencias OK) y `/health/ready` (servicio usable).
+- **Sentry PII scrub** — revisar que no se envíe email/user_id a Sentry sin hash.
 
 **Diferido a Phase 1 con coste asociado** (no acción hasta entonces):
-- **Rate-limit `/api/sentry-tunnel`** vía Cloudflare KV (~30 min cuando importe). CF WAF rate-limit es ahora add-on de pago; KV en Worker free es suficiente. Plan documentado en task tracking.
 - **Leaked Password Protection** (Supabase Pro feature). Toggle de 1 click cuando active el plan Pro al onboardar primer cliente pagante.
 - **paraglide-js v2** para i18n (~2-3h). El `$lib/i18n.ts` simple actual cubre los ~15 strings de Phase 0. Migrar cuando llegue contenido en español o pase de 50 strings.
 - **Sentry source-map auth token rotation policy** — el token actual (`sntryu_...`) en `apps/web/.env` no caduca. Revisar a Phase 1 si se quiere rotar.
@@ -124,7 +140,7 @@ Lista honesta de lo que sé que falta, ordenada por ratio coste/riesgo. **Atacar
 Infra, datos y **primera pantalla funcional**. Login + lista de engagements desplegados y operativos. Todo el trabajo está en `apps/web/`.
 
 ### DB (aplicada vía MCP)
-- `hour-phase0` en eu-central-1 · Postgres 17 · 18 tablas + `show_redacted` view · 19 helpers · 53 RLS policies (ENABLE + FORCE)
+- `hour-phase0` en eu-central-1 · Postgres 17 · **22 tablas** + `show_redacted` view · 19 helpers · 53 RLS policies (ENABLE + FORCE)
 - Marco es owner de workspace `marco-rubiol` (slug) · 15 system roles seedeados por trigger · proyecto `mamemi` (status=active, sin `type`)
 - Datos reales: **154 persons + 154 engagements** (status=`contacted`, `custom_fields.season='2026-27'`), 30 enriquecidos con dossier 2026
 - Auth hook `custom_access_token_hook` enabled en dashboard (inyecta `current_workspace_id` desde `workspace_membership`)

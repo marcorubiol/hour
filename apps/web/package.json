@@ -9,7 +9,9 @@
     "preview": "wrangler dev",
     "deploy": "vite build && wrangler deploy",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
-    "cf-typegen": "wrangler types"
+    "cf-typegen": "wrangler types",
+    "test:install": "playwright install --with-deps chromium",
+    "test:smoke": "playwright test"
   },
   "dependencies": {
     "@sentry/sveltekit": "^10.8.0",
@@ -22,6 +24,7 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250214.0",
+    "@playwright/test": "^1.59.1",
     "svelte-check": "^4.1.4",
     "typescript": "^5.7.3",
     "vite": "^6.0.0",

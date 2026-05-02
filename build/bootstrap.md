@@ -1,4 +1,12 @@
-# Bootstrap — Hour Phase 0
+> **HISTORICAL — DO NOT FOLLOW FOR CURRENT SETUP**
+>
+> This document describes the **Astro-based setup (pre-ADR-026)**. The project migrated to **SvelteKit** on 2026-05-01.
+> For current setup, see `build/setup.md` and `build/roadmap.md`.
+> Kept for archival reference only.
+
+---
+
+# Bootstrap — Hour Phase 0 (Astro era — OBSOLETE)
 
 One-shot guide from empty cloud accounts to `hour.zerosense.studio` serving a live deploy.
 Run top-to-bottom. Estimate: 2 hours for an operator who's done it before, 4 hours first time.

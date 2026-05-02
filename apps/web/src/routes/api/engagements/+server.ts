@@ -14,10 +14,10 @@
 import type { RequestHandler } from './$types';
 import * as v from 'valibot';
 import { extractBearer } from '$lib/auth';
-import type { Enum, Row } from '$lib/db-types';
+import type { Enums, Tables } from '$lib/db-types';
 import { pgGet, PostgrestError, type SupabaseEnv } from '$lib/supabase';
 
-const ALLOWED_STATUSES: ReadonlyArray<Enum<'engagement_status'>> = [
+const ALLOWED_STATUSES: ReadonlyArray<Enums<'engagement_status'>> = [
   'contacted',
   'in_conversation',
   'hold',
@@ -64,12 +64,12 @@ function json(body: unknown, status = 200): Response {
   });
 }
 
-type EngagementRow = Row<'engagement'>;
+type EngagementRow = Tables<'engagement'>;
 type PersonLite = Pick<
-  Row<'person'>,
+  Tables<'person'>,
   'id' | 'full_name' | 'email' | 'organization_name' | 'country' | 'city' | 'website'
 >;
-type ProjectLite = Pick<Row<'project'>, 'id' | 'slug' | 'name' | 'status'>;
+type ProjectLite = Pick<Tables<'project'>, 'id' | 'slug' | 'name' | 'status'>;
 
 interface EngagementItem extends EngagementRow {
   person: PersonLite | null;
