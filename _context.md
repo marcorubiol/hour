@@ -80,12 +80,14 @@ DB: **22 tablas** en producción tras `reset_v2_roadsheet` (commit `dbaf308`).
   - `apps/web/src/routes/h/[workspace]/+layout.svelte` — shell con Sidebar + lens nav + reserved-slug guard.
   - Placeholders `+page.svelte` en `/h/[workspace]/`, `/room/[slug]`, `/gig/[slug]`, `/engagement/[slug]`, `/person/[slug]`. `run/venue/asset/invoice` diferidos a su Phase.
 
-### Pendiente Phase 0.0 (~10-14h restantes)
+### Phase 0.0 — CERRADA 2026-05-09
+Todos los items del backlog Phase 0.0 cerrados. Próximo: **Phase 0.1 — Plaza + Desk shell con datos productivos**. Ver `build/roadmap.md`.
+
 - ~~Schema `reset_v2_roadsheet`~~ **CERRADO 2026-05-01** (commit `dbaf308`)
 - ~~Backup automatizado vía GitHub Actions~~ **CERRADO 2026-05-09** — workflow corriendo, primera corrida verde, ~150 KB en R2.
 - ~~Real-time wrapper + presence channel~~ **CERRADO 2026-05-09** (commit `58408eb`) — `$lib/realtime/{channels,client,presence.svelte,index}.ts`, cableado en `/h/[workspace]/+layout.svelte`.
 - ~~PartyServer DO scaffold + `withYjs` + `collab_snapshot` persistence~~ **CERRADO 2026-05-09** (commit `8085949`) — Worker separado `apps/collab/` con `RoadsheetCollab` DO, hour-web bindea via `script_name`, ruta `/api/collab/[t]/[id]` autoriza + forwarda. End-to-end verificado en runtime con WebSocket real (5 capas).
-- PWA + Service Worker + IndexedDB + write-queue (10-14h)
+- ~~PWA + Service Worker + IndexedDB + write-queue~~ **CERRADO 2026-05-09** (commits `99b9e0c`/`91afc76`/`fae60aa`/`53160e2`/`7f35580`) — vite-plugin-pwa generateSW, manifest + icon plum, IDB v1 con 2 stores (`read_cache` + `write_queue`), `/offline` prerenderizada como navigateFallback. End-to-end verificado: SW activated, manifest detectado, install button presente, IDB schema visible, offline reload sirve la página propia.
 - ~~Testing scaffold Vitest unit/component~~ **CERRADO 2026-05-09** (commit `8e312fe`).
 
 **Orden sugerido próxima sesión:** GitHub Actions backup primero (perpendicular, cierra deuda, 1-2h). Después testing scaffold o real-time wrapper (cualquiera, son independientes).
@@ -114,6 +116,25 @@ DB: **22 tablas** en producción tras `reset_v2_roadsheet` (commit `dbaf308`).
 - **GitHub Actions backup workflow** `.github/workflows/backup.yml` — schedule semanal Sunday 03:00 UTC + `workflow_dispatch`. Dump triple (data, schema, roles) vía Supabase CLI → gzip → push a R2 `hour-backups/weekly/<UTC-stamp>/` vía AWS CLI S3-compatible. Retención 12 semanas con prune automático. Runbook completo en `build/runbooks/backup.md` con secretos requeridos (`SUPABASE_DB_URL`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_ENDPOINT`) + verificación + restore drill stub. **Pendiente para activar**: crear bucket R2 `hour-backups` + emitir token + setear los 4 secretos en GitHub.
 - **Playwright smoke scaffold** instalado (`@playwright/test 1.59.1` devDep) + `playwright.config.ts` + `tests/smoke.spec.ts` (`login → /booking muestra "<n> contacts" + tbody con filas → sign out`). Scripts `pnpm test:install` (Chromium binary) + `pnpm test:smoke`. Test se auto-skipea si faltan `PW_TEST_EMAIL` + `PW_TEST_PASSWORD`. **Pendiente para activar**: crear user de test con `workspace_membership` en `hour-phase0` + setearlo en `.env.test` local.
 - **Bug fix `+server.ts`** — los imports `Enum` / `Row` del módulo `$lib/db-types` estaban rotos (regresión post-regen de tipos: el archivo exporta `Enums` / `Tables`). `pnpm check` estaba en rojo ANTES de esta sesión (contradice lo que decía el contexto). Fix trivial, ahora `pnpm check` 0 errors / 0 warnings y `pnpm build` ✓.
+
+### Cerrado en sesión 2026-05-09 (PWA + offline scaffold) — **cierre Phase 0.0**
+- **`vite-plugin-pwa` generateSW** mode + `idb` typed wrapper + `workbox-window` para registración cliente. `injectRegister: false` para tener guard manual contra `navigator.webdriver` (Playwright skip).
+- **Manifest + icono**: `static/icon.svg` (plum H placeholder, swap en visual-design phase). `app.html` con links manuales: `<meta theme-color>`, `<link rel="icon">`, `<link rel="apple-touch-icon">`, `<link rel="manifest">` — vite-plugin-pwa NO auto-injecta con SvelteKit (su HTML pipeline está fuera del adapter).
+- **`/offline` prerenderizada** (`src/routes/offline/+page.ts` con `export const prerender = true`) — sirve como `navigateFallback` cuando el SW no encuentra una ruta cacheada. Inyectada en el precache via `additionalManifestEntries` porque vite-plugin-pwa escanea `.svelte-kit/output/client/` antes de que adapter-cloudflare prerenderice los HTMLs en `.svelte-kit/cloudflare/` (gotcha sutil — pasa lo mismo con cualquier adapter que prerenderice post-Vite).
+- **D-PRE-13 (silent updates)**: `registerType: 'prompt'` + workbox `skipWaiting: false` (default) + callbacks `onNeedRefresh`/`onOfflineReady` vacíos. Nuevo SW espera a que cierres todas las pestañas, activa en next open. Sin banners.
+- **`navigateFallbackDenylist`** para `/api/*`, `/login`, `/dev/*`, `/sw.js` — esos siempre tienen que pegar a network. SW solo cachea estáticos + `/offline`.
+- **`$lib/offline/`** módulo con surface API (no wiring):
+  - `db.ts` — `idb` schema v1, dos stores (`read_cache` keyed by URL, `write_queue` autoIncrement). Helpers `cacheRead`/`getCachedRead`/`enqueueWrite`/`listQueuedWrites`/`dequeueWrite`/`bumpWriteRetries`. `prewarmDB()` para crear el schema en mount aunque no haya data (sino IDB nunca aparecía en DevTools). Versioning rule documentada en el upgrade callback.
+  - `register.ts` — `registerServiceWorker()` idempotente, skip bajo SSR/no-SW/Playwright.
+- **Cableado** en `src/routes/+layout.svelte` `onMount`: `registerServiceWorker()` + `prewarmDB()`.
+- **Verificación end-to-end** runtime (post-deploy `91be0ad8`):
+  - SW `#1744 activated and is running` ✓
+  - Manifest detectado por Chrome ✓
+  - IDB `hour-offline (1)` con dos stores ✓
+  - Install button en URL bar ✓
+  - Offline reload sirve `/offline` desde SW cache (con título "Hour" + estado de red en vivo via `navigator.onLine`) ✓
+- **Diferido Phase 0.2+**: write-queue replay logic, IDB-backed TanStack Query persisted cache, postgres_changes subscriptions sobre el cache.
+- **Diferido Phase 0.5**: local-first real evaluation (ElectricSQL/Zero/Triplit), resumable upload `tus-js-client`, push notifications.
 
 ### Cerrado en sesión 2026-05-09 (PartyServer DO scaffold)
 - **Worker separado `apps/collab/`** — adapter-cloudflare sobreescribe `_worker.js` cada build, así que no se puede co-hostear una clase DO en hour-web. Patrón canónico: declarar el DO en un Worker independiente (`hour-collab`) y bindear desde hour-web vía `script_name`. Decision firmada en commit message — `_decisions.md` puede sumar entrada si lo cazamos otra vez.
