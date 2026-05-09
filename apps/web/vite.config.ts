@@ -62,14 +62,17 @@ export default defineConfig(({ mode }) => {
             ],
           },
           workbox: {
-            globPatterns: ['**/*.{js,css,html,svg,png,webmanifest}'],
-            // /offline is a prerendered SvelteKit page (see
-            // src/routes/offline/+page.ts). Workbox precaches the emitted
-            // HTML and serves it as the navigation fallback when the user
-            // is offline and the requested route isn't individually cached.
-            // The root '/' would have been a more obvious choice, but it
-            // isn't statically rendered (the root +page.svelte redirects on
-            // the client) so there's no HTML to cache.
+            globPatterns: ['**/*.{js,css,svg,png,webmanifest}'],
+            // /offline is a SvelteKit-prerendered page (see
+            // src/routes/offline/+page.ts). It's emitted to
+            // .svelte-kit/cloudflare/offline.html by adapter-cloudflare —
+            // AFTER vite-plugin-pwa has built its precache manifest from
+            // .svelte-kit/output/client. So globPatterns can't catch it,
+            // and we inject it explicitly here with a build-stamp revision
+            // so cache busts when the page changes.
+            additionalManifestEntries: [
+              { url: '/offline', revision: String(Date.now()) },
+            ],
             navigateFallback: '/offline',
             navigateFallbackDenylist: [
               /^\/api\//,
