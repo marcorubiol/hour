@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@sentry/sveltekit": "^10.8.0",
+    "@supabase/realtime-js": "^2.105.4",
     "@sveltejs/adapter-cloudflare": "^7.0.0",
     "@sveltejs/kit": "^2.20.0",
     "@sveltejs/vite-plugin-svelte": "^5.0.3",

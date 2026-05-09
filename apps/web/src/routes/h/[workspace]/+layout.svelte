@@ -1,12 +1,16 @@
 <script lang="ts">
   import { page } from '$app/state';
   import { goto } from '$app/navigation';
+  import { env } from '$env/dynamic/public';
   import type { Snippet } from 'svelte';
+  import { onDestroy, onMount } from 'svelte';
   import Sidebar from '$lib/components/Sidebar.svelte';
   import Avatar from '$lib/components/Avatar.svelte';
   import { isReservedWorkspaceSlug } from '$lib/reserved-slugs';
-  import { provideLens, useLens, type Lens } from '$lib/stores/lens.svelte';
+  import { provideLens, type Lens } from '$lib/stores/lens.svelte';
   import { provideSelection } from '$lib/stores/selection.svelte';
+  import { providePresence, provideRealtime, type RealtimeHandle } from '$lib/realtime';
+  import type { PresenceStore } from '$lib/realtime';
 
   interface Props {
     children?: Snippet;
@@ -33,6 +37,40 @@
 
   $effect(() => {
     selection.setWorkspace(workspaceSlug);
+  });
+
+  // Realtime + presence — wired in onMount so localStorage and `env` (both
+  // browser-only) are available. `/h/` is `ssr=false`, so onMount is the
+  // safe boundary. Disposed on layout destroy.
+  // TODO Phase 0.1: pass the real workspace UUID once we resolve slug → DB.
+  // For now we use the slug as the channel anchor; presence works as long
+  // as everyone in the same workspace passes the same string.
+  let rt: RealtimeHandle | null = null;
+  let presence: PresenceStore | null = null;
+
+  onMount(() => {
+    const jwt = localStorage.getItem('hour_jwt');
+    if (!jwt || !env.PUBLIC_SUPABASE_URL || !env.PUBLIC_SUPABASE_ANON_KEY) return;
+    try {
+      rt = provideRealtime(
+        {
+          PUBLIC_SUPABASE_URL: env.PUBLIC_SUPABASE_URL,
+          PUBLIC_SUPABASE_ANON_KEY: env.PUBLIC_SUPABASE_ANON_KEY,
+        },
+        jwt,
+      );
+      presence = providePresence(workspaceSlug);
+    } catch (e) {
+      // JWT missing `sub` (malformed) or env unavailable — degrade silently.
+      // Pages that need realtime call useRealtime() and will throw a clearer
+      // error there.
+      console.warn('[realtime] init failed, continuing without presence:', e);
+    }
+  });
+
+  onDestroy(() => {
+    presence?.dispose();
+    rt?.dispose();
   });
 
   let sidebarOpen = $state(true);
