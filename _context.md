@@ -153,6 +153,19 @@ Todos los items del backlog Phase 0.0 cerrados. Próximo: **Phase 0.1 — Plaza 
   - Frame binario inbound (`<binary>`) — Yjs sync protocol activo
   - Cinco capas funcionando: SvelteKit upgrade → JWT validation → DO binding cross-Worker → partyserver upgrade → y-partyserver Yjs sync
 - **No verificado todavía** (fuera del scope scaffold; requiere Yjs updates reales): snapshot save trigger + snapshot reload roundtrip. La infra está toda en sitio; se prueba la primera vez que UI Phase 0.2 haga `Y.Text.insert()` y dispare `onSave`.
+- **Smoke e2e priorizado para Phase 0.2** (validado en revisión externa 2026-05-09 — 7 checks que cierran el riesgo del DO sin polish):
+  1. **Auth OK** — user con membership conecta a `show:<id>` válido, recibe primer frame Yjs sync.
+  2. **Auth deny** — sin token / token inválido / sin membership: 401/403 antes de tocar el DO.
+  3. **Two-client sync** — A y B en `show:1`, A inserta texto, B converge al mismo state. CRDT real, no solo "WebSocket abierto".
+  4. **Target isolation** — A,B en `show:1`, C en `show:2`. Edits de A no llegan a C. Valida routing por `idFromName`.
+  5. **Snapshot version** — tras updates + threshold, fila en `collab_snapshot` con `target_table`/`target_id`/`workspace_id` correctos, `version = previous + 1`, snapshot no vacío.
+  6. **Reload restore** — cerrar sockets, esperar, reconectar fresh: contenido reaparece desde DB. Valida que no dependes solo de memoria del DO.
+  7. **No JWT logging** — review manual de Cloudflare logs / Sentry breadcrumbs / console / errors: nunca aparece JWT completo. Crítico porque va en query string del WS.
+
+### Revisión técnica externa 2026-05-09
+Otro agente IA hizo audit completo del repo (estructura, stack, RLS, offline, collab, security, tests). La review confirmó solidez general (7.5/10 para Phase 0 interna) y aportó dos shortlists valiosos integrados arriba: 6 escenarios RLS priorizados (Phase 0.9 backlog) + 7 checks smoke e2e collab (Phase 0.2). También cazó deuda real: `sendDefaultPii: true` en `hooks.client.ts:18` y `hooks.server.ts:26` — añadida al backlog Phase 0.9 con shortlist concreto de scrub.
+
+**Retirado de la review:** afirmó que "person global contradice una memoria estratégica" como "biggest risk". La fuente era una memoria automática del agente (ID `7077df82-...`), no del repo canónico. La decisión `person` GLOBAL está reafirmada en ADR-001 + `_context.md` "Anti-CRM vocabulary" + `_decisions.md` 2026-05-01 ("person no tiene workspace_id"). El reviewer retiró el claim al pedirle fuente. **No requiere acción** — la decisión sigue firme. Se documenta aquí solo para que un lector futuro de la review original entienda por qué ese punto se descartó.
 
 ### Cerrado en sesión 2026-05-09 (Realtime wrapper + presence)
 - **`@supabase/realtime-js` standalone** (no traer todo `@supabase/supabase-js`) — mismo enfoque que `$lib/supabase.ts` con fetch raw, mantiene el bundle pequeño.
@@ -203,12 +216,19 @@ Lista honesta de lo que sé que falta, ordenada por ratio coste/riesgo. **Atacar
 
 **Phase 0.9 hardening backlog** (antes de cliente externo conocido):
 - **Rate-limit `/api/sentry-tunnel`** vía Cloudflare KV (~30 min). CF WAF rate-limit es add-on de pago; KV en Worker free es suficiente.
-- **RLS regression suite** — tests automatizados que validan políticas RLS contra escenarios de escape (usuarios sin workspace, cross-workspace leakage, permisos revocados).
+- **RLS regression suite** — 6 escenarios priorizados por valor (cubren ~80% del riesgo multi-tenant real, validados en revisión externa 2026-05-09):
+  1. **Cross-workspace leakage hard deny** — user de workspace A no lee project/show/engagement/person_note/invoice de workspace B aunque conozca UUIDs/slugs. List sin filtro, select por id, join indirecto vía engagement→project, slug conocido. Expected: 0 rows o 403, sin filtrar existencia.
+  2. **Membership revoke con JWT vivo** — user con JWT válido + `current_workspace_id`, membership eliminada, sigue intentando lectura. Expected (decisión a tomar): RLS deniega vía `exists workspace_membership where accepted_at + revoked_at IS NULL` o aceptar ventana hasta expiración (1h). Phase 0.9 endurece.
+  3. **Project permission gate** — viewer con `read:engagement` ve / sin `read:money` no ve fee real / con grant explícito gana / con revoke explícito pierde aunque rol lo tenga / owner+admin bypass. Valida `has_permission()` union + grants - revokes.
+  4. **Money redaction + write guard** — sin `read:money` lee `show_redacted` con fee masked, con `read:money` ve fee real, sin `edit:money` update rechazado por trigger, con `edit:money` permitido.
+  5. **Private person_note** — author lee su nota `visibility='private'`, otro member del mismo workspace no la lee, cross-workspace nunca, workspace-note sí leen miembros autorizados.
+  6. **Soft-delete invisibility** — `deleted_at IS NOT NULL` no aparece en list endpoints ni select por id (salvo rol admin con test separado explícito).
+  - Bonus 7º: **access-token hook claim correctness** — sign-in/refresh inyecta `current_workspace_id` correcto con/sin membership aceptada/múltiples workspaces.
 - **Restore drill** — proced documentado y probado para restaurar desde backup R2 a Supabase staging en <30 min.
 - **Admin/support minimum** — UI básica para listar workspaces, diagnosticar memberships, resetear slugs.
-- **Structured logging** — formato JSON para logs Worker, correlación por request_id.
+- **Structured logging** — formato JSON para logs Worker, correlación por request_id. Verificar que JWT en query string del WS collab no se loguea (Cloudflare logs / Sentry breadcrumbs / console / errors).
 - **Health checks** — endpoints `/health/live` (dependencias OK) y `/health/ready` (servicio usable).
-- **Sentry PII scrub** — revisar que no se envíe email/user_id a Sentry sin hash.
+- **Sentry PII scrub** — actualmente `sendDefaultPii: true` en `apps/web/src/hooks.client.ts:18` y `apps/web/src/hooks.server.ts:26` (descubierto en revisión externa 2026-05-09). Acciones concretas: (a) `sendDefaultPii: false` en client + server; (b) Replay con masking por defecto; (c) `beforeSend` que scrubea email, JWT, Authorization, cookies, query params sensibles (especialmente `?token=` del WS collab); (d) verificar que el rate-limit del tunnel cae también aquí.
 
 **Diferido a Phase 1 con coste asociado** (no acción hasta entonces):
 - **Leaked Password Protection** (Supabase Pro feature). Toggle de 1 click cuando active el plan Pro al onboardar primer cliente pagante.
