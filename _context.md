@@ -80,10 +80,10 @@ DB: **22 tablas** en producción tras `reset_v2_roadsheet` (commit `dbaf308`).
   - `apps/web/src/routes/h/[workspace]/+layout.svelte` — shell con Sidebar + lens nav + reserved-slug guard.
   - Placeholders `+page.svelte` en `/h/[workspace]/`, `/room/[slug]`, `/gig/[slug]`, `/engagement/[slug]`, `/person/[slug]`. `run/venue/asset/invoice` diferidos a su Phase.
 
-### Pendiente Phase 0.0 (~22-31h restantes)
+### Pendiente Phase 0.0 (~15-22h restantes)
 - ~~Schema `reset_v2_roadsheet`~~ **CERRADO 2026-05-01** (commit `dbaf308`)
 - ~~Backup automatizado vía GitHub Actions~~ **CERRADO 2026-05-09** — workflow corriendo, primera corrida verde, ~150 KB en R2. Ver "Cerrado en sesión 2026-05-09" abajo.
-- Real-time wrapper + presence channel (4-5h)
+- ~~Real-time wrapper + presence channel~~ **CERRADO 2026-05-09** (commit `58408eb`) — `$lib/realtime/{channels,client,presence.svelte,index}.ts` con `@supabase/realtime-js` standalone, cableado en `/h/[workspace]/+layout.svelte`. Presence reactive disponible vía `usePresence()`. Postgres changes diferido a Phase 0.2.
 - PartyServer DO scaffold + `withYjs` + `collab_snapshot` persistence (5-8h) — `collab_snapshot` table ya en sitio
 - PWA + Service Worker + IndexedDB + write-queue (10-14h)
 - ~~Testing scaffold Vitest unit/component~~ **CERRADO 2026-05-09** (commit `8e312fe`) — dos proyectos (server/client), `@testing-library/svelte` + jsdom, 9 tests scaffold (reserved-slugs + Badge). Playwright e2e smoke también operativo.
@@ -114,6 +114,20 @@ DB: **22 tablas** en producción tras `reset_v2_roadsheet` (commit `dbaf308`).
 - **GitHub Actions backup workflow** `.github/workflows/backup.yml` — schedule semanal Sunday 03:00 UTC + `workflow_dispatch`. Dump triple (data, schema, roles) vía Supabase CLI → gzip → push a R2 `hour-backups/weekly/<UTC-stamp>/` vía AWS CLI S3-compatible. Retención 12 semanas con prune automático. Runbook completo en `build/runbooks/backup.md` con secretos requeridos (`SUPABASE_DB_URL`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_ENDPOINT`) + verificación + restore drill stub. **Pendiente para activar**: crear bucket R2 `hour-backups` + emitir token + setear los 4 secretos en GitHub.
 - **Playwright smoke scaffold** instalado (`@playwright/test 1.59.1` devDep) + `playwright.config.ts` + `tests/smoke.spec.ts` (`login → /booking muestra "<n> contacts" + tbody con filas → sign out`). Scripts `pnpm test:install` (Chromium binary) + `pnpm test:smoke`. Test se auto-skipea si faltan `PW_TEST_EMAIL` + `PW_TEST_PASSWORD`. **Pendiente para activar**: crear user de test con `workspace_membership` en `hour-phase0` + setearlo en `.env.test` local.
 - **Bug fix `+server.ts`** — los imports `Enum` / `Row` del módulo `$lib/db-types` estaban rotos (regresión post-regen de tipos: el archivo exporta `Enums` / `Tables`). `pnpm check` estaba en rojo ANTES de esta sesión (contradice lo que decía el contexto). Fix trivial, ahora `pnpm check` 0 errors / 0 warnings y `pnpm build` ✓.
+
+### Cerrado en sesión 2026-05-09 (Realtime wrapper + presence)
+- **`@supabase/realtime-js` standalone** (no traer todo `@supabase/supabase-js`) — mismo enfoque que `$lib/supabase.ts` con fetch raw, mantiene el bundle pequeño.
+- **`$lib/realtime/`**: 4 archivos + 1 test:
+  - `channels.ts` — naming helpers puros (`channelName.workspacePresence(id)` etc.), única fuente de verdad. Tipos template-literal.
+  - `client.ts` — `createRealtimeClient(env, jwt)` factory + `provideRealtime`/`useRealtime` context. Decoder JWT base64url hand-rolled (~10 LoC) para extraer `sub` claim como presence key — sin pulling de jwt-decode (~1KB) por una operación trivial. Throws si JWT no tiene `sub`.
+  - `presence.svelte.ts` — `PresenceStore` clase con `$state<PresenceState>` + `count` getter + `isOnline(uid)`. Subscribe a `workspace:{slug}:presence`, listens sync/join/leave, tracks self con `online_at` ISO timestamp en `SUBSCRIBED`. `dispose()` releases channel.
+  - `index.ts` — public API.
+  - `channels.test.ts` — 5 tests pinning el formato (server project).
+- **Cableado** en `/h/[workspace]/+layout.svelte`: provides realtime + presence en `onMount` cuando JWT y `PUBLIC_SUPABASE_*` presentes; dispose en `onDestroy`. Failures degradan silenciosos (console.warn) — pages que necesiten realtime llaman `useRealtime()` y reciben error claro ahí.
+- **Convención naming**: `useRealtime`/`usePresence` (mirroring `useLens` existente, no `getRealtime`/`getPresence`).
+- **Lifecycle**: una conexión WebSocket por tab. Mismo socket multiplexa todos los channels (workspace presence ahora; project/show channels en Phase 0.2 cuando lleguen postgres_changes / collab triggers).
+- **Pendiente verificación manual**: abrir devtools → Network → WS al navegar a `/h/marco-rubiol/`, confirmar frame a `wss://lqlyorlccnniybezugme.supabase.co/realtime/v1/websocket`. Sin esa confirmación, el wiring está construido pero no probado en runtime.
+- **Diferido**: `postgres_changes` (Phase 0.2 cuando haya un campo real al que suscribir), UI que renderiza presence (Phase 0.1+).
 
 ### Cerrado en sesión 2026-05-09 (Vitest scaffold)
 - **Vitest 4.1.5** con dos `projects` (Vitest 4 renombró `workspace` → `projects`):
