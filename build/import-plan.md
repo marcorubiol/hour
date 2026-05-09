@@ -219,10 +219,10 @@ Steps:
 ### Stage 3 — `03_load_to_hour.py`
 
 Input:  `build/import/staging/02_enriched.jsonl`.
-Output: rows in Supabase `hour-phase0` via PostgREST (service-role key, bypasses RLS).
+Output: rows in Supabase `hour-phase0` via PostgREST (secret API key, authenticates as `service_role` Postgres role and bypasses RLS).
 
 Env (read from repo-root `.env`):
-- Required: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`.
+- Required: `SUPABASE_URL`, `SUPABASE_SECRET_KEY` (`sb_secret_...` from "Publishable and secret API keys" tab; legacy `SUPABASE_SERVICE_ROLE_KEY` env var name still supported by the script but the new model is preferred).
 - Optional: `HOUR_WORKSPACE_SLUG=marco-rubiol`, `HOUR_WORKSPACE_NAME="Marco Rubiol"`, `HOUR_PROJECT_SLUG=mamemi`, `HOUR_PROJECT_NAME=MaMeMi`, `HOUR_SEASON=2026-27`, `HOUR_OWNER_EMAIL=marcorubiol@gmail.com`.
 
 Flags: `--dry-run`, `--limit N`, `--verbose`, `--skip-engagements` (load only persons — use before Marco has signed up, so the engagement rows have a real `created_by`).

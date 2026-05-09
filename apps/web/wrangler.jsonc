@@ -43,8 +43,9 @@
     "binding": "CF_VERSION_METADATA"
   },
 
-  // Non-secret public env vars. Secrets (service role key) go in dashboard
-  // Settings → Variables and Secrets, never in this file.
+  // Non-secret public env vars. Secrets go via `wrangler secret put`, never
+  // in this file. The PUBLIC_SUPABASE_ANON_KEY is the new-model **publishable**
+  // key (`sb_publishable_...`), not the legacy `anon` JWT.
   //
   // Sentry config (PUBLIC_SENTRY_DSN, PUBLIC_SENTRY_ENV) lives in `.env` at
   // `apps/web/.env`, NOT here. SvelteKit reads `$env/static/public` at build
@@ -53,23 +54,25 @@
   "vars": {
     "PUBLIC_SUPABASE_URL": "https://lqlyorlccnniybezugme.supabase.co",
     "PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_IavZsGp7i04juuafanQk9w_33pFDhNu"
-  }
+  },
 
-  // ── Phase 0.0 Day 10 (ADR-025) — Durable Object scaffold for `y-partyserver`.
-  // Uncomment when the DO handler exists at src/lib/do/roadsheet.ts.
+  // DO binding to the `hour-collab` Worker. The DO class lives there
+  // (apps/collab/src/roadsheet.ts), not here — adapter-cloudflare overwrites
+  // the SvelteKit-generated _worker.js so we can't co-host DO classes in
+  // hour-web. Cross-Worker bindings via `script_name` are the canonical
+  // workaround.
   //
-  // "durable_objects": {
-  //   "bindings": [
-  //     {
-  //       "name": "ROADSHEET_COLLAB",
-  //       "class_name": "RoadsheetCollab"
-  //     }
-  //   ]
-  // },
-  // "migrations": [
-  //   {
-  //     "tag": "v1-roadsheet-collab",
-  //     "new_sqlite_classes": ["RoadsheetCollab"]
-  //   }
-  // ]
+  // No `migrations` block here — the migration tag is owned by hour-collab.
+  //
+  // Deploy order matters: `cd apps/collab && pnpm run deploy` first (creates
+  // the DO namespace), THEN `cd apps/web && pnpm run deploy` (binds to it).
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "ROADSHEET_COLLAB",
+        "class_name": "RoadsheetCollab",
+        "script_name": "hour-collab"
+      }
+    ]
+  }
 }

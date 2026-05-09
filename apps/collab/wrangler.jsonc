@@ -1,0 +1,49 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+
+  "name": "hour-collab",
+  "compatibility_date": "2026-05-01",
+  "compatibility_flags": ["nodejs_compat"],
+
+  // Worker entry — exports the RoadsheetCollab DO class + a trivial fetch
+  // handler. The DO does the real work via stubs from hour-web.
+  "main": "./src/index.ts",
+
+  // No public route. This Worker is reachable only through DO bindings from
+  // hour-web (script_name: "hour-collab" in hour-web/wrangler.jsonc). External
+  // traffic to *.workers.dev is refused.
+  "workers_dev": false,
+
+  "observability": {
+    "enabled": true
+  },
+
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "ROADSHEET_COLLAB",
+        "class_name": "RoadsheetCollab"
+      }
+    ]
+  },
+
+  // SQLite-backed DO (the new model — cheaper, more storage, supports
+  // hibernation). One migration tag declares the class. Future schema-shape
+  // changes to the DO get new migration tags.
+  "migrations": [
+    {
+      "tag": "v1-roadsheet-collab",
+      "new_sqlite_classes": ["RoadsheetCollab"]
+    }
+  ],
+
+  // Public env shared with hour-web — same Supabase project. Secret API key
+  // for `collab_snapshot` writes is set via:
+  //   pnpm wrangler secret put SUPABASE_SECRET_KEY
+  // (sb_secret_... value from the Publishable+Secret tab, NOT the legacy
+  // service_role JWT).
+  "vars": {
+    "PUBLIC_SUPABASE_URL": "https://lqlyorlccnniybezugme.supabase.co",
+    "PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_IavZsGp7i04juuafanQk9w_33pFDhNu"
+  }
+}

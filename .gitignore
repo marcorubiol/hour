@@ -50,8 +50,8 @@ build/import/__pycache__/
 # pCloud/FUSE temp files
 .fuse_hidden*
 
-# wrangler types — regenerable via `pnpm cf-typegen`
-apps/web/worker-configuration.d.ts
+# wrangler types — regenerable via `pnpm cf-typegen` per workspace
+apps/*/worker-configuration.d.ts
 
 # Playwright artefacts (regenerable per run)
 apps/web/test-results/

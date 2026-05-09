@@ -30,12 +30,12 @@ cp .env.example .env
 ```
 
 Fill in:
-- `PUBLIC_SUPABASE_URL` — from Supabase dashboard
-- `PUBLIC_SUPABASE_ANON_KEY` — from Supabase dashboard
+- `PUBLIC_SUPABASE_URL` — from Supabase dashboard → Project Settings → API
+- `PUBLIC_SUPABASE_ANON_KEY` — the **publishable** API key (`sb_publishable_...`), from the "Publishable and secret API keys" tab. NOT the legacy `anon` JWT.
 - `SENTRY_*` — optional, for error tracking
 
 Secrets (never commit):
-- `SUPABASE_SERVICE_ROLE_KEY` — `wrangler secret put` (see §5)
+- `SUPABASE_SECRET_KEY` — the **secret** API key (`sb_secret_...`), from the same tab. Replaces the legacy `service_role` JWT. Set via `wrangler secret put` (see §5). Bypasses RLS — used by the collab Durable Object to write `collab_snapshot`.
 
 ## 3. Local development
 
@@ -63,7 +63,7 @@ cd apps/web
 pnpm wrangler login
 
 # Set secrets
-pnpm wrangler secret put SUPABASE_SERVICE_ROLE_KEY
+pnpm wrangler secret put SUPABASE_SECRET_KEY
 
 # Deploy
 pnpm run deploy

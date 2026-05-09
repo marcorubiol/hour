@@ -26,6 +26,13 @@ declare global {
     ASSETS: Fetcher;
     PUBLIC_SUPABASE_URL: string;
     PUBLIC_SUPABASE_ANON_KEY: string;
+    /**
+     * DO namespace hosted in the `hour-collab` Worker (script_name binding).
+     * Used by /api/collab/[target_table]/[target_id]/+server.ts to forward
+     * authenticated WebSocket upgrades to the per-document RoadsheetCollab
+     * Durable Object.
+     */
+    ROADSHEET_COLLAB: DurableObjectNamespace;
   }
 }
 
