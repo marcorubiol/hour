@@ -86,7 +86,7 @@ DB: **22 tablas** en producción tras `reset_v2_roadsheet` (commit `dbaf308`).
 - Real-time wrapper + presence channel (4-5h)
 - PartyServer DO scaffold + `withYjs` + `collab_snapshot` persistence (5-8h) — `collab_snapshot` table ya en sitio
 - PWA + Service Worker + IndexedDB + write-queue (10-14h)
-- Testing scaffold Vitest + Playwright (3-4h) — Playwright instalado 2026-05-02, falta crear test user en `hour-phase0` para activar `tests/smoke.spec.ts`
+- Testing scaffold Vitest unit/component (~2-3h) — Playwright e2e smoke ya operativo (cerrado 2026-05-09); falta layer Vitest para tests unitarios + componentes
 
 **Orden sugerido próxima sesión:** GitHub Actions backup primero (perpendicular, cierra deuda, 1-2h). Después testing scaffold o real-time wrapper (cualquiera, son independientes).
 
@@ -114,6 +114,12 @@ DB: **22 tablas** en producción tras `reset_v2_roadsheet` (commit `dbaf308`).
 - **GitHub Actions backup workflow** `.github/workflows/backup.yml` — schedule semanal Sunday 03:00 UTC + `workflow_dispatch`. Dump triple (data, schema, roles) vía Supabase CLI → gzip → push a R2 `hour-backups/weekly/<UTC-stamp>/` vía AWS CLI S3-compatible. Retención 12 semanas con prune automático. Runbook completo en `build/runbooks/backup.md` con secretos requeridos (`SUPABASE_DB_URL`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_ENDPOINT`) + verificación + restore drill stub. **Pendiente para activar**: crear bucket R2 `hour-backups` + emitir token + setear los 4 secretos en GitHub.
 - **Playwright smoke scaffold** instalado (`@playwright/test 1.59.1` devDep) + `playwright.config.ts` + `tests/smoke.spec.ts` (`login → /booking muestra "<n> contacts" + tbody con filas → sign out`). Scripts `pnpm test:install` (Chromium binary) + `pnpm test:smoke`. Test se auto-skipea si faltan `PW_TEST_EMAIL` + `PW_TEST_PASSWORD`. **Pendiente para activar**: crear user de test con `workspace_membership` en `hour-phase0` + setearlo en `.env.test` local.
 - **Bug fix `+server.ts`** — los imports `Enum` / `Row` del módulo `$lib/db-types` estaban rotos (regresión post-regen de tipos: el archivo exporta `Enums` / `Tables`). `pnpm check` estaba en rojo ANTES de esta sesión (contradice lo que decía el contexto). Fix trivial, ahora `pnpm check` 0 errors / 0 warnings y `pnpm build` ✓.
+
+### Cerrado en sesión 2026-05-09 (Playwright smoke activado)
+- **Test user `playwright@hour.test`** creado en `hour-phase0` (auth.users + Auto-confirm) y atado a workspace `marco-rubiol` como `admin` con `accepted_at = now()` vía bloque `DO $$` idempotente. Procedimiento documentado en `build/runbooks/test-user-setup.md` (incluye SQL snippet, troubleshooting table, justificación de admin vs member).
+- **`apps/web/.env.test`** local con `PW_TEST_EMAIL` + `PW_TEST_PASSWORD` (gitignored vía nueva entrada en `.gitignore` — el patrón existente `.env.*.local` no cubría `.env.test`).
+- **Smoke verde end-to-end**: `pnpm build && pnpm test:smoke` → 1 passed en 7.9s. Cubre login → `/booking` muestra "<n> contacts" + tbody con filas → sign out. Detecta regresiones en login flow, JWT auth hook (inyección de `current_workspace_id`), RLS de `engagement` y client-side guard de `/h/`.
+- Nota RBAC: el test user usa rol `admin` (no `member`) intencionalmente. `has_permission()` da bypass a workspace owner/admin para cualquier permiso, así que el smoke valida login + RLS sin acoplarse a detalles RBAC. RBAC regression suite es trabajo aparte (Phase 0.9 gate).
 
 ### Cerrado en sesión 2026-05-09 (backup activado)
 - **Backup workflow restaurado y verde**. El commit `a65a982` del 2026-05-02 había eliminado `.github/workflows/backup.yml` por OAuth scope issue. Re-aplicado en commit nuevo tras `gh auth refresh -h github.com -s workflow`.
@@ -214,6 +220,7 @@ Resumen en una línea: antes de tocar UI, cerrar las 5 decisiones D-PRE-01 a D-P
 
 ## Diferido (Phase 0.5 o cuando toque)
 
+- **`share`** — per-engagement curated microsite (ADR-028, 2026-05-09). Lazy-creado al primer click de compartir; signed URL larga + rotable, sin login del programador; show-driven branding con subtítulo customizable; assets canónicos del show + uploads engagement-scope; email archive vía BCC tipo Basecamp (Cloudflare Email Workers); tracking medio. Wedge de diferenciación vs Drive/WeTransfer. Phase 0.5 item 4. Coste 2-3 sem.
 - `task` entity — polymorphic (project/line/show/engagement), origin: manual/protocol/ai. Manual tasks needed for Desk view. Includes task protocols: reusable chains with relative date offsets that auto-generate prep tasks backwards from gig/fair dates (ADR-011). (Deferred D3)
 - Communication layer — unified email/WhatsApp/Telegram/calls contextualised by House/Room (Deferred D4)
 - App mode — PWA installable (desktop + mobile), not web-only. Must feel like a native app. (Deferred D5)
