@@ -126,7 +126,7 @@ DB: **22 tablas** en producción tras `reset_v2_roadsheet` (commit `dbaf308`).
 - **Cableado** en `/h/[workspace]/+layout.svelte`: provides realtime + presence en `onMount` cuando JWT y `PUBLIC_SUPABASE_*` presentes; dispose en `onDestroy`. Failures degradan silenciosos (console.warn) — pages que necesiten realtime llaman `useRealtime()` y reciben error claro ahí.
 - **Convención naming**: `useRealtime`/`usePresence` (mirroring `useLens` existente, no `getRealtime`/`getPresence`).
 - **Lifecycle**: una conexión WebSocket por tab. Mismo socket multiplexa todos los channels (workspace presence ahora; project/show channels en Phase 0.2 cuando lleguen postgres_changes / collab triggers).
-- **Pendiente verificación manual**: abrir devtools → Network → WS al navegar a `/h/marco-rubiol/`, confirmar frame a `wss://lqlyorlccnniybezugme.supabase.co/realtime/v1/websocket`. Sin esa confirmación, el wiring está construido pero no probado en runtime.
+- **Verificado runtime 2026-05-09** (post-deploy, version `612495ae`): devtools → Network → WS muestra `phx_join` outbound a `realtime:workspace:marco-rubiol:presence`, `phx_reply ok`, `presence track` con `user_id` extraído del JWT (`fcdc82df-58df-...`), `presence_state` con la key correcta, heartbeats `phoenix` cada ~30s. URL construction (`http→ws`), auth con JWT, decoder `sub`, y lifecycle (mount → join → track → eventos) — los cuatro confirmados end-to-end.
 - **Diferido**: `postgres_changes` (Phase 0.2 cuando haya un campo real al que suscribir), UI que renderiza presence (Phase 0.1+).
 
 ### Cerrado en sesión 2026-05-09 (Vitest scaffold)
