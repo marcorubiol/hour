@@ -424,15 +424,16 @@ Orden por valor/coste:
 1. **D3 task entity** + manual tasks atacheadas a Gig/Room.
 2. **Asset upload resumable** (D-PRE-09) con `tus-js-client` + R2. Adaptación per-venue + inbound.
 3. **Inline status change** + PATCH con error recovery loop completo.
-4. **AI integration D8**: decision windows + dossier draft + visual markers.
-5. **Audit log UI** — historial en Gig/Room detail, diff viewer.
-6. **Notifications email + WhatsApp + Telegram** — adapters adicionales.
-7. **Postgres FT search** reemplaza ILIKE cuando ~1000 entidades.
-8. **Local-first real evaluation** — probar ElectricSQL / Zero / Triplit.
-9. **Cursor posicional en presence** (upgrade de P10 simplificada).
-10. **D1 task tags**.
-11. **D9 kanban + D10 timeline**.
-12. **Invoice creation + edit**.
+4. **`share` — per-engagement curated microsite** (ADR-028). Lazy-creado al primer click de "share"; signed URL larga duración + rotable; show-driven branding con subtítulo customizable; assets canónicos del show + uploads engagement-scope; email archive vía BCC a `eng-xxx@in.hour.zerosense.studio` (Cloudflare Email Workers); tracking medio (qué archivos descarga). Reusa `asset_version` + R2. Adelanta D6 (público guest links) y D4 (ingest only). Coste 2-3 semanas. Wedge de diferenciación vs Drive/WeTransfer.
+5. **AI integration D8**: decision windows + dossier draft + visual markers.
+6. **Audit log UI** — historial en Gig/Room detail, diff viewer.
+7. **Notifications email + WhatsApp + Telegram** — adapters adicionales.
+8. **Postgres FT search** reemplaza ILIKE cuando ~1000 entidades.
+9. **Local-first real evaluation** — probar ElectricSQL / Zero / Triplit.
+10. **Cursor posicional en presence** (upgrade de P10 simplificada).
+11. **D1 task tags**.
+12. **D9 kanban + D10 timeline**.
+13. **Invoice creation + edit**.
 
 ---
 

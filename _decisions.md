@@ -1011,3 +1011,34 @@ Triggered by Marco's pre-scaffold doubt (Phase 0.0 day 5). Five alternatives eva
 - **Re-evaluate when**: schema or workflow grows (e.g., per-day backups, multi-region). The pooler URL host might change region; secrets rotate quarterly per Phase 0.9 plan.
 - **Status**: Firm. Backup is now operational on weekly cron + manual dispatch.
 
+## [2026-05-09] — ADR-028 — `share`: per-engagement curated microsite as Phase 0.5 wedge feature
+- **Decision**: Add `share` as a new entity in Phase 0.5 — a per-engagement curated microsite served via signed URL, presenting a show to one external programmer without requiring login. Lazy-created on first "share" click; show-driven branding with per-engagement subtitle override; assets are visual references to canonical `show.assets` plus engagement-scoped one-offs (no byte duplication); incoming email archived via BCC to a per-engagement address (Basecamp-style "loop in by email"); medium-grain view tracking (which assets were downloaded); link is eternal until manual revoke + rotable.
+- **Context**: During *difusión* MaMeMi (154 active contacts for season 2026-27), Marco today juggles dossier delivery across email + WeTransfer + Drive ad-hoc per programmer. Idea surfaced 2026-05-09 to unify this surface inside Hour. Through 4 rounds of grilling, the idea narrowed from "shared bucket" to "curated micro-deal-room with versioning + email archive". Pattern equivalent outside performing arts: DocSend, Dock, Notion deal rooms.
+- **Alternatives considered (rejected)**:
+  - **Drive folder per engagement** — rejected, no version control surface, no curation layer, no analytics, brand-blind.
+  - **Per-show only (no engagement variants)** — rejected, loses "this programmer sees these 4 assets, that one sees those 6" curation, which is the core value-add over Drive.
+  - **Per-engagement only (no canonical show assets)** — rejected, would force re-uploading the same dossier 154 times.
+  - **Login required for programmer (D6 guest membership)** — rejected for Phase 0.5, fricción of 30s registration kills the "open and see immediately" promise that competes with WeTransfer/Drive links.
+  - **Real IMAP/Gmail integration** — rejected for Phase 0.5, blocks on full D4 (Communication layer); BCC-to-archive is the lighter wedge that captures 80% of value.
+  - **Auto-create microsite on engagement creation** — rejected, would generate 154 empty stubs and pollute the model; lazy-on-share is cleaner and signals which engagements are "armed".
+  - **Link expiry by default (30/90/180 days)** — rejected, performing-arts programmers respond on multi-month timelines; expiry creates fricción without preventing the real leak vector (programmer forwards link in WhatsApp). Manual revoke + rotation handles intentional cleanup; eternal default matches actual usage.
+  - **Cero tracking (privacy-first)** — rejected, "did Ana open it? did she download the rider?" is exactly the commercial signal that justifies the feature over Drive. Tracking is server-side, programmer never sees a banner.
+  - **Naming `pitch` / `dossier` / `microsite`** — rejected. `pitch` reads commercial; `dossier` already names a specific asset type; `microsite` is generic web-jargon. `share` is plain, action-oriented, anti-CRM, traduces EN/ES.
+- **Rationale**:
+  1. **Wedge value vs Drive**: curation (which assets per engagement) + version pinning (programmer always sees the version Marco decides) + branded landing presentation + activity tracking — together these are not "Drive with skin", they are a different category of artifact.
+  2. **Reuses existing schema**: `asset_version` (direction=outbound) and R2 binding `MEDIA` already in place. Net new: `share` table, `share_item` selector table, `share_email` archive table, `share_view` analytics table, plus an `asset.scope` discriminator (or nullable `asset.engagement_id`).
+  3. **Adelanta D6 (public guest links)** ya parcialmente cubierto para road sheet — generaliza el patrón.
+  4. **Adelanta D4 (comms) parcialmente** sólo en el ingest side via BCC; envío activo y multi-canal sigue Phase 1.
+  5. **Email ingest stack**: Cloudflare Email Workers (free, GA), parses incoming MIME with `postal-mime`, writes raw EML to R2 + indexed row in `share_email`. No third-party (Postmark/Mailgun) needed. Cierra el loop dentro del stack ya pagado/free.
+  6. **Phase 0.5, no antes**: requiere Plaza+Desk operacionales primero (sin engagements enriquecidos por uso diario, no hay nada que merezca un microsite curado). Adelantarlo a 0.4 sería premature optimization de venta antes de validar uso interno.
+- **Open questions deferred to spec time** (cuando arranque la implementación en Phase 0.5):
+  - Schema: `asset.scope` enum vs `asset.engagement_id` nullable. Trade-off legibility vs flexibility.
+  - Cardinality `share`↔`engagement`: 1:1 (un share por engagement) o 1:N (varios shares — ej. uno por show distinto si Marco vende 3 obras a la misma persona). Probable 1:N.
+  - Email-to-share routing: parser regex sobre `eng-<token>@in.hour.zerosense.studio` o `share-<token>@...`.
+  - Public route: `/s/<token>` (corto, opaco) vs `/h/<ws>/share/<slug>` (legible, leak-vector).
+  - Tracking granularity: hash de IP (privacy-aware) vs raw IP (más útil para fraude). Probable hash.
+  - Token rotation UX: invalida en background y muestra a Marco "share rotado, copia el nuevo link" + permite override "mantener link viejo activo otros 7 días" para no romper a la persona si ya estaba mirando.
+- **Roadmap placement**: Phase 0.5 — Deferred features. Coste estimado bruto 2-3 semanas (1 sem schema + UI interna + share button; 1 sem microsite público; 0.5-1 sem email ingest). Ver `build/roadmap.md` § Phase 0.5.
+- **Re-evaluate when**: arranque Phase 0.5, o si en Phase 0.1-0.4 emerge necesidad real (Marco quiere mandar dossier a alguien y se da cuenta de que ya merece la pena). Si Phase 1 se acelera (cliente externo serio), evaluar adelantar a Phase 0.4 como wedge de venta.
+- **Status**: Firm decision, deferred to Phase 0.5 implementation.
+
