@@ -67,6 +67,16 @@ interface HourOfflineDB extends DBSchema {
 let dbPromise: Promise<IDBPDatabase<HourOfflineDB>> | null = null;
 
 /**
+ * Open the schema without using it. Triggers `upgrade` so v1 stores exist
+ * in DevTools → Application → IndexedDB even before any data is written.
+ * Browser-only; safe to fire-and-forget. Idempotent.
+ */
+export function prewarmDB(): void {
+  if (typeof indexedDB === 'undefined') return;
+  void getDB().catch((e) => console.warn('[offline] prewarmDB failed:', e));
+}
+
+/**
  * Lazy singleton — first caller opens (and runs upgrade if needed); later
  * callers reuse the same connection. Browser-only; throws on the server.
  */

@@ -3,7 +3,7 @@
   import { QueryClient, QueryClientProvider } from '@tanstack/svelte-query';
   import { browser } from '$app/environment';
   import { onMount, type Snippet } from 'svelte';
-  import { registerServiceWorker } from '$lib/offline';
+  import { prewarmDB, registerServiceWorker } from '$lib/offline';
 
   interface Props {
     children: Snippet;
@@ -22,10 +22,12 @@
     },
   });
 
-  // Register the SW once after first paint. Helper has its own Playwright,
-  // SSR, and browser-support guards; idempotent.
+  // Offline scaffold — register SW + open the IndexedDB schema. Both are
+  // idempotent and browser-only; helpers have their own guards (Playwright,
+  // SSR, no-IDB-support).
   onMount(() => {
     void registerServiceWorker();
+    prewarmDB();
   });
 </script>
 

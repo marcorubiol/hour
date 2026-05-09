@@ -17,6 +17,7 @@ export {
   getCachedRead,
   getDB,
   listQueuedWrites,
+  prewarmDB,
   type CachedRead,
   type QueuedWrite,
   type WriteQueueMethod,
