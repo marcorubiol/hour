@@ -2,7 +2,8 @@
   import '../styles/base.css';
   import { QueryClient, QueryClientProvider } from '@tanstack/svelte-query';
   import { browser } from '$app/environment';
-  import type { Snippet } from 'svelte';
+  import { onMount, type Snippet } from 'svelte';
+  import { registerServiceWorker } from '$lib/offline';
 
   interface Props {
     children: Snippet;
@@ -19,6 +20,12 @@
         staleTime: 30_000,
       },
     },
+  });
+
+  // Register the SW once after first paint. Helper has its own Playwright,
+  // SSR, and browser-support guards; idempotent.
+  onMount(() => {
+    void registerServiceWorker();
   });
 </script>
 

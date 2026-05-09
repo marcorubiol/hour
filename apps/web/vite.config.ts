@@ -1,6 +1,7 @@
 import { sentrySvelteKit } from '@sentry/sveltekit';
 import { sveltekit } from '@sveltejs/kit/vite';
 import { loadEnv } from 'vite';
+import { VitePWA } from 'vite-plugin-pwa';
 import { defineConfig } from 'vitest/config';
 
 // `sentrySvelteKit` uploads source maps to Sentry on `vite build` so server
@@ -22,6 +23,55 @@ export default defineConfig(({ mode }) => {
           autoUploadSourceMaps: Boolean(env.SENTRY_AUTH_TOKEN),
         }),
       sveltekit(),
+      // PWA — D-PRE-08 (smart offline) + D-PRE-13 (silent SW updates).
+      //
+      // `registerType: 'prompt'` is intentional, not the auto-update default:
+      // we want the new SW to wait until all tabs close before activating,
+      // matching the Windsurf/Chrome update style. Workbox's default
+      // (skipWaiting: false) gives us that — `prompt` means the plugin
+      // doesn't auto-call skipWaiting either.
+      //
+      // We register the SW manually from $lib/offline/register so the
+      // smoke-test can opt out via navigator.webdriver. Hence
+      // `injectRegister: false`.
+      //
+      // navigateFallbackDenylist keeps the SW out of /api/* and /login —
+      // those must always hit the network, especially while we're still
+      // shipping JWT-in-localStorage (Phase 0.9 will move to httpOnly
+      // cookies and SW handling can be revisited then).
+      !process.env.VITEST &&
+        VitePWA({
+          registerType: 'prompt',
+          injectRegister: false,
+          manifest: {
+            name: 'Hour',
+            short_name: 'Hour',
+            description: 'Live performing arts management — Phase 0',
+            theme_color: '#9d3f70',
+            background_color: '#ffffff',
+            display: 'standalone',
+            start_url: '/',
+            scope: '/',
+            icons: [
+              {
+                src: '/icon.svg',
+                sizes: 'any',
+                type: 'image/svg+xml',
+                purpose: 'any',
+              },
+            ],
+          },
+          workbox: {
+            globPatterns: ['**/*.{js,css,html,svg,png,webmanifest}'],
+            navigateFallback: '/',
+            navigateFallbackDenylist: [
+              /^\/api\//,
+              /^\/login/,
+              /^\/dev\//,
+              /^\/sw\.js$/,
+            ],
+          },
+        }),
     ].filter(Boolean),
     test: {
       projects: [
