@@ -80,13 +80,13 @@ DB: **22 tablas** en producción tras `reset_v2_roadsheet` (commit `dbaf308`).
   - `apps/web/src/routes/h/[workspace]/+layout.svelte` — shell con Sidebar + lens nav + reserved-slug guard.
   - Placeholders `+page.svelte` en `/h/[workspace]/`, `/room/[slug]`, `/gig/[slug]`, `/engagement/[slug]`, `/person/[slug]`. `run/venue/asset/invoice` diferidos a su Phase.
 
-### Pendiente Phase 0.0 (~15-22h restantes)
+### Pendiente Phase 0.0 (~10-14h restantes)
 - ~~Schema `reset_v2_roadsheet`~~ **CERRADO 2026-05-01** (commit `dbaf308`)
-- ~~Backup automatizado vía GitHub Actions~~ **CERRADO 2026-05-09** — workflow corriendo, primera corrida verde, ~150 KB en R2. Ver "Cerrado en sesión 2026-05-09" abajo.
-- ~~Real-time wrapper + presence channel~~ **CERRADO 2026-05-09** (commit `58408eb`) — `$lib/realtime/{channels,client,presence.svelte,index}.ts` con `@supabase/realtime-js` standalone, cableado en `/h/[workspace]/+layout.svelte`. Presence reactive disponible vía `usePresence()`. Postgres changes diferido a Phase 0.2.
-- PartyServer DO scaffold + `withYjs` + `collab_snapshot` persistence (5-8h) — `collab_snapshot` table ya en sitio
+- ~~Backup automatizado vía GitHub Actions~~ **CERRADO 2026-05-09** — workflow corriendo, primera corrida verde, ~150 KB en R2.
+- ~~Real-time wrapper + presence channel~~ **CERRADO 2026-05-09** (commit `58408eb`) — `$lib/realtime/{channels,client,presence.svelte,index}.ts`, cableado en `/h/[workspace]/+layout.svelte`.
+- ~~PartyServer DO scaffold + `withYjs` + `collab_snapshot` persistence~~ **CERRADO 2026-05-09** (commit `8085949`) — Worker separado `apps/collab/` con `RoadsheetCollab` DO, hour-web bindea via `script_name`, ruta `/api/collab/[t]/[id]` autoriza + forwarda. End-to-end verificado en runtime con WebSocket real (5 capas).
 - PWA + Service Worker + IndexedDB + write-queue (10-14h)
-- ~~Testing scaffold Vitest unit/component~~ **CERRADO 2026-05-09** (commit `8e312fe`) — dos proyectos (server/client), `@testing-library/svelte` + jsdom, 9 tests scaffold (reserved-slugs + Badge). Playwright e2e smoke también operativo.
+- ~~Testing scaffold Vitest unit/component~~ **CERRADO 2026-05-09** (commit `8e312fe`).
 
 **Orden sugerido próxima sesión:** GitHub Actions backup primero (perpendicular, cierra deuda, 1-2h). Después testing scaffold o real-time wrapper (cualquiera, son independientes).
 
@@ -114,6 +114,24 @@ DB: **22 tablas** en producción tras `reset_v2_roadsheet` (commit `dbaf308`).
 - **GitHub Actions backup workflow** `.github/workflows/backup.yml` — schedule semanal Sunday 03:00 UTC + `workflow_dispatch`. Dump triple (data, schema, roles) vía Supabase CLI → gzip → push a R2 `hour-backups/weekly/<UTC-stamp>/` vía AWS CLI S3-compatible. Retención 12 semanas con prune automático. Runbook completo en `build/runbooks/backup.md` con secretos requeridos (`SUPABASE_DB_URL`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_ENDPOINT`) + verificación + restore drill stub. **Pendiente para activar**: crear bucket R2 `hour-backups` + emitir token + setear los 4 secretos en GitHub.
 - **Playwright smoke scaffold** instalado (`@playwright/test 1.59.1` devDep) + `playwright.config.ts` + `tests/smoke.spec.ts` (`login → /booking muestra "<n> contacts" + tbody con filas → sign out`). Scripts `pnpm test:install` (Chromium binary) + `pnpm test:smoke`. Test se auto-skipea si faltan `PW_TEST_EMAIL` + `PW_TEST_PASSWORD`. **Pendiente para activar**: crear user de test con `workspace_membership` en `hour-phase0` + setearlo en `.env.test` local.
 - **Bug fix `+server.ts`** — los imports `Enum` / `Row` del módulo `$lib/db-types` estaban rotos (regresión post-regen de tipos: el archivo exporta `Enums` / `Tables`). `pnpm check` estaba en rojo ANTES de esta sesión (contradice lo que decía el contexto). Fix trivial, ahora `pnpm check` 0 errors / 0 warnings y `pnpm build` ✓.
+
+### Cerrado en sesión 2026-05-09 (PartyServer DO scaffold)
+- **Worker separado `apps/collab/`** — adapter-cloudflare sobreescribe `_worker.js` cada build, así que no se puede co-hostear una clase DO en hour-web. Patrón canónico: declarar el DO en un Worker independiente (`hour-collab`) y bindear desde hour-web vía `script_name`. Decision firmada en commit message — `_decisions.md` puede sumar entrada si lo cazamos otra vez.
+- **`apps/collab/src/`**:
+  - `roadsheet.ts` — `RoadsheetCollab extends withYjs(Server)` (y-partyserver mixin sobre partyserver). Override `onLoad` (seed Yjs document desde último snapshot) y `onSave` (encode + write nueva fila `collab_snapshot` cada 30 updates / 60s default). Cachea `workspace_id` y `version` en `this.ctx.storage` (SQLite-backed DO con `new_sqlite_classes`), survive hibernación.
+  - `persistence.ts` — `fetchWorkspaceId` + `loadLatestSnapshot` + `saveSnapshot` vía new-model `SUPABASE_SECRET_KEY` (`sb_secret_...`, NO el legacy `service_role` JWT). bytea encodeado como hex `\x...` en JSON PostgREST.
+  - `index.ts` — re-export `RoadsheetCollab` + stub fetch handler (404). `workers_dev: false` para que el único path sea via DO bindings desde hour-web.
+- **`apps/collab/wrangler.jsonc`** — DO binding owner + migración `new_sqlite_classes: ["RoadsheetCollab"]`.
+- **`apps/web/`**:
+  - `wrangler.jsonc` — binding `ROADSHEET_COLLAB` con `script_name: "hour-collab"` (cross-Worker).
+  - `src/lib/do/auth.ts` — `authorizeCollab(env, jwt, table, id)` resuelve workspace_id via JWT del usuario contra PostgREST. Empty result == not found OR not member; no leak.
+  - `src/routes/api/collab/[target_table]/[target_id]/+server.ts` — GET-only, requiere upgrade WebSocket. Lee JWT de `?token=` (browsers no pueden setear Authorization en WS upgrade). Forward al DO via `env.ROADSHEET_COLLAB.idFromName(`${table}:${id}`).fetch(request)`.
+- **Migración a new-model API keys** (Marco request "nada legacy"): `SUPABASE_SECRET_KEY` (formato `sb_secret_...`, no `eyJ...`), `PUBLIC_SUPABASE_ANON_KEY` ya estaba en formato `sb_publishable_...`. Audit confirmó cero referencias legacy en código. `service_role` aparece en SQL solo como nombre de rol Postgres (built-in), no como nombre de API key. Docs (`build/setup.md`, `build/import-plan.md`) actualizadas.
+- **Verificación runtime end-to-end** (deploy `0cde2248` hour-web + primer deploy hour-collab):
+  - WebSocket abre limpio (`✓ open`)
+  - Frame binario inbound (`<binary>`) — Yjs sync protocol activo
+  - Cinco capas funcionando: SvelteKit upgrade → JWT validation → DO binding cross-Worker → partyserver upgrade → y-partyserver Yjs sync
+- **No verificado todavía** (fuera del scope scaffold; requiere Yjs updates reales): snapshot save trigger + snapshot reload roundtrip. La infra está toda en sitio; se prueba la primera vez que UI Phase 0.2 haga `Y.Text.insert()` y dispare `onSave`.
 
 ### Cerrado en sesión 2026-05-09 (Realtime wrapper + presence)
 - **`@supabase/realtime-js` standalone** (no traer todo `@supabase/supabase-js`) — mismo enfoque que `$lib/supabase.ts` con fetch raw, mantiene el bundle pequeño.
