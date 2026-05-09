@@ -12,7 +12,7 @@ Set in repo Settings → Secrets and variables → Actions → New repository se
 
 | Secret | Value |
 |---|---|
-| `SUPABASE_DB_URL` | `postgresql://postgres:<DB_PASSWORD>@db.lqlyorlccnniybezugme.supabase.co:5432/postgres` |
+| `SUPABASE_DB_URL` | **Use the Session pooler URL** — `postgresql://postgres.<project_ref>:<DB_PASSWORD>@aws-0-eu-central-1.pooler.supabase.com:5432/postgres`. Direct `db.<ref>.supabase.co` resolves to IPv6 only and GitHub Actions runners are IPv4-only (`Network is unreachable`). Use **Session mode (port 5432)**, not Transaction mode (6543) — `pg_dump` uses prepared statements that Transaction mode breaks. Password must be alphanumeric or percent-encoded; raw `@` `/` `#` `:` `?` break URL parsing (Go's `net/url` → `invalid userinfo`). |
 | `R2_ACCESS_KEY_ID` | R2 token's access key (Cloudflare → R2 → Manage R2 API tokens) |
 | `R2_SECRET_ACCESS_KEY` | R2 token's secret key |
 | `R2_ENDPOINT` | `https://<account_id>.r2.cloudflarestorage.com` |

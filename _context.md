@@ -62,9 +62,9 @@ Working name: **Hour**. Brand decision deferred to Phase 1.
 - Parent MaMeMi context (where Difusión originated): `01_STAGE/ZS_MaMeMi/`
 - Source of the 156 existing programmers/festivals to import: `01_STAGE/ZS_MaMeMi/Difusión/`
 
-## Status — 2026-05-01
+## Status — 2026-05-09
 
-Phase 0.0 con fundación visual + routing + **schema roadsheet** cerrados. Quedan los bloques de infra runtime (real-time, PartyServer DO, PWA/offline, testing, backup automatizado) antes de Phase 0.1.
+Phase 0.0 con fundación visual + routing + **schema roadsheet** + **backup automatizado activado** cerrados. Quedan los bloques de infra runtime (real-time, PartyServer DO, PWA/offline, testing scaffold con test user) antes de Phase 0.1.
 
 DB: **22 tablas** en producción tras `reset_v2_roadsheet` (commit `dbaf308`).
 
@@ -80,13 +80,13 @@ DB: **22 tablas** en producción tras `reset_v2_roadsheet` (commit `dbaf308`).
   - `apps/web/src/routes/h/[workspace]/+layout.svelte` — shell con Sidebar + lens nav + reserved-slug guard.
   - Placeholders `+page.svelte` en `/h/[workspace]/`, `/room/[slug]`, `/gig/[slug]`, `/engagement/[slug]`, `/person/[slug]`. `run/venue/asset/invoice` diferidos a su Phase.
 
-### Pendiente Phase 0.0 (~27-37h restantes)
+### Pendiente Phase 0.0 (~22-31h restantes)
 - ~~Schema `reset_v2_roadsheet`~~ **CERRADO 2026-05-01** (commit `dbaf308`)
-- **Backup automatizado vía GitHub Actions** (1-2h) — no Worker cron (CF Workers no pueden correr `supabase db dump`, restricción técnica descubierta esta sesión). Ver `_decisions.md` 2026-05-01.
+- ~~Backup automatizado vía GitHub Actions~~ **CERRADO 2026-05-09** — workflow corriendo, primera corrida verde, ~150 KB en R2. Ver "Cerrado en sesión 2026-05-09" abajo.
 - Real-time wrapper + presence channel (4-5h)
 - PartyServer DO scaffold + `withYjs` + `collab_snapshot` persistence (5-8h) — `collab_snapshot` table ya en sitio
 - PWA + Service Worker + IndexedDB + write-queue (10-14h)
-- Testing scaffold Vitest + Playwright (3-4h)
+- Testing scaffold Vitest + Playwright (3-4h) — Playwright instalado 2026-05-02, falta crear test user en `hour-phase0` para activar `tests/smoke.spec.ts`
 
 **Orden sugerido próxima sesión:** GitHub Actions backup primero (perpendicular, cierra deuda, 1-2h). Después testing scaffold o real-time wrapper (cualquiera, son independientes).
 
@@ -114,6 +114,16 @@ DB: **22 tablas** en producción tras `reset_v2_roadsheet` (commit `dbaf308`).
 - **GitHub Actions backup workflow** `.github/workflows/backup.yml` — schedule semanal Sunday 03:00 UTC + `workflow_dispatch`. Dump triple (data, schema, roles) vía Supabase CLI → gzip → push a R2 `hour-backups/weekly/<UTC-stamp>/` vía AWS CLI S3-compatible. Retención 12 semanas con prune automático. Runbook completo en `build/runbooks/backup.md` con secretos requeridos (`SUPABASE_DB_URL`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_ENDPOINT`) + verificación + restore drill stub. **Pendiente para activar**: crear bucket R2 `hour-backups` + emitir token + setear los 4 secretos en GitHub.
 - **Playwright smoke scaffold** instalado (`@playwright/test 1.59.1` devDep) + `playwright.config.ts` + `tests/smoke.spec.ts` (`login → /booking muestra "<n> contacts" + tbody con filas → sign out`). Scripts `pnpm test:install` (Chromium binary) + `pnpm test:smoke`. Test se auto-skipea si faltan `PW_TEST_EMAIL` + `PW_TEST_PASSWORD`. **Pendiente para activar**: crear user de test con `workspace_membership` en `hour-phase0` + setearlo en `.env.test` local.
 - **Bug fix `+server.ts`** — los imports `Enum` / `Row` del módulo `$lib/db-types` estaban rotos (regresión post-regen de tipos: el archivo exporta `Enums` / `Tables`). `pnpm check` estaba en rojo ANTES de esta sesión (contradice lo que decía el contexto). Fix trivial, ahora `pnpm check` 0 errors / 0 warnings y `pnpm build` ✓.
+
+### Cerrado en sesión 2026-05-09 (backup activado)
+- **Backup workflow restaurado y verde**. El commit `a65a982` del 2026-05-02 había eliminado `.github/workflows/backup.yml` por OAuth scope issue. Re-aplicado en commit nuevo tras `gh auth refresh -h github.com -s workflow`.
+- **R2 prep**: bucket `hour-backups` creado en EU + R2 API token (Object Read & Write) emitido + 4 secretos GitHub provisionados (`SUPABASE_DB_URL`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_ENDPOINT`).
+- **Primera corrida verde** (run `25594739063`, 1m11s): subió `data-2026-05-09T06-58-19Z.sql.gz` (137 KB), `schema-*.sql.gz` (14 KB), `roles-*.sql.gz` (208 B) a `s3://hour-backups/weekly/2026-05-09T06-58-19Z/`.
+- **Tres gotchas resueltos en el camino** (anotados en `build/runbooks/backup.md` para futuros operadores):
+  1. **OAuth scope** — el token gh CLI no tenía scope `workflow`. Push de archivos en `.github/workflows/` requería refresh con scope añadido. Sin esto: `403 refusing to allow an OAuth App to create or update workflow`.
+  2. **Password URL-encoding** — la DB password original contenía un char especial (`@`/`/`/`#`/`?`/`:`) que rompió el parser de `net/url` con `invalid userinfo`. Fix: rotar a password alfanumérica (Opción A elegida) o percent-encodear.
+  3. **IPv6 vs IPv4 + tenant routing** — la URL "Direct connection" (`db.<ref>.supabase.co`) resuelve solo IPv6 y los runners de GH Actions son IPv4-only (`Network is unreachable`). Fix: usar la URL del **Session Pooler** (`postgresql://postgres.<ref>:PASS@aws-0-eu-central-1.pooler.supabase.com:5432/postgres`). User incluye `.<project_ref>` (sin él: `Tenant or user not found`); port 5432 (Session, no Transaction — Transaction rompe `pg_dump` por prepared statements). NO necesario el IPv4 add-on de pago.
+- **Restore drill** sigue pendiente (gate Phase 0.9, no urgente). Runbook tiene el stub.
 
 ### Open debts (priority-ordered) — backlog para próximas sesiones
 Lista honesta de lo que sé que falta, ordenada por ratio coste/riesgo. **Atacar de arriba abajo.**

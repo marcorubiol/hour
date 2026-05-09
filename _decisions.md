@@ -1000,3 +1000,14 @@ Triggered by Marco's pre-scaffold doubt (Phase 0.0 day 5). Five alternatives eva
   - The current vocabulary ADR-008 remains working vocabulary, but `Room` must be validated with real users before final UI-copy lock.
 - **Status**: Firm for Phase 0.
 
+## [2026-05-09] — Backup activated + three operational gotchas captured
+- **Decision**: The 2026-05-02 backup workflow is now live. First successful run uploaded `data` (137 KB), `schema` (14 KB), `roles` (208 B) gzipped to `s3://hour-backups/weekly/2026-05-09T06-58-19Z/`. Total ~150 KB. Closes Open Debt #1 from the 2026-05-02 backlog.
+- **Context**: Activation took four iterations because of three traps that aren't in any single Supabase doc. Capturing here so any future operator (or me in 6 months) doesn't re-discover them. The runbook (`build/runbooks/backup.md`) inlines all three at the secret table.
+- **Three gotchas resolved**:
+  1. **`gh` token needs `workflow` scope** to push files in `.github/workflows/`. Without it the push silently 403s and the workflow file gets reverted (this is exactly what produced commit `a65a982` "Remove backup workflow to resolve OAuth scope issue" on 2026-05-02). Fix: `gh auth refresh -h github.com -s workflow`.
+  2. **DB password URL-encoding** — Go's `net/url` parser fails on `@`/`/`/`#`/`?`/`:` in the userinfo section. Symptom: `failed to parse as URL ... invalid userinfo`. Fix: rotate to alphanumeric password (chosen) or percent-encode special chars.
+  3. **Connection mode** — the "Direct connection" URL (`db.<ref>.supabase.co:5432`) resolves IPv6-only and GitHub Actions runners are IPv4-only. Symptom: `Network is unreachable`. The "Session pooler" URL (`aws-0-eu-central-1.pooler.supabase.com:5432` with user `postgres.<ref>`) is IPv4-compatible and free — the "Enable IPv4 add-on" button in the Connect modal is a paid distraction we don't need. Transaction pooler (port 6543) is wrong because `pg_dump` uses prepared statements that Transaction mode breaks.
+- **Why log this**: each of the three errors has a different root cause and a different fix; together they took ~25 min to chain through. Documenting them as a kit lets the next backup-related setup (e.g., adding a daily job in Phase 0.9, restore drill to staging) skip the rediscovery cost.
+- **Re-evaluate when**: schema or workflow grows (e.g., per-day backups, multi-region). The pooler URL host might change region; secrets rotate quarterly per Phase 0.9 plan.
+- **Status**: Firm. Backup is now operational on weekly cron + manual dispatch.
+
