@@ -62,7 +62,35 @@ Working name: **Hour**. Brand decision deferred to Phase 1.
 - Parent MaMeMi context (where Difusión originated): `01_STAGE/ZS_MaMeMi/`
 - Source of the 156 existing programmers/festivals to import: `01_STAGE/ZS_MaMeMi/Difusión/`
 
-## Status — 2026-05-09
+## Status — 2026-05-18
+
+**Phase 0.1 en curso.** Trabajo #1 (`<Plaza>` + endpoints `/api/houses` y `/api/rooms`) cerrado. Pendiente verificación en browser por Marco (login → `/h/marco-rubiol/` → Plaza muestra "House: marco-rubiol" + room "mamemi" + navegación a `/h/marco-rubiol/room/mamemi` con highlight).
+
+Decisiones estratégicas 2026-05-14 integradas: naming gate adelantado a final Phase 0.1, visual checkpoints (1 ligero al cerrar 0.1, 2 formal antes de 0.4). Ver `_decisions.md` y `build/roadmap.md` § Decision gates.
+
+### Cerrado en sesión 2026-05-18 (Phase 0.1 trabajo #1 — Plaza)
+- **`/api/houses`** y **`/api/rooms`** — SvelteKit `+server.ts` mirroring del pattern `/api/engagements` (Bearer JWT + Valibot + pgGet + JSON estructurado). RLS scopes visibility; `houses` retorna workspaces con membership aceptada (Phase 0: 1 row); `rooms` filtra por JWT `current_workspace_id` claim + default `status=active` (drafts/archived no en nav). Multi-house ready en shape, sin param `workspace_id` por ahora — Phase 1 lo añade.
+- **`Plaza.svelte`** — sidebar upper. TanStack `createQuery` × 2 (memory cache; IDB write-through diferido a Phase 0.2 por trade-off con TanStack Query persister). Active room `$derived` del pathname (single source = URL). Native `<a>` navigation, no click handlers. Loading / empty / error states. Semantic HTML (`<nav><ul><li><a>`) per `_area-methød/code/philosophy.md`. Scoped CSS, variable contracts (`--plaza-room-color`, `--plaza-room-bg`) que el modificador `.plaza__room--active` redeclara.
+- **`/h/[workspace]/+layout.svelte`** — `<Plaza />` inyectada en sidebar body bajo lens nav (ADR-009: lenses top, entities bottom). Nuevo `$effect` sincroniza `SelectionStore.entity` desde el pathname para que consumers no-routing (chip bar, ⌘K) no re-parseen la URL.
+- **Validación**: `pnpm check` 0/0/0, `pnpm build` verde con Sentry source maps subiendo. Commits `a4cb015` (docs) + `6cd4413` (código). No pusheado a origin.
+- **DoD trade-off explícito**: Phase 0.1 DoD línea 309 dice "Sin red: Plaza y Desk usan IndexedDB". Phase 0.0 closure parkeó IDB-backed TanStack persister a Phase 0.2+. Resolución 2026-05-14: declarar DoD parcial + deuda explícita en vez de escribir IDB write-through manual que el persister reemplazará. Memory cache only ahora.
+
+### Phase 0.1 — trabajos restantes (11 de 12)
+2. `<Desk>` sidebar lower (tree Runs→Gigs de Room seleccionada).
+3. `<GigDetail>` mobile-first.
+4. `<RelationshipStub>` bloque mínimo en Room/Gig detail.
+5. `<ProductionStub>` bloque mínimo en Gig detail.
+6. Endpoints `/api/runs`, `/api/gigs`, `/api/gigs/:id`.
+7. Router activo (rutas room/gig conectadas a datos productivos, no placeholders).
+8. Cross-highlight UP.
+9. Writes encolan offline.
+10. Presence badge "N online" en header.
+11. Settings + Master View toggle.
+12. (Ya cubierto en este trabajo) TanStack Query wiring para cada query.
+
+Al cerrar los 12 trabajos → **dos gates** (decisión 2026-05-14): checkpoint visual 1 + naming gate.
+
+### Status anterior — 2026-05-09
 
 Phase 0.0 con fundación visual + routing + **schema roadsheet** + **backup automatizado activado** cerrados. Quedan los bloques de infra runtime (real-time, PartyServer DO, PWA/offline, testing scaffold con test user) antes de Phase 0.1.
 
