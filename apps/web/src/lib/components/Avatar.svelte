@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { accentVar } from '$lib/utils/accent';
+
   type Size = 'xs' | 's' | 'm' | 'l';
   type Tone =
     | 'neutral'
@@ -14,6 +16,9 @@
     name?: string;
     size?: Size;
     tone?: Tone;
+    /** When set, fills the avatar with the workspace's hashed accent color
+        (--accent-N). Overrides `tone`. */
+    accentSlug?: string;
   }
 
   let {
@@ -22,6 +27,7 @@
     name,
     size = 'm',
     tone = 'neutral',
+    accentSlug,
   }: Props = $props();
 
   function deriveInitials(value?: string): string {
@@ -32,7 +38,16 @@
   }
 
   let initials = $derived(deriveInitials(name));
-  let classes = $derived(`avatar avatar--${size} avatar--${tone}`);
+  let classes = $derived(
+    accentSlug
+      ? `avatar avatar--${size}`
+      : `avatar avatar--${size} avatar--${tone}`,
+  );
+  let styleAttr = $derived(
+    accentSlug
+      ? `--avatar-bg: ${accentVar(accentSlug)}; --avatar-color: var(--bg);`
+      : undefined,
+  );
   let label = $derived(alt ?? name ?? 'avatar');
 
   let imageFailed = $state(false);
@@ -47,10 +62,13 @@
 {#if src && !imageFailed}
   <img
     class={classes}
+    style={styleAttr}
     {src}
     alt={label}
     onerror={() => (imageFailed = true)}
   />
 {:else}
-  <span class={classes} role="img" aria-label={label}>{initials}</span>
+  <span class={classes} style={styleAttr} role="img" aria-label={label}>
+    {initials}
+  </span>
 {/if}

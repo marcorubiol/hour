@@ -1322,6 +1322,237 @@
     font-weight: 500;
   }
 
+  /* Pill skeleton — lens / filter selector. Skeleton declares the variable
+     contract; modifiers redeclare only CSS variables. `.pill--on` flips
+     background to ink, `.pill--all` adds a dashed outline + dot, `.pill--sm`
+     shrinks padding+font for filter rows. */
+  [class*="pill"]:where(:not(.pill--none)) {
+    --pill-padding-block: 5px;
+    --pill-padding-inline: 14px;
+    --pill-font-size: var(--text-xs);
+    --pill-radius: var(--radius-pill);
+    --pill-gap: 7px;
+    --pill-background: transparent;
+    --pill-color: var(--text-muted);
+    --pill-border-color: var(--border-color);
+    --pill-border-style: solid;
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--pill-gap);
+    padding-block: var(--pill-padding-block);
+    padding-inline: var(--pill-padding-inline);
+    background: var(--pill-background);
+    color: var(--pill-color);
+    border: 1px var(--pill-border-style) var(--pill-border-color);
+    border-radius: var(--pill-radius);
+    font-family: var(--font-sans);
+    font-size: var(--pill-font-size);
+    font-weight: 500;
+    line-height: 1.2;
+    cursor: pointer;
+    transition:
+      background var(--transition), color var(--transition),
+      border-color var(--transition);
+  }
+
+  button.pill,
+  button[class*="pill--"] {
+    appearance: none;
+  }
+
+  [class*="pill"]:where(:not(.pill--none)):focus-visible {
+    outline: var(--focus-width) solid var(--focus-color);
+    outline-offset: 2px;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    [class*="pill"]:where(:not(.pill--none):not(.pill--on)):hover {
+      background: var(--bg-hover);
+    }
+  }
+
+  .pill--on {
+    --pill-background: var(--text-color);
+    --pill-color: var(--bg);
+    --pill-border-color: var(--text-color);
+  }
+
+  .pill--sm {
+    --pill-padding-block: 3px;
+    --pill-padding-inline: 9px;
+    --pill-font-size: var(--text-xxs);
+    --pill-gap: 6px;
+  }
+
+  .pill--all {
+    --pill-border-style: dashed;
+    --pill-padding-inline: 14px;
+  }
+
+  .pill--all::before {
+    content: "";
+    inline-size: 7px;
+    block-size: 7px;
+    background: currentColor;
+    border-radius: 2px;
+    display: inline-block;
+  }
+
+  /* Tag chip — small mono pastel for task tags (#travel, #press, etc).
+     Tone via [data-tone] swap of bg + fg. No border (the bg carries the
+     identity). Non-interactive by default — render as <span>. */
+  .tag-chip {
+    --tag-bg: var(--tag-neutral-bg);
+    --tag-fg: var(--tag-neutral-fg);
+
+    display: inline-block;
+    padding-block: 2px;
+    padding-inline: 6px;
+    background: var(--tag-bg);
+    color: var(--tag-fg);
+    font-family: var(--font-mono);
+    font-size: var(--text-xxs);
+    letter-spacing: var(--mono-letter-spacing);
+    line-height: 1.4;
+    border-radius: var(--radius-sm);
+    white-space: nowrap;
+  }
+
+  .tag-chip[data-tone="amber"] {
+    --tag-bg: var(--tag-amber-bg);
+    --tag-fg: var(--tag-amber-fg);
+  }
+  .tag-chip[data-tone="blue"] {
+    --tag-bg: var(--tag-blue-bg);
+    --tag-fg: var(--tag-blue-fg);
+  }
+  .tag-chip[data-tone="teal"] {
+    --tag-bg: var(--tag-teal-bg);
+    --tag-fg: var(--tag-teal-fg);
+  }
+  .tag-chip[data-tone="green"] {
+    --tag-bg: var(--tag-green-bg);
+    --tag-fg: var(--tag-green-fg);
+  }
+  .tag-chip[data-tone="purple"] {
+    --tag-bg: var(--tag-purple-bg);
+    --tag-fg: var(--tag-purple-fg);
+  }
+  .tag-chip[data-tone="red"] {
+    --tag-bg: var(--tag-red-bg);
+    --tag-fg: var(--tag-red-fg);
+  }
+
+  /* Role chip — neutral filled (for "what role this task is about") and
+     dashed bordered variant (for "other roles I don't hold"). `.is-mine`
+     promotes a dashed role-badge to solid + filled, signalling personal
+     ownership. Used inside week items + project rows. */
+  .role-chip {
+    display: inline-block;
+    padding-block: 2px;
+    padding-inline: 6px;
+    background: var(--bg-hover);
+    color: var(--text-muted);
+    font-family: var(--font-sans);
+    font-size: var(--text-xxs);
+    line-height: 1.4;
+    border-radius: var(--radius-sm);
+    letter-spacing: 0.02em;
+  }
+
+  .role-badge {
+    display: inline-block;
+    padding-block: 2px;
+    padding-inline: 8px;
+    background: transparent;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    font-size: var(--text-xxs);
+    line-height: 1.4;
+    border: 1px dashed var(--border-color);
+    border-radius: var(--radius-sm);
+    letter-spacing: 0.03em;
+  }
+
+  .role-badge.is-mine {
+    color: var(--text-color);
+    border-color: var(--text-color);
+    border-style: solid;
+    background: var(--bg-sunk);
+  }
+
+  /* State badge — show lifecycle. Border-only, tone-coloured. Lowercase
+     mono. Used in calendar dots, week items, room headers. */
+  .state-badge {
+    --state-color: var(--text-muted);
+    --state-border: var(--border-color);
+
+    display: inline-block;
+    padding-block: 2px;
+    padding-inline: 6px;
+    color: var(--state-color);
+    background: transparent;
+    border: 1px solid var(--state-border);
+    border-radius: var(--radius-sm);
+    font-family: var(--font-mono);
+    font-size: var(--text-xxs);
+    line-height: 1.4;
+    letter-spacing: 0.04em;
+    text-transform: lowercase;
+  }
+
+  .state-badge[data-tone="info"] {
+    --state-color: var(--info);
+    --state-border: var(--info);
+  }
+  .state-badge[data-tone="success"] {
+    --state-color: var(--success);
+    --state-border: var(--success);
+  }
+  .state-badge[data-tone="warning"] {
+    --state-color: var(--warning);
+    --state-border: var(--warning);
+  }
+  .state-badge[data-tone="danger"] {
+    --state-color: var(--danger);
+    --state-border: var(--danger);
+  }
+  .state-badge[data-tone="faint"] {
+    --state-color: var(--text-faint);
+    --state-border: var(--border-color-soft);
+  }
+
+  /* Kbd — keyboard hint. `<kbd>` semantic element styled with a subtle
+     bottom-bevel border so it reads as a key cap. */
+  .kbd {
+    display: inline-block;
+    padding-block: 1px;
+    padding-inline: 5px;
+    color: var(--text-muted);
+    background: var(--bg-raised);
+    border: 1px solid var(--border-color);
+    border-block-end-width: 1.5px;
+    border-radius: var(--radius-sm);
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    line-height: 1.4;
+  }
+
+  /* Eyebrow — small uppercase mono label used above section titles, list
+     headers, breadcrumbs. Sets the editorial rhythm of the page. */
+  .eyebrow {
+    display: inline-block;
+    color: var(--text-faint);
+    font-family: var(--font-mono);
+    font-size: var(--text-xxs);
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    line-height: 1.4;
+  }
+
   /* Sidebar skeleton — desktop static aside / mobile drawer.
      Desktop: takes its width in the flow; toggling open hides via display:none.
      Mobile (<48rem): position fixed, slides in via transform with backdrop. */

@@ -4,6 +4,48 @@ Running notes, in motion. Cuando algo se asiente: migrar fuera.
 
 ---
 
+## 2026-05-18 — TAM levers: qué amplía mercado de verdad (vs qué solo mejora retención)
+
+**Estado:** conversación estratégica con .zerø validada por Marco. No es decisión, es mapa de palancas para mirar al planificar Phase 0.5+. Si una de estas se prioriza explícitamente sobre otra, migra a `_decisions.md` como ADR.
+
+**Contexto:** análisis de viabilidad de Hour como producto. Pregunta de partida: ¿qué construir después de Phase 0.4 amplía el TAM atacable, vs qué solo mejora la experiencia dentro del TAM ya identificado? El roadmap actual ordena por arquitectura limpia (validar transversal antes de profundizar módulos), no por palanca comercial. Útil revisar ambos ejes.
+
+### Lo que NO amplía TAM (aunque sea valioso)
+
+- **`task` entity** (Deferred D1, hoy en Phase 0.5+ según roadmap). Sube retención (Hour pasa a estar abierto a diario en vez de solo para difusión), sube conversión post-trial (demos más cerrables), habilita guest links útiles (D6). Pero **no trae gente nueva**: una compañía que hoy gestiona con WhatsApp + Excel no salta a Hour porque añadas tasks. Los gates de adopción (volumen suficiente, apertura a SaaS, willingness-to-pay 30-60€/mes) no se mueven.
+  - **Matiz importante**: el roadmap difiere tasks a Phase 0.5+, **Marco no está cerrado a adelantarlas**. Si emerge fricción real en Phase 0.1-0.3 (p.ej. road sheet pide "asignar load-in del jueves a X"), revisar moverlas. Decisión abierta, no cerrada.
+
+### Lo que SÍ ampliaría TAM (palancas reales)
+
+1. **Comms integradas** (Deferred D4). La palanca con más leverage. Si Hour ahorra escribir 30 emails de difusión el lunes (con tracking de aperturas, draft contextualizado por engagement, BCC archive estilo Basecamp), la propuesta de valor pasa de "organiza mejor" a "ahorra horas reales". Esto sí mueve compañías que hoy viven en Excel + Gmail. Probablemente el primer multiplicador de mercado real. Acoplado a `share` (ADR-028) y a `engagement` como contenedor de conversación, encaja en el modelo existente.
+
+2. **Multi-perfil dentro de un workspace** (técnico freelance, manager externo, sala invitada como guest, además de los miembros core de la compañía). Permite vender a un ecosistema en vez de a una empresa aislada y desbloquea segmentos adyacentes.
+   - **Verificado 2026-05-18** (lectura directa de schema.sql + migración `2026-05-01_reset_v2_roadsheet.sql` + rls-policies):
+     - ✅ **Técnico freelance puntual** (sonidista para UNA gira) → cubierto. `workspace_membership(role='guest')` + `project_membership(project_id=gira_id, roles=['performer'|'technical_director'])`. RLS sobre `show`/`date`/`engagement` gateada por `has_permission(project_id, ...)`, no por workspace → ve SOLO los gigs/dates/engagements de esa gira.
+     - ✅ **Manager externo / promotor coorganizador** (colaborador de UN proyecto) → cubierto. Mismo patrón, rol `producer` con permisos `read:money`, `edit:show`, `edit:engagement`, `read:engagement`. Persons son globalmente compartidas dentro del workspace (by design ADR — contactos son activos compartidos), no hay manera de ocultarlos por project.
+     - ✅ **Sala invitada / venue como guest** (co-productor de UN show) → cubierto. `asset_version` tiene 4 RLS policies aplicadas vía migración (líneas 643-686), usando `project_id_of_asset_version(project_id, line_id, show_id)` que resuelve el project_id desde la FK que esté seteada. Guest con `project_membership` sobre el project del show ve y edita sus asset_versions, no toca otros.
+     - ❌ **Anonymous-read vía signed link** (técnico que entra solo a su road sheet SIN login) → NO cubierto, diferido a Phase 0.5 (Deferred D6 en `_context.md`). Falta: tabla `public_share`/`share_token`, RLS `TO anon`, route `/public/[entity]/[token]`. ADR-022 menciona "partial D6 activation" para road sheet en Phase 0 (signed URLs), activación completa Phase 0.5.
+   - **Veredicto operativo**: 3 de 4 perfiles cubiertos hoy. El 4º está documentado como diferido. Multi-perfil interno con login = listo. Multi-perfil sin login (anonymous share) = pendiente con scope claro.
+   - **Nota correctiva**: el dump `build/rls-policies.sql` está desfasado vs migraciones aplicadas; consultar siempre `build/migrations/*.sql` para verdad de RLS. Tachar este punto de la lista de palancas de TAM — la palanca multi-perfil estructural ya está. Queda solo el caso 4 (anonymous link) que ya está en el roadmap.
+
+3. **Plantillas verticalizadas + onboarding self-serve**. Plantilla "gira musical sala 100-500", plantilla "obra teatro temporada", plantilla "festival de creación contemporánea", plantilla "residencia". Escala atacando segmentos sin demo individual. Conecta naturalmente con `section.kind` enum de ADR-031 (las plantillas son perfiles preconfigurados de section + project + roles + protocolos). Trabajo medio (no requiere schema nuevo grande), impacto alto en conversión self-serve cuando llegue Phase 1.
+
+### Recomendación de orden (no decisión)
+
+Si hubiera que priorizar palanca comercial: **comms (D4) antes que tasks (D1)**. Tasks mejoran lo que ya tienes; comms abren mercado nuevo. Plantillas vienen detrás, asociadas a Phase 1 self-serve.
+
+Pero esto compite contra el principio de "validar transversal antes de profundizar módulos" del roadmap. No resolver desde aquí — re-mirar cuando lleguemos a Phase 0.4 cierre y haya primer cliente real probando.
+
+### Cross-arts confirmado (no solo teatro)
+
+Sub-pregunta resuelta: Hour es cross-arts estructuralmente (schema neutro, `section.kind` cubre tour/season/circuit/creation/campaign/residency, `show` es genérico, `engagement` igual de válido con programador musical, director teatral, curator festival). Perfil de cliente real (género aparte): compañía/banda/colectivo autogestionado 3-15 personas, 50-300 fechas/año, mid-size europea.
+
+No encajan: música comercial con agente/label (territorio SystemOne/Stagent), salas/festivales que programan (territorio Spektrix/Artifax), música clásica institucional (Orfeo en FR), solistas pequeños sin volumen (Google Calendar + Gmail les sobra).
+
+**Implicación de marketing**: producto cross-arts desde el código, comunicación inicial probablemente arranca con el caso piloto MaMeMi (performance + música) y abre a otros géneros vía testimonios. "Tool para artes en vivo" suena a todo y a nada.
+
+---
+
 ## 2026-05-09 — `share` (cristalizada → ADR-028)
 
 **Estado:** cerrada en 4 rondas de grilling el 2026-05-09. Migrada a `_decisions.md` como ADR-028. Roadmap Phase 0.5 item 4. Bloque de exploración debajo se mantiene como rastro del proceso de pensamiento; el contenido canónico vive en el ADR.

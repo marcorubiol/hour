@@ -1,16 +1,18 @@
 <script lang="ts">
   /**
    * Workspace shell (ADR-029) — user-scoped sidebar with simultaneous
-   * houses + lens nav as horizontal pills at the top of main.
+   * workspaces + lens nav as horizontal pills at the top of main.
    *
-   * - Sidebar upper: <Plaza /> (multi-house tree, user-scoped).
-   * - Sidebar lower: <RoomStructure /> (runs+gigs of selected Room).
-   * - Top of main: horizontal lens pills + "All" chip placeholder.
-   * - Main content: routed page (`/h/[workspace]/+page.svelte` for the
-   *   empty home, or entity sub-pages).
+   * - Sidebar upper: <Plaza /> (multi-workspace project list, user-scoped).
+   * - Sidebar lower: <RoomStructure /> (lines+shows of selected project).
+   * - Top of main: horizontal lens pills + breadcrumb + search.
+   * - Main content: routed page (Today on the empty home, or entity sub-pages).
    *
    * The URL still carries one workspace (ADR-022 path-prefix); the sidebar
-   * shows all the user's houses regardless of the URL workspace.
+   * shows all the user's workspaces regardless of the URL workspace.
+   *
+   * Visual refresh 2026-05-18 (ADR-033): editorial v0.5. Newsreader display
+   * wordmark, Inter pills, mono breadcrumb + kbd. Plum retired.
    */
 
   import { page } from '$app/state';
@@ -23,6 +25,7 @@
   import Plaza from '$lib/components/Plaza.svelte';
   import RoomStructure from '$lib/components/RoomStructure.svelte';
   import PresenceBadge from '$lib/components/PresenceBadge.svelte';
+  import Pill from '$lib/components/Pill.svelte';
   import { isReservedWorkspaceSlug } from '$lib/reserved-slugs';
   import { provideLens, type Lens } from '$lib/stores/lens.svelte';
   import { provideSelection } from '$lib/stores/selection.svelte';
@@ -49,7 +52,7 @@
   });
 
   const selection = provideSelection();
-  const lens = provideLens('plaza');
+  const lens = provideLens('today');
 
   $effect(() => {
     selection.setWorkspace(workspaceSlug);
@@ -65,26 +68,13 @@
     }
   });
 
-  // Master View — remember the path each time we navigate, but only if
-  // the user opted in via /settings. Helper short-circuits when feature
-  // is off or the path isn't saveable (e.g. /settings itself).
   $effect(() => {
     saveMasterViewPath(page.url.pathname);
   });
 
-  // Hybrid presence model B (ADR-029 follow-up 2026-05-18, per Marco's
-  // call): the topbar shows NETWORK presence — distinct users connected
-  // across ALL workspaces this user is a member of. Per-Room / per-
-  // RoadSheet contextual presence will layer on top in Phase 0.2.
-  //
-  // $state so PresenceBadge re-renders when these get assigned inside
-  // onMount (browser-only providers).
   let rt = $state<RealtimeHandle | null>(null);
   let networkPresence = $state<NetworkPresenceStore | null>(null);
 
-  // Drive the network presence subscriptions from the houses list (same
-  // query key as Plaza — TanStack caches by key, so this hits the cache
-  // and the badge connects as soon as Plaza's data lands).
   type HouseLite = { id: string; slug: string; name: string };
   const housesQuery = createQuery({
     queryKey: ['houses'],
@@ -117,9 +107,6 @@
     }
   });
 
-  // Sync the subscribed channel set as the houses list changes (initial
-  // load, future invitations, etc.). Idempotent — setWorkspaces handles
-  // diff + dispose internally.
   $effect(() => {
     const slugs = $housesQuery.data?.items.map((h) => h.slug) ?? [];
     if (networkPresence && slugs.length > 0) {
@@ -133,13 +120,25 @@
   });
 
   let sidebarOpen = $state(true);
+  let allActive = $state(false);
 
   const lensOptions: { id: Lens; label: string }[] = [
-    { id: 'plaza', label: 'Plaza' },
+    { id: 'today', label: 'Today' },
     { id: 'calendar', label: 'Calendar' },
     { id: 'contacts', label: 'Contacts' },
     { id: 'money', label: 'Money' },
   ];
+
+  let breadcrumbDate = $derived.by(() => {
+    const d = new Date();
+    return d
+      .toLocaleDateString('en-US', {
+        weekday: 'long',
+        month: 'long',
+        day: 'numeric',
+      })
+      .toUpperCase();
+  });
 
   function logout() {
     localStorage.removeItem('hour_jwt');
@@ -151,24 +150,30 @@
 
 {#if !blocked}
   <div class="workspace-shell">
-    <Sidebar bind:open={sidebarOpen} label="Houses and rooms">
+    <Sidebar bind:open={sidebarOpen} label="Projects">
       {#snippet header()}
-        <label class="workspace-shell__brand">
-          <input type="checkbox" disabled aria-hidden="true" tabindex="-1" />
-          <strong>Hour</strong>
-        </label>
+        <a class="workspace-shell__brand" href={`/h/${workspaceSlug}/`}>
+          hour
+        </a>
       {/snippet}
       {#snippet children()}
         <Plaza />
         <RoomStructure />
       {/snippet}
       {#snippet footer()}
-        <Avatar size="s" name={workspaceSlug} tone="primary" />
-        <span class="text--s workspace-shell__footer-id">{workspaceSlug}</span>
-        <a class="btn--outline btn--xs" href={`/h/${workspaceSlug}/settings`}>
+        <Avatar size="s" name={workspaceSlug} accentSlug={workspaceSlug} />
+        <span class="workspace-shell__footer-id">{workspaceSlug}</span>
+        <a
+          class="workspace-shell__footer-link"
+          href={`/h/${workspaceSlug}/settings`}
+        >
           Settings
         </a>
-        <button type="button" class="btn--outline btn--xs" onclick={logout}>
+        <button
+          type="button"
+          class="workspace-shell__footer-link"
+          onclick={logout}
+        >
           Sign out
         </button>
       {/snippet}
@@ -178,30 +183,48 @@
       <header class="workspace-shell__topbar">
         <button
           type="button"
-          class="btn--outline btn--s workspace-shell__toggle"
+          class="workspace-shell__toggle"
           onclick={() => (sidebarOpen = !sidebarOpen)}
           aria-label={sidebarOpen ? 'Hide navigation' : 'Show navigation'}
         >☰</button>
 
         <nav class="workspace-shell__lenses" aria-label="Lens">
           {#each lensOptions as opt (opt.id)}
-            <button
-              type="button"
-              class={['workspace-shell__lens', lens.current === opt.id && 'workspace-shell__lens--active']
-                .filter(Boolean)
-                .join(' ')}
-              aria-current={lens.current === opt.id ? 'true' : undefined}
+            <Pill
+              active={lens.current === opt.id}
+              ariaCurrent={lens.current === opt.id ? 'true' : undefined}
               onclick={() => lens.set(opt.id)}
-            >{opt.label}</button>
+            >
+              {opt.label}
+            </Pill>
           {/each}
         </nav>
 
-        <PresenceBadge count={networkPresence?.count ?? null} />
+        <span class="workspace-shell__crumb">
+          {workspaceSlug.toUpperCase()} · {breadcrumbDate}
+        </span>
 
-        <label class="workspace-shell__all">
-          <input type="checkbox" disabled aria-hidden="true" tabindex="-1" />
-          <span class="text--s">All</span>
-        </label>
+        <div class="workspace-shell__right">
+          <label class="workspace-shell__search">
+            <input
+              type="search"
+              placeholder="Search or jump…"
+              aria-label="Search"
+            />
+            <kbd class="kbd">⌘K</kbd>
+          </label>
+
+          <PresenceBadge count={networkPresence?.count ?? null} />
+
+          <Pill
+            all
+            active={allActive}
+            onclick={() => (allActive = !allActive)}
+            ariaLabel="Toggle scope to all projects"
+          >
+            All
+          </Pill>
+        </div>
       </header>
 
       <div class="workspace-shell__content">
@@ -212,27 +235,72 @@
 {/if}
 
 <style>
-  /* Component-scoped styles. Svelte adds a hash class to every selector for
-     isolation; we don't wrap in `@layer components` because component CSS
-     scoping plus higher selector specificity is enough to win over the
-     reset's `button { background: none; border: 0; padding: 0 }`. The
-     `@layer` wrapper interacts badly with HMR ordering in some setups. */
-
   .workspace-shell {
     display: flex;
     min-block-size: 100vh;
+    background: var(--bg);
+  }
+
+  /* The sidebar root is set via :global because Sidebar.svelte is a child
+     component; we widen it here for the desktop frame. */
+  .workspace-shell :global(.sidebar) {
+    --sidebar-width: var(--sidebar-width, 264px);
+    background: var(--bg);
+    border-inline-end: 1px solid var(--border-color);
+  }
+
+  .workspace-shell :global(.sidebar__header) {
+    padding-block: var(--pad-lg);
+    padding-inline: var(--pad-lg);
+    border-block-end: 0;
+  }
+
+  .workspace-shell :global(.sidebar__body) {
+    padding-block: var(--pad);
+    padding-inline: var(--pad-sm);
+    gap: var(--pad);
+  }
+
+  .workspace-shell :global(.sidebar__footer) {
+    padding-block: var(--pad);
+    padding-inline: var(--pad-lg);
+    border-block-start: 1px solid var(--border-color-soft);
+    gap: var(--pad-sm);
   }
 
   .workspace-shell__brand {
-    display: flex;
-    align-items: center;
-    gap: var(--space-xs);
+    font-family: var(--font-display);
+    font-style: italic;
+    font-size: var(--text-xl);
+    font-weight: 400;
+    color: var(--text-color);
+    text-decoration: none;
+    letter-spacing: -0.01em;
   }
 
-  .workspace-shell__brand input[type='checkbox'] {
-    margin: 0;
-    pointer-events: none;
-    opacity: 0.6;
+  .workspace-shell__footer-id {
+    flex: 1;
+    font-size: var(--text-s);
+    color: var(--text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .workspace-shell__footer-link {
+    font-size: var(--text-xs);
+    color: var(--text-faint);
+    text-decoration: none;
+    background: none;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+    font-family: inherit;
+    transition: color var(--transition);
+  }
+
+  .workspace-shell__footer-link:hover {
+    color: var(--text-color);
   }
 
   .workspace-shell__main {
@@ -245,78 +313,104 @@
   .workspace-shell__topbar {
     display: flex;
     align-items: center;
-    gap: var(--space-m);
-    padding-block: var(--space-s);
-    padding-inline: var(--gutter);
-    border-block-end: var(--divider);
-    background: var(--base);
+    gap: var(--pad);
+    padding-block: var(--pad-sm);
+    padding-inline: var(--pad-lg);
+    border-block-end: 1px solid var(--border-color-soft);
+    background: var(--bg);
   }
 
   .workspace-shell__toggle {
-    padding-inline: var(--space-s);
+    inline-size: 32px;
+    block-size: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition:
+      background var(--transition), color var(--transition),
+      border-color var(--transition);
+  }
+
+  .workspace-shell__toggle:hover {
+    background: var(--bg-hover);
+    color: var(--text-color);
   }
 
   .workspace-shell__lenses {
     display: flex;
     align-items: center;
-    gap: var(--space-xs);
+    gap: var(--pad-xs);
+  }
+
+  .workspace-shell__crumb {
     flex: 1;
-    justify-content: center;
+    font-family: var(--font-mono);
+    font-size: var(--text-xxs);
+    color: var(--text-faint);
+    letter-spacing: 0.16em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
-  .workspace-shell__lens {
-    padding-block: var(--space-xs);
-    padding-inline: var(--space-m);
-    border-radius: 999px;
-    border: 1px solid var(--neutral-light);
-    background: transparent;
-    color: var(--text-color);
-    font-family: inherit;
-    font-size: var(--text-s);
-    line-height: 1.2;
-    cursor: pointer;
-    transition: background-color 120ms ease-out, color 120ms ease-out,
-      border-color 120ms ease-out;
-  }
-
-  .workspace-shell__lens:hover {
-    background: var(--neutral-ultra-light);
-  }
-
-  .workspace-shell__lens:focus-visible {
-    outline: 2px solid var(--primary);
-    outline-offset: 2px;
-  }
-
-  .workspace-shell__lens--active {
-    background: var(--text-dark);
-    color: var(--base);
-    border-color: var(--text-dark);
-  }
-
-  .workspace-shell__lens--active:hover {
-    background: var(--text-dark);
-  }
-
-  .workspace-shell__all {
+  .workspace-shell__right {
     display: flex;
     align-items: center;
-    gap: var(--space-xs);
-    padding-block: var(--space-xs);
-    padding-inline: var(--space-m);
-    border-radius: 999px;
-    border: 1px solid var(--neutral-light);
-    font-size: var(--text-s);
+    gap: var(--pad-sm);
   }
 
-  .workspace-shell__all input[type='checkbox'] {
-    margin: 0;
-    pointer-events: none;
-    opacity: 0.6;
+  .workspace-shell__search {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--pad-xs);
+    padding-block: 4px;
+    padding-inline: var(--pad-sm);
+    background: var(--bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    transition: border-color var(--transition);
+    min-inline-size: 220px;
+  }
+
+  .workspace-shell__search:focus-within {
+    border-color: var(--text-muted);
+  }
+
+  .workspace-shell__search input {
+    flex: 1;
+    min-inline-size: 0;
+    background: transparent;
+    border: 0;
+    outline: none;
+    font-family: var(--font-sans);
+    font-size: var(--text-xs);
+    color: var(--text-color);
+  }
+
+  .workspace-shell__search input::placeholder {
+    color: var(--text-faint);
   }
 
   .workspace-shell__content {
     flex: 1;
-    padding: var(--space-l);
+    padding-block: var(--pad-2xl);
+    padding-inline: var(--pad-2xl);
+  }
+
+  @media (max-width: 47.999rem) {
+    .workspace-shell__crumb {
+      display: none;
+    }
+    .workspace-shell__search {
+      min-inline-size: 140px;
+    }
+    .workspace-shell__content {
+      padding-inline: var(--pad-lg);
+    }
   }
 </style>

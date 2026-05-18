@@ -64,44 +64,46 @@
   let displayName = $derived(activeRoom?.name ?? activeRoomSlug);
 </script>
 
-<aside class="room-structure" aria-label="Room structure">
+<aside class="project-structure" aria-label="Project structure">
   {#if hasRoom}
-    <header class="room-structure__header">
-      <strong>{displayName}</strong>
+    <header class="project-structure__header">
+      <span class="eyebrow">Lines</span>
     </header>
-    <p class="room-structure__empty">No runs yet.</p>
+    <p class="project-structure__empty">No lines yet.</p>
   {:else}
-    <p class="room-structure__empty room-structure__empty--prompt">
-      Select a Room to see its structure
+    <p class="project-structure__empty project-structure__empty--prompt">
+      Select a project to see its structure
     </p>
   {/if}
 </aside>
 
 <style>
   @layer components {
-    .room-structure {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-s);
-      padding-block-start: var(--space-m);
-      border-block-start: var(--divider);
-    }
-
-    .room-structure__header {
+    .project-structure {
       display: flex;
       flex-direction: column;
       gap: var(--space-xs);
+      padding-block-start: var(--pad-lg);
+      margin-block-start: var(--pad-lg);
+      border-block-start: var(--divider-light);
     }
 
-    .room-structure__empty {
+    .project-structure__header {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-xs);
+      padding-inline: var(--pad-sm);
+    }
+
+    .project-structure__empty {
       margin: 0;
-      padding-block: var(--space-xs);
-      padding-inline: var(--space-s);
+      padding-block: var(--pad-xs);
+      padding-inline: var(--pad-sm);
       font-size: var(--text-s);
-      color: var(--text-dark-muted);
+      color: var(--text-faint);
     }
 
-    .room-structure__empty--prompt {
+    .project-structure__empty--prompt {
       font-style: italic;
       text-align: center;
     }

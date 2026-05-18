@@ -2,22 +2,25 @@
   /**
    * Plaza — user-scoped sidebar tree.
    *
-   * Shows ALL Houses the user is a member of, each followed by its Rooms.
-   * Single-select per Room via URL navigation. Multi-house simultaneous
-   * display is the architectural backbone for freelancers and multi-hat
-   * users (`research/profiles/99-patterns.md §5`; ADR-029).
+   * Shows ALL workspaces the user is a member of as flat "project" rows
+   * (editorial-sobrio v0.5 design). Each row carries an accent rail
+   * (hashed from slug), the workspace name in display serif, a subtitle,
+   * and a count of active rooms. Clicking a row navigates to the workspace
+   * home; the internal structure (lines + shows) then appears in the
+   * sidebar lower via <RoomStructure />.
    *
-   * Phase 0 reality: Marco belongs to two Houses — `marco-rubiol` (personal,
-   * empty) and `mamemi` (team, holds the 154-engagement difusión project).
-   * Both render here side by side.
+   * Rooms are still fetched in the same query so the count is real and
+   * the cache is warm for RoomStructure / Today view.
    *
-   * Offline cache via IDB deferred to Phase 0.2 batch with TanStack Query
-   * persister; this iteration is memory-cache only.
+   * Phase 0 reality: Marco belongs to two workspaces — `marco-rubiol`
+   * (personal, empty) and `mamemi` (team, holds the 154-engagement
+   * difusión project). Both render here side by side.
    */
 
   import { page } from '$app/state';
   import { goto } from '$app/navigation';
   import { createQuery } from '@tanstack/svelte-query';
+  import { accentVar } from '$lib/utils/accent';
 
   type House = {
     id: string;
@@ -73,7 +76,6 @@
       fetchJSON<{ items: Room[] }>('/api/rooms?status=active', signal),
   });
 
-  // Active scope from URL: which workspace and which room (if any).
   let activeWorkspaceSlug = $derived(page.params.workspace ?? '');
   let activeRoomSlug = $derived.by(() => {
     const m = page.url.pathname.match(/^\/h\/[^/]+\/room\/([^/]+)/);
@@ -83,13 +85,12 @@
   let houses = $derived($housesQuery.data?.items ?? []);
   let rooms = $derived($roomsQuery.data?.items ?? []);
 
-  // Group rooms under their parent House. Houses with zero active rooms
-  // still render with their header so the user knows the House exists and
-  // can be navigated into.
-  let tree = $derived(
+  let projectRows = $derived(
     houses.map((house) => ({
       house,
-      rooms: rooms.filter((r) => r.workspace_id === house.id),
+      count: rooms.filter((r) => r.workspace_id === house.id).length,
+      subtitle:
+        house.kind === 'personal' ? 'Personal workspace' : 'Team workspace',
     })),
   );
 
@@ -97,55 +98,44 @@
   let errored = $derived($housesQuery.isError || $roomsQuery.isError);
 </script>
 
-<nav class="plaza" aria-label="Houses and rooms">
+<nav class="plaza" aria-label="Projects">
+  <p class="eyebrow plaza__eyebrow">Projects</p>
+
   {#if loading}
     <p class="plaza__state">Loading…</p>
   {:else if errored}
-    <p class="plaza__state plaza__state--danger">Couldn't load houses.</p>
-  {:else if tree.length === 0}
-    <p class="plaza__state">No houses yet.</p>
+    <p class="plaza__state plaza__state--danger">Couldn't load projects.</p>
+  {:else if projectRows.length === 0}
+    <p class="plaza__state">No projects yet.</p>
   {:else}
-    {#each tree as { house, rooms: houseRooms } (house.id)}
-      {@const isUrlHouse = house.slug === activeWorkspaceSlug}
-      {@const isActiveHouse = isUrlHouse && activeRoomSlug === ''}
-      {@const isOnHousePath = isUrlHouse && activeRoomSlug !== ''}
-      <section class="plaza__house">
-        <a
-          class={[
-            'plaza__house-link',
-            isActiveHouse && 'plaza__house-link--active',
-            isOnHousePath && 'plaza__house-link--on-path',
-          ]
-            .filter(Boolean)
-            .join(' ')}
-          href={`/h/${house.slug}/`}
-          aria-current={isActiveHouse ? 'page' : undefined}
-        >
-          <input type="checkbox" disabled aria-hidden="true" tabindex="-1" />
-          <strong>{house.name}</strong>
-        </a>
-
-        {#if houseRooms.length > 0}
-          <ul class="plaza__rooms">
-            {#each houseRooms as room (room.id)}
-              {@const isActiveRoom =
-                room.slug === activeRoomSlug && house.slug === activeWorkspaceSlug}
-              <li>
-                <a
-                  class={['plaza__room', isActiveRoom && 'plaza__room--active']
-                    .filter(Boolean)
-                    .join(' ')}
-                  href={`/h/${house.slug}/room/${room.slug}`}
-                  aria-current={isActiveRoom ? 'page' : undefined}
-                >{room.name}</a>
-              </li>
-            {/each}
-          </ul>
-        {:else}
-          <p class="plaza__rooms-empty">No rooms yet</p>
-        {/if}
-      </section>
-    {/each}
+    <ul class="plaza__list" role="list">
+      {#each projectRows as { house, count, subtitle } (house.id)}
+        {@const isUrlHouse = house.slug === activeWorkspaceSlug}
+        {@const isActive = isUrlHouse && activeRoomSlug === ''}
+        {@const isOnPath = isUrlHouse && activeRoomSlug !== ''}
+        <li>
+          <a
+            class={[
+              'plaza__row',
+              isActive && 'plaza__row--active',
+              isOnPath && 'plaza__row--on-path',
+            ]
+              .filter(Boolean)
+              .join(' ')}
+            href={`/h/${house.slug}/`}
+            aria-current={isActive ? 'page' : undefined}
+            style={`--c: ${accentVar(house.slug)}`}
+          >
+            <span class="plaza__row-rail" aria-hidden="true"></span>
+            <span class="plaza__row-body">
+              <span class="plaza__row-name">{house.name}</span>
+              <span class="plaza__row-sub">{subtitle}</span>
+            </span>
+            <span class="plaza__row-count">{count}</span>
+          </a>
+        </li>
+      {/each}
+    </ul>
   {/if}
 </nav>
 
@@ -154,110 +144,100 @@
     .plaza {
       display: flex;
       flex-direction: column;
-      gap: var(--space-m);
+      gap: var(--pad-sm);
     }
 
-    .plaza__house {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-xs);
-    }
-
-    .plaza__house-link {
-      display: flex;
-      align-items: center;
-      gap: var(--space-xs);
-      padding-block: var(--space-xs);
-      padding-inline: var(--space-s);
-      border-radius: var(--radius-s);
-      color: var(--text-color);
-      text-decoration: none;
-      transition: background-color 120ms ease-out;
-    }
-
-    .plaza__house-link:hover {
-      background: color-mix(in oklch, var(--neutral) 6%, transparent);
-    }
-
-    .plaza__house-link:focus-visible {
-      outline: 2px solid var(--primary);
-      outline-offset: 2px;
-    }
-
-    .plaza__house-link--active {
-      color: var(--primary);
-    }
-
-    /* Cross-highlight UP: when a Room of this House is the current page,
-       the House label gets primary color too — softer than --active, no
-       background — so the hierarchy is visible at a glance. */
-    .plaza__house-link--on-path {
-      color: var(--primary);
-    }
-
-    .plaza__house-link input[type='checkbox'] {
+    .plaza__eyebrow {
       margin: 0;
-      pointer-events: none;
-      opacity: 0.6;
+      padding-inline: var(--pad-sm);
     }
 
-    .plaza__rooms {
+    .plaza__list {
       list-style: none;
       padding: 0;
       margin: 0;
-      padding-inline-start: var(--space-l);
       display: flex;
       flex-direction: column;
-      gap: var(--space-xs);
+      gap: 1px;
     }
 
-    /* Empty placeholder for Houses with zero active Rooms. Tells the user
-       the House is intentionally empty instead of hiding the fact and
-       leaving an ambiguous gap below the header. */
-    .plaza__rooms-empty {
-      margin: 0;
-      padding-block: var(--space-xs);
-      padding-inline-start: var(--space-l);
-      font-size: var(--text-s);
-      font-style: italic;
-      color: var(--text-dark-muted);
-    }
-
-    .plaza__room {
-      --plaza-room-color: var(--text-color);
-      --plaza-room-bg: transparent;
-      display: block;
-      padding-block: var(--space-xs);
-      padding-inline: var(--space-s);
-      border-radius: var(--radius-s);
-      color: var(--plaza-room-color);
-      background: var(--plaza-room-bg);
+    .plaza__row {
+      display: grid;
+      grid-template-columns: 3px 1fr auto;
+      gap: var(--pad);
+      align-items: center;
+      padding-block: var(--pad-sm);
+      padding-inline: var(--pad-sm);
+      color: var(--text-color);
       text-decoration: none;
-      font-size: var(--text-s);
-      transition: background-color 120ms ease-out;
+      border-radius: var(--radius);
+      transition: background-color var(--transition);
     }
 
-    .plaza__room:hover {
-      --plaza-room-bg: color-mix(in oklch, var(--neutral) 10%, transparent);
+    .plaza__row:hover {
+      background: var(--bg-hover);
     }
 
-    .plaza__room:focus-visible {
-      outline: 2px solid var(--primary);
-      outline-offset: 2px;
+    .plaza__row:focus-visible {
+      outline: var(--focus-width) solid var(--focus-color);
+      outline-offset: -2px;
     }
 
-    .plaza__room--active {
-      --plaza-room-color: var(--primary);
-      --plaza-room-bg: color-mix(in oklch, var(--primary) 14%, transparent);
+    .plaza__row--active {
+      background: var(--bg-active);
+    }
+
+    .plaza__row--on-path .plaza__row-name {
+      color: var(--text-color);
+    }
+
+    .plaza__row-rail {
+      inline-size: 3px;
+      block-size: 28px;
+      background: var(--c, var(--text-muted));
+      border-radius: 2px;
+      align-self: center;
+    }
+
+    .plaza__row-body {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-inline-size: 0;
+    }
+
+    .plaza__row-name {
+      font-family: var(--font-display);
+      font-size: var(--text-l);
       font-weight: 500;
+      letter-spacing: -0.01em;
+      color: var(--text-color);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .plaza__row-sub {
+      font-size: var(--text-xs);
+      color: var(--text-faint);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .plaza__row-count {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-faint);
+      font-variant-numeric: tabular-nums;
     }
 
     .plaza__state {
       margin: 0;
-      padding-block: var(--space-xs);
-      padding-inline: var(--space-s);
+      padding-block: var(--pad-xs);
+      padding-inline: var(--pad-sm);
       font-size: var(--text-s);
-      color: var(--text-dark-muted);
+      color: var(--text-faint);
     }
 
     .plaza__state--danger {
