@@ -64,12 +64,30 @@ Working name: **Hour**. Brand decision deferred to Phase 1.
 
 ## Status — 2026-05-18
 
-**Phase 0.1 en curso.** Trabajo #1 (`<Plaza>` + endpoints `/api/houses` y `/api/rooms`) cerrado. Pendiente verificación en browser por Marco (login → `/h/marco-rubiol/` → Plaza muestra "House: marco-rubiol" + room "mamemi" + navegación a `/h/marco-rubiol/room/mamemi` con highlight).
+**Phase 0.1 — shell refactor ADR-029 aplicado.** El sidebar pasa a user-scoped (multi-house simultáneo), la lens nav vive en el top del main como pills horizontales, la lens primaria se llama `Rooms` (no `Desk`), y `<RoomStructure>` reemplaza el componente `<Desk>` previsto en el roadmap original. Pendiente verificación en browser por Marco (login → `/h/marco-rubiol/` → sidebar muestra Houses "Marco Rubiol" + "MaMeMi" + main muestra "Hello, Marco. What would you like to work on?").
 
 Decisiones estratégicas 2026-05-14 integradas: naming gate adelantado a final Phase 0.1, visual checkpoints (1 ligero al cerrar 0.1, 2 formal antes de 0.4). Ver `_decisions.md` y `build/roadmap.md` § Decision gates.
 
-### Cerrado en sesión 2026-05-18 (Phase 0.1 trabajo #1 — Plaza)
-- **`/api/houses`** y **`/api/rooms`** — SvelteKit `+server.ts` mirroring del pattern `/api/engagements` (Bearer JWT + Valibot + pgGet + JSON estructurado). RLS scopes visibility; `houses` retorna workspaces con membership aceptada (Phase 0: 1 row); `rooms` filtra por JWT `current_workspace_id` claim + default `status=active` (drafts/archived no en nav). Multi-house ready en shape, sin param `workspace_id` por ahora — Phase 1 lo añade.
+### Cerrado en sesión 2026-05-18 (ADR-029 shell user-scoped)
+- **DB migration `phase_0_1_multi_workspace_split` aplicada en producción**. Nueva workspace `mamemi` (kind=team), Marco owner + playwright admin. Project `mamemi` + 154 engagements movidos de `marco-rubiol` (kind=personal, ahora vacío) a `mamemi`. Triggers `guard_immutable_workspace_id` deshabilitados temporalmente para la migración y re-habilitados al cierre. Las RLS ya eran membership-based (`is_workspace_member`, `has_permission`) — multi-workspace queries funcionan sin refactor RLS adicional.
+- **`apps/web/src/lib/stores/lens.svelte.ts`** — type `Lens` cambia `'desk'` → `'rooms'`. Default también.
+- **`apps/web/src/lib/components/Plaza.svelte`** — refactor a multi-house tree. Cada House es header con checkbox placeholder + link al House home + lista indentada de Rooms. Active state per Room derivado de URL. Loading / error / empty / data states. CSS scoped, variable contracts para hover/active.
+- **`apps/web/src/lib/components/RoomStructure.svelte`** — componente nuevo (sidebar lower). Visible solo cuando hay Room seleccionada en URL. Header con eyebrow "Room" + nombre + empty state "No runs yet". Sin Room seleccionada → prompt italic centrado "Select a Room to see its structure".
+- **`apps/web/src/routes/h/[workspace]/+layout.svelte`** — refactor del shell:
+  - Lens nav SE MUEVE del sidebar al top del main (pills horizontales, centradas, con "All" chip a la derecha como placeholder).
+  - Sidebar children pasa de "lens buttons + Plaza" a "Plaza + RoomStructure".
+  - Brand "Hour" en sidebar header con checkbox placeholder (multi-select primitiva).
+  - Active state lens visualmente intenso (dark filled pill vs outlined neutral).
+- **`apps/web/src/routes/h/[workspace]/+page.svelte`** — empty home Spotlight-style: "Hello, Marco." + "What would you like to work on?" centrado vertical en main. Reemplaza el placeholder ad-hoc con sus 4 links manuales.
+- **No tocado deliberadamente**: endpoints `/api/houses` y `/api/rooms` siguen igual — la RLS membership-based ya devuelve multi-workspace sin cambios. `selection.svelte.ts` se mantiene (la URL es la SoT, el store es mirror). i18n (~7 strings) sin cambios — lens labels hardcoded por ahora.
+- **DoD trade-offs explícitos** (heredados de Plaza inicial y aún válidos):
+  - Multi-select real (chip bar D-PRE-05) → Phase 0.2.
+  - IDB write-through con TanStack persister → Phase 0.2.
+  - Endpoint `/api/runs` y `/api/gigs` → trabajo #6 Phase 0.1 (RoomStructure los consumirá cuando existan).
+- **Verificación**: `pnpm check` 0/0/0, `pnpm build` verde, Vite hot reload activo. Pendiente browser test por Marco.
+
+### Cerrado en sesión 2026-05-18 (Phase 0.1 trabajo #1 — Plaza inicial, después extendido a multi-house en ADR-029)
+- **`/api/houses`** y **`/api/rooms`** — SvelteKit `+server.ts` mirroring del pattern `/api/engagements` (Bearer JWT + Valibot + pgGet + JSON estructurado). RLS scopes visibility vía `is_workspace_member()` / `has_permission()` (membership-based, no claim-based). Tras ADR-029: `houses` retorna 2 rows para Marco (`marco-rubiol` + `mamemi`); `rooms` devuelve projects de TODAS las workspaces del user sin filtro `workspace_id` en query. Multi-house funciona out-of-the-box gracias a las RLS ya escritas membership-based.
 - **`Plaza.svelte`** — sidebar upper. TanStack `createQuery` × 2 (memory cache; IDB write-through diferido a Phase 0.2 por trade-off con TanStack Query persister). Active room `$derived` del pathname (single source = URL). Native `<a>` navigation, no click handlers. Loading / empty / error states. Semantic HTML (`<nav><ul><li><a>`) per `_area-methød/code/philosophy.md`. Scoped CSS, variable contracts (`--plaza-room-color`, `--plaza-room-bg`) que el modificador `.plaza__room--active` redeclara.
 - **`/h/[workspace]/+layout.svelte`** — `<Plaza />` inyectada en sidebar body bajo lens nav (ADR-009: lenses top, entities bottom). Nuevo `$effect` sincroniza `SelectionStore.entity` desde el pathname para que consumers no-routing (chip bar, ⌘K) no re-parseen la URL.
 - **Validación**: `pnpm check` 0/0/0, `pnpm build` verde con Sentry source maps subiendo. Commits `a4cb015` (docs) + `6cd4413` (código). No pusheado a origin.
