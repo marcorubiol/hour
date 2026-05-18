@@ -64,9 +64,33 @@ Working name: **Hour**. Brand decision deferred to Phase 1.
 
 ## Status — 2026-05-18
 
-**Phase 0.1 — shell refactor ADR-029 aplicado.** El sidebar pasa a user-scoped (multi-house simultáneo), la lens nav vive en el top del main como pills horizontales, la lens primaria se llama `Rooms` (no `Desk`), y `<RoomStructure>` reemplaza el componente `<Desk>` previsto en el roadmap original. Pendiente verificación en browser por Marco (login → `/h/marco-rubiol/` → sidebar muestra Houses "Marco Rubiol" + "MaMeMi" + main muestra "Hello, Marco. What would you like to work on?").
+**Phase 0.1 — sprint principal cerrado, verificado en browser por Marco.** Shell user-scoped (ADR-029) + Room detail con datos productivos (154 engagements) + presence híbrido B + cross-highlight + smoke test verde. Quedan trabajos del roadmap que dependen de datos reales (runs/gigs, write paths) o son estandalone (#11 Settings).
+
+Próximo gate decidido: **checkpoint visual 1 + naming gate con Anouk** (decisiones 2026-05-14) antes de arrancar Phase 0.2.
 
 Decisiones estratégicas 2026-05-14 integradas: naming gate adelantado a final Phase 0.1, visual checkpoints (1 ligero al cerrar 0.1, 2 formal antes de 0.4). Ver `_decisions.md` y `build/roadmap.md` § Decision gates.
+
+### Cerrado en sesión 2026-05-18 (continuación post-shell — Room detail + presence + smoke)
+- **Pills del lens nav visualmente correctas** + manifest PWA servido en dev. Quité el wrapping `@layer components` del shell scoped CSS (interaction badly con HMR layer ordering) + radius literal `999px` en vez de `--radius-circle: 50vw` (más robusto cross-zoom). `VitePWA.devOptions.enabled` para que dev sirva el manifest. Commit `3d49d18`.
+- **Status badges alineados con `/booking`** (variable-contract pattern, philosophy.md §3). Las siete variantes `badge--{status}` (contacted/in-conversation/hold/confirmed/declined/dormant/recurring) movidas a `base.css` como single source of truth — booking + RoomDetail (futuro Contacts lens) consumen las mismas. Drop del duplicado en booking. Commit `5c8ae24`.
+- **Room detail real** (trabajo #4 — RelationshipStub). `/h/[workspace]/room/[slug]/+page.svelte` ahora renderiza header (eyebrow Room + display name + meta status/dates) + RelationshipStub + tres stubs dashed (Runs/Assets/Team) que nombran la phase de cada uno. RelationshipStub consume `/api/engagements?project_slug=...&status=any&limit=10`, renderiza count + lista resumida (person · org · location · status badge) + footer "View all N engagements →" hacia `/booking` (fallback hasta Phase 0.3 Contacts lens). Reactividad: `slugStore` writable + `derived` queryOptions para que `createQuery` re-fetche al navegar entre Rooms en la misma instancia de página. Commit `8ed85c7`.
+- **Presence badge en topbar — modelo híbrido B** (decisión 2026-05-18 de Marco). `NetworkPresenceStore` nuevo en `$lib/realtime/network-presence.svelte.ts` que se suscribe a UN canal presence por cada workspace del que eres miembro y unifica los counts. Distinct users across all (no per-URL-workspace). PresenceBadge en topbar consume `networkPresence?.count`. El `PresenceStore` per-workspace existente se mantiene para futuras badges contextuales por Room / RoadSheet (Phase 0.2). `rt` y `presence` pasados a `$state` para que el badge re-renderice al asignarse post-onMount. Commits `ed065bf` (badge per-workspace inicial) + `fcb131a` (refactor a network).
+- **Cross-highlight UP en Plaza** (trabajo #8). Cuando hay una Room seleccionada, su House padre también lleva `color: var(--primary)` vía nuevo modificador `.plaza__house-link--on-path`. Tres estados visibles: `active` (URL = House home), `on-path` (URL = Room de esa House), inactive (otra House). Plus **bug fix**: RoomStructure lee display name del TanStack cache `['rooms']` (mismo key que Plaza + Room detail) en vez de echo del slug — eliminada la inconsistencia "MaMeMi vs mamemi" entre sidebar lower y main header. Commit `edbdda2`.
+- **Smoke test Playwright actualizado al flow post-ADR-029**. Cubre login → wait `/h/marco-rubiol/` (con o sin trailing slash, regex) → assert lens "Rooms" activa por class → click link `a[href="/h/mamemi/room/mamemi"]` → wait nueva URL → assert `.rel-stub__count` matches `/\d+\s+engagements?/` → assert items > 0 → sign out → `/login`. Verde en 2.8s (5.5s wall). Commit `0a2ae2e`.
+
+### Phase 0.1 — trabajos restantes
+- **#3 GigDetail mobile-first** — bloqueado por #6 + datos reales de gig.
+- **#5 ProductionStub** — bloqueado por #3.
+- **#6 Endpoints `/api/runs` + `/api/gigs` + `/api/gigs/:id`** — trabajo en seco (sin data); cuando confirmes primera fecha real.
+- **#9 Write queue offline scaffolding** — bloqueado por write paths (PATCH inline status, etc.).
+- **#11 Settings + Master View toggle** — independiente, ~45 min. Estandalone si quieres cerrar #11 antes del checkpoint visual 1.
+
+### Gates al cerrar Phase 0.1 (decisión 2026-05-14)
+- **Checkpoint visual 1** — pasada de ~1 día con datos productivos (154 engagements visibles). Evaluar: plum trial, densidad, jerarquía, tipografía. Visual debt anotada en esta sesión:
+  - Gap exagerado entre Room header (`Status: active`) y RelationshipStub.
+  - Plaza spacing entre Houses engaña — Marco Rubiol vacía parece tener contenido en blanco.
+  - Eyebrow "ROOM" aparece duplicado (sidebar lower header + main header).
+- **Naming gate** — testear `House`, `Room`, `Run`, `Gig`, `Plaza`, `Rooms` lens con Anouk (5 min) + 1-2 externos del circuito. Riesgo #14 directo. Si emerge confusión seria, refactor mecánico (~medio día) antes de Phase 0.2.
 
 ### Cerrado en sesión 2026-05-18 (ADR-029 shell user-scoped)
 - **DB migration `phase_0_1_multi_workspace_split` aplicada en producción**. Nueva workspace `mamemi` (kind=team), Marco owner + playwright admin. Project `mamemi` + 154 engagements movidos de `marco-rubiol` (kind=personal, ahora vacío) a `mamemi`. Triggers `guard_immutable_workspace_id` deshabilitados temporalmente para la migración y re-habilitados al cierre. Las RLS ya eran membership-based (`is_workspace_member`, `has_permission`) — multi-workspace queries funcionan sin refactor RLS adicional.
