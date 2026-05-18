@@ -1042,3 +1042,37 @@ Triggered by Marco's pre-scaffold doubt (Phase 0.0 day 5). Five alternatives eva
 - **Re-evaluate when**: arranque Phase 0.5, o si en Phase 0.1-0.4 emerge necesidad real (Marco quiere mandar dossier a alguien y se da cuenta de que ya merece la pena). Si Phase 1 se acelera (cliente externo serio), evaluar adelantar a Phase 0.4 como wedge de venta.
 - **Status**: Firm decision, deferred to Phase 0.5 implementation.
 
+## [2026-05-14] — Visual design validation: two checkpoints, no formal "visual design phase"
+- **Decision**: Validar diseño visual en dos momentos a lo largo de Phase 0: (1) **Checkpoint 1 ligero al cerrar Phase 0.1** — Plaza + Desk + Gig detail vivos con datos reales, pasada visual de 1 día (plum trial, densidad, jerarquía, tipografía sobre 154 engagements reales). (2) **Checkpoint 2 formal antes de Phase 0.4 polish** — con las 4 lenses vivas, revisión sistemática usando `build/design-prompt.md`. No abrir una "visual design phase" formal antes de Phase 0.1.
+- **Context**: Pregunta de Marco 2026-05-14 sobre cuándo validar diseño. Hoy el sistema visual existe solo en `/playground`; los primitivos en aislamiento mienten — un Button rodeado de chip bar + tree no se siente igual que en showcase. Plum trial declarado provisional en `_decisions.md` 2026-05-01, pendiente de re-evaluación en "visual design phase".
+- **Alternatives considered (rejected)**:
+  - **Visual design phase formal antes de Phase 0.1** — rechazado. Validar diseño visual sin Plaza/Desk vivos es validar en el vacío: solo puedes mirar primitivos aislados, que ya están auditados. Lo más caro de equivocar es la estructura informacional, no el color.
+  - **Un solo checkpoint al final (antes de 0.4)** — rechazado. Tres lenses construidas sobre un sistema visual no validado = refactor caro. Si plum canta o la densidad agobia, mejor saberlo con 0.1 encima que con 0.3.
+  - **Validación continua sin checkpoints explícitos** — rechazado. "Ojo crítico mientras construyes" es lo que hacemos ya; sin un momento formal acaba siendo polish reactivo, no pasada sistemática.
+- **Rationale**:
+  1. **Coste asimétrico**: cambiar tokens/palette/tipografía cuesta horas en Phase 0.1, días en Phase 0.3+. Validar temprano es barato; validar tarde no.
+  2. **Primitivos en aislamiento mienten**: el `/playground` showcase no produce las mismas decisiones que pantallas reales con datos productivos.
+  3. **Phase 0.4 ya tiene visual review implícito** (sección "Mobile polish" + "accessibility pass"); el checkpoint 2 lo formaliza y le añade pasada sistemática usando `build/design-prompt.md`.
+  4. **Checkpoint 1 = 1 día de tweaks** sobre un sistema vivo. Coste mínimo, valor alto.
+- **Re-evaluate when**: si en checkpoint 1 emerge que el sistema visual necesita rework profundo (no tweaks), congelar Phase 0.2 y abrir visual design phase formal antes de continuar. Hasta entonces, los dos checkpoints son suficientes.
+- **Status**: Firm.
+
+## [2026-05-14] — Naming gate adelantado del final de Phase 0.4 al final de Phase 0.1
+- **Decision**: Mover el naming gate del producto (House, Room, Run, Gig, Desk, Plaza) del final de Phase 0.4 al final de Phase 0.1. El gate de 0.4 queda como **ratificación final**, no decisión. El gate de 0.1 es la decisión real.
+- **Context**: Pregunta de Marco 2026-05-14 sobre cuándo se cementa el naming. Phase 0.1 va a meter "Room"/"Gig"/etc en URLs (`/h/:workspace/room/:slug`), endpoints (`/api/rooms`), componentes (`<RoomDetail>`) y copy. El roadmap original (línea 42) difería el gate al final de 0.4. Riesgo #14 en roadmap explícito: "`Room` no se entiende o se confunde con venue/sala".
+- **Alternatives considered (rejected)**:
+  - **Mantener el naming gate en 0.4** (status quo del roadmap) — rechazado. Para llegar a 0.4 hay que pasar por 0.2 y 0.3, que construyen 2 lenses más encima del naming. Si "Room" canta en 0.4, el refactor es 3× más caro que tras 0.1.
+  - **Naming gate antes de Phase 0.1** — rechazado. Sin Plaza vivo con datos reales, el test es abstracto ("¿entiendes que Room = proyecto?") en lugar de situacional ("¿confundes esta `Room: Atrabilis` con sala/venue?"). El test en abstracto no aporta señal.
+  - **Lock total del naming sin gate** — rechazado, contradice riesgo #14 explícitamente reconocido.
+- **Rationale**:
+  1. **Coste de cambio entre 0.1 y 0.9 es medio día**: buscar/reemplazar en routes, rename componentes, actualizar i18n keys. El schema NO cambia (ADR-008 separa nombres técnicos de producto). Entre 0.1 y 0.9 hay ~110-150h de trabajo y meses calendario donde cambiar naming es prácticamente gratis arquitectónicamente.
+  2. **"Para siempre" empieza en Phase 0.9**, no en 0.1: clientes externos con URLs guardadas/bookmarks son el primer punto donde un cambio de naming rompe algo real. Hoy no hay externos.
+  3. **Plaza vivo en 0.1 es el primer momento testeable** con personas reales (Anouk + 1-2 externos del circuito booking/producción).
+  4. **Test específico de riesgo #14**: preguntar directamente "¿confundes Room con sala/venue?" en el contexto de pantalla, no en abstracto.
+- **Cómo testear en checkpoint 1**:
+  - Anouk delante de la app real (5 min): "¿qué crees que es esto?" señalando Plaza, Desk, Room en sidebar.
+  - 1-2 personas externas con caso parecido (Electrico 28 si hay contacto, alguien que conozca booking/producción).
+  - Pregunta explícita: "¿confundes Room con sala/venue?" (riesgo #14).
+- **Re-evaluate when**: si checkpoint 1 valida el naming → ratificación silenciosa en checkpoint 2 (Phase 0.4). Si checkpoint 1 invalida algo → cambio antes de empezar Phase 0.2.
+- **Status**: Firm.
+

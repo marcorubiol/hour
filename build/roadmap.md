@@ -1,7 +1,7 @@
 # Hour — Roadmap de implementación
 
 > Documento vivo. Se actualiza al cerrar cada fase. Ordenado por dependencias reales, no por deseo.
-> Última actualización: 2026-05-02 (MVP transversal integrado definido, Phase 0.9 gate definido, 22 tablas, SvelteKit stack).
+> Última actualización: 2026-05-14 (Phase 0.0 cerrada 2026-05-09. Naming gate adelantado de 0.4 a 0.1. Visual design checkpoints añadidos).
 
 ## 🎯 Qué toca hoy (punto de entrada)
 
@@ -21,11 +21,13 @@ Antes de cualquier trabajo: leer primero el [`_context.md`](../_context.md) del 
  
 ### Current next action
  
-Terminar Phase 0.0 antes de empezar Phase 0.1.
- 
-Siguiente trabajo real: completar los DoD pendientes de Phase 0.0 — offline/PWA, realtime/presence, PartyServer DO scaffold, testing scaffold, Sentry smoke, backup R2 y rollback runbook.
- 
-No empezar Plaza/Desk productivos hasta que Phase 0.0 esté cerrada o se marque explícitamente como shortcut/deuda.
+**Phase 0.0 cerrada 2026-05-09**. Arrancar Phase 0.1 — Plaza + Desk shell.
+
+Primer trabajo: `<Plaza>` (trabajo #1 de Phase 0.1). Ver § Phase 0.1 abajo para los 12 trabajos.
+
+Al cerrar Phase 0.1 corren **dos gates** (decididos 2026-05-14, ver `_decisions.md`):
+- **Checkpoint visual 1** — pasada de 1 día sobre Plaza+Desk+Gig detail vivos con datos reales (plum, densidad, jerarquía, tipografía).
+- **Naming gate** — adelantado del final de 0.4. Test House/Room/Run/Gig/Desk/Plaza con Anouk + 1-2 externos. Riesgo #14 directo: "¿confundes Room con sala/venue?".
  
 ### Current constraints
  
@@ -39,7 +41,8 @@ No empezar Plaza/Desk productivos hasta que Phase 0.0 esté cerrada o se marque 
  
 ### Decision gates
  
-- **Naming gate**: antes de bloquear copy final en Phase 0.4, testear `House`, `Room`, `Run`, `Gig`, `Desk` con MaMeMi, Electrico 28 y 2-3 usuarios conocidos. Si `Room` se confunde con venue/sala en más de un caso serio, buscar alternativa.
+- **Naming gate**: adelantado al final de Phase 0.1 (decisión 2026-05-14, ver `_decisions.md`). Testear `House`, `Room`, `Run`, `Gig`, `Desk`, `Plaza` con Anouk + 1-2 externos del circuito booking/producción. Si `Room` se confunde con venue/sala en más de un caso serio, cambiar antes de Phase 0.2. El gate de 0.4 queda como ratificación final, no decisión.
+- **Visual design checkpoints**: dos momentos (decisión 2026-05-14, ver `_decisions.md`). Checkpoint 1 ligero al cerrar Phase 0.1 — pasada de 1 día sobre Plaza+Desk+Gig detail vivos con datos reales (plum trial, densidad, jerarquía, tipografía). Checkpoint 2 formal antes de Phase 0.4 polish — revisión sistemática con `build/design-prompt.md` sobre las 4 lenses vivas.
 - **MVP structural gate**: al final de Phase 0.1, comprobar si el mapa House → Room → Run/Gig se entiende sin explicación larga.
 - **MVP transversal gate**: al final de Phase 0.2, comprobar si Calendar + Road sheet salen naturalmente del mismo mapa operativo.
 - **System completeness gate**: al final de Phase 0.3, comprobar si las 4 lenses — Desk, Calendar, Contacts, Money — funcionan como vistas del mismo sistema.
@@ -49,7 +52,6 @@ No empezar Plaza/Desk productivos hasta que Phase 0.0 esté cerrada o se marque 
  
 ### What not to decide today
  
-- Naming final de `Room`.
 - Pricing.
 - Self-serve onboarding.
 - Integraciones WhatsApp/email/Telegram.
@@ -210,7 +212,7 @@ Las 14 D-PRE cerradas ✓ (07 y 14 cerradas 2026-04-24 con research — ver ADR-
 5. Página `/playground` (dev only) con los 13 en viewports 320px / 768px / 1440px.
 
 **Router + estado (4-5h)** — *actualizado 2026-05-01: post-ADR-026 ya estamos en SvelteKit, así que rutas viven en `src/routes/h/[workspace]/[entity]/[slug]/+page.svelte` (no `src/pages/...astro`); estado compartido en módulos `.svelte.ts` con runes module-level (`let lens = $state(...)` exportado), no nanostores — patrón nativo de Svelte 5 sin dependencia extra.*
-6. Estructura `src/routes/h/[workspace]/[entity]/[slug]/+page.svelte` (+ `+layout.svelte` con shell común). **Pendiente**: validar con un dossier dedicado si el shape `/h/[workspace]/[entity]/[slug]` es el óptimo o procede revisar ADR-022 antes de escribir el scaffold.
+6. Estructura `src/routes/h/[workspace]/[entity]/[slug]/+page.svelte` (+ `+layout.svelte` con shell común). **Validado 2026-05-01** en `build/url-architecture-dossier-2026-05-01.md`: 5 alternativas evaluadas (subdomain, sin prefix `/h/`, slug global sin entity, entity-prefix-id, status quo). Ratificado el shape de ADR-022 con tres refinamientos operativos, todos ya aplicados: `$lib/reserved-slugs.ts` (~70 entradas), migration path a subdomain documentado como Phase 1, placeholders `/engagement/[slug]` y `/person/[slug]` abiertos en Phase 0.0 día 5.
 7. `serializeViewState()` + `hydrateViewState()` en `$lib/url-state.ts` (D-PRE-05, truncación 400 chars).
 8. Stores compartidas como `.svelte.ts` con runes module-level: `lens.svelte.ts`, `selection.svelte.ts`, `chipBar.svelte.ts`, `presence.svelte.ts`. Cada uno exporta su `$state`/`$derived` y los helpers para mutarlo.
 
@@ -308,6 +310,10 @@ Phase 0.0 completa.
 - [ ] Presence badge aparece con 2+ pestañas abiertas.
 - [ ] Tests e2e cubren "login → navegar a un Gig".
 
+### Gates al cerrar Phase 0.1 (decisión 2026-05-14)
+- [ ] **Checkpoint visual 1** — 1 día de pasada sobre Plaza+Desk+Gig detail vivos con datos reales (154 engagements). Evaluar: plum trial, densidad información, jerarquía visual sidebar/topbar/contenido, tipografía con datos reales. Tweaks de tokens si procede; si emerge necesidad de rework profundo, congelar Phase 0.2 y abrir visual design phase formal.
+- [ ] **Naming gate** (adelantado de Phase 0.4) — testear `House`, `Room`, `Run`, `Gig`, `Desk`, `Plaza` con Anouk (5 min frente a app) + 1-2 externos del circuito booking/producción. Pregunta directa para riesgo #14: "¿confundes Room con sala/venue?". Si algo canta, cambiar antes de empezar Phase 0.2 (refactor mecánico ~medio día: routes + componentes + i18n; schema NO cambia).
+
 ### Pause point
 **MVP estructural inicial de Phase 0.1**: Plaza + Desk tree + Gig detail + Settings/Master View + stubs de relación/producción. **Sin Calendar ni Road sheet completos**. Demo-able como "Hour ya tiene mapa operativo: sé dónde vive cada cosa".
 
@@ -404,6 +410,8 @@ Phase 0.3 completa.
 5. GDPR export: "download my data" en Settings → ZIP (CSV por tabla + JSON workspace).
 6. Notifications channel abstracto `src/lib/notify.ts` + in-app adapter (toast + badge + panel).
 7. Accessibility pass: Axe + WCAG AA en todas las pantallas.
+8. **Checkpoint visual 2 (formal)** — revisión sistemática con `build/design-prompt.md` sobre las 4 lenses vivas. Decidido 2026-05-14.
+9. **Naming gate — ratificación final**. La decisión real se tomó al cerrar Phase 0.1 (decisión 2026-05-14). Aquí solo confirmar que el naming aguanta con las 4 lenses vivas y 4-6 meses de uso interno; si algo persiste sin convencer, última oportunidad de cambiar antes de Phase 0.9.
 
 ### Definition of done
 - [ ] ⌘K encuentra/ejecuta en <3 keystrokes.
@@ -411,6 +419,8 @@ Phase 0.3 completa.
 - [ ] Export genera ZIP válido.
 - [ ] Notifications in-app funcionan.
 - [ ] 0 errores críticos de a11y.
+- [ ] Checkpoint visual 2 cerrado.
+- [ ] Naming ratificado o cambiado.
 
 ### Pause point
 **Phase 0 internal production-ready.** Hour como herramienta diaria de verdad para uso interno; clientes externos siguen bloqueados hasta Phase 0.9.

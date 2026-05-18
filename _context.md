@@ -282,6 +282,8 @@ Plus **Desk** = the primary UI lens (the "what's on your plate" view).
 
 Schema retains technical names (`workspace`, `project`, `line`, `show`). Product vocabulary appears in UI, docs, and user-facing copy.
 
+**Naming reversibility window** (2026-05-14): renaming `House`/`Room`/`Run`/`Gig`/`Plaza`/`Desk` costs ~half day to one day while we are between Phase 0.0 and Phase 0.9. The mechanical work is: rename route folders (`src/routes/h/[workspace]/room/` → new name), update `$lib/reserved-slugs.ts`, find/replace component names, update i18n keys in `$lib/i18n.ts` + `en.json`/`es.json`, rename matching endpoints. Schema does NOT change (ADR-008 separation). After Phase 0.9 (external clients with bookmarks, screenshots in docs/support, training materials), the cost escalates to weeks — the naming gate at the end of Phase 0.1 (decision 2026-05-14) is the cheap moment to course-correct. Gap to flag: `previous_slugs[]` covers slug renames within an entity but NOT entity-type segment renames (`/room/` → `/project/` would need an explicit 301 redirect rule in `apps/web/src/routes/h/[workspace]/+layout.server.ts`, ~30 min when the case arises).
+
 ## UI architecture (ADR-009, 2026-04-20)
 
 Single-layout app with two controls:
