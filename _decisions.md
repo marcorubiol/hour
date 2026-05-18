@@ -1076,3 +1076,55 @@ Triggered by Marco's pre-scaffold doubt (Phase 0.0 day 5). Five alternatives eva
 - **Re-evaluate when**: si checkpoint 1 valida el naming → ratificación silenciosa en checkpoint 2 (Phase 0.4). Si checkpoint 1 invalida algo → cambio antes de empezar Phase 0.2.
 - **Status**: Firm.
 
+## [2026-05-18] — ADR-029 — Shell user-scoped: multi-workspace en sidebar + lens nav top + Desk lens → Rooms
+
+- **Decisión**: el shell de la app se reestructura en torno a un **sidebar user-scoped** (no workspace-scoped) que muestra simultáneamente todas las Houses del usuario y, debajo de cada House, sus Rooms. La **lens nav pasa del sidebar al top del main** como pills horizontales (`Rooms` · `Calendar` · `Contacts` · `Money`). La primera lens se llama **`Rooms`** (no `Desk`). Cuando una Room está seleccionada, el **sidebar lower** muestra la estructura interna de esa Room (Runs colapsables → Gigs) — esto reemplaza el componente `<Desk>` que el roadmap original preveía. El URL sigue siendo path-prefix per workspace (`/h/[workspace]/[entity]/[slug]`, ADR-022 vigente); solo cambia que el sidebar transciende el URL.
+- **Context**:
+  - **Trigger 2026-05-18**: Marco compartió mockups (ver chat) con multi-house en sidebar, lens nav en top, y `Rooms` en vez de `Desk` como primera lens. Su instinto cazó tres incoherencias antes de implementarlas:
+    1. ADR-009 dice "Sidebar entities (bottom): flat list of Houses → Rooms" en plural — sidebar siempre fue user-scoped por diseño, pero la implementación de Phase 0.0 lo construyó workspace-scoped por la simplicidad de path-prefix (ADR-022).
+    2. Roadmap Phase 0.1 introducía dos componentes con el mismo nombre `Desk`: la lens (modo de vista) y el sidebar lower (tree Runs→Gigs). Collision de naming reconocido como riesgo #14.
+    3. Lens nav vertical en sidebar es una elección no convencional sin justificación de research; top horizontal es lo que hacen Linear/Notion/GitHub y match con la recomendación "Desk skeleton + Rhythm soul" de `research/product/14-ux-proposals.md`.
+  - **Respaldo en research** (no opinión, evidencia):
+    - **`research/profiles/99-patterns.md §5`** "The multi-tenant freelance reality": "one human, multiple organisations, each with partial visibility... **the freelancer's personal workspace is Hour's home view for them, not a sidebar. Client workspaces are 'rooms they visit'.**" Es la arquitectura fundacional, no un add-on Phase 2 (recommendation #2 del strategy review).
+    - **`research/product/20-product-strategy-review.md §3` (Desk)**: "Desk metaphor good only if it becomes actionable. **A Desk without tasks, next actions, waiting items, or due work is just navigation**." Sin task entity en Phase 0 (D3 deferred), `Desk` lens promete acción que no podemos delivery. `Rooms` describe lo que se ve sin prometer comportamiento.
+    - **`research/product/14-ux-proposals.md` recommendation**: "Hybrid: Desk skeleton + Rhythm soul. Base structure: dual-mode sidebar + main panel. Inside the panel: **modes/lenses logic** (Rhythm) instead of fixed tabs." Lens nav en top del main es la forma idiomática de este patrón.
+    - **`architecture.md §4`**: "The tenant is called a workspace (not 'organization') because it holds both personal setups (`kind='personal'`) and team setups (`kind='team'`) — **this matches the multi-hat freelance reality**". El schema ya soporta multi-workspace per user; solo la UI no lo aprovechaba.
+- **Cambios concretos**:
+  1. **DB (migration `phase_0_1_multi_workspace_split` aplicada 2026-05-18)**:
+     - Workspace `marco-rubiol` (kind=`personal`) **se mantiene** como House personal de Marco.
+     - Nueva workspace `mamemi` (kind=`team`) creada como House del colectivo. Marco owner + playwright admin (este último para no romper el smoke test).
+     - Project `mamemi` + sus 154 engagements movidos de `marco-rubiol` a `mamemi`. Los triggers `guard_immutable_workspace_id` (project + engagement) se deshabilitan temporalmente durante la migración y se vuelven a habilitar.
+     - El JWT `current_workspace_id` claim sigue inyectándose pero deja de ser la primary scoping mechanism — las RLS ya son membership-based (`is_workspace_member()` + `has_permission()`), así que multi-workspace queries funcionan sin refactor RLS adicional.
+  2. **API**:
+     - `/api/houses` ya devolvía membership-based — ahora devuelve 2 rows para Marco.
+     - `/api/rooms` ya no filtra por current_workspace_id — devuelve projects de TODAS las workspaces del user. Sin refactor de código necesario; RLS lo gestiona.
+  3. **UI shell**:
+     - **Lens nav** mueve del sidebar al top del main. Pills horizontales. Cuatro lenses: `Rooms` · `Calendar` · `Contacts` · `Money` (extensible).
+     - **Plaza** (sidebar upper) renderiza multi-house tree: cada House es un header + lista indentada de Rooms. Single-select sigue siendo per Room (vía URL).
+     - **RoomStructure** (sidebar lower, componente nuevo): visible solo cuando hay Room seleccionada. Muestra Runs colapsables → Gigs. Empty state "Select a Room to see its structure".
+     - **Empty home main**: cuando lens=`Rooms` y sin Room seleccionada → "Hello, Marco. What would you like to work on?" centrado.
+     - **`<Desk>` componente del roadmap original**: NO se construye. Funcionalidad absorbida por `<RoomStructure>` + `Rooms` lens.
+  4. **Naming**:
+     - Lens primaria: `Desk` → `Rooms`. Cambia i18n keys, copy en sidebar/top, componentes referenciantes.
+     - **`Desk` como término desaparece del producto en Phase 0**. Si emerge Desk-with-actions en Phase 0.5+ (task entity D3 cuando llegue), se decide entonces si vuelve como nombre de lens o tab.
+  5. **Multi-select y "All" chip**: visualmente preparados (checkboxes en Houses+Rooms del sidebar, chip "All" arriba a la derecha) pero **sin funcionalidad real en este sprint**. Wiring real con chip bar D-PRE-05 va a Phase 0.2. "All" es indicador pasivo de "no filter active" por ahora.
+- **Supersede**:
+  - **ADR-008** "Product vocabulary": la línea "Plus **Desk** = the primary UI lens" queda obsoleta. Las cuatro lenses Phase 0 son `Rooms` · `Calendar` · `Contacts` · `Money`. House/Room/Run/Gig mantienen significado.
+  - **ADR-009** "UI architecture": el dual-mode sidebar mantiene el espíritu (Plaza + RoomStructure son el dual mode) pero la lens nav YA NO vive en sidebar — vive en top. Texto del ADR-009 "Lenses (sidebar top)" queda obsoleto; el resto (Rooms lens + Room sidebar selected = destination; otras lenses = filter) sigue válido.
+  - **Roadmap Phase 0.1**: trabajo #2 (`<Desk>` componente) se reemplaza por `<RoomStructure>`. Trabajos #6 (endpoints runs/gigs) y siguientes mantienen su orden pero se construyen sobre el shell nuevo.
+- **Mantiene firme**:
+  - **ADR-022** path-prefix URL `/h/[workspace]/...`. El URL sigue siendo per workspace; solo el sidebar transciende.
+  - **ADR-027** "Phase 0 transversal MVP". Este cambio refuerza la tesis: la estructura completa (Houses, Rooms, lenses) se ve desde el primer momento.
+  - **ADR-024** slug naming. Sin cambios en slugs.
+  - **Person GLOBAL** (decisión 2026-05-01). Multi-workspace sidebar refuerza la utilidad de Person global: una persona puede aparecer en engagements de Houses distintas sin duplicarse.
+- **Alternatives considered (rejected)**:
+  - **Subdomain per workspace** (`mamemi.hour.zerosense.studio` + `marco-rubiol.hour.zerosense.studio`): rechazado por ahora, mismas razones que en `build/url-architecture-dossier-2026-05-01.md` (infra cost desproporcionado para 2 workspaces). Migration path queda documentado para Phase 1 si llegan vanity domains.
+  - **Mantener single-workspace per URL Y per sidebar** (status quo Phase 0.0 que construí): rechazado. Contradice `99-patterns §5` directamente. Para Marco mismo (case 05+08 del perfil research) Hour sería peor que su tooling actual.
+  - **Renombrar workspace `marco-rubiol` a `mamemi` + crear nuevo `marco-rubiol-personal`**: rechazado por ser destructivo sin beneficio. La opción aplicada (mantener `marco-rubiol`, crear `mamemi` separado, mover project) es menos invasiva y refleja mejor la realidad: el workspace `marco-rubiol` siempre fue Marco personal por slug, solo tenía el proyecto MaMeMi dentro por inercia.
+  - **Mantener `Desk` como nombre de la lens primaria + renombrar el componente sidebar lower**: rechazado. El strategy review §3 advierte que `Desk` sin task entity es navegación vacía. Aprovechamos el momento (sin clients externos) para alinear nombre con realidad de lo que entrega.
+- **Re-evaluate when**:
+  - Si en checkpoint 1 (final Phase 0.1) Anouk u otros confunden alguna parte del vocabulario nuevo, especialmente "House"/"Room"/"Rooms lens".
+  - Si llegamos a Phase 0.5+ con task entity (D3) y emerge utilidad para una "Desk" lens con next actions reales — re-evaluar si vuelve, y bajo qué nombre.
+  - Si Phase 1 multi-workspace con N>5 workspaces hace que el sidebar plano (todas las Houses + Rooms simultáneas) sea inmanejable — entonces evaluar colapsado por defecto, búsqueda, o vanity subdomains.
+- **Status**: Firm. Migration aplicada en producción 2026-05-18.
+
