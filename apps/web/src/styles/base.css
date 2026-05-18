@@ -906,6 +906,43 @@
     --badge-accent: var(--danger);
   }
 
+  /* Engagement status variants — one badge per engagement_status enum
+     value. Defined alongside the tone variants because they're consumed
+     across booking, room detail, and future contacts lens; keeping them
+     here prevents drift between consumers and keeps the variable-contract
+     pattern (consumer parameterises, skeleton stays the same). Class
+     names mirror the enum with underscores replaced by dashes
+     (in_conversation → in-conversation). */
+  .badge--contacted {
+    --badge-background: var(--info-ultra-light);
+    --badge-color: var(--info-ultra-dark);
+  }
+  .badge--in-conversation {
+    --badge-background: var(--warning-ultra-light);
+    --badge-color: var(--warning-ultra-dark);
+  }
+  .badge--hold {
+    --badge-background: var(--neutral-ultra-light);
+    --badge-color: var(--neutral-dark);
+  }
+  .badge--confirmed {
+    --badge-background: var(--success-ultra-light);
+    --badge-color: var(--success-ultra-dark);
+  }
+  .badge--declined {
+    --badge-background: var(--danger-ultra-light);
+    --badge-color: var(--danger-ultra-dark);
+  }
+  .badge--dormant {
+    --badge-background: var(--neutral-ultra-light);
+    --badge-color: var(--neutral-semi-dark);
+    opacity: 0.75;
+  }
+  .badge--recurring {
+    --badge-background: var(--primary-ultra-light);
+    --badge-color: var(--primary-ultra-dark);
+  }
+
   /* Sizes — only xs and m redeclare; s is default. */
   .badge--xs {
     --badge-padding-block: 0.1em;

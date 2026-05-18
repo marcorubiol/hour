@@ -116,6 +116,12 @@
     return STATUS_LABELS[s] ?? s;
   }
 
+  // Mirror booking's transform: enum values use underscores, badge classes
+  // use dashes. Single source of truth lives in base.css.
+  function statusBadgeClass(s: string): string {
+    return `badge--${s.replace(/_/g, '-')}`;
+  }
+
   function locationStr(p: PersonLite | null): string {
     if (!p) return '';
     return [p.city, p.country].filter(Boolean).join(', ');
@@ -151,7 +157,7 @@
               <span class="rel-stub__location">{locationStr(e.person)}</span>
             {/if}
           </div>
-          <span class={`rel-stub__status rel-stub__status--${e.status}`}>
+          <span class={statusBadgeClass(e.status)}>
             {statusLabel(e.status)}
           </span>
         </li>
@@ -235,42 +241,6 @@
   .rel-stub__location {
     font-size: var(--text-xs);
     color: var(--text-dark-muted);
-  }
-
-  .rel-stub__status {
-    flex-shrink: 0;
-    font-size: var(--text-xs);
-    padding-block: 2px;
-    padding-inline: var(--space-s);
-    border-radius: 999px;
-    border: 1px solid var(--neutral-light);
-    color: var(--text-dark-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-  }
-
-  .rel-stub__status--confirmed {
-    background: var(--success-ultra-light);
-    border-color: var(--success-light);
-    color: var(--success-dark);
-  }
-
-  .rel-stub__status--in_conversation,
-  .rel-stub__status--hold {
-    background: var(--warning-ultra-light);
-    border-color: var(--warning-light);
-    color: var(--warning-dark);
-  }
-
-  .rel-stub__status--declined {
-    background: var(--danger-ultra-light);
-    border-color: var(--danger-light);
-    color: var(--danger-dark);
-  }
-
-  .rel-stub__status--dormant {
-    color: var(--text-dark-muted);
-    opacity: 0.7;
   }
 
   .rel-stub__state {

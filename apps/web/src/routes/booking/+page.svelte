@@ -292,34 +292,7 @@
       font-size: var(--text-s);
     }
 
-    .badge--contacted {
-      --badge-background: var(--info-ultra-light);
-      --badge-color: var(--info-ultra-dark);
-    }
-    .badge--in-conversation {
-      --badge-background: var(--warning-ultra-light);
-      --badge-color: var(--warning-ultra-dark);
-    }
-    .badge--hold {
-      --badge-background: var(--neutral-ultra-light);
-      --badge-color: var(--neutral-dark);
-    }
-    .badge--confirmed {
-      --badge-background: var(--success-ultra-light);
-      --badge-color: var(--success-ultra-dark);
-    }
-    .badge--declined {
-      --badge-background: var(--danger-ultra-light);
-      --badge-color: var(--danger-ultra-dark);
-    }
-    .badge--dormant {
-      --badge-background: var(--neutral-ultra-light);
-      --badge-color: var(--neutral-semi-dark);
-      opacity: 0.75;
-    }
-    .badge--recurring {
-      --badge-background: var(--primary-ultra-light);
-      --badge-color: var(--primary-ultra-dark);
-    }
+    /* Engagement status badge variants live in base.css (single source of
+       truth, consumed by booking + room detail + future contacts lens). */
   }
 </style>
