@@ -6,6 +6,7 @@
   import { onDestroy, onMount } from 'svelte';
   import Sidebar from '$lib/components/Sidebar.svelte';
   import Avatar from '$lib/components/Avatar.svelte';
+  import Plaza from '$lib/components/Plaza.svelte';
   import { isReservedWorkspaceSlug } from '$lib/reserved-slugs';
   import { provideLens, type Lens } from '$lib/stores/lens.svelte';
   import { provideSelection } from '$lib/stores/selection.svelte';
@@ -37,6 +38,19 @@
 
   $effect(() => {
     selection.setWorkspace(workspaceSlug);
+  });
+
+  // Sync SelectionStore.entity from the URL. The pathname is the source of
+  // truth for which entity is currently selected; the store is a convenience
+  // mirror so non-routing consumers (chip bar, future ⌘K) don't re-parse it.
+  $effect(() => {
+    const path = page.url.pathname;
+    const m = path.match(/^\/h\/[^/]+\/(room|gig|engagement|person|run|venue|asset|invoice)\/([^/]+)/);
+    if (m) {
+      selection.setEntity({ type: m[1] as never, slug: m[2] });
+    } else {
+      selection.clear();
+    }
   });
 
   // Realtime + presence — wired in onMount so localStorage and `env` (both
@@ -98,7 +112,7 @@
         <span class="text--s text--dark-muted">/ {workspaceSlug}</span>
       {/snippet}
       {#snippet children({ close })}
-        <nav class="workspace-shell__lenses">
+        <nav class="workspace-shell__lenses" aria-label="Lens">
           {#each lensOptions as opt (opt.id)}
             <button
               type="button"
@@ -110,6 +124,8 @@
             >{opt.label}</button>
           {/each}
         </nav>
+
+        <Plaza />
       {/snippet}
       {#snippet footer()}
         <Avatar size="s" name={workspaceSlug} tone="primary" />
