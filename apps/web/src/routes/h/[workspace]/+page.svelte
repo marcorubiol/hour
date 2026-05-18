@@ -1,41 +1,45 @@
 <script lang="ts">
+  /**
+   * House home — empty Spotlight-style prompt when no Room is selected.
+   * The sidebar already shows what's available; main is intentionally
+   * quiet here so the user picks where to go.
+   */
   import { page } from '$app/state';
 
   let workspace = $derived(page.params.workspace);
 </script>
 
 <svelte:head>
-  <title>{workspace} — Hour</title>
+  <title>Hour</title>
 </svelte:head>
 
-<section class="house">
-  <header>
-    <h1 class="h2">{workspace}</h1>
-    <p class="text--dark-muted">House overview · placeholder for Plaza/Desk shell (Phase 0.1).</p>
-  </header>
-
-  <ul class="house__links">
-    <li><a href={`/h/${workspace}/room/mamemi`}>Room — mamemi</a></li>
-    <li><a href={`/h/${workspace}/gig/igualada-2026-04-12`}>Gig — igualada-2026-04-12</a></li>
-    <li><a href={`/h/${workspace}/engagement/marche-teatro`}>Engagement — marche-teatro</a></li>
-    <li><a href={`/h/${workspace}/person/nuria-pages`}>Person — nuria-pages</a></li>
-  </ul>
+<section class="home">
+  <h1 class="home__greeting">Hello, Marco.</h1>
+  <p class="home__prompt">What would you like to work on?</p>
 </section>
 
 <style>
   @layer components {
-    .house {
+    .home {
       display: flex;
       flex-direction: column;
-      gap: var(--space-l);
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-xs);
+      min-block-size: 60vh;
+      text-align: center;
     }
-    .house__links {
-      list-style: none;
-      padding: 0;
+
+    .home__greeting {
+      font-size: var(--text-xxl);
+      font-weight: 500;
       margin: 0;
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-s);
+    }
+
+    .home__prompt {
+      font-size: var(--text-m);
+      color: var(--text-dark-muted);
+      margin: 0;
     }
   }
 </style>

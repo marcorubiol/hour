@@ -1,4 +1,18 @@
 <script lang="ts">
+  /**
+   * Workspace shell (ADR-029) — user-scoped sidebar with simultaneous
+   * houses + lens nav as horizontal pills at the top of main.
+   *
+   * - Sidebar upper: <Plaza /> (multi-house tree, user-scoped).
+   * - Sidebar lower: <RoomStructure /> (runs+gigs of selected Room).
+   * - Top of main: horizontal lens pills + "All" chip placeholder.
+   * - Main content: routed page (`/h/[workspace]/+page.svelte` for the
+   *   empty home, or entity sub-pages).
+   *
+   * The URL still carries one workspace (ADR-022 path-prefix); the sidebar
+   * shows all the user's houses regardless of the URL workspace.
+   */
+
   import { page } from '$app/state';
   import { goto } from '$app/navigation';
   import { env } from '$env/dynamic/public';
@@ -7,6 +21,7 @@
   import Sidebar from '$lib/components/Sidebar.svelte';
   import Avatar from '$lib/components/Avatar.svelte';
   import Plaza from '$lib/components/Plaza.svelte';
+  import RoomStructure from '$lib/components/RoomStructure.svelte';
   import { isReservedWorkspaceSlug } from '$lib/reserved-slugs';
   import { provideLens, type Lens } from '$lib/stores/lens.svelte';
   import { provideSelection } from '$lib/stores/selection.svelte';
@@ -19,9 +34,6 @@
 
   let { children }: Props = $props();
 
-  // Reserved-slug guard — defence in depth even though SvelteKit may have
-  // already routed us here. If a literal reserved word lands as workspace
-  // slug, redirect to root immediately.
   let workspaceSlug = $derived(page.params.workspace ?? '');
   let blocked = $derived(isReservedWorkspaceSlug(workspaceSlug));
 
@@ -29,20 +41,13 @@
     if (blocked) goto('/', { replaceState: true });
   });
 
-  // Provide the workspace + lens + selection context to the whole subtree.
-  // Workspace resolution (slug → DB row, previous_slugs fallback, membership
-  // check) is deferred to Phase 0.1 when Plaza loads real data — for now
-  // we pass the slug as-is so children placeholders can echo it.
   const selection = provideSelection();
-  const lens = provideLens('desk');
+  const lens = provideLens('rooms');
 
   $effect(() => {
     selection.setWorkspace(workspaceSlug);
   });
 
-  // Sync SelectionStore.entity from the URL. The pathname is the source of
-  // truth for which entity is currently selected; the store is a convenience
-  // mirror so non-routing consumers (chip bar, future ⌘K) don't re-parse it.
   $effect(() => {
     const path = page.url.pathname;
     const m = path.match(/^\/h\/[^/]+\/(room|gig|engagement|person|run|venue|asset|invoice)\/([^/]+)/);
@@ -53,12 +58,6 @@
     }
   });
 
-  // Realtime + presence — wired in onMount so localStorage and `env` (both
-  // browser-only) are available. `/h/` is `ssr=false`, so onMount is the
-  // safe boundary. Disposed on layout destroy.
-  // TODO Phase 0.1: pass the real workspace UUID once we resolve slug → DB.
-  // For now we use the slug as the channel anchor; presence works as long
-  // as everyone in the same workspace passes the same string.
   let rt: RealtimeHandle | null = null;
   let presence: PresenceStore | null = null;
 
@@ -75,9 +74,6 @@
       );
       presence = providePresence(workspaceSlug);
     } catch (e) {
-      // JWT missing `sub` (malformed) or env unavailable — degrade silently.
-      // Pages that need realtime call useRealtime() and will throw a clearer
-      // error there.
       console.warn('[realtime] init failed, continuing without presence:', e);
     }
   });
@@ -90,7 +86,7 @@
   let sidebarOpen = $state(true);
 
   const lensOptions: { id: Lens; label: string }[] = [
-    { id: 'desk', label: 'Desk' },
+    { id: 'rooms', label: 'Rooms' },
     { id: 'calendar', label: 'Calendar' },
     { id: 'contacts', label: 'Contacts' },
     { id: 'money', label: 'Money' },
@@ -106,26 +102,16 @@
 
 {#if !blocked}
   <div class="workspace-shell">
-    <Sidebar bind:open={sidebarOpen} label="{workspaceSlug} navigation">
+    <Sidebar bind:open={sidebarOpen} label="Houses and rooms">
       {#snippet header()}
-        <strong>Hour</strong>
-        <span class="text--s text--dark-muted">/ {workspaceSlug}</span>
+        <label class="workspace-shell__brand">
+          <input type="checkbox" disabled aria-hidden="true" tabindex="-1" />
+          <strong>Hour</strong>
+        </label>
       {/snippet}
-      {#snippet children({ close })}
-        <nav class="workspace-shell__lenses" aria-label="Lens">
-          {#each lensOptions as opt (opt.id)}
-            <button
-              type="button"
-              class={`menu__item${lens.current === opt.id ? ' menu__item--active' : ''}`}
-              onclick={() => {
-                lens.set(opt.id);
-                close();
-              }}
-            >{opt.label}</button>
-          {/each}
-        </nav>
-
+      {#snippet children()}
         <Plaza />
+        <RoomStructure />
       {/snippet}
       {#snippet footer()}
         <Avatar size="s" name={workspaceSlug} tone="primary" />
@@ -144,9 +130,24 @@
           onclick={() => (sidebarOpen = !sidebarOpen)}
           aria-label={sidebarOpen ? 'Hide navigation' : 'Show navigation'}
         >☰</button>
-        <span class="text--s text--dark-muted">
-          Lens: <code>{lens.current}</code>
-        </span>
+
+        <nav class="workspace-shell__lenses" aria-label="Lens">
+          {#each lensOptions as opt (opt.id)}
+            <button
+              type="button"
+              class={['workspace-shell__lens', lens.current === opt.id && 'workspace-shell__lens--active']
+                .filter(Boolean)
+                .join(' ')}
+              aria-current={lens.current === opt.id ? 'true' : undefined}
+              onclick={() => lens.set(opt.id)}
+            >{opt.label}</button>
+          {/each}
+        </nav>
+
+        <label class="workspace-shell__all">
+          <input type="checkbox" disabled aria-hidden="true" tabindex="-1" />
+          <span class="text--s">All</span>
+        </label>
       </header>
 
       <div class="workspace-shell__content">
@@ -161,6 +162,18 @@
     .workspace-shell {
       display: flex;
       min-block-size: 100vh;
+    }
+
+    .workspace-shell__brand {
+      display: flex;
+      align-items: center;
+      gap: var(--space-xs);
+    }
+
+    .workspace-shell__brand input[type='checkbox'] {
+      margin: 0;
+      pointer-events: none;
+      opacity: 0.6;
     }
 
     .workspace-shell__main {
@@ -184,15 +197,63 @@
       padding-inline: var(--space-s);
     }
 
+    .workspace-shell__lenses {
+      display: flex;
+      align-items: center;
+      gap: var(--space-xs);
+      flex: 1;
+      justify-content: center;
+    }
+
+    .workspace-shell__lens {
+      --lens-color: var(--text-color);
+      --lens-bg: transparent;
+      --lens-border: color-mix(in oklch, var(--neutral) 25%, transparent);
+      padding-block: var(--space-xs);
+      padding-inline: var(--space-m);
+      border-radius: var(--radius-circle);
+      border: 1px solid var(--lens-border);
+      background: var(--lens-bg);
+      color: var(--lens-color);
+      font-size: var(--text-s);
+      cursor: pointer;
+      transition: background-color 120ms ease-out, color 120ms ease-out, border-color 120ms ease-out;
+    }
+
+    .workspace-shell__lens:hover {
+      --lens-bg: color-mix(in oklch, var(--neutral) 6%, transparent);
+    }
+
+    .workspace-shell__lens:focus-visible {
+      outline: 2px solid var(--primary);
+      outline-offset: 2px;
+    }
+
+    .workspace-shell__lens--active {
+      --lens-color: var(--base);
+      --lens-bg: var(--text-color);
+      --lens-border: var(--text-color);
+    }
+
+    .workspace-shell__all {
+      display: flex;
+      align-items: center;
+      gap: var(--space-xs);
+      padding-block: var(--space-xs);
+      padding-inline: var(--space-m);
+      border-radius: var(--radius-circle);
+      border: 1px solid color-mix(in oklch, var(--neutral) 25%, transparent);
+    }
+
+    .workspace-shell__all input[type='checkbox'] {
+      margin: 0;
+      pointer-events: none;
+      opacity: 0.6;
+    }
+
     .workspace-shell__content {
       flex: 1;
       padding: var(--space-l);
-    }
-
-    .workspace-shell__lenses {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-xs);
     }
   }
 </style>

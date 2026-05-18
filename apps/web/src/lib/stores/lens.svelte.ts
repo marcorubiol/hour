@@ -9,10 +9,10 @@
 
 import { getContext, setContext } from 'svelte';
 
-export type Lens = 'desk' | 'calendar' | 'contacts' | 'money';
+export type Lens = 'rooms' | 'calendar' | 'contacts' | 'money';
 
 export class LensStore {
-  current = $state<Lens>('desk');
+  current = $state<Lens>('rooms');
 
   set(next: Lens) {
     this.current = next;
@@ -21,7 +21,7 @@ export class LensStore {
 
 const KEY = Symbol('lens');
 
-export function provideLens(initial: Lens = 'desk'): LensStore {
+export function provideLens(initial: Lens = 'rooms'): LensStore {
   const store = new LensStore();
   store.current = initial;
   setContext(KEY, store);
