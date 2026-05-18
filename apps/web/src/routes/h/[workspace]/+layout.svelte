@@ -22,6 +22,7 @@
   import Avatar from '$lib/components/Avatar.svelte';
   import Plaza from '$lib/components/Plaza.svelte';
   import RoomStructure from '$lib/components/RoomStructure.svelte';
+  import PresenceBadge from '$lib/components/PresenceBadge.svelte';
   import { isReservedWorkspaceSlug } from '$lib/reserved-slugs';
   import { provideLens, type Lens } from '$lib/stores/lens.svelte';
   import { provideSelection } from '$lib/stores/selection.svelte';
@@ -58,8 +59,10 @@
     }
   });
 
-  let rt: RealtimeHandle | null = null;
-  let presence: PresenceStore | null = null;
+  // $state so the topbar's PresenceBadge re-renders when these get
+  // assigned inside onMount (the providers are browser-only).
+  let rt = $state<RealtimeHandle | null>(null);
+  let presence = $state<PresenceStore | null>(null);
 
   onMount(() => {
     const jwt = localStorage.getItem('hour_jwt');
@@ -143,6 +146,8 @@
             >{opt.label}</button>
           {/each}
         </nav>
+
+        <PresenceBadge count={presence?.count ?? null} />
 
         <label class="workspace-shell__all">
           <input type="checkbox" disabled aria-hidden="true" tabindex="-1" />
