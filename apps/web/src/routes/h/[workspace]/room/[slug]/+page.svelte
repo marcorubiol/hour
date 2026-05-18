@@ -112,8 +112,14 @@
   .room {
     display: flex;
     flex-direction: column;
-    gap: var(--space-xl);
+    gap: var(--space-l);
     max-inline-size: 56rem;
+  }
+
+  /* Stubs sit further from the live block so the empty (deferred-phase)
+     surface doesn't crowd the populated one. */
+  .room__stubs {
+    margin-block-start: var(--space-m);
   }
 
   .room__header {

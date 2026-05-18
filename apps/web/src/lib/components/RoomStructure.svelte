@@ -67,7 +67,6 @@
 <aside class="room-structure" aria-label="Room structure">
   {#if hasRoom}
     <header class="room-structure__header">
-      <small class="room-structure__eyebrow">Room</small>
       <strong>{displayName}</strong>
     </header>
     <p class="room-structure__empty">No runs yet.</p>
@@ -92,13 +91,6 @@
       display: flex;
       flex-direction: column;
       gap: var(--space-xs);
-    }
-
-    .room-structure__eyebrow {
-      font-size: var(--text-xs);
-      color: var(--text-dark-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
     }
 
     .room-structure__empty {

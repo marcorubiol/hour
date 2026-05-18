@@ -141,6 +141,8 @@
               </li>
             {/each}
           </ul>
+        {:else}
+          <p class="plaza__rooms-empty">No rooms yet</p>
         {/if}
       </section>
     {/each}
@@ -207,6 +209,18 @@
       display: flex;
       flex-direction: column;
       gap: var(--space-xs);
+    }
+
+    /* Empty placeholder for Houses with zero active Rooms. Tells the user
+       the House is intentionally empty instead of hiding the fact and
+       leaving an ambiguous gap below the header. */
+    .plaza__rooms-empty {
+      margin: 0;
+      padding-block: var(--space-xs);
+      padding-inline-start: var(--space-l);
+      font-size: var(--text-s);
+      font-style: italic;
+      color: var(--text-dark-muted);
     }
 
     .plaza__room {
