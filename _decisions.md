@@ -1251,3 +1251,34 @@ Triggered by Marco's pre-scaffold doubt (Phase 0.0 day 5). Five alternatives eva
   - Si Phase 1 multi-workspace con N>5 workspaces hace que el sidebar plano (todas las Houses + Rooms simultáneas) sea inmanejable — entonces evaluar colapsado por defecto, búsqueda, o vanity subdomains.
 - **Status**: Firm. Migration aplicada en producción 2026-05-18.
 
+## [2026-05-18] — ADR-033 · Vocabulario UI: revertir a industria-standard + design system v0.5
+- **Decisión**: UI usa vocabulario industria-standard — sidebar items se etiquetan **Projects**, primera lens se renombra **Today** (era `Plaza`, antes `Rooms`, antes `Desk`). Sections se llaman **Lines** en copy. Shows mantiene **Shows**. Schema **no** cambia (sigue con `account`/`workspace`/`project`/`section`/`show` técnicos). Componentes internos mantienen `Plaza.svelte` (sidebar upper) y el sistema de pills se llama `Desk` conceptualmente — son nombres de implementación, no aparecen en copy visible al user.
+- **En paralelo**: paleta plum (`oklch(0.50 0.14 335)`) se retira como primary brand color; `--primary` se reasigna a `var(--text-color)` (cool ink). El visual editorial-sobrio del design system v0.5 (Newsreader + Inter + JetBrains Mono, surfaces warm-cream, ink cool, state colors para lifecycle, tag tones pastel, 8 accents abstractos por hash de slug) reemplaza el visual plum-anchored.
+- **Context**: Marco compartió un design system completo (HTML de referencia) + captura de la vista Today. El design no usa plum en ningún sitio visible y trata el vocabulario interno como industria-standard. El timing coincide con dos gates ya planificados:
+  - **Checkpoint visual 1** (2026-05-14): "1 día con datos productivos para evaluar plum trial, densidad, jerarquía". Este refresh ES ese checkpoint.
+  - **Naming gate** (2026-05-14): testear vocabulario House/Room/Run/Gig vs alternativas. El design system fuerza la decisión.
+- **Trade-offs**: el vocabulario nuevo pierde diferenciación de marca (cualquier SaaS dice "Projects"), pero gana cero fricción cognitiva — Marco y Anouk no tienen que traducir cuando hablan con técnicos/programadores/colaboradores. El estudio de 8 perfiles en `research/` confirmó que el vocabulario propio sólo paga cuando hay un mental model distinto que defender; House/Room/Run/Gig no lo defendía, sólo redecoraba.
+- **Cambios concretos en este sprint**:
+  1. `apps/web/src/styles/tokens.css` — reescrito. Mantiene 3 categorías (philosophy.md). Surfaces+ink+state+accents+tag-tones del design system. Plum eliminado. Fuentes Newsreader/Inter/JetBrains Mono.
+  2. `apps/web/src/app.html` — Google Fonts (Newsreader+Inter+JetBrains Mono) con preconnect+display=swap. Theme-color a `#f7f5ef`.
+  3. `apps/web/src/lib/utils/accent.ts` — helper `accentIndex/accentVar/accentStyle` para mapping `slug → --accent-N` por hash FNV-1a determinístico.
+  4. `apps/web/src/lib/stores/lens.svelte.ts` — `Lens` enum: `plaza` → `today`. Default `today`.
+  5. `apps/web/src/routes/h/[workspace]/+layout.svelte` — `lensOptions` label `Plaza` → `Today`. Sidebar `label="Houses and rooms"` → `label="Projects"`.
+  6. `apps/web/src/lib/components/Plaza.svelte` — copy: aria-label, empty/error states migran a "projects".
+  7. Pendientes en Phase C-E del plan: nuevos primitivos (Pill/FilterChip/TagChip/RoleChip/StateBadge/Kbd), repaint shell (Phase D), vista Today (Phase E).
+- **Supersede**:
+  - **ADR-008** "Product vocabulary": House/Room/Run/Gig/Desk como vocabulario de UI queda obsoleto. Schema technical names sobreviven internamente.
+  - **ADR-030** "Plaza lens": el rename `Rooms` → `Plaza` queda obsoleto. La lens ahora es `Today`. El componente `Plaza.svelte` mantiene su nombre interno por continuidad — coincidencia conceptual: la plaza es tu mapa de trabajo, today es el modo de trabajarlo.
+  - **Paleta plum** (decisión 2026-05-01): retirada. Marcada en su momento como "provisional, re-evaluar checkpoint visual 1". Re-evaluación negativa.
+- **Mantiene firme**:
+  - **ADR-022** path-prefix URL. Las rutas `/h/[workspace]/room/[slug]/` se mantienen sin rename inmediato — coste 30 min con 301 redirect, se ejecuta cuando un user externo lo note (Phase 0.9+).
+  - **ADR-029** shell user-scoped + lens nav top. Estructura intacta.
+  - **ADR-031** schema rename `line` → `section` con kind enum 10 valores. Sin cambios.
+  - **ADR-032** account layer above workspace. Sin cambios.
+- **Asunción Phase 0**: la sidebar lista WORKSPACES (no schema `project`s). Hoy renderiza 2 reales (`marco-rubiol`, `mamemi`); los 5 items que muestra el design HTML son mockup conceptual para cuando el usuario crezca. La decisión "project schema como agrupación visible separada" se difiere hasta que Marco cree el primer schema `project` distinto del workspace homónimo.
+- **Re-evaluate when**:
+  - Si un cliente externo (Phase 1) pide vocabulario propio del sector — re-evaluar branding (no schema).
+  - Si la vista Today con datos productivos resulta plana o sobre-densa tras 1 día de uso — ajustar typescale o density mode (cozy → spacious).
+  - Si Marco crea primer schema `project` distinto del workspace homónimo y necesita representación visual separada — decidir entonces shape de sidebar (aplanar cross-workspace vs anidar).
+- **Status**: Firm. Phase A+B aplicadas 2026-05-18. Phase C-E pendientes (~2-3 días).
+

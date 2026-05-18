@@ -12,8 +12,9 @@
     "cf-typegen": "wrangler types",
     "test:install": "playwright install --with-deps chromium",
     "test:smoke": "playwright test",
-    "test:unit": "vitest run",
-    "test:unit:watch": "vitest"
+    "test:unit": "vitest run --project server --project client",
+    "test:unit:watch": "vitest --project server --project client",
+    "test:rls": "vitest run --project rls"
   },
   "dependencies": {
     "@sentry/sveltekit": "^10.8.0",

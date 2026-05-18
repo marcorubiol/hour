@@ -118,6 +118,25 @@ export default defineConfig(({ mode }) => {
             exclude: ['src/**/*.svelte.{test,spec}.{js,ts}'],
           },
         },
+        {
+          // RLS regression suite — integration tests that hit the live
+          // hour-phase0 Supabase project. Excluded from default `test:unit`
+          // run; use `pnpm test:rls` (or `vitest run --project rls`).
+          // Reads env vars set by .env.test (sourced by the caller). Tests
+          // self-skip when those env vars are missing.
+          extends: './vite.config.ts',
+          test: {
+            name: 'rls',
+            environment: 'node',
+            include: ['tests/rls/**/*.test.ts'],
+            // _setup.ts loads .env + .env.test into process.env so tests
+            // can read PUBLIC_SUPABASE_* and PW_TEST_* without the caller
+            // having to source both files first.
+            setupFiles: ['./tests/rls/_setup.ts'],
+            // 30s per test — login + a few PostgREST hits over the network.
+            testTimeout: 30_000,
+          },
+        },
       ],
     },
   };
