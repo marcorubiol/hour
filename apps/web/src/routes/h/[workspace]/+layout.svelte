@@ -49,7 +49,7 @@
   });
 
   const selection = provideSelection();
-  const lens = provideLens('rooms');
+  const lens = provideLens('plaza');
 
   $effect(() => {
     selection.setWorkspace(workspaceSlug);
@@ -135,7 +135,7 @@
   let sidebarOpen = $state(true);
 
   const lensOptions: { id: Lens; label: string }[] = [
-    { id: 'rooms', label: 'Rooms' },
+    { id: 'plaza', label: 'Plaza' },
     { id: 'calendar', label: 'Calendar' },
     { id: 'contacts', label: 'Contacts' },
     { id: 'money', label: 'Money' },

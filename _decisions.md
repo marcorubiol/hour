@@ -1076,6 +1076,37 @@ Triggered by Marco's pre-scaffold doubt (Phase 0.0 day 5). Five alternatives eva
 - **Re-evaluate when**: si checkpoint 1 valida el naming → ratificación silenciosa en checkpoint 2 (Phase 0.4). Si checkpoint 1 invalida algo → cambio antes de empezar Phase 0.2.
 - **Status**: Firm.
 
+## [2026-05-18] — ADR-030 — Naming gate close: lens primaria "Plaza" + project rename a "Difusión 2026-27"
+
+- **Decisión** (dos cambios atómicos):
+  1. **Lens primaria renombrada `Rooms` → `Plaza`**. Supersede parcialmente ADR-029 (la línea que decidió "Desk lens → Rooms lens"). El sidebar upper (componente `Plaza.svelte`) y la lens primaria se llaman ahora igual a propósito — son la misma idea conceptual desde dos ángulos: el sidebar es la navegación visual de la plaza, la lens es el modo de trabajar en ella.
+  2. **Project `mamemi` display name renombrado "MaMeMi" → "Difusión 2026-27"**. Slug se mantiene como `mamemi` (no URL break). Workspace MaMeMi (House) y Room/project Difusión 2026-27 dejan de coincidir visualmente.
+- **Context**: naming gate al final de Phase 0.1 (decisión 2026-05-14, adelantado del final de 0.4). Marco previewed la UI viva con datos productivos y cazó dos confusiones reales:
+  - **Confusión 1 — "MaMeMi" significa cosas distintas en sitios distintos**. Aparecía 3 veces: como House (workspace team), como Room (project dentro), y como display name en sidebar lower + main header. Era un artefacto del seed inicial pre-ADR-029: cuando el workspace era `marco-rubiol` y el project se llamaba `MaMeMi`, el nombre era único. Tras la migración multi-workspace de ADR-029 ese nombre quedó duplicado.
+  - **Confusión 2 — Tautología "Rooms lens + sidebar lists rooms"**. ADR-029 renombró la lens primaria de "Desk" a "Rooms" (porque "Desk sin task entity no aporta — strategy review §3"). Pero el sidebar Plaza ya **lista las rooms del usuario**. Tener una lens llamada "Rooms" mientras estás mirando el sidebar que lista las Rooms = redundancia visible que no aporta señal.
+- **Por qué "Plaza" (no otro nombre)**:
+  - **Era el nombre canónico desde ADR-009 + ADR-022**: "the composable UI model defined in ADR-009 and refined 2026-04-24 (Plaza + Desk + Views + chip bar + multi-select)". Plaza siempre fue el sidebar; ADR-029 lo mantuvo. Lo que se perdió en ADR-029 fue la lens: cambiándola a "Rooms" la saqué de la coherencia con Plaza, en vez de mantener un nombre que refleja el modo de trabajo en la plaza.
+  - **Coherencia conceptual**: Plaza el componente + Plaza la lens describen la misma realidad operativa. Calendar / Contacts / Money son cortes transversales (tiempo / personas / dinero) del mismo mapa que la Plaza navega.
+  - **Resuelve la tautología sin inventar un nombre nuevo** ("Work" / "Today" / "Plate" eran las alternativas evaluadas — todas más débiles porque cada uno carga semántica que Hour aún no entrega: tasks, urgencia, plato del día).
+- **Por qué "Difusión 2026-27"** para el project name:
+  - **Describe literalmente qué es**: bucket de los 154 contactos del circuito de difusión de la temporada 2026-27 (anti-CRM vocabulary, `engagement` rows con `custom_fields.season='2026-27'`).
+  - **No genérico** (no "Temporada 2026-27" que daría igual) y no específico de un show (no "Ombra 2026" porque la difusión cubre todo el repertorio MaMeMi 2026-27).
+  - **Phase 0.5+** Marco puede crear projects más finos ("Ombra", "Nocturnes") dentro del workspace MaMeMi cuando emerja la necesidad — el slug `mamemi` queda como el "catch-all de difusión" y los específicos vendrán al lado.
+- **Alternatives considered (rejected)**:
+  - **Mantener "Rooms" lens y aceptar la tautología** — rechazado por Marco frente a la UI viva, criterio del naming gate: si una persona externa se confunde, cambia. Marco cazó la confusión en sí mismo dentro de la sesión.
+  - **Eliminar la lens primaria** (solo Calendar / Contacts / Money como modos, sin un "modo default") — rechazado. La lens primaria ancla el estado de la app cuando no estás filtrando por tiempo / personas / dinero. Sin ella, la pantalla queda sin etiqueta del modo activo.
+  - **Renombrar el slug del project** (`mamemi` → `difusion-2026-27`) — diferido. El display name cambia (visible al usuario); el slug no se toca para no invalidar URLs guardadas, links potencialmente compartidos, o el Master View path de Marco. `previous_slugs[]` lo cubriría si en el futuro se rename, pero por ahora no compensa el coste.
+- **Mecánica del cambio aplicada**:
+  - **DB**: `UPDATE project SET name='Difusión 2026-27' WHERE slug='mamemi'` vía MCP. Audit trigger captura el cambio. Slug, workspace_id, y todas las FKs intactas.
+  - **Código**: `apps/web/src/lib/stores/lens.svelte.ts` — type `Lens` cambia `'rooms'` → `'plaza'`, default también. `apps/web/src/routes/h/[workspace]/+layout.svelte` — `lensOptions[0]` cambia id+label, `provideLens('plaza')`. `apps/web/tests/smoke.spec.ts` — selector + variable rename.
+  - **Display name** aparece consistente: sidebar Plaza shows "Difusión 2026-27" como room name, RoomStructure (sidebar lower) shows "Difusión 2026-27" via TanStack cache, Room detail h1 shows "Difusión 2026-27". Una sola fuente, tres consumidores.
+- **Supersedes**:
+  - ADR-029 línea "Lens primaria: Desk → Rooms". El resto de ADR-029 (shell user-scoped, lens nav top, RoomStructure replaces Desk component, empty home state) queda firme.
+- **Re-evaluate when**:
+  - Si "Plaza" se confunde en testing externo con Anouk / Electrico 28 / otros — improbable porque Plaza es palabra neutra (no compite con sala/venue, no carga semántica funcional como "Desk"), pero el gate de Phase 0.4 (checkpoint visual 2 + naming gate ratificación) lo confirma.
+  - Si Phase 0.5 trae task entity (D3) — entonces "Desk" como nombre podría reaparecer como lens secundaria con sentido propio (Desk-with-actions). Plaza queda como modo de navegación, Desk como modo de trabajo accionable.
+- **Status**: Firm. Cambios aplicados en producción 2026-05-18.
+
 ## [2026-05-18] — ADR-029 — Shell user-scoped: multi-workspace en sidebar + lens nav top + Desk lens → Rooms
 
 - **Decisión**: el shell de la app se reestructura en torno a un **sidebar user-scoped** (no workspace-scoped) que muestra simultáneamente todas las Houses del usuario y, debajo de cada House, sus Rooms. La **lens nav pasa del sidebar al top del main** como pills horizontales (`Rooms` · `Calendar` · `Contacts` · `Money`). La primera lens se llama **`Rooms`** (no `Desk`). Cuando una Room está seleccionada, el **sidebar lower** muestra la estructura interna de esa Room (Runs colapsables → Gigs) — esto reemplaza el componente `<Desk>` que el roadmap original preveía. El URL sigue siendo path-prefix per workspace (`/h/[workspace]/[entity]/[slug]`, ADR-022 vigente); solo cambia que el sidebar transciende el URL.

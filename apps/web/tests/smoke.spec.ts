@@ -48,10 +48,10 @@ test.describe('smoke', () => {
     // /h/marco-rubiol (no slash). Match both forms.
     await page.waitForURL(/\/h\/marco-rubiol\/?$/);
 
-    // Shell loaded — the "Rooms" lens pill must be active.
-    const roomsLens = page.getByRole('button', { name: 'Rooms' });
-    await expect(roomsLens).toBeVisible();
-    await expect(roomsLens).toHaveClass(/workspace-shell__lens--active/);
+    // Shell loaded — the "Plaza" lens pill must be active.
+    const plazaLens = page.getByRole('button', { name: 'Plaza' });
+    await expect(plazaLens).toBeVisible();
+    await expect(plazaLens).toHaveClass(/workspace-shell__lens--active/);
 
     // Plaza must surface the MaMeMi room link. Targeting by href avoids
     // the ambiguity between "MaMeMi" the House and "MaMeMi" the Room
