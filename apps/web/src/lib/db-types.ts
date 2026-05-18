@@ -22,10 +22,10 @@ export type Database = {
           direction: Database["public"]["Enums"]["asset_direction"]
           id: string
           kind: Database["public"]["Enums"]["asset_kind"]
-          line_id: string | null
           notes: string | null
           previous_slugs: string[]
           project_id: string | null
+          section_id: string | null
           show_id: string | null
           slug: string | null
           updated_at: string
@@ -41,10 +41,10 @@ export type Database = {
           direction?: Database["public"]["Enums"]["asset_direction"]
           id?: string
           kind: Database["public"]["Enums"]["asset_kind"]
-          line_id?: string | null
           notes?: string | null
           previous_slugs?: string[]
           project_id?: string | null
+          section_id?: string | null
           show_id?: string | null
           slug?: string | null
           updated_at?: string
@@ -60,10 +60,10 @@ export type Database = {
           direction?: Database["public"]["Enums"]["asset_direction"]
           id?: string
           kind?: Database["public"]["Enums"]["asset_kind"]
-          line_id?: string | null
           notes?: string | null
           previous_slugs?: string[]
           project_id?: string | null
+          section_id?: string | null
           show_id?: string | null
           slug?: string | null
           updated_at?: string
@@ -81,17 +81,17 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "asset_version_line_id_fkey"
-            columns: ["line_id"]
-            isOneToOne: false
-            referencedRelation: "line"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "asset_version_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "project"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "asset_version_section_id_fkey"
+            columns: ["section_id"]
+            isOneToOne: false
+            referencedRelation: "section"
             referencedColumns: ["id"]
           },
           {
@@ -547,11 +547,11 @@ export type Database = {
           description: string
           id: string
           incurred_on: string
-          line_id: string | null
           notes: string | null
           paid_by_user_id: string | null
           receipt_url: string | null
           reimbursed: boolean
+          section_id: string | null
           show_id: string | null
           updated_at: string
           workspace_id: string
@@ -567,11 +567,11 @@ export type Database = {
           description: string
           id?: string
           incurred_on?: string
-          line_id?: string | null
           notes?: string | null
           paid_by_user_id?: string | null
           receipt_url?: string | null
           reimbursed?: boolean
+          section_id?: string | null
           show_id?: string | null
           updated_at?: string
           workspace_id: string
@@ -587,21 +587,21 @@ export type Database = {
           description?: string
           id?: string
           incurred_on?: string
-          line_id?: string | null
           notes?: string | null
           paid_by_user_id?: string | null
           receipt_url?: string | null
           reimbursed?: boolean
+          section_id?: string | null
           show_id?: string | null
           updated_at?: string
           workspace_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "expense_line_id_fkey"
-            columns: ["line_id"]
+            foreignKeyName: "expense_section_id_fkey"
+            columns: ["section_id"]
             isOneToOne: false
-            referencedRelation: "line"
+            referencedRelation: "section"
             referencedColumns: ["id"]
           },
           {
@@ -782,84 +782,6 @@ export type Database = {
           },
           {
             foreignKeyName: "invoice_line_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: false
-            referencedRelation: "workspace"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      line: {
-        Row: {
-          created_at: string
-          created_by: string | null
-          custom_fields: Json
-          deleted_at: string | null
-          dossier_url: string | null
-          end_date: string | null
-          id: string
-          kind: Database["public"]["Enums"]["line_kind"]
-          name: string
-          notes: string | null
-          previous_slugs: string[]
-          project_id: string
-          slug: string | null
-          start_date: string | null
-          status: Database["public"]["Enums"]["line_status"]
-          territory: string | null
-          updated_at: string
-          workspace_id: string
-        }
-        Insert: {
-          created_at?: string
-          created_by?: string | null
-          custom_fields?: Json
-          deleted_at?: string | null
-          dossier_url?: string | null
-          end_date?: string | null
-          id?: string
-          kind?: Database["public"]["Enums"]["line_kind"]
-          name: string
-          notes?: string | null
-          previous_slugs?: string[]
-          project_id: string
-          slug?: string | null
-          start_date?: string | null
-          status?: Database["public"]["Enums"]["line_status"]
-          territory?: string | null
-          updated_at?: string
-          workspace_id: string
-        }
-        Update: {
-          created_at?: string
-          created_by?: string | null
-          custom_fields?: Json
-          deleted_at?: string | null
-          dossier_url?: string | null
-          end_date?: string | null
-          id?: string
-          kind?: Database["public"]["Enums"]["line_kind"]
-          name?: string
-          notes?: string | null
-          previous_slugs?: string[]
-          project_id?: string
-          slug?: string | null
-          start_date?: string | null
-          status?: Database["public"]["Enums"]["line_status"]
-          territory?: string | null
-          updated_at?: string
-          workspace_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "line_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "project"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "line_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspace"
@@ -1166,6 +1088,84 @@ export type Database = {
           },
         ]
       }
+      section: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          custom_fields: Json
+          deleted_at: string | null
+          dossier_url: string | null
+          end_date: string | null
+          id: string
+          kind: Database["public"]["Enums"]["section_kind"]
+          name: string
+          notes: string | null
+          previous_slugs: string[]
+          project_id: string
+          slug: string | null
+          start_date: string | null
+          status: Database["public"]["Enums"]["section_status"]
+          territory: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          custom_fields?: Json
+          deleted_at?: string | null
+          dossier_url?: string | null
+          end_date?: string | null
+          id?: string
+          kind?: Database["public"]["Enums"]["section_kind"]
+          name: string
+          notes?: string | null
+          previous_slugs?: string[]
+          project_id: string
+          slug?: string | null
+          start_date?: string | null
+          status?: Database["public"]["Enums"]["section_status"]
+          territory?: string | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          custom_fields?: Json
+          deleted_at?: string | null
+          dossier_url?: string | null
+          end_date?: string | null
+          id?: string
+          kind?: Database["public"]["Enums"]["section_kind"]
+          name?: string
+          notes?: string | null
+          previous_slugs?: string[]
+          project_id?: string
+          slug?: string | null
+          start_date?: string | null
+          status?: Database["public"]["Enums"]["section_status"]
+          territory?: string | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "line_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "project"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "line_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspace"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       show: {
         Row: {
           city: string | null
@@ -1179,7 +1179,6 @@ export type Database = {
           fee_currency: string | null
           hospitality: Json
           id: string
-          line_id: string | null
           load_in_at: string | null
           loadout_at: string | null
           logistics: Json
@@ -1187,6 +1186,7 @@ export type Database = {
           performed_at: string
           previous_slugs: string[]
           project_id: string
+          section_id: string | null
           show_start_at: string | null
           slug: string | null
           soundcheck_at: string | null
@@ -1210,7 +1210,6 @@ export type Database = {
           fee_currency?: string | null
           hospitality?: Json
           id?: string
-          line_id?: string | null
           load_in_at?: string | null
           loadout_at?: string | null
           logistics?: Json
@@ -1218,6 +1217,7 @@ export type Database = {
           performed_at: string
           previous_slugs?: string[]
           project_id: string
+          section_id?: string | null
           show_start_at?: string | null
           slug?: string | null
           soundcheck_at?: string | null
@@ -1241,7 +1241,6 @@ export type Database = {
           fee_currency?: string | null
           hospitality?: Json
           id?: string
-          line_id?: string | null
           load_in_at?: string | null
           loadout_at?: string | null
           logistics?: Json
@@ -1249,6 +1248,7 @@ export type Database = {
           performed_at?: string
           previous_slugs?: string[]
           project_id?: string
+          section_id?: string | null
           show_start_at?: string | null
           slug?: string | null
           soundcheck_at?: string | null
@@ -1269,17 +1269,17 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "show_line_id_fkey"
-            columns: ["line_id"]
-            isOneToOne: false
-            referencedRelation: "line"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "show_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "project"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "show_section_id_fkey"
+            columns: ["section_id"]
+            isOneToOne: false
+            referencedRelation: "section"
             referencedColumns: ["id"]
           },
           {
@@ -1540,10 +1540,10 @@ export type Database = {
           fee_amount: number | null
           fee_currency: string | null
           id: string | null
-          line_id: string | null
           notes: string | null
           performed_at: string | null
           project_id: string | null
+          section_id: string | null
           status: Database["public"]["Enums"]["show_status"] | null
           updated_at: string | null
           venue_id: string | null
@@ -1561,10 +1561,10 @@ export type Database = {
           fee_amount?: never
           fee_currency?: never
           id?: string | null
-          line_id?: string | null
           notes?: string | null
           performed_at?: string | null
           project_id?: string | null
+          section_id?: string | null
           status?: Database["public"]["Enums"]["show_status"] | null
           updated_at?: string | null
           venue_id?: string | null
@@ -1582,10 +1582,10 @@ export type Database = {
           fee_amount?: never
           fee_currency?: never
           id?: string | null
-          line_id?: string | null
           notes?: string | null
           performed_at?: string | null
           project_id?: string | null
+          section_id?: string | null
           status?: Database["public"]["Enums"]["show_status"] | null
           updated_at?: string | null
           venue_id?: string | null
@@ -1601,17 +1601,17 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "show_line_id_fkey"
-            columns: ["line_id"]
-            isOneToOne: false
-            referencedRelation: "line"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "show_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "project"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "show_section_id_fkey"
+            columns: ["section_id"]
+            isOneToOne: false
+            referencedRelation: "section"
             referencedColumns: ["id"]
           },
           {
@@ -1648,7 +1648,7 @@ export type Database = {
       is_reserved_slug: { Args: { candidate: string }; Returns: boolean }
       is_workspace_member: { Args: { ws_id: string }; Returns: boolean }
       project_id_of_asset_version: {
-        Args: { p_line_id: string; p_project_id: string; p_show_id: string }
+        Args: { p_project_id: string; p_section_id: string; p_show_id: string }
         Returns: string
       }
       project_id_of_expense: { Args: { p_expense_id: string }; Returns: string }
@@ -1687,12 +1687,22 @@ export type Database = {
         | "fees"
         | "other"
       invoice_status: "draft" | "issued" | "paid" | "cancelled"
-      line_kind: "tour" | "season" | "phase" | "circuit" | "residency" | "other"
-      line_status: "open" | "closed" | "archived"
       membership_role: "owner" | "admin" | "member" | "viewer" | "guest"
       payment_method: "transfer" | "card" | "cash" | "other"
       person_note_visibility: "workspace" | "private"
       project_status: "draft" | "active" | "archived"
+      section_kind:
+        | "tour"
+        | "season"
+        | "phase"
+        | "circuit"
+        | "residency"
+        | "other"
+        | "creation"
+        | "campaign"
+        | "comms"
+        | "misc"
+      section_status: "open" | "closed" | "archived"
       show_status:
         | "proposed"
         | "hold"
@@ -1871,12 +1881,23 @@ export const Constants = {
         "other",
       ],
       invoice_status: ["draft", "issued", "paid", "cancelled"],
-      line_kind: ["tour", "season", "phase", "circuit", "residency", "other"],
-      line_status: ["open", "closed", "archived"],
       membership_role: ["owner", "admin", "member", "viewer", "guest"],
       payment_method: ["transfer", "card", "cash", "other"],
       person_note_visibility: ["workspace", "private"],
       project_status: ["draft", "active", "archived"],
+      section_kind: [
+        "tour",
+        "season",
+        "phase",
+        "circuit",
+        "residency",
+        "other",
+        "creation",
+        "campaign",
+        "comms",
+        "misc",
+      ],
+      section_status: ["open", "closed", "archived"],
       show_status: [
         "proposed",
         "hold",
@@ -1900,4 +1921,3 @@ export const Constants = {
     },
   },
 } as const
-

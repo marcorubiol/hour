@@ -1076,6 +1076,47 @@ Triggered by Marco's pre-scaffold doubt (Phase 0.0 day 5). Five alternatives eva
 - **Re-evaluate when**: si checkpoint 1 valida el naming → ratificación silenciosa en checkpoint 2 (Phase 0.4). Si checkpoint 1 invalida algo → cambio antes de empezar Phase 0.2.
 - **Status**: Firm.
 
+## [2026-05-18] — ADR-031 — Rename `line` → `section` y ampliar `kind` enum (Project intermedio del modelo)
+
+- **Decisión**: renombrar la tabla `line` a `section` (y sus columnas `line_id` → `section_id` en `asset_version`, `expense`, `show`). Renombrar el enum `line_kind` → `section_kind` y añadirle cuatro valores (`creation`, `campaign`, `comms`, `misc`) además de los seis existentes (`tour`, `season`, `phase`, `circuit`, `residency`, `other`). El enum `line_status` se renombra a `section_status`. Esto consolida el "nivel intermedio entre Project y Show" del modelo conceptual decidido en la conversación 2026-05-18 — la sección es el contenedor abstracto, la variedad vive en el `kind`.
+- **Context**: ADR-005 (2026-04-19) introdujo `line` con la semántica de touring (definido literal como "tour, season, festival circuit, residency block"). El boceto que Marco compartió 2026-05-18 reveló que el nivel intermedio que él imagina **también incluye cosas que no son touring**: "Next creation (untitled)" (fase de creación, sin shows), "Distribution 26/27" (campaign de difusión), "Communication & press" (campaign), "One-offs" (misc bucket). Forzar esos kinds dentro del nombre `line` chirría conceptualmente — el nombre es industry-slang de touring, no concepto abstracto.
+- **Alternatives considered (rejected)**:
+  - **Opción A: mantener `line`, solo expandir el enum** (`ALTER TYPE line_kind ADD VALUE 'creation', 'campaign', ...`). Cero rename. Rechazado: la palabra `line` chirría en código, docs, conversaciones por años; ahorrar 2h ahora a cambio de fricción mental crónica es un mal trade.
+  - **Opción C: mantener `line` en schema, cambiar solo el UI label a "Section"**. Inconsistencia interna schema-vs-UI permanente. Rechazado: el coste del rename (2h) era pequeño relativo a la deuda mental.
+  - **Modelo recursivo (parent_project_id en `project`)**: descartado anteriormente (la conversación lo evaluó). YAGNI, complica RLS y UI, Basecamp explícitamente no lo hace.
+- **Rationale**:
+  1. **Coherencia con la convención `date.kind` ya en el schema**. La tabla `date` se llama por el concepto abstracto (calendar primitive); su `kind` enum carga la variedad (`rehearsal`, `travel_day`, `press`, `other`). `section` aplica la misma lógica: tabla abstracta + enum cargando la diversidad.
+  2. **Encaja la realidad del boceto sin forzarla**. Cinco tipos de section conviven naturalmente: SEASON, CREATION, CAMPAIGN, COMMS, MISC. Cada uno con sus shows o sin (campaign + comms + creation pueden no tener shows; season + tour normalmente sí).
+  3. **El research de Basecamp valida la simplificación pero no la elimina del todo**. Basecamp colapsó Teams/HQ/Projects a UN concepto en 2022 porque su dominio no necesitaba intermedios con identidad. Hour SÍ los necesita (un season tiene miembros, budget, assets propios). Mantener tres niveles (Project + Section + Show) + tenant invisible es el equilibrio entre Basecamp-flat y over-engineering recursivo.
+- **Mecánica del cambio aplicada** (migración `rename_line_to_section`, ver `build/migrations/2026-05-18_rename_line_to_section.sql`):
+  - DROP de la view `show_redacted` (depende de `show.line_id`).
+  - DROP de 10 RLS policies que referencian `line` directa o vía helper functions (3 de `line`, 4 de `asset_version`, 3 de `expense`).
+  - DROP de 2 helper functions (`project_id_of_asset_version`, `project_id_of_expense`) que tenían `p_line_id` como parámetro.
+  - `ALTER TABLE line RENAME TO section`.
+  - `ALTER TABLE ... RENAME COLUMN line_id TO section_id` en 3 tablas (`asset_version`, `expense`, `show`).
+  - `RENAME CONSTRAINT` de 3 FKs.
+  - `ALTER TRIGGER ... RENAME` de 5 triggers (`line_audit` → `section_audit`, etc.).
+  - `ALTER TYPE line_kind RENAME TO section_kind`; `ALTER TYPE line_status RENAME TO section_status`.
+  - CREATE OR REPLACE de las 2 helper functions con `p_section_id` y referencia a `public.section`.
+  - CREATE de las 10 RLS policies con nombres y referencias actualizadas.
+  - CREATE OR REPLACE de la view `show_redacted` con `section_id` en lugar de `line_id`.
+  - Separadamente (non-transactional): `ALTER TYPE section_kind ADD VALUE 'creation', 'campaign', 'comms', 'misc'`.
+- **Verificación post-migration**:
+  - Tabla `section` existe; tabla `line` desaparece.
+  - 4 columnas `section_id` (3 tablas + 1 view); 0 columnas `line_id`.
+  - Enum `section_kind` con 10 valores: tour, season, phase, circuit, residency, other, creation, campaign, comms, misc.
+  - 154 engagements + project mamemi intactos. `pnpm check` 0/0/0; `pnpm build` verde; smoke test pasa en 2.3s.
+- **Código afectado**:
+  - `apps/web/src/lib/db-types.ts` regenerado vía Supabase MCP. 31 referencias a `section`, 0 a `line`.
+  - No hay referencias a `line` en código de aplicación (el Phase 0.1 no había construido UI de runs/lines todavía). Cero edits manuales necesarios.
+- **Nombre user-facing TBD**: schema dice `section`, pero el UI label cuando aterricen los componentes Phase 0.2+ puede ser "Season", "Phase", "Track" o "Section" mismo. Cada section render visualmente puede usar su `kind` como eyebrow (SEASON / CREATION / CAMPAIGN / etc.), como hace el boceto.
+- **Supersedes**:
+  - ADR-005 (línea: `line` como "tour, season, festival circuit, residency block"). Rationale del entity sigue válido pero el concepto se generaliza; el nombre cambia.
+- **Re-evaluate when**:
+  - Si emerge un kind nuevo que no encaja en los 10 actuales (ej. "fundraising", "research-residency"), añadir al enum sin renombrar la tabla.
+  - Si Phase 0.5 trae task entity (D3) y las "sections" empiezan a usar tasks específicas, evaluar si el modelo recursivo (sub-sections) emerge como necesidad real. Hoy sin evidencia, no se construye.
+- **Status**: Firm. Migración aplicada en producción 2026-05-18.
+
 ## [2026-05-18] — ADR-030 — Naming gate close: lens primaria "Plaza" + project rename a "Difusión 2026-27"
 
 - **Decisión** (dos cambios atómicos):
