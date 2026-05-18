@@ -43,6 +43,14 @@ export default defineConfig(({ mode }) => {
         VitePWA({
           registerType: 'prompt',
           injectRegister: false,
+          // Serve the generated manifest in `pnpm dev` so the browser
+          // doesn't 404 it on every page load. Production build still
+          // generates the real precache. `type: 'module'` keeps the SW
+          // build aligned with the prod output.
+          devOptions: {
+            enabled: true,
+            type: 'module',
+          },
           manifest: {
             name: 'Hour',
             short_name: 'Hour',

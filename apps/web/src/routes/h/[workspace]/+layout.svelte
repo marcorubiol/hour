@@ -158,102 +158,111 @@
 {/if}
 
 <style>
-  @layer components {
-    .workspace-shell {
-      display: flex;
-      min-block-size: 100vh;
-    }
+  /* Component-scoped styles. Svelte adds a hash class to every selector for
+     isolation; we don't wrap in `@layer components` because component CSS
+     scoping plus higher selector specificity is enough to win over the
+     reset's `button { background: none; border: 0; padding: 0 }`. The
+     `@layer` wrapper interacts badly with HMR ordering in some setups. */
 
-    .workspace-shell__brand {
-      display: flex;
-      align-items: center;
-      gap: var(--space-xs);
-    }
+  .workspace-shell {
+    display: flex;
+    min-block-size: 100vh;
+  }
 
-    .workspace-shell__brand input[type='checkbox'] {
-      margin: 0;
-      pointer-events: none;
-      opacity: 0.6;
-    }
+  .workspace-shell__brand {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+  }
 
-    .workspace-shell__main {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      min-inline-size: 0;
-    }
+  .workspace-shell__brand input[type='checkbox'] {
+    margin: 0;
+    pointer-events: none;
+    opacity: 0.6;
+  }
 
-    .workspace-shell__topbar {
-      display: flex;
-      align-items: center;
-      gap: var(--space-m);
-      padding-block: var(--space-s);
-      padding-inline: var(--gutter);
-      border-block-end: var(--divider);
-      background: var(--base);
-    }
+  .workspace-shell__main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-inline-size: 0;
+  }
 
-    .workspace-shell__toggle {
-      padding-inline: var(--space-s);
-    }
+  .workspace-shell__topbar {
+    display: flex;
+    align-items: center;
+    gap: var(--space-m);
+    padding-block: var(--space-s);
+    padding-inline: var(--gutter);
+    border-block-end: var(--divider);
+    background: var(--base);
+  }
 
-    .workspace-shell__lenses {
-      display: flex;
-      align-items: center;
-      gap: var(--space-xs);
-      flex: 1;
-      justify-content: center;
-    }
+  .workspace-shell__toggle {
+    padding-inline: var(--space-s);
+  }
 
-    .workspace-shell__lens {
-      --lens-color: var(--text-color);
-      --lens-bg: transparent;
-      --lens-border: color-mix(in oklch, var(--neutral) 25%, transparent);
-      padding-block: var(--space-xs);
-      padding-inline: var(--space-m);
-      border-radius: var(--radius-circle);
-      border: 1px solid var(--lens-border);
-      background: var(--lens-bg);
-      color: var(--lens-color);
-      font-size: var(--text-s);
-      cursor: pointer;
-      transition: background-color 120ms ease-out, color 120ms ease-out, border-color 120ms ease-out;
-    }
+  .workspace-shell__lenses {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    flex: 1;
+    justify-content: center;
+  }
 
-    .workspace-shell__lens:hover {
-      --lens-bg: color-mix(in oklch, var(--neutral) 6%, transparent);
-    }
+  .workspace-shell__lens {
+    padding-block: var(--space-xs);
+    padding-inline: var(--space-m);
+    border-radius: 999px;
+    border: 1px solid var(--neutral-light);
+    background: transparent;
+    color: var(--text-color);
+    font-family: inherit;
+    font-size: var(--text-s);
+    line-height: 1.2;
+    cursor: pointer;
+    transition: background-color 120ms ease-out, color 120ms ease-out,
+      border-color 120ms ease-out;
+  }
 
-    .workspace-shell__lens:focus-visible {
-      outline: 2px solid var(--primary);
-      outline-offset: 2px;
-    }
+  .workspace-shell__lens:hover {
+    background: var(--neutral-ultra-light);
+  }
 
-    .workspace-shell__lens--active {
-      --lens-color: var(--base);
-      --lens-bg: var(--text-color);
-      --lens-border: var(--text-color);
-    }
+  .workspace-shell__lens:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+  }
 
-    .workspace-shell__all {
-      display: flex;
-      align-items: center;
-      gap: var(--space-xs);
-      padding-block: var(--space-xs);
-      padding-inline: var(--space-m);
-      border-radius: var(--radius-circle);
-      border: 1px solid color-mix(in oklch, var(--neutral) 25%, transparent);
-    }
+  .workspace-shell__lens--active {
+    background: var(--text-dark);
+    color: var(--base);
+    border-color: var(--text-dark);
+  }
 
-    .workspace-shell__all input[type='checkbox'] {
-      margin: 0;
-      pointer-events: none;
-      opacity: 0.6;
-    }
+  .workspace-shell__lens--active:hover {
+    background: var(--text-dark);
+  }
 
-    .workspace-shell__content {
-      flex: 1;
-      padding: var(--space-l);
-    }
+  .workspace-shell__all {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    padding-block: var(--space-xs);
+    padding-inline: var(--space-m);
+    border-radius: 999px;
+    border: 1px solid var(--neutral-light);
+    font-size: var(--text-s);
+  }
+
+  .workspace-shell__all input[type='checkbox'] {
+    margin: 0;
+    pointer-events: none;
+    opacity: 0.6;
+  }
+
+  .workspace-shell__content {
+    flex: 1;
+    padding: var(--space-l);
   }
 </style>
