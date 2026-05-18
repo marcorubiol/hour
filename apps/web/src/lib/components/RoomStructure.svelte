@@ -8,34 +8,67 @@
    * + this tree (ADR-029).
    *
    * Phase 0 reality: no runs/gigs exist in DB yet. Component renders the
-   * Room header + empty state until that data arrives. Empty home (no Room
-   * selected) shows the prompt placeholder.
+   * Room display name + empty state until that data arrives. Empty home
+   * (no Room selected) shows the prompt placeholder.
    *
-   * Endpoints `/api/runs` and `/api/gigs` are roadmap Phase 0.1 trabajo
-   * #6 — not built yet. This component fetches them lazily once they
-   * exist; for now it short-circuits to the empty-runs state when a Room
-   * is selected.
+   * Room display name is read from the rooms TanStack Query cache (same
+   * `['rooms', { status: 'active' }]` key as Plaza + Room detail) — no
+   * extra fetch, no slug-vs-name drift between the three views.
    */
 
   import { page } from '$app/state';
-  import { useSelection } from '$lib/stores/selection.svelte';
+  import { createQuery } from '@tanstack/svelte-query';
+  import { goto } from '$app/navigation';
 
-  const selection = useSelection();
+  type Room = {
+    id: string;
+    slug: string;
+    name: string;
+    workspace_id: string;
+    status: 'draft' | 'active' | 'archived';
+  };
+
+  async function fetchRooms(signal: AbortSignal): Promise<{ items: Room[] }> {
+    const jwt = localStorage.getItem('hour_jwt');
+    if (!jwt) {
+      goto('/login', { replaceState: true });
+      throw new Error('Missing JWT');
+    }
+    const res = await fetch('/api/rooms?status=active', {
+      signal,
+      headers: { Authorization: `Bearer ${jwt}` },
+    });
+    if (!res.ok) throw new Error(`Error ${res.status}`);
+    return (await res.json()) as { items: Room[] };
+  }
+
+  const roomsQuery = createQuery({
+    queryKey: ['rooms', { status: 'active' }],
+    queryFn: ({ signal }) => fetchRooms(signal),
+  });
 
   let activeRoomSlug = $derived.by(() => {
     const m = page.url.pathname.match(/^\/h\/[^/]+\/room\/([^/]+)/);
     return m?.[1] ?? '';
   });
 
-  let activeWorkspaceSlug = $derived(page.params.workspace ?? '');
   let hasRoom = $derived(activeRoomSlug.length > 0);
+
+  let activeRoom = $derived(
+    $roomsQuery.data?.items.find((r) => r.slug === activeRoomSlug) ?? null,
+  );
+
+  // Display name with sensible fallbacks: cached row > slug while loading >
+  // raw slug if the room isn't visible (shouldn't happen given RLS, but
+  // keeps the empty state honest).
+  let displayName = $derived(activeRoom?.name ?? activeRoomSlug);
 </script>
 
 <aside class="room-structure" aria-label="Room structure">
   {#if hasRoom}
     <header class="room-structure__header">
       <small class="room-structure__eyebrow">Room</small>
-      <strong>{activeRoomSlug}</strong>
+      <strong>{displayName}</strong>
     </header>
     <p class="room-structure__empty">No runs yet.</p>
   {:else}

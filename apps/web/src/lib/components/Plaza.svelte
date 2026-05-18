@@ -106,10 +106,16 @@
     <p class="plaza__state">No houses yet.</p>
   {:else}
     {#each tree as { house, rooms: houseRooms } (house.id)}
-      {@const isActiveHouse = house.slug === activeWorkspaceSlug && activeRoomSlug === ''}
+      {@const isUrlHouse = house.slug === activeWorkspaceSlug}
+      {@const isActiveHouse = isUrlHouse && activeRoomSlug === ''}
+      {@const isOnHousePath = isUrlHouse && activeRoomSlug !== ''}
       <section class="plaza__house">
         <a
-          class={['plaza__house-link', isActiveHouse && 'plaza__house-link--active']
+          class={[
+            'plaza__house-link',
+            isActiveHouse && 'plaza__house-link--active',
+            isOnHousePath && 'plaza__house-link--on-path',
+          ]
             .filter(Boolean)
             .join(' ')}
           href={`/h/${house.slug}/`}
@@ -177,6 +183,13 @@
     }
 
     .plaza__house-link--active {
+      color: var(--primary);
+    }
+
+    /* Cross-highlight UP: when a Room of this House is the current page,
+       the House label gets primary color too — softer than --active, no
+       background — so the hierarchy is visible at a glance. */
+    .plaza__house-link--on-path {
       color: var(--primary);
     }
 
