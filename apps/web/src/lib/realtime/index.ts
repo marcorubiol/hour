@@ -39,3 +39,8 @@ export {
   type PresenceMeta,
   type PresenceState,
 } from './presence.svelte';
+export {
+  useNetworkPresence,
+  NetworkPresenceStore,
+  provideNetworkPresence,
+} from './network-presence.svelte';

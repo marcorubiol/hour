@@ -26,8 +26,13 @@
   import { isReservedWorkspaceSlug } from '$lib/reserved-slugs';
   import { provideLens, type Lens } from '$lib/stores/lens.svelte';
   import { provideSelection } from '$lib/stores/selection.svelte';
-  import { providePresence, provideRealtime, type RealtimeHandle } from '$lib/realtime';
-  import type { PresenceStore } from '$lib/realtime';
+  import {
+    provideNetworkPresence,
+    provideRealtime,
+    type NetworkPresenceStore,
+    type RealtimeHandle,
+  } from '$lib/realtime';
+  import { createQuery } from '@tanstack/svelte-query';
 
   interface Props {
     children?: Snippet;
@@ -59,10 +64,33 @@
     }
   });
 
-  // $state so the topbar's PresenceBadge re-renders when these get
-  // assigned inside onMount (the providers are browser-only).
+  // Hybrid presence model B (ADR-029 follow-up 2026-05-18, per Marco's
+  // call): the topbar shows NETWORK presence — distinct users connected
+  // across ALL workspaces this user is a member of. Per-Room / per-
+  // RoadSheet contextual presence will layer on top in Phase 0.2.
+  //
+  // $state so PresenceBadge re-renders when these get assigned inside
+  // onMount (browser-only providers).
   let rt = $state<RealtimeHandle | null>(null);
-  let presence = $state<PresenceStore | null>(null);
+  let networkPresence = $state<NetworkPresenceStore | null>(null);
+
+  // Drive the network presence subscriptions from the houses list (same
+  // query key as Plaza — TanStack caches by key, so this hits the cache
+  // and the badge connects as soon as Plaza's data lands).
+  type HouseLite = { id: string; slug: string; name: string };
+  const housesQuery = createQuery({
+    queryKey: ['houses'],
+    queryFn: async ({ signal }) => {
+      const jwt = localStorage.getItem('hour_jwt');
+      if (!jwt) throw new Error('Missing JWT');
+      const res = await fetch('/api/houses', {
+        signal,
+        headers: { Authorization: `Bearer ${jwt}` },
+      });
+      if (!res.ok) throw new Error(`Error ${res.status}`);
+      return (await res.json()) as { items: HouseLite[] };
+    },
+  });
 
   onMount(() => {
     const jwt = localStorage.getItem('hour_jwt');
@@ -75,14 +103,24 @@
         },
         jwt,
       );
-      presence = providePresence(workspaceSlug);
+      networkPresence = provideNetworkPresence();
     } catch (e) {
       console.warn('[realtime] init failed, continuing without presence:', e);
     }
   });
 
+  // Sync the subscribed channel set as the houses list changes (initial
+  // load, future invitations, etc.). Idempotent — setWorkspaces handles
+  // diff + dispose internally.
+  $effect(() => {
+    const slugs = $housesQuery.data?.items.map((h) => h.slug) ?? [];
+    if (networkPresence && slugs.length > 0) {
+      networkPresence.setWorkspaces(slugs);
+    }
+  });
+
   onDestroy(() => {
-    presence?.dispose();
+    networkPresence?.dispose();
     rt?.dispose();
   });
 
@@ -147,7 +185,7 @@
           {/each}
         </nav>
 
-        <PresenceBadge count={presence?.count ?? null} />
+        <PresenceBadge count={networkPresence?.count ?? null} />
 
         <label class="workspace-shell__all">
           <input type="checkbox" disabled aria-hidden="true" tabindex="-1" />
