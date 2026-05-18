@@ -3,6 +3,7 @@
   import { goto } from '$app/navigation';
   import { t } from '$lib/i18n';
   import { env } from '$env/dynamic/public';
+  import { resolveLoginTarget } from '$lib/master-view';
 
   type SupabaseAuthOk = {
     access_token: string;
@@ -18,7 +19,7 @@
 
   onMount(() => {
     if (localStorage.getItem('hour_jwt')) {
-      goto('/h/marco-rubiol/', { replaceState: true });
+      goto(resolveLoginTarget(), { replaceState: true });
     }
   });
 
@@ -63,7 +64,7 @@
         String(Date.now() + data.expires_in * 1000),
       );
 
-      goto('/h/marco-rubiol/', { replaceState: true });
+      goto(resolveLoginTarget(), { replaceState: true });
     } catch (err) {
       errorMsg = err instanceof Error ? err.message : t('login.invalid_credentials');
       submitting = false;

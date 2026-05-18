@@ -2,11 +2,13 @@
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
 
+  import { resolveLoginTarget } from '$lib/master-view';
+
   onMount(() => {
-    // Phase 0 has one workspace (marco-rubiol). When multi-workspace
-    // switching lands (Phase 1), derive from the JWT's first accepted
-    // membership instead of hardcoding.
-    const target = localStorage.getItem('hour_jwt') ? '/h/marco-rubiol/' : '/login';
+    // Phase 0 has hardcoded /h/marco-rubiol/ as the default landing.
+    // Master View (Phase 0.1 trabajo #11) can override it with the last
+    // Room the user visited, if they opted in via /settings.
+    const target = localStorage.getItem('hour_jwt') ? resolveLoginTarget() : '/login';
     goto(target, { replaceState: true });
   });
 </script>

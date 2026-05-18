@@ -26,6 +26,7 @@
   import { isReservedWorkspaceSlug } from '$lib/reserved-slugs';
   import { provideLens, type Lens } from '$lib/stores/lens.svelte';
   import { provideSelection } from '$lib/stores/selection.svelte';
+  import { saveMasterViewPath } from '$lib/master-view';
   import {
     provideNetworkPresence,
     provideRealtime,
@@ -62,6 +63,13 @@
     } else {
       selection.clear();
     }
+  });
+
+  // Master View — remember the path each time we navigate, but only if
+  // the user opted in via /settings. Helper short-circuits when feature
+  // is off or the path isn't saveable (e.g. /settings itself).
+  $effect(() => {
+    saveMasterViewPath(page.url.pathname);
   });
 
   // Hybrid presence model B (ADR-029 follow-up 2026-05-18, per Marco's
@@ -156,7 +164,10 @@
       {/snippet}
       {#snippet footer()}
         <Avatar size="s" name={workspaceSlug} tone="primary" />
-        <span class="text--s">{workspaceSlug}</span>
+        <span class="text--s workspace-shell__footer-id">{workspaceSlug}</span>
+        <a class="btn--outline btn--xs" href={`/h/${workspaceSlug}/settings`}>
+          Settings
+        </a>
         <button type="button" class="btn--outline btn--xs" onclick={logout}>
           Sign out
         </button>
