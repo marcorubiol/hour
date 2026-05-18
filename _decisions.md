@@ -1076,6 +1076,57 @@ Triggered by Marco's pre-scaffold doubt (Phase 0.0 day 5). Five alternatives eva
 - **Re-evaluate when**: si checkpoint 1 valida el naming → ratificación silenciosa en checkpoint 2 (Phase 0.4). Si checkpoint 1 invalida algo → cambio antes de empezar Phase 0.2.
 - **Status**: Firm.
 
+## [2026-05-18] — ADR-032 — Add `account` layer above workspace (billing + entity-level tenancy)
+
+- **Decisión**: añadir una tabla `account` (billing entity) por encima de `workspace`. Cada workspace pertenece a un account vía `workspace.account_id NOT NULL`. `account_membership` controla quién puede gestionar el account (crear workspaces dentro, manejar billing, invitar admins). El acceso "regular" a cada workspace sigue siendo via `workspace_membership` — un user atraviesa accounts distintos vía sus workspace_memberships.
+- **Context**: Marco va a abrir Hour a clientes pronto y necesita el modelo "una entidad paga, N workspaces dentro" listo desde el principio. El modelo workspace-as-tenant que teníamos lo expresaba como "una factura por workspace", lo cual no encaja cuando una compañía o un freelance quiere meter varios proyectos bajo una suscripción única (caso Basecamp). La conversación 2026-05-18 evaluó tres opciones (A: solo Stripe, sin schema change; B: account explícito en schema; C: account anémico solo billing). Marco eligió B híbrido: Basecamp-like en facturación + Slack-like en identidad (un user puede ser miembro de workspaces en N accounts distintos simultáneamente, ver sidebar multi-house del boceto).
+- **Modelo final**:
+  ```
+  account (billing entity, Basecamp-like)
+    ↓ has_many
+  workspace (= "Project" UI, RLS scope)
+    ↓ has_many
+  section (= "Line / Season / Campaign / ...")
+    ↓ has_many
+  show (atomic)
+  ```
+- **Cómo se aplica a casos reales** (research §5 multi-tenant freelance):
+  - **Solo artist**: 1 account personal + 1 workspace propio. 1 factura.
+  - **Theatre collective**: 1 account team + 1+ workspaces. La factura va al colectivo como entidad legal.
+  - **Marco lanza Editorial Z**: segundo workspace dentro de su account personal. Misma factura, dos workspaces.
+  - **Freelance distributor (Júlia)**: 1 account personal + invitada vía `workspace_membership` a N workspaces de N clientes. Cada cliente paga su account. Júlia ve todos los workspaces simultáneamente en sidebar (cross-account, Slack-like).
+  - **Manager 3-8 artistas**: 1 account "Manager Inc" + N workspaces (uno por artista). Bulk billing.
+  - **Agency con 20 clientes**: 1 account "Agency Inc" + 20 workspaces dentro. 1 factura grande.
+- **Alternatives considered (rejected)**:
+  - **A (solo Stripe, sin schema change)**: rechazado. El concepto "account" queda anémico — solo Stripe lo sabe, Hour interno no. Para admin UI futuro (gestionar workspaces del account, transferir workspace de un account a otro, listar workspaces que pago) hay que volver a tocar schema.
+  - **C (account anémico solo billing, sin membership scope)**: rechazado. Si el account no tiene membership propia, no hay forma de expresar "Marco es admin de su account y puede crear workspaces ahí, pero Anouk no" — la autorización queda fuera del schema.
+  - **Basecamp-strict (un user pertenece a UN account a la vez)**: rechazado. Contradice el sidebar multi-house del boceto. El research §5 lo descarta también: "the freelancer's personal workspace... client workspaces are 'rooms they visit'" — un user atraviesa accounts.
+- **Mecánica del cambio** (migración `add_account_layer`, ver `build/migrations/2026-05-18_add_account_layer.sql`):
+  - Nuevos enums: `account_kind` ('personal' | 'team'), `account_role` ('owner' | 'admin').
+  - Nueva tabla `account` (slug + previous_slugs + name + kind + billing_email + country + timezone + settings + custom_fields + created/updated/deleted_at). Unique index global sobre `(slug) WHERE deleted_at IS NULL`. set_updated_at + validate_slug triggers. RLS FORCE.
+  - Nueva tabla `account_membership` (account_id, user_id, role, invited_at, accepted_at, revoked_at). Composite PK. Index por user_id. RLS FORCE.
+  - **`workspace.account_id uuid NOT NULL`** añadida con FK references account. Backfill: 3 accounts iniciales para los 3 workspaces existentes (marco-rubiol-acc, mamemi-acc, playwright-acc). Marco es owner de marco-rubiol-acc + mamemi-acc; playwright es owner de playwright-acc.
+  - 4 RLS policies en `account` (select por membership aceptada; insert any authenticated; update solo owners; con check espejo del using).
+  - 4 RLS policies en `account_membership` (select para propio user o admins/owners; insert para admins + bootstrap por self cuando account vacío; update para admins+owners; delete solo owners).
+  - **`handle_new_user` trigger actualizado**: nuevos signups crean account personal PRIMERO + account_membership (owner) ANTES del workspace personal y su workspace_membership. Slug del account es `{user-slug}-acc` (sufijo `-acc` para evitar colisión con workspace slug).
+  - Sin audit trigger en account/account_membership por ahora (write_audit espera workspace_id, account no lo tiene). Account-level audit llega cuando admin UI lo necesite (Phase 1).
+- **Verificación post-migration**:
+  - 3 accounts + 3 account_memberships + 3 workspaces, todos con account_id NOT NULL. Marco es owner de 2 accounts (personal + MaMeMi). Playwright es owner de 1 (playwright).
+  - `pnpm check` 0/0/0, `pnpm build` verde, `pnpm test:smoke` pasa 1.8s. db-types.ts regenerado con `account` y `account_membership` types.
+  - Frontend untouched — sidebar sigue mostrando workspaces. La capa account es invisible al user hoy; emerge solo cuando llegue Settings → Account management (Phase 1).
+- **Lo que NO cambia ahora**:
+  - UI: el sidebar muestra workspaces (los 3 actuales), no accounts. "Account" aparecerá user-facing solo cuando llegue Phase 1 admin UI.
+  - RLS workspace-level: sin cambios. Todo el acceso a engagements/sections/shows sigue vía `workspace_membership` + `has_permission()`.
+  - Code de aplicación: cero. La regeneración de db-types es la única huella en frontend.
+- **Lo que queda preparado para Phase 1**:
+  - Stripe wiring: añadir `account.stripe_customer_id text` + `account.stripe_subscription_id text` + `account.plan_tier text` cuando llegue billing. Cero refactor schema-level.
+  - Admin UI: Settings → "Manage account" para owners (manage members, view billing, list workspaces of this account).
+  - Workspace creation flow: cuando un usuario quiera crear un nuevo workspace, escoge a qué account adscribirlo (default: su personal). Si crea uno nuevo de tipo team, se crea otro account `kind='team'`.
+- **Re-evaluate when**:
+  - Si emerge que un workspace necesita pertenecer a múltiples accounts (caso atípico: agency Y cliente comparten un workspace y se reparten coste) — añadir tabla join `workspace_billing_split`. No previsto.
+  - Si Phase 1 multi-workspace switching encuentra que el JWT `current_workspace_id` claim no escala bien con accounts grandes (10+ workspaces por user), reconsiderar el claim a `current_account_id` o equivalente.
+- **Status**: Firm. Migración aplicada en producción 2026-05-18.
+
 ## [2026-05-18] — ADR-031 — Rename `line` → `section` y ampliar `kind` enum (Project intermedio del modelo)
 
 - **Decisión**: renombrar la tabla `line` a `section` (y sus columnas `line_id` → `section_id` en `asset_version`, `expense`, `show`). Renombrar el enum `line_kind` → `section_kind` y añadirle cuatro valores (`creation`, `campaign`, `comms`, `misc`) además de los seis existentes (`tour`, `season`, `phase`, `circuit`, `residency`, `other`). El enum `line_status` se renombra a `section_status`. Esto consolida el "nivel intermedio entre Project y Show" del modelo conceptual decidido en la conversación 2026-05-18 — la sección es el contenedor abstracto, la variedad vive en el `kind`.

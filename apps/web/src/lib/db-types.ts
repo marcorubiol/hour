@@ -14,6 +14,89 @@ export type Database = {
   }
   public: {
     Tables: {
+      account: {
+        Row: {
+          billing_email: string | null
+          country: string | null
+          created_at: string
+          custom_fields: Json
+          deleted_at: string | null
+          id: string
+          kind: Database["public"]["Enums"]["account_kind"]
+          name: string
+          previous_slugs: string[]
+          settings: Json
+          slug: string
+          timezone: string
+          updated_at: string
+        }
+        Insert: {
+          billing_email?: string | null
+          country?: string | null
+          created_at?: string
+          custom_fields?: Json
+          deleted_at?: string | null
+          id?: string
+          kind?: Database["public"]["Enums"]["account_kind"]
+          name: string
+          previous_slugs?: string[]
+          settings?: Json
+          slug: string
+          timezone?: string
+          updated_at?: string
+        }
+        Update: {
+          billing_email?: string | null
+          country?: string | null
+          created_at?: string
+          custom_fields?: Json
+          deleted_at?: string | null
+          id?: string
+          kind?: Database["public"]["Enums"]["account_kind"]
+          name?: string
+          previous_slugs?: string[]
+          settings?: Json
+          slug?: string
+          timezone?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      account_membership: {
+        Row: {
+          accepted_at: string | null
+          account_id: string
+          invited_at: string
+          revoked_at: string | null
+          role: Database["public"]["Enums"]["account_role"]
+          user_id: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          account_id: string
+          invited_at?: string
+          revoked_at?: string | null
+          role?: Database["public"]["Enums"]["account_role"]
+          user_id: string
+        }
+        Update: {
+          accepted_at?: string | null
+          account_id?: string
+          invited_at?: string
+          revoked_at?: string | null
+          role?: Database["public"]["Enums"]["account_role"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "account_membership_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "account"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       asset_version: {
         Row: {
           adapted_from_id: string | null
@@ -1395,6 +1478,7 @@ export type Database = {
       }
       workspace: {
         Row: {
+          account_id: string
           country: string | null
           created_at: string
           custom_fields: Json
@@ -1409,6 +1493,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          account_id: string
           country?: string | null
           created_at?: string
           custom_fields?: Json
@@ -1423,6 +1508,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          account_id?: string
           country?: string | null
           created_at?: string
           custom_fields?: Json
@@ -1436,7 +1522,15 @@ export type Database = {
           timezone?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "workspace_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "account"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       workspace_membership: {
         Row: {
@@ -1657,6 +1751,8 @@ export type Database = {
       uuid_generate_v7: { Args: never; Returns: string }
     }
     Enums: {
+      account_kind: "personal" | "team"
+      account_role: "owner" | "admin"
       asset_direction: "outbound" | "inbound" | "adapted"
       asset_kind:
         | "rider"
@@ -1848,6 +1944,8 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      account_kind: ["personal", "team"],
+      account_role: ["owner", "admin"],
       asset_direction: ["outbound", "inbound", "adapted"],
       asset_kind: [
         "rider",
