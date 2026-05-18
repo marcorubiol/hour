@@ -75,7 +75,7 @@ Working name: **Hour**. Brand decision deferred to Phase 1.
 
 Resultado: 24 tablas en producción, datos productivos visibles, smoke verde, multi-tenant 3-layer listo para clientes externos.
 
-Próximo gate decidido: **checkpoint visual 1 + naming gate con Anouk** (decisiones 2026-05-14) antes de arrancar Phase 0.2. Marco va a pasar booking de colores + libro de filosofía visual cuando los tenga listos.
+**Phase 0.1 cerrada definitivamente 2026-05-18.** Los dos gates decididos 2026-05-14 (checkpoint visual 1 + naming gate con Anouk) Marco los está ejecutando asíncronamente fuera de esta sesión — el rework visual lo lleva por su cuenta y el naming queda asumido cerrado (las confusiones se cazaron y cerraron en la propia sesión: Plaza lens + project rename + line→section). Próxima fase: **Phase 0.2 — Views + Road sheet colaborativo + Calendar**, con la deuda Phase 0.9 hardening en paralelo cuando convenga (cookies httpOnly, rate limiting, RLS regression suite — antes de cliente externo).
 
 Detalle de las sesiones de cierre en `_notes/sessions-log.md` § 2026-05-18 (4 entradas: ADR-032, ADR-031, ADR-030, Phase 0.1 sprint principal continuación).
 

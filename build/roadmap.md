@@ -310,9 +310,9 @@ Phase 0.0 completa.
 - [ ] Presence badge aparece con 2+ pestañas abiertas.
 - [ ] Tests e2e cubren "login → navegar a un Gig".
 
-### Gates al cerrar Phase 0.1 (decisión 2026-05-14)
-- [ ] **Checkpoint visual 1** — 1 día de pasada sobre Plaza+Desk+Gig detail vivos con datos reales (154 engagements). Evaluar: plum trial, densidad información, jerarquía visual sidebar/topbar/contenido, tipografía con datos reales. Tweaks de tokens si procede; si emerge necesidad de rework profundo, congelar Phase 0.2 y abrir visual design phase formal.
-- [ ] **Naming gate** (adelantado de Phase 0.4) — testear `House`, `Room`, `Run`, `Gig`, `Desk`, `Plaza` con Anouk (5 min frente a app) + 1-2 externos del circuito booking/producción. Pregunta directa para riesgo #14: "¿confundes Room con sala/venue?". Si algo canta, cambiar antes de empezar Phase 0.2 (refactor mecánico ~medio día: routes + componentes + i18n; schema NO cambia).
+### Gates al cerrar Phase 0.1 (decisión 2026-05-14) — CERRADOS 2026-05-18
+- [x] **Checkpoint visual 1** — Marco lo ejecuta asíncronamente fuera de la sesión Claude (rework visual por su cuenta con su booking de colores + filosofía). Visual debt anotada quedó capturada en `_context.md` § "Gates al cerrar Phase 0.1" + `_notes/sessions-log.md` § 2026-05-18.
+- [x] **Naming gate** — cerrado dentro de la propia sesión 2026-05-18. Marco cazó las confusiones reales (Plaza lens vs Rooms tautología; House MaMeMi + Room MaMeMi duplicado) y se resolvieron en vivo: ADR-030 (Plaza lens + project rename a "Difusión 2026-27"), ADR-031 (line → section). Test con Anouk + externos diferido al checkpoint 2 de Phase 0.4 como ratificación, no decisión.
 
 ### Pause point
 **MVP estructural inicial de Phase 0.1**: Plaza + Desk tree + Gig detail + Settings/Master View + stubs de relación/producción. **Sin Calendar ni Road sheet completos**. Demo-able como "Hour ya tiene mapa operativo: sé dónde vive cada cosa".
