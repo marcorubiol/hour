@@ -18,7 +18,7 @@
 
   onMount(() => {
     if (localStorage.getItem('hour_jwt')) {
-      goto('/booking', { replaceState: true });
+      goto('/h/marco-rubiol/', { replaceState: true });
     }
   });
 
@@ -63,7 +63,7 @@
         String(Date.now() + data.expires_in * 1000),
       );
 
-      goto('/booking', { replaceState: true });
+      goto('/h/marco-rubiol/', { replaceState: true });
     } catch (err) {
       errorMsg = err instanceof Error ? err.message : t('login.invalid_credentials');
       submitting = false;
