@@ -1,12 +1,12 @@
 <script lang="ts">
   /**
-   * RelationshipStub — Room detail block showing engagements summary
+   * RelationshipStub — Project detail block showing engagements summary
    * (Phase 0.1 trabajo #4).
    *
-   * Shows the 10 most actionable engagements for a given Room (ordered by
+   * Shows the 10 most actionable engagements for a given Project (ordered by
    * next_action_at asc nullslast, then updated_at desc — same as the API
    * default). Header carries total count. "View all" link sends the user
-   * to the Contacts lens scoped to this Room — which is Phase 0.3 work; for
+   * to the Contacts lens scoped to this Project — which is Phase 0.3 work; for
    * now the link falls back to /booking (the legacy full-list view) so the
    * user can still get to all 154 contacts.
    *
@@ -146,7 +146,7 @@
   {:else if errored}
     <p class="rel-stub__state rel-stub__state--danger">Couldn't load engagements.</p>
   {:else if items.length === 0}
-    <p class="rel-stub__state">No engagements in this Room yet.</p>
+    <p class="rel-stub__state">No engagements in this Project yet.</p>
   {:else}
     <ul class="rel-stub__list">
       {#each items as e (e.id)}

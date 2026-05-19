@@ -7,7 +7,7 @@
   onMount(() => {
     // Phase 0 has hardcoded /h/marco-rubiol/ as the default landing.
     // Master View (Phase 0.1 trabajo #11) can override it with the last
-    // Room the user visited, if they opted in via /settings.
+    // Project the user visited, if they opted in via /settings.
     const target = localStorage.getItem('hour_jwt') ? resolveLoginTarget() : '/login';
     goto(target, { replaceState: true });
   });

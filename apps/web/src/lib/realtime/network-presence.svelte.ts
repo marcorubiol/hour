@@ -5,7 +5,7 @@
  *
  * Hybrid model B (Marco's call 2026-05-18): the topbar shows this network
  * view ("Anouk está conectada a Hour ahora mismo, en algún sitio que
- * compartimos"), while future per-Room / per-RoadSheet badges (Phase 0.2)
+ * compartimos"), while future per-Project / per-RoadSheet badges (Phase 0.2)
  * will surface contextual presence at the artifact level ("Anouk también
  * está mirando este road sheet contigo"). Both layers compose; this is
  * the wider one.

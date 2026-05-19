@@ -256,7 +256,8 @@
     overflow-x: auto;
   }
 
-  /* Form fields — semantic defaults so .login__input et al. don't repeat */
+  /* Form fields — semantic defaults aligned with v0.5 editorial so
+     local .login__input / .set-input duplicates can be deleted. */
   :where(
       input[type="email"],
       input[type="password"],
@@ -271,14 +272,15 @@
     inline-size: 100%;
     padding-block: var(--space-s);
     padding-inline: var(--space-m);
-    background: var(--base);
-    color: var(--heading-color);
-    border: var(--border);
-    border-radius: var(--radius-s);
-    font-size: var(--text-m);
+    background: var(--bg-ultra-light);
+    color: var(--text-color);
+    border: 1px solid var(--border-color-dark);
+    border-radius: var(--radius);
+    font-size: var(--text-s);
     line-height: var(--text-line-height);
     outline: none;
-    transition: border-color var(--transition);
+    transition:
+      border-color var(--transition), background var(--transition);
   }
 
   :where(
@@ -291,10 +293,21 @@
       input[type="url"],
       textarea,
       select
-    ):hover {
-    border-color: var(--neutral-semi-light);
+    )::placeholder {
+    color: var(--text-faint);
   }
 
+  :where(
+      input[type="email"],
+      input[type="password"],
+      input[type="text"],
+      input[type="search"],
+      input[type="number"],
+      input[type="tel"],
+      input[type="url"],
+      textarea,
+      select
+    ):focus,
   :where(
       input[type="email"],
       input[type="password"],
@@ -306,15 +319,23 @@
       textarea,
       select
     ):focus-visible {
-    border-color: var(--primary);
-    outline: var(--focus-width) solid var(--focus-color);
-    outline-offset: 1px;
+    border-color: var(--text-color);
+    background: var(--bg);
+    outline: none;
   }
 
   :where(label) {
     display: block;
     font-size: var(--text-xs);
     color: var(--text-dark-muted);
+  }
+
+  /* Input size modifiers — opt-in widths that override the default 100%. */
+  .input--short {
+    max-inline-size: 160px;
+  }
+  .input--tight {
+    inline-size: 80px;
   }
 
   /* Form layout — :where(form) is too aggressive; use .form when it applies */
@@ -396,11 +417,24 @@
   }
 
   /* Button variants — only CSS variable redeclarations */
+
+  /* Primary = ink fill (v0.5 editorial). The slate --primary stays
+     reserved for focus rings, links, selection — not button fills. */
   .btn--primary {
-    --btn-background: var(--primary);
-    --btn-background-hover: var(--primary-hover);
-    --btn-text-color: var(--text-light);
-    --btn-text-color-hover: var(--text-light);
+    --btn-background: var(--text-color);
+    --btn-background-hover: var(--neutral-semi-dark);
+    --btn-text-color: var(--bg);
+    --btn-text-color-hover: var(--bg);
+    --btn-border-color: var(--btn-background);
+    --btn-border-color-hover: var(--btn-background-hover);
+  }
+
+  /* Danger = red fill for destructive actions (Delete account, etc.). */
+  .btn--danger {
+    --btn-background: var(--danger);
+    --btn-background-hover: var(--danger-hover);
+    --btn-text-color: var(--bg);
+    --btn-text-color-hover: var(--bg);
     --btn-border-color: var(--btn-background);
     --btn-border-color-hover: var(--btn-background-hover);
   }
@@ -412,6 +446,16 @@
     --btn-text-color-hover: var(--heading-color);
     --btn-border-color: var(--border-color-dark);
     --btn-border-color-hover: var(--neutral-semi-light);
+  }
+
+  /* Warn = combinable tone modifier. Repaints text + border to danger,
+     keeps the variant's background pattern. Useful on outline buttons
+     for destructive secondary actions (Leave, Cancel, Remove). */
+  [class*="btn--"].is-warn {
+    --btn-text-color: var(--danger);
+    --btn-text-color-hover: var(--danger-dark);
+    --btn-border-color: var(--danger-light);
+    --btn-border-color-hover: var(--danger);
   }
 
   /* Loading: hide content, overlay spinner. Skeleton, not a variant. */
@@ -1251,10 +1295,11 @@
     position: absolute;
     inset-block-start: calc(100% + var(--space-xs));
     z-index: var(--z-dropdown);
-    /* Menu sizes to its own content, with a sensible floor so icon-only
-       triggers still produce a usable dropdown. It does NOT inherit the
-       trigger's width — long trigger labels (an email, a workspace slug)
-       shouldn't make the menu stretch. */
+    /* Menu matches the trigger width by default — keeps menu and trigger
+       optically aligned. Triggers should size to their content (no `flex: 1`
+       on a content-sized cluster), so the menu inherits a sensible width.
+       The floor handles icon-only triggers where the wrapper is tiny. */
+    inline-size: 100%;
     min-inline-size: 12rem;
     margin: 0;
     padding: var(--space-xs);
@@ -1571,14 +1616,60 @@
      Mobile (<48rem): position fixed, slides in via transform with backdrop. */
   .sidebar {
     --sidebar-width: 16rem;
+    --sidebar-collapsed-width: 3.5rem;
     --sidebar-mobile-width: min(80vw, 20rem);
 
+    position: relative;
     display: flex;
     flex-direction: column;
     inline-size: var(--sidebar-width);
     background: var(--base);
     border-inline-end: var(--border);
     flex-shrink: 0;
+    transition: inline-size var(--transition);
+  }
+
+  /* Collapsed rail — redeclares the width token so all `var(--sidebar-width)`
+     consumers (the aside itself, scaled controls inside) follow along. */
+  .sidebar--collapsed {
+    --sidebar-width: var(--sidebar-collapsed-width);
+  }
+
+  /* Drag-to-resize handle (opt-in via the `resizable` prop). Sits on the
+     inline-end edge; 4px hit target with no visual chrome until hover or
+     drag, where a primary-colored line appears. Double-click resets the
+     sidebar to its default width. */
+  .sidebar__resizer {
+    position: absolute;
+    inset-block: 0;
+    inset-inline-end: -2px;
+    inline-size: 4px;
+    background: transparent;
+    border: 0;
+    padding: 0;
+    cursor: col-resize;
+    z-index: 1;
+    transition: background var(--transition);
+  }
+
+  .sidebar--end .sidebar__resizer {
+    inset-inline-end: auto;
+    inset-inline-start: -2px;
+  }
+
+  .sidebar__resizer:hover,
+  .sidebar--dragging .sidebar__resizer {
+    background: var(--primary);
+  }
+
+  .sidebar--dragging {
+    user-select: none;
+  }
+
+  /* While dragging, freeze pointer + selection across the document so the
+     handle keeps tracking even when the cursor briefly leaves the strip. */
+  .sidebar--dragging ~ * {
+    user-select: none;
   }
 
   .sidebar--end {

@@ -13,6 +13,7 @@
   import { t } from '$lib/i18n';
   import { env } from '$env/dynamic/public';
   import { resolveLoginTarget } from '$lib/master-view';
+  import BrandMark from '$lib/components/BrandMark.svelte';
 
   type SupabaseAuthOk = {
     access_token: string;
@@ -88,8 +89,7 @@
 <main class="login">
   <section class="login__left">
     <header class="login__brand">
-      <span class="login__brand-mark" aria-hidden="true"></span>
-      <span>{t('app.name')}</span>
+      <BrandMark size="m" />
     </header>
 
     <div class="login__center">
@@ -104,7 +104,7 @@
           <span class="login__label">{t('login.email')}</span>
           <!-- svelte-ignore a11y_autofocus -->
           <input
-            class="login__input"
+            
             type="email"
             name="email"
             autocomplete="email"
@@ -118,7 +118,7 @@
         <label class="login__field">
           <span class="login__label">{t('login.password')}</span>
           <input
-            class="login__input"
+            
             type="password"
             name="password"
             autocomplete="current-password"
@@ -132,7 +132,7 @@
           <p class="login__error" role="alert">{errorMsg}</p>
         {/if}
 
-        <button class="login__submit" type="submit" disabled={submitting}>
+        <button class="btn--primary login__submit" type="submit" disabled={submitting}>
           <span>{submitting ? t('login.signing_in') : t('login.submit')}</span>
           <span class="login__submit-arrow" aria-hidden="true">→</span>
         </button>
@@ -218,24 +218,10 @@
       min-block-size: 0;
     }
 
+    /* .login__brand kept only as a positioning hook for the header slot
+       in the split grid; styling lives in <BrandMark />. */
     .login__brand {
       display: inline-flex;
-      align-items: center;
-      gap: var(--space-s);
-      font-family: var(--font-display);
-      font-size: var(--text-xl);
-      font-style: italic;
-      font-weight: 400;
-      letter-spacing: -0.02em;
-      color: var(--text-color);
-    }
-
-    .login__brand-mark {
-      inline-size: 14px;
-      block-size: 14px;
-      border: 1.5px solid currentColor;
-      border-radius: 3px;
-      display: inline-block;
     }
 
     .login__center {
@@ -303,59 +289,21 @@
       font-weight: 500;
     }
 
-    .login__input {
-      appearance: none;
-      border: 1px solid var(--border-color-dark);
-      background: var(--bg-ultra-light);
-      padding-block: var(--space-s);
-      padding-inline: var(--space-m);
-      font: inherit;
-      font-size: var(--text-m);
-      color: var(--text-color);
-      border-radius: var(--radius);
-      transition:
-        border-color var(--transition), background var(--transition);
-    }
-    .login__input::placeholder {
-      color: var(--text-faint);
-    }
-    .login__input:focus {
-      outline: none;
-      border-color: var(--text-color);
-      background: var(--bg);
-    }
-
     .login__error {
       font-size: var(--text-s);
       color: var(--danger);
       margin: 0;
     }
 
+    /* Login submit — full-width primary CTA aligned to the inputs
+       above. Slightly smaller vertical padding than the default block
+       to keep proportions sensible (the default --btn-padding-block
+       is sized for inline buttons, not stretched ones). */
     .login__submit {
-      appearance: none;
-      background: var(--text-color);
-      color: var(--bg);
-      border: 0;
-      font: inherit;
-      font-size: var(--text-m);
-      font-weight: 500;
-      padding-block: var(--space-m);
-      padding-inline: var(--space-m);
-      border-radius: var(--radius);
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: var(--space-s);
+      --btn-width: 100%;
+      --btn-padding-block: var(--space-s);
+      --btn-font-size: var(--text-m);
       margin-block-start: var(--space-s);
-      transition: opacity var(--transition);
-    }
-    .login__submit:hover {
-      opacity: 0.85;
-    }
-    .login__submit:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
     }
     .login__submit-arrow {
       font-family: var(--font-mono);

@@ -6,7 +6,7 @@
    * Relationships block (engagements), and dashed deferred-phase stubs
    * (Lines, Assets, Team).
    *
-   * Display name shares the rooms TanStack cache with Plaza, so arriving
+   * Display name shares the projects TanStack cache with Plaza, so arriving
    * from the sidebar costs no extra fetch.
    */
 
@@ -59,19 +59,19 @@
   });
 
   let workspaceSlug = $derived(page.params.workspace ?? '');
-  let roomSlug = $derived(page.params.slug ?? '');
+  let projectSlug = $derived(page.params.slug ?? '');
 
-  let room = $derived(
-    $projectsQuery.data?.items.find((r) => r.slug === roomSlug) ?? null,
+  let project = $derived(
+    $projectsQuery.data?.items.find((r) => r.slug === projectSlug) ?? null,
   );
 
-  let displayName = $derived(room?.name ?? roomSlug);
-  let roomLoading = $derived($projectsQuery.isPending && !room);
+  let displayName = $derived(project?.name ?? projectSlug);
+  let projectLoading = $derived($projectsQuery.isPending && !project);
 
   let statusTone = $derived.by<'success' | 'warning' | 'faint' | 'neutral'>(() => {
-    if (!room) return 'neutral';
-    if (room.status === 'active') return 'success';
-    if (room.status === 'draft') return 'warning';
+    if (!project) return 'neutral';
+    if (project.status === 'active') return 'success';
+    if (project.status === 'draft') return 'warning';
     return 'faint';
   });
 
@@ -89,32 +89,32 @@
   <title>{displayName} — Hour</title>
 </svelte:head>
 
-<article class="project" style={`--c: ${accentVar(roomSlug)}`}>
+<article class="project" style={`--c: ${accentVar(projectSlug)}`}>
   <header class="project__head">
     <p class="eyebrow">Project</p>
     <h1 class="project__title">
-      {#if roomLoading}
+      {#if projectLoading}
         <span class="project__title-skeleton" aria-hidden="true">…</span>
       {:else}
         <em>{displayName}</em>
       {/if}
     </h1>
-    {#if room}
+    {#if project}
       <div class="project__meta">
-        <StateBadge label={room.status} tone={statusTone} />
-        {#if room.starts_on || room.ends_on}
+        <StateBadge label={project.status} tone={statusTone} />
+        {#if project.starts_on || project.ends_on}
           <span class="project__meta-sep" aria-hidden="true">·</span>
           <span class="project__meta-dates">
-            {#if room.starts_on}{formatDate(room.starts_on)}{/if}
-            {#if room.starts_on && room.ends_on} → {/if}
-            {#if room.ends_on}{formatDate(room.ends_on)}{/if}
+            {#if project.starts_on}{formatDate(project.starts_on)}{/if}
+            {#if project.starts_on && project.ends_on} → {/if}
+            {#if project.ends_on}{formatDate(project.ends_on)}{/if}
           </span>
         {/if}
       </div>
     {/if}
   </header>
 
-  <RelationshipStub projectSlug={roomSlug} />
+  <RelationshipStub projectSlug={projectSlug} />
 
   <section class="project__stubs" aria-label="Pending sections">
     <div class="project__stub">

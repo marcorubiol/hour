@@ -1,7 +1,7 @@
 /**
  * Master View — D-PRE-05 (Phase 0.1 trabajo #11).
  *
- * Tracks one preference: "when I sign in, open the last Room I was working
+ * Tracks one preference: "when I sign in, open the last Project I was working
  * on instead of the default landing". Phase 0 stores it in localStorage,
  * scoped per browser. Phase 1 can promote this to `user_profile.metadata`
  * for cross-device sync without changing the call sites.
@@ -13,7 +13,7 @@
  *
  * Save policy: any path under `/h/{workspace}/` is eligible EXCEPT the
  * settings page itself (would otherwise self-loop the redirect). Phase
- * 0.1 only Room URLs are likely to land here; other entities (gig,
+ * 0.1 only Project URLs are likely to land here; other entities (gig,
  * engagement, ...) become eligible automatically as their routes ship.
  */
 

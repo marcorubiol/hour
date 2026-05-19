@@ -12,7 +12,7 @@
    *
    * Phase 0 reality: most fields are mocked/hardcoded (the user-facing copy
    * matches the design's prototype "Marco Rubiol"). The real bits wired:
-   *  - workspaces list comes from /api/houses
+   *  - workspaces list comes from /api/workspaces
    *  - email comes from JWT
    *  - Master View toggle (D-PRE-05) integrated under Notifications
    */
@@ -87,14 +87,14 @@
       .join('') || 'MR',
   );
 
-  // ─── workspaces query ─────────────────────────────────────────────────
-  type House = {
+  // ─── workspaces & projects ────────────────────────────────────────────
+  type Workspace = {
     id: string;
     slug: string;
     name: string;
     kind: 'personal' | 'team';
   };
-  type Room = {
+  type Project = {
     id: string;
     slug: string;
     name: string;
@@ -113,20 +113,20 @@
     return (await res.json()) as T;
   }
 
-  const housesQuery = createQuery({
-    queryKey: ['houses'],
+  const workspacesQuery = createQuery({
+    queryKey: ['workspaces'],
     queryFn: ({ signal }: { signal: AbortSignal }) =>
-      fetchJSON<{ items: House[] }>('/api/houses', signal),
+      fetchJSON<{ items: Workspace[] }>('/api/workspaces', signal),
   });
 
-  const roomsQuery = createQuery({
-    queryKey: ['rooms', { status: 'active' }],
+  const projectsQuery = createQuery({
+    queryKey: ['projects', { status: 'active' }],
     queryFn: ({ signal }: { signal: AbortSignal }) =>
-      fetchJSON<{ items: Room[] }>('/api/rooms?status=active', signal),
+      fetchJSON<{ items: Project[] }>('/api/projects?status=active', signal),
   });
 
-  let houses = $derived($housesQuery.data?.items ?? []);
-  let rooms = $derived($roomsQuery.data?.items ?? []);
+  let workspaces = $derived($workspacesQuery.data?.items ?? []);
+  let projects = $derived($projectsQuery.data?.items ?? []);
 
   // ─── profile state ────────────────────────────────────────────────────
   let profilePronouns = $state('he/him');
@@ -313,7 +313,7 @@
                   >
                     {initials}
                   </span>
-                  <button type="button" class="set-connect-btn">
+                  <button type="button" class="btn--primary btn--s">
                     Upload image
                   </button>
                   <span class="set-row__hint">PNG, square, ≥ 256px</span>
@@ -327,7 +327,7 @@
                 <div class="set-row__hint">Used on invoices and contracts.</div>
               </div>
               <div class="set-row__ctrl">
-                <input class="set-input" type="text" bind:value={userName} />
+                <input  type="text" bind:value={userName} />
               </div>
             </div>
 
@@ -337,7 +337,7 @@
                 <div class="set-row__hint">What collaborators see.</div>
               </div>
               <div class="set-row__ctrl">
-                <input class="set-input" type="text" bind:value={displayName} />
+                <input  type="text" bind:value={displayName} />
               </div>
             </div>
 
@@ -348,7 +348,7 @@
               </div>
               <div class="set-row__ctrl">
                 <input
-                  class="set-input set-input--short"
+                  class="input--short"
                   type="text"
                   bind:value={profilePronouns}
                 />
@@ -362,7 +362,7 @@
               </div>
               <div class="set-row__ctrl">
                 <input
-                  class="set-input"
+                  
                   type="email"
                   bind:value={userEmail}
                   readonly
@@ -383,7 +383,7 @@
                 <div class="set-row__label">Location</div>
               </div>
               <div class="set-row__ctrl">
-                <input class="set-input" type="text" bind:value={profileLocation} />
+                <input  type="text" bind:value={profileLocation} />
               </div>
             </div>
 
@@ -395,7 +395,7 @@
                 </div>
               </div>
               <div class="set-row__ctrl">
-                <input class="set-input" type="text" bind:value={profileTimezone} />
+                <input  type="text" bind:value={profileTimezone} />
               </div>
             </div>
 
@@ -434,23 +434,23 @@
 
         <section class="set-group">
           <div class="set-group__head">
-            <span class="set-group__kicker">{houses.length} active</span>
+            <span class="set-group__kicker">{workspaces.length} active</span>
             <h2 class="set-group__title">My projects</h2>
           </div>
           <div class="set-group__body">
             <div class="set-ws-list">
-              {#each houses as h (h.id)}
-                {@const roomCount = rooms.filter((r) => r.workspace_id === h.id).length}
+              {#each workspaces as w (w.id)}
+                {@const projectCount = projects.filter((p) => p.workspace_id === w.id).length}
                 {@const myRoles =
-                  h.kind === 'personal'
+                  w.kind === 'personal'
                     ? ['author', 'performer']
                     : ['musician', 'lighting', 'distribution']}
-                <div class="set-ws" style={`--c: ${accentVar(h.slug)}`}>
+                <div class="set-ws" style={`--c: ${accentVar(w.slug)}`}>
                   <div class="set-ws__rail"></div>
                   <div class="set-ws__name">
-                    <h3>{h.name}</h3>
+                    <h3>{w.name}</h3>
                     <div class="set-ws__sub">
-                      {h.kind === 'personal' ? 'Personal workspace' : 'Team workspace'}
+                      {w.kind === 'personal' ? 'Personal workspace' : 'Team workspace'}
                     </div>
                   </div>
                   <div class="set-ws__roles">
@@ -461,11 +461,11 @@
                   <div class="set-ws__meta">
                     <span>— people</span>
                     <span class="sep">·</span>
-                    <span>{roomCount} {roomCount === 1 ? 'project' : 'projects'}</span>
+                    <span>{projectCount} {projectCount === 1 ? 'project' : 'projects'}</span>
                   </div>
                   <div class="set-ws__actions">
-                    <button type="button" class="set-ghost-btn">edit role</button>
-                    <button type="button" class="set-ghost-btn is-warn">leave</button>
+                    <button type="button" class="btn--outline btn--s">edit role</button>
+                    <button type="button" class="btn--outline btn--s is-warn">leave</button>
                   </div>
                 </div>
               {/each}
@@ -646,9 +646,9 @@
                   {#if i === 0}
                     <span class="set-lang__primary">primary</span>
                   {:else}
-                    <button type="button" class="set-ghost-btn">make primary</button>
+                    <button type="button" class="btn--outline btn--s">make primary</button>
                   {/if}
-                  <button type="button" class="set-ghost-btn is-warn">remove</button>
+                  <button type="button" class="btn--outline btn--s is-warn">remove</button>
                 </div>
               {/each}
             </div>
@@ -727,7 +727,7 @@
                       <span class="set-connect__manage">manage</span>
                     </span>
                   {:else}
-                    <button type="button" class="set-connect-btn">Connect</button>
+                    <button type="button" class="btn--primary btn--s">Connect</button>
                   {/if}
                 </div>
               {/each}
@@ -748,8 +748,8 @@
               <div class="set-row__ctrl">
                 <div class="set-token">
                   <code>hour_sk_•••••••••••••••••••••••••</code>
-                  <button type="button" class="set-ghost-btn">reveal</button>
-                  <button type="button" class="set-ghost-btn">rotate</button>
+                  <button type="button" class="btn--outline btn--s">reveal</button>
+                  <button type="button" class="btn--outline btn--s">rotate</button>
                 </div>
               </div>
             </div>
@@ -940,9 +940,9 @@
               </div>
               <div class="set-row__ctrl">
                 <div class="set-hours">
-                  <input class="set-input set-input--tight" type="text" bind:value={quietStart} />
+                  <input class="input--tight" type="text" bind:value={quietStart} />
                   <span class="sep">→</span>
-                  <input class="set-input set-input--tight" type="text" bind:value={quietEnd} />
+                  <input class="input--tight" type="text" bind:value={quietEnd} />
                 </div>
               </div>
             </div>
@@ -988,7 +988,7 @@
                 <div class="set-row__ctrl">
                   <button
                     type="button"
-                    class="set-ghost-btn"
+                    class="btn--outline btn--s"
                     onclick={clearMasterView}
                   >Clear saved view</button>
                 </div>
@@ -1000,7 +1000,7 @@
 
       {#if active === 'billing'}
         <header class="set-mast">
-          <p class="set-mast__kicker">House money</p>
+          <p class="set-mast__kicker">Money</p>
           <h1 class="set-mast__title"><em>Billing</em></h1>
           <p class="set-mast__sub">
             Hour is a small Barcelona-based tool. Your money goes a long way here.
@@ -1021,13 +1021,13 @@
                 </p>
               </div>
               <div class="set-plan__actions">
-                <button type="button" class="set-connect-btn">
+                <button type="button" class="btn--primary btn--s">
                   Switch to yearly · save 20%
                 </button>
-                <button type="button" class="set-ghost-btn">
+                <button type="button" class="btn--outline btn--s">
                   Upgrade to Collective (€19/mo, up to 6 people)
                 </button>
-                <button type="button" class="set-ghost-btn is-warn">Cancel plan</button>
+                <button type="button" class="btn--outline btn--s is-warn">Cancel plan</button>
               </div>
             </div>
           </div>
@@ -1047,7 +1047,7 @@
                   <span class="set-card__brand">VISA</span>
                   <span>•••• 4242</span>
                   <span class="set-row__hint">exp 11/27</span>
-                  <button type="button" class="set-ghost-btn">update</button>
+                  <button type="button" class="btn--outline btn--s">update</button>
                 </div>
               </div>
             </div>
@@ -1057,7 +1057,7 @@
                 <div class="set-row__hint">Receipts and VAT documents.</div>
               </div>
               <div class="set-row__ctrl">
-                <input class="set-input" type="email" value={userEmail} readonly />
+                <input  type="email" value={userEmail} readonly />
               </div>
             </div>
             <div class="set-row">
@@ -1066,7 +1066,7 @@
                 <div class="set-row__hint">ES NIF / EU VAT — for proper invoices.</div>
               </div>
               <div class="set-row__ctrl">
-                <input class="set-input set-input--short" type="text" value="ES 41XXXXXXX-A" />
+                <input class="input--short" type="text" value="ES 41XXXXXXX-A" />
               </div>
             </div>
           </div>
@@ -1084,7 +1084,7 @@
                   <span class="set-invoice__plan">Solo · monthly</span>
                   <span class="set-invoice__amt">€9.00</span>
                   <span class="set-invoice__status">paid</span>
-                  <button type="button" class="set-ghost-btn">PDF</button>
+                  <button type="button" class="btn--outline btn--s">PDF</button>
                 </div>
               {/each}
             </div>
@@ -1112,7 +1112,7 @@
                 </div>
               </div>
               <div class="set-row__ctrl">
-                <button type="button" class="set-ghost-btn">Request export</button>
+                <button type="button" class="btn--outline btn--s">Request export</button>
               </div>
             </div>
             <div class="set-row">
@@ -1124,7 +1124,7 @@
                 </div>
               </div>
               <div class="set-row__ctrl">
-                <button type="button" class="set-ghost-btn is-warn">Leave all…</button>
+                <button type="button" class="btn--outline btn--s is-warn">Leave all…</button>
               </div>
             </div>
             <div class="set-row is-danger">
@@ -1135,7 +1135,7 @@
                 </div>
               </div>
               <div class="set-row__ctrl">
-                <button type="button" class="set-danger-btn">
+                <button type="button" class="btn--danger btn--s">
                   Delete my Hour…
                 </button>
               </div>
@@ -1463,32 +1463,6 @@
     max-inline-size: 56ch;
   }
 
-  .set-input {
-    appearance: none;
-    border: 1px solid var(--border-color-dark);
-    background: var(--bg-ultra-light);
-    padding-block: var(--space-s);
-    padding-inline: var(--space-s);
-    font: inherit;
-    font-size: var(--text-s);
-    color: var(--text-color);
-    border-radius: var(--radius);
-    inline-size: 100%;
-    max-inline-size: 360px;
-    transition: border-color var(--transition), background var(--transition);
-  }
-  .set-input:focus {
-    outline: none;
-    border-color: var(--text-color);
-    background: var(--bg);
-  }
-  .set-input--short {
-    max-inline-size: 160px;
-  }
-  .set-input--tight {
-    inline-size: 80px;
-  }
-
   .set-seg {
     display: inline-flex;
     background: var(--bg-light);
@@ -1547,69 +1521,23 @@
     transform: translateX(16px);
   }
 
-  .set-connect-btn,
-  .set-ghost-btn,
-  .set-danger-btn,
+  /* Pseudo-button "+ Add a thing" — dashed outline placeholder for
+     creation affordances. Specific enough to keep local. */
   .set-add {
     appearance: none;
-    font: inherit;
-    font-size: var(--text-xs);
+    align-self: flex-start;
     padding-block: var(--space-s);
     padding-inline: var(--space-m);
+    border: 1px dashed var(--border-color-dark);
     border-radius: var(--radius-s);
-    cursor: pointer;
-    border: 1px solid var(--border-color-dark);
-    background: var(--bg-ultra-light);
-    color: var(--text-color);
-    transition: background var(--transition), color var(--transition),
-      border-color var(--transition), opacity var(--transition);
-  }
-  .set-connect-btn {
-    background: var(--text-color);
-    color: var(--bg);
-    border-color: var(--text-color);
-  }
-  .set-connect-btn:hover {
-    opacity: 0.85;
-  }
-
-  .set-ghost-btn {
     background: transparent;
-    color: var(--text-muted);
-  }
-  .set-ghost-btn:hover {
-    color: var(--text-color);
-    background: var(--bg-hover);
-  }
-  .set-ghost-btn.is-warn {
-    color: var(--danger);
-    border-color: oklch(80% 0.07 25);
-  }
-  .set-ghost-btn.is-warn:hover {
-    background: oklch(96% 0.03 25);
-  }
-
-  .set-danger-btn {
-    background: var(--danger);
-    color: var(--white);
-    border-color: var(--danger);
-    font-weight: 500;
-  }
-  .set-danger-btn:hover {
-    opacity: 0.9;
-  }
-
-  .set-add {
-    align-self: flex-start;
-    background: transparent;
-    border-style: dashed;
     color: var(--text-muted);
     font-family: var(--font-mono);
     font-size: var(--text-xs);
     letter-spacing: 0.04em;
+    cursor: pointer;
     margin-block-start: var(--space-s);
-    padding-block: var(--space-s);
-    padding-inline: var(--space-m);
+    transition: color var(--transition), border-color var(--transition);
   }
   .set-add:hover {
     color: var(--text-color);

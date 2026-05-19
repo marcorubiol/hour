@@ -6,16 +6,16 @@
 </script>
 
 <svelte:head>
-  <title>{slug} — Gig — Hour</title>
+  <title>{slug} — Performance — Hour</title>
 </svelte:head>
 
 <section class="entity">
   <header>
-    <p class="text--s text--dark-muted">Gig</p>
+    <p class="text--s text--dark-muted">Performance</p>
     <h1 class="h2">{slug}</h1>
   </header>
   <p class="text--dark-muted">
-    Gig detail placeholder — full mobile-first detail + roadsheet sub-route in Phase 0.2 (ADR-023).
+    Performance detail placeholder — full mobile-first detail + roadsheet sub-route in Phase 0.2 (ADR-023).
   </p>
   <p>
     <a href={`/h/${workspace}/performance/${slug}/roadsheet`}>→ Open road sheet (placeholder)</a>

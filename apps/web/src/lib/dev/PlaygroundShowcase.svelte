@@ -13,6 +13,11 @@
   import Tooltip from '../components/Tooltip.svelte';
   import Menu, { type MenuAction } from '../components/Menu.svelte';
   import Sidebar from '../components/Sidebar.svelte';
+  import Pill from '../components/Pill.svelte';
+  import TagChip from '../components/TagChip.svelte';
+  import StateBadge from '../components/StateBadge.svelte';
+  import ThemeToggle from '../components/ThemeToggle.svelte';
+  import { accentVar } from '$lib/utils/accent';
 
   let counter = $state(0);
   let asyncLoading = $state(false);
@@ -96,6 +101,20 @@
     <div class="playground__row">
       <Button variant="primary">Primary</Button>
       <Button variant="outline">Outline</Button>
+      <Button variant="danger">Danger</Button>
+    </div>
+  </section>
+
+  <section class="playground__section">
+    <h2 class="h3">Button — warn modifier (combinable)</h2>
+    <p class="text--s text--dark-muted">
+      <code>tone="warn"</code> repaints text + border to danger; combinable
+      with any variant for destructive secondary actions.
+    </p>
+    <div class="playground__row">
+      <Button variant="outline" tone="warn">Leave workspace</Button>
+      <Button variant="outline" tone="warn" size="s">Cancel plan</Button>
+      <Button variant="primary" tone="warn">Delete</Button>
     </div>
   </section>
 
@@ -187,6 +206,34 @@
       type="search"
       placeholder="Search engagements..."
     />
+  </section>
+
+  <section class="playground__section">
+    <h2 class="h3">Input — size modifiers</h2>
+    <p class="text--s text--dark-muted">
+      <code>.input--short</code> caps at 160px (pronouns, short fields).
+      <code>.input--tight</code> 80px (time, codes, short numerics).
+    </p>
+    <div class="playground__row playground__row--start">
+      <input
+        class="input--short"
+        type="text"
+        placeholder="he/him"
+        aria-label="Pronouns"
+      />
+      <input
+        class="input--tight"
+        type="text"
+        value="22:00"
+        aria-label="Time"
+      />
+      <input
+        class="input--tight"
+        type="text"
+        value="08:00"
+        aria-label="Time"
+      />
+    </div>
   </section>
 
   <section class="playground__section">
@@ -850,6 +897,120 @@
       </main>
     </div>
   </section>
+
+  <!-- ─── v0.5 primitives (editorial refresh) ─────────────────────── -->
+
+  <section class="playground__section">
+    <h2 class="h3">Pill — lens / filter selector</h2>
+    <p class="text--s text--dark-muted">
+      Single-control toggle. Default size for lens nav (topbar); <code>size="sm"</code> for filter chips.
+    </p>
+    <div class="playground__row">
+      <Pill active>Today</Pill>
+      <Pill>Calendar</Pill>
+      <Pill>Contacts</Pill>
+      <Pill>Money</Pill>
+    </div>
+    <div class="playground__row">
+      <Pill size="sm" active>all</Pill>
+      <Pill size="sm">sound</Pill>
+      <Pill size="sm">lighting</Pill>
+      <Pill size="sm">distribution</Pill>
+    </div>
+    <div class="playground__row">
+      <Pill all>All</Pill>
+    </div>
+  </section>
+
+  <section class="playground__section">
+    <h2 class="h3">TagChip — pastel task tags</h2>
+    <p class="text--s text--dark-muted">
+      Mono 10px tag chips. Tone via <code>data-tone</code> swap.
+    </p>
+    <div class="playground__row">
+      <TagChip label="#travel" tone="teal" />
+      <TagChip label="#press" tone="blue" />
+      <TagChip label="#contract" tone="amber" />
+      <TagChip label="#billable" tone="green" />
+      <TagChip label="#creative" tone="purple" />
+      <TagChip label="#show" tone="red" />
+      <TagChip label="#admin" tone="neutral" />
+    </div>
+  </section>
+
+  <section class="playground__section">
+    <h2 class="h3">StateBadge — lifecycle indicator</h2>
+    <p class="text--s text--dark-muted">
+      Border-only, mono lowercase. For status as anotación contextual
+      (Project header, run/show meta). Distinct from <code>.badge--*</code>
+      which is filled and louder.
+    </p>
+    <div class="playground__row">
+      <StateBadge label="proposed" tone="neutral" />
+      <StateBadge label="1st hold" tone="info" />
+      <StateBadge label="confirmed" tone="success" />
+      <StateBadge label="invoiced" tone="warning" />
+      <StateBadge label="paid" tone="faint" />
+      <StateBadge label="cancelled" tone="danger" />
+    </div>
+  </section>
+
+  <section class="playground__section">
+    <h2 class="h3">Kbd — keyboard hint utility</h2>
+    <p class="text--s text--dark-muted">
+      <code>&lt;kbd class="kbd"&gt;</code> — mono 11px with subtle bottom bevel.
+    </p>
+    <div class="playground__row">
+      <kbd class="kbd">⌘K</kbd>
+      <kbd class="kbd">⇧⌘P</kbd>
+      <kbd class="kbd">esc</kbd>
+      <kbd class="kbd">⏎</kbd>
+    </div>
+  </section>
+
+  <section class="playground__section">
+    <h2 class="h3">Eyebrow — kicker label utility</h2>
+    <p class="text--s text--dark-muted">
+      <code>.eyebrow</code> — mono uppercase, letter-spacing tracked. Sits
+      above section titles or in metadata rows.
+    </p>
+    <div class="playground__col">
+      <p class="eyebrow">This week</p>
+      <h3 style="margin: 0; font-family: var(--font-display); font-size: var(--text-xxl); font-weight: 400; letter-spacing: -0.02em;">
+        Everything on your plate
+      </h3>
+    </div>
+  </section>
+
+  <section class="playground__section">
+    <h2 class="h3">ThemeToggle — mode cycle (live)</h2>
+    <p class="text--s text--dark-muted">
+      Single button cycling Light → Auto → Dark. <code>variant="plain"</code>
+      drops the border chrome for menu contexts.
+    </p>
+    <div class="playground__row">
+      <ThemeToggle />
+      <ThemeToggle variant="plain" />
+    </div>
+  </section>
+
+  <section class="playground__section">
+    <h2 class="h3">Accent palette — hash by slug</h2>
+    <p class="text--s text--dark-muted">
+      Eight neutral accent hues. Helper
+      <code>accentVar(slug)</code> maps a slug → <code>var(--accent-N)</code>
+      via FNV-1a hash; same slug always lands on the same color across
+      sessions and devices.
+    </p>
+    <div class="playground__accents">
+      {#each ['mamemi', 'marco-rubiol', 'kairos', 'fulana', 'avi-daki', 'tamarit', 'aarhus', 'igualada'] as slug (slug)}
+        <div class="playground__accent" style={`--c: ${accentVar(slug)}`}>
+          <span class="playground__accent-rail" aria-hidden="true"></span>
+          <span class="playground__accent-name">{slug}</span>
+        </div>
+      {/each}
+    </div>
+  </section>
 </main>
 
 <Toast />
@@ -913,6 +1074,42 @@
       display: flex;
       flex-direction: column;
       gap: var(--space-xs);
+    }
+
+    /* v0.5 helpers */
+    .playground__row--start {
+      justify-content: flex-start;
+    }
+    .playground__col {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-xs);
+    }
+    .playground__accents {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: var(--space-s);
+    }
+    .playground__accent {
+      display: grid;
+      grid-template-columns: 4px 1fr;
+      gap: var(--space-s);
+      align-items: center;
+      padding: var(--space-s);
+      border: 1px solid var(--border-color-light);
+      border-radius: var(--radius);
+      background: var(--bg-ultra-light);
+    }
+    .playground__accent-rail {
+      inline-size: 4px;
+      block-size: 28px;
+      background: var(--c, var(--text-faint));
+      border-radius: 2px;
+    }
+    .playground__accent-name {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-color);
     }
   }
 </style>

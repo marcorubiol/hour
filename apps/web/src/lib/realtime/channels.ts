@@ -20,7 +20,7 @@ export const channelName = {
   workspacePresence: (workspaceId: string): WorkspacePresenceChannel =>
     `workspace:${workspaceId}:presence`,
 
-  /** Project-scoped broadcast (notes, status changes inside a Room). */
+  /** Project-scoped broadcast (notes, status changes inside a Project). */
   project: (projectId: string): ProjectChannel => `project:${projectId}`,
 
   /** Show-scoped broadcast (gig-level edits, road-sheet collab triggers). */

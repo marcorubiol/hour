@@ -1,12 +1,16 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
 
-  type Variant = 'primary' | 'outline';
+  type Variant = 'primary' | 'outline' | 'danger';
   type Size = 'xs' | 's' | 'm' | 'l';
 
   interface Props {
     variant?: Variant;
     size?: Size;
+    /** Tone modifier — combinable with any variant. Currently 'warn'
+        repaints text+border to danger; useful for outline buttons that
+        carry destructive secondary actions (Leave, Cancel, Remove). */
+    tone?: 'warn';
     type?: 'button' | 'submit' | 'reset';
     disabled?: boolean;
     loading?: boolean;
@@ -19,6 +23,7 @@
   let {
     variant = 'primary',
     size = 'm',
+    tone,
     type = 'button',
     disabled = false,
     loading = false,
@@ -29,7 +34,12 @@
   }: Props = $props();
 
   let classes = $derived(
-    [`btn--${variant}`, `btn--${size}`, loading && 'btn--loading']
+    [
+      `btn--${variant}`,
+      `btn--${size}`,
+      tone === 'warn' && 'is-warn',
+      loading && 'btn--loading',
+    ]
       .filter(Boolean)
       .join(' ')
   );
