@@ -1842,10 +1842,12 @@
       box-shadow: none;
     }
 
-    /* Same accent-tinted rule for selected project names (inherits --c
-       from the parent workspace li). */
+    /* Selected project name: weight bump to 600 communicates state
+       typographically. No accent-darkened colour — the project name
+       stays in text-color (ink) regardless of the parent workspace's
+       accent. Mirrors the workspace-name selected rule. */
     .plaza__project-row--selected .plaza__project-name {
-      color: color-mix(in oklch, var(--c), black 30%);
+      font-weight: 600;
     }
 
     .plaza__project-name {
