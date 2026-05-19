@@ -2,23 +2,23 @@
   /**
    * RoomStructure — sidebar lower section.
    *
-   * Shows the internal structure of the currently-selected Room: its Runs
-   * (collapsible) and their Gigs. Replaces the `<Desk>` component the
-   * original roadmap planned — naming + scope absorbed into the Rooms lens
-   * + this tree (ADR-029).
+   * Shows the internal structure of the currently-selected Room: its Lines
+   * (sections) and eventually their Shows. Replaces the `<Desk>` component
+   * the original roadmap planned (ADR-029).
    *
-   * Phase 0 reality: no runs/gigs exist in DB yet. Component renders the
-   * Room display name + empty state until that data arrives. Empty home
-   * (no Room selected) shows the prompt placeholder.
-   *
-   * Room display name is read from the rooms TanStack Query cache (same
-   * `['rooms', { status: 'active' }]` key as Plaza + Room detail) — no
-   * extra fetch, no slug-vs-name drift between the three views.
+   * Two queries:
+   *   1. `['rooms', { status: 'active' }]` — shared cache with Plaza + Room
+   *      detail. Used to read the active room's display name and id without
+   *      a slug-vs-name drift between views.
+   *   2. `['sections', { project_id }]` — fetched on demand once we know the
+   *      active room's id. Returns sections of that project, ordered by
+   *      start_date.
    */
 
   import { page } from '$app/state';
   import { createQuery } from '@tanstack/svelte-query';
   import { goto } from '$app/navigation';
+  import { derived, writable, type Readable } from 'svelte/store';
 
   type Room = {
     id: string;
@@ -28,18 +28,48 @@
     status: 'draft' | 'active' | 'archived';
   };
 
-  async function fetchRooms(signal: AbortSignal): Promise<{ items: Room[] }> {
+  type Section = {
+    id: string;
+    slug: string | null;
+    name: string;
+    kind: string;
+    status: string;
+    start_date: string | null;
+    end_date: string | null;
+    project_id: string;
+    workspace_id: string;
+  };
+
+  function requireJwt(): string {
     const jwt = localStorage.getItem('hour_jwt');
     if (!jwt) {
       goto('/login', { replaceState: true });
       throw new Error('Missing JWT');
     }
+    return jwt;
+  }
+
+  async function fetchRooms(signal: AbortSignal): Promise<{ items: Room[] }> {
+    const jwt = requireJwt();
     const res = await fetch('/api/rooms?status=active', {
       signal,
       headers: { Authorization: `Bearer ${jwt}` },
     });
     if (!res.ok) throw new Error(`Error ${res.status}`);
     return (await res.json()) as { items: Room[] };
+  }
+
+  async function fetchSections(
+    projectId: string,
+    signal: AbortSignal,
+  ): Promise<{ items: Section[] }> {
+    const jwt = requireJwt();
+    const res = await fetch(
+      `/api/sections?project_id=${encodeURIComponent(projectId)}`,
+      { signal, headers: { Authorization: `Bearer ${jwt}` } },
+    );
+    if (!res.ok) throw new Error(`Error ${res.status}`);
+    return (await res.json()) as { items: Section[] };
   }
 
   const roomsQuery = createQuery({
@@ -52,16 +82,36 @@
     return m?.[1] ?? '';
   });
 
-  let hasRoom = $derived(activeRoomSlug.length > 0);
-
   let activeRoom = $derived(
     $roomsQuery.data?.items.find((r) => r.slug === activeRoomSlug) ?? null,
   );
 
-  // Display name with sensible fallbacks: cached row > slug while loading >
-  // raw slug if the room isn't visible (shouldn't happen given RLS, but
-  // keeps the empty state honest).
-  let displayName = $derived(activeRoom?.name ?? activeRoomSlug);
+  let hasRoom = $derived(activeRoomSlug.length > 0);
+
+  // Sections query is gated on activeRoom.id. Using a writable + derived
+  // queryOptions so the inner query refetches when navigating between rooms
+  // without remounting the component.
+  const projectIdStore = writable<string | null>(null);
+  $effect(() => {
+    projectIdStore.set(activeRoom?.id ?? null);
+  });
+
+  const sectionsQueryOptions: Readable<{
+    queryKey: readonly ['sections', { project_id: string | null }];
+    queryFn: (ctx: { signal: AbortSignal }) => Promise<{ items: Section[] }>;
+    enabled: boolean;
+  }> = derived(projectIdStore, ($projectId) => ({
+    queryKey: ['sections', { project_id: $projectId }] as const,
+    queryFn: ({ signal }: { signal: AbortSignal }) =>
+      fetchSections($projectId!, signal),
+    enabled: $projectId !== null,
+  }));
+
+  const sectionsQuery = createQuery(sectionsQueryOptions);
+
+  let sections = $derived($sectionsQuery.data?.items ?? []);
+  let isLoadingSections = $derived($sectionsQuery.isPending && activeRoom !== null);
+  let isErrorSections = $derived($sectionsQuery.isError);
 </script>
 
 <aside class="project-structure" aria-label="Project structure">
@@ -69,7 +119,24 @@
     <header class="project-structure__header">
       <span class="eyebrow">Lines</span>
     </header>
-    <p class="project-structure__empty">No lines yet.</p>
+    {#if isLoadingSections}
+      <p class="project-structure__empty">Loading…</p>
+    {:else if isErrorSections}
+      <p class="project-structure__empty project-structure__empty--error">
+        Error loading lines.
+      </p>
+    {:else if sections.length === 0}
+      <p class="project-structure__empty">No lines yet.</p>
+    {:else}
+      <ul class="project-structure__list">
+        {#each sections as section (section.id)}
+          <li class="project-structure__item">
+            <span class="project-structure__name">{section.name}</span>
+            <span class="project-structure__kind">{section.kind}</span>
+          </li>
+        {/each}
+      </ul>
+    {/if}
   {:else}
     <p class="project-structure__empty project-structure__empty--prompt">
       Select a project to see its structure
@@ -83,8 +150,8 @@
       display: flex;
       flex-direction: column;
       gap: var(--space-xs);
-      padding-block-start: var(--pad-lg);
-      margin-block-start: var(--pad-lg);
+      padding-block-start: var(--space-m);
+      margin-block-start: var(--space-m);
       border-block-start: var(--divider-light);
     }
 
@@ -92,13 +159,43 @@
       display: flex;
       flex-direction: column;
       gap: var(--space-xs);
-      padding-inline: var(--pad-sm);
+      padding-inline: var(--space-s);
+    }
+
+    .project-structure__list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-xs);
+    }
+
+    .project-structure__item {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: var(--space-s);
+      padding-block: var(--space-xs);
+      padding-inline: var(--space-s);
+      font-size: var(--text-s);
+    }
+
+    .project-structure__name {
+      color: var(--text-color);
+    }
+
+    .project-structure__kind {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-faint);
+      text-transform: lowercase;
     }
 
     .project-structure__empty {
       margin: 0;
-      padding-block: var(--pad-xs);
-      padding-inline: var(--pad-sm);
+      padding-block: var(--space-xs);
+      padding-inline: var(--space-s);
       font-size: var(--text-s);
       color: var(--text-faint);
     }
@@ -106,6 +203,10 @@
     .project-structure__empty--prompt {
       font-style: italic;
       text-align: center;
+    }
+
+    .project-structure__empty--error {
+      color: var(--danger);
     }
   }
 </style>

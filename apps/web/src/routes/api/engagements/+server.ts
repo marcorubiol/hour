@@ -33,7 +33,7 @@ const QuerySchema = v.object({
     'contacted',
   ),
   project_slug: v.optional(v.pipe(v.string(), v.minLength(1)), 'mamemi'),
-  season: v.optional(v.string(), '2026-27'),
+  season: v.optional(v.string(), 'any'),
   limit: v.optional(
     v.pipe(
       v.string(),
