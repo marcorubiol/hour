@@ -108,6 +108,34 @@
     $linesQuery.data?.items.find((l) => l.slug === lineSlug) ?? null,
   );
 
+  // Touch last_navigated_at when the line is identified. Fires once per
+  // line-id load (the $effect's tracked dep is activeLine.id). Idempotent
+  // server-side; failure is non-fatal — log and continue.
+  let lastTouchedLineId = '';
+  $effect(() => {
+    const id = activeLine?.id;
+    if (!id || id === lastTouchedLineId) return;
+    lastTouchedLineId = id;
+    void touchLineVisit(id);
+  });
+
+  async function touchLineVisit(id: string): Promise<void> {
+    try {
+      const jwt = localStorage.getItem('hour_jwt');
+      if (!jwt) return;
+      await fetch('/api/lines/visit', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${jwt}`,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ line_id: id }),
+      });
+    } catch (err) {
+      console.warn('[line-detail] touch_line_visit failed:', err);
+    }
+  }
+
   let isLoading = $derived(
     $projectsQuery.isPending || ($linesQuery.isPending && activeProject !== null),
   );

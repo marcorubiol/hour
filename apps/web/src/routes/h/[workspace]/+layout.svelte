@@ -23,11 +23,13 @@
   import Sidebar from '$lib/components/Sidebar.svelte';
   import Avatar from '$lib/components/Avatar.svelte';
   import Plaza from '$lib/components/Plaza.svelte';
+  import PlazaRail from '$lib/components/PlazaRail.svelte';
   import LineList from '$lib/components/LineList.svelte';
   import PresenceBadge from '$lib/components/PresenceBadge.svelte';
   import Pill from '$lib/components/Pill.svelte';
   import Menu from '$lib/components/Menu.svelte';
   import ThemeToggle from '$lib/components/ThemeToggle.svelte';
+  import BrandMark from '$lib/components/BrandMark.svelte';
   import { useTheme } from '$lib/theme.svelte';
   import { isReservedWorkspaceSlug } from '$lib/reserved-slugs';
   import { provideLens, type Lens } from '$lib/stores/lens.svelte';
@@ -57,18 +59,10 @@
   const selection = provideSelection();
   const lens = provideLens('today');
 
+  // Hydrate selection from URL on every navigation. Idempotent — the store
+  // bails if parsed state matches current state.
   $effect(() => {
-    selection.setWorkspace(workspaceSlug);
-  });
-
-  $effect(() => {
-    const path = page.url.pathname;
-    const m = path.match(/^\/h\/[^/]+\/(room|gig|engagement|person|run|venue|asset|invoice)\/([^/]+)/);
-    if (m) {
-      selection.setEntity({ type: m[1] as never, slug: m[2] });
-    } else {
-      selection.clear();
-    }
+    selection.hydrateFromUrl(page.url);
   });
 
   $effect(() => {
@@ -125,7 +119,27 @@
   const theme = useTheme();
 
   let sidebarOpen = $state(true);
+  let sidebarCollapsed = $state(false);
   let allActive = $state(false);
+
+  // Persist the collapsed/expanded preference across sessions. Width
+  // (when expanded) is persisted independently by <Sidebar>.
+  const SIDEBAR_COLLAPSED_KEY = 'hour_sidebar_collapsed';
+  onMount(() => {
+    try {
+      sidebarCollapsed = localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === '1';
+    } catch {
+      // Storage disabled — start expanded.
+    }
+  });
+  function toggleCollapsed() {
+    sidebarCollapsed = !sidebarCollapsed;
+    try {
+      localStorage.setItem(SIDEBAR_COLLAPSED_KEY, sidebarCollapsed ? '1' : '0');
+    } catch {
+      // ignore
+    }
+  }
 
   // Decode the user's email from the JWT payload. Phase 0: identity surfaces
   // as the email since user_metadata has no display_name yet. When a profile
@@ -189,16 +203,40 @@
 
 {#if !blocked}
   <div class="workspace-shell">
-    <Sidebar bind:open={sidebarOpen} label="Projects">
+    <Sidebar
+      bind:open={sidebarOpen}
+      collapsed={sidebarCollapsed}
+      label="Projects"
+      resizable
+      storageKey="hour_sidebar_width"
+      minWidth={200}
+      maxWidth={480}
+      onCollapse={() => {
+        sidebarCollapsed = true;
+        try { localStorage.setItem(SIDEBAR_COLLAPSED_KEY, '1'); } catch {}
+      }}
+      onExpand={() => {
+        sidebarCollapsed = false;
+        try { localStorage.setItem(SIDEBAR_COLLAPSED_KEY, '0'); } catch {}
+      }}
+    >
       {#snippet header()}
-        <a class="workspace-shell__brand" href={`/h/${workspaceSlug}/`}>
-          hour
-        </a>
+        <div
+          class="workspace-shell__brand"
+          class:workspace-shell__brand--rail={sidebarCollapsed}
+        >
+          <BrandMark
+            size="m"
+            compact={sidebarCollapsed}
+            href={`/h/${workspaceSlug}/`}
+          />
+        </div>
         <button
           type="button"
           class="workspace-shell__toggle workspace-shell__toggle--in-sidebar"
-          onclick={() => (sidebarOpen = false)}
-          aria-label="Hide navigation"
+          onclick={toggleCollapsed}
+          aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         >
           <svg
             viewBox="0 0 14 14"
@@ -209,14 +247,23 @@
             stroke-linejoin="round"
             aria-hidden="true"
           >
-            <path d="M8 3 L4 7 L8 11" />
-            <path d="M12 3 L8 7 L12 11" />
+            {#if sidebarCollapsed}
+              <path d="M6 3 L10 7 L6 11" />
+              <path d="M2 3 L6 7 L2 11" />
+            {:else}
+              <path d="M8 3 L4 7 L8 11" />
+              <path d="M12 3 L8 7 L12 11" />
+            {/if}
           </svg>
         </button>
       {/snippet}
       {#snippet children()}
-        <Plaza />
-        <LineList />
+        {#if sidebarCollapsed}
+          <PlazaRail />
+        {:else}
+          <Plaza />
+          <LineList />
+        {/if}
       {/snippet}
       {#snippet footer()}
         <Menu
@@ -412,6 +459,49 @@
     justify-content: space-between;
   }
 
+  /* Rail mode adjustments — narrower padding, stack header + footer
+     contents vertically, hide the email next to the user avatar. The
+     account dropdown trigger remains an avatar-only button (the menu
+     itself keeps its full content width via .menu's min-inline-size). */
+  .workspace-shell :global(.sidebar--collapsed .sidebar__header) {
+    flex-direction: column;
+    gap: var(--space-xs);
+    padding-inline: var(--space-xs);
+    align-items: center;
+    justify-content: center;
+  }
+
+  .workspace-shell :global(.sidebar--collapsed .sidebar__body) {
+    padding-inline: var(--space-xs);
+  }
+
+  .workspace-shell :global(.sidebar--collapsed .sidebar__footer) {
+    flex-direction: column;
+    gap: var(--space-xs);
+    padding-inline: var(--space-xs);
+    align-items: center;
+  }
+
+  /* In rail mode, the user-menu wrapper sizes to its content (avatar
+     only), undoing the `flex: 1` override above. The dropdown still
+     opens at min-inline-size: 12rem so it reads fine despite the tiny
+     trigger. */
+  .workspace-shell :global(.sidebar--collapsed .sidebar__footer .menu-wrapper) {
+    flex: 0 0 auto;
+    min-inline-size: 0;
+    inline-size: auto;
+  }
+
+  .workspace-shell :global(.sidebar--collapsed .workspace-shell__user) {
+    inline-size: auto;
+    padding-inline: var(--space-xs);
+    gap: 0;
+  }
+
+  .workspace-shell :global(.sidebar--collapsed .workspace-shell__user-id) {
+    display: none;
+  }
+
   .workspace-shell :global(.sidebar__body) {
     padding-block: var(--space-s);
     padding-inline: var(--space-s);
@@ -425,21 +515,32 @@
     gap: var(--space-s);
   }
 
+  /* Hook only — styling lives in <BrandMark />. The wrapper exists so
+     the sidebar header layout (mark + collapse toggle on the right)
+     can flex them apart. */
   .workspace-shell__brand {
-    font-family: var(--font-display);
-    font-style: italic;
-    font-size: var(--text-xl);
-    font-weight: 400;
-    color: var(--text-color);
-    text-decoration: none;
-    letter-spacing: -0.01em;
+    display: inline-flex;
+  }
+
+  /* The Menu wrapper fills the footer's content area so the dropdown
+     (which inherits inline-size: 100% of the wrapper) opens at the full
+     footer width instead of just the trigger's content width — keeps
+     menu and footer optically aligned. The trigger itself stays
+     content-sized so its hover background still hugs the avatar+email
+     cluster. */
+  .workspace-shell :global(.sidebar__footer .menu-wrapper) {
+    flex: 1;
+    min-inline-size: 0;
   }
 
   /* Account menu trigger: behaves like a single clickable row (avatar +
      email) — no button box. The menu opens upward (footer-anchored) from
-     here. Hit area is the whole row; only the text color shifts on hover. */
+     here. Hit area + hover background fills the wrapper (inline-size:
+     100%) so it matches the dropdown's width exactly when it opens —
+     no optical mismatch between the closed-state highlight and the
+     open menu. Content stays left-aligned via inline-flex defaults. */
   .workspace-shell :global(.workspace-shell__user) {
-    flex: 1;
+    inline-size: 100%;
     display: inline-flex;
     align-items: center;
     gap: var(--space-s);
@@ -462,13 +563,13 @@
   }
 
   .workspace-shell__user-id {
-    flex: 1;
     font-size: var(--text-s);
     color: var(--text-muted);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     min-inline-size: 0;
+    max-inline-size: 16rem;
   }
 
   /* Theme accordion inside the account menu. Two orthogonal controls:

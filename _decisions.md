@@ -1282,6 +1282,45 @@ Triggered by Marco's pre-scaffold doubt (Phase 0.0 day 5). Five alternatives eva
   - Si Marco crea primer schema `project` distinto del workspace homónimo y necesita representación visual separada — decidir entonces shape de sidebar (aplanar cross-workspace vs anidar).
 - **Status**: Firm. Phase A+B aplicadas 2026-05-18. Phase C-E pendientes (~2-3 días).
 
+## [2026-05-19] — ADR-038 · Sidebar como filtro multi-select (Plaza = filter, LineList = always visible)
+- **Decisión**: Plaza pasa de navegación jerárquica con un proyecto activo a **filtro multi-select** sobre workspaces × projects. LineList pasa de "lines del project activo o vacío" a **siempre visible**, filtrada por la selección activa. Selección persiste en URL (canonical paths cuando colapsa a un solo entity; query params `?ws=&project=` cuando es multi) + localStorage como fallback al aterrizar en `/h/` vacío.
+- **Context**: Marco pidió 2026-05-19 mañana que la sidebar refleje el modelo mental "compañía → producción → fase de trabajo" como filter chain en vez de navegación exclusiva. El detail de project sigue existiendo pero emerge como CONSECUENCIA de tener un solo project en filter, no como ruta primaria. La idea de fondo: cuando hay nada filtrado, ves TODAS las lines de trabajo accesibles ordenadas por last-used. Cuando filtras workspace A + project B (de workspace C), ves la unión de sus lines.
+- **Behavior matrix LineList**:
+  | Filter state | Lines mostradas |
+  |---|---|
+  | Vacío | Todas accesibles por RLS, sort by last_navigated_at desc |
+  | 1 workspace | Lines de proyectos de ese workspace |
+  | 1 project | Lines de ese project |
+  | N workspaces | Union de sus proyectos |
+  | N projects | Union directa |
+  | Mix workspace + project orthogonal | Union (proyectos del workspace + project explícito) |
+- **URL design** (vote 3A 2026-05-19):
+  - Canonical cuando la selección colapsa a un entity: `/h/[ws]/`, `/h/[ws]/project/[slug]/`, `/h/[ws]/project/[slug]/line/[line]/`.
+  - Query params para multi: `/h/[ctx-ws]/?ws=a,b&project=c,d` (anchored en la workspace de browsing context — `/h/?...` no existe porque el shell vive en `[workspace]/+layout`).
+  - Query params toman precedencia sobre canonical path al parsear (intent explícito gana).
+- **Trade-offs**:
+  - **Path workspace ≠ selected workspace**. El path `/h/[ws]/` es "browsing context" (qué workspace shell renderiza), no implica que ese workspace esté seleccionado. Marco confirmó 2026-05-19 que `/h/[ws]/` sin query params = "nothing selected" (no auto-selecciona workspace).
+  - **Project slug ambiguity en URL multi**: si dos workspaces tienen un project con el mismo slug, `?project=mamemi` es ambiguo. Phase 0 no tiene colisiones; namespace tipo `?project=muk-cia:mamemi` se evalúa Phase 1 si ocurre.
+  - **`last_navigated_at` global, no per-user**. Phase 0 con 1-5 users del mismo workspace es suficiente. Junction table `line_visit` si Phase 1 lo pide.
+- **Schema entregado** (1 column + 1 RPC + 1 index nuevo):
+  - `line.last_navigated_at timestamptz` nullable, backfilled con `updated_at` para baseline order.
+  - Index `line_last_navigated_idx` partial WHERE deleted_at IS NULL.
+  - RPC `touch_line_visit(p_line_id uuid)` SECURITY DEFINER, valida `is_workspace_member(workspace_id)` antes de tocar.
+- **App-layer entregado**:
+  - `selection.svelte.ts` rewrite a multi-select (workspaces Set, projects Set, projectWorkspaceMap, contextWorkspace, hydrateFromUrl, previewUrlAfterToggle*).
+  - `Plaza.svelte` workspace + project rows como `<a>` con href computado por preview. Visual `--selected` (filled + primary tint). Chevron expand/collapse independiente. `--on-path` retirado (no semantic clear en multi-select).
+  - `LineList.svelte` lee SelectionStore, resuelve slugs a IDs via cached projects/workspaces queries, fetch /api/lines con project_ids + workspace_ids. Render flat list con "in <project>" subtitle cuando hay >1 project en scope. Active line highlight por URL match.
+  - `/api/lines` endpoint: project_id opcional, añadidos project_ids/workspace_ids/sort by last_navigated_at desc.
+  - `/api/lines/visit` endpoint (POST): proxy a RPC touch_line_visit.
+  - Line detail page: `$effect` que llama al endpoint visit cuando activeLine.id cambia.
+  - `/h/+page.svelte` fallback: redirect a user's primer workspace preservando query params (cobertura de direct-hits y bookmarks que aterricen en /h/).
+- **Migration SQL**: `build/migrations/2026-05-19_add_line_last_navigated_at.sql`.
+- **Re-evaluate when**:
+  - Si emerge friction en multi-select projects con slug colisiones cross-workspace (Phase 1) → namespace `?project=ws:slug`.
+  - Si tracking global de last_navigated_at genera confusión con múltiples users del mismo workspace (Phase 0.5+) → junction `line_visit (line_id, user_id, at)`.
+  - Si "current_workspace_id" claim del JWT diverge de la `contextWorkspace` (browsing path) → decidir cuál wins para API queries que dependen del claim.
+- **Status**: Firm. Producción 2026-05-19.
+
 ## [2026-05-19] — ADR-034 · Tabla `cast_member` a nivel project (cast canónico + override por show)
 - **Decisión**: Añadir tabla `cast_member` con scope `(workspace_id, project_id, person_id, role)`. El cast canónico de una producción vive aquí. Las sustituciones puntuales por show continúan en `cast_override` (`replaces_person_id` apunta al `person.id` previamente listado en `cast_member`). Crew sigue exclusivamente en `crew_assignment` (per-show, sin equivalente canónico a nivel project — el dominio lo trata como decisión per-gig).
 - **Context**: Phase 0.2 arranca con road sheet. Marco aclara el dominio operativo: en cada producción se asigna un cast base que después puede reasignarse a nivel de show concreto. Mi lectura anterior (option B = todo dentro de `crew_assignment` con `role='performer'`) ignoraba ese modelo — colapsaba cast en una entidad show-scoped cuando la planificación real es project-scoped.

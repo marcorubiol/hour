@@ -1,18 +1,24 @@
 /**
  * GET /api/lines
  *
- * Lists lines of a project (e.g. tour, season, residency block, creation
- * phase). Scope is driven by `?project_id=<uuid>`; the caller (RoomStructure)
- * already has the project_id from the rooms cache, so we ask for it directly
- * instead of resolving slug → project → workspace.
+ * Lists lines accessible to the caller. Filter scope (any combination):
+ *   - ?project_id=<uuid>           → single project
+ *   - ?project_ids=uuid,uuid,...   → multi-project union
+ *   - ?workspace_ids=uuid,uuid,... → all lines whose project is in these workspaces
+ *   - (none)                       → all lines accessible by RLS
  *
- * RLS scopes by workspace membership (ADR-029): user sees lines of any
- * project in any workspace they belong to. No `current_workspace_id` claim
- * needed.
+ * If multiple filters supplied, they combine as an OR (union). LineList
+ * passes the union of (explicitly-selected projects) ∪ (projects implied
+ * by selected workspaces) when the SelectionStore has either kind active.
  *
- * Naming: schema reverted to `line` per ADR-035 (2026-05-19, naming gate
- * with live UI). The 10 kinds (tour/season/phase/circuit/residency/other/
- * creation/campaign/comms/misc) live as values of `line_kind` enum.
+ * Sort: last_navigated_at desc nullslast, updated_at desc fallback. Used by
+ * LineList for "most recently used at top" ordering.
+ *
+ * Embed: project (id, slug, name, workspace_id) so sidebar can show
+ * project context per line when multiple projects are in scope.
+ *
+ * RLS scopes by workspace membership (ADR-029). No `current_workspace_id`
+ * claim needed.
  *
  * Auth: Bearer JWT required. RLS denies anon.
  */
@@ -38,8 +44,22 @@ const ALLOWED_KINDS = [
   'misc',
 ] as const;
 
+// Parse comma-separated uuid list, drop invalid ones silently. Returns null
+// if input is null/empty (caller treats absent as "no filter").
+function parseUuidList(raw: string | null | undefined): string[] | null {
+  if (!raw) return null;
+  const list = raw
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .filter((s) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s));
+  return list.length > 0 ? list : null;
+}
+
 const QuerySchema = v.object({
-  project_id: v.pipe(v.string(), v.uuid()),
+  project_id: v.optional(v.pipe(v.string(), v.uuid())),
+  project_ids: v.optional(v.string()),
+  workspace_ids: v.optional(v.string()),
   status: v.optional(v.picklist(ALLOWED_STATUSES), 'any'),
   kind: v.optional(v.picklist(ALLOWED_KINDS), 'any'),
   limit: v.optional(
@@ -49,9 +69,9 @@ const QuerySchema = v.object({
       v.number(),
       v.integer(),
       v.minValue(1),
-      v.maxValue(100),
+      v.maxValue(200),
     ),
-    '50',
+    '100',
   ),
 });
 
@@ -61,6 +81,13 @@ function json(body: unknown, status = 200): Response {
     headers: { 'content-type': 'application/json; charset=utf-8' },
   });
 }
+
+type ProjectLite = {
+  id: string;
+  slug: string;
+  name: string;
+  workspace_id: string;
+};
 
 type LineItem = {
   id: string;
@@ -74,6 +101,8 @@ type LineItem = {
   project_id: string;
   workspace_id: string;
   updated_at: string;
+  last_navigated_at: string | null;
+  project: ProjectLite | null;
 };
 
 export const GET: RequestHandler = async ({ request, url, platform }) => {
@@ -107,18 +136,46 @@ export const GET: RequestHandler = async ({ request, url, platform }) => {
       400,
     );
   }
-  const { project_id, status, kind, limit } = parsed.output;
+  const { project_id, project_ids, workspace_ids, status, kind, limit } =
+    parsed.output;
+
+  const projectIds = parseUuidList(project_ids);
+  const workspaceIds = parseUuidList(workspace_ids);
+
+  // Build the project_id filter as union: single project_id ∪ project_ids list
+  const allProjectIds: string[] = [];
+  if (project_id) allProjectIds.push(project_id);
+  if (projectIds) allProjectIds.push(...projectIds);
+  const uniqueProjectIds = Array.from(new Set(allProjectIds));
 
   const search = new URLSearchParams();
   search.set(
     'select',
-    'id,slug,name,kind,status,territory,start_date,end_date,project_id,workspace_id,updated_at',
+    [
+      'id,slug,name,kind,status,territory',
+      'start_date,end_date,project_id,workspace_id,updated_at,last_navigated_at',
+      'project:project_id(id,slug,name,workspace_id)',
+    ].join(','),
   );
-  search.set('project_id', `eq.${project_id}`);
   search.set('deleted_at', 'is.null');
+
+  // Filter precedence: project_ids ∪ workspace_ids. If both supplied, combine
+  // via PostgREST `or=()`. If only one, simpler `in.()`. If neither, no filter
+  // (RLS still scopes to user's accessible workspaces).
+  if (uniqueProjectIds.length > 0 && workspaceIds && workspaceIds.length > 0) {
+    search.set(
+      'or',
+      `(project_id.in.(${uniqueProjectIds.join(',')}),workspace_id.in.(${workspaceIds.join(',')}))`,
+    );
+  } else if (uniqueProjectIds.length > 0) {
+    search.set('project_id', `in.(${uniqueProjectIds.join(',')})`);
+  } else if (workspaceIds && workspaceIds.length > 0) {
+    search.set('workspace_id', `in.(${workspaceIds.join(',')})`);
+  }
+
   if (status !== 'any') search.set('status', `eq.${status}`);
   if (kind !== 'any') search.set('kind', `eq.${kind}`);
-  search.set('order', 'start_date.asc.nullslast,name.asc');
+  search.set('order', 'last_navigated_at.desc.nullslast,updated_at.desc');
   search.set('limit', String(limit));
 
   try {

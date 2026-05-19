@@ -28,6 +28,7 @@
   import { goto } from '$app/navigation';
   import { createQuery } from '@tanstack/svelte-query';
   import { accentVar } from '$lib/utils/accent';
+  import { useSelection } from '$lib/stores/selection.svelte';
 
   type Workspace = {
     id: string;
@@ -85,14 +86,17 @@
       fetchJSON<{ items: Project[] }>('/api/projects?status=active', signal),
   });
 
+  const selection = useSelection();
+
+  let workspaces = $derived($workspacesQuery.data?.items ?? []);
+  let projects = $derived($projectsQuery.data?.items ?? []);
+
+  // Active scope from URL — drives the row/project highlighting.
   let activeWorkspaceSlug = $derived(page.params.workspace ?? '');
   let activeProjectSlug = $derived.by(() => {
     const m = page.url.pathname.match(/^\/h\/[^/]+\/project\/([^/]+)/);
     return m?.[1] ?? '';
   });
-
-  let workspaces = $derived($workspacesQuery.data?.items ?? []);
-  let projects = $derived($projectsQuery.data?.items ?? []);
 
   let tree = $derived(
     workspaces.map((workspace) => ({
@@ -103,6 +107,19 @@
 
   let loading = $derived($workspacesQuery.isPending || $projectsQuery.isPending);
   let errored = $derived($workspacesQuery.isError || $projectsQuery.isError);
+
+  // Register project→workspace mappings so SelectionStore can build canonical
+  // URLs for projects even when navigating from query-params form.
+  $effect(() => {
+    if (workspaces.length === 0 || projects.length === 0) return;
+    const wsById = new Map(workspaces.map((w) => [w.id, w.slug]));
+    const items: Array<{ slug: string; workspaceSlug: string }> = [];
+    for (const p of projects) {
+      const wsSlug = wsById.get(p.workspace_id);
+      if (wsSlug) items.push({ slug: p.slug, workspaceSlug: wsSlug });
+    }
+    selection.registerProjectWorkspaces(items);
+  });
 
   // Collapse state — set of workspace ids that are collapsed.
   let collapsedIds = $state<Set<string>>(new Set());
@@ -134,8 +151,8 @@
   }
 </script>
 
-<nav class="plaza" aria-label="Projects">
-  <p class="eyebrow plaza__eyebrow">Projects</p>
+<nav class="plaza" aria-label="Places">
+  <p class="eyebrow plaza__eyebrow">Places</p>
 
   {#if loading}
     <p class="plaza__state">Loading…</p>
@@ -147,16 +164,13 @@
     <ul class="plaza__list" role="list">
       {#each tree as { workspace, projects } (workspace.id)}
         {@const isCollapsed = collapsedIds.has(workspace.id)}
-        {@const isWorkspaceUrl = workspace.slug === activeWorkspaceSlug}
-        {@const hasActiveProject = isWorkspaceUrl && activeProjectSlug.length > 0}
-        {@const isWorkspaceActive = isWorkspaceUrl && activeProjectSlug.length === 0}
+        {@const isWorkspaceSelected = selection.isWorkspaceSelected(workspace.slug)}
         {@const hasProjects = projects.length > 0}
         <li class="plaza__workspace">
           <div
             class={[
               'plaza__workspace-row',
-              isWorkspaceActive && 'plaza__workspace-row--active',
-              hasActiveProject && 'plaza__workspace-row--on-path',
+              isWorkspaceSelected && 'plaza__workspace-row--selected',
             ]
               .filter(Boolean)
               .join(' ')}
@@ -165,8 +179,11 @@
             <span class="plaza__workspace-rail" aria-hidden="true"></span>
             <a
               class="plaza__workspace-link"
-              href={`/h/${workspace.slug}/`}
-              aria-current={isWorkspaceActive ? 'page' : undefined}
+              href={selection.previewUrlAfterToggleWorkspace(workspace.slug)}
+              aria-current={isWorkspaceSelected ? "true" : undefined}
+              title={isWorkspaceSelected
+                ? `Deselect ${workspace.name}`
+                : `Select ${workspace.name}`}
             >
               <span class="plaza__workspace-name">{workspace.name}</span>
               <span class="plaza__workspace-sub">
@@ -203,18 +220,23 @@
           {#if !isCollapsed && hasProjects}
             <ul class="plaza__projects" role="list">
               {#each projects as project (project.id)}
-                {@const isProjectActive =
-                  isWorkspaceUrl && project.slug === activeProjectSlug}
+                {@const isProjectSelected = selection.isProjectSelected(project.slug)}
                 <li>
                   <a
                     class={[
                       'plaza__project',
-                      isProjectActive && 'plaza__project--active',
+                      isProjectSelected && 'plaza__project--selected',
                     ]
                       .filter(Boolean)
                       .join(' ')}
-                    href={`/h/${workspace.slug}/project/${project.slug}`}
-                    aria-current={isProjectActive ? 'page' : undefined}
+                    href={selection.previewUrlAfterToggleProject(
+                      project.slug,
+                      workspace.slug,
+                    )}
+                    aria-current={isProjectSelected ? "true" : undefined}
+                    title={isProjectSelected
+                      ? `Deselect ${project.name}`
+                      : `Select ${project.name}`}
                   >
                     <span class="plaza__project-name">{project.name}</span>
                   </a>
@@ -272,11 +294,11 @@
       background: var(--bg-hover);
     }
 
-    .plaza__workspace-row--active {
+    .plaza__workspace-row--selected {
       background: var(--bg-active);
     }
 
-    .plaza__workspace-row--on-path .plaza__workspace-name {
+    .plaza__workspace-row--selected .plaza__workspace-name {
       color: var(--primary);
     }
 
@@ -389,11 +411,11 @@
       outline-offset: -2px;
     }
 
-    .plaza__project--active {
+    .plaza__project--selected {
       background: var(--bg-active);
     }
 
-    .plaza__project--active .plaza__project-name {
+    .plaza__project--selected .plaza__project-name {
       color: var(--primary);
     }
 
