@@ -1282,6 +1282,21 @@ Triggered by Marco's pre-scaffold doubt (Phase 0.0 day 5). Five alternatives eva
   - Si Marco crea primer schema `project` distinto del workspace homónimo y necesita representación visual separada — decidir entonces shape de sidebar (aplanar cross-workspace vs anidar).
 - **Status**: Firm. Phase A+B aplicadas 2026-05-18. Phase C-E pendientes (~2-3 días).
 
+## [2026-05-19] — ADR-039 · Keep `/h/` URL prefix (re-evaluated decision)
+- **Decisión**: Mantener el prefix `/h/` en todas las URLs autenticadas del app (`/h/`, `/h/[ws]/`, `/h/[ws]/project/[slug]/`, etc.). Decisión revisitada al refactorizar el shell upstairs (ADR-038 sidebar filter system requería mover shell de `/h/[workspace]/+layout` a `/h/+layout`).
+- **Context**: Durante la sesión 2026-05-19 mañana, surgió el problema de ambigüedad: `/h/[ws]/` significaba a la vez "browsing context" y "1 workspace selected". El refactor shell-up resolvía esa ambigüedad (`/h/` = empty selection, `/h/[ws]/` = workspace selected). Surgió la pregunta lateral: ¿aprovechamos para dropear el prefix `/h/` entero, ya que es vestigial desde que ADR-033 mató "House" como vocab?
+- **Alternatives considered (rejected)**:
+  - **Drop prefix entero** (URLs `/[ws]/`, `/[ws]/project/[slug]/`): rechazado. La subdomain `hour.zerosense.studio` ya namespacea el app, pero el dominio es provisional (brand decision deferred to Phase 1). Mantener `/h/` deja `/` libre para Phase 1 marketing/landing/docs/billing sin colisión.
+  - **Rename prefix** (`/app/`, `/me/`, `/now/`): rechazado. `/app/` es SaaS-generic sin Hour-identity. `/me/` poético pero English-only (no traduce limpio a "mí" en URL). `/now/` ambiguo. Cambiar la letra sin cambiar el concept es churn cosmético.
+- **Trade-offs**:
+  - **Pro keep**: opcionalidad Phase 1 (`/` libre para marketing/docs/admin), separación cognitiva app/público/API, reserved-slug list queda contenida a app-level concerns en lugar de cubrir cada top-level route imaginable.
+  - **Pro drop**: URLs 2 chars más cortas, subdomain ya namespacea (double-namespace), `h` es vestigial sin significado semántico.
+  - Marco pushback: "no lo mantengamos por el coste del refactor, mantengámoslo si es realmente la mejor opción". Re-evaluación honesta confirma keep por opcionalidad, no por inercia.
+- **Re-evaluate when**:
+  - Phase 1 cierra dominio brand-pure (`hour.app`, etc.) con marketing pages reales. Con datos sobre qué rutas viven en `/`, evaluar si keep sigue siendo el mejor balance o si drop emerge como mejor opción.
+  - Si el reserved-slug list (`apps/web/src/lib/reserved-slugs.ts`) empieza a explotar con cada nueva top-level route imaginable, replantear el modelo de namespacing.
+- **Status**: Firm para Phase 0. Re-evaluate at Phase 1 brand+domain decision.
+
 ## [2026-05-19] — ADR-038 · Sidebar como filtro multi-select (Plaza = filter, LineList = always visible)
 - **Decisión**: Plaza pasa de navegación jerárquica con un proyecto activo a **filtro multi-select** sobre workspaces × projects. LineList pasa de "lines del project activo o vacío" a **siempre visible**, filtrada por la selección activa. Selección persiste en URL (canonical paths cuando colapsa a un solo entity; query params `?ws=&project=` cuando es multi) + localStorage como fallback al aterrizar en `/h/` vacío.
 - **Context**: Marco pidió 2026-05-19 mañana que la sidebar refleje el modelo mental "compañía → producción → fase de trabajo" como filter chain en vez de navegación exclusiva. El detail de project sigue existiendo pero emerge como CONSECUENCIA de tener un solo project en filter, no como ruta primaria. La idea de fondo: cuando hay nada filtrado, ves TODAS las lines de trabajo accesibles ordenadas por last-used. Cuando filtras workspace A + project B (de workspace C), ves la unión de sus lines.
