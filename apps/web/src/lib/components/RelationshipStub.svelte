@@ -130,7 +130,10 @@
 
 <section class="rel-stub" aria-labelledby="rel-stub-title">
   <header class="rel-stub__header">
-    <h2 class="rel-stub__title" id="rel-stub-title">Relationships</h2>
+    <div class="rel-stub__head-lead">
+      <p class="eyebrow">Conversations</p>
+      <h2 class="rel-stub__title" id="rel-stub-title">Relationships</h2>
+    </div>
     {#if !loading && !errored}
       <span class="rel-stub__count">
         {total === 1 ? '1 engagement' : `${total} engagements`}
@@ -186,19 +189,30 @@
     display: flex;
     align-items: baseline;
     justify-content: space-between;
-    gap: var(--space-m);
+    gap: var(--space-s);
     flex-wrap: wrap;
   }
 
+  .rel-stub__head-lead {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+  }
+
   .rel-stub__title {
-    font-size: var(--text-l);
-    font-weight: 500;
+    font-family: var(--font-display);
+    font-size: var(--text-xl);
+    font-weight: 400;
+    letter-spacing: -0.015em;
     margin: 0;
+    color: var(--text-color);
   }
 
   .rel-stub__count {
-    font-size: var(--text-s);
-    color: var(--text-dark-muted);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    letter-spacing: 0.04em;
+    color: var(--text-faint);
   }
 
   .rel-stub__list {
@@ -208,17 +222,17 @@
     display: flex;
     flex-direction: column;
     gap: 0;
-    border-block-start: var(--divider);
+    border-block-start: 1px solid var(--border-color-light);
   }
 
   .rel-stub__item {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: var(--space-m);
+    gap: var(--space-s);
     padding-block: var(--space-s);
     padding-inline: 0;
-    border-block-end: var(--divider);
+    border-block-end: 1px solid var(--border-color-light);
   }
 
   .rel-stub__main {
@@ -231,23 +245,26 @@
   .rel-stub__name {
     font-size: var(--text-m);
     color: var(--text-color);
+    font-weight: 500;
   }
 
   .rel-stub__org {
     font-size: var(--text-s);
-    color: var(--text-dark-muted);
+    color: var(--text-muted);
   }
 
   .rel-stub__location {
+    font-family: var(--font-mono);
     font-size: var(--text-xs);
-    color: var(--text-dark-muted);
+    color: var(--text-faint);
+    letter-spacing: 0.04em;
   }
 
   .rel-stub__state {
     margin: 0;
     padding-block: var(--space-s);
     font-size: var(--text-s);
-    color: var(--text-dark-muted);
+    color: var(--text-faint);
   }
 
   .rel-stub__state--danger {
@@ -260,11 +277,12 @@
 
   .rel-stub__view-all {
     font-size: var(--text-s);
-    color: var(--primary);
+    color: var(--text-muted);
     text-decoration: none;
+    transition: color var(--transition);
   }
 
   .rel-stub__view-all:hover {
-    text-decoration: underline;
+    color: var(--text-color);
   }
 </style>

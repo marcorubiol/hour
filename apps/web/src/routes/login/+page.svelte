@@ -214,14 +214,14 @@
     .login__left {
       display: grid;
       grid-template-rows: auto 1fr auto;
-      padding: clamp(22px, 4vw, 48px);
+      padding: clamp(var(--space-l), 4vw, var(--space-xxl));
       min-block-size: 0;
     }
 
     .login__brand {
       display: inline-flex;
       align-items: center;
-      gap: 10px;
+      gap: var(--space-s);
       font-family: var(--font-display);
       font-size: var(--text-xl);
       font-style: italic;
@@ -245,16 +245,16 @@
       max-inline-size: 360px;
       inline-size: 100%;
       margin-inline: auto;
-      padding-block: var(--pad-2xl);
+      padding-block: var(--space-xl);
     }
 
     .login__kicker {
       font-family: var(--font-mono);
-      font-size: var(--text-xxs);
+      font-size: var(--text-xs);
       letter-spacing: 0.14em;
       text-transform: uppercase;
       color: var(--text-faint);
-      margin-block-end: var(--pad-lg);
+      margin-block-end: var(--space-m);
     }
 
     .login__title {
@@ -272,8 +272,8 @@
     }
 
     .login__sub {
-      margin-block-start: 14px;
-      margin-block-end: var(--pad-2xl);
+      margin-block-start: var(--space-m);
+      margin-block-end: var(--space-xl);
       color: var(--text-muted);
       font-size: var(--text-m);
       line-height: 1.55;
@@ -285,18 +285,18 @@
     .login__form {
       display: flex;
       flex-direction: column;
-      gap: var(--pad);
+      gap: var(--space-s);
     }
 
     .login__field {
       display: flex;
       flex-direction: column;
-      gap: var(--pad-xs);
+      gap: var(--space-xs);
     }
 
     .login__label {
       font-family: var(--font-mono);
-      font-size: var(--text-xxs);
+      font-size: var(--text-xs);
       letter-spacing: 0.1em;
       text-transform: uppercase;
       color: var(--text-faint);
@@ -305,10 +305,10 @@
 
     .login__input {
       appearance: none;
-      border: 1px solid var(--border-color);
-      background: var(--bg-raised);
-      padding-block: var(--pad);
-      padding-inline: 14px;
+      border: 1px solid var(--border-color-dark);
+      background: var(--bg-ultra-light);
+      padding-block: var(--space-s);
+      padding-inline: var(--space-m);
       font: inherit;
       font-size: var(--text-m);
       color: var(--text-color);
@@ -339,15 +339,15 @@
       font: inherit;
       font-size: var(--text-m);
       font-weight: 500;
-      padding-block: 13px;
-      padding-inline: var(--pad-lg);
+      padding-block: var(--space-m);
+      padding-inline: var(--space-m);
       border-radius: var(--radius);
       cursor: pointer;
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      gap: var(--pad-sm);
-      margin-block-start: var(--pad-sm);
+      gap: var(--space-s);
+      margin-block-start: var(--space-s);
       transition: opacity var(--transition);
     }
     .login__submit:hover {
@@ -367,7 +367,7 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      gap: var(--pad-sm);
+      gap: var(--space-s);
       font-size: var(--text-xs);
       color: var(--text-faint);
       flex-wrap: wrap;
@@ -376,12 +376,12 @@
     /* ── right: brand promise + preview ── */
 
     .login__right {
-      background: var(--bg-sunk);
-      border-inline-start: 1px solid var(--border-color-soft);
-      padding: clamp(22px, 4vw, 48px);
+      background: var(--bg-light);
+      border-inline-start: 1px solid var(--border-color-light);
+      padding: clamp(var(--space-l), 4vw, var(--space-xxl));
       display: grid;
       grid-template-rows: 1fr auto;
-      gap: var(--pad);
+      gap: var(--space-s);
       min-block-size: 0;
       position: relative;
       overflow: hidden;
@@ -395,7 +395,7 @@
       inset-inline-end: -40px;
       inline-size: 220px;
       block-size: 220px;
-      border: 1px solid var(--border-color);
+      border: 1px solid var(--border-color-dark);
       transform: rotate(45deg);
       opacity: 0.45;
     }
@@ -408,11 +408,11 @@
 
     .login__quote-kicker {
       font-family: var(--font-mono);
-      font-size: var(--text-xxs);
+      font-size: var(--text-xs);
       letter-spacing: 0.14em;
       text-transform: uppercase;
       color: var(--text-faint);
-      margin-block-end: 18px;
+      margin-block-end: var(--space-m);
     }
 
     .login__quote-text {
@@ -431,7 +431,7 @@
     }
 
     .login__quote-attr {
-      margin-block-start: var(--pad-lg);
+      margin-block-start: var(--space-m);
       font-size: var(--text-xs);
       color: var(--text-faint);
       font-family: var(--font-mono);
@@ -439,10 +439,10 @@
     }
 
     .login__preview {
-      background: var(--bg-raised);
-      border: 1px solid var(--border-color-soft);
-      border-radius: var(--radius-lg);
-      padding: 18px 20px;
+      background: var(--bg-ultra-light);
+      border: 1px solid var(--border-color-light);
+      border-radius: var(--radius-l);
+      padding: var(--space-m) var(--space-l);
       box-shadow: var(--box-shadow-2);
       max-inline-size: 440px;
     }
@@ -450,10 +450,10 @@
     .login__preview-head {
       display: flex;
       align-items: center;
-      gap: var(--pad-sm);
-      margin-block-end: 14px;
-      padding-block-end: 10px;
-      border-block-end: 1px solid var(--border-color-soft);
+      gap: var(--space-s);
+      margin-block-end: var(--space-m);
+      padding-block-end: var(--space-s);
+      border-block-end: 1px solid var(--border-color-light);
     }
 
     .login__preview-dot {
@@ -482,18 +482,18 @@
     .login__preview-item {
       display: grid;
       grid-template-columns: 64px auto minmax(0, 1fr) auto;
-      gap: 10px;
+      gap: var(--space-s);
       align-items: baseline;
-      padding-block: 6px;
+      padding-block: var(--space-xs);
       font-size: var(--text-xs);
     }
     .login__preview-item + .login__preview-item {
-      border-block-start: 1px solid var(--border-color-soft);
+      border-block-start: 1px solid var(--border-color-light);
     }
 
     .login__preview-kind {
       font-family: var(--font-mono);
-      font-size: var(--text-xxs);
+      font-size: var(--text-xs);
       color: var(--text-faint);
       letter-spacing: 0.04em;
       text-transform: uppercase;

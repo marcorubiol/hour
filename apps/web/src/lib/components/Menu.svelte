@@ -12,10 +12,14 @@
   interface Props {
     items?: MenuAction[];
     align?: 'start' | 'end';
+    /** Direction the panel opens relative to the trigger. Default 'down'.
+        Use 'up' when the trigger sits near the viewport bottom (footers,
+        bottom-anchored toolbars). */
+    direction?: 'up' | 'down';
     label?: string;
     triggerClass?: string;
     trigger?: Snippet;
-    children?: Snippet<[{ close: () => void }]>;
+    children?: Snippet<[{ close: (returnFocus?: boolean) => void }]>;
     onopen?: () => void;
     onclose?: () => void;
   }
@@ -23,6 +27,7 @@
   let {
     items,
     align = 'start',
+    direction = 'down',
     label = 'Open menu',
     triggerClass = 'btn--outline btn--s',
     trigger,
@@ -119,7 +124,7 @@
     close();
   }
 
-  let menuClasses = $derived(`menu menu--${align}`);
+  let menuClasses = $derived(`menu menu--${align} menu--${direction}`);
 </script>
 
 <div class="menu-wrapper" bind:this={wrapperEl}>

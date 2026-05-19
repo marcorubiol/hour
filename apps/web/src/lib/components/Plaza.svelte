@@ -259,7 +259,7 @@
 
     .plaza__workspace-row {
       display: grid;
-      grid-template-columns: 3px auto 1fr;
+      grid-template-columns: 3px 1fr auto;
       gap: var(--space-xs);
       align-items: center;
       padding-block: var(--space-xs);

@@ -37,16 +37,15 @@
 {/if}
 
 <style>
+  /* Presence is ambient info, not a control. No box, no pill shape — pill
+     radius is reserved for filter/lens selectors (philosophy: clear category
+     taxonomy). Just the dot + the label, inline with the topbar rhythm. */
   .presence-badge {
     display: inline-flex;
     align-items: center;
     gap: var(--space-xs);
-    padding-block: var(--space-xs);
-    padding-inline: var(--space-m);
-    border-radius: 999px;
-    border: 1px solid var(--neutral-light);
-    font-size: var(--text-s);
-    color: var(--text-color);
+    font-size: var(--text-xs);
+    color: var(--text-muted);
   }
 
   .presence-badge__dot {

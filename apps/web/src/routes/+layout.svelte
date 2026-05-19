@@ -4,12 +4,18 @@
   import { browser } from '$app/environment';
   import { onMount, type Snippet } from 'svelte';
   import { prewarmDB, registerServiceWorker } from '$lib/offline';
+  import { provideTheme } from '$lib/theme.svelte';
 
   interface Props {
     children: Snippet;
   }
 
   let { children }: Props = $props();
+
+  // Theme context — available to every route. The actual DOM flip on
+  // first paint is done by the inline script in app.html (avoids FOIC);
+  // this provider keeps the store in sync for the toggle component.
+  provideTheme();
 
   // One QueryClient per session. SSR-safe: enabled only on the client to avoid
   // sharing cache across requests when SvelteKit prerenders or runs SSR.

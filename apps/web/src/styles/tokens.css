@@ -3,11 +3,15 @@
   Three categories of color (philosophy.md):
   - Base hues:    --primary, --base, --neutral (palette + 7 shades + hover)
   - Status:       --info, --success, --warning, --danger (palette + shades)
-  - Contextual:   --text-color, --bg-*, --border, --accent-N, --tag-{tone}-*
+  - Contextual:   --text-color, --bg-*, --border-color-*, --accent-N, --tag-*
 
-  Visual: editorial-sobrio (Newsreader display, Inter sans, JetBrains Mono
-  metadata). Warm-cream surfaces, cool ink type. Plum retired 2026-05-18 —
-  brand color absorbed into ink (`--primary` → `var(--text-color)`).
+  Visual v0.5 (ADR-033, refined 2026-05-19):
+  - Editorial-sobrio: Newsreader display + Inter sans + JetBrains Mono metadata.
+  - Plum retired; --primary holds a cool slate as the brand hue.
+  - All spacing/typography on clamp() — single fluid system. No fixed-px
+    parallel scale.
+  - Contextual tokens derive from base hues so theme switching (light/dark/
+    presenter/...) flips by redefining contextuals only.
 */
 
 @layer tokens {
@@ -22,30 +26,29 @@
     --white: #ffffff;
     --black: #000000;
 
-    /* Cool ink — replaces plum as the brand "anchor" token.
-       If a separate brand color reappears, redefine here without
-       touching components (they read --primary, not the literal). */
-    --primary: oklch(18% 0.015 280);
-    --primary-hover: color-mix(in oklch, var(--primary), white 14%);
-    --primary-ultra-light: color-mix(in oklch, var(--primary), white 90%);
-    --primary-light: color-mix(in oklch, var(--primary), white 70%);
-    --primary-semi-light: color-mix(in oklch, var(--primary), white 40%);
-    --primary-semi-dark: color-mix(in oklch, var(--primary), black 12%);
-    --primary-dark: color-mix(in oklch, var(--primary), black 22%);
-    --primary-ultra-dark: color-mix(in oklch, var(--primary), black 40%);
+    /* Cool slate — brand hue. Distinct from --neutral so it can be used
+       deliberately without clashing with body text. */
+    --primary: oklch(35% 0.13 275);
+    --primary-hover: color-mix(in oklch, var(--primary), black 10%);
+    --primary-ultra-light: color-mix(in oklch, var(--primary), white 86%);
+    --primary-light: color-mix(in oklch, var(--primary), white 60%);
+    --primary-semi-light: color-mix(in oklch, var(--primary), white 30%);
+    --primary-semi-dark: color-mix(in oklch, var(--primary), black 15%);
+    --primary-dark: color-mix(in oklch, var(--primary), black 28%);
+    --primary-ultra-dark: color-mix(in oklch, var(--primary), black 50%);
 
-    /* Warm cream — page background anchor. */
+    /* Warm cream — body / page background anchor. */
     --base: oklch(97.5% 0.005 85);
-    --base-hover: color-mix(in oklch, var(--base), var(--primary) 5%);
-    --base-ultra-light: color-mix(in oklch, var(--base), white 60%);
+    --base-hover: color-mix(in oklch, var(--base), var(--neutral) 5%);
+    --base-ultra-light: var(--white);
     --base-light: color-mix(in oklch, var(--base), white 30%);
-    --base-semi-light: color-mix(in oklch, var(--base), var(--primary) 3%);
-    --base-semi-dark: color-mix(in oklch, var(--base), var(--primary) 8%);
-    --base-dark: color-mix(in oklch, var(--base), var(--primary) 14%);
-    --base-ultra-dark: color-mix(in oklch, var(--base), var(--primary) 24%);
+    --base-semi-light: color-mix(in oklch, var(--base), var(--neutral) 3%);
+    --base-semi-dark: color-mix(in oklch, var(--base), var(--neutral) 8%);
+    --base-dark: color-mix(in oklch, var(--base), var(--neutral) 14%);
+    --base-ultra-dark: color-mix(in oklch, var(--base), var(--neutral) 24%);
 
-    /* Cool ink muted — neutrals for text-muted, borders. */
-    --neutral: oklch(45% 0.012 280);
+    /* Cool ink — body text + borders. */
+    --neutral: oklch(28% 0.012 275);
     --neutral-hover: color-mix(in oklch, var(--neutral), black 10%);
     --neutral-ultra-light: color-mix(in oklch, var(--neutral), white 88%);
     --neutral-light: color-mix(in oklch, var(--neutral), white 65%);
@@ -55,7 +58,7 @@
     --neutral-ultra-dark: color-mix(in oklch, var(--neutral), black 60%);
 
     /* ============================================================ */
-    /* PALETTE — status (lifecycle states)                            */
+    /* PALETTE — status (lifecycle / message states)                  */
     /* ============================================================ */
 
     --info: oklch(52% 0.14 255);
@@ -94,63 +97,49 @@
     --danger-dark: color-mix(in oklch, var(--danger), black 28%);
     --danger-ultra-dark: color-mix(in oklch, var(--danger), black 52%);
 
-    /* "Faint" state — for done/paid items that should recede. */
-    --faint: oklch(62% 0.01 85);
-
     /* ============================================================ */
-    /* CONTEXTUAL — surfaces (5 warm-cream layers)                    */
+    /* CONTEXTUAL — text (3 weights, all derived from --neutral)      */
     /* ============================================================ */
 
-    --bg: var(--base);
-    --bg-sunk: color-mix(in oklch, var(--base), var(--primary) 4%);
-    --bg-raised: var(--white);
-    --bg-hover: color-mix(in oklch, var(--base), var(--primary) 6%);
-    --bg-active: color-mix(in oklch, var(--base), var(--primary) 10%);
+    --text-color: var(--neutral);
+    --text-dark-muted: color-mix(in srgb, var(--neutral) 70%, transparent);
+    --text-light: var(--neutral-ultra-light);
+    --text-muted: var(--text-dark-muted);
+    --text-faint: var(--neutral-semi-light);
+    --heading-color: var(--neutral-ultra-dark);
+
+    /* ============================================================ */
+    /* CONTEXTUAL — surfaces                                          */
+    /* Unified scale. Light side derives from --base (warm cream) to  */
+    /* keep the v0.5 editorial look; dark side from --neutral (cool   */
+    /* ink) so context-shift utilities (.bg--dark, tooltip, btn fill) */
+    /* still get a real contrast. Interaction states (hover/active)   */
+    /* are a separate axis from the contrast scale.                   */
+    /* ============================================================ */
+
+    --bg: var(--base);                          /* body / canvas */
+    --bg-ultra-light: var(--base-ultra-light);  /* near white — raised cards */
+    --bg-light: var(--base-semi-light);         /* warm cream — sunk panels */
+    --bg-dark: var(--neutral-dark);             /* context shift dark */
+    --bg-ultra-dark: var(--neutral-ultra-dark); /* context shift deepest */
+
+    --bg-hover: var(--base-semi-dark);          /* interaction feedback */
+    --bg-active: var(--base-dark);              /* pressed / active */
 
     --body-bg-color: var(--bg);
-
-    /* Legacy contextual aliases preserved while components migrate. */
-    --bg-ultra-light: var(--bg-raised);
-    --bg-light: var(--bg-sunk);
-    --bg-dark: var(--neutral-dark);
-    --bg-ultra-dark: var(--neutral-ultra-dark);
-
-    /* ============================================================ */
-    /* CONTEXTUAL — ink (3 weights of text)                           */
-    /* ============================================================ */
-
-    --text-color: var(--primary); /* default body text — cool ink */
-    --text-muted: var(--neutral);
-    --text-faint: var(--faint);
-    --heading-color: var(--text-color);
-
-    /* Legacy aliases. */
-    --text-dark: var(--text-color);
-    --text-dark-muted: var(--text-muted);
-    --text-light: var(--bg-raised);
-    --text-light-muted: color-mix(in srgb, var(--text-light) 75%, transparent);
-
-    --bg-ultra-light-text: var(--text-color);
-    --bg-ultra-light-heading: var(--heading-color);
-    --bg-light-text: var(--text-color);
-    --bg-light-heading: var(--heading-color);
-    --bg-dark-text: var(--text-light);
-    --bg-dark-heading: var(--text-light);
-    --bg-ultra-dark-text: var(--text-light);
-    --bg-ultra-dark-heading: var(--text-light);
 
     /* ============================================================ */
     /* CONTEXTUAL — borders                                           */
     /* ============================================================ */
 
-    --border-color: oklch(86% 0.009 85);
-    --border-color-soft: oklch(92% 0.008 85);
-    --border-color-dark: var(--border-color);
-    --border-color-light: var(--border-color-soft);
+    --border-color-dark: color-mix(in oklch, var(--neutral) 18%, transparent);
+    --border-color-light: color-mix(in oklch, var(--neutral) 9%, transparent);
 
     /* ============================================================ */
     /* CONTEXTUAL — accents (8 hues, mapped by hash(slug) % 8)        */
-    /* Component reads `--c` set inline from the helper.              */
+    /* Used to give each workspace a stable identifying color on the  */
+    /* sidebar rail, calendar dot, and avatar. Helper:                */
+    /* $lib/utils/accent.ts → accentVar(slug) returns var(--accent-N) */
     /* ============================================================ */
 
     --accent-1: oklch(58% 0.12 260); /* blue */
@@ -163,7 +152,7 @@
     --accent-8: oklch(64% 0.13 85); /* amber */
 
     /* ============================================================ */
-    /* CONTEXTUAL — tag tones (6 bg+fg pairs for task tags)           */
+    /* CONTEXTUAL — tag tones (6 bg+fg pairs for task-type chips)     */
     /* ============================================================ */
 
     --tag-amber-bg: oklch(94% 0.05 80);
@@ -206,36 +195,31 @@
     --mono-font-family: var(--font-mono);
     --mono-letter-spacing: 0.02em;
 
-    /* Type scale — extended to 9 steps to cover the editorial range
-       (eyebrows 11px → masthead 32-48px). Coexists with the body scale
-       via --text-* aliases; new code reads --text-* by role. */
-    --text-xxs: 0.6875rem; /* 11 — eyebrows, badges */
-    --text-xs: 0.75rem; /* 12 — sub-text */
-    --text-s: 0.8125rem; /* 13 — dense rows */
-    --text-m: 0.875rem; /* 14 — default body */
-    --text-md: 0.9375rem; /* 15 — lead paragraph */
-    --text-l: 1.0625rem; /* 17 — card titles */
-    --text-xl: 1.375rem; /* 22 — wordmark */
-    --text-xxl: 2rem; /* 32 — section title */
-    --text-display: clamp(2rem, 1.4rem + 3vw, 3rem); /* 32–48 — masthead */
+    /* Type scale — fluid via clamp(). One scale for the whole app. */
+    --text-xs: clamp(0.7rem, 0.66rem + 0.15vw, 0.75rem); /* 11-12 — eyebrows, badges */
+    --text-s: clamp(0.8rem, 0.76rem + 0.2vw, 0.875rem); /* 13-14 — dense rows, secondary */
+    --text-m: clamp(0.875rem, 0.85rem + 0.15vw, 1rem); /* 14-16 — default body */
+    --text-l: clamp(1.05rem, 1rem + 0.25vw, 1.2rem); /* 17-19 — card titles */
+    --text-xl: clamp(1.3rem, 1.2rem + 0.5vw, 1.5rem); /* 21-24 — wordmark, h4 */
+    --text-xxl: clamp(1.5rem, 1.35rem + 0.75vw, 2rem); /* 24-32 — section title */
 
-    --h1: var(--text-display);
+    --h1: clamp(2rem, 1.5rem + 2.4vw, 3rem); /* 32-48 — masthead */
     --h2: var(--text-xxl);
-    --h3: 1.75rem;
+    --h3: clamp(1.2rem, 1.05rem + 0.7vw, 1.5rem);
     --h4: var(--text-xl);
     --h5: var(--text-l);
-    --h6: var(--text-md);
+    --h6: var(--text-m);
 
     /* ============================================================ */
-    /* SPACING — fluid (between sections, gaps)                       */
+    /* SPACING — single fluid scale (clamp). No fixed-px parallel.   */
     /* ============================================================ */
 
-    --space-xs: clamp(0.25rem, 0.22rem + 0.15vw, 0.375rem);
-    --space-s: clamp(0.5rem, 0.45rem + 0.25vw, 0.75rem);
-    --space-m: clamp(0.875rem, 0.8rem + 0.4vw, 1.125rem);
-    --space-l: clamp(1.25rem, 1.05rem + 1vw, 1.875rem);
-    --space-xl: clamp(1.875rem, 1.5rem + 1.75vw, 2.75rem);
-    --space-xxl: clamp(2.75rem, 2.2rem + 2.5vw, 4rem);
+    --space-xs: clamp(0.25rem, 0.22rem + 0.15vw, 0.375rem); /* 4-6 */
+    --space-s: clamp(0.5rem, 0.45rem + 0.25vw, 0.75rem); /* 8-12 */
+    --space-m: clamp(0.875rem, 0.8rem + 0.4vw, 1.125rem); /* 14-18 */
+    --space-l: clamp(1.25rem, 1.05rem + 1vw, 1.875rem); /* 20-30 */
+    --space-xl: clamp(1.875rem, 1.5rem + 1.75vw, 2.75rem); /* 30-44 */
+    --space-xxl: clamp(2.75rem, 2.2rem + 2.5vw, 4rem); /* 44-64 */
 
     --section-space-xs: clamp(1.5rem, 1.3rem + 1vw, 2rem);
     --section-space-s: clamp(2rem, 1.7rem + 1.5vw, 3rem);
@@ -250,20 +234,6 @@
     --container-gap: var(--space-l);
     --content-gap: var(--space-m);
     --grid-gap: var(--space-m);
-
-    /* ============================================================ */
-    /* PAD — fixed-pixel padding for component internals              */
-    /* Distinct domain from --space-* (component internals, not       */
-    /* layout gaps). Fixed values keep visual rhythm of dense UI.     */
-    /* ============================================================ */
-
-    --pad-xxs: 4px;
-    --pad-xs: 6px;
-    --pad-sm: 8px;
-    --pad: 12px;
-    --pad-lg: 16px;
-    --pad-xl: 24px;
-    --pad-2xl: 32px;
 
     /* Smart spacing (opt-in via .smart-spacing) */
     --paragraph-spacing: 1em;
@@ -293,19 +263,16 @@
     --offset: calc(var(--scroll-margin) + var(--header-height));
 
     /* ============================================================ */
-    /* RADIUS                                                         */
+    /* RADIUS — semantic scale (no duplicate aliases)                 */
     /* ============================================================ */
 
-    --radius-sm: 4px;
     --radius: 6px;
+    --radius-s: 4px;
     --radius-m: var(--radius);
-    --radius-lg: 10px;
-    --radius-l: var(--radius-lg);
+    --radius-l: 10px;
     --radius-xl: 14px;
-    --radius-s: var(--radius-sm);
     --radius-50: 50%;
-    --radius-circle: 50vw;
-    --radius-pill: 999px;
+    --radius-circle: 999px;
     --radius-none: 0;
 
     /* ============================================================ */
@@ -315,11 +282,7 @@
     --border-size: 1px;
     --border-width: var(--border-size);
     --border-style: solid;
-    --border: var(--border-size) var(--border-style) var(--border-color);
-    --border-soft:
-      var(--border-size) var(--border-style) var(--border-color-soft);
-    --border-dark: var(--border);
-    --border-light: var(--border-soft);
+    --border: var(--border-size) var(--border-style) var(--border-color-dark);
 
     /* ============================================================ */
     /* DIVIDERS                                                       */
@@ -327,12 +290,12 @@
 
     --divider-size: 1px;
     --divider-style: solid;
-    --divider-color-dark: var(--border-color);
-    --divider-color-light: var(--border-color-soft);
-    --divider: var(--divider-size) var(--divider-style) var(--border-color);
+    --divider-color-dark: var(--border-color-dark);
+    --divider-color-light: var(--border-color-light);
+    --divider:
+      var(--divider-size) var(--divider-style) var(--border-color-dark);
     --divider-light:
-      var(--divider-size) var(--divider-style) var(--border-color-soft);
-    --divider-dark: var(--divider);
+      var(--divider-size) var(--divider-style) var(--border-color-light);
 
     /* ============================================================ */
     /* SHADOWS                                                        */
@@ -364,8 +327,8 @@
     /* LINKS                                                          */
     /* ============================================================ */
 
-    --link-color: var(--text-color);
-    --link-color-hover: var(--text-muted);
+    --link-color: var(--primary-dark);
+    --link-color-hover: var(--primary);
     --link-decoration: underline;
     --link-decoration-hover: underline;
     --link-underline-offset: 0.2em;
@@ -406,7 +369,7 @@
     /* FOCUS                                                          */
     /* ============================================================ */
 
-    --focus-color: var(--text-color);
+    --focus-color: var(--primary);
     --focus-width: 2px;
     --focus-offset: 2px;
 
@@ -414,8 +377,8 @@
     /* SELECTION                                                      */
     /* ============================================================ */
 
-    --selection-bg: oklch(94% 0.03 275);
-    --selection-fg: oklch(35% 0.13 275);
+    --selection-bg: color-mix(in oklch, var(--primary) 22%, transparent);
+    --selection-fg: var(--primary-ultra-dark);
 
     /* ============================================================ */
     /* INTERACTIVE STATES                                             */
@@ -436,5 +399,164 @@
   ::selection {
     background: var(--selection-bg);
     color: var(--selection-fg);
+  }
+
+  /* ============================================================ */
+  /* MODE — dark                                                    */
+  /* ============================================================ */
+  /* Two orthogonal axes:                                            */
+  /*   data-mode  → light / dark   (luminance, contrast)             */
+  /*   data-theme → default / presenter / ... (palette + fonts)      */
+  /* Activate dark with `<html data-mode="dark">`. Combine with any  */
+  /* theme: `<html data-theme="presenter" data-mode="dark">`.        */
+
+  :root[data-mode="dark"] {
+    color-scheme: dark;
+
+    /* Primitives — soft off-black canvas + off-white ink.
+       L choices land where Material/Apple/Notion sit (17-20% bg, 82-86%
+       text) to keep body-text contrast around ~12:1, not the harsh 18:1+
+       of pure black/white. Warm hue on --base (H 85) preserves the
+       intimacy of the v0.5 cream identity; cool hue on --neutral (H 275)
+       keeps the ink reading as ink, not gray. */
+    --base: oklch(21% 0.008 85);     /* warm off-black, softer than Material baseline */
+    --neutral: oklch(82% 0.006 275); /* off-white, cool, no glow */
+    --primary: oklch(72% 0.1 275);   /* slate light, ~15% less saturated */
+
+    /* Surfaces — defined explicitly. Light side now means "elevated up"
+       (raised cards lighter than body, sunk panels barely lifted); dark
+       side is context-shift, a near-white bg for blocks that want light/
+       inverted contrast inside a dark theme. The auto-derive from
+       --base shades is wrong here because color-mix(--base, --neutral)
+       INCREASES luminance once --neutral flips to light. */
+    --bg: var(--base);
+    --bg-ultra-light: oklch(29% 0.008 85);   /* raised cards, highest elevation */
+    --bg-light: oklch(25% 0.008 85);         /* sunk panels, subtle lift */
+    --bg-dark: oklch(82% 0.006 275);         /* context shift — light bg block */
+    --bg-ultra-dark: oklch(92% 0.006 275);   /* context shift — deepest light */
+    --bg-hover: oklch(26% 0.008 85);         /* interaction feedback */
+    --bg-active: oklch(30% 0.008 85);        /* pressed state */
+
+    /* Text — heading = body (no extra glow); --text-light flips to DARK
+       so callers that mean "text-on-primary-fill" still get contrast
+       (primary is now slate-light, needs dark text). */
+    --heading-color: var(--neutral);
+    --text-light: var(--neutral-ultra-dark);
+
+    /* Borders — bumped opacity so they stay perceptible on warm dark bg */
+    --border-color-dark: color-mix(in oklch, var(--neutral) 22%, transparent);
+    --border-color-light: color-mix(in oklch, var(--neutral) 12%, transparent);
+
+    /* Status — L raised so badges read; saturation dropped ~15-20pp so
+       they don't vibrate against dark bg (Material recommendation). */
+    --info: oklch(70% 0.11 255);
+    --success: oklch(68% 0.1 150);
+    --warning: oklch(75% 0.11 70);
+    --danger: oklch(70% 0.13 25);
+
+    /* Accents — same hues as light mode (identity preserved). L lifted
+       to 68-75% so they pop on dark; C dropped ~15-20% to soften vibration. */
+    --accent-1: oklch(70% 0.1 260);
+    --accent-2: oklch(72% 0.11 45);
+    --accent-3: oklch(70% 0.1 150);
+    --accent-4: oklch(70% 0.12 20);
+    --accent-5: oklch(75% 0.1 330);
+    --accent-6: oklch(72% 0.09 200);
+    --accent-7: oklch(68% 0.1 295);
+    --accent-8: oklch(74% 0.1 85);
+
+    /* Tag tones — bg ≈ 27% L (subtle pill, +6pp over body so it lifts
+       visibly), fg ≈ 80% L (legible without halo). */
+    --tag-amber-bg: oklch(27% 0.04 80);
+    --tag-amber-fg: oklch(80% 0.06 70);
+    --tag-blue-bg: oklch(27% 0.04 240);
+    --tag-blue-fg: oklch(82% 0.08 250);
+    --tag-teal-bg: oklch(27% 0.04 180);
+    --tag-teal-fg: oklch(80% 0.06 190);
+    --tag-green-bg: oklch(27% 0.05 150);
+    --tag-green-fg: oklch(80% 0.08 150);
+    --tag-purple-bg: oklch(27% 0.04 300);
+    --tag-purple-fg: oklch(82% 0.08 300);
+    --tag-red-bg: oklch(27% 0.04 20);
+    --tag-red-fg: oklch(82% 0.1 25);
+    --tag-neutral-bg: oklch(27% 0.005 60);
+    --tag-neutral-fg: var(--text-muted);
+
+    /* Selection — slate tint with off-white fg */
+    --selection-bg: color-mix(in oklch, var(--primary) 35%, transparent);
+    --selection-fg: var(--neutral);
+
+    /* Shadows — black on darker is invisible at low opacity; bump to
+       30-50% so elevation reads. */
+    --box-shadow-1: 0 1px 2px 0
+      color-mix(in srgb, var(--black) 30%, transparent);
+    --box-shadow-2: 0 2px 6px -1px
+      color-mix(in srgb, var(--black) 40%, transparent);
+    --box-shadow-3: 0 8px 24px -4px
+      color-mix(in srgb, var(--black) 50%, transparent);
+  }
+
+  /* Smooth color transitions on theme swap (browsers without View
+     Transitions API still get a gradual fade). Limit to color/bg
+     props so geometry doesn't animate. */
+  :where(html, body, *) {
+    transition:
+      background-color var(--transition),
+      color var(--transition),
+      border-color var(--transition);
+  }
+
+  /* View Transitions API — root crossfade. Disable default browser
+     opacity tween between the snapshots so colors swap clean. */
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none;
+    mix-blend-mode: normal;
+  }
+
+  /* ============================================================ */
+  /* THEME — Serif Quiet                                            */
+  /* ============================================================ */
+  /* Proof-of-concept theme. Demonstrates the data-theme axis with  */
+  /* the most visible single change: body type switches from sans   */
+  /* to serif. Everything reads in Newsreader; mono kickers stay    */
+  /* for metadata contrast. Paleta tinted warmer (closer to old-    */
+  /* paper cream) so the serif feels intentional, not accidental.   */
+
+  :root[data-theme="serif-quiet"] {
+    /* Body type → serif. Headings & mono untouched (still Newsreader
+       + JetBrains Mono). The contextual --text-font-family alias is
+       what body consumes, so this single line repaints all sans copy. */
+    --font-sans: var(--font-display);
+    --text-line-height: 1.6;
+    --text-text-wrap: pretty;
+
+    /* Cream slightly warmer — H 75 vs default 85, +chroma so it feels
+       like an aged-paper cream rather than the cool warm-cream default. */
+    --base: oklch(96% 0.014 75);
+
+    /* Slate warmer + slightly darker so it sits as a brown-slate accent
+       on cream, like ink on parchment. */
+    --primary: oklch(38% 0.09 50);
+
+    /* Borders pick up the warmth automatically via --neutral derivation,
+       but we drop chroma on the neutral so the ink doesn't compete with
+       the warm base. */
+    --neutral: oklch(28% 0.008 60);
+  }
+
+  /* Serif Quiet + dark — combine theme × mode. Most of the dark mode
+     overrides still apply; we only retune the few primitives that need
+     to keep the "aged paper" character in inverted luminance. */
+  :root[data-theme="serif-quiet"][data-mode="dark"] {
+    /* Warm dark base — slightly more chroma than the default dark to
+       stay in the aged-paper register even when inverted. */
+    --base: oklch(22% 0.014 75);
+
+    /* Off-cream text instead of cool ink-light, to keep the warm read. */
+    --neutral: oklch(84% 0.012 75);
+
+    /* Slate warm-light so primary remains the same "brown ink" feeling. */
+    --primary: oklch(74% 0.09 50);
   }
 }

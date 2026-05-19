@@ -5,6 +5,28 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="robots" content="noindex, nofollow" />
     <meta name="theme-color" content="#f7f5ef" />
+    <meta name="theme-color" content="#1a1a1a" media="(prefers-color-scheme: dark)" />
+    <script>
+      // Apply theme + mode BEFORE first paint to avoid FOIC.
+      // Mirrors $lib/theme.svelte.ts; kept inline so it runs sync.
+      // Two axes: data-theme (palette/fonts) + data-mode (light/dark).
+      // Mode: 'light' | 'dark' | 'system'. 'system' (or no saved value)
+      // follows prefers-color-scheme live; explicit light/dark wins.
+      (function () {
+        try {
+          var root = document.documentElement;
+          var theme = localStorage.getItem('hour_theme') || 'editorial-sobrio';
+          if (theme !== 'editorial-sobrio') root.setAttribute('data-theme', theme);
+          var saved = localStorage.getItem('hour_mode');
+          var mode = saved === 'light' || saved === 'dark' ? saved : 'system';
+          var dark =
+            mode === 'dark' ||
+            (mode === 'system' &&
+              window.matchMedia('(prefers-color-scheme: dark)').matches);
+          if (dark) root.setAttribute('data-mode', 'dark');
+        } catch (e) {}
+      })();
+    </script>
     <link rel="icon" type="image/svg+xml" href="%sveltekit.assets%/icon.svg" />
     <link rel="apple-touch-icon" href="%sveltekit.assets%/icon.svg" />
     <link rel="manifest" href="%sveltekit.assets%/manifest.webmanifest" />
