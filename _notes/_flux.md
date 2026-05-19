@@ -4,6 +4,13 @@ Running notes, in motion. Cuando algo se asiente: migrar fuera.
 
 ---
 
+## 2026-05-19 — "Places" eyebrow en Plaza es provisional
+Sidebar upper lleva eyebrow "Places" (sustituyó a "Projects" hoy 2026-05-19 mañana). Marco eligió "Places" por dos razones: (1) no miente como mentía "Projects" cuando el árbol contiene workspaces + projects, (2) encaja semánticamente con "Lines" en sidebar lower (places y lines como categorías espaciales, vocabulario Hour-poético anti-CRM).
+
+Pendiente decisión secundaria: ¿quitarlo completamente? El brand "hour" arriba del sidebar ya identifica el panel. La pregunta es si "Places" añade orientación valiosa o si es ruido visual. Re-evaluar tras un día de uso real con la UI. Si decide quitar, es 1-line edit en `Plaza.svelte:138`.
+
+---
+
 ## 2026-05-19 — Demo load: gaps descubiertos cargando workspace `demo` en marco-rubiol-acc
 
 **Contexto:** workspace `demo` creado en `marco-rubiol-acc` con producción ficticia "Última órbita" (1 project + 1 section tour + 3 shows BCN/MAD/VLC + 3 engagements + 2 cast_members + 1 cast_override + 6 crew_assignments + 7 dates + 4 asset_versions). Pre-carga ADR-034 añadió `cast_member` a 25 tablas. Carga manual vía SQL directo (sin UI), anotando fricción según iba. Lista honesta de gaps — algunos son schema, algunos son tool friction, algunos son UI ausente que Phase 0.2 debe responder.
