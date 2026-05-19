@@ -27,6 +27,7 @@ export { channelName } from './channels';
 export {
   createRealtimeClient,
   decodeJwtSub,
+  decodeJwtClaim,
   useRealtime,
   provideRealtime,
   type RealtimeEnv,

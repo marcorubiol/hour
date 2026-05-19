@@ -1,4 +1,13 @@
 <script lang="ts">
+  /**
+   * Sign-in page — editorial split layout (design system v0.5, ADR-033).
+   *
+   * Left column carries the form, right column carries brand promise + a
+   * static "this week" preview card. The preview is hardcoded — it's
+   * illustrative (the design says "v0.4 prototype") and shouldn't carry the
+   * cost of fetching real engagements before auth.
+   */
+
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { t } from '$lib/i18n';
@@ -77,84 +86,445 @@
 </svelte:head>
 
 <main class="login">
-  <div class="login__card">
-    <h1 class="h2">{t('app.name')}</h1>
-    <p class="text--s text--dark-muted login__subtitle">{t('login.phase')}</p>
+  <section class="login__left">
+    <header class="login__brand">
+      <span class="login__brand-mark" aria-hidden="true"></span>
+      <span>{t('app.name')}</span>
+    </header>
 
-    <form class="form" onsubmit={handleSubmit}>
-      <div>
-        <label for="email">{t('login.email')}</label>
-        <!-- svelte-ignore a11y_autofocus -->
-        <input
-          type="email"
-          id="email"
-          name="email"
-          required
-          autocomplete="email"
-          autofocus
-          bind:value={email}
-        />
+    <div class="login__center">
+      <span class="login__kicker">{t('login.submit')}</span>
+      <h1 class="login__title">Hello <em>again.</em></h1>
+      <p class="login__sub">
+        Your projects, contacts, shows and money — held together, one hour at a time.
+      </p>
+
+      <form class="login__form" onsubmit={handleSubmit}>
+        <label class="login__field">
+          <span class="login__label">{t('login.email')}</span>
+          <!-- svelte-ignore a11y_autofocus -->
+          <input
+            class="login__input"
+            type="email"
+            name="email"
+            autocomplete="email"
+            placeholder="you@somewhere.com"
+            required
+            autofocus
+            bind:value={email}
+          />
+        </label>
+
+        <label class="login__field">
+          <span class="login__label">{t('login.password')}</span>
+          <input
+            class="login__input"
+            type="password"
+            name="password"
+            autocomplete="current-password"
+            placeholder="••••••••"
+            required
+            bind:value={password}
+          />
+        </label>
+
+        {#if errorMsg}
+          <p class="login__error" role="alert">{errorMsg}</p>
+        {/if}
+
+        <button class="login__submit" type="submit" disabled={submitting}>
+          <span>{submitting ? t('login.signing_in') : t('login.submit')}</span>
+          <span class="login__submit-arrow" aria-hidden="true">→</span>
+        </button>
+      </form>
+    </div>
+
+    <footer class="login__foot">
+      <span>{t('login.phase')}</span>
+    </footer>
+  </section>
+
+  <aside class="login__right" aria-hidden="true">
+    <div class="login__quote">
+      <div class="login__quote-kicker">
+        For freelance artists who wear too many hats
       </div>
+      <p class="login__quote-text">
+        One inbox can't hold a tour, a band, a song, a residency, and a press kit
+        at the same time. <em>So we made one that can.</em>
+      </p>
+      <div class="login__quote-attr">— Hour, Phase 0 · internal</div>
+    </div>
 
-      <div>
-        <label for="password">{t('login.password')}</label>
-        <input
-          type="password"
-          id="password"
-          name="password"
-          required
-          autocomplete="current-password"
-          bind:value={password}
-        />
+    <div class="login__preview">
+      <div class="login__preview-head">
+        <span class="login__preview-dot" style="background: var(--accent-1)"></span>
+        <span class="login__preview-name">This week</span>
+        <span class="login__preview-day">Mon · 18 May</span>
       </div>
-
-      {#if errorMsg}
-        <p class="login__error login__error--visible" role="alert">{errorMsg}</p>
-      {:else}
-        <p class="login__error"></p>
-      {/if}
-
-      <button
-        class="btn--primary login__submit"
-        type="submit"
-        disabled={submitting}
-      >
-        {submitting ? t('login.signing_in') : t('login.submit')}
-      </button>
-    </form>
-  </div>
+      <div class="login__preview-item">
+        <span class="login__preview-kind">task</span>
+        <span class="login__preview-verb">Confirm</span>
+        <span class="login__preview-subj">hotel block · Igualada</span>
+        <span class="login__preview-proj">mamemi</span>
+      </div>
+      <div class="login__preview-item">
+        <span class="login__preview-kind login__preview-kind--wait">waiting 4d</span>
+        <span class="login__preview-verb">Ruth Schmidli</span>
+        <span class="login__preview-subj">Gessnerallee fee</span>
+        <span class="login__preview-proj">mamemi</span>
+      </div>
+      <div class="login__preview-item">
+        <span class="login__preview-kind login__preview-kind--event">event</span>
+        <span class="login__preview-verb">Mix</span>
+        <span class="login__preview-subj">Tamarit · session 3/5 · 10h</span>
+        <span class="login__preview-proj">marco rubiol</span>
+      </div>
+      <div class="login__preview-item">
+        <span class="login__preview-kind login__preview-kind--money">money</span>
+        <span class="login__preview-verb">Chase</span>
+        <span class="login__preview-subj">Aarhus residency · €1,800</span>
+        <span class="login__preview-proj">marco rubiol</span>
+      </div>
+    </div>
+  </aside>
 </main>
 
 <style>
   @layer components {
     .login {
-      min-block-size: 100dvh;
       display: grid;
-      place-items: center;
+      grid-template-columns: minmax(420px, 1fr) minmax(440px, 1.1fr);
+      min-block-size: 100dvh;
+      background: var(--bg);
+      color: var(--text-color);
     }
 
-    .login__card {
+    @media (max-width: 55rem) {
+      .login {
+        grid-template-columns: 1fr;
+      }
+      .login__right {
+        display: none;
+      }
+    }
+
+    /* ── left: brand + form ── */
+
+    .login__left {
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      padding: clamp(22px, 4vw, 48px);
+      min-block-size: 0;
+    }
+
+    .login__brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      font-family: var(--font-display);
+      font-size: var(--text-xl);
+      font-style: italic;
+      font-weight: 400;
+      letter-spacing: -0.02em;
+      color: var(--text-color);
+    }
+
+    .login__brand-mark {
+      inline-size: 14px;
+      block-size: 14px;
+      border: 1.5px solid currentColor;
+      border-radius: 3px;
+      display: inline-block;
+    }
+
+    .login__center {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      max-inline-size: 360px;
       inline-size: 100%;
-      max-inline-size: 22rem;
+      margin-inline: auto;
+      padding-block: var(--pad-2xl);
     }
 
-    .login__subtitle {
-      margin-block-end: var(--space-xl);
+    .login__kicker {
+      font-family: var(--font-mono);
+      font-size: var(--text-xxs);
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+      margin-block-end: var(--pad-lg);
+    }
+
+    .login__title {
+      font-family: var(--font-display);
+      font-size: clamp(2.2rem, 4vw, 2.8rem);
+      font-weight: 400;
+      letter-spacing: -0.025em;
+      line-height: 1.05;
+      margin: 0;
+      color: var(--text-color);
+    }
+    .login__title em {
+      font-style: italic;
+      color: var(--text-muted);
+    }
+
+    .login__sub {
+      margin-block-start: 14px;
+      margin-block-end: var(--pad-2xl);
+      color: var(--text-muted);
+      font-size: var(--text-m);
+      line-height: 1.55;
+      text-wrap: pretty;
+      max-inline-size: 32ch;
+    }
+
+    /* form */
+    .login__form {
+      display: flex;
+      flex-direction: column;
+      gap: var(--pad);
+    }
+
+    .login__field {
+      display: flex;
+      flex-direction: column;
+      gap: var(--pad-xs);
+    }
+
+    .login__label {
+      font-family: var(--font-mono);
+      font-size: var(--text-xxs);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+      font-weight: 500;
+    }
+
+    .login__input {
+      appearance: none;
+      border: 1px solid var(--border-color);
+      background: var(--bg-raised);
+      padding-block: var(--pad);
+      padding-inline: 14px;
+      font: inherit;
+      font-size: var(--text-m);
+      color: var(--text-color);
+      border-radius: var(--radius);
+      transition:
+        border-color var(--transition), background var(--transition);
+    }
+    .login__input::placeholder {
+      color: var(--text-faint);
+    }
+    .login__input:focus {
+      outline: none;
+      border-color: var(--text-color);
+      background: var(--bg);
     }
 
     .login__error {
-      color: var(--danger-dark);
       font-size: var(--text-s);
-      min-block-size: var(--text-s);
-      display: none;
-    }
-    .login__error--visible {
-      display: block;
+      color: var(--danger);
+      margin: 0;
     }
 
     .login__submit {
-      --btn-width: 100%;
-      margin-block-start: var(--space-xs);
+      appearance: none;
+      background: var(--text-color);
+      color: var(--bg);
+      border: 0;
+      font: inherit;
+      font-size: var(--text-m);
+      font-weight: 500;
+      padding-block: 13px;
+      padding-inline: var(--pad-lg);
+      border-radius: var(--radius);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--pad-sm);
+      margin-block-start: var(--pad-sm);
+      transition: opacity var(--transition);
+    }
+    .login__submit:hover {
+      opacity: 0.85;
+    }
+    .login__submit:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .login__submit-arrow {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      opacity: 0.7;
+    }
+
+    .login__foot {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: var(--pad-sm);
+      font-size: var(--text-xs);
+      color: var(--text-faint);
+      flex-wrap: wrap;
+    }
+
+    /* ── right: brand promise + preview ── */
+
+    .login__right {
+      background: var(--bg-sunk);
+      border-inline-start: 1px solid var(--border-color-soft);
+      padding: clamp(22px, 4vw, 48px);
+      display: grid;
+      grid-template-rows: 1fr auto;
+      gap: var(--pad);
+      min-block-size: 0;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Subtle decorative diamond — same vocab as section kind glyphs. */
+    .login__right::before {
+      content: "";
+      position: absolute;
+      inset-block-start: -40px;
+      inset-inline-end: -40px;
+      inline-size: 220px;
+      block-size: 220px;
+      border: 1px solid var(--border-color);
+      transform: rotate(45deg);
+      opacity: 0.45;
+    }
+
+    .login__quote {
+      align-self: center;
+      max-inline-size: 480px;
+      position: relative;
+    }
+
+    .login__quote-kicker {
+      font-family: var(--font-mono);
+      font-size: var(--text-xxs);
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+      margin-block-end: 18px;
+    }
+
+    .login__quote-text {
+      font-family: var(--font-display);
+      font-size: clamp(1.6rem, 2.4vw, 2.1rem);
+      font-weight: 400;
+      letter-spacing: -0.015em;
+      line-height: 1.2;
+      color: var(--text-color);
+      margin: 0;
+      text-wrap: balance;
+    }
+    .login__quote-text em {
+      font-style: italic;
+      color: var(--text-muted);
+    }
+
+    .login__quote-attr {
+      margin-block-start: var(--pad-lg);
+      font-size: var(--text-xs);
+      color: var(--text-faint);
+      font-family: var(--font-mono);
+      letter-spacing: 0.04em;
+    }
+
+    .login__preview {
+      background: var(--bg-raised);
+      border: 1px solid var(--border-color-soft);
+      border-radius: var(--radius-lg);
+      padding: 18px 20px;
+      box-shadow: var(--box-shadow-2);
+      max-inline-size: 440px;
+    }
+
+    .login__preview-head {
+      display: flex;
+      align-items: center;
+      gap: var(--pad-sm);
+      margin-block-end: 14px;
+      padding-block-end: 10px;
+      border-block-end: 1px solid var(--border-color-soft);
+    }
+
+    .login__preview-dot {
+      inline-size: 8px;
+      block-size: 8px;
+      border-radius: 50%;
+    }
+
+    .login__preview-name {
+      font-family: var(--font-display);
+      font-size: var(--text-m);
+      font-weight: 500;
+      letter-spacing: -0.01em;
+      color: var(--text-color);
+    }
+
+    .login__preview-day {
+      margin-inline-start: auto;
+      font-family: var(--font-mono);
+      font-size: 0.5625rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+    }
+
+    .login__preview-item {
+      display: grid;
+      grid-template-columns: 64px auto minmax(0, 1fr) auto;
+      gap: 10px;
+      align-items: baseline;
+      padding-block: 6px;
+      font-size: var(--text-xs);
+    }
+    .login__preview-item + .login__preview-item {
+      border-block-start: 1px solid var(--border-color-soft);
+    }
+
+    .login__preview-kind {
+      font-family: var(--font-mono);
+      font-size: var(--text-xxs);
+      color: var(--text-faint);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .login__preview-kind--wait {
+      color: var(--text-faint);
+      font-style: italic;
+    }
+    .login__preview-kind--event {
+      color: var(--success);
+    }
+    .login__preview-kind--money {
+      color: var(--warning);
+    }
+
+    .login__preview-verb {
+      color: var(--text-color);
+      font-weight: 500;
+    }
+    .login__preview-subj {
+      color: var(--text-muted);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .login__preview-proj {
+      font-family: var(--font-mono);
+      font-size: 0.5625rem;
+      color: var(--text-faint);
+      text-transform: lowercase;
+      letter-spacing: 0.04em;
     }
   }
 </style>

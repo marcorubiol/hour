@@ -32,13 +32,31 @@ export interface RealtimeEnv {
  * decides whether to fall back to an anonymous key or skip presence.
  */
 export function decodeJwtSub(jwt: string): string | null {
+  return decodeJwtClaim(jwt, 'sub');
+}
+
+/**
+ * Decode any string claim from a Supabase JWT payload. Returns null on
+ * malformed input or non-string claim. Used by callers who need the user's
+ * `email`, or `user_metadata.full_name` for greetings and presence labels.
+ */
+export function decodeJwtClaim(jwt: string, path: string): string | null {
   try {
     const [, payload] = jwt.split('.');
     if (!payload) return null;
     const b64 = payload.replace(/-/g, '+').replace(/_/g, '/');
     const padded = b64 + '='.repeat((4 - (b64.length % 4)) % 4);
-    const json = JSON.parse(atob(padded)) as { sub?: unknown };
-    return typeof json.sub === 'string' ? json.sub : null;
+    const json = JSON.parse(atob(padded)) as Record<string, unknown>;
+    const parts = path.split('.');
+    let cur: unknown = json;
+    for (const p of parts) {
+      if (cur && typeof cur === 'object' && p in (cur as Record<string, unknown>)) {
+        cur = (cur as Record<string, unknown>)[p];
+      } else {
+        return null;
+      }
+    }
+    return typeof cur === 'string' ? cur : null;
   } catch {
     return null;
   }

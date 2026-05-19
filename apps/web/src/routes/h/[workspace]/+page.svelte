@@ -20,6 +20,7 @@
   import { goto } from '$app/navigation';
   import { createQuery } from '@tanstack/svelte-query';
   import { accentVar } from '$lib/utils/accent';
+  import { decodeJwtClaim } from '$lib/realtime';
   import Pill from '$lib/components/Pill.svelte';
   import TagChip from '$lib/components/TagChip.svelte';
 
@@ -49,9 +50,10 @@
 
   type Engagement = {
     id: string;
-    title: string | null;
     status: EngagementStatus;
+    role: string | null;
     next_action_at: string | null;
+    next_action_note: string | null;
     updated_at: string;
     custom_fields: Record<string, unknown> | null;
     person: {
@@ -146,10 +148,49 @@
       .toUpperCase(),
   );
 
+  // Greeting takes the user's first name from the JWT (user_metadata.full_name
+  // set at signup; otherwise the email's local part with separators). Falls
+  // back to the personal workspace name. Workspace name is the wrong source
+  // — Marco isn't "mamemi" when he's looking at the mamemi workspace.
+
+  function titleCase(s: string): string {
+    return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
+  }
+
+  let jwtName = $state<string | null>(null);
+
+  $effect(() => {
+    if (typeof window === 'undefined') return;
+    const jwt = localStorage.getItem('hour_jwt');
+    if (!jwt) return;
+    const full =
+      decodeJwtClaim(jwt, 'user_metadata.full_name') ||
+      decodeJwtClaim(jwt, 'user_metadata.name');
+    if (full) {
+      jwtName = full.split(/\s+/)[0] ?? full;
+      return;
+    }
+    const email = decodeJwtClaim(jwt, 'email');
+    if (email) {
+      const local = email.split('@')[0] ?? '';
+      const first = local.split(/[._-]+/)[0];
+      if (first && first.length < local.length) {
+        // Email had separators — first segment is a real name.
+        jwtName = titleCase(first);
+      }
+    }
+  });
+
+  // Final greeting name: JWT user_metadata > JWT email split > the personal
+  // workspace's display name (always reads cleanly even if signup metadata
+  // is missing).
   let firstName = $derived.by(() => {
-    const ws = $housesQuery.data?.items.find((h) => h.slug === workspaceSlug);
-    if (!ws) return 'there';
-    return ws.name.split(/[\s-]+/)[0] ?? ws.name;
+    if (jwtName) return jwtName;
+    const personal = $housesQuery.data?.items.find((h) => h.kind === 'personal');
+    if (personal) {
+      return personal.name.split(/\s+/)[0] ?? personal.name;
+    }
+    return 'there';
   });
 
   let activeProjectsCount = $derived(
@@ -248,7 +289,7 @@
         const subject =
           e.person?.full_name ||
           e.person?.organization_name ||
-          e.title ||
+          e.next_action_note ||
           'Untitled';
         return {
           id: e.id,

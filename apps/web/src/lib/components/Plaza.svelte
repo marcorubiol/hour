@@ -86,12 +86,22 @@
   let rooms = $derived($roomsQuery.data?.items ?? []);
 
   let projectRows = $derived(
-    houses.map((house) => ({
-      house,
-      count: rooms.filter((r) => r.workspace_id === house.id).length,
-      subtitle:
-        house.kind === 'personal' ? 'Personal workspace' : 'Team workspace',
-    })),
+    houses.map((house) => {
+      const houseRooms = rooms.filter((r) => r.workspace_id === house.id);
+      // Navigate to the first active room if there is one (Phase 0
+      // convention: 1 project per workspace). If empty, fall back to the
+      // workspace home — same href, but at least the URL changes.
+      const firstRoom = houseRooms[0];
+      return {
+        house,
+        count: houseRooms.length,
+        subtitle:
+          house.kind === 'personal' ? 'Personal workspace' : 'Team workspace',
+        href: firstRoom
+          ? `/h/${house.slug}/room/${firstRoom.slug}`
+          : `/h/${house.slug}/`,
+      };
+    }),
   );
 
   let loading = $derived($housesQuery.isPending || $roomsQuery.isPending);
@@ -109,20 +119,15 @@
     <p class="plaza__state">No projects yet.</p>
   {:else}
     <ul class="plaza__list" role="list">
-      {#each projectRows as { house, count, subtitle } (house.id)}
+      {#each projectRows as { house, count, subtitle, href } (house.id)}
         {@const isUrlHouse = house.slug === activeWorkspaceSlug}
-        {@const isActive = isUrlHouse && activeRoomSlug === ''}
-        {@const isOnPath = isUrlHouse && activeRoomSlug !== ''}
+        {@const isActive = isUrlHouse}
         <li>
           <a
-            class={[
-              'plaza__row',
-              isActive && 'plaza__row--active',
-              isOnPath && 'plaza__row--on-path',
-            ]
+            class={['plaza__row', isActive && 'plaza__row--active']
               .filter(Boolean)
               .join(' ')}
-            href={`/h/${house.slug}/`}
+            {href}
             aria-current={isActive ? 'page' : undefined}
             style={`--c: ${accentVar(house.slug)}`}
           >
@@ -185,10 +190,6 @@
 
     .plaza__row--active {
       background: var(--bg-active);
-    }
-
-    .plaza__row--on-path .plaza__row-name {
-      color: var(--text-color);
     }
 
     .plaza__row-rail {

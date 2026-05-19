@@ -49,7 +49,7 @@ Working name: **Hour**. Brand decision deferred to Phase 1.
 - Indicative Phase 1 pricing: 25 / 60 / 120 €/mes, no setup fee, 14-day trial.
 - Coding happens in Windsurf (switched from Claude Code). Strategy happens in Cowork. Memory lives in `build/*.md`, not in chats.
 - Project lives in AGENCY (the vehicle / work for others), not STUDIO — Marco's call.
-- **Palette (semi-firm, evolutionary)**: primary `oklch(0.50 0.14 335)` ≈ `#9D3F70` (plum, swapped 2026-05-01 — terracotta `#AB4235` was 5° from danger and read as error-adjacent on focus outline / btn--primary / selected chips). Light theme (D-PRE-01). Three colour categories: base hues (`primary`, `base`, `neutral`) + status (`info`, `success`, `warning`, `danger`) + contextual (`text-color`, `bg-*`). All shades via `color-mix()` in OKLCH. Provisional — re-evaluate when visual design phase begins.
+- **Visual language v0.5** (ADR-033, 2026-05-18): editorial-sobrio. Plum retired — `--primary` reasigned to `var(--text-color)` (cool ink `oklch(18% 0.015 280)`). Surfaces warm-cream (5 layers), ink cool (3 weights), state lifecycle (info/success/warning/danger/faint), 8 abstract accents mapped by `hash(slug) % 8` (helper `$lib/utils/accent.ts`), 6 tag-tone pairs (amber/blue/teal/green/purple/red). Typography: Newsreader display + Inter sans + JetBrains Mono metadata (loaded in `app.html`). Three colour categories preserved (base hues / status / contextual) per philosophy.md. All shades via `color-mix()` in OKLCH. Reference: `/Users/marcorubiol/Downloads/Hour/Hour Design System.html`.
 
 ## Code
 - Local path: `03_AGENCY/Hour/` (monorepo, `git init` done 2026-04-19, branch `main`).
@@ -128,19 +128,21 @@ Lista honesta de lo que falta, ordenada por ratio coste/riesgo. **Atacar de arri
 - **paraglide-js v2** para i18n (~2-3h). El `$lib/i18n.ts` simple actual cubre los ~15 strings de Phase 0. Migrar cuando llegue contenido en español o pase de 50 strings.
 - **Sentry source-map auth token rotation policy** — el token actual (`sntryu_...`) en `apps/web/.env` no caduca. Revisar a Phase 1 si se quiere rotar.
 
-## Product vocabulary (ADR-008 → updated por ADR-030 + ADR-031 + ADR-032)
+## Product vocabulary (ADR-008 → updated por ADR-030 + ADR-031 + ADR-032 → reverted por ADR-033, 2026-05-18)
 
-Mapping schema → user-facing label (work in progress hasta naming gate con Anouk):
+Naming gate resuelto 2026-05-18: UI usa vocabulario industria-standard. Schema mantiene technical names.
 
-| Producto (UI label provisional) | Schema | Definición |
+| Producto (UI label) | Schema | Definición |
 |---|---|---|
 | (sin user-facing label aún; "Account" en admin UI Phase 1) | `account` | Entidad pagadora. Billing boundary. Personal (1 user) o team. Invisible en UI Phase 0; emerge en Settings → Account management. (ADR-032) |
-| **House** / **Project** | `workspace` | Tenant aislado. RLS scope. Lo que ves como top-level en el sidebar. Naming user-facing pendiente del gate. |
-| **Room** | `project` | Proyecto creativo: show, piece, album, producción, ciclo. Ej: "Difusión 2026-27" dentro de House MaMeMi. |
-| **Section** (UI label provisional) | `section` | Agrupación operativa dentro del project. Con `kind` enum: tour, season, phase, circuit, residency, other, creation, campaign, comms, misc. Renombrada desde `line` (ADR-031, 2026-05-18). |
-| **Gig** | `show` | Single performance event. |
+| **Project** | `workspace` | Tenant aislado. RLS scope. Lo que ves como top-level en el sidebar bajo el eyebrow "PROJECTS". |
+| (sin UI label en Phase 0; "Project" interno) | `project` | Proyecto creativo dentro de un workspace. En Phase 0 sólo hay 1 por workspace (convención), por lo que la UI lo trata como child implícito del workspace. Cuando aparezca el primer schema `project` distinto del workspace homónimo, decidir representación visual separada (ADR-033 open item). |
+| **Line** (UI label) | `section` | Agrupación operativa: tour, season, phase, circuit, residency, other, creation, campaign, comms, misc (kind enum, ADR-031). Renderiza en sidebar lower (`<RoomStructure>`). |
+| **Show** | `show` | Single performance event. |
 
-**Lens primaria**: **Plaza** (no Desk — descartado en ADR-030 por "Desk sin task entity = navegación vacía"). El componente sidebar y la lens primaria comparten nombre a propósito.
+**Lens primaria**: **Today** (ADR-033). Pills: `Today · Calendar · Contacts · Money`. Componentes internos mantienen los nombres `Plaza.svelte` (sidebar upper) y "Desk" como concepto del sistema de pills — no aparecen en copy visible.
+
+URL paths siguen con segmentos legacy `/h/[workspace]/room/[slug]/` (rename a `/project/` requiere 301 redirect, ~30 min, se hace cuando un user externo bookmarquee — coste no justificado en Phase 0).
 
 Schema retains technical names (`account`, `workspace`, `project`, `section`, `show`). UI labels pueden cambiar libremente hasta Phase 0.9 sin tocar schema (ADR-008 separation).
 
