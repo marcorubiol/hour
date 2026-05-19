@@ -119,24 +119,38 @@
     return m?.[1] ?? '';
   });
 
-  // Focus: pinned to SelectionStore so LineList can mirror it
-  // (workspaces filter = only the focused workspace, projects filter
-  // empty for the duration). When focus exits, the previous selection
-  // surfaces unchanged — focus never mutates the underlying sets.
+  // Focus: pinned to SelectionStore. Tree filter accounts for both kinds:
+  //  · workspace focus → only that workspace's row, all its projects
+  //  · project focus   → only the project's workspace row, only that project
   let tree = $derived.by(() => {
     const all = workspaces.map((workspace) => ({
       workspace,
       projects: projects.filter((p) => p.workspace_id === workspace.id),
     }));
-    const focusSlug = selection.focusedWorkspaceSlug;
-    if (focusSlug == null) return all;
-    return all.filter((t) => t.workspace.slug === focusSlug);
+    const wsFocus = selection.focusedWorkspaceSlug;
+    const projFocus = selection.focusedProjectSlug;
+    if (wsFocus == null) return all;
+    const filtered = all.filter((t) => t.workspace.slug === wsFocus);
+    if (projFocus == null) return filtered;
+    return filtered.map((t) => ({
+      ...t,
+      projects: t.projects.filter((p) => p.slug === projFocus),
+    }));
   });
 
   function toggleFocus(workspaceSlug: string) {
-    selection.setFocus(
-      selection.focusedWorkspaceSlug === workspaceSlug ? null : workspaceSlug,
-    );
+    // Click on focus icon: toggle workspace focus. If a project is focused,
+    // clicking workspace focus exits to the workspace level (set workspace
+    // focus, clears project focus).
+    const isOnlyWsFocused =
+      selection.focusedWorkspaceSlug === workspaceSlug &&
+      selection.focusedProjectSlug === null;
+    selection.setFocus(isOnlyWsFocused ? null : workspaceSlug);
+  }
+
+  function toggleProjectFocus(projectSlug: string, workspaceSlug: string) {
+    const isThisFocused = selection.focusedProjectSlug === projectSlug;
+    selection.setProjectFocus(isThisFocused ? null : projectSlug, workspaceSlug);
   }
 
   let loading = $derived($workspacesQuery.isPending || $projectsQuery.isPending);
@@ -398,6 +412,105 @@
       description: projFormDescription,
     });
   }
+
+  // ── Add line ──────────────────────────────────────────────────────────
+  // + button on each project row opens a dialog to create a line under
+  // that project. Mirrors create_project flow: name + color (palette) +
+  // description. Server defaults kind='other'.
+  let lineDialogOpen = $state(false);
+  let lineTargetProject = $state<Project | null>(null);
+  let lineTargetWorkspaceSlug = $state<string>('');
+  let lineFormName = $state('');
+  let lineFormAccent = $state<string | null>(null);
+  let lineFormDescription = $state('');
+  let lineFormError = $state<string | null>(null);
+
+  let lineAutoAccentSlug = $derived(lineFormName.trim() || 'line');
+
+  type CreateLineInput = {
+    project_id: string;
+    name: string;
+    accent: string | null;
+    description: string;
+  };
+
+  const createLineMutation = createMutation({
+    mutationFn: async (input: CreateLineInput) => {
+      const jwt = localStorage.getItem('hour_jwt');
+      if (!jwt) {
+        clearAuthAndBounce();
+        throw new Error('Missing JWT');
+      }
+      const reqBody: Record<string, string> = {
+        project_id: input.project_id,
+        name: input.name,
+      };
+      if (input.accent) reqBody.accent = input.accent;
+      if (input.description.trim()) reqBody.description = input.description.trim();
+      const res = await fetch('/api/lines', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${jwt}`,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify(reqBody),
+      });
+      if (res.status === 401) {
+        clearAuthAndBounce();
+        throw new Error('Unauthorized');
+      }
+      const resBody = (await res.json().catch(() => ({}))) as {
+        line?: { id: string; name: string };
+        detail?: string;
+        error?: string;
+      };
+      if (!res.ok || !resBody.line) {
+        throw new Error(resBody.detail || resBody.error || `Error ${res.status}`);
+      }
+      return resBody.line;
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['lines'] });
+      await queryClient.refetchQueries({ queryKey: ['lines'] });
+      lineDialogOpen = false;
+      lineFormName = '';
+      lineFormAccent = null;
+      lineFormDescription = '';
+      lineFormError = null;
+      lineTargetProject = null;
+      lineTargetWorkspaceSlug = '';
+    },
+    onError: (err) => {
+      lineFormError = err instanceof Error ? err.message : 'Could not create line';
+    },
+  });
+
+  function openCreateLine(project: Project, workspaceSlug: string) {
+    lineTargetProject = project;
+    lineTargetWorkspaceSlug = workspaceSlug;
+    lineFormName = '';
+    lineFormAccent = null;
+    lineFormDescription = '';
+    lineFormError = null;
+    lineDialogOpen = true;
+  }
+
+  function submitCreateLine(event: Event) {
+    event.preventDefault();
+    const name = lineFormName.trim();
+    if (!name) {
+      lineFormError = 'Name cannot be empty';
+      return;
+    }
+    if (!lineTargetProject) return;
+    lineFormError = null;
+    $createLineMutation.mutate({
+      project_id: lineTargetProject.id,
+      name,
+      accent: lineFormAccent,
+      description: lineFormDescription,
+    });
+  }
 </script>
 
 <nav class="plaza" aria-label="Places">
@@ -514,95 +627,7 @@
                 .filter(Boolean)
                 .join(' ')}
             >
-              <Tooltip
-                text={isFocused ? 'Exit focus' : 'Focus'}
-                position="left"
-                delay={400}
-              >
-                <button
-                  type="button"
-                  class={[
-                    'plaza__row-icon',
-                    'plaza__focus',
-                    isFocused && 'plaza__focus--on',
-                  ]
-                    .filter(Boolean)
-                    .join(' ')}
-                  aria-label={isFocused
-                    ? `Exit focus on ${workspace.name}`
-                    : `Focus ${workspace.name}`}
-                  aria-pressed={isFocused}
-                  onclick={() => toggleFocus(workspace.slug)}
-                >
-                  <svg
-                    viewBox="0 0 14 14"
-                    width="11"
-                    height="11"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="1.4"
-                    aria-hidden="true"
-                  >
-                    <circle cx="7" cy="7" r="4.5" />
-                    <circle cx="7" cy="7" r="1.2" fill="currentColor" />
-                  </svg>
-                </button>
-              </Tooltip>
               {#if !isFocused}
-                <Tooltip text="Settings" position="left" delay={400}>
-                  <a
-                    class="plaza__row-icon plaza__settings"
-                    href={`/h/${workspace.slug}/settings`}
-                    aria-label={`Settings for ${workspace.name}`}
-                  >
-                    <svg
-                      viewBox="0 0 24 24"
-                      width="12"
-                      height="12"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      aria-hidden="true"
-                    >
-                      <!-- Sliders horizontal: 3 rails + 3 handles at varied
-                           positions. Reads as "tune / adjust" — fits the
-                           Phase 0 settings page (colors, names, prefs). -->
-                      <path d="M21 4 H14" />
-                      <path d="M10 4 H3" />
-                      <path d="M21 12 H12" />
-                      <path d="M8 12 H3" />
-                      <path d="M21 20 H16" />
-                      <path d="M12 20 H3" />
-                      <circle cx="12" cy="4" r="2" />
-                      <circle cx="10" cy="12" r="2" />
-                      <circle cx="14" cy="20" r="2" />
-                    </svg>
-                  </a>
-                </Tooltip>
-                <Tooltip text="Add project" position="left" delay={400}>
-                  <button
-                    type="button"
-                    class="plaza__row-icon plaza__add-project"
-                    aria-label={`Add project to ${workspace.name}`}
-                    onclick={() => openCreateProject(workspace)}
-                  >
-                    <svg
-                      viewBox="0 0 14 14"
-                      width="11"
-                      height="11"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="1.5"
-                      stroke-linecap="round"
-                      aria-hidden="true"
-                    >
-                      <path d="M7 2 V12" />
-                      <path d="M2 7 H12" />
-                    </svg>
-                  </button>
-                </Tooltip>
                 <Tooltip
                   text={isCollapsed ? 'Expand' : 'Collapse'}
                   position="left"
@@ -658,7 +683,95 @@
                     {/if}
                   </button>
                 </Tooltip>
+                <Tooltip text="Settings" position="left" delay={400}>
+                  <a
+                    class="plaza__row-icon plaza__settings"
+                    href={`/h/${workspace.slug}/settings`}
+                    aria-label={`Settings for ${workspace.name}`}
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      width="12"
+                      height="12"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      aria-hidden="true"
+                    >
+                      <!-- Sliders horizontal: 3 rails + 3 handles at varied
+                           positions. Reads as "tune / adjust" — fits the
+                           Phase 0 settings page (colors, names, prefs). -->
+                      <path d="M21 4 H14" />
+                      <path d="M10 4 H3" />
+                      <path d="M21 12 H12" />
+                      <path d="M8 12 H3" />
+                      <path d="M21 20 H16" />
+                      <path d="M12 20 H3" />
+                      <circle cx="12" cy="4" r="2" />
+                      <circle cx="10" cy="12" r="2" />
+                      <circle cx="14" cy="20" r="2" />
+                    </svg>
+                  </a>
+                </Tooltip>
+                <Tooltip text="Add project" position="left" delay={400}>
+                  <button
+                    type="button"
+                    class="plaza__row-icon plaza__add-project"
+                    aria-label={`Add project to ${workspace.name}`}
+                    onclick={() => openCreateProject(workspace)}
+                  >
+                    <svg
+                      viewBox="0 0 14 14"
+                      width="11"
+                      height="11"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.5"
+                      stroke-linecap="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M7 2 V12" />
+                      <path d="M2 7 H12" />
+                    </svg>
+                  </button>
+                </Tooltip>
               {/if}
+              <Tooltip
+                text={isFocused ? 'Exit focus' : 'Focus'}
+                position="left"
+                delay={400}
+              >
+                <button
+                  type="button"
+                  class={[
+                    'plaza__row-icon',
+                    'plaza__focus',
+                    isFocused && 'plaza__focus--on',
+                  ]
+                    .filter(Boolean)
+                    .join(' ')}
+                  aria-label={isFocused
+                    ? `Exit focus on ${workspace.name}`
+                    : `Focus ${workspace.name}`}
+                  aria-pressed={isFocused}
+                  onclick={() => toggleFocus(workspace.slug)}
+                >
+                  <svg
+                    viewBox="0 0 14 14"
+                    width="11"
+                    height="11"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.4"
+                    aria-hidden="true"
+                  >
+                    <circle cx="7" cy="7" r="4.5" />
+                    <circle cx="7" cy="7" r="1.2" fill="currentColor" />
+                  </svg>
+                </button>
+              </Tooltip>
             </div>
           </div>
 
@@ -680,15 +793,18 @@
                 {@const isProjectSelected = selection.isProjectSelected(project.slug)}
                 {@const isProjectOnPath =
                   !isProjectSelected && project.slug === onPathProjectSlug}
-                <li>
+                {@const isProjectFocused = selection.focusedProjectSlug === project.slug}
+                <li
+                  class={[
+                    'plaza__project-row',
+                    isProjectSelected && 'plaza__project-row--selected',
+                    isProjectOnPath && 'plaza__project-row--on-path',
+                  ]
+                    .filter(Boolean)
+                    .join(' ')}
+                >
                   <a
-                    class={[
-                      'plaza__project',
-                      isProjectSelected && 'plaza__project--selected',
-                      isProjectOnPath && 'plaza__project--on-path',
-                    ]
-                      .filter(Boolean)
-                      .join(' ')}
+                    class="plaza__project"
                     href={selection.previewUrlAfterToggleProject(
                       project.slug,
                       workspace.slug,
@@ -700,6 +816,102 @@
                   >
                     <span class="plaza__project-name">{project.name}</span>
                   </a>
+                  <div
+                    class={[
+                      'plaza__project-actions',
+                      isProjectFocused && 'plaza__project-actions--pinned',
+                    ]
+                      .filter(Boolean)
+                      .join(' ')}
+                  >
+                    {#if !isProjectFocused}
+                      <Tooltip text="Settings" position="left" delay={400}>
+                        <a
+                          class="plaza__row-icon plaza__settings"
+                          href={`/h/${workspace.slug}/project/${project.slug}/`}
+                          aria-label={`Settings for ${project.name}`}
+                        >
+                          <svg
+                            viewBox="0 0 24 24"
+                            width="12"
+                            height="12"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            aria-hidden="true"
+                          >
+                            <path d="M21 4 H14" />
+                            <path d="M10 4 H3" />
+                            <path d="M21 12 H12" />
+                            <path d="M8 12 H3" />
+                            <path d="M21 20 H16" />
+                            <path d="M12 20 H3" />
+                            <circle cx="12" cy="4" r="2" />
+                            <circle cx="10" cy="12" r="2" />
+                            <circle cx="14" cy="20" r="2" />
+                          </svg>
+                        </a>
+                      </Tooltip>
+                      <Tooltip text="Add line" position="left" delay={400}>
+                        <button
+                          type="button"
+                          class="plaza__row-icon plaza__add-line"
+                          aria-label={`Add line to ${project.name}`}
+                          onclick={() => openCreateLine(project, workspace.slug)}
+                        >
+                          <svg
+                            viewBox="0 0 14 14"
+                            width="11"
+                            height="11"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="1.5"
+                            stroke-linecap="round"
+                            aria-hidden="true"
+                          >
+                            <path d="M7 2 V12" />
+                            <path d="M2 7 H12" />
+                          </svg>
+                        </button>
+                      </Tooltip>
+                    {/if}
+                    <Tooltip
+                      text={isProjectFocused ? 'Exit focus' : 'Focus'}
+                      position="left"
+                      delay={400}
+                    >
+                      <button
+                        type="button"
+                        class={[
+                          'plaza__row-icon',
+                          'plaza__focus',
+                          isProjectFocused && 'plaza__focus--on',
+                        ]
+                          .filter(Boolean)
+                          .join(' ')}
+                        aria-label={isProjectFocused
+                          ? `Exit focus on ${project.name}`
+                          : `Focus ${project.name}`}
+                        aria-pressed={isProjectFocused}
+                        onclick={() => toggleProjectFocus(project.slug, workspace.slug)}
+                      >
+                        <svg
+                          viewBox="0 0 14 14"
+                          width="11"
+                          height="11"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="1.4"
+                          aria-hidden="true"
+                        >
+                          <circle cx="7" cy="7" r="4.5" />
+                          <circle cx="7" cy="7" r="1.2" fill="currentColor" />
+                        </svg>
+                      </button>
+                    </Tooltip>
+                  </div>
                 </li>
               {/each}
             </ul>
@@ -934,6 +1146,114 @@
   {/snippet}
 </Dialog>
 
+<Dialog
+  bind:open={lineDialogOpen}
+  title="New line"
+  description={lineTargetProject
+    ? `Adds a line under ${lineTargetProject.name}.`
+    : 'Adds a line under the selected project.'}
+  size="s"
+  onclose={() => {
+    lineFormName = '';
+    lineFormAccent = null;
+    lineFormDescription = '';
+    lineFormError = null;
+    lineTargetProject = null;
+    lineTargetWorkspaceSlug = '';
+  }}
+>
+  {#snippet children()}
+    <form class="plaza__form" onsubmit={submitCreateLine}>
+      <Input
+        label="Name"
+        name="line-name"
+        bind:value={lineFormName}
+        placeholder="e.g. Spring 2027 tour"
+        required
+        autofocus
+        autocomplete="off"
+        error={lineFormError ?? undefined}
+        disabled={$createLineMutation.isPending}
+      />
+
+      <fieldset class="plaza__swatches">
+        <legend>Color</legend>
+        <div class="plaza__swatch-grid" role="radiogroup" aria-label="Line color">
+          {#each [1, 2, 3, 4, 5, 6, 7, 8] as n (n)}
+            {@const isOn = lineFormAccent === String(n)}
+            <button
+              type="button"
+              role="radio"
+              aria-checked={isOn}
+              class={['plaza__swatch', isOn && 'plaza__swatch--on']
+                .filter(Boolean)
+                .join(' ')}
+              style={`background: var(--accent-${n})`}
+              aria-label={`Color ${n}`}
+              disabled={$createLineMutation.isPending}
+              onclick={() => (lineFormAccent = isOn ? null : String(n))}
+            ></button>
+          {/each}
+        </div>
+        <p class="plaza__swatch-hint">
+          {#if lineFormAccent}
+            <button
+              type="button"
+              class="plaza__swatch-clear"
+              onclick={() => (lineFormAccent = null)}
+              disabled={$createLineMutation.isPending}
+            >Clear · use auto</button>
+          {:else}
+            <span class="plaza__swatch-auto">
+              <span
+                class="plaza__swatch-auto-chip"
+                style={`background: ${accentVar(lineAutoAccentSlug)}`}
+                aria-hidden="true"
+              ></span>
+              Auto from name
+            </span>
+          {/if}
+        </p>
+      </fieldset>
+
+      <label class="field">
+        <span>Description</span>
+        <textarea
+          class="plaza__desc"
+          bind:value={lineFormDescription}
+          maxlength="280"
+          rows="3"
+          placeholder="Optional. What is this line about?"
+          disabled={$createLineMutation.isPending}
+        ></textarea>
+        <p class="field__msg field__msg--quiet">
+          {lineFormDescription.length} / 280
+        </p>
+      </label>
+
+      <button type="submit" hidden aria-hidden="true"></button>
+    </form>
+  {/snippet}
+  {#snippet actions()}
+    <Button
+      variant="outline"
+      size="s"
+      disabled={$createLineMutation.isPending}
+      onclick={() => (lineDialogOpen = false)}
+    >
+      Cancel
+    </Button>
+    <Button
+      variant="primary"
+      size="s"
+      loading={$createLineMutation.isPending}
+      onclick={submitCreateLine}
+    >
+      Create
+    </Button>
+  {/snippet}
+</Dialog>
+
 <style>
   @layer components {
     .plaza {
@@ -1151,7 +1471,7 @@
       margin-inline-end: var(--space-xs);
     }
 
-    /* Accent rail: 3px vertical bar spanning the full height of the
+    /* Accent rail: 2px vertical bar spanning the full height of the
        workspace block (row + nested projects ul). Lives as a ::before
        on the <li> wrapper so it extends past the workspace row down
        through the projects list. Color comes from accentVar(workspace.slug). */
@@ -1160,7 +1480,7 @@
       position: absolute;
       inset-block: var(--space-xs);
       inset-inline-start: 0;
-      inline-size: 3px;
+      inline-size: 2px;
       background: var(--c, var(--text-muted));
       border-radius: 2px;
       pointer-events: none;
@@ -1177,7 +1497,7 @@
          name's line height (see .plaza__workspace-actions below). */
       align-items: start;
       padding-block: var(--space-xs);
-      padding-inline-start: calc(var(--space-s) + 3px);
+      padding-inline-start: calc(var(--space-s) + 2px);
       padding-inline-end: var(--space-s);
       border-radius: var(--radius);
       transition: background-color var(--transition);
@@ -1198,34 +1518,40 @@
        so the hierarchy reads — hover is a very subtle "anticipation" of
        the selected state, selected is firmer (but still subtle vs. the
        canvas). Both inherit the workspace's accent via `--c`, so each
-       workspace shows its own hue on hover/select. */
+       workspace shows its own hue on hover/select. Lowered from
+       4/8/12% to 3/4/8% (editorial-sobrio refinement): the rail does
+       most of the identity work; the bg tint stays as a quiet confirm
+       of state without flooding the row. */
     .plaza__workspace:not(.plaza__workspace--selected):has(
         > .plaza__workspace-row:hover
       ) {
-      background: color-mix(in oklch, var(--c) 4%, transparent);
+      background: color-mix(in oklch, var(--c) 3%, transparent);
       border-radius: var(--radius);
     }
 
     .plaza__workspace--selected {
-      background: color-mix(in oklch, var(--c) 8%, transparent);
+      background: color-mix(in oklch, var(--c) 4%, transparent);
       border-radius: var(--radius);
     }
 
-    /* Hover on an ALREADY-selected workspace darkens the accent overlay
-       to preview the deselect: 12% > 8% selected > 4% hover-unselected.
-       Reads as "click will release this selection". The 200ms transition
-       on background-color makes the change a perceptible fade in/out
-       (not an instantaneous toggle). */
+    /* Hover on a selected workspace: bg drops from --c 4% (selected) to
+       --c 3% (same as the hover on an unselected workspace). The lighter
+       tint reads as "the accent is letting go" — preview of the deselect
+       — while staying inside the same accent spectrum (no jump to
+       neutral that would mimic the deselected state). State stays
+       readable via rail + name font-weight 600, not the bg. Mirrors the
+       project row's hover-on-selected behaviour for consistency. */
     .plaza__workspace--selected:has(> .plaza__workspace-row:hover) {
-      background: color-mix(in oklch, var(--c) 12%, transparent);
+      background: color-mix(in oklch, var(--c) 3%, transparent);
     }
 
-    /* Selected workspace name tints with its OWN accent (`--c` from the
-       li's inline style), darkened in oklch for legibility against the
-       light-tinted bg. Each workspace carries its identity colour:
-       Marco Rubiol → red, MüK Cia → purple, etc. */
+    /* Selected workspace name: weight bump from 500 → 600 communicates
+       state typographically instead of via colour tint. Removing the
+       earlier accent-darkened text frees up a colour channel — the rail
+       + bg already carry the identity; the heavier weight carries the
+       selection. */
     .plaza__workspace-row--selected .plaza__workspace-name {
-      color: color-mix(in oklch, var(--c), black 30%);
+      font-weight: 600;
     }
 
     /* On-path: URL points inside this workspace's project sub-route
@@ -1275,8 +1601,43 @@
     .plaza__workspace-row:hover .plaza__row-icon,
     .plaza__workspace-row:hover .plaza__chevron,
     .plaza__workspace-row:has(:focus-visible) .plaza__row-icon,
-    .plaza__workspace-row:has(:focus-visible) .plaza__chevron {
+    .plaza__workspace-row:has(:focus-visible) .plaza__chevron,
+    .plaza__project-row:hover .plaza__row-icon,
+    .plaza__project-row:has(:focus-visible) .plaza__row-icon {
       display: inline-flex;
+    }
+
+    /* Project actions cluster — same layout pattern as workspace actions,
+       same hover-reveal behavior via .plaza__row-icon. */
+    .plaza__project-actions {
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+    }
+
+    .plaza__project-actions--pinned .plaza__focus {
+      display: inline-flex;
+    }
+
+    /* Right-edge fade on the workspace/project name — the text mask
+       fades to transparent in the last ~24px, so when the icons overlap
+       (narrow sidebar) the text dissolves into the row's actual bg
+       (whatever colour it is in that state) instead of being abruptly
+       covered. Painting a fixed-colour strip behind the icons clashed
+       with tinted row states (hover, selected), so the fade lives on
+       the TEXT — the row's bg shows through naturally underneath. */
+    .plaza__workspace-link,
+    .plaza__project {
+      mask-image: linear-gradient(
+        to right,
+        black calc(100% - 24px),
+        transparent
+      );
+      -webkit-mask-image: linear-gradient(
+        to right,
+        black calc(100% - 24px),
+        transparent
+      );
     }
 
     .plaza__row-icon:hover,
@@ -1359,7 +1720,7 @@
          as .plaza__workspace-row (rail width + standard inline padding).
          Trailing air comes from the li's margin-inline-end inherited from
          the workspace wrapper. */
-      padding-inline-start: calc(var(--space-s) + 3px);
+      padding-inline-start: calc(var(--space-s) + 2px);
       padding-block-start: var(--space-xs);
       display: flex;
       flex-direction: column;
@@ -1374,7 +1735,7 @@
       display: flex;
       flex-direction: column;
       gap: 2px;
-      padding-inline-start: calc(var(--space-s) + 3px + var(--space-s));
+      padding-inline-start: calc(var(--space-s) + 2px + var(--space-s));
       padding-block-start: var(--space-xs);
     }
 
@@ -1410,77 +1771,78 @@
       border-radius: var(--radius-s);
     }
 
-    .plaza__project {
-      display: block;
+    /* Project row container — link on the left, actions cluster on the
+       right. Mirrors the workspace-row layout pattern. The --selected /
+       --on-path modifiers now live on the row (the <li>), not on the
+       link itself, so the actions cluster shares the tinted bg. */
+    .plaza__project-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: var(--space-xs);
+      align-items: center;
       padding-block: var(--space-xs);
       padding-inline: var(--space-s);
-      color: var(--text-color);
-      text-decoration: none;
       border-radius: var(--radius);
       transition: background-color var(--transition);
     }
 
-    .plaza__project:not(.plaza__project--selected):hover {
-      background: color-mix(in oklch, var(--c) 4%, transparent);
+    .plaza__project {
+      display: block;
+      color: var(--text-color);
+      text-decoration: none;
+      min-inline-size: 0;
     }
 
     .plaza__project:focus-visible {
       outline: var(--focus-width) solid var(--focus-color);
       outline-offset: -2px;
+      border-radius: var(--radius-s);
     }
 
-    /* Project --selected uses the same accent-tinted mix as workspace,
-       inheriting --c from the parent <li> (set via accentVar(workspace.slug)
-       on the li style). Only surfaces in cross-workspace multi-select case
-       — when the project's own workspace is also selected, the parent li
-       bg already covers and this rule is overridden by the next one. */
-    .plaza__project--selected {
+    .plaza__project-row:not(.plaza__project-row--selected):hover {
+      background: color-mix(in oklch, var(--c) 4%, transparent);
+    }
+
+    /* Project row --selected uses the same accent-tinted mix as workspace,
+       inheriting --c from the parent workspace <li>. */
+    .plaza__project-row--selected {
       background: color-mix(in oklch, var(--c) 8%, transparent);
     }
 
-    /* Hover-on-selected project: same deselect preview as workspace —
-       12% accent overlay. Inside a selected workspace (parent --selected),
-       the parent's bg is at 8%; this project hover adds its own 12% on
-       top of the parent → darker patch on that one row, signalling
-       "this row gets removed from the cascade". */
-    .plaza__project--selected:hover,
-    .plaza__workspace--selected .plaza__project--selected:hover {
-      background: color-mix(in oklch, var(--c) 12%, transparent);
+    /* Hover on a selected project: bg drops from --c 8% (selected) to
+       --c 4% (same as the hover on an unselected project). The lighter
+       tint reads as "the accent is letting go" — preview of the deselect
+       — while staying inside the same accent spectrum (no jump to
+       neutral that would mimic the deselected state). State stays
+       readable because font-weight + opacity carry it, not the bg. */
+    .plaza__project-row--selected:hover,
+    .plaza__workspace--selected .plaza__project-row--selected:hover {
+      background: color-mix(in oklch, var(--c) 4%, transparent);
     }
 
-    /* Inside a selected workspace, a project that has been MANUALLY
-       deselected (cascade removed it from selection.projects) reads as
-       "out of the group" via opacity dim — the row stays inside the
-       workspace's tinted bg (no card-within-a-card), only the row
-       content fades so it visibly drops out of the active set. Less
-       attention-grabbing than an opaque canvas punch-out. */
-    .plaza__workspace--selected .plaza__project:not(.plaza__project--selected) {
+    /* Inside a selected workspace, manually-deselected project rows dim. */
+    .plaza__workspace--selected .plaza__project-row:not(.plaza__project-row--selected) .plaza__project {
       opacity: 0.4;
       font-style: italic;
     }
 
-    /* Inside a selected workspace, the parent <li>'s bg already covers
-       this project's row. Drop the project's own --selected bg here;
-       primary tint on the name stays. Surfaces only in cross-workspace
-       case (project selected without its workspace). */
-    .plaza__workspace--selected .plaza__project--selected {
+    /* Inside a selected workspace, the parent's bg already covers this row. */
+    .plaza__workspace--selected .plaza__project-row--selected {
       background: transparent;
     }
 
-    /* On-path: URL is inside this project's sub-route. Same 2px primary
-       inline-start marker. Suppressed when the parent workspace is also
-       on-path (the workspace-level shadow already covers this row). */
-    .plaza__project--on-path {
+    /* On-path: URL is inside this project's sub-route. */
+    .plaza__project-row--on-path {
       box-shadow: inset 2px 0 0 var(--primary);
     }
 
-    .plaza__workspace--on-path .plaza__project--on-path {
+    .plaza__workspace--on-path .plaza__project-row--on-path {
       box-shadow: none;
     }
 
     /* Same accent-tinted rule for selected project names (inherits --c
        from the parent workspace li). */
-    .plaza__project--selected .plaza__project-name {
+    .plaza__project-row--selected .plaza__project-name {
       color: color-mix(in oklch, var(--c), black 30%);
     }
 

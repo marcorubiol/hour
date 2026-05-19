@@ -64,47 +64,80 @@ export class SelectionStore {
   }
 
   /**
-   * Focus mode: pins Plaza to a single workspace AND mutates the underlying
-   * selection so every consumer (LineList, on-path highlighting, URL, future
-   * breadcrumb/⌘K) sees a single source of truth. Entering focus snapshots
-   * the prior selection; exiting restores it.
+   * Focus mode: pins Plaza to a single entity (workspace OR project) AND
+   * mutates the underlying selection so every consumer (LineList, on-path
+   * highlighting, URL, future breadcrumb/⌘K) sees a single source of truth.
+   * Entering focus snapshots the prior selection; exiting restores it.
    *
-   * Edge case: if the user changes selection mid-focus (e.g. toggles a
-   * project from the focused workspace), the snapshot is invalidated and
-   * exiting just clears focus — the user keeps what they touched. Simpler
-   * than trying to merge.
+   * Two focus types, mutually exclusive:
+   *   - Workspace focus: selection = {workspace + cascaded projects}
+   *   - Project focus:   selection = {workspace_of_project + project}
+   *
+   * Switching between focus types (workspace → project or vice versa, or
+   * across different entities) keeps the original pre-focus snapshot —
+   * only fully exiting (setFocus null) restores it.
+   *
+   * Edge case: any user-initiated mutation mid-focus invalidates the
+   * snapshot. Exiting then just clears focus, keeping whatever the user
+   * touched.
    */
   focusedWorkspaceSlug = $state<string | null>(null);
+  focusedProjectSlug = $state<string | null>(null);
   private _focusSnapshot: {
     workspaces: Set<string>;
     projects: Set<string>;
   } | null = null;
 
-  setFocus(slug: string | null): void {
-    const prev = this.focusedWorkspaceSlug;
-    if (prev === slug) return;
+  /** True if any focus is active (workspace OR project). */
+  get isFocusActive(): boolean {
+    return this.focusedWorkspaceSlug !== null || this.focusedProjectSlug !== null;
+  }
 
-    if (slug !== null && prev === null) {
-      // Enter focus: snapshot, then replace selection with just this workspace.
+  setFocus(slug: string | null): void {
+    if (slug === null) {
+      this._exitFocus();
+      return;
+    }
+    if (this.focusedWorkspaceSlug === slug && this.focusedProjectSlug === null) return;
+    this._enterOrSwitch(() => {
+      this.focusedWorkspaceSlug = slug;
+      this.focusedProjectSlug = null;
+      this._applyWorkspaceFocusSelection(slug);
+    });
+  }
+
+  setProjectFocus(projectSlug: string | null, workspaceSlug?: string): void {
+    if (projectSlug === null) {
+      this._exitFocus();
+      return;
+    }
+    const wsSlug =
+      workspaceSlug ?? this.projectWorkspaceMap.get(projectSlug) ?? null;
+    if (wsSlug === null) return; // can't focus without knowing workspace
+    if (this.focusedProjectSlug === projectSlug) return;
+    this._enterOrSwitch(() => {
+      this.focusedWorkspaceSlug = wsSlug;
+      this.focusedProjectSlug = projectSlug;
+      this._applyProjectFocusSelection(wsSlug, projectSlug);
+    });
+  }
+
+  private _enterOrSwitch(mutate: () => void): void {
+    if (!this.isFocusActive) {
+      // Entering focus from nothing: snapshot current selection.
       this._focusSnapshot = {
         workspaces: new Set(this.workspaces),
         projects: new Set(this.projects),
       };
-      this.focusedWorkspaceSlug = slug;
-      this._applyFocusSelection(slug);
-      return;
     }
+    // If already focused, keep snapshot; just switch target.
+    mutate();
+  }
 
-    if (slug !== null && prev !== null) {
-      // Switch focus to a different workspace — keep the original
-      // pre-focus snapshot, just update which workspace is focused.
-      this.focusedWorkspaceSlug = slug;
-      this._applyFocusSelection(slug);
-      return;
-    }
-
-    // Exit focus (slug === null, prev !== null)
+  private _exitFocus(): void {
+    if (!this.isFocusActive) return;
     this.focusedWorkspaceSlug = null;
+    this.focusedProjectSlug = null;
     if (this._focusSnapshot !== null) {
       this.workspaces = this._focusSnapshot.workspaces;
       this.projects = this._focusSnapshot.projects;
@@ -113,11 +146,23 @@ export class SelectionStore {
     }
   }
 
-  /** Set selection to just the focused workspace (no project cascade —
-      LineList filters by workspace anyway). Called only from setFocus. */
-  private _applyFocusSelection(slug: string): void {
+  /** Workspace focus: selection = {workspace + cascaded projects}. */
+  private _applyWorkspaceFocusSelection(slug: string): void {
+    const nextProjs = new Set<string>();
+    for (const [projSlug, wsSlug] of this.projectWorkspaceMap) {
+      if (wsSlug === slug) nextProjs.add(projSlug);
+    }
     this.workspaces = new Set([slug]);
-    this.projects = new Set();
+    this.projects = nextProjs;
+    this.navigate();
+  }
+
+  /** Project focus: selection = {workspace_of_project + project}. The
+      workspace is included so Plaza tree filtering (which keys on
+      workspaces selection) keeps the project visible. */
+  private _applyProjectFocusSelection(wsSlug: string, projSlug: string): void {
+    this.workspaces = new Set([wsSlug]);
+    this.projects = new Set([projSlug]);
     this.navigate();
   }
 
@@ -125,7 +170,7 @@ export class SelectionStore {
       exit doesn't undo their work. Called from toggleWorkspace, toggleProject,
       and clear. */
   private _invalidateFocusSnapshot(): void {
-    if (this.focusedWorkspaceSlug !== null && this._focusSnapshot !== null) {
+    if (this.isFocusActive && this._focusSnapshot !== null) {
       this._focusSnapshot = null;
     }
   }

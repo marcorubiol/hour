@@ -26,7 +26,8 @@
 import type { RequestHandler } from './$types';
 import * as v from 'valibot';
 import { extractBearer } from '$lib/auth';
-import { pgGet, PostgrestError, type SupabaseEnv } from '$lib/supabase';
+import type { Tables } from '$lib/db-types';
+import { pgGet, pgPostRpc, PostgrestError, type SupabaseEnv } from '$lib/supabase';
 
 const ALLOWED_STATUSES = ['any', 'open', 'closed', 'archived'] as const;
 
@@ -103,6 +104,81 @@ type LineItem = {
   updated_at: string;
   last_navigated_at: string | null;
   project: ProjectLite | null;
+};
+
+type LineRow = Tables<'line'>;
+
+const CreateBodySchema = v.object({
+  project_id: v.pipe(v.string(), v.uuid()),
+  name: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(80)),
+  accent: v.optional(v.pipe(v.string(), v.regex(/^[1-8]$/))),
+  description: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(280))),
+  kind: v.optional(
+    v.picklist([
+      'tour',
+      'season',
+      'phase',
+      'circuit',
+      'residency',
+      'other',
+      'creation',
+      'campaign',
+      'comms',
+      'misc',
+    ]),
+  ),
+});
+
+export const POST: RequestHandler = async ({ request, platform }) => {
+  if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);
+  const env = platform.env as unknown as SupabaseEnv;
+
+  const jwt = extractBearer(request);
+  if (!jwt) return json({ error: 'missing_authorization' }, 401);
+
+  let raw: unknown;
+  try {
+    raw = await request.json();
+  } catch {
+    return json({ error: 'invalid_body' }, 400);
+  }
+  const parsed = v.safeParse(CreateBodySchema, raw);
+  if (!parsed.success) {
+    return json(
+      {
+        error: 'invalid_body',
+        issues: parsed.issues.map((i) => ({
+          path: i.path?.map((p) => p.key).join('.'),
+          message: i.message,
+        })),
+      },
+      400,
+    );
+  }
+
+  const args: Record<string, unknown> = {
+    p_project_id: parsed.output.project_id,
+    p_name: parsed.output.name,
+  };
+  if (parsed.output.accent) args.p_accent = parsed.output.accent;
+  if (parsed.output.description) args.p_description = parsed.output.description;
+  if (parsed.output.kind) args.p_kind = parsed.output.kind;
+
+  try {
+    const { data } = await pgPostRpc<LineRow>(env, 'create_line', jwt, args);
+    const line = data[0];
+    if (!line) return json({ error: 'rpc_empty_result' }, 502);
+    return json({ line }, 201);
+  } catch (err) {
+    if (err instanceof PostgrestError) {
+      const body = err.body;
+      let status = 502;
+      if (body.includes('22023')) status = 400;
+      else if (body.includes('42501')) status = 403;
+      return json({ error: 'rpc_error', status: err.status, detail: body }, status);
+    }
+    return json({ error: 'unexpected', detail: String(err) }, 500);
+  }
 };
 
 export const GET: RequestHandler = async ({ request, url, platform }) => {

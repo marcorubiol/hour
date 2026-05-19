@@ -45,6 +45,7 @@
   import { provideLens, type Lens } from '$lib/stores/lens.svelte';
   import { provideSelection } from '$lib/stores/selection.svelte';
   import { saveMasterViewPath } from '$lib/master-view';
+  import { scrollFade } from '$lib/actions/scrollFade';
   import {
     provideNetworkPresence,
     provideRealtime,
@@ -404,13 +405,14 @@
             <PlazaRail />
           </div>
         {:else if inSettings}
-          <div class="workspace-shell__pane">
+          <div class="workspace-shell__pane" use:scrollFade>
             <SettingsNav />
           </div>
         {:else}
           <div
             class="workspace-shell__pane workspace-shell__pane--plaza"
             style={panePlazaStyle}
+            use:scrollFade
           >
             <Plaza />
           </div>
@@ -422,28 +424,38 @@
             onmousedown={startPaneResize}
             ondblclick={resetPaneSplit}
           ></button>
-          <div class="workspace-shell__pane workspace-shell__pane--lines">
+          <div
+            class="workspace-shell__pane workspace-shell__pane--lines"
+            use:scrollFade
+          >
             <LineList />
           </div>
         {/if}
       {/snippet}
       {#snippet footer()}
+        {#if !sidebarCollapsed}
+          <Avatar
+            size="xs"
+            name={userDisplayName || userEmail || workspaceSlug}
+          />
+          <span class="account-row__name"
+            >{userDisplayName || userEmail}</span
+          >
+        {/if}
         <Menu
           direction="up"
-          align="start"
+          align={sidebarCollapsed ? 'start' : 'end'}
           label="Open account menu"
-          triggerClass="workspace-shell__user"
+          triggerClass="account-row__kebab"
           onclose={() => (themeStyleExpanded = false)}
         >
           {#snippet trigger()}
-            <Avatar
-              size="xs"
-              name={userDisplayName || userEmail || workspaceSlug}
-            />
-            <span class="workspace-shell__user-id"
-              >{userDisplayName || userEmail}</span
-            >
-            <span class="workspace-shell__user-kebab" aria-hidden="true">
+            {#if sidebarCollapsed}
+              <Avatar
+                size="xs"
+                name={userDisplayName || userEmail || workspaceSlug}
+              />
+            {:else}
               <svg
                 viewBox="0 0 16 16"
                 width="14"
@@ -455,7 +467,7 @@
                 <circle cx="8" cy="8" r="1.2" />
                 <circle cx="12.5" cy="8" r="1.2" />
               </svg>
-            </span>
+            {/if}
           {/snippet}
           {#snippet children({ close })}
             <li role="presentation" class="menu-header">
@@ -764,24 +776,20 @@
     align-items: center;
   }
 
-  /* In rail mode, the user-menu wrapper sizes to its content (avatar
-     only), undoing the `flex: 1` override above. The dropdown still
-     opens at min-inline-size: 12rem so it reads fine despite the tiny
-     trigger. */
+  /* In rail mode the Menu trigger wraps the avatar directly (the
+     name + kebab don't render in collapsed mode). The kebab's 32×32
+     skeleton would leave a halo around the 24px avatar; trim it back
+     so the button hugs the avatar instead. */
   .workspace-shell :global(.sidebar--collapsed .sidebar__footer .menu-wrapper) {
     flex: 0 0 auto;
     min-inline-size: 0;
     inline-size: auto;
   }
 
-  .workspace-shell :global(.sidebar--collapsed .workspace-shell__user) {
+  .workspace-shell :global(.sidebar--collapsed .account-row__kebab) {
     inline-size: auto;
-    padding-inline: var(--space-xs);
-    gap: 0;
-  }
-
-  .workspace-shell :global(.sidebar--collapsed .workspace-shell__user-id) {
-    display: none;
+    block-size: auto;
+    padding: var(--space-xs);
   }
 
   .workspace-shell :global(.sidebar__body) {
@@ -805,6 +813,39 @@
     flex: 1 1 50%;
     min-block-size: 0;
     overflow-y: auto;
+    /* Anchor the bottom fade overlay. The pseudo-element is sticky inside
+       this scrolling viewport — relative positioning is what gives it a
+       coordinate frame even though sticky doesn't formally need it, and
+       it keeps the rule readable as "pane owns the fade". */
+    position: relative;
+  }
+
+  /* Bottom-edge fade — signals "more content below". Sticky to the
+     viewport bottom of the scroll container; negative margin-top pulls
+     it out of the flow so it doesn't add to scrollHeight (otherwise the
+     fade itself would create the overflow it's trying to indicate).
+     Opacity toggled by the scrollFade action via [data-can-scroll-down].
+     No top fade: the sticky pane header already paints var(--bg) over
+     scrolled content at the top, so it serves the same visual role. */
+  .workspace-shell__pane::after {
+    content: '';
+    display: block;
+    position: sticky;
+    inset-block-end: 0;
+    block-size: var(--space-xl);
+    margin-block-start: calc(-1 * var(--space-xl));
+    background: linear-gradient(to top, var(--bg), transparent);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity var(--transition);
+    z-index: 1;
+  }
+
+  /* :global() on the attribute matcher only — class stays scoped. Svelte
+     can't statically see the action setting this attribute, so without
+     this hint the selector reads as unused at compile time. */
+  .workspace-shell__pane:global([data-can-scroll-down])::after {
+    opacity: 1;
   }
 
   /* LineList renders its own top divider + spacing for the standalone
@@ -833,6 +874,31 @@
     background: var(--bg);
     padding-block: var(--space-xs);
     z-index: 1;
+  }
+
+  /* Top-edge fade — trails just below each sticky pane header to signal
+     "more content above". Absolute child of the sticky header, so it
+     follows the header as it stays pinned. Slightly narrower than the
+     bottom fade (--space-l vs --space-xl) because the header itself
+     already anchors the top visually; the fade just softens the cut. */
+  .workspace-shell__pane :global(.plaza__header)::after,
+  .workspace-shell__pane :global(.line-list__header)::after {
+    content: '';
+    position: absolute;
+    inset-inline: 0;
+    inset-block-start: 100%;
+    block-size: var(--space-l);
+    background: linear-gradient(to bottom, var(--bg), transparent);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity var(--transition);
+  }
+
+  .workspace-shell__pane:global([data-can-scroll-up])
+    :global(.plaza__header)::after,
+  .workspace-shell__pane:global([data-can-scroll-up])
+    :global(.line-list__header)::after {
+    opacity: 1;
   }
 
   /* Row between the two panes, draggable to redistribute their heights.
@@ -884,53 +950,49 @@
     display: inline-flex;
   }
 
-  /* The Menu wrapper fills the footer's content area so the dropdown
-     (which inherits inline-size: 100% of the wrapper) opens at the full
-     footer width instead of just the trigger's content width — keeps
-     menu and footer optically aligned. The trigger itself stays
-     content-sized so its hover background still hugs the avatar+email
-     cluster. */
-  .workspace-shell :global(.sidebar__footer .menu-wrapper) {
+  /* Account row layout: avatar + name as display-only elements + the
+     Menu wrapper (which contains just the kebab button trigger). Only
+     the kebab is interactive — the avatar and name are pure identity
+     readout. No bg-hover on the row itself; the kebab paints its own
+     hover via the icon-action skeleton below. */
+  .account-row__name {
     flex: 1;
-    min-inline-size: 0;
-  }
-
-  /* Account menu trigger: behaves like a single clickable row (avatar +
-     email) — no button box. The menu opens upward (footer-anchored) from
-     here. Hit area + hover background fills the wrapper (inline-size:
-     100%) so it matches the dropdown's width exactly when it opens —
-     no optical mismatch between the closed-state highlight and the
-     open menu. Content stays left-aligned via inline-flex defaults. */
-  .workspace-shell :global(.workspace-shell__user) {
-    inline-size: 100%;
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-s);
-    padding-block: var(--space-xs);
-    padding-inline: var(--space-xs);
-    background: transparent;
-    border: 0;
-    border-radius: var(--radius);
-    color: var(--text-color);
-    cursor: pointer;
-    text-align: start;
-    font-family: inherit;
-    transition: background var(--transition);
-    min-inline-size: 0;
-  }
-
-  .workspace-shell :global(.workspace-shell__user:hover),
-  .workspace-shell :global(.workspace-shell__user[aria-expanded='true']) {
-    background: var(--bg-hover);
-  }
-
-  .workspace-shell__user-id {
     font-size: var(--text-s);
     color: var(--text-muted);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     min-inline-size: 0;
+  }
+
+  /* Kebab button = the only menu trigger in expanded mode. Same icon-
+     action skeleton (32×32, faint idle, neutral hover/expanded) as the
+     DND bell and ThemeToggle below — when the menu is open you see a
+     vertical column of identically-sized icon buttons spanning the
+     header sign-out, the Notifications bell, and the Theme toggle, all
+     visually anchored to the same trailing edge. */
+  :global(.account-row__kebab) {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    inline-size: var(--control-size-s);
+    block-size: var(--control-size-s);
+    background: transparent;
+    border: 0;
+    border-radius: var(--radius-s);
+    color: var(--text-faint);
+    cursor: pointer;
+    transition: background var(--transition), color var(--transition);
+  }
+  :global(.account-row__kebab:hover),
+  :global(.account-row__kebab[aria-expanded='true']) {
+    background: var(--bg-ultra-light);
+    color: var(--text-color);
+  }
+  :global(.account-row__kebab:focus-visible) {
+    outline: var(--focus-width) solid var(--focus-color);
+    outline-offset: -1px;
   }
 
   /* Identity header inside the account menu (first li in source order =
@@ -998,8 +1060,8 @@
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    inline-size: 32px;
-    block-size: 32px;
+    inline-size: var(--control-size-s);
+    block-size: var(--control-size-s);
     background: transparent;
     border: 0;
     border-radius: var(--radius-s);
@@ -1016,29 +1078,6 @@
     outline-offset: -1px;
   }
 
-  /* Kebab indicator at the trailing edge of the trigger. Always visible
-     so the row reads as clickable — communicates "menu lives here".
-     Faint by default; on hover/open of the trigger, slightly stronger.
-     Sign out lives inside the menu now (no longer floating over the
-     trigger tail), so the kebab owns this slot uncontested. */
-  .workspace-shell__user-kebab {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    margin-inline-start: auto;
-    color: var(--text-faint);
-    transition: color var(--transition);
-  }
-  :global(.workspace-shell__user:hover) .workspace-shell__user-kebab,
-  :global(.workspace-shell__user[aria-expanded='true'])
-    .workspace-shell__user-kebab {
-    color: var(--text-muted);
-  }
-  /* Rail mode: only the avatar shows; kebab + name both hide. */
-  :global(.sidebar--collapsed) .workspace-shell__user-kebab {
-    display: none;
-  }
 
   /* Theme accordion inside the account menu. Two orthogonal controls:
      the expand button (label + current style + chevron) opens the list;
@@ -1080,8 +1119,8 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    inline-size: 32px;
-    block-size: 32px;
+    inline-size: var(--control-size-s);
+    block-size: var(--control-size-s);
     background: transparent;
     border: 0;
     border-radius: var(--radius-s);

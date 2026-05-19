@@ -262,6 +262,12 @@
     --scroll-margin: 0px;
     --offset: calc(var(--scroll-margin) + var(--header-height));
 
+    /* Square hit-area sizes for icon-only controls (kebab, DND bell,
+       sign-out, ThemeToggle, etc.). Fixed (not clamped) so the trailing
+       icon column inside menus and rows stays optically aligned across
+       viewport sizes. */
+    --control-size-s: 2rem; /* 32px — icon action default */
+
     /* ============================================================ */
     /* RADIUS — semantic scale (no duplicate aliases)                 */
     /* ============================================================ */

@@ -941,10 +941,12 @@ export type Database = {
       }
       line: {
         Row: {
+          accent: string | null
           created_at: string
           created_by: string | null
           custom_fields: Json
           deleted_at: string | null
+          description: string | null
           dossier_url: string | null
           end_date: string | null
           id: string
@@ -962,10 +964,12 @@ export type Database = {
           workspace_id: string
         }
         Insert: {
+          accent?: string | null
           created_at?: string
           created_by?: string | null
           custom_fields?: Json
           deleted_at?: string | null
+          description?: string | null
           dossier_url?: string | null
           end_date?: string | null
           id?: string
@@ -983,10 +987,12 @@ export type Database = {
           workspace_id: string
         }
         Update: {
+          accent?: string | null
           created_at?: string
           created_by?: string | null
           custom_fields?: Json
           deleted_at?: string | null
+          description?: string | null
           dossier_url?: string | null
           end_date?: string | null
           id?: string
@@ -1807,6 +1813,44 @@ export type Database = {
     Functions: {
       can_edit_project: { Args: { p_project_id: string }; Returns: boolean }
       can_see_person: { Args: { p_person_id: string }; Returns: boolean }
+      create_line: {
+        Args: {
+          p_accent?: string
+          p_description?: string
+          p_kind?: Database["public"]["Enums"]["line_kind"]
+          p_name: string
+          p_project_id: string
+        }
+        Returns: {
+          accent: string | null
+          created_at: string
+          created_by: string | null
+          custom_fields: Json
+          deleted_at: string | null
+          description: string | null
+          dossier_url: string | null
+          end_date: string | null
+          id: string
+          kind: Database["public"]["Enums"]["line_kind"]
+          last_navigated_at: string | null
+          name: string
+          notes: string | null
+          previous_slugs: string[]
+          project_id: string
+          slug: string | null
+          start_date: string | null
+          status: Database["public"]["Enums"]["line_status"]
+          territory: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "line"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       create_project: {
         Args: {
           p_accent?: string
