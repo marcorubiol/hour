@@ -1456,9 +1456,11 @@
       margin: 0;
       display: flex;
       flex-direction: column;
-      /* Workspace-to-workspace breathing — bumped from xs to m so each
-         workspace block reads as a distinct unit, not a list of rows. */
-      gap: var(--space-m);
+      /* Workspace-to-workspace breathing: enough that each workspace
+         block reads as a distinct unit, but not so much that the list
+         feels sparse. Sits between space-xs (too packed) and space-m
+         (too aired). */
+      gap: var(--space-s);
     }
 
     .plaza__workspace {
