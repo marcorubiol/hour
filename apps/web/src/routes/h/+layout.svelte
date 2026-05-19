@@ -113,6 +113,15 @@
     },
   });
 
+  // Settings + Notifications in the account menu need a workspace context
+  // to build their hrefs. When the user is at /h/ root (no workspace
+  // selected), fall back to the first workspace from the loaded list so
+  // the menu still works without requiring a selection.
+  let defaultWorkspaceSlug = $derived(
+    $workspacesQuery.data?.items[0]?.slug ?? '',
+  );
+  let menuWorkspaceSlug = $derived(workspaceSlug || defaultWorkspaceSlug);
+
   onMount(() => {
     const jwt = localStorage.getItem('hour_jwt');
     if (!jwt || !env.PUBLIC_SUPABASE_URL || !env.PUBLIC_SUPABASE_ANON_KEY) return;
@@ -426,36 +435,35 @@
           triggerClass="workspace-shell__user"
           onclose={() => (themeStyleExpanded = false)}
         >
-          {#snippet trigger()}
-            <Avatar
-              size="xs"
-              name={userDisplayName || userEmail || workspaceSlug}
-            />
-            <span class="workspace-shell__user-id"
-              >{userDisplayName || userEmail}</span
-            >
-            <span class="workspace-shell__user-kebab" aria-hidden="true">
-              <svg
-                viewBox="0 0 16 16"
-                width="14"
-                height="14"
-                fill="currentColor"
-                aria-hidden="true"
+            {#snippet trigger()}
+              <Avatar
+                size="xs"
+                name={userDisplayName || userEmail || workspaceSlug}
+              />
+              <span class="workspace-shell__user-id"
+                >{userDisplayName || userEmail}</span
               >
-                <circle cx="3.5" cy="8" r="1.2" />
-                <circle cx="8" cy="8" r="1.2" />
-                <circle cx="12.5" cy="8" r="1.2" />
-              </svg>
-            </span>
-          {/snippet}
-          {#snippet children({ close })}
-            {#if hasWorkspace}
+              <span class="workspace-shell__user-kebab" aria-hidden="true">
+                <svg
+                  viewBox="0 0 16 16"
+                  width="14"
+                  height="14"
+                  fill="currentColor"
+                  aria-hidden="true"
+                >
+                  <circle cx="3.5" cy="8" r="1.2" />
+                  <circle cx="8" cy="8" r="1.2" />
+                  <circle cx="12.5" cy="8" r="1.2" />
+                </svg>
+              </span>
+            {/snippet}
+            {#snippet children({ close })}
               <li role="none">
                 <a
                   role="menuitem"
                   href={inSettings
-                    ? `/h/${workspaceSlug}/`
-                    : `/h/${workspaceSlug}/settings`}
+                    ? `/h/${menuWorkspaceSlug}/`
+                    : `/h/${menuWorkspaceSlug}/settings`}
                   class="menu__item"
                   tabindex="0"
                   onclick={() => close(false)}
@@ -466,7 +474,7 @@
               <li role="none" class="settings-row">
                 <a
                   role="menuitem"
-                  href={`/h/${workspaceSlug}/settings?section=notifications`}
+                  href={`/h/${menuWorkspaceSlug}/settings?section=notifications`}
                   class="menu__item settings-row__link"
                   tabindex="0"
                   onclick={() => close(false)}
@@ -510,74 +518,74 @@
                   </svg>
                 </button>
               </li>
-            {/if}
-            <li role="none" class="theme-accordion">
-              <div class="theme-accordion__header">
-                <button
-                  type="button"
-                  class="theme-accordion__expand"
-                  aria-expanded={themeStyleExpanded}
-                  onclick={() => (themeStyleExpanded = !themeStyleExpanded)}
-                >
-                  <span class="theme-accordion__label">Theme style</span>
-                  <span class="theme-accordion__current">
-                    <span class="theme-accordion__current-name"
-                      >{activeThemeStyle.name}</span
-                    >
-                    <span
-                      class="theme-accordion__chevron"
-                      data-expanded={themeStyleExpanded || undefined}
-                      aria-hidden="true"
-                    >›</span>
-                  </span>
-                </button>
-                <ThemeToggle variant="plain" />
-              </div>
-              {#if themeStyleExpanded}
-                <ul class="theme-accordion__list" role="list">
-                  {#each themeStyles as t (t.id)}
-                    <li class="theme-accordion__item">
-                      <button
-                        type="button"
-                        class="theme-accordion__select"
-                        aria-pressed={t.id === activeThemeStyleId}
-                        data-active={t.id === activeThemeStyleId || undefined}
-                        onclick={() => theme.setTheme(t.id)}
+              <li role="none" class="theme-accordion">
+                <div class="theme-accordion__header">
+                  <button
+                    type="button"
+                    class="theme-accordion__expand"
+                    aria-expanded={themeStyleExpanded}
+                    onclick={() => (themeStyleExpanded = !themeStyleExpanded)}
+                  >
+                    <span class="theme-accordion__label">Theme style</span>
+                    <span class="theme-accordion__current">
+                      <span class="theme-accordion__current-name"
+                        >{activeThemeStyle.name}</span
                       >
-                        {t.name}
-                      </button>
-                    </li>
-                  {/each}
-                </ul>
-              {/if}
-            </li>
-          {/snippet}
-        </Menu>
-        <button
-          type="button"
-          class="workspace-shell__user-logout"
-          aria-label="Sign out"
-          title="Sign out"
-          onclick={logout}
-        >
-          <svg
-            viewBox="0 0 16 16"
-            width="14"
-            height="14"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.4"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            aria-hidden="true"
+                      <span
+                        class="theme-accordion__chevron"
+                        data-expanded={themeStyleExpanded || undefined}
+                        aria-hidden="true"
+                      >›</span>
+                    </span>
+                  </button>
+                  <ThemeToggle variant="plain" />
+                </div>
+                {#if themeStyleExpanded}
+                  <ul class="theme-accordion__list" role="list">
+                    {#each themeStyles as t (t.id)}
+                      <li class="theme-accordion__item">
+                        <button
+                          type="button"
+                          class="theme-accordion__select"
+                          aria-pressed={t.id === activeThemeStyleId}
+                          data-active={t.id === activeThemeStyleId || undefined}
+                          onclick={() => theme.setTheme(t.id)}
+                        >
+                          {t.name}
+                        </button>
+                      </li>
+                    {/each}
+                  </ul>
+                {/if}
+              </li>
+            {/snippet}
+          </Menu>
+          <button
+            type="button"
+            class="user-block__logout-chip"
+            aria-label="Sign out"
+            title="Sign out"
+            onclick={logout}
           >
-            <!-- door frame on the left -->
-            <path d="M9 2 H4 a1 1 0 0 0 -1 1 V13 a1 1 0 0 0 1 1 H9" />
-            <!-- arrow exiting to the right -->
-            <path d="M7 8 H14" />
-            <path d="M11 5 L14 8 L11 11" />
-          </svg>
-        </button>
+            <svg
+              viewBox="0 0 16 16"
+              width="14"
+              height="14"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.4"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <!-- door frame on the left -->
+              <path d="M9 2 H4 a1 1 0 0 0 -1 1 V13 a1 1 0 0 0 1 1 H9" />
+              <!-- arrow exiting to the right -->
+              <path d="M7 8 H14" />
+              <path d="M11 5 L14 8 L11 11" />
+            </svg>
+          </button>
+        </div>
       {/snippet}
     </Sidebar>
 
@@ -893,13 +901,8 @@
     min-inline-size: 0;
   }
 
-  /* Trigger bg-hover also stays painted when the cursor is on the
-     footer (i.e. over the sign-out button), because the logout is a
-     sibling DOM node — hovering it wouldn't otherwise activate the
-     trigger's :hover. Keeps the bg continuous behind the overlaid icon. */
   .workspace-shell :global(.workspace-shell__user:hover),
-  .workspace-shell :global(.workspace-shell__user[aria-expanded='true']),
-  .workspace-shell :global(.sidebar__footer:hover .workspace-shell__user) {
+  .workspace-shell :global(.workspace-shell__user[aria-expanded='true']) {
     background: var(--bg-hover);
   }
 
@@ -910,19 +913,90 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     min-inline-size: 0;
-    /* No max-inline-size — let the name use every pixel of the footer
-       so it reads in full. The sign-out icon overlaps on hover (absolute
-       positioning, see .workspace-shell__user-logout) instead of taking
-       its own column. */
+  }
+
+  /* Wrapper for the account trigger + the hover-revealed logout chip.
+     Position: relative so the chip can absolute-position itself relative
+     to the avatar inside the trigger. Display: flex + flex:1 takes over
+     the role the .menu-wrapper used to play directly inside the footer. */
+  .user-block {
+    position: relative;
+    display: flex;
+    flex: 1;
+    min-inline-size: 0;
+  }
+
+  /* Hover-revealed logout chip. Hidden by default (opacity 0, no pointer
+     events, zero space because it's positioned absolute). Revealed when
+     the avatar inside the trigger is hovered (or when the chip itself
+     is hovered/focused). Hidden again when the account menu is open
+     (avoid overlap with the dropdown). */
+  .user-block__logout-chip {
+    position: absolute;
+    inset-block-start: 50%;
+    /* Avatar (xs = 1.5rem) sits at footer padding-inline-start
+       (var(--space-m)) + trigger padding-inline (var(--space-xs)).
+       Chip lands right after the avatar with a small gap so it reads
+       as separate from the avatar but still in its orbit. */
+    inset-inline-start: calc(var(--space-xs) + 1.5rem + var(--space-xs));
+    transform: translateY(-50%);
+    inline-size: 24px;
+    block-size: 24px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg);
+    border: 1px solid var(--border-color-dark);
+    border-radius: var(--radius-s);
+    color: var(--text-faint);
+    cursor: pointer;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--transition), background var(--transition),
+      color var(--transition), border-color var(--transition);
+    z-index: 1;
+  }
+  /* Reveal: hover directly on the avatar circle (not the row), or hover/
+     focus on the chip itself. The chip is positioned touching the avatar
+     so the cursor can move from one to the other without losing hover. */
+  :global(.user-block):has(:global(.avatar):hover)
+    .user-block__logout-chip,
+  .user-block__logout-chip:hover,
+  .user-block__logout-chip:focus-visible {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  /* Hide while the account menu is open — avoids overlap with the
+     dropdown and prevents accidental logout when the user is fishing
+     for menu items. */
+  :global(.user-block):has(
+      :global(.workspace-shell__user)[aria-expanded='true']
+    )
+    .user-block__logout-chip {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .user-block__logout-chip:hover {
+    background: var(--danger-ultra-light);
+    color: var(--danger);
+    border-color: var(--danger);
+  }
+  .user-block__logout-chip:focus-visible {
+    outline: var(--focus-width) solid var(--focus-color);
+    outline-offset: 1px;
+  }
+  /* Rail mode: no hover surface for the avatar (the avatar IS the trigger),
+     so the chip has no natural way to be discovered. Hide entirely —
+     logout in rail mode requires expanding the sidebar first. */
+  :global(.sidebar--collapsed) .user-block__logout-chip {
+    display: none;
   }
 
   /* Kebab indicator at the trailing edge of the trigger. Always visible
      so the row reads as clickable — communicates "menu lives here".
      Faint by default; on hover/open of the trigger, slightly stronger.
-     The logout chip (absolute, hover-only, see .workspace-shell__user-logout)
-     paints its bg-surface over the kebab when it appears — intentional
-     overlap so we get two affordances in the same trailing slot without
-     reserving a column. */
+     Sign out lives inside the menu now (no longer floating over the
+     trigger tail), so the kebab owns this slot uncontested. */
   .workspace-shell__user-kebab {
     display: inline-flex;
     align-items: center;
@@ -932,66 +1006,13 @@
     color: var(--text-faint);
     transition: color var(--transition);
   }
-  .workspace-shell :global(.workspace-shell__user:hover)
-    .workspace-shell__user-kebab,
-  .workspace-shell
-    :global(.workspace-shell__user[aria-expanded='true'])
+  :global(.workspace-shell__user:hover) .workspace-shell__user-kebab,
+  :global(.workspace-shell__user[aria-expanded='true'])
     .workspace-shell__user-kebab {
     color: var(--text-muted);
   }
-  /* Rail mode: only the avatar shows; kebab + email both hide. */
-  .workspace-shell :global(.sidebar--collapsed) .workspace-shell__user-kebab {
-    display: none;
-  }
-
-  /* Sign-out lives at sidebar-footer level, sibling of the Menu trigger.
-     It belongs to your session/identity, not to the Settings dropdown
-     where it sat before. Positioned absolute over the trigger's right
-     edge so it doesn't reserve a column — the email reads full-width by
-     default. On hover (footer) or focus (keyboard), it fades in.
-     Background is the surface base — sits INSIDE the trigger's bg-hover
-     paint (extended via :hover above) and reads as its own clickable
-     chip (a "hole" in the hover surface), not as an icon floating over
-     the email tail. On its own hover, the chip paints danger. */
-  .workspace-shell__user-logout {
-    position: absolute;
-    inset-block-start: 50%;
-    /* footer padding-inline (var(--space-m)) places the trigger's right
-       edge; add a small visual gutter so the icon respires inside it. */
-    inset-inline-end: calc(var(--space-m) + var(--space-xs));
-    transform: translateY(-50%);
-    inline-size: 24px;
-    block-size: 24px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    background: var(--bg);
-    border: 0;
-    border-radius: var(--radius-s);
-    color: var(--text-faint);
-    cursor: pointer;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity var(--transition), background var(--transition),
-      color var(--transition);
-  }
-  :global(.sidebar__footer:hover) .workspace-shell__user-logout,
-  .workspace-shell__user-logout:focus-visible {
-    opacity: 1;
-    pointer-events: auto;
-  }
-  .workspace-shell__user-logout:hover {
-    background: var(--danger-ultra-light);
-    color: var(--danger);
-  }
-  .workspace-shell__user-logout:focus-visible {
-    outline: var(--focus-width) solid var(--focus-color);
-    outline-offset: -1px;
-  }
-  /* Rail mode hides the logout entirely — the footer is just an avatar
-     and the menu still exposes it on demand. Revisit if sign-out becomes
-     a daily action while collapsed. */
-  :global(.sidebar--collapsed) .workspace-shell__user-logout {
+  /* Rail mode: only the avatar shows; kebab + name both hide. */
+  :global(.sidebar--collapsed) .workspace-shell__user-kebab {
     display: none;
   }
 

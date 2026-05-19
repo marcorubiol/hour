@@ -184,6 +184,27 @@
     }
   }
 
+  // Collapse-all / expand-all toggle. Icon stays the same in both
+  // directions; only the tooltip + action flip based on whether
+  // everything's already collapsed. The button itself is always present
+  // (hover-reveal on the Places header).
+  let allCollapsed = $derived(
+    workspaces.length > 0 && workspaces.every((w) => collapsedIds.has(w.id)),
+  );
+
+  function toggleAllCollapsed() {
+    const next: Set<string> = allCollapsed
+      ? new Set()
+      : new Set(workspaces.map((w) => w.id));
+    collapsedIds = next;
+    try {
+      localStorage.setItem(COLLAPSE_KEY, JSON.stringify(Array.from(next)));
+    } catch {
+      // ignore
+    }
+  }
+
+
   // ── Add workspace ─────────────────────────────────────────────────────
   // First in-page creation flow. The + button next to the "Places" eyebrow
   // opens a minimal dialog (name only); the server derives the slug and
@@ -382,28 +403,62 @@
 <nav class="plaza" aria-label="Places">
   <div class="plaza__header">
     <p class="eyebrow plaza__eyebrow">Places</p>
-    <Tooltip text="Add place" position="left" delay={400}>
-      <button
-        type="button"
-        class="plaza__add"
-        aria-label="Add workspace"
-        onclick={openCreate}
+    <div class="plaza__header-actions">
+      <Tooltip
+        text={allCollapsed ? 'Expand all' : 'Collapse all'}
+        position="left"
+        delay={400}
       >
-        <svg
-          viewBox="0 0 14 14"
-          width="12"
-          height="12"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="1.5"
-          stroke-linecap="round"
-          aria-hidden="true"
+        <button
+          type="button"
+          class="plaza__add"
+          aria-label={allCollapsed ? 'Expand all workspaces' : 'Collapse all workspaces'}
+          aria-pressed={allCollapsed}
+          onclick={toggleAllCollapsed}
         >
-          <path d="M7 2 V12" />
-          <path d="M2 7 H12" />
-        </svg>
-      </button>
-    </Tooltip>
+          <!-- Single icon for both directions — inward arrows. The
+               tooltip + action change with state, the symbol doesn't. -->
+          <svg
+            viewBox="0 0 24 24"
+            width="12"
+            height="12"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M4 14h6v6" />
+            <path d="M20 10h-6V4" />
+            <path d="m14 10 7-7" />
+            <path d="m3 21 7-7" />
+          </svg>
+        </button>
+      </Tooltip>
+      <Tooltip text="Add place" position="left" delay={400}>
+        <button
+          type="button"
+          class="plaza__add"
+          aria-label="Add workspace"
+          onclick={openCreate}
+        >
+          <svg
+            viewBox="0 0 14 14"
+            width="12"
+            height="12"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.5"
+            stroke-linecap="round"
+            aria-hidden="true"
+          >
+            <path d="M7 2 V12" />
+            <path d="M2 7 H12" />
+          </svg>
+        </button>
+      </Tooltip>
+    </div>
   </div>
 
   {#if loading}
@@ -459,31 +514,6 @@
                 .filter(Boolean)
                 .join(' ')}
             >
-              {#if hasProjects}
-                <button
-                  type="button"
-                  class={['plaza__chevron', isCollapsed && 'plaza__chevron--collapsed']
-                    .filter(Boolean)
-                    .join(' ')}
-                  aria-label={isCollapsed
-                    ? `Expand ${workspace.name}`
-                    : `Collapse ${workspace.name}`}
-                  aria-expanded={!isCollapsed}
-                  onclick={() => toggleCollapse(workspace.id)}
-                >
-                  <svg
-                    viewBox="0 0 16 16"
-                    width="10"
-                    height="10"
-                    fill="currentColor"
-                    aria-hidden="true"
-                  >
-                    <path d="M5 3 L11 8 L5 13 Z" />
-                  </svg>
-                </button>
-              {:else}
-                <span class="plaza__chevron plaza__chevron--placeholder" aria-hidden="true"></span>
-              {/if}
               <Tooltip
                 text={isFocused ? 'Exit focus' : 'Focus'}
                 position="left"
@@ -518,63 +548,132 @@
                   </svg>
                 </button>
               </Tooltip>
-              <Tooltip text="Add project" position="left" delay={400}>
-                <button
-                  type="button"
-                  class="plaza__row-icon plaza__add-project"
-                  aria-label={`Add project to ${workspace.name}`}
-                  onclick={() => openCreateProject(workspace)}
-                >
-                  <svg
-                    viewBox="0 0 14 14"
-                    width="11"
-                    height="11"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="1.5"
-                    stroke-linecap="round"
-                    aria-hidden="true"
+              {#if !isFocused}
+                <Tooltip text="Settings" position="left" delay={400}>
+                  <a
+                    class="plaza__row-icon plaza__settings"
+                    href={`/h/${workspace.slug}/settings`}
+                    aria-label={`Settings for ${workspace.name}`}
                   >
-                    <path d="M7 2 V12" />
-                    <path d="M2 7 H12" />
-                  </svg>
-                </button>
-              </Tooltip>
-              <Tooltip text="Settings" position="left" delay={400}>
-                <a
-                  class="plaza__row-icon plaza__settings"
-                  href={`/h/${workspace.slug}/settings`}
-                  aria-label={`Settings for ${workspace.name}`}
-                >
-                  <svg
-                    viewBox="0 0 24 24"
-                    width="12"
-                    height="12"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    aria-hidden="true"
+                    <svg
+                      viewBox="0 0 24 24"
+                      width="12"
+                      height="12"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      aria-hidden="true"
+                    >
+                      <!-- Sliders horizontal: 3 rails + 3 handles at varied
+                           positions. Reads as "tune / adjust" — fits the
+                           Phase 0 settings page (colors, names, prefs). -->
+                      <path d="M21 4 H14" />
+                      <path d="M10 4 H3" />
+                      <path d="M21 12 H12" />
+                      <path d="M8 12 H3" />
+                      <path d="M21 20 H16" />
+                      <path d="M12 20 H3" />
+                      <circle cx="12" cy="4" r="2" />
+                      <circle cx="10" cy="12" r="2" />
+                      <circle cx="14" cy="20" r="2" />
+                    </svg>
+                  </a>
+                </Tooltip>
+                <Tooltip text="Add project" position="left" delay={400}>
+                  <button
+                    type="button"
+                    class="plaza__row-icon plaza__add-project"
+                    aria-label={`Add project to ${workspace.name}`}
+                    onclick={() => openCreateProject(workspace)}
                   >
-                    <!-- Sliders horizontal: 3 rails + 3 handles at varied
-                         positions. Reads as "tune / adjust" — fits the
-                         Phase 0 settings page (colors, names, prefs). -->
-                    <path d="M21 4 H14" />
-                    <path d="M10 4 H3" />
-                    <path d="M21 12 H12" />
-                    <path d="M8 12 H3" />
-                    <path d="M21 20 H16" />
-                    <path d="M12 20 H3" />
-                    <circle cx="12" cy="4" r="2" />
-                    <circle cx="10" cy="12" r="2" />
-                    <circle cx="14" cy="20" r="2" />
-                  </svg>
-                </a>
-              </Tooltip>
+                    <svg
+                      viewBox="0 0 14 14"
+                      width="11"
+                      height="11"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.5"
+                      stroke-linecap="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M7 2 V12" />
+                      <path d="M2 7 H12" />
+                    </svg>
+                  </button>
+                </Tooltip>
+                <Tooltip
+                  text={isCollapsed ? 'Expand' : 'Collapse'}
+                  position="left"
+                  delay={400}
+                >
+                  <button
+                    type="button"
+                    class={['plaza__chevron', isCollapsed && 'plaza__chevron--collapsed']
+                      .filter(Boolean)
+                      .join(' ')}
+                    aria-label={isCollapsed
+                      ? `Expand ${workspace.name}`
+                      : `Collapse ${workspace.name}`}
+                    aria-expanded={!isCollapsed}
+                    onclick={() => toggleCollapse(workspace.id)}
+                  >
+                    {#if isCollapsed}
+                      <!-- Expand: arrows OUT — clicking opens projects. -->
+                      <svg
+                        viewBox="0 0 24 24"
+                        width="11"
+                        height="11"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        aria-hidden="true"
+                      >
+                        <path d="M15 3h6v6" />
+                        <path d="M9 21H3v-6" />
+                        <path d="M21 3 14 10" />
+                        <path d="M3 21l7-7" />
+                      </svg>
+                    {:else}
+                      <!-- Collapse: arrows IN — clicking folds projects. -->
+                      <svg
+                        viewBox="0 0 24 24"
+                        width="11"
+                        height="11"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        aria-hidden="true"
+                      >
+                        <path d="M4 14h6v6" />
+                        <path d="M20 10h-6V4" />
+                        <path d="m14 10 7-7" />
+                        <path d="m3 21 7-7" />
+                      </svg>
+                    {/if}
+                  </button>
+                </Tooltip>
+              {/if}
             </div>
           </div>
 
+          {#if !isCollapsed && !hasProjects}
+            <div class="plaza__empty">
+              <p class="plaza__empty-msg">No projects yet.</p>
+              <button
+                type="button"
+                class="plaza__empty-action"
+                onclick={() => openCreateProject(workspace)}
+              >
+                Add new project
+              </button>
+            </div>
+          {/if}
           {#if !isCollapsed && hasProjects}
             <ul class="plaza__projects" role="list">
               {#each projects as project (project.id)}
@@ -604,8 +703,6 @@
                 </li>
               {/each}
             </ul>
-          {:else if !hasProjects}
-            <p class="plaza__empty">No projects yet.</p>
           {/if}
         </li>
       {/each}
@@ -854,6 +951,12 @@
       align-items: center;
       justify-content: space-between;
       padding-inline: var(--space-s);
+    }
+
+    .plaza__header-actions {
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
     }
 
     .plaza__eyebrow {
@@ -1134,105 +1237,34 @@
       box-shadow: inset 2px 0 0 var(--primary);
     }
 
-    /* Chevron lives inside the action pill now → white-on-colour like
-       the other icons. Size + hit box match .plaza__row-icon so the
-       cluster reads as one unit. */
-    .plaza__chevron {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      inline-size: 18px;
-      block-size: 18px;
-      padding: 0;
-      background: transparent;
-      border: 0;
-      border-radius: 50%;
-      cursor: pointer;
-      color: oklch(98% 0 0);
-      transition:
-        background-color var(--transition),
-        color var(--transition),
-        transform var(--transition);
-    }
-
-    .plaza__chevron:hover,
-    .plaza__chevron:focus-visible {
-      background: rgba(255, 255, 255, 0.22);
-      color: oklch(100% 0 0);
-    }
-
-    .plaza__chevron:focus-visible {
-      outline: var(--focus-width) solid oklch(100% 0 0 / 0.7);
-      outline-offset: 1px;
-    }
-
-    .plaza__chevron svg {
-      transform: rotate(90deg);
-      transition: transform var(--transition);
-    }
-
-    .plaza__chevron--collapsed svg {
-      transform: rotate(0deg);
-    }
-
-    .plaza__chevron--placeholder {
-      inline-size: 14px;
-      block-size: 14px;
-    }
-
-    /* "The rail blooms" — the cluster becomes a coloured pill in the
-       workspace's accent colour (--c), revealed on hover. Idea: instead
-       of icons floating on the row's neutral background, the existing
-       colour identity (the 3px left rail) "extends" into a horizontal
-       action pill on the right. Icons inside are white-on-colour, so
-       they read as buttons-on-a-tab, not as misc icons. At rest the pill
-       is invisible (opacity 0 + translateX). When focused (workspace
-       isolated), the pill stays pinned so the user keeps the action
-       handle on the visible row. */
+    /* Chevron lives inside the tinted pill alongside the other icons →
+       uses --c for icon colour and a soft tint on hover. */
+    /* Neutral action cluster — no "pill" wrapper. Each icon carries its
+       own quiet grey square; the cluster just lays them out. Hidden
+       icons use `display: none` (not opacity) so the cluster contracts
+       to fit visible ones — pinned icons snap to the right edge of the
+       row cleanly instead of sitting in their default column with
+       invisible siblings reserving space. Two modifier pins:
+         · --collapsed: chevron always visible (only way to expand back)
+         · --pinned:    only Focus rendered (markup-level {#if}) */
     .plaza__workspace-actions {
       display: inline-flex;
       align-items: center;
-      gap: 0;
-      padding-inline: 6px;
-      padding-block: 3px;
-      background: var(--c, var(--text-muted));
-      border-radius: 999px;
-      opacity: 0;
-      transform: translateX(6px);
-      pointer-events: none;
-      transition:
-        opacity var(--transition),
-        transform var(--transition);
+      gap: 2px;
     }
 
-    /* Reveal triggers: pointer hover OR keyboard focus (via :focus-visible
-       — NOT bare :focus-within, which would keep the pill open after a
-       click since the link retains focus). :has(:focus-visible) only
-       fires when the focus came from keyboard navigation, so clicked-
-       and-moved-away links don't trap the pill open. */
-    .plaza__workspace-row:hover .plaza__workspace-actions,
-    .plaza__workspace-row:has(:focus-visible) .plaza__workspace-actions,
-    .plaza__workspace-actions--pinned {
-      opacity: 1;
-      transform: translateX(0);
-      pointer-events: auto;
-    }
-
-    /* Icons inside the pill: white-on-colour, no individual background
-       (the pill carries it), tighter hit boxes (the pill groups them).
-       On hover/focus of an individual icon, a soft white overlay tints
-       it darker — keeps the colour identity, signals affordance. */
-    .plaza__row-icon {
-      display: inline-flex;
+    .plaza__row-icon,
+    .plaza__chevron {
+      display: none;
       align-items: center;
       justify-content: center;
       inline-size: 18px;
       block-size: 18px;
       padding: 0;
-      background: transparent;
+      background: var(--bg-ultra-light);
       border: 0;
-      border-radius: 50%;
-      color: oklch(98% 0 0);
+      border-radius: var(--radius-s);
+      color: var(--text-faint);
       text-decoration: none;
       cursor: pointer;
       transition:
@@ -1240,29 +1272,42 @@
         color var(--transition);
     }
 
-    .plaza__row-icon:hover,
-    .plaza__row-icon:focus-visible {
-      background: rgba(255, 255, 255, 0.22);
-      color: oklch(100% 0 0);
+    .plaza__workspace-row:hover .plaza__row-icon,
+    .plaza__workspace-row:hover .plaza__chevron,
+    .plaza__workspace-row:has(:focus-visible) .plaza__row-icon,
+    .plaza__workspace-row:has(:focus-visible) .plaza__chevron {
+      display: inline-flex;
     }
 
-    .plaza__row-icon:focus-visible {
-      outline: var(--focus-width) solid oklch(100% 0 0 / 0.7);
+    .plaza__row-icon:hover,
+    .plaza__row-icon:focus-visible,
+    .plaza__chevron:hover,
+    .plaza__chevron:focus-visible {
+      background: var(--bg-hover);
+      color: var(--text-color);
+    }
+
+    .plaza__row-icon:focus-visible,
+    .plaza__chevron:focus-visible {
+      outline: var(--focus-width) solid var(--focus-color);
       outline-offset: 1px;
     }
 
-    /* Focus icon in active state — pill is already pinned (workspace
-       focused), so this state just marks WHICH icon represents the
-       toggle. White ring inside the icon = "this is what's holding the
-       focus". Click again to release. */
+    .plaza__workspace-actions--pinned .plaza__focus {
+      display: inline-flex;
+    }
+
+    /* Focus active state — same neutral language; slightly darker bg
+       signals "this is what's holding focus." */
     .plaza__focus--on {
-      background: rgba(255, 255, 255, 0.28);
-      color: oklch(100% 0 0);
+      background: var(--bg-hover);
+      color: var(--text-color);
     }
 
     .plaza__focus--on:hover,
     .plaza__focus--on:focus-visible {
-      background: rgba(255, 255, 255, 0.36);
+      background: var(--bg-active);
+      color: var(--text-color);
     }
 
     .plaza__workspace-link {
@@ -1319,6 +1364,50 @@
       display: flex;
       flex-direction: column;
       gap: 1px;
+    }
+
+    /* Empty state — quiet message + an inline text button to add the
+       first project. Sits where the projects list would, indented to
+       align with project rows. Both elements vanish when the workspace
+       is collapsed (the empty block is gated by !isCollapsed). */
+    .plaza__empty {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      padding-inline-start: calc(var(--space-s) + 3px + var(--space-s));
+      padding-block-start: var(--space-xs);
+    }
+
+    .plaza__empty-msg {
+      margin: 0;
+      font-size: var(--text-xs);
+      color: var(--text-faint);
+      font-style: italic;
+    }
+
+    .plaza__empty-action {
+      align-self: flex-start;
+      padding: 0;
+      background: transparent;
+      border: 0;
+      font-family: inherit;
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      cursor: pointer;
+      text-decoration: underline dotted;
+      text-underline-offset: 3px;
+      transition: color var(--transition);
+    }
+
+    .plaza__empty-action:hover,
+    .plaza__empty-action:focus-visible {
+      color: var(--text-color);
+    }
+
+    .plaza__empty-action:focus-visible {
+      outline: var(--focus-width) solid var(--focus-color);
+      outline-offset: 2px;
+      border-radius: var(--radius-s);
     }
 
     .plaza__project {
@@ -1408,14 +1497,6 @@
       white-space: nowrap;
     }
 
-    .plaza__empty {
-      margin: 0;
-      padding-inline-start: calc(var(--space-s) + 3px);
-      padding-block: var(--space-xs);
-      font-size: var(--text-xs);
-      color: var(--text-faint);
-      font-style: italic;
-    }
 
     .plaza__state {
       margin: 0;
