@@ -435,157 +435,175 @@
           triggerClass="workspace-shell__user"
           onclose={() => (themeStyleExpanded = false)}
         >
-            {#snippet trigger()}
-              <Avatar
-                size="xs"
-                name={userDisplayName || userEmail || workspaceSlug}
-              />
-              <span class="workspace-shell__user-id"
-                >{userDisplayName || userEmail}</span
+          {#snippet trigger()}
+            <Avatar
+              size="xs"
+              name={userDisplayName || userEmail || workspaceSlug}
+            />
+            <span class="workspace-shell__user-id"
+              >{userDisplayName || userEmail}</span
+            >
+            <span class="workspace-shell__user-kebab" aria-hidden="true">
+              <svg
+                viewBox="0 0 16 16"
+                width="14"
+                height="14"
+                fill="currentColor"
+                aria-hidden="true"
               >
-              <span class="workspace-shell__user-kebab" aria-hidden="true">
+                <circle cx="3.5" cy="8" r="1.2" />
+                <circle cx="8" cy="8" r="1.2" />
+                <circle cx="12.5" cy="8" r="1.2" />
+              </svg>
+            </span>
+          {/snippet}
+          {#snippet children({ close })}
+            <li role="presentation" class="menu-header">
+              <div class="menu-header__identity">
+                <Avatar
+                  size="s"
+                  name={userDisplayName || userEmail || workspaceSlug}
+                />
+                <div class="menu-header__id">
+                  <span class="menu-header__name"
+                    >{userDisplayName || userEmail}</span
+                  >
+                  {#if userDisplayName && userEmail && userDisplayName !== userEmail}
+                    <span class="menu-header__email">{userEmail}</span>
+                  {/if}
+                </div>
+              </div>
+              <button
+                type="button"
+                class="menu-header__logout"
+                aria-label="Sign out"
+                title="Sign out"
+                onclick={() => {
+                  close(false);
+                  logout();
+                }}
+              >
                 <svg
                   viewBox="0 0 16 16"
                   width="14"
                   height="14"
-                  fill="currentColor"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.4"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
                   aria-hidden="true"
                 >
-                  <circle cx="3.5" cy="8" r="1.2" />
-                  <circle cx="8" cy="8" r="1.2" />
-                  <circle cx="12.5" cy="8" r="1.2" />
+                  <!-- door frame on the left -->
+                  <path d="M9 2 H4 a1 1 0 0 0 -1 1 V13 a1 1 0 0 0 1 1 H9" />
+                  <!-- arrow exiting to the right -->
+                  <path d="M7 8 H14" />
+                  <path d="M11 5 L14 8 L11 11" />
                 </svg>
-              </span>
-            {/snippet}
-            {#snippet children({ close })}
-              <li role="none">
-                <a
-                  role="menuitem"
-                  href={inSettings
-                    ? `/h/${menuWorkspaceSlug}/`
-                    : `/h/${menuWorkspaceSlug}/settings`}
-                  class="menu__item"
-                  tabindex="0"
-                  onclick={() => close(false)}
+              </button>
+            </li>
+            <li role="none">
+              <a
+                role="menuitem"
+                href={inSettings
+                  ? `/h/${menuWorkspaceSlug}/`
+                  : `/h/${menuWorkspaceSlug}/settings`}
+                class="menu__item"
+                tabindex="0"
+                onclick={() => close(false)}
+              >
+                {inSettings ? 'Dashboard' : 'All settings'}
+              </a>
+            </li>
+            <li role="none" class="settings-row">
+              <a
+                role="menuitem"
+                href={`/h/${menuWorkspaceSlug}/settings?section=notifications`}
+                class="menu__item settings-row__link"
+                tabindex="0"
+                onclick={() => close(false)}
+              >
+                Notifications
+              </a>
+              <button
+                type="button"
+                class="settings-row__action settings-row__action--toggle"
+                class:is-muted={dnd}
+                aria-label={dnd
+                  ? 'Notifications muted — click to unmute'
+                  : 'Notifications on — click to mute'}
+                aria-pressed={dnd}
+                title={dnd ? 'Muted' : 'On — click to mute'}
+                onclick={toggleDnd}
+              >
+                <svg
+                  viewBox="0 0 16 16"
+                  width="14"
+                  height="14"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.4"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
                 >
-                  {inSettings ? 'Dashboard' : 'All settings'}
-                </a>
-              </li>
-              <li role="none" class="settings-row">
-                <a
-                  role="menuitem"
-                  href={`/h/${menuWorkspaceSlug}/settings?section=notifications`}
-                  class="menu__item settings-row__link"
-                  tabindex="0"
-                  onclick={() => close(false)}
-                >
-                  Notifications
-                </a>
+                  <!-- bell body -->
+                  <path d="M4 11 C 4 9.8 4.5 9.3 4.5 8 C 4.5 5.8 6 4 8 4 C 10 4 11.5 5.8 11.5 8 C 11.5 9.3 12 9.8 12 11 Z" />
+                  <!-- rim -->
+                  <path d="M3.5 11 H 12.5" />
+                  <!-- clapper -->
+                  <path d="M7 13 C 7.2 13.6 7.5 14 8 14 C 8.5 14 8.8 13.6 9 13" />
+                  <!-- top -->
+                  <path d="M8 2.5 V 4" />
+                  {#if dnd}
+                    <!-- mute slash -->
+                    <path d="M2.5 2.5 L 13.5 13.5" />
+                  {/if}
+                </svg>
+              </button>
+            </li>
+            <li role="none" class="theme-accordion">
+              <div class="theme-accordion__header">
                 <button
                   type="button"
-                  class="settings-row__action settings-row__action--toggle"
-                  class:is-muted={dnd}
-                  aria-label={dnd
-                    ? 'Notifications muted — click to unmute'
-                    : 'Notifications on — click to mute'}
-                  aria-pressed={dnd}
-                  title={dnd ? 'Muted' : 'On — click to mute'}
-                  onclick={toggleDnd}
+                  class="theme-accordion__expand"
+                  aria-expanded={themeStyleExpanded}
+                  onclick={() => (themeStyleExpanded = !themeStyleExpanded)}
                 >
-                  <svg
-                    viewBox="0 0 16 16"
-                    width="14"
-                    height="14"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="1.4"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    aria-hidden="true"
-                  >
-                    <!-- bell body -->
-                    <path d="M4 11 C 4 9.8 4.5 9.3 4.5 8 C 4.5 5.8 6 4 8 4 C 10 4 11.5 5.8 11.5 8 C 11.5 9.3 12 9.8 12 11 Z" />
-                    <!-- rim -->
-                    <path d="M3.5 11 H 12.5" />
-                    <!-- clapper -->
-                    <path d="M7 13 C 7.2 13.6 7.5 14 8 14 C 8.5 14 8.8 13.6 9 13" />
-                    <!-- top -->
-                    <path d="M8 2.5 V 4" />
-                    {#if dnd}
-                      <!-- mute slash -->
-                      <path d="M2.5 2.5 L 13.5 13.5" />
-                    {/if}
-                  </svg>
+                  <span class="theme-accordion__label">Theme style</span>
+                  <span class="theme-accordion__current">
+                    <span class="theme-accordion__current-name"
+                      >{activeThemeStyle.name}</span
+                    >
+                    <span
+                      class="theme-accordion__chevron"
+                      data-expanded={themeStyleExpanded || undefined}
+                      aria-hidden="true"
+                    >›</span>
+                  </span>
                 </button>
-              </li>
-              <li role="none" class="theme-accordion">
-                <div class="theme-accordion__header">
-                  <button
-                    type="button"
-                    class="theme-accordion__expand"
-                    aria-expanded={themeStyleExpanded}
-                    onclick={() => (themeStyleExpanded = !themeStyleExpanded)}
-                  >
-                    <span class="theme-accordion__label">Theme style</span>
-                    <span class="theme-accordion__current">
-                      <span class="theme-accordion__current-name"
-                        >{activeThemeStyle.name}</span
+                <ThemeToggle variant="plain" />
+              </div>
+              {#if themeStyleExpanded}
+                <ul class="theme-accordion__list" role="list">
+                  {#each themeStyles as t (t.id)}
+                    <li class="theme-accordion__item">
+                      <button
+                        type="button"
+                        class="theme-accordion__select"
+                        aria-pressed={t.id === activeThemeStyleId}
+                        data-active={t.id === activeThemeStyleId || undefined}
+                        onclick={() => theme.setTheme(t.id)}
                       >
-                      <span
-                        class="theme-accordion__chevron"
-                        data-expanded={themeStyleExpanded || undefined}
-                        aria-hidden="true"
-                      >›</span>
-                    </span>
-                  </button>
-                  <ThemeToggle variant="plain" />
-                </div>
-                {#if themeStyleExpanded}
-                  <ul class="theme-accordion__list" role="list">
-                    {#each themeStyles as t (t.id)}
-                      <li class="theme-accordion__item">
-                        <button
-                          type="button"
-                          class="theme-accordion__select"
-                          aria-pressed={t.id === activeThemeStyleId}
-                          data-active={t.id === activeThemeStyleId || undefined}
-                          onclick={() => theme.setTheme(t.id)}
-                        >
-                          {t.name}
-                        </button>
-                      </li>
-                    {/each}
-                  </ul>
-                {/if}
-              </li>
-            {/snippet}
-          </Menu>
-          <button
-            type="button"
-            class="user-block__logout-chip"
-            aria-label="Sign out"
-            title="Sign out"
-            onclick={logout}
-          >
-            <svg
-              viewBox="0 0 16 16"
-              width="14"
-              height="14"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.4"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              aria-hidden="true"
-            >
-              <!-- door frame on the left -->
-              <path d="M9 2 H4 a1 1 0 0 0 -1 1 V13 a1 1 0 0 0 1 1 H9" />
-              <!-- arrow exiting to the right -->
-              <path d="M7 8 H14" />
-              <path d="M11 5 L14 8 L11 11" />
-            </svg>
-          </button>
-        </div>
+                        {t.name}
+                      </button>
+                    </li>
+                  {/each}
+                </ul>
+              {/if}
+            </li>
+          {/snippet}
+        </Menu>
       {/snippet}
     </Sidebar>
 
@@ -915,81 +933,87 @@
     min-inline-size: 0;
   }
 
-  /* Wrapper for the account trigger + the hover-revealed logout chip.
-     Position: relative so the chip can absolute-position itself relative
-     to the avatar inside the trigger. Display: flex + flex:1 takes over
-     the role the .menu-wrapper used to play directly inside the footer. */
-  .user-block {
-    position: relative;
+  /* Identity header inside the account menu (first li in source order =
+     top of the upward-opening dropdown = furthest from the cursor that
+     just clicked the trigger). Composition: avatar + identity column
+     (display name on top, email subtitle when distinct) on the left,
+     sign-out icon button at the trailing edge. Separated from the
+     navigation items below by a hairline border, so the visual reads
+     as "identity zone" vs "configuration zone". The sign-out button
+     intentionally omits role="menuitem" so the menu's initial-focus and
+     arrow-key navigation skip it — keyboard users reach the safe items
+     first, mouse users still click it directly.
+
+     Padding-inline asymmetry: the LEFT pad matches the menu items'
+     padding-inline (space-s) so the avatar lines up with the items' text
+     start. The RIGHT pad is 0 so the sign-out icon sits flush with the
+     bell (.settings-row__action) and ThemeToggle that live in
+     subsequent rows — every trailing icon column lines up on the same
+     vertical. */
+  :global(.menu-header) {
     display: flex;
+    align-items: center;
+    gap: var(--space-s);
+    padding-block: var(--space-s);
+    padding-inline-start: var(--space-s);
+    padding-inline-end: 0;
+    border-block-end: 1px solid var(--border-color-light);
+    margin-block-end: var(--space-xs);
+  }
+  :global(.menu-header__identity) {
+    display: flex;
+    align-items: center;
+    gap: var(--space-s);
     flex: 1;
     min-inline-size: 0;
   }
-
-  /* Hover-revealed logout chip. Hidden by default (opacity 0, no pointer
-     events, zero space because it's positioned absolute). Revealed when
-     the avatar inside the trigger is hovered (or when the chip itself
-     is hovered/focused). Hidden again when the account menu is open
-     (avoid overlap with the dropdown). */
-  .user-block__logout-chip {
-    position: absolute;
-    inset-block-start: 50%;
-    /* Avatar (xs = 1.5rem) sits at footer padding-inline-start
-       (var(--space-m)) + trigger padding-inline (var(--space-xs)).
-       Chip lands right after the avatar with a small gap so it reads
-       as separate from the avatar but still in its orbit. */
-    inset-inline-start: calc(var(--space-xs) + 1.5rem + var(--space-xs));
-    transform: translateY(-50%);
-    inline-size: 24px;
-    block-size: 24px;
+  :global(.menu-header__id) {
+    display: flex;
+    flex-direction: column;
+    min-inline-size: 0;
+  }
+  :global(.menu-header__name) {
+    font-size: var(--text-s);
+    color: var(--text-color);
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  :global(.menu-header__email) {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  /* Sign-out: same skeleton as .settings-row__action (32×32, neutral
+     idle) so it sits in the same trailing-icon column as the DND bell
+     and ThemeToggle below. align-self: flex-start anchors it to the
+     header's top so it aligns with the name's baseline (the identity's
+     primary line), not with the centre of the avatar + 2-line block. */
+  :global(.menu-header__logout) {
+    align-self: flex-start;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    background: var(--bg);
-    border: 1px solid var(--border-color-dark);
+    flex-shrink: 0;
+    inline-size: 32px;
+    block-size: 32px;
+    background: transparent;
+    border: 0;
     border-radius: var(--radius-s);
     color: var(--text-faint);
     cursor: pointer;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity var(--transition), background var(--transition),
-      color var(--transition), border-color var(--transition);
-    z-index: 1;
+    transition: background var(--transition), color var(--transition);
   }
-  /* Reveal: hover directly on the avatar circle (not the row), or hover/
-     focus on the chip itself. The chip is positioned touching the avatar
-     so the cursor can move from one to the other without losing hover. */
-  :global(.user-block):has(:global(.avatar):hover)
-    .user-block__logout-chip,
-  .user-block__logout-chip:hover,
-  .user-block__logout-chip:focus-visible {
-    opacity: 1;
-    pointer-events: auto;
-  }
-  /* Hide while the account menu is open — avoids overlap with the
-     dropdown and prevents accidental logout when the user is fishing
-     for menu items. */
-  :global(.user-block):has(
-      :global(.workspace-shell__user)[aria-expanded='true']
-    )
-    .user-block__logout-chip {
-    opacity: 0;
-    pointer-events: none;
-  }
-  .user-block__logout-chip:hover {
+  :global(.menu-header__logout:hover) {
     background: var(--danger-ultra-light);
     color: var(--danger);
-    border-color: var(--danger);
   }
-  .user-block__logout-chip:focus-visible {
+  :global(.menu-header__logout:focus-visible) {
     outline: var(--focus-width) solid var(--focus-color);
-    outline-offset: 1px;
-  }
-  /* Rail mode: no hover surface for the avatar (the avatar IS the trigger),
-     so the chip has no natural way to be discovered. Hide entirely —
-     logout in rail mode requires expanding the sidebar first. */
-  :global(.sidebar--collapsed) .user-block__logout-chip {
-    display: none;
+    outline-offset: -1px;
   }
 
   /* Kebab indicator at the trailing edge of the trigger. Always visible

@@ -64,39 +64,83 @@ export class SelectionStore {
   }
 
   /**
-   * Focus mode: a transient client-only view that pins the LineList filter
-   * to a single workspace, regardless of what's in `workspaces`/`projects`.
-   * Plaza also collapses its tree to just the focused workspace's row.
+   * Focus mode: pins Plaza to a single workspace AND mutates the underlying
+   * selection so every consumer (LineList, on-path highlighting, URL, future
+   * breadcrumb/⌘K) sees a single source of truth. Entering focus snapshots
+   * the prior selection; exiting restores it.
    *
-   * Crucially, focus does NOT mutate the underlying selection sets and does
-   * NOT change the URL — when the user exits focus, the prior selection
-   * surfaces unchanged. Per Marco: "el focus es realmente en ese momento".
+   * Edge case: if the user changes selection mid-focus (e.g. toggles a
+   * project from the focused workspace), the snapshot is invalidated and
+   * exiting just clears focus — the user keeps what they touched. Simpler
+   * than trying to merge.
    */
   focusedWorkspaceSlug = $state<string | null>(null);
+  private _focusSnapshot: {
+    workspaces: Set<string>;
+    projects: Set<string>;
+  } | null = null;
 
   setFocus(slug: string | null): void {
-    if (this.focusedWorkspaceSlug !== slug) this.focusedWorkspaceSlug = slug;
+    const prev = this.focusedWorkspaceSlug;
+    if (prev === slug) return;
+
+    if (slug !== null && prev === null) {
+      // Enter focus: snapshot, then replace selection with just this workspace.
+      this._focusSnapshot = {
+        workspaces: new Set(this.workspaces),
+        projects: new Set(this.projects),
+      };
+      this.focusedWorkspaceSlug = slug;
+      this._applyFocusSelection(slug);
+      return;
+    }
+
+    if (slug !== null && prev !== null) {
+      // Switch focus to a different workspace — keep the original
+      // pre-focus snapshot, just update which workspace is focused.
+      this.focusedWorkspaceSlug = slug;
+      this._applyFocusSelection(slug);
+      return;
+    }
+
+    // Exit focus (slug === null, prev !== null)
+    this.focusedWorkspaceSlug = null;
+    if (this._focusSnapshot !== null) {
+      this.workspaces = this._focusSnapshot.workspaces;
+      this.projects = this._focusSnapshot.projects;
+      this._focusSnapshot = null;
+      this.navigate();
+    }
+  }
+
+  /** Set selection to just the focused workspace (no project cascade —
+      LineList filters by workspace anyway). Called only from setFocus. */
+  private _applyFocusSelection(slug: string): void {
+    this.workspaces = new Set([slug]);
+    this.projects = new Set();
+    this.navigate();
+  }
+
+  /** Any user-initiated mutation during focus invalidates the snapshot so
+      exit doesn't undo their work. Called from toggleWorkspace, toggleProject,
+      and clear. */
+  private _invalidateFocusSnapshot(): void {
+    if (this.focusedWorkspaceSlug !== null && this._focusSnapshot !== null) {
+      this._focusSnapshot = null;
+    }
   }
 
   /**
-   * What LineList should use as the workspace-level filter. Focus wins:
-   * when active, returns ONLY the focused slug; otherwise the real
-   * `workspaces` set. Projects-level filter is suppressed during focus
-   * (see effectiveProjects).
+   * What LineList uses as the workspace-level filter. Now equivalent to
+   * `workspaces` during focus too (since focus mutates the set), but kept
+   * as a stable API so consumers don't have to know about focus internals.
    */
   effectiveWorkspaces(): Set<string> {
-    if (this.focusedWorkspaceSlug !== null) {
-      return new Set([this.focusedWorkspaceSlug]);
-    }
     return this.workspaces;
   }
 
-  /**
-   * Projects filter during focus: empty (focus is a workspace-only scope).
-   * Outside focus: the real `projects` set.
-   */
+  /** Same idea as effectiveWorkspaces — stable API over `projects`. */
   effectiveProjects(): Set<string> {
-    if (this.focusedWorkspaceSlug !== null) return new Set();
     return this.projects;
   }
 
@@ -111,6 +155,7 @@ export class SelectionStore {
    * the workspace toggles — known projects cascade as they become known.
    */
   toggleWorkspace(slug: string): void {
+    this._invalidateFocusSnapshot();
     const nextWs = new Set(this.workspaces);
     const nextProjs = new Set(this.projects);
     const isAdding = !nextWs.has(slug);
@@ -130,6 +175,7 @@ export class SelectionStore {
   }
 
   toggleProject(projectSlug: string, workspaceSlug: string): void {
+    this._invalidateFocusSnapshot();
     const next = new Set(this.projects);
     if (next.has(projectSlug)) next.delete(projectSlug);
     else next.add(projectSlug);
@@ -144,6 +190,7 @@ export class SelectionStore {
   }
 
   clear(): void {
+    this._invalidateFocusSnapshot();
     this.workspaces = new Set();
     this.projects = new Set();
     this.navigate();
