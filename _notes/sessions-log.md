@@ -8,6 +8,72 @@ Convención: secciones por fecha descendente. Cada sesión queda con commits cit
 
 ---
 
+## 2026-05-19 — Sesión maratón (~7.5h, 27 commits): checkpoint visual + naming gate roundtrips + sidebar pivot a filtro
+
+Sesión que arrancó como "validar gates Phase 0.1" y se fue ramificando a refactors estructurales conforme Marco vivía la UI productiva. **No siguió el roadmap** (el roadmap apuntaba a Phase 0.2 — Calendar + Road sheet) — pero cerró deuda real: 6 ADRs nuevos (034, 035, 036, 037, 038, 039), checkpoint visual 1 ratificado + visual 2 nuevo, naming gate completo (line→section→line + show→performance + URL cleanup), shell pivotado a filtro multi-select, in-place creation en Plaza, Settings page wired, persistencia localStorage.
+
+Resultado a nivel macro: el destino sigue siendo Phase 0.2, pero el modelo de shell ya no es el que el roadmap describía. Sidebar pasó de navegación exclusiva a filtro orto. Roadmap tiene nota de divergencia en `## Current operating state`.
+
+### Bloques temáticos (orden cronológico, commits clave)
+
+**05:41–06:54 · ADR-034 cast_member + demo workspace data (`fa54f67`, `27e5a66`, `98c7538`)**
+
+- Tabla `cast_member` project-scoped + `cast_override` per-performance. Asimetría intencional con `crew_assignment` (show-scoped): cast se planifica una vez con sustituciones; crew se decide gig a gig. RLS con `has_permission(project_id, 'edit:show')`.
+- Demo workspace `demo` dentro de `marco-rubiol-acc`: producción "Última órbita" (1 project + 1 line tour + 3 performances BCN/MAD/VLC + 3 engagements + 2 cast_members + 1 cast_override + 6 crew_assignments + 7 dates + 4 asset_versions). Carga vía SQL directo.
+- Gaps al cargar capturados en `_notes/_flux.md` § "Demo load: gaps descubiertos cargando workspace `demo`" — 10 puntos honestos sobre schema, UI flows pendientes, tooling fricción, mental-model ↔ schema alignment.
+
+**06:51–07:41 · Schema rename roundtrip line/section (`f99fbfa`)**
+
+- ADR-031 (`line → section`, aplicado 2026-05-18) revertido 24h después por ADR-035. Razón: vivir la UI con header "LINES" productivo + contexto castellano demostró que "línea de trabajo" funciona para los 10 kinds (tour/season/residency/creation/campaign/comms/misc). Schema vuelve a `line`; los 4 enum values nuevos preservados.
+- Migration `2026-05-19_revert_section_to_line.sql`. Sed automático en db-types.ts. RoomStructure → queryKeys/types/URLs actualizados. ADR-031 marcado como superseded.
+
+**07:40–07:52 · Data reorg MüK Cia + ADR-036 show→performance + ADR-037 vocab cleanup (`3690527`, `34e7fad`, `1cd5f0e`, `f5ccebe`)**
+
+- Workspace `mamemi` renombrada a `muk-cia` (display "MüK Cia"). Project recuperó display "MaMeMi" (era "Difusión 2026-27" desde ADR-030). Nueva line `difusion-2026-27` (kind=campaign) creada como frame operativo de la temporada dentro del project MaMeMi.
+- Razón: "MüK Cia" es la compañía; "MaMeMi" es UNA producción. ADR-030 había conflated los tres niveles en uno.
+- Schema `show` → `performance` (ADR-036): table + 6 FK columns (`crew_assignment.performance_id`, `cast_override.performance_id`, `asset_version.performance_id`, `date.performance_id`, `expense.performance_id`, `invoice_line.performance_id`) + enum `performance_status` + view `performance_redacted` + helper `project_id_of_performance` + 18 RLS policies recreadas. Column `show_start_at` → `start_at`.
+- ADR-037 cleanup ADR-008 vocab holdovers: URL `/h/[ws]/room/[slug]/` → `/project/[slug]/`, `/gig/[slug]/` → `/performance/[slug]/`. Endpoints `/api/rooms` → `/api/projects`, `/api/houses` → `/api/workspaces`. Componente `RoomStructure.svelte` → `LineList.svelte`. Tipos House/Room/HouseLite/RoomItem → Workspace/Project/WorkspaceLite/ProjectItem. 301 redirects en `hooks.server.ts` para bookmarks viejos.
+- Permission code `'edit:show'` queda inconsistente (closed RBAC vocab ADR-006); deuda documentada para Phase 0.9 admin UI.
+
+**07:58 · Checkpoint visual 2 (`9f8bcd9`)**
+
+- Dark mode + editorial-sobrio polish encima de ADR-033. Checkpoint visual 1 (gates Phase 0.1) ratificado en sesión: la visual debt anotada 2026-05-18 (gap Room header / Plaza spacing engaña / eyebrow duplicado) se resolvió por evolución del shell, no por pase puntual.
+
+**08:03 · Line detail page (`a2dd352`)**
+
+- Ruta `/h/[ws]/project/[slug]/line/[line]/` + LineList clickable. Primera ruta con scope intermedio entre project y performance.
+
+**08:40–09:05 · Visual polish + ADR-038 sidebar filtro multi-select (`c1a02fd`, `65302a2`, `8107fa3`, `fc52506`, `a63941d`, `bdc6008`, `e77fbbd`)**
+
+- Account menu width, form fields, button variants.
+- Flux note "Places" eyebrow provisional (decisión secundaria pendiente — `_notes/_flux.md`).
+- **ADR-038 sidebar como filtro multi-select**: pivot grande del modelo conceptual. Plaza pasa de single-select navigation a multi-select filter (workspaces Set + projects Set). LineList pasa de "lines del project activo o vacío" a SIEMPRE visible, filtrada por la unión (orden `last_navigated_at` desc cuando vacío). Selection persiste en URL (canonical cuando colapsa a 1 entity; query params `?ws=&project=` para multi) + localStorage fallback.
+- Schema entregado: column `line.last_navigated_at` + index parcial + RPC `touch_line_visit` + endpoint `/api/lines/visit`. Migration `2026-05-19_add_line_last_navigated_at.sql`.
+- App rewrite: `selection.svelte.ts` multi-select, `Plaza.svelte` rows como `<a>` con href computado por preview, `LineList.svelte` resuelve slugs a IDs via cached queries.
+- **ADR-039 keep `/h/` prefix + shell hoist**: shell movido de `/h/[workspace]/+layout` a `/h/+layout` (resuelve ambigüedad "browsing context vs workspace selected"). Re-evaluada la pregunta de dropear el prefix entero y rechazada: `/` queda libre para Phase 1 marketing/docs/billing.
+- BrandMark component reuse + page title format + sidebar border polish + icon.svg refresh.
+- On-path visual marker decoupled de selection (después retirado en ADR-038 cuando sidebar dejó de ser navegación).
+
+**11:51 · D-PRE-05 wired: Settings page + Master View toggle (`b387fe9`)**
+
+- Ruta `/h/[ws]/settings/` con `SettingsNav` reemplazando Plaza+LineList en sidebar cuando estás en settings. Master View toggle real conectado a localStorage (cierra trabajo #11 de Phase 0.1).
+
+**12:03–13:18 · In-place creation + focus mode + persistencia (`0d0af25`, `63402c8`, `978926c`, `5a81089`, `2d2ced9`, `1c24a4b`, `4436af8`)**
+
+- Workspace, project y line se crean inline desde la propia Plaza con action clusters por hover (Settings, Add project/line, Focus).
+- Focus mode aísla una workspace/project mutando la selection (snapshot + restore al salir).
+- Collapse/expand all workspaces + icon redesign.
+- Infra schema entregada: 3 RPCs (`create_workspace_rpc`, `create_project_rpc`, `create_line_rpc`) + columnas `workspace.accent + workspace.description` (4 migraciones no-ADR — mecánica, no decisión).
+- Polish final: workspace-to-workspace gap m → s, selected project name por weight bump (no por color tinted), persistencia localStorage de lens activa + focus state cross-session.
+
+### Lo que NO se hizo (era el plan del roadmap, no se ejecutó)
+
+- Phase 0.2 trabajo: ViewsNav, ChipBar, multi-select por Shift+checkbox, Calendar lens (empty + data), Road sheet colaborativo (CRDT en performance.notes vía y-partyserver), Endpoint road sheet, link público firmado, dual-timezone display, tests e2e collab.
+
+Phase 0.2 es la siguiente fase. Empieza con menos deuda visible (visual cerrado, naming cerrado, shell estable) pero con un modelo de sidebar que diverge del que el roadmap describía. Roadmap `## Current operating state` tiene una línea de reconocimiento.
+
+---
+
 ## 2026-05-18 — ADR-032 account layer above workspace
 
 Multi-tenant model pasa de 2 niveles (workspace + project) a 3 (account + workspace + project), preparado para abrir Hour a clientes externos próximos.

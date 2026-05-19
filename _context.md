@@ -34,14 +34,14 @@ Working name: **Hour**. Brand decision deferred to Phase 1.
 - Phase 0 runs entirely within free tiers.
 - Multi-tenant from day one: 3-layer model **`account` (billing) → `workspace` (RLS scope) → project** (ADR-032, 2026-05-18). Account es la entidad pagadora (Basecamp-like, 1 suscripción Stripe cuando llegue Phase 1); workspace es la unidad multi-tenant aislada (Slack-like, un user atraviesa N workspaces de N accounts vía workspace_memberships). RLS at DB level. JWT `current_workspace_id` claim. Account kind = `personal | team`; workspace kind también `personal | team`.
 - **Reset v2 + roadsheet + account + cast layers + performance rename** (ADR-001..007 + ADR-023 + ADR-032 + ADR-034 + ADR-035 + ADR-036, 2026-04-19 → 2026-05-19): **25 tablas**. Polymorphic core: `account + workspace + project + engagement + performance + line + date` — no `project.type` column (ADR-007). Engagement (conversation) distinct from performance (atomic gig, ADR-001). **Line** es la agrupación operativa dentro del project ("línea de trabajo"), con `kind` enum de 10 valores: `tour | season | phase | circuit | residency | other | creation | campaign | comms | misc` (ADR-031 amplió enum, ADR-035 revertió el rename a section → vuelta a `line`). **Performance** (ADR-036, 2026-05-19): renombre de `show` para evitar confusión con "espectáculo/producción" en castellano; "performance" universal cross-arts. Column `show_start_at` → `start_at`. Money stack: `invoice + invoice_line + payment + expense` (ADR-003). Editable RBAC: `workspace_role` catalog + `project_membership.roles/grants/revokes` con 10-permission closed vocabulary (ADR-006). `venue` es su propia entidad. **Cast** (ADR-034, 2026-05-19): canónico a nivel project (`cast_member`), sustituciones puntuales por performance (`cast_override`). Crew sigue exclusivamente performance-scoped (`crew_assignment`) — asimetría intencional porque el dominio planifica cast una vez y crew performance a performance.
-- **Shell user-scoped + lens nav top + Plaza lens** (ADR-029 + ADR-030, 2026-05-18): sidebar muestra TODAS las workspaces del usuario simultáneamente (cross-account, Slack-like). Lens nav vive en el TOP del main como horizontal pills: `Plaza · Calendar · Contacts · Money`. El componente `Plaza.svelte` (sidebar upper) y la `Plaza` lens (top pill) comparten nombre a propósito — misma idea conceptual: la Plaza es tu mapa de trabajo, la lens es el modo de trabajarla. `RoomStructure` (sidebar lower) reemplaza el componente Desk original; solo visible cuando hay Room seleccionada en URL. Lens primaria "Desk" descartada (sin task entity = navegación vacía, strategy review §3); reaparecerá en Phase 0.5+ si D3 task entity llega.
+- **Shell user-scoped + lens nav top + sidebar como filtro multi-select** (ADR-029 + ADR-030 + ADR-033 + ADR-038 + ADR-039, 2026-05-18 → 2026-05-19): shell vive en `/h/+layout.svelte` (no `/h/[workspace]/+layout`, hoisted 2026-05-19 ADR-039). Sidebar muestra TODAS las workspaces del usuario simultáneamente (cross-account, Slack-like). Lens nav vive en el TOP del main como horizontal pills: `Today · Calendar · Contacts · Money` (Today es la lens primaria desde ADR-033; Plaza como nombre de lens descartado, sobrevive solo como nombre del componente sidebar). **Sidebar = filtro multi-select** (ADR-038): Plaza (workspaces × projects) + `LineList` (lines de la unión) operan como filtro orto, no navegación exclusiva. LineList es siempre visible (no requiere project seleccionado); muestra todas las lines accesibles por RLS ordenadas por `last_navigated_at` cuando no hay filtro, filtradas por la unión cuando hay. Lens primaria "Desk" descartada en strategy review §3 (sin task entity); reaparecerá en Phase 0.5+ si D3 llega.
 - **URL architecture** (ADR-022, 2026-04-24): three levels — ephemeral session state in `localStorage`, canonical entity URLs (`/h/:workspace-slug/:entity/:slug-or-id`) stable and shareable, view-state URLs via explicit "Copy link" gesture. Path-prefix multi-tenancy (not subdomain in Phase 0). Signed public links for road sheet only in Phase 0 (partial D6).
-- **Road sheet model** (ADR-023, 2026-04-24): not an entity — projection of `show` + junctions, filtered by role. Schema extensions: 5 timeslot columns + 3 jsonb (`logistics`, `hospitality`, `technical`) on `show`; new tables `crew_assignment`, `cast_override`, `asset_version` (with `direction` enum `outbound|inbound|adapted` — captures venue returns and per-venue variants). No state machine. URL `/h/:workspace/gig/:slug/roadsheet` with optional `?role=`. Closes the "Lens Technical" pendiente (top-nav lens dropped).
+- **Road sheet model** (ADR-023, 2026-04-24; vocab updated ADR-036 + ADR-037, 2026-05-19): not an entity — projection of `performance` + junctions, filtered by role. Schema extensions: 5 timeslot columns + 3 jsonb (`logistics`, `hospitality`, `technical`) on `performance`; new tables `crew_assignment`, `cast_override`, `asset_version` (with `direction` enum `outbound|inbound|adapted` — captures venue returns and per-venue variants). No state machine. URL `/h/:workspace/performance/:slug/roadsheet` with optional `?role=`. Closes the "Lens Technical" pendiente (top-nav lens dropped).
 - **Slug naming** (ADR-024, 2026-04-24): clean names + hard reject + `previous_slugs text[]` for rename history. GitHub/Slack model. Immutable `id uuid` separate from mutable slug column. Uniqueness scope `(workspace_id, entity_type)`. Industry research of 10 SaaS confirmed nobody uses numeric suffixes as default UX.
-- **CRDT transport** (ADR-025, 2026-04-24; *transport refined 2026-05-01*): `y-partyserver` (PartyKit's active successor under Cloudflare) on native Durable Objects declared in `wrangler.jsonc` for collaborative editing of text-free fields (`show.notes`, `project.notes`). Auth gates WebSocket via Supabase JWT + membership check; RLS never sees Yjs binary. Snapshots persisted to `collab_snapshot` table every 30 updates / 60s. Hibernation supported (cheaper at scale). Scoped to text fields only — structured fields use Supabase Realtime with last-write-wins.
+- **CRDT transport** (ADR-025, 2026-04-24; *transport refined 2026-05-01*): `y-partyserver` (PartyKit's active successor under Cloudflare) on native Durable Objects declared in `wrangler.jsonc` for collaborative editing of text-free fields (`performance.notes`, `project.notes`). Auth gates WebSocket via Supabase JWT + membership check; RLS never sees Yjs binary. Snapshots persisted to `collab_snapshot` table every 30 updates / 60s. Hibernation supported (cheaper at scale). Scoped to text fields only — structured fields use Supabase Realtime with last-write-wins.
 - **Frontend stack migration** (ADR-026, 2026-05-01): SvelteKit 2 + Svelte 5 + `@sveltejs/adapter-cloudflare` replaces Astro 5 + islands. Triggered by audit showing 95% of code already in vanilla JS or Svelte; Astro was a 30-LoC SSR envelope. Gains: client-side routing, form actions with progressive enhancement, `load()` with dependency tracking, `hooks.server.ts`, cross-route stores. New defaults wired in same migration: Valibot at `+server.ts` boundaries, Sentry hooks (DSN env-var), TanStack Query for server-state cache (Plaza/Desk).
 - **Full implementation plan**: `build/roadmap.md` (documento vivo, 25 ADRs + 14 D-PRE, fases 0.0 → 1, próximo sprint 13 días). Abrir primero al retomar Hour.
-- Anti-CRM vocabulary: `person` (global, shared), `engagement` (workspace-scoped, status default `contacted`), `show` (atomic performance with hold/hold_1/2/3 lifecycle), `date` (rehearsal / travel_day / press / other), `venue` (recurring physical place). No lead / pipeline / funnel / prospect.
+- Anti-CRM vocabulary: `person` (global, shared), `engagement` (workspace-scoped, status default `contacted`), `performance` (atomic gig with hold/hold_1/2/3 lifecycle — ADR-036 renamed from `show`), `date` (rehearsal / travel_day / press / other), `venue` (recurring physical place). No lead / pipeline / funnel / prospect.
 - Difusión 2026-27 is a **line** (kind=campaign) within the MaMeMi project (ADR-036 reorg 2026-05-19). Engagements live at project level (MaMeMi); the line is the operational frame for this season's outreach. Engagements de la temporada se filtran por `custom_fields->>season = '2026-27'`.
 - PKs are UUID v7.
 - Does NOT build Spanish labor compliance (that's Ares's territory).
@@ -64,40 +64,49 @@ Working name: **Hour**. Brand decision deferred to Phase 1.
 - Parent MaMeMi context (where Difusión originated): `01_STAGE/ZS_MaMeMi/`
 - Source of the 156 existing programmers/festivals to import: `01_STAGE/ZS_MaMeMi/Difusión/`
 
-## Status — 2026-05-18
+## Status — 2026-05-19
 
-**Phase 0.1 cerrada al 100% del roadmap salvo trabajos bloqueados por datos reales (#3 GigDetail, #5 ProductionStub, #6 endpoints runs/gigs, #9 write queue offline) o estandalone restantes (#11 Settings — también cerrado).** Cuatro ADRs aplicados en sesión 2026-05-18:
+**Phase 0.1 cerrada 2026-05-18; sesión maratón 2026-05-19 (~7.5h, 27 commits 05:41 → 13:18) que no siguió el roadmap pero cerró deuda real**. La sesión empezó como checkpoint visual 1 + naming gate (los dos gates definidos 2026-05-14) y se fue ramificando a refactors estructurales conforme Marco vivía la UI productiva: ADR-035 (revert section → line), ADR-036 (show → performance), ADR-037 (cleanup ADR-008 vocab holdovers), ADR-038 (sidebar como filtro multi-select — pivot grande del modelo de navegación), ADR-039 (keep `/h/` prefix + shell hoist a `/h/+layout`).
 
-- **ADR-029** — shell user-scoped: sidebar multi-house simultáneo + lens nav top + RoomStructure reemplaza Desk component.
-- **ADR-030** — naming gate close: lens primaria `Plaza` (no `Rooms`) + project `mamemi.name` renamed a "Difusión 2026-27".
-- **ADR-031** — schema rename `line` → `section` + expand kind enum a 10 valores (incluye creation/campaign/comms/misc).
-- **ADR-032** — `account` layer above workspace (billing entity Basecamp-like + user atraviesa N accounts Slack-like).
+Hitos del día (orden cronológico, commits clave):
 
-Resultado: 24 tablas en producción, datos productivos visibles, smoke verde, multi-tenant 3-layer listo para clientes externos.
+- **ADR-034 `cast_member` + demo workspace data** (`fa54f67`, `27e5a66`) — tabla cast canónico project-scoped + sustituciones por performance via `cast_override`. Producción ficticia "Última órbita" cargada en workspace `demo` (3 performances BCN/MAD/VLC + 7 dates + 6 crew + 2 cast + 4 assets) para validar render multi-workspace. Gaps encontrados al cargar capturados en `_notes/_flux.md` § "Demo load: gaps descubiertos".
+- **Schema rename roundtrip: ADR-035 `section` → `line` revert** (`f99fbfa`, `98c7538`) — el `line → section` del 18 (ADR-031) duró 24h. Vivir la UI con "LINES" header productivo + contexto castellano demostró que "línea de trabajo" funciona para los 10 kinds (tour, season, residency, creation, campaign, comms, misc, etc.). Schema vuelve a `line` con los 4 enum values nuevos preservados.
+- **Data reorg MüK Cia / MaMeMi + ADR-036 `show` → `performance`** (`3690527`, `34e7fad`, `1cd5f0e`) — workspace renombrada (`mamemi` → `muk-cia`, display "MüK Cia"); project recuperó display "MaMeMi" (era "Difusión 2026-27" desde ADR-030); nueva line `difusion-2026-27` (kind=campaign) dentro de MaMeMi como frame operativo de la temporada. Schema `show` → `performance` para vocab cross-arts neutro (`performance_status` enum, view `performance_redacted`, 6 FK columns renombrados, helper functions con `p_performance_id`). Column `show_start_at` → `start_at`. 18 RLS policies recreadas.
+- **ADR-037 cleanup vocab holdovers** (`f5ccebe`) — URL `/h/[ws]/room/` → `/h/[ws]/project/`, `/h/[ws]/gig/` → `/h/[ws]/performance/`. Endpoints `/api/rooms` → `/api/projects`, `/api/houses` → `/api/workspaces`. Componente `RoomStructure.svelte` → `LineList.svelte`. Tipos internos `House/Room/HouseLite/RoomItem` → `Workspace/Project/WorkspaceLite/ProjectItem`. 301 redirects en `hooks.server.ts` para bookmarks viejos. Permission code `'edit:show'` queda inconsistente (closed RBAC vocab); deferido a Phase 0.9 admin UI.
+- **Checkpoint visual 2** (`9f8bcd9`) — dark mode + editorial-sobrio polish encima de ADR-033. Checkpoint visual 1 ratificado en la sesión (visual debt de 2026-05-18 — gap Room header / Plaza spacing / eyebrow duplicado — cerrada por la propia evolución del shell).
+- **Line detail page** (`a2dd352`) — `/h/[ws]/project/[slug]/line/[line]/` con LineList clickable. Primera ruta con scope intermedio entre project y performance.
+- **ADR-038 sidebar como filtro multi-select** (`8107fa3`) — el cambio conceptual más grande del día. Plaza pasa de single-select navigation a multi-select filter (workspaces Set + projects Set). LineList pasa de "lines del project activo o vacío" a SIEMPRE visible, filtrada por la unión. URL design: canonical cuando la selección colapsa a 1 entity, query params `?ws=&project=` para multi. Selection persiste en URL + localStorage fallback. Schema entregado: column `line.last_navigated_at` + RPC `touch_line_visit` + endpoint `/api/lines/visit`. Migración `2026-05-19_add_line_last_navigated_at.sql`.
+- **ADR-039 keep `/h/` prefix + shell hoist** (`a63941d`) — shell movido de `/h/[workspace]/+layout` a `/h/+layout` (resuelve la ambigüedad "browsing context vs workspace selected"). Re-evaluada la pregunta de dropear el prefix entero y rechazada: `/` queda libre para Phase 1 marketing/docs/billing.
+- **On-path visual marker decoupled** (`e77fbbd`) y luego retirado en ADR-038 cuando la sidebar dejó de ser navegación.
+- **D-PRE-05 wired: Settings page + Master View toggle** (`b387fe9`) — ruta `/h/[ws]/settings/` con `SettingsNav` reemplazando Plaza+LineList en sidebar, Master View toggle real conectado a localStorage (cierra trabajo #11 de Phase 0.1).
+- **In-place creation + focus mode en Plaza** (`0d0af25`, `63402c8`, `978926c`, `5a81089`) — workspace, project y line se crean inline desde la propia Plaza con action clusters por hover. Focus mode aísla una workspace/project mutando la selection (snapshot + restore on exit). Collapse/expand all workspaces. Infra schema: 3 RPCs (`create_workspace_rpc`, `create_project_rpc`, `create_line_rpc`) + columnas `workspace.accent + workspace.description`.
+- **Polish final** (`2d2ced9`, `1c24a4b`, `4436af8`) — workspace-to-workspace gap m → s, selected project name por weight bump (no por color), persistencia localStorage de lens + focus state cross-session.
 
-**Phase 0.1 cerrada definitivamente 2026-05-18.** Los dos gates decididos 2026-05-14 (checkpoint visual 1 + naming gate con Anouk) Marco los está ejecutando asíncronamente fuera de esta sesión — el rework visual lo lleva por su cuenta y el naming queda asumido cerrado (las confusiones se cazaron y cerraron en la propia sesión: Plaza lens + project rename + line→section). Próxima fase: **Phase 0.2 — Views + Road sheet colaborativo + Calendar**, con la deuda Phase 0.9 hardening en paralelo cuando convenga (cookies httpOnly, rate limiting, RLS regression suite — antes de cliente externo).
+**Resultado**: el roadmap original de Phase 0.2 (Views + Road sheet colaborativo + Calendar) sigue siendo el destino, pero la arquitectura del shell ya no es la que describía el roadmap — el sidebar es filtro, no navegación. El roadmap (`build/roadmap.md`) tiene una nota de divergencia al inicio.
 
-Detalle de las sesiones de cierre en `_notes/sessions-log.md` § 2026-05-18 (4 entradas: ADR-032, ADR-031, ADR-030, Phase 0.1 sprint principal continuación).
+Próxima fase: **Phase 0.2** — Calendar lens + Road sheet colaborativo. Deuda Phase 0.9 hardening en paralelo cuando convenga (cookies httpOnly, rate limiting, RLS regression suite — antes de cliente externo).
+
+Detalle granular en `_notes/sessions-log.md` § 2026-05-19.
 
 ### DB en producción
-- `hour-phase0` · Postgres 17 · **25 tablas** + `show_redacted` view · 24 functions · 78 RLS policies (ENABLE + FORCE)
-- Modelo 3-layer en producción: 3 accounts (marco-rubiol-acc, muk-cia-acc, playwright-acc) + 4 workspaces (marco-rubiol, muk-cia, playwright, demo) + 2 projects en producción (MaMeMi dentro de muk-cia con 154 engagements y line Difusión 2026-27; Última órbita dentro de demo con 1 line y 3 performances)
-- Auth hook `custom_access_token_hook` enabled (inyecta `current_workspace_id` desde `workspace_membership`). `handle_new_user` trigger actualizado (ADR-032) para crear account + account_membership ANTES del workspace personal en cada signup
-- Datos reales en workspace `muk-cia`: **154 persons + 154 engagements** (status=`contacted`, `custom_fields.season='2026-27'`), 30 enriquecidos con dossier 2026, atados al project MaMeMi + line "Difusión 2026-27" (campaign). Workspace `marco-rubiol` personal queda vacía; workspace `demo` dentro de marco-rubiol-acc tiene la producción ficticia "Última órbita" con 3 performances + 1 line tour.
+- `hour-phase0` · Postgres 17 · **25 tablas** + `performance_redacted` view · 24 functions · 78 RLS policies (ENABLE + FORCE)
+- Modelo 3-layer: 3 accounts (marco-rubiol-acc, muk-cia-acc, playwright-acc) + 4 workspaces (marco-rubiol, muk-cia, playwright, demo) + 2 projects (MaMeMi dentro de muk-cia con 154 engagements y line `difusion-2026-27`; Última órbita dentro de demo con 1 line tour y 3 performances)
+- Auth hook `custom_access_token_hook` enabled (inyecta `current_workspace_id`). `handle_new_user` trigger actualizado (ADR-032) crea account + account_membership antes del workspace personal en cada signup.
+- Datos reales en `muk-cia`: **154 persons + 154 engagements** (status=`contacted`, `custom_fields.season='2026-27'`), 30 enriquecidos con dossier 2026, atados al project MaMeMi + line "Difusión 2026-27" (kind=campaign). Workspace `marco-rubiol` personal vacía. Workspace `demo` con "Última órbita" para validar render cross-workspace.
+- Migraciones aplicadas 2026-05-19 (orden cronológico): `add_cast_member`, `revert_section_to_line`, `rename_show_to_performance`, `data_rename_muk_cia`, `add_line_last_navigated_at`, `create_workspace_rpc`, `create_project_rpc`, `create_line_rpc`, `workspace_accent_and_description`.
 
-### Phase 0.1 — trabajos restantes
-- **#3 GigDetail mobile-first** — bloqueado por #6 + datos reales de gig.
+### Phase 0.1 — trabajos pendientes (post sesión 2026-05-19)
+Vocab actualizado tras ADR-037. Estado real:
+- **#3 PerformanceDetail mobile-first** (era GigDetail) — bloqueado por #6 + primera fecha real productiva.
 - **#5 ProductionStub** — bloqueado por #3.
-- **#6 Endpoints `/api/runs` + `/api/gigs` + `/api/gigs/:id`** — trabajo en seco (sin data); cuando confirmes primera fecha real.
-- **#9 Write queue offline scaffolding** — bloqueado por write paths (PATCH inline status, etc.).
-- **#11 Settings + Master View toggle** — independiente, ~45 min. Estandalone si quieres cerrar #11 antes del checkpoint visual 1.
+- **#6 Endpoints `/api/lines`, `/api/performances`, `/api/performances/:id`** — `/api/lines` ya construido en ADR-038. Faltan los de performances en mode read (write paths Phase 0.2+).
+- **#9 Write queue offline scaffolding** — bloqueado por write paths reales (PATCH inline status etc.); SW + IndexedDB ya en sitio desde Phase 0.0.
+- **#11 Settings + Master View toggle** — ✅ CERRADO 2026-05-19 (commit `b387fe9`).
 
-### Gates al cerrar Phase 0.1 (decisión 2026-05-14)
-- **Checkpoint visual 1** — pasada de ~1 día con datos productivos (154 engagements visibles). Evaluar: plum trial, densidad, jerarquía, tipografía. Visual debt anotada 2026-05-18:
-  - Gap exagerado entre Room header (`Status: active`) y RelationshipStub.
-  - Plaza spacing entre Houses engaña — Marco Rubiol vacía parece tener contenido en blanco.
-  - Eyebrow "ROOM" aparece duplicado (sidebar lower header + main header).
-- **Naming gate** — testear `House`, `Room`, `Run`, `Gig`, `Plaza`, `Rooms` lens con Anouk (5 min) + 1-2 externos del circuito. Riesgo #14 directo. Si emerge confusión seria, refactor mecánico (~medio día) antes de Phase 0.2.
+### Gates Phase 0.1 — ambos cerrados
+- ✅ **Checkpoint visual 1** — ratificado en sesión 2026-05-19. Visual debt 2026-05-18 (gap Room header, Plaza spacing, eyebrow duplicado) resuelta por evolución del shell. Checkpoint visual 2 (`9f8bcd9`) añadió dark mode + polish editorial-sobrio encima.
+- ✅ **Naming gate** — cerrado en vivo durante la sesión. Las confusiones cazadas por Marco al usar la UI productiva (line vs section, show vs performance, room/gig vs project/performance) generaron ADR-035/036/037 que limpiaron schema + UI + URL + código en el mismo pase. Test externo con Anouk + 1-2 más diferido a checkpoint Phase 0.4 como ratificación, no decisión.
 
 ## Open debts (priority-ordered)
 
@@ -109,10 +118,10 @@ Lista honesta de lo que falta, ordenada por ratio coste/riesgo. **Atacar de arri
 ### Phase 0.9 hardening backlog (antes de cliente externo conocido)
 - **Rate-limit `/api/sentry-tunnel`** vía Cloudflare KV (~30 min). CF WAF rate-limit es add-on de pago; KV en Worker free es suficiente.
 - **RLS regression suite** — 6 escenarios priorizados por valor (cubren ~80% del riesgo multi-tenant real, validados en revisión externa 2026-05-09):
-  1. **Cross-workspace leakage hard deny** — user de workspace A no lee project/show/engagement/person_note/invoice de workspace B aunque conozca UUIDs/slugs. List sin filtro, select por id, join indirecto vía engagement→project, slug conocido. Expected: 0 rows o 403, sin filtrar existencia.
+  1. **Cross-workspace leakage hard deny** — user de workspace A no lee project/performance/engagement/person_note/invoice de workspace B aunque conozca UUIDs/slugs. List sin filtro, select por id, join indirecto vía engagement→project, slug conocido. Expected: 0 rows o 403, sin filtrar existencia.
   2. **Membership revoke con JWT vivo** — user con JWT válido + `current_workspace_id`, membership eliminada, sigue intentando lectura. Expected (decisión a tomar): RLS deniega vía `exists workspace_membership where accepted_at + revoked_at IS NULL` o aceptar ventana hasta expiración (1h). Phase 0.9 endurece.
   3. **Project permission gate** — viewer con `read:engagement` ve / sin `read:money` no ve fee real / con grant explícito gana / con revoke explícito pierde aunque rol lo tenga / owner+admin bypass. Valida `has_permission()` union + grants - revokes.
-  4. **Money redaction + write guard** — sin `read:money` lee `show_redacted` con fee masked, con `read:money` ve fee real, sin `edit:money` update rechazado por trigger, con `edit:money` permitido.
+  4. **Money redaction + write guard** — sin `read:money` lee `performance_redacted` con fee masked, con `read:money` ve fee real, sin `edit:money` update rechazado por trigger, con `edit:money` permitido.
   5. **Private person_note** — author lee su nota `visibility='private'`, otro member del mismo workspace no la lee, cross-workspace nunca, workspace-note sí leen miembros autorizados.
   6. **Soft-delete invisibility** — `deleted_at IS NOT NULL` no aparece en list endpoints ni select por id (salvo rol admin con test separado explícito).
   - Bonus 7º: **access-token hook claim correctness** — sign-in/refresh inyecta `current_workspace_id` correcto con/sin membership aceptada/múltiples workspaces.
@@ -128,67 +137,77 @@ Lista honesta de lo que falta, ordenada por ratio coste/riesgo. **Atacar de arri
 - **paraglide-js v2** para i18n (~2-3h). El `$lib/i18n.ts` simple actual cubre los ~15 strings de Phase 0. Migrar cuando llegue contenido en español o pase de 50 strings.
 - **Sentry source-map auth token rotation policy** — el token actual (`sntryu_...`) en `apps/web/.env` no caduca. Revisar a Phase 1 si se quiere rotar.
 
-## Product vocabulary (ADR-008 → updated por ADR-030 + ADR-031 + ADR-032 → reverted por ADR-033, 2026-05-18)
+## Product vocabulary (ADR-008 → ADR-030 → ADR-033 → ADR-035 → ADR-036 → ADR-037, 2026-05-18 → 2026-05-19)
 
-Naming gate resuelto 2026-05-18: UI usa vocabulario industria-standard. Schema mantiene technical names.
+Naming gate cerrado 2026-05-19 tras dos roundtrips vividos en UI productiva. Vocabulario UI/URL/schema/código alineado.
 
-| Producto (UI label) | Schema | Definición |
-|---|---|---|
-| (sin user-facing label aún; "Account" en admin UI Phase 1) | `account` | Entidad pagadora. Billing boundary. Personal (1 user) o team. Invisible en UI Phase 0; emerge en Settings → Account management. (ADR-032) |
-| **Project** | `workspace` | Tenant aislado. RLS scope. Lo que ves como top-level en el sidebar bajo el eyebrow "PROJECTS". |
-| (sin UI label en Phase 0; "Project" interno) | `project` | Proyecto creativo dentro de un workspace. En Phase 0 sólo hay 1 por workspace (convención), por lo que la UI lo trata como child implícito del workspace. Cuando aparezca el primer schema `project` distinto del workspace homónimo, decidir representación visual separada (ADR-033 open item). |
-| **Line** (UI label) | `line` | Agrupación operativa: tour, season, phase, circuit, residency, other, creation, campaign, comms, misc (kind enum, ADR-031 + ADR-035). Renderiza en sidebar lower (`<LineList>`). |
-| **Show** | `show` | Single performance event. |
+| UI label | Schema | URL | Definición |
+|---|---|---|---|
+| (sin label visible Phase 0; "Account" en admin UI Phase 1) | `account` | n/a | Entidad pagadora. Billing boundary. Personal (1 user) o team. Invisible hasta Settings → Account management Phase 1. (ADR-032) |
+| **Workspace** | `workspace` | `/h/[workspace]/` | Tenant aislado. RLS scope. Top-level en sidebar Plaza, bajo eyebrow ("Projects" en `+layout.svelte:380`; debate Places/Projects pending en `_notes/_flux.md`). |
+| **Project** | `project` | `/h/[ws]/project/[slug]/` | Producción creativa dentro de un workspace. Phase 0 con 1-2 por workspace; Phase 0.5+ más finos. |
+| **Line** | `line` | `/h/[ws]/project/[slug]/line/[line]/` | Línea de trabajo dentro de un project. `kind` enum 10 valores: tour / season / phase / circuit / residency / other / creation / campaign / comms / misc (ADR-035 mantuvo `line` después del roundtrip section). Renderiza en sidebar lower (`<LineList>`), siempre visible, filtrada por selección Plaza. |
+| **Performance** | `performance` | `/h/[ws]/performance/[slug]/` | Gig atómico. Antes `show` (ADR-036 rename 2026-05-19 para vocab cross-arts). Column principal: `start_at` (era `show_start_at`). |
 
-**Lens primaria**: **Today** (ADR-033). Pills: `Today · Calendar · Contacts · Money`. Componentes internos mantienen los nombres `Plaza.svelte` (sidebar upper) y "Desk" como concepto del sistema de pills — no aparecen en copy visible.
+**Lens primaria**: **Today** (ADR-033). Pills: `Today · Calendar · Contacts · Money`. Componente sidebar upper `Plaza.svelte` mantiene nombre interno (no aparece en copy visible).
 
 URL paths actualizados a vocabulario schema-aligned 2026-05-19 (ADR-037 cleanup): `/h/[workspace]/project/[slug]/` (was `/room/`), `/h/[workspace]/performance/[slug]/` (was `/gig/`). 301 redirects en `hooks.server.ts` para bookmarks/links viejos. API endpoints renombrados: `/api/projects` (was `/api/rooms`), `/api/workspaces` (was `/api/houses`).
 
-Schema retains technical names (`account`, `workspace`, `project`, `line`, `show`). UI labels pueden cambiar libremente hasta Phase 0.9 sin tocar schema (ADR-008 separation).
+Schema retains technical names (`account`, `workspace`, `project`, `line`, `performance`). UI labels pueden cambiar libremente hasta Phase 0.9 sin tocar schema (ADR-008 separation).
 
 **Naming reversibility window** (2026-05-14): renaming UI labels (House/Project/Room/Section/Gig/Plaza/etc.) cuesta ~half day to one day mientras estemos entre Phase 0.0 y Phase 0.9. El trabajo mecánico: rename folders en `src/routes/h/[workspace]/...`, update `$lib/reserved-slugs.ts`, find/replace componentes, update i18n keys, rename endpoints. Schema NO cambia. Después de Phase 0.9 (clientes externos con bookmarks/screenshots/training materials), el coste escala a semanas. Gap a flaggear: `previous_slugs[]` cubre rename de slug dentro de una entity, pero NO entity-type segment renames (`/room/` → `/project/` requiere 301 redirect rule explícita, ~30 min cuando aplique).
 
-## UI architecture (ADR-009 → updated por ADR-029 + ADR-030, 2026-05-18)
+## UI architecture (ADR-009 → ADR-029 → ADR-033 → ADR-037 → ADR-038 → ADR-039, 2026-05-18 → 2026-05-19)
+
+Shell vive en `/h/+layout.svelte` (hoisted up desde `/h/[workspace]/+layout.svelte` 2026-05-19, ADR-039). Cualquier URL bajo `/h/` recibe el mismo shell; el path `/h/[ws]/` representa "browsing context", no implica que ese workspace esté seleccionado.
 
 Single-layout app con dos controles:
 
-- **Lens nav** (top del main, **horizontal pills**): `Plaza · Calendar · Contacts · Money`. Determina qué tipo de contenido se muestra. Plaza es el modo default (lo que estás viendo + lo que harías a continuación). Future lenses (Comms, Archive) se añaden como pills adicionales sin cambiar layout.
-- **Sidebar** (user-scoped, **cross-account**):
-  - **Plaza component** (sidebar upper): multi-house tree mostrando TODAS las workspaces del usuario simultáneamente (cross-account, Slack-like). Cada House con sus Rooms indentadas.
-  - **LineList** (sidebar lower, solo visible cuando hay project seleccionado): muestra las lines del project activo. Empty state "Select a project to see its structure" cuando no hay selección. (Renamed from `RoomStructure` 2026-05-19 — ADR-037 cleanup de ADR-008 vocab.)
+- **Lens nav** (top del main, horizontal pills): `Today · Calendar · Contacts · Money`. Today es la lens default (lo que está pasando y lo siguiente). Future lenses (Comms, Archive) se añaden como pills adicionales sin cambiar layout.
+- **Sidebar (filtro multi-select)** (user-scoped, cross-account):
+  - **Plaza** (sidebar upper, `Plaza.svelte`): árbol multi-workspace mostrando TODAS las workspaces del usuario simultáneamente (cross-account, Slack-like). Cada workspace con sus projects indentados. Workspace y project filas son `<a>` con href computado por preview (toggle ON/OFF de la selección). Action clusters por hover (Settings, Add project/line, Focus). In-place creation (workspace, project, line) inline desde el propio sidebar. Focus mode aísla la selección a un único item (snapshot + restore al salir).
+  - **LineList** (sidebar lower, `LineList.svelte`): siempre visible. Lee `selection.svelte.ts` y muestra:
+    - Vacío → todas las lines accesibles por RLS, sort por `last_navigated_at` desc.
+    - 1 workspace → lines de proyectos de ese workspace.
+    - 1 project → lines de ese project.
+    - N items → union.
+    - Subtitle "in <project>" cuando hay >1 project en scope.
 
-**Lens × Room scope** determines main content:
-- **Plaza + Room** = Room detail (RelationshipStub + future stubs Runs/Assets/Team).
-- **Calendar + Room** = filtered calendar (Phase 0.2).
-- **Contacts + Room** = filtered contacts (Phase 0.3).
-- **Money + Room** = filtered invoices (Phase 0.3).
+**Selección persistente**: URL (canonical `/h/[ws]/project/[slug]/` cuando colapsa a 1 entity; query params `?ws=&project=` cuando es multi) + localStorage fallback al aterrizar en `/h/` vacío. Lens activa y focus state también persistidos en localStorage (commit `4436af8`, cross-session).
 
-**Cross-highlight UP** (ADR-029 trabajo #8): si una Room está seleccionada, su House padre también lleva primary color en sidebar. Tres estados: `active` (URL = House home), `on-path` (URL = Room de esa House), inactive.
+**URL routing** (ADR-037 cleanup vocab):
+- `/h/[ws]/` — workspace context, sin entity seleccionada.
+- `/h/[ws]/project/[slug]/` — project detail (Phase 0.1 muestra RelationshipStub + stubs).
+- `/h/[ws]/project/[slug]/line/[line]/` — line detail (Phase 0.1 trabajo nuevo, sesión 2026-05-19).
+- `/h/[ws]/performance/[slug]/` — performance detail (Phase 0.2).
+- `/h/[ws]/engagement/[slug]/`, `/h/[ws]/person/[slug]/` — preserved desde ADR-022.
+- `/h/[ws]/settings/` — settings + Master View toggle (D-PRE-05 wired 2026-05-19).
+- 301 redirects en `hooks.server.ts` para vocab viejo (`/room/`, `/gig/`).
 
-**Room detail** (Plaza + Room) tendrá tabs: Work, Assets, Team, About (Phase 0.3+). Assets son Room-level (canonical) o Gig-level (per-venue adaptations). Phase 0.1 muestra solo header + RelationshipStub + 3 stubs dashed.
+**Project detail** (lens Today + project seleccionado) tendrá tabs: Work, Assets, Team, About (Phase 0.3+). Phase 0.1 muestra solo header + RelationshipStub + 3 stubs dashed.
 
 **⌘K** first-class desde día 1 (Phase 0.4). Sidebar puede ocultarse entera para ⌘K-only navigation.
 
 ## Next — ver `build/roadmap.md`
 
-El roadmap completo con fases, decisiones previas obligatorias, MVP y próximo sprint concreto vive en **`build/roadmap.md`** (documento vivo, escrito 2026-04-24).
+El roadmap completo con fases, decisiones previas obligatorias, MVP y próximo sprint concreto vive en **`build/roadmap.md`** (documento vivo). El propio roadmap tiene una nota de divergencia (la sesión 2026-05-19 no siguió el orden del roadmap pero cerró deuda real — ver `## Current operating state` ahí).
 
-Resumen en una línea: antes de tocar UI, cerrar las 5 decisiones D-PRE-01 a D-PRE-05 y completar Phase 0.0 (fundación: tokens + primitivos + router + migración road sheet). Luego Phase 0.1 (Plaza + Desk shell) hasta Phase 0.4 (polish + ⌘K + mobile). Phase 0.5 son deferred features. Phase 1 es SaaS readiness.
+Estado a 2026-05-19: Phase 0.0 + 0.1 cerradas (incluyendo D-PRE-05 Master View wired). Phase 0.2 (Calendar lens + Road sheet colaborativo) es la siguiente fase, pero el modelo de shell ya no es el que el roadmap describía — sidebar es filtro multi-select, no navegación (ADR-038). Phase 0.5 son deferred features. Phase 0.9 hardening gate antes de cliente externo. Phase 1 es SaaS readiness.
 
 ## Diferido (Phase 0.5 o cuando toque)
 
 - **`share`** — per-engagement curated microsite (ADR-028, 2026-05-09). Lazy-creado al primer click de compartir; signed URL larga + rotable, sin login del programador; show-driven branding con subtítulo customizable; assets canónicos del show + uploads engagement-scope; email archive vía BCC tipo Basecamp (Cloudflare Email Workers); tracking medio. Wedge de diferenciación vs Drive/WeTransfer. Phase 0.5 item 4. Coste 2-3 sem.
-- `task` entity — polymorphic (project/line/show/engagement), origin: manual/protocol/ai. Manual tasks needed for Desk view. Includes task protocols: reusable chains with relative date offsets that auto-generate prep tasks backwards from gig/fair dates (ADR-011). (Deferred D3)
-- Communication layer — unified email/WhatsApp/Telegram/calls contextualised by House/Room (Deferred D4)
+- `task` entity — polymorphic (project/line/performance/engagement), origin: manual/protocol/ai. Manual tasks needed for Desk view. Includes task protocols: reusable chains with relative date offsets that auto-generate prep tasks backwards from performance/fair dates (ADR-011). (Deferred D3)
+- Communication layer — unified email/WhatsApp/Telegram/calls contextualised by workspace/project (Deferred D4)
 - App mode — PWA installable (desktop + mobile), not web-only. Must feel like a native app. (Deferred D5)
-- Public guest links — shareable URL (no signup required) where external collaborators (technicians, freelancers) can view their assigned gigs/dates/rider. If they choose to sign up, their guest view upgrades to a full `guest` membership with write access. Two tiers: anonymous-read via signed link, authenticated-write via `guest` role. (Deferred D6)
+- Public guest links — shareable URL (no signup required) where external collaborators (technicians, freelancers) can view their assigned performances/dates/rider. If they choose to sign up, their guest view upgrades to a full `guest` membership with write access. Two tiers: anonymous-read via signed link, authenticated-write via `guest` role. (Deferred D6)
 - Fair intelligence — import attendee lists (CSV or screenshot via AI vision), cross-reference against existing contacts, surface matches and new-contact opportunities. Needs fair entity or date.kind='fair' with attendee junction. (Deferred D7, ADR-012)
 - AI integration — invisible helper philosophy (ADR-013). Two interaction patterns: (1) continuous/invisible — AI fills fields like decision windows (ADR-019), (2) punctual/explicit — user clicks "generate dossier draft" (ADR-020). AI-touched fields get visual marker; high-stakes generation requires accept/dismiss (ADR-021). (Deferred D8)
 - Kanban view — available in Desk and Contacts lenses as work-mode complement to calendar. Groups by status. (Deferred D9, ADR-010)
 - Timeline view — horizontal/vertical timeline showing cascading task chains from protocol tasks. Depends on D3. (Deferred D10, ADR-010)
 - `task` tag vocabulary (Deferred D1)
 - UI de overrides granulares por persona (Deferred D2)
-- `show` / `line` / `invoice` flows (cuando Marco confirme la primera fecha)
+- `performance` / `line` / `invoice` flows (cuando Marco confirme la primera fecha)
 
 ## Dev setup
 

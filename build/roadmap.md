@@ -21,13 +21,13 @@ Antes de cualquier trabajo: leer primero el [`_context.md`](../_context.md) del 
  
 ### Current next action
  
-**Phase 0.0 cerrada 2026-05-09**. Arrancar Phase 0.1 — Plaza + Desk shell.
+**Phase 0.0 + 0.1 cerradas 2026-05-19**. Arrancar Phase 0.2 — Calendar lens + Road sheet colaborativo.
 
-Primer trabajo: `<Plaza>` (trabajo #1 de Phase 0.1). Ver § Phase 0.1 abajo para los 12 trabajos.
+> **Nota de divergencia 2026-05-19** — La sesión maratón del 2026-05-19 (27 commits, 6 ADRs nuevos: 034, 035, 036, 037, 038, 039) no siguió el orden del roadmap: arrancó como validación de gates Phase 0.1 y se fue ramificando a refactors estructurales conforme Marco vivía la UI productiva. Cerró deuda real (visual checkpoint 1 ratificado + 2 nuevo, naming gate completo, sidebar pivotado a filtro multi-select via ADR-038, shell hoist via ADR-039, D-PRE-05 Master View wired, in-place creation en Plaza, persistencia localStorage), pero el **modelo de shell descrito en este roadmap ya no coincide con lo construido**: el sidebar pasó de navegación exclusiva a filtro multi-select orto. Ver `_notes/sessions-log.md` § 2026-05-19 para el detalle. Phase 0.2 arranca con menos deuda visible pero con una arquitectura de selección distinta a la planificada.
 
-Al cerrar Phase 0.1 corren **dos gates** (decididos 2026-05-14, ver `_decisions.md`):
-- **Checkpoint visual 1** — pasada de 1 día sobre Plaza+Desk+Gig detail vivos con datos reales (plum, densidad, jerarquía, tipografía).
-- **Naming gate** — adelantado del final de 0.4. Test House/Room/Run/Gig/Desk/Plaza con Anouk + 1-2 externos. Riesgo #14 directo: "¿confundes Room con sala/venue?".
+Gates Phase 0.1 — ambos cerrados 2026-05-19:
+- ✅ **Checkpoint visual 1** — ratificado en sesión + checkpoint visual 2 añadido (dark mode + editorial-sobrio polish).
+- ✅ **Naming gate** — cerrado en vivo con ADR-035/036/037 (line/section roundtrip, show→performance, vocab cleanup URL/API/componentes).
  
 ### Current constraints
  
