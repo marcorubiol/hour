@@ -194,6 +194,20 @@ export class SelectionStore {
   /** Parse selection from current URL. Idempotent: skips state writes if unchanged. */
   hydrateFromUrl(url: URL): void {
     const parsed = this.parseUrl(url);
+    // Always register implied project→workspace mappings if URL exposes them,
+    // even when the URL is a sub-route that doesn't drive selection state.
+    // Plaza needs them to render canonical URLs and on-path visual hints.
+    for (const [projSlug, wsSlug] of parsed.impliedProjectWorkspaces) {
+      if (this.projectWorkspaceMap.get(projSlug) !== wsSlug) {
+        const next = new Map(this.projectWorkspaceMap);
+        next.set(projSlug, wsSlug);
+        this.projectWorkspaceMap = next;
+      }
+    }
+    // Sub-routes (line detail, future show detail) signal "viewing inside a
+    // project, not filtering by it" — selection state stays untouched.
+    // Plaza uses URL-derived on-path class for the visual marker instead.
+    if (parsed.keepSelection) return;
     if (
       setsEqual(parsed.workspaces, this.workspaces) &&
       setsEqual(parsed.projects, this.projects)
@@ -202,14 +216,6 @@ export class SelectionStore {
     }
     this.workspaces = parsed.workspaces;
     this.projects = parsed.projects;
-    // Also register implied project→workspace mappings from canonical URL
-    for (const [projSlug, wsSlug] of parsed.impliedProjectWorkspaces) {
-      if (this.projectWorkspaceMap.get(projSlug) !== wsSlug) {
-        const next = new Map(this.projectWorkspaceMap);
-        next.set(projSlug, wsSlug);
-        this.projectWorkspaceMap = next;
-      }
-    }
   }
 
   /** Try to restore from localStorage. Called when URL is /h/ with no params. */
@@ -241,6 +247,8 @@ export class SelectionStore {
     workspaces: Set<string>;
     projects: Set<string>;
     impliedProjectWorkspaces: Array<[string, string]>;
+    /** Sub-route (line detail, future show detail) — preserve existing selection. */
+    keepSelection?: boolean;
   } {
     const path = url.pathname;
     const implied: Array<[string, string]> = [];
@@ -260,8 +268,24 @@ export class SelectionStore {
       };
     }
 
-    // /h/[ws]/project/[slug]/...  → 1 workspace + 1 project (canonical)
-    const projectMatch = path.match(/^\/h\/([^/]+)\/project\/([^/]+)/);
+    // /h/[ws]/project/[slug]/<sub>/...  → sub-route (line detail, etc.)
+    // Visiting a line/show within a project doesn't imply filtering by that
+    // project. Existing selection preserved; project surfaces as on-path
+    // visual hint via URL match in Plaza.
+    const subRouteMatch = path.match(/^\/h\/([^/]+)\/project\/([^/]+)\/[^/]+/);
+    if (subRouteMatch) {
+      const [, ws, proj] = subRouteMatch;
+      implied.push([proj, ws]);
+      return {
+        workspaces: new Set(),
+        projects: new Set(),
+        impliedProjectWorkspaces: implied,
+        keepSelection: true,
+      };
+    }
+
+    // /h/[ws]/project/[slug]/  (exact, no sub-route)  → 1 ws + 1 project filter
+    const projectMatch = path.match(/^\/h\/([^/]+)\/project\/([^/]+)\/?$/);
     if (projectMatch) {
       const [, ws, proj] = projectMatch;
       implied.push([proj, ws]);

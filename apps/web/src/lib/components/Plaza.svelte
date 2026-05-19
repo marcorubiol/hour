@@ -88,6 +88,19 @@
 
   const selection = useSelection();
 
+  // On-path: the workspace + project implied by the current URL when
+  // viewing a sub-route (line detail, future show detail). NOT a selection;
+  // visual marker only. SelectionStore.parseUrl preserves the existing
+  // filter when on sub-routes, so this state surfaces independently.
+  let onPathProjectSlug = $derived.by(() => {
+    const m = page.url.pathname.match(/^\/h\/[^/]+\/project\/([^/]+)\/[^/]+/);
+    return m?.[1] ?? '';
+  });
+  let onPathWorkspaceSlug = $derived.by(() => {
+    const m = page.url.pathname.match(/^\/h\/([^/]+)\/project\/[^/]+\/[^/]+/);
+    return m?.[1] ?? '';
+  });
+
   let workspaces = $derived($workspacesQuery.data?.items ?? []);
   let projects = $derived($projectsQuery.data?.items ?? []);
 
@@ -165,12 +178,15 @@
       {#each tree as { workspace, projects } (workspace.id)}
         {@const isCollapsed = collapsedIds.has(workspace.id)}
         {@const isWorkspaceSelected = selection.isWorkspaceSelected(workspace.slug)}
+        {@const isWorkspaceOnPath =
+          !isWorkspaceSelected && workspace.slug === onPathWorkspaceSlug}
         {@const hasProjects = projects.length > 0}
         <li class="plaza__workspace">
           <div
             class={[
               'plaza__workspace-row',
               isWorkspaceSelected && 'plaza__workspace-row--selected',
+              isWorkspaceOnPath && 'plaza__workspace-row--on-path',
             ]
               .filter(Boolean)
               .join(' ')}
@@ -221,11 +237,14 @@
             <ul class="plaza__projects" role="list">
               {#each projects as project (project.id)}
                 {@const isProjectSelected = selection.isProjectSelected(project.slug)}
+                {@const isProjectOnPath =
+                  !isProjectSelected && project.slug === onPathProjectSlug}
                 <li>
                   <a
                     class={[
                       'plaza__project',
                       isProjectSelected && 'plaza__project--selected',
+                      isProjectOnPath && 'plaza__project--on-path',
                     ]
                       .filter(Boolean)
                       .join(' ')}
@@ -300,6 +319,14 @@
 
     .plaza__workspace-row--selected .plaza__workspace-name {
       color: var(--primary);
+    }
+
+    /* On-path: URL points inside this workspace's project sub-route
+       (e.g. line detail). Visual marker only, never a selection state.
+       2px primary inline-start indicator via box-shadow inset — no layout
+       shift, doesn't compete with --selected's bg fill. */
+    .plaza__workspace-row--on-path {
+      box-shadow: inset 2px 0 0 var(--primary);
     }
 
     .plaza__workspace-rail {
@@ -413,6 +440,13 @@
 
     .plaza__project--selected {
       background: var(--bg-active);
+    }
+
+    /* On-path: URL is inside this project's sub-route (line detail, etc.).
+       Visual hint only; LineList filter unchanged. Same 2px primary
+       inline-start marker as workspace on-path. */
+    .plaza__project--on-path {
+      box-shadow: inset 2px 0 0 var(--primary);
     }
 
     .plaza__project--selected .plaza__project-name {
