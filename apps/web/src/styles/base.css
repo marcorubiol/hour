@@ -1662,14 +1662,21 @@
     background: var(--primary);
   }
 
-  /* The handle gets focus after mousedown — that's expected for a button,
-     but the global focus-visible outline sits offset from the element and
-     reads as a second line next to the primary-coloured handle. Suppress
-     it here; the hover/dragging background already signals interactivity
-     for mouse users (the only ones who realistically resize). */
+  /* No focus ring on the handle — the hover/dragging background already
+     signals interactivity for mouse users (the only ones who resize). */
   .sidebar__resizer:focus,
   .sidebar__resizer:focus-visible {
     outline: none;
+  }
+
+  /* Hide the sidebar's own border-inline-end while the resizer is being
+     hovered or dragged. The resizer covers that pixel anyway but the
+     border colour is in the same hue family as --primary; once the
+     resizer paints over it the underlying border can read as a faint
+     parallel line. Drop it to transparent for the duration. */
+  .sidebar:has(.sidebar__resizer:hover),
+  .sidebar--dragging {
+    border-inline-end-color: transparent;
   }
 
   .sidebar--dragging {

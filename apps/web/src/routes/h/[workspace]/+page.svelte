@@ -387,7 +387,7 @@
 </script>
 
 <svelte:head>
-  <title>Today · Hour</title>
+  <title>Today — Hour</title>
 </svelte:head>
 
 <section class="today">

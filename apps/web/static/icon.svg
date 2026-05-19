@@ -1,4 +1,21 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" fill="#9D3F70"/>
-  <text x="256" y="362" font-family="-apple-system, system-ui, sans-serif" font-size="320" font-weight="700" fill="white" text-anchor="middle">H</text>
+  <style>
+    .bg { fill: #f7f5ef; }
+    .fg { fill: #2b251f; }
+    @media (prefers-color-scheme: dark) {
+      .bg { fill: #2b251f; }
+      .fg { fill: #f7f5ef; }
+    }
+  </style>
+  <rect class="bg" width="512" height="512" rx="96" />
+  <text
+    class="fg"
+    x="256"
+    y="372"
+    font-family="Newsreader, Georgia, 'Times New Roman', serif"
+    font-style="italic"
+    font-weight="400"
+    font-size="380"
+    text-anchor="middle"
+  >h</text>
 </svg>

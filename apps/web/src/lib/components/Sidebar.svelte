@@ -254,6 +254,7 @@
     <button
       type="button"
       class="sidebar__resizer"
+      tabindex="-1"
       aria-label={collapsed ? 'Drag to expand' : 'Drag to resize'}
       title={collapsed
         ? 'Drag right to expand'

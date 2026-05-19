@@ -159,7 +159,7 @@
 </script>
 
 <svelte:head>
-  <title>Hour — Booking 2026-27</title>
+  <title>Booking 2026-27 — Hour</title>
 </svelte:head>
 
 <header class="app-header">

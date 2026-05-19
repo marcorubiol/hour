@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import BrandMark from '$lib/components/BrandMark.svelte';
 
   let online = $state(true);
 
@@ -21,11 +22,11 @@
 </script>
 
 <svelte:head>
-  <title>Hour — Offline</title>
+  <title>Offline — Hour</title>
 </svelte:head>
 
 <main class="offline">
-  <h1 class="offline__brand">Hour</h1>
+  <BrandMark size="l" />
   <p class="offline__status">
     {#if online}
       You're back online. <button type="button" class="offline__retry" onclick={retry}>Reload</button>
@@ -46,13 +47,6 @@
       gap: var(--space-m);
       padding: var(--space-l);
       text-align: center;
-    }
-
-    .offline__brand {
-      font-size: var(--text-xl);
-      font-weight: 700;
-      color: var(--primary);
-      margin: 0;
     }
 
     .offline__status {

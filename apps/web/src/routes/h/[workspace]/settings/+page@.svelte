@@ -22,6 +22,7 @@
   import { createQuery } from '@tanstack/svelte-query';
   import { accentVar } from '$lib/utils/accent';
   import { decodeJwtClaim } from '$lib/realtime';
+  import BrandMark from '$lib/components/BrandMark.svelte';
   import {
     isMasterViewEnabled,
     getMasterViewPath,
@@ -242,10 +243,8 @@
 <div class="set">
   <aside class="set-plaza">
     <div class="set-plaza__top">
-      <a class="set-brand" href={`/h/${workspaceSlug}/`}>
-        <span class="set-brand__mark" aria-hidden="true"></span>
-        <span>hour</span>
-      </a>
+      <BrandMark size="m" href={`/h/${workspaceSlug}/`} />
+
 
       <a class="set-back" href={`/h/${workspaceSlug}/`}>
         <span class="set-back__arrow" aria-hidden="true">‹</span>
@@ -1190,26 +1189,6 @@
     flex-direction: column;
     min-block-size: 0;
     overflow-y: auto;
-  }
-
-  .set-brand {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-s);
-    font-family: var(--font-display);
-    font-size: var(--text-xl);
-    font-style: italic;
-    font-weight: 400;
-    letter-spacing: -0.02em;
-    color: var(--text-color);
-    text-decoration: none;
-    margin-block-end: var(--space-xs);
-  }
-  .set-brand__mark {
-    inline-size: 10px;
-    block-size: 10px;
-    border: 1px solid currentColor;
-    border-radius: 2px;
   }
 
   .set-back {
