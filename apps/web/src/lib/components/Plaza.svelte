@@ -5,7 +5,7 @@
    * Renders ALL workspaces the user is a member of, with their projects
    * nested below. Each workspace row has a chevron (toggle collapse) and
    * a clickable name (navigate to workspace home). Each project row links
-   * to the project detail (currently the room/[slug] route).
+   * to the project detail at /h/[workspace]/project/[slug]/.
    *
    * Active state:
    *   - Project row matches URL → `--project-active` (filled background)
@@ -19,7 +19,7 @@
    *     `plaza_collapsed_workspaces` (array of workspace_ids)
    *   - Collapsed workspace hides its projects but keeps the row + chevron
    *
-   * Lines (3rd level) live in <RoomStructure /> sidebar lower, not here —
+   * Lines (3rd level) live in <LineList /> sidebar lower, not here —
    * separates navigation (Plaza) from active project context (Lines).
    */
 
@@ -29,14 +29,14 @@
   import { createQuery } from '@tanstack/svelte-query';
   import { accentVar } from '$lib/utils/accent';
 
-  type House = {
+  type Workspace = {
     id: string;
     slug: string;
     name: string;
     kind: 'personal' | 'team';
   };
 
-  type Room = {
+  type Project = {
     id: string;
     slug: string;
     name: string;
@@ -74,35 +74,35 @@
     return (await res.json()) as T;
   }
 
-  const housesQuery = createQuery({
-    queryKey: ['houses'],
-    queryFn: ({ signal }) => fetchJSON<{ items: House[] }>('/api/houses', signal),
+  const workspacesQuery = createQuery({
+    queryKey: ['workspaces'],
+    queryFn: ({ signal }) => fetchJSON<{ items: Workspace[] }>('/api/workspaces', signal),
   });
 
-  const roomsQuery = createQuery({
-    queryKey: ['rooms', { status: 'active' }],
+  const projectsQuery = createQuery({
+    queryKey: ['projects', { status: 'active' }],
     queryFn: ({ signal }) =>
-      fetchJSON<{ items: Room[] }>('/api/rooms?status=active', signal),
+      fetchJSON<{ items: Project[] }>('/api/projects?status=active', signal),
   });
 
   let activeWorkspaceSlug = $derived(page.params.workspace ?? '');
-  let activeRoomSlug = $derived.by(() => {
-    const m = page.url.pathname.match(/^\/h\/[^/]+\/room\/([^/]+)/);
+  let activeProjectSlug = $derived.by(() => {
+    const m = page.url.pathname.match(/^\/h\/[^/]+\/project\/([^/]+)/);
     return m?.[1] ?? '';
   });
 
-  let houses = $derived($housesQuery.data?.items ?? []);
-  let rooms = $derived($roomsQuery.data?.items ?? []);
+  let workspaces = $derived($workspacesQuery.data?.items ?? []);
+  let projects = $derived($projectsQuery.data?.items ?? []);
 
   let tree = $derived(
-    houses.map((house) => ({
-      house,
-      projects: rooms.filter((r) => r.workspace_id === house.id),
+    workspaces.map((workspace) => ({
+      workspace,
+      projects: projects.filter((p) => p.workspace_id === workspace.id),
     })),
   );
 
-  let loading = $derived($housesQuery.isPending || $roomsQuery.isPending);
-  let errored = $derived($housesQuery.isError || $roomsQuery.isError);
+  let loading = $derived($workspacesQuery.isPending || $projectsQuery.isPending);
+  let errored = $derived($workspacesQuery.isError || $projectsQuery.isError);
 
   // Collapse state — set of workspace ids that are collapsed.
   let collapsedIds = $state<Set<string>>(new Set());
@@ -145,24 +145,34 @@
     <p class="plaza__state">No projects yet.</p>
   {:else}
     <ul class="plaza__list" role="list">
-      {#each tree as { house, projects } (house.id)}
-        {@const isCollapsed = collapsedIds.has(house.id)}
-        {@const isWorkspaceUrl = house.slug === activeWorkspaceSlug}
-        {@const hasActiveProject = isWorkspaceUrl && activeRoomSlug.length > 0}
-        {@const isWorkspaceActive = isWorkspaceUrl && activeRoomSlug.length === 0}
+      {#each tree as { workspace, projects } (workspace.id)}
+        {@const isCollapsed = collapsedIds.has(workspace.id)}
+        {@const isWorkspaceUrl = workspace.slug === activeWorkspaceSlug}
+        {@const hasActiveProject = isWorkspaceUrl && activeProjectSlug.length > 0}
+        {@const isWorkspaceActive = isWorkspaceUrl && activeProjectSlug.length === 0}
         {@const hasProjects = projects.length > 0}
-        <li class="plaza__house">
+        <li class="plaza__workspace">
           <div
             class={[
-              'plaza__house-row',
-              isWorkspaceActive && 'plaza__house-row--active',
-              hasActiveProject && 'plaza__house-row--on-path',
+              'plaza__workspace-row',
+              isWorkspaceActive && 'plaza__workspace-row--active',
+              hasActiveProject && 'plaza__workspace-row--on-path',
             ]
               .filter(Boolean)
               .join(' ')}
-            style={`--c: ${accentVar(house.slug)}`}
+            style={`--c: ${accentVar(workspace.slug)}`}
           >
-            <span class="plaza__house-rail" aria-hidden="true"></span>
+            <span class="plaza__workspace-rail" aria-hidden="true"></span>
+            <a
+              class="plaza__workspace-link"
+              href={`/h/${workspace.slug}/`}
+              aria-current={isWorkspaceActive ? 'page' : undefined}
+            >
+              <span class="plaza__workspace-name">{workspace.name}</span>
+              <span class="plaza__workspace-sub">
+                {workspace.kind === 'personal' ? 'Personal workspace' : 'Team workspace'}
+              </span>
+            </a>
             {#if hasProjects}
               <button
                 type="button"
@@ -170,10 +180,10 @@
                   .filter(Boolean)
                   .join(' ')}
                 aria-label={isCollapsed
-                  ? `Expand ${house.name}`
-                  : `Collapse ${house.name}`}
+                  ? `Expand ${workspace.name}`
+                  : `Collapse ${workspace.name}`}
                 aria-expanded={!isCollapsed}
-                onclick={() => toggleCollapse(house.id)}
+                onclick={() => toggleCollapse(workspace.id)}
               >
                 <svg
                   viewBox="0 0 16 16"
@@ -188,23 +198,13 @@
             {:else}
               <span class="plaza__chevron plaza__chevron--placeholder" aria-hidden="true"></span>
             {/if}
-            <a
-              class="plaza__house-link"
-              href={`/h/${house.slug}/`}
-              aria-current={isWorkspaceActive ? 'page' : undefined}
-            >
-              <span class="plaza__house-name">{house.name}</span>
-              <span class="plaza__house-sub">
-                {house.kind === 'personal' ? 'Personal workspace' : 'Team workspace'}
-              </span>
-            </a>
           </div>
 
           {#if !isCollapsed && hasProjects}
             <ul class="plaza__projects" role="list">
               {#each projects as project (project.id)}
                 {@const isProjectActive =
-                  isWorkspaceUrl && project.slug === activeRoomSlug}
+                  isWorkspaceUrl && project.slug === activeProjectSlug}
                 <li>
                   <a
                     class={[
@@ -213,7 +213,7 @@
                     ]
                       .filter(Boolean)
                       .join(' ')}
-                    href={`/h/${house.slug}/room/${project.slug}`}
+                    href={`/h/${workspace.slug}/project/${project.slug}`}
                     aria-current={isProjectActive ? 'page' : undefined}
                   >
                     <span class="plaza__project-name">{project.name}</span>
@@ -252,12 +252,12 @@
       gap: var(--space-xs);
     }
 
-    .plaza__house {
+    .plaza__workspace {
       display: flex;
       flex-direction: column;
     }
 
-    .plaza__house-row {
+    .plaza__workspace-row {
       display: grid;
       grid-template-columns: 3px auto 1fr;
       gap: var(--space-xs);
@@ -268,19 +268,19 @@
       transition: background-color var(--transition);
     }
 
-    .plaza__house-row:hover {
+    .plaza__workspace-row:hover {
       background: var(--bg-hover);
     }
 
-    .plaza__house-row--active {
+    .plaza__workspace-row--active {
       background: var(--bg-active);
     }
 
-    .plaza__house-row--on-path .plaza__house-name {
+    .plaza__workspace-row--on-path .plaza__workspace-name {
       color: var(--primary);
     }
 
-    .plaza__house-rail {
+    .plaza__workspace-rail {
       inline-size: 3px;
       block-size: 28px;
       background: var(--c, var(--text-muted));
@@ -326,7 +326,7 @@
       block-size: 14px;
     }
 
-    .plaza__house-link {
+    .plaza__workspace-link {
       display: flex;
       flex-direction: column;
       gap: 2px;
@@ -335,13 +335,13 @@
       text-decoration: none;
     }
 
-    .plaza__house-link:focus-visible {
+    .plaza__workspace-link:focus-visible {
       outline: var(--focus-width) solid var(--focus-color);
       outline-offset: 2px;
       border-radius: var(--radius);
     }
 
-    .plaza__house-name {
+    .plaza__workspace-name {
       font-family: var(--font-display);
       font-size: var(--text-m);
       font-weight: 500;
@@ -352,7 +352,7 @@
       white-space: nowrap;
     }
 
-    .plaza__house-sub {
+    .plaza__workspace-sub {
       font-size: var(--text-xs);
       color: var(--text-faint);
       overflow: hidden;

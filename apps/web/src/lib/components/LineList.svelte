@@ -1,15 +1,18 @@
 <script lang="ts">
   /**
-   * RoomStructure — sidebar lower section ("Lines").
+   * LineList — sidebar lower section ("Lines").
    *
    * Always shows the lines (operational frames) of the currently-selected
    * project. Separation of concerns: Plaza (sidebar upper) handles
    * navigation across workspaces + projects; this component handles the
    * active project's context (its lines).
    *
-   * Shows hanging from lines were removed (2026-05-19) — too much density
-   * for a navigation surface. Shows surface in dedicated views (Phase 0.2
-   * road sheet UI, calendar lens).
+   * Previously called RoomStructure — renamed when "room" was dropped as
+   * UI/code vocabulary (ADR-008 → ADR-033 → cleanup 2026-05-19).
+   *
+   * Performances (gigs) hanging from lines were removed earlier today —
+   * too much density for a navigation surface. Performances surface in
+   * dedicated views (Phase 0.2 road sheet UI, calendar lens).
    */
 
   import { page } from '$app/state';
@@ -17,7 +20,7 @@
   import { goto } from '$app/navigation';
   import { derived, writable, type Readable } from 'svelte/store';
 
-  type Room = {
+  type Project = {
     id: string;
     slug: string;
     name: string;
@@ -46,14 +49,14 @@
     return jwt;
   }
 
-  async function fetchRooms(signal: AbortSignal): Promise<{ items: Room[] }> {
+  async function fetchProjects(signal: AbortSignal): Promise<{ items: Project[] }> {
     const jwt = requireJwt();
-    const res = await fetch('/api/rooms?status=active', {
+    const res = await fetch('/api/projects?status=active', {
       signal,
       headers: { Authorization: `Bearer ${jwt}` },
     });
     if (!res.ok) throw new Error(`Error ${res.status}`);
-    return (await res.json()) as { items: Room[] };
+    return (await res.json()) as { items: Project[] };
   }
 
   async function fetchLines(
@@ -69,25 +72,25 @@
     return (await res.json()) as { items: Line[] };
   }
 
-  const roomsQuery = createQuery({
-    queryKey: ['rooms', { status: 'active' }],
-    queryFn: ({ signal }) => fetchRooms(signal),
+  const projectsQuery = createQuery({
+    queryKey: ['projects', { status: 'active' }],
+    queryFn: ({ signal }) => fetchProjects(signal),
   });
 
-  let activeRoomSlug = $derived.by(() => {
-    const m = page.url.pathname.match(/^\/h\/[^/]+\/room\/([^/]+)/);
+  let activeProjectSlug = $derived.by(() => {
+    const m = page.url.pathname.match(/^\/h\/[^/]+\/project\/([^/]+)/);
     return m?.[1] ?? '';
   });
 
-  let activeRoom = $derived(
-    $roomsQuery.data?.items.find((r) => r.slug === activeRoomSlug) ?? null,
+  let activeProject = $derived(
+    $projectsQuery.data?.items.find((p) => p.slug === activeProjectSlug) ?? null,
   );
 
-  let hasRoom = $derived(activeRoomSlug.length > 0);
+  let hasProject = $derived(activeProjectSlug.length > 0);
 
   const projectIdStore = writable<string | null>(null);
   $effect(() => {
-    projectIdStore.set(activeRoom?.id ?? null);
+    projectIdStore.set(activeProject?.id ?? null);
   });
 
   const linesQueryOptions: Readable<{
@@ -104,35 +107,33 @@
   const linesQuery = createQuery(linesQueryOptions);
 
   let lines = $derived($linesQuery.data?.items ?? []);
-  let isLoading = $derived($linesQuery.isPending && activeRoom !== null);
+  let isLoading = $derived($linesQuery.isPending && activeProject !== null);
   let isError = $derived($linesQuery.isError);
 </script>
 
-<aside class="project-structure" aria-label="Project structure">
-  {#if hasRoom}
-    <header class="project-structure__header">
+<aside class="line-list" aria-label="Project structure">
+  {#if hasProject}
+    <header class="line-list__header">
       <span class="eyebrow">Lines</span>
     </header>
     {#if isLoading}
-      <p class="project-structure__empty">Loading…</p>
+      <p class="line-list__empty">Loading…</p>
     {:else if isError}
-      <p class="project-structure__empty project-structure__empty--error">
-        Error loading lines.
-      </p>
+      <p class="line-list__empty line-list__empty--error">Error loading lines.</p>
     {:else if lines.length === 0}
-      <p class="project-structure__empty">No lines yet.</p>
+      <p class="line-list__empty">No lines yet.</p>
     {:else}
-      <ul class="project-structure__list">
+      <ul class="line-list__items">
         {#each lines as line (line.id)}
-          <li class="project-structure__item">
-            <span class="project-structure__name">{line.name}</span>
-            <span class="project-structure__kind">{line.kind}</span>
+          <li class="line-list__item">
+            <span class="line-list__name">{line.name}</span>
+            <span class="line-list__kind">{line.kind}</span>
           </li>
         {/each}
       </ul>
     {/if}
   {:else}
-    <p class="project-structure__empty project-structure__empty--prompt">
+    <p class="line-list__empty line-list__empty--prompt">
       Select a project to see its structure
     </p>
   {/if}
@@ -140,7 +141,7 @@
 
 <style>
   @layer components {
-    .project-structure {
+    .line-list {
       display: flex;
       flex-direction: column;
       gap: var(--space-xs);
@@ -149,14 +150,14 @@
       border-block-start: var(--divider-light);
     }
 
-    .project-structure__header {
+    .line-list__header {
       display: flex;
       flex-direction: column;
       gap: var(--space-xs);
       padding-inline: var(--space-s);
     }
 
-    .project-structure__list {
+    .line-list__items {
       list-style: none;
       margin: 0;
       padding: 0;
@@ -165,7 +166,7 @@
       gap: var(--space-xs);
     }
 
-    .project-structure__item {
+    .line-list__item {
       display: flex;
       align-items: baseline;
       justify-content: space-between;
@@ -175,18 +176,18 @@
       font-size: var(--text-s);
     }
 
-    .project-structure__name {
+    .line-list__name {
       color: var(--text-color);
     }
 
-    .project-structure__kind {
+    .line-list__kind {
       font-family: var(--font-mono);
       font-size: var(--text-xs);
       color: var(--text-faint);
       text-transform: lowercase;
     }
 
-    .project-structure__empty {
+    .line-list__empty {
       margin: 0;
       padding-block: var(--space-xs);
       padding-inline: var(--space-s);
@@ -194,12 +195,12 @@
       color: var(--text-faint);
     }
 
-    .project-structure__empty--prompt {
+    .line-list__empty--prompt {
       font-style: italic;
       text-align: center;
     }
 
-    .project-structure__empty--error {
+    .line-list__empty--error {
       color: var(--danger);
     }
   }

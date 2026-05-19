@@ -6,8 +6,8 @@
    * right now" project rows.
    *
    * Data sources (Phase 0, mocked):
-   * - Workspaces: TanStack ['houses'] (cached by Plaza).
-   * - Active projects: TanStack ['rooms', { status: 'active' }] (cached by Plaza).
+   * - Workspaces: TanStack ['workspaces'] (cached by Plaza).
+   * - Active projects: TanStack ['projects', { status: 'active' }] (cached by Plaza).
    * - Engagements: TanStack ['engagements', workspace] — scoped to URL
    *   workspace. Cross-workspace aggregation deferred to Phase 0.2 (the
    *   endpoint requires project_slug today).
@@ -24,14 +24,14 @@
   import Pill from '$lib/components/Pill.svelte';
   import TagChip from '$lib/components/TagChip.svelte';
 
-  type House = {
+  type Workspace = {
     id: string;
     slug: string;
     name: string;
     kind: 'personal' | 'team';
   };
 
-  type Room = {
+  type Project = {
     id: string;
     slug: string;
     name: string;
@@ -94,38 +94,38 @@
     return (await res.json()) as T;
   }
 
-  const housesQuery = createQuery({
-    queryKey: ['houses'],
-    queryFn: ({ signal }) => fetchJSON<{ items: House[] }>('/api/houses', signal),
+  const workspacesQuery = createQuery({
+    queryKey: ['workspaces'],
+    queryFn: ({ signal }) => fetchJSON<{ items: Workspace[] }>('/api/workspaces', signal),
   });
 
-  const roomsQuery = createQuery({
-    queryKey: ['rooms', { status: 'active' }],
+  const projectsQuery = createQuery({
+    queryKey: ['projects', { status: 'active' }],
     queryFn: ({ signal }) =>
-      fetchJSON<{ items: Room[] }>('/api/rooms?status=active', signal),
+      fetchJSON<{ items: Project[] }>('/api/projects?status=active', signal),
   });
 
   // Engagements scoped to the URL workspace's first active project (Phase 0
   // convention: 1 project per workspace). When a workspace has 0 projects
   // the query stays disabled and the week renders empty.
-  let firstRoomSlug = $derived.by(() => {
-    const ws = $housesQuery.data?.items.find((h) => h.slug === workspaceSlug);
+  let firstProjectSlug = $derived.by(() => {
+    const ws = $workspacesQuery.data?.items.find((h) => h.slug === workspaceSlug);
     if (!ws) return null;
-    const r = $roomsQuery.data?.items.find((r) => r.workspace_id === ws.id);
+    const r = $projectsQuery.data?.items.find((r) => r.workspace_id === ws.id);
     return r?.slug ?? null;
   });
 
   const engagementsQuery = createQuery({
     get queryKey() {
-      return ['engagements', firstRoomSlug ?? ''];
+      return ['engagements', firstProjectSlug ?? ''];
     },
     queryFn: ({ signal }: { signal: AbortSignal }) =>
       fetchJSON<{ total: number; items: Engagement[] }>(
-        `/api/engagements?project_slug=${encodeURIComponent(firstRoomSlug ?? '')}&status=any&limit=100`,
+        `/api/engagements?project_slug=${encodeURIComponent(firstProjectSlug ?? '')}&status=any&limit=100`,
         signal,
       ),
     get enabled() {
-      return !!firstRoomSlug;
+      return !!firstProjectSlug;
     },
   });
 
@@ -186,7 +186,7 @@
   // is missing).
   let firstName = $derived.by(() => {
     if (jwtName) return jwtName;
-    const personal = $housesQuery.data?.items.find((h) => h.kind === 'personal');
+    const personal = $workspacesQuery.data?.items.find((h) => h.kind === 'personal');
     if (personal) {
       return personal.name.split(/\s+/)[0] ?? personal.name;
     }
@@ -194,7 +194,7 @@
   });
 
   let activeProjectsCount = $derived(
-    ($roomsQuery.data?.items ?? []).filter((r) => r.status === 'active').length,
+    ($projectsQuery.data?.items ?? []).filter((r) => r.status === 'active').length,
   );
 
   let thisWeekCount = $derived.by(() => {
@@ -324,22 +324,22 @@
   // Project rows derivation
 
   type ProjectRow = {
-    workspace: House;
+    workspace: Workspace;
     sub: string;
-    activeRooms: number;
+    activeProjects: number;
     engagementCount: number;
   };
 
   let projectRows = $derived.by<ProjectRow[]>(() => {
-    const houses = $housesQuery.data?.items ?? [];
-    const rooms = $roomsQuery.data?.items ?? [];
-    return houses.map((ws) => ({
+    const workspaces = $workspacesQuery.data?.items ?? [];
+    const projects = $projectsQuery.data?.items ?? [];
+    return workspaces.map((ws) => ({
       workspace: ws,
       sub:
         ws.kind === 'personal'
           ? 'Personal workspace'
           : 'Team workspace',
-      activeRooms: rooms.filter((r) => r.workspace_id === ws.id && r.status === 'active').length,
+      activeProjects: projects.filter((p) => p.workspace_id === ws.id && p.status === 'active').length,
       engagementCount: ws.slug === workspaceSlug ? totalEngagements : 0,
     }));
   });
@@ -443,13 +443,13 @@
       </div>
     </div>
 
-    {#if $engagementsQuery.isPending && firstRoomSlug}
+    {#if $engagementsQuery.isPending && firstProjectSlug}
       <p class="today__placeholder">Loading…</p>
     {:else if $engagementsQuery.isError}
       <p class="today__placeholder today__placeholder--err">
         Couldn't load your week.
       </p>
-    {:else if !firstRoomSlug}
+    {:else if !firstProjectSlug}
       <p class="today__placeholder">
         This workspace has no active projects yet.
       </p>
@@ -493,7 +493,7 @@
       </div>
     </header>
 
-    {#if $housesQuery.isPending}
+    {#if $workspacesQuery.isPending}
       <p class="today__placeholder">Loading…</p>
     {:else}
       <ul class="alive" role="list">
@@ -508,7 +508,7 @@
                 {row.workspace.name}
               </a>
               <p class="alive__sub">
-                {row.sub} · {row.activeRooms} {row.activeRooms === 1 ? 'project' : 'projects'}
+                {row.sub} · {row.activeProjects} {row.activeProjects === 1 ? 'project' : 'projects'}
               </p>
             </div>
             <div class="alive__metrics">
@@ -537,7 +537,7 @@
     .today {
       display: flex;
       flex-direction: column;
-      gap: var(--pad-2xl);
+      gap: var(--space-xl);
       max-inline-size: 72rem;
       margin-inline: auto;
     }
@@ -547,14 +547,14 @@
     .today__masthead {
       display: flex;
       flex-direction: column;
-      gap: var(--pad-sm);
-      padding-block-end: var(--pad-2xl);
-      border-block-end: 1px solid var(--border-color);
+      gap: var(--space-s);
+      padding-block-end: var(--space-xl);
+      border-block-end: 1px solid var(--border-color-dark);
     }
 
     .today__greeting {
       font-family: var(--font-display);
-      font-size: var(--text-display);
+      font-size: clamp(2rem, 1.4rem + 3vw, 3rem);
       font-weight: 400;
       letter-spacing: -0.025em;
       line-height: 1;
@@ -570,10 +570,10 @@
     .today__stats {
       display: flex;
       flex-wrap: wrap;
-      gap: var(--pad-xl);
-      margin-block-start: var(--pad-sm);
+      gap: var(--space-l);
+      margin-block-start: var(--space-s);
       font-family: var(--font-mono);
-      font-size: var(--text-xxs);
+      font-size: var(--text-xs);
       color: var(--text-faint);
       letter-spacing: 0.02em;
     }
@@ -582,7 +582,7 @@
       color: var(--text-color);
       font-weight: 500;
       font-variant-numeric: tabular-nums;
-      margin-inline-end: 4px;
+      margin-inline-end: var(--space-xs);
     }
 
     /* ──────────────────────────── Section heads ──────────────────────── */
@@ -591,8 +591,8 @@
       display: flex;
       align-items: flex-end;
       justify-content: space-between;
-      gap: var(--pad-lg);
-      margin-block-end: var(--pad-lg);
+      gap: var(--space-m);
+      margin-block-end: var(--space-m);
     }
 
     .today__section-title {
@@ -621,15 +621,15 @@
     .today__filters {
       display: flex;
       flex-direction: column;
-      gap: var(--pad-xs);
-      margin-block-end: var(--pad-lg);
+      gap: var(--space-xs);
+      margin-block-end: var(--space-m);
     }
 
     .today__filter-row {
       display: flex;
       flex-wrap: wrap;
       align-items: center;
-      gap: var(--pad-xs);
+      gap: var(--space-xs);
     }
 
     .today__filter-label {
@@ -640,7 +640,7 @@
     /* ────────────────────────────── Week ─────────────────────────────── */
 
     .today__placeholder {
-      padding-block: var(--pad-xl);
+      padding-block: var(--space-l);
       text-align: center;
       color: var(--text-faint);
       font-size: var(--text-s);
@@ -653,16 +653,16 @@
     .week {
       display: grid;
       grid-template-columns: 90px 1fr;
-      gap: var(--pad-sm) var(--pad-lg);
+      gap: var(--space-s) var(--space-m);
       align-items: baseline;
     }
 
     .week__day-label {
       font-family: var(--font-mono);
-      font-size: var(--text-xxs);
+      font-size: var(--text-xs);
       letter-spacing: 0.1em;
       color: var(--text-faint);
-      padding-block-start: var(--pad-xs);
+      padding-block-start: var(--space-xs);
     }
 
     .week__rows {
@@ -674,11 +674,11 @@
     .week__item {
       display: grid;
       grid-template-columns: 68px 80px minmax(0, 1fr) auto auto;
-      gap: var(--pad);
+      gap: var(--space-s);
       align-items: baseline;
-      padding-block: var(--pad-xs);
-      padding-inline: var(--pad-sm);
-      border-radius: var(--radius-sm);
+      padding-block: var(--space-xs);
+      padding-inline: var(--space-s);
+      border-radius: var(--radius-s);
       font-size: var(--text-s);
       transition: background var(--transition);
     }
@@ -689,7 +689,7 @@
 
     .week__kind {
       font-family: var(--font-mono);
-      font-size: var(--text-xxs);
+      font-size: var(--text-xs);
       letter-spacing: 0.04em;
       text-transform: uppercase;
       color: var(--text-faint);
@@ -709,14 +709,14 @@
 
     .week__tags {
       display: inline-flex;
-      gap: var(--pad-xs);
+      gap: var(--space-xs);
     }
 
     .week__project {
       display: inline-flex;
       align-items: center;
-      gap: var(--pad-xs);
-      font-size: var(--text-xxs);
+      gap: var(--space-xs);
+      font-size: var(--text-xs);
       color: var(--text-faint);
       font-variant: small-caps;
       letter-spacing: 0.04em;
@@ -742,10 +742,10 @@
     .alive__row {
       display: grid;
       grid-template-columns: 14px 1fr auto;
-      gap: var(--pad-lg);
+      gap: var(--space-m);
       align-items: center;
-      padding-block: var(--pad-lg);
-      border-block-end: 1px solid var(--border-color-soft);
+      padding-block: var(--space-m);
+      border-block-end: 1px solid var(--border-color-light);
     }
 
     .alive__row:last-child {
@@ -763,7 +763,7 @@
       min-inline-size: 0;
       display: flex;
       flex-direction: column;
-      gap: 4px;
+      gap: var(--space-xs);
     }
 
     .alive__name {
@@ -788,10 +788,10 @@
     .alive__metrics {
       display: grid;
       grid-auto-flow: column;
-      gap: var(--pad-lg);
+      gap: var(--space-m);
       align-items: baseline;
-      padding-inline-start: var(--pad-lg);
-      border-inline-start: 1px solid var(--border-color-soft);
+      padding-inline-start: var(--space-m);
+      border-inline-start: 1px solid var(--border-color-light);
     }
 
     .alive__metric {
@@ -816,7 +816,7 @@
       letter-spacing: 0.08em;
       text-transform: uppercase;
       color: var(--text-faint);
-      margin-block-start: 4px;
+      margin-block-start: var(--space-xs);
     }
 
     @media (max-width: 47.999rem) {
@@ -825,7 +825,7 @@
       }
       .week__item {
         grid-template-columns: 60px minmax(0, 1fr);
-        gap: var(--pad-xs);
+        gap: var(--space-xs);
       }
       .week__verb,
       .week__subject,

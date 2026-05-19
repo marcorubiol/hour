@@ -18,7 +18,7 @@
     Gig detail placeholder — full mobile-first detail + roadsheet sub-route in Phase 0.2 (ADR-023).
   </p>
   <p>
-    <a href={`/h/${workspace}/gig/${slug}/roadsheet`}>→ Open road sheet (placeholder)</a>
+    <a href={`/h/${workspace}/performance/${slug}/roadsheet`}>→ Open road sheet (placeholder)</a>
   </p>
   <p>
     <a href={`/h/${workspace}`}>← Back to {workspace}</a>

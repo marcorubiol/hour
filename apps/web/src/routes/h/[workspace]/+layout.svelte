@@ -4,7 +4,7 @@
    * workspaces + lens nav as horizontal pills at the top of main.
    *
    * - Sidebar upper: <Plaza /> (multi-workspace project list, user-scoped).
-   * - Sidebar lower: <RoomStructure /> (lines+shows of selected project).
+   * - Sidebar lower: <LineList /> (lines+shows of selected project).
    * - Top of main: horizontal lens pills + breadcrumb + search.
    * - Main content: routed page (Today on the empty home, or entity sub-pages).
    *
@@ -23,9 +23,12 @@
   import Sidebar from '$lib/components/Sidebar.svelte';
   import Avatar from '$lib/components/Avatar.svelte';
   import Plaza from '$lib/components/Plaza.svelte';
-  import RoomStructure from '$lib/components/RoomStructure.svelte';
+  import LineList from '$lib/components/LineList.svelte';
   import PresenceBadge from '$lib/components/PresenceBadge.svelte';
   import Pill from '$lib/components/Pill.svelte';
+  import Menu from '$lib/components/Menu.svelte';
+  import ThemeToggle from '$lib/components/ThemeToggle.svelte';
+  import { useTheme } from '$lib/theme.svelte';
   import { isReservedWorkspaceSlug } from '$lib/reserved-slugs';
   import { provideLens, type Lens } from '$lib/stores/lens.svelte';
   import { provideSelection } from '$lib/stores/selection.svelte';
@@ -75,18 +78,18 @@
   let rt = $state<RealtimeHandle | null>(null);
   let networkPresence = $state<NetworkPresenceStore | null>(null);
 
-  type HouseLite = { id: string; slug: string; name: string };
-  const housesQuery = createQuery({
-    queryKey: ['houses'],
+  type WorkspaceLite = { id: string; slug: string; name: string };
+  const workspacesQuery = createQuery({
+    queryKey: ['workspaces'],
     queryFn: async ({ signal }) => {
       const jwt = localStorage.getItem('hour_jwt');
       if (!jwt) throw new Error('Missing JWT');
-      const res = await fetch('/api/houses', {
+      const res = await fetch('/api/workspaces', {
         signal,
         headers: { Authorization: `Bearer ${jwt}` },
       });
       if (!res.ok) throw new Error(`Error ${res.status}`);
-      return (await res.json()) as { items: HouseLite[] };
+      return (await res.json()) as { items: WorkspaceLite[] };
     },
   });
 
@@ -108,7 +111,7 @@
   });
 
   $effect(() => {
-    const slugs = $housesQuery.data?.items.map((h) => h.slug) ?? [];
+    const slugs = $workspacesQuery.data?.items.map((h) => h.slug) ?? [];
     if (networkPresence && slugs.length > 0) {
       networkPresence.setWorkspaces(slugs);
     }
@@ -119,8 +122,44 @@
     rt?.dispose();
   });
 
+  const theme = useTheme();
+
   let sidebarOpen = $state(true);
   let allActive = $state(false);
+
+  // Decode the user's email from the JWT payload. Phase 0: identity surfaces
+  // as the email since user_metadata has no display_name yet. When a profile
+  // entity exists (Phase 0.9+), swap this for the name.
+  let userEmail = $state('');
+  onMount(() => {
+    const jwt = localStorage.getItem('hour_jwt');
+    if (!jwt) return;
+    try {
+      const payload = JSON.parse(atob(jwt.split('.')[1]));
+      userEmail = payload.email ?? '';
+    } catch { /* malformed jwt — leave empty */ }
+  });
+
+  // Theme style picker — accordion inside the account menu. Five style
+  // identities; selecting one calls theme.setTheme() which writes the
+  // data-theme attribute (or removes it for the default 'editorial-sobrio')
+  // and persists to localStorage. Orthogonal to the light/dark toggle that
+  // sits next to the accordion header and applies to every style.
+  // Style identities won't actually paint anything until each one's tokens
+  // ship in tokens.css under :root[data-theme="<id>"].
+  type ThemeStyle = { id: string; name: string };
+  const themeStyles: ThemeStyle[] = [
+    { id: 'editorial-sobrio', name: 'Editorial Sober' },
+    { id: 'brutalist-mono', name: 'Brutalist Mono' },
+    { id: 'neon-noctambulo', name: 'Neon Nightshade' },
+    { id: 'serif-quiet', name: 'Serif Quiet' },
+    { id: 'archival-cream', name: 'Archival Cream' },
+  ];
+  let activeThemeStyleId = $derived(theme.theme);
+  let themeStyleExpanded = $state(false);
+  let activeThemeStyle = $derived(
+    themeStyles.find((t) => t.id === activeThemeStyleId) ?? themeStyles[0],
+  );
 
   const lensOptions: { id: Lens; label: string }[] = [
     { id: 'today', label: 'Today' },
@@ -155,38 +194,140 @@
         <a class="workspace-shell__brand" href={`/h/${workspaceSlug}/`}>
           hour
         </a>
+        <button
+          type="button"
+          class="workspace-shell__toggle workspace-shell__toggle--in-sidebar"
+          onclick={() => (sidebarOpen = false)}
+          aria-label="Hide navigation"
+        >
+          <svg
+            viewBox="0 0 14 14"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M8 3 L4 7 L8 11" />
+            <path d="M12 3 L8 7 L12 11" />
+          </svg>
+        </button>
       {/snippet}
       {#snippet children()}
         <Plaza />
-        <RoomStructure />
+        <LineList />
       {/snippet}
       {#snippet footer()}
-        <Avatar size="s" name={workspaceSlug} accentSlug={workspaceSlug} />
-        <span class="workspace-shell__footer-id">{workspaceSlug}</span>
-        <a
-          class="workspace-shell__footer-link"
-          href={`/h/${workspaceSlug}/settings`}
+        <Menu
+          direction="up"
+          align="start"
+          label="Open account menu"
+          triggerClass="workspace-shell__user"
+          onclose={() => (themeStyleExpanded = false)}
         >
-          Settings
-        </a>
-        <button
-          type="button"
-          class="workspace-shell__footer-link"
-          onclick={logout}
-        >
-          Sign out
-        </button>
+          {#snippet trigger()}
+            <Avatar
+              size="xs"
+              name={userEmail || workspaceSlug}
+              accentSlug={userEmail || workspaceSlug}
+            />
+            <span class="workspace-shell__user-id">{userEmail}</span>
+          {/snippet}
+          {#snippet children({ close })}
+            <li role="none">
+              <a
+                role="menuitem"
+                href={`/h/${workspaceSlug}/settings`}
+                class="menu__item"
+                tabindex="0"
+                onclick={() => close(false)}
+              >
+                Settings
+              </a>
+            </li>
+            <li role="none" class="theme-accordion">
+              <div class="theme-accordion__header">
+                <button
+                  type="button"
+                  class="theme-accordion__expand"
+                  aria-expanded={themeStyleExpanded}
+                  onclick={() => (themeStyleExpanded = !themeStyleExpanded)}
+                >
+                  <span class="theme-accordion__label">Theme style</span>
+                  <span class="theme-accordion__current">
+                    <span class="theme-accordion__current-name"
+                      >{activeThemeStyle.name}</span
+                    >
+                    <span
+                      class="theme-accordion__chevron"
+                      data-expanded={themeStyleExpanded || undefined}
+                      aria-hidden="true"
+                    >›</span>
+                  </span>
+                </button>
+                <ThemeToggle variant="plain" />
+              </div>
+              {#if themeStyleExpanded}
+                <ul class="theme-accordion__list" role="list">
+                  {#each themeStyles as t (t.id)}
+                    <li class="theme-accordion__item">
+                      <button
+                        type="button"
+                        class="theme-accordion__select"
+                        aria-pressed={t.id === activeThemeStyleId}
+                        data-active={t.id === activeThemeStyleId || undefined}
+                        onclick={() => theme.setTheme(t.id)}
+                      >
+                        {t.name}
+                      </button>
+                    </li>
+                  {/each}
+                </ul>
+              {/if}
+            </li>
+            <li role="none">
+              <button
+                role="menuitem"
+                type="button"
+                class="menu__item menu__item--danger"
+                tabindex="0"
+                onclick={() => {
+                  logout();
+                  close(false);
+                }}
+              >
+                Sign out
+              </button>
+            </li>
+          {/snippet}
+        </Menu>
       {/snippet}
     </Sidebar>
 
     <main class="workspace-shell__main">
       <header class="workspace-shell__topbar">
-        <button
-          type="button"
-          class="workspace-shell__toggle"
-          onclick={() => (sidebarOpen = !sidebarOpen)}
-          aria-label={sidebarOpen ? 'Hide navigation' : 'Show navigation'}
-        >☰</button>
+        {#if !sidebarOpen}
+          <button
+            type="button"
+            class="workspace-shell__toggle"
+            onclick={() => (sidebarOpen = true)}
+            aria-label="Show navigation"
+          >
+            <svg
+              viewBox="0 0 14 14"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M6 3 L10 7 L6 11" />
+              <path d="M2 3 L6 7 L2 11" />
+            </svg>
+          </button>
+        {/if}
 
         <nav class="workspace-shell__lenses" aria-label="Lens">
           {#each lensOptions as opt (opt.id)}
@@ -241,31 +382,47 @@
     background: var(--bg);
   }
 
-  /* The sidebar root is set via :global because Sidebar.svelte is a child
-     component; we widen it here for the desktop frame. */
+  /* Sidebar skeleton + width token live in base.css. We just paint the
+     background and the inline-end border to match the shell palette. */
   .workspace-shell :global(.sidebar) {
-    --sidebar-width: var(--sidebar-width, 264px);
     background: var(--bg);
-    border-inline-end: 1px solid var(--border-color);
+    border-inline-end: 1px solid var(--border-color-dark);
+  }
+
+  /* Desktop: width truly fixed (flex item won't grow OR shrink with
+     content), sidebar viewport-locked (header pinned, body scrolls
+     internally, footer always visible). Mobile drawer keeps its own
+     position: fixed rules from base.css. */
+  @media (min-width: 48rem) {
+    .workspace-shell :global(.sidebar) {
+      flex: 0 0 var(--sidebar-width);
+      min-inline-size: var(--sidebar-width);
+      max-inline-size: var(--sidebar-width);
+      position: sticky;
+      inset-block-start: 0;
+      block-size: 100vh;
+      align-self: flex-start;
+    }
   }
 
   .workspace-shell :global(.sidebar__header) {
-    padding-block: var(--pad-lg);
-    padding-inline: var(--pad-lg);
+    padding-block: var(--space-s);
+    padding-inline: var(--space-m);
     border-block-end: 0;
+    justify-content: space-between;
   }
 
   .workspace-shell :global(.sidebar__body) {
-    padding-block: var(--pad);
-    padding-inline: var(--pad-sm);
-    gap: var(--pad);
+    padding-block: var(--space-s);
+    padding-inline: var(--space-s);
+    gap: var(--space-s);
   }
 
   .workspace-shell :global(.sidebar__footer) {
-    padding-block: var(--pad);
-    padding-inline: var(--pad-lg);
-    border-block-start: 1px solid var(--border-color-soft);
-    gap: var(--pad-sm);
+    padding-block: var(--space-s);
+    padding-inline: var(--space-m);
+    border-block-start: 1px solid var(--border-color-light);
+    gap: var(--space-s);
   }
 
   .workspace-shell__brand {
@@ -278,29 +435,166 @@
     letter-spacing: -0.01em;
   }
 
-  .workspace-shell__footer-id {
+  /* Account menu trigger: behaves like a single clickable row (avatar +
+     email) — no button box. The menu opens upward (footer-anchored) from
+     here. Hit area is the whole row; only the text color shifts on hover. */
+  .workspace-shell :global(.workspace-shell__user) {
+    flex: 1;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-s);
+    padding-block: var(--space-xs);
+    padding-inline: var(--space-xs);
+    background: transparent;
+    border: 0;
+    border-radius: var(--radius);
+    color: var(--text-color);
+    cursor: pointer;
+    text-align: start;
+    font-family: inherit;
+    transition: background var(--transition);
+    min-inline-size: 0;
+  }
+
+  .workspace-shell :global(.workspace-shell__user:hover),
+  .workspace-shell :global(.workspace-shell__user[aria-expanded='true']) {
+    background: var(--bg-hover);
+  }
+
+  .workspace-shell__user-id {
     flex: 1;
     font-size: var(--text-s);
     color: var(--text-muted);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    min-inline-size: 0;
   }
 
-  .workspace-shell__footer-link {
-    font-size: var(--text-xs);
-    color: var(--text-faint);
-    text-decoration: none;
-    background: none;
+  /* Theme accordion inside the account menu. Two orthogonal controls:
+     the expand button (label + current style + chevron) opens the list;
+     the ThemeToggle to its right flips light/dark globally regardless of
+     which style is selected. The list below shows style names only — no
+     per-item mode. */
+  :global(.theme-accordion) {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+
+  /* Hover/active background lives on the row (header), not on the expand
+     button alone — so the toggle is included in the highlighted area.
+     Matches the full-width hover behaviour of the other menu items. */
+  :global(.theme-accordion__header) {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    padding-inline-end: var(--space-xs);
+    border-radius: var(--radius-s);
+    transition: background var(--transition);
+  }
+
+  :global(.theme-accordion__header):hover,
+  :global(.theme-accordion__header):has(.theme-accordion__expand[aria-expanded='true']) {
+    background: var(--bg-ultra-light);
+  }
+
+  /* Expand button stacks label (line 1) over the current style + chevron
+     (line 2). The ThemeToggle to its right stays vertically centered
+     against the two-line stack. */
+  :global(.theme-accordion__expand) {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0;
+    padding-block: var(--space-xs);
+    padding-inline: var(--space-s);
+    background: transparent;
     border: 0;
-    padding: 0;
-    cursor: pointer;
+    border-radius: var(--radius-s);
     font-family: inherit;
-    transition: color var(--transition);
+    color: var(--text-color);
+    text-align: start;
+    cursor: pointer;
+    transition: background var(--transition);
+    min-inline-size: 0;
   }
 
-  .workspace-shell__footer-link:hover {
+
+  :global(.theme-accordion__label) {
+    font-size: var(--text-s);
     color: var(--text-color);
+    line-height: 1.3;
+  }
+
+  :global(.theme-accordion__current) {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-xs);
+    max-inline-size: 100%;
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    line-height: 1.3;
+    min-inline-size: 0;
+  }
+
+  :global(.theme-accordion__current-name) {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-inline-size: 0;
+  }
+
+  :global(.theme-accordion__chevron) {
+    color: var(--text-faint);
+    line-height: 1;
+    transition: transform var(--transition);
+    flex-shrink: 0;
+  }
+
+  :global(.theme-accordion__chevron[data-expanded]) {
+    transform: rotate(90deg);
+  }
+
+  :global(.theme-accordion__list) {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    padding-inline-start: var(--space-s);
+  }
+
+  :global(.theme-accordion__item) {
+    display: flex;
+  }
+
+  :global(.theme-accordion__select) {
+    flex: 1;
+    padding-block: var(--space-xs);
+    padding-inline: var(--space-s);
+    background: transparent;
+    border: 0;
+    border-radius: var(--radius-s);
+    font-family: inherit;
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    text-align: start;
+    cursor: pointer;
+    transition: background var(--transition), color var(--transition);
+  }
+
+  :global(.theme-accordion__select):hover {
+    background: var(--bg-ultra-light);
+    color: var(--heading-color);
+  }
+
+  :global(.theme-accordion__select[data-active]) {
+    background: var(--bg-ultra-light);
+    color: var(--heading-color);
+    font-weight: 500;
   }
 
   .workspace-shell__main {
@@ -311,46 +605,51 @@
   }
 
   .workspace-shell__topbar {
+    position: sticky;
+    inset-block-start: 0;
+    z-index: var(--z-sticky);
     display: flex;
     align-items: center;
-    gap: var(--pad);
-    padding-block: var(--pad-sm);
-    padding-inline: var(--pad-lg);
-    border-block-end: 1px solid var(--border-color-soft);
+    gap: var(--space-s);
+    padding-block: var(--space-s);
+    padding-inline: var(--space-m);
+    border-block-end: 1px solid var(--border-color-light);
     background: var(--bg);
   }
 
+  /* Borderless icon button — just the chevron. Hit area comes from the
+     SVG size + padding, color shifts on hover; no box, no background. */
   .workspace-shell__toggle {
-    inline-size: 32px;
-    block-size: 32px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    padding: var(--space-xs);
     background: transparent;
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius);
+    border: 0;
     color: var(--text-muted);
     cursor: pointer;
-    transition:
-      background var(--transition), color var(--transition),
-      border-color var(--transition);
+    transition: color var(--transition);
+  }
+
+  .workspace-shell__toggle svg {
+    inline-size: var(--text-s);
+    block-size: var(--text-s);
   }
 
   .workspace-shell__toggle:hover {
-    background: var(--bg-hover);
     color: var(--text-color);
   }
 
   .workspace-shell__lenses {
     display: flex;
     align-items: center;
-    gap: var(--pad-xs);
+    gap: var(--space-xs);
   }
 
   .workspace-shell__crumb {
     flex: 1;
     font-family: var(--font-mono);
-    font-size: var(--text-xxs);
+    font-size: var(--text-xs);
     color: var(--text-faint);
     letter-spacing: 0.16em;
     overflow: hidden;
@@ -361,17 +660,17 @@
   .workspace-shell__right {
     display: flex;
     align-items: center;
-    gap: var(--pad-sm);
+    gap: var(--space-s);
   }
 
   .workspace-shell__search {
     display: inline-flex;
     align-items: center;
-    gap: var(--pad-xs);
-    padding-block: 4px;
-    padding-inline: var(--pad-sm);
+    gap: var(--space-xs);
+    padding-block: var(--space-xs);
+    padding-inline: var(--space-xs);
     background: var(--bg);
-    border: 1px solid var(--border-color);
+    border: 1px solid var(--border-color-dark);
     border-radius: var(--radius);
     transition: border-color var(--transition);
     min-inline-size: 220px;
@@ -384,11 +683,13 @@
   .workspace-shell__search input {
     flex: 1;
     min-inline-size: 0;
+    padding: 0;
     background: transparent;
     border: 0;
     outline: none;
     font-family: var(--font-sans);
     font-size: var(--text-xs);
+    line-height: 1.2;
     color: var(--text-color);
   }
 
@@ -398,8 +699,8 @@
 
   .workspace-shell__content {
     flex: 1;
-    padding-block: var(--pad-2xl);
-    padding-inline: var(--pad-2xl);
+    padding-block: var(--space-l);
+    padding-inline: var(--space-l);
   }
 
   @media (max-width: 47.999rem) {
@@ -410,7 +711,7 @@
       min-inline-size: 140px;
     }
     .workspace-shell__content {
-      padding-inline: var(--pad-lg);
+      padding-inline: var(--space-m);
     }
   }
 </style>

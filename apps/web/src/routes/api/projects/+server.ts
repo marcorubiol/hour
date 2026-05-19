@@ -1,13 +1,14 @@
 /**
- * GET /api/rooms
+ * GET /api/projects
  *
- * Lists projects in the caller's current workspace. RLS + the
- * `current_workspace_id` JWT claim scope visibility automatically — no
- * explicit workspace param needed in Phase 0. When multi-workspace switching
- * lands (Phase 1), add `?house_id=` to override the claim default.
+ * Lists projects (productions) the caller has membership-based access to.
+ * RLS scopes by workspace_membership (ADR-029) — user sees projects of any
+ * workspace they belong to, not just `current_workspace_id`. The same
+ * cache (`['projects', { status: 'active' }]`) is consumed by Plaza,
+ * LineList, the project detail page, and Today widgets.
  *
- * Product vocabulary: project → Room (ADR-008). Schema name retained in the
- * implementation; only the URL surface uses the product name.
+ * Naming: renamed from `/api/rooms` (Room was ADR-008 vocab, dropped by
+ * ADR-033). Schema entity is `project`; the route surfaces match.
  *
  * Auth: Bearer JWT required. RLS denies anon.
  */
@@ -47,7 +48,7 @@ function json(body: unknown, status = 200): Response {
   });
 }
 
-type RoomItem = Pick<
+type ProjectItem = Pick<
   Tables<'project'>,
   | 'id'
   | 'slug'
@@ -103,7 +104,7 @@ export const GET: RequestHandler = async ({ request, url, platform }) => {
   search.set('limit', String(limit));
 
   try {
-    const { data } = await pgGet<RoomItem>(env, 'project', jwt, { search });
+    const { data } = await pgGet<ProjectItem>(env, 'project', jwt, { search });
     return json({ items: data });
   } catch (err) {
     if (err instanceof PostgrestError) {

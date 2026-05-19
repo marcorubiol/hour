@@ -1336,6 +1336,27 @@ Triggered by Marco's pre-scaffold doubt (Phase 0.0 day 5). Five alternatives eva
   - Si emerge un cliente Phase 1 con vocabulario propio (ej. "función" en lugar de "performance"), evaluar UI label customizable por workspace (no schema).
 - **Status**: Firm. Producción 2026-05-19.
 
+## [2026-05-19] — ADR-037 · Cleanup ADR-008 vocab holdovers (room/gig/house) — align UI/URL/code with schema
+- **Decisión**: Eliminar las últimas referencias al vocabulario ADR-008 (House/Room/Run/Gig) en UI, URL, endpoints y componentes internos. Schema ya no usa esos nombres desde hace tiempo; quedaba inconsistencia visible cada vez que alguien leía URLs, código, o nombres de componentes.
+- **Cambios concretos**:
+  - **URL**: `/h/[workspace]/room/[slug]/` → `/h/[workspace]/project/[slug]/`; `/h/[workspace]/gig/[slug]/` → `/h/[workspace]/performance/[slug]/`. 301 redirects en `hooks.server.ts` para bookmarks/links viejos (eliminable en Phase 0.2 cuando todas las refs hayan migrado).
+  - **Endpoints**: `/api/rooms` → `/api/projects`; `/api/houses` → `/api/workspaces`. 301 redirects en `hooks.server.ts` (fetch los sigue transparentemente).
+  - **Componente**: `RoomStructure.svelte` → `LineList.svelte` (nombre refleja qué hace: lista lines del project activo).
+  - **Tipos internos**: `type House` → `type Workspace`, `type Room` → `type Project`, `HouseLite` → `WorkspaceLite`, `RoomItem` → `ProjectItem`, `HouseItem` → `WorkspaceItem`.
+  - **Variables**: `houses` → `workspaces`, `rooms` → `projects`, `fetchRooms` → `fetchProjects`, `fetchHouses` → `fetchWorkspaces`, `housesQuery` → `workspacesQuery`, `roomsQuery` → `projectsQuery`, `activeRoomSlug` → `activeProjectSlug`, `firstRoomSlug` → `firstProjectSlug`, `activeRooms` → `activeProjects` field, `plaza__house-*` CSS classes → `plaza__workspace-*`.
+  - **Smoke test**: URL `/h/mamemi/room/mamemi` → `/h/muk-cia/project/mamemi`.
+- **Context**: Marco solicitó audit de naming durante sesión 2026-05-19 ("RoomStructure ahora mismo me está causando problemas de comprensión"). 5 desfases identificados en la tabla schema ↔ UI ↔ URL ↔ código: URL legacy room/gig, endpoint legacy houses/rooms, componente legacy RoomStructure, tipos internos House/Room. Phase 0 sin usuarios externos = momento ideal para limpiar antes que escale a semanas.
+- **Trade-offs**:
+  - **Settings page de Marco (uncommitted) usa los nombres viejos**. 301 redirects en hooks.server.ts hacen que siga funcionando sin tocar su archivo. Cuando Marco actualice settings, podemos eliminar los redirects.
+  - **Historial git pierde la trazabilidad directa de "este archivo era RoomStructure"**. `git mv` preserva el rename como evento, pero `git log --follow` puede tener heuristics imprecisas con renames grandes. Aceptado.
+- **No tocado en este pase** (deferido):
+  - Permission code string `'edit:show'` (ADR-006 closed vocab) — deferido a Phase 0.9 admin UI.
+  - Route segments `/engagement/`, `/person/` — ya consistentes con schema, no necesitan rename.
+- **Migration**: solo código + URL hooks. Sin schema migration (cero cambios DB).
+- **Verificación**: `pnpm check` 1276 files, 0 errors, 0 warnings.
+- **Re-evaluate when**: si Phase 0.9 admin UI lo pide, eliminar los 301 redirects en hooks.server.ts (todas las refs migradas para entonces).
+- **Status**: Firm. Producción 2026-05-19.
+
 ## [2026-05-19] — ADR-035 · Revert `section` → `line` (naming gate vivido con UI productiva supersede ADR-031)
 - **Decisión**: Revertir el rename `line → section` aplicado el 2026-05-18 (ADR-031). El nivel intermedio entre Project y Show vuelve a llamarse `line` en schema (`line`, `line_id`, `line_kind`, `line_status`) y en UI ("Lines"). Los 4 enum values añadidos por ADR-031 (creation, campaign, comms, misc) se conservan dentro de `line_kind` — siguen siendo válidos para Hour cross-arts. El enum queda con 10 valores: tour, season, phase, circuit, residency, other, creation, campaign, comms, misc.
 - **Context**: ADR-031 razonaba que "line" era industry slang exclusivo de touring y que kinds no-touring (creation/campaign/comms/misc) chirreaban semánticamente. 2026-05-19, con la demo data viva en la UI ("LINES" header en sidebar lower) y el contexto castellano de Marco, el chequeo real produjo la lectura inversa: **"línea de trabajo" funciona perfectamente para los 10 kinds** — tour 2026, residencia, nueva creación, campaña de difusión, comms. `line` es polisémico en castellano (línea de trabajo, línea de producción) y en inglés (line of work, production line, comms line), no exclusivo del touring. El naming gate del live-UI gana sobre el razonamiento abstracto de hace 24 horas.

@@ -1,13 +1,13 @@
 /**
- * GET /api/houses
+ * GET /api/workspaces
  *
  * Lists workspaces visible to the caller. RLS gates this to workspaces the
- * user has an accepted membership in — for Phase 0 that is just
- * `marco-rubiol`, but the shape supports multi-workspace as soon as Phase 1
- * onboards external clients.
+ * user has an accepted membership in (workspace_membership.accepted_at).
+ * Cross-account memberships supported (ADR-029): one user crosses N
+ * workspaces belonging to N accounts.
  *
- * Product vocabulary: workspace → House (ADR-008). Schema name retained in
- * the implementation; only the URL surface uses the product name.
+ * Naming: renamed from `/api/houses` (House was ADR-008 vocab, dropped by
+ * ADR-033). Schema entity is `workspace`; the route surfaces match.
  *
  * Auth: Bearer JWT required. RLS denies anon.
  */
@@ -39,7 +39,7 @@ function json(body: unknown, status = 200): Response {
   });
 }
 
-type HouseItem = Pick<
+type WorkspaceItem = Pick<
   Tables<'workspace'>,
   'id' | 'slug' | 'name' | 'kind' | 'timezone' | 'country'
 >;
@@ -84,7 +84,7 @@ export const GET: RequestHandler = async ({ request, url, platform }) => {
   search.set('limit', String(limit));
 
   try {
-    const { data } = await pgGet<HouseItem>(env, 'workspace', jwt, { search });
+    const { data } = await pgGet<WorkspaceItem>(env, 'workspace', jwt, { search });
     return json({ items: data });
   } catch (err) {
     if (err instanceof PostgrestError) {

@@ -15,13 +15,13 @@ test.describe('smoke', () => {
    *   - login flow (Supabase Auth REST + JWT in localStorage)
    *   - hardcoded post-login redirect → /h/marco-rubiol/
    *   - workspace shell renders (Plaza, lens pills, sidebar footer)
-   *   - JWT auth hook injected current_workspace_id (otherwise /api/houses
+   *   - JWT auth hook injected current_workspace_id (otherwise /api/workspaces
    *     would return zero rows under RLS)
-   *   - /api/houses returned this user's actual memberships (sidebar
+   *   - /api/workspaces returned this user's actual memberships (sidebar
    *     shows MaMeMi for the playwright test user even though the URL
    *     lands on marco-rubiol, which playwright is NOT a member of —
    *     the sidebar is user-scoped, not URL-scoped, per ADR-029)
-   *   - clicking the MaMeMi room navigates to /h/mamemi/room/mamemi
+   *   - clicking the MaMeMi room navigates to /h/mamemi/project/mamemi
    *   - /api/engagements?project_slug=mamemi returned the 154 contacts
    *   - RelationshipStub renders the count + at least one row
    *   - logout clears state and redirects to /login
@@ -56,7 +56,7 @@ test.describe('smoke', () => {
     // Plaza must surface the MaMeMi room link. Targeting by href avoids
     // the ambiguity between "MaMeMi" the House and "MaMeMi" the Room
     // (the room.name happens to match the workspace.name for now).
-    const mameMiRoomLink = page.locator('a[href="/h/mamemi/room/mamemi"]');
+    const mameMiRoomLink = page.locator('a[href="/h/mamemi/project/mamemi"]');
     await expect(mameMiRoomLink).toBeVisible();
     await mameMiRoomLink.click();
 

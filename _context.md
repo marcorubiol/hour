@@ -137,12 +137,12 @@ Naming gate resuelto 2026-05-18: UI usa vocabulario industria-standard. Schema m
 | (sin user-facing label aún; "Account" en admin UI Phase 1) | `account` | Entidad pagadora. Billing boundary. Personal (1 user) o team. Invisible en UI Phase 0; emerge en Settings → Account management. (ADR-032) |
 | **Project** | `workspace` | Tenant aislado. RLS scope. Lo que ves como top-level en el sidebar bajo el eyebrow "PROJECTS". |
 | (sin UI label en Phase 0; "Project" interno) | `project` | Proyecto creativo dentro de un workspace. En Phase 0 sólo hay 1 por workspace (convención), por lo que la UI lo trata como child implícito del workspace. Cuando aparezca el primer schema `project` distinto del workspace homónimo, decidir representación visual separada (ADR-033 open item). |
-| **Line** (UI label) | `section` | Agrupación operativa: tour, season, phase, circuit, residency, other, creation, campaign, comms, misc (kind enum, ADR-031). Renderiza en sidebar lower (`<RoomStructure>`). |
+| **Line** (UI label) | `line` | Agrupación operativa: tour, season, phase, circuit, residency, other, creation, campaign, comms, misc (kind enum, ADR-031 + ADR-035). Renderiza en sidebar lower (`<LineList>`). |
 | **Show** | `show` | Single performance event. |
 
 **Lens primaria**: **Today** (ADR-033). Pills: `Today · Calendar · Contacts · Money`. Componentes internos mantienen los nombres `Plaza.svelte` (sidebar upper) y "Desk" como concepto del sistema de pills — no aparecen en copy visible.
 
-URL paths siguen con segmentos legacy `/h/[workspace]/room/[slug]/` (rename a `/project/` requiere 301 redirect, ~30 min, se hace cuando un user externo bookmarquee — coste no justificado en Phase 0).
+URL paths actualizados a vocabulario schema-aligned 2026-05-19 (ADR-037 cleanup): `/h/[workspace]/project/[slug]/` (was `/room/`), `/h/[workspace]/performance/[slug]/` (was `/gig/`). 301 redirects en `hooks.server.ts` para bookmarks/links viejos. API endpoints renombrados: `/api/projects` (was `/api/rooms`), `/api/workspaces` (was `/api/houses`).
 
 Schema retains technical names (`account`, `workspace`, `project`, `line`, `show`). UI labels pueden cambiar libremente hasta Phase 0.9 sin tocar schema (ADR-008 separation).
 
@@ -155,7 +155,7 @@ Single-layout app con dos controles:
 - **Lens nav** (top del main, **horizontal pills**): `Plaza · Calendar · Contacts · Money`. Determina qué tipo de contenido se muestra. Plaza es el modo default (lo que estás viendo + lo que harías a continuación). Future lenses (Comms, Archive) se añaden como pills adicionales sin cambiar layout.
 - **Sidebar** (user-scoped, **cross-account**):
   - **Plaza component** (sidebar upper): multi-house tree mostrando TODAS las workspaces del usuario simultáneamente (cross-account, Slack-like). Cada House con sus Rooms indentadas.
-  - **RoomStructure** (sidebar lower, solo visible cuando hay Room seleccionada): muestra Section + Show tree de la Room actual. Empty state "Select a Room to see its structure" cuando no hay selección.
+  - **LineList** (sidebar lower, solo visible cuando hay project seleccionado): muestra las lines del project activo. Empty state "Select a project to see its structure" cuando no hay selección. (Renamed from `RoomStructure` 2026-05-19 — ADR-037 cleanup de ADR-008 vocab.)
 
 **Lens × Room scope** determines main content:
 - **Plaza + Room** = Room detail (RelationshipStub + future stubs Runs/Assets/Team).
