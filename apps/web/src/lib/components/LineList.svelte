@@ -131,13 +131,18 @@
     const workspacesBySlug = new Map(
       ($workspacesQuery.data?.items ?? []).map((w) => [w.slug, w]),
     );
+    // Use the SelectionStore's "effective" accessors so focus mode wins:
+    // when a workspace is focused, effectiveWorkspaces=[focusedSlug] and
+    // effectiveProjects=[] regardless of the underlying selection sets.
+    // Outside focus, these return the real selection.workspaces /
+    // selection.projects sets.
     const projectIds: string[] = [];
-    for (const slug of selection.projects) {
+    for (const slug of selection.effectiveProjects()) {
       const p = projectsBySlug.get(slug);
       if (p) projectIds.push(p.id);
     }
     const workspaceIds: string[] = [];
-    for (const slug of selection.workspaces) {
+    for (const slug of selection.effectiveWorkspaces()) {
       const w = workspacesBySlug.get(slug);
       if (w) workspaceIds.push(w.id);
     }

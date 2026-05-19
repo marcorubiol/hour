@@ -1636,8 +1636,8 @@
   }
 
   /* Drag-to-resize handle (opt-in via the `resizable` prop). Sits on the
-     inline-end edge; 4px hit target with no visual chrome until hover or
-     drag, where a primary-colored line appears. Double-click resets the
+     inline-end edge; 4px hit target with no chrome until hover or drag,
+     where a primary-colored line appears. Double-click resets the
      sidebar to its default width. */
   .sidebar__resizer {
     position: absolute;
@@ -1662,21 +1662,9 @@
     background: var(--primary);
   }
 
-  /* No focus ring on the handle — the hover/dragging background already
-     signals interactivity for mouse users (the only ones who resize). */
   .sidebar__resizer:focus,
   .sidebar__resizer:focus-visible {
     outline: none;
-  }
-
-  /* Hide the sidebar's own border-inline-end while the resizer is being
-     hovered or dragged. The resizer covers that pixel anyway but the
-     border colour is in the same hue family as --primary; once the
-     resizer paints over it the underlying border can read as a faint
-     parallel line. Drop it to transparent for the duration. */
-  .sidebar:has(.sidebar__resizer:hover),
-  .sidebar--dragging {
-    border-inline-end-color: transparent;
   }
 
   .sidebar--dragging {

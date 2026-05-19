@@ -19,7 +19,7 @@
   import { page } from '$app/state';
   import { goto } from '$app/navigation';
   import { createQuery } from '@tanstack/svelte-query';
-  import { accentVar } from '$lib/utils/accent';
+  import { accentVar, accentVarFor } from '$lib/utils/accent';
   import { decodeJwtClaim } from '$lib/realtime';
   import Pill from '$lib/components/Pill.svelte';
   import TagChip from '$lib/components/TagChip.svelte';
@@ -29,6 +29,8 @@
     slug: string;
     name: string;
     kind: 'personal' | 'team';
+    accent?: string | null;
+    description?: string | null;
   };
 
   type Project = {
@@ -498,7 +500,7 @@
     {:else}
       <ul class="alive" role="list">
         {#each projectRows as row (row.workspace.id)}
-          <li class="alive__row" style={`--c: ${accentVar(row.workspace.slug)}`}>
+          <li class="alive__row" style={`--c: ${accentVarFor(row.workspace)}`}>
             <span class="alive__rail" aria-hidden="true"></span>
             <div class="alive__body">
               <a

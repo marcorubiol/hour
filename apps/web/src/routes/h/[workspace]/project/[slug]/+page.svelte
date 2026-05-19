@@ -13,7 +13,7 @@
   import { page } from '$app/state';
   import { createQuery } from '@tanstack/svelte-query';
   import { goto } from '$app/navigation';
-  import { accentVar } from '$lib/utils/accent';
+  import { accentVar, accentVarFor } from '$lib/utils/accent';
   import RelationshipStub from '$lib/components/RelationshipStub.svelte';
   import StateBadge from '$lib/components/StateBadge.svelte';
 
@@ -26,6 +26,8 @@
     starts_on: string | null;
     ends_on: string | null;
     updated_at: string;
+    accent?: string | null;
+    description?: string | null;
   };
 
   function clearAuthAndBounce() {
@@ -89,7 +91,7 @@
   <title>{displayName} — Hour</title>
 </svelte:head>
 
-<article class="project" style={`--c: ${accentVar(projectSlug)}`}>
+<article class="project" style={`--c: ${project ? accentVarFor(project) : accentVar(projectSlug)}`}>
   <header class="project__head">
     <p class="eyebrow">Project</p>
     <h1 class="project__title">

@@ -16,7 +16,7 @@ import type { RequestHandler } from './$types';
 import * as v from 'valibot';
 import { extractBearer } from '$lib/auth';
 import type { Tables } from '$lib/db-types';
-import { pgGet, PostgrestError, type SupabaseEnv } from '$lib/supabase';
+import { pgGet, pgPostRpc, PostgrestError, type SupabaseEnv } from '$lib/supabase';
 
 const QuerySchema = v.object({
   limit: v.optional(
@@ -41,8 +41,72 @@ function json(body: unknown, status = 200): Response {
 
 type WorkspaceItem = Pick<
   Tables<'workspace'>,
-  'id' | 'slug' | 'name' | 'kind' | 'timezone' | 'country'
+  'id' | 'slug' | 'name' | 'kind' | 'timezone' | 'country' | 'accent' | 'description'
 >;
+
+const CreateBodySchema = v.object({
+  name: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(80)),
+  slug: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(64))),
+  // Palette index '1'..'8'. Empty / omitted = let the server fall through
+  // to the hash(slug) default. Future free-form colors will widen this
+  // schema in parallel with the DB CHECK constraint relaxation.
+  accent: v.optional(v.pipe(v.string(), v.regex(/^[1-8]$/))),
+  description: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(280))),
+});
+
+type WorkspaceRow = Tables<'workspace'>;
+
+export const POST: RequestHandler = async ({ request, platform }) => {
+  if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);
+  const env = platform.env as unknown as SupabaseEnv;
+
+  const jwt = extractBearer(request);
+  if (!jwt) return json({ error: 'missing_authorization' }, 401);
+
+  let raw: unknown;
+  try {
+    raw = await request.json();
+  } catch {
+    return json({ error: 'invalid_body' }, 400);
+  }
+  const parsed = v.safeParse(CreateBodySchema, raw);
+  if (!parsed.success) {
+    return json(
+      {
+        error: 'invalid_body',
+        issues: parsed.issues.map((i) => ({
+          path: i.path?.map((p) => p.key).join('.'),
+          message: i.message,
+        })),
+      },
+      400,
+    );
+  }
+
+  const args: Record<string, unknown> = { p_name: parsed.output.name };
+  if (parsed.output.slug) args.p_slug = parsed.output.slug;
+  if (parsed.output.accent) args.p_accent = parsed.output.accent;
+  if (parsed.output.description) args.p_description = parsed.output.description;
+
+  try {
+    const { data } = await pgPostRpc<WorkspaceRow>(env, 'create_workspace', jwt, args);
+    const workspace = data[0];
+    if (!workspace) return json({ error: 'rpc_empty_result' }, 502);
+    return json({ workspace }, 201);
+  } catch (err) {
+    if (err instanceof PostgrestError) {
+      // 22023 = invalid name/slug format, 23505 = collision (shouldn't reach
+      // here — RPC retries), 42501 = caller has no personal account.
+      const body = err.body;
+      let status = 502;
+      if (body.includes('22023')) status = 400;
+      else if (body.includes('23505')) status = 409;
+      else if (body.includes('42501')) status = 403;
+      return json({ error: 'rpc_error', status: err.status, detail: body }, status);
+    }
+    return json({ error: 'unexpected', detail: String(err) }, 500);
+  }
+};
 
 export const GET: RequestHandler = async ({ request, url, platform }) => {
   if (!platform?.env) {
@@ -78,7 +142,7 @@ export const GET: RequestHandler = async ({ request, url, platform }) => {
   const { limit } = parsed.output;
 
   const search = new URLSearchParams();
-  search.set('select', 'id,slug,name,kind,timezone,country');
+  search.set('select', 'id,slug,name,kind,timezone,country,accent,description');
   search.set('deleted_at', 'is.null');
   search.set('order', 'created_at.asc');
   search.set('limit', String(limit));

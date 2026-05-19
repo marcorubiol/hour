@@ -17,7 +17,7 @@ import type { RequestHandler } from './$types';
 import * as v from 'valibot';
 import { extractBearer } from '$lib/auth';
 import type { Enums, Tables } from '$lib/db-types';
-import { pgGet, PostgrestError, type SupabaseEnv } from '$lib/supabase';
+import { pgGet, pgPostRpc, PostgrestError, type SupabaseEnv } from '$lib/supabase';
 
 const ALLOWED_STATUSES: ReadonlyArray<Enums<'project_status'> | 'any'> = [
   'any',
@@ -58,7 +58,72 @@ type ProjectItem = Pick<
   | 'starts_on'
   | 'ends_on'
   | 'updated_at'
+  | 'accent'
+  | 'description'
 >;
+
+type ProjectRow = Tables<'project'>;
+
+const CreateBodySchema = v.object({
+  workspace_id: v.pipe(v.string(), v.uuid()),
+  name: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(80)),
+  slug: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(64))),
+  accent: v.optional(v.pipe(v.string(), v.regex(/^[1-8]$/))),
+  description: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(280))),
+});
+
+export const POST: RequestHandler = async ({ request, platform }) => {
+  if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);
+  const env = platform.env as unknown as SupabaseEnv;
+
+  const jwt = extractBearer(request);
+  if (!jwt) return json({ error: 'missing_authorization' }, 401);
+
+  let raw: unknown;
+  try {
+    raw = await request.json();
+  } catch {
+    return json({ error: 'invalid_body' }, 400);
+  }
+  const parsed = v.safeParse(CreateBodySchema, raw);
+  if (!parsed.success) {
+    return json(
+      {
+        error: 'invalid_body',
+        issues: parsed.issues.map((i) => ({
+          path: i.path?.map((p) => p.key).join('.'),
+          message: i.message,
+        })),
+      },
+      400,
+    );
+  }
+
+  const args: Record<string, unknown> = {
+    p_workspace_id: parsed.output.workspace_id,
+    p_name: parsed.output.name,
+  };
+  if (parsed.output.slug) args.p_slug = parsed.output.slug;
+  if (parsed.output.accent) args.p_accent = parsed.output.accent;
+  if (parsed.output.description) args.p_description = parsed.output.description;
+
+  try {
+    const { data } = await pgPostRpc<ProjectRow>(env, 'create_project', jwt, args);
+    const project = data[0];
+    if (!project) return json({ error: 'rpc_empty_result' }, 502);
+    return json({ project }, 201);
+  } catch (err) {
+    if (err instanceof PostgrestError) {
+      const body = err.body;
+      let status = 502;
+      if (body.includes('22023')) status = 400;
+      else if (body.includes('23505')) status = 409;
+      else if (body.includes('42501')) status = 403;
+      return json({ error: 'rpc_error', status: err.status, detail: body }, status);
+    }
+    return json({ error: 'unexpected', detail: String(err) }, 500);
+  }
+};
 
 export const GET: RequestHandler = async ({ request, url, platform }) => {
   if (!platform?.env) {
@@ -96,7 +161,7 @@ export const GET: RequestHandler = async ({ request, url, platform }) => {
   const search = new URLSearchParams();
   search.set(
     'select',
-    'id,slug,name,status,workspace_id,starts_on,ends_on,updated_at',
+    'id,slug,name,status,workspace_id,starts_on,ends_on,updated_at,accent,description',
   );
   search.set('deleted_at', 'is.null');
   if (status !== 'any') search.set('status', `eq.${status}`);

@@ -34,6 +34,7 @@
   import Plaza from '$lib/components/Plaza.svelte';
   import PlazaRail from '$lib/components/PlazaRail.svelte';
   import LineList from '$lib/components/LineList.svelte';
+  import SettingsNav from '$lib/components/SettingsNav.svelte';
   import PresenceBadge from '$lib/components/PresenceBadge.svelte';
   import Pill from '$lib/components/Pill.svelte';
   import Menu from '$lib/components/Menu.svelte';
@@ -166,16 +167,110 @@
     }
   }
 
-  // Decode the user's email from the JWT payload. Phase 0: identity surfaces
-  // as the email since user_metadata has no display_name yet. When a profile
-  // entity exists (Phase 0.9+), swap this for the name.
+  // Vertical split between Plaza and LineList inside the sidebar body.
+  // Ratio is the fraction of the body height taken by the Plaza pane
+  // (0..1). `null` = default 50/50. Persisted across sessions.
+  const PANE_SPLIT_KEY = 'hour_pane_split';
+  let panePlazaRatio = $state<number | null>(null);
+  onMount(() => {
+    try {
+      const raw = localStorage.getItem(PANE_SPLIT_KEY);
+      if (raw) {
+        const n = Number(raw);
+        if (Number.isFinite(n) && n > 0 && n < 1) panePlazaRatio = n;
+      }
+    } catch {
+      // Storage disabled — start at default split.
+    }
+  });
+  let panePlazaStyle = $derived(
+    panePlazaRatio !== null
+      ? `flex: 0 0 ${(panePlazaRatio * 100).toFixed(2)}%;`
+      : undefined,
+  );
+
+  function startPaneResize(event: MouseEvent) {
+    event.preventDefault();
+    const divider = event.currentTarget as HTMLElement;
+    const body = divider.parentElement;
+    if (!body) return;
+
+    // Reference everything against the body's CONTENT box, not its
+    // border-box rect. Plaza's `flex: 0 0 X%` is interpreted relative
+    // to the flex container's content height, and the divider also
+    // takes a couple of pixels off the pane budget — both have to be
+    // accounted for or the Lines header gets clipped at the extreme.
+    const bodyRect = body.getBoundingClientRect();
+    const bodyStyles = getComputedStyle(body);
+    const padTop = parseFloat(bodyStyles.paddingBlockStart) || 0;
+    const padBottom = parseFloat(bodyStyles.paddingBlockEnd) || 0;
+    const contentTop = bodyRect.top + padTop;
+    const contentHeight = bodyRect.height - padTop - padBottom;
+    const dividerH = divider.getBoundingClientRect().height;
+
+    // Min/max determined by the actual rendered height of each sticky
+    // header — collapsing a pane just leaves its title visible, no
+    // hard-coded pixel floor. Measured once per drag (cheap; layout
+    // doesn't shift mid-drag).
+    const plazaHeader = body.querySelector('.plaza__header');
+    const linesHeader = body.querySelector('.line-list__header');
+    const plazaHeaderH = plazaHeader?.getBoundingClientRect().height ?? 0;
+    const linesHeaderH = linesHeader?.getBoundingClientRect().height ?? 0;
+    const minRatio = contentHeight > 0 ? plazaHeaderH / contentHeight : 0;
+    const maxRatio =
+      contentHeight > 0
+        ? 1 - (linesHeaderH + dividerH) / contentHeight
+        : 1;
+
+    const onMove = (e: MouseEvent) => {
+      const offset = e.clientY - contentTop;
+      const ratio = offset / contentHeight;
+      panePlazaRatio = Math.max(minRatio, Math.min(maxRatio, ratio));
+    };
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      if (panePlazaRatio !== null) {
+        try {
+          localStorage.setItem(PANE_SPLIT_KEY, String(panePlazaRatio));
+        } catch {
+          // ignore
+        }
+      }
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  }
+
+  function resetPaneSplit() {
+    panePlazaRatio = null;
+    try {
+      localStorage.removeItem(PANE_SPLIT_KEY);
+    } catch {
+      // ignore
+    }
+  }
+
+  // Decode identity from the JWT. Display name comes from Supabase
+  // user_metadata (set on signup/oauth/edit). Fallback chain:
+  // display_name → full_name → name → local-part of email. Email is
+  // kept as a secondary fallback if metadata is empty. When a profile
+  // entity ships (Phase 0.9+), swap for profile.display_name.
   let userEmail = $state('');
+  let userDisplayName = $state('');
   onMount(() => {
     const jwt = localStorage.getItem('hour_jwt');
     if (!jwt) return;
     try {
       const payload = JSON.parse(atob(jwt.split('.')[1]));
       userEmail = payload.email ?? '';
+      const meta = payload.user_metadata ?? {};
+      userDisplayName =
+        meta.display_name ??
+        meta.full_name ??
+        meta.name ??
+        userEmail.split('@')[0] ??
+        '';
     } catch { /* malformed jwt — leave empty */ }
   });
 
@@ -206,6 +301,38 @@
     { id: 'contacts', label: 'Contacts' },
     { id: 'money', label: 'Money' },
   ];
+
+  // Settings takes over the sidebar body: Plaza + LineList are replaced
+  // by SettingsNav while the user is inside /settings. Header (brand)
+  // and footer (avatar menu) stay put — settings is a "mode" of the
+  // same shell, not a separate page.
+  let inSettings = $derived(
+    /^\/h\/[^/]+\/settings(\b|\/|$)/.test(page.url.pathname),
+  );
+
+  // Do Not Disturb — quick toggle in the account menu. Persisted to
+  // localStorage so a muted state survives refresh. Phase 0 hook is
+  // visual-only (the bell flips); actual notification suppression wires
+  // up when the notification system ships. The detailed setup (digest,
+  // channels, quiet hours, per-event toggles) lives inside Settings →
+  // Notifications; this is the "30 seconds before going on stage" shortcut.
+  const DND_KEY = 'hour_dnd';
+  let dnd = $state(false);
+  onMount(() => {
+    try {
+      dnd = localStorage.getItem(DND_KEY) === '1';
+    } catch {
+      // Storage disabled — start unmuted.
+    }
+  });
+  function toggleDnd() {
+    dnd = !dnd;
+    try {
+      localStorage.setItem(DND_KEY, dnd ? '1' : '0');
+    } catch {
+      // ignore
+    }
+  }
 
   let breadcrumbDate = $derived.by(() => {
     const d = new Date();
@@ -246,48 +373,49 @@
       }}
     >
       {#snippet header()}
-        <div
-          class="workspace-shell__brand"
-          class:workspace-shell__brand--rail={sidebarCollapsed}
-        >
-          <BrandMark
-            size="m"
-            compact={sidebarCollapsed}
-            href={hasWorkspace ? `/h/${workspaceSlug}/` : '/h/'}
-          />
-        </div>
-        <button
-          type="button"
-          class="workspace-shell__toggle workspace-shell__toggle--in-sidebar"
-          onclick={toggleCollapsed}
-          aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-        >
-          <svg
-            viewBox="0 0 14 14"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.5"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            aria-hidden="true"
+        {#if sidebarCollapsed}
+          <button
+            type="button"
+            class="workspace-shell__brand-toggle"
+            onclick={toggleCollapsed}
+            aria-label="Expand sidebar"
+            title="Expand sidebar"
           >
-            {#if sidebarCollapsed}
-              <path d="M6 3 L10 7 L6 11" />
-              <path d="M2 3 L6 7 L2 11" />
-            {:else}
-              <path d="M8 3 L4 7 L8 11" />
-              <path d="M12 3 L8 7 L12 11" />
-            {/if}
-          </svg>
-        </button>
+            <BrandMark size="m" compact />
+          </button>
+        {:else}
+          <div class="workspace-shell__brand">
+            <BrandMark size="m" href="/h/" />
+          </div>
+        {/if}
       {/snippet}
       {#snippet children()}
         {#if sidebarCollapsed}
-          <PlazaRail />
+          <div class="workspace-shell__pane">
+            <PlazaRail />
+          </div>
+        {:else if inSettings}
+          <div class="workspace-shell__pane">
+            <SettingsNav />
+          </div>
         {:else}
-          <Plaza />
-          <LineList />
+          <div
+            class="workspace-shell__pane workspace-shell__pane--plaza"
+            style={panePlazaStyle}
+          >
+            <Plaza />
+          </div>
+          <button
+            type="button"
+            class="workspace-shell__pane-divider"
+            aria-label="Resize panes"
+            title="Drag to resize · double-click to reset"
+            onmousedown={startPaneResize}
+            ondblclick={resetPaneSplit}
+          ></button>
+          <div class="workspace-shell__pane workspace-shell__pane--lines">
+            <LineList />
+          </div>
         {/if}
       {/snippet}
       {#snippet footer()}
@@ -301,23 +429,86 @@
           {#snippet trigger()}
             <Avatar
               size="xs"
-              name={userEmail || workspaceSlug}
-              accentSlug={userEmail || workspaceSlug}
+              name={userDisplayName || userEmail || workspaceSlug}
             />
-            <span class="workspace-shell__user-id">{userEmail}</span>
+            <span class="workspace-shell__user-id"
+              >{userDisplayName || userEmail}</span
+            >
+            <span class="workspace-shell__user-kebab" aria-hidden="true">
+              <svg
+                viewBox="0 0 16 16"
+                width="14"
+                height="14"
+                fill="currentColor"
+                aria-hidden="true"
+              >
+                <circle cx="3.5" cy="8" r="1.2" />
+                <circle cx="8" cy="8" r="1.2" />
+                <circle cx="12.5" cy="8" r="1.2" />
+              </svg>
+            </span>
           {/snippet}
           {#snippet children({ close })}
             {#if hasWorkspace}
               <li role="none">
                 <a
                   role="menuitem"
-                  href={`/h/${workspaceSlug}/settings`}
+                  href={inSettings
+                    ? `/h/${workspaceSlug}/`
+                    : `/h/${workspaceSlug}/settings`}
                   class="menu__item"
                   tabindex="0"
                   onclick={() => close(false)}
                 >
-                  Settings
+                  {inSettings ? 'Dashboard' : 'All settings'}
                 </a>
+              </li>
+              <li role="none" class="settings-row">
+                <a
+                  role="menuitem"
+                  href={`/h/${workspaceSlug}/settings?section=notifications`}
+                  class="menu__item settings-row__link"
+                  tabindex="0"
+                  onclick={() => close(false)}
+                >
+                  Notifications
+                </a>
+                <button
+                  type="button"
+                  class="settings-row__action settings-row__action--toggle"
+                  class:is-muted={dnd}
+                  aria-label={dnd
+                    ? 'Notifications muted — click to unmute'
+                    : 'Notifications on — click to mute'}
+                  aria-pressed={dnd}
+                  title={dnd ? 'Muted' : 'On — click to mute'}
+                  onclick={toggleDnd}
+                >
+                  <svg
+                    viewBox="0 0 16 16"
+                    width="14"
+                    height="14"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.4"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    aria-hidden="true"
+                  >
+                    <!-- bell body -->
+                    <path d="M4 11 C 4 9.8 4.5 9.3 4.5 8 C 4.5 5.8 6 4 8 4 C 10 4 11.5 5.8 11.5 8 C 11.5 9.3 12 9.8 12 11 Z" />
+                    <!-- rim -->
+                    <path d="M3.5 11 H 12.5" />
+                    <!-- clapper -->
+                    <path d="M7 13 C 7.2 13.6 7.5 14 8 14 C 8.5 14 8.8 13.6 9 13" />
+                    <!-- top -->
+                    <path d="M8 2.5 V 4" />
+                    {#if dnd}
+                      <!-- mute slash -->
+                      <path d="M2.5 2.5 L 13.5 13.5" />
+                    {/if}
+                  </svg>
+                </button>
               </li>
             {/if}
             <li role="none" class="theme-accordion">
@@ -360,22 +551,33 @@
                 </ul>
               {/if}
             </li>
-            <li role="none">
-              <button
-                role="menuitem"
-                type="button"
-                class="menu__item menu__item--danger"
-                tabindex="0"
-                onclick={() => {
-                  logout();
-                  close(false);
-                }}
-              >
-                Sign out
-              </button>
-            </li>
           {/snippet}
         </Menu>
+        <button
+          type="button"
+          class="workspace-shell__user-logout"
+          aria-label="Sign out"
+          title="Sign out"
+          onclick={logout}
+        >
+          <svg
+            viewBox="0 0 16 16"
+            width="14"
+            height="14"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.4"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <!-- door frame on the left -->
+            <path d="M9 2 H4 a1 1 0 0 0 -1 1 V13 a1 1 0 0 0 1 1 H9" />
+            <!-- arrow exiting to the right -->
+            <path d="M7 8 H14" />
+            <path d="M11 5 L14 8 L11 11" />
+          </svg>
+        </button>
       {/snippet}
     </Sidebar>
 
@@ -457,19 +659,14 @@
   }
 
   /* Sidebar skeleton + width token live in base.css. We just paint the
-     background and the inline-end border to match the shell palette. */
+     background and the inline-end border to match the shell palette.
+     Stacked above the topbar so the resize handle, which extends 2px
+     beyond the sidebar edge, isn't obscured by the topbar's sticky
+     layer — that overlap was the cause of the apparent double line. */
   .workspace-shell :global(.sidebar) {
     background: var(--bg);
     border-inline-end: 1px solid var(--border-color-dark);
-  }
-
-  /* Drop the sidebar's own border while the resize handle is hovered or
-     being dragged — its colour sits in the same hue family as --primary
-     (used by the handle) and otherwise reads as a faint parallel line
-     next to the handle's 4px primary fill. */
-  .workspace-shell :global(.sidebar:has(.sidebar__resizer:hover)),
-  .workspace-shell :global(.sidebar--dragging) {
-    border-inline-end-color: transparent;
+    z-index: calc(var(--z-sticky) + 1);
   }
 
   /* Desktop: width truly fixed (flex item won't grow OR shrink with
@@ -495,16 +692,39 @@
     justify-content: space-between;
   }
 
-  /* Rail mode adjustments — narrower padding, stack header + footer
-     contents vertically, hide the email next to the user avatar. The
-     account dropdown trigger remains an avatar-only button (the menu
-     itself keeps its full content width via .menu's min-inline-size). */
+  /* Rail mode adjustments — narrower padding, hide the email next to the
+     user avatar. The account dropdown trigger remains an avatar-only
+     button (the menu itself keeps its full content width via .menu's
+     min-inline-size). Header is a single element (the brand doubles as
+     the expand control), so it stays a centred row, not a stack. */
   .workspace-shell :global(.sidebar--collapsed .sidebar__header) {
-    flex-direction: column;
-    gap: var(--space-xs);
     padding-inline: var(--space-xs);
     align-items: center;
     justify-content: center;
+  }
+
+  /* Square hit + hover area for the brand-as-toggle (collapsed mode).
+     A single italic "h" at text-xl + padding-xs is naturally taller
+     than wide; locking both axes to the same computed value keeps the
+     hover surface visibly square. Click expands the sidebar — the
+     tooltip + cursor carry the affordance, no extra icon needed. */
+  .workspace-shell__brand-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    inline-size: calc(var(--text-xl) + 2 * var(--space-xs));
+    block-size: calc(var(--text-xl) + 2 * var(--space-xs));
+    padding: 0;
+    background: transparent;
+    border: 0;
+    border-radius: var(--radius);
+    cursor: pointer;
+    color: inherit;
+    transition: background var(--transition);
+  }
+
+  .workspace-shell__brand-toggle:hover {
+    background: var(--bg-hover);
   }
 
   .workspace-shell :global(.sidebar--collapsed .sidebar__body) {
@@ -540,11 +760,91 @@
 
   .workspace-shell :global(.sidebar__body) {
     padding-block: var(--space-s);
-    padding-inline: var(--space-s);
-    gap: var(--space-s);
+    /* No inline padding on the body itself — every meaningful child
+       inside (eyebrows, rows, LineList headers) already owns its
+       padding-inline, so the body adding more on top just stacks
+       indent. The divider is full-bleed for free now. */
+    padding-inline: 0;
+    /* When the body hosts two panes (Plaza + Lines), let each one own
+       its scroll instead of scrolling the whole body. The divider lives
+       between them as a row-resize handle; no body gap so the divider
+       is the only line. min-block-size: 0 on the panes allows them to
+       shrink below their content. */
+    gap: 0;
+    overflow: hidden;
+    min-block-size: 0;
+  }
+
+  .workspace-shell__pane {
+    flex: 1 1 50%;
+    min-block-size: 0;
+    overflow-y: auto;
+  }
+
+  /* LineList renders its own top divider + spacing for the standalone
+     case. Inside the sidebar shell the pane-divider above already owns
+     that line, AND the sticky header has its own padding-block. Strip
+     all the wrapper's top spacing — otherwise the header gets pushed
+     down off the pane's top: 0 anchor and is clipped at the pane's
+     bottom edge when the pane is collapsed. */
+  .workspace-shell__pane--lines :global(.line-list) {
+    margin-block-start: 0;
+    padding-block-start: 0;
+    border-block-start: 0;
+  }
+
+  /* Pane headers stay pinned to the top of their pane while content
+     below scrolls. The sticky must live on the header WRAPPER, not on
+     the eyebrow inside it: position: sticky is constrained within the
+     element's direct parent, so a sticky eyebrow inside a tiny
+     plaza__header parent would unstick almost immediately. The header
+     wrapper's parent is the full-height plaza nav (or line-list), so
+     it has the room it needs to actually stay pinned. */
+  .workspace-shell__pane :global(.plaza__header),
+  .workspace-shell__pane :global(.line-list__header) {
+    position: sticky;
+    inset-block-start: 0;
+    background: var(--bg);
+    padding-block: var(--space-xs);
+    z-index: 1;
+  }
+
+  /* Row between the two panes, draggable to redistribute their heights.
+     Spans edge-to-edge naturally now that the body has no inline padding.
+     Slightly thicker than a 1px hairline to register as an intentional
+     divider. Hit area is widened via ::after so the user doesn't have
+     to land on the literal strip. Same visual language as the
+     inline-end resize handle: subtle by default, primary on hover/drag. */
+  .workspace-shell__pane-divider {
+    position: relative;
+    block-size: 2px;
+    background: var(--border-color-light);
+    border: 0;
+    padding: 0;
+    cursor: row-resize;
+    flex-shrink: 0;
+    transition: background var(--transition);
+  }
+
+  .workspace-shell__pane-divider::after {
+    content: "";
+    position: absolute;
+    inset-inline: 0;
+    inset-block: -3px;
+  }
+
+  .workspace-shell__pane-divider:hover,
+  .workspace-shell__pane-divider:active {
+    background: var(--primary);
+  }
+
+  .workspace-shell__pane-divider:focus,
+  .workspace-shell__pane-divider:focus-visible {
+    outline: none;
   }
 
   .workspace-shell :global(.sidebar__footer) {
+    position: relative;
     padding-block: var(--space-s);
     padding-inline: var(--space-m);
     border-block-start: 1px solid var(--border-color-light);
@@ -593,8 +893,13 @@
     min-inline-size: 0;
   }
 
+  /* Trigger bg-hover also stays painted when the cursor is on the
+     footer (i.e. over the sign-out button), because the logout is a
+     sibling DOM node — hovering it wouldn't otherwise activate the
+     trigger's :hover. Keeps the bg continuous behind the overlaid icon. */
   .workspace-shell :global(.workspace-shell__user:hover),
-  .workspace-shell :global(.workspace-shell__user[aria-expanded='true']) {
+  .workspace-shell :global(.workspace-shell__user[aria-expanded='true']),
+  .workspace-shell :global(.sidebar__footer:hover .workspace-shell__user) {
     background: var(--bg-hover);
   }
 
@@ -605,7 +910,89 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     min-inline-size: 0;
-    max-inline-size: 16rem;
+    /* No max-inline-size — let the name use every pixel of the footer
+       so it reads in full. The sign-out icon overlaps on hover (absolute
+       positioning, see .workspace-shell__user-logout) instead of taking
+       its own column. */
+  }
+
+  /* Kebab indicator at the trailing edge of the trigger. Always visible
+     so the row reads as clickable — communicates "menu lives here".
+     Faint by default; on hover/open of the trigger, slightly stronger.
+     The logout chip (absolute, hover-only, see .workspace-shell__user-logout)
+     paints its bg-surface over the kebab when it appears — intentional
+     overlap so we get two affordances in the same trailing slot without
+     reserving a column. */
+  .workspace-shell__user-kebab {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-inline-start: auto;
+    color: var(--text-faint);
+    transition: color var(--transition);
+  }
+  .workspace-shell :global(.workspace-shell__user:hover)
+    .workspace-shell__user-kebab,
+  .workspace-shell
+    :global(.workspace-shell__user[aria-expanded='true'])
+    .workspace-shell__user-kebab {
+    color: var(--text-muted);
+  }
+  /* Rail mode: only the avatar shows; kebab + email both hide. */
+  .workspace-shell :global(.sidebar--collapsed) .workspace-shell__user-kebab {
+    display: none;
+  }
+
+  /* Sign-out lives at sidebar-footer level, sibling of the Menu trigger.
+     It belongs to your session/identity, not to the Settings dropdown
+     where it sat before. Positioned absolute over the trigger's right
+     edge so it doesn't reserve a column — the email reads full-width by
+     default. On hover (footer) or focus (keyboard), it fades in.
+     Background is the surface base — sits INSIDE the trigger's bg-hover
+     paint (extended via :hover above) and reads as its own clickable
+     chip (a "hole" in the hover surface), not as an icon floating over
+     the email tail. On its own hover, the chip paints danger. */
+  .workspace-shell__user-logout {
+    position: absolute;
+    inset-block-start: 50%;
+    /* footer padding-inline (var(--space-m)) places the trigger's right
+       edge; add a small visual gutter so the icon respires inside it. */
+    inset-inline-end: calc(var(--space-m) + var(--space-xs));
+    transform: translateY(-50%);
+    inline-size: 24px;
+    block-size: 24px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg);
+    border: 0;
+    border-radius: var(--radius-s);
+    color: var(--text-faint);
+    cursor: pointer;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--transition), background var(--transition),
+      color var(--transition);
+  }
+  :global(.sidebar__footer:hover) .workspace-shell__user-logout,
+  .workspace-shell__user-logout:focus-visible {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .workspace-shell__user-logout:hover {
+    background: var(--danger-ultra-light);
+    color: var(--danger);
+  }
+  .workspace-shell__user-logout:focus-visible {
+    outline: var(--focus-width) solid var(--focus-color);
+    outline-offset: -1px;
+  }
+  /* Rail mode hides the logout entirely — the footer is just an avatar
+     and the menu still exposes it on demand. Revisit if sign-out becomes
+     a daily action while collapsed. */
+  :global(.sidebar--collapsed) .workspace-shell__user-logout {
+    display: none;
   }
 
   /* Theme accordion inside the account menu. Two orthogonal controls:
@@ -619,26 +1006,74 @@
     gap: 1px;
   }
 
-  /* Hover/active background lives on the row (header), not on the expand
-     button alone — so the toggle is included in the highlighted area.
-     Matches the full-width hover behaviour of the other menu items. */
+  /* Settings row = link/control + icon-action button side by side.
+     Same composition as .theme-accordion__header (label + ThemeToggle).
+     Each side owns its own hover so they don't double-highlight.
+     align-items: flex-start anchors the action to the TOP of the row,
+     so the icon column stays on the same baseline whether the row is
+     single-line (Notifications) or multi-line (Theme style ‧ Editorial
+     Sober ›). Centring would drift the icon downward as rows grow. */
+  :global(.settings-row) {
+    display: flex;
+    align-items: flex-start;
+    gap: 1px;
+  }
+  :global(.settings-row__link) {
+    flex: 1;
+  }
+
+  /* Single skeleton for every icon-action sitting at the row's right
+     edge — logout, DND bell, and (via matching --toggle-size) the
+     ThemeToggle. Square 32×32 means each icon's centre lands at the
+     same x/y across rows, so they read as one column.
+     Modifiers redeclare variables only (philosophy.md). */
+  :global(.settings-row__action) {
+    --action-color: var(--text-faint);
+    --action-color-hover: var(--text-color);
+    --action-bg-hover: var(--bg-ultra-light);
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    inline-size: 32px;
+    block-size: 32px;
+    background: transparent;
+    border: 0;
+    border-radius: var(--radius-s);
+    color: var(--action-color);
+    cursor: pointer;
+    transition: background var(--transition), color var(--transition);
+  }
+  :global(.settings-row__action:hover) {
+    background: var(--action-bg-hover);
+    color: var(--action-color-hover);
+  }
+  :global(.settings-row__action:focus-visible) {
+    outline: var(--focus-width) solid var(--focus-color);
+    outline-offset: -1px;
+  }
+
+  /* Stateful toggle — DND bell. ON paints in ink, muted dims to faint
+     (the SVG also draws a slash for unmistakable read). Hover stays
+     neutral; muting isn't destructive. */
+  :global(.settings-row__action--toggle) {
+    --action-color: var(--text-color);
+  }
+  :global(.settings-row__action--toggle.is-muted) {
+    --action-color: var(--text-faint);
+  }
+
+  /* Mirrors .settings-row exactly — same composition, same alignment.
+     flex-start anchors ThemeToggle to the row's TOP so it sits on the
+     same baseline as the bell / logout in sibling single-line rows.
+     The "Editorial Sober ›" line falls below; the toggle reads as
+     "action of the row" not "anchored to the centre of a 2-line stack". */
   :global(.theme-accordion__header) {
     display: flex;
-    align-items: center;
-    gap: var(--space-xs);
-    padding-inline-end: var(--space-xs);
-    border-radius: var(--radius-s);
-    transition: background var(--transition);
+    align-items: flex-start;
+    gap: 1px;
   }
 
-  :global(.theme-accordion__header):hover,
-  :global(.theme-accordion__header):has(.theme-accordion__expand[aria-expanded='true']) {
-    background: var(--bg-ultra-light);
-  }
-
-  /* Expand button stacks label (line 1) over the current style + chevron
-     (line 2). The ThemeToggle to its right stays vertically centered
-     against the two-line stack. */
   :global(.theme-accordion__expand) {
     flex: 1;
     display: flex;
@@ -656,6 +1091,14 @@
     cursor: pointer;
     transition: background var(--transition);
     min-inline-size: 0;
+  }
+  :global(.theme-accordion__expand:hover),
+  :global(.theme-accordion__expand[aria-expanded='true']) {
+    background: var(--bg-ultra-light);
+  }
+  :global(.theme-accordion__expand:focus-visible) {
+    outline: var(--focus-width) solid var(--focus-color);
+    outline-offset: -1px;
   }
 
 
@@ -754,18 +1197,28 @@
     background: var(--bg);
   }
 
-  /* Borderless icon button — just the chevron. Hit area comes from the
-     SVG size + padding, color shifts on hover; no box, no background. */
+  /* Square chevron button using the same logic as the brand-toggle:
+     content size + 2 * space-xs. Content here is text-s (the chevron
+     svg), so the resulting square is smaller than the brand-toggle's
+     square (which wraps a text-xl "h") — keeps each button optically
+     aligned with whatever it contains. Idle: subtle (faint + 0.5
+     opacity, no box). Hover: full opacity + bg-hover. */
   .workspace-shell__toggle {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    padding: var(--space-xs);
+    inline-size: calc(var(--text-s) + 2 * var(--space-xs));
+    block-size: calc(var(--text-s) + 2 * var(--space-xs));
+    padding: 0;
     background: transparent;
     border: 0;
-    color: var(--text-muted);
+    border-radius: var(--radius);
+    color: var(--text-faint);
+    opacity: 0.5;
     cursor: pointer;
-    transition: color var(--transition);
+    transition:
+      opacity var(--transition), color var(--transition),
+      background var(--transition);
   }
 
   .workspace-shell__toggle svg {
@@ -774,7 +1227,9 @@
   }
 
   .workspace-shell__toggle:hover {
-    color: var(--text-color);
+    color: var(--text-muted);
+    opacity: 1;
+    background: var(--bg-hover);
   }
 
   .workspace-shell__lenses {

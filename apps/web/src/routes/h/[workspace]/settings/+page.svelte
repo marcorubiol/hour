@@ -19,7 +19,7 @@
   import { createQuery } from '@tanstack/svelte-query';
   import { accentVar } from '$lib/utils/accent';
   import { decodeJwtClaim } from '$lib/realtime';
-  import type { SectionId } from '$lib/components/SettingsNav.svelte';
+  import { type SectionId } from '$lib/components/SettingsNav.svelte';
   import {
     isMasterViewEnabled,
     getMasterViewPath,
@@ -174,91 +174,65 @@
   <title>Settings — Hour</title>
 </svelte:head>
 
-<div class="set">
-  <aside class="set-plaza">
-    <div class="set-plaza__top">
-      <BrandMark size="m" href={`/h/${workspaceSlug}/`} />
+<article class="set-page">
+  {#if active === 'profile'}
+    <header class="set-mast">
+      <p class="set-mast__kicker">Account</p>
+      <h1 class="set-mast__title"><em>Profile</em></h1>
+      <p class="set-mast__sub">
+        The basics. Used across your projects and on press kits.
+      </p>
+    </header>
 
-
-      <a class="set-back" href={`/h/${workspaceSlug}/`}>
-        <span class="set-back__arrow" aria-hidden="true">‹</span>
-        <span>back to dashboard</span>
-      </a>
-
-      <div class="set-plaza__label">Settings</div>
-
-      <nav class="set-nav">
-        {#each SECTIONS as s (s.id)}
-          <button
-            type="button"
-            class={[
-              'set-nav__item',
-              active === s.id && 'is-active',
-              s.danger && 'is-danger',
-            ]
-              .filter(Boolean)
-              .join(' ')}
-            onclick={() => (active = s.id)}
-          >
-            <span class="set-nav__glyph" aria-hidden="true">{s.glyph}</span>
-            <span class="set-nav__label">{s.label}</span>
-          </button>
-        {/each}
-      </nav>
-    </div>
-
-    <div class="set-plaza__foot">
-      <div class="set-me-av" style={`background: ${accentVar(workspaceSlug)}`}>
-        {initials}
-      </div>
-      <div class="set-plaza__foot-id">
-        <div class="set-me-name">{userName}</div>
-        <div class="set-me-email">{userEmail || '—'}</div>
-      </div>
-    </div>
-  </aside>
-
-  <main class="set-main">
-    <article class="set-page">
-      {#if active === 'profile'}
-        <header class="set-mast">
-          <p class="set-mast__kicker">Account</p>
-          <h1 class="set-mast__title"><em>Profile</em></h1>
-          <p class="set-mast__sub">
-            The basics. Used across your projects and on press kits.
-          </p>
-        </header>
-
-        <section class="set-group">
-          <div class="set-group__body">
-            <div class="set-row">
-              <div class="set-row__lead">
-                <div class="set-row__label">Full name</div>
-                <div class="set-row__hint">Used on invoices and contracts.</div>
-              </div>
-              <div class="set-row__ctrl">
-                <input type="text" bind:value={userName} />
-              </div>
-            </div>
-
-            <div class="set-row">
-              <div class="set-row__lead">
-                <div class="set-row__label">Email</div>
-                <div class="set-row__hint">Sign-in and project invitations.</div>
-              </div>
-              <div class="set-row__ctrl">
-                <input type="email" bind:value={userEmail} readonly />
-              </div>
+    <section class="set-group">
+      <div class="set-group__body">
+        <div class="set-row">
+          <div class="set-row__lead">
+            <div class="set-row__label">Avatar</div>
+            <div class="set-row__hint">A monogram for now. Drop an image later.</div>
+          </div>
+          <div class="set-row__ctrl">
+            <div class="set-avatar-pick">
+              <span
+                class="set-avatar-pick__big"
+                style={`background: ${accentVar(workspaceSlug)}`}
+              >
+                {initials}
+              </span>
+              <button type="button" class="btn--primary btn--s">Upload image</button>
+              <span class="set-row__hint">PNG, square, ≥ 256px</span>
             </div>
           </div>
-        </section>
+        </div>
 
-        <!-- LOCATION & TIMEZONE group killed: timezone derives from
-             browser automatically, week-starts-on default to Monday is
-             fine for Phase 0, location adds nothing operational.
-             Pronouns and Display name killed too (Phase 0 reality:
-             solo Marco; pronouns opens a debate we don't need to host). -->
-      {/if}
+        <div class="set-row">
+          <div class="set-row__lead">
+            <div class="set-row__label">Full name</div>
+            <div class="set-row__hint">Used on invoices and contracts.</div>
+          </div>
+          <div class="set-row__ctrl">
+            <input type="text" bind:value={userName} />
+          </div>
+        </div>
+
+        <div class="set-row">
+          <div class="set-row__lead">
+            <div class="set-row__label">Email</div>
+            <div class="set-row__hint">Sign-in and project invitations.</div>
+          </div>
+          <div class="set-row__ctrl">
+            <input type="email" bind:value={userEmail} readonly />
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- LOCATION & TIMEZONE group killed: timezone derives from
+         browser automatically, week-starts-on default to Monday is
+         fine for Phase 0, location adds nothing operational.
+         Pronouns and Display name killed too (Phase 0 reality:
+         solo Marco; pronouns opens a debate we don't need to host). -->
+  {/if}
 
       {#if active === 'workspaces'}
         <header class="set-mast">
@@ -896,194 +870,39 @@
             </div>
           </div>
         </section>
-      {/if}
-    </article>
-  </main>
-</div>
+  {/if}
+</article>
 
 <style>
-  .set {
-    --sidebar-w: 264px;
+  /* The page is rendered inside .workspace-shell__content (which already
+     paints background + outer padding). We just need a centred article
+     with a sensible reading measure and an avatar-pick row composer. */
+  .set-page {
     --set-pad: clamp(16px, 1.6vw, 24px);
 
-    display: grid;
-    grid-template-columns: var(--sidebar-w) 1fr;
-    block-size: 100dvh;
-    overflow: hidden;
-    background: var(--bg);
+    max-inline-size: 920px;
+    margin-inline: auto;
     color: var(--text-color);
     font-family: var(--font-sans);
   }
 
-  @media (max-width: 47.999rem) {
-    .set {
-      grid-template-columns: 1fr;
-      grid-template-rows: auto 1fr;
-    }
-    .set-plaza {
-      border-inline-end: 0;
-      border-block-end: 1px solid var(--border-color-light);
-    }
-    .set-plaza__top {
-      max-block-size: 220px;
-    }
-  }
-
-  .set-plaza {
-    display: flex;
-    flex-direction: column;
-    border-inline-end: 1px solid var(--border-color-light);
-    background: var(--bg-light);
-    min-block-size: 0;
-    overflow: hidden;
-  }
-  .set-plaza__top {
-    padding: var(--set-pad);
-    flex: 1 1 auto;
-    display: flex;
-    flex-direction: column;
-    min-block-size: 0;
-    overflow-y: auto;
-  }
-
-  .set-back {
+  .set-avatar-pick {
     display: inline-flex;
     align-items: center;
-    gap: var(--space-xs);
-    color: var(--text-faint);
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    text-decoration: none;
-    padding-block: var(--space-xs);
-    margin-block-end: var(--set-pad);
-    transition: color var(--transition);
+    gap: var(--space-m);
+    flex-wrap: wrap;
   }
-  .set-back:hover {
-    color: var(--text-color);
-  }
-  .set-back__arrow {
-    font-size: var(--text-s);
-    line-height: 1;
-  }
-
-  .set-plaza__label {
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    font-weight: 500;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: var(--text-faint);
-    margin-block-end: var(--space-s);
-    padding-inline-start: 2px;
-  }
-
-  .set-nav {
-    display: flex;
-    flex-direction: column;
-    gap: 1px;
-  }
-  .set-nav__item {
-    appearance: none;
-    background: transparent;
-    border: 0;
-    text-align: start;
-    display: grid;
-    grid-template-columns: 18px 1fr;
-    gap: var(--space-s);
-    align-items: center;
-    padding-block: var(--space-s);
-    padding-inline: var(--space-s);
-    border-radius: var(--radius-s);
-    cursor: pointer;
-    font: inherit;
-    font-size: var(--text-s);
-    color: var(--text-muted);
-    transition: background var(--transition), color var(--transition);
-  }
-  .set-nav__item:hover {
-    background: var(--bg-hover);
-    color: var(--text-color);
-  }
-  .set-nav__item.is-active {
-    background: var(--bg-active);
-    color: var(--text-color);
-    box-shadow: inset 2px 0 0 var(--text-color);
-    font-weight: 500;
-  }
-  .set-nav__item.is-danger {
-    color: var(--danger);
-  }
-  .set-nav__item.is-danger.is-active {
-    background: oklch(96% 0.03 25);
-    box-shadow: inset 2px 0 0 var(--danger);
-  }
-  .set-nav__glyph {
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    color: var(--text-faint);
-    text-align: center;
-  }
-  .set-nav__item.is-active .set-nav__glyph {
-    color: var(--text-color);
-  }
-  .set-nav__item.is-danger .set-nav__glyph {
-    color: var(--danger);
-  }
-
-  .set-plaza__foot {
-    display: flex;
-    align-items: center;
-    gap: var(--space-s);
-    padding: var(--set-pad);
-    border-block-start: 1px solid var(--border-color-light);
-    flex: none;
-  }
-  .set-me-av {
-    inline-size: 28px;
-    block-size: 28px;
+  .set-avatar-pick__big {
+    inline-size: 56px;
+    block-size: 56px;
     border-radius: 50%;
     color: var(--bg);
     display: grid;
     place-items: center;
-    font-size: var(--text-xs);
+    font-family: var(--font-mono);
+    font-size: var(--text-l);
     font-weight: 600;
     flex: none;
-    font-family: var(--font-mono);
-  }
-  .set-plaza__foot-id {
-    min-inline-size: 0;
-  }
-  .set-me-name {
-    font-size: var(--text-s);
-    color: var(--text-color);
-    font-weight: 500;
-  }
-  .set-me-email {
-    font-size: var(--text-xs);
-    color: var(--text-faint);
-    font-family: var(--font-mono);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .set-main {
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    min-inline-size: 0;
-  }
-  .set-page {
-    flex: 1;
-    overflow-y: auto;
-    padding-block-start: var(--set-pad);
-    padding-block-end: var(--section-space-xl);
-    padding-inline: calc(var(--set-pad) * 1.5);
-    max-inline-size: 920px;
-    inline-size: 100%;
-    margin-inline: auto;
   }
 
   .set-mast {

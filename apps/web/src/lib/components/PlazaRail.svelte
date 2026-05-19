@@ -20,7 +20,7 @@
   import { page } from '$app/state';
   import { goto } from '$app/navigation';
   import { createQuery } from '@tanstack/svelte-query';
-  import { accentVar } from '$lib/utils/accent';
+  import { accentVarFor } from '$lib/utils/accent';
   import Avatar from './Avatar.svelte';
 
   type Workspace = {
@@ -28,6 +28,7 @@
     slug: string;
     name: string;
     kind: 'personal' | 'team';
+    accent?: string | null;
   };
 
   async function fetchWorkspaces(signal: AbortSignal): Promise<{ items: Workspace[] }> {
@@ -71,7 +72,7 @@
             title={workspace.name}
             aria-label={workspace.name}
             aria-current={isActive ? 'page' : undefined}
-            style={`--c: ${accentVar(workspace.slug)}`}
+            style={`--c: ${accentVarFor(workspace)}`}
           >
             <span class="plaza-rail__rail" aria-hidden="true"></span>
             <Avatar size="s" name={workspace.name} accentSlug={workspace.slug} />

@@ -63,13 +63,69 @@ export class SelectionStore {
     if (this.contextWorkspaceSlug !== slug) this.contextWorkspaceSlug = slug;
   }
 
+  /**
+   * Focus mode: a transient client-only view that pins the LineList filter
+   * to a single workspace, regardless of what's in `workspaces`/`projects`.
+   * Plaza also collapses its tree to just the focused workspace's row.
+   *
+   * Crucially, focus does NOT mutate the underlying selection sets and does
+   * NOT change the URL — when the user exits focus, the prior selection
+   * surfaces unchanged. Per Marco: "el focus es realmente en ese momento".
+   */
+  focusedWorkspaceSlug = $state<string | null>(null);
+
+  setFocus(slug: string | null): void {
+    if (this.focusedWorkspaceSlug !== slug) this.focusedWorkspaceSlug = slug;
+  }
+
+  /**
+   * What LineList should use as the workspace-level filter. Focus wins:
+   * when active, returns ONLY the focused slug; otherwise the real
+   * `workspaces` set. Projects-level filter is suppressed during focus
+   * (see effectiveProjects).
+   */
+  effectiveWorkspaces(): Set<string> {
+    if (this.focusedWorkspaceSlug !== null) {
+      return new Set([this.focusedWorkspaceSlug]);
+    }
+    return this.workspaces;
+  }
+
+  /**
+   * Projects filter during focus: empty (focus is a workspace-only scope).
+   * Outside focus: the real `projects` set.
+   */
+  effectiveProjects(): Set<string> {
+    if (this.focusedWorkspaceSlug !== null) return new Set();
+    return this.projects;
+  }
+
   // ── Mutations ─────────────────────────────────────────────────────────
 
+  /**
+   * Toggle a workspace AND cascade to all its known projects: selecting a
+   * workspace auto-selects all its projects, deselecting auto-deselects.
+   * Project→workspace mapping comes from `projectWorkspaceMap` (populated
+   * by Plaza via registerProjectWorkspaces when the projects query lands).
+   * If the map is incomplete (e.g., user clicks before data loads), only
+   * the workspace toggles — known projects cascade as they become known.
+   */
   toggleWorkspace(slug: string): void {
-    const next = new Set(this.workspaces);
-    if (next.has(slug)) next.delete(slug);
-    else next.add(slug);
-    this.workspaces = next;
+    const nextWs = new Set(this.workspaces);
+    const nextProjs = new Set(this.projects);
+    const isAdding = !nextWs.has(slug);
+
+    if (isAdding) nextWs.add(slug);
+    else nextWs.delete(slug);
+
+    for (const [projSlug, wsSlug] of this.projectWorkspaceMap) {
+      if (wsSlug !== slug) continue;
+      if (isAdding) nextProjs.add(projSlug);
+      else nextProjs.delete(projSlug);
+    }
+
+    this.workspaces = nextWs;
+    this.projects = nextProjs;
     this.navigate();
   }
 
@@ -131,12 +187,24 @@ export class SelectionStore {
     return this.serialize(this.workspaces, this.projects, this.projectWorkspaceMap);
   }
 
-  /** Preview URL if a workspace toggle were applied — useful for href= on links. */
+  /** Preview URL if a workspace toggle were applied — useful for href= on
+      links. Mirrors toggleWorkspace's cascade: projects of the toggled
+      workspace add/remove with it. */
   previewUrlAfterToggleWorkspace(slug: string): string {
-    const next = new Set(this.workspaces);
-    if (next.has(slug)) next.delete(slug);
-    else next.add(slug);
-    return this.serialize(next, this.projects, this.projectWorkspaceMap);
+    const nextWs = new Set(this.workspaces);
+    const nextProjs = new Set(this.projects);
+    const isAdding = !nextWs.has(slug);
+
+    if (isAdding) nextWs.add(slug);
+    else nextWs.delete(slug);
+
+    for (const [projSlug, wsSlug] of this.projectWorkspaceMap) {
+      if (wsSlug !== slug) continue;
+      if (isAdding) nextProjs.add(projSlug);
+      else nextProjs.delete(projSlug);
+    }
+
+    return this.serialize(nextWs, nextProjs, this.projectWorkspaceMap);
   }
 
   /** Preview URL if a project toggle were applied. */
