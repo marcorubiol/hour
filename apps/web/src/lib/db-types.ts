@@ -109,7 +109,7 @@ export type Database = {
           previous_slugs: string[]
           project_id: string | null
           line_id: string | null
-          show_id: string | null
+          performance_id: string | null
           slug: string | null
           updated_at: string
           uploaded_at: string
@@ -128,7 +128,7 @@ export type Database = {
           previous_slugs?: string[]
           project_id?: string | null
           line_id?: string | null
-          show_id?: string | null
+          performance_id?: string | null
           slug?: string | null
           updated_at?: string
           uploaded_at?: string
@@ -147,7 +147,7 @@ export type Database = {
           previous_slugs?: string[]
           project_id?: string | null
           line_id?: string | null
-          show_id?: string | null
+          performance_id?: string | null
           slug?: string | null
           updated_at?: string
           uploaded_at?: string
@@ -178,17 +178,17 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "asset_version_show_id_fkey"
-            columns: ["show_id"]
+            foreignKeyName: "asset_version_performance_id_fkey"
+            columns: ["performance_id"]
             isOneToOne: false
-            referencedRelation: "show"
+            referencedRelation: "performance"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "asset_version_show_id_fkey"
-            columns: ["show_id"]
+            foreignKeyName: "asset_version_performance_id_fkey"
+            columns: ["performance_id"]
             isOneToOne: false
-            referencedRelation: "show_redacted"
+            referencedRelation: "performance_redacted"
             referencedColumns: ["id"]
           },
           {
@@ -251,7 +251,7 @@ export type Database = {
           reason: string | null
           replaces_person_id: string | null
           role: string
-          show_id: string
+          performance_id: string
           updated_at: string
           workspace_id: string
         }
@@ -264,7 +264,7 @@ export type Database = {
           reason?: string | null
           replaces_person_id?: string | null
           role: string
-          show_id: string
+          performance_id: string
           updated_at?: string
           workspace_id: string
         }
@@ -277,7 +277,7 @@ export type Database = {
           reason?: string | null
           replaces_person_id?: string | null
           role?: string
-          show_id?: string
+          performance_id?: string
           updated_at?: string
           workspace_id?: string
         }
@@ -297,17 +297,17 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "cast_override_show_id_fkey"
-            columns: ["show_id"]
+            foreignKeyName: "cast_override_performance_id_fkey"
+            columns: ["performance_id"]
             isOneToOne: false
-            referencedRelation: "show"
+            referencedRelation: "performance"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "cast_override_show_id_fkey"
-            columns: ["show_id"]
+            foreignKeyName: "cast_override_performance_id_fkey"
+            columns: ["performance_id"]
             isOneToOne: false
-            referencedRelation: "show_redacted"
+            referencedRelation: "performance_redacted"
             referencedColumns: ["id"]
           },
           {
@@ -367,7 +367,7 @@ export type Database = {
           notes: string | null
           person_id: string
           role: string
-          show_id: string
+          performance_id: string
           updated_at: string
           workspace_id: string
         }
@@ -380,7 +380,7 @@ export type Database = {
           notes?: string | null
           person_id: string
           role: string
-          show_id: string
+          performance_id: string
           updated_at?: string
           workspace_id: string
         }
@@ -393,7 +393,7 @@ export type Database = {
           notes?: string | null
           person_id?: string
           role?: string
-          show_id?: string
+          performance_id?: string
           updated_at?: string
           workspace_id?: string
         }
@@ -406,17 +406,17 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "crew_assignment_show_id_fkey"
-            columns: ["show_id"]
+            foreignKeyName: "crew_assignment_performance_id_fkey"
+            columns: ["performance_id"]
             isOneToOne: false
-            referencedRelation: "show"
+            referencedRelation: "performance"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "crew_assignment_show_id_fkey"
-            columns: ["show_id"]
+            foreignKeyName: "crew_assignment_performance_id_fkey"
+            columns: ["performance_id"]
             isOneToOne: false
-            referencedRelation: "show_redacted"
+            referencedRelation: "performance_redacted"
             referencedColumns: ["id"]
           },
           {
@@ -443,7 +443,7 @@ export type Database = {
           notes: string | null
           project_id: string
           season: string | null
-          show_id: string | null
+          performance_id: string | null
           starts_at: string
           status: Database["public"]["Enums"]["date_status"]
           title: string | null
@@ -466,7 +466,7 @@ export type Database = {
           notes?: string | null
           project_id: string
           season?: string | null
-          show_id?: string | null
+          performance_id?: string | null
           starts_at: string
           status?: Database["public"]["Enums"]["date_status"]
           title?: string | null
@@ -489,7 +489,7 @@ export type Database = {
           notes?: string | null
           project_id?: string
           season?: string | null
-          show_id?: string | null
+          performance_id?: string | null
           starts_at?: string
           status?: Database["public"]["Enums"]["date_status"]
           title?: string | null
@@ -507,17 +507,17 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "date_show_id_fkey"
-            columns: ["show_id"]
+            foreignKeyName: "date_performance_id_fkey"
+            columns: ["performance_id"]
             isOneToOne: false
-            referencedRelation: "show"
+            referencedRelation: "performance"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "date_show_id_fkey"
-            columns: ["show_id"]
+            foreignKeyName: "date_performance_id_fkey"
+            columns: ["performance_id"]
             isOneToOne: false
-            referencedRelation: "show_redacted"
+            referencedRelation: "performance_redacted"
             referencedColumns: ["id"]
           },
           {
@@ -635,7 +635,7 @@ export type Database = {
           receipt_url: string | null
           reimbursed: boolean
           line_id: string | null
-          show_id: string | null
+          performance_id: string | null
           updated_at: string
           workspace_id: string
         }
@@ -655,7 +655,7 @@ export type Database = {
           receipt_url?: string | null
           reimbursed?: boolean
           line_id?: string | null
-          show_id?: string | null
+          performance_id?: string | null
           updated_at?: string
           workspace_id: string
         }
@@ -675,7 +675,7 @@ export type Database = {
           receipt_url?: string | null
           reimbursed?: boolean
           line_id?: string | null
-          show_id?: string | null
+          performance_id?: string | null
           updated_at?: string
           workspace_id?: string
         }
@@ -688,17 +688,17 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "expense_show_id_fkey"
-            columns: ["show_id"]
+            foreignKeyName: "expense_performance_id_fkey"
+            columns: ["performance_id"]
             isOneToOne: false
-            referencedRelation: "show"
+            referencedRelation: "performance"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "expense_show_id_fkey"
-            columns: ["show_id"]
+            foreignKeyName: "expense_performance_id_fkey"
+            columns: ["performance_id"]
             isOneToOne: false
-            referencedRelation: "show_redacted"
+            referencedRelation: "performance_redacted"
             referencedColumns: ["id"]
           },
           {
@@ -812,7 +812,7 @@ export type Database = {
           invoice_id: string
           line_total: number | null
           quantity: number
-          show_id: string | null
+          performance_id: string | null
           unit_amount: number
           updated_at: string
           workspace_id: string
@@ -824,7 +824,7 @@ export type Database = {
           invoice_id: string
           line_total?: number | null
           quantity?: number
-          show_id?: string | null
+          performance_id?: string | null
           unit_amount: number
           updated_at?: string
           workspace_id: string
@@ -836,7 +836,7 @@ export type Database = {
           invoice_id?: string
           line_total?: number | null
           quantity?: number
-          show_id?: string | null
+          performance_id?: string | null
           unit_amount?: number
           updated_at?: string
           workspace_id?: string
@@ -850,17 +850,17 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "invoice_line_show_id_fkey"
-            columns: ["show_id"]
+            foreignKeyName: "invoice_line_performance_id_fkey"
+            columns: ["performance_id"]
             isOneToOne: false
-            referencedRelation: "show"
+            referencedRelation: "performance"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "invoice_line_show_id_fkey"
-            columns: ["show_id"]
+            foreignKeyName: "invoice_line_performance_id_fkey"
+            columns: ["performance_id"]
             isOneToOne: false
-            referencedRelation: "show_redacted"
+            referencedRelation: "performance_redacted"
             referencedColumns: ["id"]
           },
           {
@@ -1249,7 +1249,7 @@ export type Database = {
           },
         ]
       }
-      show: {
+      performance: {
         Row: {
           city: string | null
           country: string | null
@@ -1270,10 +1270,10 @@ export type Database = {
           previous_slugs: string[]
           project_id: string
           line_id: string | null
-          show_start_at: string | null
+          start_at: string | null
           slug: string | null
           soundcheck_at: string | null
-          status: Database["public"]["Enums"]["show_status"]
+          status: Database["public"]["Enums"]["performance_status"]
           technical: Json
           updated_at: string
           venue_id: string | null
@@ -1301,10 +1301,10 @@ export type Database = {
           previous_slugs?: string[]
           project_id: string
           line_id?: string | null
-          show_start_at?: string | null
+          start_at?: string | null
           slug?: string | null
           soundcheck_at?: string | null
-          status?: Database["public"]["Enums"]["show_status"]
+          status?: Database["public"]["Enums"]["performance_status"]
           technical?: Json
           updated_at?: string
           venue_id?: string | null
@@ -1332,10 +1332,10 @@ export type Database = {
           previous_slugs?: string[]
           project_id?: string
           line_id?: string | null
-          show_start_at?: string | null
+          start_at?: string | null
           slug?: string | null
           soundcheck_at?: string | null
-          status?: Database["public"]["Enums"]["show_status"]
+          status?: Database["public"]["Enums"]["performance_status"]
           technical?: Json
           updated_at?: string
           venue_id?: string | null
@@ -1345,35 +1345,35 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "show_engagement_id_fkey"
+            foreignKeyName: "performance_engagement_id_fkey"
             columns: ["engagement_id"]
             isOneToOne: false
             referencedRelation: "engagement"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "show_project_id_fkey"
+            foreignKeyName: "performance_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "project"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "show_line_id_fkey"
+            foreignKeyName: "performance_line_id_fkey"
             columns: ["line_id"]
             isOneToOne: false
             referencedRelation: "line"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "show_venue_id_fkey"
+            foreignKeyName: "performance_venue_id_fkey"
             columns: ["venue_id"]
             isOneToOne: false
             referencedRelation: "venue"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "show_workspace_id_fkey"
+            foreignKeyName: "performance_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspace"
@@ -1622,7 +1622,7 @@ export type Database = {
       }
     }
     Views: {
-      show_redacted: {
+      performance_redacted: {
         Row: {
           city: string | null
           country: string | null
@@ -1638,7 +1638,7 @@ export type Database = {
           performed_at: string | null
           project_id: string | null
           line_id: string | null
-          status: Database["public"]["Enums"]["show_status"] | null
+          status: Database["public"]["Enums"]["performance_status"] | null
           updated_at: string | null
           venue_id: string | null
           venue_name: string | null
@@ -1659,7 +1659,7 @@ export type Database = {
           performed_at?: string | null
           project_id?: string | null
           line_id?: string | null
-          status?: Database["public"]["Enums"]["show_status"] | null
+          status?: Database["public"]["Enums"]["performance_status"] | null
           updated_at?: string | null
           venue_id?: string | null
           venue_name?: string | null
@@ -1680,7 +1680,7 @@ export type Database = {
           performed_at?: string | null
           project_id?: string | null
           line_id?: string | null
-          status?: Database["public"]["Enums"]["show_status"] | null
+          status?: Database["public"]["Enums"]["performance_status"] | null
           updated_at?: string | null
           venue_id?: string | null
           venue_name?: string | null
@@ -1688,35 +1688,35 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "show_engagement_id_fkey"
+            foreignKeyName: "performance_engagement_id_fkey"
             columns: ["engagement_id"]
             isOneToOne: false
             referencedRelation: "engagement"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "show_project_id_fkey"
+            foreignKeyName: "performance_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "project"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "show_line_id_fkey"
+            foreignKeyName: "performance_line_id_fkey"
             columns: ["line_id"]
             isOneToOne: false
             referencedRelation: "line"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "show_venue_id_fkey"
+            foreignKeyName: "performance_venue_id_fkey"
             columns: ["venue_id"]
             isOneToOne: false
             referencedRelation: "venue"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "show_workspace_id_fkey"
+            foreignKeyName: "performance_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspace"
@@ -1742,11 +1742,11 @@ export type Database = {
       is_reserved_slug: { Args: { candidate: string }; Returns: boolean }
       is_workspace_member: { Args: { ws_id: string }; Returns: boolean }
       project_id_of_asset_version: {
-        Args: { p_project_id: string; p_line_id: string; p_show_id: string }
+        Args: { p_project_id: string; p_line_id: string; p_performance_id: string }
         Returns: string
       }
       project_id_of_expense: { Args: { p_expense_id: string }; Returns: string }
-      project_id_of_show: { Args: { p_show_id: string }; Returns: string }
+      project_id_of_performance: { Args: { p_performance_id: string }; Returns: string }
       slugify: { Args: { input: string }; Returns: string }
       uuid_generate_v7: { Args: never; Returns: string }
     }
@@ -1799,7 +1799,7 @@ export type Database = {
         | "comms"
         | "misc"
       line_status: "open" | "closed" | "archived"
-      show_status:
+      performance_status:
         | "proposed"
         | "hold"
         | "hold_1"
@@ -1996,7 +1996,7 @@ export const Constants = {
         "misc",
       ],
       line_status: ["open", "closed", "archived"],
-      show_status: [
+      performance_status: [
         "proposed",
         "hold",
         "hold_1",

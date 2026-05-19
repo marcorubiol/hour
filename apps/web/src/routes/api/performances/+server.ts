@@ -1,14 +1,18 @@
 /**
- * GET /api/shows
+ * GET /api/performances
  *
- * Lists shows of a project (and optionally a specific line). Caller passes
- * `?project_id=<uuid>` to get all shows; add `?line_id=<uuid>` to narrow to
- * one line. RoomStructure uses the project-level call and groups client-side
- * to avoid N+1 fetches across lines.
+ * Lists performances of a project (and optionally a specific line). Caller
+ * passes `?project_id=<uuid>` to get all performances; add `?line_id=<uuid>`
+ * to narrow to one line. RoomStructure uses the project-level call.
  *
- * Embeds `venue` so sidebar can render `<city · date>` without a second
- * round-trip. Embedding is nullable — shows can have venue_id NULL with a
- * denormalized venue_name; the client decides which to display.
+ * Embeds `venue` so sidebar/calendar can render `<city · date>` without a
+ * second round-trip. Embedding is nullable — performances can have
+ * venue_id NULL with a denormalized venue_name; the client decides which
+ * to display.
+ *
+ * Schema renamed `show` → `performance` (ADR-036, 2026-05-19). Column
+ * `show_start_at` renamed to `start_at`. The permission code `'edit:show'`
+ * stays as-is (closed RBAC vocab, deferred to Phase 0.9 admin UI).
  *
  * RLS scopes by workspace membership (ADR-029). No `current_workspace_id`
  * claim needed.
@@ -66,10 +70,10 @@ type VenueLite = {
   country: string | null;
 };
 
-type ShowItem = {
+type PerformanceItem = {
   id: string;
   slug: string | null;
-  performed_at: string; // ISO date
+  performed_at: string;
   status: string;
   venue_id: string | null;
   venue_name: string | null;
@@ -81,7 +85,7 @@ type ShowItem = {
   fee_amount: number | null;
   fee_currency: string | null;
   load_in_at: string | null;
-  show_start_at: string | null;
+  start_at: string | null;
   venue: VenueLite | null;
 };
 
@@ -124,7 +128,7 @@ export const GET: RequestHandler = async ({ request, url, platform }) => {
     [
       'id,slug,performed_at,status,venue_id,venue_name,city,country',
       'project_id,line_id,engagement_id',
-      'fee_amount,fee_currency,load_in_at,show_start_at',
+      'fee_amount,fee_currency,load_in_at,start_at',
       'venue:venue_id(id,name,city,country)',
     ].join(','),
   );
@@ -136,7 +140,7 @@ export const GET: RequestHandler = async ({ request, url, platform }) => {
   search.set('limit', String(limit));
 
   try {
-    const { data } = await pgGet<ShowItem>(env, 'show', jwt, { search });
+    const { data } = await pgGet<PerformanceItem>(env, 'performance', jwt, { search });
     return json({ items: data });
   } catch (err) {
     if (err instanceof PostgrestError) {

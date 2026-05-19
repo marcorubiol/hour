@@ -1305,6 +1305,37 @@ Triggered by Marco's pre-scaffold doubt (Phase 0.0 day 5). Five alternatives eva
   - Si `role` freetext genera fricción cross-workspace (Phase 1) por inconsistencias entre clientes — evaluar enum por workspace o vocabulario controlado.
 - **Status**: Firm. Producción 2026-05-19.
 
+## [2026-05-19] — ADR-036 · Rename `show` → `performance` + data reorg MüK Cia/MaMeMi (naming gate sesión 2026-05-19)
+- **Decisión**: Dos cambios atómicos durante la pausa de naming de 2026-05-19:
+  1. **Data reorg**: workspace `mamemi` renombrado a `muk-cia` (display "MüK Cia") + project display "Difusión 2026-27" revertido a "MaMeMi" (slug `mamemi` se queda) + nueva line `difusion-2026-27` (kind=campaign) dentro de MaMeMi. Razón: "MüK Cia" es la COMPAÑÍA, "MaMeMi" es UNA producción dentro de ella. El project anterior con name "Difusión 2026-27" conflataba la campaña operativa con la pieza artística.
+  2. **Schema rename**: table `show` → `performance` (afecta crew_assignment.performance_id, cast_override.performance_id, asset_version.performance_id, date.performance_id, expense.performance_id, invoice_line.performance_id, enum `performance_status`, view `performance_redacted`, helper function `project_id_of_performance`, índices, triggers, FK constraints, collab_snapshot CHECK). Adicional: column `show.show_start_at` → `performance.start_at` (las otras 4 timeslots ya son específicas, prefijo redundante).
+- **Context**: durante validación visual con datos productivos (sesión 2026-05-19), Marco usa "espectáculo/show" en castellano para referirse a la pieza artística (= producción = `project` en schema), no al gig atómico (= `show` en schema). Hour schema lo llamaba `show` por convención industria-touring (música/festival). Para una herramienta cross-arts (teatro/danza/música/performance art), `performance` es universal: traduce limpio a "actuación"/"función"/"performance" en ES, "performance" en EN sin escora de género.
+- **Alternatives considered (rejected)**:
+  - **`gig`**: rechazado por escora música/touring. Una compañía de teatro pura sentiría que la herramienta no es para ellos.
+  - **Mantener `show` schema + UI label otra cosa**: rechazado. La ambigüedad reaparece cada vez que alguien lea código, db-types, logs, audit_log. Vale el coste de migración (~2h) para limpiar.
+  - **Renombrar también el permiso `'edit:show'` a `'edit:performance'`**: rechazado para Phase 0. Es un código de permiso en el closed RBAC vocab (ADR-006), almacenado como string en workspace_role.permissions + project_membership.permission_grants/revokes. Renombrar requiere UPDATE masivo + lógica de migración. Se difiere a Phase 0.9 admin UI cuando exista la pantalla para visualizar/editar permisos.
+- **Trade-offs**:
+  - **Doble naming overhead en esta sesión** (line→section→line + show→performance). Costo aceptable porque ambos venían del mismo naming gate vivido con UI productiva. Phase 0 es el momento de hacerlo; Phase 0.9 con clientes externos sería 10× más caro.
+  - **Permission code `'edit:show'` queda inconsistente** con el nombre de la tabla. Aceptado como deuda hasta Phase 0.9 admin UI. Documentado.
+- **Schema entregado**:
+  - 25 tablas totales (sin cambio de conteo). Tabla `show` → `performance` (3 demo performances + esquema vacío para muk-cia preservado).
+  - 78 RLS policies (sin cambio de conteo — 18 policies recreadas con references a `performance` / `performance_id` / `project_id_of_performance`).
+  - 6 FK columns renombrados: crew_assignment.performance_id, cast_override.performance_id, asset_version.performance_id, date.performance_id, expense.performance_id, invoice_line.performance_id.
+  - Enum `performance_status` (era `show_status`) con sus 10 valores intactos (proposed/hold/hold_1/2/3/confirmed/done/invoiced/paid/cancelled).
+  - View `performance_redacted` con la misma estructura (money-gating intacto).
+  - Helper functions con parámetros renombrados (`p_performance_id`).
+- **Migration SQL**: `build/migrations/2026-05-19_rename_show_to_performance.sql` (schema) + `build/migrations/2026-05-19_data_rename_muk_cia.sql` (data). Ambos aplicados vía Supabase MCP. Mirror inverso disponible si necesario.
+- **Código aplicación**:
+  - `apps/web/src/lib/db-types.ts` — sed targeted (`show_start_at` → `start_at` first, luego `show` → `performance` global). 0 refs show, 76 refs performance.
+  - `apps/web/src/routes/api/shows/` → `apps/web/src/routes/api/performances/`. Endpoint internal types `ShowItem` → `PerformanceItem`, table name string `'show'` → `'performance'`, column `show_start_at` → `start_at` en select.
+  - Plaza.svelte / RoomStructure.svelte / engagements/+server.ts intactos (no referencian show schema).
+- **Supersede / mantiene**:
+  - ADR-008 "Product vocabulary": el item House/Room/Run/Gig sigue obsoleto desde ADR-033. Performance se añade al vocabulario interno (no UI-facing aún).
+- **Re-evaluate when**:
+  - Si Phase 0.9 admin UI lo pide, renombrar permission code `'edit:show'` a `'edit:performance'` para consistencia visual.
+  - Si emerge un cliente Phase 1 con vocabulario propio (ej. "función" en lugar de "performance"), evaluar UI label customizable por workspace (no schema).
+- **Status**: Firm. Producción 2026-05-19.
+
 ## [2026-05-19] — ADR-035 · Revert `section` → `line` (naming gate vivido con UI productiva supersede ADR-031)
 - **Decisión**: Revertir el rename `line → section` aplicado el 2026-05-18 (ADR-031). El nivel intermedio entre Project y Show vuelve a llamarse `line` en schema (`line`, `line_id`, `line_kind`, `line_status`) y en UI ("Lines"). Los 4 enum values añadidos por ADR-031 (creation, campaign, comms, misc) se conservan dentro de `line_kind` — siguen siendo válidos para Hour cross-arts. El enum queda con 10 valores: tour, season, phase, circuit, residency, other, creation, campaign, comms, misc.
 - **Context**: ADR-031 razonaba que "line" era industry slang exclusivo de touring y que kinds no-touring (creation/campaign/comms/misc) chirreaban semánticamente. 2026-05-19, con la demo data viva en la UI ("LINES" header en sidebar lower) y el contexto castellano de Marco, el chequeo real produjo la lectura inversa: **"línea de trabajo" funciona perfectamente para los 10 kinds** — tour 2026, residencia, nueva creación, campaña de difusión, comms. `line` es polisémico en castellano (línea de trabajo, línea de producción) y en inglés (line of work, production line, comms line), no exclusivo del touring. El naming gate del live-UI gana sobre el razonamiento abstracto de hace 24 horas.
