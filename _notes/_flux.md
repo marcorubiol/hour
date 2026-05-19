@@ -4,6 +4,40 @@ Running notes, in motion. Cuando algo se asiente: migrar fuera.
 
 ---
 
+## 2026-05-19 — Demo load: gaps descubiertos cargando workspace `demo` en marco-rubiol-acc
+
+**Contexto:** workspace `demo` creado en `marco-rubiol-acc` con producción ficticia "Última órbita" (1 project + 1 section tour + 3 shows BCN/MAD/VLC + 3 engagements + 2 cast_members + 1 cast_override + 6 crew_assignments + 7 dates + 4 asset_versions). Pre-carga ADR-034 añadió `cast_member` a 25 tablas. Carga manual vía SQL directo (sin UI), anotando fricción según iba. Lista honesta de gaps — algunos son schema, algunos son tool friction, algunos son UI ausente que Phase 0.2 debe responder.
+
+### Schema-level (decisiones diferidas para Phase 0.5 o cuando friction emerge)
+
+1. **`workspace_membership` ≠ `account_membership` en tracking de invitación.** Account tiene `invited_at + accepted_at + revoked_at + role`; workspace solo `accepted_at + invited_by + role` (sin invited_at ni revoked_at). Conceptualmente las dos tablas hacen lo mismo (member en N scope) pero divergen en columnas. Funciona — pero un día querremos timeline de "cuándo te invitamos vs cuándo aceptaste" en ambos niveles para soportar audit + revoke desde UI admin. Phase 1 admin UI lo va a pedir. Coste: 2 columnas + migration trivial cuando llegue.
+
+2. **`asset_version_adapted_has_source` CHECK fuerza atomicidad.** Insertar adapted row + actualizar `adapted_from_id` después viola constraint. La estrategia "INSERT primero, UPDATE referencia luego" no funciona — hay que insertar adapted con el FK ya resuelto. Funcional para UI "click adapt, choose source" (atómico desde formulario). Problemático para imports incrementales/scripts: hay que ordenar inserts canónico → adapted o usar CTE WITH ... INSERT ... RETURNING. Anotar en runbooks/imports.md cuando exista.
+
+3. **`crew_assignment` + `cast_override` + `cast_member` son tres tablas con vocabulario casi idéntico** (`workspace_id, show_id|project_id, person_id, role` + override/notes específicos). La asimetría intencional (cast project-scoped + cast_override show-scoped vs crew solo show-scoped) la documenté en ADR-034 pero la repetición estructural sigue. Re-evaluar Phase 0.5 si emerge fricción al renderizar road sheet con las tres mezcladas.
+
+### UI flow gaps (Phase 0.2 debe responder al menos los dos primeros)
+
+4. **No hay flow "promover `venue_name` snapshot a `venue` real".** `show` permite tanto `venue_id` FK como denormalizado `venue_name + city + country`. ¿Cuándo se promueve? Probablemente: "if `venue_name` aparece N veces sin venue_id, suggerir crear venue". Lógica de UI, no schema. Phase 0.2 road sheet UI debe permitir crear venue from inline mention o linkear venue existente.
+
+5. **No hay flow "crear engagement vs asignar cast_member"** desde la misma persona. Si Lucía es cast del proyecto, pero también podría ser engagement (programmer de otro venue), la UI debe distinguir las dos relaciones de la misma `person`. Probable resolución: panel `person/[slug]` lista "Cast in N productions" + "Engagement in M projects" + "Crew on K shows" + "Venue contact in J venues" como tabs/secciones de la misma persona. Phase 0.2 al construir Contacts lens — D5 si entra mobile-first.
+
+6. **No hay UI de upload para `asset_version`.** Phase 0 lo asume — todos los URLs son R2 keys conceptuales. Demo data tiene URLs hardcoded a `demo/ultima-orbita/...` que no existen en R2. El road sheet UI puede renderizar links pero el upload llega Phase 0.3+. Si el render falla por 404 al fetch, fallback a "asset registrado, sin archivo subido aún" en el preview.
+
+### Tooling / SQL friction (no es problema del producto)
+
+7. **`UNION ALL` con `NULL` exige cast explícito** si la primera fila tiene UUID y la siguiente NULL. Detalle Postgres, no schema. Para imports incrementales conviene `NULL::uuid`.
+
+8. **DST window en MAD show (2026-10-24 → 2026-10-25)**. `load_in_at` 13:00 CEST, `wrap_at` 00:30 CET. SQL guarda timestamptz correctamente, pero la UI debe convertir a `venue.timezone` para display — y el wrap_at del 25 cae después del DST switch. Sin `venue.timezone`, render asume UTC o local del usuario. Phase 0.2 road sheet UI: dual-timezone display (D-PRE-10) debe respetar el cambio horario dentro del mismo show. Edge case raro pero real (2026 tiene el switch el 25 de octubre, próxima oportunidad real con datos de gira octubre/noviembre).
+
+### Mental-model ↔ schema alignment (los más importantes)
+
+9. **Cast vs crew asimetría (resuelta hoy, pero merece quedar capturada).** El dominio operativo es asimétrico: cast se planifica una vez con sustituciones puntuales, crew se decide show a show. ADR-034 lo encodea (`cast_member` project-scoped, `crew_assignment` show-scoped). La pregunta cobra: ¿hay otras asimetrías similares en el modelo que aún no encajamos? Probable: `asset_version` también lo es (canónico project-scoped + adapted show-scoped + inbound show-scoped). Ya está modelado correctamente. Crew vs roles internos del sistema (RBAC) también — `project_membership` es para roles de Hour (producer, viewer), no cast/crew. Separación firme.
+
+10. **`show.engagement_id` opcional** — pero en demo todos los shows tienen programmer, así que todos lo tienen seteado. ¿Caso real donde NULL? Self-produced en local propio (compañía dueña del venue), gigs internos. Mantener nullable. Phase 0.2 road sheet UI: si engagement_id NULL, omitir sección "Programmer / Contacto del venue" o derivar de `venue.contacts`.
+
+---
+
 ## 2026-05-18 — TAM levers: qué amplía mercado de verdad (vs qué solo mejora retención)
 
 **Estado:** conversación estratégica con .zerø validada por Marco. No es decisión, es mapa de palancas para mirar al planificar Phase 0.5+. Si una de estas se prioriza explícitamente sobre otra, migra a `_decisions.md` como ADR.

@@ -1282,3 +1282,26 @@ Triggered by Marco's pre-scaffold doubt (Phase 0.0 day 5). Five alternatives eva
   - Si Marco crea primer schema `project` distinto del workspace homónimo y necesita representación visual separada — decidir entonces shape de sidebar (aplanar cross-workspace vs anidar).
 - **Status**: Firm. Phase A+B aplicadas 2026-05-18. Phase C-E pendientes (~2-3 días).
 
+## [2026-05-19] — ADR-034 · Tabla `cast_member` a nivel project (cast canónico + override por show)
+- **Decisión**: Añadir tabla `cast_member` con scope `(workspace_id, project_id, person_id, role)`. El cast canónico de una producción vive aquí. Las sustituciones puntuales por show continúan en `cast_override` (`replaces_person_id` apunta al `person.id` previamente listado en `cast_member`). Crew sigue exclusivamente en `crew_assignment` (per-show, sin equivalente canónico a nivel project — el dominio lo trata como decisión per-gig).
+- **Context**: Phase 0.2 arranca con road sheet. Marco aclara el dominio operativo: en cada producción se asigna un cast base que después puede reasignarse a nivel de show concreto. Mi lectura anterior (option B = todo dentro de `crew_assignment` con `role='performer'`) ignoraba ese modelo — colapsaba cast en una entidad show-scoped cuando la planificación real es project-scoped.
+- **Alternatives considered (rejected)**:
+  - **B: reusar `crew_assignment role='performer'`**: rechazado. Vivir show-scoped contradice el flujo real (planificar cast una vez, no 20 veces). Reusar la tabla ahorra schema pero obliga a inferir el cast canónico a partir de N rows duplicadas — operativa y conceptualmente sucio.
+  - **Unificar `cast_override` dentro de `crew_assignment`** (añadir `replaces_person_id` + `reason` a crew, dropear `cast_override`): rechazado para Phase 0. Mezcla dos modelos (canónico project-scoped + override show-scoped) en una sola tabla. Si emerge la necesidad, se evalúa en Phase 0.5.
+  - **Defer cast_member a Phase 0.5**: rechazado. El roadmap arranca road sheet AHORA con datos demo; sin tabla canónica la UI tendría que decidir entre falsear con `workspace_membership` o con N filas duplicadas en `crew_assignment`. Construirlo después de cargar datos cuesta migración; construirlo ahora con producción casi vacía cuesta una tabla.
+- **Trade-offs**:
+  - **Asimetría intencional cast (project-scoped) vs crew (show-scoped)**. El dominio la pide: cast se planifica una vez con sustituciones puntuales (los actores de la obra cambian raramente), crew se decide por show porque cambia con frecuencia (técnicos freelance distintos por ciudad). Documentado en COMMENT de tabla.
+  - **`cast_override` queda como su propia tabla**. La duplicación parcial con `crew_assignment` (estructuralmente similares) se acepta por claridad semántica. Re-evaluar Phase 0.5 si emerge fricción.
+  - **`role` freetext**, no enum. Mismo criterio que `crew_assignment.role`. Vocabulario evoluciona por producción (performer/dancer/musician/narrator/co-director); cerrar enum prematuro contradice la philosophy.md "una técnica para todo el dominio".
+- **Schema entregado** (1 tabla nueva, 25 tablas totales):
+  - `cast_member (id, workspace_id, project_id, person_id, role, joined_at?, left_at?, notes?, created_by, created/updated/deleted_at)`.
+  - 4 índices (workspace/project/person + UNIQUE `(project_id, person_id, role)` WHERE deleted_at IS NULL).
+  - 3 triggers (`set_updated_at`, `guard_immutable_workspace_id`, `write_audit`) mirroring `crew_assignment`.
+  - RLS FORCE + 4 policies (SELECT/INSERT/UPDATE/DELETE) usando `has_permission(project_id, 'edit:show')` — misma gate que crew/show/date. Cast es parte de la data de producción, gobernada por la misma autoridad. Si Phase 0.5 introduce `edit:cast` granular, se actualiza.
+- **Migration SQL**: `build/migrations/2026-05-19_add_cast_member.sql`. Aplicada vía Supabase MCP `apply_migration` 2026-05-19. Producción: 25 tablas, 78 RLS policies.
+- **Re-evaluate when**:
+  - Si Phase 0.5+ con E28 emerge necesidad de `cast_member` history (mismo person actor del 2025-26 al 2026-27 con cambio de rol) — añadir columna `role_history` o segunda tabla.
+  - Si `cast_override + cast_member + crew_assignment` empieza a ser difícil de razonar al renderizar road sheet — evaluar unificación parcial.
+  - Si `role` freetext genera fricción cross-workspace (Phase 1) por inconsistencias entre clientes — evaluar enum por workspace o vocabulario controlado.
+- **Status**: Firm. Producción 2026-05-19.
+
