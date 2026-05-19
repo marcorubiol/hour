@@ -37,6 +37,10 @@ const ROUTE_PREFIX = '/h';
 type PersistedSelection = {
   ws?: string[];
   projects?: Array<{ slug: string; ws: string }>;
+  /** Focus marker — null/omitted when no focus active. Restored only when
+   *  the current selection (post-URL-hydration) still contains the focused
+   *  entity; otherwise dropped (user moved on). */
+  focus?: { workspaceSlug: string; projectSlug: string | null } | null;
 };
 
 function setsEqual<T>(a: Set<T>, b: Set<T>): boolean {
@@ -498,10 +502,57 @@ export class SelectionStore {
           slug,
           ws: this.projectWorkspaceMap.get(slug) ?? '',
         })),
+        focus:
+          this.focusedWorkspaceSlug !== null
+            ? {
+                workspaceSlug: this.focusedWorkspaceSlug,
+                projectSlug: this.focusedProjectSlug,
+              }
+            : null,
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     } catch {
       // Storage full or disabled — in-session state still works
+    }
+  }
+
+  /**
+   * Restore focus marker from localStorage, validated against current
+   * selection. Call AFTER URL hydration has run, so the workspaces/projects
+   * sets reflect what the user is actually looking at.
+   *
+   * Validation:
+   *   - Project focus: the focused project must still be in `projects`.
+   *   - Workspace focus: the focused workspace must still be in `workspaces`.
+   * If the user navigated elsewhere mid-session and the URL no longer
+   * matches, the marker is silently dropped — they moved on.
+   *
+   * Selection itself is restored via URL (master-view restores last path on
+   * login); we only re-attach the focus tag here.
+   */
+  restoreFocusFromLocalStorage(): boolean {
+    if (typeof localStorage === 'undefined') return false;
+    if (this.focusedWorkspaceSlug !== null) return false; // already set
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return false;
+      const data = JSON.parse(raw) as PersistedSelection;
+      const f = data.focus;
+      if (!f || typeof f.workspaceSlug !== 'string') return false;
+      if (f.projectSlug !== null && typeof f.projectSlug !== 'string') return false;
+
+      if (f.projectSlug !== null) {
+        if (!this.projects.has(f.projectSlug)) return false;
+        this.focusedWorkspaceSlug = f.workspaceSlug;
+        this.focusedProjectSlug = f.projectSlug;
+      } else {
+        if (!this.workspaces.has(f.workspaceSlug)) return false;
+        this.focusedWorkspaceSlug = f.workspaceSlug;
+        this.focusedProjectSlug = null;
+      }
+      return true;
+    } catch {
+      return false;
     }
   }
 }

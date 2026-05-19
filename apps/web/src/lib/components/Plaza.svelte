@@ -1553,7 +1553,9 @@
        + bg already carry the identity; the heavier weight carries the
        selection. */
     .plaza__workspace-row--selected .plaza__workspace-name {
-      font-weight: 600;
+      /* +50 over the idle 500 — leans into the variable-font axis so the
+         selected state reads "a notch firmer" instead of "a step bolder". */
+      font-weight: 550;
     }
 
     /* On-path: URL points inside this workspace's project sub-route
@@ -1842,12 +1844,14 @@
       box-shadow: none;
     }
 
-    /* Selected project name: weight bump to 600 communicates state
-       typographically. No accent-darkened colour — the project name
-       stays in text-color (ink) regardless of the parent workspace's
-       accent. Mirrors the workspace-name selected rule. */
+    /* Selected project name: weight bump to 500 (from default 400)
+       communicates state typographically. No accent-darkened colour —
+       the project name stays in text-color (ink) regardless of the
+       parent workspace's accent. Mirrors the workspace-name selected
+       rule (both bump +100 worth on their respective variable-font
+       axes; less than the previous +200 of 400→600). */
     .plaza__project-row--selected .plaza__project-name {
-      font-weight: 600;
+      font-weight: 500;
     }
 
     .plaza__project-name {

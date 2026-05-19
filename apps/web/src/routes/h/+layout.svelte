@@ -92,6 +92,15 @@
     selection.hydrateFromUrl(page.url);
   });
 
+  // One-shot restore of UI state that doesn't live in the URL: last active
+  // lens and focus marker. Run after URL hydration has populated selection
+  // so the focus check validates against what the user is actually viewing.
+  onMount(() => {
+    selection.hydrateFromUrl(page.url);
+    selection.restoreFocusFromLocalStorage();
+    lens.restoreFromLocalStorage();
+  });
+
   $effect(() => {
     saveMasterViewPath(page.url.pathname);
   });
