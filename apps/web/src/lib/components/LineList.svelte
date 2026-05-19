@@ -77,8 +77,18 @@
     queryFn: ({ signal }) => fetchProjects(signal),
   });
 
+  let activeWorkspaceSlug = $derived(page.params.workspace ?? '');
+
   let activeProjectSlug = $derived.by(() => {
     const m = page.url.pathname.match(/^\/h\/[^/]+\/project\/([^/]+)/);
+    return m?.[1] ?? '';
+  });
+
+  // Line slug from URL when on /h/[ws]/project/[slug]/line/[line]/...
+  let activeLineSlug = $derived.by(() => {
+    const m = page.url.pathname.match(
+      /^\/h\/[^/]+\/project\/[^/]+\/line\/([^/]+)/,
+    );
     return m?.[1] ?? '';
   });
 
@@ -125,9 +135,28 @@
     {:else}
       <ul class="line-list__items">
         {#each lines as line (line.id)}
+          {@const isActive = line.slug !== null && line.slug === activeLineSlug}
+          {@const href = line.slug
+            ? `/h/${activeWorkspaceSlug}/project/${activeProjectSlug}/line/${line.slug}`
+            : null}
           <li class="line-list__item">
-            <span class="line-list__name">{line.name}</span>
-            <span class="line-list__kind">{line.kind}</span>
+            {#if href}
+              <a
+                class={['line-list__row', isActive && 'line-list__row--active']
+                  .filter(Boolean)
+                  .join(' ')}
+                {href}
+                aria-current={isActive ? 'page' : undefined}
+              >
+                <span class="line-list__name">{line.name}</span>
+                <span class="line-list__kind">{line.kind}</span>
+              </a>
+            {:else}
+              <span class="line-list__row line-list__row--disabled">
+                <span class="line-list__name">{line.name}</span>
+                <span class="line-list__kind">{line.kind}</span>
+              </span>
+            {/if}
           </li>
         {/each}
       </ul>
@@ -167,6 +196,10 @@
     }
 
     .line-list__item {
+      display: block;
+    }
+
+    .line-list__row {
       display: flex;
       align-items: baseline;
       justify-content: space-between;
@@ -174,6 +207,32 @@
       padding-block: var(--space-xs);
       padding-inline: var(--space-s);
       font-size: var(--text-s);
+      color: var(--text-color);
+      text-decoration: none;
+      border-radius: var(--radius);
+      transition: background-color var(--transition);
+    }
+
+    .line-list__row:hover {
+      background: var(--bg-hover);
+    }
+
+    .line-list__row:focus-visible {
+      outline: var(--focus-width) solid var(--focus-color);
+      outline-offset: -2px;
+    }
+
+    .line-list__row--active {
+      background: var(--bg-active);
+    }
+
+    .line-list__row--active .line-list__name {
+      color: var(--primary);
+    }
+
+    .line-list__row--disabled {
+      cursor: default;
+      color: var(--text-faint);
     }
 
     .line-list__name {
