@@ -1662,6 +1662,16 @@
     background: var(--primary);
   }
 
+  /* The handle gets focus after mousedown — that's expected for a button,
+     but the global focus-visible outline sits offset from the element and
+     reads as a second line next to the primary-coloured handle. Suppress
+     it here; the hover/dragging background already signals interactivity
+     for mouse users (the only ones who realistically resize). */
+  .sidebar__resizer:focus,
+  .sidebar__resizer:focus-visible {
+    outline: none;
+  }
+
   .sidebar--dragging {
     user-select: none;
   }
