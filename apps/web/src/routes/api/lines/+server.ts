@@ -1,14 +1,18 @@
 /**
- * GET /api/sections
+ * GET /api/lines
  *
- * Lists sections of a project (e.g. tour, season, residency block). Scope is
- * driven by `?project_id=<uuid>`; the caller (RoomStructure) already has the
- * project_id from the rooms cache, so we ask for it directly instead of
- * resolving slug → project → workspace.
+ * Lists lines of a project (e.g. tour, season, residency block, creation
+ * phase). Scope is driven by `?project_id=<uuid>`; the caller (RoomStructure)
+ * already has the project_id from the rooms cache, so we ask for it directly
+ * instead of resolving slug → project → workspace.
  *
- * RLS scopes by workspace membership (ADR-029): user sees sections of any
+ * RLS scopes by workspace membership (ADR-029): user sees lines of any
  * project in any workspace they belong to. No `current_workspace_id` claim
  * needed.
+ *
+ * Naming: schema reverted to `line` per ADR-035 (2026-05-19, naming gate
+ * with live UI). The 10 kinds (tour/season/phase/circuit/residency/other/
+ * creation/campaign/comms/misc) live as values of `line_kind` enum.
  *
  * Auth: Bearer JWT required. RLS denies anon.
  */
@@ -58,7 +62,7 @@ function json(body: unknown, status = 200): Response {
   });
 }
 
-type SectionItem = {
+type LineItem = {
   id: string;
   slug: string | null;
   name: string;
@@ -118,7 +122,7 @@ export const GET: RequestHandler = async ({ request, url, platform }) => {
   search.set('limit', String(limit));
 
   try {
-    const { data } = await pgGet<SectionItem>(env, 'section', jwt, { search });
+    const { data } = await pgGet<LineItem>(env, 'line', jwt, { search });
     return json({ items: data });
   } catch (err) {
     if (err instanceof PostgrestError) {

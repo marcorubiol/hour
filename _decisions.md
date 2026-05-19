@@ -1166,7 +1166,7 @@ Triggered by Marco's pre-scaffold doubt (Phase 0.0 day 5). Five alternatives eva
 - **Re-evaluate when**:
   - Si emerge un kind nuevo que no encaja en los 10 actuales (ej. "fundraising", "research-residency"), añadir al enum sin renombrar la tabla.
   - Si Phase 0.5 trae task entity (D3) y las "sections" empiezan a usar tasks específicas, evaluar si el modelo recursivo (sub-sections) emerge como necesidad real. Hoy sin evidencia, no se construye.
-- **Status**: Firm. Migración aplicada en producción 2026-05-18.
+- **Status**: **Superseded** por ADR-035 (2026-05-19). Naming gate vivido con UI productiva produjo lectura inversa: `line` funciona genéricamente, el chirría estaba sobre-estimado. Schema revertido a `line`. ADR-031 queda como histórico del proceso de validación.
 
 ## [2026-05-18] — ADR-030 — Naming gate close: lens primaria "Plaza" + project rename a "Difusión 2026-27"
 
@@ -1303,5 +1303,28 @@ Triggered by Marco's pre-scaffold doubt (Phase 0.0 day 5). Five alternatives eva
   - Si Phase 0.5+ con E28 emerge necesidad de `cast_member` history (mismo person actor del 2025-26 al 2026-27 con cambio de rol) — añadir columna `role_history` o segunda tabla.
   - Si `cast_override + cast_member + crew_assignment` empieza a ser difícil de razonar al renderizar road sheet — evaluar unificación parcial.
   - Si `role` freetext genera fricción cross-workspace (Phase 1) por inconsistencias entre clientes — evaluar enum por workspace o vocabulario controlado.
+- **Status**: Firm. Producción 2026-05-19.
+
+## [2026-05-19] — ADR-035 · Revert `section` → `line` (naming gate vivido con UI productiva supersede ADR-031)
+- **Decisión**: Revertir el rename `line → section` aplicado el 2026-05-18 (ADR-031). El nivel intermedio entre Project y Show vuelve a llamarse `line` en schema (`line`, `line_id`, `line_kind`, `line_status`) y en UI ("Lines"). Los 4 enum values añadidos por ADR-031 (creation, campaign, comms, misc) se conservan dentro de `line_kind` — siguen siendo válidos para Hour cross-arts. El enum queda con 10 valores: tour, season, phase, circuit, residency, other, creation, campaign, comms, misc.
+- **Context**: ADR-031 razonaba que "line" era industry slang exclusivo de touring y que kinds no-touring (creation/campaign/comms/misc) chirreaban semánticamente. 2026-05-19, con la demo data viva en la UI ("LINES" header en sidebar lower) y el contexto castellano de Marco, el chequeo real produjo la lectura inversa: **"línea de trabajo" funciona perfectamente para los 10 kinds** — tour 2026, residencia, nueva creación, campaña de difusión, comms. `line` es polisémico en castellano (línea de trabajo, línea de producción) y en inglés (line of work, production line, comms line), no exclusivo del touring. El naming gate del live-UI gana sobre el razonamiento abstracto de hace 24 horas.
+- **Alternatives considered (rejected)**:
+  - **Mantener `section` schema + revertir solo UI label** (separation ADR-008 style): rechazado por inconsistencia permanente. La UI lleva `line`, dev tools y db-types llevan `section` — fricción para cualquiera leyendo el código + Marco cuando vuelva a tocar schema. Coste de revertir ambos (~1h) menor que coste de vivir con la inconsistencia durante meses.
+  - **Mantener `section` schema y aceptar que "Lines" UI fue un atajo**: rechazado por la misma razón. Si vamos con `line` en UI, schema debe seguir.
+  - **Quitar los 4 enum values nuevos** (creation, campaign, comms, misc): rechazado. La cobertura cross-arts es buena y compatible con el rename. Los 4 valores entran en `line_kind` sin problema.
+- **Trade-offs**:
+  - **Doble migración registrada en historial** (ADR-031 add + ADR-035 revert). Costo cosmético; gana claridad: el naming gate funcionó como esperado (planificar, probar live, decidir). El historial muestra el proceso de validación, no un error a esconder.
+  - **`line` polisémico en castellano** puede confundir si Marco trabaja con clientes anglo (UK, IE) donde "line" tiene mayor carga touring. Re-evaluable en Phase 1 si emergen clientes anglófonos.
+- **Schema entregado**:
+  - 25 tablas totales (sin cambio de conteo). Tabla `section` → `line` (data intacta, demo line "Gira otoño 2026" preservada).
+  - 78 RLS policies (sin cambio de conteo — 10 policies recreadas con nombres line_*).
+  - Enum `line_kind` con 10 valores (heredados del rename + 4 nuevos preservados).
+- **Migration SQL**: `build/migrations/2026-05-19_revert_section_to_line.sql`. Aplicada vía Supabase MCP `apply_migration` 2026-05-19 (name: `revert_section_to_line`). Mirror inverso de `2026-05-18_rename_line_to_section.sql`.
+- **Código aplicación**:
+  - `apps/web/src/lib/db-types.ts` — `sed 's/section/line/g'` (36 → 0 refs section). Verificado con `pnpm check` 0/0 post-cambio.
+  - `apps/web/src/routes/api/sections/` renombrado a `apps/web/src/routes/api/lines/`. Endpoint, type `SectionItem` → `LineItem`, query a tabla `'line'`.
+  - `apps/web/src/lib/components/RoomStructure.svelte` — queryKey `['sections', ...]` → `['lines', ...]`, `fetchSections` → `fetchLines`, type `Section` → `Line`, URL `/api/sections` → `/api/lines`, comentarios actualizados.
+- **Supersede**: ADR-031 marcado como superseded por este ADR. ADR-005 (definición original de line) vuelve a aplicar plenamente.
+- **Re-evaluate when**: Si Phase 1 trae clientes anglófonos donde "line" tiene mayor carga touring específica y los kinds no-touring (creation/campaign) generan confusión real. Probable resolución entonces: mantener `line` schema + UI label per-workspace customizable.
 - **Status**: Firm. Producción 2026-05-19.
 

@@ -3,15 +3,16 @@
    * RoomStructure — sidebar lower section.
    *
    * Shows the internal structure of the currently-selected Room: its Lines
-   * (sections) and eventually their Shows. Replaces the `<Desk>` component
-   * the original roadmap planned (ADR-029).
+   * (project subdivisions: tour, season, residency, creation phase, etc.)
+   * and eventually their Shows. Replaces the `<Desk>` component the
+   * original roadmap planned (ADR-029).
    *
    * Two queries:
    *   1. `['rooms', { status: 'active' }]` — shared cache with Plaza + Room
    *      detail. Used to read the active room's display name and id without
    *      a slug-vs-name drift between views.
-   *   2. `['sections', { project_id }]` — fetched on demand once we know the
-   *      active room's id. Returns sections of that project, ordered by
+   *   2. `['lines', { project_id }]` — fetched on demand once we know the
+   *      active room's id. Returns lines of that project, ordered by
    *      start_date.
    */
 
@@ -28,7 +29,7 @@
     status: 'draft' | 'active' | 'archived';
   };
 
-  type Section = {
+  type Line = {
     id: string;
     slug: string | null;
     name: string;
@@ -59,17 +60,17 @@
     return (await res.json()) as { items: Room[] };
   }
 
-  async function fetchSections(
+  async function fetchLines(
     projectId: string,
     signal: AbortSignal,
-  ): Promise<{ items: Section[] }> {
+  ): Promise<{ items: Line[] }> {
     const jwt = requireJwt();
     const res = await fetch(
-      `/api/sections?project_id=${encodeURIComponent(projectId)}`,
+      `/api/lines?project_id=${encodeURIComponent(projectId)}`,
       { signal, headers: { Authorization: `Bearer ${jwt}` } },
     );
     if (!res.ok) throw new Error(`Error ${res.status}`);
-    return (await res.json()) as { items: Section[] };
+    return (await res.json()) as { items: Line[] };
   }
 
   const roomsQuery = createQuery({
@@ -88,7 +89,7 @@
 
   let hasRoom = $derived(activeRoomSlug.length > 0);
 
-  // Sections query is gated on activeRoom.id. Using a writable + derived
+  // Lines query is gated on activeRoom.id. Using a writable + derived
   // queryOptions so the inner query refetches when navigating between rooms
   // without remounting the component.
   const projectIdStore = writable<string | null>(null);
@@ -96,22 +97,22 @@
     projectIdStore.set(activeRoom?.id ?? null);
   });
 
-  const sectionsQueryOptions: Readable<{
-    queryKey: readonly ['sections', { project_id: string | null }];
-    queryFn: (ctx: { signal: AbortSignal }) => Promise<{ items: Section[] }>;
+  const linesQueryOptions: Readable<{
+    queryKey: readonly ['lines', { project_id: string | null }];
+    queryFn: (ctx: { signal: AbortSignal }) => Promise<{ items: Line[] }>;
     enabled: boolean;
   }> = derived(projectIdStore, ($projectId) => ({
-    queryKey: ['sections', { project_id: $projectId }] as const,
+    queryKey: ['lines', { project_id: $projectId }] as const,
     queryFn: ({ signal }: { signal: AbortSignal }) =>
-      fetchSections($projectId!, signal),
+      fetchLines($projectId!, signal),
     enabled: $projectId !== null,
   }));
 
-  const sectionsQuery = createQuery(sectionsQueryOptions);
+  const linesQuery = createQuery(linesQueryOptions);
 
-  let sections = $derived($sectionsQuery.data?.items ?? []);
-  let isLoadingSections = $derived($sectionsQuery.isPending && activeRoom !== null);
-  let isErrorSections = $derived($sectionsQuery.isError);
+  let lines = $derived($linesQuery.data?.items ?? []);
+  let isLoadingLines = $derived($linesQuery.isPending && activeRoom !== null);
+  let isErrorLines = $derived($linesQuery.isError);
 </script>
 
 <aside class="project-structure" aria-label="Project structure">
@@ -119,20 +120,20 @@
     <header class="project-structure__header">
       <span class="eyebrow">Lines</span>
     </header>
-    {#if isLoadingSections}
+    {#if isLoadingLines}
       <p class="project-structure__empty">Loading…</p>
-    {:else if isErrorSections}
+    {:else if isErrorLines}
       <p class="project-structure__empty project-structure__empty--error">
         Error loading lines.
       </p>
-    {:else if sections.length === 0}
+    {:else if lines.length === 0}
       <p class="project-structure__empty">No lines yet.</p>
     {:else}
       <ul class="project-structure__list">
-        {#each sections as section (section.id)}
+        {#each lines as line (line.id)}
           <li class="project-structure__item">
-            <span class="project-structure__name">{section.name}</span>
-            <span class="project-structure__kind">{section.kind}</span>
+            <span class="project-structure__name">{line.name}</span>
+            <span class="project-structure__kind">{line.kind}</span>
           </li>
         {/each}
       </ul>
