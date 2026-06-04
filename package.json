@@ -12,5 +12,13 @@
     "build": "pnpm --filter web build",
     "preview": "pnpm --filter web preview",
     "deploy": "pnpm --filter web deploy"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@sentry/cli",
+      "esbuild",
+      "sharp",
+      "workerd"
+    ]
   }
 }

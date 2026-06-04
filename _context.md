@@ -52,7 +52,7 @@ Working name: **Hour**. Brand decision deferred to Phase 1.
 - **Visual language v0.5** (ADR-033, 2026-05-18): editorial-sobrio. Plum retired — `--primary` reasigned to `var(--text-color)` (cool ink `oklch(18% 0.015 280)`). Surfaces warm-cream (5 layers), ink cool (3 weights), state lifecycle (info/success/warning/danger/faint), 8 abstract accents mapped by `hash(slug) % 8` (helper `$lib/utils/accent.ts`), 6 tag-tone pairs (amber/blue/teal/green/purple/red). Typography: Newsreader display + Inter sans + JetBrains Mono metadata (loaded in `app.html`). Three colour categories preserved (base hues / status / contextual) per philosophy.md. All shades via `color-mix()` in OKLCH. Reference: `/Users/marcorubiol/Downloads/Hour/Hour Design System.html`.
 
 ## Code
-- Local path: `03_AGENCY/Hour/` (monorepo, `git init` done 2026-04-19, branch `main`).
+- Local path: `~/Developer/hour/` (monorepo, `git init` done 2026-04-19, branch `main`). Code moved out of the vault into `~/Developer/` on the 2026-06-04 machine recovery — the vault folder `03_AGENCY/Hour/` now holds project markdown + a `code` symlink → `~/Developer/hour`. (New repo-in-`~/Developer` model, see `.zerø/_system-context.md` § Coordinated git repos.)
 - GitHub repo: `https://github.com/marcorubiol/hour` (private, personal user). Transferable to a `zerosense` org if Phase 1 activates.
 - Live site (Phase 0): `hour.zerosense.studio` — **wired and serving** (custom domain attached in CF dashboard between 2026-04-20 and 2026-04-25). Worker primary URL: `https://hour-web.marco-rubiol.workers.dev` (CF Worker `hour-web`, wrangler 4.83.0, first deploy 2026-04-19). El custom domain proxies through CF normally — both URLs serve the same content.
 - CF bindings: `MEDIA` → R2 bucket `hour-media` · `ASSETS` → static CDN · `PUBLIC_SUPABASE_URL` + `PUBLIC_SUPABASE_ANON_KEY` in `[vars]`. DO binding `ROADSHEET_COLLAB` cross-Worker hacia `hour-collab`.
@@ -214,3 +214,13 @@ Estado a 2026-05-19: Phase 0.0 + 0.1 cerradas (incluyendo D-PRE-05 Master View w
 - **Package manager:** pnpm 10.33.0 (pinned via `packageManager` field in root `package.json`). Monorepo with `pnpm-workspace.yaml` listing `apps/*` + `packages/*`.
 - **Wrangler:** local devDependency in `apps/web/package.json` (currently `^4.83.0`). NEVER instalado global. Invocar como `pnpm wrangler <cmd>` desde `apps/web` o vía scripts (`pnpm run deploy`).
 - **Reglas portables:** `_methød/code/dev-environment.md` — léelas antes de añadir un nuevo dev tool al monorepo.
+- **DDEV no aplica a Hour** (2026-06-04). DDEV containeriza nginx+PHP+MySQL — el stack de agencia WordPress, donde sustituye a Local by Flywheel. Hour es Node/Vite + Supabase Cloud + Cloudflare Workers: cero PHP, cero servidor local. Para entorno local reproducible/offline el camino canónico es el Supabase CLI (`supabase start`), no DDEV. Hoy ni se necesita: Supabase Cloud está vivo.
+
+### Recovery (fresh machine / post-wipe)
+El repo se clona limpio pero dos cosas son gitignored y se pierden — recrearlas en orden:
+
+1. **Dependencias:** `pnpm install` desde la raíz (`~/Developer/hour`). Levanta los 3 workspace projects.
+2. **`apps/web/.env`** (gitignored, perdido en cada recover). Recrear con las `PUBLIC_SUPABASE_*` desde `apps/web/wrangler.jsonc [vars]` — son public-safe (la anon key es la publishable `sb_publishable_...`). El único secreto real del `.env` es `SENTRY_AUTH_TOKEN` (opcional, solo para subir source-maps en `vite build`; el dev server no lo necesita — regenerable desde el dashboard de Sentry si hace falta deploy con source-maps).
+3. **Arrancar:** `pnpm dev` → `http://localhost:5173`. Rutas con datos reales: `/h/muk-cia` (MaMeMi, 154 engagements) y `/h/demo` (Última órbita). La DB es Supabase Cloud, no hay que levantar nada local.
+
+`pnpm install` con pnpm 10 ignora los build scripts de `workerd`/`esbuild`/`sharp`/`@sentry/cli` por defecto — fijados en `package.json` § `pnpm.onlyBuiltDependencies` para que `wrangler dev`/`deploy` funcionen sin intervención. `vite dev` funciona aunque no se construyan.

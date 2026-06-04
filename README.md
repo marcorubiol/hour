@@ -20,8 +20,7 @@ Multi-tenant B2B SaaS for live performing arts management. Replaces Excel + Driv
 ## Quickstart for developers
 
 ```bash
-# Install
-cd apps/web
+# Install (from repo root)
 pnpm install
 
 # Dev server
@@ -30,6 +29,22 @@ pnpm dev        # localhost:5173
 # Type generation (after DB changes)
 pnpm cf-typegen # generates worker-configuration.d.ts
 ```
+
+### Recovery (fresh machine / post-wipe)
+
+The repo clones clean, but two gitignored things must be recreated:
+
+```bash
+pnpm install                                  # 1. deps (3 workspace projects)
+cp apps/web/.env.example apps/web/.env        # 2. fill PUBLIC_SUPABASE_* from
+                                              #    apps/web/wrangler.jsonc [vars]
+                                              #    (public-safe; anon key is the
+                                              #    publishable sb_publishable_ key)
+pnpm dev                                       # 3. localhost:5173 → /h/muk-cia, /h/demo
+```
+
+The only real secret in `.env` is `SENTRY_AUTH_TOKEN` (optional — source-map upload on
+build only; dev doesn't need it). DB is Supabase Cloud `hour-phase0`, nothing to run locally.
 
 ## Where docs live
 
