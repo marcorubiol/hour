@@ -43,12 +43,14 @@ export default defineConfig(({ mode }) => {
         VitePWA({
           registerType: 'prompt',
           injectRegister: false,
-          // Serve the generated manifest in `pnpm dev` so the browser
-          // doesn't 404 it on every page load. Production build still
-          // generates the real precache. `type: 'module'` keeps the SW
-          // build aligned with the prod output.
+          // SW disabled in `pnpm dev`: an active dev SW precaches the
+          // /offline page and serves it stuck whenever the dev server
+          // hiccups/restarts (the "You're back online" trap). Test PWA /
+          // offline behaviour via `pnpm preview` (runs the real Worker) or
+          // production, not vite dev. Cost of disabling: a cosmetic manifest
+          // 404 in the dev console — harmless. Prod build is unaffected.
           devOptions: {
-            enabled: true,
+            enabled: false,
             type: 'module',
           },
           manifest: {
