@@ -224,3 +224,5 @@ El repo se clona limpio pero dos cosas son gitignored y se pierden — recrearla
 3. **Arrancar:** `pnpm dev` → `http://localhost:5173`. Rutas con datos reales: `/h/muk-cia` (MaMeMi, 154 engagements) y `/h/demo` (Última órbita). La DB es Supabase Cloud, no hay que levantar nada local.
 
 `pnpm install` con pnpm 10 ignora los build scripts de `workerd`/`esbuild`/`sharp`/`@sentry/cli` por defecto — fijados en `package.json` § `pnpm.onlyBuiltDependencies` para que `wrangler dev`/`deploy` funcionen sin intervención. `vite dev` funciona aunque no se construyan.
+
+**Nunca `pnpm install` con `pnpm dev` vivo.** El install reconstruye los binarios de `esbuild`/`workerd` que vite tiene cargados en memoria → el dev server muere al siguiente request (síntoma: `ELIFECYCLE Command failed`, a veces tras un 404 cualquiera que parece la causa pero no lo es). Para instalar: para el dev, `pnpm install`, reinicia.
