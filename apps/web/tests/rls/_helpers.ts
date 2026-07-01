@@ -100,6 +100,44 @@ export async function pgGet<T = unknown>(
   return { status: res.status, rows };
 }
 
+/**
+ * Run a PATCH against PostgREST as either `authenticated` (with JWT) or
+ * `anon` (no JWT), asking for `return=representation`. Like pgGet it never
+ * throws on non-2xx — `rows` stays empty and `status` carries the code.
+ * Zero returned rows on a 2xx means the filter matched nothing OR RLS
+ * denied the update; PostgREST does not distinguish the two.
+ */
+export async function pgPatch<T = unknown>(
+  path: string,
+  jwt: string | null,
+  patch: Record<string, unknown>,
+  search?: URLSearchParams,
+): Promise<PgResult<T>> {
+  const { url, anon } = requireEnv();
+  const u = new URL(`/rest/v1/${path.replace(/^\/+/, '')}`, url);
+  if (search) for (const [k, v] of search) u.searchParams.append(k, v);
+
+  const headers: Record<string, string> = {
+    apikey: anon,
+    Authorization: `Bearer ${jwt ?? anon}`,
+    Accept: 'application/json',
+    'content-type': 'application/json',
+    Prefer: 'return=representation',
+  };
+
+  const res = await fetch(u.toString(), {
+    method: 'PATCH',
+    headers,
+    body: JSON.stringify(patch),
+  });
+  let rows: T[] = [];
+  if (res.ok) {
+    const body = await res.text();
+    if (body) rows = JSON.parse(body) as T[];
+  }
+  return { status: res.status, rows };
+}
+
 /** Decode a JWT body (no signature verification — just inspect claims). */
 export function decodeJwt(jwt: string): Record<string, unknown> {
   const [, payload] = jwt.split('.');
