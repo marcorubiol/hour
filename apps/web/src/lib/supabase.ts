@@ -47,6 +47,15 @@ function baseHeaders(env: SupabaseEnv, jwt: string | null): Record<string, strin
   };
 }
 
+function resourceUrl(env: SupabaseEnv, path: string, search?: PostgrestOptions['search']): URL {
+  const url = new URL(`/rest/v1/${path.replace(/^\/+/, '')}`, env.PUBLIC_SUPABASE_URL);
+  if (search) {
+    const params = search instanceof URLSearchParams ? search : new URLSearchParams(search);
+    for (const [k, v] of params) url.searchParams.append(k, v);
+  }
+  return url;
+}
+
 /**
  * GET a PostgREST resource with the caller's JWT. If jwt is null, the request
  * runs as `anon` — useful for smoke-tests but RLS will deny most tables.
@@ -57,14 +66,7 @@ export async function pgGet<T = unknown>(
   jwt: string | null,
   options: PostgrestOptions = {},
 ): Promise<PostgrestResult<T>> {
-  const url = new URL(`/rest/v1/${path.replace(/^\/+/, '')}`, env.PUBLIC_SUPABASE_URL);
-  if (options.search) {
-    const params =
-      options.search instanceof URLSearchParams
-        ? options.search
-        : new URLSearchParams(options.search);
-    for (const [k, v] of params) url.searchParams.append(k, v);
-  }
+  const url = resourceUrl(env, path, options.search);
 
   const headers = baseHeaders(env, jwt);
   if (options.exactCount) headers.Prefer = 'count=exact';
@@ -88,6 +90,41 @@ export async function pgGet<T = unknown>(
   }
 
   return { data, total, status: res.status };
+}
+
+/**
+ * PATCH a PostgREST resource with the caller's JWT. `options.search` must
+ * carry the row filter (e.g. `id=eq.<uuid>`) plus an optional `select` for
+ * the returned shape. Asks for `return=representation`, so `data` holds the
+ * updated rows — an empty array means no row matched the filter (missing id
+ * or RLS denied; PostgREST does not distinguish the two).
+ */
+export async function pgPatch<T = unknown>(
+  env: SupabaseEnv,
+  path: string,
+  jwt: string | null,
+  patch: Record<string, unknown>,
+  options: PostgrestOptions = {},
+): Promise<PostgrestResult<T>> {
+  const url = resourceUrl(env, path, options.search);
+
+  const headers: Record<string, string> = {
+    ...baseHeaders(env, jwt),
+    'content-type': 'application/json',
+    Prefer: 'return=representation',
+  };
+
+  const res = await fetch(url.toString(), {
+    method: 'PATCH',
+    headers,
+    body: JSON.stringify(patch),
+  });
+  const body = await res.text();
+
+  if (!res.ok) throw new PostgrestError(res.status, body);
+
+  const data = body ? (JSON.parse(body) as T[]) : [];
+  return { data, total: null, status: res.status };
 }
 
 /**

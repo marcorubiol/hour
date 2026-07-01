@@ -14,22 +14,16 @@
 import type { RequestHandler } from './$types';
 import * as v from 'valibot';
 import { extractBearer } from '$lib/auth';
-import type { Enums, Tables } from '$lib/db-types';
+import {
+  ENGAGEMENT_SELECT,
+  ENGAGEMENT_STATUSES,
+  type EngagementItem,
+} from '$lib/engagement';
 import { pgGet, PostgrestError, type SupabaseEnv } from '$lib/supabase';
-
-const ALLOWED_STATUSES: ReadonlyArray<Enums<'engagement_status'>> = [
-  'contacted',
-  'in_conversation',
-  'hold',
-  'confirmed',
-  'declined',
-  'dormant',
-  'recurring',
-];
 
 const QuerySchema = v.object({
   status: v.optional(
-    v.union([v.literal('any'), v.picklist(ALLOWED_STATUSES)]),
+    v.union([v.literal('any'), v.picklist(ENGAGEMENT_STATUSES)]),
     'contacted',
   ),
   project_slug: v.optional(v.pipe(v.string(), v.minLength(1)), 'mamemi'),
@@ -62,18 +56,6 @@ function json(body: unknown, status = 200): Response {
     status,
     headers: { 'content-type': 'application/json; charset=utf-8' },
   });
-}
-
-type EngagementRow = Tables<'engagement'>;
-type PersonLite = Pick<
-  Tables<'person'>,
-  'id' | 'full_name' | 'email' | 'organization_name' | 'country' | 'city' | 'website'
->;
-type ProjectLite = Pick<Tables<'project'>, 'id' | 'slug' | 'name' | 'status'>;
-
-interface EngagementItem extends EngagementRow {
-  person: PersonLite | null;
-  project: ProjectLite | null;
 }
 
 export const GET: RequestHandler = async ({ request, url, platform }) => {
@@ -110,13 +92,11 @@ export const GET: RequestHandler = async ({ request, url, platform }) => {
   const { status, project_slug, season, limit, offset } = parsed.output;
 
   const search = new URLSearchParams();
+  // Same embed as ENGAGEMENT_SELECT but with !inner on project — the list
+  // filters by project.slug, which needs an inner join to apply.
   search.set(
     'select',
-    [
-      '*',
-      'person:person_id(id,full_name,email,organization_name,country,city,website)',
-      'project:project_id!inner(id,slug,name,status)',
-    ].join(','),
+    ENGAGEMENT_SELECT.replace('project:project_id(', 'project:project_id!inner('),
   );
   search.set('project.slug', `eq.${project_slug}`);
   search.set('deleted_at', 'is.null');
