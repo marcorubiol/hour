@@ -3,6 +3,7 @@
   import { QueryClient, QueryClientProvider } from '@tanstack/svelte-query';
   import { browser } from '$app/environment';
   import { onMount, type Snippet } from 'svelte';
+  import Toast from '$lib/components/Toast.svelte';
   import { prewarmDB, registerServiceWorker } from '$lib/offline';
   import { provideTheme } from '$lib/theme.svelte';
 
@@ -40,3 +41,7 @@
 <QueryClientProvider client={queryClient}>
   {@render children()}
 </QueryClientProvider>
+
+<!-- App-global toast region (module store in Toast.svelte — any code calls
+     addToast()). Lives outside the provider: it renders no queries. -->
+<Toast />

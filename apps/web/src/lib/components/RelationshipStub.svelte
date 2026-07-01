@@ -17,6 +17,7 @@
   import { createQuery } from '@tanstack/svelte-query';
   import { goto } from '$app/navigation';
   import { writable, derived } from 'svelte/store';
+  import { statusBadgeClass, statusLabel } from '$lib/engagement';
 
   interface Props {
     projectSlug: string;
@@ -54,16 +55,6 @@
     total: number;
     limit: number;
     items: Engagement[];
-  };
-
-  const STATUS_LABELS: Record<string, string> = {
-    contacted: 'Contacted',
-    in_conversation: 'In conversation',
-    hold: 'Hold',
-    confirmed: 'Confirmed',
-    declined: 'Declined',
-    dormant: 'Dormant',
-    recurring: 'Recurring',
   };
 
   function clearAuthAndBounce() {
@@ -111,16 +102,6 @@
   let total = $derived($query.data?.total ?? 0);
   let loading = $derived($query.isPending);
   let errored = $derived($query.isError);
-
-  function statusLabel(s: string): string {
-    return STATUS_LABELS[s] ?? s;
-  }
-
-  // Mirror booking's transform: enum values use underscores, badge classes
-  // use dashes. Single source of truth lives in base.css.
-  function statusBadgeClass(s: string): string {
-    return `badge--${s.replace(/_/g, '-')}`;
-  }
 
   function locationStr(p: PersonLite | null): string {
     if (!p) return '';

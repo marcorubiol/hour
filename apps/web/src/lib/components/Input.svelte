@@ -9,7 +9,8 @@
     | 'search'
     | 'number'
     | 'tel'
-    | 'url';
+    | 'url'
+    | 'date';
 
   interface Props {
     label?: string;
