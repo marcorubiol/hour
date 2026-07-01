@@ -64,30 +64,20 @@ Working name: **Hour**. Brand decision deferred to Phase 1.
 - Parent MaMeMi context (where Difusión originated): `01_STAGE/ZS_MaMeMi/`
 - Source of the 156 existing programmers/festivals to import: `01_STAGE/ZS_MaMeMi/Difusión/`
 
-## Status — 2026-05-19
+## Status — 2026-07-01
 
-**Phase 0.1 cerrada 2026-05-18; sesión maratón 2026-05-19 (~7.5h, 27 commits 05:41 → 13:18) que no siguió el roadmap pero cerró deuda real**. La sesión empezó como checkpoint visual 1 + naming gate (los dos gates definidos 2026-05-14) y se fue ramificando a refactors estructurales conforme Marco vivía la UI productiva: ADR-035 (revert section → line), ADR-036 (show → performance), ADR-037 (cleanup ADR-008 vocab holdovers), ADR-038 (sidebar como filtro multi-select — pivot grande del modelo de navegación), ADR-039 (keep `/h/` prefix + shell hoist a `/h/+layout`).
+**ADR-040: primer write path en producción.** Tras ~6 semanas de pausa (última sesión de código 2026-05-19; solo recovery chores el 2026-06-04), un check-in estratégico detectó el riesgo "construido pero no usado": la app era read-only mientras la difusión 2026-27 real (su caso piloto, 154 engagements cargados) avanzaba fuera de Hour. Respuesta: adelantar el write path mínimo de engagement de Phase 0.5 a ya — excepción puntual, no reordenación de fases (ADR-040 en `_decisions.md`).
 
-Hitos del día (orden cronológico, commits clave):
+- `/booking` edita inline: **status** (menú sobre el propio badge, 7 estados) y **next action** (dialog con fecha + nota). Optimistic update con rollback + toast de error — el error→recovery loop que el roadmap exigía antes de cualquier PATCH (riesgo #5).
+- **`PATCH /api/engagements/:id`** — Valibot whitelist (status/next_action_at/next_action_note; columnas RLS-sensibles no pueden colarse), `deleted_at=is.null`, RLS decide vía `has_permission(project_id, 'edit:engagement')`. Respuesta = row + embeds (misma forma que la lista).
+- **Eliminado el TEMP VISUAL MOCK que llevaba en producción desde Phase 0.1** — las primeras 7 filas de la lista real mostraban estados falsos ("Remove before deploy" nunca ejecutado).
+- Infra nueva: `pgPatch` en `$lib/supabase.ts`, `$lib/engagement.ts` (vocabulario de status único — antes duplicado en booking + RelationshipStub — + contrato PATCH + tipos compartidos), `<Toast />` montado app-global en el layout raíz, `Input type="date"`.
+- Tests: 24 unit verdes (10 nuevos del contrato PATCH), suite RLS `engagement-write.test.ts` y e2e `engagement-write.spec.ts` nuevas (self-reverting sobre datos reales; skip sin `.env.test`).
+- Escrituras **online-only** con rollback claro; el write queue offline (primitivos IndexedDB ya en `$lib/offline/db.ts`) sigue siendo Phase 0.2+ — deuda explícita en ADR-040.
 
-- **ADR-034 `cast_member` + demo workspace data** (`fa54f67`, `27e5a66`) — tabla cast canónico project-scoped + sustituciones por performance via `cast_override`. Producción ficticia "Última órbita" cargada en workspace `demo` (3 performances BCN/MAD/VLC + 7 dates + 6 crew + 2 cast + 4 assets) para validar render multi-workspace. Gaps encontrados al cargar capturados en `_notes/_flux.md` § "Demo load: gaps descubiertos".
-- **Schema rename roundtrip: ADR-035 `section` → `line` revert** (`f99fbfa`, `98c7538`) — el `line → section` del 18 (ADR-031) duró 24h. Vivir la UI con "LINES" header productivo + contexto castellano demostró que "línea de trabajo" funciona para los 10 kinds (tour, season, residency, creation, campaign, comms, misc, etc.). Schema vuelve a `line` con los 4 enum values nuevos preservados.
-- **Data reorg MüK Cia / MaMeMi + ADR-036 `show` → `performance`** (`3690527`, `34e7fad`, `1cd5f0e`) — workspace renombrada (`mamemi` → `muk-cia`, display "MüK Cia"); project recuperó display "MaMeMi" (era "Difusión 2026-27" desde ADR-030); nueva line `difusion-2026-27` (kind=campaign) dentro de MaMeMi como frame operativo de la temporada. Schema `show` → `performance` para vocab cross-arts neutro (`performance_status` enum, view `performance_redacted`, 6 FK columns renombrados, helper functions con `p_performance_id`). Column `show_start_at` → `start_at`. 18 RLS policies recreadas.
-- **ADR-037 cleanup vocab holdovers** (`f5ccebe`) — URL `/h/[ws]/room/` → `/h/[ws]/project/`, `/h/[ws]/gig/` → `/h/[ws]/performance/`. Endpoints `/api/rooms` → `/api/projects`, `/api/houses` → `/api/workspaces`. Componente `RoomStructure.svelte` → `LineList.svelte`. Tipos internos `House/Room/HouseLite/RoomItem` → `Workspace/Project/WorkspaceLite/ProjectItem`. 301 redirects en `hooks.server.ts` para bookmarks viejos. Permission code `'edit:show'` queda inconsistente (closed RBAC vocab); deferido a Phase 0.9 admin UI.
-- **Checkpoint visual 2** (`9f8bcd9`) — dark mode + editorial-sobrio polish encima de ADR-033. Checkpoint visual 1 ratificado en la sesión (visual debt de 2026-05-18 — gap Room header / Plaza spacing / eyebrow duplicado — cerrada por la propia evolución del shell).
-- **Line detail page** (`a2dd352`) — `/h/[ws]/project/[slug]/line/[line]/` con LineList clickable. Primera ruta con scope intermedio entre project y performance.
-- **ADR-038 sidebar como filtro multi-select** (`8107fa3`) — el cambio conceptual más grande del día. Plaza pasa de single-select navigation a multi-select filter (workspaces Set + projects Set). LineList pasa de "lines del project activo o vacío" a SIEMPRE visible, filtrada por la unión. URL design: canonical cuando la selección colapsa a 1 entity, query params `?ws=&project=` para multi. Selection persiste en URL + localStorage fallback. Schema entregado: column `line.last_navigated_at` + RPC `touch_line_visit` + endpoint `/api/lines/visit`. Migración `2026-05-19_add_line_last_navigated_at.sql`.
-- **ADR-039 keep `/h/` prefix + shell hoist** (`a63941d`) — shell movido de `/h/[workspace]/+layout` a `/h/+layout` (resuelve la ambigüedad "browsing context vs workspace selected"). Re-evaluada la pregunta de dropear el prefix entero y rechazada: `/` queda libre para Phase 1 marketing/docs/billing.
-- **On-path visual marker decoupled** (`e77fbbd`) y luego retirado en ADR-038 cuando la sidebar dejó de ser navegación.
-- **D-PRE-05 wired: Settings page + Master View toggle** (`b387fe9`) — ruta `/h/[ws]/settings/` con `SettingsNav` reemplazando Plaza+LineList en sidebar, Master View toggle real conectado a localStorage (cierra trabajo #11 de Phase 0.1).
-- **In-place creation + focus mode en Plaza** (`0d0af25`, `63402c8`, `978926c`, `5a81089`) — workspace, project y line se crean inline desde la propia Plaza con action clusters por hover. Focus mode aísla una workspace/project mutando la selection (snapshot + restore on exit). Collapse/expand all workspaces. Infra schema: 3 RPCs (`create_workspace_rpc`, `create_project_rpc`, `create_line_rpc`) + columnas `workspace.accent + workspace.description`.
-- **Polish final** (`2d2ced9`, `1c24a4b`, `4436af8`) — workspace-to-workspace gap m → s, selected project name por weight bump (no por color), persistencia localStorage de lens + focus state cross-session.
+Sesión anterior (maratón 2026-05-19, 27 commits, ADRs 034-039: naming gate, sidebar como filtro, shell hoist): detalle completo en `_notes/sessions-log.md` § 2026-05-19.
 
-**Resultado**: el roadmap original de Phase 0.2 (Views + Road sheet colaborativo + Calendar) sigue siendo el destino, pero la arquitectura del shell ya no es la que describía el roadmap — el sidebar es filtro, no navegación. El roadmap (`build/roadmap.md`) tiene una nota de divergencia al inicio.
-
-Próxima fase: **Phase 0.2** — Calendar lens + Road sheet colaborativo. Deuda Phase 0.9 hardening en paralelo cuando convenga (cookies httpOnly, rate limiting, RLS regression suite — antes de cliente externo).
-
-Detalle granular en `_notes/sessions-log.md` § 2026-05-19.
+Próxima fase: **Phase 0.2** — Calendar lens + Road sheet colaborativo. El editor inline de engagement migrará a la Contacts lens en Phase 0.3. Deuda Phase 0.9 hardening en paralelo cuando convenga (cookies httpOnly, rate limiting — antes de cliente externo).
 
 ### DB en producción
 - `hour-phase0` · Postgres 17 · **25 tablas** + `performance_redacted` view · 24 functions · 78 RLS policies (ENABLE + FORCE)
@@ -96,13 +86,17 @@ Detalle granular en `_notes/sessions-log.md` § 2026-05-19.
 - Datos reales en `muk-cia`: **154 persons + 154 engagements** (status=`contacted`, `custom_fields.season='2026-27'`), 30 enriquecidos con dossier 2026, atados al project MaMeMi + line "Difusión 2026-27" (kind=campaign). Workspace `marco-rubiol` personal vacía. Workspace `demo` con "Última órbita" para validar render cross-workspace.
 - Migraciones aplicadas 2026-05-19 (orden cronológico): `add_cast_member`, `revert_section_to_line`, `rename_show_to_performance`, `data_rename_muk_cia`, `add_line_last_navigated_at`, `create_workspace_rpc`, `create_project_rpc`, `create_line_rpc`, `workspace_accent_and_description`.
 
-### Phase 0.1 — trabajos pendientes (post sesión 2026-05-19)
+### Phase 0.1 — trabajos pendientes (post 2026-07-01)
 Vocab actualizado tras ADR-037. Estado real:
 - **#3 PerformanceDetail mobile-first** (era GigDetail) — bloqueado por #6 + primera fecha real productiva.
 - **#5 ProductionStub** — bloqueado por #3.
 - **#6 Endpoints `/api/lines`, `/api/performances`, `/api/performances/:id`** — `/api/lines` ya construido en ADR-038. Faltan los de performances en mode read (write paths Phase 0.2+).
-- **#9 Write queue offline scaffolding** — bloqueado por write paths reales (PATCH inline status etc.); SW + IndexedDB ya en sitio desde Phase 0.0.
+- **#9 Write queue offline scaffolding** — DESBLOQUEADO por ADR-040 (primer write path real existe: `PATCH /api/engagements/:id`, mutación centralizada en un `createMutation`). El enqueue+replay+conflict UI sigue pendiente, Phase 0.2+.
 - **#11 Settings + Master View toggle** — ✅ CERRADO 2026-05-19 (commit `b387fe9`).
+
+### Deuda de test infra (2026-07-01)
+- **`.env.test` perdido en el recovery 2026-06-04** → smoke e2e + suites RLS se saltan (skip) en esta máquina. Recrear per `build/runbooks/test-user-setup.md` (resetear password del user `playwright@hour.test` desde el dashboard Supabase).
+- **Suites pre-rename desactualizadas**: `tests/smoke.spec.ts` (espera lens "Plaza" y URL `/h/mamemi/room/mamemi`) y `tests/rls/cross-tenant.test.ts` (espera workspace slug `mamemi`, hoy `muk-cia`; falta `demo` en el mundo) quedaron obsoletas con ADR-036/037 y nunca corrieron después. El runbook `test-user-setup.md` también describe el mundo viejo. Actualizarlas al recrear credenciales — no antes (editarlas sin poder ejecutarlas es adivinar). Las suites nuevas de ADR-040 (`engagement-write.*`) ya están escritas contra el mundo actual.
 
 ### Gates Phase 0.1 — ambos cerrados
 - ✅ **Checkpoint visual 1** — ratificado en sesión 2026-05-19. Visual debt 2026-05-18 (gap Room header, Plaza spacing, eyebrow duplicado) resuelta por evolución del shell. Checkpoint visual 2 (`9f8bcd9`) añadió dark mode + polish editorial-sobrio encima.

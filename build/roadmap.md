@@ -23,6 +23,8 @@ Antes de cualquier trabajo: leer primero el [`_context.md`](../_context.md) del 
  
 **Phase 0.0 + 0.1 cerradas 2026-05-19**. Arrancar Phase 0.2 — Calendar lens + Road sheet colaborativo.
 
+> **Nota 2026-07-01 (ADR-040)** — El item 3 de Phase 0.5 ("inline status change + PATCH con error recovery loop") se adelantó y está EN PRODUCCIÓN: `/booking` edita status + next action inline con optimistic/rollback/toast, detrás de `PATCH /api/engagements/:id`. Razón: la app era read-only y la difusión 2026-27 real avanzaba fuera de Hour (riesgo "construido pero no usado"). Excepción puntual, no reordenación — Phase 0.2 sigue siendo la siguiente fase. El write queue offline de 0.1 #9 queda desbloqueado pero sigue pendiente (0.2+). Ver ADR-040.
+
 > **Nota de divergencia 2026-05-19** — La sesión maratón del 2026-05-19 (27 commits, 6 ADRs nuevos: 034, 035, 036, 037, 038, 039) no siguió el orden del roadmap: arrancó como validación de gates Phase 0.1 y se fue ramificando a refactors estructurales conforme Marco vivía la UI productiva. Cerró deuda real (visual checkpoint 1 ratificado + 2 nuevo, naming gate completo, sidebar pivotado a filtro multi-select via ADR-038, shell hoist via ADR-039, D-PRE-05 Master View wired, in-place creation en Plaza, persistencia localStorage), pero el **modelo de shell descrito en este roadmap ya no coincide con lo construido**: el sidebar pasó de navegación exclusiva a filtro multi-select orto. Ver `_notes/sessions-log.md` § 2026-05-19 para el detalle. Phase 0.2 arranca con menos deuda visible pero con una arquitectura de selección distinta a la planificada.
 
 Gates Phase 0.1 — ambos cerrados 2026-05-19:
@@ -433,7 +435,7 @@ Orden por valor/coste:
 
 1. **D3 task entity** + manual tasks atacheadas a Gig/Room.
 2. **Asset upload resumable** (D-PRE-09) con `tus-js-client` + R2. Adaptación per-venue + inbound.
-3. **Inline status change** + PATCH con error recovery loop completo.
+3. **Inline status change** + PATCH con error recovery loop completo. ✓ ADELANTADO — en producción 2026-07-01 (ADR-040): engagement status + next action en `/booking`. Para otras entidades (performance, line) sigue aquí.
 4. **`share` — per-engagement curated microsite** (ADR-028). Lazy-creado al primer click de "share"; signed URL larga duración + rotable; show-driven branding con subtítulo customizable; assets canónicos del show + uploads engagement-scope; email archive vía BCC a `eng-xxx@in.hour.zerosense.studio` (Cloudflare Email Workers); tracking medio (qué archivos descarga). Reusa `asset_version` + R2. Adelanta D6 (público guest links) y D4 (ingest only). Coste 2-3 semanas. Wedge de diferenciación vs Drive/WeTransfer.
 5. **AI integration D8**: decision windows + dossier draft + visual markers.
 6. **Audit log UI** — historial en Gig/Room detail, diff viewer.
