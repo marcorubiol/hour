@@ -42,7 +42,22 @@ export function statusBadgeClass(status: string): string {
  */
 export const EngagementPatchSchema = v.object({
   status: v.optional(v.picklist(ENGAGEMENT_STATUSES)),
-  next_action_at: v.optional(v.nullable(v.pipe(v.string(), v.isoDate()))),
+  // isoDate is regex-only (accepts 2026-02-31); the round-trip check keeps
+  // impossible calendar dates from reaching Postgres as a 5xx.
+  next_action_at: v.optional(
+    v.nullable(
+      v.pipe(
+        v.string(),
+        v.isoDate(),
+        // Valibot runs later pipe actions even when isoDate already
+        // failed, so guard the Invalid Date case before toISOString().
+        v.check((s) => {
+          const d = new Date(`${s}T00:00:00Z`);
+          return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;
+        }, 'Not a real calendar date'),
+      ),
+    ),
+  ),
   next_action_note: v.optional(
     v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))),
   ),

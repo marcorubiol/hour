@@ -35,6 +35,18 @@ describe('EngagementPatchSchema', () => {
     expect(r.success).toBe(false);
   });
 
+  it('rejects impossible calendar dates that pass the isoDate regex', () => {
+    for (const bad of ['2026-02-31', '2026-06-31', '2026-02-29']) {
+      expect(v.safeParse(EngagementPatchSchema, { next_action_at: bad }).success).toBe(
+        false,
+      );
+    }
+    // Real leap day passes.
+    expect(
+      v.safeParse(EngagementPatchSchema, { next_action_at: '2024-02-29' }).success,
+    ).toBe(true);
+  });
+
   it('trims the note and accepts null to clear it', () => {
     const r = v.safeParse(EngagementPatchSchema, { next_action_note: '  call back  ' });
     expect(r.success).toBe(true);

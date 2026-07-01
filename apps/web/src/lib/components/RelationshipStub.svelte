@@ -17,7 +17,12 @@
   import { createQuery } from '@tanstack/svelte-query';
   import { goto } from '$app/navigation';
   import { writable, derived } from 'svelte/store';
-  import { statusBadgeClass, statusLabel } from '$lib/engagement';
+  import {
+    statusBadgeClass,
+    statusLabel,
+    type EngagementItem,
+    type PersonLite,
+  } from '$lib/engagement';
 
   interface Props {
     projectSlug: string;
@@ -36,25 +41,10 @@
     slugStore.set(projectSlug);
   });
 
-  type PersonLite = {
-    full_name: string | null;
-    organization_name: string | null;
-    city: string | null;
-    country: string | null;
-  };
-
-  type Engagement = {
-    id: string;
-    status: string;
-    next_action_at: string | null;
-    next_action_note: string | null;
-    person: PersonLite | null;
-  };
-
   type Response = {
     total: number;
     limit: number;
-    items: Engagement[];
+    items: EngagementItem[];
   };
 
   function clearAuthAndBounce() {

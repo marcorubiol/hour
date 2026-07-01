@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
-  import { derived, get, writable } from 'svelte/store';
+  import { derived, writable } from 'svelte/store';
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import Button from '$lib/components/Button.svelte';
   import Dialog from '$lib/components/Dialog.svelte';
@@ -12,22 +12,10 @@
     ENGAGEMENT_STATUSES,
     statusBadgeClass,
     statusLabel,
+    type EngagementItem,
     type EngagementPatch,
     type EngagementStatus,
   } from '$lib/engagement';
-
-  type EngagementItem = {
-    id: string;
-    status: string;
-    next_action_at: string | null;
-    next_action_note: string | null;
-    person: {
-      full_name: string | null;
-      organization_name: string | null;
-      city: string | null;
-      country: string | null;
-    } | null;
-  };
 
   type EngagementsResponse = {
     total: number;
@@ -147,19 +135,27 @@
       return body.item;
     },
     onMutate: async ({ id, patch }: PatchInput) => {
-      const key = queryKeyFor(get(offset));
-      await queryClient.cancelQueries({ queryKey: key });
-      const prev = queryClient.getQueryData<EngagementsResponse>(key);
-      if (prev) {
+      // Patch every cached page that holds the row, not the page implied by
+      // the current offset — during a pagination transition the visible rows
+      // still belong to the previous page (placeholderData), so keying off
+      // get(offset) would repaint (and roll back) the wrong cache entry.
+      await queryClient.cancelQueries({ queryKey: ['engagements'] });
+      const pages = queryClient
+        .getQueriesData<EngagementsResponse>({ queryKey: ['engagements'] })
+        .filter(([, d]) => d?.items.some((it) => it.id === id));
+      for (const [key, data] of pages) {
+        if (!data) continue;
         queryClient.setQueryData<EngagementsResponse>(key, {
-          ...prev,
-          items: prev.items.map((it) => (it.id === id ? { ...it, ...patch } : it)),
+          ...data,
+          items: data.items.map((it) => (it.id === id ? { ...it, ...patch } : it)),
         });
       }
-      return { key, prev };
+      return { pages };
     },
     onError: (err, _vars, ctx) => {
-      if (ctx?.prev) queryClient.setQueryData(ctx.key, ctx.prev);
+      for (const [key, data] of ctx?.pages ?? []) {
+        queryClient.setQueryData(key, data);
+      }
       addToast({
         tone: 'danger',
         title: 'Change not saved',
@@ -168,12 +164,14 @@
     },
     onSuccess: (item, _vars, ctx) => {
       // Replace the optimistic row with the server truth.
-      const cur = queryClient.getQueryData<EngagementsResponse>(ctx.key);
-      if (cur) {
-        queryClient.setQueryData<EngagementsResponse>(ctx.key, {
-          ...cur,
-          items: cur.items.map((it) => (it.id === item.id ? { ...it, ...item } : it)),
-        });
+      for (const [key] of ctx?.pages ?? []) {
+        const cur = queryClient.getQueryData<EngagementsResponse>(key);
+        if (cur) {
+          queryClient.setQueryData<EngagementsResponse>(key, {
+            ...cur,
+            items: cur.items.map((it) => (it.id === item.id ? { ...it, ...item } : it)),
+          });
+        }
       }
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey: ['engagements'] }),
@@ -294,7 +292,7 @@
           <td>
             <Menu
               label="Change status"
-              triggerClass="{statusBadgeClass(item.status)} status-trigger"
+              triggerClass={statusBadgeClass(item.status)}
               direction={i >= items.length - 2 && i > 2 ? 'up' : 'down'}
             >
               {#snippet trigger()}
@@ -448,13 +446,8 @@
       font-size: var(--text-s);
     }
 
-    /* Status badge doubles as the menu trigger — same badge-- variable
-       contract from base.css, plus button affordances. */
-    :global(.status-trigger) {
-      cursor: pointer;
-      border-color: var(--badge-border-color);
-      font-family: inherit;
-    }
+    /* Status badge doubles as the menu trigger — the badge-- variable
+       contract plus the base.css button reset already cover it. */
     .status-caret {
       opacity: 0.5;
       margin-inline-start: 0.35em;
@@ -462,17 +455,12 @@
     }
 
     /* Next-action cell is a click-to-edit surface: date on top, note
-       truncated underneath. */
+       truncated underneath. Button reset covers the rest. */
     .next-action {
       display: flex;
       flex-direction: column;
       align-items: flex-start;
-      gap: 2px;
-      background: none;
-      border: 0;
-      padding: 0;
-      cursor: pointer;
-      font: inherit;
+      gap: var(--space-2xs);
       text-align: start;
       max-inline-size: 100%;
     }

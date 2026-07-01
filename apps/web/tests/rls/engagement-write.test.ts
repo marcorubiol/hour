@@ -57,18 +57,25 @@ describe.skipIf(!envReady())('RLS — engagement write path', () => {
   });
 
   test('member with edit:engagement can update a row (no-op values, real UPDATE)', async () => {
-    // Grab one engagement the user can read…
-    const readable = await pgGet<EngagementRow>(
+    // Pin the pick to the workspace where the fixture user is admin
+    // (`muk-cia`, renamed from `mamemi` on 2026-05-19) — read:engagement
+    // does NOT imply edit:engagement, so an arbitrary readable row could
+    // be read-only and turn this test red for the wrong reason. Admin
+    // bypass in has_permission() guarantees edit here. order makes the
+    // pick deterministic.
+    const readable = await pgGet<EngagementRow & { workspace: { slug: string } }>(
       'engagement',
       jwt,
       new URLSearchParams({
-        select: 'id,status,next_action_note',
+        select: 'id,status,next_action_note,workspace!inner(slug)',
+        'workspace.slug': 'eq.muk-cia',
         deleted_at: 'is.null',
+        order: 'id.asc',
         limit: '1',
       }),
     );
     expect(readable.rows.length).toBe(1);
-    const row = readable.rows[0];
+    const { workspace: _ws, ...row } = readable.rows[0];
 
     // …and write back exactly what it already holds. RLS must let the
     // UPDATE through and return the representation.
