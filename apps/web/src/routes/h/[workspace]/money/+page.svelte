@@ -3,7 +3,11 @@
    * Money lens — Phase 0.3 (ADR-046). Read path is `performance_redacted`
    * (fees NULLed without read:money); fee editing lives HERE by design —
    * ADR-043 deliberately kept fee out of the performance write path.
-   * Invoices are read-only (creation is Phase 0.5).
+   *
+   * Invoices (ADR-050): created FROM a gig's fee (one line, amounts
+   * snapshot the fee + VAT/IRPF at creation — later fee edits don't
+   * retro-edit). Lifecycle: draft → issued → paid, cancelled from
+   * anywhere; only drafts can be discarded.
    *
    * Filter = sidebar selection (ADR-038), like every lens.
    */
@@ -15,6 +19,7 @@
   import Button from '$lib/components/Button.svelte';
   import Dialog from '$lib/components/Dialog.svelte';
   import Input from '$lib/components/Input.svelte';
+  import Menu from '$lib/components/Menu.svelte';
   import StateBadge from '$lib/components/StateBadge.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
   import { dayLabel } from '$lib/datetime';
@@ -206,6 +211,154 @@
     }
     $feeMutation.mutate({ id: editing.id, fee_amount: amount, fee_currency: fCurrency });
   }
+
+  // ── Invoice creation (ADR-050) ────────────────────────────────────────
+  const INVOICE_STATUSES = ['draft', 'issued', 'paid', 'cancelled'] as const;
+
+  function invoiceTone(status: string): 'neutral' | 'warning' | 'faint' | 'danger' {
+    if (status === 'issued') return 'warning';
+    if (status === 'paid') return 'faint';
+    if (status === 'cancelled') return 'danger';
+    return 'neutral';
+  }
+
+  let invOpen = $state(false);
+  let invPerf = $state<MoneyPerformance | null>(null);
+  let iVat = $state('');
+  let iIrpf = $state('');
+  let iNumber = $state('');
+  let iDueOn = $state('');
+  let iNotes = $state('');
+
+  function openInvoice(f: MoneyPerformance) {
+    invPerf = f;
+    iVat = '';
+    iIrpf = '';
+    iNumber = '';
+    iDueOn = '';
+    iNotes = '';
+    invOpen = true;
+  }
+
+  function pctOrNull(raw: unknown): number | null {
+    const s = String(raw ?? '').trim();
+    if (s === '') return null;
+    return Number(s);
+  }
+
+  let invTotal = $derived.by(() => {
+    const fee = invPerf?.fee_amount ?? 0;
+    const vat = pctOrNull(iVat);
+    const irpf = pctOrNull(iIrpf);
+    const vatAmt = vat === null ? 0 : Math.round(fee * vat) / 100;
+    const irpfAmt = irpf === null ? 0 : Math.round(fee * irpf) / 100;
+    return fee + vatAmt - irpfAmt;
+  });
+
+  const createInvoice = createMutation({
+    mutationFn: async () => {
+      const res = await fetch('/api/invoices', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('hour_jwt')}`,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          performance_id: invPerf!.id,
+          vat_pct: pctOrNull(iVat),
+          irpf_pct: pctOrNull(iIrpf),
+          number: iNumber.trim() || null,
+          due_on: iDueOn || null,
+          notes: iNotes.trim() || null,
+        }),
+      });
+      const body = (await res.json().catch(() => ({}))) as {
+        invoice?: unknown;
+        detail?: string;
+        error?: string;
+      };
+      if (!res.ok || !body.invoice) {
+        throw new Error(body.detail || body.error || `Error ${res.status}`);
+      }
+      return body.invoice;
+    },
+    onSuccess: () => {
+      invOpen = false;
+      invPerf = null;
+      void queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      addToast({ tone: 'success', message: 'Draft invoice created.' });
+    },
+    onError: (err) => {
+      addToast({
+        tone: 'danger',
+        title: 'Invoice not created',
+        message: err instanceof Error ? err.message : 'Unexpected error',
+      });
+    },
+  });
+
+  function submitInvoice() {
+    const vat = pctOrNull(iVat);
+    const irpf = pctOrNull(iIrpf);
+    for (const p of [vat, irpf]) {
+      if (p !== null && (Number.isNaN(p) || p < 0 || p > 100)) {
+        addToast({ tone: 'warning', message: 'VAT / IRPF must be a percentage 0–100 (or empty).' });
+        return;
+      }
+    }
+    $createInvoice.mutate();
+  }
+
+  const invoiceStatusMutation = createMutation({
+    mutationFn: async (input: { id: string; status: string }) => {
+      const res = await fetch(`/api/invoices/${input.id}`, {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('hour_jwt')}`,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ status: input.status }),
+      });
+      const body = (await res.json().catch(() => ({}))) as {
+        invoice?: unknown;
+        detail?: string;
+        error?: string;
+      };
+      if (!res.ok || !body.invoice) {
+        throw new Error(body.detail || body.error || `Error ${res.status}`);
+      }
+      return body.invoice;
+    },
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['invoices'] }),
+    onError: (err) => {
+      addToast({
+        tone: 'danger',
+        title: 'Status not changed',
+        message: err instanceof Error ? err.message : 'Unexpected error',
+      });
+    },
+  });
+
+  const discardInvoice = createMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/invoices/${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${localStorage.getItem('hour_jwt')}` },
+      });
+      if (!res.ok && res.status !== 204) {
+        const body = (await res.json().catch(() => ({}))) as { detail?: string; error?: string };
+        throw new Error(body.detail || body.error || `Error ${res.status}`);
+      }
+    },
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['invoices'] }),
+    onError: (err) => {
+      addToast({
+        tone: 'danger',
+        title: 'Draft not discarded',
+        message: err instanceof Error ? err.message : 'Unexpected error',
+      });
+    },
+  });
 </script>
 
 <svelte:head>
@@ -251,6 +404,7 @@
                 <th>Where</th>
                 <th>Status</th>
                 <th>Fee</th>
+                <th aria-label="Actions"></th>
               </tr>
             </thead>
             <tbody>
@@ -283,6 +437,13 @@
                       {fmtFee(f.fee_amount, f.fee_currency)}
                     </button>
                   </td>
+                  <td class="mny__cell-actions">
+                    {#if f.fee_amount !== null}
+                      <Button size="xs" variant="outline" onclick={() => openInvoice(f)}>
+                        Invoice
+                      </Button>
+                    {/if}
+                  </td>
                 </tr>
               {/each}
             </tbody>
@@ -294,19 +455,55 @@
     <section class="mny__section" aria-label="Invoices">
       <p class="eyebrow">Invoices</p>
       {#if invoices.length === 0}
-        <p class="mny__state">No invoices yet — invoice creation lands in Phase 0.5.</p>
+        <p class="mny__state">No invoices yet — create one from a gig's fee above.</p>
       {:else}
         <ul class="mny__invoices" role="list">
           {#each invoices as inv (inv.id)}
             <li>
-              <span class="mny__inv-number">{inv.number ?? 'draft'}</span>
+              <span class="mny__inv-number">{inv.number ?? 'no number'}</span>
               <span class="mny__inv-main">
                 {inv.payer?.organization_name ?? inv.payer?.full_name ?? '—'}
                 {#if inv.project}<span class="mny__cell-muted"> · {inv.project.name}</span>{/if}
               </span>
               <span class="mny__cell-date">{dayLabel(inv.issued_on)}</span>
               <span class="mny__inv-total">{money.format(inv.total)} {inv.currency}</span>
-              <span class="mny__inv-status">{inv.status}</span>
+              <span class="mny__inv-actions">
+                <Menu label="Change invoice status" triggerClass="btn--outline btn--xs">
+                  {#snippet trigger()}
+                    <StateBadge label={inv.status} tone={invoiceTone(inv.status)} />
+                    <span aria-hidden="true">▾</span>
+                  {/snippet}
+                  {#snippet children({ close })}
+                    {#each INVOICE_STATUSES as s (s)}
+                      <li role="none">
+                        <button
+                          type="button"
+                          role="menuitem"
+                          class="menu__item{s === inv.status ? ' menu__item--active' : ''}"
+                          onclick={() => {
+                            close();
+                            if (s !== inv.status)
+                              $invoiceStatusMutation.mutate({ id: inv.id, status: s });
+                          }}
+                        >
+                          {s}
+                        </button>
+                      </li>
+                    {/each}
+                  {/snippet}
+                </Menu>
+                {#if inv.status === 'draft'}
+                  <Button
+                    size="xs"
+                    variant="outline"
+                    tone="warn"
+                    loading={$discardInvoice.isPending}
+                    onclick={() => $discardInvoice.mutate(inv.id)}
+                  >
+                    Discard
+                  </Button>
+                {/if}
+              </span>
             </li>
           {/each}
         </ul>
@@ -330,6 +527,34 @@
   {#snippet actions()}
     <Button variant="outline" onclick={() => (dialogOpen = false)}>Cancel</Button>
     <Button onclick={saveFee} loading={$feeMutation.isPending}>Save</Button>
+  {/snippet}
+</Dialog>
+
+<Dialog bind:open={invOpen} title="New invoice" size="m" onclose={() => (invPerf = null)}>
+  {#if invPerf}
+    <p class="mny__dialog-who">
+      {invPerf.project?.name ?? ''} — {[invPerf.venue_name, invPerf.city]
+        .filter(Boolean)
+        .join(', ')} · {dayLabel(invPerf.performed_at)}
+    </p>
+    <p class="mny__inv-fee-line">
+      Fee (subtotal): <strong>{fmtFee(invPerf.fee_amount, invPerf.fee_currency)}</strong>
+      — amounts snapshot the fee at creation.
+    </p>
+    <div class="mny__inv-form">
+      <Input label="VAT %" type="number" bind:value={iVat} placeholder="e.g. 21 — empty = none" />
+      <Input label="IRPF %" type="number" bind:value={iIrpf} placeholder="e.g. 15 — empty = none" />
+      <Input label="Number" bind:value={iNumber} placeholder="Optional — your series" />
+      <Input label="Due on" type="date" bind:value={iDueOn} />
+    </div>
+    <Input label="Notes" bind:value={iNotes} placeholder="Optional" />
+    <p class="mny__inv-total-preview">
+      Total: <strong>{money.format(invTotal)} {invPerf.fee_currency ?? 'EUR'}</strong>
+    </p>
+  {/if}
+  {#snippet actions()}
+    <Button variant="outline" onclick={() => (invOpen = false)}>Cancel</Button>
+    <Button onclick={submitInvoice} loading={$createInvoice.isPending}>Create draft</Button>
   {/snippet}
 </Dialog>
 
@@ -450,11 +675,14 @@
       font-size: var(--text-s);
     }
 
-    .mny__inv-status {
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      color: var(--text-muted);
-      text-transform: lowercase;
+    .mny__inv-actions {
+      display: flex;
+      align-items: center;
+      gap: var(--space-xs);
+    }
+
+    .mny__cell-actions {
+      text-align: end;
     }
 
     .mny__dialog-who {
@@ -466,6 +694,24 @@
       display: grid;
       grid-template-columns: 2fr 1fr;
       gap: var(--space-m);
+      margin-block-start: var(--space-s);
+    }
+
+    .mny__inv-fee-line {
+      font-size: var(--text-s);
+      color: var(--text-muted);
+      margin-block-start: var(--space-xs);
+    }
+
+    .mny__inv-form {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+      gap: var(--space-s) var(--space-m);
+      margin-block: var(--space-s);
+    }
+
+    .mny__inv-total-preview {
+      font-size: var(--text-s);
       margin-block-start: var(--space-s);
     }
   }

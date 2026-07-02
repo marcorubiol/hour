@@ -64,6 +64,10 @@ Working name: **Hour**. Brand decision deferred to Phase 1.
 - Parent MaMeMi context (where Difusión originated): `01_STAGE/ZS_MaMeMi/`
 - Source of the 156 existing programmers/festivals to import: `01_STAGE/ZS_MaMeMi/Difusión/`
 
+## Status — 2026-07-02 (noche, 7)
+
+**ADR-050: invoice creation — el ciclo de dinero completo.** La factura nace del fee: botón "Invoice" en la Money lens → dialog IVA/IRPF/número/vencimiento con preview → RPC `create_invoice` (sexto claim-bound; snapshot del fee, forma fiscal ES total = subtotal + IVA − IRPF, una línea auto-descrita) → lifecycle draft→issued→paid/cancelled por menú (PATCH directo, la policy no es claim-bound) + descarte de drafts vía `delete_invoice` (ADR-048). Con esto **todo lo pendiente del tintero está cerrado**: D6 link público (047), misterio RLS + botón borrar nota (048), venue enlazable (049), invoices (050). Fixtures e2e purgados (20 gigs huérfanos de performance-write; el spec sigue sin poder auto-limpiarse — no hay delete de performance, pendiente de ADR-043 re-evaluate). Suite 11/11 producción + unit 53/53 + RLS 19/19.
+
 ## Status — 2026-07-02 (noche, 6)
 
 **ADR-049: venue enlazable.** El trío denormalizado (venue_name/city/country) se promueve a entidad `venue` desde el dialog de edición ("Save fields as venue", RPC `create_venue` idempotente sobre name+city — quinto caso del patrón claim-bound) y se enlaza vía select; guard `cross_workspace_link` en el PATCH. Desbloquea timezone/address/contacts reales en road sheet (incluido el público). Gotcha Svelte 5 cazado: toStore leyendo un $derived declarado más abajo → TDZ → página en blanco; los bloques van después del derived. Suite 11/11 contra producción.
