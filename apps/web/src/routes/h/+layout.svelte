@@ -322,31 +322,42 @@
   ];
 
   // Lenses with a routed page navigate (URL is canonical, ADR-022);
-  // contacts/money stay state-only until their pages exist (Phase 0.3).
+  // money stays state-only until its page exists (Phase 0.3).
+  const ROUTED_LENSES: Partial<Record<Lens, string>> = {
+    calendar: 'calendar',
+    contacts: 'contacts',
+  };
+
   function selectLens(id: Lens) {
     lens.set(id);
     if (!hasWorkspace) return;
-    if (id === 'calendar') {
-      void goto(`/h/${workspaceSlug}/calendar`);
-    } else if (id === 'today' && onCalendarRoute) {
-      // Leaving the calendar must not rewrite the filter: serialize the
+    const segment = ROUTED_LENSES[id];
+    if (segment) {
+      void goto(`/h/${workspaceSlug}/${segment}`);
+    } else if (id === 'today' && routedLens) {
+      // Leaving a routed lens must not rewrite the filter: serialize the
       // live selection (multi-select survives); bare context as fallback.
       const hasSelection = selection.workspaces.size > 0 || selection.projects.size > 0;
       void goto(hasSelection ? selection.toUrl() : `/h/${workspaceSlug}/`);
     }
   }
 
-  let onCalendarRoute = $derived(/^\/h\/[^/]+\/calendar\/?$/.test(page.url.pathname));
+  // Which routed lens (if any) the current URL is showing.
+  let routedLens = $derived.by<Lens | null>(() => {
+    const m = page.url.pathname.match(/^\/h\/[^/]+\/(calendar|contacts)\/?$/);
+    return (m?.[1] as Lens | undefined) ?? null;
+  });
 
   // Keep the pill state honest when navigation happens outside the pills
   // (deep link, browser back, the Today dashboard's "Open calendar →").
   // Lens reads go through untrack so this reacts to ROUTE changes only —
-  // otherwise it would instantly revert any state-only pill (Contacts,
-  // Money) clicked while on the calendar route.
+  // otherwise it would instantly revert any state-only pill (Money)
+  // clicked while on a routed-lens URL.
   $effect(() => {
-    if (onCalendarRoute) {
-      if (untrack(() => lens.current) !== 'calendar') lens.set('calendar');
-    } else if (untrack(() => lens.current) === 'calendar') {
+    const current = untrack(() => lens.current);
+    if (routedLens) {
+      if (current !== routedLens) lens.set(routedLens);
+    } else if (current === 'calendar' || current === 'contacts') {
       lens.set('today');
     }
   });

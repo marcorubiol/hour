@@ -26,7 +26,10 @@ const QuerySchema = v.object({
     v.union([v.literal('any'), v.picklist(ENGAGEMENT_STATUSES)]),
     'contacted',
   ),
-  project_slug: v.optional(v.pipe(v.string(), v.minLength(1)), 'mamemi'),
+  project_slug: v.optional(v.pipe(v.string(), v.minLength(1))),
+  project_ids: v.optional(v.string()),
+  workspace_ids: v.optional(v.string()),
+  q: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(120))),
   season: v.optional(v.string(), 'any'),
   limit: v.optional(
     v.pipe(
@@ -89,17 +92,53 @@ export const GET: RequestHandler = async ({ request, url, platform }) => {
       400,
     );
   }
-  const { status, project_slug, season, limit, offset } = parsed.output;
+  const { status, project_slug, project_ids, workspace_ids, q, season, limit, offset } =
+    parsed.output;
+
+  const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const parseIds = (raw?: string) =>
+    raw
+      ? [...new Set(raw.split(',').map((x) => x.trim()).filter((x) => UUID.test(x)))]
+      : [];
+  const projectIds = parseIds(project_ids);
+  const workspaceIds = parseIds(workspace_ids);
 
   const search = new URLSearchParams();
-  // Same embed as ENGAGEMENT_SELECT but with !inner on project — the list
-  // filters by project.slug, which needs an inner join to apply.
-  search.set(
-    'select',
-    ENGAGEMENT_SELECT.replace('project:project_id(', 'project:project_id!inner('),
-  );
-  search.set('project.slug', `eq.${project_slug}`);
+  // !inner joins: project when filtering by its slug; person when the
+  // free-text search runs over its columns.
+  let select = ENGAGEMENT_SELECT;
+  if (project_slug) {
+    select = select.replace('project:project_id(', 'project:project_id!inner(');
+  }
+  if (q) {
+    select = select.replace('person:person_id(', 'person:person_id!inner(');
+  }
+  search.set('select', select);
+
+  if (project_slug) search.set('project.slug', `eq.${project_slug}`);
+  if (projectIds.length > 0 && workspaceIds.length > 0) {
+    search.set(
+      'or',
+      `(project_id.in.(${projectIds.join(',')}),workspace_id.in.(${workspaceIds.join(',')}))`,
+    );
+  } else if (projectIds.length > 0) {
+    search.set('project_id', `in.(${projectIds.join(',')})`);
+  } else if (workspaceIds.length > 0) {
+    search.set('workspace_id', `in.(${workspaceIds.join(',')})`);
+  }
   search.set('deleted_at', 'is.null');
+
+  if (q) {
+    // Escape PostgREST pattern/logic chars, then substring-match person
+    // name and organization.
+    const safe = q.replace(/[%_*(),.]/g, ' ').trim();
+    if (safe) {
+      search.set(
+        'person.or',
+        `(full_name.ilike.*${safe}*,organization_name.ilike.*${safe}*)`,
+      );
+    }
+  }
 
   if (status !== 'any') search.set('status', `eq.${status}`);
   if (season !== 'any') search.set('custom_fields->>season', `eq.${season}`);
@@ -118,7 +157,6 @@ export const GET: RequestHandler = async ({ request, url, platform }) => {
       total: total ?? data.length,
       limit,
       offset,
-      project_slug,
       status,
       season,
       items: data,

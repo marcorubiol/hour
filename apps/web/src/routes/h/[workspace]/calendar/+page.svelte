@@ -27,6 +27,7 @@
   import Input from '$lib/components/Input.svelte';
   import Select from '$lib/components/Select.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
+  import { resolveSelectionIds } from '$lib/selection-filter';
   import { useSelection } from '$lib/stores/selection.svelte';
   import { accentVarFor } from '$lib/utils/accent';
   import { addDaysIso, addMonths, dayKeyInTz, monthGrid } from '$lib/calendar';
@@ -101,27 +102,12 @@
     new Map(($projectsQuery.data?.items ?? []).map((p) => [p.slug, p])),
   );
 
-  let filterIds = $derived.by(() => {
-    const projectIds: string[] = [];
-    const workspaceIds: string[] = [];
-    for (const slug of selection.effectiveProjects()) {
-      const p = projectsBySlug.get(slug);
-      if (p) projectIds.push(p.id);
-    }
-    for (const slug of selection.effectiveWorkspaces()) {
-      const w = workspacesBySlug.get(slug);
-      if (w) workspaceIds.push(w.id);
-    }
-    return { projectIds: projectIds.sort(), workspaceIds: workspaceIds.sort() };
+  let resolved = $derived(resolveSelectionIds(selection, projectsBySlug, workspacesBySlug));
+  let filterIds = $derived({
+    projectIds: resolved.projectIds,
+    workspaceIds: resolved.workspaceIds,
   });
-
-  // A selection that resolves to zero ids must NOT fall through to the
-  // unfiltered everything-feed — hold the queries until it resolves.
-  let selectionUnresolved = $derived(
-    selection.hasAnySelection() &&
-      filterIds.projectIds.length === 0 &&
-      filterIds.workspaceIds.length === 0,
-  );
+  let selectionUnresolved = $derived(resolved.unresolved);
 
   // ── Event feeds ──────────────────────────────────────────────────────
   const feedKey = toStore(() => ({

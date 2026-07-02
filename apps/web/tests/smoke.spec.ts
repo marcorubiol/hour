@@ -73,9 +73,22 @@ test.describe('smoke', () => {
       'true',
     );
 
-    // Today pill leaves the calendar (lands on the serialized selection —
-    // canonical project URL or query form, both fine; just not /calendar).
+    // Contacts lens: pill navigates, the shared EngagementTable loads the
+    // same 154 contacts inside the shell, search narrows deterministically.
+    await lensNav.getByRole('button', { name: 'Contacts' }).click();
+    await page.waitForURL(/\/h\/muk-cia\/contacts\/?$/);
+    await expect(page.locator('.status-bar__count')).toContainText(/\d+ contacts/);
+    expect(await page.locator('tbody tr').count()).toBeGreaterThan(0);
+    await page.getByPlaceholder('People or organizations…').fill('zzz-no-such-person-zzz');
+    await expect(page.locator('.msg')).toContainText('No results', { timeout: 10_000 });
+    await page.getByPlaceholder('People or organizations…').fill('');
+    await expect
+      .poll(async () => await page.locator('tbody tr').count(), { timeout: 10_000 })
+      .toBeGreaterThan(0);
+
+    // Today pill leaves the routed lens (lands on the serialized selection —
+    // canonical project URL or query form, both fine; just not a lens URL).
     await lensNav.getByRole('button', { name: 'Today' }).click();
-    await page.waitForURL((url) => !url.pathname.includes('/calendar'));
+    await page.waitForURL((url) => !url.pathname.includes('/contacts'));
   });
 });
