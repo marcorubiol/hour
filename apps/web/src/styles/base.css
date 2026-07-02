@@ -1565,23 +1565,31 @@
     text-transform: lowercase;
   }
 
-  .state-badge[data-tone="info"] {
+  /* Tone contract — component-agnostic. Anything carrying data-tone gets
+     --state-color / --state-border to consume (state-badge text+border,
+     calendar dots, future week items). :where() keeps specificity at
+     zero so components can still override locally. */
+  :where([data-tone="neutral"]) {
+    --state-color: var(--text-muted);
+    --state-border: var(--border-color-dark);
+  }
+  :where([data-tone="info"]) {
     --state-color: var(--info);
     --state-border: var(--info);
   }
-  .state-badge[data-tone="success"] {
+  :where([data-tone="success"]) {
     --state-color: var(--success);
     --state-border: var(--success);
   }
-  .state-badge[data-tone="warning"] {
+  :where([data-tone="warning"]) {
     --state-color: var(--warning);
     --state-border: var(--warning);
   }
-  .state-badge[data-tone="danger"] {
+  :where([data-tone="danger"]) {
     --state-color: var(--danger);
     --state-border: var(--danger);
   }
-  .state-badge[data-tone="faint"] {
+  :where([data-tone="faint"]) {
     --state-color: var(--text-faint);
     --state-border: var(--border-color-light);
   }

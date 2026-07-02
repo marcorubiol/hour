@@ -17,6 +17,8 @@
   import TagChip from '../components/TagChip.svelte';
   import StateBadge from '../components/StateBadge.svelte';
   import ThemeToggle from '../components/ThemeToggle.svelte';
+  import ProductionStub from '../components/ProductionStub.svelte';
+  import JsonKV from '../components/JsonKV.svelte';
   import { accentVar } from '$lib/utils/accent';
 
   let counter = $state(0);
@@ -1010,6 +1012,49 @@
         </div>
       {/each}
     </div>
+  </section>
+
+  <section class="playground__section">
+    <h2 class="h3">ProductionStub — performance production block (Phase 0.2)</h2>
+    <p class="text--s text--dark-muted">
+      Venue + dual-timezone schedule (D-PRE-10) + generic jsonb sections.
+      Fixture mirrors the demo MAD show straddling the 2026-10-25 DST switch.
+    </p>
+    <ProductionStub
+      venue={{
+        name: 'Teatro Circo Price',
+        city: 'Madrid',
+        country: 'ES',
+        address: 'Ronda de Atocha 35',
+        capacity: 600,
+        timezone: 'Europe/Madrid',
+      }}
+      loadInAt="2026-10-24T11:00:00Z"
+      soundcheckAt="2026-10-24T15:00:00Z"
+      startAt="2026-10-24T18:30:00Z"
+      loadoutAt="2026-10-24T21:00:00Z"
+      wrapAt="2026-10-24T23:30:00Z"
+      logistics={{
+        parking: '2 vans, dock B',
+        accommodation: { hotel: 'NH Atocha', nights: 2 },
+        travel: ['van from BCN', 'return 25 Oct'],
+      }}
+      hospitality={{ per_diem: '30 EUR', dietary: 'one vegan, one gluten-free' }}
+      technical={{ power: '32A three-phase', stage: '12×10m' }}
+      viewerTz="Europe/London"
+    />
+  </section>
+
+  <section class="playground__section">
+    <h2 class="h3">JsonKV — generic jsonb reader</h2>
+    <JsonKV
+      value={{
+        access_codes: { stage_door: '4471#' },
+        freight: 'lift 2000kg',
+        contacts: [{ role: 'production', email: 'prod@venue.example' }],
+        visa_flags: null,
+      }}
+    />
   </section>
 </main>
 
