@@ -107,9 +107,11 @@ Vocab actualizado tras ADR-037. Estado real:
 - **#9 Write queue offline scaffolding** — DESBLOQUEADO por ADR-040 (primer write path real existe: `PATCH /api/engagements/:id`, mutación centralizada en un `createMutation`). El enqueue+replay+conflict UI sigue pendiente, Phase 0.2+.
 - **#11 Settings + Master View toggle** — ✅ CERRADO 2026-05-19 (commit `b387fe9`).
 
-### Deuda de test infra (2026-07-01)
-- **`.env.test` perdido en el recovery 2026-06-04** → smoke e2e + suites RLS se saltan (skip) en esta máquina. Recrear per `build/runbooks/test-user-setup.md` (resetear password del user `playwright@hour.test` desde el dashboard Supabase).
-- **Suites pre-rename desactualizadas**: `tests/smoke.spec.ts` (espera lens "Plaza" y URL `/h/mamemi/room/mamemi`) y `tests/rls/cross-tenant.test.ts` (espera workspace slug `mamemi`, hoy `muk-cia`; falta `demo` en el mundo) quedaron obsoletas con ADR-036/037 y nunca corrieron después. El runbook `test-user-setup.md` también describe el mundo viejo. Actualizarlas al recrear credenciales — no antes (editarlas sin poder ejecutarlas es adivinar). Las suites nuevas de ADR-040 (`engagement-write.*`) ya están escritas contra el mundo actual.
+### Test infra — RESUELTA 2026-07-02
+- `.env.test` recreado por Marco (password nueva de `playwright@hour.test`). **Estado verde completo**: 47 unit · 17/17 RLS (incl. canario del leak + write path) · 3/3 e2e (smoke reescrito al mundo actual + write path self-reverting, contra build local Y verificado contra producción).
+- Smoke reescrito post-rename (muk-cia, lens pills, calendar incluido). Cross-tenant actualizado con evidencia live: playwright es member de `marco-rubiol`+`muk-cia`+`playwright`, `demo` invisible ✓.
+- Fixes de infra descubiertos al correr: Playwright tragaba los `*.test.ts` de vitest (testMatch explícito) y `PW_CHROMIUM` env para reutilizar un chromium cacheado sin `test:install`.
+- **Gap conocido**: performance detail y road sheet no tienen e2e — las únicas performances viven en `demo`, invisible para el test user. Opciones cuando toque: membership de playwright en demo, o fixture performance en muk-cia. El runbook `test-user-setup.md` sigue describiendo el mundo viejo (baja prioridad).
 
 ### Gates Phase 0.1 — ambos cerrados
 - ✅ **Checkpoint visual 1** — ratificado en sesión 2026-05-19. Visual debt 2026-05-18 (gap Room header, Plaza spacing, eyebrow duplicado) resuelta por evolución del shell. Checkpoint visual 2 (`9f8bcd9`) añadió dark mode + polish editorial-sobrio encima.

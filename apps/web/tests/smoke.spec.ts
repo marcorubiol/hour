@@ -10,27 +10,26 @@ test.describe('smoke', () => {
   );
 
   /**
-   * Post-ADR-029 happy path. Covers the integration points that move data
+   * Post-ADR-037/038/039 happy path (rewritten 2026-07-02 against the live
+   * world — the previous version predated the muk-cia rename and the
+   * sidebar-as-filter shell). Covers the integration points that move data
    * end to end:
    *   - login flow (Supabase Auth REST + JWT in localStorage)
-   *   - hardcoded post-login redirect → /h/marco-rubiol/
-   *   - workspace shell renders (Plaza, lens pills, sidebar footer)
-   *   - JWT auth hook injected current_workspace_id (otherwise /api/workspaces
-   *     would return zero rows under RLS)
-   *   - /api/workspaces returned this user's actual memberships (sidebar
-   *     shows MaMeMi for the playwright test user even though the URL
-   *     lands on marco-rubiol, which playwright is NOT a member of —
-   *     the sidebar is user-scoped, not URL-scoped, per ADR-029)
-   *   - clicking the MaMeMi room navigates to /h/mamemi/project/mamemi
-   *   - /api/engagements?project_slug=mamemi returned the 154 contacts
-   *   - RelationshipStub renders the count + at least one row
-   *   - logout clears state and redirects to /login
+   *   - hardcoded post-login redirect → /h/marco-rubiol
+   *   - shell renders with the lens pills, Today active
+   *   - /api/workspaces + /api/projects under RLS fill Plaza (sidebar is
+   *     user-scoped: the MaMeMi project link appears even though the URL
+   *     lands on marco-rubiol)
+   *   - project detail at /h/muk-cia/project/mamemi loads the engagement
+   *     count through /api/engagements (154 contacts under RLS)
+   *   - the Calendar lens routes, renders the month grid, and the Today
+   *     pill returns to the workspace
    *
-   * The test user (playwright@hour.test) is admin of `mamemi` and owner
-   * of its own `playwright` workspace post the 2026-05-18 migration —
-   * see build/runbooks/test-user-setup.md.
+   * The test user (playwright@hour.test) is member of marco-rubiol,
+   * muk-cia and its own playwright workspace; NOT of demo — see
+   * tests/rls/cross-tenant.test.ts for the authoritative fixture map.
    */
-  test('login → navigate to MaMeMi room → engagements load → sign out', async ({
+  test('login → MaMeMi project → engagements load → calendar lens', async ({
     page,
   }) => {
     await page.goto('/login');
@@ -39,44 +38,44 @@ test.describe('smoke', () => {
     await page.locator('input[type=password]').fill(PASSWORD!);
     await page.getByRole('button', { name: /sign in/i }).click();
 
-    // Hardcoded redirect lands on /h/marco-rubiol/ for every signed-in
-    // user in Phase 0 (will become dynamic in Phase 1 multi-workspace
-    // switching). The playwright user isn't a member of marco-rubiol —
-    // RLS returns their real workspace list (mamemi + playwright) and
-    // Plaza renders those instead.
-    // SvelteKit normalises the trailing slash, so the URL lands as
-    // /h/marco-rubiol (no slash). Match both forms.
     await page.waitForURL(/\/h\/marco-rubiol\/?$/);
 
-    // Shell loaded — the "Plaza" lens pill must be active.
-    const plazaLens = page.getByRole('button', { name: 'Plaza' });
-    await expect(plazaLens).toBeVisible();
-    await expect(plazaLens).toHaveClass(/workspace-shell__lens--active/);
+    // Shell loaded — lens pills present, Today active.
+    const lensNav = page.getByRole('navigation', { name: 'Lens' });
+    await expect(lensNav.getByRole('button', { name: 'Today' })).toHaveAttribute(
+      'aria-current',
+      'true',
+    );
 
-    // Plaza must surface the MaMeMi room link. Targeting by href avoids
-    // the ambiguity between "MaMeMi" the House and "MaMeMi" the Room
-    // (the room.name happens to match the workspace.name for now).
-    const mameMiRoomLink = page.locator('a[href="/h/mamemi/project/mamemi"]');
-    await expect(mameMiRoomLink).toBeVisible();
-    await mameMiRoomLink.click();
+    // Plaza is user-scoped: the MaMeMi project appears even though the URL
+    // landed on marco-rubiol. (Plaza row clicks are filter TOGGLES since
+    // ADR-038 — the canonical URL is the deterministic way in, so the
+    // smoke navigates directly; toggle UX gets its own test some day.)
+    await expect(
+      page.getByRole('link', { name: 'MaMeMi', exact: true }).first(),
+    ).toBeAttached();
+    await page.goto('/h/muk-cia/project/mamemi/');
 
-    await page.waitForURL(/\/h\/mamemi\/room\/mamemi\/?$/);
-
-    // RelationshipStub header reports the engagement count. The fact that
-    // any positive count renders proves: JWT survived, auth hook injected
-    // current_workspace_id, /api/engagements reached PostgREST with the
-    // right token, and RLS let the rows through.
+    // RelationshipStub proves the whole read path: JWT survived, RLS let
+    // the engagements through, the count renders.
     const countLabel = page.locator('.rel-stub__count');
     await expect(countLabel).toBeVisible();
     await expect(countLabel).toContainText(/\d+\s+engagements?/);
+    expect(await page.locator('.rel-stub__item').count()).toBeGreaterThan(0);
 
-    // Items list is non-empty. We don't assert the specific count (154)
-    // because future data changes shouldn't break the smoke — if the
-    // number ever drops to zero we want a different test telling us so.
-    const items = page.locator('.rel-stub__item');
-    expect(await items.count()).toBeGreaterThan(0);
+    // Calendar lens: pill navigates, grid renders with weekday headers.
+    await lensNav.getByRole('button', { name: 'Calendar' }).click();
+    await page.waitForURL(/\/h\/muk-cia\/calendar\/?$/);
+    await expect(page.locator('.cal__grid')).toBeVisible();
+    expect(await page.locator('.cal__weekday').count()).toBe(7);
+    await expect(lensNav.getByRole('button', { name: 'Calendar' })).toHaveAttribute(
+      'aria-current',
+      'true',
+    );
 
-    await page.getByRole('button', { name: 'Sign out' }).click();
-    await page.waitForURL('**/login');
+    // Today pill leaves the calendar (lands on the serialized selection —
+    // canonical project URL or query form, both fine; just not /calendar).
+    await lensNav.getByRole('button', { name: 'Today' }).click();
+    await page.waitForURL((url) => !url.pathname.includes('/calendar'));
   });
 });
