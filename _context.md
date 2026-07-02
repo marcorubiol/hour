@@ -64,6 +64,19 @@ Working name: **Hour**. Brand decision deferred to Phase 1.
 - Parent MaMeMi context (where Difusión originated): `01_STAGE/ZS_MaMeMi/`
 - Source of the 156 existing programmers/festivals to import: `01_STAGE/ZS_MaMeMi/Difusión/`
 
+## Status — 2026-07-02
+
+**ADR-041: superficie de lectura de Phase 0.2 en producción** (sesión autónoma .zerø, continuación del write path del día anterior):
+
+- **Calendar lens** viva en `/h/[ws]/calendar` — grid mensual con performances (tono por status, accent por project) + dates (ensayos/viajes/prensa), filtrada por la selección del sidebar (ADR-038; vacío = todo, como LineList). Pills del shell navegan; el link muerto "Open calendar →" del Today dashboard ahora funciona.
+- **Performance detail real** (cierra #3 + #5 de Phase 0.1): ProductionStub (venue + schedule dual-timezone D-PRE-10 + jsonb genéricos vía JsonKV), team (cast canónico + overrides + crew), dates, programmer, assets. Mobile-first.
+- **Road sheet read-only** en `/h/[ws]/performance/[slug]/roadsheet` — proyección role-filtered SERVER-SIDE (full/venue/performer/tech_manager, matriz provisional en ADR-041; money nunca), preview de roles con pills, print CSS. **CRDT/Realtime/presence/link público explícitamente diferidos** — exigen dos clientes autenticados para verificar (deuda `.env.test`).
+- **Endpoints**: `/api/performances` con filtros unión + rango de fechas, `/api/dates` nuevo, `/api/performances/[key]` (bundle detalle, uuid o slug+?ws=, sin columnas fee — la puerta de dinero es la view), `/api/performances/[key]/roadsheet?role=`.
+- **SEGURIDAD — leak encontrado en producción, FIX PENDIENTE DE APLICAR**: `performance_redacted` legible por anon (perdió `security_invoker` en los renames del 19-05; hoy solo expone datos demo). SQL listo en `build/migrations/2026-07-02_fix_performance_redacted_security_invoker.sql` — **correr en el SQL editor de Supabase**. Test canario en `tests/rls/redacted-view.test.ts`.
+- **Drift collab arreglado**: apps/collab + do/auth.ts hardcodeaban la tabla `show` (muerta desde ADR-036) — el CRDT de 0.2 habría nacido roto. Renombrado a `performance`; hour-collab redesplegado.
+- Revisión adversarial (29 agentes, 4 lentes): 22 hallazgos confirmados, todos aplicados — incl. compartidos nuevos por filosofía (`$lib/api.ts`, `ScheduleTable`, contrato `[data-tone]` en base.css, `toStore()`).
+- Verificado: typecheck 0/0 (web + collab), 47 unit tests, build limpio, formas PostgREST sondadas contra prod con anon key, ProductionStub verificado visualmente en /playground. Las páginas autenticadas se verán en vivo cuando haya sesión (o `.env.test`).
+
 ## Status — 2026-07-01
 
 **ADR-040: primer write path en producción.** Tras ~6 semanas de pausa (última sesión de código 2026-05-19; solo recovery chores el 2026-06-04), un check-in estratégico detectó el riesgo "construido pero no usado": la app era read-only mientras la difusión 2026-27 real (su caso piloto, 154 engagements cargados) avanzaba fuera de Hour. Respuesta: adelantar el write path mínimo de engagement de Phase 0.5 a ya — excepción puntual, no reordenación de fases (ADR-040 en `_decisions.md`).

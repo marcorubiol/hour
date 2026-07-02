@@ -200,3 +200,15 @@ A. **¿Naming?** `pitch` / `dossier` / `share` / `microsite` / otra. Mi opinión
 B. **¿Tracking de lectura del link?** Mínimo (just hits) / medio (qué archivos se descargan) / cero (privacidad por defecto).
 C. **¿El link caduca o es eterno hasta revoke manual?** Programadores responden con calma de meses; un link que caduca a 30 días es fricción. Pero un link eterno es vector de leak.
 D. **¿Phase 0.5 o se mete en 0.4?** Esto define si arrancas a especificarlo en 1 mes o en 4. La diferenciación de venta puede justificar adelantarlo si Phase 1 está en camino.
+
+---
+
+## 2026-07-02 — Notas de la sesión Phase 0.2 read surface (ADR-041)
+
+1. **`can_see_person` deja cast/crew en '—' para members sin engagement compartido.** La policy de person (compartida por engagement o created_by) no cubre "aparece en cast/crew de una performance que puedo leer". Cuando Anouk entre al workspace verá nombres vacíos en road sheets de gigs cuyos contactos creó Marco. Probable fix: ampliar `can_see_person` con exists sobre crew_assignment/cast_member/cast_override joined a performances legibles. Decisión de policy — no tomada en ADR-041 a propósito.
+
+2. **Logistics jsonb mezcla venue-facing e interno.** Parking/freight (para la sala) convive con hotel/viajes (interno) en el mismo blob. Por eso el rol venue NO recibe logistics (conservador). Cuando las shapes se separen (ADR-023 las dejó abiertas), re-evaluar la matriz.
+
+3. **Deep-link a `/h/[ws]/calendar` con selección vacía muestra TODOS los workspaces.** Ratificado como diseño (ADR-038/039: segmento = browsing context, selección vacía = todo, igual que LineList), no como bug — la review lo flaggeó y se decidió mantener coherencia con el resto del sistema.
+
+4. **Suites RLS/e2e pre-rename**: cross-tenant.test.ts ya apunta a `performance_redacted` (fix mecánico cierto), pero sus expectativas de slugs (mamemi → muk-cia, falta demo) siguen sin tocar hasta poder ejecutarlas (recrear `.env.test` per runbook). El smoke viejo idem.
