@@ -1,12 +1,38 @@
-# Hour — Playwright smoke test user setup
+# Hour — Playwright test user setup
 
-One-time provisioning so `tests/smoke.spec.ts` can run against `hour-phase0`. Re-run idempotently on password rotation.
+One-time provisioning so the e2e suite (`tests/*.spec.ts`) and the RLS
+integration suite (`tests/rls/*.test.ts`) can run against `hour-phase0`.
+Re-run idempotently on password rotation.
 
-## What this gets you
+## What this gets you (state as of 2026-07-02)
 
-A dedicated auth user `playwright@hour.test` with `workspace_membership` in `marco-rubiol` as `admin`. The smoke test logs in as this user, navigates to `/booking`, asserts the engagements list renders with `<n> contacts`, and signs out.
+A dedicated auth user `playwright@hour.test` with `workspace_membership`
+in THREE workspaces (all as `admin`, all with `accepted_at`):
 
-`admin` (not `member`) is intentional — `has_permission()` gives owner/admin a bypass for any project permission, so the test is decoupled from RBAC details. The smoke is for catching login / auth / RLS regressions, not RBAC drift. RBAC regression goes into a separate suite later.
+- **`marco-rubiol`** — the original smoke target (real data, read-mostly).
+- **`muk-cia`** — person/contacts specs write notes here (self-cleaning).
+- **`playwright`** — the FIXTURE workspace: project `zzz-e2e-collab` with
+  gigs `zzz-e2e-1` / `zzz-e2e-2`. Write-path specs (engagement,
+  performance, money/invoice, roadsheet share, venue link, collab) do
+  their mutations here. It is invisible cross-tenant — that invisibility
+  is itself asserted by `tests/rls/cross-tenant.test.ts`.
+
+The user's JWT claim `current_workspace_id` resolves to its FIRST
+membership — which is why write paths that hit claim-bound INSERT
+policies go through SECURITY DEFINER RPCs (see ADR-043/045/047/049/050).
+
+`admin` (not `member`) is intentional — `has_permission()` gives
+owner/admin a bypass for any project permission, so tests are decoupled
+from RBAC details. RBAC regression goes into a separate suite later.
+
+**Fixture hygiene**: specs are self-cleaning where the product allows it
+(fees cleared, notes/invoices/shares deleted via their RPCs). The
+performance-write spec CANNOT clean after itself — there is no
+performance delete flow yet (ADR-043 re-evaluate) — so `e2e-venue-*`
+gigs accumulate in the `playwright` workspace at 1/run. Purge
+periodically via SQL:
+`DELETE FROM performance WHERE workspace_id = (SELECT id FROM workspace WHERE slug='playwright') AND slug LIKE 'e2e-venue-%';`
+(last purged 2026-07-02, 20 rows).
 
 ## Steps
 
@@ -54,11 +80,14 @@ Expected: `NOTICE: Wired <uuid> into workspace marco-rubiol as admin`. No error 
 
 ### 3. Local env file
 
-Create `apps/web/.env.test` (gitignored):
+Create `apps/web/.env.test` (gitignored). The RLS suite also needs the
+Supabase coordinates:
 
 ```
 PW_TEST_EMAIL=playwright@hour.test
 PW_TEST_PASSWORD=<the password from step 1>
+PUBLIC_SUPABASE_URL=https://lqlyorlccnniybezugme.supabase.co
+PUBLIC_SUPABASE_ANON_KEY=<the sb_publishable_ key>
 ```
 
 ### 4. Install Chromium binary (one-time)
@@ -67,15 +96,22 @@ PW_TEST_PASSWORD=<the password from step 1>
 pnpm --filter web test:install
 ```
 
-### 5. Run the smoke
+### 5. Run the suites
 
 ```
-cd apps/web && pnpm build && pnpm test:smoke
+cd apps/web
+set -a; source .env.test; set +a
+pnpm test:unit                      # pure unit, no env needed
+pnpm test:rls                       # RLS integration against prod Supabase
+pnpm exec playwright test           # e2e against local preview (builds first)
+PW_BASE_URL=https://hour.zerosense.studio pnpm exec playwright test   # e2e against prod (enables collab specs)
 ```
 
-`pnpm build` is required because the Playwright config spins up `vite preview`, which serves the built `dist/`. Skip the build only if you're testing against a prebuilt deploy via `PW_BASE_URL=https://hour.zerosense.studio pnpm test:smoke`.
-
-Pass criteria: 1 test, "smoke › login → /booking shows engagements → sign out", green in <30s.
+Local runs spin up `vite preview` (built `dist/`); the collab specs skip
+without `PW_BASE_URL` because they need the real Worker + Durable
+Object. If the pinned Playwright browser is missing, point
+`PW_CHROMIUM` at any installed Chromium/Chrome-for-Testing binary
+(escape hatch in `playwright.config.ts`).
 
 ## When the smoke fails
 
