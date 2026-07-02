@@ -71,7 +71,7 @@ test.describe('performance write path', () => {
     const edit = page.locator('dialog[open]');
     await edit.locator('#f-loadin').fill(`${day}T11:00`);
     await edit.locator('#f-start').fill(`${day}T19:30`);
-    await edit.getByRole('button', { name: 'Save' }).click();
+    await edit.getByRole('button', { name: 'Save', exact: true }).click();
 
     // The schedule table renders both slots after the refetch.
     await expect(page.locator('.schedule')).toContainText('load in', {

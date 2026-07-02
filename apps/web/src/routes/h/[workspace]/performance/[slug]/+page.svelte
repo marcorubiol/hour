@@ -43,6 +43,8 @@
     performance: {
       id: string;
       slug: string | null;
+      workspace_id: string;
+      venue_id: string | null;
       performed_at: string;
       status: string;
       venue_name: string | null;
@@ -183,6 +185,7 @@
   let fVenue = $state('');
   let fCity = $state('');
   let fCountry = $state('');
+  let fVenueId = $state('');
   let fLoadIn = $state('');
   let fSoundcheck = $state('');
   let fStart = $state('');
@@ -195,6 +198,7 @@
     fVenue = perf.venue_name ?? '';
     fCity = perf.city ?? '';
     fCountry = perf.country ?? '';
+    fVenueId = perf.venue_id ?? '';
     fLoadIn = isoToLocalInput(perf.load_in_at);
     fSoundcheck = isoToLocalInput(perf.soundcheck_at);
     fStart = isoToLocalInput(perf.start_at);
@@ -213,6 +217,7 @@
       venue_name: fVenue.trim() || null,
       city: fCity.trim() || null,
       country: fCountry.trim() || null,
+      venue_id: fVenueId || null,
       load_in_at: localInputToIso(fLoadIn),
       soundcheck_at: localInputToIso(fSoundcheck),
       start_at: localInputToIso(fStart),
@@ -223,6 +228,68 @@
 
   let bundle = $derived($query.data ?? null);
   let perf = $derived(bundle?.performance ?? null);
+
+  // ── Venue entity (ADR-049) — after the `perf` derived: the toStore
+  // callback runs on creation and would hit the TDZ otherwise. ─────────
+  type VenueLite = {
+    id: string;
+    name: string;
+    city: string | null;
+    timezone: string | null;
+  };
+
+  const venuesOptions = toStore(() => {
+    const wsId = perf?.workspace_id ?? '';
+    return {
+      queryKey: ['venues', wsId] as const,
+      enabled: dialogOpen && Boolean(wsId),
+      queryFn: ({ signal }: { signal: AbortSignal }) =>
+        fetchJSON<{ items: VenueLite[] }>(`/api/venues?workspace_ids=${wsId}`, signal),
+    };
+  });
+  const venuesQuery = createQuery(venuesOptions);
+  let venues = $derived($venuesQuery.data?.items ?? []);
+
+  // Promote the typed venue fields to a venue row and link it. Idempotent
+  // server-side: an existing name+city match returns the existing venue.
+  const promoteVenue = createMutation({
+    mutationFn: async () => {
+      const res = await fetch('/api/venues', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('hour_jwt')}`,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          workspace_id: perf!.workspace_id,
+          name: fVenue.trim(),
+          city: fCity.trim() || null,
+          country: fCountry.trim() || null,
+        }),
+      });
+      const body = (await res.json().catch(() => ({}))) as {
+        venue?: VenueLite;
+        detail?: string;
+        error?: string;
+      };
+      if (!res.ok || !body.venue) {
+        throw new Error(body.detail || body.error || `Error ${res.status}`);
+      }
+      return body.venue;
+    },
+    onSuccess: (venue) => {
+      fVenueId = venue.id;
+      void queryClient.invalidateQueries({ queryKey: ['venues'] });
+      addToast({ tone: 'success', message: `Linked to venue "${venue.name}".` });
+    },
+    onError: (err) => {
+      addToast({
+        tone: 'danger',
+        title: 'Venue not created',
+        message: err instanceof Error ? err.message : 'Unexpected error',
+      });
+    },
+  });
   let loading = $derived($query.isPending);
   let errorMsg = $derived($query.error instanceof Error ? $query.error.message : '');
 
@@ -429,6 +496,30 @@
     <Input label="City" bind:value={fCity} />
     <Input label="Country" bind:value={fCountry} placeholder="ES" />
   </div>
+  <div class="perf__venue-link">
+    <div class="field">
+      <label for="f-venue-entity">linked venue</label>
+      <select id="f-venue-entity" bind:value={fVenueId}>
+        <option value="">— none (free text above)</option>
+        {#each venues as vn (vn.id)}
+          <option value={vn.id}>{vn.name}{vn.city ? ` — ${vn.city}` : ''}</option>
+        {/each}
+      </select>
+    </div>
+    <Button
+      variant="outline"
+      size="s"
+      disabled={!fVenue.trim()}
+      loading={$promoteVenue.isPending}
+      onclick={() => $promoteVenue.mutate()}
+    >
+      Save fields as venue
+    </Button>
+  </div>
+  <p class="perf__dialog-hint">
+    A linked venue brings its timezone (dual-time on the road sheet), address and
+    contacts. The free-text fields stay as the display fallback.
+  </p>
   <div class="perf__form-grid">
     <div class="field">
       <label for="f-loadin">load in</label>
@@ -532,6 +623,16 @@
       grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
       gap: var(--space-s) var(--space-m);
       margin-block-start: var(--space-s);
+    }
+
+    .perf__venue-link {
+      display: flex;
+      align-items: end;
+      gap: var(--space-m);
+      margin-block-start: var(--space-s);
+    }
+    .perf__venue-link .field {
+      flex: 1;
     }
 
     .perf__section {

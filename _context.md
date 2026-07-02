@@ -64,6 +64,10 @@ Working name: **Hour**. Brand decision deferred to Phase 1.
 - Parent MaMeMi context (where Difusión originated): `01_STAGE/ZS_MaMeMi/`
 - Source of the 156 existing programmers/festivals to import: `01_STAGE/ZS_MaMeMi/Difusión/`
 
+## Status — 2026-07-02 (noche, 6)
+
+**ADR-049: venue enlazable.** El trío denormalizado (venue_name/city/country) se promueve a entidad `venue` desde el dialog de edición ("Save fields as venue", RPC `create_venue` idempotente sobre name+city — quinto caso del patrón claim-bound) y se enlaza vía select; guard `cross_workspace_link` en el PATCH. Desbloquea timezone/address/contacts reales en road sheet (incluido el público). Gotcha Svelte 5 cazado: toStore leyendo un $derived declarado más abajo → TDZ → página en blanco; los bloques van después del derived. Suite 11/11 contra producción.
+
 ## Status — 2026-07-02 (noche, 5)
 
 **ADR-047 + ADR-048: road sheet público (D6) + misterio RLS resuelto.** Links públicos revocables al road sheet (`/public/roadsheet/:token`, rol fijado venue/performer/tech_manager, sin cuenta): tabla `roadsheet_share` deny-all para TODOS los roles vía PostgREST, gestión por RPCs gateados `edit:show`, saneado en dos capas (RPC anon sin fee/notes/internals + matriz `buildRoadsheet` en el Worker), UI "Public links" en el road sheet del operador (crear/copiar/revocar), revocación inmediata (`no-store`). El técnico de la sala abre su road sheet desde un WhatsApp. Y el misterio RLS de ADR-045 resuelto con experimento decisivo: la fila actualizada debe seguir SELECT-visible para el updater → **ningún soft-delete por PATCH directo, siempre RPC** (sistémico, ADR-048); el botón de borrar nota en la ficha de persona cerrado sobre esa base. Suite 10/10 contra producción, RLS 19/19.

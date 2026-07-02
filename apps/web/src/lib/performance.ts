@@ -97,6 +97,7 @@ export const PerformancePatchSchema = v.object({
   venue_name: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(200)))),
   city: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(120)))),
   country: v.optional(v.nullable(countryField)),
+  venue_id: v.optional(v.nullable(v.pipe(v.string(), v.uuid()))),
   engagement_id: v.optional(v.nullable(v.pipe(v.string(), v.uuid()))),
   line_id: v.optional(v.nullable(v.pipe(v.string(), v.uuid()))),
 });

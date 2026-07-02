@@ -121,21 +121,25 @@ export const PATCH: RequestHandler = async ({ request, params, url, platform }) 
     // project is needed to guard relinks below).
     const lookup = new URLSearchParams();
     if (isUuid(key)) {
-      lookup.set('select', 'id,project_id');
+      lookup.set('select', 'id,project_id,workspace_id');
       lookup.set('id', `eq.${key}`);
     } else {
-      lookup.set('select', 'id,project_id,workspace:workspace_id!inner(slug)');
+      lookup.set('select', 'id,project_id,workspace_id,workspace:workspace_id!inner(slug)');
       lookup.set('slug', `eq.${key}`);
       lookup.set('workspace.slug', `eq.${ws}`);
     }
     lookup.set('deleted_at', 'is.null');
     lookup.set('limit', '1');
-    const found = await pgGet<{ id: string; project_id: string }>(env, 'performance', jwt, {
-      search: lookup,
-    });
+    const found = await pgGet<{ id: string; project_id: string; workspace_id: string }>(
+      env,
+      'performance',
+      jwt,
+      { search: lookup },
+    );
     if (found.data.length === 0) return json({ error: 'not_found' }, 404);
     const id = found.data[0].id;
     const projectId = found.data[0].project_id;
+    const workspaceId = found.data[0].workspace_id;
 
     // Relink guard — the create RPC enforces that engagement/line belong
     // to the performance's project; updates must hold the same invariant
@@ -156,6 +160,24 @@ export const PATCH: RequestHandler = async ({ request, params, url, platform }) 
       if (row.data.length === 0) {
         return json(
           { error: 'cross_project_link', hint: `${field} must belong to the performance's project.` },
+          400,
+        );
+      }
+    }
+
+    // Venue is workspace-scoped (not project-scoped) — same relink guard
+    // one level up (ADR-049).
+    if (patch.venue_id) {
+      const check = new URLSearchParams();
+      check.set('select', 'id');
+      check.set('id', `eq.${patch.venue_id}`);
+      check.set('workspace_id', `eq.${workspaceId}`);
+      check.set('deleted_at', 'is.null');
+      check.set('limit', '1');
+      const row = await pgGet<{ id: string }>(env, 'venue', jwt, { search: check });
+      if (row.data.length === 0) {
+        return json(
+          { error: 'cross_workspace_link', hint: "venue_id must belong to the performance's workspace." },
           400,
         );
       }
