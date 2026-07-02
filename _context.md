@@ -64,6 +64,10 @@ Working name: **Hour**. Brand decision deferred to Phase 1.
 - Parent MaMeMi context (where Difusión originated): `01_STAGE/ZS_MaMeMi/`
 - Source of the 156 existing programmers/festivals to import: `01_STAGE/ZS_MaMeMi/Difusión/`
 
+## Status — 2026-07-02 (noche, 2)
+
+**ADR-044: Contacts lens v1 — la difusión vive en el shell.** `/h/[ws]/contacts`: la tabla de engagements (extraída a `EngagementTable`, una implementación) con filtro por selección del sidebar, búsqueda persona/organización y filtro de status, más los editores inline de ADR-040. `/booking` queda como wrapper legacy. `/api/engagements` generalizado (sin default mamemi; unión project_ids/workspace_ids + q). Resolver selección→ids extraído a `$lib/selection-filter.ts` (calendario refactorizado encima). Lenses routed generalizadas en el shell (calendar + contacts; Money sigue muerta hasta su página). Suite completa 7/7 contra producción. Con ADR-040+041+042+043+044: **el ciclo difusión completo — buscar contacto, avanzar conversación, poner fecha, confirmar, producir con road sheet colaborativo — se opera entero dentro de Hour.**
+
 ## Status — 2026-07-02 (noche)
 
 **ADR-043: write path de performances en producción.** Crear gigs desde la Calendar lens (botón "New performance" + "+" en cada día → dialog project/fecha/venue/city/status, navega al detalle) y editar en el detalle (status vía menú, schedule completo — performed_at + 5 timeslots + venue trío — vía dialog, datetime-local en zona del viewer con display dual D-PRE-10). RPC `create_performance` (patrón create_project: SECURITY DEFINER, claim-independiente, gate `edit:show`, slug auto con sufijos) porque los INSERT directos son claim-bound. Review parcial (un finder colgó): 3 hallazgos verificados a mano y corregidos — relink cross-project bloqueado en PATCH, grants del RPC arreglados en vivo (REVOKE FROM anon no quita el EXECUTE de PUBLIC — gotcha), códigos de error por JSON. E2e 2/2 contra producción + collab intacto. **El calendario ya es herramienta de booking**: la difusión puede convertir conversaciones en holds con fecha sin salir de Hour. Fee y notes fuera del path a propósito (Money lens / doc colaborativo).
