@@ -8,6 +8,45 @@ Convención: secciones por fecha descendente. Cada sesión queda con commits cit
 
 ---
 
+## 2026-07-01/02 — Sesión maratón continua (ultracode): de "construido pero no usado" a ciclo completo operable — ADR-040→050
+
+Arrancó como check-in estratégico ("¿estamos bien encarados?") y el veredicto fue el motor de todo lo demás: **ingeniería excelente, pero la app era read-only mientras la difusión 2026-27 real (154 engagements) avanzaba FUERA de Hour**. Marco autorizó push a main + deploys de producción para el esfuerzo completo y pidió avance autónomo máximo ("ponte a hacer hasta donde puedas tú solo", "dale con todo lo pendiente").
+
+### Qué se construyó (todo en producción, cada bloque con ADR + migraciones en `build/migrations/` + e2e contra prod)
+- **ADR-040** (07-01): primer write path — engagement status + next action inline en `/booking`, optimistic con rollback.
+- **ADR-041**: Calendar lens + performance detail + road sheet read-only role-filtered (matriz provisional venue/performer/tech_manager; money NUNCA en road sheet).
+- **ADR-042**: Phase 0.2 colaborativa completa — YNotes (Yjs sobre RoadsheetCollab DO), presencia, snapshot + write-back. Dos bugs de raíz: workerd entrega frames WS como Blob (y-partyserver no los entiende — normalización en onMessage) y el SUPABASE_SECRET_KEY guardado era inválido (Marco lo re-emitió; `apikey`-only headers con claves `sb_secret_`).
+- **ADR-043**: write path de performances — crear desde calendario, editar status/schedule/venue-trío. RPC `create_performance` (los INSERT directos son claim-bound). Review adversarial cazó relink cross-project y grants ineficaces (`REVOKE FROM anon` no quita el EXECUTE de PUBLIC).
+- **ADR-044**: Contacts lens (la difusión entra al shell; `/booking` queda como wrapper legacy).
+- **ADR-045**: person detail — ficha de contacto con notas workspace-scoped (RPCs create/delete_person_note).
+- **ADR-046**: Money lens — fees vía `performance_redacted` + editor de fee (ÚNICO write path de dinero) + totales pipeline/invoiced/paid. Las 4 lenses vivas.
+- **ADR-047**: road sheet público (D6 parcial) — `roadsheet_share` deny-all total vía PostgREST, RPCs gateados edit:show, saneado en dos capas (RPC anon sin fee/notes + matriz en Worker), UI crear/copiar/revocar, revocación inmediata.
+- **ADR-048**: misterio RLS RESUELTO con experimento decisivo — la fila actualizada debe seguir SELECT-visible para el updater; con el patrón `deleted_at IS NULL` universal, **ningún soft-delete puede ir por PATCH directo del cliente, jamás: siempre RPC**. Botón de borrar nota cerrado sobre esa base.
+- **ADR-049**: venue enlazable — promote del trío denormalizado a entidad (RPC `create_venue` idempotente sobre name+city) + picker en el dialog + guard cross-workspace.
+- **ADR-050**: invoice creation — la factura nace del fee (snapshot, IVA/IRPF forma ES, una línea auto), lifecycle draft→issued→paid/cancelled, descarte de drafts vía RPC.
+
+### Incidentes de seguridad encontrados y cerrados en vivo
+- **`performance_redacted` filtraba TODO a anon** (las recreaciones de la view del 05-19 perdieron `security_invoker`): anon leía todas las filas. Arreglado + test canario `redacted-view.test.ts` que debe quedar verde para siempre.
+- Grants: patrón obligatorio `REVOKE ALL FROM PUBLIC, anon, service_role; GRANT EXECUTE TO authenticated` en todos los RPCs.
+
+### Gotchas nuevas que costaron tiempo (para no re-pagarlas)
+- Workbox `navigateFallback` servía `/offline` precacheado para TODA navegación → debe ser `null` explícito + NetworkFirst.
+- `Authorization: Bearer sb_secret_...` degrada el rol en el gateway de Supabase (parsea como JWT inválido) — las claves nuevas van SOLO en `apikey`.
+- Svelte 5: `toStore()` que lee un `$derived` declarado más abajo → TDZ → componente entero en blanco (el typecheck no lo ve).
+- `Input type=number` bind entrega number, no string. `return=representation` en soft-delete → 403 (la fila deja de ser visible). `invoice_line.line_total` es GENERATED.
+- Playwright: `testMatch` explícito (el default se tragaba los `*.test.ts` de vitest); `PW_CHROMIUM` como escape hatch de binarios.
+
+### Pensado y descartado (el porqué vive en cada ADR)
+- Ampliar policies SELECT para permitir soft-delete directo (rompería listados en cascada) → RPCs.
+- Acople automático status factura ↔ status performance → sin magia, Marco cambia status él.
+- Auto-numeración de facturas → campo libre hasta que haya una serie que respetar.
+- Expiración temporal de share links → revocación manual basta por ahora.
+
+### Estado al cierre
+Suite **11/11 e2e contra producción + 53/53 unit + 19/19 RLS**. Fixtures purgados (20 gigs huérfanos), runbook test-user actualizado a la realidad (3 workspaces, fixtures, env RLS). Phase 0.2 ✓, Phase 0.3 esencialmente ✓ (4 lenses; faltan project detail tabs), adelantos de 0.5 (inline status, invoices, D6 parcial). **Lo que queda para cerrar: ver `_tasks.md` (bloque nivel 1) + roadmap § Current next action.** El gate de verdad ya no es código: es que Marco la use.
+
+---
+
 ## 2026-05-19 — Sesión maratón (~7.5h, 27 commits): checkpoint visual + naming gate roundtrips + sidebar pivot a filtro
 
 Sesión que arrancó como "validar gates Phase 0.1" y se fue ramificando a refactors estructurales conforme Marco vivía la UI productiva. **No siguió el roadmap** (el roadmap apuntaba a Phase 0.2 — Calendar + Road sheet) — pero cerró deuda real: 6 ADRs nuevos (034, 035, 036, 037, 038, 039), checkpoint visual 1 ratificado + visual 2 nuevo, naming gate completo (line→section→line + show→performance + URL cleanup), shell pivotado a filtro multi-select, in-place creation en Plaza, Settings page wired, persistencia localStorage.

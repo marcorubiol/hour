@@ -1,7 +1,7 @@
 # Hour — Roadmap de implementación
 
 > Documento vivo. Se actualiza al cerrar cada fase. Ordenado por dependencias reales, no por deseo.
-> Última actualización: 2026-05-14 (Phase 0.0 cerrada 2026-05-09. Naming gate adelantado de 0.4 a 0.1. Visual design checkpoints añadidos).
+> Última actualización: 2026-07-02 (maratón ADR-040→050: Phase 0.2 ✓, 0.3 esencialmente ✓ — 4 lenses vivas —, adelantos de 0.5 en producción. Ver "Current next action").
 
 ## 🎯 Qué toca hoy (punto de entrada)
 
@@ -20,8 +20,18 @@ Antes de cualquier trabajo: leer primero el [`_context.md`](../_context.md) del 
 ## Current operating state
  
 ### Current next action
- 
-**Phase 0.0 + 0.1 cerradas 2026-05-19**. Arrancar Phase 0.2 — Calendar lens + Road sheet colaborativo.
+
+> **Nota 2026-07-02 cierre de maratón (ADR-040→050) — ESTADO Y PLAN DE CIERRE.**
+> Dónde estamos: Phase 0.2 ✓ · Phase 0.3 esencialmente ✓ (las 4 lenses vivas: Today/Plaza, Calendar, Contacts, Money; falta item 3 — project detail tabs) · adelantos de 0.5 en producción (inline status ADR-040, invoice creation ADR-050, D6 link público parcial ADR-047, venue enlazable ADR-049). El ciclo difusión→hold→confirmed→producción→road sheet→factura se opera ENTERO dentro de Hour. Suite 11/11 e2e producción + 53/53 unit + 19/19 RLS. Detalle de la sesión: `_notes/sessions-log.md § 2026-07-01/02`.
+>
+> **Qué queda para "cerrar" (evaluación de 3 niveles, 2026-07-02):**
+> 1. **Nivel 1 — cerrar como herramienta interna diaria** (lo recomendado): (a) alta de personas + engagements desde la UI — NO existe `POST /api/persons` ni `POST /api/engagements`; la difusión no puede capturar un contacto nuevo sin SQL. Es el hueco #1. (b) delete/cancel de performance (gigs por error no se borran; RPC por ADR-048). (c) edición de venue (address/timezone/contacts — hoy solo picker+promote). ~2-3 sesiones. Después: **PARAR de construir y usarla ~1 mes** — el system-completeness gate de 0.3 solo lo cierra Marco usándola con la difusión real.
+> 2. **Nivel 2 — cliente externo**: Phase 0.9 tal cual (abajo, ~25h). Innecesario mientras sean Marco + Anouk.
+> 3. **Nivel 3 — SaaS público**: Phase 1, condicionado al gate de demanda. No es "cerrar la app".
+>
+> Deuda 0.4 pendiente sin cambios (mobile completo, ⌘K, notifications, a11y, checkpoint visual 2, ratificación naming) + checkboxes viejos de 0.0 por verificar (offline con datos cacheados, Lighthouse PWA, `t()`). Tasks accionables: **`_tasks.md`** en la raíz del repo.
+
+**Siguiente acción concreta: el bloque "cierre nivel 1" de `_tasks.md` — empezando por alta de persona + engagement desde Contacts.**
 
 > **Nota 2026-07-02 noche (ADR-043)** — El write path de performances (Phase 0.5 "cuando se confirme la primera fecha") está EN PRODUCCIÓN adelantado: crear desde la Calendar lens + editar status/schedule en el detalle, con RPC `create_performance`. Con ADR-040+043, el ciclo difusión→hold→confirmed→producción se opera entero desde Hour. Siguiente natural: Phase 0.3 (Contacts + Money) o entidad venue enlazable.
 
@@ -392,10 +402,10 @@ Phase 0.2 completa.
 6. Tests e2e de cada lens.
 
 ### Definition of done
-- [ ] 4 lenses vivas.
-- [ ] Room detail tabs navegables.
-- [ ] Todas las listas tienen empty/loading/error/offline state.
-- [ ] Contacts usable en iPhone.
+- [x] 4 lenses vivas. *(2026-07-02: Today/Plaza + Calendar + Contacts + Money — ADR-041/044/046.)*
+- [ ] Room detail tabs navegables. *(Pendiente — único item de 0.3 sin construir; project detail existe con notas colaborativas pero sin tabs Work·Assets·Team·About.)*
+- [ ] Todas las listas tienen empty/loading/error/offline state. *(empty/loading/error ✓ en las 4 lenses; offline state pendiente de verificación.)*
+- [x] Contacts usable en iPhone. *(Mobile-first desde ADR-044.)*
 
 ### Pause point
 Demo-able: "Hour arquitectónicamente completo, queda polish".
