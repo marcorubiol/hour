@@ -72,7 +72,7 @@ export type EngagementPatch = v.InferOutput<typeof EngagementPatchSchema>;
  */
 export type PersonLite = Pick<
   Tables<'person'>,
-  'id' | 'full_name' | 'email' | 'organization_name' | 'country' | 'city' | 'website'
+  'id' | 'slug' | 'full_name' | 'email' | 'organization_name' | 'country' | 'city' | 'website'
 >;
 export type ProjectLite = Pick<Tables<'project'>, 'id' | 'slug' | 'name' | 'status'>;
 
@@ -84,6 +84,6 @@ export interface EngagementItem extends Tables<'engagement'> {
 /** PostgREST embed clause matching `EngagementItem` — shared by GET + PATCH. */
 export const ENGAGEMENT_SELECT = [
   '*',
-  'person:person_id(id,full_name,email,organization_name,country,city,website)',
+  'person:person_id(id,slug,full_name,email,organization_name,country,city,website)',
   'project:project_id(id,slug,name,status)',
 ].join(',');

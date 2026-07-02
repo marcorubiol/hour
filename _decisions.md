@@ -1500,3 +1500,11 @@ Triggered by Marco's pre-scaffold doubt (Phase 0.0 day 5). Five alternatives eva
 - **Verificación**: typecheck 0/0/0 · build limpio · smoke ampliado (lens carga los 154 dentro del shell, búsqueda sin resultados → "No results" → clear → filas de nuevo, pills Contacts/Today navegan) · 5/5 e2e local.
 - **Re-evaluate when**: Phase 0.3 completa (Money lens + person detail + tabs) — y si `/booking` ya no se usa tras unas semanas, eliminar el wrapper.
 - **Status**: Firm. Producción 2026-07-02.
+
+## [2026-07-02] — ADR-045 · Person detail — la ficha de contacto con notas
+- **Decisión**: La página `/h/[ws]/person/[slug]` deja de ser placeholder: ficha completa del contacto — datos (mailto/tel/web), engagements cross-project con status y next action, **notas workspace-scoped con composer** (visibilidad workspace/private), y apariciones en cast/crew. Los nombres en la tabla de engagements (Contacts lens + /booking) enlazan a la ficha. Person es GLOBAL (sin workspace, vocabulario anti-CRM "person (global, shared)"); la nota se crea en el workspace del contexto de navegación.
+- **RPCs**: `create_person_note` (el INSERT directo es claim-bound — cuarto caso del patrón; membership check explícito, visibility default workspace) y `delete_person_note` (author-scoped soft-delete). Endpoints: `GET /api/persons/:key` (uuid o slug global; person + engagements + notes + crew + cast en paralelo, RLS decide todo) y `POST /api/persons/:key/notes`.
+- **Hallazgo RLS anotado para ojos frescos** (`_flux.md`): con el mismo autor y la misma policy UPDATE, `SET body=body` pasa pero `SET deleted_at=now()` viola RLS (reproducido en SQL puro con impersonación). El soft-delete cliente-directo está minado en toda la DB — los write paths actuales no lo usan, pero cualquier futuro delete vía PATCH lo pisará. Mientras: soft-deletes por RPC.
+- **Verificación**: typecheck 0/0/0 · build · e2e nuevo (contacts → ficha → añadir nota → persiste → cleanup por RPC, self-cleaning) · suite completa 6/6 local + RLS 17/17.
+- **Re-evaluate when**: botón de borrar nota en UI (el RPC ya existe), edición de datos de contacto (person es compartida cross-workspace — decisión de ownership pendiente), y el detalle de engagement enlazado desde la ficha.
+- **Status**: Firm. Producción 2026-07-02.

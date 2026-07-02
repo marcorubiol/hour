@@ -40,9 +40,11 @@
 
   interface Props {
     filters: EngagementFilters;
+    /** e.g. `/h/muk-cia/person` — when set, names link to the person file. */
+    personBase?: string;
   }
 
-  let { filters }: Props = $props();
+  let { filters, personBase }: Props = $props();
 
   type EngagementsResponse = {
     total: number;
@@ -235,7 +237,15 @@
     <tbody>
       {#each items as item, i (item.id)}
         <tr>
-          <td class="cell--name">{item.person?.full_name ?? '—'}</td>
+          <td class="cell--name">
+            {#if personBase && item.person?.slug}
+              <a class="cell--name-link" href={`${personBase}/${item.person.slug}`}>
+                {item.person.full_name}
+              </a>
+            {:else}
+              {item.person?.full_name ?? '—'}
+            {/if}
+          </td>
           <td class="cell--muted">{item.person?.organization_name ?? '—'}</td>
           <td class="cell--meta">{locationOf(item)}</td>
           <td>
@@ -383,6 +393,13 @@
     .cell--name {
       font-weight: 500;
       color: var(--heading-color);
+    }
+    .cell--name-link {
+      color: inherit;
+      text-decoration: none;
+    }
+    .cell--name-link:hover {
+      text-decoration: underline;
     }
     .cell--muted {
       color: var(--text-dark-muted);

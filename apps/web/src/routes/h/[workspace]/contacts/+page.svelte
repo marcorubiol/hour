@@ -8,6 +8,7 @@
    */
 
   import { createQuery } from '@tanstack/svelte-query';
+  import { page } from '$app/state';
   import { fetchJSON } from '$lib/api';
   import EngagementTable from '$lib/components/EngagementTable.svelte';
   import Input from '$lib/components/Input.svelte';
@@ -88,7 +89,7 @@
     </div>
   </header>
 
-  <EngagementTable {filters} />
+  <EngagementTable {filters} personBase={`/h/${page.params.workspace}/person`} />
 </section>
 
 <style>

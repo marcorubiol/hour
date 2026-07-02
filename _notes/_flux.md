@@ -212,3 +212,9 @@ D. **¿Phase 0.5 o se mete en 0.4?** Esto define si arrancas a especificarlo en 
 3. **Deep-link a `/h/[ws]/calendar` con selección vacía muestra TODOS los workspaces.** Ratificado como diseño (ADR-038/039: segmento = browsing context, selección vacía = todo, igual que LineList), no como bug — la review lo flaggeó y se decidió mantener coherencia con el resto del sistema.
 
 4. **Suites RLS/e2e pre-rename**: cross-tenant.test.ts ya apunta a `performance_redacted` (fix mecánico cierto), pero sus expectativas de slugs (mamemi → muk-cia, falta demo) siguen sin tocar hasta poder ejecutarlas (recrear `.env.test` per runbook). El smoke viejo idem.
+
+---
+
+## 2026-07-02 — Misterio RLS person_note (para ojos frescos)
+
+Con el MISMO user (author) y la MISMA policy UPDATE (`USING deleted_at IS NULL AND author=uid; CHECK author=uid`), `UPDATE person_note SET body=body` pasa pero `SET deleted_at=now()` da 42501 "new row violates RLS". Reproducido en SQL puro con impersonación (set local role authenticated + request.jwt.claims). El CHECK no referencia deleted_at, así que el mecanismo no es obvio — ¿re-chequeo del new row contra la policy SELECT (deleted_at IS NULL) en FORCE RLS? Investigar con calma; mientras, el soft-delete va por RPC `delete_person_note` (author-scoped). Si el mecanismo resulta ser el re-chequeo SELECT, afectaría a CUALQUIER soft-delete vía PATCH directo del cliente en todas las tablas (los endpoints actuales no lo hacen — todos filtran deleted_at y no lo escriben — pero es un landmine para futuros write paths).

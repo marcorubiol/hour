@@ -34,7 +34,10 @@
 </header>
 
 <div class="booking-body">
-  <EngagementTable filters={{ projectSlug: 'mamemi', season: '2026-27', status: 'any' }} />
+  <EngagementTable
+    filters={{ projectSlug: 'mamemi', season: '2026-27', status: 'any' }}
+    personBase="/h/muk-cia/person"
+  />
 </div>
 
 <style>
