@@ -40,12 +40,13 @@ describe.skipIf(!envReady())('RLS — cross-tenant isolation', () => {
       new URLSearchParams({ select: 'slug', deleted_at: 'is.null' }),
     );
     const slugs = rows.map((r) => r.slug).sort();
-    // marco-rubiol is included as legacy admin (test-user-setup); mamemi
-    // added on the multi-workspace split; playwright is the user's own.
-    // What matters for RLS: playwright should NEVER see a workspace they
-    // are NOT a member of. Currently all three workspaces in DB are
-    // workspaces they belong to.
-    expect(slugs).toEqual(['mamemi', 'marco-rubiol', 'playwright']);
+    // marco-rubiol is included as legacy admin (test-user-setup); muk-cia
+    // (renamed from mamemi, ADR-036 2026-05-19) added on the multi-workspace
+    // split; playwright is the user's own. What matters for RLS: playwright
+    // must NEVER see a workspace they are NOT a member of — the `demo`
+    // workspace exists in the DB and must stay invisible here.
+    expect(slugs).toEqual(['marco-rubiol', 'muk-cia', 'playwright']);
+    expect(slugs).not.toContain('demo');
   });
 
   test('account RLS: playwright sees only accounts where they have account_membership', async () => {

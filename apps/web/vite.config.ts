@@ -73,22 +73,32 @@ export default defineConfig(({ mode }) => {
           },
           workbox: {
             globPatterns: ['**/*.{js,css,svg,png,webmanifest}'],
-            // /offline is a SvelteKit-prerendered page (see
-            // src/routes/offline/+page.ts). It's emitted to
-            // .svelte-kit/cloudflare/offline.html by adapter-cloudflare —
-            // AFTER vite-plugin-pwa has built its precache manifest from
-            // .svelte-kit/output/client. So globPatterns can't catch it,
-            // and we inject it explicitly here with a build-stamp revision
-            // so cache busts when the page changes.
-            additionalManifestEntries: [
-              { url: '/offline', revision: String(Date.now()) },
-            ],
-            navigateFallback: '/offline',
-            navigateFallbackDenylist: [
-              /^\/api\//,
-              /^\/login/,
-              /^\/dev\//,
-              /^\/sw\.js$/,
+            // NO navigateFallback. In generateSW mode Workbox's
+            // NavigationRoute serves the fallback for EVERY navigation
+            // (precache-first), not just offline ones — with an active SW
+            // every hard load of the app answered with the precached
+            // /offline page ("You're back online. Reload" trap, hit in
+            // production 2026-07-02; dev had already disabled the SW for
+            // this exact reason). Navigations instead go NetworkFirst with
+            // a runtime page cache: online always reaches the Worker,
+            // offline serves the last visited copy of the page — the
+            // D-PRE-08 smart-offline behaviour without the trap. /api is
+            // never a navigation, so it stays untouched.
+            //
+            // navigateFallback must be EXPLICITLY null — omitting it makes
+            // vite-plugin-pwa inject its SPA default ('index.html', which
+            // this server-rendered app doesn't even precache).
+            navigateFallback: null,
+            runtimeCaching: [
+              {
+                urlPattern: ({ request }: { request: Request }) =>
+                  request.mode === 'navigate',
+                handler: 'NetworkFirst',
+                options: {
+                  cacheName: 'pages',
+                  networkTimeoutSeconds: 5,
+                },
+              },
             ],
           },
         }),
