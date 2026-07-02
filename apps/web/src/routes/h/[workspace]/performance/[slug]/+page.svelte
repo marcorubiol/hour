@@ -9,14 +9,26 @@
    */
 
   import { page } from '$app/state';
-  import { createQuery } from '@tanstack/svelte-query';
+  import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
   import { fetchJSON } from '$lib/api';
+  import Button from '$lib/components/Button.svelte';
+  import Dialog from '$lib/components/Dialog.svelte';
+  import Input from '$lib/components/Input.svelte';
+  import Menu from '$lib/components/Menu.svelte';
   import StateBadge from '$lib/components/StateBadge.svelte';
   import ProductionStub from '$lib/components/ProductionStub.svelte';
+  import YNotes from '$lib/components/YNotes.svelte';
+  import { addToast } from '$lib/components/Toast.svelte';
   import type { Json } from '$lib/db-types';
-  import { dayLabel } from '$lib/datetime';
-  import { performanceStatusLabel, performanceStatusTone } from '$lib/performance';
+  import { dayLabel, isoToLocalInput, localInputToIso } from '$lib/datetime';
+  import {
+    PERFORMANCE_STATUSES,
+    performanceStatusLabel,
+    performanceStatusTone,
+    type PerformancePatch,
+    type PerformanceStatus,
+  } from '$lib/performance';
 
   type PersonEmbed = {
     id: string;
@@ -120,6 +132,95 @@
 
   const query = createQuery(queryOptions);
 
+  // ── Write path (ADR-043): status menu + details dialog ─────────────────
+  const queryClient = useQueryClient();
+
+  const patchMutation = createMutation({
+    mutationFn: async (patch: PerformancePatch) => {
+      const res = await fetch(
+        `/api/performances/${encodeURIComponent(slug)}?ws=${encodeURIComponent(workspaceSlug)}`,
+        {
+          method: 'PATCH',
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('hour_jwt')}`,
+            'content-type': 'application/json',
+          },
+          body: JSON.stringify(patch),
+        },
+      );
+      const body = (await res.json().catch(() => ({}))) as {
+        performance?: unknown;
+        hint?: string;
+        detail?: string;
+        error?: string;
+      };
+      if (!res.ok || !body.performance) {
+        throw new Error(body.hint || body.detail || body.error || `Error ${res.status}`);
+      }
+      return body.performance;
+    },
+    onSuccess: () => {
+      dialogOpen = false;
+      void queryClient.invalidateQueries({ queryKey: ['performance'] });
+      void queryClient.invalidateQueries({ queryKey: ['calendar-performances'] });
+    },
+    onError: (err) => {
+      addToast({
+        tone: 'danger',
+        title: 'Change not saved',
+        message: `${err instanceof Error ? err.message : 'Unexpected error'} — try again.`,
+      });
+    },
+  });
+
+  function changeStatus(status: PerformanceStatus) {
+    if (!perf || perf.status === status) return;
+    $patchMutation.mutate({ status });
+  }
+
+  let dialogOpen = $state(false);
+  let fDay = $state('');
+  let fVenue = $state('');
+  let fCity = $state('');
+  let fCountry = $state('');
+  let fLoadIn = $state('');
+  let fSoundcheck = $state('');
+  let fStart = $state('');
+  let fLoadout = $state('');
+  let fWrap = $state('');
+
+  function openEdit() {
+    if (!perf) return;
+    fDay = perf.performed_at.slice(0, 10);
+    fVenue = perf.venue_name ?? '';
+    fCity = perf.city ?? '';
+    fCountry = perf.country ?? '';
+    fLoadIn = isoToLocalInput(perf.load_in_at);
+    fSoundcheck = isoToLocalInput(perf.soundcheck_at);
+    fStart = isoToLocalInput(perf.start_at);
+    fLoadout = isoToLocalInput(perf.loadout_at);
+    fWrap = isoToLocalInput(perf.wrap_at);
+    dialogOpen = true;
+  }
+
+  function saveEdit() {
+    if (!fDay) {
+      addToast({ tone: 'warning', message: 'The performance needs a date.' });
+      return;
+    }
+    $patchMutation.mutate({
+      performed_at: fDay,
+      venue_name: fVenue.trim() || null,
+      city: fCity.trim() || null,
+      country: fCountry.trim() || null,
+      load_in_at: localInputToIso(fLoadIn),
+      soundcheck_at: localInputToIso(fSoundcheck),
+      start_at: localInputToIso(fStart),
+      loadout_at: localInputToIso(fLoadout),
+      wrap_at: localInputToIso(fWrap),
+    });
+  }
+
   let bundle = $derived($query.data ?? null);
   let perf = $derived(bundle?.performance ?? null);
   let loading = $derived($query.isPending);
@@ -178,6 +279,26 @@
           label={performanceStatusLabel(perf.status)}
           tone={performanceStatusTone(perf.status)}
         />
+        <Menu label="Change status" triggerClass="btn--outline btn--xs">
+          {#snippet trigger()}status <span aria-hidden="true">▾</span>{/snippet}
+          {#snippet children({ close })}
+            {#each PERFORMANCE_STATUSES as s (s)}
+              <li role="none">
+                <button
+                  type="button"
+                  role="menuitem"
+                  class="menu__item{s === perf!.status ? ' menu__item--active' : ''}"
+                  onclick={() => {
+                    close();
+                    changeStatus(s);
+                  }}
+                >
+                  {performanceStatusLabel(s)}
+                </button>
+              </li>
+            {/each}
+          {/snippet}
+        </Menu>
         <span class="perf__meta-sep" aria-hidden="true">·</span>
         <span class="perf__meta-date">{dayLabel(perf.performed_at, 'short')}</span>
         {#if placeLine}
@@ -187,6 +308,7 @@
       </div>
       <p class="perf__roadsheet-link">
         <a href={`/h/${workspaceSlug}/performance/${slug}/roadsheet`}>Open road sheet →</a>
+        <Button variant="outline" size="xs" onclick={openEdit}>Edit details</Button>
       </p>
     </header>
 
@@ -286,14 +408,54 @@
       </section>
     {/if}
 
-    {#if perf.notes}
-      <section class="perf__section" aria-label="Notes">
-        <p class="eyebrow">Notes</p>
-        <p class="perf__notes">{perf.notes}</p>
-      </section>
-    {/if}
+    <section class="perf__section" aria-label="Notes">
+      <p class="eyebrow">Notes</p>
+      <YNotes
+        targetTable="performance"
+        targetId={perf.id}
+        placeholder="Production notes — shared, live (ADR-025)."
+      />
+    </section>
   {/if}
 </article>
+
+<Dialog bind:open={dialogOpen} title="Edit performance" size="m">
+  <p class="perf__dialog-hint">
+    Times are entered in your local timezone; display is dual-timezone.
+  </p>
+  <div class="perf__form-grid">
+    <Input label="Date" type="date" bind:value={fDay} required />
+    <Input label="Venue" bind:value={fVenue} placeholder="Venue name" />
+    <Input label="City" bind:value={fCity} />
+    <Input label="Country" bind:value={fCountry} placeholder="ES" />
+  </div>
+  <div class="perf__form-grid">
+    <div class="field">
+      <label for="f-loadin">load in</label>
+      <input id="f-loadin" type="datetime-local" bind:value={fLoadIn} />
+    </div>
+    <div class="field">
+      <label for="f-soundcheck">soundcheck</label>
+      <input id="f-soundcheck" type="datetime-local" bind:value={fSoundcheck} />
+    </div>
+    <div class="field">
+      <label for="f-start">start</label>
+      <input id="f-start" type="datetime-local" bind:value={fStart} />
+    </div>
+    <div class="field">
+      <label for="f-loadout">load out</label>
+      <input id="f-loadout" type="datetime-local" bind:value={fLoadout} />
+    </div>
+    <div class="field">
+      <label for="f-wrap">wrap</label>
+      <input id="f-wrap" type="datetime-local" bind:value={fWrap} />
+    </div>
+  </div>
+  {#snippet actions()}
+    <Button variant="outline" onclick={() => (dialogOpen = false)}>Cancel</Button>
+    <Button onclick={saveEdit} loading={$patchMutation.isPending}>Save</Button>
+  {/snippet}
+</Dialog>
 
 <style>
   @layer components {
@@ -355,6 +517,21 @@
 
     .perf__roadsheet-link {
       font-size: var(--text-s);
+      display: flex;
+      align-items: center;
+      gap: var(--space-m);
+    }
+
+    .perf__dialog-hint {
+      font-size: var(--text-xs);
+      color: var(--text-faint);
+    }
+
+    .perf__form-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+      gap: var(--space-s) var(--space-m);
+      margin-block-start: var(--space-s);
     }
 
     .perf__section {
@@ -408,11 +585,5 @@
       font-size: var(--text-s);
     }
 
-    .perf__notes {
-      font-size: var(--text-s);
-      color: var(--text-color);
-      white-space: pre-wrap;
-      line-height: 1.55;
-    }
   }
 </style>

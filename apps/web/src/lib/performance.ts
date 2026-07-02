@@ -1,12 +1,14 @@
 /**
- * Performance domain helpers — status → tone/label vocabulary, in one
- * place (same rationale as $lib/engagement.ts).
+ * Performance domain helpers — status → tone/label vocabulary and the
+ * write contracts (ADR-043), in one place (same rationale as
+ * $lib/engagement.ts).
  *
  * Tone mapping follows the show lifecycle reading documented on
  * StateBadge: proposed → neutral · holds → info · confirmed → success ·
  * invoiced → warning · paid/done → faint · cancelled → danger.
  */
 
+import * as v from 'valibot';
 import { Constants, type Enums } from './db-types';
 
 export type PerformanceStatus = Enums<'performance_status'>;
@@ -36,3 +38,67 @@ export function performanceStatusTone(status: string): StatusTone {
 export function performanceStatusLabel(status: string): string {
   return status.replace(/_/g, ' ');
 }
+
+const isoDateField = v.pipe(
+  v.string(),
+  v.isoDate(),
+  // isoDate is regex-only (accepts 2026-02-31); round-trip rejects
+  // impossible calendar dates. Same guard as EngagementPatchSchema.
+  v.check((s) => {
+    const d = new Date(`${s}T00:00:00Z`);
+    return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;
+  }, 'Not a real calendar date'),
+);
+
+const isoInstantField = v.pipe(
+  v.string(),
+  v.check((s) => {
+    const t = new Date(s).getTime();
+    return !Number.isNaN(t);
+  }, 'Not a valid timestamp'),
+);
+
+const countryField = v.pipe(v.string(), v.regex(/^[A-Za-z]{2}$/, 'ISO 3166 alpha-2'));
+
+/**
+ * POST /api/performances body (ADR-043). Creation goes through the
+ * `create_performance` RPC — claim-independent, permission-gated
+ * server-side, slug auto-generated with collision suffixes.
+ */
+export const PerformanceCreateSchema = v.object({
+  project_id: v.pipe(v.string(), v.uuid()),
+  performed_at: isoDateField,
+  venue_name: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(200)))),
+  city: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(120)))),
+  country: v.optional(v.nullable(countryField)),
+  status: v.optional(v.picklist(PERFORMANCE_STATUSES)),
+  engagement_id: v.optional(v.nullable(v.pipe(v.string(), v.uuid()))),
+  line_id: v.optional(v.nullable(v.pipe(v.string(), v.uuid()))),
+});
+
+export type PerformanceCreate = v.InferOutput<typeof PerformanceCreateSchema>;
+
+/**
+ * PATCH /api/performances/:key body. Whitelist of the operational fields
+ * (status lifecycle, day, the 5 timeslots, denormalized venue trio,
+ * engagement/line links). NO fee columns (edit:money trigger + Money
+ * lens own the money path) and NO notes (the collab doc owns it,
+ * ADR-042). Timeslot ordering is enforced by the DB CHECK — the endpoint
+ * maps that violation to a 400.
+ */
+export const PerformancePatchSchema = v.object({
+  status: v.optional(v.picklist(PERFORMANCE_STATUSES)),
+  performed_at: v.optional(isoDateField),
+  load_in_at: v.optional(v.nullable(isoInstantField)),
+  soundcheck_at: v.optional(v.nullable(isoInstantField)),
+  start_at: v.optional(v.nullable(isoInstantField)),
+  loadout_at: v.optional(v.nullable(isoInstantField)),
+  wrap_at: v.optional(v.nullable(isoInstantField)),
+  venue_name: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(200)))),
+  city: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(120)))),
+  country: v.optional(v.nullable(countryField)),
+  engagement_id: v.optional(v.nullable(v.pipe(v.string(), v.uuid()))),
+  line_id: v.optional(v.nullable(v.pipe(v.string(), v.uuid()))),
+});
+
+export type PerformancePatch = v.InferOutput<typeof PerformancePatchSchema>;

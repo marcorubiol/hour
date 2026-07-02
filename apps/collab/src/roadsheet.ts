@@ -23,7 +23,15 @@
 import { Server } from 'partyserver';
 import { withYjs } from 'y-partyserver';
 import * as Y from 'yjs';
-import { fetchWorkspaceId, loadLatestSnapshot, saveSnapshot } from './persistence';
+import {
+  fetchTargetMeta,
+  loadLatestSnapshot,
+  saveSnapshot,
+  writeNotesColumn,
+} from './persistence';
+
+/** The shared text field inside every collab doc (ADR-025 scope). */
+const NOTES_FIELD = 'notes';
 
 export interface CollabEnv {
   PUBLIC_SUPABASE_URL: string;
@@ -48,6 +56,25 @@ class RoadsheetCollabBase extends Server<CollabEnv> {
 const WithYjs = withYjs(RoadsheetCollabBase);
 
 export class RoadsheetCollab extends WithYjs {
+  /**
+   * workerd delivers binary frames as Blob (the WHATWG default on recent
+   * compatibility dates); y-partyserver 2.2.0 only understands
+   * ArrayBuffer/TypedArray and silently decodes an empty buffer otherwise
+   * ("Unexpected end of array", found live 2026-07-02 — the reason the
+   * 2026-05-09 scaffold never actually synced). Normalize before handing
+   * off. CRDT semantics tolerate the await's potential reordering.
+   */
+  override async onMessage(
+    conn: Parameters<InstanceType<typeof WithYjs>['onMessage']>[0],
+    message: ArrayBuffer | string,
+  ): Promise<void> {
+    const normalized =
+      typeof message !== 'string' && message instanceof Blob
+        ? await (message as Blob).arrayBuffer()
+        : message;
+    super.onMessage(conn, normalized as never);
+  }
+
   /**
    * Resolve `[targetTable, targetId]` from `this.name`. Returns null when
    * the name doesn't fit the expected pattern — we refuse to load/save in
@@ -75,12 +102,17 @@ export class RoadsheetCollab extends WithYjs {
 
     // Cache workspace_id once per DO lifecycle. Survives hibernation.
     let wsId = (await this.ctx.storage.get(STORAGE_KEYS.workspaceId)) as string | undefined;
+    let seedNotes: string | null = null;
     if (!wsId) {
       try {
-        wsId = (await fetchWorkspaceId(this.env, targetTable, targetId)) ?? undefined;
-        if (wsId) await this.ctx.storage.put(STORAGE_KEYS.workspaceId, wsId);
+        const meta = await fetchTargetMeta(this.env, targetTable, targetId);
+        if (meta) {
+          wsId = meta.workspace_id;
+          seedNotes = meta.notes;
+          await this.ctx.storage.put(STORAGE_KEYS.workspaceId, wsId);
+        }
       } catch (e) {
-        console.warn('[collab] fetchWorkspaceId failed:', e);
+        console.warn('[collab] fetchTargetMeta failed:', e);
       }
     }
 
@@ -90,8 +122,13 @@ export class RoadsheetCollab extends WithYjs {
         Y.applyUpdate(this.document, latest.snapshot);
         await this.ctx.storage.put(STORAGE_KEYS.version, latest.version);
       } else {
-        // Fresh doc — version 0 means "nothing persisted yet".
+        // Fresh doc — version 0 means "nothing persisted yet". Seed from
+        // the notes column so pre-collab text isn't lost on first save.
         await this.ctx.storage.put(STORAGE_KEYS.version, 0);
+        if (seedNotes) {
+          const text = this.document.getText(NOTES_FIELD);
+          if (text.length === 0) text.insert(0, seedNotes);
+        }
       }
     } catch (e) {
       console.warn('[collab] loadLatestSnapshot failed:', e);
@@ -109,7 +146,21 @@ export class RoadsheetCollab extends WithYjs {
     if (!parsed) return;
     const [targetTable, targetId] = parsed;
 
-    const wsId = (await this.ctx.storage.get(STORAGE_KEYS.workspaceId)) as string | undefined;
+    let wsId = (await this.ctx.storage.get(STORAGE_KEYS.workspaceId)) as string | undefined;
+    if (!wsId) {
+      // Self-heal: onLoad's fetch can fail transiently and onLoad never
+      // re-runs while the DO is warm — retry here instead of skipping
+      // every save until eviction.
+      try {
+        const meta = await fetchTargetMeta(this.env, targetTable, targetId);
+        if (meta) {
+          wsId = meta.workspace_id;
+          await this.ctx.storage.put(STORAGE_KEYS.workspaceId, wsId);
+        }
+      } catch (e) {
+        console.warn('[collab] onSave meta retry failed:', e);
+      }
+    }
     if (!wsId) {
       console.warn('[collab] onSave: missing workspace_id, skipping snapshot');
       return;
@@ -129,6 +180,21 @@ export class RoadsheetCollab extends WithYjs {
       // possible during cold-start migration. Don't bump version on failure;
       // next save retries with the same `next`.
       console.error('[collab] saveSnapshot failed:', e);
+    }
+
+    // Materialize the notes text into the target's column so non-collab
+    // readers (road sheet projection, detail endpoint) see current content.
+    // Best-effort: a failure never blocks the snapshot chain; the next
+    // save retries with fresher text anyway.
+    try {
+      await writeNotesColumn(
+        this.env,
+        targetTable,
+        targetId,
+        this.document.getText(NOTES_FIELD).toString(),
+      );
+    } catch (e) {
+      console.error('[collab] writeNotesColumn failed:', e);
     }
   }
 }

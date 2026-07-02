@@ -26,7 +26,8 @@
 import type { RequestHandler } from './$types';
 import * as v from 'valibot';
 import { extractBearer } from '$lib/auth';
-import { pgGet, PostgrestError, type SupabaseEnv } from '$lib/supabase';
+import { PerformanceCreateSchema } from '$lib/performance';
+import { pgGet, pgPostRpc, PostgrestError, type SupabaseEnv } from '$lib/supabase';
 
 const ALLOWED_STATUSES = [
   'any',
@@ -188,6 +189,75 @@ export const GET: RequestHandler = async ({ request, url, platform }) => {
   } catch (err) {
     if (err instanceof PostgrestError) {
       const upstream = err.status === 401 || err.status === 403 ? err.status : 502;
+      return json(
+        { error: 'postgrest_error', status: err.status, detail: err.body },
+        upstream,
+      );
+    }
+    return json({ error: 'unexpected', detail: String(err) }, 500);
+  }
+};
+
+/**
+ * POST /api/performances — create a gig (ADR-043).
+ *
+ * Body: PerformanceCreateSchema. Goes through the `create_performance`
+ * RPC (SECURITY DEFINER): claim-independent, gated on
+ * has_permission(project_id, 'edit:show'), slug auto-generated
+ * (slugify(venue|city|'gig')-YYYY-MM-DD, numeric suffix on collision).
+ * Returns { performance } — the full created row.
+ */
+export const POST: RequestHandler = async ({ request, platform }) => {
+  if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);
+  const env = platform.env as unknown as SupabaseEnv;
+
+  const jwt = extractBearer(request);
+  if (!jwt) return json({ error: 'missing_authorization' }, 401);
+
+  let raw: unknown;
+  try {
+    raw = await request.json();
+  } catch {
+    return json({ error: 'invalid_body' }, 400);
+  }
+  const parsed = v.safeParse(PerformanceCreateSchema, raw);
+  if (!parsed.success) {
+    return json(
+      {
+        error: 'invalid_body',
+        issues: parsed.issues.map((i) => ({
+          path: i.path?.map((pp) => pp.key).join('.'),
+          message: i.message,
+        })),
+      },
+      400,
+    );
+  }
+  const input = parsed.output;
+
+  try {
+    const { data } = await pgPostRpc<PerformanceItem>(env, 'create_performance', jwt, {
+      p_project_id: input.project_id,
+      p_performed_at: input.performed_at,
+      p_venue_name: input.venue_name ?? null,
+      p_city: input.city ?? null,
+      p_country: input.country ? input.country.toUpperCase() : null,
+      p_status: input.status ?? 'proposed',
+      p_engagement_id: input.engagement_id ?? null,
+      p_line_id: input.line_id ?? null,
+    });
+    if (data.length === 0) return json({ error: 'create_failed' }, 502);
+    return json({ performance: data[0] }, 201);
+  } catch (err) {
+    if (err instanceof PostgrestError) {
+      // RPC RAISEs: 22023 invalid input → 400, 42501 permission → 403.
+      if (err.code === '22023') {
+        return json({ error: 'invalid_input', detail: err.body }, 400);
+      }
+      if (err.code === '42501') {
+        return json({ error: 'forbidden' }, 403);
+      }
+      const upstream = err.status === 401 ? 401 : 502;
       return json(
         { error: 'postgrest_error', status: err.status, detail: err.body },
         upstream,

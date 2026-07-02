@@ -17,14 +17,24 @@
    * lens set).
    */
 
-  import { createQuery } from '@tanstack/svelte-query';
+  import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
+  import { goto } from '$app/navigation';
   import { page } from '$app/state';
   import { fetchJSON } from '$lib/api';
+  import Button from '$lib/components/Button.svelte';
+  import Dialog from '$lib/components/Dialog.svelte';
+  import Input from '$lib/components/Input.svelte';
+  import Select from '$lib/components/Select.svelte';
+  import { addToast } from '$lib/components/Toast.svelte';
   import { useSelection } from '$lib/stores/selection.svelte';
   import { accentVarFor } from '$lib/utils/accent';
   import { addDaysIso, addMonths, dayKeyInTz, monthGrid } from '$lib/calendar';
-  import { performanceStatusTone } from '$lib/performance';
+  import {
+    performanceStatusLabel,
+    performanceStatusTone,
+    type PerformanceCreate,
+  } from '$lib/performance';
 
   type WorkspaceLite = { id: string; slug: string; name: string };
   type ProjectLite = {
@@ -238,6 +248,93 @@
     return p.venue?.name ?? p.venue_name ?? p.city ?? p.project?.name ?? 'Performance';
   }
 
+  // ── New performance (ADR-043) ───────────────────────────────────────────
+  const queryClient = useQueryClient();
+
+  let createOpen = $state(false);
+  let cProject = $state('');
+  let cDay = $state('');
+  let cVenue = $state('');
+  let cCity = $state('');
+  let cStatus = $state('proposed');
+
+  const CREATE_STATUSES = ['proposed', 'hold', 'hold_1', 'hold_2', 'hold_3', 'confirmed'];
+  let statusOptions = $derived(
+    CREATE_STATUSES.map((s) => ({ value: s, label: performanceStatusLabel(s) })),
+  );
+  let projectOptions = $derived(
+    ($projectsQuery.data?.items ?? []).map((p) => ({ value: p.id, label: p.name })),
+  );
+
+  function openCreate(dayIso?: string) {
+    cDay = dayIso ?? todayIso;
+    // Pre-select when the sidebar filter collapses to one project.
+    if (!cProject) {
+      const selected = [...selection.effectiveProjects()];
+      if (selected.length === 1) {
+        cProject = projectsBySlug.get(selected[0])?.id ?? '';
+      } else if (projectOptions.length === 1) {
+        cProject = projectOptions[0].value;
+      }
+    }
+    createOpen = true;
+  }
+
+  const createMutationQ = createMutation({
+    mutationFn: async (input: PerformanceCreate) => {
+      const res = await fetch('/api/performances', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('hour_jwt')}`,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify(input),
+      });
+      const body = (await res.json().catch(() => ({}))) as {
+        performance?: { slug: string | null; workspace_id: string };
+        detail?: string;
+        error?: string;
+      };
+      if (!res.ok || !body.performance) {
+        throw new Error(body.detail || body.error || `Error ${res.status}`);
+      }
+      return body.performance;
+    },
+    onSuccess: async (perf) => {
+      createOpen = false;
+      cVenue = '';
+      cCity = '';
+      void queryClient.invalidateQueries({ queryKey: ['calendar-performances'] });
+      const ws = workspaceSlugById.get(perf.workspace_id) ?? page.params.workspace;
+      if (perf.slug) await goto(`/h/${ws}/performance/${perf.slug}`);
+    },
+    onError: (err) => {
+      addToast({
+        tone: 'danger',
+        title: 'Not created',
+        message: `${err instanceof Error ? err.message : 'Unexpected error'} — try again.`,
+      });
+    },
+  });
+
+  function submitCreate() {
+    if (!cProject) {
+      addToast({ tone: 'warning', message: 'Pick a project.' });
+      return;
+    }
+    if (!cDay) {
+      addToast({ tone: 'warning', message: 'Pick a date.' });
+      return;
+    }
+    $createMutationQ.mutate({
+      project_id: cProject,
+      performed_at: cDay,
+      venue_name: cVenue.trim() || null,
+      city: cCity.trim() || null,
+      status: cStatus as PerformanceCreate['status'],
+    });
+  }
+
   const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 </script>
 
@@ -254,6 +351,7 @@
         <button class="btn--outline btn--s" onclick={prevMonth} aria-label="Previous month">←</button>
         <button class="btn--outline btn--s" onclick={thisMonth}>Today</button>
         <button class="btn--outline btn--s" onclick={nextMonth} aria-label="Next month">→</button>
+        <Button size="s" onclick={() => openCreate()}>New performance</Button>
       </div>
     </div>
     {#if !loading && !errorMsg}
@@ -280,7 +378,15 @@
             class:cal__day--out={!day.inMonth}
             class:cal__day--today={day.iso === todayIso}
           >
-            <span class="cal__day-num">{Number(day.iso.slice(8, 10))}</span>
+            <span class="cal__day-head">
+              <span class="cal__day-num">{Number(day.iso.slice(8, 10))}</span>
+              <button
+                type="button"
+                class="cal__day-add"
+                aria-label={`New performance on ${day.iso}`}
+                onclick={() => openCreate(day.iso)}
+              >+</button>
+            </span>
             {#each perfs as p (p.id)}
               {@const href = perfHref(p)}
               {#if href}
@@ -320,6 +426,26 @@
     </div>
   {/if}
 </section>
+
+<Dialog bind:open={createOpen} title="New performance" size="s">
+  <div class="cal__form">
+    <Select
+      label="Project"
+      placeholder="Pick a project…"
+      options={projectOptions}
+      bind:value={cProject}
+      required
+    />
+    <Input label="Date" type="date" bind:value={cDay} required />
+    <Input label="Venue" bind:value={cVenue} placeholder="Venue name (optional)" />
+    <Input label="City" bind:value={cCity} placeholder="City (optional)" />
+    <Select label="Status" options={statusOptions} bind:value={cStatus} />
+  </div>
+  {#snippet actions()}
+    <Button variant="outline" onclick={() => (createOpen = false)}>Cancel</Button>
+    <Button onclick={submitCreate} loading={$createMutationQ.isPending}>Create</Button>
+  {/snippet}
+</Dialog>
 
 <style>
   @layer components {
@@ -429,6 +555,36 @@
       font-family: var(--font-mono);
       font-size: var(--text-xs);
       color: var(--text-muted);
+    }
+
+    .cal__day-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    /* Quiet add affordance — visible on cell hover (and on focus). */
+    .cal__day-add {
+      opacity: 0;
+      font-family: var(--font-mono);
+      font-size: var(--text-s);
+      line-height: 1;
+      color: var(--text-faint);
+      padding: 0 var(--space-2xs);
+      transition: opacity var(--transition), color var(--transition);
+    }
+    .cal__day:hover .cal__day-add,
+    .cal__day-add:focus-visible {
+      opacity: 1;
+    }
+    .cal__day-add:hover {
+      color: var(--text-color);
+    }
+
+    .cal__form {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-s);
     }
 
     /* Event chip. Project accent on the left rail (--c), status tone on

@@ -16,6 +16,7 @@
   import { accentVar, accentVarFor } from '$lib/utils/accent';
   import RelationshipStub from '$lib/components/RelationshipStub.svelte';
   import StateBadge from '$lib/components/StateBadge.svelte';
+  import YNotes from '$lib/components/YNotes.svelte';
 
   type Project = {
     id: string;
@@ -118,6 +119,17 @@
 
   <RelationshipStub projectSlug={projectSlug} />
 
+  {#if project}
+    <section class="project__notes" aria-label="Notes">
+      <p class="eyebrow">Notes</p>
+      <YNotes
+        targetTable="project"
+        targetId={project.id}
+        placeholder="Project notes — shared, live (ADR-025)."
+      />
+    </section>
+  {/if}
+
   <section class="project__stubs" aria-label="Pending sections">
     <div class="project__stub">
       <p class="eyebrow">Lines &amp; Shows</p>
@@ -207,6 +219,12 @@
     font-size: var(--text-xs);
     letter-spacing: 0.04em;
     color: var(--text-faint);
+  }
+
+  .project__notes {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-s);
   }
 
   .project__stubs {

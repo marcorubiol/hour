@@ -37,6 +37,21 @@ export class PostgrestError extends Error {
   ) {
     super(`PostgREST ${status}: ${body.slice(0, 200)}`);
   }
+
+  /**
+   * The Postgres error code from the structured error body, or null.
+   * Prefer this over substring-matching the raw body — user-influenced
+   * text (constraint details, RAISE messages) could contain a code-like
+   * digit string.
+   */
+  get code(): string | null {
+    try {
+      const parsed = JSON.parse(this.body) as { code?: unknown };
+      return typeof parsed.code === 'string' ? parsed.code : null;
+    } catch {
+      return null;
+    }
+  }
 }
 
 function baseHeaders(env: SupabaseEnv, jwt: string | null): Record<string, string> {
