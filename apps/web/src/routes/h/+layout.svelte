@@ -28,7 +28,7 @@
   import { goto } from '$app/navigation';
   import { env } from '$env/dynamic/public';
   import type { Snippet } from 'svelte';
-  import { onDestroy, onMount } from 'svelte';
+  import { onDestroy, onMount, untrack } from 'svelte';
   import Sidebar from '$lib/components/Sidebar.svelte';
   import Avatar from '$lib/components/Avatar.svelte';
   import Plaza from '$lib/components/Plaza.svelte';
@@ -320,6 +320,36 @@
     { id: 'contacts', label: 'Contacts' },
     { id: 'money', label: 'Money' },
   ];
+
+  // Lenses with a routed page navigate (URL is canonical, ADR-022);
+  // contacts/money stay state-only until their pages exist (Phase 0.3).
+  function selectLens(id: Lens) {
+    lens.set(id);
+    if (!hasWorkspace) return;
+    if (id === 'calendar') {
+      void goto(`/h/${workspaceSlug}/calendar`);
+    } else if (id === 'today' && onCalendarRoute) {
+      // Leaving the calendar must not rewrite the filter: serialize the
+      // live selection (multi-select survives); bare context as fallback.
+      const hasSelection = selection.workspaces.size > 0 || selection.projects.size > 0;
+      void goto(hasSelection ? selection.toUrl() : `/h/${workspaceSlug}/`);
+    }
+  }
+
+  let onCalendarRoute = $derived(/^\/h\/[^/]+\/calendar\/?$/.test(page.url.pathname));
+
+  // Keep the pill state honest when navigation happens outside the pills
+  // (deep link, browser back, the Today dashboard's "Open calendar →").
+  // Lens reads go through untrack so this reacts to ROUTE changes only —
+  // otherwise it would instantly revert any state-only pill (Contacts,
+  // Money) clicked while on the calendar route.
+  $effect(() => {
+    if (onCalendarRoute) {
+      if (untrack(() => lens.current) !== 'calendar') lens.set('calendar');
+    } else if (untrack(() => lens.current) === 'calendar') {
+      lens.set('today');
+    }
+  });
 
   // Settings takes over the sidebar body: Plaza + LineList are replaced
   // by SettingsNav while the user is inside /settings. Header (brand)
@@ -657,7 +687,7 @@
             <Pill
               active={lens.current === opt.id}
               ariaCurrent={lens.current === opt.id ? 'true' : undefined}
-              onclick={() => lens.set(opt.id)}
+              onclick={() => selectLens(opt.id)}
             >
               {opt.label}
             </Pill>

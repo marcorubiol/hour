@@ -448,6 +448,23 @@ export class SelectionStore {
       };
     }
 
+    // /h/[ws]/<entity>/... (performance, engagement, person, settings) and
+    // lens routes (/calendar): visiting them neither is nor implies a
+    // filter change — preserve the selection, same rationale as project
+    // sub-routes above. The calendar especially READS the selection as its
+    // event filter, so hydration must not clear it on arrival.
+    const neutralMatch = path.match(
+      /^\/h\/[^/]+\/(performance|engagement|person|settings|calendar)(\/|$)/,
+    );
+    if (neutralMatch) {
+      return {
+        workspaces: new Set(),
+        projects: new Set(),
+        impliedProjectWorkspaces: implied,
+        keepSelection: true,
+      };
+    }
+
     // /h/[ws]/project/[slug]/  (exact, no sub-route)  → 1 ws + 1 project filter
     const projectMatch = path.match(/^\/h\/([^/]+)\/project\/([^/]+)\/?$/);
     if (projectMatch) {
