@@ -205,7 +205,7 @@ D. **¿Phase 0.5 o se mete en 0.4?** Esto define si arrancas a especificarlo en 
 
 ## 2026-07-02 — Notas de la sesión Phase 0.2 read surface (ADR-041)
 
-1. **`can_see_person` deja cast/crew en '—' para members sin engagement compartido.** La policy de person (compartida por engagement o created_by) no cubre "aparece en cast/crew de una performance que puedo leer". Cuando Anouk entre al workspace verá nombres vacíos en road sheets de gigs cuyos contactos creó Marco. Probable fix: ampliar `can_see_person` con exists sobre crew_assignment/cast_member/cast_override joined a performances legibles. Decisión de policy — no tomada en ADR-041 a propósito.
+1. ~~**`can_see_person` deja cast/crew en '—'**~~ **RESUELTO 2026-07-02**: ampliada con cláusulas call-sheet (crew_assignment/cast_member/cast_override incl. replaces) por membership de workspace — migración `2026-07-02_extend_can_see_person_call_sheet.sql`, aplicada vía Supabase MCP, cross-tenant verificado intacto + RLS 17/17.
 
 2. **Logistics jsonb mezcla venue-facing e interno.** Parking/freight (para la sala) convive con hotel/viajes (interno) en el mismo blob. Por eso el rol venue NO recibe logistics (conservador). Cuando las shapes se separen (ADR-023 las dejó abiertas), re-evaluar la matriz.
 
