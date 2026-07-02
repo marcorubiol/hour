@@ -64,6 +64,10 @@ Working name: **Hour**. Brand decision deferred to Phase 1.
 - Parent MaMeMi context (where Difusión originated): `01_STAGE/ZS_MaMeMi/`
 - Source of the 156 existing programmers/festivals to import: `01_STAGE/ZS_MaMeMi/Difusión/`
 
+## Status — 2026-07-02 (noche, 3)
+
+**ADR-045: person detail — la ficha de contacto.** `/h/[ws]/person/[slug]` real: contacto (mailto/tel/web), engagements cross-project, **notas workspace-scoped con composer** (workspace/private) y apariciones cast/crew. Nombres de la tabla de engagements enlazan a la ficha. RPCs `create_person_note` + `delete_person_note` (INSERT claim-bound — 4º caso del patrón; y el soft-delete directo por PATCH está minado por RLS en toda la DB — misterio anotado en _flux para ojos frescos, mientras tanto soft-deletes por RPC). Suite 8/8 contra producción. Con esto la difusión tiene memoria relacional: quién es, qué conversaciones hay, qué pasó ("hablé con ella en el Grec, prefiere email").
+
 ## Status — 2026-07-02 (noche, 2)
 
 **ADR-044: Contacts lens v1 — la difusión vive en el shell.** `/h/[ws]/contacts`: la tabla de engagements (extraída a `EngagementTable`, una implementación) con filtro por selección del sidebar, búsqueda persona/organización y filtro de status, más los editores inline de ADR-040. `/booking` queda como wrapper legacy. `/api/engagements` generalizado (sin default mamemi; unión project_ids/workspace_ids + q). Resolver selección→ids extraído a `$lib/selection-filter.ts` (calendario refactorizado encima). Lenses routed generalizadas en el shell (calendar + contacts; Money sigue muerta hasta su página). Suite completa 7/7 contra producción. Con ADR-040+041+042+043+044: **el ciclo difusión completo — buscar contacto, avanzar conversación, poner fecha, confirmar, producir con road sheet colaborativo — se opera entero dentro de Hour.**
