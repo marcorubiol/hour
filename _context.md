@@ -64,6 +64,10 @@ Working name: **Hour**. Brand decision deferred to Phase 1.
 - Parent MaMeMi context (where Difusión originated): `01_STAGE/ZS_MaMeMi/`
 - Source of the 156 existing programmers/festivals to import: `01_STAGE/ZS_MaMeMi/Difusión/`
 
+## Status — 2026-07-02 (noche, 4)
+
+**ADR-046: Money lens — LAS 4 LENSES VIVAS.** `/h/[ws]/money`: fees vía `performance_redacted` (la puerta de dinero; view ampliada con slug, invoker+revoke reafirmados) con editor de fee por fila (el ÚNICO write path de dinero — trigger edit:money) y totales pipeline/invoiced/paid; invoices read-only (0 filas hoy, creación Phase 0.5). El system-completeness gate de Phase 0.3 ("¿las 4 lenses funcionan como vistas del mismo sistema?") ya tiene qué evaluar — pendiente el veredicto de Marco usándolas. Suite 9/9 contra producción.
+
 ## Status — 2026-07-02 (noche, 3)
 
 **ADR-045: person detail — la ficha de contacto.** `/h/[ws]/person/[slug]` real: contacto (mailto/tel/web), engagements cross-project, **notas workspace-scoped con composer** (workspace/private) y apariciones cast/crew. Nombres de la tabla de engagements enlazan a la ficha. RPCs `create_person_note` + `delete_person_note` (INSERT claim-bound — 4º caso del patrón; y el soft-delete directo por PATCH está minado por RLS en toda la DB — misterio anotado en _flux para ojos frescos, mientras tanto soft-deletes por RPC). Suite 8/8 contra producción. Con esto la difusión tiene memoria relacional: quién es, qué conversaciones hay, qué pasó ("hablé con ella en el Grec, prefiere email").
