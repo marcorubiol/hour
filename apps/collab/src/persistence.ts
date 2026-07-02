@@ -51,7 +51,7 @@ function authHeaders(env: PersistEnv): Record<string, string> {
  */
 export async function fetchWorkspaceId(
   env: PersistEnv,
-  targetTable: 'show' | 'project',
+  targetTable: 'performance' | 'project',
   targetId: string,
 ): Promise<string | null> {
   const url = new URL(`/rest/v1/${targetTable}`, env.PUBLIC_SUPABASE_URL);

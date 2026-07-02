@@ -1,6 +1,7 @@
 /**
  * RoadsheetCollab — per-document Durable Object for collaborative Yjs
- * editing of `show.notes` / `project.notes` (and future text fields).
+ * editing of `performance.notes` / `project.notes` (and future text fields).
+ * (ADR-036 renamed show -> performance; DO names use the live table name.)
  *
  * Naming: instance addressed via `idFromName('${target_table}:${target_id}')`,
  * so all clients of the same target hit the same DO. y-partyserver handles
@@ -36,7 +37,7 @@ const STORAGE_KEYS = {
   version: 'snapshot_version',
 } as const;
 
-const ALLOWED_TABLES = new Set(['show', 'project']);
+const ALLOWED_TABLES = new Set(['performance', 'project']);
 
 // Avoid deploying a "headless" DO that accepts traffic but can't persist.
 class RoadsheetCollabBase extends Server<CollabEnv> {
@@ -52,11 +53,11 @@ export class RoadsheetCollab extends WithYjs {
    * the name doesn't fit the expected pattern — we refuse to load/save in
    * that case rather than crashing.
    */
-  private parseName(): [table: 'show' | 'project', id: string] | null {
+  private parseName(): [table: 'performance' | 'project', id: string] | null {
     const [table, id] = this.name.split(':');
     if (!table || !id) return null;
     if (!ALLOWED_TABLES.has(table)) return null;
-    return [table as 'show' | 'project', id];
+    return [table as 'performance' | 'project', id];
   }
 
   /**

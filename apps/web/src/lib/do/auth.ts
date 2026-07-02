@@ -25,9 +25,9 @@ export interface CollabAuthFail {
 
 export type CollabAuthResult = CollabAuthOk | CollabAuthFail;
 
-const ALLOWED_TABLES = new Set(['show', 'project']);
+const ALLOWED_TABLES = new Set(['performance', 'project']);
 
-export function isAllowedTargetTable(t: string): t is 'show' | 'project' {
+export function isAllowedTargetTable(t: string): t is 'performance' | 'project' {
   return ALLOWED_TABLES.has(t);
 }
 
