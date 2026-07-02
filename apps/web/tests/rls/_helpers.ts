@@ -138,6 +138,37 @@ export async function pgPatch<T = unknown>(
   return { status: res.status, rows };
 }
 
+/**
+ * Call a Postgres function via PostgREST RPC as `authenticated` (with JWT)
+ * or `anon` (no JWT). Never throws on non-2xx. Scalar-returning functions
+ * come back as a naked JSON value — `data` carries it verbatim.
+ */
+export async function pgRpc<T = unknown>(
+  functionName: string,
+  jwt: string | null,
+  args: Record<string, unknown> = {},
+): Promise<{ status: number; data: T | null }> {
+  const { url, anon } = requireEnv();
+  const u = new URL(`/rest/v1/rpc/${functionName}`, url);
+
+  const res = await fetch(u.toString(), {
+    method: 'POST',
+    headers: {
+      apikey: anon,
+      Authorization: `Bearer ${jwt ?? anon}`,
+      Accept: 'application/json',
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify(args),
+  });
+  let data: T | null = null;
+  if (res.ok) {
+    const body = await res.text();
+    if (body) data = JSON.parse(body) as T;
+  }
+  return { status: res.status, data };
+}
+
 /** Decode a JWT body (no signature verification — just inspect claims). */
 export function decodeJwt(jwt: string): Record<string, unknown> {
   const [, payload] = jwt.split('.');

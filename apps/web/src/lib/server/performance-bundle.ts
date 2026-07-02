@@ -103,6 +103,29 @@ export interface PerformanceBundleResult {
 
 const PERSON_COLS = 'id,slug,full_name,email,phone';
 
+/**
+ * Resolve a performance key (uuid, or slug scoped by workspace slug) to its
+ * id without fetching the whole bundle. Returns null when nothing matched
+ * (missing row or RLS denied — indistinguishable by design).
+ */
+export async function resolvePerformanceId(
+  env: SupabaseEnv,
+  jwt: string,
+  key: string,
+  workspaceSlug: string | null,
+): Promise<string | null> {
+  if (isUuid(key)) return key;
+  if (!workspaceSlug) return null;
+  const search = new URLSearchParams();
+  search.set('select', 'id,workspace:workspace_id!inner(slug)');
+  search.set('slug', `eq.${key}`);
+  search.set('workspace.slug', `eq.${workspaceSlug}`);
+  search.set('deleted_at', 'is.null');
+  search.set('limit', '1');
+  const { data } = await pgGet<{ id: string }>(env, 'performance', jwt, { search });
+  return data[0]?.id ?? null;
+}
+
 // Explicit column list — deliberately NO fee_amount/fee_currency. The
 // decided read-path money gate is the performance_redacted view
 // (read:money); the detail bundle must not bypass it through the base

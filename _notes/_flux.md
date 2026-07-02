@@ -215,6 +215,6 @@ D. **¿Phase 0.5 o se mete en 0.4?** Esto define si arrancas a especificarlo en 
 
 ---
 
-## 2026-07-02 — Misterio RLS person_note (para ojos frescos)
+## ~~2026-07-02 — Misterio RLS person_note (para ojos frescos)~~ RESUELTO → ADR-048
 
-Con el MISMO user (author) y la MISMA policy UPDATE (`USING deleted_at IS NULL AND author=uid; CHECK author=uid`), `UPDATE person_note SET body=body` pasa pero `SET deleted_at=now()` da 42501 "new row violates RLS". Reproducido en SQL puro con impersonación (set local role authenticated + request.jwt.claims). El CHECK no referencia deleted_at, así que el mecanismo no es obvio — ¿re-chequeo del new row contra la policy SELECT (deleted_at IS NULL) en FORCE RLS? Investigar con calma; mientras, el soft-delete va por RPC `delete_person_note` (author-scoped). Si el mecanismo resulta ser el re-chequeo SELECT, afectaría a CUALQUIER soft-delete vía PATCH directo del cliente en todas las tablas (los endpoints actuales no lo hacen — todos filtran deleted_at y no lo escriben — pero es un landmine para futuros write paths).
+**Resuelto 2026-07-02 con experimento decisivo**: la hipótesis del re-chequeo SELECT era correcta — la fila actualizada debe seguir pasando alguna policy SELECT del updater; `deleted_at=now()` la hace invisible → 42501. Confirmado añadiendo una policy SELECT temporal (`author_id = auth.uid()`) que hace pasar el MISMO update. Es sistémico (todo el schema usa `deleted_at IS NULL` en SELECT): **ningún soft-delete puede ir por PATCH directo del cliente, nunca** — siempre RPC. Regla y detalle en `_decisions.md` ADR-048.

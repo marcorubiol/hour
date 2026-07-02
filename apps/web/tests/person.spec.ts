@@ -53,31 +53,12 @@ test.describe('person file', () => {
       timeout: 10_000,
     });
 
-    // Cleanup: soft-delete via the author-scoped RPC (a direct PATCH on
-    // deleted_at is rejected by RLS — see _flux 2026-07-02).
-    const cleaned = await page.evaluate(async (m) => {
-      const jwt = localStorage.getItem('hour_jwt');
-      const SB = 'https://lqlyorlccnniybezugme.supabase.co';
-      const ANON = 'sb_publishable_IavZsGp7i04juuafanQk9w_33pFDhNu';
-      const H = {
-        apikey: ANON,
-        Authorization: `Bearer ${jwt}`,
-        'content-type': 'application/json',
-      };
-      const list = await fetch(
-        `${SB}/rest/v1/person_note?body=eq.${encodeURIComponent(m)}&select=id`,
-        { headers: H },
-      );
-      const rows = (await list.json()) as Array<{ id: string }>;
-      if (rows.length !== 1) return { status: -1 };
-      const res = await fetch(`${SB}/rest/v1/rpc/delete_person_note`, {
-        method: 'POST',
-        headers: H,
-        body: JSON.stringify({ p_note_id: rows[0].id }),
-      });
-      return { status: res.status };
-    }, marker);
-    expect(cleaned.status).toBe(204);
+    // Cleanup IS the delete-button test: the button only renders on the
+    // author's own notes and goes through the delete_person_note RPC (a
+    // direct PATCH on deleted_at is impossible — see ADR-048).
+    const noteItem = page.locator('.person__notes li', { hasText: marker });
+    await noteItem.locator('.person__note-delete').click();
+    await expect(noteItem).toHaveCount(0, { timeout: 10_000 });
 
     // Gone after the cleanup — poll the API (render/cache races under
     // parallel runs make the reloaded UI an unreliable witness).

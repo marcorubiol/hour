@@ -13,6 +13,7 @@
   import { fetchJSON } from '$lib/api';
   import Button from '$lib/components/Button.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
+  import { decodeJwtSub } from '$lib/realtime/client';
   import { statusBadgeClass, statusLabel } from '$lib/engagement';
   import { dayLabel } from '$lib/datetime';
 
@@ -43,6 +44,7 @@
       body: string;
       visibility: 'workspace' | 'private';
       workspace_id: string;
+      author_id: string | null;
       created_at: string;
     }>;
     crew: Array<{
@@ -143,6 +145,39 @@
     }
     $noteMutation.mutate();
   }
+
+  // Delete is author-only (enforced by the delete_person_note RPC); the
+  // button only shows on the caller's own notes.
+  let callerId = $derived(decodeJwtSub(localStorage.getItem('hour_jwt') ?? '') ?? '');
+
+  const deleteNote = createMutation({
+    mutationFn: async (noteId: string) => {
+      const res = await fetch(
+        `/api/persons/${encodeURIComponent(slug)}/notes/${noteId}`,
+        {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${localStorage.getItem('hour_jwt')}` },
+        },
+      );
+      if (!res.ok && res.status !== 204) {
+        const body = (await res.json().catch(() => ({}))) as {
+          detail?: string;
+          error?: string;
+        };
+        throw new Error(body.detail || body.error || `Error ${res.status}`);
+      }
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['person', slug] });
+    },
+    onError: (err) => {
+      addToast({
+        tone: 'danger',
+        title: 'Note not deleted',
+        message: err instanceof Error ? err.message : 'Unexpected error',
+      });
+    },
+  });
 
   function noteDay(iso: string): string {
     return new Date(iso).toLocaleDateString('en-GB', {
@@ -248,6 +283,16 @@
             <li>
               <span class="person__note-meta">
                 {noteDay(n.created_at)}{#if n.visibility === 'private'} · private{/if}
+                {#if n.author_id === callerId}
+                  <button
+                    type="button"
+                    class="person__note-delete"
+                    disabled={$deleteNote.isPending}
+                    onclick={() => $deleteNote.mutate(n.id)}
+                  >
+                    delete
+                  </button>
+                {/if}
               </span>
               <p class="person__note-body">{n.body}</p>
             </li>
@@ -423,10 +468,29 @@
     }
 
     .person__note-meta {
+      display: flex;
+      align-items: baseline;
+      gap: var(--space-s);
       font-family: var(--font-mono);
       font-size: var(--text-xs);
       letter-spacing: 0.04em;
       color: var(--text-faint);
+    }
+
+    .person__note-delete {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      letter-spacing: 0.04em;
+      color: var(--text-faint);
+      background: none;
+      border: none;
+      padding: 0;
+      cursor: pointer;
+      text-decoration: underline;
+      text-underline-offset: 0.2em;
+    }
+    .person__note-delete:hover {
+      color: var(--danger);
     }
 
     .person__note-body {
