@@ -86,9 +86,15 @@ test.describe('smoke', () => {
       .poll(async () => await page.locator('tbody tr').count(), { timeout: 10_000 })
       .toBeGreaterThan(0);
 
+    // Money lens: pill navigates, totals strip + fees table render.
+    await lensNav.getByRole('button', { name: 'Money' }).click();
+    await page.waitForURL(/\/h\/muk-cia\/money\/?$/);
+    await expect(page.locator('.mny__totals')).toBeVisible();
+    await expect(page.locator('.mny__total').first()).toContainText(/pipeline/);
+
     // Today pill leaves the routed lens (lands on the serialized selection —
     // canonical project URL or query form, both fine; just not a lens URL).
     await lensNav.getByRole('button', { name: 'Today' }).click();
-    await page.waitForURL((url) => !url.pathname.includes('/contacts'));
+    await page.waitForURL((url) => !url.pathname.includes('/money'));
   });
 });

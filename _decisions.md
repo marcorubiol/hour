@@ -1508,3 +1508,12 @@ Triggered by Marco's pre-scaffold doubt (Phase 0.0 day 5). Five alternatives eva
 - **Verificación**: typecheck 0/0/0 · build · e2e nuevo (contacts → ficha → añadir nota → persiste → cleanup por RPC, self-cleaning) · suite completa 6/6 local + RLS 17/17.
 - **Re-evaluate when**: botón de borrar nota en UI (el RPC ya existe), edición de datos de contacto (person es compartida cross-workspace — decisión de ownership pendiente), y el detalle de engagement enlazado desde la ficha.
 - **Status**: Firm. Producción 2026-07-02.
+
+## [2026-07-02] — ADR-046 · Money lens — las 4 lenses vivas
+- **Decisión**: Money lens en `/h/[ws]/money`, cerrando el set de 4 (Today · Calendar · Contacts · Money — el system-completeness gate de Phase 0.3 ya tiene qué evaluar). Dos secciones: **Fees** (performances vía `performance_redacted` — LA puerta de dinero: fees NULL sin `read:money`, invoker semantics — con totales por bucket pipeline/invoiced/paid sobre lo listado y **editor de fee** por fila) e **Invoices** (read-only, RLS `read:money`; creación en Phase 0.5 — hoy 0 filas, empty state honesto). Filtro = selección del sidebar, como toda lens.
+- **El fee se edita AQUÍ y solo aquí**: ADR-043 excluyó el fee del write path de performance a propósito; sin esto la lens nacía muerta (no había NINGÚN camino para poner un fee). `PATCH /api/money/performances/:id` toca solo `fee_amount/fee_currency`; el trigger `guard_show_fee_columns` exige `edit:money` (42501→403) encima del RLS `edit:show`.
+- **View ampliada**: `performance_redacted` + columna `slug` (para enlazar al detalle; las views solo aceptan columnas al final) — recreada CON `security_invoker` + revoke anon reafirmados (lección del incidente del 19-05: nunca recrear esta view sin ellos; verificado anon → 401 tras aplicar).
+- **Gotcha Svelte cazado por el e2e**: `Input type=number` con bind entrega number, no string — `.trim()` directo revienta y el save muere en silencio. Normalizar con `String(x ?? '')`.
+- **Verificación**: typecheck 0/0/0 · build · e2e fee round-trip self-cleaning (set 1.234,56 → persiste → clear) · smoke con las 4 lenses navegadas · suite 7/7 local.
+- **Re-evaluate when**: invoice creation (Phase 0.5) — la lens ya tiene el esqueleto; multi-currency real en los totales (hoy suma cruda — con una sola divisa en uso es honesto, con mezcla habría que agrupar por currency); fee editing masivo si la difusión lo pide.
+- **Status**: Firm. Producción 2026-07-02.

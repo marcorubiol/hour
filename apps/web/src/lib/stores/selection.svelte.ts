@@ -454,7 +454,7 @@ export class SelectionStore {
     // sub-routes above. The calendar especially READS the selection as its
     // event filter, so hydration must not clear it on arrival.
     const neutralMatch = path.match(
-      /^\/h\/[^/]+\/(performance|engagement|person|settings|calendar|contacts)(\/|$)/,
+      /^\/h\/[^/]+\/(performance|engagement|person|settings|calendar|contacts|money)(\/|$)/,
     );
     if (neutralMatch) {
       return {

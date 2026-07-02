@@ -321,11 +321,11 @@
     { id: 'money', label: 'Money' },
   ];
 
-  // Lenses with a routed page navigate (URL is canonical, ADR-022);
-  // money stays state-only until its page exists (Phase 0.3).
+  // Every lens routes now (URL is canonical, ADR-022).
   const ROUTED_LENSES: Partial<Record<Lens, string>> = {
     calendar: 'calendar',
     contacts: 'contacts',
+    money: 'money',
   };
 
   function selectLens(id: Lens) {
@@ -344,7 +344,7 @@
 
   // Which routed lens (if any) the current URL is showing.
   let routedLens = $derived.by<Lens | null>(() => {
-    const m = page.url.pathname.match(/^\/h\/[^/]+\/(calendar|contacts)\/?$/);
+    const m = page.url.pathname.match(/^\/h\/[^/]+\/(calendar|contacts|money)\/?$/);
     return (m?.[1] as Lens | undefined) ?? null;
   });
 
@@ -357,7 +357,7 @@
     const current = untrack(() => lens.current);
     if (routedLens) {
       if (current !== routedLens) lens.set(routedLens);
-    } else if (current === 'calendar' || current === 'contacts') {
+    } else if (current !== 'today') {
       lens.set('today');
     }
   });
