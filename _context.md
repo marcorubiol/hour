@@ -64,7 +64,11 @@ Working name: **Hour**. Brand decision deferred to Phase 1.
 - Parent MaMeMi context (where Difusión originated): `01_STAGE/ZS_MaMeMi/`
 - Source of the 156 existing programmers/festivals to import: `01_STAGE/ZS_MaMeMi/Difusión/`
 
-## Status — 2026-07-02
+## Status — 2026-07-02 (tarde)
+
+**ADR-042: Phase 0.2 COMPLETA — notas colaborativas en vivo verificadas en producción.** `performance.notes` + `project.notes` editables colaborativamente (YNotes: Yjs + y-partyserver DO + y-indexeddb + presencia P10), con write-back a columna y seed del texto pre-existente. E2e de dos clientes reales contra `hour.zerosense.studio`: 2/2 verde (convergencia, presencia, reload restore, snapshot v1 en `collab_snapshot`, columna materializada, auth-deny). Dos bugs de raíz arreglados: workerd entrega frames como Blob (y-partyserver decodificaba vacío — el scaffold del 09-05 nunca sincronizó de verdad) y el `SUPABASE_SECRET_KEY` almacenado no era válido (re-emitido por Marco; solo header `apikey`, el Bearer degrada el rol). Gate de escritura nuevo en el upgrade WS (`edit:show`/`edit:project_meta`). Diferidos explícitos de 0.2: link público D6, cursor posicional (0.5), Realtime estructurado. Fixture e2e permanente: proyecto `zzz-e2e-collab` + 2 performances en el workspace `playwright` (basura sufijada `-339d`/`-e931` por limpiar vía MCP). Suite completa: 47 unit · 17/17 RLS · 5/5 e2e (2 collab solo con `PW_BASE_URL`).
+
+## Status — 2026-07-02 (mañana)
 
 **ADR-041: superficie de lectura de Phase 0.2 en producción** (sesión autónoma .zerø, continuación del write path del día anterior):
 

@@ -35,36 +35,77 @@ function hexToBytes(hex: string): Uint8Array {
 }
 
 function authHeaders(env: PersistEnv): Record<string, string> {
+  // New-model secret keys authenticate via the apikey header alone; adding
+  // an Authorization: Bearer with the same sb_secret makes the gateway
+  // parse it as a (invalid) JWT and demote the role (found live 2026-07-02:
+  // 200 + zero rows on a row that exists).
   return {
     apikey: env.SUPABASE_SECRET_KEY,
-    Authorization: `Bearer ${env.SUPABASE_SECRET_KEY}`,
   };
 }
 
+export interface TargetMeta {
+  workspace_id: string;
+  /** Current text of the target's notes column — seeds a fresh doc. */
+  notes: string | null;
+}
+
 /**
- * Fetch the workspace_id that owns `(targetTable, targetId)`. The DO needs
- * this to write `collab_snapshot.workspace_id` (FK + audit). Caller in
- * hour-web has already validated user membership via RLS; here we use the
- * secret key because the DO has no user JWT.
+ * Fetch the workspace_id (FK for collab_snapshot) + current notes text of
+ * `(targetTable, targetId)` in one round-trip. Caller in hour-web has
+ * already validated user membership via RLS; here we use the secret key
+ * because the DO has no user JWT.
  *
  * Returns null when the row doesn't exist (or was soft-deleted).
  */
-export async function fetchWorkspaceId(
+export async function fetchTargetMeta(
   env: PersistEnv,
   targetTable: 'performance' | 'project',
   targetId: string,
-): Promise<string | null> {
+): Promise<TargetMeta | null> {
   const url = new URL(`/rest/v1/${targetTable}`, env.PUBLIC_SUPABASE_URL);
   url.searchParams.set('id', `eq.${targetId}`);
-  url.searchParams.set('select', 'workspace_id');
+  url.searchParams.set('select', 'workspace_id,notes');
+  url.searchParams.set('deleted_at', 'is.null');
   url.searchParams.set('limit', '1');
 
   const res = await fetch(url, { headers: authHeaders(env) });
+  const body = await res.text();
   if (!res.ok) {
-    throw new Error(`fetchWorkspaceId(${targetTable}/${targetId}): ${res.status}`);
+    throw new Error(`fetchTargetMeta(${targetTable}/${targetId}): ${res.status}`);
   }
-  const rows = (await res.json()) as { workspace_id: string }[];
-  return rows[0]?.workspace_id ?? null;
+  const rows = (body ? JSON.parse(body) : []) as TargetMeta[];
+  return rows[0] ?? null;
+}
+
+/**
+ * Materialize the collaborative doc's text back into the target's `notes`
+ * column, so non-collab read surfaces (road sheet projection, detail
+ * endpoint, future exports) see current content. Push-on-change — no
+ * state machine (ADR-023). Empty text stores NULL.
+ */
+export async function writeNotesColumn(
+  env: PersistEnv,
+  targetTable: 'performance' | 'project',
+  targetId: string,
+  text: string,
+): Promise<void> {
+  const url = new URL(`/rest/v1/${targetTable}`, env.PUBLIC_SUPABASE_URL);
+  url.searchParams.set('id', `eq.${targetId}`);
+
+  const res = await fetch(url, {
+    method: 'PATCH',
+    headers: {
+      ...authHeaders(env),
+      'content-type': 'application/json',
+      Prefer: 'return=minimal',
+    },
+    body: JSON.stringify({ notes: text.length > 0 ? text : null }),
+  });
+
+  if (!res.ok) {
+    throw new Error(`writeNotesColumn: ${res.status} ${await res.text()}`);
+  }
 }
 
 export async function loadLatestSnapshot(
