@@ -1,26 +1,20 @@
 /**
- * GET /api/performances
+ * GET /api/dates
  *
- * Lists performances. Filter scope (any combination, OR/union semantics —
- * same contract as /api/lines):
- *   - ?project_id=<uuid>           → single project (original contract)
+ * Lists `date` rows (rehearsals, travel days, residencies, press, other —
+ * the calendar primitive that is NOT a performance). Same union filter
+ * contract as /api/performances and /api/lines:
  *   - ?project_ids=uuid,uuid,...   → multi-project union
- *   - ?workspace_ids=uuid,uuid,... → all performances in these workspaces
- *   - (none)                       → all performances accessible by RLS
- * Plus an optional window on performed_at for the Calendar lens:
- *   - ?from=YYYY-MM-DD&to=YYYY-MM-DD (inclusive)
+ *   - ?workspace_ids=uuid,uuid,... → all dates in these workspaces
+ *   - (none)                       → all dates accessible by RLS
+ * Window for the Calendar lens (on starts_at, inclusive):
+ *   - ?from=YYYY-MM-DD&to=YYYY-MM-DD
  *
- * Embeds `venue` (city/date rendering) and `project` (accent + slug for
- * calendar coloring and links) without a second round-trip.
+ * `to` is compared against the START of a date row — multi-day rows that
+ * begin inside the window are included; Phase 0 keeps this simple.
  *
- * Schema renamed `show` → `performance` (ADR-036, 2026-05-19). Column
- * `show_start_at` renamed to `start_at`. The permission code `'edit:show'`
- * stays as-is (closed RBAC vocab, deferred to Phase 0.9 admin UI).
- *
- * RLS scopes by workspace membership (ADR-029). No `current_workspace_id`
- * claim needed.
- *
- * Auth: Bearer JWT required. RLS denies anon.
+ * Auth: Bearer JWT required. RLS scopes rows (same 'edit:show' permission
+ * as performance — the calendar is production-side data).
  */
 
 import type { RequestHandler } from './$types';
@@ -28,26 +22,9 @@ import * as v from 'valibot';
 import { extractBearer } from '$lib/auth';
 import { pgGet, PostgrestError, type SupabaseEnv } from '$lib/supabase';
 
-const ALLOWED_STATUSES = [
-  'any',
-  'proposed',
-  'hold',
-  'hold_1',
-  'hold_2',
-  'hold_3',
-  'confirmed',
-  'done',
-  'invoiced',
-  'paid',
-  'cancelled',
-] as const;
-
 const QuerySchema = v.object({
-  project_id: v.optional(v.pipe(v.string(), v.uuid())),
   project_ids: v.optional(v.string()),
   workspace_ids: v.optional(v.string()),
-  line_id: v.optional(v.pipe(v.string(), v.uuid())),
-  status: v.optional(v.picklist(ALLOWED_STATUSES), 'any'),
   from: v.optional(v.pipe(v.string(), v.isoDate())),
   to: v.optional(v.pipe(v.string(), v.isoDate())),
   limit: v.optional(
@@ -57,9 +34,9 @@ const QuerySchema = v.object({
       v.number(),
       v.integer(),
       v.minValue(1),
-      v.maxValue(200),
+      v.maxValue(500),
     ),
-    '100',
+    '200',
   ),
 });
 
@@ -70,19 +47,11 @@ function json(body: unknown, status = 200): Response {
   });
 }
 
-/** Comma-separated uuid list → deduped valid uuids (invalid dropped). */
 function parseUuidList(raw: string | undefined): string[] {
   if (!raw) return [];
   const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   return [...new Set(raw.split(',').map((s) => s.trim()).filter((s) => UUID.test(s)))];
 }
-
-type VenueLite = {
-  id: string;
-  name: string;
-  city: string | null;
-  country: string | null;
-};
 
 type ProjectLite = {
   id: string;
@@ -92,23 +61,18 @@ type ProjectLite = {
   workspace_id: string;
 };
 
-type PerformanceItem = {
+type DateItem = {
   id: string;
-  slug: string | null;
-  performed_at: string;
+  kind: string;
   status: string;
-  venue_id: string | null;
+  title: string | null;
+  starts_at: string;
+  ends_at: string | null;
+  all_day: boolean;
   venue_name: string | null;
   city: string | null;
-  country: string | null;
   project_id: string;
-  line_id: string | null;
-  engagement_id: string | null;
-  fee_amount: number | null;
-  fee_currency: string | null;
-  load_in_at: string | null;
-  start_at: string | null;
-  venue: VenueLite | null;
+  performance_id: string | null;
   project: ProjectLite | null;
 };
 
@@ -143,47 +107,42 @@ export const GET: RequestHandler = async ({ request, url, platform }) => {
       400,
     );
   }
-  const { project_id, project_ids, workspace_ids, line_id, status, from, to, limit } =
-    parsed.output;
+  const { project_ids, workspace_ids, from, to, limit } = parsed.output;
 
   const projectIds = parseUuidList(project_ids);
-  if (project_id) projectIds.push(project_id);
-  const uniqueProjectIds = [...new Set(projectIds)];
   const workspaceIds = parseUuidList(workspace_ids);
 
   const search = new URLSearchParams();
   search.set(
     'select',
     [
-      'id,slug,performed_at,status,venue_id,venue_name,city,country',
-      'project_id,line_id,engagement_id',
-      'fee_amount,fee_currency,load_in_at,start_at',
-      'venue:venue_id(id,name,city,country)',
+      'id,kind,status,title,starts_at,ends_at,all_day,venue_name,city',
+      'project_id,performance_id',
       'project:project_id(id,slug,name,accent,workspace_id)',
     ].join(','),
   );
 
-  if (uniqueProjectIds.length > 0 && workspaceIds.length > 0) {
+  if (projectIds.length > 0 && workspaceIds.length > 0) {
     search.set(
       'or',
-      `(project_id.in.(${uniqueProjectIds.join(',')}),workspace_id.in.(${workspaceIds.join(',')}))`,
+      `(project_id.in.(${projectIds.join(',')}),workspace_id.in.(${workspaceIds.join(',')}))`,
     );
-  } else if (uniqueProjectIds.length > 0) {
-    search.set('project_id', `in.(${uniqueProjectIds.join(',')})`);
+  } else if (projectIds.length > 0) {
+    search.set('project_id', `in.(${projectIds.join(',')})`);
   } else if (workspaceIds.length > 0) {
     search.set('workspace_id', `in.(${workspaceIds.join(',')})`);
   }
 
-  if (line_id) search.set('line_id', `eq.${line_id}`);
   search.set('deleted_at', 'is.null');
-  if (status !== 'any') search.set('status', `eq.${status}`);
-  if (from) search.append('performed_at', `gte.${from}`);
-  if (to) search.append('performed_at', `lte.${to}`);
-  search.set('order', 'performed_at.asc.nullslast');
+  // Window on starts_at. `to` is a date — pad to end-of-day so timestamptz
+  // rows on the last day are included regardless of time.
+  if (from) search.append('starts_at', `gte.${from}`);
+  if (to) search.append('starts_at', `lte.${to}T23:59:59.999Z`);
+  search.set('order', 'starts_at.asc');
   search.set('limit', String(limit));
 
   try {
-    const { data } = await pgGet<PerformanceItem>(env, 'performance', jwt, { search });
+    const { data } = await pgGet<DateItem>(env, 'date', jwt, { search });
     return json({ items: data });
   } catch (err) {
     if (err instanceof PostgrestError) {
