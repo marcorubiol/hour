@@ -298,9 +298,11 @@
     inset-block-start: calc(100% + var(--space-xs));
     inset-inline-start: 0;
     z-index: var(--z-dropdown);
-    inline-size: 19rem;
+    inline-size: 18rem;
     max-inline-size: 90vw;
-    background: var(--bg-ultra-light);
+    /* Same warm-cream as the page (matches the design) — the border + soft
+       shadow are what lift it off the background, not a white fill. */
+    background: var(--bg);
     border: 1px solid var(--border-color-dark);
     border-radius: var(--radius-l);
     box-shadow: var(--box-shadow-3);
@@ -329,7 +331,7 @@
     padding-inline: var(--space-m);
   }
   .pop__opt:hover {
-    background: var(--bg-light);
+    background: var(--bg-hover);
   }
   .pop__opt-name {
     flex: 1;
@@ -338,7 +340,7 @@
     background: none;
     text-align: start;
     font-family: inherit;
-    font-size: var(--text-m);
+    font-size: var(--text-s);
     font-weight: 500;
     color: var(--text-color);
     cursor: pointer;
@@ -403,7 +405,7 @@
     font-family: inherit;
   }
   .pop__line:hover {
-    background: var(--bg-light);
+    background: var(--bg-hover);
   }
   .pop__line-g {
     inline-size: var(--space-m);
