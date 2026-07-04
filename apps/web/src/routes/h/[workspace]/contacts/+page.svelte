@@ -389,16 +389,6 @@
       color: var(--text-faint);
       margin-block-end: var(--space-2xs);
     }
-  }
-
-  /* The shared Checkbox rows render inline (box + label side by side). The
-     global `:where(label){display:block}` default is out-ranking the
-     component's `.check__row{inline-flex}` in this build, so pin it from the
-     last layer. Scoped to the picker — see note flagged to fix globally. */
-  @layer overrides {
-    .contacts__space-group :global(.check__row) {
-      display: inline-flex;
-    }
 
     .contacts__form-grid {
       display: grid;
