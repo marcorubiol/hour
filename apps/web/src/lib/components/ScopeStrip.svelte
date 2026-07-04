@@ -153,7 +153,7 @@
             <div class="pop__group">
               <div class="pop__opt">
                 <span class="scope__dot" style={`--c: ${accentVar(ws.slug)}`} aria-hidden="true"></span>
-                <button type="button" class="pop__opt-name" onclick={() => pinSpace(ws)}>{ws.name}</button>
+                <button type="button" class="pop__opt-name" onclick={() => (expandedWs = expanded ? null : ws.id)}>{ws.name}</button>
                 <button type="button" class="pop__pinspace" onclick={() => pinSpace(ws)}>pin space</button>
                 <button
                   type="button"
