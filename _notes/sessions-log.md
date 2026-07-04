@@ -8,6 +8,27 @@ Convención: secciones por fecha descendente. Cada sesión queda con commits cit
 
 ---
 
+## 2026-07-04 (tarde) — Rediseño de nav "Adaptive Digest" implementado + contacto multi-espacio + fix de raíz del orden de capas CSS
+
+Continuación del cierre de la mañana. Marco: "planifica, decide y no pares hasta que la app funcione", aplicando criterio sobre lo que no encaje. Se implementó en la app real (SvelteKit) el diseño **"Hour Nav - Adaptive Digest"** (proyecto de claude.ai) — el "rediseño completo (pins, retirar Calendar/Money)" que la entrada de la mañana dejó marcado como *abierto*. Commits: la tanda de construcción de la nav (`d68ceae`, `c972c88`, `de406eb`, `c9dfebd`…) + `a01878f` (vista Agenda + Contacts en ⌘K) + `3c4f91e` (ScopeStrip en Contacts) + `9ef65d4` (contacto multi-espacio) + `c05d4a9` (fix de capas CSS).
+
+### Qué cambió en la nav (estado decidido, en la app)
+- **No hay botones de nav arriba.** El logo `hour` = Home = **Agenda**. Calendar, Contacts y Money se alcanzan solo por **⌘K** (grupo "Views": Agenda · Calendar · Contacts · Money). Se quitó la pastilla "Today" (era repetir el logo).
+- **Modelo de scope por pins** (sustituye el sidebar-filtro de ADR-038): pins `s:<slug>` (espacio) o `l:<lineId>` (línea); sin pins = todo lo que ve el user. Componente **`ScopeStrip`** (pastilla "All spaces" cuando no hay nada pineado; picker con PIN SPACE, click en el nombre expande líneas). Presente en TODAS las lenses — home, agenda, calendar, money y contacts. `resolveScope`/`inScope` en `$lib/nav.ts`; un pin de línea alcanza engagements por su `project` (los engagements no llevan line_id).
+- **Home = próximos 7 días, capado a 10 filas**, con botón "+ N more · next 7 days → Agenda". Timeline compartido extraído a **`AgendaBoard.svelte`** (raíl de puntos, buckets por día, verbos, tags) — lo usan home (capado, next7Days) y la **nueva vista `/h/[ws]/agenda`** (sin capar, todos los rangos).
+- **Contacts** migrada del modelo viejo `selection`/`resolveSelectionIds` al modelo pins (por eso le faltaba la ScopeStrip). Contacts NO se había perdido al quitar la nav — solo perdió su entrypoint; restaurada en ⌘K.
+
+### Contacto multi-espacio (ADR-051 cont.)
+Un contacto (`person`) es identidad **global** deduplicada por email; pertenecer a un espacio = un engagement en uno de sus proyectos. El "Add contact" ahora toma un **conjunto de proyectos, agrupados por espacio** (checkboxes) → N engagements de una. Creación **secuencial, no paralela**: la primera inserción find-or-create la persona por email y devuelve su id; las siguientes enlazan ese mismo `person_id` — así un contacto **sin email no duplica persona** por espacio y no hay carrera sobre el email citext-unique. Verificado en vivo (contacto sin email en 2 espacios → 1 persona, 2 engagements, 2 workspaces distintos) y limpiado (delete de engagement es **soft**; quedó una persona huérfana `019f2f03-f1f2-71a0-9e1f-9c8c9cf331c8`, invisible en la UI — soft-delete opcional por SQL, no molesta).
+
+### Gotcha preservable — orden de capas CSS roto en dev (afectaba a TODA la app)
+Síntoma: el `Checkbox` compartido renderizaba la casilla **encima** de la etiqueta. Causa raíz (no era del checkbox): Vite inyecta el `<style>` de cada componente (envuelto en `@layer components`) por JS, y en dev uno cae **antes** de que `base.css` declare el orden `@layer reset, defaults, …, components, …;`. CSS fija el orden en la **primera mención** → `components` quedaba como la capa **más temprana / de menor prioridad**, por debajo de `defaults`, invirtiendo TODO el orden: cualquier default `:where(...)` ganaba a las reglas de componente. Solo se veía donde un default `:where()` pisaba una propiedad de componente (`:where(label){display:block}` vs `.check__row{inline-flex}`). **Fix:** declarar el orden como `<style>` estático en el `<head>` de `app.html` (se parsea antes que cualquier estilo inyectado por JS; espeja base.css, idempotente). Verificado: el orden se registra primero y home/calendar/money/contacts/settings/⌘K/diálogo new-performance render igual, labels de formulario siguen encima. Es un fallo latente de arquitectura CSS que solo no se había visto porque `Checkbox` no tenía usos fuera del showcase de dev.
+
+### Estado al cierre / al retomar
+typecheck 0/0, smoke 1/1, sin errores de consola en ninguna superficie. **Numeración ADR pendiente de reconciliar con Marco**: `_decisions.md` tiene ADR-055 dos veces (line-modules + "Today"), `_tasks.md` renumera line-modules a ADR-056, y este rediseño de nav ("Adaptive Digest", supersede la parte de nav de ADR-038) aún no tiene número firme — el código lo comenta como "ADR-055 nav redesign". El gate de producto no cambia: usar Hour con la difusión real ~1 mes antes de más features (lo cierra Marco).
+
+---
+
 ## 2026-07-04 — Cierre nivel 1 completo (ultracode): la app se opera Y se alimenta desde la UI — ADR-051→055
 
 Marco: "quiero que completes la app completamente" + ultracode. El bloque de cierre era 1a-1c en `_tasks.md`; la sesión de diseño de la mañana (gap analysis → `_notes/research-redesign-gaps.md`) lo había ampliado a 1a-1e. Se ejecutó entero con orquestación multi-agente: workflow Understand (7 lectores paralelos + critic), implementación, workflow Review adversarial (5 lentes + verificación), migraciones vía Supabase MCP, deploy (lo lanzó Marco — el clasificador de auto-mode bloquea deploys de prod), suite completa contra producción.
