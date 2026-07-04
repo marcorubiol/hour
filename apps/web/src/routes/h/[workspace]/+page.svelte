@@ -402,10 +402,10 @@
       border-block-start: 1px solid var(--border-color-light);
     }
 
-    /* ── agenda / week ── */
+    /* ── agenda / week — dense timeline (matches the design mock) ── */
     .week {
       display: grid;
-      grid-template-columns: 5rem 1fr;
+      grid-template-columns: 4.5rem 1fr;
     }
     .week__day {
       font-family: var(--font-mono);
@@ -426,13 +426,30 @@
       border-inline-start: 1px solid var(--border-color-light);
     }
     .week__item {
+      position: relative;
       display: grid;
-      grid-template-columns: 5.5rem 1fr auto;
+      grid-template-columns: 5rem 1fr auto;
       align-items: baseline;
-      gap: var(--space-m);
-      padding-block: var(--space-s);
-      padding-inline-start: var(--space-m);
-      border-block-end: 1px solid var(--border-color-light);
+      gap: var(--space-s);
+      padding-block: var(--space-xs);
+      padding-inline-start: var(--space-l);
+      border-block-end: 1px solid color-mix(in oklch, var(--border-color-light) 55%, transparent);
+    }
+    /* the dot on the rail */
+    .week__item::before {
+      content: '';
+      position: absolute;
+      inset-inline-start: -0.28rem;
+      inset-block-start: 0.6rem;
+      inline-size: 0.44rem;
+      block-size: 0.44rem;
+      border-radius: var(--radius-circle);
+      background: var(--bg);
+      border: 1.5px solid var(--border-color-dark);
+    }
+    .week__item--overdue::before {
+      background: var(--danger);
+      border-color: var(--danger);
     }
     .week__verb {
       font-family: var(--font-mono);
@@ -444,7 +461,7 @@
       color: var(--danger);
     }
     .week__subject {
-      font-size: var(--text-m);
+      font-size: var(--text-s);
       color: var(--text-color);
       text-decoration: none;
       overflow: hidden;
