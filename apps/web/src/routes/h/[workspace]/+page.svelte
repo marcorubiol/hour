@@ -172,7 +172,8 @@
     if (diffDays < 14) return { sortKey: 7, label: 'NEXT WEEK' };
     return { sortKey: 99, label: 'LATER' };
   }
-  let weekRows = $derived.by<WeekRow[]>(() =>
+  const WEEK_CAP = 10;
+  let allWeekRows = $derived.by<WeekRow[]>(() =>
     scopedEngagements
       .filter((e) => e.status !== 'declined' && e.status !== 'dormant')
       .filter((e) => e.next_action_at)
@@ -203,9 +204,11 @@
           dayLabel: bucket.label,
         };
       })
-      .sort((a, b) => a.daySortKey - b.daySortKey)
-      .slice(0, 24),
+      .sort((a, b) => a.daySortKey - b.daySortKey),
   );
+  // Show at most WEEK_CAP; the rest lives one click away in the Calendar.
+  let weekRows = $derived(allWeekRows.slice(0, WEEK_CAP));
+  let moreCount = $derived(Math.max(0, allWeekRows.length - weekRows.length));
   let groupedWeek = $derived.by(() => {
     const groups: { day: string; rows: WeekRow[] }[] = [];
     let current: { day: string; rows: WeekRow[] } | null = null;
@@ -313,6 +316,11 @@
           </div>
         {/each}
       </div>
+      {#if moreCount > 0}
+        <a class="week__more" href={`/h/${workspaceSlug}/calendar`}>
+          + {moreCount} more <span class="week__more-cal">→ Calendar</span>
+        </a>
+      {/if}
     {/if}
   </div>
 
@@ -552,6 +560,31 @@
     }
     .home__empty--err {
       color: var(--danger);
+    }
+
+    /* "+ N more → Calendar" — the agenda is capped; the rest is one hop away.
+       Transparent, quiet, dashed. */
+    .week__more {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-xs);
+      margin-block-start: var(--space-m);
+      padding-block: var(--space-xs);
+      padding-inline: var(--space-m);
+      border: 1px dashed var(--border-color-dark);
+      border-radius: var(--radius-circle);
+      background: transparent;
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      text-decoration: none;
+      transition: color var(--transition), border-color var(--transition);
+    }
+    .week__more:hover {
+      color: var(--text-color);
+      border-color: var(--text-muted);
+    }
+    .week__more-cal {
+      color: var(--text-faint);
     }
 
     /* ── pinned panels ── */
