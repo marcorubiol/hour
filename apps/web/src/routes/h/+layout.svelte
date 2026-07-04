@@ -1,27 +1,17 @@
 <script lang="ts">
   /**
-   * App shell (ADR-029 + ADR-038 + ADR-039) — user-scoped sidebar +
-   * lens nav. Lives at /h/+layout so /h/ itself can render the empty-
-   * selection state without ambiguity (`/h/[ws]/` would round-trip
-   * "browsing context" vs "1 workspace selected" through the same URL).
+   * App shell — Adaptive Digest (ADR-055 nav redesign). The persistent
+   * sidebar (Plaza + LineList) is gone; scope is expressed by PINS placed
+   * on the content by each lens (see <ScopeStrip>), and ⌘K jumps to any
+   * line or space. The top bar is: brand · lenses (Today · Calendar ·
+   * Money) · Clean|My home (Today only) · ⌘K search · account menu.
    *
-   * - /h/                                    → empty selection
-   * - /h/[ws]/                               → 1 workspace selected
-   * - /h/[ws]/project/[slug]/                → 1 project selected
-   * - /h/[ws]/project/[slug]/line/[line]/    → line detail
-   * - /h/[ws]/?ws=a,b&project=c,d            → multi-select form
+   * Settings stays a "mode" of the shell: when inside /settings a slim
+   * <SettingsNav> aside returns, so the settings surface is unaffected.
    *
-   * Sidebar upper: <Plaza /> (multi-workspace project list, multi-select
-   * filter). Sidebar lower: <LineList /> (always-visible, filter-aware).
-   * Top of main: horizontal lens pills + breadcrumb + search.
-   * Main content: routed page (workspace home, project detail, line
-   * detail, or /h/+page empty state).
-   *
-   * Auth: redirects to /login if no JWT (was the responsibility of the
-   * now-deleted /h/+layout.svelte stub).
-   *
-   * Visual refresh 2026-05-18 (ADR-033): editorial v0.5. Newsreader display
-   * wordmark, Inter pills, mono breadcrumb + kbd.
+   * Preserved from the previous shell: auth gate, selection/lens providers
+   * (pages still read selection), realtime + network presence, theme +
+   * DND account menu, master-view restore.
    */
 
   import { page } from '$app/state';
@@ -29,23 +19,22 @@
   import { env } from '$env/dynamic/public';
   import type { Snippet } from 'svelte';
   import { onDestroy, onMount, untrack } from 'svelte';
-  import Sidebar from '$lib/components/Sidebar.svelte';
   import Avatar from '$lib/components/Avatar.svelte';
-  import Plaza from '$lib/components/Plaza.svelte';
-  import PlazaRail from '$lib/components/PlazaRail.svelte';
-  import LineList from '$lib/components/LineList.svelte';
   import SettingsNav from '$lib/components/SettingsNav.svelte';
   import PresenceBadge from '$lib/components/PresenceBadge.svelte';
   import Pill from '$lib/components/Pill.svelte';
   import Menu from '$lib/components/Menu.svelte';
   import ThemeToggle from '$lib/components/ThemeToggle.svelte';
   import BrandMark from '$lib/components/BrandMark.svelte';
+  import CommandPalette from '$lib/components/CommandPalette.svelte';
   import { useTheme } from '$lib/theme.svelte';
   import { isReservedWorkspaceSlug } from '$lib/reserved-slugs';
   import { provideLens, type Lens } from '$lib/stores/lens.svelte';
   import { provideSelection } from '$lib/stores/selection.svelte';
+  import { providePins, spacePin } from '$lib/stores/pins.svelte';
+  import { provideHomeMode } from '$lib/stores/home-mode.svelte';
+  import { lineUrl, type NavLine, type NavWorkspace } from '$lib/nav';
   import { saveMasterViewPath } from '$lib/master-view';
-  import { scrollFade } from '$lib/actions/scrollFade';
   import {
     provideNetworkPresence,
     provideRealtime,
@@ -62,18 +51,12 @@
 
   let workspaceSlug = $derived(page.params.workspace ?? '');
   let hasWorkspace = $derived(workspaceSlug.length > 0);
-  // Reserved-slug guard: a URL like /h/login/ shouldn't try to render a
-  // "login workspace". Only check when a workspace segment is actually
-  // present; empty (at /h/) bypasses this.
   let blocked = $derived(hasWorkspace && isReservedWorkspaceSlug(workspaceSlug));
 
   $effect(() => {
     if (blocked) goto('/', { replaceState: true });
   });
 
-  // Auth check — redirect to /login if no JWT. Was in the previous
-  // /h/+layout stub (now merged here). Shell only renders after the
-  // check passes to avoid flashing empty UI on logged-out hits.
   let authChecked = $state(false);
   onMount(() => {
     if (!localStorage.getItem('hour_jwt')) {
@@ -85,20 +68,20 @@
 
   const selection = provideSelection();
   const lens = provideLens('today');
+  const pins = providePins();
+  const homeMode = provideHomeMode();
 
-  // Hydrate selection from URL on every navigation. Idempotent — the store
-  // bails if parsed state matches current state.
+  // Hydrate selection from URL (pages still read it). Idempotent.
   $effect(() => {
     selection.hydrateFromUrl(page.url);
   });
 
-  // One-shot restore of UI state that doesn't live in the URL: last active
-  // lens and focus marker. Run after URL hydration has populated selection
-  // so the focus check validates against what the user is actually viewing.
   onMount(() => {
     selection.hydrateFromUrl(page.url);
     selection.restoreFocusFromLocalStorage();
     lens.restoreFromLocalStorage();
+    pins.restoreFromLocalStorage();
+    homeMode.restoreFromLocalStorage();
   });
 
   $effect(() => {
@@ -123,13 +106,7 @@
     },
   });
 
-  // Settings + Notifications in the account menu need a workspace context
-  // to build their hrefs. When the user is at /h/ root (no workspace
-  // selected), fall back to the first workspace from the loaded list so
-  // the menu still works without requiring a selection.
-  let defaultWorkspaceSlug = $derived(
-    $workspacesQuery.data?.items[0]?.slug ?? '',
-  );
+  let defaultWorkspaceSlug = $derived($workspacesQuery.data?.items[0]?.slug ?? '');
   let menuWorkspaceSlug = $derived(workspaceSlug || defaultWorkspaceSlug);
 
   onMount(() => {
@@ -163,118 +140,7 @@
 
   const theme = useTheme();
 
-  let sidebarOpen = $state(true);
-  let sidebarCollapsed = $state(false);
-  let allActive = $state(false);
-
-  // Persist the collapsed/expanded preference across sessions. Width
-  // (when expanded) is persisted independently by <Sidebar>.
-  const SIDEBAR_COLLAPSED_KEY = 'hour_sidebar_collapsed';
-  onMount(() => {
-    try {
-      sidebarCollapsed = localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === '1';
-    } catch {
-      // Storage disabled — start expanded.
-    }
-  });
-  function toggleCollapsed() {
-    sidebarCollapsed = !sidebarCollapsed;
-    try {
-      localStorage.setItem(SIDEBAR_COLLAPSED_KEY, sidebarCollapsed ? '1' : '0');
-    } catch {
-      // ignore
-    }
-  }
-
-  // Vertical split between Plaza and LineList inside the sidebar body.
-  // Ratio is the fraction of the body height taken by the Plaza pane
-  // (0..1). `null` = default 50/50. Persisted across sessions.
-  const PANE_SPLIT_KEY = 'hour_pane_split';
-  let panePlazaRatio = $state<number | null>(null);
-  onMount(() => {
-    try {
-      const raw = localStorage.getItem(PANE_SPLIT_KEY);
-      if (raw) {
-        const n = Number(raw);
-        if (Number.isFinite(n) && n > 0 && n < 1) panePlazaRatio = n;
-      }
-    } catch {
-      // Storage disabled — start at default split.
-    }
-  });
-  let panePlazaStyle = $derived(
-    panePlazaRatio !== null
-      ? `flex: 0 0 ${(panePlazaRatio * 100).toFixed(2)}%;`
-      : undefined,
-  );
-
-  function startPaneResize(event: MouseEvent) {
-    event.preventDefault();
-    const divider = event.currentTarget as HTMLElement;
-    const body = divider.parentElement;
-    if (!body) return;
-
-    // Reference everything against the body's CONTENT box, not its
-    // border-box rect. Plaza's `flex: 0 0 X%` is interpreted relative
-    // to the flex container's content height, and the divider also
-    // takes a couple of pixels off the pane budget — both have to be
-    // accounted for or the Lines header gets clipped at the extreme.
-    const bodyRect = body.getBoundingClientRect();
-    const bodyStyles = getComputedStyle(body);
-    const padTop = parseFloat(bodyStyles.paddingBlockStart) || 0;
-    const padBottom = parseFloat(bodyStyles.paddingBlockEnd) || 0;
-    const contentTop = bodyRect.top + padTop;
-    const contentHeight = bodyRect.height - padTop - padBottom;
-    const dividerH = divider.getBoundingClientRect().height;
-
-    // Min/max determined by the actual rendered height of each sticky
-    // header — collapsing a pane just leaves its title visible, no
-    // hard-coded pixel floor. Measured once per drag (cheap; layout
-    // doesn't shift mid-drag).
-    const plazaHeader = body.querySelector('.plaza__header');
-    const linesHeader = body.querySelector('.line-list__header');
-    const plazaHeaderH = plazaHeader?.getBoundingClientRect().height ?? 0;
-    const linesHeaderH = linesHeader?.getBoundingClientRect().height ?? 0;
-    const minRatio = contentHeight > 0 ? plazaHeaderH / contentHeight : 0;
-    const maxRatio =
-      contentHeight > 0
-        ? 1 - (linesHeaderH + dividerH) / contentHeight
-        : 1;
-
-    const onMove = (e: MouseEvent) => {
-      const offset = e.clientY - contentTop;
-      const ratio = offset / contentHeight;
-      panePlazaRatio = Math.max(minRatio, Math.min(maxRatio, ratio));
-    };
-    const onUp = () => {
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', onUp);
-      if (panePlazaRatio !== null) {
-        try {
-          localStorage.setItem(PANE_SPLIT_KEY, String(panePlazaRatio));
-        } catch {
-          // ignore
-        }
-      }
-    };
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
-  }
-
-  function resetPaneSplit() {
-    panePlazaRatio = null;
-    try {
-      localStorage.removeItem(PANE_SPLIT_KEY);
-    } catch {
-      // ignore
-    }
-  }
-
-  // Decode identity from the JWT. Display name comes from Supabase
-  // user_metadata (set on signup/oauth/edit). Fallback chain:
-  // display_name → full_name → name → local-part of email. Email is
-  // kept as a secondary fallback if metadata is empty. When a profile
-  // entity ships (Phase 0.9+), swap for profile.display_name.
+  // Identity from JWT (display name → email local-part).
   let userEmail = $state('');
   let userDisplayName = $state('');
   onMount(() => {
@@ -285,21 +151,13 @@
       userEmail = payload.email ?? '';
       const meta = payload.user_metadata ?? {};
       userDisplayName =
-        meta.display_name ??
-        meta.full_name ??
-        meta.name ??
-        userEmail.split('@')[0] ??
-        '';
-    } catch { /* malformed jwt — leave empty */ }
+        meta.display_name ?? meta.full_name ?? meta.name ?? userEmail.split('@')[0] ?? '';
+    } catch {
+      /* malformed jwt — leave empty */
+    }
   });
 
-  // Theme style picker — accordion inside the account menu. Five style
-  // identities; selecting one calls theme.setTheme() which writes the
-  // data-theme attribute (or removes it for the default 'editorial-sobrio')
-  // and persists to localStorage. Orthogonal to the light/dark toggle that
-  // sits next to the accordion header and applies to every style.
-  // Style identities won't actually paint anything until each one's tokens
-  // ship in tokens.css under :root[data-theme="<id>"].
+  // Theme style picker — accordion inside the account menu.
   type ThemeStyle = { id: string; name: string };
   const themeStyles: ThemeStyle[] = [
     { id: 'editorial-sobrio', name: 'Editorial Sober' },
@@ -317,11 +175,9 @@
   const lensOptions: { id: Lens; label: string }[] = [
     { id: 'today', label: 'Today' },
     { id: 'calendar', label: 'Calendar' },
-    { id: 'contacts', label: 'Contacts' },
     { id: 'money', label: 'Money' },
   ];
 
-  // Every lens routes now (URL is canonical, ADR-022).
   const ROUTED_LENSES: Partial<Record<Lens, string>> = {
     calendar: 'calendar',
     contacts: 'contacts',
@@ -330,17 +186,13 @@
 
   function selectLens(id: Lens) {
     lens.set(id);
-    if (!hasWorkspace) return;
+    const ws = workspaceSlug || defaultWorkspaceSlug;
+    if (!ws) return;
     const segment = ROUTED_LENSES[id];
-    if (segment) {
-      void goto(`/h/${workspaceSlug}/${segment}`);
-    } else if (id === 'today' && routedLens) {
-      // Leaving a routed lens must not rewrite the filter: serialize the
-      // live selection (multi-select survives); bare context as fallback.
-      const hasSelection = selection.workspaces.size > 0 || selection.projects.size > 0;
-      void goto(hasSelection ? selection.toUrl() : `/h/${workspaceSlug}/`);
-    }
+    void goto(segment ? `/h/${ws}/${segment}` : `/h/${ws}/`);
   }
+
+  let inSettings = $derived(/^\/h\/[^/]+\/settings(\b|\/|$)/.test(page.url.pathname));
 
   // Which routed lens (if any) the current URL is showing.
   let routedLens = $derived.by<Lens | null>(() => {
@@ -348,11 +200,10 @@
     return (m?.[1] as Lens | undefined) ?? null;
   });
 
-  // Keep the pill state honest when navigation happens outside the pills
-  // (deep link, browser back, the Today dashboard's "Open calendar →").
-  // Lens reads go through untrack so this reacts to ROUTE changes only —
-  // otherwise it would instantly revert any state-only pill (Money)
-  // clicked while on a routed-lens URL.
+  // On the Today lens the URL has no routed segment — that's the home.
+  let onToday = $derived(!routedLens && !inSettings);
+
+  // Keep the pill state honest when navigation happens outside the pills.
   $effect(() => {
     const current = untrack(() => lens.current);
     if (routedLens) {
@@ -362,27 +213,16 @@
     }
   });
 
-  // Settings takes over the sidebar body: Plaza + LineList are replaced
-  // by SettingsNav while the user is inside /settings. Header (brand)
-  // and footer (avatar menu) stay put — settings is a "mode" of the
-  // same shell, not a separate page.
-  let inSettings = $derived(
-    /^\/h\/[^/]+\/settings(\b|\/|$)/.test(page.url.pathname),
-  );
+  let inSettings = $derived(/^\/h\/[^/]+\/settings(\b|\/|$)/.test(page.url.pathname));
 
-  // Do Not Disturb — quick toggle in the account menu. Persisted to
-  // localStorage so a muted state survives refresh. Phase 0 hook is
-  // visual-only (the bell flips); actual notification suppression wires
-  // up when the notification system ships. The detailed setup (digest,
-  // channels, quiet hours, per-event toggles) lives inside Settings →
-  // Notifications; this is the "30 seconds before going on stage" shortcut.
+  // Do Not Disturb — quick toggle in the account menu.
   const DND_KEY = 'hour_dnd';
   let dnd = $state(false);
   onMount(() => {
     try {
       dnd = localStorage.getItem(DND_KEY) === '1';
     } catch {
-      // Storage disabled — start unmuted.
+      /* storage disabled */
     }
   });
   function toggleDnd() {
@@ -390,20 +230,20 @@
     try {
       localStorage.setItem(DND_KEY, dnd ? '1' : '0');
     } catch {
-      // ignore
+      /* ignore */
     }
   }
 
-  let breadcrumbDate = $derived.by(() => {
-    const d = new Date();
-    return d
-      .toLocaleDateString('en-US', {
-        weekday: 'long',
-        month: 'long',
-        day: 'numeric',
-      })
-      .toUpperCase();
-  });
+  // ⌘K command palette.
+  let paletteOpen = $state(false);
+  function onPickLine(line: NavLine) {
+    void goto(lineUrl(line));
+  }
+  function onPickSpace(ws: NavWorkspace) {
+    pins.add(spacePin(ws.slug));
+    lens.set('today');
+    void goto(`/h/${ws.slug}/`);
+  }
 
   function logout() {
     localStorage.removeItem('hour_jwt');
@@ -414,122 +254,88 @@
 </script>
 
 {#if authChecked && !blocked}
-  <div class="workspace-shell">
-    <Sidebar
-      bind:open={sidebarOpen}
-      collapsed={sidebarCollapsed}
-      label="Projects"
-      resizable
-      storageKey="hour_sidebar_width"
-      minWidth={200}
-      maxWidth={480}
-      onCollapse={() => {
-        sidebarCollapsed = true;
-        try { localStorage.setItem(SIDEBAR_COLLAPSED_KEY, '1'); } catch {}
-      }}
-      onExpand={() => {
-        sidebarCollapsed = false;
-        try { localStorage.setItem(SIDEBAR_COLLAPSED_KEY, '0'); } catch {}
-      }}
-    >
-      {#snippet header()}
-        {#if sidebarCollapsed}
-          <button
-            type="button"
-            class="workspace-shell__brand-toggle"
-            onclick={toggleCollapsed}
-            aria-label="Expand sidebar"
-            title="Expand sidebar"
-          >
-            <BrandMark size="m" compact />
-          </button>
-        {:else}
-          <div class="workspace-shell__brand">
-            <BrandMark size="m" href="/h/" />
+  <div class="shell" class:shell--settings={inSettings}>
+    {#if inSettings}
+      <aside class="shell__settings-nav">
+        <SettingsNav />
+      </aside>
+    {/if}
+
+    <main class="shell__main">
+      <header class="shell__top">
+        <a class="shell__brand" href="/h/" aria-label="Hour home">
+          <BrandMark size="m" />
+        </a>
+
+        <nav class="shell__lenses" aria-label="Lens">
+          {#each lensOptions as opt (opt.id)}
+            <Pill
+              active={lens.current === opt.id}
+              ariaCurrent={lens.current === opt.id ? 'true' : undefined}
+              onclick={() => selectLens(opt.id)}
+            >
+              {opt.label}
+            </Pill>
+          {/each}
+        </nav>
+
+        <div class="shell__spacer"></div>
+
+        {#if onToday}
+          <div class="shell__seg" role="group" aria-label="Home mode">
+            <button
+              type="button"
+              class="shell__seg-btn"
+              class:shell__seg-btn--on={homeMode.current === 'digest'}
+              aria-pressed={homeMode.current === 'digest'}
+              onclick={() => homeMode.set('digest')}
+            >
+              Clean
+            </button>
+            <button
+              type="button"
+              class="shell__seg-btn"
+              class:shell__seg-btn--on={homeMode.current === 'custom'}
+              aria-pressed={homeMode.current === 'custom'}
+              onclick={() => homeMode.set('custom')}
+            >
+              My home
+            </button>
           </div>
         {/if}
-      {/snippet}
-      {#snippet children()}
-        {#if sidebarCollapsed}
-          <div class="workspace-shell__pane">
-            <PlazaRail />
-          </div>
-        {:else if inSettings}
-          <div class="workspace-shell__pane" use:scrollFade>
-            <SettingsNav />
-          </div>
-        {:else}
-          <div
-            class="workspace-shell__pane workspace-shell__pane--plaza"
-            style={panePlazaStyle}
-            use:scrollFade
-          >
-            <Plaza />
-          </div>
-          <button
-            type="button"
-            class="workspace-shell__pane-divider"
-            aria-label="Resize panes"
-            title="Drag to resize · double-click to reset"
-            onmousedown={startPaneResize}
-            ondblclick={resetPaneSplit}
-          ></button>
-          <div
-            class="workspace-shell__pane workspace-shell__pane--lines"
-            use:scrollFade
-          >
-            <LineList />
-          </div>
-        {/if}
-      {/snippet}
-      {#snippet footer()}
-        {#if !sidebarCollapsed}
-          <Avatar
-            size="xs"
-            name={userDisplayName || userEmail || workspaceSlug}
-          />
-          <span class="account-row__name"
-            >{userDisplayName || userEmail}</span
-          >
-        {/if}
+
+        <button
+          type="button"
+          class="shell__search"
+          onclick={() => (paletteOpen = true)}
+          aria-label="Search or jump to a line"
+        >
+          <svg viewBox="0 0 14 14" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true">
+            <circle cx="6.2" cy="6.2" r="4.2" />
+            <path d="M9.4 9.4 12 12" />
+          </svg>
+          <span class="shell__search-label">Search or jump to a line…</span>
+          <kbd class="kbd">⌘K</kbd>
+        </button>
+
+        <PresenceBadge count={networkPresence?.count ?? null} />
+
         <Menu
-          direction="up"
-          align={sidebarCollapsed ? 'start' : 'end'}
+          direction="down"
+          align="end"
           label="Open account menu"
           triggerClass="account-row__kebab"
           onclose={() => (themeStyleExpanded = false)}
         >
           {#snippet trigger()}
-            {#if sidebarCollapsed}
-              <Avatar
-                size="xs"
-                name={userDisplayName || userEmail || workspaceSlug}
-              />
-            {:else}
-              <svg
-                viewBox="0 0 16 16"
-                width="14"
-                height="14"
-                fill="currentColor"
-                aria-hidden="true"
-              >
-                <circle cx="3.5" cy="8" r="1.2" />
-                <circle cx="8" cy="8" r="1.2" />
-                <circle cx="12.5" cy="8" r="1.2" />
-              </svg>
-            {/if}
+            <Avatar size="xs" name={userDisplayName || userEmail || workspaceSlug} />
           {/snippet}
           {#snippet children({ close })}
             <li role="presentation" class="menu-header">
               <div class="menu-header__identity">
-                <Avatar
-                  size="s"
-                  name={userDisplayName || userEmail || workspaceSlug}
-                />
+                <Avatar size="s" name={userDisplayName || userEmail || workspaceSlug} />
                 <div class="menu-header__id">
-                  <span class="menu-header__name"
-                    >{userDisplayName || userEmail}</span
-                  >
+                  <span class="menu-header__name">{userDisplayName || userEmail}</span>
                   {#if userDisplayName && userEmail && userDisplayName !== userEmail}
                     <span class="menu-header__email">{userEmail}</span>
                   {/if}
@@ -545,20 +351,8 @@
                   logout();
                 }}
               >
-                <svg
-                  viewBox="0 0 16 16"
-                  width="14"
-                  height="14"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="1.4"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  aria-hidden="true"
-                >
-                  <!-- door frame on the left -->
+                <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                   <path d="M9 2 H4 a1 1 0 0 0 -1 1 V13 a1 1 0 0 0 1 1 H9" />
-                  <!-- arrow exiting to the right -->
                   <path d="M7 8 H14" />
                   <path d="M11 5 L14 8 L11 11" />
                 </svg>
@@ -567,9 +361,7 @@
             <li role="none">
               <a
                 role="menuitem"
-                href={inSettings
-                  ? `/h/${menuWorkspaceSlug}/`
-                  : `/h/${menuWorkspaceSlug}/settings`}
+                href={inSettings ? `/h/${menuWorkspaceSlug}/` : `/h/${menuWorkspaceSlug}/settings`}
                 class="menu__item"
                 tabindex="0"
                 onclick={() => close(false)}
@@ -591,34 +383,17 @@
                 type="button"
                 class="settings-row__action settings-row__action--toggle"
                 class:is-muted={dnd}
-                aria-label={dnd
-                  ? 'Notifications muted — click to unmute'
-                  : 'Notifications on — click to mute'}
+                aria-label={dnd ? 'Notifications muted — click to unmute' : 'Notifications on — click to mute'}
                 aria-pressed={dnd}
                 title={dnd ? 'Muted' : 'On — click to mute'}
                 onclick={toggleDnd}
               >
-                <svg
-                  viewBox="0 0 16 16"
-                  width="14"
-                  height="14"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="1.4"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  aria-hidden="true"
-                >
-                  <!-- bell body -->
+                <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                   <path d="M4 11 C 4 9.8 4.5 9.3 4.5 8 C 4.5 5.8 6 4 8 4 C 10 4 11.5 5.8 11.5 8 C 11.5 9.3 12 9.8 12 11 Z" />
-                  <!-- rim -->
                   <path d="M3.5 11 H 12.5" />
-                  <!-- clapper -->
                   <path d="M7 13 C 7.2 13.6 7.5 14 8 14 C 8.5 14 8.8 13.6 9 13" />
-                  <!-- top -->
                   <path d="M8 2.5 V 4" />
                   {#if dnd}
-                    <!-- mute slash -->
                     <path d="M2.5 2.5 L 13.5 13.5" />
                   {/if}
                 </svg>
@@ -634,14 +409,8 @@
                 >
                   <span class="theme-accordion__label">Theme style</span>
                   <span class="theme-accordion__current">
-                    <span class="theme-accordion__current-name"
-                      >{activeThemeStyle.name}</span
-                    >
-                    <span
-                      class="theme-accordion__chevron"
-                      data-expanded={themeStyleExpanded || undefined}
-                      aria-hidden="true"
-                    >›</span>
+                    <span class="theme-accordion__current-name">{activeThemeStyle.name}</span>
+                    <span class="theme-accordion__chevron" data-expanded={themeStyleExpanded || undefined} aria-hidden="true">›</span>
                   </span>
                 </button>
                 <ThemeToggle variant="plain" />
@@ -666,361 +435,129 @@
             </li>
           {/snippet}
         </Menu>
-      {/snippet}
-    </Sidebar>
-
-    <main class="workspace-shell__main">
-      <header class="workspace-shell__topbar">
-        {#if !sidebarOpen}
-          <button
-            type="button"
-            class="workspace-shell__toggle"
-            onclick={() => (sidebarOpen = true)}
-            aria-label="Show navigation"
-          >
-            <svg
-              viewBox="0 0 14 14"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.5"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              aria-hidden="true"
-            >
-              <path d="M6 3 L10 7 L6 11" />
-              <path d="M2 3 L6 7 L2 11" />
-            </svg>
-          </button>
-        {/if}
-
-        <nav class="workspace-shell__lenses" aria-label="Lens">
-          {#each lensOptions as opt (opt.id)}
-            <Pill
-              active={lens.current === opt.id}
-              ariaCurrent={lens.current === opt.id ? 'true' : undefined}
-              onclick={() => selectLens(opt.id)}
-            >
-              {opt.label}
-            </Pill>
-          {/each}
-        </nav>
-
-        <span class="workspace-shell__crumb">
-          {hasWorkspace ? `${workspaceSlug.toUpperCase()} · ` : ''}{breadcrumbDate}
-        </span>
-
-        <div class="workspace-shell__right">
-          <label class="workspace-shell__search">
-            <input
-              type="search"
-              placeholder="Search or jump…"
-              aria-label="Search"
-            />
-            <kbd class="kbd">⌘K</kbd>
-          </label>
-
-          <PresenceBadge count={networkPresence?.count ?? null} />
-
-          <Pill
-            all
-            active={allActive}
-            onclick={() => (allActive = !allActive)}
-            ariaLabel="Toggle scope to all projects"
-          >
-            All
-          </Pill>
-        </div>
       </header>
 
-      <div class="workspace-shell__content">
+      <div class="shell__content">
         {#if children}{@render children()}{/if}
       </div>
     </main>
   </div>
+
+  <CommandPalette bind:open={paletteOpen} {onPickLine} {onPickSpace} />
 {/if}
 
 <style>
-  .workspace-shell {
+  .shell {
     display: flex;
     min-block-size: 100vh;
     background: var(--bg);
   }
 
-  /* Sidebar skeleton + width token live in base.css. We just paint the
-     background and the inline-end border to match the shell palette.
-     Stacked above the topbar so the resize handle, which extends 2px
-     beyond the sidebar edge, isn't obscured by the topbar's sticky
-     layer — that overlap was the cause of the apparent double line. */
-  .workspace-shell :global(.sidebar) {
-    background: var(--bg);
+  .shell__settings-nav {
+    flex: 0 0 var(--sidebar-width);
+    min-inline-size: var(--sidebar-width);
+    max-inline-size: var(--sidebar-width);
     border-inline-end: 1px solid var(--border-color-dark);
-    z-index: calc(var(--z-sticky) + 1);
-  }
-
-  /* Desktop: width truly fixed (flex item won't grow OR shrink with
-     content), sidebar viewport-locked (header pinned, body scrolls
-     internally, footer always visible). Mobile drawer keeps its own
-     position: fixed rules from base.css. */
-  @media (min-width: 48rem) {
-    .workspace-shell :global(.sidebar) {
-      flex: 0 0 var(--sidebar-width);
-      min-inline-size: var(--sidebar-width);
-      max-inline-size: var(--sidebar-width);
-      position: sticky;
-      inset-block-start: 0;
-      block-size: 100vh;
-      align-self: flex-start;
-    }
-  }
-
-  .workspace-shell :global(.sidebar__header) {
-    padding-block: var(--space-s);
-    padding-inline: var(--space-m);
-    border-block-end: 0;
-    justify-content: space-between;
-  }
-
-  /* Rail mode adjustments — narrower padding, hide the email next to the
-     user avatar. The account dropdown trigger remains an avatar-only
-     button (the menu itself keeps its full content width via .menu's
-     min-inline-size). Header is a single element (the brand doubles as
-     the expand control), so it stays a centred row, not a stack. */
-  .workspace-shell :global(.sidebar--collapsed .sidebar__header) {
-    padding-inline: var(--space-xs);
-    align-items: center;
-    justify-content: center;
-  }
-
-  /* Square hit + hover area for the brand-as-toggle (collapsed mode).
-     A single italic "h" at text-xl + padding-xs is naturally taller
-     than wide; locking both axes to the same computed value keeps the
-     hover surface visibly square. Click expands the sidebar — the
-     tooltip + cursor carry the affordance, no extra icon needed. */
-  .workspace-shell__brand-toggle {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    inline-size: calc(var(--text-xl) + 2 * var(--space-xs));
-    block-size: calc(var(--text-xl) + 2 * var(--space-xs));
-    padding: 0;
-    background: transparent;
-    border: 0;
-    border-radius: var(--radius);
-    cursor: pointer;
-    color: inherit;
-    transition: background var(--transition);
-  }
-
-  .workspace-shell__brand-toggle:hover {
-    background: var(--bg-hover);
-  }
-
-  .workspace-shell :global(.sidebar--collapsed .sidebar__body) {
-    padding-inline: var(--space-xs);
-  }
-
-  .workspace-shell :global(.sidebar--collapsed .sidebar__footer) {
-    flex-direction: column;
-    gap: var(--space-xs);
-    padding-inline: var(--space-xs);
-    align-items: center;
-  }
-
-  /* In rail mode the Menu trigger wraps the avatar directly (the
-     name + kebab don't render in collapsed mode). The kebab's 32×32
-     skeleton would leave a halo around the 24px avatar; trim it back
-     so the button hugs the avatar instead. */
-  .workspace-shell :global(.sidebar--collapsed .sidebar__footer .menu-wrapper) {
-    flex: 0 0 auto;
-    min-inline-size: 0;
-    inline-size: auto;
-  }
-
-  .workspace-shell :global(.sidebar--collapsed .account-row__kebab) {
-    inline-size: auto;
-    block-size: auto;
-    padding: var(--space-xs);
-  }
-
-  .workspace-shell :global(.sidebar__body) {
-    padding-block: var(--space-s);
-    /* No inline padding on the body itself — every meaningful child
-       inside (eyebrows, rows, LineList headers) already owns its
-       padding-inline, so the body adding more on top just stacks
-       indent. The divider is full-bleed for free now. */
-    padding-inline: 0;
-    /* When the body hosts two panes (Plaza + Lines), let each one own
-       its scroll instead of scrolling the whole body. The divider lives
-       between them as a row-resize handle; no body gap so the divider
-       is the only line. min-block-size: 0 on the panes allows them to
-       shrink below their content. */
-    gap: 0;
-    overflow: hidden;
-    min-block-size: 0;
-  }
-
-  .workspace-shell__pane {
-    flex: 1 1 50%;
-    min-block-size: 0;
-    overflow-y: auto;
-    /* Anchor the bottom fade overlay. The pseudo-element is sticky inside
-       this scrolling viewport — relative positioning is what gives it a
-       coordinate frame even though sticky doesn't formally need it, and
-       it keeps the rule readable as "pane owns the fade". */
-    position: relative;
-  }
-
-  /* Bottom-edge fade — signals "more content below". Sticky to the
-     viewport bottom of the scroll container; negative margin-top pulls
-     it out of the flow so it doesn't add to scrollHeight (otherwise the
-     fade itself would create the overflow it's trying to indicate).
-     Opacity toggled by the scrollFade action via [data-can-scroll-down].
-     No top fade: the sticky pane header already paints var(--bg) over
-     scrolled content at the top, so it serves the same visual role. */
-  .workspace-shell__pane::after {
-    content: '';
-    display: block;
-    position: sticky;
-    inset-block-end: 0;
-    block-size: var(--space-xl);
-    margin-block-start: calc(-1 * var(--space-xl));
-    background: linear-gradient(to top, var(--bg), transparent);
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity var(--transition);
-    z-index: 1;
-  }
-
-  /* :global() on the attribute matcher only — class stays scoped. Svelte
-     can't statically see the action setting this attribute, so without
-     this hint the selector reads as unused at compile time. */
-  .workspace-shell__pane:global([data-can-scroll-down])::after {
-    opacity: 1;
-  }
-
-  /* LineList renders its own top divider + spacing for the standalone
-     case. Inside the sidebar shell the pane-divider above already owns
-     that line, AND the sticky header has its own padding-block. Strip
-     all the wrapper's top spacing — otherwise the header gets pushed
-     down off the pane's top: 0 anchor and is clipped at the pane's
-     bottom edge when the pane is collapsed. */
-  .workspace-shell__pane--lines :global(.line-list) {
-    margin-block-start: 0;
-    padding-block-start: 0;
-    border-block-start: 0;
-  }
-
-  /* Pane headers stay pinned to the top of their pane while content
-     below scrolls. The sticky must live on the header WRAPPER, not on
-     the eyebrow inside it: position: sticky is constrained within the
-     element's direct parent, so a sticky eyebrow inside a tiny
-     plaza__header parent would unstick almost immediately. The header
-     wrapper's parent is the full-height plaza nav (or line-list), so
-     it has the room it needs to actually stay pinned. */
-  .workspace-shell__pane :global(.plaza__header),
-  .workspace-shell__pane :global(.line-list__header) {
     position: sticky;
     inset-block-start: 0;
-    background: var(--bg);
-    padding-block: var(--space-xs);
-    z-index: 1;
-  }
-
-  /* Top-edge fade — trails just below each sticky pane header to signal
-     "more content above". Absolute child of the sticky header, so it
-     follows the header as it stays pinned. Slightly narrower than the
-     bottom fade (--space-l vs --space-xl) because the header itself
-     already anchors the top visually; the fade just softens the cut. */
-  .workspace-shell__pane :global(.plaza__header)::after,
-  .workspace-shell__pane :global(.line-list__header)::after {
-    content: '';
-    position: absolute;
-    inset-inline: 0;
-    inset-block-start: 100%;
-    block-size: var(--space-l);
-    background: linear-gradient(to bottom, var(--bg), transparent);
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity var(--transition);
-  }
-
-  .workspace-shell__pane:global([data-can-scroll-up])
-    :global(.plaza__header)::after,
-  .workspace-shell__pane:global([data-can-scroll-up])
-    :global(.line-list__header)::after {
-    opacity: 1;
-  }
-
-  /* Row between the two panes, draggable to redistribute their heights.
-     Spans edge-to-edge naturally now that the body has no inline padding.
-     Slightly thicker than a 1px hairline to register as an intentional
-     divider. Hit area is widened via ::after so the user doesn't have
-     to land on the literal strip. Same visual language as the
-     inline-end resize handle: subtle by default, primary on hover/drag. */
-  .workspace-shell__pane-divider {
-    position: relative;
-    block-size: 2px;
-    background: var(--border-color-light);
-    border: 0;
-    padding: 0;
-    cursor: row-resize;
-    flex-shrink: 0;
-    transition: background var(--transition);
-  }
-
-  .workspace-shell__pane-divider::after {
-    content: "";
-    position: absolute;
-    inset-inline: 0;
-    inset-block: -3px;
-  }
-
-  .workspace-shell__pane-divider:hover,
-  .workspace-shell__pane-divider:active {
-    background: var(--primary);
-  }
-
-  .workspace-shell__pane-divider:focus,
-  .workspace-shell__pane-divider:focus-visible {
-    outline: none;
-  }
-
-  .workspace-shell :global(.sidebar__footer) {
-    position: relative;
+    block-size: 100vh;
+    align-self: flex-start;
+    overflow-y: auto;
     padding-block: var(--space-s);
-    padding-inline: var(--space-m);
-    border-block-start: 1px solid var(--border-color-light);
-    gap: var(--space-s);
   }
 
-  /* Hook only — styling lives in <BrandMark />. The wrapper exists so
-     the sidebar header layout (mark + collapse toggle on the right)
-     can flex them apart. */
-  .workspace-shell__brand {
-    display: inline-flex;
-  }
-
-  /* Account row layout: avatar + name as display-only elements + the
-     Menu wrapper (which contains just the kebab button trigger). Only
-     the kebab is interactive — the avatar and name are pure identity
-     readout. No bg-hover on the row itself; the kebab paints its own
-     hover via the icon-action skeleton below. */
-  .account-row__name {
+  .shell__main {
     flex: 1;
-    font-size: var(--text-s);
-    color: var(--text-muted);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    display: flex;
+    flex-direction: column;
     min-inline-size: 0;
   }
 
-  /* Kebab button = the only menu trigger in expanded mode. Same icon-
-     action skeleton (32×32, faint idle, neutral hover/expanded) as the
-     DND bell and ThemeToggle below — when the menu is open you see a
-     vertical column of identically-sized icon buttons spanning the
-     header sign-out, the Notifications bell, and the Theme toggle, all
-     visually anchored to the same trailing edge. */
+  .shell__top {
+    position: sticky;
+    inset-block-start: 0;
+    z-index: var(--z-sticky);
+    display: flex;
+    align-items: center;
+    gap: var(--space-m);
+    padding-block: var(--space-s);
+    padding-inline: var(--space-l);
+    background: color-mix(in oklch, var(--bg) 88%, transparent);
+    backdrop-filter: blur(8px);
+    border-block-end: 1px solid var(--border-color-light);
+  }
+
+  .shell__brand {
+    display: inline-flex;
+    flex: none;
+    text-decoration: none;
+  }
+
+  .shell__lenses {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+  }
+
+  .shell__spacer {
+    flex: 1;
+  }
+
+  .shell__seg {
+    display: inline-flex;
+    border: 1px solid var(--border-color-dark);
+    border-radius: var(--radius-circle);
+    overflow: hidden;
+  }
+  .shell__seg-btn {
+    border: 0;
+    background: none;
+    padding-block: var(--space-xs);
+    padding-inline: var(--space-m);
+    font-family: inherit;
+    font-size: var(--text-s);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: background var(--transition), color var(--transition);
+  }
+  .shell__seg-btn--on {
+    background: var(--text-color);
+    color: var(--bg-ultra-light);
+  }
+
+  .shell__search {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-s);
+    min-inline-size: 220px;
+    padding-block: var(--space-xs);
+    padding-inline: var(--space-m) var(--space-s);
+    border: 1px solid var(--border-color-dark);
+    border-radius: var(--radius-circle);
+    background: var(--bg-ultra-light);
+    color: var(--text-faint);
+    cursor: text;
+    font-family: inherit;
+    transition: border-color var(--transition);
+  }
+  .shell__search:hover {
+    border-color: var(--text-muted);
+  }
+  .shell__search-label {
+    flex: 1;
+    text-align: start;
+    font-size: var(--text-s);
+    color: var(--text-faint);
+  }
+
+  .shell__content {
+    flex: 1;
+    padding-block: var(--space-l) var(--space-xxl);
+    padding-inline: var(--space-l);
+  }
+
+  /* ── account menu chrome (unchanged from the previous shell) ── */
+
   :global(.account-row__kebab) {
     display: inline-flex;
     align-items: center;
@@ -1030,14 +567,14 @@
     block-size: var(--control-size-s);
     background: transparent;
     border: 0;
-    border-radius: var(--radius-s);
+    border-radius: var(--radius-circle);
     color: var(--text-faint);
     cursor: pointer;
     transition: background var(--transition), color var(--transition);
   }
   :global(.account-row__kebab:hover),
   :global(.account-row__kebab[aria-expanded='true']) {
-    background: var(--bg-ultra-light);
+    background: var(--bg-light);
     color: var(--text-color);
   }
   :global(.account-row__kebab:focus-visible) {
@@ -1045,23 +582,6 @@
     outline-offset: -1px;
   }
 
-  /* Identity header inside the account menu (first li in source order =
-     top of the upward-opening dropdown = furthest from the cursor that
-     just clicked the trigger). Composition: avatar + identity column
-     (display name on top, email subtitle when distinct) on the left,
-     sign-out icon button at the trailing edge. Separated from the
-     navigation items below by a hairline border, so the visual reads
-     as "identity zone" vs "configuration zone". The sign-out button
-     intentionally omits role="menuitem" so the menu's initial-focus and
-     arrow-key navigation skip it — keyboard users reach the safe items
-     first, mouse users still click it directly.
-
-     Padding-inline asymmetry: the LEFT pad matches the menu items'
-     padding-inline (space-s) so the avatar lines up with the items' text
-     start. The RIGHT pad is 0 so the sign-out icon sits flush with the
-     bell (.settings-row__action) and ThemeToggle that live in
-     subsequent rows — every trailing icon column lines up on the same
-     vertical. */
   :global(.menu-header) {
     display: flex;
     align-items: center;
@@ -1099,11 +619,6 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  /* Sign-out: same skeleton as .settings-row__action (32×32, neutral
-     idle) so it sits in the same trailing-icon column as the DND bell
-     and ThemeToggle below. align-self: flex-start anchors it to the
-     header's top so it aligns with the name's baseline (the identity's
-     primary line), not with the centre of the avatar + 2-line block. */
   :global(.menu-header__logout) {
     align-self: flex-start;
     display: inline-flex;
@@ -1128,25 +643,11 @@
     outline-offset: -1px;
   }
 
-
-  /* Theme accordion inside the account menu. Two orthogonal controls:
-     the expand button (label + current style + chevron) opens the list;
-     the ThemeToggle to its right flips light/dark globally regardless of
-     which style is selected. The list below shows style names only — no
-     per-item mode. */
   :global(.theme-accordion) {
     display: flex;
     flex-direction: column;
     gap: 1px;
   }
-
-  /* Settings row = link/control + icon-action button side by side.
-     Same composition as .theme-accordion__header (label + ThemeToggle).
-     Each side owns its own hover so they don't double-highlight.
-     align-items: flex-start anchors the action to the TOP of the row,
-     so the icon column stays on the same baseline whether the row is
-     single-line (Notifications) or multi-line (Theme style ‧ Editorial
-     Sober ›). Centring would drift the icon downward as rows grow. */
   :global(.settings-row) {
     display: flex;
     align-items: flex-start;
@@ -1155,16 +656,10 @@
   :global(.settings-row__link) {
     flex: 1;
   }
-
-  /* Single skeleton for every icon-action sitting at the row's right
-     edge — logout, DND bell, and (via matching --toggle-size) the
-     ThemeToggle. Square 32×32 means each icon's centre lands at the
-     same x/y across rows, so they read as one column.
-     Modifiers redeclare variables only (philosophy.md). */
   :global(.settings-row__action) {
     --action-color: var(--text-faint);
     --action-color-hover: var(--text-color);
-    --action-bg-hover: var(--bg-ultra-light);
+    --action-bg-hover: var(--bg-light);
 
     display: inline-flex;
     align-items: center;
@@ -1186,10 +681,6 @@
     outline: var(--focus-width) solid var(--focus-color);
     outline-offset: -1px;
   }
-
-  /* Stateful toggle — DND bell. ON paints in ink, muted dims to faint
-     (the SVG also draws a slash for unmistakable read). Hover stays
-     neutral; muting isn't destructive. */
   :global(.settings-row__action--toggle) {
     --action-color: var(--text-color);
   }
@@ -1197,17 +688,11 @@
     --action-color: var(--text-faint);
   }
 
-  /* Mirrors .settings-row exactly — same composition, same alignment.
-     flex-start anchors ThemeToggle to the row's TOP so it sits on the
-     same baseline as the bell / logout in sibling single-line rows.
-     The "Editorial Sober ›" line falls below; the toggle reads as
-     "action of the row" not "anchored to the centre of a 2-line stack". */
   :global(.theme-accordion__header) {
     display: flex;
     align-items: flex-start;
     gap: 1px;
   }
-
   :global(.theme-accordion__expand) {
     flex: 1;
     display: flex;
@@ -1228,20 +713,17 @@
   }
   :global(.theme-accordion__expand:hover),
   :global(.theme-accordion__expand[aria-expanded='true']) {
-    background: var(--bg-ultra-light);
+    background: var(--bg-light);
   }
   :global(.theme-accordion__expand:focus-visible) {
     outline: var(--focus-width) solid var(--focus-color);
     outline-offset: -1px;
   }
-
-
   :global(.theme-accordion__label) {
     font-size: var(--text-s);
     color: var(--text-color);
     line-height: 1.3;
   }
-
   :global(.theme-accordion__current) {
     display: inline-flex;
     align-items: center;
@@ -1252,25 +734,21 @@
     line-height: 1.3;
     min-inline-size: 0;
   }
-
   :global(.theme-accordion__current-name) {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     min-inline-size: 0;
   }
-
   :global(.theme-accordion__chevron) {
     color: var(--text-faint);
     line-height: 1;
     transition: transform var(--transition);
     flex-shrink: 0;
   }
-
   :global(.theme-accordion__chevron[data-expanded]) {
     transform: rotate(90deg);
   }
-
   :global(.theme-accordion__list) {
     list-style: none;
     margin: 0;
@@ -1280,11 +758,9 @@
     gap: 1px;
     padding-inline-start: var(--space-s);
   }
-
   :global(.theme-accordion__item) {
     display: flex;
   }
-
   :global(.theme-accordion__select) {
     flex: 1;
     padding-block: var(--space-xs);
@@ -1299,145 +775,28 @@
     cursor: pointer;
     transition: background var(--transition), color var(--transition);
   }
-
   :global(.theme-accordion__select):hover {
-    background: var(--bg-ultra-light);
+    background: var(--bg-light);
     color: var(--heading-color);
   }
-
   :global(.theme-accordion__select[data-active]) {
-    background: var(--bg-ultra-light);
+    background: var(--bg-light);
     color: var(--heading-color);
     font-weight: 500;
   }
 
-  .workspace-shell__main {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    min-inline-size: 0;
-  }
-
-  .workspace-shell__topbar {
-    position: sticky;
-    inset-block-start: 0;
-    z-index: var(--z-sticky);
-    display: flex;
-    align-items: center;
-    gap: var(--space-s);
-    padding-block: var(--space-s);
-    padding-inline: var(--space-m);
-    border-block-end: 1px solid var(--border-color-light);
-    background: var(--bg);
-  }
-
-  /* Square chevron button using the same logic as the brand-toggle:
-     content size + 2 * space-xs. Content here is text-s (the chevron
-     svg), so the resulting square is smaller than the brand-toggle's
-     square (which wraps a text-xl "h") — keeps each button optically
-     aligned with whatever it contains. Idle: subtle (faint + 0.5
-     opacity, no box). Hover: full opacity + bg-hover. */
-  .workspace-shell__toggle {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    inline-size: calc(var(--text-s) + 2 * var(--space-xs));
-    block-size: calc(var(--text-s) + 2 * var(--space-xs));
-    padding: 0;
-    background: transparent;
-    border: 0;
-    border-radius: var(--radius);
-    color: var(--text-faint);
-    opacity: 0.5;
-    cursor: pointer;
-    transition:
-      opacity var(--transition), color var(--transition),
-      background var(--transition);
-  }
-
-  .workspace-shell__toggle svg {
-    inline-size: var(--text-s);
-    block-size: var(--text-s);
-  }
-
-  .workspace-shell__toggle:hover {
-    color: var(--text-muted);
-    opacity: 1;
-    background: var(--bg-hover);
-  }
-
-  .workspace-shell__lenses {
-    display: flex;
-    align-items: center;
-    gap: var(--space-xs);
-  }
-
-  .workspace-shell__crumb {
-    flex: 1;
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    color: var(--text-faint);
-    letter-spacing: 0.16em;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .workspace-shell__right {
-    display: flex;
-    align-items: center;
-    gap: var(--space-s);
-  }
-
-  .workspace-shell__search {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-xs);
-    padding-block: var(--space-xs);
-    padding-inline: var(--space-xs);
-    background: var(--bg);
-    border: 1px solid var(--border-color-dark);
-    border-radius: var(--radius);
-    transition: border-color var(--transition);
-    min-inline-size: 220px;
-  }
-
-  .workspace-shell__search:focus-within {
-    border-color: var(--text-muted);
-  }
-
-  .workspace-shell__search input {
-    flex: 1;
-    min-inline-size: 0;
-    padding: 0;
-    background: transparent;
-    border: 0;
-    outline: none;
-    font-family: var(--font-sans);
-    font-size: var(--text-xs);
-    line-height: 1.2;
-    color: var(--text-color);
-  }
-
-  .workspace-shell__search input::placeholder {
-    color: var(--text-faint);
-  }
-
-  .workspace-shell__content {
-    flex: 1;
-    padding-block: var(--space-l);
-    padding-inline: var(--space-l);
-  }
-
   @media (max-width: 47.999rem) {
-    .workspace-shell__crumb {
+    .shell__search {
+      min-inline-size: 0;
+    }
+    .shell__search-label {
       display: none;
     }
-    .workspace-shell__search {
-      min-inline-size: 140px;
-    }
-    .workspace-shell__content {
+    .shell__content {
       padding-inline: var(--space-m);
+    }
+    .shell__settings-nav {
+      display: none;
     }
   }
 </style>
