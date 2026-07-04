@@ -1,6 +1,6 @@
 <script lang="ts">
   /**
-   * Agenda — the Home (ADR-055 nav redesign). The logo lands here; there is
+   * Agenda — the Home (ADR-057 nav redesign). The logo lands here; there is
    * no "Today"/"Home" pill (that would just repeat the logo). A single quiet
    * column: greeting, the next-7-days agenda (capped, with a "+N more" link to
    * the full Agenda view), and whatever the user has PINNED brought forward.

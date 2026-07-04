@@ -3,7 +3,7 @@
    * /h/ — bare home. The logo lands here (or on /h/[ws]/). Since the agenda
    * is cross-workspace, /h/ just forwards to the first workspace's agenda so
    * the person-links etc. have a browsing context. No more "pick a workspace
-   * from the sidebar" — the sidebar is gone (ADR-055).
+   * from the sidebar" — the sidebar is gone (ADR-057).
    */
 
   import { createQuery } from '@tanstack/svelte-query';

@@ -1,5 +1,5 @@
 /**
- * Pins store (Adaptive Digest, ADR-055 nav redesign) — the scope model
+ * Pins store (Adaptive Digest, ADR-057 nav redesign) — the scope model
  * that replaces the persistent sidebar. A pin brings a unit of work forward
  * onto the clean home and scopes the Calendar/Money lenses. Two kinds:
  *

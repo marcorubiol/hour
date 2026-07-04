@@ -75,7 +75,7 @@ Working name: **Hour**. Brand decision deferred to Phase 1.
 - **Contacts** migrada a pins + **"Add contact" multi-espacio** (checkboxes por espacio → N engagements, persona global deduplicada por email, threading de `person_id`).
 - **Fix CSS de raíz**: orden de capas declarado en `<head>` de `app.html` (Vite inyectaba `@layer components` antes de base.css en dev → orden invertido; ver sessions-log).
 
-**Abierto / a decidir:** (1) **numeración ADR** a reconciliar — ADR-055 aparece 2× en `_decisions.md`, line-modules→ADR-056 en `_tasks.md`, y este rediseño de nav aún sin número firme; (2) persona huérfana de test `019f2f03-…` (invisible, soft-delete opcional por SQL); (3) el gate no cambia: usar Hour con la difusión real ~1 mes.
+**Numeración ADR reconciliada (2026-07-04 tarde):** **055 = "Today"** · **056 = line-detail modules** · **057 = nav "Adaptive Digest"** (ADR escrito, `_decisions.md`). **Abierto:** (1) persona huérfana de test `019f2f03-…` (invisible, soft-delete opcional por SQL — en Shelf); (2) el gate no cambia: usar Hour con la difusión real ~1 mes.
 
 ## Status — 2026-07-02 (noche, 7)
 

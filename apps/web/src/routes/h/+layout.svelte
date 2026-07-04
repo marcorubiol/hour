@@ -1,10 +1,11 @@
 <script lang="ts">
   /**
-   * App shell — Adaptive Digest (ADR-055 nav redesign). The persistent
+   * App shell — Adaptive Digest (ADR-057 nav redesign). The persistent
    * sidebar (Plaza + LineList) is gone; scope is expressed by PINS placed
    * on the content by each lens (see <ScopeStrip>), and ⌘K jumps to any
-   * line or space. The top bar is: brand · lenses (Today · Calendar ·
-   * Money) · Clean|My home (Today only) · ⌘K search · account menu.
+   * line or space. No top-nav buttons at all: the top bar is just brand
+   * (logo = Home = Agenda) · centered ⌘K search · account menu. Calendar,
+   * Contacts and Money are reachable only from ⌘K (Views group).
    *
    * Settings stays a "mode" of the shell: when inside /settings a slim
    * <SettingsNav> aside returns, so the settings surface is unaffected.
@@ -168,7 +169,7 @@
     themeStyles.find((t) => t.id === activeThemeStyleId) ?? themeStyles[0],
   );
 
-  // The logo IS the home = Agenda. No top-nav buttons at all (ADR-055,
+  // The logo IS the home = Agenda. No top-nav buttons at all (ADR-057,
   // final): Calendar and Money are reachable from ⌘K. Home lands on the
   // default-workspace agenda (the agenda is cross-workspace anyway; the
   // segment is just browsing context).
