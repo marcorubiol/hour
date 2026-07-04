@@ -290,14 +290,14 @@
                 {:else}
                   <span class="week__subject">{row.subject}</span>
                 {/if}
-                <span class="week__tags">
+                <span class="week__meta">
                   {#each row.tags as tag (tag.label)}
                     <TagChip label={tag.label} tone={tag.tone} />
                   {/each}
-                </span>
-                <span class="week__project" style={`--c: ${accentVar(row.projectSlug)}`}>
-                  <span class="week__dot" aria-hidden="true"></span>
-                  <span>{row.projectName}</span>
+                  <span class="week__project" style={`--c: ${accentVar(row.projectSlug)}`}>
+                    <span class="week__dot" aria-hidden="true"></span>
+                    <span>{row.projectName}</span>
+                  </span>
                 </span>
               </div>
             {/each}
@@ -382,8 +382,8 @@
       font-weight: 400;
       font-size: clamp(2rem, 1.5rem + 2.4vw, 2.9rem);
       letter-spacing: -0.02em;
-      line-height: 1.05;
-      margin: 0 0 var(--space-xs);
+      line-height: 1.1;
+      margin: 0 0 var(--space-2xs);
       color: var(--text-color);
     }
     .home__greet em {
@@ -392,11 +392,11 @@
     .home__date {
       font-size: var(--text-m);
       color: var(--text-muted);
-      margin: 0 0 var(--space-xl);
+      margin: 0 0 var(--space-m);
     }
 
     .home__toolbar {
-      margin-block: var(--space-l) var(--space-xs);
+      margin-block: var(--space-s) var(--space-xs);
     }
     .home__agenda-wrap {
       border-block-start: 1px solid var(--border-color-light);
@@ -427,9 +427,9 @@
     }
     .week__item {
       display: grid;
-      grid-template-columns: 6rem 1fr auto;
+      grid-template-columns: 5.5rem 1fr auto;
       align-items: baseline;
-      gap: var(--space-s);
+      gap: var(--space-m);
       padding-block: var(--space-s);
       padding-inline-start: var(--space-m);
       border-block-end: 1px solid var(--border-color-light);
@@ -444,18 +444,21 @@
       color: var(--danger);
     }
     .week__subject {
-      font-size: var(--text-s);
+      font-size: var(--text-m);
       color: var(--text-color);
       text-decoration: none;
       overflow: hidden;
       text-overflow: ellipsis;
+      min-inline-size: 0;
     }
     a.week__subject:hover {
       text-decoration: underline;
     }
-    .week__tags {
+    .week__meta {
       display: inline-flex;
-      gap: var(--space-xs);
+      align-items: center;
+      justify-content: flex-end;
+      gap: var(--space-s);
     }
     .week__project {
       display: inline-flex;
@@ -463,6 +466,7 @@
       gap: var(--space-xs);
       font-size: var(--text-xs);
       color: var(--text-muted);
+      white-space: nowrap;
     }
     .week__dot,
     .dot {
