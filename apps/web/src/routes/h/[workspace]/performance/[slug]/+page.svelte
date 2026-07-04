@@ -8,10 +8,11 @@
    * The road sheet sub-view (ADR-023) links from the header.
    */
 
+  import { goto } from '$app/navigation';
   import { page } from '$app/state';
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
-  import { fetchJSON } from '$lib/api';
+  import { fetchJSON, mutateJSON } from '$lib/api';
   import Button from '$lib/components/Button.svelte';
   import Dialog from '$lib/components/Dialog.svelte';
   import Input from '$lib/components/Input.svelte';
@@ -29,6 +30,7 @@
     type PerformancePatch,
     type PerformanceStatus,
   } from '$lib/performance';
+  import type { VenueContact } from '$lib/venue';
 
   type PersonEmbed = {
     id: string;
@@ -229,13 +231,46 @@
   let bundle = $derived($query.data ?? null);
   let perf = $derived(bundle?.performance ?? null);
 
+  // ── Delete (ADR-052) — for gigs created by mistake. A gig that fell
+  // through is status `cancelled`, not a deletion. ─────────────────────
+  let confirmDeleteOpen = $state(false);
+
+  const deleteMutation = createMutation({
+    mutationFn: () =>
+      mutateJSON(
+        'DELETE',
+        `/api/performances/${encodeURIComponent(slug)}?ws=${encodeURIComponent(workspaceSlug)}`,
+      ),
+    onSuccess: async () => {
+      confirmDeleteOpen = false;
+      dialogOpen = false;
+      void queryClient.invalidateQueries({ queryKey: ['calendar-performances'] });
+      void queryClient.invalidateQueries({ queryKey: ['money-performances'] });
+      void queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      addToast({ tone: 'success', message: 'Performance deleted.' });
+      await goto(`/h/${workspaceSlug}/calendar`);
+    },
+    onError: (err) => {
+      addToast({
+        tone: 'danger',
+        title: 'Not deleted',
+        message: err instanceof Error ? err.message : 'Unexpected error',
+      });
+    },
+  });
+
   // ── Venue entity (ADR-049) — after the `perf` derived: the toStore
   // callback runs on creation and would hit the TDZ otherwise. ─────────
   type VenueLite = {
     id: string;
     name: string;
     city: string | null;
+    country: string | null;
+    address: string | null;
+    capacity: number | null;
     timezone: string | null;
+    contacts: VenueContact[];
+    notes: string | null;
   };
 
   const venuesOptions = toStore(() => {
@@ -290,6 +325,95 @@
       });
     },
   });
+  // ── Venue edit (ADR-053): address, timezone (feeds dual-time on the
+  // road sheet), contacts, capacity, notes. PATCH /api/venues/:id — no
+  // RPC (venue_update RLS covers workspace members; ADR-048 only bites
+  // soft-deletes). ─────────────────────────────────────────────────────
+  type ContactDraft = { name: string; role: string; email: string; phone: string };
+
+  let venueEditOpen = $state(false);
+  let vName = $state('');
+  let vCity = $state('');
+  let vCountry = $state('');
+  let vAddress = $state('');
+  let vCapacity = $state('');
+  let vTimezone = $state('');
+  let vNotes = $state('');
+  let vContacts = $state<ContactDraft[]>([]);
+
+  // The native medium already knows every IANA zone — no bundled list.
+  const timezoneOptions =
+    typeof Intl.supportedValuesOf === 'function' ? Intl.supportedValuesOf('timeZone') : [];
+
+  function openVenueEdit() {
+    const venue = venues.find((vn) => vn.id === fVenueId);
+    if (!venue) return;
+    vName = venue.name;
+    vCity = venue.city ?? '';
+    vCountry = venue.country ?? '';
+    vAddress = venue.address ?? '';
+    vCapacity = venue.capacity != null ? String(venue.capacity) : '';
+    vTimezone = venue.timezone ?? '';
+    vNotes = venue.notes ?? '';
+    vContacts = (venue.contacts ?? []).map((c) => ({
+      name: c.name ?? '',
+      role: c.role ?? '',
+      email: c.email ?? '',
+      phone: c.phone ?? '',
+    }));
+    venueEditOpen = true;
+  }
+
+  function addContactRow() {
+    vContacts = [...vContacts, { name: '', role: '', email: '', phone: '' }];
+  }
+
+  function removeContactRow(index: number) {
+    vContacts = vContacts.filter((_, i) => i !== index);
+  }
+
+  const venuePatch = createMutation({
+    mutationFn: () =>
+      mutateJSON<{ venue: VenueLite }>('PATCH', `/api/venues/${fVenueId}`, {
+        name: vName.trim(),
+        city: vCity.trim() || null,
+        country: vCountry.trim() || null,
+        address: vAddress.trim() || null,
+        capacity: vCapacity.trim() ? Number(vCapacity) : null,
+        timezone: vTimezone.trim() || null,
+        notes: vNotes.trim() || null,
+        contacts: vContacts
+          .filter((c) => c.name.trim())
+          .map((c) => ({
+            name: c.name.trim(),
+            role: c.role.trim() || null,
+            email: c.email.trim() || null,
+            phone: c.phone.trim() || null,
+          })),
+      }),
+    onSuccess: (result) => {
+      venueEditOpen = false;
+      void queryClient.invalidateQueries({ queryKey: ['venues'] });
+      void queryClient.invalidateQueries({ queryKey: ['performance'] });
+      addToast({ tone: 'success', message: `Venue "${result?.venue.name ?? vName}" updated.` });
+    },
+    onError: (err) => {
+      addToast({
+        tone: 'danger',
+        title: 'Venue not saved',
+        message: err instanceof Error ? err.message : 'Unexpected error',
+      });
+    },
+  });
+
+  function saveVenue() {
+    if (!vName.trim()) {
+      addToast({ tone: 'warning', message: 'The venue needs a name.' });
+      return;
+    }
+    $venuePatch.mutate();
+  }
+
   let loading = $derived($query.isPending);
   let errorMsg = $derived($query.error instanceof Error ? $query.error.message : '');
 
@@ -515,6 +639,9 @@
     >
       Save fields as venue
     </Button>
+    <Button variant="outline" size="s" disabled={!fVenueId} onclick={openVenueEdit}>
+      Edit venue…
+    </Button>
   </div>
   <p class="perf__dialog-hint">
     A linked venue brings its timezone (dual-time on the road sheet), address and
@@ -542,9 +669,85 @@
       <input id="f-wrap" type="datetime-local" bind:value={fWrap} />
     </div>
   </div>
+  <div class="perf__danger">
+    <Button variant="outline" tone="warn" size="s" onclick={() => (confirmDeleteOpen = true)}>
+      Delete performance…
+    </Button>
+    <span class="perf__dialog-hint">For gigs created by mistake — a gig that fell through is status “cancelled”.</span>
+  </div>
   {#snippet actions()}
     <Button variant="outline" onclick={() => (dialogOpen = false)}>Cancel</Button>
     <Button onclick={saveEdit} loading={$patchMutation.isPending}>Save</Button>
+  {/snippet}
+</Dialog>
+
+<Dialog bind:open={venueEditOpen} title="Edit venue" size="m">
+  <p class="perf__dialog-hint">
+    The timezone drives dual-time on the road sheet. Contacts show in the
+    production block.
+  </p>
+  <div class="perf__form-grid">
+    <Input label="Name" bind:value={vName} required />
+    <Input label="City" bind:value={vCity} />
+    <Input label="Country" bind:value={vCountry} placeholder="ES" />
+    <Input label="Capacity" type="number" bind:value={vCapacity} />
+  </div>
+  <div class="perf__form-grid">
+    <Input label="Address" bind:value={vAddress} placeholder="Street, number, zip" />
+    <div class="field">
+      <label for="v-timezone">timezone</label>
+      <input
+        id="v-timezone"
+        list="v-timezone-list"
+        bind:value={vTimezone}
+        placeholder="Europe/Madrid"
+      />
+      <datalist id="v-timezone-list">
+        {#each timezoneOptions as tz (tz)}
+          <option value={tz}></option>
+        {/each}
+      </datalist>
+    </div>
+  </div>
+  <div class="perf__venue-contacts">
+    <p class="eyebrow">Contacts</p>
+    {#each vContacts as _, i (i)}
+      <div class="perf__contact-row">
+        <Input label={i === 0 ? 'Name' : undefined} bind:value={vContacts[i].name} placeholder="Name" />
+        <Input label={i === 0 ? 'Role' : undefined} bind:value={vContacts[i].role} placeholder="Tech manager…" />
+        <Input label={i === 0 ? 'Email' : undefined} type="email" bind:value={vContacts[i].email} placeholder="Email" />
+        <Input label={i === 0 ? 'Phone' : undefined} type="tel" bind:value={vContacts[i].phone} placeholder="Phone" />
+        <button
+          type="button"
+          class="perf__contact-remove"
+          aria-label="Remove contact"
+          onclick={() => removeContactRow(i)}
+        >×</button>
+      </div>
+    {/each}
+    <Button variant="outline" size="xs" onclick={addContactRow}>Add contact</Button>
+  </div>
+  <div class="field perf__venue-notes">
+    <label for="v-notes">notes</label>
+    <textarea id="v-notes" rows="3" bind:value={vNotes}></textarea>
+  </div>
+  {#snippet actions()}
+    <Button variant="outline" onclick={() => (venueEditOpen = false)}>Cancel</Button>
+    <Button onclick={saveVenue} loading={$venuePatch.isPending}>Save venue</Button>
+  {/snippet}
+</Dialog>
+
+<Dialog bind:open={confirmDeleteOpen} title="Delete performance" size="s">
+  <p>
+    This removes <strong>{title}</strong> ({perf ? dayLabel(perf.performed_at, 'short') : ''})
+    from the calendar, money and road sheet. Active invoices block deletion.
+  </p>
+  <p class="perf__dialog-hint">There is no undo from the UI.</p>
+  {#snippet actions()}
+    <Button variant="outline" onclick={() => (confirmDeleteOpen = false)}>Keep it</Button>
+    <Button variant="danger" onclick={() => $deleteMutation.mutate()} loading={$deleteMutation.isPending}>
+      Delete
+    </Button>
   {/snippet}
 </Dialog>
 
@@ -633,6 +836,47 @@
     }
     .perf__venue-link .field {
       flex: 1;
+    }
+
+    .perf__danger {
+      display: flex;
+      align-items: center;
+      gap: var(--space-m);
+      margin-block-start: var(--space-m);
+      padding-block-start: var(--space-m);
+      border-block-start: 1px solid var(--border-color-light);
+    }
+
+    .perf__venue-contacts {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-xs);
+      margin-block-start: var(--space-m);
+    }
+
+    .perf__contact-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr 1fr auto;
+      gap: var(--space-xs);
+      align-items: end;
+    }
+
+    .perf__contact-remove {
+      inline-size: 2rem;
+      block-size: 2rem;
+      border: 1px solid var(--border-color-light);
+      border-radius: var(--radius-s, 4px);
+      background: none;
+      color: var(--text-faint);
+      cursor: pointer;
+    }
+    .perf__contact-remove:hover {
+      color: var(--danger);
+      border-color: var(--danger);
+    }
+
+    .perf__venue-notes {
+      margin-block-start: var(--space-m);
     }
 
     .perf__section {

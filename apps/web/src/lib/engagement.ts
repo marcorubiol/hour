@@ -34,6 +34,23 @@ export function statusBadgeClass(status: string): string {
 }
 
 /**
+ * "YYYY-MM-DD that is a real calendar day". isoDate is regex-only
+ * (2026-02-31 passes it), so the round-trip check keeps impossible dates
+ * from reaching Postgres as a 5xx. One home — shared by the PATCH and
+ * CREATE next_action_at fields. (Valibot runs later pipe actions even
+ * when isoDate already failed, so the Invalid-Date guard sits before
+ * toISOString().)
+ */
+const realIsoDate = v.pipe(
+  v.string(),
+  v.isoDate(),
+  v.check((s) => {
+    const d = new Date(`${s}T00:00:00Z`);
+    return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;
+  }, 'Not a real calendar date'),
+);
+
+/**
  * PATCH /api/engagements/:id body. Whitelist of the fields the difusión
  * loop edits inline — unknown keys are stripped by the schema, so
  * RLS-sensitive columns (workspace_id, project_id, created_by…) can never
@@ -42,28 +59,40 @@ export function statusBadgeClass(status: string): string {
  */
 export const EngagementPatchSchema = v.object({
   status: v.optional(v.picklist(ENGAGEMENT_STATUSES)),
-  // isoDate is regex-only (accepts 2026-02-31); the round-trip check keeps
-  // impossible calendar dates from reaching Postgres as a 5xx.
-  next_action_at: v.optional(
-    v.nullable(
-      v.pipe(
-        v.string(),
-        v.isoDate(),
-        // Valibot runs later pipe actions even when isoDate already
-        // failed, so guard the Invalid Date case before toISOString().
-        v.check((s) => {
-          const d = new Date(`${s}T00:00:00Z`);
-          return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;
-        }, 'Not a real calendar date'),
-      ),
-    ),
-  ),
+  next_action_at: v.optional(v.nullable(realIsoDate)),
   next_action_note: v.optional(
     v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))),
   ),
 });
 
 export type EngagementPatch = v.InferOutput<typeof EngagementPatchSchema>;
+
+/**
+ * POST /api/engagements body (ADR-051). Two shapes, exactly one:
+ *   · person_id — link an existing person (server re-checks visibility)
+ *   · person    — inline fields; the RPC find-or-creates on email
+ * The endpoint enforces the exactly-one rule; the schema keeps both
+ * optional so the error message can be specific.
+ */
+export const EngagementCreateSchema = v.object({
+  project_id: v.pipe(v.string(), v.uuid()),
+  person_id: v.optional(v.pipe(v.string(), v.uuid())),
+  person: v.optional(
+    v.object({
+      full_name: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(200)),
+      email: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(254), v.email()))),
+      phone: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(40)))),
+      organization_name: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(200)))),
+      title: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(120)))),
+    }),
+  ),
+  status: v.optional(v.picklist(ENGAGEMENT_STATUSES), 'contacted'),
+  role: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(120)))),
+  next_action_at: v.optional(v.nullable(realIsoDate)),
+  next_action_note: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500)))),
+});
+
+export type EngagementCreate = v.InferOutput<typeof EngagementCreateSchema>;
 
 /**
  * Shape the engagement endpoints return: the row plus the person/project

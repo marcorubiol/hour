@@ -10,6 +10,13 @@
   import JsonKV, { hasJsonContent } from './JsonKV.svelte';
   import ScheduleTable from './ScheduleTable.svelte';
 
+  interface VenueContact {
+    name?: string;
+    role?: string | null;
+    email?: string | null;
+    phone?: string | null;
+  }
+
   interface VenueBlock {
     name: string;
     city: string | null;
@@ -17,6 +24,9 @@
     address: string | null;
     capacity: number | null;
     timezone: string | null;
+    /** venue.contacts jsonb (ADR-053) — tolerated loose: legacy rows may
+     * hold anything, so entries without a name are skipped. */
+    contacts?: Json;
   }
 
   interface Props {
@@ -55,6 +65,24 @@
 
   let venueTz = $derived(venue?.timezone ?? null);
 
+  let venueContacts = $derived.by((): VenueContact[] => {
+    const raw = venue?.contacts;
+    if (!Array.isArray(raw)) return [];
+    const rows: VenueContact[] = [];
+    for (const entry of raw) {
+      if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) continue;
+      const c = entry as Record<string, Json | undefined>;
+      if (typeof c.name !== 'string' || c.name === '') continue;
+      rows.push({
+        name: c.name,
+        role: typeof c.role === 'string' ? c.role : null,
+        email: typeof c.email === 'string' ? c.email : null,
+        phone: typeof c.phone === 'string' ? c.phone : null,
+      });
+    }
+    return rows;
+  });
+
   let placeLine = $derived(
     [venue?.city ?? city, venue?.country ?? country].filter(Boolean).join(', '),
   );
@@ -84,6 +112,18 @@
       {#if venue?.capacity && venueTz} · {/if}
       {#if venueTz}{venueTz}{/if}
     </span>
+    {#if venueContacts.length > 0}
+      <ul class="production__contacts" role="list">
+        {#each venueContacts as c, i (i)}
+          <li>
+            <span class="production__contact-name">{c.name}</span>
+            {#if c.role}<span class="production__contact-role">{c.role}</span>{/if}
+            {#if c.phone}<a href={`tel:${c.phone}`}>{c.phone}</a>{/if}
+            {#if c.email}<a href={`mailto:${c.email}`}>{c.email}</a>{/if}
+          </li>
+        {/each}
+      </ul>
+    {/if}
   </div>
 
   <ScheduleTable
@@ -137,6 +177,32 @@
     }
 
     .production__venue-meta {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      letter-spacing: 0.04em;
+      color: var(--text-faint);
+    }
+
+    .production__contacts {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2xs);
+      margin-block-start: var(--space-xs);
+    }
+
+    .production__contacts li {
+      display: flex;
+      gap: var(--space-s);
+      align-items: baseline;
+      font-size: var(--text-s);
+      flex-wrap: wrap;
+    }
+
+    .production__contact-name {
+      color: var(--text-color);
+    }
+
+    .production__contact-role {
       font-family: var(--font-mono);
       font-size: var(--text-xs);
       letter-spacing: 0.04em;

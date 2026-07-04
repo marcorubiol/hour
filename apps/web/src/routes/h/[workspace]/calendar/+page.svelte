@@ -21,7 +21,7 @@
   import { toStore } from 'svelte/store';
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
-  import { fetchJSON } from '$lib/api';
+  import { fetchJSON, mutateJSON } from '$lib/api';
   import Button from '$lib/components/Button.svelte';
   import Dialog from '$lib/components/Dialog.svelte';
   import Input from '$lib/components/Input.svelte';
@@ -321,6 +321,83 @@
     });
   }
 
+  // ── Calendar feed links (ADR-054) ────────────────────────────────────
+  type FeedShare = { id: string; token: string; workspace_id: string; created_at: string };
+
+  let feedOpen = $state(false);
+  let feedWs = $state('');
+
+  let feedWsOptions = $derived(
+    ($workspacesQuery.data?.items ?? []).map((w) => ({ value: w.id, label: w.name })),
+  );
+
+  function openFeed() {
+    if (!feedWs) {
+      const current = workspacesBySlug.get(page.params.workspace ?? '');
+      feedWs = current?.id ?? feedWsOptions[0]?.value ?? '';
+    }
+    feedOpen = true;
+  }
+
+  const feedSharesOptions = toStore(() => {
+    const ws = feedWs;
+    return {
+      queryKey: ['calendar-shares', ws] as const,
+      enabled: feedOpen && Boolean(ws),
+      queryFn: ({ signal }: { signal: AbortSignal }) =>
+        fetchJSON<{ items: FeedShare[] }>(
+          `/api/calendar-shares?workspace_id=${encodeURIComponent(ws)}`,
+          signal,
+        ),
+    };
+  });
+  const feedSharesQuery = createQuery(feedSharesOptions);
+  let feedShares = $derived($feedSharesQuery.data?.items ?? []);
+
+  function feedUrl(token: string): string {
+    return `${location.origin}/api/public/calendar/${token}`;
+  }
+
+  async function copyFeedUrl(token: string, scheme: 'https' | 'webcal') {
+    const url =
+      scheme === 'webcal' ? feedUrl(token).replace(/^https?:/, 'webcal:') : feedUrl(token);
+    await navigator.clipboard.writeText(url);
+    addToast({ tone: 'success', message: `${scheme === 'webcal' ? 'webcal' : 'https'} link copied.` });
+  }
+
+  const createFeed = createMutation({
+    mutationFn: () =>
+      mutateJSON<{ share: FeedShare }>('POST', '/api/calendar-shares', {
+        workspace_id: feedWs,
+      }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['calendar-shares'] });
+      addToast({ tone: 'success', message: 'Feed link created.' });
+    },
+    onError: (err) => {
+      addToast({
+        tone: 'danger',
+        title: 'Feed not created',
+        message: err instanceof Error ? err.message : 'Unexpected error',
+      });
+    },
+  });
+
+  const revokeFeed = createMutation({
+    mutationFn: (id: string) => mutateJSON('DELETE', `/api/calendar-shares/${id}`),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['calendar-shares'] });
+      addToast({ tone: 'success', message: 'Feed link revoked — subscribers stop updating now.' });
+    },
+    onError: (err) => {
+      addToast({
+        tone: 'danger',
+        title: 'Not revoked',
+        message: err instanceof Error ? err.message : 'Unexpected error',
+      });
+    },
+  });
+
   const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 </script>
 
@@ -337,6 +414,7 @@
         <button class="btn--outline btn--s" onclick={prevMonth} aria-label="Previous month">←</button>
         <button class="btn--outline btn--s" onclick={thisMonth}>Today</button>
         <button class="btn--outline btn--s" onclick={nextMonth} aria-label="Next month">→</button>
+        <Button variant="outline" size="s" onclick={openFeed}>Feed</Button>
         <Button size="s" onclick={() => openCreate()}>New performance</Button>
       </div>
     </div>
@@ -433,6 +511,53 @@
   {/snippet}
 </Dialog>
 
+<Dialog bind:open={feedOpen} title="Calendar feed" size="m">
+  <p class="cal__feed-hint">
+    Subscribe from Google/Apple Calendar: confirmed gigs and dates stay in
+    sync — no copying by hand. The link is the key: anyone holding it sees
+    the feed (never money, never notes) until you revoke it.
+  </p>
+  <Select label="Workspace" options={feedWsOptions} bind:value={feedWs} />
+  {#if $feedSharesQuery.isPending && feedWs}
+    <p class="cal__feed-hint">Loading…</p>
+  {:else if feedShares.length === 0}
+    <p class="cal__feed-hint">No feed links yet for this workspace.</p>
+  {:else}
+    <ul class="cal__feed-list" role="list">
+      {#each feedShares as share (share.id)}
+        <li class="cal__feed-row">
+          <code class="cal__feed-token">…{share.token.slice(-8)}</code>
+          <Button variant="outline" size="xs" onclick={() => copyFeedUrl(share.token, 'https')}>
+            Copy link
+          </Button>
+          <Button variant="outline" size="xs" onclick={() => copyFeedUrl(share.token, 'webcal')}>
+            Copy webcal
+          </Button>
+          <Button
+            variant="outline"
+            tone="warn"
+            size="xs"
+            loading={$revokeFeed.isPending}
+            onclick={() => $revokeFeed.mutate(share.id)}
+          >
+            Revoke
+          </Button>
+        </li>
+      {/each}
+    </ul>
+  {/if}
+  {#snippet actions()}
+    <Button variant="outline" onclick={() => (feedOpen = false)}>Close</Button>
+    <Button
+      onclick={() => $createFeed.mutate()}
+      loading={$createFeed.isPending}
+      disabled={!feedWs}
+    >
+      New feed link
+    </Button>
+  {/snippet}
+</Dialog>
+
 <style>
   @layer components {
     .cal {
@@ -473,6 +598,33 @@
       font-size: var(--text-xs);
       letter-spacing: 0.04em;
       color: var(--text-faint);
+    }
+
+    .cal__feed-hint {
+      font-size: var(--text-xs);
+      color: var(--text-faint);
+    }
+
+    .cal__feed-list {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-xs);
+      margin-block-start: var(--space-s);
+    }
+
+    .cal__feed-row {
+      display: flex;
+      align-items: center;
+      gap: var(--space-s);
+      padding-block: var(--space-xs);
+      border-block-end: 1px solid var(--border-color-light);
+    }
+
+    .cal__feed-token {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      flex: 1;
     }
 
     .cal__state {

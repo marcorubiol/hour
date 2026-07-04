@@ -21,6 +21,13 @@ Antes de cualquier trabajo: leer primero el [`_context.md`](../_context.md) del 
  
 ### Current next action
 
+> **Nota 2026-07-04 — CIERRE NIVEL 1 COMPLETO (ADR-051→055), en producción.**
+> El bloque nivel 1 que dejó pendiente la maratón está cerrado y desplegado: **1a** alta de persona+engagement desde la UI (ADR-051), **1b** delete de performance (ADR-052), **1c** venue editable — address/timezone/contacts (ADR-053), más dos huecos de borde detectados en el gap analysis de la mañana: **1d** feed ICS suscribible (ADR-054) y **1e** Today "¿qué hago ahora?" cross-workspace, muere la convención 1-project-per-workspace (ADR-055). La app ahora se **alimenta** desde la UI, no solo se opera — un contacto de feria entra sin SQL, y los bolos confirmados son suscribibles en Google/Apple Calendar. Verificado: 4 migraciones aplicadas + grants auditados, **RLS 30/30 · unit 79/79 · e2e 14/14** contra producción, review adversarial de 5 lentes + verificación ICS/SQL con 9 findings corregidos (incluido un HIGH real: un e2e que podía soft-borrar datos reales de muk-cia). Detalle: `_notes/sessions-log.md § 2026-07-04` + `_decisions.md § ADR-051→055`.
+>
+> **Numeración**: el `_tasks.md` de la mañana reservaba ADR-055 para el rediseño de módulos de line detail; como 051-055 los tomó este cierre (ya en producción y en `_decisions.md`), el rediseño de módulos pasa a **ADR-056** (marcado en `_tasks.md` para ratificar).
+>
+> **El gate de verdad sigue igual**: tras los módulos (ADR-056), PARAR y usar Hour con la difusión real ~1 mes. El veredicto es de Marco, no de código.
+
 > **Nota 2026-07-02 cierre de maratón (ADR-040→050) — ESTADO Y PLAN DE CIERRE.**
 > Dónde estamos: Phase 0.2 ✓ · Phase 0.3 esencialmente ✓ (las 4 lenses vivas: Today/Plaza, Calendar, Contacts, Money; falta item 3 — project detail tabs) · adelantos de 0.5 en producción (inline status ADR-040, invoice creation ADR-050, D6 link público parcial ADR-047, venue enlazable ADR-049). El ciclo difusión→hold→confirmed→producción→road sheet→factura se opera ENTERO dentro de Hour. Suite 11/11 e2e producción + 53/53 unit + 19/19 RLS. Detalle de la sesión: `_notes/sessions-log.md § 2026-07-01/02`.
 >

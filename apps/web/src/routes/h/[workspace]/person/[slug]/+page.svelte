@@ -10,11 +10,13 @@
   import { page } from '$app/state';
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
-  import { fetchJSON } from '$lib/api';
+  import { fetchJSON, mutateJSON } from '$lib/api';
   import Button from '$lib/components/Button.svelte';
+  import Dialog from '$lib/components/Dialog.svelte';
+  import Select from '$lib/components/Select.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
   import { decodeJwtSub } from '$lib/realtime/client';
-  import { statusBadgeClass, statusLabel } from '$lib/engagement';
+  import { ENGAGEMENT_STATUSES, statusBadgeClass, statusLabel } from '$lib/engagement';
   import { dayLabel } from '$lib/datetime';
 
   type PersonFile = {
@@ -187,6 +189,62 @@
     });
   }
 
+  // ── Add to project (ADR-051): a new conversation for this person ────
+  type ProjectItem = { id: string; slug: string; name?: string };
+
+  const projectsQuery = createQuery({
+    queryKey: ['projects', { status: 'active' }],
+    queryFn: ({ signal }: { signal: AbortSignal }) =>
+      fetchJSON<{ items: ProjectItem[] }>('/api/projects?status=active', signal),
+  });
+
+  let addOpen = $state(false);
+  let aProject = $state('');
+  let aStatus = $state('contacted');
+
+  let projectOptions = $derived.by(() => {
+    // Offer only projects without a live conversation for this person.
+    const taken = new Set((file?.engagements ?? []).map((e) => e.project?.id));
+    return ($projectsQuery.data?.items ?? [])
+      .filter((p) => !taken.has(p.id))
+      .map((p) => ({ value: p.id, label: p.name ?? p.slug }));
+  });
+  let addStatusOptions = ENGAGEMENT_STATUSES.map((s) => ({
+    value: s,
+    label: statusLabel(s),
+  }));
+
+  const addEngagement = createMutation({
+    mutationFn: () =>
+      mutateJSON<{ engagement: unknown }>('POST', '/api/engagements', {
+        project_id: aProject,
+        person_id: file!.person.id,
+        status: aStatus,
+      }),
+    onSuccess: () => {
+      addOpen = false;
+      aProject = '';
+      void queryClient.invalidateQueries({ queryKey: ['person', slug] });
+      void queryClient.invalidateQueries({ queryKey: ['engagements'] });
+      addToast({ tone: 'success', message: 'Added to project.' });
+    },
+    onError: (err) => {
+      addToast({
+        tone: 'danger',
+        title: 'Not added',
+        message: err instanceof Error ? err.message : 'Unexpected error',
+      });
+    },
+  });
+
+  function submitAddEngagement() {
+    if (!aProject) {
+      addToast({ tone: 'warning', message: 'Pick a project.' });
+      return;
+    }
+    $addEngagement.mutate();
+  }
+
   let placeLine = $derived(
     file ? [file.person.city, file.person.country].filter(Boolean).join(', ') : '',
   );
@@ -236,9 +294,14 @@
       </ul>
     </section>
 
-    {#if file.engagements.length > 0}
-      <section class="person__section" aria-label="Engagements">
+    <section class="person__section" aria-label="Engagements">
+      <div class="person__section-head">
         <p class="eyebrow">Engagements</p>
+        <Button variant="outline" size="xs" onclick={() => (addOpen = true)}>
+          Add to project
+        </Button>
+      </div>
+      {#if file.engagements.length > 0}
         <ul class="person__rows" role="list">
           {#each file.engagements as e (e.id)}
             <li>
@@ -255,8 +318,8 @@
             </li>
           {/each}
         </ul>
-      </section>
-    {/if}
+      {/if}
+    </section>
 
     <section class="person__section" aria-label="Notes">
       <p class="eyebrow">Notes</p>
@@ -330,6 +393,29 @@
   {/if}
 </article>
 
+<Dialog bind:open={addOpen} title="Add to project" size="s">
+  <div class="person__add-grid">
+    <Select
+      label="Project"
+      options={projectOptions}
+      bind:value={aProject}
+      placeholder={projectOptions.length === 0 ? 'Already in every active project' : undefined}
+      required
+    />
+    <Select label="Status" options={addStatusOptions} bind:value={aStatus} />
+  </div>
+  {#snippet actions()}
+    <Button variant="outline" onclick={() => (addOpen = false)}>Cancel</Button>
+    <Button
+      onclick={submitAddEngagement}
+      loading={$addEngagement.isPending}
+      disabled={projectOptions.length === 0}
+    >
+      Add
+    </Button>
+  {/snippet}
+</Dialog>
+
 <style>
   @layer components {
     .person {
@@ -389,6 +475,20 @@
       display: flex;
       flex-direction: column;
       gap: var(--space-s);
+    }
+
+    .person__section-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: var(--space-m);
+    }
+
+    .person__add-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+      gap: var(--space-s) var(--space-m);
+      margin-block-start: var(--space-s);
     }
 
     .person__contact li {

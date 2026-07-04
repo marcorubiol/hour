@@ -4,10 +4,8 @@
 > `build/roadmap.md § Current next action` + `_notes/sessions-log.md § 2026-07-01/02`.
 
 ## Queue
-- [ ] Cierre nivel 1a — alta de personas + engagements desde la UI (Contacts). No existe `POST /api/persons` ni `POST /api/engagements` — la difusión no puede capturar un contacto/conversación nueva sin SQL. El hueco #1. INSERT claim-bound esperado → RPCs patrón ADR-043/045/047/049/050.
-- [ ] Cierre nivel 1b — delete/cancel de performance. Gigs creados por error no se pueden borrar (lo arrastra ADR-043); soft-delete solo vía RPC (ADR-048). Desbloquea también el self-cleaning del e2e performance-write (hoy acumula `e2e-venue-*`, purga manual documentada en `build/runbooks/test-user-setup.md`).
-- [ ] Cierre nivel 1c — edición de venue: address / timezone / contacts. Hoy solo picker + promote (ADR-049); sin timezone la dual-time del road sheet sigue coja.
-- [ ] System-completeness gate (0.3): tras el bloque 1a-1c, PARAR de construir y usar Hour con la difusión real ~1 mes. El veredicto es de Marco, no de código.
+- [ ] Rediseño — line detail como composición de módulos (**ADR-056**; ⚠️ era ADR-055, renumerado: 051-055 los tomó el bloque de cierre nivel 1 el 2026-07-04 — confirmar con Marco): migración `engagement.line_id` + `line.modules` + target `'line'` en collab, shell de composición, plantillas Gira + Difusión primero (nuevos pequeños: Road sheets index, Materials registry, People). Resto de plantillas = presets const al activarse. El picker de plantillas sustituye el dropdown de 10 kinds.
+- [ ] System-completeness gate (0.3): el bloque 1a-1e YA está (ADR-051→055, producción 2026-07-04); tras los módulos (ADR-056), PARAR de construir y usar Hour con la difusión real ~1 mes. El veredicto es de Marco, no de código.
 
 ## Deferred
 - [ ] Phase 0.4 polish — mobile completo (Plaza/Calendar/Money), ⌘K, notifications in-app, GDPR export, a11y pass, checkpoint visual 2, ratificación naming @from:2026-08-01
@@ -22,6 +20,12 @@
 - [ ] Upstream issue a y-partyserver: workerd entrega frames WS como Blob @shelf
 
 ## Trace
+- [x] Cierre nivel 1a — alta persona + engagement desde la UI (ADR-051): create_engagement/delete_engagement RPC, POST/DELETE /api/engagements, dialogs Add contact + Add to project
+- [x] Cierre nivel 1b — delete de performance (ADR-052): delete_performance RPC (facturas vivas bloquean), confirm en el detalle, e2e self-cleaning
+- [x] Cierre nivel 1c — venue editable (ADR-053): PATCH /api/venues/:id, dialog timezone+contacts, display en Production
+- [x] Cierre nivel 1d — ICS feed suscribible (ADR-054): calendar_share + RPCs, $lib/ics.ts, /api/public/calendar/:token, dialog Feed
+- [x] Cierre nivel 1e — Today "¿qué hago ahora?" (ADR-055): next actions vencidas cross-workspace, stats reales, muere 1-project-per-workspace
+- [x] Review adversarial (5 lentes) + verificación ICS/SQL: 9 findings corregidos (incl. HIGH e2e que podía borrar datos reales) · migraciones aplicadas + grants verificados · RLS 30/30 + unit 79/79 + e2e 14/14 contra prod
 - [x] ADR-040→046 — write paths + 4 lenses (engagement inline, calendar+detail+roadsheet, collab, create/edit performance, Contacts, person detail, Money)
 - [x] ADR-047 — road sheet público con links firmados revocables (D6 parcial)
 - [x] ADR-048 — misterio RLS soft-delete resuelto → regla: siempre RPC; botón borrar nota

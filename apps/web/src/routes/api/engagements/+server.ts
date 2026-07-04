@@ -17,9 +17,10 @@ import { extractBearer } from '$lib/auth';
 import {
   ENGAGEMENT_SELECT,
   ENGAGEMENT_STATUSES,
+  EngagementCreateSchema,
   type EngagementItem,
 } from '$lib/engagement';
-import { pgGet, PostgrestError, type SupabaseEnv } from '$lib/supabase';
+import { pgGet, pgPostRpc, PostgrestError, type SupabaseEnv } from '$lib/supabase';
 
 const QuerySchema = v.object({
   status: v.optional(
@@ -168,6 +169,88 @@ export const GET: RequestHandler = async ({ request, url, platform }) => {
         { error: 'postgrest_error', status: err.status, detail: err.body },
         upstream,
       );
+    }
+    return json({ error: 'unexpected', detail: String(err) }, 500);
+  }
+};
+
+/**
+ * POST /api/engagements — capture a contact/conversation (ADR-051).
+ *
+ * Body: EngagementCreateSchema — project_id plus EXACTLY ONE of
+ * `person_id` (existing person) or `person` (inline fields; the RPC
+ * find-or-creates on email). Goes through the `create_engagement` RPC
+ * (SECURITY DEFINER): the direct INSERT is claim-bound — sixth case of
+ * the pattern. Gated on has_permission(project, 'edit:engagement').
+ *
+ * 409 engagement_exists: the (workspace, project, person) pair already
+ * has a conversation — the UI links to it instead of silently merging.
+ */
+export const POST: RequestHandler = async ({ request, platform }) => {
+  if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);
+  const env = platform.env as unknown as SupabaseEnv;
+
+  const jwt = extractBearer(request);
+  if (!jwt) return json({ error: 'missing_authorization' }, 401);
+
+  let raw: unknown;
+  try {
+    raw = await request.json();
+  } catch {
+    return json({ error: 'invalid_body' }, 400);
+  }
+  const parsed = v.safeParse(EngagementCreateSchema, raw);
+  if (!parsed.success) {
+    return json(
+      {
+        error: 'invalid_body',
+        issues: parsed.issues.map((i) => ({
+          path: i.path?.map((p) => p.key).join('.'),
+          message: i.message,
+        })),
+      },
+      400,
+    );
+  }
+  const input = parsed.output;
+
+  if (Boolean(input.person_id) === Boolean(input.person)) {
+    return json(
+      { error: 'invalid_body', hint: 'Send exactly one of person_id or person.' },
+      400,
+    );
+  }
+
+  try {
+    const { data } = await pgPostRpc<Record<string, unknown>>(env, 'create_engagement', jwt, {
+      p_project_id: input.project_id,
+      p_person_id: input.person_id ?? null,
+      p_full_name: input.person?.full_name ?? null,
+      p_email: input.person?.email ?? null,
+      p_phone: input.person?.phone ?? null,
+      p_organization_name: input.person?.organization_name ?? null,
+      p_title: input.person?.title ?? null,
+      p_status: input.status,
+      p_role: input.role ?? null,
+      p_next_action_at: input.next_action_at ?? null,
+      p_next_action_note: input.next_action_note ?? null,
+    });
+    if (data.length === 0 || !data[0]) return json({ error: 'create_failed' }, 502);
+    return json({ engagement: data[0] }, 201);
+  } catch (err) {
+    if (err instanceof PostgrestError) {
+      // RPC RAISEs: 22023 invalid input → 400, 42501 permission → 403,
+      // 23505 (ws, project, person) unique → 409.
+      if (err.code === '22023') return json({ error: 'invalid_input', detail: err.body }, 400);
+      if (err.code === '42501') return json({ error: 'forbidden' }, 403);
+      if (err.code === '23505') {
+        return json(
+          { error: 'engagement_exists', hint: 'This person already has a conversation in this project.' },
+          409,
+        );
+      }
+      const upstream = err.status === 401 ? 401 : 502;
+      return json({ error: 'postgrest_error', status: err.status, detail: err.body }, upstream);
     }
     return json({ error: 'unexpected', detail: String(err) }, 500);
   }

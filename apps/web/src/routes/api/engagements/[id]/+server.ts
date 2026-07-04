@@ -22,7 +22,7 @@ import {
   EngagementPatchSchema,
   type EngagementItem,
 } from '$lib/engagement';
-import { pgPatch, PostgrestError, type SupabaseEnv } from '$lib/supabase';
+import { pgPatch, pgPostRpc, PostgrestError, type SupabaseEnv } from '$lib/supabase';
 
 const IdSchema = v.pipe(v.string(), v.uuid());
 
@@ -97,6 +97,50 @@ export const PATCH: RequestHandler = async ({ request, params, platform }) => {
         { error: 'postgrest_error', status: err.status, detail: err.body },
         upstream,
       );
+    }
+    return json({ error: 'unexpected', detail: String(err) }, 500);
+  }
+};
+
+/**
+ * DELETE /api/engagements/:id — soft-delete a mistyped contact capture
+ * (ADR-051). Goes through the `delete_engagement` RPC (ADR-048 rule:
+ * soft-deletes never ride a client PATCH). Gated on
+ * has_permission(project, 'edit:engagement').
+ *
+ * Live performances referencing the conversation block deletion (409).
+ * Re-adding the same person to the project later resurrects the row
+ * (create_engagement handles the FULL unique constraint).
+ */
+export const DELETE: RequestHandler = async ({ request, params, platform }) => {
+  if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);
+  const env = platform.env as unknown as SupabaseEnv;
+
+  const jwt = extractBearer(request);
+  if (!jwt) return json({ error: 'missing_authorization' }, 401);
+
+  const idParsed = v.safeParse(IdSchema, params.id);
+  if (!idParsed.success) return json({ error: 'invalid_id' }, 400);
+
+  try {
+    await pgPostRpc(env, 'delete_engagement', jwt, { p_engagement_id: params.id });
+    return new Response(null, { status: 204 });
+  } catch (err) {
+    if (err instanceof PostgrestError) {
+      // 42501 collapses not-found and no-permission → 404 (no oracle);
+      // 23503 → live performances reference the conversation.
+      if (err.code === '42501') return json({ error: 'not_found' }, 404);
+      if (err.code === '23503') {
+        return json(
+          {
+            error: 'engagement_has_performances',
+            hint: 'Unlink or delete its performances first.',
+          },
+          409,
+        );
+      }
+      const upstream = err.status === 401 ? 401 : 502;
+      return json({ error: 'postgrest_error', status: err.status, detail: err.body }, upstream);
     }
     return json({ error: 'unexpected', detail: String(err) }, 500);
   }

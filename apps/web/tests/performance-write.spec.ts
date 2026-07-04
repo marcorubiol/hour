@@ -10,8 +10,11 @@ const PASSWORD = process.env.PW_TEST_PASSWORD;
  * Everything happens in the test user's own `playwright` workspace
  * (project zzz-e2e-collab, created by collab.spec's fixture bootstrap) —
  * invisible to every other workspace. Created gigs use a unique date per
- * run, so slugs never collide; rows accumulate in the fixture workspace
- * and get purged via MCP occasionally.
+ * run, so slugs never collide.
+ *
+ * Self-cleaning (ADR-052): the final test deletes the run's gigs — one
+ * through the UI confirm dialog (exercising the delete path), the rest
+ * via the API. No more e2e-venue-* accumulation, no manual MCP purge.
  */
 
 async function login(page: Page) {
@@ -33,6 +36,10 @@ function runDay(): string {
 
 test.describe('performance write path', () => {
   test.skip(!EMAIL || !PASSWORD, 'Set PW_TEST_EMAIL / PW_TEST_PASSWORD.');
+  // Serial: the delete test consumes the gig the create test makes, and
+  // the sweep must not race the create/ordering tests (fullyParallel is
+  // on globally). Same idiom as collab.spec.ts.
+  test.describe.configure({ mode: 'serial' });
 
   test('create from calendar → detail → status + schedule edits persist', async ({
     page,
@@ -139,5 +146,88 @@ test.describe('performance write path', () => {
     );
     if (result.skipped) test.skip(true, 'no fixture gig for this run');
     expect(result.status).toBe(400);
+  });
+
+  test('delete performance: UI confirm removes the gig, API sweeps the rest (ADR-052)', async ({
+    page,
+  }) => {
+    test.setTimeout(90_000);
+    const day = runDay();
+
+    await login(page);
+
+    // CRITICAL: scope every list to the `playwright` fixture workspace AND
+    // the fixture venue prefix. The test user is admin of `muk-cia` (real
+    // production data) — an unscoped date query would return, and the
+    // sweep would hard-delete, any real gig that happens to share the run
+    // day. Never let this test see a row it didn't create.
+    const fixture = await page.evaluate(
+      async ({ d }) => {
+        const jwt = localStorage.getItem('hour_jwt');
+        const ws = await fetch('/api/workspaces', {
+          headers: { Authorization: `Bearer ${jwt}` },
+        });
+        const workspaces = ((await ws.json()) as { items: Array<{ id: string; slug: string }> })
+          .items;
+        const wsId = workspaces.find((w) => w.slug === 'playwright')?.id ?? '';
+        if (!wsId) return { wsId: '', items: [] as Array<{ id: string; slug: string | null; venue_name: string | null }> };
+        const res = await fetch(
+          `/api/performances?status=any&from=${d}&to=${d}&workspace_ids=${wsId}`,
+          { headers: { Authorization: `Bearer ${jwt}` } },
+        );
+        const data = (await res.json()) as {
+          items: Array<{ id: string; slug: string | null; venue_name: string | null }>;
+        };
+        // Only rows this suite created (E2E Venue prefix, ADR-043 create test).
+        const mine = data.items.filter((i) => i.venue_name?.startsWith('E2E Venue'));
+        return { wsId, items: mine };
+      },
+      { d: day },
+    );
+    if (!fixture.wsId) test.skip(true, 'playwright workspace not resolved');
+    if (fixture.items.length === 0) test.skip(true, 'no fixture gig for this run');
+
+    // Delete the first one through the UI: edit dialog → danger zone →
+    // confirm dialog → lands on the calendar.
+    const first = fixture.items[0];
+    await page.goto(`/h/playwright/performance/${first.slug ?? first.id}`);
+    await page.getByRole('button', { name: 'Edit details' }).click();
+    const edit = page.locator('dialog[open]').filter({ hasText: 'Edit performance' });
+    await edit.getByRole('button', { name: 'Delete performance…' }).click();
+    const confirm = page
+      .locator('dialog[open]')
+      .filter({ hasText: 'There is no undo from the UI.' });
+    await confirm.getByRole('button', { name: 'Delete', exact: true }).click();
+    await page.waitForURL(/\/h\/playwright\/calendar/, { timeout: 15_000 });
+
+    // Sweep the remainder — still workspace + prefix scoped, never touching
+    // any workspace but `playwright`.
+    const sweep = await page.evaluate(
+      async ({ d, wsId }) => {
+        const jwt = localStorage.getItem('hour_jwt');
+        const listMine = async () => {
+          const res = await fetch(
+            `/api/performances?status=any&from=${d}&to=${d}&workspace_ids=${wsId}`,
+            { headers: { Authorization: `Bearer ${jwt}` } },
+          );
+          const data = (await res.json()) as {
+            items: Array<{ id: string; venue_name: string | null }>;
+          };
+          return data.items.filter((i) => i.venue_name?.startsWith('E2E Venue'));
+        };
+        const statuses: number[] = [];
+        for (const item of await listMine()) {
+          const del = await fetch(`/api/performances/${item.id}`, {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${jwt}` },
+          });
+          statuses.push(del.status);
+        }
+        return { statuses, remaining: (await listMine()).length };
+      },
+      { d: day, wsId: fixture.wsId },
+    );
+    expect(sweep.statuses.every((s) => s === 204)).toBe(true);
+    expect(sweep.remaining).toBe(0);
   });
 });

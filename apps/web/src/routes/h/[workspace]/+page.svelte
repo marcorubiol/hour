@@ -1,27 +1,28 @@
 <script lang="ts">
   /**
-   * Today — editorial dashboard (ADR-033, design system v0.5).
+   * Today — "what do I do now?" (ADR-033 shell; refocused 2026-07-04,
+   * cierre nivel 1e).
    *
-   * Masthead → stats → "Everything on your plate" week table → "What's alive
-   * right now" project rows.
+   * Masthead → real stats → "Next actions" table (overdue first, then
+   * today/this week — cross-workspace, everything RLS allows) → "What's
+   * alive" workspace rows with real gig counts.
    *
-   * Data sources (Phase 0, mocked):
+   * Data sources (all real):
    * - Workspaces: TanStack ['workspaces'] (cached by Plaza).
-   * - Active projects: TanStack ['projects', { status: 'active' }] (cached by Plaza).
-   * - Engagements: TanStack ['engagements', workspace] — scoped to URL
-   *   workspace. Cross-workspace aggregation deferred to Phase 0.2 (the
-   *   endpoint requires project_slug today).
-   *
-   * Where data isn't derivable from the current schema (shows by status),
-   * placeholders ("—") are honest about it instead of fabricating.
+   * - Active projects: TanStack ['projects', { status: 'active' }].
+   * - Engagements: ['engagements', 'today'] — cross-workspace (the old
+   *   "1 project per workspace" convention is gone). Sorted by the API as
+   *   next_action_at.asc.nullslast, so due rows always arrive first.
+   * - Performances: ['today-performances'] — upcoming, for confirmed /
+   *   on-hold counts (derivable since ADR-041; the "—" placeholders era
+   *   is over).
    */
 
   import { page } from '$app/state';
-  import { goto } from '$app/navigation';
   import { createQuery } from '@tanstack/svelte-query';
+  import { fetchJSON } from '$lib/api';
   import { accentVar, accentVarFor } from '$lib/utils/accent';
   import { decodeJwtClaim } from '$lib/realtime';
-  import Pill from '$lib/components/Pill.svelte';
   import TagChip from '$lib/components/TagChip.svelte';
 
   type Workspace = {
@@ -54,11 +55,13 @@
     id: string;
     status: EngagementStatus;
     role: string | null;
+    workspace_id: string;
     next_action_at: string | null;
     next_action_note: string | null;
     updated_at: string;
     custom_fields: Record<string, unknown> | null;
     person: {
+      slug: string | null;
       full_name: string | null;
       organization_name: string | null;
     } | null;
@@ -69,32 +72,14 @@
     } | null;
   };
 
+  type PerformanceLite = {
+    id: string;
+    status: string;
+    performed_at: string;
+    project: { workspace_id: string } | null;
+  };
+
   let workspaceSlug = $derived(page.params.workspace ?? '');
-
-  function clearAuthAndBounce() {
-    localStorage.removeItem('hour_jwt');
-    localStorage.removeItem('hour_refresh');
-    localStorage.removeItem('hour_expires_at');
-    goto('/login', { replaceState: true });
-  }
-
-  async function fetchJSON<T>(url: string, signal: AbortSignal): Promise<T> {
-    const jwt = localStorage.getItem('hour_jwt');
-    if (!jwt) {
-      clearAuthAndBounce();
-      throw new Error('Missing JWT');
-    }
-    const res = await fetch(url, {
-      signal,
-      headers: { Authorization: `Bearer ${jwt}` },
-    });
-    if (res.status === 401) {
-      clearAuthAndBounce();
-      throw new Error('Unauthorized');
-    }
-    if (!res.ok) throw new Error(`Error ${res.status}`);
-    return (await res.json()) as T;
-  }
 
   const workspacesQuery = createQuery({
     queryKey: ['workspaces'],
@@ -107,32 +92,40 @@
       fetchJSON<{ items: Project[] }>('/api/projects?status=active', signal),
   });
 
-  // Engagements scoped to the URL workspace's first active project (Phase 0
-  // convention: 1 project per workspace). When a workspace has 0 projects
-  // the query stays disabled and the week renders empty.
-  let firstProjectSlug = $derived.by(() => {
-    const ws = $workspacesQuery.data?.items.find((h) => h.slug === workspaceSlug);
-    if (!ws) return null;
-    const r = $projectsQuery.data?.items.find((r) => r.workspace_id === ws.id);
-    return r?.slug ?? null;
-  });
-
+  // Cross-workspace: everything RLS allows, no project_slug scoping. The
+  // API orders next_action_at.asc.nullslast — rows with a due action are
+  // always inside the first page even when the total exceeds the limit.
   const engagementsQuery = createQuery({
-    get queryKey() {
-      return ['engagements', firstProjectSlug ?? ''];
-    },
+    queryKey: ['engagements', 'today'],
     queryFn: ({ signal }: { signal: AbortSignal }) =>
       fetchJSON<{ total: number; items: Engagement[] }>(
-        `/api/engagements?project_slug=${encodeURIComponent(firstProjectSlug ?? '')}&status=any&limit=100`,
+        '/api/engagements?status=any&limit=100',
         signal,
       ),
-    get enabled() {
-      return !!firstProjectSlug;
-    },
   });
 
   let engagements = $derived($engagementsQuery.data?.items ?? []);
-  let totalEngagements = $derived($engagementsQuery.data?.total ?? 0);
+
+  // Upcoming gigs (from today) — real confirmed/on-hold counts.
+  let todayIso = new Date().toISOString().slice(0, 10);
+  const performancesQuery = createQuery({
+    queryKey: ['today-performances', todayIso],
+    queryFn: ({ signal }: { signal: AbortSignal }) =>
+      fetchJSON<{ items: PerformanceLite[] }>(
+        `/api/performances?status=any&from=${todayIso}&limit=200`,
+        signal,
+      ),
+  });
+
+  let upcomingPerformances = $derived($performancesQuery.data?.items ?? []);
+  let confirmedCount = $derived(
+    upcomingPerformances.filter((p) =>
+      ['confirmed', 'done', 'invoiced', 'paid'].includes(p.status),
+    ).length,
+  );
+  let holdCount = $derived(
+    upcomingPerformances.filter((p) => p.status.startsWith('hold')).length,
+  );
 
   // ──────────────────────────────────────────────────────────────────────
   // Masthead derivations
@@ -209,14 +202,25 @@
     }).length;
   });
 
+  let overdueCount = $derived.by(() => {
+    const startOfToday = new Date(now);
+    startOfToday.setHours(0, 0, 0, 0);
+    return engagements.filter((e) => {
+      if (!e.next_action_at) return false;
+      if (e.status === 'declined' || e.status === 'dormant') return false;
+      return new Date(e.next_action_at).getTime() < startOfToday.getTime();
+    }).length;
+  });
+
   // ──────────────────────────────────────────────────────────────────────
   // Week table derivation
 
   type WeekRow = {
     id: string;
-    kind: string;
     verb: string;
     subject: string;
+    personSlug: string | null;
+    overdue: boolean;
     tags: { label: string; tone: 'amber' | 'blue' | 'teal' | 'green' | 'purple' | 'red' | 'neutral' }[];
     projectName: string;
     projectSlug: string;
@@ -274,8 +278,11 @@
   let weekRows = $derived.by<WeekRow[]>(() => {
     return engagements
       .filter((e) => e.status !== 'declined' && e.status !== 'dormant')
+      // Only rows with a due date: Today answers "what do I do now?",
+      // not "everything that exists" (that's the Contacts lens).
+      .filter((e) => e.next_action_at)
       .map((e) => {
-        const date = e.next_action_at ? new Date(e.next_action_at) : null;
+        const date = new Date(e.next_action_at!);
         const bucket = dayBucket(date);
         const isOverdue = bucket.sortKey === -1;
         const verb = VERBS[e.status]?.[isOverdue ? 'overdue' : 'upcoming'] ?? 'Look at';
@@ -295,9 +302,10 @@
           'Untitled';
         return {
           id: e.id,
-          kind: 'task',
           verb,
           subject,
+          personSlug: e.person?.slug ?? null,
+          overdue: isOverdue,
           tags,
           projectName: e.project?.name ?? '—',
           projectSlug: e.project?.slug ?? '',
@@ -306,7 +314,7 @@
         };
       })
       .sort((a, b) => a.daySortKey - b.daySortKey)
-      .slice(0, 12);
+      .slice(0, 20);
   });
 
   let groupedWeek = $derived.by(() => {
@@ -329,63 +337,37 @@
     workspace: Workspace;
     sub: string;
     activeProjects: number;
-    engagementCount: number;
+    confirmed: number;
+    onHold: number;
+    dueActions: number;
   };
 
   let projectRows = $derived.by<ProjectRow[]>(() => {
     const workspaces = $workspacesQuery.data?.items ?? [];
     const projects = $projectsQuery.data?.items ?? [];
-    return workspaces.map((ws) => ({
-      workspace: ws,
-      sub:
-        ws.kind === 'personal'
-          ? 'Personal workspace'
-          : 'Team workspace',
-      activeProjects: projects.filter((p) => p.workspace_id === ws.id && p.status === 'active').length,
-      engagementCount: ws.slug === workspaceSlug ? totalEngagements : 0,
-    }));
+    return workspaces.map((ws) => {
+      const wsPerfs = upcomingPerformances.filter((p) => p.project?.workspace_id === ws.id);
+      const dueActions = engagements.filter(
+        (e) =>
+          e.workspace_id === ws.id &&
+          e.next_action_at &&
+          e.status !== 'declined' &&
+          e.status !== 'dormant',
+      ).length;
+      return {
+        workspace: ws,
+        sub: ws.kind === 'personal' ? 'Personal workspace' : 'Team workspace',
+        activeProjects: projects.filter(
+          (p) => p.workspace_id === ws.id && p.status === 'active',
+        ).length,
+        confirmed: wsPerfs.filter((p) =>
+          ['confirmed', 'done', 'invoiced', 'paid'].includes(p.status),
+        ).length,
+        onHold: wsPerfs.filter((p) => p.status.startsWith('hold')).length,
+        dueActions,
+      };
+    });
   });
-
-  // ──────────────────────────────────────────────────────────────────────
-  // Filters (visual only in Phase 0; localStorage hookup in Phase 0.2)
-
-  type RoleFilter = 'all' | 'sound' | 'production' | 'lighting' | 'distribution' | 'author' | 'musician';
-  type TagFilter =
-    | 'all'
-    | '#production'
-    | '#logistics'
-    | '#travel'
-    | '#creative'
-    | '#billable'
-    | '#admin'
-    | '#contract'
-    | '#press'
-    | '#show';
-
-  let roleFilter = $state<RoleFilter>('all');
-  let tagFilter = $state<TagFilter>('all');
-
-  const ROLES: RoleFilter[] = [
-    'all',
-    'sound',
-    'production',
-    'lighting',
-    'distribution',
-    'author',
-    'musician',
-  ];
-  const TAGS: TagFilter[] = [
-    'all',
-    '#production',
-    '#logistics',
-    '#travel',
-    '#creative',
-    '#billable',
-    '#admin',
-    '#contract',
-    '#press',
-    '#show',
-  ];
 </script>
 
 <svelte:head>
@@ -400,9 +382,11 @@
     </h1>
     <div class="today__stats">
       <span><b>{activeProjectsCount}</b> active projects</span>
-      <span><b>—</b> shows total</span>
-      <span><b>—</b> confirmed</span>
-      <span><b>—</b> on hold</span>
+      <span><b>{confirmedCount}</b> confirmed</span>
+      <span><b>{holdCount}</b> on hold</span>
+      {#if overdueCount > 0}
+        <span class="today__stat-overdue"><b>{overdueCount}</b> overdue</span>
+      {/if}
       <span><b>{thisWeekCount}</b> this week</span>
     </div>
   </header>
@@ -410,63 +394,41 @@
   <section class="today__plate">
     <header class="today__section-head">
       <div>
-        <p class="eyebrow">This week</p>
-        <h2 class="today__section-title">Everything on your plate</h2>
+        <p class="eyebrow">Next actions</p>
+        <h2 class="today__section-title">What do I do now?</h2>
       </div>
-      <a class="today__section-link" href={`/h/${workspaceSlug}/calendar`}>
-        Open calendar →
+      <a class="today__section-link" href={`/h/${workspaceSlug}/contacts`}>
+        Open contacts →
       </a>
     </header>
 
-    <div class="today__filters">
-      <div class="today__filter-row">
-        <span class="eyebrow today__filter-label">Role</span>
-        {#each ROLES as role (role)}
-          <Pill
-            size="sm"
-            active={roleFilter === role}
-            onclick={() => (roleFilter = role)}
-          >
-            {role}
-          </Pill>
-        {/each}
-      </div>
-      <div class="today__filter-row">
-        <span class="eyebrow today__filter-label">Tag</span>
-        {#each TAGS as tag (tag)}
-          <Pill
-            size="sm"
-            active={tagFilter === tag}
-            onclick={() => (tagFilter = tag)}
-          >
-            {tag}
-          </Pill>
-        {/each}
-      </div>
-    </div>
-
-    {#if $engagementsQuery.isPending && firstProjectSlug}
+    {#if $engagementsQuery.isPending}
       <p class="today__placeholder">Loading…</p>
     {:else if $engagementsQuery.isError}
       <p class="today__placeholder today__placeholder--err">
         Couldn't load your week.
       </p>
-    {:else if !firstProjectSlug}
-      <p class="today__placeholder">
-        This workspace has no active projects yet.
-      </p>
     {:else if groupedWeek.length === 0}
-      <p class="today__placeholder">Nothing scheduled for the week.</p>
+      <p class="today__placeholder">
+        No due actions. Set next actions on your conversations and they land here.
+      </p>
     {:else}
       <div class="week">
         {#each groupedWeek as group (group.day)}
-          <div class="week__day-label">{group.day}</div>
+          <div class="week__day-label" class:week__day-label--overdue={group.day === 'OVERDUE'}>
+            {group.day}
+          </div>
           <div class="week__rows">
             {#each group.rows as row (row.id)}
-              <div class="week__item">
-                <span class="week__kind">{row.kind}</span>
+              <div class="week__item" class:week__item--overdue={row.overdue}>
                 <span class="week__verb">{row.verb}</span>
-                <span class="week__subject">{row.subject}</span>
+                {#if row.personSlug}
+                  <a class="week__subject" href={`/h/${workspaceSlug}/person/${row.personSlug}`}>
+                    {row.subject}
+                  </a>
+                {:else}
+                  <span class="week__subject">{row.subject}</span>
+                {/if}
                 <span class="week__tags">
                   {#each row.tags as tag (tag.label)}
                     <TagChip label={tag.label} tone={tag.tone} />
@@ -515,15 +477,15 @@
             </div>
             <div class="alive__metrics">
               <div class="alive__metric">
-                <span class="alive__metric-v">{row.engagementCount || '—'}</span>
-                <span class="alive__metric-l">Engagements</span>
+                <span class="alive__metric-v">{row.dueActions}</span>
+                <span class="alive__metric-l">Open actions</span>
               </div>
               <div class="alive__metric">
-                <span class="alive__metric-v">—</span>
+                <span class="alive__metric-v">{row.confirmed}</span>
                 <span class="alive__metric-l">Confirmed</span>
               </div>
               <div class="alive__metric">
-                <span class="alive__metric-v">—</span>
+                <span class="alive__metric-v">{row.onHold}</span>
                 <span class="alive__metric-l">On hold</span>
               </div>
             </div>
@@ -587,6 +549,11 @@
       margin-inline-end: var(--space-xs);
     }
 
+    .today__stat-overdue,
+    .today__stat-overdue b {
+      color: var(--danger);
+    }
+
     /* ──────────────────────────── Section heads ──────────────────────── */
 
     .today__section-head {
@@ -618,27 +585,6 @@
       color: var(--text-color);
     }
 
-    /* ───────────────────────────── Filters ───────────────────────────── */
-
-    .today__filters {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-xs);
-      margin-block-end: var(--space-m);
-    }
-
-    .today__filter-row {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: var(--space-xs);
-    }
-
-    .today__filter-label {
-      min-inline-size: 32px;
-      margin: 0;
-    }
-
     /* ────────────────────────────── Week ─────────────────────────────── */
 
     .today__placeholder {
@@ -667,6 +613,10 @@
       padding-block-start: var(--space-xs);
     }
 
+    .week__day-label--overdue {
+      color: var(--danger);
+    }
+
     .week__rows {
       display: flex;
       flex-direction: column;
@@ -675,7 +625,7 @@
 
     .week__item {
       display: grid;
-      grid-template-columns: 68px 80px minmax(0, 1fr) auto auto;
+      grid-template-columns: 80px minmax(0, 1fr) auto auto;
       gap: var(--space-s);
       align-items: baseline;
       padding-block: var(--space-xs);
@@ -689,12 +639,8 @@
       background: var(--bg-hover);
     }
 
-    .week__kind {
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
-      color: var(--text-faint);
+    .week__item--overdue .week__verb {
+      color: var(--danger);
     }
 
     .week__verb {
@@ -707,6 +653,15 @@
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+    }
+
+    a.week__subject {
+      text-decoration: none;
+    }
+
+    a.week__subject:hover {
+      color: var(--text-color);
+      text-decoration: underline;
     }
 
     .week__tags {
@@ -826,14 +781,14 @@
         grid-template-columns: 60px 1fr;
       }
       .week__item {
-        grid-template-columns: 60px minmax(0, 1fr);
+        grid-template-columns: minmax(0, 1fr);
         gap: var(--space-xs);
       }
       .week__verb,
       .week__subject,
       .week__tags,
       .week__project {
-        grid-column: 2;
+        grid-column: 1;
       }
       .alive__metrics {
         display: none;

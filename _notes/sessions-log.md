@@ -8,6 +8,27 @@ Convención: secciones por fecha descendente. Cada sesión queda con commits cit
 
 ---
 
+## 2026-07-04 — Cierre nivel 1 completo (ultracode): la app se opera Y se alimenta desde la UI — ADR-051→055
+
+Marco: "quiero que completes la app completamente" + ultracode. El bloque de cierre era 1a-1c en `_tasks.md`; la sesión de diseño de la mañana (gap analysis → `_notes/research-redesign-gaps.md`) lo había ampliado a 1a-1e. Se ejecutó entero con orquestación multi-agente: workflow Understand (7 lectores paralelos + critic), implementación, workflow Review adversarial (5 lentes + verificación), migraciones vía Supabase MCP, deploy (lo lanzó Marco — el clasificador de auto-mode bloquea deploys de prod), suite completa contra producción.
+
+### Qué se construyó (todo en producción)
+- **ADR-051 (1a)** — `create_engagement` RPC: captura persona+conversación en un paso. Find-or-create de persona por email (citext UNIQUE global) con **resurrect en dos capas** — persona soft-deleted por email, y engagement soft-deleted por el trío (workspace,project,person) cuyo UNIQUE es TOTAL → sin resurrect quedaría bloqueado para siempre. `delete_engagement` (sin UI, para API/tests/simetría). POST/DELETE `/api/engagements`. Dialogs "Add contact" (Contacts) y "Add to project" (ficha). Duplicado vivo → 409, sin merge silencioso.
+- **ADR-052 (1b)** — `delete_performance` RPC: delete = para errores; bolo caído = status `cancelled`. Facturas vivas bloquean (23503→409). Confirm dialog en el detalle. E2e self-cleaning.
+- **ADR-053 (1c)** — `PATCH /api/venues/:id` directo (venue_update RLS basta, sin RPC): dialog de edición con timezone (datalist `Intl.supportedValuesOf`, validación nativa `Intl.DateTimeFormat`) + contacts por filas; visibles en ProductionStub. La dual-time del road sheet (D-PRE-10) por fin tiene quien la alimente.
+- **ADR-054 (1d)** — feed ICS suscribible: `calendar_share` (capability token, patrón ADR-047) + RPCs create/list/revoke + `get_public_calendar` anon saneado (confirmed+, dates no-cancelled; nunca fee/notes/persona). `$lib/ics.ts` RFC 5545 puro y testeado. `/api/public/calendar/:token` (text/calendar, no-store). Dialog "Feed" en Calendar (https + webcal + revocar).
+- **ADR-055 (1e)** — Today "¿qué hago ahora?": vencidas primero (danger), cross-workspace (muere la convención "1 project per workspace"), stats reales, fuera los filter pills muertos. Es el paso "Today lidera" de la decisión de diseño de lenses; el rediseño completo (pins, retirar Calendar/Money) sigue abierto.
+
+### Orquestación + verificación adversarial
+- **Understand**: 7 lectores paralelos + completeness critic. El critic cazó en vivo que el trabajo ya en curso rompía la aserción `distinct workspaces === 1` del canario cross-tenant, y que la clave de invalidación `['performances']` no existía.
+- **Review** (5 lentes: SQL/RLS, API, Svelte, tests, filosofía + verificación adversarial): 6 findings confirmados, **el HIGH era real** — el e2e de delete listaba gigs solo por fecha, sin filtrar workspace, y el test user es admin de muk-cia (datos reales) → podía soft-borrar bolos reales. Corregido (scope workspace+prefijo venue, serial mode). También: recuperación pre-test en los e2e, helper `mutateJSON` (unifica 6 mutaciones + cierra hueco 401), código muerto.
+- **Verificación final ICS+SQL** (agente dedicado): ambas superficies sólidas; 3 LOW reales corregidos — DTEND<DTSTART cuando wrap_at<start_at con loadout NULL (estado DB válido), viewer/guest podían publicar feed (gate → write roles), endpoint anon reflejaba `String(err)`.
+
+### Estado al cierre
+4 migraciones aplicadas + **grants auditados uno a uno** (RPCs escritura solo authenticated; get_public_calendar con anon; calendar_share deny-all RLS forzado). **RLS 30/30 · unit 79/79 · e2e 14/14** contra producción (person.spec flakeó bajo 9 workers, verde con 1 retry como CI). Deploy publicado. **Numeración**: el rediseño de módulos de line detail, que la mañana reservó como ADR-055, pasa a ADR-056 (051-055 los tomó este cierre; marcado en `_tasks.md`). El gate de verdad no cambia: usar Hour con la difusión real ~1 mes — eso lo cierra Marco, no el código.
+
+---
+
 ## 2026-07-01/02 — Sesión maratón continua (ultracode): de "construido pero no usado" a ciclo completo operable — ADR-040→050
 
 Arrancó como check-in estratégico ("¿estamos bien encarados?") y el veredicto fue el motor de todo lo demás: **ingeniería excelente, pero la app era read-only mientras la difusión 2026-27 real (154 engagements) avanzaba FUERA de Hour**. Marco autorizó push a main + deploys de producción para el esfuerzo completo y pidió avance autónomo máximo ("ponte a hacer hasta donde puedas tú solo", "dale con todo lo pendiente").

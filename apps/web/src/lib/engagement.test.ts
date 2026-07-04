@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import * as v from 'valibot';
 import {
   ENGAGEMENT_STATUSES,
+  EngagementCreateSchema,
   EngagementPatchSchema,
   STATUS_LABELS,
   statusBadgeClass,
@@ -90,5 +91,99 @@ describe('status vocabulary', () => {
 
   it('falls back to the raw value for unknown statuses', () => {
     expect(statusLabel('mystery')).toBe('mystery');
+  });
+});
+
+describe('EngagementCreateSchema', () => {
+  const PROJECT = '11111111-1111-1111-1111-111111111111';
+  const PERSON = '22222222-2222-2222-2222-222222222222';
+
+  it('accepts the existing-person shape and defaults status to contacted', () => {
+    const r = v.safeParse(EngagementCreateSchema, {
+      project_id: PROJECT,
+      person_id: PERSON,
+    });
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.output.status).toBe('contacted');
+      expect(r.output.person).toBeUndefined();
+    }
+  });
+
+  it('accepts the inline-person shape with trims applied', () => {
+    const r = v.safeParse(EngagementCreateSchema, {
+      project_id: PROJECT,
+      person: {
+        full_name: '  Jordi Programador  ',
+        email: 'jordi@teatre.cat',
+        organization_name: 'Teatre X',
+      },
+      status: 'in_conversation',
+      next_action_at: '2026-09-15',
+    });
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.output.person?.full_name).toBe('Jordi Programador');
+      expect(r.output.status).toBe('in_conversation');
+    }
+  });
+
+  it('rejects a missing project_id or a non-uuid project_id', () => {
+    expect(v.safeParse(EngagementCreateSchema, { person_id: PERSON }).success).toBe(false);
+    expect(
+      v.safeParse(EngagementCreateSchema, { project_id: 'mamemi', person_id: PERSON })
+        .success,
+    ).toBe(false);
+  });
+
+  it('rejects an inline person without full_name and a bad email', () => {
+    expect(
+      v.safeParse(EngagementCreateSchema, {
+        project_id: PROJECT,
+        person: { email: 'jordi@teatre.cat' },
+      }).success,
+    ).toBe(false);
+    expect(
+      v.safeParse(EngagementCreateSchema, {
+        project_id: PROJECT,
+        person: { full_name: 'Jordi', email: 'not-an-email' },
+      }).success,
+    ).toBe(false);
+  });
+
+  it('rejects impossible next_action_at dates (same guard as the PATCH)', () => {
+    const r = v.safeParse(EngagementCreateSchema, {
+      project_id: PROJECT,
+      person_id: PERSON,
+      next_action_at: '2026-02-31',
+    });
+    expect(r.success).toBe(false);
+  });
+
+  it('strips unknown keys (RLS-sensitive columns can never ride along)', () => {
+    const r = v.safeParse(EngagementCreateSchema, {
+      project_id: PROJECT,
+      person_id: PERSON,
+      workspace_id: '33333333-3333-3333-3333-333333333333',
+      created_by: '44444444-4444-4444-4444-444444444444',
+    });
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect('workspace_id' in r.output).toBe(false);
+      expect('created_by' in r.output).toBe(false);
+    }
+  });
+
+  it('allows both shapes through the schema — exactly-one is the endpoint rule', () => {
+    // The endpoint rejects person_id+person / neither with a specific
+    // hint; the schema stays permissive so that error can be precise.
+    const both = v.safeParse(EngagementCreateSchema, {
+      project_id: PROJECT,
+      person_id: PERSON,
+      person: { full_name: 'Jordi' },
+    });
+    expect(both.success).toBe(true);
+    const neither = v.safeParse(EngagementCreateSchema, { project_id: PROJECT });
+    expect(neither.success).toBe(true);
   });
 });

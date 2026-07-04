@@ -19,7 +19,7 @@ import * as v from 'valibot';
 import { extractBearer } from '$lib/auth';
 import { PerformancePatchSchema } from '$lib/performance';
 import { fetchPerformanceBundle, isUuid } from '$lib/server/performance-bundle';
-import { pgGet, pgPatch, PostgrestError, type SupabaseEnv } from '$lib/supabase';
+import { pgGet, pgPatch, pgPostRpc, PostgrestError, type SupabaseEnv } from '$lib/supabase';
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -214,6 +214,70 @@ export const PATCH: RequestHandler = async ({ request, params, url, platform }) 
         { error: 'postgrest_error', status: err.status, detail: err.body },
         upstream,
       );
+    }
+    return json({ error: 'unexpected', detail: String(err) }, 500);
+  }
+};
+
+/**
+ * DELETE /api/performances/:key — soft-delete a gig created by mistake
+ * (ADR-052). Goes through the `delete_performance` RPC: ADR-048 rule —
+ * with the universal `deleted_at IS NULL` SELECT pattern no soft-delete
+ * can ride a client PATCH; always RPC. Gated on
+ * has_permission(project, 'edit:show').
+ *
+ * A gig that fell through is NOT deleted — that's status `cancelled`.
+ * Live, non-cancelled invoices block deletion (409).
+ */
+export const DELETE: RequestHandler = async ({ request, params, url, platform }) => {
+  if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);
+  const env = platform.env as unknown as SupabaseEnv;
+
+  const jwt = extractBearer(request);
+  if (!jwt) return json({ error: 'missing_authorization' }, 401);
+
+  const key = params.key;
+  const ws = url.searchParams.get('ws');
+  if (!isUuid(key) && !ws) {
+    return json(
+      { error: 'invalid_key', hint: 'Pass a uuid, or a slug with ?ws=<workspace-slug>.' },
+      400,
+    );
+  }
+
+  try {
+    // Slug keys resolve to an id first (RPC takes a uuid).
+    let id = key;
+    if (!isUuid(key)) {
+      const lookup = new URLSearchParams();
+      lookup.set('select', 'id,workspace:workspace_id!inner(slug)');
+      lookup.set('slug', `eq.${key}`);
+      lookup.set('workspace.slug', `eq.${ws}`);
+      lookup.set('deleted_at', 'is.null');
+      lookup.set('limit', '1');
+      const found = await pgGet<{ id: string }>(env, 'performance', jwt, { search: lookup });
+      if (found.data.length === 0) return json({ error: 'not_found' }, 404);
+      id = found.data[0].id;
+    }
+
+    await pgPostRpc(env, 'delete_performance', jwt, { p_performance_id: id });
+    return new Response(null, { status: 204 });
+  } catch (err) {
+    if (err instanceof PostgrestError) {
+      // RPC RAISEs: 42501 collapses not-found and no-permission → 404
+      // (existence is never confirmed); 23503 → live invoices block.
+      if (err.code === '42501') return json({ error: 'not_found' }, 404);
+      if (err.code === '23503') {
+        return json(
+          {
+            error: 'performance_has_invoices',
+            hint: 'Discard or cancel its invoices first — or set the gig to cancelled instead.',
+          },
+          409,
+        );
+      }
+      const upstream = err.status === 401 ? 401 : 502;
+      return json({ error: 'postgrest_error', status: err.status, detail: err.body }, upstream);
     }
     return json({ error: 'unexpected', detail: String(err) }, 500);
   }

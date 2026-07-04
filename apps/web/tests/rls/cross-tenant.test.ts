@@ -89,13 +89,25 @@ describe.skipIf(!envReady())('RLS — cross-tenant isolation', () => {
         limit: '500',
       }),
     );
-    // Playwright is admin of `mamemi` (which holds the 154 imported
+    // Playwright is admin of `muk-cia` (which holds the 154 imported
     // engagements). They have no engagement access via marco-rubiol.
     expect(rows.length).toBeGreaterThanOrEqual(154);
-    const distinctWorkspaces = new Set(rows.map((r) => r.workspace_id));
-    // All rows must belong to the same workspace (mamemi). If we ever see
-    // more than one, something is leaking.
-    expect(distinctWorkspaces.size).toBe(1);
+
+    // The security invariant is MEMBERSHIP-BOUNDED visibility: every
+    // visible engagement must live in a workspace the caller belongs to.
+    // (The old `distinct workspaces === 1` shape broke once ADR-051
+    // lifecycle fixtures started creating short-lived engagements in the
+    // `playwright` workspace — that was an artifact of the data, not the
+    // leak canary itself.)
+    const memberships = await pgGet<{ workspace_id: string }>(
+      'workspace_membership',
+      playwrightJwt,
+      new URLSearchParams({ select: 'workspace_id' }),
+    );
+    const allowed = new Set(memberships.rows.map((m) => m.workspace_id));
+    expect(allowed.size).toBeGreaterThanOrEqual(1);
+    const outside = rows.filter((r) => !allowed.has(r.workspace_id));
+    expect(outside).toHaveLength(0);
   });
 
   test('anonymous request to workspace returns zero rows', async () => {

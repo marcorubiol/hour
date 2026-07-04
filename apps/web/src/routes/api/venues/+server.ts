@@ -12,9 +12,8 @@
 import type { RequestHandler } from './$types';
 import * as v from 'valibot';
 import { extractBearer } from '$lib/auth';
+import { VENUE_COLS } from '$lib/venue';
 import { pgGet, pgPostRpc, PostgrestError, type SupabaseEnv } from '$lib/supabase';
-
-const VENUE_COLS = 'id,slug,name,city,country,address,capacity,timezone';
 
 const CreateSchema = v.object({
   workspace_id: v.pipe(v.string(), v.uuid()),

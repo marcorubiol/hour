@@ -25,14 +25,17 @@ policies go through SECURITY DEFINER RPCs (see ADR-043/045/047/049/050).
 owner/admin a bypass for any project permission, so tests are decoupled
 from RBAC details. RBAC regression goes into a separate suite later.
 
-**Fixture hygiene**: specs are self-cleaning where the product allows it
-(fees cleared, notes/invoices/shares deleted via their RPCs). The
-performance-write spec CANNOT clean after itself — there is no
-performance delete flow yet (ADR-043 re-evaluate) — so `e2e-venue-*`
-gigs accumulate in the `playwright` workspace at 1/run. Purge
-periodically via SQL:
-`DELETE FROM performance WHERE workspace_id = (SELECT id FROM workspace WHERE slug='playwright') AND slug LIKE 'e2e-venue-%';`
-(last purged 2026-07-02, 20 rows).
+**Fixture hygiene**: every spec is self-cleaning now. Since ADR-052 the
+performance-write spec deletes its own gigs (one through the UI confirm
+dialog, the rest via `DELETE /api/performances/:id`) — the old
+`e2e-venue-*` accumulation and its manual SQL purge are gone (last
+manual purge 2026-07-02, 20 rows; none needed since). The
+contact-create spec soft-deletes its engagement via
+`DELETE /api/engagements/:id` and reruns resurrect it (ADR-051), so the
+stable fixture person (`zzz-e2e-contact@hour.test`) never duplicates.
+Leftovers only appear if a run dies mid-test; the next run's create is
+either idempotent (venue), a resurrect (engagement), or swept by the
+delete test's API sweep (performances on the run's fixture day).
 
 ## Steps
 
