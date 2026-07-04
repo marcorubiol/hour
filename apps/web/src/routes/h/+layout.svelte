@@ -222,12 +222,13 @@
     lens.set('today');
     void goto(`/h/${ws.slug}/`);
   }
-  function onPickView(view: 'calendar' | 'money') {
+  function onPickView(view: 'agenda' | 'calendar' | 'contacts' | 'money') {
     const ws = workspaceSlug || defaultWorkspaceSlug;
-    if (ws) {
-      lens.set(view);
-      void goto(`/h/${ws}/${view}`);
-    }
+    if (!ws) return;
+    // Agenda is the full view of the home timeline — same "today" lens, not
+    // its own pill; Calendar, Contacts and Money are the routed lenses.
+    lens.set(view === 'agenda' ? 'today' : view);
+    void goto(`/h/${ws}/${view}`);
   }
 
   function logout() {

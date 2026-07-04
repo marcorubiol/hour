@@ -18,7 +18,7 @@
     open: boolean;
     onPickLine: (line: NavLine) => void;
     onPickSpace: (ws: NavWorkspace) => void;
-    onPickView: (view: 'calendar' | 'money') => void;
+    onPickView: (view: 'agenda' | 'calendar' | 'contacts' | 'money') => void;
   }
   let { open = $bindable(), onPickLine, onPickSpace, onPickView }: Props = $props();
 
@@ -32,14 +32,16 @@
   let workspaces = $derived($workspacesQuery.data?.items ?? []);
   let lineIndex = $derived(buildLineIndex(workspaces, $linesQuery.data?.items ?? []));
 
-  type ViewTarget = 'calendar' | 'money';
+  type ViewTarget = 'agenda' | 'calendar' | 'contacts' | 'money';
   type ViewItem = { type: 'view'; id: string; target: ViewTarget; name: string };
   type LineItem = { type: 'line'; id: string; line: NavLine };
   type SpaceItem = { type: 'space'; id: string; ws: NavWorkspace };
   type Item = ViewItem | LineItem | SpaceItem;
 
   const VIEW_ITEMS: ViewItem[] = [
+    { type: 'view', id: 'v:agenda', target: 'agenda', name: 'Agenda' },
     { type: 'view', id: 'v:calendar', target: 'calendar', name: 'Calendar' },
+    { type: 'view', id: 'v:contacts', target: 'contacts', name: 'Contacts' },
     { type: 'view', id: 'v:money', target: 'money', name: 'Money' },
   ];
 

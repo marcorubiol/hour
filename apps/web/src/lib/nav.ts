@@ -82,6 +82,8 @@ export type ResolvedScope = {
   workspaceSlugs: string[];
   /** line ids of pinned lines */
   lineIds: string[];
+  /** project ids of pinned lines (a line pin scopes engagements through its project) */
+  projectIds: string[];
   /** the pinned NavLines, resolved (for panels/labels) */
   lines: NavLine[];
   /** true when nothing is pinned → everything the user can see */
@@ -119,19 +121,22 @@ export function resolveScope(
     workspaceIds,
     workspaceSlugs,
     lineIds,
+    projectIds: [...new Set(lines.map((l) => l.projectId))],
     lines,
     isEmpty: pins.length === 0,
   };
 }
 
-/** Keep an item if scope is empty, its workspace is a pinned space, or its
- *  line is a pinned line. The union predicate the lenses filter by. */
+/** Keep an item if scope is empty, its workspace is a pinned space, its line
+ *  is a pinned line, or its project belongs to a pinned line (engagements have
+ *  no line_id, so line pins reach them through their project). */
 export function inScope(
   scope: ResolvedScope,
-  item: { workspaceId?: string | null; lineId?: string | null },
+  item: { workspaceId?: string | null; lineId?: string | null; projectId?: string | null },
 ): boolean {
   if (scope.isEmpty) return true;
   if (item.workspaceId && scope.workspaceIds.includes(item.workspaceId)) return true;
   if (item.lineId && scope.lineIds.includes(item.lineId)) return true;
+  if (item.projectId && scope.projectIds.includes(item.projectId)) return true;
   return false;
 }

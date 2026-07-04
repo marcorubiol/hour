@@ -2,9 +2,10 @@
   /**
    * Agenda — the Home (ADR-055 nav redesign). The logo lands here; there is
    * no "Today"/"Home" pill (that would just repeat the logo). A single quiet
-   * column: greeting, this-week agenda (what's due), and whatever the user
-   * has PINNED brought forward. Calendar and Money are the other two views of
-   * the same pinned scope, switched from the shell segment.
+   * column: greeting, the next-7-days agenda (capped, with a "+N more" link to
+   * the full Agenda view), and whatever the user has PINNED brought forward.
+   * Calendar and Money are the other two views of the same pinned scope,
+   * reachable from ⌘K.
    *
    * Scope: empty pins = everything the user can see; a pinned space scopes to
    * its workspace; a pinned line scopes to its project (engagements carry no
@@ -14,7 +15,7 @@
   import { page } from '$app/state';
   import { createQuery } from '@tanstack/svelte-query';
   import { fetchJSON } from '$lib/api';
-  import { accentVar, accentVarFor } from '$lib/utils/accent';
+  import { accentVarFor } from '$lib/utils/accent';
   import { lineKindGlyph, lineKindLabel } from '$lib/utils/line-kind';
   import { decodeJwtClaim } from '$lib/realtime';
   import { usePins, spacePin } from '$lib/stores/pins.svelte';
@@ -28,7 +29,7 @@
   } from '$lib/nav';
   import { workspacesQueryOptions, allLinesQueryOptions } from '$lib/nav-queries';
   import ScopeStrip from '$lib/components/ScopeStrip.svelte';
-  import TagChip from '$lib/components/TagChip.svelte';
+  import AgendaBoard from '$lib/components/AgendaBoard.svelte';
   import { goto } from '$app/navigation';
 
   const pins = usePins();
@@ -131,97 +132,6 @@
     return personal ? (personal.name.split(/\s+/)[0] ?? personal.name) : 'there';
   });
 
-  // ── Agenda (this week) ────────────────────────────────────────────────
-  type WeekRow = {
-    id: string;
-    verb: string;
-    subject: string;
-    personSlug: string | null;
-    overdue: boolean;
-    tags: { label: string; tone: 'amber' | 'blue' | 'teal' | 'green' | 'purple' | 'red' | 'neutral' }[];
-    projectName: string;
-    projectSlug: string;
-    daySortKey: number;
-    dayLabel: string;
-  };
-  const VERBS: Record<EngagementStatus, { upcoming: string; overdue: string }> = {
-    contacted: { upcoming: 'Follow up', overdue: 'Chase' },
-    in_conversation: { upcoming: 'Reply', overdue: 'Reply' },
-    hold: { upcoming: 'Confirm', overdue: 'Confirm' },
-    confirmed: { upcoming: 'Prep', overdue: 'Prep' },
-    declined: { upcoming: 'Note', overdue: 'Note' },
-    dormant: { upcoming: 'Revive', overdue: 'Revive' },
-    recurring: { upcoming: 'Check', overdue: 'Check' },
-  };
-  const TAG_TONES: WeekRow['tags'][number]['tone'][] = ['teal', 'blue', 'green', 'purple', 'amber', 'red', 'neutral'];
-  function toneForTag(tag: string): WeekRow['tags'][number]['tone'] {
-    let h = 0;
-    for (let i = 0; i < tag.length; i++) h = (h * 31 + tag.charCodeAt(i)) >>> 0;
-    return TAG_TONES[h % TAG_TONES.length];
-  }
-  function dayBucket(d: Date | null): { sortKey: number; label: string } {
-    if (!d) return { sortKey: 1_000_000, label: 'WHENEVER' };
-    const start = new Date(now);
-    start.setHours(0, 0, 0, 0);
-    const diffDays = Math.floor((d.getTime() - start.getTime()) / (24 * 60 * 60 * 1000));
-    if (diffDays < 0) return { sortKey: -1, label: 'OVERDUE' };
-    if (diffDays === 0) return { sortKey: 0, label: 'TODAY' };
-    if (diffDays === 1) return { sortKey: 1, label: 'TOMORROW' };
-    if (diffDays < 7)
-      return { sortKey: diffDays, label: d.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase() };
-    if (diffDays < 14) return { sortKey: 7, label: 'NEXT WEEK' };
-    return { sortKey: 99, label: 'LATER' };
-  }
-  const WEEK_CAP = 10;
-  let allWeekRows = $derived.by<WeekRow[]>(() =>
-    scopedEngagements
-      .filter((e) => e.status !== 'declined' && e.status !== 'dormant')
-      .filter((e) => e.next_action_at)
-      .map((e) => {
-        const date = new Date(e.next_action_at!);
-        const bucket = dayBucket(date);
-        const isOverdue = bucket.sortKey === -1;
-        const verb = VERBS[e.status]?.[isOverdue ? 'overdue' : 'upcoming'] ?? 'Look at';
-        const tagsRaw = Array.isArray(e.custom_fields?.tags)
-          ? (e.custom_fields?.tags as unknown[]).filter((t): t is string => typeof t === 'string')
-          : [];
-        const tags = tagsRaw.slice(0, 2).map((label) => ({
-          label: label.startsWith('#') ? label : `#${label}`,
-          tone: toneForTag(label),
-        }));
-        const subject =
-          e.person?.full_name || e.person?.organization_name || e.next_action_note || 'Untitled';
-        return {
-          id: e.id,
-          verb,
-          subject,
-          personSlug: e.person?.slug ?? null,
-          overdue: isOverdue,
-          tags,
-          projectName: e.project?.name ?? '—',
-          projectSlug: e.project?.slug ?? '',
-          daySortKey: bucket.sortKey,
-          dayLabel: bucket.label,
-        };
-      })
-      .sort((a, b) => a.daySortKey - b.daySortKey),
-  );
-  // Show at most WEEK_CAP; the rest lives one click away in the Calendar.
-  let weekRows = $derived(allWeekRows.slice(0, WEEK_CAP));
-  let moreCount = $derived(Math.max(0, allWeekRows.length - weekRows.length));
-  let groupedWeek = $derived.by(() => {
-    const groups: { day: string; rows: WeekRow[] }[] = [];
-    let current: { day: string; rows: WeekRow[] } | null = null;
-    for (const row of weekRows) {
-      if (!current || current.day !== row.dayLabel) {
-        current = { day: row.dayLabel, rows: [] };
-        groups.push(current);
-      }
-      current.rows.push(row);
-    }
-    return groups;
-  });
-
   // ── Pinned panels ─────────────────────────────────────────────────────
   function perfsForLine(lineId: string): Performance[] {
     return performances.filter((p) => p.line_id === lineId);
@@ -279,50 +189,16 @@
 
   <ScopeStrip onOpenLine={openLine} />
 
-  <div class="home__toolbar"><span class="eyebrow">Today &amp; this week</span></div>
-  <div class="home__agenda-wrap">
-    {#if $engagementsQuery.isPending}
-      <p class="home__empty">Loading…</p>
-    {:else if $engagementsQuery.isError}
-      <p class="home__empty home__empty--err">Couldn't load your week.</p>
-    {:else if groupedWeek.length === 0}
-      <p class="home__empty">Nothing due in this scope. Set next actions on your conversations and they land here.</p>
-    {:else}
-      <div class="week">
-        {#each groupedWeek as group (group.day)}
-          <div class="week__day" class:week__day--overdue={group.day === 'OVERDUE'} class:week__day--today={group.day === 'TODAY'}>
-            {group.day}
-          </div>
-          <div class="week__rows">
-            {#each group.rows as row (row.id)}
-              <div class="week__item" class:week__item--overdue={row.overdue}>
-                <span class="week__verb">{row.verb}</span>
-                {#if row.personSlug}
-                  <a class="week__subject" href={`/h/${workspaceSlug}/person/${row.personSlug}`}>{row.subject}</a>
-                {:else}
-                  <span class="week__subject">{row.subject}</span>
-                {/if}
-                <span class="week__meta">
-                  {#each row.tags as tag (tag.label)}
-                    <TagChip label={tag.label} tone={tag.tone} />
-                  {/each}
-                  <span class="week__project" style={`--c: ${accentVar(row.projectSlug)}`}>
-                    <span class="week__dot" aria-hidden="true"></span>
-                    <span>{row.projectName}</span>
-                  </span>
-                </span>
-              </div>
-            {/each}
-          </div>
-        {/each}
-      </div>
-      {#if moreCount > 0}
-        <a class="week__more" href={`/h/${workspaceSlug}/calendar`}>
-          + {moreCount} more <span class="week__more-cal">→ Calendar</span>
-        </a>
-      {/if}
-    {/if}
-  </div>
+  <div class="home__toolbar"><span class="eyebrow">Next 7 days</span></div>
+  <AgendaBoard
+    engagements={scopedEngagements}
+    {workspaceSlug}
+    cap={10}
+    next7Days
+    moreHref={`/h/${workspaceSlug}/agenda`}
+    loading={$engagementsQuery.isPending}
+    error={$engagementsQuery.isError}
+  />
 
   {#if pinnedUnits.length > 0}
     <div class="home__pinned-head"><span class="eyebrow">Pinned</span></div>
@@ -455,136 +331,12 @@
     .home__toolbar {
       margin-block: var(--space-s) var(--space-2xs);
     }
-    .home__agenda-wrap {
-      border-block-start: 1px solid var(--border-color-light);
-    }
-
-    /* ── agenda / week — dense timeline (matches the design mock) ── */
-    .week {
-      display: grid;
-      grid-template-columns: 4.5rem 1fr;
-    }
-    .week__day {
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      color: var(--text-faint);
-      padding-block: var(--space-s) var(--space-2xs);
-      align-self: start;
-    }
-    .week__day--today {
-      color: var(--primary);
-    }
-    .week__day--overdue {
-      color: var(--danger);
-    }
-    .week__rows {
-      border-inline-start: 1px solid var(--border-color-light);
-    }
-    .week__item {
-      position: relative;
-      display: grid;
-      grid-template-columns: 5rem 1fr auto;
-      align-items: baseline;
-      gap: var(--space-s);
-      padding-block: var(--space-xs);
-      padding-inline-start: var(--space-l);
-      border-block-end: 1px solid color-mix(in oklch, var(--border-color-light) 55%, transparent);
-    }
-    /* the dot on the rail */
-    .week__item::before {
-      content: '';
-      position: absolute;
-      inset-inline-start: -0.28rem;
-      inset-block-start: 0.6rem;
-      inline-size: 0.44rem;
-      block-size: 0.44rem;
-      border-radius: var(--radius-circle);
-      background: var(--bg);
-      border: 1.5px solid var(--border-color-dark);
-    }
-    .week__item--overdue::before {
-      background: var(--danger);
-      border-color: var(--danger);
-    }
-    .week__verb {
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      color: var(--text-faint);
-      text-transform: lowercase;
-    }
-    .week__item--overdue .week__verb {
-      color: var(--danger);
-    }
-    .week__subject {
-      font-size: var(--text-s);
-      color: var(--text-color);
-      text-decoration: none;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      min-inline-size: 0;
-    }
-    a.week__subject:hover {
-      text-decoration: underline;
-    }
-    .week__meta {
-      display: inline-flex;
-      align-items: center;
-      justify-content: flex-end;
-      gap: var(--space-s);
-    }
-    .week__project {
-      display: inline-flex;
-      align-items: center;
-      gap: var(--space-xs);
-      font-size: var(--text-xs);
-      color: var(--text-muted);
-      white-space: nowrap;
-    }
-    .week__dot,
     .dot {
       inline-size: 0.5rem;
       block-size: 0.5rem;
       border-radius: var(--radius-circle);
       background: var(--c, var(--text-faint));
       flex: none;
-    }
-
-    .home__empty {
-      color: var(--text-muted);
-      font-style: italic;
-      font-family: var(--font-display);
-      padding-block: var(--space-l);
-      text-align: center;
-    }
-    .home__empty--err {
-      color: var(--danger);
-    }
-
-    /* "+ N more → Calendar" — the agenda is capped; the rest is one hop away.
-       Transparent, quiet, dashed. */
-    .week__more {
-      display: inline-flex;
-      align-items: center;
-      gap: var(--space-xs);
-      margin-block-start: var(--space-m);
-      padding-block: var(--space-xs);
-      padding-inline: var(--space-m);
-      border: 1px dashed var(--border-color-dark);
-      border-radius: var(--radius-circle);
-      background: transparent;
-      font-size: var(--text-xs);
-      color: var(--text-muted);
-      text-decoration: none;
-      transition: color var(--transition), border-color var(--transition);
-    }
-    .week__more:hover {
-      color: var(--text-color);
-      border-color: var(--text-muted);
-    }
-    .week__more-cal {
-      color: var(--text-faint);
     }
 
     /* ── pinned panels ── */
@@ -785,15 +537,6 @@
       font-size: var(--text-xs);
       color: var(--text-faint);
       font-style: italic;
-    }
-
-    @media (max-width: 47.999rem) {
-      .week__item {
-        grid-template-columns: 5rem 1fr;
-      }
-      .week__project {
-        display: none;
-      }
     }
   }
 </style>
