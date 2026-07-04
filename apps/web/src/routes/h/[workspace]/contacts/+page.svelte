@@ -14,41 +14,59 @@
 
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { page } from '$app/state';
+  import { goto } from '$app/navigation';
   import { fetchJSON, mutateJSON } from '$lib/api';
   import Button from '$lib/components/Button.svelte';
   import Dialog from '$lib/components/Dialog.svelte';
   import EngagementTable from '$lib/components/EngagementTable.svelte';
   import Input from '$lib/components/Input.svelte';
   import Select from '$lib/components/Select.svelte';
+  import ScopeStrip from '$lib/components/ScopeStrip.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
   import { ENGAGEMENT_STATUSES, statusLabel } from '$lib/engagement';
-  import { resolveSelectionIds } from '$lib/selection-filter';
-  import { useSelection } from '$lib/stores/selection.svelte';
+  import { usePins } from '$lib/stores/pins.svelte';
+  import {
+    buildLineIndex,
+    resolveScope,
+    lineUrl,
+    type NavLine,
+    type NavWorkspace,
+    type RawLine,
+  } from '$lib/nav';
+  import { workspacesQueryOptions, allLinesQueryOptions } from '$lib/nav-queries';
 
-  type WorkspaceLite = { id: string; slug: string };
   type ProjectLite = { id: string; slug: string; name?: string };
 
-  const selection = useSelection();
+  const pins = usePins();
 
-  const workspacesQuery = createQuery({
-    queryKey: ['workspaces'],
-    queryFn: ({ signal }: { signal: AbortSignal }) =>
-      fetchJSON<{ items: WorkspaceLite[] }>('/api/workspaces', signal),
-  });
+  const workspacesQuery = createQuery(workspacesQueryOptions());
+  const linesQuery = createQuery(allLinesQueryOptions());
   const projectsQuery = createQuery({
     queryKey: ['projects', { status: 'active' }],
     queryFn: ({ signal }: { signal: AbortSignal }) =>
       fetchJSON<{ items: ProjectLite[] }>('/api/projects?status=active', signal),
   });
 
-  let workspacesBySlug = $derived(
-    new Map(($workspacesQuery.data?.items ?? []).map((w) => [w.slug, w])),
-  );
-  let projectsBySlug = $derived(
-    new Map(($projectsQuery.data?.items ?? []).map((p) => [p.slug, p])),
+  let workspaces = $derived<NavWorkspace[]>($workspacesQuery.data?.items ?? []);
+
+  // ── Pins → scope (Adaptive Digest) ────────────────────────────────────
+  let lineIndex = $derived(buildLineIndex(workspaces, ($linesQuery.data?.items as RawLine[]) ?? []));
+  let scope = $derived(resolveScope(pins.pins, workspaces, lineIndex));
+  // A line pin scopes engagements through its project (they carry no line_id);
+  // the endpoint filters by project_ids ∪ workspace_ids.
+  let filterIds = $derived({
+    projectIds: [...new Set(scope.lines.map((l) => l.projectId))],
+    workspaceIds: scope.workspaceIds,
+  });
+  // Hold the feed while line pins exist but the lines cache hasn't resolved
+  // them yet (avoids flashing the unscoped everything-view).
+  let scopeUnresolved = $derived(
+    pins.lineIds().length > 0 && scope.lines.length !== pins.lineIds().length,
   );
 
-  let ids = $derived(resolveSelectionIds(selection, projectsBySlug, workspacesBySlug));
+  function openLine(line: NavLine) {
+    void goto(lineUrl(line));
+  }
 
   // Debounced search — the raw input updates instantly, the query key
   // only after the pause.
@@ -69,11 +87,11 @@
   ];
 
   let filters = $derived({
-    projectIds: ids.projectIds,
-    workspaceIds: ids.workspaceIds,
+    projectIds: filterIds.projectIds,
+    workspaceIds: filterIds.workspaceIds,
     q: q || undefined,
     status: statusFilter,
-    enabled: !ids.unresolved,
+    enabled: !scopeUnresolved,
   });
 
   // ── Add contact (ADR-051) ────────────────────────────────────────────
@@ -110,11 +128,10 @@
     aNextAt = '';
     aNextNote = '';
     aStatus = ENGAGEMENT_STATUSES[0];
-    // Pre-select when the sidebar filter collapses to one project.
+    // Pre-select when the pinned scope collapses to one project.
     aProject = '';
-    const selected = [...selection.effectiveProjects()];
-    if (selected.length === 1) {
-      aProject = projectsBySlug.get(selected[0])?.id ?? '';
+    if (scope.lines.length === 1) {
+      aProject = scope.lines[0].projectId;
     } else if (projectOptions.length === 1) {
       aProject = projectOptions[0].value;
     }
@@ -175,6 +192,7 @@
 <section class="contacts">
   <header class="contacts__head">
     <p class="eyebrow">Contacts</p>
+    <ScopeStrip onOpenLine={openLine} compact />
     <div class="contacts__controls">
       <div class="contacts__search">
         <Input
