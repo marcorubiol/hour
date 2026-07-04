@@ -27,8 +27,17 @@
   import Input from '$lib/components/Input.svelte';
   import Select from '$lib/components/Select.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
-  import { resolveSelectionIds } from '$lib/selection-filter';
-  import { useSelection } from '$lib/stores/selection.svelte';
+  import ScopeStrip from '$lib/components/ScopeStrip.svelte';
+  import { usePins } from '$lib/stores/pins.svelte';
+  import {
+    buildLineIndex,
+    resolveScope,
+    lineUrl,
+    type NavLine,
+    type NavWorkspace,
+    type RawLine,
+  } from '$lib/nav';
+  import { allLinesQueryOptions } from '$lib/nav-queries';
   import { accentVarFor } from '$lib/utils/accent';
   import { addDaysIso, addMonths, dayKeyInTz, monthGrid } from '$lib/calendar';
   import {
@@ -53,6 +62,7 @@
     status: string;
     venue_name: string | null;
     city: string | null;
+    line_id: string | null;
     project: ProjectLite | null;
     venue: { name: string; city: string | null } | null;
   };
@@ -69,7 +79,7 @@
     project: ProjectLite | null;
   };
 
-  const selection = useSelection();
+  const pins = usePins();
 
   const viewerTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const now = new Date();
@@ -80,7 +90,7 @@
   let gridFrom = $derived(weeks[0][0].iso);
   let gridTo = $derived(weeks[weeks.length - 1][6].iso);
 
-  // ── Selection → ids (LineList pattern: resolve against shared caches) ──
+  // ── Pins → scope (Adaptive Digest) ────────────────────────────────────
   const workspacesQuery = createQuery({
     queryKey: ['workspaces'],
     queryFn: ({ signal }: { signal: AbortSignal }) =>
@@ -91,6 +101,7 @@
     queryFn: ({ signal }: { signal: AbortSignal }) =>
       fetchJSON<{ items: ProjectLite[] }>('/api/projects?status=active', signal),
   });
+  const linesQuery = createQuery(allLinesQueryOptions());
 
   let workspacesBySlug = $derived(
     new Map(($workspacesQuery.data?.items ?? []).map((w) => [w.slug, w])),
@@ -102,18 +113,32 @@
     new Map(($projectsQuery.data?.items ?? []).map((p) => [p.slug, p])),
   );
 
-  let resolved = $derived(resolveSelectionIds(selection, projectsBySlug, workspacesBySlug));
+  let lineIndex = $derived(
+    buildLineIndex(($workspacesQuery.data?.items ?? []) as NavWorkspace[], ($linesQuery.data?.items as RawLine[]) ?? []),
+  );
+  let scope = $derived(resolveScope(pins.pins, ($workspacesQuery.data?.items ?? []) as NavWorkspace[], lineIndex));
+  // Line pins scope through their project (the endpoint filters by
+  // project_ids ∪ workspace_ids); the exact-line narrowing happens client-side.
+  let linePinProjectIds = $derived(new Set(scope.lines.map((l) => l.projectId)));
   let filterIds = $derived({
-    projectIds: resolved.projectIds,
-    workspaceIds: resolved.workspaceIds,
+    projectIds: [...linePinProjectIds],
+    workspaceIds: scope.workspaceIds,
   });
-  let selectionUnresolved = $derived(resolved.unresolved);
+  // Hold the feed while line pins exist but the lines cache hasn't resolved
+  // them yet (avoids flashing the unscoped everything-view).
+  let scopeUnresolved = $derived(
+    pins.lineIds().length > 0 && scope.lines.length !== pins.lineIds().length,
+  );
+
+  function openLine(line: NavLine) {
+    void goto(lineUrl(line));
+  }
 
   // ── Event feeds ──────────────────────────────────────────────────────
   const feedKey = toStore(() => ({
     from: gridFrom,
     to: gridTo,
-    unresolved: selectionUnresolved,
+    unresolved: scopeUnresolved,
     ...filterIds,
   }));
 
@@ -173,9 +198,29 @@
         : '',
   );
 
+  // Exact-line narrowing: the endpoint returns the whole project of a
+  // pinned line, so drop performances of that project whose line isn't the
+  // pinned one (unless their workspace is also a pinned space). Dates carry
+  // no line_id, so a line pin shows its project's dates.
+  function perfInScope(p: PerformanceEvent): boolean {
+    if (scope.isEmpty) return true;
+    const ws = p.project?.workspace_id;
+    if (ws && scope.workspaceIds.includes(ws)) return true;
+    if (p.line_id && scope.lineIds.includes(p.line_id)) return true;
+    return false;
+  }
+  function dateInScope(d: DateEvent): boolean {
+    if (scope.isEmpty) return true;
+    const ws = d.project?.workspace_id;
+    if (ws && scope.workspaceIds.includes(ws)) return true;
+    if (d.project && linePinProjectIds.has(d.project.id)) return true;
+    return false;
+  }
+
   let performancesByDay = $derived.by(() => {
     const map = new Map<string, PerformanceEvent[]>();
     for (const p of $perfQuery.data?.items ?? []) {
+      if (!perfInScope(p)) continue;
       const key = p.performed_at.slice(0, 10);
       (map.get(key) ?? map.set(key, []).get(key)!).push(p);
     }
@@ -185,6 +230,7 @@
   let datesByDay = $derived.by(() => {
     const map = new Map<string, DateEvent[]>();
     for (const d of $datesQuery.data?.items ?? []) {
+      if (!dateInScope(d)) continue;
       // All-day rows are calendar dates, not instants — keep the stored day.
       const key = d.all_day ? d.starts_at.slice(0, 10) : dayKeyInTz(d.starts_at, viewerTz);
       (map.get(key) ?? map.set(key, []).get(key)!).push(d);
@@ -254,11 +300,11 @@
 
   function openCreate(dayIso?: string) {
     cDay = dayIso ?? todayIso;
-    // Pre-select when the sidebar filter collapses to one project.
+    // Pre-select the project when a single line is pinned, or there's only
+    // one project to choose from.
     if (!cProject) {
-      const selected = [...selection.effectiveProjects()];
-      if (selected.length === 1) {
-        cProject = projectsBySlug.get(selected[0])?.id ?? '';
+      if (scope.lines.length === 1) {
+        cProject = scope.lines[0].projectId;
       } else if (projectOptions.length === 1) {
         cProject = projectOptions[0].value;
       }
@@ -408,6 +454,7 @@
 <section class="cal">
   <header class="cal__head">
     <p class="eyebrow">Calendar</p>
+    <ScopeStrip onOpenLine={openLine} compact />
     <div class="cal__nav">
       <h1 class="cal__month">{monthLabel}</h1>
       <div class="cal__nav-buttons">
@@ -421,7 +468,7 @@
     {#if !loading && !errorMsg}
       <p class="cal__count">
         {monthEventCount === 1 ? '1 event' : `${monthEventCount} events`}
-        {#if selection.hasAnySelection()}in current filter{/if}
+        {#if !scope.isEmpty}in current pins{/if}
       </p>
     {/if}
   </header>

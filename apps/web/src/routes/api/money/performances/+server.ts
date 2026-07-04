@@ -55,6 +55,7 @@ type MoneyPerformance = {
   fee_amount: number | null;
   fee_currency: string | null;
   project_id: string;
+  line_id: string | null;
   project: {
     id: string;
     slug: string;
@@ -93,7 +94,7 @@ export const GET: RequestHandler = async ({ request, url, platform }) => {
   search.set(
     'select',
     [
-      'id,slug,performed_at,status,venue_name,city,fee_amount,fee_currency,project_id',
+      'id,slug,performed_at,status,venue_name,city,fee_amount,fee_currency,project_id,line_id',
       'project:project_id(id,slug,name,accent,workspace_id)',
     ].join(','),
   );

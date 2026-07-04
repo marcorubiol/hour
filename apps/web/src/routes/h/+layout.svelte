@@ -213,8 +213,6 @@
     }
   });
 
-  let inSettings = $derived(/^\/h\/[^/]+\/settings(\b|\/|$)/.test(page.url.pathname));
-
   // Do Not Disturb — quick toggle in the account menu.
   const DND_KEY = 'hour_dnd';
   let dnd = $state(false);

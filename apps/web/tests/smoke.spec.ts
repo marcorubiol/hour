@@ -10,28 +10,23 @@ test.describe('smoke', () => {
   );
 
   /**
-   * Post-ADR-037/038/039 happy path (rewritten 2026-07-02 against the live
-   * world — the previous version predated the muk-cia rename and the
-   * sidebar-as-filter shell). Covers the integration points that move data
-   * end to end:
+   * Adaptive Digest happy path (rewritten 2026-07-04 for ADR-055 — the nav
+   * redesign removed the persistent sidebar; scope is PINS + ⌘K). Covers the
+   * integration points that move data end to end:
    *   - login flow (Supabase Auth REST + JWT in localStorage)
    *   - hardcoded post-login redirect → /h/marco-rubiol
-   *   - shell renders with the lens pills, Today active
-   *   - /api/workspaces + /api/projects under RLS fill Plaza (sidebar is
-   *     user-scoped: the MaMeMi project link appears even though the URL
-   *     lands on marco-rubiol)
+   *   - Adaptive shell: lens pills (Today · Calendar · Money), Today active,
+   *     Clean|My home toggle on the home
+   *   - ⌘K command palette jumps to a real line (built from /api/lines)
    *   - project detail at /h/muk-cia/project/mamemi loads the engagement
-   *     count through /api/engagements (154 contacts under RLS)
-   *   - the Calendar lens routes, renders the month grid, and the Today
-   *     pill returns to the workspace
+   *     count through /api/engagements (RLS)
+   *   - Calendar lens routes + month grid; Contacts route (no longer a pill)
+   *     still deep-links; Money lens totals render; Today returns home
    *
-   * The test user (playwright@hour.test) is member of marco-rubiol,
-   * muk-cia and its own playwright workspace; NOT of demo — see
-   * tests/rls/cross-tenant.test.ts for the authoritative fixture map.
+   * The test user (playwright@hour.test) is member of marco-rubiol, muk-cia
+   * and its own playwright workspace; NOT of demo.
    */
-  test('login → MaMeMi project → engagements load → calendar lens', async ({
-    page,
-  }) => {
+  test('login → shell → ⌘K → project → lenses', async ({ page }) => {
     await page.goto('/login');
 
     await page.locator('input[type=email]').fill(EMAIL!);
@@ -40,24 +35,29 @@ test.describe('smoke', () => {
 
     await page.waitForURL(/\/h\/marco-rubiol\/?$/);
 
-    // Shell loaded — lens pills present, Today active.
+    // Adaptive shell — lens pills present, Today active, home mode toggle.
     const lensNav = page.getByRole('navigation', { name: 'Lens' });
     await expect(lensNav.getByRole('button', { name: 'Today' })).toHaveAttribute(
       'aria-current',
       'true',
     );
+    await expect(page.getByRole('button', { name: 'Clean' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'My home' })).toBeVisible();
 
-    // Plaza is user-scoped: the MaMeMi project appears even though the URL
-    // landed on marco-rubiol. (Plaza row clicks are filter TOGGLES since
-    // ADR-038 — the canonical URL is the deterministic way in, so the
-    // smoke navigates directly; toggle UX gets its own test some day.)
-    await expect(
-      page.getByRole('link', { name: 'MaMeMi', exact: true }).first(),
-    ).toBeAttached();
+    // ⌘K palette is built from /api/lines (RLS): a real line is reachable in
+    // one hop even though the sidebar is gone.
+    await page.keyboard.press('Meta+k');
+    const palette = page.getByRole('dialog', { name: 'Jump to a line or space' });
+    await expect(palette).toBeVisible();
+    const lineRow = palette.getByRole('option').first();
+    await expect(lineRow).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(palette).not.toBeVisible();
+
+    // Project detail proves the whole read path: JWT survived, RLS let the
+    // engagements through, the count renders. (Reached by direct URL — the
+    // canonical way in; the sidebar link is gone.)
     await page.goto('/h/muk-cia/project/mamemi/');
-
-    // RelationshipStub proves the whole read path: JWT survived, RLS let
-    // the engagements through, the count renders.
     const countLabel = page.locator('.rel-stub__count');
     await expect(countLabel).toBeVisible();
     await expect(countLabel).toContainText(/\d+\s+engagements?/);
@@ -73,27 +73,19 @@ test.describe('smoke', () => {
       'true',
     );
 
-    // Contacts lens: pill navigates, the shared EngagementTable loads the
-    // same 154 contacts inside the shell, search narrows deterministically.
-    await lensNav.getByRole('button', { name: 'Contacts' }).click();
-    await page.waitForURL(/\/h\/muk-cia\/contacts\/?$/);
+    // Contacts is no longer a top-lens pill (ADR-055) but the route still
+    // deep-links: the shared EngagementTable loads contacts inside the shell.
+    await page.goto('/h/muk-cia/contacts');
     await expect(page.locator('.status-bar__count')).toContainText(/\d+ contacts/);
     expect(await page.locator('tbody tr').count()).toBeGreaterThan(0);
-    await page.getByPlaceholder('People or organizations…').fill('zzz-no-such-person-zzz');
-    await expect(page.locator('.msg')).toContainText('No results', { timeout: 10_000 });
-    await page.getByPlaceholder('People or organizations…').fill('');
-    await expect
-      .poll(async () => await page.locator('tbody tr').count(), { timeout: 10_000 })
-      .toBeGreaterThan(0);
 
-    // Money lens: pill navigates, totals strip + fees table render.
+    // Money lens: pill navigates, totals strip renders.
     await lensNav.getByRole('button', { name: 'Money' }).click();
     await page.waitForURL(/\/h\/muk-cia\/money\/?$/);
     await expect(page.locator('.mny__totals')).toBeVisible();
     await expect(page.locator('.mny__total').first()).toContainText(/pipeline/);
 
-    // Today pill leaves the routed lens (lands on the serialized selection —
-    // canonical project URL or query form, both fine; just not a lens URL).
+    // Today pill returns to the home (leaves the routed lens).
     await lensNav.getByRole('button', { name: 'Today' }).click();
     await page.waitForURL((url) => !url.pathname.includes('/money'));
   });

@@ -22,10 +22,21 @@
   import Menu from '$lib/components/Menu.svelte';
   import StateBadge from '$lib/components/StateBadge.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
+  import ScopeStrip from '$lib/components/ScopeStrip.svelte';
   import { dayLabel } from '$lib/datetime';
   import { performanceStatusLabel, performanceStatusTone } from '$lib/performance';
-  import { resolveSelectionIds } from '$lib/selection-filter';
-  import { useSelection } from '$lib/stores/selection.svelte';
+  import { usePins } from '$lib/stores/pins.svelte';
+  import {
+    buildLineIndex,
+    resolveScope,
+    lineUrl,
+    type NavLine,
+    type NavWorkspace,
+    type RawLine,
+  } from '$lib/nav';
+  import { allLinesQueryOptions } from '$lib/nav-queries';
+  import { lineKindGlyph, lineKindLabel } from '$lib/utils/line-kind';
+  import { goto } from '$app/navigation';
 
   type WorkspaceLite = { id: string; slug: string };
   type ProjectLite = { id: string; slug: string };
@@ -39,6 +50,7 @@
     city: string | null;
     fee_amount: number | null;
     fee_currency: string | null;
+    line_id: string | null;
     project: {
       id: string;
       slug: string;
@@ -58,7 +70,7 @@
     payer: { full_name: string; organization_name: string | null } | null;
   };
 
-  const selection = useSelection();
+  const pins = usePins();
 
   const workspacesQuery = createQuery({
     queryKey: ['workspaces'],
@@ -70,18 +82,22 @@
     queryFn: ({ signal }: { signal: AbortSignal }) =>
       fetchJSON<{ items: ProjectLite[] }>('/api/projects?status=active', signal),
   });
+  const linesQuery = createQuery(allLinesQueryOptions());
 
-  let workspacesBySlug = $derived(
-    new Map(($workspacesQuery.data?.items ?? []).map((w) => [w.slug, w])),
-  );
   let workspaceSlugById = $derived(
     new Map(($workspacesQuery.data?.items ?? []).map((w) => [w.id, w.slug])),
   );
-  let projectsBySlug = $derived(
-    new Map(($projectsQuery.data?.items ?? []).map((p) => [p.slug, p])),
-  );
 
-  let ids = $derived(resolveSelectionIds(selection, projectsBySlug, workspacesBySlug));
+  // ── Pins → scope (Adaptive Digest) ────────────────────────────────────
+  let lineIndex = $derived(
+    buildLineIndex(($workspacesQuery.data?.items ?? []) as NavWorkspace[], ($linesQuery.data?.items as RawLine[]) ?? []),
+  );
+  let scope = $derived(resolveScope(pins.pins, ($workspacesQuery.data?.items ?? []) as NavWorkspace[], lineIndex));
+  let lineById = $derived(new Map(lineIndex.map((l) => [l.id, l])));
+  let linePinProjectIds = $derived(new Set(scope.lines.map((l) => l.projectId)));
+  let scopeUnresolved = $derived(
+    pins.lineIds().length > 0 && scope.lines.length !== pins.lineIds().length,
+  );
 
   function feedParams(k: { projectIds: string[]; workspaceIds: string[] }): string {
     const p = new URLSearchParams();
@@ -89,9 +105,17 @@
     if (k.workspaceIds.length > 0) p.set('workspace_ids', k.workspaceIds.join(','));
     return p.toString();
   }
+  let filterIds = $derived({
+    projectIds: [...linePinProjectIds],
+    workspaceIds: scope.workspaceIds,
+  });
+
+  function openLine(line: NavLine) {
+    void goto(lineUrl(line));
+  }
 
   const feesOptions = toStore(() => {
-    const k = ids;
+    const k = { ...filterIds, unresolved: scopeUnresolved };
     return {
       queryKey: ['money-performances', { p: k.projectIds, w: k.workspaceIds }] as const,
       enabled: !k.unresolved,
@@ -103,7 +127,7 @@
     };
   });
   const invoicesOptions = toStore(() => {
-    const k = ids;
+    const k = { ...filterIds, unresolved: scopeUnresolved };
     return {
       queryKey: ['invoices', { p: k.projectIds, w: k.workspaceIds }] as const,
       enabled: !k.unresolved,
@@ -115,8 +139,62 @@
   const feesQuery = createQuery(feesOptions);
   const invoicesQuery = createQuery(invoicesOptions);
 
-  let fees = $derived($feesQuery.data?.items ?? []);
+  // Exact-line narrowing (the endpoint returns a pinned line's whole project).
+  function feeInScope(f: MoneyPerformance): boolean {
+    if (scope.isEmpty) return true;
+    const ws = f.project?.workspace_id;
+    if (ws && scope.workspaceIds.includes(ws)) return true;
+    if (f.line_id && scope.lineIds.includes(f.line_id)) return true;
+    return false;
+  }
+  let fees = $derived(($feesQuery.data?.items ?? []).filter(feeInScope));
   let invoices = $derived($invoicesQuery.data?.items ?? []);
+
+  // ── Roll-up by line (the Money-by-line view) ──────────────────────────
+  type LineRoll = {
+    key: string;
+    name: string;
+    kind: string;
+    projectName: string;
+    accent: string;
+    line: NavLine | null;
+    confirmed: number;
+    holds: number;
+    dates: number;
+  };
+  let byLine = $derived.by<LineRoll[]>(() => {
+    const map = new Map<string, LineRoll>();
+    for (const f of fees) {
+      const line = (f.line_id ? lineById.get(f.line_id) : null) ?? null;
+      const key = f.line_id ?? `loose:${f.project?.id ?? 'none'}`;
+      if (!map.has(key)) {
+        map.set(key, {
+          key,
+          name: line?.name ?? 'One-offs',
+          kind: line?.kind ?? 'oneoff',
+          projectName: line?.projectName ?? f.project?.name ?? '—',
+          accent: line?.accent ?? 'var(--text-faint)',
+          line,
+          confirmed: 0,
+          holds: 0,
+          dates: 0,
+        });
+      }
+      const rec = map.get(key)!;
+      if (f.fee_amount != null) {
+        if (['confirmed', 'done', 'invoiced', 'paid'].includes(f.status)) {
+          rec.confirmed += f.fee_amount;
+          rec.dates += 1;
+        } else if (f.status.startsWith('hold')) {
+          rec.holds += f.fee_amount;
+        }
+      }
+    }
+    return [...map.values()]
+      .filter((r) => r.confirmed || r.holds)
+      .sort((a, b) => b.confirmed - a.confirmed);
+  });
+  let byLineMax = $derived(Math.max(1, ...byLine.map((l) => l.confirmed + l.holds)));
   let loading = $derived($feesQuery.isLoading);
   let errorMsg = $derived(
     $feesQuery.error instanceof Error ? $feesQuery.error.message : '',
@@ -368,6 +446,7 @@
 <section class="mny">
   <header class="mny__head">
     <p class="eyebrow">Money</p>
+    <ScopeStrip onOpenLine={openLine} compact />
     <div class="mny__totals">
       <span class="mny__total">
         <span class="mny__total-label">pipeline</span>
@@ -390,10 +469,44 @@
   {:else if loading}
     <p class="mny__state">Loading…</p>
   {:else}
+    {#if byLine.length > 0}
+      <section class="mny__section" aria-label="By line">
+        <p class="eyebrow">By line</p>
+        <div class="mline-list">
+          {#each byLine as l (l.key)}
+            <button
+              type="button"
+              class="mline"
+              style={`--c: ${l.accent}`}
+              onclick={() => l.line && openLine(l.line)}
+              disabled={!l.line}
+            >
+              <span class="mline__top">
+                <span class="mline__glyph">{lineKindGlyph(l.kind)}</span>
+                <span class="mline__name">{l.name}</span>
+                <span class="mline__co">{l.projectName}</span>
+                <span class="mline__amt">{money.format(l.confirmed)}</span>
+              </span>
+              <span class="mline__bar">
+                <span class="mline__fill" style={`inline-size: ${((l.confirmed + l.holds) / byLineMax) * 100}%`}>
+                  <span class="mline__fillc" style={`inline-size: ${l.confirmed + l.holds ? (l.confirmed / (l.confirmed + l.holds)) * 100 : 0}%`}></span>
+                </span>
+              </span>
+              <span class="mline__meta">
+                <span>{l.dates} confirmed {l.dates === 1 ? 'date' : 'dates'}</span>
+                {#if l.holds > 0}<span class="mline__hold">+ {money.format(l.holds)} in holds</span>{/if}
+                {#if l.line}<span class="mline__go">open line →</span>{/if}
+              </span>
+            </button>
+          {/each}
+        </div>
+      </section>
+    {/if}
+
     <section class="mny__section" aria-label="Fees">
       <p class="eyebrow">Fees</p>
       {#if fees.length === 0}
-        <p class="mny__state">No performances in the current filter.</p>
+        <p class="mny__state">No performances in the current pins.</p>
       {:else}
         <div class="table-wrap">
           <table>
@@ -613,6 +726,92 @@
       display: flex;
       flex-direction: column;
       gap: var(--space-s);
+    }
+
+    /* ── by-line rollup ── */
+    .mline-list {
+      display: flex;
+      flex-direction: column;
+    }
+    .mline {
+      display: block;
+      inline-size: 100%;
+      text-align: start;
+      border: 0;
+      background: none;
+      border-block-end: 1px solid var(--border-color-light);
+      padding-block: var(--space-m);
+      padding-inline: var(--space-xs);
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .mline:disabled {
+      cursor: default;
+    }
+    .mline:hover:not(:disabled) {
+      background: var(--bg-light);
+    }
+    .mline__top {
+      display: flex;
+      align-items: center;
+      gap: var(--space-s);
+    }
+    .mline__glyph {
+      color: var(--c);
+      font-size: var(--text-m);
+    }
+    .mline__name {
+      font-size: var(--text-m);
+      font-weight: 500;
+      color: var(--text-color);
+    }
+    .mline__co {
+      font-size: var(--text-xs);
+      color: var(--text-faint);
+    }
+    .mline__amt {
+      margin-inline-start: auto;
+      font-family: var(--font-mono);
+      font-size: var(--text-l);
+      color: var(--text-color);
+      font-variant-numeric: tabular-nums;
+    }
+    .mline__bar {
+      display: block;
+      block-size: 0.45rem;
+      border-radius: var(--radius-circle);
+      background: var(--bg-light);
+      margin-block: var(--space-s) var(--space-xs);
+      overflow: hidden;
+    }
+    .mline__fill {
+      display: block;
+      block-size: 100%;
+      border-radius: var(--radius-circle);
+      background: color-mix(in oklch, var(--c) 32%, var(--bg-light));
+      position: relative;
+    }
+    .mline__fillc {
+      position: absolute;
+      inset-block: 0;
+      inset-inline-start: 0;
+      block-size: 100%;
+      border-radius: var(--radius-circle);
+      background: var(--c);
+    }
+    .mline__meta {
+      display: flex;
+      align-items: center;
+      gap: var(--space-m);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+    }
+    .mline__hold {
+      color: var(--text-faint);
+    }
+    .mline__go {
+      margin-inline-start: auto;
+      color: var(--text-faint);
     }
 
     .table-wrap {

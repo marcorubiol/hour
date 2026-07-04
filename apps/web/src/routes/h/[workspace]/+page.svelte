@@ -1,38 +1,41 @@
 <script lang="ts">
   /**
-   * Today — "what do I do now?" (ADR-033 shell; refocused 2026-07-04,
-   * cierre nivel 1e).
+   * Today — Adaptive Digest home (ADR-055). Opens as a single quiet column:
+   * greeting, this-week agenda, and whatever the user has PINNED brought
+   * forward. Density is opt-in: pin a space or a line and its workbench
+   * surfaces here. The Clean|My home toggle (shell top bar) flips between the
+   * quiet digest and a composed board of widgets.
    *
-   * Masthead → real stats → "Next actions" table (overdue first, then
-   * today/this week — cross-workspace, everything RLS allows) → "What's
-   * alive" workspace rows with real gig counts.
-   *
-   * Data sources (all real):
-   * - Workspaces: TanStack ['workspaces'] (cached by Plaza).
-   * - Active projects: TanStack ['projects', { status: 'active' }].
-   * - Engagements: ['engagements', 'today'] — cross-workspace (the old
-   *   "1 project per workspace" convention is gone). Sorted by the API as
-   *   next_action_at.asc.nullslast, so due rows always arrive first.
-   * - Performances: ['today-performances'] — upcoming, for confirmed /
-   *   on-hold counts (derivable since ADR-041; the "—" placeholders era
-   *   is over).
+   * Scope: empty pins = everything the user can see; a pinned space scopes to
+   * its workspace; a pinned line scopes to its project (engagements carry no
+   * line_id yet — line scope resolves through the line's project).
    */
 
   import { page } from '$app/state';
   import { createQuery } from '@tanstack/svelte-query';
   import { fetchJSON } from '$lib/api';
   import { accentVar, accentVarFor } from '$lib/utils/accent';
+  import { lineKindGlyph, lineKindLabel } from '$lib/utils/line-kind';
   import { decodeJwtClaim } from '$lib/realtime';
+  import { usePins } from '$lib/stores/pins.svelte';
+  import { useHomeMode } from '$lib/stores/home-mode.svelte';
+  import {
+    buildLineIndex,
+    resolveScope,
+    lineUrl,
+    type NavLine,
+    type NavWorkspace,
+    type RawLine,
+  } from '$lib/nav';
+  import { workspacesQueryOptions, allLinesQueryOptions } from '$lib/nav-queries';
+  import ScopeStrip from '$lib/components/ScopeStrip.svelte';
   import TagChip from '$lib/components/TagChip.svelte';
+  import { goto } from '$app/navigation';
 
-  type Workspace = {
-    id: string;
-    slug: string;
-    name: string;
-    kind: 'personal' | 'team';
-    accent?: string | null;
-    description?: string | null;
-  };
+  const pins = usePins();
+  const homeMode = useHomeMode();
+
+  let workspaceSlug = $derived(page.params.workspace ?? '');
 
   type Project = {
     id: string;
@@ -41,7 +44,6 @@
     workspace_id: string;
     status: 'draft' | 'active' | 'archived';
   };
-
   type EngagementStatus =
     | 'contacted'
     | 'in_conversation'
@@ -50,117 +52,95 @@
     | 'declined'
     | 'dormant'
     | 'recurring';
-
   type Engagement = {
     id: string;
     status: EngagementStatus;
-    role: string | null;
-    workspace_id: string;
     next_action_at: string | null;
     next_action_note: string | null;
     updated_at: string;
+    workspace_id: string;
     custom_fields: Record<string, unknown> | null;
-    person: {
-      slug: string | null;
-      full_name: string | null;
-      organization_name: string | null;
-    } | null;
-    project: {
-      id: string;
-      slug: string;
-      name: string;
-    } | null;
+    person: { full_name: string | null; organization_name: string | null; slug: string | null } | null;
+    project: { id: string; slug: string; name: string } | null;
   };
-
-  type PerformanceLite = {
+  type Performance = {
     id: string;
     status: string;
-    performed_at: string;
-    project: { workspace_id: string } | null;
+    performed_at: string | null;
+    venue_name: string | null;
+    city: string | null;
+    fee_amount: number | null;
+    line_id: string | null;
+    project: { id: string; slug: string; name: string; workspace_id: string } | null;
   };
 
-  let workspaceSlug = $derived(page.params.workspace ?? '');
-
-  const workspacesQuery = createQuery({
-    queryKey: ['workspaces'],
-    queryFn: ({ signal }) => fetchJSON<{ items: Workspace[] }>('/api/workspaces', signal),
-  });
-
+  const workspacesQuery = createQuery(workspacesQueryOptions());
+  const linesQuery = createQuery(allLinesQueryOptions());
   const projectsQuery = createQuery({
     queryKey: ['projects', { status: 'active' }],
-    queryFn: ({ signal }) =>
+    queryFn: ({ signal }: { signal: AbortSignal }) =>
       fetchJSON<{ items: Project[] }>('/api/projects?status=active', signal),
   });
-
-  // Cross-workspace: everything RLS allows, no project_slug scoping. The
-  // API orders next_action_at.asc.nullslast — rows with a due action are
-  // always inside the first page even when the total exceeds the limit.
   const engagementsQuery = createQuery({
     queryKey: ['engagements', 'today'],
     queryFn: ({ signal }: { signal: AbortSignal }) =>
-      fetchJSON<{ total: number; items: Engagement[] }>(
-        '/api/engagements?status=any&limit=100',
-        signal,
-      ),
+      fetchJSON<{ items: Engagement[] }>('/api/engagements?status=any&limit=100', signal),
   });
-
-  let engagements = $derived($engagementsQuery.data?.items ?? []);
-
-  // Upcoming gigs (from today) — real confirmed/on-hold counts.
-  let todayIso = new Date().toISOString().slice(0, 10);
+  let todayIso = $derived(new Date().toISOString().slice(0, 10));
   const performancesQuery = createQuery({
-    queryKey: ['today-performances', todayIso],
+    queryKey: ['today-performances'],
     queryFn: ({ signal }: { signal: AbortSignal }) =>
-      fetchJSON<{ items: PerformanceLite[] }>(
-        `/api/performances?status=any&from=${todayIso}&limit=200`,
+      fetchJSON<{ items: Performance[] }>(
+        `/api/performances?status=any&from=${new Date().toISOString().slice(0, 10)}&limit=200`,
         signal,
       ),
   });
 
-  let upcomingPerformances = $derived($performancesQuery.data?.items ?? []);
-  let confirmedCount = $derived(
-    upcomingPerformances.filter((p) =>
-      ['confirmed', 'done', 'invoiced', 'paid'].includes(p.status),
-    ).length,
-  );
-  let holdCount = $derived(
-    upcomingPerformances.filter((p) => p.status.startsWith('hold')).length,
-  );
+  let workspaces = $derived<NavWorkspace[]>($workspacesQuery.data?.items ?? []);
+  let lineIndex = $derived(buildLineIndex(workspaces, ($linesQuery.data?.items as RawLine[]) ?? []));
+  let engagements = $derived<Engagement[]>($engagementsQuery.data?.items ?? []);
+  let performances = $derived<Performance[]>($performancesQuery.data?.items ?? []);
 
-  // ──────────────────────────────────────────────────────────────────────
-  // Masthead derivations
+  // ── Scope resolution ──────────────────────────────────────────────────
+  let scope = $derived(resolveScope(pins.pins, workspaces, lineIndex));
+  // A pinned line scopes engagements through its project.
+  let pinnedProjectIds = $derived(new Set(scope.lines.map((l) => l.projectId)));
 
-  let now = $derived(new Date());
-
-  let dateLabel = $derived(
-    now
-      .toLocaleDateString('en-US', {
-        weekday: 'long',
-        month: 'long',
-        day: 'numeric',
-        year: 'numeric',
-      })
-      .toUpperCase(),
-  );
-
-  // Greeting takes the user's first name from the JWT (user_metadata.full_name
-  // set at signup; otherwise the email's local part with separators). Falls
-  // back to the personal workspace name. Workspace name is the wrong source
-  // — Marco isn't "mamemi" when he's looking at the mamemi workspace.
-
-  function titleCase(s: string): string {
-    return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
+  function engInScope(e: Engagement): boolean {
+    if (scope.isEmpty) return true;
+    if (scope.workspaceIds.includes(e.workspace_id)) return true;
+    if (e.project && pinnedProjectIds.has(e.project.id)) return true;
+    return false;
+  }
+  function perfInScope(p: Performance): boolean {
+    if (scope.isEmpty) return true;
+    const ws = p.project?.workspace_id;
+    if (ws && scope.workspaceIds.includes(ws)) return true;
+    if (p.line_id && scope.lineIds.includes(p.line_id)) return true;
+    if (p.project && pinnedProjectIds.has(p.project.id)) return true;
+    return false;
   }
 
-  let jwtName = $state<string | null>(null);
+  let scopedEngagements = $derived(engagements.filter(engInScope));
+  let scopedPerformances = $derived(performances.filter(perfInScope));
 
+  // ── Greeting + date ───────────────────────────────────────────────────
+  let now = $derived(new Date());
+  let greetWord = $derived.by(() => {
+    const h = now.getHours();
+    return h < 12 ? 'Good morning' : h < 19 ? 'Good afternoon' : 'Good evening';
+  });
+  let dateLabel = $derived(
+    now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }),
+  );
+
+  let jwtName = $state<string | null>(null);
   $effect(() => {
     if (typeof window === 'undefined') return;
     const jwt = localStorage.getItem('hour_jwt');
     if (!jwt) return;
     const full =
-      decodeJwtClaim(jwt, 'user_metadata.full_name') ||
-      decodeJwtClaim(jwt, 'user_metadata.name');
+      decodeJwtClaim(jwt, 'user_metadata.full_name') || decodeJwtClaim(jwt, 'user_metadata.name');
     if (full) {
       jwtName = full.split(/\s+/)[0] ?? full;
       return;
@@ -170,51 +150,17 @@
       const local = email.split('@')[0] ?? '';
       const first = local.split(/[._-]+/)[0];
       if (first && first.length < local.length) {
-        // Email had separators — first segment is a real name.
-        jwtName = titleCase(first);
+        jwtName = first.charAt(0).toUpperCase() + first.slice(1).toLowerCase();
       }
     }
   });
-
-  // Final greeting name: JWT user_metadata > JWT email split > the personal
-  // workspace's display name (always reads cleanly even if signup metadata
-  // is missing).
   let firstName = $derived.by(() => {
     if (jwtName) return jwtName;
-    const personal = $workspacesQuery.data?.items.find((h) => h.kind === 'personal');
-    if (personal) {
-      return personal.name.split(/\s+/)[0] ?? personal.name;
-    }
-    return 'there';
+    const personal = workspaces.find((h) => h.kind === 'personal');
+    return personal ? (personal.name.split(/\s+/)[0] ?? personal.name) : 'there';
   });
 
-  let activeProjectsCount = $derived(
-    ($projectsQuery.data?.items ?? []).filter((r) => r.status === 'active').length,
-  );
-
-  let thisWeekCount = $derived.by(() => {
-    const sevenDays = 7 * 24 * 60 * 60 * 1000;
-    const limit = now.getTime() + sevenDays;
-    return engagements.filter((e) => {
-      if (!e.next_action_at) return false;
-      const t = new Date(e.next_action_at).getTime();
-      return t >= now.getTime() && t <= limit;
-    }).length;
-  });
-
-  let overdueCount = $derived.by(() => {
-    const startOfToday = new Date(now);
-    startOfToday.setHours(0, 0, 0, 0);
-    return engagements.filter((e) => {
-      if (!e.next_action_at) return false;
-      if (e.status === 'declined' || e.status === 'dormant') return false;
-      return new Date(e.next_action_at).getTime() < startOfToday.getTime();
-    }).length;
-  });
-
-  // ──────────────────────────────────────────────────────────────────────
-  // Week table derivation
-
+  // ── Agenda (this week) ────────────────────────────────────────────────
   type WeekRow = {
     id: string;
     verb: string;
@@ -227,7 +173,6 @@
     daySortKey: number;
     dayLabel: string;
   };
-
   const VERBS: Record<EngagementStatus, { upcoming: string; overdue: string }> = {
     contacted: { upcoming: 'Follow up', overdue: 'Chase' },
     in_conversation: { upcoming: 'Reply', overdue: 'Reply' },
@@ -237,49 +182,28 @@
     dormant: { upcoming: 'Revive', overdue: 'Revive' },
     recurring: { upcoming: 'Check', overdue: 'Check' },
   };
-
-  const TAG_TONES: WeekRow['tags'][number]['tone'][] = [
-    'teal',
-    'blue',
-    'green',
-    'purple',
-    'amber',
-    'red',
-    'neutral',
-  ];
-
+  const TAG_TONES: WeekRow['tags'][number]['tone'][] = ['teal', 'blue', 'green', 'purple', 'amber', 'red', 'neutral'];
   function toneForTag(tag: string): WeekRow['tags'][number]['tone'] {
     let h = 0;
     for (let i = 0; i < tag.length; i++) h = (h * 31 + tag.charCodeAt(i)) >>> 0;
     return TAG_TONES[h % TAG_TONES.length];
   }
-
   function dayBucket(d: Date | null): { sortKey: number; label: string } {
     if (!d) return { sortKey: 1_000_000, label: 'WHENEVER' };
     const start = new Date(now);
     start.setHours(0, 0, 0, 0);
-    const diffMs = d.getTime() - start.getTime();
-    const diffDays = Math.floor(diffMs / (24 * 60 * 60 * 1000));
+    const diffDays = Math.floor((d.getTime() - start.getTime()) / (24 * 60 * 60 * 1000));
     if (diffDays < 0) return { sortKey: -1, label: 'OVERDUE' };
     if (diffDays === 0) return { sortKey: 0, label: 'TODAY' };
     if (diffDays === 1) return { sortKey: 1, label: 'TOMORROW' };
-    if (diffDays < 7) {
-      return {
-        sortKey: diffDays,
-        label: d
-          .toLocaleDateString('en-US', { weekday: 'short' })
-          .toUpperCase(),
-      };
-    }
+    if (diffDays < 7)
+      return { sortKey: diffDays, label: d.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase() };
     if (diffDays < 14) return { sortKey: 7, label: 'NEXT WEEK' };
     return { sortKey: 99, label: 'LATER' };
   }
-
-  let weekRows = $derived.by<WeekRow[]>(() => {
-    return engagements
+  let weekRows = $derived.by<WeekRow[]>(() =>
+    scopedEngagements
       .filter((e) => e.status !== 'declined' && e.status !== 'dormant')
-      // Only rows with a due date: Today answers "what do I do now?",
-      // not "everything that exists" (that's the Contacts lens).
       .filter((e) => e.next_action_at)
       .map((e) => {
         const date = new Date(e.next_action_at!);
@@ -287,19 +211,14 @@
         const isOverdue = bucket.sortKey === -1;
         const verb = VERBS[e.status]?.[isOverdue ? 'overdue' : 'upcoming'] ?? 'Look at';
         const tagsRaw = Array.isArray(e.custom_fields?.tags)
-          ? (e.custom_fields?.tags as unknown[]).filter(
-              (t): t is string => typeof t === 'string',
-            )
+          ? (e.custom_fields?.tags as unknown[]).filter((t): t is string => typeof t === 'string')
           : [];
         const tags = tagsRaw.slice(0, 2).map((label) => ({
           label: label.startsWith('#') ? label : `#${label}`,
           tone: toneForTag(label),
         }));
         const subject =
-          e.person?.full_name ||
-          e.person?.organization_name ||
-          e.next_action_note ||
-          'Untitled';
+          e.person?.full_name || e.person?.organization_name || e.next_action_note || 'Untitled';
         return {
           id: e.id,
           verb,
@@ -314,9 +233,8 @@
         };
       })
       .sort((a, b) => a.daySortKey - b.daySortKey)
-      .slice(0, 20);
-  });
-
+      .slice(0, 20),
+  );
   let groupedWeek = $derived.by(() => {
     const groups: { day: string; rows: WeekRow[] }[] = [];
     let current: { day: string; rows: WeekRow[] } | null = null;
@@ -330,467 +248,638 @@
     return groups;
   });
 
-  // ──────────────────────────────────────────────────────────────────────
-  // Project rows derivation
+  // ── Line + space stats (for pinned panels + custom widgets) ───────────
+  function perfsForLine(lineId: string): Performance[] {
+    return performances.filter((p) => p.line_id === lineId);
+  }
+  function perfsForWorkspace(wsId: string): Performance[] {
+    return performances.filter((p) => p.project?.workspace_id === wsId);
+  }
+  function statOf(list: Performance[]) {
+    const confirmed = list.filter((p) => ['confirmed', 'done', 'invoiced', 'paid'].includes(p.status)).length;
+    const holds = list.filter((p) => p.status.startsWith('hold')).length;
+    const fee = list
+      .filter((p) => ['confirmed', 'done', 'invoiced', 'paid'].includes(p.status))
+      .reduce((n, p) => n + (p.fee_amount ?? 0), 0);
+    return { confirmed, holds, fee };
+  }
 
-  type ProjectRow = {
-    workspace: Workspace;
-    sub: string;
-    activeProjects: number;
-    confirmed: number;
-    onHold: number;
-    dueActions: number;
-  };
-
-  let projectRows = $derived.by<ProjectRow[]>(() => {
-    const workspaces = $workspacesQuery.data?.items ?? [];
-    const projects = $projectsQuery.data?.items ?? [];
-    return workspaces.map((ws) => {
-      const wsPerfs = upcomingPerformances.filter((p) => p.project?.workspace_id === ws.id);
-      const dueActions = engagements.filter(
-        (e) =>
-          e.workspace_id === ws.id &&
-          e.next_action_at &&
-          e.status !== 'declined' &&
-          e.status !== 'dormant',
-      ).length;
-      return {
-        workspace: ws,
-        sub: ws.kind === 'personal' ? 'Personal workspace' : 'Team workspace',
-        activeProjects: projects.filter(
-          (p) => p.workspace_id === ws.id && p.status === 'active',
-        ).length,
-        confirmed: wsPerfs.filter((p) =>
-          ['confirmed', 'done', 'invoiced', 'paid'].includes(p.status),
-        ).length,
-        onHold: wsPerfs.filter((p) => p.status.startsWith('hold')).length,
-        dueActions,
-      };
-    });
+  let scopeStats = $derived(statOf(scopedPerformances));
+  let confirmedFees = $derived.by(() => {
+    return scopedPerformances
+      .filter((p) => ['confirmed', 'done', 'invoiced', 'paid'].includes(p.status) && p.fee_amount)
+      .sort((a, b) => (a.performed_at ?? '').localeCompare(b.performed_at ?? ''));
   });
+  let totalConfirmed = $derived(confirmedFees.reduce((n, p) => n + (p.fee_amount ?? 0), 0));
+
+  // Pinned units, resolved for panels.
+  type PinnedUnit =
+    | { kind: 'line'; pin: string; line: NavLine }
+    | { kind: 'space'; pin: string; ws: NavWorkspace };
+  let pinnedUnits = $derived.by<PinnedUnit[]>(() => {
+    const out: PinnedUnit[] = [];
+    const lineById = new Map(lineIndex.map((l) => [l.id, l]));
+    const wsBySlug = new Map(workspaces.map((w) => [w.slug, w]));
+    for (const pin of pins.pins) {
+      if (pin.startsWith('l:')) {
+        const line = lineById.get(pin.slice(2));
+        if (line) out.push({ kind: 'line', pin, line });
+      } else {
+        const ws = wsBySlug.get(pin.slice(2));
+        if (ws) out.push({ kind: 'space', pin, ws });
+      }
+    }
+    return out;
+  });
+  function linesOfWorkspace(wsId: string): NavLine[] {
+    return lineIndex.filter((l) => l.workspaceId === wsId);
+  }
+
+  function fmtDate(iso: string | null): string {
+    if (!iso) return '';
+    const d = new Date(iso);
+    return d.toLocaleDateString('en-US', { day: 'numeric', month: 'short' });
+  }
+  function fmtEur(n: number): string {
+    return '€' + Math.round(n).toLocaleString('en-US');
+  }
+
+  function openLine(line: NavLine) {
+    void goto(lineUrl(line));
+  }
 </script>
 
-<svelte:head>
-  <title>Today — Hour</title>
-</svelte:head>
+<svelte:head><title>Today — Hour</title></svelte:head>
 
-<section class="today">
-  <header class="today__masthead">
-    <p class="eyebrow">{dateLabel}</p>
-    <h1 class="today__greeting">
-      Hello, <em>{firstName}</em>.
-    </h1>
-    <div class="today__stats">
-      <span><b>{activeProjectsCount}</b> active projects</span>
-      <span><b>{confirmedCount}</b> confirmed</span>
-      <span><b>{holdCount}</b> on hold</span>
-      {#if overdueCount > 0}
-        <span class="today__stat-overdue"><b>{overdueCount}</b> overdue</span>
+<section class="home">
+  <h1 class="home__greet">{greetWord}, <em>{firstName}</em>.</h1>
+  <p class="home__date">
+    {dateLabel} ·
+    {homeMode.current === 'digest'
+      ? 'a quiet start — pin a space or a line to bring it forward'
+      : 'your custom home'}
+  </p>
+
+  <ScopeStrip onOpenLine={openLine} />
+
+  {#if homeMode.current === 'digest'}
+    <div class="home__toolbar"><span class="eyebrow">Today &amp; this week</span></div>
+    <div class="home__agenda-wrap">
+      {#if $engagementsQuery.isPending}
+        <p class="home__empty">Loading…</p>
+      {:else if $engagementsQuery.isError}
+        <p class="home__empty home__empty--err">Couldn't load your week.</p>
+      {:else if groupedWeek.length === 0}
+        <p class="home__empty">Nothing due in this scope. Set next actions on your conversations and they land here.</p>
+      {:else}
+        <div class="week">
+          {#each groupedWeek as group (group.day)}
+            <div class="week__day" class:week__day--overdue={group.day === 'OVERDUE'} class:week__day--today={group.day === 'TODAY'}>
+              {group.day}
+            </div>
+            <div class="week__rows">
+              {#each group.rows as row (row.id)}
+                <div class="week__item" class:week__item--overdue={row.overdue}>
+                  <span class="week__verb">{row.verb}</span>
+                  {#if row.personSlug}
+                    <a class="week__subject" href={`/h/${workspaceSlug}/person/${row.personSlug}`}>{row.subject}</a>
+                  {:else}
+                    <span class="week__subject">{row.subject}</span>
+                  {/if}
+                  <span class="week__tags">
+                    {#each row.tags as tag (tag.label)}
+                      <TagChip label={tag.label} tone={tag.tone} />
+                    {/each}
+                  </span>
+                  <span class="week__project" style={`--c: ${accentVar(row.projectSlug)}`}>
+                    <span class="week__dot" aria-hidden="true"></span>
+                    <span>{row.projectName}</span>
+                  </span>
+                </div>
+              {/each}
+            </div>
+          {/each}
+        </div>
       {/if}
-      <span><b>{thisWeekCount}</b> this week</span>
     </div>
-  </header>
 
-  <section class="today__plate">
-    <header class="today__section-head">
-      <div>
-        <p class="eyebrow">Next actions</p>
-        <h2 class="today__section-title">What do I do now?</h2>
-      </div>
-      <a class="today__section-link" href={`/h/${workspaceSlug}/contacts`}>
-        Open contacts →
-      </a>
-    </header>
-
-    {#if $engagementsQuery.isPending}
-      <p class="today__placeholder">Loading…</p>
-    {:else if $engagementsQuery.isError}
-      <p class="today__placeholder today__placeholder--err">
-        Couldn't load your week.
-      </p>
-    {:else if groupedWeek.length === 0}
-      <p class="today__placeholder">
-        No due actions. Set next actions on your conversations and they land here.
-      </p>
-    {:else}
-      <div class="week">
-        {#each groupedWeek as group (group.day)}
-          <div class="week__day-label" class:week__day-label--overdue={group.day === 'OVERDUE'}>
-            {group.day}
-          </div>
-          <div class="week__rows">
-            {#each group.rows as row (row.id)}
-              <div class="week__item" class:week__item--overdue={row.overdue}>
-                <span class="week__verb">{row.verb}</span>
-                {#if row.personSlug}
-                  <a class="week__subject" href={`/h/${workspaceSlug}/person/${row.personSlug}`}>
-                    {row.subject}
-                  </a>
-                {:else}
-                  <span class="week__subject">{row.subject}</span>
-                {/if}
-                <span class="week__tags">
-                  {#each row.tags as tag (tag.label)}
-                    <TagChip label={tag.label} tone={tag.tone} />
-                  {/each}
-                </span>
+    {#if pinnedUnits.length > 0}
+      <div class="home__pinned-head"><span class="eyebrow">Pinned</span></div>
+      <div class="home__pinned">
+        {#each pinnedUnits as unit (unit.pin)}
+          {#if unit.kind === 'line'}
+            {@const st = statOf(perfsForLine(unit.line.id))}
+            <button type="button" class="lmini" style={`--c: ${unit.line.accent}`} onclick={() => openLine(unit.line)}>
+              <div class="lmini__head">
+                <span class="lmini__co"><span class="dot" aria-hidden="true"></span>{unit.line.projectName}</span>
+                <span class="lmini__kind">{lineKindGlyph(unit.line.kind)} {lineKindLabel(unit.line.kind)}</span>
                 <span
-                  class="week__project"
-                  style={`--c: ${accentVar(row.projectSlug)}`}
-                >
-                  <span class="week__project-dot" aria-hidden="true"></span>
-                  <span>{row.projectName}</span>
-                </span>
+                  class="lmini__rm"
+                  role="button"
+                  tabindex="0"
+                  aria-label="Unpin"
+                  onclick={(e) => { e.stopPropagation(); pins.remove(unit.pin); }}
+                  onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); pins.remove(unit.pin); } }}
+                >×</span>
               </div>
+              <h3 class="lmini__name">{unit.line.name}</h3>
+              <p class="lmini__foot">
+                {#if st.confirmed || st.holds}
+                  <b>{st.confirmed}</b> confirmed{#if st.holds} · {st.holds} holds{/if}
+                {:else}
+                  internal — no dates
+                {/if}
+              </p>
+            </button>
+          {:else}
+            {@const st = statOf(perfsForWorkspace(unit.ws.id))}
+            {@const wsLines = linesOfWorkspace(unit.ws.id)}
+            <div class="spin" style={`--c: ${accentVarFor(unit.ws)}`}>
+              <div class="spin__head">
+                <span class="dot" aria-hidden="true"></span>
+                <h3 class="spin__name">{unit.ws.name}</h3>
+                <span class="spin__meta">{st.confirmed} confirmed · {st.holds} holds</span>
+                <span
+                  class="spin__rm"
+                  role="button"
+                  tabindex="0"
+                  aria-label="Unpin"
+                  onclick={() => pins.remove(unit.pin)}
+                  onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pins.remove(unit.pin); } }}
+                >×</span>
+              </div>
+              <div class="spin__lines">
+                {#each wsLines as line (line.id)}
+                  <button type="button" class="spin__line" onclick={() => openLine(line)}>
+                    <span class="spin__g">{lineKindGlyph(line.kind)}</span>
+                    <span class="spin__ln">{line.name}</span>
+                    <span class="spin__go" aria-hidden="true">→</span>
+                  </button>
+                {:else}
+                  <p class="spin__empty">No lines yet.</p>
+                {/each}
+              </div>
+            </div>
+          {/if}
+        {/each}
+      </div>
+    {/if}
+  {:else}
+    <!-- My home: composed widgets -->
+    <div class="home__grid">
+      <div class="home__col">
+        <section class="widget">
+          <div class="widget__head">
+            <span class="widget__title">This week</span>
+            <a class="widget__link" href={`/h/${workspaceSlug}/calendar`}>Calendar →</a>
+          </div>
+          {#if groupedWeek.length === 0}
+            <p class="home__empty">Nothing due in this scope.</p>
+          {:else}
+            <div class="week">
+              {#each groupedWeek as group (group.day)}
+                <div class="week__day" class:week__day--overdue={group.day === 'OVERDUE'} class:week__day--today={group.day === 'TODAY'}>{group.day}</div>
+                <div class="week__rows">
+                  {#each group.rows as row (row.id)}
+                    <div class="week__item" class:week__item--overdue={row.overdue}>
+                      <span class="week__verb">{row.verb}</span>
+                      {#if row.personSlug}
+                        <a class="week__subject" href={`/h/${workspaceSlug}/person/${row.personSlug}`}>{row.subject}</a>
+                      {:else}
+                        <span class="week__subject">{row.subject}</span>
+                      {/if}
+                      <span class="week__project" style={`--c: ${accentVar(row.projectSlug)}`}>
+                        <span class="week__dot" aria-hidden="true"></span><span>{row.projectName}</span>
+                      </span>
+                    </div>
+                  {/each}
+                </div>
+              {/each}
+            </div>
+          {/if}
+        </section>
+
+        {#if scope.lines.length > 0}
+          <section class="widget">
+            <div class="widget__head"><span class="widget__title">Lines you're working</span></div>
+            <div class="home__pinned home__pinned--single">
+              {#each scope.lines as line (line.id)}
+                {@const st = statOf(perfsForLine(line.id))}
+                <button type="button" class="lmini" style={`--c: ${line.accent}`} onclick={() => openLine(line)}>
+                  <div class="lmini__head">
+                    <span class="lmini__co"><span class="dot" aria-hidden="true"></span>{line.projectName}</span>
+                    <span class="lmini__kind">{lineKindGlyph(line.kind)} {lineKindLabel(line.kind)}</span>
+                  </div>
+                  <h3 class="lmini__name">{line.name}</h3>
+                  <p class="lmini__foot"><b>{st.confirmed}</b> confirmed{#if st.holds} · {st.holds} holds{/if}</p>
+                </button>
+              {/each}
+            </div>
+          </section>
+        {/if}
+      </div>
+
+      <div class="home__col">
+        <section class="widget widget--money">
+          <div class="widget__head"><span class="widget__title">Confirmed money</span></div>
+          <div class="widget__big">{fmtEur(totalConfirmed)}</div>
+          <div class="money-rows">
+            {#each confirmedFees.slice(0, 6) as p (p.id)}
+              <div class="money-row">
+                <span>{fmtDate(p.performed_at)} · {p.venue_name ?? '—'}</span>
+                <span class="money-row__f">{fmtEur(p.fee_amount ?? 0)}</span>
+              </div>
+            {:else}
+              <p class="home__empty">No confirmed fees in this scope.</p>
             {/each}
           </div>
-        {/each}
-      </div>
-    {/if}
-  </section>
+        </section>
 
-  <section class="today__alive">
-    <header class="today__section-head">
-      <div>
-        <p class="eyebrow">Projects</p>
-        <h2 class="today__section-title">What's alive right now</h2>
+        <section class="widget">
+          <div class="widget__head"><span class="widget__title">Roll-up</span></div>
+          <div class="rollup">
+            <div class="rollup__stat"><b>{scopeStats.confirmed}</b> confirmed</div>
+            <div class="rollup__stat"><b>{scopeStats.holds}</b> holds</div>
+            <div class="rollup__stat"><b>{scopedPerformances.length}</b> dates</div>
+          </div>
+          <p class="rollup__note">Pin the lines you live in — this home is yours.</p>
+        </section>
       </div>
-    </header>
-
-    {#if $workspacesQuery.isPending}
-      <p class="today__placeholder">Loading…</p>
-    {:else}
-      <ul class="alive" role="list">
-        {#each projectRows as row (row.workspace.id)}
-          <li class="alive__row" style={`--c: ${accentVarFor(row.workspace)}`}>
-            <span class="alive__rail" aria-hidden="true"></span>
-            <div class="alive__body">
-              <a
-                class="alive__name"
-                href={`/h/${row.workspace.slug}/`}
-              >
-                {row.workspace.name}
-              </a>
-              <p class="alive__sub">
-                {row.sub} · {row.activeProjects} {row.activeProjects === 1 ? 'project' : 'projects'}
-              </p>
-            </div>
-            <div class="alive__metrics">
-              <div class="alive__metric">
-                <span class="alive__metric-v">{row.dueActions}</span>
-                <span class="alive__metric-l">Open actions</span>
-              </div>
-              <div class="alive__metric">
-                <span class="alive__metric-v">{row.confirmed}</span>
-                <span class="alive__metric-l">Confirmed</span>
-              </div>
-              <div class="alive__metric">
-                <span class="alive__metric-v">{row.onHold}</span>
-                <span class="alive__metric-l">On hold</span>
-              </div>
-            </div>
-          </li>
-        {/each}
-      </ul>
-    {/if}
-  </section>
+    </div>
+  {/if}
 </section>
 
 <style>
   @layer components {
-    .today {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-xl);
-      max-inline-size: 72rem;
+    .home {
+      max-inline-size: 46rem;
       margin-inline: auto;
     }
-
-    /* ────────────────────────────── Masthead ─────────────────────────── */
-
-    .today__masthead {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-s);
-      padding-block-end: var(--space-xl);
-      border-block-end: 1px solid var(--border-color-dark);
+    :global(.shell__content:has(.home__grid)) .home,
+    .home:has(.home__grid) {
+      max-inline-size: 68rem;
     }
 
-    .today__greeting {
+    .home__greet {
       font-family: var(--font-display);
-      font-size: clamp(2rem, 1.4rem + 3vw, 3rem);
       font-weight: 400;
-      letter-spacing: -0.025em;
-      line-height: 1;
-      margin: 0;
-      color: var(--text-color);
-    }
-
-    .today__greeting em {
-      font-style: italic;
-      color: var(--text-muted);
-    }
-
-    .today__stats {
-      display: flex;
-      flex-wrap: wrap;
-      gap: var(--space-l);
-      margin-block-start: var(--space-s);
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      color: var(--text-faint);
-      letter-spacing: 0.02em;
-    }
-
-    .today__stats b {
-      color: var(--text-color);
-      font-weight: 500;
-      font-variant-numeric: tabular-nums;
-      margin-inline-end: var(--space-xs);
-    }
-
-    .today__stat-overdue,
-    .today__stat-overdue b {
-      color: var(--danger);
-    }
-
-    /* ──────────────────────────── Section heads ──────────────────────── */
-
-    .today__section-head {
-      display: flex;
-      align-items: flex-end;
-      justify-content: space-between;
-      gap: var(--space-m);
-      margin-block-end: var(--space-m);
-    }
-
-    .today__section-title {
-      font-family: var(--font-display);
-      font-size: var(--text-xxl);
-      font-weight: 400;
+      font-size: clamp(2rem, 1.5rem + 2.4vw, 2.9rem);
       letter-spacing: -0.02em;
-      line-height: 1.1;
-      margin: 0;
+      line-height: 1.05;
+      margin: 0 0 var(--space-xs);
       color: var(--text-color);
     }
-
-    .today__section-link {
-      font-size: var(--text-s);
+    .home__greet em {
+      font-style: italic;
+    }
+    .home__date {
+      font-size: var(--text-m);
       color: var(--text-muted);
-      text-decoration: none;
-      transition: color var(--transition);
+      margin: 0 0 var(--space-xl);
     }
 
-    .today__section-link:hover {
-      color: var(--text-color);
+    .home__toolbar {
+      margin-block: var(--space-l) var(--space-xs);
+    }
+    .home__agenda-wrap {
+      border-block-start: 1px solid var(--border-color-light);
     }
 
-    /* ────────────────────────────── Week ─────────────────────────────── */
-
-    .today__placeholder {
-      padding-block: var(--space-l);
-      text-align: center;
-      color: var(--text-faint);
-      font-size: var(--text-s);
-    }
-
-    .today__placeholder--err {
-      color: var(--danger);
-    }
-
+    /* ── agenda / week ── */
     .week {
       display: grid;
-      grid-template-columns: 90px 1fr;
-      gap: var(--space-s) var(--space-m);
-      align-items: baseline;
+      grid-template-columns: 5rem 1fr;
     }
-
-    .week__day-label {
+    .week__day {
       font-family: var(--font-mono);
       font-size: var(--text-xs);
       letter-spacing: 0.1em;
+      text-transform: uppercase;
       color: var(--text-faint);
-      padding-block-start: var(--space-xs);
+      padding-block: var(--space-s) var(--space-2xs);
+      align-self: start;
     }
-
-    .week__day-label--overdue {
+    .week__day--today {
+      color: var(--primary);
+    }
+    .week__day--overdue {
       color: var(--danger);
     }
-
     .week__rows {
-      display: flex;
-      flex-direction: column;
-      gap: 1px;
+      border-inline-start: 1px solid var(--border-color-light);
     }
-
     .week__item {
       display: grid;
-      grid-template-columns: 80px minmax(0, 1fr) auto auto;
-      gap: var(--space-s);
+      grid-template-columns: 6rem 1fr auto;
       align-items: baseline;
-      padding-block: var(--space-xs);
-      padding-inline: var(--space-s);
-      border-radius: var(--radius-s);
-      font-size: var(--text-s);
-      transition: background var(--transition);
+      gap: var(--space-s);
+      padding-block: var(--space-s);
+      padding-inline-start: var(--space-m);
+      border-block-end: 1px solid var(--border-color-light);
     }
-
-    .week__item:hover {
-      background: var(--bg-hover);
+    .week__verb {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-faint);
+      text-transform: lowercase;
     }
-
     .week__item--overdue .week__verb {
       color: var(--danger);
     }
-
-    .week__verb {
-      font-weight: 500;
-      color: var(--text-color);
-    }
-
     .week__subject {
-      color: var(--text-muted);
+      font-size: var(--text-s);
+      color: var(--text-color);
+      text-decoration: none;
       overflow: hidden;
       text-overflow: ellipsis;
-      white-space: nowrap;
     }
-
-    a.week__subject {
-      text-decoration: none;
-    }
-
     a.week__subject:hover {
-      color: var(--text-color);
       text-decoration: underline;
     }
-
     .week__tags {
       display: inline-flex;
       gap: var(--space-xs);
     }
-
     .week__project {
       display: inline-flex;
       align-items: center;
       gap: var(--space-xs);
       font-size: var(--text-xs);
-      color: var(--text-faint);
-      font-variant: small-caps;
-      letter-spacing: 0.04em;
-    }
-
-    .week__project-dot {
-      inline-size: 6px;
-      block-size: 6px;
-      border-radius: 50%;
-      background: var(--c, var(--text-faint));
-    }
-
-    /* ────────────────────────── What's alive ─────────────────────────── */
-
-    .alive {
-      list-style: none;
-      padding: 0;
-      margin: 0;
-      display: flex;
-      flex-direction: column;
-    }
-
-    .alive__row {
-      display: grid;
-      grid-template-columns: 14px 1fr auto;
-      gap: var(--space-m);
-      align-items: center;
-      padding-block: var(--space-m);
-      border-block-end: 1px solid var(--border-color-light);
-    }
-
-    .alive__row:last-child {
-      border-block-end: 0;
-    }
-
-    .alive__rail {
-      inline-size: 4px;
-      block-size: 36px;
-      background: var(--c, var(--text-faint));
-      border-radius: 2px;
-    }
-
-    .alive__body {
-      min-inline-size: 0;
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-xs);
-    }
-
-    .alive__name {
-      font-family: var(--font-display);
-      font-size: var(--text-l);
-      font-weight: 500;
-      letter-spacing: -0.015em;
-      color: var(--text-color);
-      text-decoration: none;
-    }
-
-    .alive__name:hover {
       color: var(--text-muted);
     }
-
-    .alive__sub {
-      font-size: var(--text-xs);
-      color: var(--text-faint);
-      margin: 0;
+    .week__dot,
+    .dot {
+      inline-size: 0.5rem;
+      block-size: 0.5rem;
+      border-radius: var(--radius-circle);
+      background: var(--c, var(--text-faint));
+      flex: none;
     }
 
-    .alive__metrics {
+    .home__empty {
+      color: var(--text-muted);
+      font-style: italic;
+      font-family: var(--font-display);
+      padding-block: var(--space-l);
+      text-align: center;
+    }
+    .home__empty--err {
+      color: var(--danger);
+    }
+
+    /* ── pinned panels ── */
+    .home__pinned-head {
+      margin-block: var(--space-xl) var(--space-xs);
+    }
+    .home__pinned {
       display: grid;
-      grid-auto-flow: column;
+      grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
       gap: var(--space-m);
-      align-items: baseline;
-      padding-inline-start: var(--space-m);
-      border-inline-start: 1px solid var(--border-color-light);
+    }
+    .home__pinned--single {
+      grid-template-columns: 1fr;
     }
 
-    .alive__metric {
+    .lmini {
+      position: relative;
+      display: block;
+      inline-size: 100%;
+      text-align: start;
+      border: 1px solid var(--border-color-light);
+      border-radius: var(--radius-xl);
+      padding: var(--space-m);
+      background: var(--bg-ultra-light);
+      cursor: pointer;
+      overflow: hidden;
+      font-family: inherit;
+      transition: border-color var(--transition), transform var(--transition);
+    }
+    .lmini::before {
+      content: '';
+      position: absolute;
+      inset-block: 0;
+      inset-inline-start: 0;
+      inline-size: 3px;
+      background: var(--c, var(--primary));
+    }
+    .lmini:hover {
+      border-color: var(--border-color-dark);
+      transform: translateY(-1px);
+    }
+    .lmini__head {
       display: flex;
-      flex-direction: column;
       align-items: center;
-      min-inline-size: 48px;
+      gap: var(--space-s);
+      margin-block-end: var(--space-xs);
     }
-
-    .alive__metric-v {
+    .lmini__co {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-xs);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+    }
+    .lmini__co .dot {
+      background: var(--c, var(--text-faint));
+    }
+    .lmini__kind {
+      margin-inline-start: auto;
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--c, var(--text-muted));
+    }
+    .lmini__rm,
+    .spin__rm {
+      color: var(--text-faint);
+      font-size: var(--text-m);
+      line-height: 1;
+      cursor: pointer;
+    }
+    .lmini__rm:hover,
+    .spin__rm:hover {
+      color: var(--danger);
+    }
+    .lmini__name {
       font-family: var(--font-display);
       font-size: var(--text-l);
       font-weight: 500;
-      line-height: 1;
+      margin: 0 0 var(--space-xs);
+    }
+    .lmini__foot {
+      font-size: var(--text-s);
+      color: var(--text-muted);
+      margin: 0;
+    }
+    .lmini__foot b {
       color: var(--text-color);
-      font-variant-numeric: tabular-nums;
     }
 
-    .alive__metric-l {
-      font-family: var(--font-mono);
-      font-size: 0.5625rem;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
+    .spin {
+      border: 1px solid var(--border-color-light);
+      border-radius: var(--radius-xl);
+      background: var(--bg-ultra-light);
+      overflow: hidden;
+    }
+    .spin__head {
+      display: flex;
+      align-items: center;
+      gap: var(--space-s);
+      padding-block: var(--space-s);
+      padding-inline: var(--space-m);
+      border-block-end: 1px solid var(--border-color-light);
+    }
+    .spin__head .dot {
+      background: var(--c, var(--text-faint));
+    }
+    .spin__name {
+      font-family: var(--font-display);
+      font-size: var(--text-l);
+      font-weight: 500;
+      margin: 0;
+    }
+    .spin__meta {
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      margin-inline-start: auto;
+    }
+    .spin__lines {
+      padding: var(--space-xs);
+    }
+    .spin__line {
+      display: flex;
+      align-items: center;
+      gap: var(--space-s);
+      inline-size: 100%;
+      padding-block: var(--space-s);
+      padding-inline: var(--space-s);
+      border: 0;
+      border-radius: var(--radius-m);
+      background: none;
+      text-align: start;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .spin__line:hover {
+      background: var(--bg-light);
+    }
+    .spin__g {
+      inline-size: 1.1rem;
+      text-align: center;
+      color: var(--c, var(--text-muted));
+      font-size: var(--text-s);
+    }
+    .spin__ln {
+      flex: 1;
+      font-size: var(--text-s);
+      font-weight: 500;
+      color: var(--text-color);
+    }
+    .spin__go {
       color: var(--text-faint);
-      margin-block-start: var(--space-xs);
+      opacity: 0;
+    }
+    .spin__line:hover .spin__go {
+      opacity: 1;
+    }
+    .spin__empty {
+      margin: 0;
+      padding: var(--space-s);
+      font-size: var(--text-xs);
+      color: var(--text-faint);
+      font-style: italic;
+    }
+
+    /* ── custom home widgets ── */
+    .home__grid {
+      display: grid;
+      grid-template-columns: 1.4fr 1fr;
+      gap: var(--space-m);
+      margin-block-start: var(--space-m);
+    }
+    .home__col {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-m);
+      min-inline-size: 0;
+    }
+    .widget {
+      border: 1px solid var(--border-color-light);
+      border-radius: var(--radius-xl);
+      padding: var(--space-m);
+      background: var(--bg-ultra-light);
+    }
+    .widget__head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-block-end: var(--space-s);
+    }
+    .widget__title {
+      font-family: var(--font-display);
+      font-size: var(--text-l);
+      font-weight: 500;
+    }
+    .widget__link {
+      font-size: var(--text-s);
+      color: var(--text-muted);
+      text-decoration: none;
+    }
+    .widget__link:hover {
+      color: var(--text-color);
+    }
+    .widget__big {
+      font-family: var(--font-display);
+      font-size: var(--text-xxl);
+      font-weight: 500;
+    }
+    .money-rows {
+      margin-block-start: var(--space-s);
+    }
+    .money-row {
+      display: flex;
+      justify-content: space-between;
+      gap: var(--space-s);
+      font-size: var(--text-s);
+      padding-block: var(--space-xs);
+      border-block-end: 1px solid var(--border-color-light);
+    }
+    .money-row__f {
+      font-variant-numeric: tabular-nums;
+      color: var(--text-color);
+    }
+    .rollup {
+      display: flex;
+      gap: var(--space-l);
+    }
+    .rollup__stat {
+      font-size: var(--text-s);
+      color: var(--text-muted);
+    }
+    .rollup__stat b {
+      font-family: var(--font-display);
+      font-size: var(--text-xl);
+      color: var(--text-color);
+      display: block;
+      font-variant-numeric: tabular-nums;
+    }
+    .rollup__note {
+      font-size: var(--text-s);
+      color: var(--text-faint);
+      font-style: italic;
+      font-family: var(--font-display);
+      margin: var(--space-m) 0 0;
     }
 
     @media (max-width: 47.999rem) {
-      .week {
-        grid-template-columns: 60px 1fr;
+      .home__grid {
+        grid-template-columns: 1fr;
       }
       .week__item {
-        grid-template-columns: minmax(0, 1fr);
-        gap: var(--space-xs);
+        grid-template-columns: 5rem 1fr;
       }
-      .week__verb,
-      .week__subject,
-      .week__tags,
       .week__project {
-        grid-column: 1;
-      }
-      .alive__metrics {
         display: none;
       }
     }
