@@ -248,11 +248,11 @@
 
     <main class="shell__main">
       <header class="shell__top">
-        <a class="shell__brand" href={homeHref} aria-label="Hour — home">
-          <BrandMark size="m" />
-        </a>
-
-        <div class="shell__spacer"></div>
+        <div class="shell__left">
+          <a class="shell__brand" href={homeHref} aria-label="Hour — home">
+            <BrandMark size="m" />
+          </a>
+        </div>
 
         <button
           type="button"
@@ -268,6 +268,7 @@
           <kbd class="kbd">⌘K</kbd>
         </button>
 
+        <div class="shell__right">
         <PresenceBadge count={networkPresence?.count ?? null} />
 
         <Menu
@@ -385,6 +386,7 @@
             </li>
           {/snippet}
         </Menu>
+        </div>
       </header>
 
       <div class="shell__content">
@@ -427,7 +429,8 @@
     position: sticky;
     inset-block-start: 0;
     z-index: var(--z-sticky);
-    display: flex;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
     align-items: center;
     gap: var(--space-m);
     padding-block: var(--space-s);
@@ -437,21 +440,33 @@
     border-block-end: 1px solid var(--border-color-light);
   }
 
+  .shell__left {
+    justify-self: start;
+    display: inline-flex;
+    align-items: center;
+    min-inline-size: 0;
+  }
+  .shell__right {
+    justify-self: end;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-s);
+    min-inline-size: 0;
+  }
+
   .shell__brand {
     display: inline-flex;
     flex: none;
     text-decoration: none;
   }
 
-  .shell__spacer {
-    flex: 1;
-  }
-
   .shell__search {
+    justify-self: center;
     display: inline-flex;
     align-items: center;
     gap: var(--space-s);
-    min-inline-size: 220px;
+    inline-size: min(30rem, 100%);
+    min-inline-size: 14rem;
     padding-block: var(--space-xs);
     padding-inline: var(--space-m) var(--space-s);
     border: 1px solid var(--border-color-dark);

@@ -196,7 +196,7 @@
     --mono-letter-spacing: 0.02em;
 
     /* Type scale — fluid via clamp(). One scale for the whole app. */
-    --text-xs: clamp(0.7rem, 0.66rem + 0.15vw, 0.75rem); /* 11-12 — eyebrows, badges */
+    --text-xs: clamp(0.625rem, 0.6rem + 0.12vw, 0.6875rem); /* 10-11 — eyebrows, badges. Tightened 2026-07-04 to the design's meta size (was 11-12); everything read a touch big because this floor sat above the mock. */
     --text-s: clamp(0.8rem, 0.76rem + 0.2vw, 0.875rem); /* 13-14 — dense rows, secondary */
     --text-m: clamp(0.875rem, 0.85rem + 0.15vw, 1rem); /* 14-16 — default body */
     --text-l: clamp(1.05rem, 1rem + 0.25vw, 1.2rem); /* 17-19 — card titles */

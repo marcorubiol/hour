@@ -298,7 +298,7 @@
     inset-block-start: calc(100% + var(--space-xs));
     inset-inline-start: 0;
     z-index: var(--z-dropdown);
-    inline-size: 22rem;
+    inline-size: 19rem;
     max-inline-size: 90vw;
     background: var(--bg-ultra-light);
     border: 1px solid var(--border-color-dark);
@@ -325,7 +325,7 @@
     display: flex;
     align-items: center;
     gap: var(--space-s);
-    padding-block: var(--space-s);
+    padding-block: var(--space-xs);
     padding-inline: var(--space-m);
   }
   .pop__opt:hover {
@@ -338,7 +338,7 @@
     background: none;
     text-align: start;
     font-family: inherit;
-    font-size: var(--text-l);
+    font-size: var(--text-m);
     font-weight: 500;
     color: var(--text-color);
     cursor: pointer;
@@ -358,6 +358,7 @@
     text-transform: uppercase;
     color: var(--text-muted);
     cursor: pointer;
+    white-space: nowrap;
   }
   .pop__pinspace:hover {
     border-color: var(--text-muted);
@@ -368,9 +369,8 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    inline-size: 1.6rem;
-    block-size: 1.6rem;
     flex: none;
+    padding: var(--space-xs);
     border: 0;
     background: none;
     color: var(--text-faint);
@@ -406,15 +406,15 @@
     background: var(--bg-light);
   }
   .pop__line-g {
-    inline-size: 1.1rem;
+    inline-size: var(--space-m);
     text-align: center;
     color: var(--text-muted);
-    font-size: var(--text-m);
+    font-size: var(--text-s);
   }
   .pop__line-n {
     flex: 1;
     min-inline-size: 0;
-    font-size: var(--text-m);
+    font-size: var(--text-s);
     color: var(--text-color);
     overflow: hidden;
     text-overflow: ellipsis;
