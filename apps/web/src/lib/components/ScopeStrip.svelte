@@ -12,6 +12,7 @@
   import { buildLineIndex, type NavLine, type NavWorkspace } from '$lib/nav';
   import { usePins, spacePin, linePin } from '$lib/stores/pins.svelte';
   import { lineKindGlyph, lineKindLabel } from '$lib/utils/line-kind';
+  import { accentVar } from '$lib/utils/accent';
 
   interface Props {
     onOpenLine: (line: NavLine) => void;
@@ -41,7 +42,7 @@
     for (const pin of pins.pins) {
       if (pin.startsWith('s:')) {
         const ws = wsBySlug.get(pin.slice(2));
-        if (ws) out.push({ pin, kind: 'space', name: ws.name, accent: `var(--accent-${accentIdx(ws.slug)})` });
+        if (ws) out.push({ pin, kind: 'space', name: ws.name, accent: accentVar(ws.slug) });
       } else {
         const line = lineById.get(pin.slice(2));
         if (line) out.push({ pin, kind: 'line', name: line.name, project: line.projectName, accent: line.accent, line });
@@ -49,17 +50,6 @@
     }
     return out;
   });
-
-  // Local accent index (mirror of accent util) for space chips without a
-  // resolved NavLine to borrow from.
-  function accentIdx(slug: string): number {
-    let h = 2166136261;
-    for (let i = 0; i < slug.length; i++) {
-      h ^= slug.charCodeAt(i);
-      h = Math.imul(h, 16777619);
-    }
-    return (h % 8) + 1;
-  }
 
   $effect(() => {
     function onDoc(e: MouseEvent) {
@@ -133,7 +123,7 @@
             {@const expanded = expandedWs === ws.id}
             <div class="pop__group">
               <div class="pop__opt">
-                <span class="scope__dot" style={`--c: var(--accent-${accentIdx(ws.slug)})`} aria-hidden="true"></span>
+                <span class="scope__dot" style={`--c: ${accentVar(ws.slug)}`} aria-hidden="true"></span>
                 <button type="button" class="pop__opt-name" onclick={() => pinSpace(ws)}>{ws.name}</button>
                 <button type="button" class="pop__pinspace" onclick={() => pinSpace(ws)}>pin space</button>
                 <button
@@ -142,7 +132,11 @@
                   class:pop__chev--on={expanded}
                   aria-label={expanded ? 'Hide lines' : 'Show lines'}
                   onclick={() => (expandedWs = expanded ? null : ws.id)}
-                >›</button>
+                >
+                  <svg viewBox="0 0 12 12" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                    <path d="M3 4.5 6 7.5 9 4.5" />
+                  </svg>
+                </button>
               </div>
               {#if expanded}
                 <div class="pop__lines">
@@ -245,8 +239,8 @@
     inset-block-start: calc(100% + var(--space-xs));
     inset-inline-start: 0;
     z-index: var(--z-dropdown);
-    inline-size: 300px;
-    max-inline-size: 80vw;
+    inline-size: 22rem;
+    max-inline-size: 90vw;
     background: var(--bg-ultra-light);
     border: 1px solid var(--border-color-dark);
     border-radius: var(--radius-l);
@@ -285,7 +279,8 @@
     background: none;
     text-align: start;
     font-family: inherit;
-    font-size: var(--text-s);
+    font-size: var(--text-l);
+    font-weight: 500;
     color: var(--text-color);
     cursor: pointer;
     overflow: hidden;
@@ -309,23 +304,30 @@
     border-color: var(--text-muted);
     color: var(--text-color);
   }
+  /* Chevron: points DOWN + faint when collapsed, flips UP + darker when open. */
   .pop__chev {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    inline-size: 1.6rem;
+    block-size: 1.6rem;
+    flex: none;
     border: 0;
     background: none;
     color: var(--text-faint);
     cursor: pointer;
-    font-size: var(--text-m);
-    line-height: 1;
-    padding: var(--space-2xs);
-    transition: transform var(--transition);
+    transition: transform var(--transition), color var(--transition);
+  }
+  .pop__chev:hover {
+    color: var(--text-muted);
   }
   .pop__chev--on {
-    transform: rotate(90deg);
+    transform: rotate(180deg);
     color: var(--text-color);
   }
   .pop__lines {
-    padding-block-end: var(--space-xs);
-    padding-inline-start: calc(var(--space-m) + var(--space-m));
+    padding-block: var(--space-2xs) var(--space-s);
+    padding-inline-start: calc(var(--space-l) + var(--space-s));
   }
   .pop__line {
     display: flex;
@@ -345,15 +347,15 @@
     background: var(--bg-light);
   }
   .pop__line-g {
-    inline-size: 1rem;
+    inline-size: 1.1rem;
     text-align: center;
     color: var(--text-muted);
-    font-size: var(--text-s);
+    font-size: var(--text-m);
   }
   .pop__line-n {
     flex: 1;
     min-inline-size: 0;
-    font-size: var(--text-s);
+    font-size: var(--text-m);
     color: var(--text-color);
     overflow: hidden;
     text-overflow: ellipsis;
