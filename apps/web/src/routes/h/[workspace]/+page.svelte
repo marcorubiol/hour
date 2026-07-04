@@ -17,7 +17,7 @@
   import { accentVar, accentVarFor } from '$lib/utils/accent';
   import { lineKindGlyph, lineKindLabel } from '$lib/utils/line-kind';
   import { decodeJwtClaim } from '$lib/realtime';
-  import { usePins } from '$lib/stores/pins.svelte';
+  import { usePins, spacePin } from '$lib/stores/pins.svelte';
   import {
     buildLineIndex,
     resolveScope,
@@ -261,7 +261,7 @@
 
 <svelte:head><title>Agenda — Hour</title></svelte:head>
 
-<section class="home">
+<div class="home">
   <h1 class="home__greet">{greetWord}, <em>{firstName}</em>.</h1>
   <p class="home__date">{dateLabel} · a quiet start — pin a space or a line to bring it forward</p>
 
@@ -367,11 +367,49 @@
         {/if}
       {/each}
     </div>
+  {:else if workspaces.length > 0}
+    <div class="home__pinned-head">
+      <span class="eyebrow">All spaces</span>
+      <span class="home__pinned-hint">nothing pinned — browse everything, pin what you live in</span>
+    </div>
+    <div class="home__pinned">
+      {#each workspaces as ws (ws.id)}
+        {@const st = statOf(perfsForWorkspace(ws.id))}
+        {@const wsLines = linesOfWorkspace(ws.id)}
+        <div class="spin" style={`--c: ${accentVarFor(ws)}`}>
+          <div class="spin__head">
+            <span class="dot" aria-hidden="true"></span>
+            <h3 class="spin__name">{ws.name}</h3>
+            <span class="spin__meta">{st.confirmed} confirmed · {st.holds} holds</span>
+            <button
+              type="button"
+              class="spin__pin"
+              onclick={() => pins.add(spacePin(ws.slug))}
+              title="Pin this space"
+            >pin</button>
+          </div>
+          <div class="spin__lines">
+            {#each wsLines as line (line.id)}
+              <button type="button" class="spin__line" onclick={() => openLine(line)}>
+                <span class="spin__g">{lineKindGlyph(line.kind)}</span>
+                <span class="spin__ln">{line.name}</span>
+                <span class="spin__go" aria-hidden="true">→</span>
+              </button>
+            {:else}
+              <p class="spin__empty">No lines yet.</p>
+            {/each}
+          </div>
+        </div>
+      {/each}
+    </div>
   {/if}
-</section>
+</div>
 
 <style>
   @layer components {
+    /* .home is a plain <div> (not <section>) so it dodges base.css's section
+       defaults (big padding-block + a space-l flex gap between children); the
+       vertical rhythm here is controlled by each element's own margin. */
     .home {
       max-inline-size: 46rem;
       margin-inline: auto;
@@ -380,9 +418,9 @@
     .home__greet {
       font-family: var(--font-display);
       font-weight: 400;
-      font-size: clamp(2rem, 1.5rem + 2.4vw, 2.9rem);
+      font-size: clamp(1.9rem, 1.4rem + 2.2vw, 2.6rem);
       letter-spacing: -0.02em;
-      line-height: 1.1;
+      line-height: 1.05;
       margin: 0 0 var(--space-2xs);
       color: var(--text-color);
     }
@@ -392,11 +430,11 @@
     .home__date {
       font-size: var(--text-m);
       color: var(--text-muted);
-      margin: 0 0 var(--space-m);
+      margin: 0 0 var(--space-s);
     }
 
     .home__toolbar {
-      margin-block: var(--space-s) var(--space-xs);
+      margin-block: var(--space-s) var(--space-2xs);
     }
     .home__agenda-wrap {
       border-block-start: 1px solid var(--border-color-light);
@@ -507,7 +545,17 @@
 
     /* ── pinned panels ── */
     .home__pinned-head {
-      margin-block: var(--space-xl) var(--space-xs);
+      display: flex;
+      align-items: baseline;
+      gap: var(--space-s);
+      flex-wrap: wrap;
+      margin-block: var(--space-l) var(--space-s);
+    }
+    .home__pinned-hint {
+      font-size: var(--text-xs);
+      color: var(--text-faint);
+      font-style: italic;
+      font-family: var(--font-display);
     }
     .home__pinned {
       display: grid;
@@ -618,6 +666,24 @@
       font-size: var(--text-xs);
       color: var(--text-muted);
       margin-inline-start: auto;
+    }
+    .spin__pin {
+      border: 1px solid var(--border-color-dark);
+      border-radius: var(--radius-circle);
+      background: none;
+      padding-block: var(--space-2xs);
+      padding-inline: var(--space-s);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: border-color var(--transition), color var(--transition);
+    }
+    .spin__pin:hover {
+      border-color: var(--text-muted);
+      color: var(--text-color);
     }
     .spin__lines {
       padding: var(--space-xs);

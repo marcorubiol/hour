@@ -474,7 +474,7 @@
 
   .shell__content {
     flex: 1;
-    padding-block: var(--space-m) var(--space-xxl);
+    padding-block: var(--space-s) var(--space-xxl);
     padding-inline: var(--space-l);
   }
 
