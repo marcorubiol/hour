@@ -231,6 +231,15 @@
     const holds = list.filter((p) => p.status.startsWith('hold')).length;
     return { confirmed, holds };
   }
+  /** Per-line one-liner from its performances. Real data only — a line with
+   *  no dates gets no stat (never fabricate a funnel we don't track). */
+  function lineStatLabel(line: NavLine): string {
+    const st = statOf(perfsForLine(line.id));
+    const parts: string[] = [];
+    if (st.confirmed) parts.push(`${st.confirmed} confirmed`);
+    if (st.holds) parts.push(st.holds === 1 ? '1 hold' : `${st.holds} holds`);
+    return parts.join(' · ');
+  }
 
   type PinnedUnit =
     | { kind: 'line'; pin: string; line: NavLine }
@@ -357,6 +366,7 @@
                 <button type="button" class="spin__line" onclick={() => openLine(line)}>
                   <span class="spin__g">{lineKindGlyph(line.kind)}</span>
                   <span class="spin__ln">{line.name}</span>
+                  {#if lineStatLabel(line)}<span class="spin__line-stat">{lineStatLabel(line)}</span>{/if}
                   <span class="spin__go" aria-hidden="true">→</span>
                 </button>
               {:else}
@@ -393,6 +403,7 @@
               <button type="button" class="spin__line" onclick={() => openLine(line)}>
                 <span class="spin__g">{lineKindGlyph(line.kind)}</span>
                 <span class="spin__ln">{line.name}</span>
+                {#if lineStatLabel(line)}<span class="spin__line-stat">{lineStatLabel(line)}</span>{/if}
                 <span class="spin__go" aria-hidden="true">→</span>
               </button>
             {:else}
@@ -713,13 +724,24 @@
     }
     .spin__ln {
       flex: 1;
+      min-inline-size: 0;
       font-size: var(--text-s);
       font-weight: 500;
       color: var(--text-color);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .spin__line-stat {
+      flex: none;
+      font-size: var(--text-xs);
+      color: var(--text-faint);
+      white-space: nowrap;
     }
     .spin__go {
       color: var(--text-faint);
       opacity: 0;
+      flex: none;
     }
     .spin__line:hover .spin__go {
       opacity: 1;
