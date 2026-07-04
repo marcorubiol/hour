@@ -35,14 +35,15 @@ test.describe('smoke', () => {
 
     await page.waitForURL(/\/h\/marco-rubiol\/?$/);
 
-    // Adaptive shell — lens pills present, Today active, home mode toggle.
-    const lensNav = page.getByRole('navigation', { name: 'Lens' });
-    await expect(lensNav.getByRole('button', { name: 'Today' })).toHaveAttribute(
+    // Adaptive shell — single view segment (Agenda · Calendar · Money), no
+    // pill row (logo = home). Agenda active on landing.
+    const viewNav = page.getByRole('navigation', { name: 'View' });
+    await expect(viewNav.getByRole('button', { name: 'Agenda' })).toHaveAttribute(
       'aria-current',
-      'true',
+      'page',
     );
-    await expect(page.getByRole('button', { name: 'Clean' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'My home' })).toBeVisible();
+    await expect(viewNav.getByRole('button', { name: 'Calendar' })).toBeVisible();
+    await expect(viewNav.getByRole('button', { name: 'Money' })).toBeVisible();
 
     // ⌘K palette is built from /api/lines (RLS): a real line is reachable in
     // one hop even though the sidebar is gone.
@@ -63,14 +64,14 @@ test.describe('smoke', () => {
     await expect(countLabel).toContainText(/\d+\s+engagements?/);
     expect(await page.locator('.rel-stub__item').count()).toBeGreaterThan(0);
 
-    // Calendar lens: pill navigates, grid renders with weekday headers.
-    await lensNav.getByRole('button', { name: 'Calendar' }).click();
+    // Calendar view: segment navigates, grid renders with weekday headers.
+    await viewNav.getByRole('button', { name: 'Calendar' }).click();
     await page.waitForURL(/\/h\/muk-cia\/calendar\/?$/);
     await expect(page.locator('.cal__grid')).toBeVisible();
     expect(await page.locator('.cal__weekday').count()).toBe(7);
-    await expect(lensNav.getByRole('button', { name: 'Calendar' })).toHaveAttribute(
+    await expect(viewNav.getByRole('button', { name: 'Calendar' })).toHaveAttribute(
       'aria-current',
-      'true',
+      'page',
     );
 
     // Contacts is no longer a top-lens pill (ADR-055) but the route still
@@ -79,14 +80,14 @@ test.describe('smoke', () => {
     await expect(page.locator('.status-bar__count')).toContainText(/\d+ contacts/);
     expect(await page.locator('tbody tr').count()).toBeGreaterThan(0);
 
-    // Money lens: pill navigates, totals strip renders.
-    await lensNav.getByRole('button', { name: 'Money' }).click();
+    // Money view: segment navigates, totals strip renders.
+    await viewNav.getByRole('button', { name: 'Money' }).click();
     await page.waitForURL(/\/h\/muk-cia\/money\/?$/);
     await expect(page.locator('.mny__totals')).toBeVisible();
     await expect(page.locator('.mny__total').first()).toContainText(/pipeline/);
 
-    // Today pill returns to the home (leaves the routed lens).
-    await lensNav.getByRole('button', { name: 'Today' }).click();
+    // Agenda returns to the home (leaves the routed view).
+    await viewNav.getByRole('button', { name: 'Agenda' }).click();
     await page.waitForURL((url) => !url.pathname.includes('/money'));
   });
 });

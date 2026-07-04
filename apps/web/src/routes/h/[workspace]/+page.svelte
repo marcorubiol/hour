@@ -1,10 +1,10 @@
 <script lang="ts">
   /**
-   * Today — Adaptive Digest home (ADR-055). Opens as a single quiet column:
-   * greeting, this-week agenda, and whatever the user has PINNED brought
-   * forward. Density is opt-in: pin a space or a line and its workbench
-   * surfaces here. The Clean|My home toggle (shell top bar) flips between the
-   * quiet digest and a composed board of widgets.
+   * Agenda — the Home (ADR-055 nav redesign). The logo lands here; there is
+   * no "Today"/"Home" pill (that would just repeat the logo). A single quiet
+   * column: greeting, this-week agenda (what's due), and whatever the user
+   * has PINNED brought forward. Calendar and Money are the other two views of
+   * the same pinned scope, switched from the shell segment.
    *
    * Scope: empty pins = everything the user can see; a pinned space scopes to
    * its workspace; a pinned line scopes to its project (engagements carry no
@@ -18,7 +18,6 @@
   import { lineKindGlyph, lineKindLabel } from '$lib/utils/line-kind';
   import { decodeJwtClaim } from '$lib/realtime';
   import { usePins } from '$lib/stores/pins.svelte';
-  import { useHomeMode } from '$lib/stores/home-mode.svelte';
   import {
     buildLineIndex,
     resolveScope,
@@ -33,17 +32,8 @@
   import { goto } from '$app/navigation';
 
   const pins = usePins();
-  const homeMode = useHomeMode();
-
   let workspaceSlug = $derived(page.params.workspace ?? '');
 
-  type Project = {
-    id: string;
-    slug: string;
-    name: string;
-    workspace_id: string;
-    status: 'draft' | 'active' | 'archived';
-  };
   type EngagementStatus =
     | 'contacted'
     | 'in_conversation'
@@ -67,26 +57,18 @@
     id: string;
     status: string;
     performed_at: string | null;
-    venue_name: string | null;
-    city: string | null;
-    fee_amount: number | null;
     line_id: string | null;
+    fee_amount: number | null;
     project: { id: string; slug: string; name: string; workspace_id: string } | null;
   };
 
   const workspacesQuery = createQuery(workspacesQueryOptions());
   const linesQuery = createQuery(allLinesQueryOptions());
-  const projectsQuery = createQuery({
-    queryKey: ['projects', { status: 'active' }],
-    queryFn: ({ signal }: { signal: AbortSignal }) =>
-      fetchJSON<{ items: Project[] }>('/api/projects?status=active', signal),
-  });
   const engagementsQuery = createQuery({
     queryKey: ['engagements', 'today'],
     queryFn: ({ signal }: { signal: AbortSignal }) =>
       fetchJSON<{ items: Engagement[] }>('/api/engagements?status=any&limit=100', signal),
   });
-  let todayIso = $derived(new Date().toISOString().slice(0, 10));
   const performancesQuery = createQuery({
     queryKey: ['today-performances'],
     queryFn: ({ signal }: { signal: AbortSignal }) =>
@@ -103,7 +85,6 @@
 
   // ── Scope resolution ──────────────────────────────────────────────────
   let scope = $derived(resolveScope(pins.pins, workspaces, lineIndex));
-  // A pinned line scopes engagements through its project.
   let pinnedProjectIds = $derived(new Set(scope.lines.map((l) => l.projectId)));
 
   function engInScope(e: Engagement): boolean {
@@ -112,17 +93,7 @@
     if (e.project && pinnedProjectIds.has(e.project.id)) return true;
     return false;
   }
-  function perfInScope(p: Performance): boolean {
-    if (scope.isEmpty) return true;
-    const ws = p.project?.workspace_id;
-    if (ws && scope.workspaceIds.includes(ws)) return true;
-    if (p.line_id && scope.lineIds.includes(p.line_id)) return true;
-    if (p.project && pinnedProjectIds.has(p.project.id)) return true;
-    return false;
-  }
-
   let scopedEngagements = $derived(engagements.filter(engInScope));
-  let scopedPerformances = $derived(performances.filter(perfInScope));
 
   // ── Greeting + date ───────────────────────────────────────────────────
   let now = $derived(new Date());
@@ -233,7 +204,7 @@
         };
       })
       .sort((a, b) => a.daySortKey - b.daySortKey)
-      .slice(0, 20),
+      .slice(0, 24),
   );
   let groupedWeek = $derived.by(() => {
     const groups: { day: string; rows: WeekRow[] }[] = [];
@@ -248,7 +219,7 @@
     return groups;
   });
 
-  // ── Line + space stats (for pinned panels + custom widgets) ───────────
+  // ── Pinned panels ─────────────────────────────────────────────────────
   function perfsForLine(lineId: string): Performance[] {
     return performances.filter((p) => p.line_id === lineId);
   }
@@ -258,21 +229,9 @@
   function statOf(list: Performance[]) {
     const confirmed = list.filter((p) => ['confirmed', 'done', 'invoiced', 'paid'].includes(p.status)).length;
     const holds = list.filter((p) => p.status.startsWith('hold')).length;
-    const fee = list
-      .filter((p) => ['confirmed', 'done', 'invoiced', 'paid'].includes(p.status))
-      .reduce((n, p) => n + (p.fee_amount ?? 0), 0);
-    return { confirmed, holds, fee };
+    return { confirmed, holds };
   }
 
-  let scopeStats = $derived(statOf(scopedPerformances));
-  let confirmedFees = $derived.by(() => {
-    return scopedPerformances
-      .filter((p) => ['confirmed', 'done', 'invoiced', 'paid'].includes(p.status) && p.fee_amount)
-      .sort((a, b) => (a.performed_at ?? '').localeCompare(b.performed_at ?? ''));
-  });
-  let totalConfirmed = $derived(confirmedFees.reduce((n, p) => n + (p.fee_amount ?? 0), 0));
-
-  // Pinned units, resolved for panels.
   type PinnedUnit =
     | { kind: 'line'; pin: string; line: NavLine }
     | { kind: 'space'; pin: string; ws: NavWorkspace };
@@ -295,216 +254,118 @@
     return lineIndex.filter((l) => l.workspaceId === wsId);
   }
 
-  function fmtDate(iso: string | null): string {
-    if (!iso) return '';
-    const d = new Date(iso);
-    return d.toLocaleDateString('en-US', { day: 'numeric', month: 'short' });
-  }
-  function fmtEur(n: number): string {
-    return '€' + Math.round(n).toLocaleString('en-US');
-  }
-
   function openLine(line: NavLine) {
     void goto(lineUrl(line));
   }
 </script>
 
-<svelte:head><title>Today — Hour</title></svelte:head>
+<svelte:head><title>Agenda — Hour</title></svelte:head>
 
 <section class="home">
   <h1 class="home__greet">{greetWord}, <em>{firstName}</em>.</h1>
-  <p class="home__date">
-    {dateLabel} ·
-    {homeMode.current === 'digest'
-      ? 'a quiet start — pin a space or a line to bring it forward'
-      : 'your custom home'}
-  </p>
+  <p class="home__date">{dateLabel} · a quiet start — pin a space or a line to bring it forward</p>
 
   <ScopeStrip onOpenLine={openLine} />
 
-  {#if homeMode.current === 'digest'}
-    <div class="home__toolbar"><span class="eyebrow">Today &amp; this week</span></div>
-    <div class="home__agenda-wrap">
-      {#if $engagementsQuery.isPending}
-        <p class="home__empty">Loading…</p>
-      {:else if $engagementsQuery.isError}
-        <p class="home__empty home__empty--err">Couldn't load your week.</p>
-      {:else if groupedWeek.length === 0}
-        <p class="home__empty">Nothing due in this scope. Set next actions on your conversations and they land here.</p>
-      {:else}
-        <div class="week">
-          {#each groupedWeek as group (group.day)}
-            <div class="week__day" class:week__day--overdue={group.day === 'OVERDUE'} class:week__day--today={group.day === 'TODAY'}>
-              {group.day}
-            </div>
-            <div class="week__rows">
-              {#each group.rows as row (row.id)}
-                <div class="week__item" class:week__item--overdue={row.overdue}>
-                  <span class="week__verb">{row.verb}</span>
-                  {#if row.personSlug}
-                    <a class="week__subject" href={`/h/${workspaceSlug}/person/${row.personSlug}`}>{row.subject}</a>
-                  {:else}
-                    <span class="week__subject">{row.subject}</span>
-                  {/if}
-                  <span class="week__tags">
-                    {#each row.tags as tag (tag.label)}
-                      <TagChip label={tag.label} tone={tag.tone} />
-                    {/each}
-                  </span>
-                  <span class="week__project" style={`--c: ${accentVar(row.projectSlug)}`}>
-                    <span class="week__dot" aria-hidden="true"></span>
-                    <span>{row.projectName}</span>
-                  </span>
-                </div>
-              {/each}
-            </div>
-          {/each}
-        </div>
-      {/if}
-    </div>
-
-    {#if pinnedUnits.length > 0}
-      <div class="home__pinned-head"><span class="eyebrow">Pinned</span></div>
-      <div class="home__pinned">
-        {#each pinnedUnits as unit (unit.pin)}
-          {#if unit.kind === 'line'}
-            {@const st = statOf(perfsForLine(unit.line.id))}
-            <button type="button" class="lmini" style={`--c: ${unit.line.accent}`} onclick={() => openLine(unit.line)}>
-              <div class="lmini__head">
-                <span class="lmini__co"><span class="dot" aria-hidden="true"></span>{unit.line.projectName}</span>
-                <span class="lmini__kind">{lineKindGlyph(unit.line.kind)} {lineKindLabel(unit.line.kind)}</span>
-                <span
-                  class="lmini__rm"
-                  role="button"
-                  tabindex="0"
-                  aria-label="Unpin"
-                  onclick={(e) => { e.stopPropagation(); pins.remove(unit.pin); }}
-                  onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); pins.remove(unit.pin); } }}
-                >×</span>
-              </div>
-              <h3 class="lmini__name">{unit.line.name}</h3>
-              <p class="lmini__foot">
-                {#if st.confirmed || st.holds}
-                  <b>{st.confirmed}</b> confirmed{#if st.holds} · {st.holds} holds{/if}
+  <div class="home__toolbar"><span class="eyebrow">Today &amp; this week</span></div>
+  <div class="home__agenda-wrap">
+    {#if $engagementsQuery.isPending}
+      <p class="home__empty">Loading…</p>
+    {:else if $engagementsQuery.isError}
+      <p class="home__empty home__empty--err">Couldn't load your week.</p>
+    {:else if groupedWeek.length === 0}
+      <p class="home__empty">Nothing due in this scope. Set next actions on your conversations and they land here.</p>
+    {:else}
+      <div class="week">
+        {#each groupedWeek as group (group.day)}
+          <div class="week__day" class:week__day--overdue={group.day === 'OVERDUE'} class:week__day--today={group.day === 'TODAY'}>
+            {group.day}
+          </div>
+          <div class="week__rows">
+            {#each group.rows as row (row.id)}
+              <div class="week__item" class:week__item--overdue={row.overdue}>
+                <span class="week__verb">{row.verb}</span>
+                {#if row.personSlug}
+                  <a class="week__subject" href={`/h/${workspaceSlug}/person/${row.personSlug}`}>{row.subject}</a>
                 {:else}
-                  internal — no dates
+                  <span class="week__subject">{row.subject}</span>
                 {/if}
-              </p>
-            </button>
-          {:else}
-            {@const st = statOf(perfsForWorkspace(unit.ws.id))}
-            {@const wsLines = linesOfWorkspace(unit.ws.id)}
-            <div class="spin" style={`--c: ${accentVarFor(unit.ws)}`}>
-              <div class="spin__head">
-                <span class="dot" aria-hidden="true"></span>
-                <h3 class="spin__name">{unit.ws.name}</h3>
-                <span class="spin__meta">{st.confirmed} confirmed · {st.holds} holds</span>
-                <span
-                  class="spin__rm"
-                  role="button"
-                  tabindex="0"
-                  aria-label="Unpin"
-                  onclick={() => pins.remove(unit.pin)}
-                  onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pins.remove(unit.pin); } }}
-                >×</span>
+                <span class="week__tags">
+                  {#each row.tags as tag (tag.label)}
+                    <TagChip label={tag.label} tone={tag.tone} />
+                  {/each}
+                </span>
+                <span class="week__project" style={`--c: ${accentVar(row.projectSlug)}`}>
+                  <span class="week__dot" aria-hidden="true"></span>
+                  <span>{row.projectName}</span>
+                </span>
               </div>
-              <div class="spin__lines">
-                {#each wsLines as line (line.id)}
-                  <button type="button" class="spin__line" onclick={() => openLine(line)}>
-                    <span class="spin__g">{lineKindGlyph(line.kind)}</span>
-                    <span class="spin__ln">{line.name}</span>
-                    <span class="spin__go" aria-hidden="true">→</span>
-                  </button>
-                {:else}
-                  <p class="spin__empty">No lines yet.</p>
-                {/each}
-              </div>
-            </div>
-          {/if}
+            {/each}
+          </div>
         {/each}
       </div>
     {/if}
-  {:else}
-    <!-- My home: composed widgets -->
-    <div class="home__grid">
-      <div class="home__col">
-        <section class="widget">
-          <div class="widget__head">
-            <span class="widget__title">This week</span>
-            <a class="widget__link" href={`/h/${workspaceSlug}/calendar`}>Calendar →</a>
-          </div>
-          {#if groupedWeek.length === 0}
-            <p class="home__empty">Nothing due in this scope.</p>
-          {:else}
-            <div class="week">
-              {#each groupedWeek as group (group.day)}
-                <div class="week__day" class:week__day--overdue={group.day === 'OVERDUE'} class:week__day--today={group.day === 'TODAY'}>{group.day}</div>
-                <div class="week__rows">
-                  {#each group.rows as row (row.id)}
-                    <div class="week__item" class:week__item--overdue={row.overdue}>
-                      <span class="week__verb">{row.verb}</span>
-                      {#if row.personSlug}
-                        <a class="week__subject" href={`/h/${workspaceSlug}/person/${row.personSlug}`}>{row.subject}</a>
-                      {:else}
-                        <span class="week__subject">{row.subject}</span>
-                      {/if}
-                      <span class="week__project" style={`--c: ${accentVar(row.projectSlug)}`}>
-                        <span class="week__dot" aria-hidden="true"></span><span>{row.projectName}</span>
-                      </span>
-                    </div>
-                  {/each}
-                </div>
-              {/each}
-            </div>
-          {/if}
-        </section>
+  </div>
 
-        {#if scope.lines.length > 0}
-          <section class="widget">
-            <div class="widget__head"><span class="widget__title">Lines you're working</span></div>
-            <div class="home__pinned home__pinned--single">
-              {#each scope.lines as line (line.id)}
-                {@const st = statOf(perfsForLine(line.id))}
-                <button type="button" class="lmini" style={`--c: ${line.accent}`} onclick={() => openLine(line)}>
-                  <div class="lmini__head">
-                    <span class="lmini__co"><span class="dot" aria-hidden="true"></span>{line.projectName}</span>
-                    <span class="lmini__kind">{lineKindGlyph(line.kind)} {lineKindLabel(line.kind)}</span>
-                  </div>
-                  <h3 class="lmini__name">{line.name}</h3>
-                  <p class="lmini__foot"><b>{st.confirmed}</b> confirmed{#if st.holds} · {st.holds} holds{/if}</p>
+  {#if pinnedUnits.length > 0}
+    <div class="home__pinned-head"><span class="eyebrow">Pinned</span></div>
+    <div class="home__pinned">
+      {#each pinnedUnits as unit (unit.pin)}
+        {#if unit.kind === 'line'}
+          {@const st = statOf(perfsForLine(unit.line.id))}
+          <button type="button" class="lmini" style={`--c: ${unit.line.accent}`} onclick={() => openLine(unit.line)}>
+            <div class="lmini__head">
+              <span class="lmini__co"><span class="dot" aria-hidden="true"></span>{unit.line.projectName}</span>
+              <span class="lmini__kind">{lineKindGlyph(unit.line.kind)} {lineKindLabel(unit.line.kind)}</span>
+              <span
+                class="lmini__rm"
+                role="button"
+                tabindex="0"
+                aria-label="Unpin"
+                onclick={(e) => { e.stopPropagation(); pins.remove(unit.pin); }}
+                onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); pins.remove(unit.pin); } }}
+              >×</span>
+            </div>
+            <h3 class="lmini__name">{unit.line.name}</h3>
+            <p class="lmini__foot">
+              {#if st.confirmed || st.holds}
+                <b>{st.confirmed}</b> confirmed{#if st.holds} · {st.holds} holds{/if}
+              {:else}
+                internal — no dates
+              {/if}
+            </p>
+          </button>
+        {:else}
+          {@const st = statOf(perfsForWorkspace(unit.ws.id))}
+          {@const wsLines = linesOfWorkspace(unit.ws.id)}
+          <div class="spin" style={`--c: ${accentVarFor(unit.ws)}`}>
+            <div class="spin__head">
+              <span class="dot" aria-hidden="true"></span>
+              <h3 class="spin__name">{unit.ws.name}</h3>
+              <span class="spin__meta">{st.confirmed} confirmed · {st.holds} holds</span>
+              <span
+                class="spin__rm"
+                role="button"
+                tabindex="0"
+                aria-label="Unpin"
+                onclick={() => pins.remove(unit.pin)}
+                onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pins.remove(unit.pin); } }}
+              >×</span>
+            </div>
+            <div class="spin__lines">
+              {#each wsLines as line (line.id)}
+                <button type="button" class="spin__line" onclick={() => openLine(line)}>
+                  <span class="spin__g">{lineKindGlyph(line.kind)}</span>
+                  <span class="spin__ln">{line.name}</span>
+                  <span class="spin__go" aria-hidden="true">→</span>
                 </button>
+              {:else}
+                <p class="spin__empty">No lines yet.</p>
               {/each}
             </div>
-          </section>
+          </div>
         {/if}
-      </div>
-
-      <div class="home__col">
-        <section class="widget widget--money">
-          <div class="widget__head"><span class="widget__title">Confirmed money</span></div>
-          <div class="widget__big">{fmtEur(totalConfirmed)}</div>
-          <div class="money-rows">
-            {#each confirmedFees.slice(0, 6) as p (p.id)}
-              <div class="money-row">
-                <span>{fmtDate(p.performed_at)} · {p.venue_name ?? '—'}</span>
-                <span class="money-row__f">{fmtEur(p.fee_amount ?? 0)}</span>
-              </div>
-            {:else}
-              <p class="home__empty">No confirmed fees in this scope.</p>
-            {/each}
-          </div>
-        </section>
-
-        <section class="widget">
-          <div class="widget__head"><span class="widget__title">Roll-up</span></div>
-          <div class="rollup">
-            <div class="rollup__stat"><b>{scopeStats.confirmed}</b> confirmed</div>
-            <div class="rollup__stat"><b>{scopeStats.holds}</b> holds</div>
-            <div class="rollup__stat"><b>{scopedPerformances.length}</b> dates</div>
-          </div>
-          <p class="rollup__note">Pin the lines you live in — this home is yours.</p>
-        </section>
-      </div>
+      {/each}
     </div>
   {/if}
 </section>
@@ -514,10 +375,6 @@
     .home {
       max-inline-size: 46rem;
       margin-inline: auto;
-    }
-    :global(.shell__content:has(.home__grid)) .home,
-    .home:has(.home__grid) {
-      max-inline-size: 68rem;
     }
 
     .home__greet {
@@ -635,9 +492,6 @@
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
       gap: var(--space-m);
-    }
-    .home__pinned--single {
-      grid-template-columns: 1fr;
     }
 
     .lmini {
@@ -791,91 +645,7 @@
       font-style: italic;
     }
 
-    /* ── custom home widgets ── */
-    .home__grid {
-      display: grid;
-      grid-template-columns: 1.4fr 1fr;
-      gap: var(--space-m);
-      margin-block-start: var(--space-m);
-    }
-    .home__col {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-m);
-      min-inline-size: 0;
-    }
-    .widget {
-      border: 1px solid var(--border-color-light);
-      border-radius: var(--radius-xl);
-      padding: var(--space-m);
-      background: var(--bg-ultra-light);
-    }
-    .widget__head {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-block-end: var(--space-s);
-    }
-    .widget__title {
-      font-family: var(--font-display);
-      font-size: var(--text-l);
-      font-weight: 500;
-    }
-    .widget__link {
-      font-size: var(--text-s);
-      color: var(--text-muted);
-      text-decoration: none;
-    }
-    .widget__link:hover {
-      color: var(--text-color);
-    }
-    .widget__big {
-      font-family: var(--font-display);
-      font-size: var(--text-xxl);
-      font-weight: 500;
-    }
-    .money-rows {
-      margin-block-start: var(--space-s);
-    }
-    .money-row {
-      display: flex;
-      justify-content: space-between;
-      gap: var(--space-s);
-      font-size: var(--text-s);
-      padding-block: var(--space-xs);
-      border-block-end: 1px solid var(--border-color-light);
-    }
-    .money-row__f {
-      font-variant-numeric: tabular-nums;
-      color: var(--text-color);
-    }
-    .rollup {
-      display: flex;
-      gap: var(--space-l);
-    }
-    .rollup__stat {
-      font-size: var(--text-s);
-      color: var(--text-muted);
-    }
-    .rollup__stat b {
-      font-family: var(--font-display);
-      font-size: var(--text-xl);
-      color: var(--text-color);
-      display: block;
-      font-variant-numeric: tabular-nums;
-    }
-    .rollup__note {
-      font-size: var(--text-s);
-      color: var(--text-faint);
-      font-style: italic;
-      font-family: var(--font-display);
-      margin: var(--space-m) 0 0;
-    }
-
     @media (max-width: 47.999rem) {
-      .home__grid {
-        grid-template-columns: 1fr;
-      }
       .week__item {
         grid-template-columns: 5rem 1fr;
       }

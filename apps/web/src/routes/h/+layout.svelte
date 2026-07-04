@@ -22,7 +22,6 @@
   import Avatar from '$lib/components/Avatar.svelte';
   import SettingsNav from '$lib/components/SettingsNav.svelte';
   import PresenceBadge from '$lib/components/PresenceBadge.svelte';
-  import Pill from '$lib/components/Pill.svelte';
   import Menu from '$lib/components/Menu.svelte';
   import ThemeToggle from '$lib/components/ThemeToggle.svelte';
   import BrandMark from '$lib/components/BrandMark.svelte';
@@ -32,7 +31,6 @@
   import { provideLens, type Lens } from '$lib/stores/lens.svelte';
   import { provideSelection } from '$lib/stores/selection.svelte';
   import { providePins, spacePin } from '$lib/stores/pins.svelte';
-  import { provideHomeMode } from '$lib/stores/home-mode.svelte';
   import { lineUrl, type NavLine, type NavWorkspace } from '$lib/nav';
   import { saveMasterViewPath } from '$lib/master-view';
   import {
@@ -69,7 +67,6 @@
   const selection = provideSelection();
   const lens = provideLens('today');
   const pins = providePins();
-  const homeMode = provideHomeMode();
 
   // Hydrate selection from URL (pages still read it). Idempotent.
   $effect(() => {
@@ -81,7 +78,6 @@
     selection.restoreFocusFromLocalStorage();
     lens.restoreFromLocalStorage();
     pins.restoreFromLocalStorage();
-    homeMode.restoreFromLocalStorage();
   });
 
   $effect(() => {
@@ -172,24 +168,29 @@
     themeStyles.find((t) => t.id === activeThemeStyleId) ?? themeStyles[0],
   );
 
-  const lensOptions: { id: Lens; label: string }[] = [
-    { id: 'today', label: 'Today' },
+  // The single view switcher (replaces the old lens pill row). The logo is
+  // Home = Agenda; Calendar and Money are the two transversal views, all
+  // pin-scoped. A segmented control, not competing pills.
+  type ViewId = 'agenda' | 'calendar' | 'money';
+  const views: { id: ViewId; label: string }[] = [
+    { id: 'agenda', label: 'Agenda' },
     { id: 'calendar', label: 'Calendar' },
     { id: 'money', label: 'Money' },
   ];
 
-  const ROUTED_LENSES: Partial<Record<Lens, string>> = {
-    calendar: 'calendar',
-    contacts: 'contacts',
-    money: 'money',
-  };
-
-  function selectLens(id: Lens) {
-    lens.set(id);
+  function selectView(id: ViewId) {
     const ws = workspaceSlug || defaultWorkspaceSlug;
     if (!ws) return;
-    const segment = ROUTED_LENSES[id];
-    void goto(segment ? `/h/${ws}/${segment}` : `/h/${ws}/`);
+    if (id === 'calendar') {
+      lens.set('calendar');
+      void goto(`/h/${ws}/calendar`);
+    } else if (id === 'money') {
+      lens.set('money');
+      void goto(`/h/${ws}/money`);
+    } else {
+      lens.set('today');
+      void goto(`/h/${ws}/`);
+    }
   }
 
   let inSettings = $derived(/^\/h\/[^/]+\/settings(\b|\/|$)/.test(page.url.pathname));
@@ -200,8 +201,9 @@
     return (m?.[1] as Lens | undefined) ?? null;
   });
 
-  // On the Today lens the URL has no routed segment — that's the home.
-  let onToday = $derived(!routedLens && !inSettings);
+  let activeView = $derived<ViewId>(
+    routedLens === 'calendar' ? 'calendar' : routedLens === 'money' ? 'money' : 'agenda',
+  );
 
   // Keep the pill state honest when navigation happens outside the pills.
   $effect(() => {
@@ -265,42 +267,21 @@
           <BrandMark size="m" />
         </a>
 
-        <nav class="shell__lenses" aria-label="Lens">
-          {#each lensOptions as opt (opt.id)}
-            <Pill
-              active={lens.current === opt.id}
-              ariaCurrent={lens.current === opt.id ? 'true' : undefined}
-              onclick={() => selectLens(opt.id)}
+        <nav class="shell__seg" aria-label="View">
+          {#each views as v (v.id)}
+            <button
+              type="button"
+              class="shell__seg-btn"
+              class:shell__seg-btn--on={activeView === v.id}
+              aria-current={activeView === v.id ? 'page' : undefined}
+              onclick={() => selectView(v.id)}
             >
-              {opt.label}
-            </Pill>
+              {v.label}
+            </button>
           {/each}
         </nav>
 
         <div class="shell__spacer"></div>
-
-        {#if onToday}
-          <div class="shell__seg" role="group" aria-label="Home mode">
-            <button
-              type="button"
-              class="shell__seg-btn"
-              class:shell__seg-btn--on={homeMode.current === 'digest'}
-              aria-pressed={homeMode.current === 'digest'}
-              onclick={() => homeMode.set('digest')}
-            >
-              Clean
-            </button>
-            <button
-              type="button"
-              class="shell__seg-btn"
-              class:shell__seg-btn--on={homeMode.current === 'custom'}
-              aria-pressed={homeMode.current === 'custom'}
-              onclick={() => homeMode.set('custom')}
-            >
-              My home
-            </button>
-          </div>
-        {/if}
 
         <button
           type="button"
@@ -489,12 +470,6 @@
     display: inline-flex;
     flex: none;
     text-decoration: none;
-  }
-
-  .shell__lenses {
-    display: flex;
-    align-items: center;
-    gap: var(--space-xs);
   }
 
   .shell__spacer {
