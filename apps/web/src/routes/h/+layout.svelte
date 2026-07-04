@@ -168,30 +168,11 @@
     themeStyles.find((t) => t.id === activeThemeStyleId) ?? themeStyles[0],
   );
 
-  // The single view switcher (replaces the old lens pill row). The logo is
-  // Home = Agenda; Calendar and Money are the two transversal views, all
-  // pin-scoped. A segmented control, not competing pills.
-  type ViewId = 'agenda' | 'calendar' | 'money';
-  const views: { id: ViewId; label: string }[] = [
-    { id: 'agenda', label: 'Agenda' },
-    { id: 'calendar', label: 'Calendar' },
-    { id: 'money', label: 'Money' },
-  ];
-
-  function selectView(id: ViewId) {
-    const ws = workspaceSlug || defaultWorkspaceSlug;
-    if (!ws) return;
-    if (id === 'calendar') {
-      lens.set('calendar');
-      void goto(`/h/${ws}/calendar`);
-    } else if (id === 'money') {
-      lens.set('money');
-      void goto(`/h/${ws}/money`);
-    } else {
-      lens.set('today');
-      void goto(`/h/${ws}/`);
-    }
-  }
+  // The logo IS the home = Agenda. No top-nav buttons at all (ADR-055,
+  // final): Calendar and Money are reachable from ⌘K. Home lands on the
+  // default-workspace agenda (the agenda is cross-workspace anyway; the
+  // segment is just browsing context).
+  let homeHref = $derived(menuWorkspaceSlug ? `/h/${menuWorkspaceSlug}/` : '/h/');
 
   let inSettings = $derived(/^\/h\/[^/]+\/settings(\b|\/|$)/.test(page.url.pathname));
 
@@ -201,9 +182,6 @@
     return (m?.[1] as Lens | undefined) ?? null;
   });
 
-  let activeView = $derived<ViewId>(
-    routedLens === 'calendar' ? 'calendar' : routedLens === 'money' ? 'money' : 'agenda',
-  );
 
   // Keep the pill state honest when navigation happens outside the pills.
   $effect(() => {
@@ -244,6 +222,13 @@
     lens.set('today');
     void goto(`/h/${ws.slug}/`);
   }
+  function onPickView(view: 'calendar' | 'money') {
+    const ws = workspaceSlug || defaultWorkspaceSlug;
+    if (ws) {
+      lens.set(view);
+      void goto(`/h/${ws}/${view}`);
+    }
+  }
 
   function logout() {
     localStorage.removeItem('hour_jwt');
@@ -263,23 +248,9 @@
 
     <main class="shell__main">
       <header class="shell__top">
-        <a class="shell__brand" href="/h/" aria-label="Hour home">
+        <a class="shell__brand" href={homeHref} aria-label="Hour — home">
           <BrandMark size="m" />
         </a>
-
-        <nav class="shell__seg" aria-label="View">
-          {#each views as v (v.id)}
-            <button
-              type="button"
-              class="shell__seg-btn"
-              class:shell__seg-btn--on={activeView === v.id}
-              aria-current={activeView === v.id ? 'page' : undefined}
-              onclick={() => selectView(v.id)}
-            >
-              {v.label}
-            </button>
-          {/each}
-        </nav>
 
         <div class="shell__spacer"></div>
 
@@ -422,7 +393,7 @@
     </main>
   </div>
 
-  <CommandPalette bind:open={paletteOpen} {onPickLine} {onPickSpace} />
+  <CommandPalette bind:open={paletteOpen} {onPickLine} {onPickSpace} {onPickView} />
 {/if}
 
 <style>
@@ -474,28 +445,6 @@
 
   .shell__spacer {
     flex: 1;
-  }
-
-  .shell__seg {
-    display: inline-flex;
-    border: 1px solid var(--border-color-dark);
-    border-radius: var(--radius-circle);
-    overflow: hidden;
-  }
-  .shell__seg-btn {
-    border: 0;
-    background: none;
-    padding-block: var(--space-xs);
-    padding-inline: var(--space-m);
-    font-family: inherit;
-    font-size: var(--text-s);
-    color: var(--text-muted);
-    cursor: pointer;
-    transition: background var(--transition), color var(--transition);
-  }
-  .shell__seg-btn--on {
-    background: var(--text-color);
-    color: var(--bg-ultra-light);
   }
 
   .shell__search {

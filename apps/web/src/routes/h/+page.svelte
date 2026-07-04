@@ -1,82 +1,35 @@
 <script lang="ts">
   /**
-   * /h/ — empty-selection landing.
-   *
-   * Renders inside the /h/+layout shell (sidebar + top nav are visible).
-   * This page only owns the MAIN content area. With nothing selected:
-   *   - Plaza shows all workspaces unfilled
-   *   - LineList shows all accessible lines (sorted by last-used)
-   *   - Main shows a quiet Spotlight prompt
-   *
-   * Users pick a workspace or project from the sidebar to navigate to its
-   * canonical URL (/h/[ws]/, /h/[ws]/project/[slug]/, etc).
+   * /h/ — bare home. The logo lands here (or on /h/[ws]/). Since the agenda
+   * is cross-workspace, /h/ just forwards to the first workspace's agenda so
+   * the person-links etc. have a browsing context. No more "pick a workspace
+   * from the sidebar" — the sidebar is gone (ADR-055).
    */
 
-  import { decodeJwtClaim } from '$lib/realtime';
+  import { createQuery } from '@tanstack/svelte-query';
+  import { goto } from '$app/navigation';
+  import { workspacesQueryOptions } from '$lib/nav-queries';
 
-  function titleCase(s: string): string {
-    return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
-  }
-
-  let firstName = $state<string>('there');
+  const workspacesQuery = createQuery(workspacesQueryOptions());
 
   $effect(() => {
-    if (typeof window === 'undefined') return;
-    const jwt = localStorage.getItem('hour_jwt');
-    if (!jwt) return;
-    const full =
-      decodeJwtClaim(jwt, 'user_metadata.full_name') ||
-      decodeJwtClaim(jwt, 'user_metadata.name');
-    if (full) {
-      firstName = full.split(/\s+/)[0] ?? full;
-      return;
-    }
-    const email = decodeJwtClaim(jwt, 'email');
-    if (email) {
-      const local = email.split('@')[0] ?? '';
-      const first = local.split(/[._-]+/)[0];
-      if (first && first.length < local.length) firstName = titleCase(first);
-    }
+    const first = $workspacesQuery.data?.items[0]?.slug;
+    if (first) void goto(`/h/${first}/`, { replaceState: true });
   });
 </script>
 
-<svelte:head>
-  <title>Hour</title>
-</svelte:head>
+<svelte:head><title>Hour</title></svelte:head>
 
-<section class="empty-home">
-  <p class="eyebrow">No selection</p>
-  <h1 class="empty-home__title">Hello, {firstName}.</h1>
-  <p class="empty-home__sub">
-    Pick a workspace or project from the sidebar to focus, or browse all
-    lines below.
-  </p>
-</section>
+<p class="loading">Loading…</p>
 
 <style>
   @layer components {
-    .empty-home {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-s);
-      max-inline-size: 40rem;
-      padding-block-start: var(--space-xl, var(--space-l));
-    }
-
-    .empty-home__title {
+    .loading {
+      color: var(--text-faint);
+      font-style: italic;
       font-family: var(--font-display);
-      font-size: var(--text-3xl, var(--text-2xl, var(--text-xl)));
-      font-weight: 400;
-      letter-spacing: -0.02em;
-      margin: 0;
-      color: var(--text-color);
-    }
-
-    .empty-home__sub {
-      margin: 0;
-      font-size: var(--text-m);
-      line-height: 1.5;
-      color: var(--text-muted);
+      padding-block: var(--space-xl);
+      text-align: center;
     }
   }
 </style>

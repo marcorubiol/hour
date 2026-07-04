@@ -18,8 +18,9 @@
     open: boolean;
     onPickLine: (line: NavLine) => void;
     onPickSpace: (ws: NavWorkspace) => void;
+    onPickView: (view: 'calendar' | 'money') => void;
   }
-  let { open = $bindable(), onPickLine, onPickSpace }: Props = $props();
+  let { open = $bindable(), onPickLine, onPickSpace, onPickView }: Props = $props();
 
   const workspacesQuery = createQuery(workspacesQueryOptions());
   const linesQuery = createQuery(allLinesQueryOptions());
@@ -31,34 +32,41 @@
   let workspaces = $derived($workspacesQuery.data?.items ?? []);
   let lineIndex = $derived(buildLineIndex(workspaces, $linesQuery.data?.items ?? []));
 
-  type Item =
-    | { type: 'line'; id: string; line: NavLine }
-    | { type: 'space'; id: string; ws: NavWorkspace };
+  type ViewTarget = 'calendar' | 'money';
+  type ViewItem = { type: 'view'; id: string; target: ViewTarget; name: string };
+  type LineItem = { type: 'line'; id: string; line: NavLine };
+  type SpaceItem = { type: 'space'; id: string; ws: NavWorkspace };
+  type Item = ViewItem | LineItem | SpaceItem;
 
-  let allItems = $derived<Item[]>([
-    ...lineIndex.map((line) => ({ type: 'line' as const, id: `l:${line.id}`, line })),
-    ...workspaces.map((ws) => ({ type: 'space' as const, id: `s:${ws.slug}`, ws })),
-  ]);
+  const VIEW_ITEMS: ViewItem[] = [
+    { type: 'view', id: 'v:calendar', target: 'calendar', name: 'Calendar' },
+    { type: 'view', id: 'v:money', target: 'money', name: 'Money' },
+  ];
 
-  let results = $derived.by<Item[]>(() => {
+  let viewResults = $derived.by<ViewItem[]>(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return allItems;
-    return allItems.filter((it) => {
-      if (it.type === 'line') {
-        return (
-          it.line.name.toLowerCase().includes(q) ||
-          it.line.projectName.toLowerCase().includes(q) ||
-          it.line.kind.includes(q)
-        );
-      }
-      return it.ws.name.toLowerCase().includes(q) || it.ws.slug.includes(q);
-    });
+    if (!q) return VIEW_ITEMS;
+    return VIEW_ITEMS.filter((it) => it.name.toLowerCase().includes(q));
   });
-
-  let lineResults = $derived(results.filter((r) => r.type === 'line'));
-  let spaceResults = $derived(results.filter((r) => r.type === 'space'));
-  // Lines first — they're the work.
-  let ordered = $derived<Item[]>([...lineResults, ...spaceResults]);
+  let lineResults = $derived.by<LineItem[]>(() => {
+    const q = query.trim().toLowerCase();
+    const lines: LineItem[] = lineIndex.map((line) => ({ type: 'line', id: `l:${line.id}`, line }));
+    if (!q) return lines;
+    return lines.filter(
+      (it) =>
+        it.line.name.toLowerCase().includes(q) ||
+        it.line.projectName.toLowerCase().includes(q) ||
+        it.line.kind.includes(q),
+    );
+  });
+  let spaceResults = $derived.by<SpaceItem[]>(() => {
+    const q = query.trim().toLowerCase();
+    const spaces: SpaceItem[] = workspaces.map((ws) => ({ type: 'space', id: `s:${ws.slug}`, ws }));
+    if (!q) return spaces;
+    return spaces.filter((it) => it.ws.name.toLowerCase().includes(q) || it.ws.slug.includes(q));
+  });
+  // Lines first — they're the work. Views last (quick jumps).
+  let ordered = $derived<Item[]>([...lineResults, ...spaceResults, ...viewResults]);
 
   // Reset + focus whenever the palette opens.
   $effect(() => {
@@ -85,7 +93,8 @@
 
   function pick(it: Item) {
     if (it.type === 'line') onPickLine(it.line);
-    else onPickSpace(it.ws);
+    else if (it.type === 'space') onPickSpace(it.ws);
+    else onPickView(it.target);
     open = false;
   }
 
@@ -172,6 +181,26 @@
               </span>
               <span class="cmdk__name">{it.ws.name}</span>
               <span class="cmdk__ctx"><span class="cmdk__kind">space</span></span>
+              <span class="cmdk__enter" aria-hidden="true">↵</span>
+            </button>
+          {/each}
+        {/if}
+        {#if viewResults.length > 0}
+          <p class="cmdk__group">Views</p>
+          {#each viewResults as it, i (it.id)}
+            {@const idx = lineResults.length + spaceResults.length + i}
+            <button
+              type="button"
+              class="cmdk__row"
+              class:cmdk__row--on={idx === sel}
+              role="option"
+              aria-selected={idx === sel}
+              onmouseenter={() => (sel = idx)}
+              onclick={() => pick(it)}
+            >
+              <span class="cmdk__glyph cmdk__glyph--space"><span class="cmdk__dot"></span></span>
+              <span class="cmdk__name">{it.name}</span>
+              <span class="cmdk__ctx"><span class="cmdk__kind">view</span></span>
               <span class="cmdk__enter" aria-hidden="true">↵</span>
             </button>
           {/each}
