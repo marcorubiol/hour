@@ -29,6 +29,15 @@
   let wsBySlug = $derived(new Map(workspaces.map((w) => [w.slug, w])));
   let lineById = $derived(new Map(lineIndex.map((l) => [l.id, l])));
 
+  // Scope is "everything" when nothing is pinned (the natural default) OR when
+  // every space is pinned with no line filter — both mean "all spaces". In
+  // that case the strip collapses to a single "All spaces" pill.
+  let isEverything = $derived.by(() => {
+    if (pins.pins.length === 0) return true;
+    if (pins.lineIds().length > 0) return false;
+    return workspaces.length > 0 && workspaces.every((w) => pins.has(spacePin(w.slug)));
+  });
+
   let pickerOpen = $state(false);
   let expandedWs = $state<string | null>(null);
   let pickerEl = $state<HTMLElement | null>(null);
@@ -78,43 +87,63 @@
 </script>
 
 <div class="scope" class:scope--compact={compact}>
-  {#each chips as chip (chip.pin)}
-    <button
-      type="button"
-      class="scope__pin"
-      style={`--c: ${chip.accent}`}
-      onclick={() => chip.kind === 'line' && onOpenLine(chip.line)}
-      title={chip.kind === 'line' ? `Open ${chip.name}` : chip.name}
-    >
-      <span class="scope__dot" aria-hidden="true"></span>
-      {#if chip.kind === 'line'}
-        {chip.project} <span class="scope__pin-sub">· {chip.name}</span>
-      {:else}
-        {chip.name}
-      {/if}
-      <span
-        class="scope__rm"
-        role="button"
-        tabindex="0"
-        aria-label="Unpin"
-        onclick={(e) => { e.stopPropagation(); pins.remove(chip.pin); }}
-        onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); pins.remove(chip.pin); } }}
-      >×</span>
-    </button>
-  {/each}
+  {#if !isEverything}
+    {#each chips as chip (chip.pin)}
+      <button
+        type="button"
+        class="scope__pin"
+        style={`--c: ${chip.accent}`}
+        onclick={() => chip.kind === 'line' && onOpenLine(chip.line)}
+        title={chip.kind === 'line' ? `Open ${chip.name}` : chip.name}
+      >
+        <span class="scope__dot" aria-hidden="true"></span>
+        {#if chip.kind === 'line'}
+          {chip.project} <span class="scope__pin-sub">· {chip.name}</span>
+        {:else}
+          {chip.name}
+        {/if}
+        <span
+          class="scope__rm"
+          role="button"
+          tabindex="0"
+          aria-label="Unpin"
+          onclick={(e) => { e.stopPropagation(); pins.remove(chip.pin); }}
+          onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); pins.remove(chip.pin); } }}
+        >×</span>
+      </button>
+    {/each}
+  {/if}
 
   <div class="scope__picker" bind:this={pickerEl}>
-    <button
-      type="button"
-      class="scope__addpin"
-      aria-expanded={pickerOpen}
-      onclick={() => (pickerOpen = !pickerOpen)}
-    >
-      <svg viewBox="0 0 14 14" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
-        <path d="M7 2.5v9M2.5 7h9" />
-      </svg>
-      Pin
-    </button>
+    {#if isEverything}
+      <button
+        type="button"
+        class="scope__all"
+        aria-expanded={pickerOpen}
+        onclick={() => (pickerOpen = !pickerOpen)}
+      >
+        <svg viewBox="0 0 14 14" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true">
+          <path d="M7 2 12.5 5 7 8 1.5 5 7 2Z" />
+          <path d="M2 8l5 2.7L12 8" />
+        </svg>
+        All spaces
+        <svg class="scope__all-chev" class:scope__all-chev--on={pickerOpen} viewBox="0 0 12 12" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+          <path d="M3 4.5 6 7.5 9 4.5" />
+        </svg>
+      </button>
+    {:else}
+      <button
+        type="button"
+        class="scope__addpin"
+        aria-expanded={pickerOpen}
+        onclick={() => (pickerOpen = !pickerOpen)}
+      >
+        <svg viewBox="0 0 14 14" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+          <path d="M7 2.5v9M2.5 7h9" />
+        </svg>
+        Pin
+      </button>
+    {/if}
     {#if pickerOpen}
       <div class="pop" role="menu">
         <p class="pop__label">Bring forward — space or line</p>
@@ -232,6 +261,36 @@
   .scope__addpin:hover {
     color: var(--text-color);
     border-color: var(--text-muted);
+  }
+
+  /* "All spaces" pill — the everything-scope indicator (dark, opens the
+     picker). Shown instead of the pin chips when nothing (= all) is pinned. */
+  .scope__all {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-s);
+    padding-block: var(--space-xs);
+    padding-inline: var(--space-m);
+    border: 1px solid var(--text-color);
+    border-radius: var(--radius-circle);
+    background: var(--text-color);
+    color: var(--bg-ultra-light);
+    cursor: pointer;
+    font-family: inherit;
+    font-size: var(--text-s);
+    font-weight: 500;
+    transition: background var(--transition), border-color var(--transition);
+  }
+  .scope__all:hover {
+    background: var(--neutral-hover);
+    border-color: var(--neutral-hover);
+  }
+  .scope__all-chev {
+    opacity: 0.85;
+    transition: transform var(--transition);
+  }
+  .scope__all-chev--on {
+    transform: rotate(180deg);
   }
 
   .pop {
