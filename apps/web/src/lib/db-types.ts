@@ -612,6 +612,7 @@ export type Database = {
           first_contacted_at: string | null
           id: string
           last_contacted_at: string | null
+          line_id: string | null
           next_action_at: string | null
           next_action_note: string | null
           person_id: string
@@ -631,6 +632,7 @@ export type Database = {
           first_contacted_at?: string | null
           id?: string
           last_contacted_at?: string | null
+          line_id?: string | null
           next_action_at?: string | null
           next_action_note?: string | null
           person_id: string
@@ -650,6 +652,7 @@ export type Database = {
           first_contacted_at?: string | null
           id?: string
           last_contacted_at?: string | null
+          line_id?: string | null
           next_action_at?: string | null
           next_action_note?: string | null
           person_id?: string
@@ -662,6 +665,13 @@ export type Database = {
           workspace_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "engagement_line_id_fkey"
+            columns: ["line_id"]
+            isOneToOne: false
+            referencedRelation: "line"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "engagement_person_id_fkey"
             columns: ["person_id"]
@@ -952,6 +962,7 @@ export type Database = {
           id: string
           kind: Database["public"]["Enums"]["line_kind"]
           last_navigated_at: string | null
+          modules: Json | null
           name: string
           notes: string | null
           previous_slugs: string[]
@@ -975,6 +986,7 @@ export type Database = {
           id?: string
           kind?: Database["public"]["Enums"]["line_kind"]
           last_navigated_at?: string | null
+          modules?: Json | null
           name: string
           notes?: string | null
           previous_slugs?: string[]
@@ -998,6 +1010,7 @@ export type Database = {
           id?: string
           kind?: Database["public"]["Enums"]["line_kind"]
           last_navigated_at?: string | null
+          modules?: Json | null
           name?: string
           notes?: string | null
           previous_slugs?: string[]
@@ -1818,6 +1831,7 @@ export type Database = {
           p_accent?: string
           p_description?: string
           p_kind?: Database["public"]["Enums"]["line_kind"]
+          p_modules?: Json
           p_name: string
           p_project_id: string
         }
@@ -1833,6 +1847,7 @@ export type Database = {
           id: string
           kind: Database["public"]["Enums"]["line_kind"]
           last_navigated_at: string | null
+          modules: Json | null
           name: string
           notes: string | null
           previous_slugs: string[]

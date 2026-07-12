@@ -63,6 +63,10 @@ export const EngagementPatchSchema = v.object({
   next_action_note: v.optional(
     v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))),
   ),
+  // ADR-056: relink the conversation's operational frame. Nullable so a
+  // module can detach. Cross-project integrity is the endpoint's guard
+  // (pattern ADR-043) — RLS gives zero backup on FK coherence.
+  line_id: v.optional(v.nullable(v.pipe(v.string(), v.uuid()))),
 });
 
 export type EngagementPatch = v.InferOutput<typeof EngagementPatchSchema>;
@@ -90,6 +94,10 @@ export const EngagementCreateSchema = v.object({
   role: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(120)))),
   next_action_at: v.optional(v.nullable(realIsoDate)),
   next_action_note: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500)))),
+  // ADR-056: capture straight into a line (the module context or the
+  // optional Line select in the global dialog). The RPC guards project
+  // membership of the line.
+  line_id: v.optional(v.nullable(v.pipe(v.string(), v.uuid()))),
 });
 
 export type EngagementCreate = v.InferOutput<typeof EngagementCreateSchema>;

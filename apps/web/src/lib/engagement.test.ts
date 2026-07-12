@@ -79,6 +79,17 @@ describe('EngagementPatchSchema', () => {
     expect(r.success).toBe(true);
     if (r.success) expect(Object.keys(r.output)).toHaveLength(0);
   });
+
+  it('accepts a line_id relink and null to detach (ADR-056)', () => {
+    const set = v.safeParse(EngagementPatchSchema, {
+      line_id: '55555555-5555-5555-5555-555555555555',
+    });
+    expect(set.success).toBe(true);
+    const detach = v.safeParse(EngagementPatchSchema, { line_id: null });
+    expect(detach.success).toBe(true);
+    if (detach.success) expect(detach.output.line_id).toBeNull();
+    expect(v.safeParse(EngagementPatchSchema, { line_id: 'not-a-uuid' }).success).toBe(false);
+  });
 });
 
 describe('status vocabulary', () => {
@@ -172,6 +183,23 @@ describe('EngagementCreateSchema', () => {
       expect('workspace_id' in r.output).toBe(false);
       expect('created_by' in r.output).toBe(false);
     }
+  });
+
+  it('accepts line_id at capture (ADR-056) and rejects non-uuids', () => {
+    const r = v.safeParse(EngagementCreateSchema, {
+      project_id: PROJECT,
+      person_id: PERSON,
+      line_id: '55555555-5555-5555-5555-555555555555',
+    });
+    expect(r.success).toBe(true);
+    if (r.success) expect(r.output.line_id).toBe('55555555-5555-5555-5555-555555555555');
+    expect(
+      v.safeParse(EngagementCreateSchema, {
+        project_id: PROJECT,
+        person_id: PERSON,
+        line_id: 'difusion-2026-27',
+      }).success,
+    ).toBe(false);
   });
 
   it('allows both shapes through the schema — exactly-one is the endpoint rule', () => {
