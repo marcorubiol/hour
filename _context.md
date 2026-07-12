@@ -64,9 +64,17 @@ Working name: **Hour**. Brand decision deferred to Phase 1.
 - Parent MaMeMi context (where Difusión originated): `01_STAGE/ZS_MaMeMi/`
 - Source of the 156 existing programmers/festivals to import: `01_STAGE/ZS_MaMeMi/Difusión/`
 
+## Status — 2026-07-12 — ADR-056 implementado: line detail = composición de módulos
+
+**Al retomar, empezar aquí.** Sesión autónoma .zerø (ultracode, grill previo con Marco). El line detail dejó de ser stubs y es la pila de módulos de ADR-056 — los 7 del catálogo v1 (Calendar, Contacts, Road sheets, Notes, Materials, Money, People), header con stats por kind, anchor chips, Add/Move/Remove module. Crear una line = elegir plantilla (6 tarjetas fijan kind+modules; el dropdown de 10 kinds murió). La creación (line/project/space) volvió a existir — llevaba huérfana desde ADR-057 en el Plaza desmontado — como dialogs en el layout + entradas en home cards y ⌘K. line_id corre por todos los write paths (contexto auto-asigna; dialogs globales con select opcional; guards cross-project). Money module trae la UI de expenses que faltaba; collab gana el target 'line'. Dos fixes de raíz: el leak de fee en GET /api/performances (saltaba read:money desde ADR-041) y create_line sin slug (lines RPC-creadas innavegables). Borrado el mundo sidebar entero (Plaza/LineList/Sidebar/selection//booking, ~3.000 líneas). Divergencias decididas: `_decisions.md § ADR-058`. Detalle: `_notes/sessions-log.md § 2026-07-12`.
+
+**⚠️ ESTADO AL CIERRE — producción pendiente de 2 pasos que el clasificador de auto-mode bloqueó** (exige que Marco los nombre explícito): (1) aplicar las 6 migraciones `build/migrations/2026-07-12_*.sql` vía Supabase MCP (orden: line_modules_engagement_line_id → create_engagement_line_id → create_line_template → collab_line_target → expense_rpcs → asset_version_rpcs) + regenerar db-types.ts; (2) deploy hour-collab PRIMERO (la migración del CHECK debe estar viva antes), luego hour-web. Después: suite completa contra prod (RLS line-modules + e2e line-detail nuevas) + smoke collab 2 clientes sobre una line. **El código NO se puede desplegar antes de las migraciones** (GET /api/lines selecciona `modules`). Verificado local: typecheck web+collab 0/0 · unit 100/100 · RLS viejas 30/30 contra prod · build limpio · review adversarial 5 lentes.
+
+**El gate no cambia:** tras esto, PARAR de construir y usar Hour con la difusión real ~1 mes. Los 154 engagements quedan atados a la line difusion-2026-27 por el backfill.
+
 ## Status — 2026-07-04 (tarde) — nav "Adaptive Digest" viva + contacto multi-espacio
 
-**Al retomar, empezar aquí.** Dos sesiones el 2026-07-04: mañana = cierre nivel 1 (ADR-051→055, escritura desde la UI, en producción — ver entrada de abajo); tarde = **rediseño de nav "Adaptive Digest"** (el "rediseño completo pins/retirar Calendar-Money" que quedó abierto). Detalle + gotchas: `_notes/sessions-log.md § 2026-07-04 (tarde)`.
+Dos sesiones el 2026-07-04: mañana = cierre nivel 1 (ADR-051→055, escritura desde la UI, en producción — ver entrada de abajo); tarde = **rediseño de nav "Adaptive Digest"** (el "rediseño completo pins/retirar Calendar-Money" que quedó abierto). Detalle + gotchas: `_notes/sessions-log.md § 2026-07-04 (tarde)`.
 
 **Estado actual de la nav (cambió respecto a lo descrito en `## UI architecture` más abajo):**
 - **Sin botones de nav arriba.** Logo `hour` = Home = **Agenda**. Calendar · Contacts · Money solo por **⌘K** (grupo "Views", + Agenda). Sin pastilla "Today".

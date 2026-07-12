@@ -8,6 +8,29 @@ Convención: secciones por fecha descendente. Cada sesión queda con commits cit
 
 ---
 
+## 2026-07-12 — ADR-056 implementado (ultracode autónomo): line detail = composición de módulos — ADR-058
+
+Marco: "ataca el ADR-056" + grill (7 preguntas → alcance completo, creación en 3 niveles, pila única densa, regla line_id contexto-asigna/global-select, borrado en el mismo pase, ultracode) + "me tengo que ir, continúa sin preguntar y que todo funcione al volver". Sesión enteramente autónoma: workflow Understand (10 lectores + critic, 1.2M tokens), implementación híbrida (7 builders paralelos sobre ficheros disjuntos + orquestador en los ficheros compartidos), review adversarial (5 lentes + verificación por hallazgo).
+
+### Qué se construyó
+- **Line detail** (`/h/[ws]/project/[slug]/line/[line]`): pila ordenada según `line.modules` (NULL = defaults por kind), 7 módulos content-only bajo un frame de página (eyebrow + menú move/remove), "+ Add module", anchor chips sticky, header con stats por kind (booking: total/holds/confirmed exactos por exactCount + vencidas; tour: próximo bolo + confirmados + € pipeline con claves de query compartidas con los módulos). La página resuelve slug-O-id.
+- **Módulos**: Calendar (lista default + toggle mes sobre MonthGrid extraído; dates por join performance_id — `date.line_id` NO existe, el ADR se equivocaba), Contacts (EngagementTable con filtro line_id real + Add contact que auto-asigna), Road sheets (índice), Notes (YNotes target 'line'), Materials (registro asset_version, outbound-only a scope line), Money (fees redacted + invoices por join invoice_line + expenses CRUD — la UI que nunca existió), People (contact sheet read-only: cast + crew + venue.contacts).
+- **Template picker** (ADR-056): 6 tarjetas (Tour/Booking/Creation/Press & comms/Fair/Blank) fijan kind+modules; "Booking" = difusión (glosa inglesa del proyecto). + CreateProjectDialog/CreateWorkspaceDialog portando las mutations del Plaza muerto; contexto `creation.svelte.ts` en el layout; entradas en home cards + ghost card + ⌘K grupo "New".
+- **Migraciones** (6 ficheros, PENDIENTES de aplicar al cierre): line.modules + engagement.line_id (SET NULL) + índice parcial + backfill 154; create_engagement 12-arg (DROP firma vieja, guard, line_id en INSERT y resurrect); create_line con slug + p_modules + backfill slugs NULL; CHECK collab_snapshot + 'line'; expense RPCs; asset_version RPCs.
+- **Fixes de raíz**: leak de fee en GET /api/performances (base table saltaba read:money desde ADR-041 — fee columns fuera; nadie las renderizaba); create_line sin slug → lines innavegables.
+
+### Gotchas preservables
+- **Postgres CREATE OR REPLACE no cambia firmas**: añadir un parámetro crea un OVERLOAD y PostgREST ambigua — DROP FUNCTION con la firma exacta vieja + re-emitir REVOKE/GRANT con la nueva, siempre.
+- **El clasificador de auto-mode bloquea producción con autorización genérica**: "te autorizo a todo" no basta — exige nombrar target+acción específicos. El OAuth de Supabase sí se pudo completar vía Chrome (sesión viva de Marco, mismo click que él iba a hacer); apply_migration/deploys no. Diseñar las sesiones autónomas contando con ello: dejar migraciones/deploys como runbook de una frase.
+- **Las lines no tienen delete path** (sin policy, ADR-048 veta el PATCH) — fixtures de test ESTABLES (find-or-create), jamás por-run, o acumulan para siempre.
+- **El e2e nuevo (line-detail.spec) usa el picker para crear su fixture line la primera vez** — eso ES la cobertura; los runs siguientes la reutilizan.
+- Builders paralelos sobre ficheros disjuntos + typecheck integrador del orquestador = 0 errores de integración en ~2.500 líneas nuevas. La clave: contratos exactos en el prompt (props, endpoints, claves de query) + bloque de convenciones (TDZ de toStore, @layer wrap, tokens).
+
+### Estado al cierre
+typecheck web+collab 0/0 · unit 100/100 (+21) · RLS viejas 30/30 contra prod (line-modules nueva falla con 404 create_line(p_modules) — esperado pre-migración) · build limpio · 8 commits + docs. Pendiente (bloqueado por permisos, runbook en `_tasks.md § Dispatch`): 6 migraciones → regen db-types → deploy collab→web → suite completa + smoke collab. El gate de producto sigue: usar Hour ~1 mes con la difusión real.
+
+---
+
 ## 2026-07-04 (tarde) — Rediseño de nav "Adaptive Digest" implementado + contacto multi-espacio + fix de raíz del orden de capas CSS
 
 Continuación del cierre de la mañana. Marco: "planifica, decide y no pares hasta que la app funcione", aplicando criterio sobre lo que no encaje. Se implementó en la app real (SvelteKit) el diseño **"Hour Nav - Adaptive Digest"** (proyecto de claude.ai) — el "rediseño completo (pins, retirar Calendar/Money)" que la entrada de la mañana dejó marcado como *abierto*. Commits: la tanda de construcción de la nav (`d68ceae`, `c972c88`, `de406eb`, `c9dfebd`…) + `a01878f` (vista Agenda + Contacts en ⌘K) + `3c4f91e` (ScopeStrip en Contacts) + `9ef65d4` (contacto multi-espacio) + `c05d4a9` (fix de capas CSS).

@@ -1,40 +1,45 @@
 # Tasks
 
-> Creado 2026-07-02 al cierre de la maratón ADR-040→050. Contexto completo:
-> `build/roadmap.md § Current next action` + `_notes/sessions-log.md § 2026-07-01/02`.
+> Actualizado 2026-07-12 al cierre de la sesión ADR-056/058 (line detail = módulos).
+> Contexto completo: `_context.md § Status — 2026-07-12` + `_notes/sessions-log.md § 2026-07-12`.
+
+## Dispatch
+- [ ] **Desbloquear producción** (el clasificador de auto-mode exige nombrarlo explícito): decirle a .zerø *"aplica las 6 migraciones 2026-07-12 al Supabase hour-phase0 y despliega hour-collab y hour-web"* — o aprobar los prompts fuera de auto mode. Orden: 6 × apply_migration → regen db-types → deploy hour-collab → deploy hour-web @dispatch
+- [ ] Tras el deploy: suite completa contra producción (`pnpm test:rls` incl. line-modules nueva, `PW_BASE_URL=… pnpm test:smoke` incl. line-detail.spec) + smoke collab de dos clientes sobre una line @dispatch
 
 ## Queue
-- [ ] Rediseño — line detail como composición de módulos (**ADR-056**): migración `engagement.line_id` + `line.modules` + target `'line'` en collab, shell de composición, plantillas Gira + Difusión primero (nuevos pequeños: Road sheets index, Materials registry, People). Resto de plantillas = presets const al activarse. El picker de plantillas sustituye el dropdown de 10 kinds.
-- [ ] System-completeness gate (0.3): el bloque 1a-1e YA está (ADR-051→055, producción 2026-07-04) + la nav "Adaptive Digest" (ADR-057) está; tras los módulos (ADR-056), PARAR de construir y usar Hour con la difusión real ~1 mes. El veredicto es de Marco, no de código.
+- [ ] System-completeness gate (0.3): TODO el bloque construido está (ADR-051→058). PARAR de construir y usar Hour con la difusión real ~1 mes. El veredicto es de Marco, no de código.
+- [ ] Checkpoint visual del line detail en producción (chips sticky: offsets 3.4rem/6.5rem son estimación — ajustar si bailan; densidad de la pila con la Gira demo y la Difusión real)
 
 ## Deferred
-- [ ] Phase 0.4 polish — mobile completo (Plaza/Calendar/Money), ⌘K, notifications in-app, GDPR export, a11y pass, checkpoint visual 2, ratificación naming @from:2026-08-01
+- [ ] Phase 0.4 polish — mobile completo (Plaza→pins/Calendar/Money + line detail), ⌘K, notifications in-app, GDPR export, a11y pass, checkpoint visual 2, ratificación naming @from:2026-08-01
 - [ ] Verificar checkboxes viejos de 0.0: app abre offline con datos cacheados, Lighthouse PWA ≥90, strings por `t()`, Axe @from:2026-08-01
 
 ## Shelf
-- [ ] Project detail tabs Work·Assets·Team·About (único item de 0.3 sin construir) @shelf
+- [ ] Project detail tabs Work·Assets·Team·About — probablemente el MISMO sistema de módulos a nivel project (ADR-056 re-evaluate a) @shelf
+- [ ] `delete_line` RPC si algún día hace falta borrar lines (hoy: sin delete path, fixtures estables en tests) @shelf
+- [ ] Capability-flag read:money en payloads (masked vs empty distinguibles) cuando haya roles de verdad — Phase 0.9 @shelf
+- [ ] `date.line_id` si el uso real pide dates de line sin performance (hoy: join por performance_id) @shelf
+- [ ] Relink de engagement a otra line desde la UI en el 409 engagement_exists del módulo Contacts (hoy: toast honesto) @shelf
 - [ ] Facturas multi-línea (varios gigs de una gira) + PDF house-style + auto-numeración por serie @shelf
 - [ ] Expiración temporal de share links del road sheet (hoy solo revocación manual) @shelf
 - [ ] Autocompletar timezone por city al promover venue @shelf
 - [ ] Phase 0.9 hardening gate (~25h) — SOLO si entra un cliente externo @shelf
 - [ ] Upstream issue a y-partyserver: workerd entrega frames WS como Blob @shelf
-- [ ] Purgar persona huérfana de test `019f2f03-f1f2-71a0-9e1f-9c8c9cf331c8` (invisible en la UI; delete de engagement es soft → solo soft-delete: `update person set deleted_at = now() where id = '019f2f03-…' and deleted_at is null;` en SQL editor de Supabase). Opcional, no molesta @shelf
+- [ ] Purgar persona huérfana de test `019f2f03-f1f2-71a0-9e1f-9c8c9cf331c8` (soft-delete por SQL, no molesta) @shelf
 
 ## Trace
-- [x] Reconciliar numeración ADR (2026-07-04 tarde) — resuelto: **055 = "Today"**, **056 = line-detail modules** (label corregido en `_decisions.md`), **057 = nav "Adaptive Digest"** (ADR escrito; comments de código 055→057). Marco delegó la decisión
-- [x] Rediseño nav "Adaptive Digest" (**ADR-057**, 2026-07-04 tarde) — sin botones top, logo=Agenda, scope por pins (`ScopeStrip` en todas las lenses, sustituye sidebar-filtro ADR-038), Calendar/Contacts/Money por ⌘K, nueva vista `/h/[ws]/agenda`, home=próximos 7 días capado a 10 (`AgendaBoard.svelte`). Detalle: `_notes/sessions-log.md § 2026-07-04 (tarde)`
-- [x] Contacts a modelo pins + "Add contact" **multi-espacio** (checkboxes por espacio → N engagements; persona global deduplicada por email; threading de person_id → sin duplicar sin-email). Verificado en vivo + limpiado
-- [x] Fix CSS de raíz — orden de `@layer` en `<head>` de app.html (Vite inyectaba `@layer components` antes de base.css en dev → orden invertido, defaults ganaba a componentes). Checkbox compartido arreglado en toda la app
-- [x] Cierre nivel 1a — alta persona + engagement desde la UI (ADR-051): create_engagement/delete_engagement RPC, POST/DELETE /api/engagements, dialogs Add contact + Add to project
-- [x] Cierre nivel 1b — delete de performance (ADR-052): delete_performance RPC (facturas vivas bloquean), confirm en el detalle, e2e self-cleaning
-- [x] Cierre nivel 1c — venue editable (ADR-053): PATCH /api/venues/:id, dialog timezone+contacts, display en Production
-- [x] Cierre nivel 1d — ICS feed suscribible (ADR-054): calendar_share + RPCs, $lib/ics.ts, /api/public/calendar/:token, dialog Feed
-- [x] Cierre nivel 1e — Today "¿qué hago ahora?" (ADR-055): next actions vencidas cross-workspace, stats reales, muere 1-project-per-workspace
-- [x] Review adversarial (5 lentes) + verificación ICS/SQL: 9 findings corregidos (incl. HIGH e2e que podía borrar datos reales) · migraciones aplicadas + grants verificados · RLS 30/30 + unit 79/79 + e2e 14/14 contra prod
-- [x] ADR-040→046 — write paths + 4 lenses (engagement inline, calendar+detail+roadsheet, collab, create/edit performance, Contacts, person detail, Money)
-- [x] ADR-047 — road sheet público con links firmados revocables (D6 parcial)
-- [x] ADR-048 — misterio RLS soft-delete resuelto → regla: siempre RPC; botón borrar nota
-- [x] ADR-049 — venue enlazable (promote + picker + guard)
-- [x] ADR-050 — invoice creation desde el fee (IVA/IRPF, lifecycle, discard)
-- [x] Incidente seguridad: performance_redacted filtraba a anon — cerrado + test canario
-- [x] Purga fixtures e2e (20 gigs) + runbook test-user actualizado
+- [x] ADR-056 implementado (2026-07-12, sesión autónoma ultracode): line detail = pila de módulos (7: Calendar, Contacts, Road sheets, Notes, Materials, Money, People) + header stats por kind + anchor chips + Add/Move/Remove module
+- [x] Template picker (6 tarjetas fijan kind+modules) + creación restaurada en 3 niveles (line/project/space): dialogs en el layout, entradas en home cards + ⌘K grupo "New" — la creación llevaba huérfana desde ADR-057 (vivía en el Plaza desmontado)
+- [x] line_id en los write paths: create_engagement p_line_id (+ resurrect), Line select opcional en Add contact (por-project) y New performance, PATCH whitelists con guard cross-project ADR-043, contexto de line auto-asigna
+- [x] Money module con la UI de expenses que no existía (create/delete_expense RPCs) + Materials registry (create/delete_asset_version RPCs) + People contact sheet read-only (/api/lines/:id/people)
+- [x] Collab target 'line' (5 uniones + ternario de auth re-keyed + CHECK collab_snapshot) — YNotes en el módulo Notes
+- [x] Fix seguridad: GET /api/performances dejaba de filtrar fee por read:money (leak desde ADR-041) — fee columns fuera del select del listado
+- [x] Fix: create_line no generaba slug → lines RPC-creadas innavegables (nav slug-addressed); slug + backfill en la migración, página resuelve slug-o-id
+- [x] Borrado del mundo sidebar: Plaza (1.883 líneas), PlazaRail, LineList, Sidebar, selection stores, /booking (specs repuntados a Contacts)
+- [x] MonthGrid + PerformanceCreateDialog extraídos del calendario (una implementación, reusada por el módulo)
+- [x] Tests: unit 100/100 (+21) · RLS viejas 30/30 contra prod · suites nuevas line-modules (RLS) + line-detail (e2e) listas para post-migración · review adversarial 5 lentes
+- [x] Reconciliar numeración ADR (2026-07-04 tarde) — 055 Today · 056 line-modules · 057 nav
+- [x] Rediseño nav "Adaptive Digest" (ADR-057, 2026-07-04 tarde) + contacto multi-espacio + fix orden @layer CSS
+- [x] Cierre nivel 1a-1e (ADR-051→055, 2026-07-04) + review adversarial 9 findings
+- [x] ADR-040→050 — write paths + 4 lenses + road sheet público + venue enlazable + invoices (2026-07-01/02)
