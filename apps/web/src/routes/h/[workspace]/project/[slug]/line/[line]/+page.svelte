@@ -394,7 +394,7 @@
         <section class="line-detail__module" id={`mod-${key}`}>
           <header class="line-detail__module-head">
             <p class="eyebrow">{MODULE_LABELS[key]}</p>
-            <Menu direction="down" align="end" label={`Module actions — ${MODULE_LABELS[key]}`}>
+            <Menu direction="down" align="end" triggerClass="btn--none" label={`Module actions — ${MODULE_LABELS[key]}`}>
               {#snippet trigger()}
                 <span class="line-detail__module-kebab" aria-hidden="true">⋯</span>
               {/snippet}
@@ -424,7 +424,7 @@
 
     {#if missingModules.length > 0}
       <div class="line-detail__addwrap">
-        <Menu direction="up" align="start" label="Add module">
+        <Menu direction="up" align="start" triggerClass="btn--none" label="Add module">
           {#snippet trigger()}
             <span class="creator">+ Add module</span>
           {/snippet}
