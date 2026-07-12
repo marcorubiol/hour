@@ -6,9 +6,8 @@
    * Shows the 10 most actionable engagements for a given Project (ordered by
    * next_action_at asc nullslast, then updated_at desc — same as the API
    * default). Header carries total count. "View all" link sends the user
-   * to the Contacts lens scoped to this Project — which is Phase 0.3 work; for
-   * now the link falls back to /booking (the legacy full-list view) so the
-   * user can still get to all 154 contacts.
+   * to the Contacts lens (the /booking wrapper it used to point at was
+   * retired in the ADR-056 cleanup).
    *
    * Anti-CRM vocabulary: surfaces the conversation state without using
    * "lead/pipeline/funnel/prospect" anywhere. Status labels are humane.
@@ -16,6 +15,7 @@
 
   import { createQuery } from '@tanstack/svelte-query';
   import { goto } from '$app/navigation';
+  import { page } from '$app/state';
   import { writable, derived } from 'svelte/store';
   import {
     statusBadgeClass,
@@ -140,7 +140,7 @@
 
     {#if total > items.length}
       <footer class="rel-stub__footer">
-        <a class="rel-stub__view-all" href="/booking">
+        <a class="rel-stub__view-all" href={`/h/${page.params.workspace}/contacts`}>
           View all {total} engagements →
         </a>
       </footer>

@@ -12,7 +12,6 @@
   import Toast, { addToast } from '../components/Toast.svelte';
   import Tooltip from '../components/Tooltip.svelte';
   import Menu, { type MenuAction } from '../components/Menu.svelte';
-  import Sidebar from '../components/Sidebar.svelte';
   import Pill from '../components/Pill.svelte';
   import TagChip from '../components/TagChip.svelte';
   import StateBadge from '../components/StateBadge.svelte';
@@ -75,10 +74,6 @@
   let dialogConfirmOpen = $state(false);
   let dialogLargeOpen = $state(false);
   let dialogResult = $state<string | null>(null);
-
-  // Sidebar demo state
-  let sidebarOpen = $state(true);
-  let sidebarLens = $state<'desk' | 'calendar' | 'contacts' | 'money'>('desk');
 
   // Menu demo
   const menuItems: MenuAction[] = [
@@ -188,7 +183,7 @@
         External
         {#snippet tail()}<span aria-hidden="true">↗</span>{/snippet}
       </LinkButton>
-      <LinkButton href="/booking">Booking</LinkButton>
+      <LinkButton href="/h/muk-cia/contacts">Contacts</LinkButton>
     </div>
   </section>
 
@@ -394,7 +389,7 @@
   <section class="playground__section">
     <h2 class="h3">Badge — engagement status (real domain)</h2>
     <p class="text--s text--dark-muted">
-      Mirrors the pills shown in <code>/booking</code>.
+      Mirrors the pills shown in the Contacts lens.
     </p>
     <div class="playground__row">
       <Badge tone="info">Contacted</Badge>
@@ -828,78 +823,6 @@
     </p>
   </section>
 
-  <section class="playground__section">
-    <h2 class="h3">Sidebar — desktop static / mobile drawer</h2>
-    <p class="text--s text--dark-muted">
-      Desktop ≥ 768px: sidebar takes its width in the flow, toggle hides it.
-      Mobile &lt; 768px: drawer slides in over content with backdrop, ESC and
-      backdrop click close. Resize the window to switch modes.
-    </p>
-    <div class="playground__row">
-      <Button onclick={() => (sidebarOpen = !sidebarOpen)}>
-        {sidebarOpen ? 'Hide sidebar' : 'Show sidebar'}
-      </Button>
-      <span class="text--s text--dark-muted">
-        Active lens: <code>{sidebarLens}</code>
-      </span>
-    </div>
-    <div class="playground__sidebar-demo">
-      <Sidebar bind:open={sidebarOpen} label="Hour navigation">
-        {#snippet header()}
-          <strong>Hour</strong>
-        {/snippet}
-        {#snippet children({ close })}
-          <nav class="playground__nav">
-            <button
-              type="button"
-              class={`menu__item${sidebarLens === 'desk' ? ' menu__item--active' : ''}`}
-              onclick={() => {
-                sidebarLens = 'desk';
-                close();
-              }}
-            >Desk</button>
-            <button
-              type="button"
-              class={`menu__item${sidebarLens === 'calendar' ? ' menu__item--active' : ''}`}
-              onclick={() => {
-                sidebarLens = 'calendar';
-                close();
-              }}
-            >Calendar</button>
-            <button
-              type="button"
-              class={`menu__item${sidebarLens === 'contacts' ? ' menu__item--active' : ''}`}
-              onclick={() => {
-                sidebarLens = 'contacts';
-                close();
-              }}
-            >Contacts</button>
-            <button
-              type="button"
-              class={`menu__item${sidebarLens === 'money' ? ' menu__item--active' : ''}`}
-              onclick={() => {
-                sidebarLens = 'money';
-                close();
-              }}
-            >Money</button>
-          </nav>
-        {/snippet}
-        {#snippet footer()}
-          <Avatar size="s" name="Marco Rubiol" tone="primary" />
-          <span class="text--s">Marco Rubiol</span>
-        {/snippet}
-      </Sidebar>
-      <main class="playground__sidebar-content">
-        <h3 class="h4">{sidebarLens[0].toUpperCase() + sidebarLens.slice(1)}</h3>
-        <p class="text--s text--dark-muted">
-          Main content area. On mobile, the sidebar is a full-viewport drawer —
-          this demo box doesn't constrain it because <code>position: fixed</code>
-          anchors to the viewport.
-        </p>
-      </main>
-    </div>
-  </section>
-
   <!-- ─── v0.5 primitives (editorial refresh) ─────────────────────── -->
 
   <section class="playground__section">
@@ -1095,31 +1018,6 @@
       display: inline-block;
     }
 
-    /* Sidebar demo — flex container so the desktop static aside sits next
-       to the content area. On mobile the sidebar position-fixes to the
-       viewport (covers the whole screen, not this box). */
-    .playground__sidebar-demo {
-      display: flex;
-      block-size: 24rem;
-      border: var(--border);
-      border-radius: var(--radius-m);
-      overflow: hidden;
-      position: relative;
-      background: var(--bg-ultra-light);
-    }
-    .playground__sidebar-content {
-      flex: 1;
-      padding: var(--space-l);
-      background: var(--base);
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-s);
-    }
-    .playground__nav {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-xs);
-    }
 
     /* v0.5 helpers */
     .playground__row--start {

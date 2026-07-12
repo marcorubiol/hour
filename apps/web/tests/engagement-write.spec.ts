@@ -4,7 +4,8 @@ const EMAIL = process.env.PW_TEST_EMAIL;
 const PASSWORD = process.env.PW_TEST_PASSWORD;
 
 /**
- * E2E — engagement inline write path on /booking (ADR-040).
+ * E2E — engagement inline write path on the Contacts lens (ADR-040/044;
+ * moved off the retired /booking wrapper in ADR-056 cleanup).
  *
  * Both tests write to a REAL engagement row (the difusión list). Original
  * values are captured via the API up front and restored in a `finally`
@@ -27,13 +28,13 @@ type RawEngagement = {
   person: { full_name: string | null } | null;
 };
 
-async function loginAndOpenBooking(page: Page) {
+async function loginAndOpenContacts(page: Page) {
   await page.goto('/login');
   await page.locator('input[type=email]').fill(EMAIL!);
   await page.locator('input[type=password]').fill(PASSWORD!);
   await page.getByRole('button', { name: /sign in/i }).click();
   await page.waitForURL(/\/h\//);
-  await page.goto('/booking');
+  await page.goto('/h/muk-cia/contacts');
   await expect(page.locator('tbody tr').first()).toBeVisible();
 }
 
@@ -41,7 +42,7 @@ function rowByName(page: Page, name: string) {
   return page.locator('tbody tr', { hasText: name }).first();
 }
 
-/** First page of the same list query /booking renders, raw values. */
+/** First page of the difusión list (same rows the lens can reach), raw values. */
 async function fetchListRaw(page: Page): Promise<RawEngagement[]> {
   return await page.evaluate(async () => {
     const jwt = localStorage.getItem('hour_jwt');
@@ -101,7 +102,7 @@ test.describe('engagement inline write', () => {
   );
 
   test('status change persists and reverts', async ({ page }) => {
-    await loginAndOpenBooking(page);
+    await loginAndOpenContacts(page);
 
     const original = (await fetchListRaw(page))[0];
     const name = original.person?.full_name;
@@ -149,7 +150,7 @@ test.describe('engagement inline write', () => {
   });
 
   test('next action date + note save, persist and restore', async ({ page }) => {
-    await loginAndOpenBooking(page);
+    await loginAndOpenContacts(page);
 
     const original = (await fetchListRaw(page))[0];
     const name = original.person?.full_name;
