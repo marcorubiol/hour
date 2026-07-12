@@ -13,6 +13,7 @@
   import { fetchJSON, mutateJSON } from '$lib/api';
   import Button from '$lib/components/Button.svelte';
   import Dialog from '$lib/components/Dialog.svelte';
+  import Checkbox from '$lib/components/Checkbox.svelte';
   import Select from '$lib/components/Select.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
   import { decodeJwtSub } from '$lib/realtime/client';
@@ -331,10 +332,7 @@
           bind:value={noteBody}
         ></textarea>
         <div class="person__composer-row">
-          <label class="person__private">
-            <input type="checkbox" bind:checked={notePrivate} />
-            private (only you)
-          </label>
+          <Checkbox label="Private (only you)" bind:checked={notePrivate} />
           <Button size="s" onclick={addNote} loading={$noteMutation.isPending}>
             Add note
           </Button>
@@ -361,8 +359,6 @@
             </li>
           {/each}
         </ul>
-      {:else}
-        <p class="person__empty">No notes yet.</p>
       {/if}
     </section>
 
@@ -422,7 +418,7 @@
       display: flex;
       flex-direction: column;
       gap: var(--space-xl);
-      max-inline-size: 44rem;
+      max-inline-size: var(--page-width-reading);
       margin-inline: auto;
     }
 
@@ -443,12 +439,8 @@
       border-block-end: 1px solid var(--border-color-light);
     }
 
+    /* Masthead typography via base.css h1 defaults. */
     .person__title {
-      font-family: var(--font-display);
-      font-size: clamp(1.8rem, 3vw, 2.4rem);
-      font-weight: 400;
-      letter-spacing: -0.025em;
-      line-height: 1.05;
       color: var(--text-color);
     }
     .person__title em {
@@ -550,15 +542,6 @@
       gap: var(--space-m);
     }
 
-    .person__private {
-      display: flex;
-      align-items: center;
-      gap: var(--space-xs);
-      font-size: var(--text-xs);
-      color: var(--text-muted);
-      cursor: pointer;
-    }
-
     .person__notes li {
       display: flex;
       flex-direction: column;
@@ -599,9 +582,5 @@
       white-space: pre-wrap;
     }
 
-    .person__empty {
-      font-size: var(--text-s);
-      color: var(--text-faint);
-    }
   }
 </style>

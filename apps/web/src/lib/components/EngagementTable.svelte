@@ -25,6 +25,7 @@
   import { untrack } from 'svelte';
   import { toStore } from 'svelte/store';
   import { fetchJSON } from '$lib/api';
+  import { dayMonth } from '$lib/datetime';
   import Button from '$lib/components/Button.svelte';
   import Dialog from '$lib/components/Dialog.svelte';
   import Input from '$lib/components/Input.svelte';
@@ -205,10 +206,7 @@
 
   function formatDate(iso: string | null): string {
     if (!iso) return '—';
-    return new Date(iso).toLocaleDateString('en-GB', {
-      day: '2-digit',
-      month: 'short',
-    });
+    return dayMonth(iso);
   }
 
   function locationOf(item: EngagementItem): string {
@@ -310,14 +308,14 @@
 {#if showPagination}
   <div class="pagination">
     <button
-      class="btn--outline"
+      class="btn--outline btn--s"
       onclick={() => (offset = Math.max(0, offset - LIMIT))}
       disabled={offset === 0}
     >
       Previous
     </button>
     <button
-      class="btn--outline"
+      class="btn--outline btn--s"
       onclick={() => (offset = offset + LIMIT)}
       disabled={offset + LIMIT >= total}
     >
@@ -368,10 +366,6 @@
       font-weight: 500;
     }
 
-    .table-wrap {
-      overflow-x: auto;
-    }
-
     .msg {
       text-align: center;
       padding-block: var(--space-xxl);
@@ -389,7 +383,7 @@
     }
 
     tbody td {
-      max-inline-size: 16rem;
+      max-inline-size: clamp(7rem, 24cqi, 16rem);
       overflow: hidden;
       text-overflow: ellipsis;
     }
@@ -415,12 +409,6 @@
       font-size: var(--text-s);
     }
 
-    .status-caret {
-      opacity: 0.5;
-      margin-inline-start: 0.35em;
-      font-size: 0.85em;
-    }
-
     .next-action {
       display: flex;
       flex-direction: column;
@@ -431,7 +419,9 @@
     }
     .next-action__date {
       color: var(--text-dark-muted);
-      font-size: var(--text-s);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      letter-spacing: var(--mono-letter-spacing);
     }
     .next-action:hover .next-action__date {
       color: var(--text-color);

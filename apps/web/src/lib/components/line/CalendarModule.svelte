@@ -151,7 +151,7 @@
     <p class="lcal__state">Loading…</p>
   {:else if mode === 'list'}
     {#if upcoming.length === 0}
-      <p class="lcal__state">No upcoming performances on this line.</p>
+      <p class="lcal__state">No upcoming performances on this line yet.</p>
     {:else}
       <div class="table-wrap">
         <table>
@@ -173,14 +173,14 @@
                     tone={performanceStatusTone(p.status)}
                   />
                 </td>
-                <td>
+                <td class="lcal__cell-venue">
                   {[p.venue?.name ?? p.venue_name, p.venue?.city ?? p.city]
                     .filter(Boolean)
                     .join(' · ') || '—'}
                 </td>
                 <td class="lcal__cell-link">
                   {#if p.slug}
-                    <a href={`/h/${workspaceSlug}/performance/${p.slug}`}>Open →</a>
+                    <a class="link-arrow" href={`/h/${workspaceSlug}/performance/${p.slug}`}>Open →</a>
                   {/if}
                 </td>
               </tr>
@@ -238,15 +238,15 @@
       padding-inline: var(--space-s);
       font-family: var(--font-mono);
       font-size: var(--text-xs);
-      letter-spacing: 0.04em;
+      letter-spacing: var(--mono-letter-spacing-loose);
       text-transform: uppercase;
       color: var(--text-faint);
       cursor: pointer;
       transition: color var(--transition), background var(--transition);
     }
     .lcal__mode--on {
-      background: var(--bg-light);
-      color: var(--text-color);
+      background: var(--text-color);
+      color: var(--bg);
     }
     .lcal__nav {
       display: inline-flex;
@@ -254,10 +254,10 @@
       gap: var(--space-s);
       margin-inline-start: auto;
     }
-    .lcal__bar > :global(.btn) {
+    .lcal__bar > :global([class*='btn--']) {
       margin-inline-start: auto;
     }
-    .lcal__nav + :global(.btn) {
+    .lcal__nav + :global([class*='btn--']) {
       margin-inline-start: 0;
     }
     .lcal__navbtn {
@@ -277,7 +277,7 @@
     .lcal__month {
       font-family: var(--font-mono);
       font-size: var(--text-xs);
-      letter-spacing: 0.04em;
+      letter-spacing: var(--mono-letter-spacing-loose);
       text-transform: uppercase;
       color: var(--text-muted);
     }
@@ -287,16 +287,9 @@
       color: var(--text-muted);
       white-space: nowrap;
     }
-    .lcal__cell-link a {
+    .lcal__cell-venue {
       font-size: var(--text-s);
-      color: var(--text-muted);
-      text-decoration: none;
-    }
-    .lcal__cell-link a:hover {
-      color: var(--text-color);
-    }
-    .table-wrap {
-      overflow-x: auto;
+      color: var(--text-dark-muted);
     }
     .lcal__past {
       margin: 0;

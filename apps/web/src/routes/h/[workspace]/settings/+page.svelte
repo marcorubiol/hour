@@ -177,7 +177,7 @@
 <article class="set-page">
   {#if active === 'profile'}
     <header class="set-mast">
-      <p class="set-mast__kicker">Account</p>
+      <p class="eyebrow set-mast__kicker">Account</p>
       <h1 class="set-mast__title"><em>Profile</em></h1>
       <p class="set-mast__sub">
         The basics. Used across your projects and on press kits.
@@ -236,7 +236,7 @@
 
       {#if active === 'workspaces'}
         <header class="set-mast">
-          <p class="set-mast__kicker">Roster</p>
+          <p class="eyebrow set-mast__kicker">Roster</p>
           <h1 class="set-mast__title"><em>Workspaces &amp; roles</em></h1>
           <p class="set-mast__sub">
             Each project is its own workspace. Your role decides what you see —
@@ -246,7 +246,7 @@
 
         <section class="set-group">
           <div class="set-group__head">
-            <span class="set-group__kicker">{workspaces.length} active</span>
+            <span class="eyebrow set-group__kicker">{workspaces.length} active</span>
             <h2 class="set-group__title">My projects</h2>
           </div>
           <div class="set-group__body">
@@ -267,7 +267,7 @@
                   </div>
                   <div class="set-ws__roles">
                     {#each myRoles as role (role)}
-                      <span class="set-role is-mine">{role}</span>
+                      <span class="role-badge is-mine">{role}</span>
                     {/each}
                   </div>
                   <div class="set-ws__meta">
@@ -276,8 +276,8 @@
                     <span>{projectCount} {projectCount === 1 ? 'project' : 'projects'}</span>
                   </div>
                   <div class="set-ws__actions">
-                    <button type="button" class="btn--outline btn--s">edit role</button>
-                    <button type="button" class="btn--outline btn--s is-warn">leave</button>
+                    <button type="button" class="btn--outline btn--s">Edit role</button>
+                    <button type="button" class="btn--outline btn--s is-warn">Leave</button>
                   </div>
                 </div>
               {/each}
@@ -290,7 +290,7 @@
 
         <section class="set-group">
           <div class="set-group__head">
-            <span class="set-group__kicker">By role</span>
+            <span class="eyebrow set-group__kicker">By role</span>
             <h2 class="set-group__title">Roles I take on</h2>
           </div>
           <div class="set-group__body">
@@ -302,7 +302,7 @@
               {#each ALL_ROLES as role (role)}
                 <button
                   type="button"
-                  class={['set-role-chip', activeRoles.has(role) && 'is-on']
+                  class={['pill--sm', 'pill--mono', 'set-role-chip', activeRoles.has(role) && 'pill--on']
                     .filter(Boolean)
                     .join(' ')}
                   onclick={() => toggleRole(role)}
@@ -318,7 +318,7 @@
 
       {#if active === 'privacy'}
         <header class="set-mast">
-          <p class="set-mast__kicker">Boundaries</p>
+          <p class="eyebrow set-mast__kicker">Boundaries</p>
           <h1 class="set-mast__title"><em>Visibility &amp; privacy</em></h1>
           <p class="set-mast__sub">
             Across your collectives, some things are shared and some are yours
@@ -328,7 +328,7 @@
 
         <section class="set-group">
           <div class="set-group__head">
-            <span class="set-group__kicker">Defaults</span>
+            <span class="eyebrow set-group__kicker">Defaults</span>
           </div>
           <div class="set-group__body">
             <div class="set-row">
@@ -429,7 +429,7 @@
 
       {#if active === 'languages'}
         <header class="set-mast">
-          <p class="set-mast__kicker">Materials</p>
+          <p class="eyebrow set-mast__kicker">Materials</p>
           <h1 class="set-mast__title"><em>Languages</em></h1>
           <p class="set-mast__sub">
             Press kits, dossiers, riders — Hour produces each in the languages
@@ -443,7 +443,7 @@
 
         <section class="set-group">
           <div class="set-group__head">
-            <span class="set-group__kicker">Interface</span>
+            <span class="eyebrow set-group__kicker">Interface</span>
           </div>
           <div class="set-group__body">
             <div class="set-row">
@@ -487,7 +487,7 @@
 
       {#if active === 'notifications'}
         <header class="set-mast">
-          <p class="set-mast__kicker">Quiet by default</p>
+          <p class="eyebrow set-mast__kicker">Quiet by default</p>
           <h1 class="set-mast__title"><em>Notifications</em></h1>
           <p class="set-mast__sub">
             Hour only nudges you when something genuinely changed. You decide
@@ -497,7 +497,7 @@
 
         <section class="set-group">
           <div class="set-group__head">
-            <span class="set-group__kicker">Digest</span>
+            <span class="eyebrow set-group__kicker">Digest</span>
           </div>
           <div class="set-group__body">
             <div class="set-row">
@@ -548,7 +548,7 @@
 
         <section class="set-group">
           <div class="set-group__head">
-            <span class="set-group__kicker">Priority alerts</span>
+            <span class="eyebrow set-group__kicker">Priority alerts</span>
           </div>
           <div class="set-group__body">
             <div class="set-row">
@@ -624,7 +624,7 @@
 
         <section class="set-group">
           <div class="set-group__head">
-            <span class="set-group__kicker">Channels</span>
+            <span class="eyebrow set-group__kicker">Channels</span>
           </div>
           <div class="set-group__body">
             <div class="set-row">
@@ -679,7 +679,7 @@
 
         <section class="set-group">
           <div class="set-group__head">
-            <span class="set-group__kicker">Browser memory</span>
+            <span class="eyebrow set-group__kicker">Browser memory</span>
           </div>
           <div class="set-group__body">
             <div class="set-row">
@@ -728,7 +728,7 @@
 
       {#if active === 'billing'}
         <header class="set-mast">
-          <p class="set-mast__kicker">Money</p>
+          <p class="eyebrow set-mast__kicker">Money</p>
           <h1 class="set-mast__title"><em>Billing</em></h1>
           <p class="set-mast__sub">
             Hour is a small Barcelona-based tool. Your money goes a long way here.
@@ -739,7 +739,7 @@
           <div class="set-group__body">
             <div class="set-plan">
               <div class="set-plan__head">
-                <span class="set-plan__kicker">Current plan</span>
+                <span class="eyebrow set-plan__kicker">Current plan</span>
                 <h2 class="set-plan__name">
                   Solo <em>·</em> <span>€9/mo</span>
                 </h2>
@@ -763,7 +763,7 @@
 
         <section class="set-group">
           <div class="set-group__head">
-            <span class="set-group__kicker">Payment</span>
+            <span class="eyebrow set-group__kicker">Payment</span>
           </div>
           <div class="set-group__body">
             <div class="set-row">
@@ -775,7 +775,7 @@
                   <span class="set-card__brand">VISA</span>
                   <span>•••• 4242</span>
                   <span class="set-row__hint">exp 11/27</span>
-                  <button type="button" class="btn--outline btn--s">update</button>
+                  <button type="button" class="btn--outline btn--s">Update</button>
                 </div>
               </div>
             </div>
@@ -802,7 +802,7 @@
 
         <section class="set-group">
           <div class="set-group__head">
-            <span class="set-group__kicker">History</span>
+            <span class="eyebrow set-group__kicker">History</span>
           </div>
           <div class="set-group__body">
             <div class="set-invoices">
@@ -822,7 +822,7 @@
 
       {#if active === 'danger'}
         <header class="set-mast">
-          <p class="set-mast__kicker">Last resort</p>
+          <p class="eyebrow set-mast__kicker">Last resort</p>
           <h1 class="set-mast__title"><em>Danger zone</em></h1>
           <p class="set-mast__sub">
             The buttons here can't be undone. Read twice.
@@ -880,7 +880,7 @@
   .set-page {
     --set-pad: clamp(16px, 1.6vw, 24px);
 
-    max-inline-size: 920px;
+    max-inline-size: var(--page-width-wide);
     margin-inline: auto;
     color: var(--text-color);
     font-family: var(--font-sans);
@@ -914,18 +914,9 @@
   }
   .set-mast__kicker {
     margin: 0;
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: var(--text-faint);
   }
+  /* Masthead typography via base.css h1 defaults. */
   .set-mast__title {
-    font-family: var(--font-display);
-    font-size: clamp(2rem, 3vw, 2.4rem);
-    font-weight: 400;
-    letter-spacing: -0.025em;
-    line-height: 1.05;
     margin: 0;
   }
   .set-mast__title em {
@@ -951,16 +942,11 @@
     padding-block-end: var(--space-xs);
     border-block-end: 1px solid var(--border-color-light);
   }
-  .set-group__kicker {
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: var(--text-faint);
-  }
+  /* Kicker typography via base.css .eyebrow. */
+
   .set-group__title {
     font-family: var(--font-display);
-    font-size: 1.35rem;
+    font-size: var(--h3);
     font-weight: 400;
     letter-spacing: -0.015em;
     margin: 0;
@@ -1043,7 +1029,7 @@
     background: var(--bg-ultra-light);
     color: var(--text-color);
     font-weight: 500;
-    box-shadow: 0 1px 2px oklch(0% 0 0 / 0.06);
+    box-shadow: var(--box-shadow-1);
   }
 
   .set-toggle {
@@ -1052,20 +1038,20 @@
     background: var(--border-color-dark);
     inline-size: 36px;
     block-size: 20px;
-    border-radius: 999px;
+    border-radius: var(--radius-circle);
     padding: 2px;
     cursor: pointer;
     display: inline-flex;
     align-items: center;
-    transition: background 160ms;
+    transition: background var(--transition);
   }
   .set-toggle__dot {
     inline-size: 16px;
     block-size: 16px;
     border-radius: 50%;
     background: var(--bg-ultra-light);
-    box-shadow: 0 1px 3px oklch(0% 0 0 / 0.12);
-    transition: transform 160ms;
+    box-shadow: var(--box-shadow-1);
+    transition: transform var(--transition);
   }
   .set-toggle.is-on {
     background: var(--text-color);
@@ -1139,22 +1125,7 @@
     flex-wrap: wrap;
     max-inline-size: 280px;
   }
-  .set-role {
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    color: var(--text-muted);
-    padding-block: 2px;
-    padding-inline: var(--space-s);
-    border: 1px dashed var(--border-color-dark);
-    border-radius: 3px;
-    letter-spacing: 0.03em;
-    white-space: nowrap;
-  }
-  .set-role.is-mine {
-    border-style: solid;
-    color: var(--text-color);
-    background: var(--bg-light);
-  }
+  /* Role badges via base.css .role-badge (+ .is-mine). */
   .set-ws__meta {
     font-family: var(--font-mono);
     font-size: var(--text-xs);
@@ -1176,22 +1147,9 @@
     flex-wrap: wrap;
     gap: var(--space-xs);
   }
+  /* Pill skeleton (base.css) carries the chip; only the dot is local. */
   .set-role-chip {
-    appearance: none;
-    background: transparent;
-    border: 1px solid var(--border-color-dark);
-    font: inherit;
-    font-size: var(--text-xs);
-    color: var(--text-muted);
-    padding-block: var(--space-xs);
-    padding-inline: var(--space-s) var(--space-s);
-    border-radius: 999px;
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-xs);
-    cursor: pointer;
-    font-family: var(--font-mono);
-    letter-spacing: 0.04em;
+    --pill-gap: var(--space-xs);
   }
   .set-role-chip__dot {
     inline-size: 7px;
@@ -1200,15 +1158,7 @@
     border-radius: 50%;
     display: inline-block;
   }
-  .set-role-chip:hover {
-    color: var(--text-color);
-  }
-  .set-role-chip.is-on {
-    background: var(--text-color);
-    border-color: var(--text-color);
-    color: var(--bg);
-  }
-  .set-role-chip.is-on .set-role-chip__dot {
+  :global(.set-role-chip.pill--on) .set-role-chip__dot {
     background: currentColor;
   }
 
@@ -1227,7 +1177,7 @@
     background: var(--bg-light);
     padding-block: 1px;
     padding-inline: var(--space-xs);
-    border-radius: 3px;
+    border-radius: var(--radius-s);
   }
 
   .set-plan {
@@ -1244,16 +1194,11 @@
     flex-direction: column;
     gap: var(--space-xs);
   }
-  .set-plan__kicker {
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: var(--text-faint);
-  }
+  /* Kicker typography via base.css .eyebrow. */
+
   .set-plan__name {
     font-family: var(--font-display);
-    font-size: 1.8rem;
+    font-size: var(--text-xxl);
     font-weight: 400;
     letter-spacing: -0.02em;
     margin: 0;
@@ -1264,7 +1209,7 @@
     color: var(--text-muted);
   }
   .set-plan__name span {
-    font-size: 1.3rem;
+    font-size: var(--text-xl);
     color: var(--text-muted);
   }
   .set-plan__sub {
@@ -1299,7 +1244,7 @@
     color: var(--bg);
     padding-block: 3px;
     padding-inline: var(--space-s);
-    border-radius: 3px;
+    border-radius: var(--radius-s);
   }
 
   .set-invoices {
@@ -1341,6 +1286,6 @@
     border: 1px solid currentColor;
     padding-block: 2px;
     padding-inline: var(--space-s);
-    border-radius: 3px;
+    border-radius: var(--radius-s);
   }
 </style>

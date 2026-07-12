@@ -27,6 +27,7 @@
   import StateBadge from '$lib/components/StateBadge.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
   import { dayLabel } from '$lib/datetime';
+  import { fmtFee, fmtMoney, invoiceTone } from '$lib/money';
   import { CATEGORY_LABELS, EXPENSE_CATEGORIES, categoryLabel } from '$lib/expense';
   import { performanceStatusLabel, performanceStatusTone } from '$lib/performance';
 
@@ -155,24 +156,6 @@
     $expensesQuery.error instanceof Error ? $expensesQuery.error.message : '',
   );
 
-  // ── Formatting (same formatter contract as the Money lens) ────────────
-  const money = new Intl.NumberFormat('en-GB', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-
-  function fmtFee(amount: number | null, currency: string | null): string {
-    if (amount === null) return '—';
-    return `${money.format(amount)} ${currency ?? 'EUR'}`;
-  }
-
-  function invoiceTone(status: string): 'neutral' | 'warning' | 'faint' | 'danger' {
-    if (status === 'issued') return 'warning';
-    if (status === 'paid') return 'faint';
-    if (status === 'cancelled') return 'danger';
-    return 'neutral';
-  }
-
   // ── Add expense dialog ────────────────────────────────────────────────
   const categoryOptions = EXPENSE_CATEGORIES.map((c) => ({
     value: c,
@@ -274,29 +257,29 @@
 
 <section class="lmm">
   <section class="lmm__section" aria-label="Fees">
-    <p class="lmm__sub">Fees</p>
+    <p class="eyebrow eyebrow--sub lmm__sub">Fees</p>
     {#if feesError}
       <p class="lmm__state lmm__state--danger">{feesError}</p>
     {:else if $feesQuery.isLoading}
       <p class="lmm__state">Loading…</p>
     {:else if fees.length === 0}
-      <p class="lmm__state">No performances on this line.</p>
+      <p class="lmm__state">No performances on this line yet.</p>
     {:else}
       {#if allFeesNull}
         <p class="lmm__state">Fees hidden or unset.</p>
       {:else}
         <div class="lmm__totals">
           <span class="lmm__total">
-            <span class="lmm__total-label">pipeline</span>
-            {money.format(totals.pipeline)}
+            <span class="eyebrow eyebrow--sub lmm__total-label">pipeline</span>
+            {fmtMoney(totals.pipeline)}
           </span>
           <span class="lmm__total">
-            <span class="lmm__total-label">invoiced</span>
-            {money.format(totals.invoiced)}
+            <span class="eyebrow eyebrow--sub lmm__total-label">invoiced</span>
+            {fmtMoney(totals.invoiced)}
           </span>
           <span class="lmm__total">
-            <span class="lmm__total-label">paid</span>
-            {money.format(totals.paid)}
+            <span class="eyebrow eyebrow--sub lmm__total-label">paid</span>
+            {fmtMoney(totals.paid)}
           </span>
         </div>
       {/if}
@@ -306,7 +289,7 @@
             <tr>
               <th>Date</th>
               <th>Status</th>
-              <th>Venue</th>
+              <th>Where</th>
               <th>Fee</th>
             </tr>
           </thead>
@@ -339,20 +322,20 @@
   </section>
 
   <section class="lmm__section" aria-label="Invoices">
-    <p class="lmm__sub">Invoices</p>
+    <p class="eyebrow eyebrow--sub lmm__sub">Invoices</p>
     {#if invoicesError}
       <p class="lmm__state lmm__state--danger">{invoicesError}</p>
     {:else if $invoicesQuery.isLoading}
       <p class="lmm__state">Loading…</p>
     {:else if lineInvoices.length === 0}
-      <p class="lmm__state">No invoices for this line.</p>
+      <p class="lmm__state">No invoices on this line yet.</p>
     {:else}
       <ul class="lmm__invoices" role="list">
         {#each lineInvoices as inv (inv.id)}
           <li>
             <span class="lmm__inv-number">{inv.number ?? 'no number'}</span>
             <StateBadge label={inv.status} tone={invoiceTone(inv.status)} />
-            <span class="lmm__inv-total">{money.format(inv.total)} {inv.currency}</span>
+            <span class="lmm__inv-total">{fmtMoney(inv.total)} {inv.currency}</span>
             <span class="lmm__cell-date">{dayLabel(inv.issued_on)}</span>
           </li>
         {/each}
@@ -362,7 +345,7 @@
 
   <section class="lmm__section" aria-label="Expenses">
     <header class="lmm__section-head">
-      <p class="lmm__sub">Expenses</p>
+      <p class="eyebrow eyebrow--sub lmm__sub">Expenses</p>
       <Button size="xs" variant="outline" onclick={openExpense}>Add expense</Button>
     </header>
     {#if expensesError}
@@ -370,7 +353,7 @@
     {:else if $expensesQuery.isLoading}
       <p class="lmm__state">Loading…</p>
     {:else if expenses.length === 0}
-      <p class="lmm__state">No expenses yet.</p>
+      <p class="lmm__state">No expenses on this line yet.</p>
     {:else}
       <div class="table-wrap">
         <table>
@@ -389,7 +372,7 @@
                 <td class="lmm__cell-date">{e.incurred_on ? dayLabel(e.incurred_on) : '—'}</td>
                 <td class="lmm__cell-muted">{categoryLabel(e.category)}</td>
                 <td>{e.description}</td>
-                <td class="lmm__cell-amount">{money.format(e.amount)} {e.currency}</td>
+                <td class="lmm__cell-amount">{fmtMoney(e.amount)} {e.currency}</td>
                 <td class="lmm__cell-actions">
                   <Menu
                     label="Expense actions"
@@ -410,7 +393,7 @@
         </table>
       </div>
       <p class="lmm__exp-total">
-        Total: {expenseTotals.map(([c, sum]) => `${money.format(sum)} ${c}`).join(' · ')}
+        Total: {expenseTotals.map(([c, sum]) => `${fmtMoney(sum)} ${c}`).join(' · ')}
       </p>
     {/if}
   </section>
@@ -462,16 +445,7 @@
       gap: var(--space-s);
     }
 
-    /* Sub-eyebrow — smaller sibling of the page-level .eyebrow, scoped to
-       the module's subsections. */
-    .lmm__sub {
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      font-weight: 500;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--text-faint);
-    }
+    /* Sub-eyebrow typography via base.css .eyebrow--sub. */
 
     .lmm__state {
       font-size: var(--text-s);
@@ -497,17 +471,6 @@
       gap: var(--space-xs);
     }
 
-    .lmm__total-label {
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--text-faint);
-    }
-
-    .table-wrap {
-      overflow-x: auto;
-    }
 
     .lmm__cell-date {
       font-family: var(--font-mono);

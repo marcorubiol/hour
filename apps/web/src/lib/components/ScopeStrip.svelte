@@ -433,8 +433,7 @@
     margin: 0;
     padding-block: var(--space-xs);
     padding-inline: var(--space-s);
-    font-size: var(--text-xs);
+    font-size: var(--text-s);
     color: var(--text-faint);
-    font-style: italic;
   }
 </style>

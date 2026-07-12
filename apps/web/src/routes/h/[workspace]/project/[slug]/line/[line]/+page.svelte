@@ -28,6 +28,8 @@
   import Menu from '$lib/components/Menu.svelte';
   import StateBadge from '$lib/components/StateBadge.svelte';
   import { lineKindGlyph, lineKindLabel } from '$lib/utils/line-kind';
+  import { fmtMoneyCompact } from '$lib/money';
+  import { dayMonth } from '$lib/datetime';
   import {
     MODULE_KEYS,
     MODULE_LABELS,
@@ -250,18 +252,12 @@
     return { next, confirmed, holds, pipeline, hasFees: withFee.length > 0 };
   });
 
-  const numFmt = new Intl.NumberFormat('en-GB', {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  });
-
-  function fmtDay(iso: string): string {
-    return new Date(iso + 'T00:00:00Z').toLocaleDateString('en-GB', {
-      day: '2-digit',
-      month: 'short',
-      timeZone: 'UTC',
-    });
-  }
+  /* Line lifecycle → badge tone (open = alive, everything closed = faint). */
+  const LINE_STATUS_TONE: Record<string, 'success' | 'faint'> = {
+    open: 'success',
+    closed: 'faint',
+    archived: 'faint',
+  };
 
   // ── Visit touch (last_navigated_at ordering) ──────────────────────────
   let lastTouchedLineId = '';
@@ -335,13 +331,13 @@
   {:else if activeLine}
     <header class="line-detail__header">
       <p class="eyebrow">Line</p>
-      <h1 class="line-detail__title">{activeLine.name}</h1>
+      <h1 class="line-detail__title"><em>{activeLine.name}</em></h1>
       <p class="line-detail__meta">
         <span class="line-detail__kind">
           {lineKindGlyph(activeLine.kind)} {lineKindLabel(activeLine.kind)}
         </span>
         <span class="line-detail__sep">·</span>
-        <StateBadge label={activeLine.status} />
+        <StateBadge label={activeLine.status} tone={LINE_STATUS_TONE[activeLine.status] ?? 'neutral'} />
         {#if formatDateRange(activeLine.start_date, activeLine.end_date)}
           <span class="line-detail__sep">·</span>
           <span class="line-detail__dates">
@@ -372,14 +368,14 @@
         <p class="line-detail__stats">
           {#if st.next}
             <span class="line-detail__stat">
-              next <b>{fmtDay(st.next.performed_at)}</b>
+              next <b>{dayMonth(st.next.performed_at)}</b>
               {st.next.venue?.name ?? st.next.venue_name ?? ''}
             </span>
           {/if}
           <span class="line-detail__stat"><b>{st.confirmed}</b> confirmed</span>
           <span class="line-detail__stat"><b>{st.holds}</b> holds</span>
           {#if st.hasFees && st.pipeline > 0}
-            <span class="line-detail__stat"><b>{numFmt.format(st.pipeline)}</b> pipeline</span>
+            <span class="line-detail__stat"><b>{fmtMoneyCompact(st.pipeline)}</b> pipeline</span>
           {/if}
         </p>
       {/if}
@@ -388,7 +384,7 @@
     {#if stack.length > 1}
       <nav class="line-detail__chips" aria-label="Modules">
         {#each stack as key (key)}
-          <a class="line-detail__chip" href={`#mod-${key}`}>{MODULE_LABELS[key]}</a>
+          <a class="pill--sm pill--mono line-detail__chip" href={`#mod-${key}`}>{MODULE_LABELS[key]}</a>
         {/each}
       </nav>
     {/if}
@@ -431,7 +427,7 @@
       <div class="line-detail__addwrap">
         <Menu direction="up" align="start" label="Add module">
           {#snippet trigger()}
-            <span class="line-detail__add">+ Add module</span>
+            <span class="creator">+ Add module</span>
           {/snippet}
           {#snippet children({ close }: { close: (focus?: boolean) => void })}
             {#each missingModules as key (key)}
@@ -462,7 +458,7 @@
       gap: var(--space-l);
       padding-block: var(--space-l);
       padding-inline: var(--space-m);
-      max-inline-size: 64rem;
+      max-inline-size: var(--page-width-wide);
       margin-inline: auto;
     }
 
@@ -472,13 +468,14 @@
       gap: var(--space-s);
     }
 
+    /* Masthead — base.css h1 defaults carry family/size/weight/tracking;
+       only the entity-name italic is page concern (shared convention with
+       project/person/performance). */
     .line-detail__title {
-      font-family: var(--font-display);
-      font-size: var(--text-2xl, var(--text-xl));
-      font-weight: 400;
-      letter-spacing: -0.02em;
       margin: 0;
-      color: var(--text-color);
+    }
+    .line-detail__title em {
+      font-style: italic;
     }
 
     .line-detail__meta {
@@ -538,12 +535,12 @@
       color: var(--danger);
     }
 
-    /* Anchor chips — sticky under the shell top bar. The inset clears the
-       bar's content-driven height; module sections carry scroll-margin so
-       #hash jumps land below both. */
+    /* Anchor chips — sticky under the shell top bar. --header-height is the
+       bar's real height (declared on .shell, true by construction); module
+       sections carry scroll-margin so #hash jumps land below both. */
     .line-detail__chips {
       position: sticky;
-      inset-block-start: 3.4rem;
+      inset-block-start: var(--header-height);
       z-index: calc(var(--z-sticky) - 10);
       display: flex;
       flex-wrap: wrap;
@@ -552,22 +549,10 @@
       background: color-mix(in oklch, var(--bg) 92%, transparent);
       backdrop-filter: blur(6px);
     }
+    /* Typography/border via the shared .pill--sm .pill--mono contract;
+       only the tighter block padding is local. */
     .line-detail__chip {
-      padding-block: var(--space-2xs);
-      padding-inline: var(--space-s);
-      border: 1px solid var(--border-color-light);
-      border-radius: var(--radius-circle);
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
-      color: var(--text-muted);
-      text-decoration: none;
-      transition: color var(--transition), border-color var(--transition);
-    }
-    .line-detail__chip:hover {
-      color: var(--text-color);
-      border-color: var(--border-color-dark);
+      --pill-padding-block: var(--space-2xs);
     }
 
     .line-detail__stack {
@@ -580,7 +565,8 @@
       display: flex;
       flex-direction: column;
       gap: var(--space-s);
-      scroll-margin-block-start: 6.5rem;
+      /* Clear the shell bar + the sticky chips row on #hash jumps. */
+      scroll-margin-block-start: calc(var(--header-height) + 3rem);
     }
 
     .line-detail__module-head {
@@ -613,23 +599,7 @@
     .line-detail__addwrap {
       display: flex;
     }
-    .line-detail__add {
-      display: inline-flex;
-      padding-block: var(--space-xs);
-      padding-inline: var(--space-s);
-      border: 1px dashed var(--border-color-light);
-      border-radius: var(--radius-m);
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      letter-spacing: 0.04em;
-      color: var(--text-faint);
-      cursor: pointer;
-      transition: color var(--transition), border-color var(--transition);
-    }
-    .line-detail__add:hover {
-      color: var(--text-color);
-      border-color: var(--border-color-dark);
-    }
+    /* Trigger styling via the shared .creator class (base.css). */
     .line-detail__add-item {
       display: flex;
       flex-direction: column;

@@ -193,7 +193,8 @@
     --heading-letter-spacing: -0.02em;
 
     --mono-font-family: var(--font-mono);
-    --mono-letter-spacing: 0.02em;
+    --mono-letter-spacing: 0.02em; /* lowercase mono runs (tag chips, state badges) */
+    --mono-letter-spacing-loose: 0.04em; /* uppercase mono micro-labels (anchor chips, pins, cell dates). .eyebrow keeps its own 0.14em. */
 
     /* Type scale — fluid via clamp(). One scale for the whole app. */
     --text-xs: clamp(0.625rem, 0.6rem + 0.12vw, 0.6875rem); /* 10-11 — eyebrows, badges. Tightened 2026-07-04 to the design's meta size (was 11-12); everything read a touch big because this floor sat above the mock. */
@@ -203,7 +204,7 @@
     --text-xl: clamp(1.3rem, 1.2rem + 0.5vw, 1.5rem); /* 21-24 — wordmark, h4 */
     --text-xxl: clamp(1.5rem, 1.35rem + 0.75vw, 2rem); /* 24-32 — section title */
 
-    --h1: clamp(2rem, 1.5rem + 2.4vw, 3rem); /* 32-48 — masthead */
+    --h1: clamp(1.8rem, 1.5rem + 1.5vw, 2.4rem); /* 29-38 — masthead. Retuned 2026-07-12 to the size mastheads actually render (person/performance canonical); the old 32-48 was never consumed — every page rolled its own clamp to undershoot it. */
     --h2: var(--text-xxl);
     --h3: clamp(1.2rem, 1.05rem + 0.7vw, 1.5rem);
     --h4: var(--text-xl);
@@ -257,6 +258,14 @@
       var(--content-width),
       calc(100% - var(--gutter) * 2)
     );
+
+    /* App page widths — two registers, both centered via margin-inline auto.
+       Reading = single-column entity pages (person, performance, engagement,
+       roadsheet, home digest). Wide = table/row-dominated pages (line detail,
+       project, settings). Lens pages (calendar/contacts/money/agenda) stay
+       full-bleed on purpose. */
+    --page-width-reading: 46rem;
+    --page-width-wide: 64rem;
 
     --sidebar-width: 264px;
     --header-height: 0px;
@@ -381,6 +390,19 @@
     --focus-offset: 2px;
 
     /* ============================================================ */
+    /* FIELDS — one skin for every text control                       */
+    /* Consumed by both the semantic input defaults (base.css          */
+    /* @layer defaults) and .field__control, so raw inputs and         */
+    /* component fields render identically. Canonical look = the      */
+    /* .field__control one (cream surface, small radius, primary      */
+    /* focus + ring) per ADR-033 editorial.                            */
+    /* ============================================================ */
+
+    --field-bg: var(--base);
+    --field-radius: var(--radius-s);
+    --field-border-color-focus: var(--primary);
+
+    /* ============================================================ */
     /* SELECTION                                                      */
     /* ============================================================ */
 
@@ -446,9 +468,50 @@
 
     /* Text — heading = body (no extra glow); --text-light flips to DARK
        so callers that mean "text-on-primary-fill" still get contrast
-       (primary is now slate-light, needs dark text). */
+       (primary is now slate-light, needs dark text). Literal value, not
+       var(--neutral-ultra-dark): the ladder below re-anchors that step
+       to a LIGHT ink, which would turn checkbox ticks and tooltip text
+       invisible on their light fills. */
     --heading-color: var(--neutral);
-    --text-light: var(--neutral-ultra-dark);
+    --text-light: oklch(22% 0.008 85);
+
+    /* Derived-shade ladder re-anchored for dark (the fill/ink steps the
+       pill family consumes — badges, chips, avatars, toasts, menu active).
+       Light mode mixes toward literal white/black; on a dark canvas that
+       renders near-white pills. Here fills sink toward the dark base
+       (tag-tone recipe, ~27-30% L) and inks lift toward white (~80% L).
+       The -light / -semi-light steps are NOT flipped on purpose:
+       --text-faint, button hover borders and outline tones consume them
+       as "lighter than ink", which stays true when ink is light. */
+    --neutral-ultra-light: color-mix(in oklch, var(--neutral), var(--base) 82%);
+    --neutral-semi-dark: color-mix(in oklch, var(--neutral), white 40%);
+    --neutral-dark: color-mix(in oklch, var(--neutral), white 45%);
+    --neutral-ultra-dark: color-mix(in oklch, var(--neutral), white 55%);
+
+    --primary-ultra-light: color-mix(in oklch, var(--primary), var(--base) 78%);
+    --primary-semi-dark: color-mix(in oklch, var(--primary), white 40%);
+    --primary-dark: color-mix(in oklch, var(--primary), white 45%);
+    --primary-ultra-dark: color-mix(in oklch, var(--primary), white 55%);
+
+    --info-ultra-light: color-mix(in oklch, var(--info), var(--base) 78%);
+    --info-semi-dark: color-mix(in oklch, var(--info), white 40%);
+    --info-dark: color-mix(in oklch, var(--info), white 45%);
+    --info-ultra-dark: color-mix(in oklch, var(--info), white 55%);
+
+    --success-ultra-light: color-mix(in oklch, var(--success), var(--base) 78%);
+    --success-semi-dark: color-mix(in oklch, var(--success), white 40%);
+    --success-dark: color-mix(in oklch, var(--success), white 45%);
+    --success-ultra-dark: color-mix(in oklch, var(--success), white 55%);
+
+    --warning-ultra-light: color-mix(in oklch, var(--warning), var(--base) 78%);
+    --warning-semi-dark: color-mix(in oklch, var(--warning), white 40%);
+    --warning-dark: color-mix(in oklch, var(--warning), white 45%);
+    --warning-ultra-dark: color-mix(in oklch, var(--warning), white 55%);
+
+    --danger-ultra-light: color-mix(in oklch, var(--danger), var(--base) 78%);
+    --danger-semi-dark: color-mix(in oklch, var(--danger), white 40%);
+    --danger-dark: color-mix(in oklch, var(--danger), white 45%);
+    --danger-ultra-dark: color-mix(in oklch, var(--danger), white 55%);
 
     /* Borders — bumped opacity so they stay perceptible on warm dark bg */
     --border-color-dark: color-mix(in oklch, var(--neutral) 22%, transparent);

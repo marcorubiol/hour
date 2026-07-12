@@ -31,7 +31,7 @@
 <div class="rsv">
   <header class="rsv__head">
     <p class="eyebrow">
-      Road sheet{#if sheet.project} · {sheet.project.name}{/if}
+      Road sheet{#if sheet.project}{' · '}{sheet.project.name}{/if}
     </p>
     <h1 class="rsv__title"><em>{sheet.title}</em></h1>
     <p class="rsv__day">{dayLabel(sheet.performed_at, 'long')}</p>
@@ -51,14 +51,14 @@
 
   {#if sheet.schedule}
     <section class="rsv__section" aria-label="Schedule">
-      <h2 class="rsv__section-title">Schedule</h2>
+      <h2 class="eyebrow eyebrow--sub rsv__section-title">Schedule</h2>
       <ScheduleTable slots={sheet.schedule} {venueTz} {viewerTz} />
     </section>
   {/if}
 
   {#if sheet.venue || sheet.venue_name}
     <section class="rsv__section" aria-label="Venue">
-      <h2 class="rsv__section-title">Venue</h2>
+      <h2 class="eyebrow eyebrow--sub rsv__section-title">Venue</h2>
       <div class="rsv__venue">
         <strong>{sheet.venue?.name ?? sheet.venue_name}</strong>
         {#if sheet.venue?.address}<span>{sheet.venue.address}</span>{/if}
@@ -73,28 +73,28 @@
 
   {#if hasJsonContent(sheet.logistics)}
     <section class="rsv__section" aria-label="Logistics">
-      <h2 class="rsv__section-title">Logistics</h2>
+      <h2 class="eyebrow eyebrow--sub rsv__section-title">Logistics</h2>
       <JsonKV value={sheet.logistics} />
     </section>
   {/if}
 
   {#if hasJsonContent(sheet.hospitality)}
     <section class="rsv__section" aria-label="Hospitality">
-      <h2 class="rsv__section-title">Hospitality</h2>
+      <h2 class="eyebrow eyebrow--sub rsv__section-title">Hospitality</h2>
       <JsonKV value={sheet.hospitality} />
     </section>
   {/if}
 
   {#if hasJsonContent(sheet.technical)}
     <section class="rsv__section" aria-label="Technical">
-      <h2 class="rsv__section-title">Technical</h2>
+      <h2 class="eyebrow eyebrow--sub rsv__section-title">Technical</h2>
       <JsonKV value={sheet.technical} />
     </section>
   {/if}
 
   {#if sheet.cast && sheet.cast.length > 0}
     <section class="rsv__section" aria-label="Cast">
-      <h2 class="rsv__section-title">Cast</h2>
+      <h2 class="eyebrow eyebrow--sub rsv__section-title">Cast</h2>
       <ul class="rsv__people" role="list">
         {#each sheet.cast as m, i (i)}
           <li>
@@ -118,7 +118,7 @@
 
   {#if sheet.crew && sheet.crew.length > 0}
     <section class="rsv__section" aria-label="Crew">
-      <h2 class="rsv__section-title">Crew</h2>
+      <h2 class="eyebrow eyebrow--sub rsv__section-title">Crew</h2>
       <ul class="rsv__people" role="list">
         {#each sheet.crew as m, i (i)}
           <li>
@@ -143,7 +143,7 @@
 
   {#if sheet.contacts}
     <section class="rsv__section" aria-label="Programmer">
-      <h2 class="rsv__section-title">Programmer</h2>
+      <h2 class="eyebrow eyebrow--sub rsv__section-title">Programmer</h2>
       <p class="rsv__programmer">
         {sheet.contacts.programmer.full_name}
         {#if sheet.contacts.programmer.email || sheet.contacts.programmer.phone}
@@ -159,7 +159,7 @@
 
   {#if sheet.assets && sheet.assets.length > 0}
     <section class="rsv__section" aria-label="Assets">
-      <h2 class="rsv__section-title">Assets</h2>
+      <h2 class="eyebrow eyebrow--sub rsv__section-title">Assets</h2>
       <ul class="rsv__people" role="list">
         {#each sheet.assets as a, i (i)}
           <li>
@@ -173,7 +173,7 @@
 
   {#if sheet.notes}
     <section class="rsv__section" aria-label="Notes">
-      <h2 class="rsv__section-title">Notes</h2>
+      <h2 class="eyebrow eyebrow--sub rsv__section-title">Notes</h2>
       <p class="rsv__notes">{sheet.notes}</p>
     </section>
   {/if}
@@ -195,12 +195,8 @@
       border-block-end: 1px solid var(--border-color-light);
     }
 
+    /* Masthead typography via base.css h1 defaults. */
     .rsv__title {
-      font-family: var(--font-display);
-      font-size: clamp(1.6rem, 3vw, 2.2rem);
-      font-weight: 400;
-      letter-spacing: -0.02em;
-      line-height: 1.05;
       color: var(--text-color);
     }
     .rsv__title em {
@@ -221,7 +217,7 @@
     .rsv__meta-place {
       font-family: var(--font-mono);
       font-size: var(--text-xs);
-      letter-spacing: 0.04em;
+      letter-spacing: var(--mono-letter-spacing-loose);
       color: var(--text-faint);
     }
 
@@ -233,15 +229,12 @@
       display: flex;
       flex-direction: column;
       gap: var(--space-s);
+      padding: 0;
     }
 
+    /* Sub-eyebrow typography via base.css .eyebrow--sub. */
     .rsv__section-title {
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      font-weight: 500;
-      color: var(--text-faint);
+      margin: 0;
     }
 
     .rsv__venue {
@@ -263,7 +256,7 @@
     .rsv__role {
       font-family: var(--font-mono);
       font-size: var(--text-xs);
-      letter-spacing: 0.04em;
+      letter-spacing: var(--mono-letter-spacing-loose);
       color: var(--text-faint);
       min-inline-size: 7rem;
     }

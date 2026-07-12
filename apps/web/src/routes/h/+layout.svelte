@@ -415,6 +415,11 @@
 
 <style>
   .shell {
+    /* Real top-bar height, true by construction (min-block-size below).
+       Sticky offsets and anchor scroll-margins consume this instead of
+       hardcoding approximations. */
+    --header-height: 3.6rem;
+
     display: flex;
     min-block-size: 100vh;
     background: var(--bg);
@@ -444,6 +449,7 @@
     position: sticky;
     inset-block-start: 0;
     z-index: var(--z-sticky);
+    min-block-size: var(--header-height);
     display: grid;
     grid-template-columns: 1fr auto 1fr;
     align-items: center;
@@ -504,7 +510,9 @@
 
   .shell__content {
     flex: 1;
-    padding-block: var(--space-s) var(--space-xxl);
+    /* One shared header→content distance for every route — pages used to
+       borrow the (now neutralized) global <section> padding unevenly. */
+    padding-block: var(--space-l) var(--space-xxl);
     padding-inline: var(--space-l);
   }
 

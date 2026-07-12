@@ -15,6 +15,8 @@
     disabled?: boolean;
     loading?: boolean;
     onclick?: (event: MouseEvent) => void;
+    /** Accessible name for icon-only buttons (renders as aria-label). */
+    label?: string;
     children?: Snippet;
     lead?: Snippet;
     tail?: Snippet;
@@ -28,6 +30,7 @@
     disabled = false,
     loading = false,
     onclick,
+    label,
     children,
     lead,
     tail,
@@ -52,6 +55,7 @@
   class={classes}
   disabled={isDisabled}
   aria-busy={loading || undefined}
+  aria-label={label}
   {onclick}
 >
   {#if loading}<span class="btn__spinner" aria-hidden="true"></span>{/if}

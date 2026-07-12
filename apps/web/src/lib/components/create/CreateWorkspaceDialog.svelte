@@ -13,7 +13,7 @@
   import Dialog from '$lib/components/Dialog.svelte';
   import Input from '$lib/components/Input.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
-  import { accentVar } from '$lib/utils/accent';
+  import AccentSwatchPicker from './AccentSwatchPicker.svelte';
 
   interface Props {
     open?: boolean;
@@ -107,46 +107,7 @@
       disabled={$create.isPending}
     />
 
-    <!-- Color picker: 8 swatches mapped to --accent-1..--accent-8. Auto is
-         implicit — no swatch selected submits accent=null and the server
-         derives via hash(slug); the hint previews what Auto would pick. -->
-    <fieldset class="cws__swatches">
-      <legend>Color</legend>
-      <div class="cws__swatch-grid" role="radiogroup" aria-label="Workspace color">
-        {#each [1, 2, 3, 4, 5, 6, 7, 8] as n (n)}
-          {@const isOn = accent === String(n)}
-          <button
-            type="button"
-            role="radio"
-            aria-checked={isOn}
-            class={['cws__swatch', isOn && 'cws__swatch--on'].filter(Boolean).join(' ')}
-            style={`background: var(--accent-${n})`}
-            aria-label={`Color ${n}`}
-            disabled={$create.isPending}
-            onclick={() => (accent = isOn ? null : String(n))}
-          ></button>
-        {/each}
-      </div>
-      <p class="cws__swatch-hint">
-        {#if accent}
-          <button
-            type="button"
-            class="cws__swatch-clear"
-            onclick={() => (accent = null)}
-            disabled={$create.isPending}
-          >Clear · use auto</button>
-        {:else}
-          <span class="cws__swatch-auto">
-            <span
-              class="cws__swatch-auto-chip"
-              style={`background: ${accentVar(autoAccentSlug)}`}
-              aria-hidden="true"
-            ></span>
-            Auto from name
-          </span>
-        {/if}
-      </p>
-    </fieldset>
+    <AccentSwatchPicker bind:accent autoSlug={autoAccentSlug} label="Space color" disabled={$create.isPending} />
 
     <label class="field">
       <span>Description</span>
@@ -177,97 +138,6 @@
       display: flex;
       flex-direction: column;
       gap: var(--space-m);
-    }
-
-    /* Color picker — 8 round swatches in a single row (ported from Plaza).
-       Selected state is a ring around the dot, not a border on the dot
-       itself, so the palette color reads cleanly at all sizes. */
-    .cws__swatches {
-      border: 0;
-      margin: 0;
-      padding: 0;
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-xs);
-    }
-
-    .cws__swatches > legend {
-      padding: 0;
-      font-size: var(--text-s);
-      color: var(--text-color);
-    }
-
-    .cws__swatch-grid {
-      display: flex;
-      gap: var(--space-xs);
-      flex-wrap: wrap;
-    }
-
-    .cws__swatch {
-      inline-size: 22px;
-      block-size: 22px;
-      padding: 0;
-      border: 0;
-      border-radius: var(--radius-50);
-      cursor: pointer;
-      box-shadow: 0 0 0 1px var(--border-color-light) inset;
-      transition: box-shadow var(--transition), transform var(--transition);
-    }
-
-    .cws__swatch:hover:not(:disabled) {
-      transform: scale(1.08);
-    }
-
-    .cws__swatch:focus-visible {
-      outline: var(--focus-width) solid var(--focus-color);
-      outline-offset: 2px;
-    }
-
-    .cws__swatch--on {
-      box-shadow:
-        0 0 0 2px var(--bg),
-        0 0 0 4px var(--text-color);
-    }
-
-    .cws__swatch:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-
-    .cws__swatch-hint {
-      margin: 0;
-      font-size: var(--text-xs);
-      color: var(--text-faint);
-      min-block-size: 1.2em;
-    }
-
-    .cws__swatch-auto {
-      display: inline-flex;
-      align-items: center;
-      gap: var(--space-xs);
-    }
-
-    .cws__swatch-auto-chip {
-      inline-size: 10px;
-      block-size: 10px;
-      border-radius: var(--radius-50);
-      box-shadow: 0 0 0 1px var(--border-color-light) inset;
-    }
-
-    .cws__swatch-clear {
-      background: transparent;
-      border: 0;
-      padding: 0;
-      font-family: inherit;
-      font-size: var(--text-xs);
-      color: var(--text-muted);
-      cursor: pointer;
-      text-decoration: underline dotted;
-      text-underline-offset: 2px;
-    }
-
-    .cws__swatch-clear:hover {
-      color: var(--text-color);
     }
 
     .cws__desc {

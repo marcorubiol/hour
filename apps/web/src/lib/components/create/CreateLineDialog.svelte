@@ -18,6 +18,7 @@
   import { LINE_TEMPLATES, MODULE_LABELS, type LineTemplate } from '$lib/line-templates';
   import { workspacesQueryOptions } from '$lib/nav-queries';
   import { accentVar } from '$lib/utils/accent';
+  import AccentSwatchPicker from './AccentSwatchPicker.svelte';
 
   interface Props {
     open?: boolean;
@@ -198,46 +199,7 @@
       disabled={$create.isPending}
     />
 
-    <!-- Color picker: 8 swatches mapped to --accent-1..--accent-8. Auto is
-         implicit — no swatch selected submits accent=null and the server
-         derives via hash(slug); the hint previews what Auto would pick. -->
-    <fieldset class="cln__swatches">
-      <legend>Color</legend>
-      <div class="cln__swatch-grid" role="radiogroup" aria-label="Line color">
-        {#each [1, 2, 3, 4, 5, 6, 7, 8] as n (n)}
-          {@const isOn = accent === String(n)}
-          <button
-            type="button"
-            role="radio"
-            aria-checked={isOn}
-            class={['cln__swatch', isOn && 'cln__swatch--on'].filter(Boolean).join(' ')}
-            style={`background: var(--accent-${n})`}
-            aria-label={`Color ${n}`}
-            disabled={$create.isPending}
-            onclick={() => (accent = isOn ? null : String(n))}
-          ></button>
-        {/each}
-      </div>
-      <p class="cln__swatch-hint">
-        {#if accent}
-          <button
-            type="button"
-            class="cln__swatch-clear"
-            onclick={() => (accent = null)}
-            disabled={$create.isPending}
-          >Clear · use auto</button>
-        {:else}
-          <span class="cln__swatch-auto">
-            <span
-              class="cln__swatch-auto-chip"
-              style={`background: ${accentVar(autoAccentSlug)}`}
-              aria-hidden="true"
-            ></span>
-            Auto from name
-          </span>
-        {/if}
-      </p>
-    </fieldset>
+    <AccentSwatchPicker bind:accent autoSlug={autoAccentSlug} label="Line color" disabled={$create.isPending} />
 
     <!-- Hidden submit lets Enter inside an input trigger submit. -->
     <button type="submit" hidden aria-hidden="true"></button>
@@ -332,95 +294,5 @@
       color: var(--text-faint);
     }
 
-    /* Color picker — 8 round swatches in a single row (ported from Plaza).
-       Selected state is a ring around the dot, not a border on the dot
-       itself, so the palette color reads cleanly at all sizes. */
-    .cln__swatches {
-      border: 0;
-      margin: 0;
-      padding: 0;
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-xs);
-    }
-
-    .cln__swatches > legend {
-      padding: 0;
-      font-size: var(--text-s);
-      color: var(--text-color);
-    }
-
-    .cln__swatch-grid {
-      display: flex;
-      gap: var(--space-xs);
-      flex-wrap: wrap;
-    }
-
-    .cln__swatch {
-      inline-size: 22px;
-      block-size: 22px;
-      padding: 0;
-      border: 0;
-      border-radius: var(--radius-50);
-      cursor: pointer;
-      box-shadow: 0 0 0 1px var(--border-color-light) inset;
-      transition: box-shadow var(--transition), transform var(--transition);
-    }
-
-    .cln__swatch:hover:not(:disabled) {
-      transform: scale(1.08);
-    }
-
-    .cln__swatch:focus-visible {
-      outline: var(--focus-width) solid var(--focus-color);
-      outline-offset: 2px;
-    }
-
-    .cln__swatch--on {
-      box-shadow:
-        0 0 0 2px var(--bg),
-        0 0 0 4px var(--text-color);
-    }
-
-    .cln__swatch:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-
-    .cln__swatch-hint {
-      margin: 0;
-      font-size: var(--text-xs);
-      color: var(--text-faint);
-      min-block-size: 1.2em;
-    }
-
-    .cln__swatch-auto {
-      display: inline-flex;
-      align-items: center;
-      gap: var(--space-xs);
-    }
-
-    .cln__swatch-auto-chip {
-      inline-size: 10px;
-      block-size: 10px;
-      border-radius: var(--radius-50);
-      box-shadow: 0 0 0 1px var(--border-color-light) inset;
-    }
-
-    .cln__swatch-clear {
-      background: transparent;
-      border: 0;
-      padding: 0;
-      font-family: inherit;
-      font-size: var(--text-xs);
-      color: var(--text-muted);
-      cursor: pointer;
-      text-decoration: underline dotted;
-      text-underline-offset: 2px;
-    }
-
-    .cln__swatch-clear:hover {
-      color: var(--text-color);
-    }
   }
 </style>

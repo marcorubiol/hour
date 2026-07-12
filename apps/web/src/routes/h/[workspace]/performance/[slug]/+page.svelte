@@ -22,7 +22,7 @@
   import YNotes from '$lib/components/YNotes.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
   import type { Json } from '$lib/db-types';
-  import { dayLabel, isoToLocalInput, localInputToIso } from '$lib/datetime';
+  import { dayLabel, isoToLocalInput, localInputToIso, dayMonthTs } from '$lib/datetime';
   import {
     PERFORMANCE_STATUSES,
     performanceStatusLabel,
@@ -430,12 +430,7 @@
       : '',
   );
 
-  function formatDateRow(iso: string): string {
-    return new Date(iso).toLocaleDateString('en-GB', {
-      day: '2-digit',
-      month: 'short',
-    });
-  }
+  const formatDateRow = dayMonthTs;
 
   let hasTeam = $derived(
     (bundle?.cast_members.length ?? 0) > 0 ||
@@ -466,12 +461,8 @@
       </p>
       <h1 class="perf__title"><em>{title}</em></h1>
       <div class="perf__meta">
-        <StateBadge
-          label={performanceStatusLabel(perf.status)}
-          tone={performanceStatusTone(perf.status)}
-        />
-        <Menu label="Change status" triggerClass="btn--outline btn--xs">
-          {#snippet trigger()}status <span aria-hidden="true">▾</span>{/snippet}
+        <Menu label="Change status" triggerClass="state-badge" triggerAttrs={{ 'data-tone': performanceStatusTone(perf.status) }}>
+          {#snippet trigger()}{performanceStatusLabel(perf.status)}<span class="status-caret" aria-hidden="true">▾</span>{/snippet}
           {#snippet children({ close })}
             {#each PERFORMANCE_STATUSES as s (s)}
               <li role="none">
@@ -498,7 +489,7 @@
         {/if}
       </div>
       <p class="perf__roadsheet-link">
-        <a href={`/h/${workspaceSlug}/performance/${slug}/roadsheet`}>Open road sheet →</a>
+        <a class="link-arrow" href={`/h/${workspaceSlug}/performance/${slug}/roadsheet`}>Open road sheet →</a>
         <Button variant="outline" size="xs" onclick={openEdit}>Edit details</Button>
       </p>
     </header>
@@ -604,7 +595,7 @@
       <YNotes
         targetTable="performance"
         targetId={perf.id}
-        placeholder="Production notes — shared, live (ADR-025)."
+        placeholder="Production notes — shared, live."
       />
     </section>
   {/if}
@@ -622,7 +613,7 @@
   </div>
   <div class="perf__venue-link">
     <div class="field">
-      <label for="f-venue-entity">linked venue</label>
+      <label for="f-venue-entity">Linked venue</label>
       <select id="f-venue-entity" bind:value={fVenueId}>
         <option value="">— none (free text above)</option>
         {#each venues as vn (vn.id)}
@@ -649,23 +640,23 @@
   </p>
   <div class="perf__form-grid">
     <div class="field">
-      <label for="f-loadin">load in</label>
+      <label for="f-loadin">Load in</label>
       <input id="f-loadin" type="datetime-local" bind:value={fLoadIn} />
     </div>
     <div class="field">
-      <label for="f-soundcheck">soundcheck</label>
+      <label for="f-soundcheck">Soundcheck</label>
       <input id="f-soundcheck" type="datetime-local" bind:value={fSoundcheck} />
     </div>
     <div class="field">
-      <label for="f-start">start</label>
+      <label for="f-start">Start</label>
       <input id="f-start" type="datetime-local" bind:value={fStart} />
     </div>
     <div class="field">
-      <label for="f-loadout">load out</label>
+      <label for="f-loadout">Load out</label>
       <input id="f-loadout" type="datetime-local" bind:value={fLoadout} />
     </div>
     <div class="field">
-      <label for="f-wrap">wrap</label>
+      <label for="f-wrap">Wrap</label>
       <input id="f-wrap" type="datetime-local" bind:value={fWrap} />
     </div>
   </div>
@@ -695,9 +686,10 @@
   <div class="perf__form-grid">
     <Input label="Address" bind:value={vAddress} placeholder="Street, number, zip" />
     <div class="field">
-      <label for="v-timezone">timezone</label>
+      <label for="v-timezone">Timezone</label>
       <input
         id="v-timezone"
+        type="text"
         list="v-timezone-list"
         bind:value={vTimezone}
         placeholder="Europe/Madrid"
@@ -728,7 +720,7 @@
     <Button variant="outline" size="xs" onclick={addContactRow}>Add contact</Button>
   </div>
   <div class="field perf__venue-notes">
-    <label for="v-notes">notes</label>
+    <label for="v-notes">Notes</label>
     <textarea id="v-notes" rows="3" bind:value={vNotes}></textarea>
   </div>
   {#snippet actions()}

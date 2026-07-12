@@ -104,7 +104,11 @@
   </header>
 
   <div class="production__venue">
-    <strong class="production__venue-name">{venue?.name ?? venueName ?? 'No venue yet'}</strong>
+    {#if venue?.name ?? venueName}
+      <strong class="production__venue-name">{venue?.name ?? venueName}</strong>
+    {:else}
+      <p class="production__empty">No venue yet.</p>
+    {/if}
     {#if placeLine}<span class="production__venue-place">{placeLine}</span>{/if}
     {#if venue?.address}<span class="production__venue-address">{venue.address}</span>{/if}
     <span class="production__venue-meta">
@@ -164,6 +168,12 @@
       font-size: var(--text-l);
       color: var(--text-color);
       font-weight: 500;
+    }
+
+    .production__empty {
+      margin: 0;
+      font-size: var(--text-s);
+      color: var(--text-faint);
     }
 
     .production__venue-place {

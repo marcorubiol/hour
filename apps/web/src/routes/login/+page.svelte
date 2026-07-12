@@ -93,7 +93,7 @@
     </header>
 
     <div class="login__center">
-      <span class="login__kicker">{t('login.submit')}</span>
+      <span class="eyebrow login__kicker">{t('login.submit')}</span>
       <h1 class="login__title">Hello <em>again.</em></h1>
       <p class="login__sub">
         Your projects, contacts, shows and money — held together, one hour at a time.
@@ -101,7 +101,7 @@
 
       <form class="login__form" onsubmit={handleSubmit}>
         <label class="login__field">
-          <span class="login__label">{t('login.email')}</span>
+          <span class="eyebrow login__label">{t('login.email')}</span>
           <!-- svelte-ignore a11y_autofocus -->
           <input
             
@@ -116,7 +116,7 @@
         </label>
 
         <label class="login__field">
-          <span class="login__label">{t('login.password')}</span>
+          <span class="eyebrow login__label">{t('login.password')}</span>
           <input
             
             type="password"
@@ -234,12 +234,8 @@
       padding-block: var(--space-xl);
     }
 
+    /* Kicker typography via base.css .eyebrow. */
     .login__kicker {
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      letter-spacing: 0.14em;
-      text-transform: uppercase;
-      color: var(--text-faint);
       margin-block-end: var(--space-m);
     }
 
@@ -280,14 +276,8 @@
       gap: var(--space-xs);
     }
 
-    .login__label {
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      color: var(--text-faint);
-      font-weight: 500;
-    }
+    /* Label typography via base.css .eyebrow. */
+
 
     .login__error {
       font-size: var(--text-s);
@@ -421,7 +411,7 @@
     .login__preview-day {
       margin-inline-start: auto;
       font-family: var(--font-mono);
-      font-size: 0.5625rem;
+      font-size: var(--text-xs);
       letter-spacing: 0.08em;
       text-transform: uppercase;
       color: var(--text-faint);
@@ -469,7 +459,7 @@
     }
     .login__preview-proj {
       font-family: var(--font-mono);
-      font-size: 0.5625rem;
+      font-size: var(--text-xs);
       color: var(--text-faint);
       text-transform: lowercase;
       letter-spacing: 0.04em;

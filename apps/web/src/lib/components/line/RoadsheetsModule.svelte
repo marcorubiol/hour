@@ -69,7 +69,7 @@
 {:else if loading}
   <p class="rsm__state">Loading…</p>
 {:else if items.length === 0}
-  <p class="rsm__state">No performances in this line yet.</p>
+  <p class="rsm__state">No performances on this line yet.</p>
 {:else}
   <div class="table-wrap">
     <table>
@@ -77,7 +77,7 @@
         <tr>
           <th>Date</th>
           <th>Status</th>
-          <th>Venue</th>
+          <th>Where</th>
           <th aria-label="Road sheet"></th>
         </tr>
       </thead>
@@ -94,11 +94,11 @@
             <td class="rsm__cell-muted">{whereLabel(p)}</td>
             <td class="rsm__cell-sheet">
               {#if p.slug}
-                <a class="rsm__sheet" href={`/h/${workspaceSlug}/performance/${p.slug}/roadsheet`}>
+                <a class="link-arrow" href={`/h/${workspaceSlug}/performance/${p.slug}/roadsheet`}>
                   Road sheet →
                 </a>
               {:else}
-                <span class="rsm__sheet rsm__sheet--unlinked">Road sheet →</span>
+                <span class="rsm__sheet--unlinked">Road sheet →</span>
               {/if}
             </td>
           </tr>
@@ -118,10 +118,6 @@
       color: var(--danger);
     }
 
-    .table-wrap {
-      overflow-x: auto;
-    }
-
     .rsm__cell-date {
       font-family: var(--font-mono);
       font-size: var(--text-xs);
@@ -139,15 +135,8 @@
       white-space: nowrap;
     }
 
-    .rsm__sheet {
-      font-size: var(--text-s);
-      color: var(--text-color);
-      text-decoration: none;
-    }
-    a.rsm__sheet:hover {
-      text-decoration: underline;
-    }
     .rsm__sheet--unlinked {
+      font-size: var(--text-s);
       color: var(--text-faint);
     }
   }

@@ -31,6 +31,42 @@ export function dayLabel(iso: string, style: 'short' | 'long' = 'short'): string
 }
 
 /**
+ * "09 Jul" — day + month, no weekday/year. Same UTC-anchored contract as
+ * dayLabel. For tight metadata columns (next-action dates, agenda rows).
+ */
+export function dayMonth(iso: string): string {
+  return new Date(`${iso.slice(0, 10)}T00:00:00Z`).toLocaleDateString('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    timeZone: 'UTC',
+  });
+}
+
+/**
+ * "09 Jul" for a timestamptz, in the VIEWER's zone (wall-clock display —
+ * schedules, activity rows). Not for date-only contracts: those must use
+ * the UTC-anchored dayMonth/dayLabel above.
+ */
+export function dayMonthTs(iso: string): string {
+  return new Date(iso).toLocaleDateString('en-GB', {
+    day: '2-digit',
+    month: 'short',
+  });
+}
+
+/**
+ * "09 Jul 2026" — no weekday. Same UTC-anchored contract as dayLabel.
+ */
+export function dayMonthYear(iso: string): string {
+  return new Date(`${iso.slice(0, 10)}T00:00:00Z`).toLocaleDateString('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
+}
+
+/**
  * timestamptz ISO ↔ <input type="datetime-local"> value, in the VIEWER's
  * timezone. Phase 0 caveat (documented in the edit dialog): times are
  * entered in the viewer's local zone; display is dual-timezone (D-PRE-10).

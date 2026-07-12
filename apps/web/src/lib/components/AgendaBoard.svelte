@@ -87,7 +87,7 @@
     if (diffDays === 0) return { sortKey: 0, label: 'TODAY' };
     if (diffDays === 1) return { sortKey: 1, label: 'TOMORROW' };
     if (diffDays < 7)
-      return { sortKey: diffDays, label: d.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase() };
+      return { sortKey: diffDays, label: d.toLocaleDateString('en-GB', { weekday: 'short' }).toUpperCase() };
     if (diffDays < 14) return { sortKey: 7, label: 'NEXT WEEK' };
     return { sortKey: 99, label: 'LATER' };
   }

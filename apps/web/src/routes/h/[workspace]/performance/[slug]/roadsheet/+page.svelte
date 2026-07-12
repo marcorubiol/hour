@@ -159,7 +159,7 @@
     <RoadsheetView {sheet} {venueTz} backHref={`/h/${workspaceSlug}/performance/${slug}`} />
 
     <section class="rs__share" aria-label="Public links">
-      <h2 class="rs__share-title">Public links</h2>
+      <h2 class="eyebrow eyebrow--sub rs__share-title">Public links</h2>
       <p class="rs__share-hint">
         Anyone with a link sees that role's road sheet — no account. Revoking kills the link
         immediately.
@@ -190,7 +190,7 @@
       {/if}
       <div class="rs__share-create">
         <label class="rs__share-pick">
-          Role
+          <span class="eyebrow eyebrow--sub">Role</span>
           <select bind:value={shareRole}>
             {#each PUBLIC_ROLES as r (r)}
               <option value={r}>{r.replace(/_/g, ' ')}</option>
@@ -211,7 +211,7 @@
       display: flex;
       flex-direction: column;
       gap: var(--space-l);
-      max-inline-size: 40rem;
+      max-inline-size: var(--page-width-reading);
       margin-inline: auto;
     }
 
@@ -246,13 +246,9 @@
       border-block-start: 1px solid var(--border-color-light);
     }
 
+    /* Sub-eyebrow typography via base.css .eyebrow--sub. */
     .rs__share-title {
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      font-weight: 500;
-      color: var(--text-faint);
+      margin: 0;
     }
 
     .rs__share-hint {
@@ -298,10 +294,6 @@
       display: flex;
       flex-direction: column;
       gap: var(--space-2xs);
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      letter-spacing: 0.04em;
-      color: var(--text-faint);
     }
 
     /* Print: drop the operator chrome, keep the document. */

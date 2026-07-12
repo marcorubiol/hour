@@ -24,6 +24,7 @@
   import { addToast } from '$lib/components/Toast.svelte';
   import ScopeStrip from '$lib/components/ScopeStrip.svelte';
   import { dayLabel } from '$lib/datetime';
+  import { fmtFee, fmtMoney, invoiceTone } from '$lib/money';
   import { performanceStatusLabel, performanceStatusTone } from '$lib/performance';
   import { usePins } from '$lib/stores/pins.svelte';
   import {
@@ -200,12 +201,6 @@
     $feesQuery.error instanceof Error ? $feesQuery.error.message : '',
   );
 
-  const money = new Intl.NumberFormat('en-GB', { minimumFractionDigits: 2 });
-
-  function fmtFee(amount: number | null, currency: string | null): string {
-    if (amount === null) return '—';
-    return `${money.format(amount)} ${currency ?? 'EUR'}`;
-  }
 
   /** Sums per lifecycle bucket, over the rows currently listed. */
   let totals = $derived.by(() => {
@@ -293,12 +288,6 @@
   // ── Invoice creation (ADR-050) ────────────────────────────────────────
   const INVOICE_STATUSES = ['draft', 'issued', 'paid', 'cancelled'] as const;
 
-  function invoiceTone(status: string): 'neutral' | 'warning' | 'faint' | 'danger' {
-    if (status === 'issued') return 'warning';
-    if (status === 'paid') return 'faint';
-    if (status === 'cancelled') return 'danger';
-    return 'neutral';
-  }
 
   let invOpen = $state(false);
   let invPerf = $state<MoneyPerformance | null>(null);
@@ -450,15 +439,15 @@
     <div class="mny__totals">
       <span class="mny__total">
         <span class="mny__total-label">pipeline</span>
-        {money.format(totals.pipeline)}
+        {fmtMoney(totals.pipeline)}
       </span>
       <span class="mny__total">
         <span class="mny__total-label">invoiced</span>
-        {money.format(totals.invoiced)}
+        {fmtMoney(totals.invoiced)}
       </span>
       <span class="mny__total">
         <span class="mny__total-label">paid</span>
-        {money.format(totals.paid)}
+        {fmtMoney(totals.paid)}
       </span>
       <span class="mny__total-note">over the {fees.length} listed gigs</span>
     </div>
@@ -485,7 +474,7 @@
                 <span class="mline__glyph">{lineKindGlyph(l.kind)}</span>
                 <span class="mline__name">{l.name}</span>
                 <span class="mline__co">{l.projectName}</span>
-                <span class="mline__amt">{money.format(l.confirmed)}</span>
+                <span class="mline__amt">{fmtMoney(l.confirmed)}</span>
               </span>
               <span class="mline__bar">
                 <span class="mline__fill" style={`inline-size: ${((l.confirmed + l.holds) / byLineMax) * 100}%`}>
@@ -494,8 +483,8 @@
               </span>
               <span class="mline__meta">
                 <span>{l.dates} confirmed {l.dates === 1 ? 'date' : 'dates'}</span>
-                {#if l.holds > 0}<span class="mline__hold">+ {money.format(l.holds)} in holds</span>{/if}
-                {#if l.line}<span class="mline__go">open line →</span>{/if}
+                {#if l.holds > 0}<span class="mline__hold">+ {fmtMoney(l.holds)} in holds</span>{/if}
+                {#if l.line}<span class="mline__go">Open line →</span>{/if}
               </span>
             </button>
           {/each}
@@ -579,7 +568,7 @@
                 {#if inv.project}<span class="mny__cell-muted"> · {inv.project.name}</span>{/if}
               </span>
               <span class="mny__cell-date">{dayLabel(inv.issued_on)}</span>
-              <span class="mny__inv-total">{money.format(inv.total)} {inv.currency}</span>
+              <span class="mny__inv-total">{fmtMoney(inv.total)} {inv.currency}</span>
               <span class="mny__inv-actions">
                 <Menu label="Change invoice status" triggerClass="btn--outline btn--xs">
                   {#snippet trigger()}
@@ -662,7 +651,7 @@
     </div>
     <Input label="Notes" bind:value={iNotes} placeholder="Optional" />
     <p class="mny__inv-total-preview">
-      Total: <strong>{money.format(invTotal)} {invPerf.fee_currency ?? 'EUR'}</strong>
+      Total: <strong>{fmtMoney(invTotal)} {invPerf.fee_currency ?? 'EUR'}</strong>
     </p>
   {/if}
   {#snippet actions()}
@@ -811,11 +800,7 @@
     }
     .mline__go {
       margin-inline-start: auto;
-      color: var(--text-faint);
-    }
-
-    .table-wrap {
-      overflow-x: auto;
+      color: var(--text-muted);
     }
 
     .mny__cell-date {

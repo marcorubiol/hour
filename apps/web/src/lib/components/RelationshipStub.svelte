@@ -117,7 +117,7 @@
   {:else if errored}
     <p class="rel-stub__state rel-stub__state--danger">Couldn't load engagements.</p>
   {:else if items.length === 0}
-    <p class="rel-stub__state">No engagements in this Project yet.</p>
+    <p class="rel-stub__state">No engagements on this project yet.</p>
   {:else}
     <ul class="rel-stub__list">
       {#each items as e (e.id)}
@@ -140,7 +140,7 @@
 
     {#if total > items.length}
       <footer class="rel-stub__footer">
-        <a class="rel-stub__view-all" href={`/h/${page.params.workspace}/contacts`}>
+        <a class="link-arrow" href={`/h/${page.params.workspace}/contacts`}>
           View all {total} engagements →
         </a>
       </footer>
@@ -153,7 +153,6 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-s);
-    max-inline-size: 56rem;
   }
 
   .rel-stub__header {
@@ -182,7 +181,7 @@
   .rel-stub__count {
     font-family: var(--font-mono);
     font-size: var(--text-xs);
-    letter-spacing: 0.04em;
+    letter-spacing: var(--mono-letter-spacing-loose);
     color: var(--text-faint);
   }
 
@@ -201,7 +200,7 @@
     align-items: center;
     justify-content: space-between;
     gap: var(--space-s);
-    padding-block: var(--space-s);
+    padding-block: var(--space-xs);
     padding-inline: 0;
     border-block-end: 1px solid var(--border-color-light);
   }
@@ -228,7 +227,7 @@
     font-family: var(--font-mono);
     font-size: var(--text-xs);
     color: var(--text-faint);
-    letter-spacing: 0.04em;
+    letter-spacing: var(--mono-letter-spacing-loose);
   }
 
   .rel-stub__state {
@@ -246,14 +245,4 @@
     padding-block-start: var(--space-xs);
   }
 
-  .rel-stub__view-all {
-    font-size: var(--text-s);
-    color: var(--text-muted);
-    text-decoration: none;
-    transition: color var(--transition);
-  }
-
-  .rel-stub__view-all:hover {
-    color: var(--text-color);
-  }
 </style>

@@ -103,7 +103,7 @@
 {:else if people}
   <div class="ppl">
     <section class="ppl__section" aria-label="Own team">
-      <p class="ppl__sub">Own team</p>
+      <p class="eyebrow eyebrow--sub ppl__sub">Own team</p>
       {#if people.cast.length > 0}
         <ul class="ppl__rows" role="list">
           {#each people.cast as c (c.id)}
@@ -130,12 +130,12 @@
           {/each}
         </ul>
       {:else}
-        <p class="ppl__state">No canonical team on this project yet.</p>
+        <p class="ppl__state">No team on this project yet.</p>
       {/if}
     </section>
 
     <section class="ppl__section" aria-label="Crew">
-      <p class="ppl__sub">Crew</p>
+      <p class="eyebrow eyebrow--sub ppl__sub">Crew</p>
       {#if people.crew.length > 0}
         <ul class="ppl__rows" role="list">
           {#each people.crew as c (c.id)}
@@ -178,12 +178,12 @@
           {/each}
         </ul>
       {:else}
-        <p class="ppl__state">No crew assigned on this line's performances.</p>
+        <p class="ppl__state">No crew assigned on this line yet.</p>
       {/if}
     </section>
 
     <section class="ppl__section" aria-label="Venue contacts">
-      <p class="ppl__sub">Venue contacts</p>
+      <p class="eyebrow eyebrow--sub ppl__sub">Venue contacts</p>
       {#if venueGroups.length > 0}
         {#each venueGroups as g (g.venue.id)}
           <div class="ppl__venue">
@@ -240,15 +240,7 @@
       gap: var(--space-s);
     }
 
-    /* Sub-eyebrow — smaller sibling of the page eyebrow: same mono
-       uppercase register, lighter tracking, scoped to module subsections. */
-    .ppl__sub {
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--text-faint);
-    }
+    /* Sub-eyebrow typography via base.css .eyebrow--sub. */
 
     .ppl__rows li {
       display: flex;

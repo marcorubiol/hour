@@ -12,11 +12,13 @@
 
   import { page } from '$app/state';
   import { createQuery } from '@tanstack/svelte-query';
+  import { allLinesQueryOptions } from '$lib/nav-queries';
   import { goto } from '$app/navigation';
   import { accentVar, accentVarFor } from '$lib/utils/accent';
   import RelationshipStub from '$lib/components/RelationshipStub.svelte';
   import StateBadge from '$lib/components/StateBadge.svelte';
   import YNotes from '$lib/components/YNotes.svelte';
+  import { dayMonthYear } from '$lib/datetime';
 
   type Project = {
     id: string;
@@ -61,6 +63,9 @@
       fetchJSON<{ items: Project[] }>('/api/projects?status=active', signal),
   });
 
+  // Lines of this project — shares the ['lines','all'] cache the shell warms.
+  const linesQuery = createQuery(allLinesQueryOptions());
+
   let workspaceSlug = $derived(page.params.workspace ?? '');
   let projectSlug = $derived(page.params.slug ?? '');
 
@@ -78,13 +83,13 @@
     return 'faint';
   });
 
+  let projectLines = $derived(
+    ($linesQuery.data?.items ?? []).filter((l) => l.project?.slug === projectSlug),
+  );
+
   function formatDate(iso: string | null): string {
     if (!iso) return '';
-    return new Date(iso).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    });
+    return dayMonthYear(iso);
   }
 </script>
 
@@ -125,29 +130,38 @@
       <YNotes
         targetTable="project"
         targetId={project.id}
-        placeholder="Project notes — shared, live (ADR-025)."
+        placeholder="Project notes — shared, live."
       />
     </section>
   {/if}
 
   <section class="project__stubs" aria-label="Pending sections">
     <div class="project__stub">
-      <p class="eyebrow">Lines &amp; Shows</p>
-      <p class="project__stub-body">
-        No lines yet. Will appear here when the first show is confirmed
-        (Phase 0.1 trabajo #6 + production).
-      </p>
+      <p class="eyebrow">Lines</p>
+      {#if projectLines.length > 0}
+        <ul class="project__lines" role="list">
+          {#each projectLines as l (l.id)}
+            <li>
+              <a class="link-arrow" href={`/h/${workspaceSlug}/project/${projectSlug}/line/${l.slug ?? l.id}`}>
+                {l.name} →
+              </a>
+            </li>
+          {/each}
+        </ul>
+      {:else}
+        <p class="project__stub-body">No lines yet.</p>
+      {/if}
     </div>
     <div class="project__stub">
       <p class="eyebrow">Assets</p>
       <p class="project__stub-body">
-        Riders, dossiers, stage plots — Phase 0.5 (asset upload).
+        Riders, dossiers and stage plots will live here.
       </p>
     </div>
     <div class="project__stub">
       <p class="eyebrow">Team</p>
       <p class="project__stub-body">
-        Project members &amp; permissions — Phase 0.3.
+        Project members and permissions will live here.
       </p>
     </div>
   </section>
@@ -158,7 +172,7 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-xl);
-    max-inline-size: 56rem;
+    max-inline-size: var(--page-width-wide);
     margin-inline: auto;
   }
 
@@ -184,12 +198,8 @@
     border-radius: 2px;
   }
 
+  /* Masthead typography via base.css h1 defaults. */
   .project__title {
-    font-family: var(--font-display);
-    font-size: clamp(2rem, 3vw, 2.6rem);
-    font-weight: 400;
-    letter-spacing: -0.025em;
-    line-height: 1.05;
     margin: 0;
     color: var(--text-color);
   }
@@ -225,6 +235,14 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-s);
+  }
+
+  .project__lines {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+    margin: 0;
+    padding: 0;
   }
 
   .project__stubs {

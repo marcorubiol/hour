@@ -18,6 +18,9 @@
     direction?: 'up' | 'down';
     label?: string;
     triggerClass?: string;
+    /** Extra attributes for the trigger button (e.g. data-tone for a
+        state-badge trigger). Explicit attributes below still win. */
+    triggerAttrs?: Record<string, string | undefined>;
     trigger?: Snippet;
     children?: Snippet<[{ close: (returnFocus?: boolean) => void }]>;
     onopen?: () => void;
@@ -30,6 +33,7 @@
     direction = 'down',
     label = 'Open menu',
     triggerClass = 'btn--outline btn--s',
+    triggerAttrs = {},
     trigger,
     children,
     onopen,
@@ -130,6 +134,7 @@
 <div class="menu-wrapper" bind:this={wrapperEl}>
   <button
     bind:this={triggerEl}
+    {...triggerAttrs}
     type="button"
     class={triggerClass}
     aria-haspopup="menu"

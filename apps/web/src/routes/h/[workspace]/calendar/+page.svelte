@@ -323,9 +323,9 @@
     <div class="cal__nav">
       <h1 class="cal__month">{monthLabel}</h1>
       <div class="cal__nav-buttons">
-        <button class="btn--outline btn--s" onclick={prevMonth} aria-label="Previous month">←</button>
-        <button class="btn--outline btn--s" onclick={thisMonth}>Today</button>
-        <button class="btn--outline btn--s" onclick={nextMonth} aria-label="Next month">→</button>
+        <Button variant="outline" size="s" onclick={prevMonth} label="Previous month">←</Button>
+        <Button variant="outline" size="s" onclick={thisMonth}>Today</Button>
+        <Button variant="outline" size="s" onclick={nextMonth} label="Next month">→</Button>
         <Button variant="outline" size="s" onclick={openFeed}>Feed</Button>
         <Button size="s" onclick={() => openCreate()}>New performance</Button>
       </div>

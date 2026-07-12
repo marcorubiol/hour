@@ -258,8 +258,8 @@
                 <p class="spin__empty">No lines yet.</p>
               {/each}
               <div class="spin__new">
-                <button type="button" class="spin__add" onclick={() => creation.openLine({ workspaceId: unit.ws.id })}>+ New line</button>
-                <button type="button" class="spin__add" onclick={() => creation.openProject({ workspaceId: unit.ws.id })}>+ New project</button>
+                <button type="button" class="creator" onclick={() => creation.openLine({ workspaceId: unit.ws.id })}>+ New line</button>
+                <button type="button" class="creator" onclick={() => creation.openProject({ workspaceId: unit.ws.id })}>+ New project</button>
               </div>
             </div>
           </div>
@@ -282,7 +282,7 @@
             <span class="spin__meta">{st.confirmed} confirmed · {st.holds} holds</span>
             <button
               type="button"
-              class="spin__pin"
+              class="pill--sm pill--mono spin__pin"
               onclick={() => pins.add(spacePin(ws.slug))}
               title="Pin this space"
             >pin</button>
@@ -299,8 +299,8 @@
               <p class="spin__empty">No lines yet.</p>
             {/each}
             <div class="spin__new">
-              <button type="button" class="spin__add" onclick={() => creation.openLine({ workspaceId: ws.id })}>+ New line</button>
-              <button type="button" class="spin__add" onclick={() => creation.openProject({ workspaceId: ws.id })}>+ New project</button>
+              <button type="button" class="creator" onclick={() => creation.openLine({ workspaceId: ws.id })}>+ New line</button>
+              <button type="button" class="creator" onclick={() => creation.openProject({ workspaceId: ws.id })}>+ New project</button>
             </div>
           </div>
         </div>
@@ -318,16 +318,12 @@
        defaults (big padding-block + a space-l flex gap between children); the
        vertical rhythm here is controlled by each element's own margin. */
     .home {
-      max-inline-size: 46rem;
+      max-inline-size: var(--page-width-reading);
       margin-inline: auto;
     }
 
+    /* Masthead typography via base.css h1 defaults. */
     .home__greet {
-      font-family: var(--font-display);
-      font-weight: 400;
-      font-size: clamp(1.9rem, 1.4rem + 2.2vw, 2.6rem);
-      letter-spacing: -0.02em;
-      line-height: 1.05;
       margin: 0 0 var(--space-2xs);
       color: var(--text-color);
     }
@@ -475,23 +471,9 @@
       color: var(--text-muted);
       margin-inline-start: auto;
     }
+    /* Pill skeleton (base.css) carries the chip; tighter block padding. */
     .spin__pin {
-      border: 1px solid var(--border-color-dark);
-      border-radius: var(--radius-circle);
-      background: none;
-      padding-block: var(--space-2xs);
-      padding-inline: var(--space-s);
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
-      color: var(--text-muted);
-      cursor: pointer;
-      transition: border-color var(--transition), color var(--transition);
-    }
-    .spin__pin:hover {
-      border-color: var(--text-muted);
-      color: var(--text-color);
+      --pill-padding-block: var(--space-2xs);
     }
     .spin__lines {
       padding: var(--space-xs);
@@ -546,9 +528,8 @@
     .spin__empty {
       margin: 0;
       padding: var(--space-s);
-      font-size: var(--text-xs);
+      font-size: var(--text-s);
       color: var(--text-faint);
-      font-style: italic;
     }
 
     /* Creation affordances (ADR-056) — quiet by design. */
@@ -559,40 +540,25 @@
       border-block-start: 1px solid var(--border-color-light);
       margin-block-start: var(--space-2xs);
     }
-    .spin__add {
-      border: 0;
-      background: none;
-      padding-block: var(--space-xs);
-      padding-inline: var(--space-s);
-      border-radius: var(--radius-m);
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      letter-spacing: 0.04em;
-      color: var(--text-faint);
-      cursor: pointer;
-      transition: color var(--transition), background var(--transition);
-    }
-    .spin__add:hover {
-      color: var(--text-color);
-      background: var(--bg-light);
-    }
+    /* Creators via the shared .creator class (base.css). */
     .spin--ghost {
       display: flex;
       align-items: center;
       justify-content: center;
       min-block-size: 6rem;
       border-style: dashed;
+      border-color: var(--border-color-dark);
       background: none;
       cursor: pointer;
       font-family: var(--font-mono);
-      font-size: var(--text-s);
-      letter-spacing: 0.04em;
+      font-size: var(--text-xs);
+      letter-spacing: var(--mono-letter-spacing-loose);
       color: var(--text-faint);
       transition: color var(--transition), border-color var(--transition);
     }
     .spin--ghost:hover {
       color: var(--text-color);
-      border-color: var(--border-color-dark);
+      border-color: var(--text-muted);
     }
   }
 </style>

@@ -8,6 +8,18 @@ Convención: secciones por fecha descendente. Cada sesión queda con commits cit
 
 ---
 
+## 2026-07-12 (noche) — Pasada de coherencia visual (ultracode autónomo) — ADR-059
+
+**Qué**: Marco reporta "muchísimas inconsistencias visuales" y delega el arreglo completo. Workflow de audit con 8 lentes en paralelo (page-shell, line-modules, tables, chips-badges, buttons-forms, dark-mode, empty-copy, code-tokens) sobre screenshots reales de 17 vistas light+dark (Playwright standalone contra dev local, login con el usuario de test) + el código; síntesis dedup a 42 hallazgos; verificación adversarial hallazgo-a-hallazgo (0 refutados). Aplicados 41 en la misma sesión, a mano en el main loop; F33 (alturas de control en filas de filtro) a Shelf. Decisiones de sistema en `_decisions.md § ADR-059`; el mecánico completo en el commit.
+
+**Lo gordo que salió**: (1) el default global de `<section>` (padding editorial de documento) se colaba en TODAS las páginas del shell — era la causa de los ~200px de vacío entre módulos que motivaron el checkpoint visual pendiente; (2) dark mode tenía la escalera de sombras sin re-derivar → toda la familia pill brillaba blanca (la evidencia más clara: playground dark); (3) el contrato de tonos de StateBadge estaba MUERTO por especificidad (defaults a clase vs contrato a :where) — todos los badges de lifecycle grises desde quién sabe cuándo; (4) `--text-2xl` no existía (token real: `--text-xxl`) → el título del line detail renderizaba a tamaño de card; (5) los stubs del project decían "No lines yet" con dos lines vivas y navegables.
+
+**Gotchas de la sesión**: el spend limit mensual cayó a mitad de la fase Verify del workflow (17 verificadores muertos) — los hallazgos se recuperaron del journal.jsonl de la síntesis y se verificaron a mano al aplicarlos; Marco dio "continue con monthly plan". El JWT del storageState de Playwright caduca ~1h — relogin antes de cada tanda de capturas. El spec de collab FALLA contra dev local siempre (el DO de y-partyserver no corre en dev) — es ambiental: 2/2 contra prod sin tocar nada. Svelte se come el espacio antes de un {#if} inline (kicker "ROAD SHEET· MAMEMI") — `{' · '}` explícito.
+
+**Verificación**: svelte-check 0/0 · unit 100/100 · e2e 15/15 local + collab 2/2 prod · re-captura de las 17 vistas y medición DOM (vacío intra-módulo 72px→0; chips sticky a 57.6px = altura real de la barra). Local, sin deploy — pendiente revisión de Marco.
+
+---
+
 ## 2026-07-12 — ADR-056 implementado (ultracode autónomo): line detail = composición de módulos — ADR-058
 
 Marco: "ataca el ADR-056" + grill (7 preguntas → alcance completo, creación en 3 niveles, pila única densa, regla line_id contexto-asigna/global-select, borrado en el mismo pase, ultracode) + "me tengo que ir, continúa sin preguntar y que todo funcione al volver". Sesión enteramente autónoma: workflow Understand (10 lectores + critic, 1.2M tokens), implementación híbrida (7 builders paralelos sobre ficheros disjuntos + orquestador en los ficheros compartidos), review adversarial (5 lentes + verificación por hallazgo).

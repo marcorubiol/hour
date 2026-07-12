@@ -124,7 +124,7 @@
   {:else if loading}
     <p class="mat__state">Loading…</p>
   {:else if items.length === 0}
-    <p class="mat__state">No materials registered — riders, dossiers, plots live here.</p>
+    <p class="mat__state">No materials yet — riders, dossiers and plots live here.</p>
   {:else}
     <div class="table-wrap">
       <table>
@@ -211,7 +211,7 @@
 
     .mat__head {
       display: flex;
-      justify-content: flex-start;
+      justify-content: flex-end;
     }
 
     .mat__state {
@@ -220,10 +220,6 @@
     }
     .mat__state--danger {
       color: var(--danger);
-    }
-
-    .table-wrap {
-      overflow-x: auto;
     }
 
     .mat__cell-direction {
