@@ -58,6 +58,24 @@ export const GET: RequestHandler = async ({ request, params, url, platform }) =>
   if (!parsed.success) return json({ error: 'invalid_query' }, 400);
   const { kind, limit } = parsed.output;
 
+  // Resolve the line first (like the sibling people endpoint): an
+  // invisible/unknown line is a 404, not an empty registry.
+  const lineLookup = new URLSearchParams();
+  lineLookup.set('select', 'id');
+  lineLookup.set('id', `eq.${idParsed.output}`);
+  lineLookup.set('deleted_at', 'is.null');
+  lineLookup.set('limit', '1');
+  try {
+    const line = await pgGet<{ id: string }>(env, 'line', jwt, { search: lineLookup });
+    if (line.data.length === 0) return json({ error: 'not_found' }, 404);
+  } catch (err) {
+    if (err instanceof PostgrestError) {
+      const upstream = err.status === 401 || err.status === 403 ? err.status : 502;
+      return json({ error: 'postgrest_error', status: err.status, detail: err.body }, upstream);
+    }
+    return json({ error: 'unexpected', detail: String(err) }, 500);
+  }
+
   const search = new URLSearchParams();
   search.set('select', MATERIAL_SELECT);
   search.set('line_id', `eq.${idParsed.output}`);

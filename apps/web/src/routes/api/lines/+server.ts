@@ -178,11 +178,13 @@ export const POST: RequestHandler = async ({ request, platform }) => {
     return json({ line }, 201);
   } catch (err) {
     if (err instanceof PostgrestError) {
-      const body = err.body;
+      // PostgrestError.code parses the JSON body — substring matching
+      // false-positives on user-influenced text (ADR-043 review lesson).
       let status = 502;
-      if (body.includes('22023')) status = 400;
-      else if (body.includes('42501')) status = 403;
-      return json({ error: 'rpc_error', status: err.status, detail: body }, status);
+      if (err.code === '22023') status = 400;
+      else if (err.code === '42501') status = 403;
+      else if (err.code === '23505') status = 409;
+      return json({ error: 'rpc_error', status: err.status, detail: err.body }, status);
     }
     return json({ error: 'unexpected', detail: String(err) }, 500);
   }

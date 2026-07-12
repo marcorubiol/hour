@@ -12,6 +12,10 @@
 - [ ] Verificar checkboxes viejos de 0.0: app abre offline con datos cacheados, Lighthouse PWA ≥90, strings por `t()`, Axe @from:2026-08-01
 
 ## Shelf
+- [ ] Expenses en la lens global de Money (hoy solo en el módulo de line — desviación aceptada del anti-fragmentación de ADR-056; requiere extender /api/expenses a project/workspace union) @shelf
+- [ ] Dedup filosofía: 3 copias del accent-swatch picker (create/ dialogs), 2 variantes de fmtFee, sub-eyebrow duplicado por módulo → graduar a base.css/$lib cuando se toquen @shelf
+- [ ] Totales de dinero suman cross-currency sin dimensión (lens y módulo heredan la semántica del lens original) @shelf
+- [ ] Phase 0.9: un rol edit:show puede escribir line.notes por PATCH directo PostgREST mientras el socket colaborativo exige edit:project_meta (la API no expone notes — inconsistencia solo fuera de la app) @shelf
 - [ ] Project detail tabs Work·Assets·Team·About — probablemente el MISMO sistema de módulos a nivel project (ADR-056 re-evaluate a) @shelf
 - [ ] `delete_line` RPC si algún día hace falta borrar lines (hoy: sin delete path, fixtures estables en tests) @shelf
 - [ ] Capability-flag read:money en payloads (masked vs empty distinguibles) cuando haya roles de verdad — Phase 0.9 @shelf
@@ -25,6 +29,7 @@
 - [ ] Purgar persona huérfana de test `019f2f03-f1f2-71a0-9e1f-9c8c9cf331c8` (soft-delete por SQL, no molesta) @shelf
 
 ## Trace
+- [x] Review adversarial COMPLETO en re-run (5 lentes, 33 agentes): 20 confirmados / 8 refutados. Aplicados: preset del dialog gana en contextos bloqueados (HIGH — gig en line equivocada al navegar entre lines), invalidaciones line-stats/fees, create_line v3 (reserved-slug "Booking" + cap 57 chars, migración aplicada), 23505→409 en POST /api/lines, materials GET/DELETE alineados, preflight de notes con retry, guards anti-mistarget en engagement-write.spec, finally en la suite RLS. Aceptados y documentados: expenses módulo-only, cross-currency, duplicaciones filosofía (Shelf)
 - [x] Producción desbloqueada y completada (2026-07-12, tarde): 6 migraciones aplicadas + verificadas (backfill 154, grants limpios), db-types regenerado, deploys hour-collab → hour-web, suite contra prod unit 100/100 · RLS 38/38 · **e2e 17/17 sin retries**, smoke collab line (snapshot + notes materializadas)
 - [x] Roturas destapadas por la suite y arregladas: contact-create.spec (roto desde el dialog multi-espacio del 04-07), money.spec (carrera de paralelismo → fila estable 2031), Menu descartaba label con trigger custom (a11y: botones sin nombre)
 - [x] ADR-056 implementado (2026-07-12, sesión autónoma ultracode): line detail = pila de módulos (7: Calendar, Contacts, Road sheets, Notes, Materials, Money, People) + header stats por kind + anchor chips + Add/Move/Remove module

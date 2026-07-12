@@ -28,13 +28,18 @@ type RawEngagement = {
   person: { full_name: string | null } | null;
 };
 
-async function loginAndOpenContacts(page: Page) {
+async function loginAndOpenContacts(page: Page, searchName?: string) {
   await page.goto('/login');
   await page.locator('input[type=email]').fill(EMAIL!);
   await page.locator('input[type=password]').fill(PASSWORD!);
   await page.getByRole('button', { name: /sign in/i }).click();
   await page.waitForURL(/\/h\//);
   await page.goto('/h/muk-cia/contacts');
+  if (searchName) {
+    // The lens is pins-scoped (unscoped = everything RLS allows) — narrow
+    // to the target person server-side so the row is on the first page.
+    await page.getByPlaceholder('People or organizations…').fill(searchName);
+  }
   await expect(page.locator('tbody tr').first()).toBeVisible();
 }
 
@@ -86,13 +91,19 @@ async function restoreEngagement(
 /**
  * Run a mutating click and require the PATCH to be acked by the server —
  * otherwise the assertions would certify the optimistic paint only.
+ * `expectedId` guards against mis-targeting (review 2026-07-12): the lens
+ * is unscoped and a multi-space person renders N same-name rows, so a
+ * probe write MUST prove it landed on the row the restore knows about.
  */
-async function patchOk(page: Page, doClick: () => Promise<void>) {
+async function patchOk(page: Page, expectedId: string, doClick: () => Promise<void>) {
   const resp = page.waitForResponse(
     (r) => r.request().method() === 'PATCH' && r.url().includes('/api/engagements/'),
   );
   await doClick();
-  expect((await resp).ok(), 'PATCH /api/engagements should succeed').toBe(true);
+  const r = await resp;
+  expect(r.ok(), 'PATCH /api/engagements should succeed').toBe(true);
+  const hit = r.url().match(/engagements\/([0-9a-f-]{36})/)?.[1];
+  expect(hit, 'probe write must target the captured engagement').toBe(expectedId);
 }
 
 test.describe('engagement inline write', () => {
@@ -107,6 +118,9 @@ test.describe('engagement inline write', () => {
     const original = (await fetchListRaw(page))[0];
     const name = original.person?.full_name;
     expect(name).toBeTruthy();
+    // Narrow the lens to the person server-side (unscoped lens = every
+    // workspace; the row must be on page 1 and unambiguous).
+    await page.getByPlaceholder('People or organizations…').fill(name!);
 
     try {
       const row = rowByName(page, name!);
@@ -116,13 +130,14 @@ test.describe('engagement inline write', () => {
 
       // Change status via the badge menu; require the server ack.
       await trigger.click();
-      await patchOk(page, () =>
+      await patchOk(page, original.id, () =>
         page.getByRole('menuitem', { name: target, exact: true }).click(),
       );
       await expect(trigger).toContainText(target);
 
       // PATCH acked above — reload proves the change survives a fresh fetch.
       await page.reload();
+      await page.getByPlaceholder('People or organizations…').fill(name!);
       await expect(
         rowByName(page, name!).locator('button[aria-haspopup="menu"]'),
       ).toContainText(target);
@@ -133,12 +148,13 @@ test.describe('engagement inline write', () => {
         'button[aria-haspopup="menu"]',
       );
       await triggerAfter.click();
-      await patchOk(page, () =>
+      await patchOk(page, original.id, () =>
         page.getByRole('menuitem', { name: originalLabel, exact: true }).click(),
       );
       await expect(triggerAfter).toContainText(originalLabel);
 
       await page.reload();
+      await page.getByPlaceholder('People or organizations…').fill(name!);
       await expect(
         rowByName(page, name!).locator('button[aria-haspopup="menu"]'),
       ).toContainText(originalLabel);
@@ -155,6 +171,7 @@ test.describe('engagement inline write', () => {
     const original = (await fetchListRaw(page))[0];
     const name = original.person?.full_name;
     expect(name).toBeTruthy();
+    await page.getByPlaceholder('People or organizations…').fill(name!);
 
     // The restore goes through the same date-only PATCH contract the UI
     // uses, so normalize up front.
@@ -172,7 +189,7 @@ test.describe('engagement inline write', () => {
       await expect(dialog).toBeVisible();
       await dialog.getByLabel('Date').fill('2020-01-01');
       await dialog.locator('#next-action-note').fill('e2e probe — will be reverted');
-      await patchOk(page, () =>
+      await patchOk(page, original.id, () =>
         dialog.getByRole('button', { name: 'Save' }).click(),
       );
 
@@ -181,6 +198,7 @@ test.describe('engagement inline write', () => {
       ).toContainText('e2e probe');
 
       await page.reload();
+      await page.getByPlaceholder('People or organizations…').fill(name!);
       await expect(
         rowByName(page, name!).locator('.next-action__note'),
       ).toContainText('e2e probe');

@@ -92,6 +92,17 @@ describe.skipIf(!envReady())('RLS — ADR-056 line modules', () => {
       fixtureLine = created.data as LineRow;
     }
 
+    // Crash recovery: a killed run may have left the fixture line's
+    // modules poisoned (lines have no delete path) — reset unconditionally
+    // so test 1's template assertion never inherits stale state.
+    await pgPatch<LineRow>(
+      'line',
+      jwt,
+      { modules: ['contacts', 'calendar', 'materials', 'notes'] },
+      new URLSearchParams({ id: `eq.${fixtureLine.id}`, select: 'id' }),
+    );
+    fixtureLine.modules = ['contacts', 'calendar', 'materials', 'notes'];
+
     // Crash recovery: soft-delete a leftover fixture engagement.
     const stale = await pgGet<{ id: string }>(
       'engagement',
@@ -130,25 +141,28 @@ describe.skipIf(!envReady())('RLS — ADR-056 line modules', () => {
         select: 'id,modules',
       }),
     );
-    expect(patched.status).toBeLessThan(300);
-    expect(patched.rows[0]?.modules).toEqual(next);
+    try {
+      expect(patched.status).toBeLessThan(300);
+      expect(patched.rows[0]?.modules).toEqual(next);
 
-    const anon = await pgPatch<LineRow>(
-      'line',
-      null,
-      { modules: ['notes'] },
-      new URLSearchParams({ id: `eq.${fixtureLine.id}`, select: 'id,modules' }),
-    );
-    expect(anon.rows).toHaveLength(0);
-    expect(anon.status).not.toBe(500);
-
-    // Restore the fixture's template shape.
-    await pgPatch<LineRow>(
-      'line',
-      jwt,
-      { modules: ['contacts', 'calendar', 'materials', 'notes'] },
-      new URLSearchParams({ id: `eq.${fixtureLine.id}`, select: 'id' }),
-    );
+      const anon = await pgPatch<LineRow>(
+        'line',
+        null,
+        { modules: ['notes'] },
+        new URLSearchParams({ id: `eq.${fixtureLine.id}`, select: 'id,modules' }),
+      );
+      expect(anon.rows).toHaveLength(0);
+      expect(anon.status).not.toBe(500);
+    } finally {
+      // Restore the fixture's template shape — lines are permanent, a
+      // skipped restore would poison every later run (review 2026-07-12).
+      await pgPatch<LineRow>(
+        'line',
+        jwt,
+        { modules: ['contacts', 'calendar', 'materials', 'notes'] },
+        new URLSearchParams({ id: `eq.${fixtureLine.id}`, select: 'id' }),
+      );
+    }
   });
 
   // ── engagement.line_id via create_engagement ────────────────────────
