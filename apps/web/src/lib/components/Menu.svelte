@@ -134,7 +134,7 @@
     class={triggerClass}
     aria-haspopup="menu"
     aria-expanded={open}
-    aria-label={trigger ? undefined : label}
+    aria-label={label}
     onclick={toggle}
     onkeydown={handleTriggerKeydown}
   >

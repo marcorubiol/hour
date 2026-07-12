@@ -426,7 +426,7 @@
 
     {#if missingModules.length > 0}
       <div class="line-detail__addwrap">
-        <Menu direction="up" align="start" label="Add a module">
+        <Menu direction="up" align="start" label="Add module">
           {#snippet trigger()}
             <span class="line-detail__add">+ Add module</span>
           {/snippet}
