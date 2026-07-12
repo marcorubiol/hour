@@ -3,11 +3,6 @@
 > Actualizado 2026-07-12 al cierre de la sesión ADR-056/058 (line detail = módulos).
 > Contexto completo: `_context.md § Status — 2026-07-12` + `_notes/sessions-log.md § 2026-07-12`.
 
-## Dispatch
-- [ ] **Desbloquear producción** (el clasificador de auto-mode exige nombrarlo explícito): decirle a .zerø *"aplica las 6 migraciones 2026-07-12 al Supabase hour-phase0 y despliega hour-collab y hour-web"* — o aprobar los prompts fuera de auto mode. Orden: 6 × apply_migration → regen db-types → deploy hour-collab → deploy hour-web @dispatch
-- [ ] Re-pasar las 4 lentes de review que cayeron por límite de gasto (sql / api / svelte / tests) cuando se renueve la cuota — solo completó collab @dispatch
-- [ ] Tras el deploy: suite completa contra producción (`pnpm test:rls` incl. line-modules nueva, `PW_BASE_URL=… pnpm test:smoke` incl. line-detail.spec) + smoke collab de dos clientes sobre una line @dispatch
-
 ## Queue
 - [ ] System-completeness gate (0.3): TODO el bloque construido está (ADR-051→058). PARAR de construir y usar Hour con la difusión real ~1 mes. El veredicto es de Marco, no de código.
 - [ ] Checkpoint visual del line detail en producción (chips sticky: offsets 3.4rem/6.5rem son estimación — ajustar si bailan; densidad de la pila con la Gira demo y la Difusión real)
@@ -30,6 +25,8 @@
 - [ ] Purgar persona huérfana de test `019f2f03-f1f2-71a0-9e1f-9c8c9cf331c8` (soft-delete por SQL, no molesta) @shelf
 
 ## Trace
+- [x] Producción desbloqueada y completada (2026-07-12, tarde): 6 migraciones aplicadas + verificadas (backfill 154, grants limpios), db-types regenerado, deploys hour-collab → hour-web, suite contra prod unit 100/100 · RLS 38/38 · **e2e 17/17 sin retries**, smoke collab line (snapshot + notes materializadas)
+- [x] Roturas destapadas por la suite y arregladas: contact-create.spec (roto desde el dialog multi-espacio del 04-07), money.spec (carrera de paralelismo → fila estable 2031), Menu descartaba label con trigger custom (a11y: botones sin nombre)
 - [x] ADR-056 implementado (2026-07-12, sesión autónoma ultracode): line detail = pila de módulos (7: Calendar, Contacts, Road sheets, Notes, Materials, Money, People) + header stats por kind + anchor chips + Add/Move/Remove module
 - [x] Template picker (6 tarjetas fijan kind+modules) + creación restaurada en 3 niveles (line/project/space): dialogs en el layout, entradas en home cards + ⌘K grupo "New" — la creación llevaba huérfana desde ADR-057 (vivía en el Plaza desmontado)
 - [x] line_id en los write paths: create_engagement p_line_id (+ resurrect), Line select opcional en Add contact (por-project) y New performance, PATCH whitelists con guard cross-project ADR-043, contexto de line auto-asigna
