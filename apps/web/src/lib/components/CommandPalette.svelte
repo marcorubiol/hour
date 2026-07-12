@@ -19,8 +19,9 @@
     onPickLine: (line: NavLine) => void;
     onPickSpace: (ws: NavWorkspace) => void;
     onPickView: (view: 'agenda' | 'calendar' | 'contacts' | 'money') => void;
+    onPickAction: (action: CreateAction) => void;
   }
-  let { open = $bindable(), onPickLine, onPickSpace, onPickView }: Props = $props();
+  let { open = $bindable(), onPickLine, onPickSpace, onPickView, onPickAction }: Props = $props();
 
   const workspacesQuery = createQuery(workspacesQueryOptions());
   const linesQuery = createQuery(allLinesQueryOptions());
@@ -33,10 +34,12 @@
   let lineIndex = $derived(buildLineIndex(workspaces, $linesQuery.data?.items ?? []));
 
   type ViewTarget = 'agenda' | 'calendar' | 'contacts' | 'money';
+  type CreateAction = 'new-line' | 'new-project' | 'new-space';
   type ViewItem = { type: 'view'; id: string; target: ViewTarget; name: string };
   type LineItem = { type: 'line'; id: string; line: NavLine };
   type SpaceItem = { type: 'space'; id: string; ws: NavWorkspace };
-  type Item = ViewItem | LineItem | SpaceItem;
+  type ActionItem = { type: 'action'; id: string; action: CreateAction; name: string };
+  type Item = ViewItem | LineItem | SpaceItem | ActionItem;
 
   const VIEW_ITEMS: ViewItem[] = [
     { type: 'view', id: 'v:agenda', target: 'agenda', name: 'Agenda' },
@@ -45,10 +48,23 @@
     { type: 'view', id: 'v:money', target: 'money', name: 'Money' },
   ];
 
+  // Creation actions (ADR-056) — the template picker + the two dialogs
+  // live in the layout; the palette only announces them.
+  const ACTION_ITEMS: ActionItem[] = [
+    { type: 'action', id: 'a:new-line', action: 'new-line', name: 'New line…' },
+    { type: 'action', id: 'a:new-project', action: 'new-project', name: 'New project…' },
+    { type: 'action', id: 'a:new-space', action: 'new-space', name: 'New space…' },
+  ];
+
   let viewResults = $derived.by<ViewItem[]>(() => {
     const q = query.trim().toLowerCase();
     if (!q) return VIEW_ITEMS;
     return VIEW_ITEMS.filter((it) => it.name.toLowerCase().includes(q));
+  });
+  let actionResults = $derived.by<ActionItem[]>(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return ACTION_ITEMS;
+    return ACTION_ITEMS.filter((it) => it.name.toLowerCase().includes(q));
   });
   let lineResults = $derived.by<LineItem[]>(() => {
     const q = query.trim().toLowerCase();
@@ -67,8 +83,13 @@
     if (!q) return spaces;
     return spaces.filter((it) => it.ws.name.toLowerCase().includes(q) || it.ws.slug.includes(q));
   });
-  // Lines first — they're the work. Views last (quick jumps).
-  let ordered = $derived<Item[]>([...lineResults, ...spaceResults, ...viewResults]);
+  // Lines first — they're the work. Views then actions last (quick jumps).
+  let ordered = $derived<Item[]>([
+    ...lineResults,
+    ...spaceResults,
+    ...viewResults,
+    ...actionResults,
+  ]);
 
   // Reset + focus whenever the palette opens.
   $effect(() => {
@@ -96,6 +117,7 @@
   function pick(it: Item) {
     if (it.type === 'line') onPickLine(it.line);
     else if (it.type === 'space') onPickSpace(it.ws);
+    else if (it.type === 'action') onPickAction(it.action);
     else onPickView(it.target);
     open = false;
   }
@@ -203,6 +225,26 @@
               <span class="cmdk__glyph cmdk__glyph--space"><span class="cmdk__dot"></span></span>
               <span class="cmdk__name">{it.name}</span>
               <span class="cmdk__ctx"><span class="cmdk__kind">view</span></span>
+              <span class="cmdk__enter" aria-hidden="true">↵</span>
+            </button>
+          {/each}
+        {/if}
+        {#if actionResults.length > 0}
+          <p class="cmdk__group">New</p>
+          {#each actionResults as it, i (it.id)}
+            {@const idx = lineResults.length + spaceResults.length + viewResults.length + i}
+            <button
+              type="button"
+              class="cmdk__row"
+              class:cmdk__row--on={idx === sel}
+              role="option"
+              aria-selected={idx === sel}
+              onmouseenter={() => (sel = idx)}
+              onclick={() => pick(it)}
+            >
+              <span class="cmdk__glyph cmdk__glyph--space"><span class="cmdk__plus" aria-hidden="true">+</span></span>
+              <span class="cmdk__name">{it.name}</span>
+              <span class="cmdk__ctx"><span class="cmdk__kind">create</span></span>
               <span class="cmdk__enter" aria-hidden="true">↵</span>
             </button>
           {/each}
@@ -316,6 +358,11 @@
     block-size: 0.5rem;
     border-radius: var(--radius-circle);
     background: var(--text-faint);
+  }
+  .cmdk__plus {
+    font-size: var(--text-m);
+    line-height: 1;
+    color: var(--text-muted);
   }
   .cmdk__name {
     flex: 1;
