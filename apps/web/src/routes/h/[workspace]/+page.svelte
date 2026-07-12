@@ -19,6 +19,7 @@
   import { lineKindGlyph, lineKindLabel } from '$lib/utils/line-kind';
   import { decodeJwtClaim } from '$lib/realtime';
   import { usePins, spacePin } from '$lib/stores/pins.svelte';
+  import { useCreation } from '$lib/stores/creation.svelte';
   import {
     buildLineIndex,
     resolveScope,
@@ -33,6 +34,7 @@
   import { goto } from '$app/navigation';
 
   const pins = usePins();
+  const creation = useCreation();
   let workspaceSlug = $derived(page.params.workspace ?? '');
 
   type EngagementStatus =
@@ -59,7 +61,6 @@
     status: string;
     performed_at: string | null;
     line_id: string | null;
-    fee_amount: number | null;
     project: { id: string; slug: string; name: string; workspace_id: string } | null;
   };
 
@@ -256,6 +257,10 @@
               {:else}
                 <p class="spin__empty">No lines yet.</p>
               {/each}
+              <div class="spin__new">
+                <button type="button" class="spin__add" onclick={() => creation.openLine({ workspaceId: unit.ws.id })}>+ New line</button>
+                <button type="button" class="spin__add" onclick={() => creation.openProject({ workspaceId: unit.ws.id })}>+ New project</button>
+              </div>
             </div>
           </div>
         {/if}
@@ -293,9 +298,16 @@
             {:else}
               <p class="spin__empty">No lines yet.</p>
             {/each}
+            <div class="spin__new">
+              <button type="button" class="spin__add" onclick={() => creation.openLine({ workspaceId: ws.id })}>+ New line</button>
+              <button type="button" class="spin__add" onclick={() => creation.openProject({ workspaceId: ws.id })}>+ New project</button>
+            </div>
           </div>
         </div>
       {/each}
+      <button type="button" class="spin spin--ghost" onclick={() => creation.openWorkspace()}>
+        + New space
+      </button>
     </div>
   {/if}
 </div>
@@ -537,6 +549,50 @@
       font-size: var(--text-xs);
       color: var(--text-faint);
       font-style: italic;
+    }
+
+    /* Creation affordances (ADR-056) — quiet by design. */
+    .spin__new {
+      display: flex;
+      gap: var(--space-s);
+      padding-block-start: var(--space-2xs);
+      border-block-start: 1px solid var(--border-color-light);
+      margin-block-start: var(--space-2xs);
+    }
+    .spin__add {
+      border: 0;
+      background: none;
+      padding-block: var(--space-xs);
+      padding-inline: var(--space-s);
+      border-radius: var(--radius-m);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      letter-spacing: 0.04em;
+      color: var(--text-faint);
+      cursor: pointer;
+      transition: color var(--transition), background var(--transition);
+    }
+    .spin__add:hover {
+      color: var(--text-color);
+      background: var(--bg-light);
+    }
+    .spin--ghost {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-block-size: 6rem;
+      border-style: dashed;
+      background: none;
+      cursor: pointer;
+      font-family: var(--font-mono);
+      font-size: var(--text-s);
+      letter-spacing: 0.04em;
+      color: var(--text-faint);
+      transition: color var(--transition), border-color var(--transition);
+    }
+    .spin--ghost:hover {
+      color: var(--text-color);
+      border-color: var(--border-color-dark);
     }
   }
 </style>

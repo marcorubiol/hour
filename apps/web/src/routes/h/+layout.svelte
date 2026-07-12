@@ -10,9 +10,13 @@
    * Settings stays a "mode" of the shell: when inside /settings a slim
    * <SettingsNav> aside returns, so the settings surface is unaffected.
    *
-   * Preserved from the previous shell: auth gate, selection/lens providers
-   * (pages still read selection), realtime + network presence, theme +
-   * DND account menu, master-view restore.
+   * Creation lives here too (ADR-056): the three dialogs (line template
+   * picker, project, space) are mounted once and opened via the creation
+   * context from home cards, ⌘K actions and empty states.
+   *
+   * Preserved from the previous shell: auth gate, lens provider, realtime
+   * + network presence, theme + DND account menu, master-view restore.
+   * The selection store died with the sidebar (pins are the scope model).
    */
 
   import { page } from '$app/state';
@@ -30,8 +34,11 @@
   import { useTheme } from '$lib/theme.svelte';
   import { isReservedWorkspaceSlug } from '$lib/reserved-slugs';
   import { provideLens, type Lens } from '$lib/stores/lens.svelte';
-  import { provideSelection } from '$lib/stores/selection.svelte';
   import { providePins, spacePin } from '$lib/stores/pins.svelte';
+  import { provideCreation } from '$lib/stores/creation.svelte';
+  import CreateWorkspaceDialog from '$lib/components/create/CreateWorkspaceDialog.svelte';
+  import CreateProjectDialog from '$lib/components/create/CreateProjectDialog.svelte';
+  import CreateLineDialog from '$lib/components/create/CreateLineDialog.svelte';
   import { lineUrl, type NavLine, type NavWorkspace } from '$lib/nav';
   import { saveMasterViewPath } from '$lib/master-view';
   import {
@@ -65,18 +72,11 @@
     authChecked = true;
   });
 
-  const selection = provideSelection();
   const lens = provideLens('today');
   const pins = providePins();
-
-  // Hydrate selection from URL (pages still read it). Idempotent.
-  $effect(() => {
-    selection.hydrateFromUrl(page.url);
-  });
+  const creation = provideCreation();
 
   onMount(() => {
-    selection.hydrateFromUrl(page.url);
-    selection.restoreFocusFromLocalStorage();
     lens.restoreFromLocalStorage();
     pins.restoreFromLocalStorage();
   });
@@ -230,6 +230,11 @@
     // its own pill; Calendar, Contacts and Money are the routed lenses.
     lens.set(view === 'agenda' ? 'today' : view);
     void goto(`/h/${ws}/${view}`);
+  }
+  function onPickAction(action: 'new-line' | 'new-project' | 'new-space') {
+    if (action === 'new-line') creation.openLine();
+    else if (action === 'new-project') creation.openProject();
+    else creation.openWorkspace();
   }
 
   function logout() {
@@ -397,7 +402,15 @@
     </main>
   </div>
 
-  <CommandPalette bind:open={paletteOpen} {onPickLine} {onPickSpace} {onPickView} />
+  <CommandPalette bind:open={paletteOpen} {onPickLine} {onPickSpace} {onPickView} {onPickAction} />
+
+  <CreateWorkspaceDialog bind:open={creation.workspaceOpen} />
+  <CreateProjectDialog bind:open={creation.projectOpen} workspaceId={creation.projectWorkspaceId} />
+  <CreateLineDialog
+    bind:open={creation.lineOpen}
+    workspaceId={creation.lineWorkspaceId}
+    projectId={creation.lineProjectId}
+  />
 {/if}
 
 <style>
