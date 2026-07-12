@@ -8,6 +8,25 @@ Convención: secciones por fecha descendente. Cada sesión queda con commits cit
 
 ---
 
+## 2026-07-12 (noche 2) — Home projects-first + pin de project — ADR-060
+
+Primer producto del gate 0.3: Marco, usando la app con la difusión real, detecta que los tres niveles (espacio → project → línea) solo tienen dos en la nav — la home enseñaba espacios con las líneas planas dentro, los pins eran `s:`/`l:`, ⌘K no listaba projects y el detalle de project solo se alcanzaba por el back-link del line detail. Review de la home + propuesta con maqueta (artifact claude.ai, mismo design system), OK explícito de Marco ("adelante con esto"), implementación directa en la sesión. **Cero migraciones** — la API ya filtraba todo por `project_ids ∪ workspace_ids`.
+
+Qué cambió (registro completo en ADR-060):
+- **Home = agenda + grid de projects**: una `pcard` sustituye al par lmini/spin (pinned/all-spaces); chip mono del espacio (contexto, no contenedor), pin toggle, stats honestos (conversations exactCount + confirmed/holds), líneas dentro, "+ New line" con preset. Espacios sin projects no pintan tarjeta.
+- **Pin `p:<projectId>`**: `resolveScope` gana `projectIndex` y devuelve `projects` (pins directos) + `projectIds` (unión con projects de líneas pineadas). Narrowing conservado: pin de línea = solo esa línea (calendar/money); pin de project = todo el project.
+- **ScopeStrip** con chip de project y picker en árbol (espacio → projects → líneas); **⌘K** grupo "Projects — the shows"; calendar presetea project con 1 pin de project.
+- **Orden del grid** pins → línea-pineada → actividad desc: el `updated_at` del project miente (trabajar el show toca engagements/lines, nunca la fila del project — MaMeMi salía último con 154 conversaciones).
+- Fixes de camino: project/line detail resolvían project por slug sin workspace (colisión cross-workspace, ADR-024); el detalle de project suelta su fetchJSON local pre-`$lib/api` y comparte `activeProjectsQueryOptions`.
+
+Gotchas preservables:
+- **Playwright 1.59.1 vs chromium cacheado**: pide una revisión más nueva que `chromium-1228`; el escape `PW_CHROMIUM` funciona pero la ruta del binario en ese layout es `chromium-1228/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing` (la forma vieja `chrome-mac/Chromium.app` ya no existe).
+- El orden `updated_at desc` de `/api/projects` NO es recencia de trabajo — cualquier vista "por actividad" tiene que derivarla de engagements/performances.
+
+Verificado: svelte-check 0/0 · unit 110/110 (+10 nav.test) · build limpio · e2e 15/15 local (2 collab skipped, solo-prod) con smoke actualizado · capturas light/dark/pinned/picker/⌘K sobre datos reales. Local; **deploy pendiente junto a ADR-059** (ambos los revisa Marco en dev y lanza él).
+
+---
+
 ## 2026-07-12 (noche) — Pasada de coherencia visual (ultracode autónomo) — ADR-059
 
 **Qué**: Marco reporta "muchísimas inconsistencias visuales" y delega el arreglo completo. Workflow de audit con 8 lentes en paralelo (page-shell, line-modules, tables, chips-badges, buttons-forms, dark-mode, empty-copy, code-tokens) sobre screenshots reales de 17 vistas light+dark (Playwright standalone contra dev local, login con el usuario de test) + el código; síntesis dedup a 42 hallazgos; verificación adversarial hallazgo-a-hallazgo (0 refutados). Aplicados 41 en la misma sesión, a mano en el main loop; F33 (alturas de control en filas de filtro) a Shelf. Decisiones de sistema en `_decisions.md § ADR-059`; el mecánico completo en el commit.

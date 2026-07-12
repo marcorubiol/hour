@@ -17,13 +17,20 @@
   import { usePins } from '$lib/stores/pins.svelte';
   import {
     buildLineIndex,
+    buildProjectIndex,
     resolveScope,
     lineUrl,
+    projectUrl,
     type NavLine,
+    type NavProject,
     type NavWorkspace,
     type RawLine,
   } from '$lib/nav';
-  import { workspacesQueryOptions, allLinesQueryOptions } from '$lib/nav-queries';
+  import {
+    workspacesQueryOptions,
+    activeProjectsQueryOptions,
+    allLinesQueryOptions,
+  } from '$lib/nav-queries';
   import type { AgendaEngagement } from '$lib/components/AgendaBoard.svelte';
 
   type Engagement = AgendaEngagement & { workspace_id: string };
@@ -32,6 +39,7 @@
   let workspaceSlug = $derived(page.params.workspace ?? '');
 
   const workspacesQuery = createQuery(workspacesQueryOptions());
+  const projectsQuery = createQuery(activeProjectsQueryOptions());
   const linesQuery = createQuery(allLinesQueryOptions());
   const engagementsQuery = createQuery({
     queryKey: ['engagements', 'today'],
@@ -40,22 +48,26 @@
   });
 
   let workspaces = $derived<NavWorkspace[]>($workspacesQuery.data?.items ?? []);
+  let projectIndex = $derived(buildProjectIndex(workspaces, $projectsQuery.data?.items ?? []));
   let lineIndex = $derived(buildLineIndex(workspaces, ($linesQuery.data?.items as RawLine[]) ?? []));
   let engagements = $derived<Engagement[]>($engagementsQuery.data?.items ?? []);
 
-  let scope = $derived(resolveScope(pins.pins, workspaces, lineIndex));
-  let pinnedProjectIds = $derived(new Set(scope.lines.map((l) => l.projectId)));
+  let scope = $derived(resolveScope(pins.pins, workspaces, lineIndex, projectIndex));
+  let scopedProjectIds = $derived(new Set(scope.projectIds));
 
   function engInScope(e: Engagement): boolean {
     if (scope.isEmpty) return true;
     if (scope.workspaceIds.includes(e.workspace_id)) return true;
-    if (e.project && pinnedProjectIds.has(e.project.id)) return true;
+    if (e.project && scopedProjectIds.has(e.project.id)) return true;
     return false;
   }
   let scopedEngagements = $derived(engagements.filter(engInScope));
 
   function openLine(line: NavLine) {
     void goto(lineUrl(line));
+  }
+  function openProject(project: NavProject) {
+    void goto(projectUrl(project));
   }
 </script>
 
@@ -64,7 +76,7 @@
 <section class="agenda">
   <header class="agenda__head">
     <p class="eyebrow">Agenda</p>
-    <ScopeStrip onOpenLine={openLine} compact />
+    <ScopeStrip onOpenLine={openLine} onOpenProject={openProject} compact />
     <p class="agenda__sub">Everything with a next action, in your current scope.</p>
   </header>
 

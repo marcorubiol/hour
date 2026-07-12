@@ -31,9 +31,13 @@ test.describe('smoke', () => {
     // Shell loaded — the brand is the home affordance (no nav buttons).
     await expect(page.getByRole('link', { name: /Hour — home/i })).toBeVisible();
 
-    // ⌘K palette: built from /api/lines (RLS) + the Calendar/Money views.
+    // Home = projects-first grid (ADR-060): at least one project card
+    // renders with its name (the ghost "+ New project" card has none).
+    await expect(page.locator('.pcard__name').first()).toBeVisible();
+
+    // ⌘K palette: built from /api/lines + /api/projects (RLS) + the views.
     await page.keyboard.press('Meta+k');
-    const palette = page.getByRole('dialog', { name: 'Jump to a line or space' });
+    const palette = page.getByRole('dialog', { name: 'Jump to a project, line or space' });
     await expect(palette).toBeVisible();
     await expect(palette.getByRole('option').first()).toBeVisible();
     // Money is reachable from ⌘K.

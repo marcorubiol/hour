@@ -39,7 +39,7 @@
   import CreateWorkspaceDialog from '$lib/components/create/CreateWorkspaceDialog.svelte';
   import CreateProjectDialog from '$lib/components/create/CreateProjectDialog.svelte';
   import CreateLineDialog from '$lib/components/create/CreateLineDialog.svelte';
-  import { lineUrl, type NavLine, type NavWorkspace } from '$lib/nav';
+  import { lineUrl, projectUrl, type NavLine, type NavProject, type NavWorkspace } from '$lib/nav';
   import { saveMasterViewPath } from '$lib/master-view';
   import {
     provideNetworkPresence,
@@ -218,6 +218,9 @@
   function onPickLine(line: NavLine) {
     void goto(lineUrl(line));
   }
+  function onPickProject(project: NavProject) {
+    void goto(projectUrl(project));
+  }
   function onPickSpace(ws: NavWorkspace) {
     pins.add(spacePin(ws.slug));
     lens.set('today');
@@ -265,13 +268,13 @@
           type="button"
           class="shell__search"
           onclick={() => (paletteOpen = true)}
-          aria-label="Search or jump to a line"
+          aria-label="Search or jump to a project or line"
         >
           <svg viewBox="0 0 14 14" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true">
             <circle cx="6.2" cy="6.2" r="4.2" />
             <path d="M9.4 9.4 12 12" />
           </svg>
-          <span class="shell__search-label">Search or jump to a line…</span>
+          <span class="shell__search-label">Search or jump to a project or line…</span>
           <kbd class="kbd">⌘K</kbd>
         </button>
 
@@ -402,7 +405,7 @@
     </main>
   </div>
 
-  <CommandPalette bind:open={paletteOpen} {onPickLine} {onPickSpace} {onPickView} {onPickAction} />
+  <CommandPalette bind:open={paletteOpen} {onPickLine} {onPickProject} {onPickSpace} {onPickView} {onPickAction} />
 
   <CreateWorkspaceDialog bind:open={creation.workspaceOpen} />
   <CreateProjectDialog bind:open={creation.projectOpen} workspaceId={creation.projectWorkspaceId} />

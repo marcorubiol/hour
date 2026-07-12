@@ -29,18 +29,20 @@
   import { usePins } from '$lib/stores/pins.svelte';
   import {
     buildLineIndex,
+    buildProjectIndex,
     resolveScope,
     lineUrl,
+    projectUrl,
     type NavLine,
+    type NavProject,
     type NavWorkspace,
     type RawLine,
   } from '$lib/nav';
-  import { allLinesQueryOptions } from '$lib/nav-queries';
+  import { activeProjectsQueryOptions, allLinesQueryOptions } from '$lib/nav-queries';
   import { lineKindGlyph, lineKindLabel } from '$lib/utils/line-kind';
   import { goto } from '$app/navigation';
 
   type WorkspaceLite = { id: string; slug: string };
-  type ProjectLite = { id: string; slug: string };
 
   type MoneyPerformance = {
     id: string;
@@ -78,11 +80,7 @@
     queryFn: ({ signal }: { signal: AbortSignal }) =>
       fetchJSON<{ items: WorkspaceLite[] }>('/api/workspaces', signal),
   });
-  const projectsQuery = createQuery({
-    queryKey: ['projects', { status: 'active' }],
-    queryFn: ({ signal }: { signal: AbortSignal }) =>
-      fetchJSON<{ items: ProjectLite[] }>('/api/projects?status=active', signal),
-  });
+  const projectsQuery = createQuery(activeProjectsQueryOptions());
   const linesQuery = createQuery(allLinesQueryOptions());
 
   let workspaceSlugById = $derived(
@@ -90,14 +88,18 @@
   );
 
   // ── Pins → scope (Adaptive Digest) ────────────────────────────────────
+  let projectIndex = $derived(
+    buildProjectIndex(($workspacesQuery.data?.items ?? []) as NavWorkspace[], $projectsQuery.data?.items ?? []),
+  );
   let lineIndex = $derived(
     buildLineIndex(($workspacesQuery.data?.items ?? []) as NavWorkspace[], ($linesQuery.data?.items as RawLine[]) ?? []),
   );
-  let scope = $derived(resolveScope(pins.pins, ($workspacesQuery.data?.items ?? []) as NavWorkspace[], lineIndex));
+  let scope = $derived(resolveScope(pins.pins, ($workspacesQuery.data?.items ?? []) as NavWorkspace[], lineIndex, projectIndex));
   let lineById = $derived(new Map(lineIndex.map((l) => [l.id, l])));
-  let linePinProjectIds = $derived(new Set(scope.lines.map((l) => l.projectId)));
+  let directProjectIds = $derived(new Set(scope.projects.map((p) => p.id)));
   let scopeUnresolved = $derived(
-    pins.lineIds().length > 0 && scope.lines.length !== pins.lineIds().length,
+    (pins.lineIds().length > 0 && scope.lines.length !== pins.lineIds().length) ||
+      (pins.projectIds().length > 0 && scope.projects.length !== pins.projectIds().length),
   );
 
   function feedParams(k: { projectIds: string[]; workspaceIds: string[] }): string {
@@ -107,12 +109,15 @@
     return p.toString();
   }
   let filterIds = $derived({
-    projectIds: [...linePinProjectIds],
+    projectIds: scope.projectIds,
     workspaceIds: scope.workspaceIds,
   });
 
   function openLine(line: NavLine) {
     void goto(lineUrl(line));
+  }
+  function openProject(project: NavProject) {
+    void goto(projectUrl(project));
   }
 
   const feesOptions = toStore(() => {
@@ -140,11 +145,13 @@
   const feesQuery = createQuery(feesOptions);
   const invoicesQuery = createQuery(invoicesOptions);
 
-  // Exact-line narrowing (the endpoint returns a pinned line's whole project).
+  // Exact-line narrowing (the endpoint returns a pinned line's whole
+  // project); a directly pinned project admits all its fees.
   function feeInScope(f: MoneyPerformance): boolean {
     if (scope.isEmpty) return true;
     const ws = f.project?.workspace_id;
     if (ws && scope.workspaceIds.includes(ws)) return true;
+    if (f.project && directProjectIds.has(f.project.id)) return true;
     if (f.line_id && scope.lineIds.includes(f.line_id)) return true;
     return false;
   }
@@ -435,7 +442,7 @@
 <section class="mny">
   <header class="mny__head">
     <p class="eyebrow">Money</p>
-    <ScopeStrip onOpenLine={openLine} compact />
+    <ScopeStrip onOpenLine={openLine} onOpenProject={openProject} compact />
     <div class="mny__totals">
       <span class="mny__total">
         <span class="mny__total-label">pipeline</span>

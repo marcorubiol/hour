@@ -37,6 +37,7 @@
     modulesForLine,
     type ModuleKey,
   } from '$lib/line-templates';
+  import { workspacesQueryOptions, activeProjectsQueryOptions } from '$lib/nav-queries';
   import CalendarModule from '$lib/components/line/CalendarModule.svelte';
   import ContactsModule from '$lib/components/line/ContactsModule.svelte';
   import RoadsheetsModule from '$lib/components/line/RoadsheetsModule.svelte';
@@ -44,14 +45,6 @@
   import MaterialsModule from '$lib/components/line/MaterialsModule.svelte';
   import MoneyModule from '$lib/components/line/MoneyModule.svelte';
   import PeopleModule from '$lib/components/line/PeopleModule.svelte';
-
-  type Project = {
-    id: string;
-    slug: string;
-    name: string;
-    workspace_id: string;
-    status: 'draft' | 'active' | 'archived';
-  };
 
   type Line = {
     id: string;
@@ -72,14 +65,20 @@
   let projectSlug = $derived(page.params.slug ?? '');
   let lineParam = $derived(page.params.line ?? '');
 
-  const projectsQuery = createQuery({
-    queryKey: ['projects', { status: 'active' }],
-    queryFn: ({ signal }: { signal: AbortSignal }) =>
-      fetchJSON<{ items: Project[] }>('/api/projects?status=active', signal),
-  });
+  const workspacesQuery = createQuery(workspacesQueryOptions());
+  const projectsQuery = createQuery(activeProjectsQueryOptions());
 
+  // Slug + workspace — project slugs are only unique per workspace
+  // (ADR-024), so slug alone could resolve another space's project.
+  let routeWorkspaceId = $derived(
+    $workspacesQuery.data?.items.find((w) => w.slug === workspaceSlug)?.id ?? null,
+  );
   let activeProject = $derived(
-    $projectsQuery.data?.items.find((p) => p.slug === projectSlug) ?? null,
+    routeWorkspaceId
+      ? ($projectsQuery.data?.items.find(
+          (p) => p.slug === projectSlug && p.workspace_id === routeWorkspaceId,
+        ) ?? null)
+      : null,
   );
 
   const linesOptions = toStore(() => {

@@ -1,11 +1,11 @@
 # Tasks
 
-> Actualizado 2026-07-12 (noche) tras la pasada de coherencia visual (ADR-059, 41 fixes aplicados).
-> Contexto completo: `_context.md § Status — 2026-07-12` + `_notes/sessions-log.md § 2026-07-12`.
+> Actualizado 2026-07-12 (noche 2) tras la home projects-first (ADR-060, primer feedback del gate).
+> Contexto completo: `_context.md § Status — 2026-07-12` + `_notes/sessions-log.md § 2026-07-12 (noche 2)`.
 
 ## Queue
-- [ ] System-completeness gate (0.3): TODO el bloque construido está (ADR-051→058). PARAR de construir y usar Hour con la difusión real ~1 mes. El veredicto es de Marco, no de código.
-- [ ] Deploy de la pasada de coherencia visual (ADR-059): verificada en local (svelte-check 0/0 · unit 100/100 · e2e 15/15 local + collab 2/2 prod), pendiente revisión de Marco en dev + `pnpm run deploy`
+- [ ] System-completeness gate (0.3): TODO el bloque construido está (ADR-051→058). PARAR de construir y usar Hour con la difusión real ~1 mes. El veredicto es de Marco, no de código. (ADR-060 = primer feedback del gate ya incorporado.)
+- [ ] Deploy conjunto ADR-059 (coherencia visual) + ADR-060 (home projects-first): verificados en local (svelte-check 0/0 · unit 110/110 · e2e 15/15 local · collab 2/2 prod pre-060), pendiente revisión de Marco en dev + `pnpm run deploy`
 
 ## Deferred
 - [ ] Phase 0.4 polish — mobile completo (Plaza→pins/Calendar/Money + line detail), ⌘K, notifications in-app, GDPR export, a11y pass, checkpoint visual 2, ratificación naming @from:2026-08-01
@@ -29,6 +29,7 @@
 - [ ] Purgar persona huérfana de test `019f2f03-f1f2-71a0-9e1f-9c8c9cf331c8` (soft-delete por SQL, no molesta) @shelf
 
 ## Trace
+- [x] Home projects-first (2026-07-12 noche 2, ADR-060): grid de projects pineados-primero con espacio como chip de contexto (muere el par Pinned/All-spaces), pin `p:<projectId>` (resolveScope con projectIndex, unión projectIds, narrowing línea-exacta conservado), ScopeStrip con picker en árbol espacio→projects→líneas, ⌘K grupo Projects, orden por actividad (updated_at del project miente), fix slug×workspace en project/line detail, fetchJSON compartido en project detail. Unit 110/110 (+nav.test) · e2e 15/15 local · capturas OK
 - [x] Pasada de coherencia visual COMPLETA (2026-07-12 noche, ADR-059): audit 8 lentes → 42 hallazgos → 41 aplicados / 1 a Shelf (F33). Sistémicos: neutralizado el padding de `<section>` global dentro del shell (~200px de vacíos por página fuera), escala de sombras re-derivada para dark (chips/badges/avatars/toasts ya no brillan blancos), contrato de tonos de StateBadge reactivado (estaba muerto — todos los badges grises), un solo skin de campo (--field-*), --h1 real + mastheads unificados, 2 registros de ancho de página, chips sticky del line detail con --header-height verdadero (3.6rem, ya no estimación), grammar único de empty states, F14 tabla contacts cabe en el módulo (caps cqi). Dedup Shelf graduado: AccentSwatchPicker componente, $lib/money (fmtFee/fmtMoney/invoiceTone), .eyebrow--sub, .link-arrow, .creator, .pill--mono, .table-wrap en base.css. Copy: placeholder engagement honesto, stubs de project con lines reales (F05), jerga de fases/ADR fuera de la UI. Checkpoint visual del line detail: cerrado (offsets true-by-construction + densidad arreglada).
 - [x] Review adversarial COMPLETO en re-run (5 lentes, 33 agentes): 20 confirmados / 8 refutados. Aplicados: preset del dialog gana en contextos bloqueados (HIGH — gig en line equivocada al navegar entre lines), invalidaciones line-stats/fees, create_line v3 (reserved-slug "Booking" + cap 57 chars, migración aplicada), 23505→409 en POST /api/lines, materials GET/DELETE alineados, preflight de notes con retry, guards anti-mistarget en engagement-write.spec, finally en la suite RLS. Aceptados y documentados: expenses módulo-only, cross-currency, duplicaciones filosofía (Shelf)
 - [x] Producción desbloqueada y completada (2026-07-12, tarde): 6 migraciones aplicadas + verificadas (backfill 154, grants limpios), db-types regenerado, deploys hour-collab → hour-web, suite contra prod unit 100/100 · RLS 38/38 · **e2e 17/17 sin retries**, smoke collab line (snapshot + notes materializadas)

@@ -1,29 +1,49 @@
 <script lang="ts">
   /**
-   * ⌘K command palette (Adaptive Digest) — makes every line and space
-   * addressable in one hop. A flat index: lines first (that's the work),
-   * spaces after. Type, arrow, enter. Installs the global ⌘K / Escape
-   * shortcut itself; the shell also opens it from the top-bar search box
-   * (bindable `open`). Navigation decisions live in the parent via the
-   * onPick callbacks, so this component stays about search + keyboard.
+   * ⌘K command palette (Adaptive Digest) — makes every line, project and
+   * space addressable in one hop. A flat index: lines first (that's the
+   * work), projects (the shows) after, spaces last. Type, arrow, enter.
+   * Installs the global ⌘K / Escape shortcut itself; the shell also opens
+   * it from the top-bar search box (bindable `open`). Navigation decisions
+   * live in the parent via the onPick callbacks, so this component stays
+   * about search + keyboard.
    */
 
   import { createQuery } from '@tanstack/svelte-query';
   import { tick } from 'svelte';
-  import { workspacesQueryOptions, allLinesQueryOptions } from '$lib/nav-queries';
-  import { buildLineIndex, type NavLine, type NavWorkspace } from '$lib/nav';
+  import {
+    workspacesQueryOptions,
+    activeProjectsQueryOptions,
+    allLinesQueryOptions,
+  } from '$lib/nav-queries';
+  import {
+    buildLineIndex,
+    buildProjectIndex,
+    type NavLine,
+    type NavProject,
+    type NavWorkspace,
+  } from '$lib/nav';
   import { lineKindGlyph, lineKindLabel } from '$lib/utils/line-kind';
 
   interface Props {
     open: boolean;
     onPickLine: (line: NavLine) => void;
+    onPickProject: (project: NavProject) => void;
     onPickSpace: (ws: NavWorkspace) => void;
     onPickView: (view: 'agenda' | 'calendar' | 'contacts' | 'money') => void;
     onPickAction: (action: CreateAction) => void;
   }
-  let { open = $bindable(), onPickLine, onPickSpace, onPickView, onPickAction }: Props = $props();
+  let {
+    open = $bindable(),
+    onPickLine,
+    onPickProject,
+    onPickSpace,
+    onPickView,
+    onPickAction,
+  }: Props = $props();
 
   const workspacesQuery = createQuery(workspacesQueryOptions());
+  const projectsQuery = createQuery(activeProjectsQueryOptions());
   const linesQuery = createQuery(allLinesQueryOptions());
 
   let query = $state('');
@@ -31,15 +51,17 @@
   let inputEl = $state<HTMLInputElement | null>(null);
 
   let workspaces = $derived($workspacesQuery.data?.items ?? []);
+  let projectIndex = $derived(buildProjectIndex(workspaces, $projectsQuery.data?.items ?? []));
   let lineIndex = $derived(buildLineIndex(workspaces, $linesQuery.data?.items ?? []));
 
   type ViewTarget = 'agenda' | 'calendar' | 'contacts' | 'money';
   type CreateAction = 'new-line' | 'new-project' | 'new-space';
   type ViewItem = { type: 'view'; id: string; target: ViewTarget; name: string };
   type LineItem = { type: 'line'; id: string; line: NavLine };
+  type ProjectItem = { type: 'project'; id: string; project: NavProject };
   type SpaceItem = { type: 'space'; id: string; ws: NavWorkspace };
   type ActionItem = { type: 'action'; id: string; action: CreateAction; name: string };
-  type Item = ViewItem | LineItem | SpaceItem | ActionItem;
+  type Item = ViewItem | LineItem | ProjectItem | SpaceItem | ActionItem;
 
   const VIEW_ITEMS: ViewItem[] = [
     { type: 'view', id: 'v:agenda', target: 'agenda', name: 'Agenda' },
@@ -77,15 +99,32 @@
         it.line.kind.includes(q),
     );
   });
+  let projectResults = $derived.by<ProjectItem[]>(() => {
+    const q = query.trim().toLowerCase();
+    const projects: ProjectItem[] = projectIndex.map((project) => ({
+      type: 'project',
+      id: `p:${project.id}`,
+      project,
+    }));
+    if (!q) return projects;
+    return projects.filter(
+      (it) =>
+        it.project.name.toLowerCase().includes(q) ||
+        it.project.slug.includes(q) ||
+        it.project.workspaceName.toLowerCase().includes(q),
+    );
+  });
   let spaceResults = $derived.by<SpaceItem[]>(() => {
     const q = query.trim().toLowerCase();
     const spaces: SpaceItem[] = workspaces.map((ws) => ({ type: 'space', id: `s:${ws.slug}`, ws }));
     if (!q) return spaces;
     return spaces.filter((it) => it.ws.name.toLowerCase().includes(q) || it.ws.slug.includes(q));
   });
-  // Lines first — they're the work. Views then actions last (quick jumps).
+  // Lines first — they're the work. Projects (the shows), then spaces.
+  // Views then actions last (quick jumps).
   let ordered = $derived<Item[]>([
     ...lineResults,
+    ...projectResults,
     ...spaceResults,
     ...viewResults,
     ...actionResults,
@@ -116,6 +155,7 @@
 
   function pick(it: Item) {
     if (it.type === 'line') onPickLine(it.line);
+    else if (it.type === 'project') onPickProject(it.project);
     else if (it.type === 'space') onPickSpace(it.ws);
     else if (it.type === 'action') onPickAction(it.action);
     else onPickView(it.target);
@@ -143,7 +183,7 @@
     role="presentation"
     onmousedown={() => (open = false)}
   >
-    <div class="cmdk" role="dialog" aria-modal="true" aria-label="Jump to a line or space" tabindex={-1} onmousedown={(e) => e.stopPropagation()}>
+    <div class="cmdk" role="dialog" aria-modal="true" aria-label="Jump to a project, line or space" tabindex={-1} onmousedown={(e) => e.stopPropagation()}>
       <div class="cmdk__search">
         <svg viewBox="0 0 14 14" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true">
           <circle cx="6.2" cy="6.2" r="4.2" />
@@ -153,8 +193,8 @@
           bind:this={inputEl}
           bind:value={query}
           type="text"
-          placeholder="Jump to a line or space…"
-          aria-label="Search lines and spaces"
+          placeholder="Jump to a project, line or space…"
+          aria-label="Search projects, lines and spaces"
           oninput={() => (sel = 0)}
           onkeydown={onInputKey}
         />
@@ -187,10 +227,35 @@
             </button>
           {/each}
         {/if}
+        {#if projectResults.length > 0}
+          <p class="cmdk__group">Projects — the shows</p>
+          {#each projectResults as it, i (it.id)}
+            {@const idx = lineResults.length + i}
+            <button
+              type="button"
+              class="cmdk__row"
+              class:cmdk__row--on={idx === sel}
+              role="option"
+              aria-selected={idx === sel}
+              onmouseenter={() => (sel = idx)}
+              onclick={() => pick(it)}
+            >
+              <span class="cmdk__glyph cmdk__glyph--space" style={`--c: ${it.project.accent}`}>
+                <span class="cmdk__dot cmdk__dot--accent"></span>
+              </span>
+              <span class="cmdk__name">{it.project.name}</span>
+              <span class="cmdk__ctx">
+                <span class="cmdk__kind">project</span>
+                <span class="cmdk__in">{it.project.workspaceName}</span>
+              </span>
+              <span class="cmdk__enter" aria-hidden="true">↵</span>
+            </button>
+          {/each}
+        {/if}
         {#if spaceResults.length > 0}
           <p class="cmdk__group">Spaces</p>
           {#each spaceResults as it, i (it.id)}
-            {@const idx = lineResults.length + i}
+            {@const idx = lineResults.length + projectResults.length + i}
             <button
               type="button"
               class="cmdk__row"
@@ -212,7 +277,7 @@
         {#if viewResults.length > 0}
           <p class="cmdk__group">Views</p>
           {#each viewResults as it, i (it.id)}
-            {@const idx = lineResults.length + spaceResults.length + i}
+            {@const idx = lineResults.length + projectResults.length + spaceResults.length + i}
             <button
               type="button"
               class="cmdk__row"
@@ -232,7 +297,7 @@
         {#if actionResults.length > 0}
           <p class="cmdk__group">New</p>
           {#each actionResults as it, i (it.id)}
-            {@const idx = lineResults.length + spaceResults.length + viewResults.length + i}
+            {@const idx = lineResults.length + projectResults.length + spaceResults.length + viewResults.length + i}
             <button
               type="button"
               class="cmdk__row"
@@ -358,6 +423,10 @@
     block-size: 0.5rem;
     border-radius: var(--radius-circle);
     background: var(--text-faint);
+  }
+  /* Project rows carry their space's accent on the dot. */
+  .cmdk__dot--accent {
+    background: var(--c, var(--text-faint));
   }
   .cmdk__plus {
     font-size: var(--text-m);

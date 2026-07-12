@@ -2,39 +2,54 @@
   /**
    * Scope strip (Adaptive Digest) — the pins row + "Pin" picker. Shared
    * across Today / Calendar / Money so scope stays consistent wherever you
-   * are. A pin is a whole space (workspace) or a single line. Clicking a
-   * line pin opens its workbench; × unpins. The picker lists spaces, each
-   * expandable to pin one of its lines.
+   * are. A pin is a whole space (workspace), a project (the show) or a
+   * single line. Clicking a project pin opens its detail, a line pin its
+   * workbench; × unpins. The picker lists spaces, each expandable to its
+   * projects and their lines — click a row to pin it.
    */
 
   import { createQuery } from '@tanstack/svelte-query';
-  import { workspacesQueryOptions, allLinesQueryOptions } from '$lib/nav-queries';
-  import { buildLineIndex, type NavLine, type NavWorkspace } from '$lib/nav';
-  import { usePins, spacePin, linePin } from '$lib/stores/pins.svelte';
+  import {
+    workspacesQueryOptions,
+    activeProjectsQueryOptions,
+    allLinesQueryOptions,
+  } from '$lib/nav-queries';
+  import {
+    buildLineIndex,
+    buildProjectIndex,
+    type NavLine,
+    type NavProject,
+    type NavWorkspace,
+  } from '$lib/nav';
+  import { usePins, spacePin, projectPin, linePin } from '$lib/stores/pins.svelte';
   import { lineKindGlyph, lineKindLabel } from '$lib/utils/line-kind';
   import { accentVar } from '$lib/utils/accent';
 
   interface Props {
     onOpenLine: (line: NavLine) => void;
+    onOpenProject?: (project: NavProject) => void;
     compact?: boolean;
   }
-  let { onOpenLine, compact = false }: Props = $props();
+  let { onOpenLine, onOpenProject, compact = false }: Props = $props();
 
   const pins = usePins();
   const workspacesQuery = createQuery(workspacesQueryOptions());
+  const projectsQuery = createQuery(activeProjectsQueryOptions());
   const linesQuery = createQuery(allLinesQueryOptions());
 
   let workspaces = $derived<NavWorkspace[]>($workspacesQuery.data?.items ?? []);
+  let projectIndex = $derived(buildProjectIndex(workspaces, $projectsQuery.data?.items ?? []));
   let lineIndex = $derived(buildLineIndex(workspaces, $linesQuery.data?.items ?? []));
   let wsBySlug = $derived(new Map(workspaces.map((w) => [w.slug, w])));
+  let projectById = $derived(new Map(projectIndex.map((p) => [p.id, p])));
   let lineById = $derived(new Map(lineIndex.map((l) => [l.id, l])));
 
   // Scope is "everything" when nothing is pinned (the natural default) OR when
-  // every space is pinned with no line filter — both mean "all spaces". In
-  // that case the strip collapses to a single "All spaces" pill.
+  // every space is pinned with no project/line filter — both mean "all
+  // spaces". In that case the strip collapses to a single "All spaces" pill.
   let isEverything = $derived.by(() => {
     if (pins.pins.length === 0) return true;
-    if (pins.lineIds().length > 0) return false;
+    if (pins.projectIds().length > 0 || pins.lineIds().length > 0) return false;
     return workspaces.length > 0 && workspaces.every((w) => pins.has(spacePin(w.slug)));
   });
 
@@ -45,6 +60,7 @@
   // Chip descriptors resolved from the current pins.
   type Chip =
     | { pin: string; kind: 'space'; name: string; accent: string }
+    | { pin: string; kind: 'project'; name: string; space: string; accent: string; project: NavProject }
     | { pin: string; kind: 'line'; name: string; project: string; accent: string; line: NavLine };
   let chips = $derived.by<Chip[]>(() => {
     const out: Chip[] = [];
@@ -52,6 +68,17 @@
       if (pin.startsWith('s:')) {
         const ws = wsBySlug.get(pin.slice(2));
         if (ws) out.push({ pin, kind: 'space', name: ws.name, accent: accentVar(ws.slug) });
+      } else if (pin.startsWith('p:')) {
+        const project = projectById.get(pin.slice(2));
+        if (project)
+          out.push({
+            pin,
+            kind: 'project',
+            name: project.name,
+            space: project.workspaceName,
+            accent: project.accent,
+            project,
+          });
       } else {
         const line = lineById.get(pin.slice(2));
         if (line) out.push({ pin, kind: 'line', name: line.name, project: line.projectName, accent: line.accent, line });
@@ -76,13 +103,21 @@
     pickerOpen = false;
     expandedWs = null;
   }
+  function pinProject(project: NavProject) {
+    pins.add(projectPin(project.id));
+    pickerOpen = false;
+    expandedWs = null;
+  }
   function pinLine(line: NavLine) {
     pins.add(linePin(line.id));
     pickerOpen = false;
     expandedWs = null;
   }
-  function linesFor(wsId: string): NavLine[] {
-    return lineIndex.filter((l) => l.workspaceId === wsId);
+  function projectsFor(wsId: string): NavProject[] {
+    return projectIndex.filter((p) => p.workspaceId === wsId);
+  }
+  function linesFor(projectId: string): NavLine[] {
+    return lineIndex.filter((l) => l.projectId === projectId);
   }
 </script>
 
@@ -93,12 +128,17 @@
         type="button"
         class="scope__pin"
         style={`--c: ${chip.accent}`}
-        onclick={() => chip.kind === 'line' && onOpenLine(chip.line)}
-        title={chip.kind === 'line' ? `Open ${chip.name}` : chip.name}
+        onclick={() => {
+          if (chip.kind === 'line') onOpenLine(chip.line);
+          else if (chip.kind === 'project') onOpenProject?.(chip.project);
+        }}
+        title={chip.kind === 'space' ? chip.name : `Open ${chip.name}`}
       >
         <span class="scope__dot" aria-hidden="true"></span>
         {#if chip.kind === 'line'}
           {chip.project} <span class="scope__pin-sub">· {chip.name}</span>
+        {:else if chip.kind === 'project'}
+          {chip.name} <span class="scope__pin-sub">· {chip.space}</span>
         {:else}
           {chip.name}
         {/if}
@@ -146,7 +186,7 @@
     {/if}
     {#if pickerOpen}
       <div class="pop" role="menu">
-        <p class="pop__label">Bring forward — space or line</p>
+        <p class="pop__label">Bring forward — space, project or line</p>
         <div class="pop__list">
           {#each workspaces as ws (ws.id)}
             {@const expanded = expandedWs === ws.id}
@@ -159,7 +199,7 @@
                   type="button"
                   class="pop__chev"
                   class:pop__chev--on={expanded}
-                  aria-label={expanded ? 'Hide lines' : 'Show lines'}
+                  aria-label={expanded ? 'Hide projects' : 'Show projects'}
                   onclick={() => (expandedWs = expanded ? null : ws.id)}
                 >
                   <svg viewBox="0 0 12 12" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
@@ -168,15 +208,26 @@
                 </button>
               </div>
               {#if expanded}
-                <div class="pop__lines">
-                  {#each linesFor(ws.id) as line (line.id)}
-                    <button type="button" class="pop__line" onclick={() => pinLine(line)}>
-                      <span class="pop__line-g">{lineKindGlyph(line.kind)}</span>
-                      <span class="pop__line-n">{line.name}</span>
-                      <span class="pop__line-k">{lineKindLabel(line.kind)}</span>
+                <div class="pop__projects">
+                  {#each projectsFor(ws.id) as project (project.id)}
+                    <button
+                      type="button"
+                      class="pop__project"
+                      title={`Pin ${project.name}`}
+                      onclick={() => pinProject(project)}
+                    >
+                      <span class="pop__project-n">{project.name}</span>
+                      <span class="pop__line-k">project</span>
                     </button>
+                    {#each linesFor(project.id) as line (line.id)}
+                      <button type="button" class="pop__line" title={`Pin ${line.name}`} onclick={() => pinLine(line)}>
+                        <span class="pop__line-g">{lineKindGlyph(line.kind)}</span>
+                        <span class="pop__line-n">{line.name}</span>
+                        <span class="pop__line-k">{lineKindLabel(line.kind)}</span>
+                      </button>
+                    {/each}
                   {:else}
-                    <p class="pop__empty">No lines in this space yet.</p>
+                    <p class="pop__empty">No projects in this space yet.</p>
                   {/each}
                 </div>
               {/if}
@@ -386,10 +437,12 @@
     transform: rotate(180deg);
     color: var(--text-color);
   }
-  .pop__lines {
+  .pop__projects {
     padding-block: var(--space-2xs) var(--space-s);
     padding-inline-start: calc(var(--space-l) + var(--space-s));
+    padding-inline-end: var(--space-s);
   }
+  .pop__project,
   .pop__line {
     display: flex;
     align-items: center;
@@ -404,8 +457,23 @@
     cursor: pointer;
     font-family: inherit;
   }
+  /* Lines sit one level under their project. */
+  .pop__line {
+    padding-inline-start: calc(var(--space-s) + var(--space-l));
+  }
+  .pop__project:hover,
   .pop__line:hover {
     background: var(--bg-hover);
+  }
+  .pop__project-n {
+    flex: 1;
+    min-inline-size: 0;
+    font-size: var(--text-s);
+    font-weight: 500;
+    color: var(--text-color);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .pop__line-g {
     inline-size: var(--space-m);

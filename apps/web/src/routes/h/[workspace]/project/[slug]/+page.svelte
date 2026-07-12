@@ -1,67 +1,32 @@
 <script lang="ts">
   /**
-   * Project detail (legacy URL: /h/[workspace]/project/[slug]/) — Phase 0.1.
+   * Project detail — /h/[workspace]/project/[slug]/ — Phase 0.1 surface.
    *
    * Editorial v0.5 layout: kicker + display serif title + mono meta line,
    * Relationships block (engagements), and dashed deferred-phase stubs
    * (Lines, Assets, Team).
    *
-   * Display name shares the projects TanStack cache with Plaza, so arriving
-   * from the sidebar costs no extra fetch.
+   * Shares the ['projects', { status: 'active' }] cache the shell warms, so
+   * arriving from the home grid or ⌘K costs no extra fetch. Resolution is
+   * slug + workspace — project slugs are only unique per workspace
+   * (ADR-024), so slug alone could hit the wrong space's project.
    */
 
   import { page } from '$app/state';
   import { createQuery } from '@tanstack/svelte-query';
-  import { allLinesQueryOptions } from '$lib/nav-queries';
-  import { goto } from '$app/navigation';
+  import {
+    workspacesQueryOptions,
+    activeProjectsQueryOptions,
+    allLinesQueryOptions,
+  } from '$lib/nav-queries';
   import { accentVar, accentVarFor } from '$lib/utils/accent';
   import RelationshipStub from '$lib/components/RelationshipStub.svelte';
   import StateBadge from '$lib/components/StateBadge.svelte';
   import YNotes from '$lib/components/YNotes.svelte';
   import { dayMonthYear } from '$lib/datetime';
 
-  type Project = {
-    id: string;
-    slug: string;
-    name: string;
-    status: 'draft' | 'active' | 'archived';
-    workspace_id: string;
-    starts_on: string | null;
-    ends_on: string | null;
-    updated_at: string;
-    accent?: string | null;
-    description?: string | null;
-  };
-
-  function clearAuthAndBounce() {
-    localStorage.removeItem('hour_jwt');
-    localStorage.removeItem('hour_refresh');
-    localStorage.removeItem('hour_expires_at');
-    goto('/login', { replaceState: true });
-  }
-
-  async function fetchJSON<T>(url: string, signal: AbortSignal): Promise<T> {
-    const jwt = localStorage.getItem('hour_jwt');
-    if (!jwt) {
-      clearAuthAndBounce();
-      throw new Error('Missing JWT');
-    }
-    const res = await fetch(url, { signal, headers: { Authorization: `Bearer ${jwt}` } });
-    if (res.status === 401) {
-      clearAuthAndBounce();
-      throw new Error('Unauthorized');
-    }
-    if (!res.ok) {
-      throw new Error(`Error ${res.status}`);
-    }
-    return (await res.json()) as T;
-  }
-
-  const projectsQuery = createQuery({
-    queryKey: ['projects', { status: 'active' }],
-    queryFn: ({ signal }: { signal: AbortSignal }) =>
-      fetchJSON<{ items: Project[] }>('/api/projects?status=active', signal),
-  });
+  const workspacesQuery = createQuery(workspacesQueryOptions());
+  const projectsQuery = createQuery(activeProjectsQueryOptions());
 
   // Lines of this project — shares the ['lines','all'] cache the shell warms.
   const linesQuery = createQuery(allLinesQueryOptions());
@@ -69,12 +34,21 @@
   let workspaceSlug = $derived(page.params.workspace ?? '');
   let projectSlug = $derived(page.params.slug ?? '');
 
+  let workspaceId = $derived(
+    $workspacesQuery.data?.items.find((w) => w.slug === workspaceSlug)?.id ?? null,
+  );
   let project = $derived(
-    $projectsQuery.data?.items.find((r) => r.slug === projectSlug) ?? null,
+    workspaceId
+      ? ($projectsQuery.data?.items.find(
+          (r) => r.slug === projectSlug && r.workspace_id === workspaceId,
+        ) ?? null)
+      : null,
   );
 
   let displayName = $derived(project?.name ?? projectSlug);
-  let projectLoading = $derived($projectsQuery.isPending && !project);
+  let projectLoading = $derived(
+    ($projectsQuery.isPending || $workspacesQuery.isPending) && !project,
+  );
 
   let statusTone = $derived.by<'success' | 'warning' | 'faint' | 'neutral'>(() => {
     if (!project) return 'neutral';
@@ -83,8 +57,9 @@
     return 'faint';
   });
 
+  // Filter by resolved project id, not slug — slugs repeat across workspaces.
   let projectLines = $derived(
-    ($linesQuery.data?.items ?? []).filter((l) => l.project?.slug === projectSlug),
+    project ? ($linesQuery.data?.items ?? []).filter((l) => l.project?.id === project.id) : [],
   );
 
   function formatDate(iso: string | null): string {

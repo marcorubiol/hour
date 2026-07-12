@@ -28,45 +28,52 @@
   import { usePins } from '$lib/stores/pins.svelte';
   import {
     buildLineIndex,
+    buildProjectIndex,
     resolveScope,
     lineUrl,
+    projectUrl,
     type NavLine,
+    type NavProject,
     type NavWorkspace,
     type RawLine,
+    type RawProject,
   } from '$lib/nav';
-  import { workspacesQueryOptions, allLinesQueryOptions } from '$lib/nav-queries';
-
-  type ProjectLite = { id: string; slug: string; name?: string; workspace_id: string };
+  import {
+    workspacesQueryOptions,
+    activeProjectsQueryOptions,
+    allLinesQueryOptions,
+  } from '$lib/nav-queries';
 
   const pins = usePins();
 
   const workspacesQuery = createQuery(workspacesQueryOptions());
   const linesQuery = createQuery(allLinesQueryOptions());
-  const projectsQuery = createQuery({
-    queryKey: ['projects', { status: 'active' }],
-    queryFn: ({ signal }: { signal: AbortSignal }) =>
-      fetchJSON<{ items: ProjectLite[] }>('/api/projects?status=active', signal),
-  });
+  const projectsQuery = createQuery(activeProjectsQueryOptions());
 
   let workspaces = $derived<NavWorkspace[]>($workspacesQuery.data?.items ?? []);
 
   // ── Pins → scope (Adaptive Digest) ────────────────────────────────────
+  let projectIndex = $derived(buildProjectIndex(workspaces, $projectsQuery.data?.items ?? []));
   let lineIndex = $derived(buildLineIndex(workspaces, ($linesQuery.data?.items as RawLine[]) ?? []));
-  let scope = $derived(resolveScope(pins.pins, workspaces, lineIndex));
-  // A line pin scopes engagements through its project (they carry no line_id);
-  // the endpoint filters by project_ids ∪ workspace_ids.
+  let scope = $derived(resolveScope(pins.pins, workspaces, lineIndex, projectIndex));
+  // Project pins scope directly; a line pin scopes engagements through its
+  // project. The endpoint filters by project_ids ∪ workspace_ids.
   let filterIds = $derived({
-    projectIds: [...new Set(scope.lines.map((l) => l.projectId))],
+    projectIds: scope.projectIds,
     workspaceIds: scope.workspaceIds,
   });
-  // Hold the feed while line pins exist but the lines cache hasn't resolved
-  // them yet (avoids flashing the unscoped everything-view).
+  // Hold the feed while project/line pins exist but their caches haven't
+  // resolved them yet (avoids flashing the unscoped everything-view).
   let scopeUnresolved = $derived(
-    pins.lineIds().length > 0 && scope.lines.length !== pins.lineIds().length,
+    (pins.lineIds().length > 0 && scope.lines.length !== pins.lineIds().length) ||
+      (pins.projectIds().length > 0 && scope.projects.length !== pins.projectIds().length),
   );
 
   function openLine(line: NavLine) {
     void goto(lineUrl(line));
+  }
+  function openProject(project: NavProject) {
+    void goto(projectUrl(project));
   }
 
   // Debounced search — the raw input updates instantly, the query key
@@ -115,7 +122,7 @@
   let aNextAt = $state('');
   let aNextNote = $state('');
 
-  let allProjects = $derived<ProjectLite[]>($projectsQuery.data?.items ?? []);
+  let allProjects = $derived<RawProject[]>($projectsQuery.data?.items ?? []);
   // Projects grouped under the space (workspace) they belong to — the picker
   // reads as "which spaces (and which project inside them)".
   let projectGroups = $derived.by(() => {
@@ -282,7 +289,7 @@
 <section class="contacts">
   <header class="contacts__head">
     <p class="eyebrow">Contacts</p>
-    <ScopeStrip onOpenLine={openLine} compact />
+    <ScopeStrip onOpenLine={openLine} onOpenProject={openProject} compact />
     <div class="contacts__controls">
       <div class="contacts__search">
         <Input

@@ -5,12 +5,12 @@
    * travel days, residencies, press — timestamptz, bucketed into the
    * viewer's day; all-day rows keep their stored date).
    *
-   * PINS are the filter (ADR-057): events come from the union of pinned
-   * spaces/lines, or everything RLS allows when nothing is pinned (the
-   * [workspace] URL segment is browsing context, not a filter, per
-   * ADR-039). While pins exist but haven't resolved to ids yet (caches
-   * loading), the feed stays disabled rather than silently fetching
-   * unfiltered.
+   * PINS are the filter (ADR-057; projects ADR-060): events come from the
+   * union of pinned spaces/projects/lines, or everything RLS allows when
+   * nothing is pinned (the [workspace] URL segment is browsing context,
+   * not a filter, per ADR-039). While pins exist but haven't resolved to
+   * ids yet (caches loading), the feed stays disabled rather than silently
+   * fetching unfiltered.
    *
    * The page owns the feeds, the pins scoping, and the Feed/ICS dialog;
    * MonthGrid renders the grid, PerformanceCreateDialog owns creation.
@@ -42,13 +42,16 @@
   import { usePins } from '$lib/stores/pins.svelte';
   import {
     buildLineIndex,
+    buildProjectIndex,
     resolveScope,
     lineUrl,
+    projectUrl,
     type NavLine,
+    type NavProject,
     type NavWorkspace,
     type RawLine,
   } from '$lib/nav';
-  import { allLinesQueryOptions } from '$lib/nav-queries';
+  import { activeProjectsQueryOptions, allLinesQueryOptions } from '$lib/nav-queries';
   import { addDaysIso, addMonths, dayKeyInTz, monthGrid } from '$lib/calendar';
 
   type WorkspaceLite = { id: string; slug: string; name: string };
@@ -70,6 +73,7 @@
     queryFn: ({ signal }: { signal: AbortSignal }) =>
       fetchJSON<{ items: WorkspaceLite[] }>('/api/workspaces', signal),
   });
+  const projectsQuery = createQuery(activeProjectsQueryOptions());
   const linesQuery = createQuery(allLinesQueryOptions());
 
   let workspacesBySlug = $derived(
@@ -79,25 +83,32 @@
     new Map(($workspacesQuery.data?.items ?? []).map((w) => [w.id, w.slug])),
   );
 
+  let projectIndex = $derived(
+    buildProjectIndex(($workspacesQuery.data?.items ?? []) as NavWorkspace[], $projectsQuery.data?.items ?? []),
+  );
   let lineIndex = $derived(
     buildLineIndex(($workspacesQuery.data?.items ?? []) as NavWorkspace[], ($linesQuery.data?.items as RawLine[]) ?? []),
   );
-  let scope = $derived(resolveScope(pins.pins, ($workspacesQuery.data?.items ?? []) as NavWorkspace[], lineIndex));
-  // Line pins scope through their project (the endpoint filters by
-  // project_ids ∪ workspace_ids); the exact-line narrowing happens client-side.
-  let linePinProjectIds = $derived(new Set(scope.lines.map((l) => l.projectId)));
+  let scope = $derived(resolveScope(pins.pins, ($workspacesQuery.data?.items ?? []) as NavWorkspace[], lineIndex, projectIndex));
+  // Project and line pins scope through project ids (the endpoint filters
+  // by project_ids ∪ workspace_ids); the exact-line narrowing happens
+  // client-side.
   let filterIds = $derived({
-    projectIds: [...linePinProjectIds],
+    projectIds: scope.projectIds,
     workspaceIds: scope.workspaceIds,
   });
-  // Hold the feed while line pins exist but the lines cache hasn't resolved
-  // them yet (avoids flashing the unscoped everything-view).
+  // Hold the feed while project/line pins exist but their caches haven't
+  // resolved them yet (avoids flashing the unscoped everything-view).
   let scopeUnresolved = $derived(
-    pins.lineIds().length > 0 && scope.lines.length !== pins.lineIds().length,
+    (pins.lineIds().length > 0 && scope.lines.length !== pins.lineIds().length) ||
+      (pins.projectIds().length > 0 && scope.projects.length !== pins.projectIds().length),
   );
 
   function openLine(line: NavLine) {
     void goto(lineUrl(line));
+  }
+  function openProject(project: NavProject) {
+    void goto(projectUrl(project));
   }
 
   // ── Event feeds ──────────────────────────────────────────────────────
@@ -166,12 +177,16 @@
 
   // Exact-line narrowing: the endpoint returns the whole project of a
   // pinned line, so drop performances of that project whose line isn't the
-  // pinned one (unless their workspace is also a pinned space). Dates carry
-  // no line_id, so a line pin shows its project's dates.
+  // pinned one — unless the project itself (or its space) is also pinned,
+  // which admits the whole project. Dates carry no line_id, so project and
+  // line pins both show their project's dates.
+  let directProjectIds = $derived(new Set(scope.projects.map((p) => p.id)));
+  let scopedProjectIds = $derived(new Set(scope.projectIds));
   function perfInScope(p: PerformanceEvent): boolean {
     if (scope.isEmpty) return true;
     const ws = p.project?.workspace_id;
     if (ws && scope.workspaceIds.includes(ws)) return true;
+    if (p.project && directProjectIds.has(p.project.id)) return true;
     if (p.line_id && scope.lineIds.includes(p.line_id)) return true;
     return false;
   }
@@ -179,7 +194,7 @@
     if (scope.isEmpty) return true;
     const ws = d.project?.workspace_id;
     if (ws && scope.workspaceIds.includes(ws)) return true;
-    if (d.project && linePinProjectIds.has(d.project.id)) return true;
+    if (d.project && scopedProjectIds.has(d.project.id)) return true;
     return false;
   }
 
@@ -220,8 +235,13 @@
   let createOpen = $state(false);
   let createDate = $state<string | null>(null);
 
-  // A single pinned line pre-selects its project — and its line.
-  let presetProjectId = $derived(scope.lines.length === 1 ? scope.lines[0].projectId : null);
+  // A single pinned line pre-selects its project — and its line. With no
+  // line pins, a single pinned project pre-selects itself.
+  let presetProjectId = $derived.by(() => {
+    if (scope.lines.length === 1) return scope.lines[0].projectId;
+    if (scope.lines.length === 0 && scope.projects.length === 1) return scope.projects[0].id;
+    return null;
+  });
   let presetLineId = $derived(scope.lines.length === 1 ? scope.lines[0].id : null);
 
   function openCreate(dayIso?: string) {
@@ -319,7 +339,7 @@
 <section class="cal">
   <header class="cal__head">
     <p class="eyebrow">Calendar</p>
-    <ScopeStrip onOpenLine={openLine} compact />
+    <ScopeStrip onOpenLine={openLine} onOpenProject={openProject} compact />
     <div class="cal__nav">
       <h1 class="cal__month">{monthLabel}</h1>
       <div class="cal__nav-buttons">

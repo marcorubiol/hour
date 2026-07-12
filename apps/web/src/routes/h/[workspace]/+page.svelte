@@ -1,34 +1,45 @@
 <script lang="ts">
   /**
-   * Agenda — the Home (ADR-057 nav redesign). The logo lands here; there is
-   * no "Today"/"Home" pill (that would just repeat the logo). A single quiet
-   * column: greeting, the next-7-days agenda (capped, with a "+N more" link to
-   * the full Agenda view), and whatever the user has PINNED brought forward.
-   * Calendar and Money are the other two views of the same pinned scope,
-   * reachable from ⌘K.
+   * Agenda — the Home (ADR-057 nav redesign; projects-first grid ADR-060).
+   * The logo lands here; there is no "Today"/"Home" pill (that would just
+   * repeat the logo). A single quiet column: greeting, the next-7-days
+   * agenda (capped, with a "+N more" link to the full Agenda view), and the
+   * PROJECTS grid — every production the user can see, pinned ones first.
    *
-   * Scope: empty pins = everything the user can see; a pinned space scopes to
-   * its workspace; a pinned line scopes to its project (engagements carry no
-   * line_id yet — line scope resolves through the line's project).
+   * The project is the unit of thought (the show); the space is context on
+   * each card (mono chip + accent dot), not the container — spaces with no
+   * projects render nothing. Calendar and Money are the other views of the
+   * same pinned scope, reachable from ⌘K.
+   *
+   * Scope: empty pins = everything the user can see; a pinned space scopes
+   * to its workspace; pinned projects and lines scope through
+   * `scope.projectIds` (engagement rows are filtered by project).
    */
 
   import { page } from '$app/state';
   import { createQuery } from '@tanstack/svelte-query';
+  import { toStore } from 'svelte/store';
   import { fetchJSON } from '$lib/api';
-  import { accentVarFor } from '$lib/utils/accent';
-  import { lineKindGlyph, lineKindLabel } from '$lib/utils/line-kind';
+  import { lineKindGlyph } from '$lib/utils/line-kind';
   import { decodeJwtClaim } from '$lib/realtime';
-  import { usePins, spacePin } from '$lib/stores/pins.svelte';
+  import { usePins, projectPin, linePin } from '$lib/stores/pins.svelte';
   import { useCreation } from '$lib/stores/creation.svelte';
   import {
     buildLineIndex,
+    buildProjectIndex,
     resolveScope,
     lineUrl,
+    projectUrl,
     type NavLine,
+    type NavProject,
     type NavWorkspace,
     type RawLine,
   } from '$lib/nav';
-  import { workspacesQueryOptions, allLinesQueryOptions } from '$lib/nav-queries';
+  import {
+    workspacesQueryOptions,
+    activeProjectsQueryOptions,
+    allLinesQueryOptions,
+  } from '$lib/nav-queries';
   import ScopeStrip from '$lib/components/ScopeStrip.svelte';
   import AgendaBoard from '$lib/components/AgendaBoard.svelte';
   import { goto } from '$app/navigation';
@@ -65,6 +76,7 @@
   };
 
   const workspacesQuery = createQuery(workspacesQueryOptions());
+  const projectsQuery = createQuery(activeProjectsQueryOptions());
   const linesQuery = createQuery(allLinesQueryOptions());
   const engagementsQuery = createQuery({
     queryKey: ['engagements', 'today'],
@@ -81,18 +93,43 @@
   });
 
   let workspaces = $derived<NavWorkspace[]>($workspacesQuery.data?.items ?? []);
+  let projectIndex = $derived(buildProjectIndex(workspaces, $projectsQuery.data?.items ?? []));
   let lineIndex = $derived(buildLineIndex(workspaces, ($linesQuery.data?.items as RawLine[]) ?? []));
   let engagements = $derived<Engagement[]>($engagementsQuery.data?.items ?? []);
   let performances = $derived<Performance[]>($performancesQuery.data?.items ?? []);
 
+  // Conversations per project — the card's honest activity number. One
+  // count-only request per visible project (exact `total`, no rows).
+  const engTotalsOptions = toStore(() => {
+    const ids = projectIndex.map((p) => p.id);
+    return {
+      queryKey: ['project-eng-totals', ids] as const,
+      enabled: ids.length > 0,
+      queryFn: async ({ signal }: { signal: AbortSignal }): Promise<Record<string, number>> => {
+        const entries = await Promise.all(
+          ids.map(async (id) => {
+            const r = await fetchJSON<{ total: number }>(
+              `/api/engagements?project_ids=${id}&status=any&limit=1`,
+              signal,
+            );
+            return [id, r.total] as const;
+          }),
+        );
+        return Object.fromEntries(entries);
+      },
+    };
+  });
+  const engTotalsQuery = createQuery(engTotalsOptions);
+  let engTotals = $derived<Record<string, number>>($engTotalsQuery.data ?? {});
+
   // ── Scope resolution ──────────────────────────────────────────────────
-  let scope = $derived(resolveScope(pins.pins, workspaces, lineIndex));
-  let pinnedProjectIds = $derived(new Set(scope.lines.map((l) => l.projectId)));
+  let scope = $derived(resolveScope(pins.pins, workspaces, lineIndex, projectIndex));
+  let scopedProjectIds = $derived(new Set(scope.projectIds));
 
   function engInScope(e: Engagement): boolean {
     if (scope.isEmpty) return true;
     if (scope.workspaceIds.includes(e.workspace_id)) return true;
-    if (e.project && pinnedProjectIds.has(e.project.id)) return true;
+    if (e.project && scopedProjectIds.has(e.project.id)) return true;
     return false;
   }
   let scopedEngagements = $derived(engagements.filter(engInScope));
@@ -133,12 +170,12 @@
     return personal ? (personal.name.split(/\s+/)[0] ?? personal.name) : 'there';
   });
 
-  // ── Pinned panels ─────────────────────────────────────────────────────
+  // ── Project cards ─────────────────────────────────────────────────────
   function perfsForLine(lineId: string): Performance[] {
     return performances.filter((p) => p.line_id === lineId);
   }
-  function perfsForWorkspace(wsId: string): Performance[] {
-    return performances.filter((p) => p.project?.workspace_id === wsId);
+  function perfsForProject(projectId: string): Performance[] {
+    return performances.filter((p) => p.project?.id === projectId);
   }
   function statOf(list: Performance[]) {
     const confirmed = list.filter((p) => ['confirmed', 'done', 'invoiced', 'paid'].includes(p.status)).length;
@@ -154,31 +191,49 @@
     if (st.holds) parts.push(st.holds === 1 ? '1 hold' : `${st.holds} holds`);
     return parts.join(' · ');
   }
-
-  type PinnedUnit =
-    | { kind: 'line'; pin: string; line: NavLine }
-    | { kind: 'space'; pin: string; ws: NavWorkspace };
-  let pinnedUnits = $derived.by<PinnedUnit[]>(() => {
-    const out: PinnedUnit[] = [];
-    const lineById = new Map(lineIndex.map((l) => [l.id, l]));
-    const wsBySlug = new Map(workspaces.map((w) => [w.slug, w]));
-    for (const pin of pins.pins) {
-      if (pin.startsWith('l:')) {
-        const line = lineById.get(pin.slice(2));
-        if (line) out.push({ kind: 'line', pin, line });
-      } else {
-        const ws = wsBySlug.get(pin.slice(2));
-        if (ws) out.push({ kind: 'space', pin, ws });
-      }
-    }
-    return out;
-  });
-  function linesOfWorkspace(wsId: string): NavLine[] {
-    return lineIndex.filter((l) => l.workspaceId === wsId);
+  /** Card stat: conversations (exact count) + confirmed/holds (upcoming
+   *  performances). Zeros are omitted, never fabricated. */
+  function projectStatLabel(project: NavProject): string {
+    const parts: string[] = [];
+    const conv = engTotals[project.id];
+    if (conv) parts.push(conv === 1 ? '1 conversation' : `${conv} conversations`);
+    const st = statOf(perfsForProject(project.id));
+    if (st.confirmed) parts.push(`${st.confirmed} confirmed`);
+    if (st.holds) parts.push(st.holds === 1 ? '1 hold' : `${st.holds} holds`);
+    return parts.join(' · ');
   }
+
+  function linesOfProject(projectId: string): NavLine[] {
+    return lineIndex.filter((l) => l.projectId === projectId);
+  }
+
+  // Pinned first; a project holding a pinned line floats too (you pinned
+  // something you live in — its show comes forward). Within a rank, busiest
+  // first — project.updated_at (the API order) goes stale because working
+  // the show touches engagements/lines, never the project row. Sort is
+  // stable, so zero-activity ties keep the API order.
+  let pinnedLineProjectIds = $derived(new Set(scope.lines.map((l) => l.projectId)));
+  function pinRank(p: NavProject): number {
+    if (pins.has(projectPin(p.id))) return 0;
+    if (pinnedLineProjectIds.has(p.id)) return 1;
+    return 2;
+  }
+  function activityOf(p: NavProject): number {
+    const st = statOf(perfsForProject(p.id));
+    return (engTotals[p.id] ?? 0) + st.confirmed + st.holds;
+  }
+  let orderedProjects = $derived(
+    [...projectIndex].sort(
+      (a, b) => pinRank(a) - pinRank(b) || activityOf(b) - activityOf(a),
+    ),
+  );
+  let projectsSettled = $derived(!$projectsQuery.isPending && !$workspacesQuery.isPending);
 
   function openLine(line: NavLine) {
     void goto(lineUrl(line));
+  }
+  function openProject(project: NavProject) {
+    void goto(projectUrl(project));
   }
 </script>
 
@@ -186,9 +241,9 @@
 
 <div class="home">
   <h1 class="home__greet">{greetWord}, <em>{firstName}</em>.</h1>
-  <p class="home__date">{dateLabel} · a quiet start — pin a space or a line to bring it forward</p>
+  <p class="home__date">{dateLabel} · a quiet start — pin what you live in and it comes forward</p>
 
-  <ScopeStrip onOpenLine={openLine} />
+  <ScopeStrip onOpenLine={openLine} onOpenProject={openProject} />
 
   <div class="home__toolbar"><span class="eyebrow">Next 7 days</span></div>
   <AgendaBoard
@@ -201,112 +256,58 @@
     error={$engagementsQuery.isError}
   />
 
-  {#if pinnedUnits.length > 0}
-    <div class="home__pinned-head"><span class="eyebrow">Pinned</span></div>
-    <div class="home__pinned">
-      {#each pinnedUnits as unit (unit.pin)}
-        {#if unit.kind === 'line'}
-          {@const st = statOf(perfsForLine(unit.line.id))}
-          <button type="button" class="lmini" style={`--c: ${unit.line.accent}`} onclick={() => openLine(unit.line)}>
-            <div class="lmini__head">
-              <span class="lmini__co"><span class="dot" aria-hidden="true"></span>{unit.line.projectName}</span>
-              <span class="lmini__kind">{lineKindGlyph(unit.line.kind)} {lineKindLabel(unit.line.kind)}</span>
-              <span
-                class="lmini__rm"
-                role="button"
-                tabindex="0"
-                aria-label="Unpin"
-                onclick={(e) => { e.stopPropagation(); pins.remove(unit.pin); }}
-                onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); pins.remove(unit.pin); } }}
-              >×</span>
-            </div>
-            <h3 class="lmini__name">{unit.line.name}</h3>
-            <p class="lmini__foot">
-              {#if st.confirmed || st.holds}
-                <b>{st.confirmed}</b> confirmed{#if st.holds} · {st.holds} holds{/if}
-              {:else}
-                internal — no dates
-              {/if}
-            </p>
-          </button>
-        {:else}
-          {@const st = statOf(perfsForWorkspace(unit.ws.id))}
-          {@const wsLines = linesOfWorkspace(unit.ws.id)}
-          <div class="spin" style={`--c: ${accentVarFor(unit.ws)}`}>
-            <div class="spin__head">
-              <span class="dot" aria-hidden="true"></span>
-              <h3 class="spin__name">{unit.ws.name}</h3>
-              <span class="spin__meta">{st.confirmed} confirmed · {st.holds} holds</span>
-              <span
-                class="spin__rm"
-                role="button"
-                tabindex="0"
-                aria-label="Unpin"
-                onclick={() => pins.remove(unit.pin)}
-                onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pins.remove(unit.pin); } }}
-              >×</span>
-            </div>
-            <div class="spin__lines">
-              {#each wsLines as line (line.id)}
-                <button type="button" class="spin__line" onclick={() => openLine(line)}>
-                  <span class="spin__g">{lineKindGlyph(line.kind)}</span>
-                  <span class="spin__ln">{line.name}</span>
-                  {#if lineStatLabel(line)}<span class="spin__line-stat">{lineStatLabel(line)}</span>{/if}
-                  <span class="spin__go" aria-hidden="true">→</span>
-                </button>
-              {:else}
-                <p class="spin__empty">No lines yet.</p>
-              {/each}
-              <div class="spin__new">
-                <button type="button" class="creator" onclick={() => creation.openLine({ workspaceId: unit.ws.id })}>+ New line</button>
-                <button type="button" class="creator" onclick={() => creation.openProject({ workspaceId: unit.ws.id })}>+ New project</button>
-              </div>
-            </div>
-          </div>
-        {/if}
-      {/each}
+  {#if orderedProjects.length > 0 || projectsSettled}
+    <div class="home__projects-head">
+      <span class="eyebrow">Projects</span>
+      {#if pins.pins.length === 0}
+        <span class="home__projects-hint">nothing pinned — browse everything, pin what you live in</span>
+      {/if}
+      <button type="button" class="creator home__new-space" onclick={() => creation.openWorkspace()}>
+        + New space
+      </button>
     </div>
-  {:else if workspaces.length > 0}
-    <div class="home__pinned-head">
-      <span class="eyebrow">All spaces</span>
-      <span class="home__pinned-hint">nothing pinned — browse everything, pin what you live in</span>
-    </div>
-    <div class="home__pinned">
-      {#each workspaces as ws (ws.id)}
-        {@const st = statOf(perfsForWorkspace(ws.id))}
-        {@const wsLines = linesOfWorkspace(ws.id)}
-        <div class="spin" style={`--c: ${accentVarFor(ws)}`}>
-          <div class="spin__head">
+    <div class="home__projects">
+      {#each orderedProjects as unit (unit.id)}
+        {@const pinned = pins.has(projectPin(unit.id))}
+        <article class="pcard" class:pcard--pinned={pinned} style={`--c: ${unit.accent}`}>
+          <div class="pcard__space">
             <span class="dot" aria-hidden="true"></span>
-            <h3 class="spin__name">{ws.name}</h3>
-            <span class="spin__meta">{st.confirmed} confirmed · {st.holds} holds</span>
+            <span class="pcard__ws">{unit.workspaceName}</span>
             <button
               type="button"
-              class="pill--sm pill--mono spin__pin"
-              onclick={() => pins.add(spacePin(ws.slug))}
-              title="Pin this space"
-            >pin</button>
+              class="pill--sm pill--mono pcard__pin"
+              class:pill--on={pinned}
+              onclick={() => pins.toggle(projectPin(unit.id))}
+              title={pinned ? 'Unpin this project' : 'Pin this project'}
+            >{pinned ? 'pinned' : 'pin'}</button>
           </div>
-          <div class="spin__lines">
-            {#each wsLines as line (line.id)}
-              <button type="button" class="spin__line" onclick={() => openLine(line)}>
-                <span class="spin__g">{lineKindGlyph(line.kind)}</span>
-                <span class="spin__ln">{line.name}</span>
-                {#if lineStatLabel(line)}<span class="spin__line-stat">{lineStatLabel(line)}</span>{/if}
-                <span class="spin__go" aria-hidden="true">→</span>
+          <a class="pcard__name" href={projectUrl(unit)}>{unit.name}</a>
+          <p class="pcard__meta">{projectStatLabel(unit) || 'no activity yet'}</p>
+          <div class="pcard__lines">
+            {#each linesOfProject(unit.id) as line (line.id)}
+              {@const lPinned = pins.has(linePin(line.id))}
+              <button type="button" class="pcard__line" onclick={() => openLine(line)}>
+                <span class="pcard__g">{lineKindGlyph(line.kind)}</span>
+                <span class="pcard__ln">{line.name}</span>
+                {#if lPinned}<span class="pcard__line-pin">pinned</span>{/if}
+                {#if lineStatLabel(line)}<span class="pcard__line-stat">{lineStatLabel(line)}</span>{/if}
+                <span class="pcard__go" aria-hidden="true">→</span>
               </button>
             {:else}
-              <p class="spin__empty">No lines yet.</p>
+              <p class="pcard__empty">No lines on this project yet.</p>
             {/each}
-            <div class="spin__new">
-              <button type="button" class="creator" onclick={() => creation.openLine({ workspaceId: ws.id })}>+ New line</button>
-              <button type="button" class="creator" onclick={() => creation.openProject({ workspaceId: ws.id })}>+ New project</button>
+            <div class="pcard__new">
+              <button
+                type="button"
+                class="creator"
+                onclick={() => creation.openLine({ workspaceId: unit.workspaceId, projectId: unit.id })}
+              >+ New line</button>
             </div>
           </div>
-        </div>
+        </article>
       {/each}
-      <button type="button" class="spin spin--ghost" onclick={() => creation.openWorkspace()}>
-        + New space
+      <button type="button" class="pcard pcard--ghost" onclick={() => creation.openProject()}>
+        + New project
       </button>
     </div>
   {/if}
@@ -347,138 +348,91 @@
       flex: none;
     }
 
-    /* ── pinned panels ── */
-    .home__pinned-head {
+    /* ── projects grid ── */
+    .home__projects-head {
       display: flex;
       align-items: baseline;
       gap: var(--space-s);
       flex-wrap: wrap;
       margin-block: var(--space-l) var(--space-s);
     }
-    .home__pinned-hint {
+    .home__projects-hint {
       font-size: var(--text-xs);
       color: var(--text-faint);
       font-style: italic;
       font-family: var(--font-display);
     }
-    .home__pinned {
+    .home__new-space {
+      margin-inline-start: auto;
+    }
+    .home__projects {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
       gap: var(--space-m);
     }
 
-    .lmini {
-      position: relative;
-      display: block;
-      inline-size: 100%;
-      text-align: start;
+    .pcard {
       border: 1px solid var(--border-color-light);
       border-radius: var(--radius-xl);
-      padding: var(--space-m);
       background: var(--bg-ultra-light);
-      cursor: pointer;
       overflow: hidden;
-      font-family: inherit;
-      transition: border-color var(--transition), transform var(--transition);
+      display: grid;
+      align-content: start;
+      transition: border-color var(--transition);
     }
-    .lmini::before {
-      content: '';
-      position: absolute;
-      inset-block: 0;
-      inset-inline-start: 0;
-      inline-size: 3px;
-      background: var(--c, var(--primary));
-    }
-    .lmini:hover {
+    .pcard--pinned {
       border-color: var(--border-color-dark);
-      transform: translateY(-1px);
-    }
-    .lmini__head {
-      display: flex;
-      align-items: center;
-      gap: var(--space-s);
-      margin-block-end: var(--space-xs);
-    }
-    .lmini__co {
-      display: inline-flex;
-      align-items: center;
-      gap: var(--space-xs);
-      font-size: var(--text-xs);
-      color: var(--text-muted);
-    }
-    .lmini__co .dot {
-      background: var(--c, var(--text-faint));
-    }
-    .lmini__kind {
-      margin-inline-start: auto;
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-      color: var(--c, var(--text-muted));
-    }
-    .lmini__rm,
-    .spin__rm {
-      color: var(--text-faint);
-      font-size: var(--text-m);
-      line-height: 1;
-      cursor: pointer;
-    }
-    .lmini__rm:hover,
-    .spin__rm:hover {
-      color: var(--danger);
-    }
-    .lmini__name {
-      font-family: var(--font-display);
-      font-size: var(--text-l);
-      font-weight: 500;
-      margin: 0 0 var(--space-xs);
-    }
-    .lmini__foot {
-      font-size: var(--text-s);
-      color: var(--text-muted);
-      margin: 0;
-    }
-    .lmini__foot b {
-      color: var(--text-color);
     }
 
-    .spin {
-      border: 1px solid var(--border-color-light);
-      border-radius: var(--radius-xl);
-      background: var(--bg-ultra-light);
-      overflow: hidden;
-    }
-    .spin__head {
+    /* Space = context, not container: a quiet mono chip with the space's
+       accent dot. The card belongs to the show; the space just says where. */
+    .pcard__space {
       display: flex;
       align-items: center;
-      gap: var(--space-s);
-      padding-block: var(--space-s);
+      gap: var(--space-xs);
+      padding-block-start: var(--space-s);
       padding-inline: var(--space-m);
-      border-block-end: 1px solid var(--border-color-light);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      letter-spacing: var(--mono-letter-spacing-loose);
+      text-transform: uppercase;
+      color: var(--text-muted);
     }
-    .spin__head .dot {
-      background: var(--c, var(--text-faint));
+    .pcard__ws {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
-    .spin__name {
+    .pcard__pin {
+      margin-inline-start: auto;
+      --pill-padding-block: var(--space-2xs);
+    }
+    .pcard__name {
       font-family: var(--font-display);
       font-size: var(--text-l);
       font-weight: 500;
-      margin: 0;
+      color: var(--text-color);
+      text-decoration: none;
+      margin-block-start: var(--space-xs);
+      margin-inline: var(--space-m);
+      justify-self: start;
     }
-    .spin__meta {
+    .pcard__name:hover {
+      text-decoration: underline;
+      text-underline-offset: 0.15em;
+    }
+    .pcard__meta {
+      margin-block: var(--space-2xs) var(--space-s);
+      margin-inline: var(--space-m);
       font-size: var(--text-xs);
       color: var(--text-muted);
-      margin-inline-start: auto;
     }
-    /* Pill skeleton (base.css) carries the chip; tighter block padding. */
-    .spin__pin {
-      --pill-padding-block: var(--space-2xs);
-    }
-    .spin__lines {
+
+    .pcard__lines {
+      border-block-start: 1px solid var(--border-color-light);
       padding: var(--space-xs);
     }
-    .spin__line {
+    .pcard__line {
       display: flex;
       align-items: center;
       gap: var(--space-s);
@@ -492,16 +446,16 @@
       cursor: pointer;
       font-family: inherit;
     }
-    .spin__line:hover {
+    .pcard__line:hover {
       background: var(--bg-light);
     }
-    .spin__g {
+    .pcard__g {
       inline-size: 1.1rem;
       text-align: center;
       color: var(--c, var(--text-muted));
       font-size: var(--text-s);
     }
-    .spin__ln {
+    .pcard__ln {
       flex: 1;
       min-inline-size: 0;
       font-size: var(--text-s);
@@ -511,21 +465,29 @@
       text-overflow: ellipsis;
       white-space: nowrap;
     }
-    .spin__line-stat {
+    .pcard__line-pin {
+      flex: none;
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      letter-spacing: var(--mono-letter-spacing-loose);
+      text-transform: uppercase;
+      color: var(--c, var(--text-muted));
+    }
+    .pcard__line-stat {
       flex: none;
       font-size: var(--text-xs);
       color: var(--text-faint);
       white-space: nowrap;
     }
-    .spin__go {
+    .pcard__go {
       color: var(--text-faint);
       opacity: 0;
       flex: none;
     }
-    .spin__line:hover .spin__go {
+    .pcard__line:hover .pcard__go {
       opacity: 1;
     }
-    .spin__empty {
+    .pcard__empty {
       margin: 0;
       padding: var(--space-s);
       font-size: var(--text-s);
@@ -533,7 +495,7 @@
     }
 
     /* Creation affordances (ADR-056) — quiet by design. */
-    .spin__new {
+    .pcard__new {
       display: flex;
       gap: var(--space-s);
       padding-block-start: var(--space-2xs);
@@ -541,7 +503,7 @@
       margin-block-start: var(--space-2xs);
     }
     /* Creators via the shared .creator class (base.css). */
-    .spin--ghost {
+    .pcard--ghost {
       display: flex;
       align-items: center;
       justify-content: center;
@@ -556,7 +518,7 @@
       color: var(--text-faint);
       transition: color var(--transition), border-color var(--transition);
     }
-    .spin--ghost:hover {
+    .pcard--ghost:hover {
       color: var(--text-color);
       border-color: var(--text-muted);
     }
