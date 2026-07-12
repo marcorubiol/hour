@@ -5,6 +5,7 @@
 
 ## Dispatch
 - [ ] **Desbloquear producción** (el clasificador de auto-mode exige nombrarlo explícito): decirle a .zerø *"aplica las 6 migraciones 2026-07-12 al Supabase hour-phase0 y despliega hour-collab y hour-web"* — o aprobar los prompts fuera de auto mode. Orden: 6 × apply_migration → regen db-types → deploy hour-collab → deploy hour-web @dispatch
+- [ ] Re-pasar las 4 lentes de review que cayeron por límite de gasto (sql / api / svelte / tests) cuando se renueve la cuota — solo completó collab @dispatch
 - [ ] Tras el deploy: suite completa contra producción (`pnpm test:rls` incl. line-modules nueva, `PW_BASE_URL=… pnpm test:smoke` incl. line-detail.spec) + smoke collab de dos clientes sobre una line @dispatch
 
 ## Queue

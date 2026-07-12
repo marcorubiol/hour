@@ -27,7 +27,7 @@ Marco: "ataca el ADR-056" + grill (7 preguntas → alcance completo, creación e
 - Builders paralelos sobre ficheros disjuntos + typecheck integrador del orquestador = 0 errores de integración en ~2.500 líneas nuevas. La clave: contratos exactos en el prompt (props, endpoints, claves de query) + bloque de convenciones (TDZ de toStore, @layer wrap, tokens).
 
 ### Estado al cierre
-typecheck web+collab 0/0 · unit 100/100 (+21) · RLS viejas 30/30 contra prod (line-modules nueva falla con 404 create_line(p_modules) — esperado pre-migración) · build limpio · 8 commits + docs. Pendiente (bloqueado por permisos, runbook en `_tasks.md § Dispatch`): 6 migraciones → regen db-types → deploy collab→web → suite completa + smoke collab. El gate de producto sigue: usar Hour ~1 mes con la difusión real.
+typecheck web+collab 0/0 · unit 100/100 (+21) · RLS viejas 30/30 contra prod (line-modules nueva falla con 404 create_line(p_modules) — esperado pre-migración) · build limpio · 11 commits + docs. **Review adversarial PARCIAL**: solo completó la lente collab (2 hallazgos confirmados y corregidos: cabeceras de migración que mentían "Applied" y el textarea vivo de NotesModule para roles edit:show-only cuyo socket 403ea — preflight has_permission añadido); las lentes sql/api/svelte/tests cayeron por límite de gasto mensual de la cuenta. Cobertura real: verificación por-builder + typecheck integrador + 100 unit + baseline RLS; queda deuda de re-pasar esas 4 lentes cuando el límite se renueve. Pendiente (bloqueado por permisos, runbook en `_tasks.md § Dispatch`): 6 migraciones → regen db-types → deploy collab→web → suite completa + smoke collab. El gate de producto sigue: usar Hour ~1 mes con la difusión real.
 
 ---
 
