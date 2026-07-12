@@ -45,7 +45,7 @@ const STORAGE_KEYS = {
   version: 'snapshot_version',
 } as const;
 
-const ALLOWED_TABLES = new Set(['performance', 'project']);
+const ALLOWED_TABLES = new Set(['performance', 'project', 'line']);
 
 // Avoid deploying a "headless" DO that accepts traffic but can't persist.
 class RoadsheetCollabBase extends Server<CollabEnv> {
@@ -80,11 +80,11 @@ export class RoadsheetCollab extends WithYjs {
    * the name doesn't fit the expected pattern — we refuse to load/save in
    * that case rather than crashing.
    */
-  private parseName(): [table: 'performance' | 'project', id: string] | null {
+  private parseName(): [table: 'performance' | 'project' | 'line', id: string] | null {
     const [table, id] = this.name.split(':');
     if (!table || !id) return null;
     if (!ALLOWED_TABLES.has(table)) return null;
-    return [table as 'performance' | 'project', id];
+    return [table as 'performance' | 'project' | 'line', id];
   }
 
   /**

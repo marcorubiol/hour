@@ -25,16 +25,20 @@ export interface CollabAuthFail {
 
 export type CollabAuthResult = CollabAuthOk | CollabAuthFail;
 
-const ALLOWED_TABLES = new Set(['performance', 'project']);
+export type CollabTargetTable = 'performance' | 'project' | 'line';
 
-export function isAllowedTargetTable(t: string): t is 'performance' | 'project' {
+const ALLOWED_TABLES = new Set(['performance', 'project', 'line']);
+
+export function isAllowedTargetTable(t: string): t is CollabTargetTable {
   return ALLOWED_TABLES.has(t);
 }
 
-/** Permission required to EDIT the collab doc, per target table. */
-const EDIT_PERMISSION: Record<'performance' | 'project', string> = {
+/** Permission required to EDIT the collab doc, per target table. Line
+ * notes gate on the parent project's meta permission (ADR-056). */
+const EDIT_PERMISSION: Record<CollabTargetTable, string> = {
   performance: 'edit:show',
   project: 'edit:project_meta',
+  line: 'edit:project_meta',
 };
 
 export async function authorizeCollab(
@@ -55,11 +59,13 @@ export async function authorizeCollab(
 
   const url = new URL(`/rest/v1/${targetTable}`, env.PUBLIC_SUPABASE_URL);
   url.searchParams.set('id', `eq.${targetId}`);
-  // project_id drives the write-permission check below (a project IS its
-  // own project_id).
+  // project_id drives the write-permission check below. A project IS its
+  // own project_id; performance and line both carry a project_id FK —
+  // keying the branch on 'project' keeps new child targets falling into
+  // the project_id side by default.
   url.searchParams.set(
     'select',
-    targetTable === 'performance' ? 'workspace_id,project_id' : 'workspace_id,id',
+    targetTable === 'project' ? 'workspace_id,id' : 'workspace_id,project_id',
   );
   url.searchParams.set('limit', '1');
 
@@ -114,7 +120,7 @@ export async function authorizeCollab(
         },
         body: JSON.stringify({
           p_project_id: projectId,
-          p_perm: EDIT_PERMISSION[targetTable as 'performance' | 'project'],
+          p_perm: EDIT_PERMISSION[targetTable as CollabTargetTable],
         }),
       },
     );

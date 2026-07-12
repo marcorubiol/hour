@@ -60,7 +60,7 @@ export interface TargetMeta {
  */
 export async function fetchTargetMeta(
   env: PersistEnv,
-  targetTable: 'performance' | 'project',
+  targetTable: 'performance' | 'project' | 'line',
   targetId: string,
 ): Promise<TargetMeta | null> {
   const url = new URL(`/rest/v1/${targetTable}`, env.PUBLIC_SUPABASE_URL);
@@ -86,7 +86,7 @@ export async function fetchTargetMeta(
  */
 export async function writeNotesColumn(
   env: PersistEnv,
-  targetTable: 'performance' | 'project',
+  targetTable: 'performance' | 'project' | 'line',
   targetId: string,
   text: string,
 ): Promise<void> {

@@ -1,5 +1,5 @@
 <script module lang="ts">
-  export type CollabTarget = 'performance' | 'project';
+  export type CollabTarget = 'performance' | 'project' | 'line';
 </script>
 
 <script lang="ts">
