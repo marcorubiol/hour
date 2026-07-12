@@ -2,6 +2,7 @@
   export interface EngagementFilters {
     projectSlug?: string;
     projectIds?: string[];
+    lineId?: string;
     workspaceIds?: string[];
     season?: string;
     q?: string;
@@ -71,6 +72,7 @@
     p.set('status', f.status ?? 'any');
     if (f.projectSlug) p.set('project_slug', f.projectSlug);
     if (f.projectIds && f.projectIds.length > 0) p.set('project_ids', f.projectIds.join(','));
+    if (f.lineId) p.set('line_id', f.lineId);
     if (f.workspaceIds && f.workspaceIds.length > 0)
       p.set('workspace_ids', f.workspaceIds.join(','));
     if (f.season) p.set('season', f.season);

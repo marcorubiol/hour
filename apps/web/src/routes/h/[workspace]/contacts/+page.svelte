@@ -103,6 +103,10 @@
   // on email; belonging to a space = an engagement in one of its projects).
   // So the target is a SET of projects, grouped by space in the picker.
   let aProjectIds = $state<string[]>([]);
+  // Optional line per targeted project (ADR-056) — the target is a set of
+  // projects, so one global select can't work; each checked project gets its
+  // own. Unset key = "No line".
+  let aLineByProject = $state<Record<string, string>>({});
   let aName = $state('');
   let aEmail = $state('');
   let aPhone = $state('');
@@ -127,6 +131,17 @@
     }
     return [...byWs.values()];
   });
+  // Line options per project, from the same lines cache the scope resolver
+  // reads (lineIndex) — only projects that actually have lines get a select.
+  let linesByProject = $derived.by(() => {
+    const byProject = new Map<string, { value: string; label: string }[]>();
+    for (const l of lineIndex) {
+      const opts = byProject.get(l.projectId);
+      if (opts) opts.push({ value: l.id, label: l.name });
+      else byProject.set(l.projectId, [{ value: l.id, label: l.name }]);
+    }
+    return byProject;
+  });
   let addStatusOptions = ENGAGEMENT_STATUSES.map((s) => ({
     value: s,
     label: statusLabel(s),
@@ -150,12 +165,15 @@
     aStatus = ENGAGEMENT_STATUSES[0];
     // Pre-select when the pinned scope, or the whole workspace, collapses to
     // a single project — otherwise start empty and let the user pick spaces.
+    // A single pinned line also preselects that line for its project.
     aProjectIds =
       scope.lines.length === 1
         ? [scope.lines[0].projectId]
         : allProjects.length === 1
           ? [allProjects[0].id]
           : [];
+    aLineByProject =
+      scope.lines.length === 1 ? { [scope.lines[0].projectId]: scope.lines[0].id } : {};
     addOpen = true;
   }
 
@@ -169,6 +187,7 @@
     // on the citext-unique email.
     mutationFn: async (): Promise<AddResult> => {
       const targets = [...aProjectIds];
+      const lineFor = { ...aLineByProject };
       const person = {
         full_name: aName.trim(),
         email: aEmail.trim() || null,
@@ -185,9 +204,10 @@
       const out: AddResult = { created: 0, existed: 0, failed: [] };
 
       for (const projectId of targets) {
+        const line_id = lineFor[projectId] || null;
         const body = personId
-          ? { project_id: projectId, person_id: personId, ...base }
-          : { project_id: projectId, person, ...base };
+          ? { project_id: projectId, person_id: personId, line_id, ...base }
+          : { project_id: projectId, person, line_id, ...base };
         const res = await fetch('/api/engagements', {
           method: 'POST',
           headers: { Authorization: `Bearer ${jwt}`, 'content-type': 'application/json' },
@@ -222,6 +242,7 @@
       aNextAt = '';
       aNextNote = '';
       aProjectIds = [];
+      aLineByProject = {};
       void queryClient.invalidateQueries({ queryKey: ['engagements'] });
       const parts: string[] = [];
       if (r.created) parts.push(`Added to ${r.created} ${r.created === 1 ? 'space' : 'spaces'}`);
@@ -301,6 +322,15 @@
                 checked={aProjectIds.includes(p.id)}
                 onchange={() => toggleProject(p.id)}
               />
+              {#if aProjectIds.includes(p.id) && (linesByProject.get(p.id)?.length ?? 0) > 0}
+                <div class="contacts__line">
+                  <Select
+                    label="Line"
+                    options={[{ value: '', label: 'No line' }, ...(linesByProject.get(p.id) ?? [])]}
+                    bind:value={aLineByProject[p.id]}
+                  />
+                </div>
+              {/if}
             {/each}
           </div>
         {/each}
@@ -381,6 +411,12 @@
       flex-direction: column;
       gap: var(--space-2xs);
     }
+    /* Per-project line select — indented under its project checkbox. */
+    .contacts__line {
+      margin-inline-start: var(--space-l);
+      max-inline-size: 12rem;
+    }
+
     .contacts__space-name {
       font-family: var(--font-mono);
       font-size: var(--text-xs);
