@@ -283,8 +283,11 @@
     $projectsQuery.isPending || ($linesQuery.isPending && activeProject !== null),
   );
   let isError = $derived($projectsQuery.isError || $linesQuery.isError);
+  // Also notFound when the PROJECT itself doesn't resolve (unknown slug,
+  // draft/archived project) — otherwise the page renders nothing at all
+  // (review 2026-07-12).
   let notFound = $derived(
-    !isLoading && !isError && activeProject !== null && activeLine === null,
+    !isLoading && !isError && (activeProject === null || activeLine === null),
   );
 
   function formatDateRange(start: string | null, end: string | null): string {

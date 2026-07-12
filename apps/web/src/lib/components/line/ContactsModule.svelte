@@ -81,6 +81,7 @@
     onSuccess: () => {
       addOpen = false;
       void queryClient.invalidateQueries({ queryKey: ['engagements'] });
+      void queryClient.invalidateQueries({ queryKey: ['line-eng-stats'] });
     },
     onError: (err) => {
       if (err instanceof ApiError && err.status === 409) {

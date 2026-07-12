@@ -90,16 +90,22 @@
   ]);
   let showLineSelect = $derived(!presetLineId && projectLines.length > 0);
 
-  // Apply presets on each open transition. Project/line preselection never
-  // overrides a project the user already picked (same contract as the old
-  // in-page openCreate); day is refreshed every open.
+  // Apply presets on each open transition; day is refreshed every open.
+  // When the CONTEXT dictates the target (presetProjectId/presetLineId —
+  // line modules, locked projects) the preset ALWAYS wins: the component
+  // instance survives navigation between lines (same route, new params),
+  // so a leftover cProject/cLine from line A must never leak a gig into
+  // line B (review 2026-07-12, HIGH). Only the free-form global dialog
+  // keeps the "don't override what the user picked" contract.
   let wasOpen = false;
   $effect(() => {
     if (open && !wasOpen) {
       cDay = presetDate ?? dayKeyInTz(new Date().toISOString(), viewerTz);
-      if (!cProject) {
-        cProject =
-          presetProjectId ?? (projectOptions.length === 1 ? projectOptions[0].value : '');
+      if (presetProjectId) {
+        cProject = presetProjectId;
+        cLine = presetLineId ?? '';
+      } else if (!cProject) {
+        cProject = projectOptions.length === 1 ? projectOptions[0].value : '';
         cLine = presetLineId ?? '';
       }
     }
@@ -122,6 +128,8 @@
       cCity = '';
       void queryClient.invalidateQueries({ queryKey: ['calendar-performances'] });
       void queryClient.invalidateQueries({ queryKey: ['line-performances'] });
+      void queryClient.invalidateQueries({ queryKey: ['line-money-fees'] });
+      void queryClient.invalidateQueries({ queryKey: ['today-performances'] });
       onCreated?.(perf);
     },
     onError: (err) => {

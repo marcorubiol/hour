@@ -47,7 +47,9 @@
       },
       body: JSON.stringify({ p_project_id: projectId, p_perm: 'edit:project_meta' }),
     });
-    if (!res.ok) return false;
+    // A transient failure must NOT cache as "no permission" (review
+    // 2026-07-12) — throw so the query retries and shows its own state.
+    if (!res.ok) throw new Error(`has_permission ${res.status}`);
     return (await res.json()) === true;
   }
 
@@ -64,6 +66,8 @@
 
 {#if $permQuery.isPending}
   <p class="lnm__state">Loading…</p>
+{:else if $permQuery.isError}
+  <p class="lnm__state">Couldn't check notes access — reload to retry.</p>
 {:else if $permQuery.data === true}
   {#key line.id}
     <YNotes targetTable="line" targetId={line.id} placeholder="Line notes — shared, live." rows={6} />

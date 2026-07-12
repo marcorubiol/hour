@@ -156,7 +156,11 @@
         }
       }
     },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ['engagements'] }),
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ['engagements'] });
+      // Line header funnel stats (ADR-056) read the same rows.
+      void queryClient.invalidateQueries({ queryKey: ['line-eng-stats'] });
+    },
   });
 
   function changeStatus(item: EngagementItem, status: EngagementStatus) {

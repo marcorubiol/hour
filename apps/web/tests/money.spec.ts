@@ -28,10 +28,11 @@ test.describe('money lens', () => {
     await page.goto('/h/playwright/money');
     await expect(page.locator('.mny__totals')).toBeVisible();
 
-    // Pin the STABLE collab-fixture gig (2031 dates) — never `.first()`:
-    // performance-write runs in parallel and creates/deletes transient
-    // 2032 gigs in this same workspace, so row order shifts mid-test.
-    const row = page.locator('tbody tr', { hasText: '2031' }).first();
+    // Pin a STABLE collab-fixture gig by its project name — never
+    // `.first()` (performance-write creates/deletes transient gigs in
+    // parallel) and never a bare year substring (the unpinned lens also
+    // lists real muk-cia rows).
+    const row = page.locator('tbody tr', { hasText: 'ZZZ e2e collab' }).filter({ hasText: '2031' }).first();
     const fee = row.locator('.mny__fee');
     await expect(fee).toBeVisible();
 
@@ -45,7 +46,7 @@ test.describe('money lens', () => {
     // Persists across reload.
     await page.reload();
     await expect(
-      page.locator('tbody tr', { hasText: '2031' }).first().locator('.mny__fee'),
+      page.locator('tbody tr', { hasText: 'ZZZ e2e collab' }).filter({ hasText: '2031' }).first().locator('.mny__fee'),
     ).toContainText('1,234.56', { timeout: 10_000 });
 
     // ── Invoice from the fee (ADR-050) ──────────────────────────────────
@@ -73,7 +74,7 @@ test.describe('money lens', () => {
     });
 
     // Clear it (empty amount → null) — leaves the fixture clean.
-    const rowAgain = page.locator('tbody tr', { hasText: '2031' }).first();
+    const rowAgain = page.locator('tbody tr', { hasText: 'ZZZ e2e collab' }).filter({ hasText: '2031' }).first();
     await rowAgain.locator('.mny__fee').click();
     const dialog2 = page.locator('dialog[open]');
     await dialog2.getByLabel('Amount').fill('');
