@@ -61,7 +61,9 @@ test.describe('contact capture', () => {
     // Capture through the dialog.
     await page.getByRole('button', { name: 'Add contact' }).click();
     const dialog = page.locator('dialog[open]');
-    await dialog.getByLabel('Project').selectOption({ label: 'ZZZ e2e collab' });
+    // The dialog is multi-space since ADR-057: projects are checkboxes
+    // grouped by workspace, not a single select.
+    await dialog.getByLabel('ZZZ e2e collab').check({ force: true });
     await dialog.getByLabel('Full name').fill(FIXTURE_NAME);
     await dialog.getByLabel('Email').fill(FIXTURE_EMAIL);
     await dialog.getByLabel('Organization').fill('E2E Teatre');

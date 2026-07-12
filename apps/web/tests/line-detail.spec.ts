@@ -143,6 +143,19 @@ test.describe('line detail — module composition', () => {
     await login(page);
     const line = await findFixtureLine(page);
     expect(line).not.toBeNull();
+
+    // Crash recovery: line.modules persists — a run killed after the add
+    // step leaves People in the stack and the add-menu item gone forever.
+    // Reset to the booking template shape via the whitelist PATCH.
+    await page.evaluate(async ({ lineId }) => {
+      const jwt = localStorage.getItem('hour_jwt');
+      await fetch(`/api/lines/${lineId}`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${jwt}`, 'content-type': 'application/json' },
+        body: JSON.stringify({ modules: ['contacts', 'calendar', 'materials', 'notes'] }),
+      });
+    }, { lineId: line!.id });
+
     await page.goto(`/h/playwright/project/zzz-e2e-collab/line/${line!.slug ?? line!.id}`);
 
     // Materials: register a link, see the row, remove it.

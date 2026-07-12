@@ -28,29 +28,29 @@ test.describe('money lens', () => {
     await page.goto('/h/playwright/money');
     await expect(page.locator('.mny__totals')).toBeVisible();
 
-    // The fixture workspace has gigs (zzz-e2e-collab project). Pick the
-    // first row's fee cell.
-    const firstFee = page.locator('.mny__fee').first();
-    await expect(firstFee).toBeVisible();
+    // Pin the STABLE collab-fixture gig (2031 dates) — never `.first()`:
+    // performance-write runs in parallel and creates/deletes transient
+    // 2032 gigs in this same workspace, so row order shifts mid-test.
+    const row = page.locator('tbody tr', { hasText: '2031' }).first();
+    const fee = row.locator('.mny__fee');
+    await expect(fee).toBeVisible();
 
     // Set a fee.
-    await firstFee.click();
+    await fee.click();
     const dialog = page.locator('dialog[open]');
     await dialog.getByLabel('Amount').fill('1234.56');
     await dialog.getByRole('button', { name: 'Save' }).click();
-    await expect(page.locator('.mny__fee').first()).toContainText('1,234.56', {
-      timeout: 10_000,
-    });
+    await expect(fee).toContainText('1,234.56', { timeout: 10_000 });
 
     // Persists across reload.
     await page.reload();
-    await expect(page.locator('.mny__fee').first()).toContainText('1,234.56', {
-      timeout: 10_000,
-    });
+    await expect(
+      page.locator('tbody tr', { hasText: '2031' }).first().locator('.mny__fee'),
+    ).toContainText('1,234.56', { timeout: 10_000 });
 
     // ── Invoice from the fee (ADR-050) ──────────────────────────────────
     await page
-      .locator('tbody tr')
+      .locator('tbody tr', { hasText: '2031' })
       .first()
       .getByRole('button', { name: 'Invoice' })
       .click();
@@ -73,11 +73,12 @@ test.describe('money lens', () => {
     });
 
     // Clear it (empty amount → null) — leaves the fixture clean.
-    await page.locator('.mny__fee').first().click();
+    const rowAgain = page.locator('tbody tr', { hasText: '2031' }).first();
+    await rowAgain.locator('.mny__fee').click();
     const dialog2 = page.locator('dialog[open]');
     await dialog2.getByLabel('Amount').fill('');
     await dialog2.getByRole('button', { name: 'Save' }).click();
-    await expect(page.locator('.mny__fee').first()).toContainText('—', {
+    await expect(rowAgain.locator('.mny__fee')).toContainText('—', {
       timeout: 10_000,
     });
   });

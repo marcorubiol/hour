@@ -67,7 +67,7 @@ test.describe('performance write path', () => {
     await expect(page.locator('.perf__title')).toContainText(venue);
 
     // Status: proposed → confirmed via the status menu.
-    await page.getByRole('button', { name: /^status/ }).click();
+    await page.getByRole('button', { name: 'Change status' }).click();
     await page.getByRole('menuitem', { name: 'confirmed', exact: true }).click();
     await expect(page.locator('.state-badge')).toContainText('confirmed', {
       timeout: 10_000,
