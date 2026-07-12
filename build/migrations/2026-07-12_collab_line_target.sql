@@ -6,7 +6,8 @@
 --
 -- MUST be live BEFORE any hour-collab deploy that allows the 'line' target.
 --
--- PENDING APPLY — run via Supabase MCP apply_migration
+-- Applied 2026-07-12 via Supabase MCP apply_migration — verified live
+-- (pg_constraint / information_schema / pg_proc probes + backfill count 154).
 -- (name: collab_line_target). This file is the canonical record.
 
 ALTER TABLE public.collab_snapshot

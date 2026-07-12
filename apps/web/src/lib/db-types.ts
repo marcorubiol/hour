@@ -241,6 +241,41 @@ export type Database = {
           },
         ]
       }
+      calendar_share: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          revoked_at: string | null
+          token: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          revoked_at?: string | null
+          token: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          revoked_at?: string | null
+          token?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calendar_share_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspace"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cast_member: {
         Row: {
           created_at: string
@@ -1473,6 +1508,61 @@ export type Database = {
           },
         ]
       }
+      roadsheet_share: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          performance_id: string
+          revoked_at: string | null
+          role: string
+          token: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          performance_id: string
+          revoked_at?: string | null
+          role: string
+          token: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          performance_id?: string
+          revoked_at?: string | null
+          role?: string
+          token?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "roadsheet_share_performance_id_fkey"
+            columns: ["performance_id"]
+            isOneToOne: false
+            referencedRelation: "performance"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "roadsheet_share_performance_id_fkey"
+            columns: ["performance_id"]
+            isOneToOne: false
+            referencedRelation: "performance_redacted"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "roadsheet_share_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspace"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_profile: {
         Row: {
           avatar_url: string | null
@@ -1736,6 +1826,7 @@ export type Database = {
           notes: string | null
           performed_at: string | null
           project_id: string | null
+          slug: string | null
           status: Database["public"]["Enums"]["performance_status"] | null
           updated_at: string | null
           venue_id: string | null
@@ -1757,6 +1848,7 @@ export type Database = {
           notes?: string | null
           performed_at?: string | null
           project_id?: string | null
+          slug?: string | null
           status?: Database["public"]["Enums"]["performance_status"] | null
           updated_at?: string | null
           venue_id?: string | null
@@ -1778,6 +1870,7 @@ export type Database = {
           notes?: string | null
           performed_at?: string | null
           project_id?: string | null
+          slug?: string | null
           status?: Database["public"]["Enums"]["performance_status"] | null
           updated_at?: string | null
           venue_id?: string | null
@@ -1826,6 +1919,176 @@ export type Database = {
     Functions: {
       can_edit_project: { Args: { p_project_id: string }; Returns: boolean }
       can_see_person: { Args: { p_person_id: string }; Returns: boolean }
+      create_asset_version: {
+        Args: {
+          p_direction?: Database["public"]["Enums"]["asset_direction"]
+          p_kind: Database["public"]["Enums"]["asset_kind"]
+          p_line_id: string
+          p_notes?: string
+          p_url: string
+        }
+        Returns: {
+          adapted_from_id: string | null
+          created_at: string
+          deleted_at: string | null
+          direction: Database["public"]["Enums"]["asset_direction"]
+          id: string
+          kind: Database["public"]["Enums"]["asset_kind"]
+          line_id: string | null
+          notes: string | null
+          performance_id: string | null
+          previous_slugs: string[]
+          project_id: string | null
+          slug: string | null
+          updated_at: string
+          uploaded_at: string
+          uploaded_by: string | null
+          url: string
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "asset_version"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      create_calendar_share: {
+        Args: { p_workspace_id: string }
+        Returns: {
+          created_at: string
+          created_by: string | null
+          id: string
+          revoked_at: string | null
+          token: string
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "calendar_share"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      create_engagement: {
+        Args: {
+          p_email?: string
+          p_full_name?: string
+          p_line_id?: string
+          p_next_action_at?: string
+          p_next_action_note?: string
+          p_organization_name?: string
+          p_person_id?: string
+          p_phone?: string
+          p_project_id: string
+          p_role?: string
+          p_status?: Database["public"]["Enums"]["engagement_status"]
+          p_title?: string
+        }
+        Returns: {
+          created_at: string
+          created_by: string | null
+          custom_fields: Json
+          deleted_at: string | null
+          first_contacted_at: string | null
+          id: string
+          last_contacted_at: string | null
+          line_id: string | null
+          next_action_at: string | null
+          next_action_note: string | null
+          person_id: string
+          previous_slugs: string[]
+          project_id: string
+          role: string | null
+          slug: string
+          status: Database["public"]["Enums"]["engagement_status"]
+          updated_at: string
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "engagement"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      create_expense: {
+        Args: {
+          p_amount?: number
+          p_category?: Database["public"]["Enums"]["expense_category"]
+          p_currency?: string
+          p_description?: string
+          p_incurred_on?: string
+          p_line_id?: string
+          p_notes?: string
+          p_performance_id?: string
+        }
+        Returns: {
+          amount: number
+          category: Database["public"]["Enums"]["expense_category"]
+          created_at: string
+          created_by: string | null
+          currency: string
+          custom_fields: Json
+          deleted_at: string | null
+          description: string
+          id: string
+          incurred_on: string
+          line_id: string | null
+          notes: string | null
+          paid_by_user_id: string | null
+          performance_id: string | null
+          receipt_url: string | null
+          reimbursed: boolean
+          updated_at: string
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "expense"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      create_invoice: {
+        Args: {
+          p_due_on?: string
+          p_irpf_pct?: number
+          p_notes?: string
+          p_number?: string
+          p_performance_id: string
+          p_vat_pct?: number
+        }
+        Returns: {
+          created_at: string
+          created_by: string | null
+          currency: string
+          custom_fields: Json
+          deleted_at: string | null
+          due_on: string | null
+          id: string
+          irpf_amount: number | null
+          irpf_pct: number | null
+          issued_on: string
+          notes: string | null
+          number: string | null
+          payer_person_id: string | null
+          project_id: string | null
+          status: Database["public"]["Enums"]["invoice_status"]
+          subtotal: number
+          total: number
+          updated_at: string
+          vat_amount: number | null
+          vat_pct: number | null
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "invoice"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       create_line: {
         Args: {
           p_accent?: string
@@ -1866,6 +2129,80 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      create_performance: {
+        Args: {
+          p_city?: string
+          p_country?: string
+          p_engagement_id?: string
+          p_line_id?: string
+          p_performed_at: string
+          p_project_id: string
+          p_status?: Database["public"]["Enums"]["performance_status"]
+          p_venue_name?: string
+        }
+        Returns: {
+          city: string | null
+          country: string | null
+          created_at: string
+          created_by: string | null
+          custom_fields: Json
+          deleted_at: string | null
+          engagement_id: string | null
+          fee_amount: number | null
+          fee_currency: string | null
+          hospitality: Json
+          id: string
+          line_id: string | null
+          load_in_at: string | null
+          loadout_at: string | null
+          logistics: Json
+          notes: string | null
+          performed_at: string
+          previous_slugs: string[]
+          project_id: string
+          slug: string | null
+          soundcheck_at: string | null
+          start_at: string | null
+          status: Database["public"]["Enums"]["performance_status"]
+          technical: Json
+          updated_at: string
+          venue_id: string | null
+          venue_name: string | null
+          workspace_id: string
+          wrap_at: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "performance"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      create_person_note: {
+        Args: {
+          p_body: string
+          p_person_id: string
+          p_visibility?: Database["public"]["Enums"]["person_note_visibility"]
+          p_workspace_id: string
+        }
+        Returns: {
+          author_id: string
+          body: string
+          created_at: string
+          deleted_at: string | null
+          id: string
+          person_id: string
+          updated_at: string
+          visibility: Database["public"]["Enums"]["person_note_visibility"]
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "person_note"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       create_project: {
         Args: {
           p_accent?: string
@@ -1898,6 +2235,61 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "project"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      create_roadsheet_share: {
+        Args: { p_performance_id: string; p_role: string }
+        Returns: {
+          created_at: string
+          created_by: string | null
+          id: string
+          performance_id: string
+          revoked_at: string | null
+          role: string
+          token: string
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "roadsheet_share"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      create_venue: {
+        Args: {
+          p_address?: string
+          p_capacity?: number
+          p_city?: string
+          p_country?: string
+          p_name: string
+          p_timezone?: string
+          p_workspace_id: string
+        }
+        Returns: {
+          address: string | null
+          capacity: number | null
+          city: string | null
+          contacts: Json
+          country: string | null
+          created_at: string
+          created_by: string | null
+          custom_fields: Json
+          deleted_at: string | null
+          id: string
+          name: string
+          notes: string | null
+          previous_slugs: string[]
+          slug: string | null
+          timezone: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "venue"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -1940,6 +2332,20 @@ export type Database = {
         Returns: Database["public"]["Enums"]["membership_role"]
       }
       custom_access_token_hook: { Args: { event: Json }; Returns: Json }
+      delete_asset_version: { Args: { p_asset_id: string }; Returns: undefined }
+      delete_engagement: {
+        Args: { p_engagement_id: string }
+        Returns: undefined
+      }
+      delete_expense: { Args: { p_expense_id: string }; Returns: undefined }
+      delete_invoice: { Args: { p_invoice_id: string }; Returns: undefined }
+      delete_performance: {
+        Args: { p_performance_id: string }
+        Returns: undefined
+      }
+      delete_person_note: { Args: { p_note_id: string }; Returns: undefined }
+      get_public_calendar: { Args: { p_token: string }; Returns: Json }
+      get_public_roadsheet: { Args: { p_token: string }; Returns: Json }
       has_permission: {
         Args: { p_perm: string; p_project_id: string }
         Returns: boolean
@@ -1949,6 +2355,42 @@ export type Database = {
       is_account_owner: { Args: { acc_id: string }; Returns: boolean }
       is_reserved_slug: { Args: { candidate: string }; Returns: boolean }
       is_workspace_member: { Args: { ws_id: string }; Returns: boolean }
+      list_calendar_shares: {
+        Args: { p_workspace_id: string }
+        Returns: {
+          created_at: string
+          created_by: string | null
+          id: string
+          revoked_at: string | null
+          token: string
+          workspace_id: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "calendar_share"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      list_roadsheet_shares: {
+        Args: { p_performance_id: string }
+        Returns: {
+          created_at: string
+          created_by: string | null
+          id: string
+          performance_id: string
+          revoked_at: string | null
+          role: string
+          token: string
+          workspace_id: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "roadsheet_share"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       project_id_of_asset_version: {
         Args: {
           p_line_id: string
@@ -1961,6 +2403,14 @@ export type Database = {
       project_id_of_performance: {
         Args: { p_performance_id: string }
         Returns: string
+      }
+      revoke_calendar_share: {
+        Args: { p_share_id: string }
+        Returns: undefined
+      }
+      revoke_roadsheet_share: {
+        Args: { p_share_id: string }
+        Returns: undefined
       }
       slugify: { Args: { input: string }; Returns: string }
       touch_line_visit: { Args: { p_line_id: string }; Returns: undefined }
@@ -2235,4 +2685,3 @@ export const Constants = {
     },
   },
 } as const
-

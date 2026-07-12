@@ -9,7 +9,8 @@
 -- keep the old arity as an overload and PostgREST RPC calls by named args
 -- could go ambiguous. DROP the old signature first, then CREATE + grants.
 --
--- PENDING APPLY — run via Supabase MCP apply_migration
+-- Applied 2026-07-12 via Supabase MCP apply_migration — verified live
+-- (pg_constraint / information_schema / pg_proc probes + backfill count 154).
 -- (name: create_engagement_line_id). This file is the canonical record.
 
 DROP FUNCTION public.create_engagement(uuid, uuid, text, text, text, text, text, public.engagement_status, text, timestamptz, text);
