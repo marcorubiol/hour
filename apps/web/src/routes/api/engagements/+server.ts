@@ -30,6 +30,7 @@ const QuerySchema = v.object({
   project_slug: v.optional(v.pipe(v.string(), v.minLength(1))),
   project_ids: v.optional(v.string()),
   workspace_ids: v.optional(v.string()),
+  line_id: v.optional(v.pipe(v.string(), v.uuid())),
   q: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(120))),
   season: v.optional(v.string(), 'any'),
   limit: v.optional(
@@ -93,7 +94,7 @@ export const GET: RequestHandler = async ({ request, url, platform }) => {
       400,
     );
   }
-  const { status, project_slug, project_ids, workspace_ids, q, season, limit, offset } =
+  const { status, project_slug, project_ids, workspace_ids, line_id, q, season, limit, offset } =
     parsed.output;
 
   const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -127,6 +128,7 @@ export const GET: RequestHandler = async ({ request, url, platform }) => {
   } else if (workspaceIds.length > 0) {
     search.set('workspace_id', `in.(${workspaceIds.join(',')})`);
   }
+  if (line_id) search.set('line_id', `eq.${line_id}`);
   search.set('deleted_at', 'is.null');
 
   if (q) {
@@ -234,6 +236,7 @@ export const POST: RequestHandler = async ({ request, platform }) => {
       p_role: input.role ?? null,
       p_next_action_at: input.next_action_at ?? null,
       p_next_action_note: input.next_action_note ?? null,
+      p_line_id: input.line_id ?? null,
     });
     if (data.length === 0 || !data[0]) return json({ error: 'create_failed' }, 502);
     return json({ engagement: data[0] }, 201);

@@ -105,8 +105,6 @@ type PerformanceItem = {
   project_id: string;
   line_id: string | null;
   engagement_id: string | null;
-  fee_amount: number | null;
-  fee_currency: string | null;
   load_in_at: string | null;
   start_at: string | null;
   venue: VenueLite | null;
@@ -153,12 +151,15 @@ export const GET: RequestHandler = async ({ request, url, platform }) => {
   const workspaceIds = parseUuidList(workspace_ids);
 
   const search = new URLSearchParams();
+  // No fee columns here: this reads the BASE table (RLS = edit:show), so
+  // fees would leak past the read:money gate. The money door is
+  // /api/money/performances over performance_redacted (ADR-041/056).
   search.set(
     'select',
     [
       'id,slug,performed_at,status,venue_id,venue_name,city,country',
       'project_id,line_id,engagement_id',
-      'fee_amount,fee_currency,load_in_at,start_at',
+      'load_in_at,start_at',
       'venue:venue_id(id,name,city,country)',
       'project:project_id(id,slug,name,accent,workspace_id)',
     ].join(','),

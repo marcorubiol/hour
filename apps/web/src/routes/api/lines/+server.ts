@@ -27,6 +27,7 @@ import type { RequestHandler } from './$types';
 import * as v from 'valibot';
 import { extractBearer } from '$lib/auth';
 import type { Tables } from '$lib/db-types';
+import { LineModulesSchema, type ModuleKey } from '$lib/line-templates';
 import { pgGet, pgPostRpc, PostgrestError, type SupabaseEnv } from '$lib/supabase';
 
 const ALLOWED_STATUSES = ['any', 'open', 'closed', 'archived'] as const;
@@ -99,6 +100,9 @@ type LineItem = {
   territory: string | null;
   start_date: string | null;
   end_date: string | null;
+  accent: string | null;
+  description: string | null;
+  modules: ModuleKey[] | null;
   project_id: string;
   workspace_id: string;
   updated_at: string;
@@ -127,6 +131,8 @@ const CreateBodySchema = v.object({
       'misc',
     ]),
   ),
+  // ADR-056: the template picker fixes the module set at creation.
+  modules: v.optional(LineModulesSchema),
 });
 
 export const POST: RequestHandler = async ({ request, platform }) => {
@@ -163,6 +169,7 @@ export const POST: RequestHandler = async ({ request, platform }) => {
   if (parsed.output.accent) args.p_accent = parsed.output.accent;
   if (parsed.output.description) args.p_description = parsed.output.description;
   if (parsed.output.kind) args.p_kind = parsed.output.kind;
+  if (parsed.output.modules) args.p_modules = parsed.output.modules;
 
   try {
     const { data } = await pgPostRpc<LineRow>(env, 'create_line', jwt, args);
@@ -229,7 +236,8 @@ export const GET: RequestHandler = async ({ request, url, platform }) => {
     'select',
     [
       'id,slug,name,kind,status,territory',
-      'start_date,end_date,project_id,workspace_id,updated_at,last_navigated_at',
+      'start_date,end_date,accent,description,modules',
+      'project_id,workspace_id,updated_at,last_navigated_at',
       'project:project_id(id,slug,name,workspace_id)',
     ].join(','),
   );

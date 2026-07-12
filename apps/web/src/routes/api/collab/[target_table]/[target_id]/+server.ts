@@ -4,7 +4,7 @@
  * RoadsheetCollab DO instance for `(target_table, target_id)`.
  *
  * Client URL pattern:
- *   wss://hour.zerosense.studio/api/collab/show/<uuid>?token=<jwt>
+ *   wss://hour.zerosense.studio/api/collab/<performance|project|line>/<uuid>?token=<jwt>
  *
  * Why query string for the JWT: browser WebSocket clients can't set custom
  * headers on the upgrade request. A per-connection token in the URL is the

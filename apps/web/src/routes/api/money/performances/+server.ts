@@ -17,6 +17,7 @@ import { pgGet, PostgrestError, type SupabaseEnv } from '$lib/supabase';
 const QuerySchema = v.object({
   project_ids: v.optional(v.string()),
   workspace_ids: v.optional(v.string()),
+  line_ids: v.optional(v.string()),
   from: v.optional(v.pipe(v.string(), v.isoDate())),
   to: v.optional(v.pipe(v.string(), v.isoDate())),
   limit: v.optional(
@@ -86,9 +87,10 @@ export const GET: RequestHandler = async ({ request, url, platform }) => {
       400,
     );
   }
-  const { project_ids, workspace_ids, from, to, limit } = parsed.output;
+  const { project_ids, workspace_ids, line_ids, from, to, limit } = parsed.output;
   const projectIds = parseUuidList(project_ids);
   const workspaceIds = parseUuidList(workspace_ids);
+  const lineIds = parseUuidList(line_ids);
 
   const search = new URLSearchParams();
   search.set(
@@ -110,6 +112,9 @@ export const GET: RequestHandler = async ({ request, url, platform }) => {
     search.set('workspace_id', `in.(${workspaceIds.join(',')})`);
   }
 
+  // Line narrowing (ADR-056): the Money module fetches only its line's
+  // gigs instead of the whole project. Composes with the union filter.
+  if (lineIds.length > 0) search.set('line_id', `in.(${lineIds.join(',')})`);
   search.set('deleted_at', 'is.null');
   if (from) search.append('performed_at', `gte.${from}`);
   if (to) search.append('performed_at', `lte.${to}`);
