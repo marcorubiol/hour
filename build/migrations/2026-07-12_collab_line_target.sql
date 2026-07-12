@@ -6,7 +6,7 @@
 --
 -- MUST be live BEFORE any hour-collab deploy that allows the 'line' target.
 --
--- Applied 2026-07-12 via Supabase MCP apply_migration
+-- PENDING APPLY — run via Supabase MCP apply_migration
 -- (name: collab_line_target). This file is the canonical record.
 
 ALTER TABLE public.collab_snapshot

@@ -13,7 +13,7 @@
 -- Scope: exactly one of p_performance_id / p_line_id (mirrors the table's
 -- expense_exactly_one_parent CHECK, validated first for a friendlier error).
 --
--- Applied 2026-07-12 via Supabase MCP apply_migration
+-- PENDING APPLY — run via Supabase MCP apply_migration
 -- (name: expense_rpcs). This file is the canonical record.
 
 CREATE OR REPLACE FUNCTION public.create_expense(

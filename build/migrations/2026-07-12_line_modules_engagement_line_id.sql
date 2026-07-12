@@ -11,7 +11,7 @@
 -- (3) Backfill: the season-2026-27 engagements of MaMeMi → line
 --     difusion-2026-27. custom_fields.season stays as metadata.
 --
--- Applied 2026-07-12 via Supabase MCP apply_migration
+-- PENDING APPLY — run via Supabase MCP apply_migration
 -- (name: line_modules_engagement_line_id). This file is the canonical record.
 
 ALTER TABLE public.line

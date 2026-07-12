@@ -13,7 +13,7 @@
 -- Signature change → DROP the old arity first (avoid a PostgREST-ambiguous
 -- overload), then CREATE + grants.
 --
--- Applied 2026-07-12 via Supabase MCP apply_migration
+-- PENDING APPLY — run via Supabase MCP apply_migration
 -- (name: create_line_template). This file is the canonical record.
 
 -- ── Backfill NULL slugs on live lines ───────────────────────────────────

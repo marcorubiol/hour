@@ -13,7 +13,7 @@
 -- · delete_asset_version — a hard DELETE policy exists (edit:show), but the
 --   house rule since ADR-048 is soft-delete via RPC (audit trail stays).
 --
--- Applied 2026-07-12 via Supabase MCP apply_migration
+-- PENDING APPLY — run via Supabase MCP apply_migration
 -- (name: asset_version_rpcs). This file is the canonical record.
 
 CREATE OR REPLACE FUNCTION public.create_asset_version(
