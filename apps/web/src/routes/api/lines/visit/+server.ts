@@ -17,8 +17,9 @@
 
 import type { RequestHandler } from './$types';
 import * as v from 'valibot';
-import { extractBearer } from '$lib/auth';
-import { pgPostRpc, PostgrestError, type SupabaseEnv } from '$lib/supabase';
+import { extractAccessToken } from '$lib/auth';
+import { pgPostRpc, type SupabaseEnv } from '$lib/supabase';
+import { pgErrorResponse } from '$lib/server/errors';
 
 const BodySchema = v.object({
   line_id: v.pipe(v.string(), v.uuid()),
@@ -31,11 +32,11 @@ function json(body: unknown, status = 200): Response {
   });
 }
 
-export const POST: RequestHandler = async ({ request, platform }) => {
+export const POST: RequestHandler = async ({ request, platform, locals }) => {
   if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);
   const env = platform.env as unknown as SupabaseEnv;
 
-  const jwt = extractBearer(request);
+  const jwt = extractAccessToken(request);
   if (!jwt) return json({ error: 'missing_authorization' }, 401);
 
   let raw: unknown;
@@ -63,11 +64,15 @@ export const POST: RequestHandler = async ({ request, platform }) => {
     await pgPostRpc(env, 'touch_line_visit', jwt, { p_line_id: line_id });
     return new Response(null, { status: 204 });
   } catch (err) {
-    if (err instanceof PostgrestError) {
-      // 42501 = permission denied (RPC's RAISE); map to 403.
-      const status = err.body.includes('42501') ? 403 : 502;
-      return json({ error: 'rpc_error', status: err.status, detail: err.body }, status);
-    }
-    return json({ error: 'unexpected', detail: String(err) }, 500);
+    return pgErrorResponse(
+      err,
+      { route: 'POST /api/lines/visit', requestId: locals.requestId },
+      {
+        codes: {
+          '42501': { status: 403, error: 'rpc_error' },
+        },
+        passUpstream: [],
+      },
+    );
   }
 };

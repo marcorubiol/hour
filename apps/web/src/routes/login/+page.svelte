@@ -11,24 +11,18 @@
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { t } from '$lib/i18n';
-  import { env } from '$env/dynamic/public';
   import { resolveLoginTarget } from '$lib/master-view';
+  import { ensureSession, setSessionUser, type SessionUser } from '$lib/session.svelte';
   import BrandMark from '$lib/components/BrandMark.svelte';
-
-  type SupabaseAuthOk = {
-    access_token: string;
-    refresh_token: string;
-    expires_in: number;
-  };
-  type SupabaseAuthErr = { error_description?: string; msg?: string };
 
   let email = $state('');
   let password = $state('');
   let submitting = $state(false);
   let errorMsg = $state('');
 
-  onMount(() => {
-    if (localStorage.getItem('hour_jwt')) {
+  onMount(async () => {
+    // Already signed in (httpOnly cookie — only the server can tell).
+    if (await ensureSession()) {
       goto(resolveLoginTarget(), { replaceState: true });
     }
   });
@@ -38,41 +32,29 @@
     errorMsg = '';
     submitting = true;
 
-    const supabaseUrl = env.PUBLIC_SUPABASE_URL;
-    const supabaseAnonKey = env.PUBLIC_SUPABASE_ANON_KEY;
-    if (!supabaseUrl || !supabaseAnonKey) {
-      errorMsg = 'Missing PUBLIC_SUPABASE_* env. Check wrangler.toml [vars].';
-      submitting = false;
-      return;
-    }
-
     try {
-      const res = await fetch(
-        `${supabaseUrl}/auth/v1/token?grant_type=password`,
-        {
-          method: 'POST',
-          headers: {
-            apikey: supabaseAnonKey,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ email, password }),
-        },
-      );
+      // Worker-mediated sign-in (Phase 0.9): the password grant runs
+      // server-side and the session lands as httpOnly cookies — tokens
+      // never touch JS or localStorage.
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
 
       if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as SupabaseAuthErr;
-        throw new Error(
-          body.error_description || body.msg || t('login.invalid_credentials'),
-        );
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        const key =
+          body.error === 'rate_limited'
+            ? 'login.rate_limited'
+            : body.error === 'auth_unavailable'
+              ? 'login.auth_unavailable'
+              : 'login.invalid_credentials';
+        throw new Error(t(key));
       }
 
-      const data = (await res.json()) as SupabaseAuthOk;
-      localStorage.setItem('hour_jwt', data.access_token);
-      localStorage.setItem('hour_refresh', data.refresh_token);
-      localStorage.setItem(
-        'hour_expires_at',
-        String(Date.now() + data.expires_in * 1000),
-      );
+      const data = (await res.json()) as { user: SessionUser | null };
+      setSessionUser(data.user);
 
       goto(resolveLoginTarget(), { replaceState: true });
     } catch (err) {

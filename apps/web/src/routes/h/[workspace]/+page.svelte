@@ -21,7 +21,7 @@
   import { toStore } from 'svelte/store';
   import { fetchJSON } from '$lib/api';
   import { lineKindGlyph } from '$lib/utils/line-kind';
-  import { decodeJwtClaim } from '$lib/realtime';
+  import { session } from '$lib/session.svelte';
   import { usePins, projectPin, linePin } from '$lib/stores/pins.svelte';
   import { useCreation } from '$lib/stores/creation.svelte';
   import {
@@ -144,28 +144,21 @@
     now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }),
   );
 
-  let jwtName = $state<string | null>(null);
-  $effect(() => {
-    if (typeof window === 'undefined') return;
-    const jwt = localStorage.getItem('hour_jwt');
-    if (!jwt) return;
-    const full =
-      decodeJwtClaim(jwt, 'user_metadata.full_name') || decodeJwtClaim(jwt, 'user_metadata.name');
-    if (full) {
-      jwtName = full.split(/\s+/)[0] ?? full;
-      return;
-    }
-    const email = decodeJwtClaim(jwt, 'email');
+  let sessionName = $derived.by(() => {
+    const full = session.user?.name;
+    if (full) return full.split(/\s+/)[0] ?? full;
+    const email = session.user?.email;
     if (email) {
       const local = email.split('@')[0] ?? '';
       const first = local.split(/[._-]+/)[0];
       if (first && first.length < local.length) {
-        jwtName = first.charAt(0).toUpperCase() + first.slice(1).toLowerCase();
+        return first.charAt(0).toUpperCase() + first.slice(1).toLowerCase();
       }
     }
+    return null;
   });
   let firstName = $derived.by(() => {
-    if (jwtName) return jwtName;
+    if (sessionName) return sessionName;
     const personal = workspaces.find((h) => h.kind === 'personal');
     return personal ? (personal.name.split(/\s+/)[0] ?? personal.name) : 'there';
   });

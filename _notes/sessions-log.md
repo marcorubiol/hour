@@ -8,6 +8,16 @@ Convención: secciones por fecha descendente. Cada sesión queda con commits cit
 
 ---
 
+## 2026-07-13 — Phase 0.9 hardening gate (ADR-061) — sesión autónoma ultracode
+
+Gatillo: revisión de conclusiones externas sobre la app ("¿está lista para beta?") → Marco decidió abrir a externos en semanas → implementar el gate de hardening entero. Scope elegido: **curated onboarding** (no public signup), lo que mantiene httpOnly cookies en vez de forzar `@supabase/ssr` ahora.
+
+**Método (workflows):** 1 recon (6 lentes, mapeo completo de la superficie auth/API/infra/sentry/RLS) → implementación a mano del núcleo (sesión, hooks, CSP, Sentry, health, CI) → 2 sweeps mecánicos en paralelo (error mapper ×26 endpoints, migración fetch cliente ×8 ficheros, e2e ×7 specs). **Gotcha caro:** el primer sweep murió a mitad — los subagentes heredaron Fable 5 (modelo de sesión al lanzar) y toparon con el límite de gasto mensual de Fable; dejaron ediciones parciales PERO consistentes (audit confirmó 0 ficheros rotos: ninguno con import huérfano ni half-done). Marco cambió a Opus → relancé un script nuevo excluyendo lo ya hecho → los agentes heredaron Opus y completaron. Lección: al lanzar un workflow, el modelo de los agentes = modelo de sesión en ese instante.
+
+**Bug real cazado por el build:** `%sveltekit.nonce%` es incompatible con prerender de `/offline` — y SvelteKit hace un `.includes()` literal, así que hasta el string en un COMENTARIO lo dispara. Además el review adversarial (5 lentes → verify, 12 agentes; 7 hallazgos → 2 confirmados low) destapó que kit.csp NO escanea app.html para scripts inline → el script de tema quedaría CSP-bloqueado en toda página SSR (FOIC para modo oscuro). Fix robusto: externalizar a `static/theme-init.js` (`script-src 'self'`, sin hash frágil que reintroduzca el mismo fallo silencioso). 2º confirmado: el rate-limiter KV tiene TOCTOU (ráfaga concurrente lee count stale) → docblock honesto + regla CF edge en el runbook como control real (patrón que Marco ya usa en wp-login de la flota). 5 refutados por el diseño cookie-maxAge=exp (la cookie cae al expirar → nunca se manda un token expirado → el 401→502-sin-refresh no se alcanza).
+
+Detalle completo, decisiones y estado pendiente: `_decisions.md § ADR-061` + `build/runbooks/phase09-launch.md`. Gate: svelte-check 0/0 · unit 110/110 · collab tsc · build OK. Sin correr (Marco): RLS + e2e (tocan prod / necesitan `.env.test`) + verificación en navegador del flujo de auth.
+
 ## 2026-07-12 (noche 2) — Home projects-first + pin de project — ADR-060
 
 Primer producto del gate 0.3: Marco, usando la app con la difusión real, detecta que los tres niveles (espacio → project → línea) solo tienen dos en la nav — la home enseñaba espacios con las líneas planas dentro, los pins eran `s:`/`l:`, ⌘K no listaba projects y el detalle de project solo se alcanzaba por el back-link del line detail. Review de la home + propuesta con maqueta (artifact claude.ai, mismo design system), OK explícito de Marco ("adelante con esto"), implementación directa en la sesión. **Cero migraciones** — la API ya filtraba todo por `project_ids ∪ workspace_ids`.

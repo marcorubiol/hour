@@ -16,8 +16,9 @@
 
 import type { RequestHandler } from './$types';
 import * as v from 'valibot';
-import { extractBearer } from '$lib/auth';
-import { pgGet, PostgrestError, type SupabaseEnv } from '$lib/supabase';
+import { extractAccessToken } from '$lib/auth';
+import { pgGet, type SupabaseEnv } from '$lib/supabase';
+import { pgErrorResponse } from '$lib/server/errors';
 
 const IdSchema = v.pipe(v.string(), v.uuid());
 
@@ -74,11 +75,11 @@ function parseContacts(rawList: unknown): VenueContact[] {
 
 const PERSON_SELECT = 'person:person_id(id,slug,full_name,email,phone)';
 
-export const GET: RequestHandler = async ({ request, params, platform }) => {
+export const GET: RequestHandler = async ({ request, params, platform, locals }) => {
   if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);
   const env = platform.env as unknown as SupabaseEnv;
 
-  const jwt = extractBearer(request);
+  const jwt = extractAccessToken(request);
   if (!jwt) return json({ error: 'missing_authorization' }, 401);
 
   const idParsed = v.safeParse(IdSchema, params.id);
@@ -156,13 +157,10 @@ export const GET: RequestHandler = async ({ request, params, platform }) => {
       venues: venueContacts,
     });
   } catch (err) {
-    if (err instanceof PostgrestError) {
-      const upstream = err.status === 401 || err.status === 403 ? err.status : 502;
-      return json(
-        { error: 'postgrest_error', status: err.status, detail: err.body },
-        upstream,
-      );
-    }
-    return json({ error: 'unexpected', detail: String(err) }, 500);
+    return pgErrorResponse(
+      err,
+      { route: 'GET /api/lines/[id]/people', requestId: locals.requestId },
+      { passUpstream: [401, 403] },
+    );
   }
 };

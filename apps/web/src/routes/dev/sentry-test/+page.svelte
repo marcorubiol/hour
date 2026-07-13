@@ -1,17 +1,15 @@
 <script lang="ts">
   import { dev } from '$app/environment';
   import { goto } from '$app/navigation';
-  import { page } from '$app/state';
   import { onMount } from 'svelte';
   import * as Sentry from '@sentry/sveltekit';
 
-  // Dev-only by default. In production, accessible via ?force=1 so we can
-  // run the same smoke test against the deployed Worker without exposing
-  // the test routes to drive-by traffic.
+  // Dev-only, hard (Phase 0.9) — the ?force=1 production escape hatch died
+  // with its API sibling: anyone with the URL could burn Sentry quota.
   let allowed = $state(true);
 
   onMount(() => {
-    if (!dev && page.url.searchParams.get('force') !== '1') {
+    if (!dev) {
       allowed = false;
       goto('/', { replaceState: true });
     }
@@ -31,9 +29,8 @@
 
   async function hitServerError() {
     lastResult = 'Hitting /api/sentry-test...';
-    const target = dev ? '/api/sentry-test' : '/api/sentry-test?force=1';
     try {
-      const res = await fetch(target);
+      const res = await fetch('/api/sentry-test');
       lastResult = `Server responded ${res.status} (expected 500). Check Sentry.`;
     } catch (err) {
       lastResult = `Network error: ${err instanceof Error ? err.message : String(err)}`;

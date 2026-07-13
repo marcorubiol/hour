@@ -31,12 +31,11 @@ test.describe('public road sheet link', () => {
     // Pre-clean via API: revoke strays from previously failed runs so the
     // count assertions below are deterministic.
     await page.evaluate(async () => {
-      const H = { Authorization: `Bearer ${localStorage.getItem('hour_jwt')}` };
       const base = '/api/performances/zzz-e2e-1/roadsheet/shares';
-      const res = await fetch(`${base}?ws=playwright`, { headers: H });
+      const res = await fetch(`${base}?ws=playwright`);
       const { items } = (await res.json()) as { items: Array<{ id: string }> };
       for (const s of items) {
-        await fetch(`${base}/${s.id}?ws=playwright`, { method: 'DELETE', headers: H });
+        await fetch(`${base}/${s.id}?ws=playwright`, { method: 'DELETE' });
       }
     });
     await page.reload();

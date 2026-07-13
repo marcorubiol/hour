@@ -18,9 +18,10 @@
 
 import type { RequestHandler } from './$types';
 import * as v from 'valibot';
-import { extractBearer } from '$lib/auth';
+import { extractAccessToken } from '$lib/auth';
 import { LineModulesSchema } from '$lib/line-templates';
-import { pgPatch, PostgrestError, type SupabaseEnv } from '$lib/supabase';
+import { pgPatch, type SupabaseEnv } from '$lib/supabase';
+import { pgErrorResponse } from '$lib/server/errors';
 
 const IdSchema = v.pipe(v.string(), v.uuid());
 
@@ -35,11 +36,11 @@ function json(body: unknown, status = 200): Response {
   });
 }
 
-export const PATCH: RequestHandler = async ({ request, params, platform }) => {
+export const PATCH: RequestHandler = async ({ request, params, platform, locals }) => {
   if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);
   const env = platform.env as unknown as SupabaseEnv;
 
-  const jwt = extractBearer(request);
+  const jwt = extractAccessToken(request);
   if (!jwt) {
     return json(
       { error: 'missing_authorization', hint: 'Send Authorization: Bearer <supabase_jwt>.' },
@@ -90,13 +91,10 @@ export const PATCH: RequestHandler = async ({ request, params, platform }) => {
     if (data.length === 0) return json({ error: 'not_found' }, 404);
     return json({ line: data[0] });
   } catch (err) {
-    if (err instanceof PostgrestError) {
-      const upstream = err.status === 401 || err.status === 403 ? err.status : 502;
-      return json(
-        { error: 'postgrest_error', status: err.status, detail: err.body },
-        upstream,
-      );
-    }
-    return json({ error: 'unexpected', detail: String(err) }, 500);
+    return pgErrorResponse(
+      err,
+      { route: 'PATCH /api/lines/[id]', requestId: locals.requestId },
+      { passUpstream: [401, 403] },
+    );
   }
 };

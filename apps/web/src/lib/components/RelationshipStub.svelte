@@ -14,9 +14,9 @@
    */
 
   import { createQuery } from '@tanstack/svelte-query';
-  import { goto } from '$app/navigation';
   import { page } from '$app/state';
   import { writable, derived } from 'svelte/store';
+  import { fetchJSON } from '$lib/api';
   import {
     statusBadgeClass,
     statusLabel,
@@ -46,34 +46,6 @@
     limit: number;
     items: EngagementItem[];
   };
-
-  function clearAuthAndBounce() {
-    localStorage.removeItem('hour_jwt');
-    localStorage.removeItem('hour_refresh');
-    localStorage.removeItem('hour_expires_at');
-    goto('/login', { replaceState: true });
-  }
-
-  async function fetchJSON<T>(url: string, signal: AbortSignal): Promise<T> {
-    const jwt = localStorage.getItem('hour_jwt');
-    if (!jwt) {
-      clearAuthAndBounce();
-      throw new Error('Missing JWT');
-    }
-    const res = await fetch(url, { signal, headers: { Authorization: `Bearer ${jwt}` } });
-    if (res.status === 401) {
-      clearAuthAndBounce();
-      throw new Error('Unauthorized');
-    }
-    if (!res.ok) {
-      const body = (await res.json().catch(() => ({}))) as {
-        detail?: string;
-        error?: string;
-      };
-      throw new Error(body.detail || body.error || `Error ${res.status}`);
-    }
-    return (await res.json()) as T;
-  }
 
   const LIMIT = 10;
 

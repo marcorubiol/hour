@@ -4,8 +4,9 @@
 > Contexto completo: `_context.md § Status — 2026-07-12` + `_notes/sessions-log.md § 2026-07-12 (noche 2)`.
 
 ## Queue
+- [ ] **Phase 0.9 hardening (ADR-061) — verificar en navegador + deploy.** Implementado 2026-07-13 (httpOnly sessions, CSP, error mapper, Sentry PII, rate limit, health, CI). Gate local verde: svelte-check 0/0 · unit 110/110 · collab tsc · build OK · review adversarial (2 low arreglados). **Falta antes de deploy:** (1) verificar en dev el login/refresh/logout + una nota colaborativa (el cambio de auth NO tiene cobertura e2e corrida); (2) correr RLS + e2e con `.env.test`; (3) crear KV `RATE_LIMIT` + añadir regla CF rate-limit en `/api/auth/login` (runbook `build/runbooks/phase09-launch.md`). Deploy: collab → web.
 - [ ] System-completeness gate (0.3): TODO el bloque construido está (ADR-051→058). PARAR de construir y usar Hour con la difusión real ~1 mes. El veredicto es de Marco, no de código. (ADR-060 = primer feedback del gate ya incorporado.)
-- [ ] Deploy conjunto ADR-059 (coherencia visual) + ADR-060 (home projects-first): verificados en local (svelte-check 0/0 · unit 110/110 · e2e 15/15 local · collab 2/2 prod pre-060), pendiente revisión de Marco en dev + `pnpm run deploy`
+- [ ] Deploy conjunto ADR-059 (coherencia visual) + ADR-060 (home projects-first): verificados en local (svelte-check 0/0 · unit 110/110 · e2e 15/15 local · collab 2/2 prod pre-060), pendiente revisión de Marco en dev + `pnpm run deploy`. **Nota: ADR-061 va encima de estos — deploy conjunto o 059/060 primero, da igual el orden, están en el mismo working tree.**
 
 ## Deferred
 - [ ] Phase 0.4 polish — mobile completo (Plaza→pins/Calendar/Money + line detail), ⌘K, notifications in-app, GDPR export, a11y pass, checkpoint visual 2, ratificación naming @from:2026-08-01

@@ -14,9 +14,10 @@
 
 import type { RequestHandler } from './$types';
 import * as v from 'valibot';
-import { extractBearer } from '$lib/auth';
+import { extractAccessToken } from '$lib/auth';
 import { EXPENSE_CATEGORIES, ExpenseCreateSchema, type ExpenseItem } from '$lib/expense';
-import { pgGet, pgPostRpc, PostgrestError, type SupabaseEnv } from '$lib/supabase';
+import { pgGet, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
+import { pgErrorResponse } from '$lib/server/errors';
 
 const QuerySchema = v.object({
   line_ids: v.optional(v.string()),
@@ -54,11 +55,11 @@ function parseUuidList(raw: string | undefined): string[] {
 const EXPENSE_SELECT =
   'id,workspace_id,performance_id,line_id,category,description,amount,currency,incurred_on,reimbursed,notes,created_at';
 
-export const GET: RequestHandler = async ({ request, url, platform }) => {
+export const GET: RequestHandler = async ({ request, url, platform, locals }) => {
   if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);
   const env = platform.env as unknown as SupabaseEnv;
 
-  const jwt = extractBearer(request);
+  const jwt = extractAccessToken(request);
   if (!jwt) return json({ error: 'missing_authorization' }, 401);
 
   const rawParams = Object.fromEntries(url.searchParams.entries());
@@ -106,22 +107,19 @@ export const GET: RequestHandler = async ({ request, url, platform }) => {
     const { data } = await pgGet<ExpenseItem>(env, 'expense', jwt, { search });
     return json({ items: data });
   } catch (err) {
-    if (err instanceof PostgrestError) {
-      const upstream = err.status === 401 || err.status === 403 ? err.status : 502;
-      return json(
-        { error: 'postgrest_error', status: err.status, detail: err.body },
-        upstream,
-      );
-    }
-    return json({ error: 'unexpected', detail: String(err) }, 500);
+    return pgErrorResponse(
+      err,
+      { route: 'GET /api/expenses', requestId: locals.requestId },
+      { passUpstream: [401, 403] },
+    );
   }
 };
 
-export const POST: RequestHandler = async ({ request, platform }) => {
+export const POST: RequestHandler = async ({ request, platform, locals }) => {
   if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);
   const env = platform.env as unknown as SupabaseEnv;
 
-  const jwt = extractBearer(request);
+  const jwt = extractAccessToken(request);
   if (!jwt) return json({ error: 'missing_authorization' }, 401);
 
   let raw: unknown;
@@ -166,12 +164,15 @@ export const POST: RequestHandler = async ({ request, platform }) => {
     if (data.length === 0 || !data[0]) return json({ error: 'create_failed' }, 502);
     return json({ expense: data[0] }, 201);
   } catch (err) {
-    if (err instanceof PostgrestError) {
-      if (err.code === '22023') return json({ error: 'invalid_input', detail: err.body }, 400);
-      if (err.code === '42501') return json({ error: 'forbidden' }, 403);
-      const upstream = err.status === 401 ? 401 : 502;
-      return json({ error: 'postgrest_error', status: err.status, detail: err.body }, upstream);
-    }
-    return json({ error: 'unexpected', detail: String(err) }, 500);
+    return pgErrorResponse(
+      err,
+      { route: 'POST /api/expenses', requestId: locals.requestId },
+      {
+        codes: {
+          '22023': { status: 400, error: 'invalid_input' },
+          '42501': { status: 403, error: 'forbidden' },
+        },
+      },
+    );
   }
 };

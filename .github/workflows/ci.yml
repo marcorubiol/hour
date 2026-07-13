@@ -1,0 +1,62 @@
+name: CI
+
+# Secretless barrier (Phase 0.9): svelte-check + unit tests + build for the
+# web app, typecheck for the collab Worker. Runs offline — no Supabase, no
+# Sentry (empty DSN cleanly disables it, sourcemap upload self-disables
+# without SENTRY_AUTH_TOKEN).
+#
+# Deliberately NOT here: the RLS suite (hits the live production Supabase
+# as a real user — run locally via `pnpm --filter web test:rls`) and the
+# Playwright smoke (needs PW_TEST_* credentials + live Supabase). Those
+# stay local until a staging Supabase branch exists.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PUBLIC_SENTRY_DSN: ''
+  PUBLIC_SENTRY_ENV: 'ci'
+
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4 # version read from packageManager field
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - name: svelte-check
+        run: pnpm --filter web check
+      - name: Unit tests
+        run: pnpm --filter web test:unit
+      - name: Build
+        run: pnpm --filter web build
+
+  collab:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - name: Typecheck
+        run: pnpm --filter collab check

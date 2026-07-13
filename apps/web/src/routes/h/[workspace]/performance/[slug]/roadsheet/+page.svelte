@@ -14,7 +14,7 @@
   import { page } from '$app/state';
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
-  import { fetchJSON } from '$lib/api';
+  import { fetchJSON, mutateJSON } from '$lib/api';
   import Button from '$lib/components/Button.svelte';
   import Pill from '$lib/components/Pill.svelte';
   import RoadsheetView from '$lib/components/RoadsheetView.svelte';
@@ -68,26 +68,12 @@
 
   let shareRole = $state<(typeof PUBLIC_ROLES)[number]>('tech_manager');
 
-  async function mutateShares(input: RequestInfo, init: RequestInit): Promise<void> {
-    const res = await fetch(input, {
-      ...init,
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem('hour_jwt')}`,
-        'content-type': 'application/json',
-        ...init.headers,
-      },
-    });
-    if (!res.ok) {
-      const body = (await res.json().catch(() => ({}))) as { detail?: string; error?: string };
-      throw new Error(body.detail || body.error || `Error ${res.status}`);
-    }
-  }
-
   const createShare = createMutation({
     mutationFn: () =>
-      mutateShares(
+      mutateJSON(
+        'POST',
         `/api/performances/${encodeURIComponent(slug)}/roadsheet/shares?ws=${encodeURIComponent(workspaceSlug)}`,
-        { method: 'POST', body: JSON.stringify({ role: shareRole }) },
+        { role: shareRole },
       ),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['roadsheet-shares'] });
@@ -103,9 +89,9 @@
 
   const revokeShare = createMutation({
     mutationFn: (id: string) =>
-      mutateShares(
+      mutateJSON(
+        'DELETE',
         `/api/performances/${encodeURIComponent(slug)}/roadsheet/shares/${id}?ws=${encodeURIComponent(workspaceSlug)}`,
-        { method: 'DELETE' },
       ),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['roadsheet-shares'] });

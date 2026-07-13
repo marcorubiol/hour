@@ -42,11 +42,8 @@ test.describe('contact capture', () => {
     // (Search is over person name/organization, so query by name then
     // filter by the fixture email.)
     await page.evaluate(async ({ name, email }) => {
-      const jwt = localStorage.getItem('hour_jwt');
-      const headers = { Authorization: `Bearer ${jwt}` };
       const list = await fetch(
         `/api/engagements?status=any&q=${encodeURIComponent(name)}`,
-        { headers },
       );
       const items = (
         (await list.json()) as {
@@ -54,7 +51,7 @@ test.describe('contact capture', () => {
         }
       ).items.filter((i) => i.person?.email === email);
       for (const i of items) {
-        await fetch(`/api/engagements/${i.id}`, { method: 'DELETE', headers });
+        await fetch(`/api/engagements/${i.id}`, { method: 'DELETE' });
       }
     }, { name: FIXTURE_NAME, email: FIXTURE_EMAIL });
 
@@ -82,9 +79,7 @@ test.describe('contact capture', () => {
     // the API, same surface the dialog uses.
     const apiChecks = await page.evaluate(
       async ({ name, email }) => {
-        const jwt = localStorage.getItem('hour_jwt');
         const headers = {
-          Authorization: `Bearer ${jwt}`,
           'content-type': 'application/json',
         };
 

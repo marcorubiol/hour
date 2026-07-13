@@ -24,7 +24,7 @@
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { untrack } from 'svelte';
   import { toStore } from 'svelte/store';
-  import { fetchJSON } from '$lib/api';
+  import { fetchJSON, mutateJSON } from '$lib/api';
   import { dayMonth } from '$lib/datetime';
   import Button from '$lib/components/Button.svelte';
   import Dialog from '$lib/components/Dialog.svelte';
@@ -104,22 +104,12 @@
 
   const patchMutation = createMutation({
     mutationFn: async ({ id, patch }: PatchInput) => {
-      const res = await fetch(`/api/engagements/${id}`, {
-        method: 'PATCH',
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('hour_jwt')}`,
-          'content-type': 'application/json',
-        },
-        body: JSON.stringify(patch),
-      });
-      const body = (await res.json().catch(() => ({}))) as {
-        item?: EngagementItem;
-        detail?: string;
-        error?: string;
-      };
-      if (!res.ok || !body.item) {
-        throw new Error(body.detail || body.error || `Error ${res.status}`);
-      }
+      const body = await mutateJSON<{ item?: EngagementItem }>(
+        'PATCH',
+        `/api/engagements/${id}`,
+        patch,
+      );
+      if (!body?.item) throw new Error('Unexpected response');
       return body.item;
     },
     onMutate: async ({ id, patch }: PatchInput) => {

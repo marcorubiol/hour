@@ -50,10 +50,8 @@ function rowByName(page: Page, name: string) {
 /** First page of the difusión list (same rows the lens can reach), raw values. */
 async function fetchListRaw(page: Page): Promise<RawEngagement[]> {
   return await page.evaluate(async () => {
-    const jwt = localStorage.getItem('hour_jwt');
     const res = await fetch(
       '/api/engagements?status=any&project_slug=mamemi&season=2026-27&limit=50',
-      { headers: { Authorization: `Bearer ${jwt}` } },
     );
     const data = (await res.json()) as { items: RawEngagement[] };
     return data.items;
@@ -72,11 +70,9 @@ async function restoreEngagement(
 ): Promise<void> {
   const status = await page.evaluate(
     async ({ id, patch }) => {
-      const jwt = localStorage.getItem('hour_jwt');
       const res = await fetch(`/api/engagements/${id}`, {
         method: 'PATCH',
         headers: {
-          Authorization: `Bearer ${jwt}`,
           'content-type': 'application/json',
         },
         body: JSON.stringify(patch),

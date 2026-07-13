@@ -36,14 +36,12 @@ type LineRow = { id: string; slug: string | null; name: string };
 /** The stable fixture line, if a previous run already created it. */
 async function findFixtureLine(page: Page): Promise<LineRow | null> {
   return page.evaluate(async ({ name }) => {
-    const jwt = localStorage.getItem('hour_jwt');
-    const headers = { Authorization: `Bearer ${jwt}` };
-    const ws = await fetch('/api/workspaces', { headers });
+    const ws = await fetch('/api/workspaces');
     const wsId = ((await ws.json()) as { items: { id: string; slug: string }[] }).items.find(
       (w) => w.slug === 'playwright',
     )?.id;
     if (!wsId) return null;
-    const res = await fetch(`/api/lines?workspace_ids=${wsId}&status=any`, { headers });
+    const res = await fetch(`/api/lines?workspace_ids=${wsId}&status=any`);
     const items = ((await res.json()) as { items: LineRow[] }).items;
     return items.find((l) => l.name === name) ?? null;
   }, { name: LINE_NAME }) as Promise<LineRow | null>;
@@ -94,14 +92,12 @@ test.describe('line detail — module composition', () => {
 
     // Crash recovery: soft-delete a leftover fixture conversation.
     await page.evaluate(async ({ email, lineId }) => {
-      const jwt = localStorage.getItem('hour_jwt');
-      const headers = { Authorization: `Bearer ${jwt}` };
-      const list = await fetch(`/api/engagements?status=any&line_id=${lineId}`, { headers });
+      const list = await fetch(`/api/engagements?status=any&line_id=${lineId}`);
       const items = (
         (await list.json()) as { items: { id: string; person: { email: string | null } | null }[] }
       ).items.filter((i) => i.person?.email === email);
       for (const i of items) {
-        await fetch(`/api/engagements/${i.id}`, { method: 'DELETE', headers });
+        await fetch(`/api/engagements/${i.id}`, { method: 'DELETE' });
       }
     }, { email: CONTACT_EMAIL, lineId: line!.id });
 
@@ -117,9 +113,7 @@ test.describe('line detail — module composition', () => {
 
     // Verify the line assignment through the API, then self-clean.
     const check = await page.evaluate(async ({ email, lineId }) => {
-      const jwt = localStorage.getItem('hour_jwt');
-      const headers = { Authorization: `Bearer ${jwt}` };
-      const list = await fetch(`/api/engagements?status=any&line_id=${lineId}`, { headers });
+      const list = await fetch(`/api/engagements?status=any&line_id=${lineId}`);
       const items = (
         (await list.json()) as {
           items: { id: string; line_id: string | null; person: { email: string | null } | null }[];
@@ -127,7 +121,7 @@ test.describe('line detail — module composition', () => {
       ).items;
       const mine = items.find((i) => i.person?.email === email);
       if (!mine) return { found: false as const };
-      const del = await fetch(`/api/engagements/${mine.id}`, { method: 'DELETE', headers });
+      const del = await fetch(`/api/engagements/${mine.id}`, { method: 'DELETE' });
       return { found: true as const, lineId: mine.line_id, delStatus: del.status };
     }, { email: CONTACT_EMAIL, lineId: line!.id });
 
@@ -148,10 +142,9 @@ test.describe('line detail — module composition', () => {
     // step leaves People in the stack and the add-menu item gone forever.
     // Reset to the booking template shape via the whitelist PATCH.
     await page.evaluate(async ({ lineId }) => {
-      const jwt = localStorage.getItem('hour_jwt');
       await fetch(`/api/lines/${lineId}`, {
         method: 'PATCH',
-        headers: { Authorization: `Bearer ${jwt}`, 'content-type': 'application/json' },
+        headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ modules: ['contacts', 'calendar', 'materials', 'notes'] }),
       });
     }, { lineId: line!.id });

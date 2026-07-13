@@ -10,8 +10,9 @@
 
 import type { RequestHandler } from './$types';
 import * as v from 'valibot';
-import { extractBearer } from '$lib/auth';
-import { pgPatch, PostgrestError, type SupabaseEnv } from '$lib/supabase';
+import { extractAccessToken } from '$lib/auth';
+import { pgPatch, type SupabaseEnv } from '$lib/supabase';
+import { pgErrorResponse } from '$lib/server/errors';
 
 const BodySchema = v.object({
   fee_amount: v.nullable(
@@ -29,11 +30,11 @@ function json(body: unknown, status = 200): Response {
   });
 }
 
-export const PATCH: RequestHandler = async ({ request, params, platform }) => {
+export const PATCH: RequestHandler = async ({ request, params, platform, locals }) => {
   if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);
   const env = platform.env as unknown as SupabaseEnv;
 
-  const jwt = extractBearer(request);
+  const jwt = extractAccessToken(request);
   if (!jwt) return json({ error: 'missing_authorization' }, 401);
 
   const idParsed = v.safeParse(IdSchema, params.id);
@@ -77,17 +78,17 @@ export const PATCH: RequestHandler = async ({ request, params, platform }) => {
     if (data.length === 0) return json({ error: 'not_found' }, 404);
     return json({ performance: data[0] });
   } catch (err) {
-    if (err instanceof PostgrestError) {
-      // The fee-guard trigger RAISEs 42501 without edit:money.
-      if (err.code === '42501' || err.code === 'P0001') {
-        return json({ error: 'forbidden', hint: 'edit:money required.' }, 403);
-      }
-      const upstream = err.status === 401 || err.status === 403 ? err.status : 502;
-      return json(
-        { error: 'postgrest_error', status: err.status, detail: err.body },
-        upstream,
-      );
-    }
-    return json({ error: 'unexpected', detail: String(err) }, 500);
+    // The fee-guard trigger RAISEs 42501 (or P0001) without edit:money.
+    return pgErrorResponse(
+      err,
+      { route: 'PATCH /api/money/performances/[id]', requestId: locals.requestId },
+      {
+        codes: {
+          '42501': { status: 403, error: 'forbidden', hint: 'edit:money required.' },
+          'P0001': { status: 403, error: 'forbidden', hint: 'edit:money required.' },
+        },
+        passUpstream: [401, 403],
+      },
+    );
   }
 };

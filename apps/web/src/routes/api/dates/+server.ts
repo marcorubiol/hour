@@ -19,8 +19,9 @@
 
 import type { RequestHandler } from './$types';
 import * as v from 'valibot';
-import { extractBearer } from '$lib/auth';
-import { pgGet, PostgrestError, type SupabaseEnv } from '$lib/supabase';
+import { extractAccessToken } from '$lib/auth';
+import { pgGet, type SupabaseEnv } from '$lib/supabase';
+import { pgErrorResponse } from '$lib/server/errors';
 
 const QuerySchema = v.object({
   project_ids: v.optional(v.string()),
@@ -76,13 +77,13 @@ type DateItem = {
   project: ProjectLite | null;
 };
 
-export const GET: RequestHandler = async ({ request, url, platform }) => {
+export const GET: RequestHandler = async ({ request, url, platform, locals }) => {
   if (!platform?.env) {
     return json({ error: 'platform_unavailable' }, 500);
   }
   const env = platform.env as unknown as SupabaseEnv;
 
-  const jwt = extractBearer(request);
+  const jwt = extractAccessToken(request);
   if (!jwt) {
     return json(
       {
@@ -145,13 +146,10 @@ export const GET: RequestHandler = async ({ request, url, platform }) => {
     const { data } = await pgGet<DateItem>(env, 'date', jwt, { search });
     return json({ items: data });
   } catch (err) {
-    if (err instanceof PostgrestError) {
-      const upstream = err.status === 401 || err.status === 403 ? err.status : 502;
-      return json(
-        { error: 'postgrest_error', status: err.status, detail: err.body },
-        upstream,
-      );
-    }
-    return json({ error: 'unexpected', detail: String(err) }, 500);
+    return pgErrorResponse(
+      err,
+      { route: 'GET /api/dates', requestId: locals.requestId },
+      { passUpstream: [401, 403] },
+    );
   }
 };

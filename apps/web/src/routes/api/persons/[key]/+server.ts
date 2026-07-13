@@ -12,9 +12,10 @@
  */
 
 import type { RequestHandler } from './$types';
-import { extractBearer } from '$lib/auth';
+import { extractAccessToken } from '$lib/auth';
 import { isUuid } from '$lib/server/performance-bundle';
-import { pgGet, PostgrestError, type SupabaseEnv } from '$lib/supabase';
+import { pgGet, type SupabaseEnv } from '$lib/supabase';
+import { pgErrorResponse } from '$lib/server/errors';
 import type { Tables } from '$lib/db-types';
 
 function json(body: unknown, status = 200): Response {
@@ -26,11 +27,11 @@ function json(body: unknown, status = 200): Response {
 
 type PersonRow = Tables<'person'>;
 
-export const GET: RequestHandler = async ({ request, params, platform }) => {
+export const GET: RequestHandler = async ({ request, params, platform, locals }) => {
   if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);
   const env = platform.env as unknown as SupabaseEnv;
 
-  const jwt = extractBearer(request);
+  const jwt = extractAccessToken(request);
   if (!jwt) return json({ error: 'missing_authorization' }, 401);
 
   const key = params.key;
@@ -86,13 +87,10 @@ export const GET: RequestHandler = async ({ request, params, platform }) => {
       cast: cast.data,
     });
   } catch (err) {
-    if (err instanceof PostgrestError) {
-      const upstream = err.status === 401 || err.status === 403 ? err.status : 502;
-      return json(
-        { error: 'postgrest_error', status: err.status, detail: err.body },
-        upstream,
-      );
-    }
-    return json({ error: 'unexpected', detail: String(err) }, 500);
+    return pgErrorResponse(
+      err,
+      { route: 'GET /api/persons/[key]', requestId: locals.requestId },
+      { passUpstream: [401, 403] },
+    );
   }
 };

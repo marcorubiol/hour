@@ -31,6 +31,9 @@
     type PerformanceStatus,
   } from '$lib/performance';
   import type { VenueContact } from '$lib/venue';
+  import { workspacesQueryOptions } from '$lib/nav-queries';
+  import { accentVar } from '$lib/utils/accent';
+  import { useBreadcrumb, type Crumb } from '$lib/stores/breadcrumb.svelte';
 
   type PersonEmbed = {
     id: string;
@@ -136,31 +139,23 @@
 
   const query = createQuery(queryOptions);
 
+  const breadcrumb = useBreadcrumb();
+  const wsQuery = createQuery(workspacesQueryOptions());
+  let activeWorkspaceName = $derived(
+    $wsQuery.data?.items.find((w) => w.slug === workspaceSlug)?.name ?? workspaceSlug,
+  );
+
   // ── Write path (ADR-043): status menu + details dialog ─────────────────
   const queryClient = useQueryClient();
 
   const patchMutation = createMutation({
     mutationFn: async (patch: PerformancePatch) => {
-      const res = await fetch(
+      const body = await mutateJSON<{ performance?: unknown }>(
+        'PATCH',
         `/api/performances/${encodeURIComponent(slug)}?ws=${encodeURIComponent(workspaceSlug)}`,
-        {
-          method: 'PATCH',
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('hour_jwt')}`,
-            'content-type': 'application/json',
-          },
-          body: JSON.stringify(patch),
-        },
+        patch,
       );
-      const body = (await res.json().catch(() => ({}))) as {
-        performance?: unknown;
-        hint?: string;
-        detail?: string;
-        error?: string;
-      };
-      if (!res.ok || !body.performance) {
-        throw new Error(body.hint || body.detail || body.error || `Error ${res.status}`);
-      }
+      if (!body?.performance) throw new Error('Unexpected response');
       return body.performance;
     },
     onSuccess: () => {
@@ -231,6 +226,44 @@
   let bundle = $derived($query.data ?? null);
   let perf = $derived(bundle?.performance ?? null);
 
+  // Address: Space › Project › [Line ›] Performance. The current crumb is the
+  // venue (a performance has no name of its own); the line is included when
+  // the gig belongs to one. No pin — performances aren't in the pin model.
+  $effect(() => {
+    if (perf) {
+      const crumbs: Crumb[] = [
+        {
+          label: activeWorkspaceName,
+          href: `/h/${workspaceSlug}/`,
+          kind: 'space',
+          accent: accentVar(workspaceSlug),
+        },
+      ];
+      if (perf.project) {
+        crumbs.push({
+          label: perf.project.name,
+          href: `/h/${workspaceSlug}/project/${perf.project.slug}/`,
+          kind: 'node',
+        });
+        if (perf.line) {
+          crumbs.push({
+            label: perf.line.name,
+            href: `/h/${workspaceSlug}/project/${perf.project.slug}/line/${perf.line.slug}`,
+            kind: 'node',
+          });
+        }
+      }
+      crumbs.push({
+        label: perf.venue?.name ?? perf.venue_name ?? 'Performance',
+        kind: 'node',
+      });
+      breadcrumb.set(crumbs, { width: 'reading' });
+    } else {
+      breadcrumb.clear();
+    }
+    return () => breadcrumb.clear();
+  });
+
   // ── Delete (ADR-052) — for gigs created by mistake. A gig that fell
   // through is status `cancelled`, not a deletion. ─────────────────────
   let confirmDeleteOpen = $state(false);
@@ -289,27 +322,13 @@
   // server-side: an existing name+city match returns the existing venue.
   const promoteVenue = createMutation({
     mutationFn: async () => {
-      const res = await fetch('/api/venues', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('hour_jwt')}`,
-          'content-type': 'application/json',
-        },
-        body: JSON.stringify({
-          workspace_id: perf!.workspace_id,
-          name: fVenue.trim(),
-          city: fCity.trim() || null,
-          country: fCountry.trim() || null,
-        }),
+      const body = await mutateJSON<{ venue?: VenueLite }>('POST', '/api/venues', {
+        workspace_id: perf!.workspace_id,
+        name: fVenue.trim(),
+        city: fCity.trim() || null,
+        country: fCountry.trim() || null,
       });
-      const body = (await res.json().catch(() => ({}))) as {
-        venue?: VenueLite;
-        detail?: string;
-        error?: string;
-      };
-      if (!res.ok || !body.venue) {
-        throw new Error(body.detail || body.error || `Error ${res.status}`);
-      }
+      if (!body?.venue) throw new Error('Unexpected response');
       return body.venue;
     },
     onSuccess: (venue) => {

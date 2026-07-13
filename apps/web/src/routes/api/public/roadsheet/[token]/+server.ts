@@ -19,7 +19,8 @@ import {
   type RoadsheetPerson,
   type RoadsheetRole,
 } from '$lib/roadsheet';
-import { pgPostRpc, PostgrestError, type SupabaseEnv } from '$lib/supabase';
+import { pgPostRpc, type SupabaseEnv } from '$lib/supabase';
+import { pgErrorResponse } from '$lib/server/errors';
 import type { Json } from '$lib/db-types';
 
 const TOKEN = /^[0-9a-f]{40,128}$/i;
@@ -55,7 +56,7 @@ function json(body: unknown, status = 200): Response {
   });
 }
 
-export const GET: RequestHandler = async ({ params, platform }) => {
+export const GET: RequestHandler = async ({ params, platform, locals }) => {
   if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);
   const env = platform.env as unknown as SupabaseEnv;
 
@@ -93,9 +94,12 @@ export const GET: RequestHandler = async ({ params, platform }) => {
       venue_timezone: b.venue?.timezone ?? null,
     });
   } catch (err) {
-    if (err instanceof PostgrestError) {
-      return json({ error: 'postgrest_error', status: err.status, detail: err.body }, 502);
-    }
-    return json({ error: 'unexpected', detail: String(err) }, 500);
+    // ANONYMOUS surface — errors stay fully opaque (matches the sibling
+    // public/calendar feed): details go to the server log only.
+    return pgErrorResponse(
+      err,
+      { route: 'GET /api/public/roadsheet/[token]', requestId: locals.requestId },
+      { passUpstream: [] },
+    );
   }
 };

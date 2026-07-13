@@ -9,8 +9,9 @@
 
 import type { RequestHandler } from './$types';
 import * as v from 'valibot';
-import { extractBearer } from '$lib/auth';
-import { pgGet, pgPostRpc, PostgrestError, type SupabaseEnv } from '$lib/supabase';
+import { extractAccessToken } from '$lib/auth';
+import { pgGet, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
+import { pgErrorResponse } from '$lib/server/errors';
 
 const IdSchema = v.pipe(v.string(), v.uuid());
 
@@ -21,11 +22,11 @@ function json(body: unknown, status = 200): Response {
   });
 }
 
-export const DELETE: RequestHandler = async ({ request, params, platform }) => {
+export const DELETE: RequestHandler = async ({ request, params, platform, locals }) => {
   if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);
   const env = platform.env as unknown as SupabaseEnv;
 
-  const jwt = extractBearer(request);
+  const jwt = extractAccessToken(request);
   if (!jwt) return json({ error: 'missing_authorization' }, 401);
 
   const idParsed = v.safeParse(IdSchema, params.assetId);
@@ -49,12 +50,14 @@ export const DELETE: RequestHandler = async ({ request, params, platform }) => {
     await pgPostRpc(env, 'delete_asset_version', jwt, { p_asset_id: idParsed.output });
     return new Response(null, { status: 204 });
   } catch (err) {
-    if (err instanceof PostgrestError) {
-      // 42501 collapses not-found and no-permission → 404 (no oracle).
-      if (err.code === '42501') return json({ error: 'not_found' }, 404);
-      const upstream = err.status === 401 ? 401 : 502;
-      return json({ error: 'postgrest_error', status: err.status, detail: err.body }, upstream);
-    }
-    return json({ error: 'unexpected', detail: String(err) }, 500);
+    return pgErrorResponse(
+      err,
+      { route: 'DELETE /api/lines/[id]/materials/[assetId]', requestId: locals.requestId },
+      {
+        codes: {
+          '42501': { status: 404, error: 'not_found' },
+        },
+      },
+    );
   }
 };

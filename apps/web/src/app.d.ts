@@ -4,7 +4,11 @@
 declare global {
   namespace App {
     // interface Error {}
-    // interface Locals {}
+    interface Locals {
+      /** Per-request correlation id — set in hooks.server.ts, echoed as the
+       * x-request-id response header and in every structured error log. */
+      requestId: string;
+    }
     // interface PageData {}
     // interface PageState {}
     interface Platform {
@@ -15,8 +19,8 @@ declare global {
   }
 
   /**
-   * Cloudflare Worker bindings + public env vars declared in wrangler.toml.
-   * Mirrors the [vars] + [[r2_buckets]] blocks in wrangler.toml.
+   * Cloudflare Worker bindings + public env vars declared in wrangler.jsonc.
+   * Mirrors the [vars] + [[r2_buckets]] blocks in wrangler.jsonc.
    *
    * Note: Sentry config (PUBLIC_SENTRY_DSN, PUBLIC_SENTRY_ENV) is NOT here —
    * those are read from `$env/static/public` at build time, baked into the
@@ -34,6 +38,13 @@ declare global {
      * Durable Object.
      */
     ROADSHEET_COLLAB: DurableObjectNamespace;
+    /**
+     * Optional KV namespace backing $lib/server/rate-limit.ts (login,
+     * refresh, sentry-tunnel). Absent binding = limiter no-ops, so local
+     * dev and pre-KV deploys keep working. See wrangler.jsonc for the
+     * activation step.
+     */
+    RATE_LIMIT?: KVNamespace;
   }
 }
 

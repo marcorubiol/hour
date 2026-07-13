@@ -62,10 +62,26 @@ export function decodeJwtClaim(jwt: string, path: string): string | null {
   }
 }
 
+/**
+ * Suppliers instead of a captured JWT (Phase 0.9 cookie migration): the
+ * access token now lives in an httpOnly cookie, so the client fetches it
+ * on demand via /api/auth/token — which also means reconnects and re-auths
+ * pick up a FRESH token instead of replaying the one from construction.
+ * The user id comes from the session store; it's read lazily (getter)
+ * because channels only join after the workspace list loads, by which
+ * point the session probe has long resolved.
+ */
+export interface RealtimeAuth {
+  /** Fresh access token for RLS-bearing requests. Null = no session. */
+  getToken: () => Promise<string | null>;
+  /** The signed-in user's UUID (presence key). Null while session loads. */
+  getUserId: () => string | null;
+}
+
 export interface RealtimeHandle {
   client: RealtimeClient;
-  /** Decoded `sub` claim — the connected user's UUID. */
-  userId: string;
+  /** The connected user's UUID — stable presence key across reconnects. */
+  readonly userId: string;
   /** Channel name → channel, so we don't double-subscribe. */
   channel(name: string, opts?: Parameters<RealtimeClient['channel']>[1]): RealtimeChannel;
   /** Remove a channel. Idempotent. */
@@ -75,31 +91,33 @@ export interface RealtimeHandle {
 }
 
 /**
- * Build a realtime handle. Throws if the JWT lacks a `sub` claim — without a
- * stable user key, presence would be useless.
+ * Build a realtime handle. Construction is synchronous (setContext must
+ * run during component init); auth happens via the async accessToken
+ * supplier when channels join.
  */
-export function createRealtimeClient(env: RealtimeEnv, jwt: string): RealtimeHandle {
-  const userId = decodeJwtSub(jwt);
-  if (!userId) {
-    throw new Error('createRealtimeClient: JWT has no `sub` claim — cannot anchor presence.');
-  }
-
+export function createRealtimeClient(env: RealtimeEnv, auth: RealtimeAuth): RealtimeHandle {
   // Supabase wants the realtime URL with ws(s):// scheme.
   const wsUrl = `${env.PUBLIC_SUPABASE_URL.replace(/^http/, 'ws')}/realtime/v1`;
 
   const client = new RealtimeClient(wsUrl, {
     params: { apikey: env.PUBLIC_SUPABASE_ANON_KEY },
-    // RLS-bearing requests need the user's JWT, not the anon key.
-    accessToken: () => Promise.resolve(jwt),
+    // RLS-bearing requests need the user's JWT, not the anon key. Falling
+    // back to the anon key keeps the socket protocol-valid when the
+    // session is gone; RLS then simply returns nothing.
+    accessToken: async () => (await auth.getToken()) ?? env.PUBLIC_SUPABASE_ANON_KEY,
   });
   client.connect();
-  client.setAuth(jwt);
+  void auth.getToken().then((token) => {
+    if (token) client.setAuth(token);
+  });
 
   const channels = new Map<string, RealtimeChannel>();
 
   return {
     client,
-    userId,
+    get userId() {
+      return auth.getUserId() ?? '';
+    },
     channel(name, opts) {
       const existing = channels.get(name);
       if (existing) return existing;
@@ -128,8 +146,8 @@ const KEY = Symbol('realtime');
  * layout; child layouts/pages reach for it via `useRealtime()`. Mirrors
  * the lens/selection conventions for SSR safety.
  */
-export function provideRealtime(env: RealtimeEnv, jwt: string): RealtimeHandle {
-  const handle = createRealtimeClient(env, jwt);
+export function provideRealtime(env: RealtimeEnv, auth: RealtimeAuth): RealtimeHandle {
+  const handle = createRealtimeClient(env, auth);
   setContext(KEY, handle);
   return handle;
 }

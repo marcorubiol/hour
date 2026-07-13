@@ -7,11 +7,13 @@
    * YNotes — collaborative free-text notes over Yjs (ADR-025 / D-PRE-07).
    *
    * Transport: y-partyserver YProvider through the authenticated proxy at
-   * /api/collab/<table>/<id>?token=<jwt> (the endpoint gates on membership
-   * + edit permission, then forwards to the RoadsheetCollab DO). Local
-   * mirror via y-indexeddb so the doc survives reloads offline. The DO
-   * persists snapshots and materializes the text back into the target's
-   * `notes` column for non-collab readers.
+   * /api/collab/<table>/<id> (the endpoint gates on membership + edit
+   * permission via the httpOnly session cookie — same-origin WS upgrades
+   * carry cookies, so no token rides the URL since Phase 0.9 — then
+   * forwards to the RoadsheetCollab DO). Local mirror via y-indexeddb so
+   * the doc survives reloads offline. The DO persists snapshots and
+   * materializes the text back into the target's `notes` column for
+   * non-collab readers.
    *
    * Presence (P10 simplified): peer count + a highlighted frame while
    * someone else is editing. No positional cursors (Phase 0.5).
@@ -26,6 +28,7 @@
   import * as Y from 'yjs';
   import YProvider from 'y-partyserver/provider';
   import { IndexeddbPersistence } from 'y-indexeddb';
+  import { getAccessToken, session } from '$lib/session.svelte';
 
   interface Props {
     targetTable: CollabTarget;
@@ -41,21 +44,10 @@
   let peers = $state(0);
   let editingNames = $state<string[]>([]);
 
-  function jwtEmail(): string {
-    try {
-      const jwt = localStorage.getItem('hour_jwt');
-      if (!jwt) return 'someone';
-      const payload = JSON.parse(
-        atob(jwt.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')),
-      ) as { email?: string };
-      return payload.email?.split('@')[0] ?? 'someone';
-    } catch {
-      return 'someone';
-    }
-  }
-
   onMount(() => {
-    if (!localStorage.getItem('hour_jwt')) return;
+    // Session gate — the layout's auth gate resolved before rendering us,
+    // so the store is ready.
+    if (!session.user) return;
 
     const doc = new Y.Doc();
     const ytext = doc.getText('notes');
@@ -66,9 +58,14 @@
     const provider = new YProvider(location.host, targetId, doc, {
       prefix: `/api/collab/${targetTable}/${targetId}`,
       protocol: location.protocol === 'https:' ? 'wss' : 'ws',
-      // Function form: re-read on every (re)connect so a refreshed JWT is
-      // picked up without tearing the provider down.
-      params: () => ({ token: localStorage.getItem('hour_jwt') }),
+      // Auth rides the httpOnly session cookie on the same-origin upgrade.
+      // Async params run on every (re)connect: awaiting the token endpoint
+      // refreshes a stale access cookie BEFORE the handshake, so reconnects
+      // after a laptop-lid nap don't hit the gate with a dead cookie.
+      params: async () => {
+        await getAccessToken();
+        return {};
+      },
     });
 
     let lastSeen = '';
@@ -119,7 +116,9 @@
     });
 
     const awareness = provider.awareness;
-    awareness.setLocalStateField('user', { name: jwtEmail() });
+    awareness.setLocalStateField('user', {
+      name: session.user?.email?.split('@')[0] ?? 'someone',
+    });
     const onAwareness = () => {
       const others = [...awareness.getStates().entries()].filter(
         ([id]) => id !== awareness.clientID,

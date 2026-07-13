@@ -16,9 +16,11 @@
   import Checkbox from '$lib/components/Checkbox.svelte';
   import Select from '$lib/components/Select.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
-  import { decodeJwtSub } from '$lib/realtime/client';
+  import { session } from '$lib/session.svelte';
   import { ENGAGEMENT_STATUSES, statusBadgeClass, statusLabel } from '$lib/engagement';
   import { dayLabel } from '$lib/datetime';
+  import { useBreadcrumb } from '$lib/stores/breadcrumb.svelte';
+  import { accentVar } from '$lib/utils/accent';
 
   type PersonFile = {
     person: {
@@ -68,7 +70,7 @@
     }>;
   };
 
-  type WorkspaceLite = { id: string; slug: string };
+  type WorkspaceLite = { id: string; slug: string; name: string };
 
   let workspaceSlug = $derived(page.params.workspace ?? '');
   let slug = $derived(page.params.slug ?? '');
@@ -89,6 +91,32 @@
       fetchJSON<{ items: WorkspaceLite[] }>('/api/workspaces', signal),
   });
 
+  const breadcrumb = useBreadcrumb();
+  let activeWorkspaceName = $derived(
+    $workspacesQuery.data?.items.find((w) => w.slug === workspaceSlug)?.name ?? workspaceSlug,
+  );
+
+  // A person is cross-cutting (global, appears across projects), not a tree
+  // node — so the address is Space › Person, no pin (persons aren't in the
+  // pin model). The "appears in N projects" lives in the page body.
+  $effect(() => {
+    const p = $query.data?.person;
+    if (p) {
+      breadcrumb.set([
+        {
+          label: activeWorkspaceName,
+          href: `/h/${workspaceSlug}/`,
+          kind: 'space',
+          accent: accentVar(workspaceSlug),
+        },
+        { label: p.full_name, kind: 'node' },
+      ], { width: 'reading' });
+    } else {
+      breadcrumb.clear();
+    }
+    return () => breadcrumb.clear();
+  });
+
   let file = $derived($query.data ?? null);
   let loading = $derived($query.isPending);
   let errorMsg = $derived($query.error instanceof Error ? $query.error.message : '');
@@ -104,25 +132,17 @@
 
   const noteMutation = createMutation({
     mutationFn: async () => {
-      const res = await fetch(`/api/persons/${encodeURIComponent(slug)}/notes`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('hour_jwt')}`,
-          'content-type': 'application/json',
-        },
-        body: JSON.stringify({
+      const body = await mutateJSON<{ note?: unknown; detail?: string; error?: string }>(
+        'POST',
+        `/api/persons/${encodeURIComponent(slug)}/notes`,
+        {
           workspace_id: contextWorkspaceId,
           body: noteBody,
           visibility: notePrivate ? 'private' : 'workspace',
-        }),
-      });
-      const body = (await res.json().catch(() => ({}))) as {
-        note?: unknown;
-        detail?: string;
-        error?: string;
-      };
-      if (!res.ok || !body.note) {
-        throw new Error(body.detail || body.error || `Error ${res.status}`);
+        },
+      );
+      if (!body?.note) {
+        throw new Error(body?.detail || body?.error || 'Error');
       }
       return body.note;
     },
@@ -151,24 +171,11 @@
 
   // Delete is author-only (enforced by the delete_person_note RPC); the
   // button only shows on the caller's own notes.
-  let callerId = $derived(decodeJwtSub(localStorage.getItem('hour_jwt') ?? '') ?? '');
+  let callerId = $derived(session.user?.sub ?? '');
 
   const deleteNote = createMutation({
     mutationFn: async (noteId: string) => {
-      const res = await fetch(
-        `/api/persons/${encodeURIComponent(slug)}/notes/${noteId}`,
-        {
-          method: 'DELETE',
-          headers: { Authorization: `Bearer ${localStorage.getItem('hour_jwt')}` },
-        },
-      );
-      if (!res.ok && res.status !== 204) {
-        const body = (await res.json().catch(() => ({}))) as {
-          detail?: string;
-          error?: string;
-        };
-        throw new Error(body.detail || body.error || `Error ${res.status}`);
-      }
+      await mutateJSON('DELETE', `/api/persons/${encodeURIComponent(slug)}/notes/${noteId}`);
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['person', slug] });

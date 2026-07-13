@@ -14,7 +14,7 @@
  */
 
 import type { RequestHandler } from './$types';
-import { extractBearer } from '$lib/auth';
+import { extractAccessToken } from '$lib/auth';
 import {
   buildRoadsheet,
   isRoadsheetRole,
@@ -26,7 +26,8 @@ import {
   isUuid,
   type PerformanceBundleResult,
 } from '$lib/server/performance-bundle';
-import { PostgrestError, type SupabaseEnv } from '$lib/supabase';
+import { type SupabaseEnv } from '$lib/supabase';
+import { pgErrorResponse } from '$lib/server/errors';
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -112,11 +113,11 @@ function toProjectionBundle(result: PerformanceBundleResult): PerformanceBundle 
   };
 }
 
-export const GET: RequestHandler = async ({ request, params, url, platform }) => {
+export const GET: RequestHandler = async ({ request, params, url, platform, locals }) => {
   if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);
   const env = platform.env as unknown as SupabaseEnv;
 
-  const jwt = extractBearer(request);
+  const jwt = extractAccessToken(request);
   if (!jwt) {
     return json(
       { error: 'missing_authorization', hint: 'Send Authorization: Bearer <supabase_jwt>.' },
@@ -153,13 +154,10 @@ export const GET: RequestHandler = async ({ request, params, url, platform }) =>
       venue_timezone: result.performance.venue?.timezone ?? null,
     });
   } catch (err) {
-    if (err instanceof PostgrestError) {
-      const upstream = err.status === 401 || err.status === 403 ? err.status : 502;
-      return json(
-        { error: 'postgrest_error', status: err.status, detail: err.body },
-        upstream,
-      );
-    }
-    return json({ error: 'unexpected', detail: String(err) }, 500);
+    return pgErrorResponse(
+      err,
+      { route: 'GET /api/performances/[key]/roadsheet', requestId: locals.requestId },
+      { passUpstream: [401, 403] },
+    );
   }
 };

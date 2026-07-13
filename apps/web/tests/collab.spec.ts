@@ -199,10 +199,7 @@ test.describe('collaborative notes (Yjs over the RoadsheetCollab DO)', () => {
       .poll(
         async () => {
           return await a.evaluate(async (perfId) => {
-            const jwt = localStorage.getItem('hour_jwt');
-            const res = await fetch(`/api/performances/${perfId}`, {
-              headers: { Authorization: `Bearer ${jwt}` },
-            });
+            const res = await fetch(`/api/performances/${perfId}`);
             if (!res.ok) return `http-${res.status}`;
             const data = (await res.json()) as {
               performance: { notes: string | null };

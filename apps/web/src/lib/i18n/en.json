@@ -5,5 +5,7 @@
   "login.password": "Password",
   "login.submit": "Sign in",
   "login.signing_in": "Signing in...",
-  "login.invalid_credentials": "Invalid credentials"
+  "login.invalid_credentials": "Invalid credentials",
+  "login.rate_limited": "Too many attempts — try again in a few minutes",
+  "login.auth_unavailable": "Sign-in is temporarily unavailable — try again shortly"
 }

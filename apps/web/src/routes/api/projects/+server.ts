@@ -15,9 +15,10 @@
 
 import type { RequestHandler } from './$types';
 import * as v from 'valibot';
-import { extractBearer } from '$lib/auth';
+import { extractAccessToken } from '$lib/auth';
 import type { Enums, Tables } from '$lib/db-types';
-import { pgGet, pgPostRpc, PostgrestError, type SupabaseEnv } from '$lib/supabase';
+import { pgGet, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
+import { pgErrorResponse } from '$lib/server/errors';
 
 const ALLOWED_STATUSES: ReadonlyArray<Enums<'project_status'> | 'any'> = [
   'any',
@@ -72,11 +73,11 @@ const CreateBodySchema = v.object({
   description: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(280))),
 });
 
-export const POST: RequestHandler = async ({ request, platform }) => {
+export const POST: RequestHandler = async ({ request, platform, locals }) => {
   if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);
   const env = platform.env as unknown as SupabaseEnv;
 
-  const jwt = extractBearer(request);
+  const jwt = extractAccessToken(request);
   if (!jwt) return json({ error: 'missing_authorization' }, 401);
 
   let raw: unknown;
@@ -113,25 +114,28 @@ export const POST: RequestHandler = async ({ request, platform }) => {
     if (!project) return json({ error: 'rpc_empty_result' }, 502);
     return json({ project }, 201);
   } catch (err) {
-    if (err instanceof PostgrestError) {
-      const body = err.body;
-      let status = 502;
-      if (body.includes('22023')) status = 400;
-      else if (body.includes('23505')) status = 409;
-      else if (body.includes('42501')) status = 403;
-      return json({ error: 'rpc_error', status: err.status, detail: body }, status);
-    }
-    return json({ error: 'unexpected', detail: String(err) }, 500);
+    return pgErrorResponse(
+      err,
+      { route: 'POST /api/projects', requestId: locals.requestId },
+      {
+        codes: {
+          '22023': { status: 400, error: 'rpc_error' },
+          '23505': { status: 409, error: 'rpc_error' },
+          '42501': { status: 403, error: 'rpc_error' },
+        },
+        passUpstream: [],
+      },
+    );
   }
 };
 
-export const GET: RequestHandler = async ({ request, url, platform }) => {
+export const GET: RequestHandler = async ({ request, url, platform, locals }) => {
   if (!platform?.env) {
     return json({ error: 'platform_unavailable' }, 500);
   }
   const env = platform.env as unknown as SupabaseEnv;
 
-  const jwt = extractBearer(request);
+  const jwt = extractAccessToken(request);
   if (!jwt) {
     return json(
       {
@@ -172,13 +176,10 @@ export const GET: RequestHandler = async ({ request, url, platform }) => {
     const { data } = await pgGet<ProjectItem>(env, 'project', jwt, { search });
     return json({ items: data });
   } catch (err) {
-    if (err instanceof PostgrestError) {
-      const upstream = err.status === 401 || err.status === 403 ? err.status : 502;
-      return json(
-        { error: 'postgrest_error', status: err.status, detail: err.body },
-        upstream,
-      );
-    }
-    return json({ error: 'unexpected', detail: String(err) }, 500);
+    return pgErrorResponse(
+      err,
+      { route: 'GET /api/projects', requestId: locals.requestId },
+      { passUpstream: [401, 403] },
+    );
   }
 };

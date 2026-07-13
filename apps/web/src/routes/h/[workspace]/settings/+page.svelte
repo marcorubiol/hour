@@ -18,7 +18,8 @@
   import { page } from '$app/state';
   import { createQuery } from '@tanstack/svelte-query';
   import { accentVar } from '$lib/utils/accent';
-  import { decodeJwtClaim } from '$lib/realtime';
+  import { fetchJSON } from '$lib/api';
+  import { session } from '$lib/session.svelte';
   import { type SectionId } from '$lib/components/SettingsNav.svelte';
   import {
     isMasterViewEnabled,
@@ -32,19 +33,13 @@
     (page.url.searchParams.get('section') as SectionId | null) ?? 'profile',
   );
 
-  // ─── identity from JWT ────────────────────────────────────────────────
-  let userEmail = $state('');
+  // ─── identity from session ────────────────────────────────────────────
+  let userEmail = $derived(session.user?.email ?? '');
   let userName = $state('Marco Rubiol');
 
   onMount(() => {
-    const jwt = localStorage.getItem('hour_jwt');
-    if (!jwt) return;
-    const email = decodeJwtClaim(jwt, 'email');
-    if (email) userEmail = email;
-    const full =
-      decodeJwtClaim(jwt, 'user_metadata.full_name') ||
-      decodeJwtClaim(jwt, 'user_metadata.name');
-    if (full) userName = full;
+    const name = session.user?.name;
+    if (name) userName = name;
   });
 
   let initials = $derived(
@@ -69,17 +64,6 @@
     workspace_id: string;
     status: 'draft' | 'active' | 'archived';
   };
-
-  async function fetchJSON<T>(url: string, signal: AbortSignal): Promise<T> {
-    const jwt = localStorage.getItem('hour_jwt');
-    if (!jwt) throw new Error('Missing JWT');
-    const res = await fetch(url, {
-      signal,
-      headers: { Authorization: `Bearer ${jwt}` },
-    });
-    if (!res.ok) throw new Error(`Error ${res.status}`);
-    return (await res.json()) as T;
-  }
 
   const workspacesQuery = createQuery({
     queryKey: ['workspaces'],

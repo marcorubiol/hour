@@ -7,6 +7,7 @@ import { sequence } from '@sveltejs/kit/hooks';
 import type { Handle, HandleServerError } from '@sveltejs/kit';
 import { dev } from '$app/environment';
 import { PUBLIC_SENTRY_DSN, PUBLIC_SENTRY_ENV } from '$env/static/public';
+import { scrubSentryEvent } from '$lib/sentry-scrub';
 
 /**
  * `initCloudflareSentryHandle` is the Workers-runtime-correct equivalent of
@@ -17,13 +18,75 @@ import { PUBLIC_SENTRY_DSN, PUBLIC_SENTRY_ENV } from '$env/static/public';
  *
  * If `PUBLIC_SENTRY_DSN` is unset, Sentry initialises with `enabled: false`
  * and silently no-ops — no events shipped, no warnings.
+ *
+ * PII posture (Phase 0.9): `sendDefaultPii: false` keeps IPs, cookies and
+ * headers out of events; `beforeSend` scrubs capability tokens riding in
+ * URLs (see $lib/sentry-scrub.ts).
  */
 const sentryConfig = {
   dsn: PUBLIC_SENTRY_DSN,
   enabled: Boolean(PUBLIC_SENTRY_DSN),
   environment: PUBLIC_SENTRY_ENV || (dev ? 'phase0-dev' : 'phase0'),
   tracesSampleRate: 0.1,
-  sendDefaultPii: true,
+  sendDefaultPii: false,
+  beforeSend: scrubSentryEvent,
+  beforeSendTransaction: scrubSentryEvent,
+};
+
+/**
+ * Non-CSP security headers (CSP itself is kit.csp in svelte.config.js —
+ * SvelteKit owns the nonces for its inline hydration scripts). HSTS only
+ * outside dev; frame-ancestors lives in the CSP, x-frame-options covers
+ * pre-CSP2 agents.
+ */
+const SECURITY_HEADERS: Record<string, string> = {
+  'x-content-type-options': 'nosniff',
+  'referrer-policy': 'strict-origin-when-cross-origin',
+  'x-frame-options': 'DENY',
+  'permissions-policy': 'camera=(), microphone=(), geolocation=()',
+  'cross-origin-opener-policy': 'same-origin',
+  ...(dev ? {} : { 'strict-transport-security': 'max-age=15552000' }),
+};
+
+/**
+ * Outermost shell: request id + CSRF origin floor + security headers.
+ *
+ * CSRF: session auth rides an httpOnly cookie (SameSite=Strict already
+ * blocks cross-site sends in modern browsers); this check is the second
+ * layer — a mutation whose Origin header disagrees with our own origin is
+ * rejected outright. Requests WITHOUT an Origin header pass: browsers
+ * always send it cross-site, so an absent header means a non-browser
+ * client (tests, curl) that can't be CSRF'd into anything.
+ */
+const requestContext: Handle = async ({ event, resolve }) => {
+  event.locals.requestId = crypto.randomUUID();
+
+  const method = event.request.method;
+  if (method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS') {
+    const origin = event.request.headers.get('origin');
+    if (origin && origin !== event.url.origin) {
+      return new Response(JSON.stringify({ error: 'cross_origin' }), {
+        status: 403,
+        headers: { 'content-type': 'application/json; charset=utf-8' },
+      });
+    }
+  }
+
+  const response = await resolve(event);
+
+  // 101 = WebSocket upgrade (collab) — its headers are immutable and the
+  // security headers are meaningless there anyway. Other passthrough
+  // responses (redirects) can also carry immutable headers → best-effort.
+  if (response.status === 101) return response;
+  try {
+    response.headers.set('x-request-id', event.locals.requestId);
+    for (const [name, value] of Object.entries(SECURITY_HEADERS)) {
+      response.headers.set(name, value);
+    }
+  } catch {
+    /* immutable headers on a passthrough response — serve it as-is */
+  }
+  return response;
 };
 
 /**
@@ -75,13 +138,24 @@ const legacyVocabRedirects: Handle = async ({ event, resolve }) => {
 };
 
 export const handle: Handle = sequence(
+  requestContext,
   legacyVocabRedirects,
   initCloudflareSentryHandle(sentryConfig),
   sentryHandle(),
 );
 
-export const handleError: HandleServerError = handleErrorWithSentry(
-  ({ error, event }) => {
-    console.error('Server error', { error, route: event.route?.id });
-  },
-);
+export const handleError: HandleServerError = handleErrorWithSentry(({ error, event }) => {
+  // Structured JSON — Workers observability parses these into queryable
+  // fields, and the request id ties the log line to the x-request-id the
+  // client saw.
+  console.error(
+    JSON.stringify({
+      level: 'error',
+      kind: 'unhandled',
+      request_id: event.locals.requestId ?? null,
+      route: event.route?.id ?? null,
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack?.slice(0, 1500) : undefined,
+    }),
+  );
+});

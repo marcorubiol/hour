@@ -3,13 +3,14 @@
   import { goto } from '$app/navigation';
 
   import { resolveLoginTarget } from '$lib/master-view';
+  import { ensureSession } from '$lib/session.svelte';
 
-  onMount(() => {
+  onMount(async () => {
     // Phase 0 has hardcoded /h/marco-rubiol/ as the default landing.
     // Master View (Phase 0.1 trabajo #11) can override it with the last
     // Project the user visited, if they opted in via /settings.
-    const target = localStorage.getItem('hour_jwt') ? resolveLoginTarget() : '/login';
-    goto(target, { replaceState: true });
+    const user = await ensureSession();
+    goto(user ? resolveLoginTarget() : '/login', { replaceState: true });
   });
 </script>
 

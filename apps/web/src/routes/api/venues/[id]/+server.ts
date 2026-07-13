@@ -13,9 +13,10 @@
 
 import type { RequestHandler } from './$types';
 import * as v from 'valibot';
-import { extractBearer } from '$lib/auth';
+import { extractAccessToken } from '$lib/auth';
 import { VENUE_COLS, VenuePatchSchema } from '$lib/venue';
-import { pgPatch, PostgrestError, type SupabaseEnv } from '$lib/supabase';
+import { pgPatch, type SupabaseEnv } from '$lib/supabase';
+import { pgErrorResponse } from '$lib/server/errors';
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -26,11 +27,11 @@ function json(body: unknown, status = 200): Response {
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export const PATCH: RequestHandler = async ({ request, params, platform }) => {
+export const PATCH: RequestHandler = async ({ request, params, platform, locals }) => {
   if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);
   const env = platform.env as unknown as SupabaseEnv;
 
-  const jwt = extractBearer(request);
+  const jwt = extractAccessToken(request);
   if (!jwt) return json({ error: 'missing_authorization' }, 401);
 
   if (!UUID.test(params.id)) return json({ error: 'invalid_id' }, 400);
@@ -72,23 +73,21 @@ export const PATCH: RequestHandler = async ({ request, params, platform }) => {
     if (data.length === 0) return json({ error: 'not_found' }, 404);
     return json({ venue: data[0] });
   } catch (err) {
-    if (err instanceof PostgrestError) {
-      if (err.code === '23505') {
-        return json(
-          {
+    return pgErrorResponse(
+      err,
+      { route: 'PATCH /api/venues/[id]', requestId: locals.requestId },
+      {
+        codes: {
+          '23505': {
+            status: 409,
             error: 'venue_exists',
             hint: 'Another venue in this workspace already has this name and city.',
           },
-          409,
-        );
-      }
-      // 23514 = CHECK violation (country format, empty name).
-      if (err.code === '23514') {
-        return json({ error: 'constraint_violation', detail: err.body }, 400);
-      }
-      const upstream = err.status === 401 || err.status === 403 ? err.status : 502;
-      return json({ error: 'postgrest_error', status: err.status, detail: err.body }, upstream);
-    }
-    return json({ error: 'unexpected', detail: String(err) }, 500);
+          // 23514 = CHECK violation (country format, empty name).
+          '23514': { status: 400, error: 'constraint_violation' },
+        },
+        passUpstream: [401, 403],
+      },
+    );
   }
 };

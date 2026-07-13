@@ -16,10 +16,11 @@
 
 import type { RequestHandler } from './$types';
 import * as v from 'valibot';
-import { extractBearer } from '$lib/auth';
+import { extractAccessToken } from '$lib/auth';
 import { PerformancePatchSchema } from '$lib/performance';
 import { fetchPerformanceBundle, isUuid } from '$lib/server/performance-bundle';
-import { pgGet, pgPatch, pgPostRpc, PostgrestError, type SupabaseEnv } from '$lib/supabase';
+import { pgGet, pgPatch, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
+import { pgErrorResponse } from '$lib/server/errors';
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -28,11 +29,11 @@ function json(body: unknown, status = 200): Response {
   });
 }
 
-export const GET: RequestHandler = async ({ request, params, url, platform }) => {
+export const GET: RequestHandler = async ({ request, params, url, platform, locals }) => {
   if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);
   const env = platform.env as unknown as SupabaseEnv;
 
-  const jwt = extractBearer(request);
+  const jwt = extractAccessToken(request);
   if (!jwt) {
     return json(
       { error: 'missing_authorization', hint: 'Send Authorization: Bearer <supabase_jwt>.' },
@@ -54,14 +55,11 @@ export const GET: RequestHandler = async ({ request, params, url, platform }) =>
     if (!bundle) return json({ error: 'not_found' }, 404);
     return json(bundle);
   } catch (err) {
-    if (err instanceof PostgrestError) {
-      const upstream = err.status === 401 || err.status === 403 ? err.status : 502;
-      return json(
-        { error: 'postgrest_error', status: err.status, detail: err.body },
-        upstream,
-      );
-    }
-    return json({ error: 'unexpected', detail: String(err) }, 500);
+    return pgErrorResponse(
+      err,
+      { route: 'GET /api/performances/[key]', requestId: locals.requestId },
+      { passUpstream: [401, 403] },
+    );
   }
 };
 
@@ -75,11 +73,11 @@ export const GET: RequestHandler = async ({ request, params, url, platform }) =>
  * PostgREST mutations can't filter through embedded joins, so slug keys
  * resolve to an id first.
  */
-export const PATCH: RequestHandler = async ({ request, params, url, platform }) => {
+export const PATCH: RequestHandler = async ({ request, params, url, platform, locals }) => {
   if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);
   const env = platform.env as unknown as SupabaseEnv;
 
-  const jwt = extractBearer(request);
+  const jwt = extractAccessToken(request);
   if (!jwt) return json({ error: 'missing_authorization' }, 401);
 
   const key = params.key;
@@ -196,26 +194,22 @@ export const PATCH: RequestHandler = async ({ request, params, url, platform }) 
     if (data.length === 0) return json({ error: 'not_found' }, 404);
     return json({ performance: data[0] });
   } catch (err) {
-    if (err instanceof PostgrestError) {
-      // 23514 = CHECK violation (timeslot ordering, country format) → the
-      // caller sent an impossible combination, not a gateway fault.
-      if (err.code === '23514') {
-        return json(
-          {
+    // 23514 = CHECK violation (timeslot ordering, country format) → the
+    // caller sent an impossible combination, not a gateway fault.
+    return pgErrorResponse(
+      err,
+      { route: 'PATCH /api/performances/[key]', requestId: locals.requestId },
+      {
+        codes: {
+          '23514': {
+            status: 400,
             error: 'constraint_violation',
             hint: 'Timeslots must be ordered: load in ≤ soundcheck ≤ start ≤ load out ≤ wrap.',
-            detail: err.body,
           },
-          400,
-        );
-      }
-      const upstream = err.status === 401 || err.status === 403 ? err.status : 502;
-      return json(
-        { error: 'postgrest_error', status: err.status, detail: err.body },
-        upstream,
-      );
-    }
-    return json({ error: 'unexpected', detail: String(err) }, 500);
+        },
+        passUpstream: [401, 403],
+      },
+    );
   }
 };
 
@@ -229,11 +223,11 @@ export const PATCH: RequestHandler = async ({ request, params, url, platform }) 
  * A gig that fell through is NOT deleted — that's status `cancelled`.
  * Live, non-cancelled invoices block deletion (409).
  */
-export const DELETE: RequestHandler = async ({ request, params, url, platform }) => {
+export const DELETE: RequestHandler = async ({ request, params, url, platform, locals }) => {
   if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);
   const env = platform.env as unknown as SupabaseEnv;
 
-  const jwt = extractBearer(request);
+  const jwt = extractAccessToken(request);
   if (!jwt) return json({ error: 'missing_authorization' }, 401);
 
   const key = params.key;
@@ -263,22 +257,21 @@ export const DELETE: RequestHandler = async ({ request, params, url, platform })
     await pgPostRpc(env, 'delete_performance', jwt, { p_performance_id: id });
     return new Response(null, { status: 204 });
   } catch (err) {
-    if (err instanceof PostgrestError) {
-      // RPC RAISEs: 42501 collapses not-found and no-permission → 404
-      // (existence is never confirmed); 23503 → live invoices block.
-      if (err.code === '42501') return json({ error: 'not_found' }, 404);
-      if (err.code === '23503') {
-        return json(
-          {
+    // RPC RAISEs: 42501 collapses not-found and no-permission → 404
+    // (existence is never confirmed); 23503 → live invoices block.
+    return pgErrorResponse(
+      err,
+      { route: 'DELETE /api/performances/[key]', requestId: locals.requestId },
+      {
+        codes: {
+          '42501': { status: 404, error: 'not_found' },
+          '23503': {
+            status: 409,
             error: 'performance_has_invoices',
             hint: 'Discard or cancel its invoices first — or set the gig to cancelled instead.',
           },
-          409,
-        );
-      }
-      const upstream = err.status === 401 ? 401 : 502;
-      return json({ error: 'postgrest_error', status: err.status, detail: err.body }, upstream);
-    }
-    return json({ error: 'unexpected', detail: String(err) }, 500);
+        },
+      },
+    );
   }
 };

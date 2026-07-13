@@ -11,8 +11,9 @@
 
 import type { RequestHandler } from './$types';
 import * as v from 'valibot';
-import { extractBearer } from '$lib/auth';
-import { pgPostRpc, PostgrestError, type SupabaseEnv } from '$lib/supabase';
+import { extractAccessToken } from '$lib/auth';
+import { pgPostRpc, type SupabaseEnv } from '$lib/supabase';
+import { pgErrorResponse } from '$lib/server/errors';
 
 const BodySchema = v.object({
   workspace_id: v.pipe(v.string(), v.uuid()),
@@ -41,23 +42,18 @@ function mapShare(s: ShareRow) {
   };
 }
 
-function mapError(err: unknown): Response {
-  if (err instanceof PostgrestError) {
-    // "workspace not found" and "not a member" both surface as 42501 —
-    // indistinguishable by design.
-    if (err.code === '42501') return json({ error: 'forbidden_or_not_found' }, 403);
-    if (err.code === '22023') return json({ error: 'invalid_input', detail: err.body }, 400);
-    const upstream = err.status === 401 ? 401 : 502;
-    return json({ error: 'postgrest_error', status: err.status, detail: err.body }, upstream);
-  }
-  return json({ error: 'unexpected', detail: String(err) }, 500);
-}
+// "workspace not found" and "not a member" both surface as 42501 —
+// indistinguishable by design.
+const SHARE_CODES = {
+  '42501': { status: 403, error: 'forbidden_or_not_found' },
+  '22023': { status: 400, error: 'invalid_input' },
+};
 
-export const GET: RequestHandler = async ({ request, url, platform }) => {
+export const GET: RequestHandler = async ({ request, url, platform, locals }) => {
   if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);
   const env = platform.env as unknown as SupabaseEnv;
 
-  const jwt = extractBearer(request);
+  const jwt = extractAccessToken(request);
   if (!jwt) return json({ error: 'missing_authorization' }, 401);
 
   const wsId = url.searchParams.get('workspace_id') ?? '';
@@ -70,15 +66,19 @@ export const GET: RequestHandler = async ({ request, url, platform }) => {
     });
     return json({ items: data.filter(Boolean).map(mapShare) });
   } catch (err) {
-    return mapError(err);
+    return pgErrorResponse(
+      err,
+      { route: 'GET /api/calendar-shares', requestId: locals.requestId },
+      { codes: SHARE_CODES },
+    );
   }
 };
 
-export const POST: RequestHandler = async ({ request, platform }) => {
+export const POST: RequestHandler = async ({ request, platform, locals }) => {
   if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);
   const env = platform.env as unknown as SupabaseEnv;
 
-  const jwt = extractBearer(request);
+  const jwt = extractAccessToken(request);
   if (!jwt) return json({ error: 'missing_authorization' }, 401);
 
   let raw: unknown;
@@ -97,6 +97,10 @@ export const POST: RequestHandler = async ({ request, platform }) => {
     if (data.length === 0 || !data[0]) return json({ error: 'create_failed' }, 502);
     return json({ share: mapShare(data[0]) }, 201);
   } catch (err) {
-    return mapError(err);
+    return pgErrorResponse(
+      err,
+      { route: 'POST /api/calendar-shares', requestId: locals.requestId },
+      { codes: SHARE_CODES },
+    );
   }
 };

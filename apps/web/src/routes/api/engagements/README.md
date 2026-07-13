@@ -50,7 +50,7 @@ Invalid values return `400 invalid_query` with per-field issues from Valibot.
 
 ## Helpers
 
-- `$lib/auth.ts` — `extractBearer(request)` reads the Authorization header.
+- `$lib/auth.ts` — `extractAccessToken(request)` reads the Authorization header.
 - `$lib/supabase.ts` — `pgGet(env, path, jwt, opts)` runs a PostgREST GET;
   `pgPostRpc(env, fn, jwt, args)` calls an RPC. Uses `fetch`; no
   `@supabase/supabase-js` dep, keeps the Worker bundle small.

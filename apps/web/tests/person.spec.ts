@@ -66,10 +66,7 @@ test.describe('person file', () => {
       .poll(
         async () =>
           await page.evaluate(async (m) => {
-            const jwt = localStorage.getItem('hour_jwt');
-            const res = await fetch(location.pathname.replace(/^.*person/, '/api/persons'), {
-              headers: { Authorization: `Bearer ${jwt}` },
-            });
+            const res = await fetch(location.pathname.replace(/^.*person/, '/api/persons'));
             const data = (await res.json()) as { notes: Array<{ body: string }> };
             return data.notes.some((n) => n.body === m);
           }, marker),

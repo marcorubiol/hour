@@ -19,6 +19,7 @@
   import { toStore } from 'svelte/store';
   import { env } from '$env/dynamic/public';
   import YNotes from '$lib/components/YNotes.svelte';
+  import { getAccessToken } from '$lib/session.svelte';
 
   interface Props {
     line: {
@@ -35,7 +36,9 @@
   let { line }: Props = $props();
 
   async function canEditProjectMeta(projectId: string, signal: AbortSignal): Promise<boolean> {
-    const jwt = localStorage.getItem('hour_jwt');
+    // Cross-origin PostgREST RPC — needs the raw access token (the
+    // deliberate hole in the httpOnly wall, see /api/auth/token).
+    const jwt = await getAccessToken();
     if (!jwt || !env.PUBLIC_SUPABASE_URL || !env.PUBLIC_SUPABASE_ANON_KEY) return false;
     const res = await fetch(new URL('/rest/v1/rpc/has_permission', env.PUBLIC_SUPABASE_URL), {
       method: 'POST',

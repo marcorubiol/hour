@@ -97,10 +97,7 @@ test.describe('performance write path', () => {
     // bounded). Cheaper: assert via API that the row exists with the data.
     const raw = await page.evaluate(
       async ({ d }) => {
-        const jwt = localStorage.getItem('hour_jwt');
-        const res = await fetch(`/api/performances?status=any&from=${d}&to=${d}`, {
-          headers: { Authorization: `Bearer ${jwt}` },
-        });
+        const res = await fetch(`/api/performances?status=any&from=${d}&to=${d}`);
         const data = (await res.json()) as {
           items: Array<{ venue_name: string | null; status: string; load_in_at: string | null }>;
         };
@@ -122,19 +119,13 @@ test.describe('performance write path', () => {
     // soundcheck before load-in IS adjacent → must bounce with a 400.
     const result = await page.evaluate(
       async ({ d }) => {
-        const jwt = localStorage.getItem('hour_jwt');
         // Find the run's created performance (previous test) or any fixture gig.
-        const list = await fetch(`/api/performances?status=any&from=${d}&to=${d}`, {
-          headers: { Authorization: `Bearer ${jwt}` },
-        });
+        const list = await fetch(`/api/performances?status=any&from=${d}&to=${d}`);
         const items = ((await list.json()) as { items: Array<{ id: string }> }).items;
         if (items.length === 0) return { skipped: true, status: 0 };
         const res = await fetch(`/api/performances/${items[0].id}`, {
           method: 'PATCH',
-          headers: {
-            Authorization: `Bearer ${jwt}`,
-            'content-type': 'application/json',
-          },
+          headers: { 'content-type': 'application/json' },
           body: JSON.stringify({
             load_in_at: `${d}T20:00:00.000Z`,
             soundcheck_at: `${d}T10:00:00.000Z`,
@@ -163,17 +154,13 @@ test.describe('performance write path', () => {
     // day. Never let this test see a row it didn't create.
     const fixture = await page.evaluate(
       async ({ d }) => {
-        const jwt = localStorage.getItem('hour_jwt');
-        const ws = await fetch('/api/workspaces', {
-          headers: { Authorization: `Bearer ${jwt}` },
-        });
+        const ws = await fetch('/api/workspaces');
         const workspaces = ((await ws.json()) as { items: Array<{ id: string; slug: string }> })
           .items;
         const wsId = workspaces.find((w) => w.slug === 'playwright')?.id ?? '';
         if (!wsId) return { wsId: '', items: [] as Array<{ id: string; slug: string | null; venue_name: string | null }> };
         const res = await fetch(
           `/api/performances?status=any&from=${d}&to=${d}&workspace_ids=${wsId}`,
-          { headers: { Authorization: `Bearer ${jwt}` } },
         );
         const data = (await res.json()) as {
           items: Array<{ id: string; slug: string | null; venue_name: string | null }>;
@@ -204,11 +191,9 @@ test.describe('performance write path', () => {
     // any workspace but `playwright`.
     const sweep = await page.evaluate(
       async ({ d, wsId }) => {
-        const jwt = localStorage.getItem('hour_jwt');
         const listMine = async () => {
           const res = await fetch(
             `/api/performances?status=any&from=${d}&to=${d}&workspace_ids=${wsId}`,
-            { headers: { Authorization: `Bearer ${jwt}` } },
           );
           const data = (await res.json()) as {
             items: Array<{ id: string; venue_name: string | null }>;
@@ -219,7 +204,6 @@ test.describe('performance write path', () => {
         for (const item of await listMine()) {
           const del = await fetch(`/api/performances/${item.id}`, {
             method: 'DELETE',
-            headers: { Authorization: `Bearer ${jwt}` },
           });
           statuses.push(del.status);
         }

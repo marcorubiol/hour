@@ -15,7 +15,7 @@
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
   import { page } from '$app/state';
-  import { fetchJSON } from '$lib/api';
+  import { fetchJSON, mutateJSON } from '$lib/api';
   import Button from '$lib/components/Button.svelte';
   import Dialog from '$lib/components/Dialog.svelte';
   import Input from '$lib/components/Input.svelte';
@@ -243,26 +243,12 @@
 
   const feeMutation = createMutation({
     mutationFn: async (input: { id: string; fee_amount: number | null; fee_currency: string }) => {
-      const res = await fetch(`/api/money/performances/${input.id}`, {
-        method: 'PATCH',
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('hour_jwt')}`,
-          'content-type': 'application/json',
-        },
-        body: JSON.stringify({
-          fee_amount: input.fee_amount,
-          fee_currency: input.fee_currency,
-        }),
-      });
-      const body = (await res.json().catch(() => ({}))) as {
-        performance?: unknown;
-        hint?: string;
-        detail?: string;
-        error?: string;
-      };
-      if (!res.ok || !body.performance) {
-        throw new Error(body.hint || body.detail || body.error || `Error ${res.status}`);
-      }
+      const body = await mutateJSON<{ performance?: unknown }>(
+        'PATCH',
+        `/api/money/performances/${input.id}`,
+        { fee_amount: input.fee_amount, fee_currency: input.fee_currency },
+      );
+      if (!body?.performance) throw new Error('Unexpected response');
       return body.performance;
     },
     onSuccess: () => {
@@ -331,29 +317,15 @@
 
   const createInvoice = createMutation({
     mutationFn: async () => {
-      const res = await fetch('/api/invoices', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('hour_jwt')}`,
-          'content-type': 'application/json',
-        },
-        body: JSON.stringify({
-          performance_id: invPerf!.id,
-          vat_pct: pctOrNull(iVat),
-          irpf_pct: pctOrNull(iIrpf),
-          number: iNumber.trim() || null,
-          due_on: iDueOn || null,
-          notes: iNotes.trim() || null,
-        }),
+      const body = await mutateJSON<{ invoice?: unknown }>('POST', '/api/invoices', {
+        performance_id: invPerf!.id,
+        vat_pct: pctOrNull(iVat),
+        irpf_pct: pctOrNull(iIrpf),
+        number: iNumber.trim() || null,
+        due_on: iDueOn || null,
+        notes: iNotes.trim() || null,
       });
-      const body = (await res.json().catch(() => ({}))) as {
-        invoice?: unknown;
-        detail?: string;
-        error?: string;
-      };
-      if (!res.ok || !body.invoice) {
-        throw new Error(body.detail || body.error || `Error ${res.status}`);
-      }
+      if (!body?.invoice) throw new Error('Unexpected response');
       return body.invoice;
     },
     onSuccess: () => {
@@ -385,22 +357,12 @@
 
   const invoiceStatusMutation = createMutation({
     mutationFn: async (input: { id: string; status: string }) => {
-      const res = await fetch(`/api/invoices/${input.id}`, {
-        method: 'PATCH',
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('hour_jwt')}`,
-          'content-type': 'application/json',
-        },
-        body: JSON.stringify({ status: input.status }),
-      });
-      const body = (await res.json().catch(() => ({}))) as {
-        invoice?: unknown;
-        detail?: string;
-        error?: string;
-      };
-      if (!res.ok || !body.invoice) {
-        throw new Error(body.detail || body.error || `Error ${res.status}`);
-      }
+      const body = await mutateJSON<{ invoice?: unknown }>(
+        'PATCH',
+        `/api/invoices/${input.id}`,
+        { status: input.status },
+      );
+      if (!body?.invoice) throw new Error('Unexpected response');
       return body.invoice;
     },
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['invoices'] }),
@@ -415,14 +377,7 @@
 
   const discardInvoice = createMutation({
     mutationFn: async (id: string) => {
-      const res = await fetch(`/api/invoices/${id}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${localStorage.getItem('hour_jwt')}` },
-      });
-      if (!res.ok && res.status !== 204) {
-        const body = (await res.json().catch(() => ({}))) as { detail?: string; error?: string };
-        throw new Error(body.detail || body.error || `Error ${res.status}`);
-      }
+      await mutateJSON('DELETE', `/api/invoices/${id}`);
     },
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['invoices'] }),
     onError: (err) => {

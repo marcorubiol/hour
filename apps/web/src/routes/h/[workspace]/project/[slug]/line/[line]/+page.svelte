@@ -28,6 +28,9 @@
   import Menu from '$lib/components/Menu.svelte';
   import StateBadge from '$lib/components/StateBadge.svelte';
   import { lineKindGlyph, lineKindLabel } from '$lib/utils/line-kind';
+  import { accentVar } from '$lib/utils/accent';
+  import { useBreadcrumb } from '$lib/stores/breadcrumb.svelte';
+  import { linePin } from '$lib/stores/pins.svelte';
   import { fmtMoneyCompact } from '$lib/money';
   import { dayMonth } from '$lib/datetime';
   import {
@@ -60,6 +63,7 @@
   };
 
   const queryClient = useQueryClient();
+  const breadcrumb = useBreadcrumb();
 
   let workspaceSlug = $derived(page.params.workspace ?? '');
   let projectSlug = $derived(page.params.slug ?? '');
@@ -72,6 +76,9 @@
   // (ADR-024), so slug alone could resolve another space's project.
   let routeWorkspaceId = $derived(
     $workspacesQuery.data?.items.find((w) => w.slug === workspaceSlug)?.id ?? null,
+  );
+  let activeWorkspaceName = $derived(
+    $workspacesQuery.data?.items.find((w) => w.slug === workspaceSlug)?.name ?? workspaceSlug,
   );
   let activeProject = $derived(
     routeWorkspaceId
@@ -101,6 +108,34 @@
     $linesQuery.data?.items.find((l) => l.slug === lineParam || l.id === lineParam) ?? null,
   );
 
+  // Publish this line's address to the shell's sticky breadcrumb bar
+  // (space › project › line) + the pin toggle target. Cleared on unmount so
+  // home/lens routes show no bar.
+  $effect(() => {
+    if (activeLine && activeProject) {
+      breadcrumb.set(
+        [
+          {
+            label: activeWorkspaceName,
+            href: `/h/${workspaceSlug}/`,
+            kind: 'space',
+            accent: accentVar(workspaceSlug),
+          },
+          {
+            label: activeProject.name,
+            href: `/h/${workspaceSlug}/project/${projectSlug}/`,
+            kind: 'node',
+          },
+          { label: activeLine.name, kind: 'node' },
+        ],
+        { pin: { id: linePin(activeLine.id), label: activeLine.name } },
+      );
+    } else {
+      breadcrumb.clear();
+    }
+    return () => breadcrumb.clear();
+  });
+
   // ── Module stack ──────────────────────────────────────────────────────
   // Optimistic local override so add/move/remove feel instant; the PATCH
   // invalidation refreshes the cache underneath.
@@ -117,6 +152,9 @@
     return localModules ?? modulesForLine(activeLine);
   });
   let missingModules = $derived(MODULE_KEYS.filter((k) => !stack.includes(k)));
+  // Sibling lines of this project — "where am I among peers" (the same list
+  // that drives the module stack query, so no extra fetch).
+  let siblings = $derived($linesQuery.data?.items ?? []);
 
   const REGISTRY = {
     calendar: CalendarModule,
@@ -380,6 +418,32 @@
       {/if}
     </header>
 
+    {#if siblings.length > 1}
+      <nav class="line-detail__siblings" aria-label="Lines in this project">
+        <p class="eyebrow eyebrow--sub">Lines in this project</p>
+        <div class="line-detail__sib-row">
+          {#each siblings as l (l.id)}
+            {#if l.id === activeLine.id}
+              <span class="line-detail__sib line-detail__sib--on">
+                <span class="line-detail__sib-dot" style={`--c: ${accentVar(workspaceSlug)}`}></span>
+                {l.name}
+                <span class="line-detail__sib-kind">{lineKindLabel(l.kind)}</span>
+              </span>
+            {:else}
+              <a
+                class="line-detail__sib"
+                href={`/h/${workspaceSlug}/project/${projectSlug}/line/${l.slug ?? l.id}`}
+              >
+                <span class="line-detail__sib-dot line-detail__sib-dot--off"></span>
+                {l.name}
+                <span class="line-detail__sib-kind">{lineKindLabel(l.kind)}</span>
+              </a>
+            {/if}
+          {/each}
+        </div>
+      </nav>
+    {/if}
+
     {#if stack.length > 1}
       <nav class="line-detail__chips" aria-label="Modules">
         {#each stack as key (key)}
@@ -532,6 +596,61 @@
     .line-detail__stat--danger,
     .line-detail__stat--danger b {
       color: var(--danger);
+    }
+
+    /* Sibling lines — where this line sits among its peers. Current is
+       ink-bordered + accent dot; peers are quiet links. */
+    .line-detail__siblings {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-s);
+    }
+    .line-detail__sib-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: var(--space-s);
+    }
+    .line-detail__sib {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-s);
+      padding-block: var(--space-xs);
+      padding-inline: var(--space-m);
+      border: 1px solid var(--border-color-light);
+      border-radius: var(--radius-l);
+      background: transparent;
+      font-size: var(--text-s);
+      color: var(--text-muted);
+      text-decoration: none;
+      transition: border-color var(--transition), color var(--transition);
+    }
+    .line-detail__sib:hover {
+      border-color: var(--border-color-dark);
+      color: var(--text-color);
+    }
+    .line-detail__sib--on {
+      border-color: var(--text-color);
+      background: var(--bg-ultra-light);
+      color: var(--heading-color);
+      font-weight: 500;
+    }
+    .line-detail__sib-dot {
+      inline-size: 0.5rem;
+      block-size: 0.5rem;
+      flex: none;
+      border-radius: var(--radius-circle);
+      background: var(--c, var(--text-faint));
+    }
+    .line-detail__sib-dot--off {
+      background: var(--border-color-dark);
+    }
+    .line-detail__sib-kind {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      letter-spacing: var(--mono-letter-spacing);
+      text-transform: uppercase;
+      color: var(--text-faint);
     }
 
     /* Anchor chips — sticky under the shell top bar. --header-height is the

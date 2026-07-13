@@ -35,6 +35,7 @@
   import { isReservedWorkspaceSlug } from '$lib/reserved-slugs';
   import { provideLens, type Lens } from '$lib/stores/lens.svelte';
   import { providePins, spacePin } from '$lib/stores/pins.svelte';
+  import { provideBreadcrumb } from '$lib/stores/breadcrumb.svelte';
   import { provideCreation } from '$lib/stores/creation.svelte';
   import CreateWorkspaceDialog from '$lib/components/create/CreateWorkspaceDialog.svelte';
   import CreateProjectDialog from '$lib/components/create/CreateProjectDialog.svelte';
@@ -47,6 +48,8 @@
     type NetworkPresenceStore,
     type RealtimeHandle,
   } from '$lib/realtime';
+  import { fetchJSON } from '$lib/api';
+  import { clearSession, ensureSession, getAccessToken, session } from '$lib/session.svelte';
   import { createQuery } from '@tanstack/svelte-query';
 
   interface Props {
@@ -64,8 +67,11 @@
   });
 
   let authChecked = $state(false);
-  onMount(() => {
-    if (!localStorage.getItem('hour_jwt')) {
+  onMount(async () => {
+    // Session lives in httpOnly cookies (Phase 0.9) — only the server can
+    // answer "am I signed in". ensureSession() also transparently refreshes
+    // an expired access token, so a returning tab lands signed-in.
+    if (!(await ensureSession())) {
       goto('/login', { replaceState: true });
       return;
     }
@@ -74,6 +80,7 @@
 
   const lens = provideLens('today');
   const pins = providePins();
+  const breadcrumb = provideBreadcrumb();
   const creation = provideCreation();
 
   onMount(() => {
@@ -91,31 +98,29 @@
   type WorkspaceLite = { id: string; slug: string; name: string };
   const workspacesQuery = createQuery({
     queryKey: ['workspaces'],
-    queryFn: async ({ signal }) => {
-      const jwt = localStorage.getItem('hour_jwt');
-      if (!jwt) throw new Error('Missing JWT');
-      const res = await fetch('/api/workspaces', {
-        signal,
-        headers: { Authorization: `Bearer ${jwt}` },
-      });
-      if (!res.ok) throw new Error(`Error ${res.status}`);
-      return (await res.json()) as { items: WorkspaceLite[] };
-    },
+    queryFn: ({ signal }) => fetchJSON<{ items: WorkspaceLite[] }>('/api/workspaces', signal),
   });
 
   let defaultWorkspaceSlug = $derived($workspacesQuery.data?.items[0]?.slug ?? '');
   let menuWorkspaceSlug = $derived(workspaceSlug || defaultWorkspaceSlug);
 
+  // Realtime is cross-origin (wss to supabase.co) and can't ride the
+  // httpOnly cookie — it authenticates via async suppliers backed by
+  // /api/auth/token (fresh token per (re)auth) and the session store
+  // (presence key). Construction stays synchronous: setContext only works
+  // in the sync part of onMount.
   onMount(() => {
-    const jwt = localStorage.getItem('hour_jwt');
-    if (!jwt || !env.PUBLIC_SUPABASE_URL || !env.PUBLIC_SUPABASE_ANON_KEY) return;
+    if (!env.PUBLIC_SUPABASE_URL || !env.PUBLIC_SUPABASE_ANON_KEY) return;
     try {
       rt = provideRealtime(
         {
           PUBLIC_SUPABASE_URL: env.PUBLIC_SUPABASE_URL,
           PUBLIC_SUPABASE_ANON_KEY: env.PUBLIC_SUPABASE_ANON_KEY,
         },
-        jwt,
+        {
+          getToken: getAccessToken,
+          getUserId: () => session.user?.sub ?? null,
+        },
       );
       networkPresence = provideNetworkPresence();
     } catch (e) {
@@ -137,22 +142,12 @@
 
   const theme = useTheme();
 
-  // Identity from JWT (display name → email local-part).
-  let userEmail = $state('');
-  let userDisplayName = $state('');
-  onMount(() => {
-    const jwt = localStorage.getItem('hour_jwt');
-    if (!jwt) return;
-    try {
-      const payload = JSON.parse(atob(jwt.split('.')[1]));
-      userEmail = payload.email ?? '';
-      const meta = payload.user_metadata ?? {};
-      userDisplayName =
-        meta.display_name ?? meta.full_name ?? meta.name ?? userEmail.split('@')[0] ?? '';
-    } catch {
-      /* malformed jwt — leave empty */
-    }
-  });
+  // Identity from the session store (display name → email local-part).
+  // The JWT is httpOnly now — the server decoded it in /api/auth/session.
+  let userEmail = $derived(session.user?.email ?? '');
+  let userDisplayName = $derived(
+    session.user?.name ?? session.user?.email?.split('@')[0] ?? '',
+  );
 
   // Theme style picker — accordion inside the account menu.
   type ThemeStyle = { id: string; name: string };
@@ -240,10 +235,15 @@
     else creation.openWorkspace();
   }
 
-  function logout() {
-    localStorage.removeItem('hour_jwt');
-    localStorage.removeItem('hour_refresh');
-    localStorage.removeItem('hour_expires_at');
+  async function logout() {
+    // Server-side: clears the httpOnly cookies + revokes the refresh
+    // token at Supabase. Await so the gates can't race a live cookie.
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+    } catch {
+      /* offline logout still clears local state */
+    }
+    clearSession();
     goto('/login', { replaceState: true });
   }
 </script>
@@ -399,6 +399,42 @@
         </div>
       </header>
 
+      {#if breadcrumb.crumbs.length > 0}
+        <div class="shell__address" class:shell__address--reading={breadcrumb.width === 'reading'}>
+          <div class="shell__address-inner">
+            <nav class="shell__crumbs" aria-label="Breadcrumb">
+              {#each breadcrumb.crumbs as c, i (i)}
+                {#if i > 0}<span class="shell__crumb-sep" aria-hidden="true">›</span>{/if}
+                {#if c.href}
+                  <a
+                    class="shell__crumb"
+                    class:shell__crumb--space={c.kind === 'space'}
+                    href={c.href}
+                    style={c.accent ? `--c: ${c.accent}` : undefined}
+                  >
+                    {#if c.kind === 'space'}<span class="shell__crumb-dot" aria-hidden="true"></span>{/if}{c.label}
+                  </a>
+                {:else}
+                  <span class="shell__crumb shell__crumb--here">{c.label}</span>
+                {/if}
+              {/each}
+            </nav>
+            {#if breadcrumb.pin}
+              {@const pinId = breadcrumb.pin.id}
+              <button
+                type="button"
+                class="pill--sm pill--mono shell__pin"
+                class:pill--on={pins.has(pinId)}
+                onclick={() => pins.toggle(pinId)}
+                title={pins.has(pinId) ? 'Unpin — remove from what you live in' : 'Pin — bring this forward'}
+              >
+                {pins.has(pinId) ? 'pinned' : 'pin'}
+              </button>
+            {/if}
+          </div>
+        </div>
+      {/if}
+
       <div class="shell__content">
         {#if children}{@render children()}{/if}
       </div>
@@ -517,6 +553,79 @@
        borrow the (now neutralized) global <section> padding unevenly. */
     padding-block: var(--space-l) var(--space-xxl);
     padding-inline: var(--space-l);
+  }
+
+  /* ── address bar (breadcrumb) ─────────────────────────────────────
+     Entity pages fill it via the breadcrumb store; sticks right below
+     the top bar so "where am I" is always on screen. The inner column
+     centers at the wide page width with the same gutter as the content,
+     so the crumbs land on the same left edge as the page masthead (the
+     --space-l gutters cancel out — see breadcrumb store). */
+  .shell__address {
+    position: sticky;
+    inset-block-start: var(--header-height);
+    z-index: calc(var(--z-sticky) - 1);
+    background: color-mix(in oklch, var(--bg-light) 92%, transparent);
+    backdrop-filter: blur(8px);
+    border-block-end: 1px solid var(--border-color-light);
+  }
+  .shell__address-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-m);
+    max-inline-size: var(--page-width-wide);
+    margin-inline: auto;
+    padding-block: var(--space-xs);
+    padding-inline: var(--space-l);
+    min-block-size: 2.75rem;
+  }
+  /* Reading-width pages (person, performance) center their content narrower;
+     match so the crumbs align with their masthead. */
+  .shell__address--reading .shell__address-inner {
+    max-inline-size: var(--page-width-reading);
+  }
+  .shell__crumbs {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-s);
+    min-inline-size: 0;
+  }
+  .shell__crumb {
+    font-size: var(--text-s);
+    color: var(--text-muted);
+    text-decoration: none;
+    transition: color var(--transition);
+  }
+  .shell__crumb:hover {
+    color: var(--text-color);
+  }
+  .shell__crumb--space {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-xs);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    letter-spacing: var(--mono-letter-spacing-loose);
+    text-transform: uppercase;
+  }
+  .shell__crumb-dot {
+    inline-size: 0.5rem;
+    block-size: 0.5rem;
+    flex: none;
+    border-radius: var(--radius-circle);
+    background: var(--c, var(--text-faint));
+  }
+  .shell__crumb--here {
+    font-weight: 600;
+    color: var(--heading-color);
+  }
+  .shell__crumb-sep {
+    color: var(--border-color-dark);
+  }
+  .shell__pin {
+    flex: none;
   }
 
   /* ── account menu chrome (unchanged from the previous shell) ── */

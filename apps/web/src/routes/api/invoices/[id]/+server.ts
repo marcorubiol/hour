@@ -11,8 +11,9 @@
 
 import type { RequestHandler } from './$types';
 import * as v from 'valibot';
-import { extractBearer } from '$lib/auth';
-import { pgPatch, pgPostRpc, PostgrestError, type SupabaseEnv } from '$lib/supabase';
+import { extractAccessToken } from '$lib/auth';
+import { pgPatch, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
+import { pgErrorResponse } from '$lib/server/errors';
 
 const IdSchema = v.pipe(v.string(), v.uuid());
 
@@ -30,11 +31,11 @@ function json(body: unknown, status = 200): Response {
   });
 }
 
-export const PATCH: RequestHandler = async ({ request, params, platform }) => {
+export const PATCH: RequestHandler = async ({ request, params, platform, locals }) => {
   if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);
   const env = platform.env as unknown as SupabaseEnv;
 
-  const jwt = extractBearer(request);
+  const jwt = extractAccessToken(request);
   if (!jwt) return json({ error: 'missing_authorization' }, 401);
 
   const idParsed = v.safeParse(IdSchema, params.id);
@@ -74,19 +75,19 @@ export const PATCH: RequestHandler = async ({ request, params, platform }) => {
     if (data.length === 0) return json({ error: 'not_found' }, 404);
     return json({ invoice: data[0] });
   } catch (err) {
-    if (err instanceof PostgrestError) {
-      const upstream = err.status === 401 || err.status === 403 ? err.status : 502;
-      return json({ error: 'postgrest_error', status: err.status, detail: err.body }, upstream);
-    }
-    return json({ error: 'unexpected', detail: String(err) }, 500);
+    return pgErrorResponse(
+      err,
+      { route: 'PATCH /api/invoices/[id]', requestId: locals.requestId },
+      { passUpstream: [401, 403] },
+    );
   }
 };
 
-export const DELETE: RequestHandler = async ({ request, params, platform }) => {
+export const DELETE: RequestHandler = async ({ request, params, platform, locals }) => {
   if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);
   const env = platform.env as unknown as SupabaseEnv;
 
-  const jwt = extractBearer(request);
+  const jwt = extractAccessToken(request);
   if (!jwt) return json({ error: 'missing_authorization' }, 401);
 
   const idParsed = v.safeParse(IdSchema, params.id);
@@ -96,13 +97,15 @@ export const DELETE: RequestHandler = async ({ request, params, platform }) => {
     await pgPostRpc(env, 'delete_invoice', jwt, { p_invoice_id: idParsed.output });
     return new Response(null, { status: 204 });
   } catch (err) {
-    if (err instanceof PostgrestError) {
-      // 22023 = "only draft invoices can be deleted".
-      if (err.code === '22023') return json({ error: 'not_draft', detail: err.body }, 409);
-      if (err.code === '42501') return json({ error: 'forbidden_or_not_found' }, 403);
-      const upstream = err.status === 401 ? 401 : 502;
-      return json({ error: 'postgrest_error', status: err.status, detail: err.body }, upstream);
-    }
-    return json({ error: 'unexpected', detail: String(err) }, 500);
+    return pgErrorResponse(
+      err,
+      { route: 'DELETE /api/invoices/[id]', requestId: locals.requestId },
+      {
+        codes: {
+          '22023': { status: 409, error: 'not_draft' },
+          '42501': { status: 403, error: 'forbidden_or_not_found' },
+        },
+      },
+    );
   }
 };

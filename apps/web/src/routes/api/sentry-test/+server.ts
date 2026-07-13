@@ -7,13 +7,12 @@ import { error } from '@sveltejs/kit';
  * (`initCloudflareSentryHandle` + `sentryHandle`) captures it and ships an
  * event to the configured Sentry project.
  *
- * Dev-only by default. In production, accessible with `?force=1` so we can
- * verify the deployed Worker's Sentry wiring without exposing the path to
- * drive-by traffic.
+ * Dev-only, hard. The old `?force=1` production escape hatch died in the
+ * Phase 0.9 hardening pass: anyone who knew the URL could burn Sentry quota
+ * and pollute alerting. To smoke-test production wiring, trigger a real
+ * error behind auth or use a one-off deploy — don't resurrect the flag.
  */
-export const GET: RequestHandler = async ({ url }) => {
-  if (!dev && url.searchParams.get('force') !== '1') {
-    error(404, 'Not Found');
-  }
+export const GET: RequestHandler = async () => {
+  if (!dev) error(404, 'Not Found');
   throw new Error(`Hour server smoke ${new Date().toISOString()}`);
 };

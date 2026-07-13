@@ -15,7 +15,7 @@
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { page } from '$app/state';
   import { goto } from '$app/navigation';
-  import { fetchJSON } from '$lib/api';
+  import { fetchJSON, mutateJSON, ApiError } from '$lib/api';
   import Button from '$lib/components/Button.svelte';
   import Checkbox from '$lib/components/Checkbox.svelte';
   import Dialog from '$lib/components/Dialog.svelte';
@@ -206,32 +206,29 @@
         next_action_at: aNextAt || null,
         next_action_note: aNextNote.trim() || null,
       };
-      const jwt = localStorage.getItem('hour_jwt');
       let personId: string | null = null;
       const out: AddResult = { created: 0, existed: 0, failed: [] };
 
       for (const projectId of targets) {
         const line_id = lineFor[projectId] || null;
-        const body = personId
+        const body: Record<string, unknown> = personId
           ? { project_id: projectId, person_id: personId, line_id, ...base }
           : { project_id: projectId, person, line_id, ...base };
-        const res = await fetch('/api/engagements', {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${jwt}`, 'content-type': 'application/json' },
-          body: JSON.stringify(body),
-        });
-        if (res.status === 201) {
-          const data = (await res.json().catch(() => null)) as
-            | { engagement?: { person_id?: string } }
-            | null;
+        try {
+          const data = await mutateJSON<{ engagement?: { person_id?: string } }>(
+            'POST',
+            '/api/engagements',
+            body,
+          );
           out.created += 1;
           if (!personId && data?.engagement?.person_id) personId = data.engagement.person_id;
-        } else if (res.status === 409) {
-          // Already has a conversation in this project — not an error.
-          out.existed += 1;
-        } else {
-          const err = (await res.json().catch(() => ({}))) as { error?: string; detail?: string };
-          out.failed.push(err.detail || err.error || `HTTP ${res.status}`);
+        } catch (e) {
+          if (e instanceof ApiError && e.status === 409) {
+            // Already has a conversation in this project — not an error.
+            out.existed += 1;
+          } else {
+            out.failed.push(e instanceof Error ? e.message : 'Unexpected error');
+          }
         }
       }
       // Nothing landed and something broke → surface it as an error.
