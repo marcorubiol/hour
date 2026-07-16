@@ -2,6 +2,12 @@ import { defineConfig, devices } from '@playwright/test';
 import { existsSync } from 'node:fs';
 import { loadEnvFile } from 'node:process';
 
+/**
+ * Where the shared signed-in session lands. One login per run instead of
+ * ~14 — see tests/auth.setup.ts. `.playwright/` is already gitignored.
+ */
+export const STORAGE_STATE = '.playwright/auth.json';
+
 // Keep the canonical test credentials in one place. Explicit shell values
 // still win because loadEnvFile does not overwrite existing environment vars.
 if (existsSync('.env.test')) loadEnvFile('.env.test');
@@ -31,7 +37,23 @@ export default defineConfig({
       : {},
   },
   projects: [
-    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+    // One login for the whole run — see tests/auth.setup.ts for why (the
+    // suite used to trip the /api/auth/login rate limit with ~14 logins
+    // from one IP).
+    { name: 'setup', testMatch: /auth\.setup\.ts/ },
+    {
+      name: 'chromium',
+      use: { ...devices['Desktop Chrome'], storageState: STORAGE_STATE },
+      dependencies: ['setup'],
+      // auth-session drives sign-in/refresh/logout itself: it must start
+      // signed out, so it runs in its own project below.
+      testIgnore: /auth-session\.spec\.ts/,
+    },
+    {
+      name: 'auth',
+      use: { ...devices['Desktop Chrome'] },
+      testMatch: /auth-session\.spec\.ts/,
+    },
   ],
   webServer: process.env.PW_BASE_URL
     ? undefined

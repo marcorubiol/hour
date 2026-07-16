@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect } from '@playwright/test';
 
 const EMAIL = process.env.PW_TEST_EMAIL;
 const PASSWORD = process.env.PW_TEST_PASSWORD;
@@ -10,14 +10,6 @@ const PASSWORD = process.env.PW_TEST_PASSWORD;
  * leave no residue beyond audit rows.
  */
 
-async function login(page: Page) {
-  await page.goto('/login');
-  await page.locator('input[type=email]').fill(EMAIL!);
-  await page.locator('input[type=password]').fill(PASSWORD!);
-  await page.getByRole('button', { name: /sign in/i }).click();
-  await page.waitForURL(/\/h\//);
-}
-
 test.describe('person file', () => {
   test.skip(!EMAIL || !PASSWORD, 'Set PW_TEST_EMAIL / PW_TEST_PASSWORD.');
 
@@ -25,7 +17,6 @@ test.describe('person file', () => {
     test.setTimeout(60_000);
     const marker = `note-e2e-${Date.now()}`;
 
-    await login(page);
     await page.goto('/h/muk-cia/contacts');
     await expect(page.locator('tbody tr').first()).toBeVisible();
 

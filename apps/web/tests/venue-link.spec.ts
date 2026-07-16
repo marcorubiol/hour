@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect } from '@playwright/test';
 
 const EMAIL = process.env.PW_TEST_EMAIL;
 const PASSWORD = process.env.PW_TEST_PASSWORD;
@@ -12,14 +12,6 @@ const PASSWORD = process.env.PW_TEST_PASSWORD;
  * so reruns reuse the same fixture row instead of accumulating.
  */
 
-async function login(page: Page) {
-  await page.goto('/login');
-  await page.locator('input[type=email]').fill(EMAIL!);
-  await page.locator('input[type=password]').fill(PASSWORD!);
-  await page.getByRole('button', { name: /sign in/i }).click();
-  await page.waitForURL(/\/h\//);
-}
-
 test.describe('venue linking', () => {
   test.skip(!EMAIL || !PASSWORD, 'Set PW_TEST_EMAIL / PW_TEST_PASSWORD.');
   // Serial: both tests mutate the same zzz-e2e-1 gig's venue link and the
@@ -29,7 +21,6 @@ test.describe('venue linking', () => {
   test('promote fields → link persists → unlink', async ({ page }) => {
     test.setTimeout(90_000);
 
-    await login(page);
     await page.goto('/h/playwright/performance/zzz-e2e-1');
     await expect(page.getByRole('button', { name: 'Edit details' })).toBeVisible();
 
@@ -74,7 +65,6 @@ test.describe('venue linking', () => {
   }) => {
     test.setTimeout(90_000);
 
-    await login(page);
     await page.goto('/h/playwright/performance/zzz-e2e-1');
     await page.getByRole('button', { name: 'Edit details' }).click();
     const dialog = page.locator('dialog[open]').filter({ hasText: 'Edit performance' });

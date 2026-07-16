@@ -4,6 +4,16 @@ const EMAIL = process.env.PW_TEST_EMAIL;
 const PASSWORD = process.env.PW_TEST_PASSWORD;
 
 /**
+ * The session arrives from the shared storageState (tests/auth.setup.ts), so
+ * there is no sign-in here — but the tests below drive the API from inside
+ * the page with relative URLs, and about:blank has no origin to resolve them
+ * against. Land on a real page first.
+ */
+async function openApp(page: Page) {
+  await page.goto('/h/playwright/calendar');
+}
+
+/**
  * E2E — performance write path (ADR-043): create a gig from the calendar,
  * then edit status + schedule on the detail page.
  *
@@ -16,14 +26,6 @@ const PASSWORD = process.env.PW_TEST_PASSWORD;
  * through the UI confirm dialog (exercising the delete path), the rest
  * via the API. No more e2e-venue-* accumulation, no manual MCP purge.
  */
-
-async function login(page: Page) {
-  await page.goto('/login');
-  await page.locator('input[type=email]').fill(EMAIL!);
-  await page.locator('input[type=password]').fill(PASSWORD!);
-  await page.getByRole('button', { name: /sign in/i }).click();
-  await page.waitForURL(/\/h\//);
-}
 
 /** Unique day per run inside 2032 — keeps fixture slugs collision-free. */
 function runDay(): string {
@@ -48,7 +50,6 @@ test.describe('performance write path', () => {
     const day = runDay();
     const venue = `E2E Venue ${Date.now()}`;
 
-    await login(page);
     await page.goto('/h/playwright/calendar');
     await expect(page.locator('.cal__grid')).toBeVisible();
 
@@ -112,7 +113,7 @@ test.describe('performance write path', () => {
   });
 
   test('timeslot ordering violation surfaces as a clear error', async ({ page }) => {
-    await login(page);
+    await openApp(page);
     const day = runDay();
     // The DB CHECK orders ADJACENT pairs (NULL-safe — partial schedules
     // are legal, so load-in + wrap with gaps in between never violates).
@@ -143,9 +144,8 @@ test.describe('performance write path', () => {
     page,
   }) => {
     test.setTimeout(90_000);
+    await openApp(page);
     const day = runDay();
-
-    await login(page);
 
     // CRITICAL: scope every list to the `playwright` fixture workspace AND
     // the fixture venue prefix. The test user is admin of `muk-cia` (real

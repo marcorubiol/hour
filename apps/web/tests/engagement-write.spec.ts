@@ -28,12 +28,8 @@ type RawEngagement = {
   person: { full_name: string | null } | null;
 };
 
-async function loginAndOpenContacts(page: Page, searchName?: string) {
-  await page.goto('/login');
-  await page.locator('input[type=email]').fill(EMAIL!);
-  await page.locator('input[type=password]').fill(PASSWORD!);
-  await page.getByRole('button', { name: /sign in/i }).click();
-  await page.waitForURL(/\/h\//);
+/** Session comes from the shared storageState (tests/auth.setup.ts). */
+async function openContacts(page: Page, searchName?: string) {
   await page.goto('/h/muk-cia/contacts');
   if (searchName) {
     // The lens is pins-scoped (unscoped = everything RLS allows) — narrow
@@ -109,7 +105,7 @@ test.describe('engagement inline write', () => {
   );
 
   test('status change persists and reverts', async ({ page }) => {
-    await loginAndOpenContacts(page);
+    await openContacts(page);
 
     const original = (await fetchListRaw(page))[0];
     const name = original.person?.full_name;
@@ -162,7 +158,7 @@ test.describe('engagement inline write', () => {
   });
 
   test('next action date + note save, persist and restore', async ({ page }) => {
-    await loginAndOpenContacts(page);
+    await openContacts(page);
 
     const original = (await fetchListRaw(page))[0];
     const name = original.person?.full_name;

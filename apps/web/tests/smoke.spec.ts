@@ -10,39 +10,49 @@ test.describe('smoke', () => {
   );
 
   /**
-   * Adaptive Digest happy path (ADR-055, final nav). No top-nav buttons: the
-   * logo is Home = Agenda; Calendar and Money are reached from ⌘K. Covers the
+   * Happy path across the shell (ADR-065 nav). No top-nav buttons: the logo
+   * is Home = Desk; Calendar and Money are reached from ⌘K. Covers the
    * integration points that move data end to end:
-   *   - login (server-side Supabase grant + httpOnly session) → /h/marco-rubiol
+   *   - bare /h/ forwards to the default workspace's Desk
    *   - the shell renders (brand); ⌘K jumps to a real line AND a view
    *   - project detail loads the engagement count through /api/engagements
    *   - Calendar month grid, Contacts table, Money totals all deep-link
    *
+   * Sign-in is not exercised here: the session arrives from the shared
+   * storageState (tests/auth.setup.ts) and the login flow itself is covered
+   * by auth-session.spec.ts.
+   *
    * Test user (playwright@hour.test) is member of marco-rubiol, muk-cia and
    * its own playwright workspace; NOT demo.
    */
-  test('login → shell → ⌘K → project → views', async ({ page }) => {
-    await page.goto('/login');
-    await page.locator('input[type=email]').fill(EMAIL!);
-    await page.locator('input[type=password]').fill(PASSWORD!);
-    await page.getByRole('button', { name: /sign in/i }).click();
-    await page.waitForURL(/\/h\/marco-rubiol\/?$/);
+  test('shell → ⌘K → project → views', async ({ page }) => {
+    // Bare /h/ forwards to a workspace Desk (no stale "pick a workspace").
+    await page.goto('/h/');
+    await page.waitForURL(/\/h\/[^/]+\/desk\/?$/);
 
     // Shell loaded — the brand is the home affordance (no nav buttons).
     await expect(page.getByRole('link', { name: /Hour — home/i })).toBeVisible();
 
-    // Home = projects-first grid (ADR-060): at least one project card
-    // renders with its name (the ghost "+ New project" card has none).
+    // The projects grid moved: the home IS the Desk now (ADR-062/065), so the
+    // ADR-060 grid lives on the space portada, scoped to that space. Assert it
+    // on muk-cia — marco-rubiol (the default landing space) is empty.
+    await page.goto('/h/muk-cia/');
     await expect(page.locator('.pcard__name').first()).toBeVisible();
 
-    // ⌘K palette: built from /api/lines + /api/projects (RLS) + the views.
+    // ⌘K is the SCOPE BUILDER now (Scope v2), not a lens switcher: it lists
+    // spaces / projects / lines from /api/workspaces + /api/projects +
+    // /api/lines (RLS). Lens switching moved to the visible "view as" control,
+    // so there is no Money option in here any more.
     await page.keyboard.press('Meta+k');
-    const palette = page.getByRole('dialog', { name: 'Jump to a project, line or space' });
+    const palette = page.getByRole('dialog', { name: 'Build a scope' });
     await expect(palette).toBeVisible();
     await expect(palette.getByRole('option').first()).toBeVisible();
-    // Money is reachable from ⌘K.
-    await page.locator('.cmdk__search input').fill('Money');
-    await palette.getByRole('option', { name: /Money/ }).first().click();
+    await page.keyboard.press('Escape');
+    await expect(palette).not.toBeVisible();
+
+    // "view as" is how you change lens — it only exists on a lens route.
+    await page.goto('/h/muk-cia/desk');
+    await page.getByRole('button', { name: 'Money', exact: true }).click();
     await page.waitForURL(/\/h\/[^/]+\/money\/?$/);
     await expect(page.locator('.mny__totals')).toBeVisible();
     await expect(page.locator('.mny__total').first()).toContainText(/pipeline/);
@@ -65,9 +75,5 @@ test.describe('smoke', () => {
     await expect(page.locator('.status-bar__count')).toContainText(/\d+ contacts/);
     expect(await page.locator('tbody tr').count()).toBeGreaterThan(0);
 
-    // Bare /h/ forwards to a workspace agenda (no stale "pick a workspace").
-    await page.goto('/h/');
-    await page.waitForURL(/\/h\/[^/]+\/?$/);
-    expect(new URL(page.url()).pathname).not.toBe('/h/');
   });
 });

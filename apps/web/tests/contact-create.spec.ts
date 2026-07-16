@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect } from '@playwright/test';
 
 const EMAIL = process.env.PW_TEST_EMAIL;
 const PASSWORD = process.env.PW_TEST_PASSWORD;
@@ -16,14 +16,6 @@ const PASSWORD = process.env.PW_TEST_PASSWORD;
 const FIXTURE_NAME = 'ZZZ E2E Contact';
 const FIXTURE_EMAIL = 'zzz-e2e-contact@hour.test';
 
-async function login(page: Page) {
-  await page.goto('/login');
-  await page.locator('input[type=email]').fill(EMAIL!);
-  await page.locator('input[type=password]').fill(PASSWORD!);
-  await page.getByRole('button', { name: /sign in/i }).click();
-  await page.waitForURL(/\/h\//);
-}
-
 test.describe('contact capture', () => {
   test.skip(!EMAIL || !PASSWORD, 'Set PW_TEST_EMAIL / PW_TEST_PASSWORD.');
 
@@ -32,7 +24,6 @@ test.describe('contact capture', () => {
   }) => {
     test.setTimeout(90_000);
 
-    await login(page);
     await page.goto('/h/playwright/contacts');
     await expect(page.getByRole('button', { name: 'Add contact' })).toBeVisible();
 

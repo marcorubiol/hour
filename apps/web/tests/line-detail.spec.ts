@@ -23,12 +23,14 @@ const LINE_NAME = 'ZZZ E2E Modules';
 const CONTACT_NAME = 'ZZZ E2E Line Contact';
 const CONTACT_EMAIL = 'zzz-e2e-line-contact@hour.test';
 
-async function login(page: Page) {
-  await page.goto('/login');
-  await page.locator('input[type=email]').fill(EMAIL!);
-  await page.locator('input[type=password]').fill(PASSWORD!);
-  await page.getByRole('button', { name: /sign in/i }).click();
-  await page.waitForURL(/\/h\//);
+/**
+ * The session arrives from the shared storageState (tests/auth.setup.ts), so
+ * there is no sign-in here — but findFixtureLine() fetches relative URLs from
+ * inside the page, and about:blank has no origin to resolve them against.
+ * Land on a real page first.
+ */
+async function openApp(page: Page) {
+  await page.goto('/h/playwright/desk');
 }
 
 type LineRow = { id: string; slug: string | null; name: string };
@@ -54,7 +56,7 @@ test.describe('line detail — module composition', () => {
 
   test('template picker creates the line (first run) and the stack renders', async ({ page }) => {
     test.setTimeout(120_000);
-    await login(page);
+    await openApp(page);
 
     let line = await findFixtureLine(page);
 
@@ -85,7 +87,7 @@ test.describe('line detail — module composition', () => {
 
   test('line-context contact capture auto-assigns line_id, then self-cleans', async ({ page }) => {
     test.setTimeout(120_000);
-    await login(page);
+    await openApp(page);
     const line = await findFixtureLine(page);
     expect(line).not.toBeNull();
     await page.goto(`/h/playwright/project/zzz-e2e-collab/line/${line!.slug ?? line!.id}`);
@@ -134,12 +136,12 @@ test.describe('line detail — module composition', () => {
 
   test('materials register + remove, add + remove a module', async ({ page }) => {
     test.setTimeout(120_000);
-    await login(page);
+    await openApp(page);
     const line = await findFixtureLine(page);
     expect(line).not.toBeNull();
 
     // Crash recovery: line.modules persists — a run killed after the add
-    // step leaves People in the stack and the add-menu item gone forever.
+    // step leaves Team in the stack and the add-menu item gone forever.
     // Reset to the booking template shape via the whitelist PATCH.
     await page.evaluate(async ({ lineId }) => {
       await fetch(`/api/lines/${lineId}`, {
@@ -168,16 +170,22 @@ test.describe('line detail — module composition', () => {
     await page.getByRole('menuitem', { name: /remove/i }).click();
     await expect(page.locator('#mod-materials tbody tr')).toHaveCount(0, { timeout: 10_000 });
 
-    // Add the People module, then remove it — the stack round-trips.
+    // Add the Team module, then remove it — the stack round-trips.
+    //
+    // Was asserting on #mod-contacts: it clicked "People" (the pre-ADR-065
+    // name for Team) but then checked and removed CONTACTS — a module the
+    // reset above always puts in the stack, so the assertion passed without
+    // the added module ever being looked at, and the "round-trip" removed
+    // the wrong thing. Both halves now name the module actually added.
     await page.getByRole('button', { name: /add module/i }).click();
-    await page.getByRole('menuitem', { name: /People/ }).click();
-    await expect(page.locator('#mod-contacts')).toBeVisible({ timeout: 10_000 });
+    await page.getByRole('menuitem', { name: /Team/ }).click();
+    await expect(page.locator('#mod-team')).toBeVisible({ timeout: 10_000 });
 
     await page
-      .locator('#mod-contacts')
+      .locator('#mod-team')
       .getByRole('button', { name: /module actions/i })
       .click();
     await page.getByRole('menuitem', { name: /remove module/i }).click();
-    await expect(page.locator('#mod-contacts')).not.toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('#mod-team')).not.toBeVisible({ timeout: 10_000 });
   });
 });

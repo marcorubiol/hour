@@ -1,4 +1,5 @@
 import { test, expect, type Browser, type Page } from '@playwright/test';
+import { STORAGE_STATE } from '../playwright.config';
 
 const EMAIL = process.env.PW_TEST_EMAIL;
 const PASSWORD = process.env.PW_TEST_PASSWORD;
@@ -117,14 +118,18 @@ async function ensureFixture(): Promise<Fixture> {
   return { perf1: perfs[0], perf2: perfs[1] };
 }
 
-async function loginAndOpen(browser: Browser, path: string): Promise<Page> {
-  const context = await browser.newContext();
+/**
+ * Two independent clients, both signed in as the test user — that's the
+ * point of the test (convergence between them).
+ *
+ * `browser.newContext()` does NOT inherit the project's storageState, so the
+ * shared session (tests/auth.setup.ts) has to be handed over explicitly.
+ * Without it both clients would land on /login and this would spend two more
+ * logins against the rate limit.
+ */
+async function openAsClient(browser: Browser, path: string): Promise<Page> {
+  const context = await browser.newContext({ storageState: STORAGE_STATE });
   const page = await context.newPage();
-  await page.goto('/login');
-  await page.locator('input[type=email]').fill(EMAIL!);
-  await page.locator('input[type=password]').fill(PASSWORD!);
-  await page.getByRole('button', { name: /sign in/i }).click();
-  await page.waitForURL(/\/h\//);
   await page.goto(path);
   return page;
 }
@@ -155,8 +160,8 @@ test.describe('collaborative notes (Yjs over the RoadsheetCollab DO)', () => {
     test.setTimeout(120_000);
     const marker = `e2e-${Date.now()}`;
 
-    const a = await loginAndOpen(browser, '/h/playwright/performance/zzz-e2e-1');
-    const b = await loginAndOpen(browser, '/h/playwright/performance/zzz-e2e-1');
+    const a = await openAsClient(browser, '/h/playwright/performance/zzz-e2e-1');
+    const b = await openAsClient(browser, '/h/playwright/performance/zzz-e2e-1');
 
     await expect(notesBox(a)).toBeVisible();
     await expect(notesBox(b)).toBeVisible();
@@ -224,8 +229,18 @@ test.describe('collaborative notes (Yjs over the RoadsheetCollab DO)', () => {
     await b.context().close();
   });
 
-  test('upgrade is denied without a valid token', async ({ page }) => {
-    // No login. A raw WebSocket with a garbage token must never open.
+  test('upgrade is denied without a valid token', async ({ browser }) => {
+    // Deliberately signed OUT. Two traps here, both learned the hard way:
+    //   1. the `page` fixture now carries the suite's shared session
+    //      (tests/auth.setup.ts), and post-ADR-061 the socket authenticates
+    //      from that cookie — `?token=` is ignored — so it would open;
+    //   2. a bare browser.newContext() does NOT help: it inherits the
+    //      project's `use`, storageState included (that's also why relative
+    //      goto works here). It has to be emptied EXPLICITLY.
+    // Without this the test still passes/fails for the wrong reason and
+    // asserts nothing. No session → the upgrade must be refused.
+    const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+    const page = await context.newPage();
     await page.goto('/login');
     const result = await page.evaluate(
       ({ perfId }) =>
@@ -251,5 +266,6 @@ test.describe('collaborative notes (Yjs over the RoadsheetCollab DO)', () => {
       { perfId: fx.perf1 },
     );
     expect(result).toBe('denied');
+    await context.close();
   });
 });

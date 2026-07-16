@@ -10,21 +10,12 @@ const PASSWORD = process.env.PW_TEST_PASSWORD;
  * Self-cleaning: the share ends revoked (revocation is an assertion).
  */
 
-async function login(page: Page) {
-  await page.goto('/login');
-  await page.locator('input[type=email]').fill(EMAIL!);
-  await page.locator('input[type=password]').fill(PASSWORD!);
-  await page.getByRole('button', { name: /sign in/i }).click();
-  await page.waitForURL(/\/h\//);
-}
-
 test.describe('public road sheet link', () => {
   test.skip(!EMAIL || !PASSWORD, 'Set PW_TEST_EMAIL / PW_TEST_PASSWORD.');
 
   test('create → anonymous open → revoke → dead', async ({ page, browser }) => {
     test.setTimeout(90_000);
 
-    await login(page);
     await page.goto('/h/playwright/performance/zzz-e2e-1/roadsheet');
     await expect(page.locator('.rsv__title')).toBeVisible();
 
@@ -56,8 +47,12 @@ test.describe('public road sheet link', () => {
     expect(share.token).toMatch(/^[0-9a-f]{64}$/);
     await expect(page.locator('.rs__share-list li', { hasText: 'venue' })).toBeVisible();
 
-    // Open the public URL in a fresh context — no auth, no storage.
-    const anonContext = await browser.newContext();
+    // Open the public URL with NO session — the whole point of a public
+    // link. storageState must be emptied explicitly: browser.newContext()
+    // inherits the project's `use`, which now carries the suite's shared
+    // session (tests/auth.setup.ts), and an authenticated "anonymous" open
+    // would pass while proving nothing.
+    const anonContext = await browser.newContext({ storageState: { cookies: [], origins: [] } });
     const anonPage = await anonContext.newPage();
     await anonPage.goto(`/public/roadsheet/${share.token}`);
     await expect(anonPage.locator('.rsv__title')).toBeVisible({ timeout: 15_000 });

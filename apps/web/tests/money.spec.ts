@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect } from '@playwright/test';
 
 const EMAIL = process.env.PW_TEST_EMAIL;
 const PASSWORD = process.env.PW_TEST_PASSWORD;
@@ -11,20 +11,11 @@ const PASSWORD = process.env.PW_TEST_PASSWORD;
  * fee ends null and the draft invoice is discarded.
  */
 
-async function login(page: Page) {
-  await page.goto('/login');
-  await page.locator('input[type=email]').fill(EMAIL!);
-  await page.locator('input[type=password]').fill(PASSWORD!);
-  await page.getByRole('button', { name: /sign in/i }).click();
-  await page.waitForURL(/\/h\//);
-}
-
 test.describe('money lens', () => {
   test.skip(!EMAIL || !PASSWORD, 'Set PW_TEST_EMAIL / PW_TEST_PASSWORD.');
 
   test('fee set → persists in totals → clear', async ({ page }) => {
     test.setTimeout(60_000);
-    await login(page);
     await page.goto('/h/playwright/money');
     await expect(page.locator('.mny__totals')).toBeVisible();
 
