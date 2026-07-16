@@ -21,6 +21,9 @@ export type WorkspaceDomain =
 export type NavWorkspace = {
   id: string;
   slug: string;
+  /** Optional pretty URL alias (ADR-066) — resolved inbound only; canonical
+      links always emit the slug (machine short-id). */
+  alias?: string | null;
   name: string;
   kind: 'personal' | 'team';
   accent?: string | null;

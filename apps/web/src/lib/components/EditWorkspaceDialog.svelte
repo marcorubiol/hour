@@ -9,8 +9,9 @@
    * logo_url is intentionally NOT managed here yet (upload flow + CSP img-src
    * ship later); the RPC leaves absent keys untouched, so it survives edits.
    */
-  import { createMutation, useQueryClient } from '@tanstack/svelte-query';
-  import { ApiError, mutateJSON } from '$lib/api';
+  import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
+  import { toStore } from 'svelte/store';
+  import { ApiError, fetchJSON, mutateJSON } from '$lib/api';
   import Button from '$lib/components/Button.svelte';
   import Dialog from '$lib/components/Dialog.svelte';
   import Input from '$lib/components/Input.svelte';
@@ -110,6 +111,70 @@
     }
     $save.mutate();
   }
+
+  // ── Web address (ADR-066) ─────────────────────────────────────────────
+  // The space's identity segment is a machine short-id; a pretty alias is
+  // requested here and granted by the platform operator. The canonical URL
+  // never changes — the alias is an extra door, not a rename.
+  type AliasRequest = {
+    id: string;
+    workspace_id: string;
+    alias: string;
+    status: string;
+  };
+
+  let aliasInput = $state('');
+
+  const pendingOptions = toStore(() => ({
+    queryKey: ['alias-requests', 'pending', workspace?.id] as const,
+    enabled: open && !!workspace,
+    queryFn: ({ signal }: { signal: AbortSignal }) =>
+      fetchJSON<{ items: AliasRequest[] }>(
+        '/api/workspaces/alias-requests?status=pending',
+        signal,
+      ),
+  }));
+  const pendingQuery = createQuery(pendingOptions);
+  let pendingAlias = $derived(
+    ($pendingQuery.data?.items ?? []).find((r) => r.workspace_id === workspace?.id)?.alias ??
+      null,
+  );
+
+  const requestAlias = createMutation({
+    mutationFn: async () => {
+      if (!workspace) throw new Error('No workspace');
+      const res = await mutateJSON<{ request: AliasRequest }>(
+        'POST',
+        '/api/workspaces/alias-requests',
+        { workspace_id: workspace.id, alias: aliasInput.trim().toLowerCase() },
+      );
+      if (!res?.request) throw new Error('Empty response');
+      return res.request;
+    },
+    onSuccess: async () => {
+      aliasInput = '';
+      await queryClient.invalidateQueries({ queryKey: ['alias-requests'] });
+      addToast({ tone: 'success', message: 'Alias requested — pending review.' });
+    },
+    onError: (err) => {
+      const msg =
+        err instanceof ApiError && err.status === 409
+          ? 'That alias is already taken.'
+          : err instanceof ApiError && err.status === 400
+            ? 'Invalid alias — lowercase letters, digits and hyphens.'
+            : err instanceof ApiError && err.status === 403
+              ? 'Only the space owner or an admin can request an alias.'
+              : err instanceof Error
+                ? err.message
+                : 'Unexpected error';
+      addToast({ tone: 'danger', title: 'Alias not requested', message: msg });
+    },
+  });
+
+  function submitAlias() {
+    if (!aliasInput.trim()) return;
+    $requestAlias.mutate();
+  }
 </script>
 
 <Dialog bind:open title="Edit space" size="s">
@@ -159,6 +224,39 @@
     <button type="submit" hidden aria-hidden="true"></button>
   </form>
 
+  <div class="ews__address">
+    <span class="eyebrow">Web address</span>
+    <p class="ews__address-current">
+      <span class="ews__address-url">/h/{workspace?.slug}</span>
+      {#if workspace?.alias}
+        <span class="ews__address-alias">alias: /h/{workspace.alias}</span>
+      {/if}
+    </p>
+    {#if pendingAlias}
+      <p class="ews__address-pending">Requested: /h/{pendingAlias} — pending review.</p>
+    {:else}
+      <div class="ews__address-claim">
+        <Input
+          label="Request an alias"
+          name="space-alias"
+          bind:value={aliasInput}
+          placeholder="e.g. mocia"
+          helper="Lowercase letters, digits, hyphens. Granted after review; the address above keeps working either way."
+          autocomplete="off"
+          disabled={$requestAlias.isPending}
+        />
+        <Button
+          variant="outline"
+          loading={$requestAlias.isPending}
+          disabled={!aliasInput.trim()}
+          onclick={submitAlias}
+        >
+          Request
+        </Button>
+      </div>
+    {/if}
+  </div>
+
   {#snippet actions()}
     <Button variant="outline" disabled={$save.isPending} onclick={close}>Cancel</Button>
     <Button loading={$save.isPending} onclick={submit}>Save</Button>
@@ -182,6 +280,49 @@
       font-size: var(--text-xs);
       color: var(--text-faint);
       text-align: end;
+    }
+
+    .ews__address {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-xs);
+      margin-block-start: var(--space-m);
+      padding-block-start: var(--space-m);
+      border-block-start: 1px solid var(--border-color-light);
+    }
+
+    .ews__address-current {
+      display: flex;
+      align-items: baseline;
+      gap: var(--space-m);
+      margin: 0;
+    }
+
+    .ews__address-url {
+      font-family: var(--font-mono);
+      font-size: var(--text-s);
+      color: var(--text-color);
+    }
+
+    .ews__address-alias,
+    .ews__address-pending {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+    }
+
+    .ews__address-pending {
+      margin: 0;
+    }
+
+    .ews__address-claim {
+      display: flex;
+      align-items: flex-end;
+      gap: var(--space-s);
+    }
+
+    .ews__address-claim :global(.field) {
+      flex: 1;
     }
   }
 </style>

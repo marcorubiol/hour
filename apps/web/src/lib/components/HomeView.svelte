@@ -377,7 +377,7 @@
     {workspaceSlug}
     cap={10}
     next7Days
-    moreHref={workspaceSlug ? `/h/${workspaceSlug}/desk` : undefined}
+    moreHref="/h/desk"
     loading={$engagementsQuery.isPending}
     error={$engagementsQuery.isError}
   />

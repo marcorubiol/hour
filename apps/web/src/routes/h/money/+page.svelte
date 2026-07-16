@@ -14,7 +14,6 @@
 
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
-  import { page } from '$app/state';
   import { fetchJSON, mutateJSON } from '$lib/api';
   import Button from '$lib/components/Button.svelte';
   import Dialog from '$lib/components/Dialog.svelte';
@@ -85,6 +84,9 @@
   let workspaceSlugById = $derived(
     new Map(($workspacesQuery.data?.items ?? []).map((w) => [w.id, w.slug])),
   );
+  // Browsing context for link-building only (ADR-066): lens routes carry no
+  // space segment; entity links borrow the default (first) workspace.
+  let defaultWorkspaceSlug = $derived($workspacesQuery.data?.items[0]?.slug ?? '');
 
   // ── Pins → scope (Adaptive Digest) ────────────────────────────────────
   let projectIndex = $derived(
@@ -222,7 +224,7 @@
 
   function perfHref(f: MoneyPerformance): string | null {
     if (!f.slug || !f.project) return null;
-    const ws = workspaceSlugById.get(f.project.workspace_id) ?? page.params.workspace;
+    const ws = workspaceSlugById.get(f.project.workspace_id) ?? defaultWorkspaceSlug;
     return `/h/${ws}/performance/${f.slug}`;
   }
 

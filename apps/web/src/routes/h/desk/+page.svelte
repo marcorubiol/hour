@@ -11,7 +11,6 @@
    * purpose — same data, one cache entry. Rename it in both or in neither.
    */
 
-  import { page } from '$app/state';
   import { createQuery } from '@tanstack/svelte-query';
   import { goto } from '$app/navigation';
   import { fetchJSON } from '$lib/api';
@@ -38,9 +37,11 @@
   type Engagement = DeskEngagement & { workspace_id: string };
 
   const pins = usePins();
-  let workspaceSlug = $derived(page.params.workspace ?? '');
 
   const workspacesQuery = createQuery(workspacesQueryOptions());
+  // Browsing context for link-building only (ADR-066): lens routes carry no
+  // space segment; entity links borrow the default (first) workspace.
+  let workspaceSlug = $derived($workspacesQuery.data?.items[0]?.slug ?? '');
   const projectsQuery = createQuery(activeProjectsQueryOptions());
   const linesQuery = createQuery(allLinesQueryOptions());
   const engagementsQuery = createQuery({

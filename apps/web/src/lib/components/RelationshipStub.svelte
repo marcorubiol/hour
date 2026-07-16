@@ -14,7 +14,6 @@
    */
 
   import { createQuery } from '@tanstack/svelte-query';
-  import { page } from '$app/state';
   import { writable, derived } from 'svelte/store';
   import { fetchJSON } from '$lib/api';
   import {
@@ -112,7 +111,7 @@
 
     {#if total > items.length}
       <footer class="rel-stub__footer">
-        <a class="link-arrow" href={`/h/${page.params.workspace}/contacts`}>
+        <a class="link-arrow" href="/h/contacts">
           View all {total} engagements →
         </a>
       </footer>

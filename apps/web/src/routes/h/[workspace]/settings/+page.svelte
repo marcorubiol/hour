@@ -16,9 +16,10 @@
 
   import { onMount } from 'svelte';
   import { page } from '$app/state';
-  import { createQuery } from '@tanstack/svelte-query';
+  import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { accentVar } from '$lib/utils/accent';
-  import { fetchJSON } from '$lib/api';
+  import { fetchJSON, mutateJSON, ApiError } from '$lib/api';
+  import { addToast } from '$lib/components/Toast.svelte';
   import { session } from '$lib/session.svelte';
   import { type SectionId } from '$lib/components/SettingsNav.svelte';
   import {
@@ -79,6 +80,69 @@
 
   let workspaces = $derived($workspacesQuery.data?.items ?? []);
   let projects = $derived($projectsQuery.data?.items ?? []);
+
+  // ─── alias requests (ADR-066) ─────────────────────────────────────────
+  // RLS scopes the list: a member sees their own workspace's requests, the
+  // platform admin sees all. Review buttons hide on your own rows; the RPC
+  // is the real gate (403 for non-admins) — the UI just avoids dead ends.
+  type AliasRequest = {
+    id: string;
+    workspace_id: string;
+    workspace_name: string;
+    alias: string;
+    status: string;
+    requested_by: string;
+    created_at: string;
+  };
+
+  const queryClient = useQueryClient();
+
+  const aliasRequestsQuery = createQuery({
+    queryKey: ['alias-requests', 'pending'],
+    queryFn: ({ signal }: { signal: AbortSignal }) =>
+      fetchJSON<{ items: AliasRequest[] }>(
+        '/api/workspaces/alias-requests?status=pending',
+        signal,
+      ),
+  });
+  let aliasRequests = $derived($aliasRequestsQuery.data?.items ?? []);
+
+  const reviewAlias = createMutation({
+    mutationFn: async (input: { id: string; approve: boolean }) => {
+      const res = await mutateJSON<{ request: AliasRequest }>(
+        'PATCH',
+        `/api/workspaces/alias-requests/${input.id}`,
+        { approve: input.approve },
+      );
+      if (!res?.request) throw new Error('Empty response');
+      return res.request;
+    },
+    onSuccess: async (req) => {
+      await queryClient.invalidateQueries({ queryKey: ['alias-requests'] });
+      await queryClient.invalidateQueries({ queryKey: ['workspaces'] });
+      addToast({
+        tone: 'success',
+        message:
+          req.status === 'approved'
+            ? `Alias /h/${req.alias} granted to ${req.workspace_name}.`
+            : `Alias request from ${req.workspace_name} rejected.`,
+      });
+    },
+    onError: (err) => {
+      addToast({
+        tone: 'danger',
+        title: 'Review failed',
+        message:
+          err instanceof ApiError && err.status === 403
+            ? 'Only the platform operator can review alias requests.'
+            : err instanceof ApiError && err.status === 409
+              ? 'That alias is no longer available.'
+              : err instanceof Error
+                ? err.message
+                : 'Unexpected error',
+      });
+    },
+  });
 
   // ─── privacy state ────────────────────────────────────────────────────
   let privTasksDefault = $state<'shared' | 'private'>('shared');
@@ -264,6 +328,49 @@
             </button>
           </div>
         </section>
+
+        {#if aliasRequests.length > 0}
+          <section class="set-group">
+            <div class="set-group__head">
+              <span class="eyebrow set-group__kicker">{aliasRequests.length} pending</span>
+              <h2 class="set-group__title">Alias requests</h2>
+            </div>
+            <div class="set-group__body">
+              <div class="set-alias-list">
+                {#each aliasRequests as r (r.id)}
+                  <div class="set-alias">
+                    <div class="set-alias__what">
+                      <span class="set-alias__url">/h/{r.alias}</span>
+                      <span class="set-alias__ws">for {r.workspace_name}</span>
+                    </div>
+                    {#if r.requested_by === session.user?.sub}
+                      <span class="set-alias__state">pending review</span>
+                    {:else}
+                      <div class="set-alias__actions">
+                        <button
+                          type="button"
+                          class="btn--outline btn--s"
+                          disabled={$reviewAlias.isPending}
+                          onclick={() => $reviewAlias.mutate({ id: r.id, approve: true })}
+                        >
+                          Approve
+                        </button>
+                        <button
+                          type="button"
+                          class="btn--outline btn--s is-warn"
+                          disabled={$reviewAlias.isPending}
+                          onclick={() => $reviewAlias.mutate({ id: r.id, approve: false })}
+                        >
+                          Reject
+                        </button>
+                      </div>
+                    {/if}
+                  </div>
+                {/each}
+              </div>
+            </div>
+          </section>
+        {/if}
 
         <section class="set-group">
           <div class="set-group__head">
@@ -1113,6 +1220,50 @@
     opacity: 0.5;
   }
   .set-ws__actions {
+    display: flex;
+    gap: var(--space-xs);
+  }
+
+  .set-alias-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-s);
+  }
+
+  .set-alias {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-m);
+    padding-block: var(--space-s);
+    border-block-end: 1px solid var(--border-color-light);
+  }
+
+  .set-alias__what {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-s);
+    min-inline-size: 0;
+  }
+
+  .set-alias__url {
+    font-family: var(--font-mono);
+    font-size: var(--text-s);
+    color: var(--text-color);
+  }
+
+  .set-alias__ws {
+    font-size: var(--text-s);
+    color: var(--text-muted);
+  }
+
+  .set-alias__state {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    color: var(--text-faint);
+  }
+
+  .set-alias__actions {
     display: flex;
     gap: var(--space-xs);
   }

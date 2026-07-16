@@ -20,7 +20,7 @@
    */
 
   import { page } from '$app/state';
-  import { goto } from '$app/navigation';
+  import { goto, replaceState } from '$app/navigation';
   import { env } from '$env/dynamic/public';
   import type { Snippet } from 'svelte';
   import { onDestroy, onMount, tick, untrack } from 'svelte';
@@ -32,6 +32,7 @@
   import BrandMark from '$lib/components/BrandMark.svelte';
   import CommandPalette from '$lib/components/CommandPalette.svelte';
   import ScopeGlyph from '$lib/components/ScopeGlyph.svelte';
+  import { addToast } from '$lib/components/Toast.svelte';
   import { useTheme } from '$lib/theme.svelte';
   import { isReservedWorkspaceSlug } from '$lib/reserved-slugs';
   import { provideLens, type Lens } from '$lib/stores/lens.svelte';
@@ -216,6 +217,8 @@
   }
 
   // VIEW AS — the four lens routes as a visible segmented control (Scope v2).
+  // ADR-066: lenses are space-less; the scope-sync effect re-adds ?scope=
+  // right after navigation, so pickView doesn't need to carry it.
   const VIEW_AS: { id: Lens; label: string }[] = [
     { id: 'desk', label: 'Desk' },
     { id: 'calendar', label: 'Calendar' },
@@ -223,10 +226,8 @@
     { id: 'money', label: 'Money' },
   ];
   function pickView(view: Lens) {
-    const ws = workspaceSlug || defaultWorkspaceSlug;
-    if (!ws) return;
     lens.set(view);
-    void goto(`/h/${ws}/${view}`);
+    void goto(`/h/${view}`);
   }
 
   // Realtime is cross-origin (wss to supabase.co) and can't ride the
@@ -289,20 +290,22 @@
     themeStyles.find((t) => t.id === activeThemeStyleId) ?? themeStyles[0],
   );
 
-  // The logo IS the home. Home is space-less now (spaces live in the left
-  // rail): the logo and the rail's ∑ land on /h/ — the cross-space digest
-  // bound to no space — not on any one workspace's page. Calendar and Money
-  // are still reachable from ⌘K.
-  const homeHref = '/h/';
+  // The logo IS the home: /h, the cross-space Desk digest (ADR-065/066) —
+  // not any one workspace's page. Calendar/Contacts/Money live at /h/<lens>.
+  const homeHref = '/h';
 
   let inSettings = $derived(/^\/h\/[^/]+\/settings(\b|\/|$)/.test(page.url.pathname));
 
-  // Which routed lens (if any) the current URL is showing.
+  // Which routed lens (if any) the current URL is showing. ADR-066: lens
+  // routes are space-less — the space segment appears only on entity URLs.
   let routedLens = $derived.by<Lens | null>(() => {
-    const m = page.url.pathname.match(/^\/h\/[^/]+\/(desk|calendar|contacts|money)\/?$/);
+    const m = page.url.pathname.match(/^\/h\/(desk|calendar|contacts|money)\/?$/);
     return (m?.[1] as Lens | undefined) ?? null;
   });
-
+  let atHome = $derived(/^\/h\/?$/.test(page.url.pathname));
+  // Surfaces that carry the scope in the URL (and show the scope chrome):
+  // the home digest + the four lenses.
+  let scopeSurface = $derived(routedLens !== null || atHome);
 
   // Keep the pill state honest when navigation happens outside the pills.
   $effect(() => {
@@ -313,6 +316,62 @@
       lens.set('desk');
     }
   });
+
+  // ── Alias resolution, inbound only (ADR-066) ─────────────────────────
+  // /h/<segment>/… may arrive with a workspace ALIAS; canonical is the slug
+  // (machine short-id). If the segment matches no slug but matches an alias,
+  // swap it and replace the URL — links keep working, address bar shows
+  // canonical, and everything downstream (?ws= API filters) sees slugs only.
+  $effect(() => {
+    if (!hasWorkspace || wsItems.length === 0) return;
+    const seg = workspaceSlug;
+    if (wsItems.some((w) => w.slug === seg)) return;
+    const byAlias = wsItems.find((w) => w.alias === seg);
+    if (byAlias) {
+      const target =
+        page.url.pathname.replace(`/h/${seg}`, `/h/${byAlias.slug}`) + page.url.search;
+      void goto(target, { replaceState: true });
+    }
+  });
+
+  // ── Scope ⇄ URL query (ADR-066) ──────────────────────────────────────
+  // On scope surfaces the URL carries ?scope=<pin,pin> live: pins → query
+  // via replaceState (no history spam), and an explicit ?scope= in the URL
+  // (pasted link, back/forward) → pins. A URL with NO scope param leaves
+  // pins alone — personal continuity (localStorage) wins over absence.
+  function serializePins(p: string[]): string {
+    return p.join(',');
+  }
+  $effect(() => {
+    if (!scopeSurface) return;
+    const raw = page.url.searchParams.get('scope');
+    if (raw === null) return;
+    const fromUrl = raw.split(',').filter((t) => /^[spl]:.+/.test(t));
+    if (serializePins(fromUrl) !== serializePins(untrack(() => pins.pins))) {
+      pins.set(fromUrl);
+    }
+  });
+  $effect(() => {
+    if (!scopeSurface) return;
+    const ser = serializePins(pins.pins);
+    const url = new URL(untrack(() => page.url));
+    const existing = url.searchParams.get('scope');
+    if (ser === (existing ?? '')) return;
+    if (ser) url.searchParams.set('scope', ser);
+    else url.searchParams.delete('scope');
+    replaceState(url, {});
+  });
+
+  // Copy link — the ADR-022 level-3 gesture: the URL already carries the
+  // scope, canonical id-form by construction (pins hold slugs, never aliases).
+  async function copyScopeLink() {
+    try {
+      await navigator.clipboard.writeText(location.href);
+      addToast({ tone: 'success', message: 'Link copied — scope included.' });
+    } catch {
+      addToast({ tone: 'danger', message: 'Could not copy the link.' });
+    }
+  }
 
   // Do Not Disturb — quick toggle in the account menu.
   const DND_KEY = 'hour_dnd';
@@ -595,7 +654,7 @@
     {/if}
 
     <main class="shell__main">
-      {#if routedLens}
+      {#if scopeSurface}
         <div class="shell__lenschrome">
           <div class="scopebar">
             <span class="scopebar__lead">Scope</span>
@@ -604,6 +663,11 @@
               <button type="button" class="scopebar__add" onclick={openPaletteAdd}>
                 + narrow
               </button>
+              <span class="scopebar__right">
+                <button type="button" class="scopebar__save" onclick={copyScopeLink}
+                  >⧉ Copy link</button
+                >
+              </span>
             {:else}
               {#each pins.pins as tok (tok)}
                 <span class="tok tok--{tokenKind(tok)}">
@@ -640,6 +704,9 @@
                     >☆ Save scope</button
                   >
                 {/if}
+                <button type="button" class="scopebar__save" onclick={copyScopeLink}
+                  >⧉ Copy link</button
+                >
                 <button type="button" class="scopebar__clear" onclick={() => pins.set([])}
                   >Clear</button
                 >
@@ -650,7 +717,11 @@
             <span class="viewas__lead">view as</span>
             <div class="viewas__seg">
               {#each VIEW_AS as v (v.id)}
-                <button type="button" class:is-on={routedLens === v.id} onclick={() => pickView(v.id)}>
+                <button
+                  type="button"
+                  class:is-on={routedLens === v.id || (atHome && v.id === 'desk')}
+                  onclick={() => pickView(v.id)}
+                >
                   {v.label}
                 </button>
               {/each}

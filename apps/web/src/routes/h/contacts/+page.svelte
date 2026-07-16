@@ -13,7 +13,6 @@
    */
 
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
-  import { page } from '$app/state';
   import { goto } from '$app/navigation';
   import { fetchJSON, mutateJSON, ApiError } from '$lib/api';
   import Button from '$lib/components/Button.svelte';
@@ -50,6 +49,9 @@
   const projectsQuery = createQuery(activeProjectsQueryOptions());
 
   let workspaces = $derived<NavWorkspace[]>($workspacesQuery.data?.items ?? []);
+  // Browsing context for link-building only (ADR-066): lens routes carry no
+  // space segment; person links borrow the default (first) workspace.
+  let defaultWorkspaceSlug = $derived(workspaces[0]?.slug ?? '');
 
   // ── Pins → scope (Adaptive Digest) ────────────────────────────────────
   let projectIndex = $derived(buildProjectIndex(workspaces, $projectsQuery.data?.items ?? []));
@@ -299,7 +301,7 @@
     </div>
   </header>
 
-  <EngagementTable {filters} personBase={`/h/${page.params.workspace}/person`} />
+  <EngagementTable {filters} personBase={`/h/${defaultWorkspaceSlug}/person`} />
 </section>
 
 <Dialog bind:open={addOpen} title="Add contact" size="m">

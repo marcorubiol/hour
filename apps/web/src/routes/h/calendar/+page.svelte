@@ -22,7 +22,6 @@
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
   import { goto } from '$app/navigation';
-  import { page } from '$app/state';
   import { fetchJSON, mutateJSON } from '$lib/api';
   import Button from '$lib/components/Button.svelte';
   import Dialog from '$lib/components/Dialog.svelte';
@@ -81,6 +80,9 @@
   let workspaceSlugById = $derived(
     new Map(($workspacesQuery.data?.items ?? []).map((w) => [w.id, w.slug])),
   );
+  // Browsing context for link-building only (ADR-066): lens routes carry no
+  // space segment; entity links borrow the default (first) workspace.
+  let defaultWorkspaceSlug = $derived($workspacesQuery.data?.items[0]?.slug ?? '');
 
   let projectIndex = $derived(
     buildProjectIndex(($workspacesQuery.data?.items ?? []) as NavWorkspace[], $projectsQuery.data?.items ?? []),
@@ -249,7 +251,7 @@
   }
 
   async function handleCreated(perf: CreatedPerformance) {
-    const ws = workspaceSlugById.get(perf.workspace_id) ?? page.params.workspace;
+    const ws = workspaceSlugById.get(perf.workspace_id) ?? defaultWorkspaceSlug;
     if (perf.slug) await goto(`/h/${ws}/performance/${perf.slug}`);
   }
 
@@ -265,7 +267,7 @@
 
   function openFeed() {
     if (!feedWs) {
-      const current = workspacesBySlug.get(page.params.workspace ?? '');
+      const current = workspacesBySlug.get(defaultWorkspaceSlug);
       feedWs = current?.id ?? feedWsOptions[0]?.value ?? '';
     }
     feedOpen = true;
@@ -364,7 +366,7 @@
       month={ym.month}
       performances={scopedPerfs}
       dates={scopedDates}
-      workspaceSlug={page.params.workspace ?? ''}
+      workspaceSlug={defaultWorkspaceSlug}
       {loading}
       onDayCreate={(iso) => openCreate(iso)}
     />
