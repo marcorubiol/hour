@@ -1,8 +1,20 @@
 -- Migration: update_workspace_rpc
 -- ADR-062 — edit a space's identity fields. Companion to create_workspace.
--- workspace.UPDATE stays denied by RLS; edits go through this SECURITY
--- DEFINER wrapper, gated to owner/admin membership (members can create
--- projects but not rewrite the space identity).
+-- SECURITY DEFINER wrapper gated to owner/admin membership: members can
+-- create projects but not rewrite the space identity.
+--
+-- CORRECTION 2026-07-16 — this header used to claim "workspace.UPDATE stays
+-- denied by RLS; edits go through this wrapper". That is false, and
+-- tests/rls/update-workspace.test.ts caught it: policy `workspace_update`
+-- (build/rls-policies.sql) already allows UPDATE to owner/admin with the
+-- identical membership test. This RPC is therefore not the only door — it is
+-- a door with the same lock. What it adds over a direct PATCH is the jsonb
+-- patch semantics, the non-empty-name check and slug immutability; an
+-- owner/admin going straight to PostgREST skips those (notably renaming slug
+-- without the previous_slugs machinery). Not an escalation — a non-owner/
+-- admin is refused by policy and RPC alike — and unreachable from the app,
+-- which never exposes the table write. Same family as the line.notes item on
+-- the Shelf. The SQL below is unchanged; only this prose was wrong.
 --
 -- jsonb patch semantics: only keys PRESENT in p_patch are touched; a present
 -- key with '' / null clears the (nullable) column; absent keys are left as-is
