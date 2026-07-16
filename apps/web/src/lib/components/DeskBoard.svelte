@@ -22,8 +22,11 @@
   /**
    * DeskBoard — the this-week timeline (dot rail + day buckets). Shared by
    * the Home (capped, this-week-only, with a "+N more" link to the full view)
-   * and the Agenda view (uncapped, all time ranges). Engagements come in
-   * already scoped by the caller's pins.
+   * and the Desk view at /h/[ws]/desk (uncapped, all time ranges).
+   * Engagements come in already scoped by the caller's pins.
+   *
+   * The `.agenda-*` class names are pre-ADR-065 (the lens was called Agenda);
+   * they are scoped to this file and carry no meaning outside it.
    */
   import TagChip from '$lib/components/TagChip.svelte';
   import { accentVar } from '$lib/utils/accent';

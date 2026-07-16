@@ -73,6 +73,28 @@ Working name: **Hour**. Brand decision deferred to Phase 1.
 - Parent MaMeMi context (where Difusión originated): `01_STAGE/ZS_MaMeMi/`
 - Source of the 156 existing programmers/festivals to import: `01_STAGE/ZS_MaMeMi/Difusión/`
 
+## Status — 2026-07-16 — Scope v2 EN PRODUCCIÓN · el registro de deploys arreglado (ADR-066)
+
+**Al retomar, empezar aquí.**
+
+**Qué corre en producción** (`hour-web` versión `70775b20`, rollback a `34887c61`): Scope v2 completo — shell con rail de Scopes (guardados + recientes), scope-bar de pins (`s:` espacio / `p:` project / `l:` línea), control **view as** (Desk · Calendar · Contacts · Money), ⌘K como **constructor de scope**, breadcrumb; portada de espacio editable (ADR-062: `domain`/`city`/`logo_url` + RPC `update_workspace`); rename a Desk (ADR-065) con 301 desde `/agenda`; y ADR-059/060/061 (que **ya estaban vivos desde el 07-14**, ver abajo).
+
+**El registro de deploys mentía — arreglado.** `wrangler deploy` sube el **working tree**, no un commit: el 07-14 se desplegó sin commitear y durante dos días `_context.md` listó ADR-059/060/061 como "pendiente de deploy" cuando llevaban vivos. **ADR-066** lo cierra: guard de árbol limpio (`scripts/assert-clean-tree.mjs`, encadenado en los scripts `deploy`) + build stamp servido por `/health/live`.
+
+> **Regla: antes de creerte esta sección, `curl -s https://hour.zerosense.studio/health/live`.** Devuelve `{"ok":true,"version":{"sha":"…","dirty":false,"builtAt":"…"}}`. El doc es una afirmación; el stamp es el hecho. (Hasta el próximo deploy de árbol limpio responde `{"ok":true}` sin `version` — el stamp está commiteado, no desplegado.)
+
+**Estado de tests** (contra producción, 2026-07-16): **e2e 19/19 en 13 s · RLS 46/46 · svelte-check 0/0 (1484)**. La suite hacía 14 logins desde una IP y se comía su propio rate-limit (`LOGIN_RULE` 10/5min, ADR-061) → ahora **1 login** compartido vía `tests/auth.setup.ts` + `storageState`. El límite de producción NO se tocó: está bien puesto. Gotchas que volverán: `browser.newContext()` **hereda** el `storageState` del proyecto (un contexto "anónimo" no lo es salvo que lo vacíes explícito); `chromium-1217` de la caché de Playwright está corrupto → correr con `PW_CHROMIUM` apuntando a `chromium_headless_shell-1228`.
+
+**Deuda abierta, por orden:**
+1. **Desplegar** el guard + stamp de ADR-066 y los tests (commiteados, no en prod).
+2. **e2e del nav nuevo**: ningún spec cubre scope-bar, view-as ni editar espacio. Diferido a propósito mientras el shell se reescribe (2026-07-16 noche: 12 ficheros en vuelo tocando `HomeView`, `tokens.css`, login y las portadas de entidad).
+3. **Pasada de diseño entera** — `build/screens-inventory.md`, todas las pantallas sin marcar. Prototipo de referencia: `app design/line-detail-prototype.html`.
+4. **Diferidos de ADR-062 por diseño**: `logo_url` sin flujo de subida (R2 + CSP img-src); `domain` se guarda y se pinta en el kicker pero **no dirige** vocabulario ni tipos de project por defecto; Contacts-con-organizaciones está en el modelo (ADR-065), no en el build.
+5. **Regla CF edge** de rate-limit en `/api/auth/login` — solo bloquea onboarding externo, no el uso interno. Necesita un token `Zone WAF:Edit` (el OAuth de Wrangler solo tiene `zone:read`).
+6. **Segundo usuario de fixture con rol limitado** — el desbloqueo más barato de la suite RLS: con una sola identidad admin-en-todo no se puede probar "un miembro raso es rechazado" (grants/revokes, redacción de dinero, notas privadas). Ver `build/runbooks/phase09-launch.md`.
+
+**El gate no ha cambiado desde el 12-07:** parar de construir y usar Hour con la difusión real ~1 mes. El veredicto es de Marco, no de código.
+
 ## Status — 2026-07-13 — ADR-061: Phase 0.9 hardening gate implementado (external-onboarding)
 
 **Al retomar, empezar aquí.** Marco decidió abrir Hour a usuarios externos (curated onboarding, él crea cada workspace) en las próximas semanas → el backlog "antes de cliente externo" pasó de diferido a bloqueante. Implementado en un pase (sesión autónoma ultracode):

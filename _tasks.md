@@ -1,51 +1,54 @@
 # Tasks
 
-> Actualizado 2026-07-12 (noche 2) tras la home projects-first (ADR-060, primer feedback del gate).
-> Contexto completo: `_context.md § Status — 2026-07-12` + `_notes/sessions-log.md § 2026-07-12 (noche 2)`.
+> Actualizado 2026-07-16 tras desplegar Scope v2 y arreglar el registro de deploys (ADR-066).
+> Contexto completo: `_context.md § Status — 2026-07-16` + `_notes/sessions-log.md § 2026-07-16`.
+> **Antes de fiarte de lo que está desplegado: `curl -s https://hour.zerosense.studio/health/live`.**
 
 ## Queue
-- [ ] **Phase 0.9 hardening (ADR-061) — regla edge + deploy.** Implementado 2026-07-13 (httpOnly sessions, CSP, error mapper, Sentry PII, rate limit, health, CI). Verificado 2026-07-13 noche: svelte-check 0/0 · unit 110/110 · RLS 38/38 · e2e local no-collab 16/16 · collab tsc · build + dry-runs web/collab OK. Nueva cobertura auth real: login → cookies httpOnly/Secure/SameSite=Strict → refresh recovery → logout UI; Playwright carga `.env.test` solo (muere el falso verde de 17 skips). KV `RATE_LIMIT` creado y enlazado (`wrangler.jsonc`). **Falta antes de deploy:** (1) añadir en el dashboard la regla CF edge para `/api/auth/login` (~10 req/1 min por IP → block 1 min; el browser no tiene sesión y el OAuth de Wrangler solo tiene zone:read); (2) deploy collab → web; (3) correr los 2 e2e collab contra producción + smoke post-deploy del runbook `build/runbooks/phase09-launch.md`.
-- [ ] System-completeness gate (0.3): TODO el bloque construido está (ADR-051→058). PARAR de construir y usar Hour con la difusión real ~1 mes. El veredicto es de Marco, no de código. (ADR-060 = primer feedback del gate ya incorporado.)
-- [ ] Deploy conjunto ADR-059 (coherencia visual) + ADR-060 (home projects-first): verificados en local (svelte-check 0/0 · unit 110/110 · e2e 15/15 local · collab 2/2 prod pre-060), pendiente revisión de Marco en dev + `pnpm run deploy`. **Nota: ADR-061 va encima de estos — deploy conjunto o 059/060 primero, da igual el orden, están en el mismo working tree.**
+- [ ] **Desplegar ADR-066 + los tests.** El guard de árbol limpio y el build stamp están commiteados (`314d066`) pero NO en producción — el propio guard lo impide mientras el árbol tenga el rediseño del shell sin commitear. Commitear esos ficheros y `cd apps/web && pnpm run deploy` (collab solo si cambia; hoy no). Al terminar, `/health/live` empieza a devolver su `sha`.
+- [ ] **Terminar el rediseño del shell en vuelo** (2026-07-16 noche): 12 ficheros tocados sin commitear — `HomeView`, `breadcrumb`, `h/+layout`, `tokens.css`, `login` y las portadas de engagement/performance/person/project/line/settings. Compila (svelte-check 0/0), pero está a medio: el rail de Scopes se está arrancando.
+- [ ] **e2e del nav de Scope v2**: ningún spec cubre el scope-bar, el view-as ni editar espacio. Diferido a propósito hasta que el shell pare de moverse — escribirlo antes es tirar el trabajo.
+- [ ] System-completeness gate (0.3): **PARAR de construir y usar Hour con la difusión real ~1 mes.** Abierto desde el 12-07 sin moverse; el veredicto es de Marco, no de código.
+- [ ] Regla CF edge de rate-limit en `/api/auth/login` — solo bloquea onboarding externo, no el uso interno. Necesita un token `Zone WAF:Edit` (el OAuth de Wrangler solo tiene `zone:read`). Runbook: `build/runbooks/phase09-launch.md`.
 
 ## Deferred
-- [ ] Phase 0.4 polish — mobile completo (Plaza→pins/Calendar/Money + line detail), ⌘K, notifications in-app, GDPR export, a11y pass, checkpoint visual 2, ratificación naming @from:2026-08-01
+- [ ] Pasada de diseño completa — `build/screens-inventory.md`, todas las pantallas sin marcar; prototipo de referencia en `app design/line-detail-prototype.html`
+- [ ] Phase 0.4 polish — mobile completo (pins/Calendar/Money + line detail), notifications in-app, GDPR export, a11y pass, checkpoint visual 2, ratificación naming @from:2026-08-01
 - [ ] Verificar checkboxes viejos de 0.0: app abre offline con datos cacheados, Lighthouse PWA ≥90, strings por `t()`, Axe @from:2026-08-01
 
 ## Shelf
+- [ ] Segundo usuario de fixture con rol limitado — el desbloqueo más barato de la suite RLS: con una sola identidad admin-en-todo no se puede probar "un miembro raso es rechazado" (grants/revokes, redacción de dinero, notas privadas). Ver `build/runbooks/phase09-launch.md` @shelf
+- [ ] `chromium-1217` está corrupto en la caché de Playwright (le falta el Framework) — el e2e necesita `PW_CHROMIUM=…/chromium_headless_shell-1228/…`. Reinstalar o fijar el env en un script @shelf
+- [ ] Un owner/admin desde PostgREST directo salta las validaciones de `update_workspace` (nombre vacío, y renombrar `slug` sin `previous_slugs` → redirects rotos). No es escalada; solo alcanzable fuera de la app. Misma familia que el item de `line.notes` @shelf
+- [ ] ADR-062 diferidos: `logo_url` sin flujo de subida (R2 + CSP img-src); `domain` se guarda y se pinta en el kicker pero no dirige vocabulario ni tipos de project por defecto @shelf
+- [ ] Contacts-con-organizaciones: está en el modelo (ADR-065), no en el build — hoy Contacts son personas + engagements @shelf
 - [ ] Expenses en la lens global de Money (hoy solo en el módulo de line — desviación aceptada del anti-fragmentación de ADR-056; requiere extender /api/expenses a project/workspace union) @shelf
 - [ ] Totales de dinero suman cross-currency sin dimensión (lens y módulo heredan la semántica del lens original) @shelf
-- [ ] Alturas de control desiguales en filas de filtros (input 44px vs select 41px vs botón 37px en contacts) — pide un token compartido de padding de control; único hallazgo del audit visual NO aplicado (F33) @shelf
+- [ ] Alturas de control desiguales en filas de filtros (input 44px vs select 41px vs botón 37px en contacts) — pide un token compartido de padding de control (F33) @shelf
 - [ ] Phase 0.9: un rol edit:show puede escribir line.notes por PATCH directo PostgREST mientras el socket colaborativo exige edit:project_meta (la API no expone notes — inconsistencia solo fuera de la app) @shelf
-- [ ] Project detail tabs Work·Assets·Team·About — probablemente el MISMO sistema de módulos a nivel project (ADR-056 re-evaluate a) @shelf
-- [ ] `delete_line` RPC si algún día hace falta borrar lines (hoy: sin delete path, fixtures estables en tests) @shelf
+- [ ] Project detail tabs Work·Assets·Team·About — ADR-063 ya resolvió que NO es composición de módulos; queda definir su contenido editable @shelf
 - [ ] Capability-flag read:money en payloads (masked vs empty distinguibles) cuando haya roles de verdad — Phase 0.9 @shelf
 - [ ] `date.line_id` si el uso real pide dates de line sin performance (hoy: join por performance_id) @shelf
 - [ ] Relink de engagement a otra line desde la UI en el 409 engagement_exists del módulo Contacts (hoy: toast honesto) @shelf
 - [ ] Facturas multi-línea (varios gigs de una gira) + PDF house-style + auto-numeración por serie @shelf
 - [ ] Expiración temporal de share links del road sheet (hoy solo revocación manual) @shelf
 - [ ] Autocompletar timezone por city al promover venue @shelf
-- [ ] Phase 0.9 hardening gate (~25h) — SOLO si entra un cliente externo @shelf
+- [ ] `delete_line` RPC si algún día hace falta borrar lines (hoy: sin delete path, fixtures estables en tests) @shelf
 - [ ] Upstream issue a y-partyserver: workerd entrega frames WS como Blob @shelf
 - [ ] Purgar persona huérfana de test `019f2f03-f1f2-71a0-9e1f-9c8c9cf331c8` (soft-delete por SQL, no molesta) @shelf
 
 ## Trace
-- [x] Home projects-first (2026-07-12 noche 2, ADR-060): grid de projects pineados-primero con espacio como chip de contexto (muere el par Pinned/All-spaces), pin `p:<projectId>` (resolveScope con projectIndex, unión projectIds, narrowing línea-exacta conservado), ScopeStrip con picker en árbol espacio→projects→líneas, ⌘K grupo Projects, orden por actividad (updated_at del project miente), fix slug×workspace en project/line detail, fetchJSON compartido en project detail. Unit 110/110 (+nav.test) · e2e 15/15 local · capturas OK
-- [x] Pasada de coherencia visual COMPLETA (2026-07-12 noche, ADR-059): audit 8 lentes → 42 hallazgos → 41 aplicados / 1 a Shelf (F33). Sistémicos: neutralizado el padding de `<section>` global dentro del shell (~200px de vacíos por página fuera), escala de sombras re-derivada para dark (chips/badges/avatars/toasts ya no brillan blancos), contrato de tonos de StateBadge reactivado (estaba muerto — todos los badges grises), un solo skin de campo (--field-*), --h1 real + mastheads unificados, 2 registros de ancho de página, chips sticky del line detail con --header-height verdadero (3.6rem, ya no estimación), grammar único de empty states, F14 tabla contacts cabe en el módulo (caps cqi). Dedup Shelf graduado: AccentSwatchPicker componente, $lib/money (fmtFee/fmtMoney/invoiceTone), .eyebrow--sub, .link-arrow, .creator, .pill--mono, .table-wrap en base.css. Copy: placeholder engagement honesto, stubs de project con lines reales (F05), jerga de fases/ADR fuera de la UI. Checkpoint visual del line detail: cerrado (offsets true-by-construction + densidad arreglada).
-- [x] Review adversarial COMPLETO en re-run (5 lentes, 33 agentes): 20 confirmados / 8 refutados. Aplicados: preset del dialog gana en contextos bloqueados (HIGH — gig en line equivocada al navegar entre lines), invalidaciones line-stats/fees, create_line v3 (reserved-slug "Booking" + cap 57 chars, migración aplicada), 23505→409 en POST /api/lines, materials GET/DELETE alineados, preflight de notes con retry, guards anti-mistarget en engagement-write.spec, finally en la suite RLS. Aceptados y documentados: expenses módulo-only, cross-currency, duplicaciones filosofía (Shelf)
-- [x] Producción desbloqueada y completada (2026-07-12, tarde): 6 migraciones aplicadas + verificadas (backfill 154, grants limpios), db-types regenerado, deploys hour-collab → hour-web, suite contra prod unit 100/100 · RLS 38/38 · **e2e 17/17 sin retries**, smoke collab line (snapshot + notes materializadas)
-- [x] Roturas destapadas por la suite y arregladas: contact-create.spec (roto desde el dialog multi-espacio del 04-07), money.spec (carrera de paralelismo → fila estable 2031), Menu descartaba label con trigger custom (a11y: botones sin nombre)
-- [x] ADR-056 implementado (2026-07-12, sesión autónoma ultracode): line detail = pila de módulos (7: Calendar, Contacts, Road sheets, Notes, Materials, Money, People) + header stats por kind + anchor chips + Add/Move/Remove module
-- [x] Template picker (6 tarjetas fijan kind+modules) + creación restaurada en 3 niveles (line/project/space): dialogs en el layout, entradas en home cards + ⌘K grupo "New" — la creación llevaba huérfana desde ADR-057 (vivía en el Plaza desmontado)
-- [x] line_id en los write paths: create_engagement p_line_id (+ resurrect), Line select opcional en Add contact (por-project) y New performance, PATCH whitelists con guard cross-project ADR-043, contexto de line auto-asigna
-- [x] Money module con la UI de expenses que no existía (create/delete_expense RPCs) + Materials registry (create/delete_asset_version RPCs) + People contact sheet read-only (/api/lines/:id/people)
-- [x] Collab target 'line' (5 uniones + ternario de auth re-keyed + CHECK collab_snapshot) — YNotes en el módulo Notes
-- [x] Fix seguridad: GET /api/performances dejaba de filtrar fee por read:money (leak desde ADR-041) — fee columns fuera del select del listado
-- [x] Fix: create_line no generaba slug → lines RPC-creadas innavegables (nav slug-addressed); slug + backfill en la migración, página resuelve slug-o-id
-- [x] Borrado del mundo sidebar: Plaza (1.883 líneas), PlazaRail, LineList, Sidebar, selection stores, /booking (specs repuntados a Contacts)
-- [x] MonthGrid + PerformanceCreateDialog extraídos del calendario (una implementación, reusada por el módulo)
-- [x] Tests: unit 100/100 (+21) · RLS viejas 30/30 contra prod · suites nuevas line-modules (RLS) + line-detail (e2e) listas para post-migración · review adversarial parcial (lente collab: 2 hallazgos corregidos; las otras 4 pendientes por cuota)
-- [x] Reconciliar numeración ADR (2026-07-04 tarde) — 055 Today · 056 line-modules · 057 nav
-- [x] Rediseño nav "Adaptive Digest" (ADR-057, 2026-07-04 tarde) + contacto multi-espacio + fix orden @layer CSS
-- [x] Cierre nivel 1a-1e (ADR-051→055, 2026-07-04) + review adversarial 9 findings
+- [x] ADR-066 (2026-07-16): provenance de deploys — `wrangler deploy` sube el working tree, no un commit; el 07-14 se desplegó sin commitear y los docs mintieron dos días. Guard de árbol limpio (encadenado con `&&`: pnpm 10 no corre hooks `pre*`, un `predeploy` no se habría disparado nunca) + build stamp servido por `/health/live`. Commit `314d066`
+- [x] Scope v2 desplegado a producción (2026-07-16): versión `70775b20`, rollback `34887c61`; smoke HTTP verde; collab NO redesplegado a propósito (su único cambio desde el 07-12 era añadir un script `tsc --noEmit`, cero runtime)
+- [x] Corregido el informe de estado: prod llevaba ADR-059/060/061 + ADR-062 + rename Desk vivos **desde el 07-14**, no desde hoy — descubierto sondeando prod (`/health/ready`, cabeceras CSP, 301 `/agenda`→`/desk`), no leyendo docs
+- [x] e2e 19/19 en 13 s contra prod (venía de 15/3 en 2.2 min): la suite se comía su propio rate-limit con 14 logins desde una IP (`LOGIN_RULE` 10/5min) → `tests/auth.setup.ts` + `storageState` compartido = 1 login. Serializar NO lo habría arreglado (14 secuenciales siguen pasándose de 10 en 5 min). Commit `f5f31a9`
+- [x] Dos tests que pasaban sin probar nada: `line-detail:135` añadía *People* pero asertaba/borraba `#mod-contacts` (verde por accidente desde ADR-056); el contexto "anónimo" de `roadsheet-share` llevaba sesión desde el refactor — `browser.newContext()` **hereda** el `storageState` del proyecto
+- [x] Falsa alarma de seguridad descartada con curl crudo: el upgrade WS sin sesión devuelve **401**; el `open` venía de un contexto de test que yo creía limpio y venía autenticado
+- [x] RLS 46/46 (+8): `tests/rls/update-workspace.test.ts` cubre el gate de ADR-062, sin cobertura desde que entró en prod el 07-14. Cazó que el docblock de la migración mentía ("workspace.UPDATE stays denied by RLS" — no lo está: la policy `workspace_update` lo permite a owner/admin con la misma condición). Header corregido, SQL intacto. Commit `d5c5167`
+- [x] `/scope-v2` fuera de producción (servía mock data en vivo desde el deploy de esta noche); recuperable de `358155c`
+- [x] Docblocks Agenda→Desk en `DeskBoard` + ruta `/desk` (el copy visible ya estaba bien). El `queryKey ['engagements','today']` se deja: está compartido con `HomeView`, renombrarlo en un solo sitio rompería el caché compartido en silencio
+- [x] Pendiente de ADR-065 comprobado: 0 líneas con la key muerta `people` (de las 6 visibles al usuario de test; la de `demo` queda fuera de su RLS)
+- [x] Home projects-first (2026-07-12 noche 2, ADR-060) — **nota**: la parrilla ya no vive en el home; con Scope v2 el home ES el Desk y la parrilla está en la portada de espacio
+- [x] Pasada de coherencia visual COMPLETA (2026-07-12 noche, ADR-059): 42 hallazgos → 41 aplicados / 1 a Shelf (F33)
+- [x] ADR-056 implementado (2026-07-12): line detail = composición de módulos (7) + header stats + anchor chips + Add/Move/Remove
 - [x] ADR-040→050 — write paths + 4 lenses + road sheet público + venue enlazable + invoices (2026-07-01/02)

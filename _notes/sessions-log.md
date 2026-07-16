@@ -8,6 +8,32 @@ Convención: secciones por fecha descendente. Cada sesión queda con commits cit
 
 ---
 
+## 2026-07-16 — Deploy de Scope v2 + provenance de deploys + la suite e2e que se estrangulaba sola
+
+Gatillo: "ponte al día y dime en qué punto estamos". El informe salió **mal**: dije que producción estaba en ADR-058 (07-12) y que 059/060/061 + scope-v2 seguían sin desplegar. Lo saqué de los docs. Producción, sondeada en vivo, decía otra cosa (`/health/ready` 200, CSP en cabeceras, `/agenda`→301→`/desk`): llevaba **desde el 07-14** con 059/060/061 + ADR-062 + el rename Desk. Causa raíz: `wrangler deploy` sube el working tree, no un commit → el 07-14 se desplegó sin commitear y el registro se quedó viejo. **Fix sistémico: ADR-066** (guard de árbol limpio + build stamp servido por `/health/live`). Lección operativa: **sondea prod antes de creerte un doc**.
+
+**Lo que faltaba desplegar era solo la capa nav de Scope v2** (rail de Scopes, scope-bar, view-as, CommandPalette-como-scope-builder, store `scopes`) — todo tocado entre 07-14 23:32 y 07-15 08:35, después de aquel deploy. Desplegado esta noche (`70775b20`, rollback a `34887c61`). Collab **no** se redesplegó a propósito: su único cambio desde el 07-12 era añadir un script `tsc --noEmit`, cero runtime — redesplegar habría rebotado los DOs sin motivo.
+
+**La suite e2e se estrangulaba a sí misma.** `venue-link:72` fallaba con un timeout de 90s sin explicación. Causa real, cazada en el page snapshot que guarda Playwright: `alert: "Too many attempts"`. `LOGIN_RULE = {limit:10, windowSec:300}` (ADR-061) y la suite hacía **14 logins desde una IP**. El límite está bien puesto para humanos — la abusona era la suite. Fix: `tests/auth.setup.ts` + `storageState` compartido → **1 login**. **Serializar NO lo habría arreglado** (14 logins secuenciales siguen pasándose de 10 en la misma ventana de 5 min). De paso: 2.2 min → 13 s.
+
+**Gotchas que costaron tiempo (y que volverán):**
+- **`browser.newContext()` HEREDA el `use` del proyecto**, `storageState` incluido. Un contexto que parecía limpio venía autenticado → el test de "el upgrade WS se deniega sin token" recibió `open` y **pareció un agujero de seguridad**. Un curl crudo sin cookie devolvió **401**: el gate estaba bien, el test mentía. Para un contexto de verdad anónimo hay que vaciarlo explícito: `newContext({ storageState: { cookies: [], origins: [] } })`. Mismo bug latente en `roadsheet-share`: su contexto "anónimo" llevaba sesión desde el refactor y habría seguido en verde **sin probar nada** — justo en el link público, la única cara externa de Hour.
+- **Quitar `login()` deja la página en `about:blank`** → todo `page.evaluate(fetch('/api/...'))` con URL relativa muere sin origen. Afectó a `line-detail` y `performance-write` (helper `openApp`).
+- **`chromium-1217` de la caché de Playwright está CORRUPTO** (le falta el Framework: `dlopen ... no such file`). El e2e no arranca sin `PW_CHROMIUM` apuntando a `chromium_headless_shell-1228`.
+- **pnpm 10 no ejecuta scripts `pre*`** por defecto → un `predeploy` habría sido un guard que nunca corre.
+
+**Dos tests que pasaban sin probar nada** (los dos salieron al fallar por otra cosa):
+- `line-detail:135` añadía el módulo *People* pero asertaba y borraba `#mod-contacts` — un módulo que su propio reset siempre mete en la pila. Verde por accidente desde ADR-056. Ahora ambas mitades apuntan al módulo que realmente se añade (`#mod-team`).
+- `smoke` describía una app que ya no existe: aterrizaje en `/h/<ws>/` (ahora `/desk`), parrilla de projects en el home (ahora vive en la portada de espacio; `marco-rubiol` está vacío → se asserta en `muk-cia`) y "Money is reachable from ⌘K" — falso desde Scope v2: la ⌘K es un **constructor de scope** (`aria-label="Build a scope"`), las lentes se cambian con **view as**.
+
+**`update_workspace` tenía cero cobertura** desde que entró en prod el 07-14, siendo un gate de autorización. Nueva suite `tests/rls/update-workspace.test.ts` (8 tests). Cazó a la primera que **el docblock de la migración mentía**: decía "workspace.UPDATE stays denied by RLS; edits go through this wrapper". No está denegado — la policy `workspace_update` permite UPDATE a owner/admin con **la misma** condición que el RPC. No es escalada (a un miembro raso lo para igual la policy), pero el RPC no es "la única puerta": un owner/admin desde PostgREST directo se salta sus validaciones — nombre vacío y, lo que importa, **renombrar `slug` sin `previous_slugs`** → redirects rotos. Header corregido; SQL intacto. Misma familia que el item de `line.notes` en Shelf.
+
+**Verificado en prod:** e2e **19/19** en 13 s · RLS **46/46** · svelte-check 0/0 · el shell de Scope v2 renderiza (rail, ⌘K, scope-bar, view-as en el snapshot). **Pendiente de ADR-065 comprobado:** 0 líneas con la key muerta `people` (de las 6 visibles al usuario de test; la de `demo` queda fuera de su RLS).
+
+Commits: `358155c` (scope-v2, de Marco) · `314d066` (ADR-066) · `f5f31a9` (e2e) · `d5c5167` (RLS update_workspace).
+
+---
+
 ## 2026-07-13 — Phase 0.9 hardening gate (ADR-061) — sesión autónoma ultracode
 
 Gatillo: revisión de conclusiones externas sobre la app ("¿está lista para beta?") → Marco decidió abrir a externos en semanas → implementar el gate de hardening entero. Scope elegido: **curated onboarding** (no public signup), lo que mantiene httpOnly cookies en vez de forzar `@supabase/ssr` ahora.

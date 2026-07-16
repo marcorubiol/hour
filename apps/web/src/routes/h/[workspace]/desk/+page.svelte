@@ -1,11 +1,14 @@
 <script lang="ts">
   /**
-   * Agenda view — the full, uncapped timeline behind the Home's "+N more"
-   * link. Home shows the next 7 days capped at 10 rows; this shows every
-   * conversation with a next action, in the same pinned scope (empty pins =
-   * everything the user can see; a pinned space scopes to its workspace; a
-   * pinned line scopes through its project). Reachable from the Home link and
-   * from ⌘K.
+   * Desk view (ADR-065; "Agenda" until the rename) — the full, uncapped
+   * timeline behind the Home's "+N more" link. Home shows the next 7 days
+   * capped at 10 rows; this shows every conversation with a next action, in
+   * the same pinned scope (empty pins = everything the user can see; a pinned
+   * space scopes to its workspace; a pinned line scopes through its project).
+   * Reachable from the Home link and from ⌘K.
+   *
+   * The `['engagements','today']` query key below is shared with HomeView on
+   * purpose — same data, one cache entry. Rename it in both or in neither.
    */
 
   import { page } from '$app/state';
