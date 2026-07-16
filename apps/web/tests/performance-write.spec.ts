@@ -10,7 +10,8 @@ const PASSWORD = process.env.PW_TEST_PASSWORD;
  * against. Land on a real page first.
  */
 async function openApp(page: Page) {
-  await page.goto('/h/playwright/calendar');
+  // ADR-067: the Calendar lens is space-less (scope rides in pins/?scope=).
+  await page.goto('/h/calendar');
 }
 
 /**
@@ -50,7 +51,7 @@ test.describe('performance write path', () => {
     const day = runDay();
     const venue = `E2E Venue ${Date.now()}`;
 
-    await page.goto('/h/playwright/calendar');
+    await page.goto('/h/calendar'); // ADR-067: lens is space-less
     await expect(page.locator('.cal__grid')).toBeVisible();
 
     // Create from the header button (day set manually in the dialog).
@@ -93,7 +94,7 @@ test.describe('performance write path', () => {
     await expect(page.locator('.schedule')).toContainText('11:00');
 
     // The gig shows up on its calendar day.
-    await page.goto('/h/playwright/calendar');
+    await page.goto('/h/calendar'); // ADR-067: lens is space-less
     // Navigate to the right month (2032 — click next until the chip shows,
     // bounded). Cheaper: assert via API that the row exists with the data.
     const raw = await page.evaluate(
@@ -185,7 +186,8 @@ test.describe('performance write path', () => {
       .locator('dialog[open]')
       .filter({ hasText: 'There is no undo from the UI.' });
     await confirm.getByRole('button', { name: 'Delete', exact: true }).click();
-    await page.waitForURL(/\/h\/playwright\/calendar/, { timeout: 15_000 });
+    // ADR-067: delete returns to the space-less Calendar lens.
+    await page.waitForURL(/\/h\/calendar/, { timeout: 15_000 });
 
     // Sweep the remainder — still workspace + prefix scoped, never touching
     // any workspace but `playwright`.

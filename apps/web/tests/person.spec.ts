@@ -17,14 +17,19 @@ test.describe('person file', () => {
     test.setTimeout(60_000);
     const marker = `note-e2e-${Date.now()}`;
 
-    await page.goto('/h/muk-cia/contacts');
+    // ADR-067: the Contacts lens is space-less and cross-space.
+    await page.goto('/h/contacts');
     await expect(page.locator('tbody tr').first()).toBeVisible();
 
-    // Into the person file via the linked name.
+    // Into the person file via the linked name. The workspace segment on a
+    // person URL is browsing context, not ownership — `person` is a global
+    // entity resolved by RLS, so any accessible segment renders it (verified:
+    // the same person opens under /h/marco-rubiol/ and /h/muk-cia/). Don't
+    // pin the test to one space.
     const firstName = page.locator('tbody tr').first().locator('.cell--name-link');
     const personName = (await firstName.innerText()).trim();
     await firstName.click();
-    await page.waitForURL(/\/h\/muk-cia\/person\//);
+    await page.waitForURL(/\/h\/[^/]+\/person\//);
     await expect(page.locator('.person__title')).toContainText(personName);
 
     // The engagement context renders (this person has at least the

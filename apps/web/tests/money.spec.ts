@@ -16,7 +16,7 @@ test.describe('money lens', () => {
 
   test('fee set → persists in totals → clear', async ({ page }) => {
     test.setTimeout(60_000);
-    await page.goto('/h/playwright/money');
+    await page.goto('/h/money'); // ADR-067: lens is space-less + cross-space
     await expect(page.locator('.mny__totals')).toBeVisible();
 
     // Pin a STABLE collab-fixture gig by its project name — never

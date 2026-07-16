@@ -26,23 +26,16 @@ test.describe('smoke', () => {
    * its own playwright workspace; NOT demo.
    */
   test('shell → ⌘K → project → views', async ({ page }) => {
-    // Bare /h/ forwards to a workspace Desk (no stale "pick a workspace").
-    await page.goto('/h/');
-    await page.waitForURL(/\/h\/[^/]+\/desk\/?$/);
-
-    // Shell loaded — the brand is the home affordance (no nav buttons).
+    // ADR-067: `/h` IS the home — the cross-space Desk digest + projects grid,
+    // a real page, no longer a trampoline to some workspace's desk. Note the
+    // bare path: sign-in lands on `/h`, no trailing slash.
+    await page.goto('/h');
     await expect(page.getByRole('link', { name: /Hour — home/i })).toBeVisible();
-
-    // The projects grid moved: the home IS the Desk now (ADR-062/065), so the
-    // ADR-060 grid lives on the space portada, scoped to that space. Assert it
-    // on muk-cia — marco-rubiol (the default landing space) is empty.
-    await page.goto('/h/muk-cia/');
     await expect(page.locator('.pcard__name').first()).toBeVisible();
 
-    // ⌘K is the SCOPE BUILDER now (Scope v2), not a lens switcher: it lists
+    // ⌘K is the SCOPE BUILDER (Scope v2), not a lens switcher: it lists
     // spaces / projects / lines from /api/workspaces + /api/projects +
-    // /api/lines (RLS). Lens switching moved to the visible "view as" control,
-    // so there is no Money option in here any more.
+    // /api/lines (RLS). No Money option lives in here any more.
     await page.keyboard.press('Meta+k');
     const palette = page.getByRole('dialog', { name: 'Build a scope' });
     await expect(palette).toBeVisible();
@@ -50,30 +43,33 @@ test.describe('smoke', () => {
     await page.keyboard.press('Escape');
     await expect(palette).not.toBeVisible();
 
-    // "view as" is how you change lens — it only exists on a lens route.
-    await page.goto('/h/muk-cia/desk');
-    await page.getByRole('button', { name: 'Money', exact: true }).click();
-    await page.waitForURL(/\/h\/[^/]+\/money\/?$/);
+    // ADR-067: lens routes are SPACE-LESS — scope rides in pins / ?scope=,
+    // never in the path.
+    await page.goto('/h/money');
     await expect(page.locator('.mny__totals')).toBeVisible();
     await expect(page.locator('.mny__total').first()).toContainText(/pipeline/);
 
-    // Project detail proves the read path: JWT survived, RLS let the
-    // engagements through, the count renders.
+    // Old space-scoped lens bookmarks 308 to the space-less lens.
+    await page.goto('/h/muk-cia/desk');
+    await page.waitForURL(/\/h\/desk\/?$/);
+    await expect(page.locator('.agenda__head')).toBeVisible();
+
+    // Project detail proves the read path: session survived, RLS let the
+    // engagements through, the count renders. Entities stay space-scoped.
     await page.goto('/h/muk-cia/project/mamemi/');
     const countLabel = page.locator('.rel-stub__count');
     await expect(countLabel).toBeVisible();
     await expect(countLabel).toContainText(/\d+\s+engagements?/);
     expect(await page.locator('.rel-stub__item').count()).toBeGreaterThan(0);
 
-    // Calendar month grid deep-links.
-    await page.goto('/h/muk-cia/calendar');
+    // Calendar month grid.
+    await page.goto('/h/calendar');
     await expect(page.locator('.cal__grid')).toBeVisible();
     expect(await page.locator('.cal__weekday').count()).toBe(7);
 
-    // Contacts deep-links (no longer a top-nav item).
-    await page.goto('/h/muk-cia/contacts');
+    // Contacts.
+    await page.goto('/h/contacts');
     await expect(page.locator('.status-bar__count')).toContainText(/\d+ contacts/);
     expect(await page.locator('tbody tr').count()).toBeGreaterThan(0);
-
   });
 });

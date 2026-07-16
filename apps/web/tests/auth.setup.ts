@@ -41,8 +41,9 @@ setup('authenticate', async ({ page }) => {
   await page.locator('input[type=password]').fill(PASSWORD);
   await page.getByRole('button', { name: /sign in/i }).click();
 
-  // Home lands on the Desk lens (ADR-065), not the bare workspace root.
-  await page.waitForURL(/\/h\/[^/]+\/desk\/?$/);
+  // ADR-067: sign-in lands on `/h` — the home IS the cross-space Desk digest,
+  // a real page. Note the missing trailing slash: `/\/h\//` does NOT match.
+  await page.waitForURL(/\/h\/?$/);
   await expect(page.getByRole('link', { name: /Hour — home/i })).toBeVisible();
 
   await page.context().storageState({ path: STORAGE_STATE });

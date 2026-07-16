@@ -24,7 +24,7 @@ test.describe('contact capture', () => {
   }) => {
     test.setTimeout(90_000);
 
-    await page.goto('/h/playwright/contacts');
+    await page.goto('/h/contacts'); // ADR-067: lens is space-less + cross-space
     await expect(page.getByRole('button', { name: 'Add contact' })).toBeVisible();
 
     // Crash recovery: a run killed after create but before the tail

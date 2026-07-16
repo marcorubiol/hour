@@ -30,7 +30,9 @@ const CONTACT_EMAIL = 'zzz-e2e-line-contact@hour.test';
  * Land on a real page first.
  */
 async function openApp(page: Page) {
-  await page.goto('/h/playwright/desk');
+  // ADR-067: the Desk is space-less. Any real page will do — this only has
+  // to give the context an origin.
+  await page.goto('/h/desk');
 }
 
 type LineRow = { id: string; slug: string | null; name: string };

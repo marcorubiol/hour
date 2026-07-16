@@ -30,7 +30,7 @@ type RawEngagement = {
 
 /** Session comes from the shared storageState (tests/auth.setup.ts). */
 async function openContacts(page: Page, searchName?: string) {
-  await page.goto('/h/muk-cia/contacts');
+  await page.goto('/h/contacts'); // ADR-067: lens is space-less + cross-space
   if (searchName) {
     // The lens is pins-scoped (unscoped = everything RLS allows) — narrow
     // to the target person server-side so the row is on the first page.

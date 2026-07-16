@@ -8,7 +8,8 @@ async function login(page: Page) {
   await page.locator('input[type=email]').fill(EMAIL!);
   await page.locator('input[type=password]').fill(PASSWORD!);
   await page.getByRole('button', { name: /sign in/i }).click();
-  await page.waitForURL(/\/h\//);
+  // ADR-067 lands on `/h` with no trailing slash — the old /\/h\// never matches.
+  await page.waitForURL(/\/h\/?$/);
 }
 
 async function sessionCookies(context: BrowserContext) {
