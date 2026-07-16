@@ -30,7 +30,6 @@
   import { lineKindGlyph, lineKindLabel } from '$lib/utils/line-kind';
   import { accentVar } from '$lib/utils/accent';
   import { useBreadcrumb } from '$lib/stores/breadcrumb.svelte';
-  import { linePin } from '$lib/stores/pins.svelte';
   import { fmtMoneyCompact } from '$lib/money';
   import { dayMonth } from '$lib/datetime';
   import {
@@ -48,6 +47,7 @@
   import MaterialsModule from '$lib/components/line/MaterialsModule.svelte';
   import MoneyModule from '$lib/components/line/MoneyModule.svelte';
   import TeamModule from '$lib/components/line/TeamModule.svelte';
+  import TasksModule from '$lib/components/line/TasksModule.svelte';
 
   type Line = {
     id: string;
@@ -109,8 +109,8 @@
   );
 
   // Publish this line's address to the shell's sticky breadcrumb bar
-  // (space › project › line) + the pin toggle target. Cleared on unmount so
-  // home/lens routes show no bar.
+  // (space › project › line). Cleared on unmount so home/lens routes show
+  // no bar.
   $effect(() => {
     if (activeLine && activeProject) {
       breadcrumb.set(
@@ -128,7 +128,6 @@
           },
           { label: activeLine.name, kind: 'node' },
         ],
-        { pin: { id: linePin(activeLine.id), label: activeLine.name } },
       );
     } else {
       breadcrumb.clear();
@@ -164,6 +163,7 @@
     materials: MaterialsModule,
     money: MoneyModule,
     team: TeamModule,
+    tasks: TasksModule,
   } as const;
 
   const modulesMutation = createMutation({

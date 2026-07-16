@@ -21,7 +21,6 @@
   } from '$lib/nav-queries';
   import { accentVar, accentVarFor } from '$lib/utils/accent';
   import { useBreadcrumb } from '$lib/stores/breadcrumb.svelte';
-  import { projectPin } from '$lib/stores/pins.svelte';
   import RelationshipStub from '$lib/components/RelationshipStub.svelte';
   import StateBadge from '$lib/components/StateBadge.svelte';
   import YNotes from '$lib/components/YNotes.svelte';
@@ -52,8 +51,8 @@
       : null,
   );
 
-  // Publish this project's address (space › project) + pin toggle to the
-  // shell breadcrumb bar. Cleared on unmount.
+  // Publish this project's address (space › project) to the shell
+  // breadcrumb bar. Cleared on unmount.
   $effect(() => {
     if (project) {
       breadcrumb.set(
@@ -66,7 +65,6 @@
           },
           { label: project.name, kind: 'node' },
         ],
-        { pin: { id: projectPin(project.id), label: project.name } },
       );
     } else {
       breadcrumb.clear();

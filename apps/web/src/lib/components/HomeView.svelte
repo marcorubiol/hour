@@ -1,40 +1,27 @@
 <script lang="ts">
   /**
-   * Home / Agenda digest (ADR-057 nav redesign; projects-first grid ADR-060).
-   * Extracted from the route page so it can render at BOTH `/h/` (space-less
-   * home — the rail's ∑) and `/h/[workspace]/` (same digest, browsing a
-   * space). The content is global: empty pins = everything the user can see.
+   * Space portada — the `/h/[workspace]/` surface (ADR-062 edit surface #1;
+   * portada-only since 2026-07-17): space masthead (kicker · name · about ·
+   * stats) over the space's next-7-days agenda and its projects grid.
    *
-   * A single quiet column: greeting, the next-7-days agenda (capped, with a
-   * "+N more" link to the full Agenda view), and the PROJECTS grid — every
-   * production the user can see, pinned ones first.
+   * This used to double as the cross-space home digest; that surface died
+   * when the hall landed (`/h` greets, the door goes to `/h/desk`) and the
+   * manual pin UI (card PIN chips, ScopeStrip) was removed — scopes are
+   * built in the left rail and ⌘K only. The pins STORE remains the scope
+   * engine; this page just no longer grows UI for it.
    *
-   * The project is the unit of thought (the show); the space is context on
-   * each card (mono chip + accent dot), not the container — spaces with no
-   * projects render nothing. Calendar and Money are the other views of the
-   * same pinned scope, reachable from ⌘K.
-   *
-   * `workspaceSlug` is *browsing context only* — it feeds URL construction
-   * for the agenda "more" link and person links, never the data. At `/h/`
-   * the caller passes the default (first) workspace; the digest is identical
-   * whichever space is in the segment.
-   *
-   * Scope: empty pins = everything the user can see; a pinned space scopes
-   * to its workspace; pinned projects and lines scope through
-   * `scope.projectIds` (engagement rows are filtered by project).
+   * The project is the unit of thought (the show); cards are ordered by
+   * activity (conversations + confirmed + holds).
    */
 
   import { createQuery } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
   import { fetchJSON } from '$lib/api';
   import { lineKindGlyph } from '$lib/utils/line-kind';
-  import { session } from '$lib/session.svelte';
-  import { usePins, projectPin, linePin } from '$lib/stores/pins.svelte';
   import { useCreation } from '$lib/stores/creation.svelte';
   import {
     buildLineIndex,
     buildProjectIndex,
-    resolveScope,
     lineUrl,
     projectUrl,
     type NavLine,
@@ -47,7 +34,6 @@
     activeProjectsQueryOptions,
     allLinesQueryOptions,
   } from '$lib/nav-queries';
-  import ScopeStrip from '$lib/components/ScopeStrip.svelte';
   import DeskBoard from '$lib/components/DeskBoard.svelte';
   import { accentVar } from '$lib/utils/accent';
   import { useBreadcrumb } from '$lib/stores/breadcrumb.svelte';
@@ -55,17 +41,11 @@
   import { goto } from '$app/navigation';
 
   interface Props {
-    /** Browsing-context workspace for agenda/person link URLs. Optional — the
-        home content is global; this only feeds URL construction. */
+    /** The space this portada is about (the /h/[slug]/ segment). */
     workspaceSlug?: string;
-    /** When true, render the per-space portada (the /h/[slug]/ surface): a
-        space masthead + stats, with the agenda and projects scoped to this
-        workspace. When false, the space-less cross-space home (/h/). */
-    asSpace?: boolean;
   }
-  let { workspaceSlug = '', asSpace = false }: Props = $props();
+  let { workspaceSlug = '' }: Props = $props();
 
-  const pins = usePins();
   const creation = useCreation();
   const breadcrumb = useBreadcrumb();
 
@@ -115,12 +95,10 @@
         signal,
       ),
   });
-
   let workspaces = $derived<NavWorkspace[]>($workspacesQuery.data?.items ?? []);
-  // Space portada: the workspace this /h/[slug]/ page is about (null on the
-  // home, or while the workspaces list is still loading).
+  // The workspace this portada is about (null while the list is loading).
   let currentWorkspace = $derived(
-    asSpace ? (workspaces.find((w) => w.slug === workspaceSlug) ?? null) : null,
+    workspaces.find((w) => w.slug === workspaceSlug) ?? null,
   );
   let projectIndex = $derived(buildProjectIndex(workspaces, $projectsQuery.data?.items ?? []));
   let lineIndex = $derived(buildLineIndex(workspaces, ($linesQuery.data?.items as RawLine[]) ?? []));
@@ -151,50 +129,13 @@
   const engTotalsQuery = createQuery(engTotalsOptions);
   let engTotals = $derived<Record<string, number>>($engTotalsQuery.data ?? {});
 
-  // ── Scope resolution ──────────────────────────────────────────────────
-  let scope = $derived(resolveScope(pins.pins, workspaces, lineIndex, projectIndex));
-  let scopedProjectIds = $derived(new Set(scope.projectIds));
-
-  function engInScope(e: Engagement): boolean {
-    if (scope.isEmpty) return true;
-    if (scope.workspaceIds.includes(e.workspace_id)) return true;
-    if (e.project && scopedProjectIds.has(e.project.id)) return true;
-    return false;
-  }
-  // On a space portada the agenda is that space's; on the home it follows the
-  // user's pins (empty pins = everything). The space filter is a local view
-  // scope — it never touches the pins store.
+  // The portada's agenda is this space's — a local view scope that never
+  // touches the pins store.
   let scopedEngagements = $derived(
-    asSpace && currentWorkspace
+    currentWorkspace
       ? engagements.filter((e) => e.workspace_id === currentWorkspace.id)
-      : engagements.filter(engInScope),
+      : [],
   );
-
-  // ── Greeting + date ───────────────────────────────────────────────────
-  let now = $derived(new Date());
-  let greetWord = $derived.by(() => {
-    const h = now.getHours();
-    return h < 12 ? 'Good morning' : h < 19 ? 'Good afternoon' : 'Good evening';
-  });
-  let dateLabel = $derived(
-    now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }),
-  );
-
-  // Greeting name comes from the signed-in user only (display name → email
-  // local part) — never a "personal workspace" lookup. personal/team is not a
-  // meaningful space distinction (ADR-064); it just read the wrong axis.
-  let sessionName = $derived.by(() => {
-    const full = session.user?.name;
-    if (full) return full.split(/\s+/)[0] ?? full;
-    const email = session.user?.email;
-    if (email) {
-      const local = email.split('@')[0] ?? '';
-      const first = local.split(/[._-]+/)[0] || local;
-      return first ? first.charAt(0).toUpperCase() + first.slice(1).toLowerCase() : null;
-    }
-    return null;
-  });
-  let firstName = $derived(sessionName ?? 'there');
 
   // ── Project cards ─────────────────────────────────────────────────────
   function perfsForLine(lineId: string): Performance[] {
@@ -233,41 +174,30 @@
     return lineIndex.filter((l) => l.projectId === projectId);
   }
 
-  // Pinned first; a project holding a pinned line floats too (you pinned
-  // something you live in — its show comes forward). Within a rank, busiest
-  // first — project.updated_at (the API order) goes stale because working
-  // the show touches engagements/lines, never the project row. Sort is
-  // stable, so zero-activity ties keep the API order.
-  let pinnedLineProjectIds = $derived(new Set(scope.lines.map((l) => l.projectId)));
-  function pinRank(p: NavProject): number {
-    if (pins.has(projectPin(p.id))) return 0;
-    if (pinnedLineProjectIds.has(p.id)) return 1;
-    return 2;
-  }
+  // Busiest first — project.updated_at (the API order) goes stale because
+  // working the show touches engagements/lines, never the project row. Sort
+  // is stable, so zero-activity ties keep the API order.
   function activityOf(p: NavProject): number {
     const st = statOf(perfsForProject(p.id));
     return (engTotals[p.id] ?? 0) + st.confirmed + st.holds;
   }
   let orderedProjects = $derived(
-    [...projectIndex].sort(
-      (a, b) => pinRank(a) - pinRank(b) || activityOf(b) - activityOf(a),
-    ),
+    [...projectIndex].sort((a, b) => activityOf(b) - activityOf(a)),
   );
   let projectsSettled = $derived(!$projectsQuery.isPending && !$workspacesQuery.isPending);
 
-  // Space portada: narrow the grid to this space's projects. Local view scope
-  // — does NOT touch the user's pins. The home shows everything.
+  // This space's projects only.
   let visibleProjects = $derived(
-    asSpace && currentWorkspace
+    currentWorkspace
       ? orderedProjects.filter((p) => p.workspaceId === currentWorkspace.id)
-      : orderedProjects,
+      : [],
   );
 
   // Masthead stats — aggregated from the same real data the cards show
   // (upcoming performances + exact conversation counts). Zeros stay zero,
   // never fabricated.
   let spaceStats = $derived.by(() => {
-    if (!asSpace || !currentWorkspace) return null;
+    if (!currentWorkspace) return null;
     let confirmed = 0;
     let holds = 0;
     let conversations = 0;
@@ -298,10 +228,10 @@
     return [discipline, ws.city].filter(Boolean).join(' · ');
   });
 
-  // Space portada publishes its address (● space name) to the shell
-  // breadcrumb bar. The home (asSpace=false) owns no breadcrumb.
+  // The portada publishes its address (● space name) to the shell
+  // breadcrumb bar.
   $effect(() => {
-    if (!asSpace || !currentWorkspace) return;
+    if (!currentWorkspace) return;
     breadcrumb.set([
       {
         label: currentWorkspace.name,
@@ -316,19 +246,15 @@
   function openLine(line: NavLine) {
     void goto(lineUrl(line));
   }
-  function openProject(project: NavProject) {
-    void goto(projectUrl(project));
-  }
 </script>
 
-<svelte:head><title>Desk — Hour</title></svelte:head>
+<svelte:head><title>{currentWorkspace ? `${currentWorkspace.name} — Hour` : 'Hour'}</title></svelte:head>
 
 <!-- Plain <div> (not <section>) so it dodges base.css's section defaults (big
      padding-block + a space-l flex gap between children); the vertical rhythm
      here is controlled by each element's own margin. Width: .shell__content. -->
 <div class="home">
-  {#if asSpace}
-    <header class="space-head">
+  <header class="space-head">
       {#if currentWorkspace}
         {#if spaceKicker}
           <div class="space-head__kick">
@@ -352,23 +278,17 @@
           <p class="space-head__about">{currentWorkspace.description}</p>
         {/if}
       {/if}
-    </header>
-    {#if spaceStats}
-      <div class="space-stats">
-        <div class="space-stat"><b>{spaceStats.projects}</b><span>projects</span></div>
-        <div class="space-stat"><b>{spaceStats.confirmed}</b><span>confirmed</span></div>
-        <div class="space-stat"><b>{spaceStats.holds}</b><span>holds</span></div>
-        <div class="space-stat"><b>{spaceStats.conversations}</b><span>conversations</span></div>
-      </div>
-    {/if}
-    {#if currentWorkspace}
-      <EditWorkspaceDialog bind:open={editOpen} workspace={currentWorkspace} />
-    {/if}
-  {:else}
-    <h1 class="home__greet">{greetWord}, <em>{firstName}</em>.</h1>
-    <p class="home__date">{dateLabel} · a quiet start — pin what you live in and it comes forward</p>
-
-    <ScopeStrip onOpenLine={openLine} onOpenProject={openProject} />
+  </header>
+  {#if spaceStats}
+    <div class="space-stats">
+      <div class="space-stat"><b>{spaceStats.projects}</b><span>projects</span></div>
+      <div class="space-stat"><b>{spaceStats.confirmed}</b><span>confirmed</span></div>
+      <div class="space-stat"><b>{spaceStats.holds}</b><span>holds</span></div>
+      <div class="space-stat"><b>{spaceStats.conversations}</b><span>conversations</span></div>
+    </div>
+  {/if}
+  {#if currentWorkspace}
+    <EditWorkspaceDialog bind:open={editOpen} workspace={currentWorkspace} />
   {/if}
 
   <div class="home__toolbar"><span class="eyebrow">Next 7 days</span></div>
@@ -385,45 +305,23 @@
   {#if visibleProjects.length > 0 || projectsSettled}
     <div class="home__projects-head">
       <span class="eyebrow">Projects</span>
-      {#if asSpace && currentWorkspace}
+      {#if currentWorkspace}
         <span class="home__projects-hint">everything {currentWorkspace.name} is running</span>
-      {:else if pins.pins.length === 0}
-        <span class="home__projects-hint">nothing pinned — browse everything, pin what you live in</span>
-      {/if}
-      {#if !asSpace}
-        <button type="button" class="creator home__new-space" onclick={() => creation.openWorkspace()}>
-          + New space
-        </button>
       {/if}
     </div>
     <div class="home__projects">
       {#each visibleProjects as unit (unit.id)}
-        {@const pinned = pins.has(projectPin(unit.id))}
-        <article class="pcard" class:pcard--pinned={pinned} class:pcard--accent={asSpace} style={`--c: ${unit.accent}`}>
+        <article class="pcard pcard--accent" style={`--c: ${unit.accent}`}>
           <div class="pcard__space">
-            {#if asSpace}
-              <span class="pcard__tag">Project</span>
-            {:else}
-              <span class="dot" aria-hidden="true"></span>
-              <span class="pcard__ws">{unit.workspaceName}</span>
-              <button
-                type="button"
-                class="pill--sm pill--mono pcard__pin"
-                class:pill--on={pinned}
-                onclick={() => pins.toggle(projectPin(unit.id))}
-                title={pinned ? 'Unpin this project' : 'Pin this project'}
-              >{pinned ? 'pinned' : 'pin'}</button>
-            {/if}
+            <span class="pcard__tag">Project</span>
           </div>
           <a class="pcard__name" href={projectUrl(unit)}>{unit.name}</a>
           <p class="pcard__meta">{projectStatLabel(unit) || 'no activity yet'}</p>
           <div class="pcard__lines">
             {#each linesOfProject(unit.id) as line (line.id)}
-              {@const lPinned = pins.has(linePin(line.id))}
               <button type="button" class="pcard__line" onclick={() => openLine(line)}>
                 <span class="pcard__g">{lineKindGlyph(line.kind)}</span>
                 <span class="pcard__ln">{line.name}</span>
-                {#if lPinned}<span class="pcard__line-pin">pinned</span>{/if}
                 {#if lineStatLabel(line)}<span class="pcard__line-stat">{lineStatLabel(line)}</span>{/if}
                 <span class="pcard__go" aria-hidden="true">→</span>
               </button>
@@ -445,7 +343,7 @@
         class="pcard pcard--ghost"
         onclick={() =>
           creation.openProject(
-            asSpace && currentWorkspace ? { workspaceId: currentWorkspace.id } : undefined,
+            currentWorkspace ? { workspaceId: currentWorkspace.id } : undefined,
           )}
       >
         + New project
@@ -456,21 +354,7 @@
 
 <style>
   @layer components {
-    /* Masthead typography via base.css h1 defaults. */
-    .home__greet {
-      margin: 0 0 var(--space-2xs);
-      color: var(--text-color);
-    }
-    .home__greet em {
-      font-style: italic;
-    }
-    .home__date {
-      font-size: var(--text-m);
-      color: var(--text-muted);
-      margin: 0 0 var(--space-s);
-    }
-
-    /* ── space portada masthead (asSpace) ── */
+    /* ── space portada masthead ── */
     .space-head {
       margin-block-end: var(--space-s);
     }
@@ -559,13 +443,6 @@
     .home__toolbar {
       margin-block: var(--space-s) var(--space-2xs);
     }
-    .dot {
-      inline-size: 0.5rem;
-      block-size: 0.5rem;
-      border-radius: var(--radius-circle);
-      background: var(--c, var(--text-faint));
-      flex: none;
-    }
 
     /* ── projects grid ── */
     .home__projects-head {
@@ -580,9 +457,6 @@
       color: var(--text-faint);
       font-style: italic;
       font-family: var(--font-display);
-    }
-    .home__new-space {
-      margin-inline-start: auto;
     }
     .home__projects {
       display: grid;
@@ -599,11 +473,8 @@
       align-content: start;
       transition: border-color var(--transition);
     }
-    .pcard--pinned {
-      border-color: var(--border-color-dark);
-    }
-    /* On a space portada every card is the same space, so the space chip is
-       dropped for a quiet "Project" tag + the space accent as a left rule. */
+    /* Every card is this space, so a quiet "Project" tag + the space accent
+       as a left rule. */
     .pcard--accent {
       border-inline-start: 3px solid var(--c, var(--border-color-dark));
     }
@@ -615,8 +486,6 @@
       color: var(--text-faint);
     }
 
-    /* Space = context, not container: a quiet mono chip with the space's
-       accent dot. The card belongs to the show; the space just says where. */
     .pcard__space {
       display: flex;
       align-items: center;
@@ -628,15 +497,6 @@
       letter-spacing: var(--mono-letter-spacing-loose);
       text-transform: uppercase;
       color: var(--text-muted);
-    }
-    .pcard__ws {
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    .pcard__pin {
-      margin-inline-start: auto;
-      --pill-padding-block: var(--space-2xs);
     }
     .pcard__name {
       font-family: var(--font-display);
@@ -695,14 +555,6 @@
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
-    }
-    .pcard__line-pin {
-      flex: none;
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      letter-spacing: var(--mono-letter-spacing-loose);
-      text-transform: uppercase;
-      color: var(--c, var(--text-muted));
     }
     .pcard__line-stat {
       flex: none;

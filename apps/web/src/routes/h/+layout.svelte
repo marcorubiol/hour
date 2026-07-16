@@ -1,11 +1,11 @@
 <script lang="ts">
   /**
-   * App shell — Adaptive Digest (ADR-057 nav redesign). The persistent
-   * sidebar (Plaza + LineList) is gone; scope is expressed by PINS placed
-   * on the content by each lens (see <ScopeStrip>), and ⌘K jumps to any
-   * line or space. No top-nav buttons at all: the top bar is just brand
-   * (logo = Home = Agenda) · centered ⌘K search · account menu. Calendar,
-   * Contacts and Money are reachable only from ⌘K (Views group).
+   * App shell — Scope v2. Scope is PINS in a store, built from the left
+   * rail (Everything + saved scopes + recents) and the ⌘K scope builder —
+   * the manual pin UI (card chips, breadcrumb pin, ScopeStrip) died
+   * 2026-07-17. Applying a scope from a non-lens surface lands on /h/desk.
+   * The top bar is brand (logo = /h, the hall) · centered ⌘K search ·
+   * account menu.
    *
    * Settings stays a "mode" of the shell: when inside /settings a slim
    * <SettingsNav> aside returns, so the settings surface is unaffected.
@@ -181,6 +181,10 @@
 
   function applyScope(s: Scope) {
     pins.set(s.tokens);
+    // A scope click must SHOW the scoped view: from a lens, the lens just
+    // refilters in place; from anywhere else (hall, portada, entity pages)
+    // it lands on Desk — the catch-up surface.
+    if (!routedLens) void goto('/h/desk');
     // If it's a saved scope, it becomes the base being edited; else no base.
     editingBaseTokens = scopes.saved.some((x) => scopesSameSet(x.tokens, s.tokens))
       ? [...s.tokens]
@@ -303,8 +307,10 @@
     return (m?.[1] as Lens | undefined) ?? null;
   });
   let atHome = $derived(/^\/h\/?$/.test(page.url.pathname));
-  // Surfaces that carry the scope in the URL (and show the scope chrome):
-  // the home digest + the four lenses.
+  // Surfaces that carry the scope in the URL: the home + the four lenses.
+  // The scope CHROME (scopebar + view-as) renders only on lens routes —
+  // the hall lands clean, and the revealed digest brings its own
+  // <ScopeStrip>.
   let scopeSurface = $derived(routedLens !== null || atHome);
 
   // Keep the pill state honest when navigation happens outside the pills.
@@ -334,36 +340,89 @@
     }
   });
 
-  // ── Scope ⇄ URL query (ADR-067) ──────────────────────────────────────
-  // On scope surfaces the URL carries ?scope=<pin,pin> live: pins → query
-  // via replaceState (no history spam), and an explicit ?scope= in the URL
+  // ── Scope ⇄ URL query (ADR-067 + addendum) ───────────────────────────
+  // On scope surfaces the URL carries ?scope= live: pins → query via
+  // replaceState (no history spam), and an explicit ?scope= in the URL
   // (pasted link, back/forward) → pins. A URL with NO scope param leaves
   // pins alone — personal continuity (localStorage) wins over absence.
+  //
+  // The URL speaks QUALIFIED SLUGS (`p:muk-cia/mamemi`,
+  // `l:muk-cia/mamemi/gira-26-27`) while the pins store keeps uuid
+  // identity — so renames never rot localStorage, and the address bar
+  // stays human-readable. This boundary translates both ways off the nav
+  // caches. Legacy uuid tokens (old copied links) parse forever; a
+  // qualified token that no longer resolves once the caches settle
+  // (renamed/revoked target in a stale shared link) is dropped.
   function serializePins(p: string[]): string {
     return p.join(',');
+  }
+  let navCachesSettled = $derived(
+    $workspacesQuery.isSuccess && $projectsQuery.isSuccess && $linesQuery.isSuccess,
+  );
+  function pinToUrlToken(pin: string): string {
+    const { kind, key } = parsePin(pin);
+    if (kind === 'space') return pin;
+    if (kind === 'project') {
+      const p = projectIndex.find((x) => x.id === key);
+      return p ? `p:${p.workspaceSlug}/${p.slug}` : pin;
+    }
+    const l = lineIndex.find((x) => x.id === key);
+    return l ? `l:${l.workspaceSlug}/${l.projectSlug}/${l.slug}` : pin;
+  }
+  function urlTokenToPin(tok: string): string | null {
+    const { kind, key } = parsePin(tok);
+    if (kind === 'space' || !key.includes('/')) return tok; // legacy uuid form
+    if (kind === 'project') {
+      const [ws, slug] = key.split('/');
+      const p = projectIndex.find((x) => x.workspaceSlug === ws && x.slug === slug);
+      return p ? `p:${p.id}` : null;
+    }
+    const [ws, pslug, lslug] = key.split('/');
+    const l = lineIndex.find(
+      (x) => x.workspaceSlug === ws && x.projectSlug === pslug && x.slug === lslug,
+    );
+    return l ? `l:${l.id}` : null;
   }
   $effect(() => {
     if (!scopeSurface) return;
     const raw = page.url.searchParams.get('scope');
     if (raw === null) return;
-    const fromUrl = raw.split(',').filter((t) => /^[spl]:.+/.test(t));
-    if (serializePins(fromUrl) !== serializePins(untrack(() => pins.pins))) {
-      pins.set(fromUrl);
+    const toks = raw.split(',').filter((t) => /^[spl]:.+/.test(t));
+    const mapped = toks.map(urlTokenToPin);
+    // Qualified tokens can't resolve before the caches land — this effect
+    // re-runs as they fill. Only once settled do unresolvable ones drop.
+    if (mapped.some((t) => t === null) && !navCachesSettled) return;
+    const next = mapped.filter((t): t is string => t !== null);
+    if (serializePins(next) !== serializePins(untrack(() => pins.pins))) {
+      pins.set(next);
     }
   });
   $effect(() => {
     if (!scopeSurface) return;
-    const ser = serializePins(pins.pins);
-    const url = new URL(untrack(() => page.url));
+    // page.url read reactively on purpose: lens→lens navigation drops the
+    // query, and this effect must re-run to restore it even though the
+    // pins themselves didn't change.
+    const url = new URL(page.url);
     const existing = url.searchParams.get('scope');
+    // Hold while an inbound scope is still waiting for the caches — writing
+    // now would clobber a pasted link before it ever applied.
+    if (existing && !navCachesSettled) {
+      const toks = existing.split(',').filter((t) => /^[spl]:.+/.test(t));
+      if (toks.some((t) => urlTokenToPin(t) === null)) return;
+    }
+    const ser = pins.pins.map(pinToUrlToken).join(',');
     if (ser === (existing ?? '')) return;
     if (ser) url.searchParams.set('scope', ser);
     else url.searchParams.delete('scope');
-    // URLSearchParams serializes as form-urlencoded, escaping ':' and ','
-    // (%3A/%2C) — both are legal bare in a query per RFC 3986, and the
+    // URLSearchParams serializes as form-urlencoded, escaping ':' ',' '/'
+    // (%3A/%2C/%2F) — all legal bare in a query per RFC 3986, and the
     // parser reads either form identically. Un-escape so the address bar
-    // shows the tokens as designed: ?scope=s:muk-cia,p:0198….
-    const qs = url.searchParams.toString().replace(/%3A/gi, ':').replace(/%2C/gi, ',');
+    // shows the tokens as designed: ?scope=s:muk-cia,p:muk-cia/mamemi.
+    const qs = url.searchParams
+      .toString()
+      .replace(/%3A/gi, ':')
+      .replace(/%2C/gi, ',')
+      .replace(/%2F/gi, '/');
     url.search = qs ? `?${qs}` : '';
     replaceState(url, {});
   });
@@ -419,6 +478,7 @@
   }
   function onApplyScope(tokens: string[]) {
     pins.set(tokens);
+    if (!routedLens) void goto('/h/desk');
     // Applied a verbatim saved scope → that's the base; otherwise keep the
     // current base (you may be modifying it) — the effect nulls it when empty.
     if (scopes.saved.some((s) => scopesSameSet(s.tokens, tokens))) {
@@ -660,7 +720,7 @@
     {/if}
 
     <main class="shell__main">
-      {#if scopeSurface}
+      {#if routedLens}
         <div class="shell__lenschrome">
           <div class="scopebar">
             <span class="scopebar__lead">Scope</span>
@@ -725,7 +785,7 @@
               {#each VIEW_AS as v (v.id)}
                 <button
                   type="button"
-                  class:is-on={routedLens === v.id || (atHome && v.id === 'desk')}
+                  class:is-on={routedLens === v.id}
                   onclick={() => pickView(v.id)}
                 >
                   {v.label}
@@ -756,18 +816,6 @@
                 {/if}
               {/each}
             </nav>
-            {#if breadcrumb.pin}
-              {@const pinId = breadcrumb.pin.id}
-              <button
-                type="button"
-                class="pill--sm pill--mono shell__pin"
-                class:pill--on={pins.has(pinId)}
-                onclick={() => pins.toggle(pinId)}
-                title={pins.has(pinId) ? 'Unpin — remove from what you live in' : 'Pin — bring this forward'}
-              >
-                {pins.has(pinId) ? 'pinned' : 'pin'}
-              </button>
-            {/if}
           </div>
         </div>
       {/if}
@@ -1252,10 +1300,6 @@
   .shell__crumb-sep {
     color: var(--border-color-dark);
   }
-  .shell__pin {
-    flex: none;
-  }
-
   /* ── account menu chrome (unchanged from the previous shell) ── */
 
   :global(.account-row__kebab) {

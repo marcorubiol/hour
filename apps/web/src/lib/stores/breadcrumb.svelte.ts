@@ -9,9 +9,8 @@
  * aligned with the page column). Same split as pins/lens — provided via
  * context, consumed with use*.
  *
- * `pin` is the current entity's pin target (id + label). The shell renders
- * a pin toggle from it against the shared pins store — one pin concept, two
- * surfaces (filter on the home, toggle-in-place here). Decision A.
+ * (The per-entity pin toggle this bar used to carry died 2026-07-17 with
+ * the rest of the manual pin UI — scopes are built in the rail and ⌘K.)
  */
 
 import { getContext, setContext } from 'svelte';
@@ -28,20 +27,15 @@ export type Crumb = {
   accent?: string;
 };
 
-export type PinTarget = { id: string; label: string };
-
 export class BreadcrumbStore {
   crumbs = $state<Crumb[]>([]);
-  pin = $state<PinTarget | null>(null);
 
-  set(crumbs: Crumb[], opts: { pin?: PinTarget | null } = {}): void {
+  set(crumbs: Crumb[]): void {
     this.crumbs = crumbs;
-    this.pin = opts.pin ?? null;
   }
 
   clear(): void {
     this.crumbs = [];
-    this.pin = null;
   }
 }
 

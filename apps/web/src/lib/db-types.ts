@@ -1563,6 +1563,106 @@ export type Database = {
           },
         ]
       }
+      task: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          custom_fields: Json
+          deleted_at: string | null
+          due_at: string | null
+          engagement_id: string | null
+          id: string
+          line_id: string | null
+          note: string | null
+          origin: Database["public"]["Enums"]["task_origin"]
+          performance_id: string | null
+          project_id: string | null
+          status: Database["public"]["Enums"]["task_status"]
+          title: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          custom_fields?: Json
+          deleted_at?: string | null
+          due_at?: string | null
+          engagement_id?: string | null
+          id?: string
+          line_id?: string | null
+          note?: string | null
+          origin?: Database["public"]["Enums"]["task_origin"]
+          performance_id?: string | null
+          project_id?: string | null
+          status?: Database["public"]["Enums"]["task_status"]
+          title: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          custom_fields?: Json
+          deleted_at?: string | null
+          due_at?: string | null
+          engagement_id?: string | null
+          id?: string
+          line_id?: string | null
+          note?: string | null
+          origin?: Database["public"]["Enums"]["task_origin"]
+          performance_id?: string | null
+          project_id?: string | null
+          status?: Database["public"]["Enums"]["task_status"]
+          title?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_engagement_id_fkey"
+            columns: ["engagement_id"]
+            isOneToOne: false
+            referencedRelation: "engagement"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_line_id_fkey"
+            columns: ["line_id"]
+            isOneToOne: false
+            referencedRelation: "line"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_performance_id_fkey"
+            columns: ["performance_id"]
+            isOneToOne: false
+            referencedRelation: "performance"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_performance_id_fkey"
+            columns: ["performance_id"]
+            isOneToOne: false
+            referencedRelation: "performance_redacted"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "project"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspace"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_profile: {
         Row: {
           avatar_url: string | null
@@ -2317,6 +2417,42 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      create_task: {
+        Args: {
+          p_due_at?: string
+          p_engagement_id?: string
+          p_line_id?: string
+          p_note?: string
+          p_performance_id?: string
+          p_project_id?: string
+          p_title: string
+          p_workspace_id?: string
+        }
+        Returns: {
+          created_at: string
+          created_by: string | null
+          custom_fields: Json
+          deleted_at: string | null
+          due_at: string | null
+          engagement_id: string | null
+          id: string
+          line_id: string | null
+          note: string | null
+          origin: Database["public"]["Enums"]["task_origin"]
+          performance_id: string | null
+          project_id: string | null
+          status: Database["public"]["Enums"]["task_status"]
+          title: string
+          updated_at: string
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "task"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       create_venue: {
         Args: {
           p_address?: string
@@ -2407,6 +2543,7 @@ export type Database = {
         Returns: undefined
       }
       delete_person_note: { Args: { p_note_id: string }; Returns: undefined }
+      delete_task: { Args: { p_task_id: string }; Returns: undefined }
       generate_workspace_sid: { Args: never; Returns: string }
       get_public_calendar: { Args: { p_token: string }; Returns: Json }
       get_public_roadsheet: { Args: { p_token: string }; Returns: Json }
@@ -2610,6 +2747,8 @@ export type Database = {
         | "cancelled"
       person_note_visibility: "workspace" | "private"
       project_status: "draft" | "active" | "archived"
+      task_origin: "manual" | "protocol" | "ai"
+      task_status: "open" | "done"
       workspace_domain:
         | "theatre"
         | "dance"
@@ -2815,6 +2954,8 @@ export const Constants = {
       ],
       person_note_visibility: ["workspace", "private"],
       project_status: ["draft", "active", "archived"],
+      task_origin: ["manual", "protocol", "ai"],
+      task_status: ["open", "done"],
       workspace_domain: [
         "theatre",
         "dance",

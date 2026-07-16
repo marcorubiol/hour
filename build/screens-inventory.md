@@ -11,7 +11,7 @@
 ## Product screens — with URL
 
 **Shell + home — Desk (the now)**
-- [ ] `/h` — Home / roster ∑ (cross-space: **Desk** digest + project grid). The `∑` view, ADR-062. Desk = what needs me + next + tasks.
+- [ ] `/h` — Home: the **hall** (time-aware greeting + date + "posa'm al dia" door → `/h/desk`, Marco's design 2026-07-16). The cross-space digest died with ADR-068 — Desk IS the catch-up surface.
 - [ ] `/h/desk` — full Desk view, uncapped.
 - [ ] `/h/[workspace]` — Space portada (editable entity: domain · city · logo · description).
 
@@ -67,13 +67,12 @@
 
 **Overlays / menus**
 - [ ] Account menu (topbar, with theme accordion)
-- [ ] ScopeStrip picker (space → project → line pin tree)
 - [ ] Toasts
 
 ## Cross-cutting (multiply the real work)
 
 - [ ] **States** per lens/list: empty · loading · error · offline. Phase 0.3 gate; offline still pending.
-- [ ] **Mobile**: Contacts mobile-first (ADR-015); Desk + ScopeStrip responsive pending (Phase 0.4); public road sheet mobile-critical.
+- [ ] **Mobile**: Contacts mobile-first (ADR-015); Desk responsive pending (Phase 0.4); public road sheet mobile-critical.
 - [ ] **Light + dark**: both themes are contracts (ADR-059). Every screen designed for both.
 
 ## Not counted (dev-only, not product)

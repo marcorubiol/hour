@@ -5,6 +5,12 @@
 > **Antes de fiarte de lo que está desplegado: `curl -s https://hour.zerosense.studio/health/live`.**
 
 ## Queue
+- [ ] **Pasada diseño+datos, página a página** — por cada pantalla: diseño visual + spec normativa de qué datos lleva (la parte importante), anclada a `build/schema.sql` + `build/structure-model.md`. Tick fino: diseño en `build/screens-inventory.md`, datos en `build/screen-data-spec.md`. Prototipo de referencia: `app design/line-detail-prototype.html`
+  - [ ] .zerø: propuesta en frío de `build/screen-data-spec.md` — todas las superficies, campo a campo (diálogos incluidos), delta en 3 categorías: se muestra hoy / existe en schema sin UI / gap de schema. Sin volcado previo de Marco (decidido 2026-07-17): el contraste con el uso real sale en las sesiones
+  - [ ] Revisión conjunta 1 — shell + home + lentes: Desk (`/h`, `/h/desk`), portada de space, Calendar, Contacts, Money. Formato: .zerø abre cada pantalla proponiendo qué debería llevar; Marco contrasta con lo que le falta/sobra usándolo en real
+  - [ ] Revisión conjunta 2 — detalle de entidad: project, line, performance + road sheet (interno y público), engagement, person, settings
+  - [ ] Revisión conjunta 3 — diálogos (campo a campo) + los 7 módulos de line + transversales (estados vacío/carga/error/offline, mobile, light+dark)
+  - [ ] Consolidar los gaps aceptados en tareas de build/migración (nuevas entradas en Queue cuando toque)
 - [ ] **Verificar ADR-067 en navegador** (todo lo demás hecho y verificado 2026-07-16 noche: migración aplicada vía MCP, Marco es platform_admin, alias en el select, db-types regenerados — svelte-check 0/0, unit 110/110, **RLS 46/46 post-migración**): logo→`/h` digest, `/h/desk|calendar|contacts|money`, `/h/muk-cia/desk`→redirect, pins→`?scope=` en la barra, Copy link, alias request en Edit space → aprobar en Settings.
 - [ ] **Desplegar ADR-066 + los tests.** El guard de árbol limpio y el build stamp están commiteados (`314d066`) pero NO en producción — el propio guard lo impide mientras el árbol tenga el rediseño del shell sin commitear. Commitear esos ficheros y `cd apps/web && pnpm run deploy` (collab solo si cambia; hoy no). Al terminar, `/health/live` empieza a devolver su `sha`.
 - [ ] **Terminar el rediseño del shell en vuelo** (2026-07-16 noche): 12 ficheros tocados sin commitear — `HomeView`, `breadcrumb`, `h/+layout`, `tokens.css`, `login` y las portadas de engagement/performance/person/project/line/settings. Compila (svelte-check 0/0), pero está a medio: el rail de Scopes se está arrancando.
@@ -13,7 +19,6 @@
 - [ ] Regla CF edge de rate-limit en `/api/auth/login` — solo bloquea onboarding externo, no el uso interno. Necesita un token `Zone WAF:Edit` (el OAuth de Wrangler solo tiene `zone:read`). Runbook: `build/runbooks/phase09-launch.md`.
 
 ## Deferred
-- [ ] Pasada de diseño completa — `build/screens-inventory.md`, todas las pantallas sin marcar; prototipo de referencia en `app design/line-detail-prototype.html`
 - [ ] Phase 0.4 polish — mobile completo (pins/Calendar/Money + line detail), notifications in-app, GDPR export, a11y pass, checkpoint visual 2, ratificación naming @from:2026-08-01
 - [ ] Verificar checkboxes viejos de 0.0: app abre offline con datos cacheados, Lighthouse PWA ≥90, strings por `t()`, Axe @from:2026-08-01
 

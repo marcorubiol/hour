@@ -22,6 +22,7 @@ export const MODULE_KEYS = [
   'materials',
   'money',
   'team',
+  'tasks',
 ] as const;
 
 export type ModuleKey = (typeof MODULE_KEYS)[number];
@@ -37,6 +38,7 @@ export const MODULE_LABELS: Record<ModuleKey, string> = {
   materials: 'Materials',
   money: 'Money',
   team: 'Team',
+  tasks: 'Tasks',
 };
 
 /** Shown in the "Add module" menu and module empty states. */
@@ -48,6 +50,7 @@ export const MODULE_DESCRIPTIONS: Record<ModuleKey, string> = {
   materials: 'Versioned assets — what was sent where',
   money: 'Fees, invoices and expenses of this line',
   team: 'Team on the road + venue contacts, per performance',
+  tasks: 'To-dos of this line — they feed the Desk too',
 };
 
 /** `line.modules` API boundary — order matters, unknown keys rejected. */
@@ -84,21 +87,21 @@ export const LINE_TEMPLATES: LineTemplate[] = [
     name: 'Tour',
     description: 'Performances on the road — calendar, road sheets, team, money.',
     kind: 'tour',
-    modules: ['calendar', 'roadsheets', 'team', 'money', 'materials', 'notes'],
+    modules: ['calendar', 'tasks', 'roadsheets', 'team', 'money', 'materials', 'notes'],
   },
   {
     key: 'booking',
     name: 'Booking',
     description: 'A season of difusión — conversations, dates, materials.',
     kind: 'campaign',
-    modules: ['contacts', 'calendar', 'materials', 'notes'],
+    modules: ['contacts', 'calendar', 'tasks', 'materials', 'notes'],
   },
   {
     key: 'creation',
     name: 'Creation',
     description: 'Building a new piece — schedule, notes, costs.',
     kind: 'creation',
-    modules: ['calendar', 'notes', 'materials', 'money'],
+    modules: ['calendar', 'tasks', 'notes', 'materials', 'money'],
   },
   {
     key: 'press',
