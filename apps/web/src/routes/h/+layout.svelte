@@ -359,6 +359,12 @@
     if (ser === (existing ?? '')) return;
     if (ser) url.searchParams.set('scope', ser);
     else url.searchParams.delete('scope');
+    // URLSearchParams serializes as form-urlencoded, escaping ':' and ','
+    // (%3A/%2C) — both are legal bare in a query per RFC 3986, and the
+    // parser reads either form identically. Un-escape so the address bar
+    // shows the tokens as designed: ?scope=s:muk-cia,p:0198….
+    const qs = url.searchParams.toString().replace(/%3A/gi, ':').replace(/%2C/gi, ',');
+    url.search = qs ? `?${qs}` : '';
     replaceState(url, {});
   });
 

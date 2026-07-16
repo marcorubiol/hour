@@ -44,6 +44,7 @@ type WorkspaceItem = Pick<
   Tables<'workspace'>,
   | 'id'
   | 'slug'
+  | 'alias'
   | 'name'
   | 'kind'
   | 'timezone'
@@ -53,11 +54,7 @@ type WorkspaceItem = Pick<
   | 'domain'
   | 'city'
   | 'logo_url'
-> & {
-  // ADR-067 — optional pretty URL alias. Typed by hand until db-types
-  // regenerate after the workspace_shortid_alias migration.
-  alias?: string | null;
-};
+>;
 
 const CreateBodySchema = v.object({
   name: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(80)),
@@ -160,10 +157,7 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
   const { limit } = parsed.output;
 
   const search = new URLSearchParams();
-  // TODO(ADR-067): add `alias` to this select once the
-  // workspace_shortid_alias migration is applied — selecting a column that
-  // doesn't exist yet would 400 the whole workspaces query.
-  search.set('select', 'id,slug,name,kind,timezone,country,accent,description,domain,city,logo_url');
+  search.set('select', 'id,slug,alias,name,kind,timezone,country,accent,description,domain,city,logo_url');
   search.set('deleted_at', 'is.null');
   search.set('order', 'created_at.asc');
   search.set('limit', String(limit));

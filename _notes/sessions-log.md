@@ -27,7 +27,7 @@ Sesión de exploración → decisión → build completo, arrancando de "quiero 
 - **Colisión ADR-066**: dos sesiones el mismo día reclamaron el número (esta + provenance de deploys). El append ancló en un tail viejo del fichero. Renumerado este a 067 (24 referencias en código + migración + entrada). Para la próxima: releer el tail de `_decisions.md` justo antes de escribir el heading.
 - El árbol se fue commiteando en caliente durante la sesión (3 commits, mensajes generados) — mezcló este trabajo con el rediseño de shell en vuelo de la sesión (1). Revisar `git log` antes de asumir qué hay en HEAD.
 
-**Pendiente** (en `_tasks.md § Queue`): aplicar migración → `is_platform_admin` para Marco → alias al select del GET → regen db-types → verificación en navegador.
+**Cierre (misma noche)**: migración aplicada vía Supabase MCP (`apply_migration workspace_shortid_alias`, OAuth renovado — el client_id anterior del plugin estaba caducado, "Unrecognized client_id"; reintentar `authenticate` emite uno fresco). Post-apply verificado por SQL: `generate_workspace_sid()` → `71104d7c`, columna+tabla+policy presentes, `is_platform_admin=true` para marcorubiol@gmail.com, slugs existentes intactos. `alias` activado en el select del GET, db-types regenerados por MCP (85k chars, tipo manual eliminado). **svelte-check 0/0 · unit 110/110 · RLS 46/46 contra la DB migrada.** Pendiente solo: verificación en navegador (en `_tasks.md § Queue`).
 
 ## 2026-07-16 — Deploy de Scope v2 + provenance de deploys + la suite e2e que se estrangulaba sola
 

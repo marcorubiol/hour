@@ -1568,6 +1568,7 @@ export type Database = {
           avatar_url: string | null
           created_at: string
           full_name: string
+          is_platform_admin: boolean
           locale: string
           updated_at: string
           user_id: string
@@ -1576,6 +1577,7 @@ export type Database = {
           avatar_url?: string | null
           created_at?: string
           full_name: string
+          is_platform_admin?: boolean
           locale?: string
           updated_at?: string
           user_id: string
@@ -1584,6 +1586,7 @@ export type Database = {
           avatar_url?: string | null
           created_at?: string
           full_name?: string
+          is_platform_admin?: boolean
           locale?: string
           updated_at?: string
           user_id?: string
@@ -1662,6 +1665,7 @@ export type Database = {
         Row: {
           accent: string | null
           account_id: string
+          alias: string | null
           city: string | null
           country: string | null
           created_at: string
@@ -1682,6 +1686,7 @@ export type Database = {
         Insert: {
           accent?: string | null
           account_id: string
+          alias?: string | null
           city?: string | null
           country?: string | null
           created_at?: string
@@ -1702,6 +1707,7 @@ export type Database = {
         Update: {
           accent?: string | null
           account_id?: string
+          alias?: string | null
           city?: string | null
           country?: string | null
           created_at?: string
@@ -1725,6 +1731,50 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "account"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workspace_alias_request: {
+        Row: {
+          alias: string
+          created_at: string
+          decided_at: string | null
+          decided_by: string | null
+          id: string
+          requested_by: string
+          status: string
+          workspace_id: string
+          workspace_name: string
+        }
+        Insert: {
+          alias: string
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          id?: string
+          requested_by: string
+          status?: string
+          workspace_id: string
+          workspace_name: string
+        }
+        Update: {
+          alias?: string
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          id?: string
+          requested_by?: string
+          status?: string
+          workspace_id?: string
+          workspace_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_alias_request_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspace"
             referencedColumns: ["id"]
           },
         ]
@@ -2313,13 +2363,17 @@ export type Database = {
         Returns: {
           accent: string | null
           account_id: string
+          alias: string | null
+          city: string | null
           country: string | null
           created_at: string
           custom_fields: Json
           deleted_at: string | null
           description: string | null
+          domain: Database["public"]["Enums"]["workspace_domain"] | null
           id: string
           kind: Database["public"]["Enums"]["workspace_kind"]
+          logo_url: string | null
           name: string
           previous_slugs: string[]
           settings: Json
@@ -2353,6 +2407,7 @@ export type Database = {
         Returns: undefined
       }
       delete_person_note: { Args: { p_note_id: string }; Returns: undefined }
+      generate_workspace_sid: { Args: never; Returns: string }
       get_public_calendar: { Args: { p_token: string }; Returns: Json }
       get_public_roadsheet: { Args: { p_token: string }; Returns: Json }
       has_permission: {
@@ -2413,6 +2468,46 @@ export type Database = {
         Args: { p_performance_id: string }
         Returns: string
       }
+      request_workspace_alias: {
+        Args: { p_alias: string; p_workspace_id: string }
+        Returns: {
+          alias: string
+          created_at: string
+          decided_at: string | null
+          decided_by: string | null
+          id: string
+          requested_by: string
+          status: string
+          workspace_id: string
+          workspace_name: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "workspace_alias_request"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      review_workspace_alias: {
+        Args: { p_approve: boolean; p_request_id: string }
+        Returns: {
+          alias: string
+          created_at: string
+          decided_at: string | null
+          decided_by: string | null
+          id: string
+          requested_by: string
+          status: string
+          workspace_id: string
+          workspace_name: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "workspace_alias_request"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       revoke_calendar_share: {
         Args: { p_share_id: string }
         Returns: undefined
@@ -2423,6 +2518,36 @@ export type Database = {
       }
       slugify: { Args: { input: string }; Returns: string }
       touch_line_visit: { Args: { p_line_id: string }; Returns: undefined }
+      update_workspace: {
+        Args: { p_patch: Json; p_workspace_id: string }
+        Returns: {
+          accent: string | null
+          account_id: string
+          alias: string | null
+          city: string | null
+          country: string | null
+          created_at: string
+          custom_fields: Json
+          deleted_at: string | null
+          description: string | null
+          domain: Database["public"]["Enums"]["workspace_domain"] | null
+          id: string
+          kind: Database["public"]["Enums"]["workspace_kind"]
+          logo_url: string | null
+          name: string
+          previous_slugs: string[]
+          settings: Json
+          slug: string
+          timezone: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "workspace"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       uuid_generate_v7: { Args: never; Returns: string }
     }
     Enums: {
@@ -2485,7 +2610,13 @@ export type Database = {
         | "cancelled"
       person_note_visibility: "workspace" | "private"
       project_status: "draft" | "active" | "archived"
-      workspace_domain: "theatre" | "dance" | "circus" | "music" | "mixed" | "other"
+      workspace_domain:
+        | "theatre"
+        | "dance"
+        | "circus"
+        | "music"
+        | "mixed"
+        | "other"
       workspace_kind: "personal" | "team"
       workspace_role_access_level:
         | "owner"
@@ -2684,7 +2815,14 @@ export const Constants = {
       ],
       person_note_visibility: ["workspace", "private"],
       project_status: ["draft", "active", "archived"],
-      workspace_domain: ["theatre", "dance", "circus", "music", "mixed", "other"],
+      workspace_domain: [
+        "theatre",
+        "dance",
+        "circus",
+        "music",
+        "mixed",
+        "other",
+      ],
       workspace_kind: ["personal", "team"],
       workspace_role_access_level: [
         "owner",
