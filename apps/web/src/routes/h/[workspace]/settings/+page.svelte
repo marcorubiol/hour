@@ -857,8 +857,6 @@
   .set-page {
     --set-pad: clamp(16px, 1.6vw, 24px);
 
-    max-inline-size: var(--page-width-wide);
-    margin-inline: auto;
     color: var(--text-color);
     font-family: var(--font-sans);
   }

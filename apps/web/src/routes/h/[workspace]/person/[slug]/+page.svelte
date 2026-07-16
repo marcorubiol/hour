@@ -110,7 +110,7 @@
           accent: accentVar(workspaceSlug),
         },
         { label: p.full_name, kind: 'node' },
-      ], { width: 'reading' });
+      ]);
     } else {
       breadcrumb.clear();
     }
@@ -425,8 +425,6 @@
       display: flex;
       flex-direction: column;
       gap: var(--space-xl);
-      max-inline-size: var(--page-width-reading);
-      margin-inline: auto;
     }
 
     .person__state {

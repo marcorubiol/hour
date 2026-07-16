@@ -302,17 +302,14 @@
   // breadcrumb bar. The home (asSpace=false) owns no breadcrumb.
   $effect(() => {
     if (!asSpace || !currentWorkspace) return;
-    breadcrumb.set(
-      [
-        {
-          label: currentWorkspace.name,
-          href: `/h/${currentWorkspace.slug}/`,
-          kind: 'space',
-          accent: accentVar(currentWorkspace.slug),
-        },
-      ],
-      { width: 'reading' },
-    );
+    breadcrumb.set([
+      {
+        label: currentWorkspace.name,
+        href: `/h/${currentWorkspace.slug}/`,
+        kind: 'space',
+        accent: accentVar(currentWorkspace.slug),
+      },
+    ]);
     return () => breadcrumb.clear();
   });
 
@@ -326,6 +323,9 @@
 
 <svelte:head><title>Desk — Hour</title></svelte:head>
 
+<!-- Plain <div> (not <section>) so it dodges base.css's section defaults (big
+     padding-block + a space-l flex gap between children); the vertical rhythm
+     here is controlled by each element's own margin. Width: .shell__content. -->
 <div class="home">
   {#if asSpace}
     <header class="space-head">
@@ -456,14 +456,6 @@
 
 <style>
   @layer components {
-    /* .home is a plain <div> (not <section>) so it dodges base.css's section
-       defaults (big padding-block + a space-l flex gap between children); the
-       vertical rhythm here is controlled by each element's own margin. */
-    .home {
-      max-inline-size: var(--page-width-reading);
-      margin-inline: auto;
-    }
-
     /* Masthead typography via base.css h1 defaults. */
     .home__greet {
       margin: 0 0 var(--space-2xs);

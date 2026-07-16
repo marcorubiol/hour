@@ -197,8 +197,6 @@
       display: flex;
       flex-direction: column;
       gap: var(--space-l);
-      max-inline-size: var(--page-width-reading);
-      margin-inline: auto;
     }
 
     .rs__roles {
@@ -282,14 +280,12 @@
       gap: var(--space-2xs);
     }
 
-    /* Print: drop the operator chrome, keep the document. */
+    /* Print: drop the operator chrome, keep the document. The width cap is
+       released by .shell__content's own print rule (it owns --page-width now). */
     @media print {
       .rs__roles,
       .rs__share {
         display: none;
-      }
-      .rs {
-        max-inline-size: none;
       }
     }
   }

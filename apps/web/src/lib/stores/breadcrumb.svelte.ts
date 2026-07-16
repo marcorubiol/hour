@@ -30,29 +30,18 @@ export type Crumb = {
 
 export type PinTarget = { id: string; label: string };
 
-/** Aligns the bar's column to the page's own width so the crumbs land on the
- *  same left edge as the masthead: 'wide' (line/project) or 'reading'
- *  (person/performance, single-column pages). */
-export type BreadcrumbWidth = 'wide' | 'reading';
-
 export class BreadcrumbStore {
   crumbs = $state<Crumb[]>([]);
   pin = $state<PinTarget | null>(null);
-  width = $state<BreadcrumbWidth>('wide');
 
-  set(
-    crumbs: Crumb[],
-    opts: { pin?: PinTarget | null; width?: BreadcrumbWidth } = {},
-  ): void {
+  set(crumbs: Crumb[], opts: { pin?: PinTarget | null } = {}): void {
     this.crumbs = crumbs;
     this.pin = opts.pin ?? null;
-    this.width = opts.width ?? 'wide';
   }
 
   clear(): void {
     this.crumbs = [];
     this.pin = null;
-    this.width = 'wide';
   }
 }
 

@@ -176,8 +176,6 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-xl);
-    max-inline-size: var(--page-width-wide);
-    margin-inline: auto;
   }
 
   .project__head {

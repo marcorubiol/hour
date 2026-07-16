@@ -259,13 +259,15 @@
       calc(100% - var(--gutter) * 2)
     );
 
-    /* App page widths — two registers, both centered via margin-inline auto.
-       Reading = single-column entity pages (person, performance, engagement,
-       roadsheet, home digest). Wide = table/row-dominated pages (line detail,
-       project, settings). Lens pages (calendar/contacts/money/agenda) stay
-       full-bleed on purpose. */
-    --page-width-reading: 46rem;
-    --page-width-wide: 64rem;
+    /* App page width — ONE register for every route (2026-07-16). Entity
+       pages, table-dominated pages and lenses all center on the same measure,
+       so the left edge never moves when you navigate. Superseded the old
+       reading/wide split + full-bleed lenses: three registers meant the
+       content jumped horizontally between routes, and lenses stretched their
+       rows to the viewport (unreadable past ~1200px).
+       The page body owns this; the shell applies it once (.shell__content /
+       .shell__lenschrome), pages don't re-declare it. */
+    --page-width: 51.25rem; /* 820 */
 
     --sidebar-width: 264px;
     --header-height: 0px;

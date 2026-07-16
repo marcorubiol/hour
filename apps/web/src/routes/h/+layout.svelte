@@ -382,99 +382,28 @@
 
 {#if authChecked && !blocked}
   <div class="shell" class:shell--settings={inSettings}>
-    <aside class="shell__side" aria-label="Scopes">
-      <div class="side-sec">
-        <div class="side-sec__h">Scopes</div>
-        <button
-          type="button"
-          class="srow srow--every"
-          class:is-on={scopesSameSet([], pins.pins)}
-          onclick={() => applyScope(everything)}
-        >
-          <span class="sglyph sglyph--every" aria-hidden="true">∑</span>
-          <span class="srow__name">Everything</span>
-        </button>
-        {#each scopes.saved as s (s.tokens.join(','))}
-          {#if editingScopeKey === scopeKey(s)}
-            <div class="srow srow--editing">
-              <input
-                class="srow__rename"
-                bind:this={renameInputEl}
-                bind:value={editingScopeName}
-                onblur={() => commitRename(s)}
-                onkeydown={(e) => {
-                  if (e.key === 'Enter') commitRename(s);
-                  else if (e.key === 'Escape') cancelRename();
-                }}
-              />
-            </div>
-          {:else}
-            <button
-              type="button"
-              class="srow"
-              class:is-on={scopesSameSet(s.tokens, pins.pins)}
-              onclick={() => applyScope(s)}
-              ondblclick={() => startRename(s)}
-              title="Double-click to rename"
-            >
-              <span class="srow__name">{s.name}</span>
-            </button>
-          {/if}
-        {/each}
+    <header class="shell__top">
+      <div class="shell__left">
+        <a class="shell__brand" href={homeHref} aria-label="Hour — home">
+          <BrandMark size="m" />
+        </a>
       </div>
 
-      {#if scopes.recent.length > 0}
-        <div class="side-sec">
-          <div class="side-sec__h">Recent</div>
-          {#each scopes.recent as r (r.name + r.tokens.join(','))}
-            <button
-              type="button"
-              class="srow"
-              class:is-on={scopesSameSet(r.tokens, pins.pins)}
-              onclick={() => applyScope(r)}
-            >
-              <span class="srow__name">{r.name}</span>
-            </button>
-          {/each}
-        </div>
-      {/if}
+      <button
+        type="button"
+        class="shell__search"
+        onclick={openPaletteFresh}
+        aria-label="Search or jump to a project or line"
+      >
+        <svg viewBox="0 0 14 14" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true">
+          <circle cx="6.2" cy="6.2" r="4.2" />
+          <path d="M9.4 9.4 12 12" />
+        </svg>
+        <span class="shell__search-label">Search or jump to a project or line…</span>
+        <kbd class="kbd">⌘K</kbd>
+      </button>
 
-      <div class="side-foot">
-        <button type="button" class="side-browse" onclick={openPaletteFresh}>
-          ⌘K · browse &amp; combine
-        </button>
-      </div>
-    </aside>
-
-    {#if inSettings}
-      <aside class="shell__settings-nav">
-        <SettingsNav />
-      </aside>
-    {/if}
-
-    <main class="shell__main">
-      <header class="shell__top">
-        <div class="shell__left">
-          <a class="shell__brand" href={homeHref} aria-label="Hour — home">
-            <BrandMark size="m" />
-          </a>
-        </div>
-
-        <button
-          type="button"
-          class="shell__search"
-          onclick={openPaletteFresh}
-          aria-label="Search or jump to a project or line"
-        >
-          <svg viewBox="0 0 14 14" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true">
-            <circle cx="6.2" cy="6.2" r="4.2" />
-            <path d="M9.4 9.4 12 12" />
-          </svg>
-          <span class="shell__search-label">Search or jump to a project or line…</span>
-          <kbd class="kbd">⌘K</kbd>
-        </button>
-
-        <div class="shell__right">
+      <div class="shell__right">
         <PresenceBadge count={networkPresence?.count ?? null} />
 
         <Menu
@@ -592,9 +521,80 @@
             </li>
           {/snippet}
         </Menu>
-        </div>
-      </header>
+      </div>
+    </header>
 
+    <aside class="shell__side" aria-label="Scopes">
+      <div class="side-sec">
+        <div class="side-sec__h">Scopes</div>
+        <button
+          type="button"
+          class="srow srow--every"
+          class:is-on={scopesSameSet([], pins.pins)}
+          onclick={() => applyScope(everything)}
+        >
+          <span class="sglyph sglyph--every" aria-hidden="true">∑</span>
+          <span class="srow__name">Everything</span>
+        </button>
+        {#each scopes.saved as s (s.tokens.join(','))}
+          {#if editingScopeKey === scopeKey(s)}
+            <div class="srow srow--editing">
+              <input
+                class="srow__rename"
+                bind:this={renameInputEl}
+                bind:value={editingScopeName}
+                onblur={() => commitRename(s)}
+                onkeydown={(e) => {
+                  if (e.key === 'Enter') commitRename(s);
+                  else if (e.key === 'Escape') cancelRename();
+                }}
+              />
+            </div>
+          {:else}
+            <button
+              type="button"
+              class="srow"
+              class:is-on={scopesSameSet(s.tokens, pins.pins)}
+              onclick={() => applyScope(s)}
+              ondblclick={() => startRename(s)}
+              title="Double-click to rename"
+            >
+              <span class="srow__name">{s.name}</span>
+            </button>
+          {/if}
+        {/each}
+      </div>
+
+      {#if scopes.recent.length > 0}
+        <div class="side-sec">
+          <div class="side-sec__h">Recent</div>
+          {#each scopes.recent as r (r.name + r.tokens.join(','))}
+            <button
+              type="button"
+              class="srow"
+              class:is-on={scopesSameSet(r.tokens, pins.pins)}
+              onclick={() => applyScope(r)}
+            >
+              <span class="srow__name">{r.name}</span>
+            </button>
+          {/each}
+        </div>
+      {/if}
+
+      <div class="side-foot">
+        <button type="button" class="side-browse" onclick={openPaletteFresh}>
+          ⌘K · browse &amp; combine
+        </button>
+      </div>
+    </aside>
+
+    {#if inSettings}
+      <aside class="shell__settings-nav">
+        <SettingsNav />
+      </aside>
+    {/if}
+
+    <main class="shell__main">
       {#if routedLens}
         <div class="shell__lenschrome">
           <div class="scopebar">
@@ -660,7 +660,7 @@
       {/if}
 
       {#if breadcrumb.crumbs.length > 0}
-        <div class="shell__address" class:shell__address--reading={breadcrumb.width === 'reading'}>
+        <div class="shell__address">
           <div class="shell__address-inner">
             <nav class="shell__crumbs" aria-label="Breadcrumb">
               {#each breadcrumb.crumbs as c, i (i)}
@@ -719,9 +719,18 @@
        hardcoding approximations. */
     --header-height: 3.6rem;
 
-    display: flex;
+    /* The top bar owns the full inline axis; the rail and the main column
+       share the row underneath it. The header is a sibling of the aside (not
+       nested in <main>), so grid can span it edge to edge. */
+    display: grid;
+    grid-template-columns: auto 1fr;
+    grid-template-rows: auto 1fr;
     min-block-size: 100vh;
     background: var(--bg);
+  }
+  /* Settings mode slots its own rail between the scopes rail and main. */
+  .shell--settings {
+    grid-template-columns: auto auto 1fr;
   }
 
   /* ── scopes sidebar (Scope v2) — saved scopes + recents, NOT the tree.
@@ -730,16 +739,15 @@
      recents. Replaces the ADR-057 space rail. */
   .shell__side {
     position: sticky;
-    inset-block-start: 0;
-    align-self: flex-start;
+    inset-block-start: var(--header-height);
+    align-self: start;
     z-index: var(--z-sticky);
-    flex: 0 0 15.5rem;
     inline-size: 15.5rem;
-    min-block-size: 100vh;
+    min-block-size: calc(100vh - var(--header-height));
     display: flex;
     flex-direction: column;
     gap: var(--space-l);
-    padding-block: calc(var(--header-height) + var(--space-m)) var(--space-l);
+    padding-block: var(--space-m) var(--space-l);
     padding-inline: var(--space-m);
     border-inline-end: 1px solid var(--border-color-light);
     background: var(--bg-light);
@@ -847,6 +855,11 @@
     gap: var(--space-m);
     padding-block: var(--space-m) 0;
     padding-inline: var(--space-l);
+    /* Sibling of .shell__content, so it needs the same cap to stay aligned
+       with the body underneath it. */
+    inline-size: 100%;
+    max-inline-size: calc(var(--page-width) + var(--space-l) * 2);
+    margin-inline: auto;
   }
   .scopebar {
     display: flex;
@@ -996,26 +1009,24 @@
   }
 
   .shell__settings-nav {
-    flex: 0 0 var(--sidebar-width);
-    min-inline-size: var(--sidebar-width);
-    max-inline-size: var(--sidebar-width);
+    inline-size: var(--sidebar-width);
     border-inline-end: 1px solid var(--border-color-dark);
     position: sticky;
-    inset-block-start: 0;
-    block-size: 100vh;
-    align-self: flex-start;
+    inset-block-start: var(--header-height);
+    block-size: calc(100vh - var(--header-height));
+    align-self: start;
     overflow-y: auto;
     padding-block: var(--space-s);
   }
 
   .shell__main {
-    flex: 1;
     display: flex;
     flex-direction: column;
     min-inline-size: 0;
   }
 
   .shell__top {
+    grid-column: 1 / -1;
     position: sticky;
     inset-block-start: 0;
     z-index: var(--z-sticky);
@@ -1084,6 +1095,20 @@
        borrow the (now neutralized) global <section> padding unevenly. */
     padding-block: var(--space-l) var(--space-xxl);
     padding-inline: var(--space-l);
+    /* One measure for every route. Lives here so no page re-declares it.
+       border-box puts the padding inside the cap, so the body itself lands
+       on --page-width. */
+    inline-size: 100%;
+    max-inline-size: calc(var(--page-width) + var(--space-l) * 2);
+    margin-inline: auto;
+  }
+
+  /* Print: the cap is a screen-reading concern. Documents meant for paper
+     (roadsheet) take the full sheet. */
+  @media print {
+    .shell__content {
+      max-inline-size: none;
+    }
   }
 
   /* ── address bar (breadcrumb) ─────────────────────────────────────
@@ -1105,16 +1130,11 @@
     align-items: center;
     justify-content: space-between;
     gap: var(--space-m);
-    max-inline-size: var(--page-width-wide);
+    max-inline-size: calc(var(--page-width) + var(--space-l) * 2);
     margin-inline: auto;
     padding-block: var(--space-xs);
     padding-inline: var(--space-l);
     min-block-size: 2.75rem;
-  }
-  /* Reading-width pages (person, performance) center their content narrower;
-     match so the crumbs align with their masthead. */
-  .shell__address--reading .shell__address-inner {
-    max-inline-size: var(--page-width-reading);
   }
   .shell__crumbs {
     display: flex;

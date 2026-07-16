@@ -521,8 +521,6 @@
       gap: var(--space-l);
       padding-block: var(--space-l);
       padding-inline: var(--space-m);
-      max-inline-size: var(--page-width-wide);
-      margin-inline: auto;
     }
 
     .line-detail__header {

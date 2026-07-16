@@ -81,7 +81,14 @@
         Your projects, contacts, shows and money — held together, one hour at a time.
       </p>
 
-      <form class="login__form" onsubmit={handleSubmit}>
+      <!-- method="post" is the safety net, not the path: handleSubmit
+           preventDefaults and posts JSON to /api/auth/login. But the button is
+           live in the SSR'd HTML before hydration, and a submit in that window
+           runs the browser's native default — which without this attribute is
+           GET, i.e. the password lands in the query string (history, access
+           logs, Referer). POST keeps it in the body; the route has no form
+           action, so it dead-ends at 405 instead of leaking. -->
+      <form class="login__form" method="post" onsubmit={handleSubmit}>
         <label class="login__field">
           <span class="eyebrow login__label">{t('login.email')}</span>
           <!-- svelte-ignore a11y_autofocus -->

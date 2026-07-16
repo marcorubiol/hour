@@ -39,8 +39,6 @@
       display: flex;
       flex-direction: column;
       gap: var(--space-m);
-      max-inline-size: var(--page-width-reading);
-      margin-inline: auto;
     }
     /* Masthead typography via base.css h1 defaults. */
     .entity__title {

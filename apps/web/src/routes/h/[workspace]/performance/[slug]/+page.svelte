@@ -257,7 +257,7 @@
         label: perf.venue?.name ?? perf.venue_name ?? 'Performance',
         kind: 'node',
       });
-      breadcrumb.set(crumbs, { width: 'reading' });
+      breadcrumb.set(crumbs);
     } else {
       breadcrumb.clear();
     }
