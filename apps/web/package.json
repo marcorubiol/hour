@@ -7,7 +7,7 @@
     "dev": "vite dev",
     "build": "vite build",
     "preview": "wrangler dev",
-    "deploy": "vite build && wrangler deploy",
+    "deploy": "node ../../scripts/assert-clean-tree.mjs && vite build && wrangler deploy",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "cf-typegen": "wrangler types",
     "test:install": "playwright install --with-deps chromium",

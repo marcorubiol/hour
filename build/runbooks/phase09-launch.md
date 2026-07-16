@@ -55,6 +55,35 @@ cd apps/collab && pnpm run deploy
 cd ../web && pnpm run deploy
 ```
 
+### 2b. Deploy provenance — deploy commits, not working trees
+
+`wrangler deploy` uploads **what is on disk**, not a git ref. Left alone that
+means prod can run code that exists in no commit, and the only record of what
+is live is whatever someone remembered to write down. That failed on
+2026-07-14: scope-v2 was deployed uncommitted, git and prod disagreed for two
+days, and `_context.md` confidently listed ADR-059/060/061 as "pending deploy"
+while they had been live the whole time.
+
+Two guards, both in the repo:
+
+- **`scripts/assert-clean-tree.mjs`** runs first in both `deploy` scripts and
+  refuses a dirty tree (it also warns when HEAD isn't pushed, which would make
+  the deployed SHA unresolvable by anyone else). Deliberate exception:
+  `ALLOW_DIRTY_DEPLOY=1 pnpm run deploy`.
+  Note: it's chained inside `"deploy"` on purpose — pnpm 10 does **not** run
+  `pre*` scripts by default, so a `predeploy` hook would silently never fire.
+- **The build stamp** (`buildStamp()` in `apps/web/vite.config.ts`) bakes the
+  SHA into the bundle. Ask production what it runs:
+  ```
+  curl -s https://hour.zerosense.studio/health/live
+  # {"ok":true,"version":{"sha":"358155c","dirty":false,"builtAt":"…"}}
+  ```
+  `dirty: true` means that build came from an uncommitted tree — the SHA alone
+  will not reproduce it.
+
+**Before believing any doc about what is deployed, curl `/health/live`.** The
+docs are a claim; the stamp is the fact.
+
 ### 3. Post-deploy smoke (do every time)
 - `curl -s https://hour.zerosense.studio/health/ready` → `{"ok":true,...}`.
 - Sign in through the UI. Confirm in DevTools → Application → Cookies:

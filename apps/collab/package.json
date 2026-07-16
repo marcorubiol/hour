@@ -6,7 +6,7 @@
   "description": "Hour collab Worker — Durable Object host for y-partyserver Yjs documents (ADR-025).",
   "scripts": {
     "check": "tsc --noEmit",
-    "deploy": "wrangler deploy",
+    "deploy": "node ../../scripts/assert-clean-tree.mjs && wrangler deploy",
     "dev": "wrangler dev",
     "cf-typegen": "wrangler types"
   },

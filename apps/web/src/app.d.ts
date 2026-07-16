@@ -46,6 +46,21 @@ declare global {
      */
     RATE_LIMIT?: KVNamespace;
   }
+
+  /**
+   * Build provenance, literal-substituted by vite.config.ts `define` and
+   * served by /health/live. Exists because `wrangler deploy` ships the
+   * working tree rather than a git ref — see `buildStamp()` in
+   * vite.config.ts and scripts/assert-clean-tree.mjs.
+   */
+  const __BUILD_STAMP__: {
+    /** Short commit SHA, or 'unknown' when built outside a git checkout. */
+    sha: string;
+    /** True when the tree had uncommitted changes at build time. */
+    dirty: boolean;
+    /** ISO timestamp of the build. */
+    builtAt: string;
+  };
 }
 
 export {};

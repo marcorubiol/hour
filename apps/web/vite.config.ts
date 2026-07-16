@@ -1,8 +1,44 @@
+import { execSync } from 'node:child_process';
 import { sentrySvelteKit } from '@sentry/sveltekit';
 import { sveltekit } from '@sveltejs/kit/vite';
 import { loadEnv } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 import { defineConfig } from 'vitest/config';
+
+/**
+ * Build stamp — ties a deployment to a commit.
+ *
+ * `wrangler deploy` uploads the working tree, not a git ref, so nothing
+ * otherwise records what is actually running. On 2026-07-14 the scope-v2
+ * work went to production uncommitted; for two days git and prod disagreed
+ * and the docs confidently described a state that wasn't live. Baking the
+ * SHA into the bundle makes "what is in production?" a curl against
+ * /health/live instead of an act of faith.
+ *
+ * The prevention half of this is scripts/assert-clean-tree.mjs, which
+ * refuses to deploy a dirty tree. `dirty` here stays honest when someone
+ * takes the ALLOW_DIRTY_DEPLOY escape hatch.
+ */
+function buildStamp() {
+  const git = (cmd: string): string => {
+    try {
+      return execSync(`git ${cmd}`, {
+        encoding: 'utf8',
+        stdio: ['pipe', 'pipe', 'ignore'],
+      }).trim();
+    } catch {
+      return '';
+    }
+  };
+  const sha = git('rev-parse --short HEAD');
+  return {
+    // 'unknown' (not a fake SHA) when git is unavailable — e.g. a build from
+    // a tarball. Better a loud gap than a plausible lie.
+    sha: sha || 'unknown',
+    dirty: git('status --porcelain').length > 0,
+    builtAt: new Date().toISOString(),
+  };
+}
 
 // `sentrySvelteKit` uploads source maps to Sentry on `vite build` so server
 // stack traces resolve to original .ts/.svelte. It only runs when both
@@ -12,6 +48,11 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
   return {
+    // Literal-substituted at build time; read by /health/live. Also defined
+    // under Vitest (same config), so tests see a real stamp.
+    define: {
+      __BUILD_STAMP__: JSON.stringify(buildStamp()),
+    },
     plugins: [
       !process.env.VITEST &&
         sentrySvelteKit({
