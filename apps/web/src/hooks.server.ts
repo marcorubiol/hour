@@ -134,6 +134,14 @@ const legacyVocabRedirects: Handle = async ({ event, resolve }) => {
     return Response.redirect(dest.toString(), 301);
   }
 
+  // Lens rename (ADR-065): /h/[ws]/agenda → /desk.
+  const agendaMatch = path.match(/^(\/h\/[^/]+)\/agenda\/?$/);
+  if (agendaMatch) {
+    const dest = new URL(agendaMatch[1] + '/desk', event.url);
+    dest.search = event.url.search;
+    return Response.redirect(dest.toString(), 301);
+  }
+
   return resolve(event);
 };
 

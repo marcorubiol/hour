@@ -145,7 +145,7 @@ La hipótesis central de Hour es que el valor aparece cuando las piezas operativ
 - Venue como contexto físico y técnico.
 - Assets como material canónico o adaptado.
 - Road sheet como proyección compartible de datos vivos.
-- Lenses + filtros como forma de ver el mismo mundo desde trabajo, calendario, contactos o dinero.
+- Lenses + filtros como forma de ver el mismo mundo desde trabajo, calendario, contactos o dinero. _(Modelo canónico de lente/módulo/tarea: `build/structure-model.md`, ADR-063.)_
  
 Por tanto, el MVP debe ser **poco profundo pero transversal**. Cada módulo puede empezar limitado, pero la interrelación debe funcionar antes de ampliar booking, producción, técnica, facturación o comunicación.
  

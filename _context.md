@@ -14,6 +14,15 @@
 > - HTML: elementos semánticos directos, no `<div>` con role.
 > - Tokens: tres categorías (base hues / status / contextual). Naming semántico, no numérico.
 
+> **MODELO DE ESTRUCTURA — leer antes de tocar nav / lentes / módulos / detalle de entidad**
+>
+> `build/structure-model.md` (ADR-063, 2026-07-14) es la referencia canónica de cómo se
+> estructura la app: **lente** (solo lee, cross-contenedor, sin lógica de edición) vs **módulo**
+> (edita en contexto, **solo a nivel línea**, compositivo por `kind`) vs **tarea** (verbo que
+> alimenta Agenda). Edición en 3 niveles de contenedor: espacio → project → línea/módulos.
+> Si algo en el código o en otro doc contradice ese modelo, o gana el modelo o es un bug a
+> reconciliar. No dejar que la nomenclatura vuelva a derivar.
+
 # Hour
 
 ## What
@@ -236,11 +245,17 @@ Schema retains technical names (`account`, `workspace`, `project`, `line`, `perf
 
 **Naming reversibility window** (2026-05-14): renaming UI labels (House/Project/Room/Section/Gig/Plaza/etc.) cuesta ~half day to one day mientras estemos entre Phase 0.0 y Phase 0.9. El trabajo mecánico: rename folders en `src/routes/h/[workspace]/...`, update `$lib/reserved-slugs.ts`, find/replace componentes, update i18n keys, rename endpoints. Schema NO cambia. Después de Phase 0.9 (clientes externos con bookmarks/screenshots/training materials), el coste escala a semanas. Gap a flaggear: `previous_slugs[]` cubre rename de slug dentro de una entity, pero NO entity-type segment renames (`/room/` → `/project/` requiere 301 redirect rule explícita, ~30 min cuando aplique).
 
-## UI architecture (ADR-009 → ADR-029 → ADR-033 → ADR-037 → ADR-038 → ADR-039, 2026-05-18 → 2026-05-19)
+## UI architecture
+
+> **Modelo canónico: `build/structure-model.md` (ADR-063).** Lente (solo lee) vs módulo (edita, solo en línea) vs tarea (verbo). Léelo primero.
+>
+> **Nav actual (ADR-057 → 060 → 062):** shell en `/h/+layout.svelte`. **Sin botones de nav arriba**; el logo `hour` = Home = **Agenda** (el cross-space `∑` en `/h/`, una VISTA no un contenedor). Calendar · Contacts · Money por **⌘K**. **Scope por pins** (`ScopeStrip`, `resolveScope`/`inScope` en `$lib/nav.ts`): espacio `s:`, project `p:`, línea `l:`. Portada de espacio en `/h/[slug]/` = entidad editable (ADR-062).
+>
+> **Lo de abajo (lens-pills `Today·Calendar·Contacts·Money` + sidebar-filtro Plaza/LineList, ADR-009→039) está SUPERSEDED — se conserva como histórico.** No construir contra ello.
 
 Shell vive en `/h/+layout.svelte` (hoisted up desde `/h/[workspace]/+layout.svelte` 2026-05-19, ADR-039). Cualquier URL bajo `/h/` recibe el mismo shell; el path `/h/[ws]/` representa "browsing context", no implica que ese workspace esté seleccionado.
 
-Single-layout app con dos controles:
+Single-layout app con dos controles _(histórico, superseded ADR-057)_:
 
 - **Lens nav** (top del main, horizontal pills): `Today · Calendar · Contacts · Money`. Today es la lens default (lo que está pasando y lo siguiente). Future lenses (Comms, Archive) se añaden como pills adicionales sin cambiar layout.
 - **Sidebar (filtro multi-select)** (user-scoped, cross-account):
@@ -263,7 +278,7 @@ Single-layout app con dos controles:
 - `/h/[ws]/settings/` — settings + Master View toggle (D-PRE-05 wired 2026-05-19).
 - 301 redirects en `hooks.server.ts` para vocab viejo (`/room/`, `/gig/`).
 
-**Project detail** (lens Today + project seleccionado) tendrá tabs: Work, Assets, Team, About (Phase 0.3+). Phase 0.1 muestra solo header + RelationshipStub + 3 stubs dashed.
+**Project detail** — según ADR-063: **NO** es composición de módulos (eso se queda en la línea). Es el contenido editable del project (nombre, status, about, **rider técnico / assets canónicos, cast**, poster/dossier) + sus líneas + lentes scopeadas. Las tabs históricas Work/Assets/Team/About (ADR-009) se re-leen bajo ese modelo. Estado actual: home projects-first (ADR-060) da las entradas; el detalle sigue en header + stubs.
 
 **⌘K** first-class desde día 1 (Phase 0.4). Sidebar puede ocultarse entera para ⌘K-only navigation.
 

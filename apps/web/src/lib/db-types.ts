@@ -1662,13 +1662,16 @@ export type Database = {
         Row: {
           accent: string | null
           account_id: string
+          city: string | null
           country: string | null
           created_at: string
           custom_fields: Json
           deleted_at: string | null
           description: string | null
+          domain: Database["public"]["Enums"]["workspace_domain"] | null
           id: string
           kind: Database["public"]["Enums"]["workspace_kind"]
+          logo_url: string | null
           name: string
           previous_slugs: string[]
           settings: Json
@@ -1679,13 +1682,16 @@ export type Database = {
         Insert: {
           accent?: string | null
           account_id: string
+          city?: string | null
           country?: string | null
           created_at?: string
           custom_fields?: Json
           deleted_at?: string | null
           description?: string | null
+          domain?: Database["public"]["Enums"]["workspace_domain"] | null
           id?: string
           kind?: Database["public"]["Enums"]["workspace_kind"]
+          logo_url?: string | null
           name: string
           previous_slugs?: string[]
           settings?: Json
@@ -1696,13 +1702,16 @@ export type Database = {
         Update: {
           accent?: string | null
           account_id?: string
+          city?: string | null
           country?: string | null
           created_at?: string
           custom_fields?: Json
           deleted_at?: string | null
           description?: string | null
+          domain?: Database["public"]["Enums"]["workspace_domain"] | null
           id?: string
           kind?: Database["public"]["Enums"]["workspace_kind"]
+          logo_url?: string | null
           name?: string
           previous_slugs?: string[]
           settings?: Json
@@ -2476,6 +2485,7 @@ export type Database = {
         | "cancelled"
       person_note_visibility: "workspace" | "private"
       project_status: "draft" | "active" | "archived"
+      workspace_domain: "theatre" | "dance" | "circus" | "music" | "mixed" | "other"
       workspace_kind: "personal" | "team"
       workspace_role_access_level:
         | "owner"
@@ -2674,6 +2684,7 @@ export const Constants = {
       ],
       person_note_visibility: ["workspace", "private"],
       project_status: ["draft", "active", "archived"],
+      workspace_domain: ["theatre", "dance", "circus", "music", "mixed", "other"],
       workspace_kind: ["personal", "team"],
       workspace_role_access_level: [
         "owner",

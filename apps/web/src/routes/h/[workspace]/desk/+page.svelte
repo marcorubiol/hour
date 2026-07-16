@@ -12,8 +12,7 @@
   import { createQuery } from '@tanstack/svelte-query';
   import { goto } from '$app/navigation';
   import { fetchJSON } from '$lib/api';
-  import ScopeStrip from '$lib/components/ScopeStrip.svelte';
-  import AgendaBoard from '$lib/components/AgendaBoard.svelte';
+  import DeskBoard from '$lib/components/DeskBoard.svelte';
   import { usePins } from '$lib/stores/pins.svelte';
   import {
     buildLineIndex,
@@ -31,9 +30,9 @@
     activeProjectsQueryOptions,
     allLinesQueryOptions,
   } from '$lib/nav-queries';
-  import type { AgendaEngagement } from '$lib/components/AgendaBoard.svelte';
+  import type { DeskEngagement } from '$lib/components/DeskBoard.svelte';
 
-  type Engagement = AgendaEngagement & { workspace_id: string };
+  type Engagement = DeskEngagement & { workspace_id: string };
 
   const pins = usePins();
   let workspaceSlug = $derived(page.params.workspace ?? '');
@@ -71,16 +70,15 @@
   }
 </script>
 
-<svelte:head><title>Agenda — Hour</title></svelte:head>
+<svelte:head><title>Desk — Hour</title></svelte:head>
 
 <section class="agenda">
   <header class="agenda__head">
-    <p class="eyebrow">Agenda</p>
-    <ScopeStrip onOpenLine={openLine} onOpenProject={openProject} compact />
+    <p class="eyebrow">Desk</p>
     <p class="agenda__sub">Everything with a next action, in your current scope.</p>
   </header>
 
-  <AgendaBoard
+  <DeskBoard
     engagements={scopedEngagements}
     {workspaceSlug}
     cap={null}

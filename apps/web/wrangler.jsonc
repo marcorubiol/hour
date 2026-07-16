@@ -37,18 +37,14 @@
     }
   ],
 
-  // Rate limiting (Phase 0.9) — KV counters behind $lib/server/rate-limit.ts
-  // (login, refresh, sentry-tunnel). The code no-ops while this binding is
-  // absent, so the block ships commented. To activate:
-  //   1. cd apps/web && pnpm wrangler kv namespace create RATE_LIMIT
-  //   2. paste the returned id below and uncomment
-  //   3. pnpm run deploy
-  // "kv_namespaces": [
-  //   {
-  //     "binding": "RATE_LIMIT",
-  //     "id": "<paste-namespace-id-here>"
-  //   }
-  // ],
+  // Rate limiting (Phase 0.9) — non-atomic KV backstop behind the primary
+  // Cloudflare edge rate-limit rule for /api/auth/login.
+  "kv_namespaces": [
+    {
+      "binding": "RATE_LIMIT",
+      "id": "2bcbdacb59054e8b9efa1afd43fd0ed0"
+    }
+  ],
 
   // Worker version metadata binding — used by @sentry/sveltekit to tag events
   // with the deployed version, so Sentry's "regressed in deploy X" works.

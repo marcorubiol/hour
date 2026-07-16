@@ -9,12 +9,27 @@
 import { accentVarFor } from './utils/accent';
 import { parsePin } from './stores/pins.svelte';
 
+/** Space discipline (ADR-062) — drives per-archetype vocabulary. */
+export type WorkspaceDomain =
+  | 'theatre'
+  | 'dance'
+  | 'circus'
+  | 'music'
+  | 'mixed'
+  | 'other';
+
 export type NavWorkspace = {
   id: string;
   slug: string;
   name: string;
   kind: 'personal' | 'team';
   accent?: string | null;
+  /** Space-portada masthead fields (ADR-062) — GET /api/workspaces returns
+      them; all NULL when unset (UI falls back to the kind label / hides). */
+  description?: string | null;
+  domain?: WorkspaceDomain | null;
+  city?: string | null;
+  logo_url?: string | null;
 };
 
 /** Row shape of GET /api/projects — the shared ['projects', …] cache. */

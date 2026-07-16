@@ -13,7 +13,7 @@ test.describe('smoke', () => {
    * Adaptive Digest happy path (ADR-055, final nav). No top-nav buttons: the
    * logo is Home = Agenda; Calendar and Money are reached from ⌘K. Covers the
    * integration points that move data end to end:
-   *   - login (Supabase Auth REST + JWT in localStorage) → /h/marco-rubiol
+   *   - login (server-side Supabase grant + httpOnly session) → /h/marco-rubiol
    *   - the shell renders (brand); ⌘K jumps to a real line AND a view
    *   - project detail loads the engagement count through /api/engagements
    *   - Calendar month grid, Contacts table, Money totals all deep-link

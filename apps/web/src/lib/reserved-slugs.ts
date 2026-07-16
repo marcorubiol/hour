@@ -25,7 +25,7 @@ export const RESERVED_WORKSPACE_SLUGS = [
   // Hour product vocabulary
   'house', 'room', 'run', 'gig', 'desk', 'plaza',
   'roadsheet', 'engagement', 'person', 'venue', 'asset',
-  'invoice', 'calendar', 'contacts', 'money', 'comms', 'archive',
+  'invoice', 'calendar', 'contacts', 'money', 'comms', 'archive', 'desk', 'people', 'agenda',
 
   // Operational
   'staging', 'dev', 'playground', 'booking',

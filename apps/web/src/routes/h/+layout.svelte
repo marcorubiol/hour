@@ -23,7 +23,7 @@
   import { goto } from '$app/navigation';
   import { env } from '$env/dynamic/public';
   import type { Snippet } from 'svelte';
-  import { onDestroy, onMount, untrack } from 'svelte';
+  import { onDestroy, onMount, tick, untrack } from 'svelte';
   import Avatar from '$lib/components/Avatar.svelte';
   import SettingsNav from '$lib/components/SettingsNav.svelte';
   import PresenceBadge from '$lib/components/PresenceBadge.svelte';
@@ -31,16 +31,25 @@
   import ThemeToggle from '$lib/components/ThemeToggle.svelte';
   import BrandMark from '$lib/components/BrandMark.svelte';
   import CommandPalette from '$lib/components/CommandPalette.svelte';
+  import ScopeGlyph from '$lib/components/ScopeGlyph.svelte';
   import { useTheme } from '$lib/theme.svelte';
   import { isReservedWorkspaceSlug } from '$lib/reserved-slugs';
   import { provideLens, type Lens } from '$lib/stores/lens.svelte';
-  import { providePins, spacePin } from '$lib/stores/pins.svelte';
+  import { providePins, parsePin } from '$lib/stores/pins.svelte';
+  import { provideScopes, sameSet as scopesSameSet, type Scope } from '$lib/stores/scopes.svelte';
   import { provideBreadcrumb } from '$lib/stores/breadcrumb.svelte';
   import { provideCreation } from '$lib/stores/creation.svelte';
   import CreateWorkspaceDialog from '$lib/components/create/CreateWorkspaceDialog.svelte';
   import CreateProjectDialog from '$lib/components/create/CreateProjectDialog.svelte';
   import CreateLineDialog from '$lib/components/create/CreateLineDialog.svelte';
-  import { lineUrl, projectUrl, type NavLine, type NavProject, type NavWorkspace } from '$lib/nav';
+  import {
+    buildLineIndex,
+    buildProjectIndex,
+    type NavWorkspace,
+    type RawLine,
+  } from '$lib/nav';
+  import { activeProjectsQueryOptions, allLinesQueryOptions } from '$lib/nav-queries';
+  import { accentVarFor } from '$lib/utils/accent';
   import { saveMasterViewPath } from '$lib/master-view';
   import {
     provideNetworkPresence,
@@ -78,14 +87,16 @@
     authChecked = true;
   });
 
-  const lens = provideLens('today');
+  const lens = provideLens('desk');
   const pins = providePins();
+  const scopes = provideScopes();
   const breadcrumb = provideBreadcrumb();
   const creation = provideCreation();
 
   onMount(() => {
     lens.restoreFromLocalStorage();
     pins.restoreFromLocalStorage();
+    scopes.restoreFromLocalStorage();
   });
 
   $effect(() => {
@@ -95,7 +106,7 @@
   let rt = $state<RealtimeHandle | null>(null);
   let networkPresence = $state<NetworkPresenceStore | null>(null);
 
-  type WorkspaceLite = { id: string; slug: string; name: string };
+  type WorkspaceLite = { id: string; slug: string; name: string; accent?: string | null };
   const workspacesQuery = createQuery({
     queryKey: ['workspaces'],
     queryFn: ({ signal }) => fetchJSON<{ items: WorkspaceLite[] }>('/api/workspaces', signal),
@@ -103,6 +114,120 @@
 
   let defaultWorkspaceSlug = $derived($workspacesQuery.data?.items[0]?.slug ?? '');
   let menuWorkspaceSlug = $derived(workspaceSlug || defaultWorkspaceSlug);
+
+  // ── Scope model (pins → resolved scope) for the scope bar + sidebar ──
+  const projectsQuery = createQuery(activeProjectsQueryOptions());
+  const linesQuery = createQuery(allLinesQueryOptions());
+  let wsItems = $derived(($workspacesQuery.data?.items ?? []) as unknown as NavWorkspace[]);
+  let projectIndex = $derived(buildProjectIndex(wsItems, $projectsQuery.data?.items ?? []));
+  let lineIndex = $derived(
+    buildLineIndex(wsItems, ($linesQuery.data?.items as RawLine[]) ?? []),
+  );
+
+  function tokenLabel(tok: string): string {
+    const { kind, key } = parsePin(tok);
+    if (kind === 'space') return wsItems.find((w) => w.slug === key)?.name ?? key;
+    if (kind === 'project') return projectIndex.find((p) => p.id === key)?.name ?? 'project';
+    return lineIndex.find((l) => l.id === key)?.name ?? 'line';
+  }
+  function tokenAccent(tok: string): string {
+    const { kind, key } = parsePin(tok);
+    if (kind === 'space') {
+      const w = wsItems.find((x) => x.slug === key);
+      return w ? accentVarFor(w) : 'var(--text-faint)';
+    }
+    if (kind === 'project')
+      return projectIndex.find((p) => p.id === key)?.accent ?? 'var(--text-faint)';
+    return lineIndex.find((l) => l.id === key)?.accent ?? 'var(--text-faint)';
+  }
+  function tokenKind(tok: string): 'space' | 'project' | 'line' {
+    return parsePin(tok).kind;
+  }
+  function tokenLineKind(tok: string): string {
+    const { kind, key } = parsePin(tok);
+    if (kind !== 'line') return '';
+    return lineIndex.find((l) => l.id === key)?.kind ?? '';
+  }
+
+  // Sidebar scope list: Everything + user-saved bundles only (no auto
+  // per-space rows — spaces are reached from ⌘K; the sidebar is curated).
+  const everything: Scope = { name: 'Everything', tokens: [] };
+  // Save ⇄ Update ⇄ Delete state. `editingBaseTokens` = the saved scope the
+  // current pins derive from (set on applying a saved scope, kept while you
+  // tweak it, cleared when the scope empties). exactSaved = pins land on a
+  // saved scope verbatim → Delete. modified = there is a base but you changed
+  // it → offer Update (the base) + Save new (the variant).
+  let editingBaseTokens = $state<string[] | null>(null);
+  $effect(() => {
+    if (pins.pins.length === 0) editingBaseTokens = null;
+  });
+  let exactSaved = $derived(
+    scopes.saved.find((s) => scopesSameSet(s.tokens, pins.pins)) ?? null,
+  );
+  let baseScope = $derived(
+    editingBaseTokens
+      ? (scopes.saved.find((s) => scopesSameSet(s.tokens, editingBaseTokens!)) ?? null)
+      : null,
+  );
+  let isModified = $derived(!!baseScope && !exactSaved);
+
+  function scopeAutoName(tokens: string[]): string {
+    return (
+      tokens.map(tokenLabel).slice(0, 2).join(' + ') +
+      (tokens.length > 2 ? ` +${tokens.length - 2}` : '')
+    );
+  }
+
+  function applyScope(s: Scope) {
+    pins.set(s.tokens);
+    // If it's a saved scope, it becomes the base being edited; else no base.
+    editingBaseTokens = scopes.saved.some((x) => scopesSameSet(x.tokens, s.tokens))
+      ? [...s.tokens]
+      : null;
+    if (s.tokens.length) scopes.remember(s.name, s.tokens);
+  }
+
+  // Inline rename of a saved scope (double-click its name).
+  const scopeKey = (s: Scope) => s.tokens.join(',');
+  let editingScopeKey = $state<string | null>(null);
+  let editingScopeName = $state('');
+  let renameInputEl = $state<HTMLInputElement | null>(null);
+  function startRename(s: Scope) {
+    editingScopeKey = scopeKey(s);
+    editingScopeName = s.name;
+    tick().then(() => renameInputEl?.select());
+  }
+  function commitRename(s: Scope) {
+    scopes.rename(s.tokens, editingScopeName);
+    editingScopeKey = null;
+  }
+  function cancelRename() {
+    editingScopeKey = null;
+  }
+  function saveCurrentScope() {
+    if (pins.pins.length === 0) return;
+    scopes.save(scopeAutoName(pins.pins), pins.pins);
+    editingBaseTokens = [...pins.pins];
+  }
+  function updateScope() {
+    if (!editingBaseTokens || pins.pins.length === 0) return;
+    scopes.update(editingBaseTokens, pins.pins);
+    editingBaseTokens = [...pins.pins];
+  }
+
+  // VIEW AS — the four lens routes as a visible segmented control (Scope v2).
+  const VIEW_AS: { id: Lens; label: string }[] = [
+    { id: 'desk', label: 'Desk' },
+    { id: 'calendar', label: 'Calendar' },
+    { id: 'contacts', label: 'Contacts' },
+    { id: 'money', label: 'Money' },
+  ];
+  function pickView(view: Lens) {
+    const ws = workspaceSlug || defaultWorkspaceSlug;
+    if (!ws) return;
+    lens.set(view);
+    void goto(`/h/${ws}/${view}`);
+  }
 
   // Realtime is cross-origin (wss to supabase.co) and can't ride the
   // httpOnly cookie — it authenticates via async suppliers backed by
@@ -164,17 +289,17 @@
     themeStyles.find((t) => t.id === activeThemeStyleId) ?? themeStyles[0],
   );
 
-  // The logo IS the home = Agenda. No top-nav buttons at all (ADR-057,
-  // final): Calendar and Money are reachable from ⌘K. Home lands on the
-  // default-workspace agenda (the agenda is cross-workspace anyway; the
-  // segment is just browsing context).
-  let homeHref = $derived(menuWorkspaceSlug ? `/h/${menuWorkspaceSlug}/` : '/h/');
+  // The logo IS the home. Home is space-less now (spaces live in the left
+  // rail): the logo and the rail's ∑ land on /h/ — the cross-space digest
+  // bound to no space — not on any one workspace's page. Calendar and Money
+  // are still reachable from ⌘K.
+  const homeHref = '/h/';
 
   let inSettings = $derived(/^\/h\/[^/]+\/settings(\b|\/|$)/.test(page.url.pathname));
 
   // Which routed lens (if any) the current URL is showing.
   let routedLens = $derived.by<Lens | null>(() => {
-    const m = page.url.pathname.match(/^\/h\/[^/]+\/(calendar|contacts|money)\/?$/);
+    const m = page.url.pathname.match(/^\/h\/[^/]+\/(desk|calendar|contacts|money)\/?$/);
     return (m?.[1] as Lens | undefined) ?? null;
   });
 
@@ -184,8 +309,8 @@
     const current = untrack(() => lens.current);
     if (routedLens) {
       if (current !== routedLens) lens.set(routedLens);
-    } else if (current !== 'today') {
-      lens.set('today');
+    } else if (current !== 'desk') {
+      lens.set('desk');
     }
   });
 
@@ -208,26 +333,33 @@
     }
   }
 
-  // ⌘K command palette.
+  // ⌘K scope builder — Apply sets the pins and remembers the scope.
   let paletteOpen = $state(false);
-  function onPickLine(line: NavLine) {
-    void goto(lineUrl(line));
+  // What the palette's BUILDING bar starts with. Opening from the scope bar
+  // (+ add / + narrow) seeds it with the current filters (you're adding to the
+  // scope); opening from the command bar (⌘K, top search, browse & combine)
+  // starts EMPTY — a fresh scope from zero. Reset on close so ⌘K is always
+  // fresh regardless of the previous open.
+  let paletteSeed = $state<string[]>([]);
+  $effect(() => {
+    if (!paletteOpen) paletteSeed = [];
+  });
+  function openPaletteFresh() {
+    paletteSeed = [];
+    paletteOpen = true;
   }
-  function onPickProject(project: NavProject) {
-    void goto(projectUrl(project));
+  function openPaletteAdd() {
+    paletteSeed = [...pins.pins];
+    paletteOpen = true;
   }
-  function onPickSpace(ws: NavWorkspace) {
-    pins.add(spacePin(ws.slug));
-    lens.set('today');
-    void goto(`/h/${ws.slug}/`);
-  }
-  function onPickView(view: 'agenda' | 'calendar' | 'contacts' | 'money') {
-    const ws = workspaceSlug || defaultWorkspaceSlug;
-    if (!ws) return;
-    // Agenda is the full view of the home timeline — same "today" lens, not
-    // its own pill; Calendar, Contacts and Money are the routed lenses.
-    lens.set(view === 'agenda' ? 'today' : view);
-    void goto(`/h/${ws}/${view}`);
+  function onApplyScope(tokens: string[]) {
+    pins.set(tokens);
+    // Applied a verbatim saved scope → that's the base; otherwise keep the
+    // current base (you may be modifying it) — the effect nulls it when empty.
+    if (scopes.saved.some((s) => scopesSameSet(s.tokens, tokens))) {
+      editingBaseTokens = [...tokens];
+    }
+    if (tokens.length) scopes.remember(scopeAutoName(tokens), tokens);
   }
   function onPickAction(action: 'new-line' | 'new-project' | 'new-space') {
     if (action === 'new-line') creation.openLine();
@@ -250,6 +382,70 @@
 
 {#if authChecked && !blocked}
   <div class="shell" class:shell--settings={inSettings}>
+    <aside class="shell__side" aria-label="Scopes">
+      <div class="side-sec">
+        <div class="side-sec__h">Scopes</div>
+        <button
+          type="button"
+          class="srow srow--every"
+          class:is-on={scopesSameSet([], pins.pins)}
+          onclick={() => applyScope(everything)}
+        >
+          <span class="sglyph sglyph--every" aria-hidden="true">∑</span>
+          <span class="srow__name">Everything</span>
+        </button>
+        {#each scopes.saved as s (s.tokens.join(','))}
+          {#if editingScopeKey === scopeKey(s)}
+            <div class="srow srow--editing">
+              <input
+                class="srow__rename"
+                bind:this={renameInputEl}
+                bind:value={editingScopeName}
+                onblur={() => commitRename(s)}
+                onkeydown={(e) => {
+                  if (e.key === 'Enter') commitRename(s);
+                  else if (e.key === 'Escape') cancelRename();
+                }}
+              />
+            </div>
+          {:else}
+            <button
+              type="button"
+              class="srow"
+              class:is-on={scopesSameSet(s.tokens, pins.pins)}
+              onclick={() => applyScope(s)}
+              ondblclick={() => startRename(s)}
+              title="Double-click to rename"
+            >
+              <span class="srow__name">{s.name}</span>
+            </button>
+          {/if}
+        {/each}
+      </div>
+
+      {#if scopes.recent.length > 0}
+        <div class="side-sec">
+          <div class="side-sec__h">Recent</div>
+          {#each scopes.recent as r (r.name + r.tokens.join(','))}
+            <button
+              type="button"
+              class="srow"
+              class:is-on={scopesSameSet(r.tokens, pins.pins)}
+              onclick={() => applyScope(r)}
+            >
+              <span class="srow__name">{r.name}</span>
+            </button>
+          {/each}
+        </div>
+      {/if}
+
+      <div class="side-foot">
+        <button type="button" class="side-browse" onclick={openPaletteFresh}>
+          ⌘K · browse &amp; combine
+        </button>
+      </div>
+    </aside>
+
     {#if inSettings}
       <aside class="shell__settings-nav">
         <SettingsNav />
@@ -267,7 +463,7 @@
         <button
           type="button"
           class="shell__search"
-          onclick={() => (paletteOpen = true)}
+          onclick={openPaletteFresh}
           aria-label="Search or jump to a project or line"
         >
           <svg viewBox="0 0 14 14" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true">
@@ -399,6 +595,70 @@
         </div>
       </header>
 
+      {#if routedLens}
+        <div class="shell__lenschrome">
+          <div class="scopebar">
+            <span class="scopebar__lead">Scope</span>
+            {#if pins.pins.length === 0}
+              <span class="scopebar__all">Everything · all spaces &amp; projects</span>
+              <button type="button" class="scopebar__add" onclick={openPaletteAdd}>
+                + narrow
+              </button>
+            {:else}
+              {#each pins.pins as tok (tok)}
+                <span class="tok tok--{tokenKind(tok)}">
+                  <ScopeGlyph kind={tokenKind(tok)} accent={tokenAccent(tok)} lineKind={tokenLineKind(tok)} />
+                  <span class="tok__kind">{tokenKind(tok)}</span>
+                  <span class="tok__name">{tokenLabel(tok)}</span>
+                  <button
+                    type="button"
+                    class="tok__x"
+                    onclick={() => pins.remove(tok)}
+                    aria-label={`Remove ${tokenLabel(tok)}`}>×</button
+                  >
+                </span>
+              {/each}
+              <button type="button" class="scopebar__add" onclick={openPaletteAdd}>
+                + add
+              </button>
+              <span class="scopebar__right">
+                {#if exactSaved}
+                  <button
+                    type="button"
+                    class="scopebar__save"
+                    onclick={() => scopes.remove(pins.pins)}>× Delete scope</button
+                  >
+                {:else if isModified}
+                  <button type="button" class="scopebar__save" onclick={updateScope}
+                    >↺ Update scope</button
+                  >
+                  <button type="button" class="scopebar__save" onclick={saveCurrentScope}
+                    >☆ Save new scope</button
+                  >
+                {:else}
+                  <button type="button" class="scopebar__save" onclick={saveCurrentScope}
+                    >☆ Save scope</button
+                  >
+                {/if}
+                <button type="button" class="scopebar__clear" onclick={() => pins.set([])}
+                  >Clear</button
+                >
+              </span>
+            {/if}
+          </div>
+          <div class="viewas">
+            <span class="viewas__lead">view as</span>
+            <div class="viewas__seg">
+              {#each VIEW_AS as v (v.id)}
+                <button type="button" class:is-on={routedLens === v.id} onclick={() => pickView(v.id)}>
+                  {v.label}
+                </button>
+              {/each}
+            </div>
+          </div>
+        </div>
+      {/if}
+
       {#if breadcrumb.crumbs.length > 0}
         <div class="shell__address" class:shell__address--reading={breadcrumb.width === 'reading'}>
           <div class="shell__address-inner">
@@ -441,7 +701,7 @@
     </main>
   </div>
 
-  <CommandPalette bind:open={paletteOpen} {onPickLine} {onPickProject} {onPickSpace} {onPickView} {onPickAction} />
+  <CommandPalette bind:open={paletteOpen} initialTokens={paletteSeed} {onApplyScope} {onPickAction} />
 
   <CreateWorkspaceDialog bind:open={creation.workspaceOpen} />
   <CreateProjectDialog bind:open={creation.projectOpen} workspaceId={creation.projectWorkspaceId} />
@@ -462,6 +722,277 @@
     display: flex;
     min-block-size: 100vh;
     background: var(--bg);
+  }
+
+  /* ── scopes sidebar (Scope v2) — saved scopes + recents, NOT the tree.
+     The space→project→line hierarchy is browsed from ⌘K; this rail holds
+     one-click named scopes (Everything, each space, saved bundles) + the
+     recents. Replaces the ADR-057 space rail. */
+  .shell__side {
+    position: sticky;
+    inset-block-start: 0;
+    align-self: flex-start;
+    z-index: var(--z-sticky);
+    flex: 0 0 15.5rem;
+    inline-size: 15.5rem;
+    min-block-size: 100vh;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-l);
+    padding-block: calc(var(--header-height) + var(--space-m)) var(--space-l);
+    padding-inline: var(--space-m);
+    border-inline-end: 1px solid var(--border-color-light);
+    background: var(--bg-light);
+  }
+  .side-sec {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+  .side-sec__h {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    letter-spacing: var(--mono-letter-spacing-loose);
+    text-transform: uppercase;
+    color: var(--text-faint);
+    padding-inline: var(--space-xs);
+    margin-block-end: var(--space-xs);
+  }
+  .srow {
+    display: flex;
+    align-items: center;
+    gap: var(--space-s);
+    inline-size: 100%;
+    text-align: start;
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    padding: var(--space-xs);
+    border-radius: var(--radius-m);
+    font-family: var(--font-sans);
+    font-size: var(--text-s);
+    color: var(--text-muted);
+    transition: background var(--transition), color var(--transition);
+  }
+  .srow:hover {
+    background: color-mix(in oklch, var(--text-color) 5%, transparent);
+  }
+  .srow.is-on {
+    background: var(--bg-ultra-light);
+    color: var(--text-color);
+    box-shadow: 0 0 0 1px var(--border-color-dark);
+  }
+  .sglyph {
+    inline-size: 1.4rem;
+    block-size: 1.4rem;
+    flex: none;
+    border-radius: var(--radius-s);
+    display: grid;
+    place-items: center;
+    font-family: var(--font-display);
+    font-size: var(--text-xs);
+    color: #fff;
+  }
+  .sglyph--every {
+    background: var(--text-color);
+    color: var(--bg);
+    font-family: var(--font-mono);
+  }
+  .srow__name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  /* inline rename (double-click a saved scope) */
+  .srow--editing {
+    padding: 0;
+  }
+  .srow__rename {
+    inline-size: 100%;
+    padding-block: var(--space-xs);
+    padding-inline: var(--space-xs);
+    border: 1px solid var(--primary);
+    border-radius: var(--radius-m);
+    background: var(--bg-ultra-light);
+    font-family: var(--font-sans);
+    font-size: var(--text-s);
+    color: var(--text-color);
+    outline: none;
+  }
+  .side-foot {
+    margin-block-start: auto;
+  }
+  .side-browse {
+    inline-size: 100%;
+    background: transparent;
+    border: 1px dashed var(--border-color-dark);
+    cursor: pointer;
+    padding: var(--space-s);
+    border-radius: var(--radius-m);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    letter-spacing: var(--mono-letter-spacing);
+    color: var(--text-faint);
+    transition: color var(--transition), border-color var(--transition);
+  }
+  .side-browse:hover {
+    color: var(--text-color);
+    border-color: var(--text-muted);
+  }
+
+  /* ── lens chrome: scope bar + VIEW AS (Scope v2) ── */
+  .shell__lenschrome {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-m);
+    padding-block: var(--space-m) 0;
+    padding-inline: var(--space-l);
+  }
+  .scopebar {
+    display: flex;
+    align-items: center;
+    gap: var(--space-s);
+    flex-wrap: wrap;
+    padding-block: var(--space-s);
+    padding-inline: var(--space-m);
+    background: var(--bg-ultra-light);
+    border: 1px solid var(--border-color-dark);
+    border-radius: var(--radius-l);
+    min-block-size: 3rem;
+  }
+  .scopebar__lead {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    letter-spacing: var(--mono-letter-spacing-loose);
+    text-transform: uppercase;
+    color: var(--text-faint);
+  }
+  .scopebar__all {
+    font-family: var(--font-display);
+    font-style: italic;
+    font-size: var(--text-s);
+    color: var(--text-muted);
+  }
+  .tok {
+    --glyph: 11px; /* compact glyph inside the scope-bar pills */
+    display: inline-flex;
+    align-items: center;
+    gap: 0.15rem;
+    border-radius: var(--radius-circle);
+    padding-block: var(--space-2xs);
+    padding-inline: var(--space-xs) var(--space-xs);
+    font-size: var(--text-s);
+    line-height: 1;
+    border: 1px solid var(--border-color-dark);
+    background: var(--bg-light);
+  }
+  .tok__kind {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    line-height: 1;
+    letter-spacing: var(--mono-letter-spacing);
+    text-transform: uppercase;
+    color: var(--text-faint);
+  }
+  .tok__name {
+    line-height: 1;
+  }
+  .tok__x {
+    display: grid;
+    place-items: center;
+    inline-size: 1rem;
+    block-size: 1rem;
+    border: 0;
+    border-radius: var(--radius-circle);
+    background: transparent;
+    color: var(--text-faint);
+    cursor: pointer;
+    font-size: var(--text-m);
+    line-height: 1;
+  }
+  .tok__x:hover {
+    background: color-mix(in oklch, var(--text-color) 10%, transparent);
+    color: var(--text-color);
+  }
+  .scopebar__add {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-xs);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    color: var(--text-faint);
+    border: 1px dashed var(--border-color-dark);
+    border-radius: var(--radius-circle);
+    padding-block: var(--space-2xs);
+    padding-inline: var(--space-s);
+    cursor: pointer;
+    background: transparent;
+  }
+  .scopebar__add:hover {
+    color: var(--text-color);
+    border-color: var(--text-muted);
+  }
+  .scopebar__right {
+    margin-inline-start: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-m);
+  }
+  .scopebar__save,
+  .scopebar__clear {
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    font-size: var(--text-xs);
+    color: var(--text-faint);
+  }
+  .scopebar__save:hover,
+  .scopebar__clear:hover {
+    color: var(--text-color);
+  }
+  .scopebar__clear {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .viewas {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--space-s);
+  }
+  .viewas__lead {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    letter-spacing: var(--mono-letter-spacing-loose);
+    text-transform: uppercase;
+    color: var(--text-faint);
+  }
+  .viewas__seg {
+    display: inline-flex;
+    background: var(--bg-ultra-light);
+    border: 1px solid var(--border-color-dark);
+    border-radius: var(--radius-circle);
+    padding: 2px;
+  }
+  .viewas__seg button {
+    appearance: none;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+    font-family: var(--font-sans);
+    font-size: var(--text-s);
+    color: var(--text-muted);
+    padding-block: var(--space-2xs);
+    padding-inline: var(--space-m);
+    border-radius: var(--radius-circle);
+    transition: background var(--transition), color var(--transition);
+  }
+  .viewas__seg button:hover {
+    color: var(--text-color);
+  }
+  .viewas__seg button.is-on {
+    background: var(--text-color);
+    color: var(--bg);
   }
 
   .shell__settings-nav {

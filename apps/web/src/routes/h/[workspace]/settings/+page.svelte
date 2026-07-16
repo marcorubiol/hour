@@ -237,23 +237,16 @@
             <div class="set-ws-list">
               {#each workspaces as w (w.id)}
                 {@const projectCount = projects.filter((p) => p.workspace_id === w.id).length}
-                {@const myRoles =
-                  w.kind === 'personal'
-                    ? ['author', 'performer']
-                    : ['musician', 'lighting', 'distribution']}
                 <div class="set-ws" style={`--c: ${accentVar(w.slug)}`}>
                   <div class="set-ws__rail"></div>
                   <div class="set-ws__name">
                     <h3>{w.name}</h3>
-                    <div class="set-ws__sub">
-                      {w.kind === 'personal' ? 'Personal workspace' : 'Team workspace'}
-                    </div>
                   </div>
-                  <div class="set-ws__roles">
-                    {#each myRoles as role (role)}
-                      <span class="role-badge is-mine">{role}</span>
-                    {/each}
-                  </div>
+                  <!-- personal/team label + kind-derived role badges removed
+                       (ADR-064): personal/team is not a real distinction, and
+                       real per-workspace roles need the (pending) members
+                       endpoint — no fabricated badges. -->
+                  <div class="set-ws__roles"></div>
                   <div class="set-ws__meta">
                     <span>— people</span>
                     <span class="sep">·</span>

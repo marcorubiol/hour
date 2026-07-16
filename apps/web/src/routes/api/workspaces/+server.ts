@@ -42,7 +42,17 @@ function json(body: unknown, status = 200): Response {
 
 type WorkspaceItem = Pick<
   Tables<'workspace'>,
-  'id' | 'slug' | 'name' | 'kind' | 'timezone' | 'country' | 'accent' | 'description'
+  | 'id'
+  | 'slug'
+  | 'name'
+  | 'kind'
+  | 'timezone'
+  | 'country'
+  | 'accent'
+  | 'description'
+  | 'domain'
+  | 'city'
+  | 'logo_url'
 >;
 
 const CreateBodySchema = v.object({
@@ -146,7 +156,7 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
   const { limit } = parsed.output;
 
   const search = new URLSearchParams();
-  search.set('select', 'id,slug,name,kind,timezone,country,accent,description');
+  search.set('select', 'id,slug,name,kind,timezone,country,accent,description,domain,city,logo_url');
   search.set('deleted_at', 'is.null');
   search.set('order', 'created_at.asc');
   search.set('limit', String(limit));

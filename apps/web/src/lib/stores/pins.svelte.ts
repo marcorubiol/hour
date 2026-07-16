@@ -64,6 +64,12 @@ export class PinsStore {
     else this.add(pin);
   }
 
+  /** Replace the whole pin set at once (applying a saved scope). Persists. */
+  set(pins: string[]) {
+    this.pins = [...pins];
+    this.persist();
+  }
+
   /** Workspace slugs of the pinned spaces. */
   spaceSlugs(): string[] {
     return this.pins

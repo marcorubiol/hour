@@ -1,4 +1,10 @@
 import { defineConfig, devices } from '@playwright/test';
+import { existsSync } from 'node:fs';
+import { loadEnvFile } from 'node:process';
+
+// Keep the canonical test credentials in one place. Explicit shell values
+// still win because loadEnvFile does not overwrite existing environment vars.
+if (existsSync('.env.test')) loadEnvFile('.env.test');
 
 const PORT = Number(process.env.PW_PORT ?? 4173);
 const BASE_URL = process.env.PW_BASE_URL ?? `http://localhost:${PORT}`;

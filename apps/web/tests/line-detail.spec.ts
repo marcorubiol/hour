@@ -171,13 +171,13 @@ test.describe('line detail — module composition', () => {
     // Add the People module, then remove it — the stack round-trips.
     await page.getByRole('button', { name: /add module/i }).click();
     await page.getByRole('menuitem', { name: /People/ }).click();
-    await expect(page.locator('#mod-people')).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('#mod-contacts')).toBeVisible({ timeout: 10_000 });
 
     await page
-      .locator('#mod-people')
+      .locator('#mod-contacts')
       .getByRole('button', { name: /module actions/i })
       .click();
     await page.getByRole('menuitem', { name: /remove module/i }).click();
-    await expect(page.locator('#mod-people')).not.toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('#mod-contacts')).not.toBeVisible({ timeout: 10_000 });
   });
 });

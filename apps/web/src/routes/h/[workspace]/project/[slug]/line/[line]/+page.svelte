@@ -47,7 +47,7 @@
   import NotesModule from '$lib/components/line/NotesModule.svelte';
   import MaterialsModule from '$lib/components/line/MaterialsModule.svelte';
   import MoneyModule from '$lib/components/line/MoneyModule.svelte';
-  import PeopleModule from '$lib/components/line/PeopleModule.svelte';
+  import TeamModule from '$lib/components/line/TeamModule.svelte';
 
   type Line = {
     id: string;
@@ -163,7 +163,7 @@
     notes: NotesModule,
     materials: MaterialsModule,
     money: MoneyModule,
-    people: PeopleModule,
+    team: TeamModule,
   } as const;
 
   const modulesMutation = createMutation({

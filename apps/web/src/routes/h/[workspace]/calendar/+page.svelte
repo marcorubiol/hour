@@ -28,7 +28,6 @@
   import Dialog from '$lib/components/Dialog.svelte';
   import Select from '$lib/components/Select.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
-  import ScopeStrip from '$lib/components/ScopeStrip.svelte';
   import MonthGrid, {
     dateDayKey,
     formatMonthLabel,
@@ -339,7 +338,6 @@
 <section class="cal">
   <header class="cal__head">
     <p class="eyebrow">Calendar</p>
-    <ScopeStrip onOpenLine={openLine} onOpenProject={openProject} compact />
     <div class="cal__nav">
       <h1 class="cal__month">{monthLabel}</h1>
       <div class="cal__nav-buttons">

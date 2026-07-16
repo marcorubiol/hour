@@ -7,7 +7,7 @@
     | 'declined'
     | 'dormant'
     | 'recurring';
-  export type AgendaEngagement = {
+  export type DeskEngagement = {
     id: string;
     status: EngagementStatus;
     next_action_at: string | null;
@@ -20,7 +20,7 @@
 
 <script lang="ts">
   /**
-   * AgendaBoard — the this-week timeline (dot rail + day buckets). Shared by
+   * DeskBoard — the this-week timeline (dot rail + day buckets). Shared by
    * the Home (capped, this-week-only, with a "+N more" link to the full view)
    * and the Agenda view (uncapped, all time ranges). Engagements come in
    * already scoped by the caller's pins.
@@ -29,7 +29,7 @@
   import { accentVar } from '$lib/utils/accent';
 
   interface Props {
-    engagements: AgendaEngagement[];
+    engagements: DeskEngagement[];
     workspaceSlug: string;
     cap?: number | null;
     next7Days?: boolean;
@@ -181,7 +181,7 @@
     </div>
     {#if moreCount > 0 && moreHref}
       <a class="week__more" href={moreHref}>
-        + {moreCount} more · next 7 days <span class="week__more-cal">→ Agenda</span>
+        + {moreCount} more · next 7 days <span class="week__more-cal">→ Desk</span>
       </a>
     {/if}
   {/if}

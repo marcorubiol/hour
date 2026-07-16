@@ -1725,3 +1725,89 @@ Triggered by Marco's pre-scaffold doubt (Phase 0.0 day 5). Five alternatives eva
 - **Verificación**: svelte-check **0/0** (1473 files) · unit **110/110** · collab tsc clean · production **build OK** (caught + fixed: `%sveltekit.nonce%` literal — even in a comment — is incompatible with prerendering `/offline`; removed, kit.csp auto-hashes the inline theme script instead). Adversarial review (5 lenses → verify) run. **NOT yet run: RLS suite + e2e** (need `.env.test` + the login change verified in a browser — Marco runs before deploy). **NOT yet done (manual, in `build/runbooks/phase09-launch.md`)**: create the `RATE_LIMIT` KV namespace + uncomment the wrangler binding; restore drill; point RLS suite at a staging branch; add a second non-admin fixture user (unlocks RLS scenarios 3/4/5).
 - **Re-evaluate when**: public self-serve signup becomes real → migrate to `@supabase/ssr` httpOnly-cookie Supabase client + drop the `/api/auth/token` hole; or if the login rate-limit (10/300s per IP) locks out a shared-office NAT → widen or key differently.
 - **Status**: Firm + implemented 2026-07-13, local, **pendiente de: verificación en navegador de Marco (login/refresh/collab) + RLS/e2e + KV namespace, luego deploy** (collab primero, luego web).
+
+## [2026-07-14] — ADR-062 · Modelo de espacio: H1 (espacio = una entidad), el roster es espacios (no un nivel), + campos universales domain/city/logo
+> Sesión con Marco montando la portada de espacio (`/h/[slug]/`). Al pensar los fields "en global" (contra los 8 arquetipos del research + `uploads/99-patterns.md`), salió la bifurcación de fondo: ¿un espacio es una entidad, o un contenedor con roster? Grounding: research §2.1 (show-vs-artist), §3.1 (contact book mine/ours), §5 (multi-tenant freelance).
+
+- **Decision**:
+  1. **Un espacio = una entidad** (organización o personal), tier de igual rango (§5). Los proyectos cuelgan directos del espacio. **No existe un nivel `acto`/roster** entre espacio y proyecto.
+  2. **La multiplicidad ES espacios.** Distribuidor con 5 clientes = 5 espacios (de accounts distintos, es miembro invitado). Productora con 15 artistas = 15 espacios-artista (bajo un mismo account). Mismo primitivo; la agrupación la da el `account` (ADR-029: un usuario cruza N espacios de N accounts).
+  3. **La vista-roster/portfolio = el `∑` cross-espacio** (`/h/`, ya sembrado como home sin espacio en el trabajo de esta semana). No es un contenedor de datos, es una VISTA. Sirve al distribuidor (sus clientes) y a la productora (su roster, filtrado por account) con el mismo mecanismo.
+  4. **Campos de espacio por capas** (principio anti-Airtable §1.3: columna solo si universal+estable; `custom_fields` jsonb para la cola larga por arquetipo; `settings` jsonb para defaults):
+     - Identidad (columnas): name·slug·accent·description ✅ + **`domain`** (enum disciplina) + **`city`** (home base) + **`logo_url`** → migración `2026-07-14_workspace_domain_city_logo`.
+     - Fiscal (columnas, **diferido** al módulo Money/Fase 1): razón social·NIF/VAT·dirección·moneda·régimen. Viven en el espacio (es la entidad que factura).
+  5. **`domain` conduce el vocabulario y los tipos de proyecto por-arquetipo** (§7): un espacio de música enseña "holds"/"difusión"; uno de teatro "carta de interés"/"distribución". Es el campo load-bearing — por eso enum opinado, no texto libre. El kicker del mockup ("Theatre company · Barcelona") = `domain` + `city`, no campos inventados.
+
+- **Context**: La portada necesitaba saber qué campos son reales vs fabricados. Pensarlo global sacó la bifurcación. El espacio ya se comportaba como "una entidad entre muchas" en la nav recién construida (rail + home sin espacio + portada) → ya íbamos por H1 de facto.
+
+- **Alternatives considered (rejected)**:
+  - **H2 — espacio = contenedor con roster** (espacio→acto→proyecto→línea): mete un nivel siempre-uno para la mayoría (compañía/banda/solista = peso muerto), y **rompe al distribuidor** (§3.1: los datos de cliente A y B deben estar aislados; como "actos de un roster" del distribuidor se mezclarían). Rechazado.
+  - **H3 — `acto` como tag/agrupación**: infra-modela al artista (que para agencias ES el objeto primario, §2.1). Rechazado.
+  - **Nivel `acto` diferido** (primera propuesta de .zerø): innecesario. Marco señaló que un artista es *space-like* (nombre, disciplina, shows, contactos, caché, EPK propios) → **es un espacio**, no un sub-nivel. Correcto y más simple: el nivel `acto` no debe existir.
+
+- **Rationale**: H1 es la columna vertebral que el research pide (el moat = "1 personal + N organizaciones", §5/§10.2) y lo que ya construimos. `domain` en el espacio (no en un acto) queda limpio incluso para una productora multi-disciplina (espacios con `domain` distinto). La única diferencia real distribuidor↔productora es el **default de compartición** (aislado vs compartido), y lo fija la propiedad del `account` + la frontera privado/compartido que de todos modos hay que tener (§3.1) — no un nivel de datos.
+
+- **Re-evaluate when**: aparezca un caso que "otro espacio" no cubra (p. ej. un show co-producido por dos artistas de la misma productora que deba vivir "encima" de ambos) — improbable; hasta entonces, sin nivel `acto`. La identidad fiscal se columniza al arrancar Money. El enum `workspace_domain` se amplía con `ALTER TYPE ... ADD VALUE` si falta una disciplina.
+
+- **Status**: Firm + implementado 2026-07-14. Migración `workspace_domain_city_logo` (columnas additive, nullable) + `update_workspace_rpc` (owner/admin, jsonb patch) + PATCH `/api/workspaces/[id]` + `EditWorkspaceDialog` (name·discipline·city·color·description; el lápiz del masthead lo abre, on-save invalida `['workspaces']`). La portada muestra `domain · city`; sin disciplina cae a la ciudad sola, y si no hay ni disciplina ni ciudad oculta el kicker (nada de fallback a `kind` — ejes ortogonales). MüK poblado (theatre/Barcelona). **Pendiente**: upload de `logo` (R2 + `img-src` CSP), poblar el resto de espacios, identidad fiscal (con Money), org-accounts formales (Fase 1), y la verificación en navegador de Marco (el PATCH autenticado no se conduce headless). `svelte-check 0/0` + build OK + dry-run del patch jsonb verificado.
+
+## [2026-07-14] — ADR-063 · Modelo de estructura: lente (lee) vs módulo (edita en línea) vs tarea (verbo); 3 niveles de edición; la lente no posee lógica de edición (opción 2)
+
+> Sesión con Marco afinando la nomenclatura de estructura tras unos días usando la app. Cierra la deriva de nav (ADR-009 → 057) dándole por fin definición canónica a los tres términos que se usaban sin definir. **La versión viva y completa está en `build/structure-model.md`** — esta entrada es el registro de la decisión; el doc es la referencia que no se debe perder.
+
+- **Decisión** (los términos quedan fijos):
+  - **Lente** = superficie de solo lectura / agregación. Cross-contenedor, scopeable por pins. **No posee lógica de edición propia.** El home `/h/` es la lente más ancha (ADR-062: "es una VISTA, no un contenedor").
+  - **Módulo** = sección compositiva **solo a nivel línea**, elegida por el `kind`. Es la superficie de edición-en-contexto de la línea. **Nada por encima de la línea compone módulos.** Catálogo: Calendar · Contacts · Money · Notes · Materials · People · Road sheets (+ Tasks con D3).
+  - **Tarea** = capa-verbo, no un dominio de dato. Polimórfica (project / línea / performance / engagement). Nunca lente. Se manifiesta como módulo + next-action inline en engagement (ya vivo) + feed de la lente Agenda.
+  - **Contenido editable del espacio / del project** = campos propios del contenedor. **No son módulos.**
+  - **Split**: se edita en un contenedor (3 niveles: espacio → project → línea/módulos); la lente solo muestra.
+  - **Opción 2 (elegida)**: la lente puede *hospedar* el editor de la entidad inline (comodidad), pero no define edición propia. Reconcilia los editores inline de hoy en Money / Calendar / Contacts (ADR-046 / 043 / 044): son el editor de la entidad hospedado, no lógica de la lente.
+- **Refina / resuelve**:
+  - **ADR-056**: los assets canónicos (rider técnico, dossiers) y el cast son **contenido del project**, no del módulo de línea; el módulo Materials / People de la línea es vista/adaptación que lee del canónico del project (intención original de ADR-009).
+  - **Re-evaluate (a) de ADR-057** ("¿project detail = composición de módulos?") → **No.** Project detail = su contenido + sus líneas + lentes scopeadas. Los módulos se quedan en la línea.
+  - **Mata la lente Archive** (nunca especificada; placeholder de ADR-009).
+- **Dirección (no implementada, a validar con uso)**: reducir a 3 lentes-concern — **Time** (Agenda + Calendar en una entrada, toggle lista↔grid; **NO borrar el grid** — hace detección de conflictos que la lista no), **People** (Contacts + comms como timeline por persona), **Money**. Cuarta lente **Work/Flow** solo si aterriza D3.
+- **Por qué**: los tres términos se usaban sin definición canónica → cada rediseño los resignificaba y el modelo derivaba. Con el split lectura/edición + "módulos solo en línea" + "tarea = verbo" el modelo deja de derivar. Marco: unos días de uso real bastaron para ver los puntos de conflicto que lo motivan (no hizo falta el mes entero).
+- **Re-evaluate when**: el uso real diga si Agenda y el grid de Calendar son la misma superficie (→ fusionar Time) o no (→ mantenerlas separadas); D3 (decidir Work/Flow + si Agenda mezcla tasks con events); aparezca un concern que no sea ni lectura transversal ni contenido de entidad.
+- **Status**: **Firm** (el modelo). La reducción de lentes es **dirección**, no implementada. Doc vivo y canónico: `build/structure-model.md`.
+
+## [2026-07-14] — ADR-064 · `workspace.kind` (personal/team) es vestigial: solo/compartido es emergente, mío/cliente es el account
+> Sale de ADR-062/063 al arreglar el kicker del masthead: `kind` se colaba como etiqueta ("Personal/Team space") mezclando ejes. Marco: "¿hace falta esta diferenciación? ¿qué diferencia real hay?"
+
+- **Decision**: `workspace.kind` NO es un tipo de espacio con valor de producto. Las distinciones reales viven en otro sitio:
+  - **mío vs cliente** → propiedad del **`account`** (mi account personal lo posee = mío; invitado en un workspace de otro account = cliente). ADR-062/029.
+  - **solo vs compartido** → **emergente** de `workspace_membership` (1 miembro vs N). Invitar a alguien lo hace compartido; es un hecho de membresía, no un cambio de tipo.
+  - **casa del usuario** → el home sin espacio (`∑` / `/h/`, ADR-062) + el **account personal**.
+  Se deja de decidir nada de producto sobre `workspace.kind`.
+
+- **Context**: `kind` no gatea NADA de seguridad (la RLS es por membresía; verificado). Solo tenía dos usos, ambos cosméticos: el saludo del home (heurística "busca el workspace personal para sacar el nombre") y una etiqueta en settings ("Personal/Team workspace" + role-badges fabricados por kind). Además no está bien puesto: `create_workspace` mete `kind='personal'` fijo → que MüK/Demo sean `team` viene de otro camino. Y de nombre se solapa con `account.kind` (que sí es real).
+
+- **El workspace personal NO es vestigial**: un artista solista usa su propio espacio como su acto. Ejemplo real: **"Marco Rubiol" es un proyecto de cançó d'autor**, un espacio de pleno derecho. Confirma ADR-062 (artista = espacio). Lo que sobra es el *tipo* `kind`, no el espacio.
+
+- **Alternatives (rejected)**: (a) mantener personal/team como tipo visible — mezcla ejes ortogonales y confunde con `account.kind`. (b) auto-flip `kind` al invitar a alguien — parche sobre un campo que no debería decidir nada.
+
+- **What changed (fix, 2026-07-14)**: quitada la dependencia de `kind` en los dos usos —
+  - `HomeView` saludo: el nombre sale solo del usuario (display name → local part del email), sin buscar "workspace personal".
+  - `settings` ("Workspaces & roles"): quitada la etiqueta "Personal/Team workspace" y los role-badges fabricados por kind (los roles reales necesitan el endpoint de members, pendiente).
+  La **columna `kind` se deja inerte**, marcada para borrar en una limpieza (borrarla es migración + toca el auto-workspace de signup + la sección de roles de settings).
+
+- **Re-evaluate when**: se rehaga el signup (¿sigue auto-creándose un workspace personal, o el usuario crea su primer espacio a mano?) y la sección "Workspaces & roles" de settings (wire a membresía real) → ahí `DROP COLUMN kind` + `DROP TYPE workspace_kind`.
+
+- **Status**: Firm + usos arreglados 2026-07-14 (`svelte-check` 0/0). Columna `kind` inerte, pendiente de borrado en limpieza.
+
+## [2026-07-14] — ADR-065 · Nomenclatura de la capa de lectura: Desk (home/digest) · Calendar · Contacts · Money; módulo cast/crew = Team
+
+> Sesión con Marco afinando nombres tras fijar el modelo (ADR-063). Pone nombres definitivos al sub-punto "dirección Time/People/Money" de ADR-063. Versión viva: `build/structure-model.md § Read surfaces / § Lens set`.
+
+- **Decisión**:
+  - **Capa de nav = 1 home + 3 lentes**: **Desk** (home) · **Calendar** · **Contacts** · **Money** (las 3 lentes por ⌘K).
+  - **Desk NO es una lente, es un *digest* cross-concern.** Una lente corta por UN concern (Calendar = fechas, Contacts = tu red, Money = dinero) y posee ese dominio. Desk cruza TODOS filtrando por urgencia ("qué me reclama + lo siguiente + tareas") y **no posee dato propio** — se calcula sobre las lentes + tareas. Por eso es el home (orientación) y no una 4ª lente en ⌘K; meterlo como lente sería error de categoría (un filtro-de-relevancia entre filtros-de-dominio). Detalle: `structure-model.md § Read surfaces`.
+  - **Desk** (antes "Agenda"; antes el pill "Today" de ADR-033): revive el nombre de ADR-008 —diseñado para exactamente esto: "what's on your plate: tasks, upcoming gigs, pending money, waiting items"— descartado en su día por no haber entidad task, recupera su razón justo cuando las tareas vuelven. "Agenda" se descarta: en ES/CA/FR significa *calendario* y se confundía con la lente Calendar. "Today" descartado: la vista no es solo de hoy (tareas planificadas o no).
+  - **Contacts** = tu red de booking / difusión — **personas Y organizaciones** (teatros, ayuntamientos, festivales): un contacto puede ser un individuo o una entidad. Comms se pliega dentro como timeline por contacto (dirección ADR-056).
+  - **Se descarta la fusión "Time"** (Agenda+Calendar en una lente): con Desk claramente ≠ Calendar, la redundancia que la motivaba desaparece; quedan separadas (ahora/triage vs planificar), gap que D3 solo ensancha.
+  - **Módulos de línea** (siguen a las lentes): módulo de difusión de la línea = **Contacts** (= la lente Contacts scopeada a la línea); módulo cast/crew = **Team** (cross-arts: cast+crew / músicos+equipo de gira). En Settings, el acceso de usuarios-de-la-app se llama **Members/Access**, no "Team".
+- **Desvío "People" revertido (mismo día):** se probó nombrar la lente **People** (más cálida/clara) y renombrar el módulo de difusión a People + el de cast/crew a Team. Se revirtió al ver en la app real que la lente contiene **organizaciones** — *un teatro no es "people"*. "Contacts" cubre individuo Y organización; "People" era falso para media lista. La propia app lo delataba (contador "157 contacts"). **Team se queda** (buen nombre de por sí, independiente del desvío).
+- **Por qué**: "Agenda" mentía (suena a calendario) → Desk. "People" mentía en la otra dirección (la lente tiene orgs) → Contacts. Team para cast/crew nombra bien "quién ejecuta el show" y no colisiona con Contacts. Módulos que siguen a lentes + "Desk = digest, no lente" = cero ambigüedad.
+- **Set final**: **Desk** (home) · **Calendar** · **Contacts** · **Money**. Módulos de línea: Calendar · Contacts · Money · Notes · Materials · Team · Road sheets.
+- **Re-evaluate when**: D3 (tasks) → si Desk necesita separar tasks de events, o si aparece la 4ª lente Work/Flow.
+- **Status**: Firm + **renombres aplicados 2026-07-14, cero legacy** (`svelte-check` 0/0 · unit 110/110). Aplicado: ruta `/agenda`→`/desk` (301 redirect), lens store `today`→`desk`, ⌘K + labels + títulos (**Desk · Calendar · Contacts · Money**), `AgendaBoard`→`DeskBoard`, y el módulo cast/crew `PeopleModule`→`TeamModule` + su key `people`→`team` (código + DB). La lente de difusión **se mantiene en Contacts** (ruta `/contacts`, key de módulo `contacts`), tras revertir el desvío People. **Pendiente (Marco):** (1) **migración inversa en DB** — la migración de esta mañana dejó la key de booking en `people`; el código ya volvió a `contacts`, así que hay que correr el swap inverso `people`→`contacts` (dejando `team`) para que la DB cuadre: `UPDATE line SET modules = (SELECT jsonb_agg(CASE elem #>> '{}' WHEN 'people' THEN to_jsonb('contacts'::text) ELSE elem END) FROM jsonb_array_elements(modules) AS elem) WHERE modules @> '["people"]';` (2) deploy + verificar navegador (rutas + 301 + road sheets intactos) + e2e. Doc vivo: `build/structure-model.md`; work-list de diseño: `build/screens-inventory.md`.

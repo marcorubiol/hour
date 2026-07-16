@@ -1,6 +1,8 @@
 # Hour — Design System Prompt
 
 > Copy and paste this entire prompt into your design tool (Claude, Gemini, etc.) to give it full context for designing Hour's UI.
+>
+> **Full screen work-list: `build/screens-inventory.md`** (every URL + dialog + module to design, as a checklist). Structure model behind it: `build/structure-model.md`.
 
 ---
 

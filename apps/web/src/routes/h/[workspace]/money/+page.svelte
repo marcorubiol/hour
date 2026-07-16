@@ -22,7 +22,6 @@
   import Menu from '$lib/components/Menu.svelte';
   import StateBadge from '$lib/components/StateBadge.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
-  import ScopeStrip from '$lib/components/ScopeStrip.svelte';
   import { dayLabel } from '$lib/datetime';
   import { fmtFee, fmtMoney, invoiceTone } from '$lib/money';
   import { performanceStatusLabel, performanceStatusTone } from '$lib/performance';
@@ -397,7 +396,6 @@
 <section class="mny">
   <header class="mny__head">
     <p class="eyebrow">Money</p>
-    <ScopeStrip onOpenLine={openLine} onOpenProject={openProject} compact />
     <div class="mny__totals">
       <span class="mny__total">
         <span class="mny__total-label">pipeline</span>

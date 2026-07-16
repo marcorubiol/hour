@@ -8,18 +8,18 @@
  *
  * Persistence: last active lens survives across sessions via localStorage
  * (`hour_lens`). Hydration runs in the layout's onMount after SSR so the
- * factory default ('today') paints on first frame and we don't reach for
+ * factory default ('desk') paints on first frame and we don't reach for
  * localStorage on the server.
  */
 
 import { getContext, setContext } from 'svelte';
 
-export type Lens = 'today' | 'calendar' | 'contacts' | 'money';
-const VALID_LENSES: readonly Lens[] = ['today', 'calendar', 'contacts', 'money'];
+export type Lens = 'desk' | 'calendar' | 'contacts' | 'money';
+const VALID_LENSES: readonly Lens[] = ['desk', 'calendar', 'contacts', 'money'];
 const STORAGE_KEY = 'hour_lens';
 
 export class LensStore {
-  current = $state<Lens>('today');
+  current = $state<Lens>('desk');
 
   set(next: Lens) {
     this.current = next;
@@ -51,7 +51,7 @@ export class LensStore {
 
 const KEY = Symbol('lens');
 
-export function provideLens(initial: Lens = 'today'): LensStore {
+export function provideLens(initial: Lens = 'desk'): LensStore {
   const store = new LensStore();
   store.current = initial;
   setContext(KEY, store);

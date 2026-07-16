@@ -1,0 +1,3133 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- Mirror the app's cascade layer order (app.html) so base.css :where()
+         defaults never out-rank component rules. -->
+    <style>
+      @layer reset, defaults, tokens, layouts, components, components.overrides,
+        utilities, overrides;
+    </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400..600;1,6..72,400..600&family=Inter:wght@400..600&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <!-- THE REAL DESIGN SYSTEM — base.css @imports tokens.css itself. -->
+    <style>
+/*
+  Hour — Design tokens
+  Three categories of color (philosophy.md):
+  - Base hues:    --primary, --base, --neutral (palette + 7 shades + hover)
+  - Status:       --info, --success, --warning, --danger (palette + shades)
+  - Contextual:   --text-color, --bg-*, --border-color-*, --accent-N, --tag-*
+
+  Visual v0.5 (ADR-033, refined 2026-05-19):
+  - Editorial-sobrio: Newsreader display + Inter sans + JetBrains Mono metadata.
+  - Plum retired; --primary holds a cool slate as the brand hue.
+  - All spacing/typography on clamp() — single fluid system. No fixed-px
+    parallel scale.
+  - Contextual tokens derive from base hues so theme switching (light/dark/
+    presenter/...) flips by redefining contextuals only.
+*/
+
+@layer tokens {
+  :root {
+    color-scheme: light;
+    --root-font-size: 100%;
+
+    /* ============================================================ */
+    /* PALETTE — base hues                                            */
+    /* ============================================================ */
+
+    --white: #ffffff;
+    --black: #000000;
+
+    /* Cool slate — brand hue. Distinct from --neutral so it can be used
+       deliberately without clashing with body text. */
+    --primary: oklch(35% 0.13 275);
+    --primary-hover: color-mix(in oklch, var(--primary), black 10%);
+    --primary-ultra-light: color-mix(in oklch, var(--primary), white 86%);
+    --primary-light: color-mix(in oklch, var(--primary), white 60%);
+    --primary-semi-light: color-mix(in oklch, var(--primary), white 30%);
+    --primary-semi-dark: color-mix(in oklch, var(--primary), black 15%);
+    --primary-dark: color-mix(in oklch, var(--primary), black 28%);
+    --primary-ultra-dark: color-mix(in oklch, var(--primary), black 50%);
+
+    /* Warm cream — body / page background anchor. */
+    --base: oklch(97.5% 0.005 85);
+    --base-hover: color-mix(in oklch, var(--base), var(--neutral) 5%);
+    --base-ultra-light: var(--white);
+    --base-light: color-mix(in oklch, var(--base), white 30%);
+    --base-semi-light: color-mix(in oklch, var(--base), var(--neutral) 3%);
+    --base-semi-dark: color-mix(in oklch, var(--base), var(--neutral) 8%);
+    --base-dark: color-mix(in oklch, var(--base), var(--neutral) 14%);
+    --base-ultra-dark: color-mix(in oklch, var(--base), var(--neutral) 24%);
+
+    /* Cool ink — body text + borders. */
+    --neutral: oklch(28% 0.012 275);
+    --neutral-hover: color-mix(in oklch, var(--neutral), black 10%);
+    --neutral-ultra-light: color-mix(in oklch, var(--neutral), white 88%);
+    --neutral-light: color-mix(in oklch, var(--neutral), white 65%);
+    --neutral-semi-light: color-mix(in oklch, var(--neutral), white 35%);
+    --neutral-semi-dark: color-mix(in oklch, var(--neutral), black 20%);
+    --neutral-dark: color-mix(in oklch, var(--neutral), black 40%);
+    --neutral-ultra-dark: color-mix(in oklch, var(--neutral), black 60%);
+
+    /* ============================================================ */
+    /* PALETTE — status (lifecycle / message states)                  */
+    /* ============================================================ */
+
+    --info: oklch(52% 0.14 255);
+    --info-hover: color-mix(in oklch, var(--info), black 10%);
+    --info-ultra-light: color-mix(in oklch, var(--info), white 86%);
+    --info-light: color-mix(in oklch, var(--info), white 60%);
+    --info-semi-light: color-mix(in oklch, var(--info), white 30%);
+    --info-semi-dark: color-mix(in oklch, var(--info), black 15%);
+    --info-dark: color-mix(in oklch, var(--info), black 28%);
+    --info-ultra-dark: color-mix(in oklch, var(--info), black 52%);
+
+    --success: oklch(50% 0.13 150);
+    --success-hover: color-mix(in oklch, var(--success), black 10%);
+    --success-ultra-light: color-mix(in oklch, var(--success), white 86%);
+    --success-light: color-mix(in oklch, var(--success), white 60%);
+    --success-semi-light: color-mix(in oklch, var(--success), white 30%);
+    --success-semi-dark: color-mix(in oklch, var(--success), black 15%);
+    --success-dark: color-mix(in oklch, var(--success), black 30%);
+    --success-ultra-dark: color-mix(in oklch, var(--success), black 55%);
+
+    --warning: oklch(55% 0.14 70);
+    --warning-hover: color-mix(in oklch, var(--warning), black 10%);
+    --warning-ultra-light: color-mix(in oklch, var(--warning), white 86%);
+    --warning-light: color-mix(in oklch, var(--warning), white 55%);
+    --warning-semi-light: color-mix(in oklch, var(--warning), white 28%);
+    --warning-semi-dark: color-mix(in oklch, var(--warning), black 18%);
+    --warning-dark: color-mix(in oklch, var(--warning), black 32%);
+    --warning-ultra-dark: color-mix(in oklch, var(--warning), black 58%);
+
+    --danger: oklch(55% 0.17 25);
+    --danger-hover: color-mix(in oklch, var(--danger), black 10%);
+    --danger-ultra-light: color-mix(in oklch, var(--danger), white 86%);
+    --danger-light: color-mix(in oklch, var(--danger), white 55%);
+    --danger-semi-light: color-mix(in oklch, var(--danger), white 28%);
+    --danger-semi-dark: color-mix(in oklch, var(--danger), black 15%);
+    --danger-dark: color-mix(in oklch, var(--danger), black 28%);
+    --danger-ultra-dark: color-mix(in oklch, var(--danger), black 52%);
+
+    /* ============================================================ */
+    /* CONTEXTUAL — text (3 weights, all derived from --neutral)      */
+    /* ============================================================ */
+
+    --text-color: var(--neutral);
+    --text-dark-muted: color-mix(in srgb, var(--neutral) 70%, transparent);
+    --text-light: var(--neutral-ultra-light);
+    --text-muted: var(--text-dark-muted);
+    --text-faint: var(--neutral-semi-light);
+    --heading-color: var(--neutral-ultra-dark);
+
+    /* ============================================================ */
+    /* CONTEXTUAL — surfaces                                          */
+    /* Unified scale. Light side derives from --base (warm cream) to  */
+    /* keep the v0.5 editorial look; dark side from --neutral (cool   */
+    /* ink) so context-shift utilities (.bg--dark, tooltip, btn fill) */
+    /* still get a real contrast. Interaction states (hover/active)   */
+    /* are a separate axis from the contrast scale.                   */
+    /* ============================================================ */
+
+    --bg: var(--base);                          /* body / canvas */
+    --bg-ultra-light: var(--base-ultra-light);  /* near white — raised cards */
+    --bg-light: var(--base-semi-light);         /* warm cream — sunk panels */
+    --bg-dark: var(--neutral-dark);             /* context shift dark */
+    --bg-ultra-dark: var(--neutral-ultra-dark); /* context shift deepest */
+
+    --bg-hover: var(--base-semi-dark);          /* interaction feedback */
+    --bg-active: var(--base-dark);              /* pressed / active */
+
+    --body-bg-color: var(--bg);
+
+    /* ============================================================ */
+    /* CONTEXTUAL — borders                                           */
+    /* ============================================================ */
+
+    --border-color-dark: color-mix(in oklch, var(--neutral) 18%, transparent);
+    --border-color-light: color-mix(in oklch, var(--neutral) 9%, transparent);
+
+    /* ============================================================ */
+    /* CONTEXTUAL — accents (8 hues, mapped by hash(slug) % 8)        */
+    /* Used to give each workspace a stable identifying color on the  */
+    /* sidebar rail, calendar dot, and avatar. Helper:                */
+    /* $lib/utils/accent.ts → accentVar(slug) returns var(--accent-N) */
+    /* ============================================================ */
+
+    --accent-1: oklch(58% 0.12 260); /* blue */
+    --accent-2: oklch(62% 0.14 45); /* orange */
+    --accent-3: oklch(60% 0.13 150); /* green */
+    --accent-4: oklch(60% 0.15 20); /* red */
+    --accent-5: oklch(65% 0.13 330); /* pink */
+    --accent-6: oklch(62% 0.11 200); /* cyan */
+    --accent-7: oklch(58% 0.13 295); /* purple */
+    --accent-8: oklch(64% 0.13 85); /* amber */
+
+    /* ============================================================ */
+    /* CONTEXTUAL — tag tones (6 bg+fg pairs for task-type chips)     */
+    /* ============================================================ */
+
+    --tag-amber-bg: oklch(94% 0.05 80);
+    --tag-amber-fg: oklch(40% 0.08 70);
+    --tag-blue-bg: oklch(94% 0.04 240);
+    --tag-blue-fg: oklch(42% 0.1 250);
+    --tag-teal-bg: oklch(94% 0.05 180);
+    --tag-teal-fg: oklch(40% 0.08 190);
+    --tag-green-bg: oklch(94% 0.05 150);
+    --tag-green-fg: oklch(40% 0.1 150);
+    --tag-purple-bg: oklch(94% 0.04 300);
+    --tag-purple-fg: oklch(42% 0.1 300);
+    --tag-red-bg: oklch(94% 0.04 20);
+    --tag-red-fg: oklch(45% 0.12 25);
+    --tag-neutral-bg: oklch(95% 0.01 60);
+    --tag-neutral-fg: var(--text-muted);
+
+    /* ============================================================ */
+    /* TYPOGRAPHY                                                     */
+    /* ============================================================ */
+
+    --font-display: "Newsreader", Georgia, "Times New Roman", serif;
+    --font-sans:
+      "Inter", -apple-system, system-ui, "Segoe UI", Roboto, "Helvetica Neue",
+      Arial, sans-serif;
+    --font-mono:
+      "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+    --text-font-family: var(--font-sans);
+    --text-font-weight: 400;
+    --text-line-height: 1.55;
+    --text-text-wrap: pretty;
+
+    --heading-font-family: var(--font-display);
+    --heading-font-weight: 400;
+    --heading-line-height: 1.05;
+    --heading-text-wrap: balance;
+    --heading-letter-spacing: -0.02em;
+
+    --mono-font-family: var(--font-mono);
+    --mono-letter-spacing: 0.02em; /* lowercase mono runs (tag chips, state badges) */
+    --mono-letter-spacing-loose: 0.04em; /* uppercase mono micro-labels (anchor chips, pins, cell dates). .eyebrow keeps its own 0.14em. */
+
+    /* Type scale — fluid via clamp(). One scale for the whole app. */
+    --text-xs: clamp(0.625rem, 0.6rem + 0.12vw, 0.6875rem); /* 10-11 — eyebrows, badges. Tightened 2026-07-04 to the design's meta size (was 11-12); everything read a touch big because this floor sat above the mock. */
+    --text-s: clamp(0.8rem, 0.76rem + 0.2vw, 0.875rem); /* 13-14 — dense rows, secondary */
+    --text-m: clamp(0.875rem, 0.85rem + 0.15vw, 1rem); /* 14-16 — default body */
+    --text-l: clamp(1.05rem, 1rem + 0.25vw, 1.2rem); /* 17-19 — card titles */
+    --text-xl: clamp(1.3rem, 1.2rem + 0.5vw, 1.5rem); /* 21-24 — wordmark, h4 */
+    --text-xxl: clamp(1.5rem, 1.35rem + 0.75vw, 2rem); /* 24-32 — section title */
+
+    --h1: clamp(1.8rem, 1.5rem + 1.5vw, 2.4rem); /* 29-38 — masthead. Retuned 2026-07-12 to the size mastheads actually render (person/performance canonical); the old 32-48 was never consumed — every page rolled its own clamp to undershoot it. */
+    --h2: var(--text-xxl);
+    --h3: clamp(1.2rem, 1.05rem + 0.7vw, 1.5rem);
+    --h4: var(--text-xl);
+    --h5: var(--text-l);
+    --h6: var(--text-m);
+
+    /* ============================================================ */
+    /* SPACING — single fluid scale (clamp). No fixed-px parallel.   */
+    /* ============================================================ */
+
+    --space-2xs: 0.125rem; /* 2 — typographic micro-gap (date/note stacks) */
+    --space-xs: clamp(0.25rem, 0.22rem + 0.15vw, 0.375rem); /* 4-6 */
+    --space-s: clamp(0.5rem, 0.45rem + 0.25vw, 0.75rem); /* 8-12 */
+    --space-m: clamp(0.875rem, 0.8rem + 0.4vw, 1.125rem); /* 14-18 */
+    --space-l: clamp(1.25rem, 1.05rem + 1vw, 1.875rem); /* 20-30 */
+    --space-xl: clamp(1.875rem, 1.5rem + 1.75vw, 2.75rem); /* 30-44 */
+    --space-xxl: clamp(2.75rem, 2.2rem + 2.5vw, 4rem); /* 44-64 */
+
+    --section-space-xs: clamp(1.5rem, 1.3rem + 1vw, 2rem);
+    --section-space-s: clamp(2rem, 1.7rem + 1.5vw, 3rem);
+    --section-space-m: clamp(3rem, 2.4rem + 3vw, 4.5rem);
+    --section-space-l: clamp(4rem, 3.2rem + 4vw, 6rem);
+    --section-space-xl: clamp(5rem, 4rem + 5vw, 7.5rem);
+    --section-space-xxl: clamp(7rem, 5.5rem + 7vw, 10.5rem);
+
+    --section-padding-block: var(--section-space-m);
+    --gutter: clamp(1rem, 0.5rem + 2vw, 2rem);
+
+    --container-gap: var(--space-l);
+    --content-gap: var(--space-m);
+    --grid-gap: var(--space-m);
+
+    /* Smart spacing (opt-in via .smart-spacing) */
+    --paragraph-spacing: 1em;
+    --heading-spacing: 1.2em;
+    --list-spacing: var(--paragraph-spacing);
+    --list-indent-spacing: 2em;
+    --list-item-spacing: 0.5em;
+    --nested-list-indent-spacing: 1em;
+    --flow-spacing: var(--paragraph-spacing);
+    --figure-spacing: var(--paragraph-spacing);
+    --figcaption-spacing: 0.5em;
+    --blockquote-spacing: var(--paragraph-spacing);
+
+    /* ============================================================ */
+    /* LAYOUT                                                         */
+    /* ============================================================ */
+
+    --content-width: 75rem;
+    --content-width-safe: min(
+      var(--content-width),
+      calc(100% - var(--gutter) * 2)
+    );
+
+    /* App page widths — two registers, both centered via margin-inline auto.
+       Reading = single-column entity pages (person, performance, engagement,
+       roadsheet, home digest). Wide = table/row-dominated pages (line detail,
+       project, settings). Lens pages (calendar/contacts/money/agenda) stay
+       full-bleed on purpose. */
+    --page-width-reading: 46rem;
+    --page-width-wide: 64rem;
+
+    --sidebar-width: 264px;
+    --header-height: 0px;
+    --scroll-margin: 0px;
+    --offset: calc(var(--scroll-margin) + var(--header-height));
+
+    /* Square hit-area sizes for icon-only controls (kebab, DND bell,
+       sign-out, ThemeToggle, etc.). Fixed (not clamped) so the trailing
+       icon column inside menus and rows stays optically aligned across
+       viewport sizes. */
+    --control-size-s: 2rem; /* 32px — icon action default */
+
+    /* ============================================================ */
+    /* RADIUS — semantic scale (no duplicate aliases)                 */
+    /* ============================================================ */
+
+    --radius: 6px;
+    --radius-s: 4px;
+    --radius-m: var(--radius);
+    --radius-l: 10px;
+    --radius-xl: 14px;
+    --radius-50: 50%;
+    --radius-circle: 999px;
+    --radius-none: 0;
+
+    /* ============================================================ */
+    /* BORDERS                                                        */
+    /* ============================================================ */
+
+    --border-size: 1px;
+    --border-width: var(--border-size);
+    --border-style: solid;
+    --border: var(--border-size) var(--border-style) var(--border-color-dark);
+
+    /* ============================================================ */
+    /* DIVIDERS                                                       */
+    /* ============================================================ */
+
+    --divider-size: 1px;
+    --divider-style: solid;
+    --divider-color-dark: var(--border-color-dark);
+    --divider-color-light: var(--border-color-light);
+    --divider:
+      var(--divider-size) var(--divider-style) var(--border-color-dark);
+    --divider-light:
+      var(--divider-size) var(--divider-style) var(--border-color-light);
+
+    /* ============================================================ */
+    /* SHADOWS                                                        */
+    /* ============================================================ */
+
+    --box-shadow-1: 0 1px 2px 0
+      color-mix(in srgb, var(--black) 6%, transparent);
+    --box-shadow-2: 0 2px 6px -1px
+      color-mix(in srgb, var(--black) 10%, transparent);
+    --box-shadow-3: 0 8px 24px -4px
+      color-mix(in srgb, var(--black) 14%, transparent);
+
+    /* ============================================================ */
+    /* TRANSITIONS                                                    */
+    /* ============================================================ */
+
+    --transition-duration: 0.2s;
+    --transition-timing: ease;
+    --transition-delay: 0s;
+    --transition:
+      var(--transition-duration) var(--transition-timing)
+      var(--transition-delay);
+
+    --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+    --ease-snappy: cubic-bezier(0.16, 1, 0.3, 1);
+    --ease-gentle: cubic-bezier(0.65, 0, 0.35, 1);
+
+    /* ============================================================ */
+    /* LINKS                                                          */
+    /* ============================================================ */
+
+    --link-color: var(--primary-dark);
+    --link-color-hover: var(--primary);
+    --link-decoration: underline;
+    --link-decoration-hover: underline;
+    --link-underline-offset: 0.2em;
+    --link-weight: inherit;
+    --link-transition: color var(--transition);
+
+    /* ============================================================ */
+    /* BUTTONS                                                        */
+    /* ============================================================ */
+
+    --btn-padding-block: 0.55em;
+    --btn-padding-inline: 1em;
+    --btn-min-width: 0;
+    --btn-width: max-content;
+    --btn-gap: 0.5em;
+    --btn-line-height: 1.4;
+    --btn-font-size: var(--text-m);
+    --btn-font-weight: 500;
+    --btn-font-family: inherit;
+    --btn-font-style: normal;
+    --btn-letter-spacing: 0;
+    --btn-text-decoration: none;
+    --btn-text-decoration-hover: none;
+    --btn-text-transform: none;
+    --btn-text-align: center;
+    --btn-border-width: var(--border-width);
+    --btn-border-style: solid;
+    --btn-border-radius: var(--radius);
+    --btn-radius: var(--radius);
+    --btn-justify-content: center;
+    --btn-align-items: center;
+    --btn-display: inline-flex;
+    --btn-transition:
+      background var(--transition), color var(--transition),
+      border-color var(--transition);
+
+    /* ============================================================ */
+    /* FOCUS                                                          */
+    /* ============================================================ */
+
+    --focus-color: var(--primary);
+    --focus-width: 2px;
+    --focus-offset: 2px;
+
+    /* ============================================================ */
+    /* FIELDS — one skin for every text control                       */
+    /* Consumed by both the semantic input defaults (base.css          */
+    /* @layer defaults) and .field__control, so raw inputs and         */
+    /* component fields render identically. Canonical look = the      */
+    /* .field__control one (cream surface, small radius, primary      */
+    /* focus + ring) per ADR-033 editorial.                            */
+    /* ============================================================ */
+
+    --field-bg: var(--base);
+    --field-radius: var(--radius-s);
+    --field-border-color-focus: var(--primary);
+
+    /* ============================================================ */
+    /* SELECTION                                                      */
+    /* ============================================================ */
+
+    --selection-bg: color-mix(in oklch, var(--primary) 22%, transparent);
+    --selection-fg: var(--primary-ultra-dark);
+
+    /* ============================================================ */
+    /* INTERACTIVE STATES                                             */
+    /* ============================================================ */
+
+    --disabled-opacity: 0.5;
+
+    /* ============================================================ */
+    /* Z-INDEX scale                                                  */
+    /* ============================================================ */
+
+    --z-dropdown: 100;
+    --z-sticky: 200;
+    --z-modal: 300;
+    --z-toast: 400;
+  }
+
+  ::selection {
+    background: var(--selection-bg);
+    color: var(--selection-fg);
+  }
+
+  /* ============================================================ */
+  /* MODE — dark                                                    */
+  /* ============================================================ */
+  /* Two orthogonal axes:                                            */
+  /*   data-mode  → light / dark   (luminance, contrast)             */
+  /*   data-theme → default / presenter / ... (palette + fonts)      */
+  /* Activate dark with `<html data-mode="dark">`. Combine with any  */
+  /* theme: `<html data-theme="presenter" data-mode="dark">`.        */
+
+  :root[data-mode="dark"] {
+    color-scheme: dark;
+
+    /* Primitives — soft off-black canvas + off-white ink.
+       L choices land where Material/Apple/Notion sit (17-20% bg, 82-86%
+       text) to keep body-text contrast around ~12:1, not the harsh 18:1+
+       of pure black/white. Warm hue on --base (H 85) preserves the
+       intimacy of the v0.5 cream identity; cool hue on --neutral (H 275)
+       keeps the ink reading as ink, not gray. */
+    --base: oklch(21% 0.008 85);     /* warm off-black, softer than Material baseline */
+    --neutral: oklch(82% 0.006 275); /* off-white, cool, no glow */
+    --primary: oklch(72% 0.1 275);   /* slate light, ~15% less saturated */
+
+    /* Surfaces — defined explicitly. Light side now means "elevated up"
+       (raised cards lighter than body, sunk panels barely lifted); dark
+       side is context-shift, a near-white bg for blocks that want light/
+       inverted contrast inside a dark theme. The auto-derive from
+       --base shades is wrong here because color-mix(--base, --neutral)
+       INCREASES luminance once --neutral flips to light. */
+    --bg: var(--base);
+    --bg-ultra-light: oklch(29% 0.008 85);   /* raised cards, highest elevation */
+    --bg-light: oklch(25% 0.008 85);         /* sunk panels, subtle lift */
+    --bg-dark: oklch(82% 0.006 275);         /* context shift — light bg block */
+    --bg-ultra-dark: oklch(92% 0.006 275);   /* context shift — deepest light */
+    --bg-hover: oklch(26% 0.008 85);         /* interaction feedback */
+    --bg-active: oklch(30% 0.008 85);        /* pressed state */
+
+    /* Text — heading = body (no extra glow); --text-light flips to DARK
+       so callers that mean "text-on-primary-fill" still get contrast
+       (primary is now slate-light, needs dark text). Literal value, not
+       var(--neutral-ultra-dark): the ladder below re-anchors that step
+       to a LIGHT ink, which would turn checkbox ticks and tooltip text
+       invisible on their light fills. */
+    --heading-color: var(--neutral);
+    --text-light: oklch(22% 0.008 85);
+
+    /* Derived-shade ladder re-anchored for dark (the fill/ink steps the
+       pill family consumes — badges, chips, avatars, toasts, menu active).
+       Light mode mixes toward literal white/black; on a dark canvas that
+       renders near-white pills. Here fills sink toward the dark base
+       (tag-tone recipe, ~27-30% L) and inks lift toward white (~80% L).
+       The -light / -semi-light steps are NOT flipped on purpose:
+       --text-faint, button hover borders and outline tones consume them
+       as "lighter than ink", which stays true when ink is light. */
+    --neutral-ultra-light: color-mix(in oklch, var(--neutral), var(--base) 82%);
+    --neutral-semi-dark: color-mix(in oklch, var(--neutral), white 40%);
+    --neutral-dark: color-mix(in oklch, var(--neutral), white 45%);
+    --neutral-ultra-dark: color-mix(in oklch, var(--neutral), white 55%);
+
+    --primary-ultra-light: color-mix(in oklch, var(--primary), var(--base) 78%);
+    --primary-semi-dark: color-mix(in oklch, var(--primary), white 40%);
+    --primary-dark: color-mix(in oklch, var(--primary), white 45%);
+    --primary-ultra-dark: color-mix(in oklch, var(--primary), white 55%);
+
+    --info-ultra-light: color-mix(in oklch, var(--info), var(--base) 78%);
+    --info-semi-dark: color-mix(in oklch, var(--info), white 40%);
+    --info-dark: color-mix(in oklch, var(--info), white 45%);
+    --info-ultra-dark: color-mix(in oklch, var(--info), white 55%);
+
+    --success-ultra-light: color-mix(in oklch, var(--success), var(--base) 78%);
+    --success-semi-dark: color-mix(in oklch, var(--success), white 40%);
+    --success-dark: color-mix(in oklch, var(--success), white 45%);
+    --success-ultra-dark: color-mix(in oklch, var(--success), white 55%);
+
+    --warning-ultra-light: color-mix(in oklch, var(--warning), var(--base) 78%);
+    --warning-semi-dark: color-mix(in oklch, var(--warning), white 40%);
+    --warning-dark: color-mix(in oklch, var(--warning), white 45%);
+    --warning-ultra-dark: color-mix(in oklch, var(--warning), white 55%);
+
+    --danger-ultra-light: color-mix(in oklch, var(--danger), var(--base) 78%);
+    --danger-semi-dark: color-mix(in oklch, var(--danger), white 40%);
+    --danger-dark: color-mix(in oklch, var(--danger), white 45%);
+    --danger-ultra-dark: color-mix(in oklch, var(--danger), white 55%);
+
+    /* Borders — bumped opacity so they stay perceptible on warm dark bg */
+    --border-color-dark: color-mix(in oklch, var(--neutral) 22%, transparent);
+    --border-color-light: color-mix(in oklch, var(--neutral) 12%, transparent);
+
+    /* Status — L raised so badges read; saturation dropped ~15-20pp so
+       they don't vibrate against dark bg (Material recommendation). */
+    --info: oklch(70% 0.11 255);
+    --success: oklch(68% 0.1 150);
+    --warning: oklch(75% 0.11 70);
+    --danger: oklch(70% 0.13 25);
+
+    /* Accents — same hues as light mode (identity preserved). L lifted
+       to 68-75% so they pop on dark; C dropped ~15-20% to soften vibration. */
+    --accent-1: oklch(70% 0.1 260);
+    --accent-2: oklch(72% 0.11 45);
+    --accent-3: oklch(70% 0.1 150);
+    --accent-4: oklch(70% 0.12 20);
+    --accent-5: oklch(75% 0.1 330);
+    --accent-6: oklch(72% 0.09 200);
+    --accent-7: oklch(68% 0.1 295);
+    --accent-8: oklch(74% 0.1 85);
+
+    /* Tag tones — bg ≈ 27% L (subtle pill, +6pp over body so it lifts
+       visibly), fg ≈ 80% L (legible without halo). */
+    --tag-amber-bg: oklch(27% 0.04 80);
+    --tag-amber-fg: oklch(80% 0.06 70);
+    --tag-blue-bg: oklch(27% 0.04 240);
+    --tag-blue-fg: oklch(82% 0.08 250);
+    --tag-teal-bg: oklch(27% 0.04 180);
+    --tag-teal-fg: oklch(80% 0.06 190);
+    --tag-green-bg: oklch(27% 0.05 150);
+    --tag-green-fg: oklch(80% 0.08 150);
+    --tag-purple-bg: oklch(27% 0.04 300);
+    --tag-purple-fg: oklch(82% 0.08 300);
+    --tag-red-bg: oklch(27% 0.04 20);
+    --tag-red-fg: oklch(82% 0.1 25);
+    --tag-neutral-bg: oklch(27% 0.005 60);
+    --tag-neutral-fg: var(--text-muted);
+
+    /* Selection — slate tint with off-white fg */
+    --selection-bg: color-mix(in oklch, var(--primary) 35%, transparent);
+    --selection-fg: var(--neutral);
+
+    /* Shadows — black on darker is invisible at low opacity; bump to
+       30-50% so elevation reads. */
+    --box-shadow-1: 0 1px 2px 0
+      color-mix(in srgb, var(--black) 30%, transparent);
+    --box-shadow-2: 0 2px 6px -1px
+      color-mix(in srgb, var(--black) 40%, transparent);
+    --box-shadow-3: 0 8px 24px -4px
+      color-mix(in srgb, var(--black) 50%, transparent);
+  }
+
+  /* Smooth color transitions on theme swap (browsers without View
+     Transitions API still get a gradual fade). Limit to color/bg
+     props so geometry doesn't animate. */
+  :where(html, body, *) {
+    transition:
+      background-color var(--transition),
+      color var(--transition),
+      border-color var(--transition);
+  }
+
+  /* View Transitions API — root crossfade. Disable default browser
+     opacity tween between the snapshots so colors swap clean. */
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none;
+    mix-blend-mode: normal;
+  }
+
+  /* ============================================================ */
+  /* THEME — Serif Quiet                                            */
+  /* ============================================================ */
+  /* Proof-of-concept theme. Demonstrates the data-theme axis with  */
+  /* the most visible single change: body type switches from sans   */
+  /* to serif. Everything reads in Newsreader; mono kickers stay    */
+  /* for metadata contrast. Paleta tinted warmer (closer to old-    */
+  /* paper cream) so the serif feels intentional, not accidental.   */
+
+  :root[data-theme="serif-quiet"] {
+    /* Body type → serif. Headings & mono untouched (still Newsreader
+       + JetBrains Mono). The contextual --text-font-family alias is
+       what body consumes, so this single line repaints all sans copy. */
+    --font-sans: var(--font-display);
+    --text-line-height: 1.6;
+    --text-text-wrap: pretty;
+
+    /* Cream slightly warmer — H 75 vs default 85, +chroma so it feels
+       like an aged-paper cream rather than the cool warm-cream default. */
+    --base: oklch(96% 0.014 75);
+
+    /* Slate warmer + slightly darker so it sits as a brown-slate accent
+       on cream, like ink on parchment. */
+    --primary: oklch(38% 0.09 50);
+
+    /* Borders pick up the warmth automatically via --neutral derivation,
+       but we drop chroma on the neutral so the ink doesn't compete with
+       the warm base. */
+    --neutral: oklch(28% 0.008 60);
+  }
+
+  /* Serif Quiet + dark — combine theme × mode. Most of the dark mode
+     overrides still apply; we only retune the few primitives that need
+     to keep the "aged paper" character in inverted luminance. */
+  :root[data-theme="serif-quiet"][data-mode="dark"] {
+    /* Warm dark base — slightly more chroma than the default dark to
+       stay in the aged-paper register even when inverted. */
+    --base: oklch(22% 0.014 75);
+
+    /* Off-cream text instead of cool ink-light, to keep the warm read. */
+    --neutral: oklch(84% 0.012 75);
+
+    /* Slate warm-light so primary remains the same "brown ink" feeling. */
+    --primary: oklch(74% 0.09 50);
+  }
+}
+
+</style>
+<style>
+/*
+  Hour — Base stylesheet
+  ACSS-style: defaults at semantic selector level (low specificity via :where()),
+  utility classes for context shifts, components only declare what's specific.
+*/
+
+@layer reset, defaults, tokens, layouts, components, components.overrides,
+  utilities, overrides;
+
+
+
+/* ============================================================ */
+/* RESET                                                          */
+/* ============================================================ */
+@layer reset {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  :where(
+    body,
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6,
+    p,
+    figure,
+    blockquote,
+    dl,
+    dd,
+    ul,
+    ol
+  ) {
+    margin: 0;
+  }
+
+  body :where(p, h1, h2, h3, h4, h5, h6, ul, ol, li) {
+    margin-block: 0;
+  }
+
+  :where(ul[role="list"], ol[role="list"], nav ul) {
+    list-style: none;
+    padding: 0;
+  }
+
+  html {
+    font-size: var(--root-font-size);
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
+  html,
+  body {
+    block-size: 100%;
+  }
+
+  body {
+    min-block-size: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  img,
+  picture,
+  video,
+  canvas,
+  svg {
+    display: block;
+    max-inline-size: 100%;
+  }
+
+  input,
+  button,
+  textarea,
+  select {
+    font: inherit;
+    color: inherit;
+  }
+
+  button {
+    background: none;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+  }
+
+  :where(cite, address) {
+    font-style: normal;
+  }
+  :where(blockquote) {
+    margin: 0;
+    background: transparent;
+  }
+  :where(fieldset) {
+    border: 0;
+    padding: 0;
+  }
+
+  [id] {
+    scroll-margin-top: var(--offset, 0);
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+  html:focus-within {
+    scroll-behavior: auto;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html:focus-within {
+      scroll-behavior: auto;
+    }
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+/* ============================================================ */
+/* DEFAULTS — semantic selectors carry the design                 */
+/* ============================================================ */
+@layer defaults {
+  :where(body) {
+    font-family: var(--text-font-family);
+    font-weight: var(--text-font-weight);
+    font-size: var(--text-m);
+    line-height: var(--text-line-height);
+    text-wrap: var(--text-text-wrap);
+    color: var(--text-color);
+    background: var(--body-bg-color);
+    transition: background var(--transition);
+  }
+
+  :where(p) {
+    line-height: var(--text-line-height);
+  }
+
+  /* Heading shared properties — :where() so .h1-.h6 alias classes inherit */
+  h1,
+  :where(.h1),
+  h2,
+  :where(.h2),
+  h3,
+  :where(.h3),
+  h4,
+  :where(.h4),
+  h5,
+  :where(.h5),
+  h6,
+  :where(.h6) {
+    font-family: var(--heading-font-family);
+    font-weight: var(--heading-font-weight);
+    line-height: var(--heading-line-height);
+    letter-spacing: var(--heading-letter-spacing);
+    text-wrap: var(--heading-text-wrap);
+    color: var(--heading-color);
+  }
+
+  h1,
+  :where(.h1) {
+    font-size: var(--h1);
+  }
+  h2,
+  :where(.h2) {
+    font-size: var(--h2);
+  }
+  h3,
+  :where(.h3) {
+    font-size: var(--h3);
+  }
+  h4,
+  :where(.h4) {
+    font-size: var(--h4);
+  }
+  h5,
+  :where(.h5) {
+    font-size: var(--h5);
+  }
+  h6,
+  :where(.h6) {
+    font-size: var(--h6);
+  }
+
+  /* Section / header / footer carry their own padding + gap */
+  :where(section:not(section section)) {
+    display: flex;
+    flex-direction: column;
+    padding-block: var(--section-padding-block);
+    padding-inline: var(--gutter);
+    gap: var(--container-gap);
+  }
+
+  :where(body > header) {
+    padding-block: var(--space-s);
+    padding-inline: var(--gutter);
+  }
+
+  :where(body > footer) {
+    padding-block: var(--section-padding-block);
+    padding-inline: var(--gutter);
+  }
+
+  /* Links */
+  :where(body a:not([class*="btn--"])) {
+    color: var(--link-color);
+    font-weight: var(--link-weight);
+    text-decoration: var(--link-decoration);
+    text-underline-offset: var(--link-underline-offset);
+    transition: var(--link-transition);
+  }
+  @media (hover: hover) and (pointer: fine) {
+    :where(body a:not([class*="btn--"])):hover {
+      color: var(--link-color-hover);
+      text-decoration: var(--link-decoration-hover);
+    }
+  }
+
+  /* Focus */
+  :focus {
+    outline: none;
+    box-shadow: none;
+  }
+  :focus-visible {
+    outline: var(--focus-width) solid var(--focus-color);
+    outline-offset: var(--focus-offset);
+  }
+
+  /* HR */
+  :where(hr) {
+    border: 0;
+    border-block-start: var(--divider);
+    margin-block: var(--space-l);
+  }
+
+  /* Code */
+  :where(code, kbd, samp) {
+    font-family:
+      ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.95em;
+  }
+
+  :where(pre) {
+    font-family:
+      ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: var(--text-s);
+    background: var(--bg-ultra-light);
+    padding: var(--space-m);
+    border-radius: var(--radius-m);
+    overflow-x: auto;
+  }
+
+  /* Form fields — semantic defaults consume the --field-* contract
+     (tokens.css) so raw inputs and .field__control render one skin:
+     cream surface, small radius, primary focus + ring. */
+  :where(
+      input[type="email"],
+      input[type="password"],
+      input[type="text"],
+      input[type="search"],
+      input[type="number"],
+      input[type="tel"],
+      input[type="url"],
+      input[type="date"],
+      input[type="datetime-local"],
+      input[type="time"],
+      textarea,
+      select
+    ) {
+    inline-size: 100%;
+    padding-block: var(--space-s);
+    padding-inline: var(--space-m);
+    background: var(--field-bg);
+    color: var(--text-color);
+    border: 1px solid var(--border-color-dark);
+    border-radius: var(--field-radius);
+    font-size: var(--text-s);
+    line-height: var(--text-line-height);
+    outline: none;
+    transition:
+      border-color var(--transition), background var(--transition);
+  }
+
+  :where(
+      input[type="email"],
+      input[type="password"],
+      input[type="text"],
+      input[type="search"],
+      input[type="number"],
+      input[type="tel"],
+      input[type="url"],
+      input[type="date"],
+      input[type="datetime-local"],
+      input[type="time"],
+      textarea,
+      select
+    )::placeholder {
+    color: var(--text-faint);
+  }
+
+  :where(
+      input[type="email"],
+      input[type="password"],
+      input[type="text"],
+      input[type="search"],
+      input[type="number"],
+      input[type="tel"],
+      input[type="url"],
+      input[type="date"],
+      input[type="datetime-local"],
+      input[type="time"],
+      textarea,
+      select
+    ):focus,
+  :where(
+      input[type="email"],
+      input[type="password"],
+      input[type="text"],
+      input[type="search"],
+      input[type="number"],
+      input[type="tel"],
+      input[type="url"],
+      input[type="date"],
+      input[type="datetime-local"],
+      input[type="time"],
+      textarea,
+      select
+    ):focus-visible {
+    border-color: var(--field-border-color-focus);
+    outline: var(--focus-width) solid var(--focus-color);
+    outline-offset: 1px;
+  }
+
+  :where(label) {
+    display: block;
+    font-size: var(--text-xs);
+    color: var(--text-dark-muted);
+  }
+
+  /* Input size modifiers — opt-in widths that override the default 100%. */
+  .input--short {
+    max-inline-size: 160px;
+  }
+  .input--tight {
+    inline-size: 80px;
+  }
+
+  /* Form layout — :where(form) is too aggressive; use .form when it applies */
+  .form {
+    display: grid;
+    gap: var(--space-s);
+  }
+
+  /* Tables — defaults at semantic level */
+  :where(table) {
+    inline-size: 100%;
+    border-collapse: collapse;
+  }
+
+  :where(th, td) {
+    text-align: start;
+    padding-block: var(--space-s);
+    padding-inline: var(--space-s);
+    border-block-end: var(--divider);
+    white-space: nowrap;
+  }
+
+  :where(th) {
+    font-size: var(--text-xs);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-dark-muted);
+  }
+}
+
+/* ============================================================ */
+/* COMPONENTS — shared cross-page (button, badge utility skeletons) */
+/* ============================================================ */
+@layer components {
+  /* App shell opts out of the document-level <section> default above:
+     that padding (--section-padding-block ≈ 72px + --gutter inline) is
+     editorial/marketing rhythm, and inside the app it injected ~200px
+     voids between modules and a 32px left-edge misalignment on every
+     detail page. The shell (.shell__content) owns the page rhythm;
+     components keep their own tokenized gaps. Login/public pages stay
+     on the document default. */
+  .shell__content :where(section:not(section section)) {
+    padding-block: 0;
+    padding-inline: 0;
+  }
+
+  /* Button skeleton — every .btn--* picks this up via attribute selector.
+     Modifiers only redeclare CSS variables, never properties. */
+  [class*="btn--"]:where(:not(.btn--none)) {
+    position: relative;
+    display: var(--btn-display);
+    justify-content: var(--btn-justify-content);
+    align-items: var(--btn-align-items);
+    gap: var(--btn-gap);
+    inline-size: var(--btn-width, auto);
+    min-inline-size: var(--btn-min-width);
+    padding-block: var(--btn-padding-block);
+    padding-inline: var(--btn-padding-inline);
+    font-family: var(--btn-font-family);
+    font-size: var(--btn-font-size);
+    font-weight: var(--btn-font-weight);
+    font-style: var(--btn-font-style);
+    line-height: var(--btn-line-height);
+    text-decoration: var(--btn-text-decoration);
+    text-transform: var(--btn-text-transform);
+    text-align: var(--btn-text-align);
+    letter-spacing: var(--btn-letter-spacing);
+    background: var(--btn-background);
+    color: var(--btn-text-color);
+    border-width: var(--btn-border-width);
+    border-style: var(--btn-border-style);
+    border-radius: var(--btn-border-radius);
+    border-color: var(--btn-border-color);
+    transition: var(--btn-transition);
+    cursor: pointer;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    [class*="btn--"]:where(:not(.btn--none)):hover {
+      background: var(--btn-background-hover);
+      color: var(--btn-text-color-hover);
+      border-color: var(--btn-border-color-hover);
+      text-decoration: var(--btn-text-decoration-hover);
+    }
+  }
+
+  [class*="btn--"]:where(:not(.btn--none)):disabled {
+    opacity: var(--disabled-opacity);
+    cursor: not-allowed;
+  }
+
+  /* Button variants — only CSS variable redeclarations */
+
+  /* Primary = ink fill (v0.5 editorial). The slate --primary stays
+     reserved for focus rings, links, selection — not button fills. */
+  .btn--primary {
+    --btn-background: var(--text-color);
+    --btn-background-hover: var(--neutral-semi-dark);
+    --btn-text-color: var(--bg);
+    --btn-text-color-hover: var(--bg);
+    --btn-border-color: var(--btn-background);
+    --btn-border-color-hover: var(--btn-background-hover);
+  }
+
+  /* Danger = red fill for destructive actions (Delete account, etc.). */
+  .btn--danger {
+    --btn-background: var(--danger);
+    --btn-background-hover: var(--danger-hover);
+    --btn-text-color: var(--bg);
+    --btn-text-color-hover: var(--bg);
+    --btn-border-color: var(--btn-background);
+    --btn-border-color-hover: var(--btn-background-hover);
+  }
+
+  .btn--outline {
+    --btn-background: transparent;
+    --btn-background-hover: var(--bg-ultra-light);
+    --btn-text-color: var(--text-dark-muted);
+    --btn-text-color-hover: var(--heading-color);
+    --btn-border-color: var(--border-color-dark);
+    --btn-border-color-hover: var(--neutral-semi-light);
+  }
+
+  /* Warn = combinable tone modifier. Repaints text + border to danger,
+     keeps the variant's background pattern. Useful on outline buttons
+     for destructive secondary actions (Leave, Cancel, Remove). */
+  [class*="btn--"].is-warn {
+    --btn-text-color: var(--danger);
+    --btn-text-color-hover: var(--danger-dark);
+    --btn-border-color: var(--danger-light);
+    --btn-border-color-hover: var(--danger);
+  }
+
+  /* Loading: hide content, overlay spinner. Skeleton, not a variant. */
+  .btn--loading > :not(.btn__spinner) {
+    visibility: hidden;
+  }
+
+  .btn__spinner {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+  }
+
+  .btn__spinner::before {
+    content: "";
+    inline-size: 1em;
+    block-size: 1em;
+    border: 2px solid currentColor;
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: btn-spin 0.6s linear infinite;
+  }
+
+  @keyframes btn-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  .btn__lead,
+  .btn__tail {
+    display: inline-flex;
+    align-items: center;
+  }
+
+  /* Size modifiers (combinable) */
+  .btn--xs {
+    --btn-font-size: var(--text-xs);
+  }
+  .btn--s {
+    --btn-font-size: var(--text-s);
+  }
+  .btn--m {
+    --btn-font-size: var(--text-m);
+  }
+  .btn--l {
+    --btn-font-size: var(--text-l);
+  }
+
+  /* Field skeleton — wraps label + input + helper/error.
+     The control wrapper carries the border so prefix/suffix sit inside it.
+     Input inside .field__control sheds its own border (cascade-friendly). */
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+  }
+
+  .field__control {
+    display: flex;
+    align-items: stretch;
+    background: var(--field-bg);
+    border: var(--border);
+    border-radius: var(--field-radius);
+    transition: border-color var(--transition);
+    overflow: hidden;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .field__control:hover {
+      border-color: var(--neutral-semi-light);
+    }
+  }
+
+  .field__control:focus-within {
+    border-color: var(--field-border-color-focus);
+    outline: var(--focus-width) solid var(--focus-color);
+    outline-offset: 1px;
+  }
+
+  .field--error .field__control {
+    border-color: var(--danger);
+  }
+
+  .field--error .field__control:focus-within {
+    outline-color: var(--danger);
+  }
+
+  .field--loading .field__control {
+    opacity: 0.7;
+  }
+
+  /* Disabled — wrapper picks up the state from the direct child control via
+     :has(> :disabled). Direct child only, so a <select> with internal
+     <option disabled> entries doesn't drag the wrapper into disabled style. */
+  .field__control:has(> :disabled) {
+    background: var(--bg-ultra-light);
+    border-color: var(--border-color-dark);
+    opacity: var(--disabled-opacity);
+    cursor: not-allowed;
+  }
+
+  .field__control:has(> :disabled) > * {
+    cursor: not-allowed;
+  }
+
+  .field__control > input,
+  .field__control > select {
+    border: none;
+    border-radius: 0;
+    outline: none;
+    background: transparent;
+    flex: 1;
+    min-inline-size: 0;
+  }
+
+  .field__control > input:hover,
+  .field__control > input:focus,
+  .field__control > input:focus-visible,
+  .field__control > select:hover,
+  .field__control > select:focus,
+  .field__control > select:focus-visible {
+    border: none;
+    outline: none;
+    background: transparent;
+  }
+
+  /* Native select keeps its chevron via appearance: auto (default).
+     Padding is inherited from the global :where(...select) rule. */
+  .field--select .field__control {
+    overflow: visible; /* allow native dropdown shadow if any */
+  }
+
+  .field__prefix,
+  .field__suffix {
+    display: inline-flex;
+    align-items: center;
+    padding-inline: var(--space-s);
+    color: var(--text-dark-muted);
+    background: transparent;
+    white-space: nowrap;
+  }
+
+  .field__prefix {
+    border-inline-end: var(--divider);
+  }
+
+  .field__suffix {
+    border-inline-start: var(--divider);
+  }
+
+  .field__suffix--spinner {
+    border-inline-start: none;
+  }
+
+  .field__spinner {
+    inline-size: 1em;
+    block-size: 1em;
+    border: 2px solid currentColor;
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: btn-spin 0.6s linear infinite;
+  }
+
+  .field__msg {
+    font-size: var(--text-xs);
+    color: var(--text-dark-muted);
+    min-block-size: var(--text-xs);
+    margin: 0;
+  }
+
+  .field--error .field__msg {
+    color: var(--danger-dark);
+  }
+
+  /* Check skeleton — shared by checkbox and radio.
+     Native input is visually hidden but stays in DOM (focus + a11y).
+     The .check__box is what's drawn; modifier .check--radio rounds it. */
+  .check {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+  }
+
+  .check__row {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-s);
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .check--disabled .check__row {
+    cursor: not-allowed;
+    opacity: var(--disabled-opacity);
+  }
+
+  .check__input {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .check__box {
+    flex-shrink: 0;
+    inline-size: 1.125em;
+    block-size: 1.125em;
+    border: var(--border);
+    border-radius: var(--radius-s);
+    background: var(--base);
+    display: grid;
+    place-items: center;
+    transition: background var(--transition), border-color var(--transition);
+  }
+
+  .check--radio .check__box {
+    border-radius: 50%;
+  }
+
+  .check__row:hover .check__box {
+    border-color: var(--neutral-semi-light);
+  }
+
+  .check__input:focus-visible + .check__box {
+    outline: var(--focus-width) solid var(--focus-color);
+    outline-offset: 2px;
+  }
+
+  .check__input:checked + .check__box {
+    background: var(--primary);
+    border-color: var(--primary);
+  }
+
+  /* Tick mark for checkbox (drawn with two borders rotated) */
+  .check__input[type="checkbox"]:checked + .check__box::after {
+    content: "";
+    inline-size: 0.55em;
+    block-size: 0.3em;
+    border-inline-start: 2px solid var(--text-light);
+    border-block-end: 2px solid var(--text-light);
+    transform: rotate(-45deg) translate(1px, -1px);
+  }
+
+  /* Indeterminate dash */
+  .check__input[type="checkbox"]:indeterminate + .check__box {
+    background: var(--primary);
+    border-color: var(--primary);
+  }
+  .check__input[type="checkbox"]:indeterminate + .check__box::after {
+    content: "";
+    inline-size: 0.6em;
+    block-size: 2px;
+    background: var(--text-light);
+  }
+
+  /* Dot for radio */
+  .check__input[type="radio"]:checked + .check__box::after {
+    content: "";
+    inline-size: 0.5em;
+    block-size: 0.5em;
+    border-radius: 50%;
+    background: var(--text-light);
+  }
+
+  .check--error .check__box {
+    border-color: var(--danger);
+  }
+
+  .check__label {
+    font-size: var(--text-m);
+    color: var(--text-color);
+  }
+
+  .check__msg {
+    font-size: var(--text-xs);
+    color: var(--text-dark-muted);
+    margin: 0;
+    margin-inline-start: calc(1.125em + var(--space-s));
+  }
+
+  .check--error .check__msg {
+    color: var(--danger-dark);
+  }
+
+  /* Chip skeleton — INTERACTIVE pills (filter pills, removable tags, multi-select).
+     For static visual indicators (status, etc.) use Badge instead.
+     Tones + sizes modify variables only. Border color is derived from text color
+     via color-mix — same hue, sub-tone of the chip palette. Selected overrides. */
+  [class*="chip--"]:where(:not(.chip--none)) {
+    --chip-padding-block: var(--space-xs);
+    --chip-padding-inline: var(--space-s);
+    --chip-font-size: var(--text-xs);
+    --chip-font-weight: 500;
+    --chip-radius: var(--radius-circle);
+    --chip-gap: 0.4em;
+    --chip-border-color: color-mix(
+      in oklch,
+      var(--chip-color),
+      var(--chip-background) 60%
+    );
+
+    display: inline-flex;
+    align-items: center;
+    gap: var(--chip-gap);
+    padding-block: var(--chip-padding-block);
+    padding-inline: var(--chip-padding-inline);
+    font-size: var(--chip-font-size);
+    font-weight: var(--chip-font-weight);
+    line-height: 1.4;
+    border-radius: var(--chip-radius);
+    background: var(--chip-background);
+    color: var(--chip-color);
+    border: 2px solid var(--chip-border-color);
+    transition: background var(--transition), border-color var(--transition);
+  }
+
+  /* Tones */
+  .chip--neutral {
+    --chip-background: var(--neutral-ultra-light);
+    --chip-color: var(--neutral-ultra-dark);
+  }
+  .chip--primary {
+    --chip-background: var(--primary-ultra-light);
+    --chip-color: var(--primary-ultra-dark);
+  }
+  .chip--info {
+    --chip-background: var(--info-ultra-light);
+    --chip-color: var(--info-ultra-dark);
+  }
+  .chip--success {
+    --chip-background: var(--success-ultra-light);
+    --chip-color: var(--success-ultra-dark);
+  }
+  .chip--warning {
+    --chip-background: var(--warning-ultra-light);
+    --chip-color: var(--warning-ultra-dark);
+  }
+  .chip--danger {
+    --chip-background: var(--danger-ultra-light);
+    --chip-color: var(--danger-ultra-dark);
+  }
+
+  /* Sizes — only xs and m redeclare; s is default. */
+  .chip--xs {
+    --chip-padding-block: 0.1em;
+    --chip-padding-inline: 0.5em;
+  }
+  .chip--m {
+    --chip-padding-block: var(--space-xs);
+    --chip-padding-inline: var(--space-m);
+    --chip-font-size: var(--text-s);
+  }
+
+  /* Inactive filter pill = clearly off (low opacity, no border).
+     Hover = lifted. Selected = full intensity + solid border in the tone color.
+     Only buttons get this treatment — removable chips (<span>) stay full. */
+  button[class*="chip--"]:not(:disabled):not(.chip--selected) {
+    opacity: 0.55;
+    --chip-border-color: transparent;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    button[class*="chip--"]:not(:disabled):not(.chip--selected):hover {
+      opacity: 0.9;
+    }
+  }
+
+  .chip--selected {
+    --chip-border-color: var(--chip-color);
+  }
+
+  /* Interactive (button[class*="chip--"] from onclick prop) */
+  button[class*="chip--"] {
+    cursor: pointer;
+    font-family: inherit;
+  }
+
+  button[class*="chip--"]:focus-visible {
+    outline: var(--focus-width) solid var(--focus-color);
+    outline-offset: 2px;
+  }
+
+  [class*="chip--"]:disabled,
+  .chip--disabled {
+    opacity: var(--disabled-opacity);
+    cursor: not-allowed;
+  }
+
+  /* Lead / tail icon slots — same role as btn__lead/__tail */
+  .chip__lead,
+  .chip__tail {
+    display: inline-flex;
+    align-items: center;
+  }
+
+  /* Remove button (when onRemove passed) */
+  .chip__remove {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    inline-size: 1.2em;
+    block-size: 1.2em;
+    padding: 0;
+    margin-inline-end: -0.2em;
+    font-size: 1.1em;
+    line-height: 1;
+    background: transparent;
+    border: 0;
+    border-radius: 50%;
+    color: inherit;
+    cursor: pointer;
+    opacity: 0.6;
+    transition: opacity var(--transition), background var(--transition);
+  }
+
+  .chip__remove:hover {
+    opacity: 1;
+    background: color-mix(in srgb, currentColor 15%, transparent);
+  }
+
+  .chip__remove:focus-visible {
+    outline: var(--focus-width) solid var(--focus-color);
+    outline-offset: 1px;
+    opacity: 1;
+  }
+
+  /* Badge skeleton — STATIC visual indicators (status pills, type tags, etc.).
+     Cuadradito (--radius-s), no interactive states.
+     Border derived from text color via color-mix — same hue as the badge palette. */
+  [class*="badge--"] {
+    --badge-padding-block: var(--space-xs);
+    --badge-padding-inline: var(--space-s);
+    --badge-font-size: var(--text-xs);
+    --badge-font-weight: 500;
+    --badge-radius: var(--radius-s);
+    --badge-gap: 0.4em;
+    --badge-border-color: color-mix(
+      in oklch,
+      var(--badge-color),
+      var(--badge-background) 60%
+    );
+
+    display: inline-flex;
+    align-items: center;
+    gap: var(--badge-gap);
+    padding-block: var(--badge-padding-block);
+    padding-inline: var(--badge-padding-inline);
+    font-size: var(--badge-font-size);
+    font-weight: var(--badge-font-weight);
+    line-height: 1.4;
+    border-radius: var(--badge-radius);
+    background: var(--badge-background);
+    color: var(--badge-color);
+    border: 1px solid var(--badge-border-color);
+    opacity: var(--badge-opacity, 1);
+  }
+
+  /* Tones — background + text color + accent (saturated, for dots/icons that
+     should pop against the muted text). Border is auto-derived. */
+  .badge--neutral {
+    --badge-background: var(--neutral-ultra-light);
+    --badge-color: var(--neutral-ultra-dark);
+    --badge-accent: var(--neutral-dark);
+  }
+  .badge--primary {
+    --badge-background: var(--primary-ultra-light);
+    --badge-color: var(--primary-ultra-dark);
+    --badge-accent: var(--primary);
+  }
+  .badge--info {
+    --badge-background: var(--info-ultra-light);
+    --badge-color: var(--info-ultra-dark);
+    --badge-accent: var(--info);
+  }
+  .badge--success {
+    --badge-background: var(--success-ultra-light);
+    --badge-color: var(--success-ultra-dark);
+    --badge-accent: var(--success);
+  }
+  .badge--warning {
+    --badge-background: var(--warning-ultra-light);
+    --badge-color: var(--warning-ultra-dark);
+    --badge-accent: var(--warning);
+  }
+  .badge--danger {
+    --badge-background: var(--danger-ultra-light);
+    --badge-color: var(--danger-ultra-dark);
+    --badge-accent: var(--danger);
+  }
+
+  /* Engagement status variants — one badge per engagement_status enum
+     value. Defined alongside the tone variants because they're consumed
+     across booking, room detail, and future contacts lens; keeping them
+     here prevents drift between consumers and keeps the variable-contract
+     pattern (consumer parameterises, skeleton stays the same). Class
+     names mirror the enum with underscores replaced by dashes
+     (in_conversation → in-conversation). */
+  .badge--contacted {
+    --badge-background: var(--info-ultra-light);
+    --badge-color: var(--info-ultra-dark);
+  }
+  .badge--in-conversation {
+    --badge-background: var(--warning-ultra-light);
+    --badge-color: var(--warning-ultra-dark);
+  }
+  .badge--hold {
+    --badge-background: var(--neutral-ultra-light);
+    --badge-color: var(--neutral-ultra-dark);
+  }
+  .badge--confirmed {
+    --badge-background: var(--success-ultra-light);
+    --badge-color: var(--success-ultra-dark);
+  }
+  .badge--declined {
+    --badge-background: var(--danger-ultra-light);
+    --badge-color: var(--danger-ultra-dark);
+  }
+  .badge--dormant {
+    --badge-background: var(--neutral-ultra-light);
+    --badge-color: var(--neutral-semi-dark);
+    --badge-opacity: 0.75;
+  }
+  .badge--recurring {
+    --badge-background: var(--primary-ultra-light);
+    --badge-color: var(--primary-ultra-dark);
+  }
+
+  /* Sizes — only xs and m redeclare; s is default. */
+  .badge--xs {
+    --badge-padding-block: 0.1em;
+    --badge-padding-inline: 0.5em;
+  }
+  .badge--m {
+    --badge-padding-block: var(--space-xs);
+    --badge-padding-inline: var(--space-m);
+    --badge-font-size: var(--text-s);
+  }
+
+  .badge__lead,
+  .badge__tail {
+    display: inline-flex;
+    align-items: center;
+  }
+
+  /* Avatar skeleton — circle with image or auto-derived initials. */
+  .avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    inline-size: var(--avatar-size);
+    block-size: var(--avatar-size);
+    border-radius: 50%;
+    font-weight: 500;
+    font-size: calc(var(--avatar-size) * 0.4);
+    background: var(--avatar-bg);
+    color: var(--avatar-color);
+    user-select: none;
+    flex-shrink: 0;
+    object-fit: cover;
+    overflow: hidden;
+  }
+
+  .avatar--xs {
+    --avatar-size: 1.5rem;
+  }
+  .avatar--s {
+    --avatar-size: 2rem;
+  }
+  .avatar--m {
+    --avatar-size: 2.5rem;
+  }
+  .avatar--l {
+    --avatar-size: 3rem;
+  }
+
+  .avatar--neutral {
+    --avatar-bg: var(--neutral-ultra-light);
+    --avatar-color: var(--neutral-ultra-dark);
+  }
+  .avatar--primary {
+    --avatar-bg: var(--primary-ultra-light);
+    --avatar-color: var(--primary-ultra-dark);
+  }
+  .avatar--info {
+    --avatar-bg: var(--info-ultra-light);
+    --avatar-color: var(--info-ultra-dark);
+  }
+  .avatar--success {
+    --avatar-bg: var(--success-ultra-light);
+    --avatar-color: var(--success-ultra-dark);
+  }
+  .avatar--warning {
+    --avatar-bg: var(--warning-ultra-light);
+    --avatar-color: var(--warning-ultra-dark);
+  }
+  .avatar--danger {
+    --avatar-bg: var(--danger-ultra-light);
+    --avatar-color: var(--danger-ultra-dark);
+  }
+
+  /* Dialog skeleton — native <dialog>. The element itself stays transparent
+     and only acts as the centered container that captures backdrop clicks
+     (e.target === dialog when the click lands on the ::backdrop). The
+     visible surface is .dialog__panel. Modifiers redeclare --dialog-* vars. */
+  .dialog {
+    --dialog-max-width: 32rem;
+    --dialog-radius: var(--radius-l);
+    --dialog-padding: var(--space-l);
+
+    margin: auto;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    max-inline-size: 100%;
+    max-block-size: 100%;
+  }
+
+  .dialog::backdrop {
+    background: color-mix(in srgb, var(--black) 40%, transparent);
+  }
+
+  .dialog__panel {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-m);
+    inline-size: min(90vw, var(--dialog-max-width));
+    padding: var(--dialog-padding);
+    background: var(--base);
+    color: var(--text-color);
+    border-radius: var(--dialog-radius);
+    box-shadow: var(--box-shadow-3);
+  }
+
+  .dialog__header {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+  }
+
+  .dialog__title {
+    font-size: var(--h3);
+  }
+
+  .dialog__description {
+    color: var(--text-dark-muted);
+    font-size: var(--text-s);
+  }
+
+  .dialog__body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-s);
+  }
+
+  .dialog__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--space-s);
+    flex-wrap: wrap;
+  }
+
+  .dialog--s {
+    --dialog-max-width: 24rem;
+  }
+  .dialog--l {
+    --dialog-max-width: 48rem;
+  }
+
+  /* Toast skeleton — fixed region in the bottom-right with a vertical stack.
+     Each .toast--<tone> redeclares --toast-bg / --toast-color / --toast-accent. */
+  .toast-region {
+    position: fixed;
+    inset-block-end: var(--space-m);
+    inset-inline-end: var(--space-m);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-s);
+    z-index: var(--z-toast);
+    pointer-events: none;
+    max-inline-size: min(28rem, calc(100vw - var(--space-l)));
+  }
+
+  [class*="toast--"] {
+    --toast-padding-block: var(--space-s);
+    --toast-padding-inline: var(--space-m);
+    --toast-radius: var(--radius-m);
+    --toast-border-color: color-mix(
+      in oklch,
+      var(--toast-color),
+      var(--toast-bg) 70%
+    );
+
+    pointer-events: auto;
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-s);
+    padding-block: var(--toast-padding-block);
+    padding-inline: var(--toast-padding-inline);
+    background: var(--toast-bg);
+    color: var(--toast-color);
+    border: 1px solid var(--toast-border-color);
+    border-inline-start: 4px solid var(--toast-accent);
+    border-radius: var(--toast-radius);
+    box-shadow: var(--box-shadow-2);
+    font-size: var(--text-s);
+  }
+
+  .toast--info {
+    --toast-bg: var(--info-ultra-light);
+    --toast-color: var(--info-ultra-dark);
+    --toast-accent: var(--info);
+  }
+  .toast--success {
+    --toast-bg: var(--success-ultra-light);
+    --toast-color: var(--success-ultra-dark);
+    --toast-accent: var(--success);
+  }
+  .toast--warning {
+    --toast-bg: var(--warning-ultra-light);
+    --toast-color: var(--warning-ultra-dark);
+    --toast-accent: var(--warning);
+  }
+  .toast--danger {
+    --toast-bg: var(--danger-ultra-light);
+    --toast-color: var(--danger-ultra-dark);
+    --toast-accent: var(--danger);
+  }
+
+  .toast__body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+  }
+
+  .toast__title {
+    font-size: var(--text-s);
+    font-weight: 600;
+    color: inherit;
+  }
+
+  .toast__message {
+    font-size: var(--text-s);
+    color: inherit;
+  }
+
+  .toast__dismiss {
+    flex-shrink: 0;
+    inline-size: 1.5em;
+    block-size: 1.5em;
+    padding: 0;
+    font-size: 1.1em;
+    line-height: 1;
+    background: transparent;
+    border: 0;
+    border-radius: 50%;
+    color: inherit;
+    opacity: 0.6;
+    cursor: pointer;
+    transition: opacity var(--transition), background var(--transition);
+  }
+
+  .toast__dismiss:hover {
+    opacity: 1;
+    background: color-mix(in srgb, currentColor 15%, transparent);
+  }
+
+  .toast__dismiss:focus-visible {
+    outline: var(--focus-width) solid var(--focus-color);
+    outline-offset: 1px;
+    opacity: 1;
+  }
+
+  /* Tooltip skeleton — anchored to a wrapper, positioned via .tooltip--<pos>.
+     Visibility flips with [data-visible]; transitions handle fade. */
+  .tooltip-wrapper {
+    position: relative;
+    display: inline-flex;
+  }
+
+  .tooltip {
+    position: absolute;
+    z-index: var(--z-dropdown);
+    padding-block: var(--space-xs);
+    padding-inline: var(--space-s);
+    background: var(--neutral-ultra-dark);
+    color: var(--text-light);
+    font-size: var(--text-xs);
+    line-height: 1.3;
+    border-radius: var(--radius-s);
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity var(--transition), visibility var(--transition);
+  }
+
+  .tooltip[data-visible] {
+    opacity: 1;
+    visibility: visible;
+  }
+
+  .tooltip--top {
+    inset-block-end: calc(100% + var(--space-xs));
+    inset-inline-start: 50%;
+    transform: translateX(-50%);
+  }
+  .tooltip--bottom {
+    inset-block-start: calc(100% + var(--space-xs));
+    inset-inline-start: 50%;
+    transform: translateX(-50%);
+  }
+  .tooltip--left {
+    inset-inline-end: calc(100% + var(--space-xs));
+    inset-block-start: 50%;
+    transform: translateY(-50%);
+  }
+  .tooltip--right {
+    inset-inline-start: calc(100% + var(--space-xs));
+    inset-block-start: 50%;
+    transform: translateY(-50%);
+  }
+
+  /* Menu skeleton — dropdown anchored to a trigger. Items use [role="menuitem"].
+     Modifiers .menu--start / .menu--end pick the inline alignment. */
+  .menu-wrapper {
+    position: relative;
+    display: inline-flex;
+  }
+
+  .menu {
+    position: absolute;
+    inset-block-start: calc(100% + var(--space-xs));
+    z-index: var(--z-dropdown);
+    /* Menu matches the trigger width by default — keeps menu and trigger
+       optically aligned. Triggers should size to their content (no `flex: 1`
+       on a content-sized cluster), so the menu inherits a sensible width.
+       The floor handles icon-only triggers where the wrapper is tiny. */
+    inline-size: 100%;
+    min-inline-size: 12rem;
+    margin: 0;
+    padding: var(--space-xs);
+    list-style: none;
+    background: var(--base);
+    border: var(--border);
+    border-radius: var(--radius-m);
+    box-shadow: var(--box-shadow-2);
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+
+  .menu--start {
+    inset-inline-start: 0;
+  }
+  .menu--end {
+    inset-inline-end: 0;
+  }
+
+  /* Open upward — for triggers anchored near the viewport bottom.
+     Overrides the skeleton's default downward anchor. */
+  .menu--up {
+    inset-block-start: auto;
+    inset-block-end: calc(100% + var(--space-xs));
+  }
+
+  .menu li {
+    list-style: none;
+    margin: 0;
+  }
+
+  .menu__item {
+    display: flex;
+    align-items: center;
+    inline-size: 100%;
+    text-align: start;
+    padding-block: var(--space-xs);
+    padding-inline: var(--space-s);
+    font-size: var(--text-s);
+    color: var(--text-color);
+    background: transparent;
+    border: 0;
+    border-radius: var(--radius-s);
+    text-decoration: none;
+    cursor: pointer;
+    transition: background var(--transition), color var(--transition);
+  }
+
+  .menu__item:hover,
+  .menu__item:focus-visible {
+    background: var(--bg-ultra-light);
+    outline: none;
+    color: var(--heading-color);
+  }
+
+  .menu__item[disabled],
+  .menu__item[aria-disabled="true"] {
+    opacity: var(--disabled-opacity);
+    cursor: not-allowed;
+    background: transparent;
+    color: var(--text-color);
+  }
+
+  .menu__item--danger {
+    color: var(--danger-dark);
+  }
+
+  .menu__item--danger:hover,
+  .menu__item--danger:focus-visible {
+    background: var(--danger-ultra-light);
+    color: var(--danger-ultra-dark);
+  }
+
+  .menu__item--active {
+    background: var(--primary-ultra-light);
+    color: var(--primary-ultra-dark);
+    font-weight: 500;
+  }
+
+  /* Pill skeleton — lens / filter selector. Skeleton declares the variable
+     contract; modifiers redeclare only CSS variables. `.pill--on` flips
+     background to ink, `.pill--all` adds a dashed outline + dot, `.pill--sm`
+     shrinks padding+font for filter rows. */
+  [class*="pill"]:where(:not(.pill--none)) {
+    --pill-padding-block: var(--space-xs);
+    --pill-padding-inline: var(--space-m);
+    --pill-font-size: var(--text-s);
+    --pill-font-family: var(--font-sans);
+    --pill-letter-spacing: normal;
+    --pill-text-transform: none;
+    --pill-radius: var(--radius-circle);
+    --pill-gap: var(--space-s);
+    --pill-background: transparent;
+    --pill-color: var(--text-muted);
+    --pill-border-color: var(--border-color-dark);
+    --pill-border-style: solid;
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--pill-gap);
+    padding-block: var(--pill-padding-block);
+    padding-inline: var(--pill-padding-inline);
+    background: var(--pill-background);
+    color: var(--pill-color);
+    border: 1px var(--pill-border-style) var(--pill-border-color);
+    border-radius: var(--pill-radius);
+    font-family: var(--pill-font-family);
+    font-size: var(--pill-font-size);
+    font-weight: 500;
+    letter-spacing: var(--pill-letter-spacing);
+    text-transform: var(--pill-text-transform);
+    text-decoration: none;
+    line-height: 1.2;
+    cursor: pointer;
+    transition:
+      background var(--transition), color var(--transition),
+      border-color var(--transition);
+  }
+
+  button.pill,
+  button[class*="pill--"] {
+    appearance: none;
+  }
+
+  [class*="pill"]:where(:not(.pill--none)):focus-visible {
+    outline: var(--focus-width) solid var(--focus-color);
+    outline-offset: 2px;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    [class*="pill"]:where(:not(.pill--none):not(.pill--on)):hover {
+      background: var(--bg-hover);
+    }
+  }
+
+  .pill--on {
+    --pill-background: var(--text-color);
+    --pill-color: var(--bg);
+    --pill-border-color: var(--text-color);
+  }
+
+  .pill--sm {
+    --pill-padding-block: var(--space-xs);
+    --pill-padding-inline: var(--space-s);
+    --pill-font-size: var(--text-xs);
+    --pill-gap: var(--space-xs);
+  }
+
+  .pill--all {
+    --pill-border-style: dashed;
+    --pill-padding-inline: var(--space-m);
+  }
+
+  /* Mono micro-pill — uppercase mono metadata chips (line anchor chips,
+     agenda pins, settings role chips). Variable-only modifier; combine
+     with .pill--sm for the compact form. */
+  .pill--mono {
+    --pill-font-size: var(--text-xs);
+    --pill-font-family: var(--font-mono);
+    --pill-letter-spacing: var(--mono-letter-spacing-loose);
+    --pill-text-transform: uppercase;
+  }
+
+  .pill--all::before {
+    content: "";
+    inline-size: 7px;
+    block-size: 7px;
+    background: currentColor;
+    border-radius: 2px;
+    display: inline-block;
+  }
+
+  /* Tag chip — small mono pastel for task tags (#travel, #press, etc).
+     Tone via [data-tone] swap of bg + fg. No border (the bg carries the
+     identity). Non-interactive by default — render as <span>. */
+  .tag-chip {
+    --tag-bg: var(--tag-neutral-bg);
+    --tag-fg: var(--tag-neutral-fg);
+
+    display: inline-block;
+    padding-block: 2px;
+    padding-inline: var(--space-xs);
+    background: var(--tag-bg);
+    color: var(--tag-fg);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    letter-spacing: var(--mono-letter-spacing);
+    line-height: 1.4;
+    border-radius: var(--radius-s);
+    white-space: nowrap;
+  }
+
+  .tag-chip[data-tone="amber"] {
+    --tag-bg: var(--tag-amber-bg);
+    --tag-fg: var(--tag-amber-fg);
+  }
+  .tag-chip[data-tone="blue"] {
+    --tag-bg: var(--tag-blue-bg);
+    --tag-fg: var(--tag-blue-fg);
+  }
+  .tag-chip[data-tone="teal"] {
+    --tag-bg: var(--tag-teal-bg);
+    --tag-fg: var(--tag-teal-fg);
+  }
+  .tag-chip[data-tone="green"] {
+    --tag-bg: var(--tag-green-bg);
+    --tag-fg: var(--tag-green-fg);
+  }
+  .tag-chip[data-tone="purple"] {
+    --tag-bg: var(--tag-purple-bg);
+    --tag-fg: var(--tag-purple-fg);
+  }
+  .tag-chip[data-tone="red"] {
+    --tag-bg: var(--tag-red-bg);
+    --tag-fg: var(--tag-red-fg);
+  }
+
+  /* Role chip — neutral filled (for "what role this task is about") and
+     dashed bordered variant (for "other roles I don't hold"). `.is-mine`
+     promotes a dashed role-badge to solid + filled, signalling personal
+     ownership. Used inside week items + project rows. */
+  .role-chip {
+    display: inline-block;
+    padding-block: 2px;
+    padding-inline: var(--space-xs);
+    background: var(--bg-hover);
+    color: var(--text-muted);
+    font-family: var(--font-sans);
+    font-size: var(--text-xs);
+    line-height: 1.4;
+    border-radius: var(--radius-s);
+    letter-spacing: 0.02em;
+  }
+
+  .role-badge {
+    display: inline-block;
+    padding-block: 2px;
+    padding-inline: var(--space-s);
+    background: transparent;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    line-height: 1.4;
+    border: 1px dashed var(--border-color-dark);
+    border-radius: var(--radius-s);
+    letter-spacing: var(--mono-letter-spacing);
+  }
+
+  .role-badge.is-mine {
+    color: var(--text-color);
+    border-color: var(--text-color);
+    border-style: solid;
+    background: var(--bg-light);
+  }
+
+  /* State badge — show lifecycle. Border-only, tone-coloured. Lowercase
+     mono. Used in calendar dots, week items, room headers.
+     Defaults live at zero specificity (:where) so the data-tone contract
+     below — also zero specificity, later in source — actually wins. With
+     the defaults at class specificity every badge rendered neutral gray. */
+  :where(.state-badge) {
+    --state-color: var(--text-muted);
+    --state-border: var(--border-color-dark);
+  }
+
+  .state-badge {
+    display: inline-block;
+    padding-block: 2px;
+    padding-inline: var(--space-xs);
+    color: var(--state-color);
+    background: transparent;
+    border: 1px solid var(--state-border);
+    border-radius: var(--radius-s);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    line-height: 1.4;
+    letter-spacing: var(--mono-letter-spacing-loose);
+    text-transform: lowercase;
+  }
+
+  /* Caret for status badges that double as dropdown triggers (engagement
+     table, performance header). One rule for both consumers. */
+  .status-caret {
+    margin-inline-start: 0.35em;
+    font-size: 0.8em;
+    opacity: 0.6;
+  }
+
+  /* Tone contract — component-agnostic. Anything carrying data-tone gets
+     --state-color / --state-border to consume (state-badge text+border,
+     calendar dots, future week items). :where() keeps specificity at
+     zero so components can still override locally. */
+  :where([data-tone="neutral"]) {
+    --state-color: var(--text-muted);
+    --state-border: var(--border-color-dark);
+  }
+  :where([data-tone="info"]) {
+    --state-color: var(--info);
+    --state-border: var(--info);
+  }
+  :where([data-tone="success"]) {
+    --state-color: var(--success);
+    --state-border: var(--success);
+  }
+  :where([data-tone="warning"]) {
+    --state-color: var(--warning);
+    --state-border: var(--warning);
+  }
+  :where([data-tone="danger"]) {
+    --state-color: var(--danger);
+    --state-border: var(--danger);
+  }
+  :where([data-tone="faint"]) {
+    --state-color: var(--text-faint);
+    --state-border: var(--border-color-light);
+  }
+
+  /* Kbd — keyboard hint. `<kbd>` semantic element styled with a subtle
+     bottom-bevel border so it reads as a key cap. */
+  .kbd {
+    display: inline-block;
+    padding-block: 1px;
+    padding-inline: var(--space-xs);
+    color: var(--text-muted);
+    background: var(--bg-ultra-light);
+    border: 1px solid var(--border-color-dark);
+    border-block-end-width: 1.5px;
+    border-radius: var(--radius-s);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    line-height: 1.4;
+  }
+
+  /* Eyebrow — small uppercase mono label used above section titles, list
+     headers, breadcrumbs. Sets the editorial rhythm of the page.
+     Two tiers: page/module eyebrow (0.14em tracking) and the sub-eyebrow
+     for subsections inside a module (FEES, CREW…) at 0.08em. Contract
+     variables so modifiers stay variable-only. */
+  .eyebrow {
+    --eyebrow-tracking: 0.14em;
+    --eyebrow-color: var(--text-faint);
+
+    display: inline-block;
+    color: var(--eyebrow-color);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    font-weight: 500;
+    letter-spacing: var(--eyebrow-tracking);
+    text-transform: uppercase;
+    line-height: 1.4;
+  }
+
+  .eyebrow--sub {
+    --eyebrow-tracking: 0.08em;
+  }
+
+  /* Arrow nav link — quiet row-level navigation ("Open →", "Road sheet →",
+     "View all N engagements →"). Muted at rest, ink on hover, no underline. */
+  .link-arrow {
+    color: var(--text-muted);
+    font-size: var(--text-s);
+    text-decoration: none;
+    transition: color var(--transition);
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .link-arrow:hover {
+      color: var(--text-color);
+      text-decoration: none;
+    }
+  }
+
+  /* Creator affordance — dashed "+ New thing" trigger. One treatment for
+     the agenda card footers, the New-space ghost card and the line page's
+     Add module. */
+  .creator {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-xs);
+    padding-block: var(--space-xs);
+    padding-inline: var(--space-s);
+    border: 1px dashed var(--border-color-dark);
+    border-radius: var(--radius-s);
+    background: transparent;
+    color: var(--text-faint);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    letter-spacing: var(--mono-letter-spacing-loose);
+    cursor: pointer;
+    transition: color var(--transition), border-color var(--transition);
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .creator:hover {
+      color: var(--text-color);
+      border-color: var(--text-muted);
+    }
+  }
+
+  /* Table scroller — the one sanctioned horizontal-overflow wrapper.
+     Also a size container so column caps can derive from the available
+     width (cqi) instead of forcing a fixed per-column budget. */
+  .table-wrap {
+    overflow-x: auto;
+    container-type: inline-size;
+  }
+
+  /* Sidebar skeleton — desktop static aside / mobile drawer.
+     Desktop: takes its width in the flow; toggling open hides via display:none.
+     Mobile (<48rem): position fixed, slides in via transform with backdrop. */
+  .sidebar {
+    --sidebar-width: 16rem;
+    --sidebar-collapsed-width: 3.5rem;
+    --sidebar-mobile-width: min(80vw, 20rem);
+
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    inline-size: var(--sidebar-width);
+    background: var(--base);
+    border-inline-end: var(--border);
+    flex-shrink: 0;
+    transition: inline-size var(--transition);
+  }
+
+  /* Collapsed rail — redeclares the width token so all `var(--sidebar-width)`
+     consumers (the aside itself, scaled controls inside) follow along. */
+  .sidebar--collapsed {
+    --sidebar-width: var(--sidebar-collapsed-width);
+  }
+
+  /* Drag-to-resize handle (opt-in via the `resizable` prop). Sits on the
+     inline-end edge; 4px hit target with no chrome until hover or drag,
+     where a primary-colored line appears. Double-click resets the
+     sidebar to its default width. */
+  .sidebar__resizer {
+    position: absolute;
+    inset-block: 0;
+    inset-inline-end: -2px;
+    inline-size: 4px;
+    background: transparent;
+    border: 0;
+    padding: 0;
+    cursor: col-resize;
+    z-index: 1;
+    transition: background var(--transition);
+  }
+
+  .sidebar--end .sidebar__resizer {
+    inset-inline-end: auto;
+    inset-inline-start: -2px;
+  }
+
+  .sidebar__resizer:hover,
+  .sidebar--dragging .sidebar__resizer {
+    background: var(--primary);
+  }
+
+  .sidebar__resizer:focus,
+  .sidebar__resizer:focus-visible {
+    outline: none;
+  }
+
+  .sidebar--dragging {
+    user-select: none;
+  }
+
+  /* While dragging, freeze pointer + selection across the document so the
+     handle keeps tracking even when the cursor briefly leaves the strip. */
+  .sidebar--dragging ~ * {
+    user-select: none;
+  }
+
+  .sidebar--end {
+    border-inline-end: none;
+    border-inline-start: var(--border);
+  }
+
+  .sidebar:not(.sidebar--open) {
+    display: none;
+  }
+
+  @media (max-width: 47.999rem) {
+    .sidebar,
+    .sidebar:not(.sidebar--open) {
+      display: flex;
+      position: fixed;
+      inset-block: 0;
+      inset-inline-start: 0;
+      inline-size: var(--sidebar-mobile-width);
+      z-index: var(--z-modal);
+      transform: translateX(-100%);
+      transition: transform var(--transition);
+      box-shadow: var(--box-shadow-3);
+      border: 0;
+    }
+    .sidebar--end,
+    .sidebar--end:not(.sidebar--open) {
+      inset-inline-start: auto;
+      inset-inline-end: 0;
+      transform: translateX(100%);
+    }
+    .sidebar.sidebar--open {
+      transform: translateX(0);
+    }
+  }
+
+  .sidebar__header {
+    padding: var(--space-m);
+    border-block-end: var(--divider);
+    display: flex;
+    align-items: center;
+    gap: var(--space-s);
+  }
+
+  .sidebar__body {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--space-m);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-s);
+  }
+
+  .sidebar__footer {
+    padding: var(--space-m);
+    border-block-start: var(--divider);
+    display: flex;
+    align-items: center;
+    gap: var(--space-s);
+  }
+
+  /* Backdrop — hidden on desktop, fades in on mobile when drawer opens. */
+  .sidebar__backdrop {
+    display: none;
+  }
+
+  @media (max-width: 47.999rem) {
+    .sidebar__backdrop {
+      display: block;
+      position: fixed;
+      inset: 0;
+      background: color-mix(in srgb, var(--black) 40%, transparent);
+      border: 0;
+      z-index: calc(var(--z-modal) - 1);
+      cursor: pointer;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity var(--transition), visibility var(--transition);
+    }
+    .sidebar__backdrop[data-open] {
+      opacity: 1;
+      visibility: visible;
+    }
+  }
+}
+
+/* ============================================================ */
+/* UTILITIES — text + sizing helpers                              */
+/* ============================================================ */
+@layer utilities {
+  .text--dark-muted {
+    color: var(--text-dark-muted);
+  }
+
+  .text--xs {
+    font-size: var(--text-xs);
+  }
+  .text--s {
+    font-size: var(--text-s);
+  }
+  .text--m {
+    font-size: var(--text-m);
+  }
+  .text--l {
+    font-size: var(--text-l);
+  }
+  .text--xl {
+    font-size: var(--text-xl);
+  }
+  .text--xxl {
+    font-size: var(--text-xxl);
+  }
+
+  .content-width {
+    inline-size: 100%;
+    max-inline-size: var(--content-width);
+    margin-inline: auto;
+  }
+  .content-width--safe {
+    inline-size: 100%;
+    max-inline-size: var(--content-width-safe);
+    margin-inline: auto;
+  }
+}
+
+</style>
+
+    <!-- Prototype-only styles for the NEW address layer. New class names →
+         zero collision with base.css. Everything consumes real tokens. -->
+    <style>
+      /* ── shared page frame ─────────────────────────────────────────── */
+      .proto {
+        min-block-size: 100vh;
+        background: var(--bg);
+      }
+      .bleed {
+        inline-size: 100%;
+      }
+      .wrap {
+        inline-size: 100%;
+        max-inline-size: var(--page-width-wide);
+        margin-inline: auto;
+        padding-inline: var(--gutter);
+      }
+
+      /* ── shell bar ─────────────────────────────────────────────────── */
+      .shell {
+        border-block-end: var(--divider-light);
+        background: var(--bg);
+      }
+      .shell__inner {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        block-size: 3.5rem;
+      }
+      .shell__brand {
+        display: flex;
+        align-items: baseline;
+        gap: var(--space-s);
+      }
+      .shell__logo {
+        font-family: var(--font-display);
+        font-style: italic;
+        font-size: var(--text-xl);
+        font-weight: 500;
+        letter-spacing: -0.02em;
+        color: var(--heading-color);
+      }
+      .shell__right {
+        display: flex;
+        align-items: center;
+        gap: var(--space-m);
+      }
+      .shell__search {
+        display: flex;
+        align-items: center;
+        gap: var(--space-s);
+        block-size: 2rem;
+        padding-inline: var(--space-s) var(--space-xs);
+        border: var(--border);
+        border-radius: var(--radius-circle);
+        background: var(--bg-ultra-light);
+        color: var(--text-faint);
+        font-size: var(--text-s);
+      }
+      .shell__avatar {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        inline-size: 2rem;
+        block-size: 2rem;
+        border-radius: var(--radius-circle);
+        background: var(--accent-1);
+        color: var(--white);
+        font-size: var(--text-s);
+        font-weight: 600;
+      }
+
+      /* ── address bar (the breadcrumb — the NEW orientation layer) ───── */
+      .addr {
+        background: var(--bg-light);
+        border-block-end: var(--border);
+      }
+      .addr__inner {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--space-m);
+        block-size: 3rem;
+      }
+      .crumbs {
+        display: flex;
+        align-items: center;
+        gap: var(--space-s);
+        min-inline-size: 0;
+      }
+      .crumbs a {
+        text-decoration: none;
+      }
+      .crumbs__space {
+        display: inline-flex;
+        align-items: center;
+        gap: var(--space-xs);
+        font-family: var(--font-mono);
+        font-size: var(--text-xs);
+        letter-spacing: var(--mono-letter-spacing-loose);
+        text-transform: uppercase;
+        color: var(--text-muted);
+      }
+      .crumbs__dot {
+        inline-size: 0.5rem;
+        block-size: 0.5rem;
+        border-radius: var(--radius-circle);
+        background: var(--c, var(--accent-1));
+      }
+      .crumbs__mid {
+        font-size: var(--text-s);
+        color: var(--text-muted);
+      }
+      .crumbs__sep {
+        color: var(--border-color-dark);
+      }
+      .crumbs__here {
+        display: inline-flex;
+        align-items: center;
+        gap: var(--space-xs);
+        font-size: var(--text-s);
+        font-weight: 600;
+        color: var(--heading-color);
+      }
+      .crumbs__pin {
+        color: var(--c, var(--accent-1));
+        display: inline-flex;
+      }
+      .addr__actions {
+        display: flex;
+        align-items: center;
+        gap: var(--space-s);
+        flex: none;
+      }
+      .addr__icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        inline-size: 1.75rem;
+        block-size: 1.75rem;
+        border: var(--border);
+        border-radius: var(--radius-circle);
+        background: var(--bg-ultra-light);
+        color: var(--text-muted);
+        cursor: pointer;
+      }
+
+      /* ── masthead ──────────────────────────────────────────────────── */
+      .page {
+        padding-block: var(--space-l);
+      }
+      .mast {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-s);
+      }
+      .mast__title {
+        margin: 0;
+      }
+      .mast__title em {
+        font-style: italic;
+      }
+      .mast__meta {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: var(--space-s);
+        margin: 0;
+        font-size: var(--text-s);
+        color: var(--text-faint);
+      }
+      .mast__dates {
+        font-family: var(--font-mono);
+        font-size: var(--text-xs);
+        color: var(--text-muted);
+      }
+      .mast__sep {
+        color: var(--border-color-dark);
+      }
+      .mast__stats {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-l);
+        margin: 0;
+        margin-block-start: var(--space-xs);
+        font-size: var(--text-s);
+        color: var(--text-muted);
+      }
+      .stat b {
+        font-family: var(--font-display);
+        font-size: var(--text-l);
+        font-weight: 500;
+        color: var(--text-color);
+        margin-inline-end: 0.35em;
+      }
+      .stat--danger,
+      .stat--danger b {
+        color: var(--danger);
+      }
+
+      /* ── sibling tabs (where you sit among peers) ──────────────────── */
+      .sibs {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-s);
+        margin-block-start: var(--space-l);
+      }
+      .sibs__row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: var(--space-s);
+      }
+      .sib {
+        display: inline-flex;
+        align-items: center;
+        gap: var(--space-s);
+        padding-block: var(--space-xs);
+        padding-inline: var(--space-m);
+        border: 1px solid var(--border-color-light);
+        border-radius: var(--radius-l);
+        background: transparent;
+        font-size: var(--text-s);
+        color: var(--text-muted);
+        text-decoration: none;
+      }
+      .sib--on {
+        border-color: var(--text-color);
+        background: var(--bg-ultra-light);
+        color: var(--heading-color);
+        font-weight: 500;
+      }
+      .sib__dot {
+        inline-size: 0.5rem;
+        block-size: 0.5rem;
+        border-radius: var(--radius-circle);
+        background: var(--accent-1);
+      }
+      .sib__dot--off {
+        background: var(--border-color-dark);
+      }
+      .sib__k {
+        font-family: var(--font-mono);
+        font-size: var(--text-xs);
+        letter-spacing: var(--mono-letter-spacing);
+        text-transform: uppercase;
+        color: var(--text-faint);
+      }
+
+      /* ── module tabs (jump nav — real buttons) ───────────────────── */
+      .tabs {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-xs);
+        margin-block-start: var(--space-xl);
+        padding-block-start: var(--space-l);
+        border-block-start: var(--border);
+      }
+      /* Variable-only override of the btn skeleton → compact tab size. */
+      .tabs [class*="btn--"] {
+        --btn-padding-block: var(--space-xs);
+        --btn-padding-inline: var(--space-m);
+        --btn-font-size: var(--text-s);
+      }
+
+      /* ── module stack ────────────────────────────────────────────── */
+      .mods {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-xl);
+        margin-block-start: var(--space-l);
+      }
+      .mod {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-s);
+      }
+      .mod__head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: var(--space-s);
+        padding-block-end: var(--space-xs);
+        border-block-end: var(--border);
+      }
+      .mod__head-l {
+        display: flex;
+        align-items: baseline;
+        gap: var(--space-s);
+        flex-wrap: wrap;
+      }
+      .mod__count {
+        font-size: var(--text-s);
+        color: var(--text-faint);
+      }
+      .mod__head-r {
+        display: flex;
+        align-items: center;
+        gap: var(--space-m);
+        flex: none;
+      }
+      .mod__kebab {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        inline-size: 1.5rem;
+        block-size: 1.5rem;
+        border: 0;
+        background: none;
+        color: var(--text-faint);
+        font-size: var(--text-m);
+        line-height: 1;
+        cursor: pointer;
+        border-radius: var(--radius-s);
+      }
+      .mod__kebab:hover {
+        color: var(--text-color);
+        background: var(--bg-light);
+      }
+
+      /* engagement table — flex rows, fixed lanes for alignment */
+      .etable {
+        display: flex;
+        flex-direction: column;
+      }
+      .etable__head,
+      .erow {
+        display: flex;
+        align-items: center;
+        gap: var(--space-m);
+        padding-block: var(--space-s);
+        border-block-end: var(--divider-light);
+      }
+      .etable__head {
+        padding-block: var(--space-xs);
+      }
+      .etable__h {
+        font-family: var(--font-mono);
+        font-size: var(--text-xs);
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--text-faint);
+      }
+      .ec-contact {
+        flex: 1;
+        min-inline-size: 0;
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-2xs);
+      }
+      .ec-status {
+        inline-size: 9.5rem;
+        flex: none;
+      }
+      .ec-next {
+        inline-size: 15rem;
+        flex: none;
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-2xs);
+      }
+      .ec-go {
+        inline-size: 1rem;
+        flex: none;
+        color: var(--text-faint);
+        display: flex;
+        justify-content: flex-end;
+      }
+      .erow__name {
+        font-size: var(--text-s);
+        font-weight: 500;
+        color: var(--heading-color);
+      }
+      .erow__org {
+        font-size: var(--text-xs);
+        color: var(--text-muted);
+      }
+      .erow__act {
+        font-size: var(--text-s);
+        color: var(--text-color);
+      }
+      .erow__when {
+        font-family: var(--font-mono);
+        font-size: var(--text-xs);
+        color: var(--text-muted);
+      }
+      .erow__when--danger {
+        color: var(--danger);
+      }
+      .mod__foot {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding-block-start: var(--space-s);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="proto">
+      <!-- SHELL -->
+      <header class="shell bleed">
+        <div class="shell__inner wrap">
+          <div class="shell__brand">
+            <span class="shell__logo">hour</span>
+            <span class="eyebrow">agenda</span>
+          </div>
+          <div class="shell__right">
+            <div class="shell__search">
+              <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="6" cy="6" r="4.2" /><path d="M9.3 9.3L12 12" /></svg>
+              Search or jump to…
+              <kbd class="kbd">⌘K</kbd>
+            </div>
+            <div class="shell__avatar">M</div>
+          </div>
+        </div>
+      </header>
+
+      <!-- ADDRESS BAR -->
+      <div class="addr bleed">
+        <div class="addr__inner wrap" style="--c: var(--accent-1)">
+          <nav class="crumbs" aria-label="Breadcrumb">
+            <a class="crumbs__space" href="#"><span class="crumbs__dot"></span>MüK Cia</a>
+            <span class="crumbs__sep">›</span>
+            <a class="crumbs__mid" href="#">MaMeMi</a>
+            <span class="crumbs__sep">›</span>
+            <span class="crumbs__here">
+              Difusión 2026-27
+              <span class="crumbs__pin" aria-hidden="true">
+                <svg width="12" height="12" viewBox="0 0 14 14" fill="currentColor"><path d="M7 1.5c-1.9 0-3 1.2-3 3 0 1 .4 1.7.4 2.6L2.6 9.3c-.3.3-.1.9.4.9H6.4V12c0 .5.9.5.9 0V10.2H10c.5 0 .7-.6.4-.9L8.6 7.1c0-.9.4-1.6.4-2.6 0-1.8-1.1-3-3-3Z" /></svg>
+              </span>
+            </span>
+          </nav>
+          <div class="addr__actions">
+            <button class="pill--sm pill--mono pill--on" type="button">
+              <svg width="10" height="10" viewBox="0 0 14 14" fill="currentColor"><path d="M7 1.5c-1.9 0-3 1.2-3 3 0 1 .4 1.7.4 2.6L2.6 9.3c-.3.3-.1.9.4.9H6.4V12c0 .5.9.5.9 0V10.2H10c.5 0 .7-.6.4-.9L8.6 7.1c0-.9.4-1.6.4-2.6 0-1.8-1.1-3-3-3Z" /></svg>
+              pinned
+            </button>
+            <button class="addr__icon" type="button" aria-label="Share">
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="4" cy="8" r="1.6" /><circle cx="12" cy="4" r="1.6" /><circle cx="12" cy="12" r="1.6" /><path d="M5.4 7.1l5.2-2.4M5.4 8.9l5.2 2.4" /></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- MASTHEAD + SIBLINGS -->
+      <main class="page wrap">
+        <header class="mast">
+          <p class="eyebrow">Line — Campaign</p>
+          <h1 class="mast__title"><em>Difusión 2026-27</em></h1>
+          <p class="mast__meta">
+            <span class="state-badge" data-tone="success">open</span>
+            <span class="mast__dates">Sep 2026 → Jun 2027</span>
+            <span class="mast__sep">·</span>
+            <span>Difusión season</span>
+          </p>
+          <p class="mast__stats">
+            <span class="stat"><b>154</b>conversations</span>
+            <span class="stat"><b>9</b>holds</span>
+            <span class="stat"><b>3</b>confirmed</span>
+            <span class="stat stat--danger"><b>5</b>overdue</span>
+          </p>
+        </header>
+
+        <div class="sibs">
+          <p class="eyebrow">Lines in this project</p>
+          <div class="sibs__row">
+            <a class="sib sib--on" href="#"><span class="sib__dot"></span>Difusión 2026-27 <span class="sib__k">campaign</span></a>
+            <a class="sib" href="#"><span class="sib__dot sib__dot--off"></span>Gira de sala 2027 <span class="sib__k">tour</span></a>
+            <a class="sib" href="#"><span class="sib__dot sib__dot--off"></span>Creación MaMeMi <span class="sib__k">creation</span></a>
+            <button class="creator" type="button">+ line</button>
+          </div>
+        </div>
+
+        <!-- MODULE TABS (jump nav as real buttons) -->
+        <div class="tabs">
+          <button class="btn--primary" type="button">Contacts</button>
+          <button class="btn--outline" type="button">Calendar</button>
+          <button class="btn--outline" type="button">Materials</button>
+          <button class="btn--outline" type="button">Notes</button>
+        </div>
+
+        <!-- MODULE STACK -->
+        <div class="mods">
+          <div class="mod">
+            <header class="mod__head">
+              <div class="mod__head-l">
+                <p class="eyebrow">Contacts</p>
+                <span class="mod__count">154 conversations · 5 need action</span>
+              </div>
+              <div class="mod__head-r">
+                <a class="link-arrow" href="#">Open in Contacts →</a>
+                <button class="mod__kebab" type="button" aria-label="Module actions">⋯</button>
+              </div>
+            </header>
+
+            <div class="etable">
+              <div class="etable__head">
+                <span class="ec-contact etable__h">Contact</span>
+                <span class="ec-status etable__h">Status</span>
+                <span class="ec-next etable__h">Next action</span>
+                <span class="ec-go"></span>
+              </div>
+
+              <div class="erow">
+                <div class="ec-contact"><span class="erow__name">Grec Festival de Barcelona</span><span class="erow__org">Marta Oliveres · direcció artística</span></div>
+                <div class="ec-status"><span class="state-badge" data-tone="info">in conversation</span></div>
+                <div class="ec-next"><span class="erow__act">Send 2026 dossier</span><span class="erow__when erow__when--danger">overdue · 3 days</span></div>
+                <div class="ec-go">›</div>
+              </div>
+
+              <div class="erow">
+                <div class="ec-contact"><span class="erow__name">Kunstenfestivaldesarts</span><span class="erow__org">Dries Douibi · programació · Brussels</span></div>
+                <div class="ec-status"><span class="state-badge" data-tone="warning">hold</span></div>
+                <div class="ec-next"><span class="erow__act">Confirm May dates</span><span class="erow__when">in 6 days · Mon 18</span></div>
+                <div class="ec-go">›</div>
+              </div>
+
+              <div class="erow">
+                <div class="ec-contact"><span class="erow__name">Festival TNT — Terrassa</span><span class="erow__org">Pep Pla · direcció</span></div>
+                <div class="ec-status"><span class="state-badge" data-tone="success">confirmed</span></div>
+                <div class="ec-next"><span class="erow__act erow__when">Booked · 14 May 2027</span></div>
+                <div class="ec-go">›</div>
+              </div>
+
+              <div class="erow">
+                <div class="ec-contact"><span class="erow__name">Noorderzon — Groningen</span><span class="erow__org">Aukje Verhoog · curatie</span></div>
+                <div class="ec-status"><span class="state-badge" data-tone="neutral">contacted</span></div>
+                <div class="ec-next"><span class="erow__act">Intro call</span><span class="erow__when">Tue 12 · 10:00</span></div>
+                <div class="ec-go">›</div>
+              </div>
+
+              <div class="erow">
+                <div class="ec-contact"><span class="erow__name">Théâtre de la Ville — Paris</span><span class="erow__org">Ana Gil · programació internacional</span></div>
+                <div class="ec-status"><span class="state-badge" data-tone="info">in conversation</span></div>
+                <div class="ec-next"><span class="erow__act">Share teaser video</span><span class="erow__when">Thu 14</span></div>
+                <div class="ec-go">›</div>
+              </div>
+            </div>
+
+            <div class="mod__foot">
+              <a class="link-arrow" href="#">View all 154 conversations →</a>
+              <button class="creator" type="button">+ log outreach</button>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </body>
+</html>

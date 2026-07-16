@@ -22,7 +22,6 @@
   import EngagementTable from '$lib/components/EngagementTable.svelte';
   import Input from '$lib/components/Input.svelte';
   import Select from '$lib/components/Select.svelte';
-  import ScopeStrip from '$lib/components/ScopeStrip.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
   import { ENGAGEMENT_STATUSES, statusLabel } from '$lib/engagement';
   import { usePins } from '$lib/stores/pins.svelte';
@@ -286,7 +285,6 @@
 <section class="contacts">
   <header class="contacts__head">
     <p class="eyebrow">Contacts</p>
-    <ScopeStrip onOpenLine={openLine} onOpenProject={openProject} compact />
     <div class="contacts__controls">
       <div class="contacts__search">
         <Input

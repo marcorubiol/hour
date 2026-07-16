@@ -6,6 +6,8 @@
 > Owner: Marco Rubiol
 > Data model: **reset v2 + roadsheet delta** (2026-04-19 + 2026-05-01) — **22 tables**, polymorphic core (workspace + project + engagement + show + line + date) with money stack. Editable RBAC. Anti-CRM vocabulary. See `_decisions.md` ADR-001..007 + ADR-023.
 > Last reviewed: **2026-05-02** — Phase 0.9 gate defined, 22 tables confirmed, environments updated to current reality.
+>
+> ⚠️ **Structure / nav / UX model is NOT here** — it lives in `structure-model.md` (ADR-063, canonical: lens vs module vs task, edit levels). This doc is data model + stack + security; anything it says about lenses/nav/tasks (§7, §17 "Houses/Rooms", repo layout) predates the 2026-07 nav re-architecture and is superseded there.
 
 ---
 

@@ -21,11 +21,14 @@ export const MODULE_KEYS = [
   'notes',
   'materials',
   'money',
-  'people',
+  'team',
 ] as const;
 
 export type ModuleKey = (typeof MODULE_KEYS)[number];
 
+// ADR-065: `contacts` = the line's booking conversations (the Contacts lens scoped to it —
+// people AND organizations); `team` = its cast/crew. Keys, labels, components and the DB
+// all agree — no legacy.
 export const MODULE_LABELS: Record<ModuleKey, string> = {
   calendar: 'Calendar',
   contacts: 'Contacts',
@@ -33,7 +36,7 @@ export const MODULE_LABELS: Record<ModuleKey, string> = {
   notes: 'Notes',
   materials: 'Materials',
   money: 'Money',
-  people: 'People',
+  team: 'Team',
 };
 
 /** Shown in the "Add module" menu and module empty states. */
@@ -44,7 +47,7 @@ export const MODULE_DESCRIPTIONS: Record<ModuleKey, string> = {
   notes: 'Collaborative notes',
   materials: 'Versioned assets — what was sent where',
   money: 'Fees, invoices and expenses of this line',
-  people: 'Team on the road + venue contacts, per performance',
+  team: 'Team on the road + venue contacts, per performance',
 };
 
 /** `line.modules` API boundary — order matters, unknown keys rejected. */
@@ -81,7 +84,7 @@ export const LINE_TEMPLATES: LineTemplate[] = [
     name: 'Tour',
     description: 'Performances on the road — calendar, road sheets, team, money.',
     kind: 'tour',
-    modules: ['calendar', 'roadsheets', 'people', 'money', 'materials', 'notes'],
+    modules: ['calendar', 'roadsheets', 'team', 'money', 'materials', 'notes'],
   },
   {
     key: 'booking',
@@ -107,7 +110,7 @@ export const LINE_TEMPLATES: LineTemplate[] = [
   {
     key: 'fair',
     name: 'Fair',
-    description: 'A fair or showcase — contacts, agenda, materials.',
+    description: 'A fair or showcase — contacts, calendar, materials.',
     kind: 'campaign',
     modules: ['contacts', 'calendar', 'materials', 'notes'],
   },
@@ -126,7 +129,7 @@ export const LINE_TEMPLATES: LineTemplate[] = [
  * the booking stack; the two real pre-ADR lines land right: the demo tour
  * line → tour set, difusion-2026-27 (campaign) → booking set.
  */
-const TOUR_SET: ModuleKey[] = ['calendar', 'roadsheets', 'people', 'money', 'materials', 'notes'];
+const TOUR_SET: ModuleKey[] = ['calendar', 'roadsheets', 'team', 'money', 'materials', 'notes'];
 const BOOKING_SET: ModuleKey[] = ['contacts', 'calendar', 'materials', 'notes'];
 const CREATION_SET: ModuleKey[] = ['calendar', 'notes', 'materials', 'money'];
 
