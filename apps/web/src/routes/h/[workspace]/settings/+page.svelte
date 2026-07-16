@@ -81,7 +81,7 @@
   let workspaces = $derived($workspacesQuery.data?.items ?? []);
   let projects = $derived($projectsQuery.data?.items ?? []);
 
-  // ─── alias requests (ADR-066) ─────────────────────────────────────────
+  // ─── alias requests (ADR-067) ─────────────────────────────────────────
   // RLS scopes the list: a member sees their own workspace's requests, the
   // platform admin sees all. Review buttons hide on your own rows; the RPC
   // is the real gate (403 for non-admins) — the UI just avoids dead ends.

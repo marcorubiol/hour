@@ -112,7 +112,7 @@
     $save.mutate();
   }
 
-  // ── Web address (ADR-066) ─────────────────────────────────────────────
+  // ── Web address (ADR-067) ─────────────────────────────────────────────
   // The space's identity segment is a machine short-id; a pretty alias is
   // requested here and granted by the platform operator. The canonical URL
   // never changes — the alias is an extra door, not a rename.

@@ -1,6 +1,6 @@
 /**
  * PATCH /api/workspaces/alias-requests/:id — review a pending alias request
- * (ADR-066). Body {approve: boolean}. Platform admin only — enforced by the
+ * (ADR-067). Body {approve: boolean}. Platform admin only — enforced by the
  * review_workspace_alias RPC (user_profile.is_platform_admin), not here:
  * the DB is the boundary. Approving re-checks availability and sets
  * workspace.alias; rejecting just closes the request.

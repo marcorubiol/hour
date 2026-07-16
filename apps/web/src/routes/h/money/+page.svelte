@@ -84,7 +84,7 @@
   let workspaceSlugById = $derived(
     new Map(($workspacesQuery.data?.items ?? []).map((w) => [w.id, w.slug])),
   );
-  // Browsing context for link-building only (ADR-066): lens routes carry no
+  // Browsing context for link-building only (ADR-067): lens routes carry no
   // space segment; entity links borrow the default (first) workspace.
   let defaultWorkspaceSlug = $derived($workspacesQuery.data?.items[0]?.slug ?? '');
 

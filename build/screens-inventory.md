@@ -3,6 +3,8 @@
 > What: every screen in the app, so a full design pass has a complete work-list.
 > Source: SvelteKit routes (`apps/web/src/routes`) + dialogs/overlays (`apps/web/src/lib/components`),
 > read from the repo 2026-07-14. Re-derive with `find apps/web/src/routes -name +page.svelte`.
+> URLs updated 2026-07-16 (ADR-067): lens routes are space-less; the space segment
+> appears only on entity URLs, as a machine short-id (or its granted alias, inbound-only).
 > Model these screens against `build/structure-model.md` (lens vs module vs entity edit surface).
 > Each list item is a design unit — tick it when its visual design is done.
 
@@ -10,14 +12,14 @@
 
 **Shell + home — Desk (the now)**
 - [ ] `/h` — Home / roster ∑ (cross-space: **Desk** digest + project grid). The `∑` view, ADR-062. Desk = what needs me + next + tasks.
-- [ ] `/h/[workspace]/desk` — full Desk view, uncapped.
+- [ ] `/h/desk` — full Desk view, uncapped.
 - [ ] `/h/[workspace]` — Space portada (editable entity: domain · city · logo · description).
 
 **Lenses** — three concern-lenses, reached by ⌘K (ADR-065). Desk (the home) is a cross-concern digest, not a lens — see Shell + home above.
 
-- [ ] **Calendar** — month grid / planning / conflict-detection. `/calendar`.
-- [ ] **Contacts** — your booking network (people AND organizations): engagement table + search/filter (**+ Comms** later, as a per-contact timeline). `/contacts`. Mobile-first (ADR-015).
-- [ ] **Money** — fees + invoices + totals. `/money`. Gated by `read:money`.
+- [ ] **Calendar** — month grid / planning / conflict-detection. `/h/calendar`.
+- [ ] **Contacts** — your booking network (people AND organizations): engagement table + search/filter (**+ Comms** later, as a per-contact timeline). `/h/contacts`. Mobile-first (ADR-015).
+- [ ] **Money** — fees + invoices + totals. `/h/money`. Gated by `read:money`.
 
 **Entity detail** (under `/h/[workspace]/`)
 - [ ] `/project/[slug]` — Project detail (show content + its lines + scoped lenses, ADR-063).
@@ -44,7 +46,8 @@
 - [ ] New space (CreateWorkspaceDialog)
 - [ ] New project (CreateProjectDialog)
 - [ ] New line — template picker (tour / booking / creation / press / fair / blank)
-- [ ] Edit space (EditWorkspaceDialog)
+- [ ] Edit space (EditWorkspaceDialog, incl. Web address / alias request — ADR-067)
+- [ ] Alias review block (Settings › Workspaces, platform admin — ADR-067)
 - [ ] New performance (PerformanceCreateDialog, from Calendar)
 - [ ] Edit performance (schedule + venue + status, in performance detail)
 - [ ] Add contact (multi-space, in Contacts)

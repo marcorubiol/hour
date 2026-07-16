@@ -1,5 +1,5 @@
 /**
- * Workspace alias requests (ADR-066).
+ * Workspace alias requests (ADR-067).
  *
  * POST — owner/admin of a workspace requests a pretty URL alias.
  *        Validation (format + reserved + availability vs live slugs AND

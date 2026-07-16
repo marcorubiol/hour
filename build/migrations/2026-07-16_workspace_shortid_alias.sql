@@ -1,4 +1,4 @@
--- Migration: workspace_shortid_alias (ADR-066 · URL architecture v2)
+-- Migration: workspace_shortid_alias (ADR-067 · URL architecture v2)
 --
 -- The workspace slug stops being a human-claimed global name and becomes a
 -- machine short-id; the pretty name moves to an OPTIONAL, validated alias.
@@ -55,7 +55,7 @@ REVOKE ALL ON FUNCTION public.generate_workspace_sid() FROM PUBLIC, anon, servic
 GRANT EXECUTE ON FUNCTION public.generate_workspace_sid() TO authenticated;
 
 COMMENT ON FUNCTION public.generate_workspace_sid() IS
-  'Machine identity segment for a workspace URL: 8 lowercase hex chars, unique vs live slugs AND aliases. Hex-only means it can never collide with a reserved route word (ADR-066).';
+  'Machine identity segment for a workspace URL: 8 lowercase hex chars, unique vs live slugs AND aliases. Hex-only means it can never collide with a reserved route word (ADR-067).';
 
 --------------------------------------------------------------------------------
 -- §2 workspace.alias
@@ -70,7 +70,7 @@ CREATE UNIQUE INDEX workspace_alias_key
   WHERE deleted_at IS NULL AND alias IS NOT NULL;
 
 COMMENT ON COLUMN public.workspace.alias IS
-  'Optional pretty URL alias (ADR-066). Resolved inbound → redirect to the canonical slug form. Never emitted in internal links. Granted through workspace_alias_request review; revocable without breaking any shared link (identity lives in slug).';
+  'Optional pretty URL alias (ADR-067). Resolved inbound → redirect to the canonical slug form. Never emitted in internal links. Granted through workspace_alias_request review; revocable without breaking any shared link (identity lives in slug).';
 
 --------------------------------------------------------------------------------
 -- §3 platform admin flag
@@ -80,7 +80,7 @@ ALTER TABLE public.user_profile
   ADD COLUMN is_platform_admin boolean NOT NULL DEFAULT false;
 
 COMMENT ON COLUMN public.user_profile.is_platform_admin IS
-  'Operator flag: reviews alias requests (ADR-066); future Phase 0.9 admin surface. Set manually — no self-service path by design.';
+  'Operator flag: reviews alias requests (ADR-067); future Phase 0.9 admin surface. Set manually — no self-service path by design.';
 
 --------------------------------------------------------------------------------
 -- §4 workspace_alias_request
@@ -121,7 +121,7 @@ CREATE POLICY alias_request_select ON public.workspace_alias_request
   );
 
 COMMENT ON TABLE public.workspace_alias_request IS
-  'Alias claim flow (ADR-066): owner/admin requests → pending → platform admin reviews. workspace_name is a snapshot so reviewers need no RLS access to the workspace row.';
+  'Alias claim flow (ADR-067): owner/admin requests → pending → platform admin reviews. workspace_name is a snapshot so reviewers need no RLS access to the workspace row.';
 
 --------------------------------------------------------------------------------
 -- §5 RPCs
@@ -193,7 +193,7 @@ REVOKE ALL ON FUNCTION public.request_workspace_alias(uuid, text) FROM PUBLIC, a
 GRANT EXECUTE ON FUNCTION public.request_workspace_alias(uuid, text) TO authenticated;
 
 COMMENT ON FUNCTION public.request_workspace_alias(uuid, text) IS
-  'Owner/admin of a workspace requests a URL alias. Validates format + reserved + availability (vs live slugs AND aliases), supersedes prior pending request, inserts pending (ADR-066).';
+  'Owner/admin of a workspace requests a URL alias. Validates format + reserved + availability (vs live slugs AND aliases), supersedes prior pending request, inserts pending (ADR-067).';
 
 CREATE OR REPLACE FUNCTION public.review_workspace_alias(
   p_request_id uuid,
@@ -253,7 +253,7 @@ REVOKE ALL ON FUNCTION public.review_workspace_alias(uuid, boolean) FROM PUBLIC,
 GRANT EXECUTE ON FUNCTION public.review_workspace_alias(uuid, boolean) TO authenticated;
 
 COMMENT ON FUNCTION public.review_workspace_alias(uuid, boolean) IS
-  'Platform admin approves (sets workspace.alias, re-checking availability) or rejects a pending alias request (ADR-066).';
+  'Platform admin approves (sets workspace.alias, re-checking availability) or rejects a pending alias request (ADR-067).';
 
 --------------------------------------------------------------------------------
 -- §6 creation paths switch to short-ids (p_slug kept in signature, ignored)
@@ -306,7 +306,7 @@ BEGIN
   v_accent := NULLIF(trim(COALESCE(p_accent, '')), '');
   v_description := NULLIF(trim(COALESCE(p_description, '')), '');
 
-  -- ADR-066: identity is machine-chosen. p_slug is ignored (kept for
+  -- ADR-067: identity is machine-chosen. p_slug is ignored (kept for
   -- signature compat); the pretty name goes to workspace.name and, if the
   -- client wants a pretty URL, through the alias request flow.
   INSERT INTO public.workspace (slug, name, kind, account_id, accent, description)
@@ -321,7 +321,7 @@ END;
 $$;
 
 COMMENT ON FUNCTION public.create_workspace(text, text, text, text) IS
-  'Creates a workspace under the caller''s personal account. ADR-066: slug is a machine short-id (generate_workspace_sid); p_slug is ignored, kept for signature compat. Pretty URLs go through request_workspace_alias.';
+  'Creates a workspace under the caller''s personal account. ADR-067: slug is a machine short-id (generate_workspace_sid); p_slug is ignored, kept for signature compat. Pretty URLs go through request_workspace_alias.';
 
 -- Based on the LIVE version (2026-05-18_add_account_layer.sql §10, which
 -- provisions account + account_membership before the workspace) — only the
@@ -345,7 +345,7 @@ BEGIN
   VALUES (NEW.id, v_full_name, COALESCE(NEW.raw_user_meta_data ->> 'locale', 'es'))
   ON CONFLICT (user_id) DO NOTHING;
 
-  -- ADR-066: personal workspace gets a machine short-id, not the email
+  -- ADR-067: personal workspace gets a machine short-id, not the email
   -- local-part — no signup can ever fight another over a name.
   v_slug := public.generate_workspace_sid();
 

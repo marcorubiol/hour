@@ -8,6 +8,27 @@ Convención: secciones por fecha descendente. Cada sesión queda con commits cit
 
 ---
 
+## 2026-07-16 (2) — ADR-067: URL architecture v2 — short-id + alias para espacios, lentes sin espacio, scope en query
+
+Sesión de exploración → decisión → build completo, arrancando de "quiero que el header ocupe todo" y acabando en el rediseño del modelo de URLs. El razonamiento entero (trilema de nombres, 6 alternativas, por qué gana "ids donde hay política, nombres donde hay dueño") está en `_decisions.md § ADR-067`.
+
+**Qué se construyó** (commit `4cda574` — su mensaje dice "(ADR-066)"; léase 067, ver nota de numeración en el ADR):
+- **Migración** `build/migrations/2026-07-16_workspace_shortid_alias.sql` — PENDIENTE DE APLICAR: `generate_workspace_sid()` (8 hex), `workspace.alias` (partial unique + format CHECK), `user_profile.is_platform_admin`, tabla `workspace_alias_request` (RLS: miembro ve las suyas, admin todas; escrituras solo por RPC), RPCs `request_workspace_alias`/`review_workspace_alias`, y `create_workspace` + `handle_new_user` pasan a short-id (basados en las versiones VIVAS — la de `handle_new_user` es la de add_account_layer con account, no la de schema.sql).
+- **Rutas**: `desk|calendar|contacts|money` movidas (git mv) a `/h/<lens>`; stubs 308 en las viejas; `/h` = HomeView digest (el trampolín a `/desk` murió — ADR-065 "the home IS Desk"); las 4 páginas de lente derivan `defaultWorkspaceSlug` del cache workspaces (era `page.params.workspace`).
+- **Shell**: `routedLens` regex sin segmento; `scopeSurface` = lentes + home (el cromo scope-bar/VIEW-AS ahora también en home); sync bidireccional pins ⇄ `?scope=` (replaceState, sin history spam; URL sin param NO borra pins); botón "⧉ Copy link" (canónica = id-form por construcción, los pins llevan slugs); resolución inbound de alias → redirect a canónica; header full-width de por la mañana intacto.
+- **Alias UI**: EditWorkspaceDialog → bloque "Web address" (dirección actual, alias activo, solicitud con estado pending); Settings › Workspaces → bloque "Alias requests" (Approve/Reject, botones ocultos en las propias, el gate real es el RPC).
+- **API**: `POST/GET /api/workspaces/alias-requests` + `PATCH .../:id`; `POST /api/workspaces` ya no acepta `slug`.
+
+**Checks**: svelte-check 0/0 (1500 files) · unit 110/110 · rutas nuevas y viejas 200 por curl. Verificación en navegador pendiente (sesión).
+
+**Gotchas que costaron o casi cuestan**:
+- `handle_new_user` de schema.sql está DESACTUALIZADO (sin account layer) — la migración casi lo pisa; siempre buscar la última redefinición en `migrations/` antes de un CREATE OR REPLACE.
+- Añadir `alias` al select del GET workspaces ANTES de aplicar la migración rompe toda la app (columna inexistente → 400) — quedó como TODO en el endpoint.
+- **Colisión ADR-066**: dos sesiones el mismo día reclamaron el número (esta + provenance de deploys). El append ancló en un tail viejo del fichero. Renumerado este a 067 (24 referencias en código + migración + entrada). Para la próxima: releer el tail de `_decisions.md` justo antes de escribir el heading.
+- El árbol se fue commiteando en caliente durante la sesión (3 commits, mensajes generados) — mezcló este trabajo con el rediseño de shell en vuelo de la sesión (1). Revisar `git log` antes de asumir qué hay en HEAD.
+
+**Pendiente** (en `_tasks.md § Queue`): aplicar migración → `is_platform_admin` para Marco → alias al select del GET → regen db-types → verificación en navegador.
+
 ## 2026-07-16 — Deploy de Scope v2 + provenance de deploys + la suite e2e que se estrangulaba sola
 
 Gatillo: "ponte al día y dime en qué punto estamos". El informe salió **mal**: dije que producción estaba en ADR-058 (07-12) y que 059/060/061 + scope-v2 seguían sin desplegar. Lo saqué de los docs. Producción, sondeada en vivo, decía otra cosa (`/health/ready` 200, CSP en cabeceras, `/agenda`→301→`/desk`): llevaba **desde el 07-14** con 059/060/061 + ADR-062 + el rename Desk. Causa raíz: `wrangler deploy` sube el working tree, no un commit → el 07-14 se desplegó sin commitear y el registro se quedó viejo. **Fix sistémico: ADR-066** (guard de árbol limpio + build stamp servido por `/health/live`). Lección operativa: **sondea prod antes de creerte un doc**.

@@ -217,7 +217,7 @@
   }
 
   // VIEW AS — the four lens routes as a visible segmented control (Scope v2).
-  // ADR-066: lenses are space-less; the scope-sync effect re-adds ?scope=
+  // ADR-067: lenses are space-less; the scope-sync effect re-adds ?scope=
   // right after navigation, so pickView doesn't need to carry it.
   const VIEW_AS: { id: Lens; label: string }[] = [
     { id: 'desk', label: 'Desk' },
@@ -296,7 +296,7 @@
 
   let inSettings = $derived(/^\/h\/[^/]+\/settings(\b|\/|$)/.test(page.url.pathname));
 
-  // Which routed lens (if any) the current URL is showing. ADR-066: lens
+  // Which routed lens (if any) the current URL is showing. ADR-067: lens
   // routes are space-less — the space segment appears only on entity URLs.
   let routedLens = $derived.by<Lens | null>(() => {
     const m = page.url.pathname.match(/^\/h\/(desk|calendar|contacts|money)\/?$/);
@@ -317,7 +317,7 @@
     }
   });
 
-  // ── Alias resolution, inbound only (ADR-066) ─────────────────────────
+  // ── Alias resolution, inbound only (ADR-067) ─────────────────────────
   // /h/<segment>/… may arrive with a workspace ALIAS; canonical is the slug
   // (machine short-id). If the segment matches no slug but matches an alias,
   // swap it and replace the URL — links keep working, address bar shows
@@ -334,7 +334,7 @@
     }
   });
 
-  // ── Scope ⇄ URL query (ADR-066) ──────────────────────────────────────
+  // ── Scope ⇄ URL query (ADR-067) ──────────────────────────────────────
   // On scope surfaces the URL carries ?scope=<pin,pin> live: pins → query
   // via replaceState (no history spam), and an explicit ?scope= in the URL
   // (pasted link, back/forward) → pins. A URL with NO scope param leaves

@@ -49,7 +49,7 @@
   const projectsQuery = createQuery(activeProjectsQueryOptions());
 
   let workspaces = $derived<NavWorkspace[]>($workspacesQuery.data?.items ?? []);
-  // Browsing context for link-building only (ADR-066): lens routes carry no
+  // Browsing context for link-building only (ADR-067): lens routes carry no
   // space segment; person links borrow the default (first) workspace.
   let defaultWorkspaceSlug = $derived(workspaces[0]?.slug ?? '');
 

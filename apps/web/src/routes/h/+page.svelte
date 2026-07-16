@@ -1,7 +1,7 @@
 <script lang="ts">
   /**
    * /h — the home: the cross-space Desk digest (ADR-065 "the home IS Desk";
-   * ADR-066 made it a real page instead of a trampoline to a workspace's
+   * ADR-067 made it a real page instead of a trampoline to a workspace's
    * desk route). `workspaceSlug` is browsing context only — it builds links
    * (agenda "+N more", person pages); the data is pins-driven and global.
    * An account with no workspace (shouldn't happen — signup auto-creates

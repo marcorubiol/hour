@@ -39,7 +39,7 @@
   const pins = usePins();
 
   const workspacesQuery = createQuery(workspacesQueryOptions());
-  // Browsing context for link-building only (ADR-066): lens routes carry no
+  // Browsing context for link-building only (ADR-067): lens routes carry no
   // space segment; entity links borrow the default (first) workspace.
   let workspaceSlug = $derived($workspacesQuery.data?.items[0]?.slug ?? '');
   const projectsQuery = createQuery(activeProjectsQueryOptions());
