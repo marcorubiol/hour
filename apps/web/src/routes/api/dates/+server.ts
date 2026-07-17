@@ -75,6 +75,8 @@ type DateItem = {
   project_id: string;
   performance_id: string | null;
   project: ProjectLite | null;
+  /** Timezone rule: a timed date buckets/renders on its venue's day. */
+  venue: { timezone: string | null } | null;
 };
 
 export const GET: RequestHandler = async ({ request, url, platform, locals }) => {
@@ -120,6 +122,7 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
       'id,kind,status,title,starts_at,ends_at,all_day,venue_name,city',
       'project_id,performance_id',
       'project:project_id(id,slug,name,accent,workspace_id)',
+      'venue:venue_id(timezone)',
     ].join(','),
   );
 

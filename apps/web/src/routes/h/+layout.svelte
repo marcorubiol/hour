@@ -38,6 +38,7 @@
   import { provideLens, type Lens } from '$lib/stores/lens.svelte';
   import { providePins, parsePin } from '$lib/stores/pins.svelte';
   import { provideScopes, sameSet as scopesSameSet, type Scope } from '$lib/stores/scopes.svelte';
+  import { detectLocale } from '$lib/i18n';
   import { provideBreadcrumb } from '$lib/stores/breadcrumb.svelte';
   import { provideCreation } from '$lib/stores/creation.svelte';
   import CreateWorkspaceDialog from '$lib/components/create/CreateWorkspaceDialog.svelte';
@@ -153,6 +154,37 @@
   // Sidebar scope list: Everything + user-saved bundles only (no auto
   // per-space rows — spaces are reached from ⌘K; the sidebar is curated).
   const everything: Scope = { name: 'Everything', tokens: [] };
+
+  // ── Rail clock ─────────────────────────────────────────────────────
+  // The shell is long-lived, so unlike the hall's mount-computed date this
+  // ticks: re-render exactly on the minute (the clock shows HH:MM), which
+  // also rolls the date line over at midnight. /h is client-only
+  // (ssr = false), so navigator is safe at init.
+  const clockLocale = detectLocale(navigator.language);
+  let clockNow = $state(new Date());
+  $effect(() => {
+    let timer: ReturnType<typeof setTimeout>;
+    const tick = () => {
+      timer = setTimeout(() => {
+        clockNow = new Date();
+        tick();
+      }, 60_000 - (Date.now() % 60_000));
+    };
+    tick();
+    return () => clearTimeout(timer);
+  });
+  let clockTime = $derived(
+    new Intl.DateTimeFormat(clockLocale, {
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    }).format(clockNow),
+  );
+  // "dilluns · 13 jul" — CSS mono-caps does the shouting; strip the
+  // abbreviation dot some locales append to the short month.
+  let clockDate = $derived(
+    `${new Intl.DateTimeFormat(clockLocale, { weekday: 'long' }).format(clockNow)} · ${clockNow.getDate()} ${new Intl.DateTimeFormat(clockLocale, { month: 'short' }).format(clockNow).replace(/\.$/, '')}`,
+  );
   // Save ⇄ Update ⇄ Delete state. `editingBaseTokens` = the saved scope the
   // current pins derive from (set on applying a saved scope, kept while you
   // tweak it, cleared when the scope empties). exactSaved = pins land on a
@@ -680,6 +712,10 @@
     </header>
 
     <aside class="shell__side" aria-label="Scopes">
+      <div class="side-clock">
+        <time class="side-clock__time" datetime={clockTime}>{clockTime}</time>
+        <p class="side-clock__date">{clockDate}</p>
+      </div>
       <div class="side-sec">
         <div class="side-sec__h">Scopes</div>
         <!-- The hall greets outside any scope: no row lights up there, not
@@ -877,9 +913,10 @@
        hardcoding approximations. */
     --header-height: 3.6rem;
 
-    /* The top bar owns the full inline axis; the rail and the main column
-       share the row underneath it. The header is a sibling of the aside (not
-       nested in <main>), so grid can span it edge to edge. */
+    /* The rail owns the full block axis (top to bottom, wordmark first);
+       the top bar covers only the remaining columns. The header is a
+       sibling of the aside (not nested in <main>), so grid can place both
+       freely. */
     display: grid;
     grid-template-columns: auto 1fr;
     grid-template-rows: auto 1fr;
@@ -896,20 +933,51 @@
      one-click named scopes (Everything, each space, saved bundles) + the
      recents. Replaces the ADR-057 space rail. */
   .shell__side {
+    grid-column: 1;
+    grid-row: 1 / -1;
     position: sticky;
-    inset-block-start: var(--header-height);
+    inset-block-start: 0;
     align-self: start;
     z-index: var(--z-sticky);
     inline-size: 15.5rem;
-    min-block-size: calc(100vh - var(--header-height));
+    min-block-size: 100vh;
     display: flex;
     flex-direction: column;
     gap: var(--space-l);
-    padding-block: var(--space-m) var(--space-l);
+    /* No top padding: the clock block owns the top offset so it can match
+       the header's wordmark exactly (see .side-clock). */
+    padding-block: 0 var(--space-l);
     padding-inline: var(--space-m);
     border-inline-end: 1px solid var(--border-color-light);
     background: var(--bg-light);
   }
+  .side-clock {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+    padding-inline: var(--space-xs);
+    /* Same top offset as the header's wordmark, by construction: the
+       BrandMark (size m = --text-xl, line-height 1) centers inside the
+       --header-height band, so its top sits at (band − type)/2. */
+    padding-block-start: calc((var(--header-height) - var(--text-xl)) / 2);
+  }
+  .side-clock__time {
+    font-family: var(--font-mono);
+    font-size: var(--text-xl);
+    font-weight: 400;
+    line-height: 1;
+    letter-spacing: 0.02em;
+    color: var(--heading-color);
+  }
+  .side-clock__date {
+    margin: 0;
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    letter-spacing: var(--mono-letter-spacing-loose);
+    text-transform: uppercase;
+    color: var(--text-faint);
+  }
+
   .side-sec {
     display: flex;
     flex-direction: column;
@@ -1184,7 +1252,9 @@
   }
 
   .shell__top {
-    grid-column: 1 / -1;
+    /* Everything right of the rail — also under settings mode, where the
+       settings nav takes the middle column. */
+    grid-column: 2 / -1;
     position: sticky;
     inset-block-start: 0;
     z-index: var(--z-sticky);
@@ -1201,12 +1271,14 @@
   }
 
   .shell__left {
+    grid-column: 1;
     justify-self: start;
     display: inline-flex;
     align-items: center;
     min-inline-size: 0;
   }
   .shell__right {
+    grid-column: 3;
     justify-self: end;
     display: inline-flex;
     align-items: center;
@@ -1221,6 +1293,7 @@
   }
 
   .shell__search {
+    grid-column: 2;
     justify-self: center;
     display: inline-flex;
     align-items: center;

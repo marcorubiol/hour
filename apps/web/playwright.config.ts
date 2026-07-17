@@ -11,6 +11,9 @@ export const STORAGE_STATE = '.playwright/auth.json';
 // Keep the canonical test credentials in one place. Explicit shell values
 // still win because loadEnvFile does not overwrite existing environment vars.
 if (existsSync('.env.test')) loadEnvFile('.env.test');
+// Machine-local overrides (gitignored, no secrets) — e.g. PW_CHROMIUM when
+// the pinned chromium revision is unrecoverable in this machine's cache.
+if (existsSync('.env.test.local')) loadEnvFile('.env.test.local');
 
 const PORT = Number(process.env.PW_PORT ?? 4173);
 const BASE_URL = process.env.PW_BASE_URL ?? `http://localhost:${PORT}`;
@@ -29,6 +32,10 @@ export default defineConfig({
   use: {
     baseURL: BASE_URL,
     trace: 'on-first-retry',
+    // Timezone rule: timeslot entry resolves to the workspace's home zone
+    // when no venue is linked. Pin the browser zone to the seed
+    // workspace's so time assertions are deterministic on any runner.
+    timezoneId: 'Europe/Madrid',
     // Escape hatch: point PW_CHROMIUM at any Chromium/Chrome-for-Testing
     // binary (e.g. another ms-playwright cache revision) to run without
     // `pnpm test:install` downloading this exact revision first.

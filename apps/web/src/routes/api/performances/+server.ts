@@ -161,7 +161,7 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
       'id,slug,performed_at,status,venue_id,venue_name,city,country',
       'project_id,line_id,engagement_id',
       'load_in_at,start_at',
-      'venue:venue_id(id,name,city,country)',
+      'venue:venue_id(id,name,city,country,timezone)',
       'project:project_id(id,slug,name,accent,workspace_id)',
     ].join(','),
   );

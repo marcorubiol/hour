@@ -31,6 +31,18 @@ feed or surface that layer". It promotes gaps #1 (organizations) and #2 (engagem
 conversation log) from nice-to-have to **critical path** — they are the AI's network model
 and negotiation memory. AI surfaces already in the model: `task.origin='ai'`, the hall
 status sentence.
+**Timezone rule — cross-cutting (2026-07-18, foreign gigs)**: *store the instant · display
+venue-local as primary truth with viewer time as secondary courtesy only when they differ ·
+ENTER times in venue-local · group by the venue's day.* Infrastructure exists: timeslots
+are `timestamptz`, `venue.timezone` (IANA), `dualTime()` in `$lib/datetime.ts` (already
+used by ScheduleTable + RoadsheetView). Pending: **entry bug** — performance dialogs
+interpret typed times in the BROWSER tz (a "20:30" London show typed from Barcelona stores
+19:30 London, silently wrong); coverage in Desk show-card / hall sentence / Calendar chip
+times; no-linked-venue fallback = `workspace.timezone` with a visible label (never the
+browser's, and push venue linking at create). `performance.performed_at` is a DATE (poster
+day) — already tz-safe for bucketing; timed `date` events bucket by their venue's day when
+linked.
+
 **Hard boundary on the AI's contact reach** (from `research/profiles/99-patterns.md § 3.1`
 + the profile refusals): proposals draw contacts ONLY from the workspace(s) in scope —
 contact books are never blended across workspaces (the freelance's book is her capital;
@@ -96,9 +108,14 @@ owns no data — a query over the concerns + tasks).
 **Today**: engagement next-actions only — verb (from status) + person/org + `#tags` (first 2,
 from `engagement.custom_fields.tags`) + project dot, bucketed OVERDUE / TODAY / TOMORROW /
 weekday / NEXT WEEK / LATER. Scoped by pins.
-**Contains — SETTLED (S1, 2026-07-17)**: one ranked feed, four sources, **mixed by urgency**
-within the day buckets (decided: type is expressed by verb + glyph, not separate blocks —
-Desk answers "what needs me", not "what kind of thing is it"):
+**Contains — SETTLED (S1, 2026-07-17)**: one ranked feed, four sources, grouped in day
+buckets. **Within each bucket the type order is FIXED (Marco, 2026-07-18): tasks →
+calendar → conversations → money** — mirroring the lens nav order (Desk · Calendar ·
+Contacts · Money), so the feed and the nav speak one vocabulary and every paper has its
+place. The show-day card sits above everything in its day (banner, outside the order);
+within each type-block, natural secondary sort (calendar by time, conversations by due,
+money by severity). Urgency lives in the buckets + overdue reds, not in within-day
+reordering. (Supersedes the earlier "mixed by urgency within buckets" phrasing.)
 - Engagement next-actions [now].
 - **Tasks** per the ADR-070 model: surface at `max(from_at, due_at − lead_days)`; dormant
   (`from_at` future) never rendered; undated → quiet "Anytime" tail; urgency derived, never
@@ -111,12 +128,53 @@ Desk answers "what needs me", not "what kind of thing is it"):
   Only for `read:money` viewers [db].
 - **`date` events** for today/tomorrow (rehearsal, travel_day) [db].
 - Quick-capture at top: one line → creates an anytime task [db].
+**Desk row system — settled in design iteration (2026-07-17/18, Marco + .zerø)**:
+- **Derived calls, stored tasks**: nothing enters the Desk as a mere fact — the entry
+  ticket is actionability. Only TASKS are stored; every other row is a **call computed
+  from entity state** (invoice past expected → "remind"; conversation due → "reply") that
+  **disappears when the state changes** — nothing to tick, nothing to clean. Optional
+  gesture: promote a call to a task (human-decided, never automatic). Same
+  derived-over-stored theorem as paid=Σpayments and away-days.
+- **One row grammar**: `[mark] verb object · context · why-now → one primary action`.
+  Verbs are the taxonomy (reply/chase/confirm/remind/prep/revive) — no type icons, no
+  hashtags. **Verb labels belong to derived calls only** — a task's title IS its verb.
+- **Two marks only** (mark = "can I complete it here?"): tickable circle = stored task ·
+  accent dot = derived call. AI proposal = ghost circle (task awaiting consent, with its
+  reason line + Add/dismiss). The show-day card is the single banner exception.
+- **Rhythm rules** (the "cramped" fix): the second line must be EARNED (no urgent
+  why-now → one-line row); actions reveal on hover except OVERDUE; Anytime recedes
+  (low contrast); money amounts only on remind/confirm rows.
+- **Legibility refinements (design iteration 3)**: context token = **project · line,
+  always both** (line names aren't unique across projects; workspace only when the scope
+  spans spaces, else hover). The call dot = **project accent, consistent app-wide**
+  (same hue as the project's portada card / calendar chips — never arbitrary) + hover
+  tooltip. **Verb tints by concern** (subtle, tokenized, both themes): money verbs ·
+  conversation verbs · tasks = neutral ink, no verb label — the tint says which lens
+  the call belongs to. Type legibility without type icons.
+- **Pulse strip** (Marco's desk metaphor, approved): ONE computed prose line under the
+  header replacing static subtitle — "3 conversaciones vivas · 2 holds esperando ·
+  €12.400 pipeline · próxima función sábado" — each fragment truth-derived, each a door
+  to its lens. The Desk-level sibling of the hall sentence (another AI voice surface,
+  ADR-069). No widgets, no mini-lenses (ADR-068 lesson: surfaces don't duplicate).
+- **Revive on quiet days**: when the day has no overdue and no show, the feed offers
+  1-2 season-calibrated relationship-maintenance calls (`revive · Teatre X · sin
+  contacto esta temporada`, ADR-073 semantics) — proposal-toned, capped, never on
+  loud days. Silence becomes opportunity, not emptiness.
 **Watch** (not open — settled to wait): if the task+event mix gets noisy in real use, that's
 the structure-model trigger for the Work/Flow lens. Don't pre-build it.
 **Build**: dispatched 2026-07-17 — `task-model-prompt.md` (schema+API, first) →
 `desk-prompt.md` (UI) · `desk-design-prompt.md` (design tool), all in `build/`.
 
 ### `/h/[workspace]` — space portada
+
+> **Moved out of S1 by Marco (2026-07-17)**: workspace + project + line review as ONE pack
+> — the containers session (R2). S1 closed the views (hall, Desk, lenses); this section's
+> proposal below stands as the cold input for R2. Post-S1 notes for R2: the 7-day
+> mini-Desk is now triple-redundant (Desk v2 coming); the people block gained weight
+> (person conflicts + blackouts + user↔person bridge, no invite path for Anouk yet);
+> fiscal identity (gap #3) must come out of R2 designed-and-migrable; with the
+> cross-workspace vision (ADR-074 §6) the portada is "the room you visit" in a client's
+> space.
 
 **Is**: entity edit surface #1 (space identity) + the space's project map.
 **Today**: masthead (domain · city kicker, name, description, accent, edit pencil), stats bar
@@ -185,9 +243,14 @@ dashboard" (stats + projects only) now that Desk is one key away?
   availability, `person.city` is their home base. The missing bridge is gap #8
   (user ↔ person link) — without it "my gigs / my conflicts / my blackout" cannot resolve.
 
-### `/h/contacts` — Contacts lens
+### `/h/conversations` — Conversations lens (renamed from Contacts, ADR-075 2026-07-18)
 
-**Is**: concern-lens over the booking network (people AND organizations, per ADR-065).
+> Full rename dispatched (`rename-conversation-prompt.md` — runs BEFORE the pending UI
+> builds): lens Contacts → Conversations, entity `engagement` → `conversation`, route
+> with 308. "Contacts" survives as the book concept only (by-contact toggle, person file).
+
+**Is**: concern-lens over the booking conversations; the book (people AND organizations)
+lives inside it as the by-contact view (ADR-065 → ADR-075).
 **Today**: engagement table (person, org text, location, status editable inline, next action
 editable) + q search + status filter + pins + Add contact (multi-space) + pagination 50.
 **Contains — SETTLED (S1, 2026-07-17)**:
@@ -487,7 +550,7 @@ Everything else in this doc is build-only. These need DDL, listed by blast radiu
    conversation view wants org context from day one. Note: `venue` overlaps ("a theatre is
    both a place and a programmer") — proposal: keep venue = place; organization = juridical
    actor; optional `venue.organization_id` link. Argue this in session 2.
-2. **Engagement conversation log**. `engagement_event` (engagement_id, at, kind
+2. **Conversation log** (entity renamed per ADR-075). `conversation_event` (conversation_id, at, kind
    note/call/email/**meeting**, `direction` inbound|outbound (S1, from research §2.4),
    optional event/fair reference for provenance ("met at FiraTàrrega 2026" — S1), body,
    created_by). Write path stamps `engagement.last_contacted_at` (and first, once).

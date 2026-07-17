@@ -14,6 +14,7 @@
   "hall.door": "catch me up",
   "hall.status_show": "Today: {place}.",
   "hall.status_show_time": "Today: {place}. Load-in at {time}.",
+  "hall.time_yours": "({time} your time)",
   "hall.status_attention_one": "1 thing overdue — for {days} now.",
   "hall.status_attention_many": "{n} things overdue — the oldest for {days} now.",
   "hall.days_one": "1 day",

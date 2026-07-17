@@ -166,7 +166,7 @@ const DETAIL_SELECT = [
   `engagement:engagement_id(id,slug,status,person:person_id(${PERSON_COLS},organization_name))`,
   `crew_assignment(id,role,notes,contact_override,person:person_id(${PERSON_COLS}))`,
   `cast_override(id,role,reason,person:person_id(${PERSON_COLS}),replaces_person:replaces_person_id(id,full_name))`,
-  'date(id,kind,status,title,starts_at,ends_at,all_day,venue_name,city)',
+  'date(id,kind,status,title,starts_at,ends_at,all_day,venue_name,city,venue:venue_id(timezone))',
   'asset_version(id,kind,direction,url,notes,uploaded_at)',
 ].join(',');
 

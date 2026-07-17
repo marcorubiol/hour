@@ -33,6 +33,9 @@ export type NavWorkspace = {
   domain?: WorkspaceDomain | null;
   city?: string | null;
   logo_url?: string | null;
+  /** IANA home timezone — the timeslot-entry fallback when a gig has no
+      linked venue (timezone rule, spec § Timezone rule). */
+  timezone?: string;
 };
 
 /** Row shape of GET /api/projects — the shared ['projects', …] cache. */

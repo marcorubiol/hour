@@ -1939,3 +1939,17 @@ Triggered by Marco's pre-scaffold doubt (Phase 0.0 day 5). Five alternatives eva
 - **Nota de proceso**: dos sesiones .zerø trabajaron el mismo árbol en paralelo esta noche; convergieron (la de diseño citó la migración aplicada en ADR-069 y commiteó la base en `3a4e5d2`). El "Do NOT apply" del prompt se entendió como guarda para agentes externos sin MCP: esta sesión aplicó ambas migraciones por el cauce MCP de la casa, aditivas puras, con sondas de verificación.
 - **Re-evaluate when**: (a) Desk v2 (el build despachado) — decidir si la sección v1 se disuelve en el feed mixto; (b) primer escritor `protocol`/`ai` — revisar el gate del RPC (hoy origin siempre manual); (c) si las huérfanas de padre borrado molestan en uso real → cascada de soft-delete en los delete_* de los padres.
 - **Status**: live — en el árbol de trabajo, migraciones aplicadas en la DB de producción; pendiente de deploy del Worker (gate ADR-066 + veredicto de Marco).
+
+## [2026-07-18] — ADR-075 · Rename completo: la lente Contacts pasa a Conversations y la entidad `engagement` pasa a `conversation`
+
+> Reabre el naming de ADR-065 con causa: el uso real. Salió en la iteración de diseño del Desk — el módulo de línea decía "conversación" y la lente decía "Contacts", y Marco pidió el análisis greenfield: *"quiero la respuesta como si esta aplicación no estuviera construida"*.
+
+- **Decisión**: rename completo, de una vez — UI, URL, API y base de datos:
+  1. **Lente**: Contacts → **Conversations** (ES Conversaciones · CA Converses · FR Conversations — traduce limpio, criterio ADR-065). Ruta `/h/contacts` → `/h/conversations` con redirect 308 (patrón ADR-067). "Contactos" sobrevive donde es verdad: el toggle "por contacto" de la lente y la ficha de persona — es un *concepto* (la libreta = personas ∪ organizaciones), nunca una entidad.
+  2. **Entidad**: `engagement` → **`conversation`** (tabla, columnas FK `engagement_id`, enum `engagement_status`, RPCs, políticas RLS, `/api/engagements` → `/api/conversations`, query keys, componentes).
+- **Por qué greenfield**: `engagement` suspende el mismo examen que mató a `show` (ADR-036 — opacidad en castellano) y añade el homónimo de marketing. La palabra del dominio, del Desk (sus verbos son de conversación), del log del gap #2 y de la IA es *conversación*.
+- **Por qué también la DB**: el norte ADR-069 exige un schema legible-por-IA — tabla `engagement` + producto "conversación" = un diccionario de traducción permanente para cada agente y cada prompt. Y nunca será más barato: un usuario real, cero clientes, precedente de éxito en casa (show→performance, ADR-036).
+- **La cicatriz considerada**: line→section→line (ADR-035) se revirtió porque "section" era una palabra peor elegida deprisa; "conversación" sale del uso vivido y del sistema entero — riesgo distinto.
+- **No se toca**: `person` (una persona es una persona), los ADRs históricos (historia es historia), las migraciones viejas.
+- **Orden operativo**: este rename va ANTES que los builds de UI pendientes (`desk-prompt`, `contacts-prompt`, `money-prompt`) para no construir sobre vocabulario muerto.
+- **Status**: firm. Build despachado: `build/rename-conversation-prompt.md`.

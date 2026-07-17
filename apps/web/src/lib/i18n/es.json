@@ -5,6 +5,7 @@
   "hall.door": "ponme al día",
   "hall.status_show": "Hoy: {place}.",
   "hall.status_show_time": "Hoy: {place}. Load-in a las {time}.",
+  "hall.time_yours": "({time} tu hora)",
   "hall.status_attention_one": "1 cosa vencida — hace {days}.",
   "hall.status_attention_many": "{n} cosas vencidas — la más antigua hace {days}.",
   "hall.days_one": "1 día",

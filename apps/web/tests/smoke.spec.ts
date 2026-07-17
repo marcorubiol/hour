@@ -26,12 +26,12 @@ test.describe('smoke', () => {
    * its own playwright workspace; NOT demo.
    */
   test('shell → ⌘K → project → views', async ({ page }) => {
-    // ADR-067: `/h` IS the home — the cross-space Desk digest + projects grid,
-    // a real page, no longer a trampoline to some workspace's desk. Note the
-    // bare path: sign-in lands on `/h`, no trailing slash.
+    // ADR-068: `/h` is the HALL — greeting + the "posa'm al dia" door to
+    // /h/desk. The cross-space digest died; the projects grid lives on the
+    // space portada now. Note the bare path: sign-in lands on `/h`.
     await page.goto('/h');
     await expect(page.getByRole('link', { name: /Hour — home/i })).toBeVisible();
-    await expect(page.locator('.pcard__name').first()).toBeVisible();
+    await expect(page.locator('.hall__door')).toBeVisible();
 
     // ⌘K is the SCOPE BUILDER (Scope v2), not a lens switcher: it lists
     // spaces / projects / lines from /api/workspaces + /api/projects +
@@ -52,7 +52,7 @@ test.describe('smoke', () => {
     // Old space-scoped lens bookmarks 308 to the space-less lens.
     await page.goto('/h/muk-cia/desk');
     await page.waitForURL(/\/h\/desk\/?$/);
-    await expect(page.locator('.agenda__head')).toBeVisible();
+    await expect(page.locator('.desk__head')).toBeVisible();
 
     // Project detail proves the read path: session survived, RLS let the
     // engagements through, the count renders. Entities stay space-scoped.

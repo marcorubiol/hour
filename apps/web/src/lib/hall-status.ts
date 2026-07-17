@@ -14,6 +14,7 @@
  * away always tell the same story.
  */
 
+import { dualTime } from './datetime';
 import { t, type Locale } from './i18n';
 
 /** Structural subset of the /api/engagements row the hall needs. */
@@ -36,11 +37,12 @@ export interface HallPerformance {
   start_at: string | null;
   venue_name: string | null;
   city: string | null;
-  venue: { name: string | null } | null;
+  venue: { name: string | null; timezone: string | null } | null;
+  project: { workspace_id: string } | null;
 }
 
 export type HallStatus =
-  | { kind: 'show'; place: string; at: string | null }
+  | { kind: 'show'; place: string; at: string | null; venueTz: string | null }
   | { kind: 'attention'; overdue: number; oldestDays: number }
   | { kind: 'calm'; open: number; next: { day: string; inDays: number } | null };
 // Fourth state, slot only (ADR-069): { kind: 'proposal'; ... } — the AI
@@ -69,6 +71,10 @@ export function computeHallStatus(
     engagements: HallEngagement[];
     performances: HallPerformance[];
     tasks: HallTask[];
+    /** workspace_id → home IANA timezone: the show-time zone when the gig
+        has no venue timezone (same fallback the entry dialog uses; the
+        browser's zone is never a silent stand-in). */
+    homeTzById?: Record<string, string>;
   },
   now: Date,
 ): HallStatus {
@@ -87,7 +93,11 @@ export function computeHallStatus(
       return ta ? -1 : tb ? 1 : 0;
     })[0];
     const place = first.venue?.name ?? first.venue_name ?? first.city ?? '—';
-    return { kind: 'show', place, at: timeOf(first) };
+    const venueTz =
+      first.venue?.timezone ??
+      input.homeTzById?.[first.project?.workspace_id ?? ''] ??
+      null;
+    return { kind: 'show', place, at: timeOf(first), venueTz };
   }
 
   // The working set: DeskBoard's exact semantics for engagements (status
@@ -130,8 +140,8 @@ export function computeHallStatus(
 }
 
 export interface HallSentenceOpts {
-  /** IANA zone for the load-in wall time; defaults to the viewer's. */
-  timeZone?: string;
+  /** The viewer's IANA zone (for the courtesy time); defaults to the runtime's. */
+  viewerTz?: string;
 }
 
 export function hallSentence(
@@ -141,12 +151,14 @@ export function hallSentence(
 ): string {
   if (status.kind === 'show') {
     if (!status.at) return t('hall.status_show', locale, { place: status.place });
-    const time = new Intl.DateTimeFormat(locale, {
-      hour: '2-digit',
-      minute: '2-digit',
-      hourCycle: 'h23',
-      timeZone: opts.timeZone,
-    }).format(new Date(status.at));
+    // Timezone rule (spec § Timezone rule): venue wall time is the primary
+    // truth; the viewer's time rides along in parentheses only when the
+    // zones actually disagree on the clock face.
+    const viewerTz = opts.viewerTz ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const dual = dualTime(status.at, status.venueTz, viewerTz);
+    const time = dual.secondary
+      ? `${dual.primary} ${t('hall.time_yours', locale, { time: dual.secondary })}`
+      : dual.primary;
     return t('hall.status_show_time', locale, { place: status.place, time });
   }
 

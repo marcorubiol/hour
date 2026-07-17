@@ -25,11 +25,12 @@
     slug: string | null;
     performed_at: string;
     status: string;
+    start_at: string | null;
     venue_name: string | null;
     city: string | null;
     line_id: string | null;
     project: ProjectLite | null;
-    venue: { name: string; city: string | null } | null;
+    venue: { name: string; city: string | null; timezone: string | null } | null;
   };
 
   export type DateEvent = {
@@ -42,6 +43,7 @@
     venue_name: string | null;
     city: string | null;
     project: ProjectLite | null;
+    venue: { timezone: string | null } | null;
   };
 
   /** Day bucket of a performance — performed_at is day-level truth. */
@@ -51,10 +53,13 @@
 
   /**
    * Day bucket of a date row. All-day rows are calendar dates, not
-   * instants — keep the stored day; timed rows land on the viewer's day.
+   * instants — keep the stored day. Timed rows follow the timezone rule
+   * (spec § Timezone rule): the day of THEIR venue when one is linked,
+   * the viewer's day otherwise.
    */
   export function dateDayKey(d: DateEvent, timeZone: string): string {
-    return d.all_day ? d.starts_at.slice(0, 10) : dayKeyInTz(d.starts_at, timeZone);
+    if (d.all_day) return d.starts_at.slice(0, 10);
+    return dayKeyInTz(d.starts_at, d.venue?.timezone || timeZone);
   }
 
   /** "July 2026" — shared by the page's h1 and the grid's aria-label. */
@@ -71,6 +76,7 @@
 
 <script lang="ts">
   import { createQuery } from '@tanstack/svelte-query';
+  import { dualTime } from '$lib/datetime';
   import { workspacesQueryOptions } from '$lib/nav-queries';
   import { accentVarFor } from '$lib/utils/accent';
   import { performanceStatusTone } from '$lib/performance';
@@ -109,6 +115,9 @@
   let workspaceSlugById = $derived(
     new Map(($workspacesQuery.data?.items ?? []).map((w) => [w.id, w.slug])),
   );
+  let workspaceTzById = $derived(
+    new Map(($workspacesQuery.data?.items ?? []).map((w) => [w.id, w.timezone])),
+  );
 
   let weeks = $derived(monthGrid(year, month));
   let label = $derived(formatMonthLabel(year, month));
@@ -142,6 +151,37 @@
   function perfLabel(p: PerformanceEvent): string {
     return p.venue?.name ?? p.venue_name ?? p.city ?? p.project?.name ?? 'Performance';
   }
+
+  // Chip times follow the timezone rule: venue wall time on the chip, the
+  // viewer's in the tooltip only when the clocks disagree. A venue-less
+  // gig falls back to its home space's timezone — the same zone its times
+  // were entered in — never silently the browser's. Venue-less DATE rows
+  // stay on the viewer's clock on purpose: they bucket on the viewer's
+  // day (dateDayKey), and a chip must not show a wall time from a zone
+  // other than the one that placed it in its cell.
+  function perfTz(p: PerformanceEvent): string | null {
+    return p.venue?.timezone ?? workspaceTzById.get(p.project?.workspace_id ?? '') ?? null;
+  }
+  function perfTime(p: PerformanceEvent): string | null {
+    if (!p.start_at) return null;
+    return dualTime(p.start_at, perfTz(p), viewerTz).primary;
+  }
+  function perfTitle(p: PerformanceEvent): string {
+    const base = `${perfLabel(p)} — ${p.status}`;
+    if (!p.start_at) return base;
+    const t = dualTime(p.start_at, perfTz(p), viewerTz);
+    return t.secondary ? `${base} · ${t.primary} (${t.secondary} yours)` : `${base} · ${t.primary}`;
+  }
+  function dateTime(d: DateEvent): string | null {
+    if (d.all_day) return null;
+    return dualTime(d.starts_at, d.venue?.timezone, viewerTz).primary;
+  }
+  function dateTitle(d: DateEvent): string {
+    const base = d.title ?? d.kind.replace(/_/g, ' ');
+    if (d.all_day) return base;
+    const t = dualTime(d.starts_at, d.venue?.timezone, viewerTz);
+    return t.secondary ? `${base} · ${t.primary} (${t.secondary} yours)` : `${base} · ${t.primary}`;
+  }
 </script>
 
 <div class="cal__grid" class:cal__grid--loading={loading} aria-label={label}>
@@ -170,34 +210,39 @@
         </span>
         {#each perfs as p (p.id)}
           {@const href = perfHref(p)}
+          {@const time = perfTime(p)}
           {#if href}
             <a
               class="cal__event cal__event--perf"
               data-tone={performanceStatusTone(p.status)}
               style={p.project ? `--c: ${accentVarFor(p.project)}` : undefined}
               {href}
-              title={`${perfLabel(p)} — ${p.status}`}
+              title={perfTitle(p)}
             >
               <span class="cal__event-dot" aria-hidden="true"></span>
+              {#if time}<span class="cal__event-time">{time}</span>{/if}
               {perfLabel(p)}
             </a>
           {:else}
             <span
               class="cal__event cal__event--perf"
               data-tone={performanceStatusTone(p.status)}
-              title={`${perfLabel(p)} — ${p.status}`}
+              title={perfTitle(p)}
             >
               <span class="cal__event-dot" aria-hidden="true"></span>
+              {#if time}<span class="cal__event-time">{time}</span>{/if}
               {perfLabel(p)}
             </span>
           {/if}
         {/each}
         {#each dayDates as d (d.id)}
+          {@const time = dateTime(d)}
           <span
             class="cal__event cal__event--date"
             style={d.project ? `--c: ${accentVarFor(d.project)}` : undefined}
-            title={d.title ?? d.kind.replace(/_/g, ' ')}
+            title={dateTitle(d)}
           >
+            {#if time}<span class="cal__event-time">{time}</span>{/if}
             {d.title ?? d.kind.replace(/_/g, ' ')}
           </span>
         {/each}
@@ -325,6 +370,15 @@
       border-radius: var(--radius-circle);
       flex-shrink: 0;
       background: var(--state-color, var(--text-faint));
+    }
+
+    /* Venue wall time on the chip (timezone rule) — quiet mono prefix. */
+    .cal__event-time {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      font-style: normal;
+      color: var(--text-faint);
+      flex: none;
     }
   }
 </style>

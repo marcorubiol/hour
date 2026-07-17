@@ -45,6 +45,10 @@
     technical?: Json;
     /** Viewer IANA timezone (defaults resolved by the page). */
     viewerTz: string;
+    /** Home-space timezone — the schedule's primary zone when the venue
+        has none (timezone rule: entry and display must agree; never
+        silently the browser's). */
+    fallbackTz?: string | null;
   }
 
   let {
@@ -61,9 +65,13 @@
     hospitality = {},
     technical = {},
     viewerTz,
+    fallbackTz = null,
   }: Props = $props();
 
+  // The venue meta line shows only the venue's OWN timezone; the schedule
+  // falls back to the home space's so display matches the entry zone.
   let venueTz = $derived(venue?.timezone ?? null);
+  let scheduleTz = $derived(venue?.timezone ?? fallbackTz ?? null);
 
   let venueContacts = $derived.by((): VenueContact[] => {
     const raw = venue?.contacts;
@@ -138,7 +146,7 @@
       loadout_at: loadoutAt,
       wrap_at: wrapAt,
     }}
-    {venueTz}
+    venueTz={scheduleTz}
     {viewerTz}
   />
 

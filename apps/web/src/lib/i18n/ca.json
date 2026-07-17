@@ -5,6 +5,7 @@
   "hall.door": "posa'm al dia",
   "hall.status_show": "Avui: {place}.",
   "hall.status_show_time": "Avui: {place}. Load-in a les {time}.",
+  "hall.time_yours": "({time} la teva hora)",
   "hall.status_attention_one": "1 cosa vençuda — fa {days}.",
   "hall.status_attention_many": "{n} coses vençudes — la més antiga fa {days}.",
   "hall.days_one": "1 dia",

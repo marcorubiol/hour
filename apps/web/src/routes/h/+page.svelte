@@ -16,6 +16,7 @@
   import { goto } from '$app/navigation';
   import { createQuery } from '@tanstack/svelte-query';
   import { fetchJSON } from '$lib/api';
+  import { workspacesQueryOptions } from '$lib/nav-queries';
   import { session } from '$lib/session.svelte';
   import { detectLocale, t } from '$lib/i18n';
   import {
@@ -72,6 +73,17 @@
     queryFn: ({ signal }: { signal: AbortSignal }) =>
       fetchJSON<{ items: HallTask[] }>('/api/tasks?status=open&limit=200', signal),
   });
+  // Home timezones for venue-less show days (timezone rule) — the shell
+  // keeps this cache warm; the sentence does NOT wait for it (it only
+  // sharpens the zone fallback once it lands).
+  const workspacesQuery = createQuery(workspacesQueryOptions());
+  let homeTzById = $derived(
+    Object.fromEntries(
+      ($workspacesQuery.data?.items ?? [])
+        .filter((w) => w.timezone)
+        .map((w) => [w.id, w.timezone as string]),
+    ),
+  );
 
   // Truth rule: only settled data speaks. Pending or errored → null →
   // no sentence element at all (no placeholder, no spinner text).
@@ -88,6 +100,7 @@
         engagements: $engagementsQuery.data.items,
         performances: $performancesQuery.data.items,
         tasks: $tasksQuery.data.items,
+        homeTzById,
       },
       new Date(),
     );

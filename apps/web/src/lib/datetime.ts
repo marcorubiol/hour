@@ -86,22 +86,89 @@ export function dayMonthYear(iso: string): string {
 }
 
 /**
- * timestamptz ISO ↔ <input type="datetime-local"> value, in the VIEWER's
- * timezone. Phase 0 caveat (documented in the edit dialog): times are
- * entered in the viewer's local zone; display is dual-timezone (D-PRE-10).
+ * Wall-clock parts of an instant in a zone ("2026-07-17", "20:30:00").
+ * en-CA date order + h23 keep the parts locale-stable.
  */
-export function isoToLocalInput(iso: string | null): string {
+function wallParts(atMs: number, timeZone: string): Record<string, string> {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(new Date(atMs));
+  const bag: Record<string, string> = {};
+  for (const p of parts) if (p.type !== 'literal') bag[p.type] = p.value;
+  return bag;
+}
+
+/** Zone's UTC offset at an instant, in ms (CEST → +7 200 000). */
+function tzOffsetMs(atMs: number, timeZone: string): number {
+  const base = Math.floor(atMs / 1000) * 1000; // parts are second-precise
+  const w = wallParts(base, timeZone);
+  const asUtc = Date.UTC(
+    Number(w.year),
+    Number(w.month) - 1,
+    Number(w.day),
+    Number(w.hour),
+    Number(w.minute),
+    Number(w.second),
+  );
+  return asUtc - base;
+}
+
+/**
+ * "YYYY-MM-DDTHH:mm" typed as wall time IN `timeZone` → ISO instant.
+ * The timezone-rule entry contract (screen-data-spec § Timezone rule):
+ * contracts speak venue-local, so a datetime-local value must be
+ * interpreted in the venue's zone, never the browser's.
+ *
+ * Guess-and-refine: the offset depends on the instant and the instant on
+ * the offset; two passes converge everywhere except across a DST jump,
+ * where the result is still deterministic and roundtrip-safe. The pick
+ * follows the offset sampled at the wall string read as a UTC instant:
+ * zones EAST of UTC (Madrid, London) resolve a nonexistent wall time
+ * forward and an ambiguous one to the LATER occurrence; zones WEST of
+ * UTC (the Americas) resolve the other way (backward / earlier). Both
+ * directions are pinned in datetime.test.ts.
+ */
+export function wallClockToInstant(wallClock: string, timeZone: string): string | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/.exec(wallClock);
+  if (!m) return null;
+  const wallUtc = Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +(m[6] ?? '0'));
+  if (Number.isNaN(wallUtc)) return null;
+  // Date.UTC rolls impossible components over (month 13, day 32, 25:00 …)
+  // instead of failing — same guard style as realIsoDate: the parts must
+  // survive the round-trip untouched.
+  const chk = new Date(wallUtc);
+  if (
+    chk.getUTCFullYear() !== +m[1] ||
+    chk.getUTCMonth() + 1 !== +m[2] ||
+    chk.getUTCDate() !== +m[3] ||
+    chk.getUTCHours() !== +m[4] ||
+    chk.getUTCMinutes() !== +m[5]
+  ) {
+    return null;
+  }
+  let t = wallUtc - tzOffsetMs(wallUtc, timeZone);
+  t = wallUtc - tzOffsetMs(t, timeZone);
+  return new Date(t).toISOString();
+}
+
+/**
+ * ISO instant → "YYYY-MM-DDTHH:mm" wall time in `timeZone`, the value an
+ * <input type="datetime-local"> shows. Inverse of wallClockToInstant —
+ * the roundtrip is drift-free for every wall time that exists.
+ */
+export function instantToWallClock(iso: string | null, timeZone: string): string {
   if (!iso) return '';
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '';
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-
-export function localInputToIso(value: string): string | null {
-  if (!value) return null;
-  const d = new Date(value);
-  return Number.isNaN(d.getTime()) ? null : d.toISOString();
+  const w = wallParts(d.getTime(), timeZone);
+  return `${w.year}-${w.month}-${w.day}T${w.hour}:${w.minute}`;
 }
 
 export function timeInTz(iso: string, timeZone: string): string {

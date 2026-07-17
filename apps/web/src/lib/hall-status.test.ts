@@ -40,8 +40,13 @@ function show(over: Partial<HallPerformance> = {}): HallPerformance {
     venue_name: null,
     city: null,
     venue: null,
+    project: null,
     ...over,
   };
+}
+
+function venue(name: string, timezone: string | null = null) {
+  return { name, timezone };
 }
 
 const EMPTY = { engagements: [], performances: [], tasks: [] };
@@ -52,13 +57,21 @@ describe('computeHallStatus — state selection', () => {
       {
         engagements: [eng(-3)],
         performances: [
-          show({ venue: { name: 'Kursaal' }, load_in_at: `${isoDay(0)}T15:00:00+00:00` }),
+          show({
+            venue: venue('Kursaal', 'Europe/London'),
+            load_in_at: `${isoDay(0)}T15:00:00+00:00`,
+          }),
         ],
         tasks: [],
       },
       NOW,
     );
-    expect(status).toEqual({ kind: 'show', place: 'Kursaal', at: `${isoDay(0)}T15:00:00+00:00` });
+    expect(status).toEqual({
+      kind: 'show',
+      place: 'Kursaal',
+      at: `${isoDay(0)}T15:00:00+00:00`,
+      venueTz: 'Europe/London',
+    });
   });
 
   it('ignores cancelled and non-today performances', () => {
@@ -76,7 +89,7 @@ describe('computeHallStatus — state selection', () => {
   it('show place falls back venue.name → venue_name → city → em dash', () => {
     const at = (p: Partial<HallPerformance>) =>
       computeHallStatus({ ...EMPTY, performances: [show(p)] }, NOW);
-    expect(at({ venue: { name: 'Kursaal' }, venue_name: 'x', city: 'y' })).toMatchObject({
+    expect(at({ venue: venue('Kursaal'), venue_name: 'x', city: 'y' })).toMatchObject({
       place: 'Kursaal',
     });
     expect(at({ venue_name: 'Ateneu', city: 'y' })).toMatchObject({ place: 'Ateneu' });
@@ -97,6 +110,24 @@ describe('computeHallStatus — state selection', () => {
       NOW,
     );
     expect(status).toMatchObject({ kind: 'show', place: 'Early' });
+  });
+
+  it('venue-less show falls back to the home-space timezone, never the browser silently', () => {
+    const status = computeHallStatus(
+      {
+        ...EMPTY,
+        performances: [
+          show({
+            city: 'Olot',
+            load_in_at: `${isoDay(0)}T15:00:00+00:00`,
+            project: { workspace_id: 'ws-1' },
+          }),
+        ],
+        homeTzById: { 'ws-1': 'Europe/Madrid' },
+      },
+      NOW,
+    );
+    expect(status).toMatchObject({ kind: 'show', place: 'Olot', venueTz: 'Europe/Madrid' });
   });
 
   it('show time prefers load_in_at over start_at, null when neither', () => {
@@ -144,17 +175,48 @@ describe('computeHallStatus — state selection', () => {
 });
 
 describe('hallSentence — copy building (ca)', () => {
-  it('show day with load-in time, in the requested zone', () => {
+  it('show day without venue tz: viewer wall time, no courtesy', () => {
     const s = hallSentence(
-      { kind: 'show', place: 'Kursaal', at: '2026-07-17T15:00:00+00:00' },
+      { kind: 'show', place: 'Kursaal', at: '2026-07-17T15:00:00+00:00', venueTz: null },
       'ca',
-      { timeZone: 'Europe/Madrid' },
+      { viewerTz: 'Europe/Madrid' },
+    );
+    expect(s).toBe('Avui: Kursaal. Load-in a les 17:00.');
+  });
+
+  it('show day abroad: venue time primary, viewer courtesy in parentheses', () => {
+    // London gig seen from Barcelona: 15:00Z = 16:00 BST = 17:00 CEST.
+    const s = hallSentence(
+      {
+        kind: 'show',
+        place: 'Roundhouse',
+        at: '2026-07-17T15:00:00+00:00',
+        venueTz: 'Europe/London',
+      },
+      'ca',
+      { viewerTz: 'Europe/Madrid' },
+    );
+    expect(s).toBe('Avui: Roundhouse. Load-in a les 16:00 (17:00 la teva hora).');
+  });
+
+  it('show day at home: venue tz equals viewer tz, no courtesy', () => {
+    const s = hallSentence(
+      {
+        kind: 'show',
+        place: 'Kursaal',
+        at: '2026-07-17T15:00:00+00:00',
+        venueTz: 'Europe/Madrid',
+      },
+      'ca',
+      { viewerTz: 'Europe/Madrid' },
     );
     expect(s).toBe('Avui: Kursaal. Load-in a les 17:00.');
   });
 
   it('show day without any time drops the time part', () => {
-    expect(hallSentence({ kind: 'show', place: 'Manresa', at: null }, 'ca')).toBe('Avui: Manresa.');
+    expect(
+      hallSentence({ kind: 'show', place: 'Manresa', at: null, venueTz: null }, 'ca'),
+    ).toBe('Avui: Manresa.');
   });
 
   it('attention, singular and plural, day and days', () => {
@@ -218,9 +280,11 @@ describe('hallSentence — other locales', () => {
 
   it('en', () => {
     expect(
-      hallSentence({ kind: 'show', place: 'Kursaal', at: '2026-07-17T15:00:00+00:00' }, 'en', {
-        timeZone: 'UTC',
-      }),
+      hallSentence(
+        { kind: 'show', place: 'Kursaal', at: '2026-07-17T15:00:00+00:00', venueTz: null },
+        'en',
+        { viewerTz: 'UTC' },
+      ),
     ).toBe('Today: Kursaal. Load-in at 15:00.');
     expect(hallSentence({ kind: 'calm', open: 3, next: { day: '2026-07-20', inDays: 3 } }, 'en')).toBe(
       'All quiet. 3 things open, none overdue — the next waits until Monday.',

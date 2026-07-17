@@ -3,7 +3,8 @@
    * Calendar lens — Phase 0.2. Month grid over the two event sources:
    * `performance` (performed_at, day-level truth) and `date` (rehearsals,
    * travel days, residencies, press — timestamptz, bucketed into the
-   * viewer's day; all-day rows keep their stored date).
+   * linked venue's day per the timezone rule, the viewer's day when no
+   * venue is linked; all-day rows keep their stored date).
    *
    * PINS are the filter (ADR-057; projects ADR-060): events come from the
    * union of pinned spaces/projects/lines, or everything RLS allows when
@@ -147,8 +148,9 @@
     };
   });
   // The dates window is padded ±1 day: `date` rows are timestamptz and get
-  // bucketed into the viewer's day, which can fall outside the UTC-bounded
-  // fetch window at the grid edges. Off-grid buckets simply find no cell.
+  // bucketed into their venue's (or the viewer's) day, which can fall
+  // outside the UTC-bounded fetch window at the grid edges. Off-grid
+  // buckets simply find no cell.
   const datesOptions = toStore(() => {
     const k = $feedKey;
     return {
