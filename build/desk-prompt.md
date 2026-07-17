@@ -1,5 +1,7 @@
 # Hour — Build prompt: Desk v2 (four sources + task surfacing)
 
+> **STATUS: IN PROGRESS (2026-07-17).** Rebuild en curso en sesión paralela; aún no aterrizado en `main`. En el árbol hoy = v1: 2/4 fuentes (`DeskBoard` conversations + sección `TaskBoard`) en secciones separadas, no feed mixto rankeado. Falta: performances como headline de bucket, money alerts, chips de eventos `date`, quick-capture, buzón de consentimiento IA.
+>
 > Handoff prompt for an external coding agent. Depends on `task-model-prompt.md` —
 > **which is EXECUTED and LIVE (ADR-071)**: both migrations applied, `/api/tasks` CRUD,
 > `taskSurfaceState()` unit-tested. No adapter needed — build directly on the shipped model.

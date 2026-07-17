@@ -1,5 +1,7 @@
 # Hour — Design prompt: Desk (the "what needs me" home)
 
+> **STATUS: NOT STARTED (2026-07-17).** Depende de Desk v2 (en curso). El Desk vivo aún es v1.
+>
 > For the design tool. Origin: S1 2026-07-17 — decisions in `_decisions.md` ADR-068/069/070,
 > data spec in `build/screen-data-spec.md § /h/desk`.
 

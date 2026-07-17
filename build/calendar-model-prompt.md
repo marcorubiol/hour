@@ -1,5 +1,7 @@
 # Hour — Build prompt: calendar model v1 (availability + date cascade + APIs)
 
+> **STATUS: DISPATCHED — NOT STARTED (verificado 2026-07-17).** 0 código: sin migración (`availability_block` / date-cascade / la "Migration C" del gap #8 no existen), sin `conflictsFor()` en `$lib/calendar.ts`. Corre PRIMERO.
+>
 > Handoff prompt for an external coding agent. Runs FIRST — `calendar-prompt.md` depends on it.
 > Origin: design+data review S1 (2026-07-17). Decision: `_decisions.md` § ADR-072 (person-based
 > conflicts, availability, date cascade, travel). Spec: `build/screen-data-spec.md § Calendar`

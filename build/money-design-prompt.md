@@ -1,5 +1,7 @@
 # Hour — Design prompt: Money lens (the honest collector)
 
+> **STATUS: NOT STARTED (2026-07-17).** Depende de Money v2 (no construido).
+>
 > For the design tool. Origin: S1 2026-07-17 — ADR-074, spec `§ Money`. Research:
 > payment delays are a universal top-3 frustration (99-patterns §1.8: Spanish public
 > venues 60–90 days; "when they collect, I collect" cascades).

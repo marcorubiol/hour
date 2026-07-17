@@ -1,5 +1,7 @@
 # Hour — Build prompt: Calendar lens v2 (conflicts · availability · dates · grammar)
 
+> **STATUS: DISPATCHED — NOT STARTED (verificado 2026-07-17).** 0 código; depende del model (no construido). La UI viva sigue siendo la de Phase 0.2 (month grid + pins + diálogo ICS).
+>
 > Handoff prompt for an external coding agent. Depends on `calendar-model-prompt.md`
 > (availability_block + date cascade + `$lib/calendar.ts`). If not merged yet: build behind
 > a thin adapter, render new sections only when endpoints respond — graceful absence.

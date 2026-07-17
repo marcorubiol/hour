@@ -1,5 +1,7 @@
 # Hour — Design prompt: Calendar lens (planning without alarm)
 
+> **STATUS: NOT STARTED (2026-07-17).** Depende de Calendar v2 (no construido).
+>
 > For the design tool. Origin: S1 2026-07-17 — ADR-072 in `_decisions.md`, data spec in
 > `build/screen-data-spec.md § Calendar`.
 

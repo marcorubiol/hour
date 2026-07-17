@@ -1,5 +1,7 @@
 # Hour — Build prompt: money model v1 (expected_on + payments API + expenses union)
 
+> **STATUS: DISPATCHED — NOT STARTED (verificado 2026-07-17).** 0 código: sin migración (`expected_on`/`payment_condition` no existen), sin `/api/payments`, sin `agingState`/`observedPayerTermsDays` en `$lib/money.ts`. Preexisten en schema sin UI: tabla `payment` + `invoice.payer_person_id`. Corre PRIMERO. (Sub-punto sin confirmar: si `/api/expenses` GET ya acepta la union `project_ids`/`workspace_ids`.)
+>
 > Handoff prompt for an external coding agent. Runs FIRST — `money-prompt.md` depends on it.
 > Origin: S1 2026-07-17, ADR-074. Spec: `build/screen-data-spec.md § Money` + `§ gaps #9`.
 

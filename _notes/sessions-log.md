@@ -8,6 +8,16 @@ Convención: secciones por fecha descendente. Cada sesión queda con commits cit
 
 ---
 
+## 2026-07-17 (4) — Verificación de estado real + puesta al día de los docs
+
+Gatillo: "en qué punto estamos → verifica todo y plasma la realidad en los documentos". No un work-log de build: una **pasada de verificación** para matar el drift docs↔realidad, corriendo en paralelo a la sesión de Desk v2.
+
+- **Método**: sondear prod en vivo (no fiarse de docs) + correr suites + un verificador paralelo cruzando los 13 `build/*-prompt.md` contra código/migraciones. Suites reconfirmadas: `svelte-check` 0/0 (1511) · unit **178/178**.
+- **Prod SANO** en `d85ed0d` (dirty:false): rename, task entity, hall y ADR-066/067/077 **desplegados**. Las sondas invierten el ⚠️ de ADR-075 — `/api/conversations` 401 · `/api/engagements` 404 · `/api/tasks` 401 → el deploy atómico del rename ya ocurrió. El `/h/contacts` que da 200 es el SPA fallback del adapter, no la ruta viva.
+- **El `_tasks.md` mentía en un punto**: decía Conversations v1.5 "despachada con write path (contact capture)". Falso — el commit `1eb7a96` "contact capture feature" era **en realidad el rename** (solo mueve ficheros, 0 lógica). Conversations v1.5 está a **0 código**. Igual Calendar v2 y Money v2: **sin migración → 0 código**. El único build en curso es **Desk v2** (en el árbol aún v1, 2/4 fuentes en secciones separadas).
+- **Dejado limpio y documentado**: `_tasks.md` reescrito (Queue por estado real + 6 entradas nuevas en Trace), header del `roadmap` refrescado (estaba congelado en 07-04), y **sello `STATUS` estampado en los 12 prompts de build** — conservados, no borrados (petición de Marco): EXECUTED (hall, rename) · IN PROGRESS (desk) · DISPATCHED-not-started (calendar/contacts/money model+ui) · NOT STARTED (los -design). Commits: `89abaac` (docs) + el de este sellado.
+- **Lección operativa** (preservable): verificar contra el **artefacto** (migración/endpoint/función), nunca contra el mensaje de commit — un commit generado por LLM describe la *intención del prompt que lo lanzó*, no lo que el diff hizo. El `_tasks.md` heredó esa mentira del mensaje de `1eb7a96`.
+
 ## 2026-07-17 (3) — Task entity construida (sesión paralela): D3 + ADR-070 en vivo
 
 Sesión .zerø autónoma (ultracode) que corrió EN PARALELO a la sesión de diseño de Marco — dos manos en el mismo árbol toda la noche, convergiendo: esta sesión aplicó la migración base de task ~1h antes de que la de diseño escribiera ADR-069/070 citándola; la de diseño commiteó la base de esta (`3a4e5d2`) mientras esta ejecutaba su prompt `task-model-prompt.md` sin saberlo aún. Registro completo: `_decisions.md § ADR-071`.
