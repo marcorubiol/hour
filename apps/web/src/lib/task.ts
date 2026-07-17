@@ -11,6 +11,7 @@
 
 import * as v from 'valibot';
 import { Constants, type Enums, type Tables } from './db-types';
+import { realIsoDate } from './datetime';
 
 export type TaskStatus = Enums<'task_status'>;
 
@@ -23,19 +24,6 @@ export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
 };
 
 /**
- * "YYYY-MM-DD that is a real calendar day" — same contract as
- * engagement.next_action_at (the column is timestamptz; Postgres casts).
- */
-const realIsoDate = v.pipe(
-  v.string(),
-  v.isoDate(),
-  v.check((s) => {
-    const d = new Date(`${s}T00:00:00Z`);
-    return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;
-  }, 'Not a real calendar date'),
-);
-
-/**
  * POST /api/tasks body. At most one parent FK; a task with no parent needs
  * workspace_id. Both rules are enforced by the endpoint (and again by the
  * RPC) — the fields stay optional here so the error can be specific.
@@ -44,6 +32,10 @@ export const TaskCreateSchema = v.object({
   title: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(200)),
   note: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500)))),
   due_at: v.optional(v.nullable(realIsoDate)),
+  from_at: v.optional(v.nullable(realIsoDate)),
+  lead_days: v.optional(
+    v.nullable(v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(365))),
+  ),
   workspace_id: v.optional(v.pipe(v.string(), v.uuid())),
   project_id: v.optional(v.pipe(v.string(), v.uuid())),
   line_id: v.optional(v.pipe(v.string(), v.uuid())),
@@ -64,6 +56,10 @@ export const TaskPatchSchema = v.object({
   title: v.optional(v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(200))),
   note: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500)))),
   due_at: v.optional(v.nullable(realIsoDate)),
+  from_at: v.optional(v.nullable(realIsoDate)),
+  lead_days: v.optional(
+    v.nullable(v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(365))),
+  ),
   status: v.optional(v.picklist(TASK_STATUSES)),
 });
 
@@ -105,6 +101,75 @@ export const TASK_SELECT = [
   'performance:performance_id(id,slug,project_id,venue_name,city,start_at)',
   'engagement:engagement_id(id,project_id,person:person_id(slug,full_name,organization_name))',
 ].join(',');
+
+// ── Surfacing (ADR-070) ─────────────────────────────────────────────────
+
+export type TaskSurfaceStateName =
+  | 'dormant'
+  | 'anytime'
+  | 'open'
+  | 'urgent'
+  | 'overdue'
+  | 'done';
+
+export interface TaskSurface {
+  /** The calendar day (YYYY-MM-DD) the task surfaces, or null (anytime). */
+  surfacesAt: string | null;
+  state: TaskSurfaceStateName;
+}
+
+/** Calendar-day arithmetic on an ISO date string, UTC-anchored. */
+function isoAddDays(day: string, days: number): string {
+  const d = new Date(`${day}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+/** The viewer's calendar day for an injected instant. */
+function localDayISO(now: Date): string {
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${now.getFullYear()}-${m}-${day}`;
+}
+
+/**
+ * The ADR-070 surfacing rule, pure and day-precise. `now` is a parameter —
+ * never read the clock in here. All comparisons are CALENDAR DAYS (the
+ * date-only contract: an instant compare against local midnight flags a
+ * due-today task overdue for any viewer west of UTC):
+ *
+ * - `surfacesAt = max(from_at, due_at − lead_days)` — missing parts degrade
+ *   gracefully; no dates at all → null (anytime).
+ * - Before `surfacesAt` → `dormant` (the Desk never renders it).
+ * - Past `due_at` → `overdue`. On the due day, or inside the lead window →
+ *   `urgent`. Surfaced with no due pressure → `open`. `done` wins over all.
+ */
+export function taskSurfaceState(
+  t: Pick<Tables<'task'>, 'status' | 'from_at' | 'due_at' | 'lead_days'>,
+  now: Date,
+): TaskSurface {
+  const fromDay = t.from_at ? t.from_at.slice(0, 10) : null;
+  const dueDay = t.due_at ? t.due_at.slice(0, 10) : null;
+  const leadDay = dueDay && t.lead_days != null ? isoAddDays(dueDay, -t.lead_days) : null;
+  // ISO date strings compare correctly as strings.
+  const surfacesAt =
+    fromDay && leadDay ? (fromDay > leadDay ? fromDay : leadDay) : (fromDay ?? leadDay);
+
+  const today = localDayISO(now);
+
+  if (t.status === 'done') return { surfacesAt, state: 'done' };
+  if (surfacesAt && today < surfacesAt) return { surfacesAt, state: 'dormant' };
+  if (!fromDay && !dueDay) return { surfacesAt, state: 'anytime' };
+  if (dueDay) {
+    if (today > dueDay) return { surfacesAt, state: 'overdue' };
+    if (today === dueDay || (leadDay && today >= leadDay)) {
+      return { surfacesAt, state: 'urgent' };
+    }
+    return { surfacesAt, state: 'open' };
+  }
+  // from-only, already surfaced: a plain "task to do" now.
+  return { surfacesAt, state: 'open' };
+}
 
 /**
  * The task's effective project id, resolved through whichever parent it

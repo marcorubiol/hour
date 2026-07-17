@@ -1571,7 +1571,9 @@ export type Database = {
           deleted_at: string | null
           due_at: string | null
           engagement_id: string | null
+          from_at: string | null
           id: string
+          lead_days: number | null
           line_id: string | null
           note: string | null
           origin: Database["public"]["Enums"]["task_origin"]
@@ -1589,7 +1591,9 @@ export type Database = {
           deleted_at?: string | null
           due_at?: string | null
           engagement_id?: string | null
+          from_at?: string | null
           id?: string
+          lead_days?: number | null
           line_id?: string | null
           note?: string | null
           origin?: Database["public"]["Enums"]["task_origin"]
@@ -1607,7 +1611,9 @@ export type Database = {
           deleted_at?: string | null
           due_at?: string | null
           engagement_id?: string | null
+          from_at?: string | null
           id?: string
+          lead_days?: number | null
           line_id?: string | null
           note?: string | null
           origin?: Database["public"]["Enums"]["task_origin"]
@@ -2421,6 +2427,8 @@ export type Database = {
         Args: {
           p_due_at?: string
           p_engagement_id?: string
+          p_from_at?: string
+          p_lead_days?: number
           p_line_id?: string
           p_note?: string
           p_performance_id?: string
@@ -2435,7 +2443,9 @@ export type Database = {
           deleted_at: string | null
           due_at: string | null
           engagement_id: string | null
+          from_at: string | null
           id: string
+          lead_days: number | null
           line_id: string | null
           note: string | null
           origin: Database["public"]["Enums"]["task_origin"]

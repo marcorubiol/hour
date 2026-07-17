@@ -40,9 +40,13 @@ added / removed / reordered. The **edit-in-context** surface of a line. Modules 
 line — nothing above the line composes modules.
 
 **Task** — the **verb layer**, not a concern-domain. Polymorphic: attaches to project / line /
-performance / engagement (D3, deferred). Never a lens. Surfaces in three places: inline as an
-engagement's next-action (already live via `engagement.next_action_at`), as a module (a line/project
-to-do), and as a feed into the Desk lens (the home).
+performance / engagement — at most one; none = a free workspace task (D3 **live since 2026-07-17**,
+ADR-070/071: anytime / from / due+lead, urgency always derived). Never a lens. Surfaces in three
+places: inline as an engagement's next-action (live via `engagement.next_action_at`; no backfill —
+ADR-070), as the Tasks line module, and as a feed into the Desk (the home). **Authoring**: a
+parent-attached task is created where its parent lives (the module's composer); the FREE workspace
+task has no container editor anywhere, so its authoring home is the Desk composer — a deliberate
+extension of Option 2, recorded here so it reads as a decision, not drift.
 
 ## The split that resolves everything
 
@@ -87,7 +91,7 @@ digest (not a lens). Entity-bound content → module only. Verb that hangs off o
 
 - **Lens / lente** — a global read surface. Never composed, always present, narrowed by pins.
 - **Module / módulo** — a line-level composable section. The only place modules exist.
-  Catalog: Calendar · Contacts · Money · Notes · Materials · Team · Road sheets (+ Tasks when D3).
+  Catalog: Calendar · Contacts · Money · Notes · Materials · Team · Road sheets · Tasks (live, ADR-071).
   (Contacts module = the line's booking conversations — the Contacts lens scoped to it; Team = its cast/crew.)
 - **Task / tarea** — the verb layer. Not a lens. Module + inline next-action + Desk feed.
 - **Space / project edit content** — a container's own intrinsic editable fields. **Not** modules.

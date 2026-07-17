@@ -4,6 +4,25 @@
  * when it differs. Pure functions — the caller supplies both zones.
  */
 
+import * as v from 'valibot';
+
+/**
+ * The date-only API contract: "YYYY-MM-DD that is a real calendar day".
+ * isoDate is regex-only (2026-02-31 passes it), so the round-trip check
+ * keeps impossible dates from reaching Postgres as a 5xx. One home —
+ * engagement.next_action_at, performance day fields and task.due_at all
+ * consume it. (Valibot runs later pipe actions even when isoDate already
+ * failed, so the Invalid-Date guard sits before toISOString().)
+ */
+export const realIsoDate = v.pipe(
+  v.string(),
+  v.isoDate(),
+  v.check((s) => {
+    const d = new Date(`${s}T00:00:00Z`);
+    return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;
+  }, 'Not a real calendar date'),
+);
+
 export interface DualTime {
   /** Wall time in the primary (venue) zone, HH:mm. */
   primary: string;

@@ -10,6 +10,7 @@
 
 import * as v from 'valibot';
 import { Constants, type Enums } from './db-types';
+import { realIsoDate } from './datetime';
 
 export type PerformanceStatus = Enums<'performance_status'>;
 
@@ -39,16 +40,8 @@ export function performanceStatusLabel(status: string): string {
   return status.replace(/_/g, ' ');
 }
 
-const isoDateField = v.pipe(
-  v.string(),
-  v.isoDate(),
-  // isoDate is regex-only (accepts 2026-02-31); round-trip rejects
-  // impossible calendar dates. Same guard as EngagementPatchSchema.
-  v.check((s) => {
-    const d = new Date(`${s}T00:00:00Z`);
-    return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;
-  }, 'Not a real calendar date'),
-);
+// Date-only contract — the one shared realIsoDate (see $lib/datetime).
+const isoDateField = realIsoDate;
 
 const isoInstantField = v.pipe(
   v.string(),

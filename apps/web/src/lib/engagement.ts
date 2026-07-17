@@ -8,6 +8,7 @@
 
 import * as v from 'valibot';
 import { Constants, type Enums, type Tables } from './db-types';
+import { realIsoDate } from './datetime';
 
 export type EngagementStatus = Enums<'engagement_status'>;
 
@@ -32,23 +33,6 @@ export function statusLabel(status: string): string {
 export function statusBadgeClass(status: string): string {
   return `badge--${status.replace(/_/g, '-')}`;
 }
-
-/**
- * "YYYY-MM-DD that is a real calendar day". isoDate is regex-only
- * (2026-02-31 passes it), so the round-trip check keeps impossible dates
- * from reaching Postgres as a 5xx. One home — shared by the PATCH and
- * CREATE next_action_at fields. (Valibot runs later pipe actions even
- * when isoDate already failed, so the Invalid-Date guard sits before
- * toISOString().)
- */
-const realIsoDate = v.pipe(
-  v.string(),
-  v.isoDate(),
-  v.check((s) => {
-    const d = new Date(`${s}T00:00:00Z`);
-    return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;
-  }, 'Not a real calendar date'),
-);
 
 /**
  * PATCH /api/engagements/:id body. Whitelist of the fields the difusión

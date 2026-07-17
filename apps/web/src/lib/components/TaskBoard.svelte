@@ -15,7 +15,7 @@
   import { addToast } from '$lib/components/Toast.svelte';
   import Checkbox from '$lib/components/Checkbox.svelte';
   import { dayMonth } from '$lib/datetime';
-  import { taskContextLabel, type TaskItem } from '$lib/task';
+  import { taskContextLabel, taskSurfaceState, type TaskItem } from '$lib/task';
 
   interface Props {
     tasks: TaskItem[];
@@ -43,34 +43,53 @@
   let rows = $derived(cap == null ? tasks : tasks.slice(0, cap));
   let moreCount = $derived(Math.max(0, tasks.length - rows.length));
 
-  // Same local-midnight arithmetic as DeskBoard: a date-only due_at sits at
-  // UTC midnight; anything before today's local midnight is overdue.
-  function isOverdue(t: TaskItem): boolean {
-    if (!t.due_at || t.status === 'done') return false;
-    const start = new Date();
-    start.setHours(0, 0, 0, 0);
-    return new Date(t.due_at).getTime() < start.getTime();
-  }
+  // One clock per mount — taskSurfaceState (ADR-070) owns the day math
+  // (calendar days, never instants; `now` always injected).
+  const now = new Date();
 
   function invalidate() {
     void queryClient.invalidateQueries({ queryKey: ['tasks'] });
     void queryClient.invalidateQueries({ queryKey: ['line-tasks'] });
   }
 
+  // Optimistic toggle (the EngagementTable inline-edit shape): patch every
+  // tasks cache in place so the row, its strikethrough and the done fold
+  // move with the click, and ROLL BACK on error — the native checkbox has
+  // already flipped, and with unchanged data no refetch would unflip it
+  // (structural sharing keeps the same objects).
+  type TasksCache = { items: TaskItem[] };
   const toggleTask = createMutation({
     mutationFn: ({ id, status }: { id: string; status: 'open' | 'done' }) =>
       mutateJSON<{ task: TaskItem }>('PATCH', `/api/tasks/${id}`, { status }),
-    onSuccess: invalidate,
-    onError: (err) => {
-      // Refetch too: the native checkbox already flipped visually — server
-      // truth puts it back.
-      invalidate();
+    onMutate: async ({ id, status }) => {
+      await Promise.all([
+        queryClient.cancelQueries({ queryKey: ['tasks'] }),
+        queryClient.cancelQueries({ queryKey: ['line-tasks'] }),
+      ]);
+      const snapshots = [
+        ...queryClient.getQueriesData<TasksCache>({ queryKey: ['tasks'] }),
+        ...queryClient.getQueriesData<TasksCache>({ queryKey: ['line-tasks'] }),
+      ];
+      for (const [key, data] of snapshots) {
+        if (!data) continue;
+        queryClient.setQueryData(key, {
+          ...data,
+          items: data.items.map((t) => (t.id === id ? { ...t, status } : t)),
+        });
+      }
+      return { snapshots };
+    },
+    onError: (err, _vars, ctx) => {
+      for (const [key, data] of ctx?.snapshots ?? []) {
+        queryClient.setQueryData(key, data);
+      }
       addToast({
         tone: 'danger',
         title: 'Change not saved',
         message: `${err instanceof ApiError ? err.message : 'Unexpected error'} — try again.`,
       });
     },
+    onSettled: invalidate,
   });
 
   const removeTask = createMutation({
@@ -96,20 +115,33 @@
   {:else}
     <ul class="taskboard__list">
       {#each rows as t (t.id)}
-        {@const overdue = isOverdue(t)}
+        {@const surface = taskSurfaceState(t, now)}
         {@const ctx = showContext ? taskContextLabel(t) : null}
         <li class="taskrow" class:taskrow--done={t.status === 'done'}>
           <Checkbox
             label={t.title}
             checked={t.status === 'done'}
-            onchange={() =>
-              $toggleTask.mutate({ id: t.id, status: t.status === 'done' ? 'open' : 'done' })}
+            onchange={(e) => {
+              // Target status from the EVENT, not the row: t.status is the
+              // cached value and a rapid check/uncheck would send 'done'
+              // twice before the first round trip settles.
+              const el = e.currentTarget as HTMLInputElement;
+              $toggleTask.mutate({ id: t.id, status: el.checked ? 'done' : 'open' });
+            }}
           />
           <span class="taskrow__meta">
             {#if t.note}<span class="taskrow__note" title={t.note}>{t.note}</span>{/if}
-            {#if t.due_at}
-              <span class="taskrow__due" class:taskrow__due--overdue={overdue}>
-                {overdue ? 'overdue · ' : ''}{dayMonth(t.due_at)}
+            {#if surface.state === 'dormant' && surface.surfacesAt}
+              <span class="taskrow__due taskrow__due--dormant">
+                sleeps until {dayMonth(surface.surfacesAt)}
+              </span>
+            {:else if t.due_at}
+              <span
+                class="taskrow__due"
+                class:taskrow__due--overdue={surface.state === 'overdue'}
+                class:taskrow__due--urgent={surface.state === 'urgent'}
+              >
+                {surface.state === 'overdue' ? 'overdue · ' : ''}{dayMonth(t.due_at)}
               </span>
             {/if}
             {#if ctx}<span class="taskrow__ctx">{ctx}</span>{/if}
@@ -174,6 +206,12 @@
     }
     .taskrow__due--overdue {
       color: var(--danger);
+    }
+    .taskrow__due--urgent {
+      color: var(--warning);
+    }
+    .taskrow__due--dormant {
+      color: var(--text-faint);
     }
     .taskrow__ctx {
       font-family: var(--font-mono);
