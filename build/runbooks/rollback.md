@@ -12,8 +12,8 @@ Use this when a production deploy of `hour-web` breaks login, routing, API respo
 4. Verify:
    - `https://hour.zerosense.studio/login` loads.
    - Login succeeds for Marco.
-   - `/booking` loads engagements.
-   - `/api/engagements` returns 401 without JWT and 200 with valid JWT.
+   - `/h/conversations` lists conversations.
+   - `/api/conversations` returns 401 without JWT and 200 with valid JWT.
 5. Create a follow-up issue/todo with the failed deployment timestamp, Sentry event links, and suspected commit.
 
 ## Database migrations

@@ -3,7 +3,7 @@
  * + a public role; the token opens `/public/roadsheet/:token` with no
  * account. Management is RPC-only — `roadsheet_share` is deny-all even
  * for authenticated, so the token never travels through PostgREST table
- * reads; both RPCs gate on `edit:show`.
+ * reads; both RPCs gate on `edit:performance`.
  *
  * GET  → active shares for the performance (token included: the operator
  *        needs it to build/copy the URL — it is not a secret FROM them).
@@ -39,7 +39,7 @@ function mapShare(s: ShareRow) {
   return { id: s.id, token: s.token, role: s.role, created_at: s.created_at };
 }
 
-// Both "performance not found" and "edit:show required" surface as 42501
+// Both "performance not found" and "edit:performance required" surface as 42501
 // from the RPC — indistinguishable by design.
 const SHARE_CODES = {
   '42501': { status: 403, error: 'forbidden_or_not_found' },

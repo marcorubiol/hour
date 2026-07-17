@@ -40,7 +40,7 @@ Pick the newest stamp; expect three files:
 1. Spin up an empty Supabase project (or local `supabase start`).
 2. Download the latest `schema-*.sql.gz` and `data-*.sql.gz` from R2.
 3. `gunzip` and `psql` into the staging project — schema first, then data.
-4. Verify `select count(*) from person, engagement` matches the source.
+4. Verify `select count(*) from person, conversation` matches the source.
 5. Document elapsed time. Target: <30 min end-to-end.
 
 ## When backups fail

@@ -76,7 +76,7 @@
       } | null;
       line: { id: string; slug: string; name: string; kind: string } | null;
       project: { id: string; slug: string; name: string; accent: string | null } | null;
-      engagement: {
+      conversation: {
         id: string;
         slug: string;
         status: string;
@@ -661,15 +661,15 @@
       </section>
     {/if}
 
-    {#if perf.engagement?.person}
+    {#if perf.conversation?.person}
       <section class="perf__section" aria-label="Programmer">
         <p class="eyebrow">Programmer</p>
         <p class="perf__programmer">
-          <a href={`/h/${workspaceSlug}/person/${perf.engagement.person.slug}`}>
-            {perf.engagement.person.full_name}
+          <a href={`/h/${workspaceSlug}/person/${perf.conversation.person.slug}`}>
+            {perf.conversation.person.full_name}
           </a>
-          {#if perf.engagement.person.organization_name}
-            <span class="perf__person-note">{perf.engagement.person.organization_name}</span>
+          {#if perf.conversation.person.organization_name}
+            <span class="perf__person-note">{perf.conversation.person.organization_name}</span>
           {/if}
         </p>
       </section>

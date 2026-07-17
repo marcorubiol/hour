@@ -1,26 +1,26 @@
 <script lang="ts">
   /**
    * Contacts module (ADR-056) — the line's conversations. Mounts the ONE
-   * EngagementTable implementation with a line_id filter (true line
-   * scoping, not project approximation), plus a line-scoped "Add contact"
+   * ConversationTable implementation with a line_id filter (true line
+   * scoping, not project approximation), plus a line-scoped "Add conversation"
    * that auto-assigns line_id at capture (the module context is the line —
    * no select needed, unlike the global dialog).
    *
-   * 409 engagement_exists: the (workspace, project, person) UNIQUE ignores
+   * 409 conversation_exists: the (workspace, project, person) UNIQUE ignores
    * line_id — the person already has a conversation in this project
    * (possibly on another line). v1 surfaces it honestly instead of
    * silently relinking.
    */
 
   import { createMutation, useQueryClient } from '@tanstack/svelte-query';
-  import EngagementTable from '$lib/components/EngagementTable.svelte';
+  import ConversationTable from '$lib/components/ConversationTable.svelte';
   import Button from '$lib/components/Button.svelte';
   import Dialog from '$lib/components/Dialog.svelte';
   import Input from '$lib/components/Input.svelte';
   import Select from '$lib/components/Select.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
   import { mutateJSON, ApiError } from '$lib/api';
-  import { ENGAGEMENT_STATUSES, STATUS_LABELS } from '$lib/engagement';
+  import { CONVERSATION_STATUSES, STATUS_LABELS } from '$lib/conversation';
 
   interface Props {
     line: {
@@ -40,7 +40,7 @@
 
   let filters = $derived({ lineId: line.id, status: 'any' as const });
 
-  // ── Add contact (line-scoped) ─────────────────────────────────────────
+  // ── Add conversation (line-scoped) ────────────────────────────────────
   let addOpen = $state(false);
   let aName = $state('');
   let aEmail = $state('');
@@ -49,7 +49,7 @@
   let aNextAt = $state('');
   let aNextNote = $state('');
 
-  const statusOptions = ENGAGEMENT_STATUSES.map((s) => ({
+  const statusOptions = CONVERSATION_STATUSES.map((s) => ({
     value: s,
     label: STATUS_LABELS[s],
   }));
@@ -66,7 +66,7 @@
 
   const addMutation = createMutation({
     mutationFn: () =>
-      mutateJSON('POST', '/api/engagements', {
+      mutateJSON('POST', '/api/conversations', {
         project_id: line.project_id,
         person: {
           full_name: aName.trim(),
@@ -80,7 +80,7 @@
       }),
     onSuccess: () => {
       addOpen = false;
-      void queryClient.invalidateQueries({ queryKey: ['engagements'] });
+      void queryClient.invalidateQueries({ queryKey: ['conversations'] });
       void queryClient.invalidateQueries({ queryKey: ['line-eng-stats'] });
     },
     onError: (err) => {
@@ -96,7 +96,7 @@
       }
       addToast({
         tone: 'danger',
-        title: 'Could not add contact',
+        title: 'Could not add conversation',
         message: err instanceof ApiError ? err.message : String(err),
       });
     },
@@ -113,12 +113,12 @@
 
 <div class="lcm">
   <div class="lcm__bar">
-    <Button size="xs" variant="outline" onclick={openAdd}>Add contact</Button>
+    <Button size="xs" variant="outline" onclick={openAdd}>Add conversation</Button>
   </div>
-  <EngagementTable {filters} personBase={`/h/${workspaceSlug}/person`} />
+  <ConversationTable {filters} personBase={`/h/${workspaceSlug}/person`} />
 </div>
 
-<Dialog bind:open={addOpen} title="Add contact" size="s" onclose={() => (addOpen = false)}>
+<Dialog bind:open={addOpen} title="Add conversation" size="s" onclose={() => (addOpen = false)}>
   <form
     class="lcm__form"
     onsubmit={(e) => {

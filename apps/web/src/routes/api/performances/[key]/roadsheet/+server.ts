@@ -88,11 +88,11 @@ function toProjectionBundle(result: PerformanceBundleResult): PerformanceBundle 
           contacts: p.venue.contacts,
         }
       : null,
-    programmer: p.engagement?.person
+    programmer: p.conversation?.person
       ? {
-          full_name: p.engagement.person.full_name,
-          email: p.engagement.person.email,
-          phone: p.engagement.person.phone,
+          full_name: p.conversation.person.full_name,
+          email: p.conversation.person.email,
+          phone: p.conversation.person.phone,
         }
       : null,
     cast,

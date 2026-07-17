@@ -16,7 +16,7 @@
    * (structure-model § Re-evaluate); until Marco decides, they are
    * separate sections.
    *
-   * The `['engagements','today']` query key below is shared with HomeView
+   * The `['conversations','today']` query key below is shared with HomeView
    * on purpose — same data, one cache entry. Rename it in both or in
    * neither.
    */
@@ -47,10 +47,10 @@
     activeProjectsQueryOptions,
     allLinesQueryOptions,
   } from '$lib/nav-queries';
-  import type { DeskEngagement } from '$lib/components/DeskBoard.svelte';
+  import type { DeskConversation } from '$lib/components/DeskBoard.svelte';
   import { taskProjectId, taskSurfaceState, type TaskItem } from '$lib/task';
 
-  type Engagement = DeskEngagement & { workspace_id: string };
+  type Conversation = DeskConversation & { workspace_id: string };
 
   const pins = usePins();
   const queryClient = useQueryClient();
@@ -61,10 +61,10 @@
   let workspaceSlug = $derived($workspacesQuery.data?.items[0]?.slug ?? '');
   const projectsQuery = createQuery(activeProjectsQueryOptions());
   const linesQuery = createQuery(allLinesQueryOptions());
-  const engagementsQuery = createQuery({
-    queryKey: ['engagements', 'today'],
+  const conversationsQuery = createQuery({
+    queryKey: ['conversations', 'today'],
     queryFn: ({ signal }: { signal: AbortSignal }) =>
-      fetchJSON<{ items: Engagement[] }>('/api/engagements?status=any&limit=100', signal),
+      fetchJSON<{ items: Conversation[] }>('/api/conversations?status=any&limit=100', signal),
   });
   const tasksQuery = createQuery({
     queryKey: ['tasks', 'open'],
@@ -75,21 +75,21 @@
   let workspaces = $derived<NavWorkspace[]>($workspacesQuery.data?.items ?? []);
   let projectIndex = $derived(buildProjectIndex(workspaces, $projectsQuery.data?.items ?? []));
   let lineIndex = $derived(buildLineIndex(workspaces, ($linesQuery.data?.items as RawLine[]) ?? []));
-  let engagements = $derived<Engagement[]>($engagementsQuery.data?.items ?? []);
+  let conversations = $derived<Conversation[]>($conversationsQuery.data?.items ?? []);
   let tasks = $derived<TaskItem[]>($tasksQuery.data?.items ?? []);
 
   let scope = $derived(resolveScope(pins.pins, workspaces, lineIndex, projectIndex));
   let scopedProjectIds = $derived(new Set(scope.projectIds));
 
-  function engInScope(e: Engagement): boolean {
+  function engInScope(e: Conversation): boolean {
     if (scope.isEmpty) return true;
     if (scope.workspaceIds.includes(e.workspace_id)) return true;
     if (e.project && scopedProjectIds.has(e.project.id)) return true;
     return false;
   }
-  let scopedEngagements = $derived(engagements.filter(engInScope));
+  let scopedConversations = $derived(conversations.filter(engInScope));
 
-  // Tasks reach pin scope the same way engagements do: by workspace, or
+  // Tasks reach pin scope the same way conversations do: by workspace, or
   // through their effective project (resolved via whichever parent embed).
   function taskInScope(t: TaskItem): boolean {
     if (scope.isEmpty) return true;
@@ -196,11 +196,11 @@
 
   <section class="desk__block" aria-label="Next actions">
     <DeskBoard
-      engagements={scopedEngagements}
+      conversations={scopedConversations}
       {workspaceSlug}
       cap={null}
-      loading={$engagementsQuery.isPending}
-      error={$engagementsQuery.isError}
+      loading={$conversationsQuery.isPending}
+      error={$conversationsQuery.isError}
     />
   </section>
 

@@ -14,7 +14,7 @@
  * calendar coloring and links) without a second round-trip.
  *
  * Schema renamed `show` → `performance` (ADR-036, 2026-05-19). Column
- * `show_start_at` renamed to `start_at`. The permission code `'edit:show'`
+ * `show_start_at` renamed to `start_at`. The permission code `'edit:performance'`
  * stays as-is (closed RBAC vocab, deferred to Phase 0.9 admin UI).
  *
  * RLS scopes by workspace membership (ADR-029). No `current_workspace_id`
@@ -105,7 +105,7 @@ type PerformanceItem = {
   country: string | null;
   project_id: string;
   line_id: string | null;
-  engagement_id: string | null;
+  conversation_id: string | null;
   load_in_at: string | null;
   start_at: string | null;
   venue: VenueLite | null;
@@ -152,14 +152,14 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
   const workspaceIds = parseUuidList(workspace_ids);
 
   const search = new URLSearchParams();
-  // No fee columns here: this reads the BASE table (RLS = edit:show), so
+  // No fee columns here: this reads the BASE table (RLS = edit:performance), so
   // fees would leak past the read:money gate. The money door is
   // /api/money/performances over performance_redacted (ADR-041/056).
   search.set(
     'select',
     [
       'id,slug,performed_at,status,venue_id,venue_name,city,country',
-      'project_id,line_id,engagement_id',
+      'project_id,line_id,conversation_id',
       'load_in_at,start_at',
       'venue:venue_id(id,name,city,country,timezone)',
       'project:project_id(id,slug,name,accent,workspace_id)',
@@ -202,7 +202,7 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
  *
  * Body: PerformanceCreateSchema. Goes through the `create_performance`
  * RPC (SECURITY DEFINER): claim-independent, gated on
- * has_permission(project_id, 'edit:show'), slug auto-generated
+ * has_permission(project_id, 'edit:performance'), slug auto-generated
  * (slugify(venue|city|'gig')-YYYY-MM-DD, numeric suffix on collision).
  * Returns { performance } — the full created row.
  */
@@ -242,7 +242,7 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
       p_city: input.city ?? null,
       p_country: input.country ? input.country.toUpperCase() : null,
       p_status: input.status ?? 'proposed',
-      p_engagement_id: input.engagement_id ?? null,
+      p_conversation_id: input.conversation_id ?? null,
       p_line_id: input.line_id ?? null,
     });
     if (data.length === 0) return json({ error: 'create_failed' }, 502);

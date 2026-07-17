@@ -38,7 +38,7 @@
   import { provideLens, type Lens } from '$lib/stores/lens.svelte';
   import { providePins, parsePin } from '$lib/stores/pins.svelte';
   import { provideScopes, sameSet as scopesSameSet, type Scope } from '$lib/stores/scopes.svelte';
-  import { detectLocale } from '$lib/i18n';
+  import { detectLocale, t } from '$lib/i18n';
   import { provideBreadcrumb } from '$lib/stores/breadcrumb.svelte';
   import { provideCreation } from '$lib/stores/creation.svelte';
   import CreateWorkspaceDialog from '$lib/components/create/CreateWorkspaceDialog.svelte';
@@ -155,12 +155,14 @@
   // per-space rows — spaces are reached from ⌘K; the sidebar is curated).
   const everything: Scope = { name: 'Everything', tokens: [] };
 
+  // Session locale — feeds both Intl (rail clock) and the dictionary (lens
+  // labels). /h is client-only (ssr = false), so navigator is safe at init.
+  const locale = detectLocale(navigator.language);
+
   // ── Rail clock ─────────────────────────────────────────────────────
   // The shell is long-lived, so unlike the hall's mount-computed date this
   // ticks: re-render exactly on the minute (the clock shows HH:MM), which
-  // also rolls the date line over at midnight. /h is client-only
-  // (ssr = false), so navigator is safe at init.
-  const clockLocale = detectLocale(navigator.language);
+  // also rolls the date line over at midnight.
   let clockNow = $state(new Date());
   $effect(() => {
     let timer: ReturnType<typeof setTimeout>;
@@ -174,7 +176,7 @@
     return () => clearTimeout(timer);
   });
   let clockTime = $derived(
-    new Intl.DateTimeFormat(clockLocale, {
+    new Intl.DateTimeFormat(locale, {
       hour: '2-digit',
       minute: '2-digit',
       hourCycle: 'h23',
@@ -183,7 +185,7 @@
   // "dilluns · 13 jul" — CSS mono-caps does the shouting; strip the
   // abbreviation dot some locales append to the short month.
   let clockDate = $derived(
-    `${new Intl.DateTimeFormat(clockLocale, { weekday: 'long' }).format(clockNow)} · ${clockNow.getDate()} ${new Intl.DateTimeFormat(clockLocale, { month: 'short' }).format(clockNow).replace(/\.$/, '')}`,
+    `${new Intl.DateTimeFormat(locale, { weekday: 'long' }).format(clockNow)} · ${clockNow.getDate()} ${new Intl.DateTimeFormat(locale, { month: 'short' }).format(clockNow).replace(/\.$/, '')}`,
   );
   // Save ⇄ Update ⇄ Delete state. `editingBaseTokens` = the saved scope the
   // current pins derive from (set on applying a saved scope, kept while you
@@ -268,11 +270,13 @@
   // VIEW AS — the four lens routes as a visible segmented control (Scope v2).
   // ADR-067: lenses are space-less; the scope-sync effect re-adds ?scope=
   // right after navigation, so pickView doesn't need to carry it.
+  // ADR-075: the id is the route segment and never translates; the label is
+  // display only and comes from the dictionary.
   const VIEW_AS: { id: Lens; label: string }[] = [
-    { id: 'desk', label: 'Desk' },
-    { id: 'calendar', label: 'Calendar' },
-    { id: 'contacts', label: 'Contacts' },
-    { id: 'money', label: 'Money' },
+    { id: 'desk', label: t('lens.desk', locale) },
+    { id: 'calendar', label: t('lens.calendar', locale) },
+    { id: 'conversations', label: t('lens.conversations', locale) },
+    { id: 'money', label: t('lens.money', locale) },
   ];
   function pickView(view: Lens) {
     lens.set(view);

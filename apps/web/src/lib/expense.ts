@@ -26,7 +26,7 @@ export function categoryLabel(category: string): string {
   return CATEGORY_LABELS[category as ExpenseCategory] ?? category;
 }
 
-/** "YYYY-MM-DD that is a real calendar day" — same contract as engagement. */
+/** "YYYY-MM-DD that is a real calendar day" — same contract as conversation. */
 const realIsoDate = v.pipe(
   v.string(),
   v.isoDate(),
@@ -39,7 +39,7 @@ const realIsoDate = v.pipe(
 /**
  * POST /api/expenses body. Exactly one of line_id / performance_id (the
  * endpoint enforces the rule; both stay optional so the error can be
- * specific — same shape as EngagementCreateSchema's person rule).
+ * specific — same shape as ConversationCreateSchema's person rule).
  */
 export const ExpenseCreateSchema = v.object({
   line_id: v.optional(v.pipe(v.string(), v.uuid())),

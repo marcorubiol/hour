@@ -2,13 +2,13 @@
  * GET /api/performances/:key
  *
  * Single performance with the full detail bundle: venue, line, project,
- * engagement (+person), crew, cast overrides, related dates, assets, and
+ * conversation (+person), crew, cast overrides, related dates, assets, and
  * the project's canonical cast (ADR-034).
  *
  * `:key` is a uuid, or a slug combined with `?ws=<workspace-slug>` (slugs
  * are unique per workspace, ADR-024).
  *
- * RLS authorizes (`has_permission(project_id, 'edit:show')` on the base
+ * RLS authorizes (`has_permission(project_id, 'edit:performance')` on the base
  * table); zero rows map to 404 without confirming existence.
  *
  * Auth: Bearer JWT required.
@@ -66,9 +66,9 @@ export const GET: RequestHandler = async ({ request, params, url, platform, loca
 /**
  * PATCH /api/performances/:key — update the operational fields of a gig
  * (ADR-043): status, performed_at, the 5 timeslots, denormalized venue
- * trio, engagement/line links. Whitelisted by PerformancePatchSchema; no
+ * trio, conversation/line links. Whitelisted by PerformancePatchSchema; no
  * money, no notes (collab doc owns notes, ADR-042). RLS enforces
- * has_permission(project_id, 'edit:show') on UPDATE.
+ * has_permission(project_id, 'edit:performance') on UPDATE.
  *
  * PostgREST mutations can't filter through embedded joins, so slug keys
  * resolve to an id first.
@@ -139,11 +139,11 @@ export const PATCH: RequestHandler = async ({ request, params, url, platform, lo
     const projectId = found.data[0].project_id;
     const workspaceId = found.data[0].workspace_id;
 
-    // Relink guard — the create RPC enforces that engagement/line belong
+    // Relink guard — the create RPC enforces that conversation/line belong
     // to the performance's project; updates must hold the same invariant
     // (the FKs are unscoped, RLS only checks the performance's project).
     for (const [field, table] of [
-      ['engagement_id', 'engagement'],
+      ['conversation_id', 'conversation'],
       ['line_id', 'line'],
     ] as const) {
       const value = patch[field];
@@ -218,7 +218,7 @@ export const PATCH: RequestHandler = async ({ request, params, url, platform, lo
  * (ADR-052). Goes through the `delete_performance` RPC: ADR-048 rule —
  * with the universal `deleted_at IS NULL` SELECT pattern no soft-delete
  * can ride a client PATCH; always RPC. Gated on
- * has_permission(project, 'edit:show').
+ * has_permission(project, 'edit:performance').
  *
  * A gig that fell through is NOT deleted — that's status `cancelled`.
  * Live, non-cancelled invoices block deletion (409).

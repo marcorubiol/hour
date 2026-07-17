@@ -155,7 +155,7 @@ describe('buildRoadsheet — degraded data', () => {
     expect(sheet.venue_name).toBe('Sala Nau');
   });
 
-  it('omits the programmer block when engagement is unset (self-produced)', () => {
+  it('omits the programmer block when conversation is unset (self-produced)', () => {
     const b = bundle();
     b.programmer = null;
     const sheet = buildRoadsheet(b, 'full');

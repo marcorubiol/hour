@@ -20,7 +20,7 @@
 **Lenses** — three concern-lenses, reached by ⌘K (ADR-065). Desk (the home) is a cross-concern digest, not a lens — see Shell + home above.
 
 - [ ] **Calendar** — month grid / planning / conflict-detection. `/h/calendar`.
-- [ ] **Contacts** — your booking network (people AND organizations): engagement table + search/filter (**+ Comms** later, as a per-contact timeline). `/h/contacts`. Mobile-first (ADR-015).
+- [ ] **Conversations** — your booking network (people AND organizations): conversation table + search/filter (**+ Comms** later, as a per-contact timeline). `/h/conversations`. Mobile-first (ADR-015).
 - [ ] **Money** — fees + invoices + totals. `/h/money`. Gated by `read:money`.
 
 **Entity detail** (under `/h/[workspace]/`)
@@ -28,7 +28,7 @@
 - [ ] `/project/[slug]/line/[line]` — Line detail (the module composition).
 - [ ] `/performance/[slug]` — Performance detail (the gig).
 - [ ] `/performance/[slug]/roadsheet` — Road sheet (operator, role-filtered, public-links UI).
-- [ ] `/engagement/[slug]` — Engagement detail (a conversation).
+- [ ] `/conversation/[slug]` — Conversation detail (a conversation).
 - [ ] `/person/[slug]` — Person detail (contact card).
 
 **System**
@@ -52,7 +52,7 @@
 - [ ] Alias review block (Settings › Workspaces, platform admin — ADR-067)
 - [ ] New performance (PerformanceCreateDialog, from Calendar)
 - [ ] Edit performance (schedule + venue + status, in performance detail)
-- [ ] Add contact (multi-space, in Contacts)
+- [ ] Add conversation (multi-space, in Conversations)
 - [ ] Add to project (in person detail)
 - [ ] Fee editor (in Money)
 - [ ] New invoice (in Money)
@@ -60,7 +60,7 @@
 
 **Line modules** — rendered inside `/project/[slug]/line/[line]`, each its own design surface
 - [ ] Calendar module
-- [ ] Contacts module (the line's booking conversations — Contacts lens scoped)
+- [ ] Conversations module (the line's booking conversations — Conversations lens scoped)
 - [ ] Money module
 - [ ] Notes module
 - [ ] Materials module
@@ -74,7 +74,7 @@
 ## Cross-cutting (multiply the real work)
 
 - [ ] **States** per lens/list: empty · loading · error · offline. Phase 0.3 gate; offline still pending.
-- [ ] **Mobile**: Contacts mobile-first (ADR-015); Desk responsive pending (Phase 0.4); public road sheet mobile-critical.
+- [ ] **Mobile**: Conversations mobile-first (ADR-015); Desk responsive pending (Phase 0.4); public road sheet mobile-critical.
 - [ ] **Light + dark**: both themes are contracts (ADR-059). Every screen designed for both.
 
 ## Not counted (dev-only, not product)

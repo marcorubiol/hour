@@ -52,7 +52,7 @@
     void queryClient.invalidateQueries({ queryKey: ['line-tasks'] });
   }
 
-  // Optimistic toggle (the EngagementTable inline-edit shape): patch every
+  // Optimistic toggle (the ConversationTable inline-edit shape): patch every
   // tasks cache in place so the row, its strikethrough and the done fold
   // move with the click, and ROLL BACK on error — the native checkbox has
   // already flipped, and with unchanged data no refetch would unflip it

@@ -4,7 +4,7 @@ const EMAIL = process.env.PW_TEST_EMAIL;
 const PASSWORD = process.env.PW_TEST_PASSWORD;
 
 /**
- * E2E — person file (ADR-045): reach a person from the Contacts lens,
+ * E2E — person file (ADR-045): reach a person from the Conversations lens,
  * read the file, add a workspace note, verify persistence. The note is
  * soft-deleted at the end via the API (author-scoped update), so runs
  * leave no residue beyond audit rows.
@@ -13,12 +13,12 @@ const PASSWORD = process.env.PW_TEST_PASSWORD;
 test.describe('person file', () => {
   test.skip(!EMAIL || !PASSWORD, 'Set PW_TEST_EMAIL / PW_TEST_PASSWORD.');
 
-  test('contacts → person file → add note → persists → cleanup', async ({ page }) => {
+  test('conversations → person file → add note → persists → cleanup', async ({ page }) => {
     test.setTimeout(60_000);
     const marker = `note-e2e-${Date.now()}`;
 
-    // ADR-067: the Contacts lens is space-less and cross-space.
-    await page.goto('/h/contacts');
+    // ADR-067: the Conversations lens is space-less and cross-space.
+    await page.goto('/h/conversations');
     await expect(page.locator('tbody tr').first()).toBeVisible();
 
     // Into the person file via the linked name. The workspace segment on a
@@ -32,8 +32,8 @@ test.describe('person file', () => {
     await page.waitForURL(/\/h\/[^/]+\/person\//);
     await expect(page.locator('.person__title')).toContainText(personName);
 
-    // The engagement context renders (this person has at least the
-    // MaMeMi engagement — that's why they were in the list).
+    // The conversation context renders (this person has at least the
+    // MaMeMi conversation — that's why they were in the list).
     await expect(page.locator('.person__rows li').first()).toBeVisible();
 
     // Add a workspace note.

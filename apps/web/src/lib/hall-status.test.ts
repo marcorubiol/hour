@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   computeHallStatus,
   hallSentence,
-  type HallEngagement,
+  type HallConversation,
   type HallPerformance,
   type HallTask,
 } from './hall-status';
@@ -23,7 +23,7 @@ function actionAt(offset: number): string {
   return `${isoDay(offset)}T00:00:00+00:00`;
 }
 
-function eng(offset: number | null, status = 'contacted'): HallEngagement {
+function eng(offset: number | null, status = 'contacted'): HallConversation {
   return { status, next_action_at: offset === null ? null : actionAt(offset) };
 }
 
@@ -49,13 +49,13 @@ function venue(name: string, timezone: string | null = null) {
   return { name, timezone };
 }
 
-const EMPTY = { engagements: [], performances: [], tasks: [] };
+const EMPTY = { conversations: [], performances: [], tasks: [] };
 
 describe('computeHallStatus — state selection', () => {
   it('show day outranks overdue attention', () => {
     const status = computeHallStatus(
       {
-        engagements: [eng(-3)],
+        conversations: [eng(-3)],
         performances: [
           show({
             venue: venue('Kursaal', 'Europe/London'),
@@ -77,7 +77,7 @@ describe('computeHallStatus — state selection', () => {
   it('ignores cancelled and non-today performances', () => {
     const status = computeHallStatus(
       {
-        engagements: [eng(-3)],
+        conversations: [eng(-3)],
         performances: [show({ status: 'cancelled' }), show({ performed_at: isoDay(1) })],
         tasks: [],
       },
@@ -140,18 +140,18 @@ describe('computeHallStatus — state selection', () => {
     });
   });
 
-  it('counts overdue engagements and tasks; oldest wins the age', () => {
+  it('counts overdue conversations and tasks; oldest wins the age', () => {
     const status = computeHallStatus(
-      { engagements: [eng(-5), eng(-1)], performances: [], tasks: [task(-2)] },
+      { conversations: [eng(-5), eng(-1)], performances: [], tasks: [task(-2)] },
       NOW,
     );
     expect(status).toEqual({ kind: 'attention', overdue: 3, oldestDays: 5 });
   });
 
-  it('keeps DeskBoard working-set semantics: declined/dormant/undated engagements and done tasks are out', () => {
+  it('keeps DeskBoard working-set semantics: declined/dormant/undated conversations and done tasks are out', () => {
     const status = computeHallStatus(
       {
-        engagements: [eng(-5, 'declined'), eng(-5, 'dormant'), eng(null)],
+        conversations: [eng(-5, 'declined'), eng(-5, 'dormant'), eng(null)],
         performances: [],
         tasks: [task(-5, 'done')],
       },
@@ -161,13 +161,13 @@ describe('computeHallStatus — state selection', () => {
   });
 
   it('an action due today is TODAY, not overdue (day buckets, like the Desk)', () => {
-    const status = computeHallStatus({ ...EMPTY, engagements: [eng(0)] }, NOW);
+    const status = computeHallStatus({ ...EMPTY, conversations: [eng(0)] }, NOW);
     expect(status).toEqual({ kind: 'calm', open: 1, next: { day: isoDay(0), inDays: 0 } });
   });
 
   it('calm: open = dated upcoming + undated open tasks; next = earliest dated', () => {
     const status = computeHallStatus(
-      { engagements: [eng(3), eng(10)], performances: [], tasks: [task(null)] },
+      { conversations: [eng(3), eng(10)], performances: [], tasks: [task(null)] },
       NOW,
     );
     expect(status).toEqual({ kind: 'calm', open: 3, next: { day: isoDay(3), inDays: 3 } });

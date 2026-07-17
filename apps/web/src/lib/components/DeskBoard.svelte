@@ -1,5 +1,5 @@
 <script lang="ts" module>
-  export type EngagementStatus =
+  export type ConversationStatus =
     | 'contacted'
     | 'in_conversation'
     | 'hold'
@@ -7,9 +7,9 @@
     | 'declined'
     | 'dormant'
     | 'recurring';
-  export type DeskEngagement = {
+  export type DeskConversation = {
     id: string;
-    status: EngagementStatus;
+    status: ConversationStatus;
     next_action_at: string | null;
     next_action_note: string | null;
     custom_fields: Record<string, unknown> | null;
@@ -23,7 +23,7 @@
    * DeskBoard — the this-week timeline (dot rail + day buckets). Shared by
    * the Home (capped, this-week-only, with a "+N more" link to the full view)
    * and the Desk view at /h/[ws]/desk (uncapped, all time ranges).
-   * Engagements come in already scoped by the caller's pins.
+   * Conversations come in already scoped by the caller's pins.
    *
    * The `.agenda-*` class names are pre-ADR-065 (the lens was called Agenda);
    * they are scoped to this file and carry no meaning outside it.
@@ -32,7 +32,7 @@
   import { accentVar } from '$lib/utils/accent';
 
   interface Props {
-    engagements: DeskEngagement[];
+    conversations: DeskConversation[];
     workspaceSlug: string;
     cap?: number | null;
     next7Days?: boolean;
@@ -42,7 +42,7 @@
     error?: boolean;
   }
   let {
-    engagements,
+    conversations,
     workspaceSlug,
     cap = null,
     next7Days = false,
@@ -65,7 +65,7 @@
     dayLabel: string;
   };
 
-  const VERBS: Record<EngagementStatus, { upcoming: string; overdue: string }> = {
+  const VERBS: Record<ConversationStatus, { upcoming: string; overdue: string }> = {
     contacted: { upcoming: 'Follow up', overdue: 'Chase' },
     in_conversation: { upcoming: 'Reply', overdue: 'Reply' },
     hold: { upcoming: 'Confirm', overdue: 'Confirm' },
@@ -97,7 +97,7 @@
 
   // "This week" = overdue + everything due within 7 days (sortKey < 7).
   let allRows = $derived.by<WeekRow[]>(() =>
-    engagements
+    conversations
       .filter((e) => e.status !== 'declined' && e.status !== 'dormant')
       .filter((e) => e.next_action_at)
       .map((e) => {

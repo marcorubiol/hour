@@ -4,7 +4,7 @@
  * The security contract, in order of blast radius:
  *   1. `roadsheet_share` is deny-all through PostgREST for EVERY role —
  *      tokens must never be readable by table access (not even
- *      authenticated members: management is RPC-only, gated edit:show).
+ *      authenticated members: management is RPC-only, gated edit:performance).
  *   2. `get_public_roadsheet` as anon returns the bundle for a live
  *      token, with NO fee and NO performance notes anywhere in it.
  *   3. Revocation kills the token on the next request.

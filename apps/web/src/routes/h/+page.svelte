@@ -22,7 +22,7 @@
   import {
     computeHallStatus,
     hallSentence,
-    type HallEngagement,
+    type HallConversation,
     type HallPerformance,
     type HallTask,
   } from '$lib/hall-status';
@@ -55,10 +55,10 @@
   // surface (Desk / HomeView / PerformanceCreateDialog invalidation) so
   // the hall reads warm caches instead of refetching — rename keys there
   // and here together, or nowhere.
-  const engagementsQuery = createQuery({
-    queryKey: ['engagements', 'today'],
+  const conversationsQuery = createQuery({
+    queryKey: ['conversations', 'today'],
     queryFn: ({ signal }: { signal: AbortSignal }) =>
-      fetchJSON<{ items: HallEngagement[] }>('/api/engagements?status=any&limit=100', signal),
+      fetchJSON<{ items: HallConversation[] }>('/api/conversations?status=any&limit=100', signal),
   });
   const performancesQuery = createQuery({
     queryKey: ['today-performances'],
@@ -89,7 +89,7 @@
   // no sentence element at all (no placeholder, no spinner text).
   let status = $derived.by(() => {
     if (
-      !$engagementsQuery.isSuccess ||
+      !$conversationsQuery.isSuccess ||
       !$performancesQuery.isSuccess ||
       !$tasksQuery.isSuccess
     ) {
@@ -97,7 +97,7 @@
     }
     return computeHallStatus(
       {
-        engagements: $engagementsQuery.data.items,
+        conversations: $conversationsQuery.data.items,
         performances: $performancesQuery.data.items,
         tasks: $tasksQuery.data.items,
         homeTzById,

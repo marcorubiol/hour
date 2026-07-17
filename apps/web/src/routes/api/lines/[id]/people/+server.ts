@@ -6,7 +6,7 @@
  *   · crew        — crew_assignment of the line's performances
  *   · venue folk  — venue.contacts jsonb of the line's performances
  *
- * Pure derivation: RLS covers everything (cast/crew ride edit:show via
+ * Pure derivation: RLS covers everything (cast/crew ride edit:performance via
  * their project), no RPC, no new tables. The jsonb contacts are parsed
  * defensively server-side — legacy rows may hold anything (same rule as
  * ProductionStub).

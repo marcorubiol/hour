@@ -1,7 +1,7 @@
 /**
  * Performance domain helpers — status → tone/label vocabulary and the
  * write contracts (ADR-043), in one place (same rationale as
- * $lib/engagement.ts).
+ * $lib/conversation.ts).
  *
  * Tone mapping follows the show lifecycle reading documented on
  * StateBadge: proposed → neutral · holds → info · confirmed → success ·
@@ -65,7 +65,7 @@ export const PerformanceCreateSchema = v.object({
   city: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(120)))),
   country: v.optional(v.nullable(countryField)),
   status: v.optional(v.picklist(PERFORMANCE_STATUSES)),
-  engagement_id: v.optional(v.nullable(v.pipe(v.string(), v.uuid()))),
+  conversation_id: v.optional(v.nullable(v.pipe(v.string(), v.uuid()))),
   line_id: v.optional(v.nullable(v.pipe(v.string(), v.uuid()))),
 });
 
@@ -74,7 +74,7 @@ export type PerformanceCreate = v.InferOutput<typeof PerformanceCreateSchema>;
 /**
  * PATCH /api/performances/:key body. Whitelist of the operational fields
  * (status lifecycle, day, the 5 timeslots, denormalized venue trio,
- * engagement/line links). NO fee columns (edit:money trigger + Money
+ * conversation/line links). NO fee columns (edit:money trigger + Money
  * lens own the money path) and NO notes (the collab doc owns it,
  * ADR-042). Timeslot ordering is enforced by the DB CHECK — the endpoint
  * maps that violation to a 400.
@@ -91,7 +91,7 @@ export const PerformancePatchSchema = v.object({
   city: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(120)))),
   country: v.optional(v.nullable(countryField)),
   venue_id: v.optional(v.nullable(v.pipe(v.string(), v.uuid()))),
-  engagement_id: v.optional(v.nullable(v.pipe(v.string(), v.uuid()))),
+  conversation_id: v.optional(v.nullable(v.pipe(v.string(), v.uuid()))),
   line_id: v.optional(v.nullable(v.pipe(v.string(), v.uuid()))),
 });
 

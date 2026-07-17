@@ -9,7 +9,7 @@
  * surface.
  *
  * Direct PostgREST PATCH is RLS-viable: line_update gates on
- * has_permission(project_id, 'edit:show' | 'edit:project_meta') and the
+ * has_permission(project_id, 'edit:performance' | 'edit:project_meta') and the
  * row stays SELECT-visible after the update (ADR-048 only bites
  * soft-deletes). Zero rows → 404 without confirming existence.
  *

@@ -459,6 +459,98 @@ export type Database = {
           },
         ]
       }
+      conversation: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          custom_fields: Json
+          deleted_at: string | null
+          first_contacted_at: string | null
+          id: string
+          last_contacted_at: string | null
+          line_id: string | null
+          next_action_at: string | null
+          next_action_note: string | null
+          person_id: string
+          previous_slugs: string[]
+          project_id: string
+          role: string | null
+          slug: string
+          status: Database["public"]["Enums"]["conversation_status"]
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          custom_fields?: Json
+          deleted_at?: string | null
+          first_contacted_at?: string | null
+          id?: string
+          last_contacted_at?: string | null
+          line_id?: string | null
+          next_action_at?: string | null
+          next_action_note?: string | null
+          person_id: string
+          previous_slugs?: string[]
+          project_id: string
+          role?: string | null
+          slug: string
+          status?: Database["public"]["Enums"]["conversation_status"]
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          custom_fields?: Json
+          deleted_at?: string | null
+          first_contacted_at?: string | null
+          id?: string
+          last_contacted_at?: string | null
+          line_id?: string | null
+          next_action_at?: string | null
+          next_action_note?: string | null
+          person_id?: string
+          previous_slugs?: string[]
+          project_id?: string
+          role?: string | null
+          slug?: string
+          status?: Database["public"]["Enums"]["conversation_status"]
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_line_id_fkey"
+            columns: ["line_id"]
+            isOneToOne: false
+            referencedRelation: "line"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "person"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "project"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspace"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       crew_assignment: {
         Row: {
           contact_override: Json
@@ -631,98 +723,6 @@ export type Database = {
           },
           {
             foreignKeyName: "date_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: false
-            referencedRelation: "workspace"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      engagement: {
-        Row: {
-          created_at: string
-          created_by: string | null
-          custom_fields: Json
-          deleted_at: string | null
-          first_contacted_at: string | null
-          id: string
-          last_contacted_at: string | null
-          line_id: string | null
-          next_action_at: string | null
-          next_action_note: string | null
-          person_id: string
-          previous_slugs: string[]
-          project_id: string
-          role: string | null
-          slug: string
-          status: Database["public"]["Enums"]["engagement_status"]
-          updated_at: string
-          workspace_id: string
-        }
-        Insert: {
-          created_at?: string
-          created_by?: string | null
-          custom_fields?: Json
-          deleted_at?: string | null
-          first_contacted_at?: string | null
-          id?: string
-          last_contacted_at?: string | null
-          line_id?: string | null
-          next_action_at?: string | null
-          next_action_note?: string | null
-          person_id: string
-          previous_slugs?: string[]
-          project_id: string
-          role?: string | null
-          slug: string
-          status?: Database["public"]["Enums"]["engagement_status"]
-          updated_at?: string
-          workspace_id: string
-        }
-        Update: {
-          created_at?: string
-          created_by?: string | null
-          custom_fields?: Json
-          deleted_at?: string | null
-          first_contacted_at?: string | null
-          id?: string
-          last_contacted_at?: string | null
-          line_id?: string | null
-          next_action_at?: string | null
-          next_action_note?: string | null
-          person_id?: string
-          previous_slugs?: string[]
-          project_id?: string
-          role?: string | null
-          slug?: string
-          status?: Database["public"]["Enums"]["engagement_status"]
-          updated_at?: string
-          workspace_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "engagement_line_id_fkey"
-            columns: ["line_id"]
-            isOneToOne: false
-            referencedRelation: "line"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "engagement_person_id_fkey"
-            columns: ["person_id"]
-            isOneToOne: false
-            referencedRelation: "person"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "engagement_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "project"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "engagement_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspace"
@@ -1137,12 +1137,12 @@ export type Database = {
       performance: {
         Row: {
           city: string | null
+          conversation_id: string | null
           country: string | null
           created_at: string
           created_by: string | null
           custom_fields: Json
           deleted_at: string | null
-          engagement_id: string | null
           fee_amount: number | null
           fee_currency: string | null
           hospitality: Json
@@ -1168,12 +1168,12 @@ export type Database = {
         }
         Insert: {
           city?: string | null
+          conversation_id?: string | null
           country?: string | null
           created_at?: string
           created_by?: string | null
           custom_fields?: Json
           deleted_at?: string | null
-          engagement_id?: string | null
           fee_amount?: number | null
           fee_currency?: string | null
           hospitality?: Json
@@ -1199,12 +1199,12 @@ export type Database = {
         }
         Update: {
           city?: string | null
+          conversation_id?: string | null
           country?: string | null
           created_at?: string
           created_by?: string | null
           custom_fields?: Json
           deleted_at?: string | null
-          engagement_id?: string | null
           fee_amount?: number | null
           fee_currency?: string | null
           hospitality?: Json
@@ -1230,10 +1230,10 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "performance_engagement_id_fkey"
-            columns: ["engagement_id"]
+            foreignKeyName: "performance_conversation_id_fkey"
+            columns: ["conversation_id"]
             isOneToOne: false
-            referencedRelation: "engagement"
+            referencedRelation: "conversation"
             referencedColumns: ["id"]
           },
           {
@@ -1565,12 +1565,12 @@ export type Database = {
       }
       task: {
         Row: {
+          conversation_id: string | null
           created_at: string
           created_by: string | null
           custom_fields: Json
           deleted_at: string | null
           due_at: string | null
-          engagement_id: string | null
           from_at: string | null
           id: string
           lead_days: number | null
@@ -1585,12 +1585,12 @@ export type Database = {
           workspace_id: string
         }
         Insert: {
+          conversation_id?: string | null
           created_at?: string
           created_by?: string | null
           custom_fields?: Json
           deleted_at?: string | null
           due_at?: string | null
-          engagement_id?: string | null
           from_at?: string | null
           id?: string
           lead_days?: number | null
@@ -1605,12 +1605,12 @@ export type Database = {
           workspace_id: string
         }
         Update: {
+          conversation_id?: string | null
           created_at?: string
           created_by?: string | null
           custom_fields?: Json
           deleted_at?: string | null
           due_at?: string | null
-          engagement_id?: string | null
           from_at?: string | null
           id?: string
           lead_days?: number | null
@@ -1626,10 +1626,10 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "task_engagement_id_fkey"
-            columns: ["engagement_id"]
+            foreignKeyName: "task_conversation_id_fkey"
+            columns: ["conversation_id"]
             isOneToOne: false
-            referencedRelation: "engagement"
+            referencedRelation: "conversation"
             referencedColumns: ["id"]
           },
           {
@@ -1978,12 +1978,12 @@ export type Database = {
       performance_redacted: {
         Row: {
           city: string | null
+          conversation_id: string | null
           country: string | null
           created_at: string | null
           created_by: string | null
           custom_fields: Json | null
           deleted_at: string | null
-          engagement_id: string | null
           fee_amount: number | null
           fee_currency: string | null
           id: string | null
@@ -2000,12 +2000,12 @@ export type Database = {
         }
         Insert: {
           city?: string | null
+          conversation_id?: string | null
           country?: string | null
           created_at?: string | null
           created_by?: string | null
           custom_fields?: Json | null
           deleted_at?: string | null
-          engagement_id?: string | null
           fee_amount?: never
           fee_currency?: never
           id?: string | null
@@ -2022,12 +2022,12 @@ export type Database = {
         }
         Update: {
           city?: string | null
+          conversation_id?: string | null
           country?: string | null
           created_at?: string | null
           created_by?: string | null
           custom_fields?: Json | null
           deleted_at?: string | null
-          engagement_id?: string | null
           fee_amount?: never
           fee_currency?: never
           id?: string | null
@@ -2044,10 +2044,10 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "performance_engagement_id_fkey"
-            columns: ["engagement_id"]
+            foreignKeyName: "performance_conversation_id_fkey"
+            columns: ["conversation_id"]
             isOneToOne: false
-            referencedRelation: "engagement"
+            referencedRelation: "conversation"
             referencedColumns: ["id"]
           },
           {
@@ -2135,7 +2135,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
-      create_engagement: {
+      create_conversation: {
         Args: {
           p_email?: string
           p_full_name?: string
@@ -2147,7 +2147,7 @@ export type Database = {
           p_phone?: string
           p_project_id: string
           p_role?: string
-          p_status?: Database["public"]["Enums"]["engagement_status"]
+          p_status?: Database["public"]["Enums"]["conversation_status"]
           p_title?: string
         }
         Returns: {
@@ -2166,13 +2166,13 @@ export type Database = {
           project_id: string
           role: string | null
           slug: string
-          status: Database["public"]["Enums"]["engagement_status"]
+          status: Database["public"]["Enums"]["conversation_status"]
           updated_at: string
           workspace_id: string
         }
         SetofOptions: {
           from: "*"
-          to: "engagement"
+          to: "conversation"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -2297,8 +2297,8 @@ export type Database = {
       create_performance: {
         Args: {
           p_city?: string
+          p_conversation_id?: string
           p_country?: string
-          p_engagement_id?: string
           p_line_id?: string
           p_performed_at: string
           p_project_id: string
@@ -2307,12 +2307,12 @@ export type Database = {
         }
         Returns: {
           city: string | null
+          conversation_id: string | null
           country: string | null
           created_at: string
           created_by: string | null
           custom_fields: Json
           deleted_at: string | null
-          engagement_id: string | null
           fee_amount: number | null
           fee_currency: string | null
           hospitality: Json
@@ -2425,8 +2425,8 @@ export type Database = {
       }
       create_task: {
         Args: {
+          p_conversation_id?: string
           p_due_at?: string
-          p_engagement_id?: string
           p_from_at?: string
           p_lead_days?: number
           p_line_id?: string
@@ -2437,12 +2437,12 @@ export type Database = {
           p_workspace_id?: string
         }
         Returns: {
+          conversation_id: string | null
           created_at: string
           created_by: string | null
           custom_fields: Json
           deleted_at: string | null
           due_at: string | null
-          engagement_id: string | null
           from_at: string | null
           id: string
           lead_days: number | null
@@ -2542,8 +2542,8 @@ export type Database = {
       }
       custom_access_token_hook: { Args: { event: Json }; Returns: Json }
       delete_asset_version: { Args: { p_asset_id: string }; Returns: undefined }
-      delete_engagement: {
-        Args: { p_engagement_id: string }
+      delete_conversation: {
+        Args: { p_conversation_id: string }
         Returns: undefined
       }
       delete_expense: { Args: { p_expense_id: string }; Returns: undefined }
@@ -2711,9 +2711,7 @@ export type Database = {
         | "photo"
         | "video"
         | "other"
-      date_kind: "rehearsal" | "residency" | "travel_day" | "press" | "other"
-      date_status: "tentative" | "confirmed" | "cancelled" | "done"
-      engagement_status:
+      conversation_status:
         | "contacted"
         | "in_conversation"
         | "hold"
@@ -2721,6 +2719,8 @@ export type Database = {
         | "declined"
         | "dormant"
         | "recurring"
+      date_kind: "rehearsal" | "residency" | "travel_day" | "press" | "other"
+      date_status: "tentative" | "confirmed" | "cancelled" | "done"
       expense_category:
         | "travel"
         | "lodging"
@@ -2914,9 +2914,7 @@ export const Constants = {
         "video",
         "other",
       ],
-      date_kind: ["rehearsal", "residency", "travel_day", "press", "other"],
-      date_status: ["tentative", "confirmed", "cancelled", "done"],
-      engagement_status: [
+      conversation_status: [
         "contacted",
         "in_conversation",
         "hold",
@@ -2925,6 +2923,8 @@ export const Constants = {
         "dormant",
         "recurring",
       ],
+      date_kind: ["rehearsal", "residency", "travel_day", "press", "other"],
+      date_status: ["tentative", "confirmed", "cancelled", "done"],
       expense_category: [
         "travel",
         "lodging",

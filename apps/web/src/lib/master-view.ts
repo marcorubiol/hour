@@ -14,7 +14,7 @@
  * Save policy: any path under `/h/{workspace}/` is eligible EXCEPT the
  * settings page itself (would otherwise self-loop the redirect). Phase
  * 0.1 only Project URLs are likely to land here; other entities (gig,
- * engagement, ...) become eligible automatically as their routes ship.
+ * conversation, ...) become eligible automatically as their routes ship.
  */
 
 const ENABLED_KEY = 'hour_master_view_enabled';

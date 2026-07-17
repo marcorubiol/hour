@@ -5,7 +5,7 @@
  * the user's first accepted workspace_membership and writes its
  * `workspace_id` into the JWT as `current_workspace_id`. Without that
  * claim, the SQL helper `current_workspace_id()` returns NULL and a few
- * write paths that use it (engagement insert, expense insert, section
+ * write paths that use it (conversation insert, expense insert, section
  * insert) deny.
  *
  * This test asserts:

@@ -1,13 +1,13 @@
 <script lang="ts">
   /**
-   * Contacts lens — Phase 0.3 item 1, v1 (ADR-044). The difusión work
-   * surface inside the shell: engagement list filtered by the sidebar
+   * Conversations lens — Phase 0.3 item 1, v1 (ADR-044). The difusión work
+   * surface inside the shell: conversation list filtered by the sidebar
    * selection (ADR-038 union; empty = everything RLS allows), free-text
    * search over person name/organization, status filter, and the ADR-040
-   * inline editors via the shared EngagementTable.
+   * inline editors via the shared ConversationTable.
    *
-   * "Add contact" (ADR-051) captures a person + conversation in one step:
-   * POST /api/engagements with inline person fields — the RPC
+   * "Add conversation" (ADR-051) captures a person + conversation in one step:
+   * POST /api/conversations with inline person fields — the RPC
    * find-or-creates the person on email, so re-typing a known email links
    * the existing file instead of duplicating it.
    */
@@ -18,11 +18,11 @@
   import Button from '$lib/components/Button.svelte';
   import Checkbox from '$lib/components/Checkbox.svelte';
   import Dialog from '$lib/components/Dialog.svelte';
-  import EngagementTable from '$lib/components/EngagementTable.svelte';
+  import ConversationTable from '$lib/components/ConversationTable.svelte';
   import Input from '$lib/components/Input.svelte';
   import Select from '$lib/components/Select.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
-  import { ENGAGEMENT_STATUSES, statusLabel } from '$lib/engagement';
+  import { CONVERSATION_STATUSES, statusLabel } from '$lib/conversation';
   import { usePins } from '$lib/stores/pins.svelte';
   import {
     buildLineIndex,
@@ -57,7 +57,7 @@
   let projectIndex = $derived(buildProjectIndex(workspaces, $projectsQuery.data?.items ?? []));
   let lineIndex = $derived(buildLineIndex(workspaces, ($linesQuery.data?.items as RawLine[]) ?? []));
   let scope = $derived(resolveScope(pins.pins, workspaces, lineIndex, projectIndex));
-  // Project pins scope directly; a line pin scopes engagements through its
+  // Project pins scope directly; a line pin scopes conversations through its
   // project. The endpoint filters by project_ids ∪ workspace_ids.
   let filterIds = $derived({
     projectIds: scope.projectIds,
@@ -92,7 +92,7 @@
   let statusFilter = $state('any');
   let statusOptions = [
     { value: 'any', label: 'All statuses' },
-    ...ENGAGEMENT_STATUSES.map((s) => ({ value: s, label: statusLabel(s) })),
+    ...CONVERSATION_STATUSES.map((s) => ({ value: s, label: statusLabel(s) })),
   ];
 
   let filters = $derived({
@@ -103,12 +103,12 @@
     enabled: !scopeUnresolved,
   });
 
-  // ── Add contact (ADR-051) ────────────────────────────────────────────
+  // ── Add conversation (ADR-051) ────────────────────────────────────────
   const queryClient = useQueryClient();
 
   let addOpen = $state(false);
   // A contact can live in several spaces at once (person is global, deduped
-  // on email; belonging to a space = an engagement in one of its projects).
+  // on email; belonging to a space = an conversation in one of its projects).
   // So the target is a SET of projects, grouped by space in the picker.
   let aProjectIds = $state<string[]>([]);
   // Optional line per targeted project (ADR-056) — the target is a set of
@@ -150,7 +150,7 @@
     }
     return byProject;
   });
-  let addStatusOptions = ENGAGEMENT_STATUSES.map((s) => ({
+  let addStatusOptions = CONVERSATION_STATUSES.map((s) => ({
     value: s,
     label: statusLabel(s),
   }));
@@ -170,7 +170,7 @@
     aOrg = '';
     aNextAt = '';
     aNextNote = '';
-    aStatus = ENGAGEMENT_STATUSES[0];
+    aStatus = CONVERSATION_STATUSES[0];
     // Pre-select when the pinned scope, or the whole workspace, collapses to
     // a single project — otherwise start empty and let the user pick spaces.
     // A single pinned line also preselects that line for its project.
@@ -188,7 +188,7 @@
   type AddResult = { created: number; existed: number; failed: string[] };
 
   const addMutation = createMutation({
-    // One contact, N spaces → N engagements. Sequential, not parallel: the
+    // One contact, N spaces → N conversations. Sequential, not parallel: the
     // first insert find-or-creates the person (by email) and returns its id;
     // every later insert links that same person_id. This keeps a no-email
     // contact from spawning a duplicate person per space, and avoids a race
@@ -216,13 +216,13 @@
           ? { project_id: projectId, person_id: personId, line_id, ...base }
           : { project_id: projectId, person, line_id, ...base };
         try {
-          const data = await mutateJSON<{ engagement?: { person_id?: string } }>(
+          const data = await mutateJSON<{ conversation?: { person_id?: string } }>(
             'POST',
-            '/api/engagements',
+            '/api/conversations',
             body,
           );
           out.created += 1;
-          if (!personId && data?.engagement?.person_id) personId = data.engagement.person_id;
+          if (!personId && data?.conversation?.person_id) personId = data.conversation.person_id;
         } catch (e) {
           if (e instanceof ApiError && e.status === 409) {
             // Already has a conversation in this project — not an error.
@@ -248,7 +248,7 @@
       aNextNote = '';
       aProjectIds = [];
       aLineByProject = {};
-      void queryClient.invalidateQueries({ queryKey: ['engagements'] });
+      void queryClient.invalidateQueries({ queryKey: ['conversations'] });
       const parts: string[] = [];
       if (r.created) parts.push(`Added to ${r.created} ${r.created === 1 ? 'space' : 'spaces'}`);
       if (r.existed) parts.push(`already in ${r.existed}`);
@@ -261,7 +261,7 @@
     onError: (err) => {
       addToast({
         tone: 'danger',
-        title: 'Contact not added',
+        title: 'Conversation not added',
         message: `${err instanceof Error ? err.message : 'Unexpected error'}`,
       });
     },
@@ -281,14 +281,14 @@
 </script>
 
 <svelte:head>
-  <title>Contacts — Hour</title>
+  <title>Conversations — Hour</title>
 </svelte:head>
 
-<section class="contacts">
-  <header class="contacts__head">
-    <p class="eyebrow">Contacts</p>
-    <div class="contacts__controls">
-      <div class="contacts__search">
+<section class="conversations">
+  <header class="conversations__head">
+    <p class="eyebrow">Conversations</p>
+    <div class="conversations__controls">
+      <div class="conversations__search">
         <Input
           label="Search"
           type="search"
@@ -297,29 +297,29 @@
         />
       </div>
       <Select label="Status" options={statusOptions} bind:value={statusFilter} />
-      <Button size="s" onclick={openAdd}>Add contact</Button>
+      <Button size="s" onclick={openAdd}>Add conversation</Button>
     </div>
   </header>
 
-  <EngagementTable {filters} personBase={`/h/${defaultWorkspaceSlug}/person`} />
+  <ConversationTable {filters} personBase={`/h/${defaultWorkspaceSlug}/person`} />
 </section>
 
-<Dialog bind:open={addOpen} title="Add contact" size="m">
-  <p class="contacts__dialog-hint">
+<Dialog bind:open={addOpen} title="Add conversation" size="m">
+  <p class="conversations__dialog-hint">
     Pick one or more spaces — the same contact lives in all of them. A known
     email links the same person across spaces instead of duplicating it.
   </p>
-  <fieldset class="contacts__spaces">
-    <legend class="contacts__field-label">
-      Spaces <span class="contacts__field-hint">— where does this contact belong?</span>
+  <fieldset class="conversations__spaces">
+    <legend class="conversations__field-label">
+      Spaces <span class="conversations__field-hint">— where does this contact belong?</span>
     </legend>
     {#if projectGroups.length === 0}
-      <p class="contacts__field-hint">No projects to add to yet.</p>
+      <p class="conversations__field-hint">No projects to add to yet.</p>
     {:else}
-      <div class="contacts__space-groups">
+      <div class="conversations__space-groups">
         {#each projectGroups as g (g.wsId)}
-          <div class="contacts__space-group">
-            <p class="contacts__space-name">{g.wsName}</p>
+          <div class="conversations__space-group">
+            <p class="conversations__space-name">{g.wsName}</p>
             {#each g.projects as p (p.id)}
               <Checkbox
                 label={p.name}
@@ -327,7 +327,7 @@
                 onchange={() => toggleProject(p.id)}
               />
               {#if aProjectIds.includes(p.id) && (linesByProject.get(p.id)?.length ?? 0) > 0}
-                <div class="contacts__line">
+                <div class="conversations__line">
                   <Select
                     label="Line"
                     options={[{ value: '', label: 'No line' }, ...(linesByProject.get(p.id) ?? [])]}
@@ -341,87 +341,87 @@
       </div>
     {/if}
   </fieldset>
-  <div class="contacts__form-grid">
+  <div class="conversations__form-grid">
     <Input label="Full name" bind:value={aName} required />
     <Input label="Organization" bind:value={aOrg} placeholder="Theatre, festival…" />
     <Input label="Email" type="email" bind:value={aEmail} />
     <Input label="Phone" type="tel" bind:value={aPhone} />
     <Select label="Status" options={addStatusOptions} bind:value={aStatus} />
   </div>
-  <div class="contacts__form-grid">
+  <div class="conversations__form-grid">
     <Input label="Next action" type="date" bind:value={aNextAt} />
     <Input label="Next action note" bind:value={aNextNote} placeholder="Call back after summer…" />
   </div>
   {#snippet actions()}
     <Button variant="outline" onclick={() => (addOpen = false)}>Cancel</Button>
-    <Button onclick={submitAdd} loading={$addMutation.isPending}>Add contact</Button>
+    <Button onclick={submitAdd} loading={$addMutation.isPending}>Add conversation</Button>
   {/snippet}
 </Dialog>
 
 <style>
   @layer components {
-    .contacts {
+    .conversations {
       display: flex;
       flex-direction: column;
       gap: var(--space-m);
     }
 
-    .contacts__head {
+    .conversations__head {
       display: flex;
       flex-direction: column;
       gap: var(--space-s);
     }
 
-    .contacts__controls {
+    .conversations__controls {
       display: flex;
       gap: var(--space-m);
       align-items: end;
       flex-wrap: wrap;
     }
 
-    .contacts__search {
+    .conversations__search {
       flex: 1;
       min-inline-size: 16rem;
       max-inline-size: 28rem;
     }
 
-    .contacts__dialog-hint {
+    .conversations__dialog-hint {
       font-size: var(--text-xs);
       color: var(--text-faint);
     }
 
     /* Multi-space picker — projects grouped under their space. */
-    .contacts__spaces {
+    .conversations__spaces {
       border: 0;
       padding: 0;
       margin-block-start: var(--space-m);
     }
-    .contacts__field-label {
+    .conversations__field-label {
       padding: 0;
       font-size: var(--text-s);
       color: var(--text-color);
     }
-    .contacts__field-hint {
+    .conversations__field-hint {
       color: var(--text-faint);
     }
-    .contacts__space-groups {
+    .conversations__space-groups {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
       gap: var(--space-s) var(--space-m);
       margin-block-start: var(--space-s);
     }
-    .contacts__space-group {
+    .conversations__space-group {
       display: flex;
       flex-direction: column;
       gap: var(--space-2xs);
     }
     /* Per-project line select — indented under its project checkbox. */
-    .contacts__line {
+    .conversations__line {
       margin-inline-start: var(--space-l);
       max-inline-size: 12rem;
     }
 
-    .contacts__space-name {
+    .conversations__space-name {
       font-family: var(--font-mono);
       font-size: var(--text-xs);
       letter-spacing: 0.06em;
@@ -430,7 +430,7 @@
       margin-block-end: var(--space-2xs);
     }
 
-    .contacts__form-grid {
+    .conversations__form-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
       gap: var(--space-s) var(--space-m);

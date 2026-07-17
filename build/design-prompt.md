@@ -24,7 +24,7 @@ These are the terms used in the UI. Never use the technical/database names in th
 | **Gig** | A single show/performance | `show` |
 | **Desk** | The primary UI lens — your work dashboard | — |
 
-Anti-CRM vocabulary — NEVER use: lead, pipeline, funnel, conversion, deal, prospect. Instead use: person, engagement, show, venue, date.
+Anti-CRM vocabulary — NEVER use: lead, pipeline, funnel, conversion, deal, prospect. Instead use: person, conversation, show, venue, date.
 
 ## Who uses Hour
 
@@ -52,7 +52,7 @@ The app has ONE layout with two controls:
 ```
 Desk            ← active lens (highlighted)
 Calendar
-Contacts
+Conversations
 Money
 ────────────────
 ● MaMeMi        ← houses, flat list
@@ -75,7 +75,7 @@ Marco Rubiol    ← user
 - House selected → House detail: rooms, stats, recent activity
 - Room selected → Room detail with tabs: Work | Assets | Team | About
 
-**All other lenses** (Calendar, Contacts, Money) treat sidebar selections as FILTERS:
+**All other lenses** (Calendar, Conversations, Money) treat sidebar selections as FILTERS:
 - Nothing selected → shows everything
 - House selected → filters to that House's data
 - Room selected → filters to that Room's data
@@ -153,8 +153,8 @@ A Desk panoramic view mockup already exists with:
 ## Key UX patterns to follow
 
 1. **Calendar with status colors** — the primary view. Status visible at a glance via color coding. Minimum: month + list views. No single-color calendar (biggest complaint about competitors).
-2. **Engagement list = sortable table with inline editing** — not cards, not kanban. Click a row → right side panel with full detail (keeps list visible for context).
-3. **Persistent context-sensitive "New" action** — available everywhere. Creates the right entity based on active lens (engagement in Contacts, gig in Calendar, etc.).
+2. **Conversation list = sortable table with inline editing** — not cards, not kanban. Click a row → right side panel with full detail (keeps list visible for context).
+3. **Persistent context-sensitive "New" action** — available everywhere. Creates the right entity based on active lens (conversation in Conversations, gig in Calendar, etc.).
 4. **In-page editing** — edit without leaving context. No modal forms for simple changes.
 5. **Activity trail** — "Last modified by X, 2h ago" on every entity.
 
@@ -162,7 +162,7 @@ A Desk panoramic view mockup already exists with:
 
 - Sidebar collapses to drawer
 - ⌘K becomes primary navigation
-- Supports CREATION of contacts, engagements, status changes, notes (not just viewing)
+- Supports CREATION of contacts, conversations, status changes, notes (not just viewing)
 - Full complex workflows (invoices, asset management) remain desktop
 - Creation is streamlined: minimal fields, smart defaults
 

@@ -52,7 +52,7 @@
   // Space portada: the edit-space dialog (opened from the masthead pencil).
   let editOpen = $state(false);
 
-  type EngagementStatus =
+  type ConversationStatus =
     | 'contacted'
     | 'in_conversation'
     | 'hold'
@@ -60,9 +60,9 @@
     | 'declined'
     | 'dormant'
     | 'recurring';
-  type Engagement = {
+  type Conversation = {
     id: string;
-    status: EngagementStatus;
+    status: ConversationStatus;
     next_action_at: string | null;
     next_action_note: string | null;
     updated_at: string;
@@ -82,10 +82,10 @@
   const workspacesQuery = createQuery(workspacesQueryOptions());
   const projectsQuery = createQuery(activeProjectsQueryOptions());
   const linesQuery = createQuery(allLinesQueryOptions());
-  const engagementsQuery = createQuery({
-    queryKey: ['engagements', 'today'],
+  const conversationsQuery = createQuery({
+    queryKey: ['conversations', 'today'],
     queryFn: ({ signal }: { signal: AbortSignal }) =>
-      fetchJSON<{ items: Engagement[] }>('/api/engagements?status=any&limit=100', signal),
+      fetchJSON<{ items: Conversation[] }>('/api/conversations?status=any&limit=100', signal),
   });
   const performancesQuery = createQuery({
     queryKey: ['today-performances'],
@@ -102,7 +102,7 @@
   );
   let projectIndex = $derived(buildProjectIndex(workspaces, $projectsQuery.data?.items ?? []));
   let lineIndex = $derived(buildLineIndex(workspaces, ($linesQuery.data?.items as RawLine[]) ?? []));
-  let engagements = $derived<Engagement[]>($engagementsQuery.data?.items ?? []);
+  let conversations = $derived<Conversation[]>($conversationsQuery.data?.items ?? []);
   let performances = $derived<Performance[]>($performancesQuery.data?.items ?? []);
 
   // Conversations per project — the card's honest activity number. One
@@ -116,7 +116,7 @@
         const entries = await Promise.all(
           ids.map(async (id) => {
             const r = await fetchJSON<{ total: number }>(
-              `/api/engagements?project_ids=${id}&status=any&limit=1`,
+              `/api/conversations?project_ids=${id}&status=any&limit=1`,
               signal,
             );
             return [id, r.total] as const;
@@ -131,9 +131,9 @@
 
   // The portada's agenda is this space's — a local view scope that never
   // touches the pins store.
-  let scopedEngagements = $derived(
+  let scopedConversations = $derived(
     currentWorkspace
-      ? engagements.filter((e) => e.workspace_id === currentWorkspace.id)
+      ? conversations.filter((e) => e.workspace_id === currentWorkspace.id)
       : [],
   );
 
@@ -175,7 +175,7 @@
   }
 
   // Busiest first — project.updated_at (the API order) goes stale because
-  // working the show touches engagements/lines, never the project row. Sort
+  // working the show touches conversations/lines, never the project row. Sort
   // is stable, so zero-activity ties keep the API order.
   function activityOf(p: NavProject): number {
     const st = statOf(perfsForProject(p.id));
@@ -293,13 +293,13 @@
 
   <div class="home__toolbar"><span class="eyebrow">Next 7 days</span></div>
   <DeskBoard
-    engagements={scopedEngagements}
+    conversations={scopedConversations}
     {workspaceSlug}
     cap={10}
     next7Days
     moreHref="/h/desk"
-    loading={$engagementsQuery.isPending}
-    error={$engagementsQuery.isError}
+    loading={$conversationsQuery.isPending}
+    error={$conversationsQuery.isError}
   />
 
   {#if visibleProjects.length > 0 || projectsSettled}

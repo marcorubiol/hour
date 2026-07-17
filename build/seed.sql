@@ -24,7 +24,7 @@
 --
 -- INSERT INTO public.project (workspace_id, slug, name, status, description)
 -- SELECT id, 'mamemi', 'MaMeMi', 'active',
---        'MaMeMi — the show. Source of the Difusión 2026-27 dates and engagements.'
+--        'MaMeMi — the show. Source of the Difusión 2026-27 dates and conversations.'
 -- FROM public.workspace WHERE slug = 'marco-rubiol'
 -- ON CONFLICT (workspace_id, slug) DO UPDATE SET name = EXCLUDED.name;
 

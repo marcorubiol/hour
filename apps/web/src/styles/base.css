@@ -980,9 +980,9 @@
     --badge-accent: var(--danger);
   }
 
-  /* Engagement status variants — one badge per engagement_status enum
+  /* Conversation status variants — one badge per conversation_status enum
      value. Defined alongside the tone variants because they're consumed
-     across booking, room detail, and future contacts lens; keeping them
+     across booking, room detail, and future conversations lens; keeping them
      here prevents drift between consumers and keeps the variable-contract
      pattern (consumer parameterises, skeleton stays the same). Class
      names mirror the enum with underscores replaced by dashes
@@ -1612,7 +1612,7 @@
     text-transform: lowercase;
   }
 
-  /* Caret for status badges that double as dropdown triggers (engagement
+  /* Caret for status badges that double as dropdown triggers (conversation
      table, performance header). One rule for both consumers. */
   .status-caret {
     margin-inline-start: 0.35em;
@@ -1689,7 +1689,7 @@
   }
 
   /* Arrow nav link — quiet row-level navigation ("Open →", "Road sheet →",
-     "View all N engagements →"). Muted at rest, ink on hover, no underline. */
+     "View all N conversations →"). Muted at rest, ink on hover, no underline. */
   .link-arrow {
     color: var(--text-muted);
     font-size: var(--text-s);

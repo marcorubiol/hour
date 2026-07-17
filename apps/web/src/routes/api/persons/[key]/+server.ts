@@ -1,7 +1,7 @@
 /**
  * GET /api/persons/:key — the person file (ADR-045): contact data plus
  * everything the caller's RLS lets them see about the relationship —
- * engagements across projects, workspace-scoped notes (visibility rules
+ * conversations across projects, workspace-scoped notes (visibility rules
  * in RLS), and cast/crew appearances.
  *
  * `:key` is a uuid or the person's slug (persons are GLOBAL — no
@@ -72,8 +72,8 @@ export const GET: RequestHandler = async ({ request, params, platform, locals })
       deleted_at: 'is.null',
     });
 
-    const [engagements, notes, crew, cast] = await Promise.all([
-      pgGet(env, 'engagement', jwt, { search: engSearch }),
+    const [conversations, notes, crew, cast] = await Promise.all([
+      pgGet(env, 'conversation', jwt, { search: engSearch }),
       pgGet(env, 'person_note', jwt, { search: notesSearch }),
       pgGet(env, 'crew_assignment', jwt, { search: crewSearch }),
       pgGet(env, 'cast_member', jwt, { search: castSearch }),
@@ -81,7 +81,7 @@ export const GET: RequestHandler = async ({ request, params, platform, locals })
 
     return json({
       person: p,
-      engagements: engagements.data,
+      conversations: conversations.data,
       notes: notes.data,
       crew: crew.data,
       cast: cast.data,

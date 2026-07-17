@@ -1,8 +1,8 @@
 /**
- * RLS regression — engagement + performance write-path RPCs (ADR-051/052).
+ * RLS regression — conversation + performance write-path RPCs (ADR-051/052).
  *
- * Exercises the SECURITY DEFINER RPCs create_engagement /
- * delete_engagement / delete_performance against the live project, as the
+ * Exercises the SECURITY DEFINER RPCs create_conversation /
+ * delete_conversation / delete_performance against the live project, as the
  * fixture user and as anon. Lifecycle fixtures are created in the
  * `playwright` workspace (project `zzz-e2e-collab`) and soft-deleted
  * before the file ends — cross-tenant.test.ts asserts membership-bounded
@@ -16,7 +16,7 @@
 import { beforeAll, describe, expect, test } from 'vitest';
 import { envReady, login, pgGet, pgRpc, requireEnv } from './_helpers';
 
-type EngagementRow = {
+type ConversationRow = {
   id: string;
   slug: string;
   status: string;
@@ -30,7 +30,7 @@ type PerformanceRow = { id: string; slug: string | null; status: string };
 const RANDOM_UUID = '00000000-0000-4000-8000-000000000000';
 // STABLE fixture email (the person find-or-create path dedupes on it, so
 // a fresh email per run would leak a new global person every run). The
-// engagement is soft-deleted in each test's `finally`; a run killed
+// conversation is soft-deleted in each test's `finally`; a run killed
 // between create and cleanup would leave the triple live, so beforeAll
 // recovers it (see below). RUN_TAG only disambiguates the throwaway gig.
 const RUN_TAG = `${Date.now().toString(36)}`;
@@ -63,10 +63,10 @@ describe.skipIf(!envReady())('RLS — ADR-051/052 write-path RPCs', () => {
     projectId = projects.rows[0].id;
 
     // Crash recovery: a prior run killed mid-test may have left the
-    // fixture engagement LIVE, which would 23505 → 409 the first create
+    // fixture conversation LIVE, which would 23505 → 409 the first create
     // below and wedge the suite red forever. Soft-delete any leftover.
     const stale = await pgGet<{ id: string }>(
-      'engagement',
+      'conversation',
       jwt,
       new URLSearchParams({
         select: 'id,person:person_id!inner(email)',
@@ -76,35 +76,35 @@ describe.skipIf(!envReady())('RLS — ADR-051/052 write-path RPCs', () => {
       }),
     );
     for (const row of stale.rows) {
-      await pgRpc('delete_engagement', jwt, { p_engagement_id: row.id });
+      await pgRpc('delete_conversation', jwt, { p_conversation_id: row.id });
     }
   });
 
-  test('anon cannot execute create_engagement (no grant)', async () => {
-    const { status } = await pgRpc('create_engagement', null, {
+  test('anon cannot execute create_conversation (no grant)', async () => {
+    const { status } = await pgRpc('create_conversation', null, {
       p_project_id: RANDOM_UUID,
       p_full_name: 'anon was here',
     });
     expect(status).toBeGreaterThanOrEqual(400);
   });
 
-  test('anon cannot execute delete_engagement / delete_performance (no grant)', async () => {
-    const eng = await pgRpc('delete_engagement', null, { p_engagement_id: RANDOM_UUID });
+  test('anon cannot execute delete_conversation / delete_performance (no grant)', async () => {
+    const eng = await pgRpc('delete_conversation', null, { p_conversation_id: RANDOM_UUID });
     expect(eng.status).toBeGreaterThanOrEqual(400);
     const perf = await pgRpc('delete_performance', null, { p_performance_id: RANDOM_UUID });
     expect(perf.status).toBeGreaterThanOrEqual(400);
   });
 
-  test('create_engagement against an unknown project → 403 (no existence oracle)', async () => {
-    const { status } = await pgRpc('create_engagement', jwt, {
+  test('create_conversation against an unknown project → 403 (no existence oracle)', async () => {
+    const { status } = await pgRpc('create_conversation', jwt, {
       p_project_id: RANDOM_UUID,
       p_full_name: FIXTURE_NAME,
     });
     expect(status).toBe(403);
   });
 
-  test('create_engagement without person_id nor full_name → 400', async () => {
-    const { status } = await pgRpc('create_engagement', jwt, {
+  test('create_conversation without person_id nor full_name → 400', async () => {
+    const { status } = await pgRpc('create_conversation', jwt, {
       p_project_id: projectId,
     });
     expect(status).toBe(400);
@@ -113,7 +113,7 @@ describe.skipIf(!envReady())('RLS — ADR-051/052 write-path RPCs', () => {
   test('full lifecycle: create (inline person) → duplicate 409 → delete → resurrect → delete', async () => {
     // 1. Create with inline person. Email may match a soft-deleted person
     //    from a previous run — the RPC resurrects it (same outcome).
-    const created = await pgRpc<EngagementRow>('create_engagement', jwt, {
+    const created = await pgRpc<ConversationRow>('create_conversation', jwt, {
       p_project_id: projectId,
       p_full_name: FIXTURE_NAME,
       p_email: FIXTURE_EMAIL,
@@ -122,13 +122,13 @@ describe.skipIf(!envReady())('RLS — ADR-051/052 write-path RPCs', () => {
     });
     expect(created.status).toBe(200);
     expect(created.data).not.toBeNull();
-    const engagement = created.data as EngagementRow;
-    expect(engagement.project_id).toBe(projectId);
-    expect(engagement.status).toBe('contacted');
+    const conversation = created.data as ConversationRow;
+    expect(conversation.project_id).toBe(projectId);
+    expect(conversation.status).toBe('contacted');
 
     try {
       // 2. Same person × project again → 23505 → 409 (no silent merge).
-      const dup = await pgRpc('create_engagement', jwt, {
+      const dup = await pgRpc('create_conversation', jwt, {
         p_project_id: projectId,
         p_full_name: FIXTURE_NAME,
         p_email: FIXTURE_EMAIL,
@@ -136,18 +136,18 @@ describe.skipIf(!envReady())('RLS — ADR-051/052 write-path RPCs', () => {
       expect(dup.status).toBe(409);
 
       // 3. Soft-delete via RPC…
-      const del = await pgRpc('delete_engagement', jwt, {
-        p_engagement_id: engagement.id,
+      const del = await pgRpc('delete_conversation', jwt, {
+        p_conversation_id: conversation.id,
       });
       expect(del.status).toBeLessThan(300);
 
       // …and the row is gone from the live surface.
-      const after = await pgGet<EngagementRow>(
-        'engagement',
+      const after = await pgGet<ConversationRow>(
+        'conversation',
         jwt,
         new URLSearchParams({
           select: 'id',
-          id: `eq.${engagement.id}`,
+          id: `eq.${conversation.id}`,
           deleted_at: 'is.null',
         }),
       );
@@ -155,25 +155,25 @@ describe.skipIf(!envReady())('RLS — ADR-051/052 write-path RPCs', () => {
 
       // 4. Re-adding the same person resurrects the soft-deleted row —
       //    the FULL unique constraint must never dead-end the triple.
-      const again = await pgRpc<EngagementRow>('create_engagement', jwt, {
+      const again = await pgRpc<ConversationRow>('create_conversation', jwt, {
         p_project_id: projectId,
         p_full_name: FIXTURE_NAME,
         p_email: FIXTURE_EMAIL,
         p_status: 'in_conversation',
       });
       expect(again.status).toBe(200);
-      const resurrected = again.data as EngagementRow;
-      expect(resurrected.id).toBe(engagement.id);
+      const resurrected = again.data as ConversationRow;
+      expect(resurrected.id).toBe(conversation.id);
       expect(resurrected.status).toBe('in_conversation');
     } finally {
       // 5. Always leave the live surface clean.
-      await pgRpc('delete_engagement', jwt, { p_engagement_id: engagement.id });
+      await pgRpc('delete_conversation', jwt, { p_conversation_id: conversation.id });
     }
   });
 
-  test('delete_engagement against an unknown id → 403 (no existence oracle)', async () => {
-    const { status } = await pgRpc('delete_engagement', jwt, {
-      p_engagement_id: RANDOM_UUID,
+  test('delete_conversation against an unknown id → 403 (no existence oracle)', async () => {
+    const { status } = await pgRpc('delete_conversation', jwt, {
+      p_conversation_id: RANDOM_UUID,
     });
     expect(status).toBe(403);
   });

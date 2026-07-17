@@ -15,10 +15,15 @@ whole app. Calm over gamified, always: no progress bars, no confetti, no badges 
 
 One ranked feed answering "what needs me now", grouped by day buckets:
 **OVERDUE · TODAY · TOMORROW · {weekday} · NEXT WEEK · LATER · ANYTIME** (quiet tail).
-Item types are MIXED inside buckets by urgency — type is expressed by verb + glyph, never
-by separate blocks.
+Within each bucket the type order is FIXED (Marco, 2026-07-18; spec § /h/desk): **tasks →
+calendar → conversations → money**, mirroring the lens nav — the feed and the nav speak one
+vocabulary. The left gutter carries the item-type label in mono small-caps, SINGULAR
+(the es-voiced mock reads TAREA · AGENDA · CONVERSACIÓN · DINERO; locale-resolved in
+product). AGENDA labels the timed `date` rows and points at the Calendar lens's agenda
+projection (ADR-076 — two-level vocabulary: gutter names item kinds, nav names surfaces).
+The show-day anchor sits above everything in its day, outside the order.
 
-Four item types to design:
+Five item types to design:
 
 1. **Conversation next-action** (the booking work): verb ("Reply", "Chase", "Confirm") +
    person or organization name + project color dot + up to 2 `#tags`. The workhorse row.
@@ -30,6 +35,9 @@ Four item types to design:
    than rows: venue, city, load-in time. On a show day, the show owns the day.
 4. **Money alert**: overdue invoice ("Invoice 2026-014 · 12 days overdue") and
    gig-done-without-invoice. Quiet red — informative, not alarmist.
+5. **Agenda row** (timed `date` event — rehearsal, travel, press): time + title + place +
+   project dot ("12:00 ensayo técnico · sala d'assaig"). Time in the event venue's zone
+   when linked (timezone rule). Quieter than the workhorse rows.
 
 Plus: a **quick-capture line** at the very top — one unobtrusive input ("add a loose end…"),
 keyboard-first, drops into Anytime.

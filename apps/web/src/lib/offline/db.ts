@@ -4,7 +4,7 @@
  * Phase 0.0: schema and surface only. Nothing reads/writes through here yet
  * — pages still fetch directly via TanStack Query, and we have no UI
  * mutations to enqueue. The wiring lands in Phase 0.2 when Plaza/Desk start
- * mutating engagement state and a network drop should buffer instead of
+ * mutating conversation state and a network drop should buffer instead of
  * losing the change.
  *
  * Schema versioning (when adding/changing stores in the future):

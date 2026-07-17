@@ -1,12 +1,12 @@
 <script lang="ts">
   /**
-   * RelationshipStub — Project detail block showing engagements summary
+   * RelationshipStub — Project detail block showing conversations summary
    * (Phase 0.1 trabajo #4).
    *
-   * Shows the 10 most actionable engagements for a given Project (ordered by
+   * Shows the 10 most actionable conversations for a given Project (ordered by
    * next_action_at asc nullslast, then updated_at desc — same as the API
    * default). Header carries total count. "View all" link sends the user
-   * to the Contacts lens (the /booking wrapper it used to point at was
+   * to the Conversations lens (the /booking wrapper it used to point at was
    * retired in the ADR-056 cleanup).
    *
    * Anti-CRM vocabulary: surfaces the conversation state without using
@@ -19,9 +19,9 @@
   import {
     statusBadgeClass,
     statusLabel,
-    type EngagementItem,
+    type ConversationItem,
     type PersonLite,
-  } from '$lib/engagement';
+  } from '$lib/conversation';
 
   interface Props {
     projectSlug: string;
@@ -43,16 +43,16 @@
   type Response = {
     total: number;
     limit: number;
-    items: EngagementItem[];
+    items: ConversationItem[];
   };
 
   const LIMIT = 10;
 
   const queryOptions = derived(slugStore, ($slug) => ({
-    queryKey: ['engagements', { project_slug: $slug, status: 'any', limit: LIMIT }] as const,
+    queryKey: ['conversations', { project_slug: $slug, status: 'any', limit: LIMIT }] as const,
     queryFn: ({ signal }: { signal: AbortSignal }) =>
       fetchJSON<Response>(
-        `/api/engagements?project_slug=${encodeURIComponent($slug)}&status=any&limit=${LIMIT}`,
+        `/api/conversations?project_slug=${encodeURIComponent($slug)}&status=any&limit=${LIMIT}`,
         signal,
       ),
   }));
@@ -78,7 +78,7 @@
     </div>
     {#if !loading && !errored}
       <span class="rel-stub__count">
-        {total === 1 ? '1 engagement' : `${total} engagements`}
+        {total === 1 ? '1 conversation' : `${total} conversations`}
       </span>
     {/if}
   </header>
@@ -86,9 +86,9 @@
   {#if loading}
     <p class="rel-stub__state">Loading…</p>
   {:else if errored}
-    <p class="rel-stub__state rel-stub__state--danger">Couldn't load engagements.</p>
+    <p class="rel-stub__state rel-stub__state--danger">Couldn't load conversations.</p>
   {:else if items.length === 0}
-    <p class="rel-stub__state">No engagements on this project yet.</p>
+    <p class="rel-stub__state">No conversations on this project yet.</p>
   {:else}
     <ul class="rel-stub__list">
       {#each items as e (e.id)}
@@ -111,8 +111,8 @@
 
     {#if total > items.length}
       <footer class="rel-stub__footer">
-        <a class="link-arrow" href="/h/contacts">
-          View all {total} engagements →
+        <a class="link-arrow" href="/h/conversations">
+          View all {total} conversations →
         </a>
       </footer>
     {/if}

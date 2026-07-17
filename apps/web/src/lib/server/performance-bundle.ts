@@ -1,6 +1,6 @@
 /**
  * Server-side fetcher for a single performance with everything its detail
- * page and road sheet need: venue, line, project, engagement(person),
+ * page and road sheet need: venue, line, project, conversation(person),
  * crew, cast overrides, related dates, assets — plus the project-scoped
  * canonical cast (ADR-034: cast_member hangs off project, so it cannot be
  * embedded from performance and needs a second query).
@@ -48,7 +48,7 @@ export type PerformanceDetail = Omit<
   } | null;
   line: { id: string; slug: string; name: string; kind: string } | null;
   project: { id: string; slug: string; name: string; accent: string | null } | null;
-  engagement: {
+  conversation: {
     id: string;
     slug: string;
     status: string;
@@ -136,7 +136,7 @@ const PERFORMANCE_COLS = [
   'workspace_id',
   'project_id',
   'line_id',
-  'engagement_id',
+  'conversation_id',
   'slug',
   'performed_at',
   'status',
@@ -163,7 +163,7 @@ const DETAIL_SELECT = [
   'venue:venue_id(id,slug,name,city,country,address,capacity,timezone,contacts)',
   'line:line_id(id,slug,name,kind)',
   'project:project_id(id,slug,name,accent)',
-  `engagement:engagement_id(id,slug,status,person:person_id(${PERSON_COLS},organization_name))`,
+  `conversation:conversation_id(id,slug,status,person:person_id(${PERSON_COLS},organization_name))`,
   `crew_assignment(id,role,notes,contact_override,person:person_id(${PERSON_COLS}))`,
   `cast_override(id,role,reason,person:person_id(${PERSON_COLS}),replaces_person:replaces_person_id(id,full_name))`,
   'date(id,kind,status,title,starts_at,ends_at,all_day,venue_name,city,venue:venue_id(timezone))',

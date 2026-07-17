@@ -16,17 +16,17 @@
 </script>
 
 <svelte:head>
-  <title>{title} — Engagement — Hour</title>
+  <title>{title} — Conversation — Hour</title>
 </svelte:head>
 
 <section class="entity">
   <header>
-    <p class="eyebrow">Engagement</p>
+    <p class="eyebrow">Conversation</p>
     <h1 class="entity__title"><em>{title}</em></h1>
   </header>
   <p class="text--dark-muted">
     The full conversation view — status timeline, notes, linked person and
-    gigs — isn't built yet. Manage this engagement from Contacts meanwhile.
+    gigs — isn't built yet. Manage this conversation from Contacts meanwhile.
   </p>
   <p>
     <a class="link-arrow" href={`/h/${workspace}/contacts`}>← Back to contacts</a>

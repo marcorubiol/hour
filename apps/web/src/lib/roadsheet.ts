@@ -23,7 +23,7 @@
  *   - Personal contact data (email/phone/contact_override) only for
  *     full + tech_manager — they coordinate people. Venue and performer
  *     see names + roles.
- *   - `notes` (free text) and the programmer block (engagement person)
+ *   - `notes` (free text) and the programmer block (conversation person)
  *     are internal: full only.
  *   - `assets` list for full + tech_manager (riders/plots are theirs);
  *     URLs are R2 keys with no public serving in Phase 0, so only

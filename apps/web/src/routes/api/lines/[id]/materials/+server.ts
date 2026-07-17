@@ -7,7 +7,7 @@
  * admits direction 'outbound' in v1 (the table CHECK forbids 'inbound'
  * without a performance and 'adapted' needs a source).
  *
- * Auth: Bearer JWT required. RLS (edit:show via the line's project)
+ * Auth: Bearer JWT required. RLS (edit:performance via the line's project)
  * decides visibility.
  */
 

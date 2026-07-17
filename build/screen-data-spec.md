@@ -27,7 +27,7 @@ Per screen: **Is** (its structure-model category), **Today** (what it shows now,
 **North star, declared mid-pass (ADR-069, 2026-07-17)**: Hour exists for a proactive,
 consent-first AI layer over this data ("gig in Paris in a month + 20 contacts usually around
 Paris → propose emailing them"). Every "should contain" below is also judged by "does this
-feed or surface that layer". It promotes gaps #1 (organizations) and #2 (engagement
+feed or surface that layer". It promotes gaps #1 (organizations) and #2 (conversation
 conversation log) from nice-to-have to **critical path** — they are the AI's network model
 and negotiation memory. AI surfaces already in the model: `task.origin='ai'`, the hall
 status sentence.
@@ -43,6 +43,12 @@ browser's, and push venue linking at create). `performance.performed_at` is a DA
 day) — already tz-safe for bucketing; timed `date` events bucket by their venue's day when
 linked.
 
+**Calm mode — cross-cutting, DECIDED, UI in design (Marco, 2026-07-18)**: the whole app
+gets two modes, **calm** and **open**. Calm cleans every surface — on the Desk it shows
+only today + overdue; each surface defines what calm hides. Toggle placement being designed
+(Marco's mock); scope per surface, persistence and default pending → ADR when the UI lands.
+Pending builds should not bake in assumptions that fight a global display-mode filter.
+
 **Hard boundary on the AI's contact reach** (from `research/profiles/99-patterns.md § 3.1`
 + the profile refusals): proposals draw contacts ONLY from the workspace(s) in scope —
 contact books are never blended across workspaces (the freelance's book is her capital;
@@ -51,13 +57,13 @@ contact books are never blended across workspaces (the freelance's book is her c
 hand-crafted" is universal across selling profiles).
 
 1. **`task` landed today with zero UI.** Migration `2026-07-17_task_entity.sql`: polymorphic
-   (project / line / performance / engagement / free), `title, note, due_at, status, origin
+   (project / line / performance / conversation / free), `title, note, due_at, status, origin
    (manual|protocol|ai)`. Per structure-model D3 it surfaces in three places: Desk feed,
    a Tasks module, inline next-actions. None built. The single biggest [db] item — it touches
-   Desk, project, line, performance and engagement below.
+   Desk, project, line, performance and conversation below.
 2. **`payment` has zero UI.** The advance+rest model (N payments per invoice) exists in DB;
    the app only flips `invoice.status` by hand. Money lens should own it.
-3. **Engagement detail is a stub.** The page renders a de-slugged title and a back link —
+3. **Conversation detail is a stub.** The page renders a de-slugged title and a back link —
    nothing else. For a booking tool, the conversation view is core, and it also exposes the
    one real schema hole: **no conversation log entity** (only `next_action_note`, 1 slot).
 4. **Organizations are a text field.** ADR-065 says Contacts = people AND organizations;
@@ -93,7 +99,7 @@ not the awareness.
   show-day ("Avui: Balsareny. Load-in a les 17h." — a gig day outranks everything) ·
   attention ("Dues coses vençudes — la més antiga fa cinc dies.") ·
   calm ("Tot tranquil. Tres obertes, cap vençuda — la propera espera fins dijous.").
-  Inputs: engagement next-actions (DeskBoard semantics) + tasks when the API lands +
+  Inputs: conversation next-actions (DeskBoard semantics) + tasks when the API lands +
   today/tomorrow performances [db].
 - Fourth state, slot only: **AI proposal teaser** ("Tinc una proposta per París — quan
   vulguis.") — consent-first door to an `origin='ai'` task (ADR-069). Not built yet.
@@ -105,8 +111,8 @@ not the awareness.
 
 **Is**: THE cross-concern digest (structure-model: not a lens; ranked by what needs me now;
 owns no data — a query over the concerns + tasks).
-**Today**: engagement next-actions only — verb (from status) + person/org + `#tags` (first 2,
-from `engagement.custom_fields.tags`) + project dot, bucketed OVERDUE / TODAY / TOMORROW /
+**Today**: conversation next-actions only — verb (from status) + person/org + `#tags` (first 2,
+from `conversation.custom_fields.tags`) + project dot, bucketed OVERDUE / TODAY / TOMORROW /
 weekday / NEXT WEEK / LATER. Scoped by pins.
 **Contains — SETTLED (S1, 2026-07-17)**: one ranked feed, four sources, grouped in day
 buckets. **Within each bucket the type order is FIXED (Marco, 2026-07-18): tasks →
@@ -116,7 +122,7 @@ place. The show-day card sits above everything in its day (banner, outside the o
 within each type-block, natural secondary sort (calendar by time, conversations by due,
 money by severity). Urgency lives in the buckets + overdue reds, not in within-day
 reordering. (Supersedes the earlier "mixed by urgency within buckets" phrasing.)
-- Engagement next-actions [now].
+- Conversation next-actions [now].
 - **Tasks** per the ADR-070 model: surface at `max(from_at, due_at − lead_days)`; dormant
   (`from_at` future) never rendered; undated → quiet "Anytime" tail; urgency derived, never
   stored; row shows the computed "surfaces" date, editable (AI-proposed lead visible).
@@ -200,6 +206,12 @@ dashboard" (stats + projects only) now that Desk is one key away?
 ### `/h/calendar` — Calendar lens
 
 **Is**: concern-lens over time. Read/aggregate; hosts entity editors inline (option 2).
+**Naming + projections (ADR-076, 2026-07-18)**: ONE time lens in the nav, pill fixed
+"Calendar" — inside it TWO first-class projections: grid (calendar) and list (**agenda**),
+named visible toggle, projection carried in the URL and persisted. Never two nav pills,
+never a pill that changes word, never "Time" as the lens name. The Desk's AGENDA row label
+points at the agenda projection (two-level vocabulary rule: gutter names item kinds, nav
+names surfaces).
 **Today**: month grid; performance chips (venue/city/project, status tone, accent) +
 `date` chips (title/kind, italic); pins scope; New performance (+ per-day +); ICS feed dialog.
 **Contains — direction SETTLED (S1, 2026-07-17)**:
@@ -245,16 +257,17 @@ dashboard" (stats + projects only) now that Desk is one key away?
 
 ### `/h/conversations` — Conversations lens (renamed from Contacts, ADR-075 2026-07-18)
 
-> Full rename dispatched (`rename-conversation-prompt.md` — runs BEFORE the pending UI
-> builds): lens Contacts → Conversations, entity `engagement` → `conversation`, route
-> with 308. "Contacts" survives as the book concept only (by-contact toggle, person file).
+> Rename SHIPPED 2026-07-17 (ADR-075): lens Contacts → Conversations, entity `engagement`
+> → `conversation` (DB, API, client). **No 308** — the app is pre-public, so `/h/contacts`
+> was deleted, not aliased. "Contacts" survives as the book concept only (by-contact
+> toggle, person file).
 
 **Is**: concern-lens over the booking conversations; the book (people AND organizations)
 lives inside it as the by-contact view (ADR-065 → ADR-075).
-**Today**: engagement table (person, org text, location, status editable inline, next action
+**Today**: conversation table (person, org text, location, status editable inline, next action
 editable) + q search + status filter + pins + Add contact (multi-space) + pagination 50.
 **Contains — SETTLED (S1, 2026-07-17)**:
-- The engagement table [now] + **one "last contact" column** (date, quiet styling) — the
+- The conversation table [now] + **one "last contact" column** (date, quiet styling) — the
   full history lives in the contact's file, not the lens (Marco, S1). Write path: stamp
   `last_contacted_at` on status change + a "contacted today" gesture; `first_contacted_at`
   set once [db — dispatched].
@@ -372,7 +385,7 @@ not data.)
 
 - **Calendar module** — Today: list/month of line performances + line dates; New performance
   [now]. Should add: create `date` here too (a tour has travel days) [db].
-- **Contacts module** — Today: scoped EngagementTable + Add contact (line-bound) [now].
+- **Conversations module** — Today: scoped ConversationTable + Add contact (line-bound) [now].
   Should add: same last-contact + tags columns as the lens [db]. Known 409 relink-to-line
   limitation (Shelf) stands.
 - **Money module** — Today: fees + line-filtered invoices + expenses with per-currency
@@ -395,7 +408,7 @@ not data.)
 **Is**: entity edit surface for the gig (the atomic primitive).
 **Today**: header (venue/title, status menu, date, place), ProductionStub (venue block +
 contacts, 5-slot dual-tz ScheduleTable, logistics/hospitality/technical JsonKV), team
-(cast/overrides/crew, read-only), linked dates, programmer (engagement person), assets list,
+(cast/overrides/crew, read-only), linked dates, programmer (conversation person), assets list,
 collab notes, Edit details dialog (date, venue fields, linked venue, 5 timeslots), venue
 editor, delete.
 **Should contain**:
@@ -412,7 +425,7 @@ editor, delete.
   here [db].
 - **Inbound assets**: register venue-returned docs (`asset_version` direction=inbound,
   show-scoped — table CHECK already models it; UI/API only do outbound line assets) [db].
-- **Engagement link**: `engagement_id` is PATCHable but has no UI — "this gig came from
+- **Conversation link**: `conversation_id` is PATCHable but has no UI — "this gig came from
   that conversation" closes the difusión→gig loop [db].
 - Structured **logistics/hospitality/technical editing**: today JsonKV renders whatever the
   jsonb holds; there's no editor. Minimum: key-value editor; better: agreed key sets per
@@ -439,24 +452,24 @@ drops notes/fees/programmer entirely, no-store, robots-noindex. Print CSS.
 **Open**: per-section notes (e.g. a note visible only on the venue projection)? Adds a
 matrix dimension — only if real use asks.
 
-### `/h/[ws]/engagement/[slug]` — Engagement detail  ← the build gap
+### `/h/[ws]/conversation/[slug]` — Conversation detail  ← the build gap
 
 **Is**: entity edit surface for a conversation (difusión atom).
 **Today**: STUB — de-slugged title + back link. Fetches nothing.
 **Should contain**:
 - **Header**: person (link) + organization + project/line context + status (editable) +
-  season [db — all on the engagement row today].
+  season [db — all on the conversation row today].
 - **Next action**: date + note, editable (same editor the table hosts) [db].
 - **Conversation log**: dated entries — "called, they want video", "sent dossier" — the
   memory of the negotiation. NO entity holds this today (`next_action_note` is one slot;
   `person_note` is person-scoped, wrong axis) [gap — § Schema gaps #2].
-- **Linked gigs**: performances with this `engagement_id` (proposed/hold/confirmed out of
-  this conversation) + "create performance from engagement" prefilled [db].
+- **Linked gigs**: performances with this `conversation_id` (proposed/hold/confirmed out of
+  this conversation) + "create performance from conversation" prefilled [db].
 - **First/last contacted** stamps, auto-maintained from the log [db columns / write-path].
-- **Tasks** (engagement-level — subsumes today's single next-action slot long-term; keep
+- **Tasks** (conversation-level — subsumes today's single next-action slot long-term; keep
   both until tasks prove out) [db].
 - **Money expectation**: asking fee for this conversation — lives on the eventual
-  performance today; a `fee_expectation` on engagement is speculative [open, lean no].
+  performance today; a `fee_expectation` on conversation is speculative [open, lean no].
 **Open**: this screen is where "Comms folds in later" (ADR-056/065) will land — design the
 log entity so an email-integration later writes the same table (§ gaps #2 shape).
 
@@ -464,14 +477,14 @@ log entity so an email-integration later writes the same table (§ gaps #2 shape
 
 **Is**: entity edit surface for a person (global entity, RLS-visible slice).
 **Today**: identity header (name, title, org text, city/country), contact block (email,
-phone, website, languages), engagements list, notes (composer, private toggle, author-only
+phone, website, languages), conversations list, notes (composer, private toggle, author-only
 delete), appearances (cast/crew), Add to project.
 **Should contain**:
 - Everything above [now], plus:
 - **Edit person** dialog: full_name, title, email, phone, website, city, country,
   languages, organization — NO person field is editable after creation today [db].
 - **Organization as link** once orgs exist (→ § gaps #1); until then the text field [gap].
-- Last-contact context per engagement row [db].
+- Last-contact context per conversation row [db].
 **Open**: person merge (dedup two rows for the same human) — Phase 0 manual-SQL is fine,
 but flag it before multi-user.
 
@@ -519,7 +532,7 @@ share the AccentSwatchPicker `1-8|auto` pattern — keep.)
 | New line (template picker) | template*, project*, name*, accent | + territory (optional, kind=tour/campaign) [db]; template cards [now] are right |
 | Edit space | name*, domain, city, accent, description + alias request | + logo upload when R2 lands [db]; + fiscal block (→ gaps #3) [gap] |
 | New performance | project*, date*, venue, city, status(6), line | + **linked venue select** (dedup at source — free text creates orphan venue_names; "Save as venue" exists only in edit) [db]; + fee (optional, read:money-gated) [db, open] |
-| Edit performance | date*, venue, city, country, venue_id, 5 timeslots | + engagement link [db]; + fee (see Performance detail) [db] |
+| Edit performance | date*, venue, city, country, venue_id, 5 timeslots | + conversation link [db]; + fee (see Performance detail) [db] |
 | Edit venue | name*, city, country, capacity, address, tz, contacts[], notes | complete [now] — the reference dialog |
 | Delete performance | confirm only | [now] ok (invoice block server-side) |
 | Add contact (lens, multi-space) | projects*≥1+line, name*, org, email, phone, status, next action+note | ok; unify with module variant ↓ |
@@ -544,18 +557,18 @@ Everything else in this doc is build-only. These need DDL, listed by blast radiu
 1. **Organization entity** (ADR-065 debt). `organization` (workspace-scoped: name, kind
    theatre/festival/town_hall/company/agency, city, country, website, notes, custom_fields)
    + `person.organization_id` FK (keep `organization_name` text as fallback during
-   migration) + `engagement.organization_id` (a conversation can be with an org before it
-   has a human) + `invoice.payer_organization_id`. Touches: Contacts lens, person detail,
-   engagement detail, invoices. **Decide shape before building engagement detail** — the
+   migration) + `conversation.organization_id` (a conversation can be with an org before it
+   has a human) + `invoice.payer_organization_id`. Touches: Conversations lens, person detail,
+   conversation detail, invoices. **Decide shape before building conversation detail** — the
    conversation view wants org context from day one. Note: `venue` overlaps ("a theatre is
    both a place and a programmer") — proposal: keep venue = place; organization = juridical
    actor; optional `venue.organization_id` link. Argue this in session 2.
 2. **Conversation log** (entity renamed per ADR-075). `conversation_event` (conversation_id, at, kind
    note/call/email/**meeting**, `direction` inbound|outbound (S1, from research §2.4),
    optional event/fair reference for provenance ("met at FiraTàrrega 2026" — S1), body,
-   created_by). Write path stamps `engagement.last_contacted_at` (and first, once).
+   created_by). Write path stamps `conversation.last_contacted_at` (and first, once).
    Designed so future email integration inserts the same rows (ADR-056 comms direction).
-   Unblocks the engagement detail screen + the post-fair follow-up queue.
+   Unblocks the conversation detail screen + the post-fair follow-up queue.
 3. **Fiscal identity for invoicing** — on `account` (billing root; ADR-062 deferral):
    legal_name, tax_id, address, IBAN, default_vat_pct, default_irpf_pct, invoice number
    series. Unblocks: real invoice issuing, public road sheet contact block, invoice PDF
@@ -589,7 +602,7 @@ Everything else in this doc is build-only. These need DDL, listed by blast radiu
    date (vs contractual `due_on`) + the cascade-condition note ("when they collect from
    X"). Aging measures against expected. Dispatched via `money-model-prompt.md`.
 10. *(deliberately NOT proposed)*: saved views server-side (Master View localStorage is
-   the ceiling per structure-model), fee_expectation on engagement (lean no), away-days as
+   the ceiling per structure-model), fee_expectation on conversation (lean no), away-days as
    a stored entity (always derived — storing them would let them lie), modeling the
    payer's own receivables (we only track what the user knows — fiction otherwise).
 
@@ -600,7 +613,7 @@ Collected from above, in session order:
   scoped Desk or dashboard? · calendar hold grammar · availability entity yes/no ·
   contacts season filter now? · money primary grouping (line vs project) · ⌘K entity-jump?
 - S2: project tabs vs long page · fee on performance detail (recommended yes) ·
-  organization vs venue split (gaps #1 shape) · engagement log shape (gaps #2) ·
+  organization vs venue split (gaps #1 shape) · conversation log shape (gaps #2) ·
   per-section road sheet notes?
 - S3: settings — cut vapor or keep as roadmap-ad? · notification channel · dialog deltas
   table (each row is a small yes/no).

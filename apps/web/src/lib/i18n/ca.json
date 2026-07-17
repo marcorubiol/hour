@@ -1,4 +1,8 @@
 {
+  "lens.desk": "Desk",
+  "lens.calendar": "Calendari",
+  "lens.conversations": "Converses",
+  "lens.money": "Diners",
   "hall.greeting_morning": "Bon dia",
   "hall.greeting_afternoon": "Bona tarda",
   "hall.greeting_night": "Bona nit",

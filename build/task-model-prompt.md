@@ -6,6 +6,15 @@
 > RLS suite (66 green) and e2e. Do NOT re-run this prompt. `desk-prompt.md` (Desk v2) remains
 > pending and can build directly on the shipped model.
 
+> **AMENDMENT 2026-07-17 (ADR-075) — read every `engagement` below as `conversation`.** After this
+> prompt executed, `engagement` was renamed: table `engagement` → `conversation`, `task.engagement_id`
+> → `task.conversation_id`, `create_task`'s `p_engagement_id` → `p_conversation_id`, and the
+> `/api/tasks` filter + parent field `engagement_id` → `conversation_id`. The prompt text below is
+> left exactly as written and executed: the two `2026-07-17_task_*.sql` migrations it points at
+> still literally say `engagement_id` — the rename is a separate append-only migration
+> (`2026-07-17_rename_engagement_to_conversation.sql`), so the live DB and `apps/web` say
+> `conversation_id` while those files do not.
+
 > Handoff prompt for an external coding agent. Runs FIRST — `desk-prompt.md` depends on it.
 > Origin: design+data review S1 (2026-07-17). Decision: `_decisions.md` § ADR-070
 > (task types + surfacing rule) and § ADR-069 (consent-first AI). Spec: `build/screen-data-spec.md § Desk`.

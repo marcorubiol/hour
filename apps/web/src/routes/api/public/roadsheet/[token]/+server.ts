@@ -2,7 +2,7 @@
  * GET /api/public/roadsheet/:token — the anonymous road sheet (ADR-047,
  * D6). No auth: the token IS the capability (128+ bits, unguessable,
  * revocable). The `get_public_roadsheet` RPC runs as anon and returns a
- * sanitized bundle — no fee, no notes, no engagement/person internals —
+ * sanitized bundle — no fee, no notes, no conversation/person internals —
  * with the share's pinned role; the same `buildRoadsheet` matrix used by
  * the operator endpoint then filters sections server-side, so hidden
  * data never leaves the Worker (contacts only survive for tech_manager).

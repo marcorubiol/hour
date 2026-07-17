@@ -1,13 +1,13 @@
 /**
- * RLS regression — engagement UPDATE path (ADR-040 inline write).
+ * RLS regression — conversation UPDATE path (ADR-040 inline write).
  *
- * The `engagement_update` policy requires
- * `has_permission(project_id, 'edit:engagement')` (USING + WITH CHECK) and
+ * The `conversation_update` policy requires
+ * `has_permission(project_id, 'edit:conversation')` (USING + WITH CHECK) and
  * `deleted_at IS NULL`. These tests hit PostgREST directly — the same
- * surface `PATCH /api/engagements/:id` wraps.
+ * surface `PATCH /api/conversations/:id` wraps.
  *
  * Fixtures (see cross-tenant.test.ts header for the full picture): user
- * `playwright@hour.test` is workspace admin where the MaMeMi engagements
+ * `playwright@hour.test` is workspace admin where the MaMeMi conversations
  * live, so the positive case PATCHes a real row — writing back the exact
  * values it already has. Data is unchanged; only `updated_at` bumps (the
  * `set_updated_at` trigger fires on any UPDATE) and an `audit_log` row is
@@ -17,7 +17,7 @@
 import { beforeAll, describe, expect, test } from 'vitest';
 import { envReady, login, pgGet, pgPatch, requireEnv } from './_helpers';
 
-type EngagementRow = {
+type ConversationRow = {
   id: string;
   status: string;
   next_action_note: string | null;
@@ -25,7 +25,7 @@ type EngagementRow = {
 
 const RANDOM_UUID = '00000000-0000-4000-8000-000000000000';
 
-describe.skipIf(!envReady())('RLS — engagement write path', () => {
+describe.skipIf(!envReady())('RLS — conversation write path', () => {
   let jwt: string;
 
   beforeAll(async () => {
@@ -33,9 +33,9 @@ describe.skipIf(!envReady())('RLS — engagement write path', () => {
     jwt = await login(email, password);
   });
 
-  test('anon cannot update any engagement', async () => {
-    const { status, rows } = await pgPatch<EngagementRow>(
-      'engagement',
+  test('anon cannot update any conversation', async () => {
+    const { status, rows } = await pgPatch<ConversationRow>(
+      'conversation',
       null,
       { next_action_note: 'anon was here' },
       new URLSearchParams({ id: `eq.${RANDOM_UUID}` }),
@@ -47,8 +47,8 @@ describe.skipIf(!envReady())('RLS — engagement write path', () => {
   });
 
   test('authenticated update against an unknown id matches zero rows', async () => {
-    const { rows } = await pgPatch<EngagementRow>(
-      'engagement',
+    const { rows } = await pgPatch<ConversationRow>(
+      'conversation',
       jwt,
       { next_action_note: 'ghost row' },
       new URLSearchParams({ id: `eq.${RANDOM_UUID}`, deleted_at: 'is.null' }),
@@ -56,15 +56,15 @@ describe.skipIf(!envReady())('RLS — engagement write path', () => {
     expect(rows).toHaveLength(0);
   });
 
-  test('member with edit:engagement can update a row (no-op values, real UPDATE)', async () => {
+  test('member with edit:conversation can update a row (no-op values, real UPDATE)', async () => {
     // Pin the pick to the workspace where the fixture user is admin
-    // (`muk-cia`, renamed from `mamemi` on 2026-05-19) — read:engagement
-    // does NOT imply edit:engagement, so an arbitrary readable row could
+    // (`muk-cia`, renamed from `mamemi` on 2026-05-19) — read:conversation
+    // does NOT imply edit:conversation, so an arbitrary readable row could
     // be read-only and turn this test red for the wrong reason. Admin
     // bypass in has_permission() guarantees edit here. order makes the
     // pick deterministic.
-    const readable = await pgGet<EngagementRow & { workspace: { slug: string } }>(
-      'engagement',
+    const readable = await pgGet<ConversationRow & { workspace: { slug: string } }>(
+      'conversation',
       jwt,
       new URLSearchParams({
         select: 'id,status,next_action_note,workspace!inner(slug)',
@@ -79,8 +79,8 @@ describe.skipIf(!envReady())('RLS — engagement write path', () => {
 
     // …and write back exactly what it already holds. RLS must let the
     // UPDATE through and return the representation.
-    const { status, rows } = await pgPatch<EngagementRow>(
-      'engagement',
+    const { status, rows } = await pgPatch<ConversationRow>(
+      'conversation',
       jwt,
       { status: row.status, next_action_note: row.next_action_note },
       new URLSearchParams({
@@ -99,8 +99,8 @@ describe.skipIf(!envReady())('RLS — engagement write path', () => {
     // USING (deleted_at IS NULL) a soft-deleted id can never match. With a
     // random id this is indistinguishable from not-found — which is exactly
     // the contract: PostgREST reveals nothing about hidden rows.
-    const { rows } = await pgPatch<EngagementRow>(
-      'engagement',
+    const { rows } = await pgPatch<ConversationRow>(
+      'conversation',
       jwt,
       { status: 'declined' },
       new URLSearchParams({ id: `eq.${RANDOM_UUID}`, deleted_at: 'is.null' }),

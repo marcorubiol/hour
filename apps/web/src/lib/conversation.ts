@@ -1,7 +1,7 @@
 /**
- * Engagement domain helpers — single home for the status vocabulary
+ * Conversation domain helpers — single home for the status vocabulary
  * (labels + badge classes) and the inline-PATCH contract shared by the
- * API endpoint and every surface that edits an engagement (ADR-040).
+ * API endpoint and every surface that edits an conversation (ADR-040).
  *
  * Anti-CRM vocabulary (reset v2): no lead / pipeline / funnel / prospect.
  */
@@ -10,12 +10,12 @@ import * as v from 'valibot';
 import { Constants, type Enums, type Tables } from './db-types';
 import { realIsoDate } from './datetime';
 
-export type EngagementStatus = Enums<'engagement_status'>;
+export type ConversationStatus = Enums<'conversation_status'>;
 
 /** All statuses in schema enum order (runtime mirror of the DB enum). */
-export const ENGAGEMENT_STATUSES = Constants.public.Enums.engagement_status;
+export const CONVERSATION_STATUSES = Constants.public.Enums.conversation_status;
 
-export const STATUS_LABELS: Record<EngagementStatus, string> = {
+export const STATUS_LABELS: Record<ConversationStatus, string> = {
   contacted: 'Contacted',
   in_conversation: 'In conversation',
   hold: 'Hold',
@@ -26,7 +26,7 @@ export const STATUS_LABELS: Record<EngagementStatus, string> = {
 };
 
 export function statusLabel(status: string): string {
-  return STATUS_LABELS[status as EngagementStatus] ?? status;
+  return STATUS_LABELS[status as ConversationStatus] ?? status;
 }
 
 /** Badge variants in base.css mirror the enum with underscores → dashes. */
@@ -35,14 +35,14 @@ export function statusBadgeClass(status: string): string {
 }
 
 /**
- * PATCH /api/engagements/:id body. Whitelist of the fields the difusión
+ * PATCH /api/conversations/:id body. Whitelist of the fields the difusión
  * loop edits inline — unknown keys are stripped by the schema, so
  * RLS-sensitive columns (workspace_id, project_id, created_by…) can never
  * ride along. `next_action_at` travels date-only (the column is
  * timestamptz; Postgres casts) or null to clear.
  */
-export const EngagementPatchSchema = v.object({
-  status: v.optional(v.picklist(ENGAGEMENT_STATUSES)),
+export const ConversationPatchSchema = v.object({
+  status: v.optional(v.picklist(CONVERSATION_STATUSES)),
   next_action_at: v.optional(v.nullable(realIsoDate)),
   next_action_note: v.optional(
     v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))),
@@ -53,16 +53,16 @@ export const EngagementPatchSchema = v.object({
   line_id: v.optional(v.nullable(v.pipe(v.string(), v.uuid()))),
 });
 
-export type EngagementPatch = v.InferOutput<typeof EngagementPatchSchema>;
+export type ConversationPatch = v.InferOutput<typeof ConversationPatchSchema>;
 
 /**
- * POST /api/engagements body (ADR-051). Two shapes, exactly one:
+ * POST /api/conversations body (ADR-051). Two shapes, exactly one:
  *   · person_id — link an existing person (server re-checks visibility)
  *   · person    — inline fields; the RPC find-or-creates on email
  * The endpoint enforces the exactly-one rule; the schema keeps both
  * optional so the error message can be specific.
  */
-export const EngagementCreateSchema = v.object({
+export const ConversationCreateSchema = v.object({
   project_id: v.pipe(v.string(), v.uuid()),
   person_id: v.optional(v.pipe(v.string(), v.uuid())),
   person: v.optional(
@@ -74,7 +74,7 @@ export const EngagementCreateSchema = v.object({
       title: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(120)))),
     }),
   ),
-  status: v.optional(v.picklist(ENGAGEMENT_STATUSES), 'contacted'),
+  status: v.optional(v.picklist(CONVERSATION_STATUSES), 'contacted'),
   role: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(120)))),
   next_action_at: v.optional(v.nullable(realIsoDate)),
   next_action_note: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500)))),
@@ -84,10 +84,10 @@ export const EngagementCreateSchema = v.object({
   line_id: v.optional(v.nullable(v.pipe(v.string(), v.uuid()))),
 });
 
-export type EngagementCreate = v.InferOutput<typeof EngagementCreateSchema>;
+export type ConversationCreate = v.InferOutput<typeof ConversationCreateSchema>;
 
 /**
- * Shape the engagement endpoints return: the row plus the person/project
+ * Shape the conversation endpoints return: the row plus the person/project
  * embeds the UI renders. Kept next to the schema so GET list, PATCH and
  * the client agree on one contract.
  */
@@ -97,13 +97,13 @@ export type PersonLite = Pick<
 >;
 export type ProjectLite = Pick<Tables<'project'>, 'id' | 'slug' | 'name' | 'status'>;
 
-export interface EngagementItem extends Tables<'engagement'> {
+export interface ConversationItem extends Tables<'conversation'> {
   person: PersonLite | null;
   project: ProjectLite | null;
 }
 
-/** PostgREST embed clause matching `EngagementItem` — shared by GET + PATCH. */
-export const ENGAGEMENT_SELECT = [
+/** PostgREST embed clause matching `ConversationItem` — shared by GET + PATCH. */
+export const CONVERSATION_SELECT = [
   '*',
   'person:person_id(id,slug,full_name,email,organization_name,country,city,website)',
   'project:project_id(id,slug,name,status)',

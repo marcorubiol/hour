@@ -1,7 +1,11 @@
-# Hour — Design prompt: Contacts lens (the booking network, at booking speed)
+# Hour — Design prompt: Conversations lens (the booking network, at booking speed)
 
-> For the design tool. Origin: S1 2026-07-17 — ADR-073, spec `§ Contacts`, personas in
+> For the design tool. Origin: S1 2026-07-17 — ADR-073, spec `§ Conversations`, personas in
 > `research/profiles/06-freelance-distribution.md` + `99-patterns.md`.
+> Amendment 2026-07-17 (ADR-075): the lens ADR-073 named "Contacts" is now **Conversations**
+> (route `/h/conversations`). "Contact" survives only as the book concept — the by-contact
+> grouping, the provenance chip "on a contact" and the contact-card language below are
+> correct as written.
 
 ## Who uses this
 

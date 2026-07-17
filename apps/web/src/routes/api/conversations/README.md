@@ -1,4 +1,4 @@
-# `GET /api/engagements`
+# `GET /api/conversations`
 
 SvelteKit `+server.ts` endpoint that runs on the `hour-web` Cloudflare Worker.
 Thin PostgREST wrapper — RLS + the `current_workspace_id` JWT claim are the
@@ -18,7 +18,7 @@ error).
 
 | param          | default        | meaning                                            |
 |----------------|----------------|----------------------------------------------------|
-| `status`       | `contacted`    | `engagement_status` enum, or `any` to disable      |
+| `status`       | `contacted`    | `conversation_status` enum, or `any` to disable      |
 | `project_slug` | `mamemi`       | project slug inside the current workspace          |
 | `season`       | `2026-27`      | matches `custom_fields->>season`, or `any`         |
 | `limit`        | `50` (max 100) | page size                                          |

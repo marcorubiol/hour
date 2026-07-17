@@ -1,7 +1,7 @@
 <script lang="ts">
   /**
    * Person detail — the contact file (ADR-045). A person is GLOBAL;
-   * what the caller sees of the relationship is RLS-scoped: engagements
+   * what the caller sees of the relationship is RLS-scoped: conversations
    * across projects, workspace-scoped notes (composer writes into the
    * browsing-context workspace via the create_person_note RPC), and
    * cast/crew appearances.
@@ -17,7 +17,7 @@
   import Select from '$lib/components/Select.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
   import { session } from '$lib/session.svelte';
-  import { ENGAGEMENT_STATUSES, statusBadgeClass, statusLabel } from '$lib/engagement';
+  import { CONVERSATION_STATUSES, statusBadgeClass, statusLabel } from '$lib/conversation';
   import { dayLabel } from '$lib/datetime';
   import { useBreadcrumb } from '$lib/stores/breadcrumb.svelte';
   import { accentVar } from '$lib/utils/accent';
@@ -36,7 +36,7 @@
       country: string | null;
       languages: string[];
     };
-    engagements: Array<{
+    conversations: Array<{
       id: string;
       slug: string;
       status: string;
@@ -212,19 +212,19 @@
 
   let projectOptions = $derived.by(() => {
     // Offer only projects without a live conversation for this person.
-    const taken = new Set((file?.engagements ?? []).map((e) => e.project?.id));
+    const taken = new Set((file?.conversations ?? []).map((e) => e.project?.id));
     return ($projectsQuery.data?.items ?? [])
       .filter((p) => !taken.has(p.id))
       .map((p) => ({ value: p.id, label: p.name ?? p.slug }));
   });
-  let addStatusOptions = ENGAGEMENT_STATUSES.map((s) => ({
+  let addStatusOptions = CONVERSATION_STATUSES.map((s) => ({
     value: s,
     label: statusLabel(s),
   }));
 
-  const addEngagement = createMutation({
+  const addConversation = createMutation({
     mutationFn: () =>
-      mutateJSON<{ engagement: unknown }>('POST', '/api/engagements', {
+      mutateJSON<{ conversation: unknown }>('POST', '/api/conversations', {
         project_id: aProject,
         person_id: file!.person.id,
         status: aStatus,
@@ -233,7 +233,7 @@
       addOpen = false;
       aProject = '';
       void queryClient.invalidateQueries({ queryKey: ['person', slug] });
-      void queryClient.invalidateQueries({ queryKey: ['engagements'] });
+      void queryClient.invalidateQueries({ queryKey: ['conversations'] });
       addToast({ tone: 'success', message: 'Added to project.' });
     },
     onError: (err) => {
@@ -245,12 +245,12 @@
     },
   });
 
-  function submitAddEngagement() {
+  function submitAddConversation() {
     if (!aProject) {
       addToast({ tone: 'warning', message: 'Pick a project.' });
       return;
     }
-    $addEngagement.mutate();
+    $addConversation.mutate();
   }
 
   let placeLine = $derived(
@@ -302,16 +302,16 @@
       </ul>
     </section>
 
-    <section class="person__section" aria-label="Engagements">
+    <section class="person__section" aria-label="Conversations">
       <div class="person__section-head">
-        <p class="eyebrow">Engagements</p>
+        <p class="eyebrow">Conversations</p>
         <Button variant="outline" size="xs" onclick={() => (addOpen = true)}>
           Add to project
         </Button>
       </div>
-      {#if file.engagements.length > 0}
+      {#if file.conversations.length > 0}
         <ul class="person__rows" role="list">
-          {#each file.engagements as e (e.id)}
+          {#each file.conversations as e (e.id)}
             <li>
               <span class={statusBadgeClass(e.status)}>{statusLabel(e.status)}</span>
               <span class="person__row-main">
@@ -410,8 +410,8 @@
   {#snippet actions()}
     <Button variant="outline" onclick={() => (addOpen = false)}>Cancel</Button>
     <Button
-      onclick={submitAddEngagement}
-      loading={$addEngagement.isPending}
+      onclick={submitAddConversation}
+      loading={$addConversation.isPending}
       disabled={projectOptions.length === 0}
     >
       Add

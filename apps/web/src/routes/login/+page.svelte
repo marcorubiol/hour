@@ -5,7 +5,7 @@
    * Left column carries the form, right column carries brand promise + a
    * static "this week" preview card. The preview is hardcoded — it's
    * illustrative (the design says "v0.4 prototype") and shouldn't carry the
-   * cost of fetching real engagements before auth.
+   * cost of fetching real conversations before auth.
    */
 
   import { onMount } from 'svelte';

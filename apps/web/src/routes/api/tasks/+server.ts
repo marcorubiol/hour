@@ -1,7 +1,7 @@
 /**
  * GET /api/tasks — task rows for the Desk feed and the Tasks line module
  * (ADR-068). Filter by workspace_ids/project_ids (union) and/or a single
- * line_id / performance_id / engagement_id; no filter = everything RLS
+ * line_id / performance_id / conversation_id; no filter = everything RLS
  * lets the caller see (the Desk feed's shape, same as /api/lines).
  *
  * POST /api/tasks — create a task against at most one parent, or free at
@@ -24,7 +24,7 @@ const QuerySchema = v.object({
   project_ids: v.optional(v.string()),
   line_id: v.optional(v.pipe(v.string(), v.uuid())),
   performance_id: v.optional(v.pipe(v.string(), v.uuid())),
-  engagement_id: v.optional(v.pipe(v.string(), v.uuid())),
+  conversation_id: v.optional(v.pipe(v.string(), v.uuid())),
   status: v.optional(v.union([v.literal('any'), v.picklist(TASK_STATUSES)]), 'open'),
   limit: v.optional(
     v.pipe(
@@ -73,7 +73,7 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
       400,
     );
   }
-  const { workspace_ids, project_ids, line_id, performance_id, engagement_id, status, limit } =
+  const { workspace_ids, project_ids, line_id, performance_id, conversation_id, status, limit } =
     parsed.output;
   const workspaceIds = parseUuidList(workspace_ids);
   const projectIds = parseUuidList(project_ids);
@@ -92,7 +92,7 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
   }
   if (line_id) search.set('line_id', `eq.${line_id}`);
   if (performance_id) search.set('performance_id', `eq.${performance_id}`);
-  if (engagement_id) search.set('engagement_id', `eq.${engagement_id}`);
+  if (conversation_id) search.set('conversation_id', `eq.${conversation_id}`);
   if (status !== 'any') search.set('status', `eq.${status}`);
   search.set('deleted_at', 'is.null');
   search.set('order', 'due_at.asc.nullslast,created_at.desc');
@@ -142,13 +142,13 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
     input.project_id,
     input.line_id,
     input.performance_id,
-    input.engagement_id,
+    input.conversation_id,
   ].filter(Boolean).length;
   if (parents > 1) {
     return json(
       {
         error: 'invalid_body',
-        hint: 'Send at most one of project_id / line_id / performance_id / engagement_id.',
+        hint: 'Send at most one of project_id / line_id / performance_id / conversation_id.',
       },
       400,
     );
@@ -171,7 +171,7 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
       p_project_id: input.project_id ?? null,
       p_line_id: input.line_id ?? null,
       p_performance_id: input.performance_id ?? null,
-      p_engagement_id: input.engagement_id ?? null,
+      p_conversation_id: input.conversation_id ?? null,
     });
     if (data.length === 0 || !data[0]) return json({ error: 'create_failed' }, 502);
     return json({ task: data[0] }, 201);

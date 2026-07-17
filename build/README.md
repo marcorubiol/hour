@@ -25,11 +25,17 @@ For any AI or person joining the project:
 - `bootstrap.md` — **HISTORICAL** (Astro-based setup, pre-ADR-026)
 
 ### Schema & Data
-- `migrations/` — Current schema source of truth
-  - `2026-05-01_reset_v2_roadsheet.sql` — Canonical (22 tables)
+- `migrations/` — Current schema source of truth. The **whole folder**, applied in
+  date order, is the canonical record — no single file is.
+  - `2026-05-01_reset_v2_roadsheet.sql` — the reset v2 baseline (22 tables **as of
+    that date**; the live schema is **29** — account, cast, task, share and alias
+    layers all landed in later files here)
   - `2026-05-01_post_roadsheet_cleanup.sql` — Fixes post-apply
-- `schema.sql` — Base reset v2 (partial, 18 tables)
-- `rls-policies.sql` — RLS helpers (partial)
+- `schema.sql` — **frozen snapshot, 2026-05-01. Not current, by its own header**
+  ("This file has NOT been rewritten in-place"). Predates `show` → `performance`
+  (ADR-036) and `engagement` → `conversation` (ADR-075) — it describes a schema
+  that no longer exists. Read `migrations/` or dump the live schema instead.
+- `rls-policies.sql` — same: frozen at 2026-05-01, same two renames missing.
 - `seed.sql` — Pre-seed for marco-rubiol/mamemi
 - `import/` — 3-stage pipeline (154 contacts loaded)
 
@@ -52,4 +58,6 @@ For any AI or person joining the project:
 
 ## Status
 
-Last updated: 2026-05-02 (Phase 0.9 gate defined, 22 tables, SvelteKit stack)
+Last updated: 2026-07-17 — counts re-read from the live catalog: **29 tables**, 1 view
+(`performance_redacted`), 59 functions, 82 RLS policies, 21 enums. Previous stamp
+2026-05-02 said 22 tables; seven layers landed since without this file noticing.

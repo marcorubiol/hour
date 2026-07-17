@@ -1,15 +1,15 @@
 /**
- * RLS regression — ADR-056 line modules: line.modules + engagement.line_id
+ * RLS regression — ADR-056 line modules: line.modules + conversation.line_id
  * + the create/delete RPC pairs for expense and asset_version, exercised
  * against the live project as the fixture user and as anon.
  *
  * Fixture LINE is STABLE (find-or-create by name in the playwright
  * project): lines have no delete path — no DELETE policy and soft-delete
  * by PATCH is impossible by construction (ADR-048) — so a per-run line
- * would accumulate forever. Engagement/expense/asset fixtures are
+ * would accumulate forever. Conversation/expense/asset fixtures are
  * soft-deleted via their RPCs in `finally` blocks.
  *
- * These tests REQUIRE the 2026-07-12 migrations (engagement.line_id,
+ * These tests REQUIRE the 2026-07-12 migrations (conversation.line_id,
  * line.modules, the new RPCs). Red before they apply is expected.
  */
 
@@ -26,7 +26,7 @@ type LineRow = {
   workspace_id: string;
 };
 
-type EngagementRow = {
+type ConversationRow = {
   id: string;
   line_id: string | null;
   project_id: string;
@@ -84,7 +84,7 @@ describe.skipIf(!envReady())('RLS — ADR-056 line modules', () => {
         p_project_id: projectId,
         p_name: FIXTURE_LINE_NAME,
         p_kind: 'campaign',
-        p_modules: ['contacts', 'calendar', 'materials', 'notes'],
+        p_modules: ['conversations', 'calendar', 'materials', 'notes'],
       });
       if (created.status !== 200 || !created.data) {
         throw new Error(`create_line fixture failed: ${created.status}`);
@@ -98,14 +98,14 @@ describe.skipIf(!envReady())('RLS — ADR-056 line modules', () => {
     await pgPatch<LineRow>(
       'line',
       jwt,
-      { modules: ['contacts', 'calendar', 'materials', 'notes'] },
+      { modules: ['conversations', 'calendar', 'materials', 'notes'] },
       new URLSearchParams({ id: `eq.${fixtureLine.id}`, select: 'id' }),
     );
-    fixtureLine.modules = ['contacts', 'calendar', 'materials', 'notes'];
+    fixtureLine.modules = ['conversations', 'calendar', 'materials', 'notes'];
 
-    // Crash recovery: soft-delete a leftover fixture engagement.
+    // Crash recovery: soft-delete a leftover fixture conversation.
     const stale = await pgGet<{ id: string }>(
-      'engagement',
+      'conversation',
       jwt,
       new URLSearchParams({
         select: 'id,person:person_id!inner(email)',
@@ -115,7 +115,7 @@ describe.skipIf(!envReady())('RLS — ADR-056 line modules', () => {
       }),
     );
     for (const row of stale.rows) {
-      await pgRpc('delete_engagement', jwt, { p_engagement_id: row.id });
+      await pgRpc('delete_conversation', jwt, { p_conversation_id: row.id });
     }
   });
 
@@ -125,12 +125,12 @@ describe.skipIf(!envReady())('RLS — ADR-056 line modules', () => {
     expect(fixtureLine.slug).toBeTruthy();
     expect(fixtureLine.kind).toBe('campaign');
     if (fixtureLine.modules !== null) {
-      expect(fixtureLine.modules).toEqual(['contacts', 'calendar', 'materials', 'notes']);
+      expect(fixtureLine.modules).toEqual(['conversations', 'calendar', 'materials', 'notes']);
     }
   });
 
   test('line.modules PATCH round-trips for a member and is invisible to anon', async () => {
-    const next = ['notes', 'contacts'];
+    const next = ['notes', 'conversations'];
     const patched = await pgPatch<LineRow>(
       'line',
       jwt,
@@ -159,47 +159,47 @@ describe.skipIf(!envReady())('RLS — ADR-056 line modules', () => {
       await pgPatch<LineRow>(
         'line',
         jwt,
-        { modules: ['contacts', 'calendar', 'materials', 'notes'] },
+        { modules: ['conversations', 'calendar', 'materials', 'notes'] },
         new URLSearchParams({ id: `eq.${fixtureLine.id}`, select: 'id' }),
       );
     }
   });
 
-  // ── engagement.line_id via create_engagement ────────────────────────
-  test('create_engagement with a cross-project line → 400; with the right line → assigned; resurrect keeps it', async () => {
+  // ── conversation.line_id via create_conversation ────────────────────────
+  test('create_conversation with a cross-project line → 400; with the right line → assigned; resurrect keeps it', async () => {
     // Cross-project: the real difusion line belongs to muk-cia, not here —
     // an unknown-but-valid uuid is enough (guard collapses to 22023).
-    const cross = await pgRpc('create_engagement', jwt, {
+    const cross = await pgRpc('create_conversation', jwt, {
       p_project_id: projectId,
       p_full_name: 'ZZZ Cross Project',
       p_line_id: RANDOM_UUID,
     });
     expect(cross.status).toBe(400);
 
-    const created = await pgRpc<EngagementRow>('create_engagement', jwt, {
+    const created = await pgRpc<ConversationRow>('create_conversation', jwt, {
       p_project_id: projectId,
       p_full_name: 'ZZZ Line Modules Fixture',
       p_email: FIXTURE_EMAIL,
       p_line_id: fixtureLine.id,
     });
     expect(created.status).toBe(200);
-    const engagement = created.data as EngagementRow;
-    expect(engagement.line_id).toBe(fixtureLine.id);
+    const conversation = created.data as ConversationRow;
+    expect(conversation.line_id).toBe(fixtureLine.id);
 
     try {
       // Soft-delete, then resurrect WITH the line — the resurrect UPDATE
       // must set line_id too (a resurrected conversation is not line-less).
-      await pgRpc('delete_engagement', jwt, { p_engagement_id: engagement.id });
-      const again = await pgRpc<EngagementRow>('create_engagement', jwt, {
+      await pgRpc('delete_conversation', jwt, { p_conversation_id: conversation.id });
+      const again = await pgRpc<ConversationRow>('create_conversation', jwt, {
         p_project_id: projectId,
         p_full_name: 'ZZZ Line Modules Fixture',
         p_email: FIXTURE_EMAIL,
         p_line_id: fixtureLine.id,
       });
       expect(again.status).toBe(200);
-      expect((again.data as EngagementRow).line_id).toBe(fixtureLine.id);
+      expect((again.data as ConversationRow).line_id).toBe(fixtureLine.id);
     } finally {
-      await pgRpc('delete_engagement', jwt, { p_engagement_id: engagement.id });
+      await pgRpc('delete_conversation', jwt, { p_conversation_id: conversation.id });
     }
   });
 
@@ -299,7 +299,7 @@ describe.skipIf(!envReady())('RLS — ADR-056 line modules', () => {
   });
 
   // ── backfill canary (read-only — never mutates the real campaign) ────
-  test('the difusión backfill left engagements carrying line_id', async () => {
+  test('the difusión backfill left conversations carrying line_id', async () => {
     const line = await pgGet<{ id: string }>(
       'line',
       jwt,
@@ -313,7 +313,7 @@ describe.skipIf(!envReady())('RLS — ADR-056 line modules', () => {
     // The real campaign is visible to the fixture user (admin of muk-cia).
     expect(line.rows).toHaveLength(1);
     const linked = await pgGet<{ id: string }>(
-      'engagement',
+      'conversation',
       jwt,
       new URLSearchParams({
         select: 'id',

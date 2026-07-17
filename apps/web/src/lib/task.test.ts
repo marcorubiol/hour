@@ -21,7 +21,7 @@ function item(overrides: Partial<TaskItem> = {}): TaskItem {
     project_id: null,
     line_id: null,
     performance_id: null,
-    engagement_id: null,
+    conversation_id: null,
     title: 'Send the rider',
     note: null,
     due_at: null,
@@ -37,7 +37,7 @@ function item(overrides: Partial<TaskItem> = {}): TaskItem {
     project: null,
     line: null,
     performance: null,
-    engagement: null,
+    conversation: null,
     ...overrides,
   };
 }
@@ -128,7 +128,7 @@ describe('TaskCreateSchema', () => {
   });
 
   it('accepts a parent without workspace_id (the endpoint pairs the rules)', () => {
-    const r = v.safeParse(TaskCreateSchema, { title: 'ok', engagement_id: PARENT });
+    const r = v.safeParse(TaskCreateSchema, { title: 'ok', conversation_id: PARENT });
     expect(r.success).toBe(true);
   });
 });
@@ -270,7 +270,7 @@ describe('taskProjectId', () => {
       ),
     ).toBe(PARENT);
     expect(
-      taskProjectId(item({ engagement: { id: 'x', project_id: PARENT, person: null } })),
+      taskProjectId(item({ conversation: { id: 'x', project_id: PARENT, person: null } })),
     ).toBe(PARENT);
   });
 });
@@ -302,9 +302,9 @@ describe('taskContextLabel', () => {
     expect(taskContextLabel(t)).toBe('Teatre Lliure, Barcelona');
   });
 
-  it('labels an engagement by its person', () => {
+  it('labels an conversation by its person', () => {
     const t = item({
-      engagement: {
+      conversation: {
         id: 'x',
         project_id: PARENT,
         person: { slug: 'anna', full_name: 'Anna Puig', organization_name: null },

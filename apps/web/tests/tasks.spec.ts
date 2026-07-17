@@ -143,7 +143,7 @@ test.describe('tasks — Desk feed + line module', () => {
       await fetch(`/api/lines/${lineId}`, {
         method: 'PATCH',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ modules: ['contacts', 'calendar', 'materials', 'notes'] }),
+        body: JSON.stringify({ modules: ['conversations', 'calendar', 'materials', 'notes'] }),
       });
     }, { lineId: line!.id });
 

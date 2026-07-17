@@ -3,7 +3,7 @@
    * Project detail — /h/[workspace]/project/[slug]/ — Phase 0.1 surface.
    *
    * Editorial v0.5 layout: kicker + display serif title + mono meta line,
-   * Relationships block (engagements), and dashed deferred-phase stubs
+   * Relationships block (conversations), and dashed deferred-phase stubs
    * (Lines, Assets, Team).
    *
    * Shares the ['projects', { status: 'active' }] cache the shell warms, so

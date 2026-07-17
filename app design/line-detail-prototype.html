@@ -279,9 +279,9 @@
     );
 
     /* App page widths — two registers, both centered via margin-inline auto.
-       Reading = single-column entity pages (person, performance, engagement,
+       Reading = single-column entity pages (person, performance, conversation,
        roadsheet, home digest). Wide = table/row-dominated pages (line detail,
-       project, settings). Lens pages (calendar/contacts/money/agenda) stay
+       project, settings). Lens pages (calendar/conversations/money/agenda) stay
        full-bleed on purpose. */
     --page-width-reading: 46rem;
     --page-width-wide: 64rem;
@@ -1634,9 +1634,9 @@
     --badge-accent: var(--danger);
   }
 
-  /* Engagement status variants — one badge per engagement_status enum
+  /* Conversation status variants — one badge per conversation_status enum
      value. Defined alongside the tone variants because they're consumed
-     across booking, room detail, and future contacts lens; keeping them
+     across booking, room detail, and future conversations lens; keeping them
      here prevents drift between consumers and keeps the variable-contract
      pattern (consumer parameterises, skeleton stays the same). Class
      names mirror the enum with underscores replaced by dashes
@@ -2266,7 +2266,7 @@
     text-transform: lowercase;
   }
 
-  /* Caret for status badges that double as dropdown triggers (engagement
+  /* Caret for status badges that double as dropdown triggers (conversation
      table, performance header). One rule for both consumers. */
   .status-caret {
     margin-inline-start: 0.35em;
@@ -2343,7 +2343,7 @@
   }
 
   /* Arrow nav link — quiet row-level navigation ("Open →", "Road sheet →",
-     "View all N engagements →"). Muted at rest, ink on hover, no underline. */
+     "View all N conversations →"). Muted at rest, ink on hover, no underline. */
   .link-arrow {
     color: var(--text-muted);
     font-size: var(--text-s);
@@ -2902,7 +2902,7 @@
         background: var(--bg-light);
       }
 
-      /* engagement table — flex rows, fixed lanes for alignment */
+      /* conversation table — flex rows, fixed lanes for alignment */
       .etable {
         display: flex;
         flex-direction: column;
@@ -3057,7 +3057,7 @@
 
         <!-- MODULE TABS (jump nav as real buttons) -->
         <div class="tabs">
-          <button class="btn--primary" type="button">Contacts</button>
+          <button class="btn--primary" type="button">Conversations</button>
           <button class="btn--outline" type="button">Calendar</button>
           <button class="btn--outline" type="button">Materials</button>
           <button class="btn--outline" type="button">Notes</button>
@@ -3068,11 +3068,11 @@
           <div class="mod">
             <header class="mod__head">
               <div class="mod__head-l">
-                <p class="eyebrow">Contacts</p>
+                <p class="eyebrow">Conversations</p>
                 <span class="mod__count">154 conversations · 5 need action</span>
               </div>
               <div class="mod__head-r">
-                <a class="link-arrow" href="#">Open in Contacts →</a>
+                <a class="link-arrow" href="#">Open in Conversations →</a>
                 <button class="mod__kebab" type="button" aria-label="Module actions">⋯</button>
               </div>
             </header>

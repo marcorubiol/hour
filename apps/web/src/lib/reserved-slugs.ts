@@ -4,6 +4,14 @@
  * collisions with current routes (api, login, ...) and future routes
  * (marketing site Phase 1: pricing, docs, blog, ...).
  *
+ * Since ADR-067 the workspace slug is a machine short-id, so what this list
+ * really guards is the optional human-chosen *alias*.
+ *
+ * MIRROR: this list must equal `is_reserved_slug()` in the DB — the alias flow
+ * checks both sides. They drifted apart until 2026-07-17 (`agenda` + `people`
+ * lived only here); migration `2026-07-17_close_adr036_show_debt.sql` § 4
+ * closed it. Change one, change the other.
+ *
  * See build/url-architecture-dossier-2026-05-01.md § 5 for rationale.
  */
 
@@ -22,10 +30,14 @@ export const RESERVED_WORKSPACE_SLUGS = [
   'dashboard', 'new', 'edit', 'delete', 'search',
   'explore', 'discover',
 
-  // Hour product vocabulary
+  // Hour product vocabulary — the four lens routes (desk · calendar ·
+  // conversations · money), the entity segments, and `agenda`: ADR-076 makes it
+  // a first-class projection reachable by its own alias route, so it cannot be
+  // claimable. `people` is reserved-but-rejected (ADR-065 chose Conversations
+  // over "People") — held so the name can never be taken from under a revisit.
   'house', 'room', 'run', 'gig', 'desk', 'plaza',
-  'roadsheet', 'engagement', 'person', 'venue', 'asset',
-  'invoice', 'calendar', 'contacts', 'money', 'comms', 'archive', 'desk', 'people', 'agenda',
+  'roadsheet', 'conversation', 'conversations', 'person', 'venue', 'asset',
+  'invoice', 'calendar', 'agenda', 'money', 'comms', 'archive', 'people',
 
   // Operational
   'staging', 'dev', 'playground', 'booking',
@@ -40,7 +52,7 @@ const WORKSPACE_SET = new Set<string>(RESERVED_WORKSPACE_SLUGS);
  * exist), but we expose the list for client-side validation and tooling.
  */
 export const KNOWN_ENTITY_TYPES = [
-  'room', 'run', 'gig', 'engagement', 'person',
+  'room', 'run', 'gig', 'conversation', 'person',
   'venue', 'asset', 'invoice',
 ] as const;
 

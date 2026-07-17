@@ -4,7 +4,7 @@
  * endpoints, the Tasks line module and the Desk feed.
  *
  * A task attaches to at most ONE of project / line / performance /
- * engagement — none = a free workspace-level task (workspace_id required
+ * conversation — none = a free workspace-level task (workspace_id required
  * at create). The parent is immutable after creation (DB trigger); that is
  * why the PATCH whitelist carries no parent FKs.
  */
@@ -40,7 +40,7 @@ export const TaskCreateSchema = v.object({
   project_id: v.optional(v.pipe(v.string(), v.uuid())),
   line_id: v.optional(v.pipe(v.string(), v.uuid())),
   performance_id: v.optional(v.pipe(v.string(), v.uuid())),
-  engagement_id: v.optional(v.pipe(v.string(), v.uuid())),
+  conversation_id: v.optional(v.pipe(v.string(), v.uuid())),
 });
 
 export type TaskCreate = v.InferOutput<typeof TaskCreateSchema>;
@@ -82,7 +82,7 @@ export interface TaskItem extends Tables<'task'> {
     city: string | null;
     start_at: string | null;
   } | null;
-  engagement: {
+  conversation: {
     id: string;
     project_id: string;
     person: {
@@ -99,7 +99,7 @@ export const TASK_SELECT = [
   'project:project_id(id,slug,name)',
   'line:line_id(id,slug,name,project_id)',
   'performance:performance_id(id,slug,project_id,venue_name,city,start_at)',
-  'engagement:engagement_id(id,project_id,person:person_id(slug,full_name,organization_name))',
+  'conversation:conversation_id(id,project_id,person:person_id(slug,full_name,organization_name))',
 ].join(',');
 
 // ── Surfacing (ADR-070) ─────────────────────────────────────────────────
@@ -173,7 +173,7 @@ export function taskSurfaceState(
 
 /**
  * The task's effective project id, resolved through whichever parent it
- * hangs off — how a task reaches pin scope (same route engagements take:
+ * hangs off — how a task reaches pin scope (same route conversations take:
  * line pins scope through their project).
  */
 export function taskProjectId(t: TaskItem): string | null {
@@ -181,7 +181,7 @@ export function taskProjectId(t: TaskItem): string | null {
     t.project_id ??
     t.line?.project_id ??
     t.performance?.project_id ??
-    t.engagement?.project_id ??
+    t.conversation?.project_id ??
     null
   );
 }
@@ -192,9 +192,9 @@ export function taskContextLabel(t: TaskItem): string | null {
   if (t.performance) {
     return [t.performance.venue_name, t.performance.city].filter(Boolean).join(', ') || 'Performance';
   }
-  if (t.engagement) {
+  if (t.conversation) {
     return (
-      t.engagement.person?.full_name || t.engagement.person?.organization_name || 'Conversation'
+      t.conversation.person?.full_name || t.conversation.person?.organization_name || 'Conversation'
     );
   }
   if (t.project) return t.project.name;

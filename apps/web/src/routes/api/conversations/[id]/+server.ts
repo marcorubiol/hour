@@ -1,13 +1,13 @@
 /**
- * PATCH /api/engagements/:id
+ * PATCH /api/conversations/:id
  *
  * Inline write path for the difusión loop (ADR-040): update an
- * engagement's status / next action fields, plus the line relink
+ * conversation's status / next action fields, plus the line relink
  * (ADR-056). The body schema is a whitelist — anything outside status,
  * next_action_at, next_action_note, line_id is stripped, so RLS-sensitive
  * columns (workspace_id, project_id, created_by…) can never ride along.
  *
- * RLS enforces `has_permission(project_id, 'edit:engagement')` on UPDATE.
+ * RLS enforces `has_permission(project_id, 'edit:conversation')` on UPDATE.
  * An empty representation (no row matched `id` + `deleted_at IS NULL`, or
  * RLS denied) maps to 404 without confirming whether the row exists.
  *
@@ -18,10 +18,10 @@ import type { RequestHandler } from './$types';
 import * as v from 'valibot';
 import { extractAccessToken } from '$lib/auth';
 import {
-  ENGAGEMENT_SELECT,
-  EngagementPatchSchema,
-  type EngagementItem,
-} from '$lib/engagement';
+  CONVERSATION_SELECT,
+  ConversationPatchSchema,
+  type ConversationItem,
+} from '$lib/conversation';
 import { pgGet, pgPatch, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
 
@@ -56,7 +56,7 @@ export const PATCH: RequestHandler = async ({ request, params, platform, locals 
     return json({ error: 'invalid_body' }, 400);
   }
 
-  const parsed = v.safeParse(EngagementPatchSchema, raw);
+  const parsed = v.safeParse(ConversationPatchSchema, raw);
   if (!parsed.success) {
     return json(
       {
@@ -82,8 +82,8 @@ export const PATCH: RequestHandler = async ({ request, params, platform, locals 
 
   try {
     // Relink guard (ADR-056, pattern ADR-043): a patched line_id must
-    // belong to the engagement's project — the FK is unscoped and RLS
-    // only checks the engagement's project. Needs a pre-lookup for the
+    // belong to the conversation's project — the FK is unscoped and RLS
+    // only checks the conversation's project. Needs a pre-lookup for the
     // project; `line_id: null` (detach) skips the check.
     if (patch.line_id) {
       const lookup = new URLSearchParams();
@@ -93,7 +93,7 @@ export const PATCH: RequestHandler = async ({ request, params, platform, locals 
       lookup.set('limit', '1');
       const found = await pgGet<{ id: string; project_id: string }>(
         env,
-        'engagement',
+        'conversation',
         jwt,
         { search: lookup },
       );
@@ -108,7 +108,7 @@ export const PATCH: RequestHandler = async ({ request, params, platform, locals 
       const row = await pgGet<{ id: string }>(env, 'line', jwt, { search: check });
       if (row.data.length === 0) {
         return json(
-          { error: 'cross_project_link', hint: "line_id must belong to the engagement's project." },
+          { error: 'cross_project_link', hint: "line_id must belong to the conversation's project." },
           400,
         );
       }
@@ -117,9 +117,9 @@ export const PATCH: RequestHandler = async ({ request, params, platform, locals 
     const search = new URLSearchParams();
     search.set('id', `eq.${idParsed.output}`);
     search.set('deleted_at', 'is.null');
-    search.set('select', ENGAGEMENT_SELECT);
+    search.set('select', CONVERSATION_SELECT);
 
-    const { data } = await pgPatch<EngagementItem>(env, 'engagement', jwt, patch, {
+    const { data } = await pgPatch<ConversationItem>(env, 'conversation', jwt, patch, {
       search,
     });
     if (data.length === 0) return json({ error: 'not_found' }, 404);
@@ -127,21 +127,21 @@ export const PATCH: RequestHandler = async ({ request, params, platform, locals 
   } catch (err) {
     return pgErrorResponse(
       err,
-      { route: 'PATCH /api/engagements/[id]', requestId: locals.requestId },
+      { route: 'PATCH /api/conversations/[id]', requestId: locals.requestId },
       { passUpstream: [401, 403] },
     );
   }
 };
 
 /**
- * DELETE /api/engagements/:id — soft-delete a mistyped contact capture
- * (ADR-051). Goes through the `delete_engagement` RPC (ADR-048 rule:
+ * DELETE /api/conversations/:id — soft-delete a mistyped contact capture
+ * (ADR-051). Goes through the `delete_conversation` RPC (ADR-048 rule:
  * soft-deletes never ride a client PATCH). Gated on
- * has_permission(project, 'edit:engagement').
+ * has_permission(project, 'edit:conversation').
  *
  * Live performances referencing the conversation block deletion (409).
  * Re-adding the same person to the project later resurrects the row
- * (create_engagement handles the FULL unique constraint).
+ * (create_conversation handles the FULL unique constraint).
  */
 export const DELETE: RequestHandler = async ({ request, params, platform, locals }) => {
   if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);
@@ -154,18 +154,18 @@ export const DELETE: RequestHandler = async ({ request, params, platform, locals
   if (!idParsed.success) return json({ error: 'invalid_id' }, 400);
 
   try {
-    await pgPostRpc(env, 'delete_engagement', jwt, { p_engagement_id: params.id });
+    await pgPostRpc(env, 'delete_conversation', jwt, { p_conversation_id: params.id });
     return new Response(null, { status: 204 });
   } catch (err) {
     return pgErrorResponse(
       err,
-      { route: 'DELETE /api/engagements/[id]', requestId: locals.requestId },
+      { route: 'DELETE /api/conversations/[id]', requestId: locals.requestId },
       {
         codes: {
           '42501': { status: 404, error: 'not_found' },
           '23503': {
             status: 409,
-            error: 'engagement_has_performances',
+            error: 'conversation_has_performances',
             hint: 'Unlink or delete its performances first.',
           },
         },

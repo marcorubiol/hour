@@ -17,8 +17,8 @@
 import { dualTime } from './datetime';
 import { t, type Locale } from './i18n';
 
-/** Structural subset of the /api/engagements row the hall needs. */
-export interface HallEngagement {
+/** Structural subset of the /api/conversations row the hall needs. */
+export interface HallConversation {
   status: string;
   next_action_at: string | null;
 }
@@ -68,7 +68,7 @@ function daysFromToday(iso: string, todayISO: string): number {
 
 export function computeHallStatus(
   input: {
-    engagements: HallEngagement[];
+    conversations: HallConversation[];
     performances: HallPerformance[];
     tasks: HallTask[];
     /** workspace_id → home IANA timezone: the show-time zone when the gig
@@ -100,14 +100,14 @@ export function computeHallStatus(
     return { kind: 'show', place, at: timeOf(first), venueTz };
   }
 
-  // The working set: DeskBoard's exact semantics for engagements (status
+  // The working set: DeskBoard's exact semantics for conversations (status
   // not declined/dormant, a next action set) + open tasks (the verb
   // layer, ADR-068). Undated open tasks count as open but can never be
   // overdue or "the next one".
   const dated: { day: string; inDays: number }[] = [];
   let undatedOpen = 0;
 
-  for (const e of input.engagements) {
+  for (const e of input.conversations) {
     if (e.status === 'declined' || e.status === 'dormant' || !e.next_action_at) continue;
     dated.push({
       day: e.next_action_at.slice(0, 10),

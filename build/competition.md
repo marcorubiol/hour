@@ -411,9 +411,9 @@ Stagent    Gigwell  Muzeek             Artifax   ArtsVision
 
 | Gap | Who has it? | Hour's answer |
 |-----|------------|---------------|
-| **Booking outreach FROM the company's perspective** (not the agent's) | Nobody. Agency tools assume you're booking *artists*. | Engagement entity with outreach workflow |
-| **Difusion + production in one tool** | Nobody. It's either CRM or production, never both. | Full funnel: engagement → show → line → invoice |
-| **European performing arts vocabulary** | Only Ares (Spanish only). Agency tools speak "music industry." | Anti-CRM vocabulary: person, engagement, show, venue |
+| **Booking outreach FROM the company's perspective** (not the agent's) | Nobody. Agency tools assume you're booking *artists*. | Conversation entity with outreach workflow |
+| **Difusion + production in one tool** | Nobody. It's either CRM or production, never both. | Full funnel: conversation → show → line → invoice |
+| **European performing arts vocabulary** | Only Ares (Spanish only). Agency tools speak "music industry." | Anti-CRM vocabulary: person, conversation, show, venue |
 | **Tech rider management** (stage plot, light plot, sound patch) | Nobody in SaaS. Companies use Google Drive folders. | Room-level assets with versioning |
 | **Mid-size European pricing** (25-120 €/mo) | Ares (30-60 €). Agency tools start at 99-131 €/mo but for the wrong user. | 25/60/120 €/mo tiered |
 | **Multi-genre** (theatre + dance + music + circus + spoken word) | StageSwift partially. Most tools are music-only. | Genre-agnostic "Room" concept |

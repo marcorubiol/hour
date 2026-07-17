@@ -22,31 +22,31 @@ Antes de cualquier trabajo: leer primero el [`_context.md`](../_context.md) del 
 ### Current next action
 
 > **Nota 2026-07-04 — CIERRE NIVEL 1 COMPLETO (ADR-051→055), en producción.**
-> El bloque nivel 1 que dejó pendiente la maratón está cerrado y desplegado: **1a** alta de persona+engagement desde la UI (ADR-051), **1b** delete de performance (ADR-052), **1c** venue editable — address/timezone/contacts (ADR-053), más dos huecos de borde detectados en el gap analysis de la mañana: **1d** feed ICS suscribible (ADR-054) y **1e** Today "¿qué hago ahora?" cross-workspace, muere la convención 1-project-per-workspace (ADR-055). La app ahora se **alimenta** desde la UI, no solo se opera — un contacto de feria entra sin SQL, y los bolos confirmados son suscribibles en Google/Apple Calendar. Verificado: 4 migraciones aplicadas + grants auditados, **RLS 30/30 · unit 79/79 · e2e 14/14** contra producción, review adversarial de 5 lentes + verificación ICS/SQL con 9 findings corregidos (incluido un HIGH real: un e2e que podía soft-borrar datos reales de muk-cia). Detalle: `_notes/sessions-log.md § 2026-07-04` + `_decisions.md § ADR-051→055`.
+> El bloque nivel 1 que dejó pendiente la maratón está cerrado y desplegado: **1a** alta de persona+conversation desde la UI (ADR-051), **1b** delete de performance (ADR-052), **1c** venue editable — address/timezone/contacts (ADR-053), más dos huecos de borde detectados en el gap analysis de la mañana: **1d** feed ICS suscribible (ADR-054) y **1e** Today "¿qué hago ahora?" cross-workspace, muere la convención 1-project-per-workspace (ADR-055). La app ahora se **alimenta** desde la UI, no solo se opera — un contacto de feria entra sin SQL, y los bolos confirmados son suscribibles en Google/Apple Calendar. Verificado: 4 migraciones aplicadas + grants auditados, **RLS 30/30 · unit 79/79 · e2e 14/14** contra producción, review adversarial de 5 lentes + verificación ICS/SQL con 9 findings corregidos (incluido un HIGH real: un e2e que podía soft-borrar datos reales de muk-cia). Detalle: `_notes/sessions-log.md § 2026-07-04` + `_decisions.md § ADR-051→055`.
 >
 > **Numeración**: el `_tasks.md` de la mañana reservaba ADR-055 para el rediseño de módulos de line detail; como 051-055 los tomó este cierre (ya en producción y en `_decisions.md`), el rediseño de módulos pasa a **ADR-056** (ratificado 2026-07-04 tarde). El rediseño de nav "Adaptive Digest" (2026-07-04 tarde) = **ADR-057**.
 >
 > **El gate de verdad sigue igual**: tras los módulos (ADR-056), PARAR y usar Hour con la difusión real ~1 mes. El veredicto es de Marco, no de código.
 
 > **Nota 2026-07-02 cierre de maratón (ADR-040→050) — ESTADO Y PLAN DE CIERRE.**
-> Dónde estamos: Phase 0.2 ✓ · Phase 0.3 esencialmente ✓ (las 4 lenses vivas: Today/Plaza, Calendar, Contacts, Money; falta item 3 — project detail tabs) · adelantos de 0.5 en producción (inline status ADR-040, invoice creation ADR-050, D6 link público parcial ADR-047, venue enlazable ADR-049). El ciclo difusión→hold→confirmed→producción→road sheet→factura se opera ENTERO dentro de Hour. Suite 11/11 e2e producción + 53/53 unit + 19/19 RLS. Detalle de la sesión: `_notes/sessions-log.md § 2026-07-01/02`.
+> Dónde estamos: Phase 0.2 ✓ · Phase 0.3 esencialmente ✓ (las 4 lenses vivas: Today/Plaza, Calendar, Conversations, Money; falta item 3 — project detail tabs) · adelantos de 0.5 en producción (inline status ADR-040, invoice creation ADR-050, D6 link público parcial ADR-047, venue enlazable ADR-049). El ciclo difusión→hold→confirmed→producción→road sheet→factura se opera ENTERO dentro de Hour. Suite 11/11 e2e producción + 53/53 unit + 19/19 RLS. Detalle de la sesión: `_notes/sessions-log.md § 2026-07-01/02`.
 >
 > **Qué queda para "cerrar" (evaluación de 3 niveles, 2026-07-02):**
-> 1. **Nivel 1 — cerrar como herramienta interna diaria** (lo recomendado): (a) alta de personas + engagements desde la UI — NO existe `POST /api/persons` ni `POST /api/engagements`; la difusión no puede capturar un contacto nuevo sin SQL. Es el hueco #1. (b) delete/cancel de performance (gigs por error no se borran; RPC por ADR-048). (c) edición de venue (address/timezone/contacts — hoy solo picker+promote). ~2-3 sesiones. Después: **PARAR de construir y usarla ~1 mes** — el system-completeness gate de 0.3 solo lo cierra Marco usándola con la difusión real.
+> 1. **Nivel 1 — cerrar como herramienta interna diaria** (lo recomendado): (a) alta de personas + conversations desde la UI — NO existe `POST /api/persons` ni `POST /api/conversations`; la difusión no puede capturar un contacto nuevo sin SQL. Es el hueco #1. (b) delete/cancel de performance (gigs por error no se borran; RPC por ADR-048). (c) edición de venue (address/timezone/contacts — hoy solo picker+promote). ~2-3 sesiones. Después: **PARAR de construir y usarla ~1 mes** — el system-completeness gate de 0.3 solo lo cierra Marco usándola con la difusión real.
 > 2. **Nivel 2 — cliente externo**: Phase 0.9 tal cual (abajo, ~25h). Innecesario mientras sean Marco + Anouk.
 > 3. **Nivel 3 — SaaS público**: Phase 1, condicionado al gate de demanda. No es "cerrar la app".
 >
 > Deuda 0.4 pendiente sin cambios (mobile completo, ⌘K, notifications, a11y, checkpoint visual 2, ratificación naming) + checkboxes viejos de 0.0 por verificar (offline con datos cacheados, Lighthouse PWA, `t()`). Tasks accionables: **`_tasks.md`** en la raíz del repo.
 
-**Siguiente acción concreta: el bloque "cierre nivel 1" de `_tasks.md` — empezando por alta de persona + engagement desde Contacts.**
+**Siguiente acción concreta: el bloque "cierre nivel 1" de `_tasks.md` — empezando por alta de persona + conversation desde Conversations.**
 
-> **Nota 2026-07-02 noche (ADR-043)** — El write path de performances (Phase 0.5 "cuando se confirme la primera fecha") está EN PRODUCCIÓN adelantado: crear desde la Calendar lens + editar status/schedule en el detalle, con RPC `create_performance`. Con ADR-040+043, el ciclo difusión→hold→confirmed→producción se opera entero desde Hour. Siguiente natural: Phase 0.3 (Contacts + Money) o entidad venue enlazable.
+> **Nota 2026-07-02 noche (ADR-043)** — El write path de performances (Phase 0.5 "cuando se confirme la primera fecha") está EN PRODUCCIÓN adelantado: crear desde la Calendar lens + editar status/schedule en el detalle, con RPC `create_performance`. Con ADR-040+043, el ciclo difusión→hold→confirmed→producción se opera entero desde Hour. Siguiente natural: Phase 0.3 (Conversations + Money) o entidad venue enlazable.
 
-> **Nota 2026-07-02 tarde (ADR-042) — PHASE 0.2 COMPLETA.** La mitad colaborativa quedó construida y verificada el mismo día: notas colaborativas en vivo (`YNotes` sobre el RoadsheetCollab DO) en performance detail + project detail, con presencia P10, snapshot a `collab_snapshot` y write-back de la columna `notes`. E2e de dos clientes contra producción 2/2 (los 7 smoke checks del 09-05 verificados). Diferidos que salen de 0.2: link público firmado D6 (→0.5), cursor posicional (→0.5), Realtime para campos estructurados (cuando existan writes estructurados que sincronizar). Siguiente: **Phase 0.3 — Contacts + Money + project detail tabs** (o el write path de performances si la difusión lo pide antes).
+> **Nota 2026-07-02 tarde (ADR-042) — PHASE 0.2 COMPLETA.** La mitad colaborativa quedó construida y verificada el mismo día: notas colaborativas en vivo (`YNotes` sobre el RoadsheetCollab DO) en performance detail + project detail, con presencia P10, snapshot a `collab_snapshot` y write-back de la columna `notes`. E2e de dos clientes contra producción 2/2 (los 7 smoke checks del 09-05 verificados). Diferidos que salen de 0.2: link público firmado D6 (→0.5), cursor posicional (→0.5), Realtime para campos estructurados (cuando existan writes estructurados que sincronizar). Siguiente: **Phase 0.3 — Conversations + Money + project detail tabs** (o el write path de performances si la difusión lo pide antes).
 
 > **Nota 2026-07-02 mañana (ADR-041)** — La MITAD DE LECTURA de Phase 0.2 está EN PRODUCCIÓN: Calendar lens (`/h/[ws]/calendar`, dos fuentes performance+date, filtro = selección sidebar), Performance detail completo (cierra 0.1 #3+#5), y road sheet read-only role-filtered (`/h/[ws]/performance/[slug]/roadsheet?role=`, matriz provisional en ADR-041). El drift `show`→`performance` de la infra collab quedó arreglado (el DO habría nacido roto). Item 4 (Calendar grid read-only) ✓; item 5 (proyección + rol + dual-tz ✓, colaboración ✓ ver nota tarde); item 6 (endpoint roadsheet) ✓; item 7 (link público) → 0.5.
 
-> **Nota 2026-07-01 (ADR-040)** — El item 3 de Phase 0.5 ("inline status change + PATCH con error recovery loop") se adelantó y está EN PRODUCCIÓN: `/booking` edita status + next action inline con optimistic/rollback/toast, detrás de `PATCH /api/engagements/:id`. Razón: la app era read-only y la difusión 2026-27 real avanzaba fuera de Hour (riesgo "construido pero no usado"). Excepción puntual, no reordenación — Phase 0.2 sigue siendo la siguiente fase. El write queue offline de 0.1 #9 queda desbloqueado pero sigue pendiente (0.2+). Ver ADR-040.
+> **Nota 2026-07-01 (ADR-040)** — El item 3 de Phase 0.5 ("inline status change + PATCH con error recovery loop") se adelantó y está EN PRODUCCIÓN: `/booking` edita status + next action inline con optimistic/rollback/toast, detrás de `PATCH /api/conversations/:id`. Razón: la app era read-only y la difusión 2026-27 real avanzaba fuera de Hour (riesgo "construido pero no usado"). Excepción puntual, no reordenación — Phase 0.2 sigue siendo la siguiente fase. El write queue offline de 0.1 #9 queda desbloqueado pero sigue pendiente (0.2+). Ver ADR-040.
 
 > **Nota de divergencia 2026-05-19** — La sesión maratón del 2026-05-19 (27 commits, 6 ADRs nuevos: 034, 035, 036, 037, 038, 039) no siguió el orden del roadmap: arrancó como validación de gates Phase 0.1 y se fue ramificando a refactors estructurales conforme Marco vivía la UI productiva. Cerró deuda real (visual checkpoint 1 ratificado + 2 nuevo, naming gate completo, sidebar pivotado a filtro multi-select via ADR-038, shell hoist via ADR-039, D-PRE-05 Master View wired, in-place creation en Plaza, persistencia localStorage), pero el **modelo de shell descrito en este roadmap ya no coincide con lo construido**: el sidebar pasó de navegación exclusiva a filtro multi-select orto. Ver `_notes/sessions-log.md` § 2026-05-19 para el detalle. Phase 0.2 arranca con menos deuda visible pero con una arquitectura de selección distinta a la planificada.
 
@@ -70,7 +70,7 @@ Gates Phase 0.1 — ambos cerrados 2026-05-19:
 - **Visual design checkpoints**: dos momentos (decisión 2026-05-14, ver `_decisions.md`). Checkpoint 1 ligero al cerrar Phase 0.1 — pasada de 1 día sobre Plaza+Desk+Gig detail vivos con datos reales (plum trial, densidad, jerarquía, tipografía). Checkpoint 2 formal antes de Phase 0.4 polish — revisión sistemática con `build/design-prompt.md` sobre las 4 lenses vivas.
 - **MVP structural gate**: al final de Phase 0.1, comprobar si el mapa House → Room → Run/Gig se entiende sin explicación larga.
 - **MVP transversal gate**: al final de Phase 0.2, comprobar si Calendar + Road sheet salen naturalmente del mismo mapa operativo.
-- **System completeness gate**: al final de Phase 0.3, comprobar si las 4 lenses — Desk, Calendar, Contacts, Money — funcionan como vistas del mismo sistema.
+- **System completeness gate**: al final de Phase 0.3, comprobar si las 4 lenses — Desk, Calendar, Conversations, Money — funcionan como vistas del mismo sistema.
 - **Electrico 28 gate**: antes de beta externa, representar su caso real: colectivo, ~15 personas, 4 espectáculos, booking, producción y espectáculo de calle con validación in situ.
 - **External client gate**: ningún workspace externo antes de completar Phase 0.9.
 - **Phase 1 gate**: SaaS público/self-serve solo si beta asistida valida demanda real.
@@ -100,8 +100,8 @@ Gates Phase 0.1 — ambos cerrados 2026-05-19:
 
 ### Construido y funcional
 - **Infra**: Cloudflare Worker `hour-web` + Supabase `hour-phase0` en `eu-central-1` + R2 bucket `hour-media`. Auth hook + JWT con `current_workspace_id`. Smart Placement activo para co-locar Worker cerca de Supabase.
-- **Schema (reset v2 + roadsheet)**: 22 tablas en producción, RLS forzada, `has_permission()` helper, 15 system roles seedeados, `audit_log` + triggers verificados live.
-- **Datos reales**: 154 persons + 154 engagements del circuito booking/difusión 2026-27, 30 con dossier.
+- **Schema (reset v2 + roadsheet)**: 29 tablas en producción (2026-07-17, contadas contra el catálogo vivo), RLS forzada, `has_permission()` helper, 15 system roles seedeados, `audit_log` + triggers verificados live.
+- **Datos reales**: 154 persons + 154 conversations del circuito booking/difusión 2026-27, 30 con dossier.
 - **UI mínima**: SvelteKit 2 + Svelte 5. `/login`, `/booking`, `/playground`, scaffold `/h/[workspace]/...`, 13 primitivos, TanStack Query y Sentry wiring.
 
 ### Decidido firme (ADR-001 a ADR-027 + 14 D-PRE todas cerradas)
@@ -122,7 +122,7 @@ Error boundaries, loading/empty/error states completos, form validation en todas
 ## Principios de fasing
 
 1. **Fundación antes de visual.** No tocar UI real hasta que tokens + primitivos + offline shell existan.
-2. **Mobile-first para subset crítico desde la fase que lo introduce**: primitivos responsive en 0.0; Gig detail en 0.1; Road sheet en 0.2; Contacts en 0.3. Resto (Plaza, Desk, Calendar, Money) desktop-first + polish mobile en Phase 0.4.
+2. **Mobile-first para subset crítico desde la fase que lo introduce**: primitivos responsive en 0.0; Gig detail en 0.1; Road sheet en 0.2; Conversations en 0.3. Resto (Plaza, Desk, Calendar, Money) desktop-first + polish mobile en Phase 0.4.
 3. **Local-first como norte.** Phase 0 usa smart-offline; Phase 0.5 evalúa local-first real.
 4. **Multiusuario desde Phase 0.2.** Supabase Realtime para campos estructurados + `y-partyserver` sobre Cloudflare Durable Objects para texto libre (ADR-025).
 5. **Pasos pequeños y sólidos.** Cada fase termina demo-able.
@@ -140,7 +140,7 @@ La hipótesis central de Hour es que el valor aparece cuando las piezas operativ
  
 - House / workspace como boundary de compañía, colectivo o marca.
 - Room / project como unidad creativa-comercial.
-- People + engagements como memoria relacional.
+- People + conversations como memoria relacional.
 - Gig/show/date como unidad operativa.
 - Venue como contexto físico y técnico.
 - Assets como material canónico o adaptado.
@@ -197,7 +197,7 @@ RBAC ya soporta guest-write (ADR-006). UI Phase 0: venue solo lee (signed link) 
 
 ### D-PRE-12 — Audit log desde Phase 0.0 ✓ CERRADA
 Tabla `audit_log(id, workspace_id, actor_id, action enum, target_table, target_id, before jsonb, after jsonb, created_at)`. Trigger aplicado a **13 tablas**:
-`show`, `project`, `engagement`, `person`, `venue`, `invoice`, `payment`, `expense`, `asset_version`, `crew_assignment`, `cast_override`, `workspace_role`, `project_membership`.
+`show`, `project`, `conversation`, `person`, `venue`, `invoice`, `payment`, `expense`, `asset_version`, `crew_assignment`, `cast_override`, `workspace_role`, `project_membership`.
 
 Excluye: `audit_log` (evitar recursión), `workspace`/`workspace_membership` (se auditan cambios vía triggers específicos), `date` (calendario puro), seeds.
 
@@ -209,7 +209,7 @@ Nuevas versiones se descargan en background (silencioso), se instalan en el pró
 ### D-PRE-14 — Slug naming: clean names + hard reject + redirect table ✓ CERRADA (ver ADR-024)
 - **Decisión**: hard reject al crear con modal sugerente; `previous_slugs text[]` para redirects al renombrar (12 meses mínimo); `id uuid` inmutable separado del slug; uniqueness scope `(workspace_id, entity_type)`.
 - **Razón**: investigación agentil de 10 SaaS grandes (GitHub, Linear, Notion, Vercel, Supabase, Figma, Cal.com, Slack, Discord, Airtable) — **nadie usa sufijos numéricos automáticos como default UX**. Marco quería URLs limpias; la industria lo valida.
-- **Migration**: añadir `slug text NOT NULL` + `previous_slugs text[] DEFAULT '{}'` + partial unique index por `(workspace_id, entity_type, slug)` a: `workspace`, `project`, `line`, `show`, `engagement`, `person`, `venue`, `asset_version`.
+- **Migration**: añadir `slug text NOT NULL` + `previous_slugs text[] DEFAULT '{}'` + partial unique index por `(workspace_id, entity_type, slug)` a: `workspace`, `project`, `line`, `show`, `conversation`, `person`, `venue`, `asset_version`.
 - **Rechazado**: sufijo numérico (fea URL compartida), opaque-ID-only (sacrifica readability), hybrid slug+ID-tail (fallback si alguna vez hace falta).
 
 ---
@@ -237,7 +237,7 @@ Las 14 D-PRE cerradas ✓ (07 y 14 cerradas 2026-04-24 con research — ver ADR-
 5. Página `/playground` (dev only) con los 13 en viewports 320px / 768px / 1440px.
 
 **Router + estado (4-5h)** — *actualizado 2026-05-01: post-ADR-026 ya estamos en SvelteKit, así que rutas viven en `src/routes/h/[workspace]/[entity]/[slug]/+page.svelte` (no `src/pages/...astro`); estado compartido en módulos `.svelte.ts` con runes module-level (`let lens = $state(...)` exportado), no nanostores — patrón nativo de Svelte 5 sin dependencia extra.*
-6. Estructura `src/routes/h/[workspace]/[entity]/[slug]/+page.svelte` (+ `+layout.svelte` con shell común). **Validado 2026-05-01** en `build/url-architecture-dossier-2026-05-01.md`: 5 alternativas evaluadas (subdomain, sin prefix `/h/`, slug global sin entity, entity-prefix-id, status quo). Ratificado el shape de ADR-022 con tres refinamientos operativos, todos ya aplicados: `$lib/reserved-slugs.ts` (~70 entradas), migration path a subdomain documentado como Phase 1, placeholders `/engagement/[slug]` y `/person/[slug]` abiertos en Phase 0.0 día 5.
+6. Estructura `src/routes/h/[workspace]/[entity]/[slug]/+page.svelte` (+ `+layout.svelte` con shell común). **Validado 2026-05-01** en `build/url-architecture-dossier-2026-05-01.md`: 5 alternativas evaluadas (subdomain, sin prefix `/h/`, slug global sin entity, entity-prefix-id, status quo). Ratificado el shape de ADR-022 con tres refinamientos operativos, todos ya aplicados: `$lib/reserved-slugs.ts` (~70 entradas), migration path a subdomain documentado como Phase 1, placeholders `/conversation/[slug]` y `/person/[slug]` abiertos en Phase 0.0 día 5.
 7. `serializeViewState()` + `hydrateViewState()` en `$lib/url-state.ts` (D-PRE-05, truncación 400 chars).
 8. Stores compartidas como `.svelte.ts` con runes module-level: `lens.svelte.ts`, `selection.svelte.ts`, `chipBar.svelte.ts`, `presence.svelte.ts`. Cada uno exporta su `$state`/`$derived` y los helpers para mutarlo.
 
@@ -258,7 +258,7 @@ Las 14 D-PRE cerradas ✓ (07 y 14 cerradas 2026-04-24 con research — ver ADR-
     - `crew_assignment`, `cast_override`, `asset_version` (con `direction`).
     - `audit_log` + `audit_trigger` aplicado a 13 tablas.
     - `venue.timezone text` (D-PRE-10).
-    - **Slug system (ADR-024)**: `slug text NOT NULL` + `previous_slugs text[] DEFAULT '{}'` en 8 tablas (`workspace`, `project`, `line`, `show`, `engagement`, `person`, `venue`, `asset_version`). Partial unique index por `(workspace_id, entity_type, slug)`. Función `slug_generator(name)` + trigger de validación.
+    - **Slug system (ADR-024)**: `slug text NOT NULL` + `previous_slugs text[] DEFAULT '{}'` en 8 tablas (`workspace`, `project`, `line`, `show`, `conversation`, `person`, `venue`, `asset_version`). Partial unique index por `(workspace_id, entity_type, slug)`. Función `slug_generator(name)` + trigger de validación.
     - **PartyServer persistence (ADR-025)**: tabla `collab_snapshot(id, target_table, target_id, snapshot bytea, version int, created_at)` para persistir snapshots Yjs desde el Durable Object.
 
 **PartyServer / Durable Object scaffold (5-8h)** — *actualizado 2026-05-01: PartyKit clásico (con `partykit.json` + CLI propio) deprecado bajo Cloudflare; usamos su sucesor `partyserver` + `y-partyserver`, todo en `wrangler.jsonc` y un solo deploy pipeline.*
@@ -272,7 +272,7 @@ Las 14 D-PRE cerradas ✓ (07 y 14 cerradas 2026-04-24 con research — ver ADR-
 **Testing scaffold (3-4h)**
 23. Vitest para unit/integration tests.
 24. Playwright para e2e + visual regression.
-25. Al menos un smoke test por capa: component (Button), API (GET /api/engagements), e2e (login flow).
+25. Al menos un smoke test por capa: component (Button), API (GET /api/conversations), e2e (login flow).
 26. CI placeholder — GitHub Action que corre tests en PR (no bloquea todavía).
 
 **i18n + observabilidad (2h)** — *actualizado 2026-05-01: `@inlang/paraglide-sveltekit` está deprecada; cuando i18n importe (Phase 1), migrar a `@inlang/paraglide-js@^2`. Phase 0 sigue con `$lib/i18n.ts` simple ya en producción.*
@@ -317,7 +317,7 @@ Phase 0.0 completa.
 1. `<Plaza>` — sidebar upper, tree House→Rooms, single-select. Desktop-first; mobile polish en 0.4.
 2. `<Desk>` — sidebar lower. Empty state + tree Runs→Gigs. Desktop-first; mobile polish en 0.4.
 3. `<GigDetail>` — **mobile-first desde día 1**. Panel desktop / fullscreen mobile.
-4. `<RelationshipStub>` — bloque mínimo en Room/Gig detail que muestre people/engagements vinculados si existen, aunque Contacts lens llegue en 0.3.
+4. `<RelationshipStub>` — bloque mínimo en Room/Gig detail que muestre people/conversations vinculados si existen, aunque Conversations lens llegue en 0.3.
 5. `<ProductionStub>` — bloque mínimo en Gig detail para venue, timeslots, logistics/technical/hospitality summary.
 6. Endpoints: `GET /api/houses`, `GET /api/rooms?house_id=`, `GET /api/runs?project_id=`, `GET /api/gigs?run_id=`, `GET /api/gigs/:id`.
 7. Router activo: `/h/:workspace/`, `/h/:workspace/room/:slug`, `/h/:workspace/gig/:slug` (slug según D-PRE-14). SvelteKit file-routing nativo `src/routes/h/[workspace]/[entity]/[slug]/+page.svelte`.
@@ -353,7 +353,7 @@ Encender Calendar y Road sheet para probar que fechas, producción y sharing sal
 Phase 0.1 completa. PartyServer DO ya scaffoldeado en 0.0.
 
 ### Trabajo
-1. `<ViewsNav>` — pastillas Calendar · Contacts · Money + All.
+1. `<ViewsNav>` — pastillas Calendar · Conversations · Money + All.
 2. `<ChipBar>` — persistente con multi-select.
 3. Multi-select: Cmd/Ctrl + Shift + checkbox-on-hover.
 4. Lens Calendar (empty + data) — grid mensual read-only.
@@ -390,18 +390,18 @@ Phase 0.1 completa. PartyServer DO ya scaffoldeado en 0.0.
 
 ---
 
-## Phase 0.3 — Contacts + Money + Room detail tabs (~30h focused, ~5 días)
+## Phase 0.3 — Conversations + Money + Room detail tabs (~30h focused, ~5 días)
 
 ### Goal
-Completar las lenses base para validar que el mapa transversal aguanta contactos, seguimiento y dinero básico. Room detail con 4 tabs. Contacts **mobile-first desde día 1** (ADR-015).
+Completar las lenses base para validar que el mapa transversal aguanta contactos, seguimiento y dinero básico. Room detail con 4 tabs. Conversations **mobile-first desde día 1** (ADR-015).
 
 ### Prerequisito
 Phase 0.2 completa.
 
 ### Trabajo
-1. Lens Contacts — lista searchable + filterable. Detail panel. **Mobile-first**.
-   - **Filtros obligatorios** (no negociable): House, Room, status. Sidebar entity selected = filter (Contacts + House → personas con engagement en esa House; Contacts + Room → personas con engagement en ese Room). ADR-009. Mecanismo schema: junction `engagement(person_id, project_id, workspace_id)`. Filtro por Gig vía `show.engagement_id` cuando aplique.
-   - Vista mínima de seguimiento: status, last note/date, next action y owner si existe. Esto no sustituye D3 task entity, pero evita que Contacts sea solo una libreta.
+1. Lens Conversations — lista searchable + filterable. Detail panel. **Mobile-first**.
+   - **Filtros obligatorios** (no negociable): House, Room, status. Sidebar entity selected = filter (Conversations + House → personas con conversation en esa House; Conversations + Room → personas con conversation en ese Room). ADR-009. Mecanismo schema: junction `conversation(person_id, project_id, workspace_id)`. Filtro por Gig vía `show.conversation_id` cuando aplique.
+   - Vista mínima de seguimiento: status, last note/date, next action y owner si existe. Esto no sustituye D3 task entity, pero evita que Conversations sea solo una libreta.
 2. Lens Money — invoices read-only + detail. Desktop-first.
 3. Room detail tabs: Work · Assets · Team · About.
 4. Endpoints varios.
@@ -409,10 +409,10 @@ Phase 0.2 completa.
 6. Tests e2e de cada lens.
 
 ### Definition of done
-- [x] 4 lenses vivas. *(2026-07-02: Today/Plaza + Calendar + Contacts + Money — ADR-041/044/046.)*
+- [x] 4 lenses vivas. *(2026-07-02: Today/Plaza + Calendar + Conversations + Money — ADR-041/044/046.)*
 - [ ] Room detail tabs navegables. *(Pendiente — único item de 0.3 sin construir; project detail existe con notas colaborativas pero sin tabs Work·Assets·Team·About.)*
 - [ ] Todas las listas tienen empty/loading/error/offline state. *(empty/loading/error ✓ en las 4 lenses; offline state pendiente de verificación.)*
-- [x] Contacts usable en iPhone. *(Mobile-first desde ADR-044.)*
+- [x] Conversations usable en iPhone. *(Mobile-first desde ADR-044.)*
 
 ### Pause point
 Demo-able: "Hour arquitectónicamente completo, queda polish".
@@ -458,8 +458,8 @@ Orden por valor/coste:
 
 1. **D3 task entity** + manual tasks atacheadas a Gig/Room.
 2. **Asset upload resumable** (D-PRE-09) con `tus-js-client` + R2. Adaptación per-venue + inbound.
-3. **Inline status change** + PATCH con error recovery loop completo. ✓ ADELANTADO — en producción 2026-07-01 (ADR-040): engagement status + next action en `/booking`. Para otras entidades (performance, line) sigue aquí.
-4. **`share` — per-engagement curated microsite** (ADR-028). Lazy-creado al primer click de "share"; signed URL larga duración + rotable; show-driven branding con subtítulo customizable; assets canónicos del show + uploads engagement-scope; email archive vía BCC a `eng-xxx@in.hour.zerosense.studio` (Cloudflare Email Workers); tracking medio (qué archivos descarga). Reusa `asset_version` + R2. Adelanta D6 (público guest links) y D4 (ingest only). Coste 2-3 semanas. Wedge de diferenciación vs Drive/WeTransfer.
+3. **Inline status change** + PATCH con error recovery loop completo. ✓ ADELANTADO — en producción 2026-07-01 (ADR-040): conversation status + next action en `/booking`. Para otras entidades (performance, line) sigue aquí.
+4. **`share` — per-conversation curated microsite** (ADR-028). Lazy-creado al primer click de "share"; signed URL larga duración + rotable; show-driven branding con subtítulo customizable; assets canónicos del show + uploads conversation-scope; email archive vía BCC a `eng-xxx@in.hour.zerosense.studio` (Cloudflare Email Workers); tracking medio (qué archivos descarga). Reusa `asset_version` + R2. Adelanta D6 (público guest links) y D4 (ingest only). Coste 2-3 semanas. Wedge de diferenciación vs Drive/WeTransfer.
 5. **AI integration D8**: decision windows + dossier draft + visual markers.
 6. **Audit log UI** — historial en Gig/Room detail, diff viewer.
 7. **Notifications email + WhatsApp + Telegram** — adapters adicionales.
@@ -547,7 +547,7 @@ Phase 1 activates **only if** Phase 0.9 assisted beta validates demand. Otherwis
  
 **Pantallas**: Plaza + Desk tree + Gig detail + Settings/Master View + stubs de relación/producción.
  
-Gaps: sin Calendar completo, sin Road sheet completa, sin Contacts lens completa, sin Money, sin multi-select avanzado.
+Gaps: sin Calendar completo, sin Road sheet completa, sin Conversations lens completa, sin Money, sin multi-select avanzado.
  
 Utilidad: comprobar que el mapa base se entiende: House, Room, Run/Gig, scope, URL, filtros y detalle operativo.
  
@@ -557,13 +557,13 @@ No valida todavía uso diario. Valida estructura.
  
 **Pantallas**: lo anterior + Calendar lens + Road sheet colaborativo + chip bar.
  
-Gaps: Contacts y Money aún no son lenses completas, pero la relación persona/conversación debe aparecer como contexto mínimo en Room/Gig.
+Gaps: Conversations y Money aún no son lenses completas, pero la relación persona/conversación debe aparecer como contexto mínimo en Room/Gig.
  
 Utilidad: comprobar que Hour conecta estructura, fechas, producción y sharing.
  
 ### MVP arquitectónicamente completo (fin de Phase 0.3)
  
-**Pantallas**: 4 lenses vivas — Desk, Calendar, Contacts, Money — + Room detail tabs.
+**Pantallas**: 4 lenses vivas — Desk, Calendar, Conversations, Money — + Room detail tabs.
  
 Gaps: sin profundidad modular completa, sin task entity completa, sin asset upload, sin invoice creation/edit, sin comms multicanal.
  
@@ -643,7 +643,7 @@ Las 14 D-PRE están todas cerradas. Si arrancas ya: **Día 1 abajo**.
 | 2 | Sidebar state acoplado a URL | D-PRE-02 + serializeViewState |
 | 3 | RBAC solo en RLS → empty states mudos | App-layer check en 0.4 |
 | 4 | asset_version ↔ R2 sync roto | Diseñar lifecycle antes de 0.5 upload |
-| 5 | PATCH engagement sin rollback | Error→recovery loop antes de PATCH |
+| 5 | PATCH conversation sin rollback | Error→recovery loop antes de PATCH |
 | 6 | Offline/sync destruye datos | CRDT texto + write queue con conflict UI |
 | 7 | ElectricSQL abandonado | Smart offline ahora, eval en 0.5 |
 | 8 | RLS bug cruza tenants | Phase 0.9 exige RLS regression suite con dos workspaces |
@@ -693,7 +693,7 @@ Las 14 D-PRE están todas cerradas. Si arrancas ya: **Día 1 abajo**.
 | 0.0 Fundación (+ PartyServer DO + slug system) | 55-70h | ~13 días |
 | 0.1 Plaza + Desk | 28h | ~4-5 días |
 | 0.2 Views + Road sheet colab + Calendar | 45h | ~8 días |
-| 0.3 Contacts + Money + Room detail | 30h | ~5 días |
+| 0.3 Conversations + Money + Room detail | 30h | ~5 días |
 | 0.4 Polish + ⌘K + Mobile + GDPR + Notif in-app | 40h | ~7 días |
 | 0.9 Private beta hardening / pre-cliente externo gate | 35-55h | ~7-10 días |
 | **Total Phase 0 producto** | **~200-215h** | **~38 días en chunks** (3-4 meses) |

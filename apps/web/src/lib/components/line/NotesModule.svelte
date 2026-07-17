@@ -8,7 +8,7 @@
    *
    * Permission preflight (review 2026-07-12): the socket gate is
    * has_permission(project, 'edit:project_meta') — but line_select RLS
-   * shows lines to edit:show-only roles too (director, author,
+   * shows lines to edit:performance-only roles too (director, author,
    * technical_director). Without this check YNotes would render a live
    * textarea whose WS upgrade 403s forever: the user types, the edits sit
    * in IndexedDB, "offline — edits sync on reconnect" lies. Same check

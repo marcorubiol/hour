@@ -13,7 +13,7 @@
  * `to` is compared against the START of a date row — multi-day rows that
  * begin inside the window are included; Phase 0 keeps this simple.
  *
- * Auth: Bearer JWT required. RLS scopes rows (same 'edit:show' permission
+ * Auth: Bearer JWT required. RLS scopes rows (same 'edit:performance' permission
  * as performance — the calendar is production-side data).
  */
 

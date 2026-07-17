@@ -41,7 +41,7 @@
   } from '$lib/line-templates';
   import { workspacesQueryOptions, activeProjectsQueryOptions } from '$lib/nav-queries';
   import CalendarModule from '$lib/components/line/CalendarModule.svelte';
-  import ContactsModule from '$lib/components/line/ContactsModule.svelte';
+  import ConversationsModule from '$lib/components/line/ConversationsModule.svelte';
   import RoadsheetsModule from '$lib/components/line/RoadsheetsModule.svelte';
   import NotesModule from '$lib/components/line/NotesModule.svelte';
   import MaterialsModule from '$lib/components/line/MaterialsModule.svelte';
@@ -157,7 +157,7 @@
 
   const REGISTRY = {
     calendar: CalendarModule,
-    contacts: ContactsModule,
+    conversations: ConversationsModule,
     roadsheets: RoadsheetsModule,
     notes: NotesModule,
     materials: MaterialsModule,
@@ -215,7 +215,7 @@
       queryKey: ['line-eng-stats', id] as const,
       enabled: id !== null && isBooking,
       queryFn: async ({ signal }: { signal: AbortSignal }): Promise<EngStats> => {
-        const base = `/api/engagements?line_id=${id}`;
+        const base = `/api/conversations?line_id=${id}`;
         const [all, confirmed, holds] = await Promise.all([
           fetchJSON<{ total: number; items: { next_action_at: string | null }[] }>(
             `${base}&status=any&limit=100`,

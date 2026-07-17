@@ -19,8 +19,8 @@ In `apps/web/src/routes/h/+page.svelte`, add a **status sentence** rendered stat
 under the greeting/date, above the "posa'm al dia" button.
 
 1. **Data** (TanStack Query; reuse existing caches — check `$lib` for query-options helpers):
-   - Engagements: `GET /api/engagements?status=any&limit=100`, shared key
-     `['engagements','today']` (same cache DeskBoard uses — reuse, don't duplicate).
+   - Conversations: `GET /api/conversations?status=any&limit=100`, shared key
+     `['conversations','today']` (same cache DeskBoard uses — reuse, don't duplicate).
    - Performances: `GET /api/performances?status=any&from={today}&limit=200`, key
      `['today-performances']`.
    - Tasks: ONLY if an `/api/tasks` endpoint already exists (the `task` table landed
@@ -28,7 +28,7 @@ under the greeting/date, above the "posa'm al dia" button.
 
 2. **Compute** — a pure function in `$lib` (unit-tested; take `now: Date` as a parameter,
    never call `Date.now()` inside):
-   - Working set: engagements with `next_action_at != null` and status NOT in
+   - Working set: conversations with `next_action_at != null` and status NOT in
      {declined, dormant} — read `DeskBoard.svelte` first and keep its exact semantics.
    - `overdue` = next_action_at < now · `open` = the upcoming rest · `next` = earliest
      upcoming · `showToday` = a non-cancelled performance with performed_at = today.

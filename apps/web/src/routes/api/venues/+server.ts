@@ -53,7 +53,7 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
   search.set('select', VENUE_COLS);
   if (workspaceIds.length > 0) search.set('workspace_id', `in.(${workspaceIds.join(',')})`);
   if (q) {
-    // Same PostgREST pattern-metacharacter hygiene as the engagement search.
+    // Same PostgREST pattern-metacharacter hygiene as the conversation search.
     const safe = q.replace(/[%_*,()]/g, ' ').trim();
     if (safe) search.set('name', `ilike.*${safe}*`);
   }

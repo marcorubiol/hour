@@ -34,9 +34,9 @@ Después responde:
 - **Phase 0.9** — *gate* obligatorio antes de cliente externo conocido: httpOnly cookies, rate limiting, RLS regression tests, restore drill, admin/support minimum, observability
 - **Phase 1** — SaaS público/self-serve *solo si* la beta asistida valida demanda
 
-**Modelo conceptual** (22 tablas, reset v2 + roadsheet delta):
+**Modelo conceptual** (29 tablas — reset v2 + roadsheet + account + cast + task + share/alias):
 - `workspace` → `project` → `line` (opcional) → `show`
-- `engagement` (conversación comercial) separado de `show` (gig atómico con fecha)
+- `conversation` (conversación comercial) separado de `show` (gig atómico con fecha)
 - `person` global (compartido entre workspaces), `person_note` workspace-scoped
 - Sin `project.type` (ADR-007) — el tipo emerge de subentidades presentes
 - Road sheet: proyección de `show` + junctions (`crew_assignment`, `cast_override`)
@@ -62,7 +62,7 @@ Si una decisión requiere implementación: "Esto necesita Windsurf. ¿Lo abrimos
 ## 5. Primer turno
 
 Tras leer los archivos:
-1. Un párrafo: estado de la DB (22 tablas), estado del código (SvelteKit), próximo sprint según roadmap.
+1. Un párrafo: estado de la DB (29 tablas), estado del código (SvelteKit), próximo sprint según roadmap.
 2. Una pregunta: ¿estamos en Phase 0.0 normal o acelerando hacia 0.9?
 3. Espera respuesta antes de proponer plan.
 

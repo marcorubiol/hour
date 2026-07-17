@@ -15,8 +15,8 @@ test.describe('smoke', () => {
    * integration points that move data end to end:
    *   - bare /h/ forwards to the default workspace's Desk
    *   - the shell renders (brand); ⌘K jumps to a real line AND a view
-   *   - project detail loads the engagement count through /api/engagements
-   *   - Calendar month grid, Contacts table, Money totals all deep-link
+   *   - project detail loads the conversation count through /api/conversations
+   *   - Calendar month grid, Conversations table, Money totals all deep-link
    *
    * Sign-in is not exercised here: the session arrives from the shared
    * storageState (tests/auth.setup.ts) and the login flow itself is covered
@@ -55,11 +55,11 @@ test.describe('smoke', () => {
     await expect(page.locator('.desk__head')).toBeVisible();
 
     // Project detail proves the read path: session survived, RLS let the
-    // engagements through, the count renders. Entities stay space-scoped.
+    // conversations through, the count renders. Entities stay space-scoped.
     await page.goto('/h/muk-cia/project/mamemi/');
     const countLabel = page.locator('.rel-stub__count');
     await expect(countLabel).toBeVisible();
-    await expect(countLabel).toContainText(/\d+\s+engagements?/);
+    await expect(countLabel).toContainText(/\d+\s+conversations?/);
     expect(await page.locator('.rel-stub__item').count()).toBeGreaterThan(0);
 
     // Calendar month grid.
@@ -67,9 +67,9 @@ test.describe('smoke', () => {
     await expect(page.locator('.cal__grid')).toBeVisible();
     expect(await page.locator('.cal__weekday').count()).toBe(7);
 
-    // Contacts.
-    await page.goto('/h/contacts');
-    await expect(page.locator('.status-bar__count')).toContainText(/\d+ contacts/);
+    // Conversations.
+    await page.goto('/h/conversations');
+    await expect(page.locator('.status-bar__count')).toContainText(/\d+ conversations/);
     expect(await page.locator('tbody tr').count()).toBeGreaterThan(0);
   });
 });

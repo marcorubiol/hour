@@ -6,7 +6,7 @@ const PASSWORD = process.env.PW_TEST_PASSWORD;
 /**
  * E2E — line detail as module composition (ADR-056): create a line through
  * the template picker (⌘K action), assert the template's module stack
- * renders, capture a contact from the line's Contacts module (line_id
+ * renders, capture a contact from the line's Conversations module (line_id
  * auto-assigned), register+remove a material, add+remove a module.
  *
  * The fixture LINE is STABLE and reused across runs — lines have no
@@ -77,9 +77,9 @@ test.describe('line detail — module composition', () => {
       await page.goto(`/h/playwright/project/zzz-e2e-collab/line/${line.slug ?? line.id}`);
     }
 
-    // Booking template stack: Contacts · Calendar · Materials · Notes.
+    // Booking template stack: Conversations · Calendar · Materials · Notes.
     await expect(page.getByRole('heading', { name: LINE_NAME })).toBeVisible({ timeout: 15_000 });
-    for (const label of ['Contacts', 'Calendar', 'Materials', 'Notes']) {
+    for (const label of ['Conversations', 'Calendar', 'Materials', 'Notes']) {
       await expect(page.locator(`#mod-${label.toLowerCase()}`)).toBeVisible();
     }
 
@@ -96,28 +96,28 @@ test.describe('line detail — module composition', () => {
 
     // Crash recovery: soft-delete a leftover fixture conversation.
     await page.evaluate(async ({ email, lineId }) => {
-      const list = await fetch(`/api/engagements?status=any&line_id=${lineId}`);
+      const list = await fetch(`/api/conversations?status=any&line_id=${lineId}`);
       const items = (
         (await list.json()) as { items: { id: string; person: { email: string | null } | null }[] }
       ).items.filter((i) => i.person?.email === email);
       for (const i of items) {
-        await fetch(`/api/engagements/${i.id}`, { method: 'DELETE' });
+        await fetch(`/api/conversations/${i.id}`, { method: 'DELETE' });
       }
     }, { email: CONTACT_EMAIL, lineId: line!.id });
 
     // Capture from the module — no Line select needed: the context IS the line.
-    await page.locator('#mod-contacts').getByRole('button', { name: 'Add contact' }).click();
+    await page.locator('#mod-conversations').getByRole('button', { name: 'Add conversation' }).click();
     const dialog = page.locator('dialog[open]');
     await dialog.getByLabel('Full name').fill(CONTACT_NAME);
     await dialog.getByLabel('Email').fill(CONTACT_EMAIL);
     await dialog.getByRole('button', { name: /^add$/i }).click();
     await expect(dialog).not.toBeVisible({ timeout: 10_000 });
 
-    await expect(page.locator('#mod-contacts')).toContainText(CONTACT_NAME, { timeout: 10_000 });
+    await expect(page.locator('#mod-conversations')).toContainText(CONTACT_NAME, { timeout: 10_000 });
 
     // Verify the line assignment through the API, then self-clean.
     const check = await page.evaluate(async ({ email, lineId }) => {
-      const list = await fetch(`/api/engagements?status=any&line_id=${lineId}`);
+      const list = await fetch(`/api/conversations?status=any&line_id=${lineId}`);
       const items = (
         (await list.json()) as {
           items: { id: string; line_id: string | null; person: { email: string | null } | null }[];
@@ -125,7 +125,7 @@ test.describe('line detail — module composition', () => {
       ).items;
       const mine = items.find((i) => i.person?.email === email);
       if (!mine) return { found: false as const };
-      const del = await fetch(`/api/engagements/${mine.id}`, { method: 'DELETE' });
+      const del = await fetch(`/api/conversations/${mine.id}`, { method: 'DELETE' });
       return { found: true as const, lineId: mine.line_id, delStatus: del.status };
     }, { email: CONTACT_EMAIL, lineId: line!.id });
 
@@ -149,7 +149,7 @@ test.describe('line detail — module composition', () => {
       await fetch(`/api/lines/${lineId}`, {
         method: 'PATCH',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ modules: ['contacts', 'calendar', 'materials', 'notes'] }),
+        body: JSON.stringify({ modules: ['conversations', 'calendar', 'materials', 'notes'] }),
       });
     }, { lineId: line!.id });
 
@@ -174,7 +174,7 @@ test.describe('line detail — module composition', () => {
 
     // Add the Team module, then remove it — the stack round-trips.
     //
-    // Was asserting on #mod-contacts: it clicked "People" (the pre-ADR-065
+    // Was asserting on #mod-conversations: it clicked "People" (the pre-ADR-065
     // name for Team) but then checked and removed CONTACTS — a module the
     // reset above always puts in the stack, so the assertion passed without
     // the added module ever being looked at, and the "round-trip" removed

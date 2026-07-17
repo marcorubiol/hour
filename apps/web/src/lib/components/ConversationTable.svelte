@@ -1,5 +1,5 @@
 <script module lang="ts">
-  export interface EngagementFilters {
+  export interface ConversationFilters {
     projectSlug?: string;
     projectIds?: string[];
     lineId?: string;
@@ -14,10 +14,10 @@
 
 <script lang="ts">
   /**
-   * EngagementTable — the difusión work surface (ADR-040 write path):
-   * paginated engagement list with inline status editing (menu over the
+   * ConversationTable — the difusión work surface (ADR-040 write path):
+   * paginated conversation list with inline status editing (menu over the
    * badge) and next-action editing (dialog), optimistic with rollback +
-   * toast. Extracted from /booking so the Contacts lens and the legacy
+   * toast. Extracted from /booking so the Conversations lens and the legacy
    * page share one implementation.
    */
 
@@ -32,27 +32,27 @@
   import Menu from '$lib/components/Menu.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
   import {
-    ENGAGEMENT_STATUSES,
+    CONVERSATION_STATUSES,
     statusBadgeClass,
     statusLabel,
-    type EngagementItem,
-    type EngagementPatch,
-    type EngagementStatus,
-  } from '$lib/engagement';
+    type ConversationItem,
+    type ConversationPatch,
+    type ConversationStatus,
+  } from '$lib/conversation';
 
   interface Props {
-    filters: EngagementFilters;
+    filters: ConversationFilters;
     /** e.g. `/h/muk-cia/person` — when set, names link to the person file. */
     personBase?: string;
   }
 
   let { filters, personBase }: Props = $props();
 
-  type EngagementsResponse = {
+  type ConversationsResponse = {
     total: number;
     limit: number;
     offset: number;
-    items: EngagementItem[];
+    items: ConversationItem[];
   };
 
   const LIMIT = 50;
@@ -68,7 +68,7 @@
     }
   });
 
-  function params(f: EngagementFilters, o: number): string {
+  function params(f: ConversationFilters, o: number): string {
     const p = new URLSearchParams();
     p.set('status', f.status ?? 'any');
     if (f.projectSlug) p.set('project_slug', f.projectSlug);
@@ -87,11 +87,11 @@
     const f = filters;
     const o = offset;
     return {
-      queryKey: ['engagements', { ...f, limit: LIMIT, offset: o }] as const,
+      queryKey: ['conversations', { ...f, limit: LIMIT, offset: o }] as const,
       enabled: f.enabled !== false,
       queryFn: ({ signal }: { signal: AbortSignal }) =>
-        fetchJSON<EngagementsResponse>(`/api/engagements?${params(f, o)}`, signal),
-      placeholderData: (prev: EngagementsResponse | undefined) => prev,
+        fetchJSON<ConversationsResponse>(`/api/conversations?${params(f, o)}`, signal),
+      placeholderData: (prev: ConversationsResponse | undefined) => prev,
     };
   });
 
@@ -100,26 +100,26 @@
   // ── Inline write path (ADR-040) — cache-anchored optimistic updates ────
   const queryClient = useQueryClient();
 
-  type PatchInput = { id: string; patch: EngagementPatch };
+  type PatchInput = { id: string; patch: ConversationPatch };
 
   const patchMutation = createMutation({
     mutationFn: async ({ id, patch }: PatchInput) => {
-      const body = await mutateJSON<{ item?: EngagementItem }>(
+      const body = await mutateJSON<{ item?: ConversationItem }>(
         'PATCH',
-        `/api/engagements/${id}`,
+        `/api/conversations/${id}`,
         patch,
       );
       if (!body?.item) throw new Error('Unexpected response');
       return body.item;
     },
     onMutate: async ({ id, patch }: PatchInput) => {
-      await queryClient.cancelQueries({ queryKey: ['engagements'] });
+      await queryClient.cancelQueries({ queryKey: ['conversations'] });
       const pages = queryClient
-        .getQueriesData<EngagementsResponse>({ queryKey: ['engagements'] })
+        .getQueriesData<ConversationsResponse>({ queryKey: ['conversations'] })
         .filter(([, d]) => d?.items.some((it) => it.id === id));
       for (const [key, data] of pages) {
         if (!data) continue;
-        queryClient.setQueryData<EngagementsResponse>(key, {
+        queryClient.setQueryData<ConversationsResponse>(key, {
           ...data,
           items: data.items.map((it) => (it.id === id ? { ...it, ...patch } : it)),
         });
@@ -138,9 +138,9 @@
     },
     onSuccess: (item, _vars, ctx) => {
       for (const [key] of ctx?.pages ?? []) {
-        const cur = queryClient.getQueryData<EngagementsResponse>(key);
+        const cur = queryClient.getQueryData<ConversationsResponse>(key);
         if (cur) {
-          queryClient.setQueryData<EngagementsResponse>(key, {
+          queryClient.setQueryData<ConversationsResponse>(key, {
             ...cur,
             items: cur.items.map((it) => (it.id === item.id ? { ...it, ...item } : it)),
           });
@@ -148,24 +148,24 @@
       }
     },
     onSettled: () => {
-      void queryClient.invalidateQueries({ queryKey: ['engagements'] });
+      void queryClient.invalidateQueries({ queryKey: ['conversations'] });
       // Line header funnel stats (ADR-056) read the same rows.
       void queryClient.invalidateQueries({ queryKey: ['line-eng-stats'] });
     },
   });
 
-  function changeStatus(item: EngagementItem, status: EngagementStatus) {
+  function changeStatus(item: ConversationItem, status: ConversationStatus) {
     if (item.status === status) return;
     $patchMutation.mutate({ id: item.id, patch: { status } });
   }
 
   // ── Next action editor (dialog) ─────────────────────────────────────────
   let dialogOpen = $state(false);
-  let editing = $state<EngagementItem | null>(null);
+  let editing = $state<ConversationItem | null>(null);
   let formDate = $state('');
   let formNote = $state('');
 
-  function openNextAction(item: EngagementItem) {
+  function openNextAction(item: ConversationItem) {
     editing = item;
     formDate = item.next_action_at ? item.next_action_at.slice(0, 10) : '';
     formNote = item.next_action_note ?? '';
@@ -190,7 +190,7 @@
   }
 
   let total = $derived($query.data?.total ?? 0);
-  let items = $derived(($query.data?.items ?? []) as EngagementItem[]);
+  let items = $derived(($query.data?.items ?? []) as ConversationItem[]);
   let loading = $derived($query.isLoading);
   let errorMsg = $derived($query.error instanceof Error ? $query.error.message : '');
 
@@ -199,7 +199,7 @@
     return dayMonth(iso);
   }
 
-  function locationOf(item: EngagementItem): string {
+  function locationOf(item: ConversationItem): string {
     if (!item.person) return '—';
     return [item.person.city, item.person.country].filter(Boolean).join(', ') || '—';
   }
@@ -212,7 +212,7 @@
   {#if loading}
     <span>Loading...</span>
   {:else if !errorMsg}
-    <span class="status-bar__count">{total} contacts</span>
+    <span class="status-bar__count">{total} conversations</span>
     {#if total > 0}<span>Showing {offset + 1}-{rangeEnd}</span>{/if}
   {/if}
 </div>
@@ -252,7 +252,7 @@
                 {statusLabel(item.status)}<span class="status-caret" aria-hidden="true">▾</span>
               {/snippet}
               {#snippet children({ close })}
-                {#each ENGAGEMENT_STATUSES as s (s)}
+                {#each CONVERSATION_STATUSES as s (s)}
                   <li role="none">
                     <button
                       type="button"
@@ -317,7 +317,7 @@
 <Dialog bind:open={dialogOpen} title="Next action" size="s" onclose={() => (editing = null)}>
   {#if editing}
     <p class="next-action-who">
-      {editing.person?.full_name ?? 'Engagement'}{editing.person?.organization_name
+      {editing.person?.full_name ?? 'Conversation'}{editing.person?.organization_name
         ? ` — ${editing.person.organization_name}`
         : ''}
     </p>

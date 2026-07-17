@@ -2,7 +2,7 @@
  * DELETE /api/performances/:key/roadsheet/shares/:id — revoke a public
  * road sheet link (ADR-047). Revocation is a soft kill (revoked_at): the
  * public RPC stops resolving the token immediately. The RPC re-checks
- * `edit:show` against the share's own performance, so `:key` is URL
+ * `edit:performance` against the share's own performance, so `:key` is URL
  * shape only.
  */
 

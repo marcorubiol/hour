@@ -1,5 +1,9 @@
 {
   "app.name": "Hour",
+  "lens.desk": "Desk",
+  "lens.calendar": "Calendar",
+  "lens.conversations": "Conversations",
+  "lens.money": "Money",
   "login.phase": "Phase 0",
   "login.email": "Email",
   "login.password": "Password",

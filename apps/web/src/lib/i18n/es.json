@@ -1,4 +1,8 @@
 {
+  "lens.desk": "Desk",
+  "lens.calendar": "Calendario",
+  "lens.conversations": "Conversaciones",
+  "lens.money": "Dinero",
   "hall.greeting_morning": "Buenos días",
   "hall.greeting_afternoon": "Buenas tardes",
   "hall.greeting_night": "Buenas noches",

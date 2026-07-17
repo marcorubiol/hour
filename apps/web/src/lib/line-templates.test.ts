@@ -71,7 +71,7 @@ describe('modulesForLine', () => {
     expect(modulesForLine({ kind: 'campaign', modules: null })).toEqual(
       MODULES_BY_KIND.campaign,
     );
-    expect(modulesForLine({ kind: 'campaign', modules: null })[0]).toBe('contacts');
+    expect(modulesForLine({ kind: 'campaign', modules: null })[0]).toBe('conversations');
   });
 
   it('unknown kind degrades to notes-only, never crashes', () => {

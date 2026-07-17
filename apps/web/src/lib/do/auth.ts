@@ -36,7 +36,7 @@ export function isAllowedTargetTable(t: string): t is CollabTargetTable {
 /** Permission required to EDIT the collab doc, per target table. Line
  * notes gate on the parent project's meta permission (ADR-056). */
 const EDIT_PERMISSION: Record<CollabTargetTable, string> = {
-  performance: 'edit:show',
+  performance: 'edit:performance',
   project: 'edit:project_meta',
   line: 'edit:project_meta',
 };

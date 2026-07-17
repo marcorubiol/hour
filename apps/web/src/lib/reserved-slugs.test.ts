@@ -10,7 +10,7 @@ describe('isReservedWorkspaceSlug', () => {
 
   it('matches Hour product vocabulary', () => {
     expect(isReservedWorkspaceSlug('gig')).toBe(true);
-    expect(isReservedWorkspaceSlug('engagement')).toBe(true);
+    expect(isReservedWorkspaceSlug('conversation')).toBe(true);
     expect(isReservedWorkspaceSlug('roadsheet')).toBe(true);
   });
 
@@ -28,7 +28,7 @@ describe('isReservedWorkspaceSlug', () => {
 
 describe('isKnownEntity', () => {
   it('recognises the eight entity types', () => {
-    for (const e of ['room', 'run', 'gig', 'engagement', 'person', 'venue', 'asset', 'invoice']) {
+    for (const e of ['room', 'run', 'gig', 'conversation', 'person', 'venue', 'asset', 'invoice']) {
       expect(isKnownEntity(e)).toBe(true);
     }
   });

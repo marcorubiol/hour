@@ -4,10 +4,10 @@ const EMAIL = process.env.PW_TEST_EMAIL;
 const PASSWORD = process.env.PW_TEST_PASSWORD;
 
 /**
- * E2E — engagement inline write path on the Contacts lens (ADR-040/044;
+ * E2E — conversation inline write path on the Conversations lens (ADR-040/044;
  * moved off the retired /booking wrapper in ADR-056 cleanup).
  *
- * Both tests write to a REAL engagement row (the difusión list). Original
+ * Both tests write to a REAL conversation row (the difusión list). Original
  * values are captured via the API up front and restored in a `finally`
  * with a direct API call, so a mid-test failure (or a CI retry) cannot
  * leave probe data behind. Net data change is zero up to the editor's own
@@ -20,7 +20,7 @@ const PASSWORD = process.env.PW_TEST_PASSWORD;
  * then updated_at).
  */
 
-type RawEngagement = {
+type RawConversation = {
   id: string;
   status: string;
   next_action_at: string | null;
@@ -29,8 +29,8 @@ type RawEngagement = {
 };
 
 /** Session comes from the shared storageState (tests/auth.setup.ts). */
-async function openContacts(page: Page, searchName?: string) {
-  await page.goto('/h/contacts'); // ADR-067: lens is space-less + cross-space
+async function openConversations(page: Page, searchName?: string) {
+  await page.goto('/h/conversations'); // ADR-067: lens is space-less + cross-space
   if (searchName) {
     // The lens is pins-scoped (unscoped = everything RLS allows) — narrow
     // to the target person server-side so the row is on the first page.
@@ -44,12 +44,12 @@ function rowByName(page: Page, name: string) {
 }
 
 /** First page of the difusión list (same rows the lens can reach), raw values. */
-async function fetchListRaw(page: Page): Promise<RawEngagement[]> {
+async function fetchListRaw(page: Page): Promise<RawConversation[]> {
   return await page.evaluate(async () => {
     const res = await fetch(
-      '/api/engagements?status=any&project_slug=mamemi&season=2026-27&limit=50',
+      '/api/conversations?status=any&project_slug=mamemi&season=2026-27&limit=50',
     );
-    const data = (await res.json()) as { items: RawEngagement[] };
+    const data = (await res.json()) as { items: RawConversation[] };
     return data.items;
   });
 }
@@ -59,14 +59,14 @@ async function fetchListRaw(page: Page): Promise<RawEngagement[]> {
  * the page is in a broken state. Values pass through the same PATCH
  * whitelist the UI uses (dates must be date-only).
  */
-async function restoreEngagement(
+async function restoreConversation(
   page: Page,
   id: string,
   patch: Record<string, unknown>,
 ): Promise<void> {
   const status = await page.evaluate(
     async ({ id, patch }) => {
-      const res = await fetch(`/api/engagements/${id}`, {
+      const res = await fetch(`/api/conversations/${id}`, {
         method: 'PATCH',
         headers: {
           'content-type': 'application/json',
@@ -89,23 +89,23 @@ async function restoreEngagement(
  */
 async function patchOk(page: Page, expectedId: string, doClick: () => Promise<void>) {
   const resp = page.waitForResponse(
-    (r) => r.request().method() === 'PATCH' && r.url().includes('/api/engagements/'),
+    (r) => r.request().method() === 'PATCH' && r.url().includes('/api/conversations/'),
   );
   await doClick();
   const r = await resp;
-  expect(r.ok(), 'PATCH /api/engagements should succeed').toBe(true);
-  const hit = r.url().match(/engagements\/([0-9a-f-]{36})/)?.[1];
-  expect(hit, 'probe write must target the captured engagement').toBe(expectedId);
+  expect(r.ok(), 'PATCH /api/conversations should succeed').toBe(true);
+  const hit = r.url().match(/conversations\/([0-9a-f-]{36})/)?.[1];
+  expect(hit, 'probe write must target the captured conversation').toBe(expectedId);
 }
 
-test.describe('engagement inline write', () => {
+test.describe('conversation inline write', () => {
   test.skip(
     !EMAIL || !PASSWORD,
-    'Set PW_TEST_EMAIL and PW_TEST_PASSWORD (test user with edit:engagement where the MaMeMi engagements live).',
+    'Set PW_TEST_EMAIL and PW_TEST_PASSWORD (test user with edit:conversation where the MaMeMi conversations live).',
   );
 
   test('status change persists and reverts', async ({ page }) => {
-    await openContacts(page);
+    await openConversations(page);
 
     const original = (await fetchListRaw(page))[0];
     const name = original.person?.full_name;
@@ -153,12 +153,12 @@ test.describe('engagement inline write', () => {
     } finally {
       // Safety net: unconditional API restore (no-op when the UI revert
       // already ran). Survives a dead page mid-test and CI retries.
-      await restoreEngagement(page, original.id, { status: original.status });
+      await restoreConversation(page, original.id, { status: original.status });
     }
   });
 
   test('next action date + note save, persist and restore', async ({ page }) => {
-    await openContacts(page);
+    await openConversations(page);
 
     const original = (await fetchListRaw(page))[0];
     const name = original.person?.full_name;
@@ -195,7 +195,7 @@ test.describe('engagement inline write', () => {
         rowByName(page, name!).locator('.next-action__note'),
       ).toContainText('e2e probe');
     } finally {
-      await restoreEngagement(page, original.id, restorePatch);
+      await restoreConversation(page, original.id, restorePatch);
     }
 
     // Verify the restore against the API (raw values) — after a restore

@@ -217,7 +217,7 @@ export function resolveScope(
 
 /** Keep an item if scope is empty, its workspace is a pinned space, its line
  *  is a pinned line, or its project is in scope — pinned directly or through
- *  a pinned line (engagements reach line scope through their project). */
+ *  a pinned line (conversations reach line scope through their project). */
 export function inScope(
   scope: ResolvedScope,
   item: { workspaceId?: string | null; lineId?: string | null; projectId?: string | null },

@@ -151,7 +151,7 @@ describe.skipIf(!envReady())('task RLS (ADR-068)', () => {
     const { status } = await pgRpc('create_task', jwt, {
       p_title: 'ZZZ never lands',
       p_line_id: RANDOM_UUID,
-      p_engagement_id: RANDOM_UUID,
+      p_conversation_id: RANDOM_UUID,
     });
     expect(status).toBe(400);
   });

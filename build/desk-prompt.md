@@ -4,7 +4,8 @@
 > **which is EXECUTED and LIVE (ADR-071)**: both migrations applied, `/api/tasks` CRUD,
 > `taskSurfaceState()` unit-tested. No adapter needed — build directly on the shipped model.
 > Origin: S1 2026-07-17. Decisions: ADR-065 (Desk = the home digest), ADR-068 (every scope
-> path lands on `/h/desk`), ADR-069 (consent-first AI inbox), ADR-070 (task model).
+> path lands on `/h/desk`), ADR-069 (consent-first AI inbox), ADR-070 (task model),
+> ADR-075 (the entity is `conversation`, not `conversation` — vocabulary below is post-rename).
 > Spec: `build/screen-data-spec.md § /h/desk`.
 
 > **v1 already on the page — ABSORB OR REPLACE, never duplicate.** The build session
@@ -22,7 +23,7 @@
 
 ## Context
 
-- `/h/desk` renders `DeskBoard.svelte` — READ IT FIRST and keep its semantics: engagement
+- `/h/desk` renders `DeskBoard.svelte` — READ IT FIRST and keep its semantics: conversation
   working set (`next_action_at != null`, status ∉ {declined, dormant}), verb per status,
   day buckets OVERDUE / TODAY / TOMORROW / weekday / NEXT WEEK / LATER, pins scope via
   `usePins` + `engInScope`.
@@ -31,16 +32,19 @@
 
 ## Task
 
-One ranked feed, four sources, **mixed by urgency inside the day buckets** (type expressed
-by verb + glyph, never separate blocks per type). Buckets: existing six + an **Anytime**
-quiet tail.
+One ranked feed, four sources, grouped in day buckets. **Within each bucket the type order
+is FIXED (Marco, 2026-07-18; spec § /h/desk): tasks → calendar → conversations → money** —
+mirroring the lens nav. The left gutter labels each row's type in mono small-caps, SINGULAR
+(locale-resolved; AGENDA = timed `date` rows, pointing at the Calendar lens's agenda
+projection per ADR-076). Within each type-block, natural secondary sort (calendar by time,
+conversations by due, money by severity). Buckets: existing six + an **Anytime** quiet tail.
 
-1. **Engagement next-actions** — as today.
+1. **Conversation next-actions** — as today.
 2. **Tasks** — `GET /api/tasks` (pins-scoped like other sources):
    - Bucket by `taskSurfaceState().surfacesAt` (the shared `$lib` function). `dormant` rows
      are NEVER rendered. `anytime` → the quiet tail. `overdue` → OVERDUE bucket.
    - Row: done-toggle (PATCH status) + title + parent entity link (project/line/performance/
-     engagement, resolved via the shared caches) + meta "due {day} · surfaces {day}" when
+     conversation, resolved via the shared caches) + meta "due {day} · surfaces {day}" when
      dated — the computed surfacing is VISIBLE and the row links to editing `lead_days`
      (inline editor or micro-dialog; keep it one tap).
    - `origin` badge only for `protocol` / `ai`. **`ai` rows are proposals (consent inbox,
@@ -48,7 +52,9 @@ quiet tail.
      (PATCH status done, no celebration).
 3. **Performances as day-anchors** — from `['today-performances']`-style query: a
    non-cancelled gig today/tomorrow renders as the HEADLINE of its bucket (bigger than rows):
-   venue/city + `load_in_at` (viewer tz), linking to the performance page.
+   venue/city + `load_in_at` in the VENUE's zone with viewer courtesy only when they differ
+   (timezone rule — use `dualTime()`; fallback zone = workspace home tz, never the browser's
+   silently), linking to the performance page.
 4. **Money alerts** — computable client-side from existing endpoints, shown only when the
    viewer has fee visibility (fee fields arrive non-null; if masked, suppress the section
    silently — masked and unset are indistinguishable by design):
@@ -69,7 +75,7 @@ read as an achievement, not an error (tie to the hall's "Tot tranquil" voice).
 
 - Svelte 5 runes (`$derived` over `$state`+`$effect`), semantic HTML, existing tokens only,
   both themes verified (ADR-059). No new global stores, no new dependencies.
-- Reuse shared query caches (`['engagements','today']` etc.) — never duplicate a cache key
+- Reuse shared query caches (`['conversations','today']` etc.) — never duplicate a cache key
   with different params.
 - Unit-test the merge/bucketing function (pure, `now` injected).
 - No commits, no deploys. `svelte-check` 0/0; existing tests green. Short written summary

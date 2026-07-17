@@ -2,7 +2,7 @@
  * RLS regression — cross-tenant isolation.
  *
  * Verifies that an authenticated user cannot see workspaces, accounts,
- * or engagements they have no membership in, and that anonymous (no JWT)
+ * or conversations they have no membership in, and that anonymous (no JWT)
  * requests return zero rows regardless. This is the most load-bearing
  * test in the suite — if it ever turns red, the multi-tenant promise of
  * Hour is broken.
@@ -79,9 +79,9 @@ describe.skipIf(!envReady())('RLS — cross-tenant isolation', () => {
     expect(rows.every((r) => r.user_id === playwrightUserId)).toBe(true);
   });
 
-  test('playwright user sees engagements only in workspaces they belong to', async () => {
+  test('playwright user sees conversations only in workspaces they belong to', async () => {
     const { rows } = await pgGet<{ workspace_id: string }>(
-      'engagement',
+      'conversation',
       playwrightJwt,
       new URLSearchParams({
         select: 'workspace_id',
@@ -90,13 +90,13 @@ describe.skipIf(!envReady())('RLS — cross-tenant isolation', () => {
       }),
     );
     // Playwright is admin of `muk-cia` (which holds the 154 imported
-    // engagements). They have no engagement access via marco-rubiol.
+    // conversations). They have no conversation access via marco-rubiol.
     expect(rows.length).toBeGreaterThanOrEqual(154);
 
     // The security invariant is MEMBERSHIP-BOUNDED visibility: every
-    // visible engagement must live in a workspace the caller belongs to.
+    // visible conversation must live in a workspace the caller belongs to.
     // (The old `distinct workspaces === 1` shape broke once ADR-051
-    // lifecycle fixtures started creating short-lived engagements in the
+    // lifecycle fixtures started creating short-lived conversations in the
     // `playwright` workspace — that was an artifact of the data, not the
     // leak canary itself.)
     const memberships = await pgGet<{ workspace_id: string }>(
@@ -120,8 +120,8 @@ describe.skipIf(!envReady())('RLS — cross-tenant isolation', () => {
     expect(rows.length).toBe(0);
   });
 
-  test('anonymous request to engagement returns zero rows', async () => {
-    const { rows } = await pgGet('engagement', null);
+  test('anonymous request to conversation returns zero rows', async () => {
+    const { rows } = await pgGet('conversation', null);
     expect(rows.length).toBe(0);
   });
 

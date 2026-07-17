@@ -12,7 +12,7 @@ in THREE workspaces (all as `admin`, all with `accepted_at`):
 - **`marco-rubiol`** — the original smoke target (real data, read-mostly).
 - **`muk-cia`** — person/contacts specs write notes here (self-cleaning).
 - **`playwright`** — the FIXTURE workspace: project `zzz-e2e-collab` with
-  gigs `zzz-e2e-1` / `zzz-e2e-2`. Write-path specs (engagement,
+  gigs `zzz-e2e-1` / `zzz-e2e-2`. Write-path specs (conversation,
   performance, money/invoice, roadsheet share, venue link, collab) do
   their mutations here. It is invisible cross-tenant — that invisibility
   is itself asserted by `tests/rls/cross-tenant.test.ts`.
@@ -30,11 +30,11 @@ performance-write spec deletes its own gigs (one through the UI confirm
 dialog, the rest via `DELETE /api/performances/:id`) — the old
 `e2e-venue-*` accumulation and its manual SQL purge are gone (last
 manual purge 2026-07-02, 20 rows; none needed since). The
-contact-create spec soft-deletes its engagement via
-`DELETE /api/engagements/:id` and reruns resurrect it (ADR-051), so the
+conversation-create spec soft-deletes its conversation via
+`DELETE /api/conversations/:id` and reruns resurrect it (ADR-051), so the
 stable fixture person (`zzz-e2e-contact@hour.test`) never duplicates.
 Leftovers only appear if a run dies mid-test; the next run's create is
-either idempotent (venue), a resurrect (engagement), or swept by the
+either idempotent (venue), a resurrect (conversation), or swept by the
 delete test's API sweep (performances on the run's fixture day).
 
 ## Steps
@@ -123,7 +123,7 @@ Object. If the pinned Playwright browser is missing, point
 | `0 contacts` instead of `<n> contacts` | Workspace membership missing `accepted_at`, or test user attached to wrong workspace. Re-run the SQL in step 2. |
 | Redirect loop on `/login` | Wrong password in `.env.test`, or auth user not auto-confirmed (check Authentication → Users → email_confirmed_at). |
 | `connect ECONNREFUSED` to localhost | Forgot `pnpm build` before `pnpm test:smoke`. `vite preview` needs `dist/`. |
-| 401 on `/api/engagements` | JWT not issuing `current_workspace_id` claim — check the Auth hook is enabled in Supabase Dashboard (Authentication → Hooks). |
+| 401 on `/api/conversations` | JWT not issuing `current_workspace_id` claim — check the Auth hook is enabled in Supabase Dashboard (Authentication → Hooks). |
 
 ## When to re-run
 

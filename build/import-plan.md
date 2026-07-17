@@ -2,9 +2,9 @@
 
 > Status: **implemented** (pipeline lives in `build/import/`); **needs code
 > adjustment after reset v2** — see §3.4 (drop tag/tagging steps) and §3.5
-> (engagement status default `contacted`). · Author: Marco + .zerø · Date: 2026-04-19
-> Scope: bootstrap MaMeMi's `person` + `engagement` rows from the Mostra Igualada 2026 export dataset (+ dossier PDF enrichment).
-> Related ADRs: `DECISIONS.md` → ADR-001 (engagement distinct from show), ADR-007 (no `project.type`), plus the earlier `Activate custom_fields jsonb` and `Polymorphic core` entries. The 2026-04-19 **reset v2** dropped tag/tagging, dropped `project.type`, renamed `membership → workspace_membership`, and shifted `engagement.status` to the anti-CRM enum (default `contacted`); sections below reflect the new schema.
+> (conversation status default `contacted`). · Author: Marco + .zerø · Date: 2026-04-19
+> Scope: bootstrap MaMeMi's `person` + `conversation` rows from the Mostra Igualada 2026 export dataset (+ dossier PDF enrichment).
+> Related ADRs: `DECISIONS.md` → ADR-001 (conversation distinct from show), ADR-007 (no `project.type`), plus the earlier `Activate custom_fields jsonb` and `Polymorphic core` entries. The 2026-04-19 **reset v2** dropped tag/tagging, dropped `project.type`, renamed `membership → workspace_membership`, and shifted `conversation.status` to the anti-CRM enum (default `contacted`); sections below reflect the new schema.
 
 ---
 
@@ -69,7 +69,7 @@ These 30 profiles mostly enrich ~23 international + ~7 estatal records already p
 
 ## 3. Target schema mapping
 
-> Reflects the polymorphic schema (workspace + project + person + engagement) as of the 2026-04-19 reset. No more `organization`, `contact`, or `contact_project`.
+> Reflects the polymorphic schema (workspace + project + person + conversation) as of the 2026-04-19 reset. No more `organization`, `contact`, or `contact_project`.
 
 ### 3.1 `workspace`
 
@@ -88,13 +88,13 @@ workspace_id = <marco-rubiol>, slug = 'mamemi', name = 'MaMeMi',
 status = 'active'
 ```
 
-`project.type` no longer exists (ADR-007 dropped the discriminator). The loader must **not** set `type` — polymorphism emerges from which subentities the project ends up with (engagement, show, line, date…). `build/import/03_load_to_hour.py` drops the `type='show'` upsert field as part of the reset-v2 code adjustment.
+`project.type` no longer exists (ADR-007 dropped the discriminator). The loader must **not** set `type` — polymorphism emerges from which subentities the project ends up with (conversation, show, line, date…). `build/import/03_load_to_hour.py` drops the `type='show'` upsert field as part of the reset-v2 code adjustment.
 
-Difusión-2026-27 is **not** a project — it's a filtered view over `engagement` rows where `project.slug = 'mamemi'` and `custom_fields->>'season' = '2026-27'` (see ADR *Polymorphic core* in `DECISIONS.md`).
+Difusión-2026-27 is **not** a project — it's a filtered view over `conversation` rows where `project.slug = 'mamemi'` and `custom_fields->>'season' = '2026-27'` (see ADR *Polymorphic core* in `DECISIONS.md`).
 
 ### 3.3 `person`  (per record — global, workspace-less)
 
-`person` lives outside any workspace: the same human can be reused across tenants. Privacy is enforced via `person_note.visibility` (workspace|private) and via RLS (you can see a person only if you share an engagement or note with them).
+`person` lives outside any workspace: the same human can be reused across tenants. Privacy is enforced via `person_note.visibility` (workspace|private) and via RLS (you can see a person only if you share an conversation or note with them).
 
 | Source column | Target column | Notes |
 |---|---|---|
@@ -106,7 +106,7 @@ Difusión-2026-27 is **not** a project — it's a filtered view over `engagement
 | `Ciutat d'enviament` | `city` | Title-case. |
 | inferred | `country` | `'ES'` if `Categoria procedència = catalunya` or `Província ∈ {Catalan/Spanish provinces}`, else ISO-2 from `Província`. |
 | (see §3.6) | `custom_fields` | Source-of-origin metadata (jsonb). |
-| (runtime) | `created_by` | `auth.users.id` of the HOUR_OWNER_EMAIL account. Nullable — `--skip-engagements` mode lands persons with `created_by = NULL`. |
+| (runtime) | `created_by` | `auth.users.id` of the HOUR_OWNER_EMAIL account. Nullable — `--skip-conversations` mode lands persons with `created_by = NULL`. |
 
 Dedupe key: `email` where present (unique globally on `person(email)` — the column is `extensions.citext`, which is case-insensitive, so the `UNIQUE` constraint is equivalent to a `lower(email)` index); otherwise fall back to `custom_fields->'sources'->'mostra_igualada_2026'->>'registre'` as a deterministic shadow key.
 
@@ -116,9 +116,9 @@ The `tag` and `tagging` tables were dropped in reset v2 (2026-04-19). Tag infras
 
 `build/import/03_load_to_hour.py` drops the tag-creation step (previously step 3 of the Stage 3 workflow) as part of the reset-v2 code adjustment. The seven tag names enumerated in the pre-v2 version of this doc (`src:mostra-igualada-2026`, `procedencia:*`, `tipologia:*`) remain discoverable as `custom_fields` keys — any Phase 0.5 migration that brings tagging back can backfill from there without re-reading the CSVs.
 
-### 3.5 `engagement` (per person × project)
+### 3.5 `conversation` (per person × project)
 
-One row per (person, project) in MaMeMi's workspace. Status defaults to **`contacted`** — the first value in the new anti-CRM enum (`contacted, in_conversation, hold, confirmed, declined, dormant, recurring`). Marco progresses them manually: `contacted → in_conversation → hold → confirmed` (with `declined | dormant | recurring` as steady states). Note: `engagement` no longer carries `date_id` — that linkage now lives on `show.engagement_id` (ADR-001), so the loader does not try to attach dates to engagements.
+One row per (person, project) in MaMeMi's workspace. Status defaults to **`contacted`** — the first value in the new anti-CRM enum (`contacted, in_conversation, hold, confirmed, declined, dormant, recurring`). Marco progresses them manually: `contacted → in_conversation → hold → confirmed` (with `declined | dormant | recurring` as steady states). Note: `conversation` no longer carries `date_id` — that linkage now lives on `show.conversation_id` (ADR-001), so the loader does not try to attach dates to conversations.
 
 | Target column | Value at import |
 |---|---|
@@ -127,13 +127,13 @@ One row per (person, project) in MaMeMi's workspace. Status defaults to **`conta
 | `person_id` | the person upserted in §3.3 |
 | `status` | `'contacted'` on insert; `ON CONFLICT DO NOTHING` so Marco's later edits survive reruns |
 | `custom_fields` | `{"season": "2026-27"}` — this is the handle the `difusión-2026-27` filtered view uses |
-| `created_by` | `auth.users.id` of HOUR_OWNER_EMAIL. Nullable on the current schema — `--skip-engagements` remains the safer path when Marco hasn't signed up; otherwise use his uid |
+| `created_by` | `auth.users.id` of HOUR_OWNER_EMAIL. Nullable on the current schema — `--skip-conversations` remains the safer path when Marco hasn't signed up; otherwise use his uid |
 
-Uniqueness: `UNIQUE (workspace_id, project_id, person_id)` on the `engagement` table.
+Uniqueness: `UNIQUE (workspace_id, project_id, person_id)` on the `conversation` table.
 
 ### 3.6 `custom_fields` — JSONB schema
 
-`custom_fields jsonb NOT NULL DEFAULT '{}'::jsonb` exists on `person`, `project`, `engagement`, and `date` since the polymorphic reset (no separate migration needed — see §5).
+`custom_fields jsonb NOT NULL DEFAULT '{}'::jsonb` exists on `person`, `project`, `conversation`, and `date` since the polymorphic reset (no separate migration needed — see §5).
 
 Shape on `person.custom_fields` after import:
 
@@ -157,13 +157,13 @@ Shape on `person.custom_fields` after import:
 }
 ```
 
-Shape on `engagement.custom_fields` after import:
+Shape on `conversation.custom_fields` after import:
 
 ```jsonc
 { "season": "2026-27" }
 ```
 
-Rationale: heterogeneous source-level metadata (each festival's dossier has its own fields) doesn't deserve dedicated columns. JSONB keeps the raw signal while still allowing GIN indexing if we ever need to query by it. The `season` handle on `engagement` is what lets Difusión 2026-27 stay a filter rather than a real project row.
+Rationale: heterogeneous source-level metadata (each festival's dossier has its own fields) doesn't deserve dedicated columns. JSONB keeps the raw signal while still allowing GIN indexing if we ever need to query by it. The `season` handle on `conversation` is what lets Difusión 2026-27 stay a filter rather than a real project row.
 
 ---
 
@@ -183,7 +183,7 @@ Rationale: heterogeneous source-level metadata (each festival's dossier has its 
 
 ## 5. Pre-flight migration: `custom_fields jsonb`
 
-**Already applied.** The polymorphic reset (`polymorphic_schema` migration, 2026-04-19) ships `custom_fields jsonb NOT NULL DEFAULT '{}'::jsonb` on `person`, `project`, `engagement`, and `date`, plus a GIN index on `person.custom_fields` (`jsonb_path_ops`). No separate `0005_custom_fields.sql` step exists — the column is part of the canonical schema in `build/schema.sql`. The ADR *Activate `custom_fields jsonb` on tenant tables* is marked **Accepted** in `DECISIONS.md`.
+**Already applied.** The polymorphic reset (`polymorphic_schema` migration, 2026-04-19) ships `custom_fields jsonb NOT NULL DEFAULT '{}'::jsonb` on `person`, `project`, `conversation`, and `date`, plus a GIN index on `person.custom_fields` (`jsonb_path_ops`). No separate `0005_custom_fields.sql` step exists — the column is part of the canonical schema in `build/schema.sql`. The ADR *Activate `custom_fields jsonb` on tenant tables* is marked **Accepted** in `DECISIONS.md`.
 
 ---
 
@@ -225,16 +225,16 @@ Env (read from repo-root `.env`):
 - Required: `SUPABASE_URL`, `SUPABASE_SECRET_KEY` (`sb_secret_...` from "Publishable and secret API keys" tab; legacy `SUPABASE_SERVICE_ROLE_KEY` env var name still supported by the script but the new model is preferred).
 - Optional: `HOUR_WORKSPACE_SLUG=marco-rubiol`, `HOUR_WORKSPACE_NAME="Marco Rubiol"`, `HOUR_PROJECT_SLUG=mamemi`, `HOUR_PROJECT_NAME=MaMeMi`, `HOUR_SEASON=2026-27`, `HOUR_OWNER_EMAIL=marcorubiol@gmail.com`.
 
-Flags: `--dry-run`, `--limit N`, `--verbose`, `--skip-engagements` (load only persons — use before Marco has signed up, so the engagement rows have a real `created_by`).
+Flags: `--dry-run`, `--limit N`, `--verbose`, `--skip-conversations` (load only persons — use before Marco has signed up, so the conversation rows have a real `created_by`).
 
 Steps (post reset-v2):
 1. Ensure the `workspace` row (`slug=marco-rubiol`, `kind=personal`) — upsert, idempotent. The INSERT path triggers `workspace_seed_roles` in cascade, which seeds 15 rows into `workspace_role`.
 2. Ensure the `project` row (`slug=mamemi`, `status=active`, `workspace_id=<marco-rubiol>`) — upsert on `(workspace_id, slug)`. **Do not set `type`** — the column and `project_type` enum were removed by ADR-007.
 3. *(removed — tag/tagging tables were dropped in reset v2; provenance lives in `person.custom_fields` only. See §3.4.)*
-4. Resolve `HOUR_OWNER_EMAIL` → `auth.users.id`. If absent: warn, force `--skip-engagements` semantics, continue with `person.created_by = NULL`.
+4. Resolve `HOUR_OWNER_EMAIL` → `auth.users.id`. If absent: warn, force `--skip-conversations` semantics, continue with `person.created_by = NULL`.
 5. For each canonical row:
    - Upsert `person` on `lower(email)` when email is present, else on `custom_fields->'sources'->'mostra_igualada_2026'->>'registre'` via a deterministic shadow key. Merge `custom_fields` with PostgREST JSON-merge semantics (don't clobber prior sources on rerun).
-   - Unless `--skip-engagements`: upsert `engagement (workspace_id, project_id, person_id)` with `status='contacted'` (anti-CRM default), `custom_fields={"season":"2026-27"}`, `created_by=<owner.id>`. `ON CONFLICT (workspace_id, project_id, person_id) DO NOTHING` — preserves Marco's later status changes across reruns.
+   - Unless `--skip-conversations`: upsert `conversation (workspace_id, project_id, person_id)` with `status='contacted'` (anti-CRM default), `custom_fields={"season":"2026-27"}`, `created_by=<owner.id>`. `ON CONFLICT (workspace_id, project_id, person_id) DO NOTHING` — preserves Marco's later status changes across reruns.
 6. Wrap each batch of 25 rows in a single PostgREST call. Safe to re-run any number of times.
 7. Print: inserted / updated / skipped / failed with row-level reasons.
 
@@ -253,13 +253,13 @@ person              : 156  (Programador + Fira/Festival, deduped on email)
   └─ without        : ~126
 tag / tagging       : 0    (dropped in reset v2; provenance lives in person.custom_fields)
 venue               : 0    (loader does not seed venues in Phase 0)
-engagement          : 156  (all status='contacted', custom_fields.season='2026-27')
+conversation          : 156  (all status='contacted', custom_fields.season='2026-27')
 show / date / line  : 0    (Marco creates shows manually as dates confirm)
 invoice* / payment  : 0    (out of scope for this load)
 expense             : 0    (out of scope)
 ```
 
-All 156 persons visible in Hour once the first UI screen lands, already filterable down to the "Difusión 2026-27" view via `project.slug=mamemi` + `engagement.custom_fields->>season='2026-27'`. Under `--skip-engagements` (owner not signed up yet), the engagement row count is 0 and `person.created_by` is NULL. Segmentation by procedencia/tipologia works off `person.custom_fields.sources.mostra_igualada_2026.*` until tag infrastructure lands in Phase 0.5.
+All 156 persons visible in Hour once the first UI screen lands, already filterable down to the "Difusión 2026-27" view via `project.slug=mamemi` + `conversation.custom_fields->>season='2026-27'`. Under `--skip-conversations` (owner not signed up yet), the conversation row count is 0 and `person.created_by` is NULL. Segmentation by procedencia/tipologia works off `person.custom_fields.sources.mostra_igualada_2026.*` until tag infrastructure lands in Phase 0.5.
 
 ---
 
@@ -281,10 +281,10 @@ All 156 persons visible in Hour once the first UI screen lands, already filterab
 5. ☑ Implement `01_normalize.py` → run → inspect `01_canonical.jsonl`.
 6. ☑ Implement `02_enrich_from_pdf.py` → run → inspect `02_enriched.jsonl` + unmatched report.
 7. ☑ Marco fills `manual-matches.yaml` for any unmatched profiles he can identify.
-8. ☐ **Reset v2 migration applied** (18 tables: workspace/workspace_role/workspace_membership/person/venue/project/project_membership/line/engagement/show/date/person_note/invoice/invoice_line/payment/expense/user_profile/audit_log). `build/seed.sql` CLAIM block renames Marco's auto-created workspace to `marco-rubiol` and upserts the `mamemi` project (no `type` column).
-9. ☐ **Adjust `03_load_to_hour.py`** for reset v2: drop the tag/tagging step, drop `type='show'` from project upsert, switch engagement status default to `contacted`. (Windsurf task — out of scope for this plan.)
+8. ☐ **Reset v2 migration applied** (18 tables: workspace/workspace_role/workspace_membership/person/venue/project/project_membership/line/conversation/show/date/person_note/invoice/invoice_line/payment/expense/user_profile/audit_log). `build/seed.sql` CLAIM block renames Marco's auto-created workspace to `marco-rubiol` and upserts the `mamemi` project (no `type` column).
+9. ☐ **Adjust `03_load_to_hour.py`** for reset v2: drop the tag/tagging step, drop `type='show'` from project upsert, switch conversation status default to `contacted`. (Windsurf task — out of scope for this plan.)
 10. ☐ **Marco signs up** at `hour.zerosense.studio` (or the workers.dev URL) with `marcorubiol@gmail.com` → run `build/seed.sql` CLAIM block → enable `custom_access_token_hook` in the Supabase Dashboard (Auth → Hooks).
-11. ☐ Live run: `python3 build/import/03_load_to_hour.py` (no flags) → lands 156 persons + 156 engagements (status=`contacted`) on the `mamemi` project with `season=2026-27` in `custom_fields`. No tag/tagging rows.
-12. ☐ Verify with `GET /api/engagements?project_slug=mamemi&season=2026-27` using a real JWT; cross-check counts against §7.
+11. ☐ Live run: `python3 build/import/03_load_to_hour.py` (no flags) → lands 156 persons + 156 conversations (status=`contacted`) on the `mamemi` project with `season=2026-27` in `custom_fields`. No tag/tagging rows.
+12. ☐ Verify with `GET /api/conversations?project_slug=mamemi&season=2026-27` using a real JWT; cross-check counts against §7.
 
 Each step leaves disk artefacts — safe to rerun from any point.

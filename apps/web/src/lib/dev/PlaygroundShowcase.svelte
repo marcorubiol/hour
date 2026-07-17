@@ -183,7 +183,7 @@
         External
         {#snippet tail()}<span aria-hidden="true">↗</span>{/snippet}
       </LinkButton>
-      <LinkButton href="/h/muk-cia/contacts">Contacts</LinkButton>
+      <LinkButton href="/h/conversations">Conversations</LinkButton>
     </div>
   </section>
 
@@ -201,7 +201,7 @@
       label="Search"
       name="search"
       type="search"
-      placeholder="Search engagements..."
+      placeholder="Search conversations..."
     />
   </section>
 
@@ -387,9 +387,9 @@
   </section>
 
   <section class="playground__section">
-    <h2 class="h3">Badge — engagement status (real domain)</h2>
+    <h2 class="h3">Badge — conversation status (real domain)</h2>
     <p class="text--s text--dark-muted">
-      Mirrors the pills shown in the Contacts lens.
+      Mirrors the pills shown in the Conversations lens.
     </p>
     <div class="playground__row">
       <Badge tone="info">Contacted</Badge>
@@ -622,7 +622,7 @@
     {/if}
   </section>
 
-  <Dialog bind:open={dialogBasicOpen} title="Engagement details" description="Quick info shown in a modal.">
+  <Dialog bind:open={dialogBasicOpen} title="Conversation details" description="Quick info shown in a modal.">
     <p>
       The road sheet for this gig is still pending. Confirm dates and venue
       contacts before sending the contract.
@@ -636,13 +636,13 @@
 
   <Dialog
     bind:open={dialogConfirmOpen}
-    title="Delete engagement?"
+    title="Delete conversation?"
     description="This action cannot be undone."
     closeOnBackdrop={false}
     size="s"
   >
     <p>
-      The engagement and all attached notes will be removed. This affects 1 row
+      The conversation and all attached notes will be removed. This affects 1 row
       across 2 reports.
     </p>
     {#snippet actions()}
@@ -661,7 +661,7 @@
         onclick={() => {
           dialogConfirmOpen = false;
           dialogResult = 'deleted';
-          addToast({ tone: 'danger', title: 'Deleted', message: 'Engagement removed.' });
+          addToast({ tone: 'danger', title: 'Deleted', message: 'Conversation removed.' });
         }}
       >
         Delete
@@ -704,7 +704,7 @@
         size="s"
         variant="outline"
         onclick={() =>
-          addToast({ tone: 'success', title: 'Saved', message: 'Engagement updated.' })}
+          addToast({ tone: 'success', title: 'Saved', message: 'Conversation updated.' })}
       >
         Success
       </Button>
@@ -833,7 +833,7 @@
     <div class="playground__row">
       <Pill active>Today</Pill>
       <Pill>Calendar</Pill>
-      <Pill>Contacts</Pill>
+      <Pill>Conversations</Pill>
       <Pill>Money</Pill>
     </div>
     <div class="playground__row">

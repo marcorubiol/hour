@@ -5,11 +5,11 @@ const PASSWORD = process.env.PW_TEST_PASSWORD;
 
 /**
  * E2E — contact capture (ADR-051): add a person + conversation from the
- * Contacts lens, duplicate returns 409, self-clean via DELETE.
+ * Conversations lens, duplicate returns 409, self-clean via DELETE.
  *
  * Fixtures live in the `playwright` workspace (project zzz-e2e-collab).
  * The fixture person (stable zzz e-mail) persists globally — reruns
- * reuse it via the RPC's find-or-create, and the engagement resurrects
+ * reuse it via the RPC's find-or-create, and the conversation resurrects
  * from its soft-deleted state, so nothing accumulates.
  */
 
@@ -24,8 +24,8 @@ test.describe('contact capture', () => {
   }) => {
     test.setTimeout(90_000);
 
-    await page.goto('/h/contacts'); // ADR-067: lens is space-less + cross-space
-    await expect(page.getByRole('button', { name: 'Add contact' })).toBeVisible();
+    await page.goto('/h/conversations'); // ADR-067: lens is space-less + cross-space
+    await expect(page.getByRole('button', { name: 'Add conversation' })).toBeVisible();
 
     // Crash recovery: a run killed after create but before the tail
     // cleanup would leave the fixture conversation live → next run's
@@ -34,7 +34,7 @@ test.describe('contact capture', () => {
     // filter by the fixture email.)
     await page.evaluate(async ({ name, email }) => {
       const list = await fetch(
-        `/api/engagements?status=any&q=${encodeURIComponent(name)}`,
+        `/api/conversations?status=any&q=${encodeURIComponent(name)}`,
       );
       const items = (
         (await list.json()) as {
@@ -42,12 +42,12 @@ test.describe('contact capture', () => {
         }
       ).items.filter((i) => i.person?.email === email);
       for (const i of items) {
-        await fetch(`/api/engagements/${i.id}`, { method: 'DELETE' });
+        await fetch(`/api/conversations/${i.id}`, { method: 'DELETE' });
       }
     }, { name: FIXTURE_NAME, email: FIXTURE_EMAIL });
 
     // Capture through the dialog.
-    await page.getByRole('button', { name: 'Add contact' }).click();
+    await page.getByRole('button', { name: 'Add conversation' }).click();
     const dialog = page.locator('dialog[open]');
     // The dialog is multi-space since ADR-057: projects are checkboxes
     // grouped by workspace, not a single select.
@@ -55,7 +55,7 @@ test.describe('contact capture', () => {
     await dialog.getByLabel('Full name').fill(FIXTURE_NAME);
     await dialog.getByLabel('Email').fill(FIXTURE_EMAIL);
     await dialog.getByLabel('Organization').fill('E2E Teatre');
-    await dialog.getByRole('button', { name: 'Add contact' }).click();
+    await dialog.getByRole('button', { name: 'Add conversation' }).click();
     await expect(dialog).not.toBeVisible({ timeout: 10_000 });
 
     // The new conversation shows up in the lens after the invalidation.
@@ -66,7 +66,7 @@ test.describe('contact capture', () => {
       timeout: 10_000,
     });
 
-    // Duplicate capture → 409 engagement_exists (no silent merge) — via
+    // Duplicate capture → 409 conversation_exists (no silent merge) — via
     // the API, same surface the dialog uses.
     const apiChecks = await page.evaluate(
       async ({ name, email }) => {
@@ -74,9 +74,9 @@ test.describe('contact capture', () => {
           'content-type': 'application/json',
         };
 
-        // Locate the created engagement (project + person embedded).
+        // Locate the created conversation (project + person embedded).
         const list = await fetch(
-          `/api/engagements?status=any&q=${encodeURIComponent(name)}`,
+          `/api/conversations?status=any&q=${encodeURIComponent(name)}`,
           { headers },
         );
         const items = (
@@ -87,7 +87,7 @@ test.describe('contact capture', () => {
         const mine = items.find((i) => i.person?.email === email);
         if (!mine) return { found: false as const };
 
-        const dup = await fetch('/api/engagements', {
+        const dup = await fetch('/api/conversations', {
           method: 'POST',
           headers,
           body: JSON.stringify({
@@ -97,13 +97,13 @@ test.describe('contact capture', () => {
         });
 
         // Self-clean: soft-delete the conversation (resurrects next run).
-        const del = await fetch(`/api/engagements/${mine.id}`, {
+        const del = await fetch(`/api/conversations/${mine.id}`, {
           method: 'DELETE',
           headers,
         });
 
         const after = await fetch(
-          `/api/engagements?status=any&q=${encodeURIComponent(name)}`,
+          `/api/conversations?status=any&q=${encodeURIComponent(name)}`,
           { headers },
         );
         const remaining = (

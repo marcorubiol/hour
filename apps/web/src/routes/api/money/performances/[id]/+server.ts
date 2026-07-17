@@ -3,7 +3,7 @@
  * (ADR-046). Fee lives in the Money lens by design: ADR-043 deliberately
  * excluded fee columns from the performance write path. The DB trigger
  * `guard_show_fee_columns` enforces `edit:money` on top of the RLS
- * UPDATE policy (`edit:show`) — a 42501 from the trigger maps to 403.
+ * UPDATE policy (`edit:performance`) — a 42501 from the trigger maps to 403.
  *
  * Body: { fee_amount: number|null, fee_currency?: 'EUR'-style code }.
  */

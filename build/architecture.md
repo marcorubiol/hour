@@ -4,10 +4,12 @@
 > Subdomain: `hour.zerosense.studio`
 > Status: Phase 0 internal tool → Phase 0.9 private beta hardening gate → Phase 1 SaaS if beta validates demand
 > Owner: Marco Rubiol
-> Data model: **reset v2 + roadsheet delta** (2026-04-19 + 2026-05-01) — **22 tables**, polymorphic core (workspace + project + engagement + show + line + date) with money stack. Editable RBAC. Anti-CRM vocabulary. See `_decisions.md` ADR-001..007 + ADR-023.
-> Last reviewed: **2026-05-02** — Phase 0.9 gate defined, 22 tables confirmed, environments updated to current reality.
+> Data model: **reset v2 + roadsheet delta** (2026-04-19 + 2026-05-01) — **29 tables**, polymorphic core (workspace + project + conversation + performance + line + date) with money stack. Editable RBAC. Anti-CRM vocabulary. See `_decisions.md` ADR-001..007 + ADR-023 + ADR-075.
+> Last reviewed: **2026-07-17** — table count re-counted against the live catalog (29, was documented as 22 since 2026-05-02: `account`, `account_membership`, `calendar_share`, `roadsheet_share`, `task`, `workspace_alias_request` and the cast/collab tables all landed after that review); the `show` → `performance` rename (ADR-036, 2026-05-19) applied to this doc at last; ADR-075 applied. Previous review **2026-05-02** — Phase 0.9 gate defined, 22 tables confirmed, environments updated.
 >
 > ⚠️ **Structure / nav / UX model is NOT here** — it lives in `structure-model.md` (ADR-063, canonical: lens vs module vs task, edit levels). This doc is data model + stack + security; anything it says about lenses/nav/tasks (§7, §17 "Houses/Rooms", repo layout) predates the 2026-07 nav re-architecture and is superseded there.
+>
+> ⚠️ **Vocabulary amendments applied to this doc, 2026-07-17.** **ADR-075**: `engagement` → `conversation` (table, enum `conversation_status`, `*.conversation_id` columns, RPCs `create_conversation` / `delete_conversation`, route `/api/conversations`, permissions `read:conversation` / `edit:conversation`). **ADR-036 debt closed the same day**: `show` → `performance` throughout — this doc had carried the dead word since 2026-05-19 because its last review predated the rename; the permission is now `edit:performance`, the view `performance_redacted`, the trigger function `guard_performance_fee_columns` (migration `2026-07-17_close_adr036_show_debt.sql` — the DB itself still had the old function name and its error text). **"Contact" survives as the book concept** — a contact is whoever you deal with, person *or* organization; only the lens/module named "Contacts" died. `contacted` remains a `conversation_status` value, and venue/road-sheet contacts are an unrelated namespace. § "What moved where (reset v2 map)" keeps its reset-v2 names on purpose — it is audit trail, not current state.
 
 ---
 
@@ -67,17 +69,17 @@
 Every tenant-scoped row carries `workspace_id UUID NOT NULL`. RLS policies enforce isolation at the database level — **never** trust application code for tenant isolation. The tenant is called a **workspace** (not "organization") because it holds both personal setups (`kind='personal'`) and team setups (`kind='team'`) — this matches the multi-hat freelance reality.
 
 ### Entities scope
-- **Workspace-scoped**: workspace, workspace_membership, workspace_role, venue, project, project_membership, line, show, date, engagement, person_note, invoice, invoice_line, payment, expense, audit_log. All carry `workspace_id` directly or via their parent.
-- **Global (not workspace-scoped)**: `person` is a shared registry. Anyone in any workspace may reference the same person (e.g. a programmer seen by two booking managers). Privacy comes from `person_note.visibility` (`workspace` vs `private`) and from the workspace-scoped `engagement` row, not from the person row itself.
+- **Workspace-scoped**: workspace, workspace_membership, workspace_role, venue, project, project_membership, line, performance, date, conversation, person_note, invoice, invoice_line, payment, expense, audit_log. All carry `workspace_id` directly or via their parent.
+- **Global (not workspace-scoped)**: `person` is a shared registry. Anyone in any workspace may reference the same person (e.g. a programmer seen by two booking managers). Privacy comes from `person_note.visibility` (`workspace` vs `private`) and from the workspace-scoped `conversation` row, not from the person row itself.
 - **User-scoped**: `user_profile` (mirrors `auth.users`).
 - **Cross-workspace** relationships are explicit: a user gains access to another workspace via a `workspace_membership` row; project-level scoping lives in `project_membership` (roles + grants/revokes).
 
 ### Polymorphism without a `type` tag
-No `project.type` column (ADR-007). Polymorphism is **emergent from subentity presence**: a project with `line` rows is a tour/season; a project with `show` rows is performance-driven; a project with only `date` rows is a creation cycle; combinations are legitimate.
+No `project.type` column (ADR-007). Polymorphism is **emergent from subentity presence**: a project with `line` rows is a tour/season; a project with `performance` rows is performance-driven; a project with only `date` rows is a creation cycle; combinations are legitimate.
 
-`engagement` and `show` are the two primitives at the next layer — engagement carries the conversation (anti-CRM status), show is the atomic performance (project × performed_at × venue) with its own hold lifecycle. They connect via optional `show.engagement_id`. `date` remains the calendar primitive for non-performance events (rehearsal, residency, travel_day, press, other); `date.show_id` optionally ties a rehearsal or travel day to a specific show. Money flows through `invoice` → `invoice_line` (optionally referencing shows, supporting tour-as-one-invoice) with `payment` rows N:1 against invoice, and `expense` rows grounded in either a show or a line (XOR CHECK).
+`conversation` and `performance` are the two primitives at the next layer — conversation carries the running dialogue with a contact (anti-CRM status), performance is the atomic performance (project × performed_at × venue) with its own hold lifecycle. They connect via optional `performance.conversation_id`. `date` remains the calendar primitive for non-performance events (rehearsal, residency, travel_day, press, other); `date.performance_id` optionally ties a rehearsal or travel day to a specific performance. Money flows through `invoice` → `invoice_line` (optionally referencing shows, supporting tour-as-one-invoice) with `payment` rows N:1 against invoice, and `expense` rows grounded in either a performance or a line (XOR CHECK).
 
-"Difusión 2026-27" is not a row anywhere — it's a filtered view over `mamemi`'s engagements via `custom_fields->>season='2026-27'`.
+"Difusión 2026-27" is not a row anywhere — it's a filtered view over `mamemi`'s conversations via `custom_fields->>season='2026-27'`.
 
 ### RLS pattern (standard)
 ```sql
@@ -94,9 +96,9 @@ CREATE POLICY <name>_select ON <table>
 
 `public.current_workspace_id()` reads the `current_workspace_id` claim from `auth.jwt()`. The claim is injected by `public.custom_access_token_hook(event jsonb)`, which Supabase invokes at sign-in and on each session refresh — it picks the user's first accepted `workspace_membership` row. Workspace switching = re-issue the session (Supabase `auth.refreshSession()` with a new active workspace stored in user metadata, then replay the hook).
 
-Per-project access goes through `has_permission(project_id, perm)` (ADR-006) — effective permissions are `union(workspace_role.permissions for role in project_membership.roles) + permission_grants - permission_revokes`. Workspace `owner`/`admin` on `workspace_membership` bypass the per-project check. The 10-permission vocabulary is closed: `read:money, read:engagement, read:person_note_private, read:internal_notes, edit:show, edit:engagement, edit:money, edit:project_meta, edit:membership, admin:project`.
+Per-project access goes through `has_permission(project_id, perm)` (ADR-006) — effective permissions are `union(workspace_role.permissions for role in project_membership.roles) + permission_grants - permission_revokes`. Workspace `owner`/`admin` on `workspace_membership` bypass the per-project check. The 10-permission vocabulary is closed: `read:money, read:conversation, read:person_note_private, read:internal_notes, edit:performance, edit:conversation, edit:money, edit:project_meta, edit:membership, admin:project`.
 
-`show.fee_*` columns are additionally gated: the `show_redacted` view masks them when the caller lacks `read:money` (read path), and the `guard_show_fee_columns` trigger blocks fee UPDATE without `edit:money` (write path). `person_note.visibility='private'` is readable only by `author_id = auth.uid()` plus `read:person_note_private`; `visibility='workspace'` requires only workspace membership.
+`performance.fee_*` columns are additionally gated: the `performance_redacted` view masks them when the caller lacks `read:money` (read path), and the `guard_performance_fee_columns` trigger blocks fee UPDATE without `edit:money` (write path). `person_note.visibility='private'` is readable only by `author_id = auth.uid()` plus `read:person_note_private`; `visibility='workspace'` requires only workspace membership.
 
 ---
 
@@ -110,7 +112,7 @@ Per-project access goes through `has_permission(project_id, perm)` (ADR-006) —
 
 ## 6. Phase 0 entity map (summary)
 
-Full schema in `migrations/2026-05-01_reset_v2_roadsheet.sql` (canonical current). **22 tables**, grouped:
+Full schema in `migrations/2026-05-01_reset_v2_roadsheet.sql` (canonical current). **29 tables**, grouped:
 
 **Tenant + identity**
 - `workspace` — tenant root. Columns: `slug`, `name`, `kind ∈ {personal,team}`, `country`, `timezone`, `settings jsonb`, `custom_fields jsonb`. Pre-seeded: `marco-rubiol` (Marco's personal workspace).
@@ -121,30 +123,30 @@ Full schema in `migrations/2026-05-01_reset_v2_roadsheet.sql` (canonical current
 **Project + grouping**
 - `project` — belongs to workspace. **No `type` column** (ADR-007). `status ∈ {draft,active,archived}`, generic `description`, `starts_on`, `ends_on`, `dossier_url`, `poster_url`, `custom_fields jsonb`. Polymorphism emerges from which subentities exist.
 - `project_membership` — per-user access with `roles text[]` (codes from `workspace_role`), `permission_grants text[]`, `permission_revokes text[]`. Effective perms = `union(role.permissions) + grants - revokes`.
-- `line` — optional grouping between project and show (ADR-005). `kind ∈ {tour,season,phase,circuit,residency,other}`, `territory`, `status`, date range.
+- `line` — optional grouping between project and performance (ADR-005). `kind ∈ {tour,season,phase,circuit,residency,other}`, `territory`, `status`, date range.
 
 **People (anti-CRM, 3-layer)**
 - `person` — **global** (no `workspace_id`). `full_name` (required), `email citext`, `phone`, `organization_name`, `city`, `country`, `title`, `website`, `languages text[]`, `custom_fields jsonb`. Anyone, any workspace, same row.
-- `engagement` — workspace-scoped (person_id, project_id, workspace_id). Conversation state: `status ∈ {contacted, in_conversation, hold, confirmed, declined, dormant, recurring}` (ADR-001). No `date_id` — the linkage to specific dates moved to `show.engagement_id`.
+- `conversation` — workspace-scoped (person_id, project_id, workspace_id). Conversation state: `status conversation_status ∈ {contacted, in_conversation, hold, confirmed, declined, dormant, recurring}` (ADR-001). No `date_id` — the linkage to specific dates lives on `performance.conversation_id`.
 - `person_note` — free-form notes on a person, workspace-scoped. `visibility ∈ {workspace,private}`; `private` readable only by `author_id` + `read:person_note_private`.
 
 **Calendar + venues**
 - `venue` — recurring physical place (name, city, country, address, capacity, contacts jsonb, notes).
-- `show` — atomic performance (ADR-002). `(project_id, line_id null, engagement_id null, performed_at date, venue_id null, status show_status, fee_amount, fee_currency)`. Status enum covers `proposed → hold / hold_1/2/3 → confirmed → done → invoiced → paid` plus `cancelled`. No UNIQUE on the slot — two simple holds can coexist.
-- `date` — non-performance calendar primitive. `kind ∈ {rehearsal, residency, travel_day, press, other}`, `status ∈ {tentative, confirmed, cancelled, done}`. Optional `show_id` and `venue_id` tie a rehearsal or travel day to a specific show/venue.
+- `performance` — atomic performance (ADR-002). `(project_id, line_id null, conversation_id null, performed_at date, venue_id null, status performance_status, fee_amount, fee_currency)`. Status enum covers `proposed → hold / hold_1/2/3 → confirmed → done → invoiced → paid` plus `cancelled`. No UNIQUE on the slot — two simple holds can coexist.
+- `date` — non-performance calendar primitive. `kind ∈ {rehearsal, residency, travel_day, press, other}`, `status ∈ {tentative, confirmed, cancelled, done}`. Optional `performance_id` and `venue_id` tie a rehearsal or travel day to a specific performance/venue.
 
 **Money (ADR-003)**
 - `invoice` — header (number, issued_on, due_on, status, subtotal, VAT, IRPF, total, currency, payer_person_id).
-- `invoice_line` — line item with optional `show_id` (tour-as-one-invoice). `line_total = quantity * unit_amount` (generated).
+- `invoice_line` — line item with optional `performance_id` (tour-as-one-invoice). `line_total = quantity * unit_amount` (generated).
 - `payment` — abono against invoice (amount, received_on, method, reference). N:1 with invoice.
-- `expense` — cost. XOR CHECK: exactly one of `show_id` / `line_id` is set.
+- `expense` — cost. XOR CHECK: exactly one of `performance_id` / `line_id` is set.
 
 **Audit**
-- `audit_log` — append-only. Triggers on workspace, workspace_membership, workspace_role, venue, project, project_membership, line, show, date, engagement, person, person_note, invoice, payment, expense.
+- `audit_log` — append-only. Triggers on workspace, workspace_membership, workspace_role, venue, project, project_membership, line, performance, date, conversation, person, person_note, invoice, payment, expense.
 
 **Roadsheet (ADR-023, 4 tables added 2026-05-01)**
-- `crew_assignment` — junction `show` × `person` with role, call_time, notes.
-- `cast_override` — per-show overrides of cast defaults (role, person, notes).
+- `crew_assignment` — junction `performance` × `person` with role, call_time, notes.
+- `cast_override` — per-performance overrides of cast defaults (role, person, notes).
 - `asset_version` — versioned assets (riders, dossiers) with `direction` enum (`outbound|inbound|adapted`).
 - `collab_snapshot` — Yjs CRDT snapshots for collaborative editing of text fields.
 
@@ -159,16 +161,16 @@ Full schema in `migrations/2026-05-01_reset_v2_roadsheet.sql` (canonical current
 | `tag`, `tagging`                   | Dropped — deferred to Phase 0.5 |
 | *(fee on show)*                    | Added `show.fee_amount/fee_currency` + invoice/payment/expense stack |
 
-### Contacts — Difusión migration
-The 156 programmers/festivals from MaMeMi's current markdown CRM + dossier PDF import as `person` rows (global) linked to the `mamemi` project via `engagement` rows with `status='contacted'` and `custom_fields.season='2026-27'`. Source provenance preserved in `person.custom_fields.sources.mostra_igualada_2026.*` (no tags — tag/tagging deferred to Phase 0.5). Migration plan + pipeline in `import/` (3-stage normalize→enrich→load). DIY bands are deferred out of Phase 0.
+### Conversations — Difusión migration
+The 156 programmers/festivals from MaMeMi's current markdown CRM + dossier PDF import as `person` rows (global) linked to the `mamemi` project via `conversation` rows with `status='contacted'` and `custom_fields.season='2026-27'`. Source provenance preserved in `person.custom_fields.sources.mostra_igualada_2026.*` (no tags — tag/tagging deferred to Phase 0.5). Migration plan + pipeline in `import/` (3-stage normalize→enrich→load). DIY bands are deferred out of Phase 0.
 
 ---
 
 ## 7. Tasks — deferred
 
-The polymorphic reset (and reset v2) runs without a `task` table. Phase 0 booking-outreach workflow lives in `engagement.next_action_at` + `next_action_note`, and ad-hoc todos live in Marco's `.zerø` _tasks.md. Tag/tagging infrastructure is also deferred — see DECISIONS.md "Deferred → D1" for the combined Phase 0.5 scope.
+The polymorphic reset (and reset v2) runs without a `task` table. Phase 0 booking-outreach workflow lives in `conversation.next_action_at` + `next_action_note`, and ad-hoc todos live in Marco's `.zerø` _tasks.md. Tag/tagging infrastructure is also deferred — see DECISIONS.md "Deferred → D1" for the combined Phase 0.5 scope.
 
-When tasks come back (early Phase 1, first external user), the taxonomy stays the same — `dispatch → queue → ping → deferred → shelf → trace` — but the table will be polymorphic by `entity_type` (attach to a project, line, show, date, engagement, or sit free at workspace level).
+When tasks come back (early Phase 1, first external user), the taxonomy stays the same — `dispatch → queue → ping → deferred → shelf → trace` — but the table will be polymorphic by `entity_type` (attach to a project, line, performance, date, conversation, or sit free at workspace level).
 
 ---
 
@@ -236,12 +238,12 @@ Explicit non-goals — decided now to protect scope:
 | Decision | Choice | Why |
 |----------|--------|-----|
 | Tenant key | `workspace_id` + `current_workspace_id` JWT claim (injected by `custom_access_token_hook`) | Works with Supabase RLS natively, no app-layer tenant resolution. Renamed from `organization_id` to reflect `kind=personal|team`. |
-| Polymorphic core (reset v2) | `workspace + project + engagement + show + line + date`, no `project.type` | ADR-007: type emerges from subentity presence. ADR-001: engagement (conversation) and show (atomic gig) are distinct. ADR-005: `line` is the optional tour/season grouping. |
-| Anti-CRM vocabulary | `person`, `engagement`, status `contacted`, `next_action_at` | Fits the working reality of a freelance/collective booking manager; rejects funnel/lead/conversion/campaign language. Reset v2 enum: `contacted, in_conversation, hold, confirmed, declined, dormant, recurring`. |
-| Person is global | No `workspace_id` on `person` | Real programmers exist once and are seen by many workspaces; privacy lives in `person_note.visibility` and `engagement`, not the person row. |
-| Money stack | Three tables + bridge — `invoice` + `invoice_line` + `payment` + `expense` | ADR-003. Partial payments, tour-as-one-invoice, Spanish VAT/IRPF, expenses grounded in show or line (XOR). |
+| Polymorphic core (reset v2) | `workspace + project + conversation + performance + line + date`, no `project.type` | ADR-007: type emerges from subentity presence. ADR-001: conversation (conversation) and performance (atomic gig) are distinct. ADR-005: `line` is the optional tour/season grouping. |
+| Anti-CRM vocabulary | `person`, `conversation`, status `contacted`, `next_action_at` | Fits the working reality of a freelance/collective booking manager; rejects funnel/lead/conversion/campaign language. Reset v2 enum: `contacted, in_conversation, hold, confirmed, declined, dormant, recurring`. |
+| Person is global | No `workspace_id` on `person` | Real programmers exist once and are seen by many workspaces; privacy lives in `person_note.visibility` and `conversation`, not the person row. |
+| Money stack | Three tables + bridge — `invoice` + `invoice_line` + `payment` + `expense` | ADR-003. Partial payments, tour-as-one-invoice, Spanish VAT/IRPF, expenses grounded in performance or line (XOR). |
 | RBAC (reset v2) | Flat `workspace_membership.role` + editable `workspace_role` catalog + per-membership overrides | ADR-006. 10-permission closed vocabulary. Owner/admin bypass project-level checks explicitly. 15 system roles seeded by trigger on workspace INSERT. |
-| Fee gating on show | View `show_redacted` (read) + trigger `guard_show_fee_columns` (write) | ADR-003 column-level gate. `edit:show` suffices for most edits; fee edits require `edit:money`. |
+| Fee gating on performance | View `performance_redacted` (read) + trigger `guard_performance_fee_columns` (write) | ADR-003 column-level gate. `edit:performance` suffices for most edits; fee edits require `edit:money`. |
 | PK type | UUID v7 via PL/pgSQL | Time-ordered, index-friendly, safe to expose, no enumeration risk. `pg_uuidv7` not on Supabase Cloud whitelist. |
 | Media storage | R2 (not Supabase Storage) | Zero egress cost — Supabase Storage egress is the silent killer |
 | Queue | pgmq | Zero new infra. 10k jobs/day ceiling is fine for Phase 0-1. |
@@ -269,7 +271,7 @@ Resolutions (closed by 2026-05-01, kept here as audit trail):
 |--------|----------------|----------------|-----------------|
 | Orgs | 1 | 10–100 | none in P0 |
 | Users (total) | ≤5 | 100–1000 | none in P0 |
-| Contacts | ≤500 | ≤50k | Index audit at >10k |
+| Conversations | ≤500 | ≤50k | Index audit at >10k |
 | Events | ≤100/yr | ≤10k/yr | Partition at >100k |
 | Files (R2) | ≤10 GB | ≤500 GB | R2 cost review at 1TB |
 | Monthly cost | €0–20 | €50–100 | — |
@@ -350,7 +352,7 @@ the Worker is not.**
 
 | Route | Method | Purpose |
 |-------|--------|---------|
-| `/api/engagements` | GET | `engagement` rows with embedded `person` and `project`, filtered by `project_slug` (default `mamemi`), `status` (default `contacted`, `any` to disable), `season` (default `2026-27`). Thin PostgREST wrapper; RLS scopes by `current_workspace_id`. |
+| `/api/conversations` | GET | `conversation` rows with embedded `person` and `project`, filtered by `project_slug` (default `mamemi`), `status` (default `contacted`, `any` to disable), `season` (default `2026-27`). Thin PostgREST wrapper; RLS scopes by `current_workspace_id`. |
 | `/api/sentry-tunnel` | POST | Forwards Sentry envelopes from the browser SDK to the Sentry ingest host (DSN-derived) so adblockers / Brave Shields / Firefox ETP don't drop them. |
 | `/api/sentry-test` | GET | Smoke endpoint that throws an uncaught error so the server-side Sentry handle captures it. Dev-only by default; `?force=1` allowed in prod. |
 
@@ -384,7 +386,7 @@ authenticated users.
 - `rls-policies.sql` — RLS helpers + policies + guard/audit triggers + `custom_access_token_hook`
 - `seed.sql` — pre-seed (marco-rubiol workspace + mamemi project) + post-signup CLAIM block
 - `bootstrap.md` — step-by-step: create Supabase project, configure Auth, create CF Worker, configure DNS, first deploy, first user
-- `import-plan.md` + `import/` — 156 programmers markdown → `person` + `engagement` rows mapping; 3-stage pipeline (normalize → enrich → load)
+- `import-plan.md` + `import/` — 156 programmers markdown → `person` + `conversation` rows mapping; 3-stage pipeline (normalize → enrich → load)
 - (`_decisions.md` lives at project root, not here — it's the ADR log)
 
 ---

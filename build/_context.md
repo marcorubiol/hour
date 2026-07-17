@@ -86,6 +86,8 @@ Historical (do not follow):
 
 ## Status — 2026-05-02
 
+> **Enmienda 2026-07-17 (ADR-075):** todo lo fechado de aquí en adelante es un snapshot histórico — usa la nomenclatura vigente en su fecha, no la actual. ADR-075 renombró la entidad `engagement` → `conversation` (tabla, enum `conversation_status`, FKs `conversation_id`, RPCs `create_conversation`/`delete_conversation`, endpoint `/api/conversations`, ruta de entidad `/h/[workspace]/conversation/[slug]`) y cerró el diferido de ADR-036 pasando `edit:show` → `edit:performance` en el vocabulario RBAC. Los nombres viejos se conservan abajo como registro, no como instrucción. **No cambian:** el valor de enum `contacted`, ni el concepto de libro "contacto" (quien tratas — persona **u** organización).
+
 **Phase 0.0 foundation closed** — reset v2 + roadsheet schema applied (22 tables). SvelteKit migration complete. 13/13 UI primitives built. Next: Phase 0.1 (Plaza + Desk shell) after hardening items.
 
 ### Phase 0.9 gate defined

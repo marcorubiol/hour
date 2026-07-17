@@ -2,7 +2,7 @@
 """Stage 3 — load staging/02_enriched.jsonl into Supabase `hour-phase0`.
 
 Adapted 2026-04-19 to **reset v2**: no `project.type` column (ADR-007),
-no `tag` / `tagging` tables (deferred to Phase 0.5), `engagement.status`
+no `tag` / `tagging` tables (deferred to Phase 0.5), `conversation.status`
 defaults to `contacted` (anti-CRM enum, ADR-001). Provenance that used to
 be encoded as tags now lives in `person.custom_fields.sources.*`.
 
@@ -19,13 +19,13 @@ Config:
         HOUR_PROJECT_SLUG   = mamemi
         HOUR_PROJECT_NAME   = MaMeMi
         HOUR_SEASON         = 2026-27
-        HOUR_OWNER_EMAIL    = marcorubiol@gmail.com  (resolves engagement.created_by)
+        HOUR_OWNER_EMAIL    = marcorubiol@gmail.com  (resolves conversation.created_by)
 
 Flags:
     --dry-run          : show counts + a sample of each operation without writing.
     --limit N          : process only the first N enriched rows (smoke test).
     --verbose          : print one line per row.
-    --skip-engagements : load only persons (use before the owner has signed up).
+    --skip-conversations : load only persons (use before the owner has signed up).
 
 What it does:
     1. Ensure `workspace` row exists (marco-rubiol, kind=personal).
@@ -34,22 +34,22 @@ What it does:
     2. Ensure `project` row exists (mamemi, status=active). No `type` column.
     3. Resolve the owner user from HOUR_OWNER_EMAIL. If absent:
          - Load persons only (person.created_by is nullable).
-         - Skip engagements.
+         - Skip conversations.
          - Exit with a clear warning.
     4. For every row in 02_enriched.jsonl:
        a. Upsert a `person` row (deduped on email; lookup cascade below).
           `custom_fields` merge preserves `sources.*` across reruns.
-       b. Unless --skip-engagements: upsert `engagement`
+       b. Unless --skip-conversations: upsert `conversation`
           (workspace_id × project_id × person_id) with status='contacted'
           (anti-CRM default). Respects Marco's status changes — ON CONFLICT
-          DO NOTHING. `season` goes into engagement.custom_fields.
+          DO NOTHING. `season` goes into conversation.custom_fields.
 
 Expected ending state (fresh DB, owner signed in):
     workspace      : 1   (marco-rubiol)
     workspace_role : 15  (seeded by trigger)
     project        : 1   (mamemi, no type column)
     person         : 156
-    engagement     : 156 (all status='contacted' on first run)
+    conversation     : 156 (all status='contacted' on first run)
     tag / tagging  : 0   (dropped in reset v2 — deferred to Phase 0.5)
 """
 
@@ -322,7 +322,7 @@ def upsert_person(
     return inserted[0]["id"]
 
 
-def ensure_engagement(
+def ensure_conversation(
     sb: Supabase,
     workspace_id: str,
     project_id: str,
@@ -332,13 +332,13 @@ def ensure_engagement(
     *,
     dry_run: bool,
 ) -> bool:
-    """Insert engagement if (workspace, project, person) tuple not present.
-    Returns True if inserted. Leaves existing engagement.status untouched on reruns.
+    """Insert conversation if (workspace, project, person) tuple not present.
+    Returns True if inserted. Leaves existing conversation.status untouched on reruns.
     """
     if not person_id:
         return False
     hit = sb.select(
-        "engagement",
+        "conversation",
         workspace_id=f"eq.{workspace_id}",
         project_id=f"eq.{project_id}",
         person_id=f"eq.{person_id}",
@@ -349,7 +349,7 @@ def ensure_engagement(
     if dry_run:
         return True
     custom_fields = {"season": season} if season else {}
-    sb.insert("engagement", {
+    sb.insert("conversation", {
         "workspace_id": workspace_id,
         "project_id":   project_id,
         "person_id":    person_id,
@@ -371,7 +371,7 @@ def main() -> None:
                     help="Only process the first N enriched rows.")
     ap.add_argument("--verbose", action="store_true",
                     help="Print one line per row processed.")
-    ap.add_argument("--skip-engagements", action="store_true",
+    ap.add_argument("--skip-conversations", action="store_true",
                     help="Load persons only. Use before the owner has signed up.")
     args = ap.parse_args()
 
@@ -410,11 +410,11 @@ def main() -> None:
     owner_user = sb.find_user_by_email(owner_email)
     owner_user_id = owner_user["id"] if owner_user else None
 
-    if args.skip_engagements or not owner_user_id:
+    if args.skip_conversations or not owner_user_id:
         if not owner_user_id:
-            print(f"  ! No auth.users row for {owner_email} — engagements will be skipped.")
-            print(f"    (sign up first, then rerun without --skip-engagements)")
-        args.skip_engagements = True
+            print(f"  ! No auth.users row for {owner_email} — conversations will be skipped.")
+            print(f"    (sign up first, then rerun without --skip-conversations)")
+        args.skip_conversations = True
     else:
         print(f"  owner user resolved: {owner_user_id}")
 
@@ -428,9 +428,9 @@ def main() -> None:
     print(f"Processing {len(rows)} enriched rows...")
     stats = {
         "persons_upserted":      0,
-        "engagements_created":   0,
-        "engagements_preserved": 0,
-        "engagements_skipped":   0,
+        "conversations_created":   0,
+        "conversations_preserved": 0,
+        "conversations_skipped":   0,
         "errors":                0,
     }
 
@@ -440,16 +440,16 @@ def main() -> None:
             stats["persons_upserted"] += 1
 
             if person_id:
-                if args.skip_engagements:
-                    stats["engagements_skipped"] += 1
+                if args.skip_conversations:
+                    stats["conversations_skipped"] += 1
                 else:
-                    if ensure_engagement(
+                    if ensure_conversation(
                         sb, workspace_id, project_id, person_id, owner_user_id,
                         season, dry_run=args.dry_run,
                     ):
-                        stats["engagements_created"] += 1
+                        stats["conversations_created"] += 1
                     else:
-                        stats["engagements_preserved"] += 1
+                        stats["conversations_preserved"] += 1
 
             if args.verbose:
                 name = row.get("name") or row.get("company") or "(unknown)"

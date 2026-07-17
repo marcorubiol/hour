@@ -1,7 +1,7 @@
 /**
- * GET /api/engagements
+ * GET /api/conversations
  *
- * Lists engagements in the current workspace, with the linked person and
+ * Lists conversations in the current workspace, with the linked person and
  * project embedded. RLS + the `current_workspace_id` claim decide visibility —
  * this endpoint is a thin PostgREST wrapper, no RPC needed.
  *
@@ -15,17 +15,17 @@ import type { RequestHandler } from './$types';
 import * as v from 'valibot';
 import { extractAccessToken } from '$lib/auth';
 import {
-  ENGAGEMENT_SELECT,
-  ENGAGEMENT_STATUSES,
-  EngagementCreateSchema,
-  type EngagementItem,
-} from '$lib/engagement';
+  CONVERSATION_SELECT,
+  CONVERSATION_STATUSES,
+  ConversationCreateSchema,
+  type ConversationItem,
+} from '$lib/conversation';
 import { pgGet, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
 
 const QuerySchema = v.object({
   status: v.optional(
-    v.union([v.literal('any'), v.picklist(ENGAGEMENT_STATUSES)]),
+    v.union([v.literal('any'), v.picklist(CONVERSATION_STATUSES)]),
     'contacted',
   ),
   project_slug: v.optional(v.pipe(v.string(), v.minLength(1))),
@@ -109,7 +109,7 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
   const search = new URLSearchParams();
   // !inner joins: project when filtering by its slug; person when the
   // free-text search runs over its columns.
-  let select = ENGAGEMENT_SELECT;
+  let select = CONVERSATION_SELECT;
   if (project_slug) {
     select = select.replace('project:project_id(', 'project:project_id!inner(');
   }
@@ -152,7 +152,7 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
   search.set('offset', String(offset));
 
   try {
-    const { data, total } = await pgGet<EngagementItem>(env, 'engagement', jwt, {
+    const { data, total } = await pgGet<ConversationItem>(env, 'conversation', jwt, {
       search,
       exactCount: true,
     });
@@ -168,22 +168,22 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
   } catch (err) {
     return pgErrorResponse(
       err,
-      { route: 'GET /api/engagements', requestId: locals.requestId },
+      { route: 'GET /api/conversations', requestId: locals.requestId },
       { passUpstream: [401, 403] },
     );
   }
 };
 
 /**
- * POST /api/engagements — capture a contact/conversation (ADR-051).
+ * POST /api/conversations — capture a contact/conversation (ADR-051).
  *
- * Body: EngagementCreateSchema — project_id plus EXACTLY ONE of
+ * Body: ConversationCreateSchema — project_id plus EXACTLY ONE of
  * `person_id` (existing person) or `person` (inline fields; the RPC
- * find-or-creates on email). Goes through the `create_engagement` RPC
+ * find-or-creates on email). Goes through the `create_conversation` RPC
  * (SECURITY DEFINER): the direct INSERT is claim-bound — sixth case of
- * the pattern. Gated on has_permission(project, 'edit:engagement').
+ * the pattern. Gated on has_permission(project, 'edit:conversation').
  *
- * 409 engagement_exists: the (workspace, project, person) pair already
+ * 409 conversation_exists: the (workspace, project, person) pair already
  * has a conversation — the UI links to it instead of silently merging.
  */
 export const POST: RequestHandler = async ({ request, platform, locals }) => {
@@ -199,7 +199,7 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
   } catch {
     return json({ error: 'invalid_body' }, 400);
   }
-  const parsed = v.safeParse(EngagementCreateSchema, raw);
+  const parsed = v.safeParse(ConversationCreateSchema, raw);
   if (!parsed.success) {
     return json(
       {
@@ -222,7 +222,7 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
   }
 
   try {
-    const { data } = await pgPostRpc<Record<string, unknown>>(env, 'create_engagement', jwt, {
+    const { data } = await pgPostRpc<Record<string, unknown>>(env, 'create_conversation', jwt, {
       p_project_id: input.project_id,
       p_person_id: input.person_id ?? null,
       p_full_name: input.person?.full_name ?? null,
@@ -237,18 +237,18 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
       p_line_id: input.line_id ?? null,
     });
     if (data.length === 0 || !data[0]) return json({ error: 'create_failed' }, 502);
-    return json({ engagement: data[0] }, 201);
+    return json({ conversation: data[0] }, 201);
   } catch (err) {
     return pgErrorResponse(
       err,
-      { route: 'POST /api/engagements', requestId: locals.requestId },
+      { route: 'POST /api/conversations', requestId: locals.requestId },
       {
         codes: {
           '22023': { status: 400, error: 'invalid_input' },
           '42501': { status: 403, error: 'forbidden' },
           '23505': {
             status: 409,
-            error: 'engagement_exists',
+            error: 'conversation_exists',
             hint: 'This person already has a conversation in this project.',
           },
         },
