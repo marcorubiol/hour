@@ -7,6 +7,8 @@
 > appears only on entity URLs, as a machine short-id (or its granted alias, inbound-only).
 > Model these screens against `build/structure-model.md` (lens vs module vs entity edit surface).
 > Each list item is a design unit — tick it when its visual design is done.
+> Data dimension per screen: `build/screen-data-spec.md` (normative what-goes-in-each-page,
+> with [now]/[db]/[gap] delta — the design+data pass in `_tasks.md` reviews both together).
 
 ## Product screens — with URL
 

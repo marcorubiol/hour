@@ -1,0 +1,21 @@
+{
+  "hall.greeting_morning": "Bon dia",
+  "hall.greeting_afternoon": "Bona tarda",
+  "hall.greeting_night": "Bona nit",
+  "hall.door": "posa'm al dia",
+  "hall.status_show": "Avui: {place}.",
+  "hall.status_show_time": "Avui: {place}. Load-in a les {time}.",
+  "hall.status_attention_one": "1 cosa vençuda — fa {days}.",
+  "hall.status_attention_many": "{n} coses vençudes — la més antiga fa {days}.",
+  "hall.days_one": "1 dia",
+  "hall.days_many": "{x} dies",
+  "hall.status_calm_zero": "Tot tranquil. Res a la vista.",
+  "hall.status_calm_one": "Tot tranquil. 1 cosa oberta, cap vençuda.",
+  "hall.status_calm_one_next": "Tot tranquil. 1 cosa oberta, cap vençuda — espera fins {when}.",
+  "hall.status_calm_many": "Tot tranquil. {n} coses obertes, cap vençuda.",
+  "hall.status_calm_many_next": "Tot tranquil. {n} coses obertes, cap vençuda — la propera espera fins {when}.",
+  "hall.when_today": "avui",
+  "hall.when_tomorrow": "demà",
+  "hall.when_weekday": "{weekday}",
+  "hall.when_date": "al {date}"
+}

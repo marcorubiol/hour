@@ -179,7 +179,20 @@
     );
   }
 
+  // Register-on-abandon: the combo you actually worked in enters Recent
+  // when you LEAVE it — applying another scope, Clear, logout, tab close.
+  // Never on intermediate chip edits (each × would flood Recent with
+  // half-built states and evict the good ones). remember() self-guards
+  // the empty combo and verbatim saved scopes.
+  function rememberWorkingScope(incoming?: string[]) {
+    const current = pins.pins;
+    if (current.length === 0) return;
+    if (incoming && scopesSameSet(current, incoming)) return;
+    scopes.remember(scopeAutoName(current), current);
+  }
+
   function applyScope(s: Scope) {
+    rememberWorkingScope(s.tokens);
     pins.set(s.tokens);
     // A scope click must SHOW the scoped view: from a lens, the lens just
     // refilters in place; from anywhere else (hall, portada, entity pages)
@@ -383,9 +396,16 @@
     );
     return l ? `l:${l.id}` : null;
   }
+  // BOTH effects read the address from `location`, not `page.url`:
+  // replaceState (shallow routing) updates the real address bar but NOT the
+  // reactive page.url — comparing against page.url left `existing`
+  // permanently stale after our own writes (clearing pins then found
+  // ''===null and never cleaned the bar; a stale read could even resurrect
+  // a cleared scope). `page.url` is still read as the navigation trigger.
   $effect(() => {
     if (!scopeSurface) return;
-    const raw = page.url.searchParams.get('scope');
+    void page.url; // dependency: re-run on real navigations
+    const raw = new URL(location.href).searchParams.get('scope');
     if (raw === null) return;
     const toks = raw.split(',').filter((t) => /^[spl]:.+/.test(t));
     const mapped = toks.map(urlTokenToPin);
@@ -399,10 +419,8 @@
   });
   $effect(() => {
     if (!scopeSurface) return;
-    // page.url read reactively on purpose: lens→lens navigation drops the
-    // query, and this effect must re-run to restore it even though the
-    // pins themselves didn't change.
-    const url = new URL(page.url);
+    void page.url; // dependency: lens→lens navigation must re-run this
+    const url = new URL(location.href);
     const existing = url.searchParams.get('scope');
     // Hold while an inbound scope is still waiting for the caches — writing
     // now would clobber a pasted link before it ever applied.
@@ -477,6 +495,7 @@
     paletteOpen = true;
   }
   function onApplyScope(tokens: string[]) {
+    rememberWorkingScope(tokens);
     pins.set(tokens);
     if (!routedLens) void goto('/h/desk');
     // Applied a verbatim saved scope → that's the base; otherwise keep the
@@ -492,7 +511,14 @@
     else creation.openWorkspace();
   }
 
+  /** Clear from the scope bar = abandoning the working combo too. */
+  function clearScope() {
+    rememberWorkingScope();
+    pins.set([]);
+  }
+
   async function logout() {
+    rememberWorkingScope();
     // Server-side: clears the httpOnly cookies + revokes the refresh
     // token at Supabase. Await so the gates can't race a live cookie.
     try {
@@ -504,6 +530,10 @@
     goto('/login', { replaceState: true });
   }
 </script>
+
+<!-- Tab close / hard navigation away: the working combo registers before
+     the page dies (remember() persists synchronously to localStorage). -->
+<svelte:window onpagehide={() => rememberWorkingScope()} />
 
 {#if authChecked && !blocked}
   <div class="shell" class:shell--settings={inSettings}>
@@ -652,10 +682,13 @@
     <aside class="shell__side" aria-label="Scopes">
       <div class="side-sec">
         <div class="side-sec__h">Scopes</div>
+        <!-- The hall greets outside any scope: no row lights up there, not
+             even Everything — highlighting starts once you're on a surface
+             the scope actually filters. -->
         <button
           type="button"
           class="srow srow--every"
-          class:is-on={scopesSameSet([], pins.pins)}
+          class:is-on={!atHome && scopesSameSet([], pins.pins)}
           onclick={() => applyScope(everything)}
         >
           <span class="sglyph sglyph--every" aria-hidden="true">∑</span>
@@ -679,7 +712,7 @@
             <button
               type="button"
               class="srow"
-              class:is-on={scopesSameSet(s.tokens, pins.pins)}
+              class:is-on={!atHome && scopesSameSet(s.tokens, pins.pins)}
               onclick={() => applyScope(s)}
               ondblclick={() => startRename(s)}
               title="Double-click to rename"
@@ -697,7 +730,7 @@
             <button
               type="button"
               class="srow"
-              class:is-on={scopesSameSet(r.tokens, pins.pins)}
+              class:is-on={!atHome && scopesSameSet(r.tokens, pins.pins)}
               onclick={() => applyScope(r)}
             >
               <span class="srow__name">{r.name}</span>
@@ -773,7 +806,7 @@
                 <button type="button" class="scopebar__save" onclick={copyScopeLink}
                   >⧉ Copy link</button
                 >
-                <button type="button" class="scopebar__clear" onclick={() => pins.set([])}
+                <button type="button" class="scopebar__clear" onclick={clearScope}
                   >Clear</button
                 >
               </span>

@@ -30,6 +30,8 @@ Multi-tenant B2B SaaS for live performing arts management. Covers the full funne
 
 Working name: **Hour**. Brand decision deferred to Phase 1.
 
+**North star (ADR-069, 2026-07-17)**: the product exists for a **proactive, consent-first AI layer** over this data — "you have a gig in Paris in a month; 20 of your contacts are usually around Paris — want me to email them?". The full UI is the manual surface over the same data; every screen and entity is built so that flow works. AI proposes (landing as `task.origin='ai'` and the hall status sentence), the user approves, the system executes — never unbidden.
+
 ## Phase
 **Phase 0 — internal tool for MüK Cia** (Marco + Anouk + ≤5 users, workspaces `marco-rubiol` personal + `muk-cia` team). MaMeMi es UN espectáculo (project) dentro de la compañía MüK Cia. Build is multi-tenant-ready from day one so Phase 1 (SaaS with paying customers) can flip on without a rewrite.
 

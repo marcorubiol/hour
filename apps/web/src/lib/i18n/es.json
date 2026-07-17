@@ -1,1 +1,21 @@
-{}
+{
+  "hall.greeting_morning": "Buenos días",
+  "hall.greeting_afternoon": "Buenas tardes",
+  "hall.greeting_night": "Buenas noches",
+  "hall.door": "ponme al día",
+  "hall.status_show": "Hoy: {place}.",
+  "hall.status_show_time": "Hoy: {place}. Load-in a las {time}.",
+  "hall.status_attention_one": "1 cosa vencida — hace {days}.",
+  "hall.status_attention_many": "{n} cosas vencidas — la más antigua hace {days}.",
+  "hall.days_one": "1 día",
+  "hall.days_many": "{x} días",
+  "hall.status_calm_zero": "Todo tranquilo. Nada a la vista.",
+  "hall.status_calm_one": "Todo tranquilo. 1 cosa abierta, ninguna vencida.",
+  "hall.status_calm_one_next": "Todo tranquilo. 1 cosa abierta, ninguna vencida — espera hasta {when}.",
+  "hall.status_calm_many": "Todo tranquilo. {n} cosas abiertas, ninguna vencida.",
+  "hall.status_calm_many_next": "Todo tranquilo. {n} cosas abiertas, ninguna vencida — la próxima espera hasta {when}.",
+  "hall.when_today": "hoy",
+  "hall.when_tomorrow": "mañana",
+  "hall.when_weekday": "el {weekday}",
+  "hall.when_date": "el {date}"
+}
