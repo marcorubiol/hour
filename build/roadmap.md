@@ -21,6 +21,11 @@ Antes de cualquier trabajo: leer primero el [`_context.md`](../_context.md) del 
  
 ### Current next action
 
+> **Nota 2026-07-17 — ESTADO REAL (verificado contra código + prod en vivo).** Tras la maratón 07-12→07-17: Scope v2 + shell rediseñado + hall-first en producción; **rename `engagement`→`conversation` (ADR-075), task entity (ADR-071), frase de estado del hall (ADR-068/069) y saldo de deuda `show`+slugs (ADR-077) están LIVE y desplegados** (prod `d85ed0d`, dirty:false; sondas: `/api/conversations` 401 · `/api/engagements` 404 · `/api/tasks` 401). Suites verdes: check 0/0 (1511) · unit 178 · RLS 66 · e2e 22.
+> Estamos en la **pasada diseño+datos página a página**: S1 (las vistas) HECHA → 12 prompts despachados. Estado real de esos builds: **Desk v2 EN CURSO** (sesión paralela; en el árbol aún v1, 2/4 fuentes en secciones separadas); **Calendar v2, Conversations v1.5 y Money v2 despachados pero SIN empezar** (0 código, sin migración). Modo calma (toggle global) y fix de tz de entrada = solo diseño / bug vivo.
+> Tasks accionables + estado por-build detallado: **`_tasks.md`** (raíz del repo). ADRs de S1: `_decisions.md § ADR-069→077`.
+> **El gate 0.3 sigue abierto e intacto**: tras cerrar las lentes v2, PARAR y usar Hour con la difusión real ~1 mes. Veredicto de Marco, no de código.
+
 > **Nota 2026-07-04 — CIERRE NIVEL 1 COMPLETO (ADR-051→055), en producción.**
 > El bloque nivel 1 que dejó pendiente la maratón está cerrado y desplegado: **1a** alta de persona+conversation desde la UI (ADR-051), **1b** delete de performance (ADR-052), **1c** venue editable — address/timezone/contacts (ADR-053), más dos huecos de borde detectados en el gap analysis de la mañana: **1d** feed ICS suscribible (ADR-054) y **1e** Today "¿qué hago ahora?" cross-workspace, muere la convención 1-project-per-workspace (ADR-055). La app ahora se **alimenta** desde la UI, no solo se opera — un contacto de feria entra sin SQL, y los bolos confirmados son suscribibles en Google/Apple Calendar. Verificado: 4 migraciones aplicadas + grants auditados, **RLS 30/30 · unit 79/79 · e2e 14/14** contra producción, review adversarial de 5 lentes + verificación ICS/SQL con 9 findings corregidos (incluido un HIGH real: un e2e que podía soft-borrar datos reales de muk-cia). Detalle: `_notes/sessions-log.md § 2026-07-04` + `_decisions.md § ADR-051→055`.
 >
@@ -38,7 +43,7 @@ Antes de cualquier trabajo: leer primero el [`_context.md`](../_context.md) del 
 >
 > Deuda 0.4 pendiente sin cambios (mobile completo, ⌘K, notifications, a11y, checkpoint visual 2, ratificación naming) + checkboxes viejos de 0.0 por verificar (offline con datos cacheados, Lighthouse PWA, `t()`). Tasks accionables: **`_tasks.md`** en la raíz del repo.
 
-**Siguiente acción concreta: el bloque "cierre nivel 1" de `_tasks.md` — empezando por alta de persona + conversation desde Conversations.**
+**Siguiente acción concreta (2026-07-17): terminar el rebuild de Desk v2 (feed mixto 4 fuentes) — EN CURSO — y luego seguir la pasada diseño+datos por S2 (los contenedores). Ver `_tasks.md § Queue`.**
 
 > **Nota 2026-07-02 noche (ADR-043)** — El write path de performances (Phase 0.5 "cuando se confirme la primera fecha") está EN PRODUCCIÓN adelantado: crear desde la Calendar lens + editar status/schedule en el detalle, con RPC `create_performance`. Con ADR-040+043, el ciclo difusión→hold→confirmed→producción se opera entero desde Hour. Siguiente natural: Phase 0.3 (Conversations + Money) o entidad venue enlazable.
 
