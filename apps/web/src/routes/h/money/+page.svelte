@@ -16,6 +16,7 @@
   import { toStore } from 'svelte/store';
   import { fetchJSON, mutateJSON } from '$lib/api';
   import Button from '$lib/components/Button.svelte';
+  import LensSwitcher from '$lib/components/LensSwitcher.svelte';
   import Dialog from '$lib/components/Dialog.svelte';
   import Input from '$lib/components/Input.svelte';
   import Menu from '$lib/components/Menu.svelte';
@@ -397,7 +398,10 @@
 
 <section class="mny">
   <header class="mny__head">
-    <p class="eyebrow">Money</p>
+    <div class="mny__toprow">
+      <p class="eyebrow">Money</p>
+      <LensSwitcher />
+    </div>
     <div class="mny__totals">
       <span class="mny__total">
         <span class="mny__total-label">pipeline</span>
@@ -634,6 +638,12 @@
       display: flex;
       flex-direction: column;
       gap: var(--space-s);
+    }
+    .mny__toprow {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-m);
     }
 
     .mny__totals {

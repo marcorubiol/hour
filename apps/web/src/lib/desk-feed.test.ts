@@ -43,14 +43,18 @@ function conv(id: string, o: Partial<DeskConvInput> = {}): DeskConvInput {
 function perf(id: string, o: Partial<DeskPerfInput> = {}): DeskPerfInput {
   return {
     id,
+    slug: `perf-${id}`,
     performed_at: isoDay(0),
     status: 'confirmed',
     venue_name: null,
     city: null,
     load_in_at: null,
+    soundcheck_at: null,
     start_at: null,
+    loadout_at: null,
+    wrap_at: null,
     venue: null,
-    project: { id: 'p1', slug: 'mamemi', name: 'MaMeMi' },
+    project: { id: 'p1', slug: 'mamemi', name: 'MaMeMi', workspace_id: 'w1' },
     ...o,
   };
 }

@@ -36,6 +36,7 @@
   import { useTheme } from '$lib/theme.svelte';
   import { isReservedWorkspaceSlug } from '$lib/reserved-slugs';
   import { provideLens, type Lens } from '$lib/stores/lens.svelte';
+  import { provideCalm } from '$lib/stores/calm.svelte';
   import { providePins, parsePin } from '$lib/stores/pins.svelte';
   import { provideScopes, sameSet as scopesSameSet, type Scope } from '$lib/stores/scopes.svelte';
   import { detectLocale, t } from '$lib/i18n';
@@ -94,11 +95,24 @@
   const scopes = provideScopes();
   const breadcrumb = provideBreadcrumb();
   const creation = provideCreation();
+  // Calm lives in the shell (the toggle sits by the clock); the Desk consumes it.
+  const calm = provideCalm();
 
   onMount(() => {
     lens.restoreFromLocalStorage();
     pins.restoreFromLocalStorage();
     scopes.restoreFromLocalStorage();
+    calm.restoreFromLocalStorage();
+    // Keyboard `c` toggles calm globally (spec) — never while typing.
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'c' || e.metaKey || e.ctrlKey || e.altKey) return;
+      const el = document.activeElement;
+      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || (el as HTMLElement).isContentEditable))
+        return;
+      calm.toggle();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
   });
 
   $effect(() => {
@@ -267,21 +281,9 @@
     editingBaseTokens = [...pins.pins];
   }
 
-  // VIEW AS — the four lens routes as a visible segmented control (Scope v2).
-  // ADR-067: lenses are space-less; the scope-sync effect re-adds ?scope=
-  // right after navigation, so pickView doesn't need to carry it.
-  // ADR-075: the id is the route segment and never translates; the label is
-  // display only and comes from the dictionary.
-  const VIEW_AS: { id: Lens; label: string }[] = [
-    { id: 'desk', label: t('lens.desk', locale) },
-    { id: 'calendar', label: t('lens.calendar', locale) },
-    { id: 'conversations', label: t('lens.conversations', locale) },
-    { id: 'money', label: t('lens.money', locale) },
-  ];
-  function pickView(view: Lens) {
-    lens.set(view);
-    void goto(`/h/${view}`);
-  }
+  // VIEW AS — the Desk · Calendar · Conversations · Money segmented control
+  // now lives in each lens's own header (LensSwitcher), beside its title, not
+  // in the shell chrome (2026-07-18). The chrome keeps only the scope bar.
 
   // Realtime is cross-origin (wss to supabase.co) and can't ride the
   // httpOnly cookie — it authenticates via async suppliers backed by
@@ -717,8 +719,20 @@
 
     <aside class="shell__side" aria-label="Scopes">
       <div class="side-clock">
-        <time class="side-clock__time" datetime={clockTime}>{clockTime}</time>
-        <p class="side-clock__date">{clockDate}</p>
+        <div class="side-clock__now">
+          <time class="side-clock__time" datetime={clockTime}>{clockTime}</time>
+          <p class="side-clock__date">{clockDate}</p>
+        </div>
+        <button
+          type="button"
+          class="side-calm"
+          class:is-on={calm.on}
+          aria-pressed={calm.on}
+          title={t('desk.calm', locale)}
+          onclick={() => calm.toggle()}
+        >
+          <span>{t('desk.calm', locale)}</span><span class="side-calm__k">c</span>
+        </button>
       </div>
       <div class="side-sec">
         <div class="side-sec__h">Scopes</div>
@@ -852,20 +866,6 @@
               </span>
             {/if}
           </div>
-          <div class="viewas">
-            <span class="viewas__lead">view as</span>
-            <div class="viewas__seg">
-              {#each VIEW_AS as v (v.id)}
-                <button
-                  type="button"
-                  class:is-on={routedLens === v.id}
-                  onclick={() => pickView(v.id)}
-                >
-                  {v.label}
-                </button>
-              {/each}
-            </div>
-          </div>
         </div>
       {/if}
 
@@ -957,13 +957,58 @@
   }
   .side-clock {
     display: flex;
-    flex-direction: column;
-    gap: var(--space-xs);
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-s);
     padding-inline: var(--space-xs);
     /* Same top offset as the header's wordmark, by construction: the
        BrandMark (size m = --text-xl, line-height 1) centers inside the
        --header-height band, so its top sits at (band − type)/2. */
     padding-block-start: calc((var(--header-height) - var(--text-xl)) / 2);
+  }
+  .side-clock__now {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+  }
+  /* Calm toggle — the mode control lives by the clock (spec § Desk · Calm).
+     outline = available / solid = active, so it reads as a control. */
+  .side-calm {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2xs);
+    padding-block: var(--space-2xs);
+    padding-inline: var(--space-xs);
+    border: 1px solid var(--border-color-dark);
+    border-radius: var(--radius-circle);
+    background: transparent;
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    letter-spacing: var(--mono-letter-spacing-loose);
+    text-transform: uppercase;
+    color: var(--text-muted);
+    cursor: pointer;
+    white-space: nowrap;
+    transition:
+      color var(--transition),
+      background var(--transition),
+      border-color var(--transition);
+  }
+  .side-calm:hover {
+    color: var(--text-color);
+    border-color: var(--text-muted);
+  }
+  .side-calm.is-on {
+    background: var(--text-color);
+    border-color: var(--text-color);
+    color: var(--bg);
+  }
+  .side-calm__k {
+    padding-inline: var(--space-2xs);
+    border: 1px solid currentColor;
+    border-radius: var(--radius-s);
+    opacity: 0.6;
+    text-transform: none;
   }
   .side-clock__time {
     font-family: var(--font-mono);
@@ -1197,47 +1242,6 @@
     text-decoration: underline;
     text-underline-offset: 3px;
   }
-  .viewas {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: var(--space-s);
-  }
-  .viewas__lead {
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    letter-spacing: var(--mono-letter-spacing-loose);
-    text-transform: uppercase;
-    color: var(--text-faint);
-  }
-  .viewas__seg {
-    display: inline-flex;
-    background: var(--bg-ultra-light);
-    border: 1px solid var(--border-color-dark);
-    border-radius: var(--radius-circle);
-    padding: 2px;
-  }
-  .viewas__seg button {
-    appearance: none;
-    border: 0;
-    background: transparent;
-    cursor: pointer;
-    font-family: var(--font-sans);
-    font-size: var(--text-s);
-    color: var(--text-muted);
-    padding-block: var(--space-2xs);
-    padding-inline: var(--space-m);
-    border-radius: var(--radius-circle);
-    transition: background var(--transition), color var(--transition);
-  }
-  .viewas__seg button:hover {
-    color: var(--text-color);
-  }
-  .viewas__seg button.is-on {
-    background: var(--text-color);
-    color: var(--bg);
-  }
-
   .shell__settings-nav {
     inline-size: var(--sidebar-width);
     border-inline-end: 1px solid var(--border-color-dark);

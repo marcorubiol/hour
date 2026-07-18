@@ -47,14 +47,18 @@ export interface DeskConvInput {
 
 export interface DeskPerfInput {
   id: string;
+  slug: string | null;
   performed_at: string;
   status: string;
   venue_name: string | null;
   city: string | null;
   load_in_at: string | null;
+  soundcheck_at: string | null;
   start_at: string | null;
+  loadout_at: string | null;
+  wrap_at: string | null;
   venue: { name: string | null } | null;
-  project: { id: string; slug: string | null; name: string } | null;
+  project: { id: string; slug: string | null; name: string; workspace_id: string } | null;
 }
 
 /** A pure calendar event (rehearsal / travel / press…) — NOT a performance
@@ -120,10 +124,15 @@ export interface ShowAnchor {
   venue: string;
   city: string | null;
   loadInAt: string | null;
+  soundcheckAt: string | null;
   startAt: string | null;
+  loadOutAt: string | null;
+  wrapAt: string | null;
   projectName: string;
   accentSlug: string;
-  performanceSlug: string;
+  /** Performance slug + its workspace id → the road-sheet link. */
+  performanceSlug: string | null;
+  workspaceId: string;
 }
 
 export interface DeskRun {
@@ -304,10 +313,14 @@ export function buildDeskFeed(input: DeskFeedInput, now: Date, locale: Locale = 
         venue: place,
         city: p.city,
         loadInAt: p.load_in_at,
+        soundcheckAt: p.soundcheck_at,
         startAt: p.start_at,
+        loadOutAt: p.loadout_at,
+        wrapAt: p.wrap_at,
         projectName: p.project?.name ?? '—',
         accentSlug: p.project?.slug ?? '',
-        performanceSlug: p.id,
+        performanceSlug: p.slug,
+        workspaceId: p.project?.workspace_id ?? '',
       });
       continue;
     }

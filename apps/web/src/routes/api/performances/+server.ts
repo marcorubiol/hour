@@ -107,7 +107,10 @@ type PerformanceItem = {
   line_id: string | null;
   conversation_id: string | null;
   load_in_at: string | null;
+  soundcheck_at: string | null;
   start_at: string | null;
+  loadout_at: string | null;
+  wrap_at: string | null;
   venue: VenueLite | null;
   project: ProjectLite | null;
 };
@@ -160,7 +163,7 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
     [
       'id,slug,performed_at,status,venue_id,venue_name,city,country',
       'project_id,line_id,conversation_id',
-      'load_in_at,start_at',
+      'load_in_at,soundcheck_at,start_at,loadout_at,wrap_at',
       'venue:venue_id(id,name,city,country,timezone)',
       'project:project_id(id,slug,name,accent,workspace_id)',
     ].join(','),

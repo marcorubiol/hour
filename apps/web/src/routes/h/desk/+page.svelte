@@ -21,6 +21,7 @@
   import { fetchJSON, mutateJSON, ApiError } from '$lib/api';
   import { addToast } from '$lib/components/Toast.svelte';
   import TaskComposer from '$lib/components/TaskComposer.svelte';
+  import LensSwitcher from '$lib/components/LensSwitcher.svelte';
   import { accentVar, accentVarFor } from '$lib/utils/accent';
   import { detectLocale, t } from '$lib/i18n';
   import { dayMonth } from '$lib/datetime';
@@ -49,6 +50,7 @@
     type DeskInvoiceInput,
     type DeskItem,
     type DeskPerfInput,
+    type ShowAnchor,
   } from '$lib/desk-feed';
 
   type Conversation = DeskConversation & { workspace_id: string };
@@ -165,6 +167,32 @@
   // ── Calm mode — the toggle lives in the shell sidebar (by the clock); the
   //    Desk only consumes the shared store to fold the feed. ──────────────
   const bucketCount = (b: (typeof feed)[number]) => b.runs.reduce((n, r) => n + r.items.length, 0);
+  // Count shown on the right of each day header (the show banner counts as one).
+  const bucketTotal = (b: (typeof feed)[number]) => bucketCount(b) + (b.anchor ? 1 : 0);
+
+  // ── Collapsible day buckets ────────────────────────────────────────────
+  // Every day header folds (click); the count on its right says what's hidden.
+  // Persisted by labelKey so folding the OVERDUE backlog once keeps it folded.
+  const COLLAPSE_KEY = 'hour_desk_collapsed';
+  function loadCollapsed(): Set<string> {
+    try {
+      return new Set(JSON.parse(localStorage.getItem(COLLAPSE_KEY) ?? '[]') as string[]);
+    } catch {
+      return new Set();
+    }
+  }
+  let collapsed = $state(loadCollapsed());
+  function toggleCollapse(key: string) {
+    const next = new Set(collapsed);
+    if (next.has(key)) next.delete(key);
+    else next.add(key);
+    collapsed = next;
+    try {
+      localStorage.setItem(COLLAPSE_KEY, JSON.stringify([...next]));
+    } catch {
+      /* storage disabled — in-session fold still works */
+    }
+  }
   let visibleBuckets = $derived(calm.on ? feed.filter((b) => b.sortKey === 0) : feed);
   let foldedRest = $derived(
     calm.on ? feed.filter((b) => b.sortKey > 0).reduce((n, b) => n + bucketCount(b), 0) : 0,
@@ -294,22 +322,28 @@
     return [space, i.projectName, i.lineName].filter(Boolean).join(' · ');
   };
   const isGhost = (i: DeskItem) => i.concern === 'task' && i.isProposal && i.taskId != null && !accepted.has(i.taskId);
+  // The show banner's road-sheet link: /h/<space>/performance/<slug>/roadsheet.
+  const roadsheetHref = (a: ShowAnchor) => {
+    const ws = workspaces.find((w) => w.id === a.workspaceId)?.slug;
+    return ws && a.performanceSlug ? `/h/${ws}/performance/${a.performanceSlug}/roadsheet` : null;
+  };
 </script>
 
 <svelte:head><title>Desk — Hour</title></svelte:head>
 
 <div class="desk" class:desk--calm={calm.on}>
   <header class="desk__head">
-    <div class="desk__summary">
+    <div class="desk__titlerow">
       <p class="desk__count">
         {needYouText(headline)}{#if calm.on && calmFolded}<span class="desk__rest">{t('desk.rest_waits', locale)}</span>{/if}
       </p>
-      {#if !loading && !errored}
-        <p class="desk__pulse">
-          {#each pulse as frag (frag.text)}<a class="desk__pulse-frag" href={frag.href}>{frag.text}</a>{/each}
-        </p>
-      {/if}
+      <LensSwitcher />
     </div>
+    {#if !loading && !errored}
+      <p class="desk__pulse">
+        {#each pulse as frag (frag.text)}<a class="desk__pulse-frag" href={frag.href}>{frag.text}</a>{/each}
+      </p>
+    {/if}
   </header>
 
   <TaskComposer
@@ -334,32 +368,55 @@
     <div class="timeline">
       {#each visibleBuckets as bucket (bucket.sortKey)}
         <section class="bucket" class:bucket--today={bucket.sortKey === 0}>
-          <div class="bucket__head" class:bucket__head--overdue={bucket.overdue}>
+          <button
+            type="button"
+            class="bucket__head"
+            class:bucket__head--overdue={bucket.overdue}
+            aria-expanded={!collapsed.has(bucket.labelKey)}
+            onclick={() => toggleCollapse(bucket.labelKey)}
+          >
             <span class="bucket__label"
               >{bucket.labelKey === 'weekday' ? bucket.weekday : t(`desk.bucket_${bucket.labelKey}`, locale)}</span
             >
+            <span class="bucket__caret" aria-hidden="true">›</span>
             {#if bucket.dateLabel}<span class="bucket__date">{bucket.dateLabel}</span>{/if}
-          </div>
+            <span class="bucket__count">{bucketTotal(bucket)}</span>
+          </button>
 
+          {#if !collapsed.has(bucket.labelKey)}
           {#if bucket.anchor}
-            <a class="anchor" href="/h/calendar" style={`--c: ${accentVar(bucket.anchor.accentSlug)}`}>
+            {@const rsHref = roadsheetHref(bucket.anchor)}
+            <div class="anchor" style={`--c: ${accentVar(bucket.anchor.accentSlug)}`}>
               <div class="anchor__eye">
                 {t('desk.anchor_show_today', locale, { project: bucket.anchor.projectName })}
               </div>
               <div class="anchor__venue">
                 {bucket.anchor.venue}{bucket.anchor.city ? ` · ${bucket.anchor.city}` : ''}
               </div>
-              {#if bucket.anchor.loadInAt || bucket.anchor.startAt}
+              <div class="anchor__foot">
                 <div class="anchor__slots">
                   {#if bucket.anchor.loadInAt}<span
                       ><span class="anchor__k">{t('desk.anchor_loadin', locale)}</span> {fmtTime(bucket.anchor.loadInAt)}</span
                     >{/if}
+                  {#if bucket.anchor.soundcheckAt}<span
+                      ><span class="anchor__k">{t('desk.anchor_soundcheck', locale)}</span>
+                      {fmtTime(bucket.anchor.soundcheckAt)}</span
+                    >{/if}
                   {#if bucket.anchor.startAt}<span
                       ><span class="anchor__k">{t('desk.anchor_show', locale)}</span> {fmtTime(bucket.anchor.startAt)}</span
                     >{/if}
+                  {#if bucket.anchor.loadOutAt}<span
+                      ><span class="anchor__k">{t('desk.anchor_loadout', locale)}</span> {fmtTime(bucket.anchor.loadOutAt)}</span
+                    >{/if}
+                  {#if bucket.anchor.wrapAt}<span
+                      ><span class="anchor__k">{t('desk.anchor_wrap', locale)}</span> {fmtTime(bucket.anchor.wrapAt)}</span
+                    >{/if}
                 </div>
-              {/if}
-            </a>
+                {#if rsHref}
+                  <a class="anchor__rs" href={rsHref}>{t('desk.roadsheet', locale)} ↗</a>
+                {/if}
+              </div>
+            </div>
           {/if}
 
           {#each bucket.runs as run (run.concern + run.items[0].id)}
@@ -442,6 +499,7 @@
               </div>
             </div>
           {/each}
+          {/if}
         </section>
       {/each}
 
@@ -476,11 +534,15 @@
     /* ── Header ── */
     .desk__head {
       display: flex;
-      align-items: flex-end;
+      flex-direction: column;
+    }
+    .desk__titlerow {
+      display: flex;
+      align-items: center;
       justify-content: space-between;
       gap: var(--space-m);
-      /* Separator under the status header (title + pulse), per the design. */
-      padding-block-end: var(--space-m);
+      /* The separator lives BETWEEN the title row and the pulse (design). */
+      padding-block-end: var(--space-s);
       border-block-end: 1px solid var(--border-color-light);
     }
     .desk__count {
@@ -525,17 +587,53 @@
     .timeline {
       display: flex;
       flex-direction: column;
-      gap: var(--space-l);
     }
     .bucket {
       display: flex;
       flex-direction: column;
       gap: var(--space-xs);
+      /* The rule reads as the HEADER's top edge, not the previous box's
+         bottom: generous space ABOVE the line, a thin gap to the title below
+         it. Every day gets one — OVERDUE included. */
+      margin-block-start: var(--space-l);
+      padding-block-start: var(--space-s);
+      border-block-start: 1px solid var(--border-color-light);
     }
+    .bucket:first-child {
+      margin-block-start: 0;
+    }
+    /* The whole day header is the collapse toggle. */
     .bucket__head {
       display: flex;
       align-items: baseline;
       gap: var(--space-s);
+      inline-size: 100%;
+      padding: 0;
+      background: none;
+      border: 0;
+      text-align: start;
+      cursor: pointer;
+    }
+    /* Whisper-quiet disclosure caret, to the right of the word. */
+    .bucket__caret {
+      color: color-mix(in oklch, var(--text-faint) 50%, transparent);
+      font-size: var(--text-xs);
+      line-height: 1;
+      transition:
+        transform var(--transition),
+        color var(--transition);
+    }
+    .bucket__head[aria-expanded='true'] .bucket__caret {
+      transform: rotate(90deg);
+    }
+    .bucket__head:hover .bucket__caret {
+      color: var(--text-faint);
+    }
+    .bucket__count {
+      margin-inline-start: auto;
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-faint);
     }
     .bucket__label {
       font-family: var(--font-mono);
@@ -566,12 +664,6 @@
       border: 1px solid color-mix(in oklch, var(--c) 30%, var(--border-color-light));
       background: color-mix(in oklch, var(--c) 6%, var(--bg-ultra-light));
       border-radius: var(--radius-l);
-      text-decoration: none;
-      color: inherit;
-      transition: border-color var(--transition);
-    }
-    .anchor:hover {
-      border-color: color-mix(in oklch, var(--c) 55%, var(--border-color-light));
     }
     .anchor__eye {
       font-family: var(--font-mono);
@@ -597,6 +689,34 @@
       color: var(--text-faint);
       text-transform: uppercase;
       letter-spacing: var(--mono-letter-spacing-loose);
+    }
+    .anchor__foot {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-m);
+      margin-block-start: var(--space-2xs);
+    }
+    .anchor__rs {
+      flex: none;
+      display: inline-flex;
+      align-items: center;
+      padding-block: var(--space-2xs);
+      padding-inline: var(--space-s);
+      border: 1px solid var(--border-color-dark);
+      border-radius: var(--radius);
+      background: var(--bg-ultra-light);
+      font-size: var(--text-s);
+      color: var(--text-muted);
+      text-decoration: none;
+      white-space: nowrap;
+      transition:
+        color var(--transition),
+        border-color var(--transition);
+    }
+    .anchor__rs:hover {
+      color: var(--text-color);
+      border-color: var(--text-muted);
     }
 
     /* ── Concern runs: the gutter carries the type (a door), hairline rail ── */
@@ -645,7 +765,6 @@
       gap: var(--space-s);
       padding-block: var(--space-xs);
       padding-inline-start: var(--space-m);
-      border-block-end: 1px solid color-mix(in oklch, var(--border-color-light) 55%, transparent);
     }
     .drow--task {
       grid-template-columns: auto 1fr auto;

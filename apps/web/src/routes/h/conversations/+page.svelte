@@ -16,6 +16,7 @@
   import { goto } from '$app/navigation';
   import { fetchJSON, mutateJSON, ApiError } from '$lib/api';
   import Button from '$lib/components/Button.svelte';
+  import LensSwitcher from '$lib/components/LensSwitcher.svelte';
   import Checkbox from '$lib/components/Checkbox.svelte';
   import Dialog from '$lib/components/Dialog.svelte';
   import ConversationTable from '$lib/components/ConversationTable.svelte';
@@ -286,7 +287,10 @@
 
 <section class="conversations">
   <header class="conversations__head">
-    <p class="eyebrow">Conversations</p>
+    <div class="conversations__toprow">
+      <p class="eyebrow">Conversations</p>
+      <LensSwitcher />
+    </div>
     <div class="conversations__controls">
       <div class="conversations__search">
         <Input
@@ -370,6 +374,12 @@
       display: flex;
       flex-direction: column;
       gap: var(--space-s);
+    }
+    .conversations__toprow {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-m);
     }
 
     .conversations__controls {

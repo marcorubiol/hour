@@ -25,6 +25,7 @@
   import { goto } from '$app/navigation';
   import { fetchJSON, mutateJSON } from '$lib/api';
   import Button from '$lib/components/Button.svelte';
+  import LensSwitcher from '$lib/components/LensSwitcher.svelte';
   import Dialog from '$lib/components/Dialog.svelte';
   import Select from '$lib/components/Select.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
@@ -341,7 +342,10 @@
 
 <section class="cal">
   <header class="cal__head">
-    <p class="eyebrow">Calendar</p>
+    <div class="cal__toprow">
+      <p class="eyebrow">Calendar</p>
+      <LensSwitcher />
+    </div>
     <div class="cal__nav">
       <h1 class="cal__month">{monthLabel}</h1>
       <div class="cal__nav-buttons">
@@ -442,6 +446,12 @@
       display: flex;
       flex-direction: column;
       gap: var(--space-xs);
+    }
+    .cal__toprow {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-m);
     }
 
     .cal__nav {
