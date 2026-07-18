@@ -23,6 +23,16 @@ export const realIsoDate = v.pipe(
   }, 'Not a real calendar date'),
 );
 
+/**
+ * The timestamp API contract: "a string Date can actually parse". One home
+ * for every timestamptz write field (date.starts_at/ends_at consume it;
+ * the performance timeslots predate it with a module-local copy).
+ */
+export const realIsoInstant = v.pipe(
+  v.string(),
+  v.check((s) => !Number.isNaN(new Date(s).getTime()), 'Not a valid timestamp'),
+);
+
 export interface DualTime {
   /** Wall time in the primary (venue) zone, HH:mm. */
   primary: string;

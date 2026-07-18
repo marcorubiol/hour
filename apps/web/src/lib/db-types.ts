@@ -1,3 +1,7 @@
+// hand-patched pending regen (calendar-v2): availability_block table + RPCs,
+// date.line_id + date.travel_direction, date_kind 'day_off',
+// user_profile.person_id, create_date/delete_date RPCs. Regenerate after
+// applying the 2026-07-18 migrations.
 export type Json =
   | string
   | number
@@ -234,6 +238,63 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "audit_log_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspace"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      availability_block: {
+        Row: {
+          certainty: string
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          ends_on: string
+          id: string
+          note: string | null
+          person_id: string | null
+          starts_on: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          certainty?: string
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          ends_on: string
+          id?: string
+          note?: string | null
+          person_id?: string | null
+          starts_on: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          certainty?: string
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          ends_on?: string
+          id?: string
+          note?: string | null
+          person_id?: string | null
+          starts_on?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "availability_block_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "person"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "availability_block_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspace"
@@ -634,6 +695,7 @@ export type Database = {
           ends_at: string | null
           id: string
           kind: Database["public"]["Enums"]["date_kind"]
+          line_id: string | null
           notes: string | null
           performance_id: string | null
           project_id: string
@@ -641,6 +703,7 @@ export type Database = {
           starts_at: string
           status: Database["public"]["Enums"]["date_status"]
           title: string | null
+          travel_direction: string | null
           updated_at: string
           venue_id: string | null
           venue_name: string | null
@@ -657,6 +720,7 @@ export type Database = {
           ends_at?: string | null
           id?: string
           kind?: Database["public"]["Enums"]["date_kind"]
+          line_id?: string | null
           notes?: string | null
           performance_id?: string | null
           project_id: string
@@ -664,6 +728,7 @@ export type Database = {
           starts_at: string
           status?: Database["public"]["Enums"]["date_status"]
           title?: string | null
+          travel_direction?: string | null
           updated_at?: string
           venue_id?: string | null
           venue_name?: string | null
@@ -680,6 +745,7 @@ export type Database = {
           ends_at?: string | null
           id?: string
           kind?: Database["public"]["Enums"]["date_kind"]
+          line_id?: string | null
           notes?: string | null
           performance_id?: string | null
           project_id?: string
@@ -687,12 +753,20 @@ export type Database = {
           starts_at?: string
           status?: Database["public"]["Enums"]["date_status"]
           title?: string | null
+          travel_direction?: string | null
           updated_at?: string
           venue_id?: string | null
           venue_name?: string | null
           workspace_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "date_line_id_fkey"
+            columns: ["line_id"]
+            isOneToOne: false
+            referencedRelation: "line"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "date_performance_id_fkey"
             columns: ["performance_id"]
@@ -1676,6 +1750,7 @@ export type Database = {
           full_name: string
           is_platform_admin: boolean
           locale: string
+          person_id: string | null
           updated_at: string
           user_id: string
         }
@@ -1685,6 +1760,7 @@ export type Database = {
           full_name: string
           is_platform_admin?: boolean
           locale?: string
+          person_id?: string | null
           updated_at?: string
           user_id: string
         }
@@ -1694,10 +1770,19 @@ export type Database = {
           full_name?: string
           is_platform_admin?: boolean
           locale?: string
+          person_id?: string | null
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "user_profile_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: true
+            referencedRelation: "person"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       venue: {
         Row: {
@@ -2118,6 +2203,35 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      create_availability_block: {
+        Args: {
+          p_certainty?: string
+          p_ends_on: string
+          p_note?: string
+          p_person_id?: string
+          p_starts_on: string
+          p_workspace_id: string
+        }
+        Returns: {
+          certainty: string
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          ends_on: string
+          id: string
+          note: string | null
+          person_id: string | null
+          starts_on: string
+          updated_at: string
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "availability_block"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       create_calendar_share: {
         Args: { p_workspace_id: string }
         Returns: {
@@ -2173,6 +2287,55 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "conversation"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      create_date: {
+        Args: {
+          p_all_day?: boolean
+          p_city?: string
+          p_country?: string
+          p_ends_at?: string
+          p_kind: Database["public"]["Enums"]["date_kind"]
+          p_label?: string
+          p_line_id?: string
+          p_performance_id?: string
+          p_project_id: string
+          p_starts_at: string
+          p_status?: Database["public"]["Enums"]["date_status"]
+          p_title?: string
+          p_travel_direction?: string
+          p_venue_name?: string
+        }
+        Returns: {
+          all_day: boolean
+          city: string | null
+          country: string | null
+          created_at: string
+          created_by: string | null
+          custom_fields: Json
+          deleted_at: string | null
+          ends_at: string | null
+          id: string
+          kind: Database["public"]["Enums"]["date_kind"]
+          line_id: string | null
+          notes: string | null
+          performance_id: string | null
+          project_id: string
+          season: string | null
+          starts_at: string
+          status: Database["public"]["Enums"]["date_status"]
+          title: string | null
+          travel_direction: string | null
+          updated_at: string
+          venue_id: string | null
+          venue_name: string | null
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "date"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -2542,10 +2705,15 @@ export type Database = {
       }
       custom_access_token_hook: { Args: { event: Json }; Returns: Json }
       delete_asset_version: { Args: { p_asset_id: string }; Returns: undefined }
+      delete_availability_block: {
+        Args: { p_availability_block_id: string }
+        Returns: undefined
+      }
       delete_conversation: {
         Args: { p_conversation_id: string }
         Returns: undefined
       }
+      delete_date: { Args: { p_date_id: string }; Returns: undefined }
       delete_expense: { Args: { p_expense_id: string }; Returns: undefined }
       delete_invoice: { Args: { p_invoice_id: string }; Returns: undefined }
       delete_performance: {
@@ -2719,7 +2887,13 @@ export type Database = {
         | "declined"
         | "dormant"
         | "recurring"
-      date_kind: "rehearsal" | "residency" | "travel_day" | "press" | "other"
+      date_kind:
+        | "rehearsal"
+        | "residency"
+        | "travel_day"
+        | "press"
+        | "other"
+        | "day_off"
       date_status: "tentative" | "confirmed" | "cancelled" | "done"
       expense_category:
         | "travel"
@@ -2923,7 +3097,14 @@ export const Constants = {
         "dormant",
         "recurring",
       ],
-      date_kind: ["rehearsal", "residency", "travel_day", "press", "other"],
+      date_kind: [
+        "rehearsal",
+        "residency",
+        "travel_day",
+        "press",
+        "other",
+        "day_off",
+      ],
       date_status: ["tentative", "confirmed", "cancelled", "done"],
       expense_category: [
         "travel",

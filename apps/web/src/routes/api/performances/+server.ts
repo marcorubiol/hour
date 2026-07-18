@@ -9,6 +9,12 @@
  *   - (none)                       → all performances accessible by RLS
  * Plus an optional window on performed_at for the Calendar lens:
  *   - ?from=YYYY-MM-DD&to=YYYY-MM-DD (inclusive)
+ * Plus an opt-in roster projection for the conflict engine (calendar v2,
+ * ADR-072 §1):
+ *   - ?rosters=1 → each item gains `person_ids: string[]` (project
+ *     cast_member − replaced + cast_override + crew_assignment, deduped —
+ *     the same rule as the detail bundle, batched in 3 queries). An empty
+ *     roster means "no team data" and conflictsFor() degrades honestly.
  *
  * Embeds `venue` (city/date rendering) and `project` (accent + slug for
  * calendar coloring and links) without a second round-trip.
@@ -29,6 +35,7 @@ import { extractAccessToken } from '$lib/auth';
 import { PerformanceCreateSchema } from '$lib/performance';
 import { pgGet, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
+import { fetchPerformanceRosters } from '$lib/server/rosters';
 
 const ALLOWED_STATUSES = [
   'any',
@@ -52,6 +59,7 @@ const QuerySchema = v.object({
   status: v.optional(v.picklist(ALLOWED_STATUSES), 'any'),
   from: v.optional(v.pipe(v.string(), v.isoDate())),
   to: v.optional(v.pipe(v.string(), v.isoDate())),
+  rosters: v.optional(v.picklist(['0', '1']), '0'),
   limit: v.optional(
     v.pipe(
       v.string(),
@@ -146,7 +154,7 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
       400,
     );
   }
-  const { project_id, project_ids, workspace_ids, line_id, status, from, to, limit } =
+  const { project_id, project_ids, workspace_ids, line_id, status, from, to, rosters, limit } =
     parsed.output;
 
   const projectIds = parseUuidList(project_ids);
@@ -190,7 +198,16 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
 
   try {
     const { data } = await pgGet<PerformanceItem>(env, 'performance', jwt, { search });
-    return json({ items: data });
+    if (rosters !== '1') return json({ items: data });
+
+    const personIdsByPerformance = await fetchPerformanceRosters(
+      env,
+      jwt,
+      data.map((p) => ({ id: p.id, project_id: p.project_id })),
+    );
+    return json({
+      items: data.map((p) => ({ ...p, person_ids: personIdsByPerformance[p.id] ?? [] })),
+    });
   } catch (err) {
     return pgErrorResponse(
       err,

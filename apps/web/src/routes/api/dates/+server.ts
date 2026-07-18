@@ -13,6 +13,21 @@
  * `to` is compared against the START of a date row — multi-day rows that
  * begin inside the window are included; Phase 0 keeps this simple.
  *
+ * NOTE (calendar v2): the GET select now ASKS for the ADR-078 columns
+ * (line_id, travel_direction, label ← custom_fields->>label) but degrades
+ * when the migrations aren't applied yet: an undefined-column error (42703)
+ * retries once with the legacy select, so the live calendar keeps working
+ * and the new fields simply arrive absent (§ Graceful absence of the
+ * contract — feature silently off, zero errors surfaced).
+ *
+ * POST /api/dates — create a date row (ADR-078) via the `create_date` RPC:
+ * claim-independent, gated on has_permission(project, 'edit:performance').
+ * The RPC enforces line ∈ project, performance ∈ project, the status
+ * create-whitelist (tentative|confirmed), travel_direction only on
+ * kind='travel_day', and label only on kind='other' (sole custom_fields
+ * writer) — the endpoint pre-checks the cross-field rules for 400s with
+ * hints.
+ *
  * Auth: Bearer JWT required. RLS scopes rows (same 'edit:performance' permission
  * as performance — the calendar is production-side data).
  */
@@ -20,7 +35,8 @@
 import type { RequestHandler } from './$types';
 import * as v from 'valibot';
 import { extractAccessToken } from '$lib/auth';
-import { pgGet, type SupabaseEnv } from '$lib/supabase';
+import { DateCreateSchema, type DateRow } from '$lib/date';
+import { pgGet, pgPostRpc, PostgrestError, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
 
 const QuerySchema = v.object({
@@ -77,6 +93,10 @@ type DateItem = {
   project: ProjectLite | null;
   /** Timezone rule: a timed date buckets/renders on its venue's day. */
   venue: { timezone: string | null } | null;
+  /** ADR-078 columns — absent until the migrations are applied. */
+  line_id?: string | null;
+  travel_direction?: string | null;
+  label?: string | null;
 };
 
 export const GET: RequestHandler = async ({ request, url, platform, locals }) => {
@@ -116,15 +136,21 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
   const workspaceIds = parseUuidList(workspace_ids);
 
   const search = new URLSearchParams();
-  search.set(
-    'select',
-    [
-      'id,kind,status,title,starts_at,ends_at,all_day,venue_name,city',
-      'project_id,performance_id',
-      'project:project_id(id,slug,name,accent,workspace_id)',
-      'venue:venue_id(timezone)',
-    ].join(','),
-  );
+  // Extended select first (ADR-078 cascade columns + the Altres label);
+  // the catch below retries with the legacy columns while the migrations
+  // aren't applied (42703 undefined column — graceful absence).
+  const BASE_SELECT = [
+    'id,kind,status,title,starts_at,ends_at,all_day,venue_name,city',
+    'project_id,performance_id',
+    'project:project_id(id,slug,name,accent,workspace_id)',
+    'venue:venue_id(timezone)',
+  ];
+  const EXTENDED_SELECT = [
+    ...BASE_SELECT,
+    'line_id,travel_direction',
+    'label:custom_fields->>label',
+  ];
+  search.set('select', EXTENDED_SELECT.join(','));
 
   if (projectIds.length > 0 && workspaceIds.length > 0) {
     search.set(
@@ -149,10 +175,105 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
     const { data } = await pgGet<DateItem>(env, 'date', jwt, { search });
     return json({ items: data });
   } catch (err) {
+    // Pre-migration DB: the cascade columns don't exist yet. Retry once
+    // with the legacy select — the calendar keeps working, the new fields
+    // are simply absent (contract § Graceful absence).
+    if (err instanceof PostgrestError && err.code === '42703') {
+      search.set('select', BASE_SELECT.join(','));
+      try {
+        const { data } = await pgGet<DateItem>(env, 'date', jwt, { search });
+        return json({ items: data });
+      } catch (retryErr) {
+        return pgErrorResponse(
+          retryErr,
+          { route: 'GET /api/dates', requestId: locals.requestId },
+          { passUpstream: [401, 403] },
+        );
+      }
+    }
     return pgErrorResponse(
       err,
       { route: 'GET /api/dates', requestId: locals.requestId },
       { passUpstream: [401, 403] },
+    );
+  }
+};
+
+export const POST: RequestHandler = async ({ request, platform, locals }) => {
+  if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);
+  const env = platform.env as unknown as SupabaseEnv;
+
+  const jwt = extractAccessToken(request);
+  if (!jwt) return json({ error: 'missing_authorization' }, 401);
+
+  let raw: unknown;
+  try {
+    raw = await request.json();
+  } catch {
+    return json({ error: 'invalid_body' }, 400);
+  }
+  const parsed = v.safeParse(DateCreateSchema, raw);
+  if (!parsed.success) {
+    return json(
+      {
+        error: 'invalid_body',
+        issues: parsed.issues.map((i) => ({
+          path: i.path?.map((p) => p.key).join('.'),
+          message: i.message,
+        })),
+      },
+      400,
+    );
+  }
+  const input = parsed.output;
+
+  // Cross-field rules pre-checked for honest 400s; the RPC re-enforces
+  // every one of them (strict AI=UI parity — no path bypasses the contract).
+  if (input.travel_direction && input.kind !== 'travel_day') {
+    return json(
+      { error: 'invalid_body', hint: "travel_direction requires kind='travel_day'." },
+      400,
+    );
+  }
+  if (input.label && input.kind !== 'other') {
+    return json(
+      { error: 'invalid_body', hint: "label is only accepted for kind='other'." },
+      400,
+    );
+  }
+
+  try {
+    const { data } = await pgPostRpc<DateRow>(env, 'create_date', jwt, {
+      p_project_id: input.project_id,
+      p_kind: input.kind,
+      p_starts_at: input.starts_at,
+      p_ends_at: input.ends_at ?? null,
+      p_all_day: input.all_day ?? false,
+      p_title: input.title ?? null,
+      p_venue_name: input.venue_name ?? null,
+      p_city: input.city ?? null,
+      p_country: input.country ? input.country.toUpperCase() : null,
+      p_status: input.status ?? 'tentative',
+      p_performance_id: input.performance_id ?? null,
+      p_line_id: input.line_id ?? null,
+      p_travel_direction: input.travel_direction ?? null,
+      p_label: input.label ?? null,
+    });
+    if (data.length === 0 || !data[0]) return json({ error: 'create_failed' }, 502);
+    return json({ date: data[0] }, 201);
+  } catch (err) {
+    // RPC RAISEs: 22023 invalid input (incl. line/performance ∉ project,
+    // status outside the create whitelist) → 400; 42501 collapses unknown
+    // project and no-permission → 403 (no existence oracle).
+    return pgErrorResponse(
+      err,
+      { route: 'POST /api/dates', requestId: locals.requestId },
+      {
+        codes: {
+          '22023': { status: 400, error: 'invalid_input' },
+          '42501': { status: 403, error: 'forbidden' },
+        },
+      },
     );
   }
 };
