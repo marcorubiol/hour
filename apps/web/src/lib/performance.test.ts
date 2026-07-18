@@ -4,6 +4,7 @@ import {
   PERFORMANCE_STATUSES,
   PerformanceCreateSchema,
   PerformancePatchSchema,
+  performanceStatusFamily,
   performanceStatusLabel,
   performanceStatusTone,
 } from './performance';
@@ -89,6 +90,30 @@ describe('status vocabulary', () => {
     for (const s of PERFORMANCE_STATUSES) {
       expect(performanceStatusTone(s)).toBeTruthy();
       expect(performanceStatusLabel(s)).not.toContain('_');
+    }
+  });
+});
+
+describe('performanceStatusFamily', () => {
+  it('maps every status to its chip shape', () => {
+    expect(performanceStatusFamily('confirmed')).toBe('confirmed');
+    expect(performanceStatusFamily('invoiced')).toBe('confirmed');
+    expect(performanceStatusFamily('done')).toBe('confirmed');
+    expect(performanceStatusFamily('paid')).toBe('confirmed');
+    expect(performanceStatusFamily('hold')).toBe('hold');
+    expect(performanceStatusFamily('hold_1')).toBe('hold');
+    expect(performanceStatusFamily('hold_3')).toBe('hold');
+    expect(performanceStatusFamily('proposed')).toBe('proposed');
+    expect(performanceStatusFamily('cancelled')).toBe('proposed');
+  });
+
+  it('unknown statuses never read as commitment', () => {
+    expect(performanceStatusFamily('whatever')).toBe('proposed');
+  });
+
+  it('covers the full enum — a new status must pick a shape', () => {
+    for (const s of PERFORMANCE_STATUSES) {
+      expect(['confirmed', 'hold', 'proposed']).toContain(performanceStatusFamily(s));
     }
   });
 });

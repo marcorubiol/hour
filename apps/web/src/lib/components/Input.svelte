@@ -10,7 +10,8 @@
     | 'number'
     | 'tel'
     | 'url'
-    | 'date';
+    | 'date'
+    | 'datetime-local';
 
   interface Props {
     label?: string;
@@ -25,6 +26,8 @@
     disabled?: boolean;
     loading?: boolean;
     autocomplete?: HTMLInputAttributes['autocomplete'];
+    /** id of a <datalist> the input completes from (native suggestions). */
+    list?: string;
     autofocus?: boolean;
     oninput?: (event: Event) => void;
     onchange?: (event: Event) => void;
@@ -45,6 +48,7 @@
     disabled = false,
     loading = false,
     autocomplete,
+    list,
     autofocus = false,
     oninput,
     onchange,
@@ -86,6 +90,7 @@
       {required}
       disabled={isDisabled}
       {autocomplete}
+      {list}
       {autofocus}
       aria-invalid={error ? 'true' : undefined}
       aria-describedby={hasMessage ? messageId : undefined}

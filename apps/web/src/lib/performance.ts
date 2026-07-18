@@ -35,6 +35,32 @@ export function performanceStatusTone(status: string): StatusTone {
   return TONES[status as PerformanceStatus] ?? 'neutral';
 }
 
+/**
+ * The chip grammar's three shapes (ADR-072 §5 / ADR-078): solid =
+ * commitment (confirmed and its aftermath), outline = possibility held
+ * (hold*), dashed = intention (proposed; cancelled joins it as the only
+ * remaining honest non-solid rendering). Unknown statuses read as dashed —
+ * never a false commitment.
+ */
+export type StatusFamily = 'confirmed' | 'hold' | 'proposed';
+
+const FAMILIES: Record<PerformanceStatus, StatusFamily> = {
+  proposed: 'proposed',
+  hold: 'hold',
+  hold_1: 'hold',
+  hold_2: 'hold',
+  hold_3: 'hold',
+  confirmed: 'confirmed',
+  invoiced: 'confirmed',
+  done: 'confirmed',
+  paid: 'confirmed',
+  cancelled: 'proposed',
+};
+
+export function performanceStatusFamily(status: string): StatusFamily {
+  return FAMILIES[status as PerformanceStatus] ?? 'proposed';
+}
+
 /** UI label — holds keep their rank visible (hold 1 beats hold 3). */
 export function performanceStatusLabel(status: string): string {
   return status.replace(/_/g, ' ');

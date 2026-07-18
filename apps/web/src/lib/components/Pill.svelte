@@ -23,6 +23,8 @@
     disabled?: boolean;
     ariaLabel?: string;
     ariaCurrent?: 'page' | 'true' | undefined;
+    /** Toggle-button semantics (e.g. a type-pill row) — sets aria-pressed. */
+    ariaPressed?: boolean;
     onclick?: (e: MouseEvent) => void;
     children?: Snippet;
   }
@@ -35,6 +37,7 @@
     disabled = false,
     ariaLabel,
     ariaCurrent,
+    ariaPressed,
     onclick,
     children,
   }: Props = $props();
@@ -52,6 +55,7 @@
   {disabled}
   aria-label={ariaLabel}
   aria-current={ariaCurrent}
+  aria-pressed={ariaPressed}
   {onclick}
 >
   {#if children}{@render children()}{/if}

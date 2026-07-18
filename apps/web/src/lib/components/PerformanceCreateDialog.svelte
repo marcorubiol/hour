@@ -1,33 +1,19 @@
 <script module lang="ts">
   /**
-   * "New performance" dialog (ADR-043) — extracted from the Calendar page
-   * so any lens (calendar, line detail) can create a gig. The caller owns
-   * the trigger and any preselection context (pins, current line); this
-   * component owns the form, the POST, and the cache invalidations.
-   *
-   * The create RPC returns the full row — this is the slice consumers
-   * need (workspace_id resolves the navigation target's slug).
+   * "New performance" dialog (ADR-043) — the standalone host of the shared
+   * PerformanceForm (ADR-078 §1: the form is extracted, not forked). Any
+   * lens (line detail, hall) mounts this; the unified calendar create
+   * dialog mounts PerformanceForm directly instead. The caller owns the
+   * trigger and any preselection context (pins, current line); the form
+   * owns the fields, the POST, and the cache invalidations.
    */
-  export type CreatedPerformance = {
-    id: string;
-    slug: string | null;
-    workspace_id: string;
-  };
+  export type { CreatedPerformance } from './PerformanceForm.svelte';
 </script>
 
 <script lang="ts">
-  import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
-  import { fetchJSON, mutateJSON } from '$lib/api';
   import Button from './Button.svelte';
   import Dialog from './Dialog.svelte';
-  import Input from './Input.svelte';
-  import Select from './Select.svelte';
-  import { addToast } from './Toast.svelte';
-  import { dayKeyInTz } from '$lib/calendar';
-  import { allLinesQueryOptions } from '$lib/nav-queries';
-  import { performanceStatusLabel, type PerformanceCreate } from '$lib/performance';
-
-  type ProjectLite = { id: string; slug: string; name: string };
+  import PerformanceForm, { type CreatedPerformance } from './PerformanceForm.svelte';
 
   interface Props {
     open?: boolean;
@@ -51,147 +37,28 @@
     onCreated,
   }: Props = $props();
 
-  const viewerTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  const queryClient = useQueryClient();
+  let form: { submit: () => void } | undefined = $state();
+  let pending = $state(false);
 
-  let cProject = $state('');
-  let cDay = $state('');
-  let cVenue = $state('');
-  let cCity = $state('');
-  let cStatus = $state('proposed');
-  let cLine = $state('');
-
-  // Only the statuses that make sense at creation time — later lifecycle
-  // states (done/invoiced/paid/cancelled) are reached from the detail page.
-  const CREATE_STATUSES = ['proposed', 'hold', 'hold_1', 'hold_2', 'hold_3', 'confirmed'];
-  let statusOptions = $derived(
-    CREATE_STATUSES.map((s) => ({ value: s, label: performanceStatusLabel(s) })),
-  );
-
-  const projectsQuery = createQuery({
-    queryKey: ['projects', { status: 'active' }],
-    queryFn: ({ signal }: { signal: AbortSignal }) =>
-      fetchJSON<{ items: ProjectLite[] }>('/api/projects?status=active', signal),
-  });
-  const linesQuery = createQuery(allLinesQueryOptions());
-
-  let projectOptions = $derived(
-    ($projectsQuery.data?.items ?? []).map((p) => ({ value: p.id, label: p.name })),
-  );
-
-  // Lines of the selected project — client-side narrowing over the shared
-  // ['lines','all'] cache. No lines (or a preset line) → no select at all.
-  let projectLines = $derived(
-    ($linesQuery.data?.items ?? []).filter((l) => l.project?.id === cProject),
-  );
-  let lineOptions = $derived([
-    { value: '', label: 'No line' },
-    ...projectLines.map((l) => ({ value: l.id, label: l.name })),
-  ]);
-  let showLineSelect = $derived(!presetLineId && projectLines.length > 0);
-
-  // Apply presets on each open transition; day is refreshed every open.
-  // When the CONTEXT dictates the target (presetProjectId/presetLineId —
-  // line modules, locked projects) the preset ALWAYS wins: the component
-  // instance survives navigation between lines (same route, new params),
-  // so a leftover cProject/cLine from line A must never leak a gig into
-  // line B (review 2026-07-12, HIGH). Only the free-form global dialog
-  // keeps the "don't override what the user picked" contract.
-  let wasOpen = false;
-  $effect(() => {
-    if (open && !wasOpen) {
-      cDay = presetDate ?? dayKeyInTz(new Date().toISOString(), viewerTz);
-      if (presetProjectId) {
-        cProject = presetProjectId;
-        cLine = presetLineId ?? '';
-      } else if (!cProject) {
-        cProject = projectOptions.length === 1 ? projectOptions[0].value : '';
-        cLine = presetLineId ?? '';
-      }
-    }
-    wasOpen = open;
-  });
-
-  const createPerf = createMutation({
-    mutationFn: async (input: PerformanceCreate) => {
-      const body = await mutateJSON<{ performance: CreatedPerformance }>(
-        'POST',
-        '/api/performances',
-        input,
-      );
-      if (!body?.performance) throw new Error('Malformed response');
-      return body.performance;
-    },
-    onSuccess: (perf) => {
-      open = false;
-      cVenue = '';
-      cCity = '';
-      void queryClient.invalidateQueries({ queryKey: ['calendar-performances'] });
-      void queryClient.invalidateQueries({ queryKey: ['line-performances'] });
-      void queryClient.invalidateQueries({ queryKey: ['line-money-fees'] });
-      void queryClient.invalidateQueries({ queryKey: ['today-performances'] });
-      onCreated?.(perf);
-    },
-    onError: (err) => {
-      addToast({
-        tone: 'danger',
-        title: 'Not created',
-        message: `${err instanceof Error ? err.message : 'Unexpected error'} — try again.`,
-      });
-    },
-  });
-
-  function submitCreate() {
-    if (!cProject) {
-      addToast({ tone: 'warning', message: 'Pick a project.' });
-      return;
-    }
-    if (!cDay) {
-      addToast({ tone: 'warning', message: 'Pick a date.' });
-      return;
-    }
-    $createPerf.mutate({
-      project_id: cProject,
-      performed_at: cDay,
-      venue_name: cVenue.trim() || null,
-      city: cCity.trim() || null,
-      status: cStatus as PerformanceCreate['status'],
-      line_id: cLine || null,
-    });
+  function handleCreated(perf: CreatedPerformance) {
+    open = false;
+    onCreated?.(perf);
   }
 </script>
 
 <Dialog bind:open title="New performance" size="s">
-  <div class="pcreate__form">
-    <Select
-      label="Project"
-      placeholder="Pick a project…"
-      options={projectOptions}
-      bind:value={cProject}
-      required
-      disabled={lockProject}
-      onchange={() => (cLine = '')}
-    />
-    <Input label="Date" type="date" bind:value={cDay} required />
-    <Input label="Venue" bind:value={cVenue} placeholder="Venue name (optional)" />
-    <Input label="City" bind:value={cCity} placeholder="City (optional)" />
-    <Select label="Status" options={statusOptions} bind:value={cStatus} />
-    {#if showLineSelect}
-      <Select label="Line" options={lineOptions} bind:value={cLine} />
-    {/if}
-  </div>
+  <PerformanceForm
+    bind:this={form}
+    bind:pending
+    {open}
+    {presetProjectId}
+    {presetLineId}
+    {lockProject}
+    {presetDate}
+    onCreated={handleCreated}
+  />
   {#snippet actions()}
     <Button variant="outline" onclick={() => (open = false)}>Cancel</Button>
-    <Button onclick={submitCreate} loading={$createPerf.isPending}>Create</Button>
+    <Button onclick={() => form?.submit()} loading={pending}>Create</Button>
   {/snippet}
 </Dialog>
-
-<style>
-  @layer components {
-    .pcreate__form {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-s);
-    }
-  }
-</style>
