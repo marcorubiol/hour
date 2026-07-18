@@ -301,11 +301,16 @@
     .tc__title {
       flex: 1;
       min-inline-size: 0;
+      /* Reset the global text-input skin (base.css gives every text input
+         padding-block: space-s) — otherwise it stacks on .tc's own padding
+         and the collapsed bar reads twice as tall as the scope bar. */
+      padding: 0;
       border: 0;
       outline: none;
       background: none;
       font-family: var(--font-sans);
       font-size: var(--text-m);
+      line-height: var(--text-line-height);
       color: var(--text-color);
     }
     .tc__title::placeholder {
