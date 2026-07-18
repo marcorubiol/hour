@@ -75,6 +75,10 @@ Working name: **Hour**. Brand decision deferred to Phase 1.
 - Parent MaMeMi context (where Difusión originated): `01_STAGE/ZS_MaMeMi/`
 - Source of the 156 existing programmers/festivals to import: `01_STAGE/ZS_MaMeMi/Difusión/`
 
+## Status — 2026-07-18 — Calendar v2 EN PRODUCCIÓN (grill → build autónomo → apply/merge/deploy en el día)
+
+**Al retomar, empezar aquí.** Prod en `88467c3` (verificar con `/health/live`). La lente de tiempo completa vive: dos proyecciones (`?view=month|agenda`, localStorage + default por form factor, ADR-076), diálogo unificado de creación (pills de tipo; `PerformanceForm` compartida con entrada de hora **local del venue** — cierra el BUG VIVO de timezones), blackouts (`availability_block` sin `kind`, ADR-078), motor de conflictos de 4 severidades (`people`/`possible`/`blackout`/`blackout-tentative`), bandas derivadas entre viajes (`awayBands`, display-only), `day_off`, pill Opció→tentative, etiquetas custom con autocomplete, ICS en "⋯". DB migrada (5 migraciones sondadas), suites: check 0/0 · unit 251 · RLS 100/101 · e2e performance-write 4/4 contra prod. **Deuda inmediata**: 4 specs e2e con drift de Desk v2 (smoke/scope-url×2/tasks — selectores del shell nuevo, no rotura) + regen real de db-types (hand-patch marcado). Registro: ADR-078 + `_notes/sessions-log.md § 2026-07-18` + `build/runbooks/calendar-v2-apply.md` (EXECUTED). Mock canónico publicado en el proyecto de diseño ("Hour Calendar Lens.html").
+
 ## Status — 2026-07-16 — Scope v2 EN PRODUCCIÓN · el registro de deploys arreglado (ADR-066)
 
 **Al retomar, empezar aquí.**
