@@ -21,6 +21,8 @@ Antes de cualquier trabajo: leer primero el [`_context.md`](../_context.md) del 
  
 ### Current next action
 
+> **2026-07-18 — Calendar v2 CONSTRUIDO** (grill ADR-078 por la mañana + build autónomo por la tarde, branch `calendar-v2`): modelo (5 migraciones — aplicadas a la DB viva con la frase de Marco —, endpoints, `$lib/calendar.ts`) + UI completa (dos proyecciones, diálogo unificado, blackouts, marcas de conflicto, bandas derivadas) + tests (unit 251 · RLS 100). Estado y pasos restantes (merge + deploy): `build/runbooks/calendar-v2-apply.md` y `_tasks.md`. Conversations v1.5 y Money v2 siguen despachados sin empezar.
+
 > **Nota 2026-07-17 — ESTADO REAL (verificado contra código + prod en vivo).** Tras la maratón 07-12→07-17: Scope v2 + shell rediseñado + hall-first en producción; **rename `engagement`→`conversation` (ADR-075), task entity (ADR-071), frase de estado del hall (ADR-068/069) y saldo de deuda `show`+slugs (ADR-077) están LIVE y desplegados** (prod `d85ed0d`, dirty:false; sondas: `/api/conversations` 401 · `/api/engagements` 404 · `/api/tasks` 401). Suites verdes: check 0/0 (1511) · unit 178 · RLS 66 · e2e 22.
 > Estamos en la **pasada diseño+datos página a página**: S1 (las vistas) HECHA → 12 prompts despachados. Estado real de esos builds: **Desk v2 EN CURSO** (sesión paralela; en el árbol aún v1, 2/4 fuentes en secciones separadas); **Calendar v2, Conversations v1.5 y Money v2 despachados pero SIN empezar** (0 código, sin migración). Modo calma (toggle global) y fix de tz de entrada = solo diseño / bug vivo.
 > Tasks accionables + estado por-build detallado: **`_tasks.md`** (raíz del repo). ADRs de S1: `_decisions.md § ADR-069→077`.

@@ -1,8 +1,13 @@
 # Hour — Build prompt: calendar model v1 (availability + date cascade + APIs)
 
-> **STATUS: READY TO DISPATCH — NOT STARTED (updated 2026-07-18 post-grill, ADR-078).**
-> 0 código: sin migración (`availability_block` / date-cascade / la "Migration C" del gap #8
-> no existen), sin `conflictsFor()` en `$lib/calendar.ts`. Corre PRIMERO.
+> **STATUS: EXECUTED 2026-07-18 (autonomous session, branch `calendar-v2`).** Kept as the
+> spec of record. Delivered: the 5 migration files (`build/migrations/2026-07-18_*.sql` —
+> files only, NOT applied to any live DB), the endpoints, and the `$lib/calendar.ts` pure
+> functions + suites. The as-built contract — including the divergences from this prompt's
+> letter (stage-3 `workspace_id` on `CalendarEvent`, same-project pairs never clash,
+> away-band splitting on own-event days, `RosterBundle` structural type) — is
+> `build/calendar-v2-api-contract.md`. Activation: `build/runbooks/calendar-v2-apply.md`
+> (gated on Marco's phrase).
 >
 > Handoff prompt for an external coding agent. Runs FIRST — `calendar-prompt.md` depends on it.
 > Origin: design+data review S1 (2026-07-17). Decisions: `_decisions.md` § ADR-072 (person-based

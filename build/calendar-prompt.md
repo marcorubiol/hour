@@ -1,11 +1,13 @@
 # Hour — Build prompt: Calendar lens v2 (conflicts · availability · dates · grammar)
 
-> **STATUS: BLOCKED — DO NOT START (updated 2026-07-18 post-grill, ADR-078).** Two gates,
-> BOTH must open first: **(a) Desk v2 has landed** (this build inherits its system and both
-> touch `base.css`/tokens — no parallel edits), and **(b) Marco's final Calendar design has
-> converged** (in refinement 2026-07-18). The converged mock + `calendar-design-prompt.md
-> § Binding contract` are BINDING — reread both before building, same protocol as
-> `desk-prompt.md § Converged design`.
+> **STATUS: EXECUTED 2026-07-18 (autonomous session, branch `calendar-v2`).** Kept as the
+> spec of record. Built in the same autonomous pass as the model, under the ADR-078 mandate
+> and against the updated `lens-v2.html` mock (pending publish — see the runbook); the old
+> gates were consumed rather than skipped: Desk v2's shell (LensSwitcher + calm) had landed
+> on main as `77fc9a3` and the branch builds on top of it. UI decisions taken inside the
+> mandate + as-built API divergences: sessions-log 2026-07-18 +
+> `build/calendar-v2-api-contract.md`. Not merged, not deployed — activation:
+> `build/runbooks/calendar-v2-apply.md` (gated on Marco's phrase).
 >
 > Depends on `calendar-model-prompt.md` (availability_block + date cascade +
 > `$lib/calendar.ts`). If not merged yet: build behind a thin adapter, render new sections
