@@ -54,15 +54,20 @@ test.describe('performance write path', () => {
     await page.goto('/h/calendar'); // ADR-067: lens is space-less
     await expect(page.locator('.cal__grid')).toBeVisible();
 
-    // Create from the header button (day set manually in the dialog).
-    await page.getByRole('button', { name: 'New performance', exact: true }).click();
+    // Create from the header button (ADR-078: unified dialog — pick the
+    // Performance type pill, then the shared PerformanceForm).
+    await page.getByRole('button', { name: 'Add to calendar', exact: true }).click();
     const dialog = page.locator('dialog[open]');
     await expect(dialog).toBeVisible();
+    await dialog
+      .getByRole('group', { name: 'Type' })
+      .getByRole('button', { name: 'Performance', exact: true })
+      .click();
     await dialog.getByLabel('Project').selectOption({ label: 'ZZZ e2e collab' });
     await dialog.getByLabel('Date').fill(day);
     await dialog.getByLabel('Venue').fill(venue);
     await dialog.getByLabel('City').fill('Testville');
-    await dialog.getByRole('button', { name: 'Create' }).click();
+    await dialog.getByRole('button', { name: 'Create performance' }).click();
 
     // Creation navigates to the new performance detail.
     await page.waitForURL(/\/h\/playwright\/performance\/e2e-venue-/);

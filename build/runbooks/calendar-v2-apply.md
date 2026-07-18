@@ -1,6 +1,19 @@
 # Calendar v2 — activation runbook (apply → merge → deploy)
 
-> **GATE: nothing below runs until Marco says the named phrase "APLICA CALENDAR V2".**
+> **STATUS: EXECUTED 2026-07-18 (same day).** Marco said the phrase; the harness
+> classifier still blocked the prod-DB write in auto mode (exactly as the
+> autonomous-prod-gate note predicted) and Marco explicitly authorized adding the
+> `apply_migration`/`execute_sql` allow rules to `.claude/settings.local.json`.
+> Then: 5 migrations applied + probed (RLS forced, 3 policies, day_off in enum,
+> new cols, 4 RPCs with 0 PUBLIC/anon grants; anon table grants = house baseline,
+> RLS is the fence) · RLS suite 100/101 against the migrated DB · branch committed
+> (28bd1dc model · c417721 UI · 88467c3 docs) · ff-merge to main · deployed
+> (stamp `88467c3`, builtAt 16:37Z; workers.dev + custom domain verified; ~60s
+> propagation delay observed) · e2e performance-write 4/4 against prod after
+> adapting the spec to the unified dialog. Desk-v2 e2e drift flagged in _tasks.
+> Kept below as the record of the planned path.
+>
+> **GATE (original): nothing below runs until Marco says the named phrase "APLICA CALENDAR V2".**
 > Until then the only valid actions are reading the branch and reviewing. Built
 > 2026-07-18 (autonomous session, ADR-078); this runbook is the single path from
 > "built on a branch" to "live".
