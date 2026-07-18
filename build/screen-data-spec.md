@@ -141,22 +141,24 @@ reordering. (Supersedes the earlier "mixed by urgency within buckets" phrasing.)
   **disappears when the state changes** — nothing to tick, nothing to clean. Optional
   gesture: promote a call to a task (human-decided, never automatic). Same
   derived-over-stored theorem as paid=Σpayments and away-days.
-- **One row grammar**: `[mark] verb object · context · why-now → one primary action`.
-  Verbs are the taxonomy (reply/chase/confirm/remind/prep/revive) — no type icons, no
-  hashtags. **Verb labels belong to derived calls only** — a task's title IS its verb.
-- **Two marks only** (mark = "can I complete it here?"): tickable circle = stored task ·
-  accent dot = derived call. AI proposal = ghost circle (task awaiting consent, with its
-  reason line + Add/dismiss). The show-day card is the single banner exception.
-- **Rhythm rules** (the "cramped" fix): the second line must be EARNED (no urgent
-  why-now → one-line row); actions reveal on hover except OVERDUE; Anytime recedes
-  (low contrast); money amounts only on remind/confirm rows.
-- **Legibility refinements (design iteration 3)**: context token = **project · line,
-  always both** (line names aren't unique across projects; workspace only when the scope
-  spans spaces, else hover). The call dot = **project accent, consistent app-wide**
-  (same hue as the project's portada card / calendar chips — never arbitrary) + hover
-  tooltip. **Verb tints by concern** (subtle, tokenized, both themes): money verbs ·
-  conversation verbs · tasks = neutral ink, no verb label — the tint says which lens
-  the call belongs to. Type legibility without type icons.
+- **FINAL row system (converged 2026-07-18; Marco's mockups = canonical visual ref)**:
+  - **The left gutter carries the type**, not the rows: one mono small-caps label per
+    run — **TAREA · AGENDA · CONVERSACIÓN · DINERO, singular**, tinted per concern,
+    with a fine vertical hairline. **Labels are doors**: click → that lens with the
+    current scope applied (the gutter is wayfinding — it teaches the app's structure).
+  - **Rows carry NO leading marks** (no dots, no glyphs — the marginalia won). One-line
+    default; the second line must be EARNED by an urgent why-now. Context path
+    `space · project · line` in quiet mono (identity is textual — no color codes to
+    learn). Verb labels only on derived calls (reply/chase/confirm/remind/revive),
+    tinted per concern; a task's title IS its verb. AGENDA rows lead with their hour
+    (time-as-glyph, venue-local per the timezone rule).
+  - Actions (done, open conversation, prepare reminder) on **hover only — persistent
+    in OVERDUE**. Money amounts only on remind/confirm rows. Anytime recedes AND is
+    **excluded from the headline count** ("10 need you" counts dated items only).
+  - **No per-bucket counters** (Marco, 2026-07-18: noise — never more than ~4 items a
+    day). Empty days don't render.
+  - AI proposal = ghost row inside the TAREA block: tinted container, PROPOSED badge,
+    reason line, Add/dismiss. The show-day card remains the single banner exception.
 - **Pulse strip** (Marco's desk metaphor, approved): ONE computed prose line under the
   header replacing static subtitle — "3 conversaciones vivas · 2 holds esperando ·
   €12.400 pipeline · próxima función sábado" — each fragment truth-derived, each a door
@@ -166,6 +168,18 @@ reordering. (Supersedes the earlier "mixed by urgency within buckets" phrasing.)
   1-2 season-calibrated relationship-maintenance calls (`revive · Teatre X · sin
   contacto esta temporada`, ADR-073 semantics) — proposal-toned, capped, never on
   loud days. Silence becomes opportunity, not emptiness.
+- **Calm mode (settled 2026-07-18)**: a USER-ACTIVATED filter — entering calm is a
+  consent act, never automatic. ON: the Desk reduces to today (show card + today's
+  dated items + quick capture); tomorrow / the week / Anytime fold away. Overdue is
+  NOT itemized but never denied: one quiet footer line — "2 vençudes i 7 coses més
+  esperen fora del mode calma →" (click exits). The pulse strip stays (ambient truth,
+  one line); the headline counts only what's visible ("3 need you · la resta espera").
+  Truth rule: silence without lies — the footer line is the difference between calm
+  and denial. Control: the clock-corner pill, **outline = available / solid = active**
+  (reuses the possibility/commitment grammar so it reads as a control, not a system
+  diagnosis); when active the whole page drops one contrast step — the mode is felt,
+  not just read. Remembered across sessions; keyboard `c`. Future (ADR-069): the AI
+  may PROPOSE calm on show days ("¿modo calma hasta el load-in?"), consent-first.
 **Watch** (not open — settled to wait): if the task+event mix gets noisy in real use, that's
 the structure-model trigger for the Work/Flow lens. Don't pre-build it.
 **Build**: dispatched 2026-07-17 — `task-model-prompt.md` (schema+API, first) →

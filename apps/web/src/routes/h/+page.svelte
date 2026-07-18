@@ -1,17 +1,25 @@
 <script lang="ts">
   /**
    * /h — the hall: the calm landing behind the logo (Marco's design,
-   * 2026-07-16). A time-aware greeting, today's date, the status sentence
-   * (ADR-068/069; spec § /h — the hall), and one door — "posa'm al dia" —
-   * straight to /h/desk. The cross-space digest that used to live here
-   * died 2026-07-17: Desk IS the catch-up surface (ADR-065), no
-   * intermediate page. The left rail's scope rows also navigate to
-   * /h/desk when clicked from here (see the shell).
+   * 2026-07-16 → clock redesign 2026-07-18). The layout, top to bottom:
    *
-   * The status sentence is the AI layer's first voice surface (ADR-069):
-   * truth-computed from the same caches Desk reads, never decorative.
-   * While its data loads — or fails — the hall stays silent (greeting
-   * only): silence over lies.
+   *   · a big serif CLOCK — the brand signature (the app is Hour); the
+   *     one live-ticking element the rest reads from,
+   *   · a quiet RELATION line to the next timed moment, but only when it
+   *     is genuinely imminent (≤18h) — the day horizon is the sentence's job,
+   *   · a time-aware GREETING + name,
+   *   · the AI STATUS SENTENCE (ADR-068/069; spec § /h — the hall),
+   *   · two doors — "posa'm al dia" straight to /h/desk, and "Nou apunt"
+   *     (a new free task, authored on the Desk composer),
+   *   · a subordinate day TEASER: today's timed moments + open notes.
+   *
+   * The cross-space digest that used to live here died 2026-07-17: Desk IS
+   * the catch-up surface (ADR-065), no intermediate page.
+   *
+   * Every dynamic string is truth-computed from the same caches Desk reads,
+   * never decorative. While a query loads — or fails — its element stays
+   * absent (sentence, relation, teaser): silence over lies. The clock and
+   * greeting are the only always-present copy.
    */
   import { goto } from '$app/navigation';
   import { createQuery } from '@tanstack/svelte-query';
@@ -19,9 +27,12 @@
   import { workspacesQueryOptions } from '$lib/nav-queries';
   import { session } from '$lib/session.svelte';
   import { detectLocale, t } from '$lib/i18n';
+  import Button from '$lib/components/Button.svelte';
   import {
     computeHallStatus,
     hallSentence,
+    nextTimedMoment,
+    todayMoments,
     type HallConversation,
     type HallPerformance,
     type HallTask,
@@ -32,29 +43,51 @@
   // intended source, user_profile.locale.
   const locale = detectLocale(navigator.language);
 
-  // Matí / tarda / nit — recomputed on each mount (every landing).
-  const hourNow = new Date().getHours();
-  const greeting = t(
-    hourNow < 6 || hourNow >= 21
-      ? 'hall.greeting_night'
-      : hourNow < 14
-        ? 'hall.greeting_morning'
-        : 'hall.greeting_afternoon',
-    locale,
-  );
+  // ── The clock ──────────────────────────────────────────────────────
+  // The hall lives while it's open, so unlike the old mount-frozen date
+  // this ticks on the minute (the clock shows HH:MM). Greeting, date and
+  // the relation line all read this one source, so they cross midnight and
+  // the matí/tarda/nit boundary together — live, never stale.
+  let clockNow = $state(new Date());
+  $effect(() => {
+    let timer: ReturnType<typeof setTimeout>;
+    const tick = () => {
+      timer = setTimeout(() => {
+        clockNow = new Date();
+        tick();
+      }, 60_000 - (Date.now() % 60_000));
+    };
+    tick();
+    return () => clearTimeout(timer);
+  });
+  const timeFmt = new Intl.DateTimeFormat(locale, {
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  });
+  let clockTime = $derived(timeFmt.format(clockNow));
+
+  // Matí / tarda / nit — derived from the tick, so it flips live at 6/14/21h.
+  let greeting = $derived.by(() => {
+    const h = clockNow.getHours();
+    return t(
+      h < 6 || h >= 21
+        ? 'hall.greeting_night'
+        : h < 14
+          ? 'hall.greeting_morning'
+          : 'hall.greeting_afternoon',
+      locale,
+    );
+  });
 
   let firstName = $derived(
     (session.user?.name ?? session.user?.email?.split('@')[0] ?? '').split(/\s+/)[0] ?? '',
   );
 
-  // "divendres · 17 juliol" — CSS mono-caps does the shouting.
-  const today = new Date();
-  const dateLabel = `${new Intl.DateTimeFormat(locale, { weekday: 'long' }).format(today)} · ${today.getDate()} ${new Intl.DateTimeFormat(locale, { month: 'long' }).format(today)}`;
-
-  // Status sentence inputs. Every query key is shared with an existing
-  // surface (Desk / HomeView / PerformanceCreateDialog invalidation) so
-  // the hall reads warm caches instead of refetching — rename keys there
-  // and here together, or nowhere.
+  // ── Status-sentence inputs ─────────────────────────────────────────
+  // Every query key is shared with an existing surface (Desk / HomeView /
+  // PerformanceCreateDialog invalidation) so the hall reads warm caches
+  // instead of refetching — rename keys there and here together, or nowhere.
   const conversationsQuery = createQuery({
     queryKey: ['conversations', 'today'],
     queryFn: ({ signal }: { signal: AbortSignal }) =>
@@ -102,39 +135,99 @@
         tasks: $tasksQuery.data.items,
         homeTzById,
       },
-      new Date(),
+      clockNow,
     );
   });
   let sentence = $derived(status ? hallSentence(status, locale) : null);
+
+  // ── Relation line ──────────────────────────────────────────────────
+  // The next timed moment, surfaced only while it is imminent. Beyond the
+  // horizon there is no relation line — the sentence already carries the
+  // day ("la propera espera fins dijous"), so the two never say the same
+  // thing twice.
+  const RELATION_HORIZON_MIN = 18 * 60;
+  let nextMoment = $derived(
+    $performancesQuery.isSuccess ? nextTimedMoment($performancesQuery.data.items, clockNow) : null,
+  );
+  let relation = $derived.by(() => {
+    if (!nextMoment) return null;
+    const mins = Math.round((Date.parse(nextMoment.at) - clockNow.getTime()) / 60_000);
+    if (mins <= 0 || mins > RELATION_HORIZON_MIN) return null;
+    const when =
+      mins < 60
+        ? t('hall.relation_minutes', locale, { m: mins })
+        : t('hall.relation_hours', locale, { h: Math.round(mins / 60) });
+    return `${when} · ${nextMoment.place}`;
+  });
+
+  // ── Day teaser ─────────────────────────────────────────────────────
+  // Today's timed moments + the open-notes count, from the same caches.
+  // A quiet recap and a glance into the Desk — never a second agenda.
+  let teaserTimes = $derived(
+    ($performancesQuery.isSuccess ? todayMoments($performancesQuery.data.items, clockNow) : []).map(
+      (m) => ({ time: timeFmt.format(new Date(m.at)), place: m.place }),
+    ),
+  );
+  let openNotes = $derived(
+    $tasksQuery.isSuccess ? $tasksQuery.data.items.filter((task) => task.status === 'open').length : 0,
+  );
+  let notesLabel = $derived(
+    !$tasksQuery.isSuccess || openNotes === 0
+      ? null
+      : openNotes === 1
+        ? t('hall.teaser_notes_one', locale)
+        : t('hall.teaser_notes_many', locale, { n: openNotes }),
+  );
+  let hasTeaser = $derived(teaserTimes.length > 0 || notesLabel !== null);
 </script>
 
 <section class="hall" aria-label="Home">
-    <div class="hall__center">
-      <h1 class="hall__greeting">{greeting}{firstName ? `, ${firstName}` : ''}</h1>
-      <p class="hall__date">{dateLabel}</p>
-      {#if sentence}
-        <p class="hall__status">{sentence}</p>
-      {/if}
-      <button type="button" class="hall__door" onclick={() => goto('/h/desk')}>
-        <span class="hall__door-glyph" aria-hidden="true">✻</span>
-        <span>{t('hall.door', locale)}</span>
-      </button>
+  <div class="hall__center">
+    <time class="hall__clock" datetime={clockTime}>{clockTime}</time>
+
+    {#if relation}
+      <p class="hall__relation">{relation}</p>
+    {/if}
+
+    <h1 class="hall__greeting">{greeting}{firstName ? `, ${firstName}` : ''}</h1>
+
+    {#if sentence}
+      <p class="hall__status">{sentence}</p>
+    {/if}
+
+    <div class="hall__actions">
+      <Button variant="primary" size="s" onclick={() => goto('/h/desk')}>
+        {t('hall.door', locale)}
+        {#snippet tail()}<span aria-hidden="true">→</span>{/snippet}
+      </Button>
+      <Button variant="outline" size="s" onclick={() => goto('/h/desk?compose=1')}>
+        {t('hall.action_note', locale)}
+      </Button>
     </div>
-  </section>
+
+    {#if hasTeaser}
+      <p class="hall__teaser">
+        {#each teaserTimes as item, i (item.time + item.place + i)}<span
+            class="hall__teaser-time">{item.time}</span
+          > {item.place}{#if i < teaserTimes.length - 1 || notesLabel}<span
+            class="hall__teaser-sep" aria-hidden="true"> · </span>{/if}{/each}{#if notesLabel}{notesLabel}{/if}
+      </p>
+    {/if}
+  </div>
+</section>
 
 <style>
   .hall {
     /* Fill the content column: viewport minus the top bar minus the shell
        content paddings (--space-l top, --space-xxl bottom) — true by
-       construction, no approximations. --header-height cascades from
-       .shell in the layout. */
+       construction. --header-height cascades from .shell in the layout. */
     min-block-size: calc(100vh - var(--header-height) - var(--space-l) - var(--space-xxl));
     display: grid;
     place-items: center;
-    /* The warm halo behind the greeting. Mixed from bg tokens so both
-       themes hold (ADR-059: light AND dark are contracts). */
+    /* The warm halo behind the clock. Mixed from bg tokens so both themes
+       hold (ADR-059: light AND dark are contracts). */
     background: radial-gradient(
-      ellipse 46% 40% at 50% 46%,
+      ellipse 48% 46% at 50% 44%,
       color-mix(in oklch, var(--bg-ultra-light) 85%, var(--bg)),
       transparent 72%
     );
@@ -145,21 +238,25 @@
     flex-direction: column;
     align-items: center;
     text-align: center;
+    max-inline-size: 54ch;
   }
 
-  .hall__greeting {
-    margin: 0;
+  /* The signature: the clock IS the brand (the app is Hour). Biggest
+     element on the page — the greeting sits a step under it. */
+  .hall__clock {
     font-family: var(--font-display);
     font-weight: 400;
-    font-size: clamp(3rem, 7vw, 6.5rem);
-    letter-spacing: -0.02em;
-    line-height: 1.05;
+    font-size: clamp(3.5rem, 12vw, 9.5rem);
+    line-height: 1;
+    letter-spacing: -0.03em;
     color: var(--heading-color);
+    font-variant-numeric: tabular-nums;
   }
 
-  .hall__date {
+  /* Relation to the next timed moment — quiet mono caps under the clock. */
+  .hall__relation {
     margin: 0;
-    margin-block-start: var(--space-l);
+    margin-block-start: var(--space-m);
     font-family: var(--font-mono);
     font-size: var(--text-xs);
     letter-spacing: var(--mono-letter-spacing-loose);
@@ -167,10 +264,21 @@
     color: var(--text-faint);
   }
 
+  .hall__greeting {
+    margin: 0;
+    margin-block-start: var(--space-l);
+    font-family: var(--font-display);
+    font-weight: 400;
+    font-size: clamp(1.75rem, 4.5vw, 2.75rem);
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+    color: var(--heading-color);
+  }
+
   .hall__status {
     margin: 0;
-    margin-block-start: var(--space-xl);
-    max-inline-size: 44ch;
+    margin-block-start: var(--space-m);
+    max-inline-size: 46ch;
     font-family: var(--font-display);
     font-style: italic;
     font-size: var(--text-l);
@@ -179,33 +287,39 @@
     text-wrap: balance;
   }
 
-  .hall__door {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-xs);
+  /* Two-pill actions. The pill radius comes from the button's variable
+     contract (principle 3): the shared Button defaults to the 6px card
+     radius; the hall redeclares it to a full circle without touching the
+     component. */
+  .hall__actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--space-s);
     margin-block-start: var(--space-xl);
-    padding-block: var(--space-s);
-    padding-inline: var(--space-l);
-    background: color-mix(in oklch, var(--bg) 55%, transparent);
-    border: 1px solid var(--border-color-dark);
-    border-radius: var(--radius-circle);
-    font-family: var(--font-sans);
-    font-size: var(--text-s);
-    color: var(--text-muted);
-    cursor: pointer;
-    transition:
-      color var(--transition),
-      border-color var(--transition),
-      background var(--transition);
-  }
-  .hall__door:hover {
-    color: var(--text-color);
-    border-color: var(--text-muted);
-    background: var(--bg-ultra-light);
+    --btn-border-radius: var(--radius-circle);
+    --btn-padding-inline: var(--space-l);
+    --btn-padding-block: var(--space-s);
   }
 
-  .hall__door-glyph {
-    color: var(--accent-7);
-    line-height: 1;
+  /* The day teaser — a quiet recap, clearly subordinate to the sentence.
+     A flowing line that wraps centered, not a second agenda. */
+  .hall__teaser {
+    margin: 0;
+    margin-block-start: var(--space-xl);
+    max-inline-size: 54ch;
+    font-size: var(--text-s);
+    line-height: 1.8;
+    color: var(--text-muted);
+    text-wrap: pretty;
+  }
+  .hall__teaser-time {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    letter-spacing: var(--mono-letter-spacing-loose);
+    color: var(--text-color);
+  }
+  .hall__teaser-sep {
+    color: var(--text-faint);
   }
 </style>

@@ -1,66 +1,47 @@
-# Hour — Design prompt: Desk (the "what needs me" home)
+# Hour — Design: Desk — CONVERGED (system record)
 
-> **STATUS: NOT STARTED (2026-07-17).** Depende de Desk v2 (en curso). El Desk vivo aún es v1.
->
-> For the design tool. Origin: S1 2026-07-17 — decisions in `_decisions.md` ADR-068/069/070,
-> data spec in `build/screen-data-spec.md § /h/desk`.
+> **STATUS: DESIGN CONVERGED 2026-07-18** through live iteration with Marco in his design
+> tool. His final mockups (light + dark) are the **canonical visual reference**; this file
+> records the converged system so any future regeneration or variant starts from the
+> contract, not from scratch. Build contract: `desk-prompt.md § Converged design`.
+> Semantic source of truth: `build/screen-data-spec.md § /h/desk`.
 
-## What Hour is, visually
+## The converged visual system
 
-A calm, editorial tool for a live-performing-arts company. Current language: large serif
-display type, mono small-caps labels, warm paper background, 8 accent hues (one per
-space/project), light + dark themes as equal contracts. The home (`/h`, "the hall") greets
-with one serif sentence; the Desk is one click deeper — the single catch-up surface of the
-whole app. Calm over gamified, always: no progress bars, no confetti, no badges shouting.
+- **Editorial calm**: large serif headline ("10 need you" — counts dated items only, the
+  Anytime tail is excluded), mono small-caps labels, warm paper / deep dark as equal
+  themes, zero pictographs — typeable characters only.
+- **Marginalia gutter**: the type system lives in the left gutter, not on the rows — one
+  mono small-caps label per run: TAREA · AGENDA · CONVERSACIÓN · DINERO (singular,
+  locale-resolved), tinted per concern, fine vertical hairline per run. **Labels are
+  clickable doors** to their lens, carrying the current scope (the gutter is wayfinding:
+  it teaches the app's structure while you work).
+- **Clean rows, no leading marks**: one line by default; an earned second line only for
+  urgent why-nows ("expected reply Jul 10", "92 of ~60 days"). Context path
+  `space · project · line` in quiet mono — identity is textual, no color codes to learn.
+  Verb labels tinted per concern on derived calls only (reply / chase / confirm / remind /
+  revive); tasks appear in their own words, neutral ink. AGENDA rows lead with their hour
+  (venue-local per the timezone rule). Money amounts only where money is the decision
+  (remind / confirm). Actions on hover — persistent in OVERDUE.
+- **The show-day card**: the single banner — serif venue title, the 5 real timeslots
+  (venue-local, viewer courtesy only when different), Road sheet door. On a show day the
+  show owns the day.
+- **Pulse strip**: one computed mono line under the headline — ambient state, each
+  fragment a door to its lens. Never widgets, never placeholders.
+- **Ghost proposal**: PROPOSED badge + reason line + Add/dismiss in a tinted container
+  inside the TAREA block — consent, not alarm.
+- **Anytime**: recedes (low contrast); excluded from the headline count.
+- **No per-bucket counters** — deliberate (Marco: never >4 items/day; a number is noise).
+  Empty days don't render.
+- **Calm mode**: clock-corner pill (outline = available, solid = active, keyboard `c`).
+  ON: the feed reduces to today, the rest folds, overdue collapses to one quiet footer
+  line ("N vençudes i M coses més esperen fora del mode calma →" — click exits), and the
+  whole page drops one contrast step. The mode is felt, not just read. Never automatic.
+- **Urgency language**: red only for OVERDUE, restrained; tentative reads as a question;
+  the empty feed reads as achievement (the hall's "Tot tranquil" voice).
 
-## The screen to design: Desk
+## If regenerating mockups
 
-One ranked feed answering "what needs me now", grouped by day buckets:
-**OVERDUE · TODAY · TOMORROW · {weekday} · NEXT WEEK · LATER · ANYTIME** (quiet tail).
-Within each bucket the type order is FIXED (Marco, 2026-07-18; spec § /h/desk): **tasks →
-calendar → conversations → money**, mirroring the lens nav — the feed and the nav speak one
-vocabulary. The left gutter carries the item-type label in mono small-caps, SINGULAR
-(the es-voiced mock reads TAREA · AGENDA · CONVERSACIÓN · DINERO; locale-resolved in
-product). AGENDA labels the timed `date` rows and points at the Calendar lens's agenda
-projection (ADR-076 — two-level vocabulary: gutter names item kinds, nav names surfaces).
-The show-day anchor sits above everything in its day, outside the order.
-
-Five item types to design:
-
-1. **Conversation next-action** (the booking work): verb ("Reply", "Chase", "Confirm") +
-   person or organization name + project color dot + up to 2 `#tags`. The workhorse row.
-2. **Task**: done-toggle + title + parent entity (project/line/gig/conversation) + meta
-   "due Fri · surfaces Tue" (the computed surfacing date is always visible and editable —
-   trust through transparency). Variant: **AI-proposed task** — visibly marked (badge/tone),
-   with two quiet actions: accept / dismiss. It's a proposal awaiting consent, not an alarm.
-3. **Performance day-anchor**: a gig today/tomorrow is the HEADLINE of its bucket — bigger
-   than rows: venue, city, load-in time. On a show day, the show owns the day.
-4. **Money alert**: overdue invoice ("Invoice 2026-014 · 12 days overdue") and
-   gig-done-without-invoice. Quiet red — informative, not alarmist.
-5. **Agenda row** (timed `date` event — rehearsal, travel, press): time + title + place +
-   project dot ("12:00 ensayo técnico · sala d'assaig"). Time in the event venue's zone
-   when linked (timezone rule). Quieter than the workhorse rows.
-
-Plus: a **quick-capture line** at the very top — one unobtrusive input ("add a loose end…"),
-keyboard-first, drops into Anytime.
-
-## Urgency expression
-
-- OVERDUE: red accent, but restrained — a mark, not a siren.
-- Urgent window (surfaced, due approaching): warm emphasis.
-- Open / Anytime: low contrast, recede.
-- Empty feed: it should feel like an achievement — same voice as the hall's "Tot tranquil."
-
-## States & platforms
-
-- States: loading (skeleton or nothing — no text spinners), error (one honest line),
-  empty (see above).
-- **Both themes** (light editorial / dark) — mandatory, equal quality.
-- Desktop first + a mobile pass: single column, bucket labels as sticky headers, capture
-  reachable without scrolling.
-
-## Deliverable
-
-High-fidelity mockups: desktop + mobile, both themes, one realistic day —
-1 gig today (day-anchor), 2 overdue conversations, 3 tasks (1 of them AI-proposed),
-1 overdue-invoice alert, a 3-item Anytime tail, quick-capture visible.
+Produce: busy day (show today + overdue + AI proposal) · quiet day (revive calls) · calm
+mode ON — desktop + mobile, both themes, side by side where the comparison matters
+(calm on/off especially).

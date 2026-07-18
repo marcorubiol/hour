@@ -200,3 +200,43 @@ export function taskContextLabel(t: TaskItem): string | null {
   if (t.project) return t.project.name;
   return null;
 }
+
+// ── Composer target (shared quick-add, ADR-068) ─────────────────────────
+// The single parent a new task attaches to. `id` is the FK the POST wants:
+// the workspace_id for a space, the entity's own id otherwise. Display
+// fields (name / accent / lineKind) ride along so the composer pill and the
+// picker rows render without a second lookup.
+
+export type TaskTargetKind =
+  | 'space'
+  | 'project'
+  | 'line'
+  | 'performance'
+  | 'conversation';
+
+export interface TaskTarget {
+  kind: TaskTargetKind;
+  /** workspace_id for a space; the entity's own id otherwise. */
+  id: string;
+  name: string;
+  /** CSS accent value for the glyph (space / project / line only). */
+  accent?: string;
+  /** line kind (tour / season / …) driving the line glyph + label. */
+  lineKind?: string;
+}
+
+/** Map a target to the single POST /api/tasks parent field it fills. */
+export function taskTargetFields(target: TaskTarget): Partial<TaskCreate> {
+  switch (target.kind) {
+    case 'space':
+      return { workspace_id: target.id };
+    case 'project':
+      return { project_id: target.id };
+    case 'line':
+      return { line_id: target.id };
+    case 'performance':
+      return { performance_id: target.id };
+    case 'conversation':
+      return { conversation_id: target.id };
+  }
+}

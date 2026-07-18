@@ -2,6 +2,11 @@
 
 > **STATUS: IN PROGRESS (2026-07-17).** Rebuild en curso en sesión paralela; aún no aterrizado en `main`. En el árbol hoy = v1: 2/4 fuentes (`DeskBoard` conversations + sección `TaskBoard`) en secciones separadas, no feed mixto rankeado. Falta: performances como headline de bucket, money alerts, chips de eventos `date`, quick-capture, buzón de consentimiento IA.
 >
+> **CONSOLIDATION 2026-07-18 — the design CONVERGED with Marco. Read the section
+> "## Converged design (binding)" below: it SUPERSEDES any visual detail above that
+> contradicts it. Marco's final mockups (light + dark) are the canonical visual
+> reference and travel with this prompt.**
+>
 > Handoff prompt for an external coding agent. Depends on `task-model-prompt.md` —
 > **which is EXECUTED and LIVE (ADR-071)**: both migrations applied, `/api/tasks` CRUD,
 > `taskSurfaceState()` unit-tested. No adapter needed — build directly on the shipped model.
@@ -72,6 +77,42 @@ conversations by due, money by severity). Buckets: existing six + an **Anytime**
 Scope: apply the pins resolution to ALL sources exactly as `engInScope` does today.
 States: honest loading / error / empty per the app's pattern; the empty feed message should
 read as an achievement, not an error (tie to the hall's "Tot tranquil" voice).
+
+## Converged design (2026-07-18) — BINDING over anything above
+
+The live design iteration with Marco settled these; where an item above disagrees, THIS
+section wins (full record: `build/screen-data-spec.md § /h/desk`):
+
+1. **Rows carry NO leading marks** — no dots, no glyphs (item 5's "project dot" above is
+   dead). The **left gutter carries the type**: one mono small-caps label per run
+   (TAREA · AGENDA · CONVERSACIÓN · DINERO, singular, locale-resolved), tinted per
+   concern, fine vertical hairline. **Gutter labels are LINKS** → their lens with the
+   current scope applied.
+2. **One-line rows by default**; the second line must be EARNED by an urgent why-now.
+   Context path `space · project · line` in quiet mono. Verb labels only on derived
+   calls (reply/chase/confirm/remind/revive), tinted per concern — a task's title IS its
+   verb (no injected verb chips on tasks). AGENDA rows lead with their hour
+   (time-as-glyph). No hashtags, ever. Truth-only microcopy (no fabricated telemetry).
+3. **Money amounts only on remind/confirm rows.** Actions on **hover only** — persistent
+   in OVERDUE.
+4. **Headline counts DATED items only** ("10 need you") — Anytime excluded. **No
+   per-bucket counters** (Marco: noise; never >4 items/day). Empty days don't render.
+5. **Pulse strip** under the headline: ONE computed mono line — next show (venue-local) ·
+   holds waiting · live conversations · € pipeline (money fragment only with fee
+   visibility) — each fragment a door to its lens. Computed or absent, never placeholder.
+6. **AI proposal** = ghost row inside the TAREA block: tinted container, PROPOSED badge,
+   reason line, Add/dismiss.
+7. **Revive on quiet days**: no overdue + no show → up to 2 season-calibrated revive
+   calls, proposal-toned. Never on loud days.
+8. **CALM MODE** (spec § Desk · Calm mode): clock-corner pill (outline=off / solid=on,
+   keyboard `c`, remembered in localStorage; NEVER automatic). ON → feed reduces to
+   today + quick capture + pulse; tomorrow/week/Anytime fold; overdue collapses to one
+   quiet footer line "N vençudes i M coses més esperen fora del mode calma →" (click
+   exits); whole page drops one contrast step via tokens; headline recounts visible only.
+9. Zero pictographs anywhere — typeable characters only. i18n: gutter labels, calm pill
+   and pulse copy locale-resolved.
+10. Additional unit tests (pure, `now` injected): fixed-order sort, calm-mode filtering,
+    headline count.
 
 ## Constraints
 

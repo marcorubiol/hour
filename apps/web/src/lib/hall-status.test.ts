@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   computeHallStatus,
   hallSentence,
+  nextTimedMoment,
+  todayMoments,
   type HallConversation,
   type HallPerformance,
   type HallTask,
@@ -10,6 +12,12 @@ import {
 // Friday 2026-07-17, 10:00 — built with the LOCAL constructor so the
 // viewer-calendar-day math is deterministic in any test timezone.
 const NOW = new Date(2026, 6, 17, 10, 0, 0);
+
+/** A wall-clock moment `offset` days from NOW's day, as an absolute ISO —
+ * built LOCAL like NOW so "after 10:00" holds in any test timezone. */
+function atHour(offset: number, hour: number, minute = 0): string {
+  return new Date(2026, 6, 17 + offset, hour, minute, 0).toISOString();
+}
 
 /** YYYY-MM-DD, `offset` days from NOW's calendar day. */
 function isoDay(offset: number): string {
@@ -289,5 +297,46 @@ describe('hallSentence — other locales', () => {
     expect(hallSentence({ kind: 'calm', open: 3, next: { day: '2026-07-20', inDays: 3 } }, 'en')).toBe(
       'All quiet. 3 things open, none overdue — the next waits until Monday.',
     );
+  });
+});
+
+describe('nextTimedMoment — the imminent moment for the relation line', () => {
+  it('picks the nearest FUTURE load-in/start; past times are skipped', () => {
+    const perfs = [
+      show({ venue_name: 'A', load_in_at: atHour(0, 8) }), // 08:00, already past
+      show({ venue_name: 'B', start_at: atHour(0, 20) }), // 20:00
+      show({ venue_name: 'C', load_in_at: atHour(0, 15), start_at: atHour(0, 21) }), // 15:00 + 21:00
+    ];
+    expect(nextTimedMoment(perfs, NOW)).toEqual({ at: atHour(0, 15), place: 'C', kind: 'load-in' });
+  });
+
+  it('reaches into tomorrow when nothing is left today', () => {
+    const perfs = [
+      show({ venue_name: 'Done', start_at: atHour(0, 8) }),
+      show({ venue_name: 'Next', performed_at: isoDay(1), load_in_at: atHour(1, 9) }),
+    ];
+    expect(nextTimedMoment(perfs, NOW)).toEqual({ at: atHour(1, 9), place: 'Next', kind: 'load-in' });
+  });
+
+  it('is null when nothing timed lies ahead, and ignores cancelled', () => {
+    expect(nextTimedMoment([show({ start_at: atHour(0, 8) })], NOW)).toBeNull();
+    expect(nextTimedMoment([show({ status: 'cancelled', start_at: atHour(0, 15) })], NOW)).toBeNull();
+    expect(nextTimedMoment([show({ venue_name: 'Untimed' })], NOW)).toBeNull();
+  });
+});
+
+describe('todayMoments — the day teaser', () => {
+  it('today only, one per show (start preferred over load-in), sorted, untimed dropped', () => {
+    const perfs = [
+      show({ venue_name: 'Show', start_at: atHour(0, 20), load_in_at: atHour(0, 15) }),
+      show({ venue_name: 'Rehearsal', load_in_at: atHour(0, 10, 30) }),
+      show({ venue_name: 'Untimed' }), // no time → dropped
+      show({ venue_name: 'Tomorrow', performed_at: isoDay(1), start_at: atHour(1, 12) }), // not today → dropped
+      show({ status: 'cancelled', venue_name: 'Off', start_at: atHour(0, 12) }), // cancelled → dropped
+    ];
+    expect(todayMoments(perfs, NOW)).toEqual([
+      { at: atHour(0, 10, 30), place: 'Rehearsal', kind: 'load-in' },
+      { at: atHour(0, 20), place: 'Show', kind: 'show' },
+    ]);
   });
 });

@@ -1,44 +1,34 @@
 <script lang="ts">
   /**
-   * Desk view (ADR-065) — the full, uncapped feed behind the Home's "+N
-   * more" link: every conversation with a next action, in the pinned scope
-   * (empty pins = everything the user can see; a pinned space scopes to
-   * its workspace; a pinned line scopes through its project). Reachable
-   * from the Home link and from ⌘K.
+   * Desk (ADR-065/068/069/070 · converged design 2026-07-18) — the catch-up
+   * surface reached by the hall door. ONE ranked feed, FOUR concerns
+   * (tasks → agenda → conversations → money), grouped in day buckets, fixed
+   * within-day order mirroring the lens nav. Today's/tomorrow's gig is the
+   * bucket banner. The feed math is pure and tested in $lib/desk-feed; this
+   * file fetches, scopes by pins, and renders.
    *
-   * ADR-068: the Desk also carries the TASKS feed — the verb layer's
-   * global surface (open tasks in scope + a quick-add for free workspace
-   * tasks; parent-attached tasks are created where the parent lives, e.g.
-   * the Tasks line module). Free tasks have no container editor anywhere,
-   * so this composer IS their authoring home — recorded in
-   * structure-model.md, not silent drift. Whether Desk should MIX tasks
-   * into the agenda's day buckets is an explicitly open question
-   * (structure-model § Re-evaluate); until Marco decides, they are
-   * separate sections.
+   * The gutter carries the type (a door to that lens); rows carry no marks.
+   * Only tasks are stored — every other row is a call derived from state
+   * (invoice overdue → "remind", conversation due → "reply") that vanishes
+   * when the state changes. AI-proposed tasks (origin='ai') are the consent
+   * inbox (ADR-069): real rows, accept/dismiss, never invented.
    *
-   * The `['conversations','today']` query key below is shared with HomeView
-   * on purpose — same data, one cache entry. Rename it in both or in
-   * neither.
+   * Query keys ['conversations','today'], ['today-performances'], ['tasks','open']
+   * are SHARED with the hall/HomeView — one cache. Chrome copy is i18n
+   * (locale-resolved), matching the Catalan hall.
    */
-
+  import { onMount } from 'svelte';
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
-  import { goto } from '$app/navigation';
   import { fetchJSON, mutateJSON, ApiError } from '$lib/api';
-  import DeskBoard from '$lib/components/DeskBoard.svelte';
-  import TaskBoard from '$lib/components/TaskBoard.svelte';
-  import Button from '$lib/components/Button.svelte';
-  import Input from '$lib/components/Input.svelte';
-  import Select from '$lib/components/Select.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
+  import { accentVar } from '$lib/utils/accent';
+  import { detectLocale, t } from '$lib/i18n';
+  import { dayMonth } from '$lib/datetime';
   import { usePins } from '$lib/stores/pins.svelte';
   import {
     buildLineIndex,
     buildProjectIndex,
     resolveScope,
-    lineUrl,
-    projectUrl,
-    type NavLine,
-    type NavProject,
     type NavWorkspace,
     type RawLine,
   } from '$lib/nav';
@@ -48,16 +38,53 @@
     allLinesQueryOptions,
   } from '$lib/nav-queries';
   import type { DeskConversation } from '$lib/components/DeskBoard.svelte';
-  import { taskProjectId, taskSurfaceState, type TaskItem } from '$lib/task';
+  import { taskProjectId, type TaskItem } from '$lib/task';
+  import {
+    buildDeskFeed,
+    deskSummary,
+    type DeskConcern,
+    type DeskConvInput,
+    type DeskDateInput,
+    type DeskInvoiceInput,
+    type DeskItem,
+    type DeskPerfInput,
+  } from '$lib/desk-feed';
 
   type Conversation = DeskConversation & { workspace_id: string };
+  type DeskPerf = DeskPerfInput & {
+    project: { id: string; slug: string | null; name: string; workspace_id: string } | null;
+  };
+  type DeskDate = DeskDateInput & {
+    project: { id: string; slug: string | null; name: string; workspace_id: string } | null;
+  };
+  type DeskInvoice = DeskInvoiceInput & { project: { id: string; slug: string | null; name: string } | null };
 
   const pins = usePins();
   const queryClient = useQueryClient();
+  const locale = detectLocale(navigator.language);
+  const todayParam = new Date().toISOString().slice(0, 10);
 
+  // Tick on the minute so buckets roll over at midnight (shell-clock idiom).
+  let clockNow = $state(new Date());
+  $effect(() => {
+    let timer: ReturnType<typeof setTimeout>;
+    const tick = () => {
+      timer = setTimeout(() => {
+        clockNow = new Date();
+        tick();
+      }, 60_000 - (Date.now() % 60_000));
+    };
+    tick();
+    return () => clearTimeout(timer);
+  });
+
+  const timeFmt = new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+  const fmtTime = (iso: string | null) => (iso ? timeFmt.format(new Date(iso)) : '');
+  const money = (n: number, cur: string | null) =>
+    new Intl.NumberFormat(locale, { style: 'currency', currency: cur || 'EUR', maximumFractionDigits: 0 }).format(n);
+
+  // ── Data ─────────────────────────────────────────────────────────────
   const workspacesQuery = createQuery(workspacesQueryOptions());
-  // Browsing context for link-building only (ADR-067): lens routes carry no
-  // space segment; entity links borrow the default (first) workspace.
   let workspaceSlug = $derived($workspacesQuery.data?.items[0]?.slug ?? '');
   const projectsQuery = createQuery(activeProjectsQueryOptions());
   const linesQuery = createQuery(allLinesQueryOptions());
@@ -66,174 +93,362 @@
     queryFn: ({ signal }: { signal: AbortSignal }) =>
       fetchJSON<{ items: Conversation[] }>('/api/conversations?status=any&limit=100', signal),
   });
+  const performancesQuery = createQuery({
+    queryKey: ['today-performances'],
+    queryFn: ({ signal }: { signal: AbortSignal }) =>
+      fetchJSON<{ items: DeskPerf[] }>(`/api/performances?status=any&from=${todayParam}&limit=200`, signal),
+  });
+  const datesQuery = createQuery({
+    queryKey: ['desk-dates', todayParam],
+    queryFn: ({ signal }: { signal: AbortSignal }) =>
+      fetchJSON<{ items: DeskDate[] }>(`/api/dates?from=${todayParam}&limit=200`, signal),
+  });
   const tasksQuery = createQuery({
     queryKey: ['tasks', 'open'],
     queryFn: ({ signal }: { signal: AbortSignal }) =>
       fetchJSON<{ items: TaskItem[] }>('/api/tasks?status=open&limit=200', signal),
+  });
+  // Money is fee-gated: a viewer without read:money gets 403 → isError → the
+  // whole money concern (rows + € pulse) is suppressed silently (masked and
+  // unset are indistinguishable by design).
+  const invoicesQuery = createQuery({
+    queryKey: ['desk-invoices'],
+    retry: false,
+    queryFn: ({ signal }: { signal: AbortSignal }) =>
+      fetchJSON<{ items: DeskInvoice[] }>('/api/invoices?limit=200', signal),
   });
 
   let workspaces = $derived<NavWorkspace[]>($workspacesQuery.data?.items ?? []);
   let projectIndex = $derived(buildProjectIndex(workspaces, $projectsQuery.data?.items ?? []));
   let lineIndex = $derived(buildLineIndex(workspaces, ($linesQuery.data?.items as RawLine[]) ?? []));
   let conversations = $derived<Conversation[]>($conversationsQuery.data?.items ?? []);
+  let performances = $derived<DeskPerf[]>($performancesQuery.data?.items ?? []);
+  let dates = $derived<DeskDate[]>($datesQuery.data?.items ?? []);
   let tasks = $derived<TaskItem[]>($tasksQuery.data?.items ?? []);
+  let feeVisible = $derived($invoicesQuery.isSuccess);
+  let invoices = $derived<DeskInvoice[]>(feeVisible ? ($invoicesQuery.data?.items ?? []) : []);
 
+  // ── Scope by pins (empty = everything the user can see) ───────────────
   let scope = $derived(resolveScope(pins.pins, workspaces, lineIndex, projectIndex));
   let scopedProjectIds = $derived(new Set(scope.projectIds));
-
-  function engInScope(e: Conversation): boolean {
+  const byProject = (pid: string | null | undefined, wsId?: string | null) => {
     if (scope.isEmpty) return true;
-    if (scope.workspaceIds.includes(e.workspace_id)) return true;
-    if (e.project && scopedProjectIds.has(e.project.id)) return true;
-    return false;
-  }
-  let scopedConversations = $derived(conversations.filter(engInScope));
+    if (wsId && scope.workspaceIds.includes(wsId)) return true;
+    return !!pid && scopedProjectIds.has(pid);
+  };
 
-  // Tasks reach pin scope the same way conversations do: by workspace, or
-  // through their effective project (resolved via whichever parent embed).
-  function taskInScope(t: TaskItem): boolean {
-    if (scope.isEmpty) return true;
-    if (scope.workspaceIds.includes(t.workspace_id)) return true;
-    const pid = taskProjectId(t);
-    if (pid && scopedProjectIds.has(pid)) return true;
-    return false;
-  }
-  let scopedTasks = $derived(tasks.filter(taskInScope));
-
-  // ADR-070 surfacing: the Desk NEVER renders dormant tasks; the rest rank
-  // by derived urgency (overdue → urgent → open, due-day order), with the
-  // anytime queue as the quiet tail.
-  const now = new Date();
-  const STATE_RANK = { overdue: 0, urgent: 1, open: 2, anytime: 3 } as const;
-  let visibleTasks = $derived(
-    scopedTasks
-      .map((t) => ({ t, s: taskSurfaceState(t, now) }))
-      .filter(({ s }) => s.state !== 'dormant' && s.state !== 'done')
-      .sort((a, b) => {
-        const rank =
-          STATE_RANK[a.s.state as keyof typeof STATE_RANK] -
-          STATE_RANK[b.s.state as keyof typeof STATE_RANK];
-        if (rank !== 0) return rank;
-        const aDay = a.t.due_at?.slice(0, 10) ?? a.s.surfacesAt ?? '9999-12-31';
-        const bDay = b.t.due_at?.slice(0, 10) ?? b.s.surfacesAt ?? '9999-12-31';
-        return aDay < bDay ? -1 : aDay > bDay ? 1 : 0;
-      })
-      .map(({ t }) => t),
+  let scopedConversations = $derived(
+    conversations.filter((e) => byProject(e.project?.id, e.workspace_id)),
   );
+  let scopedTasks = $derived(tasks.filter((tk) => byProject(taskProjectId(tk), tk.workspace_id)));
+  let scopedPerformances = $derived(performances.filter((p) => byProject(p.project?.id, p.project?.workspace_id)));
+  let scopedDates = $derived(dates.filter((d) => byProject(d.project?.id, d.project?.workspace_id)));
+  let scopedInvoices = $derived(invoices.filter((i) => byProject(i.project?.id)));
 
-  // ── Quick-add (free workspace task) ──────────────────────────────────
-  let tTitle = $state('');
-  let tDue = $state('');
-  // Space select: derived default that follows the pins (a single pinned
-  // space wins, else the first workspace), overridden the moment the user
-  // picks — no state+effect sync, and a pin change re-aims an untouched
-  // composer instead of silently writing into the stale space.
-  let tSpaceChoice = $state('');
-  let tSpaceDefault = $derived(
-    scope.workspaceIds.length === 1 ? scope.workspaceIds[0] : (workspaces[0]?.id ?? ''),
+  let feedInput = $derived({
+    conversations: scopedConversations as DeskConvInput[],
+    tasks: scopedTasks,
+    performances: scopedPerformances as DeskPerfInput[],
+    dates: scopedDates as DeskDateInput[],
+    invoices: feeVisible ? (scopedInvoices as DeskInvoiceInput[]) : undefined,
+  });
+  let feed = $derived(buildDeskFeed(feedInput, clockNow, locale));
+  let summary = $derived(deskSummary(feedInput, clockNow));
+
+  let loading = $derived(
+    $conversationsQuery.isPending || $tasksQuery.isPending || $performancesQuery.isPending || $datesQuery.isPending,
   );
-  let tSpace = $derived(tSpaceChoice || tSpaceDefault);
-  let spaceOptions = $derived(workspaces.map((w) => ({ value: w.id, label: w.name })));
+  let errored = $derived($conversationsQuery.isError || $tasksQuery.isError || $performancesQuery.isError);
 
-  const addTask = createMutation({
-    mutationFn: () =>
-      mutateJSON<{ task: TaskItem }>('POST', '/api/tasks', {
-        title: tTitle.trim(),
-        due_at: tDue || null,
-        workspace_id: tSpace,
-      }),
-    onSuccess: (res) => {
-      tTitle = '';
-      tDue = '';
-      void queryClient.invalidateQueries({ queryKey: ['tasks'] });
-      // The task exists but the current pins hide it — say so, or it
-      // looks lost the moment the composer clears.
-      if (res && !taskInScope(res.task)) {
-        const space = workspaces.find((w) => w.id === res.task.workspace_id);
-        addToast({
-          tone: 'info',
-          title: 'Added outside your scope',
-          message: `The task lives in ${space?.name ?? 'another space'} — your current pins hide it.`,
-        });
-      }
-    },
-    onError: (err) => {
-      addToast({
-        tone: 'danger',
-        title: 'Task not added',
-        message: err instanceof ApiError ? err.message : 'Unexpected error',
+  // ── Calm mode ────────────────────────────────────────────────────────
+  let calm = $state(false);
+  onMount(() => {
+    calm = localStorage.getItem('desk-calm') === '1';
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'c' || e.metaKey || e.ctrlKey || e.altKey) return;
+      const el = document.activeElement;
+      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || (el as HTMLElement).isContentEditable)) return;
+      toggleCalm();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
+  function toggleCalm() {
+    calm = !calm;
+    localStorage.setItem('desk-calm', calm ? '1' : '0');
+  }
+  const bucketCount = (b: (typeof feed)[number]) => b.runs.reduce((n, r) => n + r.items.length, 0);
+  let visibleBuckets = $derived(calm ? feed.filter((b) => b.sortKey === 0) : feed);
+  let foldedRest = $derived(calm ? feed.filter((b) => b.sortKey > 0).reduce((n, b) => n + bucketCount(b), 0) : 0);
+  let calmFolded = $derived(calm ? summary.overdue + foldedRest : 0);
+  let headline = $derived(calm ? visibleBuckets.reduce((n, b) => n + bucketCount(b), 0) : summary.needYou);
+
+  // ── Gutter labels are doors to their lens (scope rides in the pins store). ──
+  const LENS_HREF: Record<DeskConcern, string | null> = {
+    task: null,
+    agenda: '/h/calendar',
+    conversation: '/h/conversations',
+    money: '/h/money',
+  };
+  const concernLabel = (c: DeskConcern) => t(`desk.concern_${c}`, locale);
+  const needYouText = (n: number) =>
+    n === 0 ? t('desk.need_you_zero', locale) : n === 1 ? t('desk.need_you_one', locale) : t('desk.need_you_many', locale, { n });
+  const personHref = (slug: string | null) => (slug && workspaceSlug ? `/h/${workspaceSlug}/person/${slug}` : null);
+
+  let pulse = $derived.by(() => {
+    const f: { text: string; href: string }[] = [];
+    if (summary.live)
+      f.push({
+        text: summary.live === 1 ? t('desk.pulse_live_one', locale) : t('desk.pulse_live_many', locale, { n: summary.live }),
+        href: '/h/conversations',
       });
-    },
+    if (summary.holds)
+      f.push({
+        text: summary.holds === 1 ? t('desk.pulse_holds_one', locale) : t('desk.pulse_holds_many', locale, { n: summary.holds }),
+        href: '/h/conversations',
+      });
+    if (summary.pipeline != null && summary.pipeline > 0)
+      f.push({ text: t('desk.pulse_pipeline', locale, { amount: money(summary.pipeline, summary.currency) }), href: '/h/money' });
+    if (summary.nextShowCity)
+      f.push({ text: t('desk.pulse_next_show', locale, { place: summary.nextShowCity }), href: '/h/calendar' });
+    return f;
   });
 
-  function submitAdd() {
-    if (!tTitle.trim()) {
-      addToast({ tone: 'warning', title: 'Title required', message: 'Say what has to happen.' });
-      return;
-    }
-    if (!tSpace) {
-      addToast({ tone: 'warning', title: 'Space required', message: 'Pick a space for the task.' });
-      return;
-    }
-    $addTask.mutate();
+  // ── Task + proposal mutations (TaskBoard contract; optimistic toggle). ──
+  type TasksCache = { items: TaskItem[] };
+  const toggleTask = createMutation({
+    mutationFn: ({ id, status }: { id: string; status: 'open' | 'done' }) =>
+      mutateJSON<{ task: TaskItem }>('PATCH', `/api/tasks/${id}`, { status }),
+    onMutate: async ({ id, status }) => {
+      await queryClient.cancelQueries({ queryKey: ['tasks'] });
+      const snapshots = queryClient.getQueriesData<TasksCache>({ queryKey: ['tasks'] });
+      for (const [key, data] of snapshots) {
+        if (!data) continue;
+        queryClient.setQueryData(key, { ...data, items: data.items.map((tk) => (tk.id === id ? { ...tk, status } : tk)) });
+      }
+      return { snapshots };
+    },
+    onError: (err, _v, ctx) => {
+      for (const [key, data] of ctx?.snapshots ?? []) queryClient.setQueryData(key, data);
+      addToast({ tone: 'danger', title: 'Change not saved', message: err instanceof ApiError ? err.message : 'Unexpected error' });
+    },
+    onSettled: () => void queryClient.invalidateQueries({ queryKey: ['tasks'] }),
+  });
+  const removeTask = createMutation({
+    mutationFn: (id: string) => mutateJSON('DELETE', `/api/tasks/${id}`),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['tasks'] }),
+    onError: (err) =>
+      addToast({ tone: 'danger', title: 'Task not removed', message: err instanceof ApiError ? err.message : 'Unexpected error' }),
+  });
+
+  // AI consent inbox: dismiss = complete it (real PATCH). Accept = keep as a
+  // normal task; `origin` is not in the PATCH whitelist, so acceptance is a
+  // client acknowledgment for this session only — persistent accept needs an
+  // origin-edit path (whitelist or a dedicated endpoint). KNOWN GAP.
+  let accepted = $state(new Set<string>());
+  function acceptProposal(id: string) {
+    accepted.add(id);
+    accepted = new Set(accepted);
   }
 
-  function openLine(line: NavLine) {
-    void goto(lineUrl(line));
+  // ── Quick capture: one line → an anytime free task. ────────────────────
+  let tCapture = $state('');
+  let tSpaceDefault = $derived(scope.workspaceIds.length === 1 ? scope.workspaceIds[0] : (workspaces[0]?.id ?? ''));
+  const captureTask = createMutation({
+    mutationFn: () => mutateJSON<{ task: TaskItem }>('POST', '/api/tasks', { title: tCapture.trim(), workspace_id: tSpaceDefault }),
+    onSuccess: () => {
+      tCapture = '';
+      void queryClient.invalidateQueries({ queryKey: ['tasks'] });
+    },
+    onError: (err) =>
+      addToast({ tone: 'danger', title: 'Not captured', message: err instanceof ApiError ? err.message : 'Unexpected error' }),
+  });
+  function onCaptureKey(e: KeyboardEvent) {
+    if (e.key === 'Enter' && tCapture.trim()) {
+      e.preventDefault();
+      if (tSpaceDefault) $captureTask.mutate();
+    } else if (e.key === 'Escape') {
+      tCapture = '';
+    }
   }
-  function openProject(project: NavProject) {
-    void goto(projectUrl(project));
-  }
+
+  // On the cross-space (Everything) view, prepend the space so rows from
+  // different spaces don't blur; when scoped to one space it's redundant.
+  let spaceNameByProjectId = $derived(new Map(projectIndex.map((p) => [p.id, p.workspaceName])));
+  const contextPath = (i: DeskItem) => {
+    const space = scope.isEmpty && i.projectId ? spaceNameByProjectId.get(i.projectId) : null;
+    return [space, i.projectName, i.lineName].filter(Boolean).join(' · ');
+  };
+  const isGhost = (i: DeskItem) => i.concern === 'task' && i.isProposal && i.taskId != null && !accepted.has(i.taskId);
 </script>
 
 <svelte:head><title>Desk — Hour</title></svelte:head>
 
-<div class="desk">
+<div class="desk" class:desk--calm={calm}>
   <header class="desk__head">
-    <p class="eyebrow">Desk</p>
-    <p class="desk__sub">Everything with a next action, in your current scope.</p>
+    <div class="desk__summary">
+      <p class="desk__count">
+        {needYouText(headline)}{#if calm && calmFolded}<span class="desk__rest">{t('desk.rest_waits', locale)}</span>{/if}
+      </p>
+      {#if !loading && !errored}
+        <p class="desk__pulse">
+          {#each pulse as frag (frag.text)}<a class="desk__pulse-frag" href={frag.href}>{frag.text}</a>{/each}
+        </p>
+      {/if}
+    </div>
+    <button type="button" class="desk__calm" class:on={calm} aria-pressed={calm} onclick={toggleCalm}>
+      <span>{t('desk.calm', locale)}</span><span class="desk__calm-k">c</span>
+    </button>
   </header>
 
-  <section class="desk__block" aria-label="Next actions">
-    <DeskBoard
-      conversations={scopedConversations}
-      {workspaceSlug}
-      cap={null}
-      loading={$conversationsQuery.isPending}
-      error={$conversationsQuery.isError}
+  <div class="desk__capture">
+    <span class="desk__capture-plus" aria-hidden="true">+</span>
+    <input
+      class="desk__capture-input"
+      placeholder={t('desk.capture_placeholder', locale)}
+      autocomplete="off"
+      bind:value={tCapture}
+      onkeydown={onCaptureKey}
     />
-  </section>
+  </div>
 
-  <section class="desk__block" aria-label="Tasks">
-    <header class="desk__block-head"><p class="eyebrow">Tasks</p></header>
+  {#if loading}
+    <p class="desk__empty">{t('desk.loading', locale)}</p>
+  {:else if errored}
+    <p class="desk__empty desk__empty--err">{t('desk.error', locale)}</p>
+  {:else if feed.length === 0}
+    <div class="desk__caughtup">
+      <p class="desk__caughtup-g" aria-hidden="true">·</p>
+      <p class="desk__caughtup-l">{t('desk.caughtup_l', locale)}</p>
+      <p class="desk__caughtup-s">{t('desk.caughtup_s', locale)}</p>
+    </div>
+  {:else}
+    <div class="timeline">
+      {#each visibleBuckets as bucket (bucket.sortKey)}
+        <section class="bucket" class:bucket--today={bucket.sortKey === 0}>
+          <div class="bucket__head" class:bucket__head--overdue={bucket.overdue}>
+            <span class="bucket__label"
+              >{bucket.labelKey === 'weekday' ? bucket.weekday : t(`desk.bucket_${bucket.labelKey}`, locale)}</span
+            >
+            {#if bucket.dateLabel}<span class="bucket__date">{bucket.dateLabel}</span>{/if}
+          </div>
 
-    <form
-      class="desk__task-add"
-      onsubmit={(e) => {
-        e.preventDefault();
-        submitAdd();
-      }}
-    >
-      <div class="desk__task-title">
-        <Input label="New task" placeholder="What has to happen?" bind:value={tTitle} />
-      </div>
-      <Input label="Due" type="date" bind:value={tDue} />
-      <Select
-        label="Space"
-        options={spaceOptions}
-        value={tSpace}
-        onchange={(e) => (tSpaceChoice = (e.currentTarget as HTMLSelectElement).value)}
-      />
-      <Button size="s" variant="outline" type="submit" loading={$addTask.isPending}>Add</Button>
-    </form>
+          {#if bucket.anchor}
+            <a class="anchor" href="/h/calendar" style={`--c: ${accentVar(bucket.anchor.accentSlug)}`}>
+              <div class="anchor__eye">
+                {t('desk.anchor_show_today', locale, { project: bucket.anchor.projectName })}
+              </div>
+              <div class="anchor__venue">
+                {bucket.anchor.venue}{bucket.anchor.city ? ` · ${bucket.anchor.city}` : ''}
+              </div>
+              {#if bucket.anchor.loadInAt || bucket.anchor.startAt}
+                <div class="anchor__slots">
+                  {#if bucket.anchor.loadInAt}<span
+                      ><span class="anchor__k">{t('desk.anchor_loadin', locale)}</span> {fmtTime(bucket.anchor.loadInAt)}</span
+                    >{/if}
+                  {#if bucket.anchor.startAt}<span
+                      ><span class="anchor__k">{t('desk.anchor_show', locale)}</span> {fmtTime(bucket.anchor.startAt)}</span
+                    >{/if}
+                </div>
+              {/if}
+            </a>
+          {/if}
 
-    <TaskBoard
-      tasks={visibleTasks}
-      cap={null}
-      loading={$tasksQuery.isPending}
-      error={$tasksQuery.isError}
-    />
-  </section>
+          {#each bucket.runs as run (run.concern + run.items[0].id)}
+            <div class="run run--{run.concern}">
+              {#if LENS_HREF[run.concern]}
+                <a class="run__label" href={LENS_HREF[run.concern]}>{concernLabel(run.concern)}</a>
+              {:else}
+                <span class="run__label">{concernLabel(run.concern)}</span>
+              {/if}
+              <div class="run__rows">
+                {#each run.items as item (item.id)}
+                  {#if isGhost(item)}
+                    <div class="ghost">
+                      <div class="ghost__head">
+                        <span class="ghost__badge">{t('desk.proposed', locale)}</span>
+                        <span class="ghost__subject">{item.subject}</span>
+                      </div>
+                      {#if item.reason}<p class="ghost__reason">{item.reason}</p>{/if}
+                      <div class="ghost__actions">
+                        <button type="button" class="ghost__add" onclick={() => item.taskId && acceptProposal(item.taskId)}
+                          >{t('desk.proposal_add', locale)}</button
+                        >
+                        <button
+                          type="button"
+                          class="ghost__dismiss"
+                          onclick={() => item.taskId && $toggleTask.mutate({ id: item.taskId, status: 'done' })}
+                          >{t('desk.proposal_dismiss', locale)}</button
+                        >
+                      </div>
+                    </div>
+                  {:else if item.concern === 'task'}
+                    <div class="drow drow--task" class:drow--overdue={item.overdue}>
+                      <input
+                        type="checkbox"
+                        class="drow__check"
+                        aria-label={item.subject}
+                        checked={item.taskDone}
+                        onchange={(e) =>
+                          item.taskId && $toggleTask.mutate({ id: item.taskId, status: (e.currentTarget as HTMLInputElement).checked ? 'done' : 'open' })}
+                      />
+                      <span class="drow__subject">{item.subject}</span>
+                      <span class="drow__tail">
+                        {#if item.dueLabel}<span class="drow__due" class:drow__due--overdue={item.overdue}
+                            >{t(`desk.due_${item.dueLabel}`, locale)}</span
+                          >{:else if item.surfacesDay}<span class="drow__surfaces"
+                            >{t('desk.surfaces', locale, { day: dayMonth(item.surfacesDay) })}</span
+                          >{/if}
+                        {#if contextPath(item)}<span class="drow__ctx">{contextPath(item)}</span>{/if}
+                        <button
+                          type="button"
+                          class="drow__remove"
+                          aria-label={`Remove: ${item.subject}`}
+                          onclick={() => item.taskId && $removeTask.mutate(item.taskId)}>×</button
+                        >
+                      </span>
+                    </div>
+                  {:else}
+                    <div class="drow" class:drow--overdue={item.overdue} class:drow--proposal={item.isProposal}>
+                      <span class="drow__lead">
+                        {#if item.concern === 'agenda'}{item.allDay ? t('desk.bucket_anytime', locale) : fmtTime(item.atISO)}{:else}{t(
+                            `desk.verb_${item.verbKey}`,
+                            locale,
+                          )}{/if}
+                      </span>
+                      {#if personHref(item.personSlug)}
+                        <a class="drow__subject" href={personHref(item.personSlug)}>{item.subject}</a>
+                      {:else if item.href}
+                        <a class="drow__subject" href={item.href}>{item.subject}</a>
+                      {:else}
+                        <span class="drow__subject">{item.subject}</span>
+                      {/if}
+                      <span class="drow__tail">
+                        {#if item.amount != null}<span class="drow__amount">{money(item.amount, item.currency)}</span>{/if}
+                        {#if contextPath(item)}<span class="drow__ctx">{contextPath(item)}</span>{/if}
+                      </span>
+                    </div>
+                  {/if}
+                {/each}
+              </div>
+            </div>
+          {/each}
+        </section>
+      {/each}
+
+      {#if calm && calmFolded}
+        <button type="button" class="calmfoot" onclick={toggleCalm}>
+          <span
+            >{#if summary.overdue}<span class="calmfoot__over">{t('desk.calm_overdue', locale, { n: summary.overdue })}</span
+              >{/if}{#if summary.overdue && foldedRest} {t('desk.calm_and', locale)} {/if}{#if foldedRest}{t('desk.calm_more', locale, {
+                n: foldedRest,
+              })}{/if} {t('desk.calm_tail', locale)}</span
+          >
+          <span class="calmfoot__arrow" aria-hidden="true">→</span>
+        </button>
+      {/if}
+    </div>
+  {/if}
 </div>
 
 <style>
@@ -241,33 +456,469 @@
     .desk {
       display: flex;
       flex-direction: column;
+      gap: var(--space-l);
+      /* per-concern tints (subtle — identity is textual, this is a whisper) */
+      --c-task: var(--text-muted);
+      --c-agenda: color-mix(in oklch, var(--info) 60%, var(--text-muted));
+      --c-conversation: color-mix(in oklch, var(--primary) 60%, var(--text-muted));
+      --c-money: color-mix(in oklch, var(--success) 60%, var(--text-muted));
+    }
+
+    /* ── Header ── */
+    .desk__head {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
       gap: var(--space-m);
     }
-    .desk__head {
+    .desk__count {
+      margin: 0;
+      font-family: var(--font-display);
+      font-size: var(--text-xxl);
+      line-height: 1;
+      color: var(--heading-color);
+    }
+    .desk__rest {
+      color: var(--text-faint);
+      font-style: italic;
+    }
+    .desk__pulse {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: var(--space-xs) var(--space-s);
+      margin: var(--space-s) 0 0;
+      font-size: var(--text-s);
+    }
+    .desk__pulse-frag {
+      color: var(--text-muted);
+      text-decoration: none;
+      transition: color var(--transition);
+    }
+    .desk__pulse-frag:hover {
+      color: var(--text-color);
+    }
+    .desk__pulse-frag + .desk__pulse-frag::before {
+      content: '·';
+      margin-inline-end: var(--space-s);
+      color: var(--text-faint);
+    }
+    .desk__calm {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-xs);
+      padding-block: var(--space-2xs);
+      padding-inline: var(--space-s);
+      border: 1px solid var(--border-color-dark);
+      border-radius: var(--radius-circle);
+      background: transparent;
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      letter-spacing: var(--mono-letter-spacing-loose);
+      text-transform: uppercase;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: color var(--transition), background var(--transition), border-color var(--transition);
+      white-space: nowrap;
+    }
+    .desk__calm:hover {
+      color: var(--text-color);
+      border-color: var(--text-muted);
+    }
+    .desk__calm.on {
+      background: var(--text-color);
+      border-color: var(--text-color);
+      color: var(--bg);
+    }
+    .desk__calm-k {
+      padding-inline: var(--space-2xs);
+      border: 1px solid currentColor;
+      border-radius: var(--radius-s);
+      opacity: 0.6;
+      text-transform: none;
+    }
+    /* Calm quiets the whole surface one contrast step (overdue red survives). */
+    .desk--calm {
+      --border-color-dark: color-mix(in oklch, var(--neutral) 12%, transparent);
+      --text-color: var(--text-muted);
+    }
+
+    /* ── Quick capture ── */
+    .desk__capture {
+      display: flex;
+      align-items: center;
+      gap: var(--space-s);
+      padding-block: var(--space-s);
+      border-block: 1px solid var(--border-color-light);
+    }
+    .desk__capture-plus {
+      font-family: var(--font-mono);
+      color: var(--text-faint);
+    }
+    .desk__capture-input {
+      flex: 1;
+      border: 0;
+      background: transparent;
+      font-family: var(--font-sans);
+      font-size: var(--text-s);
+      color: var(--text-color);
+      outline: 0;
+    }
+    .desk__capture-input::placeholder {
+      color: var(--text-faint);
+    }
+
+    /* ── Timeline ── */
+    .timeline {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-l);
+    }
+    .bucket {
       display: flex;
       flex-direction: column;
       gap: var(--space-xs);
     }
-    .desk__sub {
+    .bucket__head {
+      display: flex;
+      align-items: baseline;
+      gap: var(--space-s);
+    }
+    .bucket__label {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+    }
+    .bucket--today .bucket__label {
+      color: var(--primary);
+    }
+    .bucket__head--overdue .bucket__label {
+      color: var(--danger);
+    }
+    .bucket__date {
+      font-family: var(--font-display);
+      font-style: italic;
+      font-size: var(--text-xs);
+      color: var(--text-faint);
+    }
+
+    /* ── Show anchor (banner) ── */
+    .anchor {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2xs);
+      padding: var(--space-s) var(--space-m);
+      border: 1px solid color-mix(in oklch, var(--c) 30%, var(--border-color-light));
+      background: color-mix(in oklch, var(--c) 6%, var(--bg-ultra-light));
+      border-radius: var(--radius-l);
+      text-decoration: none;
+      color: inherit;
+      transition: border-color var(--transition);
+    }
+    .anchor:hover {
+      border-color: color-mix(in oklch, var(--c) 55%, var(--border-color-light));
+    }
+    .anchor__eye {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      letter-spacing: var(--mono-letter-spacing-loose);
+      text-transform: uppercase;
+      color: color-mix(in oklch, var(--c) 70%, var(--text-muted));
+    }
+    .anchor__venue {
+      font-family: var(--font-display);
+      font-size: var(--text-l);
+      color: var(--heading-color);
+    }
+    .anchor__slots {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-s);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+    }
+    .anchor__k {
+      color: var(--text-faint);
+      text-transform: uppercase;
+      letter-spacing: var(--mono-letter-spacing-loose);
+    }
+
+    /* ── Concern runs: the gutter carries the type (a door), hairline rail ── */
+    .run {
+      display: grid;
+      grid-template-columns: 7rem 1fr;
+      align-items: start;
+      --gut: var(--text-faint);
+    }
+    .run--task {
+      --gut: var(--c-task);
+    }
+    .run--agenda {
+      --gut: var(--c-agenda);
+    }
+    .run--conversation {
+      --gut: var(--c-conversation);
+    }
+    .run--money {
+      --gut: var(--c-money);
+    }
+    .run__label {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      letter-spacing: var(--mono-letter-spacing-loose);
+      text-transform: uppercase;
+      color: var(--gut);
+      text-decoration: none;
+      padding-block: var(--space-s) 0;
+      transition: color var(--transition);
+    }
+    a.run__label:hover {
+      color: var(--text-color);
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+    .run__rows {
+      border-inline-start: 1px solid color-mix(in oklch, var(--gut) 30%, var(--border-color-light));
+    }
+
+    /* ── Rows: no leading marks; one line; context is textual ── */
+    .drow {
+      display: grid;
+      grid-template-columns: 4.5rem 1fr auto;
+      align-items: baseline;
+      gap: var(--space-s);
+      padding-block: var(--space-xs);
+      padding-inline-start: var(--space-m);
+      border-block-end: 1px solid color-mix(in oklch, var(--border-color-light) 55%, transparent);
+    }
+    .drow--task {
+      grid-template-columns: auto 1fr auto;
+    }
+    .drow--proposal {
+      font-style: italic;
+      color: var(--text-muted);
+    }
+    .drow__check {
+      inline-size: 0.95rem;
+      block-size: 0.95rem;
+      accent-color: var(--primary);
+      cursor: pointer;
+    }
+    .drow__lead {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--gut, var(--text-faint));
+      text-transform: lowercase;
+    }
+    .drow--overdue .drow__lead {
+      color: var(--danger);
+    }
+    .drow__subject {
+      font-size: var(--text-s);
+      color: var(--text-color);
+      text-decoration: none;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      min-inline-size: 0;
+    }
+    a.drow__subject:hover {
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+    .drow__tail {
+      display: inline-flex;
+      align-items: baseline;
+      gap: var(--space-s);
+      min-inline-size: 0;
+    }
+    .drow__ctx {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      letter-spacing: var(--mono-letter-spacing);
+      color: var(--text-faint);
+      white-space: nowrap;
+    }
+    .drow__due,
+    .drow__surfaces,
+    .drow__amount {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+    .drow__due--overdue {
+      color: var(--danger);
+    }
+    /* Row actions on hover only — persistent in overdue (spec). */
+    .drow__remove {
+      border: 0;
+      padding: 0;
+      background: none;
+      color: var(--text-faint);
+      font-size: var(--text-m);
+      line-height: 1;
+      cursor: pointer;
+      opacity: 0;
+      transition: color var(--transition), opacity var(--transition);
+    }
+    .drow:hover .drow__remove,
+    .drow--overdue .drow__remove,
+    .drow__remove:focus-visible {
+      opacity: 1;
+    }
+    .drow__remove:hover {
+      color: var(--danger);
+    }
+
+    /* ── AI proposal ghost (consent inbox) ── */
+    .ghost {
+      margin-inline-start: var(--space-m);
+      margin-block: var(--space-xs);
+      padding: var(--space-s) var(--space-m);
+      border: 1px dashed color-mix(in oklch, var(--accent-7) 45%, var(--border-color-dark));
+      background: color-mix(in oklch, var(--accent-7) 5%, var(--bg-ultra-light));
+      border-radius: var(--radius-l);
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2xs);
+    }
+    .ghost__head {
+      display: flex;
+      align-items: baseline;
+      gap: var(--space-s);
+    }
+    .ghost__badge {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      letter-spacing: var(--mono-letter-spacing-loose);
+      text-transform: uppercase;
+      color: var(--accent-7);
+    }
+    .ghost__subject {
+      font-size: var(--text-s);
+      color: var(--text-color);
+    }
+    .ghost__reason {
+      margin: 0;
+      font-family: var(--font-display);
+      font-style: italic;
       font-size: var(--text-s);
       color: var(--text-muted);
     }
-    /* Own sectioning root per concern (the MoneyModule precedent) — reset
-       base.css's section defaults, keep the page rhythm local. */
-    .desk__block {
+    .ghost__actions {
       display: flex;
-      flex-direction: column;
       gap: var(--space-s);
-      padding-block: 0;
+      margin-block-start: var(--space-2xs);
     }
-    .desk__task-add {
-      display: flex;
-      align-items: end;
-      gap: var(--space-s);
+    .ghost__add,
+    .ghost__dismiss {
+      border: 0;
+      background: none;
+      padding: 0;
+      font-family: var(--font-sans);
+      font-size: var(--text-xs);
+      cursor: pointer;
+      transition: color var(--transition);
     }
-    .desk__task-title {
-      flex: 1;
-      min-inline-size: 0;
+    .ghost__add {
+      color: var(--accent-7);
+      font-weight: 500;
+    }
+    .ghost__dismiss {
+      color: var(--text-faint);
+    }
+    .ghost__dismiss:hover {
+      color: var(--text-muted);
+    }
+
+    /* ── Calm footer ── */
+    .calmfoot {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-xs);
+      margin-block-start: var(--space-s);
+      padding-block: var(--space-s) 0;
+      border-block-start: 1px solid var(--border-color-light);
+      background: none;
+      border-inline: 0;
+      border-block-end: 0;
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      letter-spacing: var(--mono-letter-spacing);
+      color: var(--text-faint);
+      cursor: pointer;
+      transition: color var(--transition);
+    }
+    .calmfoot:hover {
+      color: var(--text-muted);
+    }
+    .calmfoot__over {
+      color: var(--danger);
+    }
+    .calmfoot__arrow {
+      transition: transform var(--transition);
+    }
+    .calmfoot:hover .calmfoot__arrow {
+      transform: translateX(3px);
+    }
+
+    /* ── Empty / caught-up ── */
+    .desk__empty {
+      margin: 0;
+      color: var(--text-muted);
+      font-style: italic;
+      font-family: var(--font-display);
+      padding-block: var(--space-m);
+      text-align: center;
+    }
+    .desk__empty--err {
+      color: var(--danger);
+    }
+    .desk__caughtup {
+      text-align: center;
+      padding-block: var(--space-xl);
+      color: var(--text-faint);
+    }
+    .desk__caughtup-g {
+      margin: 0;
+      font-family: var(--font-display);
+      font-size: var(--text-xxl);
+    }
+    .desk__caughtup-l {
+      margin: var(--space-xs) 0 0;
+      font-family: var(--font-display);
+      font-style: italic;
+      font-size: var(--text-l);
+      color: var(--text-muted);
+    }
+    .desk__caughtup-s {
+      margin: var(--space-2xs) 0 0;
+      font-size: var(--text-s);
+    }
+
+    @media (max-width: 47.999rem) {
+      .run {
+        grid-template-columns: 1fr;
+      }
+      .run__label {
+        padding-block: var(--space-s) var(--space-2xs);
+      }
+      .run__rows {
+        border-inline-start: 0;
+      }
+      .drow {
+        grid-template-columns: 3.5rem 1fr;
+        padding-inline-start: 0;
+      }
+      .drow--task {
+        grid-template-columns: auto 1fr;
+      }
+      .drow__ctx {
+        display: none;
+      }
     }
   }
 </style>

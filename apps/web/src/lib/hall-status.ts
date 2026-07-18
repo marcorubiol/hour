@@ -92,7 +92,7 @@ export function computeHallStatus(
       if (ta && tb) return Date.parse(ta) - Date.parse(tb);
       return ta ? -1 : tb ? 1 : 0;
     })[0];
-    const place = first.venue?.name ?? first.venue_name ?? first.city ?? '—';
+    const place = placeOf(first);
     const venueTz =
       first.venue?.timezone ??
       input.homeTzById?.[first.project?.workspace_id ?? ''] ??
@@ -137,6 +137,70 @@ export function computeHallStatus(
     open: upcoming.length + undatedOpen,
     next: upcoming[0] ?? null,
   };
+}
+
+/**
+ * A performance moment with a real wall-clock timestamp — the only rows
+ * that carry a time-of-day (conversations and tasks are date-only). Feeds
+ * the hall's relation line ("d'aquí 3h · …") and the day teaser. `kind`
+ * distinguishes a load-in from its show so the two read as two moments.
+ */
+export interface HallMoment {
+  at: string;
+  place: string;
+  kind: 'load-in' | 'show';
+}
+
+/** venue.name → venue_name → city → em dash — the show's place, one rule. */
+function placeOf(p: HallPerformance): string {
+  return p.venue?.name ?? p.venue_name ?? p.city ?? '—';
+}
+
+/**
+ * The next timed moment strictly after `now`, across all non-cancelled
+ * performances — the nearest of every load-in and start time. Null when
+ * nothing timed lies ahead. The DISPLAY horizon (how imminent it must be
+ * to surface) is the caller's call: a far moment is the status sentence's
+ * job, not the relation line's.
+ */
+export function nextTimedMoment(performances: HallPerformance[], now: Date): HallMoment | null {
+  const nowMs = now.getTime();
+  let best: { ms: number; moment: HallMoment } | null = null;
+  for (const p of performances) {
+    if (p.status === 'cancelled') continue;
+    const candidates: [string | null, 'load-in' | 'show'][] = [
+      [p.load_in_at, 'load-in'],
+      [p.start_at, 'show'],
+    ];
+    for (const [at, kind] of candidates) {
+      if (!at) continue;
+      const ms = Date.parse(at);
+      if (Number.isNaN(ms) || ms <= nowMs) continue;
+      if (!best || ms < best.ms) best = { ms, moment: { at, place: placeOf(p), kind } };
+    }
+  }
+  return best?.moment ?? null;
+}
+
+/**
+ * Today's timed moments (the viewer's calendar day), one per performance —
+ * its start time if it has one, else its load-in — sorted ascending. The
+ * quiet teaser's recap of the day; untimed shows are omitted (nothing to
+ * place on a clock). Past moments of today are kept: the teaser recaps the
+ * whole day, not just what is still ahead.
+ */
+export function todayMoments(performances: HallPerformance[], now: Date): HallMoment[] {
+  const todayISO = localDayISO(now);
+  const out: { ms: number; moment: HallMoment }[] = [];
+  for (const p of performances) {
+    if (p.status === 'cancelled' || p.performed_at.slice(0, 10) !== todayISO) continue;
+    const at = p.start_at ?? p.load_in_at;
+    if (!at) continue;
+    const ms = Date.parse(at);
+    if (Number.isNaN(ms)) continue;
+    out.push({ ms, moment: { at, place: placeOf(p), kind: p.start_at ? 'show' : 'load-in' } });
+  }
+  return out.sort((a, b) => a.ms - b.ms).map((x) => x.moment);
 }
 
 export interface HallSentenceOpts {
