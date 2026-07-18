@@ -1,8 +1,12 @@
 # Hour — Design prompt: Calendar lens (planning without alarm)
 
-> **STATUS: READY FOR DESIGN (updated 2026-07-18).** Design does NOT depend on the build —
-> it precedes it (the Desk proved the loop: design converges, then the builder gets the
-> final system). Rewritten post-ADR-076 (two projections) and post-Desk design system.
+> **STATUS: IN REFINEMENT (updated 2026-07-18 post-grill).** First mock exists ("Hour
+> Calendar Lens.html" in the design project); Marco is refining it. The grill of
+> 2026-07-18 (ADR-078) settled model + contracts — see **§ Binding contract** at the
+> bottom: the final design MUST reflect those points (the current mock predates them).
+> Design does NOT depend on the build — it precedes it (the Desk proved the loop: design
+> converges, then the builder gets the final system). Rewritten post-ADR-076 (two
+> projections) and post-Desk design system.
 >
 > For the design tool. Origin: ADR-072 (conflicts/availability/travel) + ADR-076 (one door,
 > two projections) + the timezone rule, all in `_decisions.md` / `build/screen-data-spec.md
@@ -70,3 +74,30 @@ one realistic month: 2 holds on the same day sharing an actor (people-conflict) 
 possible-conflict pair (no team data) · a tentative person blackout · a travel pair around
 a confirmed foreign gig showing venue-local hour with viewer courtesy · a rehearsal week ·
 one company-wide blackout weekend.
+
+## Binding contract — grill 2026-07-18 (ADR-078; the final design MUST reflect these)
+
+The first mock predates these decisions. When refining:
+
+- **New-blackout dialog: NO type pills** (Fora / Malaltia / Personal are gone — ADR-078
+  §4, privacy: "no estoy" is complete information). Fields: **space** (preset when the
+  pinned scope collapses to one; explicit select otherwise) · person (optional — the
+  space's TEAM, not the contacts book; empty = whole company) · date range · certainty
+  (Indisponible | Provisional) · free note, placeholder "opcional — no cal dir per què".
+- **Unified create dialog** (resolves the mock's internal contradiction): the type pill
+  drives the form. **Actuació** mounts the performance form (venue, city, hold/state,
+  venue-local hour) — the cascade's third level (attach to a performance) shows only for
+  the NON-Actuació types. Add the **Dia off** pill (planned day off on tour, optional
+  city) and **Altres** (free label with autocomplete over previously used labels). An
+  **"Opció" pill** on date kinds (tentative residency reservations etc.); tentative dates
+  render with the possibility grammar (dashed), consistent with holds. Final pill list is
+  Marco's call — the criterion is fixed: a kind earns a pill only if something branches
+  on it (Premsa is a weak keep).
+- **Hour entry is venue-local**, labeled ("hora local de …"); viewer time is courtesy.
+- **Derived "fora" band**: quiet computed band between a travel pair (anada … tornada) on
+  the days without their own events — visually DISTINCT from a declared blackout
+  (inferred vs stated). Worth a sketch.
+- **No `/h/agenda` route** — the projection lives at `?view=agenda`; the toggle stays
+  named (rejilla ⇄ agenda), never an icon.
+- **Toolbar**: ICS subscription moves to a "⋯" overflow at the end; masthead stats stay
+  (truth-only counts of the visible month).
