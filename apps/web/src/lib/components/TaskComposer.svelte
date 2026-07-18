@@ -90,7 +90,7 @@
   // Space is the neutral home (Anytime already implies it); name a non-space
   // parent so "where" is legible without expanding.
   let hint = $derived(
-    chosen.kind === 'space'
+    lockTarget || chosen.kind === 'space'
       ? whenHint
       : `${whenHint} · ${t('composer.hint_into', locale, { name: chosen.name })}`,
   );
@@ -186,8 +186,8 @@
       class="tc__title"
       type="text"
       bind:value={title}
-      placeholder={t('composer.placeholder', locale)}
-      aria-label={t('composer.placeholder', locale)}
+      placeholder={t('desk.capture_placeholder', locale)}
+      aria-label={t('desk.capture_placeholder', locale)}
       onfocus={() => (expanded = true)}
     />
     {#if !expanded}
@@ -197,38 +197,39 @@
 
   {#if expanded}
     <div class="tc__controls">
-      <div class="tc__where" bind:this={whereEl}>
-        <button
-          type="button"
-          class="tc__target"
-          disabled={lockTarget}
-          aria-haspopup="dialog"
-          aria-expanded={pickerOpen}
-          onclick={() => !lockTarget && (pickerOpen = !pickerOpen)}
-        >
-          {#if isGlyph(chosen.kind)}
-            <ScopeGlyph
-              kind={chosen.kind as 'space' | 'project' | 'line'}
-              accent={chosen.accent ?? 'var(--text-faint)'}
-              lineKind={chosen.lineKind ?? ''}
+      {#if !lockTarget}
+        <div class="tc__where" bind:this={whereEl}>
+          <button
+            type="button"
+            class="tc__target"
+            aria-haspopup="dialog"
+            aria-expanded={pickerOpen}
+            onclick={() => (pickerOpen = !pickerOpen)}
+          >
+            {#if isGlyph(chosen.kind)}
+              <ScopeGlyph
+                kind={chosen.kind as 'space' | 'project' | 'line'}
+                accent={chosen.accent ?? 'var(--text-faint)'}
+                lineKind={chosen.lineKind ?? ''}
+              />
+            {:else}
+              <span class="tc__leaf" aria-hidden="true"></span>
+            {/if}
+            <span class="tc__target-kind">{targetKindLabel}</span>
+            <span class="tc__target-name">{chosen.name}</span>
+            <span class="tc__caret" aria-hidden="true">›</span>
+          </button>
+          {#if pickerOpen}
+            <TargetPicker
+              {locale}
+              {performances}
+              {conversations}
+              onselect={selectTarget}
+              onclose={() => (pickerOpen = false)}
             />
-          {:else}
-            <span class="tc__leaf" aria-hidden="true"></span>
           {/if}
-          <span class="tc__target-kind">{targetKindLabel}</span>
-          <span class="tc__target-name">{chosen.name}</span>
-          {#if !lockTarget}<span class="tc__caret" aria-hidden="true">›</span>{/if}
-        </button>
-        {#if pickerOpen}
-          <TargetPicker
-            {locale}
-            {performances}
-            {conversations}
-            onselect={selectTarget}
-            onclose={() => (pickerOpen = false)}
-          />
-        {/if}
-      </div>
+        </div>
+      {/if}
 
       <label class="tc__field">
         <span class="tc__label">{t('composer.due', locale)}</span>

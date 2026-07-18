@@ -17,14 +17,15 @@
    * are SHARED with the hall/HomeView — one cache. Chrome copy is i18n
    * (locale-resolved), matching the Catalan hall.
    */
-  import { onMount } from 'svelte';
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { fetchJSON, mutateJSON, ApiError } from '$lib/api';
   import { addToast } from '$lib/components/Toast.svelte';
-  import { accentVar } from '$lib/utils/accent';
+  import TaskComposer from '$lib/components/TaskComposer.svelte';
+  import { accentVar, accentVarFor } from '$lib/utils/accent';
   import { detectLocale, t } from '$lib/i18n';
   import { dayMonth } from '$lib/datetime';
   import { usePins } from '$lib/stores/pins.svelte';
+  import { useCalm } from '$lib/stores/calm.svelte';
   import {
     buildLineIndex,
     buildProjectIndex,
@@ -38,7 +39,7 @@
     allLinesQueryOptions,
   } from '$lib/nav-queries';
   import type { DeskConversation } from '$lib/components/DeskBoard.svelte';
-  import { taskProjectId, type TaskItem } from '$lib/task';
+  import { taskProjectId, type TaskItem, type TaskTarget } from '$lib/task';
   import {
     buildDeskFeed,
     deskSummary,
@@ -60,6 +61,7 @@
   type DeskInvoice = DeskInvoiceInput & { project: { id: string; slug: string | null; name: string } | null };
 
   const pins = usePins();
+  const calm = useCalm();
   const queryClient = useQueryClient();
   const locale = detectLocale(navigator.language);
   const todayParam = new Date().toISOString().slice(0, 10);
@@ -160,28 +162,17 @@
   );
   let errored = $derived($conversationsQuery.isError || $tasksQuery.isError || $performancesQuery.isError);
 
-  // ── Calm mode ────────────────────────────────────────────────────────
-  let calm = $state(false);
-  onMount(() => {
-    calm = localStorage.getItem('desk-calm') === '1';
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'c' || e.metaKey || e.ctrlKey || e.altKey) return;
-      const el = document.activeElement;
-      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || (el as HTMLElement).isContentEditable)) return;
-      toggleCalm();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  });
-  function toggleCalm() {
-    calm = !calm;
-    localStorage.setItem('desk-calm', calm ? '1' : '0');
-  }
+  // ── Calm mode — the toggle lives in the shell sidebar (by the clock); the
+  //    Desk only consumes the shared store to fold the feed. ──────────────
   const bucketCount = (b: (typeof feed)[number]) => b.runs.reduce((n, r) => n + r.items.length, 0);
-  let visibleBuckets = $derived(calm ? feed.filter((b) => b.sortKey === 0) : feed);
-  let foldedRest = $derived(calm ? feed.filter((b) => b.sortKey > 0).reduce((n, b) => n + bucketCount(b), 0) : 0);
-  let calmFolded = $derived(calm ? summary.overdue + foldedRest : 0);
-  let headline = $derived(calm ? visibleBuckets.reduce((n, b) => n + bucketCount(b), 0) : summary.needYou);
+  let visibleBuckets = $derived(calm.on ? feed.filter((b) => b.sortKey === 0) : feed);
+  let foldedRest = $derived(
+    calm.on ? feed.filter((b) => b.sortKey > 0).reduce((n, b) => n + bucketCount(b), 0) : 0,
+  );
+  let calmFolded = $derived(calm.on ? summary.overdue + foldedRest : 0);
+  let headline = $derived(
+    calm.on ? visibleBuckets.reduce((n, b) => n + bucketCount(b), 0) : summary.needYou,
+  );
 
   // ── Gutter labels are doors to their lens (scope rides in the pins store). ──
   const LENS_HREF: Record<DeskConcern, string | null> = {
@@ -251,25 +242,48 @@
     accepted = new Set(accepted);
   }
 
-  // ── Quick capture: one line → an anytime free task. ────────────────────
-  let tCapture = $state('');
-  let tSpaceDefault = $derived(scope.workspaceIds.length === 1 ? scope.workspaceIds[0] : (workspaces[0]?.id ?? ''));
-  const captureTask = createMutation({
-    mutationFn: () => mutateJSON<{ task: TaskItem }>('POST', '/api/tasks', { title: tCapture.trim(), workspace_id: tSpaceDefault }),
-    onSuccess: () => {
-      tCapture = '';
-      void queryClient.invalidateQueries({ queryKey: ['tasks'] });
-    },
-    onError: (err) =>
-      addToast({ tone: 'danger', title: 'Not captured', message: err instanceof ApiError ? err.message : 'Unexpected error' }),
+  // ── Composer — TaskComposer owns the POST + cache. The default target
+  //    follows the pins (a free space task, the parentless authoring home);
+  //    the picker attaches to any project / line / show / conversation. ─────
+  let defaultWsId = $derived(
+    scope.workspaceIds.length === 1 ? scope.workspaceIds[0] : (workspaces[0]?.id ?? ''),
+  );
+  let composerTarget = $derived.by<TaskTarget>(() => {
+    const ws = workspaces.find((w) => w.id === defaultWsId) ?? workspaces[0];
+    return ws
+      ? { kind: 'space', id: ws.id, name: ws.name, accent: accentVarFor(ws) }
+      : { kind: 'space', id: '', name: '', accent: 'var(--text-faint)' };
   });
-  function onCaptureKey(e: KeyboardEvent) {
-    if (e.key === 'Enter' && tCapture.trim()) {
-      e.preventDefault();
-      if (tSpaceDefault) $captureTask.mutate();
-    } else if (e.key === 'Escape') {
-      tCapture = '';
-    }
+  // Parents the Desk already has in cache — handed to the picker, no new fetch.
+  let composerPerformances = $derived(
+    performances.map((p) => ({
+      id: p.id,
+      name: [p.venue?.name || p.venue_name || p.project?.name || 'Show', p.city]
+        .filter(Boolean)
+        .join(' · '),
+    })),
+  );
+  let composerConversations = $derived(
+    conversations.map((c) => ({
+      id: c.id,
+      name:
+        c.person?.full_name ||
+        c.person?.organization_name ||
+        c.next_action_note ||
+        c.project?.name ||
+        'Conversation',
+    })),
+  );
+  function onTaskCreated(task: TaskItem) {
+    if (byProject(taskProjectId(task), task.workspace_id)) return;
+    const space = workspaces.find((w) => w.id === task.workspace_id);
+    addToast({
+      tone: 'info',
+      title: t('composer.outside_scope_title', locale),
+      message: t('composer.outside_scope_msg', locale, {
+        space: space?.name ?? t('composer.outside_scope_fallback', locale),
+      }),
+    });
   }
 
   // On the cross-space (Everything) view, prepend the space so rows from
@@ -284,11 +298,11 @@
 
 <svelte:head><title>Desk — Hour</title></svelte:head>
 
-<div class="desk" class:desk--calm={calm}>
+<div class="desk" class:desk--calm={calm.on}>
   <header class="desk__head">
     <div class="desk__summary">
       <p class="desk__count">
-        {needYouText(headline)}{#if calm && calmFolded}<span class="desk__rest">{t('desk.rest_waits', locale)}</span>{/if}
+        {needYouText(headline)}{#if calm.on && calmFolded}<span class="desk__rest">{t('desk.rest_waits', locale)}</span>{/if}
       </p>
       {#if !loading && !errored}
         <p class="desk__pulse">
@@ -296,21 +310,15 @@
         </p>
       {/if}
     </div>
-    <button type="button" class="desk__calm" class:on={calm} aria-pressed={calm} onclick={toggleCalm}>
-      <span>{t('desk.calm', locale)}</span><span class="desk__calm-k">c</span>
-    </button>
   </header>
 
-  <div class="desk__capture">
-    <span class="desk__capture-plus" aria-hidden="true">+</span>
-    <input
-      class="desk__capture-input"
-      placeholder={t('desk.capture_placeholder', locale)}
-      autocomplete="off"
-      bind:value={tCapture}
-      onkeydown={onCaptureKey}
-    />
-  </div>
+  <TaskComposer
+    {locale}
+    target={composerTarget}
+    performances={composerPerformances}
+    conversations={composerConversations}
+    onCreated={onTaskCreated}
+  />
 
   {#if loading}
     <p class="desk__empty">{t('desk.loading', locale)}</p>
@@ -411,10 +419,11 @@
                   {:else}
                     <div class="drow" class:drow--overdue={item.overdue} class:drow--proposal={item.isProposal}>
                       <span class="drow__lead">
-                        {#if item.concern === 'agenda'}{item.allDay ? t('desk.bucket_anytime', locale) : fmtTime(item.atISO)}{:else}{t(
-                            `desk.verb_${item.verbKey}`,
-                            locale,
-                          )}{/if}
+                        {#if item.concern === 'agenda'}{item.allDay
+                            ? t('desk.all_day', locale)
+                            : item.atISO
+                              ? fmtTime(item.atISO)
+                              : '—'}{:else}{t(`desk.verb_${item.verbKey}`, locale)}{/if}
                       </span>
                       {#if personHref(item.personSlug)}
                         <a class="drow__subject" href={personHref(item.personSlug)}>{item.subject}</a>
@@ -436,8 +445,8 @@
         </section>
       {/each}
 
-      {#if calm && calmFolded}
-        <button type="button" class="calmfoot" onclick={toggleCalm}>
+      {#if calm.on && calmFolded}
+        <button type="button" class="calmfoot" onclick={() => calm.set(false)}>
           <span
             >{#if summary.overdue}<span class="calmfoot__over">{t('desk.calm_overdue', locale, { n: summary.overdue })}</span
               >{/if}{#if summary.overdue && foldedRest} {t('desk.calm_and', locale)} {/if}{#if foldedRest}{t('desk.calm_more', locale, {
@@ -470,6 +479,9 @@
       align-items: flex-end;
       justify-content: space-between;
       gap: var(--space-m);
+      /* Separator under the status header (title + pulse), per the design. */
+      padding-block-end: var(--space-m);
+      border-block-end: 1px solid var(--border-color-light);
     }
     .desk__count {
       margin: 0;
@@ -503,69 +515,10 @@
       margin-inline-end: var(--space-s);
       color: var(--text-faint);
     }
-    .desk__calm {
-      display: inline-flex;
-      align-items: center;
-      gap: var(--space-xs);
-      padding-block: var(--space-2xs);
-      padding-inline: var(--space-s);
-      border: 1px solid var(--border-color-dark);
-      border-radius: var(--radius-circle);
-      background: transparent;
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      letter-spacing: var(--mono-letter-spacing-loose);
-      text-transform: uppercase;
-      color: var(--text-muted);
-      cursor: pointer;
-      transition: color var(--transition), background var(--transition), border-color var(--transition);
-      white-space: nowrap;
-    }
-    .desk__calm:hover {
-      color: var(--text-color);
-      border-color: var(--text-muted);
-    }
-    .desk__calm.on {
-      background: var(--text-color);
-      border-color: var(--text-color);
-      color: var(--bg);
-    }
-    .desk__calm-k {
-      padding-inline: var(--space-2xs);
-      border: 1px solid currentColor;
-      border-radius: var(--radius-s);
-      opacity: 0.6;
-      text-transform: none;
-    }
     /* Calm quiets the whole surface one contrast step (overdue red survives). */
     .desk--calm {
       --border-color-dark: color-mix(in oklch, var(--neutral) 12%, transparent);
       --text-color: var(--text-muted);
-    }
-
-    /* ── Quick capture ── */
-    .desk__capture {
-      display: flex;
-      align-items: center;
-      gap: var(--space-s);
-      padding-block: var(--space-s);
-      border-block: 1px solid var(--border-color-light);
-    }
-    .desk__capture-plus {
-      font-family: var(--font-mono);
-      color: var(--text-faint);
-    }
-    .desk__capture-input {
-      flex: 1;
-      border: 0;
-      background: transparent;
-      font-family: var(--font-sans);
-      font-size: var(--text-s);
-      color: var(--text-color);
-      outline: 0;
-    }
-    .desk__capture-input::placeholder {
-      color: var(--text-faint);
     }
 
     /* ── Timeline ── */

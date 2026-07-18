@@ -1,20 +1,19 @@
 <script lang="ts">
   /**
-   * Tasks module (ADR-068) — the line's to-do list, reserved in the module
-   * catalog since ADR-063 ("+ Tasks when D3"). An inline composer (title +
-   * optional due date) plus the shared TaskBoard; done tasks fold behind a
-   * counter. Every row here also feeds the Desk (anti-fragmentation rule:
-   * a module is a line-scoped view of an entity with a global surface).
+   * Tasks module (ADR-068) — the line's to-do list. The shared TaskComposer
+   * (its parent locked to this line, so the "where" picker is hidden) plus
+   * the shared TaskBoard; done tasks fold behind a counter. Every row here
+   * also feeds the Desk (anti-fragmentation: a module is a line-scoped view
+   * of an entity that also has a global surface).
    */
 
-  import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
+  import { createQuery } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
-  import Button from '$lib/components/Button.svelte';
-  import Input from '$lib/components/Input.svelte';
   import TaskBoard from '$lib/components/TaskBoard.svelte';
-  import { addToast } from '$lib/components/Toast.svelte';
-  import { fetchJSON, mutateJSON, ApiError } from '$lib/api';
-  import type { TaskItem } from '$lib/task';
+  import TaskComposer from '$lib/components/TaskComposer.svelte';
+  import { fetchJSON } from '$lib/api';
+  import { detectLocale } from '$lib/i18n';
+  import type { TaskItem, TaskTarget } from '$lib/task';
 
   interface Props {
     line: {
@@ -30,7 +29,7 @@
 
   let { line }: Props = $props();
 
-  const queryClient = useQueryClient();
+  const locale = detectLocale(typeof navigator !== 'undefined' ? navigator.language : 'en');
 
   const tasksOptions = toStore(() => ({
     queryKey: ['line-tasks', line.id] as const,
@@ -47,55 +46,18 @@
   let doneTasks = $derived(items.filter((t) => t.status === 'done'));
   let showDone = $state(false);
 
-  // ── Composer ──────────────────────────────────────────────────────────
-  let cTitle = $state('');
-  let cDue = $state('');
-
-  const addTask = createMutation({
-    mutationFn: () =>
-      mutateJSON<{ task: TaskItem }>('POST', '/api/tasks', {
-        title: cTitle.trim(),
-        due_at: cDue || null,
-        line_id: line.id,
-      }),
-    onSuccess: () => {
-      cTitle = '';
-      cDue = '';
-      void queryClient.invalidateQueries({ queryKey: ['line-tasks', line.id] });
-      void queryClient.invalidateQueries({ queryKey: ['tasks'] });
-    },
-    onError: (err) => {
-      addToast({
-        tone: 'danger',
-        title: 'Task not added',
-        message: err instanceof ApiError ? err.message : 'Unexpected error',
-      });
-    },
+  // The composer's parent is fixed to this line — lockTarget hides the picker
+  // and drops the redundant "into <line>" hint suffix.
+  let target = $derived<TaskTarget>({
+    kind: 'line',
+    id: line.id,
+    name: line.name,
+    lineKind: line.kind,
   });
-
-  function submitAdd() {
-    if (!cTitle.trim()) {
-      addToast({ tone: 'warning', title: 'Title required', message: 'Say what has to happen.' });
-      return;
-    }
-    $addTask.mutate();
-  }
 </script>
 
 <div class="ltm">
-  <form
-    class="ltm__composer"
-    onsubmit={(e) => {
-      e.preventDefault();
-      submitAdd();
-    }}
-  >
-    <div class="ltm__composer-title">
-      <Input label="New task" placeholder="What has to happen?" bind:value={cTitle} />
-    </div>
-    <Input label="Due" type="date" bind:value={cDue} />
-    <Button size="s" variant="outline" type="submit" loading={$addTask.isPending}>Add</Button>
-  </form>
+  <TaskComposer {locale} {target} lockTarget invalidateKeys={[['line-tasks', line.id]]} />
 
   <TaskBoard
     tasks={openTasks}
@@ -121,15 +83,6 @@
       display: flex;
       flex-direction: column;
       gap: var(--space-s);
-    }
-    .ltm__composer {
-      display: flex;
-      align-items: end;
-      gap: var(--space-s);
-    }
-    .ltm__composer-title {
-      flex: 1;
-      min-inline-size: 0;
     }
     .ltm__done-toggle {
       align-self: start;
