@@ -16,7 +16,7 @@
  *     the same rule as the detail bundle, batched in 3 queries). An empty
  *     roster means "no team data" and conflictsFor() degrades honestly.
  * Plus an opt-in notice projection for the decisions queue (planner v2,
- * ADR-079 §2):
+ * ADR-080 §2):
  *   - ?notice=1 → each item gains `hold_notice_days` (NULL = standard
  *     default). OPT-IN on purpose: a pre-migration DB has no such column
  *     and PostgREST rejects the select — the always-on month feed never
@@ -130,7 +130,7 @@ type PerformanceItem = {
   wrap_at: string | null;
   venue: VenueLite | null;
   project: ProjectLite | null;
-  /** Present only on ?notice=1 fetches (decisions queue, ADR-079 §2). */
+  /** Present only on ?notice=1 fetches (decisions queue, ADR-080 §2). */
   hold_notice_days?: number | null;
 };
 

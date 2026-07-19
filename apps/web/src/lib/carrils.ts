@@ -1,14 +1,14 @@
 /**
  * Carrils — the pure logic of the Calendar lens' third projection
- * (ADR-079 §7/§8): the horizontal month ribbon grouped per espai /
- * projecte / persona (the Loom). Same contract as $lib/calendar: every
+ * (ADR-080 §7/§8): the horizontal month ribbon grouped per espai /
+ * projecte / persona (the Loom). Same contract as $lib/planner: every
  * function is pure, day-precision, string ISO-date compares only — the
  * page supplies the rows and "today", the component measures pixels.
  */
 
 import { addDaysIso } from './calendar';
 
-/** The three groupings of the carrils projection (ADR-079 §8). */
+/** The three groupings of the carrils projection (ADR-080 §8). */
 export type CarrilsGroup = 'espai' | 'projecte' | 'persona';
 
 function isCarrilsGroup(v: string | null | undefined): v is CarrilsGroup {
@@ -17,7 +17,7 @@ function isCarrilsGroup(v: string | null | undefined): v is CarrilsGroup {
 
 /**
  * Grouping resolution — same persistence chain as the projection
- * (ADR-078 §10 via ADR-079 §8): explicit `&group=` → the device's stored
+ * (ADR-078 §10 via ADR-080 §8): explicit `&group=` → the device's stored
  * preference → 'espai'. Unknown values fall through.
  */
 export function resolveCarrilsGroup(
@@ -80,7 +80,7 @@ export interface PrepRun {
 
 /**
  * Merge day-level rehearsal/residency rows into consecutive-day runs per
- * project (ADR-079 §7 — "bandas de assaigs en el carril"). A run breaks
+ * project (ADR-080 §7 — "bandas de assaigs en el carril"). A run breaks
  * on a gap day or a label change; duplicate days collapse. The caller
  * pre-filters kinds and cancelled rows — this only does the run math.
  */
@@ -109,7 +109,7 @@ export function prepRuns(days: PrepDay[]): PrepRun[] {
   return runs.sort((a, b) => (a.from < b.from ? -1 : a.from > b.from ? 1 : 0));
 }
 
-// ── The Loom (Agrupa per Persona — ADR-079 §8) ─────────────────────────
+// ── The Loom (Agrupa per Persona — ADR-080 §8) ─────────────────────────
 
 /** One person-day commitment: they are on this gig's roster. */
 export interface LoomCommitment {
@@ -171,7 +171,7 @@ export interface LoomGroup {
 }
 
 /**
- * The Loom model (ADR-079 §8): one thread per team person, grouped by the
+ * The Loom model (ADR-080 §8): one thread per team person, grouped by the
  * project that claims most of their committed days (their "home" this
  * month); persons whose commitments span several projects keep ONE thread
  * (all segments on it) and a shared badge. Persons with no data at all

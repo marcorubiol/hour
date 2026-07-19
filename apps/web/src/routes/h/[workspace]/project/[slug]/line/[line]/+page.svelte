@@ -40,7 +40,7 @@
     type ModuleKey,
   } from '$lib/line-templates';
   import { workspacesQueryOptions, activeProjectsQueryOptions } from '$lib/nav-queries';
-  import CalendarModule from '$lib/components/line/CalendarModule.svelte';
+  import PlannerModule from '$lib/components/line/PlannerModule.svelte';
   import ConversationsModule from '$lib/components/line/ConversationsModule.svelte';
   import RoadsheetsModule from '$lib/components/line/RoadsheetsModule.svelte';
   import NotesModule from '$lib/components/line/NotesModule.svelte';
@@ -156,7 +156,7 @@
   let siblings = $derived($linesQuery.data?.items ?? []);
 
   const REGISTRY = {
-    calendar: CalendarModule,
+    planner: PlannerModule,
     conversations: ConversationsModule,
     roadsheets: RoadsheetsModule,
     notes: NotesModule,

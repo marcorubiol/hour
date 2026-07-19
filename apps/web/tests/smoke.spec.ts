@@ -63,7 +63,7 @@ test.describe('smoke', () => {
     expect(await page.locator('.rel-stub__item').count()).toBeGreaterThan(0);
 
     // Calendar month grid.
-    await page.goto('/h/calendar');
+    await page.goto('/h/planner');
     await expect(page.locator('.cal__grid')).toBeVisible();
     expect(await page.locator('.cal__weekday').count()).toBe(7);
 

@@ -1,4 +1,4 @@
-# Hour — Design prompt: Calendar lens (planning without alarm)
+# Hour — Design prompt: Planner lens (planning without alarm)
 
 > **STATUS: IN REFINEMENT (updated 2026-07-18 post-grill).** First mock exists ("Hour
 > Calendar Lens.html" in the design project); Marco is refining it. The grill of

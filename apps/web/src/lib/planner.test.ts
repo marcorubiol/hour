@@ -10,10 +10,10 @@ import {
   decisionsFor,
   monthGrid,
   performanceRoster,
-  resolveCalendarView,
+  resolvePlannerView,
   rosterPersonIds,
   type BlackoutInput,
-  type CalendarEvent,
+  type PlannerEvent,
   type DecisionPerformance,
 } from './calendar';
 
@@ -192,7 +192,7 @@ describe('performanceRoster', () => {
 // ── conflictsFor — the conflict engine ────────────────────────────────────
 
 let eventSeq = 0;
-function ev(overrides: Partial<CalendarEvent> = {}): CalendarEvent {
+function ev(overrides: Partial<PlannerEvent> = {}): PlannerEvent {
   eventSeq += 1;
   return {
     id: overrides.id ?? `ev-${eventSeq}`,
@@ -380,7 +380,7 @@ describe('conflictsFor', () => {
     expect(conflictsFor([], {}, [blk()])).toEqual([]);
   });
 
-  // ── ADR-079 §3 — status-aware severities ────────────────────────────────
+  // ── ADR-080 §3 — status-aware severities ────────────────────────────────
 
   it('double: two same-project hold performances on one day', () => {
     const a = ev({ id: 'a', kind: 'performance', status: 'hold' });
@@ -452,7 +452,7 @@ describe('conflictsFor', () => {
 
   it('full severity order: people > double > blackout > blackout-tentative > possible > concurrence', () => {
     // One pair per day so each severity comes from exactly one source.
-    const events: CalendarEvent[] = [
+    const events: PlannerEvent[] = [
       // possible (declared first — must still sort near the bottom)
       ev({ id: 'p1e', project_id: 'proj-x', day: '2026-07-05' }),
       ev({ id: 'p2e', project_id: 'proj-y', day: '2026-07-05' }),
@@ -494,7 +494,7 @@ describe('conflictsFor', () => {
   });
 });
 
-// ── decisionsFor — the derived decisions queue (ADR-079) ─────────────────
+// ── decisionsFor — the derived decisions queue (ADR-080) ─────────────────
 
 const TODAY = '2026-07-18';
 
@@ -598,7 +598,7 @@ describe('decisionsFor', () => {
   });
 
   it('a possible pair drops once one side is confirmed — no roster, no asserted friction, never a release prompt', () => {
-    // ADR-079 §3 — 'possible' is a decision only while both sides are
+    // ADR-080 §3 — 'possible' is a decision only while both sides are
     // options to confront; §5's release follow-up is people|double only.
     const { decisions, concurrences } = run(
       [
@@ -938,25 +938,25 @@ describe('awayBands', () => {
   });
 });
 
-describe('resolveCalendarView', () => {
+describe('resolvePlannerView', () => {
   it('explicit ?view= wins over everything', () => {
-    expect(resolveCalendarView('agenda', 'month', false)).toBe('agenda');
-    expect(resolveCalendarView('month', 'agenda', true)).toBe('month');
+    expect(resolvePlannerView('agenda', 'month', false)).toBe('agenda');
+    expect(resolvePlannerView('month', 'agenda', true)).toBe('month');
   });
 
   it('stored preference wins over form factor', () => {
-    expect(resolveCalendarView(null, 'agenda', false)).toBe('agenda');
-    expect(resolveCalendarView(undefined, 'month', true)).toBe('month');
+    expect(resolvePlannerView(null, 'agenda', false)).toBe('agenda');
+    expect(resolvePlannerView(undefined, 'month', true)).toBe('month');
   });
 
   it('falls back to form factor: narrow = agenda, wide = month', () => {
-    expect(resolveCalendarView(null, null, true)).toBe('agenda');
-    expect(resolveCalendarView(null, null, false)).toBe('month');
+    expect(resolvePlannerView(null, null, true)).toBe('agenda');
+    expect(resolvePlannerView(null, null, false)).toBe('month');
   });
 
   it('garbage at either level falls through, never breaks', () => {
-    expect(resolveCalendarView('week', 'grid', false)).toBe('month');
-    expect(resolveCalendarView('week', 'agenda', false)).toBe('agenda');
+    expect(resolvePlannerView('week', 'grid', false)).toBe('month');
+    expect(resolvePlannerView('week', 'agenda', false)).toBe('agenda');
   });
 });
 

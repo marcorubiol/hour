@@ -5,5 +5,5 @@ import { redirect } from '@sveltejs/kit';
 import type { PageLoad } from './$types';
 
 export const load: PageLoad = ({ url }) => {
-  redirect(308, `/h/calendar${url.search}`);
+  redirect(308, `/h/planner${url.search}`);
 };

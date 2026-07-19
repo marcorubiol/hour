@@ -14,8 +14,8 @@
 
 import { getContext, setContext } from 'svelte';
 
-export type Lens = 'desk' | 'calendar' | 'conversations' | 'money';
-const VALID_LENSES: readonly Lens[] = ['desk', 'calendar', 'conversations', 'money'];
+export type Lens = 'desk' | 'planner' | 'conversations' | 'money';
+const VALID_LENSES: readonly Lens[] = ['desk', 'planner', 'conversations', 'money'];
 const STORAGE_KEY = 'hour_lens';
 
 export class LensStore {
@@ -31,12 +31,14 @@ export class LensStore {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) return false;
-      // A session stored before ADR-075 holds the dead 'contacts'. Map it and
+      // Sessions stored before a lens rename hold a dead value: 'contacts'
+      // (pre-ADR-075) or 'calendar' (pre-Calendar→Planner). Map them and
       // rewrite storage on the spot: one-shot migration, not a standing alias
-      // — once every browser has re-persisted, this line is deletable. Without
-      // it the dead value fails the check below and drops the user on 'desk'
-      // with no clue why.
-      const value = raw === 'contacts' ? 'conversations' : raw;
+      // — once every browser has re-persisted, these lines are deletable.
+      // Without them the dead value fails the check below and drops the user
+      // on 'desk' with no clue why.
+      const value =
+        raw === 'contacts' ? 'conversations' : raw === 'calendar' ? 'planner' : raw;
       if (!(VALID_LENSES as readonly string[]).includes(value)) return false;
       this.current = value as Lens;
       if (value !== raw) this.persist();

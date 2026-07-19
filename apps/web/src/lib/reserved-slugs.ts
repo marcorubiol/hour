@@ -30,14 +30,15 @@ export const RESERVED_WORKSPACE_SLUGS = [
   'dashboard', 'new', 'edit', 'delete', 'search',
   'explore', 'discover',
 
-  // Hour product vocabulary — the four lens routes (desk · calendar ·
+  // Hour product vocabulary — the lens routes (desk home + planner ·
   // conversations · money), the entity segments, and `agenda`: ADR-076 makes it
   // a first-class projection reachable by its own alias route, so it cannot be
-  // claimable. `people` is reserved-but-rejected (ADR-065 chose Conversations
-  // over "People") — held so the name can never be taken from under a revisit.
+  // claimable. `calendar` (pre-Planner rename) and `people` (ADR-065 chose
+  // Conversations over "People") are reserved-but-rejected — held so the names
+  // can never be taken from under a revisit.
   'house', 'room', 'run', 'gig', 'desk', 'plaza',
   'roadsheet', 'conversation', 'conversations', 'person', 'venue', 'asset',
-  'invoice', 'calendar', 'agenda', 'money', 'comms', 'archive', 'people',
+  'invoice', 'calendar', 'planner', 'agenda', 'money', 'comms', 'archive', 'people',
 
   // Operational
   'staging', 'dev', 'playground', 'booking',

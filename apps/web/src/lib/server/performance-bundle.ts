@@ -100,7 +100,7 @@ export interface PerformanceBundleResult {
   performance: PerformanceDetail;
   cast_members: CastMemberRow[];
   /**
-   * True when the DB has no `hold_notice_days` column yet (pre-ADR-079
+   * True when the DB has no `hold_notice_days` column yet (pre-ADR-080
    * migration) and the bundle degraded the field to null. UIs hide the
    * notice field on it — a PATCH carrying the column would be rejected.
    */
@@ -164,7 +164,7 @@ const PERFORMANCE_COLS = [
   'updated_at',
 ].join(',');
 
-// `hold_notice_days` is post-ADR-078 schema (ADR-079 §2, migration
+// `hold_notice_days` is post-ADR-078 schema (ADR-080 §2, migration
 // 2026-07-18). The bundle is ALWAYS-ON (detail page + road sheet), so
 // unlike the opt-in `?notice=1` list projection it cannot leave the
 // absence decision to the caller: a pre-migration DB rejects the whole

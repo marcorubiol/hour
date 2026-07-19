@@ -71,7 +71,7 @@ describe('PerformancePatchSchema', () => {
     if (r.success) expect(r.output.venue_name).toBe('Sala X');
   });
 
-  it('hold_notice_days: 0..365 or null pass, out-of-range and fractions fail (ADR-079 §2)', () => {
+  it('hold_notice_days: 0..365 or null pass, out-of-range and fractions fail (ADR-080 §2)', () => {
     expect(v.safeParse(PerformancePatchSchema, { hold_notice_days: 0 }).success).toBe(true);
     expect(v.safeParse(PerformancePatchSchema, { hold_notice_days: 45 }).success).toBe(true);
     expect(v.safeParse(PerformancePatchSchema, { hold_notice_days: 365 }).success).toBe(true);
@@ -144,7 +144,7 @@ describe('isHoldStatus', () => {
   });
 });
 
-describe('decideBy (ADR-079 §2)', () => {
+describe('decideBy (ADR-080 §2)', () => {
   it('NULL notice follows the standard default', () => {
     expect(HOLD_NOTICE_DEFAULT).toBe(30);
     expect(decideBy('2031-08-15', null)).toBe('2031-07-16');

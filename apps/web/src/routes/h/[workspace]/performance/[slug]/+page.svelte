@@ -169,7 +169,7 @@
     onSuccess: () => {
       dialogOpen = false;
       void queryClient.invalidateQueries({ queryKey: ['performance'] });
-      void queryClient.invalidateQueries({ queryKey: ['calendar-performances'] });
+      void queryClient.invalidateQueries({ queryKey: ['planner-performances'] });
     },
     onError: (err) => {
       addToast({
@@ -193,7 +193,7 @@
   let fCity = $state('');
   let fCountry = $state('');
   let fVenueId = $state('');
-  // ADR-079 §2 — hold decision notice; the field only exists in the dialog
+  // ADR-080 §2 — hold decision notice; the field only exists in the dialog
   // while the gig's status is hold*. null = empty = standard default.
   let fHoldNotice = $state<number | null>(null);
   let fLoadIn = $state('');
@@ -282,7 +282,7 @@
       start_at: wallClockToInstant(fStart, entryTz),
       loadout_at: wallClockToInstant(fLoadout, entryTz),
       wrap_at: wallClockToInstant(fWrap, entryTz),
-      // ADR-079 §2 — only while the field is on screen (hold* status);
+      // ADR-080 §2 — only while the field is on screen (hold* status);
       // emptied field = null = back to the standard default.
       ...(showHoldNotice ? { hold_notice_days: fHoldNotice } : {}),
     });
@@ -291,7 +291,7 @@
   let bundle = $derived($query.data ?? null);
   let perf = $derived(bundle?.performance ?? null);
 
-  // ADR-079 §2 — the notice field rides the dialog only for hold* gigs,
+  // ADR-080 §2 — the notice field rides the dialog only for hold* gigs,
   // and only while the DB has the column (a pre-migration bundle flags
   // `hold_notice_absent`; a PATCH carrying it would be rejected whole).
   let showHoldNotice = $derived(
@@ -349,7 +349,7 @@
     onSuccess: async () => {
       confirmDeleteOpen = false;
       dialogOpen = false;
-      void queryClient.invalidateQueries({ queryKey: ['calendar-performances'] });
+      void queryClient.invalidateQueries({ queryKey: ['planner-performances'] });
       void queryClient.invalidateQueries({ queryKey: ['money-performances'] });
       void queryClient.invalidateQueries({ queryKey: ['invoices'] });
       addToast({ tone: 'success', message: 'Performance deleted.' });
@@ -740,7 +740,7 @@
     <Input label="City" bind:value={fCity} />
     <Input label="Country" bind:value={fCountry} placeholder="ES" />
     {#if showHoldNotice}
-      <!-- ADR-079 §2 — discreet, hold-only. Empty = default 30 (the
+      <!-- ADR-080 §2 — discreet, hold-only. Empty = default 30 (the
            placeholder says it), 0 = no notice. -->
       <div class="field">
         <label for="f-hold-notice">{t('perf.hold_notice', locale)}</label>

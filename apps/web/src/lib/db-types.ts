@@ -3,7 +3,7 @@
 // user_profile.person_id, create_date/delete_date RPCs. Regenerate after
 // applying the 2026-07-18 migrations.
 // hand-patched pending regen (planner-v2): performance.hold_notice_days
-// (ADR-079 §2, 2026-07-18_hold_notice_days.sql).
+// (ADR-080 §2, 2026-07-18_hold_notice_days.sql).
 export type Json =
   | string
   | number

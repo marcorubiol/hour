@@ -6,6 +6,7 @@
 > is a bug to reconcile — flag it, don't silently diverge.
 > Recorded: 2026-07-14. Decision + rationale: `_decisions.md` § ADR-063 (model) + ADR-065 (naming: Desk · Calendar · Contacts · Money; the line's cast/crew module = Team).
 > Amended 2026-07-17 — ADR-075: the Contacts lens and the `contacts` line module are **Conversations**, and the entity `engagement` is **`conversation`** (DB, API, client). "Contact" survives only as the book concept — a person or organization you deal with — never as an entity or a surface name.
+> Amended 2026-07-19 — ADR-079: the Calendar lens (its route, engine `planner.ts`, and line module) is **Planner** — route `/h/planner`, label EN Planner · ES/CA Planificador · FR Planning (pending `fr.json`). The iCalendar/ICS feed (`calendar_share`, `/api/public/calendar`, `ics.ts`) keeps "calendar" — interop truth, like the `date` entity keeps its name. Every "Calendar" below, as a lens/module name, now reads **Planner**.
 > Read next to: `architecture.md` (data model / stack), `_decisions.md` (ADR log).
 
 ## The one idea
@@ -31,7 +32,7 @@ Editing always lands on an entity, never on "the view".
 - **Line** = a *línea de trabajo* inside a project (tour, booking season, creation, press, fair…).
   Its `kind` drives what it shows.
 
-**Lens** — a **read / aggregation** surface over **one concern** (a data domain: Calendar / Conversations /
+**Lens** — a **read / aggregation** surface over **one concern** (a data domain: Planner / Conversations /
 Money). Cross-container, scopeable by pins (all / space / project). Owns **no edit logic** — to change
 something you jump to where the entity is authored. (The home `/h/` is *not* a lens but the cross-concern
 **Desk** digest — see § Read surfaces. ADR-062: "a view, not a container".)
@@ -72,14 +73,14 @@ in a lens. This reconciles today's inline edits in the Money / Calendar / Conver
 ## Read surfaces and modules — the categories
 
 A **read surface** is anything that shows entities in aggregate. There are two kinds: a **concern-lens**
-(one data domain, all of it — Calendar / Conversations / Money) and the **Desk digest** (cross-concern, ranked
+(one data domain, all of it — Planner / Conversations / Money) and the **Desk digest** (cross-concern, ranked
 by what needs you now — the home; owns no data, computed over the lenses + tasks). Below, which concern
 is a lens, a module, or both:
 
 | Concern / surface               | Global read surface     | Module (line edit)? | Note |
 |---------------------------------|-------------------------|---------------------|------|
 | **Desk** (the now)              | **digest** (not a lens) | no                  | cross-concern, ranked by urgency; the home; owns no data — a query over the others + tasks; no per-line form |
-| Calendar                        | lens                    | yes                 | month grid / planning; distinct from Desk (now/triage vs planning) |
+| Planner                         | lens                    | yes                 | month grid / planning; distinct from Desk (now/triage vs planning) |
 | Conversations                   | lens                    | yes                 | your booking network — **people AND organizations** (a theatre is a contact, not a person); persons + conversations; comms folds in later |
 | Money                           | lens                    | yes                 | fees, invoices, expenses |
 | Team                            | — (module only)         | yes                 | cast + crew executing the line — **distinct from Conversations** (Conversations = who you book with; Team = who does the show) |
@@ -92,7 +93,7 @@ digest (not a lens). Entity-bound content → module only. Verb that hangs off o
 
 - **Lens / lente** — a global read surface. Never composed, always present, narrowed by pins.
 - **Module / módulo** — a line-level composable section. The only place modules exist.
-  Catalog: Calendar · Conversations · Money · Notes · Materials · Team · Road sheets · Tasks (live, ADR-071).
+  Catalog: Planner · Conversations · Money · Notes · Materials · Team · Road sheets · Tasks (live, ADR-071).
   (Conversations module = the line's booking conversations — the Conversations lens scoped to it; Team = its cast/crew.)
 - **Task / tarea** — the verb layer. Not a lens. Module + inline next-action + Desk feed.
 - **Space / project edit content** — a container's own intrinsic editable fields. **Not** modules.
@@ -107,7 +108,7 @@ The nav layer is **one home + three lenses**:
 - **Desk** — the home / the "now": what needs me + what's next + tasks (planned or not). Reached by the
   logo. Revives the ADR-008 name (fits now that tasks return); replaces "Agenda", which reads as
   "calendar" in ES/CA/FR and blurred with the Calendar lens.
-- **Calendar** — month grid / planning / conflict-detection. A ⌘K lens.
+- **Planner** — month grid / planning / conflict-detection. A ⌘K lens.
 - **Conversations** — your booking network: persons + conversations. **Not "People"** — the lens holds
   organizations too (theatres, town halls, festivals), and a theatre is not a person; a *contact* is
   whoever you deal with, individual or org. Comms folds in later as a per-contact timeline (ADR-056

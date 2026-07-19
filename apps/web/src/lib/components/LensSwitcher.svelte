@@ -1,6 +1,6 @@
 <script lang="ts">
   /**
-   * LensSwitcher — the Desk · Calendar · Conversations · Money segmented
+   * LensSwitcher — the Desk · Planner · Conversations · Money segmented
    * control (ADR-065/067/075). Extracted from the shell chrome so a lens can
    * host it in its OWN header row, beside its title (the Desk does this; the
    * design puts the title and the switcher on one line). The active lens is
@@ -17,7 +17,7 @@
 
   const VIEW_AS: { id: Lens; label: string }[] = [
     { id: 'desk', label: t('lens.desk', locale) },
-    { id: 'calendar', label: t('lens.calendar', locale) },
+    { id: 'planner', label: t('lens.planner', locale) },
     { id: 'conversations', label: t('lens.conversations', locale) },
     { id: 'money', label: t('lens.money', locale) },
   ];

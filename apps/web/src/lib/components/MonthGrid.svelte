@@ -8,13 +8,13 @@
    * clash-card popover. Pure presentation over already-scoped rows: the
    * page owns the feeds, the pins filtering, the conflict engine and the
    * i18n — this component owns bucketing + layout. Grid math stays in
-   * $lib/calendar.
+   * $lib/planner.
    *
    * Class names keep the original `cal__` block from the calendar page —
    * the e2e specs select `.cal__grid` / `.cal__weekday` (Svelte scoping
    * keeps them collision-free anyway).
    */
-  import { dayKeyInTz, monthGrid } from '$lib/calendar';
+  import { dayKeyInTz, monthGrid } from '$lib/planner';
 
   export type ProjectLite = {
     id: string;
@@ -142,7 +142,7 @@
 
   interface Props {
     year: number;
-    /** 1-12, same contract as $lib/calendar. */
+    /** 1-12, same contract as $lib/planner. */
     month: number;
     /** Already scope-filtered rows — the grid only buckets and renders. */
     performances: PerformanceEvent[];

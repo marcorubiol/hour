@@ -1,6 +1,6 @@
 <script module lang="ts">
   /**
-   * Carrils — the horizontal month ribbon (ADR-079 §7/§8): one lane per
+   * Carrils — the horizontal month ribbon (ADR-080 §7/§8): one lane per
    * espai/projecte, or the Loom (one thread per team person) under Agrupa
    * per Persona. Pure presentation over page-built VMs; day math is % of
    * the month, pixel math (pip row stacking, connector geometry, the
@@ -64,7 +64,7 @@
     bands: LaneBandVM[];
   };
 
-  /** A cross-lane conflict connector (ADR-079 §7). */
+  /** A cross-lane conflict connector (ADR-080 §7). */
   export type ConnectorVM = {
     /** Decision pair id — the band card jump target. */
     id: string;
@@ -268,21 +268,21 @@
     return () => window.removeEventListener('resize', rerun);
   });
 
-  let axisLabel = $derived(t(`calendar.group_${group}`, locale));
+  let axisLabel = $derived(t(`planner.group_${group}`, locale));
 </script>
 
 <div class="strip" bind:this={rootEl}>
   <div class="strip__inner">
-    <p class="strip__hint" aria-hidden="true">{t('calendar.carrils_hint', locale)}</p>
+    <p class="strip__hint" aria-hidden="true">{t('planner.carrils_hint', locale)}</p>
 
     {#if group === 'persona'}
-      <!-- Loom legend (ADR-079 §8) — the five words the threads speak. -->
+      <!-- Loom legend (ADR-080 §8) — the five words the threads speak. -->
       <div class="strip__legend">
-        <span class="strip__leg"><i class="strip__leg-th strip__leg-th--avail"></i>{t('calendar.loom_available', locale)}</span>
-        <span class="strip__leg"><i class="strip__leg-th strip__leg-th--commit"></i>{t('calendar.loom_commitment', locale)}</span>
-        <span class="strip__leg"><i class="strip__leg-th strip__leg-th--hold"></i>{t('calendar.loom_hold', locale)}</span>
-        <span class="strip__leg"><i class="strip__leg-th strip__leg-th--out"></i>{t('calendar.loom_out', locale)}</span>
-        <span class="strip__leg"><i class="strip__leg-th strip__leg-th--knot"></i>{t('calendar.loom_knot', locale)}</span>
+        <span class="strip__leg"><i class="strip__leg-th strip__leg-th--avail"></i>{t('planner.loom_available', locale)}</span>
+        <span class="strip__leg"><i class="strip__leg-th strip__leg-th--commit"></i>{t('planner.loom_commitment', locale)}</span>
+        <span class="strip__leg"><i class="strip__leg-th strip__leg-th--hold"></i>{t('planner.loom_hold', locale)}</span>
+        <span class="strip__leg"><i class="strip__leg-th strip__leg-th--out"></i>{t('planner.loom_out', locale)}</span>
+        <span class="strip__leg"><i class="strip__leg-th strip__leg-th--knot"></i>{t('planner.loom_knot', locale)}</span>
       </div>
     {/if}
 
@@ -339,9 +339,9 @@
               >
                 <span class="strip__lab-name">{th.name}</span>
                 {#if th.ghost}
-                  <span class="strip__badge">{t('calendar.loom_no_data', locale)}</span>
+                  <span class="strip__badge">{t('planner.loom_no_data', locale)}</span>
                 {:else if th.shared}
-                  <span class="strip__badge">{t('calendar.loom_shared', locale)}</span>
+                  <span class="strip__badge">{t('planner.loom_shared', locale)}</span>
                 {/if}
               </span>
               <span
@@ -366,14 +366,14 @@
                     class:strip__out--tent={o.tentative}
                     style="left: {leftPct(o.from)}%; inline-size: {spanPct(o.from, o.to)}%; margin-block-start: {outLanes.rows[i] * 22}px"
                     >{o.tentative
-                      ? t('calendar.loom_out_short_t', locale)
-                      : t('calendar.loom_out_short', locale)}</span
+                      ? t('planner.loom_out_short_t', locale)
+                      : t('planner.loom_out_short', locale)}</span
                   >
                 {/each}
                 {#each th.knots as day (day)}
                   <i class="strip__knot" style="left: {center(day)}%" aria-hidden="true"></i>
                   <span class="strip__kflag" style="left: {center(day)}%"
-                    >{t('calendar.loom_knot_flag', locale, { day })}</span
+                    >{t('planner.loom_knot_flag', locale, { day })}</span
                   >
                 {/each}
               </span>
@@ -724,7 +724,7 @@
       border-style: dotted;
     }
 
-    /* ── Cross-lane conflict connector (ADR-079 §7) ───────────────────── */
+    /* ── Cross-lane conflict connector (ADR-080 §7) ───────────────────── */
     .strip__conn {
       position: absolute;
       inline-size: 3px;

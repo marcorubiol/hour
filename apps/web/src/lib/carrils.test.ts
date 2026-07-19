@@ -9,7 +9,7 @@ import {
 } from './carrils';
 import { resolveCalendarView } from './calendar';
 
-describe('resolveCalendarView (carrils, ADR-079 §7)', () => {
+describe('resolveCalendarView (carrils, ADR-080 §7)', () => {
   it('accepts carrils from the URL and from storage', () => {
     expect(resolveCalendarView('carrils', null, false)).toBe('carrils');
     expect(resolveCalendarView(null, 'carrils', true)).toBe('carrils');

@@ -32,7 +32,7 @@
   import Input from './Input.svelte';
   import Select from './Select.svelte';
   import { addToast } from './Toast.svelte';
-  import { dayKeyInTz } from '$lib/calendar';
+  import { dayKeyInTz } from '$lib/planner';
   import { detectLocale, t } from '$lib/i18n';
   import { allLinesQueryOptions } from '$lib/nav-queries';
   import {
@@ -81,7 +81,7 @@
   let cCity = $state('');
   let cStatus = $state('proposed');
   let cLine = $state('');
-  // ADR-079 §2 — hold decision notice; only shown (and only sent) while
+  // ADR-080 §2 — hold decision notice; only shown (and only sent) while
   // the picked status is a hold*. null = empty field = standard default.
   let cHoldNotice = $state<number | null>(null);
   let showHoldNotice = $derived(isHoldStatus(cStatus));
@@ -145,7 +145,7 @@
         input,
       );
       if (!body?.performance) throw new Error('Malformed response');
-      // ADR-079 §2 — the create RPC doesn't know hold_notice_days, so a
+      // ADR-080 §2 — the create RPC doesn't know hold_notice_days, so a
       // typed notice rides a follow-up PATCH (the column is PATCH-whitelist
       // only; minimal path chosen over widening the RPC). A PATCH failure
       // must not undo a created gig — surface it, keep the create a success.
@@ -165,7 +165,7 @@
       cVenue = '';
       cCity = '';
       cHoldNotice = null;
-      void queryClient.invalidateQueries({ queryKey: ['calendar-performances'] });
+      void queryClient.invalidateQueries({ queryKey: ['planner-performances'] });
       void queryClient.invalidateQueries({ queryKey: ['line-performances'] });
       void queryClient.invalidateQueries({ queryKey: ['line-money-fees'] });
       void queryClient.invalidateQueries({ queryKey: ['today-performances'] });
@@ -238,7 +238,7 @@
   <Input label="City" bind:value={cCity} placeholder="City (optional)" />
   <Select label="Status" options={statusOptions} bind:value={cStatus} />
   {#if showHoldNotice}
-    <!-- ADR-079 §2 — discreet, hold-only. Empty = default (the placeholder
+    <!-- ADR-080 §2 — discreet, hold-only. Empty = default (the placeholder
          says it), 0 = no notice. Raw .field: the house Input doesn't carry
          min/max and the native attributes ARE the constraint here. -->
     <div class="field">

@@ -27,7 +27,7 @@
     type DateEvent,
     type PerformanceEvent,
   } from '$lib/components/MonthGrid.svelte';
-  import { agendaDayKeys, assignBandLanes, dayKeyInTz } from '$lib/calendar';
+  import { agendaDayKeys, assignBandLanes, dayKeyInTz } from '$lib/planner';
   import { dualTime } from '$lib/datetime';
   import { workspacesQueryOptions } from '$lib/nav-queries';
   import { accentVarFor } from '$lib/utils/accent';

@@ -1,12 +1,12 @@
 <script module lang="ts">
   /**
-   * Decision band (ADR-079 §4) — the derived decisions queue rendered
+   * Decision band (ADR-080 §4) — the derived decisions queue rendered
    * above every Calendar projection. Collapsed = one honest line (the
    * urgent one if any, the count otherwise); open = stacked "A ─ o ─ B"
    * cards plus the quiet concurrence list (§3 — "es veu, no crida").
    *
    * Pure presentation: the page owns the feeds, the engine
-   * ($lib/calendar decisionsFor), the scope filtering and the write
+   * ($lib/planner decisionsFor), the scope filtering and the write
    * mutations. The component only renders VMs and reports gestures up
    * (onConfirm / onRelease — each maps to ONE explicit PATCH, AI=UI
    * parity §5). "Mantén el hold" collapses that card locally (session
@@ -51,7 +51,7 @@
     b: DecisionOptionVM;
   };
 
-  /** A quiet same-day pair (ADR-079 §3) — seen, never counted. */
+  /** A quiet same-day pair (ADR-080 §3) — seen, never counted. */
   export type ConcurrenceVM = {
     id: string;
     day: string;
@@ -122,29 +122,29 @@
   }
 
   function title(d: DecisionVM): string {
-    if (d.level === 'people') return t('calendar.dec_people_title', locale);
-    if (d.level === 'double') return t('calendar.dec_double_title', locale);
-    return t('calendar.dec_possible_title', locale);
+    if (d.level === 'people') return t('planner.dec_people_title', locale);
+    if (d.level === 'double') return t('planner.dec_double_title', locale);
+    return t('planner.dec_possible_title', locale);
   }
   /** Reason for double/possible — 'people' renders inline (bold names). */
   function reason(d: DecisionVM): string {
-    if (d.level === 'double') return t('calendar.dec_double_reason', locale);
+    if (d.level === 'double') return t('planner.dec_double_reason', locale);
     return d.missingTeam
-      ? t('calendar.dec_possible_reason', locale, { project: d.missingTeam })
-      : t('calendar.dec_possible_reason_generic', locale);
+      ? t('planner.dec_possible_reason', locale, { project: d.missingTeam })
+      : t('planner.dec_possible_reason_generic', locale);
   }
   function tie(d: DecisionVM): string {
-    if (d.level === 'people') return t('calendar.dec_tie_people', locale);
-    if (d.level === 'double') return t('calendar.dec_tie_double', locale);
+    if (d.level === 'people') return t('planner.dec_tie_people', locale);
+    if (d.level === 'double') return t('planner.dec_tie_double', locale);
     return d.missingTeam
-      ? t('calendar.dec_tie_possible', locale, { project: d.missingTeam })
-      : t('calendar.dec_tie_possible_generic', locale);
+      ? t('planner.dec_tie_possible', locale, { project: d.missingTeam })
+      : t('planner.dec_tie_possible_generic', locale);
   }
   /** Honest, data-derived footer: a real decide-by day or "no notice". */
   function hint(d: DecisionVM): string {
     return d.decideBy
-      ? t('calendar.dec_decide_by', locale, { date: dayLabelShort(d.decideBy) })
-      : t('calendar.dec_no_notice', locale);
+      ? t('planner.dec_decide_by', locale, { date: dayLabelShort(d.decideBy) })
+      : t('planner.dec_no_notice', locale);
   }
 
   /** Collapsed-line subcopy: who/day, plus the decide-by when it exists. */
@@ -153,13 +153,13 @@
     const who = headline.people[0] ?? headline.a.project;
     const base = `${who} · ${dayLabelShort(headline.day)}`;
     return headline.decideBy
-      ? `${base} — ${t('calendar.dec_decide_by', locale, { date: dayLabelShort(headline.decideBy) })}`
+      ? `${base} — ${t('planner.dec_decide_by', locale, { date: dayLabelShort(headline.decideBy) })}`
       : base;
   });
 
   let countChip = $derived(
     urgentCount > 0
-      ? t('calendar.dec_chip_urgent', locale, { n: decisions.length, m: urgentCount })
+      ? t('planner.dec_chip_urgent', locale, { n: decisions.length, m: urgentCount })
       : String(decisions.length > 0 ? decisions.length : concurrences.length),
   );
 
@@ -187,17 +187,17 @@
   >
     {#if headline}
       <span class="decband__mark" aria-hidden="true">!</span>
-      <span class="decband__title">{t('calendar.dec_urgent_title', locale)}</span>
+      <span class="decband__title">{t('planner.dec_urgent_title', locale)}</span>
       <span class="decband__sub">{headSub}</span>
     {:else if decisions.length > 0}
       <span class="decband__mark decband__mark--soft" aria-hidden="true">?</span>
       <span class="decband__title"
-        >{t('calendar.dec_needed_title', locale, { n: decisions.length })}</span
+        >{t('planner.dec_needed_title', locale, { n: decisions.length })}</span
       >
     {:else}
       <!-- Concurrences only (§3) — seen, never counted as decisions. -->
       <span class="decband__mark decband__mark--soft" aria-hidden="true">·</span>
-      <span class="decband__title">{t('calendar.dec_concurrence_title', locale)}</span>
+      <span class="decband__title">{t('planner.dec_concurrence_title', locale)}</span>
     {/if}
     <span class="decband__count">{countChip}</span>
     <span class="decband__chev" aria-hidden="true">▾</span>
@@ -229,9 +229,9 @@
               </p>
               <p class="deccard__reason">
                 {#if d.level === 'people'}
-                  <!-- Shared person bold (ADR-079 §4) — the name IS the reason. -->
+                  <!-- Shared person bold (ADR-080 §4) — the name IS the reason. -->
                   <b>{d.people.join(', ')}</b>
-                  {t('calendar.dec_people_reason_rest', locale)}
+                  {t('planner.dec_people_reason_rest', locale)}
                 {:else}
                   {reason(d)}
                 {/if}
@@ -239,18 +239,18 @@
             </div>
             {#if d.urgent && d.decideBy}
               <span class="deccard__urg"
-                >{t('calendar.dec_decide_by', locale, { date: dayLabelShort(d.decideBy) })}</span
+                >{t('planner.dec_decide_by', locale, { date: dayLabelShort(d.decideBy) })}</span
               >
             {/if}
           </header>
 
           {#if d.kind === 'release'}
-            <!-- Follow-up card (ADR-079 §5): one side already confirmed —
+            <!-- Follow-up card (ADR-080 §5): one side already confirmed —
                  the only question left is the other hold. Two explicit
                  gestures, never a silent write. -->
             <div class="deccard__release">
               <p class="deccard__release-q">
-                {t('calendar.dec_release_q', locale, {
+                {t('planner.dec_release_q', locale, {
                   a: confirmedSide(d).venue,
                   b: holdSide(d).venue,
                 })}
@@ -262,7 +262,7 @@
                   disabled={pendingId !== null}
                   onclick={() => onRelease(holdSide(d).id)}
                 >
-                  {t('calendar.dec_release', locale)}
+                  {t('planner.dec_release', locale)}
                 </button>
                 <button
                   type="button"
@@ -270,7 +270,7 @@
                   disabled={pendingId !== null}
                   onclick={() => keptCards.add(d.id)}
                 >
-                  {t('calendar.dec_keep_hold', locale)}
+                  {t('planner.dec_keep_hold', locale)}
                 </button>
               </div>
             </div>
@@ -279,7 +279,7 @@
               {#each [d.a, d.b] as o, i (o.id)}
                 {#if i === 1}
                   <div class="deccard__mid">
-                    <span class="deccard__or">{t('calendar.dec_or', locale)}</span>
+                    <span class="deccard__or">{t('planner.dec_or', locale)}</span>
                     <span class="deccard__tie">
                       {#if d.level === 'people'}
                         <b>{d.people.join(', ')}</b><br />{tie(d)}
@@ -306,7 +306,7 @@
                     disabled={pendingId !== null}
                     onclick={() => onConfirm(o.id)}
                   >
-                    {t('calendar.dec_confirm', locale, { venue: o.venue })}
+                    {t('planner.dec_confirm', locale, { venue: o.venue })}
                   </button>
                 </div>
               {/each}
@@ -314,7 +314,7 @@
             <footer class="deccard__foot">
               <span class="deccard__hint">{hint(d)}</span>
               <button type="button" class="deccard__btn deccard__btn--quiet" onclick={() => onToggle(false)}>
-                {t('calendar.dec_keep_open', locale)}
+                {t('planner.dec_keep_open', locale)}
               </button>
             </footer>
           {/if}
@@ -322,10 +322,10 @@
       {/each}
 
       {#if concurrences.length > 0}
-        <!-- ADR-079 §3 — same day, disjoint known teams: seen, not counted,
+        <!-- ADR-080 §3 — same day, disjoint known teams: seen, not counted,
              no marks, no urgency. A quiet list and nothing more. -->
         <div class="decband__conc">
-          <p class="decband__conc-title">{t('calendar.dec_concurrence_title', locale)}</p>
+          <p class="decband__conc-title">{t('planner.dec_concurrence_title', locale)}</p>
           <ul class="decband__conc-list" role="list">
             {#each concurrences as c (c.id)}
               <li class="decband__conc-row">

@@ -3,7 +3,7 @@
  * ADR-072 §1): who is on each gig, as person ids. Three set-based queries
  * (cast_member by project, cast_override + crew_assignment by performance)
  * instead of N detail bundles, then the same pure combination rule the
- * detail page uses — `rosterPersonIds` in $lib/calendar — so month view
+ * detail page uses — `rosterPersonIds` in $lib/planner — so month view
  * and detail can never disagree.
  *
  * RLS scopes every query: rosters only contain people the caller's
@@ -12,7 +12,7 @@
  * "no team data" and degrades to 'possible' severity, honestly.
  */
 
-import { rosterPersonIds } from '$lib/calendar';
+import { rosterPersonIds } from '$lib/planner';
 import { pgGet, type SupabaseEnv } from '$lib/supabase';
 
 /**

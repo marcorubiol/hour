@@ -58,14 +58,14 @@
     type ConcurrenceVM,
     type DecisionOptionVM,
     type DecisionVM,
-  } from '$lib/components/calendar/DecisionBand.svelte';
+  } from '$lib/components/planner/DecisionBand.svelte';
   import CarrilsStrip, {
     type ConnectorVM,
     type LaneBandVM,
     type LanePipVM,
     type LaneVM,
     type LoomGroupVM,
-  } from '$lib/components/calendar/CarrilsStrip.svelte';
+  } from '$lib/components/planner/CarrilsStrip.svelte';
   import CreateEventDialog from '$lib/components/create/CreateEventDialog.svelte';
   import CreateBlackoutDialog from '$lib/components/create/CreateBlackoutDialog.svelte';
   import type { CreatedPerformance } from '$lib/components/PerformanceForm.svelte';
@@ -87,13 +87,13 @@
     dayKeyInTz,
     decisionsFor,
     monthGrid,
-    resolveCalendarView,
-    type CalendarEvent,
-    type CalendarView,
+    resolvePlannerView,
+    type PlannerEvent,
+    type PlannerView,
     type Conflict,
     type DecisionPerformance,
     type DecisionSide,
-  } from '$lib/calendar';
+  } from '$lib/planner';
   import {
     loomThreads,
     prepRuns,
@@ -148,15 +148,14 @@
       return null;
     }
   }
-  let view = $state<CalendarView>(
-    resolveCalendarView(
+  let view = $state<PlannerView>(
+    resolvePlannerView(
       new URL(location.href).searchParams.get('view'),
       storedView(),
       matchMedia('(max-width: 640px)').matches,
     ),
   );
-
-  // Carrils grouping (ADR-079 §8) — same persistence chain as the
+  // Carrils grouping (ADR-080 §8) — same persistence chain as the
   // projection: ?group= → localStorage → 'espai'. The URL only carries
   // &group= while the projection is carrils (it means nothing elsewhere).
   const GROUP_STORAGE_KEY = 'hour:calendar:group';
@@ -179,7 +178,7 @@
     else url.searchParams.delete('group');
     replaceState(url, {});
   }
-  function setView(v: CalendarView) {
+  function setView(v: PlannerView) {
     if (view === v) return;
     view = v;
     try {
@@ -313,7 +312,7 @@
   const perfOptions = toStore(() => {
     const k = $feedKey;
     return {
-      queryKey: ['calendar-performances', k] as const,
+      queryKey: ['planner-performances', k] as const,
       enabled: !k.unresolved,
       queryFn: ({ signal }: { signal: AbortSignal }) =>
         fetchJSON<{ items: PerformanceEvent[] }>(
@@ -329,7 +328,7 @@
   const datesOptions = toStore(() => {
     const k = $feedKey;
     return {
-      queryKey: ['calendar-dates', k] as const,
+      queryKey: ['planner-dates', k] as const,
       enabled: !k.unresolved,
       queryFn: ({ signal }: { signal: AbortSignal }) =>
         fetchJSON<{ items: DateEvent[] }>(
@@ -347,7 +346,7 @@
   const availabilityOptions = toStore(() => {
     const k = $feedKey;
     return {
-      queryKey: ['calendar-availability', { from: k.from, to: k.to }] as const,
+      queryKey: ['planner-availability', { from: k.from, to: k.to }] as const,
       enabled: !k.unresolved,
       queryFn: async ({ signal }: { signal: AbortSignal }) => {
         try {
@@ -368,7 +367,7 @@
   const teamOptions = toStore(() => {
     const ids = ($workspacesQuery.data?.items ?? []).map((w) => w.id);
     return {
-      queryKey: ['calendar-team', ids] as const,
+      queryKey: ['planner-team', ids] as const,
       enabled: ids.length > 0,
       queryFn: async ({ signal }: { signal: AbortSignal }) => {
         try {
@@ -385,9 +384,9 @@
     };
   });
 
-  // ── Decisions window (ADR-079 §4) — cross-month: holds live in
+  // ── Decisions window (ADR-080 §4) — cross-month: holds live in
   // [today, today+90d], not just the visible month. Same scope filter as
-  // the month feed; ?notice=1 opts into hold_notice_days (ADR-079 §2) and
+  // the month feed; ?notice=1 opts into hold_notice_days (ADR-080 §2) and
   // is what exposes this fetch to a pre-migration DB — so it degrades to
   // `absent` (contract § Graceful absence: band + decision segments of the
   // pulse simply stay off, zero errors surfaced). ─────────────────────────
@@ -421,7 +420,7 @@
           // while this window spans 90 days across the whole scope. Page
           // with a day cursor (rows arrive performed_at.asc; the boundary
           // day is re-fetched and deduped) so the queue and the pulse's
-          // "per decidir" never under-report silently (ADR-079 §1/§6:
+          // "per decidir" never under-report silently (ADR-080 §1/§6:
           // every figure maps to fetched rows — ALL of them).
           const seen = new Set<string>();
           const items: DecisionPerfItem[] = [];
@@ -523,7 +522,7 @@
   // ── Conflict engine (ADR-072 §1) — over the UNFILTERED scoped rows:
   // hiding chips behind the status filter never hides a real clash. ─────
   let engineEvents = $derived.by(() => {
-    const out: CalendarEvent[] = [];
+    const out: PlannerEvent[] = [];
     for (const p of scopedPerfs) {
       if (p.status === 'cancelled' || !p.project) continue;
       out.push({
@@ -602,21 +601,27 @@
 
   // ── View models for the two projections ──────────────────────────────
   let blackoutVMs = $derived.by((): BlackoutBandVM[] =>
-    visibleBlackouts.map((b) => ({
-      id: b.id,
-      from: b.starts_on,
-      to: b.ends_on,
-      company: b.person_id === null,
-      tentative: b.certainty === 'tentative',
-      label: blackoutLabel(b),
-      note: b.note,
-    })),
+    visibleBlackouts.map((b) => {
+      const company = b.person_id === null;
+      const personName = b.person?.full_name ?? (b.person_id ? personNames.get(b.person_id) : null);
+      return {
+        id: b.id,
+        from: b.starts_on,
+        to: b.ends_on,
+        company,
+        tentative: b.certainty === 'tentative',
+        label: company
+          ? (workspaceNameById.get(b.workspace_id) ?? '—')
+          : t('planner.band_person', locale, { person: personName ?? '—' }),
+        note: b.note,
+      };
+    }),
   );
   let awayVMs = $derived.by((): AwayBandVM[] =>
     aways.map((b) => ({
       from: b.from,
       to: b.to,
-      label: t('calendar.away', locale, {
+      label: t('planner.away', locale, {
         project: projectNameById.get(b.project_id) ?? '—',
       }),
     })),
@@ -645,7 +650,7 @@
   });
 
   function clashVM(c: Conflict): ClashVM | null {
-    // Status-aware severities (ADR-079 §3) have no cell mark here yet:
+    // Status-aware severities (ADR-080 §3) have no cell mark here yet:
     // this page feeds the engine without statuses, so they cannot occur —
     // the decisions build renders them (double via the queue, concurrence
     // deliberately silent, never a mark).
@@ -658,8 +663,8 @@
       return {
         severity: c.severity,
         glyph: '!',
-        title: t('calendar.clash_people_title', locale),
-        body: t('calendar.clash_people_body', locale, { people }),
+        title: t('planner.clash_people_title', locale),
+        body: t('planner.clash_people_body', locale, { people }),
         rows,
       };
     }
@@ -667,8 +672,8 @@
       return {
         severity: c.severity,
         glyph: '?',
-        title: t('calendar.clash_possible_title', locale),
-        body: t('calendar.clash_possible_body', locale),
+        title: t('planner.clash_possible_title', locale),
+        body: t('planner.clash_possible_body', locale),
         rows,
       };
     }
@@ -680,16 +685,16 @@
     return {
       severity: c.severity,
       glyph: tentative ? '?' : '!',
-      title: t(tentative ? 'calendar.clash_blackout_t_title' : 'calendar.clash_blackout_title', locale),
+      title: t(tentative ? 'planner.clash_blackout_t_title' : 'planner.clash_blackout_title', locale),
       body: company
         ? t(
             tentative
-              ? 'calendar.clash_blackout_t_company_body'
-              : 'calendar.clash_blackout_company_body',
+              ? 'planner.clash_blackout_t_company_body'
+              : 'planner.clash_blackout_company_body',
             locale,
             { workspace },
           )
-        : t(tentative ? 'calendar.clash_blackout_t_body' : 'calendar.clash_blackout_body', locale, {
+        : t(tentative ? 'planner.clash_blackout_t_body' : 'planner.clash_blackout_body', locale, {
             person,
           }),
       rows,
@@ -708,7 +713,7 @@
     return byDay;
   });
 
-  // ── Carrils VMs (ADR-079 §7/§8) — the ribbon speaks day-of-month
+  // ── Carrils VMs (ADR-080 §7/§8) — the ribbon speaks day-of-month
   // numbers. Pips/bands follow the status filter like the other two
   // projections; connectors read the truth-level conflict engine, same
   // rule as the month marks. ────────────────────────────────────────────
@@ -833,7 +838,7 @@
       const lane = laneFor(d.project.id, d.project.workspace_id);
       if (!lane) continue;
       if (d.kind === 'travel_day') {
-        // Mono "→ City" — direction is the arrow (ADR-079 §7).
+        // Mono "→ City" — direction is the arrow (ADR-080 §7).
         const place = d.city ?? d.title ?? d.venue_name ?? kindLabel(d.kind);
         const arrow = d.travel_direction === 'return' ? '←' : '→';
         lane.pips.push({
@@ -914,7 +919,7 @@
     return [...lanes.values()];
   });
 
-  // Cross-lane conflict connectors (ADR-079 §7): people = red !, possible
+  // Cross-lane conflict connectors (ADR-080 §7): people = red !, possible
   // = quiet ? — the two cross-project severities the engine emits here.
   // The id IS the decision pair id, so a click lands on the band's card.
   let eventById = $derived(new Map(engineEvents.map((e) => [e.id, e])));
@@ -944,7 +949,7 @@
         aKey,
         bKey,
         severity: c.severity,
-        label: t('calendar.conn_jump', locale, { day }),
+        label: t('planner.conn_jump', locale, { day }),
       });
     }
     return out;
@@ -960,7 +965,7 @@
     el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
 
-  // ── The Loom (Agrupa per Persona — ADR-079 §8) ────────────────────────
+  // ── The Loom (Agrupa per Persona — ADR-080 §8) ────────────────────────
   let loomGroups = $derived.by((): LoomGroupVM[] => {
     if (view !== 'carrils' || carrilsGroup !== 'persona') return [];
     const team = ($teamQuery.data?.items ?? []).filter(
@@ -1047,7 +1052,7 @@
     return { confirmed, holds, conflicts: conflictCount, blackouts: blackoutCount };
   });
 
-  // ── Decisions queue (ADR-079 §1/§4) — derived, nothing stored. ───────
+  // ── Decisions queue (ADR-080 §1/§4) — derived, nothing stored. ───────
   let decisionsAbsent = $derived(Boolean($decisionsPerfQuery.data?.absent));
   let decisionPerfs = $derived(
     ($decisionsPerfQuery.data?.items ?? []).filter((p) => perfInScope(p)),
@@ -1140,7 +1145,7 @@
   );
   let urgentCount = $derived(decisionVMs.filter((d) => d.urgent).length);
 
-  // Band open/collapsed — UI state only (ADR-079 §5: "Deixa-ho obert"
+  // Band open/collapsed — UI state only (ADR-080 §5: "Deixa-ho obert"
   // never persists anything in the DB).
   const DECISIONS_STORAGE_KEY = 'hour:calendar:decisions';
   let decisionsOpen = $state.raw(
@@ -1165,7 +1170,7 @@
     document.getElementById('cal-decisions')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
-  // ── Decision actions (ADR-079 §5 — AI=UI parity, two explicit
+  // ── Decision actions (ADR-080 §5 — AI=UI parity, two explicit
   // gestures): Confirma → PATCH confirmed · Allibera → PATCH cancelled.
   // Optimistic over every calendar-performances cache (month + window),
   // rollback + toast on error, refetch on settle — the derived queue then
@@ -1193,8 +1198,8 @@
       }
       addToast({
         tone: 'danger',
-        title: t('calendar.dec_not_saved', locale),
-        message: t('calendar.dec_try_again', locale, {
+        title: t('planner.dec_not_saved', locale),
+        message: t('planner.dec_try_again', locale, {
           message: err instanceof Error ? err.message : 'Unexpected error',
         }),
       });
@@ -1208,7 +1213,7 @@
     $decideMutation.isPending ? ($decideMutation.variables?.id ?? null) : null,
   );
 
-  // ── Pulse strip (ADR-079 §6) — every figure maps to fetched rows;
+  // ── Pulse strip (ADR-080 §6) — every figure maps to fetched rows;
   // segments whose feed is absent simply drop. ──────────────────────────
   function pulseDayLabel(iso: string): string {
     const mon = new Intl.DateTimeFormat(localeTag, { month: 'short', timeZone: 'UTC' })
@@ -1253,8 +1258,8 @@
   let monthTitle = $derived(monthName(ym.year, ym.month, localeTag));
   let eyebrowSpaces = $derived(
     spacesInView === 1
-      ? t('calendar.eyebrow_spaces_one', locale)
-      : t('calendar.eyebrow_spaces', locale, { n: spacesInView }),
+      ? t('planner.eyebrow_spaces_one', locale)
+      : t('planner.eyebrow_spaces', locale, { n: spacesInView }),
   );
 
   function prevMonth() {
@@ -1405,12 +1410,12 @@
 <section class="cal">
   <header class="cal__head">
     <div class="cal__toprow">
-      <p class="eyebrow">{t('lens.calendar', locale)} · {eyebrowSpaces}</p>
+      <p class="eyebrow">{t('lens.planner', locale)} · {eyebrowSpaces}</p>
       <LensSwitcher />
     </div>
     <h1 class="cal__month"><em>{monthTitle}</em> {ym.year}</h1>
     {#if !errorMsg}
-      <!-- Pulse strip (ADR-079 §6) — replaces the flat stats row. Every
+      <!-- Pulse strip (ADR-080 §6) — replaces the flat stats row. Every
            figure maps to fetched rows; a segment whose feed is absent (or
            whose count is zero) drops instead of lying. -->
       <p class="cal__stats" class:cal__stats--loading={loading}>
@@ -1418,34 +1423,34 @@
           <button type="button" class="cal__pulse-decide" onclick={jumpToDecisions}>
             <!-- {' · '} — explicit separator: Svelte trims the block-leading
                  whitespace, which glued the count to the urgent segment. -->
-            {t('calendar.pulse_decide', locale, { n: decisionVMs.length })}{#if urgentCount > 0}{' · '}{urgentCount ===
+            {t('planner.pulse_decide', locale, { n: decisionVMs.length })}{#if urgentCount > 0}{' · '}{urgentCount ===
               1
-                ? t('calendar.pulse_urgent_one', locale)
-                : t('calendar.pulse_urgent', locale, { m: urgentCount })}{/if}
+                ? t('planner.pulse_urgent_one', locale)
+                : t('planner.pulse_urgent', locale, { m: urgentCount })}{/if}
           </button>
         {/if}
         {#if !decisionsAbsent && pulseNext}
           <span class="cal__stat cal__stat--soft"
-            >{t('calendar.pulse_next', locale, {
+            >{t('planner.pulse_next', locale, {
               day: pulseDayLabel(pulseNext.day),
               venue: pulseNext.venue,
             })}</span
           >
         {/if}
-        <span class="cal__stat"><b>{stats.confirmed}</b> {t('calendar.stat_confirmed', locale)}</span>
-        <span class="cal__stat"><b>{stats.holds}</b> {t('calendar.stat_holds', locale)}</span>
+        <span class="cal__stat"><b>{stats.confirmed}</b> {t('planner.stat_confirmed', locale)}</span>
+        <span class="cal__stat"><b>{stats.holds}</b> {t('planner.stat_holds', locale)}</span>
         {#if pulseAwayPersons > 0}
           <span class="cal__stat cal__stat--soft"
             >{pulseAwayPersons === 1
-              ? t('calendar.pulse_away_one', locale)
-              : t('calendar.pulse_away', locale, { z: pulseAwayPersons })}</span
+              ? t('planner.pulse_away_one', locale)
+              : t('planner.pulse_away', locale, { z: pulseAwayPersons })}</span
           >
         {/if}
         {#if pulseTrips > 0}
           <span class="cal__stat cal__stat--soft"
             >{pulseTrips === 1
-              ? t('calendar.pulse_trips_one', locale)
-              : t('calendar.pulse_trips', locale, { w: pulseTrips })}</span
+              ? t('planner.pulse_trips_one', locale)
+              : t('planner.pulse_trips', locale, { w: pulseTrips })}</span
           >
         {/if}
       </p>
@@ -1453,7 +1458,7 @@
   </header>
 
   {#if !errorMsg && !decisionsAbsent && (decisionVMs.length > 0 || concurrenceVMs.length > 0)}
-    <!-- Decision band (ADR-079 §4) — shared by all projections. Mounted
+    <!-- Decision band (ADR-080 §4) — shared by all projections. Mounted
          for concurrences alone too: the quiet tier is "es VEU, no crida"
          (§3), so it must be seeable even when nothing is per decidir —
          it still never counts, never marks, never turns urgent. -->
@@ -1473,43 +1478,43 @@
 
   <div class="cal__toolbar">
     <div class="cal__nav-buttons">
-      <Button variant="outline" size="s" onclick={prevMonth} label={t('calendar.prev_month', locale)}
+      <Button variant="outline" size="s" onclick={prevMonth} label={t('planner.prev_month', locale)}
         >←</Button
       >
       <span class="cal__tbmonth">{monthTitle} {ym.year}</span>
-      <Button variant="outline" size="s" onclick={nextMonth} label={t('calendar.next_month', locale)}
+      <Button variant="outline" size="s" onclick={nextMonth} label={t('planner.next_month', locale)}
         >→</Button
       >
-      <Button variant="outline" size="s" onclick={thisMonth}>{t('calendar.today', locale)}</Button>
+      <Button variant="outline" size="s" onclick={thisMonth}>{t('planner.today', locale)}</Button>
     </div>
     <div class="cal__spacer"></div>
-    <div class="cal__filter" role="group" aria-label={t('calendar.filter_label', locale)}>
+    <div class="cal__filter" role="group" aria-label={t('planner.filter_label', locale)}>
       <button
         type="button"
         class="cal__filter-btn"
         class:cal__filter-btn--on={filter === 'all'}
         aria-pressed={filter === 'all'}
-        onclick={() => (filter = 'all')}>{t('calendar.filter_all', locale)}</button
+        onclick={() => (filter = 'all')}>{t('planner.filter_all', locale)}</button
       >
       <button
         type="button"
         class="cal__filter-btn"
         class:cal__filter-btn--on={filter === 'holds'}
         aria-pressed={filter === 'holds'}
-        onclick={() => (filter = 'holds')}>{t('calendar.filter_holds', locale)}</button
+        onclick={() => (filter = 'holds')}>{t('planner.filter_holds', locale)}</button
       >
       <button
         type="button"
         class="cal__filter-btn"
         class:cal__filter-btn--on={filter === 'confirmed'}
         aria-pressed={filter === 'confirmed'}
-        onclick={() => (filter = 'confirmed')}>{t('calendar.filter_confirmed', locale)}</button
+        onclick={() => (filter = 'confirmed')}>{t('planner.filter_confirmed', locale)}</button
       >
     </div>
     {#if view === 'carrils'}
-      <!-- Agrupa per (ADR-079 §8) — carrils only; means nothing elsewhere. -->
-      <div class="cal__group" role="group" aria-label={t('calendar.group_label', locale)}>
-        <span class="cal__group-lead">{t('calendar.group_label', locale)}</span>
+      <!-- Agrupa per (ADR-080 §8) — carrils only; means nothing elsewhere. -->
+      <div class="cal__group" role="group" aria-label={t('planner.group_label', locale)}>
+        <span class="cal__group-lead">{t('planner.group_label', locale)}</span>
         <div class="cal__seg">
           {#each ['espai', 'projecte', 'persona'] as const as g (g)}
             <button
@@ -1517,26 +1522,26 @@
               class="cal__seg-btn"
               class:cal__seg-btn--on={carrilsGroup === g}
               aria-pressed={carrilsGroup === g}
-              onclick={() => setGroup(g)}>{t(`calendar.group_${g}`, locale)}</button
+              onclick={() => setGroup(g)}>{t(`planner.group_${g}`, locale)}</button
             >
           {/each}
         </div>
       </div>
     {/if}
-    <div class="cal__seg" role="group" aria-label={t('calendar.view_label', locale)}>
+    <div class="cal__seg" role="group" aria-label={t('planner.view_label', locale)}>
       <button
         type="button"
         class="cal__seg-btn"
         class:cal__seg-btn--on={view === 'month'}
         aria-pressed={view === 'month'}
-        onclick={() => setView('month')}>{t('calendar.view_month', locale)}</button
+        onclick={() => setView('month')}>{t('planner.view_month', locale)}</button
       >
       <button
         type="button"
         class="cal__seg-btn"
         class:cal__seg-btn--on={view === 'agenda'}
         aria-pressed={view === 'agenda'}
-        onclick={() => setView('agenda')}>{t('calendar.view_agenda', locale)}</button
+        onclick={() => setView('agenda')}>{t('planner.view_agenda', locale)}</button
       >
       <button
         type="button"
@@ -1546,16 +1551,16 @@
         onclick={() => setView('carrils')}>{t('calendar.view_carrils', locale)}</button
       >
     </div>
-    <Button size="s" onclick={() => openCreate()} label={t('calendar.new', locale)}>+</Button>
+    <Button size="s" onclick={() => openCreate()} label={t('planner.new', locale)}>+</Button>
     <Menu
       align="end"
-      label={t('calendar.more', locale)}
+      label={t('planner.more', locale)}
       items={[
-        { label: t('calendar.feed', locale), onclick: openFeed },
+        { label: t('planner.feed', locale), onclick: openFeed },
         ...(canBlackout
           ? [
               {
-                label: t('calendar.blackout_menu', locale),
+                label: t('planner.blackout_menu', locale),
                 // Direct menu path: no day context — drop any stale preset
                 // from a cancelled day-cell create (the dialog defaults to
                 // today). The create-dialog footer path keeps its day.
@@ -1588,7 +1593,7 @@
       {clashesByDay}
       locale={localeTag}
       dateKindLabel={kindLabel}
-      createLabel={(iso) => t('calendar.new_on', locale, { day: iso })}
+      createLabel={(iso) => t('planner.new_on', locale, { day: iso })}
     />
   {:else if view === 'agenda'}
     <AgendaList
@@ -1602,12 +1607,12 @@
       {clashesByDay}
       locale={localeTag}
       dateKindLabel={kindLabel}
-      viewerTimeLabel={(time) => t('calendar.viewer_time', locale, { time })}
-      emptyLabel={t('calendar.empty_month', locale)}
-      blackoutsToggleLabel={t('calendar.blackouts_toggle', locale)}
+      viewerTimeLabel={(time) => t('planner.viewer_time', locale, { time })}
+      emptyLabel={t('planner.empty_month', locale)}
+      blackoutsToggleLabel={t('planner.blackouts_toggle', locale)}
     />
   {:else}
-    <!-- Carrils (ADR-079 §7/§8) — desktop-first; at 390px the strip
+    <!-- Carrils (ADR-080 §7/§8) — desktop-first; at 390px the strip
          itself scrolls horizontally, never the page. -->
     <CarrilsStrip
       {monthDays}

@@ -1,6 +1,6 @@
 <script lang="ts">
   /**
-   * Calendar module (ADR-056) — the line's performances and dates.
+   * Planner module (ADR-056) — the line's performances and dates.
    * Content-only component; two view modes:
    *
    *   · list  (default) — dense chronological upcoming rows; a month grid
@@ -9,7 +9,7 @@
    *
    * Dates carry no line_id (schema fact) — the module shows the dates tied
    * to the line's performances (client join through performance_id);
-   * project-level dates stay in the global Calendar lens.
+   * project-level dates stay in the global Planner lens.
    *
    * "New performance" mounts the shared PerformanceCreateDialog with the
    * project locked and the line preset — the context assigns line_id, no
@@ -27,7 +27,7 @@
     formatMonthLabel,
   } from '$lib/components/MonthGrid.svelte';
   import PerformanceCreateDialog from '$lib/components/PerformanceCreateDialog.svelte';
-  import { addMonths, addDaysIso, monthGrid } from '$lib/calendar';
+  import { addMonths, addDaysIso, monthGrid } from '$lib/planner';
   import { performanceStatusLabel, performanceStatusTone } from '$lib/performance';
   import { dayLabel } from '$lib/datetime';
 
@@ -121,7 +121,7 @@
 
 <div class="lcal">
   <div class="lcal__bar">
-    <div class="lcal__modes" role="group" aria-label="Calendar view">
+    <div class="lcal__modes" role="group" aria-label="Planner view">
       <button
         type="button"
         class="lcal__mode"
