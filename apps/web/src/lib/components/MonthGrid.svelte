@@ -170,16 +170,31 @@
     dateKindLabel?: (kind: string) => string;
     createLabel?: (isoDate: string) => string;
     /**
-     * Hold RANK for the chip foot ("1r hold") — null for non-holds. The
-     * status family folds hold_1..3 into one SHAPE (ADR-072 §5); the rank
-     * is the thing the operator actually decides between, so it stays
-     * readable without opening the gig.
+     * The word on a card's FOOT — "confirmat", "1r hold", "proposat".
+     * EVERY card carries one: without it a confirmed gig is a row shorter
+     * than a hold, so the most important thing on the grid reads as the
+     * smallest (Marco, 2026-07-19). Holds show their rank — the family
+     * folds hold_1..3 into one SHAPE (ADR-072 §5), the rank is what is
+     * actually being decided between.
      */
-    holdRankLabel?: (status: string) => string | null;
+    stateLabel?: (status: string) => string | null;
     /** Legend key words (project row + the confirmed/hold swatches). */
     legendConfirmedLabel?: string;
     legendHoldLabel?: string;
   }
+
+  /** English fallbacks for the card foot; the page overrides these with t(). */
+  const EN_STATE_WORDS: Record<string, string> = {
+    hold_1: '1st hold',
+    hold_2: '2nd hold',
+    hold_3: '3rd hold',
+    hold: 'hold',
+    confirmed: 'confirmed',
+    proposed: 'proposed',
+    invoiced: 'invoiced',
+    paid: 'paid',
+    done: 'done',
+  };
 
   let {
     year,
@@ -195,16 +210,7 @@
     locale = 'en-GB',
     dateKindLabel = (kind: string) => kind.replace(/_/g, ' '),
     createLabel = (iso: string) => `New performance on ${iso}`,
-    holdRankLabel = (status: string) =>
-      status === 'hold_1'
-        ? '1st hold'
-        : status === 'hold_2'
-          ? '2nd hold'
-          : status === 'hold_3'
-            ? '3rd hold'
-            : status === 'hold'
-              ? 'hold'
-              : null,
+    stateLabel = (status: string) => EN_STATE_WORDS[status] ?? null,
     legendConfirmedLabel = 'confirmed',
     legendHoldLabel = 'hold',
   }: Props = $props();
@@ -362,11 +368,22 @@
     return city && city !== dateText(d) ? city : null;
   }
 
-  /** Distinct projects in view, for the legend key above the grid. */
+  /**
+   * Projects that actually PAINT a chip in a rendered cell — walked from the
+   * grid's own days, not from the feed. The page fetches with a ±1 day pad
+   * (timestamptz rows can bucket outside the month), so both the raw props
+   * AND the bucketed maps still carry off-grid rows; a project whose only row
+   * lands on a pad day would get a legend entry with no card to match it.
+   */
   let legendProjects = $derived.by(() => {
     const m = new Map<string, ProjectLite>();
-    for (const p of performances) if (p.project) m.set(p.project.id, p.project);
-    for (const d of dates) if (d.project) m.set(d.project.id, d.project);
+    for (const week of weeks)
+      for (const day of week) {
+        for (const p of performancesByDay.get(day.iso) ?? [])
+          if (p.project) m.set(p.project.id, p.project);
+        for (const d of datesByDay.get(day.iso) ?? [])
+          if (d.project) m.set(d.project.id, d.project);
+      }
     return [...m.values()].sort((a, b) => a.name.localeCompare(b.name));
   });
 
@@ -443,7 +460,7 @@
 {#snippet perfBody(p: PerformanceEvent)}
   {@const time = perfTime(p)}
   {@const city = perfCity(p)}
-  {@const rank = holdRankLabel(p.status)}
+  {@const foot = stateLabel(p.status)}
   <span class="cal__event-top">
     <span class="cal__event-name">{perfLabel(p)}</span>
     {#if p.project}<button
@@ -464,7 +481,7 @@
         >{/if}
     </span>
   {/if}
-  {#if rank}<span class="cal__event-foot">{rank}</span>{/if}
+  {#if foot}<span class="cal__event-foot">{foot}</span>{/if}
 {/snippet}
 
 {#if legendProjects.length > 0}
@@ -903,7 +920,13 @@
          variables, never properties (philosophy §3). */
       --chip-bg-image: none;
       --chip-fg: var(--text-color);
-      --chip-border-color: transparent;
+      /* The project accent IS the whole border of the card — no left rail
+         (Marco, 2026-07-19). Families vary the mix, never the property. */
+      --chip-border-color: color-mix(
+        in oklch,
+        var(--c, var(--border-color-dark)) 38%,
+        var(--border-color-light)
+      );
       --chip-border-style: solid;
       --mark: 14px;
       display: flex;
@@ -914,7 +937,6 @@
       padding: var(--space-2xs) var(--space-xs);
       border-radius: var(--radius-s);
       border: 1px var(--chip-border-style) var(--chip-border-color);
-      border-inline-start: 2px solid var(--c, var(--border-color-dark));
       background-color: var(--chip-bg);
       background-image: var(--chip-bg-image);
       color: var(--chip-fg);
@@ -964,6 +986,11 @@
 
     .cal__event--perf[data-family='confirmed'] {
       --chip-bg: color-mix(in oklch, var(--c, var(--border-color-dark)) 13%, var(--bg-ultra-light));
+      --chip-border-color: color-mix(
+        in oklch,
+        var(--c, var(--border-color-dark)) 50%,
+        var(--border-color-light)
+      );
     }
     .cal__event--perf[data-family='confirmed'] .cal__event-name {
       font-weight: 600;
@@ -1044,10 +1071,11 @@
        (ADR-078 §9); confirmed stays the quiet solid form. */
     .cal__event--date {
       --chip-fg: var(--text-muted);
-      font-style: italic;
-      border-start-start-radius: 0;
-      border-end-start-radius: 0;
-      border-inline-start-color: color-mix(in oklch, var(--c, var(--border-color-dark)) 40%, var(--border-color-light));
+      --chip-border-color: color-mix(
+        in oklch,
+        var(--c, var(--border-color-dark)) 26%,
+        var(--border-color-light)
+      );
     }
     .cal__event--date[data-family='hold'] {
       --chip-bg: var(--bg);
@@ -1081,7 +1109,6 @@
       letter-spacing: var(--mono-letter-spacing);
       color: color-mix(in oklch, var(--c, var(--text-muted)) 55%, var(--text-muted));
       border: none;
-      border-inline-start: 2px solid transparent;
       white-space: nowrap;
       /* Bare text node — the base chip's flex display defeats text-overflow,
          and without overflow:hidden the label hard-clips at the cell edge
