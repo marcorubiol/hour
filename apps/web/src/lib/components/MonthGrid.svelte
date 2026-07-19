@@ -36,9 +36,15 @@
     start_at: string | null;
     venue_name: string | null;
     city: string | null;
+    country: string | null;
     line_id: string | null;
     project: ProjectLite | null;
-    venue: { name: string; city: string | null; timezone: string | null } | null;
+    venue: {
+      name: string;
+      city: string | null;
+      country?: string | null;
+      timezone: string | null;
+    } | null;
     /** ADR-084 §3 — the operator's readiness ticks, read by the card foot. */
     readiness?: Record<string, boolean> | null;
     /** Present only on ?rosters=1 fetches (conflict engine feed). */
@@ -57,6 +63,7 @@
     series_id?: string | null;
     venue_name: string | null;
     city: string | null;
+    country?: string | null;
     project: ProjectLite | null;
     venue: { timezone: string | null } | null;
     /** ADR-078 columns — absent until the migrations are applied
@@ -407,6 +414,18 @@
     return city && city !== dateText(d) ? city : null;
   }
 
+  // The ISO code beside the city (Marco, 2026-07-20): two letters are enough
+  // to tell a Barcelona from a Bayonne at a glance, and unlike a full country
+  // name they cannot wrap the line. The venue's own country wins over the
+  // denormalised trio — the linked entity is the better truth.
+  function perfCountry(p: PerformanceEvent): string | null {
+    const cc = p.venue?.country ?? p.country ?? null;
+    return cc ? cc.toUpperCase() : null;
+  }
+  function dateCountry(d: DateEvent): string | null {
+    return d.country ? d.country.toUpperCase() : null;
+  }
+
   // ── Multi-day blocks (ADR-084 §1) ────────────────────────────────────
   // A block is N rows sharing a series_id. The BAND is a rendering of those
   // rows: which day is an edge is derived here on every paint, never stored.
@@ -537,6 +556,7 @@
 {#snippet perfBody(p: PerformanceEvent)}
   {@const time = perfTime(p)}
   {@const city = perfCity(p)}
+  {@const cc = perfCountry(p)}
   {@const foot = stateLabel(p.status)}
   <span class="cal__event-top">
     <span class="cal__event-name">{perfLabel(p)}</span>
@@ -552,7 +572,9 @@
   </span>
   {#if city || time}
     <span class="cal__event-line">
-      <span class="cal__event-city">{city ?? ''}</span>
+      <span class="cal__event-city"
+        >{city ?? ''}{#if city && cc}<i class="cal__event-cc">{cc}</i>{/if}</span
+      >
       {#if time}<span class="cal__event-time"
           >{time.primary}{#if time.secondary}<i> {time.secondary}</i>{/if}</span
         >{/if}
@@ -710,6 +732,7 @@
           {:else}
             {@const time = dateTime(d)}
             {@const city = dateCity(d)}
+            {@const cc = dateCountry(d)}
             {@const edges = seriesEdges(d, day.iso)}
             {@const head = !edges || edges.first || di === 0}
             <span
@@ -737,7 +760,9 @@
                 </span>
                 {#if city || time}
                   <span class="cal__event-line">
-                    <span class="cal__event-city">{city ?? ''}</span>
+                    <span class="cal__event-city"
+                      >{city ?? ''}{#if city && cc}<i class="cal__event-cc">{cc}</i>{/if}</span
+                    >
                     {#if time}<span class="cal__event-time"
                         >{time.primary}{#if time.end}–{time.end}{/if}</span
                       >{/if}
@@ -1099,6 +1124,17 @@
       text-overflow: ellipsis;
       white-space: nowrap;
       min-inline-size: 0;
+    }
+    /* The ISO code rides INSIDE the city span so the two ellipsis together
+       as one place — a truncated "Barcelo…" must not leave a stranded "FR"
+       claiming to be somewhere it isn't. */
+    .cal__event-cc {
+      font-style: normal;
+      font-family: var(--font-mono);
+      font-size: 0.85em;
+      letter-spacing: var(--mono-letter-spacing);
+      color: var(--text-faint);
+      margin-inline-start: 0.35em;
     }
     /* The chip's foot — hold rank on a gig, kind word on a date. */
     .cal__event-foot,

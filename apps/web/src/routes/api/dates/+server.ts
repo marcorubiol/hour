@@ -89,6 +89,7 @@ type DateItem = {
   all_day: boolean;
   venue_name: string | null;
   city: string | null;
+  country: string | null;
   project_id: string;
   performance_id: string | null;
   project: ProjectLite | null;
@@ -143,7 +144,7 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
   // the catch below retries with the legacy columns while the migrations
   // aren't applied (42703 undefined column — graceful absence).
   const BASE_SELECT = [
-    'id,kind,status,title,starts_at,ends_at,all_day,venue_name,city',
+    'id,kind,status,title,starts_at,ends_at,all_day,venue_name,city,country',
     'project_id,performance_id',
     'project:project_id(id,slug,name,accent,initials,workspace_id)',
     'venue:venue_id(timezone)',
