@@ -21,6 +21,9 @@
     slug: string;
     name: string;
     accent?: string | null;
+    /** Stored identity monogram (ADR-081); absent until the migration is
+        applied — IdentityMark falls back to initials derived from name. */
+    initials?: string | null;
     workspace_id: string;
   };
 
@@ -137,6 +140,7 @@
   import { dualTime } from '$lib/datetime';
   import { workspacesQueryOptions } from '$lib/nav-queries';
   import { accentVarFor } from '$lib/utils/accent';
+  import IdentityMark from '$lib/components/IdentityMark.svelte';
   import { performanceStatusFamily } from '$lib/performance';
   import { dateStatusFamily } from '$lib/date';
 
@@ -439,6 +443,7 @@
               {href}
               title={perfTitle(p)}
             >
+              {#if p.project}<IdentityMark accent={accentVarFor(p.project)} name={p.project.name} initials={p.project.initials} />{/if}
               {#if time}<span class="cal__event-time"
                   >{time.primary}{#if time.secondary}<i> {time.secondary}</i>{/if}</span
                 >{/if}
@@ -451,6 +456,7 @@
               style={p.project ? `--c: ${accentVarFor(p.project)}` : undefined}
               title={perfTitle(p)}
             >
+              {#if p.project}<IdentityMark accent={accentVarFor(p.project)} name={p.project.name} initials={p.project.initials} />{/if}
               {#if time}<span class="cal__event-time"
                   >{time.primary}{#if time.secondary}<i> {time.secondary}</i>{/if}</span
                 >{/if}
@@ -464,7 +470,7 @@
               class="cal__event cal__event--travel"
               style={d.project ? `--c: ${accentVarFor(d.project)}` : undefined}
               title={dateTitle(d)}
-            >{travelText(d)}</span>
+            >{#if d.project}<IdentityMark accent={accentVarFor(d.project)} name={d.project.name} initials={d.project.initials} />{/if}{travelText(d)}</span>
           {:else}
             {@const time = dateTime(d)}
             <span
@@ -474,6 +480,7 @@
               style={d.project ? `--c: ${accentVarFor(d.project)}` : undefined}
               title={dateTitle(d)}
             >
+              {#if d.project}<IdentityMark accent={accentVarFor(d.project)} name={d.project.name} initials={d.project.initials} />{/if}
               {#if time}<span class="cal__event-time">{time.primary}</span>{/if}
               <span class="cal__event-kind">{dateKindLabel(d.kind)}</span>
               <span class="cal__event-name">{dateText(d)}</span>
@@ -732,6 +739,7 @@
       --chip-fg: var(--text-color);
       --chip-border-color: transparent;
       --chip-border-style: solid;
+      --mark: 14px;
       display: flex;
       align-items: baseline;
       gap: var(--space-2xs);
