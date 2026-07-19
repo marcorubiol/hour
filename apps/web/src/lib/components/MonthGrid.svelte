@@ -141,6 +141,7 @@
   import { workspacesQueryOptions } from '$lib/nav-queries';
   import { accentVarFor } from '$lib/utils/accent';
   import IdentityMark from '$lib/components/IdentityMark.svelte';
+  import IdentityQuickPanel from '$lib/components/IdentityQuickPanel.svelte';
   import { performanceStatusFamily } from '$lib/performance';
   import { dateStatusFamily } from '$lib/date';
 
@@ -185,6 +186,48 @@
     dateKindLabel = (kind: string) => kind.replace(/_/g, ' '),
     createLabel = (iso: string) => `New performance on ${iso}`,
   }: Props = $props();
+
+  // ── Identity quick-edit (ADR-081): a monogram click opens the editor at a
+  // fixed rect so it escapes the month cells' overflow:hidden. The event stays
+  // a link; the monogram intercepts its own click (preventDefault/stop).
+  let markPop = $state<{ project: ProjectLite; rect: DOMRect } | null>(null);
+  let markPopEl: HTMLElement | undefined = $state();
+  let markSiblings = $derived.by(() => {
+    const m = new Map<string, { id: string; initials?: string | null }>();
+    for (const p of performances)
+      if (p.project) m.set(p.project.id, { id: p.project.id, initials: p.project.initials });
+    for (const d of dates)
+      if (d.project) m.set(d.project.id, { id: d.project.id, initials: d.project.initials });
+    return [...m.values()];
+  });
+  function openMark(e: MouseEvent, project: ProjectLite | null) {
+    if (!project) return;
+    e.preventDefault();
+    e.stopPropagation();
+    markPop = { project, rect: (e.currentTarget as HTMLElement).getBoundingClientRect() };
+  }
+  function markPopStyle(rect: DOMRect): string {
+    const w = 240;
+    const vw = typeof window !== 'undefined' ? window.innerWidth : 1280;
+    const left = Math.max(8, Math.min(rect.left, vw - w - 8));
+    return `top: ${rect.bottom + 4}px; left: ${left}px`;
+  }
+  $effect(() => {
+    if (!markPop) return;
+    const onDown = (e: MouseEvent) => {
+      if (!markPopEl?.contains(e.target as Node)) markPop = null;
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') markPop = null;
+    };
+    const t = setTimeout(() => document.addEventListener('mousedown', onDown), 0);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      clearTimeout(t);
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  });
 
   const viewerTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const todayIso = dayKeyInTz(new Date().toISOString(), viewerTz);
@@ -443,7 +486,7 @@
               {href}
               title={perfTitle(p)}
             >
-              {#if p.project}<IdentityMark accent={accentVarFor(p.project)} name={p.project.name} initials={p.project.initials} />{/if}
+              {#if p.project}<button type="button" class="cal__markbtn" onclick={(e) => openMark(e, p.project)}><IdentityMark accent={accentVarFor(p.project)} name={p.project.name} initials={p.project.initials} /></button>{/if}
               {#if time}<span class="cal__event-time"
                   >{time.primary}{#if time.secondary}<i> {time.secondary}</i>{/if}</span
                 >{/if}
@@ -456,7 +499,7 @@
               style={p.project ? `--c: ${accentVarFor(p.project)}` : undefined}
               title={perfTitle(p)}
             >
-              {#if p.project}<IdentityMark accent={accentVarFor(p.project)} name={p.project.name} initials={p.project.initials} />{/if}
+              {#if p.project}<button type="button" class="cal__markbtn" onclick={(e) => openMark(e, p.project)}><IdentityMark accent={accentVarFor(p.project)} name={p.project.name} initials={p.project.initials} /></button>{/if}
               {#if time}<span class="cal__event-time"
                   >{time.primary}{#if time.secondary}<i> {time.secondary}</i>{/if}</span
                 >{/if}
@@ -470,7 +513,7 @@
               class="cal__event cal__event--travel"
               style={d.project ? `--c: ${accentVarFor(d.project)}` : undefined}
               title={dateTitle(d)}
-            >{#if d.project}<IdentityMark accent={accentVarFor(d.project)} name={d.project.name} initials={d.project.initials} />{/if}{travelText(d)}</span>
+            >{#if d.project}<button type="button" class="cal__markbtn" onclick={(e) => openMark(e, d.project)}><IdentityMark accent={accentVarFor(d.project)} name={d.project.name} initials={d.project.initials} /></button>{/if}{travelText(d)}</span>
           {:else}
             {@const time = dateTime(d)}
             <span
@@ -480,7 +523,7 @@
               style={d.project ? `--c: ${accentVarFor(d.project)}` : undefined}
               title={dateTitle(d)}
             >
-              {#if d.project}<IdentityMark accent={accentVarFor(d.project)} name={d.project.name} initials={d.project.initials} />{/if}
+              {#if d.project}<button type="button" class="cal__markbtn" onclick={(e) => openMark(e, d.project)}><IdentityMark accent={accentVarFor(d.project)} name={d.project.name} initials={d.project.initials} /></button>{/if}
               {#if time}<span class="cal__event-time">{time.primary}</span>{/if}
               <span class="cal__event-kind">{dateKindLabel(d.kind)}</span>
               <span class="cal__event-name">{dateText(d)}</span>
@@ -522,6 +565,16 @@
     {/each}
   {/each}
 </div>
+
+{#if markPop}
+  <div class="cal__markpop" bind:this={markPopEl} style={markPopStyle(markPop.rect)}>
+    <IdentityQuickPanel
+      project={markPop.project}
+      siblings={markSiblings}
+      onclose={() => (markPop = null)}
+    />
+  </div>
+{/if}
 
 <style>
   @layer components {
@@ -728,6 +781,23 @@
       font-size: var(--text-xs);
       color: var(--text-faint);
       flex: none;
+    }
+
+    /* Monogram as its own click zone inside the event link (ADR-081): opens
+       the identity editor instead of following the chip's href. */
+    .cal__markbtn {
+      all: unset;
+      display: inline-flex;
+      cursor: pointer;
+      border-radius: calc(var(--mark, 14px) * 0.28);
+    }
+    .cal__markbtn:focus-visible {
+      outline: var(--focus-width) solid var(--focus-color);
+      outline-offset: 1px;
+    }
+    .cal__markpop {
+      position: fixed;
+      z-index: 200;
     }
 
     /* ── Event chip — the hold grammar (ADR-072 §5): project accent on
