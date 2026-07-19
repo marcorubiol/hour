@@ -292,6 +292,14 @@
   let workspaceTzById = $derived(
     new Map(($workspacesQuery.data?.items ?? []).map((w) => [w.id, w.timezone])),
   );
+  /**
+   * ADR-002 — the hold convention this workspace follows. The month can show
+   * several workspaces at once, so the mode is resolved PER CHIP from its
+   * own project's workspace, never once for the whole view.
+   */
+  let workspaceModeById = $derived(
+    new Map(($workspacesQuery.data?.items ?? []).map((w) => [w.id, w.booking_mode ?? 'simple'])),
+  );
 
   let weeks = $derived(monthGrid(year, month));
   let label = $derived(formatMonthLabel(year, month, locale));
@@ -426,6 +434,22 @@
     return d.country ? d.country.toUpperCase() : null;
   }
 
+  /**
+   * ADR-002 — the status the FOOT should speak, given the workspace's hold
+   * convention. A ranked hold only means something where the convention is a
+   * priority queue: in a `simple` workspace (theatre/dance) hold_1 and
+   * hold_2 are the same thing — two holds coexisting on a slot — so printing
+   * "1st hold" would invent a hierarchy the company does not run.
+   *
+   * The stored status is NOT rewritten; only the word changes. A workspace
+   * that later switches to `prioritized` gets its ranks back untouched.
+   */
+  function footStatus(p: PerformanceEvent): string {
+    const mode = workspaceModeById.get(p.project?.workspace_id ?? '') ?? 'simple';
+    if (mode === 'prioritized') return p.status;
+    return p.status.startsWith('hold') ? 'hold' : p.status;
+  }
+
   // ── Multi-day blocks (ADR-084 §1) ────────────────────────────────────
   // A block is N rows sharing a series_id. The BAND is a rendering of those
   // rows: which day is an edge is derived here on every paint, never stored.
@@ -557,7 +581,7 @@
   {@const time = perfTime(p)}
   {@const city = perfCity(p)}
   {@const cc = perfCountry(p)}
-  {@const foot = stateLabel(p.status)}
+  {@const foot = stateLabel(footStatus(p))}
   <span class="cal__event-top">
     <span class="cal__event-name">{perfLabel(p)}</span>
     {#if p.project}<button

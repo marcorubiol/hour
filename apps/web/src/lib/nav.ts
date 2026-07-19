@@ -33,6 +33,14 @@ export type NavWorkspace = {
   domain?: WorkspaceDomain | null;
   city?: string | null;
   logo_url?: string | null;
+  /**
+   * ADR-002 — which hold convention this workspace follows. `simple`
+   * (theatre/dance): holds are unranked and two can coexist on one slot.
+   * `prioritized` (music): hold 1 has first right to convert, 2 promotes
+   * when 1 releases. Absent reads as `simple` — a company that never said
+   * otherwise is not running a priority queue.
+   */
+  booking_mode?: string | null;
   /** IANA home timezone — the timeslot-entry fallback when a gig has no
       linked venue (timezone rule, spec § Timezone rule). */
   timezone?: string;

@@ -157,7 +157,13 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
   const { limit } = parsed.output;
 
   const search = new URLSearchParams();
-  search.set('select', 'id,slug,alias,name,kind,timezone,country,accent,description,domain,city,logo_url');
+  // ADR-002 §booking_mode — projected as a single key, not the whole
+  // `settings` blob: the client needs this knob, not everything the
+  // workspace ever stores.
+  search.set(
+    'select',
+    'id,slug,alias,name,kind,timezone,country,accent,description,domain,city,logo_url,booking_mode:settings->>booking_mode',
+  );
   search.set('deleted_at', 'is.null');
   search.set('order', 'created_at.asc');
   search.set('limit', String(limit));
