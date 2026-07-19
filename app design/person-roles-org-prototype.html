@@ -1,0 +1,434 @@
+<!doctype html>
+<html lang="ca">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Hour — Persona amb diversos rols i la seva organització (ADR-082)</title>
+    <style>
+      @layer reset, defaults, tokens, layouts, components, components.overrides,
+        utilities, overrides;
+    </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400..600;1,6..72,400..600&family=Inter:wght@400..600&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="../apps/web/src/styles/base.css" />
+    <link rel="stylesheet" href="_kit.css" />
+
+    <style>
+      .block {
+        margin-block-start: var(--space-xl);
+      }
+      .block__head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: var(--space-s);
+        padding-block-end: var(--space-xs);
+        border-block-end: var(--border);
+      }
+      .block__lead {
+        margin-block: var(--space-s) 0;
+        font-size: var(--text-s);
+        color: var(--text-muted);
+        max-inline-size: 52ch;
+      }
+
+      /* masthead with the person mark */
+      /* .mast is column in _kit.css — the person mark sits BESIDE the title. */
+      .pmast {
+        flex-direction: row;
+        align-items: flex-start;
+        gap: var(--space-m);
+      }
+      .pmast .mk--l {
+        margin-block-start: var(--space-l);
+      }
+      .pmast__body {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-s);
+      }
+      .pmast__roles {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-xs);
+        align-items: center;
+      }
+
+      /* ── organisation relations — a relation, not a column ──────── */
+      .org {
+        display: flex;
+        align-items: center;
+        gap: var(--space-m);
+        padding-block: var(--space-s);
+        border-block-end: var(--divider-light);
+        text-decoration: none;
+      }
+      .org__id {
+        display: flex;
+        align-items: center;
+        gap: var(--space-s);
+        inline-size: 21rem;
+        flex: none;
+      }
+      .org__name {
+        font-size: var(--text-s);
+        font-weight: 500;
+        color: var(--heading-color);
+      }
+      .org__what {
+        font-size: var(--text-s);
+        color: var(--text-muted);
+        flex: 1;
+      }
+      .org__when {
+        font-family: var(--font-mono);
+        font-size: var(--text-xs);
+        color: var(--text-faint);
+        flex: none;
+      }
+      .org--past .org__name,
+      .org--past .org__what {
+        color: var(--text-faint);
+        font-weight: 400;
+      }
+
+      /* ── conversation anchoring — the three cases ───────────────── */
+      .cv {
+        display: flex;
+        align-items: center;
+        gap: var(--space-m);
+        padding-block: var(--space-s);
+        border-block-end: var(--divider-light);
+        font-size: var(--text-s);
+      }
+      .cv__anchor {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-2xs);
+        inline-size: 21rem;
+        flex: none;
+      }
+      .cv__main {
+        font-weight: 500;
+        color: var(--heading-color);
+      }
+      .cv__sub {
+        font-size: var(--text-xs);
+        color: var(--text-muted);
+      }
+      .cv__sub--empty {
+        color: var(--text-faint);
+        font-style: italic;
+      }
+      .cv__kind {
+        font-family: var(--font-mono);
+        font-size: var(--text-xs);
+        letter-spacing: var(--mono-letter-spacing-loose);
+        text-transform: uppercase;
+        color: var(--text-faint);
+        inline-size: 11rem;
+        flex: none;
+      }
+      .cv__state {
+        inline-size: 9rem;
+        flex: none;
+      }
+      .cv__next {
+        flex: 1;
+        color: var(--text-muted);
+        text-align: end;
+      }
+
+      /* ── access card ────────────────────────────────────────────── */
+      .acc {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-m);
+        margin-block-start: var(--space-m);
+        padding: var(--space-m) var(--space-l);
+        border: var(--border);
+        border-radius: var(--radius-l);
+        background: var(--bg-ultra-light);
+      }
+      .acc__state {
+        display: flex;
+        align-items: center;
+        gap: var(--space-s);
+        flex-wrap: wrap;
+      }
+      .acc__doors {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-s);
+        padding-block-start: var(--space-m);
+        border-block-start: var(--divider-light);
+      }
+      .door {
+        display: flex;
+        align-items: center;
+        gap: var(--space-m);
+        font-size: var(--text-s);
+      }
+      .door__where {
+        display: flex;
+        align-items: center;
+        gap: var(--space-s);
+        inline-size: 21rem;
+        flex: none;
+        color: var(--heading-color);
+      }
+      .door__why {
+        font-family: var(--font-mono);
+        font-size: var(--text-xs);
+        color: var(--text-faint);
+        flex: 1;
+      }
+      .door--closed .door__where {
+        color: var(--text-faint);
+      }
+
+      .app {
+        display: flex;
+        align-items: center;
+        gap: var(--space-m);
+        padding-block: var(--space-s);
+        border-block-end: var(--divider-light);
+        font-size: var(--text-s);
+      }
+      .app__what {
+        inline-size: 21rem;
+        flex: none;
+        color: var(--heading-color);
+      }
+      .app__role {
+        font-family: var(--font-mono);
+        font-size: var(--text-xs);
+        color: var(--text-muted);
+        flex: 1;
+      }
+      .app__when {
+        font-family: var(--font-mono);
+        font-size: var(--text-xs);
+        color: var(--text-faint);
+        flex: none;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="proto">
+      <header class="shell bleed">
+        <div class="shell__inner wrap">
+          <div class="shell__brand">
+            <span class="shell__logo">hour</span>
+            <span class="eyebrow">persona</span>
+          </div>
+          <div class="shell__right">
+            <div class="shell__search">Cerca o salta a… <kbd class="kbd">⌘K</kbd></div>
+            <button class="modeswap" type="button" onclick="document.documentElement.dataset.mode = document.documentElement.dataset.mode === 'dark' ? 'light' : 'dark'">clar / fosc</button>
+            <span class="mk mk--person">MR</span>
+          </div>
+        </div>
+      </header>
+
+      <div class="addr bleed">
+        <div class="addr__inner wrap">
+          <nav class="crumbs" aria-label="Breadcrumb">
+            <a class="crumbs__space" href="#"><span class="mk" style="--c: var(--accent-1)">MC</span>MüK Cia</a>
+            <span class="crumbs__sep">›</span>
+            <a class="crumbs__mid" href="#">Converses</a>
+            <span class="crumbs__sep">›</span>
+            <span class="crumbs__here">Ana Solé</span>
+          </nav>
+          <div class="addr__actions">
+            <a class="link-arrow" href="#">Escriure-li →</a>
+          </div>
+        </div>
+      </div>
+
+      <main class="page wrap">
+        <header class="mast pmast">
+          <span class="mk mk--person mk--l">AS</span>
+          <div class="pmast__body">
+            <p class="eyebrow">Persona</p>
+            <h1 class="mast__title"><em>Ana Solé</em></h1>
+            <div class="pmast__roles">
+              <span class="role-badge">distribució</span>
+              <span class="role-badge">so</span>
+              <span class="role-badge">programació</span>
+              <button class="creator" type="button">+ rol</button>
+              <span class="mx__note" style="font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-faint)">
+                els rols no donen accés
+              </span>
+            </div>
+            <p class="mast__meta">
+              <span>Barcelona</span>
+              <span class="mast__sep">·</span>
+              <span>ana@…</span>
+              <span class="mast__sep">·</span>
+              <span>+34 6…</span>
+            </p>
+          </div>
+        </header>
+
+        <!-- ═══ ORGANISATIONS — a relation, with history ═══ -->
+        <section class="block" aria-label="Organitzacions">
+          <header class="block__head">
+            <p class="eyebrow">Organitzacions</p>
+            <span class="sec__count">3 vincles · 1 acabat</span>
+          </header>
+          <p class="block__lead">
+            La persona és la cara; l'organització, el fons que persisteix. Un
+            vincle té context i data — no és una casella a la fitxa.
+          </p>
+
+          <a class="org" href="#">
+            <span class="org__id"><span class="mk" style="--c: var(--accent-4)">GR</span><span class="org__name">Grec Festival de Barcelona</span></span>
+            <span class="org__what">programació de dansa</span>
+            <span class="org__when">des de 2023</span>
+          </a>
+          <a class="org" href="#">
+            <span class="org__id"><span class="mk" style="--c: var(--accent-1)">MC</span><span class="org__name">MüK Cia</span></span>
+            <span class="org__what">so · autònoma, per bolos</span>
+            <span class="org__when">des de 2026</span>
+          </a>
+          <a class="org org--past" href="#">
+            <span class="org__id"><span class="mk" style="--c: var(--accent-7)">VC</span><span class="org__name">Cia. Vero Cendoya</span></span>
+            <span class="org__what">distribució</span>
+            <span class="org__when">2019 – 2022</span>
+          </a>
+          <div style="padding-block-start: var(--space-s)">
+            <button class="creator" type="button">+ vincle</button>
+          </div>
+        </section>
+
+        <!-- ═══ CONVERSATIONS — anchored to org and/or person ═══ -->
+        <section class="block" aria-label="Converses">
+          <header class="block__head">
+            <p class="eyebrow">Converses</p>
+            <span class="sec__count">l'àncora pot ser l'organització, la persona, o totes dues</span>
+          </header>
+
+          <div class="cv">
+            <span class="cv__anchor">
+              <span class="cv__main">Grec Festival de Barcelona</span>
+              <span class="cv__sub">Ana Solé · programació de dansa</span>
+            </span>
+            <span class="cv__kind">org + persona</span>
+            <span class="cv__state"><span class="state-badge" data-tone="info">en conversa</span></span>
+            <span class="cv__next">MaMeMi · esperant resposta des del 4 de març</span>
+          </div>
+
+          <div class="cv">
+            <span class="cv__anchor">
+              <span class="cv__main">Mercat de les Flors</span>
+              <span class="cv__sub cv__sub--empty">encara sense persona</span>
+            </span>
+            <span class="cv__kind">només org</span>
+            <span class="cv__state"><span class="state-badge" data-tone="neutral">contactat</span></span>
+            <span class="cv__next">MaMeMi · l'Ana ens hi va presentar</span>
+          </div>
+
+          <div class="cv">
+            <span class="cv__anchor">
+              <span class="cv__main">Ana Solé</span>
+              <span class="cv__sub cv__sub--empty">sense organització — autònoma</span>
+            </span>
+            <span class="cv__kind">només persona</span>
+            <span class="cv__state"><span class="state-badge" data-tone="success">tancat</span></span>
+            <span class="cv__next">Gira de sala 2027 · so per 4 bolos</span>
+          </div>
+        </section>
+
+        <!-- ═══ ACCESS — the same person is subject here and operator there ═══ -->
+        <section class="block" aria-label="Accés">
+          <header class="block__head">
+            <p class="eyebrow">Accés</p>
+            <span class="sec__count">qui hi és i qui hi entra</span>
+          </header>
+
+          <div class="acc">
+            <div class="acc__state">
+              <span class="state-badge" data-tone="neutral">contacte</span>
+              <span style="font-size: var(--text-s); color: var(--text-muted)">
+                Encara no entra a Hour. Rep les coses per correu i per enllaç.
+              </span>
+            </div>
+
+            <div class="acc__doors">
+              <p class="eyebrow eyebrow--sub">Per on podria entrar</p>
+
+              <div class="door">
+                <span class="door__where"><span class="mk" style="--c: var(--accent-1)">MC</span>MüK Cia — fer el so de la gira</span>
+                <span class="door__why">hi fa feina · convidar-la té sentit</span>
+                <button class="btn--outline btn--s" type="button">Convidar a operar →</button>
+              </div>
+
+              <div class="door door--closed">
+                <span class="door__where"><span class="mk" style="--c: var(--accent-4)">GR</span>Grec Festival — programació</span>
+                <span class="door__why">contrapart de difusió · no s'hi convida</span>
+                <a class="link-arrow" href="#">Escriure-li →</a>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ═══ APPEARANCES — the existing surface, and its collision ═══ -->
+        <section class="block" aria-label="Aparicions">
+          <header class="block__head">
+            <p class="eyebrow">Aparicions</p>
+            <span class="sec__count">on surt al repartiment i a l'equip tècnic</span>
+          </header>
+
+          <div class="app">
+            <span class="app__what">Gira de sala 2027 — 4 bolos</span>
+            <span class="app__role">equip · sonidista</span>
+            <span class="app__when">mar – jun 2027</span>
+          </div>
+          <div class="app">
+            <span class="app__what">MaMeMi — creació</span>
+            <span class="app__role">equip · disseny de so</span>
+            <span class="app__when">2026</span>
+          </div>
+        </section>
+
+        <div class="qnote">
+          <p>
+            <span class="qnote__tag">chirrido 6 · el que este mockup rompe</span>
+            <b>La regla "invitar a operar no existe en la ficha de un contacto de difusión"
+            (ADR-082 §6) no aguanta en esta pantalla.</b> Ana es contraparte (Grec) y
+            colaboradora (so para MüK) a la vez — es literalmente el caso que ADR-082 §1
+            defiende al rechazar `person.kind`. Si el enforcement es por flujo y la ficha es
+            única, o la puerta aparece siempre (y la regla no enforcea nada) o no aparece
+            nunca (y no puedes contratar a alguien que ya conoces).
+            <b>Resolución dibujada arriba:</b> la puerta no es de la persona, es
+            <b>de la pareja persona × contenedor</b> — una fila por vínculo, con puerta donde
+            hay trabajo y sin puerta donde hay difusión. Eso mantiene "una sola persona",
+            mantiene el enforcement por flujo, y hace visible el porqué en cada línea.
+            Si se acepta, ADR-082 §6 necesita esta frase; hoy no la tiene.
+          </p>
+          <p>
+            <span class="qnote__tag">chirrido 3 · aquí se ve entero</span>
+            Tres vocabularios de "rol" en una sola pantalla: los <b>chips de rol</b> del
+            masthead (ADR-082), el <b>`equip · sonidista`</b> de Aparicions (hoy texto libre
+            en `cast_member.role` / `crew_assignment.role`) y los <b>permisos</b> que el
+            schema llama `role`. El primero y el segundo dicen lo mismo con palabras
+            distintas. <b>Propuesta:</b> `cast/crew.role` deja de ser texto libre y pasa a
+            apuntar a la lista de rols; la ficha entonces puede derivar los chips en vez de
+            que se los escriban dos veces — que es la única forma de que no diverjan.
+          </p>
+          <p>
+            <span class="qnote__tag">confirma ADR-082 §5</span>
+            Las tres anclas de conversación (org+persona · solo org · solo persona) se
+            dibujan sin caso raro y el "vacío" que señalabas — negociar con el Mercat sin
+            tener aún un nombre — queda con sitio propio. Ese bloque no chirría.
+          </p>
+        </div>
+      </main>
+    </div>
+  </body>
+</html>

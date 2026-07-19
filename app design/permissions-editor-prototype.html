@@ -1,0 +1,486 @@
+<!doctype html>
+<html lang="ca">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Hour — Rols + permisos d'una persona (ADR-082)</title>
+    <style>
+      @layer reset, defaults, tokens, layouts, components, components.overrides,
+        utilities, overrides;
+    </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400..600;1,6..72,400..600&family=Inter:wght@400..600&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="../apps/web/src/styles/base.css" />
+    <link rel="stylesheet" href="_kit.css" />
+
+    <style>
+      .block {
+        margin-block-start: var(--space-xl);
+      }
+      .block__head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: var(--space-s);
+        padding-block-end: var(--space-xs);
+        border-block-end: var(--border);
+      }
+      .block__lead {
+        margin-block: var(--space-s) 0;
+        font-size: var(--text-s);
+        color: var(--text-muted);
+        max-inline-size: 48ch;
+      }
+      .chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-xs);
+        margin-block-start: var(--space-m);
+      }
+
+      /* ── level / scope selector ─────────────────────────────────── */
+      .lvl {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-s);
+        margin-block-start: var(--space-m);
+      }
+      .lvl__step {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-2xs);
+        padding: var(--space-s) var(--space-m);
+        border: 1px solid var(--border-color-light);
+        border-radius: var(--radius-l);
+        min-inline-size: 11rem;
+      }
+      .lvl__step--on {
+        border-color: var(--text-color);
+        background: var(--bg-ultra-light);
+      }
+      .lvl__k {
+        font-family: var(--font-mono);
+        font-size: var(--text-xs);
+        letter-spacing: var(--mono-letter-spacing-loose);
+        text-transform: uppercase;
+        color: var(--text-faint);
+      }
+      .lvl__v {
+        font-size: var(--text-s);
+        color: var(--heading-color);
+        font-weight: 500;
+      }
+      .lvl__v--none {
+        color: var(--text-faint);
+        font-weight: 400;
+      }
+
+      /* ── the matrix ─────────────────────────────────────────────── */
+      .mx {
+        margin-block-start: var(--space-m);
+      }
+      .mx__row {
+        display: flex;
+        align-items: center;
+        gap: var(--space-m);
+        padding-block: var(--space-s);
+        padding-inline-start: var(--space-s);
+        border-block-end: var(--divider-light);
+        border-inline-start: 2px solid transparent;
+      }
+      .mx__row--over {
+        border-inline-start-color: var(--warning);
+        background: color-mix(in oklch, var(--warning) 4%, transparent);
+      }
+      .mx__facet {
+        inline-size: 12rem;
+        flex: none;
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-2xs);
+      }
+      .mx__name {
+        font-size: var(--text-s);
+        font-weight: 500;
+        color: var(--heading-color);
+      }
+      .mx__note {
+        font-family: var(--font-mono);
+        font-size: var(--text-xs);
+        color: var(--text-faint);
+      }
+      .mx__note--over {
+        color: var(--warning);
+      }
+      .mx__seg {
+        display: flex;
+        gap: var(--space-2xs);
+        inline-size: 21rem;
+        flex: none;
+      }
+      .mx__seg [class*="pill--"] {
+        cursor: pointer;
+      }
+      .mx__thread {
+        inline-size: 11rem;
+        flex: none;
+        font-family: var(--font-mono);
+        font-size: var(--text-xs);
+        color: var(--text-faint);
+      }
+      .mx__thread--yes {
+        color: var(--text-muted);
+      }
+      .mx__thread--no {
+        color: var(--danger);
+      }
+      .mx__head {
+        display: flex;
+        gap: var(--space-m);
+        padding-block-end: var(--space-xs);
+        padding-inline-start: var(--space-s);
+      }
+
+      /* ── capabilities (NOT facets) ──────────────────────────────── */
+      .caps {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-s);
+        margin-block-start: var(--space-m);
+        padding: var(--space-m);
+        border: 1px dashed var(--border-color-dark);
+        border-radius: var(--radius-l);
+      }
+      .caps__row {
+        display: flex;
+        align-items: center;
+        gap: var(--space-m);
+        font-size: var(--text-s);
+      }
+      .caps__name {
+        inline-size: 18rem;
+        flex: none;
+        color: var(--heading-color);
+      }
+      .caps__why {
+        font-family: var(--font-mono);
+        font-size: var(--text-xs);
+        color: var(--text-faint);
+        margin-inline-start: auto;
+      }
+
+      .actions {
+        display: flex;
+        gap: var(--space-s);
+        margin-block-start: var(--space-l);
+        padding-block-start: var(--space-m);
+        border-block-start: var(--border);
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="proto">
+      <header class="shell bleed">
+        <div class="shell__inner wrap">
+          <div class="shell__brand">
+            <span class="shell__logo">hour</span>
+            <span class="eyebrow">equip</span>
+          </div>
+          <div class="shell__right">
+            <div class="shell__search">Cerca o salta a… <kbd class="kbd">⌘K</kbd></div>
+            <button class="modeswap" type="button" onclick="document.documentElement.dataset.mode = document.documentElement.dataset.mode === 'dark' ? 'light' : 'dark'">clar / fosc</button>
+            <span class="mk mk--person">MR</span>
+          </div>
+        </div>
+      </header>
+
+      <div class="addr bleed">
+        <div class="addr__inner wrap">
+          <nav class="crumbs" aria-label="Breadcrumb">
+            <a class="crumbs__space" href="#"><span class="mk" style="--c: var(--accent-1)">MC</span>MüK Cia</a>
+            <span class="crumbs__sep">›</span>
+            <a class="crumbs__mid" href="#">Equip</a>
+            <span class="crumbs__sep">›</span>
+            <span class="crumbs__here">Laia Ferrer</span>
+          </nav>
+          <div class="addr__actions">
+            <a class="link-arrow" href="#">Fitxa de la persona →</a>
+          </div>
+        </div>
+      </div>
+
+      <main class="page wrap">
+        <header class="mast">
+          <p class="eyebrow">Accés</p>
+          <h1 class="mast__title"><em>Laia Ferrer</em></h1>
+          <p class="mast__meta">
+            <span class="state-badge" data-tone="success">operadora</span>
+            <span class="mast__sep">·</span>
+            <span>entra amb laia@…  · última vegada dilluns</span>
+          </p>
+        </header>
+
+        <!-- ═══ A · ROLS — the label. No power. ═══ -->
+        <section class="block" aria-label="Rols">
+          <header class="block__head">
+            <p class="eyebrow">Rols</p>
+            <span class="sec__count">el que fa</span>
+          </header>
+          <p class="block__lead">
+            Els rols són etiquetes: diuen què fa la Laia, no què pot veure.
+            Se'n poden posar tants com calgui. <b>Canviar un rol no canvia cap permís.</b>
+          </p>
+          <div class="chips">
+            <span class="role-badge is-mine">road manager</span>
+            <span class="role-badge is-mine">producció</span>
+            <span class="role-badge">so</span>
+            <span class="role-badge">llums</span>
+            <span class="role-badge">intèrpret</span>
+            <span class="role-badge">música</span>
+            <span class="role-badge">distribució</span>
+            <span class="role-badge">autoria</span>
+            <span class="role-badge">tècnica</span>
+            <button class="creator" type="button">+ rol</button>
+          </div>
+        </section>
+
+        <!-- ═══ B · NIVELL — scope comes from WHERE you assign ═══ -->
+        <section class="block" aria-label="Nivell">
+          <header class="block__head">
+            <p class="eyebrow">On li dones aquest accés</p>
+            <span class="sec__count">l'abast el marca el nivell</span>
+          </header>
+          <p class="block__lead">
+            El mateix permís va ample o estret segons on el posis. Aquí l'estàs
+            donant a una <b>línia</b>: valdrà per a tots els bolos d'aquesta gira,
+            no per a la resta de MaMeMi.
+          </p>
+          <div class="lvl">
+            <div class="lvl__step">
+              <span class="lvl__k">Espai</span>
+              <span class="lvl__v lvl__v--none">MüK Cia — Convidada</span>
+            </div>
+            <div class="lvl__step">
+              <span class="lvl__k">Projecte</span>
+              <span class="lvl__v lvl__v--none">MaMeMi — res</span>
+            </div>
+            <div class="lvl__step lvl__step--on">
+              <span class="lvl__k">Línia</span>
+              <span class="lvl__v">Gira de sala 2027 — Producció</span>
+            </div>
+            <div class="lvl__step">
+              <span class="lvl__k">Bolo</span>
+              <span class="lvl__v lvl__v--none">— cap d'individual</span>
+            </div>
+          </div>
+          <p class="block__lead">
+            <span class="mx__note">L'efectiu és la unió: Convidada a l'espai + Producció a la gira.</span>
+          </p>
+        </section>
+
+        <!-- ═══ C · PERMISOS — preset + facet × verb ═══ -->
+        <section class="block" aria-label="Permisos">
+          <header class="block__head">
+            <p class="eyebrow">Permisos a la Gira de sala 2027</p>
+            <span class="sec__count">el que pot veure i tocar</span>
+          </header>
+
+          <div class="chips">
+            <span class="eyebrow eyebrow--sub" style="align-self: center; margin-inline-end: var(--space-s)">Preset</span>
+            <button class="pill--sm pill--mono" type="button">Convidat</button>
+            <button class="pill--sm pill--mono" type="button">Equip</button>
+            <button class="pill--sm pill--mono pill--on" type="button">Producció</button>
+            <button class="pill--sm pill--mono" type="button">Direcció</button>
+            <span class="mx__note" style="align-self: center">· 1 canvi sobre el preset</span>
+          </div>
+
+          <div class="mx">
+            <div class="mx__head">
+              <span class="eyebrow" style="inline-size: 12rem">Faceta</span>
+              <span class="eyebrow" style="inline-size: 21rem">Accés</span>
+              <span class="eyebrow" style="inline-size: 11rem">Té fil de comms?</span>
+            </div>
+
+            <div class="mx__row">
+              <span class="mx__facet"><span class="mx__name">General</span></span>
+              <span class="mx__seg">
+                <button class="pill--sm pill--mono" type="button">res</button>
+                <button class="pill--sm pill--mono pill--on" type="button">veure</button>
+                <button class="pill--sm pill--mono" type="button">veure + editar</button>
+              </span>
+              <span class="mx__thread mx__thread--yes">sí — “General”</span>
+            </div>
+
+            <div class="mx__row">
+              <span class="mx__facet"><span class="mx__name">Logística</span></span>
+              <span class="mx__seg">
+                <button class="pill--sm pill--mono" type="button">res</button>
+                <button class="pill--sm pill--mono" type="button">veure</button>
+                <button class="pill--sm pill--mono pill--on" type="button">veure + editar</button>
+              </span>
+              <span class="mx__thread mx__thread--yes">sí — “Logística”</span>
+            </div>
+
+            <div class="mx__row">
+              <span class="mx__facet"><span class="mx__name">Tècnica</span></span>
+              <span class="mx__seg">
+                <button class="pill--sm pill--mono" type="button">res</button>
+                <button class="pill--sm pill--mono pill--on" type="button">veure</button>
+                <button class="pill--sm pill--mono" type="button">veure + editar</button>
+              </span>
+              <span class="mx__thread mx__thread--yes">sí — “Tècnica”</span>
+            </div>
+
+            <!-- THE ROAD MANAGER CASE — the whole reason ADR-082 exists -->
+            <div class="mx__row">
+              <span class="mx__facet">
+                <span class="mx__name">Diners</span>
+                <span class="mx__note">aquí el delicat és el veure</span>
+              </span>
+              <span class="mx__seg">
+                <button class="pill--sm pill--mono pill--on" type="button">res</button>
+                <button class="pill--sm pill--mono" type="button">veure</button>
+                <button class="pill--sm pill--mono" type="button">veure + editar</button>
+              </span>
+              <span class="mx__thread mx__thread--yes">sí — “Diners”</span>
+            </div>
+
+            <!-- OVERRIDE — differs from the preset, and says so -->
+            <div class="mx__row mx__row--over">
+              <span class="mx__facet">
+                <span class="mx__name">Full de ruta</span>
+                <span class="mx__note mx__note--over">sobreescrit · el preset donava “veure”</span>
+              </span>
+              <span class="mx__seg">
+                <button class="pill--sm pill--mono" type="button">res</button>
+                <button class="pill--sm pill--mono" type="button">veure</button>
+                <button class="pill--sm pill--mono pill--on" type="button">veure + editar</button>
+              </span>
+              <span class="mx__thread mx__thread--no">no en té</span>
+            </div>
+
+            <div class="mx__row">
+              <span class="mx__facet"><span class="mx__name">Producció</span></span>
+              <span class="mx__seg">
+                <button class="pill--sm pill--mono" type="button">res</button>
+                <button class="pill--sm pill--mono pill--on" type="button">veure</button>
+                <button class="pill--sm pill--mono" type="button">veure + editar</button>
+              </span>
+              <span class="mx__thread mx__thread--no">no en té</span>
+            </div>
+
+            <div class="mx__row">
+              <span class="mx__facet"><span class="mx__name">Materials</span></span>
+              <span class="mx__seg">
+                <button class="pill--sm pill--mono" type="button">res</button>
+                <button class="pill--sm pill--mono pill--on" type="button">veure</button>
+                <button class="pill--sm pill--mono" type="button">veure + editar</button>
+              </span>
+              <span class="mx__thread mx__thread--no">no en té</span>
+            </div>
+
+            <div class="mx__row">
+              <span class="mx__facet">
+                <span class="mx__name">Converses</span>
+                <span class="mx__note">difusió — parlar amb programadors</span>
+              </span>
+              <span class="mx__seg">
+                <button class="pill--sm pill--mono pill--on" type="button">res</button>
+                <button class="pill--sm pill--mono" type="button">veure</button>
+                <button class="pill--sm pill--mono" type="button">veure + editar</button>
+              </span>
+              <span class="mx__thread mx__thread--no">no en té</span>
+            </div>
+          </div>
+
+          <!-- CAPABILITIES — do not fit the facet × verb grid -->
+          <div class="caps">
+            <p class="eyebrow eyebrow--sub">Capacitats — no són facetes</p>
+            <div class="caps__row">
+              <span class="caps__name">Obrir fils lliures</span>
+              <span class="pill--sm pill--mono pill--on">sí</span>
+              <span class="caps__why">del preset Producció</span>
+            </div>
+            <div class="caps__row">
+              <span class="caps__name">Convidar gent a operar</span>
+              <span class="pill--sm pill--mono">no</span>
+              <span class="caps__why">només admins de l'espai</span>
+            </div>
+            <div class="caps__row">
+              <span class="caps__name">Esborrar coses</span>
+              <span class="pill--sm pill--mono">no</span>
+              <span class="caps__why">fora de la carta</span>
+            </div>
+          </div>
+
+          <div class="actions">
+            <button class="btn--primary btn--s" type="button">Desar</button>
+            <button class="btn--outline btn--s" type="button">Tornar al preset Producció</button>
+          </div>
+        </section>
+
+        <!-- ═══ D · WHO — the same component, third appearance ═══ -->
+        <section class="block" aria-label="Què veurà i d'on li ve">
+          <header class="block__head">
+            <p class="eyebrow">Què veurà la Laia i d'on li ve</p>
+            <span class="sec__count">permisos efectius</span>
+          </header>
+          <div class="who">
+            <div class="who__line"><span class="who__name">General</span><span>veure</span><span class="who__why">preset Producció · a la gira</span></div>
+            <div class="who__line"><span class="who__name">Logística</span><span>veure + editar</span><span class="who__why">preset Producció · a la gira</span></div>
+            <div class="who__line"><span class="who__name">Tècnica</span><span>veure</span><span class="who__why">preset Producció · a la gira</span></div>
+            <div class="who__line"><span class="who__name">Full de ruta</span><span>veure + editar</span><span class="who__why" style="color: var(--warning)">sobreescrit per en Marco · 12 feb</span></div>
+            <div class="who__line"><span class="who__name">Producció</span><span>veure</span><span class="who__why">preset Producció · a la gira</span></div>
+            <div class="who__line"><span class="who__name">Materials</span><span>veure</span><span class="who__why">preset Convidat · a l'espai</span></div>
+            <div class="who__line" style="color: var(--text-faint)"><span class="who__name" style="color: inherit; font-weight: 400">Diners</span><span>res</span><span class="who__why">cap permís li'n dona</span></div>
+            <div class="who__line" style="color: var(--text-faint)"><span class="who__name" style="color: inherit; font-weight: 400">Converses</span><span>res</span><span class="who__why">cap permís li'n dona</span></div>
+          </div>
+
+          <div class="qnote">
+            <p>
+              <span class="qnote__tag">chirrido 7 · NUEVO, el más gordo</span>
+              <b>La lista de facetas de ADR-082 y la de ADR-083 no son la misma lista</b>,
+              pero ADR-083 §4 dice "una sola lista para las tres cosas". Dibujada la
+              columna "té fil de comms?", el desajuste salta: <b>Tècnica</b> y
+              <b>Logística</b> existen como hilo pero no estaban en la lista de acceso de
+              ADR-082 · <b>Full de ruta</b>, <b>Producció</b>, <b>Materials</b> y
+              <b>Converses</b> son permisos sin hilo. Solo <b>Diners</b> y
+              <b>General</b> coinciden limpio. Tres salidas: (a) unificar la lista y
+              aceptar que "Materials" tenga hilo aunque nadie lo pida; (b) admitir que
+              son <b>dos listas con solape</b> y retirar el "una sola lista" de ADR-083;
+              (c) declarar que el hilo es <b>un permiso más de cada faceta</b> — la
+              columna deja de ser "¿tiene hilo?" y pasa a ser una tercera opción de
+              acceso. <b>Mi apuesta: (c)</b> — mantiene una lista, no inventa hilos que
+              nadie abre (si nadie escribe en Materials, el hilo simplemente está vacío),
+              y hace literal el "triple servicio".
+            </p>
+            <p>
+              <span class="qnote__tag">chirrido 3</span>
+              <b>"Rol" sigue significando tres cosas en pantalla.</b> Los chips de arriba
+              son ADR-082. Pero `settings/+page.svelte:192` ya tiene su propia lista
+              hardcodeada ("Roles I take on": author, performer, musician, lighting,
+              sound, production, distribution, technician) y `/person/[slug]` muestra
+              `cast · role` / `crew · role` como texto libre. <b>Son la misma cosa o no.</b>
+              Si lo son, esta pantalla debe escribir en la lista que ya existe y el
+              settings pasa a ser un filtro sobre ella. Si no lo son, nacen dos
+              vocabularios el día uno.
+            </p>
+            <p>
+              <span class="qnote__tag">hallazgo</span>
+              <b>"Obrir fils" no cabe en la rejilla faceta × verbo</b> y ha tenido que
+              salir a un bloque aparte. ADR-083 §4 lo llama "una capacidad más", pero el
+              eje `ver | ver+editar` no la admite. O las capacidades son un segundo eje
+              declarado (y entonces el modelo tiene dos ejes, no uno), o "abrir fils"
+              se convierte en el `editar` de la faceta General.
+            </p>
+          </div>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>

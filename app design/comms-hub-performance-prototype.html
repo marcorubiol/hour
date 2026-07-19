@@ -1,0 +1,638 @@
+<!doctype html>
+<html lang="ca">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Hour — Comms hub d'un bolo (ADR-083)</title>
+    <!-- Mirror the app's cascade layer order (app.html) so base.css :where()
+         defaults never out-rank the prototype rules. -->
+    <style>
+      @layer reset, defaults, tokens, layouts, components, components.overrides,
+        utilities, overrides;
+    </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400..600;1,6..72,400..600&family=Inter:wght@400..600&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <!-- THE REAL DESIGN SYSTEM — base.css @imports tokens.css itself. -->
+    <link rel="stylesheet" href="../apps/web/src/styles/base.css" />
+    <link rel="stylesheet" href="_kit.css" />
+
+    <style>
+      /* ── thread block ───────────────────────────────────────────── */
+      .th {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-xs);
+      }
+      .th__head {
+        display: flex;
+        align-items: baseline;
+        gap: var(--space-s);
+        flex-wrap: wrap;
+      }
+      .th__title {
+        font-size: var(--text-m);
+        font-weight: 500;
+        color: var(--heading-color);
+      }
+      .th__when {
+        font-family: var(--font-mono);
+        font-size: var(--text-xs);
+        color: var(--text-faint);
+        margin-inline-start: auto;
+      }
+      .th__unread {
+        font-family: var(--font-mono);
+        font-size: var(--text-xs);
+        color: var(--text-color);
+        border-block-end: 2px solid var(--run-color, var(--text-color));
+      }
+
+      /* messages — the row DNA of the Desk: one line, no leading marks */
+      .msg {
+        display: flex;
+        align-items: baseline;
+        gap: var(--space-s);
+        padding-block: var(--space-xs);
+        font-size: var(--text-s);
+        min-inline-size: 0;
+      }
+      .msg .mk {
+        align-self: center;
+      }
+      .msg__who {
+        font-weight: 500;
+        color: var(--heading-color);
+        flex: none;
+      }
+      .msg__text {
+        color: var(--text-color);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .msg__at {
+        font-family: var(--font-mono);
+        font-size: var(--text-xs);
+        color: var(--text-faint);
+        margin-inline-start: auto;
+        flex: none;
+      }
+
+      .th__foot {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--space-s);
+        flex-wrap: wrap;
+        margin-block-start: var(--space-xs);
+      }
+
+      /* ── the roster (qui hi entra) ──────────────────────────────── */
+      .rost__row {
+        display: flex;
+        align-items: center;
+        gap: var(--space-m);
+        padding-block: var(--space-s);
+        border-block-end: var(--divider-light);
+        font-size: var(--text-s);
+      }
+      .rost__id {
+        display: flex;
+        align-items: center;
+        gap: var(--space-s);
+        inline-size: 13rem;
+        flex: none;
+      }
+      .rost__name {
+        font-weight: 500;
+        color: var(--heading-color);
+      }
+      .rost__roles {
+        display: flex;
+        gap: var(--space-xs);
+        inline-size: 12rem;
+        flex: none;
+        flex-wrap: wrap;
+      }
+      .rost__sees {
+        display: flex;
+        gap: var(--space-xs);
+        flex-wrap: wrap;
+        flex: 1;
+        min-inline-size: 0;
+      }
+      .rost__why {
+        font-family: var(--font-mono);
+        font-size: var(--text-xs);
+        color: var(--text-faint);
+        inline-size: 12rem;
+        flex: none;
+        text-align: end;
+      }
+      /* facet chip — same tint language as the gutter, so "what you see"
+         and "where it lives" are visibly the same list */
+      .fchip {
+        font-family: var(--font-mono);
+        font-size: var(--text-xs);
+        letter-spacing: var(--mono-letter-spacing-loose);
+        text-transform: uppercase;
+        padding-inline: var(--space-xs);
+        padding-block: 1px;
+        border-radius: var(--radius-s);
+        border: 1px solid currentColor;
+        color: var(--f, var(--text-faint));
+      }
+      .fchip--off {
+        color: var(--border-color-dark);
+        border-style: dashed;
+      }
+      .fchip--free {
+        border-style: dashed;
+        color: var(--text-muted);
+      }
+
+      /* ── the Desk sidecar (does comms earn a 5th type?) ─────────── */
+      .desk {
+        border: var(--border);
+        border-radius: var(--radius-l);
+        padding: var(--space-m) var(--space-l);
+        background: var(--bg-ultra-light);
+      }
+      .desk .run {
+        border-block-start: none;
+        padding-block: var(--space-s);
+      }
+      .desk__row {
+        display: flex;
+        align-items: baseline;
+        gap: var(--space-s);
+        font-size: var(--text-s);
+      }
+      .desk__path {
+        font-family: var(--font-mono);
+        font-size: var(--text-xs);
+        color: var(--text-faint);
+      }
+      .run--missatge {
+        --run-color: var(--accent-7);
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="proto">
+      <!-- SHELL -->
+      <header class="shell bleed">
+        <div class="shell__inner wrap">
+          <div class="shell__brand">
+            <span class="shell__logo">hour</span>
+            <span class="eyebrow">bolo</span>
+          </div>
+          <div class="shell__right">
+            <div class="shell__search">
+              Cerca o salta a… <kbd class="kbd">⌘K</kbd>
+            </div>
+            <button class="modeswap" type="button" onclick="document.documentElement.dataset.mode = document.documentElement.dataset.mode === 'dark' ? 'light' : 'dark'">clar / fosc</button>
+            <span class="mk mk--person">MR</span>
+          </div>
+        </div>
+      </header>
+
+      <!-- ADDRESS BAR -->
+      <div class="addr bleed">
+        <div class="addr__inner wrap" style="--c: var(--accent-5)">
+          <nav class="crumbs" aria-label="Breadcrumb">
+            <a class="crumbs__space" href="#"><span class="mk" style="--c: var(--accent-1)">MC</span>MüK Cia</a>
+            <span class="crumbs__sep">›</span>
+            <a class="crumbs__mid" href="#"><span class="mk" style="--c: var(--accent-5)">MM</span> MaMeMi</a>
+            <span class="crumbs__sep">›</span>
+            <a class="crumbs__mid" href="#">Gira de sala 2027</a>
+            <span class="crumbs__sep">›</span>
+            <span class="crumbs__here">12 març · Teatre Lliure</span>
+          </nav>
+          <div class="addr__actions">
+            <a class="link-arrow" href="#">Full de ruta →</a>
+          </div>
+        </div>
+      </div>
+
+      <main class="page wrap">
+        <!-- MASTHEAD — the performance -->
+        <header class="mast">
+          <p class="eyebrow">Bolo — dimecres 12 de març</p>
+          <h1 class="mast__title"><em>Teatre Lliure</em> — Barcelona</h1>
+          <p class="mast__meta">
+            <span class="state-badge" data-tone="success">confirmat</span>
+            <span class="mast__sep">·</span>
+            <span>20:00 · hora local de Barcelona</span>
+          </p>
+          <p class="mast__stats">
+            <span class="stat"><b>7</b>a l'equip</span>
+            <span class="stat"><b>5</b>fils</span>
+            <span class="stat"><b>3</b>sense llegir</span>
+          </p>
+        </header>
+
+        <!-- CONSENT-FIRST ACTIVATION (ADR-083 §7 + ADR-069) -->
+        <!-- The channel is NOT created — it exists because the bolo is a
+             container. What is proposed is telling the crew it is open. -->
+        <div class="sec">
+          <div class="ghost">
+            <div class="ghost__head">
+              <span class="state-badge" data-tone="info">proposat</span>
+              <span class="th__title">Avisar l'equip que aquest fil és obert</span>
+            </div>
+            <p class="ghost__why">
+              Falten 6 dies i hi ha 4 persones assignades que encara no hi han
+              entrat mai. Se'ls avisaria del fil <b>General</b>; cadascú veurà
+              només els fils del seu permís.
+            </p>
+            <div class="ghost__actions">
+              <button class="btn--primary btn--s" type="button">Avisar els 4</button>
+              <button class="btn--outline btn--s" type="button">Ara no</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- THE HUB — sub-threads as facets, in the Desk's gutter grammar -->
+        <section class="sec" aria-label="Fils">
+          <header class="sec__head">
+            <div class="sec__head-l">
+              <p class="eyebrow">Fils d'aquest bolo</p>
+              <span class="sec__count">4 facetes · 1 fil lliure</span>
+            </div>
+            <div class="sec__head-r">
+              <button class="creator" type="button">+ fil lliure</button>
+            </div>
+          </header>
+
+          <!-- GENERAL -->
+          <article class="run run--general">
+            <div class="run__gutter">
+              <a class="run__label" href="#">General</a>
+              <span class="run__sub">faceta</span>
+            </div>
+            <div class="run__body">
+              <div class="th">
+                <div class="th__head">
+                  <span class="th__title">Bolo del 12 · Teatre Lliure</span>
+                  <span class="th__when">ahir 18:41</span>
+                </div>
+                <p class="msg">
+                  <span class="mk mk--person">AN</span>
+                  <span class="msg__who">Anouk</span>
+                  <span class="msg__text">Confirmat el pas de sala a les 17:00, ens obren a les 15.</span>
+                  <span class="msg__at">18:41</span>
+                </p>
+                <p class="msg">
+                  <span class="mk mk--person">MR</span>
+                  <span class="msg__who">Marco</span>
+                  <span class="msg__text">Perfecte. Jordi arriba a les 14:30 amb la furgo.</span>
+                  <span class="msg__at">19:02</span>
+                </p>
+                <div class="th__foot">
+                  <details class="who">
+                    <summary class="who__summary">Ho veuen 7 — tothom qui està assignat al bolo</summary>
+                    <div class="who__line"><span class="mk mk--person">MR</span><span class="who__name">Marco Rubiol</span><span class="who__why">admin de l'espai</span></div>
+                    <div class="who__line"><span class="mk mk--person">AN</span><span class="who__name">Anouk Devrient</span><span class="who__why">admin de l'espai</span></div>
+                    <div class="who__line"><span class="mk mk--person">LF</span><span class="who__name">Laia Ferrer</span><span class="who__why">permís a la gira</span></div>
+                    <div class="who__line"><span class="mk mk--person">JS</span><span class="who__name">Jordi Sales</span><span class="who__why">permís en aquest bolo</span></div>
+                    <div class="who__line"><span class="mk mk--person">PM</span><span class="who__name">Pau Miró</span><span class="who__why">permís a la gira</span></div>
+                    <div class="who__line"><span class="mk mk--person">CV</span><span class="who__name">Clara Vidal</span><span class="who__why">permís a l'espai</span></div>
+                    <div class="who__line"><span class="mk mk--person">TR</span><span class="who__name">Tomàs Roig</span><span class="who__why">permís en aquest bolo</span></div>
+                  </details>
+                  <a class="link-arrow" href="#">Obrir el fil →</a>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <!-- TÈCNICA -->
+          <article class="run run--tecnica">
+            <div class="run__gutter">
+              <a class="run__label" href="#">Tècnica</a>
+              <span class="run__sub">faceta</span>
+            </div>
+            <div class="run__body">
+              <div class="th">
+                <div class="th__head">
+                  <span class="th__title">Muntatge i so</span>
+                  <span class="th__unread">2 sense llegir</span>
+                  <span class="th__when">avui 09:12</span>
+                </div>
+                <p class="msg">
+                  <span class="mk mk--person">JS</span>
+                  <span class="msg__who">Jordi</span>
+                  <span class="msg__text">La sala només té 8 canals de dimmer lliures. Adapto el plànol?</span>
+                  <span class="msg__at">09:12</span>
+                </p>
+                <div class="th__foot">
+                  <details class="who">
+                    <summary class="who__summary">Ho veuen 4 — per permís de TÈCNICA</summary>
+                    <div class="who__line"><span class="mk mk--person">MR</span><span class="who__name">Marco Rubiol</span><span class="who__why">admin de l'espai</span></div>
+                    <div class="who__line"><span class="mk mk--person">AN</span><span class="who__name">Anouk Devrient</span><span class="who__why">admin de l'espai</span></div>
+                    <div class="who__line"><span class="mk mk--person">JS</span><span class="who__name">Jordi Sales</span><span class="who__why">tècnica · veure+editar, en aquest bolo</span></div>
+                    <div class="who__line"><span class="mk mk--person">TR</span><span class="who__name">Tomàs Roig</span><span class="who__why">tècnica · veure, en aquest bolo</span></div>
+                  </details>
+                  <a class="link-arrow" href="#">Obrir el fil →</a>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <!-- LOGÍSTICA -->
+          <article class="run run--logistica">
+            <div class="run__gutter">
+              <a class="run__label" href="#">Logística</a>
+              <span class="run__sub">faceta</span>
+            </div>
+            <div class="run__body">
+              <div class="th">
+                <div class="th__head">
+                  <span class="th__title">Arribades i hotel</span>
+                  <span class="th__unread">1 sense llegir</span>
+                  <span class="th__when">avui 08:30</span>
+                </div>
+                <p class="msg">
+                  <span class="mk mk--person">LF</span>
+                  <span class="msg__who">Laia</span>
+                  <span class="msg__text">Hotel Ciutat, 4 habitacions dobles. Falta saber si en Pau ve amb cotxe.</span>
+                  <span class="msg__at">08:30</span>
+                </p>
+                <div class="th__foot">
+                  <details class="who">
+                    <summary class="who__summary">Ho veuen 5 — per permís de LOGÍSTICA</summary>
+                    <div class="who__line"><span class="mk mk--person">MR</span><span class="who__name">Marco Rubiol</span><span class="who__why">admin de l'espai</span></div>
+                    <div class="who__line"><span class="mk mk--person">AN</span><span class="who__name">Anouk Devrient</span><span class="who__why">admin de l'espai</span></div>
+                    <div class="who__line"><span class="mk mk--person">LF</span><span class="who__name">Laia Ferrer</span><span class="who__why">logística · veure+editar, a la gira</span></div>
+                    <div class="who__line"><span class="mk mk--person">JS</span><span class="who__name">Jordi Sales</span><span class="who__why">logística · veure, en aquest bolo</span></div>
+                    <div class="who__line"><span class="mk mk--person">PM</span><span class="who__name">Pau Miró</span><span class="who__why">logística · veure, a la gira</span></div>
+                  </details>
+                  <a class="link-arrow" href="#">Obrir el fil →</a>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <!-- DINERS — the gated one. Laia (road manager) is NOT here. -->
+          <article class="run run--diners">
+            <div class="run__gutter">
+              <a class="run__label" href="#">Diners</a>
+              <span class="run__sub">faceta</span>
+            </div>
+            <div class="run__body">
+              <div class="th">
+                <div class="th__head">
+                  <span class="th__title">Caché i factura</span>
+                  <span class="th__when">dilluns</span>
+                </div>
+                <p class="msg">
+                  <span class="mk mk--person">AN</span>
+                  <span class="msg__who">Anouk</span>
+                  <span class="msg__text">Han acceptat 3.200 € + IVA. Factura a 60 dies, com sempre.</span>
+                  <span class="msg__at">11:04</span>
+                </p>
+                <div class="th__foot">
+                  <details class="who">
+                    <summary class="who__summary">Ho veuen 2 — per permís de DINERS</summary>
+                    <div class="who__line"><span class="mk mk--person">MR</span><span class="who__name">Marco Rubiol</span><span class="who__why">admin de l'espai</span></div>
+                    <div class="who__line"><span class="mk mk--person">AN</span><span class="who__name">Anouk Devrient</span><span class="who__why">admin de l'espai</span></div>
+                    <div class="who__line" style="color: var(--text-faint)">
+                      <span class="who__name" style="color: inherit; font-weight: 400">La Laia no hi és</span>
+                      <span class="who__why">road manager · logística sí, diners no</span>
+                    </div>
+                  </details>
+                  <a class="link-arrow" href="#">Obrir el fil →</a>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <!-- FREE THREAD — explicit participants, no facet gate -->
+          <article class="run run--free">
+            <div class="run__gutter">
+              <a class="run__label" href="#">Vídeo premsa</a>
+              <span class="run__sub">fil lliure</span>
+            </div>
+            <div class="run__body">
+              <div class="th">
+                <div class="th__head">
+                  <span class="th__title">Vídeo per a la premsa de dijous</span>
+                  <span class="th__when">dimarts</span>
+                </div>
+                <p class="msg">
+                  <span class="mk mk--person">AN</span>
+                  <span class="msg__who">Anouk</span>
+                  <span class="msg__text">Tallem 40 segons del pas de sala i els el passem divendres.</span>
+                  <span class="msg__at">17:20</span>
+                </p>
+                <div class="th__foot">
+                  <details class="who">
+                    <summary class="who__summary">Hi entren 3 — triats en obrir el fil</summary>
+                    <div class="who__line"><span class="mk mk--person">MR</span><span class="who__name">Marco Rubiol</span><span class="who__why">afegit per l'Anouk</span></div>
+                    <div class="who__line"><span class="mk mk--person">AN</span><span class="who__name">Anouk Devrient</span><span class="who__why">va obrir el fil</span></div>
+                    <div class="who__line"><span class="mk mk--person">CV</span><span class="who__name">Clara Vidal</span><span class="who__why">afegida per l'Anouk</span></div>
+                    <div class="who__line" style="padding-block-start: var(--space-s)">
+                      <button class="creator" type="button">+ afegir algú</button>
+                    </div>
+                  </details>
+                  <a class="link-arrow" href="#">Obrir el fil →</a>
+                </div>
+              </div>
+            </div>
+          </article>
+        </section>
+
+        <!-- WHO ENTERS AND WHY — the whole hub, resolved -->
+        <section class="sec" aria-label="Qui hi entra i per què">
+          <header class="sec__head">
+            <div class="sec__head-l">
+              <p class="eyebrow">Qui hi entra i per què</p>
+              <span class="sec__count">7 operadors · 2 fora del fil</span>
+            </div>
+            <div class="sec__head-r">
+              <a class="link-arrow" href="#">Editar permisos d'aquest bolo →</a>
+            </div>
+          </header>
+
+          <div class="rost">
+            <div class="rost__row">
+              <span class="eyebrow" style="inline-size: 13rem">Persona</span>
+              <span class="eyebrow" style="inline-size: 12rem">Rols</span>
+              <span class="eyebrow" style="flex: 1">Quins fils veu</span>
+              <span class="eyebrow" style="inline-size: 12rem; text-align: end">D'on li ve</span>
+            </div>
+
+            <div class="rost__row">
+              <span class="rost__id"><span class="mk mk--person">MR</span><span class="rost__name">Marco Rubiol</span></span>
+              <span class="rost__roles"><span class="role-badge is-mine">so</span><span class="role-badge is-mine">producció</span></span>
+              <span class="rost__sees">
+                <span class="fchip" style="--f: var(--accent-1)">general</span>
+                <span class="fchip" style="--f: var(--accent-6)">tècnica</span>
+                <span class="fchip" style="--f: var(--accent-8)">logística</span>
+                <span class="fchip" style="--f: var(--accent-3)">diners</span>
+                <span class="fchip fchip--free">+ obre fils</span>
+              </span>
+              <span class="rost__why">admin de l'espai</span>
+            </div>
+
+            <div class="rost__row">
+              <span class="rost__id"><span class="mk mk--person">AN</span><span class="rost__name">Anouk Devrient</span></span>
+              <span class="rost__roles"><span class="role-badge">intèrpret</span><span class="role-badge">direcció</span></span>
+              <span class="rost__sees">
+                <span class="fchip" style="--f: var(--accent-1)">general</span>
+                <span class="fchip" style="--f: var(--accent-6)">tècnica</span>
+                <span class="fchip" style="--f: var(--accent-8)">logística</span>
+                <span class="fchip" style="--f: var(--accent-3)">diners</span>
+                <span class="fchip fchip--free">+ obre fils</span>
+              </span>
+              <span class="rost__why">admin de l'espai</span>
+            </div>
+
+            <div class="rost__row">
+              <span class="rost__id"><span class="mk mk--person">LF</span><span class="rost__name">Laia Ferrer</span></span>
+              <span class="rost__roles"><span class="role-badge">road manager</span></span>
+              <span class="rost__sees">
+                <span class="fchip" style="--f: var(--accent-1)">general</span>
+                <span class="fchip fchip--off">tècnica</span>
+                <span class="fchip" style="--f: var(--accent-8)">logística</span>
+                <span class="fchip fchip--off">diners</span>
+                <span class="fchip fchip--free">+ obre fils</span>
+              </span>
+              <span class="rost__why">Producció, a la gira</span>
+            </div>
+
+            <div class="rost__row">
+              <span class="rost__id"><span class="mk mk--person">JS</span><span class="rost__name">Jordi Sales</span></span>
+              <span class="rost__roles"><span class="role-badge">llums</span></span>
+              <span class="rost__sees">
+                <span class="fchip" style="--f: var(--accent-1)">general</span>
+                <span class="fchip" style="--f: var(--accent-6)">tècnica</span>
+                <span class="fchip" style="--f: var(--accent-8)">logística</span>
+                <span class="fchip fchip--off">diners</span>
+              </span>
+              <span class="rost__why">Tècnic, només en aquest bolo</span>
+            </div>
+
+            <div class="rost__row">
+              <span class="rost__id"><span class="mk mk--person">PM</span><span class="rost__name">Pau Miró</span></span>
+              <span class="rost__roles"><span class="role-badge">música</span></span>
+              <span class="rost__sees">
+                <span class="fchip" style="--f: var(--accent-1)">general</span>
+                <span class="fchip fchip--off">tècnica</span>
+                <span class="fchip" style="--f: var(--accent-8)">logística</span>
+                <span class="fchip fchip--off">diners</span>
+              </span>
+              <span class="rost__why">Convidat, a la gira</span>
+            </div>
+
+            <!-- OUTSIDE THE WALL — derived participants without a login.
+                 ADR-082 §6: counterparts are subjects, never operators.
+                 Drawn on purpose: dropping them silently is what makes a
+                 model look coherent and behave wrong. -->
+            <div class="who who--outside">
+              <p class="eyebrow eyebrow--sub">Fora del fil — s'hi parla per correu</p>
+              <div class="rost__row">
+                <span class="rost__id"><span class="mk mk--person">NC</span><span class="rost__name">Núria Cots</span></span>
+                <span class="rost__roles"><span class="role-badge">sala</span></span>
+                <span class="rost__sees">
+                  <span class="state-badge" data-tone="faint">sense accés</span>
+                  <a class="link-arrow" href="#">Escriure-li →</a>
+                </span>
+                <span class="rost__why">Contacte del Teatre Lliure</span>
+              </div>
+              <div class="rost__row">
+                <span class="rost__id"><span class="mk mk--person">DD</span><span class="rost__name">Dries Douibi</span></span>
+                <span class="rost__roles"><span class="role-badge">programació</span></span>
+                <span class="rost__sees">
+                  <span class="state-badge" data-tone="faint">sense accés</span>
+                  <a class="link-arrow" href="#">Escriure-li →</a>
+                </span>
+                <span class="rost__why">Conversa de difusió</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="qnote">
+            <p>
+              <span class="qnote__tag">chirrido 2</span>
+              <b>El hub del bolo dobla la frontera Conversations / Team.</b>
+              `structure-model.md:86` separa duro: Conversations = con quién reservas ·
+              Team = quién hace la obra. Este hub deriva participantes de las dos
+              (equipo + sala) y la sala no puede entrar. Dibujado arriba como banda
+              "fora del fil". Decisión que el mockup fuerza: <b>la lista de participantes
+              del bolo es más ancha que la de operadores</b> — o se acepta esa banda como
+              parte del modelo, o se dejan de derivar los contactos de sala y la ficha
+              técnica del bolo pierde a la persona con la que realmente hablas ese día.
+            </p>
+            <p>
+              <span class="qnote__tag">chirrido 5 · resuelto aquí</span>
+              El monograma de persona va <b>sin tinte</b> (círculo, ink callado); el tinte
+              queda para contenedores (espacio, proyecto). Si la persona cogiera acento
+              propio, en un hilo competirían dos sistemas de color y "color = proyecto"
+              (ADR-081) se rompería. Verificado a ojo: con 7 personas en una lista el
+              contraste sigue siendo suficiente sin color.
+            </p>
+            <p>
+              <span class="qnote__tag">hallazgo nuevo</span>
+              <b>El chip de faceta y la etiqueta del gutter son el mismo objeto.</b> Se
+              dibujaron por separado (una ordena la conversación, otro dice qué ves) y
+              salieron idénticos — que es exactamente lo que ADR-083 §4 predice
+              ("la faceta hace triple servicio"). Es la primera confirmación visual de
+              que el triple servicio no es una racionalización.
+            </p>
+          </div>
+        </section>
+
+        <!-- DOES COMMS EARN A FIFTH TYPE IN THE DESK? -->
+        <section class="sec" aria-label="Com arriba al Desk">
+          <header class="sec__head">
+            <div class="sec__head-l">
+              <p class="eyebrow">Com arribaria això al Desk</p>
+              <span class="sec__count">prova del cinquè tipus</span>
+            </div>
+          </header>
+
+          <div class="desk">
+            <div class="run run--missatge">
+              <div class="run__gutter">
+                <a class="run__label" href="#">Missatge</a>
+              </div>
+              <div class="run__body">
+                <p class="desk__row">
+                  <span style="font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-muted)">09:12</span>
+                  <span>En Jordi pregunta si adapta el plànol de llums</span>
+                  <span class="desk__path">MüK Cia · MaMeMi · 12 març — tècnica</span>
+                </p>
+                <p class="desk__row">
+                  <span style="font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-muted)">08:30</span>
+                  <span>La Laia espera saber si en Pau ve amb cotxe</span>
+                  <span class="desk__path">MüK Cia · MaMeMi · 12 març — logística</span>
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div class="qnote">
+            <p>
+              <span class="qnote__tag">chirrido 4</span>
+              <b>Comms sin puerta desde el "ahora" es una isla.</b> Arriba, MISSATGE entra
+              en la gramática del Desk sin romperla: misma fila, misma ruta de contexto,
+              hora como glifo. Pero abre dos preguntas que el diseño no puede decidir solo:
+              (a) el gutter del Desk pasa de 4 a 5 tipos — el label singular por concern era
+              parte de la calma; (b) ¿qué mensaje merece salir? Sin criterio, el Desk se
+              convierte en una bandeja de entrada, que es justo lo que ADR-083 evita al
+              rechazar el chat en vivo. <b>Propuesta:</b> solo sube al Desk el mensaje que
+              lleva una <b>pregunta abierta dirigida a ti</b> — no todo lo no leído. Eso lo
+              mantiene como capa de verbo (igual que la tarea), no como bandeja.
+            </p>
+          </div>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>
