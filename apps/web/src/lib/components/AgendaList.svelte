@@ -31,6 +31,7 @@
   import { dualTime } from '$lib/datetime';
   import { workspacesQueryOptions } from '$lib/nav-queries';
   import { accentVarFor } from '$lib/utils/accent';
+  import IdentityMark from '$lib/components/IdentityMark.svelte';
   import { performanceStatusFamily, performanceStatusLabel } from '$lib/performance';
   import { dateStatusFamily } from '$lib/date';
 
@@ -316,7 +317,7 @@
                       <span class="ag__city">{perfCity(p)}</span>{/if}</span
                   >
                   <span class="ag__sub">
-                    <span class="ag__dot" aria-hidden="true"></span>
+                    {#if p.project}<IdentityMark variant="compact" accent={accentVarFor(p.project)} initials={p.project.initials} name={p.project.name} size="15px" />{/if}
                     {p.project?.name ?? ''}
                     {#if t?.secondary}<span class="ag__courtesy"
                         >· {viewerTimeLabel(t.secondary)}</span
@@ -337,7 +338,7 @@
                   <span class="ag__body">
                     <span class="ag__title ag__title--travel">{travelText(d)}</span>
                     <span class="ag__sub">
-                      <span class="ag__dot" aria-hidden="true"></span>
+                      {#if d.project}<IdentityMark variant="compact" accent={accentVarFor(d.project)} initials={d.project.initials} name={d.project.name} size="15px" />{/if}
                       {d.project?.name ?? ''}
                     </span>
                   </span>
@@ -354,7 +355,7 @@
                   <span class="ag__body">
                     <span class="ag__title ag__title--date">{dateText(d)}</span>
                     <span class="ag__sub">
-                      <span class="ag__dot" aria-hidden="true"></span>
+                      {#if d.project}<IdentityMark variant="compact" accent={accentVarFor(d.project)} initials={d.project.initials} name={d.project.name} size="15px" />{/if}
                       {d.project?.name ?? ''}
                       {#if t?.secondary}<span class="ag__courtesy"
                           >· {viewerTimeLabel(t.secondary)}</span
@@ -554,13 +555,6 @@
       min-inline-size: 0;
       overflow: hidden;
       white-space: nowrap;
-    }
-    .ag__dot {
-      inline-size: 7px;
-      block-size: 7px;
-      border-radius: var(--radius-circle);
-      background: var(--c, var(--text-faint));
-      flex: none;
     }
     .ag__courtesy {
       color: color-mix(in oklch, var(--ag-black-accent) 50%, var(--text-faint));
