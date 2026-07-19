@@ -731,7 +731,7 @@
           title={t('desk.calm', locale)}
           onclick={() => calm.toggle()}
         >
-          <span>{t('desk.calm', locale)}</span><span class="side-calm__k">c</span>
+          <span>{t('desk.calm', locale)}</span><span class="side-calm__k">C</span>
         </button>
       </div>
       <div class="side-sec">
@@ -976,16 +976,18 @@
   .side-calm {
     display: inline-flex;
     align-items: center;
-    gap: var(--space-2xs);
+    gap: var(--space-xs);
     padding-block: var(--space-2xs);
-    padding-inline: var(--space-xs);
+    padding-inline: var(--space-m);
     border: 1px solid var(--border-color-dark);
     border-radius: var(--radius-circle);
-    background: transparent;
-    font-family: var(--font-mono);
+    background: var(--bg-ultra-light);
+    /* Desk lens button shape (sans, --space-2xs/--space-m, radius-circle, ultra-light
+       fill) but a smaller uppercase micro-label. Mono C key hint. */
+    font-family: var(--font-sans);
     font-size: var(--text-xs);
-    letter-spacing: var(--mono-letter-spacing-loose);
     text-transform: uppercase;
+    letter-spacing: 0.05em;
     color: var(--text-muted);
     cursor: pointer;
     white-space: nowrap;
@@ -1004,9 +1006,16 @@
     color: var(--bg);
   }
   .side-calm__k {
-    padding-inline: var(--space-2xs);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    inline-size: 1.35em;
+    block-size: 1.35em;
     border: 1px solid currentColor;
     border-radius: var(--radius-s);
+    /* The key stays mono even though the label is now sans. */
+    font-family: var(--font-mono);
+    font-size: 0.85em;
     opacity: 0.6;
     text-transform: none;
   }
