@@ -275,7 +275,7 @@
        rows to the viewport (unreadable past ~1200px).
        The page body owns this; the shell applies it once (.shell__content /
        .shell__lenschrome), pages don't re-declare it. */
-    --page-width: 51.25rem; /* 820 */
+    --page-width: 56.25rem; /* 900 */
 
     --sidebar-width: 264px;
     --header-height: 0px;
