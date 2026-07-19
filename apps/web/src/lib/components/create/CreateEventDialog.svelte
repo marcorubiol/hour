@@ -21,6 +21,9 @@
    */
   export const EVENT_TYPE_KEYS = [
     'performance',
+    // ADR-084 §1 — the block is a MODE of this dialog, not a second one:
+    // the pill flips the single-date form into an N-day form.
+    'block',
     'rehearsal',
     'travel_day',
     'day_off',
@@ -43,6 +46,7 @@
   import Select from '../Select.svelte';
   import { addToast } from '../Toast.svelte';
   import PerformanceForm, { type CreatedPerformance } from '../PerformanceForm.svelte';
+  import BlockForm from '../BlockForm.svelte';
   import { dayKeyInTz } from '$lib/planner';
   import { dayMonthYear, wallClockToInstant } from '$lib/datetime';
   import { detectLocale, t } from '$lib/i18n';
@@ -78,6 +82,7 @@
 
   const TYPE_LABEL_KEYS: Record<EventTypeKey, string> = {
     performance: 'create.type_performance',
+    block: 'block.type',
     rehearsal: 'create.type_rehearsal',
     travel_day: 'create.type_travel',
     day_off: 'create.type_day_off',
@@ -98,6 +103,8 @@
   // ── Performance branch — the shared form owns everything. ────────────
   let perfForm: { submit: () => void } | undefined = $state();
   let perfPending = $state(false);
+  let blockForm: { submit: () => void } | undefined = $state();
+  let blockPending = $state(false);
 
   function handlePerfCreated(perf: CreatedPerformance) {
     open = false;
@@ -325,10 +332,13 @@
 
   function submit() {
     if (type === 'performance') perfForm?.submit();
+    else if (type === 'block') blockForm?.submit();
     else submitDate();
   }
 
-  let pending = $derived(type === 'performance' ? perfPending : $createDate.isPending);
+  let pending = $derived(
+    type === 'performance' ? perfPending : type === 'block' ? blockPending : $createDate.isPending,
+  );
 </script>
 
 <Dialog bind:open title={t('create.title', locale)} size="m">
@@ -355,6 +365,16 @@
         {presetLineId}
         {presetDate}
         onCreated={handlePerfCreated}
+      />
+    {:else if type === 'block'}
+      <BlockForm
+        bind:this={blockForm}
+        bind:pending={blockPending}
+        {open}
+        {presetProjectId}
+        {presetLineId}
+        {presetDate}
+        onCreated={() => (open = false)}
       />
     {:else}
       <form
@@ -463,7 +483,9 @@
     <Button onclick={submit} loading={pending}>
       {type === 'performance'
         ? t('create.submit_performance', locale)
-        : t('create.submit_date', locale)}
+        : type === 'block'
+          ? t('block.submit', locale)
+          : t('create.submit_date', locale)}
     </Button>
   {/snippet}
 </Dialog>
