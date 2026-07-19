@@ -60,6 +60,7 @@ type ProjectItem = Pick<
   | 'ends_on'
   | 'updated_at'
   | 'accent'
+  | 'initials'
   | 'description'
 >;
 
@@ -69,7 +70,7 @@ const CreateBodySchema = v.object({
   workspace_id: v.pipe(v.string(), v.uuid()),
   name: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(80)),
   slug: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(64))),
-  accent: v.optional(v.pipe(v.string(), v.regex(/^[1-8]$/))),
+  accent: v.optional(v.pipe(v.string(), v.regex(/^([1-9]|1[0-2])$/))),
   description: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(280))),
 });
 
@@ -165,7 +166,7 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
   const search = new URLSearchParams();
   search.set(
     'select',
-    'id,slug,name,status,workspace_id,starts_on,ends_on,updated_at,accent,description',
+    'id,slug,name,status,workspace_id,starts_on,ends_on,updated_at,accent,initials,description',
   );
   search.set('deleted_at', 'is.null');
   if (status !== 'any') search.set('status', `eq.${status}`);
