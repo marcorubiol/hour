@@ -218,3 +218,20 @@ D. **¿Phase 0.5 o se mete en 0.4?** Esto define si arrancas a especificarlo en 
 ## ~~2026-07-02 — Misterio RLS person_note (para ojos frescos)~~ RESUELTO → ADR-048
 
 **Resuelto 2026-07-02 con experimento decisivo**: la hipótesis del re-chequeo SELECT era correcta — la fila actualizada debe seguir pasando alguna policy SELECT del updater; `deleted_at=now()` la hace invisible → 42501. Confirmado añadiendo una policy SELECT temporal (`author_id = auth.uid()`) que hace pasar el MISMO update. Es sistémico (todo el schema usa `deleted_at IS NULL` en SELECT): **ningún soft-delete puede ir por PATCH directo del cliente, nunca** — siempre RPC. Regla y detalle en `_decisions.md` ADR-048.
+
+---
+
+## 2026-07-19 — Posibilidades de diseño del Planner: la forma como eje semántico + destacar el bolo confirmado (SIN decidir)
+
+Dos ideas que Marco quiere aparcadas como posibles, no decididas — nacen mirando el calendario v2 en uso.
+
+**1. La forma (border-radius) como eje semántico: bolo = redondeado (objeto), todo lo demás = cuadrado (condición/tramo).**
+La clave de por qué es sólida: sería **ortogonal** a la gramática que ya existe, no competiría con ella. Hoy el *fill* dice *cuán seguro* (contorno = hold · sólido = confirmado) y el *color* dice *de quién* (acento de proyecto). La forma diría *qué es*: performance = pastilla redondeada; date/viaje/blackout/banda = cuadrado. Como shape y fill codifican cosas distintas, no se ensucian — un hold sería redondo+contorno, un confirmado redondo+sólido, un ensayo cuadrado siempre. Marco: hoy hay mezcla *accidental* (chips `radius-l`, dates `radius-s`, marcas circulares, bandas casi cuadradas); la idea es convertir ese accidente en regla. Para que "explique algo" el contraste debe ser nítido → implica **cuadrar los chips de date** (quitarles el radio), no solo redondear más los bolos.
+- **Cautelas**: (a) es compromiso de SISTEMA (calendario + agenda + carrils + road sheet + módulos de línea), o la señal se rompe → iría a `philosophy.md`/tokens, no a una superficie; (b) riesgo de sobre-codificar (ya cargamos hue+fill+tono+rojo) — pero mapea a la distinción más fundamental (el bolo es el objeto), así que probablemente se gana el canal.
+- **Cómo validarlo**: probarlo en el MOCK sobre un mes realista (bolos redondos + todo cuadrado) y mirar si se lee "significativo" o "recargado" ANTES de bajarlo a tokens. Loop de diseño de Marco.
+
+**2. Destacar el bolo confirmado más allá del contorno — link a la hoja de ruta.**
+El fill sólido ya distingue confirmado de hold, pero Marco quiere que el bolo confirmado *resalte* un poco más en el calendario. Idea concreta que se le ocurre: **una vez confirmado, el chip lleva un pequeño link a la hoja de ruta (road sheet)** — y la mera *presencia* de ese link ya sería señal de "esto está confirmado" (el road sheet no tiene sentido para un hold). Dos pájaros: (a) afordancia útil (saltar del calendario a la hoja de ruta del bolo), (b) marcador visual de confirmado sin añadir otro color/forma. Encaja con que el road sheet ya es una proyección de `performance` (ADR-023/041) y solo aplica a bolos reales.
+- Pendiente pensar: ¿icono/enlace inline en el chip (compite con el poco espacio del chip de mes) vs solo en agenda/detalle? ¿aparece en `confirmed` o desde `hold`? Probablemente confirmed+ (cuando la hoja de ruta empieza a tener contenido).
+
+Si alguna se asienta → migra a `_decisions.md` (o al `planner-design-prompt.md` como contrato de la próxima pasada de diseño).
