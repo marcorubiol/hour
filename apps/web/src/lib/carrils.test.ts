@@ -7,17 +7,17 @@ import {
   stackIntervals,
   type LoomTeamPerson,
 } from './carrils';
-import { resolveCalendarView } from './calendar';
+import { resolvePlannerView } from './planner';
 
-describe('resolveCalendarView (carrils, ADR-080 §7)', () => {
+describe('resolvePlannerView (carrils, ADR-080 §7)', () => {
   it('accepts carrils from the URL and from storage', () => {
-    expect(resolveCalendarView('carrils', null, false)).toBe('carrils');
-    expect(resolveCalendarView(null, 'carrils', true)).toBe('carrils');
+    expect(resolvePlannerView('carrils', null, false)).toBe('carrils');
+    expect(resolvePlannerView(null, 'carrils', true)).toBe('carrils');
   });
 
   it('never defaults to carrils — form-factor rule unchanged', () => {
-    expect(resolveCalendarView(null, null, true)).toBe('agenda');
-    expect(resolveCalendarView(null, null, false)).toBe('month');
+    expect(resolvePlannerView(null, null, true)).toBe('agenda');
+    expect(resolvePlannerView(null, null, false)).toBe('month');
   });
 });
 

@@ -300,7 +300,7 @@
         {/each}
         {#if todayNum !== null}
           <span class="strip__now-label" style="left: {center(todayNum)}%"
-            >{t('calendar.today', locale)}</span
+            >{t('planner.today', locale)}</span
           >
         {/if}
       </span>
@@ -381,7 +381,7 @@
           {/each}
         {/each}
         {#if loom.length === 0}
-          <p class="strip__empty">{t('calendar.empty_month', locale)}</p>
+          <p class="strip__empty">{t('planner.empty_month', locale)}</p>
         {/if}
       {:else}
         {#each lanes as lane (lane.key)}
@@ -436,7 +436,7 @@
           </div>
         {/each}
         {#if lanes.length === 0}
-          <p class="strip__empty">{t('calendar.empty_month', locale)}</p>
+          <p class="strip__empty">{t('planner.empty_month', locale)}</p>
         {/if}
         {#each connectors as c (c.id)}
           <button

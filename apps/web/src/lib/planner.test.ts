@@ -15,7 +15,7 @@ import {
   type BlackoutInput,
   type PlannerEvent,
   type DecisionPerformance,
-} from './calendar';
+} from './planner';
 
 describe('monthGrid', () => {
   it('starts weeks on Monday and pads the first week', () => {

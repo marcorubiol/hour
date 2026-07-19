@@ -753,7 +753,7 @@
   function blackoutLabel(b: AvailabilityItem): string {
     if (b.person_id === null) return workspaceNameById.get(b.workspace_id) ?? '—';
     const person = b.person?.full_name ?? personNames.get(b.person_id);
-    return t('calendar.band_person', locale, { person: person ?? '—' });
+    return t('planner.band_person', locale, { person: person ?? '—' });
   }
 
   /** Rehearsal/residency rows render as quiet run-bands, not pips. */
@@ -882,7 +882,7 @@
         id: `away:${band.project_id}:${band.from}`,
         ...range,
         kind: 'away',
-        label: t('calendar.away', locale, {
+        label: t('planner.away', locale, {
           project: projectNameById.get(band.project_id) ?? '—',
         }),
       });
@@ -1548,7 +1548,7 @@
         class="cal__seg-btn"
         class:cal__seg-btn--on={view === 'carrils'}
         aria-pressed={view === 'carrils'}
-        onclick={() => setView('carrils')}>{t('calendar.view_carrils', locale)}</button
+        onclick={() => setView('carrils')}>{t('planner.view_carrils', locale)}</button
       >
     </div>
     <Button size="s" onclick={() => openCreate()} label={t('planner.new', locale)}>+</Button>

@@ -6,7 +6,7 @@
  * page supplies the rows and "today", the component measures pixels.
  */
 
-import { addDaysIso } from './calendar';
+import { addDaysIso } from './planner';
 
 /** The three groupings of the carrils projection (ADR-080 §8). */
 export type CarrilsGroup = 'espai' | 'projecte' | 'persona';
