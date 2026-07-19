@@ -2075,6 +2075,8 @@ Triggered by Marco's pre-scaffold doubt (Phase 0.0 day 5). Five alternatives eva
 - **Status (cierre de sesión)**: build ejecutado 2026-07-18, en la MISMA sesión del grill (prolongada sobre la medianoche), rama `planner-decisions` (worktree `~/Developer/hour-calendar-v2`). Pendiente: apply (1 migración — `2026-07-18_hold_notice_days.sql`) + merge + deploy, a ejecutar por .zerø en sesión (no autónomo).
 ## [2026-07-19] — ADR-082 · Modelo de personas, roles y acceso — el "quién es quién" (prerrequisito de la capa de comms)
 
+> **NAMING (2026-07-19, cierra el Abierto #1):** la etiqueta = **rol** · el acceso = **permisos** (antes «rol de acceso»). En el texto de abajo, léase «oficio» → **rol** y «rol»/«rol de acceso» → **permisos**. Aplica igual a ADR-083. Motivo: el cliente no técnico parsea «rol» como *lo que hace* (no como nivel de permisos, que es jerga de dev); *oficio* y *perfil* descartados — oficio por romántico y por viajar peor (la app ya es multilingüe), perfil por genérico y por chocar con «perfil de usuario». Coste asumido: el schema sigue llamando `role` al acceso (`workspace_role`, `membership_role`) → desajuste UI («permisos») vs schema (`role`), a documentar al implementar.
+
 > Grill largo con Marco (2026-07-19) para madurar el modelo de personas ANTES de construir comunicación de equipo/bolo. Disparador: "programador no es un concepto en Hour" (es una `person` alcanzada por una conversación; `person` no tiene tipo, la organización es texto libre) + el choque de que "Conversations" ya está ocupada (ADR-075) cuando Marco quiere hablar CON el equipo, no solo registrar difusión. Raíz del "inmaduro": el control de acceso de hoy cuelga del login (`workspace/project_membership.user_id`) y está desconectado del mundo de contactos (`person` sin login) — dos mundos sin puente.
 
 - **Decisiones** (modelo decidido en principio, SIN implementar):
@@ -2103,6 +2105,8 @@ Triggered by Marco's pre-scaffold doubt (Phase 0.0 day 5). Five alternatives eva
 - **Re-evaluate when**: al implementar (orden: identidad+oficio+membresía → roles/capacidades → org); o si un contenedor pasa a mezclar dominios de verdad → reabrir Solución B (tipado de conversación).
 
 ## [2026-07-19] — ADR-083 · Capa de comms — hilos sobre contenedores, sub-hilos = facetas, permisos de ADR-082 (resuelve el Abierto #2 de ADR-082)
+
+> **NAMING:** ver la nota de ADR-082 — la etiqueta se llama **rol** y el acceso **permisos**. Donde abajo diga «rol X abre sub-hilos», léase **permiso**.
 
 > Continuación del mismo grill (2026-07-19), ya cerrado el modelo de acceso (ADR-082). Marco arrancó todo esto queriendo comunicación de equipo y por bolo (incl. "el día del bolo, un canal donde el equipo se habla"). Con el acceso decidido, media capa de comms cae sola: quién puede estar (operadores), quién ve (capacidades), participantes del bolo (derivables). Este ADR fija la FORMA; no toca schema.
 
