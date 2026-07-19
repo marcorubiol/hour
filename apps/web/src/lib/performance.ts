@@ -111,13 +111,16 @@ export function performanceStatusLabel(status: string): string {
 }
 
 /**
- * i18n key for a hold's RANK, shown on the month chip's foot. Booking
- * juggles 1st against 2nd hold, so the rank has to be readable without
- * opening the gig — folding hold_1..3 into one "hold" family is right for
- * the chip's SHAPE (ADR-072 §5) but loses the rank the operator decides on.
- * Non-holds return null: there is nothing to say.
+ * i18n key for the word on a month card's FOOT.
+ *
+ * Every card gets a foot on purpose: without one the confirmed card is a row
+ * shorter than a hold, so the most important gig reads as the smallest thing
+ * on the grid (Marco, 2026-07-19). Holds show their RANK — folding hold_1..3
+ * into one family is right for the chip's SHAPE (ADR-072 §5) but loses the
+ * very thing the operator decides between. Cancelled says nothing: those rows
+ * are filtered out of the grid upstream.
  */
-export function holdRankKey(status: string): string | null {
+export function statusFootKey(status: string): string | null {
   switch (status) {
     case 'hold_1':
       return 'planner.hold_rank_1';
@@ -127,6 +130,16 @@ export function holdRankKey(status: string): string | null {
       return 'planner.hold_rank_3';
     case 'hold':
       return 'planner.hold_plain';
+    case 'confirmed':
+      return 'planner.legend_confirmed';
+    case 'proposed':
+      return 'planner.state_proposed';
+    case 'invoiced':
+      return 'planner.state_invoiced';
+    case 'paid':
+      return 'planner.state_paid';
+    case 'done':
+      return 'planner.state_done';
     default:
       return null;
   }

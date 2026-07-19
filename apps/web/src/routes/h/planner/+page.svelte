@@ -107,10 +107,10 @@
   import type { DateRow } from '$lib/date';
   import { timeInTz } from '$lib/datetime';
   import {
-    holdRankKey,
     isHoldStatus,
     performanceStatusFamily,
     performanceStatusLabel,
+    statusFootKey,
   } from '$lib/performance';
   import { dateStatusFamily } from '$lib/date';
   import { accentVarFor } from '$lib/utils/accent';
@@ -1607,8 +1607,8 @@
       locale={localeTag}
       dateKindLabel={kindLabel}
       createLabel={(iso) => t('planner.new_on', locale, { day: iso })}
-      holdRankLabel={(status) => {
-        const key = holdRankKey(status);
+      stateLabel={(status) => {
+        const key = statusFootKey(status);
         return key ? t(key, locale) : null;
       }}
       legendConfirmedLabel={t('planner.legend_confirmed', locale)}
