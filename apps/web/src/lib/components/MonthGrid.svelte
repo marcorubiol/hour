@@ -928,6 +928,8 @@
         var(--border-color-light)
       );
       --chip-border-style: solid;
+      /* Square until settled — see the radius rule below. */
+      --chip-radius: var(--radius-none);
       --mark: 14px;
       display: flex;
       flex-direction: column;
@@ -935,7 +937,7 @@
       font-size: var(--text-xs);
       line-height: 1.3;
       padding: var(--space-2xs) var(--space-xs);
-      border-radius: var(--radius-s);
+      border-radius: var(--chip-radius);
       border: 1px var(--chip-border-style) var(--chip-border-color);
       background-color: var(--chip-bg);
       background-image: var(--chip-bg-image);
@@ -943,6 +945,16 @@
       text-decoration: none;
       overflow: hidden;
       min-inline-size: 0;
+    }
+
+    /* The radius is EARNED. Only a settled thing gets rounded corners; a
+       hold, a proposal, a tentative rehearsal keeps square ones — propose
+       five weeks of rehearsals and the three that never get confirmed keep
+       reading as unsettled without anyone having to read the word (Marco,
+       2026-07-19). One rule for gigs and dates alike: the family is the
+       whole story, so the shape stays true wherever the grammar is used. */
+    .cal__event[data-family='confirmed'] {
+      --chip-radius: var(--radius-s);
     }
 
     /* Card rows: name + monogram on top, place + time under, state at the
@@ -1040,13 +1052,16 @@
       block-size: 1em;
       background: var(--border-color-dark);
     }
+    /* The key restates the chips' own grammar — square until settled — so it
+       stays true rather than decorative. */
     .cal__legend-swatch {
       inline-size: 0.85em;
       block-size: 0.85em;
-      border-radius: var(--radius-s);
+      border-radius: var(--radius-none);
       border: 1px solid var(--border-color-dark);
     }
     .cal__legend-swatch[data-family='confirmed'] {
+      border-radius: var(--radius-s);
       border-color: transparent;
       background: color-mix(in oklch, var(--text-color) 22%, var(--bg-ultra-light));
     }
