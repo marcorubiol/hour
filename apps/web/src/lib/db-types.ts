@@ -1473,6 +1473,7 @@ export type Database = {
           dossier_url: string | null
           ends_on: string | null
           id: string
+          initials: string | null
           name: string
           notes: string | null
           owner_id: string | null
@@ -1494,6 +1495,7 @@ export type Database = {
           dossier_url?: string | null
           ends_on?: string | null
           id?: string
+          initials?: string | null
           name: string
           notes?: string | null
           owner_id?: string | null
@@ -1515,6 +1517,7 @@ export type Database = {
           dossier_url?: string | null
           ends_on?: string | null
           id?: string
+          initials?: string | null
           name?: string
           notes?: string | null
           owner_id?: string | null
@@ -2555,6 +2558,7 @@ export type Database = {
           dossier_url: string | null
           ends_on: string | null
           id: string
+          initials: string | null
           name: string
           notes: string | null
           owner_id: string | null
@@ -2839,6 +2843,37 @@ export type Database = {
       }
       slugify: { Args: { input: string }; Returns: string }
       touch_line_visit: { Args: { p_line_id: string }; Returns: undefined }
+      update_project: {
+        Args: { p_patch: Json; p_project_id: string }
+        Returns: {
+          accent: string | null
+          created_at: string
+          created_by: string | null
+          custom_fields: Json
+          deleted_at: string | null
+          description: string | null
+          dossier_url: string | null
+          ends_on: string | null
+          id: string
+          initials: string | null
+          name: string
+          notes: string | null
+          owner_id: string | null
+          poster_url: string | null
+          previous_slugs: string[]
+          slug: string
+          starts_on: string | null
+          status: Database["public"]["Enums"]["project_status"]
+          updated_at: string
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "project"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       update_workspace: {
         Args: { p_patch: Json; p_workspace_id: string }
         Returns: {

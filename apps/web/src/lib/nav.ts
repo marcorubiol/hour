@@ -49,6 +49,8 @@ export type RawProject = {
   ends_on: string | null;
   updated_at: string;
   accent?: string | null;
+  /** Stored identity monogram (ADR-081); absent until the migration lands. */
+  initials?: string | null;
   description?: string | null;
 };
 

@@ -1,9 +1,9 @@
 <script lang="ts">
   /**
-   * AccentSwatchPicker — the 8-swatch accent selector shared by the three
-   * create dialogs (workspace / project / line). Auto is implicit: no
-   * swatch selected means accent=null and the server derives the color
-   * via hash(slug); the hint previews what Auto would pick.
+   * AccentSwatchPicker — the 12-swatch accent selector shared by the create
+   * dialogs (workspace / project / line) and the identity editors. Auto is
+   * implicit: no swatch selected means accent=null and the server derives the
+   * color via hash(slug); the hint previews what Auto would pick.
    *
    * Formerly copy-pasted verbatim per dialog (~70 lines each).
    */
@@ -11,7 +11,7 @@
   import { accentVar } from '$lib/utils/accent';
 
   interface Props {
-    /** Selected accent "1".."8", or null for auto. */
+    /** Selected accent "1".."12", or null for auto. */
     accent?: string | null;
     /** Slug the server would hash when accent is null (auto preview). */
     autoSlug: string;
@@ -26,7 +26,7 @@
 <fieldset class="swatches">
   <legend>Color</legend>
   <div class="swatch-grid" role="radiogroup" aria-label={label}>
-    {#each [1, 2, 3, 4, 5, 6, 7, 8] as n (n)}
+    {#each [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] as n (n)}
       {@const isOn = accent === String(n)}
       <button
         type="button"

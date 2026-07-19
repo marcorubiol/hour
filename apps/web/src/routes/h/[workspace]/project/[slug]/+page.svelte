@@ -21,6 +21,8 @@
   } from '$lib/nav-queries';
   import { accentVar, accentVarFor } from '$lib/utils/accent';
   import { useBreadcrumb } from '$lib/stores/breadcrumb.svelte';
+  import IdentityMark from '$lib/components/IdentityMark.svelte';
+  import EditProjectDialog from '$lib/components/EditProjectDialog.svelte';
   import RelationshipStub from '$lib/components/RelationshipStub.svelte';
   import StateBadge from '$lib/components/StateBadge.svelte';
   import YNotes from '$lib/components/YNotes.svelte';
@@ -89,6 +91,15 @@
     project ? ($linesQuery.data?.items ?? []).filter((l) => l.project?.id === project.id) : [],
   );
 
+  let editOpen = $state(false);
+  let siblings = $derived(
+    workspaceId
+      ? ($projectsQuery.data?.items ?? [])
+          .filter((p) => p.workspace_id === workspaceId && p.id !== project?.id)
+          .map((p) => ({ id: p.id, initials: p.initials }))
+      : [],
+  );
+
   function formatDate(iso: string | null): string {
     if (!iso) return '';
     return dayMonthYear(iso);
@@ -101,7 +112,25 @@
 
 <article class="project" style={`--c: ${project ? accentVarFor(project) : accentVar(projectSlug)}`}>
   <header class="project__head">
-    <p class="eyebrow">Project</p>
+    <div class="project__kicker">
+      {#if project}
+        <button
+          type="button"
+          class="project__mark"
+          title="Edit project"
+          onclick={() => (editOpen = true)}
+        >
+          <IdentityMark
+            variant="compact"
+            accent={accentVarFor(project)}
+            initials={project.initials}
+            name={project.name}
+            size="30px"
+          />
+        </button>
+      {/if}
+      <p class="eyebrow">Project</p>
+    </div>
     <h1 class="project__title">
       {#if projectLoading}
         <span class="project__title-skeleton" aria-hidden="true">…</span>
@@ -123,6 +152,10 @@
       </div>
     {/if}
   </header>
+
+  {#if project}
+    <EditProjectDialog bind:open={editOpen} {project} {siblings} />
+  {/if}
 
   <RelationshipStub projectSlug={projectSlug} />
 
@@ -183,6 +216,23 @@
     padding-block-end: var(--space-m);
     border-block-end: 1px solid var(--border-color-light);
     position: relative;
+  }
+
+  .project__kicker {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+  }
+
+  .project__mark {
+    all: unset;
+    cursor: pointer;
+    display: inline-flex;
+    border-radius: var(--radius-s);
+  }
+  .project__mark:focus-visible {
+    outline: var(--focus-width) solid var(--focus-color);
+    outline-offset: 2px;
   }
 
   /* Project accent — a thin vertical rail to the left of the title block,

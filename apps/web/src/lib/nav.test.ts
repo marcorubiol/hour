@@ -86,7 +86,7 @@ describe('buildProjectIndex', () => {
     const mamemi = index[0];
     expect(mamemi.workspaceSlug).toBe('muk-cia');
     expect(mamemi.workspaceName).toBe('MüK Cia');
-    expect(mamemi.accent).toMatch(/^var\(--accent-\d\)$/);
+    expect(mamemi.accent).toMatch(/^var\(--accent-([1-9]|1[0-2])\)$/);
     expect(projectUrl(mamemi)).toBe('/h/muk-cia/project/mamemi/');
   });
 });
