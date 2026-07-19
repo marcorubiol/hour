@@ -11,6 +11,7 @@
     | 'tel'
     | 'url'
     | 'date'
+    | 'time'
     | 'datetime-local';
 
   interface Props {
