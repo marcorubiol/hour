@@ -51,6 +51,7 @@
     status: string;
     title: string | null;
     starts_at: string;
+    ends_at?: string | null;
     all_day: boolean;
     /** ADR-084 §1 — rows sharing this render as one multi-day band. */
     series_id?: string | null;
@@ -359,10 +360,20 @@
     const t = dualTime(at, perfTz(p), viewerTz);
     return t.secondary ? `${base} · ${t.primary} (${t.secondary} yours)` : `${base} · ${t.primary}`;
   }
-  function dateTime(d: DateEvent): { primary: string; secondary: string | null } | null {
+  function dateTime(
+    d: DateEvent,
+  ): { primary: string; secondary: string | null; end: string | null } | null {
     if (d.all_day) return null;
     const t = dualTime(d.starts_at, d.venue?.timezone, viewerTz);
-    return { primary: t.primary, secondary: t.secondary };
+    // A day says its hours as a RANGE when it has an end. On a block's
+    // continuation cell the range is the ONLY thing there is room for, and
+    // "10:00" alone would hide that Wednesday runs four hours longer than
+    // Tuesday — which is the whole reason the days are separate rows.
+    const end =
+      d.ends_at && d.ends_at !== d.starts_at
+        ? dualTime(d.ends_at, d.venue?.timezone, viewerTz).primary
+        : null;
+    return { primary: t.primary, secondary: t.secondary, end };
   }
   function dateText(d: DateEvent): string {
     // "Altres" rows carry their free label; day_off shows its city if any.
@@ -727,7 +738,9 @@
                 {#if city || time}
                   <span class="cal__event-line">
                     <span class="cal__event-city">{city ?? ''}</span>
-                    {#if time}<span class="cal__event-time">{time.primary}</span>{/if}
+                    {#if time}<span class="cal__event-time"
+                        >{time.primary}{#if time.end}–{time.end}{/if}</span
+                      >{/if}
                   </span>
                 {/if}
                 <span class="cal__event-kind">{dateKindLabel(d.kind)}</span>
@@ -736,7 +749,9 @@
                      said its name at the head; repeating it would print the
                      same words across five cells. -->
                 <span class="cal__event-line cal__event-line--cont">
-                  <span class="cal__event-time">{time.primary}</span>
+                  <span class="cal__event-time"
+                    >{time.primary}{#if time.end}–{time.end}{/if}</span
+                  >
                 </span>
               {/if}
             </span>
