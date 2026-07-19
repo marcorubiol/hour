@@ -169,6 +169,16 @@
     /** i18n hooks — the page passes t()-backed fns; defaults stay English. */
     dateKindLabel?: (kind: string) => string;
     createLabel?: (isoDate: string) => string;
+    /**
+     * Hold RANK for the chip foot ("1r hold") — null for non-holds. The
+     * status family folds hold_1..3 into one SHAPE (ADR-072 §5); the rank
+     * is the thing the operator actually decides between, so it stays
+     * readable without opening the gig.
+     */
+    holdRankLabel?: (status: string) => string | null;
+    /** Legend key words (project row + the confirmed/hold swatches). */
+    legendConfirmedLabel?: string;
+    legendHoldLabel?: string;
   }
 
   let {
@@ -185,6 +195,18 @@
     locale = 'en-GB',
     dateKindLabel = (kind: string) => kind.replace(/_/g, ' '),
     createLabel = (iso: string) => `New performance on ${iso}`,
+    holdRankLabel = (status: string) =>
+      status === 'hold_1'
+        ? '1st hold'
+        : status === 'hold_2'
+          ? '2nd hold'
+          : status === 'hold_3'
+            ? '3rd hold'
+            : status === 'hold'
+              ? 'hold'
+              : null,
+    legendConfirmedLabel = 'confirmed',
+    legendHoldLabel = 'hold',
   }: Props = $props();
 
   // ── Identity quick-edit (ADR-081): a monogram click opens the editor at a
@@ -328,6 +350,26 @@
     return place;
   }
 
+  // The chip's second row (venue on top, city underneath). Suppressed when
+  // the label ALREADY fell back to the city — a chip never prints the same
+  // place twice.
+  function perfCity(p: PerformanceEvent): string | null {
+    const city = p.venue?.city ?? p.city ?? null;
+    return city && city !== perfLabel(p) ? city : null;
+  }
+  function dateCity(d: DateEvent): string | null {
+    const city = d.city ?? null;
+    return city && city !== dateText(d) ? city : null;
+  }
+
+  /** Distinct projects in view, for the legend key above the grid. */
+  let legendProjects = $derived.by(() => {
+    const m = new Map<string, ProjectLite>();
+    for (const p of performances) if (p.project) m.set(p.project.id, p.project);
+    for (const d of dates) if (d.project) m.set(d.project.id, d.project);
+    return [...m.values()].sort((a, b) => a.name.localeCompare(b.name));
+  });
+
   type BandSlot =
     | { kind: 'blackout'; band: BlackoutBandVM; from: string; to: string }
     | { kind: 'away'; band: AwayBandVM; from: string; to: string };
@@ -395,6 +437,54 @@
     };
   });
 </script>
+
+<!-- One chip body, two shells: a gig with a slug is a link, one without is
+     inert. The body lives in a snippet so the card grammar is written once. -->
+{#snippet perfBody(p: PerformanceEvent)}
+  {@const time = perfTime(p)}
+  {@const city = perfCity(p)}
+  {@const rank = holdRankLabel(p.status)}
+  <span class="cal__event-top">
+    <span class="cal__event-name">{perfLabel(p)}</span>
+    {#if p.project}<button
+        type="button"
+        class="cal__markbtn"
+        onclick={(e) => openMark(e, p.project)}
+      ><IdentityMark
+          accent={accentVarFor(p.project)}
+          name={p.project.name}
+          initials={p.project.initials}
+        /></button>{/if}
+  </span>
+  {#if city || time}
+    <span class="cal__event-line">
+      <span class="cal__event-city">{city ?? ''}</span>
+      {#if time}<span class="cal__event-time"
+          >{time.primary}{#if time.secondary}<i> {time.secondary}</i>{/if}</span
+        >{/if}
+    </span>
+  {/if}
+  {#if rank}<span class="cal__event-foot">{rank}</span>{/if}
+{/snippet}
+
+{#if legendProjects.length > 0}
+  <div class="cal__legend">
+    {#each legendProjects as pr (pr.id)}
+      <span class="cal__legend-item"
+        ><IdentityMark accent={accentVarFor(pr)} name={pr.name} initials={pr.initials} />{pr.name}</span
+      >
+    {/each}
+    <span class="cal__legend-sep" aria-hidden="true"></span>
+    <span class="cal__legend-key"
+      ><span class="cal__legend-swatch" data-family="confirmed" aria-hidden="true"
+      ></span>{legendConfirmedLabel}</span
+    >
+    <span class="cal__legend-key"
+      ><span class="cal__legend-swatch" data-family="hold" aria-hidden="true"
+      ></span>{legendHoldLabel}</span
+    >
+  </div>
+{/if}
 
 <div
   class="cal__grid"
@@ -476,7 +566,6 @@
         {/each}
         {#each perfs as p (p.id)}
           {@const href = perfHref(p)}
-          {@const time = perfTime(p)}
           {@const family = performanceStatusFamily(p.status)}
           {#if href}
             <a
@@ -485,26 +574,14 @@
               style={p.project ? `--c: ${accentVarFor(p.project)}` : undefined}
               {href}
               title={perfTitle(p)}
-            >
-              {#if p.project}<button type="button" class="cal__markbtn" onclick={(e) => openMark(e, p.project)}><IdentityMark accent={accentVarFor(p.project)} name={p.project.name} initials={p.project.initials} /></button>{/if}
-              {#if time}<span class="cal__event-time"
-                  >{time.primary}{#if time.secondary}<i> {time.secondary}</i>{/if}</span
-                >{/if}
-              <span class="cal__event-name">{perfLabel(p)}</span>
-            </a>
+            >{@render perfBody(p)}</a>
           {:else}
             <span
               class="cal__event cal__event--perf"
               data-family={family}
               style={p.project ? `--c: ${accentVarFor(p.project)}` : undefined}
               title={perfTitle(p)}
-            >
-              {#if p.project}<button type="button" class="cal__markbtn" onclick={(e) => openMark(e, p.project)}><IdentityMark accent={accentVarFor(p.project)} name={p.project.name} initials={p.project.initials} /></button>{/if}
-              {#if time}<span class="cal__event-time"
-                  >{time.primary}{#if time.secondary}<i> {time.secondary}</i>{/if}</span
-                >{/if}
-              <span class="cal__event-name">{perfLabel(p)}</span>
-            </span>
+            >{@render perfBody(p)}</span>
           {/if}
         {/each}
         {#each dayDates as d (d.id)}
@@ -516,6 +593,7 @@
             >{#if d.project}<button type="button" class="cal__markbtn" onclick={(e) => openMark(e, d.project)}><IdentityMark accent={accentVarFor(d.project)} name={d.project.name} initials={d.project.initials} /></button>{/if}{travelText(d)}</span>
           {:else}
             {@const time = dateTime(d)}
+            {@const city = dateCity(d)}
             <span
               class="cal__event cal__event--date"
               class:cal__event--off={d.kind === 'day_off'}
@@ -523,10 +601,25 @@
               style={d.project ? `--c: ${accentVarFor(d.project)}` : undefined}
               title={dateTitle(d)}
             >
-              {#if d.project}<button type="button" class="cal__markbtn" onclick={(e) => openMark(e, d.project)}><IdentityMark accent={accentVarFor(d.project)} name={d.project.name} initials={d.project.initials} /></button>{/if}
-              {#if time}<span class="cal__event-time">{time.primary}</span>{/if}
+              <span class="cal__event-top">
+                <span class="cal__event-name">{dateText(d)}</span>
+                {#if d.project}<button
+                    type="button"
+                    class="cal__markbtn"
+                    onclick={(e) => openMark(e, d.project)}
+                  ><IdentityMark
+                      accent={accentVarFor(d.project)}
+                      name={d.project.name}
+                      initials={d.project.initials}
+                    /></button>{/if}
+              </span>
+              {#if city || time}
+                <span class="cal__event-line">
+                  <span class="cal__event-city">{city ?? ''}</span>
+                  {#if time}<span class="cal__event-time">{time.primary}</span>{/if}
+                </span>
+              {/if}
               <span class="cal__event-kind">{dateKindLabel(d.kind)}</span>
-              <span class="cal__event-name">{dateText(d)}</span>
             </span>
           {/if}
         {/each}
@@ -806,24 +899,63 @@
        possibility), never the properties. */
     .cal__event {
       --chip-bg: var(--bg-ultra-light);
+      /* Hold's hatch rides as an IMAGE so the family still only redeclares
+         variables, never properties (philosophy §3). */
+      --chip-bg-image: none;
       --chip-fg: var(--text-color);
       --chip-border-color: transparent;
       --chip-border-style: solid;
       --mark: 14px;
       display: flex;
-      align-items: baseline;
-      gap: var(--space-2xs);
+      flex-direction: column;
+      gap: 1px;
       font-size: var(--text-xs);
       line-height: 1.3;
       padding: var(--space-2xs) var(--space-xs);
       border-radius: var(--radius-s);
       border: 1px var(--chip-border-style) var(--chip-border-color);
       border-inline-start: 2px solid var(--c, var(--border-color-dark));
-      background: var(--chip-bg);
+      background-color: var(--chip-bg);
+      background-image: var(--chip-bg-image);
       color: var(--chip-fg);
       text-decoration: none;
       overflow: hidden;
       min-inline-size: 0;
+    }
+
+    /* Card rows: name + monogram on top, place + time under, state at the
+       foot. Monogram and time never shrink; the name and city take the
+       squeeze so a long venue can't push the meta out of the cell. */
+    .cal__event-top,
+    .cal__event-line {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-2xs);
+      min-inline-size: 0;
+    }
+    .cal__event-line {
+      color: var(--text-muted);
+    }
+    .cal__event-city {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      min-inline-size: 0;
+    }
+    /* The chip's foot — hold rank on a gig, kind word on a date. */
+    .cal__event-foot,
+    .cal__event-kind {
+      margin-block-start: 1px;
+      padding-block-start: 1px;
+      border-block-start: 1px solid
+        color-mix(in oklch, var(--c, var(--border-color-dark)) 16%, var(--border-color-light));
+    }
+    .cal__event-foot {
+      font-family: var(--font-mono);
+      font-size: 0.85em;
+      letter-spacing: var(--mono-letter-spacing-loose);
+      color: var(--text-faint);
     }
 
     a.cal__event:hover {
@@ -836,9 +968,18 @@
     .cal__event--perf[data-family='confirmed'] .cal__event-name {
       font-weight: 600;
     }
+    /* Hold = possibility held: dashed edge + the 135° hatch that means
+       "not settled" everywhere in this view (tentative blackouts use it
+       too), so the state reads before the words do. */
     .cal__event--perf[data-family='hold'] {
-      --chip-bg: var(--bg);
+      --chip-bg: var(--bg-ultra-light);
+      --chip-bg-image: repeating-linear-gradient(
+        135deg,
+        color-mix(in oklch, var(--c, var(--border-color-dark)) 11%, var(--bg-ultra-light)) 0 5px,
+        var(--bg-ultra-light) 5px 10px
+      );
       --chip-border-color: color-mix(in oklch, var(--c, var(--border-color-dark)) 42%, var(--border-color-light));
+      --chip-border-style: dashed;
       --chip-fg: var(--text-muted);
     }
     .cal__event--perf[data-family='proposed'] {
@@ -846,6 +987,49 @@
       --chip-border-color: var(--border-color-dark);
       --chip-border-style: dashed;
       --chip-fg: var(--text-muted);
+    }
+
+    /* Legend — the month's colour key, readable without opening anything.
+       The swatches restate the two shapes the chips use (solid = settled,
+       hatched+dashed = held), in neutral ink so they read as a key and not
+       as one more project. */
+    .cal__legend {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: var(--space-xs) var(--space-s);
+      margin-block-end: var(--space-s);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+    }
+    .cal__legend-item,
+    .cal__legend-key {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2xs);
+    }
+    .cal__legend-sep {
+      inline-size: 1px;
+      block-size: 1em;
+      background: var(--border-color-dark);
+    }
+    .cal__legend-swatch {
+      inline-size: 0.85em;
+      block-size: 0.85em;
+      border-radius: var(--radius-s);
+      border: 1px solid var(--border-color-dark);
+    }
+    .cal__legend-swatch[data-family='confirmed'] {
+      border-color: transparent;
+      background: color-mix(in oklch, var(--text-color) 22%, var(--bg-ultra-light));
+    }
+    .cal__legend-swatch[data-family='hold'] {
+      border-style: dashed;
+      background-image: repeating-linear-gradient(
+        135deg,
+        color-mix(in oklch, var(--text-color) 16%, var(--bg-ultra-light)) 0 4px,
+        var(--bg-ultra-light) 4px 8px
+      );
     }
 
     .cal__event-name {

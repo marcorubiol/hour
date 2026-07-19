@@ -105,7 +105,12 @@
   import type { AvailabilityItem } from '$lib/availability';
   import type { DateRow } from '$lib/date';
   import { timeInTz } from '$lib/datetime';
-  import { isHoldStatus, performanceStatusFamily, performanceStatusLabel } from '$lib/performance';
+  import {
+    holdRankKey,
+    isHoldStatus,
+    performanceStatusFamily,
+    performanceStatusLabel,
+  } from '$lib/performance';
   import { dateStatusFamily } from '$lib/date';
   import { accentVarFor } from '$lib/utils/accent';
 
@@ -1595,6 +1600,12 @@
       locale={localeTag}
       dateKindLabel={kindLabel}
       createLabel={(iso) => t('planner.new_on', locale, { day: iso })}
+      holdRankLabel={(status) => {
+        const key = holdRankKey(status);
+        return key ? t(key, locale) : null;
+      }}
+      legendConfirmedLabel={t('planner.legend_confirmed', locale)}
+      legendHoldLabel={t('planner.legend_hold', locale)}
     />
   {:else if view === 'agenda'}
     <AgendaList

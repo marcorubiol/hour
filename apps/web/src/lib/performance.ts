@@ -110,6 +110,28 @@ export function performanceStatusLabel(status: string): string {
   return status.replace(/_/g, ' ');
 }
 
+/**
+ * i18n key for a hold's RANK, shown on the month chip's foot. Booking
+ * juggles 1st against 2nd hold, so the rank has to be readable without
+ * opening the gig — folding hold_1..3 into one "hold" family is right for
+ * the chip's SHAPE (ADR-072 §5) but loses the rank the operator decides on.
+ * Non-holds return null: there is nothing to say.
+ */
+export function holdRankKey(status: string): string | null {
+  switch (status) {
+    case 'hold_1':
+      return 'planner.hold_rank_1';
+    case 'hold_2':
+      return 'planner.hold_rank_2';
+    case 'hold_3':
+      return 'planner.hold_rank_3';
+    case 'hold':
+      return 'planner.hold_plain';
+    default:
+      return null;
+  }
+}
+
 // Date-only contract — the one shared realIsoDate (see $lib/datetime).
 const isoDateField = realIsoDate;
 
