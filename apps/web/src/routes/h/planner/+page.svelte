@@ -74,11 +74,11 @@
     conflictsFor,
     dayKeyInTz,
     monthGrid,
-    resolveCalendarView,
-    type CalendarEvent,
-    type CalendarView,
+    resolvePlannerView,
+    type PlannerEvent,
+    type PlannerView,
     type Conflict,
-  } from '$lib/calendar';
+  } from '$lib/planner';
   import type { AvailabilityItem } from '$lib/availability';
   import type { DateRow } from '$lib/date';
   import { performanceStatusFamily, performanceStatusLabel } from '$lib/performance';
@@ -124,14 +124,14 @@
       return null;
     }
   }
-  let view = $state<CalendarView>(
-    resolveCalendarView(
+  let view = $state<PlannerView>(
+    resolvePlannerView(
       new URL(location.href).searchParams.get('view'),
       storedView(),
       matchMedia('(max-width: 640px)').matches,
     ),
   );
-  function setView(v: CalendarView) {
+  function setView(v: PlannerView) {
     if (view === v) return;
     view = v;
     try {
@@ -243,7 +243,7 @@
   const perfOptions = toStore(() => {
     const k = $feedKey;
     return {
-      queryKey: ['calendar-performances', k] as const,
+      queryKey: ['planner-performances', k] as const,
       enabled: !k.unresolved,
       queryFn: ({ signal }: { signal: AbortSignal }) =>
         fetchJSON<{ items: PerformanceEvent[] }>(
@@ -259,7 +259,7 @@
   const datesOptions = toStore(() => {
     const k = $feedKey;
     return {
-      queryKey: ['calendar-dates', k] as const,
+      queryKey: ['planner-dates', k] as const,
       enabled: !k.unresolved,
       queryFn: ({ signal }: { signal: AbortSignal }) =>
         fetchJSON<{ items: DateEvent[] }>(
@@ -277,7 +277,7 @@
   const availabilityOptions = toStore(() => {
     const k = $feedKey;
     return {
-      queryKey: ['calendar-availability', { from: k.from, to: k.to }] as const,
+      queryKey: ['planner-availability', { from: k.from, to: k.to }] as const,
       enabled: !k.unresolved,
       queryFn: async ({ signal }: { signal: AbortSignal }) => {
         try {
@@ -298,7 +298,7 @@
   const teamOptions = toStore(() => {
     const ids = ($workspacesQuery.data?.items ?? []).map((w) => w.id);
     return {
-      queryKey: ['calendar-team', ids] as const,
+      queryKey: ['planner-team', ids] as const,
       enabled: ids.length > 0,
       queryFn: async ({ signal }: { signal: AbortSignal }) => {
         try {
@@ -380,7 +380,7 @@
   // ── Conflict engine (ADR-072 §1) — over the UNFILTERED scoped rows:
   // hiding chips behind the status filter never hides a real clash. ─────
   let engineEvents = $derived.by(() => {
-    const out: CalendarEvent[] = [];
+    const out: PlannerEvent[] = [];
     for (const p of scopedPerfs) {
       if (p.status === 'cancelled' || !p.project) continue;
       out.push({
@@ -470,7 +470,7 @@
         tentative: b.certainty === 'tentative',
         label: company
           ? (workspaceNameById.get(b.workspace_id) ?? '—')
-          : t('calendar.band_person', locale, { person: personName ?? '—' }),
+          : t('planner.band_person', locale, { person: personName ?? '—' }),
         note: b.note,
       };
     }),
@@ -479,7 +479,7 @@
     aways.map((b) => ({
       from: b.from,
       to: b.to,
-      label: t('calendar.away', locale, {
+      label: t('planner.away', locale, {
         project: projectNameById.get(b.project_id) ?? '—',
       }),
     })),
@@ -516,8 +516,8 @@
       return {
         severity: c.severity,
         glyph: '!',
-        title: t('calendar.clash_people_title', locale),
-        body: t('calendar.clash_people_body', locale, { people }),
+        title: t('planner.clash_people_title', locale),
+        body: t('planner.clash_people_body', locale, { people }),
         rows,
       };
     }
@@ -525,8 +525,8 @@
       return {
         severity: c.severity,
         glyph: '?',
-        title: t('calendar.clash_possible_title', locale),
-        body: t('calendar.clash_possible_body', locale),
+        title: t('planner.clash_possible_title', locale),
+        body: t('planner.clash_possible_body', locale),
         rows,
       };
     }
@@ -538,16 +538,16 @@
     return {
       severity: c.severity,
       glyph: tentative ? '?' : '!',
-      title: t(tentative ? 'calendar.clash_blackout_t_title' : 'calendar.clash_blackout_title', locale),
+      title: t(tentative ? 'planner.clash_blackout_t_title' : 'planner.clash_blackout_title', locale),
       body: company
         ? t(
             tentative
-              ? 'calendar.clash_blackout_t_company_body'
-              : 'calendar.clash_blackout_company_body',
+              ? 'planner.clash_blackout_t_company_body'
+              : 'planner.clash_blackout_company_body',
             locale,
             { workspace },
           )
-        : t(tentative ? 'calendar.clash_blackout_t_body' : 'calendar.clash_blackout_body', locale, {
+        : t(tentative ? 'planner.clash_blackout_t_body' : 'planner.clash_blackout_body', locale, {
             person,
           }),
       rows,
@@ -591,8 +591,8 @@
   let monthTitle = $derived(monthName(ym.year, ym.month, localeTag));
   let eyebrowSpaces = $derived(
     spacesInView === 1
-      ? t('calendar.eyebrow_spaces_one', locale)
-      : t('calendar.eyebrow_spaces', locale, { n: spacesInView }),
+      ? t('planner.eyebrow_spaces_one', locale)
+      : t('planner.eyebrow_spaces', locale, { n: spacesInView }),
   );
 
   function prevMonth() {
@@ -743,17 +743,17 @@
 <section class="cal">
   <header class="cal__head">
     <div class="cal__toprow">
-      <p class="eyebrow">{t('lens.calendar', locale)} · {eyebrowSpaces}</p>
+      <p class="eyebrow">{t('lens.planner', locale)} · {eyebrowSpaces}</p>
       <LensSwitcher />
     </div>
     <h1 class="cal__month"><em>{monthTitle}</em> {ym.year}</h1>
     {#if !errorMsg}
       <p class="cal__stats" class:cal__stats--loading={loading}>
-        <span class="cal__stat"><b>{stats.confirmed}</b> {t('calendar.stat_confirmed', locale)}</span>
-        <span class="cal__stat"><b>{stats.holds}</b> {t('calendar.stat_holds', locale)}</span>
-        <span class="cal__stat"><b>{stats.conflicts}</b> {t('calendar.stat_conflicts', locale)}</span>
+        <span class="cal__stat"><b>{stats.confirmed}</b> {t('planner.stat_confirmed', locale)}</span>
+        <span class="cal__stat"><b>{stats.holds}</b> {t('planner.stat_holds', locale)}</span>
+        <span class="cal__stat"><b>{stats.conflicts}</b> {t('planner.stat_conflicts', locale)}</span>
         <span class="cal__stat cal__stat--soft"
-          ><b>{stats.blackouts}</b> {t('calendar.stat_blackouts', locale)}</span
+          ><b>{stats.blackouts}</b> {t('planner.stat_blackouts', locale)}</span
         >
       </p>
     {/if}
@@ -761,65 +761,65 @@
 
   <div class="cal__toolbar">
     <div class="cal__nav-buttons">
-      <Button variant="outline" size="s" onclick={prevMonth} label={t('calendar.prev_month', locale)}
+      <Button variant="outline" size="s" onclick={prevMonth} label={t('planner.prev_month', locale)}
         >←</Button
       >
       <span class="cal__tbmonth">{monthTitle} {ym.year}</span>
-      <Button variant="outline" size="s" onclick={nextMonth} label={t('calendar.next_month', locale)}
+      <Button variant="outline" size="s" onclick={nextMonth} label={t('planner.next_month', locale)}
         >→</Button
       >
-      <Button variant="outline" size="s" onclick={thisMonth}>{t('calendar.today', locale)}</Button>
+      <Button variant="outline" size="s" onclick={thisMonth}>{t('planner.today', locale)}</Button>
     </div>
     <div class="cal__spacer"></div>
-    <div class="cal__filter" role="group" aria-label={t('calendar.filter_label', locale)}>
+    <div class="cal__filter" role="group" aria-label={t('planner.filter_label', locale)}>
       <button
         type="button"
         class="cal__filter-btn"
         class:cal__filter-btn--on={filter === 'all'}
         aria-pressed={filter === 'all'}
-        onclick={() => (filter = 'all')}>{t('calendar.filter_all', locale)}</button
+        onclick={() => (filter = 'all')}>{t('planner.filter_all', locale)}</button
       >
       <button
         type="button"
         class="cal__filter-btn"
         class:cal__filter-btn--on={filter === 'holds'}
         aria-pressed={filter === 'holds'}
-        onclick={() => (filter = 'holds')}>{t('calendar.filter_holds', locale)}</button
+        onclick={() => (filter = 'holds')}>{t('planner.filter_holds', locale)}</button
       >
       <button
         type="button"
         class="cal__filter-btn"
         class:cal__filter-btn--on={filter === 'confirmed'}
         aria-pressed={filter === 'confirmed'}
-        onclick={() => (filter = 'confirmed')}>{t('calendar.filter_confirmed', locale)}</button
+        onclick={() => (filter = 'confirmed')}>{t('planner.filter_confirmed', locale)}</button
       >
     </div>
-    <div class="cal__seg" role="group" aria-label={t('calendar.view_label', locale)}>
+    <div class="cal__seg" role="group" aria-label={t('planner.view_label', locale)}>
       <button
         type="button"
         class="cal__seg-btn"
         class:cal__seg-btn--on={view === 'month'}
         aria-pressed={view === 'month'}
-        onclick={() => setView('month')}>{t('calendar.view_month', locale)}</button
+        onclick={() => setView('month')}>{t('planner.view_month', locale)}</button
       >
       <button
         type="button"
         class="cal__seg-btn"
         class:cal__seg-btn--on={view === 'agenda'}
         aria-pressed={view === 'agenda'}
-        onclick={() => setView('agenda')}>{t('calendar.view_agenda', locale)}</button
+        onclick={() => setView('agenda')}>{t('planner.view_agenda', locale)}</button
       >
     </div>
-    <Button size="s" onclick={() => openCreate()} label={t('calendar.new', locale)}>+</Button>
+    <Button size="s" onclick={() => openCreate()} label={t('planner.new', locale)}>+</Button>
     <Menu
       align="end"
-      label={t('calendar.more', locale)}
+      label={t('planner.more', locale)}
       items={[
-        { label: t('calendar.feed', locale), onclick: openFeed },
+        { label: t('planner.feed', locale), onclick: openFeed },
         ...(canBlackout
           ? [
               {
-                label: t('calendar.blackout_menu', locale),
+                label: t('planner.blackout_menu', locale),
                 // Direct menu path: no day context — drop any stale preset
                 // from a cancelled day-cell create (the dialog defaults to
                 // today). The create-dialog footer path keeps its day.
@@ -852,7 +852,7 @@
       {clashesByDay}
       locale={localeTag}
       dateKindLabel={kindLabel}
-      createLabel={(iso) => t('calendar.new_on', locale, { day: iso })}
+      createLabel={(iso) => t('planner.new_on', locale, { day: iso })}
     />
   {:else}
     <AgendaList
@@ -866,9 +866,9 @@
       {clashesByDay}
       locale={localeTag}
       dateKindLabel={kindLabel}
-      viewerTimeLabel={(time) => t('calendar.viewer_time', locale, { time })}
-      emptyLabel={t('calendar.empty_month', locale)}
-      blackoutsToggleLabel={t('calendar.blackouts_toggle', locale)}
+      viewerTimeLabel={(time) => t('planner.viewer_time', locale, { time })}
+      emptyLabel={t('planner.empty_month', locale)}
+      blackoutsToggleLabel={t('planner.blackouts_toggle', locale)}
     />
   {/if}
 </section>

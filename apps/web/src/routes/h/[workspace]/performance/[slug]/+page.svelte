@@ -162,7 +162,7 @@
     onSuccess: () => {
       dialogOpen = false;
       void queryClient.invalidateQueries({ queryKey: ['performance'] });
-      void queryClient.invalidateQueries({ queryKey: ['calendar-performances'] });
+      void queryClient.invalidateQueries({ queryKey: ['planner-performances'] });
     },
     onError: (err) => {
       addToast({
@@ -317,7 +317,7 @@
     onSuccess: async () => {
       confirmDeleteOpen = false;
       dialogOpen = false;
-      void queryClient.invalidateQueries({ queryKey: ['calendar-performances'] });
+      void queryClient.invalidateQueries({ queryKey: ['planner-performances'] });
       void queryClient.invalidateQueries({ queryKey: ['money-performances'] });
       void queryClient.invalidateQueries({ queryKey: ['invoices'] });
       addToast({ tone: 'success', message: 'Performance deleted.' });

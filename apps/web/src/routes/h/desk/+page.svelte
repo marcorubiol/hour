@@ -205,7 +205,7 @@
   // ── Gutter labels are doors to their lens (scope rides in the pins store). ──
   const LENS_HREF: Record<DeskConcern, string | null> = {
     task: null,
-    agenda: '/h/calendar',
+    agenda: '/h/planner',
     conversation: '/h/conversations',
     money: '/h/money',
   };
@@ -229,7 +229,7 @@
     if (summary.pipeline != null && summary.pipeline > 0)
       f.push({ text: t('desk.pulse_pipeline', locale, { amount: money(summary.pipeline, summary.currency) }), href: '/h/money' });
     if (summary.nextShowCity)
-      f.push({ text: t('desk.pulse_next_show', locale, { place: summary.nextShowCity }), href: '/h/calendar' });
+      f.push({ text: t('desk.pulse_next_show', locale, { place: summary.nextShowCity }), href: '/h/planner' });
     return f;
   });
 

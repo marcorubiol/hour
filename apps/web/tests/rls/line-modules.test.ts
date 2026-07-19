@@ -84,7 +84,7 @@ describe.skipIf(!envReady())('RLS — ADR-056 line modules', () => {
         p_project_id: projectId,
         p_name: FIXTURE_LINE_NAME,
         p_kind: 'campaign',
-        p_modules: ['conversations', 'calendar', 'materials', 'notes'],
+        p_modules: ['conversations', 'planner', 'materials', 'notes'],
       });
       if (created.status !== 200 || !created.data) {
         throw new Error(`create_line fixture failed: ${created.status}`);
@@ -98,10 +98,10 @@ describe.skipIf(!envReady())('RLS — ADR-056 line modules', () => {
     await pgPatch<LineRow>(
       'line',
       jwt,
-      { modules: ['conversations', 'calendar', 'materials', 'notes'] },
+      { modules: ['conversations', 'planner', 'materials', 'notes'] },
       new URLSearchParams({ id: `eq.${fixtureLine.id}`, select: 'id' }),
     );
-    fixtureLine.modules = ['conversations', 'calendar', 'materials', 'notes'];
+    fixtureLine.modules = ['conversations', 'planner', 'materials', 'notes'];
 
     // Crash recovery: soft-delete a leftover fixture conversation.
     const stale = await pgGet<{ id: string }>(
@@ -125,7 +125,7 @@ describe.skipIf(!envReady())('RLS — ADR-056 line modules', () => {
     expect(fixtureLine.slug).toBeTruthy();
     expect(fixtureLine.kind).toBe('campaign');
     if (fixtureLine.modules !== null) {
-      expect(fixtureLine.modules).toEqual(['conversations', 'calendar', 'materials', 'notes']);
+      expect(fixtureLine.modules).toEqual(['conversations', 'planner', 'materials', 'notes']);
     }
   });
 
@@ -159,7 +159,7 @@ describe.skipIf(!envReady())('RLS — ADR-056 line modules', () => {
       await pgPatch<LineRow>(
         'line',
         jwt,
-        { modules: ['conversations', 'calendar', 'materials', 'notes'] },
+        { modules: ['conversations', 'planner', 'materials', 'notes'] },
         new URLSearchParams({ id: `eq.${fixtureLine.id}`, select: 'id' }),
       );
     }

@@ -32,7 +32,7 @@
   import Input from './Input.svelte';
   import Select from './Select.svelte';
   import { addToast } from './Toast.svelte';
-  import { dayKeyInTz } from '$lib/calendar';
+  import { dayKeyInTz } from '$lib/planner';
   import { allLinesQueryOptions } from '$lib/nav-queries';
   import { performanceStatusLabel, type PerformanceCreate } from '$lib/performance';
 
@@ -138,7 +138,7 @@
     onSuccess: (perf) => {
       cVenue = '';
       cCity = '';
-      void queryClient.invalidateQueries({ queryKey: ['calendar-performances'] });
+      void queryClient.invalidateQueries({ queryKey: ['planner-performances'] });
       void queryClient.invalidateQueries({ queryKey: ['line-performances'] });
       void queryClient.invalidateQueries({ queryKey: ['line-money-fees'] });
       void queryClient.invalidateQueries({ queryKey: ['today-performances'] });

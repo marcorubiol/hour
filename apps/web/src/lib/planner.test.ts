@@ -9,11 +9,11 @@ import {
   dayKeyInTz,
   monthGrid,
   performanceRoster,
-  resolveCalendarView,
+  resolvePlannerView,
   rosterPersonIds,
   type BlackoutInput,
-  type CalendarEvent,
-} from './calendar';
+  type PlannerEvent,
+} from './planner';
 
 describe('monthGrid', () => {
   it('starts weeks on Monday and pads the first week', () => {
@@ -190,7 +190,7 @@ describe('performanceRoster', () => {
 // ── conflictsFor — the conflict engine ────────────────────────────────────
 
 let eventSeq = 0;
-function ev(overrides: Partial<CalendarEvent> = {}): CalendarEvent {
+function ev(overrides: Partial<PlannerEvent> = {}): PlannerEvent {
   eventSeq += 1;
   return {
     id: overrides.id ?? `ev-${eventSeq}`,
@@ -562,25 +562,25 @@ describe('awayBands', () => {
   });
 });
 
-describe('resolveCalendarView', () => {
+describe('resolvePlannerView', () => {
   it('explicit ?view= wins over everything', () => {
-    expect(resolveCalendarView('agenda', 'month', false)).toBe('agenda');
-    expect(resolveCalendarView('month', 'agenda', true)).toBe('month');
+    expect(resolvePlannerView('agenda', 'month', false)).toBe('agenda');
+    expect(resolvePlannerView('month', 'agenda', true)).toBe('month');
   });
 
   it('stored preference wins over form factor', () => {
-    expect(resolveCalendarView(null, 'agenda', false)).toBe('agenda');
-    expect(resolveCalendarView(undefined, 'month', true)).toBe('month');
+    expect(resolvePlannerView(null, 'agenda', false)).toBe('agenda');
+    expect(resolvePlannerView(undefined, 'month', true)).toBe('month');
   });
 
   it('falls back to form factor: narrow = agenda, wide = month', () => {
-    expect(resolveCalendarView(null, null, true)).toBe('agenda');
-    expect(resolveCalendarView(null, null, false)).toBe('month');
+    expect(resolvePlannerView(null, null, true)).toBe('agenda');
+    expect(resolvePlannerView(null, null, false)).toBe('month');
   });
 
   it('garbage at either level falls through, never breaks', () => {
-    expect(resolveCalendarView('week', 'grid', false)).toBe('month');
-    expect(resolveCalendarView('week', 'agenda', false)).toBe('agenda');
+    expect(resolvePlannerView('week', 'grid', false)).toBe('month');
+    expect(resolvePlannerView('week', 'agenda', false)).toBe('agenda');
   });
 });
 

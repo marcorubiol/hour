@@ -336,7 +336,7 @@ export function buildDeskFeed(input: DeskFeedInput, now: Date, locale: Locale = 
         projectName: p.project?.name ?? '—',
         projectId: p.project?.id ?? null,
         atISO: at,
-        href: '/h/calendar',
+        href: '/h/planner',
       }),
     );
   }
@@ -356,7 +356,7 @@ export function buildDeskFeed(input: DeskFeedInput, now: Date, locale: Locale = 
         projectId: d.project?.id ?? null,
         atISO: d.all_day ? null : d.starts_at,
         allDay: d.all_day,
-        href: '/h/calendar',
+        href: '/h/planner',
       }),
     );
   }

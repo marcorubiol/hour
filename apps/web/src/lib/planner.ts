@@ -1,5 +1,5 @@
 /**
- * Calendar month math + the calendar-v2 pure engine (ADR-072/078) —
+ * Month-grid + date math + the planner pure engine (ADR-072/078) —
  * roster rule, conflict detection, derived away bands.
  *
  * The grid is calendar-abstract (whole ISO days, Monday-first weeks);
@@ -12,7 +12,7 @@
 import type { AvailabilityItem } from './availability';
 import type { DateRow } from './date';
 
-export interface CalendarDay {
+export interface PlannerDay {
   /** ISO date, YYYY-MM-DD. */
   iso: string;
   /** False for leading/trailing days that pad the first/last week. */
@@ -28,16 +28,16 @@ function isoOf(utc: Date): string {
  * complete weeks — leading/trailing days belong to the neighbour months
  * and carry `inMonth: false`.
  */
-export function monthGrid(year: number, month: number): CalendarDay[][] {
+export function monthGrid(year: number, month: number): PlannerDay[][] {
   const first = new Date(Date.UTC(year, month - 1, 1));
   // getUTCDay: 0=Sunday..6=Saturday → Monday-first offset 0..6.
   const lead = (first.getUTCDay() + 6) % 7;
   const start = new Date(Date.UTC(year, month - 1, 1 - lead));
 
-  const weeks: CalendarDay[][] = [];
+  const weeks: PlannerDay[][] = [];
   const cursor = new Date(start);
   do {
-    const week: CalendarDay[] = [];
+    const week: PlannerDay[] = [];
     for (let i = 0; i < 7; i++) {
       week.push({
         iso: isoOf(cursor),
@@ -164,7 +164,7 @@ export type ConflictSeverity = 'people' | 'possible' | 'blackout' | 'blackout-te
  * project's own plan (gig + travel + rehearsal on one day) from clashing
  * with itself.
  */
-export interface CalendarEvent {
+export interface PlannerEvent {
   id: string;
   /** YYYY-MM-DD. */
   day: string;
@@ -224,14 +224,14 @@ const SEVERITY_RANK: Record<ConflictSeverity, number> = {
  * NEVER an input here (ADR-078 §6 — display-only inference).
  */
 export function conflictsFor(
-  events: CalendarEvent[],
+  events: PlannerEvent[],
   rosters: Record<string, string[]>,
   blackouts: BlackoutInput[],
 ): Conflict[] {
   const out: Conflict[] = [];
 
   // Pairwise same-day clashes, grouped by day so the scan is n² per day.
-  const byDay = new Map<string, CalendarEvent[]>();
+  const byDay = new Map<string, PlannerEvent[]>();
   for (const e of events) {
     const list = byDay.get(e.day);
     if (list) list.push(e);
@@ -390,8 +390,8 @@ function makeBand(
   return line_id === null ? { from, to, project_id } : { from, to, project_id, line_id };
 }
 
-/** The two first-class projections of the Calendar lens (ADR-076). */
-export type CalendarView = 'month' | 'agenda';
+/** The two first-class projections of the Planner lens (ADR-076). */
+export type PlannerView = 'month' | 'agenda';
 
 /**
  * Projection resolution (ADR-078 §10): explicit `?view=` → the device's
@@ -399,11 +399,11 @@ export type CalendarView = 'month' | 'agenda';
  * reads as agenda, wide as month). Unknown values at either level fall
  * through — a mistyped URL never breaks the page.
  */
-export function resolveCalendarView(
+export function resolvePlannerView(
   urlView: string | null | undefined,
   stored: string | null | undefined,
   narrowViewport: boolean,
-): CalendarView {
+): PlannerView {
   if (urlView === 'month' || urlView === 'agenda') return urlView;
   if (stored === 'month' || stored === 'agenda') return stored;
   return narrowViewport ? 'agenda' : 'month';

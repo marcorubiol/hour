@@ -10,13 +10,13 @@ import {
 
 describe('LineModulesSchema', () => {
   it('accepts an ordered list of known keys and preserves order', () => {
-    const r = v.safeParse(LineModulesSchema, ['notes', 'calendar', 'money']);
+    const r = v.safeParse(LineModulesSchema, ['notes', 'planner', 'money']);
     expect(r.success).toBe(true);
-    if (r.success) expect(r.output).toEqual(['notes', 'calendar', 'money']);
+    if (r.success) expect(r.output).toEqual(['notes', 'planner', 'money']);
   });
 
   it('rejects unknown module keys', () => {
-    const r = v.safeParse(LineModulesSchema, ['calendar', 'kanban']);
+    const r = v.safeParse(LineModulesSchema, ['planner', 'kanban']);
     expect(r.success).toBe(false);
   });
 

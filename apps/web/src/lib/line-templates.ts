@@ -15,7 +15,7 @@ import * as v from 'valibot';
 import type { Enums } from './db-types';
 
 export const MODULE_KEYS = [
-  'calendar',
+  'planner',
   'conversations',
   'roadsheets',
   'notes',
@@ -31,7 +31,7 @@ export type ModuleKey = (typeof MODULE_KEYS)[number];
 // people AND organizations); `team` = its cast/crew. Keys, labels, components and the DB
 // all agree — no legacy.
 export const MODULE_LABELS: Record<ModuleKey, string> = {
-  calendar: 'Calendar',
+  planner: 'Planner',
   conversations: 'Conversations',
   roadsheets: 'Road sheets',
   notes: 'Notes',
@@ -43,7 +43,7 @@ export const MODULE_LABELS: Record<ModuleKey, string> = {
 
 /** Shown in the "Add module" menu and module empty states. */
 export const MODULE_DESCRIPTIONS: Record<ModuleKey, string> = {
-  calendar: 'Performances and dates of this line',
+  planner: 'Performances and dates of this line',
   conversations: 'Conversations tied to this line',
   roadsheets: 'Road sheets of the line’s performances',
   notes: 'Collaborative notes',
@@ -87,35 +87,35 @@ export const LINE_TEMPLATES: LineTemplate[] = [
     name: 'Tour',
     description: 'Performances on the road — calendar, road sheets, team, money.',
     kind: 'tour',
-    modules: ['calendar', 'tasks', 'roadsheets', 'team', 'money', 'materials', 'notes'],
+    modules: ['planner', 'tasks', 'roadsheets', 'team', 'money', 'materials', 'notes'],
   },
   {
     key: 'booking',
     name: 'Booking',
     description: 'A season of difusión — conversations, dates, materials.',
     kind: 'campaign',
-    modules: ['conversations', 'calendar', 'tasks', 'materials', 'notes'],
+    modules: ['conversations', 'planner', 'tasks', 'materials', 'notes'],
   },
   {
     key: 'creation',
     name: 'Creation',
     description: 'Building a new piece — schedule, notes, costs.',
     kind: 'creation',
-    modules: ['calendar', 'tasks', 'notes', 'materials', 'money'],
+    modules: ['planner', 'tasks', 'notes', 'materials', 'money'],
   },
   {
     key: 'press',
     name: 'Press & comms',
     description: 'Press conversations and communication materials.',
     kind: 'comms',
-    modules: ['conversations', 'calendar', 'materials', 'notes'],
+    modules: ['conversations', 'planner', 'materials', 'notes'],
   },
   {
     key: 'fair',
     name: 'Fair',
     description: 'A fair or showcase — conversations, calendar, materials.',
     kind: 'campaign',
-    modules: ['conversations', 'calendar', 'materials', 'notes'],
+    modules: ['conversations', 'planner', 'materials', 'notes'],
   },
   {
     key: 'blank',
@@ -132,9 +132,9 @@ export const LINE_TEMPLATES: LineTemplate[] = [
  * the booking stack; the two real pre-ADR lines land right: the demo tour
  * line → tour set, difusion-2026-27 (campaign) → booking set.
  */
-const TOUR_SET: ModuleKey[] = ['calendar', 'roadsheets', 'team', 'money', 'materials', 'notes'];
-const BOOKING_SET: ModuleKey[] = ['conversations', 'calendar', 'materials', 'notes'];
-const CREATION_SET: ModuleKey[] = ['calendar', 'notes', 'materials', 'money'];
+const TOUR_SET: ModuleKey[] = ['planner', 'roadsheets', 'team', 'money', 'materials', 'notes'];
+const BOOKING_SET: ModuleKey[] = ['conversations', 'planner', 'materials', 'notes'];
+const CREATION_SET: ModuleKey[] = ['planner', 'notes', 'materials', 'money'];
 
 export const MODULES_BY_KIND: Record<LineKind, ModuleKey[]> = {
   tour: TOUR_SET,

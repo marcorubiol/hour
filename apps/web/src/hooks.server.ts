@@ -142,6 +142,14 @@ const legacyVocabRedirects: Handle = async ({ event, resolve }) => {
     return Response.redirect(dest.toString(), 301);
   }
 
+  // Lens rename (Calendar → Planner): /h/calendar and /h/[ws]/calendar → /h/planner
+  // (lenses are space-less since ADR-067; scope rides in ?scope=, preserved).
+  if (/^\/h(\/[^/]+)?\/calendar\/?$/.test(path)) {
+    const dest = new URL('/h/planner', event.url);
+    dest.search = event.url.search;
+    return Response.redirect(dest.toString(), 301);
+  }
+
   return resolve(event);
 };
 

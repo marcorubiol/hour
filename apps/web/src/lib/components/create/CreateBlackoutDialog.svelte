@@ -8,7 +8,7 @@
    * contact book.
    *
    * POST /api/availability with the house optimistic pattern: the block
-   * lands in every ['calendar-availability'] cache immediately, rolls
+   * lands in every ['planner-availability'] cache immediately, rolls
    * back with a toast on failure. Reachable from the unified create
    * dialog's quiet footer action and the toolbar's "⋯" overflow — both
    * hidden while the availability/team feeds are absent, so a failing
@@ -22,7 +22,7 @@
   import Input from '../Input.svelte';
   import Select from '../Select.svelte';
   import { addToast } from '../Toast.svelte';
-  import { dayKeyInTz } from '$lib/calendar';
+  import { dayKeyInTz } from '$lib/planner';
   import { detectLocale, t } from '$lib/i18n';
   import { workspacesQueryOptions } from '$lib/nav-queries';
   import type { AvailabilityCertainty, AvailabilityItem } from '$lib/availability';
@@ -64,7 +64,7 @@
   const teamStore = toStore(() => {
     const ids = ($workspacesQuery.data?.items ?? []).map((w) => w.id);
     return {
-      queryKey: ['calendar-team', ids] as const,
+      queryKey: ['planner-team', ids] as const,
       enabled: open && ids.length > 0,
       queryFn: async ({ signal }: { signal: AbortSignal }) => {
         try {
@@ -118,9 +118,9 @@
       note: string | null;
     }) => mutateJSON('POST', '/api/availability', input),
     onMutate: async (input) => {
-      await queryClient.cancelQueries({ queryKey: ['calendar-availability'] });
+      await queryClient.cancelQueries({ queryKey: ['planner-availability'] });
       const snapshots = queryClient.getQueriesData<AvailabilityCache>({
-        queryKey: ['calendar-availability'],
+        queryKey: ['planner-availability'],
       });
       const person = input.person_id
         ? (teamOfWorkspace.find((item) => item.person_id === input.person_id) ?? null)
@@ -160,7 +160,7 @@
     onSuccess: () => {
       open = false;
     },
-    onSettled: () => void queryClient.invalidateQueries({ queryKey: ['calendar-availability'] }),
+    onSettled: () => void queryClient.invalidateQueries({ queryKey: ['planner-availability'] }),
   });
 
   function submit() {

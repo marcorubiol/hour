@@ -79,7 +79,7 @@ test.describe('line detail — module composition', () => {
 
     // Booking template stack: Conversations · Calendar · Materials · Notes.
     await expect(page.getByRole('heading', { name: LINE_NAME })).toBeVisible({ timeout: 15_000 });
-    for (const label of ['Conversations', 'Calendar', 'Materials', 'Notes']) {
+    for (const label of ['Conversations', 'Planner', 'Materials', 'Notes']) {
       await expect(page.locator(`#mod-${label.toLowerCase()}`)).toBeVisible();
     }
 
@@ -149,7 +149,7 @@ test.describe('line detail — module composition', () => {
       await fetch(`/api/lines/${lineId}`, {
         method: 'PATCH',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ modules: ['conversations', 'calendar', 'materials', 'notes'] }),
+        body: JSON.stringify({ modules: ['conversations', 'planner', 'materials', 'notes'] }),
       });
     }, { lineId: line!.id });
 

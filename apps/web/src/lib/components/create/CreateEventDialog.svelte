@@ -43,7 +43,7 @@
   import Select from '../Select.svelte';
   import { addToast } from '../Toast.svelte';
   import PerformanceForm, { type CreatedPerformance } from '../PerformanceForm.svelte';
-  import { dayKeyInTz } from '$lib/calendar';
+  import { dayKeyInTz } from '$lib/planner';
   import { dayMonthYear, wallClockToInstant } from '$lib/datetime';
   import { detectLocale, t } from '$lib/i18n';
   import { activeProjectsQueryOptions, allLinesQueryOptions, workspacesQueryOptions } from '$lib/nav-queries';
@@ -259,7 +259,7 @@
     },
     onSuccess: () => {
       open = false;
-      void queryClient.invalidateQueries({ queryKey: ['calendar-dates'] });
+      void queryClient.invalidateQueries({ queryKey: ['planner-dates'] });
     },
     onError: (err) => {
       // Contract § Graceful absence: only invalid-body-class failures on a
