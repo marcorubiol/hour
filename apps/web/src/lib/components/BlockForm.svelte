@@ -25,6 +25,7 @@
   import { wallClockToInstant } from '$lib/datetime';
   import { detectLocale, t } from '$lib/i18n';
   import { allLinesQueryOptions, workspacesQueryOptions } from '$lib/nav-queries';
+  import { accentVarFor } from '$lib/utils/accent';
   import {
     blockDays,
     blockLimit,
@@ -93,9 +94,16 @@
 
   const projectsQuery = createQuery({
     queryKey: ['projects', 'all'] as const,
-    queryFn: () => fetchJSON<{ items: { id: string; name: string; workspace_id: string }[] }>(
-      '/api/projects?limit=200',
-    ),
+    queryFn: () =>
+      fetchJSON<{
+        items: {
+          id: string;
+          name: string;
+          workspace_id: string;
+          slug: string | null;
+          accent: string | null;
+        }[];
+      }>('/api/projects?limit=200'),
   });
   const linesQuery = createQuery(allLinesQueryOptions());
   const workspacesQuery = createQuery(workspacesQueryOptions());
@@ -118,6 +126,16 @@
     ($workspacesQuery.data?.items ?? []).find((w) => w.id === projectWorkspaceId)?.timezone ||
       viewerTz,
   );
+
+  /**
+   * The picked project's accent. The picker's hatch wears the colour those
+   * days will wear on the month, so "what I chose" and "what landed" are
+   * recognisably the same block rather than two neutral grey things.
+   */
+  let projectAccent = $derived.by(() => {
+    const p = ($projectsQuery.data?.items ?? []).find((x) => x.id === bProject);
+    return p ? accentVarFor(p) : null;
+  });
 
   let days = $derived(
     blockDays({ from: bFrom, to: bTo, weekdays: bWeekdays, exceptions: bExceptions }),
@@ -262,7 +280,7 @@
 
   <div class="bf__field">
     <span class="bf__label">{t('block.which_days', locale)}</span>
-    <div class="bf__days">
+    <div class="bf__days" style={projectAccent ? `--c: ${projectAccent}` : undefined}>
       <div class="bf__row2">
         <Input label={t('block.from', locale)} type="date" bind:value={bFrom} />
         <Input label={t('block.to', locale)} type="date" bind:value={bTo} />
@@ -354,7 +372,7 @@
   {#if days.length > 0 && limit === 'ok'}
     <!-- The review: you confirm against a COUNT and a shape, never a guess.
          The write is atomic and multi-row — a wrong click makes 25 rows. -->
-    <div class="bf__review">
+    <div class="bf__review" style={projectAccent ? `--c: ${projectAccent}` : undefined}>
       <p class="bf__review-h">
         <b>{days.length}</b>
         {t(KIND_KEY[bKind], locale)}
@@ -457,7 +475,8 @@
     cursor: pointer;
   }
   .bf__wdchip--on {
-    background: color-mix(in oklch, var(--text-color) 12%, var(--bg-ultra-light));
+    background: color-mix(in oklch, var(--c, var(--text-color)) 14%, var(--bg-ultra-light));
+    border-color: color-mix(in oklch, var(--c, var(--text-color)) 34%, var(--border-color-light));
     color: var(--text-color);
   }
 
@@ -488,11 +507,11 @@
   /* Selected days wear the SAME hatch the month will give them: what you
      pick here is what lands there. */
   .bf__cald--sel {
-    border-color: color-mix(in oklch, var(--text-color) 28%, transparent);
+    border-color: color-mix(in oklch, var(--c, var(--text-color)) 32%, transparent);
     border-style: dashed;
     background-image: repeating-linear-gradient(
       135deg,
-      color-mix(in oklch, var(--text-color) 10%, var(--bg-ultra-light)) 0 4px,
+      color-mix(in oklch, var(--c, var(--text-color)) 11%, var(--bg-ultra-light)) 0 4px,
       var(--bg-ultra-light) 4px 8px
     );
     color: var(--text-color);
@@ -572,10 +591,10 @@
     inline-size: 14px;
     block-size: 8px;
     border-radius: 2px;
-    border: 1px dashed color-mix(in oklch, var(--text-color) 28%, transparent);
+    border: 1px dashed color-mix(in oklch, var(--c, var(--text-color)) 32%, transparent);
     background-image: repeating-linear-gradient(
       135deg,
-      color-mix(in oklch, var(--text-color) 10%, var(--bg-ultra-light)) 0 3px,
+      color-mix(in oklch, var(--c, var(--text-color)) 11%, var(--bg-ultra-light)) 0 3px,
       var(--bg-ultra-light) 3px 6px
     );
   }
