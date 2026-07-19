@@ -207,6 +207,9 @@ const PERFORMANCE_COLS = [
   'logistics',
   'hospitality',
   'technical',
+  // ADR-084 §3 — the readiness ticks. Safe in the always-on list (unlike
+  // hold_notice_days below): its migration is applied, so no 42703 risk.
+  'readiness',
   'notes',
   'custom_fields',
   'created_at',

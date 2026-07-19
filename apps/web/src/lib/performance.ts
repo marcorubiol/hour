@@ -227,6 +227,12 @@ export const PerformancePatchSchema = v.object({
   venue_id: v.optional(v.nullable(v.pipe(v.string(), v.uuid()))),
   conversation_id: v.optional(v.nullable(v.pipe(v.string(), v.uuid()))),
   line_id: v.optional(v.nullable(v.pipe(v.string(), v.uuid()))),
+  // ADR-084 §3 — the readiness ticks. The KEY SET is closed on purpose: the
+  // DB only guarantees "an object", so this is where the vocabulary is
+  // actually enforced. A client cannot invent `readiness.whatever` and have
+  // it silently persist, which is how a jsonb column rots into a junk
+  // drawer. Adding an item = adding it to READINESS_KEYS, still no migration.
+  readiness: v.optional(v.record(v.picklist([...READINESS_KEYS]), v.boolean())),
 });
 
 export type PerformancePatch = v.InferOutput<typeof PerformancePatchSchema>;
