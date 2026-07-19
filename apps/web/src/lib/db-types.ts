@@ -3,7 +3,7 @@
 // user_profile.person_id, create_date/delete_date RPCs. Regenerate after
 // applying the 2026-07-18 migrations.
 // hand-patched pending regen (planner-v2): performance.hold_notice_days
-// hand-patched pending regen (ADR-084): performance.readiness
+// hand-patched pending regen (ADR-084): performance.readiness, date.series_id
 // (ADR-080 §2, 2026-07-18_hold_notice_days.sql).
 export type Json =
   | string
@@ -703,6 +703,7 @@ export type Database = {
           performance_id: string | null
           project_id: string
           season: string | null
+          series_id: string | null
           starts_at: string
           status: Database["public"]["Enums"]["date_status"]
           title: string | null
@@ -728,6 +729,7 @@ export type Database = {
           performance_id?: string | null
           project_id: string
           season?: string | null
+          series_id?: string | null
           starts_at: string
           status?: Database["public"]["Enums"]["date_status"]
           title?: string | null
@@ -753,6 +755,7 @@ export type Database = {
           performance_id?: string | null
           project_id?: string
           season?: string | null
+          series_id?: string | null
           starts_at?: string
           status?: Database["public"]["Enums"]["date_status"]
           title?: string | null

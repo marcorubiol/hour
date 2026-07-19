@@ -96,6 +96,8 @@ type DateItem = {
   venue: { timezone: string | null } | null;
   /** ADR-078 columns — absent until the migrations are applied. */
   line_id?: string | null;
+  /** ADR-084 §1 — multi-day block key; NULL/absent = standalone date. */
+  series_id?: string | null;
   travel_direction?: string | null;
   label?: string | null;
 };
@@ -149,6 +151,9 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
   const EXTENDED_SELECT = [
     ...BASE_SELECT,
     'line_id,travel_direction',
+    // ADR-084 §1 — the multi-day block's grouping key. The planner joins
+    // consecutive rows of one series into a band; NULL = a standalone date.
+    'series_id',
     'label:custom_fields->>label',
   ];
   search.set('select', EXTENDED_SELECT.join(','));

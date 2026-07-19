@@ -14,7 +14,7 @@
    * the e2e specs select `.cal__grid` / `.cal__weekday` (Svelte scoping
    * keeps them collision-free anyway).
    */
-  import { dayKeyInTz, monthGrid, assignBandLanes } from '$lib/planner';
+  import { addDaysIso, dayKeyInTz, monthGrid, assignBandLanes } from '$lib/planner';
 
   export type ProjectLite = {
     id: string;
@@ -52,6 +52,8 @@
     title: string | null;
     starts_at: string;
     all_day: boolean;
+    /** ADR-084 §1 — rows sharing this render as one multi-day band. */
+    series_id?: string | null;
     venue_name: string | null;
     city: string | null;
     project: ProjectLite | null;
@@ -394,6 +396,30 @@
     return city && city !== dateText(d) ? city : null;
   }
 
+  // ── Multi-day blocks (ADR-084 §1) ────────────────────────────────────
+  // A block is N rows sharing a series_id. The BAND is a rendering of those
+  // rows: which day is an edge is derived here on every paint, never stored.
+  // That is the whole reason for per-day rows — confirm one day of a run and
+  // it simply shows as itself inside the band; there is no stored span to
+  // fall out of sync with the days it claims to cover.
+  let seriesDays = $derived.by(() => {
+    const m = new Map<string, Set<string>>();
+    for (const d of dates) {
+      if (!d.series_id) continue;
+      const day = dateDayKey(d, viewerTz);
+      (m.get(d.series_id) ?? m.set(d.series_id, new Set<string>()).get(d.series_id)!).add(day);
+    }
+    return m;
+  });
+
+  /** Null when the row stands alone — a "series" of one is just a date. */
+  function seriesEdges(d: DateEvent, iso: string): { first: boolean; last: boolean } | null {
+    if (!d.series_id) return null;
+    const days = seriesDays.get(d.series_id);
+    if (!days || days.size < 2) return null;
+    return { first: !days.has(addDaysIso(iso, -1)), last: !days.has(addDaysIso(iso, 1)) };
+  }
+
   /**
    * Projects that actually PAINT a chip in a rendered cell — walked from the
    * grid's own days, not from the feed. The page fetches with a ±1 day pad
@@ -673,32 +699,46 @@
           {:else}
             {@const time = dateTime(d)}
             {@const city = dateCity(d)}
+            {@const edges = seriesEdges(d, day.iso)}
+            {@const head = !edges || edges.first || di === 0}
             <span
               class="cal__event cal__event--date"
               class:cal__event--off={d.kind === 'day_off'}
+              class:cal__event--run={!!edges}
+              class:cal__event--run-first={edges?.first}
+              class:cal__event--run-last={edges?.last}
               data-family={dateStatusFamily(d.status)}
               style={d.project ? `--c: ${accentVarFor(d.project)}` : undefined}
               title={dateTitle(d)}
             >
-              <span class="cal__event-top">
-                <span class="cal__event-name">{dateText(d)}</span>
-                {#if d.project}<button
-                    type="button"
-                    class="cal__markbtn"
-                    onclick={(e) => openMark(e, d.project)}
-                  ><IdentityMark
-                      accent={accentVarFor(d.project)}
-                      name={d.project.name}
-                      initials={d.project.initials}
-                    /></button>{/if}
-              </span>
-              {#if city || time}
-                <span class="cal__event-line">
-                  <span class="cal__event-city">{city ?? ''}</span>
-                  {#if time}<span class="cal__event-time">{time.primary}</span>{/if}
+              {#if head}
+                <span class="cal__event-top">
+                  <span class="cal__event-name">{dateText(d)}</span>
+                  {#if d.project}<button
+                      type="button"
+                      class="cal__markbtn"
+                      onclick={(e) => openMark(e, d.project)}
+                    ><IdentityMark
+                        accent={accentVarFor(d.project)}
+                        name={d.project.name}
+                        initials={d.project.initials}
+                      /></button>{/if}
+                </span>
+                {#if city || time}
+                  <span class="cal__event-line">
+                    <span class="cal__event-city">{city ?? ''}</span>
+                    {#if time}<span class="cal__event-time">{time.primary}</span>{/if}
+                  </span>
+                {/if}
+                <span class="cal__event-kind">{dateKindLabel(d.kind)}</span>
+              {:else if time}
+                <!-- A continuation day carries only its OWN hours. The block
+                     said its name at the head; repeating it would print the
+                     same words across five cells. -->
+                <span class="cal__event-line cal__event-line--cont">
+                  <span class="cal__event-time">{time.primary}</span>
                 </span>
               {/if}
-              <span class="cal__event-kind">{dateKindLabel(d.kind)}</span>
             </span>
           {/if}
         {/each}
@@ -1212,6 +1252,35 @@
     .cal__event--date[data-family='proposed'] {
       --chip-fg: var(--text-faint);
       --chip-border-style: dashed;
+    }
+
+    /* A multi-day block reads as one strip across the cells. The join is
+       VISUAL only — every day is still its own row carrying its own state,
+       so a confirmed day inside a tentative run shows as itself and the
+       strip tells the truth about a half-confirmed week. The chip bleeds
+       into the cell padding so the run crosses the grid's hairline. */
+    .cal__event--run {
+      margin-inline: calc(-1 * var(--space-xs));
+      padding-inline: var(--space-xs);
+      border-inline: 0;
+      border-radius: 0;
+    }
+    .cal__event--run-first {
+      margin-inline-start: 0;
+      border-inline-start: 1px var(--chip-border-style) var(--chip-border-color);
+      border-start-start-radius: var(--chip-radius);
+      border-end-start-radius: var(--chip-radius);
+    }
+    .cal__event--run-last {
+      margin-inline-end: 0;
+      border-inline-end: 1px var(--chip-border-style) var(--chip-border-color);
+      border-start-end-radius: var(--chip-radius);
+      border-end-end-radius: var(--chip-radius);
+    }
+    /* Continuation day: its hours sit at the run's right edge, so the times
+       line up down the week instead of drifting with each label. */
+    .cal__event-line--cont {
+      justify-content: flex-end;
     }
     .cal__event--off {
       --chip-fg: var(--text-faint);
