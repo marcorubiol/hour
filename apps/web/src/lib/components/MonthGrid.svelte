@@ -920,11 +920,14 @@
          variables, never properties (philosophy §3). */
       --chip-bg-image: none;
       --chip-fg: var(--text-color);
-      /* The project accent IS the whole border of the card — no left rail
-         (Marco, 2026-07-19). Families vary the mix, never the property. */
+      /* The project accent IS the whole border of the card — no left rail —
+         and it is ONE mix for every family (Marco, 2026-07-19). The border
+         says WHOSE this is; settledness is said by the fill, the dash and
+         the radius. Mixing it differently per family made two cards of the
+         same project read as two different colours. */
       --chip-border-color: color-mix(
         in oklch,
-        var(--c, var(--border-color-dark)) 38%,
+        var(--c, var(--border-color-dark)) 45%,
         var(--border-color-light)
       );
       --chip-border-style: solid;
@@ -998,11 +1001,6 @@
 
     .cal__event--perf[data-family='confirmed'] {
       --chip-bg: color-mix(in oklch, var(--c, var(--border-color-dark)) 13%, var(--bg-ultra-light));
-      --chip-border-color: color-mix(
-        in oklch,
-        var(--c, var(--border-color-dark)) 50%,
-        var(--border-color-light)
-      );
     }
     .cal__event--perf[data-family='confirmed'] .cal__event-name {
       font-weight: 600;
@@ -1017,13 +1015,11 @@
         color-mix(in oklch, var(--c, var(--border-color-dark)) 11%, var(--bg-ultra-light)) 0 5px,
         var(--bg-ultra-light) 5px 10px
       );
-      --chip-border-color: color-mix(in oklch, var(--c, var(--border-color-dark)) 42%, var(--border-color-light));
       --chip-border-style: dashed;
       --chip-fg: var(--text-muted);
     }
     .cal__event--perf[data-family='proposed'] {
       --chip-bg: var(--bg);
-      --chip-border-color: var(--border-color-dark);
       --chip-border-style: dashed;
       --chip-fg: var(--text-muted);
     }
@@ -1081,20 +1077,14 @@
       min-inline-size: 0;
     }
 
-    /* Date chip — italic body, mono small-caps kind label. Tentative
-       dates read as possibility (dashed) — the grammar extends
-       (ADR-078 §9); confirmed stays the quiet solid form. */
+    /* Date chip — quieter ink, mono small-caps kind label at the foot.
+       Tentative dates read as possibility (dashed + square) — the grammar
+       extends (ADR-078 §9); confirmed stays the quiet solid form. */
     .cal__event--date {
       --chip-fg: var(--text-muted);
-      --chip-border-color: color-mix(
-        in oklch,
-        var(--c, var(--border-color-dark)) 26%,
-        var(--border-color-light)
-      );
     }
     .cal__event--date[data-family='hold'] {
       --chip-bg: var(--bg);
-      --chip-border-color: color-mix(in oklch, var(--c, var(--border-color-dark)) 30%, var(--border-color-light));
       --chip-border-style: dashed;
     }
     .cal__event--date[data-family='proposed'] {
