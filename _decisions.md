@@ -2101,3 +2101,31 @@ Triggered by Marco's pre-scaffold doubt (Phase 0.0 day 5). Five alternatives eva
 - **Abierto**: (1) nombre del oficio — *oficio* vs *perfil* (Marco cierra luego). (2) La capa de comms en sí (hilos sobre contenedores) — este ADR es su prerrequisito; sigue aparcada en `_notes/_flux.md § 2026-07-19` (las 3 formas: hilo polimórfico / puente-ingest / IA-generada).
 - **Status**: **provisional — decidido en grill, SIN implementar.** No toca schema todavía. Este ADR es el mapa; construirlo es trabajo aparte.
 - **Re-evaluate when**: al implementar (orden: identidad+oficio+membresía → roles/capacidades → org); o si un contenedor pasa a mezclar dominios de verdad → reabrir Solución B (tipado de conversación).
+
+## [2026-07-19] — ADR-083 · Capa de comms — hilos sobre contenedores, sub-hilos = facetas, permisos de ADR-082 (resuelve el Abierto #2 de ADR-082)
+
+> Continuación del mismo grill (2026-07-19), ya cerrado el modelo de acceso (ADR-082). Marco arrancó todo esto queriendo comunicación de equipo y por bolo (incl. "el día del bolo, un canal donde el equipo se habla"). Con el acceso decidido, media capa de comms cae sola: quién puede estar (operadores), quién ve (capacidades), participantes del bolo (derivables). Este ADR fija la FORMA; no toca schema.
+
+- **Decisiones** (forma de comms, decidida en principio, SIN implementar):
+  1. **Un solo mecanismo polimórfico.** Un "hilo" (cadena de mensajes) que cuelga de cualquier contenedor — bolo/performance, conversación de difusión, proyecto, compañía/workspace — igual que `task` ya es polimórfica. El log de difusión diseñado (`conversation_event`) pasa a ser "hilo colgado de una conversación"; el canal del bolo es "hilo colgado de un performance". **Supera** ADR-056/065 ("comms = timeline solo dentro de Contacts"), decidido cuando comms era solo difusión.
+  2. **Asíncrono, estilo Slack, hub por contenedor.** No es chat en vivo (sin realtime/presencia/"está escribiendo"): persiste, se ordena, avisa. Cada contenedor = un hub. La jerarquía de contenedores (compañía → proyecto → bolo) ES la agrupación — no hay concepto separado de "canales". Realtime queda explícitamente FUERA.
+  3. **Sub-hilos dentro de un contenedor = las FACETAS** (fijas, pocas: técnica / logística / dinero / general…) **+ sub-hilos "libres" con label definido** (mismo patrón que oficios/roles custom). El libre existe porque las compañías hablan de cosas que no encajan en ninguna faceta. (El caso road manager de ADR-082 EXIGE este nivel: dentro de un bolo, hilos separados por tema para poder gatear "road manager ve logística, no dinero".)
+  4. **Permisos = los de ADR-082, sin sistema nuevo.** `ver | ver+editar` por sub-hilo (mismo eje); **"abrir/crear un sub-hilo" = una capacidad más** (gateada por rol — "el rol X abre sub-hilos, el técnico no"). La faceta hace **triple servicio**: ordena la conversación (sub-hilo), decide quién lo ve y quién lo abre. Una sola lista (la de facetas) para las tres cosas.
+  5. **Audiencia — dos modelos según el tipo de hilo:**
+     - **Fijos (faceta) → gateados por capacidad (automático).** Quién ve = derivado de la capacidad de la faceta + membresía del contenedor. Nadie se olvida; escala con los roles.
+     - **Libres (ad-hoc) → participantes explícitos.** Sin faceta que los gatee, eliges quién entra al crearlo (por defecto: los del contenedor; se estrecha si se quiere).
+     - **Transparencia para TODOS:** siempre se ve la lista resuelta ("esto lo ven estos N, por su rol") — el "veo quién entra" también en los automáticos. Es la "vista de permisos efectivos" de ADR-082 aplicada a hilos.
+  6. **Difusión (hacia fuera) = puente, no host.** Programadores/teatros no son operadores (sin login, ADR-082) → se habla por email; Hour archiva vía BCC (ADR-028). Lo fuerza la regla de login, no es elección.
+  7. **Canal automático del bolo (la chispa original) — no se "crea", EXISTE**, porque el bolo es un contenedor y todo contenedor tiene su hub con sus sub-hilos. Lo "automático" no es crearlo: es que Hour PROPONGA abrirlo / avisar a la crew asignada unos días antes (consent-first, ADR-069), no un blast solo. Participantes derivables del bolo (sus operadores asignados).
+
+- **Rechazado**:
+  - *Mecanismos separados* (log de difusión / chat de bolo / canal de compañía como tres sistemas) — a favor de uno polimórfico (visibilidad, participantes y archivado se escriben una vez).
+  - *Chat en vivo* — compite con WhatsApp y pierde; mundo de construir (websockets, push) para 5 personas; el valor (lo hablado pegado al dato como memoria) el asíncrono lo da igual.
+  - *Sub-hilos libres sin estructura (Slack puro)* — a favor de fijos=facetas + libre-con-label; los libres puros son el "¿en qué hilo escribo?".
+  - *Audiencia explícita para TODO* (inversión que Marco propuso y descartamos juntos) — tira el modelo de roles, devuelve a gestión manual de accesos, y el peligro real en coordinación de bolo es quedarse CORTO (olvidar a alguien → se pierde info), no pasarse. Explícito se queda solo para los libres.
+
+- **Por qué**: con el acceso ya decidido (ADR-082), comms es más pequeño de lo que parecía — enchufa en la misma máquina. Un mecanismo + hub por contenedor + sub-hilos=facetas reusa capacidades para ordenar, ver y abrir. El reparto de audiencia (auto para fijos, explícito para libres) coge lo bueno de cada uno: los fijos no se olvidan de nadie, los libres los controlas tú.
+
+- **Abierto / diferido**: (1) **la lista de facetas** — ahora es la espina de TRES cosas (acceso + estructura de comms + permisos de comms); acertarla importa el triple. (2) Schema de hilo/mensaje. (3) Mecánica del ingest BCC (ADR-028). (4) Notificaciones. Realtime está descartado, no diferido.
+- **Status**: **provisional — decidido en grill, SIN implementar.** Compañero de ADR-082; comms se apoya en el modelo de acceso. No toca schema. Resuelve el Abierto #2 de ADR-082.
+- **Re-evaluate when**: al implementar (junto con ADR-082); si el asíncrono se queda corto (improbable); si los sub-hilos libres proliferan y hacen ruido.
