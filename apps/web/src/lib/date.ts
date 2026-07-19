@@ -67,6 +67,35 @@ export const DateCreateSchema = v.object({
 export type DateCreate = v.InferOutput<typeof DateCreateSchema>;
 
 /**
+ * POST /api/dates/series body (ADR-084 §1) — a multi-day block: N days, one
+ * series_id, created atomically by the `create_date_series` RPC.
+ *
+ * The caller sends the EXACT per-day timestamps. Venue-local hour entry is
+ * already resolved client-side (ADR-078 §11); re-deriving "apply this time
+ * to those days" server-side would give the two paths two chances to
+ * disagree about a timezone. `ends` is either absent or the same length.
+ *
+ * No `travel_direction` and no `performance_id`: a direction belongs to one
+ * travel row, and a block belongs to a project/line, not to a single gig.
+ */
+export const DateSeriesCreateSchema = v.object({
+  project_id: v.pipe(v.string(), v.uuid()),
+  kind: v.picklist(DATE_KINDS),
+  starts: v.pipe(v.array(realIsoInstant), v.minLength(2), v.maxLength(92)),
+  ends: v.optional(v.nullable(v.array(realIsoInstant))),
+  all_day: v.optional(v.boolean()),
+  title: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(200)))),
+  venue_name: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(200)))),
+  city: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(120)))),
+  country: v.optional(v.nullable(countryField)),
+  status: v.optional(v.picklist(DATE_CREATE_STATUSES)),
+  line_id: v.optional(v.nullable(v.pipe(v.string(), v.uuid()))),
+  label: v.optional(v.nullable(labelField)),
+});
+
+export type DateSeriesCreate = v.InferOutput<typeof DateSeriesCreateSchema>;
+
+/**
  * PATCH /api/dates/:id body. Whitelist of the operational fields — direct
  * PostgREST PATCH (date_update is permission-gated, not claim-bound, and
  * the row stays SELECT-visible after a field edit; ADR-048 only bites
