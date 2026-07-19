@@ -1047,6 +1047,13 @@
         0 1px 2px color-mix(in oklch, var(--text-color) 10%, transparent),
         0 2px 5px color-mix(in oklch, var(--text-color) 6%, transparent);
     }
+    /* Lift needs room to land: the cell's 2px gap is thinner than the
+       shadow, so whatever follows a lifted gig would sit inside it. Only
+       the chip actually behind one pays the extra space — a lone gig, or
+       the last in the cell, keeps the tight rhythm (Marco, 2026-07-19). */
+    .cal__event--perf[data-family='confirmed'] + .cal__event {
+      margin-block-start: var(--space-xs);
+    }
     .cal__event--perf[data-family='confirmed'] .cal__event-name {
       font-weight: 600;
     }
