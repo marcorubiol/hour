@@ -39,6 +39,8 @@
     line_id: string | null;
     project: ProjectLite | null;
     venue: { name: string; city: string | null; timezone: string | null } | null;
+    /** ADR-084 §3 — the operator's readiness ticks, read by the card foot. */
+    readiness?: Record<string, boolean> | null;
     /** Present only on ?rosters=1 fetches (conflict engine feed). */
     person_ids?: string[];
   };
@@ -142,7 +144,7 @@
   import { accentVarFor } from '$lib/utils/accent';
   import IdentityMark from '$lib/components/IdentityMark.svelte';
   import IdentityQuickPanel from '$lib/components/IdentityQuickPanel.svelte';
-  import { performanceStatusFamily } from '$lib/performance';
+  import { isReady, performanceStatusFamily } from '$lib/performance';
   import { dateStatusFamily } from '$lib/date';
 
   interface Props {
@@ -178,6 +180,13 @@
      * actually being decided between.
      */
     stateLabel?: (status: string) => string | null;
+    /**
+     * The readiness checklist a CONFIRMED gig shows on its foot, in display
+     * order (ADR-084 §3). A settled gig's foot answers "is it sorted?"
+     * instead of restating "confirmed" — which the fill already says. Items
+     * always print; the tick is what varies, so the foot never collapses.
+     */
+    readinessItems?: { key: string; label: string }[];
     /** Legend key words (project row + the confirmed/hold swatches). */
     legendConfirmedLabel?: string;
     legendHoldLabel?: string;
@@ -211,6 +220,10 @@
     dateKindLabel = (kind: string) => kind.replace(/_/g, ' '),
     createLabel = (iso: string) => `New performance on ${iso}`,
     stateLabel = (status: string) => EN_STATE_WORDS[status] ?? null,
+    readinessItems = [
+      { key: 'hotel', label: 'hotel' },
+      { key: 'technical', label: 'technical' },
+    ],
     legendConfirmedLabel = 'confirmed',
     legendHoldLabel = 'hold',
   }: Props = $props();
@@ -508,7 +521,19 @@
         >{/if}
     </span>
   {/if}
-  {#if foot}<span class="cal__event-foot">{foot}</span>{/if}
+  {#if performanceStatusFamily(p.status) === 'confirmed' && readinessItems.length > 0}
+    <!-- A settled gig's foot answers "is it sorted?" — restating "confirmed"
+         would only repeat what the fill and the radius already say. -->
+    <span class="cal__event-foot cal__event-foot--ready">
+      {#each readinessItems as item (item.key)}
+        <span class="cal__ready" class:cal__ready--on={isReady(p.readiness, item.key)}
+          >{item.label}</span
+        >
+      {/each}
+    </span>
+  {:else if foot}
+    <span class="cal__event-foot">{foot}</span>
+  {/if}
 {/snippet}
 
 {#if legendProjects.length > 0}
@@ -1033,6 +1058,28 @@
       font-size: 0.85em;
       letter-spacing: var(--mono-letter-spacing-loose);
       color: var(--text-faint);
+    }
+    /* Readiness ticks: the WORD always prints, only the ✓ varies. "Not
+       sorted" then reads as a visible absence rather than as nothing at
+       all — and the settled gig's foot never collapses to empty. */
+    .cal__event-foot--ready {
+      display: flex;
+      gap: var(--space-xs);
+      letter-spacing: var(--mono-letter-spacing);
+      min-inline-size: 0;
+    }
+    .cal__ready {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .cal__ready--on {
+      color: var(--text-muted);
+    }
+    .cal__ready--on::before {
+      content: '✓';
+      margin-inline-end: 0.2em;
+      color: var(--success, currentColor);
     }
 
     a.cal__event:hover {

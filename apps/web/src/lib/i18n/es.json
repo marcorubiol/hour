@@ -17,6 +17,8 @@
   "planner.state_invoiced": "facturado",
   "planner.state_paid": "cobrado",
   "planner.state_done": "hecho",
+  "planner.ready_hotel": "hotel",
+  "planner.ready_technical": "técnica",
   "planner.legend_confirmed": "confirmado",
   "planner.legend_hold": "hold",
   "planner.prev_month": "Mes anterior",

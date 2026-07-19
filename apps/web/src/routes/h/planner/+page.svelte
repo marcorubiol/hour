@@ -109,6 +109,8 @@
     isHoldStatus,
     performanceStatusFamily,
     performanceStatusLabel,
+    READINESS_KEYS,
+    readinessLabelKey,
     statusFootKey,
   } from '$lib/performance';
   import { dateStatusFamily } from '$lib/date';
@@ -1606,6 +1608,10 @@
       }}
       legendConfirmedLabel={t('planner.legend_confirmed', locale)}
       legendHoldLabel={t('planner.legend_hold', locale)}
+      readinessItems={READINESS_KEYS.map((k) => ({
+        key: k,
+        label: t(readinessLabelKey(k), locale),
+      }))}
     />
   {:else if view === 'agenda'}
     <AgendaList

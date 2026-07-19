@@ -17,6 +17,8 @@
   "planner.state_invoiced": "facturat",
   "planner.state_paid": "cobrat",
   "planner.state_done": "fet",
+  "planner.ready_hotel": "hotel",
+  "planner.ready_technical": "tècnica",
   "planner.legend_confirmed": "confirmat",
   "planner.legend_hold": "hold",
   "planner.prev_month": "Mes anterior",

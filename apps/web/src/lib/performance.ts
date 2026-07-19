@@ -105,6 +105,29 @@ export function isValidHoldNotice(value: number | null | undefined): boolean {
   return value == null || (Number.isInteger(value) && value >= 0 && value <= 365);
 }
 
+/**
+ * The readiness checklist shown on a confirmed gig's card foot (ADR-084 §3).
+ * The DB holds the SHAPE (a jsonb object on `performance.readiness`); the
+ * WORDS live here, so adding an item costs a line of app code and never a
+ * migration. Array order is display order.
+ */
+export const READINESS_KEYS = ['hotel', 'technical'] as const;
+
+export type ReadinessKey = (typeof READINESS_KEYS)[number];
+
+/** i18n key for a checklist item's word. */
+export function readinessLabelKey(key: string): string {
+  return `planner.ready_${key}`;
+}
+
+/** An absent key reads as NOT ticked — never as unknown. */
+export function isReady(
+  readiness: Record<string, boolean> | null | undefined,
+  key: string,
+): boolean {
+  return readiness?.[key] === true;
+}
+
 /** UI label — holds keep their rank visible (hold 1 beats hold 3). */
 export function performanceStatusLabel(status: string): string {
   return status.replace(/_/g, ' ');
