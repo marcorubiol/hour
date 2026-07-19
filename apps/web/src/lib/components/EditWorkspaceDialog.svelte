@@ -39,9 +39,20 @@
     { value: 'other', label: 'Other' },
   ];
 
+  /**
+   * ADR-002 — which hold convention this space speaks. Only two entries: the
+   * simple case is the ABSENT key, not a stored "simple", so the setting has
+   * one representation instead of two that mean the same thing.
+   */
+  const BOOKING_MODE_OPTIONS = [
+    { value: '', label: 'Simple holds — theatre, dance' },
+    { value: 'prioritized', label: 'Ranked holds — music (1st, 2nd, 3rd)' },
+  ];
+
   let name = $state('');
   let accent = $state<string | null>(null); // null = auto (hash of slug)
   let domain = $state(''); // '' = no discipline
+  let bookingMode = $state(''); // '' = absent = simple
   let city = $state('');
   let description = $state('');
 
@@ -53,6 +64,7 @@
       name = workspace.name ?? '';
       accent = workspace.accent ?? null;
       domain = workspace.domain ?? '';
+      bookingMode = workspace.booking_mode === 'prioritized' ? 'prioritized' : '';
       city = workspace.city ?? '';
       description = workspace.description ?? '';
     }
@@ -74,6 +86,8 @@
         description: description.trim(),
         accent,
         domain: domain || null,
+        // '' clears the key back to absent (= simple); see the RPC.
+        booking_mode: bookingMode,
         city: city.trim(),
       };
       const res = await mutateJSON<{ workspace: { id: string; slug: string } }>(
@@ -194,6 +208,15 @@
       bind:value={domain}
       options={DOMAIN_OPTIONS}
       helper="Drives the vocabulary this space uses."
+      disabled={$save.isPending}
+    />
+
+    <Select
+      label="Holds"
+      name="space-booking-mode"
+      bind:value={bookingMode}
+      options={BOOKING_MODE_OPTIONS}
+      helper="Theatre holds coexist on a date; music holds queue by rank."
       disabled={$save.isPending}
     />
 

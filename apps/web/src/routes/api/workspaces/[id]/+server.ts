@@ -35,6 +35,12 @@ const PatchBodySchema = v.object({
   ),
   city: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(120))),
   logo_url: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(2048)))),
+  /**
+   * ADR-002 — which hold convention this workspace speaks. Empty string
+   * clears the key back to absent, which reads as `simple`; there is no
+   * stored "simple" so the setting has one representation, not two.
+   */
+  booking_mode: v.optional(v.picklist(['', 'simple', 'prioritized'])),
 });
 
 type WorkspaceRow = Tables<'workspace'>;
