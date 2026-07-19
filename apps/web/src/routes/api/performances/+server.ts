@@ -108,6 +108,7 @@ type ProjectLite = {
   slug: string;
   name: string;
   accent: string | null;
+  initials: string | null;
   workspace_id: string;
 };
 
@@ -185,7 +186,7 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
       'load_in_at,soundcheck_at,start_at,loadout_at,wrap_at',
       ...(notice === '1' ? ['hold_notice_days'] : []),
       'venue:venue_id(id,name,city,country,timezone)',
-      'project:project_id(id,slug,name,accent,workspace_id)',
+      'project:project_id(id,slug,name,accent,initials,workspace_id)',
     ].join(','),
   );
 
