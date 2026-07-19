@@ -240,6 +240,8 @@ Si alguna se asienta → migra a `_decisions.md` (o al `planner-design-prompt.md
 
 ## 2026-07-19 — Comms: el eje interno/operativo que falta + 3 formas de encararlo (SIN decidir)
 
+> **CRISTALIZADO 2026-07-19** → la forma se decidió en el mismo grill: **ADR-082** (personas/roles/acceso) + **ADR-083** (capa de comms) en `_decisions.md`. Esta entrada queda como rastro de la exploración; lo canónico vive en esos ADR. Las 3 formas de abajo se resolvieron: A (hilo polimórfico) = el mecanismo elegido · B (puente-ingest) = el lado difusión (email/BCC) · C (IA) = la activación consent-first del canal de bolo (ADR-069).
+
 **Disparador:** conversación de Marco con una compañía. Insight: una de las cosas más importantes es cómo se comunica la gente — internamente con quien trabaja en cada espectáculo, y a nivel de bolo para cada performance. Marco recuerda que "comms" existe como concepto en algún sitio pero no si está aislado. Sueña con: el día del bolo se crea automáticamente un canal donde todos los componentes se hablan entre ellos.
 
 **Hallazgo de fondo: "Conversations" ya es palabra ocupada, y hay DOS ejes metidos bajo una sola palabra.**
