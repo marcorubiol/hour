@@ -103,9 +103,26 @@
   font-size: var(--text-xs);
   color: var(--text-muted);
 }
+/* MOBILE — the centre/rail split is a DESKTOP GEOMETRY, not a priority
+   ranking. Collapsing the grid naively puts the whole rail last, so on a
+   load-in day the venue address sits three screens below five threads.
+   `display: contents` dissolves both columns so every block becomes a
+   direct flex item and can be ordered by day-of need via `--m`. */
 @media (max-width: 60rem) {
   .spread {
-    grid-template-columns: 1fr;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+  .spread > * {
+    display: contents;
+  }
+  .spread .run,
+  .spread .rail__block {
+    order: var(--m, 50);
+  }
+  .spread .rail__block {
+    margin-block-start: var(--space-l);
   }
   .rail {
     position: static;
@@ -442,6 +459,42 @@
   margin-block-start: var(--space-s);
   padding-block-start: var(--space-s);
   border-block-start: 1px dashed var(--border-color-dark);
+}
+
+/* ── people list in a rail ─────────────────────────────────────────── */
+/* Used by the gig page and the revoke screen — lives here, not in a
+   page's local <style>, because two surfaces now share it. */
+.who2 {
+  display: flex;
+  align-items: center;
+  gap: var(--space-s);
+  padding-block: var(--space-xs);
+  font-size: var(--text-s);
+}
+.who2 + .who2 {
+  border-block-start: var(--divider-light);
+}
+.who2__n {
+  color: var(--heading-color);
+  flex: 1;
+  min-inline-size: 0;
+}
+.who2__r {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-faint);
+}
+.who2__until {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-faint);
+}
+/* A guest is inside — with an end date. Dashed ring, never a band apart:
+   she is working this gig like everyone else in the list. */
+.who2--guest .mk--person {
+  background: transparent;
+  border: 1px dashed var(--border-color-dark);
 }
 
 /* ── quiet inline note / proposal ──────────────────────────────────── */

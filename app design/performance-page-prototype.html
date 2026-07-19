@@ -18,6 +18,43 @@
     <link rel="stylesheet" href="_kit.css" />
 
     <style>
+      /* ── ARA — the pinned spine of the day ──────────────────────── */
+      .nowbar {
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        display: flex;
+        align-items: baseline;
+        gap: var(--space-m);
+        margin: 0 0 var(--space-s);
+        padding-block: var(--space-s);
+        background: var(--bg);
+        border-block-end: var(--border);
+        font-size: var(--text-s);
+      }
+      .nowbar__k {
+        font-family: var(--font-mono);
+        font-size: var(--text-xs);
+        letter-spacing: var(--mono-letter-spacing-loose);
+        text-transform: uppercase;
+        color: var(--text-faint);
+      }
+      .nowbar__next b,
+      .nowbar__show b {
+        font-family: var(--font-mono);
+        font-weight: 500;
+        color: var(--heading-color);
+      }
+      .nowbar__gap {
+        font-family: var(--font-mono);
+        font-size: var(--text-xs);
+        color: var(--text-faint);
+      }
+      .nowbar__show {
+        margin-inline-start: auto;
+        color: var(--text-muted);
+      }
+
       /* ── HORARIS — time as glyph, the spine of the day ───────────── */
       .slot {
         display: flex;
@@ -150,40 +187,6 @@
         color: var(--danger);
       }
 
-      /* ── the rail's people list ──────────────────────────────────── */
-      .who2 {
-        display: flex;
-        align-items: center;
-        gap: var(--space-s);
-        padding-block: var(--space-xs);
-        font-size: var(--text-s);
-      }
-      .who2 + .who2 {
-        border-block-start: var(--divider-light);
-      }
-      .who2__n {
-        color: var(--heading-color);
-        flex: 1;
-        min-inline-size: 0;
-      }
-      .who2__r {
-        font-family: var(--font-mono);
-        font-size: var(--text-xs);
-        color: var(--text-faint);
-      }
-      /* A guest is inside — with an end date. Dashed ring, never a band
-         apart: she is working this gig like everyone else in this list. */
-      .who2--guest .mk--person {
-        background: transparent;
-        border: 1px dashed var(--border-color-dark);
-      }
-      .who2__until {
-        display: block;
-        font-family: var(--font-mono);
-        font-size: var(--text-xs);
-        color: var(--text-faint);
-      }
-
       .addr__line {
         font-size: var(--text-s);
         color: var(--text-color);
@@ -251,8 +254,18 @@
         <div class="spread" style="margin-block-start: var(--space-l)">
           <!-- ══════════ CENTRE — what you act on ══════════ -->
           <div>
+            <!-- ARA — the only thing that must never scroll away on a show
+                 day. The rail is sticky but lives on the right; the hour of
+                 the show was in the centre and scrolled off, which made the
+                 claim below false. This is the fix: the spine is pinned. -->
+            <p class="nowbar">
+              <span class="nowbar__k">ara</span>
+              <span class="nowbar__next"><b>17:00</b> Pas de sala</span>
+              <span class="nowbar__gap">d'aquí a 2 h 10</span>
+              <span class="nowbar__show">funció <b>20:00</b></span>
+            </p>
             <!-- HORARIS — the spine. This is what the page is opened for. -->
-            <article class="run" style="border-block-start: none">
+            <article class="run" style="border-block-start: none; --m: 1">
               <div class="run__gutter">
                 <a class="run__label" href="#">Horaris</a>
                 <span class="run__sub">hora local<br />de Barcelona</span>
@@ -293,7 +306,7 @@
             </article>
 
             <!-- CONVERSA — the hub, as ONE section of the page -->
-            <article class="run">
+            <article class="run" style="--m: 5">
               <div class="run__gutter">
                 <a class="run__label" href="#">Conversa</a>
                 <span class="run__sub">5 fils · 3 sense<br />llegir</span>
@@ -357,7 +370,7 @@
             </article>
 
             <!-- TASQUES — the verb layer, attached to this performance -->
-            <article class="run">
+            <article class="run" style="--m: 6">
               <div class="run__gutter">
                 <a class="run__label" href="#">Tasques</a>
                 <span class="run__sub">3 obertes</span>
@@ -391,7 +404,7 @@
           <!-- ══════════ RAIL — what you look up ══════════ -->
           <aside class="rail">
             <!-- LA SALA -->
-            <section class="rail__block">
+            <section class="rail__block" style="--m: 2">
               <header class="rail__head">
                 <p class="eyebrow">La sala</p>
                 <a class="link-arrow" href="#">fitxa →</a>
@@ -405,7 +418,7 @@
             </section>
 
             <!-- QUI VE -->
-            <section class="rail__block">
+            <section class="rail__block" style="--m: 4">
               <header class="rail__head">
                 <p class="eyebrow">Qui ve</p>
                 <span class="rail__quiet">7 + 1</span>
@@ -456,7 +469,7 @@
             </section>
 
             <!-- FULL DE RUTA -->
-            <section class="rail__block">
+            <section class="rail__block" style="--m: 3">
               <header class="rail__head">
                 <p class="eyebrow">Full de ruta</p>
               </header>
@@ -465,7 +478,7 @@
             </section>
 
             <!-- DINERS — gated. Suppressed silently when you lack it. -->
-            <section class="rail__block">
+            <section class="rail__block" style="--m: 7">
               <header class="rail__head">
                 <p class="eyebrow">Diners</p>
                 <a class="link-arrow" href="#">detall →</a>
@@ -491,8 +504,10 @@
             <b>Centro = lo que haces y lo que cambia · carril = lo que consultas y
             simplemente es cierto.</b> Por eso los horarios, los hilos y las tareas
             van al centro, y la sala, la gente, la hoja de ruta y el caché van al
-            carril. Y por eso el carril es <i>sticky</i>: mientras bajas por la
-            conversación, la hora de la función no se te va de la pantalla.
+            carril. El carril es <i>sticky</i>, pero eso solo fija la sala, la gente y el caché —
+            la hora de la función vivía en el centro y se iba con el scroll. Por eso
+            hay una <b>barra ARA fijada arriba del centro</b>: el próximo aviso y la
+            hora de función son lo único que no puede desaparecer un día de bolo.
           </p>
           <p>
             <span class="qnote__tag">hallazgo · la banda desaparece</span>

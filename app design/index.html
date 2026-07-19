@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="ca">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Hour — prototips d'accés i comms</title>
+    <style>
+      @layer reset, defaults, tokens, layouts, components, components.overrides,
+        utilities, overrides;
+    </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400..600;1,6..72,400..600&family=Inter:wght@400..600&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="../apps/web/src/styles/base.css" />
+    <link rel="stylesheet" href="_kit.css" />
+    <style>
+      .card {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: var(--space-s) var(--space-m);
+        align-items: baseline;
+        padding-block: var(--space-m);
+        border-block-start: var(--divider-light);
+        text-decoration: none;
+      }
+      .card__t {
+        font-family: var(--font-display);
+        font-size: var(--text-l);
+        font-weight: 500;
+        color: var(--heading-color);
+      }
+      .card__t em { font-style: italic; }
+      .card__d {
+        grid-column: 1;
+        font-size: var(--text-s);
+        color: var(--text-muted);
+        max-inline-size: 62ch;
+        margin: 0;
+      }
+      .card__st {
+        font-family: var(--font-mono);
+        font-size: var(--text-xs);
+        letter-spacing: var(--mono-letter-spacing-loose);
+        text-transform: uppercase;
+        color: var(--text-faint);
+        white-space: nowrap;
+      }
+      .card--old .card__t { color: var(--text-muted); }
+      .card--new .card__st { color: var(--success); }
+      .lead {
+        font-size: var(--text-m);
+        color: var(--text-muted);
+        max-inline-size: 66ch;
+      }
+      .docs { margin-block-start: var(--space-l); }
+      .docs li { font-size: var(--text-s); color: var(--text-muted); }
+      .docs code { font-family: var(--font-mono); font-size: var(--text-xs); }
+    </style>
+  </head>
+  <body>
+    <div class="proto">
+      <header class="shell bleed">
+        <div class="shell__inner wrap">
+          <div class="shell__brand">
+            <span class="shell__logo">hour</span>
+            <span class="eyebrow">prototips</span>
+          </div>
+          <button class="modeswap" type="button" onclick="document.documentElement.dataset.mode = document.documentElement.dataset.mode === 'dark' ? 'light' : 'dark'">tema fosc</button>
+        </div>
+      </header>
+
+      <main class="page wrap" style="max-inline-size: 58rem">
+        <header class="mast">
+          <p class="eyebrow">Validació del model · ADR-082 · ADR-083 · ADR-085</p>
+          <h1 class="mast__title"><em>Accés i comms</em></h1>
+          <p class="lead">
+            Set pantalles per trencar el model abans que el trenqui l'schema. Cap
+            d'aquestes toca base de dades: el model és provisional i el gate
+            segueix dret — fer servir l'app una temporada real de difusió abans de
+            construir res. Totes porten <b>tema clar i fosc</b> (botó a dalt a la
+            dreta) i <b>anotacions de disseny</b> al peu, en mono i amb vora
+            discontínua, que mai són interfície.
+          </p>
+        </header>
+
+        <section style="margin-block-start: var(--space-xl)">
+          <p class="eyebrow">Les pantalles</p>
+
+          <a class="card card--new" href="performance-page-prototype.html">
+            <span class="card__t"><em>La pàgina d'un bolo</em></span>
+            <span class="card__st">vigent · la més decidida</span>
+            <p class="card__d">
+              El bolo sencer: barra ARA fixada, horaris, la conversa <b>com una
+              secció</b> (no com la pàgina), tasques; i al carril la sala, qui ve,
+              el full de ruta i el caché. Aquí és on la banda «fora del fil»
+              desapareix perquè cada persona va al bloc que li toca.
+            </p>
+          </a>
+
+          <a class="card card--new" href="revoke-access-prototype.html">
+            <span class="card__t"><em>Treure l'accés</em></span>
+            <span class="card__st">nova · el forat que faltava</span>
+            <p class="card__d">
+              L'altra meitat de «dar de alta», que ningú havia dibuixat. Es queda /
+              es trenca / ella / sol. Treu a la llum que les <b>tasques assignades
+              queden òrfenes</b> i que una invitació no cau amb qui la va fer.
+            </p>
+          </a>
+
+          <a class="card" href="permissions-editor-prototype.html">
+            <span class="card__t"><em>Rols i permisos</em></span>
+            <span class="card__st">actualitzada</span>
+            <p class="card__d">
+              Rols (etiqueta, sense poder) → nivell → la matriu <b>per nivell de
+              contenidor</b>, amb la columna «on existeix» → la vista efectiva amb
+              procedència. Presets Mínim · Equip · Coordinació · Direcció.
+            </p>
+          </a>
+
+          <a class="card" href="operator-invite-flow-prototype.html">
+            <span class="card__t"><em>De contacte a operador</em></span>
+            <span class="card__st">actualitzada</span>
+            <p class="card__d">
+              Cinc panells: la porta al vincle, la invitació, pendent, acceptada
+              amb seient comptat, i la porta que mai ha d'existir.
+            </p>
+          </a>
+
+          <a class="card" href="person-roles-org-prototype.html">
+            <span class="card__t"><em>Una persona i les seves organitzacions</em></span>
+            <span class="card__st">actualitzada</span>
+            <p class="card__d">
+              L'Ana Solé amb tres rols i tres vincles (un d'acabat), les tres
+              maneres d'ancorar una conversa, i l'accés com <b>una fila per
+              vincle</b> — porta on hi ha feina, cap porta on hi ha difusió.
+            </p>
+          </a>
+
+          <a class="card card--old" href="comms-hub-performance-prototype.html">
+            <span class="card__t">El hub a pantalla completa</span>
+            <span class="card__st">superada · es conserva</span>
+            <p class="card__d">
+              La primera passada. La decisió de posar el hub com a pàgina sencera
+              es va revertir, però aquí hi ha més detall d'<b>audiència resolta per
+              fil</b> i del <b>roster complet</b> que val la pena reaprofitar.
+            </p>
+          </a>
+
+          <a class="card card--old" href="line-detail-prototype.html">
+            <span class="card__t">Detall d'una línia</span>
+            <span class="card__st">de juliol · un altre tema</span>
+            <p class="card__d">
+              Anterior a tot això. La capa d'adreça i la taula editorial venen
+              d'aquí. Té el seu propi kit embegut i no ha rebut cap correcció.
+            </p>
+          </a>
+        </section>
+
+        <section class="docs">
+          <p class="eyebrow">Els papers</p>
+          <ul>
+            <li><code>_notes/spec-access-comms-decisions.md</code> — el registre complet de què es va decidir i per què. <b>Comença per aquí.</b></li>
+            <li><code>_notes/adr-085-DRAFT.md</code> — ADR-085 i les esmenes a ADR-082/083, redactats i llestos per enganxar. No estan a <code>_decisions.md</code> encara, a posta.</li>
+            <li><code>_notes/review-prototypes-2026-07-20.md</code> — 45 troballes obertes de la revisió adversarial, amb evidència mesurada.</li>
+            <li><code>build/access-comms-design-prompt.md</code> — el contracte per a l'eina de disseny.</li>
+          </ul>
+        </section>
+
+        <div class="qnote">
+          <p>
+            <span class="qnote__tag">lo que sigue abierto</span>
+            <b>1.</b> Producció como faceta — la celda más floja de la tabla, en
+            observación. <b>2.</b> El bolo como cuarto nivel de permisos:
+            <code>structure-model.md</code> declara tres niveles de edición, así que
+            o se enmienda ese documento o el bolo no puede llevar permisos propios.
+            <b>3.</b> La faceta es ahora una dimensión transversal (ordena la
+            conversación, gatea el acceso y etiqueta el gutter) y <b>no tiene
+            entrada en el structure-model</b>. <b>4.</b> Si comms sube al Desk como
+            quinto tipo. <b>5.</b> La paleta de <i>concern</i> y la de <i>faceta</i>
+            se solapan en Diners y nadie las ha reconciliado.
+          </p>
+          <p>
+            <span class="qnote__tag">deuda de accesibilidad · código de la app</span>
+            La revisión midió contraste real: <code>.kbd</code> falla AA en las siete
+            pantallas y en los dos temas (2,44:1 en el peor caso), y los acentos de
+            modo claro fallan como texto (3,16–3,49:1) mientras los de modo oscuro
+            pasan — señal de que el oscuro se afinó para texto y el claro no.
+            Eso es <code>base.css</code> y <code>tokens.css</code>, código vivo: no lo
+            he tocado. Detalle en el fichero de revisión.
+          </p>
+        </div>
+      </main>
+    </div>
+  </body>
+</html>

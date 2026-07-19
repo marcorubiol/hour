@@ -146,8 +146,13 @@
         border: 1px solid currentColor;
         color: var(--f, var(--text-faint));
       }
+      /* Off-state: the DASHED BORDER carries the meaning; the word still
+         has to be legible. Painting the label with --border-color-dark (a
+         hairline token at 18% alpha) rendered it at 1.41:1 — the one state
+         the roster exists to communicate was the one you could not read. */
       .fchip--off {
-        color: var(--border-color-dark);
+        color: var(--text-faint);
+        border-color: var(--border-color-dark);
         border-style: dashed;
       }
       .fchip--free {
@@ -218,6 +223,21 @@
             <a class="link-arrow" href="#">Full de ruta →</a>
           </div>
         </div>
+      </div>
+
+      <div class="qnote" style="margin: var(--space-m) auto 0; max-inline-size: var(--proto-width);">
+        <p>
+          <span class="qnote__tag">superseded · 2026-07-20</span>
+          <b>Esta pantalla dibuja el hub a pantalla completa, y esa decisión se
+          revirtió.</b> La página del bolo es el bolo, y el hub es una sección
+          dentro — ver <b>performance-page-prototype.html</b>, que es la vigente.
+          Se conserva por dos cosas que aquí están más desarrolladas y que hay que
+          reaprovechar: el detalle de la <b>audiencia resuelta por hilo</b> y el
+          <b>roster completo</b> con la procedencia de cada permiso.
+          Lo que aquí queda obsoleto: la banda «fora del fil» (disuelta — cada
+          persona va al bloque que le toca), <b>General</b> contado como faceta
+          (es la pertenencia al contenedor) y los presets con los nombres viejos.
+        </p>
       </div>
 
       <main class="page wrap">
