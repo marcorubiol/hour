@@ -276,12 +276,25 @@
 
   // Off-grid buckets (the page's padded dates window can fetch an event a
   // day outside the grid) simply find no cell.
+  // Gigs lead the cell (they render before dates), and inside them the
+  // SETTLED one leads: a confirmed gig is what the day actually is, a hold
+  // or a proposal is a maybe — a maybe must never sit above the real thing
+  // (Marco, 2026-07-19). Ties break on the working time so the order is
+  // stable rather than feed order.
+  const PERF_RANK: Record<string, number> = { confirmed: 0, hold: 1, proposed: 2 };
   let performancesByDay = $derived.by(() => {
     const map = new Map<string, PerformanceEvent[]>();
     for (const p of performances) {
       const key = perfDayKey(p);
       (map.get(key) ?? map.set(key, []).get(key)!).push(p);
     }
+    for (const list of map.values())
+      list.sort((a, b) => {
+        const ra = PERF_RANK[performanceStatusFamily(a.status)] ?? 9;
+        const rb = PERF_RANK[performanceStatusFamily(b.status)] ?? 9;
+        if (ra !== rb) return ra - rb;
+        return (perfInstant(a) ?? '').localeCompare(perfInstant(b) ?? '');
+      });
     return map;
   });
 
@@ -387,6 +400,20 @@
     return [...m.values()].sort((a, b) => a.name.localeCompare(b.name));
   });
 
+  // Clicking a legend entry mutes that project in this view. Ephemeral,
+  // view-local state (like the clash popover) — it deliberately does NOT
+  // touch the app-wide scope: this is "let me look without them for a
+  // second", not "change what I am working on".
+  let hiddenProjects = $state<string[]>([]);
+  function toggleProject(id: string) {
+    hiddenProjects = hiddenProjects.includes(id)
+      ? hiddenProjects.filter((x) => x !== id)
+      : [...hiddenProjects, id];
+  }
+  function projectShown(e: { project?: ProjectLite | null }): boolean {
+    return !e.project || !hiddenProjects.includes(e.project.id);
+  }
+
   type BandSlot =
     | { kind: 'blackout'; band: BlackoutBandVM; from: string; to: string }
     | { kind: 'away'; band: AwayBandVM; from: string; to: string };
@@ -487,8 +514,18 @@
 {#if legendProjects.length > 0}
   <div class="cal__legend">
     {#each legendProjects as pr (pr.id)}
-      <span class="cal__legend-item"
-        ><IdentityMark accent={accentVarFor(pr)} name={pr.name} initials={pr.initials} />{pr.name}</span
+      {@const shown = !hiddenProjects.includes(pr.id)}
+      <button
+        type="button"
+        class="cal__legend-item"
+        class:cal__legend-item--muted={!shown}
+        aria-pressed={shown}
+        onclick={() => toggleProject(pr.id)}
+        ><IdentityMark
+          accent={accentVarFor(pr)}
+          name={pr.name}
+          initials={pr.initials}
+        />{pr.name}</button
       >
     {/each}
     <span class="cal__legend-sep" aria-hidden="true"></span>
@@ -515,8 +552,8 @@
   {#each weeks as week, wi (wi)}
     {@const wlc = weekLaneCount(week)}
     {#each week as day, di (day.iso)}
-      {@const perfs = performancesByDay.get(day.iso) ?? []}
-      {@const dayDates = datesByDay.get(day.iso) ?? []}
+      {@const perfs = (performancesByDay.get(day.iso) ?? []).filter(projectShown)}
+      {@const dayDates = (datesByDay.get(day.iso) ?? []).filter(projectShown)}
       {@const clashes = clashesByDay?.get(day.iso) ?? []}
       {@const bandSlots = laneSlotsOn(day.iso, wlc)}
       <div
@@ -933,6 +970,8 @@
       --chip-border-style: solid;
       /* Square until settled — see the radius rule below. */
       --chip-radius: var(--radius-none);
+      /* Flat by default; only the settled gig earns lift (see below). */
+      --chip-shadow: none;
       --mark: 14px;
       display: flex;
       flex-direction: column;
@@ -942,6 +981,7 @@
       padding: var(--space-2xs) var(--space-xs);
       border-radius: var(--chip-radius);
       border: 1px var(--chip-border-style) var(--chip-border-color);
+      box-shadow: var(--chip-shadow);
       background-color: var(--chip-bg);
       background-image: var(--chip-bg-image);
       color: var(--chip-fg);
@@ -999,8 +1039,13 @@
       filter: brightness(0.97);
     }
 
+    /* The settled gig is the day's anchor: it leads the cell AND lifts off
+       it. Lift is earned like the radius — a hold stays flat on the page. */
     .cal__event--perf[data-family='confirmed'] {
       --chip-bg: color-mix(in oklch, var(--c, var(--border-color-dark)) 13%, var(--bg-ultra-light));
+      --chip-shadow:
+        0 1px 2px color-mix(in oklch, var(--text-color) 10%, transparent),
+        0 2px 5px color-mix(in oklch, var(--text-color) 6%, transparent);
     }
     .cal__event--perf[data-family='confirmed'] .cal__event-name {
       font-weight: 600;
@@ -1042,6 +1087,29 @@
       display: inline-flex;
       align-items: center;
       gap: var(--space-2xs);
+    }
+    /* The project entries ARE the view's filter — click one to mute it. */
+    .cal__legend-item {
+      appearance: none;
+      border: 0;
+      padding: 0;
+      background: none;
+      font: inherit;
+      color: inherit;
+      cursor: pointer;
+      border-radius: var(--radius-s);
+      transition: opacity var(--transition);
+    }
+    .cal__legend-item:hover {
+      color: var(--text-color);
+    }
+    .cal__legend-item--muted {
+      opacity: 0.4;
+      text-decoration: line-through;
+    }
+    .cal__legend-item:focus-visible {
+      outline: var(--focus-width) solid var(--focus-color);
+      outline-offset: 2px;
     }
     .cal__legend-sep {
       inline-size: 1px;
