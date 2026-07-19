@@ -75,6 +75,20 @@ Working name: **Hour**. Brand decision deferred to Phase 1.
 - Parent MaMeMi context (where Difusión originated): `01_STAGE/ZS_MaMeMi/`
 - Source of the 156 existing programmers/festivals to import: `01_STAGE/ZS_MaMeMi/Difusión/`
 
+## Status — 2026-07-20 — Rediseño del Planner (Scope v2) + Cubo 2: bloques multi-día, readiness, booking_mode
+
+**Al retomar, empezar aquí.** Todo en la rama **`feat/planner-mes-cards`** (sale de `feat/identity-monogram`). **NADA DESPLEGADO** — producción sigue en lo anterior; lo único que tocó producción son las migraciones.
+
+**Cards del Mes rediseñadas** (Scope v2, mock de Marco): chips → cards de tres filas (venue + monograma / ciudad + país ISO + hora / pie de estado). Tres canales convergentes para el mismo eje — **forma** (redondeado = asentado, recto = no), **superficie** (relleno sólido vs trama 135°), **elevación** (solo el bolo confirmado levanta) — y el borde lleva **identidad de proyecto y nada más** (una sola mezcla: variarla por familia hacía que dos cards del mismo proyecto pareciesen de proyectos distintos). Orden dentro del día: confirmado → hold → propuesto. Legend con monogramas **clicables para silenciar** un proyecto (estado local de la vista, no toca el scope global).
+
+**Migraciones APLICADAS en producción** (autorizadas explícitamente; verificadas contra la base viva, 0 filas tocadas): `date.series_id` + índice · `performance.readiness jsonb` + CHECK · RPC atómica `create_date_series` · CHECK de `workspace.settings.booking_mode` · `update_workspace` extendido con `booking_mode`.
+
+**Construido encima** (ADR-084): readiness marcable desde la ficha del bolo (vocabulario cerrado en el **borde de escritura**, no solo en el CHECK) · banda multi-día con bordes **derivados en cada pintado** · rango horario en las fechas · `$lib/block.ts` (regla span + días de la semana + excepciones, 10 tests) · `BlockForm` como **modo** del diálogo unificado · `booking_mode` de ADR-002, decidido desde el enum de estados y **nunca construido hasta ahora**.
+
+**Pendiente de verificación humana** (nada de esto se pudo probar sin sesión real): marcar un tick de readiness y ver el `✓` en la card del Mes · crear un bloque desde el diálogo y ver la banda · poner una workspace en `prioritized` y ver reaparecer "1r hold".
+
+**Deuda conocida:** la trama del selector de días es neutra, sin acento de proyecto (la query de projects no trae `accent`) · `db-types.ts` sigue hand-patched (`readiness`, `series_id`), pendiente de regen real · sin e2e del bloque.
+
 ## Status — 2026-07-19 — La lente Calendar renombrada a Planner (EN Planner · ES/CA Planificador)
 
 **Al retomar, empezar aquí.** La lente de tiempo pasó de **Calendar** a **Planner** (ADR-079), desplegado y verificado (commit `d977af0`; `/health/live` sha `d977af0`; `/h/calendar` y `/h/[ws]/calendar` → 301 → `/h/planner`). Token interno `planner`; labels **EN Planner · ES/CA Planificador · FR Planning** (pendiente `fr.json`). Copy de acción en "al plan"/"al pla" (etiqueta formal, copy natural — patrón Desk). **Scope**: solo el producto (lente/ruta/motor `planner.ts`/store/módulo/reserved-slug); el **feed ICS conserva "calendar"** (`calendar_share`, `/api/public/calendar`, `ics.ts`) — es un iCalendar de verdad, como la entidad `date` conserva su nombre. Migración `build/migrations/2026-07-19_rename_calendar_to_planner.sql` (reserved slug 65=65 + swap de 3 líneas, verificado: 0 `calendar` / 3 `planner`). `svelte-check` 0/0 (1538) · unit 251/251. Detalle: `_decisions.md § ADR-079`.
