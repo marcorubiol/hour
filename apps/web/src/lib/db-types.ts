@@ -3,6 +3,7 @@
 // user_profile.person_id, create_date/delete_date RPCs. Regenerate after
 // applying the 2026-07-18 migrations.
 // hand-patched pending regen (planner-v2): performance.hold_notice_days
+// hand-patched pending regen (ADR-084): performance.readiness
 // (ADR-080 §2, 2026-07-18_hold_notice_days.sql).
 export type Json =
   | string
@@ -1231,6 +1232,7 @@ export type Database = {
           notes: string | null
           performed_at: string
           previous_slugs: string[]
+          readiness: Json
           project_id: string
           slug: string | null
           soundcheck_at: string | null
@@ -1263,6 +1265,7 @@ export type Database = {
           notes?: string | null
           performed_at: string
           previous_slugs?: string[]
+          readiness?: Json
           project_id: string
           slug?: string | null
           soundcheck_at?: string | null
@@ -1295,6 +1298,7 @@ export type Database = {
           notes?: string | null
           performed_at?: string
           previous_slugs?: string[]
+          readiness?: Json
           project_id?: string
           slug?: string | null
           soundcheck_at?: string | null

@@ -33,6 +33,9 @@
     performanceStatusTone,
     type PerformancePatch,
     type PerformanceStatus,
+    READINESS_KEYS,
+    readinessLabelKey,
+    isReady,
   } from '$lib/performance';
   import type { VenueContact } from '$lib/venue';
   import { workspacesQueryOptions } from '$lib/nav-queries';
@@ -69,6 +72,9 @@
       logistics: Json;
       hospitality: Json;
       technical: Json;
+      /* ADR-084 §3 — the verdict, next to the content it summarises. Typed
+         narrower than Json on purpose: the key set is closed app-side. */
+      readiness: Record<string, boolean> | null;
       venue: {
         id: string;
         slug: string | null;
@@ -179,6 +185,18 @@
       });
     },
   });
+
+  /**
+   * ADR-084 §3 — tick "is it sorted?". Reuses the generic patch mutation on
+   * purpose: a readiness tick is an ordinary field write, and that mutation
+   * already invalidates the planner feed, so the month card's foot repaints
+   * without a second invalidation path to keep in sync.
+   */
+  function toggleReady(key: string) {
+    if (!perf) return;
+    const current = (perf.readiness ?? {}) as Record<string, boolean>;
+    $patchMutation.mutate({ readiness: { ...current, [key]: !current[key] } });
+  }
 
   function changeStatus(status: PerformanceStatus) {
     if (!perf || perf.status === status) return;
@@ -642,6 +660,31 @@
       fallbackTz={workspaceTz}
     />
 
+    <!-- ADR-084 §3 — the answer to "is it sorted?", which the month card's
+         foot reads. Deliberately separate from the logistics/technical
+         CONTENT above: that is where the detail lives, this is the verdict. -->
+    <section class="perf__section" aria-label="Readiness">
+      <p class="eyebrow">Readiness</p>
+      <ul class="perf__ready" role="list">
+        {#each READINESS_KEYS as key (key)}
+          {@const on = isReady(perf.readiness, key)}
+          <li>
+            <button
+              type="button"
+              class="perf__ready-item"
+              class:perf__ready-item--on={on}
+              aria-pressed={on}
+              disabled={$patchMutation.isPending}
+              onclick={() => toggleReady(key)}
+            >
+              <span class="perf__ready-box" aria-hidden="true">{on ? '✓' : ''}</span>
+              {t(readinessLabelKey(key), locale)}
+            </button>
+          </li>
+        {/each}
+      </ul>
+    </section>
+
     {#if hasTeam}
       <section class="perf__section" aria-label="Team">
         <p class="eyebrow">Team</p>
@@ -1040,6 +1083,56 @@
       display: flex;
       flex-direction: column;
       gap: var(--space-s);
+    }
+
+    /* Readiness — a checklist you TICK, not a status you read. The whole
+       row is the target (box + word), never a 12px square. */
+    .perf__ready {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-xs) var(--space-m);
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+    .perf__ready-item {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2xs);
+      appearance: none;
+      border: 0;
+      padding: 0;
+      background: none;
+      font: inherit;
+      color: var(--text-muted);
+      cursor: pointer;
+    }
+    .perf__ready-item:disabled {
+      cursor: progress;
+      opacity: 0.6;
+    }
+    .perf__ready-item--on {
+      color: var(--text-color);
+    }
+    .perf__ready-box {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      inline-size: 1.1em;
+      block-size: 1.1em;
+      border: 1px solid var(--border-color-dark);
+      border-radius: var(--radius-s);
+      font-size: 0.8em;
+      line-height: 1;
+    }
+    .perf__ready-item--on .perf__ready-box {
+      border-color: transparent;
+      background: color-mix(in oklch, var(--success, var(--text-color)) 18%, transparent);
+      color: var(--success, var(--text-color));
+    }
+    .perf__ready-item:focus-visible {
+      outline: var(--focus-width) solid var(--focus-color);
+      outline-offset: 2px;
     }
 
 
