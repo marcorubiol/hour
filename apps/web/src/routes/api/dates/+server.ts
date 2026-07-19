@@ -75,6 +75,7 @@ type ProjectLite = {
   slug: string;
   name: string;
   accent: string | null;
+  initials: string | null;
   workspace_id: string;
 };
 
@@ -142,7 +143,7 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
   const BASE_SELECT = [
     'id,kind,status,title,starts_at,ends_at,all_day,venue_name,city',
     'project_id,performance_id',
-    'project:project_id(id,slug,name,accent,workspace_id)',
+    'project:project_id(id,slug,name,accent,initials,workspace_id)',
     'venue:venue_id(timezone)',
   ];
   const EXTENDED_SELECT = [

@@ -83,6 +83,9 @@
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['projects'] });
       if (project) await queryClient.invalidateQueries({ queryKey: ['project', project.slug] });
+      // Calendar chips read the perf/date feeds — refetch so they repaint too.
+      await queryClient.invalidateQueries({ queryKey: ['planner-performances'] });
+      await queryClient.invalidateQueries({ queryKey: ['planner-dates'] });
       addToast({ tone: 'success', message: 'Project updated.' });
       close();
     },

@@ -53,6 +53,10 @@
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['projects'] });
       await queryClient.invalidateQueries({ queryKey: ['project', project.slug] });
+      // The calendar chips read the project from the perf/date feeds, not the
+      // projects cache — refetch those so the monogram/color repaint there too.
+      await queryClient.invalidateQueries({ queryKey: ['planner-performances'] });
+      await queryClient.invalidateQueries({ queryKey: ['planner-dates'] });
       onclose();
     },
     onError: (err) => {
