@@ -235,3 +235,55 @@ El fill sólido ya distingue confirmado de hold, pero Marco quiere que el bolo c
 - Pendiente pensar: ¿icono/enlace inline en el chip (compite con el poco espacio del chip de mes) vs solo en agenda/detalle? ¿aparece en `confirmed` o desde `hold`? Probablemente confirmed+ (cuando la hoja de ruta empieza a tener contenido).
 
 Si alguna se asienta → migra a `_decisions.md` (o al `planner-design-prompt.md` como contrato de la próxima pasada de diseño).
+
+---
+
+## 2026-07-19 — Comms: el eje interno/operativo que falta + 3 formas de encararlo (SIN decidir)
+
+**Disparador:** conversación de Marco con una compañía. Insight: una de las cosas más importantes es cómo se comunica la gente — internamente con quien trabaja en cada espectáculo, y a nivel de bolo para cada performance. Marco recuerda que "comms" existe como concepto en algún sitio pero no si está aislado. Sueña con: el día del bolo se crea automáticamente un canal donde todos los componentes se hablan entre ellos.
+
+**Hallazgo de fondo: "Conversations" ya es palabra ocupada, y hay DOS ejes metidos bajo una sola palabra.**
+Hace dos días (ADR-075) `engagement` → `conversation`: la entidad es el estado de difusión de un `(person × project × workspace)`; la lente Conversations = tu red de booking (async, 1:1, memoria de venta). Lo que hoy plantea Marco es OTRO eje.
+
+**Eje HACIA FUERA (booking) — ya decidido, y en critical path.**
+- Memoria de la negociación con cada programador. Diseñado como `conversation_event` (gap #2, `screen-data-spec.md:580-585`): log fechado por conversación (kind note/call/email/meeting · direction inbound/outbound · body · created_by). **NO construido** (verificado: no existe tabla message/thread/event/channel ninguna en schema ni migraciones).
+- Forma decidida y bloqueada: **comms = timeline por contacto DENTRO de Conversations, ni módulo aparte ni lente aparte** (ADR-056 `:1573`, ADR-065 `:1806`).
+- Ingest mínimo: **BCC-archive estilo Basecamp** (`eng-xxx@in.hour…`, Cloudflare Email Workers), de la exploración `share`/pitch (ADR-028 `:1014`). Adelanta D4 solo por el lado ingest.
+- **Elevado a critical path por ADR-069** (`:1864`): la IA proactiva necesita la memoria de la negociación para proponer con criterio → ya no es diferido, es prerequisito del norte. (Marco ya lo marcó palanca TAM nº1 en `§ 2026-05-18`.)
+- Todo este eje es person×project. Hablar-con-programadores.
+
+**Eje HACIA DENTRO (operativo) — esto es lo NUEVO. No está modelado en ningún sitio.**
+- Hablar con la gente que HACE el espectáculo/bolo: cast, crew, compañía, colaboradores externos, sala. Hoy esa gente vive en el módulo **Team** (`/api/team` = cast_member ∪ crew_assignment ∪ contactos de venue por performance), que explícitamente NO tiene comunicación colgada (structure-model:86 traza la frontera dura: Conversations = con quién reservas · Team = quién hace la obra).
+- El **canal automático el día del bolo** vive aquí. Barrido confirmó cero concepto de auto-crear canal atado a un bolo. El comms decidido es person×project; un canal de bolo colgaría de `performance` — que YA tiene `conversation_id`, cast, crew, contactos de sala, `roadsheet_share`, y un canal realtime `show:` de presencia.
+- Este eje **dobla la frontera Conversations/Team** (structure-model:86): un canal de bolo mezcla ambas audiencias + externos de sala. Decisión explícita a tomar, no un desliz.
+
+**El problema que Marco enuncia** — (a) hablar de lo que hay que hablar + (b) tener la info a mano cuando hace falta — muerde más fuerte HACIA DENTRO, que es donde Hour tiene ventaja injusta: ya guarda el dato del bolo (horarios, logística, sala, hoja de ruta, gente derivable). La hoja de ruta ya responde parte de (b); lo que falta es una superficie donde hablar ESTÉ pegado al dato.
+
+**Primitivas ya construidas para montar el eje interno** (no partir de cero): `performance.conversation_id` · `/api/team` + `TeamModule.svelte` (deriva cast+crew+sala POR bolo) · `roadsheet_share` (ADR-047, link firmado role-filtered por `performance_id`; documento de una vía, no conversación) · realtime `show:{id}` (`lib/realtime/channels.ts`, presencia/broadcast sin persistencia) · `notify.ts` (Phase 0.4 in-app; 0.5 email/WhatsApp/Telegram — la capa de entrega, aún NO existe).
+
+**Tres formas de encararlo (spectrum de menos a más "sala de chat nativa"):**
+
+- **A — Hilo polimórfico sobre cualquier contenedor.** Generalizar el log: en vez de `conversation_event` atado solo a `conversation`, un `thread`/`message` polimórfico como YA lo es `task` — cuelga de conversation (fuera, = timeline ya decidido), performance/bolo (dentro, = canal automático), project (canal del espectáculo), workspace (canal de compañía). Un spine; participantes derivados del contenedor (bolo → `/api/team`); el canal de bolo sale gratis.
+  - A favor: máximamente Hour-native (core polimórfico account/workspace/project/conversation/performance/line/date; task ya lo es). Colapsa (a)+(b): hablas sobre la cosa, la cosa es la memoria. Reusa `/api/team`, realtime `show:`, notify.ts.
+  - En contra: generalizas antes del caso simple (YAGNI). Mensajería real (multi-parte, entrega, push, móvil) pesada para Phase 0. Adopción vs WhatsApp. Dobla frontera Conversations/Team → ADR.
+
+- **B — Puente + ingest, no chat in-app (D4 aplicado al bolo).** Hour NO hospeda el chat del equipo. Para el bolo: ensambla gente (`/api/team`) + paquete (hoja de ruta, horarios, sala, logística) y ofrece "abrir grupo / mandar convocatoria" hacia donde ya están (WhatsApp/email); opcionalmente ingiere respuestas (BCC) contra el bolo. Info-a-mano = la hoja de ruta (ya existe, role-filtered, con share público).
+  - A favor: cero pelea de adopción; reusa hoja de ruta + roadsheet_share + team (todo construido); mínimo build; mismo mecanismo que el wedge BCC de fuera.
+  - En contra: sin "sitio donde hablar" nativo; el ida-y-vuelta sigue en WhatsApp → (b) parcial hacia dentro. El sueño "todos se hablan en Hour" no se cumple: lanzadera + archivo, no sala.
+
+- **C — IA-first, consent-first: brief proactivo, sin sala.** Puro ADR-069. Al acercarse un bolo, Hour PROPONE: "bolo en Le Mans en 8 días — 5 personas asignadas; ¿abro la convocatoria con hoja de ruta + horarios y se la mando?". IA redacta, Marco aprueba, el sistema manda. La comunicación es producto del dato, empujada en el momento; el "canal" es un brief recurrente, no un chat. Aterriza como `task.origin='ai'` → aprobar → ejecutar (ADR-013: redactar sí, auto-enviar nunca).
+  - A favor: máximo apalancamiento del activo único (dato + IA); el diferenciador; esquiva la trampa chat-app Y la trampa inbox; info empujada, no recuperada.
+  - En contra: una vía (habla, no escucha) → sin captura de respuestas salvo combinado con B; depende de calidad IA; sin capa social; lo más lejos de lo que Marco imaginó.
+
+**No son excluyentes: spectrum que compone.** A es el spine de datos; B y C son fuentes/superficies sobre el mismo spine. Si construyes A, B (ingest/puente) y C (IA) escriben/leen el mismo hilo.
+
+**Recomendación (.zerø):**
+1. **No construir nada del eje interno ahora.** Es captura de diseño; el gate manda usar la app ~1 mes antes de más features. Lo próximo de comms cuando toque es el log de fuera (gap #2), ya decidido + critical-path (ADR-069). Ese primero.
+2. **Una decisión barata de future-proofing SÍ, ahora:** cuando construyas gap #2 `conversation_event`, diséñalo para **generalizar a un `thread`/`message` polimórfico sobre cualquier contenedor** (spine de A), no atado duro a `conversation_id`. Misma disciplina que la nota de gap #2 ya tiene ("diséñalo para que el email escriba las mismas filas") extendida a "para que un bolo/project/workspace escriba las mismas filas". Convierte el eje interno en migración futura barata en vez de fork de schema. Coste casi cero (forma de una tabla que construyes igual).
+3. **Canal de bolo, cuando llegue: favorecer B+C sobre A-como-chat.** No necesitas un Slack; el equipo no deja WhatsApp por una herramienta Phase-0. La ventaja injusta es el DATO (hoja de ruta, team, logística), no una UI de chat. Canal de bolo v1 = Hour propone el grupo + ensambla el paquete + puede archivar respuestas (B), con IA redactando la convocatoria (C). Sala nativa in-app = el techo, solo si el uso real lo pide.
+4. **Naming:** "Conversations" se queda para booking. El eje interno necesita palabra propia (Canal/Channel, o "Convocatoria"). NO re-sobrecargar Conversations — se acaba de desambiguar (structure-model insiste: no dejar derivar la nomenclatura). ADR explícito cuando aterrice (dobla frontera :86).
+5. **Reencuadre consent-first del canal automático:** no "se crea solo" → **"Hour te ofrece abrir el canal del bolo con las N personas asignadas y tú confirmas"** (ADR-069). La gente es derivable del bolo → se autopobla sin montarlo a mano.
+
+**Refs:** ADR-069 (`_decisions.md:1864`), ADR-075 (`:1944`), ADR-056 (`:1573`) + ADR-065 (`:1806`), ADR-028 (`:1014`), ADR-013 (`:631`), gaps #2/#1 (`screen-data-spec.md:580-585` / `:571-579`), frontera (`structure-model.md:86`), primitivas per-bolo (`TeamModule.svelte`, `/api/team`, `roadsheet_share`, `realtime/channels.ts`).
+
+**Status:** exploración, SIN decidir. Migra a `_decisions.md` como ADR si se elige dirección (disparador probable: el mes de uso real + primer bolo con equipo dentro de Hour).
