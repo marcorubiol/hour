@@ -289,3 +289,25 @@ Hace dos días (ADR-075) `engagement` → `conversation`: la entidad es el estad
 **Refs:** ADR-069 (`_decisions.md:1864`), ADR-075 (`:1944`), ADR-056 (`:1573`) + ADR-065 (`:1806`), ADR-028 (`:1014`), ADR-013 (`:631`), gaps #2/#1 (`screen-data-spec.md:580-585` / `:571-579`), frontera (`structure-model.md:86`), primitivas per-bolo (`TeamModule.svelte`, `/api/team`, `roadsheet_share`, `realtime/channels.ts`).
 
 **Status:** exploración, SIN decidir. Migra a `_decisions.md` como ADR si se elige dirección (disparador probable: el mes de uso real + primer bolo con equipo dentro de Hour).
+
+## `custom_fields` como vía de escape — ¿patrón o deuda? (2026-07-19)
+
+Encargo de Marco al decidir ADR-084 §1: quiere revisar si está bien hecho.
+
+Al plantear el multi-día apareció la alternativa de no migrar nada y guardar la
+clave de serie en `date.custom_fields->>'series'`. Se descartó (ADR-084 §1 usa
+una columna real), pero deja la pregunta viva: **¿cuándo es legítimo meter algo
+en `custom_fields` y cuándo es esquivar una decisión de modelo?**
+
+Precedente vivo: `conversation.custom_fields->>'season' = '2026-27'` — así se
+filtra la difusión de la temporada. Funciona, pero: no hay contrato (cualquiera
+escribe cualquier clave), no hay tipo, no hay constraint, y el índice GIN sólo
+sirve para containment. Si mañana `season` importa de verdad, ¿es una columna?
+¿una entidad? Mismo dilema que tendrá cualquier clave que se quede.
+
+Hipótesis a contrastar: `custom_fields` es legítimo para **datos del usuario que
+el sistema no interpreta** (notas, campos que el cliente inventa), y es deuda en
+cuanto **el código lee la clave para decidir algo** — a partir de ahí es
+vocabulario del dominio y merece columna. `season` ya cruzó esa línea.
+
+Pendiente: auditar qué claves de `custom_fields` lee hoy el código.
