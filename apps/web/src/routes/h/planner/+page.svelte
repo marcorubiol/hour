@@ -596,7 +596,7 @@
 
   const KIND_KEYS = new Set(['rehearsal', 'residency', 'travel_day', 'press', 'other', 'day_off']);
   function kindLabel(kind: string): string {
-    return KIND_KEYS.has(kind) ? t(`calendar.kind_${kind}`, locale) : kind.replace(/_/g, ' ');
+    return KIND_KEYS.has(kind) ? t(`planner.kind_${kind}`, locale) : kind.replace(/_/g, ' ');
   }
 
   // ── View models for the two projections ──────────────────────────────
@@ -1511,42 +1511,25 @@
         onclick={() => (filter = 'confirmed')}>{t('planner.filter_confirmed', locale)}</button
       >
     </div>
-    {#if view === 'carrils'}
-      <!-- Agrupa per (ADR-080 §8) — carrils only; means nothing elsewhere. -->
-      <div class="cal__group" role="group" aria-label={t('planner.group_label', locale)}>
-        <span class="cal__group-lead">{t('planner.group_label', locale)}</span>
-        <div class="cal__seg">
-          {#each ['espai', 'projecte', 'persona'] as const as g (g)}
-            <button
-              type="button"
-              class="cal__seg-btn"
-              class:cal__seg-btn--on={carrilsGroup === g}
-              aria-pressed={carrilsGroup === g}
-              onclick={() => setGroup(g)}>{t(`planner.group_${g}`, locale)}</button
-            >
-          {/each}
-        </div>
-      </div>
-    {/if}
-    <div class="cal__seg" role="group" aria-label={t('planner.view_label', locale)}>
+    <div class="cal__tabs" role="group" aria-label={t('planner.view_label', locale)}>
       <button
         type="button"
-        class="cal__seg-btn"
-        class:cal__seg-btn--on={view === 'month'}
+        class="cal__tab"
+        class:cal__tab--on={view === 'month'}
         aria-pressed={view === 'month'}
         onclick={() => setView('month')}>{t('planner.view_month', locale)}</button
       >
       <button
         type="button"
-        class="cal__seg-btn"
-        class:cal__seg-btn--on={view === 'agenda'}
+        class="cal__tab"
+        class:cal__tab--on={view === 'agenda'}
         aria-pressed={view === 'agenda'}
         onclick={() => setView('agenda')}>{t('planner.view_agenda', locale)}</button
       >
       <button
         type="button"
-        class="cal__seg-btn"
-        class:cal__seg-btn--on={view === 'carrils'}
+        class="cal__tab"
+        class:cal__tab--on={view === 'carrils'}
         aria-pressed={view === 'carrils'}
         onclick={() => setView('carrils')}>{t('planner.view_carrils', locale)}</button
       >
@@ -1576,6 +1559,24 @@
       {#snippet trigger()}⋯{/snippet}
     </Menu>
   </div>
+
+  {#if view === 'carrils'}
+    <!-- Agrupa per (ADR-080 §8) — its own row, left-aligned; carrils only. -->
+    <div class="cal__grouprow" role="group" aria-label={t('planner.group_label', locale)}>
+      <span class="cal__group-lead">{t('planner.group_label', locale)}</span>
+      <div class="cal__tabs">
+        {#each ['espai', 'projecte', 'persona'] as const as g (g)}
+          <button
+            type="button"
+            class="cal__tab"
+            class:cal__tab--on={carrilsGroup === g}
+            aria-pressed={carrilsGroup === g}
+            onclick={() => setGroup(g)}>{t(`planner.group_${g}`, locale)}</button
+          >
+        {/each}
+      </div>
+    </div>
+  {/if}
 
   {#if errorMsg}
     <p class="cal__state cal__state--danger">{errorMsg}</p>
@@ -1813,11 +1814,11 @@
       background: var(--bg-light);
     }
 
-    /* Agrupa per — the carrils-only companion of the projection seg. */
-    .cal__group {
-      display: inline-flex;
-      align-items: center;
-      gap: var(--space-xs);
+    /* Agrupa per (ADR-080 §8) — its own row under the toolbar, left-aligned. */
+    .cal__grouprow {
+      display: flex;
+      align-items: baseline;
+      gap: var(--space-s);
     }
     .cal__group-lead {
       font-family: var(--font-mono);
@@ -1828,26 +1829,33 @@
       white-space: nowrap;
     }
 
-    /* Named projection toggle (ADR-076: nunca un icono). */
-    .cal__seg {
+    /* Named projection toggle + Agrupa per — text tabs, active underlined
+       (ADR-076: nunca un icono). Lighter than a pill: the word is the tab. */
+    .cal__tabs {
       display: inline-flex;
-      border: 1px solid var(--border-color-dark);
-      border-radius: var(--radius-circle);
-      overflow: hidden;
+      align-items: baseline;
+      gap: var(--space-s);
     }
-    .cal__seg-btn {
+    .cal__tab {
       border: none;
       background: none;
-      padding: var(--space-2xs) var(--space-m);
+      padding: 0;
+      font-family: inherit;
       font-size: var(--text-s);
-      color: var(--text-muted);
+      line-height: 1.3;
+      color: var(--text-faint);
       cursor: pointer;
       white-space: nowrap;
-      transition: background var(--transition), color var(--transition);
+      border-block-end: 1.5px solid transparent;
+      transition: color var(--transition);
     }
-    .cal__seg-btn--on {
-      background: var(--text-color);
-      color: var(--bg);
+    .cal__tab:hover {
+      color: var(--text-muted);
+    }
+    .cal__tab--on {
+      color: var(--text-color);
+      font-weight: 500;
+      border-block-end-color: var(--text-color);
     }
 
     .cal__feed-hint {

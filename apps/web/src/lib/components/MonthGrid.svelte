@@ -14,7 +14,7 @@
    * the e2e specs select `.cal__grid` / `.cal__weekday` (Svelte scoping
    * keeps them collision-free anyway).
    */
-  import { dayKeyInTz, monthGrid } from '$lib/planner';
+  import { dayKeyInTz, monthGrid, assignBandLanes } from '$lib/planner';
 
   export type ProjectLite = {
     id: string;
@@ -281,22 +281,45 @@
     return place;
   }
 
-  /** Bands covering a day, blackouts first, aways after (quieter below). */
-  function bandsOn(iso: string): Array<
-    | { kind: 'blackout'; band: BlackoutBandVM }
-    | { kind: 'away'; band: AwayBandVM }
-  > {
-    const out: Array<
-      | { kind: 'blackout'; band: BlackoutBandVM }
-      | { kind: 'away'; band: AwayBandVM }
-    > = [];
-    for (const b of blackouts) {
-      if (iso >= b.from && iso <= b.to) out.push({ kind: 'blackout', band: b });
+  type BandSlot =
+    | { kind: 'blackout'; band: BlackoutBandVM; from: string; to: string }
+    | { kind: 'away'; band: AwayBandVM; from: string; to: string };
+
+  // Every band gets ONE stable lane for its whole span (Marco 2026-07-19):
+  // a multi-day band must sit on the same row across all its days and never
+  // reorder when a neighbouring day carries an extra band — otherwise a
+  // continuing band appears to "jump lanes" (the day-21 black hole).
+  // Blackouts listed before aways so aways settle into the lower lanes.
+  let laneBands = $derived.by(() => {
+    const combined: BandSlot[] = [
+      ...blackouts.map((b) => ({ kind: 'blackout' as const, band: b, from: b.from, to: b.to })),
+      ...aways.map((a) => ({ kind: 'away' as const, band: a, from: a.from, to: a.to })),
+    ];
+    const { lanes } = assignBandLanes(combined);
+    return { combined, lanes };
+  });
+
+  /** Lanes in use across a whole week row — every cell reserves this many
+   *  slots so a lane sits at the same height in every day of the week. */
+  function weekLaneCount(week: { iso: string }[]): number {
+    const { combined, lanes } = laneBands;
+    let max = -1;
+    for (const day of week) {
+      combined.forEach((c, i) => {
+        if (day.iso >= c.from && day.iso <= c.to) max = Math.max(max, lanes[i]);
+      });
     }
-    for (const a of aways) {
-      if (iso >= a.from && iso <= a.to) out.push({ kind: 'away', band: a });
-    }
-    return out;
+    return max + 1;
+  }
+
+  /** The band occupying each lane on a given day (null = reserved spacer). */
+  function laneSlotsOn(iso: string, count: number): (BandSlot | null)[] {
+    const slots: (BandSlot | null)[] = new Array(count).fill(null);
+    const { combined, lanes } = laneBands;
+    combined.forEach((c, i) => {
+      if (iso >= c.from && iso <= c.to && lanes[i] < count) slots[lanes[i]] = c;
+    });
+    return slots;
   }
 
   // ── Clash-card popover — one open at a time, keyed day:index. ──────────
@@ -336,11 +359,12 @@
     <div class="cal__weekday">{wd}</div>
   {/each}
   {#each weeks as week, wi (wi)}
+    {@const wlc = weekLaneCount(week)}
     {#each week as day, di (day.iso)}
       {@const perfs = performancesByDay.get(day.iso) ?? []}
       {@const dayDates = datesByDay.get(day.iso) ?? []}
       {@const clashes = clashesByDay?.get(day.iso) ?? []}
-      {@const dayBands = bandsOn(day.iso)}
+      {@const bandSlots = laneSlotsOn(day.iso, wlc)}
       <div
         class="cal__day"
         class:cal__day--out={!day.inMonth}
@@ -456,27 +480,33 @@
             </span>
           {/if}
         {/each}
-        {#if dayBands.length > 0}
+        {#if wlc > 0}
           <span class="cal__bands">
-            {#each dayBands as entry, bi (bi)}
-              {@const showLabel = day.iso === entry.band.from || di === 0}
-              {#if entry.kind === 'blackout'}
-                <span
-                  class="cal__band"
-                  class:cal__band--company={entry.band.company}
-                  class:cal__band--person={!entry.band.company}
-                  class:cal__band--tentative={entry.band.tentative}
-                  title={entry.band.label}
-                >
-                  {showLabel ? entry.band.label : ''}
-                  {#if day.iso === entry.band.from && entry.band.note}<i
-                      class="cal__band-note">{entry.band.note}</i
-                    >{/if}
-                </span>
+            {#each bandSlots as entry, lane (lane)}
+              {#if entry === null}
+                <!-- reserved spacer: keeps the lane above at the same height
+                     across days so no band ever jumps rows. -->
+                <span class="cal__band cal__band--spacer" aria-hidden="true"></span>
               {:else}
-                <span class="cal__band cal__band--away" title={entry.band.label}>
-                  {showLabel ? entry.band.label : ''}
-                </span>
+                {@const showLabel = day.iso === entry.from || di === 0}
+                {#if entry.kind === 'blackout'}
+                  <span
+                    class="cal__band"
+                    class:cal__band--company={entry.band.company}
+                    class:cal__band--person={!entry.band.company}
+                    class:cal__band--tentative={entry.band.tentative}
+                    title={entry.band.label}
+                  >
+                    {showLabel ? entry.band.label : ''}
+                    {#if day.iso === entry.from && entry.band.note}<i
+                        class="cal__band-note">{entry.band.note}</i
+                      >{/if}
+                  </span>
+                {:else}
+                  <span class="cal__band cal__band--away" title={entry.band.label}>
+                    {showLabel ? entry.band.label : ''}
+                  </span>
+                {/if}
               {/if}
             {/each}
           </span>
@@ -832,8 +862,16 @@
       --band-fg: var(--text-faint);
       --band-border-color: var(--border-color-light);
       --band-border-style: solid;
-      min-block-size: 1rem;
-      padding: 2px var(--space-xs);
+      /* Constant height across ALL days — labelled, empty, first-day or a
+         continuation segment — so a multi-day band reads as one clean strip
+         (Marco 2026-07-19). Flex-centre keeps text vertically centred within
+         the fixed box; line-height:1 stops text inflating the height. */
+      block-size: 1.15rem;
+      line-height: 1;
+      display: flex;
+      align-items: center;
+      padding-block: 0;
+      padding-inline: var(--space-xs);
       font-family: var(--font-mono);
       font-size: 0.6rem;
       letter-spacing: var(--mono-letter-spacing-loose);
@@ -844,6 +882,10 @@
       background: var(--band-bg);
       color: var(--band-fg);
       border-block-start: 1px var(--band-border-style) var(--band-border-color);
+    }
+    .cal__band > * {
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     .cal__band--company {
       --band-bg: color-mix(in oklch, var(--text-color) 9%, transparent);
@@ -869,6 +911,12 @@
       --band-border-style: dotted;
       text-transform: none;
       letter-spacing: var(--mono-letter-spacing);
+    }
+    /* Reserved-but-empty lane: invisible, holds height only so the bands
+       above/below keep their row across every day of the week. */
+    .cal__band--spacer {
+      background: none;
+      border-block-start-color: transparent;
     }
     .cal__band-note {
       text-transform: none;
