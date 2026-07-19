@@ -18,6 +18,8 @@
   "planner.state_invoiced": "invoiced",
   "planner.state_paid": "paid",
   "planner.state_done": "done",
+  "planner.ready_hotel": "hotel",
+  "planner.ready_technical": "technical",
   "planner.legend_confirmed": "confirmed",
   "planner.legend_hold": "hold",
   "planner.prev_month": "Previous month",

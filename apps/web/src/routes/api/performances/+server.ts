@@ -124,6 +124,7 @@ type PerformanceItem = {
   project_id: string;
   line_id: string | null;
   conversation_id: string | null;
+  readiness: Record<string, boolean> | null;
   load_in_at: string | null;
   soundcheck_at: string | null;
   start_at: string | null;
@@ -184,6 +185,10 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
       'id,slug,performed_at,status,venue_id,venue_name,city,country',
       'project_id,line_id,conversation_id',
       'load_in_at,soundcheck_at,start_at,loadout_at,wrap_at',
+      // ADR-084 §3 — the operator's readiness ticks; the card's foot reads
+      // them. The logistics/hospitality/technical CONTENT stays out of the
+      // feed (heavy, and the month never shows it).
+      'readiness',
       ...(notice === '1' ? ['hold_notice_days'] : []),
       'venue:venue_id(id,name,city,country,timezone)',
       'project:project_id(id,slug,name,accent,initials,workspace_id)',
