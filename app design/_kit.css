@@ -20,9 +20,96 @@
 
 /* ── shared page frame ─────────────────────────────────────────────── */
 .proto {
-  --proto-width: 64rem; /* wider than --page-width: these screens carry a side rail */
+  --proto-width: 74rem; /* three rails need more room than --page-width: 900 */
   min-block-size: 100vh;
   background: var(--bg);
+}
+
+/* THE 144px VOID — diagnosed 2026-07-20, and it is NOT a prototype quirk.
+   base.css gives every top-level <section> the document default
+   `padding-block: var(--section-padding-block)` (~72px) + `padding-inline:
+   var(--gutter)`. That is editorial/marketing rhythm — correct for the login
+   and public pages. Inside the app it injects ~144px of dead air between two
+   consecutive sections, which is a large part of why the first access/comms
+   prototypes read as "a lot of vertical space, something missing".
+
+   The app already solved this: `.shell__content :where(section:not(section
+   section)) { padding-block: 0; padding-inline: 0 }` in base.css, with a
+   comment describing the very same symptom ("~200px voids between modules").
+   A prototype IS shell context, so it has to reproduce the opt-out or it
+   lies about the app's real rhythm. */
+.proto :where(section:not(section section)) {
+  padding-block: 0;
+  padding-inline: 0;
+}
+
+/* ── EL BASTIDOR — the three rails ─────────────────────────────────── */
+/* Converged 2026-07-19/20. Left = marginalia (subject labels) · centre =
+   the score (limited measure, one clean line per object, groups tight and
+   air only between real subjects) · right = the rail.
+
+   WHAT THE RIGHT RAIL CARRIES IS PER SCREEN, and that is the correction of
+   2026-07-20: in a *validation* artifact it held "who sees this and why",
+   because that is what was being tested. In the product it must hold what
+   the page is actually opened for. Rule of thumb that decides it:
+
+       centre = what you ACT on (and what changes)
+       rail   = what you LOOK UP (and what is simply true)
+
+   The permissions roster is a door from the rail, not the rail — you read
+   threads fifty times a day and check who sees them three times a month. */
+.spread {
+  display: grid;
+  grid-template-columns: 1fr 20rem;
+  gap: var(--space-xl);
+  align-items: start;
+}
+.rail {
+  position: sticky;
+  top: var(--space-m);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-l);
+  min-inline-size: 0;
+}
+.rail__block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+.rail__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-s);
+  padding-block-end: var(--space-xs);
+  border-block-end: var(--divider-light);
+}
+.rail__line {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-s);
+  font-size: var(--text-s);
+  color: var(--text-color);
+}
+.rail__k {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-faint);
+  inline-size: 4.5rem;
+  flex: none;
+}
+.rail__quiet {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+@media (max-width: 60rem) {
+  .spread {
+    grid-template-columns: 1fr;
+  }
+  .rail {
+    position: static;
+  }
 }
 .bleed {
   inline-size: 100%;

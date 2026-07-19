@@ -1,0 +1,522 @@
+<!doctype html>
+<html lang="ca">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Hour — La pàgina d'un bolo (el hub és una secció, no la pàgina)</title>
+    <style>
+      @layer reset, defaults, tokens, layouts, components, components.overrides,
+        utilities, overrides;
+    </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400..600;1,6..72,400..600&family=Inter:wght@400..600&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="../apps/web/src/styles/base.css" />
+    <link rel="stylesheet" href="_kit.css" />
+
+    <style>
+      /* ── HORARIS — time as glyph, the spine of the day ───────────── */
+      .slot {
+        display: flex;
+        align-items: baseline;
+        gap: var(--space-m);
+        padding-block: var(--space-xs);
+        font-size: var(--text-s);
+      }
+      .slot + .slot {
+        border-block-start: var(--divider-light);
+      }
+      .slot__h {
+        font-family: var(--font-mono);
+        font-size: var(--text-s);
+        color: var(--text-color);
+        inline-size: 3.5rem;
+        flex: none;
+      }
+      .slot__what {
+        color: var(--heading-color);
+        flex: 1;
+      }
+      .slot__note {
+        font-family: var(--font-mono);
+        font-size: var(--text-xs);
+        color: var(--text-faint);
+      }
+      /* The gig itself — the only slot that is the reason for the others. */
+      .slot--show .slot__h,
+      .slot--show .slot__what {
+        font-family: var(--font-display);
+        font-size: var(--text-l);
+        font-weight: 500;
+        color: var(--heading-color);
+      }
+      .slot--done .slot__h,
+      .slot--done .slot__what {
+        color: var(--text-faint);
+      }
+
+      /* ── CONVERSA — the hub, collapsed to a section ──────────────── */
+      /* One line per thread by default. The last message earns the second
+         line only where something is actually waiting on someone. */
+      .th {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-2xs);
+        padding-block: var(--space-s);
+      }
+      .th + .th {
+        border-block-start: var(--divider-light);
+      }
+      .th__top {
+        display: flex;
+        align-items: baseline;
+        gap: var(--space-s);
+      }
+      .th__name {
+        font-size: var(--text-s);
+        font-weight: 500;
+        color: var(--heading-color);
+      }
+      .th__n {
+        font-family: var(--font-mono);
+        font-size: var(--text-xs);
+        color: var(--text-faint);
+      }
+      .th__unread {
+        font-family: var(--font-mono);
+        font-size: var(--text-xs);
+        color: var(--text-color);
+        border-block-end: 2px solid var(--run-color, var(--text-color));
+      }
+      .th__when {
+        font-family: var(--font-mono);
+        font-size: var(--text-xs);
+        color: var(--text-faint);
+        margin-inline-start: auto;
+      }
+      .th__last {
+        font-size: var(--text-s);
+        color: var(--text-muted);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .th__last b {
+        color: var(--text-color);
+        font-weight: 500;
+      }
+      .th__aud {
+        font-family: var(--font-mono);
+        font-size: var(--text-xs);
+        color: var(--text-faint);
+      }
+      .th--muted .th__name {
+        color: var(--text-muted);
+        font-weight: 400;
+      }
+
+      /* ── TASQUES ─────────────────────────────────────────────────── */
+      .task {
+        display: flex;
+        align-items: baseline;
+        gap: var(--space-s);
+        padding-block: var(--space-xs);
+        font-size: var(--text-s);
+      }
+      .task + .task {
+        border-block-start: var(--divider-light);
+      }
+      .task__box {
+        inline-size: 0.85rem;
+        block-size: 0.85rem;
+        border: 1px solid var(--border-color-dark);
+        border-radius: 2px;
+        flex: none;
+        align-self: center;
+      }
+      .task__what {
+        flex: 1;
+        color: var(--text-color);
+      }
+      .task__who {
+        font-family: var(--font-mono);
+        font-size: var(--text-xs);
+        color: var(--text-faint);
+      }
+      .task__when--due {
+        color: var(--danger);
+      }
+
+      /* ── the rail's people list ──────────────────────────────────── */
+      .who2 {
+        display: flex;
+        align-items: center;
+        gap: var(--space-s);
+        padding-block: var(--space-xs);
+        font-size: var(--text-s);
+      }
+      .who2 + .who2 {
+        border-block-start: var(--divider-light);
+      }
+      .who2__n {
+        color: var(--heading-color);
+        flex: 1;
+        min-inline-size: 0;
+      }
+      .who2__r {
+        font-family: var(--font-mono);
+        font-size: var(--text-xs);
+        color: var(--text-faint);
+      }
+      /* A guest is inside — with an end date. Dashed ring, never a band
+         apart: she is working this gig like everyone else in this list. */
+      .who2--guest .mk--person {
+        background: transparent;
+        border: 1px dashed var(--border-color-dark);
+      }
+      .who2__until {
+        display: block;
+        font-family: var(--font-mono);
+        font-size: var(--text-xs);
+        color: var(--text-faint);
+      }
+
+      .addr__line {
+        font-size: var(--text-s);
+        color: var(--text-color);
+      }
+      .money {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: var(--space-s);
+        font-size: var(--text-s);
+      }
+      .money b {
+        font-family: var(--font-display);
+        font-size: var(--text-l);
+        font-weight: 500;
+        color: var(--heading-color);
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="proto">
+      <header class="shell bleed">
+        <div class="shell__inner wrap">
+          <div class="shell__brand">
+            <span class="shell__logo">hour</span>
+            <span class="eyebrow">bolo</span>
+          </div>
+          <div class="shell__right">
+            <div class="shell__search">Cerca o salta a… <kbd class="kbd">⌘K</kbd></div>
+            <button class="modeswap" type="button" onclick="document.documentElement.dataset.mode = document.documentElement.dataset.mode === 'dark' ? 'light' : 'dark'">tema fosc</button>
+            <span class="mk mk--person">MR</span>
+          </div>
+        </div>
+      </header>
+
+      <div class="addr bleed">
+        <div class="addr__inner wrap">
+          <nav class="crumbs" aria-label="Breadcrumb">
+            <a class="crumbs__space" href="#"><span class="mk" style="--c: var(--accent-1)">MK</span>MüK Cia</a>
+            <span class="crumbs__sep">›</span>
+            <a class="crumbs__mid" href="#"><span class="mk" style="--c: var(--accent-4)">UÒ</span> Última òrbita</a>
+            <span class="crumbs__sep">›</span>
+            <a class="crumbs__mid" href="#">La gira</a>
+            <span class="crumbs__sep">›</span>
+            <span class="crumbs__here">25 juliol · Teatre Lliure</span>
+          </nav>
+          <div class="addr__actions">
+            <button class="pill--sm pill--mono" type="button">editar el bolo</button>
+          </div>
+        </div>
+      </div>
+
+      <main class="page wrap">
+        <header class="mast">
+          <p class="eyebrow">Bolo — divendres 25 de juliol · d-6</p>
+          <h1 class="mast__title"><em>Teatre Lliure</em> — Barcelona</h1>
+          <p class="mast__meta">
+            <span class="state-badge" data-tone="success">confirmat</span>
+            <span class="mast__sep">·</span>
+            <span>Sala Fabià Puigserver · 480 localitats</span>
+          </p>
+        </header>
+
+        <div class="spread" style="margin-block-start: var(--space-l)">
+          <!-- ══════════ CENTRE — what you act on ══════════ -->
+          <div>
+            <!-- HORARIS — the spine. This is what the page is opened for. -->
+            <article class="run" style="border-block-start: none">
+              <div class="run__gutter">
+                <a class="run__label" href="#">Horaris</a>
+                <span class="run__sub">hora local<br />de Barcelona</span>
+              </div>
+              <div class="run__body">
+                <div class="slot slot--done">
+                  <span class="slot__h">14:30</span>
+                  <span class="slot__what">Arribada i descàrrega</span>
+                  <span class="slot__note">moll del carrer Lleida</span>
+                </div>
+                <div class="slot">
+                  <span class="slot__h">15:00</span>
+                  <span class="slot__what">Muntatge</span>
+                  <span class="slot__note">2 h de sala</span>
+                </div>
+                <div class="slot">
+                  <span class="slot__h">17:00</span>
+                  <span class="slot__what">Pas de sala</span>
+                </div>
+                <div class="slot">
+                  <span class="slot__h">17:30</span>
+                  <span class="slot__what">Trucada d'equip</span>
+                  <span class="slot__note">boca d'escenari</span>
+                </div>
+                <div class="slot">
+                  <span class="slot__h">19:30</span>
+                  <span class="slot__what">Obertura de portes</span>
+                </div>
+                <div class="slot slot--show">
+                  <span class="slot__h">20:00</span>
+                  <span class="slot__what">Funció</span>
+                </div>
+                <div class="slot">
+                  <span class="slot__h">22:30</span>
+                  <span class="slot__what">Desmuntatge i càrrega</span>
+                </div>
+              </div>
+            </article>
+
+            <!-- CONVERSA — the hub, as ONE section of the page -->
+            <article class="run">
+              <div class="run__gutter">
+                <a class="run__label" href="#">Conversa</a>
+                <span class="run__sub">5 fils · 3 sense<br />llegir</span>
+              </div>
+              <div class="run__body">
+                <div class="th">
+                  <div class="th__top">
+                    <span class="th__name" style="color: var(--accent-6)">Tècnica</span>
+                    <span class="th__n">14 missatges</span>
+                    <span class="th__unread" style="--run-color: var(--accent-6)">2 nous</span>
+                    <span class="th__when">avui 08:05</span>
+                  </div>
+                  <p class="th__last"><b>Sílvia Munné</b> — Des de sala: el pont de contra ja està penjat, us el deixo a 6 m.</p>
+                  <span class="th__aud">Ho veuen 7 — per permís de tècnica ·  <a class="link-arrow" href="#">obrir →</a></span>
+                </div>
+
+                <div class="th">
+                  <div class="th__top">
+                    <span class="th__name" style="color: var(--accent-8)">Logística</span>
+                    <span class="th__n">9 missatges</span>
+                    <span class="th__unread" style="--run-color: var(--accent-8)">1 nou</span>
+                    <span class="th__when">ahir 13:11</span>
+                  </div>
+                  <p class="th__last"><b>Laia Ferrer</b> — Furgo llogada a Respublica, recollida dj a les 08:00.</p>
+                  <span class="th__aud">Ho veuen 5 — per permís de logística ·  <a class="link-arrow" href="#">obrir →</a></span>
+                </div>
+
+                <div class="th">
+                  <div class="th__top">
+                    <span class="th__name" style="color: var(--accent-3)">Diners</span>
+                    <span class="th__n">6 missatges</span>
+                    <span class="th__when">dimarts</span>
+                  </div>
+                  <p class="th__last"><b>Marco Duran</b> — Factura emesa. Falta el número de comanda del teatre.</p>
+                  <span class="th__aud">Ho veuen 3 — per permís de diners ·  <a class="link-arrow" href="#">obrir →</a></span>
+                </div>
+
+                <div class="th">
+                  <div class="th__top">
+                    <span class="th__name">General</span>
+                    <span class="th__n">21 missatges</span>
+                    <span class="th__when">avui 09:12</span>
+                  </div>
+                  <p class="th__last"><b>Ana Solé</b> — Perfecte. Jo arribo dijous a la nit, ja soc a Barcelona divendres.</p>
+                  <span class="th__aud">Ho veuen 7 — tot l'equip del bolo ·  <a class="link-arrow" href="#">obrir →</a></span>
+                </div>
+
+                <div class="th th--muted">
+                  <div class="th__top">
+                    <span class="th__name">Vídeo premsa</span>
+                    <span class="th__n">fil lliure · 4 missatges</span>
+                    <span class="th__when">dilluns</span>
+                  </div>
+                  <span class="th__aud">Hi participen 3 — triats a mà ·  <a class="link-arrow" href="#">obrir →</a></span>
+                </div>
+
+                <div style="padding-block-start: var(--space-s)">
+                  <button class="creator" type="button">+ fil lliure</button>
+                </div>
+              </div>
+            </article>
+
+            <!-- TASQUES — the verb layer, attached to this performance -->
+            <article class="run">
+              <div class="run__gutter">
+                <a class="run__label" href="#">Tasques</a>
+                <span class="run__sub">3 obertes</span>
+              </div>
+              <div class="run__body">
+                <div class="task">
+                  <span class="task__box"></span>
+                  <span class="task__what">Demanar el número de comanda al teatre</span>
+                  <span class="task__who">Marco</span>
+                  <span class="task__who task__when--due">venç demà</span>
+                </div>
+                <div class="task">
+                  <span class="task__box"></span>
+                  <span class="task__what">Confirmar càrrega de dimmers a les 09:00</span>
+                  <span class="task__who">Jordi</span>
+                  <span class="task__who">dj 24</span>
+                </div>
+                <div class="task">
+                  <span class="task__box"></span>
+                  <span class="task__what">Enviar acreditacions a taquilla</span>
+                  <span class="task__who">Marta</span>
+                  <span class="task__who">sense data</span>
+                </div>
+                <div style="padding-block-start: var(--space-s)">
+                  <button class="creator" type="button">+ tasca</button>
+                </div>
+              </div>
+            </article>
+          </div>
+
+          <!-- ══════════ RAIL — what you look up ══════════ -->
+          <aside class="rail">
+            <!-- LA SALA -->
+            <section class="rail__block">
+              <header class="rail__head">
+                <p class="eyebrow">La sala</p>
+                <a class="link-arrow" href="#">fitxa →</a>
+              </header>
+              <p class="addr__line">Teatre Lliure — Montjuïc<br />Pg. de Santa Madrona 40-46<br />08038 Barcelona</p>
+              <div class="who2" style="margin-block-start: var(--space-xs)">
+                <span class="mk mk--person">GP</span>
+                <span class="who2__n">Gerard Puig<span class="who2__until">producció de la sala</span></span>
+                <a class="link-arrow" href="#">escriu-li →</a>
+              </div>
+            </section>
+
+            <!-- QUI VE -->
+            <section class="rail__block">
+              <header class="rail__head">
+                <p class="eyebrow">Qui ve</p>
+                <span class="rail__quiet">7 + 1</span>
+              </header>
+              <div class="who2">
+                <span class="mk mk--person">MV</span>
+                <span class="who2__n">Marta Vidal</span>
+                <span class="who2__r">direcció</span>
+              </div>
+              <div class="who2">
+                <span class="mk mk--person">LF</span>
+                <span class="who2__n">Laia Ferrer</span>
+                <span class="who2__r">producció</span>
+              </div>
+              <div class="who2">
+                <span class="mk mk--person">PM</span>
+                <span class="who2__n">Pau Miralles</span>
+                <span class="who2__r">road manager</span>
+              </div>
+              <div class="who2">
+                <span class="mk mk--person">JS</span>
+                <span class="who2__n">Jordi Serra</span>
+                <span class="who2__r">so</span>
+              </div>
+              <div class="who2">
+                <span class="mk mk--person">NC</span>
+                <span class="who2__n">Núria Camps</span>
+                <span class="who2__r">llums</span>
+              </div>
+              <div class="who2">
+                <span class="mk mk--person">AS</span>
+                <span class="who2__n">Ana Solé</span>
+                <span class="who2__r">so</span>
+              </div>
+              <div class="who2">
+                <span class="mk mk--person">MD</span>
+                <span class="who2__n">Marco Duran</span>
+                <span class="who2__r">producció</span>
+              </div>
+              <div class="who2 who2--guest">
+                <span class="mk mk--person">SM</span>
+                <span class="who2__n">Sílvia Munné<span class="who2__until">convidada · fins al 8 ag</span></span>
+                <span class="who2__r">sala</span>
+              </div>
+              <p style="margin-block-start: var(--space-s)">
+                <a class="link-arrow" href="#">Qui entra i per què →</a>
+              </p>
+            </section>
+
+            <!-- FULL DE RUTA -->
+            <section class="rail__block">
+              <header class="rail__head">
+                <p class="eyebrow">Full de ruta</p>
+              </header>
+              <p class="rail__quiet">Última versió dilluns · encara no enviada a l'equip.</p>
+              <p><a class="link-arrow" href="#">Obrir el full de ruta →</a></p>
+            </section>
+
+            <!-- DINERS — gated. Suppressed silently when you lack it. -->
+            <section class="rail__block">
+              <header class="rail__head">
+                <p class="eyebrow">Diners</p>
+                <a class="link-arrow" href="#">detall →</a>
+              </header>
+              <p class="money"><b>3.200 €</b><span class="rail__quiet">+ IVA</span></p>
+              <p class="rail__quiet">Bestreta del 40 % a la signatura · la resta a 30 dies. Factura emesa dt 15.</p>
+            </section>
+          </aside>
+        </div>
+
+        <div class="qnote">
+          <p>
+            <span class="qnote__tag">la decisión de esta pantalla</span>
+            <b>El hub es una sección del bolo, no la página del bolo.</b> Lo que
+            veníamos dibujando era el hub a pantalla completa, con el bolo entero
+            comprimido en una línea de cabecera. A las ocho de la mañana del día
+            del bolo no abres esto para leer conversación: lo abres para ver a qué
+            hora es el pase de sala, quién viene y dónde está la hoja de ruta. La
+            conversación pasa <b>alrededor</b> de esos datos.
+          </p>
+          <p>
+            <span class="qnote__tag">el criterio del carril</span>
+            <b>Centro = lo que haces y lo que cambia · carril = lo que consultas y
+            simplemente es cierto.</b> Por eso los horarios, los hilos y las tareas
+            van al centro, y la sala, la gente, la hoja de ruta y el caché van al
+            carril. Y por eso el carril es <i>sticky</i>: mientras bajas por la
+            conversación, la hora de la función no se te va de la pantalla.
+          </p>
+          <p>
+            <span class="qnote__tag">hallazgo · la banda desaparece</span>
+            En las pasadas anteriores hacía falta una banda «fora del fil · sense
+            accés» para la gente derivada que no puede entrar. <b>Aquí no hace
+            falta, y no porque la hayamos escondido: porque cada persona está en el
+            bloque que le toca.</b> Gerard (producción de la sala, sin acceso) vive
+            bajo <i>La sala</i>, que es lo que es. Sílvia (técnica de la sala,
+            invitada hasta el 8 de agosto) vive en <i>Qui ve</i>, porque trabaja
+            este bolo — con anillo discontinuo y su fecha de fin. Y el programador
+            no aparece: pertenece a la conversación de difusión, no al bolo.
+            <b>La banda era el síntoma de meter a todo el mundo en una sola lista.</b>
+          </p>
+          <p>
+            <span class="qnote__tag">qué se pierde y hay que vigilar</span>
+            Con el listado de permisos detrás de una puerta, la transparencia de
+            ADR-083 §5 ya no está delante todo el rato. Lo que la sostiene es la
+            línea de audiencia bajo cada hilo (<i>«Ho veuen 5 — per permís de
+            logística»</i>), que es donde de verdad hace falta: justo antes de
+            escribir. <b>Esa línea no se puede plegar ni esconder</b> — si en algún
+            rediseño desaparece, la transparencia se ha ido con ella.
+          </p>
+        </div>
+      </main>
+    </div>
+  </body>
+</html>

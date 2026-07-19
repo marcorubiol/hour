@@ -1,161 +1,193 @@
-# Hour — Design prompt: access + comms (who is who, and where they talk)
+# Hour — Design: access + comms (who is who, and where they talk)
 
-> **STATUS: MODEL VALIDATION PASS (2026-07-19).** ADR-082 (people / roles / access) and
-> ADR-083 (comms layer) are **provisional, unimplemented, zero schema touched**. This design
-> pass exists to break the model before the schema does: if a screen creaks, the finding goes
-> back to the ADRs, not into code. There is a hard gate before any build — use the app with a
-> real difusión season first.
+> **STATUS: MODEL DECIDED IN GRILL, NOT IMPLEMENTED — zero schema.** Two design passes
+> run (2026-07-19 and 2026-07-20). The model questions this pass existed to answer are
+> **closed**; what remains is listed under § Still open. Hard gate standing: use the app
+> for a real difusión season before building any of it.
 >
-> Four working HTML prototypes already exist in `app design/`, built on the REAL token file
-> (they `<link>` `apps/web/src/styles/base.css`), light + dark:
-> `comms-hub-performance-prototype.html` · `permissions-editor-prototype.html` ·
-> `person-roles-org-prototype.html` · `operator-invite-flow-prototype.html`.
-> They carry inline `.qnote` annotations — the open questions, marked so they can never be
-> mistaken for UI. **Read them before redesigning; they are the argument, not decoration.**
+> **Read first:** `_notes/spec-access-comms-decisions.md` — the complete decision record.
+> This file is the *design* contract; that one is the *model*. Where they disagree, the
+> decision record wins and this file is the bug.
 >
-> Origin: grill 2026-07-19 → `_decisions.md § ADR-082` + `§ ADR-083`.
-> Structure model that constrains all of this: `build/structure-model.md`.
-> Do NOT inherit from `build/design-prompt.md` — that file is stale (House/Room/Run/Gig
-> vocabulary, two-axis sidebar, 8 accents; all superseded).
+> Prototypes that embody it, all `<link>`ed to the REAL `apps/web/src/styles/base.css`
+> so they cannot drift from the token file, light + dark:
+> - `app design/performance-page-prototype.html` — **the newest and most decided**: the
+>   gig page, with the comms hub as one section of it
+> - `app design/permissions-editor-prototype.html` — rols · level · the level-aware matrix
+> - `app design/person-roles-org-prototype.html` — several rols, several organisations
+> - `app design/operator-invite-flow-prototype.html` — contact → operator
+> - `app design/comms-hub-performance-prototype.html` — the hub full-screen (superseded by
+>   the gig page for layout; kept for the audience/roster detail)
+>
+> Do NOT inherit from `build/design-prompt.md` — stale (House/Room/Run/Gig, two-axis
+> sidebar, 8 accents; all superseded).
 
 ## What Hour is, visually
 
-Calm, editorial tool for live performing arts. Large serif display (Newsreader), mono
-small-caps micro-labels (JetBrains Mono), sans for body (Inter), warm paper background,
-**12** project-accent hues, light + dark as equal contracts. Zero pictographs — typeable
-characters only. Color communicates state, never decoration. Calm over gamified.
+Calm, editorial tool for live performing arts. Newsreader (serif, often italic) for titles
+and figures · Inter for body · JetBrains Mono for micro-labels, dates, hours and states.
+The serif/mono contrast IS the identity.
 
-## Inherit the Desk system (converged 2026-07-18 — do not reinvent)
+Light is primary, dark is an equal contract — design both. Real tokens:
+`--bg oklch(97.5% 0.005 85)` / ink `oklch(28% 0.012 275)` in light; `oklch(21% 0.008 85)` /
+`oklch(82% 0.006 275)` in dark. Twelve project accents at `oklch(60% 0.13 H)`,
+H = 260, 45, 150, 20, 330, 200, 295, 85, 125, 185, 235, 355.
 
-Full contract in `build/desk-design-prompt.md`. The pieces that carry over here:
+**Non-negotiable:** zero pictographs anywhere, including the theme toggle — typeable
+characters only (→ · › ⋯ + —). Colour = state, never decoration; red only for genuinely
+overdue or in conflict. Outline = possibility, solid = commitment. Truth-only microcopy:
+every string maps to a real field. UI copy in Catalan, plain and spoken. Nothing clipped.
 
-- **Marginalia gutter**: one mono small-caps label per run, tinted per concern, fine
-  vertical hairline down the run. The label is a **door** to its surface.
-- **Clean rows, no leading marks**: one line by default; a second line only when earned.
-  Context path `space · project · line` in quiet mono.
-- **Hold grammar**: outline = possibility · solid = commitment.
-- **Reds reserved** for real overdue/conflict. Everything tentative reads as a question.
-- **Consent-first proposals**: `PROPOSED` badge + reason line + accept/dismiss in a tinted
-  container. Never a blast, never an alarm.
-- **Truth-only microcopy**: every string maps to a real field. No placeholders.
+**Identity marks:** a project carries a monogram — 1–3 letters in mono on a rounded square
+tinted with its accent (bg = accent 16% over white, text = same hue at L 0.42). A person
+gets the same silhouette as a **circle with no hue**: initials in muted ink. Colour belongs
+to containers; if people took accents a thread would run two colour systems.
 
-## The model, in one page (needed to design it)
+## El bastidor — the frame (converged, do not reinvent)
 
-Three concepts that must never fuse — fusing them is the failure this design is testing:
+Three rails: **left** marginalia (one mono small-caps label per group, a hairline down the
+group, the label is a link) · **centre** the score (limited measure, one clean line per
+object, related rows tight enough to read as one body, big air only between real subjects)
+· **right** the rail.
 
-| Concept | What it is | Power? |
+**What the rail carries is per screen** — this is the correction of 2026-07-20 and the most
+important thing in this file. A *validation artifact* put "who sees this and why" in the
+rail because that was what was being tested. **The product must not.** The criterion:
+
+> **centre = what you ACT on, and what changes · rail = what you LOOK UP, and what is
+> simply true**
+
+On a gig page the rail is the venue, the people, the road sheet and the fee. The
+permissions roster is a **door** from the rail, not the rail — you read threads fifty times
+a day and check who sees them three times a month, and a permanent panel of who is watching
+has a low-grade surveillance feel that fights the calm.
+
+**One thing may never be folded away:** the per-thread audience line ("Ho veuen 5 — per
+permís de logística"). Once the roster is behind a door, that line is the only thing
+carrying ADR-083 §5's transparency, and it sits exactly where the answer is needed — right
+before you write.
+
+**One colour axis per screen.** On the gig page the section gutters are neutral ink and
+tint is reserved for facets.
+
+### The 144px void — a real trap, not a style preference
+
+`base.css` gives every top-level `<section>` the document default
+`padding-block: var(--section-padding-block)` (~72px) + `padding-inline: var(--gutter)`.
+That is editorial rhythm for the login and public pages; inside the app it injects ~144px of
+dead air between two consecutive sections. **This was a large part of why the first pass read
+as "a lot of vertical space, something missing."** The app already opts out
+(`.shell__content :where(section:not(section section)) { padding-block: 0; padding-inline: 0 }`).
+Any prototype must reproduce the opt-out or it lies about the app's rhythm — `app design/_kit.css`
+now does.
+
+## The model
+
+Containers nest: **space** (company) → **project** (show) → **line** (tour / booking season /
+creation) → **performance** (one gig, "bolo").
+
+Three things that must never fuse on screen:
+
+| | | |
 |---|---|---|
-| **Rol** (label) | what a person *does* — sound, distribution, road manager. **Multiple** per person. Standard + custom. | **None.** Pure label. |
-| **Membresía** | which containers they are in (space / project / line / performance) | decides **what they see** |
-| **Permisos** (access) | a bundle of `view \| view+edit` pairs, per facet | decides **how much** inside what they see |
+| **rol** | the label: what a person does. Multiple. Standard + custom. | **no power** |
+| **membership** | which containers they are in | decides what they SEE |
+| **permisos** | per facet: `res \| veure \| veure+editar` | decides how much |
 
-- **Naming (locked):** the label is **rol**, the access is **permisos**. The DB still calls
-  access `role` — a known UI/schema mismatch to document at implementation time.
-- **Scope comes from the LEVEL where you assign**, not from an attribute of the permission.
-  The same preset is wide at space level and narrow at one performance. Effective = **union**.
-- **Presets, not a capability composer.** The client picks Guest / Team / Production /
-  Direction; per-person **overrides** toggle one pair. Dangerous capabilities (delete,
-  membership, billing) are off the menu entirely.
-- **Hard requirement:** a **"what you see and where it comes from"** view — preset +
-  overrides, always resolvable. Without it, overrides rot into WordPress-grade mystery.
-- **Login is for OPERATORS only.** Counterparts (programmers, theatres) never log in — they
-  are subjects, reached by email and signed links. "Dar de alta" is a deliberate act, by
-  **invitation**; a cold signup matching an email does NOT link to the contact.
-- **Organization is an entity.** A conversation anchors on org and/or person (at least one).
-  Person↔org is a **relation** with context and history — several, not a column.
-- **Comms**: one polymorphic thread that hangs off any container. Async, Slack-shaped, a hub
-  per container. **Sub-threads = the facets** (fixed, few) + free threads with a label.
-  Fixed threads: audience derived from capability. Free threads: explicit participants.
-  **Always show the resolved audience**, including the automatic ones. Realtime is out.
-- The bolo channel is **not created — it exists**, because the bolo is a container. What is
-  proposed (consent-first) is *telling the crew it is open*.
+**Presets, never a capability composer: Mínim · Equip · Coordinació · Direcció.**
+(Renamed 2026-07-20: `Convidat` → `Mínim`, because "convidat" now names a *person*;
+`Producció` → `Coordinació`, because Producció is now a facet and already a rol.)
 
-## The screens to design
+### Facets exist per container level
 
-### 1. The comms hub of a performance
-The facet sub-threads in the Desk's gutter grammar. **Tinted gutter = facet** (gated by
-capability); **dashed, untinted gutter = free thread** (explicit participants). Per thread:
-title, last messages as clean rows, and a collapsed audience line — *"seen by 5 — by
-LOGÍSTICA permission"* — expanding to the resolved list with a per-person reason.
-Then, for the whole hub, **"who enters and why"**: person · rols · which threads they see
-(facet chips, present and absent) · where it comes from.
-**Must include the money thread that a road manager cannot see** — that case is the entire
-reason ADR-082 exists — and **the band below the rule**: derived participants who cannot hold
-a login (the venue contact, the programmer), shown as `no access` + *write to them →*.
-Drawing that band is mandatory. Dropping them silently is what makes a model look coherent
-and behave wrong.
+|  | espai | projecte | línia | bolo |
+|---|:--:|:--:|:--:|:--:|
+| Converses | ● | ● | ● | — |
+| Materials | — | ● | ● | ● |
+| Producció | — | ● | ● | ● |
+| Tècnica | — | ● | ● | ● |
+| Logística | — | — | ● | ● |
+| Full de ruta | — | — | — | ● |
+| Diners | ● | ● | ● | ● |
 
-### 2. Assign rol(s) + permissions
-Four blocks in this order, because the order is the argument: **Rols** (chips, multiple, with
-"changing a rol changes no permission" stated) → **Level** (where this access is given, with
-the union of the other levels shown) → **Permissions** (preset chips + a facet × `nothing |
-view | view+edit` matrix, overrides visibly marked and attributed) → **"What they will see
-and where it comes from"**. Capabilities that do not fit the facet grid ("open free threads",
-"invite people") sit in a separate, visibly different block.
+- **`General` is not a facet** and never a matrix row: it is membership in the container.
+  Its thread always exists and its audience is exactly the container's members.
+- **Absent ≠ denied.** A facet that does not exist at a level is not "set to res" — it is
+  not there. Say it in those words.
+- **Diners is the only facet at all four levels.** That is why it is the sensitive one.
+  Never smooth it away.
+- Effective access is the **union** across levels, unchanged.
+- Honest accounting to keep visible: the ergonomic gain is modest (2 / 5 / 6 / 6 rows;
+  línia and bolo differ only in Converses ↔ Full de ruta). **The gain is safety, not
+  brevity** — you cannot grant Full de ruta at space level because the row is not there.
 
-### 3. A person with several rols and their organizations
-Person file. Person mark (initials, **no hue**) + name + rol chips. **Organizations as
-relations with dates**, including a finished one. **Conversations showing all three anchors**:
-org+person · org only (negotiating before you have a name) · person only (a freelancer).
-Then **Access**: one row per link (person × container) — a door where there is work, no door
-where there is difusión.
+### The invitat — a membership minus login
 
-### 4. The alta flow — from contact to operator
-Five panels: the door on the link → the invite (space · level · preset · rols prefilled ·
-message, with the effective preview) → sent & pending (plus the "a cold signup does not link"
-note) → accepted (operator, seat counted, contacts explicitly unlimited) → **the door that
-must not exist** (a difusión-only contact whose file offers no way to make the mistake).
+**An `invitat` is a membership with permissions, minus a login, plus an end date.** Not a new
+mechanism: same containers, same facets, same view/edit axis. ADR-082 §6 survives literally —
+*login only for operators* — what falls is the tacit assumption that being **inside** required
+a login. The wall was never membership; the wall is the login and the seat.
 
-## Binding contract — what the prototypes settled
+Reached by signed link, no account, **consumes no seat**. **Can write, and is part of the
+thread.** Sees the full history of the threads they are in. Invited to **facets in a
+container**, not to individual threads — so future threads in those facets include them.
+**A free thread never inherits guests**: it always has its own explicit list. May be invited
+into facet threads including Diners. **Revoking is not erasing.** The invitation always
+carries an end, defaulted from the container when it has a date, chosen explicitly when not.
+Always visible in "who enters and why", with who invited them and when.
 
-- **The person mark carries no hue.** Same silhouette as the project monogram (ADR-081), but
-  a circle on quiet ink. Color stays the container's language; if people took accents, a
-  thread would run two color systems and "color = project" would break.
-- **The facet chip and the gutter label are the same object.** They were drawn separately and
-  came out identical — which is ADR-083's "triple service" confirming itself. Keep them
-  identical; if they ever diverge, the facet has stopped doing triple duty.
-- **The audience/effective/preview view is ONE component**, appearing four times (thread
-  audience · effective permissions · invite preview · roster). If a redesign needs it to look
-  different in each, that is a finding to report, not a styling choice.
-- **The invite door hangs off the LINK (person × container), never off the person.** Ana is a
-  Grec programmer *and* MüK's sound tech; a per-person door cannot be both present and absent.
-- **Design annotations are `.qnote`**: dashed rule, mono, muted, tagged. Never styled as UI.
+Audience of any thread = **derived(facet, container) ∪ invited** — one formula for both kinds,
+a free thread's derived set being empty.
 
-## Open questions the design must keep visible (do not resolve silently)
+### Delegation — bounded by the delegator
 
-1. **The facet list is not one list yet.** ADR-082's access facets (conversations, money, road
-   sheet, production, materials) and ADR-083's comms facets (technical, logistics, money,
-   general) overlap only on *money* and *general* — yet ADR-083 §4 claims "one list for all
-   three jobs". The permissions matrix draws a "has a comms thread?" column precisely so the
-   mismatch is unmissable. Three ways out: unify the list · admit two overlapping lists and
-   retract the claim · **make the thread a third access option of each facet** (recommended —
-   keeps one list, invents no threads nobody opens).
-2. **"Rol" still means three things on screen**: the ADR-082 chips, the hardcoded "Roles I
-   take on" list in `settings/+page.svelte`, and the free-text `cast · role` / `crew · role`
-   on the person file. Same thing or not — decide before two vocabularies exist.
-3. **Does comms earn a fifth type in the Desk?** A `MISSATGE` run fits the Desk grammar
-   without breaking it, but 4→5 concern labels costs calm, and "everything unread" turns the
-   Desk into an inbox — exactly what rejecting live chat avoided. Proposed criterion: only a
-   message carrying **an open question addressed to you** surfaces.
-4. **The hub's participants are wider than its operators.** The bolo hub derives people from
-   both sides of the Conversations/Team boundary (`structure-model.md:86`) plus the venue.
-   Either the "outside the thread" band is part of the model, or venue contacts stop being
-   derived — and the bolo loses the person you actually talk to that day.
-5. **Nothing designed for revoking.** What happens when an operator stops being one at the end
-   of a tour — access revoked, person back to contact, everything they wrote in the threads
-   kept? ADR-082/083 are silent. It is the other half of "dar de alta" and has no screen.
+You can only grant what you hold, on all three axes: **facet · verb · level**. And what you
+hold is the **ceiling, never the default** — the default of any invitation is `Mínim`, and
+every facet above it is switched on by hand. Granting Diners to a guest carries an explicit
+confirmation line. This rule **replaces** the separate "invite" capability gate.
 
-## States & platforms
+## The screens
 
-Loading · error · empty (a hub with no messages must read as calm, not broken) · the masked
-state when the viewer lacks `read:money` (**suppress silently — masked ≠ zero**) · both themes
-at equal quality · desktop primary, **mobile pass mandatory for the hub** (the bolo channel is
-read standing up on a load-in day).
+1. **The gig page** — masthead, then the **schedule** (venue-local, time as glyph, the show
+   itself in serif), the **comms hub as one section** (one line per thread + its audience
+   line), and the gig's **tasks**. Rail: the venue and its contact, who is coming (including
+   the guest with a dashed ring and her end date), the road sheet, the fee.
+   **The "outside the wall" band is gone and must stay gone** — each person sits in the block
+   they belong to: the venue's producer under *La sala*, the guest in *Qui ve*, the programmer
+   nowhere on the gig at all. The band was the symptom of one undifferentiated list.
+2. **Assigning permissions** — rols → level → the level-aware matrix (with a column showing
+   where each facet exists) → the effective view with provenance per line. Overrides marked
+   and attributed. Capabilities that do not fit the matrix in a separate block.
+3. **A person, several rols, several organisations** — organisations as relations with dates
+   including a finished one; conversations showing all three anchors (org+person / org only /
+   person only); access as **one row per link** (person × container): a door where there is
+   work, none where the relationship is booking outreach.
+4. **Contact → operator** — the door on the link, the invitation, pending, accepted (seat
+   counted), and the door that must never exist. Plus the **guest** using the *same editor*,
+   differing only in no-login, an end date, and the inviter's ceiling applied to the matrix.
 
-## Deliverable
+## Still open — do not resolve silently
 
-High-fidelity mockups of the four screens, desktop + mobile for screen 1, both themes, with
-realistic data: a confirmed bolo six days out with four facet threads and one free thread ·
-a road manager who sees logistics and not money · a venue contact with no access · a person
-holding three rols across two current organizations and one finished one · an invite whose
-preview shows one facet deliberately withheld.
+1. **Revoking has no screen.** An operator stops being one at the end of a tour: access
+   closes, the person returns to contact, everything they wrote stays. This is the other half
+   of "dar de alta" and nobody has designed it. **Highest-value thing left to draw.**
+2. **`Producció` as a facet, on probation.** The 2026-07-20 pass wrote a realistic Producció
+   thread and every message would have gone to tècnica, logística or diners. Kept because
+   Marco wants it; re-evaluate after a real season.
+3. **The concern palette vs the facet palette.** The Desk tints per concern, comms tints per
+   facet, they overlap on Diners, and no single decision reconciles them.
+4. **Does comms surface in the Desk?** A `MISSATGE` run fits the grammar, but 4→5 concern
+   labels costs calm and "everything unread" turns the Desk into an inbox. Proposed criterion
+   if it does: only a message carrying an open question addressed to you.
+5. **`roadsheet_share` expiry** — it is revoke-only today; whether it should follow the
+   guest's rule.
+
+## Deliverable, if regenerating
+
+The four screens, light AND dark, mobile for the gig page (it is read standing up on a
+load-in day), realistic Catalan data. Plus the empty hub (calm, not broken) and the
+money-masked state (**suppressed silently — masked ≠ zero, never a locked box**).
+
+Open with one short paragraph: what you changed, and what you decided that you were not
+told to decide. The 2026-07-20 pass decided the facet list in an italic caption; anything
+decided must be said out loud, in an annotation block visibly not interface.
