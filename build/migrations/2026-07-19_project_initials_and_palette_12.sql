@@ -22,8 +22,10 @@
 -- owner/admin/member — the same tiers that can create a project (the project
 -- edit level, not the more sensitive space identity which is owner/admin).
 --
--- Status: NOT YET APPLIED. Apply via Supabase MCP apply_migration
--- (name: project_initials_and_palette_12). This file is the canonical record.
+-- Applied via Supabase MCP apply_migration 2026-07-19 (name:
+-- project_initials_and_palette_12), verified on hour-phase0: the three accent
+-- checks now allow '1'..'12', project.initials + its check exist, and
+-- update_project(uuid, jsonb) is present. This file is the canonical record.
 
 -- ── 1) Palette 8 → 12 ────────────────────────────────────────────────
 DO $$

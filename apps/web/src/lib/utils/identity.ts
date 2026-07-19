@@ -13,6 +13,16 @@
 
 export const MONOGRAM_MAX = 3;
 
+/** The subset of a project the identity editors (dialog + popover) read/write. */
+export type EditableProject = {
+	id: string;
+	slug: string;
+	name: string;
+	accent?: string | null;
+	initials?: string | null;
+	description?: string | null;
+};
+
 /**
  * Suggest a monogram from a name. Fallback only — used when a project has no
  * stored `initials`. Multi-word → first char of up to `max` words, upper.

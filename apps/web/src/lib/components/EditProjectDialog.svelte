@@ -19,16 +19,7 @@
   import { addToast } from '$lib/components/Toast.svelte';
   import AccentSwatchPicker from '$lib/components/create/AccentSwatchPicker.svelte';
   import { accentVarFor } from '$lib/utils/accent';
-  import { MONOGRAM_MAX } from '$lib/utils/identity';
-
-  export type EditableProject = {
-    id: string;
-    slug: string;
-    name: string;
-    accent?: string | null;
-    initials?: string | null;
-    description?: string | null;
-  };
+  import { MONOGRAM_MAX, type EditableProject } from '$lib/utils/identity';
 
   interface Props {
     open?: boolean;

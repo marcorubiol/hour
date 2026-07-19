@@ -21,8 +21,7 @@
   } from '$lib/nav-queries';
   import { accentVar, accentVarFor } from '$lib/utils/accent';
   import { useBreadcrumb } from '$lib/stores/breadcrumb.svelte';
-  import IdentityMark from '$lib/components/IdentityMark.svelte';
-  import EditProjectDialog from '$lib/components/EditProjectDialog.svelte';
+  import ProjectIdentityPopover from '$lib/components/ProjectIdentityPopover.svelte';
   import RelationshipStub from '$lib/components/RelationshipStub.svelte';
   import StateBadge from '$lib/components/StateBadge.svelte';
   import YNotes from '$lib/components/YNotes.svelte';
@@ -91,7 +90,6 @@
     project ? ($linesQuery.data?.items ?? []).filter((l) => l.project?.id === project.id) : [],
   );
 
-  let editOpen = $state(false);
   let siblings = $derived(
     workspaceId
       ? ($projectsQuery.data?.items ?? [])
@@ -114,20 +112,7 @@
   <header class="project__head">
     <div class="project__kicker">
       {#if project}
-        <button
-          type="button"
-          class="project__mark"
-          title="Edit project"
-          onclick={() => (editOpen = true)}
-        >
-          <IdentityMark
-            variant="compact"
-            accent={accentVarFor(project)}
-            initials={project.initials}
-            name={project.name}
-            size="30px"
-          />
-        </button>
+        <ProjectIdentityPopover {project} {siblings} size="30px" />
       {/if}
       <p class="eyebrow">Project</p>
     </div>
@@ -152,10 +137,6 @@
       </div>
     {/if}
   </header>
-
-  {#if project}
-    <EditProjectDialog bind:open={editOpen} {project} {siblings} />
-  {/if}
 
   <RelationshipStub projectSlug={projectSlug} />
 
@@ -222,17 +203,6 @@
     display: flex;
     align-items: center;
     gap: var(--space-xs);
-  }
-
-  .project__mark {
-    all: unset;
-    cursor: pointer;
-    display: inline-flex;
-    border-radius: var(--radius-s);
-  }
-  .project__mark:focus-visible {
-    outline: var(--focus-width) solid var(--focus-color);
-    outline-offset: 2px;
   }
 
   /* Project accent — a thin vertical rail to the left of the title block,
