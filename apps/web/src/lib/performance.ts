@@ -9,6 +9,7 @@
  */
 
 import * as v from 'valibot';
+import { addDaysIso } from './calendar';
 import { Constants, type Enums } from './db-types';
 import { realIsoDate } from './datetime';
 
@@ -61,6 +62,49 @@ export function performanceStatusFamily(status: string): StatusFamily {
   return FAMILIES[status as PerformanceStatus] ?? 'proposed';
 }
 
+/** hold / hold_1..3 — the statuses where a decision is still pending. */
+export function isHoldStatus(status: string): boolean {
+  return performanceStatusFamily(status) === 'hold';
+}
+
+/**
+ * ADR-079 §2 — the standard hold-decision notice, in days before the gig.
+ * `performance.hold_notice_days` NULL means "follow this default"; the
+ * constant lives app-side on purpose (no DB default) so NULL keeps meaning
+ * "standard" if the standard ever moves.
+ */
+export const HOLD_NOTICE_DEFAULT = 30;
+
+/**
+ * The decide-by day of a hold (ADR-079 §2): gig day − effective notice.
+ * Derived, never stored — the queue re-reads the truth on every render.
+ *
+ * `startAtIso` is an ISO day or instant; its date part is the gig day
+ * (string day-precision compare, same convention as $lib/calendar).
+ * `holdNoticeDays` NULL/undefined → HOLD_NOTICE_DEFAULT; `0` = no notice,
+ * so there is no decide-by day at all → null (this hold never turns
+ * urgent). Copy stays honest: "decidir abans de {decideBy(...)}".
+ */
+export function decideBy(
+  startAtIso: string,
+  holdNoticeDays: number | null | undefined,
+): string | null {
+  const notice = holdNoticeDays ?? HOLD_NOTICE_DEFAULT;
+  if (notice === 0) return null;
+  return addDaysIso(startAtIso.slice(0, 10), -notice);
+}
+
+/**
+ * A client-side `hold_notice_days` value the PATCH schema will accept —
+ * THE validation rule for the field (create form and edit dialog both use
+ * it; the schema below is the same rule server-side). null/undefined =
+ * empty field = "standard default", always valid; otherwise an integer
+ * 0..365. The native input's min/max/step are hints, not enforcement.
+ */
+export function isValidHoldNotice(value: number | null | undefined): boolean {
+  return value == null || (Number.isInteger(value) && value >= 0 && value <= 365);
+}
+
 /** UI label — holds keep their rank visible (hold 1 beats hold 3). */
 export function performanceStatusLabel(status: string): string {
   return status.replace(/_/g, ' ');
@@ -108,6 +152,12 @@ export type PerformanceCreate = v.InferOutput<typeof PerformanceCreateSchema>;
 export const PerformancePatchSchema = v.object({
   status: v.optional(v.picklist(PERFORMANCE_STATUSES)),
   performed_at: v.optional(isoDateField),
+  // ADR-079 §2 — hold decision notice (NULL = default 30 · 0 = none · N =
+  // days before). PATCH-only on purpose: the create RPC doesn't know the
+  // column, so creation sends it via a follow-up PATCH (PerformanceForm).
+  hold_notice_days: v.optional(
+    v.nullable(v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(365))),
+  ),
   load_in_at: v.optional(v.nullable(isoInstantField)),
   soundcheck_at: v.optional(v.nullable(isoInstantField)),
   start_at: v.optional(v.nullable(isoInstantField)),

@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import * as v from 'valibot';
 import {
+  HOLD_NOTICE_DEFAULT,
   PERFORMANCE_STATUSES,
   PerformanceCreateSchema,
   PerformancePatchSchema,
+  decideBy,
+  isHoldStatus,
   performanceStatusFamily,
   performanceStatusLabel,
   performanceStatusTone,
@@ -68,6 +71,16 @@ describe('PerformancePatchSchema', () => {
     if (r.success) expect(r.output.venue_name).toBe('Sala X');
   });
 
+  it('hold_notice_days: 0..365 or null pass, out-of-range and fractions fail (ADR-079 §2)', () => {
+    expect(v.safeParse(PerformancePatchSchema, { hold_notice_days: 0 }).success).toBe(true);
+    expect(v.safeParse(PerformancePatchSchema, { hold_notice_days: 45 }).success).toBe(true);
+    expect(v.safeParse(PerformancePatchSchema, { hold_notice_days: 365 }).success).toBe(true);
+    expect(v.safeParse(PerformancePatchSchema, { hold_notice_days: null }).success).toBe(true);
+    expect(v.safeParse(PerformancePatchSchema, { hold_notice_days: -1 }).success).toBe(false);
+    expect(v.safeParse(PerformancePatchSchema, { hold_notice_days: 366 }).success).toBe(false);
+    expect(v.safeParse(PerformancePatchSchema, { hold_notice_days: 12.5 }).success).toBe(false);
+  });
+
   it('rejects garbage timestamps and money fields never pass', () => {
     expect(
       v.safeParse(PerformancePatchSchema, { start_at: 'not-a-time' }).success,
@@ -115,5 +128,40 @@ describe('performanceStatusFamily', () => {
     for (const s of PERFORMANCE_STATUSES) {
       expect(['confirmed', 'hold', 'proposed']).toContain(performanceStatusFamily(s));
     }
+  });
+});
+
+describe('isHoldStatus', () => {
+  it('true for every hold rank, false for the rest', () => {
+    expect(isHoldStatus('hold')).toBe(true);
+    expect(isHoldStatus('hold_1')).toBe(true);
+    expect(isHoldStatus('hold_2')).toBe(true);
+    expect(isHoldStatus('hold_3')).toBe(true);
+    expect(isHoldStatus('proposed')).toBe(false);
+    expect(isHoldStatus('confirmed')).toBe(false);
+    expect(isHoldStatus('cancelled')).toBe(false);
+    expect(isHoldStatus('whatever')).toBe(false);
+  });
+});
+
+describe('decideBy (ADR-079 §2)', () => {
+  it('NULL notice follows the standard default', () => {
+    expect(HOLD_NOTICE_DEFAULT).toBe(30);
+    expect(decideBy('2031-08-15', null)).toBe('2031-07-16');
+    expect(decideBy('2031-08-15', undefined)).toBe('2031-07-16');
+  });
+
+  it('explicit N subtracts N days from the gig day', () => {
+    expect(decideBy('2031-08-15', 7)).toBe('2031-08-08');
+    expect(decideBy('2031-08-15', 60)).toBe('2031-06-16');
+  });
+
+  it('0 = no notice — no decide-by day at all', () => {
+    expect(decideBy('2031-08-15', 0)).toBeNull();
+  });
+
+  it('accepts a full instant and crosses month/year boundaries', () => {
+    expect(decideBy('2031-08-15T20:30:00.000Z', 15)).toBe('2031-07-31');
+    expect(decideBy('2031-01-10', 30)).toBe('2030-12-11');
   });
 });

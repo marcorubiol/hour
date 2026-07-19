@@ -15,6 +15,14 @@
  *     cast_member − replaced + cast_override + crew_assignment, deduped —
  *     the same rule as the detail bundle, batched in 3 queries). An empty
  *     roster means "no team data" and conflictsFor() degrades honestly.
+ * Plus an opt-in notice projection for the decisions queue (planner v2,
+ * ADR-079 §2):
+ *   - ?notice=1 → each item gains `hold_notice_days` (NULL = standard
+ *     default). OPT-IN on purpose: a pre-migration DB has no such column
+ *     and PostgREST rejects the select — the always-on month feed never
+ *     asks for it, so the absence only reaches the decisions fetch (which
+ *     degrades gracefully client-side) and the detail bundle (which
+ *     retries without the column — $lib/server/performance-bundle).
  *
  * Embeds `venue` (city/date rendering) and `project` (accent + slug for
  * calendar coloring and links) without a second round-trip.
@@ -60,6 +68,7 @@ const QuerySchema = v.object({
   from: v.optional(v.pipe(v.string(), v.isoDate())),
   to: v.optional(v.pipe(v.string(), v.isoDate())),
   rosters: v.optional(v.picklist(['0', '1']), '0'),
+  notice: v.optional(v.picklist(['0', '1']), '0'),
   limit: v.optional(
     v.pipe(
       v.string(),
@@ -121,6 +130,8 @@ type PerformanceItem = {
   wrap_at: string | null;
   venue: VenueLite | null;
   project: ProjectLite | null;
+  /** Present only on ?notice=1 fetches (decisions queue, ADR-079 §2). */
+  hold_notice_days?: number | null;
 };
 
 export const GET: RequestHandler = async ({ request, url, platform, locals }) => {
@@ -154,7 +165,7 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
       400,
     );
   }
-  const { project_id, project_ids, workspace_ids, line_id, status, from, to, rosters, limit } =
+  const { project_id, project_ids, workspace_ids, line_id, status, from, to, rosters, notice, limit } =
     parsed.output;
 
   const projectIds = parseUuidList(project_ids);
@@ -172,6 +183,7 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
       'id,slug,performed_at,status,venue_id,venue_name,city,country',
       'project_id,line_id,conversation_id',
       'load_in_at,soundcheck_at,start_at,loadout_at,wrap_at',
+      ...(notice === '1' ? ['hold_notice_days'] : []),
       'venue:venue_id(id,name,city,country,timezone)',
       'project:project_id(id,slug,name,accent,workspace_id)',
     ].join(','),

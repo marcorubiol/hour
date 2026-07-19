@@ -7,12 +7,14 @@ import {
   awayBands,
   conflictsFor,
   dayKeyInTz,
+  decisionsFor,
   monthGrid,
   performanceRoster,
   resolveCalendarView,
   rosterPersonIds,
   type BlackoutInput,
   type CalendarEvent,
+  type DecisionPerformance,
 } from './calendar';
 
 describe('monthGrid', () => {
@@ -376,6 +378,380 @@ describe('conflictsFor', () => {
 
   it('no events, no conflicts', () => {
     expect(conflictsFor([], {}, [blk()])).toEqual([]);
+  });
+
+  // ── ADR-079 §3 — status-aware severities ────────────────────────────────
+
+  it('double: two same-project hold performances on one day', () => {
+    const a = ev({ id: 'a', kind: 'performance', status: 'hold' });
+    const b = ev({ id: 'b', kind: 'performance', status: 'hold_1' });
+    expect(conflictsFor([a, b], {}, [])).toEqual([
+      { severity: 'double', event_ids: ['a', 'b'], person_ids: [] },
+    ]);
+  });
+
+  it('double: confirmed vs hold counts ("el mateix espectacle, dos llocs")', () => {
+    const a = ev({ id: 'a', kind: 'performance', status: 'confirmed' });
+    const b = ev({ id: 'b', kind: 'performance', status: 'hold' });
+    const conflicts = conflictsFor([a, b], {}, []);
+    expect(conflicts).toHaveLength(1);
+    expect(conflicts[0].severity).toBe('double');
+  });
+
+  it('double needs a hold: two confirmed (or proposed) same-project perfs stay silent', () => {
+    const a = ev({ id: 'a', kind: 'performance', status: 'confirmed' });
+    const b = ev({ id: 'b', kind: 'performance', status: 'confirmed' });
+    expect(conflictsFor([a, b], {}, [])).toEqual([]);
+    const c = ev({ id: 'c', kind: 'performance', status: 'proposed' });
+    const d = ev({ id: 'd', kind: 'performance', status: 'confirmed' });
+    expect(conflictsFor([c, d], {}, [])).toEqual([]);
+  });
+
+  it('double is perf-vs-perf only: a project\'s own perf+travel+rehearsal day stays silent', () => {
+    const gig = ev({ id: 'gig', kind: 'performance', status: 'hold' });
+    const travel = ev({ id: 'travel', kind: 'date' });
+    const rehearsal = ev({ id: 'reh' }); // legacy caller — no kind at all
+    expect(conflictsFor([gig, travel, rehearsal], {}, [])).toEqual([]);
+  });
+
+  it('double never fires across days', () => {
+    const a = ev({ id: 'a', kind: 'performance', status: 'hold', day: '2026-07-10' });
+    const b = ev({ id: 'b', kind: 'performance', status: 'hold', day: '2026-07-11' });
+    expect(conflictsFor([a, b], {}, [])).toEqual([]);
+  });
+
+  it('concurrence: cross-project, both hold, known disjoint rosters', () => {
+    const a = ev({ id: 'a', project_id: 'proj-a', kind: 'performance', status: 'hold' });
+    const b = ev({ id: 'b', project_id: 'proj-b', kind: 'performance', status: 'hold_2' });
+    expect(conflictsFor([a, b], { a: ['p1'], b: ['p2'] }, [])).toEqual([
+      { severity: 'concurrence', event_ids: ['a', 'b'], person_ids: [] },
+    ]);
+  });
+
+  it('an empty roster degrades to possible, never concurrence', () => {
+    const a = ev({ id: 'a', project_id: 'proj-a', kind: 'performance', status: 'hold' });
+    const b = ev({ id: 'b', project_id: 'proj-b', kind: 'performance', status: 'hold' });
+    expect(conflictsFor([a, b], { a: ['p1'] }, [])).toEqual([
+      { severity: 'possible', event_ids: ['a', 'b'], person_ids: [] },
+    ]);
+  });
+
+  it('a shared person stays people, never concurrence, hold or not', () => {
+    const a = ev({ id: 'a', project_id: 'proj-a', kind: 'performance', status: 'hold' });
+    const b = ev({ id: 'b', project_id: 'proj-b', kind: 'performance', status: 'hold' });
+    const conflicts = conflictsFor([a, b], { a: ['p1'], b: ['p1'] }, []);
+    expect(conflicts).toHaveLength(1);
+    expect(conflicts[0].severity).toBe('people');
+  });
+
+  it('concurrence needs BOTH sides on hold: confirmed vs hold with disjoint rosters is silence', () => {
+    const a = ev({ id: 'a', project_id: 'proj-a', kind: 'performance', status: 'confirmed' });
+    const b = ev({ id: 'b', project_id: 'proj-b', kind: 'performance', status: 'hold' });
+    expect(conflictsFor([a, b], { a: ['p1'], b: ['p2'] }, [])).toEqual([]);
+  });
+
+  it('full severity order: people > double > blackout > blackout-tentative > possible > concurrence', () => {
+    // One pair per day so each severity comes from exactly one source.
+    const events: CalendarEvent[] = [
+      // possible (declared first — must still sort near the bottom)
+      ev({ id: 'p1e', project_id: 'proj-x', day: '2026-07-05' }),
+      ev({ id: 'p2e', project_id: 'proj-y', day: '2026-07-05' }),
+      // concurrence
+      ev({ id: 'c1', project_id: 'proj-x', day: '2026-07-06', kind: 'performance', status: 'hold' }),
+      ev({ id: 'c2', project_id: 'proj-y', day: '2026-07-06', kind: 'performance', status: 'hold' }),
+      // double
+      ev({ id: 'd1', project_id: 'proj-x', day: '2026-07-07', kind: 'performance', status: 'hold' }),
+      ev({ id: 'd2', project_id: 'proj-x', day: '2026-07-07', kind: 'performance', status: 'confirmed' }),
+      // people
+      ev({ id: 'pe1', project_id: 'proj-x', day: '2026-07-08' }),
+      ev({ id: 'pe2', project_id: 'proj-y', day: '2026-07-08' }),
+      // blackout + blackout-tentative targets
+      ev({ id: 'bf', day: '2026-07-09' }),
+      ev({ id: 'bt', day: '2026-07-09', project_id: 'proj-z' }),
+    ];
+    const conflicts = conflictsFor(
+      events,
+      { c1: ['pa'], c2: ['pb'], pe1: ['pc'], pe2: ['pc'], bf: ['pf'], bt: ['pt'] },
+      [
+        blk({ id: 'firm', person_id: 'pf', starts_on: '2026-07-09', ends_on: '2026-07-09' }),
+        blk({
+          id: 'tent',
+          person_id: 'pt',
+          certainty: 'tentative',
+          starts_on: '2026-07-09',
+          ends_on: '2026-07-09',
+        }),
+      ],
+    );
+    expect(conflicts.map((c) => c.severity)).toEqual([
+      'people',
+      'double',
+      'blackout',
+      'blackout-tentative',
+      'possible',
+      'concurrence',
+    ]);
+  });
+});
+
+// ── decisionsFor — the derived decisions queue (ADR-079) ─────────────────
+
+const TODAY = '2026-07-18';
+
+let perfSeq = 0;
+function perf(overrides: Partial<DecisionPerformance> = {}): DecisionPerformance {
+  perfSeq += 1;
+  return {
+    id: overrides.id ?? `perf-${perfSeq}`,
+    day: '2026-08-20',
+    project_id: 'proj-a',
+    workspace_id: 'ws-1',
+    status: 'hold',
+    hold_notice_days: null,
+    project: 'Show A',
+    venue: 'Teatre Ateneu',
+    city: 'Tàrrega',
+    time: '20:30',
+    ...overrides,
+  };
+}
+
+function run(
+  performances: DecisionPerformance[],
+  rosters: Record<string, string[]> = {},
+  today = TODAY,
+) {
+  return decisionsFor({ performances, rosters, today });
+}
+
+describe('decisionsFor', () => {
+  it('a same-project double (two holds) becomes a choose decision', () => {
+    const a = perf({ id: 'a', venue: 'Lloc A' });
+    const b = perf({ id: 'b', venue: 'Lloc B' });
+    const { decisions, concurrences } = run([a, b]);
+    expect(concurrences).toEqual([]);
+    expect(decisions).toEqual([
+      {
+        id: '2026-08-20:a+b',
+        day: '2026-08-20',
+        month: '2026-08',
+        level: 'double',
+        kind: 'choose',
+        a: { id: 'a', project: 'Show A', venue: 'Lloc A', city: 'Tàrrega', time: '20:30', status: 'hold' },
+        b: { id: 'b', project: 'Show A', venue: 'Lloc B', city: 'Tàrrega', time: '20:30', status: 'hold' },
+        urgent: false, // decideBy 2026-07-21 — three days out
+        decideBy: '2026-07-21',
+      },
+    ]);
+  });
+
+  it('a people pair of two holds is a choose decision carrying the shared people', () => {
+    const a = perf({ id: 'a', project_id: 'proj-a' });
+    const b = perf({ id: 'b', project_id: 'proj-b', project: 'Show B' });
+    const { decisions } = run([a, b], { a: ['p1', 'p2'], b: ['p2'] });
+    expect(decisions).toHaveLength(1);
+    expect(decisions[0].level).toBe('people');
+    expect(decisions[0].kind).toBe('choose');
+    expect(decisions[0].people).toEqual(['p2']);
+  });
+
+  it('release follow-up: after one side confirms, the same pair mutates to release', () => {
+    const holdPair = [
+      perf({ id: 'a', project_id: 'proj-a' }),
+      perf({ id: 'b', project_id: 'proj-b' }),
+    ];
+    const rosters = { a: ['p1'], b: ['p1'] };
+    const before = run(holdPair, rosters);
+    expect(before.decisions[0].kind).toBe('choose');
+
+    const after = run(
+      [perf({ id: 'a', project_id: 'proj-a', status: 'confirmed' }), holdPair[1]],
+      rosters,
+    );
+    expect(after.decisions).toHaveLength(1);
+    expect(after.decisions[0].id).toBe(before.decisions[0].id); // same derived card
+    expect(after.decisions[0].kind).toBe('release');
+    expect(after.decisions[0].level).toBe('people');
+  });
+
+  it('a confirmed+hold double is a release too', () => {
+    const { decisions } = run([
+      perf({ id: 'a', status: 'confirmed' }),
+      perf({ id: 'b', status: 'hold_1' }),
+    ]);
+    expect(decisions).toHaveLength(1);
+    expect(decisions[0].level).toBe('double');
+    expect(decisions[0].kind).toBe('release');
+  });
+
+  it('a possible pair of holds is a choose decision while both sides are open', () => {
+    const { decisions } = run(
+      [
+        perf({ id: 'a', project_id: 'proj-a', status: 'hold' }),
+        perf({ id: 'b', project_id: 'proj-b', status: 'hold' }),
+      ],
+      { a: ['p1'] }, // b has no roster
+    );
+    expect(decisions).toHaveLength(1);
+    expect(decisions[0].level).toBe('possible');
+    expect(decisions[0].kind).toBe('choose');
+  });
+
+  it('a possible pair drops once one side is confirmed — no roster, no asserted friction, never a release prompt', () => {
+    // ADR-079 §3 — 'possible' is a decision only while both sides are
+    // options to confront; §5's release follow-up is people|double only.
+    const { decisions, concurrences } = run(
+      [
+        perf({ id: 'a', project_id: 'proj-a', status: 'confirmed' }),
+        perf({ id: 'b', project_id: 'proj-b', status: 'hold' }),
+      ],
+      { a: ['p1'] }, // b has no roster
+    );
+    expect(decisions).toEqual([]);
+    expect(concurrences).toEqual([]);
+  });
+
+  it('a pair with no hold side is never a decision', () => {
+    const { decisions } = run(
+      [
+        perf({ id: 'a', project_id: 'proj-a', status: 'confirmed' }),
+        perf({ id: 'b', project_id: 'proj-b', status: 'proposed' }),
+      ],
+      { a: ['p1'], b: ['p1'] },
+    );
+    expect(decisions).toEqual([]);
+  });
+
+  it('concurrences come back separately — never decisions, never urgent', () => {
+    const a = perf({ id: 'a', project_id: 'proj-a', day: '2026-07-19' });
+    const b = perf({ id: 'b', project_id: 'proj-b', project: 'Show B', day: '2026-07-19' });
+    const { decisions, concurrences } = run([a, b], { a: ['p1'], b: ['p2'] });
+    expect(decisions).toEqual([]);
+    expect(concurrences).toEqual([
+      {
+        id: '2026-07-19:a+b',
+        day: '2026-07-19',
+        month: '2026-07',
+        a: expect.objectContaining({ id: 'a', project: 'Show A' }),
+        b: expect.objectContaining({ id: 'b', project: 'Show B' }),
+      },
+    ]);
+    expect(concurrences[0]).not.toHaveProperty('urgent');
+    expect(concurrences[0]).not.toHaveProperty('decideBy');
+  });
+
+  it('urgency boundary: today == decideBy is urgent, the day before is not', () => {
+    // Default notice 30: gig 2026-08-17 → decideBy 2026-07-18.
+    const pair = () => [
+      perf({ id: 'a', day: '2026-08-17' }),
+      perf({ id: 'b', day: '2026-08-17' }),
+    ];
+    const onTheDay = run(pair(), {}, '2026-07-18');
+    expect(onTheDay.decisions[0].decideBy).toBe('2026-07-18');
+    expect(onTheDay.decisions[0].urgent).toBe(true);
+
+    const dayBefore = run(pair(), {}, '2026-07-17');
+    expect(dayBefore.decisions[0].urgent).toBe(false);
+  });
+
+  it('notice 0 = no decide-by at all — never urgent, even past the gig', () => {
+    const { decisions } = run(
+      [
+        perf({ id: 'a', day: '2026-07-10', hold_notice_days: 0 }),
+        perf({ id: 'b', day: '2026-07-10', hold_notice_days: 0 }),
+      ],
+      {},
+      '2026-07-18', // already past the gig day
+    );
+    expect(decisions).toHaveLength(1);
+    expect(decisions[0].decideBy).toBeNull();
+    expect(decisions[0].urgent).toBe(false);
+  });
+
+  it('NULL notice follows the default (30); decideBy = min over HOLD sides only', () => {
+    // a: NULL → 2026-08-20 − 30 = 2026-07-21 · b: 5 → 2026-08-15. Min wins.
+    const { decisions } = run([
+      perf({ id: 'a', hold_notice_days: null }),
+      perf({ id: 'b', hold_notice_days: 5 }),
+    ]);
+    expect(decisions[0].decideBy).toBe('2026-07-21');
+
+    // The confirmed side's notice never counts — only holds decide.
+    const release = run([
+      perf({ id: 'a', status: 'confirmed', hold_notice_days: 1 }),
+      perf({ id: 'b', hold_notice_days: 10 }),
+    ]);
+    expect(release.decisions[0].decideBy).toBe('2026-08-10');
+
+    // A notice-0 hold contributes nothing; the other hold still sets it.
+    const mixed = run([
+      perf({ id: 'a', hold_notice_days: 0 }),
+      perf({ id: 'b', hold_notice_days: 10 }),
+    ]);
+    expect(mixed.decisions[0].decideBy).toBe('2026-08-10');
+  });
+
+  it('the queue spans months — the caller\'s window, not the visible month', () => {
+    const { decisions } = run([
+      perf({ id: 'a', day: '2026-07-25' }),
+      perf({ id: 'b', day: '2026-07-25' }),
+      perf({ id: 'c', day: '2026-09-05' }),
+      perf({ id: 'd', day: '2026-09-05' }),
+    ]);
+    expect(decisions.map((d) => d.month)).toEqual(['2026-07', '2026-09']);
+  });
+
+  it('sorts urgent first, then by day; stable within a tie', () => {
+    const rows = [
+      // Not urgent, latest day (double, decideBy 2026-08-06).
+      perf({ id: 'l1', day: '2026-09-05' }),
+      perf({ id: 'l2', day: '2026-09-05' }),
+      // Urgent (gig 3 days out, default notice already passed).
+      perf({ id: 'u1', day: '2026-07-21' }),
+      perf({ id: 'u2', day: '2026-07-21' }),
+      // Not urgent, middle day.
+      perf({ id: 'm1', day: '2026-08-30' }),
+      perf({ id: 'm2', day: '2026-08-30' }),
+      // Same day as the middle pair, cross-project people pair: the
+      // engine emits people before double — the tie keeps that order.
+      perf({ id: 'x1', day: '2026-08-30', project_id: 'proj-x' }),
+      perf({ id: 'x2', day: '2026-08-30', project_id: 'proj-y' }),
+    ];
+    // m and x rosters are known and disjoint, so their cross pairs read
+    // as quiet concurrences — out of the decisions queue by design.
+    const { decisions } = run(rows, {
+      m1: ['pm'],
+      m2: ['pm'],
+      x1: ['p9'],
+      x2: ['p9'],
+    });
+    expect(decisions.map((d) => [d.day, d.level, d.urgent])).toEqual([
+      ['2026-07-21', 'double', true],
+      ['2026-08-30', 'people', false],
+      ['2026-08-30', 'double', false],
+      ['2026-09-05', 'double', false],
+    ]);
+  });
+
+  it('cancelled rows are dropped — a cancelled gig is not an option', () => {
+    const { decisions } = run([
+      perf({ id: 'a', status: 'cancelled' }),
+      perf({ id: 'b', status: 'hold' }),
+    ]);
+    expect(decisions).toEqual([]);
+  });
+
+  it('the id is stable regardless of input order (day + perf ids sorted)', () => {
+    const a = perf({ id: 'z-late', project_id: 'proj-a' });
+    const b = perf({ id: 'a-early', project_id: 'proj-b' });
+    const one = run([a, b], { 'z-late': ['p1'], 'a-early': ['p1'] });
+    const two = run([b, a], { 'z-late': ['p1'], 'a-early': ['p1'] });
+    expect(one.decisions[0].id).toBe('2026-08-20:a-early+z-late');
+    expect(two.decisions[0].id).toBe(one.decisions[0].id);
+  });
+
+  it('no performances, nothing derived', () => {
+    expect(run([])).toEqual({ decisions: [], concurrences: [] });
   });
 });
 

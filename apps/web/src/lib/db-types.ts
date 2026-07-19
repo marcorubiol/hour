@@ -2,6 +2,8 @@
 // date.line_id + date.travel_direction, date_kind 'day_off',
 // user_profile.person_id, create_date/delete_date RPCs. Regenerate after
 // applying the 2026-07-18 migrations.
+// hand-patched pending regen (planner-v2): performance.hold_notice_days
+// (ADR-079 §2, 2026-07-18_hold_notice_days.sql).
 export type Json =
   | string
   | number
@@ -1219,6 +1221,7 @@ export type Database = {
           deleted_at: string | null
           fee_amount: number | null
           fee_currency: string | null
+          hold_notice_days: number | null
           hospitality: Json
           id: string
           line_id: string | null
@@ -1250,6 +1253,7 @@ export type Database = {
           deleted_at?: string | null
           fee_amount?: number | null
           fee_currency?: string | null
+          hold_notice_days?: number | null
           hospitality?: Json
           id?: string
           line_id?: string | null
@@ -1281,6 +1285,7 @@ export type Database = {
           deleted_at?: string | null
           fee_amount?: number | null
           fee_currency?: string | null
+          hold_notice_days?: number | null
           hospitality?: Json
           id?: string
           line_id?: string | null
@@ -2478,6 +2483,7 @@ export type Database = {
           deleted_at: string | null
           fee_amount: number | null
           fee_currency: string | null
+          hold_notice_days: number | null
           hospitality: Json
           id: string
           line_id: string | null

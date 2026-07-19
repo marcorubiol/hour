@@ -13,7 +13,7 @@
  * indistinguishable by design.
  */
 
-import { pgGet, type SupabaseEnv } from '$lib/supabase';
+import { pgGet, PostgrestError, type SupabaseEnv } from '$lib/supabase';
 import type { Json, Tables } from '$lib/db-types';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -99,6 +99,12 @@ export type CastMemberRow = {
 export interface PerformanceBundleResult {
   performance: PerformanceDetail;
   cast_members: CastMemberRow[];
+  /**
+   * True when the DB has no `hold_notice_days` column yet (pre-ADR-079
+   * migration) and the bundle degraded the field to null. UIs hide the
+   * notice field on it — a PATCH carrying the column would be rejected.
+   */
+  hold_notice_absent?: boolean;
 }
 
 const PERSON_COLS = 'id,slug,full_name,email,phone';
@@ -158,21 +164,38 @@ const PERFORMANCE_COLS = [
   'updated_at',
 ].join(',');
 
-const DETAIL_SELECT = [
-  PERFORMANCE_COLS,
-  'venue:venue_id(id,slug,name,city,country,address,capacity,timezone,contacts)',
-  'line:line_id(id,slug,name,kind)',
-  'project:project_id(id,slug,name,accent)',
-  `conversation:conversation_id(id,slug,status,person:person_id(${PERSON_COLS},organization_name))`,
-  `crew_assignment(id,role,notes,contact_override,person:person_id(${PERSON_COLS}))`,
-  `cast_override(id,role,reason,person:person_id(${PERSON_COLS}),replaces_person:replaces_person_id(id,full_name))`,
-  'date(id,kind,status,title,starts_at,ends_at,all_day,venue_name,city,venue:venue_id(timezone))',
-  'asset_version(id,kind,direction,url,notes,uploaded_at)',
-].join(',');
+// `hold_notice_days` is post-ADR-078 schema (ADR-079 §2, migration
+// 2026-07-18). The bundle is ALWAYS-ON (detail page + road sheet), so
+// unlike the opt-in `?notice=1` list projection it cannot leave the
+// absence decision to the caller: a pre-migration DB rejects the whole
+// select (42703) and every gig's detail page would 5xx. It is selected
+// separately below and retried away instead.
+const NOTICE_COL = 'hold_notice_days';
+
+function detailSelect(withNotice: boolean): string {
+  return [
+    PERFORMANCE_COLS,
+    ...(withNotice ? [NOTICE_COL] : []),
+    'venue:venue_id(id,slug,name,city,country,address,capacity,timezone,contacts)',
+    'line:line_id(id,slug,name,kind)',
+    'project:project_id(id,slug,name,accent)',
+    `conversation:conversation_id(id,slug,status,person:person_id(${PERSON_COLS},organization_name))`,
+    `crew_assignment(id,role,notes,contact_override,person:person_id(${PERSON_COLS}))`,
+    `cast_override(id,role,reason,person:person_id(${PERSON_COLS}),replaces_person:replaces_person_id(id,full_name))`,
+    'date(id,kind,status,title,starts_at,ends_at,all_day,venue_name,city,venue:venue_id(timezone))',
+    'asset_version(id,kind,direction,url,notes,uploaded_at)',
+  ].join(',');
+}
 
 /**
  * Fetch the bundle. Returns null when nothing matched (missing row or RLS
  * denied). Throws PostgrestError on upstream failures — callers map it.
+ *
+ * Graceful absence (same contract as the availability feed): when the DB
+ * predates the `hold_notice_days` migration, PostgREST rejects the select
+ * (42703 undefined column). One retry without the column keeps the detail
+ * page and road sheet alive, degrades the field to null ("standard
+ * default") and flags `hold_notice_absent` so the edit dialog hides it.
  */
 export async function fetchPerformanceBundle(
   env: SupabaseEnv,
@@ -180,31 +203,48 @@ export async function fetchPerformanceBundle(
   key: string,
   workspaceSlug: string | null,
 ): Promise<PerformanceBundleResult | null> {
-  const search = new URLSearchParams();
+  if (!isUuid(key) && !workspaceSlug) return null;
 
-  if (isUuid(key)) {
-    search.set('select', DETAIL_SELECT);
-    search.set('id', `eq.${key}`);
-  } else {
-    if (!workspaceSlug) return null;
-    // Slug lookup — scope by workspace via inner join (ADR-024 uniqueness).
-    search.set('select', `${DETAIL_SELECT},workspace:workspace_id!inner(slug)`);
-    search.set('slug', `eq.${key}`);
-    search.set('workspace.slug', `eq.${workspaceSlug}`);
+  const fetchRow = async (withNotice: boolean) => {
+    const search = new URLSearchParams();
+    const select = detailSelect(withNotice);
+
+    if (isUuid(key)) {
+      search.set('select', select);
+      search.set('id', `eq.${key}`);
+    } else {
+      // Slug lookup — scope by workspace via inner join (ADR-024 uniqueness).
+      search.set('select', `${select},workspace:workspace_id!inner(slug)`);
+      search.set('slug', `eq.${key}`);
+      search.set('workspace.slug', `eq.${workspaceSlug}`);
+    }
+
+    search.set('deleted_at', 'is.null');
+    // Soft-delete filters + ordering for the embedded collections.
+    search.set('crew_assignment.deleted_at', 'is.null');
+    search.set('cast_override.deleted_at', 'is.null');
+    search.set('date.deleted_at', 'is.null');
+    search.set('date.order', 'starts_at.asc');
+    search.set('asset_version.deleted_at', 'is.null');
+    search.set('limit', '1');
+
+    const { data } = await pgGet<PerformanceDetail>(env, 'performance', jwt, { search });
+    return data[0] ?? null;
+  };
+
+  let performance: PerformanceDetail | null;
+  let noticeAbsent = false;
+  try {
+    performance = await fetchRow(true);
+  } catch (err) {
+    // 42703 = undefined column — the one absence this select can hit
+    // pre-migration. Anything else propagates untouched.
+    if (!(err instanceof PostgrestError) || err.code !== '42703') throw err;
+    const row = await fetchRow(false);
+    performance = row === null ? null : { ...row, hold_notice_days: null };
+    noticeAbsent = true;
   }
-
-  search.set('deleted_at', 'is.null');
-  // Soft-delete filters + ordering for the embedded collections.
-  search.set('crew_assignment.deleted_at', 'is.null');
-  search.set('cast_override.deleted_at', 'is.null');
-  search.set('date.deleted_at', 'is.null');
-  search.set('date.order', 'starts_at.asc');
-  search.set('asset_version.deleted_at', 'is.null');
-  search.set('limit', '1');
-
-  const { data } = await pgGet<PerformanceDetail>(env, 'performance', jwt, { search });
-  if (data.length === 0) return null;
-  const performance = data[0];
+  if (performance === null) return null;
 
   const castSearch = new URLSearchParams();
   castSearch.set('select', `id,role,notes,person:person_id(${PERSON_COLS})`);
@@ -215,5 +255,9 @@ export async function fetchPerformanceBundle(
     search: castSearch,
   });
 
-  return { performance, cast_members: castMembers };
+  return {
+    performance,
+    cast_members: castMembers,
+    ...(noticeAbsent ? { hold_notice_absent: true } : {}),
+  };
 }

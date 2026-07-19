@@ -23,8 +23,12 @@
   import { addToast } from '$lib/components/Toast.svelte';
   import type { Json } from '$lib/db-types';
   import { dayLabel, dayMonth, instantToWallClock, wallClockToInstant } from '$lib/datetime';
+  import { detectLocale, t } from '$lib/i18n';
   import {
+    HOLD_NOTICE_DEFAULT,
     PERFORMANCE_STATUSES,
+    isHoldStatus,
+    isValidHoldNotice,
     performanceStatusLabel,
     performanceStatusTone,
     type PerformancePatch,
@@ -56,6 +60,7 @@
       city: string | null;
       country: string | null;
       notes: string | null;
+      hold_notice_days: number | null;
       load_in_at: string | null;
       soundcheck_at: string | null;
       start_at: string | null;
@@ -121,6 +126,8 @@
       notes: string | null;
       person: PersonEmbed | null;
     }>;
+    /** Pre-migration DB — hold_notice_days degraded to null; hide the field. */
+    hold_notice_absent?: boolean;
   };
 
   let workspaceSlug = $derived(page.params.workspace ?? '');
@@ -178,12 +185,17 @@
     $patchMutation.mutate({ status });
   }
 
+  const locale = detectLocale(navigator.language);
+
   let dialogOpen = $state(false);
   let fDay = $state('');
   let fVenue = $state('');
   let fCity = $state('');
   let fCountry = $state('');
   let fVenueId = $state('');
+  // ADR-079 §2 — hold decision notice; the field only exists in the dialog
+  // while the gig's status is hold*. null = empty = standard default.
+  let fHoldNotice = $state<number | null>(null);
   let fLoadIn = $state('');
   let fSoundcheck = $state('');
   let fStart = $state('');
@@ -214,6 +226,7 @@
     fCity = perf.city ?? '';
     fCountry = perf.country ?? '';
     fVenueId = perf.venue_id ?? '';
+    fHoldNotice = perf.hold_notice_days;
     // Stored instants → wall times in the entry zone (venue-local when a
     // venue is linked). entryTz reads fVenueId, set just above.
     populateSlots();
@@ -247,6 +260,15 @@
       addToast({ tone: 'warning', message: 'The performance needs a date.' });
       return;
     }
+    // Same validation rule as PerformanceForm (isValidHoldNotice — THE
+    // technique for this field): the input's min/max/step are hints, not
+    // enforcement, and one bad digit must not 400 the whole PATCH and
+    // lose every other edit in the dialog. Empty (null) stays valid —
+    // "back to the standard default".
+    if (showHoldNotice && !isValidHoldNotice(fHoldNotice)) {
+      addToast({ tone: 'warning', message: t('perf.hold_notice_invalid', locale) });
+      return;
+    }
     // Wall times → instants in the CURRENTLY selected venue's zone: re-link
     // mid-edit and "show at 20:30" stays 20:30 in the new place.
     $patchMutation.mutate({
@@ -260,11 +282,21 @@
       start_at: wallClockToInstant(fStart, entryTz),
       loadout_at: wallClockToInstant(fLoadout, entryTz),
       wrap_at: wallClockToInstant(fWrap, entryTz),
+      // ADR-079 §2 — only while the field is on screen (hold* status);
+      // emptied field = null = back to the standard default.
+      ...(showHoldNotice ? { hold_notice_days: fHoldNotice } : {}),
     });
   }
 
   let bundle = $derived($query.data ?? null);
   let perf = $derived(bundle?.performance ?? null);
+
+  // ADR-079 §2 — the notice field rides the dialog only for hold* gigs,
+  // and only while the DB has the column (a pre-migration bundle flags
+  // `hold_notice_absent`; a PATCH carrying it would be rejected whole).
+  let showHoldNotice = $derived(
+    Boolean(perf && isHoldStatus(perf.status) && !bundle?.hold_notice_absent),
+  );
 
   // Address: Space › Project › [Line ›] Performance. The current crumb is the
   // venue (a performance has no name of its own); the line is included when
@@ -707,6 +739,30 @@
     <Input label="Venue" bind:value={fVenue} placeholder="Venue name" />
     <Input label="City" bind:value={fCity} />
     <Input label="Country" bind:value={fCountry} placeholder="ES" />
+    {#if showHoldNotice}
+      <!-- ADR-079 §2 — discreet, hold-only. Empty = default 30 (the
+           placeholder says it), 0 = no notice. -->
+      <div class="field">
+        <label for="f-hold-notice">{t('perf.hold_notice', locale)}</label>
+        <div class="field__control">
+          <input
+            id="f-hold-notice"
+            type="number"
+            min="0"
+            max="365"
+            step="1"
+            inputmode="numeric"
+            bind:value={fHoldNotice}
+            placeholder={String(HOLD_NOTICE_DEFAULT)}
+            aria-describedby={fHoldNotice === 0 ? 'f-hold-notice-msg' : undefined}
+          />
+          <span class="field__suffix">{t('perf.hold_notice_suffix', locale)}</span>
+        </div>
+        {#if fHoldNotice === 0}
+          <p id="f-hold-notice-msg" class="field__msg">{t('perf.hold_notice_none', locale)}</p>
+        {/if}
+      </div>
+    {/if}
   </div>
   <div class="perf__venue-link">
     <div class="field">

@@ -11,6 +11,7 @@
 
 import type { AvailabilityItem } from './availability';
 import type { DateRow } from './date';
+import { decideBy, isHoldStatus, performanceStatusFamily } from './performance';
 
 export interface CalendarDay {
   /** ISO date, YYYY-MM-DD. */
@@ -155,14 +156,22 @@ export function performanceRoster(bundle: RosterBundle): string[] {
   });
 }
 
-export type ConflictSeverity = 'people' | 'possible' | 'blackout' | 'blackout-tentative';
+export type ConflictSeverity =
+  | 'people'
+  | 'double'
+  | 'possible'
+  | 'blackout'
+  | 'blackout-tentative'
+  | 'concurrence';
 
 /**
  * Day-precision projection of a performance or date row. `day` is bucketed
  * upstream (via `dayKeyInTz` / `all_day` slice — MonthGrid's rule);
  * `workspace_id` scopes company-wide blackouts, `project_id` keeps a
  * project's own plan (gig + travel + rehearsal on one day) from clashing
- * with itself.
+ * with itself. `kind`/`status` unlock the status-aware severities
+ * (ADR-079 §3) — callers that don't pass them get the ADR-072/078
+ * behavior unchanged.
  */
 export interface CalendarEvent {
   id: string;
@@ -170,13 +179,17 @@ export interface CalendarEvent {
   day: string;
   project_id: string;
   workspace_id: string;
+  /** 'performance' opts into double/concurrence; date rows/legacy callers omit it. */
+  kind?: 'performance' | 'date';
+  /** performance_status — read only when kind is 'performance'. */
+  status?: string;
 }
 
 export interface Conflict {
   severity: ConflictSeverity;
-  /** Pair for people/possible; single event vs a blackout. */
+  /** Pair for people/double/possible/concurrence; single event vs a blackout. */
   event_ids: [string, string] | [string];
-  /** The shared/blocked people. Empty for 'possible' and company-wide blackouts. */
+  /** The shared/blocked people. Empty for 'double', 'possible', 'concurrence' and company-wide blackouts. */
   person_ids: string[];
   /** Set on blackout severities. */
   availability_block_id?: string;
@@ -191,20 +204,32 @@ export type BlackoutInput = Pick<
   'id' | 'workspace_id' | 'person_id' | 'starts_on' | 'ends_on' | 'certainty'
 >;
 
-/** Most severe first — the output ordering of `conflictsFor`. */
+/** Most severe first — the output ordering of `conflictsFor` (ADR-079 §3:
+ * 'concurrence' is the quiet tier, below everything else). */
 const SEVERITY_RANK: Record<ConflictSeverity, number> = {
   people: 0,
-  blackout: 1,
-  'blackout-tentative': 2,
-  possible: 3,
+  double: 1,
+  blackout: 2,
+  'blackout-tentative': 3,
+  possible: 4,
+  concurrence: 5,
 };
 
+/** hold* performance — the only shape the status-aware severities read. */
+function isHoldPerf(e: CalendarEvent): boolean {
+  return e.kind === 'performance' && e.status !== undefined && isHoldStatus(e.status);
+}
+
 /**
- * The conflict engine (ADR-072 §1 / ADR-078). Conflict = shared PEOPLE,
- * not coinciding dates:
+ * The conflict engine (ADR-072 §1 / ADR-078 / ADR-079 §3). Conflict =
+ * shared PEOPLE, not coinciding dates:
  *
  * - 'people'    — same day, DIFFERENT projects, both rosters known
  *                 (non-empty) and sharing ≥1 person.
+ * - 'double'    — SAME project, two performances the same day, at least
+ *                 one hold* ("el mateix espectacle, dos llocs" —
+ *                 confirmed-vs-hold counts). ADR-079 §3: supersedes the
+ *                 blanket same-project silence for perf-vs-perf pairs ONLY.
  * - 'possible'  — same day, different projects, ≥1 roster empty — the
  *                 honest "no team data" degradation (never a confirmed
  *                 clash without roster data).
@@ -213,15 +238,21 @@ const SEVERITY_RANK: Record<ConflictSeverity, number> = {
  *                 company-wide block (person_id null) of the event's
  *                 workspace.
  * - 'blackout-tentative' — same overlap, certainty='tentative'.
+ * - 'concurrence' — cross-project same-day pair, BOTH sides hold*, both
+ *                 rosters known and DISJOINT. The quiet tier ("es veu, no
+ *                 crida"): it sorts below every other severity and never
+ *                 marks a cell.
  *
- * Same-project pairs never clash pairwise: gig + travel + rehearsal of one
- * project on one day is the project's own plan, and its people overlap by
- * construction — zero signal, all noise. Cross-company double-booking (the
- * ADR-072 §6 symmetry) is cross-project by nature, so nothing real is lost.
+ * Other same-project pairs never clash pairwise: gig + travel + rehearsal
+ * of one project on one day is the project's own plan, and its people
+ * overlap by construction — zero signal, all noise. Cross-company
+ * double-booking (the ADR-072 §6 symmetry) is cross-project by nature, so
+ * nothing real is lost.
  *
- * Output is sorted most-severe-first ('people' → 'blackout' →
- * 'blackout-tentative' → 'possible'), stable within a rank. Away bands are
- * NEVER an input here (ADR-078 §6 — display-only inference).
+ * Output is sorted most-severe-first ('people' → 'double' → 'blackout' →
+ * 'blackout-tentative' → 'possible' → 'concurrence'), stable within a
+ * rank. Away bands are NEVER an input here (ADR-078 §6 — display-only
+ * inference).
  */
 export function conflictsFor(
   events: CalendarEvent[],
@@ -242,7 +273,16 @@ export function conflictsFor(
       for (let j = i + 1; j < dayEvents.length; j++) {
         const a = dayEvents[i];
         const b = dayEvents[j];
-        if (a.project_id === b.project_id) continue;
+        const bothPerfs = a.kind === 'performance' && b.kind === 'performance';
+        if (a.project_id === b.project_id) {
+          // Two performances of ONE project on one day with a hold in
+          // play is the double-booking the same-project silence was
+          // hiding (ADR-079 §3); perf+travel+rehearsal stays silent.
+          if (bothPerfs && (isHoldPerf(a) || isHoldPerf(b))) {
+            out.push({ severity: 'double', event_ids: [a.id, b.id], person_ids: [] });
+          }
+          continue;
+        }
         const rosterA = rosters[a.id] ?? [];
         const rosterB = rosters[b.id] ?? [];
         if (rosterA.length > 0 && rosterB.length > 0) {
@@ -250,8 +290,13 @@ export function conflictsFor(
           const shared = [...new Set(rosterA)].filter((id) => setB.has(id));
           if (shared.length > 0) {
             out.push({ severity: 'people', event_ids: [a.id, b.id], person_ids: shared });
+          } else if (bothPerfs && isHoldPerf(a) && isHoldPerf(b)) {
+            // Known, disjoint teams, both still options — the quiet
+            // "same day, no people friction" read (ADR-079 §3).
+            out.push({ severity: 'concurrence', event_ids: [a.id, b.id], person_ids: [] });
           }
-          // Both rosters known and disjoint: no conflict — that's the point.
+          // Both rosters known and disjoint otherwise: no conflict —
+          // that's the point.
         } else {
           out.push({ severity: 'possible', event_ids: [a.id, b.id], person_ids: [] });
         }
@@ -282,6 +327,194 @@ export function conflictsFor(
   }
 
   return out.sort((a, b) => SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity]);
+}
+
+/**
+ * A performance row as the decisions queue consumes it (ADR-079 §1). The
+ * caller fetches the hold window ([today, today+90d] — the function is
+ * pure, it just receives rows) and buckets `day` upstream; the display
+ * refs ride onto the card untouched.
+ */
+export interface DecisionPerformance {
+  id: string;
+  /** Gig day, YYYY-MM-DD. */
+  day: string;
+  project_id: string;
+  workspace_id: string;
+  status: string;
+  /** ADR-079 §2 — NULL = standard notice, 0 = none, N = days before. */
+  hold_notice_days: number | null;
+  /** Project name (display). */
+  project: string;
+  venue: string | null;
+  city: string | null;
+  /** Display time (venue-local), caller-formatted. */
+  time: string | null;
+}
+
+/** One side of a decision card — the perf ref the band renders. */
+export type DecisionSide = Pick<
+  DecisionPerformance,
+  'id' | 'project' | 'venue' | 'city' | 'time' | 'status'
+>;
+
+/**
+ * A derived decision (ADR-079 §1) — the projection of a conflict pair
+ * where there are options to confront. Nothing stored: the queue re-reads
+ * the truth on every render.
+ */
+export interface Decision {
+  /** Stable across renders: day + perf ids sorted. */
+  id: string;
+  /** YYYY-MM-DD. */
+  day: string;
+  /** YYYY-MM — the queue spans months (window, not visible month). */
+  month: string;
+  level: 'people' | 'double' | 'possible';
+  /** 'choose' = A o B · 'release' = one side already confirmed (ADR-079 §5). */
+  kind: 'choose' | 'release';
+  a: DecisionSide;
+  b: DecisionSide;
+  /** Shared person ids ('people' level only) — the caller maps to names. */
+  people?: string[];
+  urgent: boolean;
+  /** min decideBy over the hold sides; null = no notice anywhere (never urgent). */
+  decideBy: string | null;
+}
+
+/** A quiet concurrence row (ADR-079 §3) — "es veu, no crida". */
+export interface Concurrence {
+  id: string;
+  day: string;
+  month: string;
+  a: DecisionSide;
+  b: DecisionSide;
+}
+
+function decisionSide(p: DecisionPerformance): DecisionSide {
+  return {
+    id: p.id,
+    project: p.project,
+    venue: p.venue,
+    city: p.city,
+    time: p.time,
+    status: p.status,
+  };
+}
+
+function pairId(day: string, aId: string, bId: string): string {
+  return `${day}:${[aId, bId].sort().join('+')}`;
+}
+
+/**
+ * The decisions queue, derived (ADR-079 §1/§4): conflict pairs of
+ * severities people|double|possible where ≥1 side is a hold* — kind
+ * 'choose' while both are open, 'release' once one side of a
+ * people/double pair is confirmed ("Ja has confirmat A — alliberar B?").
+ * A 'possible' pair (≥1 roster unknown) is a decision only while BOTH
+ * sides are open options: once one side is confirmed the queue cannot
+ * assert friction without roster data, so the pair drops instead of
+ * mutating to release — never a release prompt over unknown data
+ * (ADR-079 §3: decisión cuando ambos lados tienen opciones que
+ * confrontar; §5's follow-up is people|double only).
+ * Urgency (ADR-079 §2): today ≥ min decideBy over the HOLD sides
+ * (`decideBy` from $lib/performance; notice 0 contributes nothing — a
+ * hold without notice never turns urgent).
+ *
+ * Concurrences come back SEPARATELY: they are seen, never counted as
+ * decisions and never urgent (ADR-079 §3).
+ *
+ * Blackouts are NOT an input: they only ever yield single-event
+ * severities, which the pair filter below discards — a queue that asked
+ * for them would fetch rows it can never use.
+ *
+ * Decisions sort urgent-first, then by day; stable (severity order of the
+ * engine breaks remaining ties). Cancelled rows are dropped — a cancelled
+ * gig is not an option to confront.
+ */
+export function decisionsFor(input: {
+  performances: DecisionPerformance[];
+  rosters: Record<string, string[]>;
+  /** YYYY-MM-DD — the caller's "today" (the function stays pure). */
+  today: string;
+}): { decisions: Decision[]; concurrences: Concurrence[] } {
+  const { performances, rosters, today } = input;
+  const alive = performances.filter((p) => p.status !== 'cancelled');
+  const byId = new Map(alive.map((p) => [p.id, p]));
+  const events: CalendarEvent[] = alive.map((p) => ({
+    id: p.id,
+    day: p.day,
+    project_id: p.project_id,
+    workspace_id: p.workspace_id,
+    kind: 'performance',
+    status: p.status,
+  }));
+
+  const decisions: Decision[] = [];
+  const concurrences: Concurrence[] = [];
+  for (const c of conflictsFor(events, rosters, [])) {
+    if (c.event_ids.length !== 2) continue; // blackout severities — single-event
+    const a = byId.get(c.event_ids[0]);
+    const b = byId.get(c.event_ids[1]);
+    if (!a || !b) continue;
+
+    if (c.severity === 'concurrence') {
+      concurrences.push({
+        id: pairId(a.day, a.id, b.id),
+        day: a.day,
+        month: a.day.slice(0, 7),
+        a: decisionSide(a),
+        b: decisionSide(b),
+      });
+      continue;
+    }
+    if (c.severity !== 'people' && c.severity !== 'double' && c.severity !== 'possible') {
+      continue;
+    }
+    const holdA = isHoldStatus(a.status);
+    const holdB = isHoldStatus(b.status);
+    if (!holdA && !holdB) continue;
+
+    const confirmedA = performanceStatusFamily(a.status) === 'confirmed';
+    const confirmedB = performanceStatusFamily(b.status) === 'confirmed';
+    if (c.severity === 'possible' && (confirmedA || confirmedB)) {
+      // ADR-079 §3 — no roster data means no asserted friction: once one
+      // side is confirmed there is nothing left to confront, and a
+      // release prompt would push a destructive suggestion over unknown
+      // data. The pair leaves the queue.
+      continue;
+    }
+    const release = (confirmedA && holdB) || (confirmedB && holdA);
+
+    let by: string | null = null;
+    for (const side of [a, b]) {
+      if (!isHoldStatus(side.status)) continue;
+      const d = decideBy(side.day, side.hold_notice_days);
+      if (d !== null && (by === null || d < by)) by = d;
+    }
+
+    decisions.push({
+      id: pairId(a.day, a.id, b.id),
+      day: a.day,
+      month: a.day.slice(0, 7),
+      level: c.severity,
+      kind: release ? 'release' : 'choose',
+      a: decisionSide(a),
+      b: decisionSide(b),
+      ...(c.severity === 'people' ? { people: c.person_ids } : {}),
+      urgent: by !== null && today >= by,
+      decideBy: by,
+    });
+  }
+
+  // Urgent first, then by day; Array.sort is stable, so the engine's
+  // severity order survives as the remaining tiebreak.
+  decisions.sort((x, y) => {
+    if (x.urgent !== y.urgent) return x.urgent ? -1 : 1;
+    return x.day < y.day ? -1 : x.day > y.day ? 1 : 0;
+  });
+  concurrences.sort((x, y) => (x.day < y.day ? -1 : x.day > y.day ? 1 : 0));
+  return { decisions, concurrences };
 }
 
 /** One derived "fora" day-range (ADR-078 §6). Both ends inclusive. */
@@ -390,22 +623,28 @@ function makeBand(
   return line_id === null ? { from, to, project_id } : { from, to, project_id, line_id };
 }
 
-/** The two first-class projections of the Calendar lens (ADR-076). */
-export type CalendarView = 'month' | 'agenda';
+/** The three first-class projections of the Calendar lens (ADR-076;
+ * ADR-079 §7 promotes 'carrils' to the third slot). */
+export type CalendarView = 'month' | 'agenda' | 'carrils';
+
+function isCalendarView(v: string | null | undefined): v is CalendarView {
+  return v === 'month' || v === 'agenda' || v === 'carrils';
+}
 
 /**
  * Projection resolution (ADR-078 §10): explicit `?view=` → the device's
  * stored preference (localStorage) → form-factor default (narrow viewport
- * reads as agenda, wide as month). Unknown values at either level fall
- * through — a mistyped URL never breaks the page.
+ * reads as agenda, wide as month — 'carrils' is never a default, ADR-079
+ * §7 changes the roster, not the form-factor rule). Unknown values at
+ * either level fall through — a mistyped URL never breaks the page.
  */
 export function resolveCalendarView(
   urlView: string | null | undefined,
   stored: string | null | undefined,
   narrowViewport: boolean,
 ): CalendarView {
-  if (urlView === 'month' || urlView === 'agenda') return urlView;
-  if (stored === 'month' || stored === 'agenda') return stored;
+  if (isCalendarView(urlView)) return urlView;
+  if (isCalendarView(stored)) return stored;
   return narrowViewport ? 'agenda' : 'month';
 }
 

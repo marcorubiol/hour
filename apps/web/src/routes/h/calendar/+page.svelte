@@ -33,7 +33,7 @@
 
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
-  import { untrack } from 'svelte';
+  import { tick, untrack } from 'svelte';
   import { page } from '$app/state';
   import { goto, replaceState } from '$app/navigation';
   import { fetchJSON, mutateJSON } from '$lib/api';
@@ -54,6 +54,18 @@
     type PerformanceEvent,
   } from '$lib/components/MonthGrid.svelte';
   import AgendaList from '$lib/components/AgendaList.svelte';
+  import DecisionBand, {
+    type ConcurrenceVM,
+    type DecisionOptionVM,
+    type DecisionVM,
+  } from '$lib/components/calendar/DecisionBand.svelte';
+  import CarrilsStrip, {
+    type ConnectorVM,
+    type LaneBandVM,
+    type LanePipVM,
+    type LaneVM,
+    type LoomGroupVM,
+  } from '$lib/components/calendar/CarrilsStrip.svelte';
   import CreateEventDialog from '$lib/components/create/CreateEventDialog.svelte';
   import CreateBlackoutDialog from '$lib/components/create/CreateBlackoutDialog.svelte';
   import type { CreatedPerformance } from '$lib/components/PerformanceForm.svelte';
@@ -73,15 +85,27 @@
     awayBands,
     conflictsFor,
     dayKeyInTz,
+    decisionsFor,
     monthGrid,
     resolveCalendarView,
     type CalendarEvent,
     type CalendarView,
     type Conflict,
+    type DecisionPerformance,
+    type DecisionSide,
   } from '$lib/calendar';
+  import {
+    loomThreads,
+    prepRuns,
+    resolveCarrilsGroup,
+    type CarrilsGroup,
+    type LoomCommitment,
+    type PrepDay,
+  } from '$lib/carrils';
   import type { AvailabilityItem } from '$lib/availability';
   import type { DateRow } from '$lib/date';
-  import { performanceStatusFamily, performanceStatusLabel } from '$lib/performance';
+  import { timeInTz } from '$lib/datetime';
+  import { isHoldStatus, performanceStatusFamily, performanceStatusLabel } from '$lib/performance';
   import { dateStatusFamily } from '$lib/date';
   import { accentVarFor } from '$lib/utils/accent';
 
@@ -131,6 +155,30 @@
       matchMedia('(max-width: 640px)').matches,
     ),
   );
+
+  // Carrils grouping (ADR-079 §8) — same persistence chain as the
+  // projection: ?group= → localStorage → 'espai'. The URL only carries
+  // &group= while the projection is carrils (it means nothing elsewhere).
+  const GROUP_STORAGE_KEY = 'hour:calendar:group';
+  function storedGroup(): string | null {
+    try {
+      return localStorage.getItem(GROUP_STORAGE_KEY);
+    } catch {
+      return null;
+    }
+  }
+  let carrilsGroup = $state<CarrilsGroup>(
+    resolveCarrilsGroup(new URL(location.href).searchParams.get('group'), storedGroup()),
+  );
+
+  /** Rewrite the address bar (the truth) with the current view/group. */
+  function syncUrl() {
+    const url = new URL(location.href);
+    url.searchParams.set('view', view);
+    if (view === 'carrils') url.searchParams.set('group', carrilsGroup);
+    else url.searchParams.delete('group');
+    replaceState(url, {});
+  }
   function setView(v: CalendarView) {
     if (view === v) return;
     view = v;
@@ -142,17 +190,36 @@
     // The address bar is the truth: replaceState (shallow routing) never
     // updates the reactive page.url (see tests/scope-url.spec.ts), so both
     // read and write go through location.href.
-    const url = new URL(location.href);
-    url.searchParams.set('view', v);
-    replaceState(url, {});
+    syncUrl();
   }
-  // Inbound navigation carrying an explicit ?view= (pasted link,
+  function setGroup(g: CarrilsGroup) {
+    if (carrilsGroup === g) return;
+    carrilsGroup = g;
+    try {
+      localStorage.setItem(GROUP_STORAGE_KEY, g);
+    } catch {
+      // Storage disabled — in-session state still works.
+    }
+    syncUrl();
+  }
+  // Inbound navigation carrying an explicit ?view=/&group= (pasted link,
   // back/forward). page.url is only the trigger; location.href the truth.
   $effect(() => {
     void page.url;
-    const raw = new URL(location.href).searchParams.get('view');
-    if ((raw === 'month' || raw === 'agenda') && raw !== untrack(() => view)) {
+    const params = new URL(location.href).searchParams;
+    const raw = params.get('view');
+    if (
+      (raw === 'month' || raw === 'agenda' || raw === 'carrils') &&
+      raw !== untrack(() => view)
+    ) {
       view = raw;
+    }
+    const rawGroup = params.get('group');
+    if (
+      (rawGroup === 'espai' || rawGroup === 'projecte' || rawGroup === 'persona') &&
+      rawGroup !== untrack(() => carrilsGroup)
+    ) {
+      carrilsGroup = rawGroup;
     }
   });
 
@@ -226,6 +293,9 @@
     ...filterIds,
   }));
 
+  // The API's hard cap on ?limit (maxValue in its QuerySchema) — one page.
+  const FEED_LIMIT = 200;
+
   function feedParams(
     k: { projectIds: string[]; workspaceIds: string[] },
     from: string,
@@ -236,7 +306,7 @@
     params.set('to', to);
     if (k.projectIds.length > 0) params.set('project_ids', k.projectIds.join(','));
     if (k.workspaceIds.length > 0) params.set('workspace_ids', k.workspaceIds.join(','));
-    params.set('limit', '200');
+    params.set('limit', String(FEED_LIMIT));
     return params.toString();
   }
 
@@ -315,10 +385,83 @@
     };
   });
 
+  // ── Decisions window (ADR-079 §4) — cross-month: holds live in
+  // [today, today+90d], not just the visible month. Same scope filter as
+  // the month feed; ?notice=1 opts into hold_notice_days (ADR-079 §2) and
+  // is what exposes this fetch to a pre-migration DB — so it degrades to
+  // `absent` (contract § Graceful absence: band + decision segments of the
+  // pulse simply stay off, zero errors surfaced). ─────────────────────────
+  const DECISIONS_WINDOW_DAYS = 90;
+  const decisionsTo = addDaysIso(todayIso, DECISIONS_WINDOW_DAYS);
+
+  type DecisionPerfItem = PerformanceEvent & { hold_notice_days?: number | null };
+
+  const decisionsPerfOptions = toStore(() => {
+    const k = $feedKey;
+    return {
+      // Same family as the month feed on purpose: one optimistic write
+      // (setQueriesData over the prefix) and one invalidate reach both.
+      queryKey: [
+        'calendar-performances',
+        {
+          window: 'decisions',
+          unresolved: k.unresolved,
+          projectIds: k.projectIds,
+          workspaceIds: k.workspaceIds,
+        },
+      ] as const,
+      enabled: !k.unresolved,
+      queryFn: async ({
+        signal,
+      }: {
+        signal: AbortSignal;
+      }): Promise<{ items: DecisionPerfItem[]; absent?: boolean }> => {
+        try {
+          // The API caps `limit` at 200 — sized for a one-month grid,
+          // while this window spans 90 days across the whole scope. Page
+          // with a day cursor (rows arrive performed_at.asc; the boundary
+          // day is re-fetched and deduped) so the queue and the pulse's
+          // "per decidir" never under-report silently (ADR-079 §1/§6:
+          // every figure maps to fetched rows — ALL of them).
+          const seen = new Set<string>();
+          const items: DecisionPerfItem[] = [];
+          let from = todayIso;
+          for (;;) {
+            const batch = await fetchJSON<{ items: DecisionPerfItem[] }>(
+              `/api/performances?status=any&rosters=1&notice=1&${feedParams(k, from, decisionsTo)}`,
+              signal,
+            );
+            for (const it of batch.items) {
+              if (!seen.has(it.id)) {
+                seen.add(it.id);
+                items.push(it);
+              }
+            }
+            if (batch.items.length < FEED_LIMIT) break;
+            const lastDay = batch.items[batch.items.length - 1].performed_at.slice(0, 10);
+            // A single day carrying a full page cannot advance the cursor
+            // — stop rather than loop (implausible at this scale).
+            if (lastDay === from) break;
+            from = lastDay;
+          }
+          return { items };
+        } catch (err) {
+          if (err instanceof Error && err.message === 'Unauthorized') throw err;
+          console.warn('[calendar] decisions feed absent:', err);
+          return { items: [] as DecisionPerfItem[], absent: true };
+        }
+      },
+    };
+  });
+  // No availability feed for this window: blackouts only ever yield
+  // single-event severities, which decisionsFor cannot consume (pairs
+  // only) — it doesn't take them as input.
+
   const perfQuery = createQuery(perfOptions);
   const datesQuery = createQuery(datesOptions);
   const availabilityQuery = createQuery(availabilityOptions);
   const teamQuery = createQuery(teamOptions);
+  const decisionsPerfQuery = createQuery(decisionsPerfOptions);
 
   // isLoading (isPending && isFetching) — a disabled query is pending but
   // not loading, so an unresolved selection reads as empty, not stuck.
@@ -459,21 +602,15 @@
 
   // ── View models for the two projections ──────────────────────────────
   let blackoutVMs = $derived.by((): BlackoutBandVM[] =>
-    visibleBlackouts.map((b) => {
-      const company = b.person_id === null;
-      const personName = b.person?.full_name ?? (b.person_id ? personNames.get(b.person_id) : null);
-      return {
-        id: b.id,
-        from: b.starts_on,
-        to: b.ends_on,
-        company,
-        tentative: b.certainty === 'tentative',
-        label: company
-          ? (workspaceNameById.get(b.workspace_id) ?? '—')
-          : t('calendar.band_person', locale, { person: personName ?? '—' }),
-        note: b.note,
-      };
-    }),
+    visibleBlackouts.map((b) => ({
+      id: b.id,
+      from: b.starts_on,
+      to: b.ends_on,
+      company: b.person_id === null,
+      tentative: b.certainty === 'tentative',
+      label: blackoutLabel(b),
+      note: b.note,
+    })),
   );
   let awayVMs = $derived.by((): AwayBandVM[] =>
     aways.map((b) => ({
@@ -507,7 +644,12 @@
     return m;
   });
 
-  function clashVM(c: Conflict): ClashVM {
+  function clashVM(c: Conflict): ClashVM | null {
+    // Status-aware severities (ADR-079 §3) have no cell mark here yet:
+    // this page feeds the engine without statuses, so they cannot occur —
+    // the decisions build renders them (double via the queue, concurrence
+    // deliberately silent, never a mark).
+    if (c.severity === 'double' || c.severity === 'concurrence') return null;
     const rows = c.event_ids
       .map((id) => eventSummaryById.get(id))
       .filter((r): r is NonNullable<typeof r> => Boolean(r));
@@ -559,9 +701,326 @@
     for (const c of conflicts) {
       const day = eventDayById.get(c.event_ids[0]);
       if (!day) continue;
-      (byDay.get(day) ?? byDay.set(day, []).get(day)!).push(clashVM(c));
+      const vm = clashVM(c);
+      if (!vm) continue;
+      (byDay.get(day) ?? byDay.set(day, []).get(day)!).push(vm);
     }
     return byDay;
+  });
+
+  // ── Carrils VMs (ADR-079 §7/§8) — the ribbon speaks day-of-month
+  // numbers. Pips/bands follow the status filter like the other two
+  // projections; connectors read the truth-level conflict engine, same
+  // rule as the month marks. ────────────────────────────────────────────
+  let monthKey = $derived(monthFirst.slice(0, 7));
+  function inMonthDay(iso: string): number | null {
+    return iso.slice(0, 7) === monthKey ? Number(iso.slice(8, 10)) : null;
+  }
+  /** Clip an inclusive ISO range to the visible month (null = outside). */
+  function clipToMonth(from: string, to: string): { from: number; to: number } | null {
+    if (to < monthFirst || from > monthLast) return null;
+    return {
+      from: from < monthFirst ? 1 : Number(from.slice(8, 10)),
+      to: to > monthLast ? monthDays.length : Number(to.slice(8, 10)),
+    };
+  }
+
+  type ProjectRef = {
+    slug: string | null;
+    name: string;
+    accent?: string | null;
+    workspace_id: string;
+  };
+  let projectById = $derived.by(() => {
+    const m = new Map<string, ProjectRef>();
+    for (const p of $projectsQuery.data?.items ?? []) m.set(p.id, p);
+    for (const p of scopedPerfs) if (p.project) m.set(p.project.id, p.project);
+    for (const d of scopedDates) if (d.project) m.set(d.project.id, d.project);
+    return m;
+  });
+  function workspaceAccent(id: string): string {
+    return accentVarFor({ slug: workspaceSlugById.get(id) ?? null });
+  }
+  function projectAccent(id: string): string {
+    const p = projectById.get(id);
+    return p ? accentVarFor(p) : 'var(--accent-1)';
+  }
+  function blackoutLabel(b: AvailabilityItem): string {
+    if (b.person_id === null) return workspaceNameById.get(b.workspace_id) ?? '—';
+    const person = b.person?.full_name ?? personNames.get(b.person_id);
+    return t('calendar.band_person', locale, { person: person ?? '—' });
+  }
+
+  /** Rehearsal/residency rows render as quiet run-bands, not pips. */
+  const PREP_KINDS = new Set(['rehearsal', 'residency']);
+  let prepRunsIso = $derived.by(() => {
+    const days: PrepDay[] = [];
+    for (const d of shownDates) {
+      if (!PREP_KINDS.has(d.kind) || d.status === 'cancelled' || !d.project) continue;
+      const day = dateDayKey(d, viewerTz);
+      if (day.slice(0, 7) !== monthKey) continue;
+      days.push({ project_id: d.project.id, day, label: d.title ?? kindLabel(d.kind) });
+    }
+    return prepRuns(days);
+  });
+
+  // Person ↔ project attribution (roster-derived) — where a person block
+  // lands under Agrupa per Projecte, and the loom's prep attribution.
+  let projectRosters = $derived.by(() => {
+    const m = new Map<string, Set<string>>();
+    for (const p of scopedPerfs) {
+      if (!p.project || !p.person_ids) continue;
+      const set = m.get(p.project.id) ?? m.set(p.project.id, new Set()).get(p.project.id)!;
+      for (const id of p.person_ids) set.add(id);
+    }
+    return m;
+  });
+
+  let carrilsLanes = $derived.by((): LaneVM[] => {
+    if (view !== 'carrils' || carrilsGroup === 'persona') return [];
+    const byProject = carrilsGroup === 'projecte';
+    const lanes = new Map<string, LaneVM>();
+    const laneFor = (projectId: string | null, workspaceId: string | null): LaneVM | null => {
+      const key = byProject ? projectId : workspaceId;
+      if (!key) return null;
+      let lane = lanes.get(key);
+      if (!lane) {
+        lane = {
+          key,
+          label: byProject
+            ? (projectNameById.get(key) ?? '—')
+            : (workspaceNameById.get(key) ?? '—'),
+          accent: byProject ? projectAccent(key) : workspaceAccent(key),
+          pips: [],
+          bands: [],
+        };
+        lanes.set(key, lane);
+      }
+      return lane;
+    };
+
+    // Pips, chronological — insertion order = first-appearance lane order.
+    const perfs = [...shownPerfs].sort((a, b) => (perfDayKey(a) < perfDayKey(b) ? -1 : 1));
+    for (const p of perfs) {
+      if (p.status === 'cancelled' || !p.project) continue;
+      const day = inMonthDay(perfDayKey(p));
+      if (day === null) continue;
+      const lane = laneFor(p.project.id, p.project.workspace_id);
+      if (!lane) continue;
+      const venue = p.venue?.name ?? p.venue_name ?? p.city ?? p.project.name;
+      const city = p.venue?.city ?? p.city;
+      lane.pips.push({
+        id: p.id,
+        day,
+        kind: 'perf',
+        state: performanceStatusFamily(p.status) === 'confirmed' ? 'confirmed' : 'hold',
+        label: venue,
+        time: p.start_at ? timeInTz(p.start_at, p.venue?.timezone || viewerTz) : null,
+        accent: accentVarFor(p.project),
+        title: `${p.project.name} · ${venue}${city ? `, ${city}` : ''} · ${performanceStatusLabel(p.status)}`,
+        href: p.slug
+          ? `/h/${workspaceSlugById.get(p.project.workspace_id) ?? defaultWorkspaceSlug}/performance/${p.slug}`
+          : null,
+      });
+    }
+    const dates = [...shownDates].sort((a, b) =>
+      dateDayKey(a, viewerTz) < dateDayKey(b, viewerTz) ? -1 : 1,
+    );
+    for (const d of dates) {
+      if (d.status === 'cancelled' || !d.project || PREP_KINDS.has(d.kind)) continue;
+      const day = inMonthDay(dateDayKey(d, viewerTz));
+      if (day === null) continue;
+      const lane = laneFor(d.project.id, d.project.workspace_id);
+      if (!lane) continue;
+      if (d.kind === 'travel_day') {
+        // Mono "→ City" — direction is the arrow (ADR-079 §7).
+        const place = d.city ?? d.title ?? d.venue_name ?? kindLabel(d.kind);
+        const arrow = d.travel_direction === 'return' ? '←' : '→';
+        lane.pips.push({
+          id: d.id,
+          day,
+          kind: 'travel',
+          label: `${arrow} ${place}`,
+          accent: accentVarFor(d.project),
+          title: `${d.project.name} · ${kindLabel(d.kind)} · ${place}`,
+        });
+      } else {
+        lane.pips.push({
+          id: d.id,
+          day,
+          kind: 'date',
+          label: kindLabel(d.kind),
+          accent: accentVarFor(d.project),
+          title: `${d.project.name} · ${d.title ?? kindLabel(d.kind)}`,
+        });
+      }
+    }
+    // Prep runs — quiet in-lane bands, project accent, hatched.
+    for (const run of prepRunsIso) {
+      const lane = laneFor(run.project_id, projectById.get(run.project_id)?.workspace_id ?? null);
+      const range = clipToMonth(run.from, run.to);
+      if (!lane || !range) continue;
+      lane.bands.push({
+        id: `prep:${run.project_id}:${run.from}`,
+        ...range,
+        kind: 'prep',
+        label: run.label,
+        accent: projectAccent(run.project_id),
+      });
+    }
+    // Derived away bands — dotted, quieter than everything (ADR-078 §6).
+    for (const band of aways) {
+      const lane = laneFor(band.project_id, projectById.get(band.project_id)?.workspace_id ?? null);
+      const range = clipToMonth(band.from, band.to);
+      if (!lane || !range) continue;
+      lane.bands.push({
+        id: `away:${band.project_id}:${band.from}`,
+        ...range,
+        kind: 'away',
+        label: t('calendar.away', locale, {
+          project: projectNameById.get(band.project_id) ?? '—',
+        }),
+      });
+    }
+    // Blackouts. Per espai they own (and may create) their workspace lane
+    // — a closed month with no gigs is still a fact. Per projecte a
+    // blackout has no project of its own: a person block rides the lanes
+    // whose rosters name the person, a company block rides every existing
+    // lane of its workspace.
+    for (const b of visibleBlackouts) {
+      const range = clipToMonth(b.starts_on, b.ends_on);
+      if (!range) continue;
+      const vm: LaneBandVM = {
+        id: `blk:${b.id}`,
+        ...range,
+        kind: 'blackout',
+        company: b.person_id === null,
+        tentative: b.certainty === 'tentative',
+        label: blackoutLabel(b),
+        title: b.note ? `${blackoutLabel(b)} · ${b.note}` : blackoutLabel(b),
+      };
+      if (!byProject) {
+        laneFor(null, b.workspace_id)?.bands.push(vm);
+      } else {
+        for (const lane of lanes.values()) {
+          const belongs =
+            b.person_id === null
+              ? projectById.get(lane.key)?.workspace_id === b.workspace_id
+              : (projectRosters.get(lane.key)?.has(b.person_id) ?? false);
+          if (belongs) lane.bands.push({ ...vm, id: `${vm.id}:${lane.key}` });
+        }
+      }
+    }
+    return [...lanes.values()];
+  });
+
+  // Cross-lane conflict connectors (ADR-079 §7): people = red !, possible
+  // = quiet ? — the two cross-project severities the engine emits here.
+  // The id IS the decision pair id, so a click lands on the band's card.
+  let eventById = $derived(new Map(engineEvents.map((e) => [e.id, e])));
+  let carrilsConnectors = $derived.by((): ConnectorVM[] => {
+    if (view !== 'carrils' || carrilsGroup === 'persona') return [];
+    const byProject = carrilsGroup === 'projecte';
+    const out: ConnectorVM[] = [];
+    const seen = new Set<string>();
+    for (const c of conflicts) {
+      if ((c.severity !== 'people' && c.severity !== 'possible') || c.event_ids.length !== 2) {
+        continue;
+      }
+      const a = eventById.get(c.event_ids[0]);
+      const b = eventById.get(c.event_ids[1]);
+      if (!a || !b) continue;
+      const aKey = byProject ? a.project_id : a.workspace_id;
+      const bKey = byProject ? b.project_id : b.workspace_id;
+      if (aKey === bKey) continue;
+      const day = inMonthDay(a.day);
+      if (day === null) continue;
+      const dedup = `${day}:${[aKey, bKey].sort().join('|')}`;
+      if (seen.has(dedup)) continue;
+      seen.add(dedup);
+      out.push({
+        id: `${a.day}:${[a.id, b.id].sort().join('+')}`,
+        day,
+        aKey,
+        bKey,
+        severity: c.severity,
+        label: t('calendar.conn_jump', locale, { day }),
+      });
+    }
+    return out;
+  });
+
+  /** Connector gesture — open the band scrolled to that card (§7). */
+  async function jumpToDecisionCard(pairId: string) {
+    setDecisionsOpen(true);
+    await tick();
+    const el =
+      document.getElementById(`cal-decisions-card-${pairId}`) ??
+      document.getElementById('cal-decisions');
+    el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  // ── The Loom (Agrupa per Persona — ADR-079 §8) ────────────────────────
+  let loomGroups = $derived.by((): LoomGroupVM[] => {
+    if (view !== 'carrils' || carrilsGroup !== 'persona') return [];
+    const team = ($teamQuery.data?.items ?? []).filter(
+      (i) => scopeWorkspaceIds === null || scopeWorkspaceIds.has(i.workspace_id),
+    );
+    const commitments: LoomCommitment[] = [];
+    for (const p of shownPerfs) {
+      if (p.status === 'cancelled' || !p.project || !p.person_ids) continue;
+      const day = perfDayKey(p);
+      if (day.slice(0, 7) !== monthKey) continue;
+      const state =
+        performanceStatusFamily(p.status) === 'confirmed' ? ('confirmed' as const) : ('hold' as const);
+      for (const person_id of p.person_ids) {
+        commitments.push({ person_id, day, project_id: p.project.id, state });
+      }
+    }
+    const knots: Array<{ day: string; person_ids: string[] }> = [];
+    for (const c of conflicts) {
+      if (c.severity !== 'people') continue;
+      const day = eventDayById.get(c.event_ids[0]);
+      if (day && day.slice(0, 7) === monthKey) knots.push({ day, person_ids: c.person_ids });
+    }
+    const dayNum = (iso: string) => Number(iso.slice(8, 10));
+    return loomThreads({
+      team,
+      commitments,
+      preps: prepRunsIso,
+      blackouts: visibleBlackouts,
+      knots,
+      monthFrom: monthFirst,
+      monthTo: monthLast,
+    }).map((g) => ({
+      key: g.key,
+      label:
+        g.kind === 'project'
+          ? (projectNameById.get(g.key) ?? '—')
+          : (workspaceNameById.get(g.key) ?? '—'),
+      accent: g.kind === 'project' ? projectAccent(g.key) : workspaceAccent(g.key),
+      threads: g.threads.map((th) => ({
+        person_id: th.person_id,
+        name: th.name,
+        shared: th.shared,
+        ghost: th.ghost,
+        segments: th.segments.map((s) => ({
+          from: dayNum(s.from),
+          to: dayNum(s.to),
+          state: s.state,
+          accent: projectAccent(s.project_id),
+          title: `${projectNameById.get(s.project_id) ?? '—'} · ${
+            s.from === s.to ? s.from : `${s.from} → ${s.to}`
+          }`,
+        })),
+        outs: th.outs.map((o) => ({
+          from: dayNum(o.from),
+          to: dayNum(o.to),
+          tentative: o.tentative,
+        })),
+        knots: th.knots.map(dayNum),
+      })),
+    }));
   });
 
   // ── Masthead stats — counts of the visible month, every figure a real
@@ -586,6 +1045,209 @@
       if (b.starts_on <= monthLast && b.ends_on >= monthFirst) blackoutCount++;
     }
     return { confirmed, holds, conflicts: conflictCount, blackouts: blackoutCount };
+  });
+
+  // ── Decisions queue (ADR-079 §1/§4) — derived, nothing stored. ───────
+  let decisionsAbsent = $derived(Boolean($decisionsPerfQuery.data?.absent));
+  let decisionPerfs = $derived(
+    ($decisionsPerfQuery.data?.items ?? []).filter((p) => perfInScope(p)),
+  );
+  let decisionPerfById = $derived(new Map(decisionPerfs.map((p) => [p.id, p])));
+  let decisionRosters = $derived.by(() => {
+    const map: Record<string, string[]> = {};
+    for (const p of decisionPerfs) {
+      if (p.person_ids) map[p.id] = p.person_ids;
+    }
+    return map;
+  });
+  let decisionInput = $derived.by((): DecisionPerformance[] => {
+    const rows: DecisionPerformance[] = [];
+    for (const p of decisionPerfs) {
+      if (!p.project) continue;
+      rows.push({
+        id: p.id,
+        day: perfDayKey(p),
+        project_id: p.project.id,
+        workspace_id: p.project.workspace_id,
+        status: p.status,
+        hold_notice_days: p.hold_notice_days ?? null,
+        project: p.project.name,
+        venue: p.venue?.name ?? p.venue_name,
+        city: p.venue?.city ?? p.city,
+        time: p.start_at ? timeInTz(p.start_at, p.venue?.timezone || viewerTz) : null,
+      });
+    }
+    return rows;
+  });
+  let decisionQueue = $derived(
+    decisionsFor({
+      performances: decisionInput,
+      rosters: decisionRosters,
+      today: todayIso,
+    }),
+  );
+
+  function decisionOptionVM(side: DecisionSide): DecisionOptionVM {
+    const perf = decisionPerfById.get(side.id);
+    return {
+      id: side.id,
+      project: side.project,
+      accent: perf?.project ? accentVarFor(perf.project) : 'var(--accent-1)',
+      venue: side.venue ?? side.city ?? side.project,
+      city: side.venue ? side.city : null,
+      time: side.time,
+      statusLabel: performanceStatusLabel(side.status),
+      hold: isHoldStatus(side.status),
+      confirmed: performanceStatusFamily(side.status) === 'confirmed',
+    };
+  }
+  let decisionVMs = $derived.by((): DecisionVM[] =>
+    decisionQueue.decisions.map((d) => {
+      // 'possible' = ≥1 roster unknown; name the side missing team data
+      // when only one is (the honest "add the team to confirm" pointer).
+      const aKnown = (decisionRosters[d.a.id] ?? []).length > 0;
+      const bKnown = (decisionRosters[d.b.id] ?? []).length > 0;
+      const missingTeam =
+        d.level === 'possible' && aKnown !== bKnown
+          ? (aKnown ? d.b : d.a).project
+          : null;
+      return {
+        id: d.id,
+        day: d.day,
+        level: d.level,
+        kind: d.kind,
+        urgent: d.urgent,
+        decideBy: d.decideBy,
+        people: (d.people ?? []).map((id) => personNames.get(id) ?? '—'),
+        missingTeam,
+        a: decisionOptionVM(d.a),
+        b: decisionOptionVM(d.b),
+      };
+    }),
+  );
+  let concurrenceVMs = $derived.by((): ConcurrenceVM[] =>
+    decisionQueue.concurrences.map((c) => {
+      const side = (s: DecisionSide) => {
+        const perf = decisionPerfById.get(s.id);
+        return {
+          venue: s.venue ?? s.city ?? s.project,
+          project: s.project,
+          accent: perf?.project ? accentVarFor(perf.project) : 'var(--accent-1)',
+        };
+      };
+      return { id: c.id, day: c.day, a: side(c.a), b: side(c.b) };
+    }),
+  );
+  let urgentCount = $derived(decisionVMs.filter((d) => d.urgent).length);
+
+  // Band open/collapsed — UI state only (ADR-079 §5: "Deixa-ho obert"
+  // never persists anything in the DB).
+  const DECISIONS_STORAGE_KEY = 'hour:calendar:decisions';
+  let decisionsOpen = $state.raw(
+    (() => {
+      try {
+        return localStorage.getItem(DECISIONS_STORAGE_KEY) === 'open';
+      } catch {
+        return false;
+      }
+    })(),
+  );
+  function setDecisionsOpen(open: boolean) {
+    decisionsOpen = open;
+    try {
+      localStorage.setItem(DECISIONS_STORAGE_KEY, open ? 'open' : 'closed');
+    } catch {
+      // Storage disabled — in-session state still works.
+    }
+  }
+  function jumpToDecisions() {
+    setDecisionsOpen(true);
+    document.getElementById('cal-decisions')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  // ── Decision actions (ADR-079 §5 — AI=UI parity, two explicit
+  // gestures): Confirma → PATCH confirmed · Allibera → PATCH cancelled.
+  // Optimistic over every calendar-performances cache (month + window),
+  // rollback + toast on error, refetch on settle — the derived queue then
+  // re-emits itself (a choose-card mutates into a release-card alone). ───
+  const decideMutation = createMutation({
+    mutationFn: ({ id, status }: { id: string; status: 'confirmed' | 'cancelled' }) =>
+      mutateJSON('PATCH', `/api/performances/${encodeURIComponent(id)}`, { status }),
+    onMutate: async ({ id, status }) => {
+      await queryClient.cancelQueries({ queryKey: ['calendar-performances'] });
+      const pages = queryClient
+        .getQueriesData<{ items: PerformanceEvent[] }>({ queryKey: ['calendar-performances'] })
+        .filter(([, d]) => d?.items.some((it) => it.id === id));
+      for (const [key, data] of pages) {
+        if (!data) continue;
+        queryClient.setQueryData(key, {
+          ...data,
+          items: data.items.map((it) => (it.id === id ? { ...it, status } : it)),
+        });
+      }
+      return { pages };
+    },
+    onError: (err, _vars, ctx) => {
+      for (const [key, data] of ctx?.pages ?? []) {
+        queryClient.setQueryData(key, data);
+      }
+      addToast({
+        tone: 'danger',
+        title: t('calendar.dec_not_saved', locale),
+        message: t('calendar.dec_try_again', locale, {
+          message: err instanceof Error ? err.message : 'Unexpected error',
+        }),
+      });
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ['calendar-performances'] });
+      void queryClient.invalidateQueries({ queryKey: ['performance'] });
+    },
+  });
+  let decisionPendingId = $derived(
+    $decideMutation.isPending ? ($decideMutation.variables?.id ?? null) : null,
+  );
+
+  // ── Pulse strip (ADR-079 §6) — every figure maps to fetched rows;
+  // segments whose feed is absent simply drop. ──────────────────────────
+  function pulseDayLabel(iso: string): string {
+    const mon = new Intl.DateTimeFormat(localeTag, { month: 'short', timeZone: 'UTC' })
+      .format(new Date(`${iso}T00:00:00Z`))
+      .replace(/\.+$/, '');
+    return `${Number(iso.slice(8, 10))} ${mon}`;
+  }
+  // Next confirmed gig from today — the decisions window rows (scope-
+  // filtered, [today, +90d]) already hold exactly that horizon.
+  let pulseNext = $derived.by(() => {
+    let best: { day: string; venue: string } | null = null;
+    for (const p of decisionPerfs) {
+      if (performanceStatusFamily(p.status) !== 'confirmed') continue;
+      const day = perfDayKey(p);
+      if (day < todayIso) continue;
+      if (best === null || day < best.day) {
+        best = { day, venue: p.venue?.name ?? p.venue_name ?? p.city ?? '—' };
+      }
+    }
+    return best;
+  });
+  // Distinct persons with a blackout overlapping the visible month
+  // (person-level blocks of the scope's workspaces — company closures are
+  // not a person count).
+  let pulseAwayPersons = $derived.by(() => {
+    const ids = new Set<string>();
+    for (const b of visibleBlackouts) {
+      if (b.person_id && b.starts_on <= monthLast && b.ends_on >= monthFirst) ids.add(b.person_id);
+    }
+    return ids.size;
+  });
+  let pulseTrips = $derived.by(() => {
+    let n = 0;
+    for (const d of scopedDates) {
+      if (d.kind !== 'travel_day' || d.status === 'cancelled') continue;
+      const day = dateDayKey(d, viewerTz);
+      if (day >= monthFirst && day <= monthLast) n++;
+    }
+    return n;
   });
 
   let monthTitle = $derived(monthName(ym.year, ym.month, localeTag));
@@ -748,16 +1410,66 @@
     </div>
     <h1 class="cal__month"><em>{monthTitle}</em> {ym.year}</h1>
     {#if !errorMsg}
+      <!-- Pulse strip (ADR-079 §6) — replaces the flat stats row. Every
+           figure maps to fetched rows; a segment whose feed is absent (or
+           whose count is zero) drops instead of lying. -->
       <p class="cal__stats" class:cal__stats--loading={loading}>
+        {#if !decisionsAbsent && decisionVMs.length > 0}
+          <button type="button" class="cal__pulse-decide" onclick={jumpToDecisions}>
+            <!-- {' · '} — explicit separator: Svelte trims the block-leading
+                 whitespace, which glued the count to the urgent segment. -->
+            {t('calendar.pulse_decide', locale, { n: decisionVMs.length })}{#if urgentCount > 0}{' · '}{urgentCount ===
+              1
+                ? t('calendar.pulse_urgent_one', locale)
+                : t('calendar.pulse_urgent', locale, { m: urgentCount })}{/if}
+          </button>
+        {/if}
+        {#if !decisionsAbsent && pulseNext}
+          <span class="cal__stat cal__stat--soft"
+            >{t('calendar.pulse_next', locale, {
+              day: pulseDayLabel(pulseNext.day),
+              venue: pulseNext.venue,
+            })}</span
+          >
+        {/if}
         <span class="cal__stat"><b>{stats.confirmed}</b> {t('calendar.stat_confirmed', locale)}</span>
         <span class="cal__stat"><b>{stats.holds}</b> {t('calendar.stat_holds', locale)}</span>
-        <span class="cal__stat"><b>{stats.conflicts}</b> {t('calendar.stat_conflicts', locale)}</span>
-        <span class="cal__stat cal__stat--soft"
-          ><b>{stats.blackouts}</b> {t('calendar.stat_blackouts', locale)}</span
-        >
+        {#if pulseAwayPersons > 0}
+          <span class="cal__stat cal__stat--soft"
+            >{pulseAwayPersons === 1
+              ? t('calendar.pulse_away_one', locale)
+              : t('calendar.pulse_away', locale, { z: pulseAwayPersons })}</span
+          >
+        {/if}
+        {#if pulseTrips > 0}
+          <span class="cal__stat cal__stat--soft"
+            >{pulseTrips === 1
+              ? t('calendar.pulse_trips_one', locale)
+              : t('calendar.pulse_trips', locale, { w: pulseTrips })}</span
+          >
+        {/if}
       </p>
     {/if}
   </header>
+
+  {#if !errorMsg && !decisionsAbsent && (decisionVMs.length > 0 || concurrenceVMs.length > 0)}
+    <!-- Decision band (ADR-079 §4) — shared by all projections. Mounted
+         for concurrences alone too: the quiet tier is "es VEU, no crida"
+         (§3), so it must be seeable even when nothing is per decidir —
+         it still never counts, never marks, never turns urgent. -->
+    <DecisionBand
+      decisions={decisionVMs}
+      concurrences={concurrenceVMs}
+      open={decisionsOpen}
+      onToggle={setDecisionsOpen}
+      onConfirm={(id) => $decideMutation.mutate({ id, status: 'confirmed' })}
+      onRelease={(id) => $decideMutation.mutate({ id, status: 'cancelled' })}
+      pendingId={decisionPendingId}
+      {locale}
+      {localeTag}
+      id="cal-decisions"
+    />
+  {/if}
 
   <div class="cal__toolbar">
     <div class="cal__nav-buttons">
@@ -794,6 +1506,23 @@
         onclick={() => (filter = 'confirmed')}>{t('calendar.filter_confirmed', locale)}</button
       >
     </div>
+    {#if view === 'carrils'}
+      <!-- Agrupa per (ADR-079 §8) — carrils only; means nothing elsewhere. -->
+      <div class="cal__group" role="group" aria-label={t('calendar.group_label', locale)}>
+        <span class="cal__group-lead">{t('calendar.group_label', locale)}</span>
+        <div class="cal__seg">
+          {#each ['espai', 'projecte', 'persona'] as const as g (g)}
+            <button
+              type="button"
+              class="cal__seg-btn"
+              class:cal__seg-btn--on={carrilsGroup === g}
+              aria-pressed={carrilsGroup === g}
+              onclick={() => setGroup(g)}>{t(`calendar.group_${g}`, locale)}</button
+            >
+          {/each}
+        </div>
+      </div>
+    {/if}
     <div class="cal__seg" role="group" aria-label={t('calendar.view_label', locale)}>
       <button
         type="button"
@@ -808,6 +1537,13 @@
         class:cal__seg-btn--on={view === 'agenda'}
         aria-pressed={view === 'agenda'}
         onclick={() => setView('agenda')}>{t('calendar.view_agenda', locale)}</button
+      >
+      <button
+        type="button"
+        class="cal__seg-btn"
+        class:cal__seg-btn--on={view === 'carrils'}
+        aria-pressed={view === 'carrils'}
+        onclick={() => setView('carrils')}>{t('calendar.view_carrils', locale)}</button
       >
     </div>
     <Button size="s" onclick={() => openCreate()} label={t('calendar.new', locale)}>+</Button>
@@ -854,7 +1590,7 @@
       dateKindLabel={kindLabel}
       createLabel={(iso) => t('calendar.new_on', locale, { day: iso })}
     />
-  {:else}
+  {:else if view === 'agenda'}
     <AgendaList
       {monthDays}
       performances={shownPerfs}
@@ -869,6 +1605,19 @@
       viewerTimeLabel={(time) => t('calendar.viewer_time', locale, { time })}
       emptyLabel={t('calendar.empty_month', locale)}
       blackoutsToggleLabel={t('calendar.blackouts_toggle', locale)}
+    />
+  {:else}
+    <!-- Carrils (ADR-079 §7/§8) — desktop-first; at 390px the strip
+         itself scrolls horizontally, never the page. -->
+    <CarrilsStrip
+      {monthDays}
+      {todayIso}
+      group={carrilsGroup}
+      lanes={carrilsLanes}
+      loom={loomGroups}
+      connectors={carrilsConnectors}
+      onConnectorJump={jumpToDecisionCard}
+      {locale}
     />
   {/if}
 </section>
@@ -990,8 +1739,23 @@
       color: var(--text-color);
       margin-inline-end: var(--space-2xs);
     }
-    .cal__stat--soft b {
-      color: var(--text-muted);
+    /* Pulse "per decidir" — the one red figure; a jump, not a decoration. */
+    .cal__pulse-decide {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      letter-spacing: var(--mono-letter-spacing-loose);
+      text-transform: uppercase;
+      color: var(--danger);
+      background: none;
+      border: none;
+      padding: 0;
+      cursor: pointer;
+      border-block-end: 1px solid color-mix(in oklch, var(--danger) 40%, transparent);
+      transition: color var(--transition), border-color var(--transition);
+    }
+    .cal__pulse-decide:hover {
+      color: var(--danger-dark);
+      border-color: var(--danger);
     }
 
     /* Toolbar: ‹ month › · today · [filter] · [projection] · + · ⋯ */
@@ -1042,6 +1806,21 @@
     .cal__filter-btn--on {
       color: var(--text-color);
       background: var(--bg-light);
+    }
+
+    /* Agrupa per — the carrils-only companion of the projection seg. */
+    .cal__group {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-xs);
+    }
+    .cal__group-lead {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      letter-spacing: var(--mono-letter-spacing-loose);
+      text-transform: uppercase;
+      color: var(--text-faint);
+      white-space: nowrap;
     }
 
     /* Named projection toggle (ADR-076: nunca un icono). */
