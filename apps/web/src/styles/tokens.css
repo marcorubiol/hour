@@ -204,13 +204,18 @@
     --mono-letter-spacing: 0.02em; /* lowercase mono runs (tag chips, state badges) */
     --mono-letter-spacing-loose: 0.04em; /* uppercase mono micro-labels (anchor chips, pins, cell dates). .eyebrow keeps its own 0.14em. */
 
-    /* Type scale — fluid via clamp(). One scale for the whole app. */
-    --text-xs: clamp(0.625rem, 0.6rem + 0.12vw, 0.6875rem); /* 10-11 — eyebrows, badges. Tightened 2026-07-04 to the design's meta size (was 11-12); everything read a touch big because this floor sat above the mock. */
-    --text-s: clamp(0.8rem, 0.76rem + 0.2vw, 0.875rem); /* 13-14 — dense rows, secondary */
-    --text-m: clamp(0.875rem, 0.85rem + 0.15vw, 1rem); /* 14-16 — default body */
-    --text-l: clamp(1.05rem, 1rem + 0.25vw, 1.2rem); /* 17-19 — card titles */
-    --text-xl: clamp(1.3rem, 1.2rem + 0.5vw, 1.5rem); /* 21-24 — wordmark, h4 */
-    --text-xxl: clamp(1.5rem, 1.35rem + 0.75vw, 2rem); /* 24-32 — section title */
+    /* Type scale — modular + fluid. Body (--text-m) is the anchor: 16px @desktop,
+       14px @mobile. Each step is a MAJOR THIRD (×1.25) at the desktop max and a
+       MINOR THIRD (×1.20) at the mobile min; clamp() interpolates across 375↔1440px.
+       To retune: change the anchor/ratios and regenerate all six — keep the ratio
+       exact, don't hand-edit individual clamps. (2026-07-19: replaced the bespoke
+       hand-tuned scale whose xs→s jump read a touch big.) */
+    --text-xs: clamp(0.6076rem, 0.5962rem + 0.049vw, 0.64rem); /* 9.7-10.2 — eyebrows, badges */
+    --text-s: clamp(0.7292rem, 0.7042rem + 0.106vw, 0.8rem); /* 11.7-12.8 — dense rows, lens labels, secondary */
+    --text-m: clamp(0.875rem, 0.831rem + 0.188vw, 1rem); /* 14-16 — default body (anchor) */
+    --text-l: clamp(1.05rem, 0.9796rem + 0.3vw, 1.25rem); /* 16.8-20 — card titles */
+    --text-xl: clamp(1.26rem, 1.1535rem + 0.454vw, 1.5625rem); /* 20.2-25 — wordmark, clock, h4 */
+    --text-xxl: clamp(1.512rem, 1.3567rem + 0.663vw, 1.9531rem); /* 24.2-31.3 — section title, h2 */
 
     --h1: clamp(1.8rem, 1.5rem + 1.5vw, 2.4rem); /* 29-38 — masthead. Retuned 2026-07-12 to the size mastheads actually render (person/performance canonical); the old 32-48 was never consumed — every page rolled its own clamp to undershoot it. */
     --h2: var(--text-xxl);
