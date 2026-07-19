@@ -136,10 +136,14 @@
     --border-color-light: color-mix(in oklch, var(--neutral) 9%, transparent);
 
     /* ============================================================ */
-    /* CONTEXTUAL — accents (8 hues, mapped by hash(slug) % 8)        */
-    /* Used to give each workspace a stable identifying color on the  */
-    /* sidebar rail, calendar dot, and avatar. Helper:                */
+    /* CONTEXTUAL — accents (12 hues, mapped by hash(slug) % 12)      */
+    /* Give each project/workspace a stable identifying color on the  */
+    /* sidebar rail, identity monogram, and avatar. Helper:           */
     /* $lib/utils/accent.ts → accentVar(slug) returns var(--accent-N) */
+    /* The identity monogram derives its soft bg + legible fg from    */
+    /* these via IdentityMark (color-mix tint + oklch-from fg).       */
+    /* Hues 9-12 provisional (ADR-081) — spaced into the widest gaps  */
+    /* of the original 8; tune the exact values with Marco.           */
     /* ============================================================ */
 
     --accent-1: oklch(58% 0.12 260); /* blue */
@@ -150,6 +154,10 @@
     --accent-6: oklch(62% 0.11 200); /* cyan */
     --accent-7: oklch(58% 0.13 295); /* purple */
     --accent-8: oklch(64% 0.13 85); /* amber */
+    --accent-9: oklch(62% 0.13 125); /* lime */
+    --accent-10: oklch(60% 0.11 185); /* teal */
+    --accent-11: oklch(58% 0.12 235); /* azure */
+    --accent-12: oklch(60% 0.15 355); /* crimson */
 
     /* ============================================================ */
     /* CONTEXTUAL — tag tones (6 bg+fg pairs for task-type chips)     */
@@ -536,6 +544,10 @@
     --accent-6: oklch(72% 0.09 200);
     --accent-7: oklch(68% 0.1 295);
     --accent-8: oklch(74% 0.1 85);
+    --accent-9: oklch(72% 0.11 125);
+    --accent-10: oklch(70% 0.09 185);
+    --accent-11: oklch(70% 0.1 235);
+    --accent-12: oklch(70% 0.12 355);
 
     /* Tag tones — bg ≈ 27% L (subtle pill, +6pp over body so it lifts
        visibly), fg ≈ 80% L (legible without halo). */
