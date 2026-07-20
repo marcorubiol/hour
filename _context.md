@@ -54,14 +54,16 @@ orientativo, no una verdad comercial cerrada.
 - Worker: `hour-web`
 - `/health/live`: sano, `dirty:false`, SHA **`7f3de05`**.
 - `/health/ready`: sano, Supabase `ok`.
-- Producción, `main` local y `origin/main` están alineados en `7f3de05`.
+- El runtime verificado en producción es `7f3de05`; commits posteriores que
+  solo cambian documentación no requieren desplegar el Worker.
 
 ### Git
 
 - Repo: `https://github.com/marcorubiol/hour` (privado).
 - Checkout: `/Users/marcorubiol/Developer/hour`.
 - Rama principal: `main`.
-- Base funcional verificada: **`7f3de05`**, publicada en `origin/main`.
+- Base funcional del runtime: **`7f3de05`**, publicada en `origin/main`;
+  `main` local y remoto están sincronizados.
 - `wrangler deploy` exige árbol limpio y publica el SHA en `/health/live`.
 
 ### Supabase
