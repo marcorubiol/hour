@@ -65,6 +65,14 @@ orientativo, no una verdad comercial cerrada.
 - Base funcional del runtime: **`3b7c95e`**, publicada en `origin/main`;
   `main` local y remoto están sincronizados.
 - `wrangler deploy` exige árbol limpio y publica el SHA en `/health/live`.
+- **Ramas vivas (solo dos; las otras siete se borraron el 2026-07-20 por estar
+  contenidas en `main` o en la punta del stack):**
+  - `feat/planner-identity` — planner multi-día + identidad monograma. Código
+    terminado, gates verdes (check 0/0 · unit 348 · build · RLS 120/120), **sin
+    mergear ni desplegar**. Sus migraciones ya están vivas en producción.
+  - `feat/comms-threads` — comms + acceso. Modelo cerrado (ADR-082/083/085),
+    604 líneas de SQL **sin aplicar**, **cero código de aplicación**, dos
+    bloqueantes de arquitectura abiertos. Ver `_tasks.md § Bloqueado`.
 
 ### Supabase
 
