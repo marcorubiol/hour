@@ -16,6 +16,15 @@
 -- security rewritten twice is how holes appear, so stage 1 adds and stage 2
 -- removes, never both at once.
 --
+-- DEPENDS ON: `2026-07-18_user_profile_person_id.sql` (also unapplied). That
+-- migration adds `user_profile.person_id` — the user↔person bridge from
+-- ADR-072 §6. The first draft of THIS file duplicated that bridge on
+-- `membership`, which would have left the codebase with two competing
+-- answers to "which person is this user". Corrected: identity is always
+-- resolved through `user_profile.person_id`; `membership.person_id` says who
+-- the membership is FOR (an invitat may have no user at all), never who the
+-- caller is.
+--
 -- NOT APPLIED to hour-phase0 at time of writing.
 --------------------------------------------------------------------------------
 
@@ -302,13 +311,14 @@ CREATE INDEX message_thread_idx ON public.message (thread_id, created_at DESC) W
 -- Ancestors-or-self of a container. A membership at any of these covers the
 -- container — that IS the union rule (ADR-082 §3).
 --
--- It reads the DENORMALISED fks that `performance` and `line` already carry
--- (workspace_id, project_id, line_id) instead of walking upward. That is not an
--- optimisation, it is a correctness fix: `performance.line_id` is NULLABLE, so
--- a gig with no line would have lost its project and its workspace on the way
--- up, and with them every permission granted above.
+-- Reads the DENORMALISED fks that `performance`, `line` and `conversation`
+-- already carry instead of walking upward. Not an optimisation, a correctness
+-- fix: `performance.line_id` is NULLABLE, so a gig with no line would have lost
+-- its project and workspace on the way up, and with them every permission
+-- granted above.
 CREATE OR REPLACE FUNCTION public.container_chain(
-  p_workspace uuid, p_project uuid, p_line uuid, p_performance uuid
+  p_workspace uuid, p_project uuid, p_line uuid, p_performance uuid,
+  p_conversation uuid DEFAULT NULL
 ) RETURNS TABLE (level public.container_level, id uuid) AS $$
   WITH r AS (
     SELECT
@@ -316,12 +326,14 @@ CREATE OR REPLACE FUNCTION public.container_chain(
       coalesce(p_line,
                (SELECT pf.line_id FROM public.performance pf WHERE pf.id = p_performance)) AS line_id,
       coalesce(p_project,
-               (SELECT pf.project_id FROM public.performance pf WHERE pf.id = p_performance),
-               (SELECT l.project_id  FROM public.line l        WHERE l.id  = p_line))       AS project_id,
+               (SELECT pf.project_id FROM public.performance pf  WHERE pf.id = p_performance),
+               (SELECT l.project_id  FROM public.line l          WHERE l.id  = p_line),
+               (SELECT cv.project_id FROM public.conversation cv WHERE cv.id = p_conversation)) AS project_id,
       coalesce(p_workspace,
-               (SELECT pf.workspace_id FROM public.performance pf WHERE pf.id = p_performance),
-               (SELECT l.workspace_id  FROM public.line l         WHERE l.id  = p_line),
-               (SELECT pr.workspace_id FROM public.project pr     WHERE pr.id = p_project)) AS workspace_id
+               (SELECT pf.workspace_id FROM public.performance pf  WHERE pf.id = p_performance),
+               (SELECT l.workspace_id  FROM public.line l          WHERE l.id  = p_line),
+               (SELECT cv.workspace_id FROM public.conversation cv WHERE cv.id = p_conversation),
+               (SELECT pr.workspace_id FROM public.project pr      WHERE pr.id = p_project)) AS workspace_id
   )
   SELECT 'performance'::public.container_level, perf_id      FROM r WHERE perf_id      IS NOT NULL
   UNION ALL SELECT 'line'::public.container_level,      line_id      FROM r WHERE line_id      IS NOT NULL
@@ -329,12 +341,41 @@ CREATE OR REPLACE FUNCTION public.container_chain(
   UNION ALL SELECT 'workspace'::public.container_level, workspace_id FROM r WHERE workspace_id IS NOT NULL;
 $$ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, extensions, pg_temp;
 
+-- SECURITY DEFINER + no caller check = a cross-tenant structure oracle if left
+-- callable by PostgREST. It is an internal helper, so lock it down.
+REVOKE EXECUTE ON FUNCTION public.container_chain(uuid, uuid, uuid, uuid, uuid) FROM PUBLIC, anon, authenticated;
+
+-- Is the caller a live member ANYWHERE on the container's chain? This is what
+-- "the container's members" means, and it is what the general thread uses.
+-- `accepted_at` is required, matching every other gate in the codebase
+-- (is_workspace_member, current_workspace_role, has_permission) — a pending
+-- invitation must not already carry access.
+CREATE OR REPLACE FUNCTION public.is_container_member(
+  p_workspace uuid, p_project uuid, p_line uuid, p_performance uuid,
+  p_conversation uuid DEFAULT NULL
+) RETURNS boolean AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.container_chain(p_workspace, p_project, p_line, p_performance, p_conversation) c
+    JOIN public.membership m
+      ON  m.user_id     = auth.uid()
+      AND m.revoked_at  IS NULL
+      AND m.accepted_at IS NOT NULL
+      AND (m.ends_at IS NULL OR m.ends_at > now())
+      AND ( (c.level = 'workspace'   AND m.workspace_id   = c.id AND m.project_id IS NULL AND m.line_id IS NULL AND m.performance_id IS NULL)
+         OR (c.level = 'project'     AND m.project_id     = c.id)
+         OR (c.level = 'line'        AND m.line_id        = c.id)
+         OR (c.level = 'performance' AND m.performance_id = c.id) )
+  );
+$$ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, extensions, pg_temp;
+
 -- Does the CURRENT user hold `p_facet` at `p_verb` or better, anywhere on the
--- container's chain? Workspace owner/admin bypasses, exactly as has_permission
--- already does (ADR-006) — kept identical so there is one bypass rule, not two.
+-- chain? Workspace owner/admin bypasses, identical to has_permission (ADR-006)
+-- — one bypass rule, not two.
 CREATE OR REPLACE FUNCTION public.has_facet(
   p_workspace uuid, p_project uuid, p_line uuid, p_performance uuid,
-  p_facet text, p_verb public.facet_verb DEFAULT 'view'
+  p_facet text, p_verb public.facet_verb DEFAULT 'view',
+  p_conversation uuid DEFAULT NULL
 ) RETURNS boolean AS $$
   SELECT EXISTS (
     SELECT 1 FROM public.workspace_membership wm
@@ -342,17 +383,18 @@ CREATE OR REPLACE FUNCTION public.has_facet(
       AND wm.accepted_at IS NOT NULL
       AND wm.role IN ('owner', 'admin')
       AND wm.workspace_id = (
-        SELECT c.id FROM public.container_chain(p_workspace, p_project, p_line, p_performance) c
+        SELECT c.id FROM public.container_chain(p_workspace, p_project, p_line, p_performance, p_conversation) c
         WHERE c.level = 'workspace' LIMIT 1
       )
   )
   OR EXISTS (
     SELECT 1
-    FROM public.container_chain(p_workspace, p_project, p_line, p_performance) c
+    FROM public.container_chain(p_workspace, p_project, p_line, p_performance, p_conversation) c
     JOIN public.membership m
-      ON  m.revoked_at IS NULL
+      ON  m.user_id     = auth.uid()
+      AND m.revoked_at  IS NULL
+      AND m.accepted_at IS NOT NULL
       AND (m.ends_at IS NULL OR m.ends_at > now())
-      AND m.user_id = auth.uid()
       AND ( (c.level = 'workspace'   AND m.workspace_id   = c.id AND m.project_id IS NULL AND m.line_id IS NULL AND m.performance_id IS NULL)
          OR (c.level = 'project'     AND m.project_id     = c.id)
          OR (c.level = 'line'        AND m.line_id        = c.id)
@@ -362,17 +404,17 @@ CREATE OR REPLACE FUNCTION public.has_facet(
       AND mf.facet_key     = p_facet
       AND (mf.verb = 'edit' OR mf.verb = p_verb)   -- edit implies view
     -- A facet only counts where it exists. This is what makes "absent is not
-    -- denied" true at the DB level and not just in the UI.
+    -- denied" true at the DB level and not only in the UI.
     JOIN public.facet_level fl
       ON  fl.facet_key = p_facet
       AND fl.level     = c.level
   );
 $$ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, extensions, pg_temp;
 
-COMMENT ON FUNCTION public.has_facet(uuid, uuid, uuid, uuid, text, public.facet_verb) IS
-  'Effective facet check across the container chain (union of levels, ADR-082 §3). Workspace owner/admin bypass is identical to has_permission, on purpose: one bypass rule. Does NOT replace has_permission — that stays untouched in stage 1.';
+COMMENT ON FUNCTION public.has_facet(uuid, uuid, uuid, uuid, text, public.facet_verb, uuid) IS
+  'Effective facet check across the container chain (union of levels, ADR-082 §3). Requires accepted_at, like every other gate in the codebase. Does NOT replace has_permission — that stays untouched in stage 1.';
 
--- Can the current user read this thread? The one formula.
+-- Can the current user read this thread? The one formula, three branches.
 CREATE OR REPLACE FUNCTION public.can_read_thread(p_thread_id uuid)
 RETURNS boolean AS $$
   SELECT EXISTS (
@@ -380,20 +422,25 @@ RETURNS boolean AS $$
     WHERE t.id = p_thread_id
       AND t.deleted_at IS NULL
       AND (
-        -- explicitly invited: free threads always, guests wherever added
+        -- explicitly invited. Identity comes from user_profile.person_id, the
+        -- ONE user↔person bridge (ADR-072 §6) — never from membership, which
+        -- says who a membership is FOR, not who is calling.
         EXISTS (
           SELECT 1 FROM public.thread_participant tp
-          JOIN public.membership m ON m.person_id = tp.person_id
-                                  AND m.user_id   = auth.uid()
-                                  AND m.revoked_at IS NULL
-                                  AND (m.ends_at IS NULL OR m.ends_at > now())
+          JOIN public.user_profile up
+            ON up.person_id = tp.person_id AND up.user_id = auth.uid()
           WHERE tp.thread_id = t.id
         )
-        -- the container's own thread: its members, full stop
-        OR (t.is_general AND public.is_workspace_member(t.workspace_id))
+        -- the container's own thread: THE CONTAINER'S members, not the
+        -- workspace's. is_workspace_member would have opened every general
+        -- thread of every project and gig to every member of the space —
+        -- exactly what the 2026-07-20 amendment forbids.
+        OR (t.is_general AND public.is_container_member(
+              t.workspace_id, t.project_id, t.line_id, t.performance_id, t.conversation_id))
         -- a facet thread: derived from the facet
         OR (t.facet_key IS NOT NULL AND public.has_facet(
-              t.workspace_id, t.project_id, t.line_id, t.performance_id, t.facet_key, 'view'))
+              t.workspace_id, t.project_id, t.line_id, t.performance_id,
+              t.facet_key, 'view', t.conversation_id))
       )
   );
 $$ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, extensions, pg_temp;
@@ -409,12 +456,21 @@ INSERT INTO public.membership (workspace_id, user_id, preset, accepted_at, invit
 SELECT wm.workspace_id, wm.user_id,
        CASE wm.role WHEN 'owner' THEN 'direccio' WHEN 'admin' THEN 'direccio' ELSE 'equip' END,
        wm.accepted_at, wm.invited_by, wm.created_at
-FROM public.workspace_membership wm;
+FROM public.workspace_membership wm
+WHERE NOT EXISTS (
+  SELECT 1 FROM public.membership m
+  WHERE m.workspace_id = wm.workspace_id AND m.user_id = wm.user_id
+    AND m.project_id IS NULL AND m.line_id IS NULL AND m.performance_id IS NULL
+);
 
 INSERT INTO public.membership (workspace_id, project_id, user_id, preset, invited_by, created_at)
 SELECT p.workspace_id, pm.project_id, pm.user_id, 'equip', pm.invited_by, pm.created_at
 FROM public.project_membership pm
-JOIN public.project p ON p.id = pm.project_id;
+JOIN public.project p ON p.id = pm.project_id
+WHERE NOT EXISTS (
+  SELECT 1 FROM public.membership m
+  WHERE m.project_id = pm.project_id AND m.user_id = pm.user_id
+);
 
 --------------------------------------------------------------------------------
 -- 8. RLS
@@ -469,12 +525,41 @@ CREATE POLICY message_insert ON public.message
   WITH CHECK (
     public.can_read_thread(thread_id)
     AND workspace_id = current_workspace_id()
+    -- Bind the author to the caller, or any thread reader can post as anybody
+    -- — including the promoter, in the diners thread. Same shape as
+    -- person_note_insert (rls-policies.sql:621).
+    AND author_user_id = auth.uid()
+    AND author_person_id = (SELECT up.person_id FROM public.user_profile up WHERE up.user_id = auth.uid())
   );
 
+-- Editing your own words only, and only in place: without the guards below a
+-- user could UPDATE thread_id + workspace_id and drop an authentic-looking
+-- message into a workspace they were never in.
 CREATE POLICY message_update ON public.message
   FOR UPDATE TO authenticated
   USING (deleted_at IS NULL AND author_user_id = auth.uid())
   WITH CHECK (author_user_id = auth.uid());
+
+CREATE OR REPLACE FUNCTION public.guard_message_immutable_anchor()
+RETURNS trigger AS $$
+BEGIN
+  IF NEW.thread_id        IS DISTINCT FROM OLD.thread_id
+  OR NEW.workspace_id     IS DISTINCT FROM OLD.workspace_id
+  OR NEW.author_person_id IS DISTINCT FROM OLD.author_person_id
+  OR NEW.created_at       IS DISTINCT FROM OLD.created_at THEN
+    RAISE EXCEPTION 'message anchor is immutable (thread, workspace, author, created_at)';
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER message_guard_anchor BEFORE UPDATE ON public.message
+  FOR EACH ROW EXECUTE FUNCTION public.guard_message_immutable_anchor();
+
+CREATE TRIGGER membership_set_updated_at BEFORE UPDATE ON public.membership
+  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+CREATE TRIGGER thread_set_updated_at BEFORE UPDATE ON public.thread
+  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 --------------------------------------------------------------------------------
 -- 9. What stage 2 owes
@@ -487,5 +572,33 @@ CREATE POLICY message_update ON public.message
 --   RPC exists (delegation bounded by the delegator: facet, verb AND level —
 --   ADR-085 §10, enforced in the RPC, never in the client)
 -- · thread INSERT policy, once "who may open a free thread" rides its RPC
+--
+-- TWO THINGS STAGE 1 CANNOT SHIP WITHOUT, found in review 2026-07-20:
+-- · **No membership_facet rows exist and there is no path to write them**, so
+--   no facet thread is readable by anyone but a workspace owner/admin. A
+--   preset-expansion RPC is not stage-2 nice-to-have, it is what makes stage 1
+--   non-dead.
+-- · **The invitat cannot authenticate.** Every read path keys on auth.uid(),
+--   and an invitat is by definition `user_id IS NULL`. The signed-link access
+--   path (token table? scoped JWT? RPC under anon?) is undesigned. The schema
+--   can STORE an invitat and nothing can let one read. Design decision, not a
+--   bug fix.
+
+--------------------------------------------------------------------------------
+-- 10. Rollback
+--------------------------------------------------------------------------------
+-- DROP TRIGGER IF EXISTS message_guard_anchor ON public.message;
+-- DROP TRIGGER IF EXISTS membership_set_updated_at ON public.membership;
+-- DROP TRIGGER IF EXISTS thread_set_updated_at ON public.thread;
+-- DROP FUNCTION IF EXISTS public.guard_message_immutable_anchor();
+-- DROP FUNCTION IF EXISTS public.can_read_thread(uuid);
+-- DROP FUNCTION IF EXISTS public.has_facet(uuid,uuid,uuid,uuid,text,public.facet_verb,uuid);
+-- DROP FUNCTION IF EXISTS public.is_container_member(uuid,uuid,uuid,uuid,uuid);
+-- DROP FUNCTION IF EXISTS public.container_chain(uuid,uuid,uuid,uuid,uuid);
+-- DROP TABLE IF EXISTS public.message, public.thread_participant, public.thread,
+--                      public.membership_facet, public.membership,
+--                      public.facet_level, public.facet CASCADE;
+-- DROP TYPE IF EXISTS public.facet_verb, public.container_level;
+-- Nothing existing was altered, so there is nothing else to restore.
 
 COMMIT;
