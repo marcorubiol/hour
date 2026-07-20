@@ -63,6 +63,13 @@ jobs:
             -f "out/data-${stamp}.sql"
           supabase db dump --db-url "$SUPABASE_DB_URL"             -f "out/schema-${stamp}.sql"
           supabase db dump --db-url "$SUPABASE_DB_URL" --role-only -f "out/roles-${stamp}.sql"
+          # A managed target already owns Supabase's reserved roles. Keep only
+          # application-defined roles so the dump is portable to another
+          # hosted project where supautils blocks ALTER ROLE on managed roles.
+          roles_file="out/roles-${stamp}.sql"
+          sed -E '/^(CREATE|ALTER) ROLE "(anon|authenticated|authenticator|cli_login_.*|dashboard_user|pgbouncer|postgres|service_role|supabase_.*|pgsodium_keyholder|pgsodium_keyiduser|pgsodium_keymaker|pgtle_admin)" /d' \
+            "$roles_file" > "${roles_file}.portable"
+          mv "${roles_file}.portable" "$roles_file"
           gzip -9 out/*.sql
           docker run --rm postgres:17-alpine \
             psql "$SUPABASE_DB_URL" --no-psqlrc --tuples-only --no-align \

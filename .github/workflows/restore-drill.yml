@@ -134,6 +134,14 @@ jobs:
         run: |
           set -euo pipefail
           gunzip --keep restore/*.sql.gz
+          # Older backups may contain safe role settings which are valid on a
+          # self-hosted superuser but blocked by supautils on hosted projects.
+          # The target already owns every managed Supabase role; preserve only
+          # application-defined role statements from the source dump.
+          roles_file="restore/roles-${SOURCE_STAMP}.sql"
+          sed -E '/^(CREATE|ALTER) ROLE "(anon|authenticated|authenticator|cli_login_.*|dashboard_user|pgbouncer|postgres|service_role|supabase_.*|pgsodium_keyholder|pgsodium_keyiduser|pgsodium_keymaker|pgtle_admin)" /d' \
+            "$roles_file" > "${roles_file}.portable"
+          mv "${roles_file}.portable" "$roles_file"
           docker run --rm \
             --volume "$PWD/restore:/restore:ro" \
             postgres:17-alpine \
