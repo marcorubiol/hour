@@ -5,10 +5,13 @@ import {
   ConversationCreateSchema,
   ConversationPatchSchema,
   STATUS_LABELS,
+  groupConversationsByContact,
   normalizeConversationItem,
+  relativeContactDate,
   statusBadgeClass,
   statusLabel,
   type ConversationDbItem,
+  type ConversationItem,
 } from './conversation';
 
 describe('workspace dossier projection', () => {
@@ -41,6 +44,20 @@ describe('ConversationPatchSchema', () => {
     const r = v.safeParse(ConversationPatchSchema, { status: 'in_conversation' });
     expect(r.success).toBe(true);
     if (r.success) expect(r.output).toEqual({ status: 'in_conversation' });
+  });
+
+  it('accepts only the server-clock contacted-today action', () => {
+    const action = v.safeParse(ConversationPatchSchema, { contacted_today: true });
+    expect(action.success).toBe(true);
+    if (action.success) expect(action.output).toEqual({ contacted_today: true });
+    expect(
+      v.safeParse(ConversationPatchSchema, { contacted_today: false }).success,
+    ).toBe(false);
+    expect(
+      v.safeParse(ConversationPatchSchema, {
+        last_contacted_at: '2040-01-01T00:00:00.000Z',
+      }).output,
+    ).toEqual({});
   });
 
   it('accepts date-only next_action_at and null to clear', () => {
@@ -116,6 +133,73 @@ describe('ConversationPatchSchema', () => {
     expect(detach.success).toBe(true);
     if (detach.success) expect(detach.output.line_id).toBeNull();
     expect(v.safeParse(ConversationPatchSchema, { line_id: 'not-a-uuid' }).success).toBe(false);
+  });
+});
+
+describe('contact-book projection', () => {
+  function item(
+    id: string,
+    personId: string | null,
+    lastContact: string | null,
+    projectName: string,
+  ): ConversationItem {
+    return {
+      id,
+      last_contacted_at: lastContact,
+      person: personId
+        ? {
+            id: personId,
+            slug: `person-${personId}`,
+            full_name: `Person ${personId}`,
+            email: null,
+            organization_name: 'Teatre X',
+            country: 'FR',
+            city: 'Lyon',
+            website: null,
+          }
+        : null,
+      project: {
+        id: `project-${id}`,
+        slug: `project-${id}`,
+        name: projectName,
+        status: 'active',
+      },
+    } as unknown as ConversationItem;
+  }
+
+  it('keeps first-seen contact order and takes the latest valid contact', () => {
+    const groups = groupConversationsByContact([
+      item('a', 'p1', '2026-01-03T10:00:00Z', 'North'),
+      item('b', 'p2', null, 'South'),
+      item('c', 'p1', '2026-06-12T10:00:00Z', 'East'),
+      item('d', 'p1', 'not-a-date', 'West'),
+    ]);
+
+    expect(groups.map((group) => group.key)).toEqual(['p1', 'p2']);
+    expect(groups[0].conversations.map((conversation) => conversation.id)).toEqual([
+      'a',
+      'c',
+      'd',
+    ]);
+    expect(groups[0].last_contacted_at).toBe('2026-06-12T10:00:00Z');
+    expect(groups[1].last_contacted_at).toBeNull();
+  });
+
+  it('does not merge missing-person rows into one anonymous contact', () => {
+    const groups = groupConversationsByContact([
+      item('a', null, null, 'North'),
+      item('b', null, null, 'South'),
+    ]);
+    expect(groups.map((group) => group.key)).toEqual(['conversation:a', 'conversation:b']);
+  });
+
+  it('formats contact age coarsely and calmly', () => {
+    const now = Date.parse('2026-07-20T12:00:00Z');
+    expect(relativeContactDate(null, now)).toBe('—');
+    expect(relativeContactDate('2026-07-20T08:00:00Z', now)).toBe('today');
+    expect(relativeContactDate('2026-07-19T08:00:00Z', now)).toBe('yesterday');
+    expect(relativeContactDate('2026-06-29T08:00:00Z', now)).toBe('3 weeks ago');
+    expect(relativeContactDate('2025-07-20T08:00:00Z', now)).toBe('12 months ago');
   });
 });
 

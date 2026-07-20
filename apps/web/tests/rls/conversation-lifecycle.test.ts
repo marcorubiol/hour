@@ -14,7 +14,7 @@
  */
 
 import { beforeAll, describe, expect, test } from 'vitest';
-import { envReady, login, pgGet, pgRpc, requireEnv } from './_helpers';
+import { envReady, login, pgGet, pgPatch, pgRpc, requireEnv } from './_helpers';
 
 type ConversationRow = {
   id: string;
@@ -23,6 +23,8 @@ type ConversationRow = {
   person_id: string;
   project_id: string;
   workspace_id: string;
+  first_contacted_at: string | null;
+  last_contacted_at: string | null;
 };
 
 type PerformanceRow = { id: string; slug: string | null; status: string };
@@ -125,9 +127,32 @@ describe.skipIf(!envReady())('RLS — ADR-051/052 write-path RPCs', () => {
     const conversation = created.data as ConversationRow;
     expect(conversation.project_id).toBe(projectId);
     expect(conversation.status).toBe('contacted');
+    expect(conversation.first_contacted_at).toBeTruthy();
+    expect(conversation.last_contacted_at).toBeTruthy();
 
     try {
-      // 2. Same person × project again → 23505 → 409 (no silent merge).
+      // 2. A genuine status transition stamps last contact while the first
+      // contact remains write-once. This is the DB invariant behind both the
+      // API status menu and future trusted conversation-event ingress.
+      const firstContact = conversation.first_contacted_at;
+      const beforeLast = Date.parse(conversation.last_contacted_at!);
+      const touched = await pgPatch<ConversationRow>(
+        'conversation',
+        jwt,
+        { status: 'hold' },
+        new URLSearchParams({
+          id: `eq.${conversation.id}`,
+          deleted_at: 'is.null',
+          select: 'id,status,first_contacted_at,last_contacted_at',
+        }),
+      );
+      expect(touched.status).toBe(200);
+      expect(touched.rows).toHaveLength(1);
+      expect(touched.rows[0].status).toBe('hold');
+      expect(touched.rows[0].first_contacted_at).toBe(firstContact);
+      expect(Date.parse(touched.rows[0].last_contacted_at!)).toBeGreaterThanOrEqual(beforeLast);
+
+      // 3. Same person × project again → 23505 → 409 (no silent merge).
       const dup = await pgRpc('create_conversation', jwt, {
         p_project_id: projectId,
         p_full_name: FIXTURE_NAME,
@@ -135,7 +160,7 @@ describe.skipIf(!envReady())('RLS — ADR-051/052 write-path RPCs', () => {
       });
       expect(dup.status).toBe(409);
 
-      // 3. Soft-delete via RPC…
+      // 4. Soft-delete via RPC…
       const del = await pgRpc('delete_conversation', jwt, {
         p_conversation_id: conversation.id,
       });
@@ -153,7 +178,7 @@ describe.skipIf(!envReady())('RLS — ADR-051/052 write-path RPCs', () => {
       );
       expect(after.rows).toHaveLength(0);
 
-      // 4. Re-adding the same person resurrects the soft-deleted row —
+      // 5. Re-adding the same person resurrects the soft-deleted row —
       //    the FULL unique constraint must never dead-end the triple.
       const again = await pgRpc<ConversationRow>('create_conversation', jwt, {
         p_project_id: projectId,
@@ -166,7 +191,7 @@ describe.skipIf(!envReady())('RLS — ADR-051/052 write-path RPCs', () => {
       expect(resurrected.id).toBe(conversation.id);
       expect(resurrected.status).toBe('in_conversation');
     } finally {
-      // 5. Always leave the live surface clean.
+      // 6. Always leave the live surface clean.
       await pgRpc('delete_conversation', jwt, { p_conversation_id: conversation.id });
     }
   });

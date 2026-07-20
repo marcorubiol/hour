@@ -60,3 +60,11 @@ Invalid values return `400 invalid_query` with per-field issues from Valibot.
 - Validation at the boundary via Valibot (`v.safeParse`), no manual coercion.
 - Error envelope: `{ "error": "<code>", "detail": …, "hint"?: …, "issues"?: [...] }`.
 - Never log JWTs or request bodies; Cloudflare keeps Worker logs for 3 days.
+
+## `PATCH /api/conversations/:id`
+
+The inline editor accepts `status`, `next_action_at`, `next_action_note`,
+`line_id`, and the semantic action `contacted_today: true`. It never accepts a
+client-supplied contact timestamp: the Worker owns the clock. A genuine status
+transition and `contacted_today` both update `last_contacted_at`; the database
+trigger fills `first_contacted_at` once and preserves it thereafter.

@@ -310,7 +310,7 @@
     </div>
   </header>
 
-  <ConversationTable {filters} {personHref} />
+  <ConversationTable {filters} {personHref} groupable importEmptyState />
 </section>
 
 <Dialog bind:open={addOpen} title="Add conversation" size="m">

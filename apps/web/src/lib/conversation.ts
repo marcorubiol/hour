@@ -43,6 +43,8 @@ export function statusBadgeClass(status: string): string {
  */
 export const ConversationPatchSchema = v.object({
   status: v.optional(v.picklist(CONVERSATION_STATUSES)),
+  /** Semantic action: the server owns the timestamp; clients cannot forge it. */
+  contacted_today: v.optional(v.literal(true)),
   next_action_at: v.optional(v.nullable(realIsoDate)),
   next_action_note: v.optional(
     v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))),
@@ -100,6 +102,68 @@ export type ProjectLite = Pick<Tables<'project'>, 'id' | 'slug' | 'name' | 'stat
 export interface ConversationItem extends Tables<'conversation'> {
   person: PersonLite | null;
   project: ProjectLite | null;
+}
+
+export interface ConversationContactGroup {
+  /** Person id, or a conversation-scoped fallback for a missing embed. */
+  key: string;
+  person: PersonLite | null;
+  conversations: ConversationItem[];
+  /** Latest valid contact instant across the loaded conversations. */
+  last_contacted_at: string | null;
+}
+
+/**
+ * Client-side projection used by the contact-book view. It intentionally
+ * groups only the loaded page: pagination remains a server concern and the
+ * UI states that boundary whenever more rows exist.
+ */
+export function groupConversationsByContact(
+  items: readonly ConversationItem[],
+): ConversationContactGroup[] {
+  const groups = new Map<string, ConversationContactGroup>();
+
+  for (const item of items) {
+    const key = item.person?.id ?? `conversation:${item.id}`;
+    let group = groups.get(key);
+    if (!group) {
+      group = {
+        key,
+        person: item.person,
+        conversations: [],
+        last_contacted_at: null,
+      };
+      groups.set(key, group);
+    }
+    group.conversations.push(item);
+
+    const nextMs = item.last_contacted_at
+      ? Date.parse(item.last_contacted_at)
+      : Number.NaN;
+    const currentMs = group.last_contacted_at
+      ? Date.parse(group.last_contacted_at)
+      : Number.NaN;
+    if (!Number.isNaN(nextMs) && (Number.isNaN(currentMs) || nextMs > currentMs)) {
+      group.last_contacted_at = item.last_contacted_at;
+    }
+  }
+
+  return [...groups.values()];
+}
+
+/** Calm, coarse relative copy: informative without implying urgency. */
+export function relativeContactDate(iso: string | null, nowMs = Date.now()): string {
+  if (!iso) return '—';
+  const atMs = Date.parse(iso);
+  if (Number.isNaN(atMs)) return '—';
+
+  const days = Math.max(0, Math.floor((nowMs - atMs) / 86_400_000));
+  if (days === 0) return 'today';
+  if (days === 1) return 'yesterday';
+  if (days < 14) return `${days} days ago`;
+  if (days < 60) return `${Math.floor(days / 7)} weeks ago`;
+  if (days < 730) return `${Math.floor(days / 30)} months ago`;
+  return `${Math.floor(days / 365)} years ago`;
 }
 
 type WorkspacePersonEmbed = Omit<PersonLite, 'id' | 'organization_name'> & {

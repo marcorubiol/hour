@@ -23,6 +23,8 @@ const PASSWORD = process.env.PW_TEST_PASSWORD;
 type RawConversation = {
   id: string;
   status: string;
+  first_contacted_at: string | null;
+  last_contacted_at: string | null;
   next_action_at: string | null;
   next_action_note: string | null;
   person: { full_name: string | null } | null;
@@ -96,6 +98,7 @@ async function patchOk(page: Page, expectedId: string, doClick: () => Promise<vo
   expect(r.ok(), 'PATCH /api/conversations should succeed').toBe(true);
   const hit = r.url().match(/conversations\/([0-9a-f-]{36})/)?.[1];
   expect(hit, 'probe write must target the captured conversation').toBe(expectedId);
+  return r;
 }
 
 test.describe('conversation inline write', () => {
@@ -126,6 +129,13 @@ test.describe('conversation inline write', () => {
         page.getByRole('menuitem', { name: target, exact: true }).click(),
       );
       await expect(trigger).toContainText(target);
+      await expect(row.locator('.last-contact')).toContainText('today');
+
+      const touched = (await fetchListRaw(page)).find((item) => item.id === original.id);
+      expect(touched?.first_contacted_at).toBeTruthy();
+      expect(Date.parse(touched?.last_contacted_at ?? '')).toBeGreaterThanOrEqual(
+        Date.parse(original.last_contacted_at ?? '1970-01-01T00:00:00Z'),
+      );
 
       // PATCH acked above — reload proves the change survives a fresh fetch.
       await page.reload();
@@ -210,5 +220,61 @@ test.describe('conversation inline write', () => {
           : null;
       })
       .toEqual({ at: restorePatch.next_action_at, note: restorePatch.next_action_note });
+  });
+
+  test('contacted today uses the server clock and persists', async ({ page }) => {
+    await openConversations(page);
+
+    const original = (await fetchListRaw(page))[0];
+    const name = original.person?.full_name;
+    expect(name).toBeTruthy();
+    await page.getByPlaceholder('People or organizations…').fill(name!);
+
+    const row = rowByName(page, name!);
+    await row.locator('button[aria-haspopup="menu"]').click();
+    const response = await patchOk(page, original.id, () =>
+      page.getByRole('menuitem', { name: 'Contacted today', exact: true }).click(),
+    );
+    expect(response.request().postDataJSON()).toEqual({ contacted_today: true });
+    const body = (await response.json()) as { item: RawConversation };
+    expect(body.item.first_contacted_at).toBeTruthy();
+    expect(body.item.last_contacted_at).toBeTruthy();
+    expect(Date.parse(body.item.last_contacted_at!)).toBeLessThanOrEqual(Date.now());
+    await expect(row.locator('.last-contact')).toContainText('today');
+
+    await page.reload();
+    await page.getByPlaceholder('People or organizations…').fill(name!);
+    await expect(rowByName(page, name!).locator('.last-contact')).toContainText('today');
+  });
+
+  test('contact grouping persists and a project chip focuses its conversation', async ({
+    page,
+  }) => {
+    await openConversations(page);
+    const conversationCount = await page.locator('.conversation-table tbody tr').count();
+
+    await page.getByRole('button', { name: 'By contact', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'By contact', exact: true })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await expect(page.locator('.contact-table tbody tr').first()).toBeVisible();
+    expect(await page.locator('.contact-table tbody tr').count()).toBeLessThanOrEqual(
+      conversationCount,
+    );
+    expect(
+      await page.evaluate(() => localStorage.getItem('hour:conversations:view')),
+    ).toBe('contact');
+
+    await page.reload();
+    await expect(page.getByRole('button', { name: 'By contact', exact: true })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await page.locator('.project-chip').first().click();
+    await expect(page.locator('.conversation-table tbody tr')).toHaveCount(1);
+    await expect(page.getByRole('button', { name: 'Show all loaded' })).toBeVisible();
+    await page.getByRole('button', { name: 'Show all loaded' }).click();
+    expect(await page.locator('.conversation-table tbody tr').count()).toBeGreaterThan(0);
   });
 });

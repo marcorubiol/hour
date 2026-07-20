@@ -2,9 +2,9 @@
  * PATCH /api/conversations/:id
  *
  * Inline write path for the difusión loop (ADR-040): update an
- * conversation's status / next action fields, plus the line relink
- * (ADR-056). The body schema is a whitelist — anything outside status,
- * next_action_at, next_action_note, line_id is stripped, so RLS-sensitive
+ * conversation's status / contact stamp / next action fields, plus the line
+ * relink (ADR-056). The body schema is a whitelist — anything outside status,
+ * contacted_today, next_action_at, next_action_note, line_id is stripped, so RLS-sensitive
  * columns (workspace_id, project_id, created_by…) can never ride along.
  *
  * RLS enforces `has_permission(project_id, 'edit:conversation')` on UPDATE.
@@ -75,7 +75,7 @@ export const PATCH: RequestHandler = async ({ request, params, platform, locals 
     return json(
       {
         error: 'empty_patch',
-        hint: 'Send at least one of: status, next_action_at, next_action_note, line_id.',
+        hint: 'Send at least one of: status, contacted_today, next_action_at, next_action_note, line_id.',
       },
       400,
     );
@@ -115,12 +115,19 @@ export const PATCH: RequestHandler = async ({ request, params, platform, locals 
       }
     }
 
+    // `contacted_today` is an action, not a database column. The server owns
+    // the clock; the BEFORE trigger sets first_contacted_at once. A genuine
+    // status transition is stamped by that same trigger atomically.
+    const { contacted_today, ...fields } = patch;
+    const databasePatch: Record<string, unknown> = { ...fields };
+    if (contacted_today) databasePatch.last_contacted_at = new Date().toISOString();
+
     const search = new URLSearchParams();
     search.set('id', `eq.${idParsed.output}`);
     search.set('deleted_at', 'is.null');
     search.set('select', CONVERSATION_SELECT);
 
-    const { data } = await pgPatch<ConversationDbItem>(env, 'conversation', jwt, patch, {
+    const { data } = await pgPatch<ConversationDbItem>(env, 'conversation', jwt, databasePatch, {
       search,
     });
     if (data.length === 0) return json({ error: 'not_found' }, 404);
