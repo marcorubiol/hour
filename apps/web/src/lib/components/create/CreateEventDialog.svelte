@@ -21,9 +21,6 @@
    */
   export const EVENT_TYPE_KEYS = [
     'performance',
-    // ADR-084 §1 — the block is a MODE of this dialog, not a second one:
-    // the pill flips the single-date form into an N-day form.
-    'block',
     'rehearsal',
     'travel_day',
     'day_off',
@@ -46,7 +43,8 @@
   import Select from '../Select.svelte';
   import { addToast } from '../Toast.svelte';
   import PerformanceForm, { type CreatedPerformance } from '../PerformanceForm.svelte';
-  import BlockForm from '../BlockForm.svelte';
+  import BlockDays from '../BlockDays.svelte';
+  import { blockDays, blockLimit, BLOCK_MAX_DAYS } from '$lib/block';
   import { dayKeyInTz } from '$lib/planner';
   import { dayMonthYear, wallClockToInstant } from '$lib/datetime';
   import { detectLocale, t } from '$lib/i18n';
@@ -82,7 +80,6 @@
 
   const TYPE_LABEL_KEYS: Record<EventTypeKey, string> = {
     performance: 'create.type_performance',
-    block: 'block.type',
     rehearsal: 'create.type_rehearsal',
     travel_day: 'create.type_travel',
     day_off: 'create.type_day_off',
@@ -103,8 +100,6 @@
   // ── Performance branch — the shared form owns everything. ────────────
   let perfForm: { submit: () => void } | undefined = $state();
   let perfPending = $state(false);
-  let blockForm: { submit: () => void } | undefined = $state();
-  let blockPending = $state(false);
 
   function handlePerfCreated(perf: CreatedPerformance) {
     open = false;
@@ -122,6 +117,16 @@
   let dAllDay = $state(false);
   let dDay = $state(''); // all-day start (date)
   let dEndDay = $state(''); // all-day end (date, optional)
+  // ADR-084 §1 — CARDINALITY, not a type: a five-week run of rehearsals is
+  // still a rehearsal, so the pill above stays the kind and this only says
+  // how many days it covers (Marco, 2026-07-20).
+  let dMulti = $state(false);
+  let dFrom = $state('');
+  let dTo = $state('');
+  let dWeekdays = $state<number[]>([0, 1, 2, 3, 4, 5, 6]);
+  let dExceptions = $state<string[]>([]);
+  let dStartTime = $state('10:00');
+  let dEndTime = $state('');
   let dStartWall = $state(''); // timed start (datetime-local)
   let dEndWall = $state(''); // timed end (datetime-local, optional)
   let dOption = $state(false); // ADR-078 §9 — on ⇒ tentative, off ⇒ confirmed
@@ -283,11 +288,89 @@
     },
   });
 
+  /**
+   * ADR-084 §1 — several days is ONE atomic write of N rows sharing a series
+   * key. Each day's wall time is converted on its own: computing one instant
+   * and adding 24h would put every day after a DST jump an hour out.
+   */
+  const createSeries = createMutation({
+    mutationFn: async () => {
+      const days = blockDays({
+        from: dFrom,
+        to: dTo,
+        weekdays: dWeekdays,
+        exceptions: dExceptions,
+      });
+      const starts: string[] = [];
+      const ends: string[] = [];
+      for (const day of days) {
+        const s = dAllDay ? `${day}T00:00:00.000Z` : wallClockToInstant(`${day}T${dStartTime}`, entryTz);
+        if (!s) throw new Error(t('create.pick_start', locale));
+        starts.push(s);
+        if (!dAllDay && dEndTime) {
+          const e = wallClockToInstant(`${day}T${dEndTime}`, entryTz);
+          if (!e) throw new Error(t('create.pick_start', locale));
+          if (e < s) throw new Error(t('create.end_before_start', locale));
+          ends.push(e);
+        }
+      }
+      return mutateJSON<{ dates: unknown[] }>('POST', '/api/dates/series', {
+        project_id: dProject,
+        kind: type,
+        starts,
+        ends: !dAllDay && dEndTime ? ends : null,
+        all_day: dAllDay,
+        title: dTitle || null,
+        venue_name: dVenue || null,
+        city: dCity || null,
+        status: dOption ? 'tentative' : 'confirmed',
+        line_id: dLine || null,
+        label: type === 'other' ? dLabel || null : null,
+      });
+    },
+    onSuccess: (body) => {
+      const n = body?.dates?.length ?? 0;
+      void queryClient.invalidateQueries({ queryKey: ['planner-dates'] });
+      addToast({ tone: 'success', message: t('block.created', locale, { n: String(n) }) });
+      dExceptions = [];
+      open = false;
+    },
+    onError: (err) => {
+      addToast({
+        tone: 'danger',
+        title: t('create.not_created', locale),
+        message: err instanceof Error ? err.message : 'Unexpected error',
+      });
+    },
+  });
+
+  function submitSeries() {
+    const n = blockDays({
+      from: dFrom,
+      to: dTo,
+      weekdays: dWeekdays,
+      exceptions: dExceptions,
+    }).length;
+    const limit = blockLimit(n);
+    if (limit !== 'ok') {
+      addToast({
+        tone: 'warning',
+        message:
+          limit === 'too_few'
+            ? t('block.too_few', locale)
+            : t('block.too_many', locale, { max: String(BLOCK_MAX_DAYS) }),
+      });
+      return;
+    }
+    $createSeries.mutate();
+  }
+
   function submitDate() {
     if (!dProject) {
       addToast({ tone: 'warning', message: t('create.pick_project', locale) });
       return;
     }
+    if (dMulti) return submitSeries();
     // All-day rows are calendar dates: UTC-anchored midnight keeps
     // starts_at.slice(0,10) equal to the picked day (never tz-shifted).
     const startsAt = dAllDay
@@ -332,12 +415,11 @@
 
   function submit() {
     if (type === 'performance') perfForm?.submit();
-    else if (type === 'block') blockForm?.submit();
     else submitDate();
   }
 
   let pending = $derived(
-    type === 'performance' ? perfPending : type === 'block' ? blockPending : $createDate.isPending,
+    type === 'performance' ? perfPending : dMulti ? $createSeries.isPending : $createDate.isPending,
   );
 </script>
 
@@ -365,16 +447,6 @@
         {presetLineId}
         {presetDate}
         onCreated={handlePerfCreated}
-      />
-    {:else if type === 'block'}
-      <BlockForm
-        bind:this={blockForm}
-        bind:pending={blockPending}
-        {open}
-        {presetProjectId}
-        {presetLineId}
-        {presetDate}
-        onCreated={() => (open = false)}
       />
     {:else}
       <form
@@ -442,22 +514,52 @@
 
         <Checkbox label={t('create.all_day', locale)} bind:checked={dAllDay} onchange={toggleAllDay} />
 
-        <div class="ced__times">
-          {#if dAllDay}
-            <Input label={t('create.starts', locale)} type="date" bind:value={dDay} required />
-            <Input label={t('create.ends', locale)} type="date" bind:value={dEndDay} />
-          {:else}
-            <Input
-              label={t('create.starts', locale)}
-              type="datetime-local"
-              bind:value={dStartWall}
-              required
-            />
-            <Input label={t('create.ends', locale)} type="datetime-local" bind:value={dEndWall} />
+        <!-- Cardinality, not a type (ADR-084 §1): the pill above already said
+             WHAT this is; this only says over how many days it runs. -->
+        <Checkbox label={t('block.several_days', locale)} bind:checked={dMulti} />
+
+        {#if dMulti}
+          <BlockDays
+            bind:from={dFrom}
+            bind:to={dTo}
+            bind:weekdays={dWeekdays}
+            bind:exceptions={dExceptions}
+            locale={navigator.language}
+            labels={{
+              from: t('block.from', locale),
+              to: t('block.to', locale),
+              pickSpan: t('block.pick_span', locale),
+              daysUnit: t('block.days_unit', locale),
+              tooFew: t('block.too_few', locale),
+              tooMany: t('block.too_many', locale, { max: String(BLOCK_MAX_DAYS) }),
+              removed: (n: number) => t('block.removed', locale, { n: String(n) }),
+            }}
+          />
+          {#if !dAllDay}
+            <div class="ced__times">
+              <Input label={t('create.starts', locale)} type="time" bind:value={dStartTime} />
+              <Input label={t('create.ends', locale)} type="time" bind:value={dEndTime} />
+            </div>
+            <p class="ced__hint">{t('block.times_note', locale)} · {timeHint}</p>
           {/if}
-        </div>
-        {#if !dAllDay}
-          <p class="ced__hint">{timeHint}</p>
+        {:else}
+          <div class="ced__times">
+            {#if dAllDay}
+              <Input label={t('create.starts', locale)} type="date" bind:value={dDay} required />
+              <Input label={t('create.ends', locale)} type="date" bind:value={dEndDay} />
+            {:else}
+              <Input
+                label={t('create.starts', locale)}
+                type="datetime-local"
+                bind:value={dStartWall}
+                required
+              />
+              <Input label={t('create.ends', locale)} type="datetime-local" bind:value={dEndWall} />
+            {/if}
+          </div>
+          {#if !dAllDay}
+            <p class="ced__hint">{timeHint}</p>
+          {/if}
         {/if}
 
         <div class="ced__option">
@@ -483,7 +585,7 @@
     <Button onclick={submit} loading={pending}>
       {type === 'performance'
         ? t('create.submit_performance', locale)
-        : type === 'block'
+        : dMulti
           ? t('block.submit', locale)
           : t('create.submit_date', locale)}
     </Button>
