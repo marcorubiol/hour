@@ -171,25 +171,35 @@
 
         <div class="qnote">
           <p>
+            <span class="qnote__tag">cerrado el 20-07</span>
+            <b>El bolo ya puede llevar permisos, y la faceta ya existe en el modelo.</b>
+            <code>build/structure-model.md</code> enmendado: la palabra «nivel» hacía dos
+            trabajos. Hay <b>dos escaleras</b> — la de <i>edición</i> (espai · projecte ·
+            línia→mòduls, tres, intacta) y la de <b>alcance/acceso</b> (espai · projecte ·
+            línia · <b>performance</b>, cuatro). El bolo siempre estuvo en la cadena; lo que
+            faltaba era decir que puedes entrar en él para dar acceso y colgar conversación.
+            Los módulos siguen solo en la línea. Y la <b>faceta</b> entra como primitivo con
+            su tabla de niveles.
+          </p>
+          <p>
             <span class="qnote__tag">lo que sigue abierto</span>
-            <b>1.</b> Producció como faceta — la celda más floja de la tabla, en
-            observación. <b>2.</b> El bolo como cuarto nivel de permisos:
-            <code>structure-model.md</code> declara tres niveles de edición, así que
-            o se enmienda ese documento o el bolo no puede llevar permisos propios.
-            <b>3.</b> La faceta es ahora una dimensión transversal (ordena la
-            conversación, gatea el acceso y etiqueta el gutter) y <b>no tiene
-            entrada en el structure-model</b>. <b>4.</b> Si comms sube al Desk como
-            quinto tipo. <b>5.</b> La paleta de <i>concern</i> y la de <i>faceta</i>
-            se solapan en Diners y nadie las ha reconciliado.
+            <b>1.</b> Producció como faceta — la celda más floja, en observación.
+            <b>2.</b> Si comms sube al Desk como quinto tipo. <b>3.</b> La paleta de
+            <i>concern</i> y la de <i>faceta</i> se solapan en Diners y nadie las ha
+            reconciliado.
           </p>
           <p>
             <span class="qnote__tag">deuda de accesibilidad · código de la app</span>
-            La revisión midió contraste real: <code>.kbd</code> falla AA en las siete
-            pantallas y en los dos temas (2,44:1 en el peor caso), y los acentos de
-            modo claro fallan como texto (3,16–3,49:1) mientras los de modo oscuro
-            pasan — señal de que el oscuro se afinó para texto y el claro no.
-            Eso es <code>base.css</code> y <code>tokens.css</code>, código vivo: no lo
-            he tocado. Detalle en el fichero de revisión.
+            <b>Sin cifras fiables todavía.</b> El subagente reportó fallos en modo claro;
+            al medirlo yo salía lo contrario, y mi propio script tuvo dos errores
+            (<code>color-mix(in oklch,…)</code> computa a <code>oklab()</code>, y
+            <code>getPropertyValue</code> de una custom property devuelve el token sin
+            resolver). Lo único sólido es de inspección, no de medida:
+            <b><code>--text-muted</code> es el único token de tinta definido por ALFA</b>
+            (<code>color-mix(in srgb, var(--neutral) 70%, transparent)</code>) y el bloque
+            oscuro no lo re-ancla, a diferencia de todo el resto de la escala. El alfa es
+            justo la construcción cuyo contraste no sobrevive al cambio de tema. <b>Hay que
+            medirlo con una herramienta de verdad antes de tocar nada.</b>
           </p>
         </div>
       </main>
