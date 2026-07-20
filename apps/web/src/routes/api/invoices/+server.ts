@@ -11,6 +11,7 @@
 import type { RequestHandler } from './$types';
 import * as v from 'valibot';
 import { extractAccessToken } from '$lib/auth';
+import type { MoneyInvoiceItem } from '$lib/money';
 import { pgGet, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
 
@@ -43,21 +44,7 @@ function parseUuidList(raw: string | undefined): string[] {
   return [...new Set(raw.split(',').map((s) => s.trim()).filter((s) => UUID.test(s)))];
 }
 
-type InvoiceItem = {
-  id: string;
-  number: string | null;
-  status: string;
-  issued_on: string;
-  due_on: string | null;
-  subtotal: number;
-  total: number;
-  currency: string;
-  project: { id: string; slug: string; name: string } | null;
-  payer: { id: string; slug: string; full_name: string; organization_name: string | null } | null;
-  lines: { performance_id: string | null }[];
-};
-
-type InvoiceDbItem = Omit<InvoiceItem, 'payer'> & {
+type InvoiceDbItem = Omit<MoneyInvoiceItem, 'payer' | 'paid_amount'> & {
   payer: {
     id: string;
     slug: string;
@@ -90,9 +77,11 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
     'select',
     [
       'id,number,status,issued_on,due_on,subtotal,total,currency',
-      'project:project_id(id,slug,name)',
+      'workspace_id,project_id,payer_person_id,expected_on,payment_condition,vat_pct,vat_amount,irpf_pct,irpf_amount,notes',
+      'project:project_id(id,slug,name,workspace_id)',
       'payer:workspace_person!invoice_workspace_payer_person_fkey(id:person_id,slug,full_name,organization:workspace_organization!workspace_person_organization_fkey(name))',
       'lines:invoice_line(performance_id)',
+      'payments:payment!payment_invoice_id_fkey(id,workspace_id,invoice_id,amount,received_on,method,reference,notes,created_at)',
     ].join(','),
   );
 
@@ -113,8 +102,9 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
 
   try {
     const { data } = await pgGet<InvoiceDbItem>(env, 'invoice', jwt, { search });
-    const items: InvoiceItem[] = data.map((item) => ({
+    const items: MoneyInvoiceItem[] = data.map((item) => ({
       ...item,
+      paid_amount: item.payments.reduce((sum, payment) => sum + Number(payment.amount), 0),
       payer: item.payer
         ? {
             id: item.payer.id,
@@ -140,6 +130,9 @@ const CreateSchema = v.object({
   irpf_pct: v.optional(v.nullable(v.pipe(v.number(), v.minValue(0), v.maxValue(100)))),
   number: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(60)))),
   due_on: v.optional(v.nullable(v.pipe(v.string(), v.isoDate()))),
+  expected_on: v.optional(v.nullable(v.pipe(v.string(), v.isoDate()))),
+  payment_condition: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(2000)))),
+  payer_person_id: v.optional(v.nullable(v.pipe(v.string(), v.uuid()))),
   notes: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(2000)))),
 });
 
@@ -179,6 +172,9 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
       p_number: input.number ?? null,
       p_due_on: input.due_on ?? null,
       p_notes: input.notes ?? null,
+      p_expected_on: input.expected_on ?? null,
+      p_payment_condition: input.payment_condition ?? null,
+      p_payer_person_id: input.payer_person_id ?? null,
     });
     if (data.length === 0 || !data[0]) return json({ error: 'create_failed' }, 502);
     return json({ invoice: data[0] }, 201);

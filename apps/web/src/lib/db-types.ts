@@ -965,6 +965,7 @@ export type Database = {
           custom_fields: Json
           deleted_at: string | null
           due_on: string | null
+          expected_on: string | null
           id: string
           irpf_amount: number | null
           irpf_pct: number | null
@@ -972,6 +973,7 @@ export type Database = {
           notes: string | null
           number: string | null
           payer_person_id: string | null
+          payment_condition: string | null
           project_id: string | null
           status: Database["public"]["Enums"]["invoice_status"]
           subtotal: number
@@ -988,6 +990,7 @@ export type Database = {
           custom_fields?: Json
           deleted_at?: string | null
           due_on?: string | null
+          expected_on?: string | null
           id?: string
           irpf_amount?: number | null
           irpf_pct?: number | null
@@ -995,6 +998,7 @@ export type Database = {
           notes?: string | null
           number?: string | null
           payer_person_id?: string | null
+          payment_condition?: string | null
           project_id?: string | null
           status?: Database["public"]["Enums"]["invoice_status"]
           subtotal?: number
@@ -1011,6 +1015,7 @@ export type Database = {
           custom_fields?: Json
           deleted_at?: string | null
           due_on?: string | null
+          expected_on?: string | null
           id?: string
           irpf_amount?: number | null
           irpf_pct?: number | null
@@ -1018,6 +1023,7 @@ export type Database = {
           notes?: string | null
           number?: string | null
           payer_person_id?: string | null
+          payment_condition?: string | null
           project_id?: string | null
           status?: Database["public"]["Enums"]["invoice_status"]
           subtotal?: number
@@ -2786,9 +2792,12 @@ export type Database = {
       create_invoice: {
         Args: {
           p_due_on?: string
+          p_expected_on?: string
           p_irpf_pct?: number
           p_notes?: string
           p_number?: string
+          p_payer_person_id?: string
+          p_payment_condition?: string
           p_performance_id: string
           p_vat_pct?: number
         }
@@ -2799,6 +2808,7 @@ export type Database = {
           custom_fields: Json
           deleted_at: string | null
           due_on: string | null
+          expected_on: string | null
           id: string
           irpf_amount: number | null
           irpf_pct: number | null
@@ -2806,6 +2816,7 @@ export type Database = {
           notes: string | null
           number: string | null
           payer_person_id: string | null
+          payment_condition: string | null
           project_id: string | null
           status: Database["public"]["Enums"]["invoice_status"]
           subtotal: number
@@ -2858,6 +2869,36 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "line"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      create_payment: {
+        Args: {
+          p_amount: number
+          p_invoice_id: string
+          p_method?: Database["public"]["Enums"]["payment_method"]
+          p_notes?: string
+          p_received_on?: string
+          p_reference?: string
+        }
+        Returns: {
+          amount: number
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          id: string
+          invoice_id: string
+          method: Database["public"]["Enums"]["payment_method"]
+          notes: string | null
+          received_on: string
+          reference: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "payment"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -3143,6 +3184,7 @@ export type Database = {
       delete_date: { Args: { p_date_id: string }; Returns: undefined }
       delete_expense: { Args: { p_expense_id: string }; Returns: undefined }
       delete_invoice: { Args: { p_invoice_id: string }; Returns: undefined }
+      delete_payment: { Args: { p_payment_id: string }; Returns: undefined }
       delete_performance: {
         Args: { p_performance_id: string }
         Returns: undefined
@@ -3186,6 +3228,56 @@ export type Database = {
           isOneToOne: false
           isSetofReturn: true
         }
+      }
+      list_expenses_for_scope: {
+        Args: {
+          p_category?: Database["public"]["Enums"]["expense_category"]
+          p_limit?: number
+          p_line_ids?: string[]
+          p_performance_ids?: string[]
+          p_project_ids?: string[]
+          p_workspace_ids?: string[]
+        }
+        Returns: {
+          amount: number
+          category: Database["public"]["Enums"]["expense_category"]
+          created_at: string
+          created_by: string | null
+          currency: string
+          custom_fields: Json
+          deleted_at: string | null
+          description: string
+          id: string
+          incurred_on: string
+          line_id: string | null
+          notes: string | null
+          paid_by_user_id: string | null
+          performance_id: string | null
+          receipt_url: string | null
+          reimbursed: boolean
+          updated_at: string
+          workspace_id: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "expense"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      list_money_payers: {
+        Args: {
+          p_limit?: number
+          p_project_ids?: string[]
+          p_workspace_ids?: string[]
+        }
+        Returns: {
+          full_name: string
+          id: string
+          organization_name: string
+          slug: string
+          workspace_id: string
+        }[]
       }
       list_money_performances: {
         Args: {

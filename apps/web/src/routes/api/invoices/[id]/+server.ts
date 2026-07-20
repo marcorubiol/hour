@@ -18,9 +18,12 @@ import { pgErrorResponse } from '$lib/server/errors';
 const IdSchema = v.pipe(v.string(), v.uuid());
 
 const PatchSchema = v.object({
-  status: v.optional(v.picklist(['draft', 'issued', 'paid', 'cancelled'])),
+  status: v.optional(v.picklist(['draft', 'issued', 'cancelled'])),
   number: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(60)))),
   due_on: v.optional(v.nullable(v.pipe(v.string(), v.isoDate()))),
+  expected_on: v.optional(v.nullable(v.pipe(v.string(), v.isoDate()))),
+  payment_condition: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(2000)))),
+  payer_person_id: v.optional(v.nullable(v.pipe(v.string(), v.uuid()))),
   notes: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(2000)))),
 });
 
@@ -66,7 +69,10 @@ export const PATCH: RequestHandler = async ({ request, params, platform, locals 
   const search = new URLSearchParams();
   search.set('id', `eq.${idParsed.output}`);
   search.set('deleted_at', 'is.null');
-  search.set('select', 'id,number,status,issued_on,due_on,total,currency,notes');
+  search.set(
+    'select',
+    'id,workspace_id,project_id,payer_person_id,number,status,issued_on,due_on,expected_on,payment_condition,subtotal,vat_pct,vat_amount,irpf_pct,irpf_amount,total,currency,notes',
+  );
 
   try {
     const { data } = await pgPatch<Record<string, unknown>>(env, 'invoice', jwt, patch, {
@@ -78,7 +84,10 @@ export const PATCH: RequestHandler = async ({ request, params, platform, locals 
     return pgErrorResponse(
       err,
       { route: 'PATCH /api/invoices/[id]', requestId: locals.requestId },
-      { passUpstream: [401, 403] },
+      {
+        codes: { '22023': { status: 400, error: 'invalid_input' } },
+        passUpstream: [401, 403],
+      },
     );
   }
 };

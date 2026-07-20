@@ -6,7 +6,8 @@ const PASSWORD = process.env.PW_TEST_PASSWORD;
 /**
  * E2E — Money lens (ADR-046 + ADR-050): the lens renders, the fee write
  * path round-trips (set → persist → clear), and an invoice is created
- * from the fee (VAT math server-side), status-checked and discarded — all
+ * from the fee (VAT math server-side), expected collection edited, two
+ * payments observed, paid status derived, then fully cleaned up — all
  * on a fixture gig in the test user's own workspace. Self-cleaning: the
  * fee ends null and the draft invoice is discarded.
  */
@@ -54,9 +55,80 @@ test.describe('money lens', () => {
     await expect(invDialog).not.toBeVisible({ timeout: 10_000 });
 
     // The draft lands in the Invoices section with the right total.
-    const invRow = page.locator('.mny__invoices li').first();
+    let invRow = page.locator('.mny__invoices > li').first();
     await expect(invRow).toContainText('1,493.82', { timeout: 10_000 });
     await expect(invRow).toContainText('draft');
+
+    // Two collection truths are editable and survive a reload.
+    await invRow.getByRole('button', { name: 'Details' }).click();
+    const expected = invRow.getByLabel(/Expected collection date/);
+    await expected.fill('2031-08-31');
+    await Promise.all([
+      page.waitForResponse(
+        (response) =>
+          response.url().includes('/api/invoices/') &&
+          response.request().method() === 'PATCH' &&
+          response.ok(),
+      ),
+      expected.press('Tab'),
+    ]);
+    const condition = invRow.getByLabel('Payment condition');
+    await condition.fill('Pays when the presenting venue pays them');
+    await Promise.all([
+      page.waitForResponse(
+        (response) =>
+          response.url().includes('/api/invoices/') &&
+          response.request().method() === 'PATCH' &&
+          response.ok(),
+      ),
+      condition.press('Tab'),
+    ]);
+    await page.reload();
+    invRow = page.locator('.mny__invoices > li').first();
+    await invRow.getByRole('button', { name: 'Details' }).click();
+    await expect(invRow.getByLabel(/Expected collection date/)).toHaveValue('2031-08-31');
+    await expect(invRow.getByLabel('Payment condition')).toHaveValue(
+      'Pays when the presenting venue pays them',
+    );
+
+    // Issue it; "paid" is deliberately absent from the manual status menu.
+    await invRow.getByRole('button', { name: 'Change invoice status' }).click();
+    await expect(page.getByRole('menuitem', { name: 'paid', exact: true })).toHaveCount(0);
+    await page.getByRole('menuitem', { name: 'issued', exact: true }).click();
+    await expect(invRow).toContainText('issued', { timeout: 10_000 });
+
+    // Advance + rest: partial stays issued, full coverage derives paid.
+    await invRow.getByRole('button', { name: 'Record payment' }).click();
+    let paymentDialog = page.locator('dialog[open]');
+    await paymentDialog.getByLabel('Amount').fill('500');
+    await paymentDialog.getByLabel('Reference').fill('advance-e2e');
+    await paymentDialog.getByRole('button', { name: 'Record', exact: true }).click();
+    await expect(invRow).toContainText('500.00 / 1,493.82', { timeout: 10_000 });
+    await expect(invRow).toContainText('issued');
+
+    await invRow.getByRole('button', { name: 'Record payment' }).click();
+    paymentDialog = page.locator('dialog[open]');
+    await expect(paymentDialog.getByLabel('Amount')).toHaveValue('993.82');
+    await paymentDialog.getByLabel('Reference').fill('rest-e2e');
+    await paymentDialog.getByRole('button', { name: 'Record', exact: true }).click();
+    await expect(invRow).toContainText('1,493.82 / 1,493.82', { timeout: 10_000 });
+    await expect(invRow).toContainText('collected');
+    await expect(invRow).toContainText('paid');
+
+    // Removing observed payments recalculates the invoice back to issued.
+    let removePayments = invRow.getByRole('button', { name: 'Remove', exact: true });
+    await expect(removePayments).toHaveCount(2);
+    await removePayments.first().click();
+    removePayments = invRow.getByRole('button', { name: 'Remove', exact: true });
+    await expect(removePayments).toHaveCount(1);
+    await removePayments.first().click();
+    await expect(invRow).toContainText('No payments recorded.', { timeout: 10_000 });
+    await expect(invRow).toContainText('issued');
+
+    // Return the invoice to draft so the existing discard path remains the cleanup.
+    await invRow.getByRole('button', { name: 'Change invoice status' }).click();
+    await page.getByRole('menuitem', { name: 'draft', exact: true }).click();
+    await expect(invRow).toContainText('draft', { timeout: 10_000 });
 
     // Discard the draft — self-cleaning, and the discard path IS the test.
     await invRow.getByRole('button', { name: 'Discard' }).click();

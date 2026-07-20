@@ -131,5 +131,5 @@ jobs:
             echo '## Supabase staging baseline'
             echo
             echo "Commit: \`${GITHUB_SHA}\`"
-            echo 'Expected gate: fresh migration reset, synthetic fixtures, RLS 118/118, critical-route smoke.'
+            echo 'Expected gate: fresh migration reset, synthetic fixtures, RLS 120/120, critical-route smoke.'
           } >> "$GITHUB_STEP_SUMMARY"

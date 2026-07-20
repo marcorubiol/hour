@@ -1,6 +1,6 @@
 /**
  * GET /api/expenses — expense rows for the Money surfaces (ADR-056).
- * Filter by line_ids and/or performance_ids (union). RLS hides whole rows
+ * Filter by workspace/project/line/performance ids (union). RLS hides whole rows
  * without read:money (there is no redacted view for expense — invisible,
  * not masked).
  *
@@ -16,10 +16,12 @@ import type { RequestHandler } from './$types';
 import * as v from 'valibot';
 import { extractAccessToken } from '$lib/auth';
 import { EXPENSE_CATEGORIES, ExpenseCreateSchema, type ExpenseItem } from '$lib/expense';
-import { pgGet, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
+import { pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
 
 const QuerySchema = v.object({
+  project_ids: v.optional(v.string()),
+  workspace_ids: v.optional(v.string()),
   line_ids: v.optional(v.string()),
   performance_ids: v.optional(v.string()),
   category: v.optional(
@@ -52,9 +54,6 @@ function parseUuidList(raw: string | undefined): string[] {
   return [...new Set(raw.split(',').map((s) => s.trim()).filter((s) => UUID.test(s)))];
 }
 
-const EXPENSE_SELECT =
-  'id,workspace_id,performance_id,line_id,category,description,amount,currency,incurred_on,reimbursed,notes,created_at';
-
 export const GET: RequestHandler = async ({ request, url, platform, locals }) => {
   if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);
   const env = platform.env as unknown as SupabaseEnv;
@@ -76,35 +75,21 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
       400,
     );
   }
-  const { line_ids, performance_ids, category, limit } = parsed.output;
+  const { project_ids, workspace_ids, line_ids, performance_ids, category, limit } = parsed.output;
+  const projectIds = parseUuidList(project_ids);
+  const workspaceIds = parseUuidList(workspace_ids);
   const lineIds = parseUuidList(line_ids);
   const performanceIds = parseUuidList(performance_ids);
-  if (lineIds.length === 0 && performanceIds.length === 0) {
-    return json(
-      { error: 'invalid_query', hint: 'Pass line_ids and/or performance_ids.' },
-      400,
-    );
-  }
-
-  const search = new URLSearchParams();
-  search.set('select', EXPENSE_SELECT);
-  if (lineIds.length > 0 && performanceIds.length > 0) {
-    search.set(
-      'or',
-      `(line_id.in.(${lineIds.join(',')}),performance_id.in.(${performanceIds.join(',')}))`,
-    );
-  } else if (lineIds.length > 0) {
-    search.set('line_id', `in.(${lineIds.join(',')})`);
-  } else {
-    search.set('performance_id', `in.(${performanceIds.join(',')})`);
-  }
-  if (category !== 'any') search.set('category', `eq.${category}`);
-  search.set('deleted_at', 'is.null');
-  search.set('order', 'incurred_on.desc,created_at.desc');
-  search.set('limit', String(limit));
 
   try {
-    const { data } = await pgGet<ExpenseItem>(env, 'expense', jwt, { search });
+    const { data } = await pgPostRpc<ExpenseItem>(env, 'list_expenses_for_scope', jwt, {
+      p_project_ids: projectIds.length > 0 ? projectIds : null,
+      p_workspace_ids: workspaceIds.length > 0 ? workspaceIds : null,
+      p_line_ids: lineIds.length > 0 ? lineIds : null,
+      p_performance_ids: performanceIds.length > 0 ? performanceIds : null,
+      p_category: category === 'any' ? null : category,
+      p_limit: limit,
+    });
     return json({ items: data });
   } catch (err) {
     return pgErrorResponse(

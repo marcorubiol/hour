@@ -1,13 +1,13 @@
 <script lang="ts">
   /**
-   * Money lens — Phase 0.3 (ADR-046). Read path is `performance_redacted`
+   * Money lens v2 (ADR-046/074). Read path is money-gated; payments are
+   * observed facts and invoice paid status derives from their sum.
    * (fees NULLed without read:money); fee editing lives HERE by design —
    * ADR-043 deliberately kept fee out of the performance write path.
    *
    * Invoices (ADR-050): created FROM a gig's fee (one line, amounts
    * snapshot the fee + VAT/IRPF at creation — later fee edits don't
-   * retro-edit). Lifecycle: draft → issued → paid, cancelled from
-   * anywhere; only drafts can be discarded.
+   * retro-edit). Contractual and expected collection dates remain separate.
    *
    * Filter = sidebar selection (ADR-038), like every lens.
    */
@@ -16,14 +16,16 @@
   import { toStore } from 'svelte/store';
   import { fetchJSON, mutateJSON } from '$lib/api';
   import Button from '$lib/components/Button.svelte';
+  import MoneyInvoices from '$lib/components/MoneyInvoices.svelte';
   import LensSwitcher from '$lib/components/LensSwitcher.svelte';
   import Dialog from '$lib/components/Dialog.svelte';
   import Input from '$lib/components/Input.svelte';
-  import Menu from '$lib/components/Menu.svelte';
+  import Select from '$lib/components/Select.svelte';
   import StateBadge from '$lib/components/StateBadge.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
   import { dayLabel } from '$lib/datetime';
-  import { fmtFee, fmtMoney, invoiceTone } from '$lib/money';
+  import { categoryLabel, type ExpenseItem } from '$lib/expense';
+  import { fmtFee, fmtMoney, type MoneyInvoiceItem, type MoneyPayer } from '$lib/money';
   import { performanceStatusLabel, performanceStatusTone } from '$lib/performance';
   import { usePins } from '$lib/stores/pins.svelte';
   import {
@@ -31,14 +33,12 @@
     buildProjectIndex,
     resolveScope,
     lineUrl,
-    projectUrl,
     type NavLine,
-    type NavProject,
     type NavWorkspace,
     type RawLine,
   } from '$lib/nav';
   import { activeProjectsQueryOptions, allLinesQueryOptions } from '$lib/nav-queries';
-  import { lineKindGlyph, lineKindLabel } from '$lib/utils/line-kind';
+  import { lineKindGlyph } from '$lib/utils/line-kind';
   import { goto } from '$app/navigation';
 
   type WorkspaceLite = { id: string; slug: string };
@@ -59,17 +59,6 @@
       name: string;
       workspace_id: string;
     } | null;
-  };
-
-  type InvoiceItem = {
-    id: string;
-    number: string | null;
-    status: string;
-    issued_on: string;
-    total: number;
-    currency: string;
-    project: { name: string } | null;
-    payer: { full_name: string; organization_name: string | null } | null;
   };
 
   const pins = usePins();
@@ -118,10 +107,6 @@
   function openLine(line: NavLine) {
     void goto(lineUrl(line));
   }
-  function openProject(project: NavProject) {
-    void goto(projectUrl(project));
-  }
-
   const feesOptions = toStore(() => {
     const k = { ...filterIds, unresolved: scopeUnresolved };
     return {
@@ -140,12 +125,32 @@
       queryKey: ['invoices', { p: k.projectIds, w: k.workspaceIds }] as const,
       enabled: !k.unresolved,
       queryFn: ({ signal }: { signal: AbortSignal }) =>
-        fetchJSON<{ items: InvoiceItem[] }>(`/api/invoices?${feedParams(k)}`, signal),
+        fetchJSON<{ items: MoneyInvoiceItem[] }>(`/api/invoices?${feedParams(k)}`, signal),
+    };
+  });
+  const expensesOptions = toStore(() => {
+    const k = { ...filterIds, unresolved: scopeUnresolved };
+    return {
+      queryKey: ['expenses', { p: k.projectIds, w: k.workspaceIds }] as const,
+      enabled: !k.unresolved,
+      queryFn: ({ signal }: { signal: AbortSignal }) =>
+        fetchJSON<{ items: ExpenseItem[] }>(`/api/expenses?${feedParams(k)}`, signal),
+    };
+  });
+  const payersOptions = toStore(() => {
+    const k = { ...filterIds, unresolved: scopeUnresolved };
+    return {
+      queryKey: ['money-payers', { p: k.projectIds, w: k.workspaceIds }] as const,
+      enabled: !k.unresolved,
+      queryFn: ({ signal }: { signal: AbortSignal }) =>
+        fetchJSON<{ items: MoneyPayer[] }>(`/api/money/payers?${feedParams(k)}`, signal),
     };
   });
 
   const feesQuery = createQuery(feesOptions);
   const invoicesQuery = createQuery(invoicesOptions);
+  const expensesQuery = createQuery(expensesOptions);
+  const payersQuery = createQuery(payersOptions);
 
   // Exact-line narrowing (the endpoint returns a pinned line's whole
   // project); a directly pinned project admits all its fees.
@@ -159,8 +164,11 @@
   }
   let fees = $derived(($feesQuery.data?.items ?? []).filter(feeInScope));
   let invoices = $derived($invoicesQuery.data?.items ?? []);
+  let expenses = $derived($expensesQuery.data?.items ?? []);
+  let payers = $derived($payersQuery.data?.items ?? []);
 
-  // ── Roll-up by line (the Money-by-line view) ──────────────────────────
+  // ── Per-currency truth + roll-up by line ──────────────────────────────
+  type CurrencyRoll = { currency: string; confirmed: number; holds: number; expenses: number };
   type LineRoll = {
     key: string;
     name: string;
@@ -168,59 +176,123 @@
     projectName: string;
     accent: string;
     line: NavLine | null;
-    confirmed: number;
-    holds: number;
     dates: number;
+    currencies: CurrencyRoll[];
   };
+  type MutableLineRoll = Omit<LineRoll, 'currencies'> & { currencies: Map<string, CurrencyRoll> };
+
+  function ensureCurrency(map: Map<string, CurrencyRoll>, currency: string): CurrencyRoll {
+    const existing = map.get(currency);
+    if (existing) return existing;
+    const created = { currency, confirmed: 0, holds: 0, expenses: 0 };
+    map.set(currency, created);
+    return created;
+  }
+
+  let feeById = $derived(new Map(fees.map((fee) => [fee.id, fee])));
   let byLine = $derived.by<LineRoll[]>(() => {
-    const map = new Map<string, LineRoll>();
-    for (const f of fees) {
-      const line = (f.line_id ? lineById.get(f.line_id) : null) ?? null;
-      const key = f.line_id ?? `loose:${f.project?.id ?? 'none'}`;
-      if (!map.has(key)) {
-        map.set(key, {
-          key,
-          name: line?.name ?? 'One-offs',
-          kind: line?.kind ?? 'oneoff',
-          projectName: line?.projectName ?? f.project?.name ?? '—',
-          accent: line?.accent ?? 'var(--text-faint)',
-          line,
-          confirmed: 0,
-          holds: 0,
-          dates: 0,
-        });
-      }
-      const rec = map.get(key)!;
-      if (f.fee_amount != null) {
-        if (['confirmed', 'done', 'invoiced', 'paid'].includes(f.status)) {
-          rec.confirmed += f.fee_amount;
-          rec.dates += 1;
-        } else if (f.status.startsWith('hold')) {
-          rec.holds += f.fee_amount;
-        }
+    const map = new Map<string, MutableLineRoll>();
+    const ensureLine = (
+      key: string,
+      line: NavLine | null,
+      projectName: string,
+    ): MutableLineRoll => {
+      const existing = map.get(key);
+      if (existing) return existing;
+      const created: MutableLineRoll = {
+        key,
+        name: line?.name ?? 'One-offs',
+        kind: line?.kind ?? 'oneoff',
+        projectName: line?.projectName ?? projectName,
+        accent: line?.accent ?? 'var(--text-faint)',
+        line,
+        dates: 0,
+        currencies: new Map(),
+      };
+      map.set(key, created);
+      return created;
+    };
+
+    for (const fee of fees) {
+      const line = (fee.line_id ? lineById.get(fee.line_id) : null) ?? null;
+      const key = fee.line_id ?? `loose:${fee.project?.id ?? 'none'}`;
+      const record = ensureLine(key, line, fee.project?.name ?? '—');
+      if (fee.fee_amount === null) continue;
+      const currency = fee.fee_currency ?? 'EUR';
+      const amount = ensureCurrency(record.currencies, currency);
+      if (['confirmed', 'done', 'invoiced', 'paid'].includes(fee.status)) {
+        amount.confirmed += Number(fee.fee_amount);
+        record.dates += 1;
+      } else if (fee.status.startsWith('hold')) {
+        amount.holds += Number(fee.fee_amount);
       }
     }
+
+    for (const expense of expenses) {
+      const performance = expense.performance_id ? feeById.get(expense.performance_id) : null;
+      const lineId = expense.line_id ?? performance?.line_id ?? null;
+      const line = (lineId ? lineById.get(lineId) : null) ?? null;
+      const key = lineId ?? `loose:${performance?.project?.id ?? expense.workspace_id}`;
+      const record = ensureLine(key, line, performance?.project?.name ?? 'One-offs');
+      ensureCurrency(record.currencies, expense.currency).expenses += Number(expense.amount);
+    }
+
     return [...map.values()]
-      .filter((r) => r.confirmed || r.holds)
-      .sort((a, b) => b.confirmed - a.confirmed);
+      .map((record) => ({ ...record, currencies: [...record.currencies.values()].sort((a, b) => a.currency.localeCompare(b.currency)) }))
+      .filter((record) => record.currencies.some((amount) => amount.confirmed || amount.holds || amount.expenses))
+      .sort((a, b) => {
+        const aTotal = a.currencies.reduce((sum, amount) => sum + amount.confirmed, 0);
+        const bTotal = b.currencies.reduce((sum, amount) => sum + amount.confirmed, 0);
+        return bTotal - aTotal;
+      });
   });
-  let byLineMax = $derived(Math.max(1, ...byLine.map((l) => l.confirmed + l.holds)));
-  let loading = $derived($feesQuery.isLoading);
-  let errorMsg = $derived(
-    $feesQuery.error instanceof Error ? $feesQuery.error.message : '',
-  );
 
-
-  /** Sums per lifecycle bucket, over the rows currently listed. */
-  let totals = $derived.by(() => {
-    const buckets = { pipeline: 0, invoiced: 0, paid: 0 };
-    for (const f of fees) {
-      if (f.fee_amount === null) continue;
-      if (f.status === 'confirmed' || f.status === 'done') buckets.pipeline += f.fee_amount;
-      else if (f.status === 'invoiced') buckets.invoiced += f.fee_amount;
-      else if (f.status === 'paid') buckets.paid += f.fee_amount;
+  let byLineMax = $derived.by(() => {
+    const max = new Map<string, number>();
+    for (const line of byLine) {
+      for (const amount of line.currencies) {
+        max.set(amount.currency, Math.max(max.get(amount.currency) ?? 1, amount.confirmed + amount.holds));
+      }
     }
-    return buckets;
+    return max;
+  });
+
+  let loading = $derived($feesQuery.isLoading || $invoicesQuery.isLoading || $expensesQuery.isLoading);
+  let errorMsg = $derived.by(() => {
+    const error = $feesQuery.error ?? $invoicesQuery.error ?? $expensesQuery.error;
+    return error instanceof Error ? error.message : '';
+  });
+
+  let totals = $derived.by(() => {
+    const map = new Map<string, { currency: string; pipeline: number; invoiced: number; collected: number }>();
+    const ensure = (currency: string) => {
+      const existing = map.get(currency);
+      if (existing) return existing;
+      const created = { currency, pipeline: 0, invoiced: 0, collected: 0 };
+      map.set(currency, created);
+      return created;
+    };
+    for (const fee of fees) {
+      if (fee.fee_amount === null) continue;
+      if (fee.status === 'confirmed' || fee.status === 'done') {
+        ensure(fee.fee_currency ?? 'EUR').pipeline += Number(fee.fee_amount);
+      }
+    }
+    for (const invoice of invoices) {
+      if (invoice.status === 'issued' || invoice.status === 'paid') {
+        ensure(invoice.currency).invoiced += Number(invoice.total);
+      }
+      ensure(invoice.currency).collected += Number(invoice.paid_amount);
+    }
+    return [...map.values()].sort((a, b) => a.currency.localeCompare(b.currency));
+  });
+
+  let expenseTotals = $derived.by(() => {
+    const map = new Map<string, number>();
+    for (const expense of expenses) {
+      map.set(expense.currency, (map.get(expense.currency) ?? 0) + Number(expense.amount));
+    }
+    return [...map.entries()].sort(([a], [b]) => a.localeCompare(b));
   });
 
   function perfHref(f: MoneyPerformance): string | null {
@@ -280,17 +352,22 @@
     $feeMutation.mutate({ id: editing.id, fee_amount: amount, fee_currency: fCurrency });
   }
 
-  // ── Invoice creation (ADR-050) ────────────────────────────────────────
-  const INVOICE_STATUSES = ['draft', 'issued', 'paid', 'cancelled'] as const;
-
-
+  // ── Invoice creation (ADR-050 + ADR-074) ──────────────────────────────
   let invOpen = $state(false);
   let invPerf = $state<MoneyPerformance | null>(null);
   let iVat = $state('');
   let iIrpf = $state('');
   let iNumber = $state('');
   let iDueOn = $state('');
+  let iExpectedOn = $state('');
+  let iPaymentCondition = $state('');
+  let iPayerId = $state('');
   let iNotes = $state('');
+  let availablePayers = $derived(
+    invPerf?.project
+      ? payers.filter((payer) => payer.workspace_id === invPerf?.project?.workspace_id)
+      : [],
+  );
 
   function openInvoice(f: MoneyPerformance) {
     invPerf = f;
@@ -298,6 +375,9 @@
     iIrpf = '';
     iNumber = '';
     iDueOn = '';
+    iExpectedOn = '';
+    iPaymentCondition = '';
+    iPayerId = '';
     iNotes = '';
     invOpen = true;
   }
@@ -325,6 +405,9 @@
         irpf_pct: pctOrNull(iIrpf),
         number: iNumber.trim() || null,
         due_on: iDueOn || null,
+        expected_on: iExpectedOn || null,
+        payment_condition: iPaymentCondition.trim() || null,
+        payer_person_id: iPayerId || null,
         notes: iNotes.trim() || null,
       });
       if (!body?.invoice) throw new Error('Unexpected response');
@@ -356,40 +439,6 @@
     }
     $createInvoice.mutate();
   }
-
-  const invoiceStatusMutation = createMutation({
-    mutationFn: async (input: { id: string; status: string }) => {
-      const body = await mutateJSON<{ invoice?: unknown }>(
-        'PATCH',
-        `/api/invoices/${input.id}`,
-        { status: input.status },
-      );
-      if (!body?.invoice) throw new Error('Unexpected response');
-      return body.invoice;
-    },
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['invoices'] }),
-    onError: (err) => {
-      addToast({
-        tone: 'danger',
-        title: 'Status not changed',
-        message: err instanceof Error ? err.message : 'Unexpected error',
-      });
-    },
-  });
-
-  const discardInvoice = createMutation({
-    mutationFn: async (id: string) => {
-      await mutateJSON('DELETE', `/api/invoices/${id}`);
-    },
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['invoices'] }),
-    onError: (err) => {
-      addToast({
-        tone: 'danger',
-        title: 'Draft not discarded',
-        message: err instanceof Error ? err.message : 'Unexpected error',
-      });
-    },
-  });
 </script>
 
 <svelte:head>
@@ -403,19 +452,24 @@
       <LensSwitcher />
     </div>
     <div class="mny__totals">
-      <span class="mny__total">
-        <span class="mny__total-label">pipeline</span>
-        {fmtMoney(totals.pipeline)}
-      </span>
-      <span class="mny__total">
-        <span class="mny__total-label">invoiced</span>
-        {fmtMoney(totals.invoiced)}
-      </span>
-      <span class="mny__total">
-        <span class="mny__total-label">paid</span>
-        {fmtMoney(totals.paid)}
-      </span>
-      <span class="mny__total-note">over the {fees.length} listed gigs</span>
+      {#each totals as total (total.currency)}
+        <span class="mny__currency-total">
+          <span class="mny__currency">{total.currency}</span>
+          <span class="mny__total">
+            <span class="mny__total-label">pipeline</span>
+            {fmtMoney(total.pipeline)}
+          </span>
+          <span class="mny__total">
+            <span class="mny__total-label">invoiced</span>
+            {fmtMoney(total.invoiced)}
+          </span>
+          <span class="mny__total">
+            <span class="mny__total-label">collected</span>
+            {fmtMoney(total.collected)}
+          </span>
+        </span>
+      {/each}
+      <span class="mny__total-note">current pins · currencies kept separate</span>
     </div>
   </header>
 
@@ -440,16 +494,23 @@
                 <span class="mline__glyph">{lineKindGlyph(l.kind)}</span>
                 <span class="mline__name">{l.name}</span>
                 <span class="mline__co">{l.projectName}</span>
-                <span class="mline__amt">{fmtMoney(l.confirmed)}</span>
               </span>
-              <span class="mline__bar">
-                <span class="mline__fill" style={`inline-size: ${((l.confirmed + l.holds) / byLineMax) * 100}%`}>
-                  <span class="mline__fillc" style={`inline-size: ${l.confirmed + l.holds ? (l.confirmed / (l.confirmed + l.holds)) * 100 : 0}%`}></span>
+              {#each l.currencies as amount (amount.currency)}
+                <span class="mline__money">
+                  <span class="mline__amt">{fmtMoney(amount.confirmed)} {amount.currency}</span>
+                  {#if amount.expenses > 0}
+                    <span class="mline__expense">− {fmtMoney(amount.expenses)} expenses</span>
+                    <span class="mline__net">net {fmtMoney(amount.confirmed - amount.expenses)}</span>
+                  {/if}
                 </span>
-              </span>
+                <span class="mline__bar">
+                  <span class="mline__fill" style={`inline-size: ${((amount.confirmed + amount.holds) / (byLineMax.get(amount.currency) ?? 1)) * 100}%`}>
+                    <span class="mline__fillc" style={`inline-size: ${amount.confirmed + amount.holds ? (amount.confirmed / (amount.confirmed + amount.holds)) * 100 : 0}%`}></span>
+                  </span>
+                </span>
+              {/each}
               <span class="mline__meta">
                 <span>{l.dates} confirmed {l.dates === 1 ? 'date' : 'dates'}</span>
-                {#if l.holds > 0}<span class="mline__hold">+ {fmtMoney(l.holds)} in holds</span>{/if}
                 {#if l.line}<span class="mline__go">Open line →</span>{/if}
               </span>
             </button>
@@ -522,56 +583,30 @@
 
     <section class="mny__section" aria-label="Invoices">
       <p class="eyebrow">Invoices</p>
-      {#if invoices.length === 0}
-        <p class="mny__state">No invoices yet — create one from a gig's fee above.</p>
+      <MoneyInvoices {invoices} />
+    </section>
+
+    <section class="mny__section" aria-label="Expenses">
+      <div class="mny__section-head">
+        <p class="eyebrow">Expenses</p>
+        {#if expenseTotals.length > 0}
+          <p class="mny__expense-totals">
+            {#each expenseTotals as [currency, amount] (currency)}
+              <span>{fmtMoney(amount)} {currency}</span>
+            {/each}
+          </p>
+        {/if}
+      </div>
+      {#if expenses.length === 0}
+        <p class="mny__state">No expenses in the current scope.</p>
       {:else}
-        <ul class="mny__invoices" role="list">
-          {#each invoices as inv (inv.id)}
+        <ul class="mny__expenses" role="list">
+          {#each expenses as expense (expense.id)}
             <li>
-              <span class="mny__inv-number">{inv.number ?? 'no number'}</span>
-              <span class="mny__inv-main">
-                {inv.payer?.organization_name ?? inv.payer?.full_name ?? '—'}
-                {#if inv.project}<span class="mny__cell-muted"> · {inv.project.name}</span>{/if}
-              </span>
-              <span class="mny__cell-date">{dayLabel(inv.issued_on)}</span>
-              <span class="mny__inv-total">{fmtMoney(inv.total)} {inv.currency}</span>
-              <span class="mny__inv-actions">
-                <Menu label="Change invoice status" triggerClass="btn--outline btn--xs">
-                  {#snippet trigger()}
-                    <StateBadge label={inv.status} tone={invoiceTone(inv.status)} />
-                    <span aria-hidden="true">▾</span>
-                  {/snippet}
-                  {#snippet children({ close })}
-                    {#each INVOICE_STATUSES as s (s)}
-                      <li role="none">
-                        <button
-                          type="button"
-                          role="menuitem"
-                          class="menu__item{s === inv.status ? ' menu__item--active' : ''}"
-                          onclick={() => {
-                            close();
-                            if (s !== inv.status)
-                              $invoiceStatusMutation.mutate({ id: inv.id, status: s });
-                          }}
-                        >
-                          {s}
-                        </button>
-                      </li>
-                    {/each}
-                  {/snippet}
-                </Menu>
-                {#if inv.status === 'draft'}
-                  <Button
-                    size="xs"
-                    variant="outline"
-                    tone="warn"
-                    loading={$discardInvoice.isPending}
-                    onclick={() => $discardInvoice.mutate(inv.id)}
-                  >
-                    Discard
-                  </Button>
-                {/if}
-              </span>
+              <span class="mny__cell-date">{dayLabel(expense.incurred_on)}</span>
+              <span class="mny__expense-category">{categoryLabel(expense.category)}</span>
+              <span class="mny__expense-description">{expense.description}</span>
+              <strong>{fmtMoney(expense.amount)} {expense.currency}</strong>
             </li>
           {/each}
         </ul>
@@ -614,7 +649,21 @@
       <Input label="IRPF %" type="number" bind:value={iIrpf} placeholder="e.g. 15 — empty = none" />
       <Input label="Number" bind:value={iNumber} placeholder="Optional — your series" />
       <Input label="Due on" type="date" bind:value={iDueOn} />
+      <Input label="Expected collection" type="date" bind:value={iExpectedOn} />
+      <Select label="Payer" bind:value={iPayerId}>
+        <option value="">Use the linked conversation</option>
+        {#each availablePayers as payer (payer.id)}
+          <option value={payer.id}>
+            {payer.organization_name ? `${payer.organization_name} · ${payer.full_name}` : payer.full_name}
+          </option>
+        {/each}
+      </Select>
     </div>
+    <Input
+      label="Payment condition"
+      bind:value={iPaymentCondition}
+      placeholder="e.g. pays when the town hall pays them — says October"
+    />
     <Input label="Notes" bind:value={iNotes} placeholder="Optional" />
     <p class="mny__inv-total-preview">
       Total: <strong>{fmtMoney(invTotal)} {invPerf.fee_currency ?? 'EUR'}</strong>
@@ -648,14 +697,32 @@
 
     .mny__totals {
       display: flex;
-      align-items: baseline;
-      gap: var(--space-l);
+      align-items: end;
+      gap: var(--space-m);
       flex-wrap: wrap;
+    }
+
+    .mny__currency-total {
+      display: grid;
+      grid-template-columns: auto repeat(3, minmax(7rem, auto));
+      gap: var(--space-s) var(--space-m);
+      align-items: baseline;
+      padding: var(--space-s) var(--space-m);
+      border: 1px solid var(--border-color-light);
+      border-radius: var(--radius-m);
+      background: color-mix(in oklch, var(--bg-light) 55%, transparent);
+    }
+
+    .mny__currency {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      letter-spacing: 0.08em;
     }
 
     .mny__total {
       font-family: var(--font-display);
-      font-size: var(--text-xl);
+      font-size: var(--text-l);
       color: var(--text-color);
       display: flex;
       align-items: baseline;
@@ -731,9 +798,23 @@
       color: var(--text-faint);
     }
     .mline__amt {
-      margin-inline-start: auto;
       font-family: var(--font-mono);
       font-size: var(--text-l);
+      color: var(--text-color);
+      font-variant-numeric: tabular-nums;
+    }
+    .mline__money {
+      display: flex;
+      align-items: baseline;
+      justify-content: flex-end;
+      gap: var(--space-s);
+      margin-block-start: var(--space-xs);
+      font-size: var(--text-xs);
+      color: var(--text-faint);
+    }
+    .mline__expense { color: var(--text-muted); }
+    .mline__net {
+      font-family: var(--font-mono);
       color: var(--text-color);
       font-variant-numeric: tabular-nums;
     }
@@ -766,9 +847,6 @@
       gap: var(--space-m);
       font-size: var(--text-xs);
       color: var(--text-muted);
-    }
-    .mline__hold {
-      color: var(--text-faint);
     }
     .mline__go {
       margin-inline-start: auto;
@@ -806,40 +884,51 @@
       text-decoration: underline;
     }
 
-    .mny__invoices li {
-      display: flex;
-      gap: var(--space-m);
-      align-items: baseline;
-      padding-block: var(--space-xs);
-      border-block-end: 1px solid var(--border-color-light);
-    }
-
-    .mny__inv-number {
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      color: var(--text-faint);
-      min-inline-size: 6rem;
-    }
-
-    .mny__inv-main {
-      flex: 1;
-      font-size: var(--text-s);
-    }
-
-    .mny__inv-total {
-      font-variant-numeric: tabular-nums;
-      font-size: var(--text-s);
-    }
-
-    .mny__inv-actions {
-      display: flex;
-      align-items: center;
-      gap: var(--space-xs);
-    }
-
     .mny__cell-actions {
       text-align: end;
     }
+
+    .mny__section-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: var(--space-m);
+    }
+    .mny__expense-totals {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-m);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+    }
+    .mny__expenses {
+      display: flex;
+      flex-direction: column;
+    }
+    .mny__expenses li {
+      display: grid;
+      grid-template-columns: minmax(8rem, 0.8fr) minmax(6rem, 0.7fr) minmax(12rem, 2fr) auto;
+      gap: var(--space-m);
+      align-items: baseline;
+      padding: var(--space-xs);
+      border-block-end: 1px solid var(--border-color-light);
+      font-size: var(--text-s);
+    }
+    .mny__expenses strong {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      font-weight: 500;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+    .mny__expense-category {
+      color: var(--text-faint);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      text-transform: lowercase;
+    }
+    .mny__expense-description { color: var(--text-color); }
 
     .mny__dialog-who {
       font-size: var(--text-s);
@@ -869,6 +958,30 @@
     .mny__inv-total-preview {
       font-size: var(--text-s);
       margin-block-start: var(--space-s);
+    }
+
+    @media (max-width: 760px) {
+      .mny__toprow { align-items: start; }
+      .mny__currency-total {
+        inline-size: 100%;
+        grid-template-columns: auto 1fr;
+      }
+      .mny__currency { grid-column: 1 / -1; }
+      .mny__total { justify-content: space-between; }
+      .mny__total-note { inline-size: 100%; }
+      .mline__top { flex-wrap: wrap; }
+      .mline__money {
+        justify-content: flex-start;
+        flex-wrap: wrap;
+      }
+      .mny__expenses li {
+        grid-template-columns: 1fr auto;
+        gap: var(--space-xxs) var(--space-s);
+      }
+      .mny__expense-description { grid-column: 1 / -1; }
+      .mny__expenses strong { grid-column: 2; grid-row: 1; }
+      .mny__inv-form,
+      .mny__fee-form { grid-template-columns: 1fr; }
     }
   }
 </style>
