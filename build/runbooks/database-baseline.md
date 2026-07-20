@@ -24,6 +24,11 @@ be exposed to external traffic.
 - The next five migration files are version markers. Production already
   records those exact versions as applied, while their final state is folded
   into the baseline.
+- The legacy pre-checkpoint history is folded at the migration-ledger level by
+  the guarded `repair-baseline-history` mode in
+  `.github/workflows/production-migrate.yml`. The mode first proves the
+  checkpoint itself is applied, then marks only versions older than
+  `20260720105713` as reverted. It does not execute or undo schema SQL.
 - `20260720164803_harden_data_api_defaults.sql` explicitly narrows the hosted
   Data API grants and revokes broad default privileges for future public
   tables, sequences and functions.

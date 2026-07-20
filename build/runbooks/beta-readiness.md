@@ -69,12 +69,16 @@ cd ../web && pnpm run deploy
 ```
 
 Database migrations use `.github/workflows/production-migrate.yml` before
-either Worker deploy. Run it once with `apply=false` and confirmation
-`PLAN PRODUCTION`; inspect that only the expected versioned files are pending.
-Then run it with `apply=true` and confirmation
+either Worker deploy. Run `mode=plan` with confirmation `PLAN PRODUCTION` and
+inspect that only the expected versioned files are pending. The 2026-07-20
+reconstructive checkpoint initially coexisted with the legacy migration rows;
+finalize that one-time metadata fold with `mode=repair-baseline-history` and
+confirmation `REPAIR BASELINE lqlyorlccnniybezugme`, then plan again. Apply
+with `mode=apply` and confirmation
 `MIGRATE PRODUCTION lqlyorlccnniybezugme`. The workflow proves the secret DB
-URL contains the canonical production project ref, preserves migration history
-through `supabase db push`, and prints the remote history after applying.
+URL contains the canonical production project ref, preserves the executable
+history through `supabase db push`, and prints the remote history after
+applying.
 
 ### 2b. Deploy provenance — deploy commits, not working trees
 

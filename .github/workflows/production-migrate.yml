@@ -3,13 +3,17 @@ name: Supabase production migration
 on:
   workflow_dispatch:
     inputs:
-      apply:
-        description: Apply the planned migrations (false only prints the plan)
+      mode:
+        description: Plan, finalize the one-time baseline history, or apply
         required: true
-        default: false
-        type: boolean
+        default: plan
+        type: choice
+        options:
+          - plan
+          - repair-baseline-history
+          - apply
       confirm:
-        description: Type PLAN PRODUCTION or MIGRATE PRODUCTION lqlyorlccnniybezugme
+        description: Exact confirmation phrase for the selected mode
         required: true
         type: string
 
@@ -25,7 +29,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
-      APPLY: ${{ inputs.apply }}
+      MODE: ${{ inputs.mode }}
       CONFIRM: ${{ inputs.confirm }}
       PRODUCTION_PROJECT_REF: lqlyorlccnniybezugme
       SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
@@ -43,10 +47,12 @@ jobs:
             echo 'SUPABASE_DB_URL does not contain the canonical production project ref.' >&2
             exit 1
           fi
-          expected='PLAN PRODUCTION'
-          if [ "$APPLY" = 'true' ]; then
-            expected="MIGRATE PRODUCTION $PRODUCTION_PROJECT_REF"
-          fi
+          case "$MODE" in
+            plan) expected='PLAN PRODUCTION' ;;
+            repair-baseline-history) expected="REPAIR BASELINE $PRODUCTION_PROJECT_REF" ;;
+            apply) expected="MIGRATE PRODUCTION $PRODUCTION_PROJECT_REF" ;;
+            *) echo "Unsupported mode: $MODE" >&2; exit 1 ;;
+          esac
           if [ "$CONFIRM" != "$expected" ]; then
             echo "Confirmation must be exactly: $expected" >&2
             exit 1
@@ -57,15 +63,45 @@ jobs:
         with:
           version: 2.109.1
 
+      - name: Finalize the reconstructive baseline history
+        if: inputs.mode == 'repair-baseline-history'
+        run: |
+          set -euo pipefail
+          checkpoint='20260720105713'
+          checkpoint_count="$(
+            docker run --rm postgres:17-alpine \
+              psql "$SUPABASE_DB_URL" --no-psqlrc --tuples-only --no-align \
+              --set ON_ERROR_STOP=1 \
+              --command "select count(*) from supabase_migrations.schema_migrations where version = '$checkpoint';"
+          )"
+          if [ "$checkpoint_count" != '1' ]; then
+            echo "Expected applied checkpoint $checkpoint exactly once; got $checkpoint_count." >&2
+            exit 1
+          fi
+
+          mapfile -t legacy_versions < <(
+            docker run --rm postgres:17-alpine \
+              psql "$SUPABASE_DB_URL" --no-psqlrc --tuples-only --no-align \
+              --set ON_ERROR_STOP=1 \
+              --command "select version from supabase_migrations.schema_migrations where version < '$checkpoint' order by version;"
+          )
+          if [ "${#legacy_versions[@]}" -eq 0 ]; then
+            echo 'Legacy history is already folded into the reconstructive checkpoint.'
+          else
+            echo "Folding ${#legacy_versions[@]} legacy history entries into checkpoint $checkpoint."
+            supabase migration repair --db-url "$SUPABASE_DB_URL" \
+              --status reverted "${legacy_versions[@]}"
+          fi
+
       - name: Print the migration plan
         run: supabase db push --db-url "$SUPABASE_DB_URL" --dry-run
 
       - name: Apply the migration plan
-        if: inputs.apply
+        if: inputs.mode == 'apply'
         run: supabase db push --db-url "$SUPABASE_DB_URL" --yes
 
       - name: Verify remote migration history
-        if: inputs.apply
+        if: inputs.mode == 'apply'
         run: supabase migration list --db-url "$SUPABASE_DB_URL"
 
       - name: Summary
@@ -75,7 +111,7 @@ jobs:
             echo '## Production database migration'
             echo
             echo "- Commit: \`$GITHUB_SHA\`"
-            echo "- Mode: \`$([ "$APPLY" = 'true' ] && echo apply || echo plan)\`"
+            echo "- Mode: \`$MODE\`"
             echo "- Target ref: \`$PRODUCTION_PROJECT_REF\`"
             echo "- Result: \`${{ job.status }}\`"
           } >> "$GITHUB_STEP_SUMMARY"
