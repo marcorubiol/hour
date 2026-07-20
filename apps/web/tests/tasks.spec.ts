@@ -165,8 +165,11 @@ test.describe('tasks — Desk feed + line module', () => {
       mod.getByRole('button', { name: /^add$/i }).click(),
     ]);
     expect(created.status()).toBe(201);
-    const body = (await created.json()) as { task: { line_id: string | null } };
+    const body = (await created.json()) as {
+      task: { line_id: string | null; line: { id: string } | null };
+    };
     expect(body.task.line_id).toBe(line!.id);
+    expect(body.task.line?.id).toBe(line!.id);
 
     const row = mod.getByRole('checkbox', { name: TASK_LINE });
     await expect(row).toBeVisible({ timeout: 10_000 });

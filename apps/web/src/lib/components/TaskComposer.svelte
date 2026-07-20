@@ -55,6 +55,18 @@
   }: Props = $props();
 
   const queryClient = useQueryClient();
+  type TasksCache = { items: TaskItem[] };
+
+  function cacheCreatedTask(key: readonly unknown[], task: TaskItem) {
+    queryClient.setQueryData<TasksCache>(key, (current) =>
+      current
+        ? {
+            ...current,
+            items: [task, ...current.items.filter((item) => item.id !== task.id)],
+          }
+        : current,
+    );
+  }
 
   // Composer fields.
   let title = $state('');
@@ -122,6 +134,13 @@
       userTarget = null;
       expanded = false;
       pickerOpen = false;
+      if (res) {
+        // The 201 body is authoritative and already has the full TaskItem
+        // shape. Publish it synchronously so the row cannot disappear behind
+        // an asynchronous invalidation/refetch race.
+        cacheCreatedTask(['tasks', 'open'], res.task);
+        for (const key of invalidateKeys) cacheCreatedTask(key, res.task);
+      }
       void queryClient.invalidateQueries({ queryKey: ['tasks'] });
       for (const key of invalidateKeys) {
         void queryClient.invalidateQueries({ queryKey: key });

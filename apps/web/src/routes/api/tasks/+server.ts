@@ -21,7 +21,6 @@ import {
   TaskCreateSchema,
   normalizeTaskItem,
   type TaskDbItem,
-  type TaskItem,
 } from '$lib/task';
 import { pgGet, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
@@ -168,7 +167,7 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
   }
 
   try {
-    const { data } = await pgPostRpc<TaskItem>(env, 'create_task', jwt, {
+    const { data } = await pgPostRpc<{ id: string }>(env, 'create_task', jwt, {
       p_title: input.title,
       p_note: input.note ?? null,
       p_due_at: input.due_at ?? null,
@@ -181,7 +180,18 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
       p_conversation_id: input.conversation_id ?? null,
     });
     if (data.length === 0 || !data[0]) return json({ error: 'create_failed' }, 502);
-    return json({ task: data[0] }, 201);
+
+    // RPCs returning a table row do not include the parent embeds promised by
+    // TaskItem. Read the new row through the same SELECT contract as GET so a
+    // mutation response can safely become the client's immediate cache row.
+    const search = new URLSearchParams({
+      select: TASK_SELECT,
+      id: `eq.${data[0].id}`,
+      limit: '1',
+    });
+    const { data: created } = await pgGet<TaskDbItem>(env, 'task', jwt, { search });
+    if (!created[0]) return json({ error: 'create_failed' }, 502);
+    return json({ task: normalizeTaskItem(created[0]) }, 201);
   } catch (err) {
     return pgErrorResponse(
       err,
