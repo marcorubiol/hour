@@ -1,8 +1,11 @@
 # Hour — Build prompt: Conversations lens v1.5 (last contact + grouping)
 
-> **STATUS: PENDIENTE (reverificado 2026-07-20).** Sin columna "Last contact",
-> write path `last_contacted_at`/"Contacted today" ni toggle "By conversation |
-> By contact". `last_contacted_at` existe, pero esta feature no lo usa todavía.
+> **STATUS: EJECUTADO Y EN PRODUCCIÓN (2026-07-20, `ad1b580`).** Columna
+> "Last contact", reloj de servidor para cambios de estado/"Contacted today",
+> agrupación "By conversation | By contact", persistencia local, estado vacío y
+> adaptación móvil verificados. El contrato futuro de `conversation_event` está
+> congelado en `build/conversation-event-contract.md`; la tabla/timeline sigue
+> fuera del alcance explícito de v1.5.
 >
 > Handoff prompt for an external coding agent. Deliberately SMALL: everything depending on
 > the organization entity and the conversation log (gaps #1/#2) waits for review session 2

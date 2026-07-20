@@ -1,6 +1,10 @@
 # Hour — Design prompt: Conversations lens (the booking network, at booking speed)
 
-> **STATUS: PENDIENTE (reverificado 2026-07-20).** Depende de Conversations v1.5.
+> **STATUS: EJECUTADO PARA EL ALCANCE v1.5 (2026-07-20, `ad1b580`).** La tabla,
+> ambos estados de agrupación, last contact calmado, estado vacío, filtros y
+> respuesta móvil están construidos en producción. Los apartados 3–5 son diseño
+> adelantado dependiente de organización/provenance/fair mode y siguen fuera del
+> alcance de v1.5; no deben presentarse como producto construido.
 >
 > For the design tool. Origin: S1 2026-07-17 — ADR-073, spec `§ Conversations`, personas in
 > `research/profiles/06-freelance-distribution.md` + `99-patterns.md`.

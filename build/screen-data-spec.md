@@ -290,19 +290,22 @@ names surfaces).
 **Is**: concern-lens over the booking conversations; the book (people AND organizations)
 lives inside it as the by-contact view (ADR-065 → ADR-075).
 **Today**: conversation table (person, org text, location, status editable inline, next action
-editable) + q search + status filter + pins + Add contact (multi-space) + pagination 50.
+editable, last contact calmado) + gesto server-clock "Contacted today" + q search + status
+filter + pins + Add contact (multi-space) + pagination 50 + agrupación local por
+conversación/contacto con project chips + estado vacío orientado a importación. La elección
+de agrupación persiste; en móvil las filas se convierten en tarjetas.
 **Contains — SETTLED (S1, 2026-07-17)**:
 - The conversation table [now] + **one "last contact" column** (date, quiet styling) — the
   full history lives in the contact's file, not the lens (Marco, S1). Write path: stamp
   `last_contacted_at` on status change + a "contacted today" gesture; `first_contacted_at`
-  set once [db — dispatched].
+  set once [now — shipped `ad1b580`].
 - **Tags: PARKED** (S1) — seed-era `custom_fields.tags` nobody knew existed; structured
   fields (org, city, season) beat free labels for the AI. Reopen only on a real need.
 - **Organizations as rows** [gap #1, direction fixed S1]: juridical actor ≠ `venue`
   (place); **person↔org as a DATED affiliation** — programmers change theatres constantly
   and the relationship follows the person (research 99-patterns). Covers the Lyon/Paris
   case: `person.city` (lives) + org's city (works) = "where can I find X". Fine shape in S2.
-- **Contact-centric grouping toggle** (one row per person, project chips) [db — dispatched].
+- **Contact-centric grouping toggle** (one row per person, project chips) [now].
 - Per-contact timeline in the contact file — blocked by gap #2 (the lens just links).
 **From the profile research (06 + 99-patterns), added S1**:
 - **Fair rhythm**: meeting provenance ("met at FiraTàrrega 2026, re show X") as gap #2 log
@@ -318,8 +321,10 @@ editable) + q search + status filter + pins + Add contact (multi-space) + pagina
 - **Import is adoption-critical** (the Airtable-collapse catch): `build/import/` pipeline
   already exists — the lens's empty state should point at it.
 **Open (minor)**: season filter exists server-side, unused in UI — unanswered S1, park.
-**Build**: v1 dispatched 2026-07-17 (`conversations-prompt.md` + `conversations-design-prompt.md`);
-the model prompt (orgs + conversation log) follows S2's shapes.
+**Build**: v1.5 shipped 2026-07-20 (`ad1b580`; `conversations-prompt.md` +
+`conversations-design-prompt.md`). `conversation_event` has a frozen contract only
+(`conversation-event-contract.md`): org rows, timeline, provenance and fair mode follow
+the later S2 shapes and are not represented as live UI.
 
 ### `/h/money` — Money lens
 

@@ -28,12 +28,13 @@
    scope ausente en Conversations y la copia denegada en browsers embebidos;
    ambos quedan automatizados.
 
-## Ahora — bloque 3: Conversations v1.5
+## Cerrado — bloque 3: Conversations v1.5
 
-10. [ ] **Conversations v1.5.** Last contact visible, write path “contacted
+10. [x] **Conversations v1.5.** Last contact visible, write path “contacted
     today”, vista por conversación/persona y contrato de `conversation_event`.
-    Prompts activos: `build/conversations-prompt.md` y
-    `build/conversations-design-prompt.md`.
+    Runtime `ad1b580`; migración de timestamps aplicada, baseline staging desde
+    cero verde, RLS 118/118 y E2E de producción verificado. El contrato del event
+    log queda congelado sin anticipar la tabla/timeline fuera de alcance.
 
 ## Decisiones con coste o autoridad externa
 
@@ -41,7 +42,7 @@
    Free y la función requiere Pro. Marco debe decidir el upgrade; después activar
    `password_hibp_enabled` y volver a ejecutar el advisor.
 
-## Después del bloque 3 — bloques 4 a 6
+## Ahora — bloque 4: Money v2
 
 11. [ ] **Money v2.** `expected_on`, condición de pago, pagos observados,
     aging y estado paid derivado. Orden activo: `build/money-model-prompt.md` →

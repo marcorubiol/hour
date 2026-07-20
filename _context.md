@@ -52,9 +52,9 @@ orientativo, no una verdad comercial cerrada.
 
 - Web: `https://hour.zerosense.studio`
 - Worker: `hour-web`
-- `/health/live`: sano, `dirty:false`, SHA **`5cc2f6b`**.
+- `/health/live`: sano, `dirty:false`, SHA **`ad1b580`**.
 - `/health/ready`: sano, Supabase `ok`.
-- El runtime verificado en producción es `5cc2f6b`; commits posteriores que
+- El runtime verificado en producción es `ad1b580`; commits posteriores que
   solo cambian documentación no requieren desplegar el Worker.
 
 ### Git
@@ -62,7 +62,7 @@ orientativo, no una verdad comercial cerrada.
 - Repo: `https://github.com/marcorubiol/hour` (privado).
 - Checkout: `/Users/marcorubiol/Developer/hour`.
 - Rama principal: `main`.
-- Base funcional del runtime: **`5cc2f6b`**, publicada en `origin/main`;
+- Base funcional del runtime: **`ad1b580`**, publicada en `origin/main`;
   `main` local y remoto están sincronizados.
 - `wrangler deploy` exige árbol limpio y publica el SHA en `/health/live`.
 
@@ -97,14 +97,20 @@ vacía se reconstruye con `pnpm db:reset`, recibe fixtures sintéticos y pasa
 Último pase completo relevante:
 
 - `svelte-check`: 0 errores / 0 warnings.
-- Unit: **318/318**.
+- Unit: **322/322**.
 - RLS contra Supabase live: **118/118**, sin skips.
 - Collab: **11/11** + TypeScript limpio.
 - Build de producción: verde.
-- E2E contra producción: **25/25** en `5cc2f6b`, incluidos collab real,
-  aislamiento money, Conversations scoped y copy-link canónico.
-- Baseline hosted actual: run `29770132749` sobre `5cc2f6b`, reconstrucción
-  desde cero, 3 identidades Auth, fixtures, RLS 118/118, build y smoke verdes.
+- E2E contra producción: suite completa **24 passed + 2 skips remotos
+  intencionados** en `ad1b580`; recorrido específico de Conversations **5/5**.
+  Incluye reloj de servidor, agrupación persistente, aislamiento money,
+  Conversations scoped y copy-link canónico.
+- Baseline hosted actual: run `29771194783` sobre `ad1b580`, reconstrucción
+  desde cero, 3 identidades Auth, 154 conversaciones sintéticas, RLS 118/118,
+  build y smoke 2/2 verdes.
+- Migración de producción: plan `29771403137` y apply `29771440087`; solo
+  `20260720201000_conversation_contact_timestamps.sql`, con trigger y función
+  comprobados después del DDL.
 - Backup de producción actual: run `29770347695` sobre `5cc2f6b`, sello
   `2026-07-20T19-02-54Z`; esquema, datos y roles subidos a R2 y retención
   aplicada correctamente.
@@ -122,8 +128,10 @@ vacía se reconstruye con `pnpm db:reset`, recibe fixtures sintéticos y pasa
 - **Planner** `/h/planner`: mes, agenda y carriles; performances, dates,
   disponibilidad, viajes, conflictos y decisiones derivadas. `Calendar` queda
   solo para iCalendar/ICS e URLs legacy con redirect.
-- **Conversations** `/h/conversations`: libro operativo de conversaciones con
-  personas/organizaciones; escritura de estado y próxima acción.
+- **Conversations** `/h/conversations`: libro operativo con last contact,
+  “Contacted today” con reloj de servidor, agrupación conversación/contacto,
+  project chips, escritura de estado/próxima acción y estado vacío de importación.
+  El contrato de `conversation_event` existe; la tabla/timeline aún no.
 - **Money** `/h/money`: fees, facturas y estados básicos; Money v2 y pagos
   observados aún no están construidos.
 - Contenedores: workspace → project → line; los módulos editan a nivel line.
@@ -197,9 +205,9 @@ profundidad de producto, no en SvelteKit/Supabase/Cloudflare.
 
 ## Siguiente paso
 
-Abrir `_tasks.md`. Los bloques 1 y 2 están cerrados. La prioridad inmediata es
-el bloque 3: Conversations v1.5; no empezar Money ni la revisión transversal
-hasta verificarlo.
+Abrir `_tasks.md`. Los bloques 1, 2 y 3 están cerrados. La prioridad inmediata
+es el bloque 4: Money v2; no empezar la revisión de contenedores ni la
+transversal hasta verificarlo.
 
 ## Desarrollo local
 
