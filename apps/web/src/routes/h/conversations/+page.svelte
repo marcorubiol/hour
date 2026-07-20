@@ -23,7 +23,7 @@
   import Input from '$lib/components/Input.svelte';
   import Select from '$lib/components/Select.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
-  import { CONVERSATION_STATUSES, statusLabel } from '$lib/conversation';
+  import { CONVERSATION_STATUSES, statusLabel, type ConversationItem } from '$lib/conversation';
   import { usePins } from '$lib/stores/pins.svelte';
   import {
     buildLineIndex,
@@ -50,9 +50,14 @@
   const projectsQuery = createQuery(activeProjectsQueryOptions());
 
   let workspaces = $derived<NavWorkspace[]>($workspacesQuery.data?.items ?? []);
-  // Browsing context for link-building only (ADR-067): lens routes carry no
-  // space segment; person links borrow the default (first) workspace.
-  let defaultWorkspaceSlug = $derived(workspaces[0]?.slug ?? '');
+  let workspaceSlugById = $derived(new Map(workspaces.map((w) => [w.id, w.slug])));
+
+  function personHref(item: ConversationItem): string | null {
+    const workspaceSlug = workspaceSlugById.get(item.workspace_id);
+    return workspaceSlug && item.person?.slug
+      ? `/h/${workspaceSlug}/person/${item.person.slug}`
+      : null;
+  }
 
   // ── Pins → scope (Adaptive Digest) ────────────────────────────────────
   let projectIndex = $derived(buildProjectIndex(workspaces, $projectsQuery.data?.items ?? []));
@@ -305,7 +310,7 @@
     </div>
   </header>
 
-  <ConversationTable {filters} personBase={`/h/${defaultWorkspaceSlug}/person`} />
+  <ConversationTable {filters} {personHref} />
 </section>
 
 <Dialog bind:open={addOpen} title="Add conversation" size="m">

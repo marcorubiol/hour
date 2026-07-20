@@ -26,34 +26,36 @@ test.describe('person file', () => {
     // entity resolved by RLS, so any accessible segment renders it (verified:
     // the same person opens under /h/marco-rubiol/ and /h/muk-cia/). Don't
     // pin the test to one space.
-    const firstName = page.locator('tbody tr').first().locator('.cell--name-link');
+    const firstName = page.locator('tbody tr').first().getByRole('link').first();
     const personName = (await firstName.innerText()).trim();
     await firstName.click();
     await page.waitForURL(/\/h\/[^/]+\/person\//);
-    await expect(page.locator('.person__title')).toContainText(personName);
+    await expect(page.getByRole('heading', { name: personName, level: 1 })).toBeVisible();
 
     // The conversation context renders (this person has at least the
     // MaMeMi conversation — that's why they were in the list).
-    await expect(page.locator('.person__rows li').first()).toBeVisible();
+    const conversations = page.getByRole('region', { name: 'Conversations' });
+    await expect(conversations.getByRole('listitem').first()).toBeVisible();
 
     // Add a workspace note.
-    await page.getByPlaceholder('What happened with this person?').fill(marker);
-    await page.getByRole('button', { name: 'Add note' }).click();
-    await expect(page.locator('.person__note-body').first()).toContainText(marker, {
+    const notes = page.getByRole('region', { name: 'Notes' });
+    await notes.getByPlaceholder('What happened with this person?').fill(marker);
+    await notes.getByRole('button', { name: 'Add note' }).click();
+    await expect(notes.getByText(marker, { exact: true })).toBeVisible({
       timeout: 10_000,
     });
 
     // Persists across reload.
     await page.reload();
-    await expect(page.locator('.person__note-body').first()).toContainText(marker, {
+    await expect(notes.getByText(marker, { exact: true })).toBeVisible({
       timeout: 10_000,
     });
 
     // Cleanup IS the delete-button test: the button only renders on the
     // author's own notes and goes through the delete_person_note RPC (a
     // direct PATCH on deleted_at is impossible — see ADR-048).
-    const noteItem = page.locator('.person__notes li', { hasText: marker });
-    await noteItem.locator('.person__note-delete').click();
+    const noteItem = notes.getByRole('listitem').filter({ hasText: marker });
+    await noteItem.getByRole('button', { name: 'delete' }).click();
     await expect(noteItem).toHaveCount(0, { timeout: 10_000 });
 
     // Gone after the cleanup — poll the API (render/cache races under
@@ -62,9 +64,20 @@ test.describe('person file', () => {
       .poll(
         async () =>
           await page.evaluate(async (m) => {
-            const res = await fetch(location.pathname.replace(/^.*person/, '/api/persons'));
-            const data = (await res.json()) as { notes: Array<{ body: string }> };
-            return data.notes.some((n) => n.body === m);
+            const [, , workspaceSlug, , personSlug] = location.pathname.split('/');
+            const workspacesRes = await fetch('/api/workspaces');
+            const workspaces = (
+              (await workspacesRes.json()) as {
+                items: Array<{ id: string; slug: string }>;
+              }
+            ).items;
+            const workspaceId = workspaces.find((w) => w.slug === workspaceSlug)?.id;
+            if (!workspaceId || !personSlug) return null;
+            const res = await fetch(
+              `/api/persons/${encodeURIComponent(personSlug)}?workspace_id=${encodeURIComponent(workspaceId)}`,
+            );
+            const data = (await res.json()) as { notes?: Array<{ body: string }> };
+            return data.notes?.some((n) => n.body === m) ?? null;
           }, marker),
         { timeout: 10_000 },
       )

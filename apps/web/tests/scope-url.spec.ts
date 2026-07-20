@@ -51,7 +51,7 @@ test('rail-applied saved scope, then Everything, cleans the URL (replaceState st
 
   // 1. Land on the hall.
   await page.goto('/h');
-  await expect(page.locator('.hall__door')).toBeVisible({ timeout: 15000 });
+  await expect(page.getByRole('region', { name: 'Home' })).toBeVisible({ timeout: 15000 });
 
   // 2. Everything → lands on /h/desk, clean.
   await page.getByRole('button', { name: /Everything/ }).click();
@@ -72,7 +72,7 @@ test('rail-applied saved scope, then Everything, cleans the URL (replaceState st
 test('Everything from the HALL with a scoped link also lands clean on /h/desk', async ({ page }) => {
   await page.goto(`/h?scope=${FIXTURE_SPACE_TOKEN}`);
   // Hall greets; the scope applies underneath (no chip on the hall).
-  await expect(page.locator('.hall__door')).toBeVisible({ timeout: 15000 });
+  await expect(page.getByRole('region', { name: 'Home' })).toBeVisible({ timeout: 15000 });
 
   await page.getByRole('button', { name: /Everything/ }).click();
   await page.waitForURL(/\/h\/desk/, { timeout: 10000 });

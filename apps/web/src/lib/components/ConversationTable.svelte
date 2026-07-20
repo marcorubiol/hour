@@ -44,9 +44,11 @@
     filters: ConversationFilters;
     /** e.g. `/h/muk-cia/person` — when set, names link to the person file. */
     personBase?: string;
+    /** Cross-space lenses resolve the dossier from each conversation's workspace. */
+    personHref?: (item: ConversationItem) => string | null;
   }
 
-  let { filters, personBase }: Props = $props();
+  let { filters, personBase, personHref }: Props = $props();
 
   type ConversationsResponse = {
     total: number;
@@ -204,6 +206,11 @@
     return [item.person.city, item.person.country].filter(Boolean).join(', ') || '—';
   }
 
+  function personPath(item: ConversationItem): string | null {
+    if (!item.person?.slug) return null;
+    return personHref?.(item) ?? (personBase ? `${personBase}/${item.person.slug}` : null);
+  }
+
   let showPagination = $derived(total > LIMIT);
   let rangeEnd = $derived(Math.min(offset + LIMIT, total));
 </script>
@@ -230,10 +237,11 @@
     </thead>
     <tbody>
       {#each items as item, i (item.id)}
+        {@const path = personPath(item)}
         <tr>
           <td class="cell--name">
-            {#if personBase && item.person?.slug}
-              <a class="cell--name-link" href={`${personBase}/${item.person.slug}`}>
+            {#if path && item.person}
+              <a class="cell--name-link" href={path}>
                 {item.person.full_name}
               </a>
             {:else}

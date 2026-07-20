@@ -15,7 +15,7 @@ async function openApp(page: Page) {
 }
 
 /**
- * E2E — performance write path (ADR-043): create a gig from the calendar,
+ * E2E — performance write path (ADR-043): create a gig from the Planner,
  * then edit status + schedule on the detail page.
  *
  * Everything happens in the test user's own `playwright` workspace
@@ -44,7 +44,7 @@ test.describe('performance write path', () => {
   // on globally). Same idiom as collab.spec.ts.
   test.describe.configure({ mode: 'serial' });
 
-  test('create from calendar → detail → status + schedule edits persist', async ({
+  test('create from Planner → detail → status + schedule edits persist', async ({
     page,
   }) => {
     test.setTimeout(90_000);
@@ -56,7 +56,7 @@ test.describe('performance write path', () => {
 
     // Create from the header button (ADR-078: unified dialog — pick the
     // Performance type pill, then the shared PerformanceForm).
-    await page.getByRole('button', { name: 'Add to calendar', exact: true }).click();
+    await page.getByRole('button', { name: 'Add to planner', exact: true }).click();
     const dialog = page.locator('dialog[open]');
     await expect(dialog).toBeVisible();
     await dialog
@@ -192,7 +192,7 @@ test.describe('performance write path', () => {
       .filter({ hasText: 'There is no undo from the UI.' });
     await confirm.getByRole('button', { name: 'Delete', exact: true }).click();
     // ADR-067: delete returns to the space-less Planner lens.
-    await page.waitForURL(/\/h\/calendar/, { timeout: 15_000 });
+    await page.waitForURL(/\/h\/planner/, { timeout: 15_000 });
 
     // Sweep the remainder — still workspace + prefix scoped, never touching
     // any workspace but `playwright`.

@@ -25,7 +25,7 @@ const LINE_NAME = 'ZZZ E2E Modules';
 
 /** Give the context an origin before in-page fetches (ADR-067: Desk is space-less). */
 async function openApp(page: Page) {
-  await page.goto('/h/desk');
+  await page.goto('/h/desk?scope=s:playwright');
 }
 
 async function playwrightWsId(page: Page): Promise<string | null> {
@@ -79,13 +79,12 @@ test.describe('tasks — Desk feed + line module', () => {
     expect(wsId, 'playwright workspace reachable').not.toBeNull();
     await sweepTasks(page, wsId!);
 
-    // Quick-add: title + explicit space (the suite must never write into a
-    // real workspace by default-select accident). Scoped to the composer
-    // form — the layout mounts global creation dialogs whose hidden labels
-    // ('Workspace', 'Space color'…) collide with bare getByLabel.
-    const composer = page.locator('form.desk__task-add');
-    await composer.getByLabel('New task').fill(TASK_FREE);
-    await composer.getByLabel('Space').selectOption(wsId!);
+    // The scoped URL makes the fixture workspace the composer's explicit
+    // default. Assert that visible contract before writing anything.
+    const title = page.getByRole('textbox', { name: /add a loose end/i });
+    const composer = page.locator('form').filter({ has: title });
+    await title.fill(TASK_FREE);
+    await expect(composer).toContainText(/playwright/i);
     const [created] = await Promise.all([
       page.waitForResponse(
         (r) => r.url().includes('/api/tasks') && r.request().method() === 'POST',
@@ -98,14 +97,12 @@ test.describe('tasks — Desk feed + line module', () => {
     await expect(row).toBeVisible({ timeout: 10_000 });
 
     // Complete it — server-ack the PATCH (the optimistic paint alone proves
-    // nothing), then the open-only feed drops the row. Click the visible
-    // label: the real input is the 1×1 visually-hidden .check__input and
-    // Playwright's hit-target check never reaches it.
+    // nothing), then the open-only feed drops the row.
     const [patched] = await Promise.all([
       page.waitForResponse(
         (r) => /\/api\/tasks\//.test(r.url()) && r.request().method() === 'PATCH',
       ),
-      page.getByText(TASK_FREE, { exact: true }).click(),
+      row.check(),
     ]);
     expect(patched.status()).toBe(200);
     await expect(row).not.toBeVisible({ timeout: 10_000 });
@@ -159,8 +156,8 @@ test.describe('tasks — Desk feed + line module', () => {
     await expect(mod).toBeVisible({ timeout: 10_000 });
 
     // Create a task in the module — line_id auto-assigned by context.
-    await mod.getByLabel('New task').fill(TASK_LINE);
-    await mod.getByLabel('Due').fill('2030-01-15');
+    await mod.getByRole('textbox', { name: /add a loose end/i }).fill(TASK_LINE);
+    await mod.getByLabel(/due/i).fill('2030-01-15');
     const [created] = await Promise.all([
       page.waitForResponse(
         (r) => r.url().includes('/api/tasks') && r.request().method() === 'POST',
@@ -174,8 +171,7 @@ test.describe('tasks — Desk feed + line module', () => {
     const row = mod.getByRole('checkbox', { name: TASK_LINE });
     await expect(row).toBeVisible({ timeout: 10_000 });
 
-    // Complete → the row moves behind the done fold (label click — the
-    // input itself is visually hidden, see the Desk test).
+    // Complete → the row moves behind the done fold.
     const [patched] = await Promise.all([
       page.waitForResponse(
         (r) => /\/api\/tasks\//.test(r.url()) && r.request().method() === 'PATCH',
