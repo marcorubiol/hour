@@ -4,7 +4,12 @@ on:
   schedule:
     # Sunday 03:00 UTC.
     - cron: '0 3 * * 0'
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      source_stamp:
+        description: Existing R2 backup stamp to expose as a short-lived schema artifact
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -24,6 +29,7 @@ jobs:
       R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
       R2_BUCKET: hour-backups
       RETENTION_WEEKS: '12'
+      SOURCE_STAMP: ${{ inputs.source_stamp }}
     steps:
       - name: Validate required secrets
         run: |
@@ -36,11 +42,13 @@ jobs:
           fi
 
       - name: Install Supabase CLI
+        if: env.SOURCE_STAMP == ''
         uses: supabase/setup-cli@v1
         with:
           version: latest
 
       - name: Dump schema + data + roles
+        if: env.SOURCE_STAMP == ''
         run: |
           set -euo pipefail
           stamp="$(date -u +%Y-%m-%dT%H-%M-%SZ)"
@@ -53,6 +61,7 @@ jobs:
           echo "STAMP=${stamp}" >> "$GITHUB_ENV"
 
       - name: Upload to R2 (S3-compatible)
+        if: env.SOURCE_STAMP == ''
         env:
           AWS_ACCESS_KEY_ID: ${{ env.R2_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ env.R2_SECRET_ACCESS_KEY }}
@@ -65,6 +74,26 @@ jobs:
               --only-show-errors
           done
 
+      - name: Fetch an existing schema from R2
+        if: env.SOURCE_STAMP != ''
+        env:
+          AWS_ACCESS_KEY_ID: ${{ env.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ env.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+        run: |
+          set -euo pipefail
+          if [[ ! "$SOURCE_STAMP" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}-[0-9]{2}-[0-9]{2}Z$ ]]; then
+            echo "Invalid source_stamp: $SOURCE_STAMP" >&2
+            exit 1
+          fi
+          mkdir -p out
+          aws s3 cp \
+            "s3://${R2_BUCKET}/weekly/${SOURCE_STAMP}/schema-${SOURCE_STAMP}.sql.gz" \
+            "out/schema-${SOURCE_STAMP}.sql.gz" \
+            --endpoint-url "$R2_ENDPOINT" \
+            --only-show-errors
+          echo "STAMP=${SOURCE_STAMP}" >> "$GITHUB_ENV"
+
       # Schema-only copy for baseline/recovery verification. Production rows
       # remain exclusively in the private R2 backup.
       - name: Upload short-lived schema artifact
@@ -76,6 +105,7 @@ jobs:
           retention-days: 1
 
       - name: Prune backups older than RETENTION_WEEKS
+        if: env.SOURCE_STAMP == ''
         env:
           AWS_ACCESS_KEY_ID: ${{ env.R2_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ env.R2_SECRET_ACCESS_KEY }}
@@ -98,8 +128,12 @@ jobs:
       - name: Summary
         run: |
           {
-            echo "## Backup ${STAMP}"
+            echo "## Supabase schema ${STAMP}"
             echo
-            echo "Pushed to \`s3://${R2_BUCKET}/weekly/${STAMP}/\`"
+            if [ -z "$SOURCE_STAMP" ]; then
+              echo "Fresh backup pushed to \`s3://${R2_BUCKET}/weekly/${STAMP}/\`."
+            else
+              echo "Existing backup exposed as a one-day schema-only artifact."
+            fi
             ls -lh out/
           } >> "$GITHUB_STEP_SUMMARY"
