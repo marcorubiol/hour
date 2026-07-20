@@ -461,6 +461,44 @@
     return m;
   });
 
+  /**
+   * Sessions of ONE block on one day collapse into a single chip with a
+   * count; anything else stays its own chip.
+   *
+   * A rehearsal day holds a morning and an afternoon and both matter, but a
+   * card cannot grow — so the card shows the first hour and says how many
+   * more there are, and the hover carries all of them. Two different gigs on
+   * a day are NOT this case: those are two things, and both names have to be
+   * readable (Marco, 2026-07-20).
+   */
+  function groupDates(list: DateEvent[]): DateEvent[][] {
+    const out: DateEvent[][] = [];
+    const bySeries = new Map<string, DateEvent[]>();
+    for (const d of list) {
+      if (!d.series_id) {
+        out.push([d]);
+        continue;
+      }
+      const g = bySeries.get(d.series_id);
+      if (g) g.push(d);
+      else {
+        const started = [d];
+        bySeries.set(d.series_id, started);
+        out.push(started);
+      }
+    }
+    // Clock order, so "the first hour" means the earliest one.
+    for (const g of out) if (g.length > 1) g.sort((a, b) => (a.starts_at < b.starts_at ? -1 : 1));
+    return out;
+  }
+
+  /** The hover carries every session's hour — the chip had room for one. */
+  function groupTitle(g: DateEvent[]): string {
+    if (g.length < 2) return dateTitle(g[0]);
+    const times = g.map((x) => dateTime(x)?.primary).filter(Boolean);
+    return `${dateTitle(g[0])} · ${times.join(' · ')}`;
+  }
+
   /** Null when the row stands alone — a "series" of one is just a date. */
   function seriesEdges(d: DateEvent, iso: string): { first: boolean; last: boolean } | null {
     if (!d.series_id) return null;
@@ -656,7 +694,7 @@
     {@const wlc = weekLaneCount(week)}
     {#each week as day, di (day.iso)}
       {@const perfs = (performancesByDay.get(day.iso) ?? []).filter(projectShown)}
-      {@const dayDates = (datesByDay.get(day.iso) ?? []).filter(projectShown)}
+      {@const dateGroups = groupDates((datesByDay.get(day.iso) ?? []).filter(projectShown))}
       {@const clashes = clashesByDay?.get(day.iso) ?? []}
       {@const bandSlots = laneSlotsOn(day.iso, wlc)}
       <div
@@ -741,7 +779,9 @@
             >{@render perfBody(p)}</span>
           {/if}
         {/each}
-        {#each dayDates as d (d.id)}
+        {#each dateGroups as g (g[0].id)}
+          {@const d = g[0]}
+          {@const more = g.length - 1}
           {#if d.kind === 'travel_day'}
             <span
               class="cal__event cal__event--travel"
@@ -762,7 +802,7 @@
               class:cal__event--run-last={edges?.last}
               data-family={dateStatusFamily(d.status)}
               style={d.project ? `--c: ${accentVarFor(d.project)}` : undefined}
-              title={dateTitle(d)}
+              title={groupTitle(g)}
             >
               {#if head}
                 <span class="cal__event-top">
@@ -783,7 +823,9 @@
                       >{city ?? ''}{#if city && cc}<i class="cal__event-cc">{cc}</i>{/if}</span
                     >
                     {#if time}<span class="cal__event-time"
-                        >{time.primary}{#if time.end}–{time.end}{/if}</span
+                        >{time.primary}{#if time.end}–{time.end}{/if}{#if more > 0}<i
+                            class="cal__event-more">+{more}</i
+                          >{/if}</span
                       >{/if}
                   </span>
                 {/if}
@@ -794,7 +836,9 @@
                      same words across five cells. -->
                 <span class="cal__event-line cal__event-line--cont">
                   <span class="cal__event-time"
-                    >{time.primary}{#if time.end}–{time.end}{/if}</span
+                    >{time.primary}{#if time.end}–{time.end}{/if}{#if more > 0}<i
+                        class="cal__event-more">+{more}</i
+                      >{/if}</span
                   >
                 </span>
               {/if}
@@ -1398,6 +1442,13 @@
       color: color-mix(in oklch, var(--text-faint) 62%, transparent);
       /* Svelte trims the leading space inside <i> — restore the gap here. */
       margin-inline-start: var(--space-2xs);
+    }
+    /* "+2" — the day holds more sessions than the card can print. It reads as
+       part of the time rather than as a badge, because it is the same fact
+       continued: the hover carries the hours themselves. */
+    .cal__event-time i.cal__event-more {
+      color: color-mix(in oklch, var(--text-faint) 85%, var(--text-color));
+      margin-inline-start: 0.3em;
     }
 
     /* ── Blackout bands (ADR-078 §4/§5): company = full-width quiet ink,
