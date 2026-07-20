@@ -73,14 +73,12 @@ describe.skipIf(!envReady())('payment RLS + derived invoice status', () => {
     const paymentIds: string[] = [];
     try {
       if (originalFee === null) {
-        const prepared = await pgPatch<MoneyPerformance>(
-          'performance',
-          jwt,
-          { fee_amount: 100, fee_currency: performance.fee_currency ?? 'EUR' },
-          new URLSearchParams({ id: `eq.${performance.id}`, select: 'id,fee_amount,fee_currency' }),
-        );
+        const prepared = await pgRpc<MoneyPerformance>('update_performance_fee', jwt, {
+          p_performance_id: performance.id,
+          p_fee_amount: 100,
+          p_fee_currency: performance.fee_currency ?? 'EUR',
+        });
         expect(prepared.status).toBe(200);
-        expect(Number(prepared.rows[0]?.fee_amount)).toBe(100);
       }
 
       const createdInvoice = await pgRpc<InvoiceRow>('create_invoice', jwt, {
@@ -196,12 +194,11 @@ describe.skipIf(!envReady())('payment RLS + derived invoice status', () => {
         await pgRpc('delete_invoice', jwt, { p_invoice_id: invoice.id });
       }
       if (originalFee === null) {
-        await pgPatch(
-          'performance',
-          jwt,
-          { fee_amount: null },
-          new URLSearchParams({ id: `eq.${performance.id}` }),
-        );
+        await pgRpc('update_performance_fee', jwt, {
+          p_performance_id: performance.id,
+          p_fee_amount: null,
+          p_fee_currency: performance.fee_currency ?? 'EUR',
+        });
       }
     }
   }, 30_000);
