@@ -1,10 +1,11 @@
 # Apply de seguridad, identidad y organizaciones
 
 > Estado 2026-07-20: **EJECUTADO** en `hour-phase0`. Snapshot privado
-> `hour_backup_20260720`; dry-run y apply completados; RLS 108 pass / 1 skip.
+> `hour_backup_20260720`; dry-run y apply completados; RLS actual 114/114.
 > Tipos regenerados y asesores ejecutados. Follow-up aplicado como
 > `20260720114629_advisor_rls_and_fk_indexes.sql`: 0 WARN de rendimiento.
-> Pendiente: segundo usuario de fixture y HIBP cuando el proyecto use plan Pro.
+> Fixture limitado creado y matriz RLS ampliada: 114/114, sin skips. HIBP sigue
+> bloqueado por el plan Free; activarlo cuando el proyecto use Pro.
 
 ## Alcance y orden
 
@@ -76,10 +77,9 @@ las tablas históricas no deben perder filas.
    `apps/web/src/lib/db-types.ts`; eliminar sus marcadores `hand-patched pending regen`.
 2. Ejecutar `pnpm --filter web test:rls`. La línea base anterior al apply es
    102 passed, 1 skipped, 6 failed; después del apply las seis nuevas deben pasar.
-3. Crear o facilitar una identidad sintética limitada y una externa. Ejecutar la
-   matriz owner/admin/member/external y revocación usando un JWT emitido antes de la
-   revocación. La identidad actual es admin en todos sus workspaces y no puede cubrir
-   honestamente esos casos negativos.
+3. La identidad sintética limitada `limited@hour.test` ya cubre member, permisos
+   de performer, grants/revokes con JWT previo, redacción de dinero y notas privadas.
+   La identidad externa sigue perteneciendo a la matriz completa previa a beta.
 4. Ejecutar `pnpm --filter web check`, `pnpm --filter web test:unit`, `pnpm --filter collab test`,
    `pnpm --filter collab exec tsc --noEmit` y `pnpm build`.
 5. Consultar los asesores de seguridad y rendimiento de Supabase y resolver cualquier

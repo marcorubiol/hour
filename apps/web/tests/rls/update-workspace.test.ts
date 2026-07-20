@@ -12,15 +12,23 @@
  * data). Every mutation snapshots the row first and restores it in `finally`
  * — the workspace is permanent, so a skipped restore poisons later runs.
  *
- * Known coverage gap (runbook `phase09-launch.md`): the suite has a single
- * admin-everywhere identity, so "a MEMBER (non-admin) is refused" cannot be
- * asserted until a second, limited-role fixture user exists. What is covered
- * here is the other half of the gate: a caller with no owner/admin membership
- * at all is refused. That second user is the cheapest unlock for the rest.
+ * The second fixture user is a plain workspace member with the `performer`
+ * role in this project. It proves both halves of the boundary: membership
+ * makes the tenant visible, but neither workspace administration nor unrelated
+ * project permissions are implied by that membership.
  */
 
 import { beforeAll, describe, expect, test } from 'vitest';
-import { envReady, login, pgGet, pgPatch, pgRpc, requireEnv } from './_helpers';
+import {
+  envReady,
+  limitedEnvReady,
+  login,
+  pgGet,
+  pgPatch,
+  pgRpc,
+  requireEnv,
+  requireLimitedEnv,
+} from './_helpers';
 
 type WorkspaceRow = {
   id: string;
@@ -43,7 +51,9 @@ const NOT_A_MEMBER_UUID = '00000000-0000-4000-8000-000000000000';
 
 describe.skipIf(!envReady())('RLS — update_workspace (ADR-062)', () => {
   let jwt: string;
+  let limitedJwt: string;
   let fixture: WorkspaceRow;
+  let projectId: string;
 
   beforeAll(async () => {
     const { email, password } = requireEnv();
@@ -60,6 +70,25 @@ describe.skipIf(!envReady())('RLS — update_workspace (ADR-062)', () => {
     expect(res.status).toBe(200);
     expect(res.rows).toHaveLength(1);
     fixture = res.rows[0];
+
+    if (limitedEnvReady()) {
+      const limited = requireLimitedEnv();
+      limitedJwt = await login(limited.email, limited.password);
+
+      const project = await pgGet<{ id: string }>(
+        'project',
+        jwt,
+        new URLSearchParams({
+          workspace_id: `eq.${fixture.id}`,
+          slug: 'eq.zzz-e2e-collab',
+          deleted_at: 'is.null',
+          select: 'id',
+        }),
+      );
+      expect(project.status).toBe(200);
+      expect(project.rows).toHaveLength(1);
+      projectId = project.rows[0].id;
+    }
   });
 
   /** Put the fixture back exactly as found. */
@@ -93,8 +122,7 @@ describe.skipIf(!envReady())('RLS — update_workspace (ADR-062)', () => {
     // allows UPDATE to owner/admin with the very same membership test, so an
     // admin's direct PostgREST PATCH lands. That is not an escalation: a
     // non-owner/admin is refused by the policy exactly as the RPC refuses
-    // them, which is what this asserts (the one admin-everywhere fixture
-    // identity can't prove the member case — see the header).
+    // them. The concrete member case is asserted separately below.
     //
     // The migration's docblock claimed UPDATE "stays denied"; it doesn't.
     // Corrected there 2026-07-16 after this test caught it.
@@ -112,6 +140,57 @@ describe.skipIf(!envReady())('RLS — update_workspace (ADR-062)', () => {
     // owner/admin, only from outside the app (the API never exposes it) —
     // same family as the line.notes item on the Shelf. Documented, not fixed.
   });
+
+  test.runIf(limitedEnvReady())(
+    'a plain member sees the workspace but cannot rewrite its identity',
+    async () => {
+      const visible = await pgGet<WorkspaceRow>(
+        'workspace',
+        limitedJwt,
+        new URLSearchParams({ id: `eq.${fixture.id}`, select: 'id,slug,name' }),
+      );
+      expect(visible.status).toBe(200);
+      expect(visible.rows).toHaveLength(1);
+
+      const direct = await pgPatch<WorkspaceRow>(
+        'workspace',
+        limitedJwt,
+        { name: 'ZZZ member cannot land' },
+        new URLSearchParams({ id: `eq.${fixture.id}` }),
+      );
+      expect(direct.status).toBeLessThan(300);
+      expect(direct.rows).toHaveLength(0);
+
+      const rpc = await pgRpc('update_workspace', limitedJwt, {
+        p_workspace_id: fixture.id,
+        p_patch: { name: 'ZZZ member cannot land' },
+      });
+      expect(rpc.status).toBe(403);
+      expect((await read()).name).toBe(fixture.name);
+    },
+  );
+
+  test.runIf(limitedEnvReady())(
+    'the performer role grants only its declared project capability',
+    async () => {
+      const internalNotes = await pgRpc<boolean>('has_permission', limitedJwt, {
+        p_project_id: projectId,
+        p_perm: 'read:internal_notes',
+      });
+      const money = await pgRpc<boolean>('has_permission', limitedJwt, {
+        p_project_id: projectId,
+        p_perm: 'read:money',
+      });
+      const membership = await pgRpc<boolean>('has_permission', limitedJwt, {
+        p_project_id: projectId,
+        p_perm: 'edit:membership',
+      });
+
+      expect(internalNotes).toMatchObject({ status: 200, data: true });
+      expect(money).toMatchObject({ status: 200, data: false });
+      expect(membership).toMatchObject({ status: 200, data: false });
+    },
+  );
 
   test('owner/admin can patch identity fields', async () => {
     try {

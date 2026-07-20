@@ -106,10 +106,11 @@ docs are a claim; the stamp is the fact.
   currently hits PRODUCTION as the fixture user. Before onboarding, point
   `.env.test` at a Supabase branch/staging project and confirm green there.
   The 6 priority scenarios: `_context.md § Phase 0.9 hardening backlog`.
-  Known gap: the suite has ONE admin-everywhere identity, so the grant/
-  revoke permission mechanics (scenario 3) + member-level money redaction
-  (4) + private person_note (5) are untested until a second, limited-role
-  fixture user exists. That second user is the single cheapest unlock.
+  The suite now has a second, limited-role identity. It covers grant/revoke
+  precedence against an already-issued JWT, member-level money redaction,
+  private `person_note` isolation and refusal of workspace identity edits.
+  The remaining RBAC work is the deliberate product-level role matrix, not a
+  missing test identity.
 
 ## Deferred to Phase 1 (do NOT block launch on these)
 - Full CI RLS/e2e jobs (need a staging Supabase branch + secrets).

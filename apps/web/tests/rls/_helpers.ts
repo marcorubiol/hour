@@ -12,12 +12,18 @@
  *   PUBLIC_SUPABASE_ANON_KEY
  *   PW_TEST_EMAIL
  *   PW_TEST_PASSWORD
+ *
+ * Optional limited-role fixture (tests using it skip when absent):
+ *   PW_LIMITED_EMAIL
+ *   PW_LIMITED_PASSWORD
  */
 
 const SB_URL = process.env.PUBLIC_SUPABASE_URL;
 const SB_ANON = process.env.PUBLIC_SUPABASE_ANON_KEY;
 const EMAIL = process.env.PW_TEST_EMAIL;
 const PASSWORD = process.env.PW_TEST_PASSWORD;
+const LIMITED_EMAIL = process.env.PW_LIMITED_EMAIL;
+const LIMITED_PASSWORD = process.env.PW_LIMITED_PASSWORD;
 
 export function envReady(): boolean {
   return Boolean(SB_URL && SB_ANON && EMAIL && PASSWORD);
@@ -35,6 +41,19 @@ export function requireEnv(): {
     );
   }
   return { url: SB_URL, anon: SB_ANON, email: EMAIL, password: PASSWORD };
+}
+
+export function limitedEnvReady(): boolean {
+  return Boolean(SB_URL && SB_ANON && LIMITED_EMAIL && LIMITED_PASSWORD);
+}
+
+export function requireLimitedEnv(): { email: string; password: string } {
+  if (!LIMITED_EMAIL || !LIMITED_PASSWORD) {
+    throw new Error(
+      'Limited-role RLS tests need PW_LIMITED_EMAIL and PW_LIMITED_PASSWORD',
+    );
+  }
+  return { email: LIMITED_EMAIL, password: LIMITED_PASSWORD };
 }
 
 interface AuthOk {

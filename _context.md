@@ -103,9 +103,7 @@ Working name: **Hour**. Brand decision deferred to Phase 1.
 3. **Pasada de diseño entera** — `build/screens-inventory.md`, todas las pantallas sin marcar. Prototipo de referencia: `app design/line-detail-prototype.html`.
 4. **Diferidos de ADR-062 por diseño**: `logo_url` sin flujo de subida (R2 + CSP img-src); `domain` se guarda y se pinta en el kicker pero **no dirige** vocabulario ni tipos de project por defecto; Contacts-con-organizaciones está en el modelo (ADR-065), no en el build.
 5. **Regla CF edge** de rate-limit en `/api/auth/login` — solo bloquea onboarding externo, no el uso interno. Necesita un token `Zone WAF:Edit` (el OAuth de Wrangler solo tiene `zone:read`).
-6. **Segundo usuario de fixture con rol limitado** — el desbloqueo más barato de la suite RLS: con una sola identidad admin-en-todo no se puede probar "un miembro raso es rechazado" (grants/revokes, redacción de dinero, notas privadas). Ver `build/runbooks/phase09-launch.md`.
-
-**El gate no ha cambiado desde el 12-07:** parar de construir y usar Hour con la difusión real ~1 mes. El veredicto es de Marco, no de código.
+6. **Segundo usuario de fixture con rol limitado — CERRADO 2026-07-20.** `limited@hour.test` es member solo de `playwright` y performer en `zzz-e2e-collab`; la suite prueba grants/revokes con JWT previo, redacción de dinero, notas privadas y rechazo de edición del workspace. RLS 114/114, sin skips. Ver `build/runbooks/test-user-setup.md`.
 
 ## Status — 2026-07-13 — ADR-061: Phase 0.9 hardening gate implementado (external-onboarding)
 
