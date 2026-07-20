@@ -58,9 +58,23 @@ export function blockDays(rule: BlockRule): string[] {
 
   const out: string[] = [];
   let day = from;
-  // Hard stop well past the cap: a malformed span must not spin forever.
-  for (let guard = 0; day <= to && guard < 400; guard++) {
-    if (wanted.has(weekdayOf(day)) && !skip.has(day)) out.push(day);
+  // The walk is bounded by CALENDAR days while the cap counts SELECTED days,
+  // so the bound must be one that can never truncate a VALID block. The
+  // sparsest rule possible is one weekday a week, so 700 calendar days always
+  // yields ≥100 selections — past the 92 cap. Any span long enough to be cut
+  // short is therefore a span that must report "too many" anyway, and the
+  // answer the caller gets is the same either way.
+  //
+  // The previous bound counted days walked and returned the short list in
+  // SILENCE: a one-weekday rule over eighteen months came back looking like a
+  // perfectly valid block with a third of its days missing, and blockLimit
+  // said 'ok' (found by adversarial review, 2026-07-20).
+  for (let walked = 0; day <= to && walked < 700; walked++) {
+    if (wanted.has(weekdayOf(day)) && !skip.has(day)) {
+      out.push(day);
+      // Already over the cap — walking further cannot change the verdict.
+      if (out.length > BLOCK_MAX_DAYS) return out;
+    }
     day = addDaysIso(day, 1);
   }
   return out;

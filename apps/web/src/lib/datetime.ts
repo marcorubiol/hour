@@ -224,3 +224,22 @@ export function dualTime(
   }
   return { primary, primaryDay, secondary, secondaryDay };
 }
+
+/**
+ * Monday-first short weekday labels in the given locale ("mon", "dl").
+ *
+ * Lives here rather than in the month grid because it is pure locale/date
+ * formatting with two consumers now (the grid's header and the block form's
+ * weekday rule chips) — hardcoding a second English array in the form would
+ * have been the same words written twice, wrong in every other language.
+ */
+export function weekdayLabels(locale = 'en-GB'): string[] {
+  const fmt = new Intl.DateTimeFormat(locale, { weekday: 'short', timeZone: 'UTC' });
+  // 2026-06-29 is a Monday.
+  return Array.from({ length: 7 }, (_, i) =>
+    fmt
+      .format(new Date(Date.UTC(2026, 5, 29 + i)))
+      .replace(/\.+$/, '')
+      .toLowerCase(),
+  );
+}
