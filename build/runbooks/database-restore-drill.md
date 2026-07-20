@@ -83,4 +83,27 @@ Record the successful workflow URL, exact stamp and elapsed seconds below.
 
 ## Evidence
 
+### Local structural preflight — 2026-07-20
+
+Before touching a hosted project, the complete restore sequence was exercised
+against a fresh local Supabase Postgres 17 instance using a CLI-generated
+roles/schema/data backup of the synthetic baseline:
+
+- checksum verification: all files passed;
+- destructive reset: `auth.users = 0` before restore;
+- atomic roles → schema → replica-mode data restore: passed;
+- source/target counts: exact match (`2` Auth users, `4` live workspaces,
+  `3` live projects, `157` live people, `154` live conversations and `1`
+  live performance);
+- restored password login and access-token hook: passed;
+- RLS: `114/114` passed;
+- application build and critical-route smoke: `2/2` passed.
+
+This proves the dump and restore machinery but is not the hosted acceptance
+gate. The block remains open until the same workflow succeeds against the
+dedicated Supabase staging project using the private R2 stamp and records its
+workflow URL and elapsed time here.
+
+### Hosted staging acceptance
+
 Pending the first hosted staging run.
