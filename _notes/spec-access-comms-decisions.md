@@ -3,8 +3,10 @@
 > **Status: DECIDED IN GRILL, NOT IMPLEMENTED. Zero schema touched.**
 > This file is the working record of what Marco and .zerø settled after ADR-082 /
 > ADR-083 were written. It exists so the decisions survive the conversation.
-> **It is a staging file, not the canon** — the canon is `_decisions.md`. Once
-> folded in (ADR-085 + amendments to 082/083), this file can be deleted.
+> **FOLDED INTO THE CANON 2026-07-20**: ADR-085 + the amendments to ADR-082/083 are now in
+> `_decisions.md`. This file survives only as the working narrative — the *why behind the
+> why*, the rejected turns, the measurements. If it ever disagrees with `_decisions.md`,
+> the canon wins and this file is stale.
 >
 > Hard gate still standing: use the app for a real difusión season before building
 > any of this.
