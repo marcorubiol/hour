@@ -2,7 +2,23 @@
 
 ## What runs
 
-`.github/workflows/backup.yml` dumps the Supabase `public` schema (data, schema, roles) every Sunday 03:00 UTC and pushes gzipped SQL files to Cloudflare R2 bucket `hour-backups` under `weekly/<UTC-stamp>/`. Retention: 12 weeks.
+`.github/workflows/backup.yml` creates a recoverable Supabase backup every Sunday
+at 03:00 UTC and pushes it to the private Cloudflare R2 bucket `hour-backups`
+under `weekly/<UTC-stamp>/`. Retention: 12 weeks.
+
+The three dumps have distinct scopes:
+
+- `roles`: database roles required by grants and ownership.
+- `schema`: application schema and database objects. Supabase-managed schemas
+  such as `auth` and `storage` are recreated by the target Supabase project, so
+  the CLI deliberately excludes their DDL.
+- `data`: rows from the application and managed schemas, including `auth.users`,
+  so restored users can still log in. Vector-storage implementation tables are
+  excluded as recommended by Supabase.
+
+Each backup also contains `SHA256SUMS` for integrity verification. Backups made
+before 2026-07-20 used `--schema public` for the data dump and therefore cannot
+prove authentication recovery; use a newer stamp for a restore drill.
 
 Manual trigger: GitHub → Actions → "Supabase backup → R2" → Run workflow.
 
@@ -30,10 +46,17 @@ aws s3 ls s3://hour-backups/weekly/ \
   --endpoint-url "$R2_ENDPOINT"
 ```
 
-Pick the newest stamp; expect three files:
+Pick the newest stamp; expect four files:
 - `data-<stamp>.sql.gz`
 - `schema-<stamp>.sql.gz`
 - `roles-<stamp>.sql.gz`
+- `SHA256SUMS`
+
+Verify integrity before reading or restoring anything:
+
+```bash
+(cd "weekly/<stamp>" && sha256sum --check SHA256SUMS)
+```
 
 For a schema-only inspection without downloading production rows, trigger the
 workflow manually with optional input `source_stamp`. It retrieves the named R2
@@ -41,13 +64,23 @@ backup and publishes only `schema-*.sql.gz` as a one-day Actions artifact. With
 no input, the workflow creates the normal fresh backup and the same short-lived
 schema-only artifact. See `build/runbooks/database-baseline.md`.
 
-## Restore drill (do this once before Phase 0.9 gate)
+## Restore order
 
-1. Spin up an empty Supabase project (or local `supabase start`).
-2. Download the latest `schema-*.sql.gz` and `data-*.sql.gz` from R2.
-3. `gunzip` and `psql` into the staging project — schema first, then data.
-4. Verify `select count(*) from person, conversation` matches the source.
-5. Document elapsed time. Target: <30 min end-to-end.
+Use only an empty, disposable staging project whose Supabase services have
+already initialized the managed schemas. Never point the restore command at
+production.
+
+1. Download all four files for the same stamp and verify `SHA256SUMS`.
+2. Restore `roles`, then `schema`.
+3. Restore `data` in one transaction with
+   `SET session_replication_role = replica` so dependency ordering does not
+   invalidate foreign keys while loading.
+4. Re-enable normal replication mode before committing.
+5. Verify login, source/target row counts, RLS 114/114 and one critical route.
+6. Record the stamp and elapsed time. Target: under 30 minutes end-to-end.
+
+The executable staging restore procedure and evidence live in
+`build/runbooks/database-restore-drill.md` once the staging project is created.
 
 ## When backups fail
 

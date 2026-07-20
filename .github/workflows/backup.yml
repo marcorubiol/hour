@@ -53,10 +53,18 @@ jobs:
           set -euo pipefail
           stamp="$(date -u +%Y-%m-%dT%H-%M-%SZ)"
           mkdir -p out
-          supabase db dump --db-url "$SUPABASE_DB_URL" --schema public --data-only -f "out/data-${stamp}.sql"
-          supabase db dump --db-url "$SUPABASE_DB_URL" --schema public           -f "out/schema-${stamp}.sql"
-          supabase db dump --db-url "$SUPABASE_DB_URL" --role-only               -f "out/roles-${stamp}.sql"
+          # Keep managed schemas out of the schema dump (the CLI's default), but
+          # include their rows in the data dump. In particular, auth.users must
+          # be recoverable so a restore drill can prove that login still works.
+          supabase db dump --db-url "$SUPABASE_DB_URL" \
+            --data-only --use-copy \
+            --exclude storage.buckets_vectors \
+            --exclude storage.vector_indexes \
+            -f "out/data-${stamp}.sql"
+          supabase db dump --db-url "$SUPABASE_DB_URL"             -f "out/schema-${stamp}.sql"
+          supabase db dump --db-url "$SUPABASE_DB_URL" --role-only -f "out/roles-${stamp}.sql"
           gzip -9 out/*.sql
+          (cd out && sha256sum ./*.sql.gz > SHA256SUMS)
           ls -lh out/
           echo "STAMP=${stamp}" >> "$GITHUB_ENV"
 
@@ -68,7 +76,7 @@ jobs:
           AWS_DEFAULT_REGION: auto
         run: |
           set -euo pipefail
-          for f in out/*.gz; do
+          for f in out/*.gz out/SHA256SUMS; do
             aws s3 cp "$f" "s3://${R2_BUCKET}/weekly/${STAMP}/$(basename "$f")" \
               --endpoint-url "$R2_ENDPOINT" \
               --only-show-errors
@@ -100,7 +108,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: supabase-schema-${{ env.STAMP }}
-          path: out/schema-*.sql.gz
+          path: |
+            out/schema-*.sql.gz
+            out/SHA256SUMS
           if-no-files-found: error
           retention-days: 1
 
