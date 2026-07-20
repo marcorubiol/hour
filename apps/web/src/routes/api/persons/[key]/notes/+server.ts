@@ -60,14 +60,29 @@ export const POST: RequestHandler = async ({ request, params, platform, locals }
     let personId = params.key;
     if (!isUuid(personId)) {
       const lookup = new URLSearchParams({
-        select: 'id',
+        select: 'person_id',
+        workspace_id: `eq.${input.workspace_id}`,
         slug: `eq.${personId}`,
         deleted_at: 'is.null',
         limit: '1',
       });
-      const found = await pgGet<{ id: string }>(env, 'person', jwt, { search: lookup });
+      const found = await pgGet<{ person_id: string }>(env, 'workspace_person', jwt, {
+        search: lookup,
+      });
       if (found.data.length === 0) return json({ error: 'not_found' }, 404);
-      personId = found.data[0].id;
+      personId = found.data[0].person_id;
+    } else {
+      const lookup = new URLSearchParams({
+        select: 'person_id',
+        workspace_id: `eq.${input.workspace_id}`,
+        person_id: `eq.${personId}`,
+        deleted_at: 'is.null',
+        limit: '1',
+      });
+      const found = await pgGet<{ person_id: string }>(env, 'workspace_person', jwt, {
+        search: lookup,
+      });
+      if (found.data.length === 0) return json({ error: 'not_found' }, 404);
     }
 
     const { data } = await pgPostRpc(env, 'create_person_note', jwt, {

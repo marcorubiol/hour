@@ -17,15 +17,15 @@
     "test:rls": "vitest run --project rls"
   },
   "dependencies": {
-    "@sentry/sveltekit": "^10.8.0",
+    "@sentry/sveltekit": "^10.54.0",
     "@supabase/realtime-js": "^2.105.4",
-    "@sveltejs/adapter-cloudflare": "^7.0.0",
-    "@sveltejs/kit": "^2.20.0",
+    "@sveltejs/adapter-cloudflare": "^7.2.9",
+    "@sveltejs/kit": "^2.60.1",
     "@sveltejs/vite-plugin-svelte": "^5.0.3",
     "@tanstack/svelte-query": "^5.62.0",
     "idb": "^8.0.3",
     "partyserver": "^0.5.5",
-    "svelte": "^5.19.9",
+    "svelte": "^5.56.6",
     "valibot": "^1.0.0",
     "workbox-window": "^7.4.1",
     "y-indexeddb": "^9.0.12",
@@ -33,16 +33,16 @@
     "yjs": "^13.6.30"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20260509.1",
+    "@cloudflare/workers-types": "^4.20260617.1",
     "@playwright/test": "^1.59.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/svelte": "^5.3.1",
     "jsdom": "^29.1.1",
     "svelte-check": "^4.1.4",
     "typescript": "^5.7.3",
-    "vite": "^6.0.0",
+    "vite": "^6.4.3",
     "vite-plugin-pwa": "^1.3.0",
     "vitest": "^4.1.5",
-    "wrangler": "^4.90.0"
+    "wrangler": "^4.103.0"
   }
 }

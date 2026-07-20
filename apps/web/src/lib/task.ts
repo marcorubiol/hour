@@ -93,13 +93,43 @@ export interface TaskItem extends Tables<'task'> {
   } | null;
 }
 
+export interface TaskDbItem extends Omit<TaskItem, 'conversation'> {
+  conversation: {
+    id: string;
+    project_id: string;
+    person: {
+      slug: string | null;
+      full_name: string | null;
+      organization: { name: string } | null;
+    } | null;
+  } | null;
+}
+
+export function normalizeTaskItem(item: TaskDbItem): TaskItem {
+  return {
+    ...item,
+    conversation: item.conversation
+      ? {
+          ...item.conversation,
+          person: item.conversation.person
+            ? {
+                slug: item.conversation.person.slug,
+                full_name: item.conversation.person.full_name,
+                organization_name: item.conversation.person.organization?.name ?? null,
+              }
+            : null,
+        }
+      : null,
+  };
+}
+
 /** PostgREST embed clause matching `TaskItem` — shared by GET, POST and PATCH. */
 export const TASK_SELECT = [
   '*',
   'project:project_id(id,slug,name)',
   'line:line_id(id,slug,name,project_id)',
   'performance:performance_id(id,slug,project_id,venue_name,city,start_at)',
-  'conversation:conversation_id(id,project_id,person:person_id(slug,full_name,organization_name))',
+  'conversation:conversation_id(id,project_id,person:workspace_person!conversation_workspace_person_fkey(slug,full_name,organization:organization_id(name)))',
 ].join(',');
 
 // ── Surfacing (ADR-070) ─────────────────────────────────────────────────

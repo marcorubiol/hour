@@ -73,6 +73,24 @@ $$ LANGUAGE sql STABLE SECURITY DEFINER
 SET search_path = public, extensions, pg_temp;
 
 
+-- 0.4b is_workspace_admin — membership management must not query the
+-- protected workspace_membership table from inside its own policies.
+CREATE OR REPLACE FUNCTION is_workspace_admin(ws_id uuid)
+RETURNS boolean AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.workspace_membership
+    WHERE user_id      = auth.uid()
+      AND workspace_id = ws_id
+      AND accepted_at IS NOT NULL
+      AND role IN ('owner', 'admin')
+  );
+$$ LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = public, extensions, pg_temp;
+
+REVOKE ALL ON FUNCTION public.is_workspace_admin(uuid) FROM PUBLIC, anon, service_role;
+GRANT EXECUTE ON FUNCTION public.is_workspace_admin(uuid) TO authenticated;
+
+
 -- 0.5 can_see_person — the caller can see a person if they share an
 -- engagement (through any workspace they belong to) or created the row.
 CREATE OR REPLACE FUNCTION can_see_person(p_person_id uuid)
@@ -121,6 +139,10 @@ RETURNS boolean AS $$
                p.workspace_id
         FROM public.project_membership pm
         JOIN public.project p ON p.id = pm.project_id
+        JOIN public.workspace_membership wm
+          ON wm.workspace_id = p.workspace_id
+         AND wm.user_id = pm.user_id
+         AND wm.accepted_at IS NOT NULL
         WHERE pm.project_id = p_project_id
           AND pm.user_id    = auth.uid()
       ),
@@ -144,7 +166,7 @@ $$ LANGUAGE sql STABLE SECURITY DEFINER
 SET search_path = public, extensions, pg_temp;
 
 COMMENT ON FUNCTION has_permission(uuid, text) IS
-  'Effective project permission check. Workspace owner/admin bypass is explicit (ADR-006). No wildcard.';
+  'Effective project permission check. A live accepted workspace membership is the outer access envelope; project roles/grants/revokes specialize access inside it. Workspace owner/admin bypass is explicit (ADR-006). No wildcard.';
 
 
 -- 0.7 can_edit_project — convenience alias.
@@ -291,50 +313,18 @@ CREATE POLICY workspace_membership_select ON workspace_membership
 
 CREATE POLICY workspace_membership_insert ON workspace_membership
   FOR INSERT TO authenticated
-  WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM workspace_membership m
-      WHERE m.workspace_id = workspace_membership.workspace_id
-        AND m.user_id      = auth.uid()
-        AND m.accepted_at IS NOT NULL
-        AND m.role IN ('owner','admin')
-    )
-  );
+  WITH CHECK (is_workspace_admin(workspace_id));
 
 CREATE POLICY workspace_membership_update ON workspace_membership
   FOR UPDATE TO authenticated
-  USING (
-    user_id = auth.uid()
-    OR EXISTS (
-      SELECT 1 FROM workspace_membership m
-      WHERE m.workspace_id = workspace_membership.workspace_id
-        AND m.user_id      = auth.uid()
-        AND m.accepted_at IS NOT NULL
-        AND m.role IN ('owner','admin')
-    )
-  )
-  WITH CHECK (
-    user_id = auth.uid()
-    OR EXISTS (
-      SELECT 1 FROM workspace_membership m
-      WHERE m.workspace_id = workspace_membership.workspace_id
-        AND m.user_id      = auth.uid()
-        AND m.accepted_at IS NOT NULL
-        AND m.role IN ('owner','admin')
-    )
-  );
+  USING (is_workspace_admin(workspace_id))
+  WITH CHECK (is_workspace_admin(workspace_id));
 
 CREATE POLICY workspace_membership_delete ON workspace_membership
   FOR DELETE TO authenticated
   USING (
     user_id = auth.uid()   -- self-leave
-    OR EXISTS (
-      SELECT 1 FROM workspace_membership m
-      WHERE m.workspace_id = workspace_membership.workspace_id
-        AND m.user_id      = auth.uid()
-        AND m.accepted_at IS NOT NULL
-        AND m.role IN ('owner','admin')
-    )
+    OR is_workspace_admin(workspace_id)
   );
 
 --------------------------------------------------------------------------------
@@ -447,13 +437,7 @@ CREATE POLICY project_select ON project
   FOR SELECT TO authenticated
   USING (
     deleted_at IS NULL
-    AND (
-      is_workspace_member(workspace_id)
-      OR EXISTS (
-        SELECT 1 FROM project_membership pm
-        WHERE pm.project_id = project.id AND pm.user_id = auth.uid()
-      )
-    )
+    AND is_workspace_member(workspace_id)
   );
 
 CREATE POLICY project_insert ON project
@@ -475,7 +459,15 @@ CREATE POLICY project_update ON project
 CREATE POLICY project_membership_select ON project_membership
   FOR SELECT TO authenticated
   USING (
-    user_id = auth.uid()
+    (
+      user_id = auth.uid()
+      AND EXISTS (
+        SELECT 1
+        FROM public.project p
+        WHERE p.id = project_membership.project_id
+          AND is_workspace_member(p.workspace_id)
+      )
+    )
     OR has_permission(project_id, 'edit:membership')
   );
 

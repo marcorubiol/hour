@@ -5,9 +5,36 @@ import {
   ConversationCreateSchema,
   ConversationPatchSchema,
   STATUS_LABELS,
+  normalizeConversationItem,
   statusBadgeClass,
   statusLabel,
+  type ConversationDbItem,
 } from './conversation';
+
+describe('workspace dossier projection', () => {
+  it('keeps the API contract while deriving organization_name locally', () => {
+    const item = normalizeConversationItem({
+      person: {
+        person_id: '22222222-2222-4222-8222-222222222222',
+        slug: 'jordi',
+        full_name: 'Jordi',
+        email: 'jordi@example.test',
+        country: 'ES',
+        city: 'Girona',
+        website: null,
+        organization: { name: 'Teatre X' },
+      },
+      project: null,
+    } as unknown as ConversationDbItem);
+
+    expect(item.person).toMatchObject({
+      id: '22222222-2222-4222-8222-222222222222',
+      full_name: 'Jordi',
+      organization_name: 'Teatre X',
+    });
+    expect('organization' in (item.person ?? {})).toBe(false);
+  });
+});
 
 describe('ConversationPatchSchema', () => {
   it('accepts a single-field status patch', () => {

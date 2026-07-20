@@ -1,10 +1,8 @@
 <script lang="ts">
   /**
-   * Person detail — the contact file (ADR-045). A person is GLOBAL;
-   * what the caller sees of the relationship is RLS-scoped: conversations
-   * across projects, workspace-scoped notes (composer writes into the
-   * browsing-context workspace via the create_person_note RPC), and
-   * cast/crew appearances.
+   * Person detail — one workspace's dossier for a portable person identity.
+   * Contact data and every related list are explicitly scoped to the
+   * workspace in the URL; the global person id is only the identity bridge.
    */
 
   import { page } from '$app/state';
@@ -75,21 +73,30 @@
   let workspaceSlug = $derived(page.params.workspace ?? '');
   let slug = $derived(page.params.slug ?? '');
 
-  const queryOptions = toStore(() => {
-    const k = slug;
-    return {
-      queryKey: ['person', k] as const,
-      queryFn: ({ signal }: { signal: AbortSignal }) =>
-        fetchJSON<PersonFile>(`/api/persons/${encodeURIComponent(k)}`, signal),
-    };
-  });
-  const query = createQuery(queryOptions);
-
   const workspacesQuery = createQuery({
     queryKey: ['workspaces'],
     queryFn: ({ signal }: { signal: AbortSignal }) =>
       fetchJSON<{ items: WorkspaceLite[] }>('/api/workspaces', signal),
   });
+
+  let contextWorkspaceId = $derived(
+    ($workspacesQuery.data?.items ?? []).find((w) => w.slug === workspaceSlug)?.id ?? '',
+  );
+
+  const queryOptions = toStore(() => {
+    const personSlug = slug;
+    const workspaceId = contextWorkspaceId;
+    return {
+      queryKey: ['person', workspaceId, personSlug] as const,
+      enabled: Boolean(personSlug && workspaceId),
+      queryFn: ({ signal }: { signal: AbortSignal }) =>
+        fetchJSON<PersonFile>(
+          `/api/persons/${encodeURIComponent(personSlug)}?workspace_id=${encodeURIComponent(workspaceId)}`,
+          signal,
+        ),
+    };
+  });
+  const query = createQuery(queryOptions);
 
   const breadcrumb = useBreadcrumb();
   let activeWorkspaceName = $derived(
@@ -121,10 +128,6 @@
   let loading = $derived($query.isPending);
   let errorMsg = $derived($query.error instanceof Error ? $query.error.message : '');
 
-  let contextWorkspaceId = $derived(
-    ($workspacesQuery.data?.items ?? []).find((w) => w.slug === workspaceSlug)?.id ?? '',
-  );
-
   // ── Note composer ────────────────────────────────────────────────────
   const queryClient = useQueryClient();
   let noteBody = $state('');
@@ -149,7 +152,9 @@
     onSuccess: () => {
       noteBody = '';
       notePrivate = false;
-      void queryClient.invalidateQueries({ queryKey: ['person', slug] });
+      void queryClient.invalidateQueries({
+        queryKey: ['person', contextWorkspaceId, slug],
+      });
     },
     onError: (err) => {
       addToast({
@@ -178,7 +183,9 @@
       await mutateJSON('DELETE', `/api/persons/${encodeURIComponent(slug)}/notes/${noteId}`);
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['person', slug] });
+      void queryClient.invalidateQueries({
+        queryKey: ['person', contextWorkspaceId, slug],
+      });
     },
     onError: (err) => {
       addToast({
@@ -232,7 +239,9 @@
     onSuccess: () => {
       addOpen = false;
       aProject = '';
-      void queryClient.invalidateQueries({ queryKey: ['person', slug] });
+      void queryClient.invalidateQueries({
+        queryKey: ['person', contextWorkspaceId, slug],
+      });
       void queryClient.invalidateQueries({ queryKey: ['conversations'] });
       addToast({ tone: 'success', message: 'Added to project.' });
     },

@@ -102,9 +102,38 @@ export interface ConversationItem extends Tables<'conversation'> {
   project: ProjectLite | null;
 }
 
+type WorkspacePersonEmbed = Omit<PersonLite, 'id' | 'organization_name'> & {
+  person_id: string;
+  organization: { name: string } | null;
+};
+
+export interface ConversationDbItem extends Tables<'conversation'> {
+  person: WorkspacePersonEmbed | null;
+  project: ProjectLite | null;
+}
+
+/** Keep the public API stable while contact data moves to workspace_person. */
+export function normalizeConversationItem(item: ConversationDbItem): ConversationItem {
+  return {
+    ...item,
+    person: item.person
+      ? {
+          id: item.person.person_id,
+          slug: item.person.slug,
+          full_name: item.person.full_name,
+          email: item.person.email,
+          organization_name: item.person.organization?.name ?? null,
+          country: item.person.country,
+          city: item.person.city,
+          website: item.person.website,
+        }
+      : null,
+  };
+}
+
 /** PostgREST embed clause matching `ConversationItem` — shared by GET + PATCH. */
 export const CONVERSATION_SELECT = [
   '*',
-  'person:person_id(id,slug,full_name,email,organization_name,country,city,website)',
+  'person:workspace_person!conversation_workspace_person_fkey(person_id,slug,full_name,email,country,city,website,organization:organization_id(name))',
   'project:project_id(id,slug,name,status)',
 ].join(',');

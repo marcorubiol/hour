@@ -18,7 +18,8 @@ import {
   CONVERSATION_SELECT,
   CONVERSATION_STATUSES,
   ConversationCreateSchema,
-  type ConversationItem,
+  normalizeConversationItem,
+  type ConversationDbItem,
 } from '$lib/conversation';
 import { pgGet, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
@@ -114,7 +115,10 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
     select = select.replace('project:project_id(', 'project:project_id!inner(');
   }
   if (q) {
-    select = select.replace('person:person_id(', 'person:person_id!inner(');
+    select = select.replace(
+      'person:workspace_person!conversation_workspace_person_fkey(',
+      'person:workspace_person!conversation_workspace_person_fkey!inner(',
+    );
   }
   search.set('select', select);
 
@@ -133,13 +137,14 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
   search.set('deleted_at', 'is.null');
 
   if (q) {
-    // Escape PostgREST pattern/logic chars, then substring-match person
-    // name and organization.
+    // Escape PostgREST pattern/logic chars, then substring-match fields in
+    // this workspace's dossier. Organization search moves to the dedicated
+    // organization projection rather than reading a global person field.
     const safe = q.replace(/[%_*(),.]/g, ' ').trim();
     if (safe) {
       search.set(
         'person.or',
-        `(full_name.ilike.*${safe}*,organization_name.ilike.*${safe}*)`,
+        `(full_name.ilike.*${safe}*,email.ilike.*${safe}*)`,
       );
     }
   }
@@ -152,7 +157,7 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
   search.set('offset', String(offset));
 
   try {
-    const { data, total } = await pgGet<ConversationItem>(env, 'conversation', jwt, {
+    const { data, total } = await pgGet<ConversationDbItem>(env, 'conversation', jwt, {
       search,
       exactCount: true,
     });
@@ -163,7 +168,7 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
       offset,
       status,
       season,
-      items: data,
+      items: data.map(normalizeConversationItem),
     });
   } catch (err) {
     return pgErrorResponse(

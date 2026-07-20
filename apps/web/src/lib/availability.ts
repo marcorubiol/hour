@@ -70,5 +70,5 @@ export type AvailabilityItem = Omit<
 /** PostgREST embed clause matching `AvailabilityItem` — shared by GET and PATCH. */
 export const AVAILABILITY_SELECT = [
   'id,workspace_id,person_id,starts_on,ends_on,certainty,note,created_at,updated_at',
-  'person:person_id(id,slug,full_name)',
+  'person:workspace_person!availability_block_workspace_person_fkey(id:person_id,slug,full_name)',
 ].join(',');

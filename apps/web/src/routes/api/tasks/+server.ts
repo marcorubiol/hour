@@ -15,7 +15,14 @@
 import type { RequestHandler } from './$types';
 import * as v from 'valibot';
 import { extractAccessToken } from '$lib/auth';
-import { TASK_STATUSES, TASK_SELECT, TaskCreateSchema, type TaskItem } from '$lib/task';
+import {
+  TASK_STATUSES,
+  TASK_SELECT,
+  TaskCreateSchema,
+  normalizeTaskItem,
+  type TaskDbItem,
+  type TaskItem,
+} from '$lib/task';
 import { pgGet, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
 
@@ -99,8 +106,8 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
   search.set('limit', String(limit));
 
   try {
-    const { data } = await pgGet<TaskItem>(env, 'task', jwt, { search });
-    return json({ items: data });
+    const { data } = await pgGet<TaskDbItem>(env, 'task', jwt, { search });
+    return json({ items: data.map(normalizeTaskItem) });
   } catch (err) {
     return pgErrorResponse(
       err,

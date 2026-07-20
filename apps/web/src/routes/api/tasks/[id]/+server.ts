@@ -15,7 +15,12 @@
 import type { RequestHandler } from './$types';
 import * as v from 'valibot';
 import { extractAccessToken } from '$lib/auth';
-import { TASK_SELECT, TaskPatchSchema, type TaskItem } from '$lib/task';
+import {
+  TASK_SELECT,
+  TaskPatchSchema,
+  normalizeTaskItem,
+  type TaskDbItem,
+} from '$lib/task';
 import { pgPatch, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
 
@@ -69,9 +74,9 @@ export const PATCH: RequestHandler = async ({ request, params, platform, locals 
   search.set('select', TASK_SELECT);
 
   try {
-    const { data } = await pgPatch<TaskItem>(env, 'task', jwt, patch, { search });
+    const { data } = await pgPatch<TaskDbItem>(env, 'task', jwt, patch, { search });
     if (data.length === 0) return json({ error: 'not_found' }, 404);
-    return json({ task: data[0] });
+    return json({ task: normalizeTaskItem(data[0]) });
   } catch (err) {
     return pgErrorResponse(
       err,

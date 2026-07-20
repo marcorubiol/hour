@@ -31,6 +31,10 @@ export type PersonEmbed = {
   organization_name?: string | null;
 };
 
+type PersonDbEmbed = Omit<PersonEmbed, 'organization_name'> & {
+  organization: { name: string } | null;
+};
+
 export type PerformanceDetail = Omit<
   Tables<'performance'>,
   'fee_amount' | 'fee_currency' | 'deleted_at' | 'created_by' | 'previous_slugs'
@@ -96,6 +100,27 @@ export type CastMemberRow = {
   person: PersonEmbed | null;
 };
 
+type PerformanceDbDetail = Omit<
+  PerformanceDetail,
+  'conversation' | 'crew_assignment' | 'cast_override'
+> & {
+  conversation: (Omit<NonNullable<PerformanceDetail['conversation']>, 'person'> & {
+    person: PersonDbEmbed | null;
+  }) | null;
+  crew_assignment: Array<
+    Omit<PerformanceDetail['crew_assignment'][number], 'person'> & {
+      person: PersonDbEmbed | null;
+    }
+  >;
+  cast_override: Array<
+    Omit<PerformanceDetail['cast_override'][number], 'person'> & {
+      person: PersonDbEmbed | null;
+    }
+  >;
+};
+
+type CastMemberDbRow = Omit<CastMemberRow, 'person'> & { person: PersonDbEmbed | null };
+
 export interface PerformanceBundleResult {
   performance: PerformanceDetail;
   cast_members: CastMemberRow[];
@@ -107,7 +132,31 @@ export interface PerformanceBundleResult {
   hold_notice_absent?: boolean;
 }
 
-const PERSON_COLS = 'id,slug,full_name,email,phone';
+const PERSON_COLS =
+  'id:person_id,slug,full_name,email,phone,organization:organization_id(name)';
+
+function normalizePerson(person: PersonDbEmbed | null): PersonEmbed | null {
+  if (!person) return null;
+  const { organization, ...fields } = person;
+  return { ...fields, organization_name: organization?.name ?? null };
+}
+
+function normalizePerformance(row: PerformanceDbDetail): PerformanceDetail {
+  return {
+    ...row,
+    conversation: row.conversation
+      ? { ...row.conversation, person: normalizePerson(row.conversation.person) }
+      : null,
+    crew_assignment: row.crew_assignment.map((member) => ({
+      ...member,
+      person: normalizePerson(member.person),
+    })),
+    cast_override: row.cast_override.map((member) => ({
+      ...member,
+      person: normalizePerson(member.person),
+    })),
+  };
+}
 
 /**
  * Resolve a performance key (uuid, or slug scoped by workspace slug) to its
@@ -179,9 +228,9 @@ function detailSelect(withNotice: boolean): string {
     'venue:venue_id(id,slug,name,city,country,address,capacity,timezone,contacts)',
     'line:line_id(id,slug,name,kind)',
     'project:project_id(id,slug,name,accent)',
-    `conversation:conversation_id(id,slug,status,person:person_id(${PERSON_COLS},organization_name))`,
-    `crew_assignment(id,role,notes,contact_override,person:person_id(${PERSON_COLS}))`,
-    `cast_override(id,role,reason,person:person_id(${PERSON_COLS}),replaces_person:replaces_person_id(id,full_name))`,
+    `conversation:conversation_id(id,slug,status,person:workspace_person!conversation_workspace_person_fkey(${PERSON_COLS}))`,
+    `crew_assignment(id,role,notes,contact_override,person:workspace_person!crew_assignment_workspace_person_fkey(${PERSON_COLS}))`,
+    `cast_override(id,role,reason,person:workspace_person!cast_override_workspace_person_fkey(${PERSON_COLS}),replaces_person:workspace_person!cast_override_workspace_replaces_person_fkey(id:person_id,full_name))`,
     'date(id,kind,status,title,starts_at,ends_at,all_day,venue_name,city,venue:venue_id(timezone))',
     'asset_version(id,kind,direction,url,notes,uploaded_at)',
   ].join(',');
@@ -228,8 +277,8 @@ export async function fetchPerformanceBundle(
     search.set('asset_version.deleted_at', 'is.null');
     search.set('limit', '1');
 
-    const { data } = await pgGet<PerformanceDetail>(env, 'performance', jwt, { search });
-    return data[0] ?? null;
+    const { data } = await pgGet<PerformanceDbDetail>(env, 'performance', jwt, { search });
+    return data[0] ? normalizePerformance(data[0]) : null;
   };
 
   let performance: PerformanceDetail | null;
@@ -247,13 +296,20 @@ export async function fetchPerformanceBundle(
   if (performance === null) return null;
 
   const castSearch = new URLSearchParams();
-  castSearch.set('select', `id,role,notes,person:person_id(${PERSON_COLS})`);
+  castSearch.set(
+    'select',
+    `id,role,notes,person:workspace_person!cast_member_workspace_person_fkey(${PERSON_COLS})`,
+  );
   castSearch.set('project_id', `eq.${performance.project_id}`);
   castSearch.set('deleted_at', 'is.null');
   castSearch.set('order', 'role.asc');
-  const { data: castMembers } = await pgGet<CastMemberRow>(env, 'cast_member', jwt, {
+  const { data: castRows } = await pgGet<CastMemberDbRow>(env, 'cast_member', jwt, {
     search: castSearch,
   });
+  const castMembers = castRows.map((member) => ({
+    ...member,
+    person: normalizePerson(member.person),
+  }));
 
   return {
     performance,

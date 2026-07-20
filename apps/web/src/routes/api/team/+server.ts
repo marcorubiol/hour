@@ -7,9 +7,9 @@
  * picker (ADR-078 §5): the team, NOT the contact book — a workspace's
  * person table can hold hundreds of programmers who are not "us".
  *
- * Person embeds ride an inner join filtered on person.deleted_at, so
- * deleted or RLS-hidden persons drop the row instead of yielding a
- * nameless entry.
+ * Person embeds come from each workspace's own dossier and ride an inner
+ * join, so deleted or RLS-hidden dossiers drop the row instead of yielding
+ * a nameless entry.
  *
  * Auth: Bearer JWT required. RLS scopes rows (workspace membership).
  */
@@ -49,7 +49,8 @@ export type TeamItem = {
   full_name: string;
 };
 
-const TEAM_SELECT = 'workspace_id,person:person_id!inner(id,slug,full_name)';
+const TEAM_SELECT =
+  'workspace_id,person:workspace_person!cast_member_workspace_person_fkey!inner(id:person_id,slug,full_name)';
 const BATCH_LIMIT = '10000';
 
 export const GET: RequestHandler = async ({ request, url, platform, locals }) => {
@@ -69,9 +70,14 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
     return json({ error: 'invalid_query', hint: 'Pass workspace_ids.' }, 400);
   }
 
-  const makeSearch = () => {
+  const makeSearch = (source: 'cast' | 'crew') => {
     const search = new URLSearchParams();
-    search.set('select', TEAM_SELECT);
+    search.set(
+      'select',
+      source === 'cast'
+        ? TEAM_SELECT
+        : 'workspace_id,person:workspace_person!crew_assignment_workspace_person_fkey!inner(id:person_id,slug,full_name)',
+    );
     search.set('workspace_id', `in.(${workspaceIds.join(',')})`);
     search.set('deleted_at', 'is.null');
     search.set('person.deleted_at', 'is.null');
@@ -81,8 +87,8 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
 
   try {
     const [cast, crew] = await Promise.all([
-      pgGet<TeamSourceRow>(env, 'cast_member', jwt, { search: makeSearch() }),
-      pgGet<TeamSourceRow>(env, 'crew_assignment', jwt, { search: makeSearch() }),
+      pgGet<TeamSourceRow>(env, 'cast_member', jwt, { search: makeSearch('cast') }),
+      pgGet<TeamSourceRow>(env, 'crew_assignment', jwt, { search: makeSearch('crew') }),
     ]);
 
     const seen = new Map<string, TeamItem>();

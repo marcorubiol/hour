@@ -5,10 +5,12 @@ import {
   TASK_STATUS_LABELS,
   TaskCreateSchema,
   TaskPatchSchema,
+  normalizeTaskItem,
   taskContextLabel,
   taskProjectId,
   taskSurfaceState,
   type TaskItem,
+  type TaskDbItem,
 } from './task';
 
 const WS = '018f3b1a-0000-7000-8000-000000000001';
@@ -41,6 +43,28 @@ function item(overrides: Partial<TaskItem> = {}): TaskItem {
     ...overrides,
   };
 }
+
+describe('workspace dossier projection', () => {
+  it('normalizes an organization without exposing the database embed shape', () => {
+    const normalized = normalizeTaskItem({
+      conversation: {
+        id: PARENT,
+        project_id: PARENT,
+        person: {
+          slug: 'jordi',
+          full_name: 'Jordi',
+          organization: { name: 'Teatre X' },
+        },
+      },
+    } as unknown as TaskDbItem);
+
+    expect(normalized.conversation?.person).toEqual({
+      slug: 'jordi',
+      full_name: 'Jordi',
+      organization_name: 'Teatre X',
+    });
+  });
+});
 
 describe('task vocabulary', () => {
   it('mirrors the DB enum order', () => {

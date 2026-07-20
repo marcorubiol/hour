@@ -29,6 +29,16 @@ import {
   saveSnapshot,
   writeNotesColumn,
 } from './persistence';
+import {
+  assertSnapshotDidNotRegress,
+  commitSnapshotThenMaterialize,
+  createHydratedMarker,
+  isHydratedFor,
+  loadHydrationInputs,
+  type CollabTarget,
+  type CollabTargetTable,
+  type HydratedMarker,
+} from './persistence-guard';
 
 /** The shared text field inside every collab doc (ADR-025 scope). */
 const NOTES_FIELD = 'notes';
@@ -43,6 +53,7 @@ export interface CollabEnv {
 const STORAGE_KEYS = {
   workspaceId: 'workspace_id',
   version: 'snapshot_version',
+  hydration: 'hydration_state',
 } as const;
 
 const ALLOWED_TABLES = new Set(['performance', 'project', 'line']);
@@ -56,6 +67,15 @@ class RoadsheetCollabBase extends Server<CollabEnv> {
 const WithYjs = withYjs(RoadsheetCollabBase);
 
 export class RoadsheetCollab extends WithYjs {
+  /**
+   * This activation must itself complete hydration. A durable marker from a
+   * previous activation is necessary but not sufficient to authorize saves.
+   */
+  private hydration: HydratedMarker | null = null;
+
+  /** Serialize debounced saves; external fetches otherwise allow overlap. */
+  private saveQueue: Promise<void> = Promise.resolve();
+
   /**
    * workerd delivers binary frames as Blob (the WHATWG default on recent
    * compatibility dates); y-partyserver 2.2.0 only understands
@@ -77,14 +97,14 @@ export class RoadsheetCollab extends WithYjs {
 
   /**
    * Resolve `[targetTable, targetId]` from `this.name`. Returns null when
-   * the name doesn't fit the expected pattern — we refuse to load/save in
-   * that case rather than crashing.
+   * the name doesn't fit the expected pattern; load/save callers then
+   * reject the operation.
    */
-  private parseName(): [table: 'performance' | 'project' | 'line', id: string] | null {
+  private parseName(): CollabTarget | null {
     const [table, id] = this.name.split(':');
     if (!table || !id) return null;
     if (!ALLOWED_TABLES.has(table)) return null;
-    return [table as 'performance' | 'project' | 'line', id];
+    return { table: table as CollabTargetTable, id };
   }
 
   /**
@@ -92,109 +112,108 @@ export class RoadsheetCollab extends WithYjs {
    * instance. We seed the Yjs document from the latest snapshot in
    * `collab_snapshot` and cache the workspace_id for subsequent saves.
    */
-  override async onLoad(): Promise<Y.Doc | void> {
-    const parsed = this.parseName();
-    if (!parsed) {
-      console.warn('[collab] onLoad: bad name', this.name);
-      return;
+  override async onLoad(): Promise<Y.Doc> {
+    const target = this.parseName();
+    if (!target) {
+      throw new Error(`Invalid collaborative document name: ${this.name}`);
     }
-    const [targetTable, targetId] = parsed;
 
-    // Cache workspace_id once per DO lifecycle. Survives hibernation.
-    let wsId = (await this.ctx.storage.get(STORAGE_KEYS.workspaceId)) as string | undefined;
-    let seedNotes: string | null = null;
-    if (!wsId) {
-      try {
-        const meta = await fetchTargetMeta(this.env, targetTable, targetId);
-        if (meta) {
-          wsId = meta.workspace_id;
-          seedNotes = meta.notes;
-          await this.ctx.storage.put(STORAGE_KEYS.workspaceId, wsId);
-        }
-      } catch (e) {
-        console.warn('[collab] fetchTargetMeta failed:', e);
-      }
-    }
+    const previousMarker = await this.ctx.storage.get<unknown>(STORAGE_KEYS.hydration);
+    // The last known-good durable marker is an integrity lower bound. Do not
+    // overwrite it while loading: a crash or failed fetch must not erase the
+    // version needed to reject a later empty/older snapshot response. The
+    // activation-local marker below is the fail-closed loading gate.
+    this.hydration = null;
 
     try {
-      const latest = await loadLatestSnapshot(this.env, targetTable, targetId);
+      const { meta, snapshot: latest } = await loadHydrationInputs(
+        target,
+        () => fetchTargetMeta(this.env, target.table, target.id),
+        () => loadLatestSnapshot(this.env, target.table, target.id),
+      );
+      assertSnapshotDidNotRegress(previousMarker, target, latest?.version ?? null);
+
+      // Build off to the side. y-partyserver applies this document only
+      // after onLoad resolves, so a failed hydrate never exposes partial or
+      // empty state to a WebSocket client.
+      const hydratedDocument = new Y.Doc();
+      const version = latest?.version ?? 0;
       if (latest) {
-        Y.applyUpdate(this.document, latest.snapshot);
-        await this.ctx.storage.put(STORAGE_KEYS.version, latest.version);
-      } else {
-        // Fresh doc — version 0 means "nothing persisted yet". Seed from
-        // the notes column so pre-collab text isn't lost on first save.
-        await this.ctx.storage.put(STORAGE_KEYS.version, 0);
-        if (seedNotes) {
-          const text = this.document.getText(NOTES_FIELD);
-          if (text.length === 0) text.insert(0, seedNotes);
-        }
+        Y.applyUpdate(hydratedDocument, latest.snapshot);
+      } else if (meta.notes) {
+        hydratedDocument.getText(NOTES_FIELD).insert(0, meta.notes);
       }
-    } catch (e) {
-      console.warn('[collab] loadLatestSnapshot failed:', e);
+
+      const marker = createHydratedMarker(target, version);
+      await this.ctx.storage.put<string | number | HydratedMarker>({
+        [STORAGE_KEYS.workspaceId]: meta.workspace_id,
+        [STORAGE_KEYS.version]: version,
+        [STORAGE_KEYS.hydration]: marker,
+      });
+      this.hydration = marker;
+      return hydratedDocument;
+    } catch (error) {
+      console.error('[collab] hydration failed:', error);
+      throw new Error('Collaborative document is temporarily unavailable', {
+        cause: error,
+      });
     }
   }
 
   /**
    * Called by y-partyserver after callbackOptions thresholds (default: 30
    * updates / 60s). Encodes the full doc state and writes a new
-   * `collab_snapshot` row. Skips the write if `workspace_id` couldn't be
-   * resolved — better to lose a snapshot than violate the FK.
+   * `collab_snapshot` row. Saves are serialized and require matching
+   * in-memory + durable hydration markers.
    */
-  override async onSave(): Promise<void> {
-    const parsed = this.parseName();
-    if (!parsed) return;
-    const [targetTable, targetId] = parsed;
+  override onSave(): Promise<void> {
+    const queued = this.saveQueue.then(() => this.saveHydratedDocument());
+    // Keep the queue usable after a failed save while returning the original
+    // rejection to y-partyserver for observability.
+    this.saveQueue = queued.catch(() => undefined);
+    return queued;
+  }
 
-    let wsId = (await this.ctx.storage.get(STORAGE_KEYS.workspaceId)) as string | undefined;
-    if (!wsId) {
-      // Self-heal: onLoad's fetch can fail transiently and onLoad never
-      // re-runs while the DO is warm — retry here instead of skipping
-      // every save until eviction.
-      try {
-        const meta = await fetchTargetMeta(this.env, targetTable, targetId);
-        if (meta) {
-          wsId = meta.workspace_id;
-          await this.ctx.storage.put(STORAGE_KEYS.workspaceId, wsId);
-        }
-      } catch (e) {
-        console.warn('[collab] onSave meta retry failed:', e);
-      }
-    }
-    if (!wsId) {
-      console.warn('[collab] onSave: missing workspace_id, skipping snapshot');
-      return;
+  private async saveHydratedDocument(): Promise<void> {
+    const target = this.parseName();
+    if (!target) {
+      throw new Error(`Invalid collaborative document name: ${this.name}`);
     }
 
-    const prev = ((await this.ctx.storage.get(STORAGE_KEYS.version)) as number | undefined) ?? 0;
-    const next = prev + 1;
+    const storedMarker = await this.ctx.storage.get<unknown>(STORAGE_KEYS.hydration);
+    if (
+      this.hydration === null ||
+      !isHydratedFor(storedMarker, target) ||
+      storedMarker.version !== this.hydration.version
+    ) {
+      throw new Error('Refusing to save an unhydrated collaborative document');
+    }
+
+    const wsId = await this.ctx.storage.get<unknown>(STORAGE_KEYS.workspaceId);
+    if (typeof wsId !== 'string' || wsId.length === 0) {
+      throw new Error('Refusing to save without a hydrated workspace_id');
+    }
 
     const snapshot = Y.encodeStateAsUpdate(this.document);
-
-    try {
-      await saveSnapshot(this.env, wsId, targetTable, targetId, snapshot, next);
-      await this.ctx.storage.put(STORAGE_KEYS.version, next);
-    } catch (e) {
-      // Most likely cause: unique-violation on (target_table, target_id, version)
-      // which means another DO instance racing — rare with idFromName but
-      // possible during cold-start migration. Don't bump version on failure;
-      // next save retries with the same `next`.
-      console.error('[collab] saveSnapshot failed:', e);
-    }
-
-    // Materialize the notes text into the target's column so non-collab
-    // readers (road sheet projection, detail endpoint) see current content.
-    // Best-effort: a failure never blocks the snapshot chain; the next
-    // save retries with fresher text anyway.
-    try {
-      await writeNotesColumn(
-        this.env,
-        targetTable,
-        targetId,
-        this.document.getText(NOTES_FIELD).toString(),
-      );
-    } catch (e) {
-      console.error('[collab] writeNotesColumn failed:', e);
-    }
+    const notes = this.document.getText(NOTES_FIELD).toString();
+    const committed = await commitSnapshotThenMaterialize(storedMarker, {
+      persistSnapshot: (version) =>
+        saveSnapshot(this.env, wsId, target.table, target.id, snapshot, version),
+      persistHydration: (marker) =>
+        this.ctx.storage.put<number | HydratedMarker>({
+          [STORAGE_KEYS.version]: marker.version,
+          [STORAGE_KEYS.hydration]: marker,
+        }),
+      materializeNotes: async () => {
+        try {
+          await writeNotesColumn(this.env, target.table, target.id, notes);
+        } catch (error) {
+          // The immutable snapshot is authoritative and already committed.
+          // A future edit retries materialization with fresher text.
+          console.error('[collab] writeNotesColumn failed:', error);
+        }
+      },
+    });
+    this.hydration = committed;
   }
 }

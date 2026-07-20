@@ -211,7 +211,8 @@ describe.skipIf(!envReady())('availability_block RLS (ADR-078)', () => {
       'availability_block',
       jwt,
       new URLSearchParams({
-        select: 'id,person_id,certainty,person:person_id(id,slug,full_name)',
+        select:
+          'id,person_id,certainty,person:workspace_person!availability_block_workspace_person_fkey(id:person_id,slug,full_name)',
         id: `eq.${blockId}`,
       }),
     );

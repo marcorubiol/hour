@@ -57,6 +57,15 @@ type InvoiceItem = {
   lines: { performance_id: string | null }[];
 };
 
+type InvoiceDbItem = Omit<InvoiceItem, 'payer'> & {
+  payer: {
+    id: string;
+    slug: string;
+    full_name: string;
+    organization: { name: string } | null;
+  } | null;
+};
+
 export const GET: RequestHandler = async ({ request, url, platform, locals }) => {
   if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);
   const env = platform.env as unknown as SupabaseEnv;
@@ -82,7 +91,7 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
     [
       'id,number,status,issued_on,due_on,subtotal,total,currency',
       'project:project_id(id,slug,name)',
-      'payer:payer_person_id(id,slug,full_name,organization_name)',
+      'payer:workspace_person!invoice_workspace_payer_person_fkey(id:person_id,slug,full_name,organization:organization_id(name))',
       'lines:invoice_line(performance_id)',
     ].join(','),
   );
@@ -103,8 +112,19 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
   search.set('limit', String(limit));
 
   try {
-    const { data } = await pgGet<InvoiceItem>(env, 'invoice', jwt, { search });
-    return json({ items: data });
+    const { data } = await pgGet<InvoiceDbItem>(env, 'invoice', jwt, { search });
+    const items: InvoiceItem[] = data.map((item) => ({
+      ...item,
+      payer: item.payer
+        ? {
+            id: item.payer.id,
+            slug: item.payer.slug,
+            full_name: item.payer.full_name,
+            organization_name: item.payer.organization?.name ?? null,
+          }
+        : null,
+    }));
+    return json({ items });
   } catch (err) {
     return pgErrorResponse(
       err,

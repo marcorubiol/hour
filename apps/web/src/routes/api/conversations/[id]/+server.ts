@@ -20,7 +20,8 @@ import { extractAccessToken } from '$lib/auth';
 import {
   CONVERSATION_SELECT,
   ConversationPatchSchema,
-  type ConversationItem,
+  normalizeConversationItem,
+  type ConversationDbItem,
 } from '$lib/conversation';
 import { pgGet, pgPatch, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
@@ -119,11 +120,11 @@ export const PATCH: RequestHandler = async ({ request, params, platform, locals 
     search.set('deleted_at', 'is.null');
     search.set('select', CONVERSATION_SELECT);
 
-    const { data } = await pgPatch<ConversationItem>(env, 'conversation', jwt, patch, {
+    const { data } = await pgPatch<ConversationDbItem>(env, 'conversation', jwt, patch, {
       search,
     });
     if (data.length === 0) return json({ error: 'not_found' }, 404);
-    return json({ item: data[0] });
+    return json({ item: normalizeConversationItem(data[0]) });
   } catch (err) {
     return pgErrorResponse(
       err,

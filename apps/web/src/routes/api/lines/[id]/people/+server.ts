@@ -73,7 +73,10 @@ function parseContacts(rawList: unknown): VenueContact[] {
   return out;
 }
 
-const PERSON_SELECT = 'person:person_id(id,slug,full_name,email,phone)';
+const CAST_PERSON_SELECT =
+  'person:workspace_person!cast_member_workspace_person_fkey(id:person_id,slug,full_name,email,phone)';
+const CREW_PERSON_SELECT =
+  'person:workspace_person!crew_assignment_workspace_person_fkey(id:person_id,slug,full_name,email,phone)';
 
 export const GET: RequestHandler = async ({ request, params, platform, locals }) => {
   if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);
@@ -103,7 +106,7 @@ export const GET: RequestHandler = async ({ request, params, platform, locals })
     const projectId = line.data[0].project_id;
 
     const castSearch = new URLSearchParams();
-    castSearch.set('select', `id,role,notes,${PERSON_SELECT}`);
+    castSearch.set('select', `id,role,notes,${CAST_PERSON_SELECT}`);
     castSearch.set('project_id', `eq.${projectId}`);
     castSearch.set('deleted_at', 'is.null');
     castSearch.set('order', 'role.asc');
@@ -112,7 +115,7 @@ export const GET: RequestHandler = async ({ request, params, platform, locals })
     const crewSearch = new URLSearchParams();
     crewSearch.set(
       'select',
-      `id,role,notes,${PERSON_SELECT},performance:performance_id!inner(id,slug,performed_at,venue_name,city,line_id)`,
+      `id,role,notes,${CREW_PERSON_SELECT},performance:performance_id!inner(id,slug,performed_at,venue_name,city,line_id)`,
     );
     crewSearch.set('performance.line_id', `eq.${lineId}`);
     crewSearch.set('deleted_at', 'is.null');
