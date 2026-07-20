@@ -55,7 +55,9 @@ orientativo, no una verdad comercial cerrada.
 - `/health/live`: sano, `dirty:false`, SHA **`4499848`**.
 - `/health/ready`: sano, Supabase `ok`.
 - El runtime verificado en producción es `4499848`; commits posteriores que
-  solo cambian documentación no requieren desplegar el Worker.
+  solo cambian documentación o tests no requieren desplegar el Worker —
+  ninguno de los dos entra en el bundle. `main` puede estar por delante de
+  `/health/live` por esa razón y seguir siendo un estado limpio.
 
 ### Git
 
