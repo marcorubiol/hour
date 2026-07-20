@@ -37,6 +37,7 @@
   "block.created": "Creadas {n} fechas en una serie",
   "block.submit": "Crea el bloque",
   "block.status": "Estado",
+  "block.several_days": "Varios días",
   "planner.legend_confirmed": "confirmado",
   "planner.legend_hold": "hold",
   "planner.prev_month": "Mes anterior",

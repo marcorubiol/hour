@@ -37,6 +37,7 @@
   "block.created": "Creades {n} dates en una sèrie",
   "block.submit": "Crea el bloc",
   "block.status": "Estat",
+  "block.several_days": "Diversos dies",
   "planner.legend_confirmed": "confirmat",
   "planner.legend_hold": "hold",
   "planner.prev_month": "Mes anterior",
