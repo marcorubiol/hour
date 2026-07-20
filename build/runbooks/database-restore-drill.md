@@ -20,8 +20,8 @@ The destructive confirmation is also exact and production's DB URL must differ.
 
 ## One-time staging project configuration
 
-Create an empty Supabase project in the same region and Postgres major version
-as production. It is a disposable test target: never configure production
+Create an empty Supabase project in the same EU data-residency jurisdiction and
+Postgres major version as production. It is a disposable test target: never configure production
 webhooks, SMTP, OAuth callbacks or external cron destinations on it.
 
 Create the GitHub environment `staging` and configure:
@@ -99,11 +99,32 @@ roles/schema/data backup of the synthetic baseline:
 - RLS: `114/114` passed;
 - application build and critical-route smoke: `2/2` passed.
 
-This proves the dump and restore machinery but is not the hosted acceptance
-gate. The block remains open until the same workflow succeeds against the
-dedicated Supabase staging project using the private R2 stamp and records its
-workflow URL and elapsed time here.
+This proved the dump and restore machinery before the hosted acceptance gate
+below was run.
 
-### Hosted staging acceptance
+### Hosted staging acceptance — 2026-07-20
 
-Pending the first hosted staging run.
+Target: `hour-staging`, ref `slccyknqpgmzhyiyclsq`, region `eu-west-1`.
+
+The baseline workflow passed first in
+[run 29761298044](https://github.com/marcorubiol/hour/actions/runs/29761298044):
+commit `84056f8`, destructive rebuild from committed migrations, Auth Admin
+provisioning, deterministic fixtures, exact fixture shape, RLS 114/114, app
+build and critical-route smoke 2/2. Total duration: 1 minute 56 seconds.
+
+The production-backup restore passed in
+[run 29761775037](https://github.com/marcorubiol/hour/actions/runs/29761775037):
+
+- source stamp: `2026-07-20T16-01-18Z`;
+- commit: `3d5e2418c2dbe1abe16cc22db8ff2c5f61bc56de`;
+- measured restore-and-verify time: **203 seconds** (workflow total 4 minutes
+  9 seconds), below the 30-minute target;
+- restored counts: `auth.users=3`, `person=171`, `project=17`, `workspace=5`,
+  `performance=29`, `conversation=157`;
+- password login and custom access-token claims: passed;
+- RLS: 114/114; application build and critical-route smoke: 2/2;
+- final cleanup: passed and returned staging to the synthetic baseline.
+
+The role dump is sanitized before restore to omit Supabase-reserved role
+creation/alteration statements while preserving custom roles and grants. This
+is required because hosted project connections are not superusers.

@@ -21,6 +21,12 @@ and `SHA256SUMS` for integrity verification. Backups made before 2026-07-20
 used `--schema public` for the data dump and therefore cannot prove
 authentication recovery; use a newer stamp for a restore drill.
 
+The roles dump is made portable to a hosted Supabase target by stripping
+`CREATE ROLE` and `ALTER ROLE` statements for Supabase-reserved roles. Custom
+roles and the grants that depend on them remain in the dump. The hosted restore
+acceptance for this format is recorded in
+`build/runbooks/database-restore-drill.md`.
+
 Manual trigger: GitHub → Actions → "Supabase backup → R2" → Run workflow.
 
 ## Required GitHub secrets

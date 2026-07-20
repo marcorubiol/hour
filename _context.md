@@ -52,18 +52,16 @@ orientativo, no una verdad comercial cerrada.
 
 - Web: `https://hour.zerosense.studio`
 - Worker: `hour-web`
-- `/health/live`: sano, `dirty:false`, SHA **`59f1c6e`**.
+- `/health/live`: sano, `dirty:false`, SHA **`7f3de05`**.
 - `/health/ready`: sano, Supabase `ok`.
-- Producción está por detrás del HEAD local: los commits posteriores no están
-  desplegados salvo que el health stamp diga lo contrario.
+- Producción, `main` local y `origin/main` están alineados en `7f3de05`.
 
 ### Git
 
 - Repo: `https://github.com/marcorubiol/hour` (privado).
 - Checkout: `/Users/marcorubiol/Developer/hour`.
 - Rama principal: `main`.
-- Base de esta reconciliación: **`232491e`**, un commit por delante de
-  `origin/main` tras `git fetch --prune`.
+- Base funcional verificada: **`7f3de05`**, publicada en `origin/main`.
 - `wrangler deploy` exige árbol limpio y publica el SHA en `/health/live`.
 
 ### Supabase
@@ -78,15 +76,14 @@ orientativo, no una verdad comercial cerrada.
   en `zzz-e2e-collab`; sin workspace/account personal.
 - Advisor: 0 warnings de rendimiento. El único warning de producto gestionable
   es leaked-password protection; HIBP requiere Supabase Pro.
+- Staging: `hour-staging` · ref `slccyknqpgmzhyiyclsq` · `eu-west-1`, aislado
+  mediante el environment GitHub `staging`; hook de claims activo.
 
-La historia SQL está **partida**:
-
-- `build/migrations/` contiene el historial aplicado antiguo y los deltas hasta
-  julio; no es un baseline limpio garantizado.
-- `supabase/migrations/` contiene el checkpoint y las migraciones gestionadas
-  desde el hardening de identidad del 2026-07-20.
-- Hoy una base vacía **no se reconstruye de forma soportada con un único
-  `supabase db push`**. Crear baseline reproducible + staging es deuda de beta.
+`supabase/migrations/` es ahora la historia SQL ejecutable: checkpoint
+reconstructivo + marcadores aplicados + migraciones posteriores. Una base
+vacía se reconstruye con `pnpm db:reset`, recibe fixtures sintéticos y pasa
+114/114 RLS. El SQL histórico anterior vive solo en
+`build/migrations/squashed-20260720/` para auditoría.
 
 ### Verificación local y contra producción
 
@@ -97,12 +94,13 @@ La historia SQL está **partida**:
 - RLS contra Supabase live: **114/114**, sin skips.
 - Collab: **7/7** + TypeScript limpio.
 - Build de producción: verde.
-- E2E contra producción: **16 passed · 5 failed · 3 did not run**.
-
-Los cinco fallos e2e están localizados en `performance-write`, `person`, dos
-casos de `scope-url` y `tasks`. Parte es drift de selectores/rutas tras Planner,
-Hall y Desk v2; no se debe volver a afirmar que e2e está verde hasta reconciliar
-y ejecutar 24/24.
+- E2E contra producción: **24/24** en `7f3de05`; el flujo destructivo de Tasks
+  pasó además **5/5** repeticiones en serie.
+- Baseline hosted: run `29761298044`, desde cero, Auth + fixtures, RLS 114/114,
+  build y smoke 2/2.
+- Restore drill hosted: run `29761775037`, stamp
+  `2026-07-20T16-01-18Z`, **203 s**, conteos exactos, login, RLS 114/114,
+  build/smoke y retorno automático al baseline sintético.
 
 ## Producto construido hoy
 
@@ -185,8 +183,9 @@ profundidad de producto, no en SvelteKit/Supabase/Cloudflare.
 
 ## Siguiente paso
 
-Abrir `_tasks.md`. La prioridad inmediata es reconciliar los cinco e2e fallidos
-y después cerrar el gate operativo de beta; no relanzar prompts archivados.
+Abrir `_tasks.md`. El bloque 1 está cerrado. La prioridad inmediata es el
+bloque 2: matriz RBAC completa, empezando por el gap read-only de performance;
+no relanzar prompts archivados.
 
 ## Desarrollo local
 

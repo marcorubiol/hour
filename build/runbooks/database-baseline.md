@@ -24,6 +24,9 @@ be exposed to external traffic.
 - The next five migration files are version markers. Production already
   records those exact versions as applied, while their final state is folded
   into the baseline.
+- `20260720164803_harden_data_api_defaults.sql` explicitly narrows the hosted
+  Data API grants and revokes broad default privileges for future public
+  tables, sequences and functions.
 - Their original SQL remains under
   `build/migrations/squashed-20260720/` for audit. It is not executable history.
 - `supabase/seed.sql` is intentionally empty. Production people, Auth users,
@@ -51,6 +54,14 @@ catalog fingerprints. These categories matched:
 
 The raw `pg_dump` diff contains only PostgreSQL formatting/order noise after
 normalization; its semantic catalog state is equal.
+
+The hosted acceptance gate also passed on 2026-07-20 against `hour-staging`
+(`slccyknqpgmzhyiyclsq`, `eu-west-1`): GitHub Actions
+[run 29761298044](https://github.com/marcorubiol/hour/actions/runs/29761298044)
+rebuilt the project from the committed migrations, provisioned Auth through
+the Admin API, loaded synthetic fixtures, passed RLS 114/114, built the app and
+passed the critical-route smoke 2/2. Commit assessed: `84056f8`; duration:
+1 minute 56 seconds.
 
 ## Backup schema retrieval
 

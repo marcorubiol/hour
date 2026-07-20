@@ -4,26 +4,7 @@
 > Estado general y evidencia: `_context.md`. Historia: `_decisions.md` y
 > `_notes/sessions-log.md`. Los documentos de `build/archive/` no crean tareas.
 
-## Ahora
-
-1. [ ] **Reconciliar e2e con el producto actual y recuperar 24/24 contra
-   producción.** Verificación real: 16 passed, 5 failed, 3 did not run.
-   - `performance-write`: aún busca “Add to calendar”; la superficie es Planner.
-   - `person`: espera la estructura anterior de conversaciones en la ficha.
-   - `scope-url` ×2: espera `.hall__door`, eliminado por el Hall actual.
-   - `tasks`: espera `form.desk__task-add`, sustituido por `TaskComposer`.
-   - Reejecutar la suite completa; no corregirla ocultando fallos con skips.
-
-2. [ ] **Cerrar un baseline reproducible de base de datos y crear staging.** El
-   historial está dividido entre `build/migrations/` y `supabase/migrations/`;
-   el checkpoint actual aborta en una base vacía. Resultado esperado: una base
-   nueva se levanta de cero, recibe fixtures sintéticos y pasa 114/114 RLS.
-
-3. [ ] **Ejecutar y documentar el restore drill.** Restaurar el último dump R2
-   en staging, medir tiempo y verificar login, datos, RLS y una ruta crítica.
-   Runbook de origen: `build/runbooks/backup.md`.
-
-## Antes de la primera beta externa
+## Ahora — bloque 2: permisos y entrada a beta
 
 4. [ ] **Matriz RBAC completa.** Definir y probar owner/admin/member/performer/
    guest/external por superficie. Resolver el gap descubierto: hoy no existe
@@ -101,6 +82,12 @@
 
 ## Cerrado recientemente
 
+- [x] **Bloque 1 — gate operativo completo.** E2E producción 24/24 en
+  `7f3de05`; baseline alojado desde cero 114/114 en staging
+  ([run 29761298044](https://github.com/marcorubiol/hour/actions/runs/29761298044));
+  restore drill desde R2 en 203 s, login + conteos + RLS + ruta crítica
+  verificados
+  ([run 29761775037](https://github.com/marcorubiol/hour/actions/runs/29761775037)).
 - [x] Planner v2 + rename Calendar→Planner, aplicado y desplegado.
 - [x] Desk v2: feed mixto, TaskComposer, modo calma y consentimiento IA.
 - [x] Identidad workspace-scoped + organizaciones + hardening RLS.
