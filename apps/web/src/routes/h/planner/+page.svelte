@@ -43,6 +43,7 @@
   import Menu from '$lib/components/Menu.svelte';
   import Select from '$lib/components/Select.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
+  import { copyText } from '$lib/clipboard';
   import MonthGrid, {
     dateDayKey,
     monthName,
@@ -1365,8 +1366,14 @@
   async function copyFeedUrl(token: string, scheme: 'https' | 'webcal') {
     const url =
       scheme === 'webcal' ? feedUrl(token).replace(/^https?:/, 'webcal:') : feedUrl(token);
-    await navigator.clipboard.writeText(url);
-    addToast({ tone: 'success', message: `${scheme === 'webcal' ? 'webcal' : 'https'} link copied.` });
+    addToast(
+      (await copyText(url))
+        ? {
+            tone: 'success',
+            message: `${scheme === 'webcal' ? 'webcal' : 'https'} link copied.`,
+          }
+        : { tone: 'danger', message: 'Could not copy the feed link.' },
+    );
   }
 
   const createFeed = createMutation({

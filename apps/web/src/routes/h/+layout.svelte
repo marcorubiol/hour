@@ -33,6 +33,7 @@
   import CommandPalette from '$lib/components/CommandPalette.svelte';
   import ScopeGlyph from '$lib/components/ScopeGlyph.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
+  import { copyText } from '$lib/clipboard';
   import { useTheme } from '$lib/theme.svelte';
   import { isReservedWorkspaceSlug } from '$lib/reserved-slugs';
   import { provideLens, type Lens } from '$lib/stores/lens.svelte';
@@ -486,10 +487,9 @@
   // Copy link — the ADR-022 level-3 gesture: the URL already carries the
   // scope, canonical id-form by construction (pins hold slugs, never aliases).
   async function copyScopeLink() {
-    try {
-      await navigator.clipboard.writeText(location.href);
+    if (await copyText(location.href)) {
       addToast({ tone: 'success', message: 'Link copied — scope included.' });
-    } catch {
+    } else {
       addToast({ tone: 'danger', message: 'Could not copy the link.' });
     }
   }

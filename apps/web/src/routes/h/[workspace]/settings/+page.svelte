@@ -20,6 +20,7 @@
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { accentVar } from '$lib/utils/accent';
   import { fetchJSON, mutateJSON, ApiError } from '$lib/api';
+  import { copyText } from '$lib/clipboard';
   import { addToast } from '$lib/components/Toast.svelte';
   import { session } from '$lib/session.svelte';
   import { type SectionId } from '$lib/components/SettingsNav.svelte';
@@ -161,8 +162,11 @@
 
   async function copyInviteLink() {
     if (!latestInviteUrl) return;
-    await navigator.clipboard.writeText(latestInviteUrl);
-    addToast({ tone: 'success', message: 'Private invitation link copied.' });
+    addToast(
+      (await copyText(latestInviteUrl))
+        ? { tone: 'success', message: 'Private invitation link copied.' }
+        : { tone: 'danger', message: 'Could not copy the private invitation link.' },
+    );
   }
 
   async function changeMemberRole(membershipId: string, role: string) {

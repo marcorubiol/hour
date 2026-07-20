@@ -16,6 +16,7 @@
   import { toStore } from 'svelte/store';
   import { fetchJSON, mutateJSON } from '$lib/api';
   import Button from '$lib/components/Button.svelte';
+  import { copyText } from '$lib/clipboard';
   import Pill from '$lib/components/Pill.svelte';
   import RoadsheetView from '$lib/components/RoadsheetView.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
@@ -110,8 +111,11 @@
   }
 
   async function copyShare(token: string): Promise<void> {
-    await navigator.clipboard.writeText(shareUrl(token));
-    addToast({ tone: 'success', message: 'Link copied.' });
+    addToast(
+      (await copyText(shareUrl(token)))
+        ? { tone: 'success', message: 'Link copied.' }
+        : { tone: 'danger', message: 'Could not copy the road sheet link.' },
+    );
   }
 
   function shareDay(iso: string): string {
