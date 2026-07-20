@@ -65,6 +65,16 @@ jobs:
               --only-show-errors
           done
 
+      # Schema-only copy for baseline/recovery verification. Production rows
+      # remain exclusively in the private R2 backup.
+      - name: Upload short-lived schema artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: supabase-schema-${{ env.STAMP }}
+          path: out/schema-*.sql.gz
+          if-no-files-found: error
+          retention-days: 1
+
       - name: Prune backups older than RETENTION_WEEKS
         env:
           AWS_ACCESS_KEY_ID: ${{ env.R2_ACCESS_KEY_ID }}
