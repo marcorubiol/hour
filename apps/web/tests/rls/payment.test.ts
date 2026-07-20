@@ -16,7 +16,7 @@ type MoneyPerformance = {
   id: string;
   fee_amount: number | null;
   fee_currency: string | null;
-  project: { name: string } | null;
+  project: { name: string; slug: string } | null;
 };
 
 type InvoiceRow = {
@@ -63,7 +63,7 @@ describe.skipIf(!envReady())('payment RLS + derived invoice status', () => {
     });
     expect(listed.status).toBe(200);
     const performance = listed.data?.find(
-      (item) => item.project?.name === 'ZZZ e2e collab',
+      (item) => item.project?.slug === 'zzz-e2e-collab',
     );
     expect(performance).toBeTruthy();
     if (!performance) throw new Error('Missing ZZZ e2e collab fixture performance');
