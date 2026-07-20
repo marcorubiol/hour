@@ -61,7 +61,6 @@
 > |---|:--:|:--:|:--:|:--:|
 > | Converses | ● | ● | ● | — |
 > | Materials | — | ● | ● | ● |
-> | Producció | — | ● | ● | ● |
 > | Tècnica | — | ● | ● | ● |
 > | Logística | — | — | ● | ● |
 > | Full de ruta | — | — | — | ● |

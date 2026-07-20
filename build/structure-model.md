@@ -65,7 +65,6 @@ code (moving one has to be an `UPDATE`, never a migration):
 |--------------|:-----:|:-------:|:----:|:-----------:|
 | Converses    |   ●   |    ●    |  ●   |      —      |
 | Materials    |   —   |    ●    |  ●   |      ●      |
-| Producció    |   —   |    ●    |  ●   |      ●      |
 | Tècnica      |   —   |    ●    |  ●   |      ●      |
 | Logística    |   —   |    —    |  ●   |      ●      |
 | Full de ruta |   —   |    —    |  —   |      ●      |

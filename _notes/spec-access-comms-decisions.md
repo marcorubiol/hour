@@ -25,8 +25,11 @@
 Preset renames, forced by collisions:
 - `Convidat` → **`Mínim`** — "convidat" now names the guest (a person), and the
   lowest operator preset cannot share the word with it.
-- `Producció` → **`Coordinació`** — `Producció` becomes a *facet* (§ 2), and it is
-  already a *rol*. Three meanings for one word is exactly the ADR-082 §2 failure.
+- `Producció` → **`Coordinació`** — kept even after Producció stopped being a facet, and
+  the reason is now sharper: a *rol* is what you do, a *preset* is a bundle of permissions.
+  A preset named `Producció` invites exactly the wrong reflex — "give her the Producció
+  preset because she does producció" — which is the rol/permisos conflation ADR-082 exists
+  to prevent.
 
 Final preset ladder: **Mínim · Equip · Coordinació · Direcció**.
 
@@ -41,7 +44,6 @@ both because it is the only one that crosses every level.
 |---|:--:|:--:|:--:|:--:|
 | Converses | ● | ● | ● | — |
 | Materials | — | ● | ● | ● |
-| Producció | — | ● | ● | ● |
 | Tècnica | — | ● | ● | ● |
 | Logística | — | — | ● | ● |
 | Full de ruta | — | — | — | ● |
@@ -56,15 +58,25 @@ both because it is the only one that crosses every level.
   `Diners·veure` at space level grants it in every gig. The table says where a
   facet *can* exist; it does not change how access sums.
 - **Chosen deliberately over a flat list.** Marco's call. The honest accounting: the
-  ergonomic gain is modest (espai=2 rows, projecte=5, línia=6, bolo=6 — línia and
+  ergonomic gain is modest (espai=2 rows, projecte=4, línia=5, bolo=5 — línia and
   bolo differ only in Converses↔Full de ruta). **The real gain is safety, not
   brevity**: you cannot grant `Full de ruta` at space level or `Converses` on a gig,
   because the row is not there to grant.
-- **Weakest cell: `Producció`.** Kept, but on probation. The mockup pass tested it
-  by writing a realistic Producció thread and found every message would have gone to
-  tècnica, logística or diners. Note that "it's a classic theatre role" argues for it
-  being a **rol** (it already is one) — not for it being a facet. Re-evaluate after a
-  real season.
+- **`Producció` is NOT a facet — dropped 2026-07-20** after being drawn and tested.
+  Three things killed it, in ascending order of weight:
+  (a) the mockup wrote a realistic Producció thread and every message would have gone to
+  tècnica, logística or diners — nothing said there lost its home without it;
+  (b) list what it would cover — contracts, accreditations, permits, insurance, rights,
+  personnel — and each item already has a home (contracts→Diners, accreditations→Logística,
+  materials→Materials), leaving a thin residue, and **the model already has a name for the
+  residue: `General`**;
+  (c) decisive — **in shipped code `production` is the CONTAINER of the others.**
+  `ProductionStub.svelte` is the performance's production block: venue + schedule + the three
+  jsonb summaries *logistics / hospitality / technical*. Making Producció a sibling of
+  Logística and Tècnica is a category error against code that already runs.
+  It survives where the argument for it actually holds — **as a rol**, which it already was.
+  "It's a classic theatre role" argues for a rol, never for a permission facet.
+  Cheap to reverse if a real season proves otherwise: the facet list is data, one row.
 
 **Reversibility is a requirement, not a nicety** (Marco, explicit): the table above
 must be **rows, never code**. Moving Tècnica from projecte to línia has to be an
@@ -186,10 +198,9 @@ company. Do not build for it.
 1. **Revoking has no screen.** An operator stops being one at the end of a tour:
    access closes, the person returns to contact, everything they wrote stays. Nobody
    has designed it. It is the other half of "dar de alta".
-2. **`Producció` as a facet** — on probation, see § 2.
-3. **The concern palette vs the facet palette** — one decision, not yet taken.
-4. **`roadsheet_share` expiry** — whether it should follow the guest's rule.
-5. **Does comms surface in the Desk?** A `MISSATGE` run fits the grammar, but 4→5
+2. **The concern palette vs the facet palette** — one decision, not yet taken.
+3. **`roadsheet_share` expiry** — whether it should follow the guest's rule.
+4. **Does comms surface in the Desk?** A `MISSATGE` run fits the grammar, but 4→5
    concern labels costs calm and "everything unread" turns the Desk into an inbox.
    Proposed criterion if it does: only a message carrying an open question addressed
    to you.

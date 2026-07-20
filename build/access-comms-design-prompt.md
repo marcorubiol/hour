@@ -96,7 +96,9 @@ Three things that must never fuse on screen:
 
 **Presets, never a capability composer: Mínim · Equip · Coordinació · Direcció.**
 (Renamed 2026-07-20: `Convidat` → `Mínim`, because "convidat" now names a *person*;
-`Producció` → `Coordinació`, because Producció is now a facet and already a rol.)
+`Producció` → `Coordinació`, because a preset must not share its name with a rol —
+it invites "give her the Producció preset because she does producció", the exact
+rol/permisos conflation the model forbids.)
 
 ### Facets exist per container level
 
@@ -104,7 +106,6 @@ Three things that must never fuse on screen:
 |---|:--:|:--:|:--:|:--:|
 | Converses | ● | ● | ● | — |
 | Materials | — | ● | ● | ● |
-| Producció | — | ● | ● | ● |
 | Tècnica | — | ● | ● | ● |
 | Logística | — | — | ● | ● |
 | Full de ruta | — | — | — | ● |
@@ -117,7 +118,7 @@ Three things that must never fuse on screen:
 - **Diners is the only facet at all four levels.** That is why it is the sensitive one.
   Never smooth it away.
 - Effective access is the **union** across levels, unchanged.
-- Honest accounting to keep visible: the ergonomic gain is modest (2 / 5 / 6 / 6 rows;
+- Honest accounting to keep visible: the ergonomic gain is modest (2 / 4 / 5 / 5 rows;
   línia and bolo differ only in Converses ↔ Full de ruta). **The gain is safety, not
   brevity** — you cannot grant Full de ruta at space level because the row is not there.
 
@@ -171,15 +172,12 @@ confirmation line. This rule **replaces** the separate "invite" capability gate.
 1. **Revoking has no screen.** An operator stops being one at the end of a tour: access
    closes, the person returns to contact, everything they wrote stays. This is the other half
    of "dar de alta" and nobody has designed it. **Highest-value thing left to draw.**
-2. **`Producció` as a facet, on probation.** The 2026-07-20 pass wrote a realistic Producció
-   thread and every message would have gone to tècnica, logística or diners. Kept because
-   Marco wants it; re-evaluate after a real season.
-3. **The concern palette vs the facet palette.** The Desk tints per concern, comms tints per
+2. **The concern palette vs the facet palette.** The Desk tints per concern, comms tints per
    facet, they overlap on Diners, and no single decision reconciles them.
-4. **Does comms surface in the Desk?** A `MISSATGE` run fits the grammar, but 4→5 concern
+3. **Does comms surface in the Desk?** A `MISSATGE` run fits the grammar, but 4→5 concern
    labels costs calm and "everything unread" turns the Desk into an inbox. Proposed criterion
    if it does: only a message carrying an open question addressed to you.
-5. **`roadsheet_share` expiry** — it is revoke-only today; whether it should follow the
+4. **`roadsheet_share` expiry** — it is revoke-only today; whether it should follow the
    guest's rule.
 
 ## Deliverable, if regenerating
