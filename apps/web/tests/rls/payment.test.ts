@@ -15,6 +15,7 @@ const RUN_TAG = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 type MoneyPerformance = {
   id: string;
   fee_amount: number | null;
+  fee_currency: string | null;
   project: { name: string } | null;
 };
 
@@ -62,29 +63,42 @@ describe.skipIf(!envReady())('payment RLS + derived invoice status', () => {
     });
     expect(listed.status).toBe(200);
     const performance = listed.data?.find(
-      (item) => item.project?.name === 'ZZZ e2e collab' && Number(item.fee_amount) > 0,
+      (item) => item.project?.name === 'ZZZ e2e collab',
     );
     expect(performance).toBeTruthy();
-    if (!performance) return;
+    if (!performance) throw new Error('Missing ZZZ e2e collab fixture performance');
 
-    const createdInvoice = await pgRpc<InvoiceRow>('create_invoice', jwt, {
-      p_performance_id: performance.id,
-      p_vat_pct: null,
-      p_irpf_pct: null,
-      p_number: `rls-payment-${RUN_TAG}`,
-      p_due_on: null,
-      p_notes: null,
-      p_expected_on: null,
-      p_payment_condition: null,
-      p_payer_person_id: null,
-    });
-    expect(createdInvoice.status).toBe(200);
-    const invoice = createdInvoice.data;
-    expect(invoice?.id).toBeTruthy();
-    if (!invoice) return;
-
+    const originalFee = performance.fee_amount;
+    let invoice: InvoiceRow | null = null;
     const paymentIds: string[] = [];
     try {
+      if (originalFee === null) {
+        const prepared = await pgPatch<MoneyPerformance>(
+          'performance',
+          jwt,
+          { fee_amount: 100, fee_currency: performance.fee_currency ?? 'EUR' },
+          new URLSearchParams({ id: `eq.${performance.id}`, select: 'id,fee_amount,fee_currency' }),
+        );
+        expect(prepared.status).toBe(200);
+        expect(Number(prepared.rows[0]?.fee_amount)).toBe(100);
+      }
+
+      const createdInvoice = await pgRpc<InvoiceRow>('create_invoice', jwt, {
+        p_performance_id: performance.id,
+        p_vat_pct: null,
+        p_irpf_pct: null,
+        p_number: `rls-payment-${RUN_TAG}`,
+        p_due_on: null,
+        p_notes: null,
+        p_expected_on: null,
+        p_payment_condition: null,
+        p_payer_person_id: null,
+      });
+      expect(createdInvoice.status).toBe(200);
+      invoice = createdInvoice.data;
+      expect(invoice?.id).toBeTruthy();
+      if (!invoice) throw new Error('Invoice RPC returned no row');
+
       const draftPayment = await pgRpc('create_payment', jwt, {
         p_invoice_id: invoice.id,
         p_amount: 1,
@@ -172,13 +186,23 @@ describe.skipIf(!envReady())('payment RLS + derived invoice status', () => {
       for (const paymentId of paymentIds) {
         await pgRpc('delete_payment', jwt, { p_payment_id: paymentId });
       }
-      await pgPatch(
-        'invoice',
-        jwt,
-        { status: 'draft' },
-        new URLSearchParams({ id: `eq.${invoice.id}` }),
-      );
-      await pgRpc('delete_invoice', jwt, { p_invoice_id: invoice.id });
+      if (invoice) {
+        await pgPatch(
+          'invoice',
+          jwt,
+          { status: 'draft' },
+          new URLSearchParams({ id: `eq.${invoice.id}` }),
+        );
+        await pgRpc('delete_invoice', jwt, { p_invoice_id: invoice.id });
+      }
+      if (originalFee === null) {
+        await pgPatch(
+          'performance',
+          jwt,
+          { fee_amount: null },
+          new URLSearchParams({ id: `eq.${performance.id}` }),
+        );
+      }
     }
   }, 30_000);
 });
