@@ -52,9 +52,9 @@ orientativo, no una verdad comercial cerrada.
 
 - Web: `https://hour.zerosense.studio`
 - Worker: `hour-web`
-- `/health/live`: sano, `dirty:false`, SHA **`7f3de05`**.
+- `/health/live`: sano, `dirty:false`, SHA **`5cc2f6b`**.
 - `/health/ready`: sano, Supabase `ok`.
-- El runtime verificado en producción es `7f3de05`; commits posteriores que
+- El runtime verificado en producción es `5cc2f6b`; commits posteriores que
   solo cambian documentación no requieren desplegar el Worker.
 
 ### Git
@@ -62,7 +62,7 @@ orientativo, no una verdad comercial cerrada.
 - Repo: `https://github.com/marcorubiol/hour` (privado).
 - Checkout: `/Users/marcorubiol/Developer/hour`.
 - Rama principal: `main`.
-- Base funcional del runtime: **`7f3de05`**, publicada en `origin/main`;
+- Base funcional del runtime: **`5cc2f6b`**, publicada en `origin/main`;
   `main` local y remoto están sincronizados.
 - `wrangler deploy` exige árbol limpio y publica el SHA en `/health/live`.
 
@@ -71,20 +71,25 @@ orientativo, no una verdad comercial cerrada.
 - Proyecto: `hour-phase0` · ref `lqlyorlccnniybezugme` · `eu-central-1`.
 - Plan: **Free**.
 - Auth: email+password, cookies httpOnly en la app, hook de access token activo.
-- RLS: FORCE en las superficies tenant-scoped; suite live **114/114**.
+- RLS: FORCE en las superficies tenant-scoped; suite live **118/118**.
 - Identidad 2026-07-20: `workspace_person` y `workspace_organization` aplicadas,
   perfil portable y dossier local por workspace, share/revoke explícitos.
 - Fixture limitado: `limited@hour.test`, member solo de `playwright`, performer
   en `zzz-e2e-collab`; sin workspace/account personal.
-- Advisor: 0 warnings de rendimiento. El único warning de producto gestionable
-  es leaked-password protection; HIBP requiere Supabase Pro.
+- Fixture externo: `external@hour.test`; ciclo completo cero acceso → invitación
+  → aceptación → revocación con el mismo JWT, independiente de los otros users.
+- Advisors: rendimiento sin ERROR/WARN (105 INFO de índices/FK/PK a observar).
+  Seguridad sin ERROR: 63 RPC authenticated SECURITY DEFINER y las 2 proyecciones
+  públicas por token son fronteras intencionadas; HIBP es el warning pendiente
+  que requiere Supabase Pro. `workspace_invitation` sin policy es INFO y
+  deliberado: solo se accede mediante RPC.
 - Staging: `hour-staging` · ref `slccyknqpgmzhyiyclsq` · `eu-west-1`, aislado
   mediante el environment GitHub `staging`; hook de claims activo.
 
 `supabase/migrations/` es ahora la historia SQL ejecutable: checkpoint
 reconstructivo + marcadores aplicados + migraciones posteriores. Una base
 vacía se reconstruye con `pnpm db:reset`, recibe fixtures sintéticos y pasa
-114/114 RLS. El SQL histórico anterior vive solo en
+118/118 RLS. El SQL histórico anterior vive solo en
 `build/migrations/squashed-20260720/` para auditoría.
 
 ### Verificación local y contra producción
@@ -92,12 +97,17 @@ vacía se reconstruye con `pnpm db:reset`, recibe fixtures sintéticos y pasa
 Último pase completo relevante:
 
 - `svelte-check`: 0 errores / 0 warnings.
-- Unit: **312/312**.
-- RLS contra Supabase live: **114/114**, sin skips.
-- Collab: **7/7** + TypeScript limpio.
+- Unit: **318/318**.
+- RLS contra Supabase live: **118/118**, sin skips.
+- Collab: **11/11** + TypeScript limpio.
 - Build de producción: verde.
-- E2E contra producción: **24/24** en `7f3de05`; el flujo destructivo de Tasks
-  pasó además **5/5** repeticiones en serie.
+- E2E contra producción: **25/25** en `5cc2f6b`, incluidos collab real,
+  aislamiento money, Conversations scoped y copy-link canónico.
+- Baseline hosted actual: run `29770132749` sobre `5cc2f6b`, reconstrucción
+  desde cero, 3 identidades Auth, fixtures, RLS 118/118, build y smoke verdes.
+- Backup de producción actual: run `29770347695` sobre `5cc2f6b`, sello
+  `2026-07-20T19-02-54Z`; esquema, datos y roles subidos a R2 y retención
+  aplicada correctamente.
 - Baseline hosted: run `29761298044`, desde cero, Auth + fixtures, RLS 114/114,
   build y smoke 2/2.
 - Restore drill hosted: run `29761775037`, stamp
@@ -120,7 +130,9 @@ vacía se reconstruye con `pnpm db:reset`, recibe fixtures sintéticos y pasa
 - Performance detail, road sheet interno/público, venues, cast/crew, assets,
   expenses, tasks, calendar shares y colaboración Yjs están operativos.
 - Navegación actual: shell user-scoped, scopes/pins, LensSwitcher y rutas
-  globales; no Plaza, no sidebar House→Room y no `ScopeStrip` antiguo.
+  globales; Conversations conserva scope/copy-link y los aliases entrantes se
+  canonicalizan al slug estable. No Plaza, no sidebar House→Room y no
+  `ScopeStrip` antiguo.
 
 ## Modelo y vocabulario vigentes
 
@@ -185,9 +197,9 @@ profundidad de producto, no en SvelteKit/Supabase/Cloudflare.
 
 ## Siguiente paso
 
-Abrir `_tasks.md`. El bloque 1 está cerrado. La prioridad inmediata es el
-bloque 2: matriz RBAC completa, empezando por el gap read-only de performance;
-no relanzar prompts archivados.
+Abrir `_tasks.md`. Los bloques 1 y 2 están cerrados. La prioridad inmediata es
+el bloque 3: Conversations v1.5; no empezar Money ni la revisión transversal
+hasta verificarlo.
 
 ## Desarrollo local
 

@@ -274,8 +274,6 @@ Después de cualquier cambio DB:
 
 ## 11. Límites y deuda arquitectónica
 
-- El binding nativo de rate limiting y el recorrido manual de
-  alias/navegación aún necesitan verificación en el edge desplegado.
 - El enlace de invitación es copy/send manual; envío transaccional de email no
   se finge como construido.
 - Offline actual es scaffold, no road mode garantizado.

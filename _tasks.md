@@ -4,28 +4,36 @@
 > Estado general y evidencia: `_context.md`. Historia: `_decisions.md` y
 > `_notes/sessions-log.md`. Los documentos de `build/archive/` no crean tareas.
 
-## Ahora — bloque 2: permisos y entrada a beta
+## Cerrado — bloque 2: permisos y entrada a beta
 
-4. [ ] **Matriz RBAC completa.** Definir y probar owner/admin/member/performer/
-   guest/external por superficie. Resolver el gap descubierto: hoy no existe
-   permiso read-only de performance; la lectura depende de `edit:performance`.
-   Incluir revocación con JWT previo y cierre/reautorización de sockets collab.
+4. [x] **Matriz RBAC completa.** Owner/admin/member/performer/guest/external
+   cubiertos por RLS 118/118. Lectura y edición de performance están separadas;
+   la revocación invalida el JWT previo y reautoriza/cierra sockets collab.
 
-5. [ ] **Onboarding y administración sin SQL.** Invitación, aceptación, rol
-   comprensible, revocación inmediata, soporte mínimo y separación clara entre
-   datos demo/staging/producción.
+5. [x] **Onboarding y administración sin SQL.** Invitación hasheada y caduca,
+   aceptación por email verificado, rol/proyecto explícitos, ledger de acceso y
+   revocación inmediata están disponibles en Settings.
 
-6. [ ] **Identidad completamente externa de fixture.** Debe probar cero acceso
-   antes de invitación, acceso tras aceptar y revocación sin depender del usuario
-   admin ni de `limited@hour.test`.
+6. [x] **Identidad completamente externa de fixture.** `external@hour.test`
+   prueba cero acceso → invitación/aceptación → acceso → revocación con el mismo
+   JWT, sin depender del admin ni de `limited@hour.test`.
 
-7. [ ] **Regla Cloudflare edge de rate-limit en `/api/auth/login`.** El código
-   de aplicación ya limita; falta la regla edge. Requiere `Zone WAF:Edit`.
-   Procedimiento: `build/runbooks/beta-readiness.md`.
+7. [x] **Rate-limit Cloudflare en `/api/auth/login`.** Binding nativo de Workers
+   10/min/IP para ráfagas + ventana KV independiente 10/5 min/IP. La única regla
+   WAF Free sigue protegiendo `wp-login.php` (slot 1/1), sin sustituirla.
 
-8. [ ] **Verificación manual del flujo de alias y navegación ADR-067.** Hall,
-   LensSwitcher, pins, copy-link, solicitud/aprobación de alias y redirects
-   legacy. Automatizar los casos estables después de la comprobación.
+8. [x] **Verificación manual del flujo de alias y navegación ADR-067.** Hall,
+   LensSwitcher, pins, copy-link, solicitud/aprobación y canonicalización del
+   alias, y redirects legacy verificados. La revisión descubrió y corrigió el
+   scope ausente en Conversations y la copia denegada en browsers embebidos;
+   ambos quedan automatizados.
+
+## Ahora — bloque 3: Conversations v1.5
+
+10. [ ] **Conversations v1.5.** Last contact visible, write path “contacted
+    today”, vista por conversación/persona y contrato de `conversation_event`.
+    Prompts activos: `build/conversations-prompt.md` y
+    `build/conversations-design-prompt.md`.
 
 ## Decisiones con coste o autoridad externa
 
@@ -33,12 +41,7 @@
    Free y la función requiere Pro. Marco debe decidir el upgrade; después activar
    `password_hibp_enabled` y volver a ejecutar el advisor.
 
-## Producto — siguiente profundidad, elegir explícitamente
-
-10. [ ] **Conversations v1.5.** Last contact visible, write path “contacted
-    today”, vista por conversación/persona y contrato de `conversation_event`.
-    Prompts activos: `build/conversations-prompt.md` y
-    `build/conversations-design-prompt.md`.
+## Después del bloque 3 — bloques 4 a 6
 
 11. [ ] **Money v2.** `expected_on`, condición de pago, pagos observados,
     aging y estado paid derivado. Orden activo: `build/money-model-prompt.md` →
