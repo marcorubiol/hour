@@ -2,7 +2,9 @@
 
 > Estado 2026-07-20: **EJECUTADO** en `hour-phase0`. Snapshot privado
 > `hour_backup_20260720`; dry-run y apply completados; RLS 108 pass / 1 skip.
-> Pendiente: tipos generados, asesores y segundo usuario de fixture.
+> Tipos regenerados y asesores ejecutados. Follow-up aplicado como
+> `20260720114629_advisor_rls_and_fk_indexes.sql`: 0 WARN de rendimiento.
+> Pendiente: segundo usuario de fixture y HIBP cuando el proyecto use plan Pro.
 
 ## Alcance y orden
 
@@ -14,6 +16,7 @@ en este orden:
 3. `20260720105735_reinforce_workspace_membership_envelope.sql`
 4. `20260720105746_lock_account_ownership.sql`
 5. `20260720105800_workspace_identity_and_organizations.sql`
+6. `20260720114629_advisor_rls_and_fk_indexes.sql`
 
 El primer fichero no es aún un baseline reconstructivo: comprueba que el proyecto
 contiene el esquema histórico esperado y aborta en una base vacía o equivocada.

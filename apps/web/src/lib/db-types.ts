@@ -1,9 +1,3 @@
-// hand-patched pending regen (calendar-v2): availability_block table + RPCs,
-// date.line_id + date.travel_direction, date_kind 'day_off',
-// user_profile.person_id, create_date/delete_date RPCs. Regenerate after
-// applying the 2026-07-18 migrations.
-// hand-patched pending regen (planner-v2): performance.hold_notice_days
-// (ADR-080 §2, 2026-07-18_hold_notice_days.sql).
 export type Json =
   | string
   | number
@@ -302,6 +296,13 @@ export type Database = {
             referencedRelation: "workspace"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "availability_block_workspace_person_fkey"
+            columns: ["workspace_id", "person_id"]
+            isOneToOne: false
+            referencedRelation: "workspace_person"
+            referencedColumns: ["workspace_id", "person_id"]
+          },
         ]
       }
       calendar_share: {
@@ -404,6 +405,13 @@ export type Database = {
             referencedRelation: "workspace"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "cast_member_workspace_person_fkey"
+            columns: ["workspace_id", "person_id"]
+            isOneToOne: false
+            referencedRelation: "workspace_person"
+            referencedColumns: ["workspace_id", "person_id"]
+          },
         ]
       }
       cast_override: {
@@ -481,6 +489,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "workspace"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cast_override_workspace_person_fkey"
+            columns: ["workspace_id", "person_id"]
+            isOneToOne: false
+            referencedRelation: "workspace_person"
+            referencedColumns: ["workspace_id", "person_id"]
+          },
+          {
+            foreignKeyName: "cast_override_workspace_replaces_person_fkey"
+            columns: ["workspace_id", "replaces_person_id"]
+            isOneToOne: false
+            referencedRelation: "workspace_person"
+            referencedColumns: ["workspace_id", "person_id"]
           },
         ]
       }
@@ -612,6 +634,13 @@ export type Database = {
             referencedRelation: "workspace"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "conversation_workspace_person_fkey"
+            columns: ["workspace_id", "person_id"]
+            isOneToOne: false
+            referencedRelation: "workspace_person"
+            referencedColumns: ["workspace_id", "person_id"]
+          },
         ]
       }
       crew_assignment: {
@@ -683,6 +712,13 @@ export type Database = {
             referencedRelation: "workspace"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "crew_assignment_workspace_person_fkey"
+            columns: ["workspace_id", "person_id"]
+            isOneToOne: false
+            referencedRelation: "workspace_person"
+            referencedColumns: ["workspace_id", "person_id"]
+          },
         ]
       }
       date: {
@@ -702,6 +738,7 @@ export type Database = {
           performance_id: string | null
           project_id: string
           season: string | null
+          series_id: string | null
           starts_at: string
           status: Database["public"]["Enums"]["date_status"]
           title: string | null
@@ -727,6 +764,7 @@ export type Database = {
           performance_id?: string | null
           project_id: string
           season?: string | null
+          series_id?: string | null
           starts_at: string
           status?: Database["public"]["Enums"]["date_status"]
           title?: string | null
@@ -752,6 +790,7 @@ export type Database = {
           performance_id?: string | null
           project_id?: string
           season?: string | null
+          series_id?: string | null
           starts_at?: string
           status?: Database["public"]["Enums"]["date_status"]
           title?: string | null
@@ -989,6 +1028,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "workspace"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_workspace_payer_person_fkey"
+            columns: ["workspace_id", "payer_person_id"]
+            isOneToOne: false
+            referencedRelation: "workspace_person"
+            referencedColumns: ["workspace_id", "person_id"]
           },
         ]
       }
@@ -1232,6 +1278,7 @@ export type Database = {
           performed_at: string
           previous_slugs: string[]
           project_id: string
+          readiness: Json
           slug: string | null
           soundcheck_at: string | null
           start_at: string | null
@@ -1264,6 +1311,7 @@ export type Database = {
           performed_at: string
           previous_slugs?: string[]
           project_id: string
+          readiness?: Json
           slug?: string | null
           soundcheck_at?: string | null
           start_at?: string | null
@@ -1296,6 +1344,7 @@ export type Database = {
           performed_at?: string
           previous_slugs?: string[]
           project_id?: string
+          readiness?: Json
           slug?: string | null
           soundcheck_at?: string | null
           start_at?: string | null
@@ -1460,6 +1509,13 @@ export type Database = {
             referencedRelation: "workspace"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "person_note_workspace_person_fkey"
+            columns: ["workspace_id", "person_id"]
+            isOneToOne: false
+            referencedRelation: "workspace_person"
+            referencedColumns: ["workspace_id", "person_id"]
+          },
         ]
       }
       project: {
@@ -1473,6 +1529,7 @@ export type Database = {
           dossier_url: string | null
           ends_on: string | null
           id: string
+          initials: string | null
           name: string
           notes: string | null
           owner_id: string | null
@@ -1494,6 +1551,7 @@ export type Database = {
           dossier_url?: string | null
           ends_on?: string | null
           id?: string
+          initials?: string | null
           name: string
           notes?: string | null
           owner_id?: string | null
@@ -1515,6 +1573,7 @@ export type Database = {
           dossier_url?: string | null
           ends_on?: string | null
           id?: string
+          initials?: string | null
           name?: string
           notes?: string | null
           owner_id?: string | null
@@ -1751,39 +1810,66 @@ export type Database = {
       user_profile: {
         Row: {
           avatar_url: string | null
+          bio: string | null
+          city: string | null
+          country: string | null
           created_at: string
+          first_name: string | null
           full_name: string
           is_platform_admin: boolean
+          languages: string[]
+          last_name: string | null
           locale: string
           person_id: string | null
+          phone: string | null
+          professional_title: string | null
           updated_at: string
           user_id: string
+          website: string | null
         }
         Insert: {
           avatar_url?: string | null
+          bio?: string | null
+          city?: string | null
+          country?: string | null
           created_at?: string
+          first_name?: string | null
           full_name: string
           is_platform_admin?: boolean
+          languages?: string[]
+          last_name?: string | null
           locale?: string
           person_id?: string | null
+          phone?: string | null
+          professional_title?: string | null
           updated_at?: string
           user_id: string
+          website?: string | null
         }
         Update: {
           avatar_url?: string | null
+          bio?: string | null
+          city?: string | null
+          country?: string | null
           created_at?: string
+          first_name?: string | null
           full_name?: string
           is_platform_admin?: boolean
+          languages?: string[]
+          last_name?: string | null
           locale?: string
           person_id?: string | null
+          phone?: string | null
+          professional_title?: string | null
           updated_at?: string
           user_id?: string
+          website?: string | null
         }
         Relationships: [
           {
             foreignKeyName: "user_profile_person_id_fkey"
             columns: ["person_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "person"
             referencedColumns: ["id"]
           },
@@ -2009,6 +2095,174 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "workspace_membership_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspace"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workspace_organization: {
+        Row: {
+          address: string | null
+          city: string | null
+          country: string | null
+          created_at: string
+          created_by: string | null
+          custom_fields: Json
+          deleted_at: string | null
+          email: string | null
+          id: string
+          kind: string
+          name: string
+          notes: string | null
+          phone: string | null
+          slug: string
+          updated_at: string
+          website: string | null
+          workspace_id: string
+        }
+        Insert: {
+          address?: string | null
+          city?: string | null
+          country?: string | null
+          created_at?: string
+          created_by?: string | null
+          custom_fields?: Json
+          deleted_at?: string | null
+          email?: string | null
+          id?: string
+          kind?: string
+          name: string
+          notes?: string | null
+          phone?: string | null
+          slug: string
+          updated_at?: string
+          website?: string | null
+          workspace_id: string
+        }
+        Update: {
+          address?: string | null
+          city?: string | null
+          country?: string | null
+          created_at?: string
+          created_by?: string | null
+          custom_fields?: Json
+          deleted_at?: string | null
+          email?: string | null
+          id?: string
+          kind?: string
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          slug?: string
+          updated_at?: string
+          website?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_organization_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspace"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workspace_person: {
+        Row: {
+          city: string | null
+          country: string | null
+          created_at: string
+          created_by: string | null
+          custom_fields: Json
+          deleted_at: string | null
+          email: string | null
+          first_name: string | null
+          full_name: string
+          languages: string[]
+          last_name: string | null
+          notes: string | null
+          organization_id: string | null
+          person_id: string
+          phone: string | null
+          profile_shared_at: string | null
+          profile_shared_fields: string[]
+          profile_sync_enabled: boolean
+          slug: string
+          title: string | null
+          updated_at: string
+          website: string | null
+          workspace_id: string
+        }
+        Insert: {
+          city?: string | null
+          country?: string | null
+          created_at?: string
+          created_by?: string | null
+          custom_fields?: Json
+          deleted_at?: string | null
+          email?: string | null
+          first_name?: string | null
+          full_name: string
+          languages?: string[]
+          last_name?: string | null
+          notes?: string | null
+          organization_id?: string | null
+          person_id: string
+          phone?: string | null
+          profile_shared_at?: string | null
+          profile_shared_fields?: string[]
+          profile_sync_enabled?: boolean
+          slug: string
+          title?: string | null
+          updated_at?: string
+          website?: string | null
+          workspace_id: string
+        }
+        Update: {
+          city?: string | null
+          country?: string | null
+          created_at?: string
+          created_by?: string | null
+          custom_fields?: Json
+          deleted_at?: string | null
+          email?: string | null
+          first_name?: string | null
+          full_name?: string
+          languages?: string[]
+          last_name?: string | null
+          notes?: string | null
+          organization_id?: string | null
+          person_id?: string
+          phone?: string | null
+          profile_shared_at?: string | null
+          profile_shared_fields?: string[]
+          profile_sync_enabled?: boolean
+          slug?: string
+          title?: string | null
+          updated_at?: string
+          website?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_person_organization_fkey"
+            columns: ["workspace_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "workspace_organization"
+            referencedColumns: ["workspace_id", "id"]
+          },
+          {
+            foreignKeyName: "workspace_person_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "person"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workspace_person_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspace"
@@ -2329,6 +2583,7 @@ export type Database = {
           performance_id: string | null
           project_id: string
           season: string | null
+          series_id: string | null
           starts_at: string
           status: Database["public"]["Enums"]["date_status"]
           title: string | null
@@ -2343,6 +2598,54 @@ export type Database = {
           to: "date"
           isOneToOne: true
           isSetofReturn: false
+        }
+      }
+      create_date_series: {
+        Args: {
+          p_all_day?: boolean
+          p_city?: string
+          p_country?: string
+          p_ends?: string[]
+          p_kind: Database["public"]["Enums"]["date_kind"]
+          p_label?: string
+          p_line_id?: string
+          p_project_id: string
+          p_starts: string[]
+          p_status?: Database["public"]["Enums"]["date_status"]
+          p_title?: string
+          p_venue_name?: string
+        }
+        Returns: {
+          all_day: boolean
+          city: string | null
+          country: string | null
+          created_at: string
+          created_by: string | null
+          custom_fields: Json
+          deleted_at: string | null
+          ends_at: string | null
+          id: string
+          kind: Database["public"]["Enums"]["date_kind"]
+          line_id: string | null
+          notes: string | null
+          performance_id: string | null
+          project_id: string
+          season: string | null
+          series_id: string | null
+          starts_at: string
+          status: Database["public"]["Enums"]["date_status"]
+          title: string | null
+          travel_direction: string | null
+          updated_at: string
+          venue_id: string | null
+          venue_name: string | null
+          workspace_id: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "date"
+          isOneToOne: false
+          isSetofReturn: true
         }
       }
       create_expense: {
@@ -2494,6 +2797,7 @@ export type Database = {
           performed_at: string
           previous_slugs: string[]
           project_id: string
+          readiness: Json
           slug: string | null
           soundcheck_at: string | null
           start_at: string | null
@@ -2555,6 +2859,7 @@ export type Database = {
           dossier_url: string | null
           ends_on: string | null
           id: string
+          initials: string | null
           name: string
           notes: string | null
           owner_id: string | null
@@ -2739,6 +3044,7 @@ export type Database = {
       is_account_member: { Args: { acc_id: string }; Returns: boolean }
       is_account_owner: { Args: { acc_id: string }; Returns: boolean }
       is_reserved_slug: { Args: { candidate: string }; Returns: boolean }
+      is_workspace_admin: { Args: { ws_id: string }; Returns: boolean }
       is_workspace_member: { Args: { ws_id: string }; Returns: boolean }
       list_calendar_shares: {
         Args: { p_workspace_id: string }
@@ -2837,8 +3143,77 @@ export type Database = {
         Args: { p_share_id: string }
         Returns: undefined
       }
+      share_my_profile_with_workspace: {
+        Args: { p_fields?: string[]; p_workspace_id: string }
+        Returns: {
+          city: string | null
+          country: string | null
+          created_at: string
+          created_by: string | null
+          custom_fields: Json
+          deleted_at: string | null
+          email: string | null
+          first_name: string | null
+          full_name: string
+          languages: string[]
+          last_name: string | null
+          notes: string | null
+          organization_id: string | null
+          person_id: string
+          phone: string | null
+          profile_shared_at: string | null
+          profile_shared_fields: string[]
+          profile_sync_enabled: boolean
+          slug: string
+          title: string | null
+          updated_at: string
+          website: string | null
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "workspace_person"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       slugify: { Args: { input: string }; Returns: string }
+      stop_sharing_my_profile_with_workspace: {
+        Args: { p_workspace_id: string }
+        Returns: undefined
+      }
       touch_line_visit: { Args: { p_line_id: string }; Returns: undefined }
+      update_project: {
+        Args: { p_patch: Json; p_project_id: string }
+        Returns: {
+          accent: string | null
+          created_at: string
+          created_by: string | null
+          custom_fields: Json
+          deleted_at: string | null
+          description: string | null
+          dossier_url: string | null
+          ends_on: string | null
+          id: string
+          initials: string | null
+          name: string
+          notes: string | null
+          owner_id: string | null
+          poster_url: string | null
+          previous_slugs: string[]
+          slug: string
+          starts_on: string | null
+          status: Database["public"]["Enums"]["project_status"]
+          updated_at: string
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "project"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       update_workspace: {
         Args: { p_patch: Json; p_workspace_id: string }
         Returns: {
