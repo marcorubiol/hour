@@ -70,10 +70,13 @@ orientativo, no una verdad comercial cerrada.
 - **Ramas vivas: una sola.** Las otras ocho se cerraron el 2026-07-20 —
   siete borradas por estar contenidas en `main` o en la punta del stack, y
   `feat/planner-identity` mergeada aquí por fast-forward.
-  - `feat/comms-threads` — comms + acceso. Modelo cerrado (ADR-082/083/085),
-    604 líneas de SQL **sin aplicar**, **cero código de aplicación**, dos
-    bloqueantes de arquitectura abiertos. Ver `_tasks.md § Bloqueado`.
-    **No se mergea**: es diseño, no producto a medio hacer.
+  - `feat/comms-threads` — comms + acceso. **Su canon ya está en `main`**
+    (ADR-082/083/085, las dos escaleras y la faceta en `structure-model.md`, el
+    digest del grill y el review de 32 hallazgos). Lo que queda en la rama es
+    solo material de construcción: 604 líneas de SQL **sin aplicar** y los 7
+    prototipos de `app design/`. Cero código de aplicación. Dos bloqueantes de
+    arquitectura abiertos — ver `_tasks.md § Bloqueado`. **La rama no se mergea
+    entera**: el pensamiento sí sube, el SQL re-aplicable no.
 
 ### Supabase
 

@@ -91,11 +91,16 @@
 
 ## Bloqueado — comms + acceso (ADR-082/083/085)
 
-> **El modelo está cerrado; la implementación no puede empezar.** Canon en la
-> rama `feat/comms-threads` (ADR-082/083/085 + `build/structure-model.md`: dos
-> escaleras y la faceta como primitivo) y los 7 prototipos en `app design/`.
-> **No hay que rehacer el pensamiento.** Nada de esto está en `main` a propósito:
-> son 604 líneas de SQL sin aplicar y **cero código de aplicación** — ni una
+> **El modelo está cerrado; la implementación no puede empezar.** El canon está
+> **aquí, en `main`** desde el 2026-07-20: ADR-082/083/085 en `_decisions.md`,
+> las dos escaleras y la faceta como primitivo en `build/structure-model.md`, el
+> digest del grill en `_notes/spec-access-comms-decisions.md` y el review de 32
+> hallazgos en `_notes/review-comms-migration-2026-07-20.md`. **No hay que
+> rehacer el pensamiento.**
+>
+> Fuera de `main`, en la rama `feat/comms-threads`, queda solo el material de
+> construcción: la migración de 604 líneas **sin aplicar** y los 7 prototipos de
+> `app design/`. De código de aplicación no hay nada en ningún sitio — ni una
 > ruta, ni un componente, ni un endpoint.
 >
 > Verificado contra producción el 2026-07-20, no reconstruido de documentos.

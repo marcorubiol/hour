@@ -2081,6 +2081,115 @@ Triggered by Marco's pre-scaffold doubt (Phase 0.0 day 5). Five alternatives eva
 - **Status (cierre de sesión)**: build ejecutado 2026-07-18, en la MISMA sesión del grill (prolongada sobre la medianoche), rama `planner-decisions` (worktree `~/Developer/hour-calendar-v2`). Pendiente: apply (1 migración — `2026-07-18_hold_notice_days.sql`) + merge + deploy, a ejecutar por .zerø en sesión (no autónomo).
 - **Status (reconciliación 2026-07-20)**: reconciliado sobre `main` en la rama `feat/planner-identity` por cherry-pick de los commits de código. La migración ya estaba **aplicada en producción** y quedó absorbida en `supabase/migrations/20260720105713_remote_schema_checkpoint.sql`; **no se re-aplica**. La deuda de `db-types` hand-patched se cerró sola: `main` regeneró los tipos después del checkpoint y ya traen `project.initials`, el CHECK de 12 acentos y `update_project`. Gates sobre la rama reconciliada: check 0/0 · unit 348 · build · RLS 120/120. **Nota de arqueología**: la rama `feat/identity-monogram` que cita el Status anterior ya no existe como nombre — sus commits vivían contenidos en `feat/comms-threads` y desde hoy están en `main` vía `feat/planner-identity`.
 
+## [2026-07-19] — ADR-082 · Modelo de personas, roles y acceso — el "quién es quién" (prerrequisito de la capa de comms)
+
+> **ENMIENDA (2026-07-20)** — resultado del grill de acceso+comms del 2026-07-19/20 (registro completo: `_notes/spec-access-comms-decisions.md`). Corrige y precisa §4 (facetas) y §6 (login) de este ADR; el resto queda como está. **Sigue sin implementar: no toca schema.**
+>
+> **1 · Las facetas existen POR NIVEL de contenedor.** Las dos listas que ADR-082 y ADR-083 esbozaban nunca fueron dos listas: son una sola vista a dos alturas. Este ADR gateaba lo que vive arriba (el libro, los materiales), ADR-083 hablaba de lo que vive abajo (técnica, logística); Diners salía en las dos porque es la única que cruza todos los niveles.
+>
+> |  | espai | projecte | línia | bolo |
+> |---|:--:|:--:|:--:|:--:|
+> | Converses | ● | ● | ● | — |
+> | Materials | — | ● | ● | ● |
+> | Tècnica | — | ● | ● | ● |
+> | Logística | — | — | ● | ● |
+> | Full de ruta | — | — | — | ● |
+> | Diners | ● | ● | ● | ● |
+>
+> **`General` NO está en la tabla.** No es faceta: es la membresía en el contenedor. El hilo general siempre existe y su audiencia es exactamente los miembros del contenedor; un "permiso de General" sería falso, porque nunca puede valer `res` para un miembro.
+>
+> **Ausente ≠ denegado.** Una faceta que no existe en un nivel no está "puesta a `res`": no está. La UI tiene que decirlo con esas palabras, o el usuario leerá una prohibición donde solo hay una dimensión inexistente.
+>
+> **La unión entre niveles no cambia** (§3 de este ADR, intacto). `Diners·veure` a nivel espai sigue concediéndolo en cada bolo. La tabla dice *dónde puede existir* una faceta; no altera cómo se suma el acceso.
+>
+> Elegido deliberadamente frente a una lista plana, decisión de Marco. Contabilidad honesta: **la ganancia ergonómica es modesta** (espai=2 filas, projecte=5, línia=6, bolo=6; línia y bolo solo difieren en Converses↔Full de ruta). **La ganancia real es de seguridad, no de brevedad:** no puedes conceder `Full de ruta` a nivel espai ni `Converses` en un bolo, porque la fila no está ahí para concederla.
+>
+> **2 · Renombres del preset, forzados por colisión.** `Convidat` → **`Mínim`**: "convidat" pasa a nombrar al invitado (una persona sin login, ver la enmienda a §6), y el preset más bajo no puede compartir palabra con él. `Producció` → **`Coordinació`**: `Producció` pasa a ser *faceta* (tabla arriba) y ya era *rol*; tres significados para una palabra es exactamente el fallo que §2 de este ADR quería evitar. Escalera final: **Mínim · Equip · Coordinació · Direcció**.
+>
+> **3 · Delegación acotada por el delegante, en tres ejes.** Solo puedes conceder lo que tienes: **faceta** (no concedes una que no tienes), **verbo** (con `veure` no concedes `veure+editar`), **nivel** (el tuyo o más estrecho, nunca más ancho). Dividendo: **esta regla sustituye a la capacidad separada de "invitar"** de ADR-083 §4. Un admin lo tiene todo, luego puede conceder todo; una road manager delega dentro de lo suyo. Una regla en vez de dos, y el caso de las 8am sobrevive: mete al técnico de la sala en Tècnica/Logística porque las tiene, y no puede meter a nadie en Diners porque no la tiene. Lo que la regla **no** acota es la cantidad — quien tiene acceso ancho puede crear muchos invitados; con caducidad y roster visible, aceptado para una compañía de 3-15. No construir para eso.
+>
+> **4 · Lo que tienes es el TECHO, nunca el DEFAULT.** El default de cualquier invitación es `Mínim`; cada faceta por encima se enciende a mano. Marco se negó a firmar un modelo donde invitar a alguien "al bolo" arrastrase Diners por herencia. Alguien de fuera *puede* acabar viendo el caché — nunca por herencia, solo porque quien tiene Diners lo dio deliberadamente, con línea de confirmación explícita.
+>
+> **5 · `Producció` NO es una faceta (decidido 2026-07-20, después de dibujarla).** Tres cosas la tumbaron, en orden de peso: (a) al escribir un hilo de Producció realista, todos sus mensajes se iban a técnica, logística o diners — nada perdía casa sin ella; (b) su contenido ya tiene destino (contratos→Diners, acreditaciones→Logística, materiales→Materials) y el residuo es delgado, y el modelo ya tiene nombre para el residuo: `General`; (c) **decisivo — en el código desplegado `production` es el CONTENEDOR de las otras**: `ProductionStub.svelte` es el bloque del bolo con venue + horarios + los tres jsonb *logistics / hospitality / technical*. Ponerla como hermana de Logística y Tècnica era un error de categoría contra código que ya corre. Sobrevive como **rol**, que es lo que siempre fue — "es un oficio clásico de teatro" argumenta a favor de un rol, nunca de una faceta de permisos. Barato de revertir: la lista de facetas es datos, una fila.
+
+>
+> **6 · Reversibilidad como requisito, no como detalle** (Marco, explícito). La tabla de niveles tiene que ser **filas, nunca código**: mover Tècnica de projecte a línia debe ser un `UPDATE`, no una migración y no un `if`. Lista de facetas, tabla de niveles y presets son datos. Lo que nunca puede ser gratis: una faceta solo significa algo si gatea una tabla, y ese enganche vive en las políticas RLS (hoy `read:money` aparece literalmente en ~11 sitios de `rls-policies.sql`). **Mover una faceta entre niveles: gratis. Añadir una faceta nueva: cuesta su política. Borrar una que ya se usó: cuesta su historial.**
+>
+> **7 · Coste de construcción, al registro.** **Ya existe:** `has_permission(project_id, text)` resuelve `union(roles.permissions) + permission_grants − permission_revokes`, con roles/grants/revokes como *datos* en `project_membership`. Eso es el motor preset+overrides de §4 de este ADR, ya desplegado. **No existe nada:** ningún nivel que no sea proyecto. `has_permission` recibe un `project_id` y nada más, y no hay membresía de workspace, de línia ni de performance. **La dimensión de nivel es el coste íntegro de esta enmienda.**
+
+> **NAMING (2026-07-19, cierra el Abierto #1):** la etiqueta = **rol** · el acceso = **permisos** (antes «rol de acceso»). En el texto de abajo, léase «oficio» → **rol** y «rol»/«rol de acceso» → **permisos**. Aplica igual a ADR-083. Motivo: el cliente no técnico parsea «rol» como *lo que hace* (no como nivel de permisos, que es jerga de dev); *oficio* y *perfil* descartados — oficio por romántico y por viajar peor (la app ya es multilingüe), perfil por genérico y por chocar con «perfil de usuario». Coste asumido: el schema sigue llamando `role` al acceso (`workspace_role`, `membership_role`) → desajuste UI («permisos») vs schema (`role`), a documentar al implementar.
+
+> Grill largo con Marco (2026-07-19) para madurar el modelo de personas ANTES de construir comunicación de equipo/bolo. Disparador: "programador no es un concepto en Hour" (es una `person` alcanzada por una conversación; `person` no tiene tipo, la organización es texto libre) + el choque de que "Conversations" ya está ocupada (ADR-075) cuando Marco quiere hablar CON el equipo, no solo registrar difusión. Raíz del "inmaduro": el control de acceso de hoy cuelga del login (`workspace/project_membership.user_id`) y está desconectado del mundo de contactos (`person` sin login) — dos mundos sin puente.
+
+- **Decisiones** (modelo decidido en principio, SIN implementar):
+  1. **Persona única.** Un `person` por humano (ya es global, sin `workspace_id`). El login es opcional y se engancha encima; se unifican "contacto" y "usuario" sobre `person`, no dos mundos.
+  2. **Tres conceptos separados, no uno** (el error a evitar es fundirlos):
+     - **Oficio** (etiqueta; nombre TBD *oficio* vs *perfil*) — lo que alguien HACE (sonidista, distribución, programador). Sin poder, pura etiqueta. **Múltiple** por persona (programador Y técnico de sonido de otra compañía a la vez). Estándar + custom; el custom es seguro precisamente porque no da acceso.
+     - **Membresía** — en qué contenedores está (workspace / proyecto / bolo). Decide QUÉ VE.
+     - **Rol de acceso** — un paquete de capacidades. Decide CUÁNTO puede dentro de lo que ve.
+  3. **Visibilidad por contenedor (Solución A), no por tipo de conversación.** Ves los contenedores donde eres miembro, a los tres niveles. El alcance lo da el NIVEL donde se asigna el rol (idea de Marco), no un atributo del rol: el mismo rol va ancho a nivel workspace y estrecho a nivel bolo. Efectivo = **unión** de tus roles por contenedor; owner/admin del workspace = todo. NO se tipa la conversación por dominio — la separación sale de en qué contenedor/faceta vive. (Caso road manager: rol en un bolo sí, en otro no → ve lo de road manager solo donde lo es.)
+  4. **Roles = pocas capacidades, generales; eje ver/editar por faceta.** No 30 permisos: un puñado de facetas (conversaciones, dinero, hoja de ruta, producción, materiales…), cada una en `ver | ver+editar` (editar implica ver; NO se juntan — el caso normal es ver-sin-editar). Rol = bundle de esas parejas; **override por persona** enciende/apaga una pareja suelta (patrón rol + grants/revokes, ya presente en `project_membership`). Capacidades peligrosas (borrar, membresías, facturación) bloqueadas/ocultas, fuera de la carta del cliente. **Dinero es su propia faceta y ahí lo sensible es el VER, no el editar.** Requisito duro: vista de "**permisos efectivos y de dónde salen**" (rol + overrides) — sin ella los overrides se pudren en el misterio de WordPress.
+  5. **Organización = entidad; conversación anclada en org Y/O persona (al menos una).** Cubre: solo persona (freelance sin institución) · solo org (el Grec sin nombre aún — el "vacío" que Marco señaló) · las dos (Ana del Grec). **Persona↔org es una relación** (contextual, varias, con historia), no una columna en la persona — misma lógica que el rol/oficio. La persona es la cara; la org, el fondo que persiste.
+  6. **Login solo para OPERADORES** (quien entra a operar en la herramienta). Contrapartes (programadores, teatros) NUNCA hacen login — son sujetos, reciben por link/email (ficha técnica, hoja de ruta). El operador (equipo propio, técnico que coordina por la herramienta) sí. **"Dar de alta"** = acto deliberado que cruza a un contacto de sujeto a operador; no automático. Se enlaza a la persona por INVITACIÓN; un alta fría que coincida por email NO se enlaza sola (seguridad). Enforce por **FLUJO/UX** ("invitar a operar" no existe en la ficha de un contacto de difusión), no por candado de tipo (no se reintroduce el tipado de personas). Consecuencia de negocio (Phase 1): contactos = datos gratis e ilimitados; operadores = plazas (seats), el eje de expansión.
+
+- **Rechazado**:
+  - *Tipo en la persona* (`person.kind`) — una persona es varias cosas a la vez y depende del contexto; el "qué es" se deduce de las relaciones que le apuntan.
+  - *Un rol que fusiona oficio + acceso* — "lo que haces" y "lo que puedes ver" no van siempre juntos (sonidista freelance con crédito en convocatoria pero sin acceso al dinero; co-director con acceso sin oficio).
+  - *Alcance dentro del rol* — a favor de "el alcance lo da el nivel donde asignas" (mismo rol ancho/estrecho por persona).
+  - *Tipar conversaciones por dominio (Solución B)* — descartada de salida; solo se justificaría si un mismo contenedor mezclase dominios de verdad (no es el caso hoy).
+  - *Roles componibles estilo WordPress delante del cliente* — el compositor de capacidades es power-user; para una compañía de teatro no técnica = no-uso + riesgo de fuga. Cliente = presets; composición = avanzado/Phase 1.
+  - *Login para cualquier contacto / automático* — el programador nunca hace login.
+
+- **Por qué**: el target es un EQUIPO (3-15 pers.), no un operador solo. El eje que importa no es "con quién hablas" (externo/interno) sino CONTEXTO (qué contenedor) × AUDIENCIA (rol/capacidad). Separar oficio (etiqueta sin poder) de acceso (poder, presets + overrides) mata las fugas. Visibilidad por contenedor + unión cubre "jefe ve todo / técnica ve lo suyo / road manager por bolo" con lo mínimo. Org-ancla llena el "vacío" de negociar sin nombre. Login-solo-operadores deja a las contrapartes como datos (base de la expansión por seats).
+
+- **Abierto**: (1) nombre del oficio — *oficio* vs *perfil* (Marco cierra luego). (2) La capa de comms en sí (hilos sobre contenedores) — este ADR es su prerrequisito; sigue aparcada en `_notes/_flux.md § 2026-07-19` (las 3 formas: hilo polimórfico / puente-ingest / IA-generada).
+- **Status**: **provisional — decidido en grill, SIN implementar.** No toca schema todavía. Este ADR es el mapa; construirlo es trabajo aparte.
+- **Re-evaluate when**: al implementar (orden: identidad+oficio+membresía → roles/capacidades → org); o si un contenedor pasa a mezclar dominios de verdad → reabrir Solución B (tipado de conversación).
+
+## [2026-07-19] — ADR-083 · Capa de comms — hilos sobre contenedores, sub-hilos = facetas, permisos de ADR-082 (resuelve el Abierto #2 de ADR-082)
+
+> **ENMIENDA (2026-07-20)** — segunda vuelta del mismo grill, tras dibujar la capa (`_notes/spec-access-comms-decisions.md`, `app design/*.html`). Sigue SIN implementar y sin tocar schema.
+
+- **1 · Una sola fórmula de audiencia — cae el §5.** La audiencia de cualquier hilo es `derived(facet, container) ∪ invited`. Vale igual para los hilos de faceta y para los libres: un hilo libre no tiene faceta, así que su conjunto derivado es vacío y queda solo la lista de invitados — que es exactamente el "participantes explícitos" del §5, sin mecanismo aparte. **Supera el reparto en dos modelos de audiencia del §5**; lo que allí eran dos reglas es un caso degenerado de una. Menos superficie, no más.
+- **2 · Un invitat puede entrar en hilos de faceta, incluido Diners.** Marco levanta la restricción implícita de "solo hilos libres". No rompe la derivación: el invitado entra por el término `∪ invited`, el derivado sigue resolviéndose por permiso como siempre. El `invitat` (membresía sin login, con fecha de fin) se define en la enmienda de ADR-082; aquí solo importa que es un sumando de la audiencia, no una excepción a ella.
+- **3 · Un hilo libre nunca hereda los invitados concedidos a nivel de faceta.** Siempre tiene su lista explícita propia. Es la única asimetría que sobrevive, y es deliberada: la herencia por faceta es lo que arrastraría a alguien de fuera a una conversación que nadie decidió darle.
+- **4 · "Una sola lista para las tres cosas" (§4) ahora es literal — pero la lista es por nivel de contenedor.** Ordenar, ver y abrir siguen colgando de la misma lista de facetas; lo que cambia es que esa lista no es plana: qué facetas existen depende del nivel (espai / projecte / línia / bolo). Ver la enmienda de ADR-082 para la tabla y su regla de reversibilidad (filas, nunca código).
+- **5 · `General` no es una faceta.** Es el hilo propio del contenedor: existe siempre y su audiencia son exactamente los miembros. Un "permiso de General" sería falso — no puede ser `res` para un miembro. Queda fuera de la tabla de facetas.
+- **6 · La transparencia del §5 sobrevive en un sitio concreto: la línea de audiencia por hilo.** "Ho veuen 5 — per permís de logística", pegada al hilo, **nunca plegable**. Es donde hace falta la respuesta: justo antes de escribir. El roster completo de permisos pasa detrás de una puerta — se leen hilos cincuenta veces al día y se comprueba quién los ve tres veces al mes; esa frecuencia no justifica una columna permanente. La exigencia del §5 no se rebaja, se coloca.
+- **7 · `Producció` queda FUERA de las facetas** (ver la enmienda de ADR-082 §5). Sobrevive como rol.
+
+
+- **Abierto (añadido)**: ¿comms aparece en el Desk como quinta preocupación? Un run `MISSATGE` encaja en la gramática, pero pasar de 4 a 5 etiquetas cuesta calma y "todo lo no leído" convierte el Desk en una bandeja de entrada. Criterio propuesto si entra: **solo un mensaje que lleve una pregunta abierta dirigida a ti**.
+- **Status de la enmienda**: **provisional — decidido en grill, SIN implementar.** El portón sigue en pie: usar la app una temporada real de difusión antes de construir nada de esto.
+
+> **NAMING:** ver la nota de ADR-082 — la etiqueta se llama **rol** y el acceso **permisos**. Donde abajo diga «rol X abre sub-hilos», léase **permiso**.
+
+> Continuación del mismo grill (2026-07-19), ya cerrado el modelo de acceso (ADR-082). Marco arrancó todo esto queriendo comunicación de equipo y por bolo (incl. "el día del bolo, un canal donde el equipo se habla"). Con el acceso decidido, media capa de comms cae sola: quién puede estar (operadores), quién ve (capacidades), participantes del bolo (derivables). Este ADR fija la FORMA; no toca schema.
+
+- **Decisiones** (forma de comms, decidida en principio, SIN implementar):
+  1. **Un solo mecanismo polimórfico.** Un "hilo" (cadena de mensajes) que cuelga de cualquier contenedor — bolo/performance, conversación de difusión, proyecto, compañía/workspace — igual que `task` ya es polimórfica. El log de difusión diseñado (`conversation_event`) pasa a ser "hilo colgado de una conversación"; el canal del bolo es "hilo colgado de un performance". **Supera** ADR-056/065 ("comms = timeline solo dentro de Contacts"), decidido cuando comms era solo difusión.
+  2. **Asíncrono, estilo Slack, hub por contenedor.** No es chat en vivo (sin realtime/presencia/"está escribiendo"): persiste, se ordena, avisa. Cada contenedor = un hub. La jerarquía de contenedores (compañía → proyecto → bolo) ES la agrupación — no hay concepto separado de "canales". Realtime queda explícitamente FUERA.
+  3. **Sub-hilos dentro de un contenedor = las FACETAS** (fijas, pocas: técnica / logística / dinero / general…) **+ sub-hilos "libres" con label definido** (mismo patrón que oficios/roles custom). El libre existe porque las compañías hablan de cosas que no encajan en ninguna faceta. (El caso road manager de ADR-082 EXIGE este nivel: dentro de un bolo, hilos separados por tema para poder gatear "road manager ve logística, no dinero".)
+  4. **Permisos = los de ADR-082, sin sistema nuevo.** `ver | ver+editar` por sub-hilo (mismo eje); **"abrir/crear un sub-hilo" = una capacidad más** (gateada por rol — "el rol X abre sub-hilos, el técnico no"). La faceta hace **triple servicio**: ordena la conversación (sub-hilo), decide quién lo ve y quién lo abre. Una sola lista (la de facetas) para las tres cosas.
+  5. **Audiencia — dos modelos según el tipo de hilo:**
+     - **Fijos (faceta) → gateados por capacidad (automático).** Quién ve = derivado de la capacidad de la faceta + membresía del contenedor. Nadie se olvida; escala con los roles.
+     - **Libres (ad-hoc) → participantes explícitos.** Sin faceta que los gatee, eliges quién entra al crearlo (por defecto: los del contenedor; se estrecha si se quiere).
+     - **Transparencia para TODOS:** siempre se ve la lista resuelta ("esto lo ven estos N, por su rol") — el "veo quién entra" también en los automáticos. Es la "vista de permisos efectivos" de ADR-082 aplicada a hilos.
+  6. **Difusión (hacia fuera) = puente, no host.** Programadores/teatros no son operadores (sin login, ADR-082) → se habla por email; Hour archiva vía BCC (ADR-028). Lo fuerza la regla de login, no es elección.
+  7. **Canal automático del bolo (la chispa original) — no se "crea", EXISTE**, porque el bolo es un contenedor y todo contenedor tiene su hub con sus sub-hilos. Lo "automático" no es crearlo: es que Hour PROPONGA abrirlo / avisar a la crew asignada unos días antes (consent-first, ADR-069), no un blast solo. Participantes derivables del bolo (sus operadores asignados).
+
+- **Rechazado**:
+  - *Mecanismos separados* (log de difusión / chat de bolo / canal de compañía como tres sistemas) — a favor de uno polimórfico (visibilidad, participantes y archivado se escriben una vez).
+  - *Chat en vivo* — compite con WhatsApp y pierde; mundo de construir (websockets, push) para 5 personas; el valor (lo hablado pegado al dato como memoria) el asíncrono lo da igual.
+  - *Sub-hilos libres sin estructura (Slack puro)* — a favor de fijos=facetas + libre-con-label; los libres puros son el "¿en qué hilo escribo?".
+  - *Audiencia explícita para TODO* (inversión que Marco propuso y descartamos juntos) — tira el modelo de roles, devuelve a gestión manual de accesos, y el peligro real en coordinación de bolo es quedarse CORTO (olvidar a alguien → se pierde info), no pasarse. Explícito se queda solo para los libres.
+
+- **Por qué**: con el acceso ya decidido (ADR-082), comms es más pequeño de lo que parecía — enchufa en la misma máquina. Un mecanismo + hub por contenedor + sub-hilos=facetas reusa capacidades para ordenar, ver y abrir. El reparto de audiencia (auto para fijos, explícito para libres) coge lo bueno de cada uno: los fijos no se olvidan de nadie, los libres los controlas tú.
+
+- **Abierto / diferido**: (1) **la lista de facetas** — ahora es la espina de TRES cosas (acceso + estructura de comms + permisos de comms); acertarla importa el triple. (2) Schema de hilo/mensaje. (3) Mecánica del ingest BCC (ADR-028). (4) Notificaciones. Realtime está descartado, no diferido.
+- **Status**: **provisional — decidido en grill, SIN implementar.** Compañero de ADR-082; comms se apoya en el modelo de acceso. No toca schema. Resuelve el Abierto #2 de ADR-082.
+- **Re-evaluate when**: al implementar (junto con ADR-082); si el asíncrono se queda corto (improbable); si los sub-hilos libres proliferan y hacen ruido.
+
 ## [2026-07-19] — ADR-084 · Cubo 2 del rediseño del Planner: bloques multi-día por serie, readiness explícito, vencimientos aparcados
 
 > Cierre de las cuatro preguntas de modelo que quedaron abiertas al implementar el rediseño de las cards del Mes (Scope v2, Cubo 1). Marco decide; dos migraciones aditivas, sin backfill.
@@ -2105,10 +2214,47 @@ Triggered by Marco's pre-scaffold doubt (Phase 0.0 day 5). Five alternatives eva
 
 - **Status (reconciliación 2026-07-20)**: el código dejó de estar sin desplegar — los 29 commits de planner+identidad se reconciliaron sobre `main` en `feat/planner-identity`, separados de la capa de comms con la que compartían rama pero **ningún fichero**. Las cinco migraciones de este ADR (`date_series`, `performance_readiness`, `create_date_series` + los dos `CREATE OR REPLACE` posteriores, `workspace_booking_mode`, `update_workspace_booking_mode`) estaban **ya vivas en producción y absorbidas en el checkpoint de `main`**: se verificó contra la base viva (`date.series_id`, `project.initials`, `performance.readiness`, `workspace.settings->>'booking_mode'`, RPC `create_date_series`). No se traen a `build/migrations/` para no dejar SQL re-aplicable en el árbol; su historia está en el checkpoint. **Nota de arqueología**: la rama `feat/planner-mes-cards` que cita el Status anterior ya no existe como nombre (era un duplicado exacto de `feat/identity-monogram`); sus commits están en `main`.
 
+## [2026-07-20] — ADR-085 · El invitat: membresía sin login, y delegación acotada por el delegante
+
+> Continuación del grill de ADR-082/083, reabierto 2026-07-19/20 al dibujar la página de bolo. El disparador fue un accidente de diseño: la segunda pasada inventó un contacto de la sala participando en un hilo por link firmado, y Marco lo tomó como buena idea en vez de como error. Eso obligó a mirar qué separaba realmente "dentro" de "fuera" y a cerrar quién puede meter a quién. Registro de trabajo completo: `_notes/spec-access-comms-decisions.md` §3-§4 (fichero de staging, borrable una vez plegado aquí).
+
+- **Decisiones** (decididas en grill, SIN implementar):
+  1. **El `invitat` es una membresía con permisos, menos el login, más una fecha de fin.** No es un mecanismo nuevo: mismos contenedores, mismas facetas, mismo eje `res | veure | veure+editar`. Lo único que cambia es `login = no` + `ends_at`. Cuarto término del vocabulario de ADR-082, junto a rol / permisos / operador.
+  2. **No debilita ADR-082 §6, lo hace literal.** *"Login solo para operadores"* sigue siendo cierto palabra por palabra. Lo que cae es el supuesto tácito que iba pegado —que **estar dentro exigía login**—, y que nunca se decidió: se asumió. El muro nunca fue la membresía; el muro es el login y la plaza.
+  3. **Se llega por link firmado. Sin cuenta. No consume seat.** El modelo de negocio de Phase 1 (contactos gratis e ilimitados, operadores = plazas) queda intacto.
+  4. **Escribe y es parte del hilo**, no espectador. **Ve el historial completo** de los hilos en los que está, incluidos los mensajes anteriores a su invitación: un sub-hilo es *una* conversación, y el historial parcial fabrica referencias a cosas que no puedes ver.
+  5. **Se invita a FACETAS de un contenedor, no a hilos sueltos** — así los hilos futuros de esas facetas ya lo incluyen. **Un hilo libre NO hereda los invitados de las facetas**: un hilo libre tiene siempre su lista explícita.
+  6. **Puede invitarse a hilos de faceta, Diners incluido.** Marco levantó la restricción anterior ("solo hilos libres"). No rompe la derivación de audiencia: la audiencia pasa a ser `derived(faceta, contenedor) ∪ invitats`, **una sola fórmula para los dos tipos de hilo**, donde el `derived` de un hilo libre es el conjunto vacío. **Es más simple que la versión de dos mecanismos que sustituye** (ADR-083 §5, que enunciaba dos modelos de audiencia según el tipo de hilo).
+  7. **Revocar no es borrar.** Lo que escribió un invitado se queda en el hilo: es el registro de la compañía.
+  8. **Acaba con la cosa, no con un reloj.** La invitación lleva siempre un final: por defecto derivado del contenedor cuando el contenedor tiene fecha (pasa el bolo → se cierra el acceso, con un margen de semanas para la cola de factura/fotos), elegido explícitamente cuando no la tiene (un hilo libre de proyecto). Revocable a mano en cualquier momento. **Rompe con el precedente de la casa** — `roadsheet_share` tiene `revoked_at` y no `expires_at` — deliberadamente: un documento de una dirección que envejece hasta la irrelevancia no es el mismo riesgo que un canal de escritura vivo desde una URL sin autenticar.
+  9. **Siempre visible** en el "quién entra y por qué", con quién lo invitó y cuándo.
+  10. **Delegación acotada por el delegante: solo puedes dar lo que tienes**, en los tres ejes — **faceta** (no puedes dar una faceta que no tienes), **verbo** (con `veure` no puedes dar `veure+editar`), **nivel** (tu nivel o más estrecho, nunca más ancho).
+  11. **Lo que tienes es el TECHO, nunca el DEFAULT.** El default de cualquier invitación es el preset mínimo; cada faceta por encima se enciende a mano. Un invitado *puede* acabar viendo el caché — nunca por herencia, solo porque alguien que tiene Diners lo dio deliberadamente, con línea de confirmación explícita ("estàs donant la conversa econòmica a algú de fora de la companyia").
+  12. **"Invitar" desaparece como capacidad separada.** La regla del techo la sustituye: un admin lo tiene todo, luego puede dar todo; una road manager delega dentro de lo suyo. Una regla en vez de dos, y el caso de las 8 de la mañana sobrevive — puede meter al técnico de la sala en Tècnica/Logística porque las tiene, y no puede meter a nadie en Diners porque no la tiene.
+
+- **Rechazado**:
+  - *Que el invitado solo pudiera entrar a hilos libres* — Marco lo levantó; la fórmula unificada de audiencia (§6) sale más barata que mantener dos mecanismos para evitar un caso que de todas formas hay que poder autorizar a mano.
+  - *Invitado como espectador* (solo lectura por link) — si está en el hilo, está en la conversación; media presencia obliga a explicar por qué unos mensajes no se pueden responder.
+  - *Historial parcial desde la fecha de invitación* — produce referencias huérfanas dentro de una misma conversación.
+  - *Borrar lo escrito al revocar* — el registro es de la compañía, no del invitado.
+  - *Invitación sin caducidad, siguiendo `roadsheet_share`* — ver §8; el precedente se rompe a propósito.
+  - *Herencia de facetas al invitar "al bolo"* — Marco se negó a firmar un modelo donde invitar a alguien a un bolo pudiera arrastrar Diners.
+  - *Una capacidad "invitar" gateada por permisos* — redundante con §10 (§12).
+  - *Acotar la CANTIDAD de invitados* — quien tiene acceso ancho puede crear muchos. Con caducidad y roster visible, se acepta para una compañía de 3-15 personas. **No construir para esto.**
+
+- **Por qué**: el modelo de ADR-082 confundía dos cosas distintas bajo una sola frontera — quién paga plaza y quién puede estar en una conversación. Separarlas cuesta un campo (`ends_at`) y un modo de acceso (link firmado), y a cambio hace representable lo que la coordinación de un bolo hace de verdad: a las 8 de la mañana el técnico de la sala está dentro de Tècnica y de Logística, no fuera con una copia PDF. La fórmula única de audiencia es el dividendo real: el `invitat` no añade un segundo camino de resolución, colapsa los dos que había en uno. Y la delegación acotada por el delegante es la única regla que hace segura la apertura: nadie puede filtrar hacia fuera lo que no ve hacia dentro, y como el default es el mínimo, la fuga por descuido no existe — solo la fuga deliberada, que es la que se puede confirmar por pantalla.
+
+- **Abierto**: (1) **Revocar no tiene pantalla** — un operador deja de serlo al final de una gira: el acceso se cierra, la persona vuelve a contacto, todo lo que escribió se queda. Nadie lo ha diseñado; es la otra mitad de "dar de alta", y aplica igual a operadores y a invitados. (2) **Si `roadsheet_share` debe adoptar la regla de caducidad del invitado** — abierto, no ahora. (3) Schema: ni el `ends_at`, ni el link firmado, ni el nivel de contenedor existen; recuérdese que `has_permission` solo toma `project_id` y que no hay membresía de workspace/línia/performance — **la dimensión de nivel es el coste de construcción entero**. (4) La línea de audiencia por hilo ("Ho veuen 5 — per permís de logística") es lo que sostiene la transparencia de ADR-083 §5 cuando el roster pasa a estar detrás de una puerta: **no puede plegarse nunca**.
+- **Status**: **provisional — decidido en grill, SIN implementar. Cero schema tocado.** Amplía ADR-082 (§2 el invitado como cuarto término; §6 aclarado, no revocado) y supera ADR-083 §5 (dos modelos de audiencia → una fórmula). **Sigue en pie el gate duro: usar la app durante una temporada real de difusión antes de construir nada de esto.**
+- **Status (2026-07-20, tarde)**: Marco decide construir **hilos CON facetas** como primera vuelta, en vez de la rebanada fina sin facetas que se le propuso. Asumido a sabiendas: la tabla de facetas se construye antes de la temporada que debía validarla, y lo que lo hace tolerable es que la lista es **datos, no código** — corregirla es un `UPDATE`. Trabajo en rama aparte de la sesión paralela.
+- **Re-evaluate when**: al implementar, junto con ADR-082/083 (orden: nivel de contenedor → invitat → link firmado); si aparece un invitado que necesita volver temporada tras temporada y la caducidad se vuelve fricción en vez de garantía; si el roster de invitados de una compañía crece hasta pedir gestión propia (hoy explícitamente no se construye para ello); si al diseñar la pantalla de revocar se descubre que operador e invitado no comparten la misma salida.
+
 ---
 
-> **Números reservados — NO reutilizar.** `ADR-082` (personas/roles/acceso), `ADR-083`
-> (capa de comms) y `ADR-085` (el invitat + delegación acotada) están **escritos y
-> canonizados en la rama `feat/comms-threads`**, no aquí. No están en `main` porque su
-> implementación está bloqueada (ver `_tasks.md § Comms + acceso`), no porque estén
-> descartados. El siguiente ADR nuevo es **086**.
+> **ADR-082/083/085 son canon aquí, y su implementación está bloqueada.** El
+> pensamiento vive en `main` desde el 2026-07-20; lo que sigue fuera es solo el
+> material de construcción: la migración `2026-07-20_comms_threads_and_membership.sql`
+> (604 líneas, **sin aplicar**) y los 7 prototipos de `app design/`, ambos en la rama
+> `feat/comms-threads`. Se dejaron fuera a propósito — SQL re-aplicable en el árbol
+> invita al error, y los prototipos no entran en el build. Los dos bloqueantes de
+> arquitectura están en `_tasks.md § Bloqueado`. El siguiente ADR nuevo es **086**.
