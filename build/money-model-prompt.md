@@ -1,15 +1,18 @@
 # Hour — Build prompt: money model v1 (expected_on + payments API + expenses union)
 
-> **STATUS: DISPATCHED — NOT STARTED (verificado 2026-07-17).** 0 código: sin migración (`expected_on`/`payment_condition` no existen), sin `/api/payments`, sin `agingState`/`observedPayerTermsDays` en `$lib/money.ts`. Preexisten en schema sin UI: tabla `payment` + `invoice.payer_person_id`. Corre PRIMERO. (Sub-punto sin confirmar: si `/api/expenses` GET ya acepta la union `project_ids`/`workspace_ids`.)
+> **STATUS: PENDIENTE (reverificado 2026-07-20).** Sin migración
+> (`expected_on`/`payment_condition` no existen), `/api/payments`, `agingState` ni
+> `observedPayerTermsDays`. Preexisten tabla `payment` e
+> `invoice.payer_person_id` sin esta profundidad de UI. Ejecutar primero.
 >
 > Handoff prompt for an external coding agent. Runs FIRST — `money-prompt.md` depends on it.
 > Origin: S1 2026-07-17, ADR-074. Spec: `build/screen-data-spec.md § Money` + `§ gaps #9`.
 
 ## Context
 
-- Read first: house migration style (`build/migrations/2026-07-17_task_*.sql`), ADR-071
-  access decisions, `rls-policies.sql` (payment/invoice policies — `read:money`/`edit:money`
-  family), existing `/api/invoices` + `/api/expenses` handlers.
+- Read first: current migration authority in `supabase/migrations/`, ADR-071 access
+  decisions, generated `db-types.ts`, live policies/migrations (not the historical
+  `rls-policies.sql` snapshot), and existing `/api/invoices` + `/api/expenses` handlers.
 - `payment` table exists since v2 (advance+rest, N per invoice) with ZERO API/UI.
 
 ## Task
@@ -19,7 +22,8 @@
    - COMMENTs: expected_on = realistic collection date (vs contractual due_on; aging
      measures against this); payment_condition = what the user knows about a cascade
      condition ("pays when the town hall pays them — says October").
-   - Do NOT apply to live DB; deliver file + apply note (house channel: Supabase MCP).
+   - Write the managed migration under `supabase/migrations/`. Validate it on the
+     staging/baseline environment required by `_tasks.md` before any production apply.
 2. **Payments API** — `/api/payments` following the expense pattern + Valibot:
    - GET (by `invoice_id` or workspace/window), POST `{invoice_id, amount>0, received_on,
      method (transfer|card|cash|other), reference?, notes?}`, DELETE (soft).

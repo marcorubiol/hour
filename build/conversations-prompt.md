@@ -1,14 +1,15 @@
 # Hour — Build prompt: Conversations lens v1.5 (last contact + grouping)
 
-> **STATUS: DISPATCHED — NOT STARTED (verificado 2026-07-17).** 0 código: sin columna "Last contact", sin write path `last_contacted_at`/"Contacted today", sin toggle "By conversation | By contact". `last_contacted_at` existe en el schema v2 pero nadie lo lee/escribe. OJO: el commit `1eb7a96` "contact capture" era en realidad el rename (0 lógica), NO esta feature.
+> **STATUS: PENDIENTE (reverificado 2026-07-20).** Sin columna "Last contact",
+> write path `last_contacted_at`/"Contacted today" ni toggle "By conversation |
+> By contact". `last_contacted_at` existe, pero esta feature no lo usa todavía.
 >
 > Handoff prompt for an external coding agent. Deliberately SMALL: everything depending on
 > the organization entity and the conversation log (gaps #1/#2) waits for review session 2
 > — do not anticipate those schemas.
 > Origin: S1 2026-07-17, ADR-073. Spec: `build/screen-data-spec.md § /h/conversations`.
 > Amended 2026-07-17 (ADR-075, supersedes ADR-073's naming): the lens is **Conversations**
-> and the entity is `conversation` (was `engagement`). Filename kept — it is cited from
-> `_tasks.md` / `_decisions.md`. "Contact" below is the surviving book concept: a contact
+> and the entity is `conversation` (was `engagement`). "Contact" below is the surviving book concept: a contact
 > is whoever you deal with, person OR organization.
 
 ## Context

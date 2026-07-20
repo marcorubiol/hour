@@ -1,6 +1,12 @@
 # Hour — Research
 
 > **Rule:** nothing here is invented. Where data is thin, the doc says so.
+>
+> **Dated evidence, not current project state.** Each document keeps the facts
+> available when it was researched. Recheck prices, laws, competitors and API
+> capabilities before using them in a current decision. Current Hour status and
+> priorities live in [`../_context.md`](../_context.md) and
+> [`../_tasks.md`](../_tasks.md).
 
 ## User Profiles (`profiles/`)
 

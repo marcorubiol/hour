@@ -1,6 +1,6 @@
 # Hour — Design prompt: Money lens (the honest collector)
 
-> **STATUS: NOT STARTED (2026-07-17).** Depende de Money v2 (no construido).
+> **STATUS: PENDIENTE (reverificado 2026-07-20).** Depende de Money v2.
 >
 > For the design tool. Origin: S1 2026-07-17 — ADR-074, spec `§ Money`. Research:
 > payment delays are a universal top-3 frustration (99-patterns §1.8: Spanish public

@@ -13,7 +13,7 @@
  * The primary control for external launch is a Cloudflare **edge**
  * rate-limit rule on `/api/auth/login` (same mechanism already used on the
  * agency fleet's wp-login) — it's atomic at the edge and stops the burst
- * before it reaches the Worker. See build/runbooks/phase09-launch.md. This
+ * before it reaches the Worker. See build/runbooks/beta-readiness.md. This
  * KV limiter stays as defense-in-depth + the quota guard on the Sentry
  * tunnel (where coarse is fine).
  *

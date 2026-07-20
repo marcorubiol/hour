@@ -1,6 +1,8 @@
 # Competition — Landscape map
 
-> Last updated: 2026-04-20
+> **SNAPSHOT DE INVESTIGACIÓN — no es estado comercial vigente.** Última
+> verificación: 2026-04-20. Precios, tracción y producto de terceros deben
+> comprobarse de nuevo antes de tomar una decisión.
 > Scope: direct and adjacent players in SaaS for live performing arts management
 > Method: web research on each tool — pricing, features, target, traction. Where data was not publicly available, noted explicitly.
 

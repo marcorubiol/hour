@@ -1,6 +1,9 @@
 # Hour — Build prompt: Desk v2 (four sources + task surfacing)
 
-> **STATUS: IN PROGRESS (2026-07-17).** Rebuild en curso en sesión paralela; aún no aterrizado en `main`. En el árbol hoy = v1: 2/4 fuentes (`DeskBoard` conversations + sección `TaskBoard`) en secciones separadas, no feed mixto rankeado. Falta: performances como headline de bucket, money alerts, chips de eventos `date`, quick-capture, buzón de consentimiento IA.
+> **ARCHIVED — EXECUTED. DO NOT RE-RUN.**
+
+> **HISTORICAL STATUS (2026-07-17): IN PROGRESS.** Desk v2 was completed later;
+> the paragraph below records what was missing on that date.
 >
 > **CONSOLIDATION 2026-07-18 — the design CONVERGED with Marco. Read the section
 > "## Converged design (binding)" below: it SUPERSEDES any visual detail above that

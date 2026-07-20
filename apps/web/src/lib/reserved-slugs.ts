@@ -12,7 +12,7 @@
  * lived only here); migration `2026-07-17_close_adr036_show_debt.sql` § 4
  * closed it. Change one, change the other.
  *
- * See build/url-architecture-dossier-2026-05-01.md § 5 for rationale.
+ * See build/archive/2026-05-url-architecture-dossier.md § 5 for rationale.
  */
 
 export const RESERVED_WORKSPACE_SLUGS = [

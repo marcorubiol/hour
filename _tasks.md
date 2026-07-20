@@ -1,88 +1,108 @@
-# Tasks
+# Hour — cola vigente
 
-> Actualizado 2026-07-20 — **verificado contra código + Supabase + prod en vivo, no contra docs.**
-> Prod SANO en `59f1c6e` (dirty:false): identidad workspace-scoped y hardening RLS aplicados; smoke autenticado 2/2 contra `hour.zerosense.studio`. Suites locales: svelte-check 0/0 · unit 312/312 · RLS 114/114 · collab 7/7 · build verde.
-> **⚠️ e2e con drift de Desk v2**: scope-url ×2 y tasks conservan selectores del shell/feed anteriores; el smoke ya fue reconciliado y pasa contra producción.
-> Antes de fiarte de lo desplegado: `curl -s https://hour.zerosense.studio/health/live`.
-> Contexto: `_context.md` (root + build) + `_decisions.md § ADR-069→078`.
+> **ÚNICA COLA ACTIVA.** Última reconciliación: 2026-07-20.
+> Estado general y evidencia: `_context.md`. Historia: `_decisions.md` y
+> `_notes/sessions-log.md`. Los documentos de `build/archive/` no crean tareas.
 
-## Queue
+## Ahora
 
-### La pasada diseño+datos (columna vertebral)
-- [ ] **Pasada diseño+datos, página a página** — por cada pantalla: diseño visual + spec normativa de qué datos lleva (la parte importante), anclada a `build/schema.sql` + `build/structure-model.md`. Diseño en `build/screens-inventory.md`, datos en `build/screen-data-spec.md`. Prototipo de referencia: `app design/line-detail-prototype.html`
-  - [x] .zerø: propuesta en frío de `build/screen-data-spec.md` — todas las superficies, campo a campo. HECHO 2026-07-17
-  - [x] Revisión conjunta 1 — LAS VISTAS: hall (`/h`), Desk, Calendar, Conversations, Money. HECHA 2026-07-17 → ADR-069/070/072/073/074 + prompts despachados. La portada de space se movió al pack de contenedores (decisión Marco)
-  - [ ] Revisión conjunta 2 — LOS CONTENEDORES (pack completo): portada de space + project detail + line detail + los 7 módulos de line. Aquí nacen gap #1 (organizaciones) y gap #3 (identidad fiscal — la facturación llega rápido)
-  - [ ] Revisión conjunta 3 — LAS FICHAS: performance + road sheet (interno y público) + conversation (+ gap #2 log de conversación) + person + settings
-  - [ ] Revisión conjunta 4 — diálogos (campo a campo) + transversales (estados vacío/carga/error/offline, mobile, light+dark)
-  - [ ] Consolidar los gaps aceptados en tareas de build/migración (nuevas entradas en Queue cuando toque)
+1. [ ] **Reconciliar e2e con el producto actual y recuperar 24/24 contra
+   producción.** Verificación real: 16 passed, 5 failed, 3 did not run.
+   - `performance-write`: aún busca “Add to calendar”; la superficie es Planner.
+   - `person`: espera la estructura anterior de conversaciones en la ficha.
+   - `scope-url` ×2: espera `.hall__door`, eliminado por el Hall actual.
+   - `tasks`: espera `form.desk__task-add`, sustituido por `TaskComposer`.
+   - Reejecutar la suite completa; no corregirla ocultando fallos con skips.
 
-### Builds de las lentes v2 (despachados en S1 — ESTADO REAL verificado 2026-07-17)
-- [ ] **Planner v2 (ADR-080) — CONSTRUIDO, sin aplicar** — build 2026-07-18 en la misma sesión del grill (rama `planner-decisions`, este worktree, dos etapas): motor de decisiones DERIVADAS (sin entidad) + banda de decisiones en la lente Calendar + pulse strip en el masthead + `performance.hold_notice_days` (aviso por antelación) + severidades `double`/`concurrence` + **Carrils como tercera proyección** (`?view=carrils&group=espai|projecte|persona`, incl. Loom per persona) + 6 review fixes de contrato (detalle en ADR-080 § Status). Gates verdes (check · unit · build); DB viva intacta. **Pendiente: apply (1 migración `2026-07-18_hold_notice_days.sql`) + merge + deploy — lo ejecuta .zerø en sesión, no autónomo**
-- [ ] **Desk v2 — EN CURSO** (sesión paralela, aún fuera de este checkout). **DISEÑO CONVERGIDO 2026-07-18**: contrato final en `desk-prompt.md § Converged design` (VINCULANTE — gutter-marginalia navegable, orden fijo, filas sin marcas, pulso, modo calma, sin contadores, headline solo-fechado) + mockups finales de Marco como referencia visual canónica. El builder en vuelo debe releer esa sección antes de aterrizar. En el árbol hoy = v1 (2 de 4 fuentes en secciones separadas). Modelo de tareas VIVO (ADR-071). La decisión abierta de `h/desk/+page.svelte` L14-17 queda respondida: la sección v1 de tasks SE DISUELVE en el feed mixto (spec § Desk)
-- [ ] **e2e con drift de Desk v2** — smoke, scope-url ×2 y tasks fallan contra prod por selectores del shell/feed nuevos (LensSwitcher + Desk feed, commits `b5c9e11..77fc9a3`, aterrizados sin e2e). Reconciliar los specs en la sesión Desk. El de performance-write ya está adaptado al diálogo unificado (4/4 verde contra prod, 2026-07-18)
-- [x] **db-types: regen real** — regenerado por MCP desde `hour-phase0` el 2026-07-20 después de las migraciones de identidad y asesores; marcadores hand-patched eliminados. svelte-check 0/0 y unit 312/312.
-- [ ] **Conversations v1.5 — despachado, 0 código** (ADR-073). Ninguna de las 4 tareas aterrizó: no hay columna "Last contact", ni write path `last_contacted_at`/"Contacted today", ni toggle "By conversation | By contact". `last_contacted_at` existe en el schema v2 pero nadie lo lee/escribe. **OJO:** el commit `1eb7a96` "contact capture feature" era EN REALIDAD el rename (solo mueve ficheros, 0 lógica) — no confundir con la feature. Prompts: `build/contacts-prompt.md` (UI) + `build/contacts-design-prompt.md`. Orgs + log (gaps #1/#2) → model-prompt tras S2
-- [ ] **Money v2 — despachado, 0 código** (ADR-074). Sin migración: no existe `expected_on`/`payment_condition` en invoice, ni `/api/payments`, ni `observedPayerTermsDays`/`agingState` en `$lib/money.ts`. Preexisten en schema sin UI: tabla `payment` + `invoice.payer_person_id`. Orden: `build/money-model-prompt.md` (migración + APIs, PRIMERO) → `build/money-prompt.md` (UI de pagos, paid derivado, aging, condición→tarea) → `build/money-design-prompt.md`. La UI viva sigue siendo la de Phase 0.3 (facturas draft→issued→paid)
-- [ ] **Modo calma (toggle global, toda la app)** — SOLO DISEÑO, sin código (Marco diseñando la UI del toggle). Dos modos, **calma** y **abierto**: calma limpia la superficie (Desk = solo hoy + vencido; cada superficie define qué esconde). Pendiente: alcance por superficie, persistencia (candidata `user_profile`), si calma es default al aterrizar. Cuando la UI esté → ADR + prompt. (No confundir con el estado `calm` de la frase del hall, que ya existe en `hall-status.ts`)
-- [ ] **Timezones de bolos extranjeros — BUG VIVO.** Display OK (`datetime.ts` `dualTime`, tz de venue cableada en hall + `ScheduleTable`). Falta el FIX DE ENTRADA: `PerformanceCreateDialog` (y la entrada de schedule) interpretan la hora tecleada en `viewerTz` del navegador → un bolo de Londres tecleado desde Barcelona = 1h mal en silencio. Fixes: entrada en tz del venue con etiqueta, fallback `workspace.timezone` visible. Prompt de build entregado en chat 2026-07-18, sin ejecutar
+2. [ ] **Cerrar un baseline reproducible de base de datos y crear staging.** El
+   historial está dividido entre `build/migrations/` y `supabase/migrations/`;
+   el checkpoint actual aborta en una base vacía. Resultado esperado: una base
+   nueva se levanta de cero, recibe fixtures sintéticos y pasa 114/114 RLS.
 
-### Verificación / cierre pendiente
-- [x] **SECURITY — tres hotfix RLS del 20-07 aplicados.** `20260720105719_lock_user_profile_privileged_columns.sql`, `20260720105735_reinforce_workspace_membership_envelope.sql` y `20260720105746_lock_account_ownership.sql` están en `hour-phase0`; dry-run, snapshot y suite RLS verdes. La matriz member está cubierta por `limited@hour.test`; queda la identidad completamente externa antes de beta.
-- [ ] **Supabase Auth — activar leaked-password protection al pasar a Pro.** Verificado 2026-07-20: la organización está en plan Free; la protección HIBP solo está disponible en Pro y el OAuth MCP no concede `auth:write`. Requiere una decisión de facturación de Marco; después activar `password_hibp_enabled` desde Auth settings y volver a correr el asesor.
-- [ ] **Verificar ADR-067 en navegador** (todo lo demás verificado: migración aplicada, Marco platform_admin, alias en el select, db-types regenerados, suites verdes): logo→`/h`, `/h/desk|calendar|conversations|money`, `/h/muk-cia/desk`→redirect, pins→`?scope=` en la barra, Copy link, alias request en Edit space → aprobar en Settings
-- [ ] **e2e del nav de Scope v2** — empezado (`tests/scope-url.spec.ts`, 3 flujos, regresión del bug replaceState/page.url). Falta: view-as, scope-bar (save/update/delete), editar espacio + alias. Diferido hasta que el shell pare de moverse
-- [ ] Regla CF edge de rate-limit en `/api/auth/login` — solo bloquea onboarding externo, no el uso interno. Necesita un token `Zone WAF:Edit` (el OAuth de Wrangler solo tiene `zone:read`). Runbook: `build/runbooks/phase09-launch.md`
+3. [ ] **Ejecutar y documentar el restore drill.** Restaurar el último dump R2
+   en staging, medir tiempo y verificar login, datos, RLS y una ruta crítica.
+   Runbook de origen: `build/runbooks/backup.md`.
 
-### Gaps de producto y sistema — revisión 2026-07-20
-- [x] **Identidad personal portable sin expediente global compartido — milestone 1 aplicado en Supabase 2026-07-20.** `workspace_person` + `workspace_organization`, perfil portable, share/revoke explícitos, backfill, FKs compuestas, RLS forzada y APIs workspace-scoped viven en `supabase/migrations/20260720105800_workspace_identity_and_organizations.sql`. Preflight + dry-run transaccional descubrieron y corrigieron dos fallos antes del apply (slug largo acabado en guion y UPDATE heredado por los default grants antiguos). Snapshot privado en `hour_backup_20260720`; cinco migraciones aplicadas y alineadas con el historial remoto; 173 dossiers, 161 organizaciones y 0 referencias perdidas. El follow-up `20260720114629_advisor_rls_and_fk_indexes.sql` resolvió las 33 advertencias de rendimiento (28 init-plan + 5 políticas solapadas), explicitó el deny directo de shares y añadió 30 índices de FK. Tipos reales regenerados; fixture limitado creado; RLS 114/114 sin skips. Pendiente operativo: identidad externa para la matriz final y HIBP al pasar a Pro. Runbook: `build/runbooks/identity-migration-apply.md`. Milestone 2: invitación/claim/merge auditable y UI de consentimiento. Diseño: `build/identity-access-proposal.md`.
-- [ ] **Bandeja de correo integrada → conversation log.** Captura automática de inbound/outbound sin doble entrada (primero forwarding/BCC o conexión de buzón de bajo riesgo; después sync completo). Todo mensaje aterriza como `conversation_event`, con source, direction, timestamps, participantes y enlace al mensaje original.
-- [ ] **WhatsApp sin prometer una integración imposible.** Evaluar tres escalones: Share-to-Hour/manual assistido, reenvío a un número/bot y WhatsApp Business API para cuentas elegibles. El mismo contrato `conversation_event`; nunca scraping de WhatsApp Web.
-- [ ] **Road mode mobile + offline.** Definir paquete offline de próximos bolos/road sheets/contactos, indicador claro de frescura, lectura garantizada sin red y cola de escrituras limitada con resolución de conflictos. Probar en un teléfono real y conectividad degradada.
-- [ ] **Matriz RBAC revisada uno a uno.** Separar acceso (`workspace_membership` = pertenencia vigente; `project_membership` = capacidades en un proyecto) de trabajo operativo (`cast_member`/`crew_assignment` = qué hace la persona en una producción o bolo). Añadir permisos de lectura explícitos; documentar por rol qué ve/edita en Planner, Conversations, Money, Team, Tasks, disponibilidad y road sheets; probar owner/admin/member/performer/guest y revocación con JWT ya emitido. Incluir dos bordes no cubiertos por RLS: cerrar/reautorizar sockets collab ya abiertos tras una revocación y no permitir que un account se quede sin ningún owner vigente.
-- [ ] **Onboarding/admin antes de beta.** Invitación, aceptación, roles comprensibles, revocación inmediata, soporte sin SQL y separación demo/staging/producción.
-- [ ] **AI data-readiness + guardarraíles.** Para cada dato usado por IA: source, owner/workspace, confidence, consent/legal basis, observed_at, freshness y visibilidad. Para cada propuesta/acción: explicación, aprobación humana, idempotency key, audit log y undo/compensación cuando sea posible.
+## Antes de la primera beta externa
 
-## Deferred
-- [ ] Phase 0.4 polish — mobile completo (pins/Calendar/Money + line detail), notifications in-app, GDPR export, a11y pass, checkpoint visual 2 (incluye ratificar el shell rediseñado), ratificación naming @from:2026-08-01
-- [ ] Verificar checkboxes viejos de 0.0: app abre offline con datos cacheados, Lighthouse PWA ≥90, strings por `t()`, Axe @from:2026-08-01
+4. [ ] **Matriz RBAC completa.** Definir y probar owner/admin/member/performer/
+   guest/external por superficie. Resolver el gap descubierto: hoy no existe
+   permiso read-only de performance; la lectura depende de `edit:performance`.
+   Incluir revocación con JWT previo y cierre/reautorización de sockets collab.
 
-## Shelf
-- [ ] Tareas huérfanas cuando su padre (conversation/performance/line) se soft-borra: quedan sin contexto en el Desk (embed null). Aceptado en v1 (ADR-071) — si molesta en uso real, cascada de soft-delete en los delete_* de los padres @shelf
-- [ ] Promover a base.css los tratamientos compartidos TaskBoard/DeskBoard (more-pill, empty-state, divisor de fila) — pospuesto para no tocar base.css con la pasada visual del shell en vuelo (ADR-071) @shelf
-- [x] Segundo usuario de fixture con rol limitado — `limited@hour.test`, member solo de `playwright` y performer en `zzz-e2e-collab`; cubre grants/revokes con JWT previo, redacción de dinero, notas privadas y rechazo de edición del workspace. RLS 114/114 @done:2026-07-20
-- [ ] Chromium-1217: RESUELTO por env pin 2026-07-17 — `apps/web/.env.test.local` (gitignored, sin secretos) fija `PW_CHROMIUM` al headless-shell-1228 y `playwright.config.ts` lo carga tras `.env.test`; e2e corre sin overrides inline. Reinstalar NO funciona en esta máquina. Queda solo: borrar `.env.test.local` cuando un bump de @playwright/test mueva el pin más allá de 1217 @shelf
-- [ ] Un owner/admin desde PostgREST directo salta las validaciones de `update_workspace` (nombre vacío, y renombrar `slug` sin `previous_slugs` → redirects rotos). No es escalada; solo alcanzable fuera de la app. Misma familia que el item de `line.notes` @shelf
-- [ ] ADR-062 diferidos: `logo_url` sin flujo de subida (R2 + CSP img-src); `domain` se guarda y se pinta en el kicker pero no dirige vocabulario ni tipos de project por defecto @shelf
-- [ ] Contacts-con-organizaciones: está en el modelo (ADR-065/073), no en el build — hoy la lente Conversations lleva personas + conversations @shelf
-- [ ] Expenses en la lens global de Money (hoy solo en el módulo de line — desviación aceptada del anti-fragmentación de ADR-056; requiere extender /api/expenses a project/workspace union — sub-punto sin confirmar del money-model) @shelf
-- [ ] Totales de dinero suman cross-currency sin dimensión (lens y módulo heredan la semántica del lens original) @shelf
-- [ ] Alturas de control desiguales en filas de filtros (input 44px vs select 41px vs botón 37px en conversations) — pide un token compartido de padding de control (F33) @shelf
-- [ ] Phase 0.9: un rol edit:performance puede escribir line.notes por PATCH directo PostgREST mientras el socket colaborativo exige edit:project_meta (la API no expone notes — inconsistencia solo fuera de la app) @shelf
-- [ ] Project detail tabs Work·Assets·Team·About — ADR-063 ya resolvió que NO es composición de módulos; queda definir su contenido editable @shelf
-- [ ] Capability-flag read:money en payloads (masked vs empty distinguibles) cuando haya roles de verdad — Phase 0.9 @shelf
-- [ ] `date.line_id` si el uso real pide dates de line sin performance (hoy: join por performance_id) @shelf
-- [ ] Relink de conversation a otra line desde la UI en el 409 conversation_exists del módulo Conversations (hoy: toast honesto) @shelf
-- [ ] Facturas multi-línea (varios gigs de una gira) + PDF house-style + auto-numeración por serie @shelf
-- [ ] Expiración temporal de share links del road sheet (hoy solo revocación manual) @shelf
-- [ ] Autocompletar timezone por city al promover venue @shelf
-- [ ] `delete_line` RPC si algún día hace falta borrar lines (hoy: sin delete path, fixtures estables en tests) @shelf
-- [ ] Upstream issue a y-partyserver: workerd entrega frames WS como Blob @shelf
-- [ ] Purgar persona huérfana de test `019f2f03-f1f2-71a0-9e1f-9c8c9cf331c8` (soft-delete por SQL, no molesta) @shelf
+5. [ ] **Onboarding y administración sin SQL.** Invitación, aceptación, rol
+   comprensible, revocación inmediata, soporte mínimo y separación clara entre
+   datos demo/staging/producción.
 
-## Trace
-- [x] **Calendar v2 COMPLETO y desplegado (2026-07-18)** — ADR-072/076/078: grill por la mañana (13 decisiones, paridad IA=UI), build autónomo por la tarde (workflow 36 agentes, branch `calendar-v2`), frase de Marco → 5 migraciones aplicadas y sondadas (`availability_block` FORCE RLS, `day_off`, cascada+viajes, RPCs de date, puente user↔person), merge ff a main (`88467c3`), deploy verificado por stamp. Modelo (`conflictsFor`/`awayBands`/rosters + APIs) + UI (dos proyecciones `?view=`, diálogo unificado con `PerformanceForm` compartida y hora local del venue, blackouts, marcas de conflicto de 4 severidades, bandas derivadas, rail de agenda, ICS en "⋯") + suites (check 0/0 · unit 251 · RLS 100/101 · e2e performance-write 4/4 contra prod). Mock lens-v2 actualizado. Runbook: `build/runbooks/calendar-v2-apply.md` (EJECUTADO)
-- [x] Rename engagement→conversation (ADR-075) COMPLETO y desplegado (2026-07-17): migración `2026-07-17_rename_engagement_to_conversation.sql` aplicada (enum `conversation_status`, RPCs `create/delete_conversation`, rutas `/api/conversations` + `/h/[workspace]/conversation/[slug]`), 0 residuo de `engagement` en `apps/`. Prod verificado en vivo: `/api/conversations` 401 · `/api/engagements` 404. Suites: check 0/0 · unit 178 · RLS 66 · e2e 22. Cerró de paso `edit:show`→`edit:performance`
-- [x] ADR-077 (2026-07-17): saldada la deuda muerta de `show` en DB (dropea `guard_show_fee_columns()`, renombra la constraint `asset_version_inbound_has_show`) + espejo de slugs reservados sincronizado DB↔cliente (`is_reserved_slug()` = `RESERVED_WORKSPACE_SLUGS`, 64=64). Migración `2026-07-17_close_adr036_show_debt.sql`. Lección: un rename de tabla/columna en Postgres arregla los cuerpos (attnum) y abandona los nombres (constraints, funciones, triggers, vistas)
-- [x] ADR-066 DESPLEGADO (2026-07-17): guard de árbol limpio + build stamp servido por `/health/live` — prod devuelve su `sha` (`d85ed0d`, dirty:false). Cierra el drift de provenance del 07-14 (supersede la entrada previa "commiteado pero no en prod")
-- [x] Rediseño del shell estabilizado (2026-07-17): `ScopeStrip` eliminado (commit `efbc03f`), árbol commiteado y desplegado; el rail de Scopes dejó de "arrancarse". Ratificación visual → checkpoint 2 en Deferred
-- [x] Hall — frase de estado (ADR-068/069) construida y viva (2026-07-17): `hall-status.ts` — `computeHallStatus()` pura con 3 estados (show/attention/calm) + `hallSentence()` i18n + `hall-status.test.ts`, consumida en `/h/+page.svelte`. Pendiente solo el 4º estado IA `proposal` (futuro intencional, nunca se emite aún)
-- [x] Task entity (D3) + modelo ADR-070 construidos y en vivo (2026-07-17, sesión paralela): 2 migraciones, `/api/tasks`, `taskSurfaceState()`, módulo Tasks + feed en Desk; review adversarial 14 hallazgos aplicados. ADR-071. `task-model-prompt.md` EJECUTADO — no re-lanzar; `desk-prompt.md` sigue en curso
-- [x] Scope v2 desplegado a producción (2026-07-16): versión `70775b20`, rollback `34887c61`; smoke HTTP verde; collab NO redesplegado a propósito
-- [x] Corregido el informe de estado (2026-07-16): prod llevaba ADR-059/060/061 + ADR-062 + rename Desk vivos desde el 07-14, no desde ese día — descubierto sondeando prod, no leyendo docs
-- [x] e2e 19/19 en 13 s contra prod (venía de 15/3 en 2.2 min): la suite se comía su propio rate-limit con 14 logins desde una IP → `tests/auth.setup.ts` + `storageState` compartido = 1 login. Commit `f5f31a9`
-- [x] Dos tests que pasaban sin probar nada: `line-detail:135` asertaba `#mod-contacts` (verde por accidente desde ADR-056); el contexto "anónimo" de `roadsheet-share` heredaba sesión del `storageState` del proyecto
-- [x] RLS 46/46 (+8): `tests/rls/update-workspace.test.ts` cubre el gate de ADR-062; cazó que el docblock de la migración mentía sobre `workspace.UPDATE`. Commit `d5c5167`
-- [x] Pasada de coherencia visual COMPLETA (2026-07-12 noche, ADR-059): 42 hallazgos → 41 aplicados / 1 a Shelf (F33)
-- [x] ADR-056 implementado (2026-07-12): line detail = composición de módulos (7) + header stats + anchor chips + Add/Move/Remove
-- [x] ADR-040→050 — write paths + 4 lenses + road sheet público + venue enlazable + invoices (2026-07-01/02)
+6. [ ] **Identidad completamente externa de fixture.** Debe probar cero acceso
+   antes de invitación, acceso tras aceptar y revocación sin depender del usuario
+   admin ni de `limited@hour.test`.
+
+7. [ ] **Regla Cloudflare edge de rate-limit en `/api/auth/login`.** El código
+   de aplicación ya limita; falta la regla edge. Requiere `Zone WAF:Edit`.
+   Procedimiento: `build/runbooks/beta-readiness.md`.
+
+8. [ ] **Verificación manual del flujo de alias y navegación ADR-067.** Hall,
+   LensSwitcher, pins, copy-link, solicitud/aprobación de alias y redirects
+   legacy. Automatizar los casos estables después de la comprobación.
+
+## Decisiones con coste o autoridad externa
+
+9. [ ] **Supabase leaked-password protection (HIBP).** El proyecto está en plan
+   Free y la función requiere Pro. Marco debe decidir el upgrade; después activar
+   `password_hibp_enabled` y volver a ejecutar el advisor.
+
+## Producto — siguiente profundidad, elegir explícitamente
+
+10. [ ] **Conversations v1.5.** Last contact visible, write path “contacted
+    today”, vista por conversación/persona y contrato de `conversation_event`.
+    Prompts activos: `build/conversations-prompt.md` y
+    `build/conversations-design-prompt.md`.
+
+11. [ ] **Money v2.** `expected_on`, condición de pago, pagos observados,
+    aging y estado paid derivado. Orden activo: `build/money-model-prompt.md` →
+    `build/money-prompt.md` → `build/money-design-prompt.md`.
+
+12. [ ] **Revisión diseño+datos — contenedores.** Portada de workspace, project
+    detail, line detail y siete módulos; cerrar identidad fiscal y qué datos son
+    obligatorios antes de ampliar UI.
+
+13. [ ] **Revisión diseño+datos — fichas y transversales.** Performance, road
+    sheet, conversation, person, settings, diálogos; loading/error/empty/offline,
+    mobile, light/dark y accesibilidad.
+
+## Producto — después
+
+- [ ] **Email integrado → `conversation_event`.** Empezar por forwarding/BCC o
+  conexión de bajo riesgo; evitar doble entrada.
+- [ ] **WhatsApp por escalones.** Share-to-Hour/manual asistido → número/bot →
+  Business API para cuentas elegibles; nunca scraping de WhatsApp Web.
+- [ ] **Road mode mobile/offline.** Paquete de próximos bolos, road sheets y
+  contactos con frescura visible y cola de escritura limitada.
+- [ ] **AI data-readiness y guardarraíles.** Source, ownership, consent,
+  confidence, freshness y visibilidad; aprobación, idempotencia, audit log y
+  compensación para cada acción.
+- [ ] **Polish de beta.** Mobile completo, GDPR export, accesibilidad WCAG,
+  notificaciones y ratificación visual/naming con usuarios externos.
+
+## Deuda aceptada / observar en uso
+
+- Tareas cuyo padre se soft-borra pueden quedar sin contexto en Desk.
+- `update_workspace` directo por PostgREST permite a owner/admin saltar las
+  validaciones de la API; no es una escalada de privilegios.
+- `line.notes` y collab no exigen exactamente el mismo permiso fuera de la API.
+- Money suma monedas distintas sin dimensión; no mostrarlo como total económico
+  fiable hasta resolver multi-currency.
+- Expenses globales, invoices multilínea/PDF/serie, expiración de shares y
+  timezone por ciudad siguen fuera de la profundidad actual.
+- `logo_url` existe, pero no hay flujo de subida R2.
+- Persona de test huérfana `019f2f03-f1f2-71a0-9e1f-9c8c9cf331c8`: invisible;
+  purga opcional y exacta, nunca por patrón amplio.
+
+## Cerrado recientemente
+
+- [x] Planner v2 + rename Calendar→Planner, aplicado y desplegado.
+- [x] Desk v2: feed mixto, TaskComposer, modo calma y consentimiento IA.
+- [x] Identidad workspace-scoped + organizaciones + hardening RLS.
+- [x] Fixture limitado y matriz negativa inicial; RLS 114/114.
+- [x] Advisors: 0 warnings de rendimiento.

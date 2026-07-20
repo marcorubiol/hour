@@ -1,5 +1,7 @@
 # Hour — Build prompt: task model v1 (`from_at` / `due_at` + `lead_days` / API)
 
+> **ARCHIVED — EXECUTED. DO NOT RE-RUN.**
+
 > **STATUS: EXECUTED 2026-07-17 (the parallel .zerø build session — see ADR-071).** Everything
 > below is live: both migrations applied via MCP (task_entity + task_from_lead), `/api/tasks`
 > CRUD, `taskSurfaceState()` in `$lib/task.ts` (day-precise, `now` injected, unit-tested),

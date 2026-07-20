@@ -71,14 +71,16 @@ pnpm run deploy
 
 Custom domain `hour.zerosense.studio` attaches automatically if zone is in same CF account.
 
-## 6. Supabase setup (if fresh project)
+## 6. Supabase — limitación de proyecto nuevo
 
-1. Create project `hour-phase0` in `eu-central-1`
-2. Enable Auth → Email provider
-3. Run migrations: `supabase db push` or apply via MCP
-4. Enable Auth Hook: `public.custom_access_token_hook`
+No crear hoy un proyecto vacío esperando que `supabase db push` reconstruya
+Hour. El historial anterior al 2026-07-20 vive en `build/migrations/` y el primer
+checkpoint de `supabase/migrations/` exige que ese schema ya exista.
 
-See `migrations/2026-05-01_reset_v2_roadsheet.sql` for current schema.
+Antes de staging hay que producir y probar un baseline reconstructivo (tarea en
+`../_tasks.md`). Para operar el proyecto existente, las migraciones nuevas sí
+deben añadirse a `supabase/migrations/`, aplicarse de forma controlada y seguidas
+de regen de tipos + RLS tests.
 
 ## 7. Type generation
 
@@ -111,4 +113,4 @@ curl http://localhost:5173
 
 ## Next
 
-See `roadmap.md` for current sprint and Phase 0.9 gate items.
+See `../_tasks.md` for the current queue and Phase 0.9 gate items.

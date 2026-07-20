@@ -1,5 +1,7 @@
 # Hour — Design: Desk — CONVERGED (system record)
 
+> **ARCHIVED DESIGN INPUT.** Desk v2 is implemented; current truth is the UI/code.
+
 > **STATUS: DESIGN CONVERGED 2026-07-18** through live iteration with Marco in his design
 > tool. His final mockups (light + dark) are the **canonical visual reference**; this file
 > records the converged system so any future regeneration or variant starts from the

@@ -1,5 +1,8 @@
 # Hour — Roadmap de implementación
 
+> **ARCHIVED SNAPSHOT.** This plan contains superseded phases, names and status.
+> Current state: `../../_context.md`. Current queue: `../../_tasks.md`.
+
 > Documento vivo. Se actualiza al cerrar cada fase. Ordenado por dependencias reales, no por deseo.
 > Última actualización: 2026-07-02 (maratón ADR-040→050: Phase 0.2 ✓, 0.3 esencialmente ✓ — 4 lenses vivas —, adelantos de 0.5 en producción. Ver "Current next action").
 
@@ -96,10 +99,10 @@ Gates Phase 0.1 — ambos cerrados 2026-05-19:
 ### Where to look
  
 - **Build sequencing**: este roadmap.
-- **Product/UX rationale**: [research/product/20-product-strategy-review.md](../research/product/20-product-strategy-review.md).
-- **Technical architecture**: [build/architecture.md](architecture.md).
-- **Historical decisions**: [_decisions.md](../_decisions.md).
-- **Visual/UI direction**: [build/design-prompt.md](design-prompt.md).
+- **Product/UX rationale**: [research/product/20-product-strategy-review.md](../../research/product/20-product-strategy-review.md).
+- **Technical architecture**: [build/architecture.md](../architecture.md).
+- **Historical decisions**: [_decisions.md](../../_decisions.md).
+- **Visual/UI direction at that time**: [archived design prompt](2026-05-design-system-prompt.md).
 
 ---
 

@@ -1,5 +1,7 @@
 # Apply de seguridad, identidad y organizaciones
 
+> **ARCHIVED — OPERATION COMPLETED. DO NOT APPLY AGAIN.**
+
 > Estado 2026-07-20: **EJECUTADO** en `hour-phase0`. Snapshot privado
 > `hour_backup_20260720`; dry-run y apply completados; RLS actual 114/114.
 > Tipos regenerados y asesores ejecutados. Follow-up aplicado como

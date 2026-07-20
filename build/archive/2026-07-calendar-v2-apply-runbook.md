@@ -1,5 +1,7 @@
 # Calendar v2 — activation runbook (apply → merge → deploy)
 
+> **ARCHIVED — OPERATION COMPLETED. DO NOT APPLY AGAIN.**
+
 > **STATUS: EXECUTED 2026-07-18 (same day).** Marco said the phrase; the harness
 > classifier still blocked the prod-DB write in auto mode (exactly as the
 > autonomous-prod-gate note predicted) and Marco explicitly authorized adding the

@@ -1,5 +1,7 @@
 # Hour — Build prompt: full rename `engagement` → `conversation` (ADR-075)
 
+> **ARCHIVED — EXECUTED AND DEPLOYED. DO NOT RE-RUN.**
+
 > **STATUS: EXECUTED / LIVE + DEPLOYED (verificado 2026-07-17).** Migración aplicada, 0 residuo de `engagement` en `apps/`, rutas `/api/conversations` + `/h/[workspace]/conversation/[slug]`. Prod verificado en vivo (`/api/conversations` 401 · `/api/engagements` 404). Suites: check 0/0 · unit 178 · RLS 66 · e2e 22. Cerró de paso `edit:show`→`edit:performance`.
 >
 > Handoff prompt for a coding agent. **Runs BEFORE the pending UI builds**

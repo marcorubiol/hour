@@ -76,7 +76,7 @@ Two guards, both in the repo:
   SHA into the bundle. Ask production what it runs:
   ```
   curl -s https://hour.zerosense.studio/health/live
-  # {"ok":true,"version":{"sha":"358155c","dirty":false,"builtAt":"…"}}
+  # {"ok":true,"version":{"sha":"<git-sha>","dirty":false,"builtAt":"…"}}
   ```
   `dirty: true` means that build came from an uncommitted tree — the SHA alone
   will not reproduce it.
@@ -105,14 +105,16 @@ docs are a claim; the stamp is the fact.
 - **RLS regression suite against staging.** `pnpm --filter web test:rls`
   currently hits PRODUCTION as the fixture user. Before onboarding, point
   `.env.test` at a Supabase branch/staging project and confirm green there.
-  The 6 priority scenarios: `_context.md § Phase 0.9 hardening backlog`.
-  The suite now has a second, limited-role identity. It covers grant/revoke
+  The active acceptance criteria live in `_tasks.md § Antes de la primera beta
+  externa`; do not recover them from an older phase document. The suite now has
+  a second, limited-role identity. It covers grant/revoke
   precedence against an already-issued JWT, member-level money redaction,
   private `person_note` isolation and refusal of workspace identity edits.
   The remaining RBAC work is the deliberate product-level role matrix, not a
   missing test identity.
 
-## Deferred to Phase 1 (do NOT block launch on these)
+## External dependencies and later work
 - Full CI RLS/e2e jobs (need a staging Supabase branch + secrets).
-- Leaked-password protection (Supabase Pro toggle).
+- Leaked-password protection requires Supabase Pro. Its priority is decided in
+  `_tasks.md`; this runbook does not silently defer it.
 - Admin/support UI, Sentry source-map token rotation.

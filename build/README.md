@@ -1,63 +1,48 @@
-# build/ — Documentation Map
+# `build/` — mapa de documentación
 
-This folder contains specs, ADRs, and planning artifacts for Hour.
+La portada del proyecto es [`../_context.md`](../_context.md). Esta carpeta agrupa
+documentos técnicos y de producto; ya no mantiene una segunda narrativa de estado.
 
-## Read first (onboarding)
+## Documentos vivos
 
-For any AI or person joining the project:
+| Archivo | Autoridad |
+|---|---|
+| `architecture.md` | Stack, datos, seguridad y entornos |
+| `identity-access.md` | Modelo aplicado de identidad portátil y acceso |
+| `structure-model.md` | Lentes, contenedores, módulos y tareas |
+| `screen-data-spec.md` | Contrato de datos por superficie |
+| `screens-inventory.md` | Checklist de revisión de pantallas |
+| `competition.md` | Snapshot de competencia; verificar precios antes de usarlos |
+| `setup.md` | Desarrollo y deploy del stack actual |
+| `strategy-session-prompt.md` | Apertura opcional para sesiones de estrategia |
+| `conversations-prompt.md` + `conversations-design-prompt.md` | Conversations v1.5 pendiente |
+| `money-model-prompt.md` + `money-prompt.md` + `money-design-prompt.md` | Money v2 pendiente |
 
-1. [Root `_context.md`](../_context.md) — Project overview, phases, key decisions
-2. [`roadmap.md`](roadmap.md) — Living implementation plan
-3. [`architecture.md`](architecture.md) — Technical stack, security, environments
-4. [Root `_decisions.md`](../_decisions.md) — Decision log (chronological)
-5. [`runbooks/rollback.md`](runbooks/rollback.md) — If doing ops
+## Operaciones
 
-## By category
+- `runbooks/backup.md` — backup y base del restore drill.
+- `runbooks/beta-readiness.md` — gate de beta privada.
+- `runbooks/rollback.md` — rollback de Worker.
+- `runbooks/test-user-setup.md` — fixtures e2e/RLS.
 
-### Architecture & Planning
-- `architecture.md` — Stack, multi-tenancy, security, Phase 0.9 gate
-- `roadmap.md` — Phases 0.0 → 1, sprints, ADRs
-- `competition.md` — 20 competitors analyzed
+Los runbooks ejecutados se mueven a `archive/`; un runbook activo debe describir
+una operación que todavía puede repetirse.
 
-### Setup & Operations
-- `setup.md` — Current setup guide (SvelteKit + Workers + Supabase)
-- `runbooks/rollback.md` — Emergency rollback procedures
-- `bootstrap.md` — **HISTORICAL** (Astro-based setup, pre-ADR-026)
+## Schema y migraciones
 
-### Schema & Data
-- `migrations/` — Current schema source of truth. The **whole folder**, applied in
-  date order, is the canonical record — no single file is.
-  - `2026-05-01_reset_v2_roadsheet.sql` — the reset v2 baseline (22 tables **as of
-    that date**; the live schema is **29** — account, cast, task, share and alias
-    layers all landed in later files here)
-  - `2026-05-01_post_roadsheet_cleanup.sql` — Fixes post-apply
-- `schema.sql` — **frozen snapshot, 2026-05-01. Not current, by its own header**
-  ("This file has NOT been rewritten in-place"). Predates `show` → `performance`
-  (ADR-036) and `engagement` → `conversation` (ADR-075) — it describes a schema
-  that no longer exists. Read `migrations/` or dump the live schema instead.
-- `rls-policies.sql` — same: frozen at 2026-05-01, same two renames missing.
-- `seed.sql` — Pre-seed for marco-rubiol/mamemi
-- `import/` — 3-stage pipeline (154 contacts loaded)
+- `schema.sql` y `rls-policies.sql` son snapshots históricos, no el schema vivo.
+- `migrations/` conserva el historial SQL anterior al uso normalizado de
+  `supabase/migrations/`.
+- `../supabase/migrations/` contiene el checkpoint y las migraciones gestionadas
+  desde el hardening del 2026-07-20.
+- El proyecto todavía no dispone de un baseline único para levantar una base
+  vacía. Esa limitación está en `_tasks.md` y no debe ocultarse.
 
-### Prompts & Workflows
-- `director-prompt.md` — Prompt for strategic AI conversations
-- `design-prompt.md` — Prompt for design sessions
-- `_context.md` — This folder's workflow guide
+## Historia
 
-### Archive
-- `archive/` — Historical prompts and obsolete docs
-  - `reset-v2-prompt.md` — Task prompt for schema reset v2
-  - `README.md` — Archive index
+[`archive/README.md`](archive/README.md) indexa planes, prompts, contratos y
+procedimientos terminados. `_notes/` conserva sesiones y pensamiento en curso;
+`_decisions.md` conserva los ADR.
 
-### Research
-- `../research/` — Competitor/pricing/UX research (see `INDEX.md`)
-
-## Rule
-
-**Memory lives in files, not chats.** Every decision worth keeping → `_decisions.md`. Every architectural choice → `architecture.md`.
-
-## Status
-
-Last updated: 2026-07-17 — counts re-read from the live catalog: **29 tables**, 1 view
-(`performance_redacted`), 59 functions, 82 RLS policies, 21 enums. Previous stamp
-2026-05-02 said 22 tables; seven layers landed since without this file noticing.
+**Regla:** memoria en archivos, pero una sola verdad actual: `_context.md` y
+`_tasks.md`.

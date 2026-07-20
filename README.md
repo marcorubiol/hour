@@ -1,70 +1,65 @@
 # Hour
 
-Multi-tenant B2B SaaS for live performing arts management. Replaces Excel + Drive + Gmail + Notion + WhatsApp for booking outreach, touring, and production.
+Multi-tenant operating system for small and medium live-performing-arts teams:
+conversations, planning, production, road sheets, people, tasks and money in one
+shared model.
 
-## Current Phase
+## Status
 
-**Phase 0.0** — Internal tool for MaMeMi (Marco + Anouk, ≤5 users)
+**Phase 0 — internal tool, preparing the private-beta gate.** The app is live at
+`hour.zerosense.studio`, but it is not a public SaaS and does not have self-serve
+onboarding or billing.
 
-→ **Phase 0.9** — Private beta hardening gate (before external clients)
-
-→ **Phase 1** — Public SaaS if beta validates demand
+The canonical current state is [`_context.md`](_context.md). The only active work
+queue is [`_tasks.md`](_tasks.md). Do not infer current status from archived
+prompts, session notes or old ADR status paragraphs.
 
 ## Stack
 
-- **Frontend**: SvelteKit 2 + Svelte 5 + `@sveltejs/adapter-cloudflare`
-- **Backend**: Supabase Cloud (Postgres 17, Auth, RLS, Realtime)
-- **Edge**: Cloudflare Workers + R2 + Durable Objects (y-partyserver)
-- **Monorepo**: pnpm workspaces
+- SvelteKit 2 + Svelte 5 + TypeScript + Vite
+- Supabase Cloud: Postgres 17, Auth, RLS, Realtime and pgmq
+- Cloudflare Workers, R2 and Durable Objects (`y-partyserver`)
+- pnpm monorepo, Vitest, Playwright and Sentry
 
-## Quickstart for developers
+## Start here
+
+For any person or AI agent:
+
+1. [`_context.md`](_context.md) — verified current state and vocabulary
+2. [`_tasks.md`](_tasks.md) — current priorities
+3. [`build/architecture.md`](build/architecture.md) — technical model
+4. [`build/structure-model.md`](build/structure-model.md) — product structure
+5. [`_decisions.md`](_decisions.md) — append-only decision history
+
+Historical plans and executed prompts live in [`build/archive/`](build/archive/README.md)
+and are not executable instructions.
+
+## Development
 
 ```bash
-# Install (from repo root)
 pnpm install
-
-# Dev server
-pnpm dev        # localhost:5173
-
-# Type generation (after DB changes)
-pnpm cf-typegen # generates worker-configuration.d.ts
+pnpm dev
+pnpm --filter web check
+pnpm --filter web test:unit
+pnpm --filter web test:rls
+pnpm build
 ```
 
-### Recovery (fresh machine / post-wipe)
+Local public configuration comes from `apps/web/.env`. Test credentials are in
+gitignored `.env.test`; runtime secrets belong in Wrangler or the operating-system
+keychain. See [`build/setup.md`](build/setup.md).
 
-The repo clones clean, but two gitignored things must be recreated:
+## Production
 
-```bash
-pnpm install                                  # 1. deps (3 workspace projects)
-cp apps/web/.env.example apps/web/.env        # 2. fill PUBLIC_SUPABASE_* from
-                                              #    apps/web/wrangler.jsonc [vars]
-                                              #    (public-safe; anon key is the
-                                              #    publishable sb_publishable_ key)
-pnpm dev                                       # 3. localhost:5173 → /h/muk-cia, /h/demo
-```
+- App: `https://hour.zerosense.studio`
+- Worker: `hour-web`
+- Supabase: `hour-phase0` (`eu-central-1`)
+- Health truth: `GET /health/live` and `GET /health/ready`
 
-The only real secret in `.env` is `SENTRY_AUTH_TOKEN` (optional — source-map upload on
-build only; dev doesn't need it). DB is Supabase Cloud `hour-phase0`, nothing to run locally.
+Deploys require a clean tree and publish their Git SHA through `/health/live`.
 
-## Where docs live
+## Project rule
 
-Read in this order:
-1. [`_context.md`](_context.md) — Project context, phases, key decisions
-2. [`build/roadmap.md`](build/roadmap.md) — Living implementation plan
-3. [`build/architecture.md`](build/architecture.md) — Technical stack, security
-4. [`_decisions.md`](_decisions.md) — ADR log (chronological)
-5. [`build/runbooks/rollback.md`](build/runbooks/rollback.md) — If doing ops
-
-## Do not touch before reading
-
-See `_context.md` §"REGLA DEL PROYECTO" — read `03_AGENCY/_area-methød/code/philosophy.md` before writing code.
-
-## Deploy
-
-- Production: `hour.zerosense.studio`
-- Worker: `hour-web.marco-rubiol.workers.dev`
-- Supabase: `hour-phase0` (eu-central-1)
-
----
-
-Working name **Hour**. Brand decision deferred to Phase 1.
+Before changing code, read the Zerø code philosophy linked from `_context.md`.
+For navigation, lenses, modules or entity detail, also read
+`build/structure-model.md`.

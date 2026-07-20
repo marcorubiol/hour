@@ -5,7 +5,7 @@
    * form: Actuació mounts the shared PerformanceForm (one home for "how a
    * gig is created"); every other pill creates a `date` row through
    * POST /api/dates with the kind-specific fields of the contract
-   * (build/calendar-v2-api-contract.md §2).
+   * (historical contract: build/archive/2026-07-calendar-v2-api-contract.md §2).
    *
    * Timezone rule (ADR-078 §11): a typed hour is VENUE-LOCAL. The date
    * form converts wall time through the selected project's workspace

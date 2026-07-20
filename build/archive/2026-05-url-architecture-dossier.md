@@ -1,5 +1,7 @@
 # URL Architecture Dossier — Hour (2026-05-01)
 
+> **ARCHIVED DECISION INPUT.** Current routes live in code and `_context.md`.
+
 > Status: dossier de evaluación. No reabre ADR-022; confirma su validez con tres ajustes operativos antes del scaffold del día 5 de Phase 0.0.
 > Trigger: Marco no estaba convencido al 100% del shape `/h/[workspace]/[entity]/[slug]` y pidió alternativas evaluadas con razonamiento.
 

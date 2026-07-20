@@ -1,5 +1,7 @@
 # Import Plan — Phase 0 seed data
 
+> **ARCHIVED — NOT AN ACTIVE PLAN.** Kept as evidence of the executed import.
+
 > Status: **implemented** (pipeline lives in `build/import/`); **needs code
 > adjustment after reset v2** — see §3.4 (drop tag/tagging steps) and §3.5
 > (conversation status default `contacted`). · Author: Marco + .zerø · Date: 2026-04-19

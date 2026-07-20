@@ -4,9 +4,10 @@
 > still learning from real use), but from 2026-07-14 on every structural decision is measured
 > against it. If code or another doc contradicts it, either this doc wins or the contradiction
 > is a bug to reconcile — flag it, don't silently diverge.
-> Recorded: 2026-07-14. Decision + rationale: `_decisions.md` § ADR-063 (model) + ADR-065 (naming: Desk · Calendar · Contacts · Money; the line's cast/crew module = Team).
-> Amended 2026-07-17 — ADR-075: the Contacts lens and the `contacts` line module are **Conversations**, and the entity `engagement` is **`conversation`** (DB, API, client). "Contact" survives only as the book concept — a person or organization you deal with — never as an entity or a surface name.
-> Amended 2026-07-19 — ADR-079: the Calendar lens (its route, engine `planner.ts`, and line module) is **Planner** — route `/h/planner`, label EN Planner · ES/CA Planificador · FR Planning (pending `fr.json`). The iCalendar/ICS feed (`calendar_share`, `/api/public/calendar`, `ics.ts`) keeps "calendar" — interop truth, like the `date` entity keeps its name. Every "Calendar" below, as a lens/module name, now reads **Planner**.
+> Recorded: 2026-07-14; reconciled 2026-07-20. Decision + rationale:
+> `_decisions.md` § ADR-063/065/075/079. Current names are **Desk · Planner ·
+> Conversations · Money**; the cast/crew module is **Team**. `calendar` survives
+> only for iCalendar/ICS interoperability, not as a surface name.
 > Read next to: `architecture.md` (data model / stack), `_decisions.md` (ADR log).
 
 ## The one idea
@@ -44,7 +45,7 @@ line — nothing above the line composes modules.
 **Task** — the **verb layer**, not a concern-domain. Polymorphic: attaches to project / line /
 performance / conversation — at most one; none = a free workspace task (D3 **live since 2026-07-17**,
 ADR-070/071: anytime / from / due+lead, urgency always derived). Never a lens. Surfaces in three
-places: inline as an conversation's next-action (live via `conversation.next_action_at`; no backfill —
+places: inline as a conversation's next-action (live via `conversation.next_action_at`; no backfill —
 ADR-070), as the Tasks line module, and as a feed into the Desk (the home). **Authoring**: a
 parent-attached task is created where its parent lives (the module's composer); the FREE workspace
 task has no container editor anywhere, so its authoring home is the Desk composer — a deliberate
@@ -67,7 +68,7 @@ extension of Option 2, recorded here so it reads as a decision, not drift.
 **A lens only shows. Option 2 (chosen 2026-07-14):** a lens defines no editing of its own, but **may
 host an entity's editor inline** for convenience. The editor it embeds is the entity's — the same one
 reached from the module/container. So "edit lives at the container" holds even when the widget appears
-in a lens. This reconciles today's inline edits in the Money / Calendar / Conversations lenses
+in a lens. This reconciles today's inline edits in the Money / Planner / Conversations lenses
 (ADR-046 / 043 / 044): those are the entity's editors *hosted*, not lens-owned logic.
 
 ## Read surfaces and modules — the categories
@@ -107,7 +108,7 @@ The nav layer is **one home + three lenses**:
 
 - **Desk** — the home / the "now": what needs me + what's next + tasks (planned or not). Reached by the
   logo. Revives the ADR-008 name (fits now that tasks return); replaces "Agenda", which reads as
-  "calendar" in ES/CA/FR and blurred with the Calendar lens.
+  "calendar" in ES/CA/FR and blurred with the planning lens.
 - **Planner** — month grid / planning / conflict-detection. A ⌘K lens.
 - **Conversations** — your booking network: persons + conversations. **Not "People"** — the lens holds
   organizations too (theatres, town halls, festivals), and a theatre is not a person; a *contact* is
@@ -115,29 +116,29 @@ The nav layer is **one home + three lenses**:
   direction). A ⌘K lens.
 - **Money** — fees / invoices / expenses; gated by `read:money`. A ⌘K lens.
 
-**Dropped: the "Time" merge** (Agenda + Calendar into one lens). Good naming dissolved it — with **Desk**
-clearly ≠ **Calendar**, the redundancy that motivated the merge is gone. They stay separate (the "now /
+**Dropped: the "Time" merge** (Desk + Planner into one lens). Good naming dissolved it — with **Desk**
+clearly ≠ **Planner**, the redundancy that motivated the merge is gone. They stay separate (the "now /
 what do I do" vs planning), a gap D3 (tasks) only widens.
 
-A fourth lens, **Work / Flow**, appears only if the task entity (D3) lands and Desk needs to separate
-tasks from events.
+The task entity (D3) is live and did **not** create a Work/Flow lens: tasks remain
+the verb layer and surface in Desk plus their parent context.
 
 **Killed: the "Archive" lens** — never scoped, only a placeholder in ADR-009. Gone.
 
 ## Persona-fit = role, not composition
 
 Different people need different views (a booker vs a finance person vs a tour manager). The need is
-real — but it is met by **role**, never by a user-operated view builder. Two mechanisms, both
-role-driven, both already scaffolded:
+real — but it is met by **role**, never by a user-operated view builder. Access is live; role-based
+default landing remains a product direction, not implemented truth:
 
 - **Access (hard, security):** what a person can even see is RBAC (`read:money`, `read:conversation`, …
   — the 10-permission closed vocabulary, ADR-006). Money is **already fully RLS-gated by `read:money`**
-  across fees, invoices and expenses (verified in `rls-policies.sql`: `invoice_select` / `expense_select`
-  require it; the redacted performance view masks fees) — a role without it cannot read money at the DB
+  across fees, invoices and expenses (verified by the live policies and RLS suite;
+  the historical `rls-policies.sql` snapshot is not authoritative) — a role without it cannot read money at the DB
   level, which is the real boundary. The UI must mirror it: a capability flag hides the Money lens (⌘K),
   the Money module and the € stats when the viewer lacks `read:money`. This is the "roles de verdad"
   capability flag ADR-058 deferred to Phase 0.9.
-- **Emphasis (soft, cosmetic):** what is front-and-center is the **default landing lens keyed off role** —
+- **Emphasis (soft, cosmetic; pending):** what is front-and-center could be the **default landing lens keyed off role** —
   a difusión-only member lands on Conversations, not Desk; finance lands on Money. Everything else
   stays one ⌘K away. Not a per-user layout; a `default = f(role)`.
 
@@ -153,15 +154,15 @@ necessary for light personalization, they are the ceiling — not a card builder
   (technical rider, dossiers) and cast are project-level edit content** (ADR-009's original intent). A
   line's Materials / Team module is a *scoped view / adaptation layer* reading from the project's canonical
   set — not the home of the canonical material.
-- **Reframes ADR-046 / 043 / 044** — inline editing from the Money / Calendar / Conversations lens is kept,
+- **Reframes ADR-046 / 043 / 044** — inline editing from the Money / Planner / Conversations lens is kept,
   understood as the entity's editor **hosted** by a read-only lens (option 2), not lens-owned edit logic.
 - **Resolves ADR-057 re-evaluate (a)** ("is project detail a module composition?") → **No.** Project
   detail = its own edit content + its lines + scoped lenses. Modules stay at the line.
-- **Confirms ADR-062** — space = one entity (edit surface #1); the `/h/` cross-space home is the widest lens.
+- **Confirms ADR-062** — space = one entity (edit surface #1); `/h` is the Hall and Desk is the cross-space digest.
 - **Closes** — the Archive lens (deleted).
 
 ## Re-evaluate when
 
-- D3 (task entity) lands → decide the Work / Flow lens and whether Desk mixes tasks with events.
+- If Desk becomes unusably dense with tasks + events, re-evaluate their shared surface; do not infer a Work lens automatically.
 - A concern appears that is neither a transversal read nor entity-bound content → the three-category
   table needs a fourth row.

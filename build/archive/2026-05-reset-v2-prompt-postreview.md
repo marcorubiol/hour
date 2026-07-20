@@ -1,6 +1,6 @@
 > **MOVED TO ARCHIVE**
 >
-> This file has been archived. See `build/archive/reset-v2-prompt.md` for historical reference.
+> This file has been archived. See `2026-04-reset-v2-prompt-original.md` for the original prompt.
 > Current schema source of truth: `build/migrations/2026-05-01_reset_v2_roadsheet.sql`
 
 ---

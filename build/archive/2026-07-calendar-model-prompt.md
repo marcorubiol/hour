@@ -1,5 +1,7 @@
 # Hour — Build prompt: calendar model v1 (availability + date cascade + APIs)
 
+> **ARCHIVED — EXECUTED. DO NOT RE-RUN.** The live surface is Planner.
+
 > **STATUS: EXECUTED 2026-07-18 (autonomous session, branch `calendar-v2`).** Kept as the
 > spec of record. Delivered: the 5 migration files (`build/migrations/2026-07-18_*.sql` —
 > files only, NOT applied to any live DB), the endpoints, and the `$lib/calendar.ts` pure

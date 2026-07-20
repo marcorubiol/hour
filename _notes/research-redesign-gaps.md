@@ -1,8 +1,12 @@
 # Research — Huecos y sobras (gap analysis para el rediseño)
 
+> **HISTORICAL SNAPSHOT (2026-07-04).** Several gaps and navigation questions
+> below were subsequently resolved. Use `_context.md` / `_tasks.md` for current
+> truth; this file preserves the reasoning that led to later ADRs.
+
 > Fecha: 2026-07-04 · Sesión .zerø + Marco
 > Motivo: rediseño de la app en marcha (la UI se ve densa/apretada). Pregunta guía: ¿el cliente puede hacer todo lo que necesita de forma **fácil y rápida**? ¿Qué falta, qué sobra?
-> Método: superficie realmente construida a 2026-07-04 (rutas + componentes, post-maratón ADR-040→050) contrastada contra el ciclo real del cliente (difusión → hold → confirmed → producción → bolo → cobro), `build/competition.md § Gap analysis`, `_tasks.md`, `build/roadmap.md § Current next action` y `_notes/_flux.md § TAM levers`.
+> Método: superficie realmente construida a 2026-07-04 (rutas + componentes, post-maratón ADR-040→050) contrastada contra el ciclo real del cliente (difusión → hold → confirmed → producción → bolo → cobro), `build/competition.md § Gap analysis`, el roadmap histórico archivado y `_notes/_flux.md § TAM levers`.
 
 ## Estado de partida (verificado)
 

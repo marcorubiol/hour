@@ -1,16 +1,15 @@
 <script lang="ts">
   /**
-   * Settings — lives inside the workspace shell. The sidebar swaps
-   * Plaza+LineList for <SettingsNav /> while the user is here (handled
-   * by /h/+layout.svelte detecting the route). This page only renders
-   * the active section panel in the main column.
+   * Settings — scoped by the workspace segment. The global shell detects
+   * this route and exposes <SettingsNav />; this page renders the active
+   * section panel in the main column.
    *
    * Active section is driven by the `?section=` query param so the URL
    * is shareable and the sidebar nav stays in sync.
    *
    * Phase 0 reality: only Profile (full name, email) and Notifications →
    * Master View are wired. Workspaces/privacy/languages/notifications/
-   * billing/danger are kept as scaffolding for the cases the roadmap
+   * billing/danger are kept as scaffolding for the cases the active backlog
    * will actually need; the rest was pruned (vapor).
    */
 

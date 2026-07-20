@@ -1,5 +1,9 @@
 # Sessions log — Hour
 
+> **HISTORICAL SNAPSHOTS.** “Pending”, branch state and test counts below belong
+> to their date and are not instructions. Current truth: `_context.md`; current
+> work: `_tasks.md`.
+
 Historial detallado sesión-a-sesión, archivado desde `_context.md` el 2026-05-18 cuando ese archivo pasó los 40k chars y empezó a degradar performance del assistant.
 
 Estado: **referencia histórica**. No actualizar entradas viejas. Para sesiones nuevas: si la sesión deja deuda activa o decisión cristalizada → `_context.md` (status actual) o `_decisions.md`; si es work-log puro → git log + commit messages bastan; si queda algo que conviene preservar fuera de git → entrada nueva aquí.
@@ -12,11 +16,11 @@ Convención: secciones por fecha descendente. Cada sesión queda con commits cit
 
 Dos movimientos el mismo día. Por la mañana, grill Marco+.zerø sobre el mock del calendar → **ADR-078** (diálogo unificado, blackout sin `kind`, `day_off`, inferencia fora en dos niveles, paridad estricta IA=UI) + los tres prompts de calendar actualizados (`8145463`). Por la tarde, **build autónomo bajo mandato** de TODO Calendar v2 — modelo Y UI en la misma pasada — en la rama `calendar-v2`, worktree `~/Developer/hour-calendar-v2`.
 
-- **Hecho** (todo working-tree sobre `77fc9a3`, sin commitear a propósito — pendiente de revisión de Marco): 5 migraciones como ficheros (`2026-07-18_*`: day_off ADD VALUE aislado · date cascade+travel · write RPCs · availability_block · user_profile.person_id — **la DB viva está intacta**, db-types hand-patched con marcador); endpoints `/api/availability` CRUD + `/api/dates` POST/PATCH/DELETE + `/api/dates/labels` + `/api/team` + `?rosters=1`; funciones puras en `$lib/calendar.ts` (`conflictsFor()`, `awayBands()`, `rosterPersonIds`/`performanceRoster`); y la UI: `CreateEventDialog` unificado (pills de tipo; la forma de performance EXTRAÍDA a `PerformanceForm` compartida, no forkeada — `PerformanceCreateDialog` sigue funcionando igual), `CreateBlackoutDialog`, `AgendaList` (`?view=agenda` + localStorage por dispositivo), marcas de conflicto y bandas blackout/fora en `MonthGrid`. Contrato as-built completo (firmas, graceful absence, divergencias de la letra del prompt): `build/calendar-v2-api-contract.md`.
+- **Hecho** (todo working-tree sobre `77fc9a3`, sin commitear a propósito — pendiente de revisión de Marco): 5 migraciones como ficheros (`2026-07-18_*`: day_off ADD VALUE aislado · date cascade+travel · write RPCs · availability_block · user_profile.person_id — **la DB viva está intacta**, db-types hand-patched con marcador); endpoints `/api/availability` CRUD + `/api/dates` POST/PATCH/DELETE + `/api/dates/labels` + `/api/team` + `?rosters=1`; funciones puras en `$lib/calendar.ts` (`conflictsFor()`, `awayBands()`, `rosterPersonIds`/`performanceRoster`); y la UI: `CreateEventDialog` unificado (pills de tipo; la forma de performance EXTRAÍDA a `PerformanceForm` compartida, no forkeada — `PerformanceCreateDialog` sigue funcionando igual), `CreateBlackoutDialog`, `AgendaList` (`?view=agenda` + localStorage por dispositivo), marcas de conflicto y bandas blackout/fora en `MonthGrid`. Contrato as-built completo (firmas, graceful absence, divergencias de la letra del prompt): `build/archive/2026-07-calendar-v2-api-contract.md`.
 - **Decisiones tomadas dentro del mandato** (píxel/UX — el modelo no se tocó): (a) gramática de las marcas de conflicto extendida a las severidades blackout — people = círculo rojo SÓLIDO "!", possible = dashed "?", blackout = rojo SOLO CONTORNO, blackout-tentative = accent dashed (relleno=hecho, contorno=restricción, dashed=posibilidad — la misma gramática contorno/sólido de holds); (b) el rail de blackouts de la agenda en tinte NEUTRO único, nunca hue por persona (el nombre distingue, el color no grita); (c) en viewport estrecho (<~560px) el rail colapsa a threads de 3px por defecto, con pill que expande el panel nombrado como overlay; (d) la acción de crear blackout vive DENTRO del diálogo unificado de creación, no como affordance aparte.
 - **Gotchas**: (a) la sesión Desk estaba viva sobre main → **worktree** para no pisar el árbol compartido (memoria hour-parallel-sessions); a media build la sesión Desk commiteó LensSwitcher+calm (`77fc9a3`, 11:07) y la rama quedó basada exactamente en ese commit — la página de calendar de la rama ya monta LensSwitcher, así que el conflicto gordo de merge se desactivó solo, pero main SIGUE en vuelo y el runbook trae la guía de resolución para lo que aterrice después; (b) construir contra una DB sin migrar obligó a diseñar el **graceful absence** en las dos direcciones (§6 del contrato): el GET extendido de dates reintenta con el select legacy en 42703, las suites RLS nuevas se auto-skipean por sonda viva, y la UI trata cualquier non-2xx de los paths nuevos como "feature silenciosamente ausente".
 - **Verificación**: gates re-corridos en el cierre — `svelte-check` 0/0 (1538) · unit **251/251** (18 files) · RLS **66 pass + 35 skip** (las dos suites nuevas, esperando migración) — más la QA visual de la sesión de build sobre el mock actualizado `lens-v2.html` (en scratchpad de /private/tmp, **pendiente de publicar al proyecto de diseño de claude.ai** — publicarlo antes de reiniciar, tmp no sobrevive).
-- **Queda**: revisión de Marco → frase **"APLICA CALENDAR V2"** → `build/runbooks/calendar-v2-apply.md` (apply de las 5 migraciones con el caveat del ADD VALUE → regen db-types + quitar marcador → RLS 101/101 → commit+merge con guía de conflictos → deploy ADR-066 → sondas de rutas + e2e → limpiar worktree).
+- **Quedaba en ese momento**: revisión de Marco → frase **"APLICA CALENDAR V2"** → runbook hoy archivado en `build/archive/2026-07-calendar-v2-apply-runbook.md` (apply de las 5 migraciones con el caveat del ADD VALUE → regen db-types + quitar marcador → RLS 101/101 → commit+merge con guía de conflictos → deploy ADR-066 → sondas de rutas + e2e → limpiar worktree).
 
 **Continuación (tarde-noche) — segundo grill + Planner v2 (ADR-080), misma sesión prolongada sobre la medianoche.** Con Calendar v2 ya aplicado y desplegado (`88467c3`), tercer movimiento del día: mini-grill sobre el **prototipo interactivo de Marco** (`Hour Views - Scope v2.html`, proyecto de diseño — banda de decisiones + Carrils con Agrupa per) → **ADR-080**, y build autónomo bajo mandato en la rama `planner-decisions` de este mismo worktree.
 
@@ -44,7 +48,7 @@ Sesión .zerø autónoma (ultracode) que corrió EN PARALELO a la sesión de dis
 - **Hecho**: tabla `task` + delta from/lead (2 migraciones aplicadas vía MCP con sondas), RPCs create/delete, `/api/tasks` CRUD, `$lib/task.ts` con `taskSurfaceState()` (día-calendario, now inyectado), módulo Tasks en line detail, sección Tasks + quick-add en `/h/desk` (dormidas nunca pintan, orden por urgencia derivada). Suites: check 0/0 · unit 168 · RLS 66 · e2e tasks 3/3.
 - **Revisión adversarial** (23 agentes): 14 confirmados → 12 aplicados + 2 a Shelf. Los gordos: el checkbox no-bound no revertía en error de PATCH (→ toggle optimista con rollback, patrón EngagementTable), doble-click rápido enviaba done dos veces (→ status desde el evento), overdue por instante rompía al oeste de UTC (→ días-calendario).
 - **Gotchas para la próxima**: (a) `getByLabel` sin scope choca con los diálogos globales de creación (labels ocultos en el DOM); (b) el input real de `Checkbox` es 1×1px oculto — Playwright debe clicar la etiqueta; (c) títulos de fixture ÚNICOS por run — un sweep por API no despinta la fila stale ya montada y el click cae en un id soft-borrado (404); (d) fallos e2e de smoke/scope-url eran del shell en vuelo de la otra sesión, no de tasks.
-- **Pendiente**: Desk v2 (`build/desk-prompt.md`, feed mixto 4 fuentes) — la sección v1 degrada con gracia; edición from/lead en UI llega ahí.
+- **Pendiente en ese momento**: Desk v2 (prompt hoy archivado en `build/archive/2026-07-desk-prompt.md`, feed mixto 4 fuentes) — la sección v1 degrada con gracia; edición from/lead en UI llega ahí.
 
 ---
 
@@ -115,7 +119,7 @@ Gatillo: revisión de conclusiones externas sobre la app ("¿está lista para be
 
 **Bug real cazado por el build:** `%sveltekit.nonce%` es incompatible con prerender de `/offline` — y SvelteKit hace un `.includes()` literal, así que hasta el string en un COMENTARIO lo dispara. Además el review adversarial (5 lentes → verify, 12 agentes; 7 hallazgos → 2 confirmados low) destapó que kit.csp NO escanea app.html para scripts inline → el script de tema quedaría CSP-bloqueado en toda página SSR (FOIC para modo oscuro). Fix robusto: externalizar a `static/theme-init.js` (`script-src 'self'`, sin hash frágil que reintroduzca el mismo fallo silencioso). 2º confirmado: el rate-limiter KV tiene TOCTOU (ráfaga concurrente lee count stale) → docblock honesto + regla CF edge en el runbook como control real (patrón que Marco ya usa en wp-login de la flota). 5 refutados por el diseño cookie-maxAge=exp (la cookie cae al expirar → nunca se manda un token expirado → el 401→502-sin-refresh no se alcanza).
 
-Detalle completo, decisiones y estado pendiente: `_decisions.md § ADR-061` + `build/runbooks/phase09-launch.md`. Gate: svelte-check 0/0 · unit 110/110 · collab tsc · build OK. Sin correr (Marco): RLS + e2e (tocan prod / necesitan `.env.test`) + verificación en navegador del flujo de auth.
+Detalle completo, decisiones y estado pendiente en ese momento: `_decisions.md § ADR-061`; el runbook vivo se llama hoy `build/runbooks/beta-readiness.md`. Gate de aquella sesión: svelte-check 0/0 · unit 110/110 · collab tsc · build OK. Sin correr entonces (Marco): RLS + e2e (tocan prod / necesitan `.env.test`) + verificación en navegador del flujo de auth.
 
 ## 2026-07-12 (noche 2) — Home projects-first + pin de project — ADR-060
 
@@ -434,7 +438,7 @@ Cierre del naming gate adelantado a final de Phase 0.1 (decisión 2026-05-14). D
 
 ## 2026-05-09 — Phase 0.0 CERRADA
 
-Todos los items del backlog Phase 0.0 cerrados. Próximo: **Phase 0.1 — Plaza + Desk shell con datos productivos**. Ver `build/roadmap.md`.
+Todos los items del backlog Phase 0.0 cerrados. En ese momento el próximo paso era **Phase 0.1 — Plaza + Desk shell con datos productivos**. Roadmap histórico: `build/archive/2026-07-roadmap-snapshot.md`.
 
 - ~~Schema `reset_v2_roadsheet`~~ **CERRADO 2026-05-01** (commit `dbaf308`)
 - ~~Backup automatizado vía GitHub Actions~~ **CERRADO 2026-05-09** — workflow corriendo, primera corrida verde, ~150 KB en R2.
@@ -587,7 +591,7 @@ Otro agente IA hizo audit completo del repo (estructura, stack, RLS, offline, co
 
 - **13/13 primitivos** en `apps/web/src/lib/components/`: Button, LinkButton, Input, Checkbox, Radio, Avatar, Badge, Chip, Select, Dialog, Toast, Tooltip, Menu, Sidebar (desktop static / mobile drawer). Showcase completo en `/playground`.
 - **Plum trial** en `--primary` (`oklch(0.50 0.14 335)` ≈ #9D3F70) — terracotta `#AB4235` chocaba con `--danger` a 5°. Provisional, re-evaluar en visual design phase. Ver `_decisions.md` 2026-05-01.
-- **URL architecture re-evaluada** (dossier `build/url-architecture-dossier-2026-05-01.md`). Cinco alternativas evaluadas; ADR-022 sigue (path-prefix `/h/[workspace]/[entity]/[slug]`) con tres ajustes operativos cerrados en addendum.
+- **URL architecture re-evaluada** (dossier hoy archivado en `build/archive/2026-05-url-architecture-dossier.md`). Cinco alternativas evaluadas; ADR-022 sigue (path-prefix `/h/[workspace]/[entity]/[slug]`) con tres ajustes operativos cerrados en addendum.
 - **Routing scaffold Phase 0.0 día 5**:
   - `apps/web/src/lib/reserved-slugs.ts` — ~70 slugs reservados + helpers.
   - `apps/web/src/lib/url-state.ts` — `serializeViewState()` / `hydrateViewState()` base64url + 400 chars (D-PRE-05).

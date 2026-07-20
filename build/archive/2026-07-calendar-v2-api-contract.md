@@ -1,5 +1,7 @@
 # Calendar v2 — API contract (stages 2+3 of 3)
 
+> **ARCHIVED AS-BUILT SNAPSHOT.** Verify current contracts in code before reuse.
+
 > **Status: IMPLEMENTED (endpoints + `$lib/calendar.ts` pure functions).**
 > Written 2026-07-18, calendar-v2 branch. Binding source: `_decisions.md § ADR-078`
 > (+ ADR-071/072 access + day semantics). Stage 1 delivered the migrations

@@ -1,6 +1,7 @@
 # Hour — Build prompt: Money lens v2 (payments · expected aging · expenses · net)
 
-> **STATUS: DISPATCHED — NOT STARTED (verificado 2026-07-17).** 0 código; depende del model (no construido). La UI viva sigue siendo la de Phase 0.3 (facturas draft→issued→paid + edición de fee).
+> **STATUS: PENDIENTE (reverificado 2026-07-20).** Depende del modelo Money v2;
+> la UI viva conserva facturas draft→issued→paid y edición de fee.
 >
 > Handoff prompt for an external coding agent. Depends on `money-model-prompt.md` (columns,
 > payments API, union expenses, `$lib/money.ts`). If not merged: thin adapter, graceful

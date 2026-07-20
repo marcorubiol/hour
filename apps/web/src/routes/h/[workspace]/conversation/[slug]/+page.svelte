@@ -1,7 +1,6 @@
 <script lang="ts">
   import { page } from '$app/state';
 
-  let workspace = $derived(page.params.workspace);
   let slug = $derived(page.params.slug ?? '');
 
   /* Stub-grade de-slug for the masthead ("ajuntament-de-balsareny" →
@@ -26,10 +25,10 @@
   </header>
   <p class="text--dark-muted">
     The full conversation view — status timeline, notes, linked person and
-    gigs — isn't built yet. Manage this conversation from Contacts meanwhile.
+    performances — isn't built yet. Manage this conversation from Conversations meanwhile.
   </p>
   <p>
-    <a class="link-arrow" href={`/h/${workspace}/contacts`}>← Back to contacts</a>
+    <a class="link-arrow" href="/h/conversations">← Back to conversations</a>
   </p>
 </section>
 

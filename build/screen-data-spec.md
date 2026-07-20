@@ -1,5 +1,10 @@
 # Hour — Screen data spec (cold proposal)
 
+> **ACTIVE REVIEW SPEC, NOT CURRENT-STATE AUTHORITY.** Its `[now]` tags are a
+> 2026-07-17 snapshot and must be rechecked during the page-by-page review.
+> `_context.md` wins for shipped status; `db-types.ts` + live migrations win for
+> schema. Executed handoff prompts cited below now live in `build/archive/`.
+
 > What: normative data spec per screen — what each surface SHOULD contain, anchored to the
 > real schema and the real UI. Task 1 of the design+data pass (`_tasks.md` § Queue).
 > Written: 2026-07-17 by .zerø, cold (no prior dump from Marco — his real-use contrast
@@ -23,6 +28,11 @@ Per screen: **Is** (its structure-model category), **Today** (what it shows now,
 **Should contain** (the normative proposal), **Open** (decisions for the review session).
 
 ## Cross-cutting findings — the headline deltas
+
+> **Reconciliation note (2026-07-20):** items 1 and 4 below were subsequently
+> built (tasks; workspace-scoped people/organizations), and Desk calm mode also
+> landed. Item 3 (conversation detail) and the Money v2 depth remain open. Treat
+> the numbered list as the input to the review, not as a current gap count.
 
 **North star, declared mid-pass (ADR-069, 2026-07-17)**: Hour exists for a proactive,
 consent-first AI layer over this data ("gig in Paris in a month + 20 contacts usually around
@@ -105,7 +115,7 @@ not the awareness.
   vulguis.") — consent-first door to an `origin='ai'` task (ADR-069). Not built yet.
 - "torna al silenci" = the return link from Desk back to the hall (vocabulary kept);
   no collapse gesture exists.
-**Build**: dispatched 2026-07-17 to an external agent via `build/hall-prompt.md`.
+**Build**: executed; historical handoff in `build/archive/2026-07-hall-prompt.md`.
 
 ### `/h/desk` — Desk
 
@@ -116,7 +126,7 @@ from `conversation.custom_fields.tags`) + project dot, bucketed OVERDUE / TODAY 
 weekday / NEXT WEEK / LATER. Scoped by pins.
 **Contains — SETTLED (S1, 2026-07-17)**: one ranked feed, four sources, grouped in day
 buckets. **Within each bucket the type order is FIXED (Marco, 2026-07-18): tasks →
-calendar → conversations → money** — mirroring the lens nav order (Desk · Calendar ·
+planner → conversations → money** — mirroring the lens nav order (Desk · Planner ·
 Contacts · Money), so the feed and the nav speak one vocabulary and every paper has its
 place. The show-day card sits above everything in its day (banner, outside the order);
 within each type-block, natural secondary sort (calendar by time, conversations by due,
@@ -182,8 +192,9 @@ reordering. (Supersedes the earlier "mixed by urgency within buckets" phrasing.)
   may PROPOSE calm on show days ("¿modo calma hasta el load-in?"), consent-first.
 **Watch** (not open — settled to wait): if the task+event mix gets noisy in real use, that's
 the structure-model trigger for the Work/Flow lens. Don't pre-build it.
-**Build**: dispatched 2026-07-17 — `task-model-prompt.md` (schema+API, first) →
-`desk-prompt.md` (UI) · `desk-design-prompt.md` (design tool), all in `build/`.
+**Build**: executed; historical handoffs in `build/archive/2026-07-task-model-prompt.md`,
+`build/archive/2026-07-desk-prompt.md` and
+`build/archive/2026-07-desk-design-prompt.md`.
 
 ### `/h/[workspace]` — space portada
 
@@ -217,11 +228,11 @@ dashboard" (stats + projects only) now that Desk is one key away?
 
 ## Lenses
 
-### `/h/calendar` — Calendar lens
+### `/h/planner` — Planner lens
 
 **Is**: concern-lens over time. Read/aggregate; hosts entity editors inline (option 2).
 **Naming + projections (ADR-076, 2026-07-18)**: ONE time lens in the nav, pill fixed
-"Calendar" — inside it TWO first-class projections: grid (calendar) and list (**agenda**),
+Planner — three first-class projections: grid (calendar), list (**agenda**) and carrils,
 named visible toggle, projection carried in the URL and persisted. Never two nav pills,
 never a pill that changes word, never "Time" as the lens name. The Desk's AGENDA row label
 points at the agenda projection (two-level vocabulary rule: gutter names item kinds, nav
@@ -307,7 +318,7 @@ editable) + q search + status filter + pins + Add contact (multi-space) + pagina
 - **Import is adoption-critical** (the Airtable-collapse catch): `build/import/` pipeline
   already exists — the lens's empty state should point at it.
 **Open (minor)**: season filter exists server-side, unused in UI — unanswered S1, park.
-**Build**: v1 dispatched 2026-07-17 (`contacts-prompt.md` + `contacts-design-prompt.md`);
+**Build**: v1 dispatched 2026-07-17 (`conversations-prompt.md` + `conversations-design-prompt.md`);
 the model prompt (orgs + conversation log) follows S2's shapes.
 
 ### `/h/money` — Money lens
@@ -397,7 +408,7 @@ not data.)
 
 #### Line modules (each its own design+data surface)
 
-- **Calendar module** — Today: list/month of line performances + line dates; New performance
+- **Planner module** — Today: list/month of line performances + line dates; New performance
   [now]. Should add: create `date` here too (a tour has travel days) [db].
 - **Conversations module** — Today: scoped ConversationTable + Add contact (line-bound) [now].
   Should add: same last-contact + tags columns as the lens [db]. Known 409 relink-to-line
@@ -604,14 +615,14 @@ Everything else in this doc is build-only. These need DDL, listed by blast radiu
    The New-date dialog asks project* + line? + performance?; attach specific, view
    aggregated (a line's date shows in its module, the project calendar, and the lens).
 7. **Task `from_at` + `lead_days`** — ADR-070, already dispatched via
-   `build/task-model-prompt.md`.
+   `build/archive/2026-07-task-model-prompt.md`.
 8. **User ↔ person bridge — CONFIRMED (S1)**: `user_profile.person_id` nullable FK
    (claim-by-email later; person is already email-deduped). Marco's extension: "I work
    with two companies, each with their app — I see BOTH in mine, as long as they share."
    Rule from research §3.3: an invited user sees their OWN participation across
    workspaces, never other orgs' full detail. Prerequisite for the persona-symmetric
    calendar and cross-workspace self conflict detection. **Added to
-   `calendar-model-prompt.md` as migration C.**
+   `build/archive/2026-07-calendar-model-prompt.md` as migration C.**
 9. **`invoice.expected_on` + `payment_condition`** (S1, ADR-074): the realistic collection
    date (vs contractual `due_on`) + the cascade-condition note ("when they collect from
    X"). Aging measures against expected. Dispatched via `money-model-prompt.md`.

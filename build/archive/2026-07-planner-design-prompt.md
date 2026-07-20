@@ -1,6 +1,9 @@
 # Hour — Design prompt: Planner lens (planning without alarm)
 
-> **STATUS: IN REFINEMENT (updated 2026-07-18 post-grill).** First mock exists ("Hour
+> **ARCHIVED DESIGN INPUT.** Planner v2 is implemented; verify the live UI/code.
+
+> **HISTORICAL STATUS (2026-07-18): IN REFINEMENT.** Planner was completed later.
+> First mock existed ("Hour
 > Calendar Lens.html" in the design project); Marco is refining it. The grill of
 > 2026-07-18 (ADR-078) settled model + contracts — see **§ Binding contract** at the
 > bottom: the final design MUST reflect those points (the current mock predates them).

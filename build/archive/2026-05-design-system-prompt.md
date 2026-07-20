@@ -1,8 +1,14 @@
 # Hour — Design System Prompt
 
+> **ARCHIVED DESIGN SNAPSHOT.** Its House/Room sidebar and Calendar lens were
+> superseded. Use `../../_context.md`, `../structure-model.md` and the live UI
+> for current product structure.
+>
 > Copy and paste this entire prompt into your design tool (Claude, Gemini, etc.) to give it full context for designing Hour's UI.
 >
 > **Full screen work-list: `build/screens-inventory.md`** (every URL + dialog + module to design, as a checklist). Structure model behind it: `build/structure-model.md`.
+>
+> Kept only to preserve the design reasoning available at the time.
 
 ---
 
@@ -51,7 +57,7 @@ The app has ONE layout with two controls:
 ### Sidebar layout
 ```
 Desk            ← active lens (highlighted)
-Calendar
+Planner
 Conversations
 Money
 ────────────────
@@ -75,12 +81,12 @@ Marco Rubiol    ← user
 - House selected → House detail: rooms, stats, recent activity
 - Room selected → Room detail with tabs: Work | Assets | Team | About
 
-**All other lenses** (Calendar, Conversations, Money) treat sidebar selections as FILTERS:
+**All other lenses** (Planner, Conversations, Money) treat sidebar selections as FILTERS:
 - Nothing selected → shows everything
 - House selected → filters to that House's data
 - Room selected → filters to that Room's data
 
-Filters persist across lens switches. If Room A is selected and you switch from Desk to Calendar, the calendar shows only Room A's gigs.
+Filters persist across lens switches. If Room A is selected and you switch from Desk to Planner, the planner shows only Room A's performances.
 
 ### ⌘K Command palette
 First-class citizen from day 1. Supports: switching houses/rooms, jumping to any entity, switching lenses, executing actions. Power users can hide the sidebar entirely and use only ⌘K.
@@ -152,9 +158,9 @@ A Desk panoramic view mockup already exists with:
 
 ## Key UX patterns to follow
 
-1. **Calendar with status colors** — the primary view. Status visible at a glance via color coding. Minimum: month + list views. No single-color calendar (biggest complaint about competitors).
+1. **Planner with status colors** — the primary planning view. Status visible at a glance via color coding. Minimum: month + agenda views. Avoid a single-color planner (a recurring competitor complaint).
 2. **Conversation list = sortable table with inline editing** — not cards, not kanban. Click a row → right side panel with full detail (keeps list visible for context).
-3. **Persistent context-sensitive "New" action** — available everywhere. Creates the right entity based on active lens (conversation in Conversations, gig in Calendar, etc.).
+3. **Persistent context-sensitive "New" action** — available everywhere. Creates the right entity based on active lens (conversation in Conversations, performance/date in Planner, etc.).
 4. **In-page editing** — edit without leaving context. No modal forms for simple changes.
 5. **Activity trail** — "Last modified by X, 2h ago" on every entity.
 

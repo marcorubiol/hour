@@ -1,11 +1,11 @@
 # Identidad portátil, dossiers privados y acceso
 
-> Estado: **MILESTONE 1 APLICADO Y VERIFICADO EN SUPABASE — 2026-07-20**
+> Estado: **MODELO APLICADO; HITOS POSTERIORES PENDIENTES — 2026-07-20**
 > Fecha: 2026-07-20
 > Motivo: conservar una identidad personal que atraviesa compañías sin convertir
 > las fichas, conversaciones o notas de esas compañías en datos globales.
 
-## Decisión propuesta
+## Decisión aplicada
 
 Mantener la identidad portátil. No mantener una ficha de contacto global compartida.
 

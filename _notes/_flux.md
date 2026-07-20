@@ -1,6 +1,13 @@
 # Flux — Hour
 
-Running notes, in motion. Cuando algo se asiente: migrar fuera.
+> **INCUBADORA HISTÓRICA.** Estas notas reflejan el momento en que se escribieron
+> y muchas ya fueron construidas, renombradas o descartadas. No constituyen
+> trabajo activo. Cuando una idea vuelva a ser accionable debe contrastarse con
+> el código y promoverse a `_tasks.md`; las decisiones firmes viven en
+> `_decisions.md`.
+
+Notas de exploración en orden cronológico inverso. Cuando algo se asienta: migrar
+fuera.
 
 ---
 
@@ -234,4 +241,4 @@ La clave de por qué es sólida: sería **ortogonal** a la gramática que ya exi
 El fill sólido ya distingue confirmado de hold, pero Marco quiere que el bolo confirmado *resalte* un poco más en el calendario. Idea concreta que se le ocurre: **una vez confirmado, el chip lleva un pequeño link a la hoja de ruta (road sheet)** — y la mera *presencia* de ese link ya sería señal de "esto está confirmado" (el road sheet no tiene sentido para un hold). Dos pájaros: (a) afordancia útil (saltar del calendario a la hoja de ruta del bolo), (b) marcador visual de confirmado sin añadir otro color/forma. Encaja con que el road sheet ya es una proyección de `performance` (ADR-023/041) y solo aplica a bolos reales.
 - Pendiente pensar: ¿icono/enlace inline en el chip (compite con el poco espacio del chip de mes) vs solo en agenda/detalle? ¿aparece en `confirmed` o desde `hold`? Probablemente confirmed+ (cuando la hoja de ruta empieza a tener contenido).
 
-Si alguna se asienta → migra a `_decisions.md` (o al `planner-design-prompt.md` como contrato de la próxima pasada de diseño).
+Si alguna se asienta → migra a `_decisions.md` (el antiguo contrato visual de Planner se conserva en `build/archive/2026-07-planner-design-prompt.md`).

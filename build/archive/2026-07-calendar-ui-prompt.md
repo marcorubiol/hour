@@ -1,5 +1,7 @@
 # Hour — Build prompt: Calendar lens v2 (conflicts · availability · dates · grammar)
 
+> **ARCHIVED — EXECUTED. DO NOT RE-RUN.** Calendar was renamed to Planner.
+
 > **STATUS: EXECUTED 2026-07-18 (autonomous session, branch `calendar-v2`).** Kept as the
 > spec of record. Built in the same autonomous pass as the model, under the ADR-078 mandate
 > and against the updated `lens-v2.html` mock (pending publish — see the runbook); the old

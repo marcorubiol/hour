@@ -1,5 +1,8 @@
 # Hour — Prompt para el director de orquesta
 
+> **ARCHIVED.** Replaced by `../strategy-session-prompt.md`; this version tied
+> the workflow to obsolete tools, phases and entity names.
+
 > v2.0 — 2026-05-02
 > Pégalo tal cual al abrir un chat nuevo de Cowork en este workspace.
 

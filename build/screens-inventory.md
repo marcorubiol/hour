@@ -2,7 +2,7 @@
 
 > What: every screen in the app, so a full design pass has a complete work-list.
 > Source: SvelteKit routes (`apps/web/src/routes`) + dialogs/overlays (`apps/web/src/lib/components`),
-> read from the repo 2026-07-14. Re-derive with `find apps/web/src/routes -name +page.svelte`.
+> reconciled 2026-07-20. Re-derive with `find apps/web/src/routes -name +page.svelte`.
 > URLs updated 2026-07-16 (ADR-067): lens routes are space-less; the space segment
 > appears only on entity URLs, as a machine short-id (or its granted alias, inbound-only).
 > Model these screens against `build/structure-model.md` (lens vs module vs entity edit surface).
@@ -19,7 +19,7 @@
 
 **Lenses** — three concern-lenses, reached by ⌘K (ADR-065). Desk (the home) is a cross-concern digest, not a lens — see Shell + home above.
 
-- [ ] **Calendar** — month grid / planning / conflict-detection. `/h/calendar`.
+- [ ] **Planner** — month, agenda, carrils and conflict-detection. `/h/planner`.
 - [ ] **Conversations** — your booking network (people AND organizations): conversation table + search/filter (**+ Comms** later, as a per-contact timeline). `/h/conversations`. Mobile-first (ADR-015).
 - [ ] **Money** — fees + invoices + totals. `/h/money`. Gated by `read:money`.
 
@@ -50,16 +50,16 @@
 - [ ] New line — template picker (tour / booking / creation / press / fair / blank)
 - [ ] Edit space (EditWorkspaceDialog, incl. Web address / alias request — ADR-067)
 - [ ] Alias review block (Settings › Workspaces, platform admin — ADR-067)
-- [ ] New performance (PerformanceCreateDialog, from Calendar)
+- [ ] New performance (unified CreateEventDialog / PerformanceForm, from Planner)
 - [ ] Edit performance (schedule + venue + status, in performance detail)
 - [ ] Add conversation (multi-space, in Conversations)
 - [ ] Add to project (in person detail)
 - [ ] Fee editor (in Money)
 - [ ] New invoice (in Money)
-- [ ] Calendar feed (subscribe / ICS, in Calendar)
+- [ ] Calendar feed (subscribe / ICS, hosted in Planner; interop name stays Calendar)
 
 **Line modules** — rendered inside `/project/[slug]/line/[line]`, each its own design surface
-- [ ] Calendar module
+- [ ] Planner module
 - [ ] Conversations module (the line's booking conversations — Conversations lens scoped)
 - [ ] Money module
 - [ ] Notes module

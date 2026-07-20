@@ -1,6 +1,6 @@
 # Hour — Design prompt: Conversations lens (the booking network, at booking speed)
 
-> **STATUS: NOT STARTED (2026-07-17).** Depende de Conversations v1.5 (no construido).
+> **STATUS: PENDIENTE (reverificado 2026-07-20).** Depende de Conversations v1.5.
 >
 > For the design tool. Origin: S1 2026-07-17 — ADR-073, spec `§ Conversations`, personas in
 > `research/profiles/06-freelance-distribution.md` + `99-patterns.md`.

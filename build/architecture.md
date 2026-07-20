@@ -1,399 +1,290 @@
-# Hour — Architecture (Phase 0 + 0.9)
+# Hour — arquitectura vigente
 
-> Working name: **Hour**
-> Subdomain: `hour.zerosense.studio`
-> Status: Phase 0 internal tool → Phase 0.9 private beta hardening gate → Phase 1 SaaS if beta validates demand
-> Owner: Marco Rubiol
-> Data model: **reset v2 + roadsheet delta** (2026-04-19 + 2026-05-01) — **29 tables**, polymorphic core (workspace + project + conversation + performance + line + date) with money stack. Editable RBAC. Anti-CRM vocabulary. See `_decisions.md` ADR-001..007 + ADR-023 + ADR-075.
-> Last reviewed: **2026-07-17** — table count re-counted against the live catalog (29, was documented as 22 since 2026-05-02: `account`, `account_membership`, `calendar_share`, `roadsheet_share`, `task`, `workspace_alias_request` and the cast/collab tables all landed after that review); the `show` → `performance` rename (ADR-036, 2026-05-19) applied to this doc at last; ADR-075 applied. Previous review **2026-05-02** — Phase 0.9 gate defined, 22 tables confirmed, environments updated.
->
-> ⚠️ **Structure / nav / UX model is NOT here** — it lives in `structure-model.md` (ADR-063, canonical: lens vs module vs task, edit levels). This doc is data model + stack + security; anything it says about lenses/nav/tasks (§7, §17 "Houses/Rooms", repo layout) predates the 2026-07 nav re-architecture and is superseded there.
->
-> ⚠️ **Vocabulary amendments applied to this doc, 2026-07-17.** **ADR-075**: `engagement` → `conversation` (table, enum `conversation_status`, `*.conversation_id` columns, RPCs `create_conversation` / `delete_conversation`, route `/api/conversations`, permissions `read:conversation` / `edit:conversation`). **ADR-036 debt closed the same day**: `show` → `performance` throughout — this doc had carried the dead word since 2026-05-19 because its last review predated the rename; the permission is now `edit:performance`, the view `performance_redacted`, the trigger function `guard_performance_fee_columns` (migration `2026-07-17_close_adr036_show_debt.sql` — the DB itself still had the old function name and its error text). **"Contact" survives as the book concept** — a contact is whoever you deal with, person *or* organization; only the lens/module named "Contacts" died. `contacted` remains a `conversation_status` value, and venue/road-sheet contacts are an unrelated namespace. § "What moved where (reset v2 map)" keeps its reset-v2 names on purpose — it is audit trail, not current state.
+> Documento técnico vivo. Reconciliado el **2026-07-20** con código, tipos
+> generados, Supabase y producción. Estado operativo: `../_context.md`. Trabajo
+> pendiente: `../_tasks.md`. El documento anterior está archivado en
+> `archive/2026-07-17-architecture-snapshot.md`.
 
----
+## 1. Límites del sistema
 
-## 1. Purpose
+Hour es una aplicación web multi-tenant para operaciones de artes en vivo. El
+límite de seguridad es PostgreSQL RLS, no la UI ni el Worker.
 
-**Phase 0 (current).** Internal tool for MaMeMi: Difusión, gigs & tours, crew & riders. Single workspace (`marco-rubiol`), 1 project (`mamemi`), ≤5 users.
+```text
+account (facturación)
+└── workspace (tenant / límite RLS)
+    ├── memberships + role catalog
+    ├── people dossiers + organizations
+    └── project
+        ├── project memberships
+        ├── lines / modules
+        ├── conversations
+        ├── performances + dates
+        ├── cast / crew / venues / assets
+        ├── tasks
+        └── invoices / payments / expenses
+```
 
-**Phase 0.9 (hardening gate).** Mandatory before any external known client. Adds: httpOnly cookies, rate limiting, RLS regression suite, restore drill, admin/support minimum, structured logging, health checks, Sentry PII scrub. See §0.9 below.
-
-**Phase 1 (public SaaS).** Self-serve onboarding/billing only if assisted beta validates demand. Scaling decisions tracked in `build/roadmap.md`.
-
----
+No existe `project.type`: la combinación de subentidades da forma al proyecto.
+Road sheet es una proyección de performance y sus relaciones, no otra entidad.
 
 ## 2. Stack
 
-| Layer | Choice | Reason |
-|------|--------|--------|
-| Frontend | **SvelteKit 2 + Svelte 5** (runes, snippets) on `@sveltejs/adapter-cloudflare` 7 | Single-runtime app: client routing, `+server.ts` endpoints, `load()` deps, `hooks.server.ts`. Migrated from Astro 5 + islands on 2026-05-01 (ADR-026). |
-| Server-state cache | **TanStack Query** (`@tanstack/svelte-query`) | Stale-while-revalidate, dedupe, invalidation on mutation. Provider in `+layout.svelte`, browser-only. |
-| Form/query validation | **Valibot** 1.0 | Schema validation at every `+server.ts` boundary. Smaller bundle than Zod, fits Worker size budget. |
-| Bundler | **Vite** 6 | SvelteKit's native build pipeline. |
-| Edge runtime | **Cloudflare Worker** `hour-web` (wrangler 4) with **Smart Placement** | Single Worker serves SSR + static assets via `ASSETS` binding. R2 bound as `MEDIA`. Smart Placement co-locates the Worker near Supabase (Frankfurt) to cut Worker→PostgREST round-trips. Hyperdrive doesn't apply — PostgREST is HTTPS, not direct TCP. |
-| Backend | **Supabase Cloud** (Postgres 17 + Auth + RLS + Realtime) | Single operator, RLS handles multi-tenancy natively. Project `hour-phase0` in `eu-central-1`. |
-| Data access | **Thin PostgREST client** (`$lib/supabase.ts`) over `fetch`, no `@supabase/supabase-js` on the Worker | Keeps Worker bundle small; the JWT forwarded to PostgREST makes the RLS boundary explicit. |
-| Media storage | **Cloudflare R2** with signed URLs | Zero egress — critical for media-heavy app (Qlab files, PDFs, riders). Supabase Storage would be ruinous at scale. |
-| Realtime collaboration | **`y-partyserver`** on a native Cloudflare Durable Object (declared in `wrangler.jsonc`) | PartyKit's active successor under Cloudflare; runs in the same runtime. Scoped to text-free fields (ADR-025). |
-| Realtime structured | **Supabase Realtime** | Last-write-wins for structured fields (status, dates, fees). |
-| Queue | **pgmq** on Supabase Postgres | One less moving part. Sufficient to 10k jobs/day. |
-| DNS / Edge | **Cloudflare** (Workers, DNS, Access) | Marco's stack. Free tier covers Phase 0. |
-| Email | **Resend** (transactional) | Supabase built-in SMTP is dev-only per their docs. |
-| Observability | **Sentry SvelteKit** 10.8 (`initCloudflareSentryHandle` server + replay client) tunnelled via `/api/sentry-tunnel` + Supabase dashboard (DB) | Cheap, good-enough; tunnel sidesteps adblockers. |
-| CI/CD | **GitHub Actions** → `wrangler deploy` | Standard. CI scaffold pending Phase 0.0 Day 11. |
-| DB migrations | **Supabase MCP** + raw SQL files in `build/` (`schema.sql`, `rls-policies.sql`, future `reset_v2_roadsheet.sql`) | Phase 0 reality: applied via MCP, source-of-truth lives in `build/`. Supabase CLI versioning revisited in Phase 1. |
-
-### Assumptions flagged
-
-- `zerosense.studio` is registered and its nameservers point to Cloudflare. If the domain lives elsewhere (Namecheap, GoDaddy), either move nameservers to CF or configure a CNAME. **Marco to confirm.**
-- Supabase Cloud (not self-hosted). Revisit at Phase 2 only if egress/RLS costs force it.
-
----
-
-## 3. Environments
-
-| Env | Subdomain | Supabase project | Purpose |
-|-----|-----------|------------------|---------|
-| Production (current) | `hour.zerosense.studio` | `hour-phase0` | Live — Phase 0 internal tool |
-| Staging (deferred) | `hour-staging.zerosense.studio` | `hour-staging` | Pre-merge validation when external testers arrive |
-| Dev | `localhost:5173` | local Supabase via CLI | Local development |
-
-**Current reality**: Single production project `hour-phase0` in `eu-central-1`. Staging deferred until first external beta tester. Dev uses `pnpm dev` (Vite) against local Supabase or `hour-phase0` (careful with data).
-
----
-
-## 4. Multi-tenancy model
-
-### Core rule
-Every tenant-scoped row carries `workspace_id UUID NOT NULL`. RLS policies enforce isolation at the database level — **never** trust application code for tenant isolation. The tenant is called a **workspace** (not "organization") because it holds both personal setups (`kind='personal'`) and team setups (`kind='team'`) — this matches the multi-hat freelance reality.
-
-### Entities scope
-- **Workspace-scoped**: workspace, workspace_membership, workspace_role, venue, project, project_membership, line, performance, date, conversation, person_note, invoice, invoice_line, payment, expense, audit_log. All carry `workspace_id` directly or via their parent.
-- **Global (not workspace-scoped)**: `person` is a shared registry. Anyone in any workspace may reference the same person (e.g. a programmer seen by two booking managers). Privacy comes from `person_note.visibility` (`workspace` vs `private`) and from the workspace-scoped `conversation` row, not from the person row itself.
-- **User-scoped**: `user_profile` (mirrors `auth.users`).
-- **Cross-workspace** relationships are explicit: a user gains access to another workspace via a `workspace_membership` row; project-level scoping lives in `project_membership` (roles + grants/revokes).
-
-### Polymorphism without a `type` tag
-No `project.type` column (ADR-007). Polymorphism is **emergent from subentity presence**: a project with `line` rows is a tour/season; a project with `performance` rows is performance-driven; a project with only `date` rows is a creation cycle; combinations are legitimate.
-
-`conversation` and `performance` are the two primitives at the next layer — conversation carries the running dialogue with a contact (anti-CRM status), performance is the atomic performance (project × performed_at × venue) with its own hold lifecycle. They connect via optional `performance.conversation_id`. `date` remains the calendar primitive for non-performance events (rehearsal, residency, travel_day, press, other); `date.performance_id` optionally ties a rehearsal or travel day to a specific performance. Money flows through `invoice` → `invoice_line` (optionally referencing shows, supporting tour-as-one-invoice) with `payment` rows N:1 against invoice, and `expense` rows grounded in either a performance or a line (XOR CHECK).
-
-"Difusión 2026-27" is not a row anywhere — it's a filtered view over `mamemi`'s conversations via `custom_fields->>season='2026-27'`.
-
-### RLS pattern (standard)
-```sql
--- Simple workspace-scoped read (for tables that do not need per-project gating)
-CREATE POLICY <name>_ws_read ON <table>
-  FOR SELECT TO authenticated
-  USING (workspace_id = public.current_workspace_id());
-
--- Per-project gate (uses the permission catalog — ADR-006)
-CREATE POLICY <name>_select ON <table>
-  FOR SELECT TO authenticated
-  USING (has_permission(project_id, '<required_permission>'));
-```
-
-`public.current_workspace_id()` reads the `current_workspace_id` claim from `auth.jwt()`. The claim is injected by `public.custom_access_token_hook(event jsonb)`, which Supabase invokes at sign-in and on each session refresh — it picks the user's first accepted `workspace_membership` row. Workspace switching = re-issue the session (Supabase `auth.refreshSession()` with a new active workspace stored in user metadata, then replay the hook).
-
-Per-project access goes through `has_permission(project_id, perm)` (ADR-006) — effective permissions are `union(workspace_role.permissions for role in project_membership.roles) + permission_grants - permission_revokes`. Workspace `owner`/`admin` on `workspace_membership` bypass the per-project check. The 10-permission vocabulary is closed: `read:money, read:conversation, read:person_note_private, read:internal_notes, edit:performance, edit:conversation, edit:money, edit:project_meta, edit:membership, admin:project`.
-
-`performance.fee_*` columns are additionally gated: the `performance_redacted` view masks them when the caller lacks `read:money` (read path), and the `guard_performance_fee_columns` trigger blocks fee UPDATE without `edit:money` (write path). `person_note.visibility='private'` is readable only by `author_id = auth.uid()` plus `read:person_note_private`; `visibility='workspace'` requires only workspace membership.
-
----
-
-## 5. Identifiers
-
-- **Primary keys**: UUID v7 (time-ordered → good B-tree locality, safe to expose, no hot spots). Generated via `public.uuid_generate_v7()` (PL/pgSQL over `pgcrypto::gen_random_bytes`, see `schema.sql` §0). Swap for the `pg_uuidv7` extension or PG18's native `uuidv7()` when available — values are shape-identical.
-- **User-facing slugs**: `workspace.slug` (unique globally), `project.slug` (unique within workspace). Auto-generated from name, editable.
-- **No sequential integer IDs on tenant data** — information leak + tenant-enumeration vector.
-
----
-
-## 6. Phase 0 entity map (summary)
-
-Full schema in `migrations/2026-05-01_reset_v2_roadsheet.sql` (canonical current). **29 tables**, grouped:
-
-**Tenant + identity**
-- `workspace` — tenant root. Columns: `slug`, `name`, `kind ∈ {personal,team}`, `country`, `timezone`, `settings jsonb`, `custom_fields jsonb`. Pre-seeded: `marco-rubiol` (Marco's personal workspace).
-- `user_profile` — mirrors `auth.users` via `handle_new_user` trigger; name, locale, avatar.
-- `workspace_membership` — (workspace_id, user_id, role ∈ {owner,admin,member,viewer,guest}, accepted_at). Flat enum is the authority at workspace entry; per-project permissions live below.
-- `workspace_role` — editable per-workspace role catalog (ADR-006). 15 system roles seeded by trigger on workspace INSERT. `(code, label, access_level, permissions text[], is_system, archived_at)`.
-
-**Project + grouping**
-- `project` — belongs to workspace. **No `type` column** (ADR-007). `status ∈ {draft,active,archived}`, generic `description`, `starts_on`, `ends_on`, `dossier_url`, `poster_url`, `custom_fields jsonb`. Polymorphism emerges from which subentities exist.
-- `project_membership` — per-user access with `roles text[]` (codes from `workspace_role`), `permission_grants text[]`, `permission_revokes text[]`. Effective perms = `union(role.permissions) + grants - revokes`.
-- `line` — optional grouping between project and performance (ADR-005). `kind ∈ {tour,season,phase,circuit,residency,other}`, `territory`, `status`, date range.
-
-**People (anti-CRM, 3-layer)**
-- `person` — **global** (no `workspace_id`). `full_name` (required), `email citext`, `phone`, `organization_name`, `city`, `country`, `title`, `website`, `languages text[]`, `custom_fields jsonb`. Anyone, any workspace, same row.
-- `conversation` — workspace-scoped (person_id, project_id, workspace_id). Conversation state: `status conversation_status ∈ {contacted, in_conversation, hold, confirmed, declined, dormant, recurring}` (ADR-001). No `date_id` — the linkage to specific dates lives on `performance.conversation_id`.
-- `person_note` — free-form notes on a person, workspace-scoped. `visibility ∈ {workspace,private}`; `private` readable only by `author_id` + `read:person_note_private`.
-
-**Calendar + venues**
-- `venue` — recurring physical place (name, city, country, address, capacity, contacts jsonb, notes).
-- `performance` — atomic performance (ADR-002). `(project_id, line_id null, conversation_id null, performed_at date, venue_id null, status performance_status, fee_amount, fee_currency)`. Status enum covers `proposed → hold / hold_1/2/3 → confirmed → done → invoiced → paid` plus `cancelled`. No UNIQUE on the slot — two simple holds can coexist.
-- `date` — non-performance calendar primitive. `kind ∈ {rehearsal, residency, travel_day, press, other}`, `status ∈ {tentative, confirmed, cancelled, done}`. Optional `performance_id` and `venue_id` tie a rehearsal or travel day to a specific performance/venue.
-
-**Money (ADR-003)**
-- `invoice` — header (number, issued_on, due_on, status, subtotal, VAT, IRPF, total, currency, payer_person_id).
-- `invoice_line` — line item with optional `performance_id` (tour-as-one-invoice). `line_total = quantity * unit_amount` (generated).
-- `payment` — abono against invoice (amount, received_on, method, reference). N:1 with invoice.
-- `expense` — cost. XOR CHECK: exactly one of `performance_id` / `line_id` is set.
-
-**Audit**
-- `audit_log` — append-only. Triggers on workspace, workspace_membership, workspace_role, venue, project, project_membership, line, performance, date, conversation, person, person_note, invoice, payment, expense.
-
-**Roadsheet (ADR-023, 4 tables added 2026-05-01)**
-- `crew_assignment` — junction `performance` × `person` with role, call_time, notes.
-- `cast_override` — per-performance overrides of cast defaults (role, person, notes).
-- `asset_version` — versioned assets (riders, dossiers) with `direction` enum (`outbound|inbound|adapted`).
-- `collab_snapshot` — Yjs CRDT snapshots for collaborative editing of text fields.
-
-### What moved where (reset v2 map)
-| Polymorphic-reset entity / column | Reset-v2 home |
+| Capa | Implementación |
 |---|---|
-| `membership` table                 | `workspace_membership` (renamed) |
-| `project.type` enum                | Dropped — subentity presence defines kind |
-| `date.kind = 'performance'`        | Moved to `show` (atomic performance primitive) |
-| `engagement.date_id`               | Moved to `show.engagement_id` (inverted direction) |
-| `project_membership.role/scope`    | Replaced by `roles text[]` + `permission_grants/revokes text[]` |
-| `tag`, `tagging`                   | Dropped — deferred to Phase 0.5 |
-| *(fee on show)*                    | Added `show.fee_amount/fee_currency` + invoice/payment/expense stack |
+| Frontend/full-stack | SvelteKit 2 + Svelte 5 + TypeScript |
+| Build/runtime web | Vite + `@sveltejs/adapter-cloudflare` + Worker `hour-web` |
+| Server state | TanStack Query |
+| Validación | Valibot en fronteras `+server.ts` |
+| Base/Auth | Supabase Cloud, Postgres 17, Auth, RLS, Realtime, pgmq |
+| Data access | Cliente PostgREST fino sobre `fetch`; JWT reenviado explícitamente |
+| Media | Cloudflare R2 |
+| Colaboración | Yjs + `y-partyserver` sobre Durable Object `hour-collab` |
+| Observabilidad | Sentry + logs JSON + request id + health endpoints |
+| Testing | Vitest, suite RLS live, Playwright, Node test para collab |
+| Monorepo | pnpm workspaces |
 
-### Conversations — Difusión migration
-The 156 programmers/festivals from MaMeMi's current markdown CRM + dossier PDF import as `person` rows (global) linked to the `mamemi` project via `conversation` rows with `status='contacted'` and `custom_fields.season='2026-27'`. Source provenance preserved in `person.custom_fields.sources.mostra_igualada_2026.*` (no tags — tag/tagging deferred to Phase 0.5). Migration plan + pipeline in `import/` (3-stage normalize→enrich→load). DIY bands are deferred out of Phase 0.
+Este stack es una decisión firme. Los problemas actuales no justifican migrar a
+otro framework o proveedor.
 
----
+## 3. Runtimes y entornos
 
-## 7. Tasks — deferred
+### Producción interna
 
-The polymorphic reset (and reset v2) runs without a `task` table. Phase 0 booking-outreach workflow lives in `conversation.next_action_at` + `next_action_note`, and ad-hoc todos live in Marco's `.zerø` _tasks.md. Tag/tagging infrastructure is also deferred — see DECISIONS.md "Deferred → D1" for the combined Phase 0.5 scope.
+- `https://hour.zerosense.studio`
+- Worker `hour-web`; assets estáticos + SSR/API en el mismo runtime.
+- Supabase `hour-phase0` (`lqlyorlccnniybezugme`, `eu-central-1`).
+- Durable Object separado `hour-collab`.
+- R2 bucket `hour-media`.
+- `/health/live` publica SHA, dirty flag y build time.
+- `/health/ready` comprueba la dependencia Supabase.
 
-When tasks come back (early Phase 1, first external user), the taxonomy stays the same — `dispatch → queue → ping → deferred → shelf → trace` — but the table will be polymorphic by `entity_type` (attach to a project, line, performance, date, conversation, or sit free at workspace level).
+### Desarrollo
 
----
+- `pnpm dev` en `localhost:5173`.
+- Hoy usa el proyecto cloud configurado en `apps/web/.env`; **no existe un
+  Supabase local reproducible soportado**.
+- `.env.test` añade fixtures para e2e/RLS y nunca se versiona.
 
-## 8. Auth & sessions
+### Staging
 
-- **Auth provider**: Supabase Auth.
-- **Phase 0 flow**: email+password as primary method, optional TOTP 2FA (user-enrolled). No OAuth yet. Superseded magic-link-only on 2026-04-19 — see ADR `Auth flow: email+password with optional TOTP 2FA` in `_decisions.md`.
-- **Phase 1 additions**: Google OAuth (for calendar sync), Apple Sign-in (iOS app future).
-- **Session storage (Phase 0)**: JWT + refresh token + expiry persisted in `localStorage` under `hour_jwt` / `hour_refresh` / `hour_expires_at`. Pragmatic shortcut for Phase 0 (single browser, ≤5 known users); the client posts `Authorization: Bearer <jwt>` to every `/api/*` route, which forwards it to PostgREST. **Phase 0.9 must move to httpOnly Secure SameSite=Strict cookies** before any external user signs up. See §8.5.
-- **Token lifetime**: JWT 1h, refresh 7d (Supabase defaults).
-- **Access-token hook**: `public.custom_access_token_hook(event jsonb)` runs at sign-in and on refresh. It looks up the user's first accepted `workspace_membership` row, resolves the `workspace_id`, and injects `current_workspace_id` into the JWT claims. `supabase_auth_admin` has `SELECT` on `workspace_membership` so the hook can read it. The hook is **enabled** in Supabase dashboard → Authentication → Hooks (verified 2026-04-20). Without it, `current_workspace_id()` returns NULL and every RLS policy denies the request.
-- **Workspace switching**: user picks active workspace → app calls `supabase.auth.refreshSession()` after writing the choice into `user_profile` / user metadata → the hook replays and re-issues a JWT with the new `current_workspace_id`. No app-level tenant resolution.
+No existe todavía. Es obligatorio antes de la beta externa porque los tests RLS
+y buena parte de los e2e escriben hoy sobre `hour-phase0` con fixtures
+self-cleaning.
 
----
+## 4. Identidad y multi-tenancy
 
-## 8.5. Phase 0.9 — Private beta hardening boundary
+### Account, workspace y acceso
 
-Mandatory gate before any external known client. These items move from "deferred" to "blocking":
+- `account` representa quien paga; puede contener varios workspaces.
+- `account_membership` controla ownership/facturación.
+- `workspace` es el tenant y el límite de RLS.
+- `workspace_membership` dice si un usuario pertenece y su nivel
+  `owner|admin|member|viewer|guest`.
+- `project_membership` contiene `roles[]`, `permission_grants[]` y
+  `permission_revokes[]` por proyecto.
+- `workspace_role` es el catálogo editable de roles del workspace.
 
-| Item | What | How | Est |
-|------|------|-----|-----|
-| Session hardening | JWT in localStorage → httpOnly Secure SameSite=Strict cookies | `+server.ts` refresh endpoint, cookie parser in hooks | 4-6h |
-| Rate limiting | `/api/sentry-tunnel` and auth endpoints throttled | Cloudflare KV counters in Worker | 30m |
-| RLS regression suite | Automated tests for isolation guarantees | Vitest + Supabase test DB + seeded fixtures | 3-4h |
-| Restore drill | Documented & tested restore from R2 backup | GitHub Action + `psql` restore to staging | 2-3h |
-| Onboarding/support minimum | Create workspace, invite users, assign roles, diagnose issues | Protected admin routes + workspace management UI | 4-6h |
-| Structured logging | JSON logs with request_id correlation | Pino or similar in Worker hooks | 2h |
-| Health checks | `/health/live` (deps OK) and `/health/ready` (usable) | `+server.ts` endpoints | 30m |
-| Sentry PII scrub | Ensure email/user_id hashed before Sentry ingest | `beforeSend` hook in Sentry init | 1h |
-| Resilience mínimo | Timeouts, retry budget, circuit breaker for Supabase/PostgREST | `$lib/supabase.ts` wrapper with exponential backoff | 3h |
+Permiso efectivo:
 
-**Trigger**: First external known client (not Marco/Anouk/close collaborators) needs a workspace.
-**Pre-checklist**: All 9 items verified in staging before prod workspace creation.
-
----
-
-## 9. File handling (R2)
-
-- Client requests a **signed upload URL** from a Supabase Edge Function.
-- Edge Function checks permission, generates R2 presigned PUT URL (15min TTL), records a `file` row with status `pending`.
-- Client uploads directly to R2.
-- On success, client calls Edge Function to mark file `ready` + record size/mime.
-- Downloads: Edge Function checks permission, generates R2 presigned GET URL (5min TTL), redirects.
-
-**Never proxy bytes through the app server.** Too expensive, too slow.
-
----
-
-## 10. What Phase 0 is **NOT**
-
-Explicit non-goals — decided now to protect scope:
-
-- ❌ Ticketing / box office
-- ❌ Invoicing / accounting (Hour integrates with Holded/Quaderno later, does not replace)
-- ❌ Public-facing artist pages (Phase 1+)
-- ❌ Mobile apps (Phase 2)
-- ❌ AI features (agents, auto-reply, transcription) — add only when core is boring-stable
-- ❌ Custom reporting / BI dashboards — Metabase on the read replica later
-- ❌ Live cursor positional presence (Figma-style) — deferred to Phase 0.5; Phase 0.2 ships text-field CRDT (`y-partyserver`) + simplified presence (border + name on focused field), see ADR-025
-
----
-
-## 11. Critical decisions already made (with rationale)
-
-| Decision | Choice | Why |
-|----------|--------|-----|
-| Tenant key | `workspace_id` + `current_workspace_id` JWT claim (injected by `custom_access_token_hook`) | Works with Supabase RLS natively, no app-layer tenant resolution. Renamed from `organization_id` to reflect `kind=personal|team`. |
-| Polymorphic core (reset v2) | `workspace + project + conversation + performance + line + date`, no `project.type` | ADR-007: type emerges from subentity presence. ADR-001: conversation (conversation) and performance (atomic gig) are distinct. ADR-005: `line` is the optional tour/season grouping. |
-| Anti-CRM vocabulary | `person`, `conversation`, status `contacted`, `next_action_at` | Fits the working reality of a freelance/collective booking manager; rejects funnel/lead/conversion/campaign language. Reset v2 enum: `contacted, in_conversation, hold, confirmed, declined, dormant, recurring`. |
-| Person is global | No `workspace_id` on `person` | Real programmers exist once and are seen by many workspaces; privacy lives in `person_note.visibility` and `conversation`, not the person row. |
-| Money stack | Three tables + bridge — `invoice` + `invoice_line` + `payment` + `expense` | ADR-003. Partial payments, tour-as-one-invoice, Spanish VAT/IRPF, expenses grounded in performance or line (XOR). |
-| RBAC (reset v2) | Flat `workspace_membership.role` + editable `workspace_role` catalog + per-membership overrides | ADR-006. 10-permission closed vocabulary. Owner/admin bypass project-level checks explicitly. 15 system roles seeded by trigger on workspace INSERT. |
-| Fee gating on performance | View `performance_redacted` (read) + trigger `guard_performance_fee_columns` (write) | ADR-003 column-level gate. `edit:performance` suffices for most edits; fee edits require `edit:money`. |
-| PK type | UUID v7 via PL/pgSQL | Time-ordered, index-friendly, safe to expose, no enumeration risk. `pg_uuidv7` not on Supabase Cloud whitelist. |
-| Media storage | R2 (not Supabase Storage) | Zero egress cost — Supabase Storage egress is the silent killer |
-| Queue | pgmq | Zero new infra. 10k jobs/day ceiling is fine for Phase 0-1. |
-| Frontend | SvelteKit 2 + Svelte 5 (ADR-026, 2026-05-01) | Single-runtime stack: 95 % of code was already vanilla JS or Svelte; Astro was a 30-LoC SSR envelope. Gains client routing, form actions, `load()` deps, hooks, cross-route stores. |
-| Collab transport | `y-partyserver` on native CF Durable Object (ADR-025) | PartyKit was acquired by Cloudflare; `y-supabase` is abandoned. Same runtime as Hour. |
-| Multi-tenant from day one | Yes | Retrofitting tenancy later is a 6-month rewrite. Cost now: 2 extra lines per migration. |
-| i18n scaffold from day one | Yes (`$lib/i18n.ts` simple `t(key, locale)` + en.json/es.json), content **EN only** in Phase 0 (D-PRE-03) | Wire i18n early so retrofit is mechanical; defer ES content + paraglide-js v2 migration to Phase 1 when copy volume justifies it (currently ~15 strings). Target market is multilingual European productions. |
-| Migrations in git | Yes, from commit 1 | Non-negotiable for two-env setup |
-
-## 12. Critical decisions deferred to kickoff — ✓ all closed
-
-Resolutions (closed by 2026-05-01, kept here as audit trail):
-
-- **Frontend framework**: SvelteKit 2 + Svelte 5 (ADR-026, 2026-05-01). Astro 5 + islands ran from 2026-04-19 to 2026-04-30; migration triggered by audit showing Astro was a thin SSR envelope around code that was already 95 % Svelte / vanilla JS.
-- **Islands framework**: superseded — single Svelte runtime now.
-- **Auth flow**: email+password with optional TOTP, no OAuth in Phase 0 (`_decisions.md` 2026-04-19). Magic link rejected.
-- **Repo location**: `github.com/marcorubiol/hour` (private, personal user). Transferable to a `zerosense` org if Phase 1 activates.
-- **Staging frequency**: deploy on merge to `main` only. No per-PR previews in Phase 0. Staging Worker (`hour-staging`) deferred until first external tester.
-
----
-
-## 13. Scalability — Phase 0 targets
-
-| Metric | Phase 0 target | Phase 1 target | Concern trigger |
-|--------|----------------|----------------|-----------------|
-| Orgs | 1 | 10–100 | none in P0 |
-| Users (total) | ≤5 | 100–1000 | none in P0 |
-| Conversations | ≤500 | ≤50k | Index audit at >10k |
-| Events | ≤100/yr | ≤10k/yr | Partition at >100k |
-| Files (R2) | ≤10 GB | ≤500 GB | R2 cost review at 1TB |
-| Monthly cost | €0–20 | €50–100 | — |
-
-Full scalability plan up to 100k users in `../scale-plan.md` (written at Phase 1 kickoff, based on Agent 3 stack validator report).
-
----
-
-## 14. Security & privacy (Phase 0)
-
-- **RLS on every tenant table. No exceptions.** Default DENY; explicit POLICY opens each operation.
-- **No service-role key in client code.** Only in Edge Functions and server builds.
-- **GDPR**: data in EU region (Supabase Frankfurt). Deletion flow: user requests → soft delete 30d grace → hard delete job. Phase 0 = Marco + Anouk only, no external DPAs needed yet.
-- **Audit log**: `audit_log` table with (actor, action, entity_type, entity_id, changes, ts). Append-only. Read-only for non-admins. Triggers verified live in production 2026-05-01: 394 rows from bootstrap import + 1 row from UPDATE smoke = trigger pipeline functional.
-- **SECURITY DEFINER hardening (audited 2026-05-01)**: every `SECURITY DEFINER` function in `public` schema had its `EXECUTE` permission tightened. Group A — RLS helpers (`current_user_id`, `current_workspace_id`, `current_workspace_role`, `is_workspace_member`, `has_permission`, `can_edit_project`, `can_see_person`, `project_id_of_expense`): keep `authenticated`, revoke from `PUBLIC`, `anon`, `service_role`. Group B — trigger-only (`handle_new_user`, `seed_system_roles_on_workspace`, `validate_project_membership_roles`, `write_audit`): only `postgres` (owner) executes; revoked from `PUBLIC`, `anon`, `authenticated`, `service_role`. Closes the real attack vector (an authenticated client invoking `write_audit()` directly to forge audit rows). Supabase Security Advisor still flags 8 "Signed-In Users Can Execute" warnings on Group A — those are false-positive structural alerts intrinsic to RLS-with-SECURITY-DEFINER architecture, intentionally ignored.
-- **Auth password protection**: leaked-password check (HaveIBeenPwned integration) is gated to Supabase Pro and above — surfaced as the only remaining advisor warning post-hardening. Deferred to Phase 1 alongside Supabase Pro upgrade when first paying customer onboards.
-- **Secrets**: Cloudflare Worker `[vars]` in `wrangler.jsonc` for non-secret public values (PUBLIC_SUPABASE_*); Cloudflare dashboard → Settings → Variables and Secrets for service-role keys; `apps/web/.env` for build-time vars consumed by `$env/static/public` (PUBLIC_SENTRY_DSN, PUBLIC_SUPABASE_*, SENTRY_AUTH_TOKEN/ORG/PROJECT) — gitignored, copy from `.env.example`.
-
----
-
-## 15. Repo layout (proposed)
-
-```
-hour/
-├── apps/
-│   └── web/                          # SvelteKit app
-│       ├── src/
-│       │   ├── app.html
-│       │   ├── hooks.client.ts       # Sentry browser init + replay
-│       │   ├── hooks.server.ts       # initCloudflareSentryHandle + sentryHandle
-│       │   ├── lib/
-│       │   │   ├── components/       # primitives (Button, Input, Sidebar, …)
-│       │   │   ├── auth.ts           # extractBearer
-│       │   │   ├── supabase.ts       # thin PostgREST client (pgGet, pgPostRpc)
-│       │   │   ├── db-types.ts       # generated Supabase types
-│       │   │   └── i18n/             # t(key, locale) + en.json/es.json
-│       │   ├── routes/
-│       │   │   ├── +layout.svelte    # QueryClientProvider
-│       │   │   ├── login/+page.svelte
-│       │   │   ├── booking/+page.svelte
-│       │   │   ├── playground/+page.svelte
-│       │   │   └── api/<name>/+server.ts
-│       │   └── styles/
-│       │       ├── tokens.css        # OKLCH three-tier (base / status / contextual)
-│       │       └── base.css          # cascade layers + skeletons
-│       ├── svelte.config.js          # adapter-cloudflare
-│       ├── vite.config.ts
-│       ├── wrangler.jsonc            # Worker config (DO declared here in Phase 0.0)
-│       └── package.json
-├── build/                            # specs, ADRs, schema, planning (this folder)
-├── research/                         # competitor / pricing / UX research
-├── _context.md                       # project rules (inherits .zerø)
-├── _decisions.md                     # ADR log
-├── CLAUDE.md                         # stub (@_context.md) for Claude Code / Cowork
-├── pnpm-workspace.yaml
-└── package.json
+```text
+union(permisos de roles) + grants explícitos - revokes explícitos
 ```
 
-Monorepo via pnpm 10 workspaces. Today: one app (`apps/web`). `packages/shared` to be created when a second app needs shared types.
+Owner/admin del workspace tienen bypass por proyecto. El vocabulario cerrado
+actual es:
 
----
+```text
+read:money
+read:conversation
+read:person_note_private
+read:internal_notes
+edit:performance
+edit:conversation
+edit:money
+edit:project_meta
+edit:membership
+admin:project
+```
 
-## 16. Open questions to close before first commit
+Gap conocido: no hay `read:performance`; un rol limitado necesita
+`edit:performance` para leer filas de performance. La matriz RBAC debe decidir
+si se amplía el vocabulario antes de beta.
 
-1. **Legal entity for the SaaS future.** Do we ship Phase 0 under Marco personal, or under a new sociedad? Affects where the domain sits and what appears in the footer. (Phase 0: personal is fine; Phase 1: needs sociedad for invoicing EU clients.)
-2. **Data residency commitment.** If EU-only → Supabase Frankfurt. Phase 0 fine. Phase 1 if any US client signs up → consider.
-3. **Branding on Phase 0.** Minimal or themed? Recommendation: minimal (logo = wordmark, no illustration). Save branding spend for when marketing starts.
-4. **Who else besides Marco touches this before Phase 1 checkpoint?** Only Anouk? +1 tester? Affects invite flow priority.
+### Persona portable sin expediente global compartido
 
----
+- `person` contiene la identidad portable/deduplicable.
+- `workspace_person` contiene el dossier privado y la visibilidad de cada
+  workspace.
+- `workspace_organization` contiene organizaciones/contactos locales.
+- Compartir una persona es explícito y revocable; no comparte automáticamente
+  notas, conversaciones ni expediente de otro workspace.
+- `user_profile.person_id` puede unir una cuenta con su identidad personal.
 
-## 17. API routes (SvelteKit endpoints on the Worker)
+Este modelo permite que una misma persona participe en varias compañías con
+roles distintos sin mezclar sus datos tenant-scoped.
 
-Location: `apps/web/src/routes/api/<name>/+server.ts`. Validation is enforced
-with Valibot at every endpoint boundary. All data endpoints forward the
-caller's Supabase JWT to PostgREST — **RLS is the access-control boundary;
-the Worker is not.**
+## 5. Auth y sesiones
 
-| Route | Method | Purpose |
-|-------|--------|---------|
-| `/api/conversations` | GET | `conversation` rows with embedded `person` and `project`, filtered by `project_slug` (default `mamemi`), `status` (default `contacted`, `any` to disable), `season` (default `2026-27`). Thin PostgREST wrapper; RLS scopes by `current_workspace_id`. |
-| `/api/sentry-tunnel` | POST | Forwards Sentry envelopes from the browser SDK to the Sentry ingest host (DSN-derived) so adblockers / Brave Shields / Firefox ETP don't drop them. |
-| `/api/sentry-test` | GET | Smoke endpoint that throws an uncaught error so the server-side Sentry handle captures it. Dev-only by default; `?force=1` allowed in prod. |
+- Proveedor: Supabase Auth, email+password; TOTP opcional en el modelo.
+- La app guarda access/refresh tokens en cookies **HttpOnly + Secure +
+  SameSite=Strict**; no en localStorage.
+- Endpoints: `/api/auth/login|refresh|logout|session|token`.
+- `custom_access_token_hook` inyecta `current_workspace_id` en el JWT.
+- Rate limit de aplicación cubre login, refresh y Sentry tunnel.
+- Falta la regla Cloudflare WAF edge y la experiencia admin/onboarding.
+- Leaked-password/HIBP está bloqueado por el plan Free de Supabase.
 
-Planned (per `roadmap.md` Phase 0.1+): `/api/houses`, `/api/rooms`, `/api/runs`, `/api/gigs`, `/api/gigs/:id/roadsheet`, plus mutations.
+No crear usuarios insertando en `auth.users`: usar Auth Admin API/Dashboard.
 
-Shared helpers:
-- `src/lib/auth.ts` — JWT extraction from `Authorization` header (`extractBearer`).
-- `src/lib/supabase.ts` — thin PostgREST client over `fetch` (`pgGet`, `pgPostRpc`, `PostgrestError`). No `@supabase/supabase-js` on the Worker.
-- `src/lib/db-types.ts` — generated types + convenience aliases `Row<T>`, `Insert<T>`, `Update<T>`, `Enum<T>`, `RpcArgs<T>`, `RpcReturn<T>`. Regenerate via the Supabase MCP `generate_typescript_types` (or `supabase gen types typescript --project-id lqlyorlccnniybezugme`).
+## 6. Modelo operativo
 
-Conventions:
-- Read `platform.env` from the SvelteKit `RequestHandler` arg to access bindings.
-- Validate query params via Valibot `safeParse`; return `{ error, issues }` on schema violation.
-- Return `{ error, detail?, hint? }` on failure; never log JWT or request body.
-- No `prerender` flag needed (SvelteKit defaults endpoints to dynamic).
+### Contenedores
 
-Open dependency: the `custom_access_token_hook` is enabled in Supabase
-dashboard → Authentication → Hooks (verified 2026-04-20). Without it,
-`current_workspace_id()` returns NULL and RLS returns zero rows for
-authenticated users.
+- `workspace` → `project` → `line`.
+- Los módulos editables viven exclusivamente en line y se componen por
+  `line.modules`/`line.kind`.
+- Las lentes (`Desk`, `Planner`, `Conversations`, `Money`) leen el sistema
+  transversalmente; no poseen lógica de edición de entidades.
 
----
+### Conversaciones y contactos
 
-## 18. Files in `build/`
+- `conversation` es workspace/project-scoped y referencia person/organization.
+- Estados anti-CRM: contacted, in conversation, hold, confirmed, declined,
+  dormant, recurring.
+- Próxima acción y last-contact alimentan Desk; Conversations v1.5 ampliará la
+  captura y el timeline.
 
-- `_context.md` — workflow guide for this folder (siblings: chats vs files)
-- `architecture.md` — this file
-- `roadmap.md` — living implementation plan (phases 0.0 → 1, ADRs, sprints)
-- `competition.md` — 20 competitors, pricing, gap analysis
-- `schema.sql` — full Postgres schema (18 tables, reset v2)
-- `rls-policies.sql` — RLS helpers + policies + guard/audit triggers + `custom_access_token_hook`
-- `seed.sql` — pre-seed (marco-rubiol workspace + mamemi project) + post-signup CLAIM block
-- `bootstrap.md` — step-by-step: create Supabase project, configure Auth, create CF Worker, configure DNS, first deploy, first user
-- `import-plan.md` + `import/` — 156 programmers markdown → `person` + `conversation` rows mapping; 3-stage pipeline (normalize → enrich → load)
-- (`_decisions.md` lives at project root, not here — it's the ADR log)
+### Tiempo
 
----
+- `performance` representa el bolo/función y su lifecycle de holds.
+- `date` representa ensayo, residencia, viaje, prensa, day off u otro evento.
+- `availability_block` modela indisponibilidad/tentative por persona o compañía.
+- Planner deriva conflictos, decisiones y away bands; no persiste una entidad
+  `decision`.
+- `calendar_share` y `/api/public/calendar` conservan Calendar por ser iCalendar.
 
-## 19. Out of scope for this doc
+### Producción y road sheet
 
-- Visual design (lives in `_methød/design.md`)
-- CSS methodology (lives in `_methød/css.md`)
-- MaMeMi-specific content (lives in `01_STAGE/MüK CIA - MaMeMi/_context.md`)
-- Phase 1 SaaS pricing / packaging (decided at month 6 checkpoint)
+- Cast canónico: `cast_member` a nivel project.
+- Sustituciones: `cast_override` por performance.
+- Crew: `crew_assignment` por performance.
+- Assets: `asset_version` con dirección outbound/inbound/adapted.
+- Road sheet público: `roadsheet_share` con token revocable y rol fijado.
+- Texto colaborativo: Yjs; snapshots en `collab_snapshot`, materialización a
+  `notes` tras persistir el snapshot/marker.
+
+### Dinero
+
+- `performance.fee_*`, `invoice`, `invoice_line`, `payment`, `expense`.
+- `performance_redacted` oculta fee sin `read:money`.
+- Trigger de escritura exige `edit:money` para cambiar fee.
+- Money v2, condiciones/pagos observados, multi-currency correcto y documentos
+  fiscales profundos siguen pendientes.
+
+### Tareas e IA
+
+- `task` puede ser libre o apuntar a project/line/performance/conversation.
+- `from_at`, `due_at` y `lead_days` producen surfacing derivado en Desk.
+- `origin='ai'` representa una propuesta real; aceptar/descartar es una acción
+  humana sobre la tarea. No hay ejecución autónoma sin consentimiento.
+
+## 7. RLS y puertas de escritura
+
+- Toda tabla tenant-scoped usa ENABLE + FORCE RLS.
+- Los reads simples se basan en membership; los datos de proyecto usan
+  `has_permission(project_id, perm)`.
+- Operaciones claim-bound o multi-fila pasan por RPC SECURITY DEFINER con
+  `search_path` fijo, grants mínimos y checks explícitos.
+- Funciones públicas por token se limitan a road sheet e ICS y devuelven una
+  proyección saneada.
+- Soft-delete que deja la fila invisible al updater se hace por RPC, no por
+  PATCH directo.
+- El Worker nunca sustituye RLS; valida forma/contrato y reenvía identidad.
+
+La suite `apps/web/tests/rls/` golpea Supabase real como anon, admin y fixture
+limitado. Baseline actual: 114/114.
+
+## 8. API
+
+Las rutas SvelteKit viven en `apps/web/src/routes/api/` y se agrupan por dominio:
+
+- auth, workspaces y alias;
+- projects, lines, people/team y venues;
+- conversations y notes;
+- performances, dates, availability, Planner shares;
+- tasks;
+- invoices, money y expenses;
+- collab y road sheets públicos;
+- health y Sentry.
+
+Convenciones:
+
+- Valibot whitelist en cada frontera de escritura.
+- `{ error, detail?, hint? }` en fallos; no loguear tokens/body sensible.
+- `platform.env` para bindings Cloudflare.
+- Mutaciones con rollback optimista cuando la UI lo necesita.
+- Slugs mutables + `previous_slugs`; UUID v7 como identidad estable.
+
+## 9. Migraciones y reproducibilidad
+
+El schema live evolucionó primero con SQL aplicado por MCP y después con una
+carpeta Supabase normalizada. Por eso existen dos series:
+
+- `build/migrations/`: historial legacy, necesario para auditoría.
+- `supabase/migrations/`: checkpoint remoto y migraciones administradas desde
+  2026-07-20.
+
+`build/schema.sql` y `build/rls-policies.sql` son snapshots congelados. No deben
+editarse como si fueran el schema actual.
+
+Limitación actual: el primer checkpoint de `supabase/migrations` verifica que el
+schema histórico ya existe y aborta sobre una base vacía. Antes de staging/beta
+hay que generar y probar un baseline reconstructivo, sin reescribir la historia
+aplicada de producción.
+
+Después de cualquier cambio DB:
+
+1. preflight/backup proporcional;
+2. migración transaccional cuando PostgreSQL lo permita;
+3. regenerar `apps/web/src/lib/db-types.ts` desde live;
+4. ejecutar RLS, unit, check y build;
+5. consultar advisors y revisar grants públicos.
+
+## 10. Deploy, CI y rollback
+
+- `.github/workflows/ci.yml` ejecuta check/unit/build/collab sin secretos.
+- Deploy manual mediante los scripts pnpm/wrangler de cada app.
+- `scripts/assert-clean-tree.mjs` impide publicar un árbol sucio.
+- El build stamp permite comparar producción con Git.
+- Rollback: `build/runbooks/rollback.md`.
+- Backup: GitHub Actions + R2; restore drill aún pendiente.
+
+## 11. Límites y deuda arquitectónica
+
+- Sin staging ni baseline DB limpio.
+- Admin/onboarding y soporte todavía dependen de operaciones manuales.
+- RBAC necesita permisos read-only más explícitos y test external/guest.
+- Sockets collab deben reautorizarse/cerrarse tras una revocación.
+- Offline actual es scaffold, no road mode garantizado.
+- Correo/WhatsApp todavía no aterrizan en `conversation_event`.
+- HIBP requiere plan Supabase Pro.
+- Totales cross-currency no son económicamente fiables.
+
+La prioridad de estas deudas vive exclusivamente en `../_tasks.md`.
+
+## 12. Layout del repo
+
+```text
+apps/web/                 SvelteKit Worker y producto
+apps/collab/              Durable Object de colaboración
+supabase/migrations/      historia administrada reciente
+build/migrations/         historia SQL legacy
+build/runbooks/           operaciones activas
+build/archive/            planes/prompts/runbooks terminados
+research/                 investigación fechada
+_context.md               estado actual
+_tasks.md                 cola actual
+_decisions.md             ADR append-only
+_notes/                   historia de sesiones y flux
+```

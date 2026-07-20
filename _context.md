@@ -1,354 +1,204 @@
-> Inherits: `.zerø/_system-context.md` · Method: `_methød/`
-> Status: **kept** (valid: live, kept, parked)
-> Dev env: pnpm + per-project wrangler. See `_methød/code/dev-environment.md` and `## Dev setup` below.
+# Hour — estado canónico del proyecto
 
-> **REGLA DEL PROYECTO — leer ANTES de escribir código**
+> **FUENTE DE VERDAD ACTUAL.** Cualquier agente o persona debe empezar aquí.
+> Última verificación: **2026-07-20**, contrastada con Git, el código, producción,
+> Supabase y las suites; no reconstruida desde documentos antiguos.
 >
-> Antes de tocar una sola línea de código en Hour (CSS, JavaScript, Svelte, HTML, schema, API), leer **`03_AGENCY/_area-methød/code/philosophy.md`**.
->
-> No es lectura recomendada — es la regla de oro del sistema. Cualquier decisión técnica se evalúa contra los 5 principios universales descritos ahí. Si un patrón típico de la industria contradice la filosofía y el contexto del proyecto no lo justifica explícitamente como "isla de pragma", **gana la filosofía**.
->
-> Casos comunes que afecta:
-> - CSS: defaults a nivel de selector con `:where()`, no en clases. Modificadores redeclaran CSS variables, no propiedades.
-> - JS / Svelte 5: `$derived` antes que `$state` con `$effect`. Una técnica para todo el dominio.
-> - HTML: elementos semánticos directos, no `<div>` con role.
-> - Tokens: tres categorías (base hues / status / contextual). Naming semántico, no numérico.
-
-> **MODELO DE ESTRUCTURA — leer antes de tocar nav / lentes / módulos / detalle de entidad**
->
-> `build/structure-model.md` (ADR-063, 2026-07-14) es la referencia canónica de cómo se
-> estructura la app: **lente** (solo lee, cross-contenedor, sin lógica de edición) vs **módulo**
-> (edita en contexto, **solo a nivel línea**, compositivo por `kind`) vs **tarea** (verbo que
-> alimenta Agenda). Edición en 3 niveles de contenedor: espacio → project → línea/módulos.
-> Si algo en el código o en otro doc contradice ese modelo, o gana el modelo o es un bug a
-> reconciliar. No dejar que la nomenclatura vuelva a derivar.
-
-# Hour
-
-## What
-Multi-tenant B2B SaaS for live performing arts management. Covers the full funnel from *difusión* (booking outreach) to production and execution, for medium cross-genre European companies. Not a labor-compliance tool — that stays with Ares, Holded, or the gestoría.
-
-Working name: **Hour**. Brand decision deferred to Phase 1.
-
-**North star (ADR-069, 2026-07-17)**: the product exists for a **proactive, consent-first AI layer** over this data — "you have a gig in Paris in a month; 20 of your contacts are usually around Paris — want me to email them?". The full UI is the manual surface over the same data; every screen and entity is built so that flow works. AI proposes (landing as `task.origin='ai'` and the hall status sentence), the user approves, the system executes — never unbidden.
-
-## Phase
-**Phase 0 — internal tool for MüK Cia** (Marco + Anouk + ≤5 users, workspaces `marco-rubiol` personal + `muk-cia` team). MaMeMi es UN espectáculo (project) dentro de la compañía MüK Cia. Build is multi-tenant-ready from day one so Phase 1 (SaaS with paying customers) can flip on without a rewrite.
-
-**Phase 0.9 — private beta hardening gate**: mandatory before any external known client. Adds httpOnly sessions, rate limiting, RLS regression tests, restore drill, admin/support minimum, observability and health checks.
-
-**Phase 1 — SaaS readiness/public launch**: self-serve onboarding/billing only if assisted beta validates demand.
-
-## Key decisions (see `_decisions.md` for full log)
-- Deploys at `hour.zerosense.studio` (subdomain, zero cost). Brand decision deferred to Phase 1.
-- Stack: Supabase Cloud + Cloudflare Workers + R2 + pgmq + Resend + Sentry + **SvelteKit 2 + Svelte 5** + pnpm monorepo (ADR-026, 2026-05-01: migrated from Astro 5 + islands; reverts D-PRE-02).
-- Phase 0 runs entirely within free tiers.
-- Multi-tenant from day one: 3-layer model **`account` (billing) → `workspace` (RLS scope) → project** (ADR-032, 2026-05-18). Account es la entidad pagadora (Basecamp-like, 1 suscripción Stripe cuando llegue Phase 1); workspace es la unidad multi-tenant aislada (Slack-like, un user atraviesa N workspaces de N accounts vía workspace_memberships). RLS at DB level. JWT `current_workspace_id` claim. Account kind = `personal | team`; workspace kind también `personal | team`.
-- **Reset v2 + roadsheet + account + cast layers + performance rename** (ADR-001..007 + ADR-023 + ADR-032 + ADR-034 + ADR-035 + ADR-036, 2026-04-19 → 2026-05-19): **25 tablas** (entonces; **29 vivas** a 2026-07-17 — account/cast/task/share/alias llegaron después: cuenta real en `build/architecture.md`). Polymorphic core: `account + workspace + project + conversation + performance + line + date` — no `project.type` column (ADR-007). Conversation (tabla `engagement` hasta el rename de ADR-075, 2026-07-17) distinct from performance (atomic gig, ADR-001). **Line** es la agrupación operativa dentro del project ("línea de trabajo"), con `kind` enum de 10 valores: `tour | season | phase | circuit | residency | other | creation | campaign | comms | misc` (ADR-031 amplió enum, ADR-035 revertió el rename a section → vuelta a `line`). **Performance** (ADR-036, 2026-05-19): renombre de `show` para evitar confusión con "espectáculo/producción" en castellano; "performance" universal cross-arts. Column `show_start_at` → `start_at`. Money stack: `invoice + invoice_line + payment + expense` (ADR-003). Editable RBAC: `workspace_role` catalog + `project_membership.roles/grants/revokes` con 10-permission closed vocabulary (ADR-006). `venue` es su propia entidad. **Cast** (ADR-034, 2026-05-19): canónico a nivel project (`cast_member`), sustituciones puntuales por performance (`cast_override`). Crew sigue exclusivamente performance-scoped (`crew_assignment`) — asimetría intencional porque el dominio planifica cast una vez y crew performance a performance.
-- **Shell user-scoped + lens nav top + sidebar como filtro multi-select** (ADR-029 + ADR-030 + ADR-033 + ADR-038 + ADR-039, 2026-05-18 → 2026-05-19): shell vive en `/h/+layout.svelte` (no `/h/[workspace]/+layout`, hoisted 2026-05-19 ADR-039). Sidebar muestra TODAS las workspaces del usuario simultáneamente (cross-account, Slack-like). Lens nav vive en el TOP del main como horizontal pills: `Today · Calendar · Contacts · Money` (Today es la lens primaria desde ADR-033; Plaza como nombre de lens descartado, sobrevive solo como nombre del componente sidebar). **Sidebar = filtro multi-select** (ADR-038): Plaza (workspaces × projects) + `LineList` (lines de la unión) operan como filtro orto, no navegación exclusiva. LineList es siempre visible (no requiere project seleccionado); muestra todas las lines accesibles por RLS ordenadas por `last_navigated_at` cuando no hay filtro, filtradas por la unión cuando hay. Lens primaria "Desk" descartada en strategy review §3 (sin task entity); reaparecerá en Phase 0.5+ si D3 llega. **⚠️ Nav SUPERSEDED 2026-07-04 (tarde) por el rediseño "Adaptive Digest"**: fuera el sidebar-filtro y las lens pills top; ahora scope por pins (`ScopeStrip`), logo=Agenda, Calendar/Contacts/Money por ⌘K. Ver `## Status — 2026-07-04 (tarde)` y `_notes/sessions-log.md`.
-- **URL architecture** (ADR-022, 2026-04-24): three levels — ephemeral session state in `localStorage`, canonical entity URLs (`/h/:workspace-slug/:entity/:slug-or-id`) stable and shareable, view-state URLs via explicit "Copy link" gesture. Path-prefix multi-tenancy (not subdomain in Phase 0). Signed public links for road sheet only in Phase 0 (partial D6).
-- **Road sheet model** (ADR-023, 2026-04-24; vocab updated ADR-036 + ADR-037, 2026-05-19): not an entity — projection of `performance` + junctions, filtered by role. Schema extensions: 5 timeslot columns + 3 jsonb (`logistics`, `hospitality`, `technical`) on `performance`; new tables `crew_assignment`, `cast_override`, `asset_version` (with `direction` enum `outbound|inbound|adapted` — captures venue returns and per-venue variants). No state machine. URL `/h/:workspace/performance/:slug/roadsheet` with optional `?role=`. Closes the "Lens Technical" pendiente (top-nav lens dropped).
-- **Slug naming** (ADR-024, 2026-04-24): clean names + hard reject + `previous_slugs text[]` for rename history. GitHub/Slack model. Immutable `id uuid` separate from mutable slug column. Uniqueness scope `(workspace_id, entity_type)`. Industry research of 10 SaaS confirmed nobody uses numeric suffixes as default UX.
-- **CRDT transport** (ADR-025, 2026-04-24; *transport refined 2026-05-01*): `y-partyserver` (PartyKit's active successor under Cloudflare) on native Durable Objects declared in `wrangler.jsonc` for collaborative editing of text-free fields (`performance.notes`, `project.notes`). Auth gates WebSocket via Supabase JWT + membership check; RLS never sees Yjs binary. Snapshots persisted to `collab_snapshot` table every 30 updates / 60s. Hibernation supported (cheaper at scale). Scoped to text fields only — structured fields use Supabase Realtime with last-write-wins.
-- **Frontend stack migration** (ADR-026, 2026-05-01): SvelteKit 2 + Svelte 5 + `@sveltejs/adapter-cloudflare` replaces Astro 5 + islands. Triggered by audit showing 95% of code already in vanilla JS or Svelte; Astro was a 30-LoC SSR envelope. Gains: client-side routing, form actions with progressive enhancement, `load()` with dependency tracking, `hooks.server.ts`, cross-route stores. New defaults wired in same migration: Valibot at `+server.ts` boundaries, Sentry hooks (DSN env-var), TanStack Query for server-state cache (Plaza/Desk).
-- **Full implementation plan**: `build/roadmap.md` (documento vivo, 25 ADRs + 14 D-PRE, fases 0.0 → 1, próximo sprint 13 días). Abrir primero al retomar Hour.
-- Anti-CRM vocabulary: `person` (global, shared), `conversation` (workspace-scoped, status default `contacted` — ADR-075 renamed from `engagement`, 2026-07-17), `performance` (atomic gig with hold/hold_1/2/3 lifecycle — ADR-036 renamed from `show`), `date` (rehearsal / travel_day / press / other), `venue` (recurring physical place). No lead / pipeline / funnel / prospect.
-- Difusión 2026-27 is a **line** (kind=campaign) within the MaMeMi project (ADR-036 reorg 2026-05-19). Conversations live at project level (MaMeMi); the line is the operational frame for this season's outreach. Conversations de la temporada se filtran por `custom_fields->>season = '2026-27'`.
-- PKs are UUID v7.
-- Does NOT build Spanish labor compliance (that's Ares's territory).
-- **Private beta gate (Phase 0.9)**: no external workspace before cookies httpOnly, rate limiting, RLS regression suite, restore drill, admin/support minimum, structured logging, health checks and Sentry PII scrub.
-- Indicative Phase 1 pricing: 25 / 60 / 120 €/mes, no setup fee, 14-day trial.
-- Coding happens in Windsurf (switched from Claude Code). Strategy happens in Cowork. Memory lives in `build/*.md`, not in chats.
-- Project lives in AGENCY (the vehicle / work for others), not STUDIO — Marco's call.
-- **Visual language v0.5** (ADR-033, 2026-05-18): editorial-sobrio. Plum retired — `--primary` reasigned to `var(--text-color)` (cool ink `oklch(18% 0.015 280)`). Surfaces warm-cream (5 layers), ink cool (3 weights), state lifecycle (info/success/warning/danger/faint), 8 abstract accents mapped by `hash(slug) % 8` (helper `$lib/utils/accent.ts`), 6 tag-tone pairs (amber/blue/teal/green/purple/red). Typography: Newsreader display + Inter sans + JetBrains Mono metadata (loaded in `app.html`). Three colour categories preserved (base hues / status / contextual) per philosophy.md. All shades via `color-mix()` in OKLCH. Reference: `/Users/marcorubiol/Downloads/Hour/Hour Design System.html`.
-
-## Code
-- Local path: `~/Developer/hour/` (monorepo, `git init` done 2026-04-19, branch `main`). Code moved out of the vault into `~/Developer/` on the 2026-06-04 machine recovery — the vault folder `03_AGENCY/Hour/` now holds project markdown + a `code` symlink → `~/Developer/hour`. (New repo-in-`~/Developer` model, see `.zerø/_system-context.md` § Coordinated git repos.)
-- GitHub repo: `https://github.com/marcorubiol/hour` (private, personal user). Transferable to a `zerosense` org if Phase 1 activates.
-- Live site (Phase 0): `hour.zerosense.studio` — **wired and serving** (custom domain attached in CF dashboard between 2026-04-20 and 2026-04-25). Worker primary URL: `https://hour-web.marco-rubiol.workers.dev` (CF Worker `hour-web`, wrangler 4.83.0, first deploy 2026-04-19). El custom domain proxies through CF normally — both URLs serve the same content.
-- CF bindings: `MEDIA` → R2 bucket `hour-media` · `ASSETS` → static CDN · `PUBLIC_SUPABASE_URL` + `PUBLIC_SUPABASE_ANON_KEY` in `[vars]`. DO binding `ROADSHEET_COLLAB` cross-Worker hacia `hour-collab`.
-- Supabase project: `hour-phase0` · ref `lqlyorlccnniybezugme` · region `eu-central-1` · URL `https://lqlyorlccnniybezugme.supabase.co`.
-- Specs and planning: `build/` (`roadmap.md`, `architecture.md`, `competition.md`, `runbooks/`) plus `_decisions.md` at project root.
-- **Historial sesión-a-sesión:** `_notes/sessions-log.md` (archivo extraído de aquí el 2026-05-18 cuando este archivo cruzó los 40k chars). Para detalle más granular: `git log --oneline`.
-
-## Links
-- Parent MaMeMi context (where Difusión originated): `01_STAGE/ZS_MaMeMi/`
-- Source of the 156 existing programmers/festivals to import: `01_STAGE/ZS_MaMeMi/Difusión/`
-
-## Status — 2026-07-19 — La lente Calendar renombrada a Planner (EN Planner · ES/CA Planificador)
-
-**Al retomar, empezar aquí.** La lente de tiempo pasó de **Calendar** a **Planner** (ADR-079), desplegado y verificado (commit `d977af0`; `/health/live` sha `d977af0`; `/h/calendar` y `/h/[ws]/calendar` → 301 → `/h/planner`). Token interno `planner`; labels **EN Planner · ES/CA Planificador · FR Planning** (pendiente `fr.json`). Copy de acción en "al plan"/"al pla" (etiqueta formal, copy natural — patrón Desk). **Scope**: solo el producto (lente/ruta/motor `planner.ts`/store/módulo/reserved-slug); el **feed ICS conserva "calendar"** (`calendar_share`, `/api/public/calendar`, `ics.ts`) — es un iCalendar de verdad, como la entidad `date` conserva su nombre. Migración `build/migrations/2026-07-19_rename_calendar_to_planner.sql` (reserved slug 65=65 + swap de 3 líneas, verificado: 0 `calendar` / 3 `planner`). `svelte-check` 0/0 (1538) · unit 251/251. Detalle: `_decisions.md § ADR-079`.
-
-## Status — 2026-07-18 — Calendar v2 EN PRODUCCIÓN (grill → build autónomo → apply/merge/deploy en el día)
-
-**Al retomar, empezar aquí.** Prod en `88467c3` (verificar con `/health/live`). La lente de tiempo completa vive: dos proyecciones (`?view=month|agenda`, localStorage + default por form factor, ADR-076), diálogo unificado de creación (pills de tipo; `PerformanceForm` compartida con entrada de hora **local del venue** — cierra el BUG VIVO de timezones), blackouts (`availability_block` sin `kind`, ADR-078), motor de conflictos de 4 severidades (`people`/`possible`/`blackout`/`blackout-tentative`), bandas derivadas entre viajes (`awayBands`, display-only), `day_off`, pill Opció→tentative, etiquetas custom con autocomplete, ICS en "⋯". DB migrada (5 migraciones sondadas), suites: check 0/0 · unit 251 · RLS 100/101 · e2e performance-write 4/4 contra prod. **Deuda inmediata**: 4 specs e2e con drift de Desk v2 (smoke/scope-url×2/tasks — selectores del shell nuevo, no rotura) + regen real de db-types (hand-patch marcado). Registro: ADR-078 + `_notes/sessions-log.md § 2026-07-18` + `build/runbooks/calendar-v2-apply.md` (EXECUTED). Mock canónico publicado en el proyecto de diseño ("Hour Calendar Lens.html").
-
-**Continuación (misma sesión, tarde-noche) — Planner v2 CONSTRUIDO (ADR-080).** Segundo grill sobre el prototipo de Marco (`Hour Views - Scope v2.html`) → la lente Calendar gana la capa de planificación: **cola de decisiones DERIVADA** (proyección de los pares del motor de conflictos — sin entidad `decision`, nada que almacenar ni caducar) con banda encima de las proyecciones + pulse strip en el masthead; **aviso por antelación** (`performance.hold_notice_days`, NULL = 30, urgencia = hoy ≥ start_at − aviso — sin settings); dos severidades nuevas: **`double`** (mismo espectáculo, dos sitios, ≥1 hold → decisión SIEMPRE) y **`concurrence`** (cross-project sin fricción de personas → se VE, no grita); y **Carrils como tercera proyección** (`?view=carrils&group=espai|projecte|persona` — el grupo per Persona es el Loom: hilo por persona, hold punteado, "fora" rompe, conflicto = nudo). Todo en la rama `planner-decisions` (este worktree), gates verdes, DB viva intacta. **Pendiente: apply (1 migración) + merge + deploy — .zerø en sesión.** Registro: ADR-080 + sessions-log § 2026-07-18 (continuación).
-
-## Status — 2026-07-16 — Scope v2 EN PRODUCCIÓN · el registro de deploys arreglado (ADR-066)
-
-**Al retomar, empezar aquí.**
-
-**Qué corre en producción** (`hour-web` versión `70775b20`, rollback a `34887c61`): Scope v2 completo — shell con rail de Scopes (guardados + recientes), scope-bar de pins (`s:` espacio / `p:` project / `l:` línea), control **view as** (Desk · Calendar · Contacts · Money), ⌘K como **constructor de scope**, breadcrumb; portada de espacio editable (ADR-062: `domain`/`city`/`logo_url` + RPC `update_workspace`); rename a Desk (ADR-065) con 301 desde `/agenda`; y ADR-059/060/061 (que **ya estaban vivos desde el 07-14**, ver abajo).
-
-**El registro de deploys mentía — arreglado.** `wrangler deploy` sube el **working tree**, no un commit: el 07-14 se desplegó sin commitear y durante dos días `_context.md` listó ADR-059/060/061 como "pendiente de deploy" cuando llevaban vivos. **ADR-066** lo cierra: guard de árbol limpio (`scripts/assert-clean-tree.mjs`, encadenado en los scripts `deploy`) + build stamp servido por `/health/live`.
-
-> **Regla: antes de creerte esta sección, `curl -s https://hour.zerosense.studio/health/live`.** Devuelve `{"ok":true,"version":{"sha":"…","dirty":false,"builtAt":"…"}}`. El doc es una afirmación; el stamp es el hecho. (Hasta el próximo deploy de árbol limpio responde `{"ok":true}` sin `version` — el stamp está commiteado, no desplegado.)
-
-**Estado de tests** (contra producción, 2026-07-16): **e2e 19/19 en 13 s · RLS 46/46 · svelte-check 0/0 (1484)**. La suite hacía 14 logins desde una IP y se comía su propio rate-limit (`LOGIN_RULE` 10/5min, ADR-061) → ahora **1 login** compartido vía `tests/auth.setup.ts` + `storageState`. El límite de producción NO se tocó: está bien puesto. Gotchas que volverán: `browser.newContext()` **hereda** el `storageState` del proyecto (un contexto "anónimo" no lo es salvo que lo vacíes explícito); `chromium-1217` de la caché de Playwright está corrupto → correr con `PW_CHROMIUM` apuntando a `chromium_headless_shell-1228`.
-
-**Deuda abierta, por orden:**
-1. **Desplegar** el guard + stamp de ADR-066 y los tests (commiteados, no en prod).
-2. **e2e del nav nuevo**: ningún spec cubre scope-bar, view-as ni editar espacio. Diferido a propósito mientras el shell se reescribe (2026-07-16 noche: 12 ficheros en vuelo tocando `HomeView`, `tokens.css`, login y las portadas de entidad).
-3. **Pasada de diseño entera** — `build/screens-inventory.md`, todas las pantallas sin marcar. Prototipo de referencia: `app design/line-detail-prototype.html`.
-4. **Diferidos de ADR-062 por diseño**: `logo_url` sin flujo de subida (R2 + CSP img-src); `domain` se guarda y se pinta en el kicker pero **no dirige** vocabulario ni tipos de project por defecto; Contacts-con-organizaciones está en el modelo (ADR-065), no en el build.
-5. **Regla CF edge** de rate-limit en `/api/auth/login` — solo bloquea onboarding externo, no el uso interno. Necesita un token `Zone WAF:Edit` (el OAuth de Wrangler solo tiene `zone:read`).
-6. **Segundo usuario de fixture con rol limitado — CERRADO 2026-07-20.** `limited@hour.test` es member solo de `playwright` y performer en `zzz-e2e-collab`; la suite prueba grants/revokes con JWT previo, redacción de dinero, notas privadas y rechazo de edición del workspace. RLS 114/114, sin skips. Ver `build/runbooks/test-user-setup.md`.
-
-## Status — 2026-07-13 — ADR-061: Phase 0.9 hardening gate implementado (external-onboarding)
-
-**Al retomar, empezar aquí.** Marco decidió abrir Hour a usuarios externos (curated onboarding, él crea cada workspace) en las próximas semanas → el backlog "antes de cliente externo" pasó de diferido a bloqueante. Implementado en un pase (sesión autónoma ultracode):
-
-- **Sesión httpOnly** (antes: access+refresh en localStorage, sin refresh flow). Login/refresh/logout/session/token server-side en `/api/auth/*`; `hour_at` (httpOnly/Secure/SameSite=Strict, TTL=exp, Path=/) + `hour_rt` (Path=/api/auth, 60d, rotado). `$lib/api.ts`: 401 → refresh single-flight → retry → bounce. Identidad desde `$lib/session.svelte.ts` (server `/api/auth/session`); mató todos los decode de JWT en cliente y los presence-gate de localStorage. El único JWT que llega a JS es el access token (≤1h) vía `/api/auth/token`, para los 2 consumidores cross-origin (Supabase Realtime + RPC has_permission). Collab WS pasó de `?token=` (leak a logs) a la cookie en el upgrade same-origin.
-- **CSP + security headers** (kit.csp mode auto + hooks.server.ts: nosniff, referrer-policy, x-frame-options DENY, permissions-policy, COOP, HSTS non-dev, CSRF same-origin floor, x-request-id). El script de tema pre-paint se externalizó a `static/theme-init.js` (kit.csp NO escanea app.html → un inline se bloquearía; `script-src 'self'` cubre el externo, sin hash frágil).
-- **Error mapper central** `$lib/server/errors.ts` — ~30 endpoints dejaron de reflejar `err.body` (nombres de constraint, RAISE, valores en conflicto) al navegador; detalle al log estructurado, cliente recibe códigos estables. Superficie anon (public/roadsheet) totalmente opaca.
-- **Sentry PII scrub** (sendDefaultPii:false, scrub de tokens en URLs, Replay masking, `/api/sentry-test` dev-only sin `?force=1`, tunnel rate-limited + size-capped + DSN-checked). **Rate limit** KV (login/refresh/tunnel). **Health** `/health/live|ready`. **Logging** JSON con request_id. **CI** `.github/workflows/ci.yml` (svelte-check + unit + build + collab tsc, sin secretos).
-
-Gate local: **svelte-check 0/0 (1473) · unit 110/110 · collab tsc · build OK**. Review adversarial (5 lentes → verify, 12 agentes): 7 hallazgos → 2 confirmados low, **ambos arreglados** (CSP bloqueaba el script de tema → externalizado; docblock del rate-limiter honesto sobre el TOCTOU + regla CF edge en el runbook), 5 refutados (carrera de sesión, 401→502, CGNAT — el diseño cookie-maxAge=exp los previene). **Pendiente (Marco):** verificar en navegador login/refresh/collab · correr RLS+e2e con `.env.test` (el cambio de auth NO tiene e2e corrido) · KV `RATE_LIMIT` + regla CF rate-limit en `/api/auth/login`. Runbook: `build/runbooks/phase09-launch.md`. Registro: `_decisions.md § ADR-061`.
-
-## Status — 2026-07-12 (noche 2) — ADR-060: home projects-first, el project entra en la nav
-
-**Al retomar, empezar aquí.** Primer feedback del gate 0.3 (Marco usando la app real): el project — el espectáculo, la unidad de pensamiento — no existía en la nav (pins solo espacio/línea, home = tarjetas de espacio con líneas planas, ⌘K sin projects, detalle de project huérfano). Implementado el mismo día tras propuesta con maqueta: **home = agenda + grid de projects** (pineados primero, orden por actividad, espacio como chip de contexto — espacios sin projects no pintan tarjeta), **pin `p:<projectId>`** como tercer kind (resolveScope con projectIndex; unión projectIds — la API no cambió, todas las lenses ya filtraban por project_ids; narrowing conservado: pin de línea = solo esa línea, pin de project = todo el project), ScopeStrip con picker en árbol espacio→projects→líneas, ⌘K con grupo Projects. De camino: fix del resolve slug-sin-workspace en project/line detail (colisión cross-workspace) y el detalle de project pierde su fetchJSON local pre-$lib/api. Cero migraciones. Suite: svelte-check 0/0 · unit 110/110 (+nav.test) · e2e 15/15 local (2 collab skipped, solo-prod). **Local, pendiente deploy conjunto con ADR-059** — Marco revisa en dev y lanza. Registro: `_decisions.md § ADR-060` · detalle: `_notes/sessions-log.md § 2026-07-12 (noche 2)`. También pendiente de deploy: ADR-059 (pasada visual de la sesión anterior).
-
-## Status — 2026-07-12 — ADR-056 implementado: line detail = composición de módulos
-
-Sesión autónoma .zerø (ultracode, grill previo con Marco). El line detail dejó de ser stubs y es la pila de módulos de ADR-056 — los 7 del catálogo v1 (Calendar, Contacts, Road sheets, Notes, Materials, Money, People), header con stats por kind, anchor chips, Add/Move/Remove module. Crear una line = elegir plantilla (6 tarjetas fijan kind+modules; el dropdown de 10 kinds murió). La creación (line/project/space) volvió a existir — llevaba huérfana desde ADR-057 en el Plaza desmontado — como dialogs en el layout + entradas en home cards y ⌘K. line_id corre por todos los write paths (contexto auto-asigna; dialogs globales con select opcional; guards cross-project). Money module trae la UI de expenses que faltaba; collab gana el target 'line'. Dos fixes de raíz: el leak de fee en GET /api/performances (saltaba read:money desde ADR-041) y create_line sin slug (lines RPC-creadas innavegables). Borrado el mundo sidebar entero (Plaza/LineList/Sidebar/selection//booking, ~3.000 líneas). Divergencias decididas: `_decisions.md § ADR-058`. Detalle: `_notes/sessions-log.md § 2026-07-12`.
-
-**EN PRODUCCIÓN desde 2026-07-12** (Marco desbloqueó el gate con la frase explícita): 6 migraciones aplicadas y verificadas en vivo (backfill = 154 exactos, 0 slugs NULL, grants solo-authenticated, sin overloads), db-types regenerado del schema real, hour-collab + hour-web desplegados en orden. Suite completa contra producción: **typecheck 0/0 · unit 100/100 · RLS 38/38 · e2e 17/17 sin retries** — incluida la nueva line-detail.spec (el picker crea la line fixture en vivo) y el smoke del collab target 'line' (snapshot `target_table='line'` persistido + `line.notes` materializado). De camino cayeron tres roturas que la suite destapó: contact-create.spec llevaba roto desde el dialog multi-espacio del 04-07 (solo se re-corrió smoke aquella tarde), money.spec era una carrera de paralelismo (fila pinneada a la fixture 2031), y `Menu` descartaba su `label` con triggers custom (botones de icono sin nombre accesible — fix también para el menú de cuenta).
-
-**El gate no cambia:** tras esto, PARAR de construir y usar Hour con la difusión real ~1 mes. Los 154 engagements quedan atados a la line difusion-2026-27 por el backfill.
-
-## Status — 2026-07-04 (tarde) — nav "Adaptive Digest" viva + contacto multi-espacio
-
-Dos sesiones el 2026-07-04: mañana = cierre nivel 1 (ADR-051→055, escritura desde la UI, en producción — ver entrada de abajo); tarde = **rediseño de nav "Adaptive Digest"** (el "rediseño completo pins/retirar Calendar-Money" que quedó abierto). Detalle + gotchas: `_notes/sessions-log.md § 2026-07-04 (tarde)`.
-
-**Estado actual de la nav (cambió respecto a lo descrito en `## UI architecture` más abajo; ampliado por ADR-060 2026-07-12):**
-- **Sin botones de nav arriba.** Logo `hour` = Home = **Agenda**. Calendar · Contacts · Money solo por **⌘K** (grupo "Views", + Agenda; desde ADR-060 también grupo "Projects"). Sin pastilla "Today".
-- **Scope por pins** (sustituye el sidebar-filtro de ADR-038): componente `ScopeStrip` en TODAS las lenses (pastilla "All spaces" sin pins). `resolveScope`/`inScope` en `$lib/nav.ts`. **Desde ADR-060 los pins son tres**: espacio `s:`, project `p:`, línea `l:`.
-- **Home** = próximos 7 días capado a 10 (`AgendaBoard.svelte`) + "+ N more → Agenda" + **grid de projects** (ADR-060 — sustituye las tarjetas de espacio; espacio = chip de contexto en cada tarjeta); **vista `/h/[ws]/agenda`** sin capar.
-- **Contacts** migrada a pins + **"Add contact" multi-espacio** (checkboxes por espacio → N engagements, persona global deduplicada por email, threading de `person_id`).
-- **Fix CSS de raíz**: orden de capas declarado en `<head>` de `app.html` (Vite inyectaba `@layer components` antes de base.css en dev → orden invertido; ver sessions-log).
-
-**Numeración ADR reconciliada (2026-07-04 tarde):** **055 = "Today"** · **056 = line-detail modules** · **057 = nav "Adaptive Digest"** (ADR escrito, `_decisions.md`). **Abierto:** (1) persona huérfana de test `019f2f03-…` (invisible, soft-delete opcional por SQL — en Shelf); (2) el gate no cambia: usar Hour con la difusión real ~1 mes.
-
-## Status — 2026-07-02 (noche, 7)
-
-**ADR-050: invoice creation — el ciclo de dinero completo.** La factura nace del fee: botón "Invoice" en la Money lens → dialog IVA/IRPF/número/vencimiento con preview → RPC `create_invoice` (sexto claim-bound; snapshot del fee, forma fiscal ES total = subtotal + IVA − IRPF, una línea auto-descrita) → lifecycle draft→issued→paid/cancelled por menú (PATCH directo, la policy no es claim-bound) + descarte de drafts vía `delete_invoice` (ADR-048). Con esto **todo lo pendiente del tintero está cerrado**: D6 link público (047), misterio RLS + botón borrar nota (048), venue enlazable (049), invoices (050). Fixtures e2e purgados (20 gigs huérfanos de performance-write; el spec sigue sin poder auto-limpiarse — no hay delete de performance, pendiente de ADR-043 re-evaluate). Suite 11/11 producción + unit 53/53 + RLS 19/19.
-
-**Al retomar: empezar por `_tasks.md`** (bloque "cierre nivel 1": alta persona+engagement desde UI, delete de performance, edición de venue — y después usar la app ~1 mes antes de más features). El plan de cierre completo en 3 niveles está en `build/roadmap.md § Current next action`; el resumen de esta maratón (hecho / descartado / gotchas) en `_notes/sessions-log.md § 2026-07-01/02`.
-
-## Status — 2026-07-02 (noche, 6)
-
-**ADR-049: venue enlazable.** El trío denormalizado (venue_name/city/country) se promueve a entidad `venue` desde el dialog de edición ("Save fields as venue", RPC `create_venue` idempotente sobre name+city — quinto caso del patrón claim-bound) y se enlaza vía select; guard `cross_workspace_link` en el PATCH. Desbloquea timezone/address/contacts reales en road sheet (incluido el público). Gotcha Svelte 5 cazado: toStore leyendo un $derived declarado más abajo → TDZ → página en blanco; los bloques van después del derived. Suite 11/11 contra producción.
-
-## Status — 2026-07-02 (noche, 5)
-
-**ADR-047 + ADR-048: road sheet público (D6) + misterio RLS resuelto.** Links públicos revocables al road sheet (`/public/roadsheet/:token`, rol fijado venue/performer/tech_manager, sin cuenta): tabla `roadsheet_share` deny-all para TODOS los roles vía PostgREST, gestión por RPCs gateados `edit:show`, saneado en dos capas (RPC anon sin fee/notes/internals + matriz `buildRoadsheet` en el Worker), UI "Public links" en el road sheet del operador (crear/copiar/revocar), revocación inmediata (`no-store`). El técnico de la sala abre su road sheet desde un WhatsApp. Y el misterio RLS de ADR-045 resuelto con experimento decisivo: la fila actualizada debe seguir SELECT-visible para el updater → **ningún soft-delete por PATCH directo, siempre RPC** (sistémico, ADR-048); el botón de borrar nota en la ficha de persona cerrado sobre esa base. Suite 10/10 contra producción, RLS 19/19.
-
-## Status — 2026-07-02 (noche, 4)
-
-**ADR-046: Money lens — LAS 4 LENSES VIVAS.** `/h/[ws]/money`: fees vía `performance_redacted` (la puerta de dinero; view ampliada con slug, invoker+revoke reafirmados) con editor de fee por fila (el ÚNICO write path de dinero — trigger edit:money) y totales pipeline/invoiced/paid; invoices read-only (0 filas hoy, creación Phase 0.5). El system-completeness gate de Phase 0.3 ("¿las 4 lenses funcionan como vistas del mismo sistema?") ya tiene qué evaluar — pendiente el veredicto de Marco usándolas. Suite 9/9 contra producción.
-
-## Status — 2026-07-02 (noche, 3)
-
-**ADR-045: person detail — la ficha de contacto.** `/h/[ws]/person/[slug]` real: contacto (mailto/tel/web), engagements cross-project, **notas workspace-scoped con composer** (workspace/private) y apariciones cast/crew. Nombres de la tabla de engagements enlazan a la ficha. RPCs `create_person_note` + `delete_person_note` (INSERT claim-bound — 4º caso del patrón; y el soft-delete directo por PATCH está minado por RLS en toda la DB — misterio anotado en _flux para ojos frescos, mientras tanto soft-deletes por RPC). Suite 8/8 contra producción. Con esto la difusión tiene memoria relacional: quién es, qué conversaciones hay, qué pasó ("hablé con ella en el Grec, prefiere email").
-
-## Status — 2026-07-02 (noche, 2)
-
-**ADR-044: Contacts lens v1 — la difusión vive en el shell.** `/h/[ws]/contacts`: la tabla de engagements (extraída a `EngagementTable`, una implementación) con filtro por selección del sidebar, búsqueda persona/organización y filtro de status, más los editores inline de ADR-040. `/booking` queda como wrapper legacy. `/api/engagements` generalizado (sin default mamemi; unión project_ids/workspace_ids + q). Resolver selección→ids extraído a `$lib/selection-filter.ts` (calendario refactorizado encima). Lenses routed generalizadas en el shell (calendar + contacts; Money sigue muerta hasta su página). Suite completa 7/7 contra producción. Con ADR-040+041+042+043+044: **el ciclo difusión completo — buscar contacto, avanzar conversación, poner fecha, confirmar, producir con road sheet colaborativo — se opera entero dentro de Hour.**
-
-## Status — 2026-07-02 (noche)
-
-**ADR-043: write path de performances en producción.** Crear gigs desde la Calendar lens (botón "New performance" + "+" en cada día → dialog project/fecha/venue/city/status, navega al detalle) y editar en el detalle (status vía menú, schedule completo — performed_at + 5 timeslots + venue trío — vía dialog, datetime-local en zona del viewer con display dual D-PRE-10). RPC `create_performance` (patrón create_project: SECURITY DEFINER, claim-independiente, gate `edit:show`, slug auto con sufijos) porque los INSERT directos son claim-bound. Review parcial (un finder colgó): 3 hallazgos verificados a mano y corregidos — relink cross-project bloqueado en PATCH, grants del RPC arreglados en vivo (REVOKE FROM anon no quita el EXECUTE de PUBLIC — gotcha), códigos de error por JSON. E2e 2/2 contra producción + collab intacto. **El calendario ya es herramienta de booking**: la difusión puede convertir conversaciones en holds con fecha sin salir de Hour. Fee y notes fuera del path a propósito (Money lens / doc colaborativo).
-
-## Status — 2026-07-02 (tarde)
-
-**ADR-042: Phase 0.2 COMPLETA — notas colaborativas en vivo verificadas en producción.** `performance.notes` + `project.notes` editables colaborativamente (YNotes: Yjs + y-partyserver DO + y-indexeddb + presencia P10), con write-back a columna y seed del texto pre-existente. E2e de dos clientes reales contra `hour.zerosense.studio`: 2/2 verde (convergencia, presencia, reload restore, snapshot v1 en `collab_snapshot`, columna materializada, auth-deny). Dos bugs de raíz arreglados: workerd entrega frames como Blob (y-partyserver decodificaba vacío — el scaffold del 09-05 nunca sincronizó de verdad) y el `SUPABASE_SECRET_KEY` almacenado no era válido (re-emitido por Marco; solo header `apikey`, el Bearer degrada el rol). Gate de escritura nuevo en el upgrade WS (`edit:show`/`edit:project_meta`). Diferidos explícitos de 0.2: link público D6, cursor posicional (0.5), Realtime estructurado. Fixture e2e permanente: proyecto `zzz-e2e-collab` + 2 performances en el workspace `playwright` (basura sufijada `-339d`/`-e931` por limpiar vía MCP). Suite completa: 47 unit · 17/17 RLS · 5/5 e2e (2 collab solo con `PW_BASE_URL`).
-
-## Status — 2026-07-02 (mañana)
-
-**ADR-041: superficie de lectura de Phase 0.2 en producción** (sesión autónoma .zerø, continuación del write path del día anterior):
-
-- **Calendar lens** viva en `/h/[ws]/calendar` — grid mensual con performances (tono por status, accent por project) + dates (ensayos/viajes/prensa), filtrada por la selección del sidebar (ADR-038; vacío = todo, como LineList). Pills del shell navegan; el link muerto "Open calendar →" del Today dashboard ahora funciona.
-- **Performance detail real** (cierra #3 + #5 de Phase 0.1): ProductionStub (venue + schedule dual-timezone D-PRE-10 + jsonb genéricos vía JsonKV), team (cast canónico + overrides + crew), dates, programmer, assets. Mobile-first.
-- **Road sheet read-only** en `/h/[ws]/performance/[slug]/roadsheet` — proyección role-filtered SERVER-SIDE (full/venue/performer/tech_manager, matriz provisional en ADR-041; money nunca), preview de roles con pills, print CSS. **CRDT/Realtime/presence/link público explícitamente diferidos** — exigen dos clientes autenticados para verificar (deuda `.env.test`).
-- **Endpoints**: `/api/performances` con filtros unión + rango de fechas, `/api/dates` nuevo, `/api/performances/[key]` (bundle detalle, uuid o slug+?ws=, sin columnas fee — la puerta de dinero es la view), `/api/performances/[key]/roadsheet?role=`.
-- **SEGURIDAD — leak encontrado en producción, FIX PENDIENTE DE APLICAR**: `performance_redacted` legible por anon (perdió `security_invoker` en los renames del 19-05; hoy solo expone datos demo). SQL listo en `build/migrations/2026-07-02_fix_performance_redacted_security_invoker.sql` — **correr en el SQL editor de Supabase**. Test canario en `tests/rls/redacted-view.test.ts`.
-- **Drift collab arreglado**: apps/collab + do/auth.ts hardcodeaban la tabla `show` (muerta desde ADR-036) — el CRDT de 0.2 habría nacido roto. Renombrado a `performance`; hour-collab redesplegado.
-- Revisión adversarial (29 agentes, 4 lentes): 22 hallazgos confirmados, todos aplicados — incl. compartidos nuevos por filosofía (`$lib/api.ts`, `ScheduleTable`, contrato `[data-tone]` en base.css, `toStore()`).
-- Verificado: typecheck 0/0 (web + collab), 47 unit tests, build limpio, formas PostgREST sondadas contra prod con anon key, ProductionStub verificado visualmente en /playground. Las páginas autenticadas se verán en vivo cuando haya sesión (o `.env.test`).
-
-## Status — 2026-07-01
-
-**ADR-040: primer write path en producción.** Tras ~6 semanas de pausa (última sesión de código 2026-05-19; solo recovery chores el 2026-06-04), un check-in estratégico detectó el riesgo "construido pero no usado": la app era read-only mientras la difusión 2026-27 real (su caso piloto, 154 engagements cargados) avanzaba fuera de Hour. Respuesta: adelantar el write path mínimo de engagement de Phase 0.5 a ya — excepción puntual, no reordenación de fases (ADR-040 en `_decisions.md`).
-
-- `/booking` edita inline: **status** (menú sobre el propio badge, 7 estados) y **next action** (dialog con fecha + nota). Optimistic update con rollback + toast de error — el error→recovery loop que el roadmap exigía antes de cualquier PATCH (riesgo #5).
-- **`PATCH /api/engagements/:id`** — Valibot whitelist (status/next_action_at/next_action_note; columnas RLS-sensibles no pueden colarse), `deleted_at=is.null`, RLS decide vía `has_permission(project_id, 'edit:engagement')`. Respuesta = row + embeds (misma forma que la lista).
-- **Eliminado el TEMP VISUAL MOCK que llevaba en producción desde Phase 0.1** — las primeras 7 filas de la lista real mostraban estados falsos ("Remove before deploy" nunca ejecutado).
-- Infra nueva: `pgPatch` en `$lib/supabase.ts`, `$lib/engagement.ts` (vocabulario de status único — antes duplicado en booking + RelationshipStub — + contrato PATCH + tipos compartidos), `<Toast />` montado app-global en el layout raíz, `Input type="date"`.
-- Tests: 24 unit verdes (10 nuevos del contrato PATCH), suite RLS `engagement-write.test.ts` y e2e `engagement-write.spec.ts` nuevas (self-reverting sobre datos reales; skip sin `.env.test`).
-- Escrituras **online-only** con rollback claro; el write queue offline (primitivos IndexedDB ya en `$lib/offline/db.ts`) sigue siendo Phase 0.2+ — deuda explícita en ADR-040.
-
-Sesión anterior (maratón 2026-05-19, 27 commits, ADRs 034-039: naming gate, sidebar como filtro, shell hoist): detalle completo en `_notes/sessions-log.md` § 2026-05-19.
-
-Próxima fase: **Phase 0.2** — Calendar lens + Road sheet colaborativo. El editor inline de engagement migrará a la Contacts lens en Phase 0.3. Deuda Phase 0.9 hardening en paralelo cuando convenga (cookies httpOnly, rate limiting — antes de cliente externo).
-
-### DB en producción
-- `hour-phase0` · Postgres 17 · **25 tablas** + `performance_redacted` view · 24 functions · 78 RLS policies (ENABLE + FORCE)
-- Modelo 3-layer: 3 accounts (marco-rubiol-acc, muk-cia-acc, playwright-acc) + 4 workspaces (marco-rubiol, muk-cia, playwright, demo) + 2 projects (MaMeMi dentro de muk-cia con 154 engagements y line `difusion-2026-27`; Última órbita dentro de demo con 1 line tour y 3 performances)
-- Auth hook `custom_access_token_hook` enabled (inyecta `current_workspace_id`). `handle_new_user` trigger actualizado (ADR-032) crea account + account_membership antes del workspace personal en cada signup.
-- Datos reales en `muk-cia`: **154 persons + 154 engagements** (status=`contacted`, `custom_fields.season='2026-27'`), 30 enriquecidos con dossier 2026, atados al project MaMeMi + line "Difusión 2026-27" (kind=campaign). Workspace `marco-rubiol` personal vacía. Workspace `demo` con "Última órbita" para validar render cross-workspace.
-- Migraciones aplicadas 2026-05-19 (orden cronológico): `add_cast_member`, `revert_section_to_line`, `rename_show_to_performance`, `data_rename_muk_cia`, `add_line_last_navigated_at`, `create_workspace_rpc`, `create_project_rpc`, `create_line_rpc`, `workspace_accent_and_description`.
-
-### Phase 0.1 — trabajos pendientes (post 2026-07-01)
-Vocab actualizado tras ADR-037. Estado real:
-- **#3 PerformanceDetail mobile-first** (era GigDetail) — bloqueado por #6 + primera fecha real productiva.
-- **#5 ProductionStub** — bloqueado por #3.
-- **#6 Endpoints `/api/lines`, `/api/performances`, `/api/performances/:id`** — `/api/lines` ya construido en ADR-038. Faltan los de performances en mode read (write paths Phase 0.2+).
-- **#9 Write queue offline scaffolding** — DESBLOQUEADO por ADR-040 (primer write path real existe: `PATCH /api/engagements/:id`, mutación centralizada en un `createMutation`). El enqueue+replay+conflict UI sigue pendiente, Phase 0.2+.
-- **#11 Settings + Master View toggle** — ✅ CERRADO 2026-05-19 (commit `b387fe9`).
-
-### Test infra — RESUELTA 2026-07-02
-- `.env.test` recreado por Marco (password nueva de `playwright@hour.test`). **Estado verde completo**: 47 unit · 17/17 RLS (incl. canario del leak + write path) · 3/3 e2e (smoke reescrito al mundo actual + write path self-reverting, contra build local Y verificado contra producción).
-- Smoke reescrito post-rename (muk-cia, lens pills, calendar incluido). Cross-tenant actualizado con evidencia live: playwright es member de `marco-rubiol`+`muk-cia`+`playwright`, `demo` invisible ✓.
-- Fixes de infra descubiertos al correr: Playwright tragaba los `*.test.ts` de vitest (testMatch explícito) y `PW_CHROMIUM` env para reutilizar un chromium cacheado sin `test:install`.
-- **Gap conocido**: performance detail y road sheet no tienen e2e — las únicas performances viven en `demo`, invisible para el test user. Opciones cuando toque: membership de playwright en demo, o fixture performance en muk-cia. El runbook `test-user-setup.md` sigue describiendo el mundo viejo (baja prioridad).
-
-### Gates Phase 0.1 — ambos cerrados
-- ✅ **Checkpoint visual 1** — ratificado en sesión 2026-05-19. Visual debt 2026-05-18 (gap Room header, Plaza spacing, eyebrow duplicado) resuelta por evolución del shell. Checkpoint visual 2 (`9f8bcd9`) añadió dark mode + polish editorial-sobrio encima.
-- ✅ **Naming gate** — cerrado en vivo durante la sesión. Las confusiones cazadas por Marco al usar la UI productiva (line vs section, show vs performance, room/gig vs project/performance) generaron ADR-035/036/037 que limpiaron schema + UI + URL + código en el mismo pase. Test externo con Anouk + 1-2 más diferido a checkpoint Phase 0.4 como ratificación, no decisión.
-
-## Open debts (priority-ordered)
-
-Lista honesta de lo que falta, ordenada por ratio coste/riesgo. **Atacar de arriba abajo.**
-
-1. **[ALTA Phase 0.9] Cookies httpOnly en lugar de JWT en localStorage** (4-6h). Hoy XSS = sesión exfiltrable. Phase 0 con 5 usuarios conocidos OK; antes de meter primer cliente externo (Phase 0.9 gate), mover a httpOnly+Secure+SameSite=Strict.
-2. **[BAJA] Pasada cosmética de primitivos** (30 min, opcional). Avatar usa template literal para clases mientras Button/Chip usan `[...].filter(Boolean).join(' ')`. Menu línea 55 `open ? close() : openMenu()` mejor como `if/else`. Cosmético — no rompe nada.
-
-### Phase 0.9 hardening backlog (antes de cliente externo conocido)
-- **Rate-limit `/api/sentry-tunnel`** vía Cloudflare KV (~30 min). CF WAF rate-limit es add-on de pago; KV en Worker free es suficiente.
-- **RLS regression suite** — 6 escenarios priorizados por valor (cubren ~80% del riesgo multi-tenant real, validados en revisión externa 2026-05-09):
-  1. **Cross-workspace leakage hard deny** — user de workspace A no lee project/performance/engagement/person_note/invoice de workspace B aunque conozca UUIDs/slugs. List sin filtro, select por id, join indirecto vía engagement→project, slug conocido. Expected: 0 rows o 403, sin filtrar existencia.
-  2. **Membership revoke con JWT vivo** — user con JWT válido + `current_workspace_id`, membership eliminada, sigue intentando lectura. Expected (decisión a tomar): RLS deniega vía `exists workspace_membership where accepted_at + revoked_at IS NULL` o aceptar ventana hasta expiración (1h). Phase 0.9 endurece.
-  3. **Project permission gate** — viewer con `read:engagement` ve / sin `read:money` no ve fee real / con grant explícito gana / con revoke explícito pierde aunque rol lo tenga / owner+admin bypass. Valida `has_permission()` union + grants - revokes.
-  4. **Money redaction + write guard** — sin `read:money` lee `performance_redacted` con fee masked, con `read:money` ve fee real, sin `edit:money` update rechazado por trigger, con `edit:money` permitido.
-  5. **Private person_note** — author lee su nota `visibility='private'`, otro member del mismo workspace no la lee, cross-workspace nunca, workspace-note sí leen miembros autorizados.
-  6. **Soft-delete invisibility** — `deleted_at IS NOT NULL` no aparece en list endpoints ni select por id (salvo rol admin con test separado explícito).
-  - Bonus 7º: **access-token hook claim correctness** — sign-in/refresh inyecta `current_workspace_id` correcto con/sin membership aceptada/múltiples workspaces.
-- **Smoke e2e collab DO** — 7 checks para Phase 0.2, archivados en `_notes/sessions-log.md` § 2026-05-09 (PartyServer DO scaffold).
-- **Restore drill** — proced documentado y probado para restaurar desde backup R2 a Supabase staging en <30 min.
-- **Admin/support minimum** — UI básica para listar workspaces, diagnosticar memberships, resetear slugs.
-- **Structured logging** — formato JSON para logs Worker, correlación por request_id. Verificar que JWT en query string del WS collab no se loguea (Cloudflare logs / Sentry breadcrumbs / console / errors).
-- **Health checks** — endpoints `/health/live` (dependencias OK) y `/health/ready` (servicio usable).
-- **Sentry PII scrub** — actualmente `sendDefaultPii: true` en `apps/web/src/hooks.client.ts:18` y `apps/web/src/hooks.server.ts:26` (descubierto en revisión externa 2026-05-09). Acciones concretas: (a) `sendDefaultPii: false` en client + server; (b) Replay con masking por defecto; (c) `beforeSend` que scrubea email, JWT, Authorization, cookies, query params sensibles (especialmente `?token=` del WS collab); (d) verificar que el rate-limit del tunnel cae también aquí.
-
-### Diferido a Phase 1 con coste asociado (no acción hasta entonces)
-- **Leaked Password Protection** (Supabase Pro feature). Toggle de 1 click cuando active el plan Pro al onboardar primer cliente pagante.
-- **paraglide-js v2** para i18n (~2-3h). El `$lib/i18n.ts` simple actual cubre los ~15 strings de Phase 0. Migrar cuando llegue contenido en español o pase de 50 strings.
-- **Sentry source-map auth token rotation policy** — el token actual (`sntryu_...`) en `apps/web/.env` no caduca. Revisar a Phase 1 si se quiere rotar.
-
-## Product vocabulary (ADR-008 → ADR-030 → ADR-033 → ADR-035 → ADR-036 → ADR-037, 2026-05-18 → 2026-05-19)
-
-Naming gate cerrado 2026-05-19 tras dos roundtrips vividos en UI productiva. Vocabulario UI/URL/schema/código alineado.
-
-| UI label | Schema | URL | Definición |
-|---|---|---|---|
-| (sin label visible Phase 0; "Account" en admin UI Phase 1) | `account` | n/a | Entidad pagadora. Billing boundary. Personal (1 user) o team. Invisible hasta Settings → Account management Phase 1. (ADR-032) |
-| **Workspace** | `workspace` | `/h/[workspace]/` | Tenant aislado. RLS scope. Top-level en sidebar Plaza, bajo eyebrow ("Projects" en `+layout.svelte:380`; debate Places/Projects pending en `_notes/_flux.md`). |
-| **Project** | `project` | `/h/[ws]/project/[slug]/` | Producción creativa dentro de un workspace. Phase 0 con 1-2 por workspace; Phase 0.5+ más finos. |
-| **Line** | `line` | `/h/[ws]/project/[slug]/line/[line]/` | Línea de trabajo dentro de un project. `kind` enum 10 valores: tour / season / phase / circuit / residency / other / creation / campaign / comms / misc (ADR-035 mantuvo `line` después del roundtrip section). Renderiza en sidebar lower (`<LineList>`), siempre visible, filtrada por selección Plaza. |
-| **Performance** | `performance` | `/h/[ws]/performance/[slug]/` | Gig atómico. Antes `show` (ADR-036 rename 2026-05-19 para vocab cross-arts). Column principal: `start_at` (era `show_start_at`). |
-
-**Lens primaria**: **Today** (ADR-033). Pills: `Today · Calendar · Contacts · Money`. Componente sidebar upper `Plaza.svelte` mantiene nombre interno (no aparece en copy visible).
-
-URL paths actualizados a vocabulario schema-aligned 2026-05-19 (ADR-037 cleanup): `/h/[workspace]/project/[slug]/` (was `/room/`), `/h/[workspace]/performance/[slug]/` (was `/gig/`). 301 redirects en `hooks.server.ts` para bookmarks/links viejos. API endpoints renombrados: `/api/projects` (was `/api/rooms`), `/api/workspaces` (was `/api/houses`).
-
-Schema retains technical names (`account`, `workspace`, `project`, `line`, `performance`). UI labels pueden cambiar libremente hasta Phase 0.9 sin tocar schema (ADR-008 separation).
-
-**Naming reversibility window** (2026-05-14): renaming UI labels (House/Project/Room/Section/Gig/Plaza/etc.) cuesta ~half day to one day mientras estemos entre Phase 0.0 y Phase 0.9. El trabajo mecánico: rename folders en `src/routes/h/[workspace]/...`, update `$lib/reserved-slugs.ts`, find/replace componentes, update i18n keys, rename endpoints. Schema NO cambia. Después de Phase 0.9 (clientes externos con bookmarks/screenshots/training materials), el coste escala a semanas. Gap a flaggear: `previous_slugs[]` cubre rename de slug dentro de una entity, pero NO entity-type segment renames (`/room/` → `/project/` requiere 301 redirect rule explícita, ~30 min cuando aplique).
-
-## UI architecture
-
-> **Modelo canónico: `build/structure-model.md` (ADR-063).** Lente (solo lee) vs módulo (edita, solo en línea) vs tarea (verbo). Léelo primero.
->
-> **Nav actual (ADR-057 → 060 → 062):** shell en `/h/+layout.svelte`. **Sin botones de nav arriba**; el logo `hour` = Home = **Agenda** (el cross-space `∑` en `/h/`, una VISTA no un contenedor). Calendar · Contacts · Money por **⌘K**. **Scope por pins** (`ScopeStrip`, `resolveScope`/`inScope` en `$lib/nav.ts`): espacio `s:`, project `p:`, línea `l:`. Portada de espacio en `/h/[slug]/` = entidad editable (ADR-062).
->
-> **Lo de abajo (lens-pills `Today·Calendar·Contacts·Money` + sidebar-filtro Plaza/LineList, ADR-009→039) está SUPERSEDED — se conserva como histórico.** No construir contra ello.
-
-Shell vive en `/h/+layout.svelte` (hoisted up desde `/h/[workspace]/+layout.svelte` 2026-05-19, ADR-039). Cualquier URL bajo `/h/` recibe el mismo shell; el path `/h/[ws]/` representa "browsing context", no implica que ese workspace esté seleccionado.
-
-Single-layout app con dos controles _(histórico, superseded ADR-057)_:
-
-- **Lens nav** (top del main, horizontal pills): `Today · Calendar · Contacts · Money`. Today es la lens default (lo que está pasando y lo siguiente). Future lenses (Comms, Archive) se añaden como pills adicionales sin cambiar layout.
-- **Sidebar (filtro multi-select)** (user-scoped, cross-account):
-  - **Plaza** (sidebar upper, `Plaza.svelte`): árbol multi-workspace mostrando TODAS las workspaces del usuario simultáneamente (cross-account, Slack-like). Cada workspace con sus projects indentados. Workspace y project filas son `<a>` con href computado por preview (toggle ON/OFF de la selección). Action clusters por hover (Settings, Add project/line, Focus). In-place creation (workspace, project, line) inline desde el propio sidebar. Focus mode aísla la selección a un único item (snapshot + restore al salir).
-  - **LineList** (sidebar lower, `LineList.svelte`): siempre visible. Lee `selection.svelte.ts` y muestra:
-    - Vacío → todas las lines accesibles por RLS, sort por `last_navigated_at` desc.
-    - 1 workspace → lines de proyectos de ese workspace.
-    - 1 project → lines de ese project.
-    - N items → union.
-    - Subtitle "in <project>" cuando hay >1 project en scope.
-
-**Selección persistente**: URL (canonical `/h/[ws]/project/[slug]/` cuando colapsa a 1 entity; query params `?ws=&project=` cuando es multi) + localStorage fallback al aterrizar en `/h/` vacío. Lens activa y focus state también persistidos en localStorage (commit `4436af8`, cross-session).
-
-**URL routing** (ADR-037 cleanup vocab):
-- `/h/[ws]/` — workspace context, sin entity seleccionada.
-- `/h/[ws]/project/[slug]/` — project detail (Phase 0.1 muestra RelationshipStub + stubs).
-- `/h/[ws]/project/[slug]/line/[line]/` — line detail (Phase 0.1 trabajo nuevo, sesión 2026-05-19).
-- `/h/[ws]/performance/[slug]/` — performance detail (Phase 0.2).
-- `/h/[ws]/engagement/[slug]/`, `/h/[ws]/person/[slug]/` — preserved desde ADR-022.
-- `/h/[ws]/settings/` — settings + Master View toggle (D-PRE-05 wired 2026-05-19).
-- 301 redirects en `hooks.server.ts` para vocab viejo (`/room/`, `/gig/`).
-
-**Project detail** — según ADR-063: **NO** es composición de módulos (eso se queda en la línea). Es el contenido editable del project (nombre, status, about, **rider técnico / assets canónicos, cast**, poster/dossier) + sus líneas + lentes scopeadas. Las tabs históricas Work/Assets/Team/About (ADR-009) se re-leen bajo ese modelo. Estado actual: home projects-first (ADR-060) da las entradas; el detalle sigue en header + stubs.
-
-**⌘K** first-class desde día 1 (Phase 0.4). Sidebar puede ocultarse entera para ⌘K-only navigation.
-
-## Next — ver `build/roadmap.md`
-
-El roadmap completo con fases, decisiones previas obligatorias, MVP y próximo sprint concreto vive en **`build/roadmap.md`** (documento vivo). El propio roadmap tiene una nota de divergencia (la sesión 2026-05-19 no siguió el orden del roadmap pero cerró deuda real — ver `## Current operating state` ahí).
-
-Estado a 2026-05-19: Phase 0.0 + 0.1 cerradas (incluyendo D-PRE-05 Master View wired). Phase 0.2 (Calendar lens + Road sheet colaborativo) es la siguiente fase, pero el modelo de shell ya no es el que el roadmap describía — sidebar es filtro multi-select, no navegación (ADR-038). Phase 0.5 son deferred features. Phase 0.9 hardening gate antes de cliente externo. Phase 1 es SaaS readiness.
-
-## Diferido (Phase 0.5 o cuando toque)
-
-- **`share`** — per-engagement curated microsite (ADR-028, 2026-05-09). Lazy-creado al primer click de compartir; signed URL larga + rotable, sin login del programador; show-driven branding con subtítulo customizable; assets canónicos del show + uploads engagement-scope; email archive vía BCC tipo Basecamp (Cloudflare Email Workers); tracking medio. Wedge de diferenciación vs Drive/WeTransfer. Phase 0.5 item 4. Coste 2-3 sem.
-- `task` entity — polymorphic (project/line/performance/engagement), origin: manual/protocol/ai. Manual tasks needed for Desk view. Includes task protocols: reusable chains with relative date offsets that auto-generate prep tasks backwards from performance/fair dates (ADR-011). (Deferred D3)
-- Communication layer — unified email/WhatsApp/Telegram/calls contextualised by workspace/project (Deferred D4)
-- App mode — PWA installable (desktop + mobile), not web-only. Must feel like a native app. (Deferred D5)
-- Public guest links — shareable URL (no signup required) where external collaborators (technicians, freelancers) can view their assigned performances/dates/rider. If they choose to sign up, their guest view upgrades to a full `guest` membership with write access. Two tiers: anonymous-read via signed link, authenticated-write via `guest` role. (Deferred D6)
-- Fair intelligence — import attendee lists (CSV or screenshot via AI vision), cross-reference against existing contacts, surface matches and new-contact opportunities. Needs fair entity or date.kind='fair' with attendee junction. (Deferred D7, ADR-012)
-- AI integration — invisible helper philosophy (ADR-013). Two interaction patterns: (1) continuous/invisible — AI fills fields like decision windows (ADR-019), (2) punctual/explicit — user clicks "generate dossier draft" (ADR-020). AI-touched fields get visual marker; high-stakes generation requires accept/dismiss (ADR-021). (Deferred D8)
-- Kanban view — available in Desk and Contacts lenses as work-mode complement to calendar. Groups by status. (Deferred D9, ADR-010)
-- Timeline view — horizontal/vertical timeline showing cascading task chains from protocol tasks. Depends on D3. (Deferred D10, ADR-010)
-- `task` tag vocabulary (Deferred D1)
-- UI de overrides granulares por persona (Deferred D2)
-- `performance` / `line` / `invoice` flows (cuando Marco confirme la primera fecha)
-
-## Dev setup
-
-- **Package manager:** pnpm 10.33.0 (pinned via `packageManager` field in root `package.json`). Monorepo with `pnpm-workspace.yaml` listing `apps/*` + `packages/*`.
-- **Wrangler:** local devDependency in `apps/web/package.json` (currently `^4.83.0`). NEVER instalado global. Invocar como `pnpm wrangler <cmd>` desde `apps/web` o vía scripts (`pnpm run deploy`).
-- **Reglas portables:** `_methød/code/dev-environment.md` — léelas antes de añadir un nuevo dev tool al monorepo.
-- **DDEV no aplica a Hour** (2026-06-04). DDEV containeriza nginx+PHP+MySQL — el stack de agencia WordPress, donde sustituye a Local by Flywheel. Hour es Node/Vite + Supabase Cloud + Cloudflare Workers: cero PHP, cero servidor local. Para entorno local reproducible/offline el camino canónico es el Supabase CLI (`supabase start`), no DDEV. Hoy ni se necesita: Supabase Cloud está vivo.
-
-### Recovery (fresh machine / post-wipe)
-El repo se clona limpio pero dos cosas son gitignored y se pierden — recrearlas en orden:
-
-1. **Dependencias:** `pnpm install` desde la raíz (`~/Developer/hour`). Levanta los 3 workspace projects.
-2. **`apps/web/.env`** (gitignored, perdido en cada recover). Recrear con las `PUBLIC_SUPABASE_*` desde `apps/web/wrangler.jsonc [vars]` — son public-safe (la anon key es la publishable `sb_publishable_...`). El único secreto real del `.env` es `SENTRY_AUTH_TOKEN` (opcional, solo para subir source-maps en `vite build`; el dev server no lo necesita — regenerable desde el dashboard de Sentry si hace falta deploy con source-maps).
-3. **Arrancar:** `pnpm dev` → `http://localhost:5173`. Rutas con datos reales: `/h/muk-cia` (MaMeMi, 154 engagements) y `/h/demo` (Última órbita). La DB es Supabase Cloud, no hay que levantar nada local.
-
-`pnpm install` con pnpm 10 ignora los build scripts de `workerd`/`esbuild`/`sharp`/`@sentry/cli` por defecto — fijados en `package.json` § `pnpm.onlyBuiltDependencies` para que `wrangler dev`/`deploy` funcionen sin intervención. `vite dev` funciona aunque no se construyan.
-
-**Nunca `pnpm install` con `pnpm dev` vivo.** El install reconstruye los binarios de `esbuild`/`workerd` que vite tiene cargados en memoria → el dev server muere al siguiente request (síntoma: `ELIFECYCLE Command failed`, a veces tras un 404 cualquiera que parece la causa pero no lo es). Para instalar: para el dev, `pnpm install`, reinicia.
+> Si otro archivo contradice este documento sobre el estado presente, gana este
+> documento. Si contradice una decisión de producto estable, consultar
+> `_decisions.md` y comprobar si la decisión fue superseded.
+
+## Lectura mínima al entrar
+
+1. `_context.md` — qué es Hour y dónde está ahora.
+2. `_tasks.md` — única cola de trabajo vigente.
+3. `build/architecture.md` — arquitectura técnica y límites de seguridad.
+4. `build/structure-model.md` — modelo de producto: lente, contenedor, módulo y tarea.
+5. `_decisions.md` — ADR cronológicos; **historia**, no estado operativo.
+6. `build/runbooks/` — solo para operaciones concretas.
+
+No usar como instrucciones los documentos de `build/archive/` ni los snapshots de
+`_notes/`. Se conservan para entender por qué se llegó aquí.
+
+## Qué es Hour
+
+Hour es un SaaS B2B multi-tenant para compañías pequeñas y medianas de artes en
+vivo. Une difusión, conversaciones, planificación, producción, road sheets,
+equipo, tareas y dinero. Sustituye la combinación dispersa de Excel, Drive,
+correo, Notion y WhatsApp sin intentar sustituir la gestoría ni construir
+compliance laboral español.
+
+La dirección de producto es una capa de IA **proactiva y consent-first** sobre
+el mismo grafo operativo. La IA propone; una persona aprueba; el sistema ejecuta
+y deja auditoría. La UI manual y la futura IA deben leer y escribir los mismos
+contratos.
+
+## Fase real
+
+**Phase 0 — herramienta interna funcional, endureciéndose para beta privada.**
+
+- Uso real inicial: Marco, MüK Cia / MaMeMi y fixtures sintéticos.
+- No está abierta al público ni tiene billing/self-service.
+- El modelo ya es multi-workspace y multi-account; no es una app single-tenant.
+- La beta externa no debe empezar hasta cerrar los elementos de Phase 0.9 que
+  siguen en `_tasks.md`.
+
+Phase 1 solo empieza si la beta asistida valida demanda. El pricing sigue siendo
+orientativo, no una verdad comercial cerrada.
+
+## Estado operativo verificado
+
+### Producción
+
+- Web: `https://hour.zerosense.studio`
+- Worker: `hour-web`
+- `/health/live`: sano, `dirty:false`, SHA **`59f1c6e`**.
+- `/health/ready`: sano, Supabase `ok`.
+- Producción está por detrás del HEAD local: los commits posteriores no están
+  desplegados salvo que el health stamp diga lo contrario.
+
+### Git
+
+- Repo: `https://github.com/marcorubiol/hour` (privado).
+- Checkout: `/Users/marcorubiol/Developer/hour`.
+- Rama principal: `main`.
+- Base de esta reconciliación: **`232491e`**, un commit por delante de
+  `origin/main` tras `git fetch --prune`.
+- `wrangler deploy` exige árbol limpio y publica el SHA en `/health/live`.
+
+### Supabase
+
+- Proyecto: `hour-phase0` · ref `lqlyorlccnniybezugme` · `eu-central-1`.
+- Plan: **Free**.
+- Auth: email+password, cookies httpOnly en la app, hook de access token activo.
+- RLS: FORCE en las superficies tenant-scoped; suite live **114/114**.
+- Identidad 2026-07-20: `workspace_person` y `workspace_organization` aplicadas,
+  perfil portable y dossier local por workspace, share/revoke explícitos.
+- Fixture limitado: `limited@hour.test`, member solo de `playwright`, performer
+  en `zzz-e2e-collab`; sin workspace/account personal.
+- Advisor: 0 warnings de rendimiento. El único warning de producto gestionable
+  es leaked-password protection; HIBP requiere Supabase Pro.
+
+La historia SQL está **partida**:
+
+- `build/migrations/` contiene el historial aplicado antiguo y los deltas hasta
+  julio; no es un baseline limpio garantizado.
+- `supabase/migrations/` contiene el checkpoint y las migraciones gestionadas
+  desde el hardening de identidad del 2026-07-20.
+- Hoy una base vacía **no se reconstruye de forma soportada con un único
+  `supabase db push`**. Crear baseline reproducible + staging es deuda de beta.
+
+### Verificación local y contra producción
+
+Último pase completo relevante:
+
+- `svelte-check`: 0 errores / 0 warnings.
+- Unit: **312/312**.
+- RLS contra Supabase live: **114/114**, sin skips.
+- Collab: **7/7** + TypeScript limpio.
+- Build de producción: verde.
+- E2E contra producción: **16 passed · 5 failed · 3 did not run**.
+
+Los cinco fallos e2e están localizados en `performance-write`, `person`, dos
+casos de `scope-url` y `tasks`. Parte es drift de selectores/rutas tras Planner,
+Hall y Desk v2; no se debe volver a afirmar que e2e está verde hasta reconciliar
+y ejecutar 24/24.
+
+## Producto construido hoy
+
+- **Hall** `/h`: puerta de entrada y frase de estado.
+- **Desk** `/h/desk`: feed mixto real de tareas, agenda, conversaciones y
+  dinero; modo calma y propuestas IA representadas como tareas reales.
+- **Planner** `/h/planner`: mes, agenda y carriles; performances, dates,
+  disponibilidad, viajes, conflictos y decisiones derivadas. `Calendar` queda
+  solo para iCalendar/ICS e URLs legacy con redirect.
+- **Conversations** `/h/conversations`: libro operativo de conversaciones con
+  personas/organizaciones; escritura de estado y próxima acción.
+- **Money** `/h/money`: fees, facturas y estados básicos; Money v2 y pagos
+  observados aún no están construidos.
+- Contenedores: workspace → project → line; los módulos editan a nivel line.
+- Performance detail, road sheet interno/público, venues, cast/crew, assets,
+  expenses, tasks, calendar shares y colaboración Yjs están operativos.
+- Navegación actual: shell user-scoped, scopes/pins, LensSwitcher y rutas
+  globales; no Plaza, no sidebar House→Room y no `ScopeStrip` antiguo.
+
+## Modelo y vocabulario vigentes
+
+- `account` = pagador; `workspace` = límite RLS; `project` = obra/producción;
+  `line` = agrupación operativa componible.
+- `person` = identidad portable; `workspace_person` = dossier local privado.
+- `workspace_organization` = organización/contacto de un workspace.
+- `conversation` = diálogo de difusión; nunca `engagement` en código vivo.
+- `performance` = bolo/función atómica; nunca `show` en código vivo.
+- `date` = ensayo, viaje, prensa, day off u otro evento no-performance.
+- Lentes: **Desk · Planner · Conversations · Money**.
+- Road sheet es una proyección de performance, no una entidad independiente.
+- No usar CRM vocabulary (`lead`, `pipeline`, `prospect`) salvo en investigación
+  o interoperabilidad externa.
+
+## Arquitectura resumida
+
+- SvelteKit 2 + Svelte 5 + TypeScript + Vite.
+- Cloudflare Workers + R2 + Durable Objects (`y-partyserver`).
+- Supabase Cloud: Postgres 17, Auth, RLS, Realtime, pgmq.
+- Valibot en fronteras API, TanStack Query para server state, Vitest y
+  Playwright para verificación, Sentry para observabilidad.
+- Monorepo pnpm: `apps/web` y `apps/collab` son los runtimes principales.
+
+El stack sigue siendo adecuado; no hay motivo para reiniciar el producto con
+otro framework. La deuda está en disciplina operativa, permisos, entornos y
+profundidad de producto, no en SvelteKit/Supabase/Cloudflare.
+
+## Reglas para cualquier agente
+
+1. Antes de escribir código, leer
+   `/Users/marcorubiol/Zerø System/03_AGENCY/_area-methød/code/philosophy.md`.
+2. Para nav, lentes, módulos o detalle, leer `build/structure-model.md`.
+3. Confirmar estado inestable con evidencia: health stamp, Git, catálogo DB o
+   tests. Nunca promover a verdad una frase de un prompt/sesión.
+4. `_tasks.md` es la cola; no crear otra cola paralela en un prompt o runbook.
+5. `_decisions.md` es append-only. Añadir `Superseded by ADR-…` cuando cambie una
+   decisión; no reescribir la historia para que parezca que siempre acertó.
+6. No ejecutar nada de `build/archive/`.
+7. No editar ni insertar directamente `auth.users`; usar Supabase Auth Admin.
+8. No hacer cambios de schema sin migración, backup/preflight proporcional,
+   regeneración de tipos y RLS tests.
+9. No desplegar un árbol sucio. Producción es lo que dice `/health/live`, no el
+   último commit local ni un documento.
+10. Los secretos viven en Wrangler, Keychain o `.env*` gitignored; nunca en Git.
+
+## Dónde vive cada verdad
+
+| Pregunta | Fuente |
+|---|---|
+| ¿Dónde estamos? | `_context.md` |
+| ¿Qué hacemos ahora? | `_tasks.md` |
+| ¿Cómo está diseñado técnicamente? | `build/architecture.md` |
+| ¿Cómo se estructura el producto? | `build/structure-model.md` |
+| ¿Qué datos lleva cada pantalla? | `build/screen-data-spec.md` |
+| ¿Qué pantallas faltan revisar? | `build/screens-inventory.md` |
+| ¿Por qué se decidió algo? | `_decisions.md` |
+| ¿Qué ocurrió en una sesión? | `_notes/sessions-log.md` |
+| ¿Cómo opero producción/backup/beta? | `build/runbooks/` |
+| ¿Dónde están planes y prompts terminados? | `build/archive/` |
+| ¿Qué se investigó? | `research/INDEX.md` |
+
+## Siguiente paso
+
+Abrir `_tasks.md`. La prioridad inmediata es reconciliar los cinco e2e fallidos
+y después cerrar el gate operativo de beta; no relanzar prompts archivados.
+
+## Desarrollo local
+
+```bash
+pnpm install
+pnpm dev
+pnpm --filter web check
+pnpm --filter web test:unit
+pnpm --filter web test:rls
+pnpm build
+```
+
+Los valores públicos Supabase viven en `apps/web/.env`; los secretos y fixtures
+en `.env.test`, Keychain o Wrangler. Ver `build/setup.md` y
+`build/runbooks/test-user-setup.md`.

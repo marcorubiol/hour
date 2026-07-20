@@ -1,5 +1,7 @@
 # Hour — Build prompt: hall status sentence (`/h`)
 
+> **ARCHIVED — EXECUTED. DO NOT RE-RUN.**
+
 > **STATUS: EXECUTED / LIVE (verificado 2026-07-17).** Construido: `hall-status.ts` (`computeHallStatus` pura, 3 estados show/attention/calm + `hallSentence` i18n) + `hall-status.test.ts`, consumido en `/h/+page.svelte`. Pendiente solo el 4º estado IA `proposal` (futuro intencional, nunca se emite aún).
 >
 > Handoff prompt for an external coding agent. Self-contained: context + task + constraints.
