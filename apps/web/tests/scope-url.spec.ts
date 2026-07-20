@@ -80,3 +80,21 @@ test('Everything from the HALL with a scoped link also lands clean on /h/desk', 
 
   expect(page.url()).not.toContain('scope=');
 });
+
+test('Conversations is a scoped lens and copies its canonical scoped URL', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.goto(`/h/conversations?scope=${FIXTURE_SPACE_TOKEN}`);
+
+  await expect(page.locator('.tok').first()).toBeVisible({ timeout: 15000 });
+  await expect(page.getByRole('tab', { name: 'Conversations' })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
+  await expect(page).toHaveURL(/\/h\/conversations\?scope=s:playwright$/);
+
+  await page.getByRole('button', { name: /Copy link/ }).click();
+  await expect(page.getByText('Link copied — scope included.')).toBeVisible();
+
+  const copied = await page.evaluate(() => navigator.clipboard.readText());
+  expect(copied).toBe(page.url());
+});

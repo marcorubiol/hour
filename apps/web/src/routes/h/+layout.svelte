@@ -354,7 +354,7 @@
   // Which routed lens (if any) the current URL is showing. ADR-067: lens
   // routes are space-less — the space segment appears only on entity URLs.
   let routedLens = $derived.by<Lens | null>(() => {
-    const m = page.url.pathname.match(/^\/h\/(desk|planner|contacts|money)\/?$/);
+    const m = page.url.pathname.match(/^\/h\/(desk|planner|conversations|money)\/?$/);
     return (m?.[1] as Lens | undefined) ?? null;
   });
   let atHome = $derived(/^\/h\/?$/.test(page.url.pathname));
