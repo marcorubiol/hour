@@ -133,7 +133,7 @@ export interface PerformanceBundleResult {
 }
 
 const PERSON_COLS =
-  'id:person_id,slug,full_name,email,phone,organization:organization_id(name)';
+  'id:person_id,slug,full_name,email,phone,organization:workspace_organization!workspace_person_organization_fkey(name)';
 
 function normalizePerson(person: PersonDbEmbed | null): PersonEmbed | null {
   if (!person) return null;

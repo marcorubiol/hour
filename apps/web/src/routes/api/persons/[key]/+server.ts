@@ -64,7 +64,7 @@ export const GET: RequestHandler = async ({ request, params, url, platform, loca
     const personSearch = new URLSearchParams();
     personSearch.set(
       'select',
-      'workspace_id,person_id,slug,full_name,first_name,last_name,email,phone,website,city,country,languages,title,notes,custom_fields,organization:organization_id(id,slug,name,kind)',
+      'workspace_id,person_id,slug,full_name,first_name,last_name,email,phone,website,city,country,languages,title,notes,custom_fields,organization:workspace_organization!workspace_person_organization_fkey(id,slug,name,kind)',
     );
     personSearch.set('workspace_id', `eq.${workspaceId}`);
     personSearch.set(isUuid(key) ? 'person_id' : 'slug', `eq.${key}`);

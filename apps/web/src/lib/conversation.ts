@@ -134,6 +134,6 @@ export function normalizeConversationItem(item: ConversationDbItem): Conversatio
 /** PostgREST embed clause matching `ConversationItem` — shared by GET + PATCH. */
 export const CONVERSATION_SELECT = [
   '*',
-  'person:workspace_person!conversation_workspace_person_fkey(person_id,slug,full_name,email,country,city,website,organization:organization_id(name))',
+  'person:workspace_person!conversation_workspace_person_fkey(person_id,slug,full_name,email,country,city,website,organization:workspace_organization!workspace_person_organization_fkey(name))',
   'project:project_id(id,slug,name,status)',
 ].join(',');

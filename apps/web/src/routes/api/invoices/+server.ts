@@ -91,7 +91,7 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
     [
       'id,number,status,issued_on,due_on,subtotal,total,currency',
       'project:project_id(id,slug,name)',
-      'payer:workspace_person!invoice_workspace_payer_person_fkey(id:person_id,slug,full_name,organization:organization_id(name))',
+      'payer:workspace_person!invoice_workspace_payer_person_fkey(id:person_id,slug,full_name,organization:workspace_organization!workspace_person_organization_fkey(name))',
       'lines:invoice_line(performance_id)',
     ].join(','),
   );

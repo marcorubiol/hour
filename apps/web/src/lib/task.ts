@@ -129,7 +129,7 @@ export const TASK_SELECT = [
   'project:project_id(id,slug,name)',
   'line:line_id(id,slug,name,project_id)',
   'performance:performance_id(id,slug,project_id,venue_name,city,start_at)',
-  'conversation:conversation_id(id,project_id,person:workspace_person!conversation_workspace_person_fkey(slug,full_name,organization:organization_id(name)))',
+  'conversation:conversation_id(id,project_id,person:workspace_person!conversation_workspace_person_fkey(slug,full_name,organization:workspace_organization!workspace_person_organization_fkey(name)))',
 ].join(',');
 
 // ── Surfacing (ADR-070) ─────────────────────────────────────────────────
