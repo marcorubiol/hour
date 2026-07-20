@@ -11,6 +11,12 @@
     "dev": "pnpm --filter web dev",
     "build": "pnpm --filter web build",
     "preview": "pnpm --filter web preview",
-    "deploy": "pnpm --filter web deploy"
+    "deploy": "pnpm --filter web deploy",
+    "db:start": "supabase start",
+    "db:reset": "supabase db reset --local",
+    "db:stop": "supabase stop"
+  },
+  "devDependencies": {
+    "supabase": "2.109.1"
   }
 }

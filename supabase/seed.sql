@@ -1,0 +1,5 @@
+-- Intentionally empty.
+--
+-- The committed baseline reconstructs schema only. Never seed production rows,
+-- user identities, contact data, or secrets from a live dump. Purpose-built
+-- local/staging fixtures may be added here once they are synthetic.

@@ -35,6 +35,12 @@ Pick the newest stamp; expect three files:
 - `schema-<stamp>.sql.gz`
 - `roles-<stamp>.sql.gz`
 
+For a schema-only inspection without downloading production rows, trigger the
+workflow manually with optional input `source_stamp`. It retrieves the named R2
+backup and publishes only `schema-*.sql.gz` as a one-day Actions artifact. With
+no input, the workflow creates the normal fresh backup and the same short-lived
+schema-only artifact. See `build/runbooks/database-baseline.md`.
+
 ## Restore drill (do this once before Phase 0.9 gate)
 
 1. Spin up an empty Supabase project (or local `supabase start`).
