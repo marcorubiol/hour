@@ -8,10 +8,10 @@ environment:
 
 1. `Supabase staging baseline` rebuilds a hosted staging database from the
    committed migrations, creates Auth users through the Admin API, loads only
-   deterministic synthetic fixtures, and requires RLS 114/114 plus the critical
+   deterministic synthetic fixtures, and requires RLS 118/118 plus the critical
    route smoke.
 2. `Supabase staging restore drill` temporarily replaces that data with one
-   private R2 backup, verifies login, source counts, RLS 114/114 and the same
+   private R2 backup, verifies login, source counts, RLS 118/118 and the same
    route, records evidence, then always rebuilds the synthetic baseline.
 
 Both workflows serialize on the `supabase-staging` concurrency group and refuse
@@ -61,7 +61,7 @@ REBUILD STAGING
 ```
 
 The successful summary must show the same commit being assessed. The RLS step
-must report `114 passed`; no skips or expected failures count as completion.
+must report `118 passed`; no skips or expected failures count as completion.
 
 ## Run the restore drill
 
@@ -85,6 +85,10 @@ Record the successful workflow URL, exact stamp and elapsed seconds below.
 
 ### Local structural preflight — 2026-07-20
 
+The counts below are historical evidence from the block-1 commit, whose RLS
+contract contained 114 tests. The executable gate now contains 118 tests and
+must report 118/118 on every new baseline or restore run.
+
 Before touching a hosted project, the complete restore sequence was exercised
 against a fresh local Supabase Postgres 17 instance using a CLI-generated
 roles/schema/data backup of the synthetic baseline:
@@ -103,6 +107,9 @@ This proved the dump and restore machinery before the hosted acceptance gate
 below was run.
 
 ### Hosted staging acceptance — 2026-07-20
+
+These two run records are historical block-1 evidence (114/114 at their exact
+commits). New runs use the expanded 118/118 contract.
 
 Target: `hour-staging`, ref `slccyknqpgmzhyiyclsq`, region `eu-west-1`.
 

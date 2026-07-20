@@ -1,9 +1,9 @@
 /**
  * GET /api/money/performances — the fees feed for the Money lens
- * (ADR-046). Reads `performance_redacted`, the decided money-safe path:
- * fee columns are NULLed by the view unless the caller holds
- * `read:money` on the project (invoker semantics — RLS of the base
- * table applies underneath).
+ * (ADR-046). Reads through a SECURITY DEFINER RPC that returns rows only
+ * when the caller holds `read:money`. Authenticated users have no direct
+ * SELECT grant on fee columns, so custom PostgREST queries cannot bypass
+ * the same money boundary.
  *
  * Union filters + optional performed_at window, same contract as the
  * other list endpoints.
@@ -12,7 +12,7 @@
 import type { RequestHandler } from './$types';
 import * as v from 'valibot';
 import { extractAccessToken } from '$lib/auth';
-import { pgGet, type SupabaseEnv } from '$lib/supabase';
+import { pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
 
 const QuerySchema = v.object({
@@ -93,38 +93,14 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
   const workspaceIds = parseUuidList(workspace_ids);
   const lineIds = parseUuidList(line_ids);
 
-  const search = new URLSearchParams();
-  search.set(
-    'select',
-    [
-      'id,slug,performed_at,status,venue_name,city,fee_amount,fee_currency,project_id,line_id',
-      'project:project_id(id,slug,name,accent,workspace_id)',
-    ].join(','),
-  );
-
-  if (projectIds.length > 0 && workspaceIds.length > 0) {
-    search.set(
-      'or',
-      `(project_id.in.(${projectIds.join(',')}),workspace_id.in.(${workspaceIds.join(',')}))`,
-    );
-  } else if (projectIds.length > 0) {
-    search.set('project_id', `in.(${projectIds.join(',')})`);
-  } else if (workspaceIds.length > 0) {
-    search.set('workspace_id', `in.(${workspaceIds.join(',')})`);
-  }
-
-  // Line narrowing (ADR-056): the Money module fetches only its line's
-  // gigs instead of the whole project. Composes with the union filter.
-  if (lineIds.length > 0) search.set('line_id', `in.(${lineIds.join(',')})`);
-  search.set('deleted_at', 'is.null');
-  if (from) search.append('performed_at', `gte.${from}`);
-  if (to) search.append('performed_at', `lte.${to}`);
-  search.set('order', 'performed_at.asc');
-  search.set('limit', String(limit));
-
   try {
-    const { data } = await pgGet<MoneyPerformance>(env, 'performance_redacted', jwt, {
-      search,
+    const { data } = await pgPostRpc<MoneyPerformance>(env, 'list_money_performances', jwt, {
+      p_project_ids: projectIds.length > 0 ? projectIds : null,
+      p_workspace_ids: workspaceIds.length > 0 ? workspaceIds : null,
+      p_line_ids: lineIds.length > 0 ? lineIds : null,
+      p_from: from ?? null,
+      p_to: to ?? null,
+      p_limit: limit,
     });
     return json({ items: data });
   } catch (err) {

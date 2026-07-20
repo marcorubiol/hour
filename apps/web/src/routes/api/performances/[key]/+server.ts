@@ -184,6 +184,15 @@ export const PATCH: RequestHandler = async ({ request, params, url, platform, lo
     const search = new URLSearchParams();
     search.set('id', `eq.${id}`);
     search.set('deleted_at', 'is.null');
+    search.set(
+      'select',
+      [
+        'id,workspace_id,project_id,line_id,conversation_id,slug,performed_at,status',
+        'venue_id,venue_name,city,country,load_in_at,soundcheck_at,start_at',
+        'loadout_at,wrap_at,logistics,hospitality,technical,notes,custom_fields',
+        'created_by,created_at,updated_at,deleted_at,previous_slugs,hold_notice_days,readiness',
+      ].join(','),
+    );
     const { data } = await pgPatch<Record<string, unknown>>(
       env,
       'performance',

@@ -37,8 +37,22 @@
     }
   ],
 
-  // Rate limiting (Phase 0.9) — non-atomic KV backstop behind the primary
-  // Cloudflare edge rate-limit rule for /api/auth/login.
+  // Rate limiting (Phase 0.9). Cloudflare's native limiter catches login
+  // bursts with the only supported long period (60s); the KV window below
+  // independently preserves the 10 requests / 5 minutes contract.
+  "ratelimits": [
+    {
+      "name": "LOGIN_RATE_LIMIT",
+      "namespace_id": "2026072001",
+      "simple": {
+        "limit": 10,
+        "period": 60
+      }
+    }
+  ],
+
+  // Non-atomic long-window backstop for login plus coarse refresh/tunnel
+  // quotas. The login endpoint composes this with LOGIN_RATE_LIMIT above.
   "kv_namespaces": [
     {
       "binding": "RATE_LIMIT",

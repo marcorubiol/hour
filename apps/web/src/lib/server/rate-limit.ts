@@ -10,12 +10,11 @@
  * serious credential-stuffing tool uses. Treat it as an in-Worker backstop,
  * not the primary control.
  *
- * The primary control for external launch is a Cloudflare **edge**
- * rate-limit rule on `/api/auth/login` (same mechanism already used on the
- * agency fleet's wp-login) — it's atomic at the edge and stops the burst
- * before it reaches the Worker. See build/runbooks/beta-readiness.md. This
- * KV limiter stays as defense-in-depth + the quota guard on the Sentry
- * tunnel (where coarse is fine).
+ * Login has a second, burst-oriented control: Cloudflare's native Workers
+ * Rate Limiting binding. The native counter and this five-minute KV window
+ * are deliberately composed: the native binding catches concurrent bursts
+ * while KV preserves the longer 10-per-five-minute budget for sequential
+ * attempts. See build/runbooks/beta-readiness.md.
  *
  * No binding → no-op (allow everything). This keeps vite dev, preview and
  * pre-KV deploys working; creating the namespace and uncommenting the
@@ -27,6 +26,28 @@ export interface RateLimitRule {
   limit: number;
   /** Window length in seconds (KV TTL floor is 60). */
   windowSec: number;
+}
+
+/** Minimal structural type so unit tests do not need a Workers runtime. */
+export interface NativeRateLimiter {
+  limit(options: { key: string }): Promise<{ success: boolean }>;
+}
+
+/**
+ * Cloudflare-native burst gate. No binding in local development means no-op.
+ * A transient binding error fails open so Cloudflare cannot lock every user
+ * out; the independent KV window still runs immediately afterwards.
+ */
+export async function allowNativeRequest(
+  limiter: NativeRateLimiter | undefined,
+  key: string,
+): Promise<boolean> {
+  if (!limiter) return true;
+  try {
+    return (await limiter.limit({ key })).success;
+  } catch {
+    return true;
+  }
 }
 
 /**

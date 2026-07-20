@@ -1,6 +1,6 @@
 # Identidad portátil, dossiers privados y acceso
 
-> Estado: **MODELO APLICADO; HITOS POSTERIORES PENDIENTES — 2026-07-20**
+> Estado: **MODELO + CICLO DE ACCESO APLICADOS; CLAIMS/PROCEDENCIA PENDIENTES — 2026-07-20**
 > Fecha: 2026-07-20
 > Motivo: conservar una identidad personal que atraviesa compañías sin convertir
 > las fichas, conversaciones o notas de esas compañías en datos globales.
@@ -25,8 +25,12 @@ Mantener la identidad portátil. No mantener una ficha de contacto global compar
 - Las APIs de personas, conversaciones, equipo, disponibilidad, facturas, tareas y
   road sheets ya leen el dossier local. `person` queda accesible al rol autenticado
   solo por su `id` opaco.
-- Quedan para un milestone posterior: invitación transaccional, registro de claims y
-  merges reversibles, procedencia por campo y UI de selección de campos compartidos.
+- La invitación ya es transaccional: token aleatorio almacenado solo como hash,
+  caducidad/revocación, email Auth verificado, membership y rol de proyecto
+  opcional. Settings permite invitar, cambiar rol y revocar sin SQL manual.
+- Quedan para un milestone posterior: registro de claims y merges reversibles,
+  procedencia por campo, enlace automático con la ficha local y UI de selección
+  de campos compartidos.
 - El directorio `supabase/migrations/` ya contiene el checkpoint defensivo, los tres
   hotfixes y la migración de identidad en el mismo orden/versiones del historial remoto.
   El checkpoint aborta sobre una base vacía o equivocada; todavía falta sustituirlo
@@ -117,9 +121,11 @@ fusionar personas por un email compartido, reciclado o mal importado.
 
 1. La compañía invita desde su ficha local.
 2. El destinatario entra o crea cuenta y verifica el mismo email.
-3. Hour muestra compañía, rol, permisos y campos portátiles que se compartirán.
-4. Una transacción acepta la membership, registra el claim y vincula la ficha local.
-5. Los valores locales y los compartidos permanecen diferenciados y con procedencia.
+3. Hour muestra compañía, rol y proyecto/rol de proyecto opcionales.
+4. Una transacción acepta la membership y la asignación de proyecto. El claim y
+   el enlace con la ficha local permanecen explícitamente fuera de este corte.
+5. Los valores locales y los compartidos permanecen separados; la UI de
+   procedencia/selección llegará con el milestone de claims.
 
 ### Segunda compañía
 
@@ -154,7 +160,8 @@ ve ambas participaciones; cada compañía conserva exclusivamente su dossier y a
 
 ### 2. Migración aditiva
 
-1. Crear `workspace_person`, `workspace_organization`, shares, invitaciones y claims.
+1. Crear `workspace_person`, `workspace_organization`, shares e invitaciones.
+   Los claims siguen pendientes.
 2. Generar un dossier por cada par real `(workspace_id, person_id)` encontrado en
    conversaciones, reparto, crew, sustituciones, notas, disponibilidad y facturas.
 3. Copiar deliberadamente los actuales campos globales a cada dossier local; no
@@ -186,8 +193,8 @@ vez que la base completa puede reconstruirse sin depender de SQL manual históri
 
 ## Decisiones adoptadas para el primer milestone
 
-1. El contrato permite elegir campos; `full_name` es obligatorio. La UI de aceptación
-   deberá mostrar la selección antes de invocar el RPC.
+1. El contrato futuro de perfil permitirá elegir campos; `full_name` será
+   obligatorio. La aceptación actual no comparte perfil ni simula esa selección.
 2. Revocar conserva el dato local y detiene futuras sincronizaciones.
 3. Un conflicto cross-workspace mostrará solo disponibilidad, nunca el otro trabajo;
    esa proyección todavía no forma parte de esta migración.

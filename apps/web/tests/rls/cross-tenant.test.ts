@@ -20,7 +20,7 @@
  */
 
 import { beforeAll, describe, expect, test } from 'vitest';
-import { decodeJwt, envReady, login, pgGet, requireEnv } from './_helpers';
+import { decodeJwt, envReady, login, pgGet, pgRpc, requireEnv } from './_helpers';
 
 describe.skipIf(!envReady())('RLS — cross-tenant isolation', () => {
   let playwrightJwt: string;
@@ -125,19 +125,12 @@ describe.skipIf(!envReady())('RLS — cross-tenant isolation', () => {
     expect(rows.length).toBe(0);
   });
 
-  test('performance_redacted view respects RLS (security_invoker)', async () => {
-    // This view used to be created WITHOUT security_invoker, which is
-    // the canonical "views bypass RLS" gotcha called out by the Supabase
-    // agent skill. Fixed 2026-05-18 (see migration
-    // 2026-05-18_secure_performance_redacted_view.sql). Test guards against
-    // regression.
-    const { rows: anonRows } = await pgGet('performance_redacted', null);
-    expect(anonRows.length).toBe(0);
+  test('money feed is authenticated and permission-filtered', async () => {
+    const anonymous = await pgRpc('list_money_performances', null);
+    expect(anonymous.status).toBeGreaterThanOrEqual(400);
 
-    // No shows exist yet in Phase 0 — we don't assert on row count
-    // for the authenticated path, only that it doesn't error and (if
-    // any rows return) belongs to a workspace the user can see.
-    const { status } = await pgGet('performance_redacted', playwrightJwt);
-    expect(status).toBeLessThan(400);
+    const authenticated = await pgRpc<unknown[]>('list_money_performances', playwrightJwt);
+    expect(authenticated.status).toBe(200);
+    expect(Array.isArray(authenticated.data)).toBe(true);
   });
 });

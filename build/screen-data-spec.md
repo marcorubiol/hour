@@ -516,15 +516,17 @@ but flag it before multi-user.
 ### `/settings` — Settings
 
 **Is**: system surface (account + platform admin). Mostly scaffold by design.
-**Today (real)**: alias-request review (platform admin, wired), Master View (localStorage),
-session name/email display. Everything else (privacy, languages, notifications, billing,
-danger zone, roles chips) is local-state vapor, honestly marked in the file header.
+**Today (real)**: workspace access desk (member/pending-invite ledger, invite-link
+creation, role changes and revocation), alias-request review (platform admin,
+wired), Master View (localStorage), session name/email display. Privacy,
+languages, notifications, billing and danger-zone controls remain local-state
+vapor, honestly marked in the file header.
 **Should contain (Phase 0 honest core)**:
 - **Profile that persists**: full_name + locale + avatar — `user_profile` has all three
   columns; the form writes none of them [db].
-- **Workspace members panel**: list `workspace_membership` + `user_profile` per space,
-  role; invite (Anouk is user #2 — currently no UI path to add her) [db — membership table
-  + invited_by exist; invite flow needs an email or link mechanism, build not schema].
+- **Workspace members panel**: implemented with `list_workspace_access`, hashed
+  expiring invite links, optional project role, acceptance by verified matching
+  email, role edits and revoke [now]. Email delivery is deliberately manual copy/send.
 - Alias review [now]. Master View [now].
 - **Cut or hide the vapor** (billing, notifications, privacy toggles) until each is real —
   a settings page that lies erodes trust in the ones that work [design decision].
@@ -536,8 +538,8 @@ decide channel before designing the panel.
 ## Auth / public / system
 
 ### `/login`
-Email + password [now]; TOTP slot reserved (design for the second factor field now, wire
-later); locale-aware error copy [now]. Sufficient.
+Email + password and invited-user signup [now]; safe `next` return path and email
+confirmation state [now]. TOTP remains reserved for later.
 
 ### `/offline`
 Static + reload on reconnect [now]. Should eventually state WHAT is available offline

@@ -84,7 +84,7 @@ production.
    `SET session_replication_role = replica` so dependency ordering does not
    invalidate foreign keys while loading.
 4. Re-enable normal replication mode before committing.
-5. Verify login, source/target row counts, RLS 114/114 and one critical route.
+5. Verify login, source/target row counts, RLS 118/118 and one critical route.
 6. Record the stamp and elapsed time. Target: under 30 minutes end-to-end.
 
 The executable staging restore procedure and evidence live in

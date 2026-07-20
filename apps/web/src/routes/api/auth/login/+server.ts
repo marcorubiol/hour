@@ -15,7 +15,11 @@ import {
   setSessionCookies,
   type SessionEnv,
 } from '$lib/server/session';
-import { allowRequest, clientIp } from '$lib/server/rate-limit';
+import {
+  allowNativeRequest,
+  allowRequest,
+  clientIp,
+} from '$lib/server/rate-limit';
 
 const LOGIN_RULE = { limit: 10, windowSec: 300 };
 
@@ -34,8 +38,14 @@ function json(body: unknown, status = 200): Response {
 export const POST: RequestHandler = async ({ request, cookies, platform }) => {
   if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);
   const env = platform.env as unknown as SessionEnv;
+  const loginKey = `login:${clientIp(request)}`;
 
-  if (!(await allowRequest(env.RATE_LIMIT, `login:${clientIp(request)}`, LOGIN_RULE))) {
+  // Native 10/minute rejects a concurrent burst; KV independently enforces
+  // the longer 10/five-minute budget for slower sequential attempts.
+  if (!(await allowNativeRequest(env.LOGIN_RATE_LIMIT, loginKey))) {
+    return json({ error: 'rate_limited' }, 429);
+  }
+  if (!(await allowRequest(env.RATE_LIMIT, loginKey, LOGIN_RULE))) {
     return json({ error: 'rate_limited' }, 429);
   }
 

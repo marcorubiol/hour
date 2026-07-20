@@ -105,9 +105,9 @@ jobs:
               )::text;
             ")"
           echo "$actual" | jq -e \
-            '. == {"users": 2, "workspaces": 4, "conversations": 154}' >/dev/null
+            '. == {"users": 3, "workspaces": 4, "conversations": 154}' >/dev/null
 
-      - name: RLS contract (114/114)
+      - name: RLS contract
         run: pnpm --filter web test:rls
 
       - name: Prepare staging Worker runtime configuration
@@ -131,5 +131,5 @@ jobs:
             echo '## Supabase staging baseline'
             echo
             echo "Commit: \`${GITHUB_SHA}\`"
-            echo 'Expected gate: fresh migration reset, synthetic fixtures, RLS 114/114, critical-route smoke.'
+            echo 'Expected gate: fresh migration reset, synthetic fixtures, RLS 118/118, critical-route smoke.'
           } >> "$GITHUB_STEP_SUMMARY"

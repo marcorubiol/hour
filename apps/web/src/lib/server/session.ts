@@ -27,11 +27,11 @@ export const REFRESH_COOKIE = 'hour_rt';
 const REFRESH_COOKIE_PATH = '/api/auth';
 const REFRESH_MAX_AGE = 60 * 60 * 24 * 60; // 60 days
 
-/** Env surface the auth endpoints need. RATE_LIMIT is optional on purpose —
- * the code no-ops without the KV binding so local dev and pre-KV deploys
- * keep working (see $lib/server/rate-limit.ts). */
+/** Env surface the auth endpoints need. Rate-limit bindings are optional so
+ * local Vite development keeps working (see $lib/server/rate-limit.ts). */
 export interface SessionEnv extends SupabaseEnv {
   RATE_LIMIT?: KVNamespace;
+  LOGIN_RATE_LIMIT?: RateLimit;
 }
 
 export interface SessionUser {
@@ -45,6 +45,10 @@ interface SupabaseAuthUser {
   email?: string | null;
   user_metadata?: Record<string, unknown>;
 }
+
+export type SignUpResult =
+  | { ok: true; grant: TokenGrant | null; user: SupabaseAuthUser | null }
+  | { ok: false; reason: 'invalid_signup' | 'upstream' };
 
 export interface TokenGrant {
   access_token: string;
@@ -136,6 +140,46 @@ export function passwordGrant(env: SessionEnv, email: string, password: string):
 
 export function refreshGrant(env: SessionEnv, refreshToken: string): Promise<GrantResult> {
   return tokenGrant(env, 'refresh_token', { refresh_token: refreshToken });
+}
+
+export async function signUp(
+  env: SessionEnv,
+  email: string,
+  password: string,
+  fullName: string,
+): Promise<SignUpResult> {
+  let response: Response;
+  try {
+    response = await fetch(`${env.PUBLIC_SUPABASE_URL}/auth/v1/signup`, {
+      method: 'POST',
+      headers: {
+        apikey: env.PUBLIC_SUPABASE_ANON_KEY,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        email,
+        password,
+        data: { full_name: fullName },
+      }),
+    });
+  } catch {
+    return { ok: false, reason: 'upstream' };
+  }
+  if (!response.ok) {
+    return {
+      ok: false,
+      reason: response.status < 500 ? 'invalid_signup' : 'upstream',
+    };
+  }
+
+  const body = (await response.json()) as Partial<TokenGrant> & {
+    user?: SupabaseAuthUser | null;
+  };
+  const grant =
+    body.access_token && body.refresh_token && typeof body.expires_in === 'number'
+      ? (body as TokenGrant)
+      : null;
+  return { ok: true, grant, user: body.user ?? null };
 }
 
 /** Best-effort server-side revocation on logout. Cookie clearing is the

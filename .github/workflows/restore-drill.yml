@@ -171,7 +171,7 @@ jobs:
           jq -e --argjson actual "$actual" '.counts == $actual' restore/METADATA.json >/dev/null
           echo "RESTORED_COUNTS=$actual" >> "$GITHUB_ENV"
 
-      - name: Restored login and RLS contract (114/114)
+      - name: Restored login and RLS contract (118/118)
         run: pnpm --filter web test:rls
 
       - name: Prepare restored Worker runtime configuration
@@ -196,7 +196,7 @@ jobs:
             --arg commit "$GITHUB_SHA" \
             --argjson elapsed_seconds "$elapsed" \
             --argjson counts "$RESTORED_COUNTS" \
-            '{source_stamp: $source_stamp, commit: $commit, elapsed_seconds: $elapsed_seconds, counts: $counts, rls: "114/114", critical_route: "passed"}' \
+            '{source_stamp: $source_stamp, commit: $commit, elapsed_seconds: $elapsed_seconds, counts: $counts, rls: "118/118", critical_route: "passed"}' \
             > restore/evidence.json
           echo "DRILL_ELAPSED_SECONDS=$elapsed" >> "$GITHUB_ENV"
 
@@ -231,7 +231,7 @@ jobs:
             echo "Commit: \`${GITHUB_SHA}\`"
             if [ -n "${DRILL_ELAPSED_SECONDS:-}" ]; then
               echo "Elapsed: **${DRILL_ELAPSED_SECONDS}s**"
-              echo 'Login, source counts, RLS 114/114 and critical-route smoke passed.'
+              echo 'Login, source counts, RLS 118/118 and critical-route smoke passed.'
             else
               echo 'The drill did not reach the successful evidence step; inspect the failed step.'
             fi

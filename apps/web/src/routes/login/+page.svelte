@@ -10,6 +10,7 @@
 
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
+  import { page } from '$app/state';
   import { t } from '$lib/i18n';
   import { resolveLoginTarget } from '$lib/master-view';
   import { ensureSession, setSessionUser, type SessionUser } from '$lib/session.svelte';
@@ -17,13 +18,28 @@
 
   let email = $state('');
   let password = $state('');
+  let fullName = $state('');
   let submitting = $state(false);
   let errorMsg = $state('');
+  let confirmationRequired = $state(false);
+  let isSignup = $derived(page.url.searchParams.get('mode') === 'signup');
+  let nextPath = $derived.by(() => {
+    const candidate = page.url.searchParams.get('next');
+    return candidate?.startsWith('/') && !candidate.startsWith('//')
+      ? candidate
+      : resolveLoginTarget();
+  });
+  let alternateHref = $derived(
+    `/login?${new URLSearchParams({
+      ...(isSignup ? {} : { mode: 'signup' }),
+      ...(nextPath !== resolveLoginTarget() ? { next: nextPath } : {}),
+    }).toString()}`,
+  );
 
   onMount(async () => {
     // Already signed in (httpOnly cookie — only the server can tell).
     if (await ensureSession()) {
-      goto(resolveLoginTarget(), { replaceState: true });
+      goto(nextPath, { replaceState: true });
     }
   });
 
@@ -36,10 +52,12 @@
       // Worker-mediated sign-in (Phase 0.9): the password grant runs
       // server-side and the session lands as httpOnly cookies — tokens
       // never touch JS or localStorage.
-      const res = await fetch('/api/auth/login', {
+      const res = await fetch(isSignup ? '/api/auth/signup' : '/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify(
+          isSignup ? { full_name: fullName, email, password } : { email, password },
+        ),
       });
 
       if (!res.ok) {
@@ -50,13 +68,25 @@
             : body.error === 'auth_unavailable'
               ? 'login.auth_unavailable'
               : 'login.invalid_credentials';
-        throw new Error(t(key));
+        throw new Error(
+          isSignup && body.error === 'signup_rejected'
+            ? 'This account could not be created. It may already exist.'
+            : t(key),
+        );
       }
 
-      const data = (await res.json()) as { user: SessionUser | null };
-      setSessionUser(data.user);
+      const data = (await res.json()) as {
+        status?: 'signed_in' | 'confirmation_required';
+        user?: SessionUser | null;
+      };
+      if (data.status === 'confirmation_required') {
+        confirmationRequired = true;
+        submitting = false;
+        return;
+      }
+      setSessionUser(data.user ?? null);
 
-      goto(resolveLoginTarget(), { replaceState: true });
+      goto(nextPath, { replaceState: true });
     } catch (err) {
       errorMsg = err instanceof Error ? err.message : t('login.invalid_credentials');
       submitting = false;
@@ -75,10 +105,14 @@
     </header>
 
     <div class="login__center">
-      <span class="eyebrow login__kicker">{t('login.submit')}</span>
-      <h1 class="login__title">Hello <em>again.</em></h1>
+      <span class="eyebrow login__kicker">{isSignup ? 'Create account' : t('login.submit')}</span>
+      <h1 class="login__title">
+        {isSignup ? 'Join the' : 'Hello'} <em>{isSignup ? 'company.' : 'again.'}</em>
+      </h1>
       <p class="login__sub">
-        Your projects, contacts, shows and money — held together, one hour at a time.
+        {isSignup
+          ? 'Create your private Hour identity, then review and accept the invitation.'
+          : 'Your projects, contacts, shows and money — held together, one hour at a time.'}
       </p>
 
       <!-- method="post" is the safety net, not the path: handleSubmit
@@ -89,6 +123,20 @@
            logs, Referer). POST keeps it in the body; the route has no form
            action, so it dead-ends at 405 instead of leaking. -->
       <form class="login__form" method="post" onsubmit={handleSubmit}>
+        {#if isSignup}
+          <label class="login__field">
+            <span class="eyebrow login__label">Full name</span>
+            <input
+              type="text"
+              name="full_name"
+              autocomplete="name"
+              placeholder="Your name"
+              required
+              minlength="2"
+              bind:value={fullName}
+            />
+          </label>
+        {/if}
         <label class="login__field">
           <span class="eyebrow login__label">{t('login.email')}</span>
           <!-- svelte-ignore a11y_autofocus -->
@@ -99,7 +147,7 @@
             autocomplete="email"
             placeholder="you@somewhere.com"
             required
-            autofocus
+            autofocus={!isSignup}
             bind:value={email}
           />
         </label>
@@ -110,22 +158,41 @@
             
             type="password"
             name="password"
-            autocomplete="current-password"
+            autocomplete={isSignup ? 'new-password' : 'current-password'}
             placeholder="••••••••"
             required
+            minlength={isSignup ? 10 : undefined}
             bind:value={password}
           />
         </label>
+
+        {#if confirmationRequired}
+          <p class="login__notice" role="status">
+            Check {email} to confirm the account. Then reopen this invitation and sign in.
+          </p>
+        {/if}
 
         {#if errorMsg}
           <p class="login__error" role="alert">{errorMsg}</p>
         {/if}
 
         <button class="btn--primary login__submit" type="submit" disabled={submitting}>
-          <span>{submitting ? t('login.signing_in') : t('login.submit')}</span>
+          <span>
+            {submitting
+              ? isSignup
+                ? 'Creating account…'
+                : t('login.signing_in')
+              : isSignup
+                ? 'Create account'
+                : t('login.submit')}
+          </span>
           <span class="login__submit-arrow" aria-hidden="true">→</span>
         </button>
       </form>
+      <p class="login__alternate">
+        {isSignup ? 'Already have an account?' : 'Joining through an invitation?'}
+        <a href={alternateHref}>{isSignup ? 'Sign in' : 'Create one'}</a>
+      </p>
     </div>
 
     <footer class="login__foot">
@@ -272,6 +339,27 @@
       font-size: var(--text-s);
       color: var(--danger);
       margin: 0;
+    }
+
+    .login__notice {
+      margin: 0;
+      padding: var(--space-s);
+      border-inline-start: 2px solid var(--accent-color);
+      background: var(--bg-light);
+      color: var(--text-muted);
+      font-size: var(--text-s);
+      line-height: 1.5;
+    }
+
+    .login__alternate {
+      margin-block: var(--space-m) 0;
+      color: var(--text-faint);
+      font-size: var(--text-s);
+    }
+    .login__alternate a {
+      margin-inline-start: 0.35rem;
+      color: var(--text-color);
+      text-underline-offset: 0.2em;
     }
 
     /* Login submit — full-width primary CTA aligned to the inputs

@@ -45,6 +45,11 @@ declare global {
      * activation step.
      */
     RATE_LIMIT?: KVNamespace;
+    /**
+     * Cloudflare-native burst limiter for password login. The 10/minute
+     * native gate composes with RATE_LIMIT's 10/five-minute KV window.
+     */
+    LOGIN_RATE_LIMIT?: RateLimit;
   }
 
   /**

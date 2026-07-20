@@ -24,6 +24,8 @@ const EMAIL = process.env.PW_TEST_EMAIL;
 const PASSWORD = process.env.PW_TEST_PASSWORD;
 const LIMITED_EMAIL = process.env.PW_LIMITED_EMAIL;
 const LIMITED_PASSWORD = process.env.PW_LIMITED_PASSWORD;
+const EXTERNAL_EMAIL = process.env.PW_EXTERNAL_EMAIL ?? 'external@hour.test';
+const EXTERNAL_PASSWORD = process.env.PW_EXTERNAL_PASSWORD ?? LIMITED_PASSWORD;
 
 export function envReady(): boolean {
   return Boolean(SB_URL && SB_ANON && EMAIL && PASSWORD);
@@ -54,6 +56,19 @@ export function requireLimitedEnv(): { email: string; password: string } {
     );
   }
   return { email: LIMITED_EMAIL, password: LIMITED_PASSWORD };
+}
+
+export function externalEnvReady(): boolean {
+  return Boolean(SB_URL && SB_ANON && EXTERNAL_EMAIL && EXTERNAL_PASSWORD);
+}
+
+export function requireExternalEnv(): { email: string; password: string } {
+  if (!EXTERNAL_EMAIL || !EXTERNAL_PASSWORD) {
+    throw new Error(
+      'External-identity RLS tests need PW_EXTERNAL_PASSWORD or PW_LIMITED_PASSWORD',
+    );
+  }
+  return { email: EXTERNAL_EMAIL, password: EXTERNAL_PASSWORD };
 }
 
 interface AuthOk {
@@ -166,7 +181,7 @@ export async function pgRpc<T = unknown>(
   functionName: string,
   jwt: string | null,
   args: Record<string, unknown> = {},
-): Promise<{ status: number; data: T | null }> {
+): Promise<{ status: number; data: T | null; error?: string }> {
   const { url, anon } = requireEnv();
   const u = new URL(`/rest/v1/rpc/${functionName}`, url);
 
@@ -181,11 +196,14 @@ export async function pgRpc<T = unknown>(
     body: JSON.stringify(args),
   });
   let data: T | null = null;
+  let error: string | undefined;
   if (res.ok) {
     const body = await res.text();
     if (body) data = JSON.parse(body) as T;
+  } else {
+    error = await res.text();
   }
-  return { status: res.status, data };
+  return { status: res.status, data, ...(error ? { error } : {}) };
 }
 
 /** Decode a JWT body (no signature verification — just inspect claims). */

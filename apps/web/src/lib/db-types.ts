@@ -7,10 +7,30 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "14.5"
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
   }
   public: {
     Tables: {
@@ -2061,6 +2081,69 @@ export type Database = {
           },
         ]
       }
+      workspace_invitation: {
+        Row: {
+          accepted_at: string | null
+          accepted_by: string | null
+          created_at: string
+          email: string
+          expires_at: string
+          id: string
+          invited_by: string
+          project_id: string | null
+          project_role_code: string | null
+          revoked_at: string | null
+          role: Database["public"]["Enums"]["membership_role"]
+          token_hash: string
+          workspace_id: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          accepted_by?: string | null
+          created_at?: string
+          email: string
+          expires_at: string
+          id?: string
+          invited_by: string
+          project_id?: string | null
+          project_role_code?: string | null
+          revoked_at?: string | null
+          role: Database["public"]["Enums"]["membership_role"]
+          token_hash: string
+          workspace_id: string
+        }
+        Update: {
+          accepted_at?: string | null
+          accepted_by?: string | null
+          created_at?: string
+          email?: string
+          expires_at?: string
+          id?: string
+          invited_by?: string
+          project_id?: string | null
+          project_role_code?: string | null
+          revoked_at?: string | null
+          role?: Database["public"]["Enums"]["membership_role"]
+          token_hash?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_invitation_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "project"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workspace_invitation_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspace"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workspace_membership: {
         Row: {
           accepted_at: string | null
@@ -2426,8 +2509,22 @@ export type Database = {
       }
     }
     Functions: {
+      accept_workspace_invitation: {
+        Args: { p_token: string }
+        Returns: {
+          role: Database["public"]["Enums"]["membership_role"]
+          workspace_id: string
+          workspace_name: string
+          workspace_slug: string
+        }[]
+      }
+      can_access_project: { Args: { p_project_id: string }; Returns: boolean }
       can_edit_project: { Args: { p_project_id: string }; Returns: boolean }
       can_see_person: { Args: { p_person_id: string }; Returns: boolean }
+      can_user_write_collab: {
+        Args: { p_target_id: string; p_target_table: string; p_user_id: string }
+        Returns: boolean
+      }
       create_asset_version: {
         Args: {
           p_direction?: Database["public"]["Enums"]["asset_direction"]
@@ -3008,6 +3105,25 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      create_workspace_invitation: {
+        Args: {
+          p_email: string
+          p_expires_days?: number
+          p_project_id?: string
+          p_project_role_code?: string
+          p_role?: Database["public"]["Enums"]["membership_role"]
+          p_workspace_id: string
+        }
+        Returns: {
+          email: string
+          expires_at: string
+          id: string
+          project_id: string
+          project_role_code: string
+          role: Database["public"]["Enums"]["membership_role"]
+          token: string
+        }[]
+      }
       current_user_id: { Args: never; Returns: string }
       current_workspace_id: { Args: never; Returns: string }
       current_workspace_role: {
@@ -3040,11 +3156,19 @@ export type Database = {
         Args: { p_perm: string; p_project_id: string }
         Returns: boolean
       }
+      has_permission_for_user: {
+        Args: { p_perm: string; p_project_id: string; p_user_id: string }
+        Returns: boolean
+      }
       is_account_admin: { Args: { acc_id: string }; Returns: boolean }
       is_account_member: { Args: { acc_id: string }; Returns: boolean }
       is_account_owner: { Args: { acc_id: string }; Returns: boolean }
       is_reserved_slug: { Args: { candidate: string }; Returns: boolean }
       is_workspace_admin: { Args: { ws_id: string }; Returns: boolean }
+      is_workspace_internal_member: {
+        Args: { p_workspace_id: string }
+        Returns: boolean
+      }
       is_workspace_member: { Args: { ws_id: string }; Returns: boolean }
       list_calendar_shares: {
         Args: { p_workspace_id: string }
@@ -3062,6 +3186,29 @@ export type Database = {
           isOneToOne: false
           isSetofReturn: true
         }
+      }
+      list_money_performances: {
+        Args: {
+          p_from?: string
+          p_limit?: number
+          p_line_ids?: string[]
+          p_project_ids?: string[]
+          p_to?: string
+          p_workspace_ids?: string[]
+        }
+        Returns: {
+          city: string
+          fee_amount: number
+          fee_currency: string
+          id: string
+          line_id: string
+          performed_at: string
+          project: Json
+          project_id: string
+          slug: string
+          status: Database["public"]["Enums"]["performance_status"]
+          venue_name: string
+        }[]
       }
       list_roadsheet_shares: {
         Args: { p_performance_id: string }
@@ -3081,6 +3228,38 @@ export type Database = {
           isOneToOne: false
           isSetofReturn: true
         }
+      }
+      list_workspace_access: {
+        Args: { p_workspace_id: string }
+        Returns: {
+          accepted_at: string
+          access_kind: string
+          created_at: string
+          display_name: string
+          email: string
+          expires_at: string
+          id: string
+          project_id: string
+          project_name: string
+          project_role_code: string
+          role: Database["public"]["Enums"]["membership_role"]
+          status: string
+          user_id: string
+        }[]
+      }
+      preview_workspace_invitation: {
+        Args: { p_token: string }
+        Returns: {
+          email: string
+          expires_at: string
+          project_id: string
+          project_name: string
+          project_role_code: string
+          role: Database["public"]["Enums"]["membership_role"]
+          workspace_id: string
+          workspace_name: string
+          workspace_slug: string
+        }[]
       }
       project_id_of_asset_version: {
         Args: {
@@ -3143,6 +3322,14 @@ export type Database = {
         Args: { p_share_id: string }
         Returns: undefined
       }
+      revoke_workspace_invitation: {
+        Args: { p_invitation_id: string }
+        Returns: undefined
+      }
+      revoke_workspace_member: {
+        Args: { p_membership_id: string }
+        Returns: undefined
+      }
       share_my_profile_with_workspace: {
         Args: { p_fields?: string[]; p_workspace_id: string }
         Returns: {
@@ -3183,6 +3370,18 @@ export type Database = {
         Returns: undefined
       }
       touch_line_visit: { Args: { p_line_id: string }; Returns: undefined }
+      update_performance_fee: {
+        Args: {
+          p_fee_amount: number
+          p_fee_currency?: string
+          p_performance_id: string
+        }
+        Returns: {
+          fee_amount: number
+          fee_currency: string
+          id: string
+        }[]
+      }
       update_project: {
         Args: { p_patch: Json; p_project_id: string }
         Returns: {
@@ -3243,6 +3442,13 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      update_workspace_member_role: {
+        Args: {
+          p_membership_id: string
+          p_role: Database["public"]["Enums"]["membership_role"]
+        }
+        Returns: undefined
       }
       uuid_generate_v7: { Args: never; Returns: string }
     }
@@ -3453,6 +3659,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       account_kind: ["personal", "team"],

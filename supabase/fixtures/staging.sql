@@ -1,4 +1,4 @@
--- Synthetic, deterministic staging fixture for the 114-test RLS contract.
+-- Synthetic, deterministic staging fixture for the RLS contract.
 -- Auth identities are deliberately created first through the Auth Admin API
 -- (`provision-auth.mjs`); never insert directly into auth.users.
 
@@ -6,8 +6,8 @@ begin;
 
 do $$
 begin
-  if (select count(*) from auth.users where email in ('playwright@hour.test', 'limited@hour.test')) <> 2 then
-    raise exception 'Both staging Auth fixture users must exist before loading SQL fixtures';
+  if (select count(*) from auth.users where email in ('playwright@hour.test', 'limited@hour.test', 'external@hour.test')) <> 3 then
+    raise exception 'All three staging Auth fixture users must exist before loading SQL fixtures';
   end if;
 end
 $$;

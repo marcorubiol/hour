@@ -15,6 +15,8 @@ export interface CollabAuthEnv {
 export interface CollabAuthOk {
   ok: true;
   workspaceId: string;
+  userId: string;
+  expiresAt: number;
 }
 
 export interface CollabAuthFail {
@@ -136,5 +138,32 @@ export async function authorizeCollab(
     return { ok: false, status: 403, reason: 'edit-permission-required' };
   }
 
-  return { ok: true, workspaceId: rows[0].workspace_id };
+  // PostgREST has now verified the token signature and expiry. Decode only
+  // the two claims the internal DO needs to re-check this live connection.
+  const [, payload] = jwt.split('.');
+  let claims: Record<string, unknown> | null = null;
+  try {
+    if (payload) {
+      const normalized = payload.replace(/-/g, '+').replace(/_/g, '/');
+      const padded = normalized + '='.repeat((4 - (normalized.length % 4)) % 4);
+      claims = JSON.parse(atob(padded)) as Record<string, unknown>;
+    }
+  } catch {
+    claims = null;
+  }
+  if (
+    typeof claims?.sub !== 'string' ||
+    claims.sub.length === 0 ||
+    typeof claims.exp !== 'number' ||
+    !Number.isSafeInteger(claims.exp)
+  ) {
+    return { ok: false, status: 401, reason: 'missing-session-claims' };
+  }
+
+  return {
+    ok: true,
+    workspaceId: rows[0].workspace_id,
+    userId: claims.sub,
+    expiresAt: claims.exp,
+  };
 }

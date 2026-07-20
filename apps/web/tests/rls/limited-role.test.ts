@@ -33,6 +33,11 @@ interface PerformanceRow {
   fee_currency: string | null;
 }
 
+interface WorkspaceMembershipRow {
+  id: string;
+  role: 'owner' | 'admin' | 'member' | 'viewer' | 'guest';
+}
+
 interface PersonNoteRow {
   id: string;
   body: string;
@@ -45,6 +50,7 @@ describe.skipIf(!envReady() || !limitedEnvReady())('RLS — limited performer fi
   let workspaceId: string;
   let projectId: string;
   let membership: ProjectMembershipRow;
+  let workspaceMembership: WorkspaceMembershipRow;
   let performance: PerformanceRow;
   let personId: string;
   let noteId: string | null = null;
@@ -65,12 +71,23 @@ describe.skipIf(!envReady() || !limitedEnvReady())('RLS — limited performer fi
 
   async function restorePerformance() {
     if (!performance) return;
-    await pgPatch(
-      'performance',
+    await pgRpc(
+      'update_performance_fee',
       adminJwt,
-      { fee_amount: performance.fee_amount, fee_currency: performance.fee_currency },
-      new URLSearchParams({ id: `eq.${performance.id}` }),
+      {
+        p_performance_id: performance.id,
+        p_fee_amount: performance.fee_amount,
+        p_fee_currency: performance.fee_currency,
+      },
     );
+  }
+
+  async function restoreWorkspaceMembership() {
+    if (!workspaceMembership) return;
+    await pgRpc('update_workspace_member_role', adminJwt, {
+      p_membership_id: workspaceMembership.id,
+      p_role: workspaceMembership.role,
+    });
   }
 
   async function deleteFixtureNote() {
@@ -94,6 +111,18 @@ describe.skipIf(!envReady() || !limitedEnvReady())('RLS — limited performer fi
     );
     expect(workspaces.rows).toHaveLength(1);
     workspaceId = workspaces.rows[0].id;
+
+    const workspaceMemberships = await pgGet<WorkspaceMembershipRow>(
+      'workspace_membership',
+      adminJwt,
+      new URLSearchParams({
+        workspace_id: `eq.${workspaceId}`,
+        user_id: `eq.${limitedUserId}`,
+        select: 'id,role',
+      }),
+    );
+    expect(workspaceMemberships.rows).toHaveLength(1);
+    workspaceMembership = workspaceMemberships.rows[0];
 
     const projects = await pgGet<{ id: string }>(
       'project',
@@ -120,18 +149,24 @@ describe.skipIf(!envReady() || !limitedEnvReady())('RLS — limited performer fi
     expect(memberships.rows).toHaveLength(1);
     membership = memberships.rows[0];
 
-    const performances = await pgGet<PerformanceRow>(
+    const performances = await pgGet<{ id: string }>(
       'performance',
       adminJwt,
       new URLSearchParams({
         project_id: `eq.${projectId}`,
         deleted_at: 'is.null',
-        select: 'id,fee_amount,fee_currency',
+        select: 'id',
         limit: '1',
       }),
     );
     expect(performances.rows).toHaveLength(1);
-    performance = performances.rows[0];
+    const money = await pgRpc<PerformanceRow[]>('list_money_performances', adminJwt, {
+      p_project_ids: [projectId],
+      p_limit: 1,
+    });
+    expect(money.status).toBe(200);
+    expect(money.data).toHaveLength(1);
+    performance = money.data![0];
 
     const people = await pgGet<{ person_id: string }>(
       'workspace_person',
@@ -149,6 +184,7 @@ describe.skipIf(!envReady() || !limitedEnvReady())('RLS — limited performer fi
   afterAll(async () => {
     await deleteFixtureNote();
     await restoreMembership();
+    await restoreWorkspaceMembership();
     await restorePerformance();
   });
 
@@ -186,45 +222,108 @@ describe.skipIf(!envReady() || !limitedEnvReady())('RLS — limited performer fi
     }
   });
 
-  test('performance_redacted masks fees for an editor without read:money', async () => {
+  test('performer reads production but cannot select or list fees', async () => {
     try {
-      // The current closed vocabulary has no read-only performance capability:
-      // base-row visibility is tied to edit:performance. Grant that capability
-      // temporarily so this test isolates the independent money boundary.
-      const access = await pgPatch<ProjectMembershipRow>(
-        'project_membership',
-        adminJwt,
-        { permission_grants: ['edit:performance'], permission_revokes: [] },
-        new URLSearchParams({ id: `eq.${membership.id}` }),
-      );
-      expect(access.rows).toHaveLength(1);
-
-      const seeded = await pgPatch<PerformanceRow>(
+      const production = await pgGet<{ id: string }>(
         'performance',
-        adminJwt,
-        { fee_amount: 12345.67, fee_currency: 'EUR' },
-        new URLSearchParams({ id: `eq.${performance.id}` }),
+        limitedJwt,
+        new URLSearchParams({ id: `eq.${performance.id}`, select: 'id' }),
       );
-      expect(seeded.rows).toHaveLength(1);
+      expect(production).toMatchObject({ status: 200 });
+      expect(production.rows).toHaveLength(1);
 
-      const adminView = await pgGet<PerformanceRow>(
-        'performance_redacted',
-        adminJwt,
-        new URLSearchParams({ id: `eq.${performance.id}`, select: 'id,fee_amount,fee_currency' }),
-      );
-      const limitedView = await pgGet<PerformanceRow>(
-        'performance_redacted',
+      const directFees = await pgGet<PerformanceRow>(
+        'performance',
         limitedJwt,
         new URLSearchParams({ id: `eq.${performance.id}`, select: 'id,fee_amount,fee_currency' }),
       );
+      expect(directFees.status).toBeGreaterThanOrEqual(400);
 
-      expect(adminView.rows).toHaveLength(1);
-      expect(adminView.rows[0].fee_amount).toBe(12345.67);
-      expect(limitedView.rows).toHaveLength(1);
-      expect(limitedView.rows[0]).toMatchObject({ fee_amount: null, fee_currency: null });
+      const money = await pgRpc<PerformanceRow[]>('list_money_performances', limitedJwt, {
+        p_project_ids: [projectId],
+        p_limit: 10,
+      });
+      expect(money).toMatchObject({ status: 200, data: [] });
+
+      const adminMoney = await pgRpc<PerformanceRow[]>('list_money_performances', adminJwt, {
+        p_project_ids: [projectId],
+        p_limit: 10,
+      });
+      expect(adminMoney.status).toBe(200);
+      expect(adminMoney.data?.[0]).toMatchObject({
+        id: performance.id,
+        fee_amount: performance.fee_amount,
+      });
     } finally {
       await restoreMembership();
       await restorePerformance();
+    }
+  });
+
+  test('project visibility is assignment-bound for a non-admin', async () => {
+    const { rows } = await pgGet<{ slug: string }>(
+      'project',
+      limitedJwt,
+      new URLSearchParams({
+        workspace_id: `eq.${workspaceId}`,
+        select: 'slug',
+        deleted_at: 'is.null',
+      }),
+    );
+    expect(rows.map((row) => row.slug)).toEqual(['zzz-e2e-collab']);
+    expect(rows.map((row) => row.slug)).not.toContain('zzz-rls-foreign-project');
+  });
+
+  test('an already-issued JWT loses production access after a live revoke', async () => {
+    try {
+      const revoked = await pgPatch<ProjectMembershipRow>(
+        'project_membership',
+        adminJwt,
+        { permission_revokes: ['read:performance'] },
+        new URLSearchParams({ id: `eq.${membership.id}` }),
+      );
+      expect(revoked.rows).toHaveLength(1);
+
+      const afterRevoke = await pgGet<{ id: string }>(
+        'performance',
+        limitedJwt,
+        new URLSearchParams({ id: `eq.${performance.id}`, select: 'id' }),
+      );
+      expect(afterRevoke).toMatchObject({ status: 200, rows: [] });
+    } finally {
+      await restoreMembership();
+    }
+  });
+
+  test('guest keeps assigned production but loses workspace directories', async () => {
+    try {
+      const changed = await pgRpc('update_workspace_member_role', adminJwt, {
+        p_membership_id: workspaceMembership.id,
+        p_role: 'guest',
+      });
+      expect(changed).toMatchObject({ status: 204 });
+
+      const production = await pgGet<{ id: string }>(
+        'performance',
+        limitedJwt,
+        new URLSearchParams({ id: `eq.${performance.id}`, select: 'id' }),
+      );
+      const directory = await pgGet<{ person_id: string }>(
+        'workspace_person',
+        limitedJwt,
+        new URLSearchParams({ workspace_id: `eq.${workspaceId}`, select: 'person_id' }),
+      );
+      const tasks = await pgGet<{ id: string }>(
+        'task',
+        limitedJwt,
+        new URLSearchParams({ workspace_id: `eq.${workspaceId}`, select: 'id' }),
+      );
+
+      expect(production.rows).toHaveLength(1);
+      expect(directory.rows).toHaveLength(0);
+      expect(tasks.rows).toHaveLength(0);
+    } finally {
+      await restoreWorkspaceMembership();
     }
   });
 

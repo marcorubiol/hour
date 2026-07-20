@@ -2,12 +2,14 @@ const url = process.env.PUBLIC_SUPABASE_URL;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const adminPassword = process.env.PW_TEST_PASSWORD;
 const limitedPassword = process.env.PW_LIMITED_PASSWORD;
+const externalPassword = process.env.PW_EXTERNAL_PASSWORD ?? limitedPassword;
 
 const required = {
   PUBLIC_SUPABASE_URL: url,
   SUPABASE_SERVICE_ROLE_KEY: serviceRoleKey,
   PW_TEST_PASSWORD: adminPassword,
   PW_LIMITED_PASSWORD: limitedPassword,
+  PW_EXTERNAL_PASSWORD: externalPassword,
 };
 
 const missing = Object.entries(required)
@@ -91,6 +93,11 @@ for (const fixture of [
     email: 'limited@hour.test',
     password: limitedPassword,
     fullName: 'Limited Staging Performer',
+  },
+  {
+    email: 'external@hour.test',
+    password: externalPassword,
+    fullName: 'External Staging Invitee',
   },
 ]) {
   const action = await ensureUser(fixture);

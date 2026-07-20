@@ -14,6 +14,8 @@
    */
 
   import { onMount } from 'svelte';
+  import { toStore } from 'svelte/store';
+  import { SvelteSet } from 'svelte/reactivity';
   import { page } from '$app/state';
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { accentVar } from '$lib/utils/accent';
@@ -79,6 +81,127 @@
 
   let workspaces = $derived($workspacesQuery.data?.items ?? []);
   let projects = $derived($projectsQuery.data?.items ?? []);
+  let currentWorkspace = $derived(workspaces.find((workspace) => workspace.slug === workspaceSlug));
+  let currentProjects = $derived(
+    projects.filter((project) => project.workspace_id === currentWorkspace?.id),
+  );
+  const queryClient = useQueryClient();
+
+  // ─── workspace access lifecycle ──────────────────────────────────────
+  type AccessItem = {
+    access_kind: 'member' | 'invitation';
+    id: string;
+    user_id: string | null;
+    email: string;
+    display_name: string;
+    role: 'owner' | 'admin' | 'member' | 'viewer' | 'guest';
+    project_id: string | null;
+    project_name: string | null;
+    project_role_code: string | null;
+    status: 'active' | 'pending' | 'accepted' | 'revoked' | 'expired';
+    expires_at: string | null;
+  };
+
+  const accessOptions = toStore(() => ({
+    queryKey: ['workspace-access', currentWorkspace?.id ?? null] as const,
+    enabled: Boolean(currentWorkspace?.id),
+    retry: false,
+    queryFn: ({ signal }: { signal: AbortSignal }) =>
+      fetchJSON<{ items: AccessItem[] }>(
+        `/api/workspaces/${currentWorkspace!.id}/access`,
+        signal,
+      ),
+  }));
+  const accessQuery = createQuery(accessOptions);
+  let accessItems = $derived($accessQuery.data?.items ?? []);
+  let activeMembers = $derived(
+    accessItems.filter((item) => item.access_kind === 'member' && item.status === 'active'),
+  );
+  let pendingInvitations = $derived(
+    accessItems.filter((item) => item.access_kind === 'invitation' && item.status === 'pending'),
+  );
+
+  let inviteEmail = $state('');
+  let inviteRole = $state<'admin' | 'member' | 'viewer' | 'guest'>('guest');
+  let inviteProjectId = $state('');
+  let inviteProjectRole = $state('performer');
+  let latestInviteUrl = $state('');
+
+  const inviteMember = createMutation({
+    mutationFn: async () => {
+      if (!currentWorkspace) throw new Error('Workspace unavailable');
+      const response = await mutateJSON<{
+        invitation: { email: string; invite_url: string };
+      }>('POST', `/api/workspaces/${currentWorkspace.id}/access`, {
+        email: inviteEmail,
+        role: inviteRole,
+        project_id: inviteProjectId || null,
+        project_role_code: inviteProjectId ? inviteProjectRole : null,
+      });
+      if (!response?.invitation) throw new Error('Invitation returned no link');
+      return response.invitation;
+    },
+    onSuccess: async (invitation) => {
+      latestInviteUrl = invitation.invite_url;
+      inviteEmail = '';
+      await queryClient.invalidateQueries({ queryKey: ['workspace-access'] });
+      addToast({
+        tone: 'success',
+        message: `Invitation created for ${invitation.email}. Copy and send the private link.`,
+      });
+    },
+    onError: (error) => {
+      addToast({
+        tone: 'danger',
+        title: 'Invitation not created',
+        message: error instanceof Error ? error.message : 'Unexpected error',
+      });
+    },
+  });
+
+  async function copyInviteLink() {
+    if (!latestInviteUrl) return;
+    await navigator.clipboard.writeText(latestInviteUrl);
+    addToast({ tone: 'success', message: 'Private invitation link copied.' });
+  }
+
+  async function changeMemberRole(membershipId: string, role: string) {
+    if (!currentWorkspace) return;
+    try {
+      await mutateJSON('PATCH', `/api/workspaces/${currentWorkspace.id}/access`, {
+        membership_id: membershipId,
+        role,
+      });
+      await queryClient.invalidateQueries({ queryKey: ['workspace-access'] });
+      addToast({ tone: 'success', message: 'Workspace role updated.' });
+    } catch (error) {
+      addToast({
+        tone: 'danger',
+        title: 'Role not updated',
+        message: error instanceof Error ? error.message : 'Unexpected error',
+      });
+    }
+  }
+
+  async function revokeAccess(item: AccessItem) {
+    if (!currentWorkspace) return;
+    const label = item.access_kind === 'member' ? item.display_name : item.email;
+    if (!window.confirm(`Revoke access for ${label}? Open sessions will be reauthorized.`)) return;
+    try {
+      await mutateJSON('DELETE', `/api/workspaces/${currentWorkspace.id}/access`, {
+        kind: item.access_kind === 'member' ? 'member' : 'invitation',
+        id: item.id,
+      });
+      await queryClient.invalidateQueries({ queryKey: ['workspace-access'] });
+      addToast({ tone: 'success', message: `Access revoked for ${label}.` });
+    } catch (error) {
+      addToast({
+        tone: 'danger',
+        title: 'Access not revoked',
+        message: error instanceof Error ? error.message : 'Unexpected error',
+      });
+    }
+  }
 
   // ─── alias requests (ADR-067) ─────────────────────────────────────────
   // RLS scopes the list: a member sees their own workspace's requests, the
@@ -93,8 +216,6 @@
     requested_by: string;
     created_at: string;
   };
-
-  const queryClient = useQueryClient();
 
   const aliasRequestsQuery = createQuery({
     queryKey: ['alias-requests', 'pending'],
@@ -199,21 +320,18 @@
     'distribution',
     'technician',
   ];
-  let activeRoles = $state(
-    new Set<string>([
+  const activeRoles = new SvelteSet<string>([
       'musician',
       'lighting',
       'distribution',
       'production',
       'author',
       'performer',
-    ]),
-  );
+    ]);
 
   function toggleRole(role: string) {
     if (activeRoles.has(role)) activeRoles.delete(role);
     else activeRoles.add(role);
-    activeRoles = new Set(activeRoles);
   }
 </script>
 
@@ -286,8 +404,8 @@
           <p class="eyebrow set-mast__kicker">Roster</p>
           <h1 class="set-mast__title"><em>Workspaces &amp; roles</em></h1>
           <p class="set-mast__sub">
-            Each project is its own workspace. Your role decides what you see —
-            and what your collaborators see of you.
+            A workspace holds the company boundary. Project assignments decide
+            which productions each collaborator can enter.
           </p>
         </header>
 
@@ -327,6 +445,131 @@
             </button>
           </div>
         </section>
+
+        {#if $accessQuery.isSuccess && currentWorkspace}
+          <section class="set-group set-access">
+            <div class="set-group__head set-access__head">
+              <div>
+                <span class="eyebrow set-group__kicker">Access desk</span>
+                <h2 class="set-group__title">{currentWorkspace.name}</h2>
+              </div>
+              <span class="set-access__count">{activeMembers.length} active</span>
+            </div>
+
+            <div class="set-access__invite">
+              <label>
+                <span class="eyebrow">Email</span>
+                <input type="email" placeholder="collaborator@example.com" bind:value={inviteEmail} />
+              </label>
+              <label>
+                <span class="eyebrow">Workspace role</span>
+                <select bind:value={inviteRole}>
+                  <option value="guest">Guest · assigned work only</option>
+                  <option value="viewer">Viewer · internal read-only</option>
+                  <option value="member">Member · internal collaborator</option>
+                  <option value="admin">Admin · manages access</option>
+                </select>
+              </label>
+              <label>
+                <span class="eyebrow">Project assignment</span>
+                <select bind:value={inviteProjectId}>
+                  <option value="">No project yet</option>
+                  {#each currentProjects as project (project.id)}
+                    <option value={project.id}>{project.name}</option>
+                  {/each}
+                </select>
+              </label>
+              <label>
+                <span class="eyebrow">Project role</span>
+                <select bind:value={inviteProjectRole} disabled={!inviteProjectId}>
+                  <option value="performer">Performer · production read</option>
+                  <option value="viewer">Viewer · production read</option>
+                  <option value="director">Director · production edit</option>
+                  <option value="production_manager">Production manager</option>
+                  <option value="distribution">Distribution</option>
+                </select>
+              </label>
+              <button
+                type="button"
+                class="btn--primary set-access__invite-button"
+                disabled={!inviteEmail || $inviteMember.isPending}
+                onclick={() => $inviteMember.mutate()}
+              >
+                {$inviteMember.isPending ? 'Creating…' : 'Create private link'}
+              </button>
+            </div>
+
+            {#if latestInviteUrl}
+              <div class="set-access__link" role="status">
+                <div>
+                  <span class="eyebrow">Ready to send</span>
+                  <p>The link expires in 7 days and works only for the invited email.</p>
+                </div>
+                <button type="button" class="btn--outline btn--s" onclick={copyInviteLink}>
+                  Copy invitation link
+                </button>
+              </div>
+            {/if}
+
+            <div class="set-access__ledger">
+              {#each activeMembers as member (member.id)}
+                <div class="set-access__row">
+                  <span class="set-access__mark" aria-hidden="true"></span>
+                  <div class="set-access__identity">
+                    <strong>{member.display_name}</strong>
+                    <span>{member.email}</span>
+                  </div>
+                  {#if member.role === 'owner'}
+                    <span class="set-access__role">Owner</span>
+                  {:else}
+                    <label class="set-access__role-select">
+                      <span class="sr-only">Role for {member.display_name}</span>
+                      <select
+                        value={member.role}
+                        onchange={(event) =>
+                          changeMemberRole(member.id, event.currentTarget.value)}
+                      >
+                        <option value="admin">Admin</option>
+                        <option value="member">Member</option>
+                        <option value="viewer">Viewer</option>
+                        <option value="guest">Guest</option>
+                      </select>
+                    </label>
+                  {/if}
+                  <span class="set-access__status">active</span>
+                  {#if member.role !== 'owner'}
+                    <button
+                      type="button"
+                      class="btn--outline btn--s is-warn"
+                      onclick={() => revokeAccess(member)}
+                    >Revoke</button>
+                  {/if}
+                </div>
+              {/each}
+
+              {#each pendingInvitations as invitation (invitation.id)}
+                <div class="set-access__row is-pending">
+                  <span class="set-access__mark" aria-hidden="true"></span>
+                  <div class="set-access__identity">
+                    <strong>{invitation.email}</strong>
+                    <span>
+                      {invitation.project_name
+                        ? `${invitation.project_name} · ${invitation.project_role_code}`
+                        : 'Workspace only'}
+                    </span>
+                  </div>
+                  <span class="set-access__role">{invitation.role}</span>
+                  <span class="set-access__status">pending</span>
+                  <button
+                    type="button"
+                    class="btn--outline btn--s is-warn"
+                    onclick={() => revokeAccess(invitation)}
+                  >Cancel</button>
+                </div>
+              {/each}
+            </div>
+          </section>
+        {/if}
 
         {#if aliasRequests.length > 0}
           <section class="set-group">
@@ -1412,5 +1655,107 @@
     padding-block: 2px;
     padding-inline: var(--space-s);
     border-radius: var(--radius-s);
+  }
+
+  .set-access {
+    border: 1px solid var(--border-color-dark);
+    background: var(--bg-light);
+  }
+  .set-access__head {
+    display: flex;
+    align-items: end;
+    justify-content: space-between;
+    gap: var(--space-m);
+  }
+  .set-access__count,
+  .set-access__status,
+  .set-access__role {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-faint);
+  }
+  .set-access__invite {
+    display: grid;
+    grid-template-columns: minmax(12rem, 1.4fr) repeat(3, minmax(9rem, 1fr)) auto;
+    gap: var(--space-s);
+    align-items: end;
+    padding: var(--space-m);
+    border-block: 1px solid var(--border-color-light);
+  }
+  .set-access__invite label {
+    display: grid;
+    gap: var(--space-xs);
+  }
+  .set-access__invite-button { white-space: nowrap; }
+  .set-access__link {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-m);
+    margin: var(--space-m);
+    padding: var(--space-s) var(--space-m);
+    border-inline-start: 3px solid var(--accent-color);
+    background: var(--bg);
+  }
+  .set-access__link p {
+    margin: var(--space-xs) 0 0;
+    color: var(--text-muted);
+    font-size: var(--text-s);
+  }
+  .set-access__ledger { padding-inline: var(--space-m); }
+  .set-access__row {
+    display: grid;
+    grid-template-columns: 8px minmax(12rem, 1fr) minmax(7rem, auto) 5rem auto;
+    gap: var(--space-m);
+    align-items: center;
+    min-block-size: 4.25rem;
+    border-block-end: 1px solid var(--border-color-light);
+  }
+  .set-access__row:last-child { border-block-end: 0; }
+  .set-access__mark {
+    inline-size: 6px;
+    block-size: 6px;
+    border-radius: 50%;
+    background: var(--success);
+  }
+  .set-access__row.is-pending .set-access__mark {
+    background: transparent;
+    border: 1px solid var(--text-faint);
+  }
+  .set-access__identity {
+    display: grid;
+    gap: 2px;
+    min-inline-size: 0;
+  }
+  .set-access__identity strong {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-weight: 500;
+  }
+  .set-access__identity span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--text-faint);
+    font-size: var(--text-xs);
+  }
+  .set-access__role-select select { min-inline-size: 8rem; }
+
+  @media (max-width: 72rem) {
+    .set-access__invite { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .set-access__invite-button { grid-column: 1 / -1; }
+  }
+  @media (max-width: 44rem) {
+    .set-access__invite { grid-template-columns: 1fr; }
+    .set-access__row {
+      grid-template-columns: 8px 1fr auto;
+      gap: var(--space-s);
+      padding-block: var(--space-s);
+    }
+    .set-access__role,
+    .set-access__role-select { grid-column: 2; }
+    .set-access__status { display: none; }
+    .set-access__row > button { grid-column: 3; grid-row: 1 / span 2; }
   }
 </style>

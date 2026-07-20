@@ -2,8 +2,8 @@
 
 > The hardening gate that must pass before the first external (non-MüK)
 > workspace. Implemented 2026-07-13 (ADR-061). This runbook covers the
-> manual steps the code can't do for itself: KV namespace, deploy order,
-> and the drills.
+> deploy order and the drills, plus the evidence for controls constrained by
+> the current Cloudflare plan.
 
 ## What shipped in code (ADR-061)
 
@@ -21,32 +21,45 @@
   scrub, Replay masking, `/api/sentry-test` dev-only (no more `?force=1`),
   tunnel rate-limited + size-capped + DSN-checked.
 - **Rate limiting** (`$lib/server/rate-limit.ts`) on login/refresh/tunnel.
+  Login composes Cloudflare's native Workers Rate Limiting binding with an
+  independent five-minute KV window.
+- **Onboarding without SQL.** Signup, expiring/hashed invite links, verified-email
+  acceptance, optional project role, role changes and revocation from Settings.
+- **Live collab revocation.** The private Durable Object rechecks connected users
+  every 30 seconds and closes expired/revoked editors fail-closed.
 - **Health checks** `/health/live` + `/health/ready`.
 - **CI** `.github/workflows/ci.yml` (svelte-check + unit + build + collab tsc).
 
 ## Manual steps BEFORE the external-onboarding deploy
 
-### 1. Login protection — edge rate-limit rule (the real control) + KV backstop
+### 1. Login protection — native burst gate + long-window KV gate
 
-**The primary control is a Cloudflare edge rate-limit rule**, not the KV
-limiter. The KV limiter (`$lib/server/rate-limit.ts`) is a non-atomic
-in-Worker backstop: it bounds slow sequential abuse but a concurrent burst
-largely slips through (KV has no atomic increment — see its docblock). So:
+The intended dedicated WAF rule cannot coexist on the current Free zone:
+Cloudflare's authenticated dashboard was checked on 2026-07-20 and reports
+`1/1` rate-limiting rules. The existing active rule
+`RL wp-login.php — 5/10s/IP, 10s ban (fleet)` occupies that slot. It protects a
+separate fleet surface and must not be removed or silently broadened.
 
-- **Add a CF rate-limit rule on `hour.zerosense.studio/api/auth/login`**
-  (dashboard → Security → WAF → Rate limiting rules), same mechanism you
-  already run on the fleet's `wp-login.php`. Suggested: ~10 req / 1 min per
-  IP → block 1 min. This is atomic at the edge and stops the burst before
-  the Worker. Confirm the custom domain is proxied (orange cloud) first.
-- **KV backstop (~2 min, optional but cheap):**
-  ```
-  cd apps/web
-  pnpm wrangler kv namespace create RATE_LIMIT
-  ```
-  Paste the returned `id` into `apps/web/wrangler.jsonc` and uncomment the
-  `kv_namespaces` block (there, commented, with the exact shape). Without
-  it the limiter no-ops (login still works, just unthrottled in-Worker —
-  fine once the edge rule is up).
+Hour therefore uses two independent controls at the login endpoint:
+
+- **Cloudflare Workers Rate Limiting binding** `LOGIN_RATE_LIMIT` — 10 calls
+  per 60 seconds per source IP (`namespace_id=2026072001`). It uses
+  Cloudflare's native rate-limit infrastructure and rejects concurrent bursts
+  before any Supabase password grant is attempted. Cloudflare only supports
+  10- or 60-second periods for this binding.
+- **KV long-window gate** `RATE_LIMIT` — 10 calls per 300 seconds per source
+  IP. KV is not atomic, but it enforces the slower sequential-attempt budget
+  that the one-minute native window cannot express.
+
+Both must admit the request. A native-service error fails open for login
+availability, after which the independent KV gate still runs. The custom
+domain was also verified through the Cloudflare API on 2026-07-20:
+`hour.zerosense.studio` is proxied (`proxied=true`).
+
+If the zone is upgraded or its WAF slot is freed later, add the dedicated
+`POST /api/auth/login` 10/5-minute WAF rule as an additional outer layer; it
+is no longer a blocker for external onboarding because the login does not
+depend on KV alone.
 
 ### 2. Deploy order (unchanged from always)
 Collab first (owns the DO migration tag), then web:
@@ -98,23 +111,16 @@ docs are a claim; the stamp is the fact.
 
 ## Drills the gate still requires (not code — do once, record here)
 
-- **Restore drill.** Restore the latest R2 weekly dump into a Supabase
-  staging project and confirm it opens. Target <30 min. Record the date +
-  result here. Procedure: `build/runbooks/backup.md` (dump side) — restore
-  side to be written on first run.
-- **RLS regression suite against staging.** `pnpm --filter web test:rls`
-  currently hits PRODUCTION as the fixture user. Before onboarding, point
-  `.env.test` at a Supabase branch/staging project and confirm green there.
-  The active acceptance criteria live in `_tasks.md § Antes de la primera beta
-  externa`; do not recover them from an older phase document. The suite now has
-  a second, limited-role identity. It covers grant/revoke
-  precedence against an already-issued JWT, member-level money redaction,
-  private `person_note` isolation and refusal of workspace identity edits.
-  The remaining RBAC work is the deliberate product-level role matrix, not a
-  missing test identity.
+- **Restore drill:** completed on hosted staging in 203 seconds; executable
+  procedure and evidence are in `build/runbooks/database-restore-drill.md`.
+- **RLS regression suite against staging:** hosted baseline exists. The current
+  118-test contract adds a fully external third identity and covers zero access
+  → invite → accept → revoke with the same JWT, read-only performance access,
+  fee isolation, guest directories and collab reauthorization.
 
 ## External dependencies and later work
-- Full CI RLS/e2e jobs (need a staging Supabase branch + secrets).
+- Full E2E remains a production/manual gate; the staging workflow runs RLS,
+  build and critical-route smoke with isolated secrets.
 - Leaked-password protection requires Supabase Pro. Its priority is decided in
   `_tasks.md`; this runbook does not silently defer it.
-- Admin/support UI, Sentry source-map token rotation.
+- Transactional invite email delivery and Sentry source-map token rotation.

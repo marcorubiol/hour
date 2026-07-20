@@ -1,5 +1,5 @@
 /**
- * RLS regression — performance_redacted must NOT bypass RLS.
+ * RLS regression — fee columns must not be directly selectable.
  *
  * 2026-05-18_rls_findings_fix applied `security_invoker = true` to the
  * view; the 2026-05-19 recreations (section revert + show→performance
@@ -16,14 +16,14 @@
 import { describe, expect, test } from 'vitest';
 import { envReady, pgGet } from './_helpers';
 
-describe.skipIf(!envReady())('RLS — performance_redacted invoker semantics', () => {
-  test('anon reads zero rows through the redacted view', async () => {
-    const { rows } = await pgGet<{ id: string }>(
+describe.skipIf(!envReady())('RLS — fee column isolation', () => {
+  test('the legacy redacted view is not exposed through the Data API', async () => {
+    const result = await pgGet<{ id: string }>(
       'performance_redacted',
       null,
       new URLSearchParams({ select: 'id', limit: '5' }),
     );
-    expect(rows).toHaveLength(0);
+    expect(result.status).toBeGreaterThanOrEqual(400);
   });
 
   test('anon reads zero rows from performance and date base tables', async () => {

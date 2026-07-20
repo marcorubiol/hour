@@ -182,6 +182,11 @@ export default defineConfig(({ mode }) => {
             name: 'rls',
             environment: 'node',
             include: ['tests/rls/**/*.test.ts'],
+            // These integration files intentionally mutate and restore the
+            // same fixture identities. Running files concurrently makes one
+            // authorization assertion observe another file's temporary role
+            // or permission grant, so preserve transaction-like isolation.
+            fileParallelism: false,
             // _setup.ts loads .env + .env.test into process.env so tests
             // can read PUBLIC_SUPABASE_* and PW_TEST_* without the caller
             // having to source both files first.

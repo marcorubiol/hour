@@ -20,7 +20,7 @@
  * client-controllable headers.
  */
 
-import { Server } from 'partyserver';
+import { Server, type Connection, type ConnectionContext } from 'partyserver';
 import { withYjs } from 'y-partyserver';
 import * as Y from 'yjs';
 import {
@@ -39,9 +39,19 @@ import {
   type CollabTargetTable,
   type HydratedMarker,
 } from './persistence-guard';
+import {
+  canUserWriteCollab,
+  connectionStateFromRequest,
+  isConnectionState,
+  sessionNeedsReauthentication,
+  type CollabConnectionState,
+} from './authorization';
 
 /** The shared text field inside every collab doc (ADR-025 scope). */
 const NOTES_FIELD = 'notes';
+const AUTHORIZATION_RECHECK_MS = 30_000;
+const REAUTHENTICATE_CODE = 4401;
+const REAUTHENTICATE_REASON = 'reauthentication required';
 
 export interface CollabEnv {
   PUBLIC_SUPABASE_URL: string;
@@ -60,6 +70,12 @@ const ALLOWED_TABLES = new Set(['performance', 'project', 'line']);
 
 // Avoid deploying a "headless" DO that accepts traffic but can't persist.
 class RoadsheetCollabBase extends Server<CollabEnv> {
+  // PartyServer defaults to in-memory sockets. Persisting connection state in
+  // attachments only becomes useful when hibernation is enabled; with this
+  // option the DO can sleep while idle sockets remain connected and wake for
+  // alarms/messages with userId + JWT expiry intact.
+  static override options = { hibernate: true };
+
   // Inherit fetch/onConnect/onClose from partyserver — they handle the
   // WebSocket lifecycle. We only customize the Yjs persistence hooks.
 }
@@ -76,6 +92,28 @@ export class RoadsheetCollab extends WithYjs {
   /** Serialize debounced saves; external fetches otherwise allow overlap. */
   private saveQueue: Promise<void> = Promise.resolve();
 
+  override async onStart(): Promise<void> {
+    await super.onStart();
+    if ([...this.getConnections()].length > 0) {
+      await this.ensureAuthorizationAlarm();
+    }
+  }
+
+  override async onConnect(
+    connection: Connection<CollabConnectionState>,
+    context: ConnectionContext,
+  ): Promise<void> {
+    const state = connectionStateFromRequest(context.request);
+    if (!state || sessionNeedsReauthentication(state)) {
+      connection.close(REAUTHENTICATE_CODE, REAUTHENTICATE_REASON);
+      return;
+    }
+
+    connection.setState(state);
+    await super.onConnect(connection, context);
+    await this.ensureAuthorizationAlarm();
+  }
+
   /**
    * workerd delivers binary frames as Blob (the WHATWG default on recent
    * compatibility dates); y-partyserver 2.2.0 only understands
@@ -85,14 +123,80 @@ export class RoadsheetCollab extends WithYjs {
    * off. CRDT semantics tolerate the await's potential reordering.
    */
   override async onMessage(
-    conn: Parameters<InstanceType<typeof WithYjs>['onMessage']>[0],
+    conn: Connection<CollabConnectionState>,
     message: ArrayBuffer | string,
   ): Promise<void> {
+    if (sessionNeedsReauthentication(conn.state)) {
+      conn.close(REAUTHENTICATE_CODE, REAUTHENTICATE_REASON);
+      return;
+    }
     const normalized =
       typeof message !== 'string' && message instanceof Blob
         ? await (message as Blob).arrayBuffer()
         : message;
-    super.onMessage(conn, normalized as never);
+    await super.onMessage(conn, normalized as never);
+  }
+
+  override async onClose(
+    connection: Connection<CollabConnectionState>,
+    code: number,
+    reason: string,
+    wasClean: boolean,
+  ): Promise<void> {
+    await super.onClose(connection, code, reason, wasClean);
+    if ([...this.getConnections()].length === 0) {
+      await this.ctx.storage.deleteAlarm();
+    }
+  }
+
+  override async onAlarm(): Promise<void> {
+    const target = this.parseName();
+    const connections = [...this.getConnections<CollabConnectionState>()];
+    if (!target || connections.length === 0) return;
+
+    const nowSeconds = Math.floor(Date.now() / 1_000);
+    const active = connections.filter((connection) => {
+      if (sessionNeedsReauthentication(connection.state, nowSeconds)) {
+        connection.close(REAUTHENTICATE_CODE, REAUTHENTICATE_REASON);
+        return false;
+      }
+      return true;
+    });
+
+    const decisions = new Map<string, boolean>();
+    try {
+      await Promise.all(
+        [...new Set(active.map((connection) => connection.state!.userId))].map(
+          async (userId) => {
+            decisions.set(userId, await canUserWriteCollab(this.env, target, userId));
+          },
+        ),
+      );
+    } catch (error) {
+      console.error('[collab] live authorization failed closed:', error);
+    }
+
+    let authorizedConnections = 0;
+    for (const connection of active) {
+      const state = connection.state;
+      if (!isConnectionState(state) || decisions.get(state.userId) !== true) {
+        connection.close(REAUTHENTICATE_CODE, REAUTHENTICATE_REASON);
+      } else {
+        authorizedConnections += 1;
+      }
+    }
+
+    if (authorizedConnections > 0) {
+      await this.ensureAuthorizationAlarm();
+    }
+  }
+
+  private async ensureAuthorizationAlarm(): Promise<void> {
+    const alarm = await this.ctx.storage.getAlarm();
+    const latestAcceptable = Date.now() + AUTHORIZATION_RECHECK_MS;
+    if (alarm === null || alarm > latestAcceptable) {
+      await this.ctx.storage.setAlarm(latestAcceptable);
+    }
   }
 
   /**

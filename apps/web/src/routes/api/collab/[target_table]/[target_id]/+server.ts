@@ -59,8 +59,18 @@ export const GET: RequestHandler = async ({ request, params, platform, locals })
   const id = platform.env.ROADSHEET_COLLAB.idFromName(`${targetTable}:${targetId}`);
   const stub = platform.env.ROADSHEET_COLLAB.get(id);
 
-  // Forward the upgrade. partyserver's Server.fetch handles the WebSocket
+  // Forward only verified identity metadata. Strip the browser credential
+  // before crossing the Worker boundary; the private DO reauthorizes this
+  // user against live database state on a short alarm cadence.
+  const headers = new Headers(request.headers);
+  headers.delete('authorization');
+  headers.delete('cookie');
+  headers.set('x-hour-collab-user-id', auth.userId);
+  headers.set('x-hour-collab-expires-at', String(auth.expiresAt));
+  const forwarded = new Request(request, { headers });
+
+  // partyserver's Server.fetch handles the WebSocket
   // pair construction and returns a 101 response with the server-side
   // socket attached; we pass it through unchanged.
-  return stub.fetch(request);
+  return stub.fetch(forwarded);
 };
