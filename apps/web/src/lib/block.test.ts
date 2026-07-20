@@ -56,6 +56,26 @@ describe('blockDays', () => {
     expect(blockDays({ from: '', to: '', weekdays: WEEKDAYS })).toEqual([]);
   });
 
+  // Regression (adversarial review, 2026-07-20): the walk used to be bounded
+  // by CALENDAR days while the cap counts SELECTED days, so a sparse rule over
+  // a long span came back short — and blockLimit still said 'ok'. A block that
+  // quietly loses a third of its days is worse than one that refuses.
+  it('does not truncate a long sparse span that is still under the cap', () => {
+    // 577 calendar days, 82 Mondays — the old 400-day walk returned 57.
+    const days = blockDays({ from: '2026-01-01', to: '2027-08-01', weekdays: [1] });
+    expect(days).toHaveLength(82);
+    expect(days.at(-1)).toBe('2027-07-26');
+    expect(blockLimit(days.length)).toBe('ok');
+  });
+
+  it('reports too_many for a sparse span past the cap instead of a short list', () => {
+    // 882 calendar days, 126 Mondays — must read as oversized, never as a
+    // tidy 92-day block.
+    const days = blockDays({ from: '2026-01-01', to: '2028-06-01', weekdays: [1] });
+    expect(days.length).toBeGreaterThan(BLOCK_MAX_DAYS);
+    expect(blockLimit(days.length)).toBe('too_many');
+  });
+
   it('includes a single-day span (the limit rejects it, not the generator)', () => {
     expect(blockDays({ from: '2026-03-09', to: '2026-03-09', weekdays: WEEKDAYS })).toEqual([
       '2026-03-09',

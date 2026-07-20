@@ -36,6 +36,7 @@
   "block.series_note": "Una serie. Cada día conserva su horario y su estado — confirmas unas semanas después, el resto siguen siendo opciones.",
   "block.created": "Creadas {n} fechas en una serie",
   "block.submit": "Crea el bloque",
+  "block.status": "Estado",
   "planner.legend_confirmed": "confirmado",
   "planner.legend_hold": "hold",
   "planner.prev_month": "Mes anterior",

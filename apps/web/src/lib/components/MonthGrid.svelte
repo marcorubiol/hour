@@ -15,6 +15,7 @@
    * keeps them collision-free anyway).
    */
   import { addDaysIso, dayKeyInTz, monthGrid, assignBandLanes } from '$lib/planner';
+  import { weekdayLabels } from '$lib/datetime';
 
   export type ProjectLite = {
     id: string;
@@ -134,17 +135,11 @@
     });
   }
 
-  /** Monday-first short weekday labels in the given locale ("mon", "dl"). */
-  export function weekdayLabels(locale = 'en-GB'): string[] {
-    const fmt = new Intl.DateTimeFormat(locale, { weekday: 'short', timeZone: 'UTC' });
-    // 2026-06-29 is a Monday.
-    return Array.from({ length: 7 }, (_, i) =>
-      fmt
-        .format(new Date(Date.UTC(2026, 5, 29 + i)))
-        .replace(/\.+$/, '')
-        .toLowerCase(),
-    );
-  }
+  /**
+   * Monday-first short weekday labels — moved to $lib/datetime once the block
+   * form needed them too (re-exported so this module's surface is unchanged).
+   */
+  export { weekdayLabels };
 </script>
 
 <script lang="ts">

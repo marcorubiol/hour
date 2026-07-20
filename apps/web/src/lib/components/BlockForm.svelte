@@ -22,7 +22,7 @@
   import Select from '$lib/components/Select.svelte';
   import Input from '$lib/components/Input.svelte';
   import { dayKeyInTz, addDaysIso } from '$lib/planner';
-  import { wallClockToInstant } from '$lib/datetime';
+  import { wallClockToInstant, weekdayLabels } from '$lib/datetime';
   import { detectLocale, t } from '$lib/i18n';
   import { allLinesQueryOptions, workspacesQueryOptions } from '$lib/nav-queries';
   import { accentVarFor } from '$lib/utils/accent';
@@ -144,6 +144,23 @@
   let weeks = $derived(blockWeeks(days));
   let daySet = $derived(new Set(days));
   let exceptionSet = $derived(new Set(bExceptions));
+  /**
+   * Only the exceptions that still remove something. Move the range or drop a
+   * weekday and an old punch-out stops affecting anything — counting it would
+   * report "3 removed" on a rule the user can see removes one.
+   */
+  let liveExceptions = $derived(
+    bExceptions.filter((d) => d >= bFrom && d <= bTo && bWeekdays.includes(weekdayOf(d))),
+  );
+
+  // Changing the project orphans a line belonging to the old one — both
+  // sibling forms clear it, and the RPC would reject it anyway (line ∉
+  // project). Waits for the lines to load so a preset is never wiped early.
+  $effect(() => {
+    const items = $linesQuery.data?.items;
+    if (!bLine || !items) return;
+    if (!items.some((l) => l.id === bLine && l.project?.id === bProject)) bLine = '';
+  });
 
   /** The calendar shown under the rule: whole weeks covering the span, so a
       day can be punched out where the eye already expects to find it. */
@@ -247,10 +264,18 @@
     press: 'create.type_press',
     other: 'create.type_other',
   };
-  const WD_LABEL = ['S', 'M', 'T', 'W', 'T', 'F', 'S']; // getDay() index
+  /** Monday-first, from the locale — same order as WEEKDAY_ORDER. */
+  let wdLabels = $derived(weekdayLabels(locale));
 </script>
 
-<div class="bf">
+<!-- A real <form> so Enter submits, like both sibling forms. -->
+<form
+  class="bf"
+  onsubmit={(e) => {
+    e.preventDefault();
+    submit();
+  }}
+>
   <Select
     label={t('create.project', locale)}
     options={projectOptions}
@@ -287,13 +312,13 @@
       </div>
 
       <div class="bf__wd">
-        {#each WEEKDAY_ORDER as w (w)}
+        {#each WEEKDAY_ORDER as w, i (w)}
           <button
             type="button"
             class="bf__wdchip"
             class:bf__wdchip--on={bWeekdays.includes(w)}
             aria-pressed={bWeekdays.includes(w)}
-            onclick={() => toggleWeekday(w)}>{WD_LABEL[w]}</button
+            onclick={() => toggleWeekday(w)}>{wdLabels[i]}</button
           >
         {/each}
       </div>
@@ -327,8 +352,8 @@
           <i>{t('block.too_many', locale, { max: String(BLOCK_MAX_DAYS) })}</i>
         {:else if limit === 'too_few'}
           <i>{t('block.too_few', locale)}</i>
-        {:else if bExceptions.length > 0}
-          <i>{t('block.removed', locale, { n: String(bExceptions.length) })}</i>
+        {:else if liveExceptions.length > 0}
+          <i>{t('block.removed', locale, { n: String(liveExceptions.length) })}</i>
         {/if}
       </p>
     </div>
@@ -347,7 +372,7 @@
   </div>
 
   <div class="bf__field">
-    <span class="bf__label">{t('create.type_label', locale)}</span>
+    <span class="bf__label">{t('block.status', locale)}</span>
     <div class="bf__seg">
       <button
         type="button"
@@ -389,7 +414,7 @@
       <p class="bf__review-ser">{t('block.series_note', locale)}</p>
     </div>
   {/if}
-</div>
+</form>
 
 <style>
   .bf {

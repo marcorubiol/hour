@@ -37,6 +37,7 @@
   "block.series_note": "One series. Each day keeps its own hours and status — confirm some weeks later, the rest stay options.",
   "block.created": "Created {n} dates in one series",
   "block.submit": "Create the block",
+  "block.status": "Status",
   "planner.legend_confirmed": "confirmed",
   "planner.legend_hold": "hold",
   "planner.prev_month": "Previous month",
