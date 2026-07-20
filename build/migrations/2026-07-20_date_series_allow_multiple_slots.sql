@@ -66,15 +66,6 @@ BEGIN
       USING ERRCODE = '22023';
   END IF;
 
-  -- Two rows on the same day would break the band: its edges are derived by
-  -- asking whether the neighbouring DAY belongs to the series.
-  IF (
-    SELECT count(DISTINCT (s AT TIME ZONE coalesce(v_tz, 'UTC'))::date)
-    FROM unnest(p_starts) s
-  ) <> v_n THEN
-    RAISE EXCEPTION 'a series cannot carry two rows on the same day'
-      USING ERRCODE = '22023';
-  END IF;
 
   -- §9: the enum of 4 is never exposed at creation.
   IF p_status IS NULL OR p_status NOT IN ('tentative', 'confirmed') THEN
