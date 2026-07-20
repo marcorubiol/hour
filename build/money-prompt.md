@@ -1,7 +1,8 @@
 # Hour — Build prompt: Money lens v2 (payments · expected aging · expenses · net)
 
-> **STATUS: PENDIENTE (reverificado 2026-07-20).** Depende del modelo Money v2;
-> la UI viva conserva facturas draft→issued→paid y edición de fee.
+> **STATUS: EJECUTADO (2026-07-20).** UI Money v2 desplegada en `3b7c95e`:
+> pagos observados, aging, condición/cascade task, payer, gastos/neto,
+> monedas separadas y VAT/IRPF; E2E específico y suite completa verdes.
 >
 > Handoff prompt for an external coding agent. Depends on `money-model-prompt.md` (columns,
 > payments API, union expenses, `$lib/money.ts`). If not merged: thin adapter, graceful

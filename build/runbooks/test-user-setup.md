@@ -30,7 +30,7 @@ The limited identity drives the negative authorization matrix: workspace
 identity edits are denied, performer permissions are exact, grant/revoke
 changes take effect against an already-issued JWT, fees stay redacted without
 `read:money`, and another author's private note stays invisible. The live RLS
-baseline is **118/118** with no skipped fixture cases.
+baseline is **120/120** with no skipped fixture cases.
 
 The user's JWT claim `current_workspace_id` resolves to its FIRST
 membership — which is why write paths that hit claim-bound INSERT

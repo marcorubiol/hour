@@ -215,7 +215,7 @@ No crear usuarios insertando en `auth.users`: usar Auth Admin API/Dashboard.
 - El Worker nunca sustituye RLS; valida forma/contrato y reenvía identidad.
 
 La suite `apps/web/tests/rls/` golpea Supabase como anon, admin, fixture limitado
-y usuario externo. Baseline actual: 118/118. Incluye cero acceso → invitación →
+y usuario externo. Baseline actual: 120/120. Incluye cero acceso → invitación →
 aceptación → revocación con el mismo JWT, además de aislamiento de fees y guest.
 
 ## 8. API

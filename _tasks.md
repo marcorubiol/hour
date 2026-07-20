@@ -42,11 +42,14 @@
    Free y la función requiere Pro. Marco debe decidir el upgrade; después activar
    `password_hibp_enabled` y volver a ejecutar el advisor.
 
-## Ahora — bloque 4: Money v2
+## Cerrado — bloque 4: Money v2
 
-11. [ ] **Money v2.** `expected_on`, condición de pago, pagos observados,
-    aging y estado paid derivado. Orden activo: `build/money-model-prompt.md` →
-    `build/money-prompt.md` → `build/money-design-prompt.md`.
+11. [x] **Money v2.** `expected_on`, condición de pago, pagos observados,
+    aging y estado paid derivado; payer, gastos union-scoped, neto por línea,
+    VAT/IRPF y totales separados por moneda. Runtime `3b7c95e`, baseline
+    staging desde cero verde, RLS 120/120 y E2E de producción completo.
+
+## Ahora — bloque 5: contenedores
 
 12. [ ] **Revisión diseño+datos — contenedores.** Portada de workspace, project
     detail, line detail y siete módulos; cerrar identidad fiscal y qué datos son
@@ -76,9 +79,7 @@
 - `update_workspace` directo por PostgREST permite a owner/admin saltar las
   validaciones de la API; no es una escalada de privilegios.
 - `line.notes` y collab no exigen exactamente el mismo permiso fuera de la API.
-- Money suma monedas distintas sin dimensión; no mostrarlo como total económico
-  fiable hasta resolver multi-currency.
-- Expenses globales, invoices multilínea/PDF/serie, expiración de shares y
+- Invoices multilínea/PDF/serie, expiración de shares y
   timezone por ciudad siguen fuera de la profundidad actual.
 - `logo_url` existe, pero no hay flujo de subida R2.
 - Persona de test huérfana `019f2f03-f1f2-71a0-9e1f-9c8c9cf331c8`: invisible;

@@ -1,9 +1,8 @@
 # Hour — Build prompt: money model v1 (expected_on + payments API + expenses union)
 
-> **STATUS: PENDIENTE (reverificado 2026-07-20).** Sin migración
-> (`expected_on`/`payment_condition` no existen), `/api/payments`, `agingState` ni
-> `observedPayerTermsDays`. Preexisten tabla `payment` e
-> `invoice.payer_person_id` sin esta profundidad de UI. Ejecutar primero.
+> **STATUS: EJECUTADO (2026-07-20).** Migración
+> `20260720214500_money_v2.sql`, payments API, expenses union y helpers puros
+> desplegados en `3b7c95e`; staging desde cero y RLS 120/120 verdes.
 >
 > Handoff prompt for an external coding agent. Runs FIRST — `money-prompt.md` depends on it.
 > Origin: S1 2026-07-17, ADR-074. Spec: `build/screen-data-spec.md § Money` + `§ gaps #9`.

@@ -31,7 +31,8 @@ Per screen: **Is** (its structure-model category), **Today** (what it shows now,
 
 > **Reconciliation note (2026-07-20):** items 1 and 4 below were subsequently
 > built (tasks; workspace-scoped people/organizations), and Desk calm mode also
-> landed. Item 3 (conversation detail) and the Money v2 depth remain open. Treat
+> landed. Money v2 also landed on 2026-07-20; item 3 (conversation detail) keeps
+> only its future event timeline open. Treat
 > the numbered list as the input to the review, not as a current gap count.
 
 **North star, declared mid-pass (ADR-069, 2026-07-17)**: Hour exists for a proactive,
@@ -71,8 +72,8 @@ hand-crafted" is universal across selling profiles).
    (manual|protocol|ai)`. Per structure-model D3 it surfaces in three places: Desk feed,
    a Tasks module, inline next-actions. None built. The single biggest [db] item — it touches
    Desk, project, line, performance and conversation below.
-2. **`payment` has zero UI.** The advance+rest model (N payments per invoice) exists in DB;
-   the app only flips `invoice.status` by hand. Money lens should own it.
+2. **`payment` is now live.** The Money lens records advance+rest rows, derives paid
+   server-side and returns to issued when active coverage drops. Manual paid is gone.
 3. **Conversation detail is a stub.** The page renders a de-slugged title and a back link —
    nothing else. For a booking tool, the conversation view is core, and it also exposes the
    one real schema hole: **no conversation log entity** (only `next_action_note`, 1 slot).
@@ -329,17 +330,18 @@ the later S2 shapes and are not represented as live UI.
 ### `/h/money` — Money lens
 
 **Is**: concern-lens over money; gated by `read:money` (RLS-enforced via `performance_redacted`).
-**Today**: totals (pipeline/invoiced/paid), by-line rollup with progress bars, fees table
-(click-to-edit fee), invoices list (status menu, discard draft), New invoice from fee.
+**Today**: per-currency pipeline/invoiced/collected, by-line fees−expenses net,
+fees table, payer-aware invoices, contractual and expected dates, observed aging,
+payment condition/follow-up, advance+rest rows, derived paid and VAT/IRPF detail.
 **Contains — SETTLED (S1, 2026-07-17)**:
 - All of today's [now] — **by-line grouping KEPT** (the line is the operating unit;
   project view comes from pins).
 - **Payments with UI**: record `payment` rows (amount, received_on, method, reference);
   invoice shows paid-vs-total; **"paid" DERIVES from Σ payments** — derived state over
-  manual flag, same principle as task urgency [db — table complete, zero UI; dispatched].
+  manual flag, same principle as task urgency [now].
 - **Two truths per invoice** (Marco, S1 — the collector's pain, both hats: company←town
   halls and freelancer←companies): `due_on` = contractual · **`expected_on` = realistic**
-  [gap #9]. **Aging measures against expected**: "47 of 60 — normal" calms; "92 of 60"
+  [now]. **Aging measures against expected**: "47 of 60 — normal" calms; "92 of 60"
   escalates and feeds the Desk money alerts.
 - **expected_on source cascade**: (1) **observed payer behavior** — issued→paid delta per
   payer computed from payment history, zero maintenance; (2) declared payer terms — on the
@@ -352,8 +354,8 @@ the later S2 shapes and are not represented as live UI.
   invoice dialog** (`payer_person_id` exists, never set; org-capable after S2) [db].
 - **Real invoicing/PDF: not now** (covered externally) — **but it arrives fast: S2 must
   leave gap #3 designed and migrable** (fiscal identity + numbering series).
-**Build**: dispatched 2026-07-17 — `money-model-prompt.md` (first) → `money-prompt.md` ·
-`money-design-prompt.md`.
+**Build**: shipped 2026-07-20 in `3b7c95e` — `money-model-prompt.md` →
+`money-prompt.md` · `money-design-prompt.md`; production RLS 120/120 and Money E2E 2/2.
 
 ### ⌘K Command Palette
 
@@ -630,9 +632,10 @@ Everything else in this doc is build-only. These need DDL, listed by blast radiu
    workspaces, never other orgs' full detail. Prerequisite for the persona-symmetric
    calendar and cross-workspace self conflict detection. **Added to
    `build/archive/2026-07-calendar-model-prompt.md` as migration C.**
-9. **`invoice.expected_on` + `payment_condition`** (S1, ADR-074): the realistic collection
-   date (vs contractual `due_on`) + the cascade-condition note ("when they collect from
-   X"). Aging measures against expected. Dispatched via `money-model-prompt.md`.
+9. **`invoice.expected_on` + `payment_condition` — BUILT 2026-07-20** (S1,
+   ADR-074): the realistic collection date (vs contractual `due_on`) + the
+   cascade-condition note ("when they collect from X"). Aging measures against
+   expected. Migration `20260720214500_money_v2.sql`.
 10. *(deliberately NOT proposed)*: saved views server-side (Master View localStorage is
    the ceiling per structure-model), fee_expectation on conversation (lean no), away-days as
    a stored entity (always derived — storing them would let them lie), modeling the

@@ -52,9 +52,9 @@ orientativo, no una verdad comercial cerrada.
 
 - Web: `https://hour.zerosense.studio`
 - Worker: `hour-web`
-- `/health/live`: sano, `dirty:false`, SHA **`ad1b580`**.
+- `/health/live`: sano, `dirty:false`, SHA **`3b7c95e`**.
 - `/health/ready`: sano, Supabase `ok`.
-- El runtime verificado en producción es `ad1b580`; commits posteriores que
+- El runtime verificado en producción es `3b7c95e`; commits posteriores que
   solo cambian documentación no requieren desplegar el Worker.
 
 ### Git
@@ -62,7 +62,7 @@ orientativo, no una verdad comercial cerrada.
 - Repo: `https://github.com/marcorubiol/hour` (privado).
 - Checkout: `/Users/marcorubiol/Developer/hour`.
 - Rama principal: `main`.
-- Base funcional del runtime: **`ad1b580`**, publicada en `origin/main`;
+- Base funcional del runtime: **`3b7c95e`**, publicada en `origin/main`;
   `main` local y remoto están sincronizados.
 - `wrangler deploy` exige árbol limpio y publica el SHA en `/health/live`.
 
@@ -71,15 +71,15 @@ orientativo, no una verdad comercial cerrada.
 - Proyecto: `hour-phase0` · ref `lqlyorlccnniybezugme` · `eu-central-1`.
 - Plan: **Free**.
 - Auth: email+password, cookies httpOnly en la app, hook de access token activo.
-- RLS: FORCE en las superficies tenant-scoped; suite live **118/118**.
+- RLS: FORCE en las superficies tenant-scoped; suite live **120/120**.
 - Identidad 2026-07-20: `workspace_person` y `workspace_organization` aplicadas,
   perfil portable y dossier local por workspace, share/revoke explícitos.
 - Fixture limitado: `limited@hour.test`, member solo de `playwright`, performer
   en `zzz-e2e-collab`; sin workspace/account personal.
 - Fixture externo: `external@hour.test`; ciclo completo cero acceso → invitación
   → aceptación → revocación con el mismo JWT, independiente de los otros users.
-- Advisors: rendimiento sin ERROR/WARN (105 INFO de índices/FK/PK a observar).
-  Seguridad sin ERROR: 63 RPC authenticated SECURITY DEFINER y las 2 proyecciones
+- Advisors: rendimiento sin ERROR/WARN (102 INFO de índices/FK/PK a observar).
+  Seguridad sin ERROR: 68 RPC authenticated SECURITY DEFINER y las 2 proyecciones
   públicas por token son fronteras intencionadas; HIBP es el warning pendiente
   que requiere Supabase Pro. `workspace_invitation` sin policy es INFO y
   deliberado: solo se accede mediante RPC.
@@ -89,7 +89,7 @@ orientativo, no una verdad comercial cerrada.
 `supabase/migrations/` es ahora la historia SQL ejecutable: checkpoint
 reconstructivo + marcadores aplicados + migraciones posteriores. Una base
 vacía se reconstruye con `pnpm db:reset`, recibe fixtures sintéticos y pasa
-118/118 RLS. El SQL histórico anterior vive solo en
+120/120 RLS. El SQL histórico anterior vive solo en
 `build/migrations/squashed-20260720/` para auditoría.
 
 ### Verificación local y contra producción
@@ -97,19 +97,19 @@ vacía se reconstruye con `pnpm db:reset`, recibe fixtures sintéticos y pasa
 Último pase completo relevante:
 
 - `svelte-check`: 0 errores / 0 warnings.
-- Unit: **322/322**.
-- RLS contra Supabase live: **118/118**, sin skips.
+- Unit: **328/328**.
+- RLS contra Supabase live: **120/120**, sin skips.
 - Collab: **11/11** + TypeScript limpio.
 - Build de producción: verde.
-- E2E contra producción: suite completa **24 passed + 2 skips remotos
-  intencionados** en `ad1b580`; recorrido específico de Conversations **5/5**.
-  Incluye reloj de servidor, agrupación persistente, aislamiento money,
-  Conversations scoped y copy-link canónico.
-- Baseline hosted actual: run `29771194783` sobre `ad1b580`, reconstrucción
-  desde cero, 3 identidades Auth, 154 conversaciones sintéticas, RLS 118/118,
+- E2E contra producción: suite completa **25 passed + 2 skips remotos
+  intencionados** en `3b7c95e`; recorrido específico de Money **2/2**.
+  Incluye anticipo+resto, paid derivado y reversible, expected aging,
+  Conversations scoped, sesiones y limpieza de los datos de prueba.
+- Baseline hosted actual: run `29774763911` sobre `3b7c95e`, reconstrucción
+  desde cero, 3 identidades Auth, 154 conversaciones sintéticas, RLS 120/120,
   build y smoke 2/2 verdes.
-- Migración de producción: plan `29771403137` y apply `29771440087`; solo
-  `20260720201000_conversation_contact_timestamps.sql`, con trigger y función
+- Migración de producción: plan `29774560595` y apply `29774607258`; solo
+  `20260720214500_money_v2.sql`, con grants, triggers y estado derivado
   comprobados después del DDL.
 - Backup de producción actual: run `29770347695` sobre `5cc2f6b`, sello
   `2026-07-20T19-02-54Z`; esquema, datos y roles subidos a R2 y retención
@@ -132,8 +132,10 @@ vacía se reconstruye con `pnpm db:reset`, recibe fixtures sintéticos y pasa
   “Contacted today” con reloj de servidor, agrupación conversación/contacto,
   project chips, escritura de estado/próxima acción y estado vacío de importación.
   El contrato de `conversation_event` existe; la tabla/timeline aún no.
-- **Money** `/h/money`: fees, facturas y estados básicos; Money v2 y pagos
-  observados aún no están construidos.
+- **Money** `/h/money`: fees, facturas y payer; fechas contractual/esperada,
+  aging con procedencia, condición de cobro y follow-up a Desk; anticipos y
+  restos con paid derivado, gastos por scope, neto por línea, VAT/IRPF y
+  totales por moneda sin mezclarlas.
 - Contenedores: workspace → project → line; los módulos editan a nivel line.
 - Performance detail, road sheet interno/público, venues, cast/crew, assets,
   expenses, tasks, calendar shares y colaboración Yjs están operativos.
@@ -205,9 +207,9 @@ profundidad de producto, no en SvelteKit/Supabase/Cloudflare.
 
 ## Siguiente paso
 
-Abrir `_tasks.md`. Los bloques 1, 2 y 3 están cerrados. La prioridad inmediata
-es el bloque 4: Money v2; no empezar la revisión de contenedores ni la
-transversal hasta verificarlo.
+Abrir `_tasks.md`. Los bloques 1–4 están cerrados. La prioridad inmediata es
+el bloque 5: revisión diseño+datos de contenedores; la revisión transversal
+empieza solo después de verificarlo.
 
 ## Desarrollo local
 
