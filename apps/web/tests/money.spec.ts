@@ -24,7 +24,19 @@ test.describe('money lens', () => {
     // `.first()` (performance-write creates/deletes transient gigs in
     // parallel) and never a bare year substring (the unpinned lens also
     // lists real muk-cia rows).
-    const row = page.locator('tbody tr', { hasText: 'ZZZ e2e collab' }).filter({ hasText: '2031' }).first();
+    //
+    // The fixture holds TWO 2031 gigs (15 and 16 Jan, seeded 200ms apart on
+    // 2026-07-02), so `hasText: '2031'` matched both and `.first()` resolved
+    // to whichever the RPC happened to order first — different rows on
+    // different renders. That ambiguity aimed the cleanup at the bottom of
+    // this test at the wrong row: it cleared a fee that was already null,
+    // asserted "—" against it, and left the real fee set. Hence the fees and
+    // draft invoices that have been piling up on the fixture. Pin the exact
+    // rendered day (dayLabel → en-GB "Wed, 15 Jan 2031") and resolve the row
+    // ONCE, so every later step — including the cleanup — speaks about it.
+    const row = page
+      .locator('tbody tr', { hasText: 'ZZZ e2e collab' })
+      .filter({ hasText: '15 Jan 2031' });
     const fee = row.locator('.mny__fee');
     await expect(fee).toBeVisible();
 
@@ -35,18 +47,13 @@ test.describe('money lens', () => {
     await dialog.getByRole('button', { name: 'Save' }).click();
     await expect(fee).toContainText('1,234.56', { timeout: 10_000 });
 
-    // Persists across reload.
+    // Persists across reload. `fee` is a lazy locator — it re-resolves
+    // against the fresh DOM, so it must not be re-derived with `.first()`.
     await page.reload();
-    await expect(
-      page.locator('tbody tr', { hasText: 'ZZZ e2e collab' }).filter({ hasText: '2031' }).first().locator('.mny__fee'),
-    ).toContainText('1,234.56', { timeout: 10_000 });
+    await expect(fee).toContainText('1,234.56', { timeout: 10_000 });
 
     // ── Invoice from the fee (ADR-050) ──────────────────────────────────
-    await page
-      .locator('tbody tr', { hasText: '2031' })
-      .first()
-      .getByRole('button', { name: 'Invoice' })
-      .click();
+    await row.getByRole('button', { name: 'Invoice' }).click();
     const invDialog = page.locator('dialog[open]');
     await invDialog.getByLabel('VAT %').fill('21');
     // Total preview = server math: 1234.56 + 21% = 1,493.82.
@@ -136,14 +143,13 @@ test.describe('money lens', () => {
       timeout: 10_000,
     });
 
-    // Clear it (empty amount → null) — leaves the fixture clean.
-    const rowAgain = page.locator('tbody tr', { hasText: 'ZZZ e2e collab' }).filter({ hasText: '2031' }).first();
-    await rowAgain.locator('.mny__fee').click();
+    // Clear it (empty amount → null) — leaves the fixture clean. Same `row`
+    // as the one the fee was set on: this assertion is only meaningful if it
+    // is made about the row this test actually wrote to.
+    await fee.click();
     const dialog2 = page.locator('dialog[open]');
     await dialog2.getByLabel('Amount').fill('');
     await dialog2.getByRole('button', { name: 'Save' }).click();
-    await expect(rowAgain.locator('.mny__fee')).toContainText('—', {
-      timeout: 10_000,
-    });
+    await expect(fee).toContainText('—', { timeout: 10_000 });
   });
 });

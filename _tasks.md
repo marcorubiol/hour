@@ -49,21 +49,21 @@
     VAT/IRPF y totales separados por moneda. Runtime `3b7c95e`, baseline
     staging desde cero verde, RLS 120/120 y E2E de producción completo.
 
-## Ahora — planner + identidad, reconciliado y sin desplegar
+## Cerrado — bloque 6: planner + identidad
 
-> Rama `feat/planner-identity`: 29 commits de código rescatados de
-> `feat/comms-threads`, donde estaban atrapados detrás de un bloqueo que no era
-> suyo. Gates verdes sobre la rama: check 0/0 · unit 348 · build · RLS 120/120.
-> **Las migraciones NO se re-aplican**: las cinco de ADR-084 y la de ADR-081 ya
-> estaban vivas en producción y absorbidas en el checkpoint de `main`. Esto
-> invierte el riesgo habitual — aquí la base de datos iba **por delante** del
-> código, no al revés.
+> 29 commits de código rescatados de `feat/comms-threads`, donde estaban
+> atrapados detrás de un bloqueo que no era suyo. **Las migraciones NO se
+> re-aplicaron**: las cinco de ADR-084 y la de ADR-081 ya estaban vivas en
+> producción y absorbidas en el checkpoint de `main`. Esto invirtió el riesgo
+> habitual — aquí la base de datos iba **por delante** del código, no al revés.
 
-14. [ ] **Merge + deploy de `feat/planner-identity`.** Contenido: monograma de
-    identidad + paleta 12 (ADR-081), bloques multi-día por serie, ticks de
-    readiness, `booking_mode` (ADR-002/084), `/api/dates/series`,
-    `/api/projects/[id]`. Falta E2E contra producción antes de desplegar, y
-    `wrangler deploy` exige árbol limpio.
+14. [x] **Planner multi-día + identidad monograma, desplegado.** Monograma +
+    paleta 12 (ADR-081), bloques multi-día por serie, ticks de readiness,
+    `booking_mode` (ADR-002/084), `/api/dates/series`, `/api/projects/[id]`.
+    Runtime `4499848`, `dirty:false`. Gates: check 0/0 · unit 348 · build ·
+    RLS 120/120 · **E2E contra producción 27/27 sin skips**.
+
+## Ahora — planner, lo que quedó pendiente
 
 15. [ ] **Editar una fecha desde la UI — NO EXISTE.** `PATCH /api/dates/[id]` y
     `DatePatchSchema` están construidos, pero **ningún componente los usa** y el
@@ -205,6 +205,17 @@
 - `logo_url` existe, pero no hay flujo de subida R2.
 - Persona de test huérfana `019f2f03-f1f2-71a0-9e1f-9c8c9cf331c8`: invisible;
   purga opcional y exacta, nunca por patrón amplio.
+- **43 facturas draft acumuladas en `zzz-e2e-collab`**, desde el 2026-07-04.
+  Causa encontrada y corregida el 2026-07-20: la fixture tiene **dos** bolos de
+  2031 (15 y 16 de enero, sembrados con 200 ms de diferencia), y `money.spec.ts`
+  los filtraba por `'2031'` con `.first()`. La limpieza final del test resolvía a
+  veces la fila equivocada: borraba un fee que ya era null, afirmaba `'—'` contra
+  ella y dejaba el fee real puesto y la draft viva. **El test ya está arreglado**
+  (fija el día exacto `15 Jan 2031` y resuelve la fila UNA vez), así que la
+  acumulación se detiene aquí; lo que queda es el residuo histórico. Purga
+  segura, si se quiere: `delete from invoice where project_id = (select id from
+  project where slug='zzz-e2e-collab') and status='draft'` — nunca por patrón
+  amplio, y solo con Marco delante.
 
 ## Cerrado recientemente
 

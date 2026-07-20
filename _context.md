@@ -52,9 +52,9 @@ orientativo, no una verdad comercial cerrada.
 
 - Web: `https://hour.zerosense.studio`
 - Worker: `hour-web`
-- `/health/live`: sano, `dirty:false`, SHA **`3b7c95e`**.
+- `/health/live`: sano, `dirty:false`, SHA **`4499848`**.
 - `/health/ready`: sano, Supabase `ok`.
-- El runtime verificado en producción es `3b7c95e`; commits posteriores que
+- El runtime verificado en producción es `4499848`; commits posteriores que
   solo cambian documentación no requieren desplegar el Worker.
 
 ### Git
@@ -62,17 +62,16 @@ orientativo, no una verdad comercial cerrada.
 - Repo: `https://github.com/marcorubiol/hour` (privado).
 - Checkout: `/Users/marcorubiol/Developer/hour`.
 - Rama principal: `main`.
-- Base funcional del runtime: **`3b7c95e`**, publicada en `origin/main`;
+- Base funcional del runtime: **`4499848`**, publicada en `origin/main`;
   `main` local y remoto están sincronizados.
 - `wrangler deploy` exige árbol limpio y publica el SHA en `/health/live`.
-- **Ramas vivas (solo dos; las otras siete se borraron el 2026-07-20 por estar
-  contenidas en `main` o en la punta del stack):**
-  - `feat/planner-identity` — planner multi-día + identidad monograma. Código
-    terminado, gates verdes (check 0/0 · unit 348 · build · RLS 120/120), **sin
-    mergear ni desplegar**. Sus migraciones ya están vivas en producción.
+- **Ramas vivas: una sola.** Las otras ocho se cerraron el 2026-07-20 —
+  siete borradas por estar contenidas en `main` o en la punta del stack, y
+  `feat/planner-identity` mergeada aquí por fast-forward.
   - `feat/comms-threads` — comms + acceso. Modelo cerrado (ADR-082/083/085),
     604 líneas de SQL **sin aplicar**, **cero código de aplicación**, dos
     bloqueantes de arquitectura abiertos. Ver `_tasks.md § Bloqueado`.
+    **No se mergea**: es diseño, no producto a medio hacer.
 
 ### Supabase
 
@@ -105,13 +104,15 @@ vacía se reconstruye con `pnpm db:reset`, recibe fixtures sintéticos y pasa
 Último pase completo relevante:
 
 - `svelte-check`: 0 errores / 0 warnings.
-- Unit: **328/328**.
+- Unit: **348/348** (subió de 328 con los tests de identidad y bloques).
 - RLS contra Supabase live: **120/120**, sin skips.
 - Collab: **11/11** + TypeScript limpio.
 - Build de producción: verde.
-- E2E contra producción: suite completa **25 passed + 2 skips remotos
-  intencionados** en `3b7c95e`; recorrido específico de Money **2/2**.
-  Incluye anticipo+resto, paid derivado y reversible, expected aging,
+- E2E contra producción: suite completa **27 passed, 0 skips** sobre el runtime
+  `4499848`; recorrido específico de Money **2/2**. Los 2 skips que antes se
+  daban por «remotos intencionados» eran los de collab corriendo contra
+  `vite preview`, donde el Durable Object no existe: contra producción corren y
+  pasan. Incluye anticipo+resto, paid derivado y reversible, expected aging,
   Conversations scoped, sesiones y limpieza de los datos de prueba.
 - Baseline hosted actual: run `29774763911` sobre `3b7c95e`, reconstrucción
   desde cero, 3 identidades Auth, 154 conversaciones sintéticas, RLS 120/120,
