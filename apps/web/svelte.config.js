@@ -1,13 +1,17 @@
 import adapter from '@sveltejs/adapter-cloudflare';
 import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
 
+const productionSupabaseUrl = 'https://lqlyorlccnniybezugme.supabase.co';
+const supabaseUrl = process.env.PUBLIC_SUPABASE_URL ?? productionSupabaseUrl;
+const supabaseWsUrl = supabaseUrl.replace(/^https:/, 'wss:');
+
 /** @type {import('@sveltejs/kit').Config} */
 export default {
   preprocess: vitePreprocess(),
   kit: {
     adapter: adapter({
       platformProxy: {
-        configPath: 'wrangler.jsonc',
+        configPath: process.env.HOUR_WRANGLER_CONFIG_PATH ?? 'wrangler.jsonc',
         persist: false,
       },
     }),
@@ -22,8 +26,8 @@ export default {
      *
      * Origin notes:
      *  - Supabase project host (https + wss): browser-direct Realtime and
-     *    the has_permission RPC. Mirrors wrangler.jsonc [vars] — update
-     *    both if the Supabase project ever changes.
+     *    the has_permission RPC. Derived from PUBLIC_SUPABASE_URL so local,
+     *    staging and production builds get the matching CSP origin.
      *  - Sentry needs NO origin here: envelopes tunnel same-origin through
      *    /api/sentry-tunnel. If the tunnel is ever dropped, add the ingest
      *    host to connect-src.
@@ -42,8 +46,8 @@ export default {
         'font-src': ['self', 'https://fonts.gstatic.com'],
         'connect-src': [
           'self',
-          'https://lqlyorlccnniybezugme.supabase.co',
-          'wss://lqlyorlccnniybezugme.supabase.co',
+          supabaseUrl,
+          supabaseWsUrl,
         ],
         'img-src': ['self', 'data:'],
         'worker-src': ['self', 'blob:'],

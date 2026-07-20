@@ -64,7 +64,23 @@ jobs:
           supabase db dump --db-url "$SUPABASE_DB_URL"             -f "out/schema-${stamp}.sql"
           supabase db dump --db-url "$SUPABASE_DB_URL" --role-only -f "out/roles-${stamp}.sql"
           gzip -9 out/*.sql
-          (cd out && sha256sum ./*.sql.gz > SHA256SUMS)
+          docker run --rm postgres:17-alpine \
+            psql "$SUPABASE_DB_URL" --no-psqlrc --tuples-only --no-align \
+            --set ON_ERROR_STOP=1 --command "
+              select jsonb_build_object(
+                'format_version', 1,
+                'captured_at', timezone('utc', now()),
+                'counts', jsonb_build_object(
+                  'auth.users', (select count(*) from auth.users),
+                  'public.workspace', (select count(*) from public.workspace where deleted_at is null),
+                  'public.project', (select count(*) from public.project where deleted_at is null),
+                  'public.person', (select count(*) from public.person where deleted_at is null),
+                  'public.conversation', (select count(*) from public.conversation where deleted_at is null),
+                  'public.performance', (select count(*) from public.performance where deleted_at is null)
+                )
+              )::text;
+            " > out/METADATA.json
+          (cd out && sha256sum ./*.sql.gz ./METADATA.json > SHA256SUMS)
           ls -lh out/
           echo "STAMP=${stamp}" >> "$GITHUB_ENV"
 
@@ -76,7 +92,7 @@ jobs:
           AWS_DEFAULT_REGION: auto
         run: |
           set -euo pipefail
-          for f in out/*.gz out/SHA256SUMS; do
+          for f in out/*.gz out/METADATA.json out/SHA256SUMS; do
             aws s3 cp "$f" "s3://${R2_BUCKET}/weekly/${STAMP}/$(basename "$f")" \
               --endpoint-url "$R2_ENDPOINT" \
               --only-show-errors
@@ -110,6 +126,7 @@ jobs:
           name: supabase-schema-${{ env.STAMP }}
           path: |
             out/schema-*.sql.gz
+            out/METADATA.json
             out/SHA256SUMS
           if-no-files-found: error
           retention-days: 1

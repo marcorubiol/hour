@@ -1,0 +1,135 @@
+name: Supabase staging baseline
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: Type REBUILD STAGING to erase staging and rebuild it from migrations
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supabase-staging
+  cancel-in-progress: false
+
+jobs:
+  rebuild-and-verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    environment: staging
+    env:
+      CONFIRM: ${{ inputs.confirm }}
+      STAGING_PROJECT_REF: ${{ vars.STAGING_PROJECT_REF }}
+      STAGING_DB_URL: ${{ secrets.STAGING_DB_URL }}
+      PRODUCTION_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      PUBLIC_SUPABASE_URL: ${{ vars.STAGING_SUPABASE_URL }}
+      PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.STAGING_SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.STAGING_SUPABASE_SERVICE_ROLE_KEY }}
+      PW_TEST_EMAIL: playwright@hour.test
+      PW_TEST_PASSWORD: ${{ secrets.STAGING_PW_TEST_PASSWORD }}
+      PW_LIMITED_EMAIL: limited@hour.test
+      PW_LIMITED_PASSWORD: ${{ secrets.STAGING_PW_LIMITED_PASSWORD }}
+      PUBLIC_SENTRY_DSN: ''
+      PUBLIC_SENTRY_ENV: staging-ci
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prove the destructive target is staging
+        run: |
+          set -euo pipefail
+          if [ "$CONFIRM" != 'REBUILD STAGING' ]; then
+            echo 'Confirmation must be exactly: REBUILD STAGING' >&2
+            exit 1
+          fi
+          missing=()
+          for v in STAGING_PROJECT_REF STAGING_DB_URL PRODUCTION_DB_URL PUBLIC_SUPABASE_URL \
+            PUBLIC_SUPABASE_ANON_KEY SUPABASE_SERVICE_ROLE_KEY PW_TEST_PASSWORD PW_LIMITED_PASSWORD; do
+            if [ -z "${!v}" ]; then missing+=("$v"); fi
+          done
+          if [ ${#missing[@]} -ne 0 ]; then
+            echo "Missing staging configuration: ${missing[*]}" >&2
+            exit 1
+          fi
+          if [ "$STAGING_DB_URL" = "$PRODUCTION_DB_URL" ]; then
+            echo 'Refusing to reset production: staging and production URLs are identical.' >&2
+            exit 1
+          fi
+          if [[ "$STAGING_DB_URL" != *"$STAGING_PROJECT_REF"* ]]; then
+            echo 'STAGING_DB_URL does not contain STAGING_PROJECT_REF.' >&2
+            exit 1
+          fi
+          if [ "$PUBLIC_SUPABASE_URL" != "https://${STAGING_PROJECT_REF}.supabase.co" ]; then
+            echo 'STAGING_SUPABASE_URL does not match STAGING_PROJECT_REF.' >&2
+            exit 1
+          fi
+          if [[ "$PRODUCTION_DB_URL" == *"$STAGING_PROJECT_REF"* ]]; then
+            echo 'Refusing to reset: STAGING_PROJECT_REF resolves to production.' >&2
+            exit 1
+          fi
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.109.1
+
+      - name: Rebuild the database from zero
+        run: supabase db reset --db-url "$STAGING_DB_URL" --no-seed --yes
+
+      - name: Create Auth fixtures through the Admin API
+        run: node supabase/fixtures/provision-auth.mjs
+
+      - name: Load deterministic synthetic fixtures
+        run: |
+          docker run --rm -i postgres:17-alpine \
+            psql "$STAGING_DB_URL" --no-psqlrc --set ON_ERROR_STOP=1 \
+            < supabase/fixtures/staging.sql
+
+      - name: Verify synthetic fixture shape
+        run: |
+          actual="$(docker run --rm postgres:17-alpine \
+            psql "$STAGING_DB_URL" --no-psqlrc --tuples-only --no-align \
+            --set ON_ERROR_STOP=1 --command "
+              select jsonb_build_object(
+                'users', (select count(*) from auth.users),
+                'workspaces', (select count(*) from public.workspace where deleted_at is null),
+                'conversations', (select count(*) from public.conversation where deleted_at is null)
+              )::text;
+            ")"
+          echo "$actual" | jq -e \
+            '. == {"users": 2, "workspaces": 4, "conversations": 154}' >/dev/null
+
+      - name: RLS contract (114/114)
+        run: pnpm --filter web test:rls
+
+      - name: Prepare staging Worker runtime configuration
+        run: |
+          runtime_config="$RUNNER_TEMP/wrangler.staging.jsonc"
+          node scripts/write-wrangler-runtime-config.mjs "$runtime_config"
+          echo "HOUR_WRANGLER_CONFIG_PATH=$runtime_config" >> "$GITHUB_ENV"
+
+      - name: Build the app against staging
+        run: pnpm --filter web build
+
+      - name: Critical-route smoke
+        run: |
+          pnpm --filter web test:install
+          pnpm --filter web exec playwright test tests/smoke.spec.ts --project=chromium
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo '## Supabase staging baseline'
+            echo
+            echo "Commit: \`${GITHUB_SHA}\`"
+            echo 'Expected gate: fresh migration reset, synthetic fixtures, RLS 114/114, critical-route smoke.'
+          } >> "$GITHUB_STEP_SUMMARY"

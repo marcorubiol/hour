@@ -16,9 +16,10 @@ The three dumps have distinct scopes:
   so restored users can still log in. Vector-storage implementation tables are
   excluded as recommended by Supabase.
 
-Each backup also contains `SHA256SUMS` for integrity verification. Backups made
-before 2026-07-20 used `--schema public` for the data dump and therefore cannot
-prove authentication recovery; use a newer stamp for a restore drill.
+Each backup also contains `METADATA.json` with non-sensitive source row counts
+and `SHA256SUMS` for integrity verification. Backups made before 2026-07-20
+used `--schema public` for the data dump and therefore cannot prove
+authentication recovery; use a newer stamp for a restore drill.
 
 Manual trigger: GitHub → Actions → "Supabase backup → R2" → Run workflow.
 
@@ -46,10 +47,11 @@ aws s3 ls s3://hour-backups/weekly/ \
   --endpoint-url "$R2_ENDPOINT"
 ```
 
-Pick the newest stamp; expect four files:
+Pick the newest stamp; expect five files:
 - `data-<stamp>.sql.gz`
 - `schema-<stamp>.sql.gz`
 - `roles-<stamp>.sql.gz`
+- `METADATA.json`
 - `SHA256SUMS`
 
 Verify integrity before reading or restoring anything:
@@ -70,7 +72,7 @@ Use only an empty, disposable staging project whose Supabase services have
 already initialized the managed schemas. Never point the restore command at
 production.
 
-1. Download all four files for the same stamp and verify `SHA256SUMS`.
+1. Download all five files for the same stamp and verify `SHA256SUMS`.
 2. Restore `roles`, then `schema`.
 3. Restore `data` in one transaction with
    `SET session_replication_role = replica` so dependency ordering does not

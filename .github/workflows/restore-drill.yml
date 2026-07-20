@@ -1,0 +1,231 @@
+name: Supabase staging restore drill
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_stamp:
+        description: R2 UTC stamp, for example 2026-07-20T15-39-54Z
+        required: true
+        type: string
+      confirm:
+        description: Type RESTORE STAGING FROM R2 to erase staging temporarily
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supabase-staging
+  cancel-in-progress: false
+
+jobs:
+  restore-verify-and-clean:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: staging
+    env:
+      SOURCE_STAMP: ${{ inputs.source_stamp }}
+      CONFIRM: ${{ inputs.confirm }}
+      STAGING_PROJECT_REF: ${{ vars.STAGING_PROJECT_REF }}
+      STAGING_DB_URL: ${{ secrets.STAGING_DB_URL }}
+      PRODUCTION_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      PUBLIC_SUPABASE_URL: ${{ vars.STAGING_SUPABASE_URL }}
+      PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.STAGING_SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.STAGING_SUPABASE_SERVICE_ROLE_KEY }}
+      PW_TEST_EMAIL: playwright@hour.test
+      PW_TEST_PASSWORD: ${{ secrets.RESTORE_PW_TEST_PASSWORD }}
+      PW_LIMITED_EMAIL: limited@hour.test
+      PW_LIMITED_PASSWORD: ${{ secrets.RESTORE_PW_LIMITED_PASSWORD }}
+      SYNTHETIC_PW_TEST_PASSWORD: ${{ secrets.STAGING_PW_TEST_PASSWORD }}
+      SYNTHETIC_PW_LIMITED_PASSWORD: ${{ secrets.STAGING_PW_LIMITED_PASSWORD }}
+      R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+      R2_BUCKET: hour-backups
+      PUBLIC_SENTRY_DSN: ''
+      PUBLIC_SENTRY_ENV: staging-restore-drill
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prove source and destructive target
+        id: safety
+        run: |
+          set -euo pipefail
+          if [ "$CONFIRM" != 'RESTORE STAGING FROM R2' ]; then
+            echo 'Confirmation must be exactly: RESTORE STAGING FROM R2' >&2
+            exit 1
+          fi
+          if [[ ! "$SOURCE_STAMP" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}-[0-9]{2}-[0-9]{2}Z$ ]]; then
+            echo "Invalid source_stamp: $SOURCE_STAMP" >&2
+            exit 1
+          fi
+          missing=()
+          for v in STAGING_PROJECT_REF STAGING_DB_URL PRODUCTION_DB_URL PUBLIC_SUPABASE_URL \
+            PUBLIC_SUPABASE_ANON_KEY SUPABASE_SERVICE_ROLE_KEY PW_TEST_PASSWORD PW_LIMITED_PASSWORD \
+            SYNTHETIC_PW_TEST_PASSWORD SYNTHETIC_PW_LIMITED_PASSWORD \
+            R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY R2_ENDPOINT; do
+            if [ -z "${!v}" ]; then missing+=("$v"); fi
+          done
+          if [ ${#missing[@]} -ne 0 ]; then
+            echo "Missing restore configuration: ${missing[*]}" >&2
+            exit 1
+          fi
+          if [ "$STAGING_DB_URL" = "$PRODUCTION_DB_URL" ] \
+            || [[ "$PRODUCTION_DB_URL" == *"$STAGING_PROJECT_REF"* ]]; then
+            echo 'Refusing to restore over production.' >&2
+            exit 1
+          fi
+          if [[ "$STAGING_DB_URL" != *"$STAGING_PROJECT_REF"* ]] \
+            || [ "$PUBLIC_SUPABASE_URL" != "https://${STAGING_PROJECT_REF}.supabase.co" ]; then
+            echo 'Staging URL/ref consistency check failed.' >&2
+            exit 1
+          fi
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.109.1
+
+      - name: Download the private backup from R2
+        env:
+          AWS_ACCESS_KEY_ID: ${{ env.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ env.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+        run: |
+          set -euo pipefail
+          mkdir -p restore
+          for name in \
+            "roles-${SOURCE_STAMP}.sql.gz" \
+            "schema-${SOURCE_STAMP}.sql.gz" \
+            "data-${SOURCE_STAMP}.sql.gz" \
+            METADATA.json SHA256SUMS; do
+            aws s3 cp \
+              "s3://${R2_BUCKET}/weekly/${SOURCE_STAMP}/${name}" \
+              "restore/${name}" \
+              --endpoint-url "$R2_ENDPOINT" \
+              --only-show-errors
+          done
+          (cd restore && sha256sum --check SHA256SUMS)
+
+      - name: Prepare an empty managed Supabase target
+        run: |
+          echo 'RESTORE_STARTED=true' >> "$GITHUB_ENV"
+          echo "DRILL_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
+          supabase db reset --db-url "$STAGING_DB_URL" --no-seed --yes
+          docker run --rm postgres:17-alpine \
+            psql "$STAGING_DB_URL" --no-psqlrc --set ON_ERROR_STOP=1 \
+            --command 'drop schema if exists public cascade; create schema public authorization postgres;'
+          auth_users="$(docker run --rm postgres:17-alpine \
+            psql "$STAGING_DB_URL" --no-psqlrc --tuples-only --no-align \
+            --set ON_ERROR_STOP=1 --command 'select count(*) from auth.users;')"
+          if [ "$auth_users" != '0' ]; then
+            echo 'Target reset left Auth users behind; refusing to merge a restore.' >&2
+            exit 1
+          fi
+
+      - name: Restore roles, schema and data atomically
+        run: |
+          set -euo pipefail
+          gunzip --keep restore/*.sql.gz
+          docker run --rm \
+            --volume "$PWD/restore:/restore:ro" \
+            postgres:17-alpine \
+            psql "$STAGING_DB_URL" \
+              --no-psqlrc \
+              --single-transaction \
+              --variable ON_ERROR_STOP=1 \
+              --file "/restore/roles-${SOURCE_STAMP}.sql" \
+              --file "/restore/schema-${SOURCE_STAMP}.sql" \
+              --command 'SET session_replication_role = replica' \
+              --file "/restore/data-${SOURCE_STAMP}.sql"
+
+      - name: Compare restored source counts
+        run: |
+          actual="$(docker run --rm postgres:17-alpine \
+            psql "$STAGING_DB_URL" --no-psqlrc --tuples-only --no-align \
+            --set ON_ERROR_STOP=1 --command "
+              select jsonb_build_object(
+                'auth.users', (select count(*) from auth.users),
+                'public.workspace', (select count(*) from public.workspace where deleted_at is null),
+                'public.project', (select count(*) from public.project where deleted_at is null),
+                'public.person', (select count(*) from public.person where deleted_at is null),
+                'public.conversation', (select count(*) from public.conversation where deleted_at is null),
+                'public.performance', (select count(*) from public.performance where deleted_at is null)
+              )::text;
+            ")"
+          jq -e --argjson actual "$actual" '.counts == $actual' restore/METADATA.json >/dev/null
+          echo "RESTORED_COUNTS=$actual" >> "$GITHUB_ENV"
+
+      - name: Restored login and RLS contract (114/114)
+        run: pnpm --filter web test:rls
+
+      - name: Prepare restored Worker runtime configuration
+        run: |
+          runtime_config="$RUNNER_TEMP/wrangler.staging.jsonc"
+          node scripts/write-wrangler-runtime-config.mjs "$runtime_config"
+          echo "HOUR_WRANGLER_CONFIG_PATH=$runtime_config" >> "$GITHUB_ENV"
+
+      - name: Build the app against restored staging
+        run: pnpm --filter web build
+
+      - name: Restored critical-route smoke
+        run: |
+          pnpm --filter web test:install
+          pnpm --filter web exec playwright test tests/smoke.spec.ts --project=chromium
+
+      - name: Record successful evidence
+        run: |
+          elapsed="$(( $(date +%s) - DRILL_STARTED_AT ))"
+          jq -n \
+            --arg source_stamp "$SOURCE_STAMP" \
+            --arg commit "$GITHUB_SHA" \
+            --argjson elapsed_seconds "$elapsed" \
+            --argjson counts "$RESTORED_COUNTS" \
+            '{source_stamp: $source_stamp, commit: $commit, elapsed_seconds: $elapsed_seconds, counts: $counts, rls: "114/114", critical_route: "passed"}' \
+            > restore/evidence.json
+          echo "DRILL_ELAPSED_SECONDS=$elapsed" >> "$GITHUB_ENV"
+
+      - name: Upload non-sensitive drill evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: restore-drill-evidence-${{ env.SOURCE_STAMP }}
+          path: restore/evidence.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Return staging to synthetic data
+        if: always() && env.RESTORE_STARTED == 'true'
+        env:
+          PW_TEST_PASSWORD: ${{ env.SYNTHETIC_PW_TEST_PASSWORD }}
+          PW_LIMITED_PASSWORD: ${{ env.SYNTHETIC_PW_LIMITED_PASSWORD }}
+        run: |
+          set -euo pipefail
+          supabase db reset --db-url "$STAGING_DB_URL" --no-seed --yes
+          node supabase/fixtures/provision-auth.mjs
+          docker run --rm -i postgres:17-alpine \
+            psql "$STAGING_DB_URL" --no-psqlrc --set ON_ERROR_STOP=1 \
+            < supabase/fixtures/staging.sql
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo '## Supabase staging restore drill'
+            echo
+            echo "Source stamp: \`${SOURCE_STAMP}\`"
+            echo "Commit: \`${GITHUB_SHA}\`"
+            if [ -n "${DRILL_ELAPSED_SECONDS:-}" ]; then
+              echo "Elapsed: **${DRILL_ELAPSED_SECONDS}s**"
+              echo 'Login, source counts, RLS 114/114 and critical-route smoke passed.'
+            else
+              echo 'The drill did not reach the successful evidence step; inspect the failed step.'
+            fi
+            echo 'The final cleanup returns staging to deterministic synthetic data.'
+          } >> "$GITHUB_STEP_SUMMARY"
