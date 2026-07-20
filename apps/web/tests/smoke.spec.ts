@@ -31,7 +31,7 @@ test.describe('smoke', () => {
     // space portada now. Note the bare path: sign-in lands on `/h`.
     await page.goto('/h');
     await expect(page.getByRole('link', { name: /Hour — home/i })).toBeVisible();
-    await expect(page.locator('.hall__door')).toBeVisible();
+    await expect(page.getByRole('button', { name: /catch me up/i })).toBeVisible();
 
     // ⌘K is the SCOPE BUILDER (Scope v2), not a lens switcher: it lists
     // spaces / projects / lines from /api/workspaces + /api/projects +
