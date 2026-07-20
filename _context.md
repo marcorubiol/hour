@@ -16,10 +16,20 @@
 
 > **MODELO DE ESTRUCTURA — leer antes de tocar nav / lentes / módulos / detalle de entidad**
 >
-> `build/structure-model.md` (ADR-063, 2026-07-14) es la referencia canónica de cómo se
-> estructura la app: **lente** (solo lee, cross-contenedor, sin lógica de edición) vs **módulo**
-> (edita en contexto, **solo a nivel línea**, compositivo por `kind`) vs **tarea** (verbo que
-> alimenta Agenda). Edición en 3 niveles de contenedor: espacio → project → línea/módulos.
+> `build/structure-model.md` (ADR-063, 2026-07-14 · enmendado 2026-07-20 por ADR-085) es la
+> referencia canónica de cómo se estructura la app: **lente** (solo lee, cross-contenedor, sin
+> lógica de edición) vs **módulo** (edita en contexto, **solo a nivel línea**, compositivo por
+> `kind`) vs **tarea** (verbo que alimenta el Desk) vs **faceta** (el primitivo nuevo: la
+> clasifica contenido DENTRO de un contenedor y hace triple servicio — sub-hilo, unidad de
+> permiso y etiqueta del gutter).
+>
+> **DOS ESCALERAS, no una** — la palabra "nivel" hacía dos trabajos:
+> · **edición** (dónde se autoriza contenido): espacio → project → línea/módulos — **tres**
+> · **alcance/acceso** (dónde entras, das permisos y cuelga conversación): espacio → project →
+>   línea → **performance** — **cuatro**
+> El bolo lleva acceso y conversación; **no compone módulos**. Si aparecen módulos en el bolo,
+> eso es deriva. Qué facetas existen en cada nivel es una TABLA DE DATOS, no código.
+>
 > Si algo en el código o en otro doc contradice ese modelo, o gana el modelo o es un bug a
 > reconciliar. No dejar que la nomenclatura vuelva a derivar.
 
