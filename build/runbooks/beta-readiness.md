@@ -68,6 +68,14 @@ cd apps/collab && pnpm run deploy
 cd ../web && pnpm run deploy
 ```
 
+Database migrations use `.github/workflows/production-migrate.yml` before
+either Worker deploy. Run it once with `apply=false` and confirmation
+`PLAN PRODUCTION`; inspect that only the expected versioned files are pending.
+Then run it with `apply=true` and confirmation
+`MIGRATE PRODUCTION lqlyorlccnniybezugme`. The workflow proves the secret DB
+URL contains the canonical production project ref, preserves migration history
+through `supabase db push`, and prints the remote history after applying.
+
 ### 2b. Deploy provenance — deploy commits, not working trees
 
 `wrangler deploy` uploads **what is on disk**, not a git ref. Left alone that

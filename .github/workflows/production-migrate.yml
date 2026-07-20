@@ -1,0 +1,81 @@
+name: Supabase production migration
+
+on:
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: Apply the planned migrations (false only prints the plan)
+        required: true
+        default: false
+        type: boolean
+      confirm:
+        description: Type PLAN PRODUCTION or MIGRATE PRODUCTION lqlyorlccnniybezugme
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supabase-production-migration
+  cancel-in-progress: false
+
+jobs:
+  plan-or-apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      APPLY: ${{ inputs.apply }}
+      CONFIRM: ${{ inputs.confirm }}
+      PRODUCTION_PROJECT_REF: lqlyorlccnniybezugme
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Prove the production target and operator intent
+        run: |
+          set -euo pipefail
+          if [ -z "$SUPABASE_DB_URL" ]; then
+            echo 'SUPABASE_DB_URL is not configured.' >&2
+            exit 1
+          fi
+          if [[ "$SUPABASE_DB_URL" != *"$PRODUCTION_PROJECT_REF"* ]]; then
+            echo 'SUPABASE_DB_URL does not contain the canonical production project ref.' >&2
+            exit 1
+          fi
+          expected='PLAN PRODUCTION'
+          if [ "$APPLY" = 'true' ]; then
+            expected="MIGRATE PRODUCTION $PRODUCTION_PROJECT_REF"
+          fi
+          if [ "$CONFIRM" != "$expected" ]; then
+            echo "Confirmation must be exactly: $expected" >&2
+            exit 1
+          fi
+
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.109.1
+
+      - name: Print the migration plan
+        run: supabase db push --db-url "$SUPABASE_DB_URL" --dry-run
+
+      - name: Apply the migration plan
+        if: inputs.apply
+        run: supabase db push --db-url "$SUPABASE_DB_URL" --yes
+
+      - name: Verify remote migration history
+        if: inputs.apply
+        run: supabase migration list --db-url "$SUPABASE_DB_URL"
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo '## Production database migration'
+            echo
+            echo "- Commit: \`$GITHUB_SHA\`"
+            echo "- Mode: \`$([ "$APPLY" = 'true' ] && echo apply || echo plan)\`"
+            echo "- Target ref: \`$PRODUCTION_PROJECT_REF\`"
+            echo "- Result: \`${{ job.status }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
