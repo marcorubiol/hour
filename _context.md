@@ -221,9 +221,13 @@ profundidad de producto, no en SvelteKit/Supabase/Cloudflare.
 
 ## Siguiente paso
 
-Abrir `_tasks.md`. Los bloques 1–4 están cerrados. La prioridad inmediata es
-el bloque 5: revisión diseño+datos de contenedores; la revisión transversal
-empieza solo después de verificarlo.
+Abrir `_tasks.md`. La prioridad inmediata es **money v3** (ADR-086): la
+estructura está **decidida** en grill 2026-07-21 (detalle en
+`_notes/spec-money-v3-decisions.md`), pero **nada está implementado**. Falta,
+en este orden: (1) el **diseño** — house-style del PDF de factura/proforma,
+formularios de identidad fiscal, UI de Money (Marco los hace en frío, no en
+caliente); (2) el **build** — delta de schema en el spec. La revisión
+diseño+datos de contenedores (bloque 5) va **después** de money v3.
 
 ## Desarrollo local
 

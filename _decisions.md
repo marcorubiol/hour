@@ -2257,4 +2257,53 @@ Triggered by Marco's pre-scaffold doubt (Phase 0.0 day 5). Five alternatives eva
 > (604 líneas, **sin aplicar**) y los 7 prototipos de `app design/`, ambos en la rama
 > `feat/comms-threads`. Se dejaron fuera a propósito — SQL re-aplicable en el árbol
 > invita al error, y los prototipos no entran en el build. Los dos bloqueantes de
-> arquitectura están en `_tasks.md § Bloqueado`. El siguiente ADR nuevo es **086**.
+> arquitectura están en `_tasks.md § Bloqueado`. El siguiente ADR nuevo es **087**.
+
+## [2026-07-21] — ADR-086 · Money v3: el dinero deja de girar alrededor de la factura
+
+> Estructura decidida en grill con Marco 2026-07-21. **NO implementado; diseño y
+> build pendientes.** Detalle estructural completo, delta de schema y sección de
+> futuro en `_notes/spec-money-v3-decisions.md`. Empezó como "cerrar identidad
+> fiscal" (gap #3 de contenedores) y creció a un rediseño del dinero.
+
+- **Decisión** (seis piezas):
+  1. **Factura = módulo por espacio** (`workspace.settings.invoicing_mode` ∈
+     off/interno/legal). Legal = **Factura**, interno = **Proforma**.
+  2. **Identidad fiscal = tabla propia `fiscal_identity`** con dueño blando
+     (cuenta por defecto, workspace override), congelada como snapshot en la
+     factura. Dirección estructurada, IBAN+SWIFT. **Refina ADR-062.**
+  3. **El dinero es el suelo, facturar es opcional encima.** `payment` se
+     desacopla de `invoice`; el fee del bolo es el ancla; "cobrado" se deriva de
+     pagos contra el fee. **Invierte la derivación de cobro de money v2 (ADR-074)**
+     — por eso es v3.
+  4. **Tamaño A ahora, B-ready por una espina estrecha** (scope·contraparte·
+     categoría nullable). No se construye B (dinero a artistas, P&L). Guardia
+     anti-sobre-construcción escrita en el spec.
+  5. **Numeración auto-correlativa** en los dos modos, dos series separadas
+     (Factura por `fiscal_identity`+año; Proforma por workspace+año), al emitir.
+  6. **El receptor reutiliza `fiscal_identity`** (workspace-owned); la factura
+     enlaza y congela emisor+receptor; difiere la entidad `organization` (gap #1).
+
+- **Frontera de producto (gate)**: money v3 reabre en parte la frontera de
+  `_context.md` ("Hour no es la gestoría"). El tamaño A es libro de dinero, no
+  compliance; el tamaño B (nómina/intermittents, cierre) es otro producto y no se
+  construye sin señal de uso real.
+
+- **Futuro forward-compat (no build, nada puede cerrarlo)**: enlace fiscal entre
+  empresas con consentimiento (patrón `person`/`workspace_person`); lo habilitan
+  el dueño-blando de `fiscal_identity` + el snapshot de la factura.
+
+- **Abierto**: (1) el **diseño** — house-style del PDF de factura/proforma,
+  formularios de identidad fiscal, cambios de UI de Money; Marco lo hace en frío.
+  (2) El **build** — delta de schema en el spec; backup/preflight + RLS
+  proporcionales (payment/invoice, ~11 políticas de dinero).
+
+- **Status**: **estructura cerrada, NO implementado.** Va **primero, antes de la
+  revisión de contenedores** (el campo "identidad fiscal" de la portada queda
+  absorbido aquí). El PDF "casi ya" lo pone en camino crítico. Sujeto a una
+  lectura en frío de Marco; si cambia una pieza estructural se añade Status
+  (append-only).
+
+- **Re-evaluate when**: aparezca señal de uso real que pida el tamaño B; el enlace
+  fiscal entre empresas se vuelva demanda; o la dirección estructurada necesite
+  automatización (e-invoice Facturae/EN-16931).

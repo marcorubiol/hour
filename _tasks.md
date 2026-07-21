@@ -63,7 +63,42 @@
     Runtime `4499848`, `dirty:false`. Gates: check 0/0 · unit 348 · build ·
     RLS 120/120 · **E2E contra producción 27/27 sin skips**.
 
-## Ahora — planner, lo que quedó pendiente
+## Ahora — money v3 (ADR-086): estructura decidida, diseño + build pendientes
+
+> Cerrado en grill 2026-07-21. Estructura completa + delta de schema:
+> `_notes/spec-money-v3-decisions.md`. Decisión: `_decisions.md § ADR-086`.
+> **Va PRIMERO — antes de contenedores y de los flecos de planner.** Nada
+> implementado, cero schema tocado. En una frase: el dinero deja de girar
+> alrededor de la factura — el fee del bolo es el ancla, cobrar y facturar son
+> hechos independientes; tamaño A (libro de entrada/salida) ahora, B-ready.
+
+**Primero DISEÑO** (Marco, en frío — es la otra vía de pensamiento):
+- [ ] **House-style del PDF de factura/proforma.** Es lo del "casi ya": sin él no
+  hay documento que emitir. Es lo que desbloquea todo lo demás.
+- [ ] **Formularios de `fiscal_identity`** — emisor (cuenta) y receptor
+  (workspace); dirección estructurada (`address_line_1/2` + postal/city/region/
+  country); el autocompletado es API externa, después.
+- [ ] **UI de Money** — pago desacoplado de la factura; el fee del bolo como
+  ancla; "cobrado" derivado contra el fee (no contra la factura).
+
+**Luego BUILD** (backup/preflight + RLS proporcionales; payment/invoice tocan ~11
+políticas de dinero):
+- [ ] Tabla `fiscal_identity` (dueño blando `account_id`|`workspace_id`) +
+  `account.default_fiscal_identity_id` + `workspace.fiscal_identity_id`.
+- [ ] `invoice`: `type` factura|proforma, snapshot emisor+receptor congelado,
+  serie de numeración auto-correlativa al emitir, pasa a documento opcional que
+  referencia el fee.
+- [ ] `payment`: `invoice_id` nullable + ancla scope + contraparte + categoría;
+  reescribir la derivación de "cobrado" a pagos-vs-fee.
+- [ ] `expense`: + contraparte nullable.
+- [ ] `workspace.settings.invoicing_mode` ∈ {off, interno, legal}.
+
+**NO construir** (forward-compat, ver spec § Futuro): tabla `payable` (dinero a
+artistas), P&L, `fiscal_identity` compartible entre empresas, entidad
+`organization`. El dueño-blando + el snapshot ya dejan abierto el enlace fiscal
+entre empresas sin construirlo.
+
+## Después de money v3 — planner, lo que quedó pendiente
 
 15. [ ] **Editar una fecha desde la UI — NO EXISTE.** `PATCH /api/dates/[id]` y
     `DatePatchSchema` están construidos, pero **ningún componente los usa** y el
@@ -175,7 +210,7 @@
   antes de construir nada de esto*. Mientras no se cumpla, resolver los dos
   bloqueantes es trabajo especulativo por bueno que sea el modelo.
 
-## Ahora — bloque 5: contenedores
+## Después de money v3 — contenedores (bloque 5)
 
 12. [ ] **Revisión diseño+datos — contenedores.** Portada de workspace, project
     detail, line detail y siete módulos; cerrar identidad fiscal y qué datos son
