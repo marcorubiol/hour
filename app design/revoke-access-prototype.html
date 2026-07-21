@@ -1,0 +1,381 @@
+<!doctype html>
+<html lang="ca">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Hour — Treure l'accés (l'altra meitat de donar d'alta)</title>
+    <style>
+      @layer reset, defaults, tokens, layouts, components, components.overrides,
+        utilities, overrides;
+    </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400..600;1,6..72,400..600&family=Inter:wght@400..600&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="../apps/web/src/styles/base.css" />
+    <link rel="stylesheet" href="_kit.css" />
+
+    <style>
+      .pmast {
+        flex-direction: row;
+        align-items: flex-start;
+        gap: var(--space-m);
+      }
+      .pmast .mk--l {
+        margin-block-start: var(--space-l);
+      }
+      .pmast__body {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-s);
+      }
+
+      /* ── consequence rows ────────────────────────────────────────── */
+      .cons {
+        display: flex;
+        align-items: baseline;
+        gap: var(--space-m);
+        padding-block: var(--space-s);
+        font-size: var(--text-s);
+      }
+      .cons + .cons {
+        border-block-start: var(--divider-light);
+      }
+      .cons__what {
+        flex: 1;
+        color: var(--text-color);
+        min-inline-size: 0;
+      }
+      .cons__what b {
+        color: var(--heading-color);
+        font-weight: 500;
+      }
+      .cons__tag {
+        font-family: var(--font-mono);
+        font-size: var(--text-xs);
+        color: var(--text-faint);
+        inline-size: 7rem;
+        flex: none;
+      }
+      /* What breaks earns a mark; what stays does not. Restraint is the
+         point — "stays" is the majority and must not read as a warning. */
+      .cons--breaks {
+        border-inline-start: 2px solid var(--warning);
+        padding-inline-start: var(--space-s);
+        margin-inline-start: calc(var(--space-s) * -1);
+      }
+      .cons--breaks .cons__tag {
+        color: var(--warning);
+      }
+
+      .lede {
+        margin-block: var(--space-s) 0;
+        font-size: var(--text-s);
+        color: var(--text-muted);
+        max-inline-size: 58ch;
+      }
+
+      .actions {
+        display: flex;
+        align-items: center;
+        gap: var(--space-s);
+        margin-block-start: var(--space-l);
+        padding-block-start: var(--space-m);
+        border-block-start: var(--border);
+      }
+
+      /* ── the automatic case: a guest simply running out ──────────── */
+      .auto {
+        display: flex;
+        align-items: baseline;
+        gap: var(--space-m);
+        padding-block: var(--space-xs);
+        font-size: var(--text-s);
+      }
+      .auto + .auto {
+        border-block-start: var(--divider-light);
+      }
+      .auto__when {
+        font-family: var(--font-mono);
+        font-size: var(--text-xs);
+        color: var(--text-faint);
+        inline-size: 6rem;
+        flex: none;
+      }
+      .auto__who {
+        flex: 1;
+        color: var(--text-color);
+      }
+      .auto__who span {
+        color: var(--text-faint);
+        font-family: var(--font-mono);
+        font-size: var(--text-xs);
+      }
+
+      .seatline {
+        display: flex;
+        align-items: baseline;
+        gap: var(--space-s);
+        font-size: var(--text-s);
+        color: var(--text-muted);
+      }
+      .seatline b {
+        font-family: var(--font-display);
+        font-size: var(--text-l);
+        font-weight: 500;
+        color: var(--heading-color);
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="proto">
+      <header class="shell bleed">
+        <div class="shell__inner wrap">
+          <div class="shell__brand">
+            <span class="shell__logo">hour</span>
+            <span class="eyebrow">accés</span>
+          </div>
+          <div class="shell__right">
+            <div class="shell__search">Cerca o salta a… <kbd class="kbd">⌘K</kbd></div>
+            <button class="modeswap" type="button" onclick="document.documentElement.dataset.mode = document.documentElement.dataset.mode === 'dark' ? 'light' : 'dark'">tema fosc</button>
+            <span class="mk mk--person">MR</span>
+          </div>
+        </div>
+      </header>
+
+      <div class="addr bleed">
+        <div class="addr__inner wrap">
+          <nav class="crumbs" aria-label="Breadcrumb">
+            <a class="crumbs__space" href="#"><span class="mk" style="--c: var(--accent-1)">MK</span>MüK Cia</a>
+            <span class="crumbs__sep">›</span>
+            <a class="crumbs__mid" href="#">Equip</a>
+            <span class="crumbs__sep">›</span>
+            <span class="crumbs__here">Ana Solé — treure l'accés</span>
+          </nav>
+        </div>
+      </div>
+
+      <main class="page wrap">
+        <header class="mast pmast">
+          <span class="mk mk--person mk--l">AS</span>
+          <div class="pmast__body">
+            <p class="eyebrow">Treure l'accés</p>
+            <h1 class="mast__title"><em>Ana Solé</em></h1>
+            <p class="mast__meta">
+              <span>Li estàs traient</span>
+              <span class="state-badge" data-tone="neutral">Coordinació · a la gira</span>
+              <span class="mast__sep">·</span>
+              <span>la gira s'ha acabat el 12 de setembre</span>
+            </p>
+          </div>
+        </header>
+
+        <div class="spread" style="margin-block-start: var(--space-l)">
+          <div>
+            <!-- WHAT STAYS — the majority, and it must not read as a warning -->
+            <article class="run" style="border-block-start: none">
+              <div class="run__gutter">
+                <a class="run__label" href="#">Es queda</a>
+                <span class="run__sub">treure no és<br />esborrar</span>
+              </div>
+              <div class="run__body">
+                <div class="cons">
+                  <span class="cons__what"><b>412 missatges</b> seus als fils de la gira, amb el seu nom</span>
+                  <span class="cons__tag">memòria</span>
+                </div>
+                <div class="cons">
+                  <span class="cons__what"><b>4 bolos</b> on surt com a so, al repartiment i a les hojes de ruta</span>
+                  <span class="cons__tag">historial</span>
+                </div>
+                <div class="cons">
+                  <span class="cons__what">La seva <b>fitxa de persona</b>, els seus rols i els seus vincles amb organitzacions</span>
+                  <span class="cons__tag">contacte</span>
+                </div>
+                <div class="cons">
+                  <span class="cons__what">Les <b>converses de difusió</b> ancorades a ella (Grec, Mercat de les Flors)</span>
+                  <span class="cons__tag">difusió</span>
+                </div>
+              </div>
+            </article>
+
+            <!-- WHAT BREAKS — few, marked, and each with a door -->
+            <article class="run">
+              <div class="run__gutter">
+                <a class="run__label" href="#">Es trenca</a>
+                <span class="run__sub">3 coses · totes<br />reassignables</span>
+              </div>
+              <div class="run__body">
+                <div class="cons cons--breaks">
+                  <span class="cons__what">
+                    <b>2 tasques obertes</b> assignades a ella — «Passar la sessió de QLab actualitzada»
+                    i «Tancar el lloguer de la taula»
+                  </span>
+                  <span class="cons__tag">reassignar</span>
+                  <button class="btn--outline btn--s" type="button">Passar-les a…</button>
+                </div>
+                <div class="cons cons--breaks">
+                  <span class="cons__what">
+                    És <b>l'única amb Tècnica · veure+editar</b> a la gira, a part de l'Anouk.
+                    Si la treus, la fitxa tècnica queda amb un sol editor.
+                  </span>
+                  <span class="cons__tag">única</span>
+                  <button class="btn--outline btn--s" type="button">Veure qui més</button>
+                </div>
+                <div class="cons cons--breaks">
+                  <span class="cons__what">
+                    Va convidar la <b>Sílvia Munné</b> (tècnica de la sala) fins al 8 d'agost.
+                    La invitació no depèn d'ella: segueix fins a la seva data.
+                  </span>
+                  <span class="cons__tag">convidada</span>
+                  <a class="link-arrow" href="#">Revisar-la →</a>
+                </div>
+              </div>
+            </article>
+
+            <!-- WHAT HAPPENS TO THE PERSON -->
+            <article class="run">
+              <div class="run__gutter">
+                <a class="run__label" href="#">Ella</a>
+                <span class="run__sub">què passa<br />amb l'Ana</span>
+              </div>
+              <div class="run__body">
+                <p class="lede" style="margin-block-start: 0">
+                  Un cop treta la gira, a l'Ana <b>no li queda cap accés a MüK Cia</b>.
+                  Deixa de ser operadora i torna a ser un contacte — la mateixa fitxa,
+                  la mateixa persona, sense porta.
+                </p>
+                <div class="cons">
+                  <span class="cons__what">L'inici de sessió deixa de funcionar per a aquest espai</span>
+                  <span class="cons__tag">login</span>
+                </div>
+                <div class="cons">
+                  <span class="cons__what"><b>Allibera un seient</b> — quedareu a 3 de 5</span>
+                  <span class="cons__tag">seient</span>
+                </div>
+                <div class="cons">
+                  <span class="cons__what">
+                    Se li pot tornar a donar accés quan torni a haver-hi feina, i
+                    <b>enllaça amb la mateixa fitxa</b> — no en neix una de nova
+                  </span>
+                  <span class="cons__tag">tornar</span>
+                </div>
+                <div class="actions">
+                  <button class="btn--danger btn--s" type="button">Treure l'accés a la gira</button>
+                  <button class="btn--outline btn--s" type="button">Cancel·lar</button>
+                  <span class="rail__quiet">No s'avisa ningú automàticament.</span>
+                </div>
+              </div>
+            </article>
+
+            <!-- THE AUTOMATIC CASE — nobody has to do anything -->
+            <article class="run">
+              <div class="run__gutter">
+                <a class="run__label" href="#">Sol</a>
+                <span class="run__sub">el que s'apaga<br />sense fer res</span>
+              </div>
+              <div class="run__body">
+                <p class="lede" style="margin-block-start: 0">
+                  Els invitats porten data. Ningú els ha de treure: s'apaguen quan
+                  toca, i el que van escriure es queda.
+                </p>
+                <div class="auto">
+                  <span class="auto__when">8 ag</span>
+                  <span class="auto__who">Sílvia Munné <span>· tècnica de la sala · tècnica + logística al bolo del 25 jul</span></span>
+                  <a class="link-arrow" href="#">allargar →</a>
+                </div>
+                <div class="auto">
+                  <span class="auto__when">30 set</span>
+                  <span class="auto__who">Marc Bertran <span>· vídeo · fil lliure «Vídeo premsa»</span></span>
+                  <a class="link-arrow" href="#">allargar →</a>
+                </div>
+                <div class="auto">
+                  <span class="auto__when">ja apagat</span>
+                  <span class="auto__who" style="color: var(--text-faint)">Joan Ribó <span>· sala de Girona · va caducar el 2 de juny</span></span>
+                  <a class="link-arrow" href="#">tornar a convidar →</a>
+                </div>
+              </div>
+            </article>
+          </div>
+
+          <!-- RAIL — what you look up before you commit -->
+          <aside class="rail">
+            <section class="rail__block">
+              <header class="rail__head">
+                <p class="eyebrow">La resta del seu accés</p>
+              </header>
+              <p class="rail__quiet">El que NO li estàs traient. Ara mateix, res — la gira era l'únic.</p>
+              <div class="who2" style="opacity: 0.55">
+                <span class="mk" style="--c: var(--accent-1)">MK</span>
+                <span class="who2__n">MüK Cia<span class="who2__until">cap accés a nivell d'espai</span></span>
+              </div>
+              <div class="who2" style="opacity: 0.55">
+                <span class="mk" style="--c: var(--accent-4)">UÒ</span>
+                <span class="who2__n">Última òrbita<span class="who2__until">cap accés a nivell de projecte</span></span>
+              </div>
+            </section>
+
+            <section class="rail__block">
+              <header class="rail__head">
+                <p class="eyebrow">Seients</p>
+              </header>
+              <p class="seatline"><b>4</b><span>de 5 ocupats ara</span></p>
+              <p class="seatline"><b>3</b><span>quan ho confirmis</span></p>
+              <p class="rail__quiet">Els contactes i els invitats no ocupen seient.</p>
+            </section>
+
+            <section class="rail__block">
+              <header class="rail__head">
+                <p class="eyebrow">Qui ho fa</p>
+              </header>
+              <p class="rail__quiet">
+                Marco Rubiol · admin de l'espai. Queda registrat amb data a
+                l'historial d'accés de l'Ana.
+              </p>
+            </section>
+          </aside>
+        </div>
+
+        <div class="qnote">
+          <p>
+            <span class="qnote__tag">el hueco que faltaba</span>
+            <b>Revocar era la mitad no dibujada de «dar de alta».</b> ADR-082 y ADR-083
+            describen cómo entra alguien y no dicen nada de cómo sale. Al dibujarlo
+            aparecen tres eventos distintos que es fácil confundir en uno solo:
+            <b>(1)</b> una invitación que caduca sola, <b>(2)</b> quitar una membresía
+            de un nivel, <b>(3)</b> dejar de ser operador del todo. Solo (2) es un acto;
+            (1) es una fecha y (3) es una <i>consecuencia</i> de (2) cuando era la última.
+          </p>
+          <p>
+            <span class="qnote__tag">hallazgo · lo que nadie había mirado</span>
+            <b>Las tareas asignadas quedan huérfanas.</b> La tarea es polimórfica y se
+            cuelga del bolo, pero su asignatario es una persona que puede perder el
+            acceso. Ni ADR-070/071 ni ADR-082 dicen qué pasa. Aquí se resuelve
+            enseñándolo <b>antes</b> de confirmar, con la puerta para reasignar. Lo mismo
+            con el caso «es la única con este permiso»: quitarlo puede dejar una faceta
+            con un solo editor, y eso es una decisión, no un efecto secundario.
+          </p>
+          <p>
+            <span class="qnote__tag">la forma de la pantalla</span>
+            <b>Se queda / Se rompe / Ella / Solo.</b> El orden importa: lo que se
+            conserva va primero y sin marca, porque es la mayoría y porque el miedo real
+            al revocar es «¿pierdo lo que escribió?». Lo que se rompe son tres líneas,
+            marcadas, cada una con su puerta. Nada de esto es una alarma: quitar el
+            acceso a alguien cuando acaba una gira es rutina, no un incidente.
+          </p>
+          <p>
+            <span class="qnote__tag">decisión que este dibujo propone</span>
+            <b>La invitación que ella hizo NO cae con ella.</b> La Sílvia sigue hasta su
+            fecha aunque quien la invitó ya no esté. La alternativa —invitaciones en
+            cascada— dejaría a la técnica de la sala fuera del hilo a mitad de montaje
+            porque alguien de producción cambió de proyecto. Pero es una decisión
+            explícita y hay que firmarla: <b>una invitación depende de su fecha, no de
+            su padrino.</b>
+          </p>
+        </div>
+      </main>
+    </div>
+  </body>
+</html>
