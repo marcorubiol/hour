@@ -93,17 +93,35 @@ Design; realizado como componentes *presentational*, sin schema, en rutas dev):
 > conecte sin reescritura. Parts A+B viven en `main` (commit `c7a9bfd`); Part C
 > en `feat/money-v3-design`.
 
-**Luego BUILD** (backup/preflight + RLS proporcionales; payment/invoice tocan ~11
-políticas de dinero):
-- [ ] Tabla `fiscal_identity` (dueño blando `account_id`|`workspace_id`) +
-  `account.default_fiscal_identity_id` + `workspace.fiscal_identity_id`.
-- [ ] `invoice`: `type` factura|proforma, snapshot emisor+receptor congelado,
-  serie de numeración auto-correlativa al emitir, pasa a documento opcional que
-  referencia el fee.
-- [ ] `payment`: `invoice_id` nullable + ancla scope + contraparte + categoría;
-  reescribir la derivación de "cobrado" a pagos-vs-fee.
-- [ ] `expense`: + contraparte nullable.
-- [ ] `workspace.settings.invoicing_mode` ∈ {off, interno, legal}.
+**BUILD — hecho y verificado en local** (rama `feat/money-v3-build`, **5
+migraciones aditivas**, NO desplegado a prod). Todo espina aditiva y
+**no-breaking**: la Money v2 viva (UI, RPCs, triggers de cobro-vs-factura) sigue
+funcionando; los RPCs crecen solo con params opcionales al final (PostgREST
+named-arg). La "inversión" a cobrado-vs-fee se **añade** (nueva derivación en
+`list_money_performances`) junto a la de v2; la lente v2 se reescribe en el
+apartado siguiente (wire de la UI).
+- [x] Tabla `fiscal_identity` (dueño blando `account_id`|`workspace_id`, `kind`,
+  dirección, banca/defaults solo emisor) + `account.default_fiscal_identity_id` +
+  `workspace.fiscal_identity_id`. FORCE RLS, triggers updated_at/audit.
+- [x] `invoice`: `doc_type` factura|proforma, snapshot emisor+receptor congelado,
+  serie de numeración auto-correlativa atómica al emitir (`issue_invoice` +
+  `next_invoice_number`, número inmutable); `create_invoice` v3.
+- [x] `payment`: `invoice_id` nullable + ancla gig/línia/projecte + contraparte +
+  categoría; `create_payment`/`delete_payment` v3; **cobrado derivado
+  pagos-vs-fee** en `list_money_performances`; políticas RLS reescritas
+  (autorización por-adjunto, AND no OR).
+- [x] `expense`: + contraparte nullable; `create_expense` v3.
+- [x] `workspace.settings.invoicing_mode` ∈ {off, interno, legal} + write-path
+  (`update_workspace`, con override `fiscal_identity_id`).
+
+> Verificado 2026-07-23 en Supabase **local** (Docker + fixtures de staging):
+> 5 migraciones aplican limpias, `db diff` sin drift, `svelte-check` 0/0, unit
+> **348/348**, RLS **126/126** (120 de v2 intactas + 6 nuevas de v3). Review
+> adversarial de las migraciones (4 lentes + verify): 11 hallazgos confirmados,
+> **todos corregidos** (incl. una escalada RLS en las políticas de payment).
+> **Pendiente y gateado (fuera de este apartado):** aplicar a staging/prod con
+> backup/preflight + OK de deploy (reglas #8/#9), y el **wire de la UI** de
+> `/h/money` al modelo v3 (que completa la inversión de la derivación).
 
 **NO construir** (forward-compat, ver spec § Futuro): tabla `payable` (dinero a
 artistas), P&L, `fiscal_identity` compartible entre empresas, entidad

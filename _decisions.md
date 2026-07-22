@@ -2307,3 +2307,16 @@ Triggered by Marco's pre-scaffold doubt (Phase 0.0 day 5). Five alternatives eva
 - **Re-evaluate when**: aparezca señal de uso real que pida el tamaño B; el enlace
   fiscal entre empresas se vuelva demanda; o la dirección estructurada necesite
   automatización (e-invoice Facturae/EN-16931).
+
+- **Status 2026-07-23 — diseño + build implementados (local), no desplegados.**
+  El **diseño** (Parts A/B/C) es código *presentational* en rutas dev
+  (`/dev/invoice`, `/dev/facturacio`, `/dev/money`). El **build** son 5
+  migraciones aditivas en `feat/money-v3-build`, **no-breaking** con la Money v2
+  viva (RPCs extendidos solo con params opcionales al final; la derivación
+  cobrado-vs-fee se añade junto a la de v2, no la sustituye todavía). Verificado
+  en Supabase local: sin drift, `svelte-check` 0/0, unit 348/348, RLS 126/126
+  (120 v2 + 6 v3), y una review adversarial de las migraciones (11 hallazgos
+  confirmados, todos corregidos, incl. una escalada RLS de payment). Falta,
+  gateado: staging/prod con backup/preflight, y el wire de `/h/money` al modelo
+  v3 (que completa la inversión de ADR-074). No cambia ninguna pieza estructural
+  de este ADR.
