@@ -507,7 +507,7 @@
         <button type="button" class="calmfoot" onclick={() => calm.set(false)}>
           <span
             >{#if summary.overdue}<span class="calmfoot__over">{t('desk.calm_overdue', locale, { n: summary.overdue })}</span
-              >{/if}{#if summary.overdue && foldedRest} {t('desk.calm_and', locale)} {/if}{#if foldedRest}{t('desk.calm_more', locale, {
+              >{/if}{#if summary.overdue && foldedRest}{' '}{t('desk.calm_and', locale)}{' '}{/if}{#if foldedRest}{t('desk.calm_more', locale, {
                 n: foldedRest,
               })}{/if} {t('desk.calm_tail', locale)}</span
           >
