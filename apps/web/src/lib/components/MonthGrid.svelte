@@ -787,7 +787,7 @@
               class="cal__event cal__event--travel"
               style={d.project ? `--c: ${accentVarFor(d.project)}` : undefined}
               title={dateTitle(d)}
-            >{#if d.project}<button type="button" class="cal__markbtn" onclick={(e) => openMark(e, d.project)}><IdentityMark accent={accentVarFor(d.project)} name={d.project.name} initials={d.project.initials} /></button>{/if}{travelText(d)}</span>
+            ><span class="cal__travel-text">{travelText(d)}</span>{#if d.project}<button type="button" class="cal__markbtn" onclick={(e) => openMark(e, d.project)}><IdentityMark accent={accentVarFor(d.project)} name={d.project.name} initials={d.project.initials} /></button>{/if}</span>
           {:else}
             {@const time = dateTime(d)}
             {@const city = dateCity(d)}
@@ -1422,13 +1422,21 @@
       letter-spacing: var(--mono-letter-spacing);
       color: color-mix(in oklch, var(--c, var(--text-muted)) 55%, var(--text-muted));
       border: none;
-      white-space: nowrap;
-      /* Bare text node — the base chip's flex display defeats text-overflow,
-         and without overflow:hidden the label hard-clips at the cell edge
-         mid-glyph. Block + hidden lets the ellipsis work. */
-      display: block;
+      /* Row so the monogram pins RIGHT like every other chip (Marco,
+         2026-07-23). The text span takes the squeeze and ellipsizes — the
+         base chip's column flex + a bare text node defeated text-overflow,
+         which is why this used to be display:block with the mark inline-left. */
+      flex-direction: row;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-2xs);
+      min-inline-size: 0;
+    }
+    .cal__travel-text {
       overflow: hidden;
       text-overflow: ellipsis;
+      white-space: nowrap;
+      min-inline-size: 0;
     }
 
     /* Venue wall time on the chip (timezone rule) — quiet mono prefix;
