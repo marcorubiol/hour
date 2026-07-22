@@ -492,14 +492,14 @@
       label: `Gig · ${[f.venue_name, f.city].filter(Boolean).join(', ') || f.project?.name || '—'} — ${dayLabel(f.performed_at)}`,
     })),
   ]);
-  function openExpense() {
+  function openExpense(f?: MoneyPerformance) {
     eAmount = '';
-    eCurrency = currencies[0] ?? 'EUR';
+    eCurrency = f?.fee_currency ?? currencies[0] ?? 'EUR';
     eDescription = '';
     eCategory = 'other';
     eIncurredOn = todayIso();
     eCounterparty = '';
-    eAnchor = expenseAnchorOptions[0]?.value ?? '';
+    eAnchor = f ? `gig:${f.id}` : (expenseAnchorOptions[0]?.value ?? '');
     expOpen = true;
   }
   const createExpense = createMutation({
@@ -633,6 +633,7 @@
                   <span class="fee__collected">collected {fmtMoney(coll)} / {fmtMoney(fee)}{#if rem > 0} · <span class="fee__rem">{fmtMoney(rem)} left</span>{/if}</span>
                   <span class="fee__acts">
                     <Button size="xs" variant="outline" onclick={() => openPay(f)}>Record payment</Button>
+                    <Button size="xs" variant="outline" onclick={() => openExpense(f)}>Add expense</Button>
                     {#if mode !== 'off'}
                       <Button size="xs" variant="outline" onclick={() => openInvoice(f)}>{mode === 'interno' ? 'Create proforma' : 'Create invoice'}</Button>
                     {/if}
@@ -661,7 +662,7 @@
               {#each expenseTotals as [currency, amount] (currency)}<span>− {fmtMoney(amount)} {currency}</span>{/each}
             </p>
           {/if}
-          <Button size="xs" variant="outline" onclick={openExpense} disabled={expenseAnchorOptions.length === 0}>Add expense</Button>
+          <Button size="xs" variant="outline" onclick={() => openExpense()} disabled={expenseAnchorOptions.length === 0}>Add expense</Button>
         </div>
       </div>
       {#if expenses.length === 0}
