@@ -134,6 +134,10 @@ const CreateSchema = v.object({
   payment_condition: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(2000)))),
   payer_person_id: v.optional(v.nullable(v.pipe(v.string(), v.uuid()))),
   notes: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(2000)))),
+  // Money v3 (ADR-086): factura|proforma; null lets the RPC derive it from the
+  // workspace invoicing_mode. Optional receiver fiscal identity.
+  doc_type: v.optional(v.nullable(v.picklist(['factura', 'proforma']))),
+  payer_fiscal_identity_id: v.optional(v.nullable(v.pipe(v.string(), v.uuid()))),
 });
 
 export const POST: RequestHandler = async ({ request, platform, locals }) => {
@@ -175,6 +179,8 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
       p_expected_on: input.expected_on ?? null,
       p_payment_condition: input.payment_condition ?? null,
       p_payer_person_id: input.payer_person_id ?? null,
+      p_doc_type: input.doc_type ?? null,
+      p_payer_fiscal_identity_id: input.payer_fiscal_identity_id ?? null,
     });
     if (data.length === 0 || !data[0]) return json({ error: 'create_failed' }, 502);
     return json({ invoice: data[0] }, 201);

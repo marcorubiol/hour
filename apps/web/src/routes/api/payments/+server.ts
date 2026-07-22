@@ -108,12 +108,17 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
 
   try {
     const { data } = await pgPostRpc<PaymentItem>(env, 'create_payment', jwt, {
-      p_invoice_id: input.invoice_id,
+      p_invoice_id: input.invoice_id ?? null,
       p_amount: input.amount,
       p_received_on: input.received_on,
       p_method: input.method,
       p_reference: input.reference ?? null,
       p_notes: input.notes ?? null,
+      p_performance_id: input.performance_id ?? null,
+      p_line_id: input.line_id ?? null,
+      p_project_id: input.project_id ?? null,
+      p_counterparty: input.counterparty ?? null,
+      p_category: input.category ?? null,
     });
     if (!data[0]) return json({ error: 'create_failed' }, 502);
     return json({ payment: data[0] }, 201);

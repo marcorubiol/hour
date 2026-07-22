@@ -53,6 +53,8 @@ export const ExpenseCreateSchema = v.object({
   ),
   incurred_on: v.optional(v.nullable(realIsoDate)),
   notes: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500)))),
+  // Money v3 (ADR-086 D4) — who was paid.
+  counterparty: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(200)))),
 });
 
 export type ExpenseCreate = v.InferOutput<typeof ExpenseCreateSchema>;
@@ -87,5 +89,6 @@ export type ExpenseItem = Pick<
   | 'incurred_on'
   | 'reimbursed'
   | 'notes'
+  | 'counterparty'
   | 'created_at'
 >;

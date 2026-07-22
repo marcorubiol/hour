@@ -145,6 +145,7 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
       p_currency: input.currency,
       p_incurred_on: input.incurred_on ?? null,
       p_notes: input.notes ?? null,
+      p_counterparty: input.counterparty ?? null,
     });
     if (data.length === 0 || !data[0]) return json({ error: 'create_failed' }, 502);
     return json({ expense: data[0] }, 201);
