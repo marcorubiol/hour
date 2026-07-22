@@ -893,7 +893,7 @@
         </div>
       {/if}
 
-      <div class="shell__content">
+      <div class="shell__content" class:shell__content--calm={calm.on}>
         {#if children}{@render children()}{/if}
       </div>
     </main>
@@ -1339,6 +1339,10 @@
 
   .shell__content {
     flex: 1;
+    /* Re-anchor text color here so Calm's remap (below) cascades to EVERY
+       route's inherited text, not only elements that name var(--text-color).
+       In normal mode this resolves to the same token the body uses. */
+    color: var(--text-color);
     /* One shared header→content distance for every route — pages used to
        borrow the (now neutralized) global <section> padding unevenly. */
     padding-block: var(--space-l) var(--space-xxl);
@@ -1349,6 +1353,14 @@
     inline-size: 100%;
     max-inline-size: calc(var(--page-width) + var(--space-l) * 2);
     margin-inline: auto;
+  }
+
+  /* Calm mode (Desk · Calm) quiets every lens one contrast step — body text
+     to muted, dark borders softened. One class for the whole routed surface;
+     headings, links and overdue red keep their own tokens. */
+  .shell__content--calm {
+    --text-color: var(--text-muted);
+    --border-color-dark: color-mix(in oklch, var(--neutral) 12%, transparent);
   }
 
   /* Print: the cap is a screen-reading concern. Documents meant for paper
