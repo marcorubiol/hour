@@ -402,7 +402,9 @@
     if (d.travel_direction === 'outbound') return `→ ${place}`;
     if (d.travel_direction === 'return') return `${place} →`;
     if (d.travel_direction === 'leg') return `→ ${place} →`;
-    return place;
+    // No stored direction still reads as a trip: lead with the arrow so a
+    // bare "Vitoria" can't be mistaken for a place label on some other chip.
+    return `→ ${place}`;
   }
 
   // The chip's second row (venue on top, city underneath). Suppressed when
@@ -1255,12 +1257,6 @@
     .cal__event--perf[data-family='confirmed'] + .cal__event {
       margin-block-start: var(--space-xs);
     }
-    /* The gig's name is the chip's title — bold on both families so it reads
-       apart from its city/time line and foot. Family (settled vs held) is
-       still said by the fill, dash, hatch and radius, not the title weight. */
-    .cal__event--perf .cal__event-name {
-      font-weight: 600;
-    }
     /* Hold = possibility held: dashed edge + the 135° hatch that means
        "not settled" everywhere in this view (tentative blackouts use it
        too), so the state reads before the words do. */
@@ -1350,6 +1346,10 @@
     }
 
     .cal__event-name {
+      /* The chip's title — bold on EVERY kind (gig, rehearsal, residency,
+         press, day-off) so it reads apart from its city/time line and foot.
+         Settled-vs-held is said by fill, dash, hatch and radius, not weight. */
+      font-weight: 600;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
