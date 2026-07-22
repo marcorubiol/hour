@@ -67,19 +67,31 @@
 
 > Cerrado en grill 2026-07-21. Estructura completa + delta de schema:
 > `_notes/spec-money-v3-decisions.md`. Decisión: `_decisions.md § ADR-086`.
-> **Va PRIMERO — antes de contenedores y de los flecos de planner.** Nada
-> implementado, cero schema tocado. En una frase: el dinero deja de girar
+> **Va PRIMERO — antes de contenedores y de los flecos de planner.** Diseño
+> implementado en código (presentational, rutas dev); cero schema tocado. En una frase: el dinero deja de girar
 > alrededor de la factura — el fee del bolo es el ancla, cobrar y facturar son
 > hechos independientes; tamaño A (libro de entrada/salida) ahora, B-ready.
 
-**Primero DISEÑO** (Marco, en frío — es la otra vía de pensamiento):
-- [ ] **House-style del PDF de factura/proforma.** Es lo del "casi ya": sin él no
-  hay documento que emitir. Es lo que desbloquea todo lo demás.
-- [ ] **Formularios de `fiscal_identity`** — emisor (cuenta) y receptor
+**DISEÑO — hecho e implementado en código** (Marco lo diseñó en frío en Claude
+Design; realizado como componentes *presentational*, sin schema, en rutas dev):
+- [x] **House-style del PDF de factura/proforma** → `InvoiceDocument.svelte` +
+  `invoice.ts`; preview en `/dev/invoice` (factura/proforma · draft/issued/paid ·
+  una función/gira; light/dark/print).
+- [x] **Formularios de `fiscal_identity`** — emisor (cuenta) y receptor
   (workspace); dirección estructurada (`address_line_1/2` + postal/city/region/
-  country); el autocompletado es API externa, después.
-- [ ] **UI de Money** — pago desacoplado de la factura; el fee del bolo como
-  ancla; "cobrado" derivado contra el fee (no contra la factura).
+  country) → `FiscalIdentityDialog.svelte` + `fiscal.ts`; ajustes en
+  `/dev/facturacio` (modo off/interno/legal, wiring cuenta↔override, toggle
+  "solo nombre" del receptor). El autocompletado de dirección sigue siendo API
+  externa, después.
+- [x] **UI de Money** — pago desacoplado, fee como ancla, "cobrado" derivado
+  contra el fee → `RecordPaymentDialog` + `AddExpenseDialog` + `moneybook.ts`;
+  lente en `/dev/money` (documentos opcionales por modo; libro limpio en `off`).
+
+> Verificado 2026-07-22: `svelte-check` 0/0; renderizado en los tres estados +
+> diálogos, light/dark. **Presentational: cero schema, cero fetch, cero RLS** —
+> alimentado por datos de ejemplo vía contrato tipado, listo para que el BUILD lo
+> conecte sin reescritura. Parts A+B viven en `main` (commit `c7a9bfd`); Part C
+> en `feat/money-v3-design`.
 
 **Luego BUILD** (backup/preflight + RLS proporcionales; payment/invoice tocan ~11
 políticas de dinero):
