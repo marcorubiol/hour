@@ -1255,7 +1255,10 @@
     .cal__event--perf[data-family='confirmed'] + .cal__event {
       margin-block-start: var(--space-xs);
     }
-    .cal__event--perf[data-family='confirmed'] .cal__event-name {
+    /* The gig's name is the chip's title — bold on both families so it reads
+       apart from its city/time line and foot. Family (settled vs held) is
+       still said by the fill, dash, hatch and radius, not the title weight. */
+    .cal__event--perf .cal__event-name {
       font-weight: 600;
     }
     /* Hold = possibility held: dashed edge + the 135° hatch that means
