@@ -142,22 +142,23 @@
     /* $lib/utils/accent.ts → accentVar(slug) returns var(--accent-N) */
     /* The identity monogram derives its soft bg + legible fg from    */
     /* these via IdentityMark (color-mix tint + oklch-from fg).       */
-    /* Hues 9-12 provisional (ADR-081) — spaced into the widest gaps  */
-    /* of the original 8; tune the exact values with Marco.           */
+    /* 7 EQUIDISTANT hues (bin-centred, 360·(i+0.5)/7) at the fixed custom  */
+    /* envelope L/C, so each swatch is exactly the colour the hue slider    */
+    /* shows at its position — the slider is the source of truth. Colour is */
+    /* a grouping cue, not the ID (the monogram is), so repeats are fine.   */
     /* ============================================================ */
 
-    --accent-1: oklch(58% 0.12 260); /* blue */
-    --accent-2: oklch(62% 0.14 45); /* orange */
-    --accent-3: oklch(60% 0.13 150); /* green */
-    --accent-4: oklch(60% 0.15 20); /* red */
-    --accent-5: oklch(65% 0.13 330); /* pink */
-    --accent-6: oklch(62% 0.11 200); /* cyan */
-    --accent-7: oklch(58% 0.13 295); /* purple */
-    --accent-8: oklch(64% 0.13 85); /* amber */
-    --accent-9: oklch(62% 0.13 125); /* lime */
-    --accent-10: oklch(60% 0.11 185); /* teal */
-    --accent-11: oklch(58% 0.12 235); /* azure */
-    --accent-12: oklch(60% 0.15 355); /* crimson */
+    /* Envelope: L + C fixed so every accent (preset or custom hue) stays soft
+       and only the hue varies. Dark mode lifts these; the accents follow. */
+    --accent-custom-l: 55%;
+    --accent-custom-c: 0.12;
+    --accent-1: oklch(var(--accent-custom-l) var(--accent-custom-c) 26);
+    --accent-2: oklch(var(--accent-custom-l) var(--accent-custom-c) 77);
+    --accent-3: oklch(var(--accent-custom-l) var(--accent-custom-c) 129);
+    --accent-4: oklch(var(--accent-custom-l) var(--accent-custom-c) 180);
+    --accent-5: oklch(var(--accent-custom-l) var(--accent-custom-c) 231);
+    --accent-6: oklch(var(--accent-custom-l) var(--accent-custom-c) 283);
+    --accent-7: oklch(var(--accent-custom-l) var(--accent-custom-c) 334);
 
     /* ============================================================ */
     /* CONTEXTUAL — tag tones (6 bg+fg pairs for task-type chips)     */
@@ -539,20 +540,10 @@
     --warning: oklch(75% 0.11 70);
     --danger: oklch(70% 0.13 25);
 
-    /* Accents — same hues as light mode (identity preserved). L lifted
-       to 68-75% so they pop on dark; C dropped ~15-20% to soften vibration. */
-    --accent-1: oklch(70% 0.1 260);
-    --accent-2: oklch(72% 0.11 45);
-    --accent-3: oklch(70% 0.1 150);
-    --accent-4: oklch(70% 0.12 20);
-    --accent-5: oklch(75% 0.1 330);
-    --accent-6: oklch(72% 0.09 200);
-    --accent-7: oklch(68% 0.1 295);
-    --accent-8: oklch(74% 0.1 85);
-    --accent-9: oklch(72% 0.11 125);
-    --accent-10: oklch(70% 0.09 185);
-    --accent-11: oklch(70% 0.1 235);
-    --accent-12: oklch(70% 0.12 355);
+    /* Accents inherit the equidistant hues from :root and adapt to dark via
+       this lifted envelope (L up ~13%, C eased to soften vibration). */
+    --accent-custom-l: 68%;
+    --accent-custom-c: 0.1;
 
     /* Tag tones — bg ≈ 27% L (subtle pill, +6pp over body so it lifts
        visibly), fg ≈ 80% L (legible without halo). */

@@ -29,7 +29,7 @@ const PatchBodySchema = v.object({
   name: v.optional(v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(80))),
   // '' clears (RPC NULLIFs). accent/domain/logo_url accept null to clear.
   description: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(280))),
-  accent: v.optional(v.nullable(v.pipe(v.string(), v.regex(/^[1-8]$/)))),
+  accent: v.optional(v.nullable(v.pipe(v.string(), v.regex(/^([1-9]|1[0-2]|h\d{1,3})$/)))),
   domain: v.optional(
     v.nullable(v.picklist(['theatre', 'dance', 'circus', 'music', 'mixed', 'other'])),
   ),

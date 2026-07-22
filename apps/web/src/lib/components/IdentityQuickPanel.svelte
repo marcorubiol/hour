@@ -74,51 +74,59 @@
   function openFull() {
     fullOpen = true;
   }
+
+  // Panel mounts fresh per open → focus the monogram with the caret at the
+  // start (no select-all), ready to edit from the first character.
+  function focusAtStart(node: HTMLInputElement) {
+    node.focus();
+    node.setSelectionRange(0, 0);
+  }
 </script>
 
 <div class="iqp" role="dialog" aria-label="Project identity">
-  <p class="iqp__name">{project.name}</p>
-  <span class="eyebrow">Identity</span>
-
-  <div class="iqp__preview">
+  <header class="iqp__head">
+    <p class="iqp__name">{project.name}</p>
     <IdentityMark
       variant="compact"
       accent={previewAccent}
       initials={initials}
       name={project.name}
-      size="30px"
+      size="34px"
     />
-  </div>
-
-  <label class="iqp__field">
-    <span>Monogram</span>
+  </header>
+  <div class="iqp__identity">
+    <span class="eyebrow">Identity</span>
     <input
       class="iqp__input"
       bind:value={initials}
+      use:focusAtStart
       oninput={() => {
         if (initials.length > MONOGRAM_MAX) initials = initials.slice(0, MONOGRAM_MAX);
       }}
       placeholder="e.g. MdA"
       autocomplete="off"
+      aria-label="Monogram"
     />
-  </label>
-  {#if collision}
-    <p class="iqp__collision">Another project already uses “{initials.trim()}”.</p>
-  {/if}
-
-  <AccentSwatchPicker bind:accent autoSlug={project.slug} label="Project color" />
-
-  <div class="iqp__actions">
-    <button type="button" class="iqp__link" onclick={openFull}>Edit project →</button>
-    <button
-      type="button"
-      class="iqp__save"
-      onclick={() => $save.mutate()}
-      disabled={$save.isPending}
-    >
-      Save
-    </button>
+    <p class="iqp__hint">1–{MONOGRAM_MAX} characters, upper or lower case</p>
+    {#if collision}
+      <p class="iqp__collision">Another project already uses “{initials.trim()}”.</p>
+    {/if}
   </div>
+
+  <AccentSwatchPicker bind:accent autoSlug={project.slug} label="Project color" hideLegend />
+
+  <button
+    type="button"
+    class="iqp__save"
+    onclick={() => $save.mutate()}
+    disabled={$save.isPending}
+  >
+    Save identity
+  </button>
+
+  <hr class="iqp__rule" />
+
+  <button type="button" class="iqp__link" onclick={openFull}>Edit project →</button>
 </div>
 
 <EditProjectDialog bind:open={fullOpen} {project} {siblings} />
@@ -126,11 +134,11 @@
 <style>
   @layer components {
     .iqp {
-      inline-size: 15rem;
-      max-inline-size: min(15rem, 90vw);
+      inline-size: 18.5rem;
+      max-inline-size: min(18.5rem, 92vw);
       display: flex;
       flex-direction: column;
-      gap: var(--space-s);
+      gap: var(--space-l);
       padding: var(--space-m);
       background: var(--bg-ultra-light);
       border: 1px solid var(--border-color-light);
@@ -145,22 +153,29 @@
       color: var(--text-color);
     }
 
-    .iqp__preview {
+    .iqp__head {
       display: flex;
       align-items: center;
-      min-block-size: 2em;
+      justify-content: space-between;
+      gap: var(--space-s);
     }
 
-    .iqp__field {
+    /* Eyebrow + monogram input + hint stay a tight group; the larger panel
+       gap gives air between this block, the colour picker and the actions. */
+    .iqp__identity {
       display: flex;
       flex-direction: column;
       gap: var(--space-2xs);
     }
-    .iqp__field > span {
+
+    .iqp__hint {
+      margin: 0;
       font-size: var(--text-xs);
-      color: var(--text-dark-muted);
+      color: var(--text-faint);
     }
+
     .iqp__input {
+      inline-size: 100%;
       font: inherit;
       padding: var(--space-2xs) var(--space-xs);
       border: 1px solid var(--border-color-dark);
@@ -179,15 +194,37 @@
       color: var(--text-muted);
     }
 
-    .iqp__actions {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: var(--space-s);
+    .iqp__save {
+      font: inherit;
+      font-weight: 600;
+      font-size: var(--text-s);
+      inline-size: 100%;
+      padding: var(--space-xs) var(--space-m);
+      border: 0;
+      border-radius: var(--radius-s);
+      background: var(--primary);
+      color: var(--bg-ultra-light);
+      cursor: pointer;
       margin-block-start: var(--space-2xs);
+    }
+    .iqp__save:hover:not(:disabled) {
+      filter: brightness(0.96);
+    }
+    .iqp__save:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .iqp__rule {
+      inline-size: 100%;
+      block-size: 0;
+      border: 0;
+      border-block-start: 1px solid var(--border-color-light);
+      margin: 0;
     }
 
     .iqp__link {
+      align-self: center;
       background: transparent;
       border: 0;
       padding: 0;
@@ -200,21 +237,6 @@
     }
     .iqp__link:hover {
       color: var(--text-color);
-    }
-
-    .iqp__save {
-      font: inherit;
-      font-size: var(--text-s);
-      padding: var(--space-2xs) var(--space-m);
-      border: 0;
-      border-radius: var(--radius-s);
-      background: var(--primary);
-      color: var(--bg-ultra-light);
-      cursor: pointer;
-    }
-    .iqp__save:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
     }
   }
 </style>
