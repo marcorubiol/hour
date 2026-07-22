@@ -40,6 +40,7 @@ export type Database = {
           country: string | null
           created_at: string
           custom_fields: Json
+          default_fiscal_identity_id: string | null
           deleted_at: string | null
           id: string
           kind: Database["public"]["Enums"]["account_kind"]
@@ -55,6 +56,7 @@ export type Database = {
           country?: string | null
           created_at?: string
           custom_fields?: Json
+          default_fiscal_identity_id?: string | null
           deleted_at?: string | null
           id?: string
           kind?: Database["public"]["Enums"]["account_kind"]
@@ -70,6 +72,7 @@ export type Database = {
           country?: string | null
           created_at?: string
           custom_fields?: Json
+          default_fiscal_identity_id?: string | null
           deleted_at?: string | null
           id?: string
           kind?: Database["public"]["Enums"]["account_kind"]
@@ -80,7 +83,15 @@ export type Database = {
           timezone?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "account_default_fiscal_identity_id_fkey"
+            columns: ["default_fiscal_identity_id"]
+            isOneToOne: false
+            referencedRelation: "fiscal_identity"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       account_membership: {
         Row: {
@@ -950,6 +961,99 @@ export type Database = {
           },
           {
             foreignKeyName: "expense_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspace"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fiscal_identity: {
+        Row: {
+          account_id: string | null
+          address_line_1: string | null
+          address_line_2: string | null
+          archived: boolean
+          city: string | null
+          country: string | null
+          created_at: string
+          created_by: string | null
+          custom_fields: Json
+          default_irpf_pct: number | null
+          default_vat_pct: number | null
+          deleted_at: string | null
+          iban: string | null
+          id: string
+          kind: string
+          label: string
+          legal_name: string
+          postal_code: string | null
+          region: string | null
+          swift_bic: string | null
+          tax_id: string | null
+          updated_at: string
+          workspace_id: string | null
+        }
+        Insert: {
+          account_id?: string | null
+          address_line_1?: string | null
+          address_line_2?: string | null
+          archived?: boolean
+          city?: string | null
+          country?: string | null
+          created_at?: string
+          created_by?: string | null
+          custom_fields?: Json
+          default_irpf_pct?: number | null
+          default_vat_pct?: number | null
+          deleted_at?: string | null
+          iban?: string | null
+          id?: string
+          kind: string
+          label?: string
+          legal_name: string
+          postal_code?: string | null
+          region?: string | null
+          swift_bic?: string | null
+          tax_id?: string | null
+          updated_at?: string
+          workspace_id?: string | null
+        }
+        Update: {
+          account_id?: string | null
+          address_line_1?: string | null
+          address_line_2?: string | null
+          archived?: boolean
+          city?: string | null
+          country?: string | null
+          created_at?: string
+          created_by?: string | null
+          custom_fields?: Json
+          default_irpf_pct?: number | null
+          default_vat_pct?: number | null
+          deleted_at?: string | null
+          iban?: string | null
+          id?: string
+          kind?: string
+          label?: string
+          legal_name?: string
+          postal_code?: string | null
+          region?: string | null
+          swift_bic?: string | null
+          tax_id?: string | null
+          updated_at?: string
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fiscal_identity_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "account"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fiscal_identity_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspace"
@@ -1981,6 +2085,7 @@ export type Database = {
           deleted_at: string | null
           description: string | null
           domain: Database["public"]["Enums"]["workspace_domain"] | null
+          fiscal_identity_id: string | null
           id: string
           kind: Database["public"]["Enums"]["workspace_kind"]
           logo_url: string | null
@@ -2002,6 +2107,7 @@ export type Database = {
           deleted_at?: string | null
           description?: string | null
           domain?: Database["public"]["Enums"]["workspace_domain"] | null
+          fiscal_identity_id?: string | null
           id?: string
           kind?: Database["public"]["Enums"]["workspace_kind"]
           logo_url?: string | null
@@ -2023,6 +2129,7 @@ export type Database = {
           deleted_at?: string | null
           description?: string | null
           domain?: Database["public"]["Enums"]["workspace_domain"] | null
+          fiscal_identity_id?: string | null
           id?: string
           kind?: Database["public"]["Enums"]["workspace_kind"]
           logo_url?: string | null
@@ -2039,6 +2146,13 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "account"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workspace_fiscal_identity_id_fkey"
+            columns: ["fiscal_identity_id"]
+            isOneToOne: false
+            referencedRelation: "fiscal_identity"
             referencedColumns: ["id"]
           },
         ]
@@ -3129,6 +3243,7 @@ export type Database = {
           deleted_at: string | null
           description: string | null
           domain: Database["public"]["Enums"]["workspace_domain"] | null
+          fiscal_identity_id: string | null
           id: string
           kind: Database["public"]["Enums"]["workspace_kind"]
           logo_url: string | null
@@ -3518,6 +3633,7 @@ export type Database = {
           deleted_at: string | null
           description: string | null
           domain: Database["public"]["Enums"]["workspace_domain"] | null
+          fiscal_identity_id: string | null
           id: string
           kind: Database["public"]["Enums"]["workspace_kind"]
           logo_url: string | null
@@ -3848,3 +3964,4 @@ export const Constants = {
     },
   },
 } as const
+
