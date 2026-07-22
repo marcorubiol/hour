@@ -515,8 +515,13 @@
 
   let allBlackouts = $derived($availabilityQuery.data?.items ?? []);
   // The bands/rail show the scope's workspaces only; the engine reads all.
+  // Calm hides the blackout bands/lanes entirely (and, via pulseAwayPersons,
+  // the "away" pulse) — but the conflict engine reads allBlackouts, so a real
+  // clash against an unavailability still surfaces.
   let visibleBlackouts = $derived(
-    allBlackouts.filter((b) => scopeWorkspaceIds === null || scopeWorkspaceIds.has(b.workspace_id)),
+    calm.on
+      ? []
+      : allBlackouts.filter((b) => scopeWorkspaceIds === null || scopeWorkspaceIds.has(b.workspace_id)),
   );
 
   // ── Status filter (display only — conflicts stay truth-level) ────────
