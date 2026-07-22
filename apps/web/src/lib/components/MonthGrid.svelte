@@ -1510,7 +1510,9 @@
       --band-border-color: var(--border-color-dark);
     }
     .cal__band--person {
-      --band-bg: color-mix(in oklch, var(--cal-accent, var(--warning)) 15%, transparent);
+      /* Softer solid fill (was 15%) — the person band was reading too loud
+         against the neutral company band; the tentative hatch stays as-is. */
+      --band-bg: color-mix(in oklch, var(--cal-accent, var(--warning)) 10%, transparent);
       --band-fg: color-mix(in oklch, var(--cal-accent, var(--warning)) 50%, var(--text-muted));
       --band-border-color: color-mix(in oklch, var(--cal-accent, var(--warning)) 30%, var(--border-color-light));
     }
