@@ -2320,3 +2320,73 @@ Triggered by Marco's pre-scaffold doubt (Phase 0.0 day 5). Five alternatives eva
   gateado: staging/prod con backup/preflight, y el wire de `/h/money` al modelo
   v3 (que completa la inversión de ADR-074). No cambia ninguna pieza estructural
   de este ADR.
+
+## [2026-07-23] — ADR-087 · El bolo es la unidad de dinero: conversación → bolo → función; money v3 se re-ancla del `performance` al `bolo`
+
+> Cerrado en grill con Marco 2026-07-23, al wire-ar la lente Money. El propio
+> grill destapó que el dinero de money v3 está anclado un nivel demasiado bajo.
+
+- **Decisión (modelo):** el **bolo** (el trato con una sala) es la unidad de
+  dinero, no la función. Esqueleto:
+  - **Conversación** (difusión) → 1:N **Bolo**.
+  - **Bolo** (trato: **una sala · caché · documento · cobrado · pendiente**) →
+    1:N **Función** (`performance`).
+  - **Función** = día · hora · road sheet · agenda. **No lleva dinero.**
+  - El caché se negocia **por bolo** (Marco: "por bolo"), no por función; un
+    bolo puede ser 1..N funciones (dos el sábado, una el domingo).
+  - El bolo nace de una conversación confirmada **o** se crea a mano (opción c).
+
+- **Qué muestra la lente Money (deriva del modelo):** arriba, la **posición
+  general** (por moneda: pipeline · cobrado · **pendiente**); cuerpo = **bolos
+  agrupados por obra** (nunca por línia); cada cabecera de obra lleva
+  contratado · cobrado · pendiente; el **documento vive en el bolo** (chip que
+  abre el PDF), no en una sección aparte; las funciones son sub-detalle del bolo
+  (o solo en Planner). Se estrecha por pins (space/project/line). El "libro"
+  aparece al bajar; ancho = agregado. **`pendiente = contratado (confirmado) −
+  cobrado`**, con independencia de si hay factura.
+
+- **Vocabulario:** `performance` **deja de ser "bolo/función atómica"** — se
+  parte: `performance` = **función**; el **bolo** es entidad nueva. Refina
+  `structure-model.md` (lo importante en Money es el bolo, la línia no agrega
+  dinero).
+
+- **Implementación elegida — P2 (padre nuevo), no P1 (promover):** se añade una
+  entidad **`bolo`** por encima de `performance`; el **dinero sube al bolo**
+  (caché, pago, factura, cobrado); `performance` se queda como la función
+  (`bolo_id` FK; conserva `performed_at`, slots ADR-023, road sheet, planner).
+  Backfill: cada `performance` existente → un bolo de N=1 (hereda venue/caché/
+  proyecto/conversación; la función conserva fecha/agenda + recibe `bolo_id`).
+  - **Rationale P2 sobre P1:** el scheduling (road sheet, planner, MonthGrid,
+    slots) es **maduro, testeado y desplegado** (RLS 120/120, E2E 27/27); money
+    v3 es **nuevo, sin desplegar, en rama `feat/money-v3-build`, sin mergear**.
+    Disrupter el dinero (controlado, fuera de prod) es más barato y seguro que
+    disrupter el scheduling. P2 es además más limpio: `performance` sigue siendo
+    la función atómica que ya es.
+
+- **Supersede / refina / absorbe:** **refina ADR-086** (el ancla de money v3
+  pasa de `performance` a `bolo`: `fee_amount/currency` → `bolo`; `payment` y
+  `invoice_line` referencian el bolo; `collected` = pagos-vs-caché-del-bolo;
+  `list_money_performances` → una lista por bolo). **Absorbe** la tarea pendiente
+  "multi-día para performances" (`series_id`): las varias funciones de un bolo
+  la resuelven. **Refina** la vocab de `_context.md`/`structure-model.md`.
+
+- **Blast-radius (P2, para el build):** *sube al bolo* — `performance.fee_amount/
+  fee_currency/venue_name/city/country/conversation_id`, `create_invoice`,
+  `issue_invoice`, `create_payment` (ancla), `create_expense` (ancla gig),
+  `list_money_performances` (+`collected`), `update_performance_fee`,
+  `invoice_line.performance_id`, `payment.performance_id`, y la UI `/h/money` +
+  `MoneyModule` + `MoneyInvoices` + `RecordPaymentDialog` + `money.ts`/
+  `moneybook.ts`/`invoice.ts`. *No se toca* — road sheet
+  (`performance-bundle.ts`, `roadsheet`, `rosters`), `dates`, `planner`,
+  `MonthGrid`, la agenda de `performance`.
+
+- **Status:** **decidido, NO construido.** Gate: re-anclar money v3 al bolo
+  **antes** de desplegarlo (nunca desplegar el ancla-por-función). Se construye
+  sobre la rama `feat/money-v3-build` (revisando sus 5 migraciones sin desplegar,
+  no añadiendo una capa encima). Prompt de handoff en
+  `_notes/build-prompt-bolo-money-v3.md`.
+
+- **Re-evaluate when:** aparezca un caché genuinamente por-función (una sala que
+  paga por show, no por trato) — el bolo podría necesitar sub-importes por
+  función; o un bolo multi-sala (un promotor contrata varias salas en un trato).
+  Hoy: un bolo = una sala, un caché.

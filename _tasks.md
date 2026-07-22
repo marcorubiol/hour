@@ -122,6 +122,13 @@ apartado siguiente (wire de la UI).
 > **Pendiente y gateado (fuera de este apartado):** aplicar a staging/prod con
 > backup/preflight + OK de deploy (reglas #8/#9), y el **wire de la UI** de
 > `/h/money` al modelo v3 (que completa la inversión de la derivación).
+>
+> **REABIERTO 2026-07-23 — ADR-087.** El grill al wire-ar la lente destapó que el
+> ancla del dinero está un nivel demasiado bajo: la unidad de dinero es el
+> **bolo** (trato con una sala, 1..N funciones), no el `performance`. Antes de
+> desplegar money v3 hay que **re-anclarlo al bolo** (plan P2). Menos mal que
+> está en rama sin desplegar. Prompt de build:
+> `_notes/build-prompt-bolo-money-v3.md`. **No desplegar el ancla-por-función.**
 
 **NO construir** (forward-compat, ver spec § Futuro): tabla `payable` (dinero a
 artistas), P&L, `fiscal_identity` compartible entre empresas, entidad
