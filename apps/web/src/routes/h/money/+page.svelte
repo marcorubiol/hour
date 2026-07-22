@@ -480,10 +480,18 @@
   let eCategory = $state<string>('other');
   let eIncurredOn = $state('');
   let eCounterparty = $state('');
-  let eLineId = $state('');
-  let expenseLineOptions = $derived(
-    byLine.filter((l) => l.line).map((l) => ({ value: l.line!.id, label: `${l.name} · ${l.projectName}` })),
-  );
+  let eAnchor = $state('');
+  // Anchor an expense to a whole line OR an individual gig (ADR-086 D4). The
+  // value encodes which: line:<id> | gig:<id>.
+  let expenseAnchorOptions = $derived([
+    ...byLine
+      .filter((l) => l.line)
+      .map((l) => ({ value: `line:${l.line!.id}`, label: `Line · ${l.name} — ${l.projectName}` })),
+    ...fees.map((f) => ({
+      value: `gig:${f.id}`,
+      label: `Gig · ${[f.venue_name, f.city].filter(Boolean).join(', ') || f.project?.name || '—'} — ${dayLabel(f.performed_at)}`,
+    })),
+  ]);
   function openExpense() {
     eAmount = '';
     eCurrency = currencies[0] ?? 'EUR';
@@ -491,16 +499,17 @@
     eCategory = 'other';
     eIncurredOn = todayIso();
     eCounterparty = '';
-    eLineId = byLine.find((l) => l.line)?.line?.id ?? '';
+    eAnchor = expenseAnchorOptions[0]?.value ?? '';
     expOpen = true;
   }
   const createExpense = createMutation({
     mutationFn: async () => {
       const amount = Number(String(eAmount).trim());
       if (!Number.isFinite(amount) || amount <= 0) throw new Error('Amount must be greater than zero');
-      if (!eLineId) throw new Error('Pick a line to anchor the expense');
+      if (!eAnchor) throw new Error('Pick a line or gig to anchor the expense');
+      const [kind, id] = eAnchor.split(':');
       const body = await mutateJSON<{ expense?: unknown }>('POST', '/api/expenses', {
-        line_id: eLineId,
+        ...(kind === 'gig' ? { performance_id: id } : { line_id: id }),
         category: eCategory,
         description: eDescription.trim() || 'Expense',
         amount,
@@ -605,8 +614,12 @@
               <div class="fee__top">
                 <span class="fee__date">{dayLabel(f.performed_at)}</span>
                 <span class="fee__where">
-                  {#if perfHref(f)}<a class="fee__proj" href={perfHref(f)}>{f.project?.name ?? '—'}</a>{:else}<b>{f.project?.name ?? '—'}</b>{/if}
-                  <span class="fee__venue">{[f.venue_name, f.city].filter(Boolean).join(' · ') || '—'}</span>
+                  {#if perfHref(f)}
+                    <a class="fee__venue-main" href={perfHref(f)}>{f.venue_name || '—'}{#if f.city}<span class="fee__city"> · {f.city}</span>{/if}</a>
+                  {:else}
+                    <span class="fee__venue-main">{f.venue_name || '—'}{#if f.city}<span class="fee__city"> · {f.city}</span>{/if}</span>
+                  {/if}
+                  <span class="fee__proj-sub">{f.project?.name ?? '—'}</span>
                 </span>
                 <span class="fee__badge"><StateBadge label={performanceStatusLabel(f.status)} tone={performanceStatusTone(f.status)} /></span>
                 <span class="fee__amt">
@@ -648,7 +661,7 @@
               {#each expenseTotals as [currency, amount] (currency)}<span>− {fmtMoney(amount)} {currency}</span>{/each}
             </p>
           {/if}
-          <Button size="xs" variant="outline" onclick={openExpense} disabled={expenseLineOptions.length === 0}>Add expense</Button>
+          <Button size="xs" variant="outline" onclick={openExpense} disabled={expenseAnchorOptions.length === 0}>Add expense</Button>
         </div>
       </div>
       {#if expenses.length === 0}
@@ -727,7 +740,7 @@
   {/snippet}
 </Dialog>
 
-<Dialog bind:open={expOpen} title="Add expense" size="s" description="Money out · anchored to a line">
+<Dialog bind:open={expOpen} title="Add expense" size="s" description="Money out · anchored to a line or a gig">
   <div class="mny__pay-form">
     <div class="mny__row2">
       <Input label="Amount" type="number" bind:value={eAmount} />
@@ -738,7 +751,7 @@
       <Input label="Date" type="date" bind:value={eIncurredOn} />
       <Select label="Category" bind:value={eCategory} options={EXPENSE_CATEGORIES.map((c) => ({ value: c, label: categoryLabel(c) }))} />
     </div>
-    <Select label="Line" bind:value={eLineId} options={expenseLineOptions} />
+    <Select label="Anchor (line or gig)" bind:value={eAnchor} options={expenseAnchorOptions} />
     <Input label="Counterparty (optional — who's paid)" bind:value={eCounterparty} placeholder="e.g. Rent-a-Car Vic" />
   </div>
   {#snippet actions()}
@@ -803,9 +816,10 @@
     .fee__top { display: grid; grid-template-columns: auto 1fr auto auto; align-items: baseline; gap: var(--space-m); }
     .fee__date { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-muted); white-space: nowrap; }
     .fee__where { min-inline-size: 0; }
-    .fee__proj { font-size: var(--text-m); font-weight: 500; color: var(--text-color); text-decoration: none; }
-    .fee__proj:hover { text-decoration: underline; }
-    .fee__venue { display: block; font-size: var(--text-xs); color: var(--text-muted); }
+    .fee__venue-main { font-size: var(--text-m); font-weight: 500; color: var(--text-color); text-decoration: none; }
+    .fee__venue-main:hover { text-decoration: underline; }
+    .fee__city { color: var(--text-muted); font-weight: 400; }
+    .fee__proj-sub { display: block; font-size: var(--text-xs); color: var(--text-muted); }
     .fee__amt { text-align: end; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
     .fee__fee { font-family: var(--font-mono); font-size: var(--text-m); color: var(--text-color); font-variant-numeric: tabular-nums; }
     .fee__fee:hover { text-decoration: underline; }
