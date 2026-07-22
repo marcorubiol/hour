@@ -1257,22 +1257,27 @@
     .cal__event--perf[data-family='confirmed'] + .cal__event {
       margin-block-start: var(--space-xs);
     }
-    /* Hold = possibility held: dashed edge + the 135° hatch that means
-       "not settled" everywhere in this view (tentative blackouts use it
-       too), so the state reads before the words do. */
-    .cal__event--perf[data-family='hold'] {
+    /* Tentative = textured, EVERYWHERE (Marco 2026-07-23): holds AND proposed,
+       performances AND dates carry the "not settled" texture and the dashed
+       edge; solid fill is reserved for settled. (Tentative blackout bands keep
+       their own accent hatch.) */
+    .cal__event--perf[data-family='hold'],
+    .cal__event--perf[data-family='proposed'],
+    .cal__event--date[data-family='hold'],
+    .cal__event--date[data-family='proposed'] {
       --chip-bg: var(--bg-ultra-light);
-      --chip-bg-image: repeating-linear-gradient(
-        135deg,
-        color-mix(in oklch, var(--c, var(--border-color-dark)) 11%, var(--bg-ultra-light)) 0 5px,
-        var(--bg-ultra-light) 5px 10px
+      /* The "not settled" texture: a faint neutral dot stipple — pencilled in,
+         not inked. Grey, never the project accent; colour lives in the dashed
+         border and the monogram, so the month reads calm, not multicolour. */
+      --chip-bg-image: radial-gradient(
+        color-mix(in oklch, var(--text-color) 11%, transparent) 1px,
+        transparent 1.3px
       );
+      background-size: 7px 7px;
       --chip-border-style: dashed;
-      --chip-fg: var(--text-muted);
     }
+    .cal__event--perf[data-family='hold'],
     .cal__event--perf[data-family='proposed'] {
-      --chip-bg: var(--bg);
-      --chip-border-style: dashed;
       --chip-fg: var(--text-muted);
     }
 
@@ -1357,18 +1362,15 @@
     }
 
     /* Date chip — quieter ink, mono small-caps kind label at the foot.
-       Tentative dates read as possibility (dashed + square) — the grammar
-       extends (ADR-078 §9); confirmed stays the quiet solid form. */
+       Tentative dates read as possibility (dashed + square + the shared dot
+       texture above) — the grammar extends (ADR-078 §9); confirmed stays the
+       quiet solid form. */
     .cal__event--date {
       --chip-fg: var(--text-muted);
     }
-    .cal__event--date[data-family='hold'] {
-      --chip-bg: var(--bg);
-      --chip-border-style: dashed;
-    }
+    /* hold keeps the base muted ink; proposed drops to the faintest. */
     .cal__event--date[data-family='proposed'] {
       --chip-fg: var(--text-faint);
-      --chip-border-style: dashed;
     }
 
     /* A multi-day block reads as one strip across the cells. The join is
@@ -1505,16 +1507,18 @@
       text-overflow: ellipsis;
     }
     .cal__band--company {
-      --band-bg: color-mix(in oklch, var(--text-color) 9%, transparent);
-      --band-fg: var(--text-muted);
-      --band-border-color: var(--border-color-dark);
+      /* Subtle: a faint grey wash with the base-light border and a faint
+         label — the band should whisper, not box the day (Marco 2026-07-23). */
+      --band-bg: color-mix(in oklch, var(--text-color) 6%, transparent);
+      --band-fg: var(--text-faint);
+      --band-border-color: var(--border-color-light);
     }
     .cal__band--person {
-      /* Softer solid fill (was 15%) — the person band was reading too loud
-         against the neutral company band; the tentative hatch stays as-is. */
-      --band-bg: color-mix(in oklch, var(--cal-accent, var(--warning)) 10%, transparent);
-      --band-fg: color-mix(in oklch, var(--cal-accent, var(--warning)) 50%, var(--text-muted));
-      --band-border-color: color-mix(in oklch, var(--cal-accent, var(--warning)) 30%, var(--border-color-light));
+      /* Subtle accent wash — just enough hue to say WHOSE, no more. The
+         tentative hatch (below) stays as-is; Marco kept that one. */
+      --band-bg: color-mix(in oklch, var(--cal-accent, var(--warning)) 7%, transparent);
+      --band-fg: color-mix(in oklch, var(--cal-accent, var(--warning)) 40%, var(--text-faint));
+      --band-border-color: color-mix(in oklch, var(--cal-accent, var(--warning)) 18%, var(--border-color-light));
     }
     .cal__band--tentative {
       --band-bg: repeating-linear-gradient(
