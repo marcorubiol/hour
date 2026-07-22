@@ -53,6 +53,18 @@ CREATE INDEX fiscal_identity_account_id_idx
   ON public.fiscal_identity (account_id) WHERE account_id IS NOT NULL;
 CREATE INDEX fiscal_identity_workspace_id_idx
   ON public.fiscal_identity (workspace_id) WHERE workspace_id IS NOT NULL;
+CREATE INDEX fiscal_identity_created_by_idx
+  ON public.fiscal_identity (created_by) WHERE created_by IS NOT NULL;
+
+-- Uniform conventions (as on invoice/payment/expense): auto-bump updated_at and
+-- write the audit trail.
+CREATE TRIGGER fiscal_identity_set_updated_at
+BEFORE UPDATE ON public.fiscal_identity
+FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+CREATE TRIGGER fiscal_identity_audit
+AFTER INSERT OR DELETE OR UPDATE ON public.fiscal_identity
+FOR EACH ROW EXECUTE FUNCTION public.write_audit();
 
 ALTER TABLE public.fiscal_identity ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.fiscal_identity FORCE ROW LEVEL SECURITY;

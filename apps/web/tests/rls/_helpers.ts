@@ -173,6 +173,39 @@ export async function pgPatch<T = unknown>(
 }
 
 /**
+ * Run an INSERT against PostgREST as `authenticated` (with JWT) or `anon`
+ * (no JWT), asking for `return=representation`. Like pgPatch it never throws
+ * on non-2xx — `rows` stays empty and `status` carries the code. Used to
+ * exercise tables whose write path is a direct RLS-gated INSERT (not an RPC).
+ */
+export async function pgPost<T = unknown>(
+  path: string,
+  jwt: string | null,
+  row: Record<string, unknown>,
+): Promise<PgResult<T>> {
+  const { url, anon } = requireEnv();
+  const u = new URL(`/rest/v1/${path.replace(/^\/+/, '')}`, url);
+
+  const res = await fetch(u.toString(), {
+    method: 'POST',
+    headers: {
+      apikey: anon,
+      Authorization: `Bearer ${jwt ?? anon}`,
+      Accept: 'application/json',
+      'content-type': 'application/json',
+      Prefer: 'return=representation',
+    },
+    body: JSON.stringify(row),
+  });
+  let rows: T[] = [];
+  if (res.ok) {
+    const body = await res.text();
+    if (body) rows = JSON.parse(body) as T[];
+  }
+  return { status: res.status, rows };
+}
+
+/**
  * Call a Postgres function via PostgREST RPC as `authenticated` (with JWT)
  * or `anon` (no JWT). Never throws on non-2xx. Scalar-returning functions
  * come back as a naked JSON value — `data` carries it verbatim.

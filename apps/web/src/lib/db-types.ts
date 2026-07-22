@@ -880,6 +880,7 @@ export type Database = {
         Row: {
           amount: number
           category: Database["public"]["Enums"]["expense_category"]
+          counterparty: string | null
           created_at: string
           created_by: string | null
           currency: string
@@ -900,6 +901,7 @@ export type Database = {
         Insert: {
           amount: number
           category?: Database["public"]["Enums"]["expense_category"]
+          counterparty?: string | null
           created_at?: string
           created_by?: string | null
           currency?: string
@@ -920,6 +922,7 @@ export type Database = {
         Update: {
           amount?: number
           category?: Database["public"]["Enums"]["expense_category"]
+          counterparty?: string | null
           created_at?: string
           created_by?: string | null
           currency?: string
@@ -1068,15 +1071,20 @@ export type Database = {
           currency: string
           custom_fields: Json
           deleted_at: string | null
+          doc_type: string
           due_on: string | null
           expected_on: string | null
           id: string
           irpf_amount: number | null
           irpf_pct: number | null
           issued_on: string
+          issuer_fiscal_identity_id: string | null
+          issuer_snapshot: Json | null
           notes: string | null
           number: string | null
+          payer_fiscal_identity_id: string | null
           payer_person_id: string | null
+          payer_snapshot: Json | null
           payment_condition: string | null
           project_id: string | null
           status: Database["public"]["Enums"]["invoice_status"]
@@ -1093,15 +1101,20 @@ export type Database = {
           currency?: string
           custom_fields?: Json
           deleted_at?: string | null
+          doc_type?: string
           due_on?: string | null
           expected_on?: string | null
           id?: string
           irpf_amount?: number | null
           irpf_pct?: number | null
           issued_on?: string
+          issuer_fiscal_identity_id?: string | null
+          issuer_snapshot?: Json | null
           notes?: string | null
           number?: string | null
+          payer_fiscal_identity_id?: string | null
           payer_person_id?: string | null
+          payer_snapshot?: Json | null
           payment_condition?: string | null
           project_id?: string | null
           status?: Database["public"]["Enums"]["invoice_status"]
@@ -1118,15 +1131,20 @@ export type Database = {
           currency?: string
           custom_fields?: Json
           deleted_at?: string | null
+          doc_type?: string
           due_on?: string | null
           expected_on?: string | null
           id?: string
           irpf_amount?: number | null
           irpf_pct?: number | null
           issued_on?: string
+          issuer_fiscal_identity_id?: string | null
+          issuer_snapshot?: Json | null
           notes?: string | null
           number?: string | null
+          payer_fiscal_identity_id?: string | null
           payer_person_id?: string | null
+          payer_snapshot?: Json | null
           payment_condition?: string | null
           project_id?: string | null
           status?: Database["public"]["Enums"]["invoice_status"]
@@ -1138,6 +1156,20 @@ export type Database = {
           workspace_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "invoice_issuer_fiscal_identity_id_fkey"
+            columns: ["issuer_fiscal_identity_id"]
+            isOneToOne: false
+            referencedRelation: "fiscal_identity"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_payer_fiscal_identity_id_fkey"
+            columns: ["payer_fiscal_identity_id"]
+            isOneToOne: false
+            referencedRelation: "fiscal_identity"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "invoice_payer_person_id_fkey"
             columns: ["payer_person_id"]
@@ -1229,6 +1261,57 @@ export type Database = {
           },
           {
             foreignKeyName: "invoice_line_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspace"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invoice_number_series: {
+        Row: {
+          created_at: string
+          fiscal_identity_id: string | null
+          id: string
+          next_seq: number
+          scope_kind: string
+          scope_ref: string
+          updated_at: string
+          workspace_id: string
+          year: number
+        }
+        Insert: {
+          created_at?: string
+          fiscal_identity_id?: string | null
+          id?: string
+          next_seq?: number
+          scope_kind: string
+          scope_ref: string
+          updated_at?: string
+          workspace_id: string
+          year: number
+        }
+        Update: {
+          created_at?: string
+          fiscal_identity_id?: string | null
+          id?: string
+          next_seq?: number
+          scope_kind?: string
+          scope_ref?: string
+          updated_at?: string
+          workspace_id?: string
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_number_series_fiscal_identity_id_fkey"
+            columns: ["fiscal_identity_id"]
+            isOneToOne: false
+            referencedRelation: "fiscal_identity"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_number_series_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspace"
@@ -1329,13 +1412,18 @@ export type Database = {
       payment: {
         Row: {
           amount: number
+          category: string | null
+          counterparty: string | null
           created_at: string
           created_by: string | null
           deleted_at: string | null
           id: string
-          invoice_id: string
+          invoice_id: string | null
+          line_id: string | null
           method: Database["public"]["Enums"]["payment_method"]
           notes: string | null
+          performance_id: string | null
+          project_id: string | null
           received_on: string
           reference: string | null
           updated_at: string
@@ -1343,13 +1431,18 @@ export type Database = {
         }
         Insert: {
           amount: number
+          category?: string | null
+          counterparty?: string | null
           created_at?: string
           created_by?: string | null
           deleted_at?: string | null
           id?: string
-          invoice_id: string
+          invoice_id?: string | null
+          line_id?: string | null
           method?: Database["public"]["Enums"]["payment_method"]
           notes?: string | null
+          performance_id?: string | null
+          project_id?: string | null
           received_on?: string
           reference?: string | null
           updated_at?: string
@@ -1357,13 +1450,18 @@ export type Database = {
         }
         Update: {
           amount?: number
+          category?: string | null
+          counterparty?: string | null
           created_at?: string
           created_by?: string | null
           deleted_at?: string | null
           id?: string
-          invoice_id?: string
+          invoice_id?: string | null
+          line_id?: string | null
           method?: Database["public"]["Enums"]["payment_method"]
           notes?: string | null
+          performance_id?: string | null
+          project_id?: string | null
           received_on?: string
           reference?: string | null
           updated_at?: string
@@ -1375,6 +1473,34 @@ export type Database = {
             columns: ["invoice_id"]
             isOneToOne: false
             referencedRelation: "invoice"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_line_id_fkey"
+            columns: ["line_id"]
+            isOneToOne: false
+            referencedRelation: "line"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_performance_id_fkey"
+            columns: ["performance_id"]
+            isOneToOne: false
+            referencedRelation: "performance"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_performance_id_fkey"
+            columns: ["performance_id"]
+            isOneToOne: false
+            referencedRelation: "performance_redacted"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "project"
             referencedColumns: ["id"]
           },
           {
@@ -2869,6 +2995,7 @@ export type Database = {
         Args: {
           p_amount?: number
           p_category?: Database["public"]["Enums"]["expense_category"]
+          p_counterparty?: string
           p_currency?: string
           p_description?: string
           p_incurred_on?: string
@@ -2879,6 +3006,7 @@ export type Database = {
         Returns: {
           amount: number
           category: Database["public"]["Enums"]["expense_category"]
+          counterparty: string | null
           created_at: string
           created_by: string | null
           currency: string
@@ -2905,11 +3033,13 @@ export type Database = {
       }
       create_invoice: {
         Args: {
+          p_doc_type?: string
           p_due_on?: string
           p_expected_on?: string
           p_irpf_pct?: number
           p_notes?: string
           p_number?: string
+          p_payer_fiscal_identity_id?: string
           p_payer_person_id?: string
           p_payment_condition?: string
           p_performance_id: string
@@ -2921,15 +3051,20 @@ export type Database = {
           currency: string
           custom_fields: Json
           deleted_at: string | null
+          doc_type: string
           due_on: string | null
           expected_on: string | null
           id: string
           irpf_amount: number | null
           irpf_pct: number | null
           issued_on: string
+          issuer_fiscal_identity_id: string | null
+          issuer_snapshot: Json | null
           notes: string | null
           number: string | null
+          payer_fiscal_identity_id: string | null
           payer_person_id: string | null
+          payer_snapshot: Json | null
           payment_condition: string | null
           project_id: string | null
           status: Database["public"]["Enums"]["invoice_status"]
@@ -2989,22 +3124,32 @@ export type Database = {
       }
       create_payment: {
         Args: {
-          p_amount: number
-          p_invoice_id: string
+          p_amount?: number
+          p_category?: string
+          p_counterparty?: string
+          p_invoice_id?: string
+          p_line_id?: string
           p_method?: Database["public"]["Enums"]["payment_method"]
           p_notes?: string
+          p_performance_id?: string
+          p_project_id?: string
           p_received_on?: string
           p_reference?: string
         }
         Returns: {
           amount: number
+          category: string | null
+          counterparty: string | null
           created_at: string
           created_by: string | null
           deleted_at: string | null
           id: string
-          invoice_id: string
+          invoice_id: string | null
+          line_id: string | null
           method: Database["public"]["Enums"]["payment_method"]
           notes: string | null
+          performance_id: string | null
+          project_id: string | null
           received_on: string
           reference: string | null
           updated_at: string
@@ -3306,6 +3451,7 @@ export type Database = {
       }
       delete_person_note: { Args: { p_note_id: string }; Returns: undefined }
       delete_task: { Args: { p_task_id: string }; Returns: undefined }
+      fiscal_identity_snapshot: { Args: { p_id: string }; Returns: Json }
       generate_workspace_sid: { Args: never; Returns: string }
       get_public_calendar: { Args: { p_token: string }; Returns: Json }
       get_public_roadsheet: { Args: { p_token: string }; Returns: Json }
@@ -3327,6 +3473,45 @@ export type Database = {
         Returns: boolean
       }
       is_workspace_member: { Args: { ws_id: string }; Returns: boolean }
+      issue_invoice: {
+        Args: { p_invoice_id: string }
+        Returns: {
+          created_at: string
+          created_by: string | null
+          currency: string
+          custom_fields: Json
+          deleted_at: string | null
+          doc_type: string
+          due_on: string | null
+          expected_on: string | null
+          id: string
+          irpf_amount: number | null
+          irpf_pct: number | null
+          issued_on: string
+          issuer_fiscal_identity_id: string | null
+          issuer_snapshot: Json | null
+          notes: string | null
+          number: string | null
+          payer_fiscal_identity_id: string | null
+          payer_person_id: string | null
+          payer_snapshot: Json | null
+          payment_condition: string | null
+          project_id: string | null
+          status: Database["public"]["Enums"]["invoice_status"]
+          subtotal: number
+          total: number
+          updated_at: string
+          vat_amount: number | null
+          vat_pct: number | null
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "invoice"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       list_calendar_shares: {
         Args: { p_workspace_id: string }
         Returns: {
@@ -3356,6 +3541,7 @@ export type Database = {
         Returns: {
           amount: number
           category: Database["public"]["Enums"]["expense_category"]
+          counterparty: string | null
           created_at: string
           created_by: string | null
           currency: string
@@ -3405,6 +3591,7 @@ export type Database = {
         }
         Returns: {
           city: string
+          collected: number
           fee_amount: number
           fee_currency: string
           id: string
@@ -3453,6 +3640,15 @@ export type Database = {
           status: string
           user_id: string
         }[]
+      }
+      next_invoice_number: {
+        Args: {
+          p_doc_type: string
+          p_fiscal_identity_id: string
+          p_workspace_id: string
+          p_year: number
+        }
+        Returns: string
       }
       preview_workspace_invitation: {
         Args: { p_token: string }
