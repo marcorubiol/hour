@@ -149,10 +149,6 @@ export function buildLineIndex(
   return out;
 }
 
-export function workspaceUrl(slug: string): string {
-  return `/h/${slug}/`;
-}
-
 export function projectUrl(project: NavProject): string {
   return `/h/${project.workspaceSlug}/project/${project.slug}/`;
 }

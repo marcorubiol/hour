@@ -18,10 +18,6 @@ export function accentVar(slug: string | null | undefined): string {
 	return `var(--accent-${accentIndex(slug)})`;
 }
 
-export function accentStyle(slug: string | null | undefined): string {
-	return `--c: ${accentVar(slug)}`;
-}
-
 /**
  * Workspaces / projects can store an explicit accent override:
  *   - '1'..'7'     → palette index → var(--accent-N) (out-of-range wraps in)
@@ -63,11 +59,4 @@ export function isCustomAccent(accent: string | null | undefined): boolean {
 export function customHue(accent: string | null | undefined): number | null {
 	const m = accent?.trim().match(/^h(\d{1,3})$/);
 	return m ? Number(m[1]) % 360 : null;
-}
-
-export function accentStyleFor(entity: {
-	slug: string | null | undefined;
-	accent?: string | null;
-}): string {
-	return `--c: ${accentVarFor(entity)}`;
 }

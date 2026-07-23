@@ -72,18 +72,6 @@ export function dayMonth(iso: string): string {
 }
 
 /**
- * "09 Jul" for a timestamptz, in the VIEWER's zone (wall-clock display —
- * schedules, activity rows). Not for date-only contracts: those must use
- * the UTC-anchored dayMonth/dayLabel above.
- */
-export function dayMonthTs(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-GB', {
-    day: '2-digit',
-    month: 'short',
-  });
-}
-
-/**
  * "09 Jul 2026" — no weekday. Same UTC-anchored contract as dayLabel.
  */
 export function dayMonthYear(iso: string): string {
