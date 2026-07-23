@@ -297,8 +297,16 @@ entre empresas sin construirlo.
 
 ## Producto — después
 
-- [ ] **Email integrado → `conversation_event`.** Empezar por forwarding/BCC o
-  conexión de bajo riesgo; evitar doble entrada.
+- [ ] **Poll de fechas candidatas (à la Doodle/When2meet, integrado).** Al buscar
+  fecha para una residencia, un ensayo o una reunión, proponer **varias `date`
+  candidatas de golpe**; cada participante confirma las que puede; cuando todos
+  han respondido, el sistema revela **qué opciones funcionan** (y cuáles son
+  parciales). Encaja con la disponibilidad/conflictos que Planner ya modela y con
+  el patrón consent-first (el sistema propone, la gente confirma, el sistema
+  concluye). Existen servicios externos que lo hacen; tenerlo dentro evita el
+  salto de herramienta. **Dependencia a vigilar:** si los participantes son
+  externos, responder es una **escritura desde `anon`** — misma frontera que el
+  BLOQUEANTE 1 de comms/acceso; para gente ya dentro del workspace no aplica.
 - [ ] **WhatsApp por escalones.** Share-to-Hour/manual asistido → número/bot →
   Business API para cuentas elegibles; nunca scraping de WhatsApp Web.
 - [ ] **Road mode mobile/offline.** Paquete de próximos bolos, road sheets y
