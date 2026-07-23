@@ -1,4 +1,4 @@
-export const ACCENT_COUNT = 10;
+export const ACCENT_COUNT = 7;
 
 function hashSlug(slug: string): number {
 	let h = 2166136261;
@@ -63,32 +63,6 @@ export function isCustomAccent(accent: string | null | undefined): boolean {
 export function customHue(accent: string | null | undefined): number | null {
 	const m = accent?.trim().match(/^h(\d{1,3})$/);
 	return m ? Number(m[1]) % 360 : null;
-}
-
-/** Hue of each palette swatch (mirrors --accent-N in tokens.css): 10 hues,
- *  bin-centred at 360·(i+0.5)/10 — the eye's practical limit for categorical
- *  colour, spaced 36° apart. */
-export const PALETTE_HUES = [18, 54, 90, 126, 162, 198, 234, 270, 306, 342];
-
-/**
- * The effective hue (0-360) an entity's accent resolves to: a custom hue, a
- * preset's hue, or — for null/auto — the hash-derived preset's hue.
- */
-export function accentHue(entity: { slug: string | null | undefined; accent?: string | null }): number {
-	const a = entity.accent?.trim();
-	const custom = customHue(a);
-	if (custom !== null) return custom;
-	const idx =
-		a && /^\d+$/.test(a)
-			? (((Number(a) - 1) % ACCENT_COUNT) + ACCENT_COUNT) % ACCENT_COUNT
-			: accentIndex(entity.slug) - 1;
-	return PALETTE_HUES[idx];
-}
-
-/** Shortest angular distance (0-180) between two hues on the wheel. */
-export function hueDistance(a: number, b: number): number {
-	const d = Math.abs(a - b) % 360;
-	return Math.min(d, 360 - d);
 }
 
 export function accentStyleFor(entity: {

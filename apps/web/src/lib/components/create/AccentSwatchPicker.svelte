@@ -1,36 +1,33 @@
 <script lang="ts">
   /**
    * AccentSwatchPicker — the accent selector shared by the create dialogs
-   * (workspace / project / line) and the identity editors. A single hue slider
-   * IS the control: a pale bar carrying the hue wheel 0→360 across its width,
-   * with 10 equidistant PRESET ticks and a draggable pin beneath it. Drag/click
-   * to any hue; the pin MAGNETS to a tick when it comes within a few degrees
-   * (that lands a preset), otherwise it's a custom hue. "auto" clears back to
-   * the hash-from-name colour.
+   * (workspace / project / line) and the identity editors: a row of the 7
+   * curated palette swatches with an always-visible hue slider beneath it. The
+   * SLIDER is the source of truth — a lens carrying the hue wheel 0→360 across
+   * its full width — and the 7 swatches are equidistant samples of it, laid out
+   * (space-around) so each swatch sits exactly above its hue on the slider.
    *
-   * The pin shows the real accent colour; the bar is the pale "background"
-   * preview of the range. Stored as '1'..'10', 'h<0-360>', or null (auto).
-   * Lightness + chroma are fixed by the palette tokens so any colour stays soft
-   * and adapts light/dark (see $lib/utils/accent).
+   * Pick a swatch for a preset, or drag/arrow the slider to fine-tune into a
+   * custom hue; "back to presets" returns to auto. The custom picker stores
+   * only a hue ('h<0-360>'); lightness + chroma are fixed by the palette tokens
+   * so any colour stays soft and adapts light/dark (see $lib/utils/accent).
    */
 
   import {
     ACCENT_COUNT,
-    PALETTE_HUES,
     accentIndex,
     accentVarFor,
     customAccent,
     customHue,
-    hueDistance,
     isCustomAccent,
   } from '$lib/utils/accent';
 
   interface Props {
-    /** Selected accent: "1".."10", a custom hue "h<0-360>", or null for auto. */
+    /** Selected accent: "1".."7", a custom hue "h<0-360>", or null for auto. */
     accent?: string | null;
     /** Slug the server would hash when accent is null (auto preview). */
     autoSlug: string;
-    /** Slider accessible name, e.g. "Line color". */
+    /** Radiogroup accessible name, e.g. "Line color". */
     label: string;
     disabled?: boolean;
     /** Visually hide the "Color" legend (kept for screen readers). */
@@ -40,11 +37,15 @@
   let { accent = $bindable(null), autoSlug, label, disabled = false, hideLegend = false }: Props =
     $props();
 
-  const SNAP_DEG = 7; // magnet radius around each preset tick
+  // Bin-centred equidistant hues (360·(i+0.5)/7) — MUST mirror --accent-N in
+  // tokens.css so a swatch (space-around, centre at (i+0.5)/7) lands exactly
+  // above the slider's hue at that fraction.
+  const PALETTE_HUES = [26, 77, 129, 180, 231, 283, 334];
+  const swatches = Array.from({ length: ACCENT_COUNT }, (_, i) => i + 1);
 
   let isCustom = $derived(isCustomAccent(accent));
-  // Palette index the pin rests on when not custom: the chosen preset, else the
-  // hash-derived one (auto). Old out-of-range indices wrap in.
+  // Palette index the slider rests on when not custom: the chosen preset, else
+  // the hash-derived one (auto). Old out-of-range indices wrap in.
   let baseIndex = $derived(
     accent && /^\d+$/.test(accent)
       ? (((Number(accent) - 1) % ACCENT_COUNT) + ACCENT_COUNT) % ACCENT_COUNT
@@ -57,41 +58,27 @@
       : accentVarFor({ slug: autoSlug, accent }),
   );
 
+  // ── Custom hue slider (own pointer/keyboard handling so the thumb sits at
+  //    an exact fraction; a native <input range> insets the thumb and would
+  //    break the swatch alignment). ─────────────────────────────────────────
   let trackEl: HTMLDivElement | undefined = $state();
   let dragging = $state(false);
 
-  function hueAt(clientX: number): number {
+  function hueFromClientX(clientX: number): number {
     if (!trackEl) return hue;
     const r = trackEl.getBoundingClientRect();
     const f = Math.min(1, Math.max(0, (clientX - r.left) / r.width));
     return Math.min(359, Math.round(f * 360));
   }
-  function nearestPresetIndex(raw: number): number {
-    let best = 0;
-    let bestD = Infinity;
-    for (let i = 0; i < PALETTE_HUES.length; i++) {
-      const d = hueDistance(raw, PALETTE_HUES[i]);
-      if (d < bestD) {
-        bestD = d;
-        best = i;
-      }
-    }
-    return best;
-  }
   function onPointerDown(e: PointerEvent) {
     if (disabled) return;
     dragging = true;
     trackEl?.setPointerCapture(e.pointerId);
-    // A click lands on the nearest PRESET — precise colours only. Dragging off
-    // it (below) is what reaches a custom hue in between.
-    accent = String(nearestPresetIndex(hueAt(e.clientX)) + 1);
+    accent = customAccent(hueFromClientX(e.clientX));
   }
   function onPointerMove(e: PointerEvent) {
     if (!dragging || disabled) return;
-    // Now dragging: magnet to a tick within SNAP_DEG, else a free custom hue.
-    const raw = hueAt(e.clientX);
-    const i = nearestPresetIndex(raw);
-    accent = hueDistance(raw, PALETTE_HUES[i]) <= SNAP_DEG ? String(i + 1) : customAccent(raw);
+    accent = customAccent(hueFromClientX(e.clientX));
   }
   function endDrag(e: PointerEvent) {
     dragging = false;
@@ -108,17 +95,37 @@
       accent = customAccent(hue - step);
     }
   }
+
+  function selectPreset(n: number) {
+    accent = accent === String(n) ? null : String(n);
+  }
 </script>
 
-<fieldset class="picker">
+<fieldset class="swatches">
   <legend class:legend--hidden={hideLegend}>Color</legend>
 
+  <div class="swatch-grid" role="radiogroup" aria-label={label}>
+    {#each swatches as n (n)}
+      {@const isOn = accent === String(n)}
+      <button
+        type="button"
+        role="radio"
+        aria-checked={isOn}
+        class={['swatch', isOn && 'swatch--on'].filter(Boolean).join(' ')}
+        style={`left: ${(PALETTE_HUES[n - 1] / 360) * 100}%; background: var(--accent-${n})`}
+        aria-label={`Color ${n}`}
+        {disabled}
+        onclick={() => selectPreset(n)}
+      ></button>
+    {/each}
+  </div>
+
   <div
-    class="track"
+    class="hue"
     bind:this={trackEl}
     role="slider"
     tabindex={disabled ? -1 : 0}
-    aria-label={label}
+    aria-label="Custom hue"
     aria-valuemin="0"
     aria-valuemax="359"
     aria-valuenow={hue}
@@ -129,54 +136,55 @@
     onpointercancel={endDrag}
     onkeydown={onKey}
   >
-    <div class="track__bar" aria-hidden="true"></div>
-    {#each PALETTE_HUES as h, i (i)}
-      <span class="track__tick" style={`left: ${(h / 360) * 100}%`} aria-hidden="true"></span>
-    {/each}
+    <div class="hue-lens" aria-hidden="true"></div>
     <div
-      class="track__thumb"
-      style={`left: ${(hue / 360) * 100}%; --thumb: ${currentColor}`}
+      class="hue-thumb"
+      style={`left: ${(hue / 360) * 100}%; background: ${currentColor}`}
       aria-hidden="true"
-    >
-      <span class="track__chip"></span>
-    </div>
+    ></div>
   </div>
 
-  <p class="picker__hint">
+  <p class="swatch-hint">
     {#if isCustom}
       <span class="hint-state">
         <span class="hint-dot" style={`background: ${currentColor}`} aria-hidden="true"></span>
         Custom {hue}°
       </span>
-    {:else}
-      <span></span>
-    {/if}
-    {#if accent}
-      <button type="button" class="hint-reset" onclick={() => (accent = null)} {disabled}
-        >auto</button
+      <button type="button" class="swatch-clear" onclick={() => (accent = null)} {disabled}
+        >back to presets</button
       >
+    {:else if accent}
+      <span></span>
+      <button type="button" class="swatch-clear" onclick={() => (accent = null)} {disabled}
+        >Clear · use auto</button
+      >
+    {:else}
+      <span class="hint-state">
+        <span class="hint-dot" style={`background: ${currentColor}`} aria-hidden="true"></span>
+        Auto from name
+      </span>
     {/if}
   </p>
 </fieldset>
 
 <style>
   @layer components {
-    .picker {
+    .swatches {
       display: flex;
       flex-direction: column;
-      gap: var(--space-2xs);
+      gap: var(--space-s);
       border: 0;
       padding: 0;
       margin: 0;
     }
 
-    .picker > legend {
+    .swatches > legend {
       padding: 0;
       font-size: var(--text-xs);
       color: var(--text-dark-muted);
     }
 
-    .picker > legend.legend--hidden {
+    .swatches > legend.legend--hidden {
       position: absolute;
       inline-size: 1px;
       block-size: 1px;
@@ -187,90 +195,113 @@
       white-space: nowrap;
     }
 
-    /* The slider itself is the whole control: a pale hue bar with preset ticks
-       and a pin hanging beneath it. */
-    .track {
+    /* Each swatch is placed at the SAME fraction the slider maps its hue to
+       (hue/360), with the same translateX(-50%) as the thumb, so it sits
+       exactly above it — space-around only approximated the fraction. */
+    .swatch-grid {
       position: relative;
-      block-size: 54px;
+      block-size: 26px;
+    }
+
+    .swatch {
+      position: absolute;
+      inset-block-start: 0;
+      inline-size: 26px;
+      block-size: 26px;
+      padding: 0;
+      border: 0;
+      border-radius: var(--radius-50);
+      cursor: pointer;
+      transform: translateX(-50%);
+      box-shadow: 0 0 0 1px var(--border-color-light) inset;
+      transition:
+        box-shadow var(--transition),
+        transform var(--transition);
+    }
+
+    .swatch:hover:not(:disabled) {
+      transform: translateX(-50%) scale(1.08);
+    }
+
+    .swatch:focus-visible {
+      outline: var(--focus-width) solid var(--focus-color);
+      outline-offset: 2px;
+    }
+
+    .swatch--on {
+      box-shadow:
+        0 0 0 2px var(--bg),
+        0 0 0 4px var(--text-color);
+    }
+
+    .swatch:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    /* Hue slider: a lens carrying the hue wheel; the thumb is positioned by an
+       exact fraction (hue/360) so it tracks the swatches above. */
+    .hue {
+      position: relative;
+      block-size: 26px;
       cursor: pointer;
       touch-action: none;
     }
-    .track:focus-visible {
+
+    .hue:focus-visible {
       outline: var(--focus-width) solid var(--focus-color);
       outline-offset: 4px;
-      border-radius: var(--radius-m);
+      border-radius: var(--radius-50);
     }
 
-    .track__bar {
+    .hue-lens {
       position: absolute;
       inset-inline: 0;
-      inset-block-start: 2px;
-      block-size: 20px;
-      border-radius: 999px;
+      inset-block-start: 50%;
+      block-size: 16px;
+      transform: translateY(-50%);
       pointer-events: none;
-      box-shadow: 0 0 0 1px var(--border-color-light) inset;
-      /* Pale pastel preview of the hue wheel (high L, low C — see --accent-track-*). */
+      clip-path: polygon(
+        0% 50%,
+        12% 22%,
+        30% 6%,
+        50% 0%,
+        70% 6%,
+        88% 22%,
+        100% 50%,
+        88% 78%,
+        70% 94%,
+        50% 100%,
+        30% 94%,
+        12% 78%
+      );
       background: linear-gradient(
         to right,
-        oklch(var(--accent-track-l) var(--accent-track-c) 0),
-        oklch(var(--accent-track-l) var(--accent-track-c) 45),
-        oklch(var(--accent-track-l) var(--accent-track-c) 90),
-        oklch(var(--accent-track-l) var(--accent-track-c) 135),
-        oklch(var(--accent-track-l) var(--accent-track-c) 180),
-        oklch(var(--accent-track-l) var(--accent-track-c) 225),
-        oklch(var(--accent-track-l) var(--accent-track-c) 270),
-        oklch(var(--accent-track-l) var(--accent-track-c) 315),
-        oklch(var(--accent-track-l) var(--accent-track-c) 360)
+        oklch(var(--accent-custom-l) var(--accent-custom-c) 0),
+        oklch(var(--accent-custom-l) var(--accent-custom-c) 60),
+        oklch(var(--accent-custom-l) var(--accent-custom-c) 120),
+        oklch(var(--accent-custom-l) var(--accent-custom-c) 180),
+        oklch(var(--accent-custom-l) var(--accent-custom-c) 240),
+        oklch(var(--accent-custom-l) var(--accent-custom-c) 300),
+        oklch(var(--accent-custom-l) var(--accent-custom-c) 360)
       );
     }
 
-    /* Preset ticks — the 10 standard colours, marked on the pale bar. */
-    .track__tick {
+    .hue-thumb {
       position: absolute;
-      inset-block-start: 6px;
-      block-size: 12px;
-      inline-size: 2px;
-      transform: translateX(-50%);
-      border-radius: 1px;
+      inset-block-start: 50%;
+      inline-size: 22px;
+      block-size: 22px;
+      transform: translate(-50%, -50%);
+      border-radius: var(--radius-50);
       pointer-events: none;
-      background: color-mix(in oklch, var(--text-color) 18%, transparent);
-    }
-
-    /* The pin hangs below the bar: a light frame with a coloured ring, holding
-       the current-colour chip inside (a thing within a thing), and a triangle
-       pointing up at its hue. */
-    .track__thumb {
-      position: absolute;
-      inset-block-start: 28px;
-      transform: translateX(-50%);
-      padding: 3px;
-      border-radius: 8px;
-      pointer-events: none;
-      /* The frame fills with the identity mark's own soft tint (same recipe as
-         IdentityMark's --_bg), so the pin previews the identity. */
-      background: color-mix(in oklch, var(--thumb, var(--accent-1)) 16%, var(--bg-ultra-light));
       box-shadow:
-        0 0 0 2px var(--thumb, var(--accent-1)),
-        0 1px 3px color-mix(in oklch, var(--text-color) 28%, transparent);
-    }
-    .track__thumb::before {
-      content: '';
-      position: absolute;
-      inset-block-start: -6px;
-      inset-inline-start: 50%;
-      transform: translateX(-50%);
-      border-inline: 6px solid transparent;
-      border-block-end: 6px solid var(--thumb, var(--accent-1));
-    }
-    .track__chip {
-      display: block;
-      inline-size: 16px;
-      block-size: 16px;
-      border-radius: 5px;
-      background: var(--thumb, var(--accent-1));
+        0 0 0 3px var(--bg),
+        0 0 0 4px color-mix(in oklch, var(--text-color) 22%, transparent),
+        0 1px 2px color-mix(in oklch, var(--text-color) 30%, transparent);
     }
 
-    .picker__hint {
+    .swatch-hint {
       margin: 0;
       font-size: var(--text-xs);
       color: var(--text-faint);
@@ -296,7 +327,7 @@
       flex: none;
     }
 
-    .hint-reset {
+    .swatch-clear {
       background: transparent;
       border: 0;
       padding: 0;
@@ -308,7 +339,8 @@
       text-underline-offset: 2px;
       white-space: nowrap;
     }
-    .hint-reset:hover {
+
+    .swatch-clear:hover {
       color: var(--text-color);
     }
   }
