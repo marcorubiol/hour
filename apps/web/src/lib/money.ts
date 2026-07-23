@@ -299,6 +299,23 @@ export function agingState(
 	};
 }
 
+/**
+ * Per-currency sums — never add EUR to USD. Sorted by currency code so
+ * mixed-currency totals list in the same order on every surface.
+ */
+export function totalsByCurrency<T>(
+	rows: readonly T[],
+	currency: (row: T) => string,
+	amount: (row: T) => number,
+): [string, number][] {
+	const map = new Map<string, number>();
+	for (const row of rows) {
+		const code = currency(row);
+		map.set(code, (map.get(code) ?? 0) + amount(row));
+	}
+	return [...map.entries()].sort(([a], [b]) => a.localeCompare(b));
+}
+
 const money = new Intl.NumberFormat('en-GB', {
 	minimumFractionDigits: 2,
 	maximumFractionDigits: 2,

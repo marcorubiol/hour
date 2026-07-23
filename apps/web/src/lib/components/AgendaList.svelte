@@ -44,7 +44,7 @@
     type PerformanceEvent,
   } from '$lib/components/MonthGrid.svelte';
   import { assignBandLanes, dayKeyInTz } from '$lib/planner';
-  import { dualTime } from '$lib/datetime';
+  import { dualTime, localeWeekdayShort } from '$lib/datetime';
   import { workspacesQueryOptions } from '$lib/nav-queries';
   import { accentVarFor } from '$lib/utils/accent';
   import IdentityMark from '$lib/components/IdentityMark.svelte';
@@ -267,10 +267,7 @@
 
   // ── Day header + month divider labels ──────────────────────────────────
   function headWeekday(iso: string): string {
-    return new Date(`${iso}T00:00:00Z`)
-      .toLocaleDateString(locale, { weekday: 'short', timeZone: 'UTC' })
-      .replace(/\.+$/, '')
-      .toLowerCase();
+    return localeWeekdayShort(iso, locale).toLowerCase();
   }
   function monthDivName(iso: string): string {
     const raw = new Date(`${iso}T00:00:00Z`).toLocaleDateString(locale, {

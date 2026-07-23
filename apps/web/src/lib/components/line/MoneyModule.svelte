@@ -24,8 +24,8 @@
   import Select from '$lib/components/Select.svelte';
   import StateBadge from '$lib/components/StateBadge.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
-  import { dayLabel } from '$lib/datetime';
-  import { fmtFee, fmtMoney, invoiceTone } from '$lib/money';
+  import { dayLabel, localDayISO } from '$lib/datetime';
+  import { fmtFee, fmtMoney, invoiceTone, totalsByCurrency } from '$lib/money';
   import { CATEGORY_LABELS, EXPENSE_CATEGORIES, categoryLabel } from '$lib/expense';
   import { performanceStatusLabel, performanceStatusTone } from '$lib/performance';
 
@@ -142,12 +142,7 @@
 
   let expenses = $derived($expensesQuery.data?.items ?? []);
 
-  /** Per-currency sums — never add EUR to USD. */
-  let expenseTotals = $derived.by(() => {
-    const map = new Map<string, number>();
-    for (const e of expenses) map.set(e.currency, (map.get(e.currency) ?? 0) + e.amount);
-    return [...map.entries()];
-  });
+  let expenseTotals = $derived(totalsByCurrency(expenses, (e) => e.currency, (e) => e.amount));
 
   let feesError = $derived($feesQuery.error instanceof Error ? $feesQuery.error.message : '');
   let invoicesError = $derived(
@@ -163,12 +158,6 @@
     label: CATEGORY_LABELS[c],
   }));
 
-  function todayISO(): string {
-    const d = new Date();
-    const pad = (n: number) => String(n).padStart(2, '0');
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-  }
-
   let expOpen = $state(false);
   let eCategory = $state('other');
   let eDescription = $state('');
@@ -182,7 +171,7 @@
     eDescription = '';
     eAmount = '';
     eCurrency = 'EUR';
-    eDate = todayISO();
+    eDate = localDayISO();
     eNotes = '';
     expOpen = true;
   }

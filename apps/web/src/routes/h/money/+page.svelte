@@ -26,7 +26,7 @@
   import Select from '$lib/components/Select.svelte';
   import StateBadge from '$lib/components/StateBadge.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
-  import { dayLabel } from '$lib/datetime';
+  import { dayLabel, localDayISO } from '$lib/datetime';
   import { categoryLabel, EXPENSE_CATEGORIES, type ExpenseItem } from '$lib/expense';
   import {
     agingState,
@@ -36,6 +36,7 @@
     fmtMoney,
     observedPayerTermsDays,
     PAYMENT_METHODS,
+    totalsByCurrency,
     type MoneyInvoiceItem,
     type MoneyPayer,
   } from '$lib/money';
@@ -374,11 +375,7 @@
     return [...map.values()].sort((a, b) => a.currency.localeCompare(b.currency));
   });
 
-  let expenseTotals = $derived.by(() => {
-    const map = new Map<string, number>();
-    for (const expense of expenses) map.set(expense.currency, (map.get(expense.currency) ?? 0) + Number(expense.amount));
-    return [...map.entries()].sort(([a], [b]) => a.localeCompare(b));
-  });
+  let expenseTotals = $derived(totalsByCurrency(expenses, (e) => e.currency, (e) => Number(e.amount)));
 
   const queryClient = useQueryClient();
 
@@ -429,14 +426,11 @@
   let payCounterparty = $state('');
   let payCategory = $state('');
   let payReference = $state('');
-  function todayIso(): string {
-    return new Date().toISOString().slice(0, 10);
-  }
   function openPay(b: MoneyBolo) {
     payBolo = b;
     const remaining = Math.max(0, Number(b.fee_amount ?? 0) - Number(b.collected ?? 0));
     payAmount = remaining ? remaining.toFixed(2) : '';
-    payReceivedOn = todayIso();
+    payReceivedOn = localDayISO();
     payMethod = 'transfer';
     payCounterparty = b.venue_name ?? '';
     payCategory = '';
@@ -449,7 +443,7 @@
       if (!Number.isFinite(amount) || amount <= 0) throw new Error('Amount must be greater than zero');
       const body = await mutateJSON<{ payment?: unknown }>('POST', '/api/payments', {
         amount,
-        received_on: payReceivedOn || todayIso(),
+        received_on: payReceivedOn || localDayISO(),
         method: payMethod,
         bolo_id: payBolo!.id,
         counterparty: payCounterparty.trim() || null,
@@ -566,7 +560,7 @@
     eCurrency = b?.fee_currency ?? currencies[0] ?? 'EUR';
     eDescription = '';
     eCategory = 'other';
-    eIncurredOn = todayIso();
+    eIncurredOn = localDayISO();
     eCounterparty = '';
     eAnchor = b ? `bolo:${b.id}` : (expenseAnchorOptions[0]?.value ?? '');
     expOpen = true;

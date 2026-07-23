@@ -61,6 +61,7 @@
 </script>
 
 <script lang="ts">
+  import { localeDayMonth, localeMonthShort, localeWeekdayShort } from '$lib/datetime';
   import { t, type Locale } from '$lib/i18n';
   import { SvelteSet } from 'svelte/reactivity';
 
@@ -106,20 +107,6 @@
   function dayNum(iso: string): number {
     return Number(iso.slice(8, 10));
   }
-  function monthShort(iso: string): string {
-    return new Intl.DateTimeFormat(localeTag, { month: 'short', timeZone: 'UTC' })
-      .format(new Date(`${iso}T00:00:00Z`))
-      .replace(/\.+$/, '');
-  }
-  function weekdayShort(iso: string): string {
-    return new Intl.DateTimeFormat(localeTag, { weekday: 'short', timeZone: 'UTC' })
-      .format(new Date(`${iso}T00:00:00Z`))
-      .replace(/\.+$/, '');
-  }
-  /** "17 jul" — the honest date every copy leans on. */
-  function dayLabelShort(iso: string): string {
-    return `${dayNum(iso)} ${monthShort(iso)}`;
-  }
 
   function title(d: DecisionVM): string {
     if (d.level === 'people') return t('planner.dec_people_title', locale);
@@ -143,7 +130,7 @@
   /** Honest, data-derived footer: a real decide-by day or "no notice". */
   function hint(d: DecisionVM): string {
     return d.decideBy
-      ? t('planner.dec_decide_by', locale, { date: dayLabelShort(d.decideBy) })
+      ? t('planner.dec_decide_by', locale, { date: localeDayMonth(d.decideBy, localeTag) })
       : t('planner.dec_no_notice', locale);
   }
 
@@ -151,9 +138,9 @@
   let headSub = $derived.by(() => {
     if (!headline) return '';
     const who = headline.people[0] ?? headline.a.project;
-    const base = `${who} · ${dayLabelShort(headline.day)}`;
+    const base = `${who} · ${localeDayMonth(headline.day, localeTag)}`;
     return headline.decideBy
-      ? `${base} — ${t('planner.dec_decide_by', locale, { date: dayLabelShort(headline.decideBy) })}`
+      ? `${base} — ${t('planner.dec_decide_by', locale, { date: localeDayMonth(headline.decideBy, localeTag) })}`
       : base;
   });
 
@@ -216,7 +203,7 @@
           <header class="deccard__top">
             <div class="deccard__date">
               <div class="deccard__daynum">{dayNum(d.day)}</div>
-              <div class="deccard__dayrow">{monthShort(d.day)} · {weekdayShort(d.day)}</div>
+              <div class="deccard__dayrow">{localeMonthShort(d.day, localeTag)} · {localeWeekdayShort(d.day, localeTag)}</div>
             </div>
             <div class="deccard__q">
               <p class="deccard__title">
@@ -239,7 +226,7 @@
             </div>
             {#if d.urgent && d.decideBy}
               <span class="deccard__urg"
-                >{t('planner.dec_decide_by', locale, { date: dayLabelShort(d.decideBy) })}</span
+                >{t('planner.dec_decide_by', locale, { date: localeDayMonth(d.decideBy, localeTag) })}</span
               >
             {/if}
           </header>
@@ -329,7 +316,7 @@
           <ul class="decband__conc-list" role="list">
             {#each concurrences as c (c.id)}
               <li class="decband__conc-row">
-                <span class="decband__conc-day">{dayLabelShort(c.day)}</span>
+                <span class="decband__conc-day">{localeDayMonth(c.day, localeTag)}</span>
                 <span class="decband__conc-pair">
                   <span class="deccard__dot" style="--c: {c.a.accent}" aria-hidden="true"></span>
                   {c.a.venue} · {c.a.project}

@@ -15,7 +15,7 @@
   import { addToast } from '$lib/components/Toast.svelte';
   import Checkbox from '$lib/components/Checkbox.svelte';
   import { dayMonth } from '$lib/datetime';
-  import { taskContextLabel, taskSurfaceState, type TaskItem } from '$lib/task';
+  import { taskContextLabel, taskSurfaceState, type TaskItem, type TasksCache } from '$lib/task';
 
   interface Props {
     tasks: TaskItem[];
@@ -57,7 +57,6 @@
   // move with the click, and ROLL BACK on error — the native checkbox has
   // already flipped, and with unchanged data no refetch would unflip it
   // (structural sharing keeps the same objects).
-  type TasksCache = { items: TaskItem[] };
   const toggleTask = createMutation({
     mutationFn: ({ id, status }: { id: string; status: 'open' | 'done' }) =>
       mutateJSON<{ task: TaskItem }>('PATCH', `/api/tasks/${id}`, { status }),

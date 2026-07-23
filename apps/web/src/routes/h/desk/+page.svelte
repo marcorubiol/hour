@@ -41,7 +41,7 @@
     allLinesQueryOptions,
   } from '$lib/nav-queries';
   import type { DeskConversation } from '$lib/components/DeskBoard.svelte';
-  import { taskProjectId, type TaskItem, type TaskTarget } from '$lib/task';
+  import { taskProjectId, type TaskItem, type TasksCache, type TaskTarget } from '$lib/task';
   import {
     buildDeskFeed,
     deskSummary,
@@ -235,7 +235,6 @@
   });
 
   // ── Task + proposal mutations (TaskBoard contract; optimistic toggle). ──
-  type TasksCache = { items: TaskItem[] };
   const toggleTask = createMutation({
     mutationFn: ({ id, status }: { id: string; status: 'open' | 'done' }) =>
       mutateJSON<{ task: TaskItem }>('PATCH', `/api/tasks/${id}`, { status }),

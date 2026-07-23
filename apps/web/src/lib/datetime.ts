@@ -84,6 +84,33 @@ export function dayMonthYear(iso: string): string {
 }
 
 /**
+ * "09 Jul 2026" from a full TIMESTAMP, in the VIEWER's zone. The wall-clock
+ * counterpart to the UTC-anchored dayMonthYear above: a timestamptz names a
+ * moment (note/share created_at), so the viewer's own day is the honest one
+ * — never feed it a plain date, which must not shift through the viewer's
+ * zone.
+ */
+export function dayMonthYearTs(iso: string): string {
+  return new Date(iso).toLocaleDateString('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
+}
+
+/**
+ * The viewer's calendar day for `now`, as YYYY-MM-DD. VIEWER-zone by
+ * design: "today" for date-input seeds and calendar-day comparisons follows
+ * the viewer's clock — a UTC read (toISOString) is a day off around
+ * midnight for anyone off the meridian.
+ */
+export function localDayISO(now: Date = new Date()): string {
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  return `${now.getFullYear()}-${m}-${d}`;
+}
+
+/**
  * Wall-clock parts of an instant in a zone ("2026-07-17", "20:30:00").
  * en-CA date order + h23 keep the parts locale-stable.
  */
@@ -211,6 +238,29 @@ export function dualTime(
     return { primary, primaryDay, secondary: null, secondaryDay: null };
   }
   return { primary, primaryDay, secondary, secondaryDay };
+}
+
+/**
+ * Locale-aware short month for an ISO date ("jul"). Same UTC-anchored
+ * contract as dayLabel; the trailing abbreviation dot some locales add
+ * ("jul.") is stripped, the weekdayLabels idiom.
+ */
+export function localeMonthShort(iso: string, locale: string): string {
+  return new Intl.DateTimeFormat(locale, { month: 'short', timeZone: 'UTC' })
+    .format(new Date(`${iso.slice(0, 10)}T00:00:00Z`))
+    .replace(/\.+$/, '');
+}
+
+/** Locale-aware short weekday ("thu", "dj") — same contract as localeMonthShort. */
+export function localeWeekdayShort(iso: string, locale: string): string {
+  return new Intl.DateTimeFormat(locale, { weekday: 'short', timeZone: 'UTC' })
+    .format(new Date(`${iso.slice(0, 10)}T00:00:00Z`))
+    .replace(/\.+$/, '');
+}
+
+/** "17 jul" — bare day number + locale short month; the honest compact date. */
+export function localeDayMonth(iso: string, locale: string): string {
+  return `${Number(iso.slice(8, 10))} ${localeMonthShort(iso, locale)}`;
 }
 
 /**

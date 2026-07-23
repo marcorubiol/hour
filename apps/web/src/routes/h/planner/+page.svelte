@@ -107,7 +107,7 @@
   } from '$lib/carrils';
   import type { AvailabilityItem } from '$lib/availability';
   import type { DateRow } from '$lib/date';
-  import { timeInTz } from '$lib/datetime';
+  import { localeDayMonth, timeInTz } from '$lib/datetime';
   import {
     isHoldStatus,
     performanceStatusFamily,
@@ -1431,12 +1431,6 @@
 
   // ── Pulse strip (ADR-080 §6) — every figure maps to fetched rows;
   // segments whose feed is absent simply drop. ──────────────────────────
-  function pulseDayLabel(iso: string): string {
-    const mon = new Intl.DateTimeFormat(localeTag, { month: 'short', timeZone: 'UTC' })
-      .format(new Date(`${iso}T00:00:00Z`))
-      .replace(/\.+$/, '');
-    return `${Number(iso.slice(8, 10))} ${mon}`;
-  }
   // Next confirmed gig from today — the decisions window rows (scope-
   // filtered, [today, +90d]) already hold exactly that horizon.
   let pulseNext = $derived.by(() => {
@@ -1655,7 +1649,7 @@
         {#if !decisionsAbsent && pulseNext}
           <span class="cal__stat cal__stat--soft"
             >{t('planner.pulse_next', locale, {
-              day: pulseDayLabel(pulseNext.day),
+              day: localeDayMonth(pulseNext.day, localeTag),
               venue: pulseNext.venue,
             })}</span
           >

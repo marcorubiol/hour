@@ -22,6 +22,7 @@
  * block — real rows (the consent inbox, ADR-069), never invented.
  */
 
+import { localDayISO } from './datetime';
 import { taskSurfaceState, taskContextLabel, taskProjectId, type TaskItem } from './task';
 import type { Locale } from './i18n';
 
@@ -180,12 +181,6 @@ const CONCERN_RANK: Record<DeskConcern, number> = {
 
 const DAY = 86_400_000;
 const PAID_OR_DEAD = new Set(['paid', 'void', 'cancelled', 'draft']);
-
-function localDayISO(now: Date): string {
-  const m = String(now.getMonth() + 1).padStart(2, '0');
-  const d = String(now.getDate()).padStart(2, '0');
-  return `${now.getFullYear()}-${m}-${d}`;
-}
 
 export function dayBucket(
   dayISO: string | null,

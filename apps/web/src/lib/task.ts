@@ -11,7 +11,7 @@
 
 import * as v from 'valibot';
 import { Constants, type Enums, type Tables } from './db-types';
-import { realIsoDate } from './datetime';
+import { localDayISO, realIsoDate } from './datetime';
 
 export type TaskStatus = Enums<'task_status'>;
 
@@ -93,6 +93,9 @@ export interface TaskItem extends Tables<'task'> {
   } | null;
 }
 
+/** The `{ items }` envelope the tasks endpoints return and every tasks query caches. */
+export type TasksCache = { items: TaskItem[] };
+
 export interface TaskDbItem extends Omit<TaskItem, 'conversation'> {
   conversation: {
     id: string;
@@ -153,13 +156,6 @@ function isoAddDays(day: string, days: number): string {
   const d = new Date(`${day}T00:00:00Z`);
   d.setUTCDate(d.getUTCDate() + days);
   return d.toISOString().slice(0, 10);
-}
-
-/** The viewer's calendar day for an injected instant. */
-function localDayISO(now: Date): string {
-  const m = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-  return `${now.getFullYear()}-${m}-${day}`;
 }
 
 /**

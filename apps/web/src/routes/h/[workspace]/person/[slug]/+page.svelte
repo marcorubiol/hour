@@ -16,7 +16,7 @@
   import { addToast } from '$lib/components/Toast.svelte';
   import { session } from '$lib/session.svelte';
   import { CONVERSATION_STATUSES, statusBadgeClass, statusLabel } from '$lib/conversation';
-  import { dayLabel } from '$lib/datetime';
+  import { dayLabel, dayMonthYearTs } from '$lib/datetime';
   import { useBreadcrumb } from '$lib/stores/breadcrumb.svelte';
   import { accentVar } from '$lib/utils/accent';
 
@@ -196,14 +196,6 @@
     },
   });
 
-  function noteDay(iso: string): string {
-    return new Date(iso).toLocaleDateString('en-GB', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-    });
-  }
-
   // ── Add to project (ADR-051): a new conversation for this person ────
   type ProjectItem = { id: string; slug: string; name?: string };
 
@@ -359,7 +351,7 @@
           {#each file.notes as n (n.id)}
             <li>
               <span class="person__note-meta">
-                {noteDay(n.created_at)}{#if n.visibility === 'private'} · private{/if}
+                {dayMonthYearTs(n.created_at)}{#if n.visibility === 'private'} · private{/if}
                 {#if n.author_id === callerId}
                   <button
                     type="button"

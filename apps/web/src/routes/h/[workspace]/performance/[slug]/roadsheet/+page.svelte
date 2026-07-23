@@ -20,6 +20,7 @@
   import Pill from '$lib/components/Pill.svelte';
   import RoadsheetView from '$lib/components/RoadsheetView.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
+  import { dayMonthYearTs } from '$lib/datetime';
   import { ROADSHEET_ROLES, type Roadsheet, type RoadsheetRole } from '$lib/roadsheet';
 
   type Response = { roadsheet: Roadsheet; venue_timezone: string | null };
@@ -118,13 +119,6 @@
     );
   }
 
-  function shareDay(iso: string): string {
-    return new Date(iso).toLocaleDateString('en-GB', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-    });
-  }
 </script>
 
 <svelte:head>
@@ -159,7 +153,7 @@
           {#each shares as s (s.id)}
             <li>
               <span class="rs__share-role">{s.role.replace(/_/g, ' ')}</span>
-              <span class="rs__share-date">{shareDay(s.created_at)}</span>
+              <span class="rs__share-date">{dayMonthYearTs(s.created_at)}</span>
               <span class="rs__share-actions">
                 <Button size="s" variant="outline" onclick={() => copyShare(s.token)}>
                   Copy link

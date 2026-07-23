@@ -14,7 +14,7 @@
  * away always tell the same story.
  */
 
-import { dualTime } from './datetime';
+import { dualTime, localDayISO } from './datetime';
 import { t, type Locale } from './i18n';
 
 /** Structural subset of the /api/conversations row the hall needs. */
@@ -51,13 +51,6 @@ export type HallStatus =
 // computeHallStatus never returns it yet.
 
 const DAY = 86_400_000;
-
-/** The viewer's calendar day for `now`, as YYYY-MM-DD. */
-function localDayISO(now: Date): string {
-  const m = String(now.getMonth() + 1).padStart(2, '0');
-  const d = String(now.getDate()).padStart(2, '0');
-  return `${now.getFullYear()}-${m}-${d}`;
-}
 
 /** Whole calendar days from `todayISO` to the date part of `iso`. */
 function daysFromToday(iso: string, todayISO: string): number {

@@ -31,7 +31,7 @@
   import { accentVar } from '$lib/utils/accent';
   import { useBreadcrumb } from '$lib/stores/breadcrumb.svelte';
   import { fmtMoneyCompact } from '$lib/money';
-  import { dayMonth } from '$lib/datetime';
+  import { dayMonth, dayMonthYear } from '$lib/datetime';
   import {
     MODULE_KEYS,
     MODULE_LABELS,
@@ -325,16 +325,9 @@
 
   function formatDateRange(start: string | null, end: string | null): string {
     if (!start && !end) return '';
-    const fmt = (iso: string) =>
-      new Date(iso + 'T00:00:00Z').toLocaleDateString('en-GB', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-        timeZone: 'UTC',
-      });
-    if (start && end) return `${fmt(start)} → ${fmt(end)}`;
-    if (start) return `From ${fmt(start)}`;
-    return `Until ${fmt(end!)}`;
+    if (start && end) return `${dayMonthYear(start)} → ${dayMonthYear(end)}`;
+    if (start) return `From ${dayMonthYear(start)}`;
+    return `Until ${dayMonthYear(end!)}`;
   }
 </script>
 

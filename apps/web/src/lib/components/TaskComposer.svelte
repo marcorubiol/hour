@@ -25,7 +25,7 @@
   import { dayMonth } from '$lib/datetime';
   import { t, type Locale } from '$lib/i18n';
   import { lineKindLabel } from '$lib/utils/line-kind';
-  import { taskTargetFields, type TaskItem, type TaskTarget, type TaskTargetKind } from '$lib/task';
+  import { taskTargetFields, type TaskItem, type TasksCache, type TaskTarget, type TaskTargetKind } from '$lib/task';
 
   interface EntityLite {
     id: string;
@@ -56,7 +56,6 @@
   }: Props = $props();
 
   const queryClient = useQueryClient();
-  type TasksCache = { items: TaskItem[] };
 
   function cacheCreatedTask(key: readonly unknown[], task: TaskItem) {
     queryClient.setQueryData<TasksCache>(key, (current) =>
