@@ -63,14 +63,33 @@
     Runtime `4499848`, `dirty:false`. Gates: check 0/0 · unit 348 · build ·
     RLS 120/120 · **E2E contra producción 27/27 sin skips**.
 
-## Ahora — money v3 (ADR-086): estructura decidida, diseño + build pendientes
+## Cerrado — bloque 7: money v3 (ADR-086/087/088), DESPLEGADO
 
+> **DESPLEGADO EN PRODUCCIÓN 2026-07-23.** Reconciliado con Git/Actions/`/health`
+> el 2026-07-23 (regla #3: no fiarse de una frase fechada). Gate completo, en
+> orden, todo verde:
+> - Backup a R2: run [30010780853](https://github.com/marcorubiol/hour/actions/runs/30010780853), 13:20Z.
+> - Staging baseline (migraciones + RLS + smoke): run [30012286297](https://github.com/marcorubiol/hour/actions/runs/30012286297), 13:41Z.
+> - Prod migrate **plan**: run [30013059054](https://github.com/marcorubiol/hour/actions/runs/30013059054), 13:51Z (Apply skipped).
+> - Prod migrate **apply** + verify remote history: run [30013141085](https://github.com/marcorubiol/hour/actions/runs/30013141085), 13:52Z.
+> - Worker deploy: `/health/live` = **`a35e8c4`**, `dirty:false`, builtAt 14:27Z;
+>   `/health/ready` → `supabase: ok`.
+>
+> Runtime de prod = `a35e8c4`, encima de toda la pila money v3 (bolo, ADR-087,
+> ADR-088/Books, fiscal, invoice, payment). `origin/main` contiene el stack
+> entero. La rama `feat/money-v3-build` va 2 commits por delante de `origin/main`
+> (`c4f2e3a` estilo MonthGrid + `21da2be` i18n — de Travel v2, no de money v3);
+> `origin/main` (tip `f9eb324`, candidate polling) va 1 commit por delante de prod.
+>
 > Cerrado en grill 2026-07-21. Estructura completa + delta de schema:
 > `_notes/spec-money-v3-decisions.md`. Decisión: `_decisions.md § ADR-086`.
-> **Va PRIMERO — antes de contenedores y de los flecos de planner.** Diseño
-> implementado en código (presentational, rutas dev); cero schema tocado. En una frase: el dinero deja de girar
-> alrededor de la factura — el fee del bolo es el ancla, cobrar y facturar son
-> hechos independientes; tamaño A (libro de entrada/salida) ahora, B-ready.
+> En una frase: el dinero deja de girar alrededor de la factura — el fee del bolo
+> es el ancla, cobrar y facturar son hechos independientes; tamaño A (libro de
+> entrada/salida) ahora, B-ready.
+>
+> **Follow-up abierto (no bloquea nada):** la UX de **enlazar una función nueva a
+> un bolo** — las performances creadas en Planner nacen sin bolo hasta que exista
+> esa UI. La lente Money vive de los bolos del backfill + los creados a mano.
 
 **DISEÑO — hecho e implementado en código** (Marco lo diseñó en frío en Claude
 Design; realizado como componentes *presentational*, sin schema, en rutas dev):
@@ -93,8 +112,8 @@ Design; realizado como componentes *presentational*, sin schema, en rutas dev):
 > conecte sin reescritura. Parts A+B viven en `main` (commit `c7a9bfd`); Part C
 > en `feat/money-v3-design`.
 
-**BUILD — hecho y verificado en local** (rama `feat/money-v3-build`, **5
-migraciones aditivas**, NO desplegado a prod). Todo espina aditiva y
+**BUILD — hecho, verificado y DESPLEGADO** (rama `feat/money-v3-build`, **5
+migraciones aditivas**; aplicado a prod 2026-07-23, ver stamp arriba). Todo espina aditiva y
 **no-breaking**: la Money v2 viva (UI, RPCs, triggers de cobro-vs-factura) sigue
 funcionando; los RPCs crecen solo con params opcionales al final (PostgREST
 named-arg). La "inversión" a cobrado-vs-fee se **añade** (nueva derivación en
@@ -130,8 +149,8 @@ apartado siguiente (wire de la UI).
 > está en rama sin desplegar. Prompt de build:
 > `_notes/build-prompt-bolo-money-v3.md`. **No desplegar el ancla-por-función.**
 
-**RE-ANCLA AL BOLO — hecho y verificado en local** (ADR-087, plan P2; rama
-`feat/money-v3-build`, **NO desplegado**). El dinero sube del `performance` al
+**RE-ANCLA AL BOLO — hecho, verificado y DESPLEGADO** (ADR-087, plan P2; rama
+`feat/money-v3-build`; aplicado a prod 2026-07-23, ver stamp arriba). El dinero sube del `performance` al
 nuevo `bolo` (trato = una sala · caché · documento · cobrado · pendiente; agrupa
 1..N funciones). Se **revisaron** las 5 migraciones de money v3, no se apiló una
 capa encima.
@@ -161,11 +180,11 @@ capa encima.
 > `pnpm build` verde. Review adversarial del re-ancla (4 lentes + verify): **9
 > hallazgos confirmados, todos corregidos** — incl. una **escalada RLS real** en
 > `create_payment` (la rama invoice escribía anclas caller-supplied sin gate
-> `edit:money`; el RPC SECURITY DEFINER saltaba la RLS por-adjunto). **Gateado
-> (fuera de este apartado):** staging/prod con backup/preflight + OK de deploy
-> (reglas #8/#9); y la UX de **enlazar una función nueva a un bolo** — las
-> performances creadas en Planner quedan sin bolo hasta que exista esa UI
-> (follow-up; no bloquea el re-ancla, la lente Money vive de los bolos del
+> `edit:money`; el RPC SECURITY DEFINER saltaba la RLS por-adjunto). **Deploy a
+> staging/prod: HECHO** el 2026-07-23 con backup/preflight (reglas #8/#9), ver
+> stamp arriba. **Sigue abierta** solo la UX de **enlazar una función nueva a un
+> bolo** — las performances creadas en Planner quedan sin bolo hasta que exista
+> esa UI (follow-up; no bloquea nada, la lente Money vive de los bolos del
 > backfill + los creados a mano).
 
 **NO construir** (forward-compat, ver spec § Futuro): tabla `payable` (dinero a

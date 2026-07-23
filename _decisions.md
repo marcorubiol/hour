@@ -2491,6 +2491,13 @@ Triggered by Marco's pre-scaffold doubt (Phase 0.0 day 5). Five alternatives eva
   (PDF imprimible) siguen con IVA/IRPF local — a tax_lines cuando se cablee a datos;
   UI de preset por-país (hoy inputs IVA/IRPF = preset ES); rename físico `accounts`.
 
+- **Status 2026-07-23 (posterior) — DESPLEGADO.** El status de arriba («local, no
+  desplegado») quedó superado ese mismo día: money v3 (ADR-086/087/088) se desplegó
+  a producción. Runtime `a35e8c4`, `dirty:false`. Gate completo verde: backup a R2
+  (run 30010780853) → staging baseline (run 30012286297) → prod migrate plan
+  (run 30013059054) + apply (run 30013141085) → worker deploy. Evidencia y detalle
+  en `_tasks.md § bloque 7` y `_context.md § Producción`.
+
 ## ADR-089 — El viaje es un trayecto multi-etapa: origen → destino + tramos, con documentos por tramo
 
 - **Contexto.** Sesión 2026-07-23. El modelo trata el viaje (`date` con

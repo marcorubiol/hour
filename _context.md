@@ -3,6 +3,9 @@
 > **FUENTE DE VERDAD ACTUAL.** Cualquier agente o persona debe empezar aquí.
 > Última verificación: **2026-07-20**, contrastada con Git, el código, producción,
 > Supabase y las suites; no reconstruida desde documentos antiguos.
+> **Reconciliación 2026-07-23:** money v3 (ADR-086/087/088) se desplegó a prod
+> ese día — runtime **`a35e8c4`**; ver «Producción» y «Git» abajo y
+> `_tasks.md § bloque 7`. El resto del doc no se re-verificó en esa fecha.
 >
 > Si otro archivo contradice este documento sobre el estado presente, gana este
 > documento. Si contradice una decisión de producto estable, consultar
@@ -52,11 +55,16 @@ orientativo, no una verdad comercial cerrada.
 
 - Web: `https://hour.zerosense.studio`
 - Worker: `hour-web`
-- `/health/live`: sano, `dirty:false`, SHA **`4499848`**.
+- `/health/live`: sano, `dirty:false`, SHA **`a35e8c4`** (builtAt 2026-07-23T14:27Z).
 - `/health/ready`: sano, Supabase `ok`.
-- El runtime verificado en producción es `4499848`; commits posteriores que
-  solo cambian documentación o tests no requieren desplegar el Worker —
-  ninguno de los dos entra en el bundle. `main` puede estar por delante de
+- El runtime verificado en producción es `a35e8c4` — **money v3 (ADR-086/087/088)
+  desplegado el 2026-07-23**: bolo como unidad de dinero, fiscal_identity,
+  invoice/proforma con numeración, payment desacoplado, lente Books e impuesto
+  country-agnostic. Gate completo ese día (backup → staging → prod migrate
+  plan+apply → worker deploy), evidencia de runs en `_tasks.md § bloque 7`.
+- El runtime anterior era `4499848` (planner + identidad, 2026-07-20). Commits
+  posteriores que solo cambian documentación o tests no requieren desplegar el
+  Worker — ninguno de los dos entra en el bundle; `main` puede ir por delante de
   `/health/live` por esa razón y seguir siendo un estado limpio.
 
 ### Git
@@ -64,8 +72,13 @@ orientativo, no una verdad comercial cerrada.
 - Repo: `https://github.com/marcorubiol/hour` (privado).
 - Checkout: `/Users/marcorubiol/Developer/hour`.
 - Rama principal: `main`.
-- Base funcional del runtime: **`4499848`**, publicada en `origin/main`;
-  `main` local y remoto están sincronizados.
+- Base funcional del runtime: **`a35e8c4`** (money v3), publicada en `origin/main`.
+  `origin/main` (tip `f9eb324`, candidate polling) va 1 commit por delante de
+  prod. La rama viva `feat/money-v3-build` va 2 commits por delante de
+  `origin/main` (`c4f2e3a` estilo MonthGrid + `21da2be` i18n, de Travel v2, sin
+  desplegar). **Atención:** el `main` **local** quedó stale — 3 commits de
+  identidad sin pushear y 15 por detrás de `origin/main`; `origin/main` es la
+  verdad, no el `main` local (reconciliar en frío es higiene, no bloquea nada).
 - `wrangler deploy` exige árbol limpio y publica el SHA en `/health/live`.
 - **Ramas vivas: una sola.** Las otras ocho se cerraron el 2026-07-20 —
   siete borradas por estar contenidas en `main` o en la punta del stack, y
@@ -146,10 +159,16 @@ vacía se reconstruye con `pnpm db:reset`, recibe fixtures sintéticos y pasa
   “Contacted today” con reloj de servidor, agrupación conversación/contacto,
   project chips, escritura de estado/próxima acción y estado vacío de importación.
   El contrato de `conversation_event` existe; la tabla/timeline aún no.
-- **Money** `/h/money`: fees, facturas y payer; fechas contractual/esperada,
-  aging con procedencia, condición de cobro y follow-up a Desk; anticipos y
-  restos con paid derivado, gastos por scope, neto por línea, VAT/IRPF y
-  totales por moneda sin mezclarlas.
+- **Books** (lente `Books` / ES `Cuentas`; ruta física `/h/money`, rename a
+  `accounts` diferido) — money v3 (ADR-086/087/088), desplegado 2026-07-23. El
+  **bolo** es la unidad de dinero (1 sala · 1 contrato · 1 fee/pagador/factura ·
+  1..N funciones); spine de bolos agrupados por obra, venue-first. Cabecera por
+  moneda: Vendido → Cobrado → Pendiente/Vencido (derivado de facturas emitidas sin
+  cobrar vía aging), con neto-tras-tasas. `fiscal_identity` emisor/receptor;
+  invoice/proforma con numeración correlativa atómica; pago desacoplado del
+  facturar (cobrado = pagos-vs-caché-del-bolo); impuesto genérico country-agnostic
+  (`invoice_tax_line`, preset ES relleno) que **se para antes de la emisión legal
+  certificada**. Vencido → tarea a Desk.
 - Contenedores: workspace → project → line; los módulos editan a nivel line.
 - Performance detail, road sheet interno/público, venues, cast/crew, assets,
   expenses, tasks, calendar shares y colaboración Yjs están operativos.
@@ -165,9 +184,14 @@ vacía se reconstruye con `pnpm db:reset`, recibe fixtures sintéticos y pasa
 - `person` = identidad portable; `workspace_person` = dossier local privado.
 - `workspace_organization` = organización/contacto de un workspace.
 - `conversation` = diálogo de difusión; nunca `engagement` en código vivo.
-- `performance` = bolo/función atómica; nunca `show` en código vivo.
+- `performance` = **función** (día·hora·road sheet, sin dinero; ADR-087); nunca
+  `show` en código vivo. Ya no se llama «bolo/función atómica».
+- `bolo` = **unidad de dinero** (ADR-087): el trato con una sala, agrupa 1..N
+  funciones; caché/fee, cobrado y factura cuelgan del bolo, no de la función.
 - `date` = ensayo, viaje, prensa, day off u otro evento no-performance.
-- Lentes: **Desk · Planner · Conversations · Money**.
+- Lentes (ADR-088): **Desk** es el digest cross-concern (pill propio, fuera del
+  segmented "view as"); las 3 lentes son **Planner · Conversations · Books**
+  (ES `Cuentas`). «Money» muere como etiqueta; la ruta `/h/money` se conserva.
 - Road sheet es una proyección de performance, no una entidad independiente.
 - No usar CRM vocabulary (`lead`, `pipeline`, `prospect`) salvo en investigación
   o interoperabilidad externa.
@@ -221,13 +245,19 @@ profundidad de producto, no en SvelteKit/Supabase/Cloudflare.
 
 ## Siguiente paso
 
-Abrir `_tasks.md`. La prioridad inmediata es **money v3** (ADR-086): la
-estructura está **decidida** en grill 2026-07-21 (detalle en
-`_notes/spec-money-v3-decisions.md`), pero **nada está implementado**. Falta,
-en este orden: (1) el **diseño** — house-style del PDF de factura/proforma,
-formularios de identidad fiscal, UI de Money (Marco los hace en frío, no en
-caliente); (2) el **build** — delta de schema en el spec. La revisión
-diseño+datos de contenedores (bloque 5) va **después** de money v3.
+Abrir `_tasks.md`. **Money v3 (ADR-086/087/088) está construido y desplegado en
+prod** (2026-07-23, runtime `a35e8c4`, ver `_tasks.md § bloque 7`). Lo que sigue,
+por orden:
+
+1. **Follow-up de money v3 (no bloquea):** UX de **enlazar una función nueva a un
+   bolo** — las performances creadas en Planner nacen sin bolo hasta que exista.
+2. **Travel v2 (ADR-089), EN CURSO:** modelo decidido, nada de schema construido;
+   la migración P1 está por escribir. Depende en parte de la tarea 15 (editar una
+   fecha desde la UI, que aún no existe).
+3. **Contenedores (bloque 5)** y los flecos de planner (editar fecha, multi-día de
+   performances, tipos de horario) van después.
+
+`_tasks.md` es la cola detallada con el estado exacto de cada uno.
 
 ## Desarrollo local
 
