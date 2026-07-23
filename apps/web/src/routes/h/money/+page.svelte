@@ -19,7 +19,8 @@
   import { fetchJSON, mutateJSON } from '$lib/api';
   import Button from '$lib/components/Button.svelte';
   import MoneyInvoices from '$lib/components/MoneyInvoices.svelte';
-  import LensSwitcher from '$lib/components/LensSwitcher.svelte';
+  import LensHeader from '$lib/components/LensHeader.svelte';
+  import LensTitle from '$lib/components/LensTitle.svelte';
   import Dialog from '$lib/components/Dialog.svelte';
   import Input from '$lib/components/Input.svelte';
   import Select from '$lib/components/Select.svelte';
@@ -600,29 +601,30 @@
 </svelte:head>
 
 <section class="mny">
-  <header class="mny__head">
-    <div class="mny__toprow">
-      <div class="mny__toprow-l">
-        <p class="eyebrow">Money</p>
-        <Button size="xs" variant="outline" onclick={openDeal} disabled={projectIndex.length === 0}>New deal</Button>
-      </div>
-      <LensSwitcher />
-    </div>
-    <div class="mny__totals">
-      {#each totals as total (total.currency)}
-        <span class="mny__currency-total">
-          <span class="mny__currency">{total.currency}</span>
-          <span class="mny__total"><span class="mny__total-label">pipeline</span>{fmtMoney(total.pipeline)}</span>
-          <span class="mny__total"><span class="mny__total-label">collected</span>{fmtMoney(total.collected)}</span>
-          <span class="mny__total"><span class="mny__total-label">pending</span>{fmtMoney(total.pending)}</span>
-          {#if anyDocMode}
-            <span class="mny__total mny__total--soft"><span class="mny__total-label">invoiced</span>{fmtMoney(total.invoiced)}</span>
-          {/if}
-        </span>
-      {/each}
-      <span class="mny__total-note">current pins · currencies kept separate · pending = contracted − collected</span>
-    </div>
-  </header>
+  <LensHeader>
+    {#snippet title()}<LensTitle text="Money" />{/snippet}
+    <!-- TEMP sub — placeholder until this lens's real subtitle is defined. -->
+    {#snippet sub()}<span class="lenshead__todo">temporal · define esta lente</span>{/snippet}
+  </LensHeader>
+
+  <div class="mny__actions">
+    <Button size="xs" variant="outline" onclick={openDeal} disabled={projectIndex.length === 0}>New deal</Button>
+  </div>
+
+  <div class="mny__totals">
+    {#each totals as total (total.currency)}
+      <span class="mny__currency-total">
+        <span class="mny__currency">{total.currency}</span>
+        <span class="mny__total"><span class="mny__total-label">pipeline</span>{fmtMoney(total.pipeline)}</span>
+        <span class="mny__total"><span class="mny__total-label">collected</span>{fmtMoney(total.collected)}</span>
+        <span class="mny__total"><span class="mny__total-label">pending</span>{fmtMoney(total.pending)}</span>
+        {#if anyDocMode}
+          <span class="mny__total mny__total--soft"><span class="mny__total-label">invoiced</span>{fmtMoney(total.invoiced)}</span>
+        {/if}
+      </span>
+    {/each}
+    <span class="mny__total-note">current pins · currencies kept separate · pending = contracted − collected</span>
+  </div>
 
   {#if errorMsg}
     <p class="mny__state mny__state--danger">{errorMsg}</p>
@@ -836,9 +838,8 @@
 <style>
   @layer components {
     .mny { display: flex; flex-direction: column; gap: var(--space-l); }
-    .mny__head { display: flex; flex-direction: column; gap: var(--space-s); }
-    .mny__toprow { display: flex; align-items: center; justify-content: space-between; gap: var(--space-m); }
-    .mny__toprow-l { display: flex; align-items: center; gap: var(--space-m); }
+    /* Header is now the shared LensHeader (global .lenshead* classes). */
+    .mny__actions { display: flex; justify-content: flex-end; }
     .mny__totals { display: flex; align-items: end; gap: var(--space-m); flex-wrap: wrap; }
     .mny__currency-total {
       display: grid; grid-template-columns: auto repeat(4, minmax(6rem, auto));
@@ -931,7 +932,6 @@
     .mny__inv-total-preview { font-size: var(--text-s); margin-block-start: var(--space-s); }
 
     @media (max-width: 760px) {
-      .mny__toprow { align-items: start; }
       .mny__currency-total { inline-size: 100%; grid-template-columns: auto 1fr; }
       .mny__currency { grid-column: 1 / -1; }
       .mny__total { justify-content: space-between; }

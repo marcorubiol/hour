@@ -21,7 +21,8 @@
   import { fetchJSON, mutateJSON, ApiError } from '$lib/api';
   import { addToast } from '$lib/components/Toast.svelte';
   import TaskComposer from '$lib/components/TaskComposer.svelte';
-  import LensSwitcher from '$lib/components/LensSwitcher.svelte';
+  import LensHeader from '$lib/components/LensHeader.svelte';
+  import LensTitle from '$lib/components/LensTitle.svelte';
   import { accentVar, accentVarFor } from '$lib/utils/accent';
   import { detectLocale, t } from '$lib/i18n';
   import { dayMonth } from '$lib/datetime';
@@ -332,19 +333,16 @@
 <svelte:head><title>Desk — Hour</title></svelte:head>
 
 <div class="desk">
-  <header class="desk__head">
-    <div class="desk__titlerow">
-      <p class="desk__count">
-        {needYouText(headline)}{#if calm.on && calmFolded}<span class="desk__rest">{t('desk.rest_waits', locale)}</span>{/if}
-      </p>
-      <LensSwitcher />
-    </div>
-    {#if !loading && !errored}
-      <p class="desk__pulse">
-        {#each pulse as frag (frag.text)}<a class="desk__pulse-frag" href={frag.href}>{frag.text}</a>{/each}
-      </p>
-    {/if}
-  </header>
+  <LensHeader>
+    {#snippet title()}
+      <LensTitle text={needYouText(headline)} />{#if calm.on && calmFolded}<span class="desk__rest">{t('desk.rest_waits', locale)}</span>{/if}
+    {/snippet}
+    {#snippet sub()}
+      {#if !loading && !errored}
+        {#each pulse as frag (frag.text)}<a class="lenshead__frag" href={frag.href}>{frag.text}</a>{/each}
+      {/if}
+    {/snippet}
+  </LensHeader>
 
   <TaskComposer
     {locale}
@@ -532,50 +530,11 @@
     }
 
     /* ── Header ── */
-    .desk__head {
-      display: flex;
-      flex-direction: column;
-    }
-    .desk__titlerow {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: var(--space-m);
-      /* The separator lives BETWEEN the title row and the pulse (design). */
-      padding-block-end: var(--space-s);
-      border-block-end: 1px solid var(--border-color-light);
-    }
-    .desk__count {
-      margin: 0;
-      font-family: var(--font-display);
-      font-size: var(--text-xxl);
-      line-height: 1;
-      color: var(--heading-color);
-    }
+    /* The header is now the shared LensHeader (global .lenshead* classes).
+       Only Desk-specific bits stay here. */
     .desk__rest {
       color: var(--text-faint);
       font-style: italic;
-    }
-    .desk__pulse {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: baseline;
-      gap: var(--space-xs) var(--space-s);
-      margin: var(--space-s) 0 0;
-      font-size: var(--text-s);
-    }
-    .desk__pulse-frag {
-      color: var(--text-muted);
-      text-decoration: none;
-      transition: color var(--transition);
-    }
-    .desk__pulse-frag:hover {
-      color: var(--text-color);
-    }
-    .desk__pulse-frag + .desk__pulse-frag::before {
-      content: '·';
-      margin-inline-end: var(--space-s);
-      color: var(--text-faint);
     }
     /* Calm's contrast remap now lives on .shell__content--calm in the /h
        layout, so it quiets every lens from one place (Desk included). */

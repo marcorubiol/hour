@@ -16,7 +16,8 @@
   import { goto } from '$app/navigation';
   import { fetchJSON, mutateJSON, ApiError } from '$lib/api';
   import Button from '$lib/components/Button.svelte';
-  import LensSwitcher from '$lib/components/LensSwitcher.svelte';
+  import LensHeader from '$lib/components/LensHeader.svelte';
+  import LensTitle from '$lib/components/LensTitle.svelte';
   import Checkbox from '$lib/components/Checkbox.svelte';
   import Dialog from '$lib/components/Dialog.svelte';
   import ConversationTable from '$lib/components/ConversationTable.svelte';
@@ -291,24 +292,24 @@
 </svelte:head>
 
 <section class="conversations">
-  <header class="conversations__head">
-    <div class="conversations__toprow">
-      <p class="eyebrow">Conversations</p>
-      <LensSwitcher />
+  <LensHeader>
+    {#snippet title()}<LensTitle text="Conversations" />{/snippet}
+    <!-- TEMP sub — placeholder until this lens's real subtitle is defined. -->
+    {#snippet sub()}<span class="lenshead__todo">temporal · define esta lente</span>{/snippet}
+  </LensHeader>
+
+  <div class="conversations__controls">
+    <div class="conversations__search">
+      <Input
+        label="Search"
+        type="search"
+        placeholder="People or organizations…"
+        bind:value={qRaw}
+      />
     </div>
-    <div class="conversations__controls">
-      <div class="conversations__search">
-        <Input
-          label="Search"
-          type="search"
-          placeholder="People or organizations…"
-          bind:value={qRaw}
-        />
-      </div>
-      <Select label="Status" options={statusOptions} bind:value={statusFilter} />
-      <Button size="s" onclick={openAdd}>Add conversation</Button>
-    </div>
-  </header>
+    <Select label="Status" options={statusOptions} bind:value={statusFilter} />
+    <Button size="s" onclick={openAdd}>Add conversation</Button>
+  </div>
 
   <ConversationTable {filters} {personHref} groupable importEmptyState />
 </section>
@@ -375,18 +376,7 @@
       gap: var(--space-m);
     }
 
-    .conversations__head {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-s);
-    }
-    .conversations__toprow {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: var(--space-m);
-    }
-
+    /* Header is now the shared LensHeader (global .lenshead* classes). */
     .conversations__controls {
       display: flex;
       gap: var(--space-m);

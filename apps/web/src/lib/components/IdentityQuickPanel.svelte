@@ -128,23 +128,26 @@
 
   <div class="iqp__color">
     <AccentSwatchPicker bind:accent autoSlug={project.slug} label="Project color" hideLegend />
-    {#if colorClash}
-      <p class="iqp__collision">A similar colour is used by {colorClash}.</p>
-    {/if}
+    <!-- Space is always reserved so the warning appears without a layout jump. -->
+    <p class="iqp__clash">
+      {#if colorClash}A similar colour is used by {colorClash}.{/if}
+    </p>
   </div>
 
-  <button
-    type="button"
-    class="iqp__save"
-    onclick={() => $save.mutate()}
-    disabled={$save.isPending}
-  >
-    Save identity
-  </button>
+  <div class="iqp__actions">
+    <button
+      type="button"
+      class="iqp__save"
+      onclick={() => $save.mutate()}
+      disabled={$save.isPending}
+    >
+      Save identity
+    </button>
 
-  <hr class="iqp__rule" />
+    <hr class="iqp__rule" />
 
-  <button type="button" class="iqp__link" onclick={openFull}>Edit project →</button>
+    <button type="button" class="iqp__link" onclick={openFull}>Edit project →</button>
+  </div>
 </div>
 
 <EditProjectDialog bind:open={fullOpen} {project} {siblings} />
@@ -218,6 +221,21 @@
       color: var(--text-muted);
     }
 
+    /* Colour warning — space reserved (one line) so it never shifts layout. */
+    .iqp__clash {
+      margin: 0;
+      min-block-size: 1.2em;
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+    }
+
+    /* Save · rule · Edit sit tighter than the panel's roomy rhythm above. */
+    .iqp__actions {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-s);
+    }
+
     .iqp__save {
       font: inherit;
       font-weight: 600;
@@ -229,7 +247,6 @@
       background: var(--primary);
       color: var(--bg-ultra-light);
       cursor: pointer;
-      margin-block-start: var(--space-2xs);
     }
     .iqp__save:hover:not(:disabled) {
       filter: brightness(0.96);

@@ -1688,6 +1688,76 @@
     --eyebrow-tracking: 0.08em;
   }
 
+  /* Lens header — the ONE shared top block for the four lenses (Desk ·
+     Planner · Conversations · Money). Every lens renders it via LensHeader,
+     so they share these exact classes and layout:
+       • a big display title on a bordered row, beside the LensSwitcher;
+       • below, a small ·-separated line of indications/links (the "sub").
+     Global (not component-scoped) so page-provided title/sub content styles
+     identically no matter which lens renders it. */
+  .lenshead {
+    display: flex;
+    flex-direction: column;
+  }
+  .lenshead__titlerow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-m);
+    /* the separator lives BETWEEN the title row and the sub */
+    padding-block-end: var(--space-s);
+    border-block-end: 1px solid var(--border-color-light);
+  }
+  .lenshead__title {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: var(--text-xxl);
+    font-weight: 400;
+    line-height: 1;
+    letter-spacing: normal;
+    color: var(--heading-color);
+    /* Title rule (all four lenses): letters italic… */
+    font-style: italic;
+  }
+  /* …numbers upright. LensTitle wraps digit runs in .lenshead__num. */
+  .lenshead__num {
+    font-style: normal;
+  }
+  .lenshead__sub {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--space-xs) var(--space-s);
+    margin: var(--space-s) 0 0;
+    font-size: var(--text-s);
+    color: var(--text-muted);
+  }
+  /* a link fragment in the sub line (muted → ink on hover) */
+  .lenshead__frag {
+    color: var(--text-muted);
+    text-decoration: none;
+    transition: color var(--transition);
+  }
+  a.lenshead__frag:hover {
+    color: var(--text-color);
+  }
+  /* uniform · between every sub item, whatever its class (links, figures,
+     buttons) — one rhythm for all four lenses. */
+  .lenshead__sub > * + *::before {
+    content: '·';
+    margin-inline-end: var(--space-s);
+    color: var(--text-faint);
+  }
+  /* temporary placeholder sub — an obvious stand-in for a lens still being
+     defined; delete the class use as each lens gets its real sub. */
+  .lenshead__todo {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    letter-spacing: var(--mono-letter-spacing);
+    color: var(--text-faint);
+    font-style: normal;
+  }
+
   /* Arrow nav link — quiet row-level navigation ("Open →", "Road sheet →",
      "View all N conversations →"). Muted at rest, ink on hover, no underline. */
   .link-arrow {

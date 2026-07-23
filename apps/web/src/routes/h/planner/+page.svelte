@@ -38,7 +38,8 @@
   import { goto, replaceState } from '$app/navigation';
   import { fetchJSON, mutateJSON } from '$lib/api';
   import Button from '$lib/components/Button.svelte';
-  import LensSwitcher from '$lib/components/LensSwitcher.svelte';
+  import LensHeader from '$lib/components/LensHeader.svelte';
+  import LensTitle from '$lib/components/LensTitle.svelte';
   import Dialog from '$lib/components/Dialog.svelte';
   import Menu from '$lib/components/Menu.svelte';
   import Select from '$lib/components/Select.svelte';
@@ -292,12 +293,6 @@
     for (const l of scope.lines) ids.add(l.workspaceId);
     return ids;
   });
-  let spacesInView = $derived(
-    scopeWorkspaceIds === null
-      ? ($workspacesQuery.data?.items ?? []).length
-      : scopeWorkspaceIds.size,
-  );
-
   // ── Event feeds ──────────────────────────────────────────────────────
   const feedKey = toStore(() => ({
     from: gridFrom,
@@ -1275,10 +1270,10 @@
   });
 
   let monthTitle = $derived(monthName(ym.year, ym.month, localeTag));
-  let eyebrowSpaces = $derived(
-    spacesInView === 1
-      ? t('planner.eyebrow_spaces_one', locale)
-      : t('planner.eyebrow_spaces', locale, { n: spacesInView }),
+  // Capitalized "Julio 2026" — LensTitle then keeps the month italic and the
+  // year upright (the title rule). (Month names are lowercase in es/ca.)
+  let monthLabel = $derived(
+    `${monthTitle.charAt(0).toUpperCase()}${monthTitle.slice(1)} ${ym.year}`,
   );
 
   function prevMonth() {
@@ -1433,21 +1428,15 @@
 </svelte:head>
 
 <section class="cal">
-  <header class="cal__head">
-    <div class="cal__toprow">
-      <p class="eyebrow">{t('lens.planner', locale)} · {eyebrowSpaces}</p>
-      <LensSwitcher />
-    </div>
-    <h1 class="cal__month"><em>{monthTitle}</em> {ym.year}</h1>
-    {#if !errorMsg}
-      <!-- Pulse strip (ADR-080 §6) — replaces the flat stats row. Every
-           figure maps to fetched rows; a segment whose feed is absent (or
-           whose count is zero) drops instead of lying. -->
-      <p class="cal__stats" class:cal__stats--loading={loading}>
+  <LensHeader>
+    {#snippet title()}<LensTitle text={monthLabel} />{/snippet}
+    {#snippet sub()}
+      <!-- Pulse strip (ADR-080 §6) — every figure maps to fetched rows; a
+           segment whose feed is absent (or count is zero) drops instead of
+           lying. The shared .lenshead__sub inserts the · between items. -->
+      {#if !errorMsg}
         {#if !calm.on && !decisionsAbsent && decisionVMs.length > 0}
           <button type="button" class="cal__pulse-decide" onclick={jumpToDecisions}>
-            <!-- {' · '} — explicit separator: Svelte trims the block-leading
-                 whitespace, which glued the count to the urgent segment. -->
             {t('planner.pulse_decide', locale, { n: decisionVMs.length })}{#if urgentCount > 0}{' · '}{urgentCount ===
               1
                 ? t('planner.pulse_urgent_one', locale)
@@ -1478,9 +1467,9 @@
               : t('planner.pulse_trips', locale, { w: pulseTrips })}</span
           >
         {/if}
-      </p>
-    {/if}
-  </header>
+      {/if}
+    {/snippet}
+  </LensHeader>
 
   {#if !calm.on && !errorMsg && !decisionsAbsent && (decisionVMs.length > 0 || concurrenceVMs.length > 0)}
     <!-- Decision band (ADR-080 §4) — shared by all projections. Mounted
@@ -1736,45 +1725,8 @@
       gap: var(--space-m);
     }
 
-    .cal__head {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-xs);
-    }
-    .cal__toprow {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: var(--space-m);
-      /* The lens switcher is wider than a phone viewport — let it wrap
-         under the eyebrow instead of forcing horizontal page overflow. */
-      flex-wrap: wrap;
-    }
-
-    .cal__month {
-      font-family: var(--font-display);
-      font-size: clamp(1.6rem, 2.5vw, 2.1rem);
-      font-weight: 400;
-      letter-spacing: -0.02em;
-      color: var(--text-color);
-    }
-    .cal__month em {
-      font-style: italic;
-      text-transform: capitalize;
-    }
-
-    /* Masthead stats — verdad-solo-datos: every figure maps to rows. */
-    .cal__stats {
-      display: flex;
-      flex-wrap: wrap;
-      gap: var(--space-m);
-      font-size: var(--text-s);
-      color: var(--text-muted);
-      transition: opacity var(--transition);
-    }
-    .cal__stats--loading {
-      opacity: 0.5;
-    }
+    /* The masthead (title + switcher + stats) is now the shared LensHeader
+       (global .lenshead* classes). Only the stat-item styling stays here. */
     .cal__stat b {
       font-family: var(--font-mono);
       font-weight: 500;

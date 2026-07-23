@@ -828,8 +828,10 @@
               {#each pins.pins as tok (tok)}
                 <span class="tok tok--{tokenKind(tok)}">
                   <ScopeGlyph kind={tokenKind(tok)} accent={tokenAccent(tok)} lineKind={tokenLineKind(tok)} />
-                  <span class="tok__kind">{tokenKind(tok)}</span>
-                  <span class="tok__name">{tokenLabel(tok)}</span>
+                  <span class="tok__label">
+                    <span class="tok__kind">{tokenKind(tok)}</span>
+                    <span class="tok__name">{tokenLabel(tok)}</span>
+                  </span>
                   <button
                     type="button"
                     class="tok__x"
@@ -1195,6 +1197,15 @@
     line-height: 1;
     border: 1px solid var(--border-color-dark);
     background: var(--bg-light);
+  }
+  /* Kind label + name share a baseline INSIDE this group (so the mono
+     "PROJECT" doesn't float above the sans name); the group, the glyph and
+     the × stay centered as boxes via .tok's align-items. Same fix as the
+     scope descriptor. */
+  .tok__label {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.15rem;
   }
   .tok__kind {
     font-family: var(--font-mono);
