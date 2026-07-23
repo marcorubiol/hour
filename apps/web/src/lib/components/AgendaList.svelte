@@ -1,21 +1,37 @@
+<script module lang="ts">
+  /**
+   * One inline contested-hold band (ADR-080 §4 surfaced in the book): the
+   * two competing performance ids and a pre-localized reason header. The
+   * pick/release actions stay in the DecisionBand above — the agenda only
+   * *shows* the tension, it never duplicates the write UI.
+   */
+  export type AgendaDecision = {
+    /** The two performance ids in tension — both rows are wrapped. */
+    ids: [string, string];
+    /** Localized reason ("… a dues reserves el mateix dia", "Sense dades…"). */
+    reason: string;
+    severity: 'people' | 'possible' | 'double';
+  };
+</script>
+
 <script lang="ts">
   /**
-   * Agenda projection of the Calendar lens (ADR-076 second first-class
-   * projection; ADR-078 §10) — the same fetched rows as the month grid,
-   * regrouped as pure chronology: sticky day headers, one row per event
-   * (time-as-glyph · title · place · project dot · status), clash banners
-   * leading each conflicted day, and the blackout rail on the right.
+   * Agenda projection of the Calendar lens (ADR-076) — the same fetched
+   * rows as the month grid, regrouped as a continuous multi-month BOOK:
+   * a serif month divider opens each month, every day of the span gets a
+   * row (empty days a hairline, kept ones their events), and the reader
+   * scrolls to summon more months (an end sentinel asks the page to extend
+   * the span; a top "earlier" action prepends with scroll-anchoring).
    *
-   * Included days = days with events ∪ days inside a stored blackout
-   * (agendaDayKeys). Derived away bands never create days — they ride the
-   * rail as dotted threads (display-only inference, ADR-078 §6).
+   * Each day: a weekday+number header column, one row per event
+   * (meta[time·status | kind badge] · title · place · project chip),
+   * clash banners leading a conflicted day, contested holds wrapped under
+   * a reason band, and the blackout/festival rail on the right.
    *
-   * The rail renders per-day segments (absolute, full row height) instead
-   * of measuring offsets: a blackout's covered days are all included by
-   * the day rule, so contiguous segments read as one capsule. All persons
-   * share ONE neutral availability accent — identity is the vertical mono
-   * name, never a per-person hue. Narrow frames collapse the rail to 3px
-   * threads; the "blackouts" pill expands the named panel as an overlay.
+   * The page owns the feeds, the conflict/decision engines, the i18n and
+   * the multi-month span; this component is pure presentation. Days are
+   * given whole (`days`) — the "days with events" inclusion rule is gone,
+   * the book shows the calendar entire.
    */
   import { createQuery } from '@tanstack/svelte-query';
   import {
@@ -27,7 +43,7 @@
     type DateEvent,
     type PerformanceEvent,
   } from '$lib/components/MonthGrid.svelte';
-  import { agendaDayKeys, assignBandLanes, dayKeyInTz } from '$lib/planner';
+  import { assignBandLanes, dayKeyInTz } from '$lib/planner';
   import { dualTime } from '$lib/datetime';
   import { workspacesQueryOptions } from '$lib/nav-queries';
   import { accentVarFor } from '$lib/utils/accent';
@@ -36,8 +52,8 @@
   import { dateStatusFamily } from '$lib/date';
 
   interface Props {
-    /** Ordered ISO days of the visible month. */
-    monthDays: string[];
+    /** Ordered ISO days across the whole agenda span (multi-month). */
+    days: string[];
     /** Already scope-filtered rows — same feed as the month grid. */
     performances: PerformanceEvent[];
     dates: DateEvent[];
@@ -47,18 +63,33 @@
     blackouts?: BlackoutBandVM[];
     aways?: AwayBandVM[];
     clashesByDay?: Map<string, ClashVM[]>;
-    /** BCP47/locale tag for the day-header labels. */
+    /** Contested holds per day (ADR-080 §4) — reason + the two perf ids. */
+    decisionsByDay?: Map<string, AgendaDecision[]>;
+    /** Today's day key (viewer tz) — the accented number. */
+    todayIso?: string;
+    /** BCP47/locale tag for the day-header/divider labels. */
     locale?: string;
     /** i18n hooks — the page passes t()-backed fns/strings. */
     dateKindLabel?: (kind: string) => string;
     viewerTimeLabel?: (time: string) => string;
     statusLabel?: (status: string) => string;
+    travelDirLabel?: (dir: string) => string;
     emptyLabel?: string;
     blackoutsToggleLabel?: string;
+    earlierLabel?: string;
+    decideLabel?: string;
+    /** Header of the right-hand dot-grid notes column. */
+    notesLabel?: string;
+    /** Scroll reached the end → page appends the next month. */
+    onReachEnd?: () => void;
+    /** Top "earlier months" action → page prepends (scroll-anchored). */
+    onReachStart?: () => void;
+    /** Jump to the DecisionBand (where the pick/release actions live). */
+    onDecideJump?: () => void;
   }
 
   let {
-    monthDays,
+    days,
     performances,
     dates,
     workspaceSlug,
@@ -66,16 +97,24 @@
     blackouts = [],
     aways = [],
     clashesByDay,
+    decisionsByDay,
     locale = 'en-GB',
+    todayIso = dayKeyInTz(new Date().toISOString(), Intl.DateTimeFormat().resolvedOptions().timeZone),
     dateKindLabel = (kind: string) => kind.replace(/_/g, ' '),
     viewerTimeLabel = (time: string) => `${time}`,
     statusLabel = performanceStatusLabel,
+    travelDirLabel = (dir: string) => dir,
     emptyLabel = 'Nothing this month.',
     blackoutsToggleLabel = 'blackouts',
+    earlierLabel = '↑ earlier',
+    decideLabel = 'decide ↑',
+    notesLabel = 'NOTES',
+    onReachEnd,
+    onReachStart,
+    onDecideJump,
   }: Props = $props();
 
   const viewerTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  const todayIso = dayKeyInTz(new Date().toISOString(), viewerTz);
 
   const workspacesQuery = createQuery(workspacesQueryOptions());
   let workspaceSlugById = $derived(
@@ -108,13 +147,63 @@
     return map;
   });
 
-  let shownDays = $derived(
-    agendaDayKeys(
-      monthDays,
-      rowsByDay.keys(),
-      blackouts.map((b) => ({ starts_on: b.from, ends_on: b.to })),
-    ),
-  );
+  // The book shows every day of the span — no inclusion filter.
+  let shownDays = $derived(days);
+
+  // First day of each month → where the serif divider opens.
+  let monthBreaks = $derived.by(() => {
+    const s = new Set<string>();
+    let prev = '';
+    for (const d of days) {
+      const mk = d.slice(0, 7);
+      if (mk !== prev) {
+        s.add(d);
+        prev = mk;
+      }
+    }
+    return s;
+  });
+
+  // ── Render items per day: loose rows, with contested holds folded into a
+  // band at the position of their first member (both members must be
+  // present — a status filter can hide one, then it just reads as a row). ─
+  type ContestGroup = { dec: AgendaDecision; a: Row; b: Row };
+  type RenderItem = { contest: ContestGroup } | { row: Row };
+
+  function dayItems(day: string): RenderItem[] {
+    const rows = rowsByDay.get(day) ?? [];
+    const decs = decisionsByDay?.get(day);
+    if (!decs || decs.length === 0) return rows.map((row) => ({ row }));
+
+    const rowByPerf = new Map<string, Row>();
+    for (const r of rows) if (r.kind === 'perf') rowByPerf.set(r.perf.id, r);
+
+    const grouped = new Set<string>();
+    const firstMember = new Map<string, ContestGroup>();
+    for (const dec of decs) {
+      if (grouped.has(dec.ids[0]) || grouped.has(dec.ids[1])) continue;
+      const a = rowByPerf.get(dec.ids[0]);
+      const b = rowByPerf.get(dec.ids[1]);
+      if (!a || !b) continue;
+      const g: ContestGroup = { dec, a, b };
+      grouped.add(dec.ids[0]);
+      grouped.add(dec.ids[1]);
+      firstMember.set(rows.indexOf(a) <= rows.indexOf(b) ? dec.ids[0] : dec.ids[1], g);
+    }
+    if (grouped.size === 0) return rows.map((row) => ({ row }));
+
+    const out: RenderItem[] = [];
+    for (const r of rows) {
+      const pid = r.kind === 'perf' ? r.perf.id : null;
+      if (pid && grouped.has(pid)) {
+        const g = firstMember.get(pid);
+        if (g) out.push({ contest: g });
+        continue;
+      }
+      out.push({ row: r });
+    }
+    return out;
+  }
 
   // ── Time rendering (timezone rule — same as MonthGrid) ────────────────
   function perfTz(p: PerformanceEvent): string | null {
@@ -153,33 +242,45 @@
     return p.venue?.city ?? p.city;
   }
   function dateText(d: DateEvent): string {
-    if (d.kind === 'other') return d.label ?? d.title ?? dateKindLabel(d.kind);
+    // `other` names itself with its custom label (badge), so the body shows
+    // the real title (+ place) — e.g. "Mescla · Tamarit", badge "ESTUDI".
+    if (d.kind === 'other') {
+      return [d.title ?? d.label, d.city].filter(Boolean).join(' · ') || dateKindLabel(d.kind);
+    }
     if (d.kind === 'day_off') {
       const base = dateKindLabel(d.kind);
       return d.city ? `${base} · ${d.city}` : (d.title ?? base);
     }
     return d.title ?? d.city ?? dateKindLabel(d.kind);
   }
+  // The meta badge: `other` shows its custom label (custom_fields.label,
+  // ADR-078 §8) uppercased; every other kind shows the kind name.
+  function dateBadge(d: DateEvent): string {
+    if (d.kind === 'other' && d.label) return d.label;
+    return dateKindLabel(d.kind);
+  }
   function travelText(d: DateEvent): string {
     const place = d.city ?? d.title ?? d.venue_name ?? dateKindLabel(d.kind);
-    if (d.travel_direction === 'outbound') return `→ ${place}`;
-    if (d.travel_direction === 'return') return `${place} →`;
-    if (d.travel_direction === 'leg') return `→ ${place} →`;
-    return place;
+    const dir = d.travel_direction ? travelDirLabel(d.travel_direction) : null;
+    return dir ? `✈ ${place} · ${dir}` : `✈ ${place}`;
   }
 
-  // ── Day header labels ──────────────────────────────────────────────────
+  // ── Day header + month divider labels ──────────────────────────────────
   function headWeekday(iso: string): string {
     return new Date(`${iso}T00:00:00Z`)
       .toLocaleDateString(locale, { weekday: 'short', timeZone: 'UTC' })
       .replace(/\.+$/, '')
       .toLowerCase();
   }
-  function headMonth(iso: string): string {
-    return new Date(`${iso}T00:00:00Z`)
-      .toLocaleDateString(locale, { month: 'short', timeZone: 'UTC' })
-      .replace(/\.+$/, '')
-      .toLowerCase();
+  function monthDivName(iso: string): string {
+    const raw = new Date(`${iso}T00:00:00Z`).toLocaleDateString(locale, {
+      month: 'long',
+      timeZone: 'UTC',
+    });
+    return raw.charAt(0).toUpperCase() + raw.slice(1);
+  }
+  function monthDivYear(iso: string): string {
+    return iso.slice(0, 4);
   }
 
   // ── Blackout rail — shared lane system for capsules + away threads. ───
@@ -233,10 +334,15 @@
   let railMode = $derived(narrow ? (panelOpen ? 'panel' : 'threads') : 'side');
   let capW = $derived(railMode === 'threads' ? 3 : railMode === 'panel' ? 20 : 22);
   let laneGap = $derived(railMode === 'threads' ? 4 : 7);
-  /** Reserved width — panel mode overlays, so it reserves like threads. */
+  // The NOTES column (dot grid) lives on the right at wide sizes; the rail
+  // floats OVER it (ADR mock — "blackouts encima"), so content reserves
+  // nothing there. Narrow collapses the notes away and the rail reserves
+  // a thread strip inside the content like before.
+  let notesW = $derived(narrow ? 0 : 240);
+  /** Content reserve — 0 at side (rail over notes); threads/panel reserve. */
   let reservedW = $derived.by(() => {
     const n = railLanes.laneCount;
-    if (n === 0) return 0;
+    if (n === 0 || railMode === 'side') return 0;
     const w = railMode === 'panel' ? 3 : capW;
     const g = railMode === 'panel' ? 4 : laneGap;
     return g + n * (w + g);
@@ -251,6 +357,24 @@
     });
     return out;
   }
+
+  // ── Lazy end-extension: a sentinel below the last day asks the page to
+  // append the next month. Re-observed on every span change so a sentinel
+  // still in view after one extension re-fires (fills the viewport). ─────
+  let endSentinel = $state<HTMLElement>();
+  $effect(() => {
+    void days.length;
+    const el = endSentinel;
+    if (!el || !onReachEnd) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) if (e.isIntersecting) onReachEnd?.();
+      },
+      { rootMargin: '800px 0px' },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  });
 </script>
 
 <div
@@ -258,8 +382,16 @@
   class:ag--loading={loading}
   class:ag--panel={railMode === 'panel'}
   data-rail={railMode}
-  style={`--ag-rail-reserve: ${reservedW}px; --ag-cap-w: ${capW}px; --ag-lane-gap: ${laneGap}px;`}
+  style={`--ag-rail-reserve: ${reservedW}px; --ag-cap-w: ${capW}px; --ag-lane-gap: ${laneGap}px; --ag-notes-w: ${notesW}px;`}
 >
+  {#if notesW > 0}
+    <!-- The dot-grid notes margin (mock) — a real bullet-journal column;
+         the blackout rail floats over its left edge ("blackouts encima"). -->
+    <aside class="ag__notes">
+      <span class="ag__notes-head">{notesLabel}</span>
+    </aside>
+  {/if}
+
   {#if narrow && railItems.length > 0}
     <div class="ag__railbar">
       <button
@@ -278,15 +410,30 @@
   {#if shownDays.length === 0}
     <p class="ag__empty">{emptyLabel}</p>
   {:else}
+    {#if onReachStart}
+      <button type="button" class="ag__earlier" onclick={onReachStart}>{earlierLabel}</button>
+    {/if}
+
     {#each shownDays as day (day)}
-      {@const rows = rowsByDay.get(day) ?? []}
+      {#if monthBreaks.has(day)}
+        <h2 class="ag__monthdiv">
+          <span class="ag__monthdiv-name">{monthDivName(day)}</span>
+          <span class="ag__monthdiv-year">{monthDivYear(day)}</span>
+        </h2>
+      {/if}
+      {@const items = dayItems(day)}
       {@const banners = clashesByDay?.get(day) ?? []}
       {@const segs = railSegs(day)}
-      <section class="ag__day" data-day={day}>
-        <header class="ag__head" class:ag__head--today={day === todayIso}>
+      {@const empty = items.length === 0 && banners.length === 0}
+      <section
+        class="ag__day"
+        class:ag__day--empty={empty}
+        class:ag__day--today={day === todayIso}
+        data-day={day}
+      >
+        <header class="ag__head">
           <span class="ag__wd">{headWeekday(day)}</span>
           <span class="ag__num">{Number(day.slice(8, 10))}</span>
-          <span class="ag__mo">{headMonth(day)}</span>
         </header>
         <div class="ag__rows">
           {#each banners as c, ci (ci)}
@@ -297,73 +444,27 @@
               <span class="ag__clash-text">{c.body}</span>
             </p>
           {/each}
-          {#each rows as row, ri (ri)}
-            {#if row.kind === 'perf'}
-              {@const p = row.perf}
-              {@const t = perfDual(p)}
-              {@const href = perfHref(p)}
-              {@const family = performanceStatusFamily(p.status)}
-              <svelte:element
-                this={href ? 'a' : 'div'}
-                class="ag__row ag__row--perf"
-                data-family={family}
-                style={p.project ? `--c: ${accentVarFor(p.project)}` : undefined}
-                href={href ?? undefined}
-              >
-                <span class="ag__time">{t?.primary ?? '—'}</span>
-                <span class="ag__body">
-                  <span class="ag__title"
-                    ><b>{perfName(p)}</b>{#if perfCity(p)}
-                      <span class="ag__city">{perfCity(p)}</span>{/if}</span
+          {#each items as it, ii (ii)}
+            {#if 'contest' in it}
+              <div class="ag__contest" data-severity={it.contest.dec.severity}>
+                <p class="ag__contest-head">
+                  <span
+                    class="ag__contest-mark"
+                    data-severity={it.contest.dec.severity}
+                    aria-hidden="true">{it.contest.dec.severity === 'possible' ? '?' : '!'}</span
                   >
-                  <span class="ag__sub">
-                    {#if p.project}<IdentityMark variant="compact" accent={accentVarFor(p.project)} initials={p.project.initials} name={p.project.name} size="15px" />{/if}
-                    {p.project?.name ?? ''}
-                    {#if t?.secondary}<span class="ag__courtesy"
-                        >· {viewerTimeLabel(t.secondary)}</span
-                      >{/if}
-                  </span>
-                </span>
-                <span class="ag__status">{statusLabel(p.status)}</span>
-              </svelte:element>
+                  <span class="ag__contest-reason">{it.contest.dec.reason}</span>
+                  {#if onDecideJump}<button
+                      type="button"
+                      class="ag__contest-jump"
+                      onclick={onDecideJump}>{decideLabel}</button
+                    >{/if}
+                </p>
+                {@render eventRow(it.contest.a)}
+                {@render eventRow(it.contest.b)}
+              </div>
             {:else}
-              {@const d = row.date}
-              {@const t = dateDual(d)}
-              {#if d.kind === 'travel_day'}
-                <div
-                  class="ag__row ag__row--travel"
-                  style={d.project ? `--c: ${accentVarFor(d.project)}` : undefined}
-                >
-                  <span class="ag__time ag__time--meta">{dateKindLabel(d.kind)}</span>
-                  <span class="ag__body">
-                    <span class="ag__title ag__title--travel">{travelText(d)}</span>
-                    <span class="ag__sub">
-                      {#if d.project}<IdentityMark variant="compact" accent={accentVarFor(d.project)} initials={d.project.initials} name={d.project.name} size="15px" />{/if}
-                      {d.project?.name ?? ''}
-                    </span>
-                  </span>
-                </div>
-              {:else}
-                <div
-                  class="ag__row ag__row--date"
-                  data-family={dateStatusFamily(d.status)}
-                  style={d.project ? `--c: ${accentVarFor(d.project)}` : undefined}
-                >
-                  <span class="ag__time ag__time--meta"
-                    >{t?.primary ?? dateKindLabel(d.kind)}</span
-                  >
-                  <span class="ag__body">
-                    <span class="ag__title ag__title--date">{dateText(d)}</span>
-                    <span class="ag__sub">
-                      {#if d.project}<IdentityMark variant="compact" accent={accentVarFor(d.project)} initials={d.project.initials} name={d.project.name} size="15px" />{/if}
-                      {d.project?.name ?? ''}
-                      {#if t?.secondary}<span class="ag__courtesy"
-                          >· {viewerTimeLabel(t.secondary)}</span
-                        >{/if}
-                    </span>
-                  </span>
-                </div>
-              {/if}
+              {@render eventRow(it.row)}
             {/if}
           {/each}
         </div>
@@ -386,8 +487,97 @@
         {/each}
       </section>
     {/each}
+
+    {#if onReachEnd}<div class="ag__sentinel" bind:this={endSentinel} aria-hidden="true"></div>{/if}
   {/if}
 </div>
+
+{#snippet eventRow(row: Row)}
+  {#if row.kind === 'perf'}
+    {@const p = row.perf}
+    {@const t = perfDual(p)}
+    {@const href = perfHref(p)}
+    {@const family = performanceStatusFamily(p.status)}
+    <svelte:element
+      this={href ? 'a' : 'div'}
+      class="ag__row ag__row--perf"
+      data-family={family}
+      style={p.project ? `--c: ${accentVarFor(p.project)}` : undefined}
+      href={href ?? undefined}
+    >
+      <span class="ag__meta">
+        <span class="ag__time">{t?.primary ?? '—'}</span>
+        <span class="ag__state">{statusLabel(p.status)}</span>
+      </span>
+      <span class="ag__body">
+        <span class="ag__title"
+          ><b>{perfName(p)}</b>{#if perfCity(p)}<span class="ag__city">{perfCity(p)}</span>{/if}</span
+        >
+        <span class="ag__sub">
+          {#if p.project}<IdentityMark
+              variant="compact"
+              accent={accentVarFor(p.project)}
+              initials={p.project.initials}
+              name={p.project.name}
+              size="15px"
+            />{/if}
+          {p.project?.name ?? ''}
+          {#if t?.secondary}<span class="ag__courtesy">· {viewerTimeLabel(t.secondary)}</span>{/if}
+        </span>
+      </span>
+    </svelte:element>
+  {:else}
+    {@const d = row.date}
+    {@const t = dateDual(d)}
+    {#if d.kind === 'travel_day'}
+      <div
+        class="ag__row ag__row--travel"
+        style={d.project ? `--c: ${accentVarFor(d.project)}` : undefined}
+      >
+        <span class="ag__meta"><span class="ag__badge">{dateBadge(d)}</span></span>
+        <span class="ag__body">
+          <span class="ag__title ag__title--travel">{travelText(d)}</span>
+          <span class="ag__sub">
+            {#if d.project}<IdentityMark
+                variant="compact"
+                accent={accentVarFor(d.project)}
+                initials={d.project.initials}
+                name={d.project.name}
+                size="15px"
+              />{/if}
+            {d.project?.name ?? ''}
+          </span>
+        </span>
+      </div>
+    {:else}
+      <div
+        class="ag__row ag__row--date"
+        data-family={dateStatusFamily(d.status)}
+        style={d.project ? `--c: ${accentVarFor(d.project)}` : undefined}
+      >
+        <span class="ag__meta">
+          <span class="ag__badge">{dateBadge(d)}</span>
+          {#if t?.primary}<span class="ag__time ag__time--date">{t.primary}</span>{/if}
+        </span>
+        <span class="ag__body">
+          <span class="ag__title ag__title--date">{dateText(d)}</span>
+          <span class="ag__sub">
+            {#if d.project}<IdentityMark
+                variant="compact"
+                accent={accentVarFor(d.project)}
+                initials={d.project.initials}
+                name={d.project.name}
+                size="15px"
+              />{/if}
+            {d.project?.name ?? ''}
+            {#if t?.secondary}<span class="ag__courtesy">· {viewerTimeLabel(t.secondary)}</span
+              >{/if}
+          </span>
+        </span>
+      </div>
+    {/if}
+  {/if}
+{/snippet}
 
 <style>
   @layer components {
@@ -396,12 +586,45 @@
          hues); company blackouts sink to ink. */
       --ag-black-accent: var(--cal-accent, var(--warning));
       position: relative;
-      display: flex;
-      flex-direction: column;
+      display: grid;
+      grid-template-columns: 1fr var(--ag-notes-w, 0px);
+      align-content: start;
       transition: opacity var(--transition);
+    }
+    /* The book stacks in column 1; the notes margin spans every row in 2. */
+    .ag > :not(.ag__notes) {
+      grid-column: 1;
+      min-inline-size: 0;
     }
     .ag--loading {
       opacity: 0.6;
+    }
+
+    /* ── NOTES margin — a dot-grid bullet-journal column on the right. ── */
+    .ag__notes {
+      grid-column: 2;
+      grid-row: 1 / -1;
+      position: relative;
+      border-inline-start: 1px solid var(--border-color-light);
+      background-image: radial-gradient(
+        circle,
+        color-mix(in oklch, var(--text-faint) 45%, transparent) 1px,
+        transparent 1.5px
+      );
+      background-size: 22px 22px;
+      background-position: 18px 44px;
+      z-index: 0;
+    }
+    .ag__notes-head {
+      position: sticky;
+      top: 0;
+      display: block;
+      padding: var(--space-m) var(--space-s) var(--space-s) var(--space-l);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      letter-spacing: 0.28em;
+      text-transform: uppercase;
+      color: var(--text-faint);
     }
 
     .ag__empty {
@@ -412,25 +635,72 @@
       color: var(--text-faint);
     }
 
-    /* ── Day group: sticky header column + rows. ── */
+    /* Top "earlier months" — quiet, centered, prepends with anchoring. */
+    .ag__earlier {
+      justify-self: center;
+      margin-block: var(--space-s);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      letter-spacing: var(--mono-letter-spacing-loose);
+      text-transform: uppercase;
+      color: var(--text-faint);
+      background: none;
+      border: 1px solid var(--border-color-light);
+      border-radius: var(--radius-circle);
+      padding: var(--space-2xs) var(--space-m);
+      cursor: pointer;
+      transition: color var(--transition), border-color var(--transition);
+    }
+    .ag__earlier:hover {
+      color: var(--text-muted);
+      border-color: var(--border-color-dark);
+    }
+
+    /* ── Serif month divider — the book's chapter head. ── */
+    .ag__monthdiv {
+      display: flex;
+      align-items: baseline;
+      gap: var(--space-s);
+      margin-block: var(--space-l) var(--space-2xs);
+      padding-inline-start: var(--space-xs);
+      font-weight: 400;
+    }
+    .ag__monthdiv:first-child {
+      margin-block-start: var(--space-2xs);
+    }
+    .ag__monthdiv-name {
+      font-family: var(--font-display);
+      font-size: var(--text-xl);
+      color: var(--text-color);
+    }
+    .ag__monthdiv-year {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      letter-spacing: var(--mono-letter-spacing-loose);
+      color: var(--text-faint);
+    }
+
+    /* ── Day group: header column + rows, a ledger rule beneath. ── */
     .ag__day {
       position: relative;
       display: grid;
       grid-template-columns: 6rem 1fr;
       align-items: start;
+      border-block-end: 1px solid var(--border-color-light);
+    }
+    .ag__day--empty {
+      min-block-size: 2.5rem;
     }
 
     .ag__head {
-      position: sticky;
-      top: 0;
       display: flex;
       flex-direction: column;
-      padding: var(--space-m) 0 var(--space-xs) var(--space-xs);
-      background: linear-gradient(var(--bg) 78%, transparent);
-      z-index: 2;
+      padding: var(--space-s) 0 var(--space-xs) var(--space-xs);
     }
-    .ag__wd,
-    .ag__mo {
+    .ag__day--empty .ag__head {
+      padding-block: var(--space-xs);
+    }
+    .ag__wd {
       font-family: var(--font-mono);
       font-size: var(--text-xs);
       letter-spacing: var(--mono-letter-spacing-loose);
@@ -443,27 +713,35 @@
       line-height: 1.05;
       color: var(--text-color);
       font-variant-numeric: tabular-nums;
-      margin-block: var(--space-2xs);
+      margin-block-start: var(--space-2xs);
     }
-    .ag__head--today .ag__wd,
-    .ag__head--today .ag__num,
-    .ag__head--today .ag__mo {
+    .ag__day--empty .ag__num {
+      font-size: var(--text-l);
+      color: var(--text-muted);
+    }
+    .ag__day--today .ag__wd,
+    .ag__day--today .ag__num {
       color: var(--ag-black-accent);
     }
 
     .ag__rows {
-      border-inline-start: 1px solid var(--border-color-light);
       padding-block: var(--space-s);
       padding-inline-end: calc(var(--ag-rail-reserve) + var(--space-s));
-      min-block-size: 3.25rem;
       min-inline-size: 0;
     }
+    .ag__day:not(.ag__day--empty) .ag__rows {
+      border-inline-start: 1px solid var(--border-color-light);
+    }
+    .ag__day--empty .ag__rows {
+      padding-block: var(--space-xs);
+      min-block-size: 0;
+    }
 
-    /* ── Row DNA: time-as-glyph · body · status. ── */
+    /* ── Row DNA: meta[time·status | badge] · body. ── */
     .ag__row {
       position: relative;
       display: grid;
-      grid-template-columns: 4.5rem 1fr auto;
+      grid-template-columns: 5rem 1fr;
       gap: var(--space-s);
       align-items: baseline;
       padding: var(--space-xs) var(--space-s) var(--space-xs) var(--space-m);
@@ -497,6 +775,12 @@
       --node-border: var(--c, var(--border-color-dark));
     }
 
+    .ag__meta {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2xs);
+      min-inline-size: 0;
+    }
     .ag__time {
       font-family: var(--font-mono);
       font-size: var(--text-xs);
@@ -504,11 +788,33 @@
       color: var(--text-muted);
       white-space: nowrap;
     }
-    .ag__time--meta {
-      font-size: 0.85em;
+    .ag__time--date {
+      color: var(--text-faint);
+    }
+    /* Status pill — bordered, project-accent tinted (CONFIRMAT / 1R HOLD). */
+    .ag__state {
+      align-self: flex-start;
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      letter-spacing: var(--mono-letter-spacing);
+      text-transform: uppercase;
+      color: color-mix(in oklch, var(--c, var(--text-muted)) 55%, var(--text-muted));
+      border: 1px solid color-mix(in oklch, var(--c, var(--border-color-dark)) 40%, var(--border-color-light));
+      border-radius: var(--radius-s);
+      padding: 1px var(--space-xs);
+      white-space: nowrap;
+    }
+    .ag__row--perf[data-family='hold'] .ag__state {
+      border-style: dashed;
+    }
+    /* Type badge for dates — ASSAIG / PREMSA / VIATGE … */
+    .ag__badge {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
       letter-spacing: var(--mono-letter-spacing-loose);
       text-transform: uppercase;
       color: var(--text-faint);
+      white-space: nowrap;
     }
 
     .ag__body {
@@ -559,13 +865,74 @@
     .ag__courtesy {
       color: color-mix(in oklch, var(--ag-black-accent) 50%, var(--text-faint));
     }
-    .ag__status {
+
+    /* ── Contested holds — a heavier clash band wrapping the two rows. ── */
+    .ag__contest {
+      margin: var(--space-2xs) var(--space-s) var(--space-xs) var(--space-m);
+      border: 1px solid color-mix(in oklch, var(--danger) 22%, var(--border-color-light));
+      border-radius: var(--radius-m);
+      background: color-mix(in oklch, var(--danger) 4%, transparent);
+      overflow: hidden;
+    }
+    .ag__contest[data-severity='possible'] {
+      border-color: var(--border-color-dark);
+      background: var(--bg-light);
+    }
+    .ag__contest-head {
+      display: flex;
+      align-items: center;
+      gap: var(--space-xs);
+      padding: var(--space-xs) var(--space-s);
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      border-block-end: 1px solid color-mix(in oklch, var(--danger) 12%, var(--border-color-light));
+    }
+    .ag__contest[data-severity='possible'] .ag__contest-head {
+      border-block-end-color: var(--border-color-light);
+    }
+    .ag__contest-mark {
+      inline-size: 1rem;
+      block-size: 1rem;
+      border-radius: var(--radius-circle);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
       font-family: var(--font-mono);
       font-size: var(--text-xs);
-      letter-spacing: var(--mono-letter-spacing);
+      line-height: 1;
+      background: var(--danger);
+      color: var(--bg);
+      flex: none;
+    }
+    .ag__contest-mark[data-severity='possible'] {
+      background: var(--bg);
       color: var(--text-faint);
-      align-self: center;
+      border: 1px dashed var(--border-color-dark);
+    }
+    .ag__contest-reason {
+      min-inline-size: 0;
+      flex: 1;
+    }
+    .ag__contest-jump {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      letter-spacing: var(--mono-letter-spacing-loose);
+      text-transform: uppercase;
+      color: var(--text-faint);
+      background: none;
+      border: none;
+      cursor: pointer;
+      flex: none;
       white-space: nowrap;
+    }
+    .ag__contest-jump:hover {
+      color: var(--text-muted);
+    }
+    .ag__contest .ag__row {
+      padding-inline-start: var(--space-s);
+    }
+    .ag__contest .ag__row::before {
+      display: none;
     }
 
     /* ── Clash banners — same grammar as the month day-marks. ── */
@@ -636,14 +1003,17 @@
       min-inline-size: 0;
     }
 
-    /* ── Blackout rail — per-day segments; contiguity comes free because
-       every day inside a stored blackout is an included day. ── */
+    /* ── Blackout / festival rail — per-day segments; contiguity comes
+       free because every day inside a stored blackout is included. ── */
     .ag__cap {
       position: absolute;
       top: 0;
       bottom: 0;
+      /* Negative → the capsule crosses the book/notes boundary and floats
+         OVER the dot-grid notes column ("blackouts encima"). Narrow mode
+         flips this back to a positive in-content reserve (media query). */
       inset-inline-end: calc(
-        var(--ag-lane-gap) + var(--lane) * (var(--ag-cap-w) + var(--ag-lane-gap))
+        -1 * (var(--ag-lane-gap) + var(--lane) * (var(--ag-cap-w) + var(--ag-lane-gap)) + var(--ag-cap-w))
       );
       inline-size: var(--ag-cap-w);
       background: color-mix(in oklch, var(--ag-black-accent) 26%, var(--bg));
@@ -701,6 +1071,10 @@
       box-shadow: -12px 0 18px -10px color-mix(in oklch, var(--text-color) 35%, transparent);
     }
 
+    .ag__sentinel {
+      block-size: 1px;
+    }
+
     /* ── Narrow toggle pill. ── */
     .ag__railbar {
       display: flex;
@@ -737,12 +1111,19 @@
         grid-template-columns: 4.25rem 1fr;
       }
       .ag__row {
-        grid-template-columns: 3.6rem 1fr auto;
+        grid-template-columns: 4.25rem 1fr;
         gap: var(--space-xs);
         padding-inline: var(--space-xs) var(--space-xs);
       }
-      .ag__clash {
+      .ag__clash,
+      .ag__contest {
         margin-inline: var(--space-xs);
+      }
+      /* No notes column here — the rail reserves a thread strip in-content. */
+      .ag__cap {
+        inset-inline-end: calc(
+          var(--ag-lane-gap) + var(--lane) * (var(--ag-cap-w) + var(--ag-lane-gap))
+        );
       }
     }
   }

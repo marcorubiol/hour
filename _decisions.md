@@ -2490,3 +2490,74 @@ Triggered by Marco's pre-scaffold doubt (Phase 0.0 day 5). Five alternatives eva
   `invoice_line`. **Follow-ups deliberados:** `InvoiceDocument.svelte`/`invoice.ts`
   (PDF imprimible) siguen con IVA/IRPF local — a tax_lines cuando se cablee a datos;
   UI de preset por-país (hoy inputs IVA/IRPF = preset ES); rename físico `accounts`.
+
+## ADR-089 — El viaje es un trayecto multi-etapa: origen → destino + tramos, con documentos por tramo
+
+- **Contexto.** Sesión 2026-07-23. El modelo trata el viaje (`date` con
+  `kind='travel_day'`) como **una sola ciudad + `travel_direction`**
+  (outbound/return/leg): `travelText` solo puede decir `→ Sevilla`, nunca
+  `Barcelona → Sevilla` — el origen no existe como dato. Marco: un viaje tiene
+  **origen y destino** (donde empieza y donde acaba) y **etapas multimodales** en
+  medio (avión → taxi → metro), y **cada tramo debe aceptar documentos** (billete
+  de avión en PDF, subible y descargable). Elegido en frío entre tres formas
+  (solo extremos / etapas en JSON / **tabla completa**) → gana la tabla completa,
+  con los 9 modos. Refina ADR-072 (hold grammar + `travel_direction`), ADR-078
+  (dates y `awayBands()`), ADR-023 (road sheet), ADR-056 (materials/R2).
+
+- **Decisión — viaje = extremos gruesos + tabla de tramos.**
+  - **Extremos en `date`** (lo que pinta el card): `origin_city`,
+    `origin_country`, `destination_city`, `destination_country`. Baratos y
+    siempre presentes aunque el viaje no tenga desglose; el card muestra
+    `origin → destination` (fallback a `city`/dirección para filas viejas).
+  - **`travel_direction` se queda**: sigue alimentando `awayBands()` (ADR-078
+    §6), así no se rompen los tramos "fuera". **Deuda anotada:** reconciliar
+    dirección↔extremos (derivar la dirección desde los extremos + una base de la
+    compañía) queda para después; hoy coexisten, el card usa extremos y away usa
+    dirección.
+  - **Tramos** — tabla `travel_stage` (1:N por viaje), la logística fina del road
+    sheet, **opcional** (un viaje puede ser solo `A → B` sin desglose):
+    `position`, `mode`, `from_city/from_country/from_place`,
+    `to_city/to_country/to_place`, `depart_at`, `arrive_at`, `reference`, `notes`.
+    `*_place` = aeropuerto/estación/hotel.
+
+- **`transport_mode`** (enum nuevo) = `plane · train · bus · car · taxi · metro ·
+  walk · ferry · other` — los cuatro grupos de Marco: básicos (avión/tren/bus/
+  coche), urbanos/última milla (taxi/metro/a pie), marítimos (ferry), genérico.
+
+- **Documentos por tramo — hallazgo y diferimiento (P3).** Cada tramo lleva 1..N
+  documentos. **Hallazgo:** el bucket R2 `MEDIA` (`hour-media`) está **declarado**
+  (`wrangler.jsonc`, `app.d.ts`) pero **sin una sola línea de uso** — Hour no tiene
+  pipeline de subida/descarga real (materials y `expense.receipt_url` solo guardan
+  una URL ya formada; ADR-056 "upload arrives with R2 UI", sin construir). Por
+  tanto "documentos descargables por tramo" implica construir el **primer pipeline
+  de archivos** de la app: upload→R2 con key scoped por workspace, download con
+  auth + **RLS** (solo miembros del workspace), límites de mime/tamaño, bucket
+  nunca público. Es **fundacional y reutilizable** (riders, fichas técnicas,
+  recibos de gasto). Tabla `travel_stage_document` (`travel_stage_id`,
+  `object_key`, `filename`, `mime`, `size_bytes`, `uploaded_by`). **Se difiere**
+  a un bloque posterior; el modelo va primero ("modelo primero", Marco).
+
+- **Postura de seguridad — clon de `date`/`bolo` (ADR-087).** `travel_stage`:
+  RLS `ENABLE` + `FORCE`; `REVOKE ALL FROM PUBLIC, anon, service_role`; SELECT
+  policy `has_permission(project_id, 'read:performance')` (el tramo hereda el
+  proyecto del viaje); **escritura solo por RPCs SECURITY DEFINER**
+  `create_travel_stage` / `update_travel_stage` / `delete_travel_stage`
+  (+ reorder), gateados `edit:performance`; triggers `set_updated_at` +
+  `write_audit`; FK `date_id → date ON DELETE CASCADE`, índices en `date_id`,
+  `(date_id, position)`, `workspace_id`. Los **extremos de `date`** se escriben
+  **extendiendo** `create_date` / `update_date` / `create_date_series` con
+  params `origin/destination` (DROP+CREATE por cambio de firma, como el resto de
+  money v3).
+
+- **Alcance y secuencia.** **P1 (este ADR):** schema del modelo — enum, columnas
+  en `date`, tabla `travel_stage` con RLS/RPCs, regen de tipos, tests RLS. **P2:**
+  card `Barcelona → Sevilla` (`travelText`). **P3:** editor de tramos en el
+  diálogo/detalle. **Diferido:** documentos (pipeline R2 + `travel_stage_document`),
+  road sheet e ICS. Rama **`feat/travel-stages`** (no money-v3); migración
+  **primero a `hour-staging`** (RLS 120/120 + los nuevos) → luego `hour-phase0`
+  por `prod-migrate`, nunca DDL directo a prod sin OK + backup proporcional.
+
+- **Status 2026-07-23 — decidido, no construido.** Modelo aprobado por Marco
+  (elección de tabla completa + 9 modos). Migración, tipos y tests **por escribir**;
+  nada aplicado a ninguna DB. Este ADR es el punto de revisión previo a la
+  migración.

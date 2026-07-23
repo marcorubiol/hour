@@ -199,6 +199,72 @@ entre empresas sin construirlo.
     reescribir road sheet, `ProductionStub`, `ScheduleTable`, whitelist del
     PATCH). Merece ADR propio.
 
+## EN CURSO — Travel v2: el viaje como trayecto multi-etapa (ADR-089)
+
+> **Sesión 2026-07-23. Modelo DECIDIDO (ADR-089), NADA de schema construido.**
+> Empezó como retoque visual de las cards del mes y creció hasta un modelo de
+> viaje nuevo. "Modelo primero" (Marco): primero el schema, los documentos
+> después.
+
+18. [ ] **Travel v2 — origen → destino + tramos multimodales (ADR-089).**
+    El viaje hoy es *una ciudad + `travel_direction`*; `travelText` solo puede
+    decir `→ Sevilla`. Marco quiere **origen y destino** explícitos y **etapas**
+    (avión → taxi → metro), y **cada tramo con documentos** (billete PDF subible/
+    descargable). Eligió en frío la **tabla completa** + 9 modos. Todo el diseño
+    está en **ADR-089** (`_decisions.md`).
+
+    **Secuencia:**
+    - **P1 (siguiente, por escribir):** migración — enum `transport_mode`
+      (`plane·train·bus·car·taxi·metro·walk·ferry·other`); columnas
+      `origin_city/country` + `destination_city/country` en `date`; tabla
+      `travel_stage` (1:N, opcional): `position, mode, from_*/to_* (city/country/
+      place), depart_at, arrive_at, reference, notes`. Seguridad = **clon de
+      `bolo`/`date`**: RLS FORCE, escritura solo por RPCs SECURITY DEFINER
+      (`create/update/delete_travel_stage`, gate `edit:performance`), FK
+      `date_id→date ON DELETE CASCADE`, triggers `set_updated_at`+`write_audit`.
+      Extremos de `date` → **extender** `create_date`/`update_date`/
+      `create_date_series` (DROP+CREATE por firma). Luego regen `db-types.ts` +
+      tests RLS. Molde exacto a copiar: `supabase/migrations/20260722102000_money_v3_bolo.sql`.
+    - **P2:** card muestra `Barcelona → Sevilla` en `MonthGrid` (`travelText`,
+      fallback a `city`/dirección). Actualizar la data demo (abajo) con extremos.
+    - **P3:** editor de tramos en el diálogo/detalle de fecha (depende de la
+      tarea 15 — editar fecha desde la UI, que NO EXISTE aún).
+    - **Diferido (P3+):** **documentos por tramo** → requieren el **primer
+      pipeline de archivos R2** de Hour (`MEDIA` está declarado pero SIN uso;
+      materials y `expense.receipt_url` solo guardan una URL ya formada). Es
+      fundacional y reutilizable (riders, recibos). Tabla `travel_stage_document`.
+      También diferidos: road sheet e ICS de los tramos.
+
+    **Deuda anotada:** `travel_direction` (outbound/return/leg) **se queda** porque
+    alimenta `awayBands()` (ADR-078 §6); reconciliar dirección↔extremos = después.
+
+    **PENDIENTE de Marco antes de escribir la migración** (le pregunté, no
+    respondió — cerró sesión):
+    1. ¿Aprueba el modelo del ADR-089? (mantener `travel_direction`; gate
+       `edit:performance`; extender `create_date`/`update_date`).
+    2. **Rama**: tenía cambios sin commitear (`AgendaList`, `planner/+page`, i18n,
+       un brief borrado). NO tocar. ¿Migración a rama nueva `feat/travel-stages`
+       o dejar archivos sin crear rama?
+    3. ¿Aplicar a `hour-staging` tras escribir, o solo dejar el archivo para
+       revisar antes de tocar DB?
+
+    **Ya hecho esta sesión (CSS de las cards, cerrado):** unificación en
+    `MonthGrid.svelte` — todas las opciones (hold/proposed, bolo y date)
+    comparten una sola regla por `data-family` (fondo + borde dasheado +
+    textura); el **bolo confirmado** conserva su forma propia (tinte+lift+
+    redondeo); `proposed` unificado a `text-faint`; el **viaje** foldeado al
+    contenedor compartido (data-family + sin `border:none`/`transparent`).
+    `svelte-check` 0/0. **Ya commiteado por Marco como `c4f2e3a`** en
+    `feat/money-v3-build`.
+
+    **Data demo en `hour-phase0` (prod, la misma DB que usa el dev local):**
+    8 cards de muestra en el proyecto **MaMeMi** (workspace MüK Cia,
+    `019da78d-a016-741b-a263-6987b00969c4`), julio 2026, tag
+    `custom_fields.demo_batch='cards-20260723'`. Sirven para VER las cards; **NO
+    tienen origen/destino** (el modelo aún no existe). **Limpieza:**
+    `delete from date where custom_fields->>'demo_batch'='cards-20260723';`
+    `delete from performance where custom_fields->>'demo_batch'='cards-20260723';`
+
 ## Bloqueado — comms + acceso (ADR-082/083/085)
 
 > **El modelo está cerrado; la implementación no puede empezar.** El canon está

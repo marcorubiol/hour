@@ -55,7 +55,7 @@
     type DateEvent,
     type PerformanceEvent,
   } from '$lib/components/MonthGrid.svelte';
-  import AgendaList from '$lib/components/AgendaList.svelte';
+  import AgendaList, { type AgendaDecision } from '$lib/components/AgendaList.svelte';
   import DecisionBand, {
     type ConcurrenceVM,
     type DecisionOptionVM,
@@ -148,6 +148,47 @@
     return out;
   });
   let monthLast = $derived(monthDays[monthDays.length - 1]);
+
+  // ── Agenda span (ADR-076 continuous book) — the agenda projection is a
+  // multi-month scroll, INDEPENDENT of `ym` (which stays the single-month
+  // truth for Month/Carrils). Seed = current month → +2 (a 3-month book);
+  // `extendAgendaEnd` appends the next month as the reader scrolls, and
+  // `extendAgendaStart` prepends earlier history on request. The whole
+  // downstream engine reads the agenda window only while view === 'agenda'
+  // (the source-switch below), so nothing here perturbs the other two. ──
+  function firstOfMonth(m: { year: number; month: number }): string {
+    return `${m.year}-${String(m.month).padStart(2, '0')}-01`;
+  }
+  // The book OPENS on today (not the 1st) — a diary starts where you are.
+  // "Earlier" first fills the rest of today's month, then walks back a
+  // month at a time (extendAgendaStart).
+  let agendaFromIso = $state(todayIso);
+  let agendaEnd = $state(addMonths(now.getFullYear(), now.getMonth() + 1, 2));
+  let agendaToIso = $derived(
+    addDaysIso(firstOfMonth(addMonths(agendaEnd.year, agendaEnd.month, 1)), -1),
+  );
+  // Every ISO day across the span — the agenda renders ALL of them (empty
+  // days included), so this replaces the "days with events" rule entirely.
+  let agendaDays = $derived.by(() => {
+    const out: string[] = [];
+    let d = agendaFromIso;
+    while (d <= agendaToIso) {
+      out.push(d);
+      d = addDaysIso(d, 1);
+    }
+    return out;
+  });
+  function extendAgendaEnd() {
+    agendaEnd = addMonths(agendaEnd.year, agendaEnd.month, 1);
+  }
+  function extendAgendaStart() {
+    const y = Number(agendaFromIso.slice(0, 4));
+    const m = Number(agendaFromIso.slice(5, 7));
+    const d = Number(agendaFromIso.slice(8, 10));
+    // Mid-month start → back-fill this month first; already at the 1st →
+    // prepend the whole previous month.
+    agendaFromIso = d > 1 ? firstOfMonth({ year: y, month: m }) : firstOfMonth(addMonths(y, m, -1));
+  }
 
   // ── Projection (ADR-076 + ADR-078 §10) ───────────────────────────────
   // Resolution: explicit ?view= → localStorage (per device) → form factor.
@@ -322,7 +363,9 @@
     const k = $feedKey;
     return {
       queryKey: ['planner-performances', k] as const,
-      enabled: !k.unresolved,
+      // Agenda has its own multi-month feed (below); don't double-fetch the
+      // grid window while it is showing.
+      enabled: view !== 'agenda' && !k.unresolved,
       queryFn: ({ signal }: { signal: AbortSignal }) =>
         fetchJSON<{ items: PerformanceEvent[] }>(
           `/api/performances?status=any&rosters=1&${feedParams(k, k.from, k.to)}`,
@@ -338,7 +381,7 @@
     const k = $feedKey;
     return {
       queryKey: ['planner-dates', k] as const,
-      enabled: !k.unresolved,
+      enabled: view !== 'agenda' && !k.unresolved,
       queryFn: ({ signal }: { signal: AbortSignal }) =>
         fetchJSON<{ items: DateEvent[] }>(
           `/api/dates?${feedParams(k, addDaysIso(k.from, -1), addDaysIso(k.to, 1))}`,
@@ -356,7 +399,7 @@
     const k = $feedKey;
     return {
       queryKey: ['planner-availability', { from: k.from, to: k.to }] as const,
-      enabled: !k.unresolved,
+      enabled: view !== 'agenda' && !k.unresolved,
       queryFn: async ({ signal }: { signal: AbortSignal }) => {
         try {
           return await fetchJSON<{ items: AvailabilityItem[]; absent?: boolean }>(
@@ -465,21 +508,120 @@
   // single-event severities, which decisionsFor cannot consume (pairs
   // only) — it doesn't take them as input.
 
+  // ── Agenda feed (multi-month) ─────────────────────────────────────────
+  // The agenda book spans many months, so it owns its OWN window instead of
+  // the single-month grid feeds above (which stay untouched for Month/
+  // Carrils). Both row feeds page past the API's 200-row cap with the same
+  // day-cursor loop the decisions window uses — `pagedFeed` factors it out.
+  async function pagedFeed<T extends { id: string }>(
+    urlFor: (from: string) => string,
+    cursorDay: (row: T) => string,
+    from: string,
+    signal: AbortSignal,
+  ): Promise<{ items: T[] }> {
+    const seen = new Set<string>();
+    const items: T[] = [];
+    let cursor = from;
+    for (;;) {
+      const batch = await fetchJSON<{ items: T[] }>(urlFor(cursor), signal);
+      for (const it of batch.items) {
+        if (!seen.has(it.id)) {
+          seen.add(it.id);
+          items.push(it);
+        }
+      }
+      if (batch.items.length < FEED_LIMIT) break;
+      const lastDay = cursorDay(batch.items[batch.items.length - 1]);
+      // A single day carrying a full page cannot advance the cursor — stop.
+      if (lastDay === cursor) break;
+      cursor = lastDay;
+    }
+    return { items };
+  }
+
+  const agendaFeedKey = toStore(() => ({
+    from: agendaFromIso,
+    to: agendaToIso,
+    unresolved: scopeUnresolved,
+    ...filterIds,
+  }));
+  const agendaPerfOptions = toStore(() => {
+    const k = $agendaFeedKey;
+    return {
+      queryKey: ['planner-agenda-performances', k] as const,
+      enabled: view === 'agenda' && !k.unresolved,
+      queryFn: ({ signal }: { signal: AbortSignal }) =>
+        pagedFeed<PerformanceEvent>(
+          (from) => `/api/performances?status=any&rosters=1&${feedParams(k, from, k.to)}`,
+          (p) => p.performed_at.slice(0, 10),
+          k.from,
+          signal,
+        ),
+    };
+  });
+  const agendaDatesOptions = toStore(() => {
+    const k = $agendaFeedKey;
+    return {
+      queryKey: ['planner-agenda-dates', k] as const,
+      enabled: view === 'agenda' && !k.unresolved,
+      queryFn: ({ signal }: { signal: AbortSignal }) =>
+        pagedFeed<DateEvent>(
+          // Same ±1-day pad as the grid dates feed (tz bucketing at edges).
+          (from) => `/api/dates?${feedParams(k, addDaysIso(from, -1), addDaysIso(k.to, 1))}`,
+          (d) => d.starts_at.slice(0, 10),
+          k.from,
+          signal,
+        ),
+    };
+  });
+  const agendaAvailabilityOptions = toStore(() => {
+    const k = $agendaFeedKey;
+    return {
+      queryKey: ['planner-agenda-availability', { from: k.from, to: k.to }] as const,
+      enabled: view === 'agenda' && !k.unresolved,
+      queryFn: async ({ signal }: { signal: AbortSignal }) => {
+        try {
+          return await fetchJSON<{ items: AvailabilityItem[]; absent?: boolean }>(
+            `/api/availability?from=${k.from}&to=${k.to}&limit=500`,
+            signal,
+          );
+        } catch (err) {
+          if (err instanceof Error && err.message === 'Unauthorized') throw err;
+          console.warn('[calendar] agenda availability feed absent:', err);
+          return { items: [] as AvailabilityItem[], absent: true };
+        }
+      },
+    };
+  });
+
   const perfQuery = createQuery(perfOptions);
   const datesQuery = createQuery(datesOptions);
   const availabilityQuery = createQuery(availabilityOptions);
   const teamQuery = createQuery(teamOptions);
   const decisionsPerfQuery = createQuery(decisionsPerfOptions);
+  const agendaPerfQuery = createQuery(agendaPerfOptions);
+  const agendaDatesQuery = createQuery(agendaDatesOptions);
+  const agendaAvailabilityQuery = createQuery(agendaAvailabilityOptions);
 
   // isLoading (isPending && isFetching) — a disabled query is pending but
   // not loading, so an unresolved selection reads as empty, not stuck.
-  let loading = $derived($perfQuery.isLoading || $datesQuery.isLoading);
+  let loading = $derived(
+    view === 'agenda'
+      ? $agendaPerfQuery.isLoading || $agendaDatesQuery.isLoading
+      : $perfQuery.isLoading || $datesQuery.isLoading,
+  );
   let errorMsg = $derived(
-    $perfQuery.error instanceof Error
-      ? $perfQuery.error.message
-      : $datesQuery.error instanceof Error
-        ? $datesQuery.error.message
-        : '',
+    view === 'agenda'
+      ? $agendaPerfQuery.error instanceof Error
+        ? $agendaPerfQuery.error.message
+        : $agendaDatesQuery.error instanceof Error
+          ? $agendaDatesQuery.error.message
+          : ''
+      : $perfQuery.error instanceof Error
+        ? $perfQuery.error.message
+        : $datesQuery.error instanceof Error
+          ? $datesQuery.error.message
+          : '',
   );
 
   // Exact-line narrowing: the endpoint returns the whole project of a
@@ -505,10 +647,29 @@
     return false;
   }
 
-  let scopedPerfs = $derived(($perfQuery.data?.items ?? []).filter((p) => perfInScope(p)));
-  let scopedDates = $derived(($datesQuery.data?.items ?? []).filter((d) => dateInScope(d)));
+  // ── Source-switch (ADR-076) — the agenda projection reads its OWN
+  // multi-month window; Month/Carrils read the single-month grid window.
+  // Only these three source arrays branch on `view`; EVERYTHING downstream
+  // (scope filter, conflict/decision/away engines, VMs, stats) recomputes
+  // over whichever window is active with zero duplication. The two windows
+  // are byte-identical shapes, so when view !== 'agenda' the engine sees
+  // exactly what it saw before this change. ─────────────────────────────
+  let activePerfRows = $derived(
+    view === 'agenda' ? ($agendaPerfQuery.data?.items ?? []) : ($perfQuery.data?.items ?? []),
+  );
+  let activeDateRows = $derived(
+    view === 'agenda' ? ($agendaDatesQuery.data?.items ?? []) : ($datesQuery.data?.items ?? []),
+  );
+  let activeBlackoutRows = $derived(
+    view === 'agenda'
+      ? ($agendaAvailabilityQuery.data?.items ?? [])
+      : ($availabilityQuery.data?.items ?? []),
+  );
 
-  let allBlackouts = $derived($availabilityQuery.data?.items ?? []);
+  let scopedPerfs = $derived(activePerfRows.filter((p) => perfInScope(p)));
+  let scopedDates = $derived(activeDateRows.filter((d) => dateInScope(d)));
+
+  let allBlackouts = $derived(activeBlackoutRows);
   // The bands/rail show the scope's workspaces only; the engine reads all.
   // Calm hides the blackout bands/lanes entirely (and, via pulseAwayPersons,
   // the "away" pulse) — but the conflict engine reads allBlackouts, so a real
@@ -1159,6 +1320,47 @@
   );
   let urgentCount = $derived(decisionVMs.filter((d) => d.urgent).length);
 
+  // ── Inline decision bands for the agenda book (ADR-080 §4 surfaced at
+  // the day) — the SAME derived queue the DecisionBand renders, indexed by
+  // day and pre-localized so AgendaList stays t()-free. The agenda wraps
+  // the two contested holds under a reason header; the pick/release
+  // actions stay in the DecisionBand above (no duplicate write UI). ──────
+  let agendaDecisionsByDay = $derived.by(() => {
+    const m = new Map<string, AgendaDecision[]>();
+    for (const d of decisionVMs) {
+      const reason =
+        d.level === 'people'
+          ? t('planner.clash_people_body', locale, { people: d.people.join(', ') })
+          : d.level === 'double'
+            ? t('planner.dec_double_reason', locale)
+            : d.missingTeam
+              ? t('planner.dec_possible_reason', locale, { project: d.missingTeam })
+              : t('planner.dec_possible_reason_generic', locale);
+      (m.get(d.day) ?? m.set(d.day, []).get(d.day)!).push({
+        ids: [d.a.id, d.b.id],
+        reason,
+        severity: d.level,
+      });
+    }
+    return m;
+  });
+
+  // Agenda status foot: confirmed → "confirmat", holds → "1r/2n/3r hold"
+  // (statusFootKey already maps both); anything else keeps the plain label.
+  function agendaStatusLabel(status: string): string {
+    const key = statusFootKey(status);
+    return key ? t(key, locale) : performanceStatusLabel(status);
+  }
+
+  // Prepend an earlier month with scroll-anchoring so the viewport stays
+  // pixel-stable (inserting days above would otherwise shove content down).
+  async function loadEarlier() {
+    const before = document.documentElement.scrollHeight;
+    extendAgendaStart();
+    await tick();
+    window.scrollBy(0, document.documentElement.scrollHeight - before);
+  }
+
   // Band open/collapsed — UI state only (ADR-080 §5: "Deixa-ho obert"
   // never persists anything in the DB).
   const DECISIONS_STORAGE_KEY = 'hour:calendar:decisions';
@@ -1284,6 +1486,13 @@
   }
   function thisMonth() {
     ym = { year: now.getFullYear(), month: now.getMonth() + 1 };
+  }
+  // Agenda "Avui" scrolls the book to today's day header instead of moving
+  // the single-month window (which the agenda no longer uses).
+  function scrollToToday() {
+    document
+      .querySelector(`[data-day="${todayIso}"]`)
+      ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   // ── Creation — the unified dialog (ADR-078 §1) behind every "+". ─────
@@ -1492,14 +1701,22 @@
 
   <div class="cal__toolbar">
     <div class="cal__nav-buttons">
-      <Button variant="outline" size="s" onclick={prevMonth} label={t('planner.prev_month', locale)}
-        >←</Button
+      {#if view !== 'agenda'}
+        <!-- Month/Carrils step through `ym`; the agenda is a continuous
+             book (its own span) so the ←/→ window nav means nothing there. -->
+        <Button variant="outline" size="s" onclick={prevMonth} label={t('planner.prev_month', locale)}
+          >←</Button
+        >
+        <span class="cal__tbmonth">{monthTitle} {ym.year}</span>
+        <Button variant="outline" size="s" onclick={nextMonth} label={t('planner.next_month', locale)}
+          >→</Button
+        >
+      {/if}
+      <Button
+        variant="outline"
+        size="s"
+        onclick={view === 'agenda' ? scrollToToday : thisMonth}>{t('planner.today', locale)}</Button
       >
-      <span class="cal__tbmonth">{monthTitle} {ym.year}</span>
-      <Button variant="outline" size="s" onclick={nextMonth} label={t('planner.next_month', locale)}
-        >→</Button
-      >
-      <Button variant="outline" size="s" onclick={thisMonth}>{t('planner.today', locale)}</Button>
     </div>
     <div class="cal__spacer"></div>
     {#if !calm.on}
@@ -1624,7 +1841,7 @@
     />
   {:else if view === 'agenda'}
     <AgendaList
-      {monthDays}
+      days={agendaDays}
       performances={shownPerfs}
       dates={shownDates}
       workspaceSlug={defaultWorkspaceSlug}
@@ -1632,11 +1849,21 @@
       blackouts={blackoutVMs}
       aways={awayVMs}
       {clashesByDay}
+      decisionsByDay={agendaDecisionsByDay}
+      {todayIso}
       locale={localeTag}
       dateKindLabel={kindLabel}
+      statusLabel={agendaStatusLabel}
       viewerTimeLabel={(time) => t('planner.viewer_time', locale, { time })}
+      travelDirLabel={(dir) => t(`planner.travel_${dir}`, locale)}
       emptyLabel={t('planner.empty_month', locale)}
       blackoutsToggleLabel={t('planner.blackouts_toggle', locale)}
+      earlierLabel={t('planner.agenda_earlier', locale)}
+      decideLabel={t('planner.agenda_decide', locale)}
+      notesLabel={t('planner.agenda_notes', locale)}
+      onReachEnd={extendAgendaEnd}
+      onReachStart={loadEarlier}
+      onDecideJump={jumpToDecisions}
     />
   {:else}
     <!-- Carrils (ADR-080 §7/§8) — desktop-first; at 390px the strip
