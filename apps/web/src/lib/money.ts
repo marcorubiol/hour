@@ -55,6 +55,60 @@ export interface MoneyPayer {
 	organization_name: string | null;
 }
 
+/**
+ * A document's tax breakdown is a list of generic, country-agnostic lines
+ * (money v3 · grill 2026-07-23). Each is a signed rate: `add` (+IVA/TVA),
+ * `withhold` (−IRPF), or `exempt` (0 + a legal reason). Spain is just a preset
+ * (esTaxLines); France (TVA) plugs in as another preset with no model change.
+ */
+export type TaxLineKind = 'add' | 'withhold' | 'exempt';
+
+export interface TaxLineInput {
+	label: string;
+	kind: TaxLineKind;
+	rate_pct: number;
+	exempt_reason?: string | null;
+}
+
+export interface InvoiceTaxLine extends TaxLineInput {
+	id: string;
+	base_amount: number;
+	amount: number;
+	ordinal: number;
+}
+
+/**
+ * Signed contribution of one rate line over a base. Mirrors the SQL
+ * round(base * rate / 100, 2) exactly: it works in integer base cents, because
+ * a plain float base*rate undershoots a half-cent (e.g. 4.1*15 = 61.4999…) and
+ * would round a cent low on the withhold path, drifting from the stored invoice.
+ */
+function taxLineAmount(base: number, line: TaxLineInput): number {
+	if (line.kind === 'exempt') return 0;
+	const baseCents = Math.round(base * 100);
+	const magnitude = Math.round((baseCents * line.rate_pct) / 100) / 100;
+	return line.kind === 'withhold' ? -magnitude : magnitude;
+}
+
+/** total = subtotal + Σ(signed line), snapped to cents; the pre-issue preview. */
+export function applyTaxLines(subtotal: number, lines: TaxLineInput[]): number {
+	const total = lines.reduce((sum, line) => sum + taxLineAmount(subtotal, line), subtotal);
+	return Math.round(total * 100) / 100;
+}
+
+/**
+ * Spain preset: turn the familiar IVA% / IRPF% inputs into generic tax lines.
+ * The model never stores "IVA"/"IRPF" as columns — only these signed lines, so
+ * France (TVA) or an exempt cross-border line are the same shape. A null/blank
+ * percentage drops that line.
+ */
+export function esTaxLines(vatPct: number | null, irpfPct: number | null): TaxLineInput[] {
+	const lines: TaxLineInput[] = [];
+	if (vatPct != null) lines.push({ label: 'IVA', kind: 'add', rate_pct: vatPct });
+	if (irpfPct != null) lines.push({ label: 'IRPF', kind: 'withhold', rate_pct: irpfPct });
+	return lines;
+}
+
 export interface MoneyInvoiceItem {
 	id: string;
 	workspace_id: string;
@@ -67,12 +121,10 @@ export interface MoneyInvoiceItem {
 	expected_on: string | null;
 	payment_condition: string | null;
 	subtotal: number;
-	vat_pct: number | null;
-	vat_amount: number | null;
-	irpf_pct: number | null;
-	irpf_amount: number | null;
 	total: number;
 	currency: string;
+	country: string | null;
+	tax_lines: InvoiceTaxLine[];
 	notes: string | null;
 	paid_amount: number;
 	project: { id: string; slug: string; name: string; workspace_id: string } | null;

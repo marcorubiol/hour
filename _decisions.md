@@ -2411,3 +2411,82 @@ Triggered by Marco's pre-scaffold doubt (Phase 0.0 day 5). Five alternatives eva
   bloquea):** una función creada en Planner nace **sin** `bolo_id` — falta la UX
   de crear/enlazar deal↔funciones (hoy: `New deal` a mano en la lente + el
   backfill). No cambia el modelo de este ADR.
+
+## ADR-088 — Grill 2026-07-23: las 4 lentes, Books, y el impuesto como adaptador de país
+
+- **Contexto.** Sesión `/grill-me` sobre las tres dudas de Marco: (A) ¿son 4 las
+  vistas, ni más ni menos?; (B) ¿son los nombres correctos y coherentes entre sí?;
+  (C) ¿mostramos lo necesario? Foco: **Money**, la lente que menos convence (es la
+  parte de artes escénicas que Marco nunca ha operado; el dinero se externaliza
+  pronto a una gestoría, pero la titularidad es de la compañía). Detalle y fuentes
+  (terminología del gremio, Verifactu ES, factura electrónica FR) en
+  `_notes/grill-2026-07-23-lentes-y-money-books.md`. Refina ADR-065 (lens set),
+  ADR-085 (facetas/escaleras), ADR-086 (money v3), ADR-087 (el bolo es el dinero).
+
+- **A — Cuatro, ni más ni menos = 1 digest + 3 lentes.** *Más no:* difusión es una
+  **persona** que cruza lentes (default-landing por rol), no un concern; los assets
+  son acceso rápido (⌘K) + readiness (Desk) + entrar al contenedor, no una lente
+  ("es un archivo" = almacenamiento, no dominio). *Menos no:* Money sobrevive como
+  **costura de extensibilidad** (una lente empieza fina y profundiza sin tocar la
+  nav), no por uso diario. **Desk no es una lente-par** — es el digest cross-concern;
+  gana **pill propio** y sale del segmented "view as", que queda con las 3 lentes.
+
+- **B — Fitness, no simetría.** Un nombre no debe *mentir* sobre su contenido (por
+  eso muere "Fiscal" = palabra del gestor, y "Numbers" = deja de decir dinero y se
+  necesita para una futura lente de datos). Desk · Planner · Conversations se
+  quedan. **Money → concepto `accounts`; etiquetas EN `Books` · ES `Cuentas` ·
+  FR/CA `Comptes`** — se traduce el *idiom* ("do the books / echar cuentas / faire
+  les comptes"), no la palabra. La ruta física `/h/money` se conserva (rename a
+  `accounts` = pase mecánico diferido; el usuario nunca ve la ruta).
+
+- **C — Books se organiza alrededor del bolo.** Spine = filas de bolos, no
+  secciones-tipo. Cabecera por moneda: **Vendido (Σ bruto)** lidera, luego Cobrado,
+  y **Pendiente/Vencido** (owed — la cifra-acción, derivada de facturas emitidas sin
+  cobrar vía aging) como número de acción; pipeline (holds) demovido. Neto-tras-tasas
+  por bolo como compañero del bruto. Vencido → tarea a Desk. Entidad: `bolo` = 1 sala
+  + 1 contrato + 1 fee/pagador/factura, 1..N funciones; discriminador "cambia el
+  dinero o la sala → otro bolo"; **gira = `line.kind`, no un nivel** (una gira exige
+  ≥3 municipios; un bolo de 2 funciones no lo es).
+
+- **Alcance de la factura (proforma, no emisión legal).** Emitir la factura es
+  trabajo de la compañía, pero hacerlo *desde Hour* la convierte en "software de
+  facturación" → **Verifactu (ES, 2027, multa ≤50k€) / Factur-X·Chorus Pro (FR,
+  2026-2027)**. Books llega hasta **proforma + radar de cobro + handoff** y **se para
+  antes** de la emisión certificada: esa última milla es por-país y diferida.
+
+- **El impuesto como adaptador de país (la decisión estructural).** El fiscal es
+  *inherentemente* por-país (España IVA/IRPF ≠ Francia TVA multi-tipo). El eje de
+  variación es cierto y con nombre → costura debida, pero como **frontera de datos,
+  no framework**: (1) **núcleo universal, agnóstico de impuestos** — el bolo/fee/
+  cobro no saben de fiscal; (2) **impuesto genérico** = tabla `invoice_tax_line`
+  con `kind ∈ {add, withhold, exempt}`, tipo con signo, `total = subtotal + Σ`;
+  la factura snapshotea su `country`; (3) el **preset** (qué líneas aplican) vive en
+  la capa app, **solo España relleno** (`esTaxLines`: IVA add + IRPF withhold; exento
+  con motivo para intracomunitario/export). Francia = otro preset + su emisión legal,
+  **cero migración del núcleo**. Se **quitan** las columnas hardcodeadas
+  `vat_pct/vat_amount/irpf_pct/irpf_amount` de `invoice`.
+
+- **Status 2026-07-23 — implementado (local, no desplegado), plegado dentro de
+  money-v3.** Sobre `feat/money-v3-build`: nueva migración
+  `20260722104200_money_v3_invoice_tax.sql` (invoice.country, drop vat/irpf, tabla
+  `invoice_tax_line` con RLS clon de `invoice_line`); `create_invoice_from_bolo`
+  reescrita a `p_tax_lines jsonb` + `p_country` (núcleo firma+suma, cero IVA/IRPF);
+  `db-types.ts` regenerado (diff quirúrgico); `money.ts` (`applyTaxLines`/`esTaxLines`;
+  `MoneyInvoiceItem` sin vat/irpf, con country+tax_lines); vista `/h/money`
+  (cabecera Vendido→Pendiente/Vencido vía aging, neto por bolo, diálogo vía preset);
+  `MoneyInvoices` (render de tax_lines); APIs `/api/invoices` (+`[id]`); i18n
+  Books/Cuentas/Comptes + `books.*`; `LensSwitcher` (Desk pill + 3 lentes).
+  **Verificado local:** `db:reset` OK (migración+objetos confirmados en DB local:
+  `invoice_tax_line` RLS force, `invoice.country` sí / `vat_pct` no, `v_country`
+  assigned); `svelte-check` **0/0** (1825 ficheros); unit **368/368** (incl. tests de
+  `applyTaxLines`/`esTaxLines` + regresión de redondeo). **Review adversarial**
+  (4 dim × find+verify): 4 bugs reales cazados y corregidos — `v_country` NULL,
+  redondeo TS≠SQL (1 cént IRPF), doble-conteo Cobrado/owed, `docs[0]` sin orden.
+  **RLS pendiente:** la suite `test:rls` apunta vía `.env.test` a la DB **hosted v2**
+  (los RPC de money-v3 → 404 allí) y `db:reset` local no siembra fixtures/usuarios;
+  las 5 fallas son mismatch de entorno, no del cambio (p.ej. `payment.test` peta en un
+  `list` *antes* de llamar al RPC editado). La suite RLS se valida en el entorno
+  hosted-v3 (baseline CI); la policy de `invoice_tax_line` es clon fiel de
+  `invoice_line`. **Follow-ups deliberados:** `InvoiceDocument.svelte`/`invoice.ts`
+  (PDF imprimible) siguen con IVA/IRPF local — a tax_lines cuando se cablee a datos;
+  UI de preset por-país (hoy inputs IVA/IRPF = preset ES); rename físico `accounts`.

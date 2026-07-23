@@ -14,6 +14,17 @@
 > there and a conversation hangs there — while modules stay at the line. And **facet** joins
 > the primitives: it is the cross-cutting dimension the model had no slot for. See
 > § Two ladders and § Facet below.
+> Amended 2026-07-23 — grill (lenses + money): **Money → Books** (concept `accounts`;
+> labels EN Books · ES Cuentas · FR/CA Comptes — the *idiom* "do the books / echar
+> cuentas / faire les comptes", not a literal). **Desk is the home/digest, not a peer
+> lens** — it gets its own pill; the "view as" switcher holds only the three concern
+> lenses. **The bolo is the money unit** (ADR-087), split from the función (calendar):
+> bolo = 1 venue + 1 contract + 1 fee/payer/invoice, 1..N funciones; **gira is a
+> `line.kind`, not a level.** Books ships as proforma + cobro-radar + handoff — it
+> stops before certified legal issuance (Verifactu ES / Factur-X·Chorus Pro FR), the
+> per-country last mile. Tax is a generic `invoice_tax_line` (add|withhold|exempt) +
+> a per-country preset adapter (Spain filled). See
+> `_notes/grill-2026-07-23-lentes-y-money-books.md` and `_decisions.md § ADR-088`.
 > Read next to: `architecture.md` (data model / stack), `_decisions.md` (ADR log).
 
 ## The one idea

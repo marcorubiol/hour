@@ -137,6 +137,45 @@
 
 ---
 
+## Ejecutado 2026-07-23 (ultracode, plegado dentro de money-v3)
+
+- **Fase 0 — tasas genéricas ✔** Nueva migración `supabase/migrations/
+  20260722104200_money_v3_invoice_tax.sql`: `invoice.country`, quita
+  `vat_pct/vat_amount/irpf_pct/irpf_amount`, tabla `invoice_tax_line`
+  (`kind add|withhold|exempt`, base+amount snapshot, RLS clon de `invoice_line`).
+  `create_invoice_from_bolo` reescrita: recibe `p_tax_lines jsonb` + `p_country`,
+  el núcleo firma+suma, cero IVA/IRPF hardcodeado. `db-types.ts` regenerado (diff
+  quirúrgico). Preset España en app (`esTaxLines` en `money.ts`).
+- **Fase 1 — Books ✔** `money.ts`: `TaxLineInput`/`InvoiceTaxLine`/`applyTaxLines`/
+  `esTaxLines`; `MoneyInvoiceItem` sin vat/irpf, con `country`+`tax_lines`. Vista
+  `/h/money`: cabecera **Vendido (Σ bruto) → Cobrado → Pendiente/Vencido** (owed vía
+  `agingState`), pipeline demovido; **neto por bolo**; diálogo de factura vía preset.
+  `MoneyInvoices.svelte` renderiza tax_lines. APIs `/api/invoices` (GET/POST) y
+  `[id]` migradas a tax_lines+country.
+- **Fase 2 — naming ✔** i18n `lens.money` → **Books/Cuentas/Comptes** + claves
+  `books.*`. `LensSwitcher`: **Desk fuera del segmented, pill propio**; las 3 lentes
+  en "view as". Título de la vista vía `t('lens.money')`. Ruta física `/h/money`
+  intacta (rename a `accounts` = pase mecánico diferido).
+- **Verificación:** `db:reset` local exit 0 (migraciones + seed; `invoice_tax_line`
+  RLS force, `invoice.country` sí / `vat_pct` no, `v_country` assigned — todo
+  confirmado por query al DB local) · `svelte-check` **0/0** (1825 ficheros) · unit
+  **368/368** (incl. regresión de redondeo TS↔SQL) · RLS: la suite `test:rls` apunta
+  vía `.env.test` a la DB hosted v2 (RPC money-v3 → 404) y `db:reset` local no
+  siembra fixtures/usuarios → las 5 fallas son mismatch de entorno, no del cambio
+  (`payment.test` peta en un `list` *antes* del RPC editado); validar en el entorno
+  hosted-v3 (baseline CI). Policy de `invoice_tax_line` = clon fiel de `invoice_line`.
+- **Review adversarial** (workflow: 4 dimensiones × find + verify): **4 bugs reales
+  cazados y corregidos** — (1) `v_country` nunca se asignaba → `invoice.country`
+  siempre NULL; (2) redondeo TS `Math.round(base*rate)/100` divergía 1 cént del SQL
+  en la vía withhold/IRPF (preview ≠ total guardado) → reescrito a céntimos-enteros +
+  regresión unit; (3) doble-conteo Cobrado vs Pendiente (pago desde deal-card subía
+  collected sin bajar owed) → owed re-medido a nivel bolo, misma fuente que collected;
+  (4) `docs[0]` sin filtro/orden mostraba draft/cancelled → ranking issued>paid>draft>
+  cancelled + gate del neto a issued/paid. 2 hallazgos refutados.
+- **Follow-ups deliberados:** `InvoiceDocument.svelte`/`invoice.ts` (PDF imprimible)
+  siguen con IVA/IRPF local — pasar a tax_lines cuando se cablee a datos reales;
+  preset de país en la UI (hoy inputs IVA/IRPF = preset ES); rename físico `accounts`.
+
 ## Plan de acción
 
 ### FASE 0 — Corrección de rumbo del modelo de tasas (antes de mergear money-v3)

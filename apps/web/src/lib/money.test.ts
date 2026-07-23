@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { agingState, observedPayerTermsDays, type TermsPayment } from './money';
+import {
+	agingState,
+	applyTaxLines,
+	esTaxLines,
+	observedPayerTermsDays,
+	type TermsPayment,
+} from './money';
 
 describe('observedPayerTermsDays', () => {
 	it('returns the median only after two fully paid samples', () => {
@@ -103,5 +109,45 @@ describe('agingState', () => {
 
 		expect(state.state).toBe('paid');
 		expect(state.paidAmount).toBe(100);
+	});
+});
+
+describe('esTaxLines / applyTaxLines (generic country-agnostic tax)', () => {
+	it('turns the Spain IVA/IRPF percentages into signed generic lines', () => {
+		expect(esTaxLines(21, 15)).toEqual([
+			{ label: 'IVA', kind: 'add', rate_pct: 21 },
+			{ label: 'IRPF', kind: 'withhold', rate_pct: 15 },
+		]);
+	});
+
+	it('drops a null/absent percentage', () => {
+		expect(esTaxLines(10, null)).toEqual([{ label: 'IVA', kind: 'add', rate_pct: 10 }]);
+		expect(esTaxLines(null, null)).toEqual([]);
+	});
+
+	it('applies add (+) and withhold (−) over the subtotal', () => {
+		// 2500 + 21% IVA (525) − 15% IRPF (375) = 2650 (matches the SQL rounding)
+		expect(applyTaxLines(2500, esTaxLines(21, 15))).toBe(2650);
+	});
+
+	it('a bare subtotal (no lines) is its own total', () => {
+		expect(applyTaxLines(2500, [])).toBe(2500);
+	});
+
+	it('rounds each line half-away-from-zero to match the SQL (no 1-cent drift)', () => {
+		// The float path base*rate undershoots these half-cents (4.1*15 = 61.4999…)
+		// and would give 4.35 / 69.01 / 137.49; create_invoice_from_bolo stores the
+		// values below, so the preview must too.
+		expect(applyTaxLines(4.1, esTaxLines(21, 15))).toBe(4.34);
+		expect(applyTaxLines(65.1, esTaxLines(21, 15))).toBe(69);
+		expect(applyTaxLines(129.7, esTaxLines(21, 15))).toBe(137.48);
+	});
+
+	it('an exempt line contributes zero (cross-border reverse charge / export)', () => {
+		expect(
+			applyTaxLines(2500, [
+				{ label: 'Exempt', kind: 'exempt', rate_pct: 0, exempt_reason: 'intra-EU' },
+			]),
+		).toBe(2500);
 	});
 });

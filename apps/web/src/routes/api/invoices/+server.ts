@@ -77,10 +77,11 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
     'select',
     [
       'id,number,status,issued_on,due_on,subtotal,total,currency',
-      'workspace_id,project_id,payer_person_id,expected_on,payment_condition,vat_pct,vat_amount,irpf_pct,irpf_amount,notes',
+      'workspace_id,project_id,payer_person_id,expected_on,payment_condition,country,notes',
       'project:project_id(id,slug,name,workspace_id)',
       'payer:workspace_person!invoice_workspace_payer_person_fkey(id:person_id,slug,full_name,organization:workspace_organization!workspace_person_organization_fkey(name))',
       'lines:invoice_line(bolo_id)',
+      'tax_lines:invoice_tax_line(id,label,kind,rate_pct,base_amount,amount,exempt_reason,ordinal)',
       'payments:payment!payment_invoice_id_fkey(id,workspace_id,invoice_id,amount,received_on,method,reference,notes,created_at)',
     ].join(','),
   );
@@ -124,10 +125,20 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
   }
 };
 
+const TaxLineSchema = v.object({
+  label: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(60)),
+  kind: v.picklist(['add', 'withhold', 'exempt']),
+  rate_pct: v.pipe(v.number(), v.minValue(0), v.maxValue(100)),
+  exempt_reason: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(200)))),
+});
+
 const CreateSchema = v.object({
   bolo_id: v.pipe(v.string(), v.uuid()),
-  vat_pct: v.optional(v.nullable(v.pipe(v.number(), v.minValue(0), v.maxValue(100)))),
-  irpf_pct: v.optional(v.nullable(v.pipe(v.number(), v.minValue(0), v.maxValue(100)))),
+  // Generic, country-agnostic tax breakdown (grill 2026-07-23): a list of signed
+  // rate lines. The per-country preset (app layer) builds these; the core just
+  // signs + sums. Empty = no tax (e.g. a bare proforma).
+  tax_lines: v.optional(v.array(TaxLineSchema), []),
+  country: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.length(2)))),
   number: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(60)))),
   due_on: v.optional(v.nullable(v.pipe(v.string(), v.isoDate()))),
   expected_on: v.optional(v.nullable(v.pipe(v.string(), v.isoDate()))),
@@ -171,8 +182,8 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
   try {
     const { data } = await pgPostRpc<Record<string, unknown>>(env, 'create_invoice_from_bolo', jwt, {
       p_bolo_id: input.bolo_id,
-      p_vat_pct: input.vat_pct ?? null,
-      p_irpf_pct: input.irpf_pct ?? null,
+      p_tax_lines: input.tax_lines ?? [],
+      p_country: input.country ?? null,
       p_number: input.number ?? null,
       p_due_on: input.due_on ?? null,
       p_notes: input.notes ?? null,

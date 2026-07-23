@@ -1,10 +1,11 @@
--- Money v3 (ADR-086) — Phase 2b: the issue path. issue_invoice resolves the
--- issuer (workspace override ?? account default), freezes the issuer + payer
--- fiscal snapshots (ADR-050), and assigns the auto-correlative number from the
--- right series. create_invoice gains a doc_type + payer identity (trailing
--- optional params — the money v2 9-arg call still resolves and behaves exactly
--- as before, defaulting to a factura). Nothing v2 relies on changes: v2 still
--- issues by PATCHing status='issued' and its invoice-paid triggers are intact.
+-- Money v3 (ADR-086 · ADR-087 · grill 2026-07-23) — Phase 2b: the issue path.
+-- issue_invoice resolves the issuer (workspace override ?? account default),
+-- freezes the issuer + payer fiscal snapshots (ADR-050), and assigns the
+-- auto-correlative number. create_invoice_from_bolo bills a deal from its bolo
+-- and takes a generic, country-agnostic tax breakdown: p_tax_lines is an array
+-- of signed rate lines (add | withhold | exempt) built by the per-country
+-- preset (app layer); the core just signs, sums (total = subtotal + Σ amount)
+-- and snapshots the regime country. No IVA/IRPF is hardcoded here.
 
 -- Snapshot builder: the printed subset of a fiscal identity, frozen on issue.
 CREATE OR REPLACE FUNCTION public.fiscal_identity_snapshot(p_id uuid)
@@ -145,8 +146,7 @@ DROP FUNCTION public.create_invoice(uuid, numeric, numeric, text, date, text, da
 
 CREATE FUNCTION public.create_invoice_from_bolo(
   p_bolo_id uuid,
-  p_vat_pct numeric DEFAULT NULL,
-  p_irpf_pct numeric DEFAULT NULL,
+  p_tax_lines jsonb DEFAULT '[]'::jsonb,
   p_number text DEFAULT NULL,
   p_due_on date DEFAULT NULL,
   p_notes text DEFAULT NULL,
@@ -154,7 +154,8 @@ CREATE FUNCTION public.create_invoice_from_bolo(
   p_payment_condition text DEFAULT NULL,
   p_payer_person_id uuid DEFAULT NULL,
   p_doc_type text DEFAULT NULL,
-  p_payer_fiscal_identity_id uuid DEFAULT NULL
+  p_payer_fiscal_identity_id uuid DEFAULT NULL,
+  p_country text DEFAULT NULL
 ) RETURNS public.invoice
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -169,21 +170,28 @@ DECLARE
   v_inferred_payer uuid;
   v_payer uuid;
   v_doc_type text;
+  v_country text;
   v_subtotal numeric;
-  v_vat numeric;
-  v_irpf numeric;
   v_total numeric;
   v_desc text;
   v_invoice public.invoice;
+  v_elem jsonb;
+  v_label text;
+  v_kind text;
+  v_rate numeric;
+  v_reason text;
+  v_amount numeric;
+  v_ordinal integer := 0;
+  v_tax_rows jsonb := '[]'::jsonb;
 BEGIN
   IF v_caller IS NULL THEN
     RAISE EXCEPTION 'authentication required' USING ERRCODE = '42501';
   END IF;
-  IF p_vat_pct IS NOT NULL AND (p_vat_pct < 0 OR p_vat_pct > 100) THEN
-    RAISE EXCEPTION 'vat_pct must be between 0 and 100' USING ERRCODE = '22023';
+  IF jsonb_typeof(coalesce(p_tax_lines, '[]'::jsonb)) <> 'array' THEN
+    RAISE EXCEPTION 'tax_lines must be a JSON array' USING ERRCODE = '22023';
   END IF;
-  IF p_irpf_pct IS NOT NULL AND (p_irpf_pct < 0 OR p_irpf_pct > 100) THEN
-    RAISE EXCEPTION 'irpf_pct must be between 0 and 100' USING ERRCODE = '22023';
+  IF p_country IS NOT NULL AND upper(btrim(p_country)) !~ '^[A-Z]{2}$' THEN
+    RAISE EXCEPTION 'country must be an ISO alpha-2 code' USING ERRCODE = '22023';
   END IF;
   IF p_payment_condition IS NOT NULL AND length(p_payment_condition) > 2000 THEN
     RAISE EXCEPTION 'payment_condition is too long' USING ERRCODE = '22023';
@@ -237,6 +245,10 @@ BEGIN
     CASE WHEN v_ws.settings->>'invoicing_mode' = 'interno' THEN 'proforma' ELSE 'factura' END
   );
 
+  -- country: the tax regime this document is snapshotted under. The app passes
+  -- the resolved regime; fall back to the bolo's, then the workspace's.
+  v_country := upper(nullif(btrim(coalesce(p_country, v_bolo.country, v_ws.country, '')), ''));
+
   SELECT name INTO v_project_name FROM public.project WHERE id = v_bolo.project_id;
 
   -- The deal may span several functions; date the line by the earliest one.
@@ -250,9 +262,45 @@ BEGIN
 
   v_payer := coalesce(p_payer_person_id, v_inferred_payer);
   v_subtotal := v_bolo.fee_amount;
-  v_vat := CASE WHEN p_vat_pct IS NULL THEN NULL ELSE round(v_subtotal * p_vat_pct / 100, 2) END;
-  v_irpf := CASE WHEN p_irpf_pct IS NULL THEN NULL ELSE round(v_subtotal * p_irpf_pct / 100, 2) END;
-  v_total := v_subtotal + coalesce(v_vat, 0) - coalesce(v_irpf, 0);
+  v_total := v_subtotal;
+
+  -- Validate + compute each generic tax line. The per-country preset (app layer)
+  -- decided which lines apply; the core just signs each and sums the total.
+  FOR v_elem IN SELECT value FROM jsonb_array_elements(coalesce(p_tax_lines, '[]'::jsonb))
+  LOOP
+    v_label  := btrim(coalesce(v_elem->>'label', ''));
+    v_kind   := coalesce(v_elem->>'kind', '');
+    v_rate   := coalesce((v_elem->>'rate_pct')::numeric, 0);
+    v_reason := nullif(btrim(coalesce(v_elem->>'exempt_reason', '')), '');
+
+    IF v_label = '' THEN
+      RAISE EXCEPTION 'tax line label is required' USING ERRCODE = '22023';
+    END IF;
+    IF v_kind NOT IN ('add', 'withhold', 'exempt') THEN
+      RAISE EXCEPTION 'tax line kind must be add, withhold or exempt' USING ERRCODE = '22023';
+    END IF;
+    IF v_rate < 0 OR v_rate > 100 THEN
+      RAISE EXCEPTION 'tax line rate must be between 0 and 100' USING ERRCODE = '22023';
+    END IF;
+    IF v_kind = 'exempt' AND v_reason IS NULL THEN
+      RAISE EXCEPTION 'an exempt tax line needs a reason' USING ERRCODE = '22023';
+    END IF;
+
+    v_amount := CASE v_kind
+      WHEN 'add'      THEN round(v_subtotal * v_rate / 100, 2)
+      WHEN 'withhold' THEN -round(v_subtotal * v_rate / 100, 2)
+      ELSE 0
+    END;
+    v_total := v_total + v_amount;
+
+    v_tax_rows := v_tax_rows || jsonb_build_object(
+      'label', v_label, 'kind', v_kind, 'rate_pct', v_rate,
+      'base_amount', v_subtotal, 'amount', v_amount,
+      'exempt_reason', v_reason, 'ordinal', v_ordinal
+    );
+    v_ordinal := v_ordinal + 1;
+  END LOOP;
+
   v_desc := concat_ws(
     ' — ',
     coalesce(v_project_name, 'Performance'),
@@ -262,7 +310,7 @@ BEGIN
 
   INSERT INTO public.invoice (
     workspace_id, project_id, number, due_on, expected_on, payment_condition,
-    status, doc_type, subtotal, vat_pct, vat_amount, irpf_pct, irpf_amount, total,
+    status, doc_type, country, subtotal, total,
     currency, payer_person_id, payer_fiscal_identity_id, notes, created_by
   ) VALUES (
     v_bolo.workspace_id,
@@ -273,11 +321,8 @@ BEGIN
     nullif(btrim(coalesce(p_payment_condition, '')), ''),
     'draft',
     v_doc_type,
+    v_country,
     v_subtotal,
-    p_vat_pct,
-    v_vat,
-    p_irpf_pct,
-    v_irpf,
     v_total,
     coalesce(v_bolo.fee_currency, 'EUR'),
     v_payer,
@@ -292,13 +337,23 @@ BEGIN
     v_bolo.workspace_id, v_invoice.id, v_bolo.id, v_desc, 1, v_subtotal
   );
 
+  INSERT INTO public.invoice_tax_line (
+    workspace_id, invoice_id, label, kind, rate_pct, base_amount, amount, exempt_reason, ordinal
+  )
+  SELECT
+    v_bolo.workspace_id, v_invoice.id,
+    e->>'label', e->>'kind', (e->>'rate_pct')::numeric,
+    (e->>'base_amount')::numeric, (e->>'amount')::numeric,
+    e->>'exempt_reason', (e->>'ordinal')::integer
+  FROM jsonb_array_elements(v_tax_rows) AS e;
+
   RETURN v_invoice;
 END;
 $$;
 
 REVOKE ALL ON FUNCTION public.create_invoice_from_bolo(
-  uuid, numeric, numeric, text, date, text, date, text, uuid, text, uuid
+  uuid, jsonb, text, date, text, date, text, uuid, text, uuid, text
 ) FROM PUBLIC, anon, service_role;
 GRANT EXECUTE ON FUNCTION public.create_invoice_from_bolo(
-  uuid, numeric, numeric, text, date, text, date, text, uuid, text, uuid
+  uuid, jsonb, text, date, text, date, text, uuid, text, uuid, text
 ) TO authenticated;

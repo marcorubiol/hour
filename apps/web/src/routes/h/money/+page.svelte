@@ -28,7 +28,18 @@
   import { addToast } from '$lib/components/Toast.svelte';
   import { dayLabel } from '$lib/datetime';
   import { categoryLabel, EXPENSE_CATEGORIES, type ExpenseItem } from '$lib/expense';
-  import { fmtFee, fmtMoney, PAYMENT_METHODS, type MoneyInvoiceItem, type MoneyPayer } from '$lib/money';
+  import {
+    agingState,
+    applyTaxLines,
+    esTaxLines,
+    fmtFee,
+    fmtMoney,
+    observedPayerTermsDays,
+    PAYMENT_METHODS,
+    type MoneyInvoiceItem,
+    type MoneyPayer,
+  } from '$lib/money';
+  import { detectLocale, t } from '$lib/i18n';
   import { performanceStatusLabel, performanceStatusTone } from '$lib/performance';
   import { usePins } from '$lib/stores/pins.svelte';
   import {
@@ -72,6 +83,7 @@
   const CONTRACTED = ['confirmed', 'done', 'invoiced', 'paid'];
 
   const pins = usePins();
+  const locale = detectLocale(navigator.language);
 
   const workspacesQuery = createQuery({
     queryKey: ['workspaces'],
@@ -180,6 +192,9 @@
   );
 
   // Documents live on the bolo: map each invoice to the bolo its line references.
+  // Rank so the card's chip + net read the LIVE document (issued > paid > draft >
+  // cancelled), newest first — not raw API order (which floats a new draft first).
+  const DOC_RANK = (s: string) => (s === 'issued' ? 0 : s === 'paid' ? 1 : s === 'draft' ? 2 : 3);
   let invoicesByBolo = $derived.by(() => {
     const map = new Map<string, MoneyInvoiceItem[]>();
     for (const inv of invoices) {
@@ -189,6 +204,11 @@
         bucket.push(inv);
         map.set(l.bolo_id, bucket);
       }
+    }
+    for (const bucket of map.values()) {
+      bucket.sort(
+        (a, b) => DOC_RANK(a.status) - DOC_RANK(b.status) || (b.issued_on ?? '').localeCompare(a.issued_on ?? ''),
+      );
     }
     return map;
   });
@@ -299,31 +319,59 @@
     return error instanceof Error ? error.message : '';
   });
 
-  // ── General position (top) — per currency: pipeline · collected · pending ──
+  // ── General position (top) — per currency (grill 2026-07-23):
+  //   Vendido (Σ gross fee) leads · Cobrado · Pendiente/Vencido (owed — the action
+  //   number, from issued-unpaid invoices via aging) · pipeline (holds) demoted.
   let currencies = $derived([...new Set(bolos.map((b) => b.fee_currency ?? 'EUR'))].sort());
+  const today = new Date();
+  let termsByPayer = $derived(
+    observedPayerTermsDays(invoices, invoices.flatMap((i) => i.payments)),
+  );
   let totals = $derived.by(() => {
-    const map = new Map<string, { currency: string; pipeline: number; contratado: number; collected: number; invoiced: number }>();
+    const map = new Map<
+      string,
+      { currency: string; vendido: number; collected: number; owed: number; overdue: number; pipeline: number }
+    >();
     const ensure = (currency: string) => {
       const existing = map.get(currency);
       if (existing) return existing;
-      const created = { currency, pipeline: 0, contratado: 0, collected: 0, invoiced: 0 };
+      const created = { currency, vendido: 0, collected: 0, owed: 0, overdue: 0, pipeline: 0 };
       map.set(currency, created);
       return created;
     };
+    // Owed is measured at the BOLO level, from the same bolo.collected that feeds
+    // Cobrado — never from invoice-linked payments — so a deal-card payment (which
+    // anchors to the bolo, not the invoice) can't show as both collected AND still
+    // owed. The issued invoice only supplies the tax-adjusted total + expected date.
     for (const b of bolos) {
-      const cur = b.fee_currency ?? 'EUR';
-      const roll = ensure(cur);
-      roll.collected += Number(b.collected ?? 0);
+      const roll = ensure(b.fee_currency ?? 'EUR');
+      const collected = Number(b.collected ?? 0);
+      roll.collected += collected;
       if (b.fee_amount === null) continue;
-      if (b.status === 'confirmed' || b.status === 'done') roll.pipeline += Number(b.fee_amount);
-      if (CONTRACTED.includes(b.status)) roll.contratado += Number(b.fee_amount);
+      const contracted = CONTRACTED.includes(b.status);
+      if (contracted) roll.vendido += Number(b.fee_amount);
+      else if (b.status.startsWith('hold')) roll.pipeline += Number(b.fee_amount);
+      if (!contracted) continue;
+      const issuedDoc = (invoicesByBolo.get(b.id) ?? []).find((i) => i.status === 'issued');
+      const effectiveTotal = issuedDoc ? Number(issuedDoc.total) : Number(b.fee_amount);
+      const outstanding = Math.max(0, effectiveTotal - collected);
+      if (outstanding <= 0) continue;
+      roll.owed += outstanding;
+      if (issuedDoc) {
+        const aging = agingState(
+          {
+            ...issuedDoc,
+            observed_terms_days: issuedDoc.payer_person_id
+              ? termsByPayer.get(issuedDoc.payer_person_id)?.days ?? null
+              : null,
+          },
+          issuedDoc.payments,
+          today,
+        );
+        if (aging.state === 'past-expected') roll.overdue += outstanding;
+      }
     }
-    for (const invoice of invoices) {
-      if (invoice.status === 'issued' || invoice.status === 'paid') ensure(invoice.currency).invoiced += Number(invoice.total);
-    }
-    return [...map.values()]
-      .map((t) => ({ ...t, pending: Math.max(0, t.contratado - t.collected) }))
-      .sort((a, b) => a.currency.localeCompare(b.currency));
+    return [...map.values()].sort((a, b) => a.currency.localeCompare(b.currency));
   });
 
   let expenseTotals = $derived.by(() => {
@@ -448,20 +496,16 @@
     if (s === '') return null;
     return Number(s);
   }
-  let invTotal = $derived.by(() => {
-    const fee = invBolo?.fee_amount ?? 0;
-    const vat = pctOrNull(iVat);
-    const irpf = pctOrNull(iIrpf);
-    const vatAmt = vat === null ? 0 : Math.round(fee * vat) / 100;
-    const irpfAmt = irpf === null ? 0 : Math.round(fee * irpf) / 100;
-    return fee + vatAmt - irpfAmt;
-  });
+  let invTotal = $derived(
+    applyTaxLines(invBolo?.fee_amount ?? 0, esTaxLines(pctOrNull(iVat), pctOrNull(iIrpf))),
+  );
   const createInvoice = createMutation({
     mutationFn: async () => {
       const body = await mutateJSON<{ invoice?: unknown }>('POST', '/api/invoices', {
         bolo_id: invBolo!.id,
-        vat_pct: pctOrNull(iVat),
-        irpf_pct: pctOrNull(iIrpf),
+        // ES preset → generic tax lines; the model stays country-agnostic (grill).
+        tax_lines: esTaxLines(pctOrNull(iVat), pctOrNull(iIrpf)),
+        country: invBolo!.country ?? null,
         due_on: iDueOn || null,
         expected_on: iExpectedOn || null,
         payment_condition: iPaymentCondition.trim() || null,
@@ -602,7 +646,7 @@
 
 <section class="mny">
   <LensHeader>
-    {#snippet title()}<LensTitle text="Money" />{/snippet}
+    {#snippet title()}<LensTitle text={t('lens.money', locale)} />{/snippet}
     <!-- TEMP sub — placeholder until this lens's real subtitle is defined. -->
     {#snippet sub()}<span class="lenshead__todo">temporal · define esta lente</span>{/snippet}
   </LensHeader>
@@ -615,15 +659,18 @@
     {#each totals as total (total.currency)}
       <span class="mny__currency-total">
         <span class="mny__currency">{total.currency}</span>
-        <span class="mny__total"><span class="mny__total-label">pipeline</span>{fmtMoney(total.pipeline)}</span>
-        <span class="mny__total"><span class="mny__total-label">collected</span>{fmtMoney(total.collected)}</span>
-        <span class="mny__total"><span class="mny__total-label">pending</span>{fmtMoney(total.pending)}</span>
-        {#if anyDocMode}
-          <span class="mny__total mny__total--soft"><span class="mny__total-label">invoiced</span>{fmtMoney(total.invoiced)}</span>
+        <span class="mny__total"><span class="mny__total-label">{t('books.sold', locale)}</span>{fmtMoney(total.vendido)}</span>
+        <span class="mny__total"><span class="mny__total-label">{t('books.collected', locale)}</span>{fmtMoney(total.collected)}</span>
+        <span class="mny__total"><span class="mny__total-label">{t('books.owed', locale)}</span>{fmtMoney(total.owed)}</span>
+        {#if total.overdue > 0}
+          <span class="mny__total mny__total--danger"><span class="mny__total-label">{t('books.overdue', locale)}</span>{fmtMoney(total.overdue)}</span>
+        {/if}
+        {#if total.pipeline > 0}
+          <span class="mny__total mny__total--soft"><span class="mny__total-label">{t('books.pipeline', locale)}</span>{fmtMoney(total.pipeline)}</span>
         {/if}
       </span>
     {/each}
-    <span class="mny__total-note">current pins · currencies kept separate · pending = contracted − collected</span>
+    <span class="mny__total-note">current pins · currencies kept separate · owed = contracted deals not yet collected</span>
   </div>
 
   {#if errorMsg}
@@ -680,6 +727,9 @@
                 <span class="fee__badge"><StateBadge label={performanceStatusLabel(b.status)} tone={performanceStatusTone(b.status)} /></span>
                 <span class="fee__amt">
                   <button type="button" class="fee__fee" title="Edit fee" onclick={() => openFee(b)}>{fmtFee(b.fee_amount, b.fee_currency)}</button>
+                  {#if docs.length > 0 && (docs[0]!.status === 'issued' || docs[0]!.status === 'paid') && Number(docs[0]!.total) !== Number(docs[0]!.subtotal)}
+                    <span class="fee__net">{t('books.net', locale)} {fmtMoney(Number(docs[0]!.total))} {docs[0]!.currency}</span>
+                  {/if}
                   {#if b.fee_amount !== null}<span class="pill" data-tone={FEE_PILL[st].tone}>{FEE_PILL[st].label}</span>{/if}
                 </span>
               </div>
@@ -850,6 +900,7 @@
     .mny__currency { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-muted); letter-spacing: 0.08em; }
     .mny__total { font-family: var(--font-display); font-size: var(--text-l); color: var(--text-color); display: flex; align-items: baseline; gap: var(--space-xs); }
     .mny__total--soft { color: var(--text-muted); }
+    .mny__total--danger { color: var(--danger); }
     .mny__total-label { font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-faint); }
     .mny__total-note { font-size: var(--text-xs); color: var(--text-faint); }
     .mny__state { font-size: var(--text-s); color: var(--text-faint); }
@@ -898,6 +949,7 @@
     .fee__amt { text-align: end; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
     .fee__fee { font-family: var(--font-mono); font-size: var(--text-m); color: var(--text-color); font-variant-numeric: tabular-nums; }
     .fee__fee:hover { text-decoration: underline; }
+    .fee__net { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-muted); font-variant-numeric: tabular-nums; }
     .pill {
       display: inline-block; font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: 0.04em;
       text-transform: lowercase; padding: 2px 8px; border-radius: var(--radius-circle);

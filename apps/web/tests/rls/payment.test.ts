@@ -83,8 +83,7 @@ describe.skipIf(!envReady())('payment RLS + derived invoice status', () => {
 
       const createdInvoice = await pgRpc<InvoiceRow>('create_invoice_from_bolo', jwt, {
         p_bolo_id: bolo.id,
-        p_vat_pct: null,
-        p_irpf_pct: null,
+        p_tax_lines: [],
         p_number: `rls-payment-${RUN_TAG}`,
         p_due_on: null,
         p_notes: null,

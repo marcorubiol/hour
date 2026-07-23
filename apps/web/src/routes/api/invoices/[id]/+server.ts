@@ -71,7 +71,7 @@ export const PATCH: RequestHandler = async ({ request, params, platform, locals 
   search.set('deleted_at', 'is.null');
   search.set(
     'select',
-    'id,workspace_id,project_id,payer_person_id,number,status,issued_on,due_on,expected_on,payment_condition,subtotal,vat_pct,vat_amount,irpf_pct,irpf_amount,total,currency,notes',
+    'id,workspace_id,project_id,payer_person_id,number,status,issued_on,due_on,expected_on,payment_condition,subtotal,total,currency,country,notes',
   );
 
   try {

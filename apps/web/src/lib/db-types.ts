@@ -1114,6 +1114,7 @@ export type Database = {
       }
       invoice: {
         Row: {
+          country: string | null
           created_at: string
           created_by: string | null
           currency: string
@@ -1123,8 +1124,6 @@ export type Database = {
           due_on: string | null
           expected_on: string | null
           id: string
-          irpf_amount: number | null
-          irpf_pct: number | null
           issued_on: string
           issuer_fiscal_identity_id: string | null
           issuer_snapshot: Json | null
@@ -1139,11 +1138,10 @@ export type Database = {
           subtotal: number
           total: number
           updated_at: string
-          vat_amount: number | null
-          vat_pct: number | null
           workspace_id: string
         }
         Insert: {
+          country?: string | null
           created_at?: string
           created_by?: string | null
           currency?: string
@@ -1153,8 +1151,6 @@ export type Database = {
           due_on?: string | null
           expected_on?: string | null
           id?: string
-          irpf_amount?: number | null
-          irpf_pct?: number | null
           issued_on?: string
           issuer_fiscal_identity_id?: string | null
           issuer_snapshot?: Json | null
@@ -1169,11 +1165,10 @@ export type Database = {
           subtotal?: number
           total?: number
           updated_at?: string
-          vat_amount?: number | null
-          vat_pct?: number | null
           workspace_id: string
         }
         Update: {
+          country?: string | null
           created_at?: string
           created_by?: string | null
           currency?: string
@@ -1183,8 +1178,6 @@ export type Database = {
           due_on?: string | null
           expected_on?: string | null
           id?: string
-          irpf_amount?: number | null
-          irpf_pct?: number | null
           issued_on?: string
           issuer_fiscal_identity_id?: string | null
           issuer_snapshot?: Json | null
@@ -1199,8 +1192,6 @@ export type Database = {
           subtotal?: number
           total?: number
           updated_at?: string
-          vat_amount?: number | null
-          vat_pct?: number | null
           workspace_id?: string
         }
         Relationships: [
@@ -1353,6 +1344,63 @@ export type Database = {
           },
           {
             foreignKeyName: "invoice_number_series_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspace"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invoice_tax_line: {
+        Row: {
+          amount: number
+          base_amount: number
+          created_at: string
+          exempt_reason: string | null
+          id: string
+          invoice_id: string
+          kind: string
+          label: string
+          ordinal: number
+          rate_pct: number
+          workspace_id: string
+        }
+        Insert: {
+          amount: number
+          base_amount: number
+          created_at?: string
+          exempt_reason?: string | null
+          id?: string
+          invoice_id: string
+          kind: string
+          label: string
+          ordinal?: number
+          rate_pct?: number
+          workspace_id: string
+        }
+        Update: {
+          amount?: number
+          base_amount?: number
+          created_at?: string
+          exempt_reason?: string | null
+          id?: string
+          invoice_id?: string
+          kind?: string
+          label?: string
+          ordinal?: number
+          rate_pct?: number
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_tax_line_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoice"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_tax_line_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspace"
@@ -2990,18 +3038,19 @@ export type Database = {
       create_invoice_from_bolo: {
         Args: {
           p_bolo_id: string
+          p_country?: string
           p_doc_type?: string
           p_due_on?: string
           p_expected_on?: string
-          p_irpf_pct?: number
           p_notes?: string
           p_number?: string
           p_payer_fiscal_identity_id?: string
           p_payer_person_id?: string
           p_payment_condition?: string
-          p_vat_pct?: number
+          p_tax_lines?: Json
         }
         Returns: {
+          country: string | null
           created_at: string
           created_by: string | null
           currency: string
@@ -3011,8 +3060,6 @@ export type Database = {
           due_on: string | null
           expected_on: string | null
           id: string
-          irpf_amount: number | null
-          irpf_pct: number | null
           issued_on: string
           issuer_fiscal_identity_id: string | null
           issuer_snapshot: Json | null
@@ -3027,8 +3074,6 @@ export type Database = {
           subtotal: number
           total: number
           updated_at: string
-          vat_amount: number | null
-          vat_pct: number | null
           workspace_id: string
         }
         SetofOptions: {
@@ -3432,6 +3477,7 @@ export type Database = {
       issue_invoice: {
         Args: { p_invoice_id: string }
         Returns: {
+          country: string | null
           created_at: string
           created_by: string | null
           currency: string
@@ -3441,8 +3487,6 @@ export type Database = {
           due_on: string | null
           expected_on: string | null
           id: string
-          irpf_amount: number | null
-          irpf_pct: number | null
           issued_on: string
           issuer_fiscal_identity_id: string | null
           issuer_snapshot: Json | null
@@ -3457,8 +3501,6 @@ export type Database = {
           subtotal: number
           total: number
           updated_at: string
-          vat_amount: number | null
-          vat_pct: number | null
           workspace_id: string
         }
         SetofOptions: {

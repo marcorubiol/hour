@@ -15,8 +15,9 @@
   const lens = useLens();
   const locale = detectLocale(navigator.language);
 
+  // Desk is the home/digest, not a peer lens (grill 2026-07-23): it gets its own
+  // pill; the segmented "view as" holds only the three concern lenses.
   const VIEW_AS: { id: Lens; label: string }[] = [
-    { id: 'desk', label: t('lens.desk', locale) },
     { id: 'planner', label: t('lens.planner', locale) },
     { id: 'conversations', label: t('lens.conversations', locale) },
     { id: 'money', label: t('lens.money', locale) },
@@ -30,21 +31,60 @@
   }
 </script>
 
-<div class="lensswitch" role="tablist" aria-label="View as">
-  {#each VIEW_AS as v (v.id)}
-    <button
-      type="button"
-      role="tab"
-      aria-selected={active === v.id}
-      class:is-on={active === v.id}
-      onclick={() => pick(v.id)}
-    >
-      {v.label}
-    </button>
-  {/each}
+<div class="lensswitch-wrap">
+  <button
+    type="button"
+    class="lensswitch__home"
+    class:is-on={active === 'desk'}
+    aria-current={active === 'desk' ? 'page' : undefined}
+    onclick={() => pick('desk')}
+  >
+    {t('lens.desk', locale)}
+  </button>
+  <div class="lensswitch" role="tablist" aria-label="View as">
+    {#each VIEW_AS as v (v.id)}
+      <button
+        type="button"
+        role="tab"
+        aria-selected={active === v.id}
+        class:is-on={active === v.id}
+        onclick={() => pick(v.id)}
+      >
+        {v.label}
+      </button>
+    {/each}
+  </div>
 </div>
 
 <style>
+  .lensswitch-wrap {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-s);
+  }
+  .lensswitch__home {
+    appearance: none;
+    border: 1px solid var(--border-color-dark);
+    background: var(--bg-ultra-light);
+    cursor: pointer;
+    font-family: var(--font-sans);
+    font-size: var(--text-s);
+    color: var(--text-muted);
+    padding-block: var(--space-2xs);
+    padding-inline: var(--space-m);
+    border-radius: var(--radius-circle);
+    transition:
+      background var(--transition),
+      color var(--transition);
+  }
+  .lensswitch__home:hover {
+    color: var(--text-color);
+  }
+  .lensswitch__home.is-on {
+    background: var(--text-color);
+    color: var(--bg);
+    border-color: var(--text-color);
+  }
   .lensswitch {
     display: inline-flex;
     background: var(--bg-ultra-light);

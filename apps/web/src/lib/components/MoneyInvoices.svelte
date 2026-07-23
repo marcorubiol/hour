@@ -366,8 +366,18 @@
 
             <dl class="mny-inv__tax">
               <div><dt>Subtotal</dt><dd>{fmtMoney(invoice.subtotal)} {invoice.currency}</dd></div>
-              <div><dt>VAT {invoice.vat_pct ?? 0}%</dt><dd>+ {fmtMoney(invoice.vat_amount ?? 0)}</dd></div>
-              <div><dt>IRPF {invoice.irpf_pct ?? 0}%</dt><dd>− {fmtMoney(invoice.irpf_amount ?? 0)}</dd></div>
+              {#each invoice.tax_lines as tax (tax.id)}
+                <div>
+                  <dt>{tax.label}{#if tax.kind !== 'exempt'} {tax.rate_pct}%{/if}</dt>
+                  <dd>
+                    {#if tax.kind === 'exempt'}
+                      exempt{#if tax.exempt_reason} · {tax.exempt_reason}{/if}
+                    {:else}
+                      {tax.kind === 'withhold' ? '−' : '+'} {fmtMoney(Math.abs(tax.amount))}
+                    {/if}
+                  </dd>
+                </div>
+              {/each}
               <div><dt>Total</dt><dd>{fmtMoney(invoice.total)} {invoice.currency}</dd></div>
             </dl>
           </div>
@@ -548,7 +558,7 @@
 
     .mny-inv__tax {
       display: grid;
-      grid-template-columns: repeat(4, minmax(8rem, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
       gap: var(--space-s);
       margin: 0;
     }
