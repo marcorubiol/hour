@@ -794,6 +794,7 @@
           {#if d.kind === 'travel_day'}
             <span
               class="cal__event cal__event--travel"
+              data-family={dateStatusFamily(d.status)}
               style={d.project ? `--c: ${accentVarFor(d.project)}` : undefined}
               title={dateTitle(d)}
             ><span class="cal__travel-text">{travelText(d)}</span>{#if d.project}<button type="button" class="cal__markbtn" onclick={(e) => openMark(e, d.project)}><IdentityMark accent={accentVarFor(d.project)} name={d.project.name} initials={d.project.initials} /></button>{/if}</span>
@@ -1264,14 +1265,14 @@
     .cal__event--perf[data-family='confirmed'] + .cal__event {
       margin-block-start: var(--space-xs);
     }
-    /* Tentative = textured, EVERYWHERE (Marco 2026-07-23): holds AND proposed,
-       performances AND dates carry the "not settled" texture and the dashed
-       edge; solid fill is reserved for settled. (Tentative blackout bands keep
-       their own accent hatch.) */
-    .cal__event--perf[data-family='hold'],
-    .cal__event--perf[data-family='proposed'],
-    .cal__event--date[data-family='hold'],
-    .cal__event--date[data-family='proposed'] {
+    /* Options — held or proposed, gig or date — are ONE card (Marco
+       2026-07-23): the family ALONE drives the "not settled" grammar, so a
+       held gig and a tentative rehearsal share the exact same rule, texture
+       and dashed edge — no per-type branch to drift apart. Solid fill stays
+       reserved for settled things. (Travel carries no family, so it keeps its
+       bare form; tentative blackout bands keep their own accent hatch.) */
+    .cal__event[data-family='hold'],
+    .cal__event[data-family='proposed'] {
       --chip-bg: var(--bg-ultra-light);
       /* The "not settled" texture: a faint neutral dot stipple — pencilled in,
          not inked. Grey, never the project accent; colour lives in the dashed
@@ -1283,9 +1284,15 @@
       background-size: 7px 7px;
       --chip-border-style: dashed;
     }
-    .cal__event--perf[data-family='hold'],
-    .cal__event--perf[data-family='proposed'] {
+    /* Ink is the one axis that still steps by depth: held a shade quieter, and
+       proposed — the least committed — the faintest, and the SAME on a gig or
+       a date. A gig's base ink is full strength (the settled tint needs it),
+       so held gigs are pulled to muted here; dates already sit muted. */
+    .cal__event--perf[data-family='hold'] {
       --chip-fg: var(--text-muted);
+    }
+    .cal__event[data-family='proposed'] {
+      --chip-fg: var(--text-faint);
     }
 
     /* Legend — the month's colour key, readable without opening anything.
@@ -1368,16 +1375,13 @@
       min-inline-size: 0;
     }
 
-    /* Date chip — quieter ink, mono small-caps kind label at the foot.
-       Tentative dates read as possibility (dashed + square + the shared dot
-       texture above) — the grammar extends (ADR-078 §9); confirmed stays the
-       quiet solid form. */
+    /* Date chip — quieter ink than a gig, mono small-caps kind label at the
+       foot. Tentative dates read as possibility through the shared option
+       grammar above (dashed + square + dot texture); a held date keeps this
+       base muted ink and a proposed one drops to the faintest via the shared
+       proposed rule; confirmed stays the quiet solid form. */
     .cal__event--date {
       --chip-fg: var(--text-muted);
-    }
-    /* hold keeps the base muted ink; proposed drops to the faintest. */
-    .cal__event--date[data-family='proposed'] {
-      --chip-fg: var(--text-faint);
     }
 
     /* A multi-day block reads as one strip across the cells. The join is
@@ -1423,14 +1427,16 @@
       flex: none;
     }
 
-    /* Travel chip — bare mono, direction arrows carry the meaning. */
+    /* Travel chip — shares the SAME container as every other option (Marco
+       2026-07-23): it carries a data-family, so the shared grammar above gives
+       it the chip fill, the dashed edge when tentative and the earned radius
+       when confirmed — no bare exception. Only its CONTENT stays its own: mono
+       text where the direction arrows carry the meaning, on one row. */
     .cal__event--travel {
-      --chip-bg: transparent;
       font-family: var(--font-mono);
       font-size: var(--text-xs);
       letter-spacing: var(--mono-letter-spacing);
       color: color-mix(in oklch, var(--c, var(--text-muted)) 55%, var(--text-muted));
-      border: none;
       /* Row so the monogram pins RIGHT like every other chip (Marco,
          2026-07-23). The text span takes the squeeze and ellipsizes — the
          base chip's column flex + a bare text node defeated text-overflow,
