@@ -47,7 +47,8 @@ test.describe('smoke', () => {
     // never in the path.
     await page.goto('/h/money');
     await expect(page.locator('.mny__totals')).toBeVisible();
-    await expect(page.locator('.mny__total').first()).toContainText(/pipeline/);
+    // Books header leads with Vendido/sold now (grill ADR-088); pipeline is demoted.
+    await expect(page.locator('.mny__total').first()).toContainText(/sold/);
 
     // Old space-scoped lens bookmarks 308 to the space-less lens.
     await page.goto('/h/muk-cia/desk');
