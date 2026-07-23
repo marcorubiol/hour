@@ -11,46 +11,28 @@
    * Master View are wired. Workspaces/privacy/languages/notifications/
    * billing/danger are kept as scaffolding for the cases the active backlog
    * will actually need; the rest was pruned (vapor).
+   *
+   * Each section's markup, local state and section-specific styles live in
+   * $lib/components/settings/*Section.svelte. This page keeps the section
+   * routing, the workspace/project queries and the shared layout CSS tier
+   * (promoted to `.set-page :global(…)` so it reaches the section children).
    */
 
-  import { onMount } from 'svelte';
-  import { toStore } from 'svelte/store';
-  import { SvelteSet } from 'svelte/reactivity';
   import { page } from '$app/state';
-  import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
-  import { accentVar } from '$lib/utils/accent';
-  import { fetchJSON, mutateJSON, ApiError } from '$lib/api';
-  import { copyText } from '$lib/clipboard';
-  import { addToast } from '$lib/components/Toast.svelte';
-  import { session } from '$lib/session.svelte';
+  import { createQuery } from '@tanstack/svelte-query';
+  import { fetchJSON } from '$lib/api';
   import { type SectionId } from '$lib/components/SettingsNav.svelte';
-  import {
-    isMasterViewEnabled,
-    getMasterViewPath,
-    setMasterViewEnabled,
-    clearMasterViewPath,
-  } from '$lib/master-view';
+  import ProfileSection from '$lib/components/settings/ProfileSection.svelte';
+  import WorkspacesSection from '$lib/components/settings/WorkspacesSection.svelte';
+  import PrivacySection from '$lib/components/settings/PrivacySection.svelte';
+  import LanguagesSection from '$lib/components/settings/LanguagesSection.svelte';
+  import NotificationsSection from '$lib/components/settings/NotificationsSection.svelte';
+  import BillingSection from '$lib/components/settings/BillingSection.svelte';
+  import DangerSection from '$lib/components/settings/DangerSection.svelte';
 
   let workspaceSlug = $derived(page.params.workspace ?? '');
   let active = $derived<SectionId>(
     (page.url.searchParams.get('section') as SectionId | null) ?? 'profile',
-  );
-
-  // ─── identity from session ────────────────────────────────────────────
-  let userEmail = $derived(session.user?.email ?? '');
-  let userName = $state('Marco Rubiol');
-
-  onMount(() => {
-    const name = session.user?.name;
-    if (name) userName = name;
-  });
-
-  let initials = $derived(
-    userName
-      .split(/\s+/)
-      .slice(0, 2)
-      .map((p) => p[0]?.toUpperCase() ?? '')
-      .join('') || 'MR',
   );
 
   // ─── workspaces & projects ────────────────────────────────────────────
@@ -86,257 +68,6 @@
   let currentProjects = $derived(
     projects.filter((project) => project.workspace_id === currentWorkspace?.id),
   );
-  const queryClient = useQueryClient();
-
-  // ─── workspace access lifecycle ──────────────────────────────────────
-  type AccessItem = {
-    access_kind: 'member' | 'invitation';
-    id: string;
-    user_id: string | null;
-    email: string;
-    display_name: string;
-    role: 'owner' | 'admin' | 'member' | 'viewer' | 'guest';
-    project_id: string | null;
-    project_name: string | null;
-    project_role_code: string | null;
-    status: 'active' | 'pending' | 'accepted' | 'revoked' | 'expired';
-    expires_at: string | null;
-  };
-
-  const accessOptions = toStore(() => ({
-    queryKey: ['workspace-access', currentWorkspace?.id ?? null] as const,
-    enabled: Boolean(currentWorkspace?.id),
-    retry: false,
-    queryFn: ({ signal }: { signal: AbortSignal }) =>
-      fetchJSON<{ items: AccessItem[] }>(
-        `/api/workspaces/${currentWorkspace!.id}/access`,
-        signal,
-      ),
-  }));
-  const accessQuery = createQuery(accessOptions);
-  let accessItems = $derived($accessQuery.data?.items ?? []);
-  let activeMembers = $derived(
-    accessItems.filter((item) => item.access_kind === 'member' && item.status === 'active'),
-  );
-  let pendingInvitations = $derived(
-    accessItems.filter((item) => item.access_kind === 'invitation' && item.status === 'pending'),
-  );
-
-  let inviteEmail = $state('');
-  let inviteRole = $state<'admin' | 'member' | 'viewer' | 'guest'>('guest');
-  let inviteProjectId = $state('');
-  let inviteProjectRole = $state('performer');
-  let latestInviteUrl = $state('');
-
-  const inviteMember = createMutation({
-    mutationFn: async () => {
-      if (!currentWorkspace) throw new Error('Workspace unavailable');
-      const response = await mutateJSON<{
-        invitation: { email: string; invite_url: string };
-      }>('POST', `/api/workspaces/${currentWorkspace.id}/access`, {
-        email: inviteEmail,
-        role: inviteRole,
-        project_id: inviteProjectId || null,
-        project_role_code: inviteProjectId ? inviteProjectRole : null,
-      });
-      if (!response?.invitation) throw new Error('Invitation returned no link');
-      return response.invitation;
-    },
-    onSuccess: async (invitation) => {
-      latestInviteUrl = invitation.invite_url;
-      inviteEmail = '';
-      await queryClient.invalidateQueries({ queryKey: ['workspace-access'] });
-      addToast({
-        tone: 'success',
-        message: `Invitation created for ${invitation.email}. Copy and send the private link.`,
-      });
-    },
-    onError: (error) => {
-      addToast({
-        tone: 'danger',
-        title: 'Invitation not created',
-        message: error instanceof Error ? error.message : 'Unexpected error',
-      });
-    },
-  });
-
-  async function copyInviteLink() {
-    if (!latestInviteUrl) return;
-    addToast(
-      (await copyText(latestInviteUrl))
-        ? { tone: 'success', message: 'Private invitation link copied.' }
-        : { tone: 'danger', message: 'Could not copy the private invitation link.' },
-    );
-  }
-
-  async function changeMemberRole(membershipId: string, role: string) {
-    if (!currentWorkspace) return;
-    try {
-      await mutateJSON('PATCH', `/api/workspaces/${currentWorkspace.id}/access`, {
-        membership_id: membershipId,
-        role,
-      });
-      await queryClient.invalidateQueries({ queryKey: ['workspace-access'] });
-      addToast({ tone: 'success', message: 'Workspace role updated.' });
-    } catch (error) {
-      addToast({
-        tone: 'danger',
-        title: 'Role not updated',
-        message: error instanceof Error ? error.message : 'Unexpected error',
-      });
-    }
-  }
-
-  async function revokeAccess(item: AccessItem) {
-    if (!currentWorkspace) return;
-    const label = item.access_kind === 'member' ? item.display_name : item.email;
-    if (!window.confirm(`Revoke access for ${label}? Open sessions will be reauthorized.`)) return;
-    try {
-      await mutateJSON('DELETE', `/api/workspaces/${currentWorkspace.id}/access`, {
-        kind: item.access_kind === 'member' ? 'member' : 'invitation',
-        id: item.id,
-      });
-      await queryClient.invalidateQueries({ queryKey: ['workspace-access'] });
-      addToast({ tone: 'success', message: `Access revoked for ${label}.` });
-    } catch (error) {
-      addToast({
-        tone: 'danger',
-        title: 'Access not revoked',
-        message: error instanceof Error ? error.message : 'Unexpected error',
-      });
-    }
-  }
-
-  // ─── alias requests (ADR-067) ─────────────────────────────────────────
-  // RLS scopes the list: a member sees their own workspace's requests, the
-  // platform admin sees all. Review buttons hide on your own rows; the RPC
-  // is the real gate (403 for non-admins) — the UI just avoids dead ends.
-  type AliasRequest = {
-    id: string;
-    workspace_id: string;
-    workspace_name: string;
-    alias: string;
-    status: string;
-    requested_by: string;
-    created_at: string;
-  };
-
-  const aliasRequestsQuery = createQuery({
-    queryKey: ['alias-requests', 'pending'],
-    queryFn: ({ signal }: { signal: AbortSignal }) =>
-      fetchJSON<{ items: AliasRequest[] }>(
-        '/api/workspaces/alias-requests?status=pending',
-        signal,
-      ),
-  });
-  let aliasRequests = $derived($aliasRequestsQuery.data?.items ?? []);
-
-  const reviewAlias = createMutation({
-    mutationFn: async (input: { id: string; approve: boolean }) => {
-      const res = await mutateJSON<{ request: AliasRequest }>(
-        'PATCH',
-        `/api/workspaces/alias-requests/${input.id}`,
-        { approve: input.approve },
-      );
-      if (!res?.request) throw new Error('Empty response');
-      return res.request;
-    },
-    onSuccess: async (req) => {
-      await queryClient.invalidateQueries({ queryKey: ['alias-requests'] });
-      await queryClient.invalidateQueries({ queryKey: ['workspaces'] });
-      addToast({
-        tone: 'success',
-        message:
-          req.status === 'approved'
-            ? `Alias /h/${req.alias} granted to ${req.workspace_name}.`
-            : `Alias request from ${req.workspace_name} rejected.`,
-      });
-    },
-    onError: (err) => {
-      addToast({
-        tone: 'danger',
-        title: 'Review failed',
-        message:
-          err instanceof ApiError && err.status === 403
-            ? 'Only the platform operator can review alias requests.'
-            : err instanceof ApiError && err.status === 409
-              ? 'That alias is no longer available.'
-              : err instanceof Error
-                ? err.message
-                : 'Unexpected error',
-      });
-    },
-  });
-
-  // ─── privacy state ────────────────────────────────────────────────────
-  let privTasksDefault = $state<'shared' | 'private'>('shared');
-  let privMoneyVis = $state<'me-only' | 'project' | 'all'>('me-only');
-  let privNotesPrivate = $state(true);
-  let privDistribution = $state<'me-only' | 'distributors' | 'all'>('me-only');
-
-  // ─── languages state ──────────────────────────────────────────────────
-  // Working languages (which langs the user speaks) deferred: it's Person
-  // metadata, not an app setting. Only the app-interface language remains.
-  let appLanguage = $state<'ca' | 'es' | 'en' | 'fr'>('en');
-
-  // ─── notifications state ──────────────────────────────────────────────
-  let notifDigest = $state<'off' | 'weekday' | 'daily'>('weekday');
-  let notifWeeklyReview = $state(true);
-  let notifWarmReply = $state(true);
-  let notifMoneyIn = $state(true);
-  let notifMoneyOverdue = $state(true);
-  let notifDayOfShow = $state(true);
-  let notifEmail = $state(true);
-  let notifPush = $state(true);
-  let quietStart = $state('22:00');
-  let quietEnd = $state('08:00');
-
-  // ─── Master View (D-PRE-05) — real wire ───────────────────────────────
-  let masterViewEnabled = $state(false);
-  let masterViewPath = $state<string | null>(null);
-
-  function refreshMasterView() {
-    masterViewEnabled = isMasterViewEnabled();
-    masterViewPath = getMasterViewPath();
-  }
-
-  onMount(refreshMasterView);
-
-  function toggleMasterView(next: boolean) {
-    masterViewEnabled = next;
-    setMasterViewEnabled(next);
-    refreshMasterView();
-  }
-
-  function clearMasterView() {
-    clearMasterViewPath();
-    refreshMasterView();
-  }
-
-  // Hardcoded role set for Phase 0 — Marco's hats.
-  const ALL_ROLES = [
-    'author',
-    'performer',
-    'musician',
-    'lighting',
-    'sound',
-    'production',
-    'distribution',
-    'technician',
-  ];
-  const activeRoles = new SvelteSet<string>([
-      'musician',
-      'lighting',
-      'distribution',
-      'production',
-      'author',
-      'performer',
-    ]);
-
-  function toggleRole(role: string) {
-    if (activeRoles.has(role)) activeRoles.delete(role);
-    else activeRoles.add(role);
-  }
 </script>
 
 <svelte:head>
@@ -345,868 +76,43 @@
 
 <article class="set-page">
   {#if active === 'profile'}
-    <header class="set-mast">
-      <p class="eyebrow set-mast__kicker">Account</p>
-      <h1 class="set-mast__title"><em>Profile</em></h1>
-      <p class="set-mast__sub">
-        The basics. Used across your projects and on press kits.
-      </p>
-    </header>
-
-    <section class="set-group">
-      <div class="set-group__body">
-        <div class="set-row">
-          <div class="set-row__lead">
-            <div class="set-row__label">Avatar</div>
-            <div class="set-row__hint">A monogram for now. Drop an image later.</div>
-          </div>
-          <div class="set-row__ctrl">
-            <div class="set-avatar-pick">
-              <span
-                class="set-avatar-pick__big"
-                style={`background: ${accentVar(workspaceSlug)}`}
-              >
-                {initials}
-              </span>
-              <button type="button" class="btn--primary btn--s">Upload image</button>
-              <span class="set-row__hint">PNG, square, ≥ 256px</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="set-row">
-          <div class="set-row__lead">
-            <div class="set-row__label">Full name</div>
-            <div class="set-row__hint">Used on invoices and contracts.</div>
-          </div>
-          <div class="set-row__ctrl">
-            <input type="text" bind:value={userName} />
-          </div>
-        </div>
-
-        <div class="set-row">
-          <div class="set-row__lead">
-            <div class="set-row__label">Email</div>
-            <div class="set-row__hint">Sign-in and project invitations.</div>
-          </div>
-          <div class="set-row__ctrl">
-            <input type="email" bind:value={userEmail} readonly />
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- LOCATION & TIMEZONE group killed: timezone derives from
-         browser automatically, week-starts-on default to Monday is
-         fine for Phase 0, location adds nothing operational.
-         Pronouns and Display name killed too (Phase 0 reality:
-         solo Marco; pronouns opens a debate we don't need to host). -->
+    <ProfileSection {workspaceSlug} />
   {/if}
 
-      {#if active === 'workspaces'}
-        <header class="set-mast">
-          <p class="eyebrow set-mast__kicker">Roster</p>
-          <h1 class="set-mast__title"><em>Workspaces &amp; roles</em></h1>
-          <p class="set-mast__sub">
-            A workspace holds the company boundary. Project assignments decide
-            which productions each collaborator can enter.
-          </p>
-        </header>
+  {#if active === 'workspaces'}
+    <WorkspacesSection {workspaces} {projects} {currentWorkspace} {currentProjects} />
+  {/if}
 
-        <section class="set-group">
-          <div class="set-group__head">
-            <span class="eyebrow set-group__kicker">{workspaces.length} active</span>
-            <h2 class="set-group__title">My projects</h2>
-          </div>
-          <div class="set-group__body">
-            <div class="set-ws-list">
-              {#each workspaces as w (w.id)}
-                {@const projectCount = projects.filter((p) => p.workspace_id === w.id).length}
-                <div class="set-ws" style={`--c: ${accentVar(w.slug)}`}>
-                  <div class="set-ws__rail"></div>
-                  <div class="set-ws__name">
-                    <h3>{w.name}</h3>
-                  </div>
-                  <!-- personal/team label + kind-derived role badges removed
-                       (ADR-064): personal/team is not a real distinction, and
-                       real per-workspace roles need the (pending) members
-                       endpoint — no fabricated badges. -->
-                  <div class="set-ws__roles"></div>
-                  <div class="set-ws__meta">
-                    <span>— people</span>
-                    <span class="sep">·</span>
-                    <span>{projectCount} {projectCount === 1 ? 'project' : 'projects'}</span>
-                  </div>
-                  <div class="set-ws__actions">
-                    <button type="button" class="btn--outline btn--s">Edit role</button>
-                    <button type="button" class="btn--outline btn--s is-warn">Leave</button>
-                  </div>
-                </div>
-              {/each}
-            </div>
-            <button type="button" class="set-add">
-              + Create or join a workspace
-            </button>
-          </div>
-        </section>
+  {#if active === 'privacy'}
+    <PrivacySection />
+  {/if}
 
-        {#if $accessQuery.isSuccess && currentWorkspace}
-          <section class="set-group set-access">
-            <div class="set-group__head set-access__head">
-              <div>
-                <span class="eyebrow set-group__kicker">Access desk</span>
-                <h2 class="set-group__title">{currentWorkspace.name}</h2>
-              </div>
-              <span class="set-access__count">{activeMembers.length} active</span>
-            </div>
+  {#if active === 'languages'}
+    <LanguagesSection />
+  {/if}
 
-            <div class="set-access__invite">
-              <label>
-                <span class="eyebrow">Email</span>
-                <input type="email" placeholder="collaborator@example.com" bind:value={inviteEmail} />
-              </label>
-              <label>
-                <span class="eyebrow">Workspace role</span>
-                <select bind:value={inviteRole}>
-                  <option value="guest">Guest · assigned work only</option>
-                  <option value="viewer">Viewer · internal read-only</option>
-                  <option value="member">Member · internal collaborator</option>
-                  <option value="admin">Admin · manages access</option>
-                </select>
-              </label>
-              <label>
-                <span class="eyebrow">Project assignment</span>
-                <select bind:value={inviteProjectId}>
-                  <option value="">No project yet</option>
-                  {#each currentProjects as project (project.id)}
-                    <option value={project.id}>{project.name}</option>
-                  {/each}
-                </select>
-              </label>
-              <label>
-                <span class="eyebrow">Project role</span>
-                <select bind:value={inviteProjectRole} disabled={!inviteProjectId}>
-                  <option value="performer">Performer · production read</option>
-                  <option value="viewer">Viewer · production read</option>
-                  <option value="director">Director · production edit</option>
-                  <option value="production_manager">Production manager</option>
-                  <option value="distribution">Distribution</option>
-                </select>
-              </label>
-              <button
-                type="button"
-                class="btn--primary set-access__invite-button"
-                disabled={!inviteEmail || $inviteMember.isPending}
-                onclick={() => $inviteMember.mutate()}
-              >
-                {$inviteMember.isPending ? 'Creating…' : 'Create private link'}
-              </button>
-            </div>
+  <!-- "Connections" section killed: 7 providers (Fastmail, Holded,
+       Spotify, Bandcamp, Drive, Bank...) ZERO actually wired —
+       vapor visual. Resurrects when an integration ships. Same
+       goes for Personal API token (Phase 1 public API). -->
 
-            {#if latestInviteUrl}
-              <div class="set-access__link" role="status">
-                <div>
-                  <span class="eyebrow">Ready to send</span>
-                  <p>The link expires in 7 days and works only for the invited email.</p>
-                </div>
-                <button type="button" class="btn--outline btn--s" onclick={copyInviteLink}>
-                  Copy invitation link
-                </button>
-              </div>
-            {/if}
+  {#if active === 'notifications'}
+    <NotificationsSection />
+  {/if}
 
-            <div class="set-access__ledger">
-              {#each activeMembers as member (member.id)}
-                <div class="set-access__row">
-                  <span class="set-access__mark" aria-hidden="true"></span>
-                  <div class="set-access__identity">
-                    <strong>{member.display_name}</strong>
-                    <span>{member.email}</span>
-                  </div>
-                  {#if member.role === 'owner'}
-                    <span class="set-access__role">Owner</span>
-                  {:else}
-                    <label class="set-access__role-select">
-                      <span class="sr-only">Role for {member.display_name}</span>
-                      <select
-                        value={member.role}
-                        onchange={(event) =>
-                          changeMemberRole(member.id, event.currentTarget.value)}
-                      >
-                        <option value="admin">Admin</option>
-                        <option value="member">Member</option>
-                        <option value="viewer">Viewer</option>
-                        <option value="guest">Guest</option>
-                      </select>
-                    </label>
-                  {/if}
-                  <span class="set-access__status">active</span>
-                  {#if member.role !== 'owner'}
-                    <button
-                      type="button"
-                      class="btn--outline btn--s is-warn"
-                      onclick={() => revokeAccess(member)}
-                    >Revoke</button>
-                  {/if}
-                </div>
-              {/each}
+  {#if active === 'billing'}
+    <BillingSection />
+  {/if}
 
-              {#each pendingInvitations as invitation (invitation.id)}
-                <div class="set-access__row is-pending">
-                  <span class="set-access__mark" aria-hidden="true"></span>
-                  <div class="set-access__identity">
-                    <strong>{invitation.email}</strong>
-                    <span>
-                      {invitation.project_name
-                        ? `${invitation.project_name} · ${invitation.project_role_code}`
-                        : 'Workspace only'}
-                    </span>
-                  </div>
-                  <span class="set-access__role">{invitation.role}</span>
-                  <span class="set-access__status">pending</span>
-                  <button
-                    type="button"
-                    class="btn--outline btn--s is-warn"
-                    onclick={() => revokeAccess(invitation)}
-                  >Cancel</button>
-                </div>
-              {/each}
-            </div>
-          </section>
-        {/if}
-
-        {#if aliasRequests.length > 0}
-          <section class="set-group">
-            <div class="set-group__head">
-              <span class="eyebrow set-group__kicker">{aliasRequests.length} pending</span>
-              <h2 class="set-group__title">Alias requests</h2>
-            </div>
-            <div class="set-group__body">
-              <div class="set-alias-list">
-                {#each aliasRequests as r (r.id)}
-                  <div class="set-alias">
-                    <div class="set-alias__what">
-                      <span class="set-alias__url">/h/{r.alias}</span>
-                      <span class="set-alias__ws">for {r.workspace_name}</span>
-                    </div>
-                    {#if r.requested_by === session.user?.sub}
-                      <span class="set-alias__state">pending review</span>
-                    {:else}
-                      <div class="set-alias__actions">
-                        <button
-                          type="button"
-                          class="btn--outline btn--s"
-                          disabled={$reviewAlias.isPending}
-                          onclick={() => $reviewAlias.mutate({ id: r.id, approve: true })}
-                        >
-                          Approve
-                        </button>
-                        <button
-                          type="button"
-                          class="btn--outline btn--s is-warn"
-                          disabled={$reviewAlias.isPending}
-                          onclick={() => $reviewAlias.mutate({ id: r.id, approve: false })}
-                        >
-                          Reject
-                        </button>
-                      </div>
-                    {/if}
-                  </div>
-                {/each}
-              </div>
-            </div>
-          </section>
-        {/if}
-
-        <section class="set-group">
-          <div class="set-group__head">
-            <span class="eyebrow set-group__kicker">By role</span>
-            <h2 class="set-group__title">Roles I take on</h2>
-          </div>
-          <div class="set-group__body">
-            <p class="set-prose">
-              Hour groups your work by the role you play. Toggle which roles to
-              surface in the side filter.
-            </p>
-            <div class="set-roles-grid">
-              {#each ALL_ROLES as role (role)}
-                <button
-                  type="button"
-                  class={['pill--sm', 'pill--mono', 'set-role-chip', activeRoles.has(role) && 'pill--on']
-                    .filter(Boolean)
-                    .join(' ')}
-                  onclick={() => toggleRole(role)}
-                >
-                  <span class="set-role-chip__dot" aria-hidden="true"></span>
-                  <span>{role}</span>
-                </button>
-              {/each}
-            </div>
-          </div>
-        </section>
-      {/if}
-
-      {#if active === 'privacy'}
-        <header class="set-mast">
-          <p class="eyebrow set-mast__kicker">Boundaries</p>
-          <h1 class="set-mast__title"><em>Visibility &amp; privacy</em></h1>
-          <p class="set-mast__sub">
-            Across your collectives, some things are shared and some are yours
-            alone. Defaults here apply to every new project.
-          </p>
-        </header>
-
-        <section class="set-group">
-          <div class="set-group__head">
-            <span class="eyebrow set-group__kicker">Defaults</span>
-          </div>
-          <div class="set-group__body">
-            <div class="set-row">
-              <div class="set-row__lead">
-                <div class="set-row__label">New tasks default to</div>
-                <div class="set-row__hint">You can flip any individual task later.</div>
-              </div>
-              <div class="set-row__ctrl">
-                <div class="set-seg">
-                  <button
-                    type="button"
-                    class={privTasksDefault === 'shared' ? 'is-on' : ''}
-                    onclick={() => (privTasksDefault = 'shared')}
-                  >Shared</button>
-                  <button
-                    type="button"
-                    class={privTasksDefault === 'private' ? 'is-on' : ''}
-                    onclick={() => (privTasksDefault = 'private')}
-                  >Private</button>
-                </div>
-              </div>
-            </div>
-
-            <div class="set-row">
-              <div class="set-row__lead">
-                <div class="set-row__label">Money visibility</div>
-                <div class="set-row__hint">Who can see fees, invoices, chases.</div>
-              </div>
-              <div class="set-row__ctrl">
-                <div class="set-seg">
-                  <button
-                    type="button"
-                    class={privMoneyVis === 'me-only' ? 'is-on' : ''}
-                    onclick={() => (privMoneyVis = 'me-only')}
-                  >Only me</button>
-                  <button
-                    type="button"
-                    class={privMoneyVis === 'project' ? 'is-on' : ''}
-                    onclick={() => (privMoneyVis = 'project')}
-                  >Per-project rule</button>
-                  <button
-                    type="button"
-                    class={privMoneyVis === 'all' ? 'is-on' : ''}
-                    onclick={() => (privMoneyVis = 'all')}
-                  >All collaborators</button>
-                </div>
-              </div>
-            </div>
-
-            <div class="set-row">
-              <div class="set-row__lead">
-                <div class="set-row__label">Private notes</div>
-                <div class="set-row__hint">Your tech notes, drafts, hot takes.</div>
-              </div>
-              <div class="set-row__ctrl">
-                <button
-                  type="button"
-                  class={['set-toggle', privNotesPrivate && 'is-on']
-                    .filter(Boolean)
-                    .join(' ')}
-                  aria-label="Private notes"
-                  aria-pressed={privNotesPrivate}
-                  onclick={() => (privNotesPrivate = !privNotesPrivate)}
-                >
-                  <span class="set-toggle__dot"></span>
-                </button>
-              </div>
-            </div>
-
-            <div class="set-row">
-              <div class="set-row__lead">
-                <div class="set-row__label">Distribution pipeline</div>
-                <div class="set-row__hint">Letters out, warm replies, dead leads.</div>
-              </div>
-              <div class="set-row__ctrl">
-                <div class="set-seg">
-                  <button
-                    type="button"
-                    class={privDistribution === 'me-only' ? 'is-on' : ''}
-                    onclick={() => (privDistribution = 'me-only')}
-                  >Only me</button>
-                  <button
-                    type="button"
-                    class={privDistribution === 'distributors' ? 'is-on' : ''}
-                    onclick={() => (privDistribution = 'distributors')}
-                  >Distributors only</button>
-                  <button
-                    type="button"
-                    class={privDistribution === 'all' ? 'is-on' : ''}
-                    onclick={() => (privDistribution = 'all')}
-                  >Everyone</button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-      {/if}
-
-      {#if active === 'languages'}
-        <header class="set-mast">
-          <p class="eyebrow set-mast__kicker">Materials</p>
-          <h1 class="set-mast__title"><em>Languages</em></h1>
-          <p class="set-mast__sub">
-            Press kits, dossiers, riders — Hour produces each in the languages
-            you work in.
-          </p>
-        </header>
-
-        <!-- "Working languages" list killed: it's metadata of the Person
-             entity (which languages Marco speaks), not an app setting.
-             Belongs on the Person profile when that page exists. -->
-
-        <section class="set-group">
-          <div class="set-group__head">
-            <span class="eyebrow set-group__kicker">Interface</span>
-          </div>
-          <div class="set-group__body">
-            <div class="set-row">
-              <div class="set-row__lead">
-                <div class="set-row__label">App language</div>
-                <div class="set-row__hint">The Hour interface itself.</div>
-              </div>
-              <div class="set-row__ctrl">
-                <div class="set-seg">
-                  <button
-                    type="button"
-                    class={appLanguage === 'ca' ? 'is-on' : ''}
-                    onclick={() => (appLanguage = 'ca')}
-                  >Català</button>
-                  <button
-                    type="button"
-                    class={appLanguage === 'es' ? 'is-on' : ''}
-                    onclick={() => (appLanguage = 'es')}
-                  >Castellano</button>
-                  <button
-                    type="button"
-                    class={appLanguage === 'en' ? 'is-on' : ''}
-                    onclick={() => (appLanguage = 'en')}
-                  >English</button>
-                  <button
-                    type="button"
-                    class={appLanguage === 'fr' ? 'is-on' : ''}
-                    onclick={() => (appLanguage = 'fr')}
-                  >Français</button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-      {/if}
-
-      <!-- "Connections" section killed: 7 providers (Fastmail, Holded,
-           Spotify, Bandcamp, Drive, Bank...) ZERO actually wired —
-           vapor visual. Resurrects when an integration ships. Same
-           goes for Personal API token (Phase 1 public API). -->
-
-      {#if active === 'notifications'}
-        <header class="set-mast">
-          <p class="eyebrow set-mast__kicker">Quiet by default</p>
-          <h1 class="set-mast__title"><em>Notifications</em></h1>
-          <p class="set-mast__sub">
-            Hour only nudges you when something genuinely changed. You decide
-            where.
-          </p>
-        </header>
-
-        <section class="set-group">
-          <div class="set-group__head">
-            <span class="eyebrow set-group__kicker">Digest</span>
-          </div>
-          <div class="set-group__body">
-            <div class="set-row">
-              <div class="set-row__lead">
-                <div class="set-row__label">Daily digest</div>
-                <div class="set-row__hint">A morning summary of your week.</div>
-              </div>
-              <div class="set-row__ctrl">
-                <div class="set-seg">
-                  <button
-                    type="button"
-                    class={notifDigest === 'off' ? 'is-on' : ''}
-                    onclick={() => (notifDigest = 'off')}
-                  >Off</button>
-                  <button
-                    type="button"
-                    class={notifDigest === 'weekday' ? 'is-on' : ''}
-                    onclick={() => (notifDigest = 'weekday')}
-                  >Mon–Fri</button>
-                  <button
-                    type="button"
-                    class={notifDigest === 'daily' ? 'is-on' : ''}
-                    onclick={() => (notifDigest = 'daily')}
-                  >Every day</button>
-                </div>
-              </div>
-            </div>
-
-            <div class="set-row">
-              <div class="set-row__lead">
-                <div class="set-row__label">Weekly review</div>
-                <div class="set-row__hint">Sunday evening, ten minutes of looking back.</div>
-              </div>
-              <div class="set-row__ctrl">
-                <button
-                  type="button"
-                  class={['set-toggle', notifWeeklyReview && 'is-on'].filter(Boolean).join(' ')}
-                  aria-label="Weekly review"
-                  aria-pressed={notifWeeklyReview}
-                  onclick={() => (notifWeeklyReview = !notifWeeklyReview)}
-                >
-                  <span class="set-toggle__dot"></span>
-                </button>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section class="set-group">
-          <div class="set-group__head">
-            <span class="eyebrow set-group__kicker">Priority alerts</span>
-          </div>
-          <div class="set-group__body">
-            <div class="set-row">
-              <div class="set-row__lead">
-                <div class="set-row__label">Warm reply lands</div>
-                <div class="set-row__hint">Someone you pitched said yes-ish.</div>
-              </div>
-              <div class="set-row__ctrl">
-                <button
-                  type="button"
-                  class={['set-toggle', notifWarmReply && 'is-on'].filter(Boolean).join(' ')}
-                  aria-label="Warm reply lands"
-                  aria-pressed={notifWarmReply}
-                  onclick={() => (notifWarmReply = !notifWarmReply)}
-                >
-                  <span class="set-toggle__dot"></span>
-                </button>
-              </div>
-            </div>
-            <div class="set-row">
-              <div class="set-row__lead">
-                <div class="set-row__label">Money in</div>
-                <div class="set-row__hint">A wire matches an invoice.</div>
-              </div>
-              <div class="set-row__ctrl">
-                <button
-                  type="button"
-                  class={['set-toggle', notifMoneyIn && 'is-on'].filter(Boolean).join(' ')}
-                  aria-label="Money in"
-                  aria-pressed={notifMoneyIn}
-                  onclick={() => (notifMoneyIn = !notifMoneyIn)}
-                >
-                  <span class="set-toggle__dot"></span>
-                </button>
-              </div>
-            </div>
-            <div class="set-row">
-              <div class="set-row__lead">
-                <div class="set-row__label">Money overdue</div>
-                <div class="set-row__hint">A fee past 60 days.</div>
-              </div>
-              <div class="set-row__ctrl">
-                <button
-                  type="button"
-                  class={['set-toggle', notifMoneyOverdue && 'is-on'].filter(Boolean).join(' ')}
-                  aria-label="Money overdue"
-                  aria-pressed={notifMoneyOverdue}
-                  onclick={() => (notifMoneyOverdue = !notifMoneyOverdue)}
-                >
-                  <span class="set-toggle__dot"></span>
-                </button>
-              </div>
-            </div>
-            <div class="set-row">
-              <div class="set-row__lead">
-                <div class="set-row__label">Day-of-show</div>
-                <div class="set-row__hint">Six hours before doors.</div>
-              </div>
-              <div class="set-row__ctrl">
-                <button
-                  type="button"
-                  class={['set-toggle', notifDayOfShow && 'is-on'].filter(Boolean).join(' ')}
-                  aria-label="Day-of-show"
-                  aria-pressed={notifDayOfShow}
-                  onclick={() => (notifDayOfShow = !notifDayOfShow)}
-                >
-                  <span class="set-toggle__dot"></span>
-                </button>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section class="set-group">
-          <div class="set-group__head">
-            <span class="eyebrow set-group__kicker">Channels</span>
-          </div>
-          <div class="set-group__body">
-            <div class="set-row">
-              <div class="set-row__lead">
-                <div class="set-row__label">Email</div>
-                <div class="set-row__hint">{userEmail || '—'}</div>
-              </div>
-              <div class="set-row__ctrl">
-                <button
-                  type="button"
-                  class={['set-toggle', notifEmail && 'is-on'].filter(Boolean).join(' ')}
-                  aria-label="Email notifications"
-                  aria-pressed={notifEmail}
-                  onclick={() => (notifEmail = !notifEmail)}
-                >
-                  <span class="set-toggle__dot"></span>
-                </button>
-              </div>
-            </div>
-            <div class="set-row">
-              <div class="set-row__lead">
-                <div class="set-row__label">Mobile push</div>
-                <div class="set-row__hint">iOS app · Android app</div>
-              </div>
-              <div class="set-row__ctrl">
-                <button
-                  type="button"
-                  class={['set-toggle', notifPush && 'is-on'].filter(Boolean).join(' ')}
-                  aria-label="Mobile push notifications"
-                  aria-pressed={notifPush}
-                  onclick={() => (notifPush = !notifPush)}
-                >
-                  <span class="set-toggle__dot"></span>
-                </button>
-              </div>
-            </div>
-            <div class="set-row">
-              <div class="set-row__lead">
-                <div class="set-row__label">Quiet hours</div>
-                <div class="set-row__hint">No pings on the road.</div>
-              </div>
-              <div class="set-row__ctrl">
-                <div class="set-hours">
-                  <input class="input--tight" type="text" bind:value={quietStart} />
-                  <span class="sep">→</span>
-                  <input class="input--tight" type="text" bind:value={quietEnd} />
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section class="set-group">
-          <div class="set-group__head">
-            <span class="eyebrow set-group__kicker">Browser memory</span>
-          </div>
-          <div class="set-group__body">
-            <div class="set-row">
-              <div class="set-row__lead">
-                <div class="set-row__label">Master View</div>
-                <div class="set-row__hint">
-                  Remember the last page you visited inside a project and open
-                  there next sign-in. Per-browser; not synced across devices.
-                </div>
-              </div>
-              <div class="set-row__ctrl">
-                <button
-                  type="button"
-                  class={['set-toggle', masterViewEnabled && 'is-on']
-                    .filter(Boolean)
-                    .join(' ')}
-                  aria-label="Master View — remember last visited page"
-                  aria-pressed={masterViewEnabled}
-                  onclick={() => toggleMasterView(!masterViewEnabled)}
-                >
-                  <span class="set-toggle__dot"></span>
-                </button>
-              </div>
-            </div>
-            {#if masterViewEnabled && masterViewPath}
-              <div class="set-row">
-                <div class="set-row__lead">
-                  <div class="set-row__label">Saved view</div>
-                  <div class="set-row__hint">
-                    Will open <code class="set-codeline">{masterViewPath}</code>
-                    on next sign-in.
-                  </div>
-                </div>
-                <div class="set-row__ctrl">
-                  <button
-                    type="button"
-                    class="btn--outline btn--s"
-                    onclick={clearMasterView}
-                  >Clear saved view</button>
-                </div>
-              </div>
-            {/if}
-          </div>
-        </section>
-      {/if}
-
-      {#if active === 'billing'}
-        <header class="set-mast">
-          <p class="eyebrow set-mast__kicker">Money</p>
-          <h1 class="set-mast__title"><em>Billing</em></h1>
-          <p class="set-mast__sub">
-            Hour is a small Barcelona-based tool. Your money goes a long way here.
-          </p>
-        </header>
-
-        <section class="set-group">
-          <div class="set-group__body">
-            <div class="set-plan">
-              <div class="set-plan__head">
-                <span class="eyebrow set-plan__kicker">Current plan</span>
-                <h2 class="set-plan__name">
-                  Solo <em>·</em> <span>€9/mo</span>
-                </h2>
-                <p class="set-plan__sub">
-                  All features, unlimited projects, one person. Next billing 1
-                  May 2026.
-                </p>
-              </div>
-              <div class="set-plan__actions">
-                <button type="button" class="btn--primary btn--s">
-                  Switch to yearly · save 20%
-                </button>
-                <button type="button" class="btn--outline btn--s">
-                  Upgrade to Collective (€19/mo, up to 6 people)
-                </button>
-                <button type="button" class="btn--outline btn--s is-warn">Cancel plan</button>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section class="set-group">
-          <div class="set-group__head">
-            <span class="eyebrow set-group__kicker">Payment</span>
-          </div>
-          <div class="set-group__body">
-            <div class="set-row">
-              <div class="set-row__lead">
-                <div class="set-row__label">Method</div>
-              </div>
-              <div class="set-row__ctrl">
-                <div class="set-card">
-                  <span class="set-card__brand">VISA</span>
-                  <span>•••• 4242</span>
-                  <span class="set-row__hint">exp 11/27</span>
-                  <button type="button" class="btn--outline btn--s">Update</button>
-                </div>
-              </div>
-            </div>
-            <div class="set-row">
-              <div class="set-row__lead">
-                <div class="set-row__label">Billing email</div>
-                <div class="set-row__hint">Receipts and VAT documents.</div>
-              </div>
-              <div class="set-row__ctrl">
-                <input  type="email" value={userEmail} readonly />
-              </div>
-            </div>
-            <div class="set-row">
-              <div class="set-row__lead">
-                <div class="set-row__label">Tax ID</div>
-                <div class="set-row__hint">ES NIF / EU VAT — for proper invoices.</div>
-              </div>
-              <div class="set-row__ctrl">
-                <input class="input--short" type="text" value="ES 41XXXXXXX-A" />
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section class="set-group">
-          <div class="set-group__head">
-            <span class="eyebrow set-group__kicker">History</span>
-          </div>
-          <div class="set-group__body">
-            <div class="set-invoices">
-              {#each ['2026-04-01', '2026-03-01', '2026-02-01', '2026-01-01'] as d (d)}
-                <div class="set-invoice">
-                  <span class="set-invoice__date">{d}</span>
-                  <span class="set-invoice__plan">Solo · monthly</span>
-                  <span class="set-invoice__amt">€9.00</span>
-                  <span class="set-invoice__status">paid</span>
-                  <button type="button" class="btn--outline btn--s">PDF</button>
-                </div>
-              {/each}
-            </div>
-          </div>
-        </section>
-      {/if}
-
-      {#if active === 'danger'}
-        <header class="set-mast">
-          <p class="eyebrow set-mast__kicker">Last resort</p>
-          <h1 class="set-mast__title"><em>Danger zone</em></h1>
-          <p class="set-mast__sub">
-            The buttons here can't be undone. Read twice.
-          </p>
-        </header>
-
-        <section class="set-group">
-          <div class="set-group__body">
-            <div class="set-row">
-              <div class="set-row__lead">
-                <div class="set-row__label">Export all data</div>
-                <div class="set-row__hint">
-                  A zip of every project, contact, show, invoice and note — in
-                  open formats.
-                </div>
-              </div>
-              <div class="set-row__ctrl">
-                <button type="button" class="btn--outline btn--s">Request export</button>
-              </div>
-            </div>
-            <div class="set-row">
-              <div class="set-row__lead">
-                <div class="set-row__label">Leave all workspaces</div>
-                <div class="set-row__hint">
-                  Your collaborators keep what they had access to. You keep the
-                  rest.
-                </div>
-              </div>
-              <div class="set-row__ctrl">
-                <button type="button" class="btn--outline btn--s is-warn">Leave all…</button>
-              </div>
-            </div>
-            <div class="set-row is-danger">
-              <div class="set-row__lead">
-                <div class="set-row__label">Delete account</div>
-                <div class="set-row__hint">
-                  14-day grace period after which everything is purged.
-                </div>
-              </div>
-              <div class="set-row__ctrl">
-                <button type="button" class="btn--danger btn--s">
-                  Delete my Hour…
-                </button>
-              </div>
-            </div>
-          </div>
-        </section>
+  {#if active === 'danger'}
+    <DangerSection />
   {/if}
 </article>
 
 <style>
   /* The page is rendered inside .workspace-shell__content (which already
      paints background + outer padding). We just need a centred article
-     with a sensible reading measure and an avatar-pick row composer. */
+     with a sensible reading measure. */
   .set-page {
     --set-pad: clamp(16px, 1.6vw, 24px);
 
@@ -1214,44 +120,32 @@
     font-family: var(--font-sans);
   }
 
-  .set-avatar-pick {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-m);
-    flex-wrap: wrap;
-  }
-  .set-avatar-pick__big {
-    inline-size: 56px;
-    block-size: 56px;
-    border-radius: 50%;
-    color: var(--bg);
-    display: grid;
-    place-items: center;
-    font-family: var(--font-mono);
-    font-size: var(--text-l);
-    font-weight: 600;
-    flex: none;
-  }
+  /* ── Shared layout tier ────────────────────────────────────────────────
+     These nodes are rendered by the section child components, so plain
+     scoped selectors would no longer match them. They are promoted to
+     `.set-page :global(…)` — still anchored under this page's root, so
+     nothing leaks app-wide. Declarations are verbatim from the pre-split
+     page. Section-specific rules live in each *Section.svelte. */
 
-  .set-mast {
+  .set-page :global(.set-mast) {
     display: flex;
     flex-direction: column;
     gap: var(--space-xs);
     margin-block-end: calc(var(--set-pad) * 1.2);
     padding-block-end: var(--space-m);
   }
-  .set-mast__kicker {
+  .set-page :global(.set-mast__kicker) {
     margin: 0;
   }
   /* Masthead typography via base.css h1 defaults. */
-  .set-mast__title {
+  .set-page :global(.set-mast__title) {
     margin: 0;
   }
-  .set-mast__title em {
+  .set-page :global(.set-mast__title em) {
     font-style: italic;
     color: var(--text-color);
   }
-  .set-mast__sub {
+  .set-page :global(.set-mast__sub) {
     margin: 0;
     color: var(--text-muted);
     font-size: var(--text-m);
@@ -1259,10 +153,10 @@
     max-inline-size: 56ch;
   }
 
-  .set-group {
+  .set-page :global(.set-group) {
     margin-block-end: calc(var(--set-pad) * 2);
   }
-  .set-group__head {
+  .set-page :global(.set-group__head) {
     display: flex;
     flex-direction: column;
     gap: var(--space-xs);
@@ -1272,7 +166,7 @@
   }
   /* Kicker typography via base.css .eyebrow. */
 
-  .set-group__title {
+  .set-page :global(.set-group__title) {
     font-family: var(--font-display);
     font-size: var(--h3);
     font-weight: 400;
@@ -1280,12 +174,12 @@
     margin: 0;
     color: var(--text-color);
   }
-  .set-group__body {
+  .set-page :global(.set-group__body) {
     display: flex;
     flex-direction: column;
   }
 
-  .set-row {
+  .set-page :global(.set-row) {
     display: grid;
     grid-template-columns: minmax(180px, 1fr) minmax(280px, 1.6fr);
     gap: calc(var(--set-pad) * 1.4);
@@ -1293,51 +187,43 @@
     padding-block: var(--set-pad);
     border-block-end: 1px solid var(--border-color-light);
   }
-  .set-row:last-child {
+  .set-page :global(.set-row:last-child) {
     border-block-end: 0;
   }
-  .set-row__lead {
+  .set-page :global(.set-row__lead) {
     padding-block-start: var(--space-xs);
   }
-  .set-row__label {
+  .set-page :global(.set-row__label) {
     font-size: var(--text-s);
     font-weight: 500;
     color: var(--text-color);
     line-height: 1.3;
   }
-  .set-row__hint {
+  .set-page :global(.set-row__hint) {
     font-size: var(--text-xs);
     color: var(--text-faint);
     line-height: 1.55;
     margin-block-start: var(--space-xs);
     max-inline-size: 36ch;
   }
-  .set-row__ctrl {
+  .set-page :global(.set-row__ctrl) {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: var(--space-s);
   }
-  .set-row.is-danger .set-row__label {
+  .set-page :global(.set-row.is-danger .set-row__label) {
     color: var(--danger);
   }
 
-  .set-prose {
-    font-size: var(--text-s);
-    color: var(--text-muted);
-    line-height: 1.6;
-    margin-block: 0 var(--space-s);
-    max-inline-size: 56ch;
-  }
-
-  .set-seg {
+  .set-page :global(.set-seg) {
     display: inline-flex;
     background: var(--bg-light);
     border: 1px solid var(--border-color-light);
     border-radius: var(--radius);
     padding: 2px;
   }
-  .set-seg button {
+  .set-page :global(.set-seg button) {
     appearance: none;
     background: transparent;
     border: 0;
@@ -1350,17 +236,17 @@
     cursor: pointer;
     transition: background var(--transition), color var(--transition);
   }
-  .set-seg button:hover {
+  .set-page :global(.set-seg button:hover) {
     color: var(--text-color);
   }
-  .set-seg button.is-on {
+  .set-page :global(.set-seg button.is-on) {
     background: var(--bg-ultra-light);
     color: var(--text-color);
     font-weight: 500;
     box-shadow: var(--box-shadow-1);
   }
 
-  .set-toggle {
+  .set-page :global(.set-toggle) {
     appearance: none;
     border: 0;
     background: var(--border-color-dark);
@@ -1373,7 +259,7 @@
     align-items: center;
     transition: background var(--transition);
   }
-  .set-toggle__dot {
+  .set-page :global(.set-toggle__dot) {
     inline-size: 16px;
     block-size: 16px;
     border-radius: 50%;
@@ -1381,385 +267,10 @@
     box-shadow: var(--box-shadow-1);
     transition: transform var(--transition);
   }
-  .set-toggle.is-on {
+  .set-page :global(.set-toggle.is-on) {
     background: var(--text-color);
   }
-  .set-toggle.is-on .set-toggle__dot {
+  .set-page :global(.set-toggle.is-on .set-toggle__dot) {
     transform: translateX(16px);
-  }
-
-  /* Pseudo-button "+ Add a thing" — dashed outline placeholder for
-     creation affordances. Specific enough to keep local. */
-  .set-add {
-    appearance: none;
-    align-self: flex-start;
-    padding-block: var(--space-s);
-    padding-inline: var(--space-m);
-    border: 1px dashed var(--border-color-dark);
-    border-radius: var(--radius-s);
-    background: transparent;
-    color: var(--text-muted);
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    letter-spacing: 0.04em;
-    cursor: pointer;
-    margin-block-start: var(--space-s);
-    transition: color var(--transition), border-color var(--transition);
-  }
-  .set-add:hover {
-    color: var(--text-color);
-    border-color: var(--text-muted);
-  }
-
-  .set-ws-list {
-    display: flex;
-    flex-direction: column;
-  }
-  .set-ws {
-    display: grid;
-    grid-template-columns: 4px minmax(140px, 1fr) auto auto auto;
-    gap: var(--set-pad);
-    align-items: center;
-    padding-block: var(--space-m);
-    border-block-end: 1px solid var(--border-color-light);
-  }
-  .set-ws:last-child {
-    border-block-end: 0;
-  }
-  .set-ws__rail {
-    inline-size: 4px;
-    block-size: 38px;
-    background: var(--c);
-    border-radius: 2px;
-  }
-  .set-ws__name h3 {
-    font-family: var(--font-display);
-    font-size: var(--text-l);
-    font-weight: 500;
-    letter-spacing: -0.01em;
-    margin: 0;
-    color: var(--text-color);
-  }
-  .set-ws__sub {
-    font-size: var(--text-xs);
-    color: var(--text-faint);
-    font-family: var(--font-mono);
-    letter-spacing: 0.04em;
-    margin-block-start: 2px;
-  }
-  .set-ws__roles {
-    display: flex;
-    gap: var(--space-xs);
-    flex-wrap: wrap;
-    max-inline-size: 280px;
-  }
-  /* Role badges via base.css .role-badge (+ .is-mine). */
-  .set-ws__meta {
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    color: var(--text-faint);
-    display: flex;
-    gap: var(--space-xs);
-    white-space: nowrap;
-  }
-  .set-ws__meta .sep {
-    opacity: 0.5;
-  }
-  .set-ws__actions {
-    display: flex;
-    gap: var(--space-xs);
-  }
-
-  .set-alias-list {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-s);
-  }
-
-  .set-alias {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-m);
-    padding-block: var(--space-s);
-    border-block-end: 1px solid var(--border-color-light);
-  }
-
-  .set-alias__what {
-    display: flex;
-    align-items: baseline;
-    gap: var(--space-s);
-    min-inline-size: 0;
-  }
-
-  .set-alias__url {
-    font-family: var(--font-mono);
-    font-size: var(--text-s);
-    color: var(--text-color);
-  }
-
-  .set-alias__ws {
-    font-size: var(--text-s);
-    color: var(--text-muted);
-  }
-
-  .set-alias__state {
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    color: var(--text-faint);
-  }
-
-  .set-alias__actions {
-    display: flex;
-    gap: var(--space-xs);
-  }
-
-  .set-roles-grid {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-xs);
-  }
-  /* Pill skeleton (base.css) carries the chip; only the dot is local. */
-  .set-role-chip {
-    --pill-gap: var(--space-xs);
-  }
-  .set-role-chip__dot {
-    inline-size: 7px;
-    block-size: 7px;
-    border: 1px solid currentColor;
-    border-radius: 50%;
-    display: inline-block;
-  }
-  :global(.set-role-chip.pill--on) .set-role-chip__dot {
-    background: currentColor;
-  }
-
-  .set-hours {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-s);
-  }
-  .set-hours .sep {
-    color: var(--text-faint);
-    font-family: var(--font-mono);
-  }
-  .set-codeline {
-    font-family: var(--font-mono);
-    font-size: 0.95em;
-    background: var(--bg-light);
-    padding-block: 1px;
-    padding-inline: var(--space-xs);
-    border-radius: var(--radius-s);
-  }
-
-  .set-plan {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: var(--space-m);
-    padding: var(--space-m);
-    border: 1px solid var(--border-color-light);
-    border-radius: var(--radius);
-    background: var(--bg-light);
-  }
-  .set-plan__head {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-xs);
-  }
-  /* Kicker typography via base.css .eyebrow. */
-
-  .set-plan__name {
-    font-family: var(--font-display);
-    font-size: var(--text-xxl);
-    font-weight: 400;
-    letter-spacing: -0.02em;
-    margin: 0;
-    color: var(--text-color);
-  }
-  .set-plan__name em {
-    font-style: italic;
-    color: var(--text-muted);
-  }
-  .set-plan__name span {
-    font-size: var(--text-xl);
-    color: var(--text-muted);
-  }
-  .set-plan__sub {
-    font-size: var(--text-s);
-    color: var(--text-muted);
-    margin: var(--space-xs) 0 0;
-    line-height: 1.55;
-  }
-  .set-plan__actions {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-xs);
-    align-items: flex-end;
-  }
-  .set-plan__actions button {
-    white-space: nowrap;
-  }
-
-  .set-card {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-s);
-    font-size: var(--text-s);
-    color: var(--text-color);
-  }
-  .set-card__brand {
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    font-weight: 700;
-    letter-spacing: 0.1em;
-    background: var(--text-color);
-    color: var(--bg);
-    padding-block: 3px;
-    padding-inline: var(--space-s);
-    border-radius: var(--radius-s);
-  }
-
-  .set-invoices {
-    display: flex;
-    flex-direction: column;
-  }
-  .set-invoice {
-    display: grid;
-    grid-template-columns: 100px 1fr auto auto auto;
-    gap: var(--space-m);
-    align-items: center;
-    padding-block: var(--space-s);
-    border-block-end: 1px solid var(--border-color-light);
-    font-size: var(--text-s);
-  }
-  .set-invoice:last-child {
-    border-block-end: 0;
-  }
-  .set-invoice__date {
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    color: var(--text-muted);
-    letter-spacing: 0.04em;
-  }
-  .set-invoice__plan {
-    color: var(--text-color);
-  }
-  .set-invoice__amt {
-    font-family: var(--font-mono);
-    color: var(--text-color);
-    font-weight: 500;
-  }
-  .set-invoice__status {
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--success);
-    border: 1px solid currentColor;
-    padding-block: 2px;
-    padding-inline: var(--space-s);
-    border-radius: var(--radius-s);
-  }
-
-  .set-access {
-    border: 1px solid var(--border-color-dark);
-    background: var(--bg-light);
-  }
-  .set-access__head {
-    display: flex;
-    align-items: end;
-    justify-content: space-between;
-    gap: var(--space-m);
-  }
-  .set-access__count,
-  .set-access__status,
-  .set-access__role {
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--text-faint);
-  }
-  .set-access__invite {
-    display: grid;
-    grid-template-columns: minmax(12rem, 1.4fr) repeat(3, minmax(9rem, 1fr)) auto;
-    gap: var(--space-s);
-    align-items: end;
-    padding: var(--space-m);
-    border-block: 1px solid var(--border-color-light);
-  }
-  .set-access__invite label {
-    display: grid;
-    gap: var(--space-xs);
-  }
-  .set-access__invite-button { white-space: nowrap; }
-  .set-access__link {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-m);
-    margin: var(--space-m);
-    padding: var(--space-s) var(--space-m);
-    border-inline-start: 3px solid var(--accent-color);
-    background: var(--bg);
-  }
-  .set-access__link p {
-    margin: var(--space-xs) 0 0;
-    color: var(--text-muted);
-    font-size: var(--text-s);
-  }
-  .set-access__ledger { padding-inline: var(--space-m); }
-  .set-access__row {
-    display: grid;
-    grid-template-columns: 8px minmax(12rem, 1fr) minmax(7rem, auto) 5rem auto;
-    gap: var(--space-m);
-    align-items: center;
-    min-block-size: 4.25rem;
-    border-block-end: 1px solid var(--border-color-light);
-  }
-  .set-access__row:last-child { border-block-end: 0; }
-  .set-access__mark {
-    inline-size: 6px;
-    block-size: 6px;
-    border-radius: 50%;
-    background: var(--success);
-  }
-  .set-access__row.is-pending .set-access__mark {
-    background: transparent;
-    border: 1px solid var(--text-faint);
-  }
-  .set-access__identity {
-    display: grid;
-    gap: 2px;
-    min-inline-size: 0;
-  }
-  .set-access__identity strong {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    font-weight: 500;
-  }
-  .set-access__identity span {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    color: var(--text-faint);
-    font-size: var(--text-xs);
-  }
-  .set-access__role-select select { min-inline-size: 8rem; }
-
-  @media (max-width: 72rem) {
-    .set-access__invite { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .set-access__invite-button { grid-column: 1 / -1; }
-  }
-  @media (max-width: 44rem) {
-    .set-access__invite { grid-template-columns: 1fr; }
-    .set-access__row {
-      grid-template-columns: 8px 1fr auto;
-      gap: var(--space-s);
-      padding-block: var(--space-s);
-    }
-    .set-access__role,
-    .set-access__role-select { grid-column: 2; }
-    .set-access__status { display: none; }
-    .set-access__row > button { grid-column: 3; grid-row: 1 / span 2; }
   }
 </style>
