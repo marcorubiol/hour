@@ -669,6 +669,24 @@
   let scopedPerfs = $derived(activePerfRows.filter((p) => perfInScope(p)));
   let scopedDates = $derived(activeDateRows.filter((d) => dateInScope(d)));
 
+  // TEMP DEBUG — remove after diagnosing the empty-agenda feed.
+  $effect(() => {
+    console.log('[agenda-dbg]', {
+      view,
+      unresolved: scopeUnresolved,
+      from: agendaFromIso,
+      to: agendaToIso,
+      enabled: view === 'agenda' && !scopeUnresolved,
+      perfStatus: $agendaPerfQuery.status,
+      perfFetch: $agendaPerfQuery.fetchStatus,
+      perfLen: $agendaPerfQuery.data?.items?.length ?? null,
+      perfErr: $agendaPerfQuery.error instanceof Error ? $agendaPerfQuery.error.message : null,
+      activeLen: activePerfRows.length,
+      scopedLen: scopedPerfs.length,
+      scopeEmpty: scope.isEmpty,
+    });
+  });
+
   let allBlackouts = $derived(activeBlackoutRows);
   // The bands/rail show the scope's workspaces only; the engine reads all.
   // Calm hides the blackout bands/lanes entirely (and, via pulseAwayPersons,
