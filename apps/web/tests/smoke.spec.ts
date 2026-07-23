@@ -53,7 +53,8 @@ test.describe('smoke', () => {
     // Old space-scoped lens bookmarks 308 to the space-less lens.
     await page.goto('/h/muk-cia/desk');
     await page.waitForURL(/\/h\/desk\/?$/);
-    await expect(page.locator('.desk__head')).toBeVisible();
+    // Lens headers were unified to the shared LensHeader (.lenshead) in a6cd10e.
+    await expect(page.locator('.lenshead').first()).toBeVisible();
 
     // Project detail proves the read path: session survived, RLS let the
     // conversations through, the count renders. Entities stay space-scoped.
