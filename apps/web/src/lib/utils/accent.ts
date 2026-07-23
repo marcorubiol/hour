@@ -1,4 +1,4 @@
-export const ACCENT_COUNT = 7;
+export const ACCENT_COUNT = 10;
 
 function hashSlug(slug: string): number {
 	let h = 2166136261;
@@ -65,8 +65,10 @@ export function customHue(accent: string | null | undefined): number | null {
 	return m ? Number(m[1]) % 360 : null;
 }
 
-/** Hue of each palette swatch (mirrors --accent-N in tokens.css). */
-export const PALETTE_HUES = [26, 77, 129, 180, 231, 283, 334];
+/** Hue of each palette swatch (mirrors --accent-N in tokens.css): 10 hues,
+ *  bin-centred at 360·(i+0.5)/10 — the eye's practical limit for categorical
+ *  colour, spaced 36° apart. */
+export const PALETTE_HUES = [18, 54, 90, 126, 162, 198, 234, 270, 306, 342];
 
 /**
  * The effective hue (0-360) an entity's accent resolves to: a custom hue, a

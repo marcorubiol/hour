@@ -32,11 +32,12 @@ describe('accentVarFor', () => {
 	it('honours an in-range palette index', () => {
 		expect(accentVarFor({ slug: 'x', accent: '3' })).toBe('var(--accent-3)');
 	});
-	it('wraps an out-of-range index back into the shrunk palette', () => {
-		// old 12-colour palette leftovers must not dangle at undefined tokens
-		expect(accentVarFor({ slug: 'x', accent: '8' })).toBe('var(--accent-1)');
-		expect(accentVarFor({ slug: 'x', accent: '9' })).toBe('var(--accent-2)');
-		expect(accentVarFor({ slug: 'x', accent: '12' })).toBe('var(--accent-5)');
+	it('keeps in-range indices and wraps out-of-range ones', () => {
+		// 1..10 pass through; anything above wraps so old 11/12 never dangle
+		expect(accentVarFor({ slug: 'x', accent: '8' })).toBe('var(--accent-8)');
+		expect(accentVarFor({ slug: 'x', accent: '10' })).toBe('var(--accent-10)');
+		expect(accentVarFor({ slug: 'x', accent: '12' })).toBe('var(--accent-2)');
+		expect(accentVarFor({ slug: 'x', accent: '13' })).toBe('var(--accent-3)');
 	});
 	it('renders a custom hue with the palette-fixed L/C tokens', () => {
 		expect(accentVarFor({ slug: 'x', accent: 'h210' })).toBe(
@@ -73,7 +74,7 @@ describe('accentHue', () => {
 		expect(accentHue({ slug: 'x', accent: 'h210' })).toBe(210);
 	});
 	it('wraps a legacy out-of-range index', () => {
-		expect(accentHue({ slug: 'x', accent: '9' })).toBe(PALETTE_HUES[1]);
+		expect(accentHue({ slug: 'x', accent: '13' })).toBe(PALETTE_HUES[2]);
 	});
 	it('falls back to the hashed preset hue for auto (null)', () => {
 		expect(accentHue({ slug: 'mamemi', accent: null })).toBe(PALETTE_HUES[accentIndex('mamemi') - 1]);
@@ -84,7 +85,7 @@ describe('hueDistance', () => {
 	it('takes the shortest way round the wheel', () => {
 		expect(hueDistance(10, 350)).toBe(20);
 		expect(hueDistance(0, 180)).toBe(180);
-		expect(hueDistance(26, 77)).toBe(51);
-		expect(hueDistance(129, 129)).toBe(0);
+		expect(hueDistance(18, 54)).toBe(36);
+		expect(hueDistance(90, 90)).toBe(0);
 	});
 });

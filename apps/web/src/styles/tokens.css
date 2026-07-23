@@ -142,23 +142,30 @@
     /* $lib/utils/accent.ts → accentVar(slug) returns var(--accent-N) */
     /* The identity monogram derives its soft bg + legible fg from    */
     /* these via IdentityMark (color-mix tint + oklch-from fg).       */
-    /* 7 EQUIDISTANT hues (bin-centred, 360·(i+0.5)/7) at the fixed custom  */
-    /* envelope L/C, so each swatch is exactly the colour the hue slider    */
-    /* shows at its position — the slider is the source of truth. Colour is */
-    /* a grouping cue, not the ID (the monogram is), so repeats are fine.   */
+    /* 10 EQUIDISTANT hues (bin-centred, 360·(i+0.5)/10, 36° apart) at the   */
+    /* fixed custom envelope L/C, so each preset is exactly the colour the   */
+    /* hue slider shows at its tick — the slider is the source of truth.     */
+    /* Colour is a grouping cue, not the ID (the monogram is).               */
     /* ============================================================ */
 
     /* Envelope: L + C fixed so every accent (preset or custom hue) stays soft
        and only the hue varies. Dark mode lifts these; the accents follow. */
     --accent-custom-l: 55%;
     --accent-custom-c: 0.12;
-    --accent-1: oklch(var(--accent-custom-l) var(--accent-custom-c) 26);
-    --accent-2: oklch(var(--accent-custom-l) var(--accent-custom-c) 77);
-    --accent-3: oklch(var(--accent-custom-l) var(--accent-custom-c) 129);
-    --accent-4: oklch(var(--accent-custom-l) var(--accent-custom-c) 180);
-    --accent-5: oklch(var(--accent-custom-l) var(--accent-custom-c) 231);
-    --accent-6: oklch(var(--accent-custom-l) var(--accent-custom-c) 283);
-    --accent-7: oklch(var(--accent-custom-l) var(--accent-custom-c) 334);
+    /* Pale "background" preview of the hue wheel in the picker bar — high L,
+       low C so the hues read as clean pastels, not muddy mid-tones. */
+    --accent-track-l: 91%;
+    --accent-track-c: 0.05;
+    --accent-1: oklch(var(--accent-custom-l) var(--accent-custom-c) 18);
+    --accent-2: oklch(var(--accent-custom-l) var(--accent-custom-c) 54);
+    --accent-3: oklch(var(--accent-custom-l) var(--accent-custom-c) 90);
+    --accent-4: oklch(var(--accent-custom-l) var(--accent-custom-c) 126);
+    --accent-5: oklch(var(--accent-custom-l) var(--accent-custom-c) 162);
+    --accent-6: oklch(var(--accent-custom-l) var(--accent-custom-c) 198);
+    --accent-7: oklch(var(--accent-custom-l) var(--accent-custom-c) 234);
+    --accent-8: oklch(var(--accent-custom-l) var(--accent-custom-c) 270);
+    --accent-9: oklch(var(--accent-custom-l) var(--accent-custom-c) 306);
+    --accent-10: oklch(var(--accent-custom-l) var(--accent-custom-c) 342);
 
     /* ============================================================ */
     /* CONTEXTUAL — tag tones (6 bg+fg pairs for task-type chips)     */
@@ -544,6 +551,8 @@
        this lifted envelope (L up ~13%, C eased to soften vibration). */
     --accent-custom-l: 68%;
     --accent-custom-c: 0.1;
+    --accent-track-l: 34%;
+    --accent-track-c: 0.055;
 
     /* Tag tones — bg ≈ 27% L (subtle pill, +6pp over body so it lifts
        visibly), fg ≈ 80% L (legible without halo). */
