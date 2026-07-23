@@ -24,6 +24,19 @@ export type EditableProject = {
 };
 
 /**
+ * A sibling the identity editor checks against: its monogram (case-exact
+ * collision) and, for the colour warning, its slug + accent (resolved to a
+ * hue) and name.
+ */
+export type IdentitySibling = {
+	id: string;
+	initials?: string | null;
+	slug?: string | null;
+	name?: string | null;
+	accent?: string | null;
+};
+
+/**
  * Suggest a monogram from a name. Fallback only — used when a project has no
  * stored `initials`. Multi-word → first char of up to `max` words, upper.
  * Single word → its first two chars (first upper). Diacritics preserved.

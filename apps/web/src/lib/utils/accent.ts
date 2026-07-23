@@ -65,6 +65,30 @@ export function customHue(accent: string | null | undefined): number | null {
 	return m ? Number(m[1]) % 360 : null;
 }
 
+/** Hue of each palette swatch (mirrors --accent-N in tokens.css). */
+export const PALETTE_HUES = [26, 77, 129, 180, 231, 283, 334];
+
+/**
+ * The effective hue (0-360) an entity's accent resolves to: a custom hue, a
+ * preset's hue, or — for null/auto — the hash-derived preset's hue.
+ */
+export function accentHue(entity: { slug: string | null | undefined; accent?: string | null }): number {
+	const a = entity.accent?.trim();
+	const custom = customHue(a);
+	if (custom !== null) return custom;
+	const idx =
+		a && /^\d+$/.test(a)
+			? (((Number(a) - 1) % ACCENT_COUNT) + ACCENT_COUNT) % ACCENT_COUNT
+			: accentIndex(entity.slug) - 1;
+	return PALETTE_HUES[idx];
+}
+
+/** Shortest angular distance (0-180) between two hues on the wheel. */
+export function hueDistance(a: number, b: number): number {
+	const d = Math.abs(a - b) % 360;
+	return Math.min(d, 360 - d);
+}
+
 export function accentStyleFor(entity: {
 	slug: string | null | undefined;
 	accent?: string | null;

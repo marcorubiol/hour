@@ -15,6 +15,7 @@
 
   import {
     ACCENT_COUNT,
+    PALETTE_HUES,
     accentIndex,
     accentVarFor,
     customAccent,
@@ -37,10 +38,6 @@
   let { accent = $bindable(null), autoSlug, label, disabled = false, hideLegend = false }: Props =
     $props();
 
-  // Bin-centred equidistant hues (360·(i+0.5)/7) — MUST mirror --accent-N in
-  // tokens.css so a swatch (space-around, centre at (i+0.5)/7) lands exactly
-  // above the slider's hue at that fraction.
-  const PALETTE_HUES = [26, 77, 129, 180, 231, 283, 334];
   const swatches = Array.from({ length: ACCENT_COUNT }, (_, i) => i + 1);
 
   let isCustom = $derived(isCustomAccent(accent));

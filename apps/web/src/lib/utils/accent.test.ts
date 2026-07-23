@@ -1,11 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import {
 	ACCENT_COUNT,
+	PALETTE_HUES,
+	accentHue,
 	accentIndex,
 	accentVar,
 	accentVarFor,
 	customAccent,
 	customHue,
+	hueDistance,
 	isCustomAccent,
 } from './accent';
 
@@ -59,5 +62,29 @@ describe('custom hue helpers', () => {
 		expect(isCustomAccent(null)).toBe(false);
 		expect(customHue('h210')).toBe(210);
 		expect(customHue('3')).toBeNull();
+	});
+});
+
+describe('accentHue', () => {
+	it('resolves a preset index to its palette hue', () => {
+		expect(accentHue({ slug: 'x', accent: '3' })).toBe(PALETTE_HUES[2]);
+	});
+	it('resolves a custom token to its hue', () => {
+		expect(accentHue({ slug: 'x', accent: 'h210' })).toBe(210);
+	});
+	it('wraps a legacy out-of-range index', () => {
+		expect(accentHue({ slug: 'x', accent: '9' })).toBe(PALETTE_HUES[1]);
+	});
+	it('falls back to the hashed preset hue for auto (null)', () => {
+		expect(accentHue({ slug: 'mamemi', accent: null })).toBe(PALETTE_HUES[accentIndex('mamemi') - 1]);
+	});
+});
+
+describe('hueDistance', () => {
+	it('takes the shortest way round the wheel', () => {
+		expect(hueDistance(10, 350)).toBe(20);
+		expect(hueDistance(0, 180)).toBe(180);
+		expect(hueDistance(26, 77)).toBe(51);
+		expect(hueDistance(129, 129)).toBe(0);
 	});
 });

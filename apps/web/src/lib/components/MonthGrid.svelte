@@ -147,6 +147,7 @@
   import { dualTime } from '$lib/datetime';
   import { workspacesQueryOptions } from '$lib/nav-queries';
   import { accentVarFor } from '$lib/utils/accent';
+  import type { IdentitySibling } from '$lib/utils/identity';
   import IdentityMark from '$lib/components/IdentityMark.svelte';
   import IdentityQuickPanel from '$lib/components/IdentityQuickPanel.svelte';
   import { isReady, performanceStatusFamily } from '$lib/performance';
@@ -239,11 +240,17 @@
   let markPop = $state<{ project: ProjectLite; rect: DOMRect } | null>(null);
   let markPopEl: HTMLElement | undefined = $state();
   let markSiblings = $derived.by(() => {
-    const m = new Map<string, { id: string; initials?: string | null }>();
-    for (const p of performances)
-      if (p.project) m.set(p.project.id, { id: p.project.id, initials: p.project.initials });
-    for (const d of dates)
-      if (d.project) m.set(d.project.id, { id: d.project.id, initials: d.project.initials });
+    const m = new Map<string, IdentitySibling>();
+    const add = (p: ProjectLite) =>
+      m.set(p.id, {
+        id: p.id,
+        initials: p.initials,
+        slug: p.slug,
+        name: p.name,
+        accent: p.accent,
+      });
+    for (const p of performances) if (p.project) add(p.project);
+    for (const d of dates) if (d.project) add(d.project);
     return [...m.values()];
   });
   function openMark(e: MouseEvent, project: ProjectLite | null) {

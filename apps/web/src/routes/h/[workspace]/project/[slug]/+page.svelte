@@ -94,7 +94,13 @@
     workspaceId
       ? ($projectsQuery.data?.items ?? [])
           .filter((p) => p.workspace_id === workspaceId && p.id !== project?.id)
-          .map((p) => ({ id: p.id, initials: p.initials }))
+          .map((p) => ({
+            id: p.id,
+            initials: p.initials,
+            slug: p.slug,
+            name: p.name,
+            accent: p.accent,
+          }))
       : [],
   );
 

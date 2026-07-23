@@ -15,12 +15,12 @@
   import EditProjectDialog from '$lib/components/EditProjectDialog.svelte';
   import AccentSwatchPicker from '$lib/components/create/AccentSwatchPicker.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
-  import { accentVarFor } from '$lib/utils/accent';
-  import { MONOGRAM_MAX, type EditableProject } from '$lib/utils/identity';
+  import { accentVarFor, accentHue, hueDistance } from '$lib/utils/accent';
+  import { MONOGRAM_MAX, type EditableProject, type IdentitySibling } from '$lib/utils/identity';
 
   interface Props {
     project: EditableProject;
-    siblings?: Array<{ id: string; initials?: string | null }>;
+    siblings?: IdentitySibling[];
     onclose: () => void;
   }
 
@@ -39,6 +39,19 @@
     initials.trim().length > 0 &&
       siblings.some((s) => s.id !== project.id && (s.initials ?? '') === initials.trim()),
   );
+
+  // Colour warning (soft): the chosen/auto hue is within this many degrees of a
+  // sibling's. The accent is a grouping cue, so this informs, never blocks.
+  const COLOR_CLASH_DEG = 25;
+  let colorClash = $derived.by((): string | null => {
+    const mine = accentHue({ slug: project.slug, accent });
+    for (const s of siblings) {
+      if (s.id === project.id) continue;
+      if (hueDistance(accentHue({ slug: s.slug, accent: s.accent }), mine) <= COLOR_CLASH_DEG)
+        return s.name ?? 'another project';
+    }
+    return null;
+  });
 
   const save = createMutation({
     mutationFn: async () => {
@@ -113,7 +126,12 @@
     {/if}
   </div>
 
-  <AccentSwatchPicker bind:accent autoSlug={project.slug} label="Project color" hideLegend />
+  <div class="iqp__color">
+    <AccentSwatchPicker bind:accent autoSlug={project.slug} label="Project color" hideLegend />
+    {#if colorClash}
+      <p class="iqp__collision">A similar colour is used by {colorClash}.</p>
+    {/if}
+  </div>
 
   <button
     type="button"
@@ -163,6 +181,12 @@
     /* Eyebrow + monogram input + hint stay a tight group; the larger panel
        gap gives air between this block, the colour picker and the actions. */
     .iqp__identity {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2xs);
+    }
+
+    .iqp__color {
       display: flex;
       flex-direction: column;
       gap: var(--space-2xs);
