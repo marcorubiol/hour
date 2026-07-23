@@ -1,19 +1,17 @@
 <script lang="ts">
   /**
-   * Money module (ADR-056) — fees + invoices of a line, plus the expense
-   * rows UI. Content-only: the line shell owns the page-level eyebrow;
-   * this module uses small mono sub-eyebrows per subsection.
+   * Money module (ADR-056 + ADR-087) — the deals (bolos) + invoices of a
+   * line, plus the expense rows UI. Content-only: the line shell owns the
+   * page-level eyebrow; this module uses small mono sub-eyebrows per subsection.
    *
-   * Fees read `performance_redacted` via /api/money/performances —
-   * fee_amount is NULL both when masked (no read:money) and when unset,
-   * indistinguishable by design → render '—' and never present 0.00 as
-   * real when every fee is null.
+   * Fees read the bolo fee via /api/money/bolos — fee_amount is NULL both when
+   * masked (no read:money) and when unset, indistinguishable by design → render
+   * '—' and never present 0.00 as real when every fee is null.
    *
    * Invoices: headers carry no line linkage (join path is
-   * invoice_line.performance_id → performance.line_id), so the module
-   * fetches the project's invoices and filters client-side against this
-   * line's performance ids. Read-only here — creation lives in the Money
-   * lens / fee editor.
+   * invoice_line.bolo_id → bolo.line_id), so the module fetches the project's
+   * invoices and filters client-side against this line's bolo ids. Read-only
+   * here — creation lives in the Money lens / fee editor.
    */
 
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
@@ -43,17 +41,20 @@
     workspaceSlug: string;
   }
 
-  let { line, workspaceSlug }: Props = $props();
+  // workspaceSlug is part of the shared module contract; the deals table no
+  // longer links per-function (a bolo has no route), so it is unused here.
+  let { line }: Props = $props();
 
   type FeeItem = {
     id: string;
-    slug: string | null;
-    performed_at: string;
+    next_performed_at: string | null;
+    function_count: number;
     status: string;
     venue_name: string | null;
     city: string | null;
     fee_amount: number | null;
     fee_currency: string | null;
+    collected: number;
     project_id: string;
     line_id: string | null;
   };
@@ -68,7 +69,7 @@
     total: number;
     currency: string;
     payer: { full_name: string; organization_name: string | null } | null;
-    lines: { performance_id: string | null }[];
+    lines: { bolo_id: string | null }[];
   };
 
   type ExpenseRow = {
@@ -89,7 +90,7 @@
     queryKey: ['line-money-fees', line.id] as const,
     queryFn: ({ signal }: { signal: AbortSignal }) =>
       fetchJSON<{ items: FeeItem[] }>(
-        `/api/money/performances?line_ids=${line.id}&limit=500`,
+        `/api/money/bolos?line_ids=${line.id}&limit=500`,
         signal,
       ),
   }));
@@ -102,14 +103,14 @@
   /** True masked-or-unset across the board — totals would lie as 0.00. */
   let allFeesNull = $derived(fees.length > 0 && fees.every((f) => f.fee_amount === null));
 
-  /** Same lifecycle bucketing as the Money lens. */
+  /** Same lifecycle bucketing as the Money lens; collected is payment-derived. */
   let totals = $derived.by(() => {
-    const buckets = { pipeline: 0, invoiced: 0, paid: 0 };
+    const buckets = { pipeline: 0, invoiced: 0, collected: 0 };
     for (const f of fees) {
+      buckets.collected += Number(f.collected ?? 0);
       if (f.fee_amount === null) continue;
       if (f.status === 'confirmed' || f.status === 'done') buckets.pipeline += f.fee_amount;
       else if (f.status === 'invoiced') buckets.invoiced += f.fee_amount;
-      else if (f.status === 'paid') buckets.paid += f.fee_amount;
     }
     return buckets;
   });
@@ -127,7 +128,7 @@
 
   let lineInvoices = $derived(
     ($invoicesQuery.data?.items ?? []).filter((inv) =>
-      inv.lines.some((l) => l.performance_id !== null && feeIds.has(l.performance_id)),
+      inv.lines.some((l) => l.bolo_id !== null && feeIds.has(l.bolo_id)),
     ),
   );
 
@@ -263,7 +264,7 @@
     {:else if $feesQuery.isLoading}
       <p class="lmm__state">Loading…</p>
     {:else if fees.length === 0}
-      <p class="lmm__state">No performances on this line yet.</p>
+      <p class="lmm__state">No deals on this line yet.</p>
     {:else}
       {#if allFeesNull}
         <p class="lmm__state">Fees hidden or unset.</p>
@@ -278,8 +279,8 @@
             {fmtMoney(totals.invoiced)}
           </span>
           <span class="lmm__total">
-            <span class="eyebrow eyebrow--sub lmm__total-label">paid</span>
-            {fmtMoney(totals.paid)}
+            <span class="eyebrow eyebrow--sub lmm__total-label">collected</span>
+            {fmtMoney(totals.collected)}
           </span>
         </div>
       {/if}
@@ -296,7 +297,10 @@
           <tbody>
             {#each fees as f (f.id)}
               <tr>
-                <td class="lmm__cell-date">{dayLabel(f.performed_at)}</td>
+                <td class="lmm__cell-date">
+                  {f.next_performed_at ? dayLabel(f.next_performed_at) : '—'}
+                  {#if f.function_count > 1}<span class="lmm__fn-count"> · {f.function_count} fns</span>{/if}
+                </td>
                 <td>
                   <StateBadge
                     label={performanceStatusLabel(f.status)}
@@ -304,13 +308,7 @@
                   />
                 </td>
                 <td class="lmm__cell-muted">
-                  {#if f.slug}
-                    <a class="lmm__perf-link" href={`/h/${workspaceSlug}/performance/${f.slug}`}>
-                      {[f.venue_name, f.city].filter(Boolean).join(' · ') || '—'}
-                    </a>
-                  {:else}
-                    {[f.venue_name, f.city].filter(Boolean).join(' · ') || '—'}
-                  {/if}
+                  {[f.venue_name, f.city].filter(Boolean).join(' · ') || '—'}
                 </td>
                 <td class="lmm__cell-amount">{fmtFee(f.fee_amount, f.fee_currency)}</td>
               </tr>
@@ -495,13 +493,10 @@
       text-align: end;
     }
 
-    .lmm__perf-link {
-      color: var(--text-color);
-      font-weight: 500;
-      text-decoration: none;
-    }
-    .lmm__perf-link:hover {
-      text-decoration: underline;
+    .lmm__fn-count {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-faint);
     }
 
     .lmm__invoices li {

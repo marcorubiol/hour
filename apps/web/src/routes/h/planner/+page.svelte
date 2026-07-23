@@ -71,6 +71,7 @@
   import CreateBlackoutDialog from '$lib/components/create/CreateBlackoutDialog.svelte';
   import type { CreatedPerformance } from '$lib/components/PerformanceForm.svelte';
   import { usePins } from '$lib/stores/pins.svelte';
+  import { useCalm } from '$lib/stores/calm.svelte';
   import { detectLocale, t } from '$lib/i18n';
   import {
     buildLineIndex,
@@ -121,6 +122,7 @@
   type TeamItem = { person_id: string; workspace_id: string; slug: string; full_name: string };
 
   const pins = usePins();
+  const calm = useCalm();
   const locale = detectLocale(navigator.language);
   const localeTag = { en: 'en-GB', es: 'es-ES', ca: 'ca-ES' }[locale];
 
@@ -233,6 +235,10 @@
   // ── Client-side status filter (ADR-078 §12: Tot | Holds | Confirmats) ─
   type CalFilter = 'all' | 'holds' | 'confirmed';
   let filter = $state<CalFilter>('all');
+  // Calm mode (Desk · Calm) forces the confirmed-only view here too — no
+  // manual status filter while it is on. Non-destructive: `filter` is
+  // restored when calm turns back off.
+  let effectiveFilter = $derived<CalFilter>(calm.on ? 'confirmed' : filter);
 
   // ── Pins → scope (Adaptive Digest) ────────────────────────────────────
   const workspacesQuery = createQuery({
@@ -509,20 +515,25 @@
 
   let allBlackouts = $derived($availabilityQuery.data?.items ?? []);
   // The bands/rail show the scope's workspaces only; the engine reads all.
+  // Calm hides the blackout bands/lanes entirely (and, via pulseAwayPersons,
+  // the "away" pulse) — but the conflict engine reads allBlackouts, so a real
+  // clash against an unavailability still surfaces.
   let visibleBlackouts = $derived(
-    allBlackouts.filter((b) => scopeWorkspaceIds === null || scopeWorkspaceIds.has(b.workspace_id)),
+    calm.on
+      ? []
+      : allBlackouts.filter((b) => scopeWorkspaceIds === null || scopeWorkspaceIds.has(b.workspace_id)),
   );
 
   // ── Status filter (display only — conflicts stay truth-level) ────────
   function perfPassesFilter(p: PerformanceEvent): boolean {
-    if (filter === 'all') return true;
+    if (effectiveFilter === 'all') return true;
     const family = performanceStatusFamily(p.status);
-    return filter === 'holds' ? family === 'hold' : family === 'confirmed';
+    return effectiveFilter === 'holds' ? family === 'hold' : family === 'confirmed';
   }
   function datePassesFilter(d: DateEvent): boolean {
-    if (filter === 'all') return true;
+    if (effectiveFilter === 'all') return true;
     const family = dateStatusFamily(d.status);
-    return filter === 'holds' ? family === 'hold' : family === 'confirmed';
+    return effectiveFilter === 'holds' ? family === 'hold' : family === 'confirmed';
   }
   let shownPerfs = $derived(scopedPerfs.filter(perfPassesFilter));
   let shownDates = $derived(scopedDates.filter(datePassesFilter));
@@ -1433,7 +1444,7 @@
            figure maps to fetched rows; a segment whose feed is absent (or
            whose count is zero) drops instead of lying. -->
       <p class="cal__stats" class:cal__stats--loading={loading}>
-        {#if !decisionsAbsent && decisionVMs.length > 0}
+        {#if !calm.on && !decisionsAbsent && decisionVMs.length > 0}
           <button type="button" class="cal__pulse-decide" onclick={jumpToDecisions}>
             <!-- {' · '} — explicit separator: Svelte trims the block-leading
                  whitespace, which glued the count to the urgent segment. -->
@@ -1471,7 +1482,7 @@
     {/if}
   </header>
 
-  {#if !errorMsg && !decisionsAbsent && (decisionVMs.length > 0 || concurrenceVMs.length > 0)}
+  {#if !calm.on && !errorMsg && !decisionsAbsent && (decisionVMs.length > 0 || concurrenceVMs.length > 0)}
     <!-- Decision band (ADR-080 §4) — shared by all projections. Mounted
          for concurrences alone too: the quiet tier is "es VEU, no crida"
          (§3), so it must be seeable even when nothing is per decidir —
@@ -1502,29 +1513,31 @@
       <Button variant="outline" size="s" onclick={thisMonth}>{t('planner.today', locale)}</Button>
     </div>
     <div class="cal__spacer"></div>
-    <div class="cal__filter" role="group" aria-label={t('planner.filter_label', locale)}>
-      <button
-        type="button"
-        class="cal__filter-btn"
-        class:cal__filter-btn--on={filter === 'all'}
-        aria-pressed={filter === 'all'}
-        onclick={() => (filter = 'all')}>{t('planner.filter_all', locale)}</button
-      >
-      <button
-        type="button"
-        class="cal__filter-btn"
-        class:cal__filter-btn--on={filter === 'holds'}
-        aria-pressed={filter === 'holds'}
-        onclick={() => (filter = 'holds')}>{t('planner.filter_holds', locale)}</button
-      >
-      <button
-        type="button"
-        class="cal__filter-btn"
-        class:cal__filter-btn--on={filter === 'confirmed'}
-        aria-pressed={filter === 'confirmed'}
-        onclick={() => (filter = 'confirmed')}>{t('planner.filter_confirmed', locale)}</button
-      >
-    </div>
+    {#if !calm.on}
+      <div class="cal__filter" role="group" aria-label={t('planner.filter_label', locale)}>
+        <button
+          type="button"
+          class="cal__filter-btn"
+          class:cal__filter-btn--on={filter === 'all'}
+          aria-pressed={filter === 'all'}
+          onclick={() => (filter = 'all')}>{t('planner.filter_all', locale)}</button
+        >
+        <button
+          type="button"
+          class="cal__filter-btn"
+          class:cal__filter-btn--on={filter === 'holds'}
+          aria-pressed={filter === 'holds'}
+          onclick={() => (filter = 'holds')}>{t('planner.filter_holds', locale)}</button
+        >
+        <button
+          type="button"
+          class="cal__filter-btn"
+          class:cal__filter-btn--on={filter === 'confirmed'}
+          aria-pressed={filter === 'confirmed'}
+          onclick={() => (filter = 'confirmed')}>{t('planner.filter_confirmed', locale)}</button
+        >
+      </div>
+    {/if}
     <div class="cal__tabs" role="group" aria-label={t('planner.view_label', locale)}>
       <button
         type="button"

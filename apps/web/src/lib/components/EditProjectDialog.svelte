@@ -19,13 +19,13 @@
   import { addToast } from '$lib/components/Toast.svelte';
   import AccentSwatchPicker from '$lib/components/create/AccentSwatchPicker.svelte';
   import { accentVarFor } from '$lib/utils/accent';
-  import { MONOGRAM_MAX, type EditableProject } from '$lib/utils/identity';
+  import { MONOGRAM_MAX, type EditableProject, type IdentitySibling } from '$lib/utils/identity';
 
   interface Props {
     open?: boolean;
     project: EditableProject | null;
     /** Other projects in scope — for the case-sensitive collision warning. */
-    siblings?: Array<{ id: string; initials?: string | null }>;
+    siblings?: IdentitySibling[];
   }
 
   let { open = $bindable(false), project, siblings = [] }: Props = $props();

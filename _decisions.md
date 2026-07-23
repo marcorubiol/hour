@@ -2390,3 +2390,24 @@ Triggered by Marco's pre-scaffold doubt (Phase 0.0 day 5). Five alternatives eva
   paga por show, no por trato) — el bolo podría necesitar sub-importes por
   función; o un bolo multi-sala (un promotor contrata varias salas en un trato).
   Hoy: un bolo = una sala, un caché.
+
+- **Status 2026-07-23 — re-ancla implementada (local), no desplegada.** Sobre
+  `feat/money-v3-build`, revisando las 5 migraciones de money v3 (no una capa
+  encima): nueva migración `20260722102000_money_v3_bolo.sql` (entidad `bolo`,
+  `performance.bolo_id`, backfill N=1, caché fuera del `performance`) + las de
+  invoice/payment revisadas al bolo. **Dinero al bolo:** `fee_amount/currency`,
+  `payment.bolo_id`, `invoice_line.bolo_id`, y **también `expense.bolo_id`**
+  (gasto de gig → bolo, resolviendo el "o a la función — decide" del blast-radius:
+  el income es del trato y el coste también cuelga del bolo/línia; ninguna
+  superficie de scheduling lee gastos por-función, así que no la toca).
+  `list_money_performances` → `list_money_bolos`; `create_invoice` →
+  `create_invoice_from_bolo`; `update_performance_fee` → `update_bolo_fee`;
+  `create_bolo`/`delete_bolo` nuevos. Se **retiran** la vista
+  `performance_redacted` y el trigger `guard_performance_fee_columns` (el gate
+  `edit:money` del caché ahora vive en `update_bolo_fee`). Verificado en local:
+  drift limpio, `svelte-check` 0/0, unit 357, RLS 127, build verde; review
+  adversarial (4 lentes + verify) con 9 hallazgos corregidos, incl. una escalada
+  RLS en `create_payment` (invoice+ancla ahora rechazado). **Abierto (no
+  bloquea):** una función creada en Planner nace **sin** `bolo_id` — falta la UX
+  de crear/enlazar deal↔funciones (hoy: `New deal` a mano en la lente + el
+  backfill). No cambia el modelo de este ADR.

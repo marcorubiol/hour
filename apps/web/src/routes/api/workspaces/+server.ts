@@ -63,7 +63,7 @@ const CreateBodySchema = v.object({
   // Palette index '1'..'8'. Empty / omitted = let the server fall through
   // to the hash(slug) default. Future free-form colors will widen this
   // schema in parallel with the DB CHECK constraint relaxation.
-  accent: v.optional(v.pipe(v.string(), v.regex(/^[1-8]$/))),
+  accent: v.optional(v.pipe(v.string(), v.regex(/^([1-9]|1[0-2]|h\d{1,3})$/))),
   description: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(280))),
 });
 

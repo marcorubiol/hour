@@ -218,7 +218,7 @@ describe.skipIf(!envReady())('RLS — ADR-056 line modules', () => {
 
   test('expense lifecycle: XOR guard → create on line → delete → gone', async () => {
     const both = await pgRpc('create_expense', jwt, {
-      p_performance_id: RANDOM_UUID,
+      p_bolo_id: RANDOM_UUID,
       p_line_id: fixtureLine.id,
       p_description: 'both parents',
       p_amount: 10,

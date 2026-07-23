@@ -130,6 +130,44 @@ apartado siguiente (wire de la UI).
 > está en rama sin desplegar. Prompt de build:
 > `_notes/build-prompt-bolo-money-v3.md`. **No desplegar el ancla-por-función.**
 
+**RE-ANCLA AL BOLO — hecho y verificado en local** (ADR-087, plan P2; rama
+`feat/money-v3-build`, **NO desplegado**). El dinero sube del `performance` al
+nuevo `bolo` (trato = una sala · caché · documento · cobrado · pendiente; agrupa
+1..N funciones). Se **revisaron** las 5 migraciones de money v3, no se apiló una
+capa encima.
+- [x] Entidad `bolo` (FORCE RLS por `read:money`; escritura solo por RPC
+  SECURITY DEFINER: `create_bolo`/`update_bolo_fee`/`delete_bolo`) +
+  `performance.bolo_id` + backfill 1 bolo N=1 por performance (CTE MATERIALIZED,
+  validado contra datos multi-fila con nulls y soft-delete).
+- [x] Caché fuera del `performance` (drop columnas + retiro de la vista
+  `performance_redacted`, el trigger `guard_performance_fee_columns`,
+  `update_performance_fee` y `list_money_performances`).
+- [x] `invoice_line`, `payment` (ancla) y el gasto de gig → `bolo_id` (rename +
+  remap + FK + RLS + helpers); `create_invoice_from_bolo`, `create_payment`(bolo),
+  `create_expense`(bolo|línia), `list_money_bolos` (cobrado = pagos-vs-caché-del
+  -bolo, `function_count`, próxima fecha).
+- [x] **Decisión:** el gasto de gig sube al **bolo** (E3), no se queda en la
+  función — ninguna superficie de scheduling lee gastos por-función; income y
+  coste cuelgan del bolo/línia (asimetría deliberada: el caché es del trato).
+- [x] UI `/h/money` reescrita al layout ADR-087 (posición general con
+  **pendiente** → bolos **por obra** con contratado/cobrado/pendiente → documento
+  en el bolo (chip) → funciones como sub-detalle; venue-first) + botón **New
+  deal** (crea bolo a mano). `MoneyModule` y el resumen de la línia re-apuntados.
+- [x] Tests RLS al modelo bolo (las de caché/masking de v2 adaptadas) + 1
+  regresión de escalada (`create_payment` invoice+ancla rechazado).
+
+> Verificado 2026-07-23 en Supabase **local**: 6 migraciones aplican limpias,
+> `db diff` sin drift, `svelte-check` 0/0, unit **357/357**, RLS **127/127**,
+> `pnpm build` verde. Review adversarial del re-ancla (4 lentes + verify): **9
+> hallazgos confirmados, todos corregidos** — incl. una **escalada RLS real** en
+> `create_payment` (la rama invoice escribía anclas caller-supplied sin gate
+> `edit:money`; el RPC SECURITY DEFINER saltaba la RLS por-adjunto). **Gateado
+> (fuera de este apartado):** staging/prod con backup/preflight + OK de deploy
+> (reglas #8/#9); y la UX de **enlazar una función nueva a un bolo** — las
+> performances creadas en Planner quedan sin bolo hasta que exista esa UI
+> (follow-up; no bloquea el re-ancla, la lente Money vive de los bolos del
+> backfill + los creados a mano).
+
 **NO construir** (forward-compat, ver spec § Futuro): tabla `payable` (dinero a
 artistas), P&L, `fiscal_identity` compartible entre empresas, entidad
 `organization`. El dueño-blando + el snapshot ya dejan abierto el enlace fiscal

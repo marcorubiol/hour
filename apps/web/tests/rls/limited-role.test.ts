@@ -27,7 +27,7 @@ interface ProjectMembershipRow {
   permission_revokes: string[];
 }
 
-interface PerformanceRow {
+interface BoloRow {
   id: string;
   fee_amount: number | null;
   fee_currency: string | null;
@@ -51,7 +51,8 @@ describe.skipIf(!envReady() || !limitedEnvReady())('RLS — limited performer fi
   let projectId: string;
   let membership: ProjectMembershipRow;
   let workspaceMembership: WorkspaceMembershipRow;
-  let performance: PerformanceRow;
+  let bolo: BoloRow;
+  let performanceId: string;
   let personId: string;
   let noteId: string | null = null;
 
@@ -69,15 +70,15 @@ describe.skipIf(!envReady() || !limitedEnvReady())('RLS — limited performer fi
     );
   }
 
-  async function restorePerformance() {
-    if (!performance) return;
+  async function restoreBoloFee() {
+    if (!bolo) return;
     await pgRpc(
-      'update_performance_fee',
+      'update_bolo_fee',
       adminJwt,
       {
-        p_performance_id: performance.id,
-        p_fee_amount: performance.fee_amount,
-        p_fee_currency: performance.fee_currency,
+        p_bolo_id: bolo.id,
+        p_fee_amount: bolo.fee_amount,
+        p_fee_currency: bolo.fee_currency,
       },
     );
   }
@@ -160,13 +161,14 @@ describe.skipIf(!envReady() || !limitedEnvReady())('RLS — limited performer fi
       }),
     );
     expect(performances.rows).toHaveLength(1);
-    const money = await pgRpc<PerformanceRow[]>('list_money_performances', adminJwt, {
+    performanceId = performances.rows[0].id;
+    const money = await pgRpc<BoloRow[]>('list_money_bolos', adminJwt, {
       p_project_ids: [projectId],
       p_limit: 1,
     });
     expect(money.status).toBe(200);
     expect(money.data).toHaveLength(1);
-    performance = money.data![0];
+    bolo = money.data![0];
 
     const people = await pgGet<{ person_id: string }>(
       'workspace_person',
@@ -185,7 +187,7 @@ describe.skipIf(!envReady() || !limitedEnvReady())('RLS — limited performer fi
     await deleteFixtureNote();
     await restoreMembership();
     await restoreWorkspaceMembership();
-    await restorePerformance();
+    await restoreBoloFee();
   });
 
   test('explicit grants apply immediately and explicit revokes win', async () => {
@@ -227,36 +229,39 @@ describe.skipIf(!envReady() || !limitedEnvReady())('RLS — limited performer fi
       const production = await pgGet<{ id: string }>(
         'performance',
         limitedJwt,
-        new URLSearchParams({ id: `eq.${performance.id}`, select: 'id' }),
+        new URLSearchParams({ id: `eq.${performanceId}`, select: 'id' }),
       );
       expect(production).toMatchObject({ status: 200 });
       expect(production.rows).toHaveLength(1);
 
-      const directFees = await pgGet<PerformanceRow>(
-        'performance',
+      // The fee lives on the bolo now (ADR-087); without read:money the whole
+      // deal row is hidden by RLS — not a masked column, an invisible row.
+      const directFees = await pgGet<BoloRow>(
+        'bolo',
         limitedJwt,
-        new URLSearchParams({ id: `eq.${performance.id}`, select: 'id,fee_amount,fee_currency' }),
+        new URLSearchParams({ id: `eq.${bolo.id}`, select: 'id,fee_amount,fee_currency' }),
       );
-      expect(directFees.status).toBeGreaterThanOrEqual(400);
+      expect(directFees.status).toBe(200);
+      expect(directFees.rows).toHaveLength(0);
 
-      const money = await pgRpc<PerformanceRow[]>('list_money_performances', limitedJwt, {
+      const money = await pgRpc<BoloRow[]>('list_money_bolos', limitedJwt, {
         p_project_ids: [projectId],
         p_limit: 10,
       });
       expect(money).toMatchObject({ status: 200, data: [] });
 
-      const adminMoney = await pgRpc<PerformanceRow[]>('list_money_performances', adminJwt, {
+      const adminMoney = await pgRpc<BoloRow[]>('list_money_bolos', adminJwt, {
         p_project_ids: [projectId],
         p_limit: 10,
       });
       expect(adminMoney.status).toBe(200);
       expect(adminMoney.data?.[0]).toMatchObject({
-        id: performance.id,
-        fee_amount: performance.fee_amount,
+        id: bolo.id,
+        fee_amount: bolo.fee_amount,
       });
     } finally {
       await restoreMembership();
-      await restorePerformance();
+      await restoreBoloFee();
     }
   });
 
@@ -287,7 +292,7 @@ describe.skipIf(!envReady() || !limitedEnvReady())('RLS — limited performer fi
       const afterRevoke = await pgGet<{ id: string }>(
         'performance',
         limitedJwt,
-        new URLSearchParams({ id: `eq.${performance.id}`, select: 'id' }),
+        new URLSearchParams({ id: `eq.${performanceId}`, select: 'id' }),
       );
       expect(afterRevoke).toMatchObject({ status: 200, rows: [] });
     } finally {
@@ -306,7 +311,7 @@ describe.skipIf(!envReady() || !limitedEnvReady())('RLS — limited performer fi
       const production = await pgGet<{ id: string }>(
         'performance',
         limitedJwt,
-        new URLSearchParams({ id: `eq.${performance.id}`, select: 'id' }),
+        new URLSearchParams({ id: `eq.${performanceId}`, select: 'id' }),
       );
       const directory = await pgGet<{ person_id: string }>(
         'workspace_person',

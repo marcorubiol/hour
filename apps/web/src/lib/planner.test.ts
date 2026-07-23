@@ -970,14 +970,16 @@ describe('assignBandLanes', () => {
     expect(laneCount).toBe(1);
   });
 
-  it('overlapping ranges stack into new lanes', () => {
+  it('overlapping ranges stack into new lanes, longest lane at the bottom', () => {
     const { lanes, laneCount } = assignBandLanes([
-      { from: '2026-05-13', to: '2026-05-18' },
+      { from: '2026-05-13', to: '2026-05-18' }, // 5-day span → sinks to bottom
       { from: '2026-05-24', to: '2026-05-27' },
       { from: '2026-05-26', to: '2026-05-29' },
       { from: '2026-05-27', to: '2026-05-30' },
     ]);
-    expect(lanes).toEqual([0, 0, 1, 2]);
+    // Packed lanes are [0,0,1,2]; re-stacked so the lane carrying the 5-day
+    // range (indices 0 and 1, which share it) drops to the bottom lane 2.
+    expect(lanes).toEqual([2, 2, 0, 1]);
     expect(laneCount).toBe(3);
   });
 
@@ -994,8 +996,9 @@ describe('assignBandLanes', () => {
       { from: '2026-05-10', to: '2026-05-12' },
       { from: '2026-05-01', to: '2026-05-11' },
     ]);
-    // Chronologically the second range comes first and takes lane 0.
-    expect(lanes).toEqual([1, 0]);
+    // The longer second range sinks to the bottom lane; the short first range
+    // sits on top. Lanes still index the INPUT order.
+    expect(lanes).toEqual([0, 1]);
   });
 
   it('empty input yields no lanes', () => {

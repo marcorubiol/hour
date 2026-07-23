@@ -14,12 +14,12 @@
   import IdentityMark from '$lib/components/IdentityMark.svelte';
   import IdentityQuickPanel from '$lib/components/IdentityQuickPanel.svelte';
   import { accentVarFor } from '$lib/utils/accent';
-  import type { EditableProject } from '$lib/utils/identity';
+  import type { EditableProject, IdentitySibling } from '$lib/utils/identity';
 
   interface Props {
     project: EditableProject;
-    /** Other projects in scope — for the case-sensitive collision warning. */
-    siblings?: Array<{ id: string; initials?: string | null }>;
+    /** Other projects in scope — for the monogram + colour collision warnings. */
+    siblings?: IdentitySibling[];
     /** Trigger mark size (forwarded to IdentityMark). */
     size?: string;
     /** Trigger variant — 'full' shows the name too (legend chips). */

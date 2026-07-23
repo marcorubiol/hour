@@ -265,7 +265,7 @@
       enabled: id !== null && isTour,
       queryFn: ({ signal }: { signal: AbortSignal }) =>
         fetchJSON<{ items: LineFee[] }>(
-          `/api/money/performances?line_ids=${id}&limit=500`,
+          `/api/money/bolos?line_ids=${id}&limit=500`,
           signal,
         ),
     };

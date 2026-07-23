@@ -331,7 +331,7 @@
 
 <svelte:head><title>Desk — Hour</title></svelte:head>
 
-<div class="desk" class:desk--calm={calm.on}>
+<div class="desk">
   <header class="desk__head">
     <div class="desk__titlerow">
       <p class="desk__count">
@@ -507,7 +507,7 @@
         <button type="button" class="calmfoot" onclick={() => calm.set(false)}>
           <span
             >{#if summary.overdue}<span class="calmfoot__over">{t('desk.calm_overdue', locale, { n: summary.overdue })}</span
-              >{/if}{#if summary.overdue && foldedRest} {t('desk.calm_and', locale)} {/if}{#if foldedRest}{t('desk.calm_more', locale, {
+              >{/if}{#if summary.overdue && foldedRest}{' '}{t('desk.calm_and', locale)}{' '}{/if}{#if foldedRest}{t('desk.calm_more', locale, {
                 n: foldedRest,
               })}{/if} {t('desk.calm_tail', locale)}</span
           >
@@ -577,11 +577,8 @@
       margin-inline-end: var(--space-s);
       color: var(--text-faint);
     }
-    /* Calm quiets the whole surface one contrast step (overdue red survives). */
-    .desk--calm {
-      --border-color-dark: color-mix(in oklch, var(--neutral) 12%, transparent);
-      --text-color: var(--text-muted);
-    }
+    /* Calm's contrast remap now lives on .shell__content--calm in the /h
+       layout, so it quiets every lens from one place (Desk included). */
 
     /* ── Timeline ── */
     .timeline {

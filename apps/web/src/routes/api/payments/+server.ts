@@ -114,7 +114,7 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
       p_method: input.method,
       p_reference: input.reference ?? null,
       p_notes: input.notes ?? null,
-      p_performance_id: input.performance_id ?? null,
+      p_bolo_id: input.bolo_id ?? null,
       p_line_id: input.line_id ?? null,
       p_project_id: input.project_id ?? null,
       p_counterparty: input.counterparty ?? null,

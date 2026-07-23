@@ -136,13 +136,15 @@ $$;
 REVOKE ALL ON FUNCTION public.issue_invoice(uuid) FROM PUBLIC, anon, service_role;
 GRANT EXECUTE ON FUNCTION public.issue_invoice(uuid) TO authenticated;
 
--- create_invoice v3: add p_doc_type + p_payer_fiscal_identity_id as trailing
--- optional params. The v2 9-arg call resolves here unchanged (doc_type NULL →
--- factura; payer identity NULL). Body is the v2 body plus the two new fields.
+-- create_invoice_from_bolo (ADR-087): an invoice bills a deal, so it is created
+-- from the bolo, reading the bolo's fee / currency / venue / conversation. This
+-- replaces money v2's create_invoice(performance) — the fee lives on the bolo
+-- now. Same optional params (doc_type derived from invoicing_mode, payer person
+-- + receiver fiscal identity). The single invoice line references the bolo.
 DROP FUNCTION public.create_invoice(uuid, numeric, numeric, text, date, text, date, text, uuid);
 
-CREATE FUNCTION public.create_invoice(
-  p_performance_id uuid,
+CREATE FUNCTION public.create_invoice_from_bolo(
+  p_bolo_id uuid,
   p_vat_pct numeric DEFAULT NULL,
   p_irpf_pct numeric DEFAULT NULL,
   p_number text DEFAULT NULL,
@@ -160,9 +162,10 @@ SET search_path TO 'public', 'pg_temp'
 AS $$
 DECLARE
   v_caller uuid := auth.uid();
-  v_perf public.performance;
+  v_bolo public.bolo;
   v_ws public.workspace;
   v_project_name text;
+  v_first_date date;
   v_inferred_payer uuid;
   v_payer uuid;
   v_doc_type text;
@@ -189,18 +192,18 @@ BEGIN
     RAISE EXCEPTION 'doc_type must be factura or proforma' USING ERRCODE = '22023';
   END IF;
 
-  SELECT * INTO v_perf
-  FROM public.performance
-  WHERE id = p_performance_id AND deleted_at IS NULL;
+  SELECT * INTO v_bolo
+  FROM public.bolo
+  WHERE id = p_bolo_id AND deleted_at IS NULL;
 
-  IF v_perf.id IS NULL THEN
-    RAISE EXCEPTION 'performance not found' USING ERRCODE = '42501';
+  IF v_bolo.id IS NULL THEN
+    RAISE EXCEPTION 'bolo not found' USING ERRCODE = '42501';
   END IF;
-  IF NOT public.has_permission(v_perf.project_id, 'edit:money') THEN
+  IF NOT public.has_permission(v_bolo.project_id, 'edit:money') THEN
     RAISE EXCEPTION 'edit:money required' USING ERRCODE = '42501';
   END IF;
-  IF v_perf.fee_amount IS NULL THEN
-    RAISE EXCEPTION 'performance has no fee — set the fee first' USING ERRCODE = '22023';
+  IF v_bolo.fee_amount IS NULL THEN
+    RAISE EXCEPTION 'bolo has no fee — set the fee first' USING ERRCODE = '22023';
   END IF;
   IF p_expected_on IS NOT NULL AND p_expected_on < CURRENT_DATE THEN
     RAISE EXCEPTION 'expected_on cannot precede issued_on' USING ERRCODE = '22023';
@@ -209,17 +212,17 @@ BEGIN
   IF p_payer_person_id IS NOT NULL AND NOT EXISTS (
     SELECT 1
     FROM public.workspace_person wp
-    WHERE wp.workspace_id = v_perf.workspace_id
+    WHERE wp.workspace_id = v_bolo.workspace_id
       AND wp.person_id = p_payer_person_id
       AND wp.deleted_at IS NULL
   ) THEN
-    RAISE EXCEPTION 'payer is not in the performance workspace' USING ERRCODE = '42501';
+    RAISE EXCEPTION 'payer is not in the bolo workspace' USING ERRCODE = '42501';
   END IF;
 
   IF p_payer_fiscal_identity_id IS NOT NULL AND NOT EXISTS (
     SELECT 1 FROM public.fiscal_identity fi
     WHERE fi.id = p_payer_fiscal_identity_id
-      AND fi.workspace_id = v_perf.workspace_id
+      AND fi.workspace_id = v_bolo.workspace_id
       AND fi.kind = 'receiver'
       AND fi.deleted_at IS NULL
   ) THEN
@@ -228,28 +231,33 @@ BEGIN
 
   -- doc_type: explicit param wins; else derive from the workspace invoicing_mode
   -- (interno → proforma, legal/off → factura).
-  SELECT * INTO v_ws FROM public.workspace WHERE id = v_perf.workspace_id;
+  SELECT * INTO v_ws FROM public.workspace WHERE id = v_bolo.workspace_id;
   v_doc_type := coalesce(
     p_doc_type,
     CASE WHEN v_ws.settings->>'invoicing_mode' = 'interno' THEN 'proforma' ELSE 'factura' END
   );
 
-  SELECT name INTO v_project_name FROM public.project WHERE id = v_perf.project_id;
+  SELECT name INTO v_project_name FROM public.project WHERE id = v_bolo.project_id;
+
+  -- The deal may span several functions; date the line by the earliest one.
+  SELECT min(pf.performed_at) INTO v_first_date
+  FROM public.performance pf
+  WHERE pf.bolo_id = v_bolo.id AND pf.deleted_at IS NULL;
 
   SELECT person_id INTO v_inferred_payer
   FROM public.conversation
-  WHERE id = v_perf.conversation_id AND deleted_at IS NULL;
+  WHERE id = v_bolo.conversation_id AND deleted_at IS NULL;
 
   v_payer := coalesce(p_payer_person_id, v_inferred_payer);
-  v_subtotal := v_perf.fee_amount;
+  v_subtotal := v_bolo.fee_amount;
   v_vat := CASE WHEN p_vat_pct IS NULL THEN NULL ELSE round(v_subtotal * p_vat_pct / 100, 2) END;
   v_irpf := CASE WHEN p_irpf_pct IS NULL THEN NULL ELSE round(v_subtotal * p_irpf_pct / 100, 2) END;
   v_total := v_subtotal + coalesce(v_vat, 0) - coalesce(v_irpf, 0);
   v_desc := concat_ws(
     ' — ',
     coalesce(v_project_name, 'Performance'),
-    nullif(concat_ws(', ', v_perf.venue_name, v_perf.city), ''),
-    to_char(v_perf.performed_at::date, 'YYYY-MM-DD')
+    nullif(concat_ws(', ', v_bolo.venue_name, v_bolo.city), ''),
+    to_char(v_first_date, 'YYYY-MM-DD')
   );
 
   INSERT INTO public.invoice (
@@ -257,8 +265,8 @@ BEGIN
     status, doc_type, subtotal, vat_pct, vat_amount, irpf_pct, irpf_amount, total,
     currency, payer_person_id, payer_fiscal_identity_id, notes, created_by
   ) VALUES (
-    v_perf.workspace_id,
-    v_perf.project_id,
+    v_bolo.workspace_id,
+    v_bolo.project_id,
     nullif(btrim(coalesce(p_number, '')), ''),
     p_due_on,
     p_expected_on,
@@ -271,7 +279,7 @@ BEGIN
     p_irpf_pct,
     v_irpf,
     v_total,
-    coalesce(v_perf.fee_currency, 'EUR'),
+    coalesce(v_bolo.fee_currency, 'EUR'),
     v_payer,
     p_payer_fiscal_identity_id,
     nullif(btrim(coalesce(p_notes, '')), ''),
@@ -279,18 +287,18 @@ BEGIN
   ) RETURNING * INTO v_invoice;
 
   INSERT INTO public.invoice_line (
-    workspace_id, invoice_id, performance_id, description, quantity, unit_amount
+    workspace_id, invoice_id, bolo_id, description, quantity, unit_amount
   ) VALUES (
-    v_perf.workspace_id, v_invoice.id, v_perf.id, v_desc, 1, v_subtotal
+    v_bolo.workspace_id, v_invoice.id, v_bolo.id, v_desc, 1, v_subtotal
   );
 
   RETURN v_invoice;
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.create_invoice(
+REVOKE ALL ON FUNCTION public.create_invoice_from_bolo(
   uuid, numeric, numeric, text, date, text, date, text, uuid, text, uuid
 ) FROM PUBLIC, anon, service_role;
-GRANT EXECUTE ON FUNCTION public.create_invoice(
+GRANT EXECUTE ON FUNCTION public.create_invoice_from_bolo(
   uuid, numeric, numeric, text, date, text, date, text, uuid, text, uuid
 ) TO authenticated;

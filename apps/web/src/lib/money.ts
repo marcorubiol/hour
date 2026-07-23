@@ -13,10 +13,10 @@ export type PaymentMethod = Enums<'payment_method'>;
 export const PAYMENT_METHODS = Constants.public.Enums.payment_method;
 
 /**
- * Money v3 (ADR-086): a payment attaches to an invoice OR a scope anchor
- * (gig / line / project) and carries an optional counterparty + category.
- * invoice_id is nullable now — the v2 path still passes it, the anchor path
- * omits it. The RPC enforces "an invoice or exactly one anchor".
+ * Money v3 (ADR-086 + ADR-087): a payment attaches to an invoice OR a scope
+ * anchor (bolo / line / project) and carries an optional counterparty +
+ * category. invoice_id is nullable now — the v2 path still passes it, the anchor
+ * path omits it. The RPC enforces "an invoice or exactly one anchor".
  */
 export const PaymentCreateSchema = v.object({
 	invoice_id: v.optional(v.nullable(v.pipe(v.string(), v.uuid()))),
@@ -25,7 +25,7 @@ export const PaymentCreateSchema = v.object({
 	method: v.picklist(PAYMENT_METHODS),
 	reference: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(200)))),
 	notes: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(2000)))),
-	performance_id: v.optional(v.nullable(v.pipe(v.string(), v.uuid()))),
+	bolo_id: v.optional(v.nullable(v.pipe(v.string(), v.uuid()))),
 	line_id: v.optional(v.nullable(v.pipe(v.string(), v.uuid()))),
 	project_id: v.optional(v.nullable(v.pipe(v.string(), v.uuid()))),
 	counterparty: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(200)))),
@@ -82,7 +82,7 @@ export interface MoneyInvoiceItem {
 		full_name: string;
 		organization_name: string | null;
 	} | null;
-	lines: { performance_id: string | null }[];
+	lines: { bolo_id: string | null }[];
 	payments: PaymentItem[];
 }
 

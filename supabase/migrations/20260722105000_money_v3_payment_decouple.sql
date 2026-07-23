@@ -1,10 +1,13 @@
--- Money v3 (ADR-086) — Phase 3: payment decoupled from the invoice. The fee is
--- the anchor; a payment attaches to a gig / line / project (or, as in v2, an
--- invoice) and carries a counterparty + category. "Collected" becomes a derived
--- read against the fee (added to list_money_performances) alongside v2's
--- invoice-paid triggers, which stay intact. Everything is additive: the v2
--- create_payment / create_expense calls, the invoice-paid derivation and the
--- money v2 UI keep working unchanged.
+-- Money v3 (ADR-086 + ADR-087) — Phase 3: payment decoupled from the invoice,
+-- anchored to the deal. The fee is the anchor and lives on the bolo; a payment
+-- attaches to a bolo / line / project (or, as in v2, an invoice) and carries a
+-- counterparty + category. "Collected" becomes a derived read against the bolo
+-- fee (list_money_bolos) alongside v2's invoice-paid triggers, which stay intact.
+-- Additive to money v2: its create_payment / create_expense calls, the
+-- invoice-paid derivation and the money v2 UI keep working. The gig-level
+-- expense re-anchors to the bolo (the deal) here too — the table move + read
+-- helpers live in the bolo phase; this only swaps create_expense's anchor and
+-- adds a counterparty.
 
 -- ── payment: nullable invoice link + anchor + counterparty + category ────────
 ALTER TABLE public.payment ALTER COLUMN invoice_id DROP NOT NULL;
@@ -12,33 +15,33 @@ ALTER TABLE public.payment ALTER COLUMN invoice_id DROP NOT NULL;
 -- Anchor FKs are NO ACTION (not SET NULL): a payment is money that must never
 -- be silently stripped of its last attachment (that would abort against
 -- payment_has_attachment). Deleting an anchor with live payments raises an
--- honest 23503, same class as delete_performance's live-invoice guard.
+-- honest 23503, same class as delete_bolo's live-invoice guard.
 ALTER TABLE public.payment
-  ADD COLUMN performance_id uuid REFERENCES public.performance(id),
-  ADD COLUMN line_id        uuid REFERENCES public.line(id),
-  ADD COLUMN project_id     uuid REFERENCES public.project(id),
-  ADD COLUMN counterparty   text,
-  ADD COLUMN category       text;
+  ADD COLUMN bolo_id      uuid REFERENCES public.bolo(id),
+  ADD COLUMN line_id      uuid REFERENCES public.line(id),
+  ADD COLUMN project_id   uuid REFERENCES public.project(id),
+  ADD COLUMN counterparty text,
+  ADD COLUMN category     text;
 
 -- Every payment attaches to at least one thing (an invoice or a scope anchor).
 ALTER TABLE public.payment
   ADD CONSTRAINT payment_has_attachment CHECK (
     invoice_id IS NOT NULL
-    OR performance_id IS NOT NULL
+    OR bolo_id IS NOT NULL
     OR line_id IS NOT NULL
     OR project_id IS NOT NULL
   );
 
 COMMENT ON COLUMN public.payment.invoice_id IS
   'Optional link to a document (ADR-086 D3). A payment usually anchors to a fee, not an invoice; the invoice link is metadata.';
-COMMENT ON COLUMN public.payment.performance_id IS
-  'Fee anchor: the gig this payment is collected against. "Collected" derives from active payments anchored here.';
+COMMENT ON COLUMN public.payment.bolo_id IS
+  'Fee anchor: the deal this payment is collected against (ADR-087). "Collected" derives from active payments anchored here.';
 COMMENT ON COLUMN public.payment.counterparty IS 'Who paid (free text; a receiver identity is not required to record money).';
 COMMENT ON COLUMN public.payment.category IS 'Optional payment category (caixet / bestreta / …); load-bearing only in size B.';
 
-CREATE INDEX payment_performance_id_idx ON public.payment (performance_id) WHERE performance_id IS NOT NULL;
-CREATE INDEX payment_line_id_idx        ON public.payment (line_id)        WHERE line_id IS NOT NULL;
-CREATE INDEX payment_project_id_idx     ON public.payment (project_id)     WHERE project_id IS NOT NULL;
+CREATE INDEX payment_bolo_id_idx    ON public.payment (bolo_id)    WHERE bolo_id IS NOT NULL;
+CREATE INDEX payment_line_id_idx    ON public.payment (line_id)    WHERE line_id IS NOT NULL;
+CREATE INDEX payment_project_id_idx ON public.payment (project_id) WHERE project_id IS NOT NULL;
 
 -- ── expense: counterparty ───────────────────────────────────────────────────
 ALTER TABLE public.expense ADD COLUMN counterparty text;
@@ -46,10 +49,10 @@ COMMENT ON COLUMN public.expense.counterparty IS 'Optional — who was paid (ADR
 
 -- ── payment RLS: cover both invoice-linked and anchor-based rows ─────────────
 -- Reads require read:money on the payment's effective project (via invoice,
--- performance, line or project) or workspace admin for a workspace-scoped
--- invoice. Writes require edit:money the same way. Direct writes still also
--- require the JWT's current workspace; the create_payment RPC (SECURITY
--- DEFINER) is the real path and applies its own gate.
+-- bolo, line or project) or workspace admin for a workspace-scoped invoice.
+-- Writes require edit:money the same way. Direct writes still also require the
+-- JWT's current workspace; the create_payment RPC (SECURITY DEFINER) is the
+-- real path and applies its own gate.
 DROP POLICY IF EXISTS payment_select ON public.payment;
 DROP POLICY IF EXISTS payment_insert ON public.payment;
 DROP POLICY IF EXISTS payment_update ON public.payment;
@@ -64,10 +67,10 @@ CREATE POLICY payment_select ON public.payment
           OR (iv.project_id IS NULL AND public.is_workspace_admin(iv.workspace_id))
         )
       ))
-      OR (performance_id IS NOT NULL AND EXISTS (
-        SELECT 1 FROM public.performance pf
-        WHERE pf.id = payment.performance_id AND pf.deleted_at IS NULL
-          AND public.has_permission(pf.project_id, 'read:money')
+      OR (bolo_id IS NOT NULL AND EXISTS (
+        SELECT 1 FROM public.bolo b
+        WHERE b.id = payment.bolo_id AND b.deleted_at IS NULL
+          AND public.has_permission(b.project_id, 'read:money')
       ))
       OR (line_id IS NOT NULL AND EXISTS (
         SELECT 1 FROM public.line l
@@ -93,10 +96,10 @@ CREATE POLICY payment_insert ON public.payment
         AND ((iv.project_id IS NOT NULL AND public.has_permission(iv.project_id, 'edit:money'))
              OR (iv.project_id IS NULL AND public.is_workspace_admin(iv.workspace_id)))
     ))
-    AND (performance_id IS NULL OR EXISTS (
-      SELECT 1 FROM public.performance pf
-      WHERE pf.id = payment.performance_id AND pf.deleted_at IS NULL
-        AND public.has_permission(pf.project_id, 'edit:money')
+    AND (bolo_id IS NULL OR EXISTS (
+      SELECT 1 FROM public.bolo b
+      WHERE b.id = payment.bolo_id AND b.deleted_at IS NULL
+        AND public.has_permission(b.project_id, 'edit:money')
     ))
     AND (line_id IS NULL OR EXISTS (
       SELECT 1 FROM public.line l
@@ -116,10 +119,10 @@ CREATE POLICY payment_update ON public.payment
         AND ((iv.project_id IS NOT NULL AND public.has_permission(iv.project_id, 'edit:money'))
              OR (iv.project_id IS NULL AND public.is_workspace_admin(iv.workspace_id)))
     ))
-    AND (performance_id IS NULL OR EXISTS (
-      SELECT 1 FROM public.performance pf
-      WHERE pf.id = payment.performance_id AND pf.deleted_at IS NULL
-        AND public.has_permission(pf.project_id, 'edit:money')
+    AND (bolo_id IS NULL OR EXISTS (
+      SELECT 1 FROM public.bolo b
+      WHERE b.id = payment.bolo_id AND b.deleted_at IS NULL
+        AND public.has_permission(b.project_id, 'edit:money')
     ))
     AND (line_id IS NULL OR EXISTS (
       SELECT 1 FROM public.line l
@@ -135,10 +138,10 @@ CREATE POLICY payment_update ON public.payment
         AND ((iv.project_id IS NOT NULL AND public.has_permission(iv.project_id, 'edit:money'))
              OR (iv.project_id IS NULL AND public.is_workspace_admin(iv.workspace_id)))
     ))
-    AND (performance_id IS NULL OR EXISTS (
-      SELECT 1 FROM public.performance pf
-      WHERE pf.id = payment.performance_id AND pf.deleted_at IS NULL
-        AND public.has_permission(pf.project_id, 'edit:money')
+    AND (bolo_id IS NULL OR EXISTS (
+      SELECT 1 FROM public.bolo b
+      WHERE b.id = payment.bolo_id AND b.deleted_at IS NULL
+        AND public.has_permission(b.project_id, 'edit:money')
     ))
     AND (line_id IS NULL OR EXISTS (
       SELECT 1 FROM public.line l
@@ -158,7 +161,7 @@ CREATE FUNCTION public.create_payment(
   p_method public.payment_method DEFAULT 'transfer',
   p_reference text DEFAULT NULL,
   p_notes text DEFAULT NULL,
-  p_performance_id uuid DEFAULT NULL,
+  p_bolo_id uuid DEFAULT NULL,
   p_line_id uuid DEFAULT NULL,
   p_project_id uuid DEFAULT NULL,
   p_counterparty text DEFAULT NULL,
@@ -173,7 +176,7 @@ DECLARE
   v_invoice      public.invoice;
   v_workspace_id uuid;
   v_project_id   uuid;
-  v_anchors      integer := num_nonnulls(p_performance_id, p_line_id, p_project_id);
+  v_anchors      integer := num_nonnulls(p_bolo_id, p_line_id, p_project_id);
   v_payment      public.payment;
 BEGIN
   IF v_caller IS NULL THEN
@@ -185,6 +188,17 @@ BEGIN
 
   IF p_invoice_id IS NOT NULL THEN
     -- v2 path: against an invoice; the sync trigger derives invoice paid.
+    -- A payment attaches to an invoice OR a scope anchor, never both: the
+    -- invoice already ties to its bolo through invoice_line. Rejecting the
+    -- combination is a hard boundary — this RPC is SECURITY DEFINER and bypasses
+    -- the payment RLS, so an unchecked caller-supplied anchor here would smuggle
+    -- a payment onto a bolo/line/project the caller cannot edit (and would also
+    -- double-count in collected).
+    IF v_anchors <> 0 THEN
+      RAISE EXCEPTION 'a payment attaches to an invoice OR a scope anchor, not both'
+        USING ERRCODE = '22023';
+    END IF;
+
     SELECT * INTO v_invoice
     FROM public.invoice
     WHERE id = p_invoice_id AND deleted_at IS NULL
@@ -201,14 +215,14 @@ BEGIN
     END IF;
     v_workspace_id := v_invoice.workspace_id;
   ELSE
-    -- v3 path: anchored to exactly one of gig / line / project.
+    -- v3 path: anchored to exactly one of bolo / line / project.
     IF v_anchors <> 1 THEN
-      RAISE EXCEPTION 'a payment needs an invoice or exactly one anchor (gig, line or project)'
+      RAISE EXCEPTION 'a payment needs an invoice or exactly one anchor (bolo, line or project)'
         USING ERRCODE = '22023';
     END IF;
-    IF p_performance_id IS NOT NULL THEN
+    IF p_bolo_id IS NOT NULL THEN
       SELECT workspace_id, project_id INTO v_workspace_id, v_project_id
-      FROM public.performance WHERE id = p_performance_id AND deleted_at IS NULL;
+      FROM public.bolo WHERE id = p_bolo_id AND deleted_at IS NULL;
     ELSIF p_line_id IS NOT NULL THEN
       SELECT workspace_id, project_id INTO v_workspace_id, v_project_id
       FROM public.line WHERE id = p_line_id AND deleted_at IS NULL;
@@ -223,7 +237,7 @@ BEGIN
 
   INSERT INTO public.payment (
     workspace_id, invoice_id, amount, received_on, method, reference, notes,
-    performance_id, line_id, project_id, counterparty, category, created_by
+    bolo_id, line_id, project_id, counterparty, category, created_by
   ) VALUES (
     v_workspace_id,
     p_invoice_id,
@@ -232,7 +246,7 @@ BEGIN
     coalesce(p_method, 'transfer'),
     nullif(btrim(coalesce(p_reference, '')), ''),
     nullif(btrim(coalesce(p_notes, '')), ''),
-    p_performance_id,
+    p_bolo_id,
     p_line_id,
     p_project_id,
     nullif(btrim(coalesce(p_counterparty, '')), ''),
@@ -285,9 +299,9 @@ BEGIN
       OR (iv.project_id IS NULL AND public.is_workspace_admin(iv.workspace_id))
     ) INTO v_ok
     FROM public.invoice iv WHERE iv.id = v_payment.invoice_id AND iv.deleted_at IS NULL;
-  ELSIF v_payment.performance_id IS NOT NULL THEN
-    SELECT public.has_permission(pf.project_id, 'edit:money') INTO v_ok
-    FROM public.performance pf WHERE pf.id = v_payment.performance_id AND pf.deleted_at IS NULL;
+  ELSIF v_payment.bolo_id IS NOT NULL THEN
+    SELECT public.has_permission(b.project_id, 'edit:money') INTO v_ok
+    FROM public.bolo b WHERE b.id = v_payment.bolo_id AND b.deleted_at IS NULL;
   ELSIF v_payment.line_id IS NOT NULL THEN
     SELECT public.has_permission(l.project_id, 'edit:money') INTO v_ok
     FROM public.line l WHERE l.id = v_payment.line_id AND l.deleted_at IS NULL;
@@ -306,11 +320,12 @@ $$;
 REVOKE ALL ON FUNCTION public.delete_payment(uuid) FROM PUBLIC, anon, service_role;
 GRANT EXECUTE ON FUNCTION public.delete_payment(uuid) TO authenticated;
 
--- ── create_expense v3: + counterparty (trailing optional) ───────────────────
+-- ── create_expense v3: anchor to bolo | line, + counterparty ────────────────
+-- The gig-level cost anchors to the deal now (ADR-087); line costs unchanged.
 DROP FUNCTION public.create_expense(uuid, uuid, public.expense_category, text, numeric, text, date, text);
 
 CREATE FUNCTION public.create_expense(
-  p_performance_id uuid DEFAULT NULL,
+  p_bolo_id uuid DEFAULT NULL,
   p_line_id uuid DEFAULT NULL,
   p_category public.expense_category DEFAULT 'other',
   p_description text DEFAULT NULL,
@@ -335,8 +350,8 @@ BEGIN
   IF v_caller IS NULL THEN
     RAISE EXCEPTION 'authentication required' USING ERRCODE = '42501';
   END IF;
-  IF num_nonnulls(p_performance_id, p_line_id) <> 1 THEN
-    RAISE EXCEPTION 'exactly one of performance_id or line_id is required' USING ERRCODE = '22023';
+  IF num_nonnulls(p_bolo_id, p_line_id) <> 1 THEN
+    RAISE EXCEPTION 'exactly one of bolo_id or line_id is required' USING ERRCODE = '22023';
   END IF;
   IF v_description IS NULL THEN
     RAISE EXCEPTION 'description cannot be empty' USING ERRCODE = '22023';
@@ -348,9 +363,9 @@ BEGIN
     RAISE EXCEPTION 'currency must be a 3-letter code' USING ERRCODE = '22023';
   END IF;
 
-  IF p_performance_id IS NOT NULL THEN
+  IF p_bolo_id IS NOT NULL THEN
     SELECT workspace_id, project_id INTO v_workspace_id, v_project_id
-    FROM public.performance WHERE id = p_performance_id AND deleted_at IS NULL;
+    FROM public.bolo WHERE id = p_bolo_id AND deleted_at IS NULL;
   ELSE
     SELECT workspace_id, project_id INTO v_workspace_id, v_project_id
     FROM public.line WHERE id = p_line_id AND deleted_at IS NULL;
@@ -364,10 +379,10 @@ BEGIN
   END IF;
 
   INSERT INTO public.expense (
-    workspace_id, performance_id, line_id, category, description, amount,
+    workspace_id, bolo_id, line_id, category, description, amount,
     currency, incurred_on, notes, counterparty, created_by
   ) VALUES (
-    v_workspace_id, p_performance_id, p_line_id, p_category, v_description,
+    v_workspace_id, p_bolo_id, p_line_id, p_category, v_description,
     round(p_amount, 2), v_currency,
     coalesce(p_incurred_on, CURRENT_DATE),
     nullif(btrim(coalesce(p_notes, '')), ''),
@@ -386,12 +401,15 @@ GRANT EXECUTE ON FUNCTION public.create_expense(
   uuid, uuid, public.expense_category, text, numeric, text, date, text, text
 ) TO authenticated;
 
--- ── list_money_performances: + collected (payments-against-fee, ADR-086 D3) ──
--- Collected = active payments anchored directly to the gig OR linked to an
--- invoice whose line references the gig. Coexists with v2's invoice-paid.
+-- ── list_money_bolos: one row per deal, with collected (ADR-087) ─────────────
+-- The Money lens lists bolos (not functions). Collected = active payments
+-- anchored directly to the bolo OR linked to an invoice whose lines reference
+-- only this bolo (so a multi-bolo invoice's payment is not double-counted).
+-- function_count / next_performed_at come from the bolo's functions for display.
+-- Replaces list_money_performances (fee is on the bolo now, not the function).
 DROP FUNCTION public.list_money_performances(uuid[], uuid[], uuid[], date, date, integer);
 
-CREATE FUNCTION public.list_money_performances(
+CREATE FUNCTION public.list_money_bolos(
   p_project_ids uuid[] DEFAULT NULL,
   p_workspace_ids uuid[] DEFAULT NULL,
   p_line_ids uuid[] DEFAULT NULL,
@@ -400,17 +418,19 @@ CREATE FUNCTION public.list_money_performances(
   p_limit integer DEFAULT 200
 ) RETURNS TABLE (
   id uuid,
-  slug text,
-  performed_at date,
-  status public.performance_status,
-  venue_name text,
-  city text,
-  fee_amount numeric,
-  fee_currency character(3),
   project_id uuid,
   line_id uuid,
+  conversation_id uuid,
+  venue_name text,
+  city text,
+  country character(2),
+  fee_amount numeric,
+  fee_currency character(3),
+  status public.performance_status,
   project jsonb,
-  collected numeric
+  collected numeric,
+  function_count integer,
+  next_performed_at date
 )
 LANGUAGE plpgsql
 STABLE
@@ -418,21 +438,24 @@ SECURITY DEFINER
 SET search_path TO 'public', 'pg_temp'
 AS $$
 BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'authentication required' USING ERRCODE = '42501';
+  END IF;
   IF p_limit < 1 OR p_limit > 500 THEN
     RAISE EXCEPTION 'limit must be between 1 and 500' USING ERRCODE = '22023';
   END IF;
 
   RETURN QUERY
-  SELECT pf.id,
-         pf.slug,
-         pf.performed_at,
-         pf.status,
-         pf.venue_name,
-         pf.city,
-         pf.fee_amount,
-         pf.fee_currency,
-         pf.project_id,
-         pf.line_id,
+  SELECT b.id,
+         b.project_id,
+         b.line_id,
+         b.conversation_id,
+         b.venue_name,
+         b.city,
+         b.country,
+         b.fee_amount,
+         b.fee_currency,
+         b.status,
          jsonb_build_object(
            'id', p.id,
            'slug', p.slug,
@@ -445,43 +468,49 @@ BEGIN
            FROM public.payment pay
            WHERE pay.deleted_at IS NULL
              AND (
-               pay.performance_id = pf.id
-               -- Invoice-linked: attribute only when the invoice references a
-               -- single performance, so a multi-gig invoice's payment is not
-               -- counted in full against every gig it lists.
-               OR pay.invoice_id IN (
+               pay.bolo_id = b.id
+               -- Invoice-linked only when the payment carries NO direct anchor,
+               -- so a payment is counted once (never via both anchor and invoice).
+               OR (pay.bolo_id IS NULL AND pay.invoice_id IN (
                  SELECT il.invoice_id
                  FROM public.invoice_line il
                  JOIN public.invoice iv ON iv.id = il.invoice_id AND iv.deleted_at IS NULL
-                 WHERE il.performance_id IS NOT NULL
+                 WHERE il.bolo_id IS NOT NULL
                  GROUP BY il.invoice_id
-                 HAVING bool_and(il.performance_id = pf.id)
-               )
+                 HAVING bool_and(il.bolo_id = b.id)
+               ))
              )
-         ), 0) AS collected
-  FROM public.performance pf
-  JOIN public.project p ON p.id = pf.project_id AND p.deleted_at IS NULL
-  WHERE pf.deleted_at IS NULL
-    AND public.has_permission(pf.project_id, 'read:money')
+         ), 0) AS collected,
+         fx.function_count::integer,
+         fx.next_performed_at
+  FROM public.bolo b
+  JOIN public.project p ON p.id = b.project_id AND p.deleted_at IS NULL
+  LEFT JOIN LATERAL (
+    SELECT count(*) AS function_count, min(pf.performed_at) AS next_performed_at
+    FROM public.performance pf
+    WHERE pf.bolo_id = b.id AND pf.deleted_at IS NULL
+  ) fx ON true
+  WHERE b.deleted_at IS NULL
+    AND public.has_permission(b.project_id, 'read:money')
     AND (
       (coalesce(cardinality(p_project_ids), 0) = 0 AND coalesce(cardinality(p_workspace_ids), 0) = 0)
-      OR pf.project_id = ANY (coalesce(p_project_ids, '{}'::uuid[]))
-      OR pf.workspace_id = ANY (coalesce(p_workspace_ids, '{}'::uuid[]))
+      OR b.project_id = ANY (coalesce(p_project_ids, '{}'::uuid[]))
+      OR b.workspace_id = ANY (coalesce(p_workspace_ids, '{}'::uuid[]))
     )
     AND (
       coalesce(cardinality(p_line_ids), 0) = 0
-      OR pf.line_id = ANY (p_line_ids)
+      OR b.line_id = ANY (p_line_ids)
     )
-    AND (p_from IS NULL OR pf.performed_at >= p_from)
-    AND (p_to IS NULL OR pf.performed_at <= p_to)
-  ORDER BY pf.performed_at ASC
+    AND (p_from IS NULL OR fx.next_performed_at >= p_from)
+    AND (p_to IS NULL OR fx.next_performed_at <= p_to)
+  ORDER BY fx.next_performed_at ASC NULLS LAST, b.created_at ASC
   LIMIT p_limit;
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.list_money_performances(
+REVOKE ALL ON FUNCTION public.list_money_bolos(
   uuid[], uuid[], uuid[], date, date, integer
 ) FROM PUBLIC, anon, service_role;
-GRANT EXECUTE ON FUNCTION public.list_money_performances(
+GRANT EXECUTE ON FUNCTION public.list_money_bolos(
   uuid[], uuid[], uuid[], date, date, integer
 ) TO authenticated;

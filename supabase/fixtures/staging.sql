@@ -164,24 +164,46 @@ from generate_series(1, 154) as n
 on conflict (id) do update
 set status = excluded.status, line_id = excluded.line_id, updated_at = now(), deleted_at = null;
 
+-- ADR-087: the fee lives on the bolo (the deal). The performance (the function)
+-- links to it via bolo_id and carries no fee.
+insert into public.bolo (
+  id, workspace_id, project_id, line_id, venue_name, status,
+  fee_amount, fee_currency, created_by
+)
+values (
+  '71000000-0000-4000-8000-000000000001',
+  '20000000-0000-4000-8000-000000000001',
+  '30000000-0000-4000-8000-000000000001',
+  '40000000-0000-4000-8000-000000000001',
+  'Synthetic Venue',
+  'confirmed',
+  2500.00,
+  'EUR',
+  (select id from auth.users where email = 'playwright@hour.test')
+)
+on conflict (id) do update
+set venue_name = excluded.venue_name, status = excluded.status,
+    fee_amount = excluded.fee_amount, fee_currency = excluded.fee_currency,
+    updated_at = now(), deleted_at = null;
+
 insert into public.performance (
-  id, workspace_id, project_id, line_id, performed_at, venue_name, status,
-  fee_amount, fee_currency, created_by, slug
+  id, workspace_id, project_id, line_id, bolo_id, performed_at, venue_name, status,
+  created_by, slug
 )
 values (
   '70000000-0000-4000-8000-000000000001',
   '20000000-0000-4000-8000-000000000001',
   '30000000-0000-4000-8000-000000000001',
   '40000000-0000-4000-8000-000000000001',
+  '71000000-0000-4000-8000-000000000001',
   '2030-06-15',
   'Synthetic Venue',
   'confirmed',
-  2500.00,
-  'EUR',
   (select id from auth.users where email = 'playwright@hour.test'),
   'zzz-e2e-1'
 )
 on conflict (id) do update
-set venue_name = excluded.venue_name, status = excluded.status, updated_at = now(), deleted_at = null;
+set venue_name = excluded.venue_name, status = excluded.status,
+    bolo_id = excluded.bolo_id, updated_at = now(), deleted_at = null;
 
 commit;

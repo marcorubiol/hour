@@ -126,10 +126,10 @@ describe.skipIf(!envReady())('RLS — cross-tenant isolation', () => {
   });
 
   test('money feed is authenticated and permission-filtered', async () => {
-    const anonymous = await pgRpc('list_money_performances', null);
+    const anonymous = await pgRpc('list_money_bolos', null);
     expect(anonymous.status).toBeGreaterThanOrEqual(400);
 
-    const authenticated = await pgRpc<unknown[]>('list_money_performances', playwrightJwt);
+    const authenticated = await pgRpc<unknown[]>('list_money_bolos', playwrightJwt);
     expect(authenticated.status).toBe(200);
     expect(Array.isArray(authenticated.data)).toBe(true);
   });

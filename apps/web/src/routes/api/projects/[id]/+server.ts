@@ -30,7 +30,7 @@ const PatchBodySchema = v.object({
   name: v.optional(v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(80))),
   // '' clears (RPC NULLIFs). accent/initials accept null to clear.
   description: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(280))),
-  accent: v.optional(v.nullable(v.pipe(v.string(), v.regex(/^([1-9]|1[0-2])$/)))),
+  accent: v.optional(v.nullable(v.pipe(v.string(), v.regex(/^([1-9]|1[0-2]|h\d{1,3})$/)))),
   // Monogram: 0..3 non-space chars, mixed case kept. '' / null clears.
   initials: v.optional(
     v.nullable(v.pipe(v.string(), v.trim(), v.regex(/^\S{0,3}$/, 'monogram: up to 3 non-space chars'))),

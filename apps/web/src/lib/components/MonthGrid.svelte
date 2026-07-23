@@ -147,6 +147,7 @@
   import { dualTime } from '$lib/datetime';
   import { workspacesQueryOptions } from '$lib/nav-queries';
   import { accentVarFor } from '$lib/utils/accent';
+  import type { IdentitySibling } from '$lib/utils/identity';
   import IdentityMark from '$lib/components/IdentityMark.svelte';
   import IdentityQuickPanel from '$lib/components/IdentityQuickPanel.svelte';
   import { isReady, performanceStatusFamily } from '$lib/performance';
@@ -239,11 +240,17 @@
   let markPop = $state<{ project: ProjectLite; rect: DOMRect } | null>(null);
   let markPopEl: HTMLElement | undefined = $state();
   let markSiblings = $derived.by(() => {
-    const m = new Map<string, { id: string; initials?: string | null }>();
-    for (const p of performances)
-      if (p.project) m.set(p.project.id, { id: p.project.id, initials: p.project.initials });
-    for (const d of dates)
-      if (d.project) m.set(d.project.id, { id: d.project.id, initials: d.project.initials });
+    const m = new Map<string, IdentitySibling>();
+    const add = (p: ProjectLite) =>
+      m.set(p.id, {
+        id: p.id,
+        initials: p.initials,
+        slug: p.slug,
+        name: p.name,
+        accent: p.accent,
+      });
+    for (const p of performances) if (p.project) add(p.project);
+    for (const d of dates) if (d.project) add(d.project);
     return [...m.values()];
   });
   function openMark(e: MouseEvent, project: ProjectLite | null) {
@@ -402,7 +409,9 @@
     if (d.travel_direction === 'outbound') return `→ ${place}`;
     if (d.travel_direction === 'return') return `${place} →`;
     if (d.travel_direction === 'leg') return `→ ${place} →`;
-    return place;
+    // No stored direction still reads as a trip: lead with the arrow so a
+    // bare "Vitoria" can't be mistaken for a place label on some other chip.
+    return `→ ${place}`;
   }
 
   // The chip's second row (venue on top, city underneath). Suppressed when
@@ -787,7 +796,7 @@
               class="cal__event cal__event--travel"
               style={d.project ? `--c: ${accentVarFor(d.project)}` : undefined}
               title={dateTitle(d)}
-            >{#if d.project}<button type="button" class="cal__markbtn" onclick={(e) => openMark(e, d.project)}><IdentityMark accent={accentVarFor(d.project)} name={d.project.name} initials={d.project.initials} /></button>{/if}{travelText(d)}</span>
+            ><span class="cal__travel-text">{travelText(d)}</span>{#if d.project}<button type="button" class="cal__markbtn" onclick={(e) => openMark(e, d.project)}><IdentityMark accent={accentVarFor(d.project)} name={d.project.name} initials={d.project.initials} /></button>{/if}</span>
           {:else}
             {@const time = dateTime(d)}
             {@const city = dateCity(d)}
@@ -1255,25 +1264,27 @@
     .cal__event--perf[data-family='confirmed'] + .cal__event {
       margin-block-start: var(--space-xs);
     }
-    .cal__event--perf[data-family='confirmed'] .cal__event-name {
-      font-weight: 600;
-    }
-    /* Hold = possibility held: dashed edge + the 135° hatch that means
-       "not settled" everywhere in this view (tentative blackouts use it
-       too), so the state reads before the words do. */
-    .cal__event--perf[data-family='hold'] {
+    /* Tentative = textured, EVERYWHERE (Marco 2026-07-23): holds AND proposed,
+       performances AND dates carry the "not settled" texture and the dashed
+       edge; solid fill is reserved for settled. (Tentative blackout bands keep
+       their own accent hatch.) */
+    .cal__event--perf[data-family='hold'],
+    .cal__event--perf[data-family='proposed'],
+    .cal__event--date[data-family='hold'],
+    .cal__event--date[data-family='proposed'] {
       --chip-bg: var(--bg-ultra-light);
-      --chip-bg-image: repeating-linear-gradient(
-        135deg,
-        color-mix(in oklch, var(--c, var(--border-color-dark)) 11%, var(--bg-ultra-light)) 0 5px,
-        var(--bg-ultra-light) 5px 10px
+      /* The "not settled" texture: a faint neutral dot stipple — pencilled in,
+         not inked. Grey, never the project accent; colour lives in the dashed
+         border and the monogram, so the month reads calm, not multicolour. */
+      --chip-bg-image: radial-gradient(
+        color-mix(in oklch, var(--text-color) 11%, transparent) 1px,
+        transparent 1.3px
       );
+      background-size: 7px 7px;
       --chip-border-style: dashed;
-      --chip-fg: var(--text-muted);
     }
+    .cal__event--perf[data-family='hold'],
     .cal__event--perf[data-family='proposed'] {
-      --chip-bg: var(--bg);
-      --chip-border-style: dashed;
       --chip-fg: var(--text-muted);
     }
 
@@ -1347,6 +1358,10 @@
     }
 
     .cal__event-name {
+      /* The chip's title — bold on EVERY kind (gig, rehearsal, residency,
+         press, day-off) so it reads apart from its city/time line and foot.
+         Settled-vs-held is said by fill, dash, hatch and radius, not weight. */
+      font-weight: 600;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
@@ -1354,18 +1369,15 @@
     }
 
     /* Date chip — quieter ink, mono small-caps kind label at the foot.
-       Tentative dates read as possibility (dashed + square) — the grammar
-       extends (ADR-078 §9); confirmed stays the quiet solid form. */
+       Tentative dates read as possibility (dashed + square + the shared dot
+       texture above) — the grammar extends (ADR-078 §9); confirmed stays the
+       quiet solid form. */
     .cal__event--date {
       --chip-fg: var(--text-muted);
     }
-    .cal__event--date[data-family='hold'] {
-      --chip-bg: var(--bg);
-      --chip-border-style: dashed;
-    }
+    /* hold keeps the base muted ink; proposed drops to the faintest. */
     .cal__event--date[data-family='proposed'] {
       --chip-fg: var(--text-faint);
-      --chip-border-style: dashed;
     }
 
     /* A multi-day block reads as one strip across the cells. The join is
@@ -1419,13 +1431,21 @@
       letter-spacing: var(--mono-letter-spacing);
       color: color-mix(in oklch, var(--c, var(--text-muted)) 55%, var(--text-muted));
       border: none;
-      white-space: nowrap;
-      /* Bare text node — the base chip's flex display defeats text-overflow,
-         and without overflow:hidden the label hard-clips at the cell edge
-         mid-glyph. Block + hidden lets the ellipsis work. */
-      display: block;
+      /* Row so the monogram pins RIGHT like every other chip (Marco,
+         2026-07-23). The text span takes the squeeze and ellipsizes — the
+         base chip's column flex + a bare text node defeated text-overflow,
+         which is why this used to be display:block with the mark inline-left. */
+      flex-direction: row;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-2xs);
+      min-inline-size: 0;
+    }
+    .cal__travel-text {
       overflow: hidden;
       text-overflow: ellipsis;
+      white-space: nowrap;
+      min-inline-size: 0;
     }
 
     /* Venue wall time on the chip (timezone rule) — quiet mono prefix;
@@ -1494,14 +1514,18 @@
       text-overflow: ellipsis;
     }
     .cal__band--company {
-      --band-bg: color-mix(in oklch, var(--text-color) 9%, transparent);
-      --band-fg: var(--text-muted);
-      --band-border-color: var(--border-color-dark);
+      /* Subtle: a faint grey wash with the base-light border and a faint
+         label — the band should whisper, not box the day (Marco 2026-07-23). */
+      --band-bg: color-mix(in oklch, var(--text-color) 6%, transparent);
+      --band-fg: var(--text-faint);
+      --band-border-color: var(--border-color-light);
     }
     .cal__band--person {
-      --band-bg: color-mix(in oklch, var(--cal-accent, var(--warning)) 15%, transparent);
-      --band-fg: color-mix(in oklch, var(--cal-accent, var(--warning)) 50%, var(--text-muted));
-      --band-border-color: color-mix(in oklch, var(--cal-accent, var(--warning)) 30%, var(--border-color-light));
+      /* Subtle accent wash — just enough hue to say WHOSE, no more. The
+         tentative hatch (below) stays as-is; Marco kept that one. */
+      --band-bg: color-mix(in oklch, var(--cal-accent, var(--warning)) 7%, transparent);
+      --band-fg: color-mix(in oklch, var(--cal-accent, var(--warning)) 40%, var(--text-faint));
+      --band-border-color: color-mix(in oklch, var(--cal-accent, var(--warning)) 18%, var(--border-color-light));
     }
     .cal__band--tentative {
       --band-bg: repeating-linear-gradient(

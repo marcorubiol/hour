@@ -1,13 +1,16 @@
 <script lang="ts">
   /**
-   * Money lens v3 (ADR-086). The gig's fee is the anchor: "collected" derives
-   * from payments-against-fee (list_money_performances.collected), cobrar and
-   * facturar are independent. Documents (factura/proforma) are optional and
-   * driven by each workspace's invoicing_mode. Filter = sidebar pins (ADR-038).
+   * Money lens v3 (ADR-086 + ADR-087). The BOLO (the deal with a venue) is the
+   * money unit: its fee is the anchor, "collected" derives from payments-against
+   * -fee (list_money_bolos.collected), cobrar and facturar are independent.
+   * Layout: a general position on top (per currency: pipeline · collected ·
+   * pending), then bolos grouped BY OBRA (project, never by line) with per-obra
+   * contratado · cobrado · pendiente, the document living on the bolo (a chip),
+   * and the functions as a sub-detail count. Filter = sidebar pins (ADR-038).
    *
    * Reads are money-gated (fees NULLed without read:money). Fee editing lives
    * here by design (ADR-043). Payment is decoupled from the invoice: recording
-   * one anchors to the gig and moves its collected state, with or without a
+   * one anchors to the deal and moves its collected state, with or without a
    * document.
    */
 
@@ -31,30 +34,31 @@
     buildLineIndex,
     buildProjectIndex,
     resolveScope,
-    lineUrl,
     type NavLine,
     type NavWorkspace,
     type RawLine,
   } from '$lib/nav';
   import { activeProjectsQueryOptions, allLinesQueryOptions } from '$lib/nav-queries';
-  import { lineKindGlyph } from '$lib/utils/line-kind';
   import { goto } from '$app/navigation';
 
   type InvoicingMode = 'off' | 'interno' | 'legal';
   type WorkspaceLite = { id: string; slug: string; invoicing_mode: InvoicingMode | null };
 
-  type MoneyPerformance = {
+  type MoneyBolo = {
     id: string;
-    slug: string | null;
-    performed_at: string;
-    status: string;
+    project_id: string;
+    line_id: string | null;
+    conversation_id: string | null;
     venue_name: string | null;
     city: string | null;
+    country: string | null;
     fee_amount: number | null;
     fee_currency: string | null;
-    line_id: string | null;
+    status: string;
     collected: number;
-    project: { id: string; slug: string; name: string; workspace_id: string } | null;
+    function_count: number;
+    next_performed_at: string | null;
+    project: { id: string; slug: string; name: string; accent: string | null; workspace_id: string } | null;
   };
 
   const PAYMENT_METHOD_LABELS: Record<string, string> = {
@@ -63,6 +67,8 @@
     cash: 'Cash',
     other: 'Other',
   };
+
+  const CONTRACTED = ['confirmed', 'done', 'invoiced', 'paid'];
 
   const pins = usePins();
 
@@ -105,17 +111,18 @@
   }
   let filterIds = $derived({ projectIds: scope.projectIds, workspaceIds: scope.workspaceIds });
 
-  function openLine(line: NavLine) {
-    void goto(lineUrl(line));
+  function openProject(projectSlug: string, workspaceId: string) {
+    const ws = workspaceSlugById.get(workspaceId) ?? defaultWorkspaceSlug;
+    void goto(`/h/${ws}/project/${projectSlug}/`);
   }
 
-  const feesOptions = toStore(() => {
+  const bolosOptions = toStore(() => {
     const k = { ...filterIds, unresolved: scopeUnresolved };
     return {
-      queryKey: ['money-performances', { p: k.projectIds, w: k.workspaceIds }] as const,
+      queryKey: ['money-bolos', { p: k.projectIds, w: k.workspaceIds }] as const,
       enabled: !k.unresolved,
       queryFn: ({ signal }: { signal: AbortSignal }) =>
-        fetchJSON<{ items: MoneyPerformance[] }>(`/api/money/performances?${feedParams(k)}`, signal),
+        fetchJSON<{ items: MoneyBolo[] }>(`/api/money/bolos?${feedParams(k)}`, signal),
     };
   });
   const invoicesOptions = toStore(() => {
@@ -146,37 +153,58 @@
     };
   });
 
-  const feesQuery = createQuery(feesOptions);
+  const bolosQuery = createQuery(bolosOptions);
   const invoicesQuery = createQuery(invoicesOptions);
   const expensesQuery = createQuery(expensesOptions);
   const payersQuery = createQuery(payersOptions);
 
-  function feeInScope(f: MoneyPerformance): boolean {
+  function boloInScope(b: MoneyBolo): boolean {
     if (scope.isEmpty) return true;
-    const ws = f.project?.workspace_id;
+    const ws = b.project?.workspace_id;
     if (ws && scope.workspaceIds.includes(ws)) return true;
-    if (f.project && directProjectIds.has(f.project.id)) return true;
-    if (f.line_id && scope.lineIds.includes(f.line_id)) return true;
+    if (b.project && directProjectIds.has(b.project.id)) return true;
+    if (b.line_id && scope.lineIds.includes(b.line_id)) return true;
     return false;
   }
-  let fees = $derived(($feesQuery.data?.items ?? []).filter(feeInScope));
+  let bolos = $derived(($bolosQuery.data?.items ?? []).filter(boloInScope));
   let invoices = $derived($invoicesQuery.data?.items ?? []);
   let expenses = $derived($expensesQuery.data?.items ?? []);
   let payers = $derived($payersQuery.data?.items ?? []);
 
-  // Any scoped fee's workspace issues documents → show the Documents section
+  let boloById = $derived(new Map(bolos.map((b) => [b.id, b])));
+  // A line's project, learned from the bolos on it — enough to attribute a
+  // line-anchored expense to an obra header.
+  let lineToProjectId = $derived(
+    new Map(bolos.filter((b) => b.line_id).map((b) => [b.line_id as string, b.project_id])),
+  );
+
+  // Documents live on the bolo: map each invoice to the bolo its line references.
+  let invoicesByBolo = $derived.by(() => {
+    const map = new Map<string, MoneyInvoiceItem[]>();
+    for (const inv of invoices) {
+      for (const l of inv.lines) {
+        if (!l.bolo_id) continue;
+        const bucket = map.get(l.bolo_id) ?? [];
+        bucket.push(inv);
+        map.set(l.bolo_id, bucket);
+      }
+    }
+    return map;
+  });
+
+  // Any scoped bolo's workspace issues documents → show the Documents section
   // and the per-currency invoiced column.
   let anyDocMode = $derived(
-    fees.some((f) => (workspaceModeById.get(f.project?.workspace_id ?? '') ?? 'legal') !== 'off'),
+    bolos.some((b) => (workspaceModeById.get(b.project?.workspace_id ?? '') ?? 'legal') !== 'off'),
   );
-  function feeMode(f: MoneyPerformance): InvoicingMode {
-    return workspaceModeById.get(f.project?.workspace_id ?? '') ?? 'legal';
+  function boloMode(b: MoneyBolo): InvoicingMode {
+    return workspaceModeById.get(b.project?.workspace_id ?? '') ?? 'legal';
   }
 
   type FeeState = 'unpaid' | 'partial' | 'full';
-  function feeState(f: MoneyPerformance): FeeState {
-    const fee = Number(f.fee_amount ?? 0);
-    const coll = Number(f.collected ?? 0);
+  function feeState(b: MoneyBolo): FeeState {
+    const fee = Number(b.fee_amount ?? 0);
+    const coll = Number(b.collected ?? 0);
     if (coll <= 0) return 'unpaid';
     if (coll >= fee) return 'full';
     return 'partial';
@@ -187,120 +215,114 @@
     unpaid: { tone: 'faint', label: 'uncollected' },
   };
 
-  // ── Per-currency truth + roll-up by line ──────────────────────────────
-  type CurrencyRoll = { currency: string; confirmed: number; holds: number; expenses: number };
-  type LineRoll = {
-    key: string;
+  // ── Per-currency truth, grouped by obra (ADR-087) ─────────────────────
+  type CurrencyRoll = { currency: string; contratado: number; holds: number; collected: number; expenses: number };
+  type ObraGroup = {
+    projectId: string;
     name: string;
-    kind: string;
-    projectName: string;
     accent: string;
-    line: NavLine | null;
-    dates: number;
+    slug: string;
+    workspaceId: string;
+    mode: InvoicingMode;
+    bolos: MoneyBolo[];
     currencies: CurrencyRoll[];
   };
-  type MutableLineRoll = Omit<LineRoll, 'currencies'> & { currencies: Map<string, CurrencyRoll> };
+  type MutableObra = Omit<ObraGroup, 'currencies'> & { currencies: Map<string, CurrencyRoll> };
 
   function ensureCurrency(map: Map<string, CurrencyRoll>, currency: string): CurrencyRoll {
     const existing = map.get(currency);
     if (existing) return existing;
-    const created = { currency, confirmed: 0, holds: 0, expenses: 0 };
+    const created = { currency, contratado: 0, holds: 0, collected: 0, expenses: 0 };
     map.set(currency, created);
     return created;
   }
 
-  let feeById = $derived(new Map(fees.map((fee) => [fee.id, fee])));
-  let byLine = $derived.by<LineRoll[]>(() => {
-    const map = new Map<string, MutableLineRoll>();
-    const ensureLine = (key: string, line: NavLine | null, projectName: string): MutableLineRoll => {
+  let byObra = $derived.by<ObraGroup[]>(() => {
+    const map = new Map<string, MutableObra>();
+    const ensureObra = (b: MoneyBolo): MutableObra => {
+      const key = b.project?.id ?? b.project_id;
       const existing = map.get(key);
       if (existing) return existing;
-      const created: MutableLineRoll = {
-        key,
-        name: line?.name ?? 'One-offs',
-        kind: line?.kind ?? 'oneoff',
-        projectName: line?.projectName ?? projectName,
-        accent: line?.accent ?? 'var(--text-faint)',
-        line,
-        dates: 0,
+      const created: MutableObra = {
+        projectId: key,
+        name: b.project?.name ?? '—',
+        accent: b.project?.accent ?? 'var(--text-faint)',
+        slug: b.project?.slug ?? '',
+        workspaceId: b.project?.workspace_id ?? '',
+        mode: boloMode(b),
+        bolos: [],
         currencies: new Map(),
       };
       map.set(key, created);
       return created;
     };
 
-    for (const fee of fees) {
-      const line = (fee.line_id ? lineById.get(fee.line_id) : null) ?? null;
-      const key = fee.line_id ?? `loose:${fee.project?.id ?? 'none'}`;
-      const record = ensureLine(key, line, fee.project?.name ?? '—');
-      if (fee.fee_amount === null) continue;
-      const currency = fee.fee_currency ?? 'EUR';
-      const amount = ensureCurrency(record.currencies, currency);
-      if (['confirmed', 'done', 'invoiced', 'paid'].includes(fee.status)) {
-        amount.confirmed += Number(fee.fee_amount);
-        record.dates += 1;
-      } else if (fee.status.startsWith('hold')) {
-        amount.holds += Number(fee.fee_amount);
-      }
+    for (const b of bolos) {
+      const obra = ensureObra(b);
+      obra.bolos.push(b);
+      const roll = ensureCurrency(obra.currencies, b.fee_currency ?? 'EUR');
+      roll.collected += Number(b.collected ?? 0);
+      if (b.fee_amount === null) continue;
+      if (CONTRACTED.includes(b.status)) roll.contratado += Number(b.fee_amount);
+      else if (b.status.startsWith('hold')) roll.holds += Number(b.fee_amount);
     }
 
     for (const expense of expenses) {
-      const performance = expense.performance_id ? feeById.get(expense.performance_id) : null;
-      const lineId = expense.line_id ?? performance?.line_id ?? null;
-      const line = (lineId ? lineById.get(lineId) : null) ?? null;
-      const key = lineId ?? `loose:${performance?.project?.id ?? expense.workspace_id}`;
-      const record = ensureLine(key, line, performance?.project?.name ?? 'One-offs');
-      ensureCurrency(record.currencies, expense.currency).expenses += Number(expense.amount);
+      const projectId = expense.bolo_id
+        ? boloById.get(expense.bolo_id)?.project_id ?? null
+        : expense.line_id
+          ? lineToProjectId.get(expense.line_id) ?? null
+          : null;
+      if (!projectId) continue;
+      const obra = map.get(projectId);
+      if (!obra) continue;
+      ensureCurrency(obra.currencies, expense.currency).expenses += Number(expense.amount);
     }
 
     return [...map.values()]
-      .map((record) => ({ ...record, currencies: [...record.currencies.values()].sort((a, b) => a.currency.localeCompare(b.currency)) }))
-      .filter((record) => record.currencies.some((amount) => amount.confirmed || amount.holds || amount.expenses))
-      .sort((a, b) => {
-        const aTotal = a.currencies.reduce((sum, amount) => sum + amount.confirmed, 0);
-        const bTotal = b.currencies.reduce((sum, amount) => sum + amount.confirmed, 0);
-        return bTotal - aTotal;
+      .map((obra) => ({
+        ...obra,
+        bolos: [...obra.bolos].sort((a, c) => (a.next_performed_at ?? '9999').localeCompare(c.next_performed_at ?? '9999')),
+        currencies: [...obra.currencies.values()].sort((a, c) => a.currency.localeCompare(c.currency)),
+      }))
+      .sort((a, c) => {
+        const at = a.currencies.reduce((s, r) => s + r.contratado, 0);
+        const ct = c.currencies.reduce((s, r) => s + r.contratado, 0);
+        return ct - at;
       });
   });
 
-  let byLineMax = $derived.by(() => {
-    const max = new Map<string, number>();
-    for (const line of byLine) {
-      for (const amount of line.currencies) {
-        max.set(amount.currency, Math.max(max.get(amount.currency) ?? 1, amount.confirmed + amount.holds));
-      }
-    }
-    return max;
-  });
-
-  let loading = $derived($feesQuery.isLoading || $invoicesQuery.isLoading || $expensesQuery.isLoading);
+  let loading = $derived($bolosQuery.isLoading || $invoicesQuery.isLoading || $expensesQuery.isLoading);
   let errorMsg = $derived.by(() => {
-    const error = $feesQuery.error ?? $invoicesQuery.error ?? $expensesQuery.error;
+    const error = $bolosQuery.error ?? $invoicesQuery.error ?? $expensesQuery.error;
     return error instanceof Error ? error.message : '';
   });
 
-  // Per currency: pipeline (confirmed fees) · collected (fee.collected, v3) ·
-  // invoiced (issued documents, shown only where documents exist).
-  let currencies = $derived([...new Set(fees.map((f) => f.fee_currency ?? 'EUR'))].sort());
+  // ── General position (top) — per currency: pipeline · collected · pending ──
+  let currencies = $derived([...new Set(bolos.map((b) => b.fee_currency ?? 'EUR'))].sort());
   let totals = $derived.by(() => {
-    const map = new Map<string, { currency: string; pipeline: number; collected: number; invoiced: number }>();
+    const map = new Map<string, { currency: string; pipeline: number; contratado: number; collected: number; invoiced: number }>();
     const ensure = (currency: string) => {
       const existing = map.get(currency);
       if (existing) return existing;
-      const created = { currency, pipeline: 0, collected: 0, invoiced: 0 };
+      const created = { currency, pipeline: 0, contratado: 0, collected: 0, invoiced: 0 };
       map.set(currency, created);
       return created;
     };
-    for (const fee of fees) {
-      if (fee.fee_amount === null) continue;
-      const cur = fee.fee_currency ?? 'EUR';
-      if (fee.status === 'confirmed' || fee.status === 'done') ensure(cur).pipeline += Number(fee.fee_amount);
-      ensure(cur).collected += Number(fee.collected ?? 0);
+    for (const b of bolos) {
+      const cur = b.fee_currency ?? 'EUR';
+      const roll = ensure(cur);
+      roll.collected += Number(b.collected ?? 0);
+      if (b.fee_amount === null) continue;
+      if (b.status === 'confirmed' || b.status === 'done') roll.pipeline += Number(b.fee_amount);
+      if (CONTRACTED.includes(b.status)) roll.contratado += Number(b.fee_amount);
     }
     for (const invoice of invoices) {
       if (invoice.status === 'issued' || invoice.status === 'paid') ensure(invoice.currency).invoiced += Number(invoice.total);
     }
-    return [...map.values()].sort((a, b) => a.currency.localeCompare(b.currency));
+    return [...map.values()]
+      .map((t) => ({ ...t, pending: Math.max(0, t.contratado - t.collected) }))
+      .sort((a, b) => a.currency.localeCompare(b.currency));
   });
 
   let expenseTotals = $derived.by(() => {
@@ -309,38 +331,32 @@
     return [...map.entries()].sort(([a], [b]) => a.localeCompare(b));
   });
 
-  function perfHref(f: MoneyPerformance): string | null {
-    if (!f.slug || !f.project) return null;
-    const ws = workspaceSlugById.get(f.project.workspace_id) ?? defaultWorkspaceSlug;
-    return `/h/${ws}/performance/${f.slug}`;
-  }
-
   const queryClient = useQueryClient();
 
-  // ── Fee editor (ADR-043) ──────────────────────────────────────────────
+  // ── Fee editor (ADR-043) — writes the bolo fee ────────────────────────
   let feeOpen = $state(false);
-  let feeEditing = $state<MoneyPerformance | null>(null);
+  let feeEditing = $state<MoneyBolo | null>(null);
   let fAmount = $state('');
   let fCurrency = $state('EUR');
-  function openFee(f: MoneyPerformance) {
-    feeEditing = f;
-    fAmount = f.fee_amount === null ? '' : String(f.fee_amount);
-    fCurrency = f.fee_currency ?? 'EUR';
+  function openFee(b: MoneyBolo) {
+    feeEditing = b;
+    fAmount = b.fee_amount === null ? '' : String(b.fee_amount);
+    fCurrency = b.fee_currency ?? 'EUR';
     feeOpen = true;
   }
   const feeMutation = createMutation({
     mutationFn: async (input: { id: string; fee_amount: number | null; fee_currency: string }) => {
-      const body = await mutateJSON<{ performance?: unknown }>('PATCH', `/api/money/performances/${input.id}`, {
+      const body = await mutateJSON<{ bolo?: unknown }>('PATCH', `/api/money/bolos/${input.id}`, {
         fee_amount: input.fee_amount,
         fee_currency: input.fee_currency,
       });
-      if (!body?.performance) throw new Error('Unexpected response');
-      return body.performance;
+      if (!body?.bolo) throw new Error('Unexpected response');
+      return body.bolo;
     },
     onSuccess: () => {
       feeOpen = false;
       feeEditing = null;
-      void queryClient.invalidateQueries({ queryKey: ['money-performances'] });
+      void queryClient.invalidateQueries({ queryKey: ['money-bolos'] });
     },
     onError: (err) => addToast({ tone: 'danger', title: 'Fee not saved', message: `${err instanceof Error ? err.message : 'Unexpected error'} — try again.` }),
   });
@@ -355,9 +371,9 @@
     $feeMutation.mutate({ id: feeEditing.id, fee_amount: amount, fee_currency: fCurrency });
   }
 
-  // ── Record payment — anchored to the gig's fee (ADR-086 D3) ────────────
+  // ── Record payment — anchored to the deal's fee (ADR-086 D3) ───────────
   let payOpen = $state(false);
-  let payFee = $state<MoneyPerformance | null>(null);
+  let payBolo = $state<MoneyBolo | null>(null);
   let payAmount = $state('');
   let payReceivedOn = $state('');
   let payMethod = $state<string>('transfer');
@@ -367,13 +383,13 @@
   function todayIso(): string {
     return new Date().toISOString().slice(0, 10);
   }
-  function openPay(f: MoneyPerformance) {
-    payFee = f;
-    const remaining = Math.max(0, Number(f.fee_amount ?? 0) - Number(f.collected ?? 0));
+  function openPay(b: MoneyBolo) {
+    payBolo = b;
+    const remaining = Math.max(0, Number(b.fee_amount ?? 0) - Number(b.collected ?? 0));
     payAmount = remaining ? remaining.toFixed(2) : '';
     payReceivedOn = todayIso();
     payMethod = 'transfer';
-    payCounterparty = '';
+    payCounterparty = b.venue_name ?? '';
     payCategory = '';
     payReference = '';
     payOpen = true;
@@ -386,7 +402,7 @@
         amount,
         received_on: payReceivedOn || todayIso(),
         method: payMethod,
-        performance_id: payFee!.id,
+        bolo_id: payBolo!.id,
         counterparty: payCounterparty.trim() || null,
         category: payCategory.trim() || null,
         reference: payReference.trim() || null,
@@ -396,8 +412,8 @@
     },
     onSuccess: () => {
       payOpen = false;
-      payFee = null;
-      void queryClient.invalidateQueries({ queryKey: ['money-performances'] });
+      payBolo = null;
+      void queryClient.invalidateQueries({ queryKey: ['money-bolos'] });
       addToast({ tone: 'success', message: 'Payment recorded against the fee.' });
     },
     onError: (err) => addToast({ tone: 'danger', title: 'Payment not recorded', message: err instanceof Error ? err.message : 'Unexpected error' }),
@@ -405,7 +421,7 @@
 
   // ── Invoice creation (ADR-050) — doc_type driven by workspace mode ─────
   let invOpen = $state(false);
-  let invPerf = $state<MoneyPerformance | null>(null);
+  let invBolo = $state<MoneyBolo | null>(null);
   let iVat = $state('');
   let iIrpf = $state('');
   let iDueOn = $state('');
@@ -413,11 +429,11 @@
   let iPaymentCondition = $state('');
   let iPayerId = $state('');
   let availablePayers = $derived(
-    invPerf?.project ? payers.filter((payer) => payer.workspace_id === invPerf?.project?.workspace_id) : [],
+    invBolo?.project ? payers.filter((payer) => payer.workspace_id === invBolo?.project?.workspace_id) : [],
   );
-  let invDocType = $derived(invPerf ? (feeMode(invPerf) === 'interno' ? 'proforma' : 'factura') : 'factura');
-  function openInvoice(f: MoneyPerformance) {
-    invPerf = f;
+  let invDocType = $derived(invBolo ? (boloMode(invBolo) === 'interno' ? 'proforma' : 'factura') : 'factura');
+  function openInvoice(b: MoneyBolo) {
+    invBolo = b;
     iVat = '';
     iIrpf = '';
     iDueOn = '';
@@ -432,7 +448,7 @@
     return Number(s);
   }
   let invTotal = $derived.by(() => {
-    const fee = invPerf?.fee_amount ?? 0;
+    const fee = invBolo?.fee_amount ?? 0;
     const vat = pctOrNull(iVat);
     const irpf = pctOrNull(iIrpf);
     const vatAmt = vat === null ? 0 : Math.round(fee * vat) / 100;
@@ -442,7 +458,7 @@
   const createInvoice = createMutation({
     mutationFn: async () => {
       const body = await mutateJSON<{ invoice?: unknown }>('POST', '/api/invoices', {
-        performance_id: invPerf!.id,
+        bolo_id: invBolo!.id,
         vat_pct: pctOrNull(iVat),
         irpf_pct: pctOrNull(iIrpf),
         due_on: iDueOn || null,
@@ -456,7 +472,7 @@
     },
     onSuccess: () => {
       invOpen = false;
-      invPerf = null;
+      invBolo = null;
       void queryClient.invalidateQueries({ queryKey: ['invoices'] });
       addToast({ tone: 'success', message: `Draft ${invDocType} created.` });
     },
@@ -472,7 +488,7 @@
     $createInvoice.mutate();
   }
 
-  // ── Add expense (money out) — with counterparty (ADR-086 D4) ───────────
+  // ── Add expense (money out) — anchored to a deal or a line (ADR-087) ────
   let expOpen = $state(false);
   let eAmount = $state('');
   let eCurrency = $state('EUR');
@@ -481,35 +497,43 @@
   let eIncurredOn = $state('');
   let eCounterparty = $state('');
   let eAnchor = $state('');
-  // Anchor an expense to a whole line OR an individual gig (ADR-086 D4). The
-  // value encodes which: line:<id> | gig:<id>.
+  // Anchor an expense to a whole line OR an individual deal (ADR-087). The value
+  // encodes which: line:<id> | bolo:<id>.
+  let scopedLines = $derived.by(() => {
+    const seen = new Map<string, NavLine>();
+    for (const b of bolos) {
+      if (b.line_id && !seen.has(b.line_id)) {
+        const line = lineById.get(b.line_id);
+        if (line) seen.set(b.line_id, line);
+      }
+    }
+    return [...seen.values()];
+  });
   let expenseAnchorOptions = $derived([
-    ...byLine
-      .filter((l) => l.line)
-      .map((l) => ({ value: `line:${l.line!.id}`, label: `Line · ${l.name} — ${l.projectName}` })),
-    ...fees.map((f) => ({
-      value: `gig:${f.id}`,
-      label: `Gig · ${[f.venue_name, f.city].filter(Boolean).join(', ') || f.project?.name || '—'} — ${dayLabel(f.performed_at)}`,
+    ...scopedLines.map((l) => ({ value: `line:${l.id}`, label: `Line · ${l.name} — ${l.projectName}` })),
+    ...bolos.map((b) => ({
+      value: `bolo:${b.id}`,
+      label: `Deal · ${[b.venue_name, b.city].filter(Boolean).join(', ') || b.project?.name || '—'}`,
     })),
   ]);
-  function openExpense(f?: MoneyPerformance) {
+  function openExpense(b?: MoneyBolo) {
     eAmount = '';
-    eCurrency = f?.fee_currency ?? currencies[0] ?? 'EUR';
+    eCurrency = b?.fee_currency ?? currencies[0] ?? 'EUR';
     eDescription = '';
     eCategory = 'other';
     eIncurredOn = todayIso();
     eCounterparty = '';
-    eAnchor = f ? `gig:${f.id}` : (expenseAnchorOptions[0]?.value ?? '');
+    eAnchor = b ? `bolo:${b.id}` : (expenseAnchorOptions[0]?.value ?? '');
     expOpen = true;
   }
   const createExpense = createMutation({
     mutationFn: async () => {
       const amount = Number(String(eAmount).trim());
       if (!Number.isFinite(amount) || amount <= 0) throw new Error('Amount must be greater than zero');
-      if (!eAnchor) throw new Error('Pick a line or gig to anchor the expense');
+      if (!eAnchor) throw new Error('Pick a line or deal to anchor the expense');
       const [kind, id] = eAnchor.split(':');
       const body = await mutateJSON<{ expense?: unknown }>('POST', '/api/expenses', {
-        ...(kind === 'gig' ? { performance_id: id } : { line_id: id }),
+        ...(kind === 'bolo' ? { bolo_id: id } : { line_id: id }),
         category: eCategory,
         description: eDescription.trim() || 'Expense',
         amount,
@@ -527,6 +551,48 @@
     },
     onError: (err) => addToast({ tone: 'danger', title: 'Expense not added', message: err instanceof Error ? err.message : 'Unexpected error' }),
   });
+
+  // ── New deal — create a bolo by hand (ADR-087) ─────────────────────────
+  // The backfill covers existing gigs; this is how a deal is recorded going
+  // forward (its functions are scheduled later in Planner).
+  let dealOpen = $state(false);
+  let dealProjectId = $state('');
+  let dealVenue = $state('');
+  let dealCity = $state('');
+  let dealFee = $state('');
+  let dealCurrency = $state('EUR');
+  let dealOptions = $derived(projectIndex.map((p) => ({ value: p.id, label: `${p.name} · ${p.workspaceName}` })));
+  function openDeal() {
+    dealProjectId = scope.projects[0]?.id ?? projectIndex[0]?.id ?? '';
+    dealVenue = '';
+    dealCity = '';
+    dealFee = '';
+    dealCurrency = currencies[0] ?? 'EUR';
+    dealOpen = true;
+  }
+  const createBolo = createMutation({
+    mutationFn: async () => {
+      if (!dealProjectId) throw new Error('Pick a project');
+      const trimmed = String(dealFee).trim();
+      const fee = trimmed === '' ? null : Number(trimmed);
+      if (fee !== null && (Number.isNaN(fee) || fee < 0)) throw new Error('Fee must be a positive number (or empty)');
+      const body = await mutateJSON<{ bolo?: unknown }>('POST', '/api/money/bolos', {
+        project_id: dealProjectId,
+        venue_name: dealVenue.trim() || null,
+        city: dealCity.trim() || null,
+        fee_amount: fee,
+        fee_currency: dealCurrency.trim() || 'EUR',
+      });
+      if (!body?.bolo) throw new Error('Unexpected response');
+      return body.bolo;
+    },
+    onSuccess: () => {
+      dealOpen = false;
+      void queryClient.invalidateQueries({ queryKey: ['money-bolos'] });
+      addToast({ tone: 'success', message: 'Deal created.' });
+    },
+    onError: (err) => addToast({ tone: 'danger', title: 'Deal not created', message: err instanceof Error ? err.message : 'Unexpected error' }),
+  });
 </script>
 
 <svelte:head>
@@ -536,7 +602,10 @@
 <section class="mny">
   <header class="mny__head">
     <div class="mny__toprow">
-      <p class="eyebrow">Money</p>
+      <div class="mny__toprow-l">
+        <p class="eyebrow">Money</p>
+        <Button size="xs" variant="outline" onclick={openDeal} disabled={projectIndex.length === 0}>New deal</Button>
+      </div>
       <LensSwitcher />
     </div>
     <div class="mny__totals">
@@ -545,12 +614,13 @@
           <span class="mny__currency">{total.currency}</span>
           <span class="mny__total"><span class="mny__total-label">pipeline</span>{fmtMoney(total.pipeline)}</span>
           <span class="mny__total"><span class="mny__total-label">collected</span>{fmtMoney(total.collected)}</span>
+          <span class="mny__total"><span class="mny__total-label">pending</span>{fmtMoney(total.pending)}</span>
           {#if anyDocMode}
             <span class="mny__total mny__total--soft"><span class="mny__total-label">invoiced</span>{fmtMoney(total.invoiced)}</span>
           {/if}
         </span>
       {/each}
-      <span class="mny__total-note">current pins · currencies kept separate</span>
+      <span class="mny__total-note">current pins · currencies kept separate · pending = contracted − collected</span>
     </div>
   </header>
 
@@ -558,84 +628,68 @@
     <p class="mny__state mny__state--danger">{errorMsg}</p>
   {:else if loading}
     <p class="mny__state">Loading…</p>
+  {:else if bolos.length === 0}
+    <p class="mny__state">No deals in the current pins.</p>
   {:else}
-    {#if byLine.length > 0}
-      <section class="mny__section" aria-label="By line">
-        <p class="eyebrow">By line</p>
-        <div class="mline-list">
-          {#each byLine as l (l.key)}
-            <button type="button" class="mline" style={`--c: ${l.accent}`} onclick={() => l.line && openLine(l.line)} disabled={!l.line}>
-              <span class="mline__top">
-                <span class="mline__glyph">{lineKindGlyph(l.kind)}</span>
-                <span class="mline__name">{l.name}</span>
-                <span class="mline__co">{l.projectName}</span>
+    {#each byObra as obra (obra.projectId)}
+      <section class="obra" style={`--c: ${obra.accent}`} aria-label={obra.name}>
+        <header class="obra__head">
+          <button type="button" class="obra__title" onclick={() => obra.slug && openProject(obra.slug, obra.workspaceId)} disabled={!obra.slug}>
+            <span class="obra__dot"></span>
+            <span class="obra__name">{obra.name}</span>
+            <span class="obra__count">{obra.bolos.length} {obra.bolos.length === 1 ? 'deal' : 'deals'}</span>
+          </button>
+          <div class="obra__rolls">
+            {#each obra.currencies as roll (roll.currency)}
+              <span class="obra__roll">
+                <span class="obra__cur">{roll.currency}</span>
+                <span class="obra__stat"><span class="obra__stat-l">contracted</span>{fmtMoney(roll.contratado)}</span>
+                <span class="obra__stat"><span class="obra__stat-l">collected</span>{fmtMoney(roll.collected)}</span>
+                <span class="obra__stat"><span class="obra__stat-l">pending</span>{fmtMoney(Math.max(0, roll.contratado - roll.collected))}</span>
+                {#if roll.expenses > 0}
+                  <span class="obra__stat obra__stat--soft"><span class="obra__stat-l">net</span>{fmtMoney(roll.contratado - roll.expenses)}</span>
+                {/if}
               </span>
-              {#each l.currencies as amount (amount.currency)}
-                <span class="mline__money">
-                  <span class="mline__amt">{fmtMoney(amount.confirmed)} {amount.currency}</span>
-                  {#if amount.expenses > 0}
-                    <span class="mline__expense">− {fmtMoney(amount.expenses)} expenses</span>
-                    <span class="mline__net">net {fmtMoney(amount.confirmed - amount.expenses)}</span>
-                  {/if}
-                </span>
-                <span class="mline__bar">
-                  <span class="mline__fill" style={`inline-size: ${((amount.confirmed + amount.holds) / (byLineMax.get(amount.currency) ?? 1)) * 100}%`}>
-                    <span class="mline__fillc" style={`inline-size: ${amount.confirmed + amount.holds ? (amount.confirmed / (amount.confirmed + amount.holds)) * 100 : 0}%`}></span>
-                  </span>
-                </span>
-              {/each}
-              <span class="mline__meta">
-                <span>{l.dates} confirmed {l.dates === 1 ? 'date' : 'dates'}</span>
-                {#if l.line}<span class="mline__go">Open line →</span>{/if}
-              </span>
-            </button>
-          {/each}
-        </div>
-      </section>
-    {/if}
+            {/each}
+          </div>
+        </header>
 
-    <section class="mny__section" aria-label="Fees">
-      <div class="mny__section-head">
-        <p class="eyebrow">Fees</p>
-        <span class="mny__section-r">{fees.length} {fees.length === 1 ? 'gig' : 'gigs'}{currencies.length ? ` · ${currencies.join(' · ')}` : ''}</span>
-      </div>
-      {#if fees.length === 0}
-        <p class="mny__state">No performances in the current pins.</p>
-      {:else}
         <div class="fees">
-          {#each fees as f (f.id)}
-            {@const st = feeState(f)}
-            {@const fee = Number(f.fee_amount ?? 0)}
-            {@const coll = Number(f.collected ?? 0)}
+          {#each obra.bolos as b (b.id)}
+            {@const st = feeState(b)}
+            {@const fee = Number(b.fee_amount ?? 0)}
+            {@const coll = Number(b.collected ?? 0)}
             {@const rem = fee - coll}
             {@const cp = fee > 0 ? Math.min(100, Math.round((coll / fee) * 100)) : 0}
-            {@const mode = feeMode(f)}
-            <div class="fee" data-st={f.fee_amount === null ? 'none' : st}>
+            {@const mode = obra.mode}
+            {@const docs = invoicesByBolo.get(b.id) ?? []}
+            <div class="fee" data-st={b.fee_amount === null ? 'none' : st}>
               <div class="fee__top">
-                <span class="fee__date">{dayLabel(f.performed_at)}</span>
-                <span class="fee__where">
-                  {#if perfHref(f)}
-                    <a class="fee__venue-main" href={perfHref(f)}>{f.venue_name || '—'}{#if f.city}<span class="fee__city"> · {f.city}</span>{/if}</a>
-                  {:else}
-                    <span class="fee__venue-main">{f.venue_name || '—'}{#if f.city}<span class="fee__city"> · {f.city}</span>{/if}</span>
-                  {/if}
-                  <span class="fee__proj-sub">{f.project?.name ?? '—'}</span>
+                <span class="fee__date">
+                  {b.next_performed_at ? dayLabel(b.next_performed_at) : 'no date'}
+                  {#if b.function_count > 1}<span class="fee__fns">· {b.function_count} fns</span>{/if}
                 </span>
-                <span class="fee__badge"><StateBadge label={performanceStatusLabel(f.status)} tone={performanceStatusTone(f.status)} /></span>
+                <span class="fee__where">
+                  <span class="fee__venue-main">{b.venue_name || '—'}{#if b.city}<span class="fee__city"> · {b.city}</span>{/if}</span>
+                  {#if docs.length > 0}
+                    <a class="fee__doc" href="#mny-documents" title="Document lives on this deal">{docs[0]!.number ?? docs[0]!.status}</a>
+                  {/if}
+                </span>
+                <span class="fee__badge"><StateBadge label={performanceStatusLabel(b.status)} tone={performanceStatusTone(b.status)} /></span>
                 <span class="fee__amt">
-                  <button type="button" class="fee__fee" title="Edit fee" onclick={() => openFee(f)}>{fmtFee(f.fee_amount, f.fee_currency)}</button>
-                  {#if f.fee_amount !== null}<span class="pill" data-tone={FEE_PILL[st].tone}>{FEE_PILL[st].label}</span>{/if}
+                  <button type="button" class="fee__fee" title="Edit fee" onclick={() => openFee(b)}>{fmtFee(b.fee_amount, b.fee_currency)}</button>
+                  {#if b.fee_amount !== null}<span class="pill" data-tone={FEE_PILL[st].tone}>{FEE_PILL[st].label}</span>{/if}
                 </span>
               </div>
-              {#if f.fee_amount !== null}
+              {#if b.fee_amount !== null}
                 <div class="fee__bar"><span class="fee__coll" style={`inline-size:${cp}%`}></span></div>
                 <div class="fee__foot">
                   <span class="fee__collected">collected {fmtMoney(coll)} / {fmtMoney(fee)}{#if rem > 0} · <span class="fee__rem">{fmtMoney(rem)} left</span>{/if}</span>
                   <span class="fee__acts">
-                    <Button size="xs" variant="outline" onclick={() => openPay(f)}>Record payment</Button>
-                    <Button size="xs" variant="outline" onclick={() => openExpense(f)}>Add expense</Button>
+                    <Button size="xs" variant="outline" onclick={() => openPay(b)}>Record payment</Button>
+                    <Button size="xs" variant="outline" onclick={() => openExpense(b)}>Add expense</Button>
                     {#if mode !== 'off'}
-                      <Button size="xs" variant="outline" onclick={() => openInvoice(f)}>{mode === 'interno' ? 'Create proforma' : 'Create invoice'}</Button>
+                      <Button size="xs" variant="outline" onclick={() => openInvoice(b)}>{mode === 'interno' ? 'Create proforma' : 'Create invoice'}</Button>
                     {/if}
                   </span>
                 </div>
@@ -643,11 +697,11 @@
             </div>
           {/each}
         </div>
-      {/if}
-    </section>
+      </section>
+    {/each}
 
     {#if anyDocMode}
-      <section class="mny__section" aria-label="Documents">
+      <section class="mny__section" id="mny-documents" aria-label="Documents">
         <p class="eyebrow">Documents</p>
         <MoneyInvoices {invoices} />
       </section>
@@ -671,7 +725,7 @@
         <ul class="mny__expenses" role="list">
           {#each expenses as expense (expense.id)}
             <li>
-              <span class="mny__cell-date">{dayLabel(expense.incurred_on)}</span>
+              <span class="mny__cell-date">{expense.incurred_on ? dayLabel(expense.incurred_on) : '—'}</span>
               <span class="mny__expense-description"><b>{expense.description}</b>{#if expense.counterparty}<span class="mny__expense-counter"> · {expense.counterparty}</span>{/if}</span>
               <span class="mny__expense-category">{categoryLabel(expense.category)}</span>
               <strong>− {fmtMoney(expense.amount)} {expense.currency}</strong>
@@ -685,7 +739,7 @@
 
 <Dialog bind:open={feeOpen} title="Fee" size="s" onclose={() => (feeEditing = null)}>
   {#if feeEditing}
-    <p class="mny__dialog-who">{feeEditing.project?.name ?? ''} — {[feeEditing.venue_name, feeEditing.city].filter(Boolean).join(', ')} · {dayLabel(feeEditing.performed_at)}</p>
+    <p class="mny__dialog-who">{feeEditing.project?.name ?? ''} — {[feeEditing.venue_name, feeEditing.city].filter(Boolean).join(', ')}</p>
   {/if}
   <div class="mny__fee-form">
     <Input label="Amount" type="number" bind:value={fAmount} placeholder="Empty clears the fee" />
@@ -697,10 +751,10 @@
   {/snippet}
 </Dialog>
 
-<Dialog bind:open={payOpen} title="Record payment" size="s" description={payFee ? `${[payFee.venue_name, payFee.city].filter(Boolean).join(', ')} · ${dayLabel(payFee.performed_at)}` : ''} onclose={() => (payFee = null)}>
+<Dialog bind:open={payOpen} title="Record payment" size="s" description={payBolo ? `${[payBolo.venue_name, payBolo.city].filter(Boolean).join(', ')}` : ''} onclose={() => (payBolo = null)}>
   <div class="mny__pay-form">
     <div class="mny__row2">
-      <Input label={`Amount (${payFee?.fee_currency ?? 'EUR'})`} type="number" bind:value={payAmount} />
+      <Input label={`Amount (${payBolo?.fee_currency ?? 'EUR'})`} type="number" bind:value={payAmount} />
       <Input label="Received on" type="date" bind:value={payReceivedOn} />
     </div>
     <div class="mny__row2">
@@ -716,10 +770,10 @@
   {/snippet}
 </Dialog>
 
-<Dialog bind:open={invOpen} title={invDocType === 'proforma' ? 'New proforma' : 'New invoice'} size="m" onclose={() => (invPerf = null)}>
-  {#if invPerf}
-    <p class="mny__dialog-who">{invPerf.project?.name ?? ''} — {[invPerf.venue_name, invPerf.city].filter(Boolean).join(', ')} · {dayLabel(invPerf.performed_at)}</p>
-    <p class="mny__inv-fee-line">Fee (subtotal): <strong>{fmtFee(invPerf.fee_amount, invPerf.fee_currency)}</strong> — amounts snapshot the fee at creation.</p>
+<Dialog bind:open={invOpen} title={invDocType === 'proforma' ? 'New proforma' : 'New invoice'} size="m" onclose={() => (invBolo = null)}>
+  {#if invBolo}
+    <p class="mny__dialog-who">{invBolo.project?.name ?? ''} — {[invBolo.venue_name, invBolo.city].filter(Boolean).join(', ')}</p>
+    <p class="mny__inv-fee-line">Fee (subtotal): <strong>{fmtFee(invBolo.fee_amount, invBolo.fee_currency)}</strong> — amounts snapshot the fee at creation.</p>
     <div class="mny__inv-form">
       <Input label="VAT %" type="number" bind:value={iVat} placeholder="e.g. 21 — empty = none" />
       <Input label="IRPF %" type="number" bind:value={iIrpf} placeholder="e.g. 15 — empty = none" />
@@ -733,7 +787,7 @@
       </Select>
     </div>
     <Input label="Payment condition" bind:value={iPaymentCondition} placeholder="e.g. pays when the town hall pays them — says October" />
-    <p class="mny__inv-total-preview">Total: <strong>{fmtMoney(invTotal)} {invPerf.fee_currency ?? 'EUR'}</strong></p>
+    <p class="mny__inv-total-preview">Total: <strong>{fmtMoney(invTotal)} {invBolo.fee_currency ?? 'EUR'}</strong></p>
   {/if}
   {#snippet actions()}
     <Button variant="outline" onclick={() => (invOpen = false)}>Cancel</Button>
@@ -741,7 +795,25 @@
   {/snippet}
 </Dialog>
 
-<Dialog bind:open={expOpen} title="Add expense" size="s" description="Money out · anchored to a line or a gig">
+<Dialog bind:open={dealOpen} title="New deal" size="s" description="A deal with one venue — the money unit. Schedule its functions later in Planner.">
+  <div class="mny__pay-form">
+    <Select label="Project (obra)" bind:value={dealProjectId} options={dealOptions} />
+    <div class="mny__row2">
+      <Input label="Venue" bind:value={dealVenue} placeholder="e.g. Teatre Municipal" />
+      <Input label="City" bind:value={dealCity} placeholder="e.g. Girona" />
+    </div>
+    <div class="mny__row2">
+      <Input label="Fee (optional)" type="number" bind:value={dealFee} placeholder="Set it later if unknown" />
+      <Input label="Currency" bind:value={dealCurrency} placeholder="EUR" />
+    </div>
+  </div>
+  {#snippet actions()}
+    <Button variant="outline" onclick={() => (dealOpen = false)}>Cancel</Button>
+    <Button onclick={() => $createBolo.mutate()} loading={$createBolo.isPending}>Create deal</Button>
+  {/snippet}
+</Dialog>
+
+<Dialog bind:open={expOpen} title="Add expense" size="s" description="Money out · anchored to a line or a deal">
   <div class="mny__pay-form">
     <div class="mny__row2">
       <Input label="Amount" type="number" bind:value={eAmount} />
@@ -752,7 +824,7 @@
       <Input label="Date" type="date" bind:value={eIncurredOn} />
       <Select label="Category" bind:value={eCategory} options={EXPENSE_CATEGORIES.map((c) => ({ value: c, label: categoryLabel(c) }))} />
     </div>
-    <Select label="Anchor (line or gig)" bind:value={eAnchor} options={expenseAnchorOptions} />
+    <Select label="Anchor (line or deal)" bind:value={eAnchor} options={expenseAnchorOptions} />
     <Input label="Counterparty (optional — who's paid)" bind:value={eCounterparty} placeholder="e.g. Rent-a-Car Vic" />
   </div>
   {#snippet actions()}
@@ -766,9 +838,10 @@
     .mny { display: flex; flex-direction: column; gap: var(--space-l); }
     .mny__head { display: flex; flex-direction: column; gap: var(--space-s); }
     .mny__toprow { display: flex; align-items: center; justify-content: space-between; gap: var(--space-m); }
+    .mny__toprow-l { display: flex; align-items: center; gap: var(--space-m); }
     .mny__totals { display: flex; align-items: end; gap: var(--space-m); flex-wrap: wrap; }
     .mny__currency-total {
-      display: grid; grid-template-columns: auto repeat(3, minmax(7rem, auto));
+      display: grid; grid-template-columns: auto repeat(4, minmax(6rem, auto));
       gap: var(--space-s) var(--space-m); align-items: baseline;
       padding: var(--space-s) var(--space-m); border: 1px solid var(--border-color-light);
       border-radius: var(--radius-m); background: color-mix(in oklch, var(--bg-light) 55%, transparent);
@@ -783,28 +856,24 @@
     .mny__section { display: flex; flex-direction: column; gap: var(--space-s); }
     .mny__section-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-m); }
     .mny__section-headr { display: flex; align-items: center; gap: var(--space-m); }
-    .mny__section-r { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-faint); }
 
-    /* ── by-line rollup ── */
-    .mline-list { display: flex; flex-direction: column; }
-    .mline { display: block; inline-size: 100%; text-align: start; border: 0; background: none; border-block-end: 1px solid var(--border-color-light); padding-block: var(--space-m); padding-inline: var(--space-xs); cursor: pointer; font-family: inherit; }
-    .mline:disabled { cursor: default; }
-    .mline:hover:not(:disabled) { background: var(--bg-light); }
-    .mline__top { display: flex; align-items: center; gap: var(--space-s); }
-    .mline__glyph { color: var(--c); font-size: var(--text-m); }
-    .mline__name { font-size: var(--text-m); font-weight: 500; color: var(--text-color); }
-    .mline__co { font-size: var(--text-xs); color: var(--text-faint); }
-    .mline__amt { font-family: var(--font-mono); font-size: var(--text-l); color: var(--text-color); font-variant-numeric: tabular-nums; }
-    .mline__money { display: flex; align-items: baseline; justify-content: flex-end; gap: var(--space-s); margin-block-start: var(--space-xs); font-size: var(--text-xs); color: var(--text-faint); }
-    .mline__expense { color: var(--text-muted); }
-    .mline__net { font-family: var(--font-mono); color: var(--text-color); font-variant-numeric: tabular-nums; }
-    .mline__bar { display: block; block-size: 0.45rem; border-radius: var(--radius-circle); background: var(--bg-light); margin-block: var(--space-s) var(--space-xs); overflow: hidden; }
-    .mline__fill { display: block; block-size: 100%; border-radius: var(--radius-circle); background: color-mix(in oklch, var(--c) 32%, var(--bg-light)); position: relative; }
-    .mline__fillc { position: absolute; inset-block: 0; inset-inline-start: 0; block-size: 100%; border-radius: var(--radius-circle); background: var(--c); }
-    .mline__meta { display: flex; align-items: center; gap: var(--space-m); font-size: var(--text-xs); color: var(--text-muted); }
-    .mline__go { margin-inline-start: auto; color: var(--text-muted); }
+    /* ── obra group (deals grouped by project) ── */
+    .obra { display: flex; flex-direction: column; gap: var(--space-s); }
+    .obra__head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-m); flex-wrap: wrap; padding-block-end: var(--space-xs); border-block-end: 1px solid var(--border-color-light); }
+    .obra__title { display: flex; align-items: center; gap: var(--space-s); border: 0; background: none; padding: 0; cursor: pointer; font-family: inherit; }
+    .obra__title:disabled { cursor: default; }
+    .obra__dot { inline-size: 0.5rem; block-size: 0.5rem; border-radius: var(--radius-circle); background: var(--c); }
+    .obra__name { font-size: var(--text-m); font-weight: 500; color: var(--text-color); }
+    .obra__title:hover:not(:disabled) .obra__name { text-decoration: underline; }
+    .obra__count { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-faint); }
+    .obra__rolls { display: flex; gap: var(--space-m); flex-wrap: wrap; }
+    .obra__roll { display: flex; align-items: baseline; gap: var(--space-s); font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+    .obra__cur { font-size: var(--text-xs); color: var(--text-muted); letter-spacing: 0.06em; }
+    .obra__stat { font-size: var(--text-s); color: var(--text-color); display: flex; align-items: baseline; gap: var(--space-2xs); }
+    .obra__stat--soft { color: var(--text-muted); }
+    .obra__stat-l { font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-faint); }
 
-    /* ── fee anchor cards (v3) ── */
+    /* ── deal (bolo) cards, venue-first ── */
     .fees { display: flex; flex-direction: column; gap: var(--space-s); }
     .fee {
       padding: var(--space-m); border: 1px solid var(--border-color-dark);
@@ -816,11 +885,15 @@
     .fee[data-st='unpaid'], .fee[data-st='none'] { border-inline-start-color: var(--border-color-dark); }
     .fee__top { display: grid; grid-template-columns: auto 1fr auto auto; align-items: baseline; gap: var(--space-m); }
     .fee__date { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-muted); white-space: nowrap; }
-    .fee__where { min-inline-size: 0; }
-    .fee__venue-main { font-size: var(--text-m); font-weight: 500; color: var(--text-color); text-decoration: none; }
-    .fee__venue-main:hover { text-decoration: underline; }
+    .fee__fns { color: var(--text-faint); }
+    .fee__where { min-inline-size: 0; display: flex; flex-direction: column; gap: 2px; }
+    .fee__venue-main { font-size: var(--text-m); font-weight: 500; color: var(--text-color); }
     .fee__city { color: var(--text-muted); font-weight: 400; }
-    .fee__proj-sub { display: block; font-size: var(--text-xs); color: var(--text-muted); }
+    .fee__doc {
+      align-self: start; font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-muted);
+      text-decoration: none; padding: 1px 8px; border: 1px solid var(--border-color-dark); border-radius: var(--radius-circle);
+    }
+    .fee__doc:hover { color: var(--text-color); border-color: var(--text-faint); }
     .fee__amt { text-align: end; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
     .fee__fee { font-family: var(--font-mono); font-size: var(--text-m); color: var(--text-color); font-variant-numeric: tabular-nums; }
     .fee__fee:hover { text-decoration: underline; }
@@ -863,8 +936,8 @@
       .mny__currency { grid-column: 1 / -1; }
       .mny__total { justify-content: space-between; }
       .mny__total-note { inline-size: 100%; }
-      .mline__top { flex-wrap: wrap; }
-      .mline__money { justify-content: flex-start; flex-wrap: wrap; }
+      .obra__head { flex-direction: column; align-items: stretch; }
+      .obra__rolls { flex-direction: column; gap: var(--space-xs); }
       .fee__top { grid-template-columns: 1fr auto; }
       .fee__date, .fee__badge { grid-column: 1 / -1; }
       .mny__expenses li { grid-template-columns: 1fr auto; gap: var(--space-2xs) var(--space-s); }

@@ -2,8 +2,8 @@
  * GET  /api/invoices — invoice list for the Money lens (ADR-046). RLS
  *      gates rows on `read:money` (project invoices) or workspace
  *      owner/admin (workspace-level invoices).
- * POST /api/invoices — create a draft invoice FROM a performance's fee
- *      (ADR-050) via the `create_invoice` RPC (the direct INSERT is
+ * POST /api/invoices — create a draft invoice FROM a bolo's fee (ADR-050 +
+ *      ADR-087) via the `create_invoice_from_bolo` RPC (the direct INSERT is
  *      claim-bound — sixth case of the pattern). One line, amounts
  *      snapshot the fee + optional VAT/IRPF percentages.
  */
@@ -70,9 +70,9 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
   const workspaceIds = parseUuidList(workspace_ids);
 
   const search = new URLSearchParams();
-  // lines embed (ADR-056): invoice headers carry no line linkage — the
-  // join path is invoice_line.performance_id → performance.line_id. The
-  // Money module filters client-side on its line's performance ids.
+  // lines embed (ADR-056 + ADR-087): invoice headers carry no line linkage —
+  // the join path is invoice_line.bolo_id → bolo.line_id. The Money module
+  // filters client-side on its line's bolo ids.
   search.set(
     'select',
     [
@@ -80,7 +80,7 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
       'workspace_id,project_id,payer_person_id,expected_on,payment_condition,vat_pct,vat_amount,irpf_pct,irpf_amount,notes',
       'project:project_id(id,slug,name,workspace_id)',
       'payer:workspace_person!invoice_workspace_payer_person_fkey(id:person_id,slug,full_name,organization:workspace_organization!workspace_person_organization_fkey(name))',
-      'lines:invoice_line(performance_id)',
+      'lines:invoice_line(bolo_id)',
       'payments:payment!payment_invoice_id_fkey(id,workspace_id,invoice_id,amount,received_on,method,reference,notes,created_at)',
     ].join(','),
   );
@@ -125,7 +125,7 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
 };
 
 const CreateSchema = v.object({
-  performance_id: v.pipe(v.string(), v.uuid()),
+  bolo_id: v.pipe(v.string(), v.uuid()),
   vat_pct: v.optional(v.nullable(v.pipe(v.number(), v.minValue(0), v.maxValue(100)))),
   irpf_pct: v.optional(v.nullable(v.pipe(v.number(), v.minValue(0), v.maxValue(100)))),
   number: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(60)))),
@@ -169,8 +169,8 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
   const input = parsed.output;
 
   try {
-    const { data } = await pgPostRpc<Record<string, unknown>>(env, 'create_invoice', jwt, {
-      p_performance_id: input.performance_id,
+    const { data } = await pgPostRpc<Record<string, unknown>>(env, 'create_invoice_from_bolo', jwt, {
+      p_bolo_id: input.bolo_id,
       p_vat_pct: input.vat_pct ?? null,
       p_irpf_pct: input.irpf_pct ?? null,
       p_number: input.number ?? null,

@@ -209,13 +209,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "asset_version_performance_id_fkey"
-            columns: ["performance_id"]
-            isOneToOne: false
-            referencedRelation: "performance_redacted"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "asset_version_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
@@ -333,6 +326,89 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "workspace_person"
             referencedColumns: ["workspace_id", "person_id"]
+          },
+        ]
+      }
+      bolo: {
+        Row: {
+          city: string | null
+          conversation_id: string | null
+          country: string | null
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          fee_amount: number | null
+          fee_currency: string | null
+          id: string
+          line_id: string | null
+          project_id: string
+          status: Database["public"]["Enums"]["performance_status"]
+          updated_at: string
+          venue_name: string | null
+          workspace_id: string
+        }
+        Insert: {
+          city?: string | null
+          conversation_id?: string | null
+          country?: string | null
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          fee_amount?: number | null
+          fee_currency?: string | null
+          id?: string
+          line_id?: string | null
+          project_id: string
+          status?: Database["public"]["Enums"]["performance_status"]
+          updated_at?: string
+          venue_name?: string | null
+          workspace_id: string
+        }
+        Update: {
+          city?: string | null
+          conversation_id?: string | null
+          country?: string | null
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          fee_amount?: number | null
+          fee_currency?: string | null
+          id?: string
+          line_id?: string | null
+          project_id?: string
+          status?: Database["public"]["Enums"]["performance_status"]
+          updated_at?: string
+          venue_name?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bolo_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversation"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bolo_line_id_fkey"
+            columns: ["line_id"]
+            isOneToOne: false
+            referencedRelation: "line"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bolo_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "project"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bolo_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspace"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -491,13 +567,6 @@ export type Database = {
             columns: ["performance_id"]
             isOneToOne: false
             referencedRelation: "performance"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "cast_override_performance_id_fkey"
-            columns: ["performance_id"]
-            isOneToOne: false
-            referencedRelation: "performance_redacted"
             referencedColumns: ["id"]
           },
           {
@@ -723,13 +792,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "crew_assignment_performance_id_fkey"
-            columns: ["performance_id"]
-            isOneToOne: false
-            referencedRelation: "performance_redacted"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "crew_assignment_person_id_fkey"
             columns: ["person_id"]
             isOneToOne: false
@@ -847,13 +909,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "date_performance_id_fkey"
-            columns: ["performance_id"]
-            isOneToOne: false
-            referencedRelation: "performance_redacted"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "date_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
@@ -879,6 +934,7 @@ export type Database = {
       expense: {
         Row: {
           amount: number
+          bolo_id: string | null
           category: Database["public"]["Enums"]["expense_category"]
           counterparty: string | null
           created_at: string
@@ -892,7 +948,6 @@ export type Database = {
           line_id: string | null
           notes: string | null
           paid_by_user_id: string | null
-          performance_id: string | null
           receipt_url: string | null
           reimbursed: boolean
           updated_at: string
@@ -900,6 +955,7 @@ export type Database = {
         }
         Insert: {
           amount: number
+          bolo_id?: string | null
           category?: Database["public"]["Enums"]["expense_category"]
           counterparty?: string | null
           created_at?: string
@@ -913,7 +969,6 @@ export type Database = {
           line_id?: string | null
           notes?: string | null
           paid_by_user_id?: string | null
-          performance_id?: string | null
           receipt_url?: string | null
           reimbursed?: boolean
           updated_at?: string
@@ -921,6 +976,7 @@ export type Database = {
         }
         Update: {
           amount?: number
+          bolo_id?: string | null
           category?: Database["public"]["Enums"]["expense_category"]
           counterparty?: string | null
           created_at?: string
@@ -934,7 +990,6 @@ export type Database = {
           line_id?: string | null
           notes?: string | null
           paid_by_user_id?: string | null
-          performance_id?: string | null
           receipt_url?: string | null
           reimbursed?: boolean
           updated_at?: string
@@ -942,24 +997,17 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "expense_bolo_id_fkey"
+            columns: ["bolo_id"]
+            isOneToOne: false
+            referencedRelation: "bolo"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "expense_line_id_fkey"
             columns: ["line_id"]
             isOneToOne: false
             referencedRelation: "line"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "expense_performance_id_fkey"
-            columns: ["performance_id"]
-            isOneToOne: false
-            referencedRelation: "performance"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "expense_performance_id_fkey"
-            columns: ["performance_id"]
-            isOneToOne: false
-            referencedRelation: "performance_redacted"
             referencedColumns: ["id"]
           },
           {
@@ -1202,36 +1250,36 @@ export type Database = {
       }
       invoice_line: {
         Row: {
+          bolo_id: string | null
           created_at: string
           description: string
           id: string
           invoice_id: string
           line_total: number | null
-          performance_id: string | null
           quantity: number
           unit_amount: number
           updated_at: string
           workspace_id: string
         }
         Insert: {
+          bolo_id?: string | null
           created_at?: string
           description: string
           id?: string
           invoice_id: string
           line_total?: number | null
-          performance_id?: string | null
           quantity?: number
           unit_amount: number
           updated_at?: string
           workspace_id: string
         }
         Update: {
+          bolo_id?: string | null
           created_at?: string
           description?: string
           id?: string
           invoice_id?: string
           line_total?: number | null
-          performance_id?: string | null
           quantity?: number
           unit_amount?: number
           updated_at?: string
@@ -1239,24 +1287,17 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "invoice_line_bolo_id_fkey"
+            columns: ["bolo_id"]
+            isOneToOne: false
+            referencedRelation: "bolo"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "invoice_line_invoice_id_fkey"
             columns: ["invoice_id"]
             isOneToOne: false
             referencedRelation: "invoice"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "invoice_line_performance_id_fkey"
-            columns: ["performance_id"]
-            isOneToOne: false
-            referencedRelation: "performance"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "invoice_line_performance_id_fkey"
-            columns: ["performance_id"]
-            isOneToOne: false
-            referencedRelation: "performance_redacted"
             referencedColumns: ["id"]
           },
           {
@@ -1412,6 +1453,7 @@ export type Database = {
       payment: {
         Row: {
           amount: number
+          bolo_id: string | null
           category: string | null
           counterparty: string | null
           created_at: string
@@ -1422,7 +1464,6 @@ export type Database = {
           line_id: string | null
           method: Database["public"]["Enums"]["payment_method"]
           notes: string | null
-          performance_id: string | null
           project_id: string | null
           received_on: string
           reference: string | null
@@ -1431,6 +1472,7 @@ export type Database = {
         }
         Insert: {
           amount: number
+          bolo_id?: string | null
           category?: string | null
           counterparty?: string | null
           created_at?: string
@@ -1441,7 +1483,6 @@ export type Database = {
           line_id?: string | null
           method?: Database["public"]["Enums"]["payment_method"]
           notes?: string | null
-          performance_id?: string | null
           project_id?: string | null
           received_on?: string
           reference?: string | null
@@ -1450,6 +1491,7 @@ export type Database = {
         }
         Update: {
           amount?: number
+          bolo_id?: string | null
           category?: string | null
           counterparty?: string | null
           created_at?: string
@@ -1460,7 +1502,6 @@ export type Database = {
           line_id?: string | null
           method?: Database["public"]["Enums"]["payment_method"]
           notes?: string | null
-          performance_id?: string | null
           project_id?: string | null
           received_on?: string
           reference?: string | null
@@ -1468,6 +1509,13 @@ export type Database = {
           workspace_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "payment_bolo_id_fkey"
+            columns: ["bolo_id"]
+            isOneToOne: false
+            referencedRelation: "bolo"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "payment_invoice_id_fkey"
             columns: ["invoice_id"]
@@ -1480,20 +1528,6 @@ export type Database = {
             columns: ["line_id"]
             isOneToOne: false
             referencedRelation: "line"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "payment_performance_id_fkey"
-            columns: ["performance_id"]
-            isOneToOne: false
-            referencedRelation: "performance"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "payment_performance_id_fkey"
-            columns: ["performance_id"]
-            isOneToOne: false
-            referencedRelation: "performance_redacted"
             referencedColumns: ["id"]
           },
           {
@@ -1514,6 +1548,7 @@ export type Database = {
       }
       performance: {
         Row: {
+          bolo_id: string | null
           city: string | null
           conversation_id: string | null
           country: string | null
@@ -1521,8 +1556,6 @@ export type Database = {
           created_by: string | null
           custom_fields: Json
           deleted_at: string | null
-          fee_amount: number | null
-          fee_currency: string | null
           hold_notice_days: number | null
           hospitality: Json
           id: string
@@ -1547,6 +1580,7 @@ export type Database = {
           wrap_at: string | null
         }
         Insert: {
+          bolo_id?: string | null
           city?: string | null
           conversation_id?: string | null
           country?: string | null
@@ -1554,8 +1588,6 @@ export type Database = {
           created_by?: string | null
           custom_fields?: Json
           deleted_at?: string | null
-          fee_amount?: number | null
-          fee_currency?: string | null
           hold_notice_days?: number | null
           hospitality?: Json
           id?: string
@@ -1580,6 +1612,7 @@ export type Database = {
           wrap_at?: string | null
         }
         Update: {
+          bolo_id?: string | null
           city?: string | null
           conversation_id?: string | null
           country?: string | null
@@ -1587,8 +1620,6 @@ export type Database = {
           created_by?: string | null
           custom_fields?: Json
           deleted_at?: string | null
-          fee_amount?: number | null
-          fee_currency?: string | null
           hold_notice_days?: number | null
           hospitality?: Json
           id?: string
@@ -1613,6 +1644,13 @@ export type Database = {
           wrap_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "performance_bolo_id_fkey"
+            columns: ["bolo_id"]
+            isOneToOne: false
+            referencedRelation: "bolo"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "performance_conversation_id_fkey"
             columns: ["conversation_id"]
@@ -1942,13 +1980,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "roadsheet_share_performance_id_fkey"
-            columns: ["performance_id"]
-            isOneToOne: false
-            referencedRelation: "performance_redacted"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "roadsheet_share_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
@@ -2038,13 +2069,6 @@ export type Database = {
             columns: ["performance_id"]
             isOneToOne: false
             referencedRelation: "performance"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "task_performance_id_fkey"
-            columns: ["performance_id"]
-            isOneToOne: false
-            referencedRelation: "performance_redacted"
             referencedColumns: ["id"]
           },
           {
@@ -2648,111 +2672,7 @@ export type Database = {
       }
     }
     Views: {
-      performance_redacted: {
-        Row: {
-          city: string | null
-          conversation_id: string | null
-          country: string | null
-          created_at: string | null
-          created_by: string | null
-          custom_fields: Json | null
-          deleted_at: string | null
-          fee_amount: number | null
-          fee_currency: string | null
-          id: string | null
-          line_id: string | null
-          notes: string | null
-          performed_at: string | null
-          project_id: string | null
-          slug: string | null
-          status: Database["public"]["Enums"]["performance_status"] | null
-          updated_at: string | null
-          venue_id: string | null
-          venue_name: string | null
-          workspace_id: string | null
-        }
-        Insert: {
-          city?: string | null
-          conversation_id?: string | null
-          country?: string | null
-          created_at?: string | null
-          created_by?: string | null
-          custom_fields?: Json | null
-          deleted_at?: string | null
-          fee_amount?: never
-          fee_currency?: never
-          id?: string | null
-          line_id?: string | null
-          notes?: string | null
-          performed_at?: string | null
-          project_id?: string | null
-          slug?: string | null
-          status?: Database["public"]["Enums"]["performance_status"] | null
-          updated_at?: string | null
-          venue_id?: string | null
-          venue_name?: string | null
-          workspace_id?: string | null
-        }
-        Update: {
-          city?: string | null
-          conversation_id?: string | null
-          country?: string | null
-          created_at?: string | null
-          created_by?: string | null
-          custom_fields?: Json | null
-          deleted_at?: string | null
-          fee_amount?: never
-          fee_currency?: never
-          id?: string | null
-          line_id?: string | null
-          notes?: string | null
-          performed_at?: string | null
-          project_id?: string | null
-          slug?: string | null
-          status?: Database["public"]["Enums"]["performance_status"] | null
-          updated_at?: string | null
-          venue_id?: string | null
-          venue_name?: string | null
-          workspace_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "performance_conversation_id_fkey"
-            columns: ["conversation_id"]
-            isOneToOne: false
-            referencedRelation: "conversation"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "performance_line_id_fkey"
-            columns: ["line_id"]
-            isOneToOne: false
-            referencedRelation: "line"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "performance_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "project"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "performance_venue_id_fkey"
-            columns: ["venue_id"]
-            isOneToOne: false
-            referencedRelation: "venue"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "performance_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: false
-            referencedRelation: "workspace"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
+      [_ in never]: never
     }
     Functions: {
       accept_workspace_invitation: {
@@ -2830,6 +2750,42 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "availability_block"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      create_bolo: {
+        Args: {
+          p_city?: string
+          p_conversation_id?: string
+          p_country?: string
+          p_fee_amount?: number
+          p_fee_currency?: string
+          p_line_id?: string
+          p_project_id: string
+          p_status?: Database["public"]["Enums"]["performance_status"]
+          p_venue_name?: string
+        }
+        Returns: {
+          city: string | null
+          conversation_id: string | null
+          country: string | null
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          fee_amount: number | null
+          fee_currency: string | null
+          id: string
+          line_id: string | null
+          project_id: string
+          status: Database["public"]["Enums"]["performance_status"]
+          updated_at: string
+          venue_name: string | null
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "bolo"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -2994,6 +2950,7 @@ export type Database = {
       create_expense: {
         Args: {
           p_amount?: number
+          p_bolo_id?: string
           p_category?: Database["public"]["Enums"]["expense_category"]
           p_counterparty?: string
           p_currency?: string
@@ -3001,10 +2958,10 @@ export type Database = {
           p_incurred_on?: string
           p_line_id?: string
           p_notes?: string
-          p_performance_id?: string
         }
         Returns: {
           amount: number
+          bolo_id: string | null
           category: Database["public"]["Enums"]["expense_category"]
           counterparty: string | null
           created_at: string
@@ -3018,7 +2975,6 @@ export type Database = {
           line_id: string | null
           notes: string | null
           paid_by_user_id: string | null
-          performance_id: string | null
           receipt_url: string | null
           reimbursed: boolean
           updated_at: string
@@ -3031,8 +2987,9 @@ export type Database = {
           isSetofReturn: false
         }
       }
-      create_invoice: {
+      create_invoice_from_bolo: {
         Args: {
+          p_bolo_id: string
           p_doc_type?: string
           p_due_on?: string
           p_expected_on?: string
@@ -3042,7 +2999,6 @@ export type Database = {
           p_payer_fiscal_identity_id?: string
           p_payer_person_id?: string
           p_payment_condition?: string
-          p_performance_id: string
           p_vat_pct?: number
         }
         Returns: {
@@ -3125,19 +3081,20 @@ export type Database = {
       create_payment: {
         Args: {
           p_amount?: number
+          p_bolo_id?: string
           p_category?: string
           p_counterparty?: string
           p_invoice_id?: string
           p_line_id?: string
           p_method?: Database["public"]["Enums"]["payment_method"]
           p_notes?: string
-          p_performance_id?: string
           p_project_id?: string
           p_received_on?: string
           p_reference?: string
         }
         Returns: {
           amount: number
+          bolo_id: string | null
           category: string | null
           counterparty: string | null
           created_at: string
@@ -3148,7 +3105,6 @@ export type Database = {
           line_id: string | null
           method: Database["public"]["Enums"]["payment_method"]
           notes: string | null
-          performance_id: string | null
           project_id: string | null
           received_on: string
           reference: string | null
@@ -3174,6 +3130,7 @@ export type Database = {
           p_venue_name?: string
         }
         Returns: {
+          bolo_id: string | null
           city: string | null
           conversation_id: string | null
           country: string | null
@@ -3181,8 +3138,6 @@ export type Database = {
           created_by: string | null
           custom_fields: Json
           deleted_at: string | null
-          fee_amount: number | null
-          fee_currency: string | null
           hold_notice_days: number | null
           hospitality: Json
           id: string
@@ -3437,6 +3392,7 @@ export type Database = {
         Args: { p_availability_block_id: string }
         Returns: undefined
       }
+      delete_bolo: { Args: { p_bolo_id: string }; Returns: undefined }
       delete_conversation: {
         Args: { p_conversation_id: string }
         Returns: undefined
@@ -3531,15 +3487,16 @@ export type Database = {
       }
       list_expenses_for_scope: {
         Args: {
+          p_bolo_ids?: string[]
           p_category?: Database["public"]["Enums"]["expense_category"]
           p_limit?: number
           p_line_ids?: string[]
-          p_performance_ids?: string[]
           p_project_ids?: string[]
           p_workspace_ids?: string[]
         }
         Returns: {
           amount: number
+          bolo_id: string | null
           category: Database["public"]["Enums"]["expense_category"]
           counterparty: string | null
           created_at: string
@@ -3553,7 +3510,6 @@ export type Database = {
           line_id: string | null
           notes: string | null
           paid_by_user_id: string | null
-          performance_id: string | null
           receipt_url: string | null
           reimbursed: boolean
           updated_at: string
@@ -3565,6 +3521,32 @@ export type Database = {
           isOneToOne: false
           isSetofReturn: true
         }
+      }
+      list_money_bolos: {
+        Args: {
+          p_from?: string
+          p_limit?: number
+          p_line_ids?: string[]
+          p_project_ids?: string[]
+          p_to?: string
+          p_workspace_ids?: string[]
+        }
+        Returns: {
+          city: string
+          collected: number
+          conversation_id: string
+          country: string
+          fee_amount: number
+          fee_currency: string
+          function_count: number
+          id: string
+          line_id: string
+          next_performed_at: string
+          project: Json
+          project_id: string
+          status: Database["public"]["Enums"]["performance_status"]
+          venue_name: string
+        }[]
       }
       list_money_payers: {
         Args: {
@@ -3578,30 +3560,6 @@ export type Database = {
           organization_name: string
           slug: string
           workspace_id: string
-        }[]
-      }
-      list_money_performances: {
-        Args: {
-          p_from?: string
-          p_limit?: number
-          p_line_ids?: string[]
-          p_project_ids?: string[]
-          p_to?: string
-          p_workspace_ids?: string[]
-        }
-        Returns: {
-          city: string
-          collected: number
-          fee_amount: number
-          fee_currency: string
-          id: string
-          line_id: string
-          performed_at: string
-          project: Json
-          project_id: string
-          slug: string
-          status: Database["public"]["Enums"]["performance_status"]
-          venue_name: string
         }[]
       }
       list_roadsheet_shares: {
@@ -3773,11 +3731,11 @@ export type Database = {
         Returns: undefined
       }
       touch_line_visit: { Args: { p_line_id: string }; Returns: undefined }
-      update_performance_fee: {
+      update_bolo_fee: {
         Args: {
+          p_bolo_id: string
           p_fee_amount: number
           p_fee_currency?: string
-          p_performance_id: string
         }
         Returns: {
           fee_amount: number

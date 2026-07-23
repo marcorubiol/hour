@@ -652,12 +652,16 @@ export function resolvePlannerView(
  * Greedy lane assignment for overlapping inclusive day ranges — the agenda
  * rail's capsule layout. Ranges are considered in chronological order
  * (from, then to) but the returned lanes index the INPUT order, so callers
- * keep their own list untouched. Overlap is string ISO-date compare, both
- * ends inclusive (two ranges sharing a single day still stack).
+ * keep their own list untouched. Lanes are then re-stacked so the LONGEST
+ * span sinks to the bottom lane (short bands ride on top). Overlap is string
+ * ISO-date compare, both ends inclusive (two ranges sharing a single day
+ * still stack).
  */
 export function assignBandLanes(
   bands: Array<{ from: string; to: string }>,
 ): { lanes: number[]; laneCount: number } {
+  // Greedy interval packing — MUST walk in start order: the free-lane test
+  // compares each range's `from` against a lane's last placed `to`.
   const order = bands
     .map((_, i) => i)
     .sort((a, b) => {
@@ -668,15 +672,32 @@ export function assignBandLanes(
       return a - b;
     });
   const laneEnds: string[] = [];
-  const lanes = new Array<number>(bands.length).fill(0);
+  const rawLane = new Array<number>(bands.length).fill(0);
   for (const i of order) {
     const b = bands[i];
     let lane = 0;
     while (lane < laneEnds.length && b.from <= laneEnds[lane]) lane++;
-    lanes[i] = lane;
+    rawLane[i] = lane;
     laneEnds[lane] = b.to;
   }
-  return { lanes, laneCount: laneEnds.length };
+  const laneCount = laneEnds.length;
+
+  // Re-stack so the LONGEST span sinks to the bottom lane (Marco 2026-07-23):
+  // rank each packed lane by the longest range it carries, shortest on top.
+  // A pure relabel — bands sharing a lane never overlap, so moving a whole
+  // lane keeps every range collision-free and one stable lane per span.
+  const span = (i: number) => Date.parse(bands[i].to) - Date.parse(bands[i].from);
+  const laneMax = new Array<number>(laneCount).fill(-1);
+  bands.forEach((_, i) => {
+    if (span(i) > laneMax[rawLane[i]]) laneMax[rawLane[i]] = span(i);
+  });
+  const byLength = Array.from({ length: laneCount }, (_, l) => l).sort(
+    (a, b) => laneMax[a] - laneMax[b] || a - b,
+  );
+  const remap = new Array<number>(laneCount);
+  byLength.forEach((oldLane, newLane) => (remap[oldLane] = newLane));
+
+  return { lanes: rawLane.map((l) => remap[l]), laneCount };
 }
 
 /**

@@ -2,8 +2,9 @@
   /**
    * TaskComposer (ADR-068) — the one quick-add for tasks, shared by the Desk
    * and the Tasks line module (it replaces the two divergent inline forms).
-   * Progressive disclosure: a calm one-liner ("+ add a loose end… ↵ drops
-   * into Anytime") that expands on focus to expose the WHOLE task model the
+   * Progressive disclosure: a calm one-liner ("Capture  add a loose end… ↵
+   * drops into Anytime") — a mono lead mirroring the scope bar's "SCOPE" so
+   * the composer reads as its twin — that expands on focus to expose the WHOLE task model the
    * schema already carries — due, defer (from_at), a lead window (lead_days)
    * and a single parent (space / project / line / show / conversation) — via
    * TargetPicker, which reuses the scope-bar glyph vocabulary.
@@ -200,7 +201,7 @@
   }}
 >
   <div class="tc__line">
-    <span class="tc__plus" aria-hidden="true">+</span>
+    <span class="tc__cap" aria-hidden="true">Capture</span>
     <input
       class="tc__title"
       type="text"
@@ -310,11 +311,14 @@
       align-items: center;
       gap: var(--space-s);
     }
-    .tc__plus {
+    /* Mono uppercase lead mirroring the scope bar's "SCOPE" — the composer
+       reads as the scope bar's twin. */
+    .tc__cap {
       flex: none;
       font-family: var(--font-mono);
-      font-size: var(--text-m);
-      line-height: 1;
+      font-size: var(--text-xs);
+      letter-spacing: var(--mono-letter-spacing-loose);
+      text-transform: uppercase;
       color: var(--text-faint);
     }
     .tc__title {
@@ -328,7 +332,9 @@
       outline: none;
       background: none;
       font-family: var(--font-sans);
-      font-size: var(--text-m);
+      /* text-s: shares the scale of the scope bar's descriptor (a calm
+         sibling, not the biggest text on the page). */
+      font-size: var(--text-s);
       line-height: var(--text-line-height);
       color: var(--text-color);
     }

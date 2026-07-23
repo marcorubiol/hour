@@ -810,9 +810,11 @@
       {#if routedLens}
         <div class="shell__lenschrome">
           <div class="scopebar">
-            <span class="scopebar__lead">Scope</span>
             {#if pins.pins.length === 0}
-              <span class="scopebar__all">Everything · all spaces &amp; projects</span>
+              <span class="scopebar__scope">
+                <span class="scopebar__lead">Scope</span>
+                <span class="scopebar__all">Everything · all spaces &amp; projects</span>
+              </span>
               <button type="button" class="scopebar__add" onclick={openPaletteAdd}>
                 + narrow
               </button>
@@ -822,6 +824,7 @@
                 >
               </span>
             {:else}
+              <span class="scopebar__lead">Scope</span>
               {#each pins.pins as tok (tok)}
                 <span class="tok tok--{tokenKind(tok)}">
                   <ScopeGlyph kind={tokenKind(tok)} accent={tokenAccent(tok)} lineKind={tokenLineKind(tok)} />
@@ -893,7 +896,7 @@
         </div>
       {/if}
 
-      <div class="shell__content">
+      <div class="shell__content" class:shell__content--calm={calm.on}>
         {#if children}{@render children()}{/if}
       </div>
     </main>
@@ -1157,6 +1160,16 @@
     border-radius: var(--radius-l);
     min-block-size: 3rem;
   }
+  /* The mono micro-label + serif descriptor are one unit: baseline-aligned to
+     each other INSIDE this group, then the group is centered as a block by the
+     bar's align-items. (Setting baseline on the bar itself dragged the whole
+     row upward — the fix is to decouple the pair's internal alignment from the
+     bar's vertical centering.) */
+  .scopebar__scope {
+    display: inline-flex;
+    align-items: baseline;
+    gap: var(--space-s);
+  }
   .scopebar__lead {
     font-family: var(--font-mono);
     font-size: var(--text-xs);
@@ -1339,6 +1352,10 @@
 
   .shell__content {
     flex: 1;
+    /* Re-anchor text color here so Calm's remap (below) cascades to EVERY
+       route's inherited text, not only elements that name var(--text-color).
+       In normal mode this resolves to the same token the body uses. */
+    color: var(--text-color);
     /* One shared header→content distance for every route — pages used to
        borrow the (now neutralized) global <section> padding unevenly. */
     padding-block: var(--space-l) var(--space-xxl);
@@ -1349,6 +1366,14 @@
     inline-size: 100%;
     max-inline-size: calc(var(--page-width) + var(--space-l) * 2);
     margin-inline: auto;
+  }
+
+  /* Calm mode (Desk · Calm) quiets every lens one contrast step — body text
+     to muted, dark borders softened. One class for the whole routed surface;
+     headings, links and overdue red keep their own tokens. */
+  .shell__content--calm {
+    --text-color: var(--text-muted);
+    --border-color-dark: color-mix(in oklch, var(--neutral) 12%, transparent);
   }
 
   /* Print: the cap is a screen-reading concern. Documents meant for paper

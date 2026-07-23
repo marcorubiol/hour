@@ -34,7 +34,7 @@ interface InvoiceRow {
   issuer_snapshot: unknown;
   payer_snapshot: unknown;
 }
-interface MoneyPerf {
+interface MoneyBolo {
   id: string;
   collected: number;
   project?: { slug?: string } | null;
@@ -44,7 +44,7 @@ describe.skipIf(!envReady())('money v3 — fiscal identity, invoicing mode, anch
   let jwt: string;
   let wsId: string;
   let accountId: string;
-  let perfId: string;
+  let boloId: string;
 
   const fiscalIds: string[] = [];
   const invoiceIds: string[] = [];
@@ -62,7 +62,7 @@ describe.skipIf(!envReady())('money v3 — fiscal identity, invoicing mode, anch
     wsId = ws.rows[0]!.id;
     accountId = ws.rows[0]!.account_id;
 
-    const perfs = await pgRpc<MoneyPerf[]>('list_money_performances', jwt, {
+    const perfs = await pgRpc<MoneyBolo[]>('list_money_bolos', jwt, {
       p_project_ids: null,
       p_workspace_ids: null,
       p_line_ids: null,
@@ -73,7 +73,7 @@ describe.skipIf(!envReady())('money v3 — fiscal identity, invoicing mode, anch
     expect(perfs.status).toBe(200);
     const perf = (perfs.data ?? []).find((p) => p.project?.slug === 'zzz-e2e-collab');
     if (!perf) throw new Error('Missing ZZZ e2e collab fixture performance');
-    perfId = perf.id;
+    boloId = perf.id;
   });
 
   afterAll(async () => {
@@ -168,30 +168,30 @@ describe.skipIf(!envReady())('money v3 — fiscal identity, invoicing mode, anch
 
   it('payment anchored to a gig counts as collected against the fee; no-attachment rejected', async () => {
     // anon denied
-    const anon = await pgRpc('create_payment', null, { p_amount: 100, p_performance_id: perfId });
+    const anon = await pgRpc('create_payment', null, { p_amount: 100, p_bolo_id: boloId });
     expect([401, 403, 404]).toContain(anon.status);
 
     // collected before
-    const before = await pgRpc<MoneyPerf[]>('list_money_performances', jwt, {
+    const before = await pgRpc<MoneyBolo[]>('list_money_bolos', jwt, {
       p_project_ids: null, p_workspace_ids: null, p_line_ids: null, p_from: null, p_to: null, p_limit: 500,
     });
-    const collBefore = (before.data ?? []).find((p) => p.id === perfId)!.collected;
+    const collBefore = (before.data ?? []).find((p) => p.id === boloId)!.collected;
 
     // anchored payment, no invoice
-    const pay = await pgRpc<{ id: string; performance_id: string; invoice_id: string | null }>(
+    const pay = await pgRpc<{ id: string; bolo_id: string; invoice_id: string | null }>(
       'create_payment', jwt,
-      { p_amount: 250, p_performance_id: perfId, p_counterparty: `Teatre ${RUN}`, p_category: 'Caixet' },
+      { p_amount: 250, p_bolo_id: boloId, p_counterparty: `Teatre ${RUN}`, p_category: 'Caixet' },
     );
     expect(pay.status).toBe(200);
-    expect(pay.data!.performance_id).toBe(perfId);
+    expect(pay.data!.bolo_id).toBe(boloId);
     expect(pay.data!.invoice_id).toBeNull();
     paymentIds.push(pay.data!.id);
 
     // collected reflects it
-    const after = await pgRpc<MoneyPerf[]>('list_money_performances', jwt, {
+    const after = await pgRpc<MoneyBolo[]>('list_money_bolos', jwt, {
       p_project_ids: null, p_workspace_ids: null, p_line_ids: null, p_from: null, p_to: null, p_limit: 500,
     });
-    const collAfter = (after.data ?? []).find((p) => p.id === perfId)!.collected;
+    const collAfter = (after.data ?? []).find((p) => p.id === boloId)!.collected;
     expect(Number(collAfter)).toBeCloseTo(Number(collBefore) + 250, 2);
 
     // a payment with neither invoice nor anchor is rejected
@@ -202,14 +202,14 @@ describe.skipIf(!envReady())('money v3 — fiscal identity, invoicing mode, anch
   it.skipIf(!limitedEnvReady())('payment: a performer without edit:money cannot anchor a payment', async () => {
     const lim = requireLimitedEnv();
     const limJwt = await login(lim.email, lim.password);
-    const pay = await pgRpc('create_payment', limJwt, { p_amount: 100, p_performance_id: perfId });
+    const pay = await pgRpc('create_payment', limJwt, { p_amount: 100, p_bolo_id: boloId });
     expect([401, 403]).toContain(pay.status);
   });
 
   it('issue_invoice: proforma numbers PRO; a factura needs an issuer identity; wired factura numbers FAC + freezes snapshots', async () => {
     // proforma: create a draft and issue it → PRO number, no identities needed
-    const pro = await pgRpc<InvoiceRow>('create_invoice', jwt, {
-      p_performance_id: perfId, p_number: null, p_doc_type: 'proforma',
+    const pro = await pgRpc<InvoiceRow>('create_invoice_from_bolo', jwt, {
+      p_bolo_id: boloId, p_number: null, p_doc_type: 'proforma',
     });
     expect(pro.status).toBe(200);
     expect(pro.data!.doc_type).toBe('proforma');
@@ -221,8 +221,8 @@ describe.skipIf(!envReady())('money v3 — fiscal identity, invoicing mode, anch
     expect(proIssued.data!.number).toMatch(/^PRO \d{4}-\d{4}$/);
 
     // factura without a fiscal identity → refused
-    const facBare = await pgRpc<InvoiceRow>('create_invoice', jwt, {
-      p_performance_id: perfId, p_doc_type: 'factura',
+    const facBare = await pgRpc<InvoiceRow>('create_invoice_from_bolo', jwt, {
+      p_bolo_id: boloId, p_doc_type: 'factura',
     });
     expect(facBare.status).toBe(200);
     invoiceIds.push(facBare.data!.id);
@@ -250,8 +250,8 @@ describe.skipIf(!envReady())('money v3 — fiscal identity, invoicing mode, anch
     });
     expect(wire.status).toBe(200);
 
-    const fac = await pgRpc<InvoiceRow>('create_invoice', jwt, {
-      p_performance_id: perfId, p_doc_type: 'factura', p_payer_fiscal_identity_id: receiver.rows[0]!.id,
+    const fac = await pgRpc<InvoiceRow>('create_invoice_from_bolo', jwt, {
+      p_bolo_id: boloId, p_doc_type: 'factura', p_payer_fiscal_identity_id: receiver.rows[0]!.id,
     });
     expect(fac.status).toBe(200);
     invoiceIds.push(fac.data!.id);
@@ -262,5 +262,34 @@ describe.skipIf(!envReady())('money v3 — fiscal identity, invoicing mode, anch
     expect(facIssued.data!.number).toMatch(/^FAC \d{4}-\d{4}$/);
     expect(facIssued.data!.issuer_snapshot).toBeTruthy();
     expect(facIssued.data!.payer_snapshot).toBeTruthy();
+  });
+
+  it('create_payment rejects an invoice + a scope anchor together (no anchor smuggling)', async () => {
+    const draft = await pgRpc<InvoiceRow>('create_invoice_from_bolo', jwt, {
+      p_bolo_id: boloId,
+      p_doc_type: 'proforma',
+    });
+    expect(draft.status).toBe(200);
+    invoiceIds.push(draft.data!.id);
+    const issued = await pgRpc<InvoiceRow>('issue_invoice', jwt, { p_invoice_id: draft.data!.id });
+    expect(issued.status).toBe(200);
+
+    // an issued invoice takes an invoice-only payment…
+    const ok = await pgRpc<{ id: string }>('create_payment', jwt, {
+      p_invoice_id: draft.data!.id,
+      p_amount: 10,
+    });
+    expect(ok.status).toBe(200);
+    if (ok.data?.id) paymentIds.push(ok.data.id);
+
+    // …but a payment carrying BOTH an invoice and a scope anchor is rejected:
+    // the SECURITY DEFINER RPC would otherwise write the anchor without an
+    // edit:money check on it (cross-project money escalation).
+    const smuggled = await pgRpc('create_payment', jwt, {
+      p_invoice_id: draft.data!.id,
+      p_amount: 10,
+      p_bolo_id: boloId,
+    });
+    expect(smuggled.status).toBeGreaterThanOrEqual(400);
   });
 });

@@ -1,9 +1,8 @@
 /**
- * PATCH /api/money/performances/:id — set or clear a performance's fee
- * (ADR-046). Fee lives in the Money lens by design: ADR-043 deliberately
- * excluded fee columns from the regular performance write path. The
- * `update_performance_fee` RPC requires both `edit:performance` and
- * `edit:money`; callers never receive direct SELECT access to fee columns.
+ * PATCH /api/money/bolos/:id — set or clear a bolo's fee (ADR-087). The fee is
+ * negotiated per deal and lives on the bolo; it stays in the Money lens by
+ * design. The `update_bolo_fee` RPC requires `edit:money`; callers never
+ * receive direct SELECT access to the fee.
  *
  * Body: { fee_amount: number|null, fee_currency?: 'EUR'-style code }.
  */
@@ -66,18 +65,18 @@ export const PATCH: RequestHandler = async ({ request, params, platform, locals 
       id: string;
       fee_amount: number | null;
       fee_currency: string | null;
-    }>(env, 'update_performance_fee', jwt, {
-      p_performance_id: idParsed.output,
+    }>(env, 'update_bolo_fee', jwt, {
+      p_bolo_id: idParsed.output,
       p_fee_amount: fee_amount,
       p_fee_currency: (fee_currency ?? 'EUR').toUpperCase(),
     });
     if (data.length === 0) return json({ error: 'not_found' }, 404);
-    return json({ performance: data[0] });
+    return json({ bolo: data[0] });
   } catch (err) {
-    // The fee-guard trigger RAISEs 42501 (or P0001) without edit:money.
+    // update_bolo_fee RAISEs 42501 without edit:money.
     return pgErrorResponse(
       err,
-      { route: 'PATCH /api/money/performances/[id]', requestId: locals.requestId },
+      { route: 'PATCH /api/money/bolos/[id]', requestId: locals.requestId },
       {
         codes: {
           '42501': { status: 403, error: 'forbidden', hint: 'edit:money required.' },

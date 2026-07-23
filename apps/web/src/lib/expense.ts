@@ -37,13 +37,14 @@ const realIsoDate = v.pipe(
 );
 
 /**
- * POST /api/expenses body. Exactly one of line_id / performance_id (the
- * endpoint enforces the rule; both stay optional so the error can be
- * specific — same shape as ConversationCreateSchema's person rule).
+ * POST /api/expenses body. Exactly one of line_id / bolo_id (the endpoint
+ * enforces the rule; both stay optional so the error can be specific — same
+ * shape as ConversationCreateSchema's person rule). ADR-087: the gig-level cost
+ * anchors to the deal (bolo).
  */
 export const ExpenseCreateSchema = v.object({
   line_id: v.optional(v.pipe(v.string(), v.uuid())),
-  performance_id: v.optional(v.pipe(v.string(), v.uuid())),
+  bolo_id: v.optional(v.pipe(v.string(), v.uuid())),
   category: v.optional(v.picklist(EXPENSE_CATEGORIES), 'other'),
   description: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(300)),
   amount: v.pipe(v.number(), v.minValue(0.01), v.maxValue(9_999_999_999.99)),
@@ -80,7 +81,7 @@ export type ExpenseItem = Pick<
   Tables<'expense'>,
   | 'id'
   | 'workspace_id'
-  | 'performance_id'
+  | 'bolo_id'
   | 'line_id'
   | 'category'
   | 'description'

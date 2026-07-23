@@ -116,7 +116,7 @@ type LineRow = Tables<'line'>;
 const CreateBodySchema = v.object({
   project_id: v.pipe(v.string(), v.uuid()),
   name: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(80)),
-  accent: v.optional(v.pipe(v.string(), v.regex(/^[1-8]$/))),
+  accent: v.optional(v.pipe(v.string(), v.regex(/^([1-9]|1[0-2]|h\d{1,3})$/))),
   description: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(280))),
   kind: v.optional(
     v.picklist([

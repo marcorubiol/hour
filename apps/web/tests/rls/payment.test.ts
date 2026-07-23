@@ -12,7 +12,7 @@ import {
 
 const RUN_TAG = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
-type MoneyPerformance = {
+type MoneyBolo = {
   id: string;
   fee_amount: number | null;
   fee_currency: string | null;
@@ -53,7 +53,7 @@ describe.skipIf(!envReady())('payment RLS + derived invoice status', () => {
   });
 
   test('payments derive paid, soft-delete derives issued, and a non-editor is denied', async () => {
-    const listed = await pgRpc<MoneyPerformance[]>('list_money_performances', jwt, {
+    const listed = await pgRpc<MoneyBolo[]>('list_money_bolos', jwt, {
       p_project_ids: null,
       p_workspace_ids: null,
       p_line_ids: null,
@@ -62,27 +62,27 @@ describe.skipIf(!envReady())('payment RLS + derived invoice status', () => {
       p_limit: 500,
     });
     expect(listed.status).toBe(200);
-    const performance = listed.data?.find(
+    const bolo = listed.data?.find(
       (item) => item.project?.slug === 'zzz-e2e-collab',
     );
-    expect(performance).toBeTruthy();
-    if (!performance) throw new Error('Missing ZZZ e2e collab fixture performance');
+    expect(bolo).toBeTruthy();
+    if (!bolo) throw new Error('Missing ZZZ e2e collab fixture bolo');
 
-    const originalFee = performance.fee_amount;
+    const originalFee = bolo.fee_amount;
     let invoice: InvoiceRow | null = null;
     const paymentIds: string[] = [];
     try {
       if (originalFee === null) {
-        const prepared = await pgRpc<MoneyPerformance>('update_performance_fee', jwt, {
-          p_performance_id: performance.id,
+        const prepared = await pgRpc<MoneyBolo>('update_bolo_fee', jwt, {
+          p_bolo_id: bolo.id,
           p_fee_amount: 100,
-          p_fee_currency: performance.fee_currency ?? 'EUR',
+          p_fee_currency: bolo.fee_currency ?? 'EUR',
         });
         expect(prepared.status).toBe(200);
       }
 
-      const createdInvoice = await pgRpc<InvoiceRow>('create_invoice', jwt, {
-        p_performance_id: performance.id,
+      const createdInvoice = await pgRpc<InvoiceRow>('create_invoice_from_bolo', jwt, {
+        p_bolo_id: bolo.id,
         p_vat_pct: null,
         p_irpf_pct: null,
         p_number: `rls-payment-${RUN_TAG}`,
@@ -194,10 +194,10 @@ describe.skipIf(!envReady())('payment RLS + derived invoice status', () => {
         await pgRpc('delete_invoice', jwt, { p_invoice_id: invoice.id });
       }
       if (originalFee === null) {
-        await pgRpc('update_performance_fee', jwt, {
-          p_performance_id: performance.id,
+        await pgRpc('update_bolo_fee', jwt, {
+          p_bolo_id: bolo.id,
           p_fee_amount: null,
-          p_fee_currency: performance.fee_currency ?? 'EUR',
+          p_fee_currency: bolo.fee_currency ?? 'EUR',
         });
       }
     }

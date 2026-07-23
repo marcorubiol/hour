@@ -136,6 +136,9 @@
       paymentInvoice = null;
       void queryClient.invalidateQueries({ queryKey: ['invoices'] });
       void queryClient.invalidateQueries({ queryKey: ['payments'] });
+      // Collected on the deal cards derives from payments (ADR-087).
+      void queryClient.invalidateQueries({ queryKey: ['money-bolos'] });
+      void queryClient.invalidateQueries({ queryKey: ['line-money-fees'] });
       addToast({ tone: 'success', message: 'Payment recorded.' });
     },
     onError: (err) => {
@@ -161,6 +164,8 @@
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['invoices'] });
       void queryClient.invalidateQueries({ queryKey: ['payments'] });
+      void queryClient.invalidateQueries({ queryKey: ['money-bolos'] });
+      void queryClient.invalidateQueries({ queryKey: ['line-money-fees'] });
       addToast({ tone: 'info', message: 'Payment removed; invoice status recalculated.' });
     },
     onError: (err) => {
@@ -214,7 +219,7 @@
 </script>
 
 {#if invoices.length === 0}
-  <p class="mny-inv__empty">No invoices yet — create one from a gig's fee above.</p>
+  <p class="mny-inv__empty">No invoices yet — create one from a deal's fee above.</p>
 {:else}
   <ul class="mny__invoices" role="list">
     {#each invoices as invoice (invoice.id)}

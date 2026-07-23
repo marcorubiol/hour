@@ -1,21 +1,20 @@
 /**
- * GET /api/expenses — expense rows for the Money surfaces (ADR-056).
- * Filter by workspace/project/line/bolo ids (union). RLS hides whole rows
- * without read:money (there is no redacted view for expense — invisible,
- * not masked).
+ * GET  /api/money/bolos — the deals feed for the Money lens (ADR-087). Reads
+ *      through a SECURITY DEFINER RPC that returns rows only when the caller
+ *      holds `read:money`. Authenticated users have no direct SELECT grant on
+ *      the bolo fee, so custom PostgREST queries cannot bypass the money boundary.
+ * POST /api/money/bolos — record a deal by hand (ADR-087: a bolo is born from a
+ *      confirmed conversation OR created here). Via `create_bolo` (claim-bound,
+ *      edit:money on the deal's project).
  *
- * POST /api/expenses — record an expense against a line or a bolo (exactly
- * one; ADR-087). Goes through the `create_expense` RPC: the direct INSERT
- * is claim-bound — eighth case of the pattern. Gated on
- * has_permission(parent project, 'edit:money').
- *
- * Auth: Bearer JWT required.
+ * One row per bolo (deal), with collected (payments-against-fee) and display
+ * aids (function_count, next_performed_at). Union filters + optional performed
+ * window, same contract as the other list endpoints.
  */
 
 import type { RequestHandler } from './$types';
 import * as v from 'valibot';
 import { extractAccessToken } from '$lib/auth';
-import { EXPENSE_CATEGORIES, ExpenseCreateSchema, type ExpenseItem } from '$lib/expense';
 import { pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
 
@@ -23,11 +22,8 @@ const QuerySchema = v.object({
   project_ids: v.optional(v.string()),
   workspace_ids: v.optional(v.string()),
   line_ids: v.optional(v.string()),
-  bolo_ids: v.optional(v.string()),
-  category: v.optional(
-    v.union([v.literal('any'), v.picklist(EXPENSE_CATEGORIES)]),
-    'any',
-  ),
+  from: v.optional(v.pipe(v.string(), v.isoDate())),
+  to: v.optional(v.pipe(v.string(), v.isoDate())),
   limit: v.optional(
     v.pipe(
       v.string(),
@@ -54,6 +50,29 @@ function parseUuidList(raw: string | undefined): string[] {
   return [...new Set(raw.split(',').map((s) => s.trim()).filter((s) => UUID.test(s)))];
 }
 
+type MoneyBolo = {
+  id: string;
+  project_id: string;
+  line_id: string | null;
+  conversation_id: string | null;
+  venue_name: string | null;
+  city: string | null;
+  country: string | null;
+  fee_amount: number | null;
+  fee_currency: string | null;
+  status: string;
+  project: {
+    id: string;
+    slug: string;
+    name: string;
+    accent: string | null;
+    workspace_id: string;
+  } | null;
+  collected: number;
+  function_count: number;
+  next_performed_at: string | null;
+};
+
 export const GET: RequestHandler = async ({ request, url, platform, locals }) => {
   if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);
   const env = platform.env as unknown as SupabaseEnv;
@@ -75,30 +94,40 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
       400,
     );
   }
-  const { project_ids, workspace_ids, line_ids, bolo_ids, category, limit } = parsed.output;
+  const { project_ids, workspace_ids, line_ids, from, to, limit } = parsed.output;
   const projectIds = parseUuidList(project_ids);
   const workspaceIds = parseUuidList(workspace_ids);
   const lineIds = parseUuidList(line_ids);
-  const boloIds = parseUuidList(bolo_ids);
 
   try {
-    const { data } = await pgPostRpc<ExpenseItem>(env, 'list_expenses_for_scope', jwt, {
+    const { data } = await pgPostRpc<MoneyBolo>(env, 'list_money_bolos', jwt, {
       p_project_ids: projectIds.length > 0 ? projectIds : null,
       p_workspace_ids: workspaceIds.length > 0 ? workspaceIds : null,
       p_line_ids: lineIds.length > 0 ? lineIds : null,
-      p_bolo_ids: boloIds.length > 0 ? boloIds : null,
-      p_category: category === 'any' ? null : category,
+      p_from: from ?? null,
+      p_to: to ?? null,
       p_limit: limit,
     });
     return json({ items: data });
   } catch (err) {
     return pgErrorResponse(
       err,
-      { route: 'GET /api/expenses', requestId: locals.requestId },
+      { route: 'GET /api/money/bolos', requestId: locals.requestId },
       { passUpstream: [401, 403] },
     );
   }
 };
+
+const CreateSchema = v.object({
+  project_id: v.pipe(v.string(), v.uuid()),
+  venue_name: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(200)))),
+  city: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(120)))),
+  country: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.regex(/^[A-Za-z]{2}$/, 'ISO 3166 alpha-2')))),
+  fee_amount: v.optional(v.nullable(v.pipe(v.number(), v.minValue(0), v.maxValue(9_999_999_999.99)))),
+  fee_currency: v.optional(v.pipe(v.string(), v.regex(/^[A-Za-z]{3}$/, 'ISO 4217')), 'EUR'),
+  line_id: v.optional(v.nullable(v.pipe(v.string(), v.uuid()))),
+  conversation_id: v.optional(v.nullable(v.pipe(v.string(), v.uuid()))),
+});
 
 export const POST: RequestHandler = async ({ request, platform, locals }) => {
   if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);
@@ -113,7 +142,7 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
   } catch {
     return json({ error: 'invalid_body' }, 400);
   }
-  const parsed = v.safeParse(ExpenseCreateSchema, raw);
+  const parsed = v.safeParse(CreateSchema, raw);
   if (!parsed.success) {
     return json(
       {
@@ -128,35 +157,27 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
   }
   const input = parsed.output;
 
-  if (Boolean(input.line_id) === Boolean(input.bolo_id)) {
-    return json(
-      { error: 'invalid_body', hint: 'Send exactly one of line_id or bolo_id.' },
-      400,
-    );
-  }
-
   try {
-    const { data } = await pgPostRpc<ExpenseItem>(env, 'create_expense', jwt, {
-      p_bolo_id: input.bolo_id ?? null,
+    const { data } = await pgPostRpc<Record<string, unknown>>(env, 'create_bolo', jwt, {
+      p_project_id: input.project_id,
+      p_venue_name: input.venue_name ?? null,
+      p_city: input.city ?? null,
+      p_country: input.country ? input.country.toUpperCase() : null,
+      p_fee_amount: input.fee_amount ?? null,
+      p_fee_currency: (input.fee_currency ?? 'EUR').toUpperCase(),
       p_line_id: input.line_id ?? null,
-      p_category: input.category,
-      p_description: input.description,
-      p_amount: input.amount,
-      p_currency: input.currency,
-      p_incurred_on: input.incurred_on ?? null,
-      p_notes: input.notes ?? null,
-      p_counterparty: input.counterparty ?? null,
+      p_conversation_id: input.conversation_id ?? null,
     });
     if (data.length === 0 || !data[0]) return json({ error: 'create_failed' }, 502);
-    return json({ expense: data[0] }, 201);
+    return json({ bolo: data[0] }, 201);
   } catch (err) {
     return pgErrorResponse(
       err,
-      { route: 'POST /api/expenses', requestId: locals.requestId },
+      { route: 'POST /api/money/bolos', requestId: locals.requestId },
       {
         codes: {
           '22023': { status: 400, error: 'invalid_input' },
-          '42501': { status: 403, error: 'forbidden' },
+          '42501': { status: 403, error: 'forbidden', hint: 'edit:money required.' },
         },
       },
     );
