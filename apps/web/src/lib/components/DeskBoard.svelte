@@ -30,6 +30,9 @@
    */
   import TagChip from '$lib/components/TagChip.svelte';
   import { accentVar } from '$lib/utils/accent';
+  import { dayBucket } from '$lib/desk-feed';
+  import { localeWeekdayShort } from '$lib/datetime';
+  import { detectLocale, t } from '$lib/i18n';
 
   interface Props {
     conversations: DeskConversation[];
@@ -65,6 +68,8 @@
     dayLabel: string;
   };
 
+  const locale = detectLocale(navigator.language);
+
   const VERBS: Record<ConversationStatus, { upcoming: string; overdue: string }> = {
     contacted: { upcoming: 'Follow up', overdue: 'Chase' },
     in_conversation: { upcoming: 'Reply', overdue: 'Reply' },
@@ -82,17 +87,16 @@
   }
 
   let now = $derived(new Date());
-  function dayBucket(d: Date): { sortKey: number; label: string } {
-    const start = new Date(now);
-    start.setHours(0, 0, 0, 0);
-    const diffDays = Math.floor((d.getTime() - start.getTime()) / (24 * 60 * 60 * 1000));
-    if (diffDays < 0) return { sortKey: -1, label: 'OVERDUE' };
-    if (diffDays === 0) return { sortKey: 0, label: 'TODAY' };
-    if (diffDays === 1) return { sortKey: 1, label: 'TOMORROW' };
-    if (diffDays < 7)
-      return { sortKey: diffDays, label: d.toLocaleDateString('en-GB', { weekday: 'short' }).toUpperCase() };
-    if (diffDays < 14) return { sortKey: 7, label: 'NEXT WEEK' };
-    return { sortKey: 99, label: 'LATER' };
+  // Buckets come from the canonical dayBucket in $lib/desk-feed (same
+  // thresholds as the Desk lens). Only the weekday presentation differs:
+  // the 4.5rem rail wants the short form, not the Desk's long weekday.
+  function railLabel(iso: string): { sortKey: number; label: string } {
+    const bucket = dayBucket(iso, now, locale);
+    const label =
+      bucket.labelKey === 'weekday'
+        ? localeWeekdayShort(iso, locale)
+        : t(`desk.bucket_${bucket.labelKey}`, locale);
+    return { sortKey: bucket.sortKey, label };
   }
 
   // "This week" = overdue + everything due within 7 days (sortKey < 7).
@@ -101,8 +105,7 @@
       .filter((e) => e.status !== 'declined' && e.status !== 'dormant')
       .filter((e) => e.next_action_at)
       .map((e) => {
-        const date = new Date(e.next_action_at!);
-        const bucket = dayBucket(date);
+        const bucket = railLabel(e.next_action_at!);
         const isOverdue = bucket.sortKey === -1;
         const verb = VERBS[e.status]?.[isOverdue ? 'overdue' : 'upcoming'] ?? 'Look at';
         const tagsRaw = Array.isArray(e.custom_fields?.tags)
@@ -133,11 +136,11 @@
   let rows = $derived(cap == null ? allRows : allRows.slice(0, cap));
   let moreCount = $derived(Math.max(0, allRows.length - rows.length));
   let grouped = $derived.by(() => {
-    const groups: { day: string; rows: WeekRow[] }[] = [];
-    let current: { day: string; rows: WeekRow[] } | null = null;
+    const groups: { day: string; sortKey: number; rows: WeekRow[] }[] = [];
+    let current: { day: string; sortKey: number; rows: WeekRow[] } | null = null;
     for (const row of rows) {
       if (!current || current.day !== row.dayLabel) {
-        current = { day: row.dayLabel, rows: [] };
+        current = { day: row.dayLabel, sortKey: row.daySortKey, rows: [] };
         groups.push(current);
       }
       current.rows.push(row);
@@ -156,7 +159,7 @@
   {:else}
     <div class="week">
       {#each grouped as group (group.day)}
-        <div class="week__day" class:week__day--overdue={group.day === 'OVERDUE'} class:week__day--today={group.day === 'TODAY'}>
+        <div class="week__day" class:week__day--overdue={group.sortKey === -1} class:week__day--today={group.sortKey === 0}>
           {group.day}
         </div>
         <div class="week__rows">
