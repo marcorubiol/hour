@@ -20,9 +20,20 @@ import { authorizeCollab, isAllowedTargetTable } from '$lib/do/auth';
 import { extractAccessToken } from '$lib/auth';
 import type { RequestHandler } from './$types';
 
-export const GET: RequestHandler = async ({ request, params, platform, locals }) => {
+export const GET: RequestHandler = async ({ request, url, params, platform, locals }) => {
   if (request.headers.get('upgrade')?.toLowerCase() !== 'websocket') {
     return new Response('Expected WebSocket upgrade', { status: 426 });
+  }
+
+  // Origin floor for the WS write channel. The hooks.server.ts CSRF check
+  // exempts GET (a WS handshake IS a GET), so guard it here: browsers always
+  // send Origin on a WebSocket handshake, so a cross-site one is rejected;
+  // an absent Origin means a non-browser client (Authorization-header path)
+  // that can't be CSRF'd. SameSite=Strict already blocks the cookie cross-site
+  // — this closes the gap if that ever loosens (cross-site WS hijacking).
+  const origin = request.headers.get('origin');
+  if (origin && origin !== url.origin) {
+    return new Response('cross_origin', { status: 403 });
   }
 
   if (!platform?.env) {

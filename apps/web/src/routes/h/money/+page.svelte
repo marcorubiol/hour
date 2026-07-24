@@ -324,7 +324,15 @@
   //   Vendido (Σ gross fee) leads · Cobrado · Pendiente/Vencido (owed — the action
   //   number, from issued-unpaid invoices via aging) · pipeline (holds) demoted.
   let currencies = $derived([...new Set(bolos.map((b) => b.fee_currency ?? 'EUR'))].sort());
-  const today = new Date();
+  // Live "today" so aging (overdue/approaching) re-derives across midnight on a
+  // dashboard left open, instead of freezing against the mount-time date. Cheap:
+  // a minute tick over a few hundred rows.
+  let nowMs = $state(Date.now());
+  $effect(() => {
+    const id = setInterval(() => (nowMs = Date.now()), 60_000);
+    return () => clearInterval(id);
+  });
+  let today = $derived(new Date(nowMs));
   let termsByPayer = $derived(
     observedPayerTermsDays(invoices, invoices.flatMap((i) => i.payments)),
   );
@@ -407,7 +415,7 @@
     onError: (err) => addToast({ tone: 'danger', title: 'Fee not saved', message: `${err instanceof Error ? err.message : 'Unexpected error'} — try again.` }),
   });
   function saveFee() {
-    if (!feeEditing) return;
+    if (!feeEditing || $feeMutation.isPending) return;
     const trimmed = String(fAmount ?? '').trim();
     const amount = trimmed === '' ? null : Number(trimmed);
     if (amount !== null && (Number.isNaN(amount) || amount < 0)) {
@@ -426,6 +434,11 @@
   let payCounterparty = $state('');
   let payCategory = $state('');
   let payReference = $state('');
+  // Stable per dialog-open, so a double-submit (two clicks before the button
+  // disables) or a two-tab race carries the SAME key — create_payment dedups on
+  // it (unique index + ON CONFLICT), preventing a duplicated, over-counted
+  // payment. Fresh key each time openPay runs = each intended payment is new.
+  let payIdempotencyKey = $state('');
   function openPay(b: MoneyBolo) {
     payBolo = b;
     const remaining = Math.max(0, Number(b.fee_amount ?? 0) - Number(b.collected ?? 0));
@@ -435,6 +448,7 @@
     payCounterparty = b.venue_name ?? '';
     payCategory = '';
     payReference = '';
+    payIdempotencyKey = crypto.randomUUID();
     payOpen = true;
   }
   const payMutation = createMutation({
@@ -449,6 +463,7 @@
         counterparty: payCounterparty.trim() || null,
         category: payCategory.trim() || null,
         reference: payReference.trim() || null,
+        idempotency_key: payIdempotencyKey,
       });
       if (!body?.payment) throw new Error('Unexpected response');
       return body.payment;
@@ -518,6 +533,7 @@
     onError: (err) => addToast({ tone: 'danger', title: 'Document not created', message: err instanceof Error ? err.message : 'Unexpected error' }),
   });
   function submitInvoice() {
+    if ($createInvoice.isPending) return;
     for (const p of [pctOrNull(iVat), pctOrNull(iIrpf)]) {
       if (p !== null && (Number.isNaN(p) || p < 0 || p > 100)) {
         addToast({ tone: 'warning', message: 'VAT / IRPF must be a percentage 0–100 (or empty).' });
@@ -812,7 +828,7 @@
   <p class="mny__dialog-note">Collected derives from payments against the fee — not from a document.</p>
   {#snippet actions()}
     <Button variant="outline" onclick={() => (payOpen = false)}>Cancel</Button>
-    <Button onclick={() => $payMutation.mutate()} loading={$payMutation.isPending}>Record</Button>
+    <Button onclick={() => !$payMutation.isPending && $payMutation.mutate()} loading={$payMutation.isPending}>Record</Button>
   {/snippet}
 </Dialog>
 
@@ -855,7 +871,7 @@
   </div>
   {#snippet actions()}
     <Button variant="outline" onclick={() => (dealOpen = false)}>Cancel</Button>
-    <Button onclick={() => $createBolo.mutate()} loading={$createBolo.isPending}>Create deal</Button>
+    <Button onclick={() => !$createBolo.isPending && $createBolo.mutate()} loading={$createBolo.isPending}>Create deal</Button>
   {/snippet}
 </Dialog>
 
@@ -875,7 +891,7 @@
   </div>
   {#snippet actions()}
     <Button variant="outline" onclick={() => (expOpen = false)}>Cancel</Button>
-    <Button onclick={() => $createExpense.mutate()} loading={$createExpense.isPending}>Add</Button>
+    <Button onclick={() => !$createExpense.isPending && $createExpense.mutate()} loading={$createExpense.isPending}>Add</Button>
   {/snippet}
 </Dialog>
 

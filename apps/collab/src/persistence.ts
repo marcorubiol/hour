@@ -152,12 +152,45 @@ export async function saveSnapshot(
     headers: {
       ...authHeaders(env),
       'content-type': 'application/json',
-      Prefer: 'return=minimal',
+      // Upsert on the (target_table, target_id, version) unique index. A save
+      // that already wrote the snapshot row but failed to advance the durable
+      // marker retries the SAME version; without merge-duplicates that retry
+      // 23505s forever (found by review: persistence-guard commit ordering).
+      // Merging makes the retry a harmless overwrite with the newer doc state.
+      Prefer: 'return=minimal, resolution=merge-duplicates',
     },
     body,
   });
 
   if (!res.ok) {
     throw new Error(`saveSnapshot: ${res.status} ${await res.text()}`);
+  }
+}
+
+/**
+ * Drop snapshot rows older than `keepFromVersion` for a target. Each save
+ * writes a full-document row and only the latest is ever read, so without
+ * pruning `collab_snapshot` grows unbounded (one ever-larger row per ~30
+ * edits). Keep a small tail for safety. Best-effort — a failed prune must
+ * never fail the save that just committed.
+ */
+export async function pruneSnapshots(
+  env: PersistEnv,
+  targetTable: string,
+  targetId: string,
+  keepFromVersion: number,
+): Promise<void> {
+  if (keepFromVersion <= 0) return;
+  const url = new URL(`/rest/v1/${TABLE}`, env.PUBLIC_SUPABASE_URL);
+  url.searchParams.set('target_table', `eq.${targetTable}`);
+  url.searchParams.set('target_id', `eq.${targetId}`);
+  url.searchParams.set('version', `lt.${keepFromVersion}`);
+
+  const res = await fetch(url, {
+    method: 'DELETE',
+    headers: { ...authHeaders(env), Prefer: 'return=minimal' },
+  });
+  if (!res.ok) {
+    throw new Error(`pruneSnapshots: ${res.status} ${await res.text()}`);
   }
 }

@@ -30,6 +30,9 @@ export const PaymentCreateSchema = v.object({
 	project_id: v.optional(v.nullable(v.pipe(v.string(), v.uuid()))),
 	counterparty: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(200)))),
 	category: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(60)))),
+	// Client-generated, stable per intended payment — create_payment dedups on
+	// it so a double-submit / two-tab race records one payment, not two.
+	idempotency_key: v.optional(v.nullable(v.pipe(v.string(), v.uuid()))),
 });
 
 export type PaymentCreate = v.InferOutput<typeof PaymentCreateSchema>;

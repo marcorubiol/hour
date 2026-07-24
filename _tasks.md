@@ -4,6 +4,46 @@
 > Estado general y evidencia: `_context.md`. Historia: `_decisions.md` y
 > `_notes/sessions-log.md`. Los documentos de `build/archive/` no crean tareas.
 
+## EN CURSO — pase de endurecimiento (auditoría 2026-07-24)
+
+Auditoría completa de seguridad, rendimiento y estabilidad sobre `main`
+(5 frentes: API/auth, SQL/RLS/RPC, XSS/frontend, rendimiento, estabilidad).
+Veredicto de fondo: **sin agujeros críticos ni cross-tenant**; las defensas
+estructurales aguantan el trazado (RLS uniforme, `search_path` fijado en las
+~100 funciones DEFINER, CSP estricta, cero `{@html}`, numeración atómica).
+
+Rama: **`hardening/audit-fixes`**. Verificado local: `svelte-check` 0/0 (1.834
+ficheros), unit **368/368**, collab 11/11 + tsc limpio, build verde, y las 5
+migraciones aplicadas contra un Postgres 17 desechable (cuerpos plpgsql
+validados + pruebas funcionales de idempotencia y de los guards fiscales).
+
+**FALTA PARA CERRAR — el gate de siempre, no lo salta nadie:**
+
+1. [ ] **Backup de producción** antes de tocar schema.
+2. [ ] **Staging**: `migrate plan` + `apply`, y **RLS 120/120 + los tests nuevos**.
+   La suite RLS no se pudo correr en la sesión de la auditoría (sin CLI de
+   Supabase ni `.env.test` en ese entorno): **es obligatoria antes de prod.**
+3. [ ] **Tests RLS nuevos que faltan por escribir** (deuda consciente de este pase):
+   - `fiscal_identity`: un member sin `read:money` NO ve iban/swift/tax_id.
+   - `invoice`/`payment`/`invoice_line`: INSERT/UPDATE/DELETE directos por
+     PostgREST fallan; las RPC siguen funcionando.
+   - `update_invoice`: rechaza `number`, `status:'issued'` y `status:'paid'`.
+   - Las 3 RPC reescritas devuelven **exactamente** las mismas filas que antes
+     (equivalencia de autorización tras el cambio de `has_permission` por fila).
+4. [ ] **Prod**: migrate apply + `wrangler deploy` (web **y** collab: el worker
+   de collab cambió — poda de snapshots y reintentos).
+5. [ ] **E2E post-deploy** y actualizar `_context.md` con el runtime nuevo.
+
+**Diferido a propósito, con motivo escrito** (ver
+`20260724094000_rls_force_parity.sql`):
+- `project_id_of_*` expuestas como RPC → oráculo de existencia cross-tenant
+  (LOW). Revocar el EXECUTE **rompería 26 policies RLS** que las llaman; el
+  arreglo correcto es moverlas a un schema no expuesto y repuntar las 26.
+- Tokens de share en claro (INFO). Hashearlos toca 4 funciones + migración de
+  datos sobre tokens vivos; hacerlo mal rompe todos los enlaces públicos.
+- `sharp`/`cookie`: CVE transitivos de `wrangler>miniflare` y de kit; son de
+  build, no entran al runtime del Worker.
+
 ## Cerrado — bloque 2: permisos y entrada a beta
 
 4. [x] **Matriz RBAC completa.** Owner/admin/member/performer/guest/external

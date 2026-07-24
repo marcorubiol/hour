@@ -1,10 +1,18 @@
 /**
  * PATCH  /api/invoices/:id — lifecycle + metadata edits (ADR-050):
- *        status (draft → issued → paid, cancelled from anywhere), number,
- *        due_on, notes. Amounts are NOT editable — an invoice's numbers
- *        are a snapshot; wrong amounts mean delete the draft (or cancel)
- *        and re-create. Direct PostgREST UPDATE: the invoice_update
- *        policy gates on edit:money (not claim-bound), so no RPC needed.
+ *        status (draft/cancelled), due_on, expected_on, payment_condition,
+ *        payer_person_id, notes. Amounts are NOT editable — an invoice's
+ *        numbers are a snapshot; wrong amounts mean delete the draft (or
+ *        cancel) and re-create.
+ *
+ *        Two RPCs, no direct UPDATE (hardening audit 2026-07-24): the money
+ *        tables no longer grant writes to `authenticated`, because a direct
+ *        PATCH could set status:'issued' with a hand-written `number`, forging
+ *        a fiscal correlative that never went through the atomic series and
+ *        leaving the issuer/payer snapshots empty.
+ *          · status:'issued' → `issue_invoice` (assigns the correlative through
+ *            next_invoice_number and freezes the fiscal snapshots)
+ *          · everything else → `update_invoice` (whitelisted metadata patch)
  * DELETE /api/invoices/:id — discard a DRAFT via the `delete_invoice`
  *        RPC (client-direct soft-deletes are impossible, ADR-048).
  */
@@ -12,14 +20,13 @@
 import type { RequestHandler } from './$types';
 import * as v from 'valibot';
 import { extractAccessToken } from '$lib/auth';
-import { pgPatch, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
+import { pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
 
 const IdSchema = v.pipe(v.string(), v.uuid());
 
 const PatchSchema = v.object({
   status: v.optional(v.picklist(['draft', 'issued', 'cancelled'])),
-  number: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(60)))),
   due_on: v.optional(v.nullable(v.pipe(v.string(), v.isoDate()))),
   expected_on: v.optional(v.nullable(v.pipe(v.string(), v.isoDate()))),
   payment_condition: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(2000)))),
@@ -63,29 +70,47 @@ export const PATCH: RequestHandler = async ({ request, params, platform, locals 
       400,
     );
   }
-  const patch = parsed.output;
-  if (Object.keys(patch).length === 0) return json({ error: 'empty_patch' }, 400);
-
-  const search = new URLSearchParams();
-  search.set('id', `eq.${idParsed.output}`);
-  search.set('deleted_at', 'is.null');
-  search.set(
-    'select',
-    'id,workspace_id,project_id,payer_person_id,number,status,issued_on,due_on,expected_on,payment_condition,subtotal,total,currency,country,notes',
-  );
+  const { status, ...metadata } = parsed.output;
+  if (status === undefined && Object.keys(metadata).length === 0) {
+    return json({ error: 'empty_patch' }, 400);
+  }
 
   try {
-    const { data } = await pgPatch<Record<string, unknown>>(env, 'invoice', jwt, patch, {
-      search,
-    });
-    if (data.length === 0) return json({ error: 'not_found' }, 404);
-    return json({ invoice: data[0] });
+    // Metadata first, so a combined patch doesn't issue an invoice and then
+    // fail half-applied on a bad field.
+    let invoice: Record<string, unknown> | undefined;
+    if (Object.keys(metadata).length > 0) {
+      const { data } = await pgPostRpc<Record<string, unknown>>(env, 'update_invoice', jwt, {
+        p_invoice_id: idParsed.output,
+        p_patch: metadata,
+      });
+      invoice = data[0];
+    }
+
+    if (status === 'issued') {
+      const { data } = await pgPostRpc<Record<string, unknown>>(env, 'issue_invoice', jwt, {
+        p_invoice_id: idParsed.output,
+      });
+      invoice = data[0];
+    } else if (status !== undefined) {
+      const { data } = await pgPostRpc<Record<string, unknown>>(env, 'update_invoice', jwt, {
+        p_invoice_id: idParsed.output,
+        p_patch: { status },
+      });
+      invoice = data[0];
+    }
+
+    if (!invoice) return json({ error: 'not_found' }, 404);
+    return json({ invoice });
   } catch (err) {
     return pgErrorResponse(
       err,
       { route: 'PATCH /api/invoices/[id]', requestId: locals.requestId },
       {
-        codes: { '22023': { status: 400, error: 'invalid_input' } },
+        codes: {
+          '22023': { status: 400, error: 'invalid_input' },
+          '42501': { status: 403, error: 'forbidden_or_not_found' },
+        },
         passUpstream: [401, 403],
       },
     );

@@ -1,0 +1,31 @@
+-- RLS parity + audit notes (hardening audit 2026-07-24).
+
+-- workspace_alias_request was the only one of the 32 public tables with RLS
+-- ENABLEd but not FORCEd, against the project's stated "FORCE on tenant-scoped
+-- tables" posture. ENABLE already gates anon/authenticated; FORCE additionally
+-- covers the table-owner path, so this is parity, not a hole being closed.
+ALTER TABLE public.workspace_alias_request FORCE ROW LEVEL SECURITY;
+
+-- ── Deliberately NOT done here, with reasons ────────────────────────────────
+--
+-- 1. project_id_of_asset_version / project_id_of_performance / project_id_of_line
+--    are SECURITY DEFINER helpers that are also EXECUTE-granted to
+--    `authenticated`, so they are callable as PostgREST RPCs and answer
+--    "does this row id exist, and in which project?" across tenants. The audit
+--    rates this LOW (row ids are v7/random UUIDs and not secret).
+--
+--    The obvious fix — REVOKE EXECUTE FROM authenticated — WOULD BREAK THE APP:
+--    these helpers are called from inside 26 RLS policies (asset_version,
+--    cast_override, crew_assignment, …) which are evaluated as the invoking
+--    role, and a policy calling a function the caller cannot EXECUTE fails the
+--    whole query. The correct fix is to move them into a schema PostgREST does
+--    not expose and repoint all 26 policies, which deserves its own migration
+--    and a full RLS suite run rather than riding along here.
+--
+-- 2. Calendar/road-sheet share tokens are stored in plaintext (invitations, by
+--    contrast, store only a sha256). Entropy is ~244 bits so brute force is not
+--    the risk; the residual is that a DB/backup compromise yields directly
+--    usable public links. Hashing them means changing create_calendar_share,
+--    create_roadsheet_share, get_public_roadsheet and get_public_calendar plus
+--    a data migration over live tokens — get it wrong and every shared link
+--    breaks. Deferred deliberately, tracked in _tasks.md.

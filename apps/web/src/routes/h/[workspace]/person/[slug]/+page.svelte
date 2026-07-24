@@ -19,6 +19,7 @@
   import { dayLabel, dayMonthYearTs } from '$lib/datetime';
   import { useBreadcrumb } from '$lib/stores/breadcrumb.svelte';
   import { accentVar } from '$lib/utils/accent';
+  import { safeHref } from '$lib/utils/safe-url';
 
   type PersonFile = {
     person: {
@@ -292,7 +293,7 @@
         {/if}
         {#if file.person.website}
           <li>
-            <a href={file.person.website} target="_blank" rel="noopener noreferrer">
+            <a href={safeHref(file.person.website)} target="_blank" rel="noopener noreferrer">
               {file.person.website}
             </a>
           </li>

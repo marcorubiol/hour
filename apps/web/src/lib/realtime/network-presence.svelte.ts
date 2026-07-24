@@ -74,10 +74,16 @@ export class NetworkPresenceStore {
 
     ch.subscribe(async (status) => {
       if (status === 'SUBSCRIBED') {
-        await ch.track({
-          user_id: this.rt.userId,
-          online_at: new Date().toISOString(),
-        });
+        try {
+          await ch.track({
+            user_id: this.rt.userId,
+            online_at: new Date().toISOString(),
+          });
+        } catch (err) {
+          // Swallow-and-log: a failed track() must not surface as an unhandled
+          // rejection; presence for this workspace just stays empty until sync.
+          console.warn('[network-presence] track failed:', err);
+        }
       }
     });
 

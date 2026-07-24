@@ -37,7 +37,17 @@ export function kindLabel(kind: string): string {
  */
 export const MaterialCreateSchema = v.object({
   kind: v.picklist(ASSET_KINDS),
-  url: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(2000), v.url()),
+  // `v.url()` alone accepts `javascript:`/`data:` (it only runs `new URL()`).
+  // A material link is a where-the-file-lives pointer, so pin it to http(s)
+  // at the write boundary; the render side also guards via safeHref().
+  url: v.pipe(
+    v.string(),
+    v.trim(),
+    v.minLength(1),
+    v.maxLength(2000),
+    v.url(),
+    v.regex(/^https?:\/\//i, 'must be an http(s) URL'),
+  ),
   notes: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500)))),
 });
 

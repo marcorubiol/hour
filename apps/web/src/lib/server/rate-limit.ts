@@ -50,6 +50,11 @@ export async function allowNativeRequest(
   }
 }
 
+function bucketKey(key: string, rule: RateLimitRule): string {
+  const bucket = Math.floor(Date.now() / (rule.windowSec * 1000));
+  return `rl:${key}:${bucket}`;
+}
+
 /**
  * True = request admitted. Fails open on KV errors — availability of the
  * login path outranks precision of the limiter.
@@ -61,8 +66,7 @@ export async function allowRequest(
 ): Promise<boolean> {
   if (!kv) return true;
   try {
-    const bucket = Math.floor(Date.now() / (rule.windowSec * 1000));
-    const kvKey = `rl:${key}:${bucket}`;
+    const kvKey = bucketKey(key, rule);
     const count = parseInt((await kv.get(kvKey)) ?? '0', 10);
     if (count >= rule.limit) return false;
     // Not atomic (KV is last-write-wins) — see module docblock.
@@ -73,6 +77,54 @@ export async function allowRequest(
   } catch {
     return true;
   }
+}
+
+/**
+ * Read-only gate: true = under the limit, WITHOUT incrementing. Pair with
+ * `recordFailure` when the counter must only advance on failed attempts (e.g.
+ * per-account login throttling, where counting successes would let an attacker
+ * lock out the real user, and counting the victim's own successful logins is
+ * pointless). Fails open.
+ */
+export async function underLimit(
+  kv: KVNamespace | undefined,
+  key: string,
+  rule: RateLimitRule,
+): Promise<boolean> {
+  if (!kv) return true;
+  try {
+    const count = parseInt((await kv.get(bucketKey(key, rule))) ?? '0', 10);
+    return count < rule.limit;
+  } catch {
+    return true;
+  }
+}
+
+/** Increment the window counter for `key` (best-effort). Use after an attempt
+ * that should count against the budget — typically a FAILED one. */
+export async function recordFailure(
+  kv: KVNamespace | undefined,
+  key: string,
+  rule: RateLimitRule,
+): Promise<void> {
+  if (!kv) return;
+  try {
+    const kvKey = bucketKey(key, rule);
+    const count = parseInt((await kv.get(kvKey)) ?? '0', 10);
+    await kv.put(kvKey, String(count + 1), {
+      expirationTtl: Math.max(60, rule.windowSec * 2),
+    });
+  } catch {
+    /* best-effort — see module docblock */
+  }
+}
+
+/** SHA-256 hex of a value, for KV keys that must not store the plaintext
+ * (e.g. the login email in a per-account throttle key). */
+export async function hashKey(value: string): Promise<string> {
+  const bytes = new TextEncoder().encode(value);
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
 /** The client IP as Cloudflare saw it. 'unknown' groups non-CF traffic

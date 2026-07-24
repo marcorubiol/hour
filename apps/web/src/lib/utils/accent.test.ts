@@ -44,8 +44,16 @@ describe('accentVarFor', () => {
 			'oklch(var(--accent-custom-l) var(--accent-custom-c) 210)',
 		);
 	});
-	it('passes a literal colour through untouched', () => {
-		expect(accentVarFor({ slug: 'x', accent: 'oklch(55% 0.1 200)' })).toBe('oklch(55% 0.1 200)');
+	it('never echoes a raw literal into inline CSS — falls back to the hash var', () => {
+		// The picker and API validators (/^([1-9]|1[0-2]|h\d{1,3})$/) can never
+		// store a literal, so this branch is dead for real data. Guard it anyway:
+		// echoing an arbitrary stored string into a `style` would be CSS injection
+		// (style-src keeps 'unsafe-inline'). Any non-index/non-hue accent must
+		// resolve to the safe hash-derived palette var.
+		expect(accentVarFor({ slug: 'x', accent: 'oklch(55% 0.1 200)' })).toBe(accentVar('x'));
+		expect(accentVarFor({ slug: 'x', accent: 'red; background:url(https://evil/x)' })).toBe(
+			accentVar('x'),
+		);
 	});
 });
 

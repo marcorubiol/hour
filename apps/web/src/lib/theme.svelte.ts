@@ -20,7 +20,7 @@
  * `document.startViewTransition()` when available for a smooth fade.
  */
 
-import { getContext, setContext } from 'svelte';
+import { getContext, onDestroy, setContext } from 'svelte';
 
 export type ThemeMode = 'light' | 'dark' | 'system';
 export type ResolvedMode = 'light' | 'dark';
@@ -121,11 +121,15 @@ export function provideTheme(): ThemeStore {
 	// When mode === 'system', subscribe to OS changes so the app flips live.
 	if (typeof matchMedia !== 'undefined') {
 		const mq = matchMedia('(prefers-color-scheme: dark)');
-		mq.addEventListener('change', () => {
+		const onSchemeChange = () => {
 			if (store.mode === 'system') {
 				startSwap(() => applyMode(systemPrefersDark() ? 'dark' : 'light'));
 			}
-		});
+		};
+		mq.addEventListener('change', onSchemeChange);
+		// setContext runs during component init, so onDestroy is valid here:
+		// drop the listener when the providing component tears down.
+		onDestroy(() => mq.removeEventListener('change', onSchemeChange));
 	}
 
 	return store;

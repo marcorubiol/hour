@@ -40,9 +40,11 @@ export function accentVarFor(entity: {
 	// picked hue stays inside the softness envelope and adapts per theme.
 	const hue = /^h(\d{1,3})$/.exec(a);
 	if (hue) return `oklch(var(--accent-custom-l) var(--accent-custom-c) ${hue[1]})`;
-	// Literal color (hex, oklch, …) — wrap so existing var(--c) consumers
-	// keep working without a separate code path.
-	return a;
+	// Anything else is not a shape the picker or the API validators
+	// (/^([1-9]|1[0-2]|h\d{1,3})$/) can produce. Rather than echo an arbitrary
+	// stored string straight into an inline `style` (CSS injection: style-src
+	// keeps 'unsafe-inline'), fall back to the safe hash-derived palette var.
+	return accentVar(entity.slug);
 }
 
 /** Stored value for a custom-hue accent (hue 0-360, wrapped and rounded). */

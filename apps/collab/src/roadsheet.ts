@@ -26,6 +26,7 @@ import * as Y from 'yjs';
 import {
   fetchTargetMeta,
   loadLatestSnapshot,
+  pruneSnapshots,
   saveSnapshot,
   writeNotesColumn,
 } from './persistence';
@@ -52,6 +53,8 @@ const NOTES_FIELD = 'notes';
 const AUTHORIZATION_RECHECK_MS = 30_000;
 const REAUTHENTICATE_CODE = 4401;
 const REAUTHENTICATE_REASON = 'reauthentication required';
+/** Snapshot rows to keep behind the latest (the rest are dead weight). */
+const SNAPSHOT_RETENTION = 3;
 
 export interface CollabEnv {
   PUBLIC_SUPABASE_URL: string;
@@ -64,6 +67,9 @@ const STORAGE_KEYS = {
   workspaceId: 'workspace_id',
   version: 'snapshot_version',
   hydration: 'hydration_state',
+  // Set when a notes materialization failed; retried on the next alarm or on
+  // reactivation so the denormalized column can't diverge forever.
+  notesDirty: 'notes_dirty',
 } as const;
 
 const ALLOWED_TABLES = new Set(['performance', 'project', 'line']);
@@ -163,23 +169,29 @@ export class RoadsheetCollab extends WithYjs {
       return true;
     });
 
+    // Per-user recheck. A THROWN recheck is inconclusive (e.g. a transient
+    // Supabase blip), NOT a denial — booting every collaborator on one flaky
+    // RPC is worse than trusting the still-unexpired JWT for another 30 s.
+    // Only a definitive `false` closes a connection.
     const decisions = new Map<string, boolean>();
-    try {
-      await Promise.all(
-        [...new Set(active.map((connection) => connection.state!.userId))].map(
-          async (userId) => {
+    await Promise.all(
+      [...new Set(active.map((connection) => connection.state!.userId))].map(
+        async (userId) => {
+          try {
             decisions.set(userId, await canUserWriteCollab(this.env, target, userId));
-          },
-        ),
-      );
-    } catch (error) {
-      console.error('[collab] live authorization failed closed:', error);
-    }
+          } catch (error) {
+            console.error('[collab] live authorization inconclusive, keeping session:', error);
+          }
+        },
+      ),
+    );
 
     let authorizedConnections = 0;
     for (const connection of active) {
       const state = connection.state;
-      if (!isConnectionState(state) || decisions.get(state.userId) !== true) {
+      if (!isConnectionState(state) || decisions.get(state.userId) === false) {
+        // Unknown state or a definitive denial closes. An inconclusive recheck
+        // (userId absent from `decisions`) keeps the unexpired session.
         connection.close(REAUTHENTICATE_CODE, REAUTHENTICATE_REASON);
       } else {
         authorizedConnections += 1;
@@ -187,7 +199,26 @@ export class RoadsheetCollab extends WithYjs {
     }
 
     if (authorizedConnections > 0) {
+      await this.flushPendingNotes(target);
       await this.ensureAuthorizationAlarm();
+    }
+  }
+
+  /**
+   * Retry a notes materialization that failed on an earlier save. The current
+   * in-memory doc text is authoritative (it equals the latest snapshot), so we
+   * push that rather than any stale captured text. Best-effort: on failure the
+   * dirty flag stays set for the next attempt.
+   */
+  private async flushPendingNotes(target: CollabTarget): Promise<void> {
+    const dirty = await this.ctx.storage.get<unknown>(STORAGE_KEYS.notesDirty);
+    if (!dirty) return;
+    try {
+      const notes = this.document.getText(NOTES_FIELD).toString();
+      await writeNotesColumn(this.env, target.table, target.id, notes);
+      await this.ctx.storage.delete(STORAGE_KEYS.notesDirty);
+    } catch (error) {
+      console.error('[collab] pending notes flush failed, will retry:', error);
     }
   }
 
@@ -255,6 +286,24 @@ export class RoadsheetCollab extends WithYjs {
         [STORAGE_KEYS.hydration]: marker,
       });
       this.hydration = marker;
+
+      // Reactivation flush: if a prior save left the denormalized notes column
+      // behind (materialize failed, then everyone disconnected so no alarm
+      // retried), catch it up now from the authoritative hydrated text.
+      if (await this.ctx.storage.get<unknown>(STORAGE_KEYS.notesDirty)) {
+        try {
+          await writeNotesColumn(
+            this.env,
+            target.table,
+            target.id,
+            hydratedDocument.getText(NOTES_FIELD).toString(),
+          );
+          await this.ctx.storage.delete(STORAGE_KEYS.notesDirty);
+        } catch (error) {
+          console.error('[collab] reactivation notes flush failed, will retry:', error);
+        }
+      }
+
       return hydratedDocument;
     } catch (error) {
       console.error('[collab] hydration failed:', error);
@@ -311,13 +360,25 @@ export class RoadsheetCollab extends WithYjs {
       materializeNotes: async () => {
         try {
           await writeNotesColumn(this.env, target.table, target.id, notes);
+          await this.ctx.storage.delete(STORAGE_KEYS.notesDirty);
         } catch (error) {
-          // The immutable snapshot is authoritative and already committed.
-          // A future edit retries materialization with fresher text.
-          console.error('[collab] writeNotesColumn failed:', error);
+          // The immutable snapshot is authoritative and already committed. Mark
+          // the column dirty so the next alarm / reactivation retries the write
+          // even if the doc is never edited again (the old "future edit retries"
+          // assumption failed when "never edited again" was the steady state).
+          await this.ctx.storage.put(STORAGE_KEYS.notesDirty, true);
+          console.error('[collab] writeNotesColumn failed, marked dirty:', error);
         }
       },
     });
     this.hydration = committed;
+
+    // Prune superseded snapshot rows — only the latest is ever read. Best-effort:
+    // a failed prune must never fail the save that already committed.
+    try {
+      await pruneSnapshots(this.env, target.table, target.id, committed.version - SNAPSHOT_RETENTION);
+    } catch (error) {
+      console.error('[collab] snapshot prune failed (non-fatal):', error);
+    }
   }
 }

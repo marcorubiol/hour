@@ -25,9 +25,11 @@
   let isSignup = $derived(page.url.searchParams.get('mode') === 'signup');
   let nextPath = $derived.by(() => {
     const candidate = page.url.searchParams.get('next');
-    return candidate?.startsWith('/') && !candidate.startsWith('//')
-      ? candidate
-      : resolveLoginTarget();
+    // Same-origin path only. Reject protocol-relative ('//host') AND
+    // backslash-folded ('/\host', which URL parsers normalise to '//host')
+    // so this stays safe even if the redirect ever moves off goto()'s
+    // internal-navigation guard.
+    return candidate && /^\/(?![/\\])/.test(candidate) ? candidate : resolveLoginTarget();
   });
   let alternateHref = $derived(
     `/login?${new URLSearchParams({
@@ -70,7 +72,10 @@
               : 'login.invalid_credentials';
         throw new Error(
           isSignup && body.error === 'signup_rejected'
-            ? 'This account could not be created. It may already exist.'
+            ? // Deliberately generic — do not confirm whether the address is
+              // already registered (email-enumeration oracle). Point existing
+              // users at sign-in without asserting the account exists.
+              "We couldn't create an account with those details. If you already have one, sign in instead."
             : t(key),
         );
       }

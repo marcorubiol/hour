@@ -119,6 +119,7 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
       p_project_id: input.project_id ?? null,
       p_counterparty: input.counterparty ?? null,
       p_category: input.category ?? null,
+      p_idempotency_key: input.idempotency_key ?? null,
     });
     if (!data[0]) return json({ error: 'create_failed' }, 502);
     return json({ payment: data[0] }, 201);

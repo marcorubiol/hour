@@ -107,9 +107,15 @@ export function createRealtimeClient(env: RealtimeEnv, auth: RealtimeAuth): Real
     accessToken: async () => (await auth.getToken()) ?? env.PUBLIC_SUPABASE_ANON_KEY,
   });
   client.connect();
-  void auth.getToken().then((token) => {
-    if (token) client.setAuth(token);
-  });
+  void auth
+    .getToken()
+    .then((token) => {
+      if (token) client.setAuth(token);
+    })
+    // A failed /api/auth/token here must not surface as an unhandled rejection:
+    // the accessToken supplier above re-fetches on (re)connect, so the socket
+    // still authenticates lazily. Log and continue.
+    .catch((err) => console.warn('[realtime] initial setAuth skipped:', err));
 
   const channels = new Map<string, RealtimeChannel>();
 

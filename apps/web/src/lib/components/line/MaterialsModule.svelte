@@ -18,6 +18,7 @@
   import { addToast } from '$lib/components/Toast.svelte';
   import { dayLabel } from '$lib/datetime';
   import { ASSET_KINDS, KIND_LABELS, kindLabel, type MaterialItem } from '$lib/material';
+  import { safeHref } from '$lib/utils/safe-url';
 
   interface Props {
     line: {
@@ -144,7 +145,7 @@
               <td>{kindLabel(m.kind)}</td>
               <td class="mat__cell-direction">{m.direction}</td>
               <td>
-                <a class="mat__link" href={m.url} target="_blank" rel="noopener noreferrer">
+                <a class="mat__link" href={safeHref(m.url)} target="_blank" rel="noopener noreferrer">
                   {m.url}
                 </a>
               </td>

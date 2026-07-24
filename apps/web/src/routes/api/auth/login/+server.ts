@@ -19,9 +19,17 @@ import {
   allowNativeRequest,
   allowRequest,
   clientIp,
+  hashKey,
+  recordFailure,
+  underLimit,
 } from '$lib/server/rate-limit';
 
 const LOGIN_RULE = { limit: 10, windowSec: 300 };
+// Per-account budget: a distributed stuffing tool spreading one victim account
+// across many IPs never trips the per-IP gate above. Counted on FAILED grants
+// only — successes don't advance it, so the real user can't lock themselves
+// out, and the window is generous enough that normal typos stay well under.
+const LOGIN_ACCOUNT_RULE = { limit: 20, windowSec: 900 };
 
 const BodySchema = v.object({
   email: v.pipe(v.string(), v.trim(), v.minLength(3), v.maxLength(320)),
@@ -58,10 +66,19 @@ export const POST: RequestHandler = async ({ request, cookies, platform }) => {
   const parsed = v.safeParse(BodySchema, raw);
   if (!parsed.success) return json({ error: 'invalid_body' }, 400);
 
+  const acctKey = `login-acct:${await hashKey(parsed.output.email.toLowerCase())}`;
+  if (!(await underLimit(env.RATE_LIMIT, acctKey, LOGIN_ACCOUNT_RULE))) {
+    return json({ error: 'rate_limited' }, 429);
+  }
+
   const result = await passwordGrant(env, parsed.output.email, parsed.output.password);
   if (!result.ok) {
     // Same public shape for wrong-password and unknown-user — no oracle.
-    if (result.reason === 'invalid_grant') return json({ error: 'invalid_credentials' }, 401);
+    if (result.reason === 'invalid_grant') {
+      // A bad grant advances the per-account failure budget (success does not).
+      await recordFailure(env.RATE_LIMIT, acctKey, LOGIN_ACCOUNT_RULE);
+      return json({ error: 'invalid_credentials' }, 401);
+    }
     return json({ error: 'auth_unavailable' }, 502);
   }
 

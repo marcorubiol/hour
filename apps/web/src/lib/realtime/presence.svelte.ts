@@ -49,10 +49,16 @@ export class PresenceStore {
 
     ch.subscribe(async (status) => {
       if (status === 'SUBSCRIBED') {
-        await ch.track({
-          user_id: this.rt.userId,
-          online_at: new Date().toISOString(),
-        });
+        try {
+          await ch.track({
+            user_id: this.rt.userId,
+            online_at: new Date().toISOString(),
+          });
+        } catch (err) {
+          // A rejected track() must not become an unhandled rejection; the
+          // user simply won't appear in presence until the next sync.
+          console.warn('[presence] track failed:', err);
+        }
       }
     });
 
