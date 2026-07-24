@@ -98,23 +98,46 @@
 > clear, autolimpiante). El ciclo profundo — crear invoice/proforma v3 con tax
 > lines, numeración, pagos desacoplados, aging/paid derivado — no tiene E2E.
 >
-> **BUG abierto (2026-07-24): `/h/money` puede quedarse en «Loading…» para
-> siempre** (race no determinista; un reload lo cura). Evidencia de esa noche:
-> con sesión válida y las 9 llamadas API en 200 en <2,2 s (bolos/invoices/
-> expenses incluidas), el bloque de filas sigue mostrando «Loading…» >20 s —
-> es decir, `loading` (`bolos.isLoading || invoices.isLoading ||
-> expenses.isLoading`, línea ~317) nunca baja pese a que los datos llegaron;
-> los totales por moneda sí pintan. Reproducido 2 veces en sondas Playwright
-> directas (contexto frío) y repetidamente en la suite E2E; 6 sondas
-> posteriores idénticas renderizaron bien — no determinista, sin error de
-> consola ni pageerror. Sospechoso principal: la construcción reactiva de las
-> queries (`toStore` de opciones + `enabled: !k.unresolved` + queryKey que
-> cambia cuando el scope de pins se resuelve) — una carrera entre el flap de
-> `enabled`/queryKey y el observer de TanStack. OJO: `lib/planner-feeds
-> .svelte.ts` usa el mismo patrón. No se pudo aún bisecar si nació con money
-> v3 (`a35e8c4`, 2026-07-23 — aquel gate no re-corrió E2E contra el UI nuevo)
-> o con el split del layout (2026-07-24). El spec `money.spec.ts` reescrito es
-> el guardián: falla cuando la race muerde (suite 26/27 esa noche).
+> **BUG DIAGNOSTICADO Y ARREGLADO (2026-07-24, sin desplegar aún): `/h/money`
+> se quedaba en «Loading…» para siempre.** No era una race del `enabled`/
+> queryKey ni de la construcción reactiva — era la **optimización de
+> tracked-props de TanStack Query**. `QueryObserver.shouldNotifyListeners`
+> solo notifica cuando cambia una prop que el consumidor **leyó** (rastreada).
+> En `/h/money`, `invoices`/`expenses`.data se leen **solo dentro de
+> `for (const b of bolos)`** (totales, `invoicesByBolo`), así que mientras
+> `bolos` carga nadie lee su `.data`/`.isLoading`; lo único que los toca es
+> `errorMsg` (`.error`) — y `loading = bolos.isLoading || invoices.isLoading
+> || …` **cortocircuita** con `||`, sin llegar a leer `.isLoading` de los
+> hermanos. Resultado: su único tracked-prop es `error`. Si invoices/expenses
+> resolvían **antes o a la vez** que bolos, cambiaban status/isLoading/data
+> pero **no error** → notificación suprimida → el store de Svelte se
+> **congelaba en `{isLoading:true, data:undefined}`** para siempre, y nada lo
+> recalculaba (las opciones ya no re-emitían). Los totales pintaban porque
+> derivan de `bolos` (sí resuelto). No determinista = **orden de resolución de
+> los 3 fetches**, no el flap del scope.
+>
+> **Reproducido de forma determinista** a nivel query-core (scratchpad
+> `repro.mjs`/`repro2.mjs`): con solo `.error` rastreada, la resolución NO
+> notifica y el store queda en `isLoading:true`; con `notifyOnChangeProps:
+> 'all'` notifica y llega a `isLoading:false`. Verificado por la ruta exacta
+> del fix (default del `QueryClient`).
+>
+> **Fix (un dueño):** `notifyOnChangeProps: 'all'` como default global en el
+> `QueryClient` de `apps/web/src/routes/+layout.svelte`. Mata la clase entera
+> —  no solo money: `planner` (`planner-feeds.svelte.ts`, mismo patrón,
+> flagueado), `desk` (`isPending ||` sobre 4 queries) y project/line eran
+> gemelos latentes cuya seguridad era **incidental** (dependía del gating del
+> template — justo lo que rompió el split del layout). Coste despreciable:
+> queries a nivel lente/página, no per-row; el equality-check de Svelte
+> absorbe notificaciones redundantes. Comentario largo en el sitio.
+>
+> **Verificación:** `svelte-check` 0/0 (1832), unit **368/368**, build de
+> prod verde. Repro determinista PASS. **E2E guardián no corrido en local**:
+> el login compartido (`playwright@hour.test`) devuelve «Invalid credentials»
+> contra la Supabase del dev server — problema de fixture/harness, ajeno al
+> fix; correr `money.spec.ts` (el guardián, que espera `section.obra`, solo
+> visible con `loading===false`) contra un entorno desplegado tras el deploy.
+> **Falta desplegar** (solo frontend, cero schema).
 
 **DISEÑO — hecho e implementado en código** (Marco lo diseñó en frío en Claude
 Design; realizado como componentes *presentational*, sin schema, en rutas dev):

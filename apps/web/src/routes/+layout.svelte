@@ -25,6 +25,21 @@
       queries: {
         enabled: browser,
         staleTime: 30_000,
+        // notifyOnChangeProps: 'all' is a correctness setting here, not a perf
+        // knob. TanStack's default tracked-props optimisation notifies an
+        // observer ONLY when a prop the consumer actually read changes. Our
+        // lens pages compute `loading`/`errorMsg` with short-circuiting `||`/
+        // `??` chains AND read each feed's `.data` only from inside loops over
+        // ANOTHER feed's rows. So while the first feed is still loading, a
+        // sibling feed has only `error` tracked; when THAT sibling resolves,
+        // status/isLoading/data change but error doesn't, the notification is
+        // suppressed, and its Svelte store freezes at isLoading:true forever —
+        // the non-deterministic "/h/money stuck on Loading…" bug (a reload
+        // cured it). Opting every query out of tracked-props makes each
+        // resolution notify unconditionally. Cost is negligible: queries here
+        // are lens/page-level, not per-row, and Svelte's own equality checks
+        // absorb any redundant notifications.
+        notifyOnChangeProps: 'all',
       },
     },
   });
