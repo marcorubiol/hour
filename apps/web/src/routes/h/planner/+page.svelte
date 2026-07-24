@@ -32,19 +32,13 @@
    */
 
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
-  import { toStore } from 'svelte/store';
   import { tick, untrack } from 'svelte';
   import { page } from '$app/state';
   import { goto, replaceState } from '$app/navigation';
   import { fetchJSON, mutateJSON } from '$lib/api';
-  import Button from '$lib/components/Button.svelte';
   import LensHeader from '$lib/components/LensHeader.svelte';
   import LensTitle from '$lib/components/LensTitle.svelte';
-  import Dialog from '$lib/components/Dialog.svelte';
-  import Menu from '$lib/components/Menu.svelte';
-  import Select from '$lib/components/Select.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
-  import { copyText } from '$lib/clipboard';
   import MonthGrid, {
     dateDayKey,
     monthName,
@@ -68,6 +62,8 @@
     type LaneVM,
     type LoomGroupVM,
   } from '$lib/components/planner/CarrilsStrip.svelte';
+  import CalToolbar, { type CalFilter } from '$lib/components/planner/CalToolbar.svelte';
+  import FeedDialog from '$lib/components/planner/FeedDialog.svelte';
   import CreateEventDialog from '$lib/components/create/CreateEventDialog.svelte';
   import CreateBlackoutDialog from '$lib/components/create/CreateBlackoutDialog.svelte';
   import type { CreatedPerformance } from '$lib/components/PerformanceForm.svelte';
@@ -97,6 +93,7 @@
     type DecisionPerformance,
     type DecisionSide,
   } from '$lib/planner';
+  import { createPlannerFeeds } from '$lib/planner-feeds.svelte';
   import {
     loomThreads,
     prepRuns,
@@ -120,7 +117,6 @@
   import { accentVarFor } from '$lib/utils/accent';
 
   type WorkspaceLite = { id: string; slug: string; name: string };
-  type TeamItem = { person_id: string; workspace_id: string; slug: string; full_name: string };
 
   const pins = usePins();
   const calm = useCalm();
@@ -275,7 +271,6 @@
   });
 
   // ── Client-side status filter (ADR-078 §12: Tot | Holds | Confirmats) ─
-  type CalFilter = 'all' | 'holds' | 'confirmed';
   let filter = $state<CalFilter>('all');
   // Calm mode (Desk · Calm) forces the confirmed-only view here too — no
   // manual status filter while it is on. Non-destructive: `filter` is
@@ -291,9 +286,6 @@
   const projectsQuery = createQuery(activeProjectsQueryOptions());
   const linesQuery = createQuery(allLinesQueryOptions());
 
-  let workspacesBySlug = $derived(
-    new Map(($workspacesQuery.data?.items ?? []).map((w) => [w.slug, w])),
-  );
   let workspaceSlugById = $derived(
     new Map(($workspacesQuery.data?.items ?? []).map((w) => [w.id, w.slug])),
   );
@@ -334,274 +326,30 @@
     for (const l of scope.lines) ids.add(l.workspaceId);
     return ids;
   });
-  // ── Event feeds ──────────────────────────────────────────────────────
-  const feedKey = toStore(() => ({
-    from: gridFrom,
-    to: gridTo,
-    unresolved: scopeUnresolved,
-    ...filterIds,
-  }));
-
-  // The API's hard cap on ?limit (maxValue in its QuerySchema) — one page.
-  const FEED_LIMIT = 200;
-
-  function feedParams(
-    k: { projectIds: string[]; workspaceIds: string[] },
-    from: string,
-    to: string,
-  ): string {
-    const params = new URLSearchParams();
-    params.set('from', from);
-    params.set('to', to);
-    if (k.projectIds.length > 0) params.set('project_ids', k.projectIds.join(','));
-    if (k.workspaceIds.length > 0) params.set('workspace_ids', k.workspaceIds.join(','));
-    params.set('limit', String(FEED_LIMIT));
-    return params.toString();
-  }
-
-  const perfOptions = toStore(() => {
-    const k = $feedKey;
-    return {
-      queryKey: ['planner-performances', k] as const,
-      // Agenda has its own multi-month feed (below); don't double-fetch the
-      // grid window while it is showing.
-      enabled: view !== 'agenda' && !k.unresolved,
-      queryFn: ({ signal }: { signal: AbortSignal }) =>
-        fetchJSON<{ items: PerformanceEvent[] }>(
-          `/api/performances?status=any&rosters=1&${feedParams(k, k.from, k.to)}`,
-          signal,
-        ),
-    };
+  // ── Event feeds — the whole query layer lives in $lib/planner-feeds
+  // (grid + team + decisions window + agenda book). Reactive inputs are
+  // passed as getters so the option stores keep tracking this page's
+  // state; called synchronously so the query-client context resolves. ──
+  const {
+    perfQuery,
+    datesQuery,
+    availabilityQuery,
+    teamQuery,
+    decisionsPerfQuery,
+    agendaPerfQuery,
+    agendaDatesQuery,
+    agendaAvailabilityQuery,
+  } = createPlannerFeeds({
+    view: () => view,
+    gridFrom: () => gridFrom,
+    gridTo: () => gridTo,
+    agendaFrom: () => agendaFromIso,
+    agendaTo: () => agendaToIso,
+    scopeUnresolved: () => scopeUnresolved,
+    filterIds: () => filterIds,
+    teamWorkspaceIds: () => ($workspacesQuery.data?.items ?? []).map((w) => w.id),
+    todayIso,
   });
-  // The dates window is padded ±1 day: `date` rows are timestamptz and get
-  // bucketed into their venue's (or the viewer's) day, which can fall
-  // outside the UTC-bounded fetch window at the grid edges. Off-grid
-  // buckets simply find no cell.
-  const datesOptions = toStore(() => {
-    const k = $feedKey;
-    return {
-      queryKey: ['planner-dates', k] as const,
-      enabled: view !== 'agenda' && !k.unresolved,
-      queryFn: ({ signal }: { signal: AbortSignal }) =>
-        fetchJSON<{ items: DateEvent[] }>(
-          `/api/dates?${feedParams(k, addDaysIso(k.from, -1), addDaysIso(k.to, 1))}`,
-          signal,
-        ),
-    };
-  });
-  // Blackouts — NO workspace filter: the engine wants every block RLS lets
-  // through (a shared person's block from another space still collides,
-  // ADR-078 §5). Graceful absence (contract §6): a pre-migration DB 502s —
-  // render no blackouts, surface nothing. The `absent` marker is what
-  // hides the blackout-creation entry points (no write UI over a missing
-  // table).
-  const availabilityOptions = toStore(() => {
-    const k = $feedKey;
-    return {
-      queryKey: ['planner-availability', { from: k.from, to: k.to }] as const,
-      enabled: view !== 'agenda' && !k.unresolved,
-      queryFn: async ({ signal }: { signal: AbortSignal }) => {
-        try {
-          return await fetchJSON<{ items: AvailabilityItem[]; absent?: boolean }>(
-            `/api/availability?from=${k.from}&to=${k.to}&limit=500`,
-            signal,
-          );
-        } catch (err) {
-          if (err instanceof Error && err.message === 'Unauthorized') throw err;
-          console.warn('[calendar] availability feed absent:', err);
-          return { items: [] as AvailabilityItem[], absent: true };
-        }
-      },
-    };
-  });
-  // Team of every visible workspace — person names for clash cards and
-  // rail labels. Works against the live DB today; still fails quiet.
-  const teamOptions = toStore(() => {
-    const ids = ($workspacesQuery.data?.items ?? []).map((w) => w.id);
-    return {
-      queryKey: ['planner-team', ids] as const,
-      enabled: ids.length > 0,
-      queryFn: async ({ signal }: { signal: AbortSignal }) => {
-        try {
-          return await fetchJSON<{ items: TeamItem[]; absent?: boolean }>(
-            `/api/team?workspace_ids=${ids.join(',')}`,
-            signal,
-          );
-        } catch (err) {
-          if (err instanceof Error && err.message === 'Unauthorized') throw err;
-          console.warn('[calendar] team feed absent:', err);
-          return { items: [] as TeamItem[], absent: true };
-        }
-      },
-    };
-  });
-
-  // ── Decisions window (ADR-080 §4) — cross-month: holds live in
-  // [today, today+90d], not just the visible month. Same scope filter as
-  // the month feed; ?notice=1 opts into hold_notice_days (ADR-080 §2) and
-  // is what exposes this fetch to a pre-migration DB — so it degrades to
-  // `absent` (contract § Graceful absence: band + decision segments of the
-  // pulse simply stay off, zero errors surfaced). ─────────────────────────
-  const DECISIONS_WINDOW_DAYS = 90;
-  const decisionsTo = addDaysIso(todayIso, DECISIONS_WINDOW_DAYS);
-
-  type DecisionPerfItem = PerformanceEvent & { hold_notice_days?: number | null };
-
-  const decisionsPerfOptions = toStore(() => {
-    const k = $feedKey;
-    return {
-      // Same family as the month feed on purpose: one optimistic write
-      // (setQueriesData over the prefix) and one invalidate reach both.
-      queryKey: [
-        'calendar-performances',
-        {
-          window: 'decisions',
-          unresolved: k.unresolved,
-          projectIds: k.projectIds,
-          workspaceIds: k.workspaceIds,
-        },
-      ] as const,
-      enabled: !k.unresolved,
-      queryFn: async ({
-        signal,
-      }: {
-        signal: AbortSignal;
-      }): Promise<{ items: DecisionPerfItem[]; absent?: boolean }> => {
-        try {
-          // The API caps `limit` at 200 — sized for a one-month grid,
-          // while this window spans 90 days across the whole scope. Page
-          // with a day cursor (rows arrive performed_at.asc; the boundary
-          // day is re-fetched and deduped) so the queue and the pulse's
-          // "per decidir" never under-report silently (ADR-080 §1/§6:
-          // every figure maps to fetched rows — ALL of them).
-          const seen = new Set<string>();
-          const items: DecisionPerfItem[] = [];
-          let from = todayIso;
-          for (;;) {
-            const batch = await fetchJSON<{ items: DecisionPerfItem[] }>(
-              `/api/performances?status=any&rosters=1&notice=1&${feedParams(k, from, decisionsTo)}`,
-              signal,
-            );
-            for (const it of batch.items) {
-              if (!seen.has(it.id)) {
-                seen.add(it.id);
-                items.push(it);
-              }
-            }
-            if (batch.items.length < FEED_LIMIT) break;
-            const lastDay = batch.items[batch.items.length - 1].performed_at.slice(0, 10);
-            // A single day carrying a full page cannot advance the cursor
-            // — stop rather than loop (implausible at this scale).
-            if (lastDay === from) break;
-            from = lastDay;
-          }
-          return { items };
-        } catch (err) {
-          if (err instanceof Error && err.message === 'Unauthorized') throw err;
-          console.warn('[calendar] decisions feed absent:', err);
-          return { items: [] as DecisionPerfItem[], absent: true };
-        }
-      },
-    };
-  });
-  // No availability feed for this window: blackouts only ever yield
-  // single-event severities, which decisionsFor cannot consume (pairs
-  // only) — it doesn't take them as input.
-
-  // ── Agenda feed (multi-month) ─────────────────────────────────────────
-  // The agenda book spans many months, so it owns its OWN window instead of
-  // the single-month grid feeds above (which stay untouched for Month/
-  // Carrils). Both row feeds page past the API's 200-row cap with the same
-  // day-cursor loop the decisions window uses — `pagedFeed` factors it out.
-  async function pagedFeed<T extends { id: string }>(
-    urlFor: (from: string) => string,
-    cursorDay: (row: T) => string,
-    from: string,
-    signal: AbortSignal,
-  ): Promise<{ items: T[] }> {
-    const seen = new Set<string>();
-    const items: T[] = [];
-    let cursor = from;
-    for (;;) {
-      const batch = await fetchJSON<{ items: T[] }>(urlFor(cursor), signal);
-      for (const it of batch.items) {
-        if (!seen.has(it.id)) {
-          seen.add(it.id);
-          items.push(it);
-        }
-      }
-      if (batch.items.length < FEED_LIMIT) break;
-      const lastDay = cursorDay(batch.items[batch.items.length - 1]);
-      // A single day carrying a full page cannot advance the cursor — stop.
-      if (lastDay === cursor) break;
-      cursor = lastDay;
-    }
-    return { items };
-  }
-
-  const agendaFeedKey = toStore(() => ({
-    from: agendaFromIso,
-    to: agendaToIso,
-    unresolved: scopeUnresolved,
-    ...filterIds,
-  }));
-  const agendaPerfOptions = toStore(() => {
-    const k = $agendaFeedKey;
-    return {
-      queryKey: ['planner-agenda-performances', k] as const,
-      enabled: view === 'agenda' && !k.unresolved,
-      queryFn: ({ signal }: { signal: AbortSignal }) =>
-        pagedFeed<PerformanceEvent>(
-          (from) => `/api/performances?status=any&rosters=1&${feedParams(k, from, k.to)}`,
-          (p) => p.performed_at.slice(0, 10),
-          k.from,
-          signal,
-        ),
-    };
-  });
-  const agendaDatesOptions = toStore(() => {
-    const k = $agendaFeedKey;
-    return {
-      queryKey: ['planner-agenda-dates', k] as const,
-      enabled: view === 'agenda' && !k.unresolved,
-      queryFn: ({ signal }: { signal: AbortSignal }) =>
-        pagedFeed<DateEvent>(
-          // Same ±1-day pad as the grid dates feed (tz bucketing at edges).
-          (from) => `/api/dates?${feedParams(k, addDaysIso(from, -1), addDaysIso(k.to, 1))}`,
-          (d) => d.starts_at.slice(0, 10),
-          k.from,
-          signal,
-        ),
-    };
-  });
-  const agendaAvailabilityOptions = toStore(() => {
-    const k = $agendaFeedKey;
-    return {
-      queryKey: ['planner-agenda-availability', { from: k.from, to: k.to }] as const,
-      enabled: view === 'agenda' && !k.unresolved,
-      queryFn: async ({ signal }: { signal: AbortSignal }) => {
-        try {
-          return await fetchJSON<{ items: AvailabilityItem[]; absent?: boolean }>(
-            `/api/availability?from=${k.from}&to=${k.to}&limit=500`,
-            signal,
-          );
-        } catch (err) {
-          if (err instanceof Error && err.message === 'Unauthorized') throw err;
-          console.warn('[calendar] agenda availability feed absent:', err);
-          return { items: [] as AvailabilityItem[], absent: true };
-        }
-      },
-    };
-  });
-
-  const perfQuery = createQuery(perfOptions);
-  const datesQuery = createQuery(datesOptions);
-  const availabilityQuery = createQuery(availabilityOptions);
-  const teamQuery = createQuery(teamOptions);
-  const decisionsPerfQuery = createQuery(decisionsPerfOptions);
-  const agendaPerfQuery = createQuery(agendaPerfOptions);
-  const agendaDatesQuery = createQuery(agendaDatesOptions);
-  const agendaAvailabilityQuery = createQuery(agendaAvailabilityOptions);
 
   // isLoading (isPending && isFetching) — a disabled query is pending but
   // not loading, so an unresolved selection reads as empty, not stuck.
@@ -1542,88 +1290,14 @@
     blackoutOpen = true;
   }
 
-  // ── Calendar feed links (ADR-054) — entry now lives in the "⋯" menu. ──
-  type FeedShare = { id: string; token: string; workspace_id: string; created_at: string };
-
+  // ── Calendar feed links (ADR-054) — entry now lives in the "⋯" menu;
+  // FeedDialog owns the workspace pick, the shares query and the
+  // create/revoke mutations. The page only holds the open flag.
   let feedOpen = $state(false);
-  let feedWs = $state('');
-
-  let feedWsOptions = $derived(
-    ($workspacesQuery.data?.items ?? []).map((w) => ({ value: w.id, label: w.name })),
-  );
 
   function openFeed() {
-    if (!feedWs) {
-      const current = workspacesBySlug.get(defaultWorkspaceSlug);
-      feedWs = current?.id ?? feedWsOptions[0]?.value ?? '';
-    }
     feedOpen = true;
   }
-
-  const feedSharesOptions = toStore(() => {
-    const ws = feedWs;
-    return {
-      queryKey: ['calendar-shares', ws] as const,
-      enabled: feedOpen && Boolean(ws),
-      queryFn: ({ signal }: { signal: AbortSignal }) =>
-        fetchJSON<{ items: FeedShare[] }>(
-          `/api/calendar-shares?workspace_id=${encodeURIComponent(ws)}`,
-          signal,
-        ),
-    };
-  });
-  const feedSharesQuery = createQuery(feedSharesOptions);
-  let feedShares = $derived($feedSharesQuery.data?.items ?? []);
-
-  function feedUrl(token: string): string {
-    return `${location.origin}/api/public/calendar/${token}`;
-  }
-
-  async function copyFeedUrl(token: string, scheme: 'https' | 'webcal') {
-    const url =
-      scheme === 'webcal' ? feedUrl(token).replace(/^https?:/, 'webcal:') : feedUrl(token);
-    addToast(
-      (await copyText(url))
-        ? {
-            tone: 'success',
-            message: `${scheme === 'webcal' ? 'webcal' : 'https'} link copied.`,
-          }
-        : { tone: 'danger', message: 'Could not copy the feed link.' },
-    );
-  }
-
-  const createFeed = createMutation({
-    mutationFn: () =>
-      mutateJSON<{ share: FeedShare }>('POST', '/api/calendar-shares', {
-        workspace_id: feedWs,
-      }),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['calendar-shares'] });
-      addToast({ tone: 'success', message: 'Feed link created.' });
-    },
-    onError: (err) => {
-      addToast({
-        tone: 'danger',
-        title: 'Feed not created',
-        message: err instanceof Error ? err.message : 'Unexpected error',
-      });
-    },
-  });
-
-  const revokeFeed = createMutation({
-    mutationFn: (id: string) => mutateJSON('DELETE', `/api/calendar-shares/${id}`),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['calendar-shares'] });
-      addToast({ tone: 'success', message: 'Feed link revoked — subscribers stop updating now.' });
-    },
-    onError: (err) => {
-      addToast({
-        tone: 'danger',
-        title: 'Not revoked',
-        message: err instanceof Error ? err.message : 'Unexpected error',
-      });
-    },
-  });
 </script>
 
 <svelte:head>
@@ -1693,117 +1367,32 @@
     />
   {/if}
 
-  <div class="cal__toolbar">
-    <div class="cal__nav-buttons">
-      {#if view !== 'agenda'}
-        <!-- Month/Carrils step through `ym`; the agenda is a continuous
-             book (its own span) so the ←/→ window nav means nothing there. -->
-        <Button variant="outline" size="s" onclick={prevMonth} label={t('planner.prev_month', locale)}
-          >←</Button
-        >
-        <span class="cal__tbmonth">{monthTitle} {ym.year}</span>
-        <Button variant="outline" size="s" onclick={nextMonth} label={t('planner.next_month', locale)}
-          >→</Button
-        >
-      {/if}
-      <Button
-        variant="outline"
-        size="s"
-        onclick={view === 'agenda' ? scrollToToday : thisMonth}>{t('planner.today', locale)}</Button
-      >
-    </div>
-    <div class="cal__spacer"></div>
-    {#if !calm.on}
-      <div class="cal__filter" role="group" aria-label={t('planner.filter_label', locale)}>
-        <button
-          type="button"
-          class="cal__filter-btn"
-          class:cal__filter-btn--on={filter === 'all'}
-          aria-pressed={filter === 'all'}
-          onclick={() => (filter = 'all')}>{t('planner.filter_all', locale)}</button
-        >
-        <button
-          type="button"
-          class="cal__filter-btn"
-          class:cal__filter-btn--on={filter === 'holds'}
-          aria-pressed={filter === 'holds'}
-          onclick={() => (filter = 'holds')}>{t('planner.filter_holds', locale)}</button
-        >
-        <button
-          type="button"
-          class="cal__filter-btn"
-          class:cal__filter-btn--on={filter === 'confirmed'}
-          aria-pressed={filter === 'confirmed'}
-          onclick={() => (filter = 'confirmed')}>{t('planner.filter_confirmed', locale)}</button
-        >
-      </div>
-    {/if}
-    <div class="cal__tabs" role="group" aria-label={t('planner.view_label', locale)}>
-      <button
-        type="button"
-        class="cal__tab"
-        class:cal__tab--on={view === 'month'}
-        aria-pressed={view === 'month'}
-        onclick={() => setView('month')}>{t('planner.view_month', locale)}</button
-      >
-      <button
-        type="button"
-        class="cal__tab"
-        class:cal__tab--on={view === 'agenda'}
-        aria-pressed={view === 'agenda'}
-        onclick={() => setView('agenda')}>{t('planner.view_agenda', locale)}</button
-      >
-      <button
-        type="button"
-        class="cal__tab"
-        class:cal__tab--on={view === 'carrils'}
-        aria-pressed={view === 'carrils'}
-        onclick={() => setView('carrils')}>{t('planner.view_carrils', locale)}</button
-      >
-    </div>
-    <Button size="s" onclick={() => openCreate()} label={t('planner.new', locale)}>+</Button>
-    <Menu
-      align="end"
-      label={t('planner.more', locale)}
-      items={[
-        { label: t('planner.feed', locale), onclick: openFeed },
-        ...(canBlackout
-          ? [
-              {
-                label: t('planner.blackout_menu', locale),
-                // Direct menu path: no day context — drop any stale preset
-                // from a cancelled day-cell create (the dialog defaults to
-                // today). The create-dialog footer path keeps its day.
-                onclick: () => {
-                  createDate = null;
-                  openBlackout();
-                },
-              },
-            ]
-          : []),
-      ]}
-    >
-      {#snippet trigger()}⋯{/snippet}
-    </Menu>
-  </div>
-
-  {#if view === 'carrils'}
-    <!-- Agrupa per (ADR-080 §8) — its own row, left-aligned; carrils only. -->
-    <div class="cal__grouprow" role="group" aria-label={t('planner.group_label', locale)}>
-      <span class="cal__group-lead">{t('planner.group_label', locale)}</span>
-      <div class="cal__tabs">
-        {#each ['espai', 'projecte', 'persona'] as const as g (g)}
-          <button
-            type="button"
-            class="cal__tab"
-            class:cal__tab--on={carrilsGroup === g}
-            aria-pressed={carrilsGroup === g}
-            onclick={() => setGroup(g)}>{t(`planner.group_${g}`, locale)}</button
-          >
-        {/each}
-      </div>
-    </div>
-  {/if}
+  <CalToolbar
+    {view}
+    {monthTitle}
+    year={ym.year}
+    {filter}
+    {carrilsGroup}
+    calm={calm.on}
+    {canBlackout}
+    {locale}
+    onPrevMonth={prevMonth}
+    onNextMonth={nextMonth}
+    onThisMonth={thisMonth}
+    onScrollToToday={scrollToToday}
+    onSetView={setView}
+    onSetGroup={setGroup}
+    onSetFilter={(f) => (filter = f)}
+    onCreate={() => openCreate()}
+    onFeed={openFeed}
+    onBlackout={() => {
+      // Direct menu path: no day context — drop any stale preset from a
+      // cancelled day-cell create (the dialog defaults to today). The
+      // create-dialog footer path keeps its day.
+      createDate = null;
+      openBlackout();
+    }}
+  />
 
   {#if errorMsg}
     <p class="cal__state cal__state--danger">{errorMsg}</p>
@@ -1891,52 +1480,7 @@
   presetDate={createDate}
 />
 
-<Dialog bind:open={feedOpen} title="Calendar feed" size="m">
-  <p class="cal__feed-hint">
-    Subscribe from Google/Apple Calendar: confirmed gigs and dates stay in
-    sync — no copying by hand. The link is the key: anyone holding it sees
-    the feed (never money, never notes) until you revoke it.
-  </p>
-  <Select label="Workspace" options={feedWsOptions} bind:value={feedWs} />
-  {#if $feedSharesQuery.isPending && feedWs}
-    <p class="cal__feed-hint">Loading…</p>
-  {:else if feedShares.length === 0}
-    <p class="cal__feed-hint">No feed links yet for this workspace.</p>
-  {:else}
-    <ul class="cal__feed-list" role="list">
-      {#each feedShares as share (share.id)}
-        <li class="cal__feed-row">
-          <code class="cal__feed-token">…{share.token.slice(-8)}</code>
-          <Button variant="outline" size="xs" onclick={() => copyFeedUrl(share.token, 'https')}>
-            Copy link
-          </Button>
-          <Button variant="outline" size="xs" onclick={() => copyFeedUrl(share.token, 'webcal')}>
-            Copy webcal
-          </Button>
-          <Button
-            variant="outline"
-            tone="warn"
-            size="xs"
-            loading={$revokeFeed.isPending}
-            onclick={() => $revokeFeed.mutate(share.id)}
-          >
-            Revoke
-          </Button>
-        </li>
-      {/each}
-    </ul>
-  {/if}
-  {#snippet actions()}
-    <Button variant="outline" onclick={() => (feedOpen = false)}>Close</Button>
-    <Button
-      onclick={() => $createFeed.mutate()}
-      loading={$createFeed.isPending}
-      disabled={!feedWs}
-    >
-      New feed link
-    </Button>
-  {/snippet}
-</Dialog>
+<FeedDialog bind:open={feedOpen} workspaces={$workspacesQuery.data?.items ?? []} />
 
 <style>
   @layer components {
@@ -1972,127 +1516,6 @@
     .cal__pulse-decide:hover {
       color: var(--danger-dark);
       border-color: var(--danger);
-    }
-
-    /* Toolbar: ‹ month › · today · [filter] · [projection] · + · ⋯ */
-    .cal__toolbar {
-      display: flex;
-      align-items: center;
-      gap: var(--space-s);
-      flex-wrap: wrap;
-    }
-    .cal__nav-buttons {
-      display: flex;
-      align-items: center;
-      gap: var(--space-xs);
-    }
-    .cal__tbmonth {
-      font-family: var(--font-display);
-      font-size: var(--text-m);
-      font-weight: 500;
-      min-inline-size: 7.5rem;
-      text-align: center;
-      text-transform: capitalize;
-    }
-    .cal__spacer {
-      flex: 1;
-    }
-
-    .cal__filter {
-      display: inline-flex;
-      align-items: center;
-      gap: var(--space-2xs);
-    }
-    .cal__filter-btn {
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      letter-spacing: var(--mono-letter-spacing-loose);
-      text-transform: uppercase;
-      color: var(--text-faint);
-      padding: var(--space-2xs) var(--space-xs);
-      border-radius: var(--radius-m);
-      background: none;
-      border: none;
-      cursor: pointer;
-      transition: color var(--transition), background var(--transition);
-    }
-    .cal__filter-btn:hover {
-      color: var(--text-color);
-    }
-    .cal__filter-btn--on {
-      color: var(--text-color);
-      background: var(--bg-light);
-    }
-
-    /* Agrupa per (ADR-080 §8) — its own row under the toolbar, left-aligned. */
-    .cal__grouprow {
-      display: flex;
-      align-items: baseline;
-      gap: var(--space-s);
-    }
-    .cal__group-lead {
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      letter-spacing: var(--mono-letter-spacing-loose);
-      text-transform: uppercase;
-      color: var(--text-faint);
-      white-space: nowrap;
-    }
-
-    /* Named projection toggle + Agrupa per — text tabs, active underlined
-       (ADR-076: nunca un icono). Lighter than a pill: the word is the tab. */
-    .cal__tabs {
-      display: inline-flex;
-      align-items: baseline;
-      gap: var(--space-s);
-    }
-    .cal__tab {
-      border: none;
-      background: none;
-      padding: 0;
-      font-family: inherit;
-      font-size: var(--text-s);
-      line-height: 1.3;
-      color: var(--text-faint);
-      cursor: pointer;
-      white-space: nowrap;
-      border-block-end: 1.5px solid transparent;
-      transition: color var(--transition);
-    }
-    .cal__tab:hover {
-      color: var(--text-muted);
-    }
-    .cal__tab--on {
-      color: var(--text-color);
-      font-weight: 500;
-      border-block-end-color: var(--text-color);
-    }
-
-    .cal__feed-hint {
-      font-size: var(--text-xs);
-      color: var(--text-faint);
-    }
-
-    .cal__feed-list {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-xs);
-      margin-block-start: var(--space-s);
-    }
-
-    .cal__feed-row {
-      display: flex;
-      align-items: center;
-      gap: var(--space-s);
-      padding-block: var(--space-xs);
-      border-block-end: 1px solid var(--border-color-light);
-    }
-
-    .cal__feed-token {
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      color: var(--text-muted);
-      flex: 1;
     }
 
     .cal__state {
