@@ -107,7 +107,10 @@
           tone: toneForTag(label),
         }));
         const subject =
-          e.person?.full_name || e.person?.organization_name || e.next_action_note || 'Untitled';
+          e.person?.full_name ||
+          e.person?.organization_name ||
+          e.next_action_note ||
+          t('desk.untitled', locale);
         return {
           id: e.id,
           verb,
@@ -142,11 +145,11 @@
 
 <div class="agenda-wrap">
   {#if loading}
-    <p class="agenda-empty">Loading…</p>
+    <p class="agenda-empty">{t('desk.loading', locale)}</p>
   {:else if error}
-    <p class="agenda-empty agenda-empty--err">Couldn't load your week.</p>
+    <p class="agenda-empty agenda-empty--err">{t('desk.week_error', locale)}</p>
   {:else if grouped.length === 0}
-    <p class="agenda-empty">Nothing due in this scope. Set next actions on your conversations and they land here.</p>
+    <p class="agenda-empty">{t('desk.week_empty', locale)}</p>
   {:else}
     <div class="week">
       {#each grouped as group (group.day)}
@@ -178,7 +181,8 @@
     </div>
     {#if moreCount > 0 && moreHref}
       <a class="week__more" href={moreHref}>
-        + {moreCount} more · next 7 days <span class="week__more-cal">→ Desk</span>
+        {t('desk.week_more', locale, { n: moreCount })}
+        <span class="week__more-cal">→ {t('lens.desk', locale)}</span>
       </a>
     {/if}
   {/if}

@@ -35,6 +35,9 @@
     allLinesQueryOptions,
   } from '$lib/nav-queries';
   import DeskBoard from '$lib/components/DeskBoard.svelte';
+  import { detectLocale, t } from '$lib/i18n';
+
+  const locale = detectLocale(navigator.language);
   import { accentVar } from '$lib/utils/accent';
   import { useBreadcrumb } from '$lib/stores/breadcrumb.svelte';
   import EditWorkspaceDialog from '$lib/components/EditWorkspaceDialog.svelte';
@@ -154,8 +157,11 @@
   function lineStatLabel(line: NavLine): string {
     const st = statOf(perfsForLine(line.id));
     const parts: string[] = [];
-    if (st.confirmed) parts.push(`${st.confirmed} confirmed`);
-    if (st.holds) parts.push(st.holds === 1 ? '1 hold' : `${st.holds} holds`);
+    if (st.confirmed) parts.push(t('hall.stat_confirmed_n', locale, { n: st.confirmed }));
+    if (st.holds)
+      parts.push(
+        st.holds === 1 ? t('hall.stat_hold_one', locale) : t('hall.stat_hold_many', locale, { n: st.holds }),
+      );
     return parts.join(' · ');
   }
   /** Card stat: conversations (exact count) + confirmed/holds (upcoming
@@ -163,10 +169,16 @@
   function projectStatLabel(project: NavProject): string {
     const parts: string[] = [];
     const conv = engTotals[project.id];
-    if (conv) parts.push(conv === 1 ? '1 conversation' : `${conv} conversations`);
+    if (conv)
+      parts.push(
+        conv === 1 ? t('hall.stat_conv_one', locale) : t('hall.stat_conv_many', locale, { n: conv }),
+      );
     const st = statOf(perfsForProject(project.id));
-    if (st.confirmed) parts.push(`${st.confirmed} confirmed`);
-    if (st.holds) parts.push(st.holds === 1 ? '1 hold' : `${st.holds} holds`);
+    if (st.confirmed) parts.push(t('hall.stat_confirmed_n', locale, { n: st.confirmed }));
+    if (st.holds)
+      parts.push(
+        st.holds === 1 ? t('hall.stat_hold_one', locale) : t('hall.stat_hold_many', locale, { n: st.holds }),
+      );
     return parts.join(' · ');
   }
 
@@ -210,13 +222,13 @@
     return { projects: visibleProjects.length, confirmed, holds, conversations };
   });
 
-  const DOMAIN_LABELS: Record<string, string> = {
-    theatre: 'Theatre',
-    dance: 'Dance',
-    circus: 'Circus',
-    music: 'Music',
-    mixed: 'Mixed',
-    other: 'Space',
+  const DOMAIN_KEYS: Record<string, string> = {
+    theatre: 'hall.domain_theatre',
+    dance: 'hall.domain_dance',
+    circus: 'hall.domain_circus',
+    music: 'hall.domain_music',
+    mixed: 'hall.domain_mixed',
+    other: 'hall.domain_space',
   };
   // Masthead kicker: discipline · home base — both real fields (ADR-062).
   // No kind fallback: discipline and personal/team are orthogonal axes, so an
@@ -224,7 +236,9 @@
   let spaceKicker = $derived.by(() => {
     const ws = currentWorkspace;
     if (!ws) return '';
-    const discipline = ws.domain ? (DOMAIN_LABELS[ws.domain] ?? 'Space') : '';
+    const discipline = ws.domain
+      ? t(DOMAIN_KEYS[ws.domain] ?? 'hall.domain_space', locale)
+      : '';
     return [discipline, ws.city].filter(Boolean).join(' · ');
   });
 
@@ -268,8 +282,8 @@
             type="button"
             class="space-head__edit"
             onclick={() => (editOpen = true)}
-            title="Edit space"
-            aria-label="Edit space"
+            title={t('hall.edit_space', locale)}
+            aria-label={t('hall.edit_space', locale)}
           >
             <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>
           </button>
@@ -281,17 +295,17 @@
   </header>
   {#if spaceStats}
     <div class="space-stats">
-      <div class="space-stat"><b>{spaceStats.projects}</b><span>projects</span></div>
-      <div class="space-stat"><b>{spaceStats.confirmed}</b><span>confirmed</span></div>
-      <div class="space-stat"><b>{spaceStats.holds}</b><span>holds</span></div>
-      <div class="space-stat"><b>{spaceStats.conversations}</b><span>conversations</span></div>
+      <div class="space-stat"><b>{spaceStats.projects}</b><span>{t('hall.stat_projects', locale)}</span></div>
+      <div class="space-stat"><b>{spaceStats.confirmed}</b><span>{t('hall.stat_confirmed', locale)}</span></div>
+      <div class="space-stat"><b>{spaceStats.holds}</b><span>{t('hall.stat_holds', locale)}</span></div>
+      <div class="space-stat"><b>{spaceStats.conversations}</b><span>{t('hall.stat_conversations', locale)}</span></div>
     </div>
   {/if}
   {#if currentWorkspace}
     <EditWorkspaceDialog bind:open={editOpen} workspace={currentWorkspace} />
   {/if}
 
-  <div class="home__toolbar"><span class="eyebrow">Next 7 days</span></div>
+  <div class="home__toolbar"><span class="eyebrow">{t('hall.next7', locale)}</span></div>
   <DeskBoard
     conversations={scopedConversations}
     {workspaceSlug}
@@ -304,19 +318,19 @@
 
   {#if visibleProjects.length > 0 || projectsSettled}
     <div class="home__projects-head">
-      <span class="eyebrow">Projects</span>
+      <span class="eyebrow">{t('hall.projects', locale)}</span>
       {#if currentWorkspace}
-        <span class="home__projects-hint">everything {currentWorkspace.name} is running</span>
+        <span class="home__projects-hint">{t('hall.projects_hint', locale, { name: currentWorkspace.name })}</span>
       {/if}
     </div>
     <div class="home__projects">
       {#each visibleProjects as unit (unit.id)}
         <article class="pcard pcard--accent" style={`--c: ${unit.accent}`}>
           <div class="pcard__space">
-            <span class="pcard__tag">Project</span>
+            <span class="pcard__tag">{t('hall.project_tag', locale)}</span>
           </div>
           <a class="pcard__name" href={projectUrl(unit)}>{unit.name}</a>
-          <p class="pcard__meta">{projectStatLabel(unit) || 'no activity yet'}</p>
+          <p class="pcard__meta">{projectStatLabel(unit) || t('hall.no_activity', locale)}</p>
           <div class="pcard__lines">
             {#each linesOfProject(unit.id) as line (line.id)}
               <button type="button" class="pcard__line" onclick={() => openLine(line)}>
@@ -326,14 +340,14 @@
                 <span class="pcard__go" aria-hidden="true">→</span>
               </button>
             {:else}
-              <p class="pcard__empty">No lines on this project yet.</p>
+              <p class="pcard__empty">{t('hall.no_lines', locale)}</p>
             {/each}
             <div class="pcard__new">
               <button
                 type="button"
                 class="creator"
                 onclick={() => creation.openLine({ workspaceId: unit.workspaceId, projectId: unit.id })}
-              >+ New line</button>
+              >{t('hall.new_line', locale)}</button>
             </div>
           </div>
         </article>
@@ -346,7 +360,7 @@
             currentWorkspace ? { workspaceId: currentWorkspace.id } : undefined,
           )}
       >
-        + New project
+        {t('hall.new_project', locale)}
       </button>
     </div>
   {/if}
