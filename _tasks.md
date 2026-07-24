@@ -98,7 +98,7 @@
 > clear, autolimpiante). El ciclo profundo — crear invoice/proforma v3 con tax
 > lines, numeración, pagos desacoplados, aging/paid derivado — no tiene E2E.
 >
-> **BUG DIAGNOSTICADO Y ARREGLADO (2026-07-24, sin desplegar aún): `/h/money`
+> **BUG ARREGLADO Y DESPLEGADO (2026-07-24, runtime `ff6ec4e`): `/h/money`
 > se quedaba en «Loading…» para siempre.** No era una race del `enabled`/
 > queryKey ni de la construcción reactiva — era la **optimización de
 > tracked-props de TanStack Query**. `QueryObserver.shouldNotifyListeners`
@@ -135,9 +135,13 @@
 > prod verde. Repro determinista PASS. **E2E guardián no corrido en local**:
 > el login compartido (`playwright@hour.test`) devuelve «Invalid credentials»
 > contra la Supabase del dev server — problema de fixture/harness, ajeno al
-> fix; correr `money.spec.ts` (el guardián, que espera `section.obra`, solo
-> visible con `loading===false`) contra un entorno desplegado tras el deploy.
-> **Falta desplegar** (solo frontend, cero schema).
+> fix (PENDIENTE aparte: arreglar/rotar esa credencial, la suite E2E local no
+> puede loguear). Correr `money.spec.ts` (el guardián, que espera
+> `section.obra`, solo visible con `loading===false`) contra prod `ff6ec4e`
+> queda como confirmación end-to-end. **Desplegado** el 2026-07-24: commit
+> `ff6ec4e` (rama efímera `fix/money-loading-race` → ff a `main` → push →
+> `pnpm --filter web run deploy`); `/health/live` sha `ff6ec4e` dirty:false,
+> `/health/ready` Supabase ok. Solo frontend, cero schema.
 
 **DISEÑO — hecho e implementado en código** (Marco lo diseñó en frío en Claude
 Design; realizado como componentes *presentational*, sin schema, en rutas dev):

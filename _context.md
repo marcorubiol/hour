@@ -59,11 +59,14 @@ orientativo, no una verdad comercial cerrada.
 
 - Web: `https://hour.zerosense.studio`
 - Worker: `hour-web`
-- `/health/live`: sano, `dirty:false`, SHA **`a643620`** (builtAt 2026-07-24T07:10Z).
+- `/health/live`: sano, `dirty:false`, SHA **`ff6ec4e`** (builtAt 2026-07-24T11:51Z).
 - `/health/ready`: sano, Supabase `ok`.
-- El runtime verificado en producción es **`a643620`** — **la consolidación,
-  el Hall i18n y el picker de identidad, desplegado el 2026-07-24** (solo
-  frontend, cero schema; `main` == prod). Debajo va `a35e8c4` — **money v3
+- El runtime verificado en producción es **`ff6ec4e`** — **fix de la race de
+  `/h/money` («Loading…» colgado): `notifyOnChangeProps:'all'` como default del
+  QueryClient, desplegado el 2026-07-24** (solo frontend, cero schema; `main`
+  == prod; ver `_tasks.md § bloque 7`). Debajo va `a643620` — **la
+  consolidación, el Hall i18n y el picker de identidad, desplegado el
+  2026-07-24** (solo frontend, cero schema). Debajo va `a35e8c4` — **money v3
   (ADR-086/087/088) desplegado el 2026-07-23**: bolo como unidad de dinero, fiscal_identity,
   invoice/proforma con numeración, payment desacoplado, lente Books e impuesto
   country-agnostic. Gate completo ese día (backup → staging → prod migrate
@@ -78,9 +81,12 @@ orientativo, no una verdad comercial cerrada.
 - Repo: `https://github.com/marcorubiol/hour` (privado).
 - Checkout: `/Users/marcorubiol/Developer/hour`.
 - Rama principal: `main`.
-- **`main` == `origin/main` == prod** desde el 2026-07-24 (runtime `a643620`,
-  merge fast-forward + deploy el mismo día). Lo que entró encima de money v3,
-  sin cambios de schema:
+- **`main` == `origin/main` == prod** desde el 2026-07-24 (runtime `ff6ec4e`,
+  merge fast-forward + deploy el mismo día). Encima de `a643620`, sin schema:
+  `ff6ec4e` — **fix de la race de `/h/money`** (default global
+  `notifyOnChangeProps:'all'` en el QueryClient; TanStack tracked-props
+  suprimía la notificación de éxito de una query hermana → store congelado en
+  `isLoading:true`). Antes, encima de money v3, sin cambios de schema:
   candidate polling (`f9eb324`), los 2 de Travel v2 (`c4f2e3a` estilo MonthGrid
   + `21da2be` i18n), el ciclo de debug del agenda feed (`1e8a600`+`f4170fc`),
   docs (`0d45b22`) y el **pase de consolidación 2026-07-24** — `0ad0553` borra
