@@ -7,8 +7,9 @@
 > ese día — runtime **`a35e8c4`**; ver «Producción» y «Git» abajo y
 > `_tasks.md § bloque 7`. El resto del doc no se re-verificó en esa fecha.
 > **Reconciliación 2026-07-24:** pase de consolidación sobre `feat/money-v3-build`
-> (código muerto fuera, helpers unificados, los 4 ficheros gigantes partidos);
-> ver «Git» y «Verificación». Sin cambios de schema ni deploy.
+> (código muerto fuera, helpers unificados, los 4 ficheros gigantes partidos),
+> Hall i18n y picker de identidad; todo mergeado a `main` y **desplegado a prod
+> el mismo día** (runtime `a643620`). Sin cambios de schema.
 >
 > Si otro archivo contradice este documento sobre el estado presente, gana este
 > documento. Si contradice una decisión de producto estable, consultar
@@ -58,10 +59,12 @@ orientativo, no una verdad comercial cerrada.
 
 - Web: `https://hour.zerosense.studio`
 - Worker: `hour-web`
-- `/health/live`: sano, `dirty:false`, SHA **`a35e8c4`** (builtAt 2026-07-23T14:27Z).
+- `/health/live`: sano, `dirty:false`, SHA **`a643620`** (builtAt 2026-07-24T07:10Z).
 - `/health/ready`: sano, Supabase `ok`.
-- El runtime verificado en producción es `a35e8c4` — **money v3 (ADR-086/087/088)
-  desplegado el 2026-07-23**: bolo como unidad de dinero, fiscal_identity,
+- El runtime verificado en producción es **`a643620`** — **la consolidación,
+  el Hall i18n y el picker de identidad, desplegado el 2026-07-24** (solo
+  frontend, cero schema; `main` == prod). Debajo va `a35e8c4` — **money v3
+  (ADR-086/087/088) desplegado el 2026-07-23**: bolo como unidad de dinero, fiscal_identity,
   invoice/proforma con numeración, payment desacoplado, lente Books e impuesto
   country-agnostic. Gate completo ese día (backup → staging → prod migrate
   plan+apply → worker deploy), evidencia de runs en `_tasks.md § bloque 7`.
@@ -75,9 +78,9 @@ orientativo, no una verdad comercial cerrada.
 - Repo: `https://github.com/marcorubiol/hour` (privado).
 - Checkout: `/Users/marcorubiol/Developer/hour`.
 - Rama principal: `main`.
-- Runtime desplegado: **`a35e8c4`** (money v3). **`main` == `origin/main`**
-  (tip `d55d5fa`) va **21 commits** por delante de prod tras el merge
-  fast-forward del 2026-07-24 — todo sin desplegar y sin cambios de schema:
+- **`main` == `origin/main` == prod** desde el 2026-07-24 (runtime `a643620`,
+  merge fast-forward + deploy el mismo día). Lo que entró encima de money v3,
+  sin cambios de schema:
   candidate polling (`f9eb324`), los 2 de Travel v2 (`c4f2e3a` estilo MonthGrid
   + `21da2be` i18n), el ciclo de debug del agenda feed (`1e8a600`+`f4170fc`),
   docs (`0d45b22`) y el **pase de consolidación 2026-07-24** — `0ad0553` borra
@@ -132,11 +135,15 @@ vacía se reconstruye con `pnpm db:reset`, recibe fixtures sintéticos y pasa
 
 ### Verificación local y contra producción
 
-**Pase parcial 2026-07-24** (consolidación, sin schema ni deploy): `svelte-check`
-0/0 (1.832 ficheros), unit **363/363** (subió de 348), collab 11/11, build de
-producción verde, y verificación mecánica de los splits (CSS y markup movidos
-byte a byte). RLS y E2E no se re-corrieron: no hubo cambios de DB y la suite
-E2E corre contra el runtime desplegado, que no cambió.
+**Pase 2026-07-24** (consolidación + deploy): `svelte-check` 0/0 (1.832
+ficheros), unit **368/368** (subió de 348: identidad + picker), collab 11/11,
+build verde, verificación mecánica de los splits (CSS y markup byte a byte).
+RLS no se re-corrió (cero cambios de DB). **E2E post-deploy contra `a643620`:
+26/27** — collab arreglado (el spec ahora reintenta la reescritura hasta dejar
+el doc Yjs limpio), `money.spec.ts` reescrito contra el UI v3 (el spec viejo
+era de money v2 y llevaba roto desde el 23 sin que nadie lo corriera), y el
+fallo restante es un **bug real no determinista de `/h/money`** («Loading…»
+colgado con datos ya llegados) anotado en `_tasks.md` — el spec es su guardián.
 
 Último pase completo relevante:
 

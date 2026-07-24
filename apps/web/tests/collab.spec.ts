@@ -173,10 +173,18 @@ test.describe('collaborative notes (Yjs over the RoadsheetCollab DO)', () => {
       timeout: 15_000,
     });
 
-    // A rewrites the note with this run's marker.
-    await notesBox(a).click();
-    await notesBox(a).press('ControlOrMeta+a');
-    await notesBox(a).pressSequentially(`${marker} from A`, { delay: 10 });
+    // A rewrites the note with this run's marker. The select-all races the
+    // provider's initial sync: content restored from the DO can land AFTER
+    // the selection and survive the rewrite (observed as residue from prior
+    // runs interleaved into the doc). Retry the rewrite until the doc holds
+    // exactly this run's text — which also leaves the fixture doc clean for
+    // the next run.
+    await expect(async () => {
+      await notesBox(a).click();
+      await notesBox(a).press('ControlOrMeta+a');
+      await notesBox(a).pressSequentially(`${marker} from A`, { delay: 10 });
+      await expect(notesBox(a)).toHaveValue(`${marker} from A`, { timeout: 3000 });
+    }).toPass({ timeout: 45_000 });
 
     // B converges without touching anything.
     await expect(notesBox(b)).toHaveValue(new RegExp(`${marker} from A`), {

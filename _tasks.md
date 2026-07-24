@@ -90,6 +90,31 @@
 > **Follow-up abierto (no bloquea nada):** la UX de **enlazar una función nueva a
 > un bolo** — las performances creadas en Planner nacen sin bolo hasta que exista
 > esa UI. La lente Money vive de los bolos del backfill + los creados a mano.
+>
+> **Follow-up abierto (2026-07-24, no bloquea):** portar la cobertura E2E de
+> **invoice/payments a los diálogos v3**. El spec v2 (`money.spec.ts`, tbody +
+> "VAT %" + pagos anclados a factura) quedó obsoleto con la reescritura ADR-087
+> y se sustituyó por el roundtrip de fee (set → roll de la obra → reload →
+> clear, autolimpiante). El ciclo profundo — crear invoice/proforma v3 con tax
+> lines, numeración, pagos desacoplados, aging/paid derivado — no tiene E2E.
+>
+> **BUG abierto (2026-07-24): `/h/money` puede quedarse en «Loading…» para
+> siempre** (race no determinista; un reload lo cura). Evidencia de esa noche:
+> con sesión válida y las 9 llamadas API en 200 en <2,2 s (bolos/invoices/
+> expenses incluidas), el bloque de filas sigue mostrando «Loading…» >20 s —
+> es decir, `loading` (`bolos.isLoading || invoices.isLoading ||
+> expenses.isLoading`, línea ~317) nunca baja pese a que los datos llegaron;
+> los totales por moneda sí pintan. Reproducido 2 veces en sondas Playwright
+> directas (contexto frío) y repetidamente en la suite E2E; 6 sondas
+> posteriores idénticas renderizaron bien — no determinista, sin error de
+> consola ni pageerror. Sospechoso principal: la construcción reactiva de las
+> queries (`toStore` de opciones + `enabled: !k.unresolved` + queryKey que
+> cambia cuando el scope de pins se resuelve) — una carrera entre el flap de
+> `enabled`/queryKey y el observer de TanStack. OJO: `lib/planner-feeds
+> .svelte.ts` usa el mismo patrón. No se pudo aún bisecar si nació con money
+> v3 (`a35e8c4`, 2026-07-23 — aquel gate no re-corrió E2E contra el UI nuevo)
+> o con el split del layout (2026-07-24). El spec `money.spec.ts` reescrito es
+> el guardián: falla cuando la race muerde (suite 26/27 esa noche).
 
 **DISEÑO — hecho e implementado en código** (Marco lo diseñó en frío en Claude
 Design; realizado como componentes *presentational*, sin schema, en rutas dev):
