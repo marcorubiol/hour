@@ -15,12 +15,12 @@
   import EditProjectDialog from '$lib/components/EditProjectDialog.svelte';
   import AccentSwatchPicker from '$lib/components/create/AccentSwatchPicker.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
-  import { accentVarFor } from '$lib/utils/accent';
-  import { MONOGRAM_MAX, type EditableProject } from '$lib/utils/identity';
+  import { accentVarFor, accentHue, hueDistance } from '$lib/utils/accent';
+  import { MONOGRAM_MAX, type EditableProject, type IdentitySibling } from '$lib/utils/identity';
 
   interface Props {
     project: EditableProject;
-    siblings?: Array<{ id: string; initials?: string | null }>;
+    siblings?: IdentitySibling[];
     onclose: () => void;
   }
 
@@ -39,6 +39,19 @@
     initials.trim().length > 0 &&
       siblings.some((s) => s.id !== project.id && (s.initials ?? '') === initials.trim()),
   );
+
+  // Colour warning (soft): the chosen/auto hue is within this many degrees of a
+  // sibling's. The accent is a grouping cue, so this informs, never blocks.
+  const COLOR_CLASH_DEG = 25;
+  let colorClash = $derived.by((): string | null => {
+    const mine = accentHue({ slug: project.slug, accent });
+    for (const s of siblings) {
+      if (s.id === project.id) continue;
+      if (hueDistance(accentHue({ slug: s.slug, accent: s.accent }), mine) <= COLOR_CLASH_DEG)
+        return s.name ?? 'another project';
+    }
+    return null;
+  });
 
   const save = createMutation({
     mutationFn: async () => {
@@ -113,20 +126,28 @@
     {/if}
   </div>
 
-  <AccentSwatchPicker bind:accent autoSlug={project.slug} label="Project color" hideLegend />
+  <div class="iqp__color">
+    <AccentSwatchPicker bind:accent autoSlug={project.slug} label="Project color" hideLegend />
+    <!-- Space is always reserved so the warning appears without a layout jump. -->
+    <p class="iqp__clash">
+      {#if colorClash}A similar colour is used by {colorClash}.{/if}
+    </p>
+  </div>
 
-  <button
-    type="button"
-    class="iqp__save"
-    onclick={() => $save.mutate()}
-    disabled={$save.isPending}
-  >
-    Save identity
-  </button>
+  <div class="iqp__actions">
+    <button
+      type="button"
+      class="iqp__save"
+      onclick={() => $save.mutate()}
+      disabled={$save.isPending}
+    >
+      Save identity
+    </button>
 
-  <hr class="iqp__rule" />
+    <hr class="iqp__rule" />
 
-  <button type="button" class="iqp__link" onclick={openFull}>Edit project →</button>
+    <button type="button" class="iqp__link" onclick={openFull}>Edit project →</button>
+  </div>
 </div>
 
 <EditProjectDialog bind:open={fullOpen} {project} {siblings} />
@@ -168,6 +189,12 @@
       gap: var(--space-2xs);
     }
 
+    .iqp__color {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2xs);
+    }
+
     .iqp__hint {
       margin: 0;
       font-size: var(--text-xs);
@@ -194,6 +221,21 @@
       color: var(--text-muted);
     }
 
+    /* Colour warning — space reserved (one line) so it never shifts layout. */
+    .iqp__clash {
+      margin: 0;
+      min-block-size: 1.2em;
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+    }
+
+    /* Save · rule · Edit sit tighter than the panel's roomy rhythm above. */
+    .iqp__actions {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-s);
+    }
+
     .iqp__save {
       font: inherit;
       font-weight: 600;
@@ -205,7 +247,6 @@
       background: var(--primary);
       color: var(--bg-ultra-light);
       cursor: pointer;
-      margin-block-start: var(--space-2xs);
     }
     .iqp__save:hover:not(:disabled) {
       filter: brightness(0.96);

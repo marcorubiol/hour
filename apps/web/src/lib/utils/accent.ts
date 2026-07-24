@@ -1,4 +1,4 @@
-export const ACCENT_COUNT = 7;
+export const ACCENT_COUNT = 10;
 
 function hashSlug(slug: string): number {
 	let h = 2166136261;
@@ -20,7 +20,7 @@ export function accentVar(slug: string | null | undefined): string {
 
 /**
  * Workspaces / projects can store an explicit accent override:
- *   - '1'..'7'     → palette index → var(--accent-N) (out-of-range wraps in)
+ *   - '1'..'10'    → palette index → var(--accent-N) (out-of-range wraps in)
  *   - 'h<0-360>'   → custom hue → oklch(<palette L> <palette C> <hue>), so a
  *                    free-picked hue stays soft and adapts to light/dark
  *   - hex / oklch  → literal color (accepted; the picker only ever emits h<hue>)
@@ -33,7 +33,7 @@ export function accentVarFor(entity: {
 	const a = entity.accent?.trim();
 	if (!a) return accentVar(entity.slug);
 	// Palette index — wrap into 1..ACCENT_COUNT so an override stored under the
-	// old 12-colour palette never dangles at an undefined token now there are 7.
+	// old 12-colour palette never dangles at an undefined token now there are 10.
 	if (/^\d+$/.test(a))
 		return `var(--accent-${(((Number(a) - 1) % ACCENT_COUNT) + ACCENT_COUNT) % ACCENT_COUNT + 1})`;
 	// Custom hue ('h<0-360>') — render with the palette-fixed L/C tokens so the
@@ -59,4 +59,30 @@ export function isCustomAccent(accent: string | null | undefined): boolean {
 export function customHue(accent: string | null | undefined): number | null {
 	const m = accent?.trim().match(/^h(\d{1,3})$/);
 	return m ? Number(m[1]) % 360 : null;
+}
+
+/** Hue of each palette swatch (mirrors --accent-N in tokens.css): 10 hues,
+ *  bin-centred at 360·(i+0.5)/10 — the eye's practical limit for categorical
+ *  colour, spaced 36° apart. */
+export const PALETTE_HUES = [18, 54, 90, 126, 162, 198, 234, 270, 306, 342];
+
+/**
+ * The effective hue (0-360) an entity's accent resolves to: a custom hue, a
+ * preset's hue, or — for null/auto — the hash-derived preset's hue.
+ */
+export function accentHue(entity: { slug: string | null | undefined; accent?: string | null }): number {
+	const a = entity.accent?.trim();
+	const custom = customHue(a);
+	if (custom !== null) return custom;
+	const idx =
+		a && /^\d+$/.test(a)
+			? (((Number(a) - 1) % ACCENT_COUNT) + ACCENT_COUNT) % ACCENT_COUNT
+			: accentIndex(entity.slug) - 1;
+	return PALETTE_HUES[idx];
+}
+
+/** Shortest angular distance (0-180) between two hues on the wheel. */
+export function hueDistance(a: number, b: number): number {
+	const d = Math.abs(a - b) % 360;
+	return Math.min(d, 360 - d);
 }
