@@ -6,6 +6,9 @@
 > **Reconciliación 2026-07-23:** money v3 (ADR-086/087/088) se desplegó a prod
 > ese día — runtime **`a35e8c4`**; ver «Producción» y «Git» abajo y
 > `_tasks.md § bloque 7`. El resto del doc no se re-verificó en esa fecha.
+> **Reconciliación 2026-07-24:** pase de consolidación sobre `feat/money-v3-build`
+> (código muerto fuera, helpers unificados, los 4 ficheros gigantes partidos);
+> ver «Git» y «Verificación». Sin cambios de schema ni deploy.
 >
 > Si otro archivo contradice este documento sobre el estado presente, gana este
 > documento. Si contradice una decisión de producto estable, consultar
@@ -74,15 +77,26 @@ orientativo, no una verdad comercial cerrada.
 - Rama principal: `main`.
 - Base funcional del runtime: **`a35e8c4`** (money v3), publicada en `origin/main`.
   `origin/main` (tip `f9eb324`, candidate polling) va 1 commit por delante de
-  prod. La rama viva `feat/money-v3-build` va 2 commits por delante de
-  `origin/main` (`c4f2e3a` estilo MonthGrid + `21da2be` i18n, de Travel v2, sin
-  desplegar). **Atención:** el `main` **local** quedó stale — 3 commits de
-  identidad sin pushear y 15 por detrás de `origin/main`; `origin/main` es la
-  verdad, no el `main` local (reconciliar en frío es higiene, no bloquea nada).
+  prod. La rama viva `feat/money-v3-build` va **11 commits** por delante de
+  `origin/main`, nada desplegado: los 2 de Travel v2 (`c4f2e3a` estilo MonthGrid
+  + `21da2be` i18n), el ciclo de debug del agenda feed (`1e8a600`+`f4170fc`),
+  docs (`0d45b22`) y el **pase de consolidación 2026-07-24** — `0ad0553` borra
+  ~3.4k líneas de harnesses de diseño de money v3 ya obsoletos y exports
+  muertos; `e0a47a0` unifica helpers duplicados de fecha/dinero/tasks (incluye
+  fix del seed UTC de received_on/incurred_on); `bdc30fd` settings 1766→276
+  (7 secciones); `c88a8e4` planner 2107→1530 (feeds/toolbar/feed-dialog);
+  `496e527` layout 1705→682 (shell/); `ace9341` MonthGrid 1566→1053 (chips/
+  legend/clash + `month-events.ts`, estilos de cards intactos byte a byte).
+- El `main` local se reconcilió con `origin/main` (2026-07-24); el aviso de
+  stale de la reconciliación anterior ya no aplica.
 - `wrangler deploy` exige árbol limpio y publica el SHA en `/health/live`.
-- **Ramas vivas: una sola.** Las otras ocho se cerraron el 2026-07-20 —
-  siete borradas por estar contenidas en `main` o en la punta del stack, y
-  `feat/planner-identity` mergeada aquí por fast-forward.
+- **Ramas: una viva + una aparcada.** Ocho se cerraron el 2026-07-20 y
+  `feat/money-v3-design` se borró el 2026-07-24 (contenida en `main`).
+  - `feat/identity-colour-picker` — **aparcada, con backup en origin**
+    (2026-07-24): slider de color con magnet + aviso de color similar
+    (3 commits). Integrarla es trabajo de diseño, no mecánico — conflicta con
+    el stack de money v3 en ~5 ficheros de identidad. La migración CHECK que
+    la acompaña ya está aplicada en prod.
   - `feat/comms-threads` — comms + acceso. **Su canon ya está en `main`**
     (ADR-082/083/085, las dos escaleras y la faceta en `structure-model.md`, el
     digest del grill y el review de 32 hallazgos). Lo que queda en la rama es
@@ -118,6 +132,12 @@ vacía se reconstruye con `pnpm db:reset`, recibe fixtures sintéticos y pasa
 `build/migrations/squashed-20260720/` para auditoría.
 
 ### Verificación local y contra producción
+
+**Pase parcial 2026-07-24** (consolidación, sin schema ni deploy): `svelte-check`
+0/0 (1.832 ficheros), unit **363/363** (subió de 348), collab 11/11, build de
+producción verde, y verificación mecánica de los splits (CSS y markup movidos
+byte a byte). RLS y E2E no se re-corrieron: no hubo cambios de DB y la suite
+E2E corre contra el runtime desplegado, que no cambió.
 
 Último pase completo relevante:
 
