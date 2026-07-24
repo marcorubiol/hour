@@ -75,10 +75,10 @@ orientativo, no una verdad comercial cerrada.
 - Repo: `https://github.com/marcorubiol/hour` (privado).
 - Checkout: `/Users/marcorubiol/Developer/hour`.
 - Rama principal: `main`.
-- Base funcional del runtime: **`a35e8c4`** (money v3), publicada en `origin/main`.
-  `origin/main` (tip `f9eb324`, candidate polling) va 1 commit por delante de
-  prod. La rama viva `feat/money-v3-build` va **19 commits** por delante de
-  `origin/main`, nada desplegado: los 2 de Travel v2 (`c4f2e3a` estilo MonthGrid
+- Runtime desplegado: **`a35e8c4`** (money v3). **`main` == `origin/main`**
+  (tip `d55d5fa`) va **21 commits** por delante de prod tras el merge
+  fast-forward del 2026-07-24 — todo sin desplegar y sin cambios de schema:
+  candidate polling (`f9eb324`), los 2 de Travel v2 (`c4f2e3a` estilo MonthGrid
   + `21da2be` i18n), el ciclo de debug del agenda feed (`1e8a600`+`f4170fc`),
   docs (`0d45b22`) y el **pase de consolidación 2026-07-24** — `0ad0553` borra
   ~3.4k líneas de harnesses de diseño de money v3 ya obsoletos y exports
@@ -91,14 +91,11 @@ orientativo, no una verdad comercial cerrada.
   dayBucket + `f765cfe` verbos + `10520c0` portada/board, 25 claves ca/en/es)
   y **el picker de identidad mergeado** (`05c84d3` — slider de 10 tonos con
   magnet, aviso de color similar, helpers de hue; unit sube a 368).
-- El `main` local se reconcilió con `origin/main` (2026-07-24); el aviso de
-  stale de la reconciliación anterior ya no aplica.
 - `wrangler deploy` exige árbol limpio y publica el SHA en `/health/live`.
-- **Ramas vivas: una sola.** Ocho se cerraron el 2026-07-20;
-  `feat/money-v3-design` se borró el 2026-07-24 (contenida en `main`) y
-  `feat/identity-colour-picker` se **mergeó a la rama viva ese mismo día**
-  (merge `05c84d3` — los conflictos temidos eran solo 2 ficheros) y se borró
-  de local y origin.
+- **Ramas de trabajo: ninguna — `main` es la única verdad.** El 2026-07-24
+  `feat/money-v3-build` se mergeó a `main` por fast-forward y se borró (local
+  y origin), con `feat/identity-colour-picker` ya dentro (merge `05c84d3`);
+  `feat/money-v3-design` se borró contenida. Queda solo `feat/comms-threads`:
   - `feat/comms-threads` — comms + acceso. **Su canon ya está en `main`**
     (ADR-082/083/085, las dos escaleras y la faceta en `structure-model.md`, el
     digest del grill y el review de 32 hallazgos). Lo que queda en la rama es
