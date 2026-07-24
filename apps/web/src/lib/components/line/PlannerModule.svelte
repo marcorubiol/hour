@@ -21,11 +21,8 @@
   import { fetchJSON } from '$lib/api';
   import Button from '$lib/components/Button.svelte';
   import StateBadge from '$lib/components/StateBadge.svelte';
-  import MonthGrid, {
-    type DateEvent,
-    type PerformanceEvent,
-    formatMonthLabel,
-  } from '$lib/components/MonthGrid.svelte';
+  import MonthGrid from '$lib/components/MonthGrid.svelte';
+  import { type DateEvent, type PerformanceEvent, formatMonthLabel } from '$lib/month-events';
   import PerformanceCreateDialog from '$lib/components/PerformanceCreateDialog.svelte';
   import { addMonths, addDaysIso, monthGrid } from '$lib/planner';
   import { performanceStatusLabel, performanceStatusTone } from '$lib/performance';

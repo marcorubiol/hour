@@ -1,4 +1,4 @@
-<script module lang="ts">
+<script lang="ts">
   /**
    * Month grid presentation for the Calendar lens — weeks × days with
    * performance/date chips, day numbers, and the quiet per-day "+"
@@ -13,145 +13,37 @@
    * Class names keep the original `cal__` block from the calendar page —
    * the e2e specs select `.cal__grid` / `.cal__weekday` (Svelte scoping
    * keeps them collision-free anyway).
+   *
+   * Split (2026-07-24): the event types + pure day/label helpers live in
+   * $lib/month-events; the chips (PerfChip/DateChip), the legend
+   * (CalLegend) and the clash popover (ClashCard) are components under
+   * planner/. The chips are styleless on purpose — the hand-tuned
+   * `.cal__event*` grammar stays HERE, one :global rule-set for every
+   * card, so the shared design layer cannot fork per chip kind.
    */
+  import { createQuery } from '@tanstack/svelte-query';
   import { addDaysIso, dayKeyInTz, monthGrid, assignBandLanes } from '$lib/planner';
   import { weekdayLabels } from '$lib/datetime';
-
-  export type ProjectLite = {
-    id: string;
-    slug: string;
-    name: string;
-    accent?: string | null;
-    /** Stored identity monogram (ADR-081); absent until the migration is
-        applied — IdentityMark falls back to initials derived from name. */
-    initials?: string | null;
-    workspace_id: string;
-  };
-
-  export type PerformanceEvent = {
-    id: string;
-    slug: string | null;
-    performed_at: string;
-    status: string;
-    load_in_at?: string | null;
-    start_at: string | null;
-    venue_name: string | null;
-    city: string | null;
-    country: string | null;
-    line_id: string | null;
-    project: ProjectLite | null;
-    venue: {
-      name: string;
-      city: string | null;
-      country?: string | null;
-      timezone: string | null;
-    } | null;
-    /** ADR-084 §3 — the operator's readiness ticks, read by the card foot. */
-    readiness?: Record<string, boolean> | null;
-    /** Present only on ?rosters=1 fetches (conflict engine feed). */
-    person_ids?: string[];
-  };
-
-  export type DateEvent = {
-    id: string;
-    kind: string;
-    status: string;
-    title: string | null;
-    starts_at: string;
-    ends_at?: string | null;
-    all_day: boolean;
-    /** ADR-084 §1 — rows sharing this render as one multi-day band. */
-    series_id?: string | null;
-    venue_name: string | null;
-    city: string | null;
-    country?: string | null;
-    project: ProjectLite | null;
-    venue: { timezone: string | null } | null;
-    /** ADR-078 columns — absent until the migrations are applied
-        (graceful absence: chips render directionless, no away bands). */
-    line_id?: string | null;
-    travel_direction?: string | null;
-    label?: string | null;
-  };
-
-  /** A stored blackout, page-shaped for rendering (label already built). */
-  export type BlackoutBandVM = {
-    id: string;
-    /** starts_on / ends_on — inclusive ISO days. */
-    from: string;
-    to: string;
-    company: boolean;
-    tentative: boolean;
-    label: string;
-    note?: string | null;
-  };
-
-  /** A derived away band (ADR-078 §6) — display-only inference. */
-  export type AwayBandVM = {
-    from: string;
-    to: string;
-    label: string;
-  };
-
-  /** One conflict, page-shaped for the day mark + clash card. */
-  export type ClashVM = {
-    severity: 'people' | 'possible' | 'blackout' | 'blackout-tentative';
-    glyph: '!' | '?';
-    title: string;
-    body: string;
-    rows: Array<{ label: string; status: string; accent: string | null }>;
-  };
-
-  /** Day bucket of a performance — performed_at is day-level truth. */
-  export function perfDayKey(p: PerformanceEvent): string {
-    return p.performed_at.slice(0, 10);
-  }
-
-  /**
-   * Day bucket of a date row. All-day rows are calendar dates, not
-   * instants — keep the stored day. Timed rows follow the timezone rule
-   * (spec § Timezone rule): the day of THEIR venue when one is linked,
-   * the viewer's day otherwise.
-   */
-  export function dateDayKey(d: DateEvent, timeZone: string): string {
-    if (d.all_day) return d.starts_at.slice(0, 10);
-    return dayKeyInTz(d.starts_at, d.venue?.timezone || timeZone);
-  }
-
-  /** "July 2026" — shared by the page's h1 and the grid's aria-label. */
-  export function formatMonthLabel(year: number, month: number, locale = 'en-GB'): string {
-    return new Date(Date.UTC(year, month - 1, 1)).toLocaleDateString(locale, {
-      month: 'long',
-      year: 'numeric',
-      timeZone: 'UTC',
-    });
-  }
-
-  /** Month name alone ("May", "maig") — the masthead's serif em. */
-  export function monthName(year: number, month: number, locale = 'en-GB'): string {
-    return new Date(Date.UTC(year, month - 1, 1)).toLocaleDateString(locale, {
-      month: 'long',
-      timeZone: 'UTC',
-    });
-  }
-
-  /**
-   * Monday-first short weekday labels — moved to $lib/datetime once the block
-   * form needed them too (re-exported so this module's surface is unchanged).
-   */
-  export { weekdayLabels };
-</script>
-
-<script lang="ts">
-  import { createQuery } from '@tanstack/svelte-query';
-  import { dualTime } from '$lib/datetime';
   import { workspacesQueryOptions } from '$lib/nav-queries';
-  import { accentVarFor } from '$lib/utils/accent';
   import type { IdentitySibling } from '$lib/utils/identity';
-  import IdentityMark from '$lib/components/IdentityMark.svelte';
   import IdentityQuickPanel from '$lib/components/IdentityQuickPanel.svelte';
-  import { isReady, performanceStatusFamily } from '$lib/performance';
-  import { dateStatusFamily } from '$lib/date';
+  import { performanceStatusFamily } from '$lib/performance';
+  import {
+    perfDayKey,
+    dateDayKey,
+    formatMonthLabel,
+    perfInstant,
+    type ProjectLite,
+    type PerformanceEvent,
+    type DateEvent,
+    type BlackoutBandVM,
+    type AwayBandVM,
+    type ClashVM,
+  } from '$lib/month-events';
+  import CalLegend from '$lib/components/planner/CalLegend.svelte';
+  import ClashCard from '$lib/components/planner/ClashCard.svelte';
+  import PerfChip from '$lib/components/planner/PerfChip.svelte';
+  import DateChip from '$lib/components/planner/DateChip.svelte';
 
   interface Props {
     year: number;
@@ -340,120 +232,6 @@
     return map;
   });
 
-  function perfHref(p: PerformanceEvent): string | null {
-    if (!p.slug || !p.project) return null;
-    const ws = workspaceSlugById.get(p.project.workspace_id) ?? workspaceSlug;
-    return `/h/${ws}/performance/${p.slug}`;
-  }
-
-  function perfLabel(p: PerformanceEvent): string {
-    return p.venue?.name ?? p.venue_name ?? p.city ?? p.project?.name ?? 'Performance';
-  }
-
-  // Chip times follow the timezone rule: venue wall time on the chip, the
-  // viewer's as a faint courtesy only when the clocks disagree. A
-  // venue-less gig falls back to its home space's timezone — the same zone
-  // its times were entered in — never silently the browser's. Venue-less
-  // DATE rows stay on the viewer's clock on purpose: they bucket on the
-  // viewer's day (dateDayKey), and a chip must not show a wall time from a
-  // zone other than the one that placed it in its cell.
-  function perfTz(p: PerformanceEvent): string | null {
-    return p.venue?.timezone ?? workspaceTzById.get(p.project?.workspace_id ?? '') ?? null;
-  }
-  /** ADR-078: the working time — load-in when known, else show start. */
-  function perfInstant(p: PerformanceEvent): string | null {
-    return p.load_in_at ?? p.start_at;
-  }
-  function perfTime(p: PerformanceEvent): { primary: string; secondary: string | null } | null {
-    const at = perfInstant(p);
-    if (!at) return null;
-    const t = dualTime(at, perfTz(p), viewerTz);
-    return { primary: t.primary, secondary: t.secondary };
-  }
-  function perfTitle(p: PerformanceEvent): string {
-    const base = `${perfLabel(p)} — ${p.status.replace(/_/g, ' ')}`;
-    const at = perfInstant(p);
-    if (!at) return base;
-    const t = dualTime(at, perfTz(p), viewerTz);
-    return t.secondary ? `${base} · ${t.primary} (${t.secondary} yours)` : `${base} · ${t.primary}`;
-  }
-  function dateTime(
-    d: DateEvent,
-  ): { primary: string; secondary: string | null; end: string | null } | null {
-    if (d.all_day) return null;
-    const t = dualTime(d.starts_at, d.venue?.timezone, viewerTz);
-    // A day says its hours as a RANGE when it has an end. On a block's
-    // continuation cell the range is the ONLY thing there is room for, and
-    // "10:00" alone would hide that Wednesday runs four hours longer than
-    // Tuesday — which is the whole reason the days are separate rows.
-    const end =
-      d.ends_at && d.ends_at !== d.starts_at
-        ? dualTime(d.ends_at, d.venue?.timezone, viewerTz).primary
-        : null;
-    return { primary: t.primary, secondary: t.secondary, end };
-  }
-  function dateText(d: DateEvent): string {
-    // "Altres" rows carry their free label; day_off shows its city if any.
-    if (d.kind === 'other') return d.label ?? d.title ?? dateKindLabel(d.kind);
-    if (d.kind === 'day_off') return d.city ?? d.title ?? '';
-    return d.title ?? d.city ?? '';
-  }
-  function dateTitle(d: DateEvent): string {
-    const base = d.title ?? dateKindLabel(d.kind);
-    if (d.all_day) return base;
-    const t = dualTime(d.starts_at, d.venue?.timezone, viewerTz);
-    return t.secondary ? `${base} · ${t.primary} (${t.secondary} yours)` : `${base} · ${t.primary}`;
-  }
-  function travelText(d: DateEvent): string {
-    const place = d.city ?? d.title ?? d.venue_name ?? dateKindLabel(d.kind);
-    if (d.travel_direction === 'outbound') return `→ ${place}`;
-    if (d.travel_direction === 'return') return `${place} →`;
-    if (d.travel_direction === 'leg') return `→ ${place} →`;
-    // No stored direction still reads as a trip: lead with the arrow so a
-    // bare "Vitoria" can't be mistaken for a place label on some other chip.
-    return `→ ${place}`;
-  }
-
-  // The chip's second row (venue on top, city underneath). Suppressed when
-  // the label ALREADY fell back to the city — a chip never prints the same
-  // place twice.
-  function perfCity(p: PerformanceEvent): string | null {
-    const city = p.venue?.city ?? p.city ?? null;
-    return city && city !== perfLabel(p) ? city : null;
-  }
-  function dateCity(d: DateEvent): string | null {
-    const city = d.city ?? null;
-    return city && city !== dateText(d) ? city : null;
-  }
-
-  // The ISO code beside the city (Marco, 2026-07-20): two letters are enough
-  // to tell a Barcelona from a Bayonne at a glance, and unlike a full country
-  // name they cannot wrap the line. The venue's own country wins over the
-  // denormalised trio — the linked entity is the better truth.
-  function perfCountry(p: PerformanceEvent): string | null {
-    const cc = p.venue?.country ?? p.country ?? null;
-    return cc ? cc.toUpperCase() : null;
-  }
-  function dateCountry(d: DateEvent): string | null {
-    return d.country ? d.country.toUpperCase() : null;
-  }
-
-  /**
-   * ADR-002 — the status the FOOT should speak, given the workspace's hold
-   * convention. A ranked hold only means something where the convention is a
-   * priority queue: in a `simple` workspace (theatre/dance) hold_1 and
-   * hold_2 are the same thing — two holds coexisting on a slot — so printing
-   * "1st hold" would invent a hierarchy the company does not run.
-   *
-   * The stored status is NOT rewritten; only the word changes. A workspace
-   * that later switches to `prioritized` gets its ranks back untouched.
-   */
-  function footStatus(p: PerformanceEvent): string {
-    const mode = workspaceModeById.get(p.project?.workspace_id ?? '') ?? 'simple';
-    if (mode === 'prioritized') return p.status;
-    return p.status.startsWith('hold') ? 'hold' : p.status;
-  }
-
   // ── Multi-day blocks (ADR-084 §1) ────────────────────────────────────
   // A block is N rows sharing a series_id. The BAND is a rendering of those
   // rows: which day is an edge is derived here on every paint, never stored.
@@ -499,13 +277,6 @@
     // Clock order, so "the first hour" means the earliest one.
     for (const g of out) if (g.length > 1) g.sort((a, b) => (a.starts_at < b.starts_at ? -1 : 1));
     return out;
-  }
-
-  /** The hover carries every session's hour — the chip had room for one. */
-  function groupTitle(g: DateEvent[]): string {
-    if (g.length < 2) return dateTitle(g[0]);
-    const times = g.map((x) => dateTime(x)?.primary).filter(Boolean);
-    return `${dateTitle(g[0])} · ${times.join(' · ')}`;
   }
 
   /** Null when the row stands alone — a "series" of one is just a date. */
@@ -617,77 +388,14 @@
   });
 </script>
 
-<!-- One chip body, two shells: a gig with a slug is a link, one without is
-     inert. The body lives in a snippet so the card grammar is written once. -->
-{#snippet perfBody(p: PerformanceEvent)}
-  {@const time = perfTime(p)}
-  {@const city = perfCity(p)}
-  {@const cc = perfCountry(p)}
-  {@const foot = stateLabel(footStatus(p))}
-  <span class="cal__event-top">
-    <span class="cal__event-name">{perfLabel(p)}</span>
-    {#if p.project}<button
-        type="button"
-        class="cal__markbtn"
-        onclick={(e) => openMark(e, p.project)}
-      ><IdentityMark
-          accent={accentVarFor(p.project)}
-          name={p.project.name}
-          initials={p.project.initials}
-        /></button>{/if}
-  </span>
-  {#if city || time}
-    <span class="cal__event-line">
-      <span class="cal__event-city"
-        >{city ?? ''}{#if city && cc}<i class="cal__event-cc">{cc}</i>{/if}</span
-      >
-      {#if time}<span class="cal__event-time"
-          >{time.primary}{#if time.secondary}<i> {time.secondary}</i>{/if}</span
-        >{/if}
-    </span>
-  {/if}
-  {#if performanceStatusFamily(p.status) === 'confirmed' && readinessItems.length > 0}
-    <!-- A settled gig's foot answers "is it sorted?" — restating "confirmed"
-         would only repeat what the fill and the radius already say. -->
-    <span class="cal__event-foot cal__event-foot--ready">
-      {#each readinessItems as item (item.key)}
-        <span class="cal__ready" class:cal__ready--on={isReady(p.readiness, item.key)}
-          >{item.label}</span
-        >
-      {/each}
-    </span>
-  {:else if foot}
-    <span class="cal__event-foot">{foot}</span>
-  {/if}
-{/snippet}
-
 {#if legendProjects.length > 0}
-  <div class="cal__legend">
-    {#each legendProjects as pr (pr.id)}
-      {@const shown = !hiddenProjects.includes(pr.id)}
-      <button
-        type="button"
-        class="cal__legend-item"
-        class:cal__legend-item--muted={!shown}
-        aria-pressed={shown}
-        onclick={() => toggleProject(pr.id)}
-        ><IdentityMark
-          accent={accentVarFor(pr)}
-          name={pr.name}
-          initials={pr.initials}
-        />{pr.name}</button
-      >
-    {/each}
-    <span class="cal__legend-sep" aria-hidden="true"></span>
-    <span class="cal__legend-key"
-      ><span class="cal__legend-swatch" data-family="confirmed" aria-hidden="true"
-      ></span>{legendConfirmedLabel}</span
-    >
-    <span class="cal__legend-key"
-      ><span class="cal__legend-swatch" data-family="hold" aria-hidden="true"
-      ></span>{legendHoldLabel}</span
-    >
-  </div>
+  <CalLegend
+    projects={legendProjects}
+    hidden={hiddenProjects}
+    onToggle={toggleProject}
+    confirmedLabel={legendConfirmedLabel}
+    holdLabel={legendHoldLabel}
+  />
 {/if}
 
 <div
@@ -740,120 +448,31 @@
           {#if openClash === `${day.iso}:${i}`}
             <!-- Bottom rows open upward: the grid's overflow (rounded
                  corners) would clip a downward card past the last cells. -->
-            <div
-              class="cal__clashcard"
-              class:cal__clashcard--up={wi >= weeks.length - 2}
-              class:cal__clashcard--flip={di >= 5}
-              role="dialog"
-              aria-label={c.title}
-            >
-              <p class="cal__clashcard-head">
-                <span class="cal__mark cal__mark--static" data-severity={c.severity}
-                  >{c.glyph}</span
-                >
-                {c.title}
-              </p>
-              <p class="cal__clashcard-body">{c.body}</p>
-              {#each c.rows as row, ri (ri)}
-                <p class="cal__clashcard-row">
-                  <span
-                    class="cal__clashcard-dot"
-                    style={row.accent ? `--c: ${row.accent}` : undefined}
-                    aria-hidden="true"
-                  ></span>
-                  <span class="cal__clashcard-label">{row.label}</span>
-                  <span class="cal__clashcard-status">{row.status}</span>
-                </p>
-              {/each}
-            </div>
+            <ClashCard {c} up={wi >= weeks.length - 2} flip={di >= 5} />
           {/if}
         {/each}
         {#each perfs as p (p.id)}
-          {@const href = perfHref(p)}
-          {@const family = performanceStatusFamily(p.status)}
-          {#if href}
-            <a
-              class="cal__event cal__event--perf"
-              data-family={family}
-              style={p.project ? `--c: ${accentVarFor(p.project)}` : undefined}
-              {href}
-              title={perfTitle(p)}
-            >{@render perfBody(p)}</a>
-          {:else}
-            <span
-              class="cal__event cal__event--perf"
-              data-family={family}
-              style={p.project ? `--c: ${accentVarFor(p.project)}` : undefined}
-              title={perfTitle(p)}
-            >{@render perfBody(p)}</span>
-          {/if}
+          <PerfChip
+            {p}
+            {workspaceSlug}
+            {workspaceSlugById}
+            {workspaceTzById}
+            {workspaceModeById}
+            {viewerTz}
+            {stateLabel}
+            {readinessItems}
+            onMarkOpen={openMark}
+          />
         {/each}
         {#each dateGroups as g (g[0].id)}
-          {@const d = g[0]}
-          {@const more = g.length - 1}
-          {#if d.kind === 'travel_day'}
-            <span
-              class="cal__event cal__event--travel"
-              data-family={dateStatusFamily(d.status)}
-              style={d.project ? `--c: ${accentVarFor(d.project)}` : undefined}
-              title={dateTitle(d)}
-            ><span class="cal__travel-text">{travelText(d)}</span>{#if d.project}<button type="button" class="cal__markbtn" onclick={(e) => openMark(e, d.project)}><IdentityMark accent={accentVarFor(d.project)} name={d.project.name} initials={d.project.initials} /></button>{/if}</span>
-          {:else}
-            {@const time = dateTime(d)}
-            {@const city = dateCity(d)}
-            {@const cc = dateCountry(d)}
-            {@const edges = seriesEdges(d, day.iso)}
-            {@const head = !edges || edges.first || di === 0}
-            <span
-              class="cal__event cal__event--date"
-              class:cal__event--off={d.kind === 'day_off'}
-              class:cal__event--run={!!edges}
-              class:cal__event--run-first={edges?.first}
-              class:cal__event--run-last={edges?.last}
-              data-family={dateStatusFamily(d.status)}
-              style={d.project ? `--c: ${accentVarFor(d.project)}` : undefined}
-              title={groupTitle(g)}
-            >
-              {#if head}
-                <span class="cal__event-top">
-                  <span class="cal__event-name">{dateText(d)}</span>
-                  {#if d.project}<button
-                      type="button"
-                      class="cal__markbtn"
-                      onclick={(e) => openMark(e, d.project)}
-                    ><IdentityMark
-                        accent={accentVarFor(d.project)}
-                        name={d.project.name}
-                        initials={d.project.initials}
-                      /></button>{/if}
-                </span>
-                {#if city || time}
-                  <span class="cal__event-line">
-                    <span class="cal__event-city"
-                      >{city ?? ''}{#if city && cc}<i class="cal__event-cc">{cc}</i>{/if}</span
-                    >
-                    {#if time}<span class="cal__event-time"
-                        >{time.primary}{#if time.end}–{time.end}{/if}{#if more > 0}<i
-                            class="cal__event-more">+{more}</i
-                          >{/if}</span
-                      >{/if}
-                  </span>
-                {/if}
-                <span class="cal__event-kind">{dateKindLabel(d.kind)}</span>
-              {:else if time}
-                <!-- A continuation day carries only its OWN hours. The block
-                     said its name at the head; repeating it would print the
-                     same words across five cells. -->
-                <span class="cal__event-line cal__event-line--cont">
-                  <span class="cal__event-time"
-                    >{time.primary}{#if time.end}–{time.end}{/if}{#if more > 0}<i
-                        class="cal__event-more">+{more}</i
-                      >{/if}</span
-                  >
-                </span>
-              {/if}
-            </span>
-          {/if}
+          <DateChip
+            {g}
+            edges={seriesEdges(g[0], day.iso)}
+            {di}
+            {viewerTz}
+            {dateKindLabel}
+            onMarkOpen={openMark}
+          />
         {/each}
         {#if wlc > 0}
           <span class="cal__bands">
@@ -990,13 +609,15 @@
 
     /* ── Conflict day-marks (ADR-072 grammar, EXACT):
        people = solid red circle "!" · possible = dashed line-2 circle "?"
-       blackout = red OUTLINE circle · blackout-tentative = accent dashed. */
+       blackout = red OUTLINE circle · blackout-tentative = accent dashed.
+       Anchored :global under .cal__grid — ClashCard renders the static
+       head mark, so one rule-set styles both it and the day-head marks. */
     .cal__marks {
       display: inline-flex;
       gap: 3px;
       margin-inline-start: auto;
     }
-    .cal__mark {
+    .cal__grid :global(.cal__mark) {
       /* Variable contract — each severity redeclares, never re-styles. */
       --mark-bg: var(--bg);
       --mark-fg: var(--text-muted);
@@ -1018,105 +639,37 @@
       cursor: pointer;
       flex: none;
     }
-    .cal__mark[data-severity='people'] {
+    .cal__grid :global(.cal__mark[data-severity='people']) {
       --mark-bg: var(--danger);
       --mark-fg: var(--bg);
     }
-    .cal__mark[data-severity='possible'] {
+    .cal__grid :global(.cal__mark[data-severity='possible']) {
       --mark-border-color: var(--border-color-dark);
       --mark-border-style: dashed;
       --mark-fg: var(--text-faint);
     }
-    .cal__mark[data-severity='blackout'] {
+    .cal__grid :global(.cal__mark[data-severity='blackout']) {
       --mark-border-color: var(--danger);
       --mark-fg: var(--danger);
     }
-    .cal__mark[data-severity='blackout-tentative'] {
+    .cal__grid :global(.cal__mark[data-severity='blackout-tentative']) {
       --mark-border-color: var(--cal-accent, var(--warning));
       --mark-border-style: dashed;
       --mark-fg: var(--cal-accent, var(--warning));
     }
-    .cal__mark--static {
+    .cal__grid :global(.cal__mark--static) {
       cursor: default;
-    }
-
-    /* Clash card — the popover naming shared people + the two bookings. */
-    .cal__clashcard {
-      position: absolute;
-      z-index: var(--z-dropdown);
-      top: 2rem;
-      inset-inline-start: var(--space-xs);
-      inline-size: 15.5rem;
-      max-inline-size: 60vw;
-      background: var(--bg-ultra-light);
-      border: 1px solid var(--border-color-dark);
-      border-radius: var(--radius-l);
-      box-shadow: var(--box-shadow-3);
-      padding: var(--space-s) var(--space-m);
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-xs);
-      white-space: normal;
-    }
-    .cal__clashcard--up {
-      top: auto;
-      bottom: 2rem;
-    }
-    /* Weekend columns anchor to the cell's right edge — a leftward card
-       would run past the grid boundary and get clipped. */
-    .cal__clashcard--flip {
-      inset-inline-start: auto;
-      inset-inline-end: var(--space-xs);
-    }
-    .cal__clashcard-head {
-      display: flex;
-      align-items: center;
-      gap: var(--space-xs);
-      font-size: var(--text-s);
-      font-weight: 600;
-      color: var(--text-color);
-    }
-    .cal__clashcard-body {
-      font-size: var(--text-s);
-      color: var(--text-muted);
-      line-height: 1.45;
-    }
-    .cal__clashcard-row {
-      display: flex;
-      align-items: center;
-      gap: var(--space-xs);
-      font-size: var(--text-xs);
-      color: var(--text-muted);
-    }
-    .cal__clashcard-dot {
-      inline-size: 7px;
-      block-size: 7px;
-      border-radius: var(--radius-circle);
-      background: var(--c, var(--text-faint));
-      flex: none;
-    }
-    .cal__clashcard-label {
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    .cal__clashcard-status {
-      margin-inline-start: auto;
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      color: var(--text-faint);
-      flex: none;
     }
 
     /* Monogram as its own click zone inside the event link (ADR-081): opens
        the identity editor instead of following the chip's href. */
-    .cal__markbtn {
+    .cal__grid :global(.cal__markbtn) {
       all: unset;
       display: inline-flex;
       cursor: pointer;
       border-radius: calc(var(--mark, 14px) * 0.28);
     }
-    .cal__markbtn:focus-visible {
+    .cal__grid :global(.cal__markbtn:focus-visible) {
       outline: var(--focus-width) solid var(--focus-color);
       outline-offset: 1px;
     }
@@ -1128,8 +681,11 @@
     /* ── Event chip — the hold grammar (ADR-072 §5): project accent on
        the left rail (--c); the STATUS family redeclares the chip
        variables (solid tint = confirmed, outline = hold, dashed =
-       possibility), never the properties. */
-    .cal__event {
+       possibility), never the properties.
+       The chips render in PerfChip/DateChip (styleless children) — every
+       .cal__event* rule stays HERE, anchored :global under .cal__grid, so
+       the hand-tuned card grammar remains ONE rule-set for all cards. */
+    .cal__grid :global(.cal__event) {
       --chip-bg: var(--bg-ultra-light);
       /* Hold's hatch rides as an IMAGE so the family still only redeclares
          variables, never properties (philosophy §3). */
@@ -1174,25 +730,25 @@
        reading as unsettled without anyone having to read the word (Marco,
        2026-07-19). One rule for gigs and dates alike: the family is the
        whole story, so the shape stays true wherever the grammar is used. */
-    .cal__event[data-family='confirmed'] {
+    .cal__grid :global(.cal__event[data-family='confirmed']) {
       --chip-radius: var(--radius-s);
     }
 
     /* Card rows: name + monogram on top, place + time under, state at the
        foot. Monogram and time never shrink; the name and city take the
        squeeze so a long venue can't push the meta out of the cell. */
-    .cal__event-top,
-    .cal__event-line {
+    .cal__grid :global(.cal__event-top),
+    .cal__grid :global(.cal__event-line) {
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: var(--space-2xs);
       min-inline-size: 0;
     }
-    .cal__event-line {
+    .cal__grid :global(.cal__event-line) {
       color: var(--text-muted);
     }
-    .cal__event-city {
+    .cal__grid :global(.cal__event-city) {
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
@@ -1201,7 +757,7 @@
     /* The ISO code rides INSIDE the city span so the two ellipsis together
        as one place — a truncated "Barcelo…" must not leave a stranded "FR"
        claiming to be somewhere it isn't. */
-    .cal__event-cc {
+    .cal__grid :global(.cal__event-cc) {
       font-style: normal;
       font-family: var(--font-mono);
       font-size: 0.85em;
@@ -1210,14 +766,14 @@
       margin-inline-start: 0.35em;
     }
     /* The chip's foot — hold rank on a gig, kind word on a date. */
-    .cal__event-foot,
-    .cal__event-kind {
+    .cal__grid :global(.cal__event-foot),
+    .cal__grid :global(.cal__event-kind) {
       margin-block-start: 1px;
       padding-block-start: 1px;
       border-block-start: 1px solid
         color-mix(in oklch, var(--c, var(--border-color-dark)) 16%, var(--border-color-light));
     }
-    .cal__event-foot {
+    .cal__grid :global(.cal__event-foot) {
       font-family: var(--font-mono);
       font-size: 0.85em;
       letter-spacing: var(--mono-letter-spacing-loose);
@@ -1226,33 +782,33 @@
     /* Readiness ticks: the WORD always prints, only the ✓ varies. "Not
        sorted" then reads as a visible absence rather than as nothing at
        all — and the settled gig's foot never collapses to empty. */
-    .cal__event-foot--ready {
+    .cal__grid :global(.cal__event-foot--ready) {
       display: flex;
       gap: var(--space-xs);
       letter-spacing: var(--mono-letter-spacing);
       min-inline-size: 0;
     }
-    .cal__ready {
+    .cal__grid :global(.cal__ready) {
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
-    .cal__ready--on {
+    .cal__grid :global(.cal__ready--on) {
       color: var(--text-muted);
     }
-    .cal__ready--on::before {
+    .cal__grid :global(.cal__ready--on::before) {
       content: '✓';
       margin-inline-end: 0.2em;
       color: var(--success, currentColor);
     }
 
-    a.cal__event:hover {
+    .cal__grid :global(a.cal__event:hover) {
       filter: brightness(0.97);
     }
 
     /* The settled gig is the day's anchor: it leads the cell AND lifts off
        it. Lift is earned like the radius — a hold stays flat on the page. */
-    .cal__event--perf[data-family='confirmed'] {
+    .cal__grid :global(.cal__event--perf[data-family='confirmed']) {
       --chip-bg: color-mix(in oklch, var(--c, var(--border-color-dark)) 13%, var(--bg-ultra-light));
       --chip-shadow:
         0 1px 2px color-mix(in oklch, var(--text-color) 10%, transparent),
@@ -1262,7 +818,7 @@
        shadow, so whatever follows a lifted gig would sit inside it. Only
        the chip actually behind one pays the extra space — a lone gig, or
        the last in the cell, keeps the tight rhythm (Marco, 2026-07-19). */
-    .cal__event--perf[data-family='confirmed'] + .cal__event {
+    .cal__grid :global(.cal__event--perf[data-family='confirmed'] + .cal__event) {
       margin-block-start: var(--space-xs);
     }
     /* Options — held or proposed, gig or date — are ONE card (Marco
@@ -1271,8 +827,8 @@
        and dashed edge — no per-type branch to drift apart. Solid fill stays
        reserved for settled things. (Travel carries no family, so it keeps its
        bare form; tentative blackout bands keep their own accent hatch.) */
-    .cal__event[data-family='hold'],
-    .cal__event[data-family='proposed'] {
+    .cal__grid :global(.cal__event[data-family='hold']),
+    .cal__grid :global(.cal__event[data-family='proposed']) {
       --chip-bg: var(--bg-ultra-light);
       /* The "not settled" texture: a faint neutral dot stipple — pencilled in,
          not inked. Grey, never the project accent; colour lives in the dashed
@@ -1288,83 +844,14 @@
        proposed — the least committed — the faintest, and the SAME on a gig or
        a date. A gig's base ink is full strength (the settled tint needs it),
        so held gigs are pulled to muted here; dates already sit muted. */
-    .cal__event--perf[data-family='hold'] {
+    .cal__grid :global(.cal__event--perf[data-family='hold']) {
       --chip-fg: var(--text-muted);
     }
-    .cal__event[data-family='proposed'] {
+    .cal__grid :global(.cal__event[data-family='proposed']) {
       --chip-fg: var(--text-faint);
     }
 
-    /* Legend — the month's colour key, readable without opening anything.
-       The swatches restate the two shapes the chips use (solid = settled,
-       hatched+dashed = held), in neutral ink so they read as a key and not
-       as one more project. */
-    .cal__legend {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: var(--space-xs) var(--space-s);
-      margin-block-end: var(--space-s);
-      font-size: var(--text-xs);
-      color: var(--text-muted);
-    }
-    .cal__legend-item,
-    .cal__legend-key {
-      display: inline-flex;
-      align-items: center;
-      gap: var(--space-2xs);
-    }
-    /* The project entries ARE the view's filter — click one to mute it. */
-    .cal__legend-item {
-      appearance: none;
-      border: 0;
-      padding: 0;
-      background: none;
-      font: inherit;
-      color: inherit;
-      cursor: pointer;
-      border-radius: var(--radius-s);
-      transition: opacity var(--transition);
-    }
-    .cal__legend-item:hover {
-      color: var(--text-color);
-    }
-    .cal__legend-item--muted {
-      opacity: 0.4;
-      text-decoration: line-through;
-    }
-    .cal__legend-item:focus-visible {
-      outline: var(--focus-width) solid var(--focus-color);
-      outline-offset: 2px;
-    }
-    .cal__legend-sep {
-      inline-size: 1px;
-      block-size: 1em;
-      background: var(--border-color-dark);
-    }
-    /* The key restates the chips' own grammar — square until settled — so it
-       stays true rather than decorative. */
-    .cal__legend-swatch {
-      inline-size: 0.85em;
-      block-size: 0.85em;
-      border-radius: var(--radius-none);
-      border: 1px solid var(--border-color-dark);
-    }
-    .cal__legend-swatch[data-family='confirmed'] {
-      border-radius: var(--radius-s);
-      border-color: transparent;
-      background: color-mix(in oklch, var(--text-color) 22%, var(--bg-ultra-light));
-    }
-    .cal__legend-swatch[data-family='hold'] {
-      border-style: dashed;
-      background-image: repeating-linear-gradient(
-        135deg,
-        color-mix(in oklch, var(--text-color) 16%, var(--bg-ultra-light)) 0 4px,
-        var(--bg-ultra-light) 4px 8px
-      );
-    }
-
-    .cal__event-name {
+    .cal__grid :global(.cal__event-name) {
       /* The chip's title — bold on EVERY kind (gig, rehearsal, residency,
          press, day-off) so it reads apart from its city/time line and foot.
          Settled-vs-held is said by fill, dash, hatch and radius, not weight. */
@@ -1380,7 +867,7 @@
        grammar above (dashed + square + dot texture); a held date keeps this
        base muted ink and a proposed one drops to the faintest via the shared
        proposed rule; confirmed stays the quiet solid form. */
-    .cal__event--date {
+    .cal__grid :global(.cal__event--date) {
       --chip-fg: var(--text-muted);
     }
 
@@ -1389,19 +876,19 @@
        so a confirmed day inside a tentative run shows as itself and the
        strip tells the truth about a half-confirmed week. The chip bleeds
        into the cell padding so the run crosses the grid's hairline. */
-    .cal__event--run {
+    .cal__grid :global(.cal__event--run) {
       margin-inline: calc(-1 * var(--space-xs));
       padding-inline: var(--space-xs);
       border-inline: 0;
       border-radius: 0;
     }
-    .cal__event--run-first {
+    .cal__grid :global(.cal__event--run-first) {
       margin-inline-start: 0;
       border-inline-start: 1px var(--chip-border-style) var(--chip-border-color);
       border-start-start-radius: var(--chip-radius);
       border-end-start-radius: var(--chip-radius);
     }
-    .cal__event--run-last {
+    .cal__grid :global(.cal__event--run-last) {
       margin-inline-end: 0;
       border-inline-end: 1px var(--chip-border-style) var(--chip-border-color);
       border-start-end-radius: var(--chip-radius);
@@ -1409,15 +896,15 @@
     }
     /* Continuation day: its hours sit at the run's right edge, so the times
        line up down the week instead of drifting with each label. */
-    .cal__event-line--cont {
+    .cal__grid :global(.cal__event-line--cont) {
       justify-content: flex-end;
     }
-    .cal__event--off {
+    .cal__grid :global(.cal__event--off) {
       --chip-fg: var(--text-faint);
       border-inline-start-style: dotted;
     }
 
-    .cal__event-kind {
+    .cal__grid :global(.cal__event-kind) {
       font-style: normal;
       font-family: var(--font-mono);
       font-size: 0.85em;
@@ -1432,7 +919,7 @@
        it the chip fill, the dashed edge when tentative and the earned radius
        when confirmed — no bare exception. Only its CONTENT stays its own: mono
        text where the direction arrows carry the meaning, on one row. */
-    .cal__event--travel {
+    .cal__grid :global(.cal__event--travel) {
       font-family: var(--font-mono);
       font-size: var(--text-xs);
       letter-spacing: var(--mono-letter-spacing);
@@ -1447,7 +934,7 @@
       gap: var(--space-2xs);
       min-inline-size: 0;
     }
-    .cal__travel-text {
+    .cal__grid :global(.cal__travel-text) {
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
@@ -1456,14 +943,14 @@
 
     /* Venue wall time on the chip (timezone rule) — quiet mono prefix;
        the viewer's clock rides as a fainter courtesy when it differs. */
-    .cal__event-time {
+    .cal__grid :global(.cal__event-time) {
       font-family: var(--font-mono);
       font-size: var(--text-xs);
       font-style: normal;
       color: var(--text-faint);
       flex: none;
     }
-    .cal__event-time i {
+    .cal__grid :global(.cal__event-time i) {
       font-style: normal;
       color: color-mix(in oklch, var(--text-faint) 62%, transparent);
       /* Svelte trims the leading space inside <i> — restore the gap here. */
@@ -1472,7 +959,7 @@
     /* "+2" — the day holds more sessions than the card can print. It reads as
        part of the time rather than as a badge, because it is the same fact
        continued: the hover carries the hours themselves. */
-    .cal__event-time i.cal__event-more {
+    .cal__grid :global(.cal__event-time i.cal__event-more) {
       color: color-mix(in oklch, var(--text-faint) 85%, var(--text-color));
       margin-inline-start: 0.3em;
     }

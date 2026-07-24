@@ -15,7 +15,7 @@ import { toStore } from 'svelte/store';
 import { fetchJSON } from '$lib/api';
 import { addDaysIso, type PlannerView } from '$lib/planner';
 import type { AvailabilityItem } from '$lib/availability';
-import type { DateEvent, PerformanceEvent } from '$lib/components/MonthGrid.svelte';
+import type { DateEvent, PerformanceEvent } from '$lib/month-events';
 
 export type TeamItem = {
   person_id: string;

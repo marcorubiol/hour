@@ -42,7 +42,7 @@
     type ClashVM,
     type DateEvent,
     type PerformanceEvent,
-  } from '$lib/components/MonthGrid.svelte';
+  } from '$lib/month-events';
   import { assignBandLanes, dayKeyInTz } from '$lib/planner';
   import { dualTime, localeWeekdayShort } from '$lib/datetime';
   import { workspacesQueryOptions } from '$lib/nav-queries';

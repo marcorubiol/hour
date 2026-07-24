@@ -39,7 +39,8 @@
   import LensHeader from '$lib/components/LensHeader.svelte';
   import LensTitle from '$lib/components/LensTitle.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
-  import MonthGrid, {
+  import MonthGrid from '$lib/components/MonthGrid.svelte';
+  import {
     dateDayKey,
     monthName,
     perfDayKey,
@@ -48,7 +49,7 @@
     type ClashVM,
     type DateEvent,
     type PerformanceEvent,
-  } from '$lib/components/MonthGrid.svelte';
+  } from '$lib/month-events';
   import AgendaList, { type AgendaDecision } from '$lib/components/AgendaList.svelte';
   import DecisionBand, {
     type ConcurrenceVM,
