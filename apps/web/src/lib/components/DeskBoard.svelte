@@ -30,7 +30,7 @@
    */
   import TagChip from '$lib/components/TagChip.svelte';
   import { accentVar } from '$lib/utils/accent';
-  import { dayBucket } from '$lib/desk-feed';
+  import { conversationVerbKey, dayBucket } from '$lib/desk-feed';
   import { localeWeekdayShort } from '$lib/datetime';
   import { detectLocale, t } from '$lib/i18n';
 
@@ -70,15 +70,6 @@
 
   const locale = detectLocale(navigator.language);
 
-  const VERBS: Record<ConversationStatus, { upcoming: string; overdue: string }> = {
-    contacted: { upcoming: 'Follow up', overdue: 'Chase' },
-    in_conversation: { upcoming: 'Reply', overdue: 'Reply' },
-    hold: { upcoming: 'Confirm', overdue: 'Confirm' },
-    confirmed: { upcoming: 'Prep', overdue: 'Prep' },
-    declined: { upcoming: 'Note', overdue: 'Note' },
-    dormant: { upcoming: 'Revive', overdue: 'Revive' },
-    recurring: { upcoming: 'Check', overdue: 'Check' },
-  };
   const TAG_TONES: Tone[] = ['teal', 'blue', 'green', 'purple', 'amber', 'red', 'neutral'];
   function toneForTag(tag: string): Tone {
     let h = 0;
@@ -107,7 +98,7 @@
       .map((e) => {
         const bucket = railLabel(e.next_action_at!);
         const isOverdue = bucket.sortKey === -1;
-        const verb = VERBS[e.status]?.[isOverdue ? 'overdue' : 'upcoming'] ?? 'Look at';
+        const verb = t(`desk.verb_${conversationVerbKey(e.status, isOverdue)}`, locale);
         const tagsRaw = Array.isArray(e.custom_fields?.tags)
           ? (e.custom_fields?.tags as unknown[]).filter((t): t is string => typeof t === 'string')
           : [];

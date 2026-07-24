@@ -170,6 +170,11 @@ const VERB_KEYS: Record<string, { upcoming: string; overdue: string }> = {
   recurring: { upcoming: 'check', overdue: 'check' },
 };
 
+/** i18n verb key (desk.verb_*) for a conversation's derived call. */
+export function conversationVerbKey(status: string, overdue: boolean): string {
+  return VERB_KEYS[status]?.[overdue ? 'overdue' : 'upcoming'] ?? 'look';
+}
+
 // Fixed within-day order, mirroring the lens nav (Desk · Calendar · Contacts ·
 // Money). The show-day banner sits above this, outside the order.
 const CONCERN_RANK: Record<DeskConcern, number> = {
@@ -375,7 +380,7 @@ export function buildDeskFeed(input: DeskFeedInput, now: Date, locale: Locale = 
         subject: convSubject(e),
         projectName: e.project?.name ?? '—',
         projectId: e.project?.id ?? null,
-        verbKey: VERB_KEYS[e.status]?.[overdue ? 'overdue' : 'upcoming'] ?? 'look',
+        verbKey: conversationVerbKey(e.status, overdue),
         overdue,
         personSlug: e.person?.slug ?? null,
       }),
