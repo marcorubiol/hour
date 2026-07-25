@@ -84,7 +84,15 @@ describe.skipIf(!envReady())('payment RLS + derived invoice status', () => {
       const createdInvoice = await pgRpc<InvoiceRow>('create_invoice_from_bolo', jwt, {
         p_bolo_id: bolo.id,
         p_tax_lines: [],
-        p_number: `rls-payment-${RUN_TAG}`,
+        // No free-text number: a correlative comes from the series via
+        // issue_invoice (hardening 2026-07-24), and a draft carrying a
+        // hand-written number can never be issued (immutability trigger).
+        p_number: null,
+        // Proforma so it is issuable here: with invoicing_mode unset the RPC
+        // derives 'factura', which needs issuer + payer fiscal identities.
+        // Factura issuance is money-v3.test.ts's job; this test only needs an
+        // issued invoice so payments are allowed against it.
+        p_doc_type: 'proforma',
         p_due_on: null,
         p_notes: null,
         p_expected_on: null,
@@ -104,21 +112,30 @@ describe.skipIf(!envReady())('payment RLS + derived invoice status', () => {
       });
       expect(draftPayment.status).toBe(400);
 
-      const issued = await pgPatch<InvoiceRow>(
-        'invoice',
-        jwt,
-        { status: 'issued' },
-        new URLSearchParams({ id: `eq.${invoice.id}`, select: 'id,status,total' }),
-      );
-      expect(issued.rows[0]?.status).toBe('issued');
+      // Issue through the RPC: direct UPDATE on invoice was revoked in the
+      // 2026-07-24 hardening pass, so this is now the only path — and the one
+      // that assigns a real correlative and freezes the fiscal snapshots.
+      const issued = await pgRpc<InvoiceRow>('issue_invoice', jwt, {
+        p_invoice_id: invoice.id,
+      });
+      expect(issued.status).toBe(200);
+      expect(issued.data?.status).toBe('issued');
 
-      const manualPaid = await pgPatch<InvoiceRow>(
+      // `paid` stays derived from payments — update_invoice refuses to set it
+      // by hand, and the direct PATCH that used to be checked here is gone.
+      const manualPaid = await pgRpc('update_invoice', jwt, {
+        p_invoice_id: invoice.id,
+        p_patch: { status: 'paid' },
+      });
+      expect(manualPaid.status).toBeGreaterThanOrEqual(400);
+
+      const directPaid = await pgPatch<InvoiceRow>(
         'invoice',
         jwt,
         { status: 'paid' },
         new URLSearchParams({ id: `eq.${invoice.id}`, select: 'id,status,total' }),
       );
-      expect(manualPaid.status).toBe(400);
+      expect([401, 403]).toContain(directPaid.status);
 
       if (limitedEnvReady()) {
         const limited = requireLimitedEnv();
@@ -184,12 +201,13 @@ describe.skipIf(!envReady())('payment RLS + derived invoice status', () => {
         await pgRpc('delete_payment', jwt, { p_payment_id: paymentId });
       }
       if (invoice) {
-        await pgPatch(
-          'invoice',
-          jwt,
-          { status: 'draft' },
-          new URLSearchParams({ id: `eq.${invoice.id}` }),
-        );
+        // Via the RPC — a direct PATCH here would 403 since the 2026-07-24
+        // hardening pass and silently leave an issued invoice that
+        // delete_invoice (drafts only) can never remove.
+        await pgRpc('update_invoice', jwt, {
+          p_invoice_id: invoice.id,
+          p_patch: { status: 'draft' },
+        });
         await pgRpc('delete_invoice', jwt, { p_invoice_id: invoice.id });
       }
       if (originalFee === null) {

@@ -139,7 +139,12 @@ const CreateSchema = v.object({
   // signs + sums. Empty = no tax (e.g. a bare proforma).
   tax_lines: v.optional(v.array(TaxLineSchema), []),
   country: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.length(2)))),
-  number: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(60)))),
+  // No client-supplied `number` (hardening audit 2026-07-24). A correlative is
+  // assigned by issue_invoice through the atomic series, never by the caller.
+  // Accepting one also created an UN-ISSUABLE draft: issue_invoice writes the
+  // series number unconditionally and invoice_guard_immutable_number rejects
+  // overwriting an existing one, so such a draft could never be issued once the
+  // direct-PATCH escape hatch was closed. The UI never sent it.
   due_on: v.optional(v.nullable(v.pipe(v.string(), v.isoDate()))),
   expected_on: v.optional(v.nullable(v.pipe(v.string(), v.isoDate()))),
   payment_condition: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(2000)))),
@@ -184,7 +189,7 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
       p_bolo_id: input.bolo_id,
       p_tax_lines: input.tax_lines ?? [],
       p_country: input.country ?? null,
-      p_number: input.number ?? null,
+      p_number: null,
       p_due_on: input.due_on ?? null,
       p_notes: input.notes ?? null,
       p_expected_on: input.expected_on ?? null,

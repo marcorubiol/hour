@@ -33,9 +33,28 @@ agente, y un fallo de ese paso dejaría la BD de staging con el mismo aspecto
 (migraciones + fixtures ya aplicadas antes). Marco lo lanzó y el run habría
 salido rojo; **si alguien quiere el dato duro, está en el summary del run**.
 
-Pendiente menor: escribir los tests RLS nuevos que cubren lo anterior (abajo).
+**Tests RLS escritos y en verde (2026-07-25):** `tests/rls/hardening.test.ts`,
+9 casos. Suite completa **136/136**. Cubren lo que fallaría en silencio: el
+candado de escritura fiscal (una migración futura con un GRANT en bloque lo
+deshace y nadie se entera), la equivalencia de autorización de las RPC
+reescritas (contrastada contra el camino RLS fila-a-fila, intacto), la
+idempotencia de pagos y el gate de `read:money` sobre `fiscal_identity`.
 
-## Deuda de este pase — tests RLS que faltan por escribir
+**Escribirlos destapó dos regresiones que el deploy no había visto** — motivo
+suficiente por sí solo para haberlos escrito:
+
+1. `payment.test.ts` y el `afterAll` de `money-v3.test.ts` emitían y reseteaban
+   facturas con un PATCH directo. Tras el revoke eso da 403 **sin romper el
+   test** (no había aserción), dejando facturas emitidas que `delete_invoice`
+   —solo borradores— no puede limpiar: fuga de fixtures acumulativa. Ambos
+   pasan ahora por `issue_invoice` / `update_invoice`.
+2. `POST /api/invoices` aceptaba un `number` del cliente. Con el PATCH directo
+   cerrado, ese borrador quedaba **imposible de emitir** para siempre
+   (`issue_invoice` escribe el correlativo y el trigger de inmutabilidad lo
+   rechaza). La UI nunca lo enviaba, así que no hubo impacto vivo; el campo
+   sale del schema — los números vienen de la serie, punto.
+
+## Deuda de este pase
 
 Auditoría completa de seguridad, rendimiento y estabilidad sobre `main`
 (5 frentes: API/auth, SQL/RLS/RPC, XSS/frontend, rendimiento, estabilidad).
@@ -48,13 +67,16 @@ Verificado local antes del deploy: `svelte-check` 0/0 (1.834 ficheros), unit
 aplicadas contra un Postgres 17 desechable (cuerpos plpgsql validados +
 pruebas funcionales de idempotencia y de los tres guards fiscales).
 
-1. [ ] `fiscal_identity`: un member sin `read:money` NO ve iban/swift/tax_id.
-2. [ ] `invoice`/`payment`/`invoice_line`: INSERT/UPDATE/DELETE directos por
+1. [x] `fiscal_identity`: un member sin `read:money` NO ve iban/swift/tax_id.
+2. [x] `invoice`/`payment`/`invoice_line`: INSERT/UPDATE/DELETE directos por
    PostgREST fallan; las RPC siguen funcionando.
-3. [ ] `update_invoice`: rechaza `number`, `status:'issued'` y `status:'paid'`.
-4. [ ] Equivalencia de las 3 RPC reescritas, como test permanente (se comprobó
-   a mano en vivo el 2026-07-25, pero no hay red que lo sostenga en el futuro).
-5. [ ] **E2E post-deploy** contra `252729f` — no se ha corrido.
+3. [x] `update_invoice`: rechaza `number`, `status:'issued'` y `status:'paid'`.
+4. [x] Equivalencia de las 3 RPC reescritas, como test permanente: contrasta la
+   RPC contra el camino RLS por fila (dos implementaciones independientes de la
+   misma pregunta de autorización, que deben seguir coincidiendo).
+5. [ ] **E2E post-deploy** contra `252729f` — sigue sin correrse.
+6. [ ] **Desplegar los dos fixes de esta tanda** (`POST /api/invoices` ya no
+   acepta `number`): es solo frontend/Worker, cero schema.
 
 **Diferido a propósito, con motivo escrito** (ver
 `20260724094000_rls_force_parity.sql`):
@@ -332,6 +354,12 @@ entre empresas sin construirlo.
     reescribir road sheet, `ProductionStub`, `ScheduleTable`, whitelist del
     PATCH). Merece ADR propio.
 
+    > **No construir esto como `performance_slot` sin leer antes «Orden del día
+    > en vivo» en § Producto — después (2026-07-25).** Marco quiere la misma
+    > escaleta para un **día de ensayo**, no solo para una función; si la tabla
+    > nace con FK a `performance` cierra esa puerta y obliga a migrar otra vez.
+    > La decisión de a qué cuelga (función, día, o ambos) es parte del ADR.
+
 ## EN CURSO — Travel v2: el viaje como trayecto multi-etapa (ADR-089)
 
 > **Sesión 2026-07-23. Modelo DECIDIDO (ADR-089), NADA de schema construido.**
@@ -506,6 +534,37 @@ entre empresas sin construirlo.
   salto de herramienta. **Dependencia a vigilar:** si los participantes son
   externos, responder es una **escritura desde `anon`** — misma frontera que el
   BLOQUEANTE 1 de comms/acceso; para gente ya dentro del workspace no aplica.
+- [ ] **Orden del día en vivo — un scope de «momento» dentro del día.** Idea de
+  Marco (2026-07-25, apuntada desde la herramienta de diseño mientras montaba
+  unos desayunos). Hour no solo debería **mostrar** lo que hay planificado: la
+  herramienta podría servir para **hacer el orden del día y rellenarlo al
+  momento**, escribiendo lo que toca mientras ocurre (un desayuno de trabajo, un
+  día de ensayos, un día de bolo). Implicación de navegación: dentro de la
+  **vista día** del Planner haría falta **un scope aún más fino — una vista de
+  «momento»** que diga qué pasa en cada tramo, no solo qué eventos tiene el día.
+
+  **Hipótesis principal (Marco, 2026-07-25): no es una superficie nueva, es el
+  road sheet ampliado.** Vas al día de ensayo y lo haces explícito hora a hora.
+  Comprobado contra el código, la distancia exacta entre lo que hay y la idea son
+  tres cosas, no una reescritura:
+  1. La sección `schedule` del road sheet son **5 columnas fijas** en
+     `performance` (`load_in_at`, `soundcheck_at`, `start_at`, `loadout_at`,
+     `wrap_at` — `apps/web/src/lib/roadsheet.ts:149`). No es una lista de
+     momentos: nadie puede añadir un tramo sin migración. **Eso es exactamente la
+     tarea 17**, que ya diagnostica esas columnas como «una lista disfrazada» y
+     propone `performance_slot`.
+  2. El road sheet **solo existe para `performance`**: rutas y API cuelgan de
+     `performance/[slug]/roadsheet`. Un ensayo (`date`) no tiene ninguno. Para
+     que la idea funcione, la tabla de la tarea 17 **no puede ser
+     `performance_slot`** — tiene que colgar del día, no solo de la función.
+  3. «Rellenarlo al momento» ya tiene precedente e infraestructura: la colab Yjs
+     existe, pero **solo sobre `notes`** (`apps/collab/src/roadsheet.ts`, un único
+     `Y.Text`). La escaleta tendría que volverse una lista colaborativa.
+
+  Dependencia real: tocar el día de un **ensayo** pasa por la **tarea 15**
+  (editar una `date` desde la UI, que no existe). Misma dependencia que Travel v2
+  P3. **Sin decidir; no entra en la cola activa hasta que se decida si se hace
+  ADR propio junto con la tarea 17.**
 - [ ] **WhatsApp por escalones.** Share-to-Hour/manual asistido → número/bot →
   Business API para cuentas elegibles; nunca scraping de WhatsApp Web.
 - [ ] **Road mode mobile/offline.** Paquete de próximos bolos, road sheets y

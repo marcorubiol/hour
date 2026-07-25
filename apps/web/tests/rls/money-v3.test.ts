@@ -79,7 +79,10 @@ describe.skipIf(!envReady())('money v3 — fiscal identity, invoicing mode, anch
   afterAll(async () => {
     for (const id of paymentIds) await pgRpc('delete_payment', jwt, { p_payment_id: id });
     for (const id of invoiceIds) {
-      await pgPatch('invoice', jwt, { status: 'draft' }, new URLSearchParams({ id: `eq.${id}` }));
+      // Reset to draft through the RPC: direct UPDATE on invoice was revoked in
+      // the 2026-07-24 hardening pass, so a pgPatch here would silently 403 and
+      // leave issued invoices that delete_invoice (drafts only) can never remove.
+      await pgRpc('update_invoice', jwt, { p_invoice_id: id, p_patch: { status: 'draft' } });
       await pgRpc('delete_invoice', jwt, { p_invoice_id: id });
     }
     // Detach the workspace override before deleting the identity it points at.
