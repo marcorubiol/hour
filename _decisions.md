@@ -2672,3 +2672,46 @@ Triggered by Marco's pre-scaffold doubt (Phase 0.0 day 5). Five alternatives eva
   backfill y fuera). Nada aplicado a ninguna DB; ni migración, ni tipos, ni tests.
   Este ADR es el punto de revisión previo a la migración. **No empieza hasta
   cerrar Travel v2**, que está EN CURSO y también sin schema escrito.
+
+## ADR-091 — Los tokens de share se quedan recuperables: no se hashean
+
+- **Contexto.** La auditoría de endurecimiento (2026-07-24) marcó como INFO que
+  `calendar_share.token` y `roadsheet_share.token` se guardan **en claro**,
+  mientras las invitaciones guardan solo `sha256`. Quedó como diferido. El
+  2026-07-25, al ir a cerrarlo, el análisis dio la vuelta a la conclusión.
+
+- **El beneficio real es ~cero contra la amenaza declarada.** El riesgo escrito
+  era: «un compromiso de la BD o de un backup entrega enlaces directamente
+  usables». Pero ese mismo dump contiene **los datos que el enlace expone**, en
+  claro: 32 performances y 26 dates conviven con los 46 calendar shares y 105
+  roadsheet shares. Hashear el token protege *el enlace a unos datos que el
+  atacante ya tiene abiertos delante*. No es una defensa, es un gesto.
+
+  La entropía nunca fue el problema: dos `gen_random_uuid()` concatenados
+  (~244 bits) hacen la fuerza bruta irrelevante, y la revocación
+  (`revoked_at`, honrada en cada lectura, `cache-control: no-store`) es el
+  control que de verdad cierra un enlace.
+
+- **El coste es una regresión de producto real.** La UI **lista los shares
+  existentes y deja recopiar su URL** (`FeedDialog.svelte:116-120`, con botones
+  https y webcal), y el endpoint lo documenta como intencionado: *«el token va
+  incluido: el operador lo necesita para construir/copiar la URL — no es un
+  secreto frente a él»*. Hashear obliga al patrón «cópialo ahora o piérdelo».
+  Para un feed de calendario, que se re-suscribe desde varios dispositivos y
+  se recupera meses después, eso es peor producto a cambio de nada.
+
+- **Decisión.** Los tokens siguen en claro y recuperables. Los controles son la
+  entropía y la revocación, no el secreto en reposo. **Esto no queda como
+  diferido: queda decidido.**
+
+- **Revisar si cambia alguna de estas premisas:**
+  1. Un token llega a autorizar una **escritura**, o a abrir datos que **no**
+     están en la misma base (hoy no: las dos proyecciones son de solo lectura
+     y saneadas).
+  2. Los backups salen a un tercero con menos confianza que la propia BD.
+  3. Aparece una superficie de share con datos de terceros bajo RGPD donde el
+     enlace en sí sea el dato sensible.
+
+- **Status 2026-07-25 — decidido, nada que construir.** Cierra el diferido de
+  la auditoría 2026-07-24. Ver también `20260724094000_rls_force_parity.sql`,
+  donde quedó anotado el motivo original de aplazarlo.

@@ -83,18 +83,47 @@ pruebas funcionales de idempotencia y de los tres guards fiscales).
    fallo a la race de carga de `/h/money`, y tras arreglar esa race
    (`ff6ec4e`) no se volvió a correr. Ahora la aserción está invertida y pinza
    la regla de verdad: **el pipeline no puede contarse como vendido**.
-6. [ ] **Desplegar los dos fixes de esta tanda** (`POST /api/invoices` ya no
-   acepta `number`): es solo frontend/Worker, cero schema.
+6. [x] Desplegado 2026-07-25 — runtime `09f512a`, E2E 27/27 contra él.
 
-**Diferido a propósito, con motivo escrito** (ver
-`20260724094000_rls_force_parity.sql`):
-- `project_id_of_*` expuestas como RPC → oráculo de existencia cross-tenant
-  (LOW). Revocar el EXECUTE **rompería 26 policies RLS** que las llaman; el
-  arreglo correcto es moverlas a un schema no expuesto y repuntar las 26.
-- Tokens de share en claro (INFO). Hashearlos toca 4 funciones + migración de
-  datos sobre tokens vivos; hacerlo mal rompe todos los enlaces públicos.
-- `sharp`/`cookie`: CVE transitivos de `wrangler>miniflare` y de kit; son de
-  build, no entran al runtime del Worker.
+## Cero diferidos — los tres, cerrados (2026-07-25)
+
+Marco: «no quiero ningún diferido». Cerrados los tres, cada uno como tocaba.
+
+1. **`project_id_of_*` expuestas como RPC → ARREGLADO.**
+   `20260725100000_unexpose_project_id_helpers.sql`. Las 3 funciones se mueven
+   al esquema **`private`**, que PostgREST no expone, y las **14 policies** de
+   `asset_version`/`cast_override`/`crew_assignment`/`expense` se repuntan.
+   El GRANT a `authenticated` **se mantiene a propósito**: las policies se
+   evalúan como el invocador y sin él fallaría la consulta entera — lo que se
+   quita es la exposición como endpoint, no el permiso.
+   **Verificado localmente reconstruyendo el esquema entero desde cero** (las
+   25 migraciones, 0 fallos) y con prueba funcional de RLS sobre fixture: el
+   dueño ve sus filas (1/1), un extraño no ve nada (0/0). Test permanente en
+   `hardening.test.ts` que exige que el RPC no resuelva **y** que las tablas
+   dependientes sigan leyéndose (la mitad que se rompe si alguien «arregla»
+   esto revocando el EXECUTE).
+   **PENDIENTE: aplicar por el gate** (backup → staging+RLS → prod).
+
+2. **Tokens de share en claro → DECIDIDO NO HACERLO (ADR-091).**
+   No es deuda, es un trade-off, y al analizarlo la conclusión se dio la
+   vuelta: el beneficio es ~cero y el coste es real. La amenaza escrita era «un
+   dump entrega enlaces usables», pero **ese mismo dump ya contiene los datos
+   que el enlace expone** (32 performances y 26 dates junto a los 46+105
+   shares): hashear protege el enlace a unos datos que el atacante ya tiene
+   abiertos. Y la UI **lista los shares y deja recopiar la URL**
+   (`FeedDialog.svelte:116-120`), así que hashear impone «cópialo ahora o
+   piérdelo» — peor producto a cambio de nada. Los controles siguen siendo la
+   entropía (~244 bits) y la revocación. Premisas que obligarían a revisarlo,
+   en el ADR.
+
+3. **HIBP → no es deuda técnica, es una compra.** Confirmado por API: la org
+   `marcorubiol's Org` está en plan **`free`** y la protección de contraseñas
+   filtradas exige **Pro**. No hay nada que yo pueda arreglar en el código;
+   es una decisión de dinero tuya. Sigue en «Decisiones con coste».
+
+   `sharp`/`cookie`: CVE transitivos de `wrangler>miniflare` y de `kit`. Son
+   dependencias de **build**, no entran al bundle del Worker, y no hay versión
+   que los resuelva sin que sus padres actualicen. Nada que hacer hoy.
 
 ## Cerrado — bloque 2: permisos y entrada a beta
 

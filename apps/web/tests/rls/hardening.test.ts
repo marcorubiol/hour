@@ -293,7 +293,37 @@ describe.skipIf(!envReady())('hardening 2026-07-24 — fiscal write lock, money 
     }
   });
 
-  // ── 5. fiscal_identity is money-gated, not member-visible ─────────────────
+  // ── 5. the project_id_of_* helpers are off the API surface ────────────────
+
+  // These SECURITY DEFINER helpers take a row id and return its project, with
+  // no permission check — that is fine INSIDE an RLS policy (their only job)
+  // and a cross-tenant existence oracle if PostgREST publishes them as RPCs.
+  // They live in `private` since 20260725100000; `private` is not an exposed
+  // schema, so the endpoint must not resolve. Note the grant to `authenticated`
+  // deliberately REMAINS — policies are evaluated as the invoker and would
+  // fail outright without it. This test pins the exposure, not the grant.
+  it('project_id_of_* are not reachable as PostgREST RPCs', async () => {
+    for (const fn of [
+      'project_id_of_performance',
+      'project_id_of_expense',
+      'project_id_of_asset_version',
+    ]) {
+      const res = await pgRpc(fn, jwt, {});
+      // 404 = no such function in the exposed schema. Anything 2xx means the
+      // helper is published again and the oracle is back.
+      expect(res.status).toBeGreaterThanOrEqual(400);
+      expect(res.status).not.toBe(401); // not merely a permission error
+    }
+
+    // …and the tables whose policies depend on them still read fine, which is
+    // the half that breaks if someone "fixes" this by revoking EXECUTE.
+    for (const table of ['crew_assignment', 'cast_override', 'asset_version']) {
+      const rows = await pgGet(`${table}?select=id&limit=1`, jwt);
+      expect(rows.status).toBe(200);
+    }
+  });
+
+  // ── 6. fiscal_identity is money-gated, not member-visible ─────────────────
 
   it.skipIf(!limitedEnvReady())(
     'a member without read:money cannot read banking details',
