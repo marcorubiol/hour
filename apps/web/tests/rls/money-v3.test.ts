@@ -37,6 +37,7 @@ interface InvoiceRow {
 interface MoneyBolo {
   id: string;
   collected: number;
+  fee_amount: number | null;
   project?: { slug?: string } | null;
 }
 
@@ -74,6 +75,18 @@ describe.skipIf(!envReady())('money v3 — fiscal identity, invoicing mode, anch
     const perf = (perfs.data ?? []).find((p) => p.project?.slug === 'zzz-e2e-collab');
     if (!perf) throw new Error('Missing ZZZ e2e collab fixture performance');
     boloId = perf.id;
+
+    // money.spec.ts (E2E) clears this bolo's fee as its last step, and
+    // create_invoice_from_bolo refuses a feeless bolo (22023) — so E2E-then-RLS
+    // failed here for reasons unrelated to the contract under test. Seed it.
+    if (perf.fee_amount === null) {
+      const seeded = await pgRpc('update_bolo_fee', jwt, {
+        p_bolo_id: boloId,
+        p_fee_amount: 1000,
+        p_fee_currency: 'EUR',
+      });
+      expect(seeded.status).toBe(200);
+    }
   });
 
   afterAll(async () => {

@@ -41,6 +41,7 @@ interface BoloRow {
 interface MoneyBolo {
   id: string;
   collected: number;
+  fee_amount: number | null;
   project?: { slug?: string } | null;
 }
 interface InvoiceRow {
@@ -77,6 +78,21 @@ describe.skipIf(!envReady())('hardening 2026-07-24 — fiscal write lock, money 
     const target = (bolos.data ?? []).find((b) => b.project?.slug === 'zzz-e2e-collab');
     if (!target) throw new Error('Missing ZZZ e2e collab fixture bolo');
     boloId = target.id;
+
+    // Do not inherit the fixture's fee from whatever ran last. money.spec.ts
+    // (E2E) deliberately CLEARS this bolo's fee as its final step, and
+    // create_invoice_from_bolo refuses a bolo with no fee ("set the fee first",
+    // 22023) — so running E2E and then this suite used to fail here for reasons
+    // that have nothing to do with what is under test. Same guard payment.test.ts
+    // already carries.
+    if (target.fee_amount === null) {
+      const seeded = await pgRpc('update_bolo_fee', jwt, {
+        p_bolo_id: boloId,
+        p_fee_amount: 1000,
+        p_fee_currency: 'EUR',
+      });
+      expect(seeded.status).toBe(200);
+    }
   });
 
   afterAll(async () => {
@@ -303,16 +319,23 @@ describe.skipIf(!envReady())('hardening 2026-07-24 — fiscal write lock, money 
   // deliberately REMAINS — policies are evaluated as the invoker and would
   // fail outright without it. This test pins the exposure, not the grant.
   it('project_id_of_* are not reachable as PostgREST RPCs', async () => {
-    for (const fn of [
-      'project_id_of_performance',
-      'project_id_of_expense',
-      'project_id_of_asset_version',
-    ]) {
-      const res = await pgRpc(fn, jwt, {});
-      // 404 = no such function in the exposed schema. Anything 2xx means the
-      // helper is published again and the oracle is back.
-      expect(res.status).toBeGreaterThanOrEqual(400);
-      expect(res.status).not.toBe(401); // not merely a permission error
+    // Pass REAL arguments. Calling with `{}` would 404 for want of a matching
+    // signature even while the function is published — the test would pass for
+    // the wrong reason and guard nothing. These payloads are exactly what the
+    // oracle needs, so a 2xx here means it is answering.
+    const probes: Array<[string, Record<string, unknown>]> = [
+      ['project_id_of_performance', { p_performance_id: crypto.randomUUID() }],
+      ['project_id_of_expense', { p_expense_id: crypto.randomUUID() }],
+      [
+        'project_id_of_asset_version',
+        { p_project_id: null, p_line_id: null, p_performance_id: crypto.randomUUID() },
+      ],
+    ];
+    for (const [fn, args] of probes) {
+      const res = await pgRpc(fn, jwt, args);
+      // 404 = not in an exposed schema. A 2xx means it is published again and
+      // the cross-tenant oracle is back.
+      expect(res.status).toBe(404);
     }
 
     // …and the tables whose policies depend on them still read fine, which is

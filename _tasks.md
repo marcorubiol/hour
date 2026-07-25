@@ -102,7 +102,22 @@ Marco: «no quiero ningún diferido». Cerrados los tres, cada uno como tocaba.
    `hardening.test.ts` que exige que el RPC no resuelva **y** que las tablas
    dependientes sigan leyéndose (la mitad que se rompe si alguien «arregla»
    esto revocando el EXECUTE).
-   **PENDIENTE: aplicar por el gate** (backup → staging+RLS → prod).
+   **Aplicado y verificado en STAGING** (2026-07-25): 0 helpers públicos, 3 en
+   `private`, 14 policies repuntadas, versión registrada. Los ceros que devuelve
+   un miembro en `asset_version`/`expense` se persiguieron hasta el fondo: esas
+   dos filas están **soft-deleted** y las policies llevan `deleted_at IS NULL`,
+   o sea RLS correcto — no un 0 vacío que no prueba nada.
+
+   > **PENDIENTE — solo queda aplicar a PRODUCCIÓN.** El harness del agente
+   > bloquea tanto `gh` como el DDL contra la Supabase de prod, así que este
+   > último paso es de Marco. Rollback exacto capturado **antes** de tocar nada
+   > en `build/runbooks/rollback-20260725-unexpose-helpers.sql` (la migración no
+   > muta ni una fila: crea un esquema, mueve 3 funciones y recrea 14 policies).
+   >
+   > **La suite RLS está 136/137 a propósito**: el único rojo es
+   > `project_id_of_* are not reachable as PostgREST RPCs`, que exige el estado
+   > post-migración. Se pone verde solo, en cuanto se aplique. En CI ya sale
+   > verde porque staging migra antes de correr RLS.
 
 2. **Tokens de share en claro → DECIDIDO NO HACERLO (ADR-091).**
    No es deuda, es un trade-off, y al analizarlo la conclusión se dio la
