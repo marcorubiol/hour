@@ -62,9 +62,22 @@ orientativo, no una verdad comercial cerrada.
 
 - Web: `https://hour.zerosense.studio`
 - Worker: `hour-web`
-- `/health/live`: sano, `dirty:false`, SHA **`252729f`** (builtAt 2026-07-25T07:10Z).
+- `/health/live`: sano, `dirty:false`, SHA **`09f512a`** (builtAt 2026-07-25T08:03Z).
 - `/health/ready`: sano, Supabase `ok`.
-- El runtime verificado en producción es **`252729f`** — **pase de endurecimiento
+- **DB por delante del Worker, a propósito:** el runtime es `09f512a` pero la
+  base lleva además la migración **`20260725100000_unexpose_project_id_helpers`**
+  (aplicada el 2026-07-25, run 30160118066). No requiere desplegar: saca las 3
+  funciones `project_id_of_*` del esquema expuesto —eran un oráculo de
+  existencia cross-tenant vía RPC— y repunta las 14 policies que las usan. El
+  GRANT a `authenticated` se mantiene a propósito: las policies se evalúan como
+  el invocador. Verificado después: **RLS 137/137, E2E 27/27**, advisors sin
+  ERROR y los avisos de DEFINER expuestas bajando de 73 a 70 (las 3 retiradas).
+  Con esto **la auditoría 2026-07-24 queda sin diferidos**: los tokens de share
+  se decidieron NO hashear (ADR-091) y el HIBP es una compra de plan, no deuda.
+- Encima de `09f512a` van solo tests y documentación (`c27d4b2`, `f08d1c7`):
+  no entran en el bundle, por eso `main` va por delante de `/health/live` sin
+  que eso sea un estado sucio.
+- Debajo de `09f512a` va **`252729f`** — **pase de endurecimiento
   (auditoría 2026-07-25), desplegado con 5 migraciones**. Cierra: la lectura de
   `fiscal_identity` sin `read:money` (filtraba IBAN/SWIFT/NIF a cualquier
   miembro), la escritura directa por Data API sobre `invoice`/`invoice_line`/
