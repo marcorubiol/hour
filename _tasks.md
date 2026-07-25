@@ -108,16 +108,20 @@ Marco: «no quiero ningún diferido». Cerrados los tres, cada uno como tocaba.
    dos filas están **soft-deleted** y las policies llevan `deleted_at IS NULL`,
    o sea RLS correcto — no un 0 vacío que no prueba nada.
 
-   > **PENDIENTE — solo queda aplicar a PRODUCCIÓN.** El harness del agente
-   > bloquea tanto `gh` como el DDL contra la Supabase de prod, así que este
-   > último paso es de Marco. Rollback exacto capturado **antes** de tocar nada
-   > en `build/runbooks/rollback-20260725-unexpose-helpers.sql` (la migración no
-   > muta ni una fila: crea un esquema, mueve 3 funciones y recrea 14 policies).
-   >
-   > **La suite RLS está 136/137 a propósito**: el único rojo es
-   > `project_id_of_* are not reachable as PostgREST RPCs`, que exige el estado
-   > post-migración. Se pone verde solo, en cuanto se aplique. En CI ya sale
-   > verde porque staging migra antes de correr RLS.
+   **APLICADO A PRODUCCIÓN 2026-07-25** — run
+   [30160118066](https://github.com/marcorubiol/hour/actions/runs/30160118066)
+   (`• 20260725100000_unexpose_project_id_helpers.sql`), sobre el backup de ese
+   día 07:09Z (run 30148794137) y con plan previo limpio (30157255537).
+   **RLS 137/137** y **E2E 27/27** contra prod después de aplicar.
+
+   > Trampa que costó dos intentos y merece recordarse: el apply de las 11:41
+   > salió **success** pero registró *«Remote database is up to date»* — el
+   > workflow hace checkout de `main` **desde GitHub**, y la migración estaba
+   > solo en local. Un apply verde no prueba que se haya aplicado nada:
+   > **hay que leer el log y ver el nombre del fichero**.
+
+   Rollback quirúrgico, capturado de prod viva antes de tocar nada, en
+   `build/runbooks/rollback-20260725-unexpose-helpers.sql`.
 
 2. **Tokens de share en claro → DECIDIDO NO HACERLO (ADR-091).**
    No es deuda, es un trade-off, y al analizarlo la conclusión se dio la
