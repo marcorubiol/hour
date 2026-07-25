@@ -4,7 +4,38 @@
 > Estado general y evidencia: `_context.md`. Historia: `_decisions.md` y
 > `_notes/sessions-log.md`. Los documentos de `build/archive/` no crean tareas.
 
-## EN CURSO — pase de endurecimiento (auditoría 2026-07-24)
+## Cerrado — pase de endurecimiento (auditoría 2026-07-24), DESPLEGADO 2026-07-25
+
+Runtime en prod **`252729f`**, `dirty:false`, builtAt 2026-07-25T07:10Z;
+`main == origin/main == prod`. Las 5 migraciones `20260724*` constan aplicadas
+en `supabase_migrations.schema_migrations` de **prod y de staging**.
+
+**Verificado contra producción real, no contra el prompt:**
+
+- Vector de falsificación fiscal **cerrado**: `has_table_privilege('authenticated', …)`
+  da `false` en INSERT/UPDATE sobre `invoice`, `invoice_line` y `payment`;
+  las RPC sancionadas (`update_invoice`, `issue_invoice`, `create_payment`)
+  siguen ejecutables, y `expense` conserva su UPDATE a propósito.
+- `create_payment` con 12 argumentos + `payment.idempotency_key` y su índice
+  único parcial; los 3 índices nuevos presentes.
+- Las 3 RPC calientes reescritas usan `accessible_project_ids`, y la
+  **equivalencia de autorización se comprobó en vivo** suplantando a un usuario
+  real: 27 = 27 bolos, 157 = 157 pagadores (0 gastos porque prod no tiene ni uno).
+- `fiscal_identity_select` gateada por `can_read_workspace_money`;
+  `workspace_alias_request` con FORCE RLS.
+- Advisors de seguridad: **0 ERROR** (76 WARN = fronteras DEFINER intencionadas
+  + las 2 proyecciones públicas por token + HIBP, que pide Supabase Pro).
+- Datos intactos: 53 facturas, 16 pagos, 118 bolos.
+
+**Lo único no verificado desde aquí:** que el paso «RLS contract» del run de
+staging saliera en verde. El CLI de `gh` está bloqueado en el entorno del
+agente, y un fallo de ese paso dejaría la BD de staging con el mismo aspecto
+(migraciones + fixtures ya aplicadas antes). Marco lo lanzó y el run habría
+salido rojo; **si alguien quiere el dato duro, está en el summary del run**.
+
+Pendiente menor: escribir los tests RLS nuevos que cubren lo anterior (abajo).
+
+## Deuda de este pase — tests RLS que faltan por escribir
 
 Auditoría completa de seguridad, rendimiento y estabilidad sobre `main`
 (5 frentes: API/auth, SQL/RLS/RPC, XSS/frontend, rendimiento, estabilidad).
@@ -12,27 +43,18 @@ Veredicto de fondo: **sin agujeros críticos ni cross-tenant**; las defensas
 estructurales aguantan el trazado (RLS uniforme, `search_path` fijado en las
 ~100 funciones DEFINER, CSP estricta, cero `{@html}`, numeración atómica).
 
-Rama: **`hardening/audit-fixes`**. Verificado local: `svelte-check` 0/0 (1.834
-ficheros), unit **368/368**, collab 11/11 + tsc limpio, build verde, y las 5
-migraciones aplicadas contra un Postgres 17 desechable (cuerpos plpgsql
-validados + pruebas funcionales de idempotencia y de los guards fiscales).
+Verificado local antes del deploy: `svelte-check` 0/0 (1.834 ficheros), unit
+**368/368**, collab 11/11 + tsc limpio, build verde, y las 5 migraciones
+aplicadas contra un Postgres 17 desechable (cuerpos plpgsql validados +
+pruebas funcionales de idempotencia y de los tres guards fiscales).
 
-**FALTA PARA CERRAR — el gate de siempre, no lo salta nadie:**
-
-1. [ ] **Backup de producción** antes de tocar schema.
-2. [ ] **Staging**: `migrate plan` + `apply`, y **RLS 120/120 + los tests nuevos**.
-   La suite RLS no se pudo correr en la sesión de la auditoría (sin CLI de
-   Supabase ni `.env.test` en ese entorno): **es obligatoria antes de prod.**
-3. [ ] **Tests RLS nuevos que faltan por escribir** (deuda consciente de este pase):
-   - `fiscal_identity`: un member sin `read:money` NO ve iban/swift/tax_id.
-   - `invoice`/`payment`/`invoice_line`: INSERT/UPDATE/DELETE directos por
-     PostgREST fallan; las RPC siguen funcionando.
-   - `update_invoice`: rechaza `number`, `status:'issued'` y `status:'paid'`.
-   - Las 3 RPC reescritas devuelven **exactamente** las mismas filas que antes
-     (equivalencia de autorización tras el cambio de `has_permission` por fila).
-4. [ ] **Prod**: migrate apply + `wrangler deploy` (web **y** collab: el worker
-   de collab cambió — poda de snapshots y reintentos).
-5. [ ] **E2E post-deploy** y actualizar `_context.md` con el runtime nuevo.
+1. [ ] `fiscal_identity`: un member sin `read:money` NO ve iban/swift/tax_id.
+2. [ ] `invoice`/`payment`/`invoice_line`: INSERT/UPDATE/DELETE directos por
+   PostgREST fallan; las RPC siguen funcionando.
+3. [ ] `update_invoice`: rechaza `number`, `status:'issued'` y `status:'paid'`.
+4. [ ] Equivalencia de las 3 RPC reescritas, como test permanente (se comprobó
+   a mano en vivo el 2026-07-25, pero no hay red que lo sostenga en el futuro).
+5. [ ] **E2E post-deploy** contra `252729f` — no se ha corrido.
 
 **Diferido a propósito, con motivo escrito** (ver
 `20260724094000_rls_force_parity.sql`):

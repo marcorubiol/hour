@@ -10,6 +10,9 @@
 > (código muerto fuera, helpers unificados, los 4 ficheros gigantes partidos),
 > Hall i18n y picker de identidad; todo mergeado a `main` y **desplegado a prod
 > el mismo día** (runtime `a643620`). Sin cambios de schema.
+> **Reconciliación 2026-07-25:** pase de endurecimiento (auditoría de seguridad,
+> rendimiento y estabilidad) desplegado a prod — runtime **`252729f`**, **con
+> cambios de schema** (5 migraciones). Ver «Producción», «Git» y `_tasks.md`.
 >
 > Si otro archivo contradice este documento sobre el estado presente, gana este
 > documento. Si contradice una decisión de producto estable, consultar
@@ -59,9 +62,20 @@ orientativo, no una verdad comercial cerrada.
 
 - Web: `https://hour.zerosense.studio`
 - Worker: `hour-web`
-- `/health/live`: sano, `dirty:false`, SHA **`ff6ec4e`** (builtAt 2026-07-24T11:51Z).
+- `/health/live`: sano, `dirty:false`, SHA **`252729f`** (builtAt 2026-07-25T07:10Z).
 - `/health/ready`: sano, Supabase `ok`.
-- El runtime verificado en producción es **`ff6ec4e`** — **fix de la race de
+- El runtime verificado en producción es **`252729f`** — **pase de endurecimiento
+  (auditoría 2026-07-25), desplegado con 5 migraciones**. Cierra: la lectura de
+  `fiscal_identity` sin `read:money` (filtraba IBAN/SWIFT/NIF a cualquier
+  miembro), la escritura directa por Data API sobre `invoice`/`invoice_line`/
+  `payment` (permitía falsificar un correlativo fiscal saltándose
+  `issue_invoice`), la ausencia de idempotencia en `create_payment` (un doble
+  click duplicaba el cobro) y el throttle de login solo por-IP. Rendimiento:
+  `has_permission()` ya no se evalúa por fila en las 3 RPC de money
+  (`accessible_project_ids` resuelve el set una vez) — **equivalencia de
+  autorización verificada en vivo contra la lógica antigua: 27=27 bolos,
+  157=157 pagadores**. Estabilidad: poda de `collab_snapshot`, resiliencia del
+  worker collab, fugas de promesas y listeners. Debajo va `ff6ec4e` — **fix de la race de
   `/h/money` («Loading…» colgado): `notifyOnChangeProps:'all'` como default del
   QueryClient, desplegado el 2026-07-24** (solo frontend, cero schema; `main`
   == prod; ver `_tasks.md § bloque 7`). Debajo va `a643620` — **la
