@@ -74,7 +74,15 @@ pruebas funcionales de idempotencia y de los tres guards fiscales).
 4. [x] Equivalencia de las 3 RPC reescritas, como test permanente: contrasta la
    RPC contra el camino RLS por fila (dos implementaciones independientes de la
    misma pregunta de autorización, que deben seguir coincidiendo).
-5. [ ] **E2E post-deploy** contra `252729f` — sigue sin correrse.
+5. [x] **E2E post-deploy contra `252729f`: 27/27, sin skips** (2026-07-25).
+   Destapó un tercer fallo, y en `money.spec.ts` **la equivocada era la
+   aserción, no la app**: esperaba que la tarifa de un trato `proposed`
+   apareciera en el roll «contracted», cuando `CONTRACTED` son solo
+   confirmed/done/invoiced/paid (ADR-087). Nunca había pasado — el spec se
+   escribió contra el UI v3 el 07-24, la única pasada posterior atribuyó su
+   fallo a la race de carga de `/h/money`, y tras arreglar esa race
+   (`ff6ec4e`) no se volvió a correr. Ahora la aserción está invertida y pinza
+   la regla de verdad: **el pipeline no puede contarse como vendido**.
 6. [ ] **Desplegar los dos fixes de esta tanda** (`POST /api/invoices` ya no
    acepta `number`): es solo frontend/Worker, cero schema.
 

@@ -44,11 +44,23 @@ test.describe('books lens', () => {
     await dialog.getByRole('button', { name: 'Save' }).click();
     await expect(fee).toContainText('1,234.56', { timeout: 10_000 });
 
-    // The obra roll and the deal's collected line reflect the contract.
-    await expect(obra.locator('.obra__stat', { hasText: 'contracted' })).toContainText(
-      '1,234.56',
-    );
+    // The deal line carries the fee it was just given.
     await expect(deal).toContainText('/ 1,234.56');
+
+    // …but the obra's "contracted" roll must NOT move: the fixture deal is
+    // `proposed`, and only CONTRACTED statuses (confirmed/done/invoiced/paid)
+    // count as sold (ADR-087). Pipeline money showing up as contracted would
+    // overstate what the company has actually sold — the exact error this
+    // lens exists to prevent, so pin it.
+    //
+    // This assertion used to expect 1,234.56 here and had never passed: the
+    // spec was written against money v3's UI on 2026-07-24 but the one E2E run
+    // that followed attributed its failure to the /h/money loading race, and no
+    // run happened after that race was fixed (ff6ec4e). Verified 2026-07-25:
+    // the app is right, the expectation was wrong.
+    await expect(obra.locator('.obra__stat', { hasText: 'contracted' })).toContainText(
+      '0.00',
+    );
 
     // Persists across reload. `fee` is a lazy locator — it re-resolves
     // against the fresh DOM, so it must not be re-derived elsewhere.
