@@ -2568,3 +2568,107 @@ Triggered by Marco's pre-scaffold doubt (Phase 0.0 day 5). Five alternatives eva
   (elección de tabla completa + 9 modos). Migración, tipos y tests **por escribir**;
   nada aplicado a ninguna DB. Este ADR es el punto de revisión previo a la
   migración.
+
+## ADR-090 — La escaleta es una lista de momentos colgada de la función o del día, y se rellena en vivo
+
+- **Contexto.** Sesión 2026-07-25. Marco, diseñando unos desayunos, ve que Hour no
+  debería solo **mostrar** lo planificado: la herramienta puede servir para **hacer
+  el orden del día y rellenarlo al momento**, mientras ocurre. Y afina él mismo la
+  hipótesis: no es una superficie nueva, es **el road sheet ampliado** — vas al día
+  de ensayo y lo haces explícito hora a hora. Implicación de navegación: dentro de
+  la **vista día** hace falta un scope más fino, una **vista de «momento»**.
+
+  Contrastado con el código, la distancia son tres cosas concretas:
+  1. La sección `schedule` del road sheet son **5 columnas fijas** en `performance`
+     (`load_in_at`, `soundcheck_at`, `start_at`, `loadout_at`, `wrap_at`) con el
+     CHECK `performance_timeslots_ordered`. Nadie añade «photo call» sin migración.
+     Es el diagnóstico que la **tarea 17** ya tenía: *una lista disfrazada de
+     columnas*. Este ADR la absorbe y le cambia la forma.
+  2. El road sheet **solo existe para `performance`** (rutas y API cuelgan de
+     `performance/[slug]/roadsheet`). Un ensayo no tiene ninguno. Por eso la tabla
+     **no puede ser `performance_slot`**: nacería cerrando la puerta del ensayo.
+  3. «Rellenarlo al momento» ya tiene precedente pero mínimo: la colab Yjs cubre
+     **solo `notes`**, un único `Y.Text` (`apps/collab/src/roadsheet.ts`).
+
+  Refina ADR-023 (road sheet como proyección y sus 5 franjas) y ADR-041 (matriz de
+  campos por rol). Toca la tarea 17, que deja de ser autónoma.
+
+- **Descartado — la escaleta como filas de `date` con `parent_date_id`.** Tentador:
+  `date` ya tiene `starts_at`/`ends_at`/`all_day`/`kind`/`title`/`notes`, RPCs, RLS,
+  series y auditoría; y **ya existe media convención**: un `date` con
+  `performance_id` es el *gig slot* de esa función y Desk lo descarta para no
+  duplicar fila (`apps/web/src/lib/desk-feed.ts:344`). Se descarta por el radio de
+  explosión: cada consulta sobre `date` (MonthGrid, conflictos de planner, agenda,
+  ICS, series) tendría que aprender a excluir hijos, y **hay prueba de que esa
+  disciplina ya falla** — `month-events.ts` ni siquiera selecciona `performance_id`,
+  así que el gig slot que Desk suprime, MonthGrid lo pintaría. Además `date_kind`
+  es un ENUM, justo lo que la tarea 17 quiere dejar de ser, y `date` arrastra
+  status, venue, season, series y `travel_direction` para decir «photo call 17:00».
+
+- **Decisión — tabla `schedule_slot`, colgada de la función XOR del día.**
+  Molde exacto de `travel_stage` (ADR-089). Radio de explosión cero sobre `date`.
+  - `id`, `workspace_id`, `project_id` — **denormalizados**, para que la RLS no
+    evalúe `has_permission()` por fila (lección del pase de endurecimiento
+    2026-07-25).
+  - `performance_id uuid NULL → performance ON DELETE CASCADE`
+  - `date_id uuid NULL → date ON DELETE CASCADE`
+  - `CHECK (num_nonnulls(performance_id, date_id) = 1)` — exactamente uno.
+  - `label text` **libre** (adiós al enum: «photo call» sin migración),
+    `kind text NULL` opcional para iconos y para la matriz por rol del road sheet,
+    `at timestamptz`, `ends_at timestamptz NULL`, `sort smallint`, `notes text NULL`.
+  - Escritura **solo por RPCs SECURITY DEFINER** (`create/update/delete/
+    reorder_schedule_slot`), gate `edit:performance` — el mismo que `date` y `bolo`;
+    triggers `set_updated_at` + `write_audit`; índices en `(performance_id, sort)`,
+    `(date_id, sort)` y `workspace_id`.
+
+- **Decisión — se rellena en vivo, y la escaleta nace colaborativa (Yjs).**
+  Marco lo eligió **contra la recomendación** de empezar con filas + Realtime: el
+  caso es varias personas anotando durante un ensayo, y migrar de filas a CRDT
+  después es peor que nacer así. Cómo persiste una **lista** colaborativa, que es
+  lo que hoy no existe:
+  - **Mismo documento, campo nuevo.** El doc `performance:<id>` ya contiene
+    `notes` (`Y.Text`); la escaleta es un **`Y.Array` `schedule`** de `Y.Map`
+    (`id`, `label`, `kind`, `at`, `ends_at`, `notes`) en **ese mismo doc**: misma
+    sala, misma autorización, misma alarma. `date` entra en `ALLOWED_TABLES` para
+    abrir la sala `date:<id>` de los ensayos.
+  - **El orden lo lleva el CRDT**, no un número: `sort` existe solo en las filas
+    materializadas. Es la razón de ser de un `Y.Array` y evita las guerras de
+    reordenación.
+  - **Materialización** calcada de `writeNotesColumn`: un
+    `replace_schedule_slots(target_table, target_id, slots jsonb)` que **diffea por
+    el `id` del `Y.Map`** (alta/cambio/baja) en una sola transacción, con el mismo
+    dirty-flag + reintento por alarma + flush de reactivación que ya protege a
+    `notes`. Las **filas siguen siendo la proyección consultable** (road sheet,
+    Desk, ICS, vista pública por token leen SQL, no Yjs) — exactamente la relación
+    que `notes` ya tiene con su columna.
+  - **Hidratación:** si no hay snapshot, el `Y.Array` se siembra desde las filas
+    ordenadas por `sort`, igual que `notes` cae a `meta.notes`. Es lo que hace
+    aparecer los 5 tramos backfilleados la primera vez que se abre el doc.
+  - **Deuda aceptada, escrita:** si alguien escribe filas por RPC mientras el doc
+    está vivo, el doc gana en la siguiente materialización y pisa el cambio.
+    `notes` ya tiene exactamente ese riesgo; no se agrava, pero ahora aplica a
+    datos estructurados. Import y backfill deben correr con el doc frío.
+
+- **Decisión — las 5 columnas se backfillean y se van, en la misma migración.**
+  Convivir sería dos verdades sobre a qué hora es el soundcheck. Se convierten en
+  5 `schedule_slot` con su `kind` (`load_in · soundcheck · start · loadout · wrap`)
+  y se eliminan las columnas y el CHECK `performance_timeslots_ordered`. Coste ya
+  presupuestado en la tarea 17: road sheet (`apps/web/src/lib/roadsheet.ts:149`),
+  `ProductionStub`, `ScheduleTable`, whitelist del PATCH y las **2 RPC del
+  checkpoint** que serializan las 5 franjas a jsonb. **Ojo a `start_at`**: lo leen
+  Desk, MonthGrid y tasks — es el que más superficie tiene, y el que decide si la
+  migración es de una tacada o pide una columna derivada de transición.
+
+- **Alcance y secuencia.** **P1:** migración — tabla, RLS, las 4 RPCs, backfill de
+  las 5 franjas, drop de columnas y CHECK, regen de `db-types.ts`, tests RLS.
+  **P2:** `Y.Array` + materialización en el worker de collab, `date` en
+  `ALLOWED_TABLES`. **P3:** UI — la **vista de momento** dentro del día y el editor
+  de escaleta. **Dependencia dura:** tocar el día de un **ensayo** desde la UI pasa
+  por la **tarea 15** (editar una `date`, que no existe) — la misma que bloquea
+  Travel v2 P3.
+
+- **Status 2026-07-25 — decidido, no construido.** Modelo ratificado por Marco en
+  las tres bifurcaciones (tabla nueva función-XOR-día · Yjs desde el principio ·
+  backfill y fuera). Nada aplicado a ninguna DB; ni migración, ni tipos, ni tests.
+  Este ADR es el punto de revisión previo a la migración. **No empieza hasta
+  cerrar Travel v2**, que está EN CURSO y también sin schema escrito.

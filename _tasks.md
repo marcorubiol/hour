@@ -353,20 +353,36 @@ entre empresas sin construirlo.
     y agrupación en `MonthGrid`. **Dos funciones DISTINTAS el mismo día no se
     colapsan nunca** — los dos nombres tienen que verse.
 
-17. [ ] **Tipos de horario añadibles por el usuario.** Las cinco franjas de
-    ADR-023 son **columnas fijas** en `performance` con un CHECK de orden: nadie
-    puede añadir «photo call» sin migración. Diagnóstico: son una lista
-    disfrazada de columnas — tienen orden, tipo y se recorren en secuencia.
-    Propuesta sin decidir: tabla `performance_slot (performance_id, kind, label,
-    at, sort)`. Es la pieza más grande pendiente (migración + backfill +
-    reescribir road sheet, `ProductionStub`, `ScheduleTable`, whitelist del
-    PATCH). Merece ADR propio.
+17. [ ] **Escaleta de momentos — el orden del día, en vivo (ADR-090).**
+    **Modelo DECIDIDO el 2026-07-25, nada de schema construido.** Absorbe la vieja
+    tarea «tipos de horario añadibles por el usuario»: las cinco franjas de
+    ADR-023 son **columnas fijas** en `performance` con un CHECK de orden — una
+    lista disfrazada de columnas, y nadie puede añadir «photo call» sin migración.
 
-    > **No construir esto como `performance_slot` sin leer antes «Orden del día
-    > en vivo» en § Producto — después (2026-07-25).** Marco quiere la misma
-    > escaleta para un **día de ensayo**, no solo para una función; si la tabla
-    > nace con FK a `performance` cierra esa puerta y obliga a migrar otra vez.
-    > La decisión de a qué cuelga (función, día, o ambos) es parte del ADR.
+    Marco (2026-07-25) la amplió: no es solo poder añadir tramos a una función, es
+    **hacer el orden del día y rellenarlo al momento**, y que valga igual para un
+    **día de ensayo**. Por eso la tabla **no es `performance_slot`**.
+
+    **Lo decidido (ADR-090):** tabla `schedule_slot` con `performance_id` **XOR**
+    `date_id` (`CHECK num_nonnulls = 1`), molde de `travel_stage`; `label` libre en
+    vez de enum; escritura solo por RPC con gate `edit:performance`. La escaleta
+    **nace colaborativa**: `Y.Array` `schedule` en el **mismo doc** que ya tiene
+    `notes`, con `date` añadido a `ALLOWED_TABLES`, y materialización por
+    `replace_schedule_slots` que diffea por id — las filas siguen siendo la
+    proyección que leen road sheet, Desk, ICS y la vista pública. Las 5 columnas se
+    **backfillean y se eliminan** en la misma migración.
+
+    **Secuencia:** P1 migración (tabla + RLS + 4 RPCs + backfill + drop + tipos +
+    tests RLS) · P2 `Y.Array` y materialización en el worker de collab · P3 UI: la
+    **vista de momento** dentro del día.
+
+    **Dependencia dura:** el día de un ensayo desde la UI pasa por la **tarea 15**
+    (editar una `date`, que no existe) — la misma que bloquea Travel v2 P3.
+    **Ojo al backfill:** `start_at` lo leen Desk, MonthGrid y tasks; es la
+    superficie que decide si la migración va de una tacada.
+
+    > **No empieza hasta cerrar Travel v2**, que está EN CURSO y también sin
+    > schema escrito. Dos modelos nuevos a la vez es como se pierde el hilo.
 
 ## EN CURSO — Travel v2: el viaje como trayecto multi-etapa (ADR-089)
 
@@ -542,37 +558,6 @@ entre empresas sin construirlo.
   salto de herramienta. **Dependencia a vigilar:** si los participantes son
   externos, responder es una **escritura desde `anon`** — misma frontera que el
   BLOQUEANTE 1 de comms/acceso; para gente ya dentro del workspace no aplica.
-- [ ] **Orden del día en vivo — un scope de «momento» dentro del día.** Idea de
-  Marco (2026-07-25, apuntada desde la herramienta de diseño mientras montaba
-  unos desayunos). Hour no solo debería **mostrar** lo que hay planificado: la
-  herramienta podría servir para **hacer el orden del día y rellenarlo al
-  momento**, escribiendo lo que toca mientras ocurre (un desayuno de trabajo, un
-  día de ensayos, un día de bolo). Implicación de navegación: dentro de la
-  **vista día** del Planner haría falta **un scope aún más fino — una vista de
-  «momento»** que diga qué pasa en cada tramo, no solo qué eventos tiene el día.
-
-  **Hipótesis principal (Marco, 2026-07-25): no es una superficie nueva, es el
-  road sheet ampliado.** Vas al día de ensayo y lo haces explícito hora a hora.
-  Comprobado contra el código, la distancia exacta entre lo que hay y la idea son
-  tres cosas, no una reescritura:
-  1. La sección `schedule` del road sheet son **5 columnas fijas** en
-     `performance` (`load_in_at`, `soundcheck_at`, `start_at`, `loadout_at`,
-     `wrap_at` — `apps/web/src/lib/roadsheet.ts:149`). No es una lista de
-     momentos: nadie puede añadir un tramo sin migración. **Eso es exactamente la
-     tarea 17**, que ya diagnostica esas columnas como «una lista disfrazada» y
-     propone `performance_slot`.
-  2. El road sheet **solo existe para `performance`**: rutas y API cuelgan de
-     `performance/[slug]/roadsheet`. Un ensayo (`date`) no tiene ninguno. Para
-     que la idea funcione, la tabla de la tarea 17 **no puede ser
-     `performance_slot`** — tiene que colgar del día, no solo de la función.
-  3. «Rellenarlo al momento» ya tiene precedente e infraestructura: la colab Yjs
-     existe, pero **solo sobre `notes`** (`apps/collab/src/roadsheet.ts`, un único
-     `Y.Text`). La escaleta tendría que volverse una lista colaborativa.
-
-  Dependencia real: tocar el día de un **ensayo** pasa por la **tarea 15**
-  (editar una `date` desde la UI, que no existe). Misma dependencia que Travel v2
-  P3. **Sin decidir; no entra en la cola activa hasta que se decida si se hace
-  ADR propio junto con la tarea 17.**
 - [ ] **WhatsApp por escalones.** Share-to-Hour/manual asistido → número/bot →
   Business API para cuentas elegibles; nunca scraping de WhatsApp Web.
 - [ ] **Road mode mobile/offline.** Paquete de próximos bolos, road sheets y
