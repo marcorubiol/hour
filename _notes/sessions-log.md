@@ -12,6 +12,45 @@ Convención: secciones por fecha descendente. Cada sesión queda con commits cit
 
 ---
 
+## 2026-07-30 (noche) — La red que nunca estuvo rota
+
+Sesión de revisión: leer el diseño del Planner v3 y decir si es construible.
+El veredicto está en `_tasks.md § AHORA`. Aquí va lo que no se deduce del diff.
+
+**El hallazgo no fue del diseño, fue del propio informe de esta mañana.** La cola
+decía, en mayúsculas, que las credenciales de fixture estaban muertas y que ni
+RLS ni E2E podían correrse desde esta máquina; y lo decía tras haberlo
+«verificado». Corrí la suite por curiosidad antes de creerme la tarea: **RLS
+137/137 contra producción, 23 segundos.** Después E2E, 27/30. No había nada roto.
+Lo que había era `.env.local` apuntando a una Supabase local donde los usuarios
+fixture no existen — la misma trampa que el handoff de la mañana **avisaba en su
+punto 3** y que aun así se diagnosticó como credenciales podridas.
+
+La lección no es «comprueba antes de creer un documento», que ya está escrita en
+la regla 3. Es más incómoda: **el documento lo escribió alguien que sí comprobó**,
+y comprobó contra el destino equivocado. Un «verificado» no dice contra qué. Por
+eso lo que queda en `_context.md § Verificación` no es «las suites funcionan»
+sino **cómo se corren**, con el `PW_BASE_URL` y el porqué de que `vite preview`
+no valga: ahí no hay `platform.env`, y esta app lee `PUBLIC_SUPABASE_URL` del
+entorno del Worker, no de un `$env/static`. Eso también jubila el viejo cuento de
+los «skips intencionados» de collab.
+
+**El primer rojo de un spec que nunca había corrido era del spec.** `date-edit`
+elegía el 15 del mes para crear su fecha, porque el mes dibuja el mes entero. La
+agenda es un diario y **abre en hoy**. Quince días de cada treinta, el mismo dato
+estaba visible en un dibujo e invisible en el otro, y el test lo llamaba bug.
+Su hermano `money.spec.ts` hizo lo mismo el 24. Dos de dos: **un spec sin correr
+no es cobertura, es una hipótesis con sintaxis de aserción.**
+
+**Y el diseño y el código ya se habían encontrado sin saberlo.** El `agRowKeys()`
+del prototipo y el `peopleOf()` de `$lib/people`, escritos por separado, dicen la
+misma ley con las mismas palabras — reparto explícito manda, si no la inferencia
+del cast, y **la inferencia se para en la puerta de la ausencia**. Eso, más que
+cualquier inventario de campos, es lo que hace creíble que el Planner v3 se pueda
+construir: el modelo ya pensaba así.
+
+---
+
 ## 2026-07-30 — El eje de persona, y lo que apareció al tirar del hilo
 
 Sesión que empieza en diseño (el rediseño del Planner, Scope v3, fuera del repo)

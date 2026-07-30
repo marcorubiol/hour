@@ -13,13 +13,17 @@
 > **Reconciliación 2026-07-25:** pase de endurecimiento (auditoría de seguridad,
 > rendimiento y estabilidad) desplegado a prod — runtime **`252729f`**, **con
 > cambios de schema** (5 migraciones). Ver «Producción», «Git» y `_tasks.md`.
-> **Reconciliación 2026-07-30:** el **eje de persona** (persona como cuarta
-> dimensión de scope) construido y commiteado, más el **enlace login↔persona**
-> abierto por fin; **2 migraciones aplicadas a prod ese día**. Ojo al estado
-> partido, que es lo primero que hay que leer abajo: **la base va por delante y
-> el Worker NO se ha desplegado** — `main` (`84758fc`) lleva código de
-> aplicación que producción todavía no corre. Ver «Producción», «Git»,
-> `_tasks.md § bloque 8` y ADR-092.
+> **Reconciliación 2026-07-30 (noche) — el estado partido está CERRADO:** el
+> **eje de persona** (persona como cuarta dimensión de scope) y el **enlace
+> login↔persona** están **desplegados**. Runtime **`0f8e12f`**
+> (builtAt 2026-07-30T21:23Z), `main` == `origin/main` == prod, con las
+> 2 migraciones del día ya aplicadas. Verificado después del deploy:
+> **RLS 137/137** y **E2E 30/30** contra producción.
+> **Y una corrección que importa más que el deploy:** el aviso de esa mañana de
+> que «las credenciales de fixture están rotas y ni RLS ni E2E se pueden correr»
+> era **falso**. Las dos suites corren desde esta máquina y siempre pudieron.
+> Lo roto era el destino: `.env.local` apunta a una Supabase local donde los
+> usuarios fixture no existen. Ver «Verificación» abajo y `_tasks.md § 21`.
 >
 > Si otro archivo contradice este documento sobre el estado presente, gana este
 > documento. Si contradice una decisión de producto estable, consultar
@@ -69,8 +73,16 @@ orientativo, no una verdad comercial cerrada.
 
 - Web: `https://hour.zerosense.studio`
 - Worker: `hour-web`
-- `/health/live`: sano, `dirty:false`, SHA **`09f512a`** (builtAt 2026-07-25T08:03Z).
+- `/health/live`: sano, `dirty:false`, SHA **`0f8e12f`** (builtAt 2026-07-30T21:23Z).
 - `/health/ready`: sano, Supabase `ok`.
+- **`main` == `origin/main` == prod.** No hay código de aplicación sin desplegar.
+  El deploy del 2026-07-30 por la noche subió el eje de persona, el enlace
+  login↔persona y la tarea 15 (editar fecha). Verificado inmediatamente después
+  contra el runtime desplegado: **RLS 137/137 · E2E 30/30**, cero skips.
+- *Cómo se despliega, porque el comando documentado no funciona:* es
+  **`pnpm --filter web run deploy`**. `pnpm deploy` desde la raíz choca con el
+  subcomando propio de pnpm y muere con `ERR_PNPM_NOTHING_TO_DEPLOY` sin tocar
+  nada.
 - **DB por delante del Worker, a propósito:** el runtime es `09f512a` pero la
   base lleva además la migración **`20260725100000_unexpose_project_id_helpers`**
   (aplicada el 2026-07-25, run 30160118066). No requiere desplegar: saca las 3
@@ -81,15 +93,13 @@ orientativo, no una verdad comercial cerrada.
   ERROR y los avisos de DEFINER expuestas bajando de 73 a 70 (las 3 retiradas).
   Con esto **la auditoría 2026-07-24 queda sin diferidos**: los tokens de share
   se decidieron NO hashear (ADR-091) y el HIBP es una compra de plan, no deuda.
-- **Encima de `09f512a` YA HAY CÓDIGO DE APLICACIÓN SIN DESPLEGAR** (cambio de
-  estado el 2026-07-30, y la razón por la que la frase que vivía aquí —«encima
-  solo van tests y documentación»— dejó de ser cierta). Además de `c27d4b2` y
-  `f08d1c7` (tests y docs, fuera del bundle) van ahora **`7d03827` y
-  `84758fc`**: el eje de persona y el enlace login↔persona. Entran en el
-  bundle. Hasta que se despliegue, `/health/live` y `main` describen **dos
-  productos distintos**, y esto NO es el caso benigno de antes.
-- **Segunda parte del estado partido, y va al revés:** la base lleva dos
-  migraciones que el Worker desplegado no necesita —
+- Debajo de `0f8e12f` va **`09f512a`**, que fue el runtime desde el 2026-07-25
+  hasta la noche del 30. Durante esas horas hubo código de aplicación sin
+  desplegar (`7d03827`, `84758fc`, `25fc1c5`) — el eje de persona y el enlace
+  login↔persona. **Ese hueco está cerrado**; se deja escrito porque es el caso
+  que la frase antigua de esta sección —«encima solo van tests y
+  documentación»— no cubría, y volverá a pasar.
+- **Las dos migraciones del 2026-07-30** —
   **`20260730164435_bind_auth_user_trigger`** y
   **`20260730164608_revoke_anon_user_profile_update`**, aplicadas el 2026-07-30
   por MCP (no por el workflow plan+apply; anotado a propósito). La primera es
@@ -147,15 +157,13 @@ orientativo, no una verdad comercial cerrada.
 - Repo: `https://github.com/marcorubiol/hour` (privado).
 - Checkout: `/Users/marcorubiol/Developer/hour`.
 - Rama principal: `main`.
-- **2026-07-30: `main` == `origin/main` == `84758fc`, pero `main` != prod.**
-  Dos commits de aplicación pusheados y **sin desplegar** — `7d03827` (eje de
-  persona: `$lib/people`, pin `pe:`, `/api/me`, `/api/me/profile-share`,
-  `project_ids` en `/api/team`, la puerta en Ajustes → Perfil) y `84758fc`
-  (personas en el ⌘K y la copy de la banda de scope). Desplegar es
-  `pnpm deploy`; el árbol está limpio, así que el guard pasa. **Ojo antes de
-  hacerlo**: el mismo árbol lleva la tarea 15 (editar fecha), cuyo E2E
-  `tests/date-edit.spec.ts` **no se ha ejecutado nunca** — lo dice su propia
-  cabecera. Desplegar la envía igual.
+- **2026-07-30 (noche): `main` == `origin/main` == prod == `0f8e12f`.**
+  El eje de persona (`$lib/people`, pin `pe:`, `/api/me`,
+  `/api/me/profile-share`, `project_ids` en `/api/team`, la puerta en
+  Ajustes → Perfil), las personas en el ⌘K y la tarea 15 (editar fecha) ya
+  corren. El E2E de la tarea 15 **corrió por primera vez esa noche y quedó en
+  verde** — su primer rojo fue del spec, no de la app (elegía un día que el mes
+  dibuja y la agenda no; ver `_tasks.md § 15`).
 - Antes de eso, **`main` == `origin/main` == prod** desde el 2026-07-24 (runtime
   `ff6ec4e`, merge fast-forward + deploy el mismo día). Encima de `a643620`, sin schema:
   `ff6ec4e` — **fix de la race de `/h/money`** (default global
@@ -207,13 +215,13 @@ orientativo, no una verdad comercial cerrada.
   deliberado: solo se accede mediante RPC.
 - Staging: `hour-staging` · ref `slccyknqpgmzhyiyclsq` · `eu-west-1`, aislado
   mediante el environment GitHub `staging`; hook de claims activo.
-- **Fixtures rotos, verificado el 2026-07-30:** las credenciales de
-  `.env.test` dan `invalid_credentials` **tanto contra prod como contra la
-  base local** (probadas `PW_TEST_*` y `PW_LIMITED_*` por el endpoint de
-  login). Consecuencia operativa: **la suite RLS y la E2E no se pueden correr
-  desde esta máquina**, y no por falta de CLI sino porque no hay con qué
-  autenticarse. Mientras siga así, cualquier «RLS 137/137» de un doc es
-  historia, no una comprobación de hoy.
+- **Los fixtures están SANOS.** `PW_TEST_*` y `PW_LIMITED_*` de `.env.test`
+  autentican contra producción sin tocar nada: RLS 137/137 y E2E 30/30 la noche
+  del 2026-07-30. La mañana de ese mismo día este documento afirmó lo contrario
+  («fixtures rotos, `invalid_credentials`, las suites no se pueden correr»); era
+  falso, y la causa está en «Verificación» — `.env.test` no lleva URL de
+  Supabase, así que quien la resuelva desde `.env.local` acaba pegando contra la
+  base local, donde esos usuarios no existen.
 - **El eje de persona depende de datos que casi no existen** (2026-07-30):
   `cast_member` son **6 filas en 3 proyectos** y `crew_assignment` 7, todas en
   el workspace `demo` y con gente de test; **MüK Cia no tiene reparto**. Y
@@ -234,17 +242,38 @@ pasa nunca por esa puerta. Cerrado por `20260730164435`.
 
 ### Verificación local y contra producción
 
-**Pase 2026-07-30** (eje de persona + enlace login↔persona): `svelte-check`
+**CÓMO SE CORREN LAS SUITES** (aprendido a golpes el 2026-07-30; si algún
+documento dice que no se pueden correr, está desactualizado):
+
+- `pnpm --filter web test:rls` → **contra producción siempre**. Carga `.env` +
+  `.env.test` explícitamente y **no** mira `.env.local`.
+- E2E → **contra un origen desplegado**:
+  `PW_BASE_URL=https://hour.zerosense.studio npx playwright test`.
+  **Nunca contra `vite preview`**: ahí no hay `platform.env`, y como la app lee
+  `PUBLIC_SUPABASE_URL` del entorno del Worker (`wrangler.jsonc § vars`) y no de
+  un `$env/static`, en preview simplemente no hay Supabase y el login no puede
+  completarse. Eso, y no un fallo de credenciales, explica también los viejos
+  «skips intencionados» de collab.
+- **`.env.local` es la trampa.** Apunta `vite dev` a una Supabase local en
+  `127.0.0.1:54321` (que suele estar levantada), donde los usuarios fixture no
+  existen. Cualquier «invalid_credentials» empieza por preguntar **contra qué
+  base** se está mirando. Al build de producción no le afecta: `PUBLIC_SUPABASE_*`
+  no se hornea en el bundle.
+
+**Pase 2026-07-30 (noche)** — deploy y verificación completa contra el runtime
+desplegado `0f8e12f`: **RLS 137/137** (19 ficheros, 23 s) y **E2E 30/30**
+(16 s), cero skips. Los 3 tests nuevos son los de la tarea 15. Antes del deploy,
+el mismo E2E daba 27/30: los 3 rojos eran la función sin desplegar, o sea el
+spec funcionando.
+
+**Pase 2026-07-30 (día)** (eje de persona + enlace login↔persona): `svelte-check`
 **0/0 (1.844 ficheros)**, unit **408/408** (subió de 375: `people.test.ts`
 nuevo, más casos en `nav`, `planner` y `carrils`), build de producción verde.
 Contra la base viva: las 2 migraciones aplicadas y comprobadas una por una
 (trigger activo; `anon` 17→0; `authenticated` 12 intacto), **advisors 0 ERROR**
 y los 73 WARN conocidos sin categoría nueva, y la migración del trigger probada
-**antes** en la base local con un alta real. **RLS y E2E NO se corrieron** — no
-hay credenciales que funcionen (ver «Supabase»); ninguna de las dos migraciones
-toca una policy, así que la suite tampoco habría dicho nada de ellas. La única
-verificación en navegador es manual y de Marco: búsqueda de persona en el ⌘K
-contra la base local.
+**antes** en la base local con un alta real. Ese pase creyó que RLS y E2E no
+podían correrse; **se equivocaba** — ver el bloque de arriba.
 
 **Pase 2026-07-24** (consolidación + deploy): `svelte-check` 0/0 (1.832
 ficheros), unit **368/368** (subió de 348: identidad + picker), collab 11/11,
@@ -382,21 +411,28 @@ profundidad de producto, no en SvelteKit/Supabase/Cloudflare.
 
 ## Siguiente paso
 
-Abrir `_tasks.md`. Lo primero de la cola no es una feature: **hay código de
-aplicación commiteado y sin desplegar** (eje de persona + enlace login↔persona,
-`84758fc`; prod en `09f512a`). Lo que sigue, por orden:
+Abrir `_tasks.md`. Nada bloquea: `main` == prod y las dos suites están en verde.
+Todo lo que sigue sirve al **Planner v3**, que es la pieza en curso. Por orden:
 
-1. **Desplegar `84758fc`** (`pnpm deploy`, árbol limpio) — decidiendo antes si
-   se envía con él la tarea 15, cuyo E2E nunca ha corrido. Ver `_tasks.md § 19`.
-2. **El escritor de reparto**, que hoy no existe en ninguna forma: sin él el eje
-   de persona no puede incluir a nadie que no esté ya sembrado. Es **pantalla**,
-   y cae dentro del rediseño del Planner en curso. Ver `_tasks.md § 20`.
-3. **Follow-up de money v3 (no bloquea):** UX de **enlazar una función nueva a un
+1. **La nota del día — y si cuelga de Conversations** (`_tasks.md § 23`). Es la
+   ÚNICA maquinaria que el diseño del Planner v3 necesita y no existe, y no se
+   migra nada hasta cerrar la pregunta: `conversation_event` está contratado y
+   su tabla no existe, así que la respuesta decide si esto es una tabla nueva o
+   el arranque de esa.
+2. **Persona: ¿dial o vista?** (`§ 24`) — ADR-092 y el prototipo no dicen lo
+   mismo, y de eso depende si vive en la URL.
+3. **La fontanería barata** (`§ 25`): los 3 campos del run sheet que ya viajan y
+   se tiran, `'day'` como cuarta proyección, y la convención de holds en
+   `workspace.settings`.
+4. **El escritor de reparto** (`§ 20`), que no existe en ninguna forma: sin él
+   el eje de persona no puede incluir a nadie que no esté ya sembrado. Es
+   **pantalla**, y se construye dentro del pase de UI del Planner v3.
+5. **Follow-up de money v3 (no bloquea):** UX de **enlazar una función nueva a un
    bolo** — las performances creadas en Planner nacen sin bolo hasta que exista.
-4. **Travel v2 (ADR-089), EN CURSO:** modelo decidido, nada de schema construido;
-   la migración P1 está por escribir. Depende en parte de la tarea 15 (editar una
-   fecha desde la UI, **que ya está construida y sin desplegar**).
-5. **Contenedores (bloque 5)** y los flecos de planner (multi-día de
+6. **Travel v2 (ADR-089):** modelo decidido, nada de schema construido. Su
+   dependencia dura —la tarea 15, editar una fecha desde la UI— **ya está
+   construida, desplegada y con E2E verde**.
+7. **Contenedores (bloque 5)** y los flecos de planner (multi-día de
    performances, escaleta ADR-090) van después.
 
 > **Rediseño del Planner (Scope v3 Agenda), en curso y fuera del repo:** el

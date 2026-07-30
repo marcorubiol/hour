@@ -4,31 +4,37 @@
 > Estado general y evidencia: `_context.md`. Historia: `_decisions.md` y
 > `_notes/sessions-log.md`. Los documentos de `build/archive/` no crean tareas.
 
-## PRIMERO — dos cosas construidas y sin desplegar (2026-07-30)
+## PRIMERO — nada. `main` == prod y las dos suites están vivas (2026-07-30, noche)
 
-> Esto va arriba porque es lo único que hoy separa a `main` de producción, y
-> porque la primera decisión no es técnica.
+> Esta sección existía para dos cosas y ya no queda ninguna. Se deja el
+> cierre escrito porque una de las dos era **falsa**, y borrarla sin decirlo
+> es cómo se repite.
 
-19. [ ] **Desplegar `84758fc`** (`pnpm deploy` — el árbol está limpio, el guard
-    pasa). Prod sigue en `09f512a`: el **eje de persona** y el **enlace
-    login↔persona** están commiteados y **no corriendo**.
-    **Antes de pulsar, decide una cosa:** el mismo árbol lleva la **tarea 15**
-    (editar fecha), cuyo E2E `tests/date-edit.spec.ts` **no se ha ejecutado
-    nunca** — su cabecera lo dice en mayúsculas y su hermano `money.spec.ts`
-    ya demostró que un spec sin correr puede afirmar lo contrario de la regla
-    de producto. Desplegar lo envía igual. No es un bloqueo, es una elección.
+19. [x] **Desplegado.** `pnpm --filter web run deploy` → `/health/live` =
+    **`0f8e12f`** (builtAt 2026-07-30T21:23Z), `/health/ready` con Supabase
+    `ok`. Prod == `main` == `origin/main`. El eje de persona, el enlace
+    login↔persona y la tarea 15 ya corren.
+    *Nota de comando:* `pnpm deploy` desde la raíz **no funciona** — pnpm tiene
+    su propio subcomando `deploy` que se come el script y responde
+    `ERR_PNPM_NOTHING_TO_DEPLOY`. Es `pnpm --filter web run deploy`.
 
-21. [ ] **Las dos suites de verificación están muertas, y no es de este pase.**
-    Las credenciales de `.env.test` dan `invalid_credentials` **contra prod y
-    contra la base local** (probadas `PW_TEST_*` y `PW_LIMITED_*` por el
-    endpoint de login, 2026-07-30). Consecuencia: **ni RLS ni E2E se pueden
-    correr desde esta máquina**, y no por falta de CLI — no hay con qué
-    autenticarse. Eso afecta a todo lo que venga, no solo al eje de persona:
-    hoy la única red que queda es `check` + unit + build, y ninguna de las tres
-    ve una policy ni un navegador. Arreglarlo es resetear la contraseña de los
-    usuarios fixture por **Supabase Auth Admin** (regla 7: nunca tocando
-    `auth.users` a mano) y volver a apuntar la suite. Mientras no se haga,
-    cualquier «RLS 137/137» que se lea en un documento es historia.
+21. [x] **FALSA ALARMA — las dos suites nunca estuvieron muertas.** Corrido el
+    2026-07-30 por la noche, desde esta máquina: **RLS 137/137** (23 s) y
+    **E2E 30/30** (16 s), ambas contra producción. Las credenciales de
+    `.env.test` son correctas y no hubo que resetear nada por Auth Admin.
+    **Lo que estaba roto era el destino, no la credencial.** `.env.local`
+    (añadido el 23 jul) apunta a una Supabase **local** en `127.0.0.1:54321`
+    —que además está levantada y responde— donde los usuarios fixture no
+    existen. La suite RLS carga `.env` + `.env.test` explícitamente, así que
+    siempre pega contra prod y siempre funcionó; cualquier cosa que pase por
+    un build de Vite se come `.env.local` y aterriza en la local. De ahí el
+    `invalid_credentials`.
+    **Regla que sale de aquí:** el E2E se corre contra un origen desplegado
+    (`PW_BASE_URL=https://hour.zerosense.studio`), **nunca contra
+    `vite preview`** — ahí no hay `platform.env`, y como la app lee
+    `PUBLIC_SUPABASE_URL` del entorno del Worker y no de un `$env/static`,
+    en preview no hay Supabase y el login no puede completarse. Eso también
+    explica los viejos «skips intencionados» de collab contra preview.
 
 22. [ ] **`build/schema.sql`: decidir si se borra.** Lleva desde hoy un banner
     de «histórico, no ejecutar» porque contiene una versión **vieja y falsa** de
@@ -46,9 +52,80 @@
     el coste es un endpoint pequeño **más una pantalla** — quién actúa en una
     obra y con qué papel. **Es pantalla, no tubería**, y cae justo en la zona
     que Marco está rediseñando (el Board por personas), así que no se construye
-    a ciegas: primero el diseño.
+    a ciegas: primero el diseño. **Decidido el 2026-07-30:** se construye
+    dentro del pase de UI del Planner v3, no antes y no suelto.
 
-## Cerrado — bloque 8: el eje de persona (2026-07-30), CONSTRUIDO, SIN DESPLEGAR
+## AHORA — preparar el Planner v3 (revisión de viabilidad, 2026-07-30)
+
+> Del contraste entre `Hour Views - Scope v3 - Agenda.html` (proyecto
+> claude.ai/design `f1741f1f`, leído con `DesignSync`) y el modelo real.
+> **Veredicto: es implementable.** Casi todo el prototipo se dibuja sobre
+> maquinaria que ya existe, y en varios sitios el prototipo y el repo ya dicen
+> la misma ley con las mismas palabras (`agRowKeys()` del prototipo ≡
+> `peopleOf()` de `$lib/people`, incluida la parada de la inferencia en la
+> puerta de la ausencia). Lo que sigue es lo que NO está.
+
+23. [ ] **La nota del día — y si es una conversación.** El margen del diseño es
+    una **pila** (varios autores por día, la mía editable, con visibilidad
+    privada-o-compartida; decisión de Marco del 2026-07-29). **No existe
+    ninguna tabla de nota anclada a un día.** El prototipo lo finge con
+    localStorage.
+    **Abierto, y es lo primero que hay que pensar (Marco, 2026-07-30):** puede
+    que estas notas deban colgar de **Conversations** en vez de ser una tabla
+    suelta. Dato que lo cambia todo: `conversation` existe, pero
+    `conversation_event` **está contratado y la tabla no existe** — si la nota
+    es un evento de conversación, esto no es «añadir una tabla», es construir
+    esa. El patrón más cercano ya en producción es `person_note`
+    (`workspace_id, person_id, author_id, visibility`, con RLS): la forma
+    exacta, con el ancla equivocada. **No se migra nada hasta cerrar esto.**
+
+24. [ ] **Persona: ¿dial o vista?** ADR-092 dice que si cambia qué es una fila,
+    cambió el dibujo → **vista**. El prototipo lo tiene como dial
+    (`calState.lanes='persona'|'scope'`). No es cosmética: por scope una fila
+    es un proyecto y cada cosa cae en **una**; por persona un bolo que tocan
+    tres cae en **tres** filas a la vez, el `+` de una celda vacía ya no sabe
+    para qué proyecto crea, y el total de la lane cuenta otra cosa. Como vista
+    vive en la URL y se comparte; como dial es mobiliario que no sobrevive a un
+    reload. **Decisión de Marco, antes de construir.**
+
+25. [ ] **Fontanería del Planner v3 — barata, y va antes que la UI.**
+    - El **run sheet ya viaja y se tira**: `/api/performances` hace SELECT de
+      los cinco (`load_in_at, soundcheck_at, start_at, loadout_at, wrap_at`,
+      `+server.ts:187`) y el VM de `month-events.ts` solo declara `load_in_at` y
+      `start_at`. Declarar los tres que faltan + el adaptador de pasos
+      (`[{label, at}]`) decidido el 29 — cuando llegue `schedule_slot` de
+      ADR-090 solo cambia el adaptador.
+    - **`'day'` en `PlannerView`** (`'month'|'agenda'|'carrils'`): el Today del
+      diseño es la cuarta proyección. Flow≈agenda, Board≈carrils, Month=month
+      ya existen.
+    - **Convención de holds por espacio** (`queue` con 1r/2n/3r vs `single`):
+      `workspace.settings jsonb` existe y **no lo usa nadie**. Casa gratis, sin
+      migración. El enum `performance_status` ya lleva `hold` **y** `hold_1..3`,
+      o sea que los dos modos son representables hoy sin tocar un dato.
+
+26. [x] **Vocabulario del diseño vs el enum — CERRADO: gana lo implementado.**
+    (Marco, 2026-07-30.) `budget` no existe en `line_kind` → cae en `misc`.
+    `estudi` y `reunió` no existen en `date_kind`
+    (`rehearsal, residency, travel_day, press, other, day_off`) → caen en
+    `other`. `residence` del prototipo es `residency`. **Cero migraciones de
+    enum**; el diseño se ajusta al vocabulario que ya corre.
+
+> **Lo que NO hay que construir** (verificado contra la base viva, no contra el
+> checkpoint): la banda de decisiones (`decisionsFor()` ya emite
+> `level: people|double|possible` + `kind: choose|release` y devuelve las
+> concurrencias aparte), la caducidad del hold (`decideBy()` devuelve una fecha
+> ISO real: día del bolo − `hold_notice_days`), los chips de producción
+> (`READINESS_KEYS = ['hotel','technical']` + `performance.readiness`), el
+> monograma editable (`project.initials` + `accent`), el gloss de zona horaria
+> (`venue.timezone`, ya en el VM), el viaje (`date.kind='travel_day'` +
+> `travel_direction`), el bloque de ensayos multi-día (`series_id`) y todos los
+> verbos del board (`PATCH /api/performances/[key]` para el *Confirm*,
+> `POST/PATCH/DELETE /api/dates` para el `+` y la ficha inline).
+> **Y una deuda que se cierra sola:** `personRowKeys()` y `noCastKey()` están
+> exportadas sin usar en `$lib/people` — son exactamente el resolutor de
+> carriles del Board, así que el diseño las estrena.
+
+## Cerrado — bloque 8: el eje de persona (2026-07-30), CONSTRUIDO Y DESPLEGADO
 
 - **Persona como cuarta dimensión de scope** (ADR-092): pin `pe:<personId>`,
   `ResolvedScope.personIds`, búsqueda de personas en el ⌘K (insensible a
@@ -467,12 +544,19 @@ entre empresas sin construirlo.
 
 ## Después de money v3 — planner, lo que quedó pendiente
 
-15. [ ] **Editar una fecha desde la UI — NO EXISTE.** `PATCH /api/dates/[id]` y
-    `DatePatchSchema` están construidos, pero **ningún componente los usa** y el
-    chip de fecha del mes es un `<span>`, no un enlace: ensayos, prensa,
-    residencias, días off y viajes nunca se han podido abrir, editar ni borrar.
-    No es deuda del multi-día — este solo lo hizo evidente, porque crear 25
-    fechas de golpe hace que la falta duela.
+15. [x] **Editar una fecha desde la UI — HECHO Y VALIDADO EN PROD (2026-07-30).**
+    `EditDateDialog.svelte` sobre `PATCH`/`DELETE /api/dates/[id]`, abierto desde
+    el chip del mes y desde la fila de la agenda. Su E2E
+    (`tests/date-edit.spec.ts`, 3 tests) **corrió por primera vez esa noche
+    contra el runtime `0f8e12f` y quedó en verde**, incluida la aserción que
+    lleva el peso: guardar sin tocar la hora deja `starts_at` idéntico.
+    El primer rojo fue **del spec, no de la app**: `runDay()` elegía el 15 del
+    mes en curso, que el mes dibuja y la agenda no —la agenda es un diario y
+    **abre en hoy** (`agendaFromIso = todayIso`), lo anterior queda tras un
+    «cargar antes»—. Corregido a hoy, el único día que las dos proyecciones
+    enseñan sin navegar. Antes decía: *«PATCH y DatePatchSchema están
+    construidos pero ningún componente los usa, y el chip del mes es un `span`
+    y no un enlace»*.
 
 16. [ ] **Multi-día para PERFORMANCES.** Hoy `performance.performed_at` es un
     solo día. Es simétrico a lo que ya existe para `date`: `performance.series_id`

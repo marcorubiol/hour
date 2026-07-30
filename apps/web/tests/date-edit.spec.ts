@@ -4,18 +4,20 @@ const EMAIL = process.env.PW_TEST_EMAIL;
 const PASSWORD = process.env.PW_TEST_PASSWORD;
 
 /**
- * ⚠️ NEVER RUN — written 2026-07-25 alongside the date-edit dialog (task
- * 15) and NOT executed against anything: the local dev server has no
- * usable login here (the shared `playwright@hour.test` credential returns
- * "Invalid credentials" against its Supabase — a known open item), so this
- * file has only been type-checked. Treat every assertion below as a
- * HYPOTHESIS until it runs green against production.
+ * GREEN against production since 2026-07-30 (runtime `0f8e12f`), on its
+ * first real run. It was written on 2026-07-25 and carried a "NEVER RUN"
+ * banner until then: the credential that supposedly returned "Invalid
+ * credentials" was fine all along — what was broken was the TARGET, since
+ * `.env.local` points a local build at a local Supabase where the fixture
+ * users do not exist. Run it against a deployed origin (`PW_BASE_URL`),
+ * never against `vite preview`, which has no `platform.env` and therefore
+ * no Supabase at all.
  *
- * That warning is not boilerplate. `money.spec.ts` was written the same
- * way on 2026-07-24, went unrun, and turned out to assert the OPPOSITE of
- * the product rule (pipeline counted as sold). The first red here is as
- * likely to be a wrong expectation as a real bug — read the failure before
- * touching the app.
+ * The old banner's warning earned itself, so it is kept as history: the
+ * first run went red, and it was the SPEC that was wrong, not the app —
+ * see `runDay()`. `money.spec.ts` had the same story on 2026-07-24
+ * (unrun, and asserting the opposite of the product rule). Read the
+ * failure before touching the app.
  *
  * ── What it pins ──────────────────────────────────────────────────────
  * The write path that existed but was unreachable until task 15: PATCH
@@ -44,14 +46,28 @@ const FIXTURE_SPACE_TOKEN = 's:playwright';
 const FIXTURE_PROJECT_ID = '019f21d2-7482-77e6-9ad9-27d881cff305';
 
 /**
- * Mid-month of the CURRENT month: the planner opens on today's month with
- * no URL param for it, so a far-future day (the performance suite's 2032
- * trick) would need ~70 clicks on "next" to become visible. The 15th is in
- * every month, and the fixture scope keeps real rows off the grid anyway.
+ * TODAY — the only day BOTH projections show without navigation, which is
+ * what a test opening the same dialog from two of them needs.
+ *
+ * The planner takes no day/month URL param, so the day has to be one the
+ * two views land on by themselves, and their windows are not the same
+ * shape: the month draws the whole current month (so any day of it works),
+ * while the agenda is a diary that OPENS ON TODAY and runs forward —
+ * `agendaFromIso = todayIso`, with earlier days behind a "load earlier".
+ * The intersection is today onwards, and only today is guaranteed to be
+ * inside the current month too (today+2 falls into next month at a month
+ * end, which the month view would then need a click to reach).
+ *
+ * This is what the first run of this file caught: the 15th of the current
+ * month passed the month test and failed the agenda one for 15 days out of
+ * every 30 — visible in one drawing, behind the fold in the other. The app
+ * is right (a diary starts where you are); the day was wrong.
  */
 function runDay(): string {
   const now = new Date();
-  return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}-15`;
+  return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}-${String(
+    now.getUTCDate(),
+  ).padStart(2, '0')}`;
 }
 
 type CreatedDate = { id: string; starts_at: string };
