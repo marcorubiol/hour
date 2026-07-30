@@ -18,6 +18,25 @@
     ya demostró que un spec sin correr puede afirmar lo contrario de la regla
     de producto. Desplegar lo envía igual. No es un bloqueo, es una elección.
 
+21. [ ] **Las dos suites de verificación están muertas, y no es de este pase.**
+    Las credenciales de `.env.test` dan `invalid_credentials` **contra prod y
+    contra la base local** (probadas `PW_TEST_*` y `PW_LIMITED_*` por el
+    endpoint de login, 2026-07-30). Consecuencia: **ni RLS ni E2E se pueden
+    correr desde esta máquina**, y no por falta de CLI — no hay con qué
+    autenticarse. Eso afecta a todo lo que venga, no solo al eje de persona:
+    hoy la única red que queda es `check` + unit + build, y ninguna de las tres
+    ve una policy ni un navegador. Arreglarlo es resetear la contraseña de los
+    usuarios fixture por **Supabase Auth Admin** (regla 7: nunca tocando
+    `auth.users` a mano) y volver a apuntar la suite. Mientras no se haga,
+    cualquier «RLS 137/137» que se lea en un documento es historia.
+
+22. [ ] **`build/schema.sql`: decidir si se borra.** Lleva desde hoy un banner
+    de «histórico, no ejecutar» porque contiene una versión **vieja y falsa** de
+    `handle_new_user` (sin la capa de cuenta). Su último motivo para existir
+    —ser el único sitio con el `CREATE TRIGGER`— se cerró con
+    `20260730164435`. O se borra, o el banner se queda para siempre; lo que no
+    puede es seguir pareciendo un schema.
+
 20. [ ] **El reparto no se puede escribir desde la app — el eslabón que falta.**
     Verificado: `/api/lines/[id]/people` exporta **solo `GET`** y **ningún**
     endpoint escribe `cast_member`; las 6 filas que existen se sembraron. Sin

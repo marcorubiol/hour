@@ -12,6 +12,62 @@ Convención: secciones por fecha descendente. Cada sesión queda con commits cit
 
 ---
 
+## 2026-07-30 — El eje de persona, y lo que apareció al tirar del hilo
+
+Sesión que empieza en diseño (el rediseño del Planner, Scope v3, fuera del repo)
+y acaba construyendo. Lo que sí está en el diff está en `_context.md`, `_tasks.md
+§ bloque 8` y ADR-092; aquí queda solo lo que **no se deduce leyendo el código**.
+
+**Me equivoqué en público sobre la RLS, y así es como pasó.** Dije que leer el
+reparto exigía `edit:performance`, y monté encima un plan de arreglo. Lo había
+leído en `20260720105713_remote_schema_checkpoint.sql` — un **snapshot** — sin
+comprobar que una migración de ese mismo día (`…172431_complete_rbac_read_matrix`)
+ya lo había movido a `read:performance`. La regla 3 del proyecto existe justo
+para esto y me la salté por leer un fichero grande y creerlo actual. **El
+checkpoint no es el estado; el estado es la base.** Verificarlo costó una
+consulta a `pg_policies`.
+
+**No hubo backfill, y ese fue el hallazgo.** El plan era enlazar los logins
+huérfanos con su persona por correo. No había ninguno que enlazar: ni una
+`person` correspondía a ningún login, ni por email ni por nombre, **la de Marco
+incluida**. Y el único perfil enlazado apuntaba a una persona sintética creada
+por un test de RLS. O sea que el modelo de identidad llevaba desde julio sin
+usarse ni una vez de verdad.
+
+**La causa raíz era una puerta sin picaporte.** `share_my_profile_with_workspace`
+estaba viva en producción, tipada en `db-types.ts`, y **sin un solo llamador de
+aplicación**. Hace el trabajo entero (reclama dossier por email verificado, crea
+la `person`, escribe `user_profile.person_id`, upserta el dossier). No había que
+inventar nada: había que construirle la puerta. Cuando algo del schema parece que
+falta, mirar antes si está y no se llama.
+
+**Cómo se enlazó a Marco sin escribir filas a mano:** poniendo
+`request.jwt.claims` a su `sub` en una transacción y llamando a la RPC. Efecto
+idéntico a pulsar el botón, y pasa por el gate de consentimiento en vez de
+rodearlo. Sirve para cualquier RPC `SECURITY DEFINER` que dependa de `auth.uid()`.
+
+**Dos horas perdidas por no mirar un fichero que sí miré.** Afirmé que el dev
+server pegaba contra producción. Pegaba contra una Supabase local: `.env.local`
+pisa a `.env`. Yo había impreso ese fichero **enmascarando los valores**, así que
+vi que existía y no vi a dónde apuntaba. El síntoma («la búsqueda de personas no
+encuentra a nadie») no era un bug: era que le di a Marco un nombre que solo existe
+en prod. **Enmascarar un valor por prudencia también te ciega a ti**; si el valor
+decide el diagnóstico, hay que mirarlo.
+
+**Lo que el CSP tapaba.** Los errores de websocket que salían en consola no eran
+ruido: `svelte.config.js` deriva `connect-src` de `process.env`, que no ve los
+`.env*`, así que con Supabase local la CSP se horneaba con el host de producción
+y **el realtime llevaba muerto en local quién sabe cuánto**, en silencio. Al
+arreglarlo, el guard importante no es leer los ficheros: es **no leerlos en un
+`build`**, porque `wrangler deploy` corre desde la máquina de Marco y un
+`.env.local` habría acabado dentro de un bundle desplegado.
+
+**Y donde paré.** El eje de persona funciona y no puede incluir a Marco, porque
+para salir en él hay que estar en un reparto y **no existe forma de escribir un
+reparto desde la app** (`/api/lines/[id]/people` solo exporta `GET`). Eso es una
+pantalla —quién actúa en una obra y con qué papel—, cae dentro del rediseño en
+curso, y construirla a ciegas era la forma segura de tirarla. Queda como tarea 20.
+
 ## 2026-07-19/20 — Acceso + comms: del grill al schema. Modelo canónico, 7 prototipos, migración escrita y NO aplicada
 
 Sesión larga de dos días. Empieza como una pasada de **diseño para validar** ADR-082/083 (que estaban provisionales, sin implementar) y acaba con la migración de la capa de comms escrita, revisada y parada a un paso de aplicarse. Ramas: `design/access-comms` (diseño) → `feat/comms-threads` (schema). La sesión paralela (planner) commiteaba en la misma rama y en el mismo worktree durante casi todo — de ahí la disciplina de commitear solo ficheros propios.

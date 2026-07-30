@@ -1,3 +1,26 @@
+-- ╔══════════════════════════════════════════════════════════════════════════╗
+-- ║  HISTÓRICO — NO EJECUTAR, Y NO LEER COMO VERDAD.  (banner 2026-07-30)    ║
+-- ╚══════════════════════════════════════════════════════════════════════════╝
+--
+-- Describe el schema de MAYO de 2026 y desde entonces ha envejecido mal. La
+-- historia SQL ejecutable vive en `supabase/migrations/` (checkpoint
+-- reconstructivo + migraciones posteriores); una base vacía se levanta con
+-- `pnpm db:reset`, nunca con esto.
+--
+-- Miente en concreto sobre la función más delicada que contiene:
+-- `public.handle_new_user()` aparece aquí en su versión vieja — SIN la capa de
+-- cuenta (`account` / `account_membership`) y con el slug derivado de la parte
+-- local del email. La función viva, la del checkpoint, sí crea esa capa.
+-- Copiar la de aquí deja logins a medio provisionar. Verificado 2026-07-30.
+--
+-- Hasta el 2026-07-30 este fichero tenía un motivo para existir: era el ÚNICO
+-- sitio donde estaba el `CREATE TRIGGER on_auth_user_created` que engancha esa
+-- función a `auth.users`, y al no estar en ninguna migración, una base
+-- reconstruida aceptaba altas sin crear user_profile, cuenta, workspace ni
+-- membresía. Cerrado en `20260730164435_bind_auth_user_trigger.sql`. Con eso
+-- este fichero ya no aporta nada que no esté mejor dicho en otro sitio: se
+-- conserva para arqueología, y borrarlo es una decisión pendiente de Marco.
+--
 -- Hour — Phase 0 Schema (reset v2)
 -- Target: Supabase Cloud (Postgres 15+)
 -- Generated: 2026-04-19. Last migration: 2026-05-01 (reset_v2_roadsheet).
