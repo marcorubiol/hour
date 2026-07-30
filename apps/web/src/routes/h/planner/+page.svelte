@@ -66,6 +66,7 @@
   import CalToolbar, { type CalFilter } from '$lib/components/planner/CalToolbar.svelte';
   import FeedDialog from '$lib/components/planner/FeedDialog.svelte';
   import CreateEventDialog from '$lib/components/create/CreateEventDialog.svelte';
+  import EditDateDialog from '$lib/components/planner/EditDateDialog.svelte';
   import CreateBlackoutDialog from '$lib/components/create/CreateBlackoutDialog.svelte';
   import type { CreatedPerformance } from '$lib/components/PerformanceForm.svelte';
   import { usePins } from '$lib/stores/pins.svelte';
@@ -94,6 +95,7 @@
     type DecisionPerformance,
     type DecisionSide,
   } from '$lib/planner';
+  import { buildPersonScope } from '$lib/people';
   import { createPlannerFeeds } from '$lib/planner-feeds.svelte';
   import {
     loomThreads,
@@ -396,6 +398,7 @@
     return false;
   }
 
+
   // ── Source-switch (ADR-076) — the agenda projection reads its OWN
   // multi-month window; Month/Carrils read the single-month grid window.
   // Only these three source arrays branch on `view`; EVERYTHING downstream
@@ -415,8 +418,47 @@
       : ($availabilityQuery.data?.items ?? []),
   );
 
-  let scopedPerfs = $derived(activePerfRows.filter((p) => perfInScope(p)));
-  let scopedDates = $derived(activeDateRows.filter((d) => dateInScope(d)));
+  // ── The person axis (scope, never a display filter) ───────────────────
+  // A person is not a container, so `resolveScope` only carries the ids and
+  // the narrowing happens here, where a roster can actually be resolved: a
+  // performance brings its own (`?rosters=1`), a date brings none and is
+  // judged by its project's cast minus whoever is away that day.
+  //
+  // It sits at the SCOPE level deliberately. Scope narrows what the conflict
+  // engine sees; the status filter below deliberately does not, so that
+  // hiding chips can never hide a real clash. Pinning a person is the first
+  // kind, not the second: you are changing what you are looking at.
+  //
+  // Declared HERE, after the source-switch, because it reads
+  // `activeBlackoutRows` — and those are the UNFILTERED rows on purpose:
+  // calm hides bands from the page, it does not make anybody available.
+  let personScope = $derived(
+    buildPersonScope({
+      pinnedPersonIds: scope.personIds,
+      team: $teamQuery.data?.items ?? [],
+      blocks: activeBlackoutRows,
+    }),
+  );
+  function perfPersonVerdict(p: PerformanceEvent) {
+    return personScope.verdict({
+      projectId: p.project?.id ?? null,
+      day: perfDayKey(p),
+      roster: p.person_ids,
+    });
+  }
+  function datePersonVerdict(d: DateEvent) {
+    return personScope.verdict({
+      projectId: d.project?.id ?? null,
+      day: dateDayKey(d, viewerTz),
+    });
+  }
+
+  let scopedPerfs = $derived(
+    activePerfRows.filter((p) => perfInScope(p) && perfPersonVerdict(p) !== 'no'),
+  );
+  let scopedDates = $derived(
+    activeDateRows.filter((d) => dateInScope(d) && datePersonVerdict(d) !== 'no'),
+  );
 
   let allBlackouts = $derived(activeBlackoutRows);
   // The bands/rail show the scope's workspaces only; the engine reads all.
@@ -892,8 +934,14 @@
   // ── The Loom (Agrupa per Persona — ADR-080 §8) ────────────────────────
   let loomGroups = $derived.by((): LoomGroupVM[] => {
     if (view !== 'carrils' || carrilsGroup !== 'persona') return [];
+    // The loom's rows ARE people, so a pinned person narrows the rows too —
+    // otherwise pinning one name drew twelve threads with eleven of them
+    // empty, which reads as "nobody is working" rather than as a filter.
+    const pinnedPeople = new Set(scope.personIds);
     const team = ($teamQuery.data?.items ?? []).filter(
-      (i) => scopeWorkspaceIds === null || scopeWorkspaceIds.has(i.workspace_id),
+      (i) =>
+        (scopeWorkspaceIds === null || scopeWorkspaceIds.has(i.workspace_id)) &&
+        (pinnedPeople.size === 0 || pinnedPeople.has(i.person_id)),
     );
     const commitments: LoomCommitment[] = [];
     for (const p of shownPerfs) {
@@ -1204,6 +1252,26 @@
     }
     return ids.size;
   });
+  /**
+   * Rows the person filter admitted on an INFERENCE, not a fact — a date of
+   * a project the pinned person is on file for, with nobody actually cast on
+   * it (there is no date↔person table to be cast in).
+   *
+   * It has to be said out loud. Including them is the right call — excluding
+   * them would hide a person's own rehearsals — but a guess that looks like a
+   * fact is the one thing the person axis must not do, and the scope chip
+   * only says WHO is pinned, not on what evidence. Drops to nothing when the
+   * axis is inactive or everything matched a real roster, like every other
+   * segment of this strip.
+   */
+  let pulseInferred = $derived.by(() => {
+    if (!personScope.active) return 0;
+    let n = 0;
+    for (const p of shownPerfs) if (perfPersonVerdict(p) === 'inferred') n++;
+    for (const d of shownDates) if (datePersonVerdict(d) === 'inferred') n++;
+    return n;
+  });
+
   let pulseTrips = $derived.by(() => {
     let n = 0;
     for (const d of scopedDates) {
@@ -1256,6 +1324,24 @@
   function openCreate(dayIso?: string) {
     createDate = dayIso ?? todayIso;
     createOpen = true;
+  }
+
+  // ── Editing a date (task 15) — both projections open the same dialog.
+  // A date has no page of its own (no slug, no road sheet), so the edit
+  // is a dialog over the calendar, exactly where creation happens.
+  let editOpen = $state(false);
+  let editDate = $state<DateEvent | null>(null);
+
+  /** True when other loaded rows share this row's series (ADR-084 §1). */
+  let editInSeries = $derived.by(() => {
+    const sid = editDate?.series_id;
+    if (!sid) return false;
+    return shownDates.filter((d) => d.series_id === sid).length > 1;
+  });
+
+  function openDate(d: DateEvent) {
+    editDate = d;
+    editOpen = true;
   }
 
   async function handleCreated(perf: CreatedPerformance) {
@@ -1345,6 +1431,13 @@
               : t('planner.pulse_trips', locale, { w: pulseTrips })}</span
           >
         {/if}
+        {#if pulseInferred > 0}
+          <!-- The person filter is showing rows nobody is cast on. Say so:
+               a guess must never read as a fact. -->
+          <span class="cal__stat cal__stat--soft"
+            >{t('planner.pulse_inferred', locale, { n: String(pulseInferred) })}</span
+          >
+        {/if}
       {/if}
     {/snippet}
   </LensHeader>
@@ -1406,6 +1499,7 @@
       workspaceSlug={defaultWorkspaceSlug}
       {loading}
       onDayCreate={(iso) => openCreate(iso)}
+      onDateOpen={openDate}
       blackouts={blackoutVMs}
       aways={awayVMs}
       {clashesByDay}
@@ -1448,6 +1542,7 @@
       onReachEnd={extendAgendaEnd}
       onReachStart={loadEarlier}
       onDecideJump={jumpToDecisions}
+      onDateOpen={openDate}
     />
   {:else}
     <!-- Carrils (ADR-080 §7/§8) — desktop-first; at 390px the strip
@@ -1480,6 +1575,8 @@
   presetWorkspaceId={blackoutPresetWs}
   presetDate={createDate}
 />
+
+<EditDateDialog bind:open={editOpen} date={editDate} inSeries={editInSeries} />
 
 <FeedDialog bind:open={feedOpen} workspaces={$workspacesQuery.data?.items ?? []} />
 

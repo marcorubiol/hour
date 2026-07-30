@@ -109,6 +109,40 @@ export function prepRuns(days: PrepDay[]): PrepRun[] {
   return runs.sort((a, b) => (a.from < b.from ? -1 : a.from > b.from ? 1 : 0));
 }
 
+/**
+ * An inclusive day range minus a set of blocked ranges, as the contiguous
+ * runs that survive. Day-by-day because these spans are days, not years, and
+ * a walk is impossible to get subtly wrong — the same shape `awayBands` uses
+ * to split a trip around an own-event day.
+ *
+ * Used to keep an INFERRED segment off the days its person is away: a
+ * rehearsal block is attributed to a thread by roster membership, not by
+ * anybody saying "she is at this rehearsal", so the guess must stop where a
+ * fact contradicts it.
+ */
+function subtractDays(
+  from: string,
+  to: string,
+  blocked: ReadonlyArray<{ from: string; to: string }>,
+): Array<{ from: string; to: string }> {
+  const out: Array<{ from: string; to: string }> = [];
+  let runStart: string | null = null;
+  let prev: string | null = null;
+  for (let day = from; day <= to; day = addDaysIso(day, 1)) {
+    const hit = blocked.some((b) => day >= b.from && day <= b.to);
+    if (hit) {
+      if (runStart !== null && prev !== null) out.push({ from: runStart, to: prev });
+      runStart = null;
+      prev = null;
+    } else {
+      if (runStart === null) runStart = day;
+      prev = day;
+    }
+  }
+  if (runStart !== null && prev !== null) out.push({ from: runStart, to: prev });
+  return out;
+}
+
 // ── The Loom (Agrupa per Persona — ADR-080 §8) ─────────────────────────
 
 /** One person-day commitment: they are on this gig's roster. */
@@ -251,14 +285,8 @@ export function loomThreads(input: {
       }
       segments.push({ from, to, project_id, state });
     }
-    // Prep runs of the person's projects ride their thread, faded.
-    for (const run of preps) {
-      if (membership.get(person.person_id)?.has(run.project_id)) {
-        segments.push({ from: run.from, to: run.to, project_id: run.project_id, state: 'prep' });
-      }
-    }
-    segments.sort((a, b) => (a.from < b.from ? -1 : a.from > b.from ? 1 : 0));
-
+    // The absences come FIRST: they are facts, and the prep attribution
+    // below is an inference that has to yield to them.
     const outs = blackouts
       .filter(
         (b) =>
@@ -270,6 +298,23 @@ export function loomThreads(input: {
         tentative: b.certainty === 'tentative',
       }))
       .sort((a, b) => (a.from < b.from ? -1 : a.from > b.from ? 1 : 0));
+
+    // Prep runs of the person's projects ride their thread, faded — MINUS the
+    // days that person is away. Nobody wrote down who attends a rehearsal
+    // (there is no date↔person table), so this attribution is a guess made
+    // from roster membership; drawing it over an absence made one thread say
+    // both "she is away all day" and "she may be rehearsing" about the same
+    // day. Whoever is away is not a candidate: the inference stops at the
+    // door of the absence, and a block that straddles one comes back as the
+    // days that survive rather than being dropped whole — three real days of
+    // a five-day block are still three real days.
+    for (const run of preps) {
+      if (!membership.get(person.person_id)?.has(run.project_id)) continue;
+      for (const part of subtractDays(run.from, run.to, outs)) {
+        segments.push({ ...part, project_id: run.project_id, state: 'prep' });
+      }
+    }
+    segments.sort((a, b) => (a.from < b.from ? -1 : a.from > b.from ? 1 : 0));
 
     const knotDays = [
       ...new Set(

@@ -58,6 +58,8 @@
     loading?: boolean;
     /** When given, each day shows a "+" that reports its ISO date. */
     onDayCreate?: (isoDate: string) => void;
+    /** When given, date chips open — the page owns the edit dialog. */
+    onDateOpen?: (d: DateEvent) => void;
     /** Stored blackouts to paint as day-cell bands (page-scoped VMs). */
     blackouts?: BlackoutBandVM[];
     /** Derived away bands — quieter than any blackout, display-only. */
@@ -111,6 +113,7 @@
     workspaceSlug,
     loading = false,
     onDayCreate,
+    onDateOpen,
     blackouts = [],
     aways = [],
     clashesByDay,
@@ -472,6 +475,7 @@
             {viewerTz}
             {dateKindLabel}
             onMarkOpen={openMark}
+            onOpen={onDateOpen}
           />
         {/each}
         {#if wlc > 0}
@@ -802,8 +806,33 @@
       color: var(--success, currentColor);
     }
 
-    .cal__grid :global(a.cal__event:hover) {
+    .cal__grid :global(a.cal__event:hover),
+    .cal__grid :global(.cal__event--openable:hover) {
       filter: brightness(0.97);
+    }
+
+    /* A date chip that can be opened (task 15). The hit target is a bare
+       button stretched over the card — see DateChip for why it is a
+       sibling and not a wrapper. It sits UNDER the monogram and OVER the
+       text, which is inert anyway. */
+    .cal__grid :global(.cal__event--openable) {
+      position: relative;
+      cursor: pointer;
+    }
+    .cal__grid :global(.cal__event-hit) {
+      all: unset;
+      position: absolute;
+      inset: 0;
+      cursor: pointer;
+    }
+    .cal__grid :global(.cal__event-hit:focus-visible) {
+      outline: 2px solid var(--focus-ring, var(--text-color));
+      outline-offset: -2px;
+    }
+    /* The monogram keeps its own click through the hit layer. */
+    .cal__grid :global(.cal__event--openable .cal__markbtn) {
+      position: relative;
+      z-index: 1;
     }
 
     /* The settled gig is the day's anchor: it leads the cell AND lifts off

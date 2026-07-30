@@ -17,10 +17,12 @@
   import { createQuery } from '@tanstack/svelte-query';
   import { tick } from 'svelte';
   import { goto } from '$app/navigation';
+  import { toStore } from 'svelte/store';
   import {
     workspacesQueryOptions,
     activeProjectsQueryOptions,
     allLinesQueryOptions,
+    teamQueryOptions,
   } from '$lib/nav-queries';
   import {
     buildLineIndex,
@@ -29,7 +31,7 @@
     lineUrl,
     type NavWorkspace,
   } from '$lib/nav';
-  import { parsePin } from '$lib/stores/pins.svelte';
+  import { parsePin, personPin } from '$lib/stores/pins.svelte';
   import { accentVarFor } from '$lib/utils/accent';
   import { lineKindLabel } from '$lib/utils/line-kind';
   import ScopeGlyph from '$lib/components/ScopeGlyph.svelte';
@@ -58,6 +60,57 @@
   let projectIndex = $derived(buildProjectIndex(workspaces, $projectsQuery.data?.items ?? []));
   let lineIndex = $derived(buildLineIndex(workspaces, $linesQuery.data?.items ?? []));
 
+  /**
+   * The team — the fourth thing you can narrow by, and the only one that is
+   * not a container. Fetched while the palette is open, on the key the
+   * planner and the blackout dialog already share.
+   *
+   * It is the TEAM (cast ∪ crew), never the contact book: a workspace's
+   * person table holds hundreds of programmers who are not "us", and putting
+   * them in this list would bury the eight people who carry the work.
+   */
+  const teamStore = toStore(() =>
+    teamQueryOptions(
+      workspaces.map((w) => w.id),
+      { enabled: open },
+    ),
+  );
+  const teamQuery = createQuery(teamStore);
+
+  type PersonEntry = {
+    person_id: string;
+    full_name: string;
+    slug: string;
+    workspaceSlug: string;
+    workspaceName: string;
+    projectIds: string[];
+  };
+  /** One entry per person even when they serve two workspaces: the identity is
+   *  portable, so the first workspace wins the path and the projects merge. */
+  let people = $derived.by<PersonEntry[]>(() => {
+    const wsById = new Map(workspaces.map((w) => [w.id, w]));
+    const byPerson = new Map<string, PersonEntry>();
+    for (const item of $teamQuery.data?.items ?? []) {
+      const ws = wsById.get(item.workspace_id);
+      const found = byPerson.get(item.person_id);
+      if (found) {
+        for (const id of item.project_ids ?? []) {
+          if (!found.projectIds.includes(id)) found.projectIds.push(id);
+        }
+        continue;
+      }
+      byPerson.set(item.person_id, {
+        person_id: item.person_id,
+        full_name: item.full_name,
+        slug: item.slug,
+        workspaceSlug: ws?.slug ?? '',
+        workspaceName: ws?.name ?? '',
+        projectIds: [...(item.project_ids ?? [])],
+      });
+    }
+    return [...byPerson.values()].sort((a, b) => a.full_name.localeCompare(b.full_name));
+  });
+
   let query = $state('');
   /** null = top-level (spaces); `s:<slug>` = that space's projects;
       `p:<id>` = that project's lines. */
@@ -66,7 +119,7 @@
   let cur = $state(0);
   let inputEl = $state<HTMLInputElement | null>(null);
 
-  type Kind = 'space' | 'project' | 'line';
+  type Kind = 'space' | 'project' | 'line' | 'person';
   interface Row {
     token: string;
     kind: Kind;
@@ -86,6 +139,8 @@
     const { kind, key } = parsePin(token);
     if (kind === 'space') return workspaces.find((w) => w.slug === key)?.name ?? key;
     if (kind === 'project') return projectIndex.find((p) => p.id === key)?.name ?? 'project';
+    if (kind === 'person')
+      return people.find((p) => p.person_id === key)?.full_name ?? 'person';
     return lineIndex.find((l) => l.id === key)?.name ?? 'line';
   }
   function accentFor(token: string): string {
@@ -95,6 +150,9 @@
       return w ? accentVarFor(w) : 'var(--text-faint)';
     }
     if (kind === 'project') return projectIndex.find((p) => p.id === key)?.accent ?? 'var(--text-faint)';
+    // Hue is project identity: a person is drawn in ink (ScopeGlyph ignores
+    // this value for `person`, and the staged chip stays honest too).
+    if (kind === 'person') return 'var(--text-faint)';
     return lineIndex.find((l) => l.id === key)?.accent ?? 'var(--text-faint)';
   }
   function lineKindFor(token: string): string {
@@ -106,12 +164,15 @@
   // Placeholder examples — pulled per-user from their OWN loaded nav data
   // (one space · project · line), never hardcoded: in a multi-tenant app a
   // fixed "muk/mamemi" would leak one tenant's names to everyone.
-  function hintWord(name: string): string {
-    const norm = name
+  /** Lowercased and stripped of diacritics \u2014 "Vill\u00e9" \u2192 "ville". */
+  function fold(s: string): string {
+    return s
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
       .toLowerCase();
-    return norm.match(/[a-z0-9]{2,}/)?.[0] ?? '';
+  }
+  function hintWord(name: string): string {
+    return fold(name).match(/[a-z0-9]{2,}/)?.[0] ?? '';
   }
   let examples = $derived(
     [workspaces[0]?.name, projectIndex[0]?.name, lineIndex[0]?.name]
@@ -121,8 +182,8 @@
   );
   let placeholder = $derived(
     examples.length > 0
-      ? `Filter spaces, projects, lines… (try ${examples.map((e) => `“${e}”`).join(', ')})`
-      : 'Filter spaces, projects, lines…',
+      ? `Filter spaces, projects, lines, people… (try ${examples.map((e) => `“${e}”`).join(', ')})`
+      : 'Filter spaces, projects, lines, people…',
   );
 
   function spaceRow(w: NavWorkspace, canDrill: boolean): Row {
@@ -133,6 +194,10 @@
   }
   function lineRow(l: (typeof lineIndex)[number], path: string): Row {
     return { token: `l:${l.id}`, kind: 'line', name: l.name, path, drill: null, lineKind: l.kind };
+  }
+  /** A person never drills: they hold nothing to descend into. */
+  function personRow(p: PersonEntry, path: string): Row {
+    return { token: personPin(p.person_id), kind: 'person', name: p.full_name, path, drill: null };
   }
 
   // Results grouped under section headers (Spaces / Projects / Working lines).
@@ -159,11 +224,20 @@
             l.kind.includes(q),
         )
         .map((l) => lineRow(l, l.projectName));
+      // Names are the one field where diacritics are unavoidable and nobody
+      // types them: "ville" has to find "Anouk Villé". The other three match
+      // on slugs and kinds, which are already ASCII, so only people normalise.
+      const nq = fold(q);
+      const persons = people
+        .filter((p) => fold(p.full_name).includes(nq) || p.slug.includes(q))
+        .map((p) => personRow(p, p.workspaceName));
       return (
         [
           { key: 'space', header: 'Spaces', rows: spaces },
           { key: 'project', header: 'Projects', rows: projects },
           { key: 'line', header: 'Working lines', rows: lines },
+          // Last, because it is the axis that is not a level of the others.
+          { key: 'person', header: 'People', rows: persons },
         ] as Group[]
       ).filter((g) => g.rows.length > 0);
     }
@@ -180,13 +254,24 @@
         },
       ];
     }
-    return [
-      {
-        key: 'line',
-        header: 'Working lines',
-        rows: lineIndex.filter((l) => l.projectId === key).map((l) => lineRow(l, '')),
-      },
-    ];
+    // Inside a project: its lines, and who is on it. The people are here
+    // because this is the one place that knows the project — `project_ids` on
+    // the team feed is what makes "who is on this show" answerable without a
+    // second request.
+    return (
+      [
+        {
+          key: 'line',
+          header: 'Working lines',
+          rows: lineIndex.filter((l) => l.projectId === key).map((l) => lineRow(l, '')),
+        },
+        {
+          key: 'person',
+          header: 'People',
+          rows: people.filter((p) => p.projectIds.includes(key)).map((p) => personRow(p, '')),
+        },
+      ] as Group[]
+    ).filter((g) => g.rows.length > 0);
   });
   let flatRows = $derived(groups.flatMap((g) => g.rows));
   let groupOffsets = $derived.by(() => {
@@ -204,6 +289,11 @@
     else if (kind === 'project') {
       const p = projectIndex.find((x) => x.id === key);
       if (p) void goto(projectUrl(p));
+    } else if (kind === 'person') {
+      // The dossier is per workspace, so the path needs one: the first
+      // workspace this person was found in (see `people`).
+      const p = people.find((x) => x.person_id === key);
+      if (p?.workspaceSlug && p.slug) void goto(`/h/${p.workspaceSlug}/person/${p.slug}/`);
     } else {
       const l = lineIndex.find((x) => x.id === key);
       if (l) void goto(lineUrl(l));

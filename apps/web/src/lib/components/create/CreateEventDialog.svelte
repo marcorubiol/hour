@@ -29,6 +29,28 @@
     'other',
   ] as const;
   export type EventTypeKey = (typeof EVENT_TYPE_KEYS)[number];
+
+  /**
+   * The six `date` kinds in pill order — this list minus Actuació, which is
+   * a performance and not a date row. EditDateDialog renders the same pills
+   * (a date can change kind, but never become a performance), so the order
+   * and the words stay one decision in one place.
+   */
+  export type DateTypeKey = Exclude<EventTypeKey, 'performance'>;
+  export const DATE_TYPE_KEYS = EVENT_TYPE_KEYS.filter(
+    (k): k is DateTypeKey => k !== 'performance',
+  );
+
+  /** Shared with EditDateDialog — one home for what a kind is called. */
+  export const TYPE_LABEL_KEYS: Record<EventTypeKey, string> = {
+    performance: 'create.type_performance',
+    rehearsal: 'create.type_rehearsal',
+    travel_day: 'create.type_travel',
+    day_off: 'create.type_day_off',
+    residency: 'create.type_residency',
+    press: 'create.type_press',
+    other: 'create.type_other',
+  };
 </script>
 
 <script lang="ts">
@@ -49,7 +71,12 @@
   import { dayMonthYear, wallClockToInstant } from '$lib/datetime';
   import { detectLocale, t } from '$lib/i18n';
   import { activeProjectsQueryOptions, allLinesQueryOptions, workspacesQueryOptions } from '$lib/nav-queries';
-  import { TRAVEL_DIRECTIONS, type DateRow, type TravelDirection } from '$lib/date';
+  import {
+    TRAVEL_DIRECTIONS,
+    invalidateDateFeeds,
+    type DateRow,
+    type TravelDirection,
+  } from '$lib/date';
 
   interface Props {
     open?: boolean;
@@ -77,16 +104,6 @@
   const locale = detectLocale(navigator.language);
   const viewerTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const queryClient = useQueryClient();
-
-  const TYPE_LABEL_KEYS: Record<EventTypeKey, string> = {
-    performance: 'create.type_performance',
-    rehearsal: 'create.type_rehearsal',
-    travel_day: 'create.type_travel',
-    day_off: 'create.type_day_off',
-    residency: 'create.type_residency',
-    press: 'create.type_press',
-    other: 'create.type_other',
-  };
 
   /** Day-level kinds open in all-day mode; timed kinds with a clock. */
   const ALL_DAY_DEFAULT: Record<string, boolean> = {
@@ -271,7 +288,7 @@
     },
     onSuccess: () => {
       open = false;
-      void queryClient.invalidateQueries({ queryKey: ['planner-dates'] });
+      invalidateDateFeeds(queryClient);
     },
     onError: (err) => {
       // Contract § Graceful absence: only invalid-body-class failures on a
@@ -330,7 +347,7 @@
     },
     onSuccess: (body) => {
       const n = body?.dates?.length ?? 0;
-      void queryClient.invalidateQueries({ queryKey: ['planner-dates'] });
+      invalidateDateFeeds(queryClient);
       addToast({ tone: 'success', message: t('block.created', locale, { n: String(n) }) });
       dExceptions = [];
       open = false;

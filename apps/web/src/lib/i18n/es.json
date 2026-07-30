@@ -327,6 +327,7 @@
   "planner.pulse_away_one": "1 persona fuera",
   "planner.pulse_trips": "{w} viajes",
   "planner.pulse_trips_one": "1 viaje",
+  "planner.pulse_inferred": "{n} por proyecto, sin reparto",
   "planner.view_carrils": "Carriles",
   "planner.group_label": "Agrupar por",
   "planner.group_espai": "Espacio",
@@ -348,5 +349,19 @@
   "perf.hold_notice_suffix": "días antes",
   "perf.hold_notice_none": "sin aviso — este hold nunca se vuelve urgente",
   "perf.hold_notice_not_saved": "Creado, pero el aviso no se guardó — ajústalo desde la página del bolo.",
-  "perf.hold_notice_invalid": "El aviso debe ser un número entero de días entre 0 y 365 — no se ha guardado nada."
+  "perf.hold_notice_invalid": "El aviso debe ser un número entero de días entre 0 y 365 — no se ha guardado nada.",
+  "edit.date_title": "Editar fecha",
+  "edit.save": "Guardar cambios",
+  "edit.saved": "Guardado",
+  "edit.not_saved": "No se ha guardado",
+  "edit.delete": "Borrar",
+  "edit.delete_confirm": "¿Borrar del todo?",
+  "edit.deleted": "Fecha borrada",
+  "edit.not_deleted": "No se ha borrado",
+  "edit.status": "Estado",
+  "edit.status_tentative": "Opción",
+  "edit.status_confirmed": "Confirmada",
+  "edit.status_cancelled": "Cancelada",
+  "edit.status_done": "Hecha",
+  "edit.series_note": "Un día de un bloque — esta edición cambia solo este día."
 }

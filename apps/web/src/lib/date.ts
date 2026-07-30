@@ -124,6 +124,33 @@ export const DatePatchSchema = v.object({
 export type DatePatch = v.InferOutput<typeof DatePatchSchema>;
 
 /**
+ * Every cached feed that renders `date` rows. Four keys, because the month
+ * and the agenda fetch the SAME rows under different keys — a write that
+ * refreshes only `planner-dates` leaves the agenda showing the row it just
+ * changed, which is exactly what happened while creation was the only
+ * write path (it invalidated one key and nobody looked at the book view).
+ * A write touching a date invalidates the set, never a hand-picked subset.
+ */
+const DATE_FEED_KEYS = [
+  ['planner-dates'],
+  ['planner-agenda-dates'],
+  ['line-dates'],
+  ['desk-dates'],
+] as const;
+
+/**
+ * Mark every date feed stale after a create/edit/delete. Inactive feeds
+ * (the agenda while you're on the month, Desk while you're on the planner)
+ * are only flagged — they refetch when they next mount, so the cost of
+ * being thorough here is nil.
+ */
+export function invalidateDateFeeds(client: {
+  invalidateQueries: (filters: { queryKey: readonly unknown[] }) => Promise<void>;
+}): void {
+  for (const queryKey of DATE_FEED_KEYS) void client.invalidateQueries({ queryKey });
+}
+
+/**
  * Date rows join the performance chip grammar (ADR-078 §9): tentative is a
  * possibility (outline), confirmed/done the quiet solid form, cancelled the
  * dashed leftover. Same three-shape vocabulary as

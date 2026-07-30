@@ -180,6 +180,63 @@ describe('loomThreads', () => {
     expect(anouk.segments.some((s) => s.state === 'prep')).toBe(false);
   });
 
+  /**
+   * The prep attribution is a GUESS — nobody wrote down who attends a
+   * rehearsal — so it has to yield to a fact. Drawn over an absence, one
+   * thread said both "away all day" and "maybe rehearsing" about the same
+   * day, which is the defect that killed inference-by-default in the first
+   * place. A block that straddles an absence comes back as the days that
+   * survive: three real days of a five-day block are still three real days.
+   */
+  it('keeps an inferred prep run off the days its person is away', () => {
+    const groups = loomThreads({
+      team: team.slice(0, 2),
+      commitments: [
+        { person_id: 'mia', day: '2026-07-11', project_id: 'mamemi', state: 'confirmed' },
+      ],
+      preps: [{ project_id: 'mamemi', from: '2026-07-06', to: '2026-07-10', label: 'Assaigs' }],
+      blackouts: [
+        { person_id: 'mia', starts_on: '2026-07-08', ends_on: '2026-07-09', certainty: 'unavailable' },
+      ],
+      knots: [],
+      ...month,
+    });
+    const mia = groups.flatMap((g) => g.threads).find((t) => t.person_id === 'mia')!;
+    const prep = mia.segments.filter((s) => s.state === 'prep');
+    // Split around the absence, not dropped and not drawn through it.
+    expect(prep).toEqual([
+      { from: '2026-07-06', to: '2026-07-07', project_id: 'mamemi', state: 'prep' },
+      { from: '2026-07-10', to: '2026-07-10', project_id: 'mamemi', state: 'prep' },
+    ]);
+    // And the absence itself is still on the thread — the fact survives.
+    expect(mia.outs).toEqual([
+      { from: '2026-07-08', to: '2026-07-09', tentative: false },
+    ]);
+  });
+
+  it('drops an inferred prep run entirely when the absence covers it', () => {
+    const groups = loomThreads({
+      team: team.slice(0, 2),
+      commitments: [
+        { person_id: 'mia', day: '2026-07-11', project_id: 'mamemi', state: 'confirmed' },
+      ],
+      preps: [{ project_id: 'mamemi', from: '2026-07-06', to: '2026-07-08', label: 'Assaigs' }],
+      blackouts: [
+        { person_id: 'mia', starts_on: '2026-07-01', ends_on: '2026-07-09', certainty: 'tentative' },
+      ],
+      knots: [],
+      ...month,
+    });
+    const mia = groups.flatMap((g) => g.threads).find((t) => t.person_id === 'mia')!;
+    expect(mia.segments.filter((s) => s.state === 'prep')).toEqual([]);
+    // A TENTATIVE absence still gates the guess: certainty is about what gets
+    // drawn, not about whether somebody is a candidate for a night nobody
+    // was cast on.
+    expect(mia.outs[0].tentative).toBe(true);
+    // The real commitment is untouched — only the inference yields.
+    expect(mia.segments.some((s) => s.state === 'confirmed')).toBe(true);
+  });
+
   it('clips outs to the month, flags tentative, and ignores company blocks', () => {
     const groups = loomThreads({
       team: team.slice(0, 2),

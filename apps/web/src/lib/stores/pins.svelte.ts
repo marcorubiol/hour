@@ -2,11 +2,24 @@
  * Pins store (Adaptive Digest, ADR-057 nav redesign; projects ADR-060) —
  * the scope model that replaces the persistent sidebar. A pin brings a unit
  * of work forward onto the clean home and scopes the Calendar/Money lenses.
- * Three kinds, one per level of the model:
+ * Three kinds are the container ladder, one per level of the model:
  *
  *   · space   → a whole workspace         encoded `s:<workspaceSlug>`
  *   · project → a production (the show)    encoded `p:<projectId>`
  *   · line    → a single line of work      encoded `l:<lineId>`
+ *
+ * And a fourth that is NOT on that ladder:
+ *
+ *   · person  → whoever carries the work   encoded `pe:<personId>`
+ *
+ * A person is not a container — it holds nothing, it is *attached to* things
+ * by rosters — so it narrows on a different axis: the three above partition
+ * the work (each row belongs to exactly one space and one project), a person
+ * covers it (a gig is a night for everyone who plays it). Narrowing does not
+ * care about that difference; GROUPING does, which is why `$lib/people`
+ * keeps the attribution and its evidence separate. Two letters because `p:`
+ * was already the project's, and `parsePin` tests it first so it can never
+ * fall through to the space branch.
  *
  * Identity only — display (name, kind, accent, URL) is resolved by consumers
  * from the live `['workspaces']`, `['projects', …]` and `['lines', …]`
@@ -22,7 +35,7 @@ import { getContext, setContext } from 'svelte';
 const KEY = Symbol('pins');
 const STORAGE_KEY = 'hour_pins';
 
-export type PinKind = 'space' | 'project' | 'line';
+export type PinKind = 'space' | 'project' | 'line' | 'person';
 export type ParsedPin = { kind: PinKind; key: string };
 
 export function spacePin(workspaceSlug: string): string {
@@ -34,7 +47,16 @@ export function projectPin(projectId: string): string {
 export function linePin(lineId: string): string {
   return `l:${lineId}`;
 }
+export function personPin(personId: string): string {
+  return `pe:${personId}`;
+}
 export function parsePin(pin: string): ParsedPin {
+  // `pe:` is tested BEFORE `p:` and before the space fallback: the last line
+  // treats anything unrecognised as a space and slices two characters off it,
+  // so a token checked in the wrong order does not fail — it silently becomes
+  // a space pin with a mangled slug, which resolves to nothing and reads as
+  // "scope is empty". Order is load-bearing here, not stylistic.
+  if (pin.startsWith('pe:')) return { kind: 'person', key: pin.slice(3) };
   if (pin.startsWith('l:')) return { kind: 'line', key: pin.slice(2) };
   if (pin.startsWith('p:')) return { kind: 'project', key: pin.slice(2) };
   return { kind: 'space', key: pin.slice(2) };
@@ -89,6 +111,13 @@ export class PinsStore {
     return this.pins
       .filter((p) => p.startsWith('l:'))
       .map((p) => p.slice(2));
+  }
+
+  /** Person ids of the pinned people — the axis that is not a container. */
+  personIds(): string[] {
+    return this.pins
+      .filter((p) => p.startsWith('pe:'))
+      .map((p) => p.slice(3));
   }
 
   restoreFromLocalStorage(): void {

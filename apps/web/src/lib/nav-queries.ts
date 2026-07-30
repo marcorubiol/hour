@@ -7,6 +7,7 @@
 
 import { fetchJSON } from './api';
 import type { NavWorkspace, RawLine, RawProject } from './nav';
+import type { TeamItem } from './people';
 
 /**
  * Nav data (workspaces/projects/lines) changes rarely and its create/edit
@@ -42,6 +43,69 @@ export function allLinesQueryOptions() {
     queryKey: ['lines', 'all'] as const,
     queryFn: ({ signal }: { signal: AbortSignal }) =>
       fetchJSON<{ items: RawLine[] }>('/api/lines?status=any', signal),
+    staleTime: NAV_STALE_TIME,
+  };
+}
+
+/**
+ * The team of the given workspaces — the person axis' only name source, and
+ * the blackout dialog's person picker.
+ *
+ * The key was already shared by the planner feed and that dialog, but the
+ * query FUNCTION and the row type were copy-pasted into both (one of them
+ * carrying a comment admitting it). One warm cache deserves one writer:
+ * `project_ids` reached every consumer the moment this became the only place
+ * that builds the request.
+ *
+ * Graceful absence (contract §6): a pre-migration or permission-shy answer
+ * comes back `absent` with no rows instead of throwing, so the surfaces that
+ * draw people simply stay off. `Unauthorized` still throws — that one is the
+ * session, not the feature.
+ */
+export function teamQueryOptions(workspaceIds: string[], opts?: { enabled?: boolean }) {
+  return {
+    queryKey: ['planner-team', workspaceIds] as const,
+    enabled: (opts?.enabled ?? true) && workspaceIds.length > 0,
+    queryFn: async ({ signal }: { signal: AbortSignal }) => {
+      try {
+        return await fetchJSON<{ items: TeamItem[]; absent?: boolean }>(
+          `/api/team?workspace_ids=${workspaceIds.join(',')}`,
+          signal,
+        );
+      } catch (err) {
+        if (err instanceof Error && err.message === 'Unauthorized') throw err;
+        console.warn('[nav] team feed absent:', err);
+        return { items: [] as TeamItem[], absent: true };
+      }
+    },
+  };
+}
+
+/** One workspace that holds my dossier — where I exist as a person. */
+export type MyDossier = {
+  workspace_id: string;
+  slug: string;
+  full_name: string;
+  profile_sync_enabled: boolean;
+  profile_shared_fields: string[];
+};
+
+/**
+ * Which PERSON the signed-in login is (`user_profile.person_id`) and where it
+ * has a dossier. `person_id: null` is a normal answer — a login that has
+ * never shared its profile is not linked to a person, and the affordances
+ * that need one (pin myself, appear in a cast) hide rather than break.
+ *
+ * Invalidate `['me']` after sharing or unsharing.
+ */
+export function meQueryOptions() {
+  return {
+    queryKey: ['me'] as const,
+    queryFn: ({ signal }: { signal: AbortSignal }) =>
+      fetchJSON<{ person_id: string | null; full_name: string; dossiers: MyDossier[] }>(
+        '/api/me',
+        signal,
+      ),
     staleTime: NAV_STALE_TIME,
   };
 }

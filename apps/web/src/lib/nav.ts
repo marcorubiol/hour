@@ -171,7 +171,24 @@ export type ResolvedScope = {
   projects: NavProject[];
   /** the pinned NavLines, resolved (for panels/labels) */
   lines: NavLine[];
-  /** true when nothing is pinned → everything the user can see */
+  /**
+   * Person ids of the pinned people. A person is NOT a container: it
+   * contributes no workspace, project or line, so it never widens or narrows
+   * `projectIds` — the surfaces that understand rosters narrow by it
+   * themselves (`matchesPinnedPeople` in $lib/people), and the ones that do
+   * not simply ignore it.
+   */
+  personIds: string[];
+  /**
+   * True when no CONTAINER is pinned → every container the user can see.
+   *
+   * Deliberately blind to person pins, and that is the whole point: every
+   * consumer reads `isEmpty` as "do not filter by container" (see `inScope`
+   * below, plus the Planner, Desk, Conversations and Books). Counting a
+   * person pin here would flip it to false while contributing no ids, so
+   * `inScope` would answer false for everything and pinning a person would
+   * blank out three lenses that have no idea what a person is.
+   */
   isEmpty: boolean;
 };
 
@@ -189,8 +206,18 @@ export function resolveScope(
   const lineIds: string[] = [];
   const lines: NavLine[] = [];
   const projects: NavProject[] = [];
+  const personIds: string[] = [];
+  let containerPins = 0;
   for (const pin of pins) {
     const { kind, key } = parsePin(pin);
+    if (kind === 'person') {
+      // Unresolved on purpose: there is no container index to look a person
+      // up in, and an id is all the person axis needs. The label comes from
+      // the team feed, which the surfaces that draw people already fetch.
+      if (key) personIds.push(key);
+      continue;
+    }
+    containerPins++;
     if (kind === 'space') {
       const ws = wsBySlug.get(key);
       if (ws) {
@@ -217,13 +244,20 @@ export function resolveScope(
     ],
     projects,
     lines,
-    isEmpty: pins.length === 0,
+    personIds: [...new Set(personIds)],
+    isEmpty: containerPins === 0,
   };
 }
 
 /** Keep an item if scope is empty, its workspace is a pinned space, its line
  *  is a pinned line, or its project is in scope — pinned directly or through
- *  a pinned line (conversations reach line scope through their project). */
+ *  a pinned line (conversations reach line scope through their project).
+ *
+ *  CONTAINER-ONLY, by contract: a person pin passes straight through here.
+ *  An item has no person of its own to test against (a roster is computed
+ *  from three tables and only a performance has one), so narrowing by person
+ *  belongs to `$lib/people` — where the answer can carry whether it was a
+ *  fact or an inference, which a boolean cannot. */
 export function inScope(
   scope: ResolvedScope,
   item: { workspaceId?: string | null; lineId?: string | null; projectId?: string | null },

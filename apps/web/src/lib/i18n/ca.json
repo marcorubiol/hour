@@ -327,6 +327,7 @@
   "planner.pulse_away_one": "1 persona fora",
   "planner.pulse_trips": "{w} viatges",
   "planner.pulse_trips_one": "1 viatge",
+  "planner.pulse_inferred": "{n} per projecte, sense repartiment",
   "planner.view_carrils": "Carrils",
   "planner.group_label": "Agrupa per",
   "planner.group_espai": "Espai",
@@ -348,5 +349,19 @@
   "perf.hold_notice_suffix": "dies abans",
   "perf.hold_notice_none": "sense avís — aquest hold mai es torna urgent",
   "perf.hold_notice_not_saved": "Creat, però l'avís no s'ha desat — ajusta'l des de la pàgina del bolo.",
-  "perf.hold_notice_invalid": "L'avís ha de ser un nombre enter de dies entre 0 i 365 — no s'ha desat res."
+  "perf.hold_notice_invalid": "L'avís ha de ser un nombre enter de dies entre 0 i 365 — no s'ha desat res.",
+  "edit.date_title": "Editar data",
+  "edit.save": "Desar canvis",
+  "edit.saved": "Desat",
+  "edit.not_saved": "No s’ha desat",
+  "edit.delete": "Esborrar",
+  "edit.delete_confirm": "Esborrar del tot?",
+  "edit.deleted": "Data esborrada",
+  "edit.not_deleted": "No s’ha esborrat",
+  "edit.status": "Estat",
+  "edit.status_tentative": "Opció",
+  "edit.status_confirmed": "Confirmada",
+  "edit.status_cancelled": "Cancel·lada",
+  "edit.status_done": "Feta",
+  "edit.series_note": "Un dia d’un bloc — aquesta edició canvia només aquest dia."
 }

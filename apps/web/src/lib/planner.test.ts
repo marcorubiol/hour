@@ -899,13 +899,39 @@ describe('awayBands', () => {
     expect(bands).toEqual([{ from: '2026-07-02', to: '2026-07-04', project_id: 'proj-a' }]);
   });
 
-  it('a second outbound while the trip is open is ignored — earliest brackets', () => {
+  /**
+   * Trips pair like BRACKETS: the return closes the MOST RECENT outbound.
+   *
+   * This test used to assert the opposite — "earliest brackets, later
+   * outbounds ignored" — and that rule contradicted the honesty rule right
+   * above it in the docblock ("unpaired ⇒ no band"): the first outbound was
+   * not unpaired, it was paired with a return belonging to a later trip.
+   */
+  it('a return closes the most recent outbound, not the earliest', () => {
     const bands = awayBands([
       travel({ travel_direction: 'outbound', starts_at: '2026-07-01T08:00:00Z' }),
       travel({ travel_direction: 'outbound', starts_at: '2026-07-03T08:00:00Z' }),
       travel({ travel_direction: 'return', starts_at: '2026-07-06T18:00:00Z' }),
     ]);
-    expect(bands).toEqual([{ from: '2026-07-02', to: '2026-07-05', project_id: 'proj-a' }]);
+    expect(bands).toEqual([{ from: '2026-07-04', to: '2026-07-05', project_id: 'proj-a' }]);
+  });
+
+  /**
+   * The seventeen-day lie, pinned. A trip whose return was never entered
+   * used to swallow the next trip's return and paint the company away for
+   * three weeks — and a band that wide silently converts a month of bookable
+   * nights into "on tour", which is exactly the number the calendar is read
+   * for. The unpaired outbound must produce NOTHING.
+   */
+  it('an outbound with no return of its own borrows nobody elses', () => {
+    const bands = awayBands([
+      // Brussels: outbound entered, return never was.
+      travel({ travel_direction: 'outbound', starts_at: '2026-07-05T08:00:00Z' }),
+      // London, three weeks later: a complete trip.
+      travel({ travel_direction: 'outbound', starts_at: '2026-07-24T08:00:00Z' }),
+      travel({ travel_direction: 'return', starts_at: '2026-07-26T18:00:00Z' }),
+    ]);
+    expect(bands).toEqual([{ from: '2026-07-25', to: '2026-07-25', project_id: 'proj-a' }]);
   });
 
   it('sequential pairs produce sequential bands', () => {

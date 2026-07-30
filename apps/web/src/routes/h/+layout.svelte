@@ -24,6 +24,7 @@
   import { env } from '$env/dynamic/public';
   import type { Snippet } from 'svelte';
   import { onDestroy, onMount, untrack } from 'svelte';
+  import { toStore } from 'svelte/store';
   import SettingsNav from '$lib/components/SettingsNav.svelte';
   import PresenceBadge from '$lib/components/PresenceBadge.svelte';
   import BrandMark from '$lib/components/BrandMark.svelte';
@@ -35,7 +36,7 @@
   import { isReservedWorkspaceSlug } from '$lib/reserved-slugs';
   import { provideLens, type Lens } from '$lib/stores/lens.svelte';
   import { provideCalm } from '$lib/stores/calm.svelte';
-  import { providePins, parsePin } from '$lib/stores/pins.svelte';
+  import { providePins, parsePin, type PinKind } from '$lib/stores/pins.svelte';
   import { provideScopes, sameSet as scopesSameSet, type Scope } from '$lib/stores/scopes.svelte';
   import { provideBreadcrumb } from '$lib/stores/breadcrumb.svelte';
   import { provideCreation } from '$lib/stores/creation.svelte';
@@ -48,7 +49,7 @@
     type NavWorkspace,
     type RawLine,
   } from '$lib/nav';
-  import { activeProjectsQueryOptions, allLinesQueryOptions } from '$lib/nav-queries';
+  import { activeProjectsQueryOptions, allLinesQueryOptions, teamQueryOptions } from '$lib/nav-queries';
   import { accentVarFor } from '$lib/utils/accent';
   import { saveMasterViewPath } from '$lib/master-view';
   import {
@@ -137,10 +138,29 @@
     buildLineIndex(wsItems, ($linesQuery.data?.items as RawLine[]) ?? []),
   );
 
+  // A person pin is the one token whose label lives outside the nav caches —
+  // it is a roster row, not a container — so the team feed is fetched ONLY
+  // when a person is actually pinned. Same query key the planner and the
+  // blackout dialog use, so on the planner this costs no request at all: the
+  // cache is already warm. Without a name a chip would print a raw uuid.
+  let hasPersonPin = $derived(pins.personIds().length > 0);
+  const teamStore = toStore(() =>
+    teamQueryOptions(
+      wsItems.map((w) => w.id),
+      { enabled: hasPersonPin },
+    ),
+  );
+  const teamQuery = createQuery(teamStore);
+  let personNameById = $derived(
+    new Map(($teamQuery.data?.items ?? []).map((p) => [p.person_id, p.full_name])),
+  );
+
   function tokenLabel(tok: string): string {
     const { kind, key } = parsePin(tok);
     if (kind === 'space') return wsItems.find((w) => w.slug === key)?.name ?? key;
     if (kind === 'project') return projectIndex.find((p) => p.id === key)?.name ?? 'project';
+    // Still loading, or a person who left the team: say the word, never the id.
+    if (kind === 'person') return personNameById.get(key) ?? 'person';
     return lineIndex.find((l) => l.id === key)?.name ?? 'line';
   }
   function tokenAccent(tok: string): string {
@@ -151,9 +171,12 @@
     }
     if (kind === 'project')
       return projectIndex.find((p) => p.id === key)?.accent ?? 'var(--text-faint)';
+    // A person has no accent of their own: hue is project identity (the glyph
+    // ignores this value for `person`, and this keeps the pill honest too).
+    if (kind === 'person') return 'var(--text-faint)';
     return lineIndex.find((l) => l.id === key)?.accent ?? 'var(--text-faint)';
   }
-  function tokenKind(tok: string): 'space' | 'project' | 'line' {
+  function tokenKind(tok: string): PinKind {
     return parsePin(tok).kind;
   }
   function tokenLineKind(tok: string): string {
@@ -330,9 +353,18 @@
   let navCachesSettled = $derived(
     $workspacesQuery.isSuccess && $projectsQuery.isSuccess && $linesQuery.isSuccess,
   );
+  /**
+   * A person keeps the UUID form in the address, deliberately. The qualified
+   * slug trick exists so renames cannot rot a link, and it needs a cache to
+   * translate through — but the person cache is only fetched once somebody is
+   * pinned, so on the way IN there would be nothing to resolve against.
+   * A person's identity is portable across workspaces anyway, while the slug
+   * belongs to one workspace's dossier: there is no single qualified path to
+   * write. The token stays opaque and stable.
+   */
   function pinToUrlToken(pin: string): string {
     const { kind, key } = parsePin(pin);
-    if (kind === 'space') return pin;
+    if (kind === 'space' || kind === 'person') return pin;
     if (kind === 'project') {
       const p = projectIndex.find((x) => x.id === key);
       return p ? `p:${p.workspaceSlug}/${p.slug}` : pin;
@@ -340,9 +372,18 @@
     const l = lineIndex.find((x) => x.id === key);
     return l ? `l:${l.workspaceSlug}/${l.projectSlug}/${l.slug}` : pin;
   }
+  /**
+   * The token grammar of the address bar. It is a GROUP, not a character
+   * class: `[spl]` matched the `p` of `pe:` and then demanded a colon, so a
+   * person token failed the test — and failing this test is not inert. The
+   * inbound effect rewrites the pins from whatever survives the filter, so a
+   * dropped token does not merely fail to apply: it DELETES the pin that
+   * wrote it, one navigation after you set it.
+   */
+  const URL_TOKEN = /^(?:pe|[spl]):.+/;
   function urlTokenToPin(tok: string): string | null {
     const { kind, key } = parsePin(tok);
-    if (kind === 'space' || !key.includes('/')) return tok; // legacy uuid form
+    if (kind === 'space' || kind === 'person' || !key.includes('/')) return tok; // uuid form
     if (kind === 'project') {
       const [ws, slug] = key.split('/');
       const p = projectIndex.find((x) => x.workspaceSlug === ws && x.slug === slug);
@@ -365,7 +406,7 @@
     void page.url; // dependency: re-run on real navigations
     const raw = new URL(location.href).searchParams.get('scope');
     if (raw === null) return;
-    const toks = raw.split(',').filter((t) => /^[spl]:.+/.test(t));
+    const toks = raw.split(',').filter((t) => URL_TOKEN.test(t));
     const mapped = toks.map(urlTokenToPin);
     // Qualified tokens can't resolve before the caches land — this effect
     // re-runs as they fill. Only once settled do unresolvable ones drop.
@@ -383,7 +424,7 @@
     // Hold while an inbound scope is still waiting for the caches — writing
     // now would clobber a pasted link before it ever applied.
     if (existing && !navCachesSettled) {
-      const toks = existing.split(',').filter((t) => /^[spl]:.+/.test(t));
+      const toks = existing.split(',').filter((t) => URL_TOKEN.test(t));
       if (toks.some((t) => urlTokenToPin(t) === null)) return;
     }
     const ser = pins.pins.map(pinToUrlToken).join(',');

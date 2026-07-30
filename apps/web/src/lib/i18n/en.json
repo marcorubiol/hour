@@ -336,6 +336,7 @@
   "planner.pulse_away_one": "1 person away",
   "planner.pulse_trips": "{w} trips",
   "planner.pulse_trips_one": "1 trip",
+  "planner.pulse_inferred": "{n} by project, not by cast",
   "planner.view_carrils": "Lanes",
   "planner.group_label": "Group by",
   "planner.group_espai": "Space",
@@ -357,5 +358,19 @@
   "perf.hold_notice_suffix": "days before",
   "perf.hold_notice_none": "no notice — this hold never turns urgent",
   "perf.hold_notice_not_saved": "Created, but the notice wasn't saved — set it from the gig's page.",
-  "perf.hold_notice_invalid": "Notice must be a whole number of days between 0 and 365 — nothing was saved."
+  "perf.hold_notice_invalid": "Notice must be a whole number of days between 0 and 365 — nothing was saved.",
+  "edit.date_title": "Edit date",
+  "edit.save": "Save changes",
+  "edit.saved": "Saved",
+  "edit.not_saved": "Not saved",
+  "edit.delete": "Delete",
+  "edit.delete_confirm": "Delete for good?",
+  "edit.deleted": "Date deleted",
+  "edit.not_deleted": "Not deleted",
+  "edit.status": "Status",
+  "edit.status_tentative": "Option",
+  "edit.status_confirmed": "Confirmed",
+  "edit.status_cancelled": "Cancelled",
+  "edit.status_done": "Done",
+  "edit.series_note": "One day of a block — this edit changes this day only."
 }

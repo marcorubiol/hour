@@ -14,15 +14,13 @@ import { createQuery } from '@tanstack/svelte-query';
 import { toStore } from 'svelte/store';
 import { fetchJSON } from '$lib/api';
 import { addDaysIso, type PlannerView } from '$lib/planner';
+import { teamQueryOptions } from '$lib/nav-queries';
 import type { AvailabilityItem } from '$lib/availability';
 import type { DateEvent, PerformanceEvent } from '$lib/month-events';
+import type { TeamItem } from '$lib/people';
 
-export type TeamItem = {
-  person_id: string;
-  workspace_id: string;
-  slug: string;
-  full_name: string;
-};
+/** Canonical in $lib/people; re-exported so existing importers keep working. */
+export type { TeamItem };
 export type DecisionPerfItem = PerformanceEvent & { hold_notice_days?: number | null };
 
 // The API's hard cap on ?limit (maxValue in its QuerySchema) — one page.
@@ -159,27 +157,10 @@ export function createPlannerFeeds(inputs: PlannerFeedInputs) {
       },
     };
   });
-  // Team of every visible workspace — person names for clash cards and
-  // rail labels. Works against the live DB today; still fails quiet.
-  const teamOptions = toStore(() => {
-    const ids = inputs.teamWorkspaceIds();
-    return {
-      queryKey: ['planner-team', ids] as const,
-      enabled: ids.length > 0,
-      queryFn: async ({ signal }: { signal: AbortSignal }) => {
-        try {
-          return await fetchJSON<{ items: TeamItem[]; absent?: boolean }>(
-            `/api/team?workspace_ids=${ids.join(',')}`,
-            signal,
-          );
-        } catch (err) {
-          if (err instanceof Error && err.message === 'Unauthorized') throw err;
-          console.warn('[calendar] team feed absent:', err);
-          return { items: [] as TeamItem[], absent: true };
-        }
-      },
-    };
-  });
+  // Team of every visible workspace — person names for clash cards and rail
+  // labels, and the project pool the person axis infers from. One builder in
+  // $lib/nav-queries, shared with the shell and the blackout dialog.
+  const teamOptions = toStore(() => teamQueryOptions(inputs.teamWorkspaceIds()));
 
   // ── Decisions window (ADR-080 §4) — same scope filter as the month
   // feed; ?notice=1 opts into hold_notice_days (ADR-080 §2) and is what

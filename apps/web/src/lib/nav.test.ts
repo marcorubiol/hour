@@ -10,7 +10,7 @@ import {
   type RawLine,
   type RawProject,
 } from './nav';
-import { linePin, parsePin, projectPin, spacePin } from './stores/pins.svelte';
+import { linePin, parsePin, personPin, projectPin, spacePin } from './stores/pins.svelte';
 
 const WS: NavWorkspace[] = [
   { id: 'ws-muk', slug: 'muk-cia', name: 'MüK Cia', kind: 'team' },
@@ -72,10 +72,24 @@ const LINES: RawLine[] = [
 ];
 
 describe('parsePin', () => {
-  it('round-trips the three pin kinds', () => {
+  it('round-trips the four pin kinds', () => {
     expect(parsePin(spacePin('muk-cia'))).toEqual({ kind: 'space', key: 'muk-cia' });
     expect(parsePin(projectPin('proj-mamemi'))).toEqual({ kind: 'project', key: 'proj-mamemi' });
     expect(parsePin(linePin('line-difusion'))).toEqual({ kind: 'line', key: 'line-difusion' });
+    expect(parsePin(personPin('person-laia'))).toEqual({ kind: 'person', key: 'person-laia' });
+  });
+
+  /**
+   * The last line of parsePin treats anything unrecognised as a space and
+   * slices two characters off it, so a person token tested in the wrong
+   * order would not fail — it would become the space `:person-laia`, resolve
+   * to nothing, and read on screen as "scope is empty".
+   */
+  it('never lets a person token fall through to the space branch', () => {
+    expect(parsePin('pe:person-laia').kind).toBe('person');
+    expect(parsePin('pe:person-laia').key).toBe('person-laia');
+    // And the project prefix still wins for a real project token.
+    expect(parsePin('p:proj-mamemi').kind).toBe('project');
   });
 });
 
@@ -141,6 +155,45 @@ describe('resolveScope', () => {
     expect(scope.workspaceIds).toEqual([]);
     expect(scope.lineIds).toEqual([]);
   });
+
+  /**
+   * THE case that protects three lenses. `isEmpty` means "do not filter by
+   * container", and every consumer reads it that way. A person pin resolves
+   * to no container ids at all, so if it flipped `isEmpty` to false, `inScope`
+   * would answer false for everything and pinning a person would blank out
+   * Conversations, Books and the Desk — surfaces that have no idea what a
+   * person is.
+   */
+  it('a person pin carries its id and leaves the container axis untouched', () => {
+    const scope = resolveScope([personPin('person-laia')], WS, lineIndex, projectIndex);
+    expect(scope.personIds).toEqual(['person-laia']);
+    expect(scope.isEmpty).toBe(true);
+    expect(scope.workspaceIds).toEqual([]);
+    expect(scope.projectIds).toEqual([]);
+    expect(scope.lineIds).toEqual([]);
+  });
+
+  it('a person pin composes with a container pin instead of replacing it', () => {
+    const scope = resolveScope(
+      [spacePin('muk-cia'), personPin('person-laia')],
+      WS,
+      lineIndex,
+      projectIndex,
+    );
+    expect(scope.isEmpty).toBe(false);
+    expect(scope.workspaceIds).toEqual(['ws-muk']);
+    expect(scope.personIds).toEqual(['person-laia']);
+  });
+
+  it('dedupes the same person pinned twice', () => {
+    const scope = resolveScope(
+      [personPin('person-laia'), personPin('person-laia')],
+      WS,
+      lineIndex,
+      projectIndex,
+    );
+    expect(scope.personIds).toEqual(['person-laia']);
+  });
 });
 
 describe('inScope', () => {
@@ -162,6 +215,14 @@ describe('inScope', () => {
 
   it('empty scope admits everything', () => {
     const scope = resolveScope([], WS, lineIndex, projectIndex);
+    expect(inScope(scope, {})).toBe(true);
+  });
+
+  /** Container-only by contract: the person axis is narrowed elsewhere, by
+   *  the surfaces that can compute a roster. Here it must pass through. */
+  it('a person pin alone does not narrow a container surface', () => {
+    const scope = resolveScope([personPin('person-laia')], WS, lineIndex, projectIndex);
+    expect(inScope(scope, { projectId: 'proj-orbita' })).toBe(true);
     expect(inScope(scope, {})).toBe(true);
   });
 });

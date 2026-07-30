@@ -56,6 +56,9 @@ export type DateEvent = {
   country?: string | null;
   project: ProjectLite | null;
   venue: { timezone: string | null } | null;
+  /** The performance this date hangs from (ADR-078 §1, third cascade
+      level). Always fetched by the feed; read by the edit dialog. */
+  performance_id?: string | null;
   /** ADR-078 columns — absent until the migrations are applied
       (graceful absence: chips render directionless, no away bands). */
   line_id?: string | null;

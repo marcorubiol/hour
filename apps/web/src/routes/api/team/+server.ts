@@ -11,7 +11,17 @@
  * join, so deleted or RLS-hidden dossiers drop the row instead of yielding
  * a nameless entry.
  *
- * Auth: Bearer JWT required. RLS scopes rows (workspace membership).
+ * `project_ids` — the projects each person is on file for — is what makes
+ * the person axis possible at all. A `date` row (rehearsal, travel, press)
+ * carries NO people: there is no date↔person table, so the only honest way
+ * to say whose rehearsal it is, is to infer it from the project's canonical
+ * cast and mark the answer as an inference (`$lib/people`). This field is
+ * that pool. One row per person per workspace still, so the field is
+ * additive: the blackout picker sees exactly what it saw before.
+ *
+ * Auth: Bearer JWT required. RLS scopes rows (workspace membership) — and
+ * the roster tables gate on `read:performance`, not on an edit permission,
+ * so a performer assigned to a project can read the cast they are in.
  */
 
 import type { RequestHandler } from './$types';
@@ -40,6 +50,10 @@ function parseUuidList(raw: string | undefined): string[] {
 type TeamSourceRow = {
   workspace_id: string;
   person: { id: string; slug: string; full_name: string };
+  /** cast_member carries the project outright. */
+  project_id?: string | null;
+  /** crew_assignment reaches it through its performance. */
+  performance?: { project_id: string | null } | null;
 };
 
 export type TeamItem = {
@@ -47,10 +61,12 @@ export type TeamItem = {
   workspace_id: string;
   slug: string;
   full_name: string;
+  /** Projects this person is on file for, in this workspace. */
+  project_ids: string[];
 };
 
 const TEAM_SELECT =
-  'workspace_id,person:workspace_person!cast_member_workspace_person_fkey!inner(id:person_id,slug,full_name)';
+  'workspace_id,project_id,person:workspace_person!cast_member_workspace_person_fkey!inner(id:person_id,slug,full_name)';
 const BATCH_LIMIT = '10000';
 
 export const GET: RequestHandler = async ({ request, url, platform, locals }) => {
@@ -76,7 +92,11 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
       'select',
       source === 'cast'
         ? TEAM_SELECT
-        : 'workspace_id,person:workspace_person!crew_assignment_workspace_person_fkey!inner(id:person_id,slug,full_name)',
+        : // The performance embed is a LEFT join on purpose: a crew row whose
+          // performance is hidden still proves the person is on this team, and
+          // dropping them would quietly shrink the blackout picker. They just
+          // arrive without that project in their list.
+          'workspace_id,performance:performance_id(project_id),person:workspace_person!crew_assignment_workspace_person_fkey!inner(id:person_id,slug,full_name)',
     );
     search.set('workspace_id', `in.(${workspaceIds.join(',')})`);
     search.set('deleted_at', 'is.null');
@@ -92,6 +112,7 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
     ]);
 
     const seen = new Map<string, TeamItem>();
+    const projects = new Map<string, Set<string>>();
     for (const row of [...cast.data, ...crew.data]) {
       if (!row.person) continue;
       const key = `${row.workspace_id}:${row.person.id}`;
@@ -101,8 +122,18 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
           workspace_id: row.workspace_id,
           slug: row.person.slug,
           full_name: row.person.full_name,
+          project_ids: [],
         });
+        projects.set(key, new Set<string>());
       }
+      // A person appears once per workspace but can arrive several times —
+      // one row per project they are cast in, plus one per gig they crew. The
+      // identity dedupes; the projects accumulate.
+      const projectId = row.project_id ?? row.performance?.project_id ?? null;
+      if (projectId) projects.get(key)!.add(projectId);
+    }
+    for (const [key, item] of seen) {
+      item.project_ids = [...(projects.get(key) ?? [])].sort();
     }
     const items = [...seen.values()].sort((a, b) => a.full_name.localeCompare(b.full_name));
     return json({ items });

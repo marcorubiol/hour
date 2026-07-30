@@ -24,11 +24,9 @@
   import { addToast } from '../Toast.svelte';
   import { dayKeyInTz } from '$lib/planner';
   import { detectLocale, t } from '$lib/i18n';
-  import { workspacesQueryOptions } from '$lib/nav-queries';
+  import { teamQueryOptions, workspacesQueryOptions } from '$lib/nav-queries';
   import type { AvailabilityCertainty, AvailabilityItem } from '$lib/availability';
   import { AVAILABILITY_CERTAINTIES } from '$lib/availability';
-
-  type TeamItem = { person_id: string; workspace_id: string; slug: string; full_name: string };
 
   interface Props {
     open?: boolean;
@@ -60,26 +58,13 @@
     ($workspacesQuery.data?.items ?? []).map((w) => ({ value: w.id, label: w.name })),
   );
 
-  // Same key construction as the calendar page — one warm team cache.
-  const teamStore = toStore(() => {
-    const ids = ($workspacesQuery.data?.items ?? []).map((w) => w.id);
-    return {
-      queryKey: ['planner-team', ids] as const,
-      enabled: open && ids.length > 0,
-      queryFn: async ({ signal }: { signal: AbortSignal }) => {
-        try {
-          return await fetchJSON<{ items: TeamItem[] }>(
-            `/api/team?workspace_ids=${ids.join(',')}`,
-            signal,
-          );
-        } catch (err) {
-          if (err instanceof Error && err.message === 'Unauthorized') throw err;
-          console.warn('[calendar] team feed absent:', err);
-          return { items: [] as TeamItem[], absent: true };
-        }
-      },
-    };
-  });
+  // One builder, one warm cache — shared with the planner feed and the shell.
+  const teamStore = toStore(() =>
+    teamQueryOptions(
+      ($workspacesQuery.data?.items ?? []).map((w) => w.id),
+      { enabled: open },
+    ),
+  );
   const teamQuery = createQuery(teamStore);
 
   let teamOfWorkspace = $derived(

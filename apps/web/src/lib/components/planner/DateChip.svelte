@@ -28,9 +28,20 @@
     dateKindLabel: (kind: string) => string;
     /** Monogram click — opens MonthGrid's identity quick panel (ADR-081). */
     onMarkOpen: (e: MouseEvent, project: ProjectLite | null) => void;
+    /**
+     * Chip click — opens the edit dialog on the LEAD row of the group.
+     * Absent ⇒ the chip stays the inert span it has always been, so a
+     * read-only surface never grows a dead affordance.
+     *
+     * Only sessions of ONE block on ONE day ever group (groupDates), and
+     * the lead is the earliest — the "+N" sessions behind it are reached
+     * from the agenda, which lists every row on its own line. The month
+     * collapses them for space; it doesn't hide them from editing.
+     */
+    onOpen?: (d: DateEvent) => void;
   }
 
-  let { g, edges, di, viewerTz, dateKindLabel, onMarkOpen }: Props = $props();
+  let { g, edges, di, viewerTz, dateKindLabel, onMarkOpen, onOpen }: Props = $props();
 
   let d = $derived(g[0]);
   let more = $derived(g.length - 1);
@@ -93,30 +104,39 @@
     const times = g.map((x) => dateTime(x)?.primary).filter(Boolean);
     return `${dateTitle(g[0])} · ${times.join(' · ')}`;
   }
+
+  // The shell's attributes, computed once so the button and the span
+  // versions cannot drift: the run classes and the family are what the
+  // hand-tuned .cal__event grammar keys off, and a chip that loses one
+  // when it becomes clickable would break the strip across the week.
+  let travel = $derived(d.kind === 'travel_day');
+  let chipClass = $derived(
+    [
+      'cal__event',
+      travel ? 'cal__event--travel' : 'cal__event--date',
+      !travel && d.kind === 'day_off' ? 'cal__event--off' : '',
+      !travel && edges ? 'cal__event--run' : '',
+      !travel && edges?.first ? 'cal__event--run-first' : '',
+      !travel && edges?.last ? 'cal__event--run-last' : '',
+    ]
+      .filter(Boolean)
+      .join(' '),
+  );
+  let chipStyle = $derived(d.project ? `--c: ${accentVarFor(d.project)}` : undefined);
+  let chipTitle = $derived(travel ? dateTitle(d) : groupTitle(g));
 </script>
 
-{#if d.kind === 'travel_day'}
-  <span
-    class="cal__event cal__event--travel"
-    data-family={dateStatusFamily(d.status)}
-    style={d.project ? `--c: ${accentVarFor(d.project)}` : undefined}
-    title={dateTitle(d)}
-  ><span class="cal__travel-text">{travelText(d)}</span>{#if d.project}<button type="button" class="cal__markbtn" onclick={(e) => onMarkOpen(e, d.project)}><IdentityMark accent={accentVarFor(d.project)} name={d.project.name} initials={d.project.initials} /></button>{/if}</span>
-{:else}
-  {@const time = dateTime(d)}
-  {@const city = dateCity(d)}
-  {@const cc = dateCountry(d)}
-  {@const head = !edges || edges.first || di === 0}
-  <span
-    class="cal__event cal__event--date"
-    class:cal__event--off={d.kind === 'day_off'}
-    class:cal__event--run={!!edges}
-    class:cal__event--run-first={edges?.first}
-    class:cal__event--run-last={edges?.last}
-    data-family={dateStatusFamily(d.status)}
-    style={d.project ? `--c: ${accentVarFor(d.project)}` : undefined}
-    title={groupTitle(g)}
-  >
+<!-- One chip body, two shells — PerfChip's pattern. A surface that can edit
+     gains a hit layer over the card; one that can't keeps the inert span
+     the grid has always had. The card grammar is written once either way. -->
+{#snippet body()}
+  {#if travel}
+    <span class="cal__travel-text">{travelText(d)}</span>{#if d.project}<button type="button" class="cal__markbtn" onclick={(e) => onMarkOpen(e, d.project)}><IdentityMark accent={accentVarFor(d.project)} name={d.project.name} initials={d.project.initials} /></button>{/if}
+  {:else}
+    {@const time = dateTime(d)}
+    {@const city = dateCity(d)}
+    {@const cc = dateCountry(d)}
+    {@const head = !edges || edges.first || di === 0}
     {#if head}
       <span class="cal__event-top">
         <span class="cal__event-name">{dateText(d)}</span>
@@ -155,5 +175,32 @@
         >
       </span>
     {/if}
-  </span>
+  {/if}
+{/snippet}
+
+{#if onOpen}
+  <!-- The open action is an absolutely-positioned SIBLING covering the
+       card, not a <button> wrapped around it: the chip already contains
+       the monogram button, and the HTML parser closes an open <button>
+       the moment it meets a nested one — SSR would tear the card in two.
+       The monogram lifts above this layer (z-index) so the identity panel
+       (ADR-081) stays reachable from a date chip. -->
+  <span
+    class="{chipClass} cal__event--openable"
+    data-family={dateStatusFamily(d.status)}
+    style={chipStyle}
+    title={chipTitle}
+  ><button
+      type="button"
+      class="cal__event-hit"
+      aria-label={chipTitle}
+      onclick={() => onOpen?.(d)}
+    ></button>{@render body()}</span>
+{:else}
+  <span
+    class={chipClass}
+    data-family={dateStatusFamily(d.status)}
+    style={chipStyle}
+    title={chipTitle}
+  >{@render body()}</span>
 {/if}

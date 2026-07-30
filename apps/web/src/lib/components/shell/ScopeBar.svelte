@@ -2,7 +2,7 @@
   import ScopeGlyph from '$lib/components/ScopeGlyph.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
   import { copyText } from '$lib/clipboard';
-  import { usePins } from '$lib/stores/pins.svelte';
+  import { usePins, type PinKind } from '$lib/stores/pins.svelte';
   import { useScopes, type Scope } from '$lib/stores/scopes.svelte';
 
   interface Props {
@@ -10,7 +10,9 @@
         scopeAutoName too) and arrive here as functions over the nav caches. */
     tokenLabel: (tok: string) => string;
     tokenAccent: (tok: string) => string;
-    tokenKind: (tok: string) => 'space' | 'project' | 'line';
+    /** `PinKind`, not a literal union: spelling the kinds out here is how the
+        person pin got three type errors before it got a pill. */
+    tokenKind: (tok: string) => PinKind;
     tokenLineKind: (tok: string) => string;
     /** Save ⇄ Update ⇄ Delete state, derived in the layout (it owns
         editingBaseTokens). */

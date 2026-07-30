@@ -537,8 +537,14 @@ export interface AwayBand {
  * - Unpaired outbound/return ⇒ NO band (the AI layer proposes missing
  *   legs — never a second inference rule).
  * - 'leg' rows neither open nor close a trip.
- * - A second outbound while a trip is open is ignored (the earliest
- *   outbound brackets the trip); the return closes it.
+ * - Trips pair like BRACKETS: a return closes the most recent outbound, so
+ *   an outbound is only paired if no other outbound of the same scope sits
+ *   between it and that return. The rule used to be the opposite — earliest
+ *   outbound wins, later ones ignored — and it broke the rule above it: a
+ *   trip to Brussels whose return was never entered swallowed the return of
+ *   the NEXT trip three weeks later and put the company seventeen days on
+ *   the road. An unpaired outbound must produce no band, not a band built
+ *   out of somebody else's return.
  * - An own-event day inside the bracket splits the band into contiguous
  *   runs — a {from,to} range cannot represent a hole, and the event chip
  *   already tells that day's story.
@@ -586,7 +592,10 @@ export function awayBands(
     let openDay: string | null = null;
     for (const t of sorted) {
       if (t.direction === 'outbound') {
-        if (openDay === null) openDay = t.day;
+        // The LAST outbound before a return is the one that trip belongs to.
+        // Keeping the first instead let an outbound with no return of its own
+        // borrow the next trip's — see the bracket rule in the docblock.
+        openDay = t.day;
         continue;
       }
       if (openDay === null) continue; // unpaired return — no band

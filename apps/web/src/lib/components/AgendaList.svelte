@@ -86,6 +86,12 @@
     onReachStart?: () => void;
     /** Jump to the DecisionBand (where the pick/release actions live). */
     onDecideJump?: () => void;
+    /**
+     * Date row click — opens the page's edit dialog. Absent ⇒ the rows
+     * stay inert divs, as the book has always rendered them. A gig row
+     * keeps its link: a performance has a page, a date does not.
+     */
+    onDateOpen?: (d: DateEvent) => void;
   }
 
   let {
@@ -112,7 +118,18 @@
     onReachEnd,
     onReachStart,
     onDecideJump,
+    onDateOpen,
   }: Props = $props();
+
+  /**
+   * The shell a date row renders as. `svelte:element` swaps the tag; the
+   * button-only attributes ride as a spread so a plain div never carries a
+   * stray type="button". IdentityMark is a span, so unlike the month chip
+   * there is no nested interactive content to work around here.
+   */
+  function rowShellProps(d: DateEvent): Record<string, unknown> {
+    return onDateOpen ? { type: 'button', onclick: () => onDateOpen(d) } : {};
+  }
 
   const viewerTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
@@ -527,9 +544,12 @@
     {@const d = row.date}
     {@const t = dateDual(d)}
     {#if d.kind === 'travel_day'}
-      <div
+      <svelte:element
+        this={onDateOpen ? 'button' : 'div'}
         class="ag__row ag__row--travel"
+        class:ag__row--openable={onDateOpen}
         style={d.project ? `--c: ${accentVarFor(d.project)}` : undefined}
+        {...rowShellProps(d)}
       >
         <span class="ag__meta"><span class="ag__badge">{dateBadge(d)}</span></span>
         <span class="ag__body">
@@ -545,12 +565,15 @@
             {d.project?.name ?? ''}
           </span>
         </span>
-      </div>
+      </svelte:element>
     {:else}
-      <div
+      <svelte:element
+        this={onDateOpen ? 'button' : 'div'}
         class="ag__row ag__row--date"
+        class:ag__row--openable={onDateOpen}
         data-family={dateStatusFamily(d.status)}
         style={d.project ? `--c: ${accentVarFor(d.project)}` : undefined}
+        {...rowShellProps(d)}
       >
         <span class="ag__meta">
           <span class="ag__badge">{dateBadge(d)}</span>
@@ -571,7 +594,7 @@
               >{/if}
           </span>
         </span>
-      </div>
+      </svelte:element>
     {/if}
   {/if}
 {/snippet}
@@ -746,8 +769,20 @@
       text-decoration: none;
       border-radius: var(--radius-s);
     }
-    a.ag__row:hover {
+    a.ag__row:hover,
+    .ag__row--openable:hover {
       background: var(--bg-light);
+    }
+    /* An openable date row is a <button>: undo the widget defaults the
+       grid layout above assumes (font, centred text, intrinsic width,
+       chrome border) without touching the row DNA itself. */
+    .ag__row--openable {
+      inline-size: 100%;
+      border: none;
+      background: none;
+      font: inherit;
+      text-align: start;
+      cursor: pointer;
     }
     /* Timeline node on the day line — the status family redeclares the
        node variables (solid = confirmed, outline = hold, faint = rest). */
