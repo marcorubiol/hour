@@ -2715,3 +2715,69 @@ Triggered by Marco's pre-scaffold doubt (Phase 0.0 day 5). Five alternatives eva
 - **Status 2026-07-25 — decidido, nada que construir.** Cierra el diferido de
   la auditoría 2026-07-24. Ver también `20260724094000_rls_force_parity.sql`,
   donde quedó anotado el motivo original de aplazarlo.
+
+## [2026-07-30] — ADR-092 · La persona es una dimensión de scope, no un contenedor; y un login se vuelve persona solo compartiendo
+
+> Sesión de construcción sobre el rediseño del Planner. Marco, mirando el dial del
+> Board (`workspace · project · person`): *"si la gente ya tiene scope propio, no
+> tiene mucho sentido que existan estas líneas"*. De ahí salió la separación de
+> abajo, y al construirla apareció que el enlace login↔persona nunca se había
+> podido crear desde la app.
+
+- **1 · Estrechar y agrupar no son la misma operación, y solo una exige partición.**
+  `workspace` y `project` **parten** el conjunto: cada fila cae en un carril y solo
+  uno. Una `person` **cubre**: la misma noche es de todos los que la tocan, y hay
+  filas que no son de nadie. El comentario de `agRows()` en el prototipo ya lo decía
+  y nadie había sacado la conclusión. Consecuencia: **una persona se puede pinar**
+  (un filtro es un predicado, y «con Laia» es tan buen predicado como «de MüK»),
+  pero **«las filas son personas» es una VISTA, no un valor de un dial** — si cambia
+  qué es una fila, cambió el dibujo. Tercera vez que este proyecto encuentra dos
+  cosas bajo una etiqueta (`span`, `rows by`, y ahora el dial del Board).
+- **2 · Token `pe:<personId>`, y `isEmpty` pasa a significar «ningún contenedor
+  pinado».** Todo consumidor lee `isEmpty` como «no filtres por contenedor», así que
+  contar el pin de persona ahí habría dejado en blanco Conversations, Books y el
+  Desk. Las lentes que no entienden de personas **ignoran** el token: degradación
+  honesta, no fallo. `inScope()` se queda container-only por contrato.
+- **3 · La atribución puede ser inferencia, y tiene que decirlo.** Un bolo trae
+  reparto real; una `date` no trae ninguno (no existe tabla date↔persona), así que
+  sus personas se infieren del reparto canónico del proyecto. Dos reglas que tiran en
+  direcciones opuestas a propósito: **un reparto explícito NUNCA se filtra por
+  ausencias** (alguien repartido y fuera el mismo día es un *choque*, y esconderlo lo
+  borraría de la única superficie que existe para cazarlo), y **la inferencia se para
+  en la puerta de la ausencia** (quien está fuera no es candidato). Y `unknown` es
+  una tercera palabra, distinta de «no hay nadie»: nadie puede imprimir «libre» sobre
+  un dato que falta.
+- **4 · Un login se vuelve persona SOLO compartiendo, y compartir es explícito.**
+  `share_my_profile_with_workspace` ya existía, viva en producción y tipada, **sin un
+  solo llamador de aplicación** — reclama un dossier por correo verificado, si no
+  crea la `person`, escribe `user_profile.person_id` y hace upsert del dossier. Se le
+  construye la puerta (`/api/me/profile-share` + Ajustes → Perfil) y **no** se
+  engancha a aceptar una invitación: compartir escribe tu nombre en el espacio de
+  otro, y hacerlo por haber aceptado una invitación es consentimiento por defecto,
+  que es justo lo que ADR-085 se negó a firmar. Por defecto **solo el nombre**, más
+  estrecho que el propio default de la RPC (nueve campos).
+- **5 · Sin dossier no hay reparto, y sin reparto no hay eje.** `cast_member` y
+  `crew_assignment` apuntan al dossier por clave compuesta `(workspace_id,
+  person_id)`, así que compartir es el prerrequisito de poder estar en un reparto —
+  y `/api/team` es cast ∪ crew, así que quien no está repartido no aparece. Esto
+  convierte **el escritor de reparto (inexistente) en el eslabón que decide si el eje
+  sirve**, no en un extra.
+- **Rechazado**: contar el pin de persona en `isEmpty` (vacía tres lentes); filtrar el
+  reparto explícito por ausencias (esconde el choque); excluir las filas inferidas del
+  filtro (esconde los ensayos de la propia persona); crear la persona al aceptar una
+  invitación (consentimiento por defecto); dar acento de color a una persona (el tono
+  es identidad de proyecto — el glifo es tinta).
+- **Abierto / decidido en diseño pero NO construido:** que la fila del Board sea
+  **siempre un proyecto**, agrupado bajo cabecera de espacio, con el dial reducido a
+  `project · person` o eliminado del todo. La línea **no** se gana carril (dentro de
+  una obra, comparar «Gira» con «Creació» no es una pregunta que nadie haga, y dos
+  giras simultáneas se contestan por persona). Depende del pase de diseño en curso.
+- **Status**: **construido y commiteado (`7d03827`, `84758fc`), SIN desplegar**;
+  prod sigue en `09f512a`. 2 migraciones aplicadas el mismo día
+  (`20260730164435`, `20260730164608`). Gates: check 0/0 · unit 408/408 · build
+  verde; RLS y E2E no corridas (credenciales de fixture rotas). Ver `_context.md` y
+  `_tasks.md § bloque 8`.
+- **Re-evaluate when**: (a) exista el escritor de reparto y el eje tenga datos reales;
+  (b) el uso pida comparar personas a lo largo de un mes → entonces la quinta vista
+  «las filas son personas» se gana su sitio; (c) haga falta reparto **por fecha** (un
+  ensayo solo para tres músicos) → tabla nueva, y la inferencia deja de hacer falta.

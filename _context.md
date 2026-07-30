@@ -13,6 +13,13 @@
 > **Reconciliación 2026-07-25:** pase de endurecimiento (auditoría de seguridad,
 > rendimiento y estabilidad) desplegado a prod — runtime **`252729f`**, **con
 > cambios de schema** (5 migraciones). Ver «Producción», «Git» y `_tasks.md`.
+> **Reconciliación 2026-07-30:** el **eje de persona** (persona como cuarta
+> dimensión de scope) construido y commiteado, más el **enlace login↔persona**
+> abierto por fin; **2 migraciones aplicadas a prod ese día**. Ojo al estado
+> partido, que es lo primero que hay que leer abajo: **la base va por delante y
+> el Worker NO se ha desplegado** — `main` (`84758fc`) lleva código de
+> aplicación que producción todavía no corre. Ver «Producción», «Git»,
+> `_tasks.md § bloque 8` y ADR-092.
 >
 > Si otro archivo contradice este documento sobre el estado presente, gana este
 > documento. Si contradice una decisión de producto estable, consultar
@@ -74,9 +81,31 @@ orientativo, no una verdad comercial cerrada.
   ERROR y los avisos de DEFINER expuestas bajando de 73 a 70 (las 3 retiradas).
   Con esto **la auditoría 2026-07-24 queda sin diferidos**: los tokens de share
   se decidieron NO hashear (ADR-091) y el HIBP es una compra de plan, no deuda.
-- Encima de `09f512a` van solo tests y documentación (`c27d4b2`, `f08d1c7`):
-  no entran en el bundle, por eso `main` va por delante de `/health/live` sin
-  que eso sea un estado sucio.
+- **Encima de `09f512a` YA HAY CÓDIGO DE APLICACIÓN SIN DESPLEGAR** (cambio de
+  estado el 2026-07-30, y la razón por la que la frase que vivía aquí —«encima
+  solo van tests y documentación»— dejó de ser cierta). Además de `c27d4b2` y
+  `f08d1c7` (tests y docs, fuera del bundle) van ahora **`7d03827` y
+  `84758fc`**: el eje de persona y el enlace login↔persona. Entran en el
+  bundle. Hasta que se despliegue, `/health/live` y `main` describen **dos
+  productos distintos**, y esto NO es el caso benigno de antes.
+- **Segunda parte del estado partido, y va al revés:** la base lleva dos
+  migraciones que el Worker desplegado no necesita —
+  **`20260730164435_bind_auth_user_trigger`** y
+  **`20260730164608_revoke_anon_user_profile_update`**, aplicadas el 2026-07-30
+  por MCP (no por el workflow plan+apply; anotado a propósito). La primera es
+  **no-op en prod** (el trigger ya estaba) y existe por el camino de
+  reconstrucción: el `CREATE TRIGGER` que engancha `handle_new_user` a
+  `auth.users` **no estaba en ninguna migración**, solo en `build/schema.sql`,
+  que no se ejecuta — así que una base levantada con `pnpm db:reset` aceptaba
+  altas **sin crear user_profile, cuenta, workspace ni membresía**. Verificado
+  empíricamente en la base local: antes `trigger: AUSENTE`, después un alta de
+  prueba deja `user_profile: 1 · workspaces: 1`. La segunda quita a `anon` el
+  UPDATE sobre `user_profile` (cubría `person_id`, `user_id` e
+  `is_platform_admin`); **no era una puerta abierta** —RLS forced y la única
+  policy exige `user_id = auth.uid()`, que para `anon` es NULL— sino un grant a
+  una policy de distancia de ser tres escaladas. Después: `anon` 17→**0**,
+  `authenticated` **12 intacto**, advisors **0 ERROR** y los 73 WARN de
+  siempre, sin categoría nueva.
 - Debajo de `09f512a` va **`252729f`** — **pase de endurecimiento
   (auditoría 2026-07-25), desplegado con 5 migraciones**. Cierra: la lectura de
   `fiscal_identity` sin `read:money` (filtraba IBAN/SWIFT/NIF a cualquier
@@ -101,15 +130,34 @@ orientativo, no una verdad comercial cerrada.
 - El runtime anterior era `4499848` (planner + identidad, 2026-07-20). Commits
   posteriores que solo cambian documentación o tests no requieren desplegar el
   Worker — ninguno de los dos entra en el bundle; `main` puede ir por delante de
-  `/health/live` por esa razón y seguir siendo un estado limpio.
+  `/health/live` por esa razón y seguir siendo un estado limpio. **Esa excusa
+  ya no cubre el hueco actual** (ver arriba: `7d03827`/`84758fc` sí entran).
+- **Dato de producción tocado a mano el 2026-07-30**, dicho aquí porque no lo
+  cuenta ninguna migración: el login `marcorubiol@gmail.com` pasó a ser una
+  **persona** — `person_id 019fb37d-780e-7e19-927f-ed256dff6771`, dossiers en
+  `muk-cia` y `marco-rubiol`, y `user_profile.full_name` corregido de
+  `marcorubiol` a `Marco Rubiol`. Hecho **llamando a la RPC de consentimiento**
+  (`share_my_profile_with_workspace`) con las claims del propio usuario, no
+  escribiendo filas: mismo efecto que pulsar el botón. Perfiles enlazados 1→2
+  de 4. Reversible: borrar los dos `workspace_person`, poner `person_id` a NULL
+  y borrar la `person`.
 
 ### Git
 
 - Repo: `https://github.com/marcorubiol/hour` (privado).
 - Checkout: `/Users/marcorubiol/Developer/hour`.
 - Rama principal: `main`.
-- **`main` == `origin/main` == prod** desde el 2026-07-24 (runtime `ff6ec4e`,
-  merge fast-forward + deploy el mismo día). Encima de `a643620`, sin schema:
+- **2026-07-30: `main` == `origin/main` == `84758fc`, pero `main` != prod.**
+  Dos commits de aplicación pusheados y **sin desplegar** — `7d03827` (eje de
+  persona: `$lib/people`, pin `pe:`, `/api/me`, `/api/me/profile-share`,
+  `project_ids` en `/api/team`, la puerta en Ajustes → Perfil) y `84758fc`
+  (personas en el ⌘K y la copy de la banda de scope). Desplegar es
+  `pnpm deploy`; el árbol está limpio, así que el guard pasa. **Ojo antes de
+  hacerlo**: el mismo árbol lleva la tarea 15 (editar fecha), cuyo E2E
+  `tests/date-edit.spec.ts` **no se ha ejecutado nunca** — lo dice su propia
+  cabecera. Desplegar la envía igual.
+- Antes de eso, **`main` == `origin/main` == prod** desde el 2026-07-24 (runtime
+  `ff6ec4e`, merge fast-forward + deploy el mismo día). Encima de `a643620`, sin schema:
   `ff6ec4e` — **fix de la race de `/h/money`** (default global
   `notifyOnChangeProps:'all'` en el QueryClient; TanStack tracked-props
   suprimía la notificación de éxito de una query hermana → store congelado en
@@ -159,14 +207,44 @@ orientativo, no una verdad comercial cerrada.
   deliberado: solo se accede mediante RPC.
 - Staging: `hour-staging` · ref `slccyknqpgmzhyiyclsq` · `eu-west-1`, aislado
   mediante el environment GitHub `staging`; hook de claims activo.
+- **Fixtures rotos, verificado el 2026-07-30:** las credenciales de
+  `.env.test` dan `invalid_credentials` **tanto contra prod como contra la
+  base local** (probadas `PW_TEST_*` y `PW_LIMITED_*` por el endpoint de
+  login). Consecuencia operativa: **la suite RLS y la E2E no se pueden correr
+  desde esta máquina**, y no por falta de CLI sino porque no hay con qué
+  autenticarse. Mientras siga así, cualquier «RLS 137/137» de un doc es
+  historia, no una comprobación de hoy.
+- **El eje de persona depende de datos que casi no existen** (2026-07-30):
+  `cast_member` son **6 filas en 3 proyectos** y `crew_assignment` 7, todas en
+  el workspace `demo` y con gente de test; **MüK Cia no tiene reparto**. Y
+  `user_profile.person_id` estaba puesto en **1 de 4** perfiles (ahora 2). No
+  es un fallo del eje: es que el reparto no se ha rellenado nunca, en parte
+  porque **no hay forma de escribirlo desde la app** (ver `_tasks.md`).
 
 `supabase/migrations/` es ahora la historia SQL ejecutable: checkpoint
 reconstructivo + marcadores aplicados + migraciones posteriores. Una base
 vacía se reconstruye con `pnpm db:reset`, recibe fixtures sintéticos y pasa
 120/120 RLS. El SQL histórico anterior vive solo en
-`build/migrations/squashed-20260720/` para auditoría.
+`build/migrations/squashed-20260720/` para auditoría. **Corregido el
+2026-07-30:** esa reconstrucción estaba incompleta y la suite no lo veía —
+faltaba el `CREATE TRIGGER on_auth_user_created`, así que en una base
+reconstruida el alta de un usuario no provisionaba nada. Lo tapaba el hecho de
+que los fixtures siembran `user_profile` directamente, así que ninguna prueba
+pasa nunca por esa puerta. Cerrado por `20260730164435`.
 
 ### Verificación local y contra producción
+
+**Pase 2026-07-30** (eje de persona + enlace login↔persona): `svelte-check`
+**0/0 (1.844 ficheros)**, unit **408/408** (subió de 375: `people.test.ts`
+nuevo, más casos en `nav`, `planner` y `carrils`), build de producción verde.
+Contra la base viva: las 2 migraciones aplicadas y comprobadas una por una
+(trigger activo; `anon` 17→0; `authenticated` 12 intacto), **advisors 0 ERROR**
+y los 73 WARN conocidos sin categoría nueva, y la migración del trigger probada
+**antes** en la base local con un alta real. **RLS y E2E NO se corrieron** — no
+hay credenciales que funcionen (ver «Supabase»); ninguna de las dos migraciones
+toca una policy, así que la suite tampoco habría dicho nada de ellas. La única
+verificación en navegador es manual y de Marco: búsqueda de persona en el ⌘K
+contra la base local.
 
 **Pase 2026-07-24** (consolidación + deploy): `svelte-check` 0/0 (1.832
 ficheros), unit **368/368** (subió de 348: identidad + picker), collab 11/11,
@@ -304,17 +382,30 @@ profundidad de producto, no en SvelteKit/Supabase/Cloudflare.
 
 ## Siguiente paso
 
-Abrir `_tasks.md`. **Money v3 (ADR-086/087/088) está construido y desplegado en
-prod** (2026-07-23, runtime `a35e8c4`, ver `_tasks.md § bloque 7`). Lo que sigue,
-por orden:
+Abrir `_tasks.md`. Lo primero de la cola no es una feature: **hay código de
+aplicación commiteado y sin desplegar** (eje de persona + enlace login↔persona,
+`84758fc`; prod en `09f512a`). Lo que sigue, por orden:
 
-1. **Follow-up de money v3 (no bloquea):** UX de **enlazar una función nueva a un
+1. **Desplegar `84758fc`** (`pnpm deploy`, árbol limpio) — decidiendo antes si
+   se envía con él la tarea 15, cuyo E2E nunca ha corrido. Ver `_tasks.md § 19`.
+2. **El escritor de reparto**, que hoy no existe en ninguna forma: sin él el eje
+   de persona no puede incluir a nadie que no esté ya sembrado. Es **pantalla**,
+   y cae dentro del rediseño del Planner en curso. Ver `_tasks.md § 20`.
+3. **Follow-up de money v3 (no bloquea):** UX de **enlazar una función nueva a un
    bolo** — las performances creadas en Planner nacen sin bolo hasta que exista.
-2. **Travel v2 (ADR-089), EN CURSO:** modelo decidido, nada de schema construido;
+4. **Travel v2 (ADR-089), EN CURSO:** modelo decidido, nada de schema construido;
    la migración P1 está por escribir. Depende en parte de la tarea 15 (editar una
-   fecha desde la UI, que aún no existe).
-3. **Contenedores (bloque 5)** y los flecos de planner (editar fecha, multi-día de
-   performances, tipos de horario) van después.
+   fecha desde la UI, **que ya está construida y sin desplegar**).
+5. **Contenedores (bloque 5)** y los flecos de planner (multi-día de
+   performances, escaleta ADR-090) van después.
+
+> **Rediseño del Planner (Scope v3 Agenda), en curso y fuera del repo:** el
+> diseño vive en un proyecto de claude.ai/design (`Hour Views - Scope v3 -
+> Agenda.html` + `AGENDA-SYSTEM.md`), se lee con la herramienta `DesignSync`, y
+> **nada de él está implementado**. Ese documento se declaró a sí mismo
+> no-especificación tras descubrir que ocho de sus leyes eran falsas en
+> pantalla: cuando se implemente, se destila a ADRs de aquí más aserciones
+> ejecutables — no se trata como spec.
 
 `_tasks.md` es la cola detallada con el estado exacto de cada uno.
 

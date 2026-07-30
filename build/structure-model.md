@@ -25,6 +25,12 @@
 > per-country last mile. Tax is a generic `invoice_tax_line` (add|withhold|exempt) +
 > a per-country preset adapter (Spain filled). See
 > `_notes/grill-2026-07-23-lentes-y-money-books.md` and `_decisions.md § ADR-088`.
+> Amended 2026-07-30 — ADR-092 (**the person axis**): **narrowing is not the container
+> ladder.** The pins that scope a lens now admit a fourth token, `pe:<personId>`, and a
+> person is **not** a container — it holds nothing, it is *attached to* rows by rosters.
+> This does **not** touch either ladder below: no permission hangs off a person, no
+> conversation hangs off a person, and `inScope()` stays container-only. See § Narrowing
+> vs the ladders.
 > Read next to: `architecture.md` (data model / stack), `_decisions.md` (ADR log).
 
 ## The one idea
@@ -121,6 +127,39 @@ of that night talks in that gig's hub. That is the narrowest and most common gra
 **This does not touch the module rule.** A performance carries access and a conversation; it
 does **not** compose modules. Modules still exist only at the line. If modules ever appear at
 the performance, that is drift — the two ladders are separate on purpose.
+
+## Narrowing vs the ladders (ADR-092)
+
+There is a third thing the word "scope" was quietly doing: **narrowing a view**. That is what
+the pins do, and it is neither of the ladders above — it grants nothing and holds nothing.
+Since 2026-07-30 it admits a token that is not a container at all: **a person**.
+
+The distinction that makes this legal, and the one to hold on to:
+
+| | partitions? | can it be a lane? | can it narrow? |
+|---|---|---|---|
+| space · project · line | yes — a row belongs to exactly one | yes | yes |
+| **person** | **no** — a gig is a night for everyone who plays it, and some rows belong to nobody | **only as its own drawing** | **yes** |
+
+**Narrowing does not care whether a dimension partitions the set; GROUPING does.** A filter is
+a predicate — "with Laia" is as good a predicate as "of MüK". A lane is a claim about
+structure, and drawing rows that cover rather than partition means the same night is drawn
+several times, which is a different drawing, not a different filter. That is why a person may
+be pinned but a "rows are people" view is a **view**, not a value of some grouping dial: if the
+row changes, the drawing changed.
+
+Three consequences worth stating so they are not rediscovered:
+
+- **`isEmpty` means "no CONTAINER is pinned."** Every consumer reads it as "do not filter by
+  container", so counting a person pin there would blank out Conversations, Books and the Desk
+  — surfaces that have no idea what a person is. They ignore the person token; that is the
+  honest degradation, not a bug.
+- **Attribution can be an inference, and must say so.** A `performance` carries a real roster;
+  a `date` carries nobody (there is no date↔person table), so its people are inferred from the
+  project's cast — and the inference stops at the door of an absence. An inferred row is
+  included, never silently: see `$lib/people.ts`.
+- **Being on the axis at all requires a roster row.** No cast, no presence — which is why the
+  cast write path (still missing) is the thing that makes this model usable, not more model.
 
 **Editing happens at a container. Three edit levels:**
 - **Space** — its own identity/fiscal content: name, domain, city, logo, accent, description;

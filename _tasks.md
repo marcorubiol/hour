@@ -1,8 +1,70 @@
 # Hour — cola vigente
 
-> **ÚNICA COLA ACTIVA.** Última reconciliación: 2026-07-20.
+> **ÚNICA COLA ACTIVA.** Última reconciliación: 2026-07-30.
 > Estado general y evidencia: `_context.md`. Historia: `_decisions.md` y
 > `_notes/sessions-log.md`. Los documentos de `build/archive/` no crean tareas.
+
+## PRIMERO — dos cosas construidas y sin desplegar (2026-07-30)
+
+> Esto va arriba porque es lo único que hoy separa a `main` de producción, y
+> porque la primera decisión no es técnica.
+
+19. [ ] **Desplegar `84758fc`** (`pnpm deploy` — el árbol está limpio, el guard
+    pasa). Prod sigue en `09f512a`: el **eje de persona** y el **enlace
+    login↔persona** están commiteados y **no corriendo**.
+    **Antes de pulsar, decide una cosa:** el mismo árbol lleva la **tarea 15**
+    (editar fecha), cuyo E2E `tests/date-edit.spec.ts` **no se ha ejecutado
+    nunca** — su cabecera lo dice en mayúsculas y su hermano `money.spec.ts`
+    ya demostró que un spec sin correr puede afirmar lo contrario de la regla
+    de producto. Desplegar lo envía igual. No es un bloqueo, es una elección.
+
+20. [ ] **El reparto no se puede escribir desde la app — el eslabón que falta.**
+    Verificado: `/api/lines/[id]/people` exporta **solo `GET`** y **ningún**
+    endpoint escribe `cast_member`; las 6 filas que existen se sembraron. Sin
+    esto el eje de persona funciona pero **no puede incluirte a ti**: `/api/team`
+    es cast ∪ crew, así que quien no está repartido no aparece ni se puede pinar.
+    La política de INSERT ya existe y está gateada (`edit:performance`), así que
+    el coste es un endpoint pequeño **más una pantalla** — quién actúa en una
+    obra y con qué papel. **Es pantalla, no tubería**, y cae justo en la zona
+    que Marco está rediseñando (el Board por personas), así que no se construye
+    a ciegas: primero el diseño.
+
+## Cerrado — bloque 8: el eje de persona (2026-07-30), CONSTRUIDO, SIN DESPLEGAR
+
+- **Persona como cuarta dimensión de scope** (ADR-092): pin `pe:<personId>`,
+  `ResolvedScope.personIds`, búsqueda de personas en el ⌘K (insensible a
+  diacríticos), y el Planner estrechando por persona en las tres proyecciones.
+  La atribución vive en `$lib/people.ts`, pura y con 20 tests: un reparto
+  explícito **nunca** se filtra por ausencias (eso es el choque, y esconderlo lo
+  borraría de la única vista que existe para cazarlo) y la **inferencia se para
+  en la puerta de la ausencia**. El filtro **dice cuándo supone**
+  (`N por proyecto, sin reparto` en el pulse).
+- **El enlace login↔persona tenía puerta pero no picaporte.**
+  `share_my_profile_with_workspace` estaba viva en prod, tipada en `db-types.ts`
+  y **sin un solo llamador de aplicación** (solo un test de RLS). Ahora:
+  `GET/PATCH /api/me`, `POST/DELETE /api/me/profile-share` y un grupo real en
+  Ajustes → Perfil. Compartir sigue siendo **explícito y solo el nombre por
+  defecto** — no se engancha a aceptar una invitación a propósito.
+- **Dos defectos del motor, arreglados con test:** `awayBands()` emparejaba la
+  ida más antigua, así que un viaje sin vuelta se apropiaba de la vuelta del
+  siguiente y pintaba 17 días de gira (había un test **fijando** el
+  comportamiento equivocado); y el Loom atribuía ensayos a personas **sin mirar
+  si estaban fuera**, con lo que un hilo decía «fuera todo el día» y «quizá
+  ensayando» del mismo día.
+- **Un defecto que habría destruido datos:** el filtro de tokens de la URL era
+  `/^[spl]:.+/` — una clase de caracteres, así que `pe:` no pasaba, y como el
+  efecto de entrada reescribe los pins con lo que sobrevive al filtro, pinar
+  una persona la **borraba** en la siguiente navegación.
+- **CSP de desarrollo:** `svelte.config.js` derivaba `connect-src` de
+  `process.env`, que no ve los `.env*` — así que con una Supabase local la CSP
+  se horneaba con el host de producción y **todo websocket de realtime quedaba
+  bloqueado en silencio**. Ahora lee los ficheros con `loadEnv`, **nunca en un
+  `build`** (un `.env.local` no puede alcanzar un bundle desplegado).
+- Consolidación de paso: `TeamItem` estaba declarado 3 veces y la consulta
+  copiada 2 (con un comentario confesándolo) → un `teamQueryOptions()` en
+  `nav-queries`, y `project_ids` llegó a los cuatro consumidores de una vez.
+- Gates: `svelte-check` 0/0 (1.844), unit **408/408**, build verde. RLS y E2E
+  **no** (credenciales de fixture rotas — ver `_context.md § Supabase`).
 
 ## Cerrado — pase de endurecimiento (auditoría 2026-07-24), DESPLEGADO 2026-07-25
 
