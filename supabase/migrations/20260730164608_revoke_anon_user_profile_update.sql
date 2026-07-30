@@ -39,4 +39,4 @@
 REVOKE UPDATE ON TABLE public.user_profile FROM anon;
 
 COMMENT ON COLUMN public.user_profile.person_id IS
-  'The login → person bridge. Written ONLY by share_my_profile_with_workspace (a consent RPC); not in the authenticated UPDATE grant, and as of 20260730130000 not in anon''s either.';
+  'The login → person bridge. Written ONLY by share_my_profile_with_workspace (a consent RPC); not in the authenticated UPDATE grant, and as of 20260730164608 not in anon''s either.';

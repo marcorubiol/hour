@@ -59,7 +59,11 @@
     {#if pins.pins.length === 0}
       <span class="scopebar__scope">
         <span class="scopebar__lead">Scope</span>
-        <span class="scopebar__all">Everything · all spaces &amp; projects</span>
+        <!-- Names every axis you can narrow by, and it has to name them ALL:
+             the line has to earn its place in the sentence, and a person is
+             now a fourth thing you can pin. A band that lists two of four
+             teaches that the other two do not exist. -->
+        <span class="scopebar__all">Everything · all spaces, projects, lines &amp; people</span>
       </span>
       <button type="button" class="scopebar__add" onclick={openPaletteAdd}>
         + narrow

@@ -1,9 +1,48 @@
+import { fileURLToPath } from 'node:url';
+import { dirname } from 'node:path';
 import adapter from '@sveltejs/adapter-cloudflare';
 import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
+import { loadEnv } from 'vite';
 
 const productionSupabaseUrl = 'https://lqlyorlccnniybezugme.supabase.co';
-const supabaseUrl = process.env.PUBLIC_SUPABASE_URL ?? productionSupabaseUrl;
-const supabaseWsUrl = supabaseUrl.replace(/^https:/, 'wss:');
+
+/**
+ * Which Supabase this bundle is allowed to talk to — it feeds the CSP's
+ * `connect-src`, so getting it wrong does not warn, it BLOCKS.
+ *
+ * The subtlety that cost an afternoon: this file is loaded before Vite reads
+ * the `.env*` files, so `process.env.PUBLIC_SUPABASE_URL` is empty for anyone
+ * whose URL lives in `.env.local` — which is everyone developing against a
+ * local Supabase. The CSP was then baked for the PRODUCTION host while the app
+ * talked to `127.0.0.1`, and every realtime websocket was refused:
+ *
+ *   Connecting to 'ws://…/realtime/v1/websocket' violates the following
+ *   Content Security Policy directive: "connect-src 'self' https://<prod>"
+ *
+ * Silently, in the console, forever — presence and collaboration simply dead
+ * in local dev. So the files are read here too, the same ones and in the same
+ * precedence Vite itself uses (`loadEnv` also folds in matching process.env,
+ * which keeps a shell variable winning).
+ *
+ * NEVER ON A BUILD, and that guard is the important half. `wrangler deploy`
+ * runs the build from a developer's machine, where `.env.local` may well point
+ * at localhost. Reading it there would bake `connect-src http://127.0.0.1`
+ * into a bundle served from production — a page that loads and can reach
+ * nothing. A build therefore uses only the real environment, exactly as it did
+ * before this change, and no local file can reach a deployed artefact.
+ */
+const isBuild = process.argv.includes('build');
+const fileEnv = isBuild
+  ? {}
+  : loadEnv(
+      process.env.NODE_ENV || 'development',
+      dirname(fileURLToPath(import.meta.url)),
+      'PUBLIC_',
+    );
+const supabaseUrl =
+  process.env.PUBLIC_SUPABASE_URL ?? fileEnv.PUBLIC_SUPABASE_URL ?? productionSupabaseUrl;
+/** http → ws as well as https → wss: a local stack is served over plain http. */
+const supabaseWsUrl = supabaseUrl.replace(/^http(s?):/, 'ws$1:');
 
 /** @type {import('@sveltejs/kit').Config} */
 export default {

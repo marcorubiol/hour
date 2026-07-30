@@ -66,6 +66,9 @@ export function teamQueryOptions(workspaceIds: string[], opts?: { enabled?: bool
   return {
     queryKey: ['planner-team', workspaceIds] as const,
     enabled: (opts?.enabled ?? true) && workspaceIds.length > 0,
+    // Nav-shaped, like the other three: rosters change rarely, and a surface
+    // that opens on a keystroke cannot afford to start its fetch then.
+    staleTime: NAV_STALE_TIME,
     queryFn: async ({ signal }: { signal: AbortSignal }) => {
       try {
         return await fetchJSON<{ items: TeamItem[]; absent?: boolean }>(

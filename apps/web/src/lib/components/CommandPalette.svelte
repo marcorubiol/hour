@@ -1,8 +1,10 @@
 <script lang="ts">
   /**
    * ⌘K — scope builder (Scope v2). Browse the space → project → line tree
-   * (→ drills in), or type to filter across all three at once; stage tokens
-   * into a "building" set and Apply them as the active scope (pins). This
+   * (→ drills in), or type to filter across all FOUR axes at once — the three
+   * containers plus people, who are not a level of that tree but can be
+   * narrowed by all the same; stage tokens into a "building" set and Apply
+   * them as the active scope (pins). This
    * replaces the flat jump palette: with a visible VIEW AS + a saved-scopes
    * sidebar, ⌘K's job is composing scope, not switching views.
    *
@@ -62,19 +64,22 @@
 
   /**
    * The team — the fourth thing you can narrow by, and the only one that is
-   * not a container. Fetched while the palette is open, on the key the
-   * planner and the blackout dialog already share.
+   * not a container. On the key the planner and the blackout dialog already
+   * share, so it is usually warm before you ever open this.
    *
    * It is the TEAM (cast ∪ crew), never the contact book: a workspace's
    * person table holds hundreds of programmers who are not "us", and putting
    * them in this list would bury the eight people who carry the work.
+   *
+   * NOT gated on `open`, and that was a real bug rather than a preference:
+   * gating it meant the fetch STARTED when the palette opened, and this is a
+   * surface you open and type into inside a second. The People group only
+   * renders when it has rows, so an unresolved fetch looked exactly like a
+   * workspace with nobody in it — the search appeared broken. It loads with
+   * the other three nav queries now, and while it is in flight the group says
+   * so (below) instead of being absent.
    */
-  const teamStore = toStore(() =>
-    teamQueryOptions(
-      workspaces.map((w) => w.id),
-      { enabled: open },
-    ),
-  );
+  const teamStore = toStore(() => teamQueryOptions(workspaces.map((w) => w.id)));
   const teamQuery = createQuery(teamStore);
 
   type PersonEntry = {
@@ -133,6 +138,9 @@
     key: Kind;
     header: string;
     rows: Row[];
+    /** Shown INSTEAD of rows when a group has none but still has something
+     *  true to say — "still loading" is not the same fact as "nobody". */
+    note?: string;
   }
 
   function labelFor(token: string): string {
@@ -231,15 +239,28 @@
       const persons = people
         .filter((p) => fold(p.full_name).includes(nq) || p.slug.includes(q))
         .map((p) => personRow(p, p.workspaceName));
+      // An empty People group has three different meanings and they must not
+      // look alike: still fetching · the feed could not be read · nobody
+      // matches. Only the last one is silence.
+      const peopleNote =
+        persons.length > 0
+          ? undefined
+          : $teamQuery.isLoading
+            ? 'Looking up the team…'
+            : $teamQuery.data?.absent
+              ? 'The team feed is unavailable right now'
+              : people.length === 0
+                ? 'Nobody is on a cast or crew yet'
+                : undefined;
       return (
         [
           { key: 'space', header: 'Spaces', rows: spaces },
           { key: 'project', header: 'Projects', rows: projects },
           { key: 'line', header: 'Working lines', rows: lines },
           // Last, because it is the axis that is not a level of the others.
-          { key: 'person', header: 'People', rows: persons },
+          { key: 'person', header: 'People', rows: persons, note: peopleNote },
         ] as Group[]
-      ).filter((g) => g.rows.length > 0);
+      ).filter((g) => g.rows.length > 0 || g.note);
     }
     if (drill === null) {
       return [{ key: 'space', header: 'Spaces', rows: workspaces.map((w) => spaceRow(w, true)) }];
@@ -451,7 +472,7 @@
           bind:value={query}
           type="text"
           {placeholder}
-          aria-label="Filter spaces, projects and lines"
+          aria-label="Filter spaces, projects, lines and people"
           oninput={() => {
             drill = null;
             cur = 0;
@@ -477,12 +498,15 @@
           {/each}
         </p>
 
-        {#if flatRows.length === 0}
+        {#if flatRows.length === 0 && !groups.some((g) => g.note)}
           <p class="cmdk__empty">No match.</p>
         {/if}
 
         {#each groups as g, gIdx (g.key)}
           <p class="cmdk__group">{g.header}</p>
+          {#if g.rows.length === 0 && g.note}
+            <p class="cmdk__note">{g.note}</p>
+          {/if}
           {#each g.rows as r, i (r.token)}
             {@const gi = groupOffsets[gIdx] + i}
             <div class="cmdk__row" class:cmdk__row--on={gi === cur} class:cmdk__row--staged={isStaged(r.token)}>
@@ -738,6 +762,15 @@
     color: var(--text-muted);
     font-style: italic;
     font-family: var(--font-display);
+  }
+  /* A group with nothing to list but something to say. Quieter than a row
+     and quieter than the global empty state: it is a status, not a result. */
+  .cmdk__note {
+    margin: 0;
+    padding: var(--space-2xs) var(--space-m) var(--space-s);
+    color: var(--text-faint);
+    font-size: var(--text-xs);
+    font-style: italic;
   }
 
   .cmdk__staged {
