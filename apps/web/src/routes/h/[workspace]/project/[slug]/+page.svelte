@@ -21,6 +21,7 @@
   } from '$lib/nav-queries';
   import { accentVar, accentVarFor } from '$lib/utils/accent';
   import { useBreadcrumb } from '$lib/stores/breadcrumb.svelte';
+  import CastPanel from '$lib/components/CastPanel.svelte';
   import ProjectIdentityPopover from '$lib/components/ProjectIdentityPopover.svelte';
   import RelationshipStub from '$lib/components/RelationshipStub.svelte';
   import StateBadge from '$lib/components/StateBadge.svelte';
@@ -181,10 +182,12 @@
       </p>
     </div>
     <div class="project__stub">
-      <p class="eyebrow">Team</p>
-      <p class="project__stub-body">
-        Project members and permissions will live here.
-      </p>
+      <p class="eyebrow">Cast</p>
+      {#if project}
+        <CastPanel projectId={project.id} />
+      {:else}
+        <p class="project__stub-body">…</p>
+      {/if}
     </div>
   </section>
 </article>
