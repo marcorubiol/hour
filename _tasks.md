@@ -65,19 +65,36 @@
 > `peopleOf()` de `$lib/people`, incluida la parada de la inferencia en la
 > puerta de la ausencia). Lo que sigue es lo que NO está.
 
-23. [ ] **La nota del día — y si es una conversación.** El margen del diseño es
-    una **pila** (varios autores por día, la mía editable, con visibilidad
-    privada-o-compartida; decisión de Marco del 2026-07-29). **No existe
-    ninguna tabla de nota anclada a un día.** El prototipo lo finge con
-    localStorage.
-    **Abierto, y es lo primero que hay que pensar (Marco, 2026-07-30):** puede
-    que estas notas deban colgar de **Conversations** en vez de ser una tabla
-    suelta. Dato que lo cambia todo: `conversation` existe, pero
-    `conversation_event` **está contratado y la tabla no existe** — si la nota
-    es un evento de conversación, esto no es «añadir una tabla», es construir
-    esa. El patrón más cercano ya en producción es `person_note`
-    (`workspace_id, person_id, author_id, visibility`, con RLS): la forma
-    exacta, con el ancla equivocada. **No se migra nada hasta cerrar esto.**
+23. [ ] **`note` — el post-it privado, y absorber `person_note`. CERRADO EN
+    GRILL, listo para construir (ADR-093, 2026-07-31).**
+    La pregunta («¿las notas cuelgan de Conversations?») se cerró girándola: **la
+    nota es siempre privada, y lo que ve el equipo es comunicación.** El margen
+    del Planner v3 sale como una caja de texto mía, sin firmas ni pila. Las notas
+    de equipo esperan a comms — que pasa a ser **lo siguiente grande**.
+    Lo que hay que construir, por orden:
+    - **Migración aditiva `note`**: `workspace_id, author_id, body`,
+      `on_day date NOT NULL`, `visibility DEFAULT 'private'`, y anclajes
+      anulables `project_id · line_id · performance_id · date_id · person_id`
+      con `CHECK (…) <= 1` **copiando `task_at_most_one_parent`** — cero padres
+      es válido y significa «de la compañía», que es el día vacío con el scope en
+      «Everything». Sin `conversation_id` ni `bolo_id`. Sin `parent_id`.
+    - **RLS**: SELECT/UPDATE/DELETE `author_id = auth.uid()`, INSERT con
+      `current_workspace_id()` + miembro + autor. **La rama
+      `visibility='workspace'` no se escribe todavía.**
+    - **Absorber `person_note`** (cero filas en prod, verificado): la ficha de
+      persona lee `note` por `person_id`, se van la tabla y sus RPC
+      `create_person_note`/`delete_person_note`, y `person.spec.ts` se
+      **re-apunta**, no se borra. De paso muere un bug latente: hoy
+      `person_note_select` te exige `read:person_note_private` sobre algún
+      proyecto **para leer tu propia nota privada**.
+    - **El margen, en la UI**: una caja por día y por contenedor. En un día con
+      una sola entrada de calendario el ancla viene rellena; con varias, se
+      elige; en un día vacío cae al scope pineado y, si no hay, a la compañía.
+    - **No** crea tareas (lo impide ADR-084 §2: las tareas no salen en el
+      calendario). **No** añade bloque de notas a la página de función ni de
+      línea.
+    Regla 8: la parte destructiva es pequeña pero es destructiva — backup/
+    preflight proporcional, tipos regenerados y RLS verde antes de prod.
 
 24. [ ] **Persona: ¿dial o vista?** ADR-092 dice que si cambia qué es una fila,
     cambió el dibujo → **vista**. El prototipo lo tiene como dial

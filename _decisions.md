@@ -2781,3 +2781,134 @@ Triggered by Marco's pre-scaffold doubt (Phase 0.0 day 5). Five alternatives eva
   (b) el uso pida comparar personas a lo largo de un mes → entonces la quinta vista
   «las filas son personas» se gana su sitio; (c) haga falta reparto **por fecha** (un
   ensayo solo para tres músicos) → tabla nueva, y la inferencia deja de hacer falta.
+
+## [2026-07-31] — ADR-093 · La nota es privada; lo que ve el equipo es comunicación. Y `note` nace con la forma del mensaje
+
+> Grill sobre el margen del Planner v3. Marco arrancó con *«estas notas deberían
+> estar linkadas de alguna manera a Conversations»* y acabó girando la pregunta
+> entera: *«a lo mejor el error es querer darle más peso a las notas del que
+> deberían tener — que sean notas a nivel de cada persona, y el resto pase por
+> comunicaciones»*. Lo que sigue es esa vuelta, cerrada.
+
+- **1 · La nota no es del día: cuelga de un contenedor y ADEMÁS lleva un día.**
+  Las cinco notas de ejemplo del propio prototipo lo demostraron — tres son de una
+  función (el camión del Antic, el backline del OTO), una de una conversación (los
+  domingos de la Nau Ivanow) y una de la disponibilidad de alguien. **Ninguna es
+  del día**; el día es dónde estabas parado cuando la escribiste. Pero el margen
+  tiene que existir en un día vacío (*«puedo abrir un día y, aunque no haya nada,
+  decidir que tengo algo que escribir»*), así que el día no puede derivarse del
+  contenedor: es una coordenada propia. **El contenedor dice de qué habla; `on_day`
+  dice dónde vive.** El prototipo hacía lo contrario —clave `key(m,d)`, mes y día y
+  nada más— y ese es el punto donde el diseño y el modelo no se hablaban.
+
+- **2 · La visibilidad de una nota es SIEMPRE privada. Lo compartido es comms.**
+  Ésta es la decisión grande y **supera la de Marco del 2026-07-29** («una nota del
+  día puede ser privada O compartida, así que es una entidad con visibilidad y el
+  margen es una pila de varios autores»). El argumento que la mató es el propio
+  dibujo: aplicando el criterio «¿esto es privado?» a sus cinco notas de ejemplo,
+  **ninguna lo es** — el camión, el rider y el ensayo libre de Anouk son cosas que
+  alguien le está *diciendo* al equipo. **El margen nunca fue un sitio de notas: era
+  una superficie de comunicación disfrazada de notas**, y por eso se caía solo hacia
+  Conversations. Consecuencia inmediata: el margen del Planner v3 sale como **un
+  post-it privado**, una caja de texto, sin firmas ni horas ni pila. Las notas del
+  equipo no salen en el rediseño; esperan a comms.
+
+- **3 · Y por eso NO se crea un segundo mecanismo de comunicación.** ADR-083 §1
+  decidió un único mecanismo polimórfico y rechazó explícitamente los mecanismos
+  separados. Una tabla de notas compartidas, firmadas y con audiencia habría sido
+  ese segundo mecanismo, construido once días después de firmar que no. Una nota
+  privada no compite: es un post-it, no un canal. **ADR-083 sale intacto y
+  protegido, no superado.**
+
+- **4 · La tabla es `note`, y nace con la forma que `message` va a necesitar.**
+  Anclajes polimórficos al idioma de la casa —FKs anulables + `CHECK (…) <= 1`,
+  copiado de `task_at_most_one_parent`, donde **cero padres es válido** y significa
+  «de la compañía»—, más `author_id`, `on_day date NOT NULL`, `visibility` con
+  `private` por defecto y `body`. Escalera: `project · line · performance · date ·
+  person`. Sin `conversation_id` (es el ancla de comms, entra con comms) y sin
+  `bolo_id` (nada del Planner lo dibuja).
+  Se eligió **contra** un `container_type`/`container_id` suelto: sin FK no hay
+  integridad ni cascada, y cada policy de RLS tendría que abrir un `CASE` — el
+  último sitio del sistema donde conviene ser listo.
+  Se eligió también **contra** una tabla desechable: es lo que `_notes/_flux.md
+  § 291` ya recomendaba por escrito («diséñalo para generalizar a un thread/message
+  polimórfico… coste casi cero»). Cuando llegue comms no se migra nada — se le añade
+  audiencia e hilo, y la primera temporada de mensajes ya está escrita.
+  **En pantalla es un post-it y nada más.** La tabla puede saber a qué aspira; la
+  interfaz no debe prometerlo.
+
+- **5 · `note` se come a `person_note`, y ahora, porque solo ahora es gratis.**
+  `person_note` es campo por campo la misma tabla con el ancla fija, y tiene **cero
+  filas** en producción pese a llevar tabla, RPC, endpoint, toggle de privacidad en
+  la ficha de persona y un E2E verde. Absorberla hoy no es una migración: es un
+  borrado y un re-apuntado. El día que alguien escriba la primera nota de dossier
+  deja de ser gratis para siempre y quedan dos pilas firmadas para el resto de la
+  vida del producto. La nota de dossier **también** pasa a privada-solo: una
+  excepción el primer día mata la regla del §2.
+  **Y arregla un bug latente**: `person_note_select` exige, en su rama privada,
+  `read:person_note_private` sobre algún proyecto del workspace **para leer tu
+  propia nota privada** — un miembro sin permisos de proyecto no ve lo que él mismo
+  escribió. La policy nueva es `author_id = auth.uid()` + miembro del workspace, y
+  nada más. La rama `visibility='workspace'` **no se escribe todavía**: una policy
+  para un valor que nadie puede producir es superficie sin usuario.
+
+- **6 · El margen no crea tareas en v1 — lo impide ADR-084 §2.** Marco preguntó si
+  parte de esto son tareas; sí, y `task` ya existe con los mismos anclajes, `due_at`,
+  `from_at`, `lead_days` y sitio en el Desk. Pero ADR-084 §2 decidió que **las tareas
+  no salen en el calendario**. Una tarea creada desde el margen desaparecería del
+  margen en el instante de crearla. Para tener tareas ahí hay que reabrir ADR-084
+  primero; no se hace de tapadillo desde una caja de texto.
+
+- **7 · La nota se ve en dos sitios: el margen y la ficha de persona.** Nada más. No
+  se añade un bloque de notas a la página de función ni a la de línea: ahí ya viven
+  `performance.notes` y `line.notes`, dos de los **diecisiete** campos de prosa que
+  Hour ya tiene (dieciséis de ellos mudos: sin autor, sin hora, sin visibilidad).
+  Poner una segunda caja al lado, sin que nadie lo haya pedido, es el ruido que esta
+  decisión existe para quitar.
+
+- **Rechazado**:
+  - *Una tabla `day_note` anclada al día* — sería el sitio dieciocho para escribir
+    prosa, y contradice el §1.
+  - *Notas compartidas con pila de varios autores* (la decisión del 29) — es comms
+    con otro nombre; ver §2.
+  - *Hilos en el margen* (poder contestar a la nota de alguien) — si el valor que se
+    busca es la respuesta, eso es comms y es un proyecto de otro tamaño: audiencias,
+    facetas, permisos y notificaciones. Sin `parent_id` ni `thread_id` en v1.
+  - *No construir margen y esperar a comms* — se pierde la temporada de aprendizaje
+    que es justo el motivo por el que comms se dejó para el final.
+  - *Conservar `person_note` en paralelo* — dos pilas firmadas es el mecanismo #2 por
+    la puerta de atrás.
+
+- **Por qué**: el margen dibujado prometía comunicación de equipo y el modelo no
+  tenía dónde ponerla; construir esa promesa como «notas» habría duplicado la capa
+  de comms antes de diseñarla. Recortar la nota a lo que de verdad es —privada, mía,
+  anclada a algo, fechada— deja la promesa entera para comms, no crea mecanismo
+  nuevo, y convierte la temporada que viene en el instrumento de especificación que
+  Marco quería: **cada nota privada que escriba queriendo compartirla es una línea
+  del spec de comms, y se queda en las filas.**
+
+- **Abierto**: (1) el nombre `note` puede quedarse corto cuando la tabla lleve
+  mensajes; renombrar con migración es barato y se decide entonces, no ahora.
+  (2) El margen redibujado — se van firmas, horas, `noteStack` y el plegado
+  `N more notes`; queda una caja. Diseño de Marco.
+  (3) Si durante la temporada hace falta marcar «esto lo habría compartido», es un
+  toggle sobre la columna que ya existe, sin migración.
+
+- **Status**: **decidido en grill (2026-07-31), SIN implementar.** Toca schema: una
+  migración aditiva (`note`) + una destructiva pequeña (`person_note` y su RPC, con
+  cero filas). Va con backup/preflight y tests RLS, regla 8.
+
+- **Re-evaluate when**: (a) al abrir comms — es cuando `note` gana audiencia e hilo y
+  cuando se decide el nombre definitivo; (b) si al usarlo una temporada resulta que
+  lo que se escribe en el margen es abrumadoramente del equipo y no privado →
+  entonces el orden se invierte, comms va primero y el margen espera; (c) si hace
+  falta anclar una nota a un `bolo` o a una `conversation` antes de comms.
+
+> **REORDENA EL ROADMAP.** De este grill sale un dato que no estaba escrito en
+> ningún documento: **comms es lo siguiente que Marco quiere construir**, y llevaba
+> aparcado a propósito. En sus palabras: *«es la parte más importante, fue la razón
+> por la cual empecé a hacer esta aplicación… lo he dejado al final para poder ver
+> todo lo que aprendía durante el otro»*. ADR-082 y ADR-083 dejaron la capa
+> diseñada y sin construir tras un portón («usar la app una temporada real de
+> difusión antes»). Ese portón sigue en pie, pero deja de ser indefinido: **el
+> Planner v3 es la temporada.**

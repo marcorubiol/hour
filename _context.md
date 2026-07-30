@@ -414,11 +414,11 @@ profundidad de producto, no en SvelteKit/Supabase/Cloudflare.
 Abrir `_tasks.md`. Nada bloquea: `main` == prod y las dos suites están en verde.
 Todo lo que sigue sirve al **Planner v3**, que es la pieza en curso. Por orden:
 
-1. **La nota del día — y si cuelga de Conversations** (`_tasks.md § 23`). Es la
-   ÚNICA maquinaria que el diseño del Planner v3 necesita y no existe, y no se
-   migra nada hasta cerrar la pregunta: `conversation_event` está contratado y
-   su tabla no existe, así que la respuesta decide si esto es una tabla nueva o
-   el arranque de esa.
+1. **`note`, el post-it privado** (`_tasks.md § 23`, ADR-093). Es la única
+   maquinaria que el Planner v3 necesita y no existe. **Ya está decidida:** la
+   nota es siempre privada, lo que ve el equipo es comunicación, y la tabla nace
+   con la forma que `message` va a necesitar. Incluye absorber `person_note`
+   (cero filas — solo hoy es gratis).
 2. **Persona: ¿dial o vista?** (`§ 24`) — ADR-092 y el prototipo no dicen lo
    mismo, y de eso depende si vive en la URL.
 3. **La fontanería barata** (`§ 25`): los 3 campos del run sheet que ya viajan y
@@ -434,6 +434,19 @@ Todo lo que sigue sirve al **Planner v3**, que es la pieza en curso. Por orden:
    construida, desplegada y con E2E verde**.
 7. **Contenedores (bloque 5)** y los flecos de planner (multi-día de
    performances, escaleta ADR-090) van después.
+
+> **Y DESPUÉS DEL PLANNER, COMMS — esto es nuevo y no estaba escrito en ningún
+> sitio.** La capa de comunicación (ADR-082 + ADR-083: un hilo polimórfico sobre
+> cualquier contenedor, hub por contenedor, sub-hilos = facetas) está **diseñada
+> desde el 2026-07-19 y sin construir**, detrás de un portón que Marco puso:
+> *usar la app una temporada real de difusión antes*. Lo que salió del grill de
+> ADR-093 es **por qué** llevaba aparcada: es la parte más importante del
+> producto y la razón por la que Hour existe —comunicación con profesionales—, y
+> Marco la dejó deliberadamente para el final **para construirla con todo lo
+> aprendido en el resto**. El portón sigue en pie pero deja de ser indefinido:
+> **el Planner v3 es esa temporada**, y el post-it privado de ADR-093 es el
+> instrumento que la va a especificar. Quien lea esto y planifique más allá del
+> Planner: lo siguiente grande es comms, no una lente nueva.
 
 > **Rediseño del Planner (Scope v3 Agenda), en curso y fuera del repo:** el
 > diseño vive en un proyecto de claude.ai/design (`Hour Views - Scope v3 -
