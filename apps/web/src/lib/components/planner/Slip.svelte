@@ -57,6 +57,14 @@
     showCountry?: boolean;
     /** Monogram click — opens the identity quick panel (ADR-081, «las siete» §7). */
     onMarkOpen?: (e: MouseEvent, project: ProjectLite | null) => void;
+    /**
+     * Opens the thing. A slip with no page of its own (a `date`) still has to
+     * be openable — that is where its edit dialog lives — so it becomes a
+     * BUTTON, which is what the prototype draws for every slip anyway
+     * (`<button class="ag3me">`). Without this a date drawn on the month is
+     * inert, and the only way to change a rehearsal's hour disappears.
+     */
+    onOpen?: () => void;
   }
 
   let {
@@ -66,6 +74,7 @@
     stateUrgent = false,
     showCountry = false,
     onMarkOpen,
+    onOpen,
   }: Props = $props();
 
   let state = $derived(stateLabel(slip));
@@ -142,6 +151,16 @@
     style={slip.project ? `--c: ${accentVarFor(slip.project)}` : undefined}
     href={slip.href}
     title={slip.title}>{@render body()}</a
+  >
+{:else if onOpen}
+  <button
+    type="button"
+    class="slip"
+    data-family={slip.cert}
+    data-kind={slip.kind}
+    style={slip.project ? `--c: ${accentVarFor(slip.project)}` : undefined}
+    title={slip.title}
+    onclick={onOpen}>{@render body()}</button
   >
 {:else}
   <span
@@ -235,7 +254,13 @@
       letter-spacing: 0.06em;
       text-transform: uppercase;
       color: var(--text-muted);
-      white-space: nowrap;
+      /* Without the pill the chip is plain text, so in a narrow cell it has to
+         be allowed to turn a line instead of running off the edge. `1st hold ·
+         expires 25/08` does not fit 143px on one line, and clipping the
+         DEADLINE is clipping the one thing on a held card that is not a maybe.
+         Caught on screen, 2026-07-31: it printed `HOLD · EXPIRES 25/0…`. */
+      white-space: normal;
+      line-height: 1.2;
     }
     .slip__state--due {
       color: var(--info);
@@ -358,7 +383,12 @@
     .slip:hover {
       border-color: var(--text-faint);
     }
-    a.slip:hover .slip__n {
+    button.slip {
+      font-family: inherit;
+      cursor: pointer;
+    }
+    a.slip:hover .slip__n,
+    button.slip:hover .slip__n {
       text-decoration: underline;
       text-decoration-color: var(--border-color-light);
       text-underline-offset: 2px;

@@ -28,7 +28,11 @@
   import type { IdentitySibling } from '$lib/utils/identity';
   import IdentityQuickPanel from '$lib/components/IdentityQuickPanel.svelte';
   import { performanceStatusFamily } from '$lib/performance';
+  import { dualTime } from '$lib/datetime';
   import {
+    performanceSlip,
+    dateSlip,
+    type Slip as SlipVM,
     perfDayKey,
     dateDayKey,
     formatMonthLabel,
@@ -41,7 +45,7 @@
     type ClashVM,
   } from '$lib/month-events';
   import ClashCard from '$lib/components/planner/ClashCard.svelte';
-  import PerfChip from '$lib/components/planner/PerfChip.svelte';
+  import Slip from '$lib/components/planner/Slip.svelte';
   import DateChip from '$lib/components/planner/DateChip.svelte';
 
   interface Props {
@@ -86,6 +90,12 @@
      * always print; the tick is what varies, so the foot never collapses.
      */
     readinessItems?: { key: string; label: string }[];
+    /** «more» — the word after the +N door on a full cell. */
+    moreLabel?: string;
+    /** «let go» — the word a released slip carries. */
+    releasedLabel?: string;
+    /** «expires Mon» — the deadline phrase, given the decide-by ISO day. */
+    expiresLabel?: (isoDay: string) => string;
   }
 
   /** English fallbacks for the card foot; the page overrides these with t(). */
@@ -121,6 +131,9 @@
       { key: 'hotel', label: 'hotel' },
       { key: 'technical', label: 'technical' },
     ],
+    moreLabel = 'more',
+    releasedLabel = 'let go',
+    expiresLabel = (iso: string) => `expires ${iso.slice(8, 10)}/${iso.slice(5, 7)}`,
   }: Props = $props();
 
   // ── Identity quick-edit (ADR-081): a monogram click opens the editor at a
@@ -174,6 +187,19 @@
   const viewerTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const todayIso = dayKeyInTz(new Date().toISOString(), viewerTz);
 
+  /** The state line: released says `let go`, a hold says its rank and its
+      deadline. A FIRM SHOW AND A PROPOSED ONE BOTH SAY NOTHING — the geometry
+      already carries them, and the `?` on the kind word carries the option. */
+  function slipState(sl: SlipVM): string | null {
+    if (sl.cert === 'released') return releasedLabel;
+    if (sl.cert === 'hold' && sl.hold) {
+      const rank = sl.hold.rank ? stateLabel(`hold_${sl.hold.rank}`) : stateLabel('hold');
+      if (!sl.hold.expires) return rank;
+      return `${rank} · ${expiresLabel(sl.hold.expires)}`;
+    }
+    return null;
+  }
+
   // Same cache key the shell/nav keeps warm — resolves each chip's href to
   // its own workspace (a perf can belong to a non-current one).
   const workspacesQuery = createQuery(workspacesQueryOptions());
@@ -191,6 +217,84 @@
   let workspaceModeById = $derived(
     new Map(($workspacesQuery.data?.items ?? []).map((w) => [w.id, w.booking_mode ?? 'simple'])),
   );
+
+  /* ── ONE OBJECT, NOT TWO CHIPS (ADR-095 §0) ────────────────────────────
+     The cell renders `Slip`, and both primitives reach it through the same
+     normaliser. `PerfChip` is gone; `DateChip` survives only for the
+     multi-day SERIES, which is a band and not a slip.
+
+     THE CELL CAPS AT THREE, and the rest becomes `+N more`. Without the cap
+     the row height is set by the fullest day, and that day can hold nine
+     things — so a quiet week could never look short, which is half of what
+     the month is for. */
+  let slipCtx = $derived({
+    workspaceSlug,
+    workspaceSlugById,
+    workspaceTzById,
+    workspaceModeById,
+    viewerTz,
+    kindLabel: (k: string) => dateKindLabel(k),
+    dualTime,
+  });
+  const CELL_CAP = 3;
+
+  /**
+   * The cell's contents in ONE ordered list, because a cap that only counts
+   * gigs is a cap that lets a day with four rehearsals grow anyway.
+   *
+   * Order is the running order of the day: things with an hour first, by the
+   * clock; things without an hour after them. A hold nobody has timed is the
+   * normal case, not an error, so it sorts last rather than to 00:00.
+   *
+   * A multi-day SERIES still renders through `DateChip` — it is a band, not a
+   * slip, and turning it into one element that spans columns is the next step.
+   */
+  function cellSlips(
+    perfs: PerformanceEvent[],
+    groups: DateEvent[][],
+  ): Array<{
+    key: string;
+    slip: SlipVM;
+    dateGroup?: DateEvent[];
+    dateRow?: DateEvent;
+    sortAt: string;
+  }> {
+    const out: Array<{
+      key: string;
+      slip: SlipVM;
+      dateGroup?: DateEvent[];
+      dateRow?: DateEvent;
+      sortAt: string;
+    }> = [];
+    for (const p of perfs) {
+      const slip = performanceSlip(p, slipCtx);
+      out.push({ key: p.id, slip, sortAt: perfInstant(p) ?? '~' });
+    }
+    for (const g of groups) {
+      const slip = dateSlip(g[0], slipCtx);
+      const isSeries = Boolean(g[0].series_id);
+      out.push({
+        key: g[0].id,
+        slip,
+        ...(isSeries ? { dateGroup: g } : { dateRow: g[0] }),
+        sortAt: g[0].all_day ? '~' : g[0].starts_at,
+      });
+    }
+    // `~` sorts after every digit, so the un-timed fall to the bottom without
+    // a second comparator and without pretending to be midnight.
+    //
+    // NOT `localeCompare`, and this is not a style preference: locale collation
+    // reorders punctuation, so `'~'.localeCompare('2')` is -1 and every un-timed
+    // hold jumped to the TOP of its day, above the gig that actually has an
+    // hour. Caught on screen, 2026-07-31. These are ISO strings and a sentinel;
+    // codepoint order is the order we mean.
+    return out.sort((a, b) => (a.sortAt < b.sortAt ? -1 : a.sortAt > b.sortAt ? 1 : 0));
+  }
+
+  /** verb-cal only while the clock is actually running (ADR-080 §2). */
+  function isUrgentHold(sl: SlipVM): boolean {
+    return Boolean(sl.hold?.expires && sl.hold.expires <= todayIso);
+  }
 
   let weeks = $derived(monthGrid(year, month));
   let label = $derived(formatMonthLabel(year, month, locale));
@@ -360,9 +464,33 @@
   });
 </script>
 
+<!-- ONE DISPATCHER, on the grid. The cell carries only `data-cal-new`; the
+     handler fires only when the click landed on the cell ITSELF, so the slips,
+     the +N door and the day marks keep their own clicks. Reading the target
+     rather than giving every cell a role is also what keeps 42 cells out of the
+     tab order — the keyboard path to «a new date» is `N` on the page, which is
+     the same door (ADR-095 §7). -->
 <div
   class="cal__grid"
   class:cal__grid--loading={loading}
+  role="grid"
+  tabindex="-1"
+  onclick={(e) => {
+    const el = e.target as HTMLElement;
+    const iso = el?.dataset?.calNew;
+    if (iso) onDayCreate?.(iso);
+  }}
+  onkeydown={(e) => {
+    // The grid itself is not the keyboard path — `N` on the page is (one
+    // door, three handles). This exists so the click handler is not a
+    // mouse-only affordance, and it fires on the same target rule.
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const el = e.target as HTMLElement;
+    const iso = el?.dataset?.calNew;
+    if (!iso) return;
+    e.preventDefault();
+    onDayCreate?.(iso);
+  }}
   aria-label={label}
   bind:this={gridEl}
 >
@@ -374,15 +502,35 @@
     {#each week as day, di (day.iso)}
       {@const perfs = performancesByDay.get(day.iso) ?? []}
       {@const dateGroups = groupDates(datesByDay.get(day.iso) ?? [])}
+      {@const entries = cellSlips(perfs, dateGroups)}
+      {@const overflow = entries.length - CELL_CAP}
       {@const clashes = clashesByDay?.get(day.iso) ?? []}
       {@const bandSlots = laneSlotsOn(day.iso, wlc)}
+      <!-- A DATE IS A PLACE, SO A NEW DATE IS MADE AT THE PLACE (ADR-095 §7).
+           THE CELL ITSELF is the door — not a button laid over its foot. The
+           old `+` was absolute, reserved 16px of a foot that reserves 10, and
+           covered the bottom half of anything below it: clicks meant for one
+           control fired the other. `opacity: 0` hides a thing; it does not stop
+           it being hit. The hint is a `::after` with no pointer-events, and the
+           handler only fires when the click landed on nothing else.
+           And the door is THIS MONTH'S only: you cannot point at a day that is
+           not on this sheet and mean it. -->
       <div
         class="cal__day"
         class:cal__day--out={!day.inMonth}
         class:cal__day--today={day.iso === todayIso}
+        data-cal-new={day.inMonth && onDayCreate ? day.iso : undefined}
       >
         <span class="cal__day-head">
-          <span class="cal__day-num">{Number(day.iso.slice(8, 10))}</span>
+          <!-- A DAY OUTSIDE THE MONTH DRAWS ITS CONTENT AND NEVER ITS NUMBER
+               (ADR-095). It used to do the opposite — number and grey wash, the
+               noise without the information, which is the worse of the two
+               deals available. The ABSENCE of the number is the whole of the
+               mark, and there is no fade: a weaker CLAIM is not fainter INK,
+               and «not July» is not a weaker claim at all. -->
+          {#if day.inMonth}
+            <span class="cal__day-num">{Number(day.iso.slice(8, 10))}</span>
+          {/if}
           {#if clashes.length > 0}
             <span class="cal__marks">
               {#each clashes as c, i (i)}
@@ -397,14 +545,6 @@
               {/each}
             </span>
           {/if}
-          {#if onDayCreate}
-            <button
-              type="button"
-              class="cal__day-add"
-              aria-label={createLabel(day.iso)}
-              onclick={() => onDayCreate?.(day.iso)}
-            >+</button>
-          {/if}
         </span>
         {#each clashes as c, i (i)}
           {#if openClash === `${day.iso}:${i}`}
@@ -413,30 +553,37 @@
             <ClashCard {c} up={wi >= weeks.length - 2} flip={di >= 5} />
           {/if}
         {/each}
-        {#each perfs as p (p.id)}
-          <PerfChip
-            {p}
-            {workspaceSlug}
-            {workspaceSlugById}
-            {workspaceTzById}
-            {workspaceModeById}
-            {viewerTz}
-            {stateLabel}
-            {readinessItems}
-            onMarkOpen={openMark}
-          />
+        <!-- Three, then a door. The cap is what lets a quiet week look short:
+             the row is as tall as its fullest day, and without it that day can
+             hold nine things. -->
+        {#each entries.slice(0, CELL_CAP) as entry (entry.key)}
+          {#if entry.dateGroup}
+            <DateChip
+              g={entry.dateGroup}
+              edges={seriesEdges(entry.dateGroup[0], day.iso)}
+              {di}
+              {viewerTz}
+              {dateKindLabel}
+              onMarkOpen={openMark}
+              onOpen={onDateOpen}
+            />
+          {:else}
+            <Slip
+              slip={entry.slip}
+              kindLabel={(k) => dateKindLabel(k)}
+              stateLabel={slipState}
+              stateUrgent={isUrgentHold(entry.slip)}
+              showCountry={false}
+              onMarkOpen={openMark}
+              onOpen={entry.dateRow && onDateOpen ? () => onDateOpen?.(entry.dateRow!) : undefined}
+            />
+          {/if}
         {/each}
-        {#each dateGroups as g (g[0].id)}
-          <DateChip
-            {g}
-            edges={seriesEdges(g[0], day.iso)}
-            {di}
-            {viewerTz}
-            {dateKindLabel}
-            onMarkOpen={openMark}
-            onOpen={onDateOpen}
-          />
-        {/each}
+        {#if overflow > 0}
+          <button type="button" class="cal__more" onclick={() => onDayCreate?.(day.iso)}
+            >+{overflow} {moreLabel}</button
+          >
+        {/if}
         {#if wlc > 0}
           <span class="cal__bands">
             {#each bandSlots as entry, lane (lane)}
@@ -521,9 +668,51 @@
       position: relative;
     }
 
-    .cal__day--out {
-      background: var(--bg-light);
+    /* The invitation appears WHERE YOU POINT, and it is the cell's own empty
+       space — no element, so nothing can cover another control. */
+    .cal__day[data-cal-new]::after {
+      content: '+';
+      position: absolute;
+      inset-inline: 5px;
+      inset-block-end: 1px;
+      block-size: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-mono);
+      font-size: 8.5px;
+      color: var(--text-faint);
+      border: 1px dashed color-mix(in oklch, var(--text-color) 14%, transparent);
+      border-radius: 2px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.1s;
     }
+    .cal__day[data-cal-new]:hover::after,
+    .cal__day[data-cal-new]:focus-visible::after {
+      opacity: 1;
+    }
+    .cal__more {
+      align-self: flex-start;
+      margin-block-start: 3px;
+      padding: 0;
+      border: 0;
+      background: none;
+      cursor: pointer;
+      font-family: var(--font-mono);
+      font-size: 9px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+    }
+    .cal__more:hover {
+      color: var(--text-muted);
+    }
+    /* NO WASH ON A DAY THAT IS NOT THIS MONTH. It was legible while the cell
+       held nothing but a grey number; now that it holds slips it would put a
+       venue behind a tint, and the law is already written elsewhere in this
+       project: a weaker CLAIM is not fainter INK. The missing day number is
+       the whole of the mark. */
     .cal__day--out .cal__day-num {
       color: var(--text-faint);
     }
@@ -553,22 +742,6 @@
     }
 
     /* Quiet add affordance — visible on cell hover (and on focus). */
-    .cal__day-add {
-      opacity: 0;
-      font-family: var(--font-mono);
-      font-size: var(--text-s);
-      line-height: 1;
-      color: var(--text-faint);
-      padding: 0 var(--space-2xs);
-      transition: opacity var(--transition), color var(--transition);
-    }
-    .cal__day:hover .cal__day-add,
-    .cal__day-add:focus-visible {
-      opacity: 1;
-    }
-    .cal__day-add:hover {
-      color: var(--text-color);
-    }
 
     /* ── Conflict day-marks (ADR-072 grammar, EXACT):
        people = solid red circle "!" · possible = dashed line-2 circle "?"

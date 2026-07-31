@@ -107,6 +107,7 @@
       country: 'ES',
       time: { primary: '20h', secondary: null },
       project: SLIP_PROJ,
+      hold: null,
       href: null,
       title: 'Teatre Principal — confirmed · 20h',
       ...over,

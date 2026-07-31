@@ -156,10 +156,14 @@ test.describe('date edit path (task 15)', () => {
     await page.reload();
     await expect(page.locator('.cal__grid')).toBeVisible({ timeout: 15_000 });
 
-    // The chip is the openable date card carrying this run's title.
-    const chip = page.locator('.cal__event--date', { hasText: title });
+    // The chip is the openable date card carrying this run's title. Since
+    // ADR-095 §0 the month draws ONE object for both primitives — `Slip` — and
+    // a slip with no page of its own IS the button, so there is no inner hit
+    // target any more. (`.cal__event--date` + `button.cal__event-hit` was the
+    // DateChip markup, which now survives only for multi-day series.)
+    const chip = page.locator('button.slip', { hasText: title });
     await expect(chip).toBeVisible({ timeout: 15_000 });
-    await chip.locator('button.cal__event-hit').click();
+    await chip.click();
 
     const dialog = page.locator('dialog[open]');
     await expect(dialog).toBeVisible();
@@ -182,7 +186,7 @@ test.describe('date edit path (task 15)', () => {
 
     // And the grid shows the edit after a reload, not just the API.
     await page.reload();
-    await expect(page.locator('.cal__event--date', { hasText: edited })).toBeVisible({
+    await expect(page.locator('button.slip', { hasText: edited })).toBeVisible({
       timeout: 15_000,
     });
   });
@@ -232,9 +236,9 @@ test.describe('date edit path (task 15)', () => {
     await expect(page.locator('.cal__grid')).toBeVisible({ timeout: 15_000 });
 
     if (created) {
-      const chip = page.locator('.cal__event--date', { hasText: title });
+      const chip = page.locator('button.slip', { hasText: title });
       await expect(chip).toBeVisible({ timeout: 15_000 });
-      await chip.locator('button.cal__event-hit').click();
+      await chip.click();
 
       const dialog = page.locator('dialog[open]');
       const del = dialog.getByRole('button', { name: 'Delete', exact: true });

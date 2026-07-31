@@ -5,7 +5,7 @@
  * touching the component. Grid math stays in $lib/planner.
  */
 import { dayKeyInTz } from '$lib/planner';
-import { performanceStatusFamily, type StatusFamily } from '$lib/performance';
+import { decideBy, performanceStatusFamily, type StatusFamily } from '$lib/performance';
 import { dateStatusFamily } from '$lib/date';
 
 export type ProjectLite = {
@@ -228,6 +228,17 @@ export type Slip = {
   country: string | null;
   time: SlipTime | null;
   project: ProjectLite | null;
+  /**
+   * Present only while `cert === 'hold'`. The RANK is what is actually being
+   * decided between (folding hold_1..3 into one shape is right for the
+   * geometry and loses the very thing the operator chooses), and `expires` is
+   * THE one thing on a held card that is not a maybe.
+   *
+   * A workspace that does not run a queue gets `rank: null` — there, hold_1
+   * and hold_2 are the same thing (two holds coexisting on a slot), so
+   * printing "1st" would invent a hierarchy the company does not have.
+   */
+  hold: { rank: number | null; expires: string | null } | null;
   /** Where the thing lives, or null when it has no page of its own. */
   href: string | null;
   /** Full sentence for the `title` attribute — the one place a truncated or
@@ -242,6 +253,8 @@ type SlipContext = {
   viewerTz: string;
   /** Injected so this file stays free of i18n — the caller owns the words. */
   kindLabel: (kind: SlipKind) => string;
+  /** ADR-002 — the workspace's hold convention, resolved PER SLIP. */
+  workspaceModeById?: Map<string, string>;
   dualTime: (
     at: string,
     tz: string | null,
@@ -266,10 +279,21 @@ export function performanceSlip(p: PerformanceEvent, ctx: SlipContext): Slip {
   const ws = ctx.workspaceSlugById.get(p.project?.workspace_id ?? '') ?? ctx.workspaceSlug;
   const cc = p.venue?.country ?? p.country ?? null;
   const base = `${name} — ${p.status.replace(/_/g, ' ')}`;
+  const cert = performanceStatusFamily(p.status);
+  // The rank only means something where the convention is a priority queue.
+  const mode = ctx.workspaceModeById?.get(p.project?.workspace_id ?? '') ?? 'simple';
+  const rankMatch = mode === 'prioritized' ? p.status.match(/^hold_([123])$/) : null;
   return {
     id: p.id,
     kind: 'show',
-    cert: performanceStatusFamily(p.status),
+    cert,
+    hold:
+      cert === 'hold'
+        ? {
+            rank: rankMatch ? Number(rankMatch[1]) : null,
+            expires: at ? decideBy(at, p.hold_notice_days) : null,
+          }
+        : null,
     name,
     city: cityUnder(name, p.venue?.city ?? p.city),
     country: cc ? cc.toUpperCase() : null,
@@ -298,6 +322,8 @@ export function dateSlip(d: DateEvent, ctx: SlipContext): Slip {
     id: d.id,
     kind,
     cert: dateStatusFamily(d.status),
+    // A date has no booking queue: `tentative` is the whole of what it says.
+    hold: null,
     name,
     city: cityUnder(name, d.city),
     country: cc ? cc.toUpperCase() : null,
