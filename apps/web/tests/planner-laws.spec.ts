@@ -406,7 +406,7 @@ test.describe('the monogram', () => {
         }),
       );
       for (const m of marks) {
-        expect(m.h, `${view}: the tile grew`).toBeLessThanOrEqual(14);
+        expect(m.h, `${view}: the tile grew`).toBeLessThanOrEqual(12);
         expect(m.radius, `${view}: the corner is too round for this size`).toBeLessThanOrEqual(3);
         expect(m.ring, `${view}: the ring came back`).toBe('none');
       }

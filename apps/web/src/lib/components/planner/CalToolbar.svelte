@@ -229,6 +229,8 @@
       display: flex;
       align-items: baseline;
       gap: var(--space-m);
+      /* …so the dial beside it has a baseline to meet. */
+      align-self: baseline;
     }
     .cal__view {
       border: 0;
@@ -263,12 +265,27 @@
     }
 
     /* ── the dial · metadata, and it looks like it ───────────────────── */
+    /* ONE SENTENCE, ON ONE BASELINE. The dial was centred on the row while
+       the view words sat on their own baseline, so a 9.5px mono phrase
+       floated in the middle of a 21px serif line — two objects on one row
+       instead of `Board by workspace project person` read straight through.
+       And it stood `--space-m` away from the last word, which is the gap
+       BETWEEN the four view words: the dial is not a fifth view, so it must
+       be nearer than they are to each other, not the same distance — and
+       nearer than a word space, because `Board by …` is one phrase and the
+       four words are a list. */
     .cal__dial {
       display: inline-flex;
       align-items: baseline;
       gap: var(--space-xs);
-      margin-inline-start: var(--space-m);
-      align-self: center;
+      /* THE TOOLBAR'S OWN GAP IS CANCELLED FIRST. `.cal__toolbar` puts
+         `--space-s` between every child, so a margin here ADDS to it — the
+         dial ended up 17px from the last word against the 18px that separates
+         the words themselves, which is the one distance it must not have.
+         Subtracting the row's gap makes this declaration the whole answer:
+         the phrase closes at `--space-xs`, a third of the list's spacing. */
+      margin-inline-start: calc(var(--space-xs) - var(--space-s));
+      align-self: baseline;
     }
     .cal__dial-by,
     .cal__dial-v {

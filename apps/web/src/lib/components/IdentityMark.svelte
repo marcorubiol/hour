@@ -36,10 +36,10 @@
     /** Base tile size; overridable per context via the `--mark` var. */
     size?: string;
     /**
-     * THE DENSE TREATMENT — 13px tall, a 3px corner, and NO RING.
+     * THE DENSE TREATMENT — 12px tall, a 3px corner, and NO RING.
      *
      * It is one named treatment and not three props because the three always
-     * travel together, and the ring is the reason: at 13px a 1px inset ring
+     * travel together, and the ring is the reason: at this size a 1px ring
      * takes 15% of the tile and closes on the letters until `MM` reads as a
      * smudge. The tint alone carries the identity at this size — which is the
      * whole job — and the ring comes back the moment the tile is big enough
@@ -114,16 +114,25 @@
 
     /* ── mini · the dense treatment (see the `mini` prop) ─────────────── */
     .mark--mini {
-      --_m: 13px;
+      /* 12, down from the prototype's 13: at 13 the chip was the tallest
+         thing on a head line whose other two tokens are 9px, so the tile —
+         the least specific field there — set the line's height. At 12 it sits
+         flush and the tint still carries.
+         THE FLOOR IS HERE. One step further (11/7.5) and a three-letter
+         monogram like `MdA` stops being scannable, and this tile is the ONE
+         token a whole board can be read by: the moment its letters go it is a
+         coloured dot again, which is the thing IdentityMark was built to
+         replace. */
+      --_m: 12px;
     }
     .mark--mini .mark__chip {
       padding-inline: 3px;
-      /* A flatter corner, not just a smaller one: 3/13 reads squarer than the
-         proportional 3.6, and at this size a rounder tile loses the letters
-         to its own curve. */
+      /* A flatter corner, not just a smaller one: 3 on 12 reads squarer than
+         the proportional 3.4, and at this size a rounder tile loses the
+         letters to its own curve. */
       border-radius: 3px;
       box-shadow: none;
-      font-size: 8.5px;
+      font-size: 8px;
       font-weight: 500;
       letter-spacing: 0.02em;
     }
