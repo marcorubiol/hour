@@ -363,5 +363,8 @@
   "planner.marks_firm": "és real",
   "planner.marks_held": "demanat — encara no és real",
   "planner.marks_clash": "hi ha una trucada a fer",
-  "planner.stat_holds_one": "opció"
+  "planner.stat_holds_one": "opció",
+  "planner.stat_free_one": "nit lliure",
+  "planner.stat_free": "nits lliures",
+  "planner.calm_state": "calma · només confirmats"
 }

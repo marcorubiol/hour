@@ -97,7 +97,8 @@
     type DecisionPerformance,
     type DecisionSide,
     normalizePlannerView,
-  } from '$lib/planner';
+    nightsFree,
+    daysCoveredBy,} from '$lib/planner';
   import { buildPersonScope } from '$lib/people';
   import { createPlannerFeeds } from '$lib/planner-feeds.svelte';
   import {
@@ -1099,7 +1100,36 @@
     for (const b of visibleBlackouts) {
       if (b.starts_on <= monthLast && b.ends_on >= monthFirst) blackoutCount++;
     }
-    return { confirmed, holds, conflicts: conflictCount, blackouts: blackoutCount };
+
+    /* NIGHTS FREE — inventory unsold, and the only figure here that is about
+       the business rather than the calendar.
+       Two things it must get right, and both are easy to miss:
+       · Availability IGNORES the narrowing. Nobody is free because you hid the
+         project that is occupying them — so this walks `activePerfRows` and
+         `activeDateRows`, the rows as they arrive, not `scopedPerfs`.
+       · A NIGHT ON TOUR IS NOT A FREE NIGHT: between an outbound leg and its
+         return there is nothing of its own on the calendar and still nothing
+         to sell, because the company is 1.200km from home.
+       HONEST LIMIT, written where the cost goes: with project pins set, the
+       server already filtered the unpinned rows out before they reached the
+       browser (`/api/performances` narrows by project_ids ∪ workspace_ids), so
+       what arrives is the widest set this page CAN see, not the widest that
+       exists. The counter can therefore still read high under a project pin.
+       The fix is an unfiltered availability feed — the precedent is right here
+       in this file, where blackouts are already fetched without a workspace
+       filter for exactly this reason. */
+    const occupied = new Set<string>();
+    for (const p of activePerfRows) {
+      if (p.status === 'cancelled') continue;
+      occupied.add(perfDayKey(p));
+    }
+    for (const d of activeDateRows) {
+      if (d.status === 'cancelled') continue;
+      occupied.add(dateDayKey(d, viewerTz));
+    }
+    const free = nightsFree(monthDays, occupied, daysCoveredBy(aways));
+
+    return { confirmed, holds, conflicts: conflictCount, blackouts: blackoutCount, free };
   });
 
   // ── Decisions queue (ADR-080 §1/§4) — derived, nothing stored. ───────
@@ -1383,6 +1413,76 @@
       .querySelector(`[data-day="${todayIso}"]`)
       ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
+  /** `T` — one verb, and each projection knows what "today" means for it. */
+  function goToday() {
+    if (view === 'agenda') scrollToToday();
+    else thisMonth();
+  }
+
+  /* ── THE KEYBOARD (ADR-095) ───────────────────────────────────────────
+     Views by number, in the SAME ORDER AS THE WORDS ON SCREEN — that is the
+     rule, not the specific digits, so when the Day view lands and becomes the
+     first word it becomes `1` and the rest shift with it.
+
+     `T` today · `← →` move the window · `N` a new date on the day you are
+     looking at. `N` IS THE ONLY KEY THAT WRITES, and it goes through the same
+     door as the three buttons — one call, and they cannot drift apart.
+
+     ONE LISTENER, and the reason is written in the prototype's own scars:
+     there were two global keydowns at once (one moving the selection by hand,
+     the other clicking the DOM arrow), so a single `→` advanced TWO days.
+     `preventDefault()` does not stop a sibling listener — deleting it does.
+     The shell already owns `c` (calm) and the palette owns ⌘K; this handler
+     claims only the keys above and never fires while you are typing. */
+  $effect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const el = document.activeElement;
+      if (
+        el &&
+        (el.tagName === 'INPUT' ||
+          el.tagName === 'TEXTAREA' ||
+          el.tagName === 'SELECT' ||
+          (el as HTMLElement).isContentEditable)
+      ) {
+        return;
+      }
+      // A dialog is open: it owns the keyboard until it closes.
+      if (createOpen || editOpen || marksOpen) return;
+
+      const views: PlannerView[] = ['month', 'agenda', 'board'];
+      const n = Number(e.key);
+      if (n >= 1 && n <= views.length) {
+        e.preventDefault();
+        setView(views[n - 1]);
+        return;
+      }
+      switch (e.key) {
+        case 't':
+        case 'T':
+          e.preventDefault();
+          goToday();
+          return;
+        case 'ArrowLeft':
+          if (view === 'agenda') return; // a continuous book has no window to step
+          e.preventDefault();
+          prevMonth();
+          return;
+        case 'ArrowRight':
+          if (view === 'agenda') return;
+          e.preventDefault();
+          nextMonth();
+          return;
+        case 'n':
+        case 'N':
+          e.preventDefault();
+          openCreate();
+          return;
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
 
   // ── Creation — the unified dialog (ADR-078 §1) behind every "+". ─────
   const queryClient = useQueryClient();
@@ -1477,6 +1577,15 @@
            segment whose feed is absent (or count is zero) drops instead of
            lying. The shared .lenshead__sub inserts the · between items. -->
       {#if !errorMsg}
+        <!-- CALM IS A WORD, ON THE FACTS SIDE (ADR-095 §3). It lives in the
+             Desk — global and non-destructive — and the Planner does not draw
+             its switch: it draws what it DOES. An active filter you cannot see
+             is a filter that lies, and this one hides two thirds of the month.
+             The counters beside it do not move: they count the WINDOW, not the
+             drawing, so the word is what explains why only one is on paper. -->
+        {#if calm.on}
+          <span class="cal__stat cal__stat--soft">{t('planner.calm_state', locale)}</span>
+        {/if}
         {#if !calm.on && !decisionsAbsent && decisionVMs.length > 0}
           <button type="button" class="cal__pulse-decide" onclick={jumpToDecisions}>
             {t('planner.pulse_decide', locale, { n: decisionVMs.length })}{#if urgentCount > 0}{' · '}{urgentCount ===
@@ -1493,6 +1602,15 @@
             })}</span
           >
         {/if}
+        <!-- COUNTERS FOLLOW THE GEOMETRY, NOT THE WORD (ADR-095).
+             A BOUNDED drawing that announces a range has to count it; a drawing
+             whose horizon grows as you scroll can NAME its horizon but must not
+             count it. The agenda is a continuous book — it has no last day — so
+             printing `N confirmed` there was neither the agenda's truth nor the
+             month's: the numbers were July's window computed over a feed that
+             starts today, so a July with nine occupied days announced `0
+             confirmed · 31 nights free`. Caught on screen, 2026-07-31. -->
+        {#if view !== 'agenda'}
         <span class="cal__stat"><b>{stats.confirmed}</b> {t('planner.stat_confirmed', locale)}</span>
         <!-- `1 holds` was printing on every single-hold month. The design's own
              word for this counter is `option`, and it agrees in number. -->
@@ -1500,6 +1618,13 @@
           ><b>{stats.holds}</b>
           {t(stats.holds === 1 ? 'planner.stat_holds_one' : 'planner.stat_holds', locale)}</span
         >
+        <!-- The number about the business, not the calendar. It counts the
+             WINDOW and never the drawing, so calm does not move it. -->
+        <span class="cal__stat"
+          ><b>{stats.free}</b>
+          {t(stats.free === 1 ? 'planner.stat_free_one' : 'planner.stat_free', locale)}</span
+        >
+        {/if}
         {#if pulseAwayPersons > 0}
           <span class="cal__stat cal__stat--soft"
             >{pulseAwayPersons === 1

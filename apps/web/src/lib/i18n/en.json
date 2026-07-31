@@ -372,5 +372,8 @@
   "planner.marks_firm": "it is real",
   "planner.marks_held": "asked for — not real yet",
   "planner.marks_clash": "there is a call to make",
-  "planner.stat_holds_one": "option"
+  "planner.stat_holds_one": "option",
+  "planner.stat_free_one": "night free",
+  "planner.stat_free": "nights free",
+  "planner.calm_state": "calm · confirmed only"
 }
