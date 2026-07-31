@@ -49,11 +49,16 @@ const FIXTURE_PROJECT_ID = '019f21d2-7482-77e6-9ad9-27d881cff305';
  * TODAY — the only day BOTH projections show without navigation, which is
  * what a test opening the same dialog from two of them needs.
  *
- * The planner takes no day/month URL param, so the day has to be one the
- * two views land on by themselves, and their windows are not the same
- * shape: the month draws the whole current month (so any day of it works),
- * while the agenda is a diary that OPENS ON TODAY and runs forward —
- * `agendaFromIso = todayIso`, with earlier days behind a "load earlier".
+ * The day has to be one the two views land on by themselves, and their
+ * windows are not the same shape: the month draws the whole current month (so
+ * any day of it works), while the agenda is a diary that OPENS ON TODAY and
+ * runs forward — `agendaFromIso = todayIso`, with earlier days behind a
+ * "load earlier".
+ *
+ * (Since ADR-095 §9 the planner DOES take `?ym=YYYY-MM`, so the month half of
+ * this could now be navigated instead of waited for. The agenda half still
+ * cannot — a continuous book has no month to name — so `today` remains the
+ * only intersection and this spec keeps its rule.)
  * The intersection is today onwards, and only today is guaranteed to be
  * inside the current month too (today+2 falls into next month at a month
  * end, which the month view would then need a click to reach).
