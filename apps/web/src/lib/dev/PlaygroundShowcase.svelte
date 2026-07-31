@@ -103,9 +103,10 @@
       kind: 'show',
       cert: 'confirmed',
       name: 'Teatre Principal',
+      lead: null,
       city: 'Terrassa',
       country: 'ES',
-      time: { primary: '20h', secondary: null },
+      time: { primary: '20h', end: null, secondary: null },
       project: SLIP_PROJ,
       hold: null,
       href: null,
@@ -169,7 +170,7 @@
               name: 'Teatre Nacional de Catalunya',
               city: 'London',
               country: 'GB',
-              time: { primary: '19h–20h30', secondary: '20h–21h30 here' },
+              time: { primary: '19h', end: '20h30', secondary: '20h–21h30 here' },
             })}
             kindLabel={SLIP_KIND}
             stateLabel={SLIP_STATE}
@@ -187,7 +188,7 @@
             slip={mkSlip({
               kind: k,
               name: k === 'show' ? 'Teatre Principal' : 'Sala d’assaig',
-              time: k === 'travel_day' ? null : { primary: '10h', secondary: null },
+              time: k === 'travel_day' ? null : { primary: '10h', end: null, secondary: null },
             })}
             kindLabel={SLIP_KIND}
             stateLabel={SLIP_STATE}

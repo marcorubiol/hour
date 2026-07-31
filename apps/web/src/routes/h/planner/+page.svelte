@@ -119,7 +119,7 @@
   } from '$lib/carrils';
   import type { AvailabilityItem } from '$lib/availability';
   import type { DateRow } from '$lib/date';
-  import { localeDayMonth, timeInTz, dualTime } from '$lib/datetime';
+  import { localeDayMonth, localeWeekdayShort, timeInTz, hourMark, dualTime } from '$lib/datetime';
   import {
     isHoldStatus,
     performanceStatusFamily,
@@ -674,6 +674,9 @@
         label: company
           ? (workspaceNameById.get(b.workspace_id) ?? '—')
           : t('planner.band_person', locale, { person: personName ?? '—' }),
+        subject: company
+          ? (workspaceNameById.get(b.workspace_id) ?? '—')
+          : (personName ?? '—'),
         note: b.note,
       };
     }),
@@ -759,7 +762,6 @@
       const people = c.person_ids.map((id) => personNames.get(id) ?? '?').join(', ');
       return {
         severity: c.severity,
-        glyph: '!',
         title: t('planner.clash_people_title', locale),
         body: t('planner.clash_people_body', locale, { people }),
         rows,
@@ -769,7 +771,6 @@
     if (c.severity === 'possible') {
       return {
         severity: c.severity,
-        glyph: '?',
         title: t('planner.clash_possible_title', locale),
         body: t('planner.clash_possible_body', locale),
         rows,
@@ -783,7 +784,6 @@
     const workspace = block ? (workspaceNameById.get(block.workspace_id) ?? '—') : '—';
     return {
       severity: c.severity,
-      glyph: tentative ? '?' : '!',
       title: t(tentative ? 'planner.clash_blackout_t_title' : 'planner.clash_blackout_title', locale),
       body: company
         ? t(
@@ -965,7 +965,7 @@
           | 'confirmed'
           | 'hold',
         label: venue,
-        time: p.start_at ? timeInTz(p.start_at, p.venue?.timezone || viewerTz) : null,
+        time: p.start_at ? hourMark(timeInTz(p.start_at, p.venue?.timezone || viewerTz)) : null,
         accent: accentVarFor(p.project),
         title: `${p.project.name} · ${venue}${city ? `, ${city}` : ''} · ${performanceStatusLabel(p.status)}`,
         href: p.slug
@@ -1294,7 +1294,7 @@
         project: p.project.name,
         venue: p.venue?.name ?? p.venue_name,
         city: p.venue?.city ?? p.city,
-        time: p.start_at ? timeInTz(p.start_at, p.venue?.timezone || viewerTz) : null,
+        time: p.start_at ? hourMark(timeInTz(p.start_at, p.venue?.timezone || viewerTz)) : null,
       });
     }
     return rows;
@@ -1550,16 +1550,33 @@
   }
   /** `T` — one verb, and each projection knows what "today" means for it. */
   /** The window steps by whatever the drawing's window IS. */
+  /**
+   * THE ARROWS BELONG TO ANY WINDOW YOU CAN STEP — all four drawings.
+   *
+   * The agenda carried `today` and nothing else, on the argument that a
+   * control which can never fire is not drawn. That was true only while the
+   * agenda ran forwards: it loads BACKWARDS too (`extendAgendaStart`), so its
+   * start is a thing you can move, and the arrows move it exactly as they
+   * move the month. The title says where the window BEGINS, and these two
+   * move that beginning — which is the whole reason they belong beside it.
+   */
   function stepBack() {
     if (view === 'day') {
       dayIso = addDaysIso(selectedDay, -1);
       syncUrl();
-    } else prevMonth();
+    } else if (view === 'agenda') extendAgendaStart();
+    else prevMonth();
   }
   function stepNext() {
     if (view === 'day') {
       dayIso = addDaysIso(selectedDay, 1);
       syncUrl();
+    } else if (view === 'agenda') {
+      // Forward is where the diary already goes; the arrow is the same act as
+      // reaching the foot of it, without the scrolling.
+      const y = Number(agendaFromIso.slice(0, 4));
+      const m = Number(agendaFromIso.slice(5, 7));
+      agendaFromIso = firstOfMonth(addMonths(y, m, 1));
     } else nextMonth();
   }
   function goToday() {
@@ -1733,14 +1750,12 @@
       <!-- THE ARROWS AND `today` GO WITH THE TITLE: they are the controls OF
            the date, and a date you can walk through is ONE object. Down in the
            row of views they read as a fourth way to change the drawing. -->
-      {#if view !== 'agenda'}
-        <Button variant="outline" size="s" onclick={stepBack} label={t('planner.prev_month', locale)}
-          >‹</Button
-        >
-        <Button variant="outline" size="s" onclick={stepNext} label={t('planner.next_month', locale)}
-          >›</Button
-        >
-      {/if}
+      <Button variant="outline" size="s" onclick={stepBack} label={t('planner.prev_month', locale)}
+        >‹</Button
+      >
+      <Button variant="outline" size="s" onclick={stepNext} label={t('planner.next_month', locale)}
+        >›</Button
+      >
       <Button variant="outline" size="s" onclick={goToday}>{t('planner.today', locale)}</Button>
     {/snippet}
 
@@ -1941,7 +1956,10 @@
       nothingWord={t('planner.week_nothing', locale)}
       moreLabel={t('planner.more_n', locale)}
       releasedLabel={t('planner.released', locale)}
-      expiresLabel={(iso) => t('planner.expires_on', locale, { day: localeDayMonth(iso, localeTag) })}
+      expiresLabel={(iso) => localeWeekdayShort(iso, localeTag)}
+      awayWord={t('planner.band_away', locale)}
+      tourWord={t('planner.band_tour', locale)}
+      untilLabel={(day) => t('planner.band_until', locale, { day })}
       readinessItems={READINESS_KEYS.map((k) => ({
         key: k,
         label: t(readinessLabelKey(k), locale),

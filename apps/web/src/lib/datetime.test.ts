@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { dualTime, instantToWallClock, timeInTz, wallClockToInstant } from './datetime';
+import { dualTime, hourMark, instantToWallClock, timeInTz, wallClockToInstant } from './datetime';
 
 describe('timeInTz', () => {
   it('renders wall time in the requested zone', () => {
@@ -123,5 +123,29 @@ describe('wallClockToInstant / instantToWallClock', () => {
     expect(wallClockToInstant('2026-07-17T20:30:45', 'Europe/Madrid')).toBe(
       '2026-07-17T18:30:45.000Z',
     );
+  });
+});
+
+describe('hourMark — the Planner’s clock', () => {
+  it('drops the zeroes on a round hour and rides the unit on the number', () => {
+    expect(hourMark('16:00')).toBe('16h');
+    expect(hourMark('20:30')).toBe('20h30');
+    expect(hourMark('09:05')).toBe('09h05');
+  });
+
+  it('touches nothing that is not a clock', () => {
+    // It is exported, so «the caller only ever passes a time» is a promise
+    // this function cannot keep. Running twice must not produce `16hh`, and
+    // a word must come back a word — `all day` used to come back `all dayh`.
+    expect(hourMark(hourMark('20:30'))).toBe('20h30');
+    expect(hourMark('all day')).toBe('all day');
+    expect(hourMark('Europe/Madrid')).toBe('Europe/Madrid');
+    expect(hourMark('16:00–20:00')).toBe('16:00–20:00');
+  });
+
+  it('keeps nothing as nothing — an absent hour is a real, frequent state', () => {
+    expect(hourMark(null)).toBe('');
+    expect(hourMark(undefined)).toBe('');
+    expect(hourMark('  ')).toBe('');
   });
 });

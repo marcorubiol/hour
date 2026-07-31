@@ -29,7 +29,7 @@
 >
   <p class="cal__clashcard-head">
     <span class="cal__mark cal__mark--static" data-severity={c.severity}
-      >{c.glyph}</span
+      >!</span
     >
     {c.title}
   </p>

@@ -5,6 +5,7 @@
  * touching the component. Grid math stays in $lib/planner.
  */
 import { dayKeyInTz } from '$lib/planner';
+import { hourMark } from '$lib/datetime';
 import { decideBy, performanceStatusFamily, type StatusFamily } from '$lib/performance';
 import { dateStatusFamily } from '$lib/date';
 
@@ -90,7 +91,15 @@ export type BlackoutBandVM = {
   to: string;
   company: boolean;
   tentative: boolean;
+  /** The whole sentence, for surfaces with room for exactly one string. */
   label: string;
+  /**
+   * The bare name — the person, or the company. A band draws WORD · SUBJECT ·
+   * SPAN as three fields in three voices (mono kind word, the name in text,
+   * the dates in the margin voice), and three voices cannot be recovered from
+   * one composed sentence.
+   */
+  subject?: string;
   note?: string | null;
 };
 
@@ -127,7 +136,6 @@ export type ClashVM = {
    * and never which.
    */
   event_ids: string[];
-  glyph: '!' | '?';
   title: string;
   body: string;
   rows: Array<{ label: string; status: string; accent: string | null }>;
@@ -202,8 +210,19 @@ export type SlipKind =
   | 'other';
 
 export type SlipTime = {
-  /** The venue's wall clock — the hour that is printed. */
+  /** The venue's wall clock — the hour that is printed. `20h30`, never
+      `20:30`: the Planner's clock (see `hourMark`). */
   primary: string;
+  /**
+   * The end of the range, when there is one, and it is a SEPARATE FIELD on
+   * purpose — not `«16h–20h»` in one string.
+   *
+   * If a cell runs short something has to go, and the rule is that it is the
+   * end hour: a start hour alone is a whole assertion, half a range is not.
+   * That decision belongs to the CELL (a container query), and a cell cannot
+   * drop the second half of a string.
+   */
+  end: string | null;
   /** The reader's clock, only when the two disagree. A GLOSS: it takes its
       own line and can never push an hour out of its box. */
   secondary: string | null;
@@ -222,6 +241,17 @@ export type Slip = {
   cert: StatusFamily;
   /** Venue, or the best name this thing has. Never the same string as `city`. */
   name: string;
+  /**
+   * A mono, uppercase word that governs the NAME — today only `to` / `from`
+   * on a travel day, where the place alone is ambiguous («London» is a
+   * departure or an arrival depending on a column nobody can see).
+   *
+   * The design prints BOTH legs («to Brussels / from Barcelona») because its
+   * fixture knows where home is. We do not: the origin of a leg is not in the
+   * data and that is exactly ADR-089's subject. So one leg, correctly
+   * labelled, instead of a home city invented to fill a line.
+   */
+  lead: string | null;
   city: string | null;
   /** ISO-2. The month drops it (the cell gives 57px and city+code needs
       58–70); the board and the day print it. The DRAWING decides, not this. */
@@ -269,13 +299,23 @@ function cityUnder(name: string, city: string | null | undefined): string | null
   return c && c !== name ? c : null;
 }
 
+/** `HH:MM` off the wire → the Planner's clock, keeping null null. */
+function clock(t: string | null): string | null {
+  return t ? hourMark(t) : null;
+}
+
 export function performanceSlip(p: PerformanceEvent, ctx: SlipContext): Slip {
   const name = p.venue?.name ?? p.venue_name ?? p.city ?? p.project?.name ?? 'Performance';
   const at = perfInstant(p);
   // A venue-less gig falls back to its home space's zone — the one its times
   // were entered in — never silently the browser's.
   const tz = p.venue?.timezone ?? ctx.workspaceTzById.get(p.project?.workspace_id ?? '') ?? null;
-  const time = at ? ctx.dualTime(at, tz, ctx.viewerTz) : null;
+  const dual = at ? ctx.dualTime(at, tz, ctx.viewerTz) : null;
+  // A gig is ONE instant on the sheet — the working time. Its running order
+  // (load-in, soundcheck, wrap) is the Day's business, through runSheetSteps.
+  const time: SlipTime | null = dual
+    ? { primary: hourMark(dual.primary), end: null, secondary: clock(dual.secondary) }
+    : null;
   const ws = ctx.workspaceSlugById.get(p.project?.workspace_id ?? '') ?? ctx.workspaceSlug;
   const cc = p.venue?.country ?? p.country ?? null;
   const base = `${name} — ${p.status.replace(/_/g, ' ')}`;
@@ -295,6 +335,7 @@ export function performanceSlip(p: PerformanceEvent, ctx: SlipContext): Slip {
           }
         : null,
     name,
+    lead: null,
     city: cityUnder(name, p.venue?.city ?? p.city),
     country: cc ? cc.toUpperCase() : null,
     time,
@@ -315,9 +356,34 @@ export function dateSlip(d: DateEvent, ctx: SlipContext): Slip {
   // the reader's day (dateDayKey), and a slip must not print a wall time from
   // a zone other than the one that placed it in its cell.
   const tz = d.venue?.timezone ?? null;
-  const time = d.all_day ? null : ctx.dualTime(d.starts_at, tz, ctx.viewerTz);
+  const dual = d.all_day ? null : ctx.dualTime(d.starts_at, tz, ctx.viewerTz);
+  // The END of a session is real information a date carries and a gig does
+  // not — a rehearsal is `10h–14h`, and the second half is what tells you the
+  // afternoon is free. It is its own field so the cell can drop it.
+  const endDual = !d.all_day && d.ends_at ? ctx.dualTime(d.ends_at, tz, ctx.viewerTz) : null;
+  const time: SlipTime | null = dual
+    ? {
+        primary: hourMark(dual.primary),
+        end: clock(endDual && endDual.primary !== dual.primary ? endDual.primary : null),
+        secondary: clock(dual.secondary),
+      }
+    : null;
   const cc = d.country ?? null;
   const base = `${ctx.kindLabel(kind)} — ${d.status.replace(/_/g, ' ')}`;
+  /**
+   * `to`, and it is `to` for all three directions — see `Slip.lead`.
+   *
+   * A travel day stores ONE place and it is the DESTINATION, whichever way
+   * you are going: `tourPlaceFor()` reads the outbound leg's city as where
+   * the tour is, and the return leg's city is home. So the word that is true
+   * of the stored field is `to` — and it is not redundant for being constant:
+   * `Barcelona` on a travel day could be read as «this happens in Barcelona»,
+   * which is exactly what a travel day is not.
+   *
+   * `from` waits for ADR-089, which is where the origin of a leg gets a
+   * column. Printing a second place today would mean inventing it.
+   */
+  const lead = kind === 'travel_day' && d.travel_direction ? 'to' : null;
   return {
     id: d.id,
     kind,
@@ -325,6 +391,7 @@ export function dateSlip(d: DateEvent, ctx: SlipContext): Slip {
     // A date has no booking queue: `tentative` is the whole of what it says.
     hold: null,
     name,
+    lead,
     city: cityUnder(name, d.city),
     country: cc ? cc.toUpperCase() : null,
     time,

@@ -15,15 +15,15 @@
    * keeps them collision-free anyway).
    *
    * Split (2026-07-24): the event types + pure day/label helpers live in
-   * $lib/month-events; the chips (PerfChip/DateChip) and the clash popover
-   * (ClashCard) are components under
-   * planner/. The chips are styleless on purpose — the hand-tuned
-   * `.cal__event*` grammar stays HERE, one :global rule-set for every
-   * card, so the shared design layer cannot fork per chip kind.
+   * $lib/month-events; everything that happens draws as `Slip`, and the
+   * clash popover is `ClashCard`. There is no second card grammar left in
+   * this file to fork from the first.
    */
   import { createQuery } from '@tanstack/svelte-query';
   import { addDaysIso, dayKeyInTz, isoWeek, monthGrid, assignBandLanes } from '$lib/planner';
-  import { weekdayLabels } from '$lib/datetime';
+  import { weekdayLabels, localeMonthShort } from '$lib/datetime';
+  import IdentityMark from '$lib/components/IdentityMark.svelte';
+  import { accentVarFor } from '$lib/utils/accent';
   import { workspacesQueryOptions } from '$lib/nav-queries';
   import type { IdentitySibling } from '$lib/utils/identity';
   import IdentityQuickPanel from '$lib/components/IdentityQuickPanel.svelte';
@@ -46,7 +46,6 @@
   } from '$lib/month-events';
   import ClashCard from '$lib/components/planner/ClashCard.svelte';
   import Slip from '$lib/components/planner/Slip.svelte';
-  import DateChip from '$lib/components/planner/DateChip.svelte';
 
   interface Props {
     year: number;
@@ -103,6 +102,13 @@
     releasedLabel?: string;
     /** «expires Mon» — the deadline phrase, given the decide-by ISO day. */
     expiresLabel?: (isoDay: string) => string;
+    /** The kind word a band carries: an absence says «away», a tour says
+        «on tour». They are two different claims and never the same word —
+        an absence is a fact somebody wrote down, a tour is inferred. */
+    awayWord?: string;
+    tourWord?: string;
+    /** «until 20 jul» — a band that opened before this week. */
+    untilLabel?: (day: string) => string;
   }
 
   /** English fallbacks for the card foot; the page overrides these with t(). */
@@ -146,6 +152,9 @@
     nothingWord = 'nothing yet',
     releasedLabel = 'let go',
     expiresLabel = (iso: string) => `expires ${iso.slice(8, 10)}/${iso.slice(5, 7)}`,
+    awayWord = 'away',
+    tourWord = 'on tour',
+    untilLabel = (day: string) => `until ${day}`,
   }: Props = $props();
 
   // ── Identity quick-edit (ADR-081): a monogram click opens the editor at a
@@ -207,6 +216,12 @@
     if (sl.cert === 'hold' && sl.hold) {
       const rank = sl.hold.rank ? stateLabel(`hold_${sl.hold.rank}`) : stateLabel('hold');
       if (!sl.hold.expires) return rank;
+      // THE MONTH SAYS THE WEEKDAY, NOT THE DATE. `hold · expires 25 jun` is
+      // 21 characters in a 76px box: it wrapped to two lines and then printed
+      // `HOLD · EXPIRES 25/0…`, clipping the one thing on a held card that is
+      // not a maybe. `hold · Thu` is nine, fits on one line, and is the more
+      // useful reading anyway — a deadline inside the next week is a weekday,
+      // and the full date is on the card and in the title.
       return `${rank} · ${expiresLabel(sl.hold.expires)}`;
     }
     return null;
@@ -232,8 +247,8 @@
 
   /* ── ONE OBJECT, NOT TWO CHIPS (ADR-095 §0) ────────────────────────────
      The cell renders `Slip`, and both primitives reach it through the same
-     normaliser. `PerfChip` is gone; `DateChip` survives only for the
-     multi-day SERIES, which is a band and not a slip.
+     normaliser. `PerfChip` and `DateChip` are both gone — the run of days
+     that was `DateChip`'s last excuse is a band now, not a stack of chips.
 
      THE CELL CAPS AT THREE, and the rest becomes `+N more`. Without the cap
      the row height is set by the fullest day, and that day can hold nine
@@ -283,12 +298,13 @@
       out.push({ key: p.id, slip, sortAt: perfInstant(p) ?? '~' });
     }
     for (const g of groups) {
-      const slip = dateSlip(g[0], slipCtx);
-      const isSeries = Boolean(g[0].series_id);
+      // A multi-day run left the cell: it is the week's band now, drawn once
+      // over the days it covers with each day's own hours under it.
+      if (isSeriesBand(g)) continue;
       out.push({
         key: g[0].id,
-        slip,
-        ...(isSeries ? { dateGroup: g } : { dateRow: g[0] }),
+        slip: dateSlip(g[0], slipCtx),
+        dateRow: g[0],
         sortAt: g[0].all_day ? '~' : g[0].starts_at,
       });
     }
@@ -392,12 +408,85 @@
     return out;
   }
 
-  /** Null when the row stands alone — a "series" of one is just a date. */
-  function seriesEdges(d: DateEvent, iso: string): { first: boolean; last: boolean } | null {
-    if (!d.series_id) return null;
-    const days = seriesDays.get(d.series_id);
-    if (!days || days.size < 2) return null;
-    return { first: !days.has(addDaysIso(iso, -1)), last: !days.has(addDaysIso(iso, 1)) };
+  /** True while these rows are a real multi-day run — the test the cell uses
+      to hand the group to the band instead of drawing it as a slip. */
+  function isSeriesBand(g: DateEvent[]): boolean {
+    const sid = g[0]?.series_id;
+    return Boolean(sid && (seriesDays.get(sid)?.size ?? 0) >= 2);
+  }
+
+  /* ── A RUN OF DAYS IS ONE BAND, NOT N LOOSE CARDS ──────────────────────
+     A block of rehearsals is not one thing lasting five days: it is five
+     entries that share a name, each with its own real hours (the 8th is
+     10–18, the 10th is 10–13). Repeating the same empty card five times is
+     noise; repeating it with DIFFERENT INFORMATION is telling the truth.
+
+     So the run draws once — name, project and place said one time — with a
+     seven-column strip under it carrying each day's own sessions. That strip
+     is the entire argument for per-day rows, and until now the month threw it
+     away: the group rendered as a chip in the first day's cell and the other
+     days got an orphan time box with no name attached to it (seen on screen,
+     2026-07-31 — a bare `12:00–16:00` floating in Sunday).
+
+     A session is a LINE. Two sessions in one day are two lines, never one
+     line with a separator: at a 72px column `10h–14h · 16h–18h` needs 93px
+     and the cell hides its overflow, so it printed `10h–14h · 16h—` and lost
+     an hour. A clipped hour is the one thing this drawing will not do. */
+  type SeriesCell = { iso: string; row: DateEvent | null; hours: SlipVM['time'][] };
+  type WeekSeries = {
+    key: string;
+    colStart: number;
+    colEnd: number;
+    project: ProjectLite | null;
+    kindWord: string;
+    label: string;
+    city: string | null;
+    cert: SlipVM['cert'];
+    title: string;
+    cells: SeriesCell[];
+  };
+  function weekSeries(week: { iso: string }[]): WeekSeries[] {
+    const grouped = new Map<string, { rows: DateEvent[]; cols: number[] }>();
+    week.forEach((day, ci) => {
+      for (const d of datesByDay.get(day.iso) ?? []) {
+        if (!isSeriesBand([d])) continue;
+        const g = grouped.get(d.series_id!) ?? { rows: [], cols: [] };
+        g.rows.push(d);
+        if (!g.cols.includes(ci)) g.cols.push(ci);
+        grouped.set(d.series_id!, g);
+      }
+    });
+    const out: WeekSeries[] = [];
+    for (const [sid, g] of grouped) {
+      const a = Math.min(...g.cols);
+      const b = Math.max(...g.cols);
+      const head = dateSlip(g.rows[0], slipCtx);
+      const cells: SeriesCell[] = [];
+      for (let c = a; c <= b; c++) {
+        const iso = week[c].iso;
+        const rows = g.rows
+          .filter((r) => dateDayKey(r, viewerTz) === iso)
+          .sort((x, y) => (x.starts_at < y.starts_at ? -1 : 1));
+        cells.push({
+          iso,
+          row: rows[0] ?? null,
+          hours: rows.map((r) => dateSlip(r, slipCtx).time),
+        });
+      }
+      out.push({
+        key: `${sid}:${week[0].iso}`,
+        colStart: a + 1,
+        colEnd: b + 2,
+        project: g.rows[0].project,
+        kindWord: dateKindLabel(g.rows[0].kind),
+        label: head.name,
+        city: head.city,
+        cert: head.cert,
+        title: head.title,
+        cells,
+      });
+    }
+    return out.sort((x, y) => x.colStart - y.colStart);
   }
 
   /* THE LEGEND IS NOT A FILTER ANY MORE (ADR-095 §3). Its project entries were
@@ -446,6 +535,22 @@
     kind: 'blackout' | 'away';
     colStart: number;
     colEnd: number;
+    /**
+     * THREE FIELDS IN THREE VOICES, never one composed sentence. `word` is
+     * what kind of band this is (mono, the margin voice), `subject` is who or
+     * where (text, full ink — it is the thing you are reading), `span` is when
+     * (mono again, quietest).
+     *
+     * It was `away · MaMeMi` in one 9px mono string, which drew the SUBJECT —
+     * the only part you actually look for — at the size and weight of its own
+     * label. The design's band has had the three-part shape from the start.
+     */
+    word: string;
+    subject: string;
+    span: string | null;
+    /** Tours travel with their project: at one column wide the coloured
+        monogram is the only thing that survives. */
+    project: ProjectLite | null;
     label: string;
     note?: string | null;
     tentative: boolean;
@@ -454,6 +559,12 @@
     cutRight: boolean;
     lane: number;
   };
+  /** «15 jul → 20 jul», or «until 20 jul» when the band opened before this
+      week: an arrowhead cannot claim a start the sheet is not showing. */
+  function bandSpan(from: string, to: string, cutLeft: boolean): string {
+    const d = (iso: string) => `${Number(iso.slice(8, 10))} ${localeMonthShort(iso, locale)}`;
+    return cutLeft ? untilLabel(d(to)) : `${d(from)} → ${d(to)}`;
+  }
   function weekBands(week: { iso: string }[]): WeekBand[] {
     const first = week[0].iso;
     const last = week[6].iso;
@@ -467,15 +578,37 @@
       const colEnd = week.findIndex((d) => d.iso === to) + 2;
       if (colStart < 1 || colEnd < 2) return;
       const isBlackout = slot.kind === 'blackout';
+      const cutLeft = slot.from < first;
+      const bo = slot.band as BlackoutBandVM;
+      const aw = slot.band as AwayBandVM;
       out.push({
         key: `${slot.kind}:${i}:${first}`,
         kind: slot.kind,
         colStart,
         colEnd,
+        word: isBlackout ? awayWord : tourWord,
+        // An absence names a PERSON; a tour names a PLACE — and when nobody
+        // wrote the place down it names the project instead of inventing one.
+        subject: isBlackout ? (bo.subject ?? bo.label) : (aw.place ?? aw.projectName ?? ''),
+        // A tour says no dates: it is inferred from two travel legs, and the
+        // legs are already drawn on the sheet as the days they are.
+        span: isBlackout ? bandSpan(slot.from, slot.to, cutLeft) : null,
+        project: isBlackout
+          ? null
+          : aw.project_id
+            ? {
+                id: aw.project_id,
+                slug: '',
+                name: aw.projectName ?? '',
+                accent: aw.accent,
+                initials: aw.initials,
+                workspace_id: '',
+              }
+            : null,
         label: slot.band.label,
-        note: isBlackout ? (slot.band as BlackoutBandVM).note : null,
-        tentative: isBlackout ? (slot.band as BlackoutBandVM).tentative : false,
-        cutLeft: slot.from < first,
+        note: isBlackout ? bo.note : null,
+        tentative: isBlackout ? bo.tentative : false,
+        cutLeft,
         cutRight: slot.to > last,
         lane: lanes[i] ?? 0,
       });
@@ -551,8 +684,12 @@
   function weekFill(week: { iso: string }[]): number {
     let max = 0;
     for (const d of week) {
-      const n =
-        (performancesByDay.get(d.iso) ?? []).length + (datesByDay.get(d.iso) ?? []).length;
+      // A run of days is NOT in the cell — it is the week's own band, on its
+      // own row. Counting it here asked for a full-height cell to hold
+      // nothing, so a week whose only content was one rehearsal block drew as
+      // tall as the busiest week of the month (seen on screen, 2026-07-31).
+      const inCell = (datesByDay.get(d.iso) ?? []).filter((x) => !isSeriesBand([x])).length;
+      const n = (performancesByDay.get(d.iso) ?? []).length + inCell;
       max = Math.max(max, Math.min(n, CELL_CAP));
     }
     return WEEK_FILL[max];
@@ -650,6 +787,7 @@
     {@const wlc = weekLaneCount(week)}
     {@const marks = weekMarks(week)}
     {@const bands = weekBands(week)}
+    {@const series = weekSeries(week)}
     <!-- A ROW OF THE MONTH IS A WEEK, and each week is its own block: a gutter
          that counts it, then its seven days. -->
     <div class="cal__wk" style="--wf: {weekFill(week)}">
@@ -659,14 +797,113 @@
           {#each marks as m, mi (mi)}<i class="cal__wkm" data-mark={m}></i>{/each}
         </span>
       </div>
-      <div class="cal__wkc">
+      <!-- ONE GRID PER WEEK, THREE BANDS OF ROWS: the day numbers on row 1,
+           the runs of days under them, and the day cells on the last row —
+           all of them placed, none of them auto-flowed. A run belongs
+           BETWEEN the number and the day's own contents: above the number it
+           reads as a header for the week, below the contents it lands under
+           the `+N more` door. It is the frame the days sit inside. -->
+      <div class="cal__wkc" style="--cr: {series.length + 2}">
+        {#each week as day, di (day.iso)}
+          {@const clashes = clashesByDay?.get(day.iso) ?? []}
+          <div
+            class="cal__num"
+            class:cal__day--out={!day.inMonth}
+            class:cal__day--today={day.iso === todayIso}
+            style="grid-row: 1; grid-column: {di + 1}"
+          >
+            <span class="cal__day-head">
+              <!-- A DAY OUTSIDE THE MONTH DRAWS ITS CONTENT AND NEVER ITS
+                   NUMBER (ADR-095). It used to do the opposite — number and
+                   grey wash, the noise without the information. The ABSENCE
+                   of the number is the whole of the mark, and there is no
+                   fade: a weaker CLAIM is not fainter INK. -->
+              {#if day.inMonth}
+                <span class="cal__day-num">{Number(day.iso.slice(8, 10))}</span>
+              {/if}
+              {#if clashes.length > 0}
+                <span class="cal__marks">
+                  {#each clashes as c, i (i)}
+                    <button
+                      type="button"
+                      class="cal__mark"
+                      data-severity={c.severity}
+                      aria-label={c.title}
+                      aria-expanded={openClash === `${day.iso}:${i}`}
+                      onclick={() => toggleClash(day.iso, i)}>!</button
+                    >
+                  {/each}
+                </span>
+              {/if}
+            </span>
+            {#each clashes as c, i (i)}
+              {#if openClash === `${day.iso}:${i}`}
+                <!-- Bottom rows open upward: a downward card would run off
+                     the foot of the sheet. -->
+                <ClashCard {c} up={wi >= weeks.length - 2} flip={di >= 5} />
+              {/if}
+            {/each}
+          </div>
+        {/each}
+        {#each series as s, si (s.key)}
+          <div
+            class="cal__run"
+            data-family={s.cert}
+            style="grid-row: {si + 2}; grid-column: {s.colStart} / {s.colEnd}{s.project
+              ? `; --c: ${accentVarFor(s.project)}`
+              : ''}"
+            title={s.title}
+          >
+              <span class="cal__run-h">
+                <span class="cal__run-k">
+                  {#if s.project}
+                    <IdentityMark
+                      accent={accentVarFor(s.project)}
+                      name={s.project.name}
+                      initials={s.project.initials}
+                    />
+                  {/if}
+                  <span class="cal__run-w">{s.kindWord}</span>
+                </span>
+                <b>{s.label}</b>
+                {#if s.city}<span class="cal__run-c">{s.city}</span>{/if}
+              </span>
+              <!-- Each day's OWN hours. This strip is the whole reason a run
+                   is stored as per-day rows rather than a span. -->
+              <span
+                class="cal__run-g"
+                style="grid-template-columns: repeat({s.cells.length}, minmax(0, 1fr))"
+              >
+                {#each s.cells as c (c.iso)}
+                  {#if c.row && onDateOpen}
+                    <button
+                      type="button"
+                      class="cal__run-d"
+                      onclick={() => onDateOpen?.(c.row!)}
+                      title={c.iso}
+                    >
+                      {#each c.hours as h, hi (hi)}
+                        <i>{h?.primary ?? '·'}{#if h?.end}<u>–{h.end}</u>{/if}</i>
+                      {/each}
+                    </button>
+                  {:else}
+                    <span class="cal__run-d" class:cal__run-d--off={!c.row}>
+                      {#if c.row}
+                        {#each c.hours as h, hi (hi)}
+                          <i>{h?.primary ?? '·'}{#if h?.end}<u>–{h.end}</u>{/if}</i>
+                        {/each}
+                      {:else}<i>–</i>{/if}
+                    </span>
+                  {/if}
+                {/each}
+              </span>
+            </div>
+        {/each}
     {#each week as day, di (day.iso)}
       {@const perfs = performancesByDay.get(day.iso) ?? []}
       {@const dateGroups = groupDates(datesByDay.get(day.iso) ?? [])}
       {@const entries = cellSlips(perfs, dateGroups)}
       {@const overflow = entries.length - CELL_CAP}
-      {@const clashes = clashesByDay?.get(day.iso) ?? []}
-      {@const bandSlots = laneSlotsOn(day.iso, wlc)}
       <!-- A DATE IS A PLACE, SO A NEW DATE IS MADE AT THE PLACE (ADR-095 §7).
            THE CELL ITSELF is the door — not a button laid over its foot. The
            old `+` was absolute, reserved 16px of a foot that reserves 10, and
@@ -681,64 +918,21 @@
         class:cal__day--out={!day.inMonth}
         class:cal__day--today={day.iso === todayIso}
         data-cal-new={day.inMonth && onDayCreate ? day.iso : undefined}
+        style="grid-row: var(--cr); grid-column: {di + 1}"
       >
-        <span class="cal__day-head">
-          <!-- A DAY OUTSIDE THE MONTH DRAWS ITS CONTENT AND NEVER ITS NUMBER
-               (ADR-095). It used to do the opposite — number and grey wash, the
-               noise without the information, which is the worse of the two
-               deals available. The ABSENCE of the number is the whole of the
-               mark, and there is no fade: a weaker CLAIM is not fainter INK,
-               and «not July» is not a weaker claim at all. -->
-          {#if day.inMonth}
-            <span class="cal__day-num">{Number(day.iso.slice(8, 10))}</span>
-          {/if}
-          {#if clashes.length > 0}
-            <span class="cal__marks">
-              {#each clashes as c, i (i)}
-                <button
-                  type="button"
-                  class="cal__mark"
-                  data-severity={c.severity}
-                  aria-label={c.title}
-                  aria-expanded={openClash === `${day.iso}:${i}`}
-                  onclick={() => toggleClash(day.iso, i)}
-                >{c.glyph}</button>
-              {/each}
-            </span>
-          {/if}
-        </span>
-        {#each clashes as c, i (i)}
-          {#if openClash === `${day.iso}:${i}`}
-            <!-- Bottom rows open upward: the grid's overflow (rounded
-                 corners) would clip a downward card past the last cells. -->
-            <ClashCard {c} up={wi >= weeks.length - 2} flip={di >= 5} />
-          {/if}
-        {/each}
         <!-- Three, then a door. The cap is what lets a quiet week look short:
              the row is as tall as its fullest day, and without it that day can
              hold nine things. -->
         {#each entries.slice(0, CELL_CAP) as entry (entry.key)}
-          {#if entry.dateGroup}
-            <DateChip
-              g={entry.dateGroup}
-              edges={seriesEdges(entry.dateGroup[0], day.iso)}
-              {di}
-              {viewerTz}
-              {dateKindLabel}
-              onMarkOpen={openMark}
-              onOpen={onDateOpen}
-            />
-          {:else}
-            <Slip
-              slip={entry.slip}
-              kindLabel={(k) => dateKindLabel(k)}
-              stateLabel={slipState}
-              stateUrgent={isUrgentHold(entry.slip)}
-              showCountry={false}
-              onMarkOpen={openMark}
-              onOpen={entry.dateRow && onDateOpen ? () => onDateOpen?.(entry.dateRow!) : undefined}
-            />
-          {/if}
+          <Slip
+            slip={entry.slip}
+            kindLabel={(k) => dateKindLabel(k)}
+            stateLabel={slipState}
+            stateUrgent={isUrgentHold(entry.slip)}
+            showCountry={false}
+            onMarkOpen={openMark}
+            onOpen={entry.dateRow && onDateOpen ? () => onDateOpen?.(entry.dateRow!) : undefined}
+          />
         {/each}
         {#if overflow > 0}
           <button type="button" class="cal__more" onclick={() => onDayCreate?.(day.iso)}
@@ -762,7 +956,18 @@
               style="grid-column: {b.colStart} / {b.colEnd}"
               title={b.note ? `${b.label} · ${b.note}` : b.label}
             >
-              <span class="cal__band-n">{b.label}</span>
+              <span class="cal__band-k">
+                {#if b.project}
+                  <IdentityMark
+                    accent={accentVarFor(b.project)}
+                    name={b.project.name}
+                    initials={b.project.initials}
+                  />
+                {/if}
+                <span class="cal__band-w">{b.word}</span>
+              </span>
+              {#if b.subject}<span class="cal__band-n">{b.subject}</span>{/if}
+              {#if b.span}<em class="cal__band-s">{b.span}</em>{/if}
               <!-- The rule with its terminus. It is not drawn when the band runs
                    past the week's edge: an arrowhead there would claim an end
                    the calendar cannot show. -->
@@ -791,20 +996,24 @@
        A row of the month IS a week, and a week that has to carry a gutter, a
        density row and a band spanning columns cannot be seven loose cells of
        somebody else's grid. */
+    /* THE SHEET IS NOT A WIDGET. It had a 1px border, a large radius,
+       `overflow: hidden` and a card fill — a rounded panel sitting on the
+       page, which is the shape of a component and not the shape of a month.
+       The design draws PAPER: the rules of the grid are the only lines, the
+       ground is the page's own, and nothing is clipped at a corner. The fill
+       also broke the column ruling — the cells painted `--card` OVER the
+       gradient that draws the seven verticals (see `.cal__wkc`). */
     .cal__grid {
       --cal-wk-gutter: 66px;
       --cal-cell-h: 128px;
       display: flex;
       flex-direction: column;
-      border: 1px solid var(--border-color-light);
-      border-radius: var(--radius-l);
-      overflow: hidden;
-      background: var(--card);
       transition: opacity var(--transition);
     }
     .cal__wkh {
       display: grid;
       grid-template-columns: var(--cal-wk-gutter) repeat(7, minmax(0, 1fr));
+      margin-block-start: 12px;
       border-block-end: 1px solid var(--border-color-light);
     }
     .cal__wk {
@@ -820,21 +1029,29 @@
       display: flex;
       flex-direction: column;
       align-items: flex-end;
-      gap: 5px;
+      gap: 3px;
       padding: 9px 9px 10px 0;
       border-inline-end: 1px solid var(--border-color-light);
+      /* The gutter spans the WHOLE week block — the run strip, the days and
+         the foot bands are three rows in column 2, and without this the
+         gutter would take one of them and the days would fall to column 1. */
+      grid-column: 1;
+      grid-row: 1 / -1;
     }
     .cal__wkn {
       font-family: var(--font-mono);
       font-size: 9px;
       letter-spacing: 0.06em;
       text-transform: uppercase;
-      color: var(--text-faint);
+      /* One step above the marks it labels: the number is read, the marks are
+         seen. */
+      color: var(--text-muted);
     }
     .cal__wkd {
       display: flex;
       align-items: center;
       gap: 3px;
+      margin-block-start: 5px;
     }
     /* solid = a confirmed gig · ring = an option · rule = a working day that is
        not a gig · faint dot = a night still free. */
@@ -876,25 +1093,52 @@
       grid-template-columns: repeat(7, minmax(0, 1fr));
       gap: 2px 0;
       padding: 2px 0 5px;
-      border-block-start: 1px solid var(--border-color-light);
     }
+    /* THE RULE BELONGS TO THE BAND, NOT TO THE ROW. A `border-block-start` on
+       the container drew a hairline the full width of the week whenever ANY
+       band existed — a line that measures seven days for a fact that lasts
+       two. The band's own top border spans exactly the columns it covers,
+       which is the whole point of measuring it. */
     .cal__band {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 9px;
       min-inline-size: 0;
-      padding-inline: 8px;
+      padding: 1px 8px 2px;
+      border-block-start: 1px solid var(--border-color-light);
       overflow: visible;
       white-space: nowrap;
     }
-    .cal__band-n {
+    .cal__band-k {
       flex: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .cal__band-w {
       font-family: var(--font-mono);
       font-size: 9px;
       letter-spacing: 0.06em;
+      text-transform: uppercase;
       color: var(--text-muted);
+    }
+    /* The subject is the thing you are reading, so it is TEXT, not a label:
+       the one field on the band drawn in the body voice. */
+    .cal__band-n {
+      flex: none;
+      font-size: 11px;
+      color: var(--text-color);
       overflow: hidden;
       text-overflow: ellipsis;
+    }
+    .cal__band-s {
+      flex: none;
+      font-family: var(--font-mono);
+      font-style: normal;
+      font-size: 9px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-faint);
     }
     /* A rule with a terminus — never a box. An absence is a stretch of days,
        and a box says «a thing that happened», which is what it is not. */
@@ -923,7 +1167,14 @@
     /* ON TOUR is QUIETER THAN AN ABSENCE: an absence is a fact somebody wrote
        down, this is deduced from two travel legs, and they cannot weigh the
        same. Dotted where away is solid, and one ink lighter. */
+    .cal__band--away {
+      border-block-start-style: dotted;
+    }
     .cal__band--away .cal__band-n {
+      font-size: 10.5px;
+      color: var(--text-faint);
+    }
+    .cal__band--away .cal__band-w {
       color: var(--text-faint);
     }
     .cal__band--away .cal__band-r {
@@ -935,6 +1186,9 @@
     }
     /* An absence that is settled is ink; one that is not is faint and leans —
        the certainty axis, same as everywhere else. */
+    .cal__band--tent {
+      border-block-start-style: dashed;
+    }
     .cal__band--tent .cal__band-n {
       color: var(--text-faint);
       font-style: italic;
@@ -943,7 +1197,125 @@
       border-block-start-style: dotted;
     }
 
+    /* The day NUMBER is its own cell on row 1 of the week's grid, so a run of
+       days can sit between it and the day's contents. It also means the
+       numbers line up across a week whose days hold different things. */
+    .cal__num {
+      position: relative;
+      min-inline-size: 0;
+      padding: 6px 8px 2px;
+    }
+
+    /* ── THE RUN · one band, its days' hours under it ─────────────────── */
+    /* The same box as a slip — a run IS a slip with a longer life, and giving
+       it its own shape is how a fifth vocabulary gets invented. */
+    .cal__run {
+      position: relative;
+      isolation: isolate;
+      display: flex;
+      flex-direction: column;
+      min-inline-size: 0;
+      margin: 4px 0 1px;
+      padding: 3px 8px;
+      background: var(--bg-ultra-light);
+      border: 1px solid var(--border-color-light);
+      border-radius: var(--radius-s);
+    }
+    /* …and the same certainty grammar, so a tentative run says «not sure» at
+       exactly the volume a tentative gig does. */
+    .cal__run[data-family='hold'],
+    .cal__run[data-family='proposed'] {
+      border-style: dashed;
+      border-color: color-mix(in oklch, var(--text-color) 13%, var(--border-color-light));
+    }
+    .cal__run[data-family='released'] {
+      border-style: dotted;
+      background: transparent;
+    }
+    .cal__run[data-family='released'] b {
+      text-decoration: line-through;
+      color: var(--text-faint);
+    }
+    .cal__run-h {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-inline-size: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      line-height: 1.1;
+    }
+    .cal__run-k {
+      flex: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .cal__run-w {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+    }
+    .cal__run-h b {
+      font-weight: 400;
+      font-size: 11px;
+      color: var(--text-color);
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .cal__run-c {
+      font-size: 9px;
+      color: var(--text-faint);
+      white-space: nowrap;
+    }
+    /* EVERY HOUR HANGS AT THE RIGHT OF THE DAY IT BELONGS TO — the same edge
+       as the day column above it, so the strip reads as a row of the grid and
+       not as a sentence. */
+    .cal__run-g {
+      display: grid;
+      align-items: center;
+      font-family: var(--font-mono);
+      font-size: 9px;
+      line-height: 1.15;
+      color: var(--text-muted);
+      font-variant-numeric: tabular-nums;
+    }
+    .cal__run-d {
+      padding: 0 6px 0 0;
+      border: 0;
+      background: none;
+      font: inherit;
+      color: inherit;
+      text-align: right;
+      white-space: nowrap;
+      overflow: hidden;
+    }
+    button.cal__run-d {
+      cursor: pointer;
+    }
+    button.cal__run-d:hover {
+      color: var(--text-color);
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+    /* A session is a LINE. Two sessions in one day are two lines — never one
+       line with a separator, which is how an hour got clipped in a 72px cell. */
+    .cal__run-d i {
+      display: block;
+      font-style: normal;
+    }
+    .cal__run-d u {
+      text-decoration: none;
+    }
+    .cal__run-d--off {
+      color: var(--text-faint);
+      opacity: 0.6;
+    }
+
     .cal__wkc {
+      grid-column: 2;
       display: grid;
       grid-template-columns: repeat(7, minmax(0, 1fr));
       align-items: stretch;
@@ -957,14 +1329,16 @@
       opacity: 0.6;
     }
 
+    /* The weekday axis is a LABEL, not a header bar: a filled band turns the
+       row into a table chrome the month does not have. One hairline under it
+       is the whole of the separation. */
     .cal__weekday {
-      background: var(--bg-light);
-      padding: var(--space-xs) var(--space-s);
+      padding: 7px 9px;
       font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      letter-spacing: 0.04em;
+      font-size: 9px;
+      letter-spacing: 0.14em;
       color: var(--text-faint);
-      text-transform: lowercase;
+      text-transform: uppercase;
     }
 
     .cal__day {
@@ -975,24 +1349,27 @@
       min-inline-size: 0;
       display: flex;
       flex-direction: column;
-      padding: 1px 5px 10px;
+      padding: 1px 5px 9px;
       overflow: hidden;
-      background: var(--card);
     }
 
     /* The invitation appears WHERE YOU POINT, and it is the cell's own empty
        space — no element, so nothing can cover another control. */
     .cal__day[data-cal-new]::after {
-      content: '+';
+      /* The hint says WHAT it will make. A bare `+` in a calendar cell is the
+         one glyph that could mean anything the app can create. */
+      content: '+ date';
       position: absolute;
       inset-inline: 5px;
       inset-block-end: 1px;
-      block-size: 12px;
+      block-size: 10px;
       display: flex;
       align-items: center;
       justify-content: center;
       font-family: var(--font-mono);
       font-size: 8.5px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
       color: var(--text-faint);
       border: 1px dashed color-mix(in oklch, var(--text-color) 14%, transparent);
       border-radius: 2px;
@@ -1029,81 +1406,87 @@
       color: var(--text-faint);
     }
 
+    /* TODAY IS INK AND A WASH — never a filled pill. The pill was the loudest
+       object on the whole sheet: a black disc that outranked every gig on it,
+       to say something the reader already knows (it is the one date they did
+       not have to look up). Colour is project identity and nothing else, and
+       the same law governs all four drawings: today is the cell's 4% wash and
+       one step of weight on its number. */
+    .cal__day--today {
+      background: color-mix(in oklch, var(--text-color) 4%, transparent);
+    }
     .cal__day--today .cal__day-num {
-      color: var(--bg);
-      background: var(--text-color);
-      border-radius: var(--radius-circle);
-      inline-size: 1.5rem;
-      block-size: 1.5rem;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text-color);
     }
 
     .cal__day-num {
       font-family: var(--font-mono);
-      font-size: var(--text-xs);
+      font-size: 15px;
+      line-height: 1;
       color: var(--text-muted);
+      font-variant-numeric: tabular-nums;
     }
 
+    /* The number, then the slack, then the marks. `space-between` parked a
+       lone note dot in the middle of the cell — whatever comes SECOND takes
+       the slack, and anything after it sits beside it. */
     .cal__day-head {
       display: flex;
       align-items: center;
-      justify-content: space-between;
-      gap: var(--space-2xs);
+      justify-content: flex-start;
+      gap: 6px;
+      margin-block-end: 4px;
+      min-block-size: 16px;
+    }
+    .cal__day-head > :nth-child(2) {
+      margin-inline-start: auto;
     }
 
     /* Quiet add affordance — visible on cell hover (and on focus). */
 
-    /* ── Conflict day-marks (ADR-072 grammar, EXACT):
-       people = solid red circle "!" · possible = dashed line-2 circle "?"
-       blackout = red OUTLINE circle · blackout-tentative = accent dashed.
-       Anchored :global under .cal__grid — ClashCard renders the static
-       head mark, so one rule-set styles both it and the day-head marks. */
+    /* ══ ONE MARK, ONE MEANING ══════════════════════════════════════════
+       There is something to DECIDE on this day. That is the whole message.
+
+       It used to be four badges — a filled red disc, a dashed circle with a
+       `?`, a red ring, an amber dashed ring — which read as four different
+       KINDS of problem when there is one problem seen at four moments. Worse,
+       the `!`/`?` fork said «this one is urgent» in a slot that cannot carry
+       urgency: WHEN a hold's clock runs out is said by the hold chip inside
+       the slip, in words, where you can act on it. The number's mark only
+       says THAT there is a call to make.
+
+       And the circles were the loudest objects in a cell full of gigs, for a
+       flag. Now it is a glyph: red when people actually collide, verb-cal
+       when they do not — the one colour law the Planner already declares
+       (red is conflict and only conflict; verb-cal is a call to make). */
     .cal__marks {
       display: inline-flex;
       gap: 3px;
       margin-inline-start: auto;
     }
     .cal__grid :global(.cal__mark) {
-      /* Variable contract — each severity redeclares, never re-styles. */
-      --mark-bg: var(--bg);
-      --mark-fg: var(--text-muted);
-      --mark-border-color: transparent;
-      --mark-border-style: solid;
-      inline-size: 1rem;
-      block-size: 1rem;
-      border-radius: var(--radius-circle);
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
+      --mark-fg: var(--info);
+      flex: none;
+      padding: 0 0 0 1px;
+      border: 0;
+      background: none;
       font-family: var(--font-mono);
-      font-size: var(--text-xs);
+      font-size: 12px;
       font-weight: 500;
       line-height: 1;
-      background: var(--mark-bg);
       color: var(--mark-fg);
-      border: 1px var(--mark-border-style) var(--mark-border-color);
       cursor: pointer;
-      flex: none;
     }
-    .cal__grid :global(.cal__mark[data-severity='people']) {
-      --mark-bg: var(--danger);
-      --mark-fg: var(--bg);
+    .cal__grid :global(.cal__mark:hover) {
+      text-decoration: underline;
+      text-underline-offset: 2px;
     }
-    .cal__grid :global(.cal__mark[data-severity='possible']) {
-      --mark-border-color: var(--border-color-dark);
-      --mark-border-style: dashed;
-      --mark-fg: var(--text-faint);
-    }
+    /* Red is a REAL clash of people, and nothing else earns it. */
+    .cal__grid :global(.cal__mark[data-severity='people']),
     .cal__grid :global(.cal__mark[data-severity='blackout']) {
-      --mark-border-color: var(--danger);
       --mark-fg: var(--danger);
-    }
-    .cal__grid :global(.cal__mark[data-severity='blackout-tentative']) {
-      --mark-border-color: var(--cal-accent, var(--warning));
-      --mark-border-style: dashed;
-      --mark-fg: var(--cal-accent, var(--warning));
     }
     .cal__grid :global(.cal__mark--static) {
       cursor: default;

@@ -120,7 +120,12 @@
       >
     </span>
     {#if slip.time}
-      <span class="slip__t">{slip.time.primary}</span>
+      <!-- The END HOUR is its own element so the CELL can drop it (see the
+           container queries below). A start hour alone is a whole assertion;
+           half a range is not, so nothing is ever cut mid-string. -->
+      <span class="slip__t"
+        >{slip.time.primary}{#if slip.time.end}<i>–{slip.time.end}</i>{/if}</span
+      >
     {/if}
   </span>
 
@@ -128,7 +133,12 @@
     <span class="slip__state" class:slip__state--due={stateUrgent}>{state}</span>
   {/if}
 
-  <span class="slip__n">{slip.name}</span>
+  <!-- A travel day's place is ambiguous on its own — «London» is a departure
+       or an arrival depending on a column nobody can see — so the direction
+       governs the name, in the margin voice. -->
+  <span class="slip__n"
+    >{#if slip.lead}<i class="slip__pre">{slip.lead}</i>{/if}{slip.name}</span
+  >
 
   {#if slip.city}
     <span class="slip__c"
@@ -241,6 +251,20 @@
       color: var(--text-muted);
       font-variant-numeric: tabular-nums;
       white-space: nowrap;
+    }
+    .slip__t i {
+      font-style: normal;
+    }
+    /* `TO` / `FROM` — the margin voice, so it reads as a label on the place
+       and never as part of the place's name. */
+    .slip__pre {
+      font-style: normal;
+      font-family: var(--font-mono);
+      font-size: 9px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+      margin-inline-end: 4px;
     }
 
     /* ── state · plain text, never a pill ───────────────────────────────
@@ -370,12 +394,19 @@
       border-style: dotted;
       background: transparent;
     }
-    .slip[data-family='released'] .slip__n,
-    .slip[data-family='released'] .slip__c,
-    .slip[data-family='released'] .slip__t {
+    /* ONLY THE NAME IS STRUCK. Three struck fields in a 76px box is a card
+       drawn through, and it stops reading as a card at all — while the city
+       and the hour are still TRUE of the thing that was let go, which is the
+       whole reason the slip is kept as memory instead of removed. The strike
+       is a verdict on the commitment, so it lands on the commitment's name. */
+    .slip[data-family='released'] .slip__n {
       color: var(--text-faint);
       text-decoration: line-through;
       text-decoration-thickness: 1px;
+    }
+    .slip[data-family='released'] .slip__c,
+    .slip[data-family='released'] .slip__t {
+      color: var(--text-faint);
     }
 
     /* hover — the edge darkens and the NAME underlines. Nothing else moves:
@@ -398,9 +429,11 @@
        Measured, never declared. The host sets `container-type: inline-size`;
        these are the two steps the design measured on a real month cell. */
     @container (max-width: 142px) {
-      /* the end hour goes, the start stays — the range is in the title */
-      .slip__t {
-        letter-spacing: 0;
+      /* THE END HOUR GOES, THE START STAYS — the range is still in the title.
+         Half a range is not an assertion, so it is dropped whole rather than
+         clipped: `10h–14h` becomes `10h`, never `10h–1…`. */
+      .slip__t i {
+        display: none;
       }
     }
     @container (max-width: 126px) {
@@ -408,6 +441,25 @@
       .slip__tz {
         display: none;
       }
+      .slip__kind,
+      .slip__t,
+      .slip__state {
+        letter-spacing: 0;
+      }
+      .slip__n {
+        line-height: 1.22;
+      }
+      /* AND THE GIG KEEPS ITS STEP OVER THE OTHER KINDS AT EVERY WIDTH.
+         Flattening both to 11px here is the one place a show and a press call
+         would be drawn at the same weight — the family swap would be carrying
+         the distinction alone. 12/11 at this width, 13/11 above it. */
+      .slip[data-kind='show'] .slip__n {
+        font-size: 12px;
+        line-height: 1.2;
+      }
+      /* Row gap tight, COLUMN gap not: the clock now sits immediately after
+         the kind word, and 2px there is not separation — `SHOW?18h30` reads
+         as one token. Six is a word space. */
       .slip__h {
         gap: 2px 6px;
       }

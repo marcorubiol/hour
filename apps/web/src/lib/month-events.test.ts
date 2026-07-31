@@ -105,13 +105,25 @@ const CTX = {
   workspaceTzById: new Map([['ws1', 'Europe/Madrid']]),
   viewerTz: 'Europe/Madrid',
   kindLabel: (k: string) => k.replace(/_/g, ' '),
-  // Deterministic stand-in: primary is the venue zone, secondary only when
-  // the two zones differ — the real `dualTime` law, without Intl in a test.
-  dualTime: (at: string, tz: string | null, viewerTz: string) => ({
-    primary: `${at.slice(11, 16)}@${tz ?? 'none'}`,
-    secondary: tz && tz !== viewerTz ? `${at.slice(11, 16)}@${viewerTz}` : null,
-  }),
+  // Deterministic stand-in: a real wall time, secondary only when the two
+  // zones differ — the real `dualTime` law, without Intl in a test.
+  //
+  // THE ZONE IS RECORDED, NOT SMUGGLED THROUGH THE OUTPUT. It used to ride
+  // inside `primary` as `20:00@Europe/Madrid`, which worked only while
+  // nothing downstream touched the string — and the moment `hourMark` turned
+  // it into the Planner's clock, `20:00@Europe/Madrid` became `20h` and the
+  // zone the test existed to check was silently gone. A stub that has to
+  // survive its consumer's formatting is testing the formatter.
+  dualTime: (at: string, tz: string | null, viewerTz: string) => {
+    tzCalls.push(tz);
+    return {
+      primary: at.slice(11, 16),
+      secondary: tz && tz !== viewerTz ? at.slice(11, 16) : null,
+    };
+  },
 };
+/** Every zone `dualTime` was called with, in order. Reset per test. */
+const tzCalls: (string | null)[] = [];
 
 const PROJ = { id: 'p1', slug: 'mamemi', name: 'MaMeMi', workspace_id: 'ws1' };
 
@@ -167,8 +179,15 @@ describe('performanceSlip', () => {
   test('a venue-less gig reads its home space clock, never the browser’s', () => {
     // The zone its times were ENTERED in. Silently using the reader's would
     // move the gig by an hour and nothing on screen would say so.
-    const s = performanceSlip(gig(), CTX);
-    expect(s.time?.primary).toContain('Europe/Madrid');
+    tzCalls.length = 0;
+    performanceSlip(gig(), CTX);
+    expect(tzCalls).toEqual(['Europe/Madrid']);
+  });
+
+  test('the hour is the Planner’s clock, not a wire format', () => {
+    // `20:00` reads as a precise instant and costs five characters in the
+    // tightest text in the app; nine gigs in ten are called at a round hour.
+    expect(performanceSlip(gig(), CTX).time?.primary).toBe('20h');
   });
 
   test('the second clock appears only when the two disagree — and it is a gloss', () => {

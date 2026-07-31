@@ -545,6 +545,10 @@
       font-family: var(--font-mono);
       font-size: var(--text-xs);
       color: var(--text-faint);
+      /* The leading space in the markup is collapsed away by the compiler, so
+         the hour printed welded to the venue: `Teatre Principal22h`. A word
+         space that has to survive whitespace handling is not a word space. */
+      margin-inline-start: 5px;
     }
     .strip__pip--date .strip__pip-lab,
     .strip__pip--travel .strip__pip-lab {

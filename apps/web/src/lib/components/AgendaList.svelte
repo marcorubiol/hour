@@ -44,7 +44,7 @@
     type PerformanceEvent,
   } from '$lib/month-events';
   import { assignBandLanes, dayKeyInTz } from '$lib/planner';
-  import { dualTime, localeWeekdayShort } from '$lib/datetime';
+  import { dualTime, hourMark, localeWeekdayShort } from '$lib/datetime';
   import { workspacesQueryOptions } from '$lib/nav-queries';
   import { accentVarFor } from '$lib/utils/accent';
   import IdentityMark from '$lib/components/IdentityMark.svelte';
@@ -255,6 +255,10 @@
     const t = dualTime(at, perfTz(p), viewerTz);
     return { primary: t.primary, secondary: t.secondary };
   }
+  /* THE SORT KEY STAYS ON THE WIRE CLOCK. `hourMark` is a reading, not an
+     ordering: `9h` sorts above `20h30` by codepoint, so the day's running
+     order would invert the moment the hour lost its leading zero. Formatting
+     happens where it is printed and nowhere else. */
   function perfSortKey(p: PerformanceEvent): string {
     return perfDual(p)?.primary ?? '';
   }
@@ -473,7 +477,7 @@
           {#each banners as c, ci (ci)}
             <p class="ag__clash" data-severity={c.severity}>
               <span class="ag__clash-mark" data-severity={c.severity} aria-hidden="true"
-                >{c.glyph}</span
+                >!</span
               >
               <span class="ag__clash-text">{c.body}</span>
             </p>
@@ -574,9 +578,9 @@
              somebody ASKED for, so most arrive without one; a dash reads as an
              hour that failed to print. -->
         <span class="ag__time" class:ag__time--none={!t?.primary}
-          >{t?.primary ?? noHourWord}</span
+          >{t?.primary ? hourMark(t.primary) : noHourWord}</span
         >
-        {#if t?.secondary}<span class="ag__courtesy">{viewerTimeLabel(t.secondary)}</span>{/if}
+        {#if t?.secondary}<span class="ag__courtesy">{viewerTimeLabel(hourMark(t.secondary))}</span>{/if}
       </span>
       <span class="ag__body">
         <!-- The name is NEVER truncated: a row may grow, and «Teatre Nacional
@@ -621,10 +625,10 @@
           <span class="ag__time ag__time--none">{allDayWord}</span>
         {:else}
           <span class="ag__time" class:ag__time--none={!t?.primary}
-            >{t?.primary ?? noHourWord}</span
+            >{t?.primary ? hourMark(t.primary) : noHourWord}</span
           >
         {/if}
-        {#if t?.secondary}<span class="ag__courtesy">{viewerTimeLabel(t.secondary)}</span>{/if}
+        {#if t?.secondary}<span class="ag__courtesy">{viewerTimeLabel(hourMark(t.secondary))}</span>{/if}
       </span>
       <span class="ag__body">
         <span class="ag__title">{d.kind === 'travel_day' ? travelText(d) : dateText(d)}</span>
@@ -1113,43 +1117,22 @@
       --clash-bg: color-mix(in oklch, var(--ag-black-accent) 8%, transparent);
       --clash-fg: var(--text-muted);
     }
+    /* ONE MARK, ONE MEANING — the same law the month draws (see MonthGrid).
+       Four circular badges said four kinds of problem where there is one:
+       something to decide on this day. Red is a real clash of people and
+       nothing else earns it; everything else is a call to make. */
     .ag__clash-mark {
-      --mark-bg: var(--bg);
-      --mark-fg: var(--text-muted);
-      --mark-border-color: transparent;
-      --mark-border-style: solid;
-      inline-size: 1rem;
-      block-size: 1rem;
-      border-radius: var(--radius-circle);
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
+      --mark-fg: var(--info);
+      flex: none;
       font-family: var(--font-mono);
-      font-size: var(--text-xs);
+      font-size: 12px;
       font-weight: 500;
       line-height: 1;
-      background: var(--mark-bg);
       color: var(--mark-fg);
-      border: 1px var(--mark-border-style) var(--mark-border-color);
-      flex: none;
     }
-    .ag__clash-mark[data-severity='people'] {
-      --mark-bg: var(--danger);
-      --mark-fg: var(--bg);
-    }
-    .ag__clash-mark[data-severity='possible'] {
-      --mark-border-color: var(--border-color-dark);
-      --mark-border-style: dashed;
-      --mark-fg: var(--text-faint);
-    }
+    .ag__clash-mark[data-severity='people'],
     .ag__clash-mark[data-severity='blackout'] {
-      --mark-border-color: var(--danger);
       --mark-fg: var(--danger);
-    }
-    .ag__clash-mark[data-severity='blackout-tentative'] {
-      --mark-border-color: var(--ag-black-accent);
-      --mark-border-style: dashed;
-      --mark-fg: var(--ag-black-accent);
     }
     .ag__clash-text {
       min-inline-size: 0;

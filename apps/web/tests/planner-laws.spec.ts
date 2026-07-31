@@ -214,3 +214,97 @@ test.describe('planner laws (ADR-095)', () => {
     expect(page.url(), 'the old vocabulary was written back').not.toContain('group=');
   });
 });
+
+/* ══ THE SHEET · what the month is made of ═════════════════════════════════
+   Four laws that were repo convention until the design was read against the
+   drawing side by side (2026-07-31). Each one is a place where a component
+   default quietly outranked the design's own rule. */
+test.describe('the sheet', () => {
+  test.skip(!EMAIL || !PASSWORD, 'Set PW_TEST_EMAIL / PW_TEST_PASSWORD.');
+
+  test('THE SHEET IS PAPER, NOT A WIDGET — no frame, no fill, no clipped corner', async ({
+    page,
+  }) => {
+    // A bordered, rounded, `overflow: hidden` panel is the shape of a
+    // component. A month is a ruled sheet: the rules of the grid are the only
+    // lines on it. The fill also painted OVER the column ruling.
+    await planner(page, 'month');
+    const box = await page.evaluate(() => {
+      const el = document.querySelector('.cal__grid');
+      if (!el) return null;
+      const cs = getComputedStyle(el);
+      return {
+        border: parseFloat(cs.borderTopWidth),
+        radius: parseFloat(cs.borderTopLeftRadius),
+        overflow: cs.overflowX,
+      };
+    });
+    expect(box).not.toBeNull();
+    expect(box!.border).toBe(0);
+    expect(box!.radius).toBe(0);
+    expect(box!.overflow, 'a clipped sheet cannot show a popover').not.toBe('hidden');
+  });
+
+  test('THE CLOCK IS THE PLANNER’S — `20h30`, never `20:30`, in every drawing', async ({
+    page,
+  }) => {
+    // One clock across the four views. The agenda used to build its own hours
+    // straight from `dualTime` and print the wire format beside a month that
+    // printed the Planner's.
+    for (const view of ['month', 'agenda']) {
+      await planner(page, view);
+      const colons = await page.evaluate(() =>
+        [...document.querySelectorAll('.slip__t, .ag__time')]
+          .map((el) => el.textContent?.trim() ?? '')
+          .filter((s) => /\d:\d/.test(s)),
+      );
+      expect(colons, `${view} printed a wire clock`).toEqual([]);
+    }
+  });
+
+  test('TODAY IS INK AND A WASH — never a filled pill', async ({ page }) => {
+    // Colour is project identity and nothing else. A black disc on the one
+    // date the reader did not have to look up outranked every gig on the
+    // sheet.
+    await planner(page, 'month');
+    const num = page.locator('.cal__day--today .cal__day-num').first();
+    if ((await num.count()) === 0) test.skip(true, 'today is not on this sheet');
+    const paint = await num.evaluate((el) => {
+      const cs = getComputedStyle(el);
+      return { bg: cs.backgroundColor, radius: parseFloat(cs.borderTopLeftRadius) };
+    });
+    expect(paint.bg).toMatch(/rgba\(0, 0, 0, 0\)|transparent/);
+    expect(paint.radius).toBe(0);
+  });
+
+  test('ONE MARK, ONE MEANING — a day says THAT there is a call, never how bad', async ({
+    page,
+  }) => {
+    // It used to fork into `!` and `?` by whether a clock was running, which
+    // read as two kinds of problem where there is one seen at two moments.
+    // WHEN it is due is the hold chip's job, in words, inside the slip.
+    await planner(page, 'month');
+    const glyphs = await page.evaluate(() => [
+      ...new Set([...document.querySelectorAll('.cal__mark')].map((el) => el.textContent?.trim())),
+    ]);
+    expect(glyphs.filter((g) => g !== '!'), 'a second glyph is a second meaning').toEqual([]);
+  });
+
+  test('A RUN OF DAYS IS ONE ELEMENT, and it carries each day’s own hours', async ({ page }) => {
+    // The whole argument for storing a rehearsal block as per-day rows. The
+    // month used to draw the group as a chip in the first day and leave the
+    // others an orphan time box with no name attached to it.
+    await planner(page, 'month');
+    const runs = await page.evaluate(() =>
+      [...document.querySelectorAll('.cal__run')].map((el) => ({
+        span: getComputedStyle(el).gridColumnStart + '/' + getComputedStyle(el).gridColumnEnd,
+        days: el.querySelectorAll('.cal__run-d').length,
+        named: (el.querySelector('.cal__run-h b')?.textContent ?? '').length > 0,
+      })),
+    );
+    for (const r of runs) {
+      expect(r.days, 'a run with fewer than two day cells is not a run').toBeGreaterThan(1);
+      expect(r.named, 'a run drew its hours and never its name').toBe(true);
+    }
+  });
+});

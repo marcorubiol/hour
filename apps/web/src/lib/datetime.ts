@@ -215,6 +215,36 @@ function dayInTz(iso: string, timeZone: string): string {
 }
 
 /**
+ * THE PLANNER'S CLOCK — `20:30` → `20h30`, `16:00` → `16h`.
+ *
+ * A round hour drops its zeroes, and the unit rides ON the number instead of
+ * a colon holding two fields apart. Two reasons it is not cosmetic:
+ *
+ * 1. `16h` is 3 characters where `16:00` is 5, in the tightest text in the
+ *    app — a month cell gives the hour about 30px beside a pack that never
+ *    yields. That is the difference between the end hour surviving and being
+ *    dropped by the container query.
+ * 2. `16:00` reads as a *precise instant*; nine gigs in ten are called at a
+ *    round hour and the two trailing zeroes are noise pretending to be data.
+ *
+ * It is the PLANNER's clock and not the app's: a road sheet and an invoice are
+ * documents an outsider reads, and they keep `HH:MM`. Idempotent, so a string
+ * that already carries an `h` passes through untouched.
+ */
+export function hourMark(t: string | null | undefined): string {
+  const s = String(t ?? '').trim();
+  if (!s) return '';
+  // ONLY A CLOCK IS RE-CLOCKED. Splitting on `:` and appending `h` to
+  // whatever came back turned every non-time string into nonsense — `all
+  // day` became `all dayh`. Caught by its own test, 2026-07-31: this
+  // function is exported, so «the caller only ever passes times» is a
+  // promise the function cannot keep.
+  const m = /^(\d{1,2}):([0-5]\d)(?::\d\d)?$/.exec(s);
+  if (!m) return s;
+  return m[2] === '00' ? `${m[1]}h` : `${m[1]}h${m[2]}`;
+}
+
+/**
  * Venue-first dual time. `venueTz` falls back to `viewerTz` when the venue
  * has no timezone on record (then there is nothing to contrast and
  * `secondary` is null).
