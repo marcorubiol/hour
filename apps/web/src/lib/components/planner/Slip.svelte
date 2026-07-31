@@ -1,0 +1,389 @@
+<script lang="ts">
+  /**
+   * THE SLIP · one vocabulary, four placings (ADR-095 §0).
+   *
+   * Everything that happens draws as this: the month cell, the board cell, the
+   * flow row and the day card carry the SAME fields in the SAME order — pack
+   * (whose · what) · hour · state · name · city · gloss. The only thing that
+   * differs between placings is WHERE THE HOUR LIVES, and that is the caller's
+   * business, not this component's.
+   *
+   * It replaces `PerfChip` and `DateChip`, and it is the object the board must
+   * render too. Three implementations of one card is how the month came to
+   * print a country code the board could not, and how a held gig and a
+   * tentative rehearsal ended up with two ways of saying the same doubt.
+   *
+   * THE HEAD LINE, and this is the law that moved most: the PACK opens it —
+   * monogram + the kind word, `flex: none`, never yielding — and the CLOCK
+   * follows immediately. Not the right edge, which is what the month did.
+   * A right-aligned clock column promises its members are commensurable
+   * measurements of one kind, and they are not: `19h–20h30` is a span, `22h`
+   * is an instant, and NO HOUR AT ALL is a real, frequent state. It offers a
+   * scan it cannot support, for a question nobody asks here — in a month you
+   * are reading commitments, and the hour is a detail you check after you have
+   * found the date. Beside the pack it is a sentence: `MM SHOW? 18h30`.
+   *
+   * If something has to go it is the END TIME; the pack never yields, because
+   * `SHOW` vs `PRESS` vs `TRAVEL` is not recoverable from anything else and a
+   * half-glyph is worse than a second line.
+   *
+   * Styles live HERE and not in a parent's `:global` block — that is what let
+   * the board invent its own grammar in the first place. The host cell owns
+   * only `container-type: inline-size`, so the CELL decides what a slip can
+   * afford. Width is measured, never declared: «that cell does not give the
+   * width» is true at 85px and false at 143px.
+   */
+  import IdentityMark from '$lib/components/IdentityMark.svelte';
+  import { accentVarFor } from '$lib/utils/accent';
+  import type { Slip, SlipKind } from '$lib/month-events';
+  import type { ProjectLite } from '$lib/month-events';
+
+  interface Props {
+    slip: Slip;
+    /** The kind word — `show`, `rehearsal`, `travel`… Caller owns the words. */
+    kindLabel: (kind: SlipKind) => string;
+    /**
+     * The state line. A hold says its rank and its deadline in PLAIN TEXT
+     * («1st hold · expires Mon»); released says `let go`. A FIRM SHOW SAYS
+     * NOTHING — the clean box, the full ink and the serif already say it three
+     * times, so a word there is the fourth (ADR-095 §4).
+     */
+    stateLabel: (slip: Slip) => string | null;
+    /** True while the hold's clock is actually running — the one thing on a
+        held card that is not a maybe, so it is the one thing that takes ink. */
+    stateUrgent?: boolean;
+    /** The month drops the ISO code (the cell gives 57px, city+code needs
+        58–70); the board and the day print it. The DRAWING decides. */
+    showCountry?: boolean;
+    /** Monogram click — opens the identity quick panel (ADR-081, «las siete» §7). */
+    onMarkOpen?: (e: MouseEvent, project: ProjectLite | null) => void;
+  }
+
+  let {
+    slip,
+    kindLabel,
+    stateLabel,
+    stateUrgent = false,
+    showCountry = false,
+    onMarkOpen,
+  }: Props = $props();
+
+  let state = $derived(stateLabel(slip));
+  let held = $derived(slip.cert === 'hold' || slip.cert === 'proposed');
+</script>
+
+<!-- One body, two shells: a thing with a page of its own is a link, one
+     without is inert. Written once so the grammar cannot fork. -->
+{#snippet body()}
+  <span class="slip__h">
+    <!-- The pack. Indivisible: `flex: none` on the whole thing. -->
+    <span class="slip__pack">
+      {#if slip.project}
+        {#if onMarkOpen}
+          <span
+            class="slip__mark"
+            role="button"
+            tabindex="0"
+            onclick={(e) => onMarkOpen(e, slip.project)}
+            onkeydown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onMarkOpen(e as unknown as MouseEvent, slip.project);
+              }
+            }}
+          >
+            <IdentityMark
+              accent={accentVarFor(slip.project)}
+              name={slip.project.name}
+              initials={slip.project.initials}
+            />
+          </span>
+        {:else}
+          <IdentityMark
+            accent={accentVarFor(slip.project)}
+            name={slip.project.name}
+            initials={slip.project.initials}
+          />
+        {/if}
+      {/if}
+      <span class="slip__kind" class:slip__kind--q={held}
+        >{kindLabel(slip.kind)}{#if held}?{/if}</span
+      >
+    </span>
+    {#if slip.time}
+      <span class="slip__t">{slip.time.primary}</span>
+    {/if}
+  </span>
+
+  {#if state}
+    <span class="slip__state" class:slip__state--due={stateUrgent}>{state}</span>
+  {/if}
+
+  <span class="slip__n">{slip.name}</span>
+
+  {#if slip.city}
+    <span class="slip__c"
+      >{slip.city}{#if showCountry && slip.country}<i class="slip__cc">{slip.country}</i>{/if}</span
+    >
+  {/if}
+
+  <!-- THE SECOND CLOCK IS A GLOSS: its own line, so it can never push an hour
+       out of its box, and the first thing the cell drops when it runs short. -->
+  {#if slip.time?.secondary}
+    <span class="slip__tz">{slip.time.secondary}</span>
+  {/if}
+{/snippet}
+
+{#if slip.href}
+  <a
+    class="slip"
+    data-family={slip.cert}
+    data-kind={slip.kind}
+    style={slip.project ? `--c: ${accentVarFor(slip.project)}` : undefined}
+    href={slip.href}
+    title={slip.title}>{@render body()}</a
+  >
+{:else}
+  <span
+    class="slip"
+    data-family={slip.cert}
+    data-kind={slip.kind}
+    style={slip.project ? `--c: ${accentVarFor(slip.project)}` : undefined}
+    title={slip.title}>{@render body()}</span
+  >
+{/if}
+
+<style>
+  @layer components {
+    .slip {
+      position: relative;
+      isolation: isolate;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      width: 100%;
+      min-width: 0;
+      padding: 4px 6px;
+      text-align: left;
+      text-decoration: none;
+      background: var(--bg-ultra-light);
+      border: 1px solid var(--border-color-light);
+      border-radius: var(--radius-s);
+      color: var(--text-color);
+    }
+    .slip + :global(.slip) {
+      margin-block-start: 3px;
+    }
+
+    /* ── the head line ──────────────────────────────────────────────── */
+    .slip__h {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1px 6px;
+      width: 100%;
+      min-width: 0;
+      /* The wrapped head keeps a hairline: two 10px line boxes at 1.05 with
+         no row-gap touch, and the board's slip wraps more often than the
+         month's. 1px and 1.15 — still tight, never touching. */
+      line-height: 1.15;
+    }
+    .slip__pack {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      flex: none; /* the pack NEVER yields — see the header note */
+    }
+    .slip__mark {
+      display: inline-flex;
+      cursor: pointer;
+      border-radius: var(--radius-s);
+    }
+    .slip__mark:focus-visible {
+      outline: 1px solid var(--text-muted);
+      outline-offset: 1px;
+    }
+    .slip__kind {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+      white-space: nowrap;
+    }
+    /* An option LEANS: the kind word and its `?` are italic wherever they are
+       drawn. The glyph never leans — it is a symbol, not a word. */
+    .slip__kind--q {
+      font-style: italic;
+    }
+    .slip__t {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      color: var(--text-muted);
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+
+    /* ── state · plain text, never a pill ───────────────────────────────
+       A pill outranks everything around it: in a cell it read louder than
+       the venue you came there to read. Same words, same place, no box. */
+    .slip__state {
+      align-self: flex-start;
+      margin-block: 0 1px;
+      font-family: var(--font-mono);
+      font-size: 9px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+    .slip__state--due {
+      color: var(--info);
+    }
+
+    /* ── name · clamps to three lines, never one with an ellipsis ─────── */
+    .slip__n {
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 3;
+      line-clamp: 3;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 100%;
+      font-size: 11px;
+      line-height: 1.22;
+      color: var(--text-color);
+      /* Last-resort valve only: it fires when a single word cannot fit,
+         never on ordinary text. */
+      overflow-wrap: anywhere;
+      word-break: normal;
+      hyphens: none;
+    }
+    /* The gig keeps its step over every other kind at EVERY width: the agenda
+       says it 16/13, the month says it 13/11. Flattening the two is the one
+       place a show and a press call were drawn at the same weight. */
+    .slip[data-kind='show'] .slip__n {
+      font-family: var(--font-display);
+      font-size: 13px;
+    }
+
+    .slip__c {
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+      line-clamp: 2;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-block-start: -1px;
+      font-size: 9px;
+      color: var(--text-faint);
+      overflow-wrap: anywhere;
+      word-break: normal;
+    }
+    .slip__cc {
+      font-style: normal;
+      margin-inline-start: 4px;
+      letter-spacing: 0.06em;
+      opacity: 0.8;
+    }
+    .slip__tz {
+      display: block;
+      margin-block-start: 2px;
+      font-family: var(--font-mono);
+      font-size: 9px;
+      letter-spacing: 0.05em;
+      color: var(--text-faint);
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+
+    /* ══ THE CERTAINTY VOCABULARY ═══════════════════════════════════════
+       Geometry states the certainty. A theme may repaint the material; it may
+       never re-shape the geometry. */
+
+    /* firm — it IS real: clean ground, full ink, no mark at all. */
+
+    /* held / proposed — no solid edge, and the grain says it. The dashed edge
+       has to be READ; the texture is just SEEN, and it is calibrated once so
+       every drawing says "not sure" at the same volume. */
+    .slip[data-family='hold'],
+    .slip[data-family='proposed'] {
+      border-style: dashed;
+      border-color: color-mix(in oklch, var(--text-color) 13%, var(--border-color-light));
+      background: var(--bg-ultra-light);
+    }
+    .slip[data-family='hold']::before,
+    .slip[data-family='proposed']::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      z-index: -1;
+      opacity: 0.62;
+      background-image: radial-gradient(
+        color-mix(in oklch, var(--text-color) 22%, transparent) 0.75px,
+        transparent 1.4px
+      );
+      background-size: 7px 7px;
+      -webkit-mask-image: linear-gradient(150deg, #000 0 20%, transparent 82%);
+      mask-image: linear-gradient(150deg, #000 0 20%, transparent 82%);
+    }
+    /* The title takes the quieter ink here and in every other drawing: one
+       value for one state. And it leans — an option is written in italic
+       wherever its name appears. */
+    .slip[data-family='hold'] .slip__n,
+    .slip[data-family='proposed'] .slip__n {
+      color: var(--text-muted);
+      font-style: italic;
+    }
+    .slip[data-family='proposed'] .slip__n {
+      color: var(--text-faint);
+    }
+
+    /* released — WAS real, isn't. Kept as memory: dotted (a fourth line style,
+       so it can never be read as held or firm), struck, faintest ink. */
+    .slip[data-family='released'] {
+      border-style: dotted;
+      background: transparent;
+    }
+    .slip[data-family='released'] .slip__n,
+    .slip[data-family='released'] .slip__c,
+    .slip[data-family='released'] .slip__t {
+      color: var(--text-faint);
+      text-decoration: line-through;
+      text-decoration-thickness: 1px;
+    }
+
+    /* hover — the edge darkens and the NAME underlines. Nothing else moves:
+       a slip that changes shape on hover is a slip that flickers in a grid. */
+    .slip:hover {
+      border-color: var(--text-faint);
+    }
+    a.slip:hover .slip__n {
+      text-decoration: underline;
+      text-decoration-color: var(--border-color-light);
+      text-underline-offset: 2px;
+    }
+
+    /* ══ THE CELL DECIDES WHAT A SLIP CAN AFFORD ════════════════════════
+       Measured, never declared. The host sets `container-type: inline-size`;
+       these are the two steps the design measured on a real month cell. */
+    @container (max-width: 142px) {
+      /* the end hour goes, the start stays — the range is in the title */
+      .slip__t {
+        letter-spacing: 0;
+      }
+    }
+    @container (max-width: 126px) {
+      /* a gloss is the FIRST thing to go, and never the hour */
+      .slip__tz {
+        display: none;
+      }
+      .slip__h {
+        gap: 2px 6px;
+      }
+      .slip {
+        padding: 4px 3px 5px;
+      }
+    }
+  }
+</style>

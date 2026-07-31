@@ -74,6 +74,7 @@
   "planner.clash_blackout_t_body": "{person} provisionalment fora — podria xocar.",
   "planner.clash_blackout_t_company_body": "{workspace} — tancament provisional — podria xocar.",
   "planner.blackouts_toggle": "blackouts",
+  "planner.kind_show": "funció",
   "planner.kind_rehearsal": "assaig",
   "planner.kind_residency": "residència",
   "planner.kind_travel_day": "viatge",

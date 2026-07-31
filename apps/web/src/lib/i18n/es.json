@@ -74,6 +74,7 @@
   "planner.clash_blackout_t_body": "{person} provisionalmente fuera — podría chocar.",
   "planner.clash_blackout_t_company_body": "{workspace} — cierre provisional — podría chocar.",
   "planner.blackouts_toggle": "blackouts",
+  "planner.kind_show": "función",
   "planner.kind_rehearsal": "ensayo",
   "planner.kind_residency": "residencia",
   "planner.kind_travel_day": "viaje",

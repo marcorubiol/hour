@@ -1,4 +1,6 @@
 <script lang="ts">
+  import Slip from '../components/planner/Slip.svelte';
+  import type { Slip as SlipVM, SlipKind } from '../month-events';
   import Button from '../components/Button.svelte';
   import LinkButton from '../components/LinkButton.svelte';
   import Input from '../components/Input.svelte';
@@ -83,6 +85,45 @@
     { label: 'Pin', disabled: true },
     { label: 'Delete', danger: true, onclick: () => addToast({ tone: 'danger', message: 'Deleted' }) },
   ];
+  /* ── THE SLIP · the four certainties, in one place ─────────────────────
+     The point of this block is the COMPARISON: four certainties side by side
+     is the only way to see whether the geometry really states them, which is
+     the invariant the whole Planner v3 design hangs on (ADR-095 §0). */
+  const SLIP_PROJ = {
+    id: 'p1',
+    slug: 'mamemi',
+    name: 'MaMeMi',
+    accent: null,
+    initials: 'MM',
+    workspace_id: 'ws1',
+  };
+  function mkSlip(over: Partial<SlipVM> = {}): SlipVM {
+    return {
+      id: 's1',
+      kind: 'show',
+      cert: 'confirmed',
+      name: 'Teatre Principal',
+      city: 'Terrassa',
+      country: 'ES',
+      time: { primary: '20h', secondary: null },
+      project: SLIP_PROJ,
+      href: null,
+      title: 'Teatre Principal — confirmed · 20h',
+      ...over,
+    };
+  }
+  const SLIP_KIND = (k: SlipKind) =>
+    ({ show: 'show', rehearsal: 'rehearsal', residency: 'residency', travel_day: 'travel', press: 'press', day_off: 'day off', other: 'other' })[k] ?? k;
+  /* `state = opt || hold` in the prototype — and nothing else. A PROPOSED slip
+     carries no word either: the `?` on the kind word already says it, and a
+     second `option` under it is the same fact twice, forty pixels apart. */
+  const SLIP_STATE = (s: SlipVM) => {
+    if (s.cert === 'released') return 'let go';
+    if (s.cert === 'hold') return '1st hold · expires Mon';
+    return null; // firm and proposed both say nothing — ADR-095 §4
+  };
+  const SLIP_CELLS = [143, 126, 85];
+
 </script>
 
 <main class="playground">
@@ -92,6 +133,68 @@
       Dev-only. Hot reload from <code>src/components/</code>.
     </p>
   </header>
+
+
+  <section class="playground__section">
+    <h2 class="h3">Slip — the four certainties (ADR-095)</h2>
+    <p class="text--s text--dark-muted">
+      Geometry states the certainty. Firm carries no word at all; held and
+      proposed carry the grain and lean; released is struck and dotted.
+    </p>
+    <div class="playground__slips">
+      {#each ['confirmed', 'hold', 'proposed', 'released'] as const as cert (cert)}
+        <div class="playground__cell" style="inline-size: 143px">
+          <Slip
+            slip={mkSlip({ cert })}
+            kindLabel={SLIP_KIND}
+            stateLabel={SLIP_STATE}
+            stateUrgent={cert === 'hold'}
+            showCountry={false}
+          />
+        </div>
+      {/each}
+    </div>
+
+    <h2 class="h3">Slip — the cell decides what it can afford</h2>
+    <p class="text--s text--dark-muted">
+      Measured, never declared: 143px (sidebar closed) keeps the second clock,
+      126px drops it, 85px is the brief's narrow cell.
+    </p>
+    <div class="playground__slips">
+      {#each SLIP_CELLS as w (w)}
+        <div class="playground__cell" style="inline-size: {w}px">
+          <Slip
+            slip={mkSlip({
+              name: 'Teatre Nacional de Catalunya',
+              city: 'London',
+              country: 'GB',
+              time: { primary: '19h–20h30', secondary: '20h–21h30 here' },
+            })}
+            kindLabel={SLIP_KIND}
+            stateLabel={SLIP_STATE}
+            showCountry={true}
+          />
+        </div>
+      {/each}
+    </div>
+
+    <h2 class="h3">Slip — a gig keeps its step over every other kind</h2>
+    <div class="playground__slips">
+      {#each ['show', 'rehearsal', 'travel_day', 'press'] as const as k (k)}
+        <div class="playground__cell" style="inline-size: 143px">
+          <Slip
+            slip={mkSlip({
+              kind: k,
+              name: k === 'show' ? 'Teatre Principal' : 'Sala d’assaig',
+              time: k === 'travel_day' ? null : { primary: '10h', secondary: null },
+            })}
+            kindLabel={SLIP_KIND}
+            stateLabel={SLIP_STATE}
+          />
+        </div>
+      {/each}
+    </div>
+  </section>
 
   <section class="playground__section">
     <h2 class="h3">Button — variants</h2>
@@ -984,6 +1087,22 @@
 <Toast />
 
 <style>
+  .playground__slips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: flex-start;
+    margin-block: 8px 20px;
+  }
+  /* The host owns `container-type` — that is what lets the CELL decide what a
+     slip can afford, exactly as the month grid will. */
+  .playground__cell {
+    container-type: inline-size;
+    padding: 4px;
+    border: 1px dashed var(--border-color-light);
+    border-radius: var(--radius-s);
+  }
+
   @layer components {
     .playground {
       padding: var(--space-l);
