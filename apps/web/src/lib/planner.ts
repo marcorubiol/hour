@@ -754,6 +754,56 @@ export function assignBandLanes(
 }
 
 /**
+ * NIGHTS FREE — inventory unsold, which is the one number in the Planner that
+ * is about the business rather than about the calendar (ADR-095).
+ *
+ * Two rules, and the second is the one that is easy to get wrong:
+ *
+ *  1 · A night with anything of its own is not free. Anything: a gig, a
+ *      rehearsal, a press call, a travel leg. The question is «could I sell
+ *      this night», not «is there a show».
+ *  2 · A NIGHT ON TOUR IS NOT A FREE NIGHT. Between an outbound leg and its
+ *      return, the days with nothing of their own still cannot be sold — the
+ *      company is 1.200km from home. Counting them as free is the calendar
+ *      offering something that does not exist.
+ *
+ * Availability deliberately IGNORES the project filter: nobody is free
+ * because you hid the project that is occupying them. The caller is
+ * responsible for passing every occupied day it knows of, not just the
+ * pinned ones — and for saying so when it cannot.
+ */
+export function nightsFree(
+  days: string[],
+  occupiedDays: Iterable<string>,
+  tourDays: Iterable<string> = [],
+): number {
+  const busy = new Set(occupiedDays);
+  const away = new Set(tourDays);
+  let n = 0;
+  for (const day of days) if (!busy.has(day) && !away.has(day)) n++;
+  return n;
+}
+
+/**
+ * Every day covered by a set of bands, inclusive at both ends — the tour
+ * nights that `nightsFree` discounts. Bands are display-level inference
+ * (ADR-078 §6), and this is the one place that inference is allowed to move
+ * a number: not because it invents a fact, but because it withdraws a claim.
+ */
+export function daysCoveredBy(bands: Array<{ from: string; to: string }>): Set<string> {
+  const out = new Set<string>();
+  for (const b of bands) {
+    let d = b.from;
+    // Guard against an inverted band rather than looping forever on it.
+    for (let i = 0; d <= b.to && i < 400; i++) {
+      out.add(d);
+      d = addDaysIso(d, 1);
+    }
+  }
+  return out;
+}
+
+/**
  * The agenda's included-days rule (ADR-076/078): a day earns a group when
  * it carries an event OR sits inside a stored blackout. `days` is the
  * ordered day list of the visible range (the month); order is preserved.

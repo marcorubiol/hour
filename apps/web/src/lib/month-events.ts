@@ -46,6 +46,13 @@ export type PerformanceEvent = {
   } | null;
   /** ADR-084 §3 — the operator's readiness ticks, read by the card foot. */
   readiness?: Record<string, boolean> | null;
+  /**
+   * ADR-080 §2 — days of notice before the gig, NULL meaning "the standard".
+   * It travels under `?notice=1`, which until ADR-095 only the decisions feed
+   * asked for: the chip could say a hold's RANK but never its DEADLINE, and
+   * the deadline is the one thing on a held card that is not a maybe.
+   */
+  hold_notice_days?: number | null;
   /** Present only on ?rosters=1 fetches (conflict engine feed). */
   person_ids?: string[];
 };
@@ -87,16 +94,39 @@ export type BlackoutBandVM = {
   note?: string | null;
 };
 
-/** A derived away band (ADR-078 §6) — display-only inference. */
+/**
+ * A derived away band (ADR-078 §6) — display-only inference, and quieter than
+ * an absence on purpose: an absence is a fact somebody wrote down, this is
+ * deduced from two travel legs.
+ *
+ * It says WHOSE tour: at one column wide the coloured monogram is the only
+ * thing that survives, so the project travels with the band rather than being
+ * flattened into a label the drawing cannot take apart again.
+ */
 export type AwayBandVM = {
   from: string;
   to: string;
   label: string;
+  project_id: string;
+  /** Accent as a CSS value, for the monogram. */
+  accent: string | null;
+  initials: string | null;
+  projectName: string | null;
+  /** Where the tour is. Without it, «on tour» cannot tell London from anywhere. */
+  place: string | null;
 };
 
 /** One conflict, page-shaped for the day mark + clash card. */
 export type ClashVM = {
   severity: 'people' | 'possible' | 'blackout' | 'blackout-tentative';
+  /**
+   * WHICH two collide. The red rule is painted on exactly the pair, and the
+   * bridge between two adjacent slips only draws when both are on the sheet —
+   * neither is possible from a label. These were resolved to strings at the VM
+   * boundary and thrown away, so the month could say THAT something clashed
+   * and never which.
+   */
+  event_ids: string[];
   glyph: '!' | '?';
   title: string;
   body: string;

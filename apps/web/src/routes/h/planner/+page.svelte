@@ -607,14 +607,50 @@
       };
     }),
   );
+  /**
+   * Where a tour IS. The band is inferred from a pair of travel legs, so its
+   * place is the destination of the leg that opened it: the latest outbound
+   * travel day for that project on or before the band's first day.
+   *
+   * Null is a real answer and stays null — «on tour» with an invented place
+   * would be the drawing asserting something nobody wrote down, which is the
+   * one thing the whole certainty grammar exists to prevent.
+   */
+  function tourPlaceFor(band: { from: string; project_id: string }): string | null {
+    let best: { day: string; place: string } | null = null;
+    for (const d of scopedDates) {
+      if (d.kind !== 'travel_day' || d.status === 'cancelled') continue;
+      if (d.project?.id !== band.project_id) continue;
+      if (d.travel_direction !== 'outbound') continue;
+      const day = d.starts_at.slice(0, 10);
+      if (day > band.from) continue;
+      const place = d.city ?? d.venue_name ?? null;
+      if (!place) continue;
+      if (!best || day > best.day) best = { day, place };
+    }
+    return best?.place ?? null;
+  }
+
+  // The band travels with its project and its place (ADR-095): at one column
+  // wide the monogram is all that survives, and «on tour» with no place cannot
+  // tell London from anywhere at all. The label stays for the surfaces that
+  // only have room for a sentence.
   let awayVMs = $derived.by((): AwayBandVM[] =>
-    aways.map((b) => ({
-      from: b.from,
-      to: b.to,
-      label: t('planner.away', locale, {
-        project: projectNameById.get(b.project_id) ?? '—',
-      }),
-    })),
+    aways.map((b) => {
+      const proj = projectById.get(b.project_id) ?? null;
+      return {
+        from: b.from,
+        to: b.to,
+        label: t('planner.away', locale, {
+          project: projectNameById.get(b.project_id) ?? '—',
+        }),
+        project_id: b.project_id,
+        accent: proj ? accentVarFor(proj) : null,
+        initials: proj?.initials ?? null,
+        projectName: proj?.name ?? null,
+        place: tourPlaceFor(b),
+      };
+    }),
   );
 
   let blackoutById = $derived(new Map(allBlackouts.map((b) => [b.id, b])));
@@ -656,6 +692,7 @@
         title: t('planner.clash_people_title', locale),
         body: t('planner.clash_people_body', locale, { people }),
         rows,
+        event_ids: c.event_ids,
       };
     }
     if (c.severity === 'possible') {
@@ -665,6 +702,7 @@
         title: t('planner.clash_possible_title', locale),
         body: t('planner.clash_possible_body', locale),
         rows,
+        event_ids: c.event_ids,
       };
     }
     const tentative = c.severity === 'blackout-tentative';
@@ -688,6 +726,7 @@
             person,
           }),
       rows,
+      event_ids: c.event_ids,
     };
   }
 
@@ -721,6 +760,7 @@
   }
 
   type ProjectRef = {
+    initials?: string | null;
     slug: string | null;
     name: string;
     accent?: string | null;

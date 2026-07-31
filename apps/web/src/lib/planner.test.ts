@@ -6,10 +6,12 @@ import {
   assignBandLanes,
   awayBands,
   conflictsFor,
+  daysCoveredBy,
   dayKeyInTz,
   decisionsFor,
   isoWeek,
   monthGrid,
+  nightsFree,
   normalizePlannerView,
   performanceRoster,
   resolvePlannerView,
@@ -1126,5 +1128,58 @@ describe('agendaDayKeys', () => {
 
   it('no events and no blackouts shows no days', () => {
     expect(agendaDayKeys(days, [], [])).toEqual([]);
+  });
+});
+
+describe('nightsFree — the one number about the business', () => {
+  const JULY = ['2026-07-01', '2026-07-02', '2026-07-03', '2026-07-04', '2026-07-05'];
+
+  it('a night with anything of its own is not free', () => {
+    // Anything: the question is «could I sell this night», not «is there a
+    // show». A rehearsal occupies the night exactly as a gig does.
+    expect(nightsFree(JULY, ['2026-07-02', '2026-07-04'])).toBe(3);
+  });
+
+  it('A NIGHT ON TOUR IS NOT A FREE NIGHT', () => {
+    // The middle of a tour has nothing of its own and still cannot be sold:
+    // the company is 1.200km from home. Counting it free is the calendar
+    // offering something that does not exist.
+    expect(nightsFree(JULY, ['2026-07-01'], ['2026-07-02', '2026-07-03'])).toBe(2);
+  });
+
+  it('a day both occupied and on tour is counted once, not twice', () => {
+    expect(nightsFree(JULY, ['2026-07-02'], ['2026-07-02'])).toBe(4);
+  });
+
+  it('an empty window has no free nights to offer', () => {
+    expect(nightsFree([], ['2026-07-02'])).toBe(0);
+  });
+});
+
+describe('daysCoveredBy', () => {
+  it('covers both ends inclusively', () => {
+    expect([...daysCoveredBy([{ from: '2026-07-01', to: '2026-07-03' }])]).toEqual([
+      '2026-07-01',
+      '2026-07-02',
+      '2026-07-03',
+    ]);
+  });
+
+  it('a single-day band is that day', () => {
+    expect([...daysCoveredBy([{ from: '2026-07-09', to: '2026-07-09' }])]).toEqual(['2026-07-09']);
+  });
+
+  it('overlapping bands do not double-count', () => {
+    const days = daysCoveredBy([
+      { from: '2026-07-01', to: '2026-07-03' },
+      { from: '2026-07-02', to: '2026-07-04' },
+    ]);
+    expect(days.size).toBe(4);
+  });
+
+  it('an inverted band yields nothing instead of looping forever', () => {
+    // Cheap insurance: this walks day by day, and a `to` before `from` used to
+    // be the shape that hangs a render.
+    expect(daysCoveredBy([{ from: '2026-07-05', to: '2026-07-01' }]).size).toBe(0);
   });
 });

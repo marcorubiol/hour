@@ -111,7 +111,7 @@ export function createPlannerFeeds(inputs: PlannerFeedInputs) {
       enabled: inputs.view() !== 'agenda' && !k.unresolved,
       queryFn: ({ signal }: { signal: AbortSignal }) =>
         fetchJSON<{ items: PerformanceEvent[] }>(
-          `/api/performances?status=any&rosters=1&${feedParams(k, k.from, k.to)}`,
+          `/api/performances?status=any&rosters=1&notice=1&${feedParams(k, k.from, k.to)}`,
           signal,
         ),
     };
@@ -245,7 +245,7 @@ export function createPlannerFeeds(inputs: PlannerFeedInputs) {
       enabled: inputs.view() === 'agenda' && !k.unresolved,
       queryFn: ({ signal }: { signal: AbortSignal }) =>
         pagedFeed<PerformanceEvent>(
-          (from) => `/api/performances?status=any&rosters=1&${feedParams(k, from, k.to)}`,
+          (from) => `/api/performances?status=any&rosters=1&notice=1&${feedParams(k, from, k.to)}`,
           (p) => p.performed_at.slice(0, 10),
           k.from,
           signal,

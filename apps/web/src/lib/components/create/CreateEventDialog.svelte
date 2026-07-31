@@ -146,7 +146,11 @@
   let dEndTime = $state('');
   let dStartWall = $state(''); // timed start (datetime-local)
   let dEndWall = $state(''); // timed end (datetime-local, optional)
-  let dOption = $state(false); // ADR-078 §9 — on ⇒ tentative, off ⇒ confirmed
+  // ADR-078 §9 — on ⇒ tentative, off ⇒ confirmed. DEFAULT ON since ADR-095 §7:
+  // a date is born asked-for, not settled. The toggle stays, because settling
+  // it at creation is a real (if rarer) act — what changed is which of the two
+  // the app assumes when you say nothing.
+  let dOption = $state(true);
   let dDirection = $state<TravelDirection>('outbound');
 
   const workspacesQuery = createQuery(workspacesQueryOptions());
@@ -266,7 +270,7 @@
       dCity = '';
       dLabel = '';
       dPerformance = '';
-      dOption = false;
+      dOption = true;
       dDirection = 'outbound';
       dAllDay = false;
       if (presetProjectId) {

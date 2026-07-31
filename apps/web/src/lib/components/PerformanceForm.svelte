@@ -79,7 +79,11 @@
   let cDay = $state('');
   let cVenue = $state('');
   let cCity = $state('');
-  let cStatus = $state('proposed');
+  // A NEW DATE IS BORN AS A HOLD (ADR-095 §7). Nobody adds a night to a touring
+  // calendar because it is settled: you add it because a theatre asked for it,
+  // and the whole certainty grammar exists to carry that difference.
+  // Confirming is a separate act, and it lives on the row.
+  let cStatus = $state('hold');
   let cLine = $state('');
   // ADR-080 §2 — hold decision notice; only shown (and only sent) while
   // the picked status is a hold*. null = empty field = standard default.
