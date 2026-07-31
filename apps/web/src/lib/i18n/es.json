@@ -12,7 +12,7 @@
   "planner.eyebrow_spaces_one": "1 espacio en vista",
   "planner.eyebrow_spaces": "{n} espacios en vista",
   "planner.stat_confirmed": "confirmados",
-  "planner.stat_holds": "holds",
+  "planner.stat_holds": "opciones",
   "planner.stat_conflicts": "conflictos",
   "planner.stat_blackouts": "blackouts",
   "planner.hold_rank_1": "1er hold",
@@ -362,5 +362,6 @@
   "planner.read_marks": "Leer las marcas",
   "planner.marks_firm": "es real",
   "planner.marks_held": "pedido — todavía no es real",
-  "planner.marks_clash": "hay una llamada que hacer"
+  "planner.marks_clash": "hay una llamada que hacer",
+  "planner.stat_holds_one": "opción"
 }

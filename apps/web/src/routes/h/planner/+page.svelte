@@ -1494,7 +1494,12 @@
           >
         {/if}
         <span class="cal__stat"><b>{stats.confirmed}</b> {t('planner.stat_confirmed', locale)}</span>
-        <span class="cal__stat"><b>{stats.holds}</b> {t('planner.stat_holds', locale)}</span>
+        <!-- `1 holds` was printing on every single-hold month. The design's own
+             word for this counter is `option`, and it agrees in number. -->
+        <span class="cal__stat"
+          ><b>{stats.holds}</b>
+          {t(stats.holds === 1 ? 'planner.stat_holds_one' : 'planner.stat_holds', locale)}</span
+        >
         {#if pulseAwayPersons > 0}
           <span class="cal__stat cal__stat--soft"
             >{pulseAwayPersons === 1
@@ -1542,8 +1547,6 @@
   <CalToolbar
     onReadMarks={() => (marksOpen = true)}
     {view}
-    {monthTitle}
-    year={ym.year}
     {laneAxis}
     calm={calm.on}
     {canBlackout}

@@ -17,8 +17,6 @@
 
   interface Props {
     view: PlannerView;
-    monthTitle: string;
-    year: number;
     laneAxis: LaneAxis;
     calm: boolean;
     /** Blackout entry points hide while availability/team feeds are absent. */
@@ -39,8 +37,6 @@
 
   let {
     view,
-    monthTitle,
-    year,
     laneAxis,
     calm,
     canBlackout,
@@ -66,7 +62,12 @@
       <Button variant="outline" size="s" onclick={onPrevMonth} label={t('planner.prev_month', locale)}
         >←</Button
       >
-      <span class="cal__tbmonth">{monthTitle} {year}</span>
+      <!-- THE DATE IS SAID ONCE (ADR-095 §9). The page title IS the date, in
+           40px serif, four centimetres above; repeating it here was the same
+           fact twice on one screen. And it was sitting BETWEEN the two arrows,
+           so a control you press repeatedly had a variable-width label in the
+           middle of it — the month name changes width, so the ‹ and the › move
+           depending on which month you are in. -->
       <Button variant="outline" size="s" onclick={onNextMonth} label={t('planner.next_month', locale)}
         >→</Button
       >
@@ -157,14 +158,6 @@
       display: flex;
       align-items: center;
       gap: var(--space-xs);
-    }
-    .cal__tbmonth {
-      font-family: var(--font-display);
-      font-size: var(--text-m);
-      font-weight: 500;
-      min-inline-size: 7.5rem;
-      text-align: center;
-      text-transform: capitalize;
     }
     .cal__spacer {
       flex: 1;

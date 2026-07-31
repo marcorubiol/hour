@@ -12,7 +12,7 @@
   "planner.eyebrow_spaces_one": "1 espai en vista",
   "planner.eyebrow_spaces": "{n} espais en vista",
   "planner.stat_confirmed": "confirmats",
-  "planner.stat_holds": "holds",
+  "planner.stat_holds": "opcions",
   "planner.stat_conflicts": "conflictes",
   "planner.stat_blackouts": "blackouts",
   "planner.hold_rank_1": "1r hold",
@@ -362,5 +362,6 @@
   "planner.read_marks": "Llegir les marques",
   "planner.marks_firm": "és real",
   "planner.marks_held": "demanat — encara no és real",
-  "planner.marks_clash": "hi ha una trucada a fer"
+  "planner.marks_clash": "hi ha una trucada a fer",
+  "planner.stat_holds_one": "opció"
 }
