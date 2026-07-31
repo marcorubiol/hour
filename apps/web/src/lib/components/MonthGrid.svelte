@@ -879,6 +879,25 @@
     .cal__grid :global(.cal__event[data-family='proposed']) {
       --chip-fg: var(--text-faint);
     }
+    /* RELEASED — was real, isn't any more (ADR-095 §0, the fourth certainty).
+       It is kept as MEMORY, not dropped: what you let go of is the thing you
+       most need to see when you look back at the month. Struck through and at
+       the faintest ink, with a dotted edge — dotted is a fourth line style, so
+       it can never be confused with held/proposed (dashed) or firm (solid).
+       Before this rule existed `cancelled` fell into `proposed`, and then into
+       the BASE chip style once it stopped being proposed — which is the
+       confirmed look. A gig the company lost would have drawn as real. */
+    .cal__grid :global(.cal__event[data-family='released']) {
+      --chip-fg: var(--text-faint);
+      --chip-bg: transparent;
+      --chip-border-style: dotted;
+    }
+    .cal__grid :global(.cal__event[data-family='released'] .cal__event-name),
+    .cal__grid :global(.cal__event[data-family='released'] .cal__event-time),
+    .cal__grid :global(.cal__event[data-family='released'] .cal__event-city) {
+      text-decoration: line-through;
+      text-decoration-thickness: 1px;
+    }
 
     .cal__grid :global(.cal__event-name) {
       /* The chip's title — bold on EVERY kind (gig, rehearsal, residency,

@@ -37,13 +37,25 @@ export function performanceStatusTone(status: string): StatusTone {
 }
 
 /**
- * The chip grammar's three shapes (ADR-072 §5 / ADR-078): solid =
- * commitment (confirmed and its aftermath), outline = possibility held
- * (hold*), dashed = intention (proposed; cancelled joins it as the only
- * remaining honest non-solid rendering). Unknown statuses read as dashed —
- * never a false commitment.
+ * The certainty grammar, and there are FOUR states (ADR-095 §0, from the
+ * Planner v3 design; extends ADR-072 §5 / ADR-078). Geometry states the
+ * certainty — a theme may repaint the material, never re-shape it:
+ *
+ *   confirmed → it IS real      · clean ground, full ink, no mark at all
+ *   hold      → asked for       · grain + the word `option` + the hold chip
+ *   proposed  → somebody's idea · grain + `option?`
+ *   released  → WAS real        · struck through, faintest ink, `let go`
+ *
+ * `released` is the one that was missing, and its absence was not neutral:
+ * `cancelled` was folded into `proposed`, so a date the company had confirmed
+ * and then lost read as a date somebody had merely suggested. Those are
+ * opposite facts. Released is kept as MEMORY — it is drawn, not dropped,
+ * because a gig you let go of is the thing you most need to see when you look
+ * back at the month.
+ *
+ * Unknown statuses read as `proposed` — never a false commitment.
  */
-export type StatusFamily = 'confirmed' | 'hold' | 'proposed';
+export type StatusFamily = 'confirmed' | 'hold' | 'proposed' | 'released';
 
 const FAMILIES: Record<PerformanceStatus, StatusFamily> = {
   proposed: 'proposed',
@@ -55,7 +67,7 @@ const FAMILIES: Record<PerformanceStatus, StatusFamily> = {
   invoiced: 'confirmed',
   done: 'confirmed',
   paid: 'confirmed',
-  cancelled: 'proposed',
+  cancelled: 'released',
 };
 
 export function performanceStatusFamily(status: string): StatusFamily {

@@ -868,6 +868,16 @@
     .ag__row[data-family='proposed'] .ag__title {
       color: var(--text-muted);
     }
+    /* RELEASED — the fourth certainty (ADR-095 §0). Kept as memory: struck
+       through at the faintest ink, in the row exactly as on the month slip.
+       Without this rule a released row inherits the plain title, which is the
+       confirmed treatment — the loudest possible lie about a gig you lost. */
+    .ag__row[data-family='released'] .ag__title,
+    .ag__row[data-family='released'] .ag__time {
+      color: var(--text-faint);
+      text-decoration: line-through;
+      text-decoration-thickness: 1px;
+    }
     .ag__title--date {
       font-style: italic;
       color: var(--text-muted);

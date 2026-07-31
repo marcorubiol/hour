@@ -69,6 +69,30 @@ export function addDaysIso(iso: string, delta: number): string {
 }
 
 /**
+ * ISO-8601 week number (ADR-095 §1). The Month view's grain is a WEEK, and
+ * `weeks 27 → 31` in the header is the one thing that says so without
+ * announcing it — the range proves what a row is.
+ *
+ * ISO rules, not the American ones: weeks start on Monday and week 1 is the
+ * one containing the first Thursday of the year. The standard trick is to
+ * jump to that Thursday — every day of an ISO week belongs to the year of its
+ * own Thursday, which is exactly why 29 December can be week 1 of the year
+ * after and 1 January can be week 52 of the year before.
+ */
+export function isoWeek(iso: string): number {
+  const d = new Date(`${iso}T00:00:00Z`);
+  // Monday = 0 … Sunday = 6, then step to this week's Thursday.
+  const dow = (d.getUTCDay() + 6) % 7;
+  d.setUTCDate(d.getUTCDate() - dow + 3);
+  const thursday = d.getTime();
+  // Week 1 is the week holding 4 January, by the same definition.
+  const jan4 = new Date(Date.UTC(d.getUTCFullYear(), 0, 4));
+  const jan4Dow = (jan4.getUTCDay() + 6) % 7;
+  jan4.setUTCDate(jan4.getUTCDate() - jan4Dow + 3);
+  return 1 + Math.round((thursday - jan4.getTime()) / (7 * 24 * 3600 * 1000));
+}
+
+/**
  * Bucket a timestamptz into the ISO day it falls on in `timeZone`.
  * en-CA formats as YYYY-MM-DD natively.
  */

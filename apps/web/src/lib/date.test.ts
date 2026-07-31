@@ -6,7 +6,12 @@ describe('dateStatusFamily', () => {
     expect(dateStatusFamily('tentative')).toBe('hold');
     expect(dateStatusFamily('confirmed')).toBe('confirmed');
     expect(dateStatusFamily('done')).toBe('confirmed');
-    expect(dateStatusFamily('cancelled')).toBe('proposed');
+  });
+
+  it('cancelled is released — the same word the performance grammar uses', () => {
+    // One vocabulary across both calendar primitives (ADR-095 §0): if these
+    // two ever disagree, the month draws two grammars on one sheet.
+    expect(dateStatusFamily('cancelled')).toBe('released');
   });
 
   it('unknown statuses never read as commitment', () => {
@@ -15,7 +20,7 @@ describe('dateStatusFamily', () => {
 
   it('covers the full enum', () => {
     for (const s of DATE_STATUSES) {
-      expect(['confirmed', 'hold', 'proposed']).toContain(dateStatusFamily(s));
+      expect(['confirmed', 'hold', 'proposed', 'released']).toContain(dateStatusFamily(s));
     }
   });
 });

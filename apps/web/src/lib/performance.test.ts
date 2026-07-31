@@ -117,7 +117,15 @@ describe('performanceStatusFamily', () => {
     expect(performanceStatusFamily('hold_1')).toBe('hold');
     expect(performanceStatusFamily('hold_3')).toBe('hold');
     expect(performanceStatusFamily('proposed')).toBe('proposed');
-    expect(performanceStatusFamily('cancelled')).toBe('proposed');
+  });
+
+  it('cancelled is RELEASED, not proposed — they are opposite facts', () => {
+    // ADR-095 §0. Folding `cancelled` into `proposed` made a gig the company
+    // confirmed and then lost read as a gig somebody had merely suggested.
+    // Released is drawn, not dropped: what you let go of is the thing you
+    // most need to see when you look back at the month.
+    expect(performanceStatusFamily('cancelled')).toBe('released');
+    expect(performanceStatusFamily('cancelled')).not.toBe('proposed');
   });
 
   it('unknown statuses never read as commitment', () => {
@@ -126,7 +134,9 @@ describe('performanceStatusFamily', () => {
 
   it('covers the full enum — a new status must pick a shape', () => {
     for (const s of PERFORMANCE_STATUSES) {
-      expect(['confirmed', 'hold', 'proposed']).toContain(performanceStatusFamily(s));
+      expect(['confirmed', 'hold', 'proposed', 'released']).toContain(
+        performanceStatusFamily(s),
+      );
     }
   });
 });

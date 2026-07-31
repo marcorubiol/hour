@@ -8,6 +8,7 @@ import {
   conflictsFor,
   dayKeyInTz,
   decisionsFor,
+  isoWeek,
   monthGrid,
   performanceRoster,
   resolvePlannerView,
@@ -16,6 +17,47 @@ import {
   type PlannerEvent,
   type DecisionPerformance,
 } from './planner';
+
+describe('isoWeek', () => {
+  // The cases that separate a real ISO week from a naive day-of-year ÷ 7:
+  // every one of these crosses a year boundary, which is where the "week of
+  // its own Thursday" rule earns its keep.
+  it('the year boundary belongs to the week that holds its Thursday', () => {
+    expect(isoWeek('2026-01-01')).toBe(1); // Thu — so week 1 of 2026
+    expect(isoWeek('2025-12-29')).toBe(1); // Mon, but its Thursday is 1 Jan 2026
+    expect(isoWeek('2025-01-01')).toBe(1); // Wed — week 1 of 2025
+    expect(isoWeek('2024-12-30')).toBe(1); // Mon, Thursday falls in 2025
+    expect(isoWeek('2023-01-01')).toBe(52); // Sun — still week 52 of 2022
+  });
+
+  it('a week is Monday to Sunday, and the number holds across all seven', () => {
+    const days = [
+      '2026-07-13', // Mon
+      '2026-07-14',
+      '2026-07-15',
+      '2026-07-16',
+      '2026-07-17',
+      '2026-07-18',
+      '2026-07-19', // Sun
+    ];
+    const weeks = days.map(isoWeek);
+    expect(new Set(weeks).size).toBe(1);
+    expect(weeks[0]).toBe(29);
+    // …and the next Monday steps exactly one.
+    expect(isoWeek('2026-07-20')).toBe(30);
+  });
+
+  it('July 2026 spans weeks 27 → 31 — the range the Month header prints', () => {
+    expect(isoWeek('2026-07-01')).toBe(27);
+    expect(isoWeek('2026-07-31')).toBe(31);
+  });
+
+  it('a 53-week year has a week 53', () => {
+    // 2026 starts on a Thursday, which is one of the two shapes that produce
+    // 53 ISO weeks. If this ever returns 1, the Thursday jump is broken.
+    expect(isoWeek('2026-12-31')).toBe(53);
+  });
+});
 
 describe('monthGrid', () => {
   it('starts weeks on Monday and pads the first week', () => {

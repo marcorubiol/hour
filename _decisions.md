@@ -2983,3 +2983,127 @@ Triggered by Marco's pre-scaffold doubt (Phase 0.0 day 5). Five alternatives eva
   (b) el dial pase de tres valores a dos (ADR-092 dejó abierto reducirlo a
   `project · person`); (c) alguien pida comparar personas a lo largo de varios
   meses, que es cuando una proyección propia sí se gana el sitio.
+
+## [2026-07-31] — ADR-095 · El Planner v3 se implementa entero, y estas son las decisiones que hacían falta para poder empezar
+
+> Marco: *«aplica todo lo relacionado con planner, todas las visiones, el día, la
+> agenda, el mes, la pizarra, todo, todo, todo, tal como está. La única adaptación
+> que seguramente tendrás que hacer es sobre las notas»*. Y después:
+> *«sé autónomo, pregunta solo lo que realmente no puedas contestarte solo»*.
+> Este ADR es el resultado de contrastar el prototipo entero contra el repo —
+> **321 leyes en seis dibujos**, inventariadas una a una con su ancla en ambos
+> lados — y de decidir los choques que ese contraste destapó.
+
+- **0 · La regla de lectura, porque el documento del diseño no es una
+  especificación y lo dice él mismo.** `AGENDA-SYSTEM.md` lleva secciones
+  marcadas *(historia)* que son decisiones superadas, y en un punto capital dice
+  las dos cosas: en la línea 391 el Day es «la franja + el día en palabras» y en
+  la 493 **«El Day es la franja, y nada más»**. Regla: **manda el código del
+  prototipo, el `.md` lo explica**, y cuando el `.md` y el código discrepan se
+  anota como trampa. Excepción única, el margen: ver §5.
+
+- **1 · Cuatro vistas, un dial, y el dial NUNCA cambia qué es una fila.**
+  Today (una fila es un hilo del día) · Agenda (un día) · Month (una semana) ·
+  Board (una entidad, con dial `lanes by`). Es la misma ley que ADR-094 firmó
+  ayer desde el otro lado, y confirma que el dial de carriles ya construido era
+  la forma correcta. `window` desaparece como eje: no es una vista, es el
+  horizonte del tablero.
+
+- **2 · El Loom muere, y lo decide un dato, no un gusto.** `calLoom()` sigue en
+  el prototipo y **no tiene ni un llamador**: el dibujo de hilos está muerto allí.
+  Lo que el diseño dibuja con `by person` es **el mismo tablero** — mismas
+  columnas, mismas celdas, mismas fichas — con una fila por persona bajo banda de
+  proyecto. Esto contesta el «Abierto» de ADR-094 sin coste: se borra
+  `loomThreads()` (412 líneas de `carrils.ts` y sus tests) y por fin se estrenan
+  `personRowKeys()` y `noCastKey()`, exportadas y sin usar desde el 30 de julio.
+  **Supersedes ADR-080 §8** en la parte del Loom; el dial y su valor en la URL
+  siguen intactos.
+
+- **3 · El Planner pierde su filtro de estado.** `CalFilter` (Tot · Holds ·
+  Confirmats) y el filtro-por-leyenda salen. **Supersedes ADR-078 §12.** El
+  motivo es de arquitectura, no de estética: la app ya tiene una máquina de
+  estrechar y se llama scope, vive cien píxeles más arriba, y una segunda máquina
+  para el mismo acto enseña que esta lente razona distinto del resto de la
+  herramienta. Calm sobrevive como **palabra dibujada** (`calm · confirmed only`)
+  del lado de los hechos, nunca como interruptor, y los contadores **no se
+  mueven**: se parten en dos predicados, uno que cuenta la ventana y otro que
+  dibuja.
+
+- **4 · Un bolo confirmado no lleva palabra de estado, y en el mes tampoco pie de
+  readiness. Supersedes ADR-084 §3 en el dibujo del mes.** La caja limpia, la
+  tinta plena y la serif ya dicen «confirmado» tres veces; la palabra vive en la
+  ficha y en el full de ruta, donde leen los de fuera. El pie `hotel · technical`
+  contestaba una pregunta legítima («¿está resuelto?») en la celda que menos
+  espacio tiene de toda la app (57px de caja inline). La pregunta no se pierde:
+  se contesta donde hay ancho — la ficha ancha del tablero y el Day.
+
+- **5 · El margen es la única parte que se construye distinta a propósito, y aquí
+  la regla del §0 no sirve.** La sección «El margen es una pila, y cada nota dice
+  quién la lee» **no** está marcada *(historia)* y el código del prototipo la
+  cumple entera. No gana ninguno de los dos: gana **ADR-093**, que es de un día
+  después y supera explícitamente la decisión del 2026-07-29. Se van la pila, las
+  firmas, las horas, el botón `share` y el plegado `N more notes`; queda una caja.
+  Consecuencias que hay que ejecutar y no olvidar:
+  - **Dos aserciones del prototipo se borran conscientemente** (`calAudit` 25 «una
+    nota dice quién puede leerla» y 26 «la pila se cuenta a sí misma»): portarlas
+    sería reconstruir lo que ADR-093 mató.
+  - La tercera (27, «un margen dibujado contiene algo») **sobrevive recortada**, y
+    su cláusula de nota-de-equipo desaparece. Copiarla entera deja una regla que
+    no puede dispararse nunca, que en palabras del propio fichero *«es un
+    comentario»*.
+  - `noteCount()` solo puede valer **0 o 1**, así que la tapa que cuenta
+    (`notes · 4`) degenera a tell de presencia. El punto del mes sobrevive
+    intacto: su ley ya era «dice QUE hay escritura, nunca cuánta».
+  - La nota **no se guarda en cada tecla** (el prototipo lo hace contra
+    `localStorage`, que es gratis; contra la red es una petición por pulsación).
+    Se elige el guardado con debounce, y la ficha de persona se alinea con él.
+
+- **6 · La decisión baja al margen, y `to decide` no se pliega. Supersedes
+  ADR-080 §4** en el sitio del dibujo, no en su contenido. La objeción del repo
+  —«la agenda solo enseña la tensión, nunca duplica la UI de escritura»— la
+  contesta el propio diseño y mejor de lo que yo la habría contestado: *la ley de
+  «nada se dice dos veces» es sobre **hechos**, porque un hecho solo hay que
+  leerlo una vez; un **acto** no se lee, se ejerce, y el sitio de ejercerlo es
+  donde ya estás mirando*. Tres puertas a un acto con **un solo despachador** no
+  son tres máquinas, son una con tres pomos — la misma forma que ya tiene «añadir
+  una fecha». Y la pregunta no lleva tapa: plegar la pregunta es el único pliegue
+  que puede costarte una fecha.
+
+- **7 · Una fecha se crea EN el sitio, y nace como hold.** La celda **es** la
+  puerta (no un botón sobre su pie: `opacity:0` esconde una cosa, no impide que
+  se pulse), la celda vacía de un carril es la mejor puerta de la app porque sabe
+  el día **y** de quién es el carril, y `＋ date` cierra la fila de controles.
+  Las tres puertas pasan por una sola función. Nace como hold porque nadie añade
+  una noche a un calendario de gira por estar cerrada: la añades porque un teatro
+  la ha pedido, y toda la gramática de certeza existe para cargar esa diferencia.
+
+- **8 · Una sola medida, y mide el ELEMENTO.** Todos los umbrales salen del ancho
+  propio del dibujo por `ResizeObserver`, nunca del viewport. Hoy conviven tres
+  sistemas que miden la ventana (`matchMedia(560)`, `matchMedia(640)`, un
+  `resize` en `CarrilsStrip`) y el Planner nunca es la ventana: es una columna
+  dentro de un caparazón.
+
+- **9 · El estado vive en la URL, y hoy no del todo.** Vista, dial **y la
+  fecha**: `ym` es hoy `$state` del componente y `syncUrl()` no lo escribe, así
+  que con el título convertido EN la fecha un enlace compartido manda otra vista.
+  Los diales los escribe **solo la vista que los tiene** (una dirección con
+  `lanes=` sobre el Month miente), y las direcciones viejas se traducen **una vez
+  al entrar**. El vocabulario de la URL es estable e inglés; las etiquetas se
+  traducen (ca/en/es), que es lo que Marco pidió: *«el sitio tiene que estar en
+  los idiomas que tienen que estar»*.
+
+- **Rechazado**: implementar dibujo a dibujo (las leyes cruzan las cuatro vistas,
+  así que la ficha se escribiría cuatro veces — el diseño exige por ley que *la
+  ficha del tablero SEA la del mes*); portar la pila de notas «porque está en el
+  prototipo»; y mover la banda de decisiones al margen **sin** unificar antes el
+  despachador, que es lo que produciría dos sitios que confirman el mismo bolo.
+
+- **Status**: decidido 2026-07-31, **en construcción** en `feat/planner-v3`.
+  Inventario completo de las 321 leyes con ancla a ambos lados en
+  `_notes/planner-v3-inventory.json`.
+
+- **Re-evaluate when**: (a) ADR-090 (`schedule_slot`) se construya — entonces el
+  adaptador `runSheetSteps()` cambia por dentro y un paso puede llamarse «photo
+  call»; (b) ADR-089 (Travel v2) dé el otro extremo de un trayecto, que es lo
+  único que bloquea el slip de viaje a dos sitios; (c) comms abra, que es cuando
+  `note` gana audiencia e hilo y el margen puede volver a ser una pila.

@@ -16,6 +16,7 @@
 import * as v from 'valibot';
 import { Constants, type Enums, type Tables } from './db-types';
 import { realIsoInstant } from './datetime';
+import type { StatusFamily } from './performance';
 
 export type DateKind = Enums<'date_kind'>;
 export type DateStatus = Enums<'date_status'>;
@@ -151,13 +152,16 @@ export function invalidateDateFeeds(client: {
 }
 
 /**
- * Date rows join the performance chip grammar (ADR-078 §9): tentative is a
- * possibility (outline), confirmed/done the quiet solid form, cancelled the
- * dashed leftover. Same three-shape vocabulary as
- * `performanceStatusFamily` — one grammar across both calendar primitives.
+ * Date rows join the certainty grammar (ADR-078 §9, four states since
+ * ADR-095): tentative is a possibility, confirmed/done the quiet solid form,
+ * cancelled is RELEASED — it was real and is not any more — and anything else
+ * reads as somebody's idea. One vocabulary across both calendar primitives,
+ * which is the whole reason this function mirrors `performanceStatusFamily`
+ * instead of inventing its own words.
  */
-export function dateStatusFamily(status: string): 'confirmed' | 'hold' | 'proposed' {
+export function dateStatusFamily(status: string): StatusFamily {
   if (status === 'confirmed' || status === 'done') return 'confirmed';
   if (status === 'tentative') return 'hold';
+  if (status === 'cancelled') return 'released';
   return 'proposed';
 }
