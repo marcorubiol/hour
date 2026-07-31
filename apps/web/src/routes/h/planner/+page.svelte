@@ -1769,33 +1769,13 @@
 
 
 
-  <CalToolbar
-    onReadMarks={() => (marksOpen = true)}
-    {view}
-    {laneAxis}
-    calm={calm.on}
-    {canBlackout}
-    {locale}
-    onStepBack={stepBack}
-    onStepNext={stepNext}
-    onNow={goToday}
-    onSetView={setView}
-    onSetLaneAxis={setLaneAxis}
-    onCreate={() => openCreate()}
-    onFeed={openFeed}
-    onBlackout={() => {
-      // Direct menu path: no day context — drop any stale preset from a
-      // cancelled day-cell create (the dialog defaults to today). The
-      // create-dialog footer path keeps its day.
-      createDate = null;
-      openBlackout();
-    }}
-  />
+  <!-- THE META SITS ABOVE THE ROW OF CONTROLS — the order Marco's prototype
+       fixes, and he is the one who spent the hours on it.
 
-  <!-- BAND 3 · THE META, under the view row — the order the design fixes:
-       the window answers, the view names the drawing, and only then the
-       machine speaks. It used to sit between the title and the views, so the
-       9.5px mono line cut the two serif scales apart. -->
+       Top to bottom the head reads answer → report → controls: the window
+       states the date, the machine reports on THAT window in 9.5px mono, and
+       the controls that change it close the band. With the meta underneath,
+       the line summarising July sat below the buttons that leave July. -->
   <p class="cal__meta">
       <!-- Pulse strip (ADR-080 §6) — every figure maps to fetched rows; a
            segment whose feed is absent (or count is zero) drops instead of
@@ -1897,6 +1877,29 @@
         {/if}
       {/if}
     </p>
+  <CalToolbar
+    onReadMarks={() => (marksOpen = true)}
+    {view}
+    {laneAxis}
+    calm={calm.on}
+    {canBlackout}
+    {locale}
+    onStepBack={stepBack}
+    onStepNext={stepNext}
+    onNow={goToday}
+    onSetView={setView}
+    onSetLaneAxis={setLaneAxis}
+    onCreate={() => openCreate()}
+    onFeed={openFeed}
+    onBlackout={() => {
+      // Direct menu path: no day context — drop any stale preset from a
+      // cancelled day-cell create (the dialog defaults to today). The
+      // create-dialog footer path keeps its day.
+      createDate = null;
+      openBlackout();
+    }}
+  />
+
 
   {#if errorMsg}
     <p class="cal__state cal__state--danger">{errorMsg}</p>
@@ -1936,10 +1939,6 @@
         return key ? t(key, locale) : null;
       }}
       isoWeekLabel={(n) => `${t('planner.week_n', locale)} ${n}`}
-      confirmedWord={t('planner.week_confirmed', locale)}
-      optionWord={t('planner.week_options', locale)}
-      freeWord={t('planner.week_free', locale)}
-      nothingWord={t('planner.week_nothing', locale)}
       moreLabel={t('planner.more_n', locale)}
       releasedLabel={t('planner.released', locale)}
       expiresLabel={(iso) => localeWeekdayShort(iso, localeTag)}

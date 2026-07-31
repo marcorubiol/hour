@@ -93,11 +93,6 @@
     moreLabel?: string;
     /** «week 27» — the gutter's own label. */
     isoWeekLabel?: (n: number) => string;
-    /** Words for the density row's tooltip; the sheet itself stays wordless. */
-    confirmedWord?: string;
-    optionWord?: string;
-    freeWord?: string;
-    nothingWord?: string;
     /** «let go» — the word a released slip carries. */
     releasedLabel?: string;
     /** «expires Mon» — the deadline phrase, given the decide-by ISO day. */
@@ -146,10 +141,6 @@
     ],
     moreLabel = 'more',
     isoWeekLabel = (n: number) => `week ${n}`,
-    confirmedWord = 'confirmed',
-    optionWord = 'options',
-    freeWord = 'nights free',
-    nothingWord = 'nothing yet',
     releasedLabel = 'let go',
     expiresLabel = (iso: string) => `expires ${iso.slice(8, 10)}/${iso.slice(5, 7)}`,
     awayWord = 'away',
@@ -618,48 +609,18 @@
 
   /** Lanes in use across a whole week row — every cell reserves this many
    *  slots so a lane sits at the same height in every day of the week. */
-  /**
-   * THE WEEK'S GUTTER — the row that counts the week without words.
-   *
-   * One mark per day: solid for a confirmed gig, a ring for an option, a rule
-   * for a working day that is not a gig, a faint dot for a night still free.
-   * Three numbers became one row you read at a glance, and the words survive
-   * in the tooltip.
-   *
-   * `free` here is the same law as the header's counter: a night with anything
-   * of its own is not free, and neither is a night on tour.
-   */
-  type DayMark = 'firm' | 'held' | 'busy' | 'free' | 'out';
-  function weekMarks(week: { iso: string; inMonth: boolean }[]): DayMark[] {
-    return week.map((d) => {
-      if (!d.inMonth) return 'out';
-      const perfs = performancesByDay.get(d.iso) ?? [];
-      const dates = datesByDay.get(d.iso) ?? [];
-      let firm = false;
-      let held = false;
-      for (const p of perfs) {
-        const fam = performanceStatusFamily(p.status);
-        if (fam === 'confirmed') firm = true;
-        else if (fam === 'hold') held = true;
-      }
-      if (firm) return 'firm';
-      if (held) return 'held';
-      if (perfs.length > 0 || dates.length > 0) return 'busy';
-      return tourDays.has(d.iso) ? 'busy' : 'free';
-    });
-  }
-  /** Days covered by an away band — a tour night is never a free night. */
-  let tourDays = $derived.by(() => {
-    const out = new Set<string>();
-    for (const b of aways) {
-      let d = b.from;
-      for (let i = 0; d <= b.to && i < 400; i++) {
-        out.add(d);
-        d = addDaysIso(d, 1);
-      }
-    }
-    return out;
-  });
+  /* THE DENSITY ROW IS GONE, and it went by Marco's own hand: «sé que estos
+     puntos estaban en el diseño, pero no veo que realmente funcionen».
+
+     Seven marks per week in four textures — solid, ring, rule, faint dot —
+     asked the reader to hold a four-symbol legend in order to learn what the
+     SEVEN CELLS BESIDE THEM already say at full size, in words, with names on
+     them. It is a miniature of the drawing it is printed next to, and a month
+     is not a chart that needs a sparkline. The counts it summarised survive
+     where they are read: the meta band, once, for the whole window.
+
+     `tourDays` went with it — it had no other reader — and so did the four
+     count words that only its tooltip needed. */
 
   /**
    * The week is as tall as its FULLEST day, so a quiet week is visibly short
@@ -671,16 +632,6 @@
    * slip comes out taller than the row.
    */
   const WEEK_FILL = [0.34, 0.62, 0.85, 1];
-  /** The words for the density row live in the tooltip, not on the sheet. */
-  function weekMarksTitle(marks: DayMark[]): string {
-    const n = (k: DayMark) => marks.filter((m) => m === k).length;
-    const parts = [
-      n('firm') ? `${n('firm')} ${confirmedWord}` : '',
-      n('held') ? `${n('held')} ${optionWord}` : '',
-      n('free') ? `${n('free')} ${freeWord}` : '',
-    ].filter(Boolean);
-    return parts.join(' · ') || nothingWord;
-  }
   function weekFill(week: { iso: string }[]): number {
     let max = 0;
     for (const d of week) {
@@ -785,7 +736,6 @@
   </div>
   {#each weeks as week, wi (wi)}
     {@const wlc = weekLaneCount(week)}
-    {@const marks = weekMarks(week)}
     {@const bands = weekBands(week)}
     {@const series = weekSeries(week)}
     <!-- A ROW OF THE MONTH IS A WEEK, and each week is its own block: a gutter
@@ -793,9 +743,6 @@
     <div class="cal__wk" style="--wf: {weekFill(week)}">
       <div class="cal__wkg">
         <span class="cal__wkn">{isoWeekLabel(isoWeek(week[0].iso))}</span>
-        <span class="cal__wkd" title={weekMarksTitle(marks)}>
-          {#each marks as m, mi (mi)}<i class="cal__wkm" data-mark={m}></i>{/each}
-        </span>
       </div>
       <!-- ONE GRID PER WEEK, THREE BANDS OF ROWS: the day numbers on row 1,
            the runs of days under them, and the day cells on the last row —
@@ -1048,40 +995,6 @@
       /* One step above the marks it labels: the number is read, the marks are
          seen. */
       color: var(--text-muted);
-    }
-    .cal__wkd {
-      display: flex;
-      align-items: center;
-      gap: 3px;
-      margin-block-start: 5px;
-    }
-    /* solid = a confirmed gig · ring = an option · rule = a working day that is
-       not a gig · faint dot = a night still free. */
-    .cal__wkm {
-      flex: none;
-      inline-size: 5px;
-      block-size: 5px;
-      border-radius: 50%;
-    }
-    .cal__wkm[data-mark='firm'] {
-      background: var(--text-muted);
-    }
-    .cal__wkm[data-mark='held'] {
-      box-shadow: 0 0 0 1px var(--text-faint) inset;
-    }
-    .cal__wkm[data-mark='busy'] {
-      inline-size: 5px;
-      block-size: 1px;
-      border-radius: 0;
-      background: color-mix(in oklch, var(--text-faint) 60%, transparent);
-    }
-    .cal__wkm[data-mark='free'] {
-      inline-size: 3px;
-      block-size: 3px;
-      background: color-mix(in oklch, var(--text-faint) 40%, transparent);
-    }
-    .cal__wkm[data-mark='out'] {
-      background: none;
     }
     /* The seven days. The 1px rules ARE the grid — a background-image column
        ruling, so a cell can never be pushed out of alignment by a border. */

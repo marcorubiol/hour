@@ -101,8 +101,12 @@ test.describe('planner laws (ADR-095)', () => {
         metaPx: px('.cal__meta'),
       };
     });
-    expect(head.title).toBeLessThan(head.views);
-    expect(head.views).toBeLessThan(head.meta);
+    // ANSWER → REPORT → CONTROLS. The window states the date, the machine
+    // reports on THAT window, and the controls that change it close the band.
+    // With the meta underneath, the line summarising July sat below the
+    // buttons that leave July.
+    expect(head.title).toBeLessThan(head.meta);
+    expect(head.meta).toBeLessThan(head.views);
     expect(head.titlePx).toBeGreaterThan(head.viewPx);
     expect(head.viewPx).toBeGreaterThan(head.metaPx);
     // …and the lit word keeps a STEP over its sisters. All four at one size
