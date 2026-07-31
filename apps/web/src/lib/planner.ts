@@ -660,11 +660,11 @@ function makeBand(
  * The Planner's first-class projections (ADR-076; ADR-095 §1).
  *
  * A VIEW DECLARES WHAT A ROW IS, and nothing inside the view changes it:
- * Agenda — a row is a day · Month — a row is a week · Board — a row is an
- * entity, and its `lanes` dial only ever relabels the entity. ('day', where a
- * row is a thread of the day, joins when its drawing exists.)
+ * Day — a row is a THREAD of the day · Agenda — a row is a day · Month — a row
+ * is a week · Board — a row is an entity, and its `lanes` dial only ever
+ * relabels the entity.
  */
-export type PlannerView = 'month' | 'agenda' | 'board';
+export type PlannerView = 'day' | 'month' | 'agenda' | 'board';
 
 /**
  * Legacy view tokens, translated ONCE on entry and never written back — a
@@ -678,7 +678,7 @@ const VIEW_ALIASES: Record<string, PlannerView> = {
 
 /** A token from a URL or from storage → a view, or null if it is neither. */
 export function normalizePlannerView(v: string | null | undefined): PlannerView | null {
-  if (v === 'month' || v === 'agenda' || v === 'board') return v;
+  if (v === 'day' || v === 'month' || v === 'agenda' || v === 'board') return v;
   return (v && VIEW_ALIASES[v]) || null;
 }
 

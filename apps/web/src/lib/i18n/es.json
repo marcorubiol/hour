@@ -376,5 +376,8 @@
   "planner.released": "soltado",
   "planner.expires_on": "vence {day}",
   "planner.no_hour": "sin hora",
-  "planner.all_day": "todo el día"
+  "planner.all_day": "todo el día",
+  "planner.view_day": "Día",
+  "planner.day_empty": "Nada en este día.",
+  "planner.day_axis": "el día"
 }

@@ -376,5 +376,8 @@
   "planner.released": "deixat anar",
   "planner.expires_on": "venç {day}",
   "planner.no_hour": "sense hora",
-  "planner.all_day": "tot el dia"
+  "planner.all_day": "tot el dia",
+  "planner.view_day": "Dia",
+  "planner.day_empty": "Res en aquest dia.",
+  "planner.day_axis": "el dia"
 }

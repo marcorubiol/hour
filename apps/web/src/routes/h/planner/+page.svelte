@@ -49,7 +49,8 @@
     type ClashVM,
     type DateEvent,
     type PerformanceEvent,
-  } from '$lib/month-events';
+    performanceSlip,
+    dateSlip,} from '$lib/month-events';
   import AgendaList, { type AgendaDecision } from '$lib/components/AgendaList.svelte';
   import DecisionBand, {
     type ConcurrenceVM,
@@ -65,6 +66,8 @@
   } from '$lib/components/planner/CarrilsStrip.svelte';
   import CalToolbar from '$lib/components/planner/CalToolbar.svelte';
   import CalLegend from '$lib/components/planner/CalLegend.svelte';
+  import DayStrip from '$lib/components/planner/DayStrip.svelte';
+  import { performanceThread, dateThread, stripWindow, hourOf } from '$lib/day-strip';
   import Dialog from '$lib/components/Dialog.svelte';
   import FeedDialog from '$lib/components/planner/FeedDialog.svelte';
   import CreateEventDialog from '$lib/components/create/CreateEventDialog.svelte';
@@ -112,7 +115,7 @@
   } from '$lib/carrils';
   import type { AvailabilityItem } from '$lib/availability';
   import type { DateRow } from '$lib/date';
-  import { localeDayMonth, timeInTz } from '$lib/datetime';
+  import { localeDayMonth, timeInTz, dualTime } from '$lib/datetime';
   import {
     isHoldStatus,
     performanceStatusFamily,
@@ -132,6 +135,17 @@
   // (ADR-095 §3), so it is reachable from all four drawings and not from the
   // foot of one of them.
   let marksOpen = $state(false);
+  /**
+   * THE DAY the Day view is looking at. In the URL like everything else
+   * (ADR-095 §9) — a day you are reading is exactly the kind of thing you send
+   * somebody. Defaults to today, which is where a diary starts.
+   */
+  let dayIso = $state(
+    (() => {
+      const raw = new URL(location.href).searchParams.get('d');
+      return raw && /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : null;
+    })(),
+  );
   const locale = detectLocale(navigator.language);
   const localeTag = { en: 'en-GB', es: 'es-ES', ca: 'ca-ES' }[locale];
 
@@ -254,6 +268,8 @@
     else url.searchParams.delete('lanes');
     if (view === 'agenda') url.searchParams.delete('ym');
     else url.searchParams.set('ym', `${ym.year}-${String(ym.month).padStart(2, '0')}`);
+    if (view === 'day') url.searchParams.set('d', dayIso ?? todayIso);
+    else url.searchParams.delete('d');
     url.searchParams.delete('group');
     replaceState(url, {});
   }
@@ -291,6 +307,9 @@
 
     const nextLanes = normalizeLaneAxis(params.get('lanes') ?? params.get('group'));
     if (nextLanes && nextLanes !== untrack(() => laneAxis)) laneAxis = nextLanes;
+
+    const rawD = params.get('d');
+    if (rawD && /^\d{4}-\d{2}-\d{2}$/.test(rawD) && rawD !== untrack(() => dayIso)) dayIso = rawD;
 
     const rawYm = params.get('ym');
     const m = rawYm?.match(/^(\d{4})-(\d{2})$/);
@@ -340,6 +359,24 @@
   // Browsing context for link-building only (ADR-067): lens routes carry no
   // space segment; entity links borrow the default (first) workspace.
   let defaultWorkspaceSlug = $derived($workspacesQuery.data?.items[0]?.slug ?? '');
+  // The two maps the slip normaliser needs: a venue-less gig reads its home
+  // space's clock, and the hold convention is resolved per workspace.
+  let workspaceTzById = $derived(
+    new Map(
+      ($workspacesQuery.data?.items ?? []).map((w) => [
+        w.id,
+        (w as { timezone?: string }).timezone,
+      ]),
+    ),
+  );
+  let workspaceModeById = $derived(
+    new Map(
+      ($workspacesQuery.data?.items ?? []).map((w) => [
+        w.id,
+        (w as { booking_mode?: string }).booking_mode ?? 'simple',
+      ]),
+    ),
+  );
 
   let projectIndex = $derived(
     buildProjectIndex(($workspacesQuery.data?.items ?? []) as NavWorkspace[], $projectsQuery.data?.items ?? []),
@@ -1079,6 +1116,54 @@
     }));
   });
 
+  /* ── THE DAY'S THREADS (ADR-095) ───────────────────────────────────────
+     One row per WORLD, not per event. Everything that has no hour at all is
+     absent from the track on purpose — there is nowhere to put it, and putting
+     it at midnight would be the drawing inventing a fact. */
+  let selectedDay = $derived(dayIso ?? todayIso);
+  /** Same normaliser the month uses — one shape for both primitives. */
+  let slipCtxPage = $derived({
+    workspaceSlug: defaultWorkspaceSlug,
+    workspaceSlugById,
+    workspaceTzById,
+    workspaceModeById,
+    viewerTz,
+    kindLabel,
+    dualTime,
+  });
+  let dayThreads = $derived.by(() => {
+    const out = [];
+    for (const p of shownPerfs) {
+      if (perfDayKey(p) !== selectedDay) continue;
+      const sl = performanceSlip(p, slipCtxPage);
+      const t = performanceThread(p, viewerTz, sl.name, sl.city, sl.cert);
+      if (t) out.push({ ...t, project: p.project });
+    }
+    for (const d of shownDates) {
+      if (dateDayKey(d, viewerTz) !== selectedDay) continue;
+      const sl = dateSlip(d, slipCtxPage);
+      const t = dateThread(d, viewerTz, sl.name, sl.city, sl.cert);
+      if (t) out.push({ ...t, project: d.project });
+    }
+    return out;
+  });
+  /* THE DAY DRAGS ITS MONTH. The feeds are windowed by `ym`, so a Day view
+     pointing at 3 August while `ym` still said July fetched a month that does
+     not contain the day being drawn — the strip came up with one thread and
+     silently dropped the rest. Seen on screen, 2026-07-31.
+     The window follows the day, never the other way round: the day is what you
+     asked for. */
+  $effect(() => {
+    if (view !== 'day') return;
+    const y = Number(selectedDay.slice(0, 4));
+    const m = Number(selectedDay.slice(5, 7));
+    const cur = untrack(() => ym);
+    if (y !== cur.year || m !== cur.month) ym = { year: y, month: m };
+  });
+
+  let dayWin = $derived(stripWindow(dayThreads));
+  let dayNow = $derived(selectedDay === todayIso ? hourOf(new Date().toISOString(), viewerTz) : null);
+
   // ── Masthead stats — counts of the visible month, every figure a real
   // row (ADR-078 §12; no read:money gate — nothing monetary here). ──────
   let stats = $derived.by(() => {
@@ -1416,7 +1501,10 @@
   /** `T` — one verb, and each projection knows what "today" means for it. */
   function goToday() {
     if (view === 'agenda') scrollToToday();
-    else thisMonth();
+    else if (view === 'day') {
+      dayIso = todayIso;
+      syncUrl();
+    } else thisMonth();
   }
 
   /* ── THE KEYBOARD (ADR-095) ───────────────────────────────────────────
@@ -1450,7 +1538,7 @@
       // A dialog is open: it owns the keyboard until it closes.
       if (createOpen || editOpen || marksOpen) return;
 
-      const views: PlannerView[] = ['month', 'agenda', 'board'];
+      const views: PlannerView[] = ['day', 'month', 'agenda', 'board'];
       const n = Number(e.key);
       if (n >= 1 && n <= views.length) {
         e.preventDefault();
@@ -1466,12 +1554,18 @@
         case 'ArrowLeft':
           if (view === 'agenda') return; // a continuous book has no window to step
           e.preventDefault();
-          prevMonth();
+          if (view === 'day') {
+            dayIso = addDaysIso(selectedDay, -1);
+            syncUrl();
+          } else prevMonth();
           return;
         case 'ArrowRight':
           if (view === 'agenda') return;
           e.preventDefault();
-          nextMonth();
+          if (view === 'day') {
+            dayIso = addDaysIso(selectedDay, 1);
+            syncUrl();
+          } else nextMonth();
           return;
         case 'n':
         case 'N':
@@ -1695,6 +1789,21 @@
 
   {#if errorMsg}
     <p class="cal__state cal__state--danger">{errorMsg}</p>
+  {:else if view === 'day'}
+    <DayStrip
+      threads={dayThreads}
+      win={dayWin}
+      now={dayNow}
+      kindLabel={(k) => kindLabel(k)}
+      stepLabel={(k) => t(`desk.anchor_${k === 'load_in' ? 'loadin' : k}`, locale)}
+      hourLabel={(h) => {
+        const hh = String(Math.floor(h)).padStart(2, '0');
+        const mm = String(Math.round((h % 1) * 60)).padStart(2, '0');
+        return `${hh}:${mm}`;
+      }}
+      emptyLabel={t('planner.day_empty', locale)}
+      axisLabel={t('planner.day_axis', locale)}
+    />
   {:else if view === 'month'}
     <MonthGrid
       year={ym.year}

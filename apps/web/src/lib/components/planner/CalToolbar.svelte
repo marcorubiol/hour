@@ -84,6 +84,15 @@
        CALM, and it survives as a word on the facts side of the state line —
        never as a switch here. -->
   <div class="cal__tabs" role="group" aria-label={t('planner.view_label', locale)}>
+    <!-- The words in the order the design gives them: Day · Agenda · Month ·
+         Board. The keyboard follows THE WORDS ON SCREEN, not fixed digits. -->
+    <button
+      type="button"
+      class="cal__tab"
+      class:cal__tab--on={view === 'day'}
+      aria-pressed={view === 'day'}
+      onclick={() => onSetView('day')}>{t('planner.view_day', locale)}</button
+    >
     <button
       type="button"
       class="cal__tab"
