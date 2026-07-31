@@ -1,7 +1,7 @@
 <script module lang="ts">
   /**
    * Carrils — the horizontal month ribbon (ADR-080 §7/§8): one lane per
-   * espai/projecte, or the Loom (one thread per team person) under Agrupa
+   * workspace/project/person — ONE drawing on three axes (ADR-095 §2);
    * per Persona. Pure presentation over page-built VMs; day math is % of
    * the month, pixel math (pip row stacking, connector geometry, the
    * center-on-today scroll) happens in ONE measured pass after render —
@@ -76,31 +76,8 @@
     label: string;
   };
 
-  export type LoomSegmentVM = {
-    from: number;
-    to: number;
-    state: 'confirmed' | 'hold' | 'prep';
-    accent: string;
-    title: string;
-  };
 
-  export type LoomThreadVM = {
-    person_id: string;
-    name: string;
-    shared: boolean;
-    ghost: boolean;
-    segments: LoomSegmentVM[];
-    outs: Array<{ from: number; to: number; tentative: boolean }>;
-    /** Knot days of month, 1-based. */
-    knots: number[];
-  };
 
-  export type LoomGroupVM = {
-    key: string;
-    label: string;
-    accent: string;
-    threads: LoomThreadVM[];
-  };
 </script>
 
 <script lang="ts">
@@ -115,7 +92,6 @@
     todayIso: string;
     group: LaneAxis;
     lanes: LaneVM[];
-    loom: LoomGroupVM[];
     connectors: ConnectorVM[];
     /** Connector gesture — the page opens the decision band at the card. */
     onConnectorJump: (decisionId: string) => void;
@@ -127,7 +103,6 @@
     todayIso,
     group,
     lanes,
-    loom,
     connectors,
     onConnectorJump,
     locale,
@@ -163,12 +138,6 @@
   /** Stacked rows for a lane's bands (kept pure — ISO-free day ints). */
   function bandRows(bands: LaneBandVM[]): { rows: number[]; rowCount: number } {
     return stackIntervals(bands.map((b) => ({ start: b.from, end: b.to + 0.5 })));
-  }
-  function outRows(outs: Array<{ from: number; to: number }>): {
-    rows: number[];
-    rowCount: number;
-  } {
-    return stackIntervals(outs.map((o) => ({ start: o.from, end: o.to + 0.5 })));
   }
 
   // ── Measured pass (the calPostRender pattern) ────────────────────────
@@ -248,7 +217,6 @@
   $effect(() => {
     // Re-run whenever the rendered data changes …
     void lanes;
-    void loom;
     void connectors;
     void group;
     void nDays;
@@ -275,16 +243,6 @@
   <div class="strip__inner">
     <p class="strip__hint" aria-hidden="true">{t('planner.carrils_hint', locale)}</p>
 
-    {#if group === 'person'}
-      <!-- Loom legend (ADR-080 §8) — the five words the threads speak. -->
-      <div class="strip__legend">
-        <span class="strip__leg"><i class="strip__leg-th strip__leg-th--avail"></i>{t('planner.loom_available', locale)}</span>
-        <span class="strip__leg"><i class="strip__leg-th strip__leg-th--commit"></i>{t('planner.loom_commitment', locale)}</span>
-        <span class="strip__leg"><i class="strip__leg-th strip__leg-th--hold"></i>{t('planner.loom_hold', locale)}</span>
-        <span class="strip__leg"><i class="strip__leg-th strip__leg-th--out"></i>{t('planner.loom_out', locale)}</span>
-        <span class="strip__leg"><i class="strip__leg-th strip__leg-th--knot"></i>{t('planner.loom_knot', locale)}</span>
-      </div>
-    {/if}
 
     <div class="strip__axis">
       <span class="strip__lab strip__lab--axis" data-lane-label>{axisLabel}</span>
@@ -321,69 +279,6 @@
         {/if}
       </div>
 
-      {#if group === 'person'}
-        {#each loom as grp (grp.key)}
-          <div class="strip__grp">
-            <span class="strip__grp-name" style="--c: {grp.accent}">
-              <i class="strip__grp-sq" aria-hidden="true"></i>{grp.label}
-            </span>
-          </div>
-          {#each grp.threads as th (th.person_id)}
-            {@const outLanes = outRows(th.outs)}
-            <div class="strip__lane strip__lane--thread">
-              <span
-                class="strip__lab strip__lab--person"
-                class:strip__lab--shared={th.shared}
-                class:strip__lab--ghost={th.ghost}
-                data-lane-label
-              >
-                <span class="strip__lab-name">{th.name}</span>
-                {#if th.ghost}
-                  <span class="strip__badge">{t('planner.loom_no_data', locale)}</span>
-                {:else if th.shared}
-                  <span class="strip__badge">{t('planner.loom_shared', locale)}</span>
-                {/if}
-              </span>
-              <span
-                class="strip__track strip__track--thread"
-                style="block-size: {32 + Math.max(outLanes.rowCount - 1, 0) * 22}px"
-              >
-                <i class="strip__thread" class:strip__thread--ghost={th.ghost} aria-hidden="true"
-                ></i>
-                {#each th.segments as seg, i (`${seg.from}-${seg.state}-${seg.accent}-${i}`)}
-                  <i
-                    class="strip__seg strip__seg--{seg.state}"
-                    style="--c: {seg.accent}; left: {leftPct(seg.from)}%; inline-size: {spanPct(
-                      seg.from,
-                      seg.to,
-                    )}%"
-                    title={seg.title}
-                  ></i>
-                {/each}
-                {#each th.outs as o, i (`${o.from}-${o.to}-${i}`)}
-                  <span
-                    class="strip__out"
-                    class:strip__out--tent={o.tentative}
-                    style="left: {leftPct(o.from)}%; inline-size: {spanPct(o.from, o.to)}%; margin-block-start: {outLanes.rows[i] * 22}px"
-                    >{o.tentative
-                      ? t('planner.loom_out_short_t', locale)
-                      : t('planner.loom_out_short', locale)}</span
-                  >
-                {/each}
-                {#each th.knots as day (day)}
-                  <i class="strip__knot" style="left: {center(day)}%" aria-hidden="true"></i>
-                  <span class="strip__kflag" style="left: {center(day)}%"
-                    >{t('planner.loom_knot_flag', locale, { day })}</span
-                  >
-                {/each}
-              </span>
-            </div>
-          {/each}
-        {/each}
-        {#if loom.length === 0}
-          <p class="strip__empty">{t('planner.empty_month', locale)}</p>
-        {/if}
-      {:else}
         {#each lanes as lane (lane.key)}
           {@const bands = bandRows(lane.bands)}
           <div class="strip__lane" data-lane-key={lane.key}>
@@ -452,7 +347,6 @@
             onclick={() => onConnectorJump(c.id)}
           ></button>
         {/each}
-      {/if}
     </div>
   </div>
 </div>

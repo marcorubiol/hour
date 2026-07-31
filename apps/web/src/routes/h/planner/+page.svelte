@@ -62,7 +62,6 @@
     type LaneBandVM,
     type LanePipVM,
     type LaneVM,
-    type LoomGroupVM,
   } from '$lib/components/planner/CarrilsStrip.svelte';
   import CalToolbar from '$lib/components/planner/CalToolbar.svelte';
   import CalLegend from '$lib/components/planner/CalLegend.svelte';
@@ -101,16 +100,20 @@
     type DecisionSide,
     normalizePlannerView,
     nightsFree,
-    daysCoveredBy,} from '$lib/planner';
-  import { buildPersonScope } from '$lib/people';
+    daysCoveredBy,
+  } from '$lib/planner';
+  import {
+    buildPersonScope,
+    peopleOf,
+    personRowKeys,
+    noCastProjectId,
+  } from '$lib/people';
   import { createPlannerFeeds } from '$lib/planner-feeds.svelte';
   import {
-    loomThreads,
     normalizeLaneAxis,
     prepRuns,
     resolveLaneAxis,
     type LaneAxis,
-    type LoomCommitment,
     type PrepDay,
   } from '$lib/carrils';
   import type { AvailabilityItem } from '$lib/availability';
@@ -148,6 +151,8 @@
   );
   const locale = detectLocale(navigator.language);
   const localeTag = { en: 'en-GB', es: 'es-ES', ca: 'ca-ES' }[locale];
+  /** The ghost row's word: «nobody is on this» is an answer, not a hole. */
+  const noCastWord = t('planner.no_cast', locale);
 
   const viewerTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const now = new Date();
@@ -863,10 +868,39 @@
     return m;
   });
 
+  /* ── THE BOARD IS ONE DRAWING ON THREE AXES (ADR-095 §2) ───────────────
+     `by person` is the SAME board — same columns, same cells, same chips —
+     with one row per person. It is not a different drawing, which is what the
+     Loom had become: a second implementation of «rows are people», with its
+     own segments, its own knots and its own vocabulary.
+     The proof it was a mistake is in the prototype itself: `calLoom()` is
+     still in the file and HAS NO CALLERS. The thread drawing is dead there.
+     So person lanes go through `personRowKeys()` — the resolver that has been
+     exported and unused in `$lib/people` since 30 July — and the one thing a
+     person axis adds is that a row can land in SEVERAL lanes at once: a
+     workspace and a project PARTITION, a person COVERS. That is ADR-092's own
+     distinction, finally drawn. */
+  /** Who is recorded as away on a given day — the door the inference stops at. */
+  function awayPersonIdsOn(day: string): Set<string> {
+    const out = new Set<string>();
+    for (const b of visibleBlackouts) {
+      if (!b.person_id) continue;
+      if (day >= b.starts_on && day <= b.ends_on) out.add(b.person_id);
+    }
+    return out;
+  }
+
   let carrilsLanes = $derived.by((): LaneVM[] => {
-    if (view !== 'board' || laneAxis === 'person') return [];
+    if (view !== 'board') return [];
     const byProject = laneAxis === 'project';
+    const byPerson = laneAxis === 'person';
     const lanes = new Map<string, LaneVM>();
+    /** A person lane's label: their name, or «no cast» for the ghost row. */
+    const personLabel = (key: string): string => {
+      const proj = noCastProjectId(key);
+      if (proj) return `${projectNameById.get(proj) ?? '—'} · ${noCastWord}`;
+      return personNames.get(key) ?? '—';
+    };
     const laneFor = (projectId: string | null, workspaceId: string | null): LaneVM | null => {
       const key = byProject ? projectId : workspaceId;
       if (!key) return null;
@@ -885,6 +919,21 @@
       }
       return lane;
     };
+    /** The person axis resolves its own keys, and there may be several. */
+    const personLaneFor = (key: string, projectId: string | null): LaneVM => {
+      let lane = lanes.get(key);
+      if (!lane) {
+        lane = {
+          key,
+          label: personLabel(key),
+          accent: projectId ? projectAccent(projectId) : 'var(--text-faint)',
+          pips: [],
+          bands: [],
+        };
+        lanes.set(key, lane);
+      }
+      return lane;
+    };
 
     // Pips, chronological — insertion order = first-appearance lane order.
     const perfs = [...shownPerfs].sort((a, b) => (perfDayKey(a) < perfDayKey(b) ? -1 : 1));
@@ -892,15 +941,15 @@
       if (p.status === 'cancelled' || !p.project) continue;
       const day = inMonthDay(perfDayKey(p));
       if (day === null) continue;
-      const lane = laneFor(p.project.id, p.project.workspace_id);
-      if (!lane) continue;
       const venue = p.venue?.name ?? p.venue_name ?? p.city ?? p.project.name;
       const city = p.venue?.city ?? p.city;
-      lane.pips.push({
+      const pip = {
         id: p.id,
         day,
-        kind: 'perf',
-        state: performanceStatusFamily(p.status) === 'confirmed' ? 'confirmed' : 'hold',
+        kind: 'perf' as const,
+        state: (performanceStatusFamily(p.status) === 'confirmed' ? 'confirmed' : 'hold') as
+          | 'confirmed'
+          | 'hold',
         label: venue,
         time: p.start_at ? timeInTz(p.start_at, p.venue?.timezone || viewerTz) : null,
         accent: accentVarFor(p.project),
@@ -908,7 +957,21 @@
         href: p.slug
           ? `/h/${workspaceSlugById.get(p.project.workspace_id) ?? defaultWorkspaceSlug}/performance/${p.slug}`
           : null,
-      });
+      };
+      if (byPerson) {
+        // A PERSON COVERS: the same night lands in every lane that touches it,
+        // and a gig with nobody cast lands in its project's `no cast` row —
+        // which is a row, not a hole, because «nobody is on this» is an answer.
+        const { keys } = personRowKeys(
+          peopleOf({ roster: p.person_ids ?? null }),
+          p.project.id,
+        );
+        for (const key of keys) personLaneFor(key, p.project.id).pips.push({ ...pip });
+      } else {
+        const lane = laneFor(p.project.id, p.project.workspace_id);
+        if (!lane) continue;
+        lane.pips.push(pip);
+      }
     }
     const dates = [...shownDates].sort((a, b) =>
       dateDayKey(a, viewerTz) < dateDayKey(b, viewerTz) ? -1 : 1,
@@ -917,8 +980,25 @@
       if (d.status === 'cancelled' || !d.project || PREP_KINDS.has(d.kind)) continue;
       const day = inMonthDay(dateDayKey(d, viewerTz));
       if (day === null) continue;
-      const lane = laneFor(d.project.id, d.project.workspace_id);
-      if (!lane) continue;
+      const dateLanes: LaneVM[] = [];
+      if (byPerson) {
+        // A date carries no roster of its own, so its people are INFERRED from
+        // the project's canonical cast — and the inference stops at the door of
+        // an absence (ADR-092 §3). `peopleOf` owns that rule; here we only ask.
+        const { keys } = personRowKeys(
+          peopleOf({
+            projectCast: [...(projectRosters.get(d.project.id) ?? [])],
+            awayPersonIds: awayPersonIdsOn(dateDayKey(d, viewerTz)),
+          }),
+          d.project.id,
+        );
+        for (const key of keys) dateLanes.push(personLaneFor(key, d.project.id));
+      } else {
+        const l = laneFor(d.project.id, d.project.workspace_id);
+        if (l) dateLanes.push(l);
+      }
+      if (dateLanes.length === 0) continue;
+      const lane = dateLanes[0];
       if (d.kind === 'travel_day') {
         // Mono "→ City" — direction is the arrow (ADR-080 §7).
         const place = d.city ?? d.title ?? d.venue_name ?? kindLabel(d.kind);
@@ -942,12 +1022,28 @@
         });
       }
     }
+    /* A LANE THE PERSON AXIS DOES NOT OWN IS NOT A LANE. `laneFor` keys by
+       project or workspace, so on the person axis it invented a lane keyed by
+       WORKSPACE and labelled with the workspace's name — a rehearsal block and
+       an absence landed in a row that is not a person at all. Seen on screen,
+       2026-07-31. Now each band resolves the rows it actually belongs to. */
+    const bandLanesFor = (projectId: string): LaneVM[] => {
+      if (!byPerson) {
+        const l = laneFor(projectId, projectById.get(projectId)?.workspace_id ?? null);
+        return l ? [l] : [];
+      }
+      const { keys } = personRowKeys(
+        peopleOf({ projectCast: [...(projectRosters.get(projectId) ?? [])] }),
+        projectId,
+      );
+      return keys.map((k) => personLaneFor(k, projectId));
+    };
+
     // Prep runs — quiet in-lane bands, project accent, hatched.
     for (const run of prepRunsIso) {
-      const lane = laneFor(run.project_id, projectById.get(run.project_id)?.workspace_id ?? null);
       const range = clipToMonth(run.from, run.to);
-      if (!lane || !range) continue;
-      lane.bands.push({
+      if (!range) continue;
+      for (const lane of bandLanesFor(run.project_id)) lane.bands.push({
         id: `prep:${run.project_id}:${run.from}`,
         ...range,
         kind: 'prep',
@@ -957,10 +1053,9 @@
     }
     // Derived away bands — dotted, quieter than everything (ADR-078 §6).
     for (const band of aways) {
-      const lane = laneFor(band.project_id, projectById.get(band.project_id)?.workspace_id ?? null);
       const range = clipToMonth(band.from, band.to);
-      if (!lane || !range) continue;
-      lane.bands.push({
+      if (!range) continue;
+      for (const lane of bandLanesFor(band.project_id)) lane.bands.push({
         id: `away:${band.project_id}:${band.from}`,
         ...range,
         kind: 'away',
@@ -969,6 +1064,10 @@
         }),
       });
     }
+    /* AN ABSENCE BELONGS TO A PERSON, and the person axis is the one place it
+       can say so directly: a personal blackout rides that person's lane and
+       nobody else's, a company one rides every lane of its workspace. On the
+       other two axes it keeps the roster-based attribution it had. */
     // Blackouts. Per espai they own (and may create) their workspace lane
     // — a closed month with no gigs is still a fact. Per projecte a
     // blackout has no project of its own: a person block rides the lanes
@@ -1048,78 +1147,6 @@
   }
 
   // ── The Loom (Agrupa per Persona — ADR-080 §8) ────────────────────────
-  let loomGroups = $derived.by((): LoomGroupVM[] => {
-    if (view !== 'board' || laneAxis !== 'person') return [];
-    // The loom's rows ARE people, so a pinned person narrows the rows too —
-    // otherwise pinning one name drew twelve threads with eleven of them
-    // empty, which reads as "nobody is working" rather than as a filter.
-    const pinnedPeople = new Set(scope.personIds);
-    const team = ($teamQuery.data?.items ?? []).filter(
-      (i) =>
-        (scopeWorkspaceIds === null || scopeWorkspaceIds.has(i.workspace_id)) &&
-        (pinnedPeople.size === 0 || pinnedPeople.has(i.person_id)),
-    );
-    const commitments: LoomCommitment[] = [];
-    for (const p of shownPerfs) {
-      if (p.status === 'cancelled' || !p.project || !p.person_ids) continue;
-      const day = perfDayKey(p);
-      if (day.slice(0, 7) !== monthKey) continue;
-      const state =
-        performanceStatusFamily(p.status) === 'confirmed' ? ('confirmed' as const) : ('hold' as const);
-      for (const person_id of p.person_ids) {
-        commitments.push({ person_id, day, project_id: p.project.id, state });
-      }
-    }
-    const knots: Array<{ day: string; person_ids: string[] }> = [];
-    for (const c of conflicts) {
-      if (c.severity !== 'people') continue;
-      const day = eventDayById.get(c.event_ids[0]);
-      if (day && day.slice(0, 7) === monthKey) knots.push({ day, person_ids: c.person_ids });
-    }
-    const dayNum = (iso: string) => Number(iso.slice(8, 10));
-    return loomThreads({
-      team,
-      commitments,
-      preps: prepRunsIso,
-      blackouts: visibleBlackouts,
-      knots,
-      monthFrom: monthFirst,
-      monthTo: monthLast,
-    }).map((g) => ({
-      key: g.key,
-      label:
-        g.kind === 'project'
-          ? (projectNameById.get(g.key) ?? '—')
-          : (workspaceNameById.get(g.key) ?? '—'),
-      accent: g.kind === 'project' ? projectAccent(g.key) : workspaceAccent(g.key),
-      threads: g.threads.map((th) => ({
-        person_id: th.person_id,
-        name: th.name,
-        shared: th.shared,
-        ghost: th.ghost,
-        segments: th.segments.map((s) => ({
-          from: dayNum(s.from),
-          to: dayNum(s.to),
-          state: s.state,
-          accent: projectAccent(s.project_id),
-          title: `${projectNameById.get(s.project_id) ?? '—'} · ${
-            s.from === s.to ? s.from : `${s.from} → ${s.to}`
-          }`,
-        })),
-        outs: th.outs.map((o) => ({
-          from: dayNum(o.from),
-          to: dayNum(o.to),
-          tentative: o.tentative,
-        })),
-        knots: th.knots.map(dayNum),
-      })),
-    }));
-  });
-
-  /* ── THE DAY'S THREADS (ADR-095) ───────────────────────────────────────
-     One row per WORLD, not per event. Everything that has no hour at all is
-     absent from the track on purpose — there is nowhere to put it, and putting
-     it at midnight would be the drawing inventing a fact. */
   let selectedDay = $derived(dayIso ?? todayIso);
   /** Same normaliser the month uses — one shape for both primitives. */
   let slipCtxPage = $derived({
@@ -1876,7 +1903,6 @@
       {todayIso}
       group={laneAxis}
       lanes={carrilsLanes}
-      loom={loomGroups}
       connectors={carrilsConnectors}
       onConnectorJump={jumpToDecisionCard}
       {locale}

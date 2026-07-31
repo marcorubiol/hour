@@ -379,5 +379,6 @@
   "planner.all_day": "tot el dia",
   "planner.view_day": "Dia",
   "planner.day_empty": "Res en aquest dia.",
-  "planner.day_axis": "el dia"
+  "planner.day_axis": "el dia",
+  "planner.no_cast": "sense repartiment"
 }

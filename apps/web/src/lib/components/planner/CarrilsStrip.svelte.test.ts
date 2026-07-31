@@ -3,7 +3,6 @@ import { describe, expect, it, vi } from 'vitest';
 import CarrilsStrip, {
   type ConnectorVM,
   type LaneVM,
-  type LoomGroupVM,
 } from './CarrilsStrip.svelte';
 
 const JULY = Array.from({ length: 31 }, (_, i) => `2026-07-${String(i + 1).padStart(2, '0')}`);
@@ -72,44 +71,12 @@ const connectors: ConnectorVM[] = [
   },
 ];
 
-const loom: LoomGroupVM[] = [
-  {
-    key: 'proj-mamemi',
-    label: 'MaMeMi',
-    accent: 'var(--accent-3)',
-    threads: [
-      {
-        person_id: 'anouk',
-        name: 'Anouk Villé',
-        shared: true,
-        ghost: false,
-        segments: [
-          { from: 11, to: 11, state: 'confirmed', accent: 'var(--accent-3)', title: 'MaMeMi · 11' },
-          { from: 17, to: 17, state: 'hold', accent: 'var(--accent-4)', title: 'Última · 17' },
-        ],
-        outs: [{ from: 26, to: 29, tentative: true }],
-        knots: [17],
-      },
-      {
-        person_id: 'zoe',
-        name: 'Zoe',
-        shared: false,
-        ghost: true,
-        segments: [],
-        outs: [],
-        knots: [],
-      },
-    ],
-  },
-];
-
 describe('CarrilsStrip — lanes', () => {
   const props = {
     monthDays: JULY,
     todayIso: '2026-07-18',
     group: 'workspace' as const,
     lanes,
-    loom: [],
     connectors,
     onConnectorJump: () => {},
     locale: 'en' as const,
@@ -162,38 +129,3 @@ describe('CarrilsStrip — lanes', () => {
   });
 });
 
-describe('CarrilsStrip — loom (per persona)', () => {
-  const props = {
-    monthDays: JULY,
-    todayIso: '2026-07-18',
-    group: 'person' as const,
-    lanes: [],
-    loom,
-    connectors: [],
-    onConnectorJump: () => {},
-    locale: 'en' as const,
-  };
-
-  it('renders the legend, group header and one thread per person', () => {
-    const { container } = render(CarrilsStrip, props);
-    expect(container.querySelector('.strip__legend')).toBeInTheDocument();
-    expect(container.querySelector('.strip__grp-name')!.textContent).toContain('MaMeMi');
-    expect(container.querySelectorAll('.strip__thread')).toHaveLength(2);
-  });
-
-  it('speaks the thread grammar: segments, fora? pill, knot + flag, badges', () => {
-    const { container } = render(CarrilsStrip, props);
-    expect(container.querySelectorAll('.strip__seg')).toHaveLength(2);
-    expect(container.querySelector('.strip__seg--hold')).toBeInTheDocument();
-    expect(container.querySelector('.strip__out--tent')!.textContent).toBe('away?');
-    expect(container.querySelector('.strip__knot')).toBeInTheDocument();
-    expect(container.querySelector('.strip__kflag')!.textContent).toBe('knot · 17');
-    const badges = [...container.querySelectorAll('.strip__badge')].map((b) => b.textContent);
-    expect(badges).toEqual(['shared', 'no data']);
-  });
-
-  it('ghost threads render dashed with no segments', () => {
-    const { container } = render(CarrilsStrip, props);
-    expect(container.querySelector('.strip__thread--ghost')).toBeInTheDocument();
-  });
-});
