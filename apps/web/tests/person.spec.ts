@@ -5,9 +5,14 @@ const PASSWORD = process.env.PW_TEST_PASSWORD;
 
 /**
  * E2E — person file (ADR-045): reach a person from the Conversations lens,
- * read the file, add a workspace note, verify persistence. The note is
- * soft-deleted at the end via the API (author-scoped update), so runs
- * leave no residue beyond audit rows.
+ * read the file, add a note, verify persistence. The note is soft-deleted at
+ * the end via the API (author-scoped), so runs leave no residue beyond audit
+ * rows.
+ *
+ * Re-pointed at `note` by ADR-093 (`person_note` was absorbed). The flow is
+ * unchanged on purpose — the only thing that went is the visibility toggle,
+ * because a note is now always private. This spec never touched it, which is
+ * itself the evidence that the toggle was never load-bearing.
  */
 
 test.describe('person file', () => {
@@ -52,8 +57,9 @@ test.describe('person file', () => {
     });
 
     // Cleanup IS the delete-button test: the button only renders on the
-    // author's own notes and goes through the delete_person_note RPC (a
-    // direct PATCH on deleted_at is impossible — see ADR-048).
+    // author's own notes and goes through the delete_note RPC (a direct PATCH
+    // on deleted_at is impossible — the SELECT policy is enforced against the
+    // new row, see ADR-048 and the ADR-093 migration header).
     const noteItem = notes.getByRole('listitem').filter({ hasText: marker });
     await noteItem.getByRole('button', { name: 'delete' }).click();
     await expect(noteItem).toHaveCount(0, { timeout: 10_000 });

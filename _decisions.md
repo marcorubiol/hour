@@ -2733,6 +2733,11 @@ Triggered by Marco's pre-scaffold doubt (Phase 0.0 day 5). Five alternatives eva
   pero **«las filas son personas» es una VISTA, no un valor de un dial** — si cambia
   qué es una fila, cambió el dibujo. Tercera vez que este proyecto encuentra dos
   cosas bajo una etiqueta (`span`, `rows by`, y ahora el dial del Board).
+  > **Superseded by ADR-094 (2026-07-31), solo en la conclusión de mobiliario.**
+  > El razonamiento partir-vs-cubrir se mantiene entero (y con él `inScope()`
+  > container-only e `isEmpty`); lo que se cae es «no puede ser un dial». Sí
+  > puede, si avisa de lo que cambia y guarda su valor en la URL — que es lo que
+  > `carrilsGroup` ya hacía cuando se escribió esto.
 - **2 · Token `pe:<personId>`, y `isEmpty` pasa a significar «ningún contenedor
   pinado».** Todo consumidor lee `isEmpty` como «no filtres por contenedor», así que
   contar el pin de persona ahí habría dejado en blanco Conversations, Books y el
@@ -2912,3 +2917,69 @@ Triggered by Marco's pre-scaffold doubt (Phase 0.0 day 5). Five alternatives eva
 > diseñada y sin construir tras un portón («usar la app una temporada real de
 > difusión antes»). Ese portón sigue en pie, pero deja de ser indefinido: **el
 > Planner v3 es la temporada.**
+
+## [2026-07-31] — ADR-094 · El eje de carriles es un dial, y su valor vive en la URL. Y ya estaba construido
+
+> Marco, al reabrir el Planner v3: *«decidimos que iba a ser dial, pero yo pensaba
+> que ya estaba decidido eso»*. Tenía razón en las dos mitades, y las dos
+> importan: estaba decidido —al revés de como él lo recordaba— y además estaba
+> **construido** desde ADR-080 §8, cosa que ADR-092 no vio al escribir lo suyo.
+
+- **1 · Lo que había, contra lo que decía el papel.** `CarrilsGroup` es
+  `'espai' | 'projecte' | 'persona'` (`$lib/carrils.ts`), la barra lo dibuja como
+  dial («Agrupa per»), y su valor **ya se escribe en la URL**
+  (`?view=carrils&group=persona`), sobrevive a la recarga, se comparte, y además
+  cae a `localStorage` y a la navegación entrante. Con `group='persona'` la
+  página no dibuja carriles de proyecto: dibuja **el Loom**, cuyas filas SON
+  personas agrupadas bajo cabecera de proyecto o espacio. O sea que «las filas
+  son personas» lleva meses siendo un valor de dial con estado en la URL.
+
+- **2 · ADR-092 §1 queda superado en este punto, y solo en este.** Aquella
+  decisión escribió que «las filas son personas» es una **vista, no un valor de
+  un dial», y lo argumentó bien: `workspace` y `project` **parten** el conjunto,
+  una `person` **cubre**. Ese razonamiento sigue siendo cierto y es la razón de
+  que `inScope()` siga siendo container-only y de que `isEmpty` no cuente el pin
+  de persona — nada de eso se toca. Lo que se cae es la **conclusión de
+  mobiliario**: la objeción real nunca fue contra el widget, era contra que
+  «persona» se colara sin avisar de que cambia tres comportamientos. Un dial
+  puede avisar. Y el que ya existe, además, guarda su valor donde debe.
+
+- **3 · Lo que el dial tiene que hacer explícito al girar a persona.** Los tres,
+  porque son consecuencias de «cubrir» y no bugs: (a) una misma noche **sale en N
+  filas** si la tocan N personas; (b) el `+` de una celda vacía **no sabe para qué
+  proyecto** crea y tiene que preguntar; (c) el total de un carril **deja de
+  sumar el mes** — cuenta compromisos, no cosas. Un dial que gire sin decir esto
+  es exactamente lo que ADR-092 temía.
+
+- **4 · El valor vive en la URL, no en el componente.** Ya es así y se ratifica:
+  como estado efímero no sobreviviría a una recarga y el enlace copiado enseñaría
+  otra cosa, en una herramienta donde copiar la vista es un gesto que ya existe.
+  «Dial en el mueble, vista en el modelo.»
+
+- **Rechazado**: sacar persona del dial y hacerla una quinta proyección hermana de
+  month/agenda/carrils/day (es una variante del Board, no otra proyección — y
+  habría que desmontar el Loom, que funciona); y dejarlo como dial efímero al
+  estilo del prototipo (`calState.lanes`), que es un retroceso respecto de lo
+  construido.
+
+- **Abierto — y es lo único que queda de verdad:** qué **dibuja** el valor
+  `persona`. Hoy dibuja el **Loom** (hilos por persona, agrupados). El prototipo
+  del Planner v3 dibuja **carriles de Board** (filas duplicadas por persona, con
+  su fila de «sin repartir»). No son el mismo dibujo y solo uno sobrevive. De
+  paso se resuelve la deuda anotada en ADR-092: `personRowKeys()` y `noCastKey()`
+  siguen **exportadas y sin usar** en `$lib/people` — son el resolutor de
+  carriles del Board, o sea que si gana el Board se estrenan y si gana el Loom se
+  borran. Depende del pase de UI, que depende del diseño.
+
+- **Por qué**: porque el coste de esta decisión no era construir nada — era
+  descubrir que ya estaba construido y que el documento decía lo contrario.
+  Escribirlo evita el tercer viaje.
+
+- **Status**: **ratificado, cero código.** El mecanismo (dial + URL +
+  localStorage + navegación entrante) ya corría en producción antes de esta
+  decisión. Supersedes ADR-092 §1 **solo** en la parte de mobiliario.
+
+- **Re-evaluate when**: (a) el pase de UI elija entre Loom y carriles de Board;
+  (b) el dial pase de tres valores a dos (ADR-092 dejó abierto reducirlo a
+  `project · person`); (c) alguien pida comparar personas a lo largo de varios
+  meses, que es cuando una proyección propia sí se gana el sitio.

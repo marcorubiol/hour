@@ -1,9 +1,10 @@
 /**
- * DELETE /api/persons/:key/notes/:id — soft-delete a person note via the
- * `delete_person_note` RPC (author-only, enforced in the RPC). Direct
- * PATCH soft-deletes are impossible by construction: the updated row must
- * stay SELECT-visible to the updater, and `deleted_at IS NOT NULL` fails
- * the SELECT policy (mechanism confirmed 2026-07-02, see _decisions.md).
+ * DELETE /api/persons/:key/notes/:id — soft-delete a note via the `delete_note`
+ * RPC (author-only, enforced in the RPC). Direct PATCH soft-deletes are
+ * impossible by construction: the updated row must stay SELECT-visible to the
+ * updater, and `deleted_at IS NOT NULL` fails the SELECT policy (mechanism
+ * confirmed 2026-07-02, and re-confirmed empirically on 2026-07-31 while
+ * building `note` — see the migration header).
  */
 
 import type { RequestHandler } from './$types';
@@ -32,7 +33,7 @@ export const DELETE: RequestHandler = async ({ request, params, platform, locals
   if (!idParsed.success) return json({ error: 'invalid_id' }, 400);
 
   try {
-    await pgPostRpc(env, 'delete_person_note', jwt, { p_note_id: idParsed.output });
+    await pgPostRpc(env, 'delete_note', jwt, { p_note_id: idParsed.output });
     return new Response(null, { status: 204 });
   } catch (err) {
     return pgErrorResponse(

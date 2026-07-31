@@ -11,7 +11,6 @@
   import { fetchJSON, mutateJSON } from '$lib/api';
   import Button from '$lib/components/Button.svelte';
   import Dialog from '$lib/components/Dialog.svelte';
-  import Checkbox from '$lib/components/Checkbox.svelte';
   import Select from '$lib/components/Select.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
   import { session } from '$lib/session.svelte';
@@ -46,7 +45,9 @@
     notes: Array<{
       id: string;
       body: string;
-      visibility: 'workspace' | 'private';
+      /** The day the note lives on (ADR-093 §1) — not necessarily the day it
+          was written about. */
+      on_day: string;
       workspace_id: string;
       author_id: string | null;
       created_at: string;
@@ -132,7 +133,6 @@
   // ── Note composer ────────────────────────────────────────────────────
   const queryClient = useQueryClient();
   let noteBody = $state('');
-  let notePrivate = $state(false);
 
   const noteMutation = createMutation({
     mutationFn: async () => {
@@ -142,7 +142,8 @@
         {
           workspace_id: contextWorkspaceId,
           body: noteBody,
-          visibility: notePrivate ? 'private' : 'workspace',
+          // The writer's own day, not the server's UTC one (ADR-093 §1).
+          on_day: new Date().toLocaleDateString('en-CA'),
         },
       );
       if (!body?.note) {
@@ -152,7 +153,6 @@
     },
     onSuccess: () => {
       noteBody = '';
-      notePrivate = false;
       void queryClient.invalidateQueries({
         queryKey: ['person', contextWorkspaceId, slug],
       });
@@ -175,8 +175,8 @@
     $noteMutation.mutate();
   }
 
-  // Delete is author-only (enforced by the delete_person_note RPC); the
-  // button only shows on the caller's own notes.
+  // Delete is author-only (enforced by the delete_note RPC); the button only
+  // shows on the caller's own notes — which, since ADR-093, is all of them.
   let callerId = $derived(session.user?.sub ?? '');
 
   const deleteNote = createMutation({
@@ -341,7 +341,10 @@
           bind:value={noteBody}
         ></textarea>
         <div class="person__composer-row">
-          <Checkbox label="Private (only you)" bind:checked={notePrivate} />
+          <!-- No visibility control: a note is always private (ADR-093 §2).
+               The line says so once, instead of a checkbox implying a choice
+               that no longer exists. -->
+          <span class="person__composer-hint">Only you can see this</span>
           <Button size="s" onclick={addNote} loading={$noteMutation.isPending}>
             Add note
           </Button>
@@ -352,7 +355,7 @@
           {#each file.notes as n (n.id)}
             <li>
               <span class="person__note-meta">
-                {dayMonthYearTs(n.created_at)}{#if n.visibility === 'private'} · private{/if}
+                {dayMonthYearTs(n.created_at)}
                 {#if n.author_id === callerId}
                   <button
                     type="button"
@@ -547,6 +550,11 @@
       justify-content: space-between;
       align-items: center;
       gap: var(--space-m);
+    }
+
+    .person__composer-hint {
+      font-size: var(--font-size-s);
+      color: var(--text-faint);
     }
 
     .person__notes li {

@@ -85,8 +85,12 @@ export const GET: RequestHandler = async ({ request, params, url, platform, loca
       deleted_at: 'is.null',
       order: 'updated_at.desc',
     });
+    // ADR-093 — `note` absorbed `person_note`. No visibility filter and no
+    // permission gate: RLS already narrows this to the caller's own notes,
+    // because a note is always private. The old policy demanded
+    // `read:person_note_private` over some project to read your own.
     const notesSearch = new URLSearchParams({
-      select: 'id,body,visibility,workspace_id,author_id,created_at',
+      select: 'id,body,on_day,workspace_id,author_id,created_at',
       workspace_id: `eq.${workspaceId}`,
       person_id: `eq.${personId}`,
       deleted_at: 'is.null',
@@ -109,7 +113,7 @@ export const GET: RequestHandler = async ({ request, params, url, platform, loca
 
     const [conversations, notes, crew, cast] = await Promise.all([
       pgGet(env, 'conversation', jwt, { search: engSearch }),
-      pgGet(env, 'person_note', jwt, { search: notesSearch }),
+      pgGet(env, 'note', jwt, { search: notesSearch }),
       pgGet(env, 'crew_assignment', jwt, { search: crewSearch }),
       pgGet(env, 'cast_member', jwt, { search: castSearch }),
     ]);

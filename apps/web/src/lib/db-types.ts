@@ -1498,6 +1498,100 @@ export type Database = {
           },
         ]
       }
+      note: {
+        Row: {
+          author_id: string
+          body: string
+          created_at: string
+          date_id: string | null
+          deleted_at: string | null
+          id: string
+          line_id: string | null
+          on_day: string
+          performance_id: string | null
+          person_id: string | null
+          project_id: string | null
+          updated_at: string
+          visibility: Database["public"]["Enums"]["note_visibility"]
+          workspace_id: string
+        }
+        Insert: {
+          author_id: string
+          body: string
+          created_at?: string
+          date_id?: string | null
+          deleted_at?: string | null
+          id?: string
+          line_id?: string | null
+          on_day: string
+          performance_id?: string | null
+          person_id?: string | null
+          project_id?: string | null
+          updated_at?: string
+          visibility?: Database["public"]["Enums"]["note_visibility"]
+          workspace_id: string
+        }
+        Update: {
+          author_id?: string
+          body?: string
+          created_at?: string
+          date_id?: string | null
+          deleted_at?: string | null
+          id?: string
+          line_id?: string | null
+          on_day?: string
+          performance_id?: string | null
+          person_id?: string | null
+          project_id?: string | null
+          updated_at?: string
+          visibility?: Database["public"]["Enums"]["note_visibility"]
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "note_date_id_fkey"
+            columns: ["date_id"]
+            isOneToOne: false
+            referencedRelation: "date"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "note_line_id_fkey"
+            columns: ["line_id"]
+            isOneToOne: false
+            referencedRelation: "line"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "note_performance_id_fkey"
+            columns: ["performance_id"]
+            isOneToOne: false
+            referencedRelation: "performance"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "note_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "person"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "note_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "project"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "note_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspace"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payment: {
         Row: {
           amount: number
@@ -1508,6 +1602,7 @@ export type Database = {
           created_by: string | null
           deleted_at: string | null
           id: string
+          idempotency_key: string | null
           invoice_id: string | null
           line_id: string | null
           method: Database["public"]["Enums"]["payment_method"]
@@ -1527,6 +1622,7 @@ export type Database = {
           created_by?: string | null
           deleted_at?: string | null
           id?: string
+          idempotency_key?: string | null
           invoice_id?: string | null
           line_id?: string | null
           method?: Database["public"]["Enums"]["payment_method"]
@@ -1546,6 +1642,7 @@ export type Database = {
           created_by?: string | null
           deleted_at?: string | null
           id?: string
+          idempotency_key?: string | null
           invoice_id?: string | null
           line_id?: string | null
           method?: Database["public"]["Enums"]["payment_method"]
@@ -1801,64 +1898,6 @@ export type Database = {
           website?: string | null
         }
         Relationships: []
-      }
-      person_note: {
-        Row: {
-          author_id: string
-          body: string
-          created_at: string
-          deleted_at: string | null
-          id: string
-          person_id: string
-          updated_at: string
-          visibility: Database["public"]["Enums"]["person_note_visibility"]
-          workspace_id: string
-        }
-        Insert: {
-          author_id: string
-          body: string
-          created_at?: string
-          deleted_at?: string | null
-          id?: string
-          person_id: string
-          updated_at?: string
-          visibility?: Database["public"]["Enums"]["person_note_visibility"]
-          workspace_id: string
-        }
-        Update: {
-          author_id?: string
-          body?: string
-          created_at?: string
-          deleted_at?: string | null
-          id?: string
-          person_id?: string
-          updated_at?: string
-          visibility?: Database["public"]["Enums"]["person_note_visibility"]
-          workspace_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "person_note_person_id_fkey"
-            columns: ["person_id"]
-            isOneToOne: false
-            referencedRelation: "person"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "person_note_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: false
-            referencedRelation: "workspace"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "person_note_workspace_person_fkey"
-            columns: ["workspace_id", "person_id"]
-            isOneToOne: false
-            referencedRelation: "workspace_person"
-            referencedColumns: ["workspace_id", "person_id"]
-          },
-        ]
       }
       project: {
         Row: {
@@ -2732,8 +2771,36 @@ export type Database = {
           workspace_slug: string
         }[]
       }
+      accessible_project_ids: { Args: { p_perm: string }; Returns: string[] }
+      add_cast_member: {
+        Args: { p_person_id: string; p_project_id: string; p_role: string }
+        Returns: {
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          id: string
+          joined_at: string | null
+          left_at: string | null
+          notes: string | null
+          person_id: string
+          project_id: string
+          role: string
+          updated_at: string
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "cast_member"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       can_access_project: { Args: { p_project_id: string }; Returns: boolean }
       can_edit_project: { Args: { p_project_id: string }; Returns: boolean }
+      can_read_workspace_money: {
+        Args: { p_workspace_id: string }
+        Returns: boolean
+      }
       can_see_person: { Args: { p_person_id: string }; Returns: boolean }
       can_user_write_collab: {
         Args: { p_target_id: string; p_target_table: string; p_user_id: string }
@@ -3123,12 +3190,47 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      create_note: {
+        Args: {
+          p_body: string
+          p_date_id?: string
+          p_line_id?: string
+          p_on_day: string
+          p_performance_id?: string
+          p_person_id?: string
+          p_project_id?: string
+          p_workspace_id?: string
+        }
+        Returns: {
+          author_id: string
+          body: string
+          created_at: string
+          date_id: string | null
+          deleted_at: string | null
+          id: string
+          line_id: string | null
+          on_day: string
+          performance_id: string | null
+          person_id: string | null
+          project_id: string | null
+          updated_at: string
+          visibility: Database["public"]["Enums"]["note_visibility"]
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "note"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       create_payment: {
         Args: {
           p_amount?: number
           p_bolo_id?: string
           p_category?: string
           p_counterparty?: string
+          p_idempotency_key?: string
           p_invoice_id?: string
           p_line_id?: string
           p_method?: Database["public"]["Enums"]["payment_method"]
@@ -3146,6 +3248,7 @@ export type Database = {
           created_by: string | null
           deleted_at: string | null
           id: string
+          idempotency_key: string | null
           invoice_id: string | null
           line_id: string | null
           method: Database["public"]["Enums"]["payment_method"]
@@ -3209,31 +3312,6 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "performance"
-          isOneToOne: true
-          isSetofReturn: false
-        }
-      }
-      create_person_note: {
-        Args: {
-          p_body: string
-          p_person_id: string
-          p_visibility?: Database["public"]["Enums"]["person_note_visibility"]
-          p_workspace_id: string
-        }
-        Returns: {
-          author_id: string
-          body: string
-          created_at: string
-          deleted_at: string | null
-          id: string
-          person_id: string
-          updated_at: string
-          visibility: Database["public"]["Enums"]["person_note_visibility"]
-          workspace_id: string
-        }
-        SetofOptions: {
-          from: "*"
-          to: "person_note"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -3445,12 +3523,12 @@ export type Database = {
       delete_date: { Args: { p_date_id: string }; Returns: undefined }
       delete_expense: { Args: { p_expense_id: string }; Returns: undefined }
       delete_invoice: { Args: { p_invoice_id: string }; Returns: undefined }
+      delete_note: { Args: { p_note_id: string }; Returns: undefined }
       delete_payment: { Args: { p_payment_id: string }; Returns: undefined }
       delete_performance: {
         Args: { p_performance_id: string }
         Returns: undefined
       }
-      delete_person_note: { Args: { p_note_id: string }; Returns: undefined }
       delete_task: { Args: { p_task_id: string }; Returns: undefined }
       fiscal_identity_snapshot: { Args: { p_id: string }; Returns: Json }
       generate_workspace_sid: { Args: never; Returns: string }
@@ -3664,18 +3742,28 @@ export type Database = {
           workspace_slug: string
         }[]
       }
-      project_id_of_asset_version: {
-        Args: {
-          p_line_id: string
-          p_performance_id: string
-          p_project_id: string
+      remove_cast_member: {
+        Args: { p_cast_member_id: string }
+        Returns: {
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          id: string
+          joined_at: string | null
+          left_at: string | null
+          notes: string | null
+          person_id: string
+          project_id: string
+          role: string
+          updated_at: string
+          workspace_id: string
         }
-        Returns: string
-      }
-      project_id_of_expense: { Args: { p_expense_id: string }; Returns: string }
-      project_id_of_performance: {
-        Args: { p_performance_id: string }
-        Returns: string
+        SetofOptions: {
+          from: "*"
+          to: "cast_member"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       request_workspace_alias: {
         Args: { p_alias: string; p_workspace_id: string }
@@ -3784,6 +3872,42 @@ export type Database = {
           fee_currency: string
           id: string
         }[]
+      }
+      update_invoice: {
+        Args: { p_invoice_id: string; p_patch: Json }
+        Returns: {
+          country: string | null
+          created_at: string
+          created_by: string | null
+          currency: string
+          custom_fields: Json
+          deleted_at: string | null
+          doc_type: string
+          due_on: string | null
+          expected_on: string | null
+          id: string
+          issued_on: string
+          issuer_fiscal_identity_id: string | null
+          issuer_snapshot: Json | null
+          notes: string | null
+          number: string | null
+          payer_fiscal_identity_id: string | null
+          payer_person_id: string | null
+          payer_snapshot: Json | null
+          payment_condition: string | null
+          project_id: string | null
+          status: Database["public"]["Enums"]["invoice_status"]
+          subtotal: number
+          total: number
+          updated_at: string
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "invoice"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       update_project: {
         Args: { p_patch: Json; p_project_id: string }
@@ -3908,6 +4032,7 @@ export type Database = {
         | "misc"
       line_status: "open" | "closed" | "archived"
       membership_role: "owner" | "admin" | "member" | "viewer" | "guest"
+      note_visibility: "private" | "workspace"
       payment_method: "transfer" | "card" | "cash" | "other"
       performance_status:
         | "proposed"
@@ -3920,7 +4045,6 @@ export type Database = {
         | "invoiced"
         | "paid"
         | "cancelled"
-      person_note_visibility: "workspace" | "private"
       project_status: "draft" | "active" | "archived"
       task_origin: "manual" | "protocol" | "ai"
       task_status: "open" | "done"
@@ -4124,6 +4248,7 @@ export const Constants = {
       ],
       line_status: ["open", "closed", "archived"],
       membership_role: ["owner", "admin", "member", "viewer", "guest"],
+      note_visibility: ["private", "workspace"],
       payment_method: ["transfer", "card", "cash", "other"],
       performance_status: [
         "proposed",
@@ -4137,7 +4262,6 @@ export const Constants = {
         "paid",
         "cancelled",
       ],
-      person_note_visibility: ["workspace", "private"],
       project_status: ["draft", "active", "archived"],
       task_origin: ["manual", "protocol", "ai"],
       task_status: ["open", "done"],

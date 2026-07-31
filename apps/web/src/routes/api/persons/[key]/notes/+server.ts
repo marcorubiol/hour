@@ -1,11 +1,14 @@
 /**
- * POST /api/persons/:key/notes — add a workspace-scoped note to a person
- * (ADR-045). Goes through the `create_person_note` RPC (the direct
- * INSERT policy is claim-bound). Visibility: `workspace` (any member of
- * that workspace reads it) or `private` (author only, gated further by
- * read:person_note_private on the read path).
+ * POST /api/persons/:key/notes — add a note about a person (ADR-045, rebuilt
+ * on ADR-093). Goes through the `create_note` RPC (the direct INSERT policy
+ * is claim-bound).
  *
- * Body: { workspace_id, body, visibility? }.
+ * There is no visibility any more: a note is ALWAYS private, and what the team
+ * sees is comms (ADR-093 §2). `on_day` is the day the note lives on — the
+ * client sends its own local day, since the server's is UTC and a note written
+ * at 00:30 in Barcelona belongs to the day the writer thinks it does.
+ *
+ * Body: { workspace_id, body, on_day? }.
  */
 
 import type { RequestHandler } from './$types';
@@ -18,7 +21,7 @@ import { pgErrorResponse } from '$lib/server/errors';
 const BodySchema = v.object({
   workspace_id: v.pipe(v.string(), v.uuid()),
   body: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(4000)),
-  visibility: v.optional(v.picklist(['workspace', 'private'])),
+  on_day: v.optional(v.pipe(v.string(), v.isoDate())),
 });
 
 function json(body: unknown, status = 200): Response {
@@ -85,11 +88,11 @@ export const POST: RequestHandler = async ({ request, params, platform, locals }
       if (found.data.length === 0) return json({ error: 'not_found' }, 404);
     }
 
-    const { data } = await pgPostRpc(env, 'create_person_note', jwt, {
+    const { data } = await pgPostRpc(env, 'create_note', jwt, {
       p_person_id: personId,
       p_workspace_id: input.workspace_id,
       p_body: input.body,
-      p_visibility: input.visibility ?? 'workspace',
+      p_on_day: input.on_day ?? new Date().toISOString().slice(0, 10),
     });
     if (data.length === 0) return json({ error: 'create_failed' }, 502);
     return json({ note: data[0] }, 201);

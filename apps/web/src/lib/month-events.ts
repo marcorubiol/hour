@@ -22,8 +22,15 @@ export type PerformanceEvent = {
   slug: string | null;
   performed_at: string;
   status: string;
+  // The run sheet, all five. `/api/performances` has always SELECTed them
+  // (+server.ts § select); only two were declared here, so the other three
+  // arrived over the wire and were dropped on the floor by the type. They
+  // are the day's shape, and the Planner v3 draws it.
   load_in_at?: string | null;
+  soundcheck_at?: string | null;
   start_at: string | null;
+  loadout_at?: string | null;
+  wrap_at?: string | null;
   venue_name: string | null;
   city: string | null;
   country: string | null;
@@ -130,4 +137,40 @@ export function monthName(year: number, month: number, locale = 'en-GB'): string
 /** ADR-078: the working time — load-in when known, else show start. */
 export function perfInstant(p: PerformanceEvent): string | null {
   return p.load_in_at ?? p.start_at;
+}
+
+/** One moment of the day, in order. `key` is a vocabulary, not a string to
+ *  print — the caller translates it. */
+export type RunSheetStepKey = 'load_in' | 'soundcheck' | 'start' | 'loadout' | 'wrap';
+
+export type RunSheetStep = { key: RunSheetStepKey; at: string };
+
+/** Fixed order, because the five columns carry a CHECK that enforces it. */
+const RUN_SHEET_ORDER: ReadonlyArray<
+  readonly [RunSheetStepKey, (p: PerformanceEvent) => string | null | undefined]
+> = [
+  ['load_in', (p) => p.load_in_at],
+  ['soundcheck', (p) => p.soundcheck_at],
+  ['start', (p) => p.start_at],
+  ['loadout', (p) => p.loadout_at],
+  ['wrap', (p) => p.wrap_at],
+];
+
+/**
+ * The day's running order as a list, skipping what nobody filled in.
+ *
+ * THIS IS THE SEAM. Today the five moments are five columns on `performance`
+ * — a list wearing a table's clothes, which is exactly what ADR-090 objected
+ * to: nobody can add "photo call" without a migration. When `schedule_slot`
+ * lands, the rows move and the labels go free, and the only thing that has to
+ * change is the body of this function. Everything that draws the day should
+ * go through it and never touch `*_at` directly.
+ */
+export function runSheetSteps(p: PerformanceEvent): RunSheetStep[] {
+  const out: RunSheetStep[] = [];
+  for (const [key, read] of RUN_SHEET_ORDER) {
+    const at = read(p);
+    if (at) out.push({ key, at });
+  }
+  return out;
 }
