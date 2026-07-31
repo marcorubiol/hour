@@ -426,6 +426,63 @@
     return { combined, lanes };
   });
 
+  /**
+   * A BAND IS ONE ELEMENT THAT SPANS COLUMNS (ADR-095), not N slices glued
+   * edge to edge — and it lives at the FOOT of its week, which is where the
+   * design puts absences and tours.
+   *
+   * Before this it was a per-cell lane system: every day of the week reserved
+   * an empty slot for every lane so the pieces would line up, and the label
+   * was reprinted on the first day of each week. That kept seven copies of one
+   * fact in the DOM and could never draw a terminus — an arrowhead only means
+   * something on an element that has an end.
+   *
+   * Clipping is per ISO week because a band that runs past Sunday does not end
+   * there: it loses its arrowhead and says `until <date>` instead, so the
+   * geometry never claims something the calendar cannot show.
+   */
+  type WeekBand = {
+    key: string;
+    kind: 'blackout' | 'away';
+    colStart: number;
+    colEnd: number;
+    label: string;
+    note?: string | null;
+    tentative: boolean;
+    /** The band continues past this week's edge — no terminus on that side. */
+    cutLeft: boolean;
+    cutRight: boolean;
+    lane: number;
+  };
+  function weekBands(week: { iso: string }[]): WeekBand[] {
+    const first = week[0].iso;
+    const last = week[6].iso;
+    const out: WeekBand[] = [];
+    const { combined, lanes } = laneBands;
+    combined.forEach((slot, i) => {
+      if (slot.to < first || slot.from > last) return;
+      const from = slot.from < first ? first : slot.from;
+      const to = slot.to > last ? last : slot.to;
+      const colStart = week.findIndex((d) => d.iso === from) + 1;
+      const colEnd = week.findIndex((d) => d.iso === to) + 2;
+      if (colStart < 1 || colEnd < 2) return;
+      const isBlackout = slot.kind === 'blackout';
+      out.push({
+        key: `${slot.kind}:${i}:${first}`,
+        kind: slot.kind,
+        colStart,
+        colEnd,
+        label: slot.band.label,
+        note: isBlackout ? (slot.band as BlackoutBandVM).note : null,
+        tentative: isBlackout ? (slot.band as BlackoutBandVM).tentative : false,
+        cutLeft: slot.from < first,
+        cutRight: slot.to > last,
+        lane: lanes[i] ?? 0,
+      });
+    });
+    return out.sort((a, b) => a.lane - b.lane || a.colStart - b.colStart);
+  }
+
   /** Lanes in use across a whole week row — every cell reserves this many
    *  slots so a lane sits at the same height in every day of the week. */
   /**
@@ -592,6 +649,7 @@
   {#each weeks as week, wi (wi)}
     {@const wlc = weekLaneCount(week)}
     {@const marks = weekMarks(week)}
+    {@const bands = weekBands(week)}
     <!-- A ROW OF THE MONTH IS A WEEK, and each week is its own block: a gutter
          that counts it, then its seven days. -->
     <div class="cal__wk" style="--wf: {weekFill(week)}">
@@ -687,40 +745,32 @@
             >+{overflow} {moreLabel}</button
           >
         {/if}
-        {#if wlc > 0}
-          <span class="cal__bands">
-            {#each bandSlots as entry, lane (lane)}
-              {#if entry === null}
-                <!-- reserved spacer: keeps the lane above at the same height
-                     across days so no band ever jumps rows. -->
-                <span class="cal__band cal__band--spacer" aria-hidden="true"></span>
-              {:else}
-                {@const showLabel = day.iso === entry.from || di === 0}
-                {#if entry.kind === 'blackout'}
-                  <span
-                    class="cal__band"
-                    class:cal__band--company={entry.band.company}
-                    class:cal__band--person={!entry.band.company}
-                    class:cal__band--tentative={entry.band.tentative}
-                    title={entry.band.label}
-                  >
-                    {showLabel ? entry.band.label : ''}
-                    {#if day.iso === entry.from && entry.band.note}<i
-                        class="cal__band-note">{entry.band.note}</i
-                      >{/if}
-                  </span>
-                {:else}
-                  <span class="cal__band cal__band--away" title={entry.band.label}>
-                    {showLabel ? entry.band.label : ''}
-                  </span>
-                {/if}
-              {/if}
-            {/each}
-          </span>
-        {/if}
       </div>
     {/each}
       </div>
+      {#if bands.length > 0}
+        <!-- The foot of the week: absences and tours, each ONE element measured
+             over the days it covers. -->
+        <div class="cal__wkb">
+          {#each bands as b (b.key)}
+            <span
+              class="cal__band"
+              class:cal__band--away={b.kind === 'away'}
+              class:cal__band--tent={b.tentative}
+              class:cal__band--cutl={b.cutLeft}
+              class:cal__band--cutr={b.cutRight}
+              style="grid-column: {b.colStart} / {b.colEnd}"
+              title={b.note ? `${b.label} · ${b.note}` : b.label}
+            >
+              <span class="cal__band-n">{b.label}</span>
+              <!-- The rule with its terminus. It is not drawn when the band runs
+                   past the week's edge: an arrowhead there would claim an end
+                   the calendar cannot show. -->
+              <span class="cal__band-r"></span>
+            </span>
+          {/each}
+        </div>
+      {/if}
     </div>
   {/each}
 </div>
@@ -816,6 +866,83 @@
     }
     /* The seven days. The 1px rules ARE the grid — a background-image column
        ruling, so a cell can never be pushed out of alignment by a border. */
+    /* THE FOOT OF THE WEEK · absences and tours. */
+    .cal__wkb {
+      /* The week block is `gutter | content`; without this the band row lands
+         in the GUTTER column and every band draws under the week number
+         instead of over the days it measures. Seen on screen, 2026-07-31. */
+      grid-column: 2;
+      display: grid;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      gap: 2px 0;
+      padding: 2px 0 5px;
+      border-block-start: 1px solid var(--border-color-light);
+    }
+    .cal__band {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-inline-size: 0;
+      padding-inline: 8px;
+      overflow: visible;
+      white-space: nowrap;
+    }
+    .cal__band-n {
+      flex: none;
+      font-family: var(--font-mono);
+      font-size: 9px;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    /* A rule with a terminus — never a box. An absence is a stretch of days,
+       and a box says «a thing that happened», which is what it is not. */
+    .cal__band-r {
+      flex: 1;
+      min-inline-size: 12px;
+      position: relative;
+      block-size: 0;
+      border-block-start: 1px solid color-mix(in oklch, var(--text-color) 45%, transparent);
+    }
+    .cal__band-r::after {
+      content: '';
+      position: absolute;
+      inset-inline-end: -1px;
+      inset-block-start: -2.5px;
+      inline-size: 5px;
+      block-size: 5px;
+      border-block-start: 1px solid color-mix(in oklch, var(--text-color) 58%, transparent);
+      border-inline-end: 1px solid color-mix(in oklch, var(--text-color) 58%, transparent);
+      transform: rotate(45deg);
+    }
+    /* Runs past the week's edge: no terminus on that side. */
+    .cal__band--cutr .cal__band-r::after {
+      display: none;
+    }
+    /* ON TOUR is QUIETER THAN AN ABSENCE: an absence is a fact somebody wrote
+       down, this is deduced from two travel legs, and they cannot weigh the
+       same. Dotted where away is solid, and one ink lighter. */
+    .cal__band--away .cal__band-n {
+      color: var(--text-faint);
+    }
+    .cal__band--away .cal__band-r {
+      border-block-start-style: dotted;
+      border-block-start-color: color-mix(in oklch, var(--text-color) 16%, transparent);
+    }
+    .cal__band--away .cal__band-r::after {
+      display: none;
+    }
+    /* An absence that is settled is ink; one that is not is faint and leans —
+       the certainty axis, same as everywhere else. */
+    .cal__band--tent .cal__band-n {
+      color: var(--text-faint);
+      font-style: italic;
+    }
+    .cal__band--tent .cal__band-r {
+      border-block-start-style: dotted;
+    }
+
     .cal__wkc {
       display: grid;
       grid-template-columns: repeat(7, minmax(0, 1fr));
@@ -1342,85 +1469,7 @@
        dashed. Derived away band (§6) is QUIETER still — transparent,
        dotted top border, faint mono label. Bands sit at the cell floor,
        full-bleed across the cell padding. */
-    .cal__bands {
-      margin-block-start: auto;
-      margin-inline: calc(-1 * var(--space-xs));
-      margin-block-end: calc(-1 * var(--space-xs));
-      display: flex;
-      flex-direction: column;
-    }
-    .cal__band {
-      --band-bg: transparent;
-      --band-fg: var(--text-faint);
-      --band-border-color: var(--border-color-light);
-      --band-border-style: solid;
-      /* Constant height across ALL days — labelled, empty, first-day or a
-         continuation segment — so a multi-day band reads as one clean strip
-         (Marco 2026-07-19). Flex-centre keeps text vertically centred within
-         the fixed box; line-height:1 stops text inflating the height. */
-      block-size: 1.15rem;
-      line-height: 1;
-      display: flex;
-      align-items: center;
-      padding-block: 0;
-      padding-inline: var(--space-xs);
-      font-family: var(--font-mono);
-      font-size: 0.6rem;
-      letter-spacing: var(--mono-letter-spacing-loose);
-      text-transform: uppercase;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      background: var(--band-bg);
-      color: var(--band-fg);
-      border-block-start: 1px var(--band-border-style) var(--band-border-color);
-    }
-    .cal__band > * {
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    .cal__band--company {
-      /* Subtle: a faint grey wash with the base-light border and a faint
-         label — the band should whisper, not box the day (Marco 2026-07-23). */
-      --band-bg: color-mix(in oklch, var(--text-color) 6%, transparent);
-      --band-fg: var(--text-faint);
-      --band-border-color: var(--border-color-light);
-    }
-    .cal__band--person {
-      /* Subtle accent wash — just enough hue to say WHOSE, no more. The
-         tentative hatch (below) stays as-is; Marco kept that one. */
-      --band-bg: color-mix(in oklch, var(--cal-accent, var(--warning)) 7%, transparent);
-      --band-fg: color-mix(in oklch, var(--cal-accent, var(--warning)) 40%, var(--text-faint));
-      --band-border-color: color-mix(in oklch, var(--cal-accent, var(--warning)) 18%, var(--border-color-light));
-    }
-    .cal__band--tentative {
-      --band-bg: repeating-linear-gradient(
-        135deg,
-        color-mix(in oklch, var(--cal-accent, var(--warning)) 9%, transparent) 0 6px,
-        transparent 6px 12px
-      );
-      --band-fg: var(--text-muted);
-      --band-border-color: var(--border-color-dark);
-      --band-border-style: dashed;
-    }
-    .cal__band--away {
-      --band-border-style: dotted;
-      text-transform: none;
-      letter-spacing: var(--mono-letter-spacing);
-    }
     /* Reserved-but-empty lane: invisible, holds height only so the bands
        above/below keep their row across every day of the week. */
-    .cal__band--spacer {
-      background: none;
-      border-block-start-color: transparent;
-    }
-    .cal__band-note {
-      text-transform: none;
-      letter-spacing: 0;
-      font-style: italic;
-      font-family: var(--font-display);
-      color: var(--text-faint);
-      margin-inline-start: var(--space-xs);
-    }
   }
 </style>
