@@ -313,6 +313,19 @@
     const nextLanes = normalizeLaneAxis(params.get('lanes') ?? params.get('group'));
     if (nextLanes && nextLanes !== untrack(() => laneAxis)) laneAxis = nextLanes;
 
+    /* AND THE TRANSLATION IS WRITTEN BACK, ONCE. Reading a legacy address and
+       silently keeping it in the bar is half a translation: the state moved to
+       `board`, the URL still said `carrils`, so copying the link handed the
+       next person the old vocabulary again — forever. Rewriting here is what
+       makes «translated once on entry» true.
+       Caught by the ported `calAudit` law on its FIRST run (2026-07-31), which
+       is exactly what that suite is for. */
+    const legacy =
+      (params.get('view') && params.get('view') !== nextView) ||
+      params.has('group') ||
+      (params.get('lanes') && params.get('lanes') !== nextLanes);
+    if (legacy) syncUrl();
+
     const rawD = params.get('d');
     if (rawD && /^\d{4}-\d{2}-\d{2}$/.test(rawD) && rawD !== untrack(() => dayIso)) dayIso = rawD;
 
