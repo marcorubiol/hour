@@ -242,16 +242,23 @@ export type Slip = {
   /** Venue, or the best name this thing has. Never the same string as `city`. */
   name: string;
   /**
-   * A mono, uppercase word that governs the NAME — today only `to` / `from`
-   * on a travel day, where the place alone is ambiguous («London» is a
-   * departure or an arrival depending on a column nobody can see).
-   *
-   * The design prints BOTH legs («to Brussels / from Barcelona») because its
-   * fixture knows where home is. We do not: the origin of a leg is not in the
-   * data and that is exactly ADR-089's subject. So one leg, correctly
-   * labelled, instead of a home city invented to fill a line.
+   * A mono, uppercase word that governs the NAME — `to` on a travel day,
+   * where the place alone is ambiguous («London» is a departure or an arrival
+   * depending on a column nobody can see).
    */
   lead: string | null;
+  /**
+   * WHERE THE LEG STARTED, when it can be known — printed as a second line
+   * («from Barcelona»), which is how the design draws a travel day.
+   *
+   * The origin is not a column on `date` (that is ADR-089's subject), so it
+   * is DEDUCED, and the deduction is the one the calendar itself makes: where
+   * you were is the last place the sheet put you. The nearest event before
+   * this day that names a city is where this leg began. It is the same class
+   * of inference the tour band already makes from two legs, and it is null —
+   * not a guess — when nothing precedes it.
+   */
+  origin: string | null;
   city: string | null;
   /** ISO-2. The month drops it (the cell gives 57px and city+code needs
       58–70); the board and the day print it. The DRAWING decides, not this. */
@@ -285,6 +292,9 @@ type SlipContext = {
   kindLabel: (kind: SlipKind) => string;
   /** ADR-002 — the workspace's hold convention, resolved PER SLIP. */
   workspaceModeById?: Map<string, string>;
+  /** Where a travel leg began — see `Slip.origin`. The DRAWING supplies it,
+      because only a drawing knows what else is on the sheet. */
+  originOf?: (d: DateEvent) => string | null;
   dualTime: (
     at: string,
     tz: string | null,
@@ -336,6 +346,7 @@ export function performanceSlip(p: PerformanceEvent, ctx: SlipContext): Slip {
         : null,
     name,
     lead: null,
+    origin: null,
     city: cityUnder(name, p.venue?.city ?? p.city),
     country: cc ? cc.toUpperCase() : null,
     time,
@@ -380,10 +391,10 @@ export function dateSlip(d: DateEvent, ctx: SlipContext): Slip {
    * `Barcelona` on a travel day could be read as «this happens in Barcelona»,
    * which is exactly what a travel day is not.
    *
-   * `from` waits for ADR-089, which is where the origin of a leg gets a
-   * column. Printing a second place today would mean inventing it.
+   * The second place («from …») is deduced, not invented — see `origin`.
    */
   const lead = kind === 'travel_day' && d.travel_direction ? 'to' : null;
+  const origin = lead ? (ctx.originOf?.(d) ?? null) : null;
   return {
     id: d.id,
     kind,
@@ -392,6 +403,7 @@ export function dateSlip(d: DateEvent, ctx: SlipContext): Slip {
     hold: null,
     name,
     lead,
+    origin,
     city: cityUnder(name, d.city),
     country: cc ? cc.toUpperCase() : null,
     time,

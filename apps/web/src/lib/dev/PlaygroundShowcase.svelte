@@ -104,6 +104,7 @@
       cert: 'confirmed',
       name: 'Teatre Principal',
       lead: null,
+      origin: null,
       city: 'Terrassa',
       country: 'ES',
       time: { primary: '20h', end: null, secondary: null },

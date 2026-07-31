@@ -253,7 +253,43 @@
     viewerTz,
     kindLabel: (k: string) => dateKindLabel(k),
     dualTime,
+    originOf: travelOrigin,
   });
+
+  /* WHERE YOU WERE IS WHERE THE SHEET LAST PUT YOU (see `Slip.origin`).
+     The nearest event BEFORE this travel day that names a city. It reads the
+     whole loaded window, not the visible month, so a leg on the 1st still
+     knows it left from wherever the 28th was. Null when nothing precedes —
+     an absent origin is a real answer and stays absent. */
+  let placedDays = $derived.by(() => {
+    const out: Array<{ day: string; city: string; project: string | null }> = [];
+    for (const p of performances) {
+      const city = p.venue?.city ?? p.city;
+      if (city) out.push({ day: perfDayKey(p), city, project: p.project?.id ?? null });
+    }
+    for (const d of dates) {
+      // A travel day names where it is GOING, so it cannot say where you were.
+      if (d.kind === 'travel_day' || !d.city) continue;
+      out.push({ day: dateDayKey(d, viewerTz), city: d.city, project: d.project?.id ?? null });
+    }
+    return out.sort((a, b) => (a.day < b.day ? -1 : a.day > b.day ? 1 : 0));
+  });
+  function travelOrigin(d: DateEvent): string | null {
+    const day = dateDayKey(d, viewerTz);
+    // THE PROJECT'S OWN LAST PLACE, not the sheet's. Two companies share this
+    // calendar: on a night MaMeMi is in London and Última òrbita is in
+    // Barcelona, «where were you» has two answers and only one of them is
+    // this leg's. Unscoped, MaMeMi's flight home read as leaving from the
+    // city it was flying to, and the line simply vanished.
+    const mine = d.project?.id ?? null;
+    let best: string | null = null;
+    for (const p of placedDays) {
+      if (p.day >= day) break;
+      if (mine && p.project !== mine) continue;
+      best = p.city;
+    }
+    return best && best !== (d.city ?? null) ? best : null;
+  }
   const CELL_CAP = 3;
 
   /**
@@ -590,9 +626,20 @@
     word: string;
     subject: string;
     span: string | null;
-    /** Tours travel with their project: at one column wide the coloured
-        monogram is the only thing that survives. */
-    project: ProjectLite | null;
+    /**
+     * Tours travel with their project: at one column wide the coloured
+     * monogram is the only thing that survives.
+     *
+     * ALREADY RESOLVED. `AwayBandVM.accent` is the CSS value the page built
+     * with `accentVarFor`; running it through that helper a SECOND time was a
+     * real defect — `var(--accent-7)` is not a shape it recognises, so it fell
+     * back to hashing the slug, and the synthetic object had no slug. The
+     * tour's monogram came out a different colour from the same project's
+     * monogram on the gig beside it. Marco saw it.
+     */
+    accent: string | null;
+    initials: string | null;
+    projectName: string | null;
     label: string;
     note?: string | null;
     tentative: boolean;
@@ -635,18 +682,9 @@
         // A tour says no dates: it is inferred from two travel legs, and the
         // legs are already drawn on the sheet as the days they are.
         span: isBlackout ? bandSpan(slot.from, slot.to, cutLeft) : null,
-        project: isBlackout
-          ? null
-          : aw.project_id
-            ? {
-                id: aw.project_id,
-                slug: '',
-                name: aw.projectName ?? '',
-                accent: aw.accent,
-                initials: aw.initials,
-                workspace_id: '',
-              }
-            : null,
+        accent: isBlackout ? null : aw.accent,
+        initials: isBlackout ? null : aw.initials,
+        projectName: isBlackout ? null : aw.projectName,
         label: slot.band.label,
         note: isBlackout ? bo.note : null,
         tentative: isBlackout ? bo.tentative : false,
@@ -718,6 +756,12 @@
     return slots;
   }
 
+  /* THE HOVERED DAY, in state and not in CSS. A cell is TWO grid items — the
+     number row and the contents, with any run of days between them — so no
+     single element can carry a `:hover` that means «this day» without also
+     lighting the other six. One string, set by both halves. */
+  let hoverDay = $state<string | null>(null);
+
   // ── Clash-card popover — one open at a time, keyed day:index. ──────────
   let openClash = $state<string | null>(null);
   let gridEl: HTMLElement | undefined = $state();
@@ -745,33 +789,20 @@
   });
 </script>
 
-<!-- ONE DISPATCHER, on the grid. The cell carries only `data-cal-new`; the
-     handler fires only when the click landed on the cell ITSELF, so the slips,
-     the +N door and the day marks keep their own clicks. Reading the target
-     rather than giving every cell a role is also what keeps 42 cells out of the
-     tab order — the keyboard path to «a new date» is `N` on the page, which is
-     the same door (ADR-095 §7). -->
+<!-- THE CELL IS NOT A DOOR ANY MORE (Marco, 2026-07-31), and this is a
+     simplification with teeth. It used to be: click anywhere the click did not
+     land on something else, and a create dialog opened. That makes every
+     harmless gesture in the sheet — a stray click while reading, a click to
+     dismiss a popover, a drag that ends nowhere — a request to make a gig.
+     An affordance that fires on «you did not hit anything» is not an
+     affordance, it is a tripwire.
+     The invitation is now ONE explicit control, in the cell's header, and it
+     is the only thing that opens the dialog. -->
 <div
   class="cal__grid"
   class:cal__grid--loading={loading}
   role="grid"
   tabindex="-1"
-  onclick={(e) => {
-    const el = e.target as HTMLElement;
-    const iso = el?.dataset?.calNew;
-    if (iso) onDayCreate?.(iso);
-  }}
-  onkeydown={(e) => {
-    // The grid itself is not the keyboard path — `N` on the page is (one
-    // door, three handles). This exists so the click handler is not a
-    // mouse-only affordance, and it fires on the same target rule.
-    if (e.key !== 'Enter' && e.key !== ' ') return;
-    const el = e.target as HTMLElement;
-    const iso = el?.dataset?.calNew;
-    if (!iso) return;
-    e.preventDefault();
-    onDayCreate?.(iso);
-  }}
   aria-label={label}
   bind:this={gridEl}
 >
@@ -808,7 +839,11 @@
             class="cal__num"
             class:cal__day--out={!day.inMonth}
             class:cal__day--today={day.iso === todayIso}
+            data-hover={hoverDay === day.iso ? '' : undefined}
             style="grid-row: 1; grid-column: {di + 1}"
+            onmouseenter={() => (hoverDay = day.iso)}
+            onmouseleave={() => (hoverDay = hoverDay === day.iso ? null : hoverDay)}
+            role="presentation"
           >
             <span class="cal__day-head">
               <!-- A DAY OUTSIDE THE MONTH DRAWS ITS CONTENT AND NEVER ITS
@@ -816,23 +851,34 @@
                    grey wash, the noise without the information. The ABSENCE
                    of the number is the whole of the mark, and there is no
                    fade: a weaker CLAIM is not fainter INK. -->
-              {#if day.inMonth}
-                <span class="cal__day-num">{Number(day.iso.slice(8, 10))}</span>
+              <!-- THREE SLOTS, ALWAYS, so the middle one is a real centre and
+                   not «whatever is left». An out-of-month day draws no number
+                   and a quiet day draws no mark, but both keep their column. -->
+              <span class="cal__day-num"
+                >{#if day.inMonth}{Number(day.iso.slice(8, 10))}{/if}</span
+              >
+              {#if day.inMonth && onDayCreate}
+                <button
+                  type="button"
+                  class="cal__new"
+                  aria-label={createLabel(day.iso)}
+                  onclick={() => onDayCreate?.(day.iso)}>+</button
+                >
+              {:else}
+                <span></span>
               {/if}
-              {#if clashes.length > 0}
-                <span class="cal__marks">
-                  {#each clashes as c, i (i)}
-                    <button
-                      type="button"
-                      class="cal__mark"
-                      data-severity={c.severity}
-                      aria-label={c.title}
-                      aria-expanded={openClash === `${day.iso}:${i}`}
-                      onclick={() => toggleClash(day.iso, i)}>!</button
-                    >
-                  {/each}
-                </span>
-              {/if}
+              <span class="cal__marks">
+                {#each clashes as c, i (i)}
+                  <button
+                    type="button"
+                    class="cal__mark"
+                    data-severity={c.severity}
+                    aria-label={c.title}
+                    aria-expanded={openClash === `${day.iso}:${i}`}
+                    onclick={() => toggleClash(day.iso, i)}>!</button
+                  >
+                {/each}
+              </span>
             </span>
             {#each clashes as c, i (i)}
               {#if openClash === `${day.iso}:${i}`}
@@ -847,9 +893,8 @@
           <div
             class="cal__run"
             data-family={s.cert}
-            style="grid-row: {si + 2}; grid-column: {s.colStart} / {s.colEnd}{s.project
-              ? `; --c: ${accentVarFor(s.project)}`
-              : ''}"
+            style="grid-row: {si + 2}; grid-column: {s.colStart} / {s.colEnd}; --run-cols: {s.cells
+              .length}{s.project ? `; --c: ${accentVarFor(s.project)}` : ''}"
             title={s.title}
           >
               <span class="cal__run-h">
@@ -918,8 +963,10 @@
         class="cal__day"
         class:cal__day--out={!day.inMonth}
         class:cal__day--today={day.iso === todayIso}
-        data-cal-new={day.inMonth && onDayCreate ? day.iso : undefined}
         style="grid-row: var(--cr); grid-column: {di + 1}"
+        onmouseenter={() => (hoverDay = day.iso)}
+        onmouseleave={() => (hoverDay = hoverDay === day.iso ? null : hoverDay)}
+        role="presentation"
       >
         <!-- Three, then a door. The cap is what lets a quiet week look short:
              the row is as tall as its fullest day, and without it that day can
@@ -942,6 +989,7 @@
             >+{overflow} {moreLabel}</button
           >
         {/if}
+
       </div>
     {/each}
       </div>
@@ -960,12 +1008,12 @@
               title={b.note ? `${b.label} · ${b.note}` : b.label}
             >
               <span class="cal__band-k">
-                {#if b.project}
+                {#if b.accent}
                   <IdentityMark
                     mini
-                    accent={accentVarFor(b.project)}
-                    name={b.project.name}
-                    initials={b.project.initials}
+                    accent={b.accent}
+                    name={b.projectName}
+                    initials={b.initials}
                   />
                 {/if}
                 <span class="cal__band-w">{b.word}</span>
@@ -1206,9 +1254,32 @@
       text-decoration: line-through;
       color: var(--text-faint);
     }
+    /* THE DAY BOUNDARIES CROSS THE BAND. The seven column rules are painted
+       on `.cal__wkc`, behind everything, so a band that spans days covered
+       them and read as one box floating over the week instead of a run
+       measured in days. Drawn back on top — same hairline, same pitch, no
+       pointer events — the band is visibly four days long without a word.
+       (Marco's experiment, 2026-07-31.) */
+    .cal__run::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background-image: linear-gradient(
+        to right,
+        var(--border-color-light) 0 1px,
+        transparent 1px
+      );
+      background-size: calc(100% / var(--run-cols, 1)) 100%;
+      background-position: -1px 0;
+      background-repeat: repeat-x;
+    }
     .cal__run-h {
       display: flex;
       align-items: center;
+      /* The hours sit directly under this line, so the two need a hairline of
+         air or the name and its own clock read as one wrapped sentence. */
+      margin-block-end: 3px;
       gap: 8px;
       min-inline-size: 0;
       white-space: nowrap;
@@ -1249,7 +1320,11 @@
       font-family: var(--font-mono);
       font-size: 9px;
       line-height: 1.15;
-      color: var(--text-muted);
+      /* Full ink. These hours are the ONLY thing the band says that its own
+         title does not — the whole argument for storing a run as per-day rows
+         is that the 8th is 10–18 and the 10th is 10–13. At muted they read as
+         a caption on the name above them. */
+      color: var(--text-color);
       font-variant-numeric: tabular-nums;
     }
     .cal__run-d {
@@ -1319,38 +1394,57 @@
       min-inline-size: 0;
       display: flex;
       flex-direction: column;
-      padding: 1px 5px 9px;
+      /* THE FOOT RESERVES THE HINT, it does not lend it space. The hint is
+         10px tall at `bottom: 1px` — eleven — and the foot only held back
+         nine, so on a full cell it printed straight over the last card.
+         An affordance that covers the thing it is offered beside is worse
+         than no affordance: you cannot read what is already there.
+         (Marco asked to see this exact case before trusting it. He was
+         right to: 2026-07-31, day 9, two gigs and a clash.) */
+      padding: 1px 5px 13px;
       overflow: hidden;
     }
 
-    /* The invitation appears WHERE YOU POINT, and it is the cell's own empty
-       space — no element, so nothing can cover another control. */
-    .cal__day[data-cal-new]::after {
-      /* The hint says WHAT it will make. A bare `+` in a calendar cell is the
-         one glyph that could mean anything the app can create. */
-      content: '+ date';
-      position: absolute;
-      inset-inline: 5px;
-      inset-block-end: 1px;
-      block-size: 10px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+    /* ── THE INVITATION · one `+`, dead centre, only under the pointer ─
+       Three placings were tried before this one. Laid over the FOOT with a
+       `::after` it printed across the last card on a full day — an affordance
+       that covers the thing it is offered beside is worse than none, because
+       you can no longer read what is already there. In flow at the foot it
+       stopped overlapping but sat under the day's contents, which is not
+       where you point. At the header's right edge it queued behind the marks.
+
+       The number row is the one strip of a cell that is ALWAYS reserved and
+       never fills: a number, and at most two marks. The middle of it is empty
+       in every cell of every month, so that is where the `+` goes — and it is
+       a bare glyph, no box, because a chip in a header full of 9px marks
+       reads as a fourth kind of badge. */
+    .cal__new {
+      justify-self: center;
+      padding: 0;
+      border: 0;
+      background: none;
       font-family: var(--font-mono);
-      font-size: 8.5px;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      color: var(--text-faint);
-      border: 1px dashed color-mix(in oklch, var(--text-color) 14%, transparent);
-      border-radius: 2px;
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 0.1s;
+      font-size: 13px;
+      line-height: 1;
+      /* THE LINE TOKEN, not an ink one — and it is a token, not a bespoke
+         mix. `--border-color-dark` is the neutral at 18% alpha: the value
+         this app uses for «a line you can just see», which is the whole
+         register of a glyph that only has to be findable. It is an OFFER
+         sitting in a row of FACTS (the date, the marks), so it must be the
+         quietest thing there even while it is the only one that moves. */
+      color: var(--border-color-dark);
+      cursor: pointer;
+      visibility: hidden;
+      transition: color 0.1s;
     }
-    .cal__day[data-cal-new]:hover::after,
-    .cal__day[data-cal-new]:focus-visible::after {
-      opacity: 1;
+    .cal__num[data-hover] .cal__new,
+    .cal__new:focus-visible {
+      visibility: visible;
     }
+    .cal__new:hover {
+      color: var(--text-color);
+    }
+
     .cal__more {
       align-self: flex-start;
       margin-block-start: 3px;
@@ -1399,19 +1493,24 @@
       font-variant-numeric: tabular-nums;
     }
 
-    /* The number, then the slack, then the marks. `space-between` parked a
-       lone note dot in the middle of the cell — whatever comes SECOND takes
-       the slack, and anything after it sits beside it. */
+    /* THREE COLUMNS, so the middle is a TRUE centre: the number holds the
+       left, the marks hold the right, and the invitation sits on the cell's
+       own axis whatever their widths. `space-between` on a flex row cannot do
+       this — it centres between the neighbours, so the invitation would slide
+       sideways on any day that happens to carry a mark. */
     .cal__day-head {
-      display: flex;
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
       align-items: center;
-      justify-content: flex-start;
       gap: 6px;
       margin-block-end: 4px;
       min-block-size: 16px;
     }
-    .cal__day-head > :nth-child(2) {
-      margin-inline-start: auto;
+    .cal__day-head > :first-child {
+      justify-self: start;
+    }
+    .cal__day-head > :last-child {
+      justify-self: end;
     }
 
     /* Quiet add affordance — visible on cell hover (and on focus). */

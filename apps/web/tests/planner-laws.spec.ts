@@ -215,9 +215,14 @@ test.describe('planner laws (ADR-095)', () => {
 
   test('A DAY OUTSIDE THE MONTH DRAWS ITS CONTENT AND NEVER ITS NUMBER', async ({ page }) => {
     await planner(page, 'month');
-    const numbered = await page.evaluate(
-      () =>
-        document.querySelectorAll('.cal__day--out .cal__day-num').length,
+    // THE TEXT, not the element. The number's slot is always present — the
+    // cell header is a three-column grid so its middle is a true centre — so
+    // «no element» stopped being the same claim as «no number». What the law
+    // has always meant is that nothing is PRINTED there.
+    const numbered = await page.evaluate(() =>
+      [...document.querySelectorAll('.cal__day--out .cal__day-num')].filter(
+        (el) => (el.textContent ?? '').trim().length > 0,
+      ).length,
     );
     expect(numbered, 'an out-of-month cell printed its number').toBe(0);
   });

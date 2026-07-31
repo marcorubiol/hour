@@ -164,7 +164,12 @@
     >{#if slip.lead}<i class="slip__pre">{slip.lead}</i>{/if}{slip.name}</span
   >
 
-  {#if slip.city}
+  <!-- WHERE THE LEG BEGAN, under where it goes — the shape the design draws
+       for a travel day: `to Brussels` over `from Barcelona`. It is deduced
+       from the sheet, and absent rather than guessed when nothing precedes. -->
+  {#if slip.origin}
+    <span class="slip__c"><i class="slip__pre">from</i>{slip.origin}</span>
+  {:else if slip.city}
     <span class="slip__c"
       >{slip.city}{#if showCountry && slip.country}<i class="slip__cc">{slip.country}</i>{/if}</span
     >
