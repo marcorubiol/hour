@@ -65,6 +65,19 @@
      * inert, and the only way to change a rehearsal's hour disappears.
      */
     onOpen?: () => void;
+    /**
+     * THE CLASH, drawn on exactly the two slips it is between.
+     *
+     * `soft` — two maybes colliding is a collision of maybes: the rule is
+     * drawn, but dashed. `hard` — one of the two is inked, so the collision
+     * stopped being hypothetical and the rule goes solid and full weight.
+     * GRAVITY, NOT CERTAINTY: a running deadline does not promote it — when
+     * the clock matters the hold chip says so, in words.
+     */
+    clash?: 'none' | 'soft' | 'hard';
+    /** The next slip down is the other half of this clash, so the rule
+        bridges the gap between the two boxes. */
+    bridge?: boolean;
   }
 
   let {
@@ -75,6 +88,8 @@
     showCountry = false,
     onMarkOpen,
     onOpen,
+    clash = 'none',
+    bridge = false,
   }: Props = $props();
 
   let state = $derived(stateLabel(slip));
@@ -160,6 +175,8 @@
     class="slip"
     data-family={slip.cert}
     data-kind={slip.kind}
+    data-clash={clash === 'none' ? undefined : clash}
+    data-bridge={bridge ? '' : undefined}
     style={slip.project ? `--c: ${accentVarFor(slip.project)}` : undefined}
     href={slip.href}
     title={slip.title}>{@render body()}</a
@@ -170,6 +187,8 @@
     class="slip"
     data-family={slip.cert}
     data-kind={slip.kind}
+    data-clash={clash === 'none' ? undefined : clash}
+    data-bridge={bridge ? '' : undefined}
     style={slip.project ? `--c: ${accentVarFor(slip.project)}` : undefined}
     title={slip.title}
     onclick={onOpen}>{@render body()}</button
@@ -179,6 +198,8 @@
     class="slip"
     data-family={slip.cert}
     data-kind={slip.kind}
+    data-clash={clash === 'none' ? undefined : clash}
+    data-bridge={bridge ? '' : undefined}
     style={slip.project ? `--c: ${accentVarFor(slip.project)}` : undefined}
     title={slip.title}>{@render body()}</span
   >
@@ -234,12 +255,18 @@
       outline: 1px solid var(--text-muted);
       outline-offset: 1px;
     }
+    /* ONE VOICE FOR THE PACK AND THE CLOCK. The hour sat one ink step above
+       the kind word, so `SHOW 16h` read as a faint label with a loud number
+       glued to it — and the head line is meant to be a SENTENCE («MM SHOW
+       16h»), three tokens in one act of reading. Whatever the step was
+       protecting, it was not a hierarchy anybody uses: you do not read the
+       hour before you know what kind of thing it belongs to. */
     .slip__kind {
       font-family: var(--font-mono);
       font-size: 9px;
       letter-spacing: 0.1em;
       text-transform: uppercase;
-      color: var(--text-faint);
+      color: var(--text-muted);
       white-space: nowrap;
     }
     /* An option LEANS: the kind word and its `?` are italic wherever they are
@@ -409,6 +436,56 @@
     .slip[data-family='released'] .slip__c,
     .slip[data-family='released'] .slip__t {
       color: var(--text-faint);
+    }
+
+    /* ══ THE CLASH · one red rule down the two slips it is between ══════
+       Red is conflict, and ONLY conflict — the one place in the Planner it is
+       allowed to sit still. The rule is painted on exactly the pair the data
+       names, never on «every gig on this day»: three things can sit on one
+       date and only two of them are the collision.
+
+       It survives the option's dashed edge because the two say different
+       things — the edge says «not sure», the rule says «not both» — and it
+       takes the LEFT edge, which is the only edge no other state uses.
+
+       GRAVITY, NOT CERTAINTY. Two holds colliding is a collision of two
+       maybes: the rule is drawn, but dashed. The moment one of them is inked
+       it goes solid and full weight. A running deadline does NOT promote it:
+       when the clock matters the hold chip says so, in words. */
+    /* THIN. The rule is a hairline that says «not both», not a bar that
+       competes with the card it is attached to — at 2/3px it read as a status
+       stripe and became the loudest thing in the cell. 1.5 dashed and 2 solid
+       keep the step between «two maybes» and «one is real» while staying a
+       rule. */
+    .slip[data-clash] {
+      border-inline-start: 1.5px dashed color-mix(in oklch, var(--danger) 62%, var(--border-color-light));
+      border-start-start-radius: 0;
+      border-end-start-radius: 0;
+    }
+    .slip[data-clash='hard'] {
+      border-inline-start-width: 2px;
+      border-inline-start-style: solid;
+      border-inline-start-color: var(--danger);
+    }
+    /* The gap between two stacked slips is not a break in the collision, so
+       the rule bridges it — dashed while the clash is, solid when it is not. */
+    .slip[data-bridge]::after {
+      content: '';
+      position: absolute;
+      inset-inline-start: -1.5px;
+      inset-block-start: 100%;
+      inline-size: 1.5px;
+      block-size: 4px;
+      background: repeating-linear-gradient(
+        180deg,
+        color-mix(in oklch, var(--danger) 62%, var(--border-color-light)) 0 2px,
+        transparent 2px 4px
+      );
+    }
+    .slip[data-clash='hard'][data-bridge]::after {
+      inset-inline-start: -2px;
+      inline-size: 2px;
+      background: var(--danger);
     }
 
     /* hover — the edge darkens and the NAME underlines. Nothing else moves:

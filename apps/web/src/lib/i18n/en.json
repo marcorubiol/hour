@@ -154,6 +154,7 @@
   "hall.greeting_afternoon": "Good afternoon",
   "hall.greeting_night": "Good night",
   "hall.door": "catch me up",
+  "hall.home": "Hall",
   "hall.action_note": "New note",
   "hall.relation_hours": "in {h}h",
   "hall.relation_minutes": "in {m} min",

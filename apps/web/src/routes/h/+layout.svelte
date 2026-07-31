@@ -494,11 +494,13 @@
 {#if authChecked && !blocked}
   <div class="shell" class:shell--settings={inSettings}>
     <header class="shell__top">
-      <div class="shell__left">
-        <a class="shell__brand" href={homeHref} aria-label="Hour — home">
-          <BrandMark size="m" />
-        </a>
-      </div>
+      <!-- THE WORDMARK IS GONE FROM THE BAR (Marco, 2026-07-31). A product
+           tells you its name on the way in — the login and the invitation
+           still carry it — and after that it is the one thing on screen that
+           can never change and can never be acted on. The door it was is not
+           lost: the CLOCK is the way home now, which is the object at the top
+           of the rail that already says «here, now». -->
+      <div class="shell__left"></div>
 
       <button
         type="button"
@@ -638,11 +640,6 @@
     min-inline-size: 0;
   }
 
-  .shell__brand {
-    display: inline-flex;
-    flex: none;
-    text-decoration: none;
-  }
 
   .shell__search {
     grid-column: 2;

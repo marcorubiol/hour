@@ -79,10 +79,14 @@
 
 <aside class="shell__side" aria-label="Scopes">
   <div class="side-clock">
-    <div class="side-clock__now">
+    <!-- THE CLOCK IS THE WAY HOME. It took the door the wordmark used to
+         hold: «here, now» is already what it says, and a clock you can press
+         to get back to the top of the app is a smaller promise than a logo
+         that navigates. -->
+    <a class="side-clock__now" href="/h" aria-label={t('hall.home', locale)}>
       <time class="side-clock__time" datetime={clockTime}>{clockTime}</time>
       <p class="side-clock__date">{clockDate}</p>
-    </div>
+    </a>
     <button
       type="button"
       class="side-calm"
@@ -199,6 +203,11 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-xs);
+    text-decoration: none;
+    color: inherit;
+  }
+  .side-clock__now:hover .side-clock__time {
+    color: var(--text-color);
   }
   /* Calm toggle — the mode control lives by the clock (spec § Desk · Calm).
      outline = available / solid = active, so it reads as a control. */
@@ -210,11 +219,15 @@
     padding-inline: var(--space-m);
     border: 1px solid var(--border-color-dark);
     border-radius: var(--radius-circle);
-    background: var(--bg-ultra-light);
-    /* Desk lens button shape (sans, --space-2xs/--space-m, radius-circle, ultra-light
-       fill) but a smaller uppercase micro-label. Mono C key hint. */
+    /* NO FILL WHEN IT IS OFF (Marco, 2026-07-31). The outline alone says
+       «available»; a fill on a control that is not doing anything reads as a
+       state. The solid ground stays for `.is-on`, where it IS the state. */
+    background: none;
+    /* Desk lens button shape (sans, --space-2xs/--space-m, radius-circle) but
+       a micro-label one step under the smallest named step — 9px is the
+       Planner's own margin voice, and this is furniture beside a clock. */
     font-family: var(--font-sans);
-    font-size: var(--text-xs);
+    font-size: 9px;
     text-transform: uppercase;
     letter-spacing: 0.05em;
     color: var(--text-muted);
@@ -250,7 +263,9 @@
   }
   .side-clock__time {
     font-family: var(--font-mono);
-    font-size: var(--text-xl);
+    /* One step down the scale (was --text-xl): the clock states the day, it
+       does not head the page. */
+    font-size: var(--text-l);
     font-weight: 400;
     line-height: 1;
     letter-spacing: 0.02em;

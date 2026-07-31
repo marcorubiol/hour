@@ -145,6 +145,7 @@
   "hall.greeting_afternoon": "Buenas tardes",
   "hall.greeting_night": "Buenas noches",
   "hall.door": "ponme al día",
+  "hall.home": "Recibidor",
   "hall.action_note": "Nueva nota",
   "hall.relation_hours": "dentro de {h} h",
   "hall.relation_minutes": "dentro de {m} min",

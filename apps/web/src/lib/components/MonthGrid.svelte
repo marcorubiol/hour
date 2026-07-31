@@ -310,6 +310,28 @@
     return out.sort((a, b) => (a.sortAt < b.sortAt ? -1 : a.sortAt > b.sortAt ? 1 : 0));
   }
 
+  /* ── WHICH TWO COLLIDE ────────────────────────────────────────────────
+     `ClashVM.event_ids` names the pair. It was added to the VM for exactly
+     this and then never read: the month could say THAT something clashed —
+     the `!` on the day number — and never which two, which is the half of the
+     message you can act on.
+
+     A RULE THAT POINTS AT TWO AND SHOWS ONE IS A LIE. Narrow the scope so
+     that only one half of the pair is on the sheet and the rule leaves with
+     it; the mark on the day number stays, because it never asked the filter,
+     and it is the honest thing left to say. */
+  function clashFlags(
+    entries: Array<{ slip: SlipVM }>,
+    clashes: ClashVM[],
+  ): { on: boolean[]; hard: boolean } {
+    const ids = new Set(clashes.flatMap((c) => c.event_ids));
+    const on = entries.map((e) => ids.has(e.slip.id));
+    if (on.filter(Boolean).length < 2) return { on: on.map(() => false), hard: false };
+    // Gravity: nothing is urgent until something is real.
+    const hard = entries.some((e, i) => on[i] && e.slip.cert === 'confirmed');
+    return { on, hard };
+  }
+
   /** verb-cal only while the clock is actually running (ADR-080 §2). */
   function isUrgentHold(sl: SlipVM): boolean {
     return Boolean(sl.hold?.expires && sl.hold.expires <= todayIso);
@@ -852,6 +874,8 @@
       {@const dateGroups = groupDates(datesByDay.get(day.iso) ?? [])}
       {@const entries = cellSlips(perfs, dateGroups)}
       {@const overflow = entries.length - CELL_CAP}
+      {@const lead = entries.slice(0, CELL_CAP)}
+      {@const cf = clashFlags(lead, clashesByDay?.get(day.iso) ?? [])}
       <!-- A DATE IS A PLACE, SO A NEW DATE IS MADE AT THE PLACE (ADR-095 §7).
            THE CELL ITSELF is the door — not a button laid over its foot. The
            old `+` was absolute, reserved 16px of a foot that reserves 10, and
@@ -871,13 +895,15 @@
         <!-- Three, then a door. The cap is what lets a quiet week look short:
              the row is as tall as its fullest day, and without it that day can
              hold nine things. -->
-        {#each entries.slice(0, CELL_CAP) as entry (entry.key)}
+        {#each lead as entry, ei (entry.key)}
           <Slip
             slip={entry.slip}
             kindLabel={(k) => dateKindLabel(k)}
             stateLabel={slipState}
             stateUrgent={isUrgentHold(entry.slip)}
             showCountry={false}
+            clash={cf.on[ei] ? (cf.hard ? 'hard' : 'soft') : 'none'}
+            bridge={cf.on[ei] && cf.on[ei + 1]}
             onMarkOpen={openMark}
             onOpen={entry.dateRow && onDateOpen ? () => onDateOpen?.(entry.dateRow!) : undefined}
           />
