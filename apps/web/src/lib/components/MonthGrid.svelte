@@ -321,14 +321,27 @@
      it; the mark on the day number stays, because it never asked the filter,
      and it is the honest thing left to say. */
   function clashFlags(
-    entries: Array<{ slip: SlipVM }>,
+    lead: Array<{ slip: SlipVM }>,
     clashes: ClashVM[],
-  ): { on: boolean[]; hard: boolean } {
+  ): { on: boolean[]; hard: boolean[] } {
     const ids = new Set(clashes.flatMap((c) => c.event_ids));
-    const on = entries.map((e) => ids.has(e.slip.id));
-    if (on.filter(Boolean).length < 2) return { on: on.map(() => false), hard: false };
-    // Gravity: nothing is urgent until something is real.
-    const hard = entries.some((e, i) => on[i] && e.slip.cert === 'confirmed');
+    const on = lead.map((e) => ids.has(e.slip.id));
+    if (on.filter(Boolean).length < 2) return { on: on.map(() => false), hard: on.map(() => false) };
+    /* THE RULE SPEAKS ABOUT THE CARD IT IS DRAWN ON. Solid when THIS thing is
+       real, dashed while it is still an option.
+
+       Two wrong answers came before it. The first asked «is anything on this
+       date confirmed?», so a day holding one real gig drew every other
+       collision on it as settled — two holds colliding with each other were
+       reported as a hard problem because a third, unrelated thing beside them
+       was inked. The second asked «is the OTHER half of the pair confirmed?»,
+       which inverted the day: the confirmed gig came out dashed and the two
+       holds around it came out solid.
+
+       The answer Marco asked for is the one the rest of this drawing already
+       uses: geometry states the certainty, per object. A solid red rule on a
+       dashed-edged option card is two claims about one thing. */
+    const hard = lead.map((e, i) => on[i] && e.slip.cert === 'confirmed');
     return { on, hard };
   }
 
@@ -902,7 +915,7 @@
             stateLabel={slipState}
             stateUrgent={isUrgentHold(entry.slip)}
             showCountry={false}
-            clash={cf.on[ei] ? (cf.hard ? 'hard' : 'soft') : 'none'}
+            clash={cf.on[ei] ? (cf.hard[ei] ? 'hard' : 'soft') : 'none'}
             bridge={cf.on[ei] && cf.on[ei + 1]}
             onMarkOpen={openMark}
             onOpen={entry.dateRow && onDateOpen ? () => onDateOpen?.(entry.dateRow!) : undefined}

@@ -220,7 +220,9 @@
       text-decoration: none;
       background: var(--bg-ultra-light);
       border: 1px solid var(--border-color-light);
-      border-radius: var(--radius-s);
+      /* 3px, not the 4 of `--radius-s`: «solo un poquito en redondito».
+         At the size of a month cell the extra point reads as a chip. */
+      border-radius: 3px;
       color: var(--text-color);
     }
     .slip + :global(.slip) {
@@ -457,10 +459,15 @@
        stripe and became the loudest thing in the cell. 1.5 dashed and 2 solid
        keep the step between «two maybes» and «one is real» while staying a
        rule. */
+    /* IT IS THE CARD'S OWN EDGE, and it keeps the card's corners. The design
+       squares them, and squaring them is what made Marco read the rule as a
+       rail bolted to the outside: a box rounded on two corners and square on
+       the other two looks like two objects. Curved with the rest of the
+       outline it is unmistakably one — the same edge, in another colour,
+       saying another thing. */
     .slip[data-clash] {
-      border-inline-start: 1.5px dashed color-mix(in oklch, var(--danger) 62%, var(--border-color-light));
-      border-start-start-radius: 0;
-      border-end-start-radius: 0;
+      border-inline-start: 1.5px dashed
+        color-mix(in oklch, var(--danger) 62%, var(--border-color-light));
     }
     .slip[data-clash='hard'] {
       border-inline-start-width: 2px;
