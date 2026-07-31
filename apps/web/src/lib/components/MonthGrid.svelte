@@ -852,11 +852,9 @@
                    of the number is the whole of the mark, and there is no
                    fade: a weaker CLAIM is not fainter INK. -->
               <!-- THREE SLOTS, ALWAYS, so the middle one is a real centre and
-                   not «whatever is left». An out-of-month day draws no number
-                   and a quiet day draws no mark, but both keep their column. -->
-              <span class="cal__day-num"
-                >{#if day.inMonth}{Number(day.iso.slice(8, 10))}{/if}</span
-              >
+                   not «whatever is left». A quiet day draws no mark but keeps
+                   its column. -->
+              <span class="cal__day-num">{Number(day.iso.slice(8, 10))}</span>
               {#if day.inMonth && onDayCreate}
                 <button
                   type="button"
@@ -1461,13 +1459,20 @@
     .cal__more:hover {
       color: var(--text-muted);
     }
-    /* NO WASH ON A DAY THAT IS NOT THIS MONTH. It was legible while the cell
-       held nothing but a grey number; now that it holds slips it would put a
-       venue behind a tint, and the law is already written elsewhere in this
-       project: a weaker CLAIM is not fainter INK. The missing day number is
-       the whole of the mark. */
+    /* A DAY OUTSIDE THE MONTH KEEPS ITS NUMBER, ATTENUATED — Marco,
+       2026-08-01, and it reverses a law of the design that this file carried
+       until today («the missing number is the whole of the mark»).
+
+       That law was right about the CONTENT and wrong about the number. What
+       it was defending against is fading a venue behind a tint — a weaker
+       claim is not fainter ink, and an August gig is not a weaker claim. But
+       the number is not a claim at all: it is the ORIENTATION, and a run of
+       five blank cells at the head of a sheet asks the reader to count. So
+       the content keeps its full ink and the number takes the faintest step
+       the app has — the same token as the `+`, which is the register of
+       «findable, never read». */
     .cal__day--out .cal__day-num {
-      color: var(--text-faint);
+      color: var(--border-color-dark);
     }
 
     /* TODAY IS INK AND A WASH — never a filled pill. The pill was the loudest

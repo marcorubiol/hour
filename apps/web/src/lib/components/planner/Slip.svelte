@@ -288,10 +288,16 @@
     .slip__kind--q {
       font-style: italic;
     }
+    /* AN HOUR IS A FACT, AND IT TAKES FULL INK WHEREVER IT IS DRAWN. The run
+       band's per-day hours are at full ink because they are the only thing
+       that band says its title does not — and a slip's hour is exactly as
+       much of a fact, so drawing it a step quieter made one clock louder than
+       another for no reason a reader could name. The KIND word stays muted:
+       it is a label on the hour, not a second measurement. */
     .slip__t {
       font-family: var(--font-mono);
       font-size: 9px;
-      color: var(--text-muted);
+      color: var(--text-color);
       font-variant-numeric: tabular-nums;
       white-space: nowrap;
     }

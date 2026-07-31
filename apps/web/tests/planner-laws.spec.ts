@@ -213,18 +213,37 @@ test.describe('planner laws (ADR-095)', () => {
     await expect(page.locator('.cal__legend-item')).toHaveCount(0);
   });
 
-  test('A DAY OUTSIDE THE MONTH DRAWS ITS CONTENT AND NEVER ITS NUMBER', async ({ page }) => {
+  test('A DAY OUTSIDE THE MONTH KEEPS ITS NUMBER, AND ONLY THE NUMBER FADES', async ({
+    page,
+  }) => {
+    // REVERSED on 2026-08-01, by Marco. The old law said the missing number
+    // WAS the mark. It was right about the content and wrong about the
+    // number: a venue in August is not a weaker claim and must not be fainter
+    // ink — but the number is not a claim at all, it is the orientation, and
+    // five blank cells at the head of a sheet ask the reader to count.
     await planner(page, 'month');
-    // THE TEXT, not the element. The number's slot is always present — the
-    // cell header is a three-column grid so its middle is a true centre — so
-    // «no element» stopped being the same claim as «no number». What the law
-    // has always meant is that nothing is PRINTED there.
-    const numbered = await page.evaluate(() =>
-      [...document.querySelectorAll('.cal__day--out .cal__day-num')].filter(
-        (el) => (el.textContent ?? '').trim().length > 0,
-      ).length,
+    const out = await page.evaluate(() => {
+      const num = (sel: string) => {
+        const el = document.querySelector(sel);
+        return el ? { text: (el.textContent ?? '').trim(), color: getComputedStyle(el).color } : null;
+      };
+      return {
+        outside: num('.cal__day--out .cal__day-num'),
+        inside: num('.cal__day:not(.cal__day--out) .cal__day-num'),
+        // The CONTENT of an out-of-month day is never dimmed — only the number.
+        dimmedContent: [...document.querySelectorAll('.cal__day--out')].filter(
+          (c) => parseFloat(getComputedStyle(c).opacity) < 1,
+        ).length,
+      };
+    });
+    expect(out.outside?.text, 'an out-of-month day lost its number').toBeTruthy();
+    expect(out.dimmedContent, 'an out-of-month cell faded its content').toBe(0);
+    // Alpha: the outside number is the faintest thing in the header.
+    const alpha = (c: string | undefined) =>
+      Number(/\/\s*([\d.]+)\s*\)/.exec(c ?? '')?.[1] ?? '1');
+    expect(alpha(out.outside?.color), 'the outside number is not attenuated').toBeLessThan(
+      alpha(out.inside?.color),
     );
-    expect(numbered, 'an out-of-month cell printed its number').toBe(0);
   });
 
   test('THE CELL CAPS AT THREE, AND THE REST IS A DOOR', async ({ page }) => {
