@@ -149,23 +149,30 @@
       padding: 0;
       cursor: pointer;
       font-family: var(--font-display);
-      /* 21px, named by the design: the view is the middle of three scales —
-         window 29 · view 21 · meta 9.5 — and the token nearest it is 19.5,
-         which flattens the step the view word is supposed to keep. */
-      font-size: 21px;
+      /* THE LIT WORD KEEPS A STEP OVER ITS SISTERS, and the step is SIZE.
+         All four at 21px made the row of controls weigh as much as the date
+         above it, and then the only thing saying which drawing you were in
+         was a 1.5px rule — the quietest signal on the band carrying the most
+         important fact on it.
+         21px is the view band's named scale (window 29 · view 21 · meta 9.5),
+         so it belongs to the word that is TRUE, not to all four. */
+      font-size: 15.5px;
       font-weight: 400;
       line-height: 1.1;
       color: var(--text-faint);
-      transition: color 0.12s;
+      transition:
+        color 0.12s,
+        font-size 0.12s;
     }
     .cal__view:hover {
       color: var(--text-muted);
     }
-    /* The lit word is a STEP UP, not a different object: full ink and a rule.
-       It must not stand out from its siblings by becoming another shape. */
+    /* Size and ink, and nothing else. The underline was a third signal for a
+       fact already said twice — and a rule under one word in a row of four
+       reads as a tab, which is the shape this axis stopped being. */
     .cal__view--on {
+      font-size: 21px;
       color: var(--text-color);
-      border-block-end: 1.5px solid var(--text-color);
     }
 
     /* ── the dial · metadata, and it looks like it ───────────────────── */

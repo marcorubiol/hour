@@ -858,6 +858,7 @@
                 <span class="cal__run-k">
                   {#if s.project}
                     <IdentityMark
+                      mini
                       accent={accentVarFor(s.project)}
                       name={s.project.name}
                       initials={s.project.initials}
@@ -959,6 +960,7 @@
               <span class="cal__band-k">
                 {#if b.project}
                   <IdentityMark
+                    mini
                     accent={accentVarFor(b.project)}
                     name={b.project.name}
                     initials={b.project.initials}

@@ -35,9 +35,23 @@
     variant?: 'compact' | 'full' | 'bare';
     /** Base tile size; overridable per context via the `--mark` var. */
     size?: string;
+    /**
+     * THE DENSE TREATMENT — 13px tall, a 3px corner, and NO RING.
+     *
+     * It is one named treatment and not three props because the three always
+     * travel together, and the ring is the reason: at 13px a 1px inset ring
+     * takes 15% of the tile and closes on the letters until `MM` reads as a
+     * smudge. The tint alone carries the identity at this size — which is the
+     * whole job — and the ring comes back the moment the tile is big enough
+     * to spend a pixel on definition.
+     *
+     * This is what every Planner drawing uses: the slip, the bands and the
+     * board all sit inside a cell that gives a monogram about thirty pixels.
+     */
+    mini?: boolean;
   }
 
-  let { accent, initials, name, variant = 'compact', size }: Props = $props();
+  let { accent, initials, name, variant = 'compact', size, mini = false }: Props = $props();
 
   let text = $derived(variant === 'bare' ? '' : markText({ initials, name }));
   let label = $derived(name ?? text ?? 'project');
@@ -45,6 +59,7 @@
 
 <span
   class="mark mark--{variant}"
+  class:mark--mini={mini}
   style={`--c: ${accent}${size ? `; --mark: ${size}` : ''}`}
 >
   <span
@@ -95,6 +110,22 @@
       letter-spacing: 0.01em;
       font-variant-numeric: tabular-nums;
       white-space: nowrap;
+    }
+
+    /* ── mini · the dense treatment (see the `mini` prop) ─────────────── */
+    .mark--mini {
+      --_m: 13px;
+    }
+    .mark--mini .mark__chip {
+      padding-inline: 3px;
+      /* A flatter corner, not just a smaller one: 3/13 reads squarer than the
+         proportional 3.6, and at this size a rounder tile loses the letters
+         to its own curve. */
+      border-radius: 3px;
+      box-shadow: none;
+      font-size: 8.5px;
+      font-weight: 500;
+      letter-spacing: 0.02em;
     }
 
     /* bare = same silhouette, no glyph. Keep it square (min = block). */

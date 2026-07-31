@@ -94,7 +94,10 @@ test.describe('planner laws (ADR-095)', () => {
         views: top('.cal__views'),
         meta: top('.cal__meta'),
         titlePx: px('.lenshead__title'),
-        viewPx: px('.cal__view'),
+        // THE LIT WORD, not the first one: 21px is the view band's scale and
+        // it belongs to the word that is true, not to all four.
+        viewPx: px('.cal__view--on'),
+        viewOffPx: px('.cal__view:not(.cal__view--on)'),
         metaPx: px('.cal__meta'),
       };
     });
@@ -102,6 +105,10 @@ test.describe('planner laws (ADR-095)', () => {
     expect(head.views).toBeLessThan(head.meta);
     expect(head.titlePx).toBeGreaterThan(head.viewPx);
     expect(head.viewPx).toBeGreaterThan(head.metaPx);
+    // …and the lit word keeps a STEP over its sisters. All four at one size
+    // made a row of controls weigh as much as the date above it, and left a
+    // 1.5px rule as the only thing saying which drawing you were in.
+    expect(head.viewOffPx, 'the view axis lost its step').toBeLessThan(head.viewPx);
   });
 
   test('THE VIEW WORDS KEEP THE DESIGN’S ORDER', async ({ page }) => {
@@ -305,6 +312,36 @@ test.describe('the sheet', () => {
     for (const r of runs) {
       expect(r.days, 'a run with fewer than two day cells is not a run').toBeGreaterThan(1);
       expect(r.named, 'a run drew its hours and never its name').toBe(true);
+    }
+  });
+});
+
+test.describe('the monogram', () => {
+  test.skip(!EMAIL || !PASSWORD, 'Set PW_TEST_EMAIL / PW_TEST_PASSWORD.');
+
+  test('THE PLANNER’S MONOGRAM IS THE DENSE TREATMENT — small, square, no ring', async ({
+    page,
+  }) => {
+    // At 13px a 1px inset ring takes 15% of the tile and closes on the
+    // letters until `MM` reads as a smudge. The tint alone carries the
+    // identity at this size, which is the whole job.
+    for (const view of ['month', 'agenda']) {
+      await planner(page, view);
+      const marks = await page.evaluate(() =>
+        [...document.querySelectorAll('.mark--mini .mark__chip')].map((el) => {
+          const cs = getComputedStyle(el);
+          return {
+            h: Math.round(el.getBoundingClientRect().height),
+            radius: parseFloat(cs.borderTopLeftRadius),
+            ring: cs.boxShadow,
+          };
+        }),
+      );
+      for (const m of marks) {
+        expect(m.h, `${view}: the tile grew`).toBeLessThanOrEqual(14);
+        expect(m.radius, `${view}: the corner is too round for this size`).toBeLessThanOrEqual(3);
+        expect(m.ring, `${view}: the ring came back`).toBe('none');
+      }
     }
   });
 });

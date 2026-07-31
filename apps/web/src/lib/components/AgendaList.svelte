@@ -557,11 +557,11 @@
       <span class="ag__id">
         <span class="ag__pack">
           {#if p.project}<IdentityMark
+              mini
               variant="compact"
               accent={accentVarFor(p.project)}
               initials={p.project.initials}
               name={p.project.name}
-              size="15px"
             />{/if}
           <span class="ag__kind" class:ag__kind--q={held}
             >{showWord}{#if held}?{/if}</span
@@ -608,11 +608,11 @@
       <span class="ag__id">
         <span class="ag__pack">
           {#if d.project}<IdentityMark
+              mini
               variant="compact"
               accent={accentVarFor(d.project)}
               initials={d.project.initials}
               name={d.project.name}
-              size="15px"
             />{/if}
           <span class="ag__kind" class:ag__kind--q={held}
             >{dateKindLabel(d.kind)}{#if held}?{/if}</span

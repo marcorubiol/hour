@@ -102,6 +102,7 @@
             }}
           >
             <IdentityMark
+              mini
               accent={accentVarFor(slip.project)}
               name={slip.project.name}
               initials={slip.project.initials}
@@ -109,6 +110,7 @@
           </span>
         {:else}
           <IdentityMark
+            mini
             accent={accentVarFor(slip.project)}
             name={slip.project.name}
             initials={slip.project.initials}
