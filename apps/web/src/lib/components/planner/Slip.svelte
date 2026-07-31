@@ -75,9 +75,6 @@
      * the clock matters the hold chip says so, in words.
      */
     clash?: 'none' | 'soft' | 'hard';
-    /** The next slip down is the other half of this clash, so the rule
-        bridges the gap between the two boxes. */
-    bridge?: boolean;
   }
 
   let {
@@ -89,7 +86,6 @@
     onMarkOpen,
     onOpen,
     clash = 'none',
-    bridge = false,
   }: Props = $props();
 
   let state = $derived(stateLabel(slip));
@@ -176,7 +172,6 @@
     data-family={slip.cert}
     data-kind={slip.kind}
     data-clash={clash === 'none' ? undefined : clash}
-    data-bridge={bridge ? '' : undefined}
     style={slip.project ? `--c: ${accentVarFor(slip.project)}` : undefined}
     href={slip.href}
     title={slip.title}>{@render body()}</a
@@ -188,7 +183,6 @@
     data-family={slip.cert}
     data-kind={slip.kind}
     data-clash={clash === 'none' ? undefined : clash}
-    data-bridge={bridge ? '' : undefined}
     style={slip.project ? `--c: ${accentVarFor(slip.project)}` : undefined}
     title={slip.title}
     onclick={onOpen}>{@render body()}</button
@@ -199,7 +193,6 @@
     data-family={slip.cert}
     data-kind={slip.kind}
     data-clash={clash === 'none' ? undefined : clash}
-    data-bridge={bridge ? '' : undefined}
     style={slip.project ? `--c: ${accentVarFor(slip.project)}` : undefined}
     title={slip.title}>{@render body()}</span
   >
@@ -474,26 +467,15 @@
       border-inline-start-style: solid;
       border-inline-start-color: var(--danger);
     }
-    /* The gap between two stacked slips is not a break in the collision, so
-       the rule bridges it — dashed while the clash is, solid when it is not. */
-    .slip[data-bridge]::after {
-      content: '';
-      position: absolute;
-      inset-inline-start: -1.5px;
-      inset-block-start: 100%;
-      inline-size: 1.5px;
-      block-size: 4px;
-      background: repeating-linear-gradient(
-        180deg,
-        color-mix(in oklch, var(--danger) 62%, var(--border-color-light)) 0 2px,
-        transparent 2px 4px
-      );
-    }
-    .slip[data-clash='hard'][data-bridge]::after {
-      inset-inline-start: -2px;
-      inline-size: 2px;
-      background: var(--danger);
-    }
+    /* NO BRIDGE ACROSS THE GAP, and the reason is the corner. The design
+       squares the two left corners and joins the pair with a straight 4px
+       stub between the boxes. Once the corners keep their curve — which is
+       what stopped the rule reading as a rail bolted on the outside — a
+       straight stub at the border's own x protrudes past both curves and
+       lands in the gap as a third mark that belongs to neither card. Marco
+       saw it before I did.
+       Three pixels apart, two rules in the same red at the same x already
+       read as one; the stub was buying nothing and printing a defect. */
 
     /* hover — the edge darkens and the NAME underlines. Nothing else moves:
        a slip that changes shape on hover is a slip that flickers in a grid. */

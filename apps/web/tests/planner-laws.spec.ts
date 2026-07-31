@@ -120,8 +120,11 @@ test.describe('planner laws (ADR-095)', () => {
     // follow — so a reader who learns one has learned the other.
     await planner(page, 'month');
     const words = await page.locator('.cal__view').allInnerTexts();
+    // `Day` names the DRAWING; `Now` (the window control beside it) names the
+    // act of going to the present. Two words, two jobs — they used to be the
+    // same word seventy pixels apart.
     expect(words.map((w) => w.trim().toLowerCase())).toEqual([
-      'today',
+      'day',
       'agenda',
       'month',
       'board',

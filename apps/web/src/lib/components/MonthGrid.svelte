@@ -916,7 +916,6 @@
             stateUrgent={isUrgentHold(entry.slip)}
             showCountry={false}
             clash={cf.on[ei] ? (cf.hard[ei] ? 'hard' : 'soft') : 'none'}
-            bridge={cf.on[ei] && cf.on[ei + 1]}
             onMarkOpen={openMark}
             onOpen={entry.dateRow && onDateOpen ? () => onDateOpen?.(entry.dateRow!) : undefined}
           />

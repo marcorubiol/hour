@@ -288,7 +288,8 @@
        rows to the viewport (unreadable past ~1200px).
        The page body owns this; the shell applies it once (.shell__content /
        .shell__lenschrome), pages don't re-declare it. */
-    --page-width: 56.25rem; /* 900 */
+    --page-width: 77.5rem; /* 1240 — Marco, 2026-07-31. One measure for the
+       whole app: it is applied once, in .shell__content, and no route overrides it. */
 
     --sidebar-width: 264px;
     --header-height: 0px;

@@ -390,7 +390,7 @@
   "planner.expires_on": "expires {day}",
   "planner.no_hour": "no hour",
   "planner.all_day": "all day",
-  "planner.view_day": "Today",
+  "planner.view_day": "Day",
   "planner.day_empty": "Nothing on this day.",
   "planner.day_axis": "the day",
   "planner.no_cast": "no cast",
