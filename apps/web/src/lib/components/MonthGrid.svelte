@@ -62,6 +62,16 @@
     onDayCreate?: (isoDate: string) => void;
     /** When given, date chips open — the page owns the edit dialog. */
     onDateOpen?: (d: DateEvent) => void;
+    /**
+     * The day NUMBER is a door to that day's own drawing.
+     *
+     * The month answers «what is this month shaped like»; the moment you have
+     * found the day you were looking for, the next question is always «what
+     * does that day look like», and the number is the thing your eye is
+     * already on. Out-of-month numbers stay inert — they are orientation, and
+     * the sheet does not own days it is not drawing.
+     */
+    onDayOpen?: (isoDate: string) => void;
     /** Stored blackouts to paint as day-cell bands (page-scoped VMs). */
     blackouts?: BlackoutBandVM[];
     /** Derived away bands — quieter than any blackout, display-only. */
@@ -128,6 +138,7 @@
     loading = false,
     onDayCreate,
     onDateOpen,
+    onDayOpen,
     blackouts = [],
     aways = [],
     clashesByDay,
@@ -854,7 +865,15 @@
               <!-- THREE SLOTS, ALWAYS, so the middle one is a real centre and
                    not «whatever is left». A quiet day draws no mark but keeps
                    its column. -->
-              <span class="cal__day-num">{Number(day.iso.slice(8, 10))}</span>
+              {#if day.inMonth && onDayOpen}
+                <button
+                  type="button"
+                  class="cal__day-num"
+                  onclick={() => onDayOpen?.(day.iso)}>{Number(day.iso.slice(8, 10))}</button
+                >
+              {:else}
+                <span class="cal__day-num">{Number(day.iso.slice(8, 10))}</span>
+              {/if}
               {#if day.inMonth && onDayCreate}
                 <button
                   type="button"
@@ -1491,11 +1510,21 @@
     }
 
     .cal__day-num {
+      padding: 0;
+      border: 0;
+      background: none;
       font-family: var(--font-mono);
       font-size: 15px;
       line-height: 1;
       color: var(--text-muted);
       font-variant-numeric: tabular-nums;
+    }
+    button.cal__day-num {
+      cursor: pointer;
+      transition: color 0.12s;
+    }
+    button.cal__day-num:hover {
+      color: var(--text-color);
     }
 
     /* THREE COLUMNS, so the middle is a TRUE centre: the number holds the

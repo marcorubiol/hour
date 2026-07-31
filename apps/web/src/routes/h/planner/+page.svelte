@@ -1313,6 +1313,7 @@
       id: side.id,
       project: side.project,
       accent: perf?.project ? accentVarFor(perf.project) : 'var(--accent-1)',
+      initials: perf?.project?.initials ?? null,
       venue: side.venue ?? side.city ?? side.project,
       city: side.venue ? side.city : null,
       time: side.time,
@@ -1353,6 +1354,7 @@
           venue: s.venue ?? s.city ?? s.project,
           project: s.project,
           accent: perf?.project ? accentVarFor(perf.project) : 'var(--accent-1)',
+          initials: perf?.project?.initials ?? null,
         };
       };
       return { id: c.id, day: c.day, a: side(c.a), b: side(c.b) };
@@ -1748,24 +1750,6 @@
     {#snippet title()}<LensTitle text={view === 'day' ? dayLabel : monthLabel} />{/snippet}
   </LensHeader>
 
-  {#if !calm.on && !errorMsg && !decisionsAbsent && (decisionVMs.length > 0 || concurrenceVMs.length > 0)}
-    <!-- Decision band (ADR-080 §4) — shared by all projections. Mounted
-         for concurrences alone too: the quiet tier is "es VEU, no crida"
-         (§3), so it must be seeable even when nothing is per decidir —
-         it still never counts, never marks, never turns urgent. -->
-    <DecisionBand
-      decisions={decisionVMs}
-      concurrences={concurrenceVMs}
-      open={decisionsOpen}
-      onToggle={setDecisionsOpen}
-      onConfirm={(id) => $decideMutation.mutate({ id, status: 'confirmed' })}
-      onRelease={(id) => $decideMutation.mutate({ id, status: 'cancelled' })}
-      pendingId={decisionPendingId}
-      {locale}
-      {localeTag}
-      id="cal-decisions"
-    />
-  {/if}
 
 
 
@@ -1790,12 +1774,27 @@
         {#if calm.on}
           <span class="cal__stat cal__stat--soft">{t('planner.calm_state', locale)}</span>
         {/if}
-        {#if !calm.on && !decisionsAbsent && decisionVMs.length > 0}
-          <button type="button" class="cal__pulse-decide" onclick={jumpToDecisions}>
+        <!-- CALM QUIETS VOLUME, NOT OBLIGATIONS. This control was gated on
+             `!calm.on`, so the one line on the page that says «you have to
+             decide something» disappeared in the mode people leave switched
+             on — which is why Marco never saw the drawer and reported it as
+             unbuilt. Calm already removes the counters' noise; the call to
+             make is not noise. -->
+        {#if !decisionsAbsent && decisionVMs.length > 0}
+          <button
+            type="button"
+            class="cal__pulse-decide"
+            aria-expanded={decisionsOpen}
+            aria-controls="cal-decisions"
+            onclick={() => setDecisionsOpen(!decisionsOpen)}
+          >
             {t('planner.pulse_decide', locale, { n: decisionVMs.length })}{#if urgentCount > 0}{' · '}{urgentCount ===
               1
                 ? t('planner.pulse_urgent_one', locale)
-                : t('planner.pulse_urgent', locale, { m: urgentCount })}{/if}
+                : t('planner.pulse_urgent', locale, { m: urgentCount })}{/if}<i
+              class="cal__pulse-chev"
+              aria-hidden="true">{decisionsOpen ? '▴' : '▾'}</i
+            >
           </button>
         {/if}
         {#if !decisionsAbsent && pulseNext}
@@ -1877,6 +1876,26 @@
         {/if}
       {/if}
     </p>
+  <!-- THE DRAWER OPENS UNDER THE LINE THAT COUNTS IT — the meta says
+       `3 to decide · 1 urgent`, and what it names unfolds directly beneath,
+       above the controls. -->
+  {#if !errorMsg && !decisionsAbsent}
+    <DecisionBand
+      decisions={decisionVMs}
+      concurrences={concurrenceVMs}
+      open={decisionsOpen}
+      onConfirm={(id) => $decideMutation.mutate({ id, status: 'confirmed' })}
+      onJump={(iso) => {
+        dayIso = iso;
+        setView('day');
+      }}
+      pendingId={decisionPendingId}
+      {locale}
+      {localeTag}
+      id="cal-decisions"
+    />
+  {/if}
+
   <CalToolbar
     onReadMarks={() => (marksOpen = true)}
     {view}
@@ -1928,6 +1947,10 @@
       {loading}
       onDayCreate={(iso) => openCreate(iso)}
       onDateOpen={openDate}
+      onDayOpen={(iso) => {
+        dayIso = iso;
+        setView('day');
+      }}
       blackouts={blackoutVMs}
       aways={awayVMs}
       {clashesByDay}
@@ -2063,6 +2086,12 @@
       margin-inline-end: var(--space-2xs);
     }
     /* Pulse "per decidir" — the one red figure; a jump, not a decoration. */
+    .cal__pulse-chev {
+      font-style: normal;
+      margin-inline-start: 5px;
+      font-size: 8px;
+      vertical-align: 1px;
+    }
     .cal__pulse-decide {
       font-family: var(--font-mono);
       font-size: var(--text-xs);
