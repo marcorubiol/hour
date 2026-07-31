@@ -146,7 +146,10 @@
     padding-inline: var(--space-m);
     background: var(--bg-ultra-light);
     border: 1px solid var(--border-color-dark);
-    border-radius: var(--radius-l);
+    /* One step down from `--radius-l`. At 10px on a box this wide the corner
+       reads as a card floating on the page; the scope bar is a RULE about what
+       you are looking at, and it sits flush with the sheet below it. */
+    border-radius: var(--radius);
     min-block-size: 3rem;
   }
   /* The mono micro-label + serif descriptor are one unit: baseline-aligned to

@@ -170,10 +170,13 @@
 <style>
   @layer components {
     /* ── the window's controls · deliberately the smallest things here ──
-       Verbatim from the prototype: 28px squares, an 8px corner, 13px glyph;
-       the pill at 12px with 5/12 padding. The `VIEW` lead word that used to
-       open this row went with them — the nav is what precedes the words in
-       the design, and two labels in that slot is one too many. */
+       Sizes verbatim from the prototype: 28px squares, 13px glyph; the pill
+       at 12px with 5/12 padding. The CORNER is ours and one step tighter than
+       the prototype's 8px — `var(--radius)` (6px), the same step the scope bar
+       now takes, so the app has one radius for a small control instead of an
+       imported literal beside a token. The `VIEW` lead word that used to open
+       this row went with them: the nav is what precedes the words in the
+       design, and two labels in that slot is one too many. */
     .cal__nav {
       display: inline-flex;
       align-items: center;
@@ -187,7 +190,7 @@
       justify-content: center;
       padding: 0;
       border: 1px solid var(--border-color-light);
-      border-radius: 8px;
+      border-radius: var(--radius);
       background: var(--bg-ultra-light);
       color: var(--text-faint);
       font-size: 13px;
@@ -201,7 +204,7 @@
     .cal__now {
       padding: 5px 12px;
       border: 1px solid var(--border-color-light);
-      border-radius: 100px;
+      border-radius: var(--radius-circle);
       background: var(--bg-ultra-light);
       color: var(--text-faint);
       font-family: inherit;
@@ -315,7 +318,7 @@
       block-size: 28px;
       padding-inline: 11px;
       border: 1px solid var(--text-color);
-      border-radius: 8px;
+      border-radius: var(--radius);
       background: var(--text-color);
       color: var(--bg);
       font-size: 13px;
@@ -342,7 +345,7 @@
       justify-content: center;
       padding: 0;
       border: 1px solid var(--border-color-light);
-      border-radius: 8px;
+      border-radius: var(--radius);
       background: var(--bg-ultra-light);
       color: var(--text-faint);
       font-size: 13px;
