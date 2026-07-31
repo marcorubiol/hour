@@ -44,15 +44,9 @@
   "block.submit": "Crea el bloque",
   "block.status": "Estado",
   "block.several_days": "Varios días",
-  "planner.legend_confirmed": "confirmado",
-  "planner.legend_hold": "hold",
   "planner.prev_month": "Mes anterior",
   "planner.next_month": "Mes siguiente",
   "planner.today": "Hoy",
-  "planner.filter_label": "Filtro",
-  "planner.filter_all": "Todo",
-  "planner.filter_holds": "Holds",
-  "planner.filter_confirmed": "Confirmados",
   "planner.view_label": "Vista",
   "planner.view_month": "Mes",
   "planner.view_agenda": "Agenda",
@@ -364,5 +358,9 @@
   "edit.status_confirmed": "Confirmada",
   "edit.status_cancelled": "Cancelada",
   "edit.status_done": "Hecha",
-  "edit.series_note": "Un día de un bloque — esta edición cambia solo este día."
+  "edit.series_note": "Un día de un bloque — esta edición cambia solo este día.",
+  "planner.read_marks": "Leer las marcas",
+  "planner.marks_firm": "es real",
+  "planner.marks_held": "pedido — todavía no es real",
+  "planner.marks_clash": "hay una llamada que hacer"
 }

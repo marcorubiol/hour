@@ -166,7 +166,12 @@ export function statusFootKey(status: string): string | null {
     case 'hold':
       return 'planner.hold_plain';
     case 'confirmed':
-      return 'planner.legend_confirmed';
+      // A FIRM SHOW SAYS NO WORD (ADR-095 §4): the clean box, the full ink and
+      // the serif already say «confirmed» three times, so a fourth is noise —
+      // and it was pointing at a legend key that no longer exists, because the
+      // legend stopped being a per-project filter. The word survives where
+      // outsiders read: the detail card and the road sheet.
+      return null;
     case 'proposed':
       return 'planner.state_proposed';
     case 'invoiced':

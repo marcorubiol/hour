@@ -63,7 +63,9 @@
     type LaneVM,
     type LoomGroupVM,
   } from '$lib/components/planner/CarrilsStrip.svelte';
-  import CalToolbar, { type CalFilter } from '$lib/components/planner/CalToolbar.svelte';
+  import CalToolbar from '$lib/components/planner/CalToolbar.svelte';
+  import CalLegend from '$lib/components/planner/CalLegend.svelte';
+  import Dialog from '$lib/components/Dialog.svelte';
   import FeedDialog from '$lib/components/planner/FeedDialog.svelte';
   import CreateEventDialog from '$lib/components/create/CreateEventDialog.svelte';
   import EditDateDialog from '$lib/components/planner/EditDateDialog.svelte';
@@ -125,6 +127,10 @@
 
   const pins = usePins();
   const calm = useCalm();
+  // «Reading the marks» — the grammar key, out of the sheet and into the head
+  // (ADR-095 §3), so it is reachable from all four drawings and not from the
+  // foot of one of them.
+  let marksOpen = $state(false);
   const locale = detectLocale(navigator.language);
   const localeTag = { en: 'en-GB', es: 'es-ES', ca: 'ca-ES' }[locale];
 
@@ -297,12 +303,23 @@
     }
   });
 
-  // ── Client-side status filter (ADR-078 §12: Tot | Holds | Confirmats) ─
-  let filter = $state<CalFilter>('all');
-  // Calm mode (Desk · Calm) forces the confirmed-only view here too — no
-  // manual status filter while it is on. Non-destructive: `filter` is
-  // restored when calm turns back off.
-  let effectiveFilter = $derived<CalFilter>(calm.on ? 'confirmed' : filter);
+  /* ── THE PLANNER HAS NO FILTER (ADR-095 §3) ───────────────────────────
+     Because the app already has one and it is called scope. Both narrowed by
+     project, and both lived in the same hundred pixels: the scope bar says
+     WHAT YOU ARE LOOKING AT one line above, and a second machine for the same
+     act right underneath teaches that this lens reasons differently from the
+     rest of the tool. One grammar for narrowing, everywhere.
+
+     What survives is CALM, and it survives as a WORD, not a switch: it lives
+     in the Desk (global, non-destructive) and the Planner draws
+     `calm · confirmed only` on the facts side of the state line. A filter you
+     cannot see is a filter that lies.
+
+     TWO PREDICATES, ON PURPOSE. `vis` is the narrowing axis and governs
+     COUNTING; `dvis` adds calm and governs DRAWING. So the counters keep
+     saying `6 confirmed · 7 options · 12 nights free` whether or not calm is
+     on — they count the WINDOW, not the drawing — and the word is what
+     explains why only six are on the paper. */
 
   // ── Pins → scope (Adaptive Digest) ────────────────────────────────────
   const workspacesQuery = createQuery({
@@ -495,19 +512,16 @@
       : allBlackouts.filter((b) => scopeWorkspaceIds === null || scopeWorkspaceIds.has(b.workspace_id)),
   );
 
-  // ── Status filter (display only — conflicts stay truth-level) ────────
-  function perfPassesFilter(p: PerformanceEvent): boolean {
-    if (effectiveFilter === 'all') return true;
-    const family = performanceStatusFamily(p.status);
-    return effectiveFilter === 'holds' ? family === 'hold' : family === 'confirmed';
+  // `dvis` — the DRAWING predicate: scope, plus calm. Counting uses the
+  // scoped rows directly (`vis`), which is why the numbers never move.
+  function perfDrawn(p: PerformanceEvent): boolean {
+    return !calm.on || performanceStatusFamily(p.status) === 'confirmed';
   }
-  function datePassesFilter(d: DateEvent): boolean {
-    if (effectiveFilter === 'all') return true;
-    const family = dateStatusFamily(d.status);
-    return effectiveFilter === 'holds' ? family === 'hold' : family === 'confirmed';
+  function dateDrawn(d: DateEvent): boolean {
+    return !calm.on || dateStatusFamily(d.status) === 'confirmed';
   }
-  let shownPerfs = $derived(scopedPerfs.filter(perfPassesFilter));
-  let shownDates = $derived(scopedDates.filter(datePassesFilter));
+  let shownPerfs = $derived(scopedPerfs.filter(perfDrawn));
+  let shownDates = $derived(scopedDates.filter(dateDrawn));
 
   // ── Conflict engine (ADR-072 §1) — over the UNFILTERED scoped rows:
   // hiding chips behind the status filter never hides a real clash. ─────
@@ -1526,10 +1540,10 @@
   {/if}
 
   <CalToolbar
+    onReadMarks={() => (marksOpen = true)}
     {view}
     {monthTitle}
     year={ym.year}
-    {filter}
     {laneAxis}
     calm={calm.on}
     {canBlackout}
@@ -1540,7 +1554,6 @@
     onScrollToToday={scrollToToday}
     onSetView={setView}
     onSetLaneAxis={setLaneAxis}
-    onSetFilter={(f) => (filter = f)}
     onCreate={() => openCreate()}
     onFeed={openFeed}
     onBlackout={() => {
@@ -1574,8 +1587,6 @@
         const key = statusFootKey(status);
         return key ? t(key, locale) : null;
       }}
-      legendConfirmedLabel={t('planner.legend_confirmed', locale)}
-      legendHoldLabel={t('planner.legend_hold', locale)}
       readinessItems={READINESS_KEYS.map((k) => ({
         key: k,
         label: t(readinessLabelKey(k), locale),
@@ -1690,3 +1701,14 @@
     }
   }
 </style>
+
+<!-- READING THE MARKS — the grammar of all four drawings, said once, in the
+     head's overflow. It used to sit at the foot of the month, which is three
+     screens down: the place nobody who needs teaching ever reaches. -->
+<Dialog bind:open={marksOpen} title={t('planner.read_marks', locale)} size="s">
+  <CalLegend
+    confirmedLabel={t('planner.marks_firm', locale)}
+    holdLabel={t('planner.marks_held', locale)}
+    clashLabel={t('planner.marks_clash', locale)}
+  />
+</Dialog>

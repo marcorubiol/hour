@@ -45,15 +45,9 @@
   "block.submit": "Create the block",
   "block.status": "Status",
   "block.several_days": "Several days",
-  "planner.legend_confirmed": "confirmed",
-  "planner.legend_hold": "hold",
   "planner.prev_month": "Previous month",
   "planner.next_month": "Next month",
   "planner.today": "Today",
-  "planner.filter_label": "Filter",
-  "planner.filter_all": "All",
-  "planner.filter_holds": "Holds",
-  "planner.filter_confirmed": "Confirmed",
   "planner.view_label": "View",
   "planner.view_month": "Month",
   "planner.view_agenda": "Agenda",
@@ -373,5 +367,9 @@
   "edit.status_confirmed": "Confirmed",
   "edit.status_cancelled": "Cancelled",
   "edit.status_done": "Done",
-  "edit.series_note": "One day of a block — this edit changes this day only."
+  "edit.series_note": "One day of a block — this edit changes this day only.",
+  "planner.read_marks": "Reading the marks",
+  "planner.marks_firm": "it is real",
+  "planner.marks_held": "asked for — not real yet",
+  "planner.marks_clash": "there is a call to make"
 }

@@ -15,8 +15,8 @@
    * keeps them collision-free anyway).
    *
    * Split (2026-07-24): the event types + pure day/label helpers live in
-   * $lib/month-events; the chips (PerfChip/DateChip), the legend
-   * (CalLegend) and the clash popover (ClashCard) are components under
+   * $lib/month-events; the chips (PerfChip/DateChip) and the clash popover
+   * (ClashCard) are components under
    * planner/. The chips are styleless on purpose — the hand-tuned
    * `.cal__event*` grammar stays HERE, one :global rule-set for every
    * card, so the shared design layer cannot fork per chip kind.
@@ -40,7 +40,6 @@
     type AwayBandVM,
     type ClashVM,
   } from '$lib/month-events';
-  import CalLegend from '$lib/components/planner/CalLegend.svelte';
   import ClashCard from '$lib/components/planner/ClashCard.svelte';
   import PerfChip from '$lib/components/planner/PerfChip.svelte';
   import DateChip from '$lib/components/planner/DateChip.svelte';
@@ -87,9 +86,6 @@
      * always print; the tick is what varies, so the foot never collapses.
      */
     readinessItems?: { key: string; label: string }[];
-    /** Legend key words (project row + the confirmed/hold swatches). */
-    legendConfirmedLabel?: string;
-    legendHoldLabel?: string;
   }
 
   /** English fallbacks for the card foot; the page overrides these with t(). */
@@ -125,8 +121,6 @@
       { key: 'hotel', label: 'hotel' },
       { key: 'technical', label: 'technical' },
     ],
-    legendConfirmedLabel = 'confirmed',
-    legendHoldLabel = 'hold',
   }: Props = $props();
 
   // ── Identity quick-edit (ADR-081): a monogram click opens the editor at a
@@ -290,38 +284,13 @@
     return { first: !days.has(addDaysIso(iso, -1)), last: !days.has(addDaysIso(iso, 1)) };
   }
 
-  /**
-   * Projects that actually PAINT a chip in a rendered cell — walked from the
-   * grid's own days, not from the feed. The page fetches with a ±1 day pad
-   * (timestamptz rows can bucket outside the month), so both the raw props
-   * AND the bucketed maps still carry off-grid rows; a project whose only row
-   * lands on a pad day would get a legend entry with no card to match it.
-   */
-  let legendProjects = $derived.by(() => {
-    const m = new Map<string, ProjectLite>();
-    for (const week of weeks)
-      for (const day of week) {
-        for (const p of performancesByDay.get(day.iso) ?? [])
-          if (p.project) m.set(p.project.id, p.project);
-        for (const d of datesByDay.get(day.iso) ?? [])
-          if (d.project) m.set(d.project.id, d.project);
-      }
-    return [...m.values()].sort((a, b) => a.name.localeCompare(b.name));
-  });
-
-  // Clicking a legend entry mutes that project in this view. Ephemeral,
-  // view-local state (like the clash popover) — it deliberately does NOT
-  // touch the app-wide scope: this is "let me look without them for a
-  // second", not "change what I am working on".
-  let hiddenProjects = $state<string[]>([]);
-  function toggleProject(id: string) {
-    hiddenProjects = hiddenProjects.includes(id)
-      ? hiddenProjects.filter((x) => x !== id)
-      : [...hiddenProjects, id];
-  }
-  function projectShown(e: { project?: ProjectLite | null }): boolean {
-    return !e.project || !hiddenProjects.includes(e.project.id);
-  }
+  /* THE LEGEND IS NOT A FILTER ANY MORE (ADR-095 §3). Its project entries were
+     the month's own narrowing machine — a second one, a hundred pixels under
+     the scope bar that already does exactly this. What the legend keeps is the
+     part the drawing cannot say on its own (solid / dashed / `!`), and even
+     that leaves the sheet: its subject is the grammar of all four views, not
+     the month, and the foot of a drawing three screens tall is where nobody
+     who needs teaching will ever arrive. */
 
   type BandSlot =
     | { kind: 'blackout'; band: BlackoutBandVM; from: string; to: string }
@@ -391,16 +360,6 @@
   });
 </script>
 
-{#if legendProjects.length > 0}
-  <CalLegend
-    projects={legendProjects}
-    hidden={hiddenProjects}
-    onToggle={toggleProject}
-    confirmedLabel={legendConfirmedLabel}
-    holdLabel={legendHoldLabel}
-  />
-{/if}
-
 <div
   class="cal__grid"
   class:cal__grid--loading={loading}
@@ -413,8 +372,8 @@
   {#each weeks as week, wi (wi)}
     {@const wlc = weekLaneCount(week)}
     {#each week as day, di (day.iso)}
-      {@const perfs = (performancesByDay.get(day.iso) ?? []).filter(projectShown)}
-      {@const dateGroups = groupDates((datesByDay.get(day.iso) ?? []).filter(projectShown))}
+      {@const perfs = performancesByDay.get(day.iso) ?? []}
+      {@const dateGroups = groupDates(datesByDay.get(day.iso) ?? [])}
       {@const clashes = clashesByDay?.get(day.iso) ?? []}
       {@const bandSlots = laneSlotsOn(day.iso, wlc)}
       <div

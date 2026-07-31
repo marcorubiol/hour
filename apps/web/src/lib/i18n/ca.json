@@ -44,15 +44,9 @@
   "block.submit": "Crea el bloc",
   "block.status": "Estat",
   "block.several_days": "Diversos dies",
-  "planner.legend_confirmed": "confirmat",
-  "planner.legend_hold": "hold",
   "planner.prev_month": "Mes anterior",
   "planner.next_month": "Mes següent",
   "planner.today": "Avui",
-  "planner.filter_label": "Filtre",
-  "planner.filter_all": "Tot",
-  "planner.filter_holds": "Holds",
-  "planner.filter_confirmed": "Confirmats",
   "planner.view_label": "Vista",
   "planner.view_month": "Mes",
   "planner.view_agenda": "Agenda",
@@ -364,5 +358,9 @@
   "edit.status_confirmed": "Confirmada",
   "edit.status_cancelled": "Cancel·lada",
   "edit.status_done": "Feta",
-  "edit.series_note": "Un dia d’un bloc — aquesta edició canvia només aquest dia."
+  "edit.series_note": "Un dia d’un bloc — aquesta edició canvia només aquest dia.",
+  "planner.read_marks": "Llegir les marques",
+  "planner.marks_firm": "és real",
+  "planner.marks_held": "demanat — encara no és real",
+  "planner.marks_clash": "hi ha una trucada a fer"
 }

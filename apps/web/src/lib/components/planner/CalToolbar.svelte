@@ -1,13 +1,11 @@
 <script module lang="ts">
-  /** Client-side status filter (ADR-078 §12: Tot | Holds | Confirmats). */
-  export type CalFilter = 'all' | 'holds' | 'confirmed';
 </script>
 
 <script lang="ts">
   /**
-   * Planner toolbar — ‹ month › · today · [filter] · [projection] · + · ⋯,
+   * Planner toolbar — ‹ month › · today · [projection] · [lanes] · + · ⋯,
    * plus the carrils-only "Agrupa per" row. Pure presentation: the page
-   * owns every piece of state (view/filter/group, month window, dialog
+   * owns every piece of state (view/lanes, month window, dialog
    * flags) and the URL-sync semantics; this component only renders values
    * and reports gestures up through callbacks.
    */
@@ -21,9 +19,7 @@
     view: PlannerView;
     monthTitle: string;
     year: number;
-    filter: CalFilter;
     laneAxis: LaneAxis;
-    /** Calm mode hides the manual status filter (confirmed-only forced). */
     calm: boolean;
     /** Blackout entry points hide while availability/team feeds are absent. */
     canBlackout: boolean;
@@ -34,9 +30,10 @@
     onScrollToToday: () => void;
     onSetView: (v: PlannerView) => void;
     onSetLaneAxis: (g: LaneAxis) => void;
-    onSetFilter: (f: CalFilter) => void;
     onCreate: () => void;
     onFeed: () => void;
+    /** «reading the marks» — the grammar key, one door for all four views. */
+    onReadMarks: () => void;
     onBlackout: () => void;
   }
 
@@ -44,7 +41,6 @@
     view,
     monthTitle,
     year,
-    filter,
     laneAxis,
     calm,
     canBlackout,
@@ -55,9 +51,9 @@
     onScrollToToday,
     onSetView,
     onSetLaneAxis,
-    onSetFilter,
     onCreate,
     onFeed,
+    onReadMarks,
     onBlackout,
   }: Props = $props();
 </script>
@@ -82,31 +78,10 @@
     >
   </div>
   <div class="cal__spacer"></div>
-  {#if !calm}
-    <div class="cal__filter" role="group" aria-label={t('planner.filter_label', locale)}>
-      <button
-        type="button"
-        class="cal__filter-btn"
-        class:cal__filter-btn--on={filter === 'all'}
-        aria-pressed={filter === 'all'}
-        onclick={() => onSetFilter('all')}>{t('planner.filter_all', locale)}</button
-      >
-      <button
-        type="button"
-        class="cal__filter-btn"
-        class:cal__filter-btn--on={filter === 'holds'}
-        aria-pressed={filter === 'holds'}
-        onclick={() => onSetFilter('holds')}>{t('planner.filter_holds', locale)}</button
-      >
-      <button
-        type="button"
-        class="cal__filter-btn"
-        class:cal__filter-btn--on={filter === 'confirmed'}
-        aria-pressed={filter === 'confirmed'}
-        onclick={() => onSetFilter('confirmed')}>{t('planner.filter_confirmed', locale)}</button
-      >
-    </div>
-  {/if}
+  <!-- THE STATUS FILTER IS GONE (ADR-095 §3). The app already has one machine
+       for narrowing and it is called scope, one line above. What survives is
+       CALM, and it survives as a word on the facts side of the state line —
+       never as a switch here. -->
   <div class="cal__tabs" role="group" aria-label={t('planner.view_label', locale)}>
     <button
       type="button"
@@ -135,6 +110,7 @@
     align="end"
     label={t('planner.more', locale)}
     items={[
+      { label: t('planner.read_marks', locale), onclick: onReadMarks },
       { label: t('planner.feed', locale), onclick: onFeed },
       ...(canBlackout
         ? [
@@ -170,7 +146,7 @@
 
 <style>
   @layer components {
-    /* Toolbar: ‹ month › · today · [filter] · [projection] · + · ⋯ */
+    /* Toolbar: ‹ month › · today · [projection] · [lanes] · + · ⋯ */
     .cal__toolbar {
       display: flex;
       align-items: center;
@@ -194,31 +170,6 @@
       flex: 1;
     }
 
-    .cal__filter {
-      display: inline-flex;
-      align-items: center;
-      gap: var(--space-2xs);
-    }
-    .cal__filter-btn {
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      letter-spacing: var(--mono-letter-spacing-loose);
-      text-transform: uppercase;
-      color: var(--text-faint);
-      padding: var(--space-2xs) var(--space-xs);
-      border-radius: var(--radius-m);
-      background: none;
-      border: none;
-      cursor: pointer;
-      transition: color var(--transition), background var(--transition);
-    }
-    .cal__filter-btn:hover {
-      color: var(--text-color);
-    }
-    .cal__filter-btn--on {
-      color: var(--text-color);
-      background: var(--bg-light);
-    }
 
     /* Agrupa per (ADR-080 §8) — its own row under the toolbar, left-aligned. */
     .cal__grouprow {

@@ -1,125 +1,103 @@
 <script lang="ts">
   /**
-   * Legend — the month's colour key, readable without opening anything.
-   * Extracted from MonthGrid verbatim. The project entries ARE the view's
-   * filter: the muted-project state stays in MonthGrid (it drives the
-   * grid's own chip filtering); this component only reads `hidden` and
-   * reports clicks through `onToggle`.
+   * READING THE MARKS — three entries, and only three (ADR-095 §3).
+   *
+   * This used to be the month's colour key AND the month's filter: one row per
+   * project, click to mute. Both halves are gone, for different reasons.
+   *
+   * The FILTER died because the app already has a machine for narrowing and it
+   * is called scope, one line above — a second one underneath teaches that this
+   * lens reasons differently from the rest of the tool.
+   *
+   * The PROJECT ROWS died with it: they WERE the filter's controls, and a
+   * colour key listing every project keys something the monogram already says
+   * on every single card.
+   *
+   * What is left is the grammar the drawing genuinely cannot say on its own —
+   * solid / dashed / `!` — and that grammar is not the month's, it belongs to
+   * all four views. So it leaves the sheet and lives in the Planner's overflow,
+   * reachable from every one of them. A legend at the foot of a drawing three
+   * screens tall is exactly where nobody who needs teaching will ever arrive;
+   * and a legend of six entries is a confession that the vocabulary is not
+   * evident yet.
    */
-  import { accentVarFor } from '$lib/utils/accent';
-  import IdentityMark from '$lib/components/IdentityMark.svelte';
-  import type { ProjectLite } from '$lib/month-events';
-
   interface Props {
-    /** Projects that actually paint a chip in a rendered cell. */
-    projects: ProjectLite[];
-    /** View-local muted project ids — owned by MonthGrid, shared with the grid. */
-    hidden: string[];
-    onToggle: (id: string) => void;
-    /** Legend key words (the confirmed/hold swatches). */
+    /** «it is real» */
     confirmedLabel: string;
+    /** «asked for — not real yet» */
     holdLabel: string;
+    /** «there is a call to make here» */
+    clashLabel: string;
   }
 
-  let { projects, hidden, onToggle, confirmedLabel, holdLabel }: Props = $props();
+  let { confirmedLabel, holdLabel, clashLabel }: Props = $props();
 </script>
 
-<div class="cal__legend">
-  {#each projects as pr (pr.id)}
-    {@const shown = !hidden.includes(pr.id)}
-    <button
-      type="button"
-      class="cal__legend-item"
-      class:cal__legend-item--muted={!shown}
-      aria-pressed={shown}
-      onclick={() => onToggle(pr.id)}
-      ><IdentityMark
-        accent={accentVarFor(pr)}
-        name={pr.name}
-        initials={pr.initials}
-      />{pr.name}</button
-    >
-  {/each}
-  <span class="cal__legend-sep" aria-hidden="true"></span>
-  <span class="cal__legend-key"
-    ><span class="cal__legend-swatch" data-family="confirmed" aria-hidden="true"
-    ></span>{confirmedLabel}</span
-  >
-  <span class="cal__legend-key"
-    ><span class="cal__legend-swatch" data-family="hold" aria-hidden="true"
-    ></span>{holdLabel}</span
-  >
-</div>
+<dl class="marks">
+  <div class="marks__row">
+    <dt class="marks__swatch marks__swatch--firm" aria-hidden="true"></dt>
+    <dd class="marks__word">{confirmedLabel}</dd>
+  </div>
+  <div class="marks__row">
+    <dt class="marks__swatch marks__swatch--held" aria-hidden="true"></dt>
+    <dd class="marks__word">{holdLabel}</dd>
+  </div>
+  <div class="marks__row">
+    <dt class="marks__swatch marks__swatch--clash" aria-hidden="true">!</dt>
+    <dd class="marks__word">{clashLabel}</dd>
+  </div>
+</dl>
 
 <style>
   @layer components {
-    /* Legend — the month's colour key, readable without opening anything.
-       The swatches restate the two shapes the chips use (solid = settled,
-       hatched+dashed = held), in neutral ink so they read as a key and not
-       as one more project. */
-    .cal__legend {
+    .marks {
       display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: var(--space-xs) var(--space-s);
-      margin-block-end: var(--space-s);
-      font-size: var(--text-xs);
-      color: var(--text-muted);
-    }
-    .cal__legend-item,
-    .cal__legend-key {
-      display: inline-flex;
-      align-items: center;
-      gap: var(--space-2xs);
-    }
-    /* The project entries ARE the view's filter — click one to mute it. */
-    .cal__legend-item {
-      appearance: none;
-      border: 0;
+      flex-direction: column;
+      gap: 8px;
+      margin: 0;
       padding: 0;
-      background: none;
-      font: inherit;
-      color: inherit;
-      cursor: pointer;
+    }
+    .marks__row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .marks__swatch {
+      flex: none;
+      inline-size: 22px;
+      block-size: 14px;
       border-radius: var(--radius-s);
-      transition: opacity var(--transition);
+      border: 1px solid var(--border-color-light);
     }
-    .cal__legend-item:hover {
-      color: var(--text-color);
+    /* it IS real — clean ground, full ink, no mark at all */
+    .marks__swatch--firm {
+      background: var(--bg-ultra-light);
+      border-color: color-mix(in oklch, var(--text-color) 22%, transparent);
     }
-    .cal__legend-item--muted {
-      opacity: 0.4;
-      text-decoration: line-through;
-    }
-    .cal__legend-item:focus-visible {
-      outline: var(--focus-width) solid var(--focus-color);
-      outline-offset: 2px;
-    }
-    .cal__legend-sep {
-      inline-size: 1px;
-      block-size: 1em;
-      background: var(--border-color-dark);
-    }
-    /* The key restates the chips' own grammar — square until settled — so it
-       stays true rather than decorative. */
-    .cal__legend-swatch {
-      inline-size: 0.85em;
-      block-size: 0.85em;
-      border-radius: var(--radius-none);
-      border: 1px solid var(--border-color-dark);
-    }
-    .cal__legend-swatch[data-family='confirmed'] {
-      border-radius: var(--radius-s);
-      border-color: transparent;
-      background: color-mix(in oklch, var(--text-color) 22%, var(--bg-ultra-light));
-    }
-    .cal__legend-swatch[data-family='hold'] {
+    /* asked for — the dashed edge has to be READ, the grain is just SEEN */
+    .marks__swatch--held {
       border-style: dashed;
-      background-image: repeating-linear-gradient(
-        135deg,
-        color-mix(in oklch, var(--text-color) 16%, var(--bg-ultra-light)) 0 4px,
-        var(--bg-ultra-light) 4px 8px
+      background-image: radial-gradient(
+        color-mix(in oklch, var(--text-color) 22%, transparent) 0.75px,
+        transparent 1.4px
       );
+      background-size: 7px 7px;
+    }
+    /* a call to make. ONE shape and ONE colour: WHICH two collide is the red
+       rule on the slips, and WHY is a sentence on the decision card. */
+    .marks__swatch--clash {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 0;
+      font-family: var(--font-mono);
+      font-size: var(--text-s);
+      color: var(--info);
+    }
+    .marks__word {
+      margin: 0;
+      font-size: var(--text-s);
+      color: var(--text-muted);
     }
   }
 </style>
