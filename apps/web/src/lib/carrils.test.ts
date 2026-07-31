@@ -2,17 +2,18 @@ import { describe, expect, it } from 'vitest';
 import {
   isWeekendIso,
   loomThreads,
+  normalizeLaneAxis,
   prepRuns,
-  resolveCarrilsGroup,
+  resolveLaneAxis,
   stackIntervals,
   type LoomTeamPerson,
 } from './carrils';
 import { resolvePlannerView } from './planner';
 
-describe('resolvePlannerView (carrils, ADR-080 §7)', () => {
+describe('resolvePlannerView (board, ADR-080 §7)', () => {
   it('accepts carrils from the URL and from storage', () => {
-    expect(resolvePlannerView('carrils', null, false)).toBe('carrils');
-    expect(resolvePlannerView(null, 'carrils', true)).toBe('carrils');
+    expect(resolvePlannerView('board', null, false)).toBe('board');
+    expect(resolvePlannerView(null, 'board', true)).toBe('board');
   });
 
   it('never defaults to carrils — form-factor rule unchanged', () => {
@@ -21,16 +22,16 @@ describe('resolvePlannerView (carrils, ADR-080 §7)', () => {
   });
 });
 
-describe('resolveCarrilsGroup', () => {
+describe('resolveLaneAxis', () => {
   it('URL wins, then storage, then espai', () => {
-    expect(resolveCarrilsGroup('persona', 'projecte')).toBe('persona');
-    expect(resolveCarrilsGroup(null, 'projecte')).toBe('projecte');
-    expect(resolveCarrilsGroup(undefined, undefined)).toBe('espai');
+    expect(resolveLaneAxis('person', 'project')).toBe('person');
+    expect(resolveLaneAxis(null, 'project')).toBe('project');
+    expect(resolveLaneAxis(undefined, undefined)).toBe('workspace');
   });
 
   it('unknown values fall through', () => {
-    expect(resolveCarrilsGroup('venue', 'nope')).toBe('espai');
-    expect(resolveCarrilsGroup('week', 'persona')).toBe('persona');
+    expect(resolveLaneAxis('venue', 'nope')).toBe('workspace');
+    expect(resolveLaneAxis('week', 'person')).toBe('person');
   });
 });
 
@@ -340,5 +341,33 @@ describe('loomThreads', () => {
       ...month,
     });
     expect(groups.map((g) => g.key)).toEqual(['memorias', 'ultima']);
+  });
+});
+
+describe('normalizeLaneAxis (ADR-095 §9)', () => {
+  it('the English vocabulary passes through', () => {
+    expect(normalizeLaneAxis('workspace')).toBe('workspace');
+    expect(normalizeLaneAxis('project')).toBe('project');
+    expect(normalizeLaneAxis('person')).toBe('person');
+  });
+
+  it('the Catalan generation still opens — translated once, never written back', () => {
+    // The site is translated; the address bar is not. These three shipped in
+    // an otherwise English URL vocabulary and somebody has them bookmarked.
+    expect(normalizeLaneAxis('espai')).toBe('workspace');
+    expect(normalizeLaneAxis('projecte')).toBe('project');
+    expect(normalizeLaneAxis('persona')).toBe('person');
+  });
+
+  it('anything else falls through to the caller default', () => {
+    expect(normalizeLaneAxis('line')).toBeNull();
+    expect(normalizeLaneAxis(null)).toBeNull();
+    expect(resolveLaneAxis('nope', 'alsonope')).toBe('workspace');
+  });
+
+  it('a stored Catalan preference is honoured too, not just the URL', () => {
+    // localStorage carries the old word on every device that used the app
+    // before today; dropping it would silently reset everyone to workspace.
+    expect(resolveLaneAxis(null, 'persona')).toBe('person');
   });
 });

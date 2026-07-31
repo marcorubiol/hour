@@ -14,7 +14,7 @@
   import Button from '$lib/components/Button.svelte';
   import Menu from '$lib/components/Menu.svelte';
   import { t, type Locale } from '$lib/i18n';
-  import type { CarrilsGroup } from '$lib/carrils';
+  import type { LaneAxis } from '$lib/carrils';
   import type { PlannerView } from '$lib/planner';
 
   interface Props {
@@ -22,7 +22,7 @@
     monthTitle: string;
     year: number;
     filter: CalFilter;
-    carrilsGroup: CarrilsGroup;
+    laneAxis: LaneAxis;
     /** Calm mode hides the manual status filter (confirmed-only forced). */
     calm: boolean;
     /** Blackout entry points hide while availability/team feeds are absent. */
@@ -33,7 +33,7 @@
     onThisMonth: () => void;
     onScrollToToday: () => void;
     onSetView: (v: PlannerView) => void;
-    onSetGroup: (g: CarrilsGroup) => void;
+    onSetLaneAxis: (g: LaneAxis) => void;
     onSetFilter: (f: CalFilter) => void;
     onCreate: () => void;
     onFeed: () => void;
@@ -45,7 +45,7 @@
     monthTitle,
     year,
     filter,
-    carrilsGroup,
+    laneAxis,
     calm,
     canBlackout,
     locale,
@@ -54,7 +54,7 @@
     onThisMonth,
     onScrollToToday,
     onSetView,
-    onSetGroup,
+    onSetLaneAxis,
     onSetFilter,
     onCreate,
     onFeed,
@@ -125,9 +125,9 @@
     <button
       type="button"
       class="cal__tab"
-      class:cal__tab--on={view === 'carrils'}
-      aria-pressed={view === 'carrils'}
-      onclick={() => onSetView('carrils')}>{t('planner.view_carrils', locale)}</button
+      class:cal__tab--on={view === 'board'}
+      aria-pressed={view === 'board'}
+      onclick={() => onSetView('board')}>{t('planner.view_board', locale)}</button
     >
   </div>
   <Button size="s" onclick={onCreate} label={t('planner.new', locale)}>+</Button>
@@ -150,18 +150,18 @@
   </Menu>
 </div>
 
-{#if view === 'carrils'}
+{#if view === 'board'}
   <!-- Agrupa per (ADR-080 §8) — its own row, left-aligned; carrils only. -->
-  <div class="cal__grouprow" role="group" aria-label={t('planner.group_label', locale)}>
-    <span class="cal__group-lead">{t('planner.group_label', locale)}</span>
+  <div class="cal__grouprow" role="group" aria-label={t('planner.lanes_label', locale)}>
+    <span class="cal__group-lead">{t('planner.lanes_label', locale)}</span>
     <div class="cal__tabs">
-      {#each ['espai', 'projecte', 'persona'] as const as g (g)}
+      {#each ['workspace', 'project', 'person'] as const as g (g)}
         <button
           type="button"
           class="cal__tab"
-          class:cal__tab--on={carrilsGroup === g}
-          aria-pressed={carrilsGroup === g}
-          onclick={() => onSetGroup(g)}>{t(`planner.group_${g}`, locale)}</button
+          class:cal__tab--on={laneAxis === g}
+          aria-pressed={laneAxis === g}
+          onclick={() => onSetLaneAxis(g)}>{t(`planner.lanes_${g}`, locale)}</button
         >
       {/each}
     </div>

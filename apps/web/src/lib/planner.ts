@@ -656,29 +656,49 @@ function makeBand(
   return line_id === null ? { from, to, project_id } : { from, to, project_id, line_id };
 }
 
-/** The three first-class projections of the Calendar lens (ADR-076;
- * ADR-080 §7 promotes 'carrils' to the third slot). */
-export type PlannerView = 'month' | 'agenda' | 'carrils';
+/**
+ * The Planner's first-class projections (ADR-076; ADR-095 §1).
+ *
+ * A VIEW DECLARES WHAT A ROW IS, and nothing inside the view changes it:
+ * Agenda — a row is a day · Month — a row is a week · Board — a row is an
+ * entity, and its `lanes` dial only ever relabels the entity. ('day', where a
+ * row is a thread of the day, joins when its drawing exists.)
+ */
+export type PlannerView = 'month' | 'agenda' | 'board';
 
-function isPlannerView(v: string | null | undefined): v is PlannerView {
-  return v === 'month' || v === 'agenda' || v === 'carrils';
+/**
+ * Legacy view tokens, translated ONCE on entry and never written back — a
+ * link somebody sent last month is not a bug. `carrils` was the Catalan name
+ * ADR-080 §7 gave the board; ADR-095 §9 moved the URL vocabulary to a stable
+ * English one, with the visible labels translated instead.
+ */
+const VIEW_ALIASES: Record<string, PlannerView> = {
+  carrils: 'board',
+};
+
+/** A token from a URL or from storage → a view, or null if it is neither. */
+export function normalizePlannerView(v: string | null | undefined): PlannerView | null {
+  if (v === 'month' || v === 'agenda' || v === 'board') return v;
+  return (v && VIEW_ALIASES[v]) || null;
 }
 
 /**
  * Projection resolution (ADR-078 §10): explicit `?view=` → the device's
- * stored preference (localStorage) → form-factor default (narrow viewport
- * reads as agenda, wide as month — 'carrils' is never a default, ADR-080
- * §7 changes the roster, not the form-factor rule). Unknown values at
- * either level fall through — a mistyped URL never breaks the page.
+ * stored preference (localStorage) → form-factor default (narrow reads as
+ * agenda, wide as month — the board is never a default; ADR-080 §7 changed
+ * the roster, not the form-factor rule). Unknown values at either level fall
+ * through — a mistyped URL never breaks the page.
  */
 export function resolvePlannerView(
   urlView: string | null | undefined,
   stored: string | null | undefined,
   narrowViewport: boolean,
 ): PlannerView {
-  if (isPlannerView(urlView)) return urlView;
-  if (isPlannerView(stored)) return stored;
-  return narrowViewport ? 'agenda' : 'month';
+  return (
+    normalizePlannerView(urlView) ??
+    normalizePlannerView(stored) ??
+    (narrowViewport ? 'agenda' : 'month')
+  );
 }
 
 /**

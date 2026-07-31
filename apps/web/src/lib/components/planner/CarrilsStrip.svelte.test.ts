@@ -107,7 +107,7 @@ describe('CarrilsStrip — lanes', () => {
   const props = {
     monthDays: JULY,
     todayIso: '2026-07-18',
-    group: 'espai' as const,
+    group: 'workspace' as const,
     lanes,
     loom: [],
     connectors,
@@ -166,7 +166,7 @@ describe('CarrilsStrip — loom (per persona)', () => {
   const props = {
     monthDays: JULY,
     todayIso: '2026-07-18',
-    group: 'persona' as const,
+    group: 'person' as const,
     lanes: [],
     loom,
     connectors: [],

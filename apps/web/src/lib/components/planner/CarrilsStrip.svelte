@@ -19,7 +19,7 @@
    *   it survives horizontal scroll at any width (390px scrolls the strip,
    *   never the page).
    */
-  import type { CarrilsGroup } from '$lib/carrils';
+  import type { LaneAxis } from '$lib/carrils';
 
   /** One event pip on a lane. */
   export type LanePipVM = {
@@ -113,7 +113,7 @@
     monthDays: string[];
     /** YYYY-MM-DD — paints the "avui" line when inside the month. */
     todayIso: string;
-    group: CarrilsGroup;
+    group: LaneAxis;
     lanes: LaneVM[];
     loom: LoomGroupVM[];
     connectors: ConnectorVM[];
@@ -268,14 +268,14 @@
     return () => window.removeEventListener('resize', rerun);
   });
 
-  let axisLabel = $derived(t(`planner.group_${group}`, locale));
+  let axisLabel = $derived(t(`planner.lanes_${group}`, locale));
 </script>
 
 <div class="strip" bind:this={rootEl}>
   <div class="strip__inner">
     <p class="strip__hint" aria-hidden="true">{t('planner.carrils_hint', locale)}</p>
 
-    {#if group === 'persona'}
+    {#if group === 'person'}
       <!-- Loom legend (ADR-080 §8) — the five words the threads speak. -->
       <div class="strip__legend">
         <span class="strip__leg"><i class="strip__leg-th strip__leg-th--avail"></i>{t('planner.loom_available', locale)}</span>
@@ -321,7 +321,7 @@
         {/if}
       </div>
 
-      {#if group === 'persona'}
+      {#if group === 'person'}
         {#each loom as grp (grp.key)}
           <div class="strip__grp">
             <span class="strip__grp-name" style="--c: {grp.accent}">
@@ -390,7 +390,7 @@
             <span class="strip__lab" data-lane-label>
               <i
                 class="strip__dot"
-                class:strip__dot--sq={group === 'projecte'}
+                class:strip__dot--sq={group === 'project'}
                 style="--c: {lane.accent}"
                 aria-hidden="true"
               ></i>

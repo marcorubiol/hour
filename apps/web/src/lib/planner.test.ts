@@ -10,6 +10,7 @@ import {
   decisionsFor,
   isoWeek,
   monthGrid,
+  normalizePlannerView,
   performanceRoster,
   resolvePlannerView,
   rosterPersonIds,
@@ -17,6 +18,29 @@ import {
   type PlannerEvent,
   type DecisionPerformance,
 } from './planner';
+
+describe('normalizePlannerView', () => {
+  it.each([
+    ['month', 'month'],
+    ['agenda', 'agenda'],
+    ['board', 'board'],
+  ])('%s passes through', (raw, want) => {
+    expect(normalizePlannerView(raw)).toBe(want);
+  });
+
+  it('a link somebody sent last month is not a bug', () => {
+    // ADR-095 §9: legacy tokens are translated ONCE on entry and never
+    // written back. `carrils` was the Catalan name ADR-080 §7 gave the board.
+    expect(normalizePlannerView('carrils')).toBe('board');
+  });
+
+  it('anything else is null, so the caller falls through to its default', () => {
+    expect(normalizePlannerView('week')).toBeNull();
+    expect(normalizePlannerView('')).toBeNull();
+    expect(normalizePlannerView(null)).toBeNull();
+    expect(normalizePlannerView(undefined)).toBeNull();
+  });
+});
 
 describe('isoWeek', () => {
   // The cases that separate a real ISO week from a naive day-of-year ÷ 7:

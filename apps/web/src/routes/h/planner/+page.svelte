@@ -94,14 +94,16 @@
     type Conflict,
     type DecisionPerformance,
     type DecisionSide,
+    normalizePlannerView,
   } from '$lib/planner';
   import { buildPersonScope } from '$lib/people';
   import { createPlannerFeeds } from '$lib/planner-feeds.svelte';
   import {
     loomThreads,
+    normalizeLaneAxis,
     prepRuns,
-    resolveCarrilsGroup,
-    type CarrilsGroup,
+    resolveLaneAxis,
+    type LaneAxis,
     type LoomCommitment,
     type PrepDay,
   } from '$lib/carrils';
@@ -206,9 +208,8 @@
       matchMedia('(max-width: 640px)').matches,
     ),
   );
-  // Carrils grouping (ADR-080 §8) — same persistence chain as the
-  // projection: ?group= → localStorage → 'espai'. The URL only carries
-  // &group= while the projection is carrils (it means nothing elsewhere).
+  // The Board's lane axis (ADR-080 §8, ADR-095 §9) — same persistence chain
+  // as the projection: ?lanes= → localStorage → 'workspace'.
   const GROUP_STORAGE_KEY = 'hour:calendar:group';
   function storedGroup(): string | null {
     try {
@@ -217,16 +218,36 @@
       return null;
     }
   }
-  let carrilsGroup = $state<CarrilsGroup>(
-    resolveCarrilsGroup(new URL(location.href).searchParams.get('group'), storedGroup()),
+  let laneAxis = $state<LaneAxis>(
+    resolveLaneAxis(
+      // `group` is the previous generation of this parameter; read once.
+      new URL(location.href).searchParams.get('lanes') ??
+        new URL(location.href).searchParams.get('group'),
+      storedGroup(),
+    ),
   );
 
-  /** Rewrite the address bar (the truth) with the current view/group. */
+  /**
+   * Rewrite the address bar (the truth) with view · lanes · the month.
+   *
+   * THE DIALS ARE WRITTEN ONLY BY THE VIEW THAT HAS THEM (ADR-095 §9): a URL
+   * carrying `lanes=person` over the Month is a URL that lies. And the MONTH
+   * goes in, which it never did — `ym` was component state, so with the title
+   * about to become the date, a link you sent showed the reader a different
+   * window from the one you were looking at. The agenda is exempt: it is a
+   * continuous book with no single month to name.
+   *
+   * Legacy parameters are dropped here, never rewritten — they were already
+   * translated on the way in.
+   */
   function syncUrl() {
     const url = new URL(location.href);
     url.searchParams.set('view', view);
-    if (view === 'carrils') url.searchParams.set('group', carrilsGroup);
-    else url.searchParams.delete('group');
+    if (view === 'board') url.searchParams.set('lanes', laneAxis);
+    else url.searchParams.delete('lanes');
+    if (view === 'agenda') url.searchParams.delete('ym');
+    else url.searchParams.set('ym', `${ym.year}-${String(ym.month).padStart(2, '0')}`);
+    url.searchParams.delete('group');
     replaceState(url, {});
   }
   function setView(v: PlannerView) {
@@ -242,9 +263,9 @@
     // read and write go through location.href.
     syncUrl();
   }
-  function setGroup(g: CarrilsGroup) {
-    if (carrilsGroup === g) return;
-    carrilsGroup = g;
+  function setLaneAxis(g: LaneAxis) {
+    if (laneAxis === g) return;
+    laneAxis = g;
     try {
       localStorage.setItem(GROUP_STORAGE_KEY, g);
     } catch {
@@ -252,24 +273,27 @@
     }
     syncUrl();
   }
-  // Inbound navigation carrying an explicit ?view=/&group= (pasted link,
+  // Inbound navigation carrying an explicit ?view=/&lanes=/&ym= (pasted link,
   // back/forward). page.url is only the trigger; location.href the truth.
+  // Every legacy generation is translated HERE, once, and never written back.
   $effect(() => {
     void page.url;
     const params = new URL(location.href).searchParams;
-    const raw = params.get('view');
-    if (
-      (raw === 'month' || raw === 'agenda' || raw === 'carrils') &&
-      raw !== untrack(() => view)
-    ) {
-      view = raw;
-    }
-    const rawGroup = params.get('group');
-    if (
-      (rawGroup === 'espai' || rawGroup === 'projecte' || rawGroup === 'persona') &&
-      rawGroup !== untrack(() => carrilsGroup)
-    ) {
-      carrilsGroup = rawGroup;
+    const nextView = normalizePlannerView(params.get('view'));
+    if (nextView && nextView !== untrack(() => view)) view = nextView;
+
+    const nextLanes = normalizeLaneAxis(params.get('lanes') ?? params.get('group'));
+    if (nextLanes && nextLanes !== untrack(() => laneAxis)) laneAxis = nextLanes;
+
+    const rawYm = params.get('ym');
+    const m = rawYm?.match(/^(\d{4})-(\d{2})$/);
+    if (m) {
+      const year = Number(m[1]);
+      const month = Number(m[2]);
+      const cur = untrack(() => ym);
+      if (month >= 1 && month <= 12 && (year !== cur.year || month !== cur.month)) {
+        ym = { year, month };
+      }
     }
   });
 
@@ -748,8 +772,8 @@
   });
 
   let carrilsLanes = $derived.by((): LaneVM[] => {
-    if (view !== 'carrils' || carrilsGroup === 'persona') return [];
-    const byProject = carrilsGroup === 'projecte';
+    if (view !== 'board' || laneAxis === 'person') return [];
+    const byProject = laneAxis === 'project';
     const lanes = new Map<string, LaneVM>();
     const laneFor = (projectId: string | null, workspaceId: string | null): LaneVM | null => {
       const key = byProject ? projectId : workspaceId;
@@ -890,8 +914,8 @@
   // The id IS the decision pair id, so a click lands on the band's card.
   let eventById = $derived(new Map(engineEvents.map((e) => [e.id, e])));
   let carrilsConnectors = $derived.by((): ConnectorVM[] => {
-    if (view !== 'carrils' || carrilsGroup === 'persona') return [];
-    const byProject = carrilsGroup === 'projecte';
+    if (view !== 'board' || laneAxis === 'person') return [];
+    const byProject = laneAxis === 'project';
     const out: ConnectorVM[] = [];
     const seen = new Set<string>();
     for (const c of conflicts) {
@@ -933,7 +957,7 @@
 
   // ── The Loom (Agrupa per Persona — ADR-080 §8) ────────────────────────
   let loomGroups = $derived.by((): LoomGroupVM[] => {
-    if (view !== 'carrils' || carrilsGroup !== 'persona') return [];
+    if (view !== 'board' || laneAxis !== 'person') return [];
     // The loom's rows ARE people, so a pinned person narrows the rows too —
     // otherwise pinning one name drew twelve threads with eleven of them
     // empty, which reads as "nobody is working" rather than as a filter.
@@ -1466,7 +1490,7 @@
     {monthTitle}
     year={ym.year}
     {filter}
-    {carrilsGroup}
+    {laneAxis}
     calm={calm.on}
     {canBlackout}
     {locale}
@@ -1475,7 +1499,7 @@
     onThisMonth={thisMonth}
     onScrollToToday={scrollToToday}
     onSetView={setView}
-    onSetGroup={setGroup}
+    onSetLaneAxis={setLaneAxis}
     onSetFilter={(f) => (filter = f)}
     onCreate={() => openCreate()}
     onFeed={openFeed}
@@ -1550,7 +1574,7 @@
     <CarrilsStrip
       {monthDays}
       {todayIso}
-      group={carrilsGroup}
+      group={laneAxis}
       lanes={carrilsLanes}
       loom={loomGroups}
       connectors={carrilsConnectors}

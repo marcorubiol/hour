@@ -8,25 +8,42 @@
 
 import { addDaysIso } from './planner';
 
-/** The three groupings of the carrils projection (ADR-080 §8). */
-export type CarrilsGroup = 'espai' | 'projecte' | 'persona';
+/**
+ * The Board's lane axis — what one row IS (ADR-080 §8, renamed by ADR-095 §9).
+ *
+ * The dial only ever relabels the lanes; it can never change the fact that a
+ * Board row is an entity. That is the whole of ADR-094: a dial in the
+ * furniture, a view in the model.
+ */
+export type LaneAxis = 'workspace' | 'project' | 'person';
 
-function isCarrilsGroup(v: string | null | undefined): v is CarrilsGroup {
-  return v === 'espai' || v === 'projecte' || v === 'persona';
+/**
+ * Legacy lane tokens, translated ONCE on entry. These were Catalan words in
+ * an otherwise English URL vocabulary — the site is translated, the address
+ * bar is not (ADR-095 §9).
+ */
+const LANE_ALIASES: Record<string, LaneAxis> = {
+  espai: 'workspace',
+  projecte: 'project',
+  persona: 'person',
+};
+
+/** A token from a URL or storage → a lane axis, or null if it is neither. */
+export function normalizeLaneAxis(v: string | null | undefined): LaneAxis | null {
+  if (v === 'workspace' || v === 'project' || v === 'person') return v;
+  return (v && LANE_ALIASES[v]) || null;
 }
 
 /**
- * Grouping resolution — same persistence chain as the projection
- * (ADR-078 §10 via ADR-080 §8): explicit `&group=` → the device's stored
- * preference → 'espai'. Unknown values fall through.
+ * Lane resolution — same persistence chain as the projection (ADR-078 §10 via
+ * ADR-080 §8): explicit `&lanes=` → the device's stored preference →
+ * 'workspace'. Unknown values fall through.
  */
-export function resolveCarrilsGroup(
-  urlGroup: string | null | undefined,
+export function resolveLaneAxis(
+  urlLanes: string | null | undefined,
   stored: string | null | undefined,
-): CarrilsGroup {
-  if (isCarrilsGroup(urlGroup)) return urlGroup;
-  if (isCarrilsGroup(stored)) return stored;
-  return 'espai';
+): LaneAxis {
+  return normalizeLaneAxis(urlLanes) ?? normalizeLaneAxis(stored) ?? 'workspace';
 }
 
 /** Sunday/Saturday check on a plain ISO date (UTC math, tz-free). */
