@@ -1744,6 +1744,18 @@
              month's: the numbers were July's window computed over a feed that
              starts today, so a July with nine occupied days announced `0
              confirmed · 31 nights free`. Caught on screen, 2026-07-31. -->
+        <!-- A WINDOW WITH NO END NAMES WHERE IT BEGINS, AND SAYS SO. The
+             agenda cannot count — its horizon grows as you scroll — but it can
+             say what it IS: a book opened at a day. Without this the band went
+             silent when the counters were gated, which is honest and mute; the
+             law asks for honest and legible. -->
+        {#if view === 'agenda'}
+          <span class="cal__stat cal__stat--soft"
+            >{t('planner.agenda_from', locale, {
+              day: localeDayMonth(agendaFromIso, localeTag),
+            })}</span
+          >
+        {/if}
         {#if view !== 'agenda'}
         <span class="cal__stat"><b>{stats.confirmed}</b> {t('planner.stat_confirmed', locale)}</span>
         <!-- `1 holds` was printing on every single-hold month. The design's own

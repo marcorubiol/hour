@@ -389,5 +389,6 @@
   "planner.view_day": "Day",
   "planner.day_empty": "Nothing on this day.",
   "planner.day_axis": "the day",
-  "planner.no_cast": "no cast"
+  "planner.no_cast": "no cast",
+  "planner.agenda_from": "from {day} onwards"
 }
