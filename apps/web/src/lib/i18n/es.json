@@ -374,5 +374,7 @@
   "planner.week_nothing": "nada aún",
   "planner.more_n": "más",
   "planner.released": "soltado",
-  "planner.expires_on": "vence {day}"
+  "planner.expires_on": "vence {day}",
+  "planner.no_hour": "sin hora",
+  "planner.all_day": "todo el día"
 }

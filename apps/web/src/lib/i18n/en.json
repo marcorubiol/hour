@@ -383,5 +383,7 @@
   "planner.week_nothing": "nothing yet",
   "planner.more_n": "more",
   "planner.released": "let go",
-  "planner.expires_on": "expires {day}"
+  "planner.expires_on": "expires {day}",
+  "planner.no_hour": "no hour",
+  "planner.all_day": "all day"
 }

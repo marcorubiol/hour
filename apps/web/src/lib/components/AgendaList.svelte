@@ -80,6 +80,14 @@
     decideLabel?: string;
     /** Header of the right-hand dot-grid notes column. */
     notesLabel?: string;
+    /** «show» — the kind word a performance row carries in its pack. */
+    showWord?: string;
+    /** «let go» — the word a released row carries. */
+    releasedWord?: string;
+    /** «no hour» — a hold nobody has timed. NEVER a dash. */
+    noHourWord?: string;
+    /** «all day» — a row that lasts the day, which is not the same as no hour. */
+    allDayWord?: string;
     /** Scroll reached the end → page appends the next month. */
     onReachEnd?: () => void;
     /** Top "earlier months" action → page prepends (scroll-anchored). */
@@ -115,6 +123,10 @@
     earlierLabel = '↑ earlier',
     decideLabel = 'decide ↑',
     notesLabel = 'NOTES',
+    showWord = 'show',
+    releasedWord = 'let go',
+    noHourWord = 'no hour',
+    allDayWord = 'all day',
     onReachEnd,
     onReachStart,
     onDecideJump,
@@ -158,8 +170,16 @@
       push(dateDayKey(d, viewerTz), { kind: 'date', sort: dateSortKey(d), date: d });
     }
     for (const rows of map.values()) {
-      // Day-level rows (empty sort key) lead; timed rows follow the clock.
-      rows.sort((a, b) => (a.sort < b.sort ? -1 : a.sort > b.sort ? 1 : 0));
+      /* TIMED FIRST, then the un-timed — the running order of the day.
+         It used to be the other way round: the empty sort key sorted before
+         every clock, so a hold nobody had timed opened the day above the gig
+         that actually happens at 20h. A day reads forwards. */
+      rows.sort((a, b) => {
+        const ra = a.sort ? 0 : 1;
+        const rb = b.sort ? 0 : 1;
+        if (ra !== rb) return ra - rb;
+        return a.sort < b.sort ? -1 : a.sort > b.sort ? 1 : 0;
+      });
     }
     return map;
   });
@@ -507,11 +527,22 @@
 </div>
 
 {#snippet eventRow(row: Row)}
+  <!-- THE IDENTITY OPENS THE ROW (ADR-095). Three columns: a fixed identity
+       column, the name, and a slot reserved for the verbs.
+
+       In the identity column the PACK comes first — monogram + the kind word —
+       then the state, and the HOUR SITS UNDER THEM. That is the one place the
+       Flow differs from the month on purpose: here the hour is a COLUMN of the
+       sheet, so it aligns down the page and you can scan time with your eye.
+       Before this the row opened with the hour and buried the project in a
+       second line of the BODY, so the token the whole app is colour-coded by
+       was the last thing you reached. -->
   {#if row.kind === 'perf'}
     {@const p = row.perf}
     {@const t = perfDual(p)}
     {@const href = perfHref(p)}
     {@const family = performanceStatusFamily(p.status)}
+    {@const held = family === 'hold' || family === 'proposed'}
     <svelte:element
       this={href ? 'a' : 'div'}
       class="ag__row ag__row--perf"
@@ -519,15 +550,8 @@
       style={p.project ? `--c: ${accentVarFor(p.project)}` : undefined}
       href={href ?? undefined}
     >
-      <span class="ag__meta">
-        <span class="ag__time">{t?.primary ?? '—'}</span>
-        <span class="ag__state">{statusLabel(p.status)}</span>
-      </span>
-      <span class="ag__body">
-        <span class="ag__title"
-          ><b>{perfName(p)}</b>{#if perfCity(p)}<span class="ag__city">{perfCity(p)}</span>{/if}</span
-        >
-        <span class="ag__sub">
+      <span class="ag__id">
+        <span class="ag__pack">
           {#if p.project}<IdentityMark
               variant="compact"
               accent={accentVarFor(p.project)}
@@ -535,67 +559,79 @@
               name={p.project.name}
               size="15px"
             />{/if}
-          {p.project?.name ?? ''}
-          {#if t?.secondary}<span class="ag__courtesy">· {viewerTimeLabel(t.secondary)}</span>{/if}
+          <span class="ag__kind" class:ag__kind--q={held}
+            >{showWord}{#if held}?{/if}</span
+          >
         </span>
+        {#if family === 'hold'}
+          <!-- Plain text, never a pill: a pill here reads louder than the venue
+               you came to read. It is allowed to turn a line in 118px. -->
+          <span class="ag__hold">{statusLabel(p.status)}</span>
+        {:else if family === 'released'}
+          <span class="ag__hold">{releasedWord}</span>
+        {/if}
+        <!-- NO HOUR IS A FACT, not a typographic shrug. A hold is a date
+             somebody ASKED for, so most arrive without one; a dash reads as an
+             hour that failed to print. -->
+        <span class="ag__time" class:ag__time--none={!t?.primary}
+          >{t?.primary ?? noHourWord}</span
+        >
+        {#if t?.secondary}<span class="ag__courtesy">{viewerTimeLabel(t.secondary)}</span>{/if}
       </span>
+      <span class="ag__body">
+        <!-- The name is NEVER truncated: a row may grow, and «Teatre Nacional
+             de Cataluny…» is a name you cannot look up. The city sits UNDER
+             it — one line for what it is, one for where it is. -->
+        <span class="ag__title">{perfName(p)}</span>
+        {#if perfCity(p)}<span class="ag__city">{perfCity(p)}</span>{/if}
+      </span>
+      <span class="ag__acts"></span>
     </svelte:element>
   {:else}
     {@const d = row.date}
     {@const t = dateDual(d)}
-    {#if d.kind === 'travel_day'}
-      <svelte:element
-        this={onDateOpen ? 'button' : 'div'}
-        class="ag__row ag__row--travel"
-        class:ag__row--openable={onDateOpen}
-        style={d.project ? `--c: ${accentVarFor(d.project)}` : undefined}
-        {...rowShellProps(d)}
-      >
-        <span class="ag__meta"><span class="ag__badge">{dateBadge(d)}</span></span>
-        <span class="ag__body">
-          <span class="ag__title ag__title--travel">{travelText(d)}</span>
-          <span class="ag__sub">
-            {#if d.project}<IdentityMark
-                variant="compact"
-                accent={accentVarFor(d.project)}
-                initials={d.project.initials}
-                name={d.project.name}
-                size="15px"
-              />{/if}
-            {d.project?.name ?? ''}
-          </span>
+    {@const fam = dateStatusFamily(d.status)}
+    {@const held = fam === 'hold' || fam === 'proposed'}
+    <svelte:element
+      this={onDateOpen ? 'button' : 'div'}
+      class="ag__row ag__row--date"
+      class:ag__row--openable={onDateOpen}
+      class:ag__row--travel={d.kind === 'travel_day'}
+      data-family={fam}
+      style={d.project ? `--c: ${accentVarFor(d.project)}` : undefined}
+      {...rowShellProps(d)}
+    >
+      <span class="ag__id">
+        <span class="ag__pack">
+          {#if d.project}<IdentityMark
+              variant="compact"
+              accent={accentVarFor(d.project)}
+              initials={d.project.initials}
+              name={d.project.name}
+              size="15px"
+            />{/if}
+          <span class="ag__kind" class:ag__kind--q={held}
+            >{dateKindLabel(d.kind)}{#if held}?{/if}</span
+          >
         </span>
-      </svelte:element>
-    {:else}
-      <svelte:element
-        this={onDateOpen ? 'button' : 'div'}
-        class="ag__row ag__row--date"
-        class:ag__row--openable={onDateOpen}
-        data-family={dateStatusFamily(d.status)}
-        style={d.project ? `--c: ${accentVarFor(d.project)}` : undefined}
-        {...rowShellProps(d)}
-      >
-        <span class="ag__meta">
-          <span class="ag__badge">{dateBadge(d)}</span>
-          {#if t?.primary}<span class="ag__time ag__time--date">{t.primary}</span>{/if}
-        </span>
-        <span class="ag__body">
-          <span class="ag__title ag__title--date">{dateText(d)}</span>
-          <span class="ag__sub">
-            {#if d.project}<IdentityMark
-                variant="compact"
-                accent={accentVarFor(d.project)}
-                initials={d.project.initials}
-                name={d.project.name}
-                size="15px"
-              />{/if}
-            {d.project?.name ?? ''}
-            {#if t?.secondary}<span class="ag__courtesy">· {viewerTimeLabel(t.secondary)}</span
-              >{/if}
-          </span>
-        </span>
-      </svelte:element>
-    {/if}
+        {#if fam === 'released'}
+          <span class="ag__hold">{releasedWord}</span>
+        {/if}
+        {#if d.all_day}
+          <span class="ag__time ag__time--none">{allDayWord}</span>
+        {:else}
+          <span class="ag__time" class:ag__time--none={!t?.primary}
+            >{t?.primary ?? noHourWord}</span
+          >
+        {/if}
+        {#if t?.secondary}<span class="ag__courtesy">{viewerTimeLabel(t.secondary)}</span>{/if}
+      </span>
+      <span class="ag__body">
+        <span class="ag__title">{d.kind === 'travel_day' ? travelText(d) : dateText(d)}</span>
+        {#if d.city && d.kind !== 'travel_day'}<span class="ag__city">{d.city}</span>{/if}
+      </span>
+      <span class="ag__acts"></span>
+    </svelte:element>
   {/if}
 {/snippet}
 
@@ -761,8 +797,11 @@
     .ag__row {
       position: relative;
       display: grid;
-      grid-template-columns: 5rem 1fr;
-      gap: var(--space-s);
+      /* identity · the name · the verbs' reserved slot. The identity column is
+         fixed so the names line up down the page; the verb slot is reserved so
+         the row cannot change height when the pointer crosses it. */
+      grid-template-columns: 7.5rem minmax(0, 1fr) auto;
+      gap: 0 var(--space-m);
       align-items: baseline;
       padding: var(--space-xs) var(--space-s) var(--space-xs) var(--space-m);
       color: inherit;
@@ -855,16 +894,82 @@
       flex-direction: column;
       gap: var(--space-2xs);
     }
+    /* NO VIEW TRUNCATES A NAME (ADR-095). A row is allowed to grow, and
+       «Teatre Nacional de Cataluny…» is a name you cannot look up. The
+       ellipsis was not arbitrary — the name used to be `nowrap` with VISIBLE
+       overflow and printed over the row's actions — but wrapping fixes that
+       too: inside a `minmax(0, 1fr)` column a wrapped name cannot leave its
+       track. */
     .ag__title {
       font-size: var(--text-s);
       color: var(--text-color);
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+      overflow: visible;
+      text-overflow: clip;
+      white-space: normal;
+      text-wrap: pretty;
+      overflow-wrap: break-word;
+      line-height: 1.2;
     }
     .ag__title b {
       font-weight: 600;
     }
+    /* ── THE ROW · three columns (ADR-095) ────────────────────────────
+       identity (fixed) · the name · a slot reserved for the verbs, so the row
+       never changes height when the pointer crosses it. */
+    .ag__id {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 2px;
+      min-inline-size: 0;
+    }
+    .ag__pack {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      flex: none;
+    }
+    .ag__kind {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+      white-space: nowrap;
+    }
+    .ag__kind--q {
+      font-style: italic;
+    }
+    /* Plain text, and allowed to turn a line in a 118px column. */
+    .ag__hold {
+      display: block;
+      font-family: var(--font-mono);
+      font-size: 9px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      line-height: 1.2;
+      white-space: normal;
+    }
+    /* One hour, one size, one colour. It used to grow and darken when a date
+       became firm, so certainty was said twice in the clock on top of every
+       other mark that already says it. An hour is an hour. */
+    .ag__time--none {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+      font-variant-numeric: normal;
+    }
+    .ag__acts {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 6px;
+      min-inline-size: 7rem;
+    }
+
     .ag__row[data-family='proposed'] .ag__title {
       color: var(--text-muted);
     }
@@ -887,12 +992,17 @@
       font-size: var(--text-xs);
       color: color-mix(in oklch, var(--c, var(--text-muted)) 50%, var(--text-muted));
     }
+    /* THE CITY SITS UNDER THE NAME — one line for what it is, one for where
+       it is — and it is QUIETER: the name is the assertion, the place is the
+       gloss. It used to ride inline behind the name, where it inherited the
+       name's size and read as part of it. */
     .ag__city {
-      color: var(--text-faint);
+      display: block;
+      margin-inline-start: 0;
+      margin-block-start: 1px;
+      font-size: var(--text-xs);
       font-weight: 400;
-      /* Svelte trims the whitespace between </b> and this span — restore
-         the name–city gap here. */
-      margin-inline-start: var(--space-2xs);
+      color: var(--text-faint);
     }
     .ag__sub {
       display: flex;

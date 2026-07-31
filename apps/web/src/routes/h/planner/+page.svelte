@@ -1750,6 +1750,10 @@
       earlierLabel={t('planner.agenda_earlier', locale)}
       decideLabel={t('planner.agenda_decide', locale)}
       notesLabel={t('planner.agenda_notes', locale)}
+      showWord={t('planner.kind_show', locale)}
+      releasedWord={t('planner.released', locale)}
+      noHourWord={t('planner.no_hour', locale)}
+      allDayWord={t('planner.all_day', locale)}
       onReachEnd={extendAgendaEnd}
       onReachStart={loadEarlier}
       onDecideJump={jumpToDecisions}
