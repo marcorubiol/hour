@@ -1715,6 +1715,14 @@
         const key = statusFootKey(status);
         return key ? t(key, locale) : null;
       }}
+      isoWeekLabel={(n) => `${t('planner.week_n', locale)} ${n}`}
+      confirmedWord={t('planner.week_confirmed', locale)}
+      optionWord={t('planner.week_options', locale)}
+      freeWord={t('planner.week_free', locale)}
+      nothingWord={t('planner.week_nothing', locale)}
+      moreLabel={t('planner.more_n', locale)}
+      releasedLabel={t('planner.released', locale)}
+      expiresLabel={(iso) => t('planner.expires_on', locale, { day: localeDayMonth(iso, localeTag) })}
       readinessItems={READINESS_KEYS.map((k) => ({
         key: k,
         label: t(readinessLabelKey(k), locale),

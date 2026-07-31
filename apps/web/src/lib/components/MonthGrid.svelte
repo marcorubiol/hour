@@ -22,7 +22,7 @@
    * card, so the shared design layer cannot fork per chip kind.
    */
   import { createQuery } from '@tanstack/svelte-query';
-  import { addDaysIso, dayKeyInTz, monthGrid, assignBandLanes } from '$lib/planner';
+  import { addDaysIso, dayKeyInTz, isoWeek, monthGrid, assignBandLanes } from '$lib/planner';
   import { weekdayLabels } from '$lib/datetime';
   import { workspacesQueryOptions } from '$lib/nav-queries';
   import type { IdentitySibling } from '$lib/utils/identity';
@@ -92,6 +92,13 @@
     readinessItems?: { key: string; label: string }[];
     /** «more» — the word after the +N door on a full cell. */
     moreLabel?: string;
+    /** «week 27» — the gutter's own label. */
+    isoWeekLabel?: (n: number) => string;
+    /** Words for the density row's tooltip; the sheet itself stays wordless. */
+    confirmedWord?: string;
+    optionWord?: string;
+    freeWord?: string;
+    nothingWord?: string;
     /** «let go» — the word a released slip carries. */
     releasedLabel?: string;
     /** «expires Mon» — the deadline phrase, given the decide-by ISO day. */
@@ -132,6 +139,11 @@
       { key: 'technical', label: 'technical' },
     ],
     moreLabel = 'more',
+    isoWeekLabel = (n: number) => `week ${n}`,
+    confirmedWord = 'confirmed',
+    optionWord = 'options',
+    freeWord = 'nights free',
+    nothingWord = 'nothing yet',
     releasedLabel = 'let go',
     expiresLabel = (iso: string) => `expires ${iso.slice(8, 10)}/${iso.slice(5, 7)}`,
   }: Props = $props();
@@ -416,6 +428,79 @@
 
   /** Lanes in use across a whole week row — every cell reserves this many
    *  slots so a lane sits at the same height in every day of the week. */
+  /**
+   * THE WEEK'S GUTTER — the row that counts the week without words.
+   *
+   * One mark per day: solid for a confirmed gig, a ring for an option, a rule
+   * for a working day that is not a gig, a faint dot for a night still free.
+   * Three numbers became one row you read at a glance, and the words survive
+   * in the tooltip.
+   *
+   * `free` here is the same law as the header's counter: a night with anything
+   * of its own is not free, and neither is a night on tour.
+   */
+  type DayMark = 'firm' | 'held' | 'busy' | 'free' | 'out';
+  function weekMarks(week: { iso: string; inMonth: boolean }[]): DayMark[] {
+    return week.map((d) => {
+      if (!d.inMonth) return 'out';
+      const perfs = performancesByDay.get(d.iso) ?? [];
+      const dates = datesByDay.get(d.iso) ?? [];
+      let firm = false;
+      let held = false;
+      for (const p of perfs) {
+        const fam = performanceStatusFamily(p.status);
+        if (fam === 'confirmed') firm = true;
+        else if (fam === 'hold') held = true;
+      }
+      if (firm) return 'firm';
+      if (held) return 'held';
+      if (perfs.length > 0 || dates.length > 0) return 'busy';
+      return tourDays.has(d.iso) ? 'busy' : 'free';
+    });
+  }
+  /** Days covered by an away band — a tour night is never a free night. */
+  let tourDays = $derived.by(() => {
+    const out = new Set<string>();
+    for (const b of aways) {
+      let d = b.from;
+      for (let i = 0; d <= b.to && i < 400; i++) {
+        out.add(d);
+        d = addDaysIso(d, 1);
+      }
+    }
+    return out;
+  });
+
+  /**
+   * The week is as tall as its FULLEST day, so a quiet week is visibly short
+   * without drawing anything to say so. Four steps, and the cap is what makes
+   * them mean something (see CELL_CAP).
+   *
+   * Out-of-month days count too, on purpose: without them a week whose only
+   * slip falls on the 1st of the next month asks for 32% of a cell and the
+   * slip comes out taller than the row.
+   */
+  const WEEK_FILL = [0.34, 0.62, 0.85, 1];
+  /** The words for the density row live in the tooltip, not on the sheet. */
+  function weekMarksTitle(marks: DayMark[]): string {
+    const n = (k: DayMark) => marks.filter((m) => m === k).length;
+    const parts = [
+      n('firm') ? `${n('firm')} ${confirmedWord}` : '',
+      n('held') ? `${n('held')} ${optionWord}` : '',
+      n('free') ? `${n('free')} ${freeWord}` : '',
+    ].filter(Boolean);
+    return parts.join(' · ') || nothingWord;
+  }
+  function weekFill(week: { iso: string }[]): number {
+    let max = 0;
+    for (const d of week) {
+      const n =
+        (performancesByDay.get(d.iso) ?? []).length + (datesByDay.get(d.iso) ?? []).length;
+      max = Math.max(max, Math.min(n, CELL_CAP));
+    }
+    return WEEK_FILL[max];
+  }
+
   function weekLaneCount(week: { iso: string }[]): number {
     const { combined, lanes } = laneBands;
     let max = -1;
@@ -494,11 +579,29 @@
   aria-label={label}
   bind:this={gridEl}
 >
-  {#each wkLabels as wd (wd)}
-    <div class="cal__weekday">{wd}</div>
-  {/each}
+  <!-- THE WEEKDAY AXIS NEVER GOES. It costs fourteen pixels once for the whole
+       sheet, and there is no weekend wash by law — in this trade Saturday is
+       the best working day — so without the names you cannot tell which column
+       is Saturday except by counting from a number. The axis is the reading. -->
+  <div class="cal__wkh">
+    <span></span>
+    {#each wkLabels as wd (wd)}
+      <span class="cal__weekday">{wd}</span>
+    {/each}
+  </div>
   {#each weeks as week, wi (wi)}
     {@const wlc = weekLaneCount(week)}
+    {@const marks = weekMarks(week)}
+    <!-- A ROW OF THE MONTH IS A WEEK, and each week is its own block: a gutter
+         that counts it, then its seven days. -->
+    <div class="cal__wk" style="--wf: {weekFill(week)}">
+      <div class="cal__wkg">
+        <span class="cal__wkn">{isoWeekLabel(isoWeek(week[0].iso))}</span>
+        <span class="cal__wkd" title={weekMarksTitle(marks)}>
+          {#each marks as m, mi (mi)}<i class="cal__wkm" data-mark={m}></i>{/each}
+        </span>
+      </div>
+      <div class="cal__wkc">
     {#each week as day, di (day.iso)}
       {@const perfs = performancesByDay.get(day.iso) ?? []}
       {@const dateGroups = groupDates(datesByDay.get(day.iso) ?? [])}
@@ -617,6 +720,8 @@
         {/if}
       </div>
     {/each}
+      </div>
+    </div>
   {/each}
 </div>
 
@@ -632,15 +737,93 @@
 
 <style>
   @layer components {
+    /* THE SHEET · a stack of week blocks, not one flat grid of 42 cells.
+       A row of the month IS a week, and a week that has to carry a gutter, a
+       density row and a band spanning columns cannot be seven loose cells of
+       somebody else's grid. */
     .cal__grid {
-      display: grid;
-      grid-template-columns: repeat(7, minmax(0, 1fr));
+      --cal-wk-gutter: 66px;
+      --cal-cell-h: 128px;
+      display: flex;
+      flex-direction: column;
       border: 1px solid var(--border-color-light);
       border-radius: var(--radius-l);
       overflow: hidden;
-      background: var(--border-color-light);
-      gap: 1px;
+      background: var(--card);
       transition: opacity var(--transition);
+    }
+    .cal__wkh {
+      display: grid;
+      grid-template-columns: var(--cal-wk-gutter) repeat(7, minmax(0, 1fr));
+      border-block-end: 1px solid var(--border-color-light);
+    }
+    .cal__wk {
+      display: grid;
+      grid-template-columns: var(--cal-wk-gutter) minmax(0, 1fr);
+      border-block-end: 1px solid var(--border-color-light);
+    }
+    .cal__wk:last-child {
+      border-block-end: 0;
+    }
+    /* The gutter counts the week WITHOUT WORDS. */
+    .cal__wkg {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 5px;
+      padding: 9px 9px 10px 0;
+      border-inline-end: 1px solid var(--border-color-light);
+    }
+    .cal__wkn {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+    }
+    .cal__wkd {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+    }
+    /* solid = a confirmed gig · ring = an option · rule = a working day that is
+       not a gig · faint dot = a night still free. */
+    .cal__wkm {
+      flex: none;
+      inline-size: 5px;
+      block-size: 5px;
+      border-radius: 50%;
+    }
+    .cal__wkm[data-mark='firm'] {
+      background: var(--text-muted);
+    }
+    .cal__wkm[data-mark='held'] {
+      box-shadow: 0 0 0 1px var(--text-faint) inset;
+    }
+    .cal__wkm[data-mark='busy'] {
+      inline-size: 5px;
+      block-size: 1px;
+      border-radius: 0;
+      background: color-mix(in oklch, var(--text-faint) 60%, transparent);
+    }
+    .cal__wkm[data-mark='free'] {
+      inline-size: 3px;
+      block-size: 3px;
+      background: color-mix(in oklch, var(--text-faint) 40%, transparent);
+    }
+    .cal__wkm[data-mark='out'] {
+      background: none;
+    }
+    /* The seven days. The 1px rules ARE the grid — a background-image column
+       ruling, so a cell can never be pushed out of alignment by a border. */
+    .cal__wkc {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      align-items: stretch;
+      background-image: linear-gradient(to right, var(--border-color-light) 0 1px, transparent 1px);
+      background-size: calc(100% / 7) 100%;
+      background-position: -1px 0;
+      background-repeat: repeat-x;
     }
 
     .cal__grid--loading {
@@ -658,14 +841,16 @@
     }
 
     .cal__day {
-      background: var(--bg);
-      min-block-size: 6.5rem;
-      padding: var(--space-xs);
+      /* The CELL decides what a slip can afford — measured, never declared. */
+      container-type: inline-size;
+      position: relative;
+      min-block-size: calc(var(--cal-cell-h) * var(--wf, 1));
+      min-inline-size: 0;
       display: flex;
       flex-direction: column;
-      gap: var(--space-2xs);
-      min-inline-size: 0;
-      position: relative;
+      padding: 1px 5px 10px;
+      overflow: hidden;
+      background: var(--card);
     }
 
     /* The invitation appears WHERE YOU POINT, and it is the cell's own empty
@@ -1056,10 +1241,18 @@
        so a confirmed day inside a tentative run shows as itself and the
        strip tells the truth about a half-confirmed week. The chip bleeds
        into the cell padding so the run crosses the grid's hairline. */
+    /* THE RUN NO LONGER BLEEDS INTO ITS NEIGHBOUR. It used to simulate a band
+       with negative inline margins, which worked while the sheet was ONE flat
+       grid of 42 cells: the bleed landed inside the next cell of the same grid.
+       Now that a week is its own block, the bleed escapes the week and prints
+       past the right edge of the sheet — visible on 2026-07-31 with a Sat→Sun
+       rehearsal.
+       The real fix is the law this drawing still owes: a thing that lasts more
+       than a day is ONE element that spans columns (`grid-column: a / b`), not
+       N chips glued edge to edge. Until that lands the run stays inside its own
+       day, which is honest and does not lie about where the week ends. */
     .cal__grid :global(.cal__event--run) {
-      margin-inline: calc(-1 * var(--space-xs));
-      padding-inline: var(--space-xs);
-      border-inline: 0;
+      margin-inline: 0;
       border-radius: 0;
     }
     .cal__grid :global(.cal__event--run-first) {

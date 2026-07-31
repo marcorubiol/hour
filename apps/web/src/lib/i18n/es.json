@@ -366,5 +366,13 @@
   "planner.stat_holds_one": "opción",
   "planner.stat_free_one": "noche libre",
   "planner.stat_free": "noches libres",
-  "planner.calm_state": "calma · solo confirmados"
+  "planner.calm_state": "calma · solo confirmados",
+  "planner.week_n": "semana",
+  "planner.week_confirmed": "confirmados",
+  "planner.week_options": "opciones",
+  "planner.week_free": "noches libres",
+  "planner.week_nothing": "nada aún",
+  "planner.more_n": "más",
+  "planner.released": "soltado",
+  "planner.expires_on": "vence {day}"
 }

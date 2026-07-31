@@ -366,5 +366,13 @@
   "planner.stat_holds_one": "opció",
   "planner.stat_free_one": "nit lliure",
   "planner.stat_free": "nits lliures",
-  "planner.calm_state": "calma · només confirmats"
+  "planner.calm_state": "calma · només confirmats",
+  "planner.week_n": "setmana",
+  "planner.week_confirmed": "confirmats",
+  "planner.week_options": "opcions",
+  "planner.week_free": "nits lliures",
+  "planner.week_nothing": "res encara",
+  "planner.more_n": "més",
+  "planner.released": "deixat anar",
+  "planner.expires_on": "venç {day}"
 }
