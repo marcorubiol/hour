@@ -22,10 +22,17 @@
     /** Blackout entry points hide while availability/team feeds are absent. */
     canBlackout: boolean;
     locale: Locale;
-    onPrevMonth: () => void;
-    onNextMonth: () => void;
-    onThisMonth: () => void;
-    onScrollToToday: () => void;
+    /**
+     * THE WINDOW'S THREE CONTROLS, and they live in THIS row — before the
+     * view words, which is where the design puts them.
+     *
+     * They step whatever the drawing's window IS (a month, a day, the
+     * agenda's start), so the page owns the arithmetic and hands down three
+     * verbs. `onNow` moves you to the present in whatever drawing you are in.
+     */
+    onStepBack: () => void;
+    onStepNext: () => void;
+    onNow: () => void;
     onSetView: (v: PlannerView) => void;
     onSetLaneAxis: (g: LaneAxis) => void;
     onCreate: () => void;
@@ -44,10 +51,9 @@
     calm,
     canBlackout,
     locale,
-    onPrevMonth,
-    onNextMonth,
-    onThisMonth,
-    onScrollToToday,
+    onStepBack,
+    onStepNext,
+    onNow,
     onSetView,
     onSetLaneAxis,
     onCreate,
@@ -74,7 +80,35 @@
      instead of a form. It was a label («Group by») on a row of its own, which
      is what made nine states of the board look like nine views. -->
 <div class="cal__toolbar">
-  <span class="cal__viewlead">{t('planner.view_label', locale)}</span>
+  <!-- THE WINDOW'S CONTROLS OPEN THE ROW, before the view words.
+
+       They were up with the title, on the argument that a date you can walk
+       through is one object. Marco's own prototype puts them here, and here
+       they are also SMALL — 28px squares and a 12px pill — because the thing
+       they must not do is compete with the words beside them: those name the
+       drawing, these only move the window inside it.
+
+       And the button is `Now`, NOT `Today`. Adjacent to a view called Today,
+       the same word at the same weight seventy pixels apart is two different
+       acts wearing one label — the one defect in this band that can lose
+       somebody their place without telling them why. `Now` moves the window;
+       `Today` names a drawing, like Agenda, Month and Board do. -->
+  <span class="cal__nav">
+    <button
+      type="button"
+      class="cal__arw"
+      aria-label={t('planner.prev_month', locale)}
+      onclick={onStepBack}>‹</button
+    >
+    <button
+      type="button"
+      class="cal__arw"
+      aria-label={t('planner.next_month', locale)}
+      onclick={onStepNext}>›</button
+    >
+  </span>
+  <button type="button" class="cal__now" onclick={onNow}>{t('planner.now', locale)}</button>
+  <span class="cal__sep" aria-hidden="true"></span>
   <div class="cal__views" role="group" aria-label={t('planner.view_label', locale)}>
     {#each VIEW_ORDER as v (v)}
       <button
@@ -105,10 +139,16 @@
   <div class="cal__spacer"></div>
 
   <!-- `＋ date` is the one solid thing here: everything else in this row reads,
-       this one writes. -->
-  <Button size="s" onclick={onCreate} label={t('planner.new_date', locale)}>＋</Button>
+       this one writes. It says WHAT it makes — a bare `+` in a planner is the
+       one glyph that could mean anything the app can create — and it sits at
+       the row's own height, because a control that outgrows its band starts
+       announcing itself instead of waiting to be used. -->
+  <button type="button" class="cal__add" onclick={onCreate}
+    >＋ <span>{t('planner.date_word', locale)}</span></button
+  >
   <Menu
     align="end"
+    triggerClass="cal__kebab"
     label={t('planner.more', locale)}
     items={[
       { label: t('planner.read_marks', locale), onclick: onReadMarks },
@@ -129,15 +169,59 @@
 
 <style>
   @layer components {
-    /* ── BAND 2 · the view, 21px serif, full ink ────────────────────── */
-    .cal__viewlead {
-      font-family: var(--font-mono);
-      font-size: 9.5px;
-      letter-spacing: 0.14em;
-      text-transform: uppercase;
-      color: var(--text-faint);
-      align-self: center;
+    /* ── the window's controls · deliberately the smallest things here ──
+       Verbatim from the prototype: 28px squares, an 8px corner, 13px glyph;
+       the pill at 12px with 5/12 padding. The `VIEW` lead word that used to
+       open this row went with them — the nav is what precedes the words in
+       the design, and two labels in that slot is one too many. */
+    .cal__nav {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
     }
+    .cal__arw {
+      inline-size: 28px;
+      block-size: 28px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      border: 1px solid var(--border-color-light);
+      border-radius: 8px;
+      background: var(--bg-ultra-light);
+      color: var(--text-faint);
+      font-size: 13px;
+      line-height: 1;
+      cursor: pointer;
+    }
+    .cal__arw:hover {
+      color: var(--text-color);
+      border-color: var(--text-faint);
+    }
+    .cal__now {
+      padding: 5px 12px;
+      border: 1px solid var(--border-color-light);
+      border-radius: 100px;
+      background: var(--bg-ultra-light);
+      color: var(--text-faint);
+      font-family: inherit;
+      font-size: 12px;
+      line-height: 1.1;
+      cursor: pointer;
+    }
+    .cal__now:hover {
+      color: var(--text-color);
+    }
+    /* A hairline, not a gap: the window's controls and the view words are two
+       different acts, and eight pixels of air does not say so. */
+    .cal__sep {
+      inline-size: 1px;
+      block-size: 20px;
+      background: var(--border-color-light);
+      margin-inline: var(--space-2xs);
+    }
+
+    /* ── BAND 2 · the view, 21px serif, full ink ────────────────────── */
     .cal__views {
       display: flex;
       align-items: baseline;
@@ -217,6 +301,57 @@
     }
     .cal__spacer {
       flex: 1;
+    }
+
+    /* ── the two on the right, at the row's own height ────────────────
+       They were the shared `Button` at size `s` — 44px tall next to a 28px
+       arrow, so the loudest objects in the band were the two that do the
+       least reading. Same 28px and the same 8px corner as the arrows: one
+       row, one height. */
+    .cal__add {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      block-size: 28px;
+      padding-inline: 11px;
+      border: 1px solid var(--text-color);
+      border-radius: 8px;
+      background: var(--text-color);
+      color: var(--bg);
+      font-size: 13px;
+      line-height: 1;
+      cursor: pointer;
+    }
+    .cal__add span {
+      font-family: var(--font-mono);
+      font-size: 9.5px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+    .cal__add:hover {
+      background: var(--text-muted);
+      border-color: var(--text-muted);
+    }
+    /* The kebab lives inside `Menu`, so it is reached through its
+       `triggerClass` and scoped by this row rather than styled globally. */
+    .cal__toolbar :global(.cal__kebab) {
+      inline-size: 28px;
+      block-size: 28px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      border: 1px solid var(--border-color-light);
+      border-radius: 8px;
+      background: var(--bg-ultra-light);
+      color: var(--text-faint);
+      font-size: 13px;
+      line-height: 1;
+      cursor: pointer;
+    }
+    .cal__toolbar :global(.cal__kebab:hover) {
+      color: var(--text-color);
+      border-color: var(--text-faint);
     }
 
 

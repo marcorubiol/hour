@@ -386,5 +386,7 @@
   "planner.no_cast": "sense repartiment",
   "planner.agenda_from": "des de {day}",
   "planner.week_range": "setmanes {a} → {b}",
-  "planner.new_date": "Nova data"
+  "planner.new_date": "Nova data",
+  "planner.now": "Ara",
+  "planner.date_word": "data"
 }

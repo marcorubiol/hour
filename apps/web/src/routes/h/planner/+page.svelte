@@ -1746,19 +1746,6 @@
 <section class="cal">
   <LensHeader>
     {#snippet title()}<LensTitle text={view === 'day' ? dayLabel : monthLabel} />{/snippet}
-    {#snippet titleAside()}
-      <!-- THE ARROWS AND `today` GO WITH THE TITLE: they are the controls OF
-           the date, and a date you can walk through is ONE object. Down in the
-           row of views they read as a fourth way to change the drawing. -->
-      <Button variant="outline" size="s" onclick={stepBack} label={t('planner.prev_month', locale)}
-        >‹</Button
-      >
-      <Button variant="outline" size="s" onclick={stepNext} label={t('planner.next_month', locale)}
-        >›</Button
-      >
-      <Button variant="outline" size="s" onclick={goToday}>{t('planner.today', locale)}</Button>
-    {/snippet}
-
   </LensHeader>
 
   {#if !calm.on && !errorMsg && !decisionsAbsent && (decisionVMs.length > 0 || concurrenceVMs.length > 0)}
@@ -1789,10 +1776,9 @@
     calm={calm.on}
     {canBlackout}
     {locale}
-    onPrevMonth={prevMonth}
-    onNextMonth={nextMonth}
-    onThisMonth={thisMonth}
-    onScrollToToday={scrollToToday}
+    onStepBack={stepBack}
+    onStepNext={stepNext}
+    onNow={goToday}
     onSetView={setView}
     onSetLaneAxis={setLaneAxis}
     onCreate={() => openCreate()}

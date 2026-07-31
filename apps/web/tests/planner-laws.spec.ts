@@ -124,12 +124,49 @@ test.describe('planner laws (ADR-095)', () => {
     ]);
   });
 
-  test('THE ARROWS AND `today` RIDE WITH THE TITLE', async ({ page }) => {
-    // They are the controls OF the date. Down in the row of views they read as
-    // a fourth way to change the drawing.
+  test('THE WINDOW’S CONTROLS OPEN THE VIEW ROW, and they are the smallest things in it', async ({
+    page,
+  }) => {
+    // Marco's prototype puts `‹ › Now` here, BEFORE the view words — and small.
+    // They only move the window; the words beside them name the drawing, and a
+    // control must not outweigh the thing it operates on.
     await planner(page, 'month');
-    await expect(page.locator('.lenshead__aside button')).toHaveCount(3);
-    await expect(page.locator('.cal__toolbar button', { hasText: /^‹|›$/ })).toHaveCount(0);
+    await expect(page.locator('.cal__toolbar .cal__arw')).toHaveCount(2);
+    await expect(page.locator('.cal__toolbar .cal__now')).toHaveCount(1);
+    // Nothing left up with the title but the title and the lens switcher.
+    await expect(page.locator('.lenshead__aside')).toHaveCount(0);
+
+    const geom = await page.evaluate(() => {
+      const r = (s: string) => document.querySelector(s)?.getBoundingClientRect() ?? null;
+      const arw = r('.cal__arw');
+      const now = r('.cal__now');
+      const first = r('.cal__view');
+      const lit = r('.cal__view--on');
+      const add = r('.cal__add');
+      const keb = r('.cal__kebab');
+      return {
+        arwLeft: arw?.left ?? -1,
+        nowLeft: now?.left ?? -1,
+        wordLeft: first?.left ?? -1,
+        arwH: Math.round(arw?.height ?? -1),
+        nowH: Math.round(now?.height ?? -1),
+        addH: Math.round(add?.height ?? -1),
+        kebH: Math.round(keb?.height ?? -1),
+        litH: Math.round(lit?.height ?? -1),
+      };
+    });
+    // Order: arrows, then Now, then the words.
+    expect(geom.arwLeft).toBeLessThan(geom.nowLeft);
+    expect(geom.nowLeft).toBeLessThan(geom.wordLeft);
+    // ONE ROW, ONE HEIGHT — the four controls agree, and none of them towers
+    // over the lit view word.
+    expect(geom.arwH).toBe(28);
+    expect(geom.addH).toBe(28);
+    expect(geom.kebH).toBe(28);
+    expect(geom.nowH).toBeLessThanOrEqual(28);
+    expect(geom.arwH, 'a control outgrew the word it operates on').toBeLessThanOrEqual(
+      geom.litH + 6,
+    );
   });
 
   test('THE DATE IS SAID ONCE', async ({ page }) => {

@@ -395,5 +395,7 @@
   "planner.no_cast": "no cast",
   "planner.agenda_from": "from {day} onwards",
   "planner.week_range": "weeks {a} → {b}",
-  "planner.new_date": "New date"
+  "planner.new_date": "New date",
+  "planner.now": "Now",
+  "planner.date_word": "date"
 }
