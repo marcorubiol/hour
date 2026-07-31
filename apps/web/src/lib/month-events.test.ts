@@ -8,7 +8,14 @@
  */
 
 import { describe, expect, test } from 'vitest';
-import { runSheetSteps, perfInstant, type PerformanceEvent } from './month-events';
+import {
+  runSheetSteps,
+  perfInstant,
+  performanceSlip,
+  dateSlip,
+  type PerformanceEvent,
+  type DateEvent,
+} from './month-events';
 
 function perf(over: Partial<PerformanceEvent> = {}): PerformanceEvent {
   return {
@@ -81,5 +88,148 @@ describe('perfInstant (unchanged by the adapter)', () => {
     expect(perfInstant(perf({ load_in_at: 'a', start_at: 'b' }))).toBe('a');
     expect(perfInstant(perf({ start_at: 'b' }))).toBe('b');
     expect(perfInstant(perf())).toBeNull();
+  });
+});
+
+/**
+ * The slip normaliser (ADR-095 §0).
+ *
+ * These pin the LAWS, not the fields. The design's argument is that four
+ * drawings render one object, so the moment a second implementation of "what
+ * is a slip" appears, the month and the board start drifting — which is
+ * exactly the history this normaliser exists to end.
+ */
+const CTX = {
+  workspaceSlug: 'fallback',
+  workspaceSlugById: new Map([['ws1', 'muk-cia']]),
+  workspaceTzById: new Map([['ws1', 'Europe/Madrid']]),
+  viewerTz: 'Europe/Madrid',
+  kindLabel: (k: string) => k.replace(/_/g, ' '),
+  // Deterministic stand-in: primary is the venue zone, secondary only when
+  // the two zones differ — the real `dualTime` law, without Intl in a test.
+  dualTime: (at: string, tz: string | null, viewerTz: string) => ({
+    primary: `${at.slice(11, 16)}@${tz ?? 'none'}`,
+    secondary: tz && tz !== viewerTz ? `${at.slice(11, 16)}@${viewerTz}` : null,
+  }),
+};
+
+const PROJ = { id: 'p1', slug: 'mamemi', name: 'MaMeMi', workspace_id: 'ws1' };
+
+function gig(over: Partial<PerformanceEvent> = {}): PerformanceEvent {
+  return {
+    id: 'perf1',
+    slug: 'terrassa-18',
+    performed_at: '2026-07-18',
+    status: 'confirmed',
+    start_at: '2026-07-18T20:00:00Z',
+    venue_name: null,
+    city: null,
+    country: null,
+    line_id: null,
+    project: PROJ,
+    venue: null,
+    ...over,
+  };
+}
+
+function dateRow(over: Partial<DateEvent> = {}): DateEvent {
+  return {
+    id: 'd1',
+    kind: 'rehearsal',
+    status: 'confirmed',
+    title: null,
+    starts_at: '2026-07-18T10:00:00Z',
+    all_day: false,
+    venue_name: null,
+    city: null,
+    project: PROJ,
+    venue: null,
+    ...over,
+  };
+}
+
+describe('performanceSlip', () => {
+  test('a slip never prints the same place twice', () => {
+    // The name already fell back to the city, so the city line is suppressed.
+    const s = performanceSlip(gig({ city: 'Terrassa' }), CTX);
+    expect(s.name).toBe('Terrassa');
+    expect(s.city).toBeNull();
+  });
+
+  test('the name falls back venue → venue_name → city → project', () => {
+    expect(performanceSlip(gig({ venue: { name: 'L’Atlàntida', city: null, timezone: null } }), CTX).name)
+      .toBe('L’Atlàntida');
+    expect(performanceSlip(gig({ venue_name: 'Antic Teatre' }), CTX).name).toBe('Antic Teatre');
+    expect(performanceSlip(gig({ city: 'Olot' }), CTX).name).toBe('Olot');
+    expect(performanceSlip(gig(), CTX).name).toBe('MaMeMi');
+  });
+
+  test('a venue-less gig reads its home space clock, never the browser’s', () => {
+    // The zone its times were ENTERED in. Silently using the reader's would
+    // move the gig by an hour and nothing on screen would say so.
+    const s = performanceSlip(gig(), CTX);
+    expect(s.time?.primary).toContain('Europe/Madrid');
+  });
+
+  test('the second clock appears only when the two disagree — and it is a gloss', () => {
+    const away = performanceSlip(
+      gig({ venue: { name: 'Cafe OTO', city: 'London', country: 'gb', timezone: 'Europe/London' } }),
+      CTX,
+    );
+    expect(away.time?.secondary).not.toBeNull();
+    expect(performanceSlip(gig(), CTX).time?.secondary).toBeNull();
+  });
+
+  test('country is upper-cased ISO-2, and the DRAWING decides whether to print it', () => {
+    const s = performanceSlip(
+      gig({ venue: { name: 'Cafe OTO', city: 'London', country: 'gb', timezone: null } }),
+      CTX,
+    );
+    expect(s.country).toBe('GB');
+  });
+
+  test('cancelled normalises to released — the certainty, not the status', () => {
+    expect(performanceSlip(gig({ status: 'cancelled' }), CTX).cert).toBe('released');
+    expect(performanceSlip(gig({ status: 'hold_2' }), CTX).cert).toBe('hold');
+    expect(performanceSlip(gig(), CTX).cert).toBe('confirmed');
+  });
+
+  test('a gig with no hour has no time at all — never a dash', () => {
+    // A hold is a date somebody ASKED for, so most arrive without an hour.
+    // The absence is a fact; drawing `—` reads as an hour that failed to print.
+    expect(performanceSlip(gig({ start_at: null, status: 'hold' }), CTX).time).toBeNull();
+  });
+
+  test('href resolves through the workspace slug map, and is null without a slug', () => {
+    expect(performanceSlip(gig(), CTX).href).toBe('/h/muk-cia/performance/terrassa-18');
+    expect(performanceSlip(gig({ slug: null }), CTX).href).toBeNull();
+  });
+});
+
+describe('dateSlip', () => {
+  test('every kind survives verbatim — no translation table in the model', () => {
+    expect(dateSlip(dateRow({ kind: 'travel_day' }), CTX).kind).toBe('travel_day');
+    expect(dateSlip(dateRow({ kind: 'day_off' }), CTX).kind).toBe('day_off');
+  });
+
+  test('an all-day row has no clock', () => {
+    expect(dateSlip(dateRow({ all_day: true }), CTX).time).toBeNull();
+  });
+
+  test('a date names itself by title, then venue, then city, then its kind', () => {
+    expect(dateSlip(dateRow({ title: 'Assaig general' }), CTX).name).toBe('Assaig general');
+    expect(dateSlip(dateRow({ venue_name: 'La Caldera' }), CTX).name).toBe('La Caldera');
+    expect(dateSlip(dateRow({ city: 'Salt' }), CTX).name).toBe('Salt');
+    expect(dateSlip(dateRow(), CTX).name).toBe('rehearsal');
+  });
+
+  test('a cancelled date is released too — one vocabulary, both primitives', () => {
+    // If these two ever disagree the month draws two grammars on one sheet.
+    expect(dateSlip(dateRow({ status: 'cancelled' }), CTX).cert).toBe('released');
+    expect(dateSlip(dateRow({ status: 'tentative' }), CTX).cert).toBe('hold');
+  });
+
+  test('a date has no page of its own yet, so it carries no href', () => {
+    expect(dateSlip(dateRow(), CTX).href).toBeNull();
   });
 });

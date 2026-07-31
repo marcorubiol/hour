@@ -5,6 +5,8 @@
  * touching the component. Grid math stays in $lib/planner.
  */
 import { dayKeyInTz } from '$lib/planner';
+import { performanceStatusFamily, type StatusFamily } from '$lib/performance';
+import { dateStatusFamily } from '$lib/date';
 
 export type ProjectLite = {
   id: string;
@@ -137,6 +139,143 @@ export function monthName(year: number, month: number, locale = 'en-GB'): string
 /** ADR-078: the working time — load-in when known, else show start. */
 export function perfInstant(p: PerformanceEvent): string | null {
   return p.load_in_at ?? p.start_at;
+}
+
+/* ══ THE SLIP · ONE VOCABULARY FOR EVERYTHING THAT HAPPENS ══════════════
+   ADR-095 §0. The design draws ONE object in four placings — the month cell,
+   the board cell, the flow row and the day card carry the same fields in the
+   same order (pack · hour · state · name · city · gloss), and the only thing
+   that differs is WHERE THE HOUR LIVES. That is a law with teeth: it is the
+   reason the board's chip must BE the month's chip and not a lookalike.
+
+   A lookalike is exactly what we have. `PerformanceEvent` and `DateEvent` are
+   two shapes with two sets of accessors, `PerfChip` and `DateChip` are two
+   components, and the board invented a third grammar in `.strip__pip`. Three
+   implementations of one object is how the month came to print a country code
+   the board could not, and how a held gig and a tentative rehearsal ended up
+   with two ways of saying the same doubt.
+
+   So both primitives normalise HERE, into one `Slip`, and every drawing
+   renders that. `kind` and `cert` are the two words the design normalises to;
+   everything else is already shared.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/** What sort of thing this is. `show` is a performance; the rest are `date`
+    kinds, kept verbatim so the vocabulary never needs a translation table. */
+export type SlipKind =
+  | 'show'
+  | 'rehearsal'
+  | 'residency'
+  | 'travel_day'
+  | 'press'
+  | 'day_off'
+  | 'other';
+
+export type SlipTime = {
+  /** The venue's wall clock — the hour that is printed. */
+  primary: string;
+  /** The reader's clock, only when the two disagree. A GLOSS: it takes its
+      own line and can never push an hour out of its box. */
+  secondary: string | null;
+};
+
+/**
+ * One thing that happens, in the vocabulary every drawing reads.
+ *
+ * `name` is never truncated by any view (the design's own law, four
+ * violations old): a row is allowed to grow, and «Teatre Nacional de
+ * Cataluny…» is a name you cannot look up.
+ */
+export type Slip = {
+  id: string;
+  kind: SlipKind;
+  cert: StatusFamily;
+  /** Venue, or the best name this thing has. Never the same string as `city`. */
+  name: string;
+  city: string | null;
+  /** ISO-2. The month drops it (the cell gives 57px and city+code needs
+      58–70); the board and the day print it. The DRAWING decides, not this. */
+  country: string | null;
+  time: SlipTime | null;
+  project: ProjectLite | null;
+  /** Where the thing lives, or null when it has no page of its own. */
+  href: string | null;
+  /** Full sentence for the `title` attribute — the one place a truncated or
+      dropped field is still recoverable. */
+  title: string;
+};
+
+type SlipContext = {
+  workspaceSlug: string;
+  workspaceSlugById: Map<string, string>;
+  workspaceTzById: Map<string, string | undefined>;
+  viewerTz: string;
+  /** Injected so this file stays free of i18n — the caller owns the words. */
+  kindLabel: (kind: SlipKind) => string;
+  dualTime: (
+    at: string,
+    tz: string | null,
+    viewerTz: string,
+  ) => { primary: string; secondary: string | null };
+};
+
+/** A city is only a second line when it is not already the name. A slip never
+    prints the same place twice. */
+function cityUnder(name: string, city: string | null | undefined): string | null {
+  const c = city ?? null;
+  return c && c !== name ? c : null;
+}
+
+export function performanceSlip(p: PerformanceEvent, ctx: SlipContext): Slip {
+  const name = p.venue?.name ?? p.venue_name ?? p.city ?? p.project?.name ?? 'Performance';
+  const at = perfInstant(p);
+  // A venue-less gig falls back to its home space's zone — the one its times
+  // were entered in — never silently the browser's.
+  const tz = p.venue?.timezone ?? ctx.workspaceTzById.get(p.project?.workspace_id ?? '') ?? null;
+  const time = at ? ctx.dualTime(at, tz, ctx.viewerTz) : null;
+  const ws = ctx.workspaceSlugById.get(p.project?.workspace_id ?? '') ?? ctx.workspaceSlug;
+  const cc = p.venue?.country ?? p.country ?? null;
+  const base = `${name} — ${p.status.replace(/_/g, ' ')}`;
+  return {
+    id: p.id,
+    kind: 'show',
+    cert: performanceStatusFamily(p.status),
+    name,
+    city: cityUnder(name, p.venue?.city ?? p.city),
+    country: cc ? cc.toUpperCase() : null,
+    time,
+    project: p.project,
+    href: p.slug && p.project ? `/h/${ws}/performance/${p.slug}` : null,
+    title: time
+      ? time.secondary
+        ? `${base} · ${time.primary} (${time.secondary} yours)`
+        : `${base} · ${time.primary}`
+      : base,
+  };
+}
+
+export function dateSlip(d: DateEvent, ctx: SlipContext): Slip {
+  const kind = (d.kind as SlipKind) ?? 'other';
+  const name = d.title ?? d.venue_name ?? d.city ?? ctx.kindLabel(kind);
+  // A venue-less DATE stays on the reader's clock on purpose: it buckets on
+  // the reader's day (dateDayKey), and a slip must not print a wall time from
+  // a zone other than the one that placed it in its cell.
+  const tz = d.venue?.timezone ?? null;
+  const time = d.all_day ? null : ctx.dualTime(d.starts_at, tz, ctx.viewerTz);
+  const cc = d.country ?? null;
+  const base = `${ctx.kindLabel(kind)} — ${d.status.replace(/_/g, ' ')}`;
+  return {
+    id: d.id,
+    kind,
+    cert: dateStatusFamily(d.status),
+    name,
+    city: cityUnder(name, d.city),
+    country: cc ? cc.toUpperCase() : null,
+    time,
+    project: d.project,
+    href: null,
+    title: time ? `${name} · ${base} · ${time.primary}` : `${name} · ${base}`,
+  };
 }
 
 /** One moment of the day, in order. `key` is a vocabulary, not a string to
