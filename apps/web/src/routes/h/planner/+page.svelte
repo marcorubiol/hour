@@ -64,6 +64,7 @@
     type LaneVM,
   } from '$lib/components/planner/CarrilsStrip.svelte';
   import CalToolbar from '$lib/components/planner/CalToolbar.svelte';
+  import Button from '$lib/components/Button.svelte';
   import CalLegend from '$lib/components/planner/CalLegend.svelte';
   import DayStrip from '$lib/components/planner/DayStrip.svelte';
   import { performanceThread, dateThread, stripWindow, hourOf } from '$lib/day-strip';
@@ -101,7 +102,7 @@
     normalizePlannerView,
     nightsFree,
     daysCoveredBy,
-  } from '$lib/planner';
+    isoWeek,} from '$lib/planner';
   import {
     buildPersonScope,
     peopleOf,
@@ -1201,6 +1202,15 @@
     if (y !== cur.year || m !== cur.month) ym = { year: y, month: m };
   });
 
+  /** The Day's title IS its date — the whole day, spelled out. */
+  let dayLabel = $derived(
+    new Date(`${selectedDay}T00:00:00Z`).toLocaleDateString(localeTag, {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+      timeZone: 'UTC',
+    }),
+  );
   let dayWin = $derived(stripWindow(dayThreads));
   let dayNow = $derived(selectedDay === todayIso ? hourOf(new Date().toISOString(), viewerTz) : null);
 
@@ -1539,6 +1549,19 @@
       ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
   /** `T` — one verb, and each projection knows what "today" means for it. */
+  /** The window steps by whatever the drawing's window IS. */
+  function stepBack() {
+    if (view === 'day') {
+      dayIso = addDaysIso(selectedDay, -1);
+      syncUrl();
+    } else prevMonth();
+  }
+  function stepNext() {
+    if (view === 'day') {
+      dayIso = addDaysIso(selectedDay, 1);
+      syncUrl();
+    } else nextMonth();
+  }
   function goToday() {
     if (view === 'agenda') scrollToToday();
     else if (view === 'day') {
@@ -1705,8 +1728,74 @@
 
 <section class="cal">
   <LensHeader>
-    {#snippet title()}<LensTitle text={monthLabel} />{/snippet}
-    {#snippet sub()}
+    {#snippet title()}<LensTitle text={view === 'day' ? dayLabel : monthLabel} />{/snippet}
+    {#snippet titleAside()}
+      <!-- THE ARROWS AND `today` GO WITH THE TITLE: they are the controls OF
+           the date, and a date you can walk through is ONE object. Down in the
+           row of views they read as a fourth way to change the drawing. -->
+      {#if view !== 'agenda'}
+        <Button variant="outline" size="s" onclick={stepBack} label={t('planner.prev_month', locale)}
+          >‹</Button
+        >
+        <Button variant="outline" size="s" onclick={stepNext} label={t('planner.next_month', locale)}
+          >›</Button
+        >
+      {/if}
+      <Button variant="outline" size="s" onclick={goToday}>{t('planner.today', locale)}</Button>
+    {/snippet}
+
+  </LensHeader>
+
+  {#if !calm.on && !errorMsg && !decisionsAbsent && (decisionVMs.length > 0 || concurrenceVMs.length > 0)}
+    <!-- Decision band (ADR-080 §4) — shared by all projections. Mounted
+         for concurrences alone too: the quiet tier is "es VEU, no crida"
+         (§3), so it must be seeable even when nothing is per decidir —
+         it still never counts, never marks, never turns urgent. -->
+    <DecisionBand
+      decisions={decisionVMs}
+      concurrences={concurrenceVMs}
+      open={decisionsOpen}
+      onToggle={setDecisionsOpen}
+      onConfirm={(id) => $decideMutation.mutate({ id, status: 'confirmed' })}
+      onRelease={(id) => $decideMutation.mutate({ id, status: 'cancelled' })}
+      pendingId={decisionPendingId}
+      {locale}
+      {localeTag}
+      id="cal-decisions"
+    />
+  {/if}
+
+
+
+  <CalToolbar
+    onReadMarks={() => (marksOpen = true)}
+    {view}
+    {laneAxis}
+    calm={calm.on}
+    {canBlackout}
+    {locale}
+    onPrevMonth={prevMonth}
+    onNextMonth={nextMonth}
+    onThisMonth={thisMonth}
+    onScrollToToday={scrollToToday}
+    onSetView={setView}
+    onSetLaneAxis={setLaneAxis}
+    onCreate={() => openCreate()}
+    onFeed={openFeed}
+    onBlackout={() => {
+      // Direct menu path: no day context — drop any stale preset from a
+      // cancelled day-cell create (the dialog defaults to today). The
+      // create-dialog footer path keeps its day.
+      createDate = null;
+      openBlackout();
+    }}
+  />
+
+  <!-- BAND 3 · THE META, under the view row — the order the design fixes:
+       the window answers, the view names the drawing, and only then the
+       machine speaks. It used to sit between the title and the views, so the
+       9.5px mono line cut the two serif scales apart. -->
+  <p class="cal__meta">
       <!-- Pulse strip (ADR-080 §6) — every figure maps to fetched rows; a
            segment whose feed is absent (or count is zero) drops instead of
            lying. The shared .lenshead__sub inserts the · between items. -->
@@ -1749,6 +1838,19 @@
              say what it IS: a book opened at a day. Without this the band went
              silent when the counters were gated, which is honest and mute; the
              law asks for honest and legible. -->
+        <!-- BAND 3 · THE META, and it opens with the GRAIN. `weeks 27 → 31` is
+             the one thing that says a row of the month is a WEEK without
+             announcing it: the range proves what a row is. The Day has no
+             range to give — a day counts itself — and the agenda's horizon
+             grows, so neither prints one. -->
+        {#if view === 'month' || view === 'board'}
+          <span class="cal__stat cal__stat--soft"
+            >{t('planner.week_range', locale, {
+              a: String(isoWeek(monthFirst)),
+              b: String(isoWeek(monthLast)),
+            })}</span
+          >
+        {/if}
         {#if view === 'agenda'}
           <span class="cal__stat cal__stat--soft"
             >{t('planner.agenda_from', locale, {
@@ -1793,51 +1895,7 @@
           >
         {/if}
       {/if}
-    {/snippet}
-  </LensHeader>
-
-  {#if !calm.on && !errorMsg && !decisionsAbsent && (decisionVMs.length > 0 || concurrenceVMs.length > 0)}
-    <!-- Decision band (ADR-080 §4) — shared by all projections. Mounted
-         for concurrences alone too: the quiet tier is "es VEU, no crida"
-         (§3), so it must be seeable even when nothing is per decidir —
-         it still never counts, never marks, never turns urgent. -->
-    <DecisionBand
-      decisions={decisionVMs}
-      concurrences={concurrenceVMs}
-      open={decisionsOpen}
-      onToggle={setDecisionsOpen}
-      onConfirm={(id) => $decideMutation.mutate({ id, status: 'confirmed' })}
-      onRelease={(id) => $decideMutation.mutate({ id, status: 'cancelled' })}
-      pendingId={decisionPendingId}
-      {locale}
-      {localeTag}
-      id="cal-decisions"
-    />
-  {/if}
-
-  <CalToolbar
-    onReadMarks={() => (marksOpen = true)}
-    {view}
-    {laneAxis}
-    calm={calm.on}
-    {canBlackout}
-    {locale}
-    onPrevMonth={prevMonth}
-    onNextMonth={nextMonth}
-    onThisMonth={thisMonth}
-    onScrollToToday={scrollToToday}
-    onSetView={setView}
-    onSetLaneAxis={setLaneAxis}
-    onCreate={() => openCreate()}
-    onFeed={openFeed}
-    onBlackout={() => {
-      // Direct menu path: no day context — drop any stale preset from a
-      // cancelled day-cell create (the dialog defaults to today). The
-      // create-dialog footer path keeps its day.
-      createDate = null;
-      openBlackout();
-    }}
-  />
+    </p>
 
   {#if errorMsg}
     <p class="cal__state cal__state--danger">{errorMsg}</p>
@@ -1961,6 +2019,35 @@
       display: flex;
       flex-direction: column;
       gap: var(--space-m);
+    }
+
+    /* BAND 3 · the machine. Mono 9.5px in caps — one of the three scales the
+       head runs on (window 29px serif · view 21px serif · meta 9.5px mono). */
+    .cal__meta {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: var(--space-2xs) var(--space-s);
+      margin: 0 0 var(--space-s);
+      font-family: var(--font-mono);
+      font-size: 9.5px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+    }
+    .cal__meta :global(.cal__stat) {
+      white-space: nowrap;
+    }
+    /* Each part is its own nowrap unit, and the `·` is inserted BETWEEN them —
+       so a part that drops (no trips, no urgent) takes its separator with it. */
+    .cal__meta :global(.cal__stat + .cal__stat)::before {
+      content: '·';
+      margin-inline-end: var(--space-s);
+      color: var(--border-color-dark);
+    }
+    .cal__meta :global(.cal__stat b) {
+      font-weight: 400;
+      color: var(--text-muted);
     }
 
     /* The masthead (title + switcher + stats) is now the shared LensHeader

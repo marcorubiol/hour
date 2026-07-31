@@ -377,9 +377,11 @@
   "planner.expires_on": "vence {day}",
   "planner.no_hour": "sin hora",
   "planner.all_day": "todo el día",
-  "planner.view_day": "Día",
+  "planner.view_day": "Hoy",
   "planner.day_empty": "Nada en este día.",
   "planner.day_axis": "el día",
   "planner.no_cast": "sin reparto",
-  "planner.agenda_from": "desde {day}"
+  "planner.agenda_from": "desde {day}",
+  "planner.week_range": "semanas {a} → {b}",
+  "planner.new_date": "Nueva fecha"
 }

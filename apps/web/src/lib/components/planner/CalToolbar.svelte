@@ -35,6 +35,9 @@
     onBlackout: () => void;
   }
 
+  /** The order the design fixes, and the order the keys follow. */
+  const VIEW_ORDER = ['day', 'agenda', 'month', 'board'] as const;
+
   let {
     view,
     laneAxis,
@@ -54,68 +57,56 @@
   }: Props = $props();
 </script>
 
+<!-- THE ROW OF VIEWS (ADR-095 § «El encabezado: el título es la fecha»).
+
+     Three bands, three scales, three jobs: the WINDOW is the answer (29px
+     serif, up with the title), the VIEW is the drawing (21px serif, full ink),
+     and the META is the machine (9.5px mono). The view word keeps A STEP over
+     its siblings — knowing which drawing you are in at a glance is worth one
+     — and it does not need to be the title to have it.
+
+     THE ORDER NEVER CHANGES WITH THE STATE: Today · Agenda · Month · Board,
+     the same order as the keys 1 2 3 4.
+
+     And the dial is METADATA and looks like it: mono, in this row, right
+     behind the last view word, with ONE word of grammar — `Board by workspace
+     project person`. `by` is a preposition, so the row reads as a SENTENCE
+     instead of a form. It was a label («Group by») on a row of its own, which
+     is what made nine states of the board look like nine views. -->
 <div class="cal__toolbar">
-  <div class="cal__nav-buttons">
-    {#if view !== 'agenda'}
-      <!-- Month/Carrils step through `ym`; the agenda is a continuous
-           book (its own span) so the ←/→ window nav means nothing there. -->
-      <Button variant="outline" size="s" onclick={onPrevMonth} label={t('planner.prev_month', locale)}
-        >←</Button
+  <span class="cal__viewlead">{t('planner.view_label', locale)}</span>
+  <div class="cal__views" role="group" aria-label={t('planner.view_label', locale)}>
+    {#each VIEW_ORDER as v (v)}
+      <button
+        type="button"
+        class="cal__view"
+        class:cal__view--on={view === v}
+        aria-pressed={view === v}
+        onclick={() => onSetView(v)}>{t(`planner.view_${v}`, locale)}</button
       >
-      <!-- THE DATE IS SAID ONCE (ADR-095 §9). The page title IS the date, in
-           40px serif, four centimetres above; repeating it here was the same
-           fact twice on one screen. And it was sitting BETWEEN the two arrows,
-           so a control you press repeatedly had a variable-width label in the
-           middle of it — the month name changes width, so the ‹ and the › move
-           depending on which month you are in. -->
-      <Button variant="outline" size="s" onclick={onNextMonth} label={t('planner.next_month', locale)}
-        >→</Button
-      >
-    {/if}
-    <Button
-      variant="outline"
-      size="s"
-      onclick={view === 'agenda' ? onScrollToToday : onThisMonth}>{t('planner.today', locale)}</Button
-    >
+    {/each}
   </div>
+
+  {#if view === 'board'}
+    <span class="cal__dial">
+      <span class="cal__dial-by">{t('planner.lanes_label', locale)}</span>
+      {#each ['workspace', 'project', 'person'] as const as g (g)}
+        <button
+          type="button"
+          class="cal__dial-v"
+          class:cal__dial-v--on={laneAxis === g}
+          aria-pressed={laneAxis === g}
+          onclick={() => onSetLaneAxis(g)}>{t(`planner.lanes_${g}`, locale)}</button
+        >
+      {/each}
+    </span>
+  {/if}
+
   <div class="cal__spacer"></div>
-  <!-- THE STATUS FILTER IS GONE (ADR-095 §3). The app already has one machine
-       for narrowing and it is called scope, one line above. What survives is
-       CALM, and it survives as a word on the facts side of the state line —
-       never as a switch here. -->
-  <div class="cal__tabs" role="group" aria-label={t('planner.view_label', locale)}>
-    <!-- The words in the order the design gives them: Day · Agenda · Month ·
-         Board. The keyboard follows THE WORDS ON SCREEN, not fixed digits. -->
-    <button
-      type="button"
-      class="cal__tab"
-      class:cal__tab--on={view === 'day'}
-      aria-pressed={view === 'day'}
-      onclick={() => onSetView('day')}>{t('planner.view_day', locale)}</button
-    >
-    <button
-      type="button"
-      class="cal__tab"
-      class:cal__tab--on={view === 'month'}
-      aria-pressed={view === 'month'}
-      onclick={() => onSetView('month')}>{t('planner.view_month', locale)}</button
-    >
-    <button
-      type="button"
-      class="cal__tab"
-      class:cal__tab--on={view === 'agenda'}
-      aria-pressed={view === 'agenda'}
-      onclick={() => onSetView('agenda')}>{t('planner.view_agenda', locale)}</button
-    >
-    <button
-      type="button"
-      class="cal__tab"
-      class:cal__tab--on={view === 'board'}
-      aria-pressed={view === 'board'}
-      onclick={() => onSetView('board')}>{t('planner.view_board', locale)}</button
-    >
-  </div>
-  <Button size="s" onclick={onCreate} label={t('planner.new', locale)}>+</Button>
+
+  <!-- `＋ date` is the one solid thing here: everything else in this row reads,
+       this one writes. -->
+  <Button size="s" onclick={onCreate} label={t('planner.new_date', locale)}>＋</Button>
   <Menu
     align="end"
     label={t('planner.more', locale)}
@@ -136,26 +127,80 @@
   </Menu>
 </div>
 
-{#if view === 'board'}
-  <!-- Agrupa per (ADR-080 §8) — its own row, left-aligned; carrils only. -->
-  <div class="cal__grouprow" role="group" aria-label={t('planner.lanes_label', locale)}>
-    <span class="cal__group-lead">{t('planner.lanes_label', locale)}</span>
-    <div class="cal__tabs">
-      {#each ['workspace', 'project', 'person'] as const as g (g)}
-        <button
-          type="button"
-          class="cal__tab"
-          class:cal__tab--on={laneAxis === g}
-          aria-pressed={laneAxis === g}
-          onclick={() => onSetLaneAxis(g)}>{t(`planner.lanes_${g}`, locale)}</button
-        >
-      {/each}
-    </div>
-  </div>
-{/if}
-
 <style>
   @layer components {
+    /* ── BAND 2 · the view, 21px serif, full ink ────────────────────── */
+    .cal__viewlead {
+      font-family: var(--font-mono);
+      font-size: 9.5px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+      align-self: center;
+    }
+    .cal__views {
+      display: flex;
+      align-items: baseline;
+      gap: var(--space-m);
+    }
+    .cal__view {
+      border: 0;
+      background: none;
+      padding: 0;
+      cursor: pointer;
+      font-family: var(--font-display);
+      /* 21px, named by the design: the view is the middle of three scales —
+         window 29 · view 21 · meta 9.5 — and the token nearest it is 19.5,
+         which flattens the step the view word is supposed to keep. */
+      font-size: 21px;
+      font-weight: 400;
+      line-height: 1.1;
+      color: var(--text-faint);
+      transition: color 0.12s;
+    }
+    .cal__view:hover {
+      color: var(--text-muted);
+    }
+    /* The lit word is a STEP UP, not a different object: full ink and a rule.
+       It must not stand out from its siblings by becoming another shape. */
+    .cal__view--on {
+      color: var(--text-color);
+      border-block-end: 1.5px solid var(--text-color);
+    }
+
+    /* ── the dial · metadata, and it looks like it ───────────────────── */
+    .cal__dial {
+      display: inline-flex;
+      align-items: baseline;
+      gap: var(--space-xs);
+      margin-inline-start: var(--space-m);
+      align-self: center;
+    }
+    .cal__dial-by,
+    .cal__dial-v {
+      font-family: var(--font-mono);
+      font-size: 9.5px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+    }
+    .cal__dial-v {
+      border: 0;
+      background: none;
+      padding: 0;
+      cursor: pointer;
+    }
+    .cal__dial-v:hover {
+      color: var(--text-muted);
+    }
+    /* Full ink, a rule, and HALF A POINT of size. One point more and a mono
+       word in caps stops reading as the same list — it is a qualifier, not a
+       title. */
+    .cal__dial-v--on {
+      font-size: 10.5px;
+      color: var(--text-color);
+      border-block-end: 1px solid var(--text-color);
+    }
     /* Toolbar: ‹ month › · today · [projection] · [lanes] · + · ⋯ */
     .cal__toolbar {
       display: flex;
@@ -163,58 +208,14 @@
       gap: var(--space-s);
       flex-wrap: wrap;
     }
-    .cal__nav-buttons {
-      display: flex;
-      align-items: center;
-      gap: var(--space-xs);
-    }
     .cal__spacer {
       flex: 1;
     }
 
 
     /* Agrupa per (ADR-080 §8) — its own row under the toolbar, left-aligned. */
-    .cal__grouprow {
-      display: flex;
-      align-items: baseline;
-      gap: var(--space-s);
-    }
-    .cal__group-lead {
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      letter-spacing: var(--mono-letter-spacing-loose);
-      text-transform: uppercase;
-      color: var(--text-faint);
-      white-space: nowrap;
-    }
 
     /* Named projection toggle + Agrupa per — text tabs, active underlined
        (ADR-076: nunca un icono). Lighter than a pill: the word is the tab. */
-    .cal__tabs {
-      display: inline-flex;
-      align-items: baseline;
-      gap: var(--space-s);
-    }
-    .cal__tab {
-      border: none;
-      background: none;
-      padding: 0;
-      font-family: inherit;
-      font-size: var(--text-s);
-      line-height: 1.3;
-      color: var(--text-faint);
-      cursor: pointer;
-      white-space: nowrap;
-      border-block-end: 1.5px solid transparent;
-      transition: color var(--transition);
-    }
-    .cal__tab:hover {
-      color: var(--text-muted);
-    }
-    .cal__tab--on {
-      color: var(--text-color);
-      font-weight: 500;
-      border-block-end-color: var(--text-color);
-    }
   }
 </style>

@@ -20,13 +20,23 @@
     title: Snippet;
     /** the small ·-separated line below (indications / links); omit if none */
     sub?: Snippet;
+    /**
+     * Controls that belong TO THE TITLE, beside it (ADR-095): the Planner's
+     * `‹ › today` are the controls OF the date, and a date you can walk
+     * through is one object — so they ride with it instead of sitting in the
+     * row of controls, where they read as a fourth way to change the drawing.
+     */
+    titleAside?: Snippet;
   }
-  let { title, sub }: Props = $props();
+  let { title, sub, titleAside }: Props = $props();
 </script>
 
 <header class="lenshead">
   <div class="lenshead__titlerow">
     <h1 class="lenshead__title">{@render title()}</h1>
+    {#if titleAside}
+      <span class="lenshead__aside">{@render titleAside()}</span>
+    {/if}
     <LensSwitcher />
   </div>
   {#if sub}

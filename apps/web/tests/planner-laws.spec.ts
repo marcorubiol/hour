@@ -74,6 +74,57 @@ test.describe('planner laws (ADR-095)', () => {
     expect(clipped, 'these names are set to be cut with an ellipsis').toEqual([]);
   });
 
+  test('THE HEAD RUNS ON THREE SCALES, IN ORDER', async ({ page }) => {
+    // window (the answer) · view (the drawing) · meta (the machine). Getting
+    // the ORDER wrong is what put a 9.5px mono line between the two serif
+    // scales and cut the head in half; getting the SIZES wrong is what made
+    // the biggest body on the page a control and the smallest the answer.
+    await planner(page, 'month');
+    const head = await page.evaluate(() => {
+      const top = (s: string) => {
+        const el = document.querySelector(s);
+        return el ? Math.round(el.getBoundingClientRect().top) : -1;
+      };
+      const px = (s: string) => {
+        const el = document.querySelector(s);
+        return el ? Math.round(parseFloat(getComputedStyle(el).fontSize)) : -1;
+      };
+      return {
+        title: top('.lenshead__title'),
+        views: top('.cal__views'),
+        meta: top('.cal__meta'),
+        titlePx: px('.lenshead__title'),
+        viewPx: px('.cal__view'),
+        metaPx: px('.cal__meta'),
+      };
+    });
+    expect(head.title).toBeLessThan(head.views);
+    expect(head.views).toBeLessThan(head.meta);
+    expect(head.titlePx).toBeGreaterThan(head.viewPx);
+    expect(head.viewPx).toBeGreaterThan(head.metaPx);
+  });
+
+  test('THE VIEW WORDS KEEP THE DESIGN’S ORDER', async ({ page }) => {
+    // It never changes with the state, and it is the order the keys 1 2 3 4
+    // follow — so a reader who learns one has learned the other.
+    await planner(page, 'month');
+    const words = await page.locator('.cal__view').allInnerTexts();
+    expect(words.map((w) => w.trim().toLowerCase())).toEqual([
+      'today',
+      'agenda',
+      'month',
+      'board',
+    ]);
+  });
+
+  test('THE ARROWS AND `today` RIDE WITH THE TITLE', async ({ page }) => {
+    // They are the controls OF the date. Down in the row of views they read as
+    // a fourth way to change the drawing.
+    await planner(page, 'month');
+    await expect(page.locator('.lenshead__aside button')).toHaveCount(3);
+    await expect(page.locator('.cal__toolbar button', { hasText: /^‹|›$/ })).toHaveCount(0);
+  });
+
   test('THE DATE IS SAID ONCE', async ({ page }) => {
     // The page title IS the date. It used to be repeated in the toolbar,
     // BETWEEN the two arrows, so a control you press repeatedly had a
@@ -96,11 +147,11 @@ test.describe('planner laws (ADR-095)', () => {
   test('A DIAL EXISTS ONLY IN THE VIEW THAT OWNS IT', async ({ page }) => {
     // A URL carrying `lanes=person` over the Month is a URL that lies.
     await planner(page, 'month');
-    await expect(page.locator('.cal__grouprow')).toHaveCount(0);
+    await expect(page.locator('.cal__dial')).toHaveCount(0);
     expect(page.url()).not.toContain('lanes=');
 
     await planner(page, 'board');
-    await expect(page.locator('.cal__grouprow')).toHaveCount(1);
+    await expect(page.locator('.cal__dial')).toHaveCount(1);
     expect(page.url()).toContain('lanes=');
   });
 
@@ -138,11 +189,11 @@ test.describe('planner laws (ADR-095)', () => {
     // An inert control on screen is a promise the drawing cannot keep.
     await planner(page, 'month');
     const inert = await page.evaluate(() =>
-      [...document.querySelectorAll<HTMLButtonElement>('.cal__tab')].filter((b) => b.disabled).length,
+      [...document.querySelectorAll<HTMLButtonElement>('.cal__view')].filter((b) => b.disabled).length,
     );
     expect(inert).toBe(0);
     // All four projections are reachable.
-    await expect(page.locator('.cal__tab')).toHaveCount(4);
+    await expect(page.locator('.cal__view')).toHaveCount(4);
   });
 
   test('THE FOUR VIEWS SURVIVE A RELOAD — the state is in the URL', async ({ page }) => {

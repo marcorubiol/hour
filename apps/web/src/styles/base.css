@@ -1708,6 +1708,15 @@
     padding-block-end: var(--space-s);
     border-block-end: 1px solid var(--border-color-light);
   }
+  /* The controls OF the date, beside it — never in the row that changes the
+     drawing (ADR-095). `margin-right: auto` keeps them next to the title
+     instead of drifting to the far edge with the lens switcher. */
+  .lenshead__aside {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2xs);
+    margin-inline-end: auto;
+  }
   .lenshead__title {
     margin: 0;
     font-family: var(--font-display);
