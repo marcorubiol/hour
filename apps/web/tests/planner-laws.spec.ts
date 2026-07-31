@@ -389,3 +389,51 @@ test.describe('the monogram', () => {
     }
   });
 });
+
+test.describe('the clash', () => {
+  test.skip(!EMAIL || !PASSWORD, 'Set PW_TEST_EMAIL / PW_TEST_PASSWORD.');
+
+  test('THE MARK AND THE RULE NEVER DISAGREE ABOUT HOW BAD IT IS', async ({ page }) => {
+    // One day printed a BLUE `!` on the number and a RED rule down the two
+    // cards beneath it — two levels of alarm about one collision. The rule's
+    // colour is now bound to the mark's own test (people/blackout → red,
+    // everything else → the «decide» blue), so the two cannot drift apart.
+    await planner(page, 'month');
+    const days = await page.evaluate(() =>
+      [...document.querySelectorAll('.cal__wkc')].flatMap((wk) =>
+        [...wk.querySelectorAll('.cal__day')]
+          .map((cell, i) => {
+            const rules = [...cell.querySelectorAll('.slip[data-clash]')];
+            if (rules.length === 0) return null;
+            const num = wk.querySelectorAll('.cal__num')[i];
+            const mark = num?.querySelector('.cal__mark');
+            return {
+              markRed: mark ? getComputedStyle(mark).color : null,
+              ruleRed: rules.map((r) => getComputedStyle(r).borderLeftColor),
+            };
+          })
+          .filter(Boolean),
+      ),
+    );
+    // Every day that draws a rule also draws a mark: the rule is the pair, the
+    // mark is the day, and a pair implies a day.
+    for (const d of days) {
+      expect(d!.markRed, 'a clash rule with no mark above it').not.toBeNull();
+      // Same hue family on both. `!` and the rule are the same fact.
+      // Third field, and NEVER the last one: `color-mix` emits an alpha
+      // (`oklch(L C H / A)`), so a greedy «last number before the paren» reads
+      // 0.65 as the hue and every mixed rule looks like a disagreement. The
+      // law was wrong, not the drawing — checked against the real values.
+      const HUE = /oklch\(\s*[\d.%]+\s+[\d.]+\s+([\d.]+)/;
+      const markHue = HUE.exec(d!.markRed!)?.[1];
+      for (const rule of d!.ruleRed) {
+        const ruleHue = HUE.exec(rule)?.[1];
+        if (markHue && ruleHue) {
+          expect(Math.abs(Number(markHue) - Number(ruleHue)), 'mark and rule disagree').toBeLessThan(
+            40,
+          );
+        }
+      }
+    }
+  });
+});

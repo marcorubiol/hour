@@ -75,6 +75,16 @@
      * the clock matters the hold chip says so, in words.
      */
     clash?: 'none' | 'soft' | 'hard';
+    /**
+     * The collision is about a PERSON — the same human booked twice, or
+     * booked across an absence they wrote down. It is the one case where an
+     * alarm is honest, so it is the one case that takes red.
+     *
+     * Two axes, two props, because they are two facts: `clash` is how certain
+     * the collision is (the STROKE), this is how bad it is (the COLOUR).
+     * Folding them into one value is how a «solid» started meaning «urgent».
+     */
+    clashPeople?: boolean;
   }
 
   let {
@@ -86,6 +96,7 @@
     onMarkOpen,
     onOpen,
     clash = 'none',
+    clashPeople = false,
   }: Props = $props();
 
   let state = $derived(stateLabel(slip));
@@ -172,6 +183,7 @@
     data-family={slip.cert}
     data-kind={slip.kind}
     data-clash={clash === 'none' ? undefined : clash}
+    data-clash-people={clash !== 'none' && clashPeople ? '' : undefined}
     style={slip.project ? `--c: ${accentVarFor(slip.project)}` : undefined}
     href={slip.href}
     title={slip.title}>{@render body()}</a
@@ -183,6 +195,7 @@
     data-family={slip.cert}
     data-kind={slip.kind}
     data-clash={clash === 'none' ? undefined : clash}
+    data-clash-people={clash !== 'none' && clashPeople ? '' : undefined}
     style={slip.project ? `--c: ${accentVarFor(slip.project)}` : undefined}
     title={slip.title}
     onclick={onOpen}>{@render body()}</button
@@ -193,6 +206,7 @@
     data-family={slip.cert}
     data-kind={slip.kind}
     data-clash={clash === 'none' ? undefined : clash}
+    data-clash-people={clash !== 'none' && clashPeople ? '' : undefined}
     style={slip.project ? `--c: ${accentVarFor(slip.project)}` : undefined}
     title={slip.title}>{@render body()}</span
   >
@@ -433,40 +447,42 @@
       color: var(--text-faint);
     }
 
-    /* ══ THE CLASH · one red rule down the two slips it is between ══════
-       Red is conflict, and ONLY conflict — the one place in the Planner it is
-       allowed to sit still. The rule is painted on exactly the pair the data
-       names, never on «every gig on this day»: three things can sit on one
-       date and only two of them are the collision.
+    /* ══ THE CLASH · one rule down the two slips it is between ══════════
+       IT IS BLUE BY DEFAULT, and that is a product decision: this app does
+       not raise alarms. A collision on a calendar is a thing to DECIDE, and
+       `--info` is already the colour that says exactly that here — the hold's
+       running deadline wears it. Red everywhere was also inconsistent on its
+       own terms: the mark on the day number is blue for the same fact, so one
+       day printed two different levels of alarm about one collision.
 
-       It survives the option's dashed edge because the two say different
-       things — the edge says «not sure», the rule says «not both» — and it
-       takes the LEFT edge, which is the only edge no other state uses.
+       RED SURVIVES FOR ONE CASE, and it is bound to the mark's own test so
+       the two can never disagree again: the collision is about a PERSON — the
+       same human booked twice, or booked across an absence they wrote down.
+       That is the one place an alarm is honest, and keeping it rare is what
+       keeps it legible the day it fires.
 
-       GRAVITY, NOT CERTAINTY. Two holds colliding is a collision of two
-       maybes: the rule is drawn, but dashed. The moment one of them is inked
-       it goes solid and full weight. A running deadline does NOT promote it:
-       when the clock matters the hold chip says so, in words. */
-    /* THIN. The rule is a hairline that says «not both», not a bar that
-       competes with the card it is attached to — at 2/3px it read as a status
-       stripe and became the loudest thing in the cell. 1.5 dashed and 2 solid
-       keep the step between «two maybes» and «one is real» while staying a
-       rule. */
-    /* IT IS THE CARD'S OWN EDGE, and it keeps the card's corners. The design
-       squares them, and squaring them is what made Marco read the rule as a
-       rail bolted to the outside: a box rounded on two corners and square on
-       the other two looks like two objects. Curved with the rest of the
-       outline it is unmistakably one — the same edge, in another colour,
-       saying another thing. */
+       The rule is painted on exactly the pair the data names, never on «every
+       gig on this day»: three things can sit on one date and only two of them
+       are the collision. It survives the option's dashed EDGE because the two
+       say different things — the edge says «not sure», the rule says «not
+       both» — and it takes the LEFT edge, the only one no other state uses.
+
+       ONE WIDTH. The certainty is in the STROKE — dashed while this is an
+       option, solid once it is real — so the weight has nothing left to say.
+       Colour and width doing one job is one variable too many. */
     .slip[data-clash] {
+      --clash-ink: var(--info);
       border-inline-start: 1.5px dashed
-        color-mix(in oklch, var(--danger) 62%, var(--border-color-light));
+        color-mix(in oklch, var(--clash-ink) 62%, var(--border-color-light));
+    }
+    .slip[data-clash-people] {
+      --clash-ink: var(--danger);
     }
     .slip[data-clash='hard'] {
-      border-inline-start-width: 2px;
       border-inline-start-style: solid;
-      border-inline-start-color: var(--danger);
+      border-inline-start-color: var(--clash-ink);
     }
+
     /* NO BRIDGE ACROSS THE GAP, and the reason is the corner. The design
        squares the two left corners and joins the pair with a straight 4px
        stub between the boxes. Once the corners keep their curve — which is

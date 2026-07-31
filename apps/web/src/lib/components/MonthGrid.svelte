@@ -323,10 +323,11 @@
   function clashFlags(
     lead: Array<{ slip: SlipVM }>,
     clashes: ClashVM[],
-  ): { on: boolean[]; hard: boolean[] } {
+  ): { on: boolean[]; hard: boolean[]; people: boolean[] } {
     const ids = new Set(clashes.flatMap((c) => c.event_ids));
     const on = lead.map((e) => ids.has(e.slip.id));
-    if (on.filter(Boolean).length < 2) return { on: on.map(() => false), hard: on.map(() => false) };
+    const none = on.map(() => false);
+    if (on.filter(Boolean).length < 2) return { on: none, hard: none, people: none };
     /* THE RULE SPEAKS ABOUT THE CARD IT IS DRAWN ON. Solid when THIS thing is
        real, dashed while it is still an option.
 
@@ -342,7 +343,22 @@
        uses: geometry states the certainty, per object. A solid red rule on a
        dashed-edged option card is two claims about one thing. */
     const hard = lead.map((e, i) => on[i] && e.slip.cert === 'confirmed');
-    return { on, hard };
+    /* RED IS BOUND TO THE MARK'S OWN TEST. The `!` on the day number goes red
+       for `people` and `blackout` — a real human double-booked, or booked
+       across an absence they wrote down — and the rule beside it must use the
+       same test or the same day prints two levels of alarm about one fact.
+       That contradiction is exactly what Marco read on 9 July: a blue mark
+       next to a red rule. */
+    const people = lead.map(
+      (e, i) =>
+        on[i] &&
+        clashes.some(
+          (c) =>
+            (c.severity === 'people' || c.severity === 'blackout') &&
+            c.event_ids.includes(e.slip.id),
+        ),
+    );
+    return { on, hard, people };
   }
 
   /** verb-cal only while the clock is actually running (ADR-080 §2). */
@@ -916,6 +932,7 @@
             stateUrgent={isUrgentHold(entry.slip)}
             showCountry={false}
             clash={cf.on[ei] ? (cf.hard[ei] ? 'hard' : 'soft') : 'none'}
+            clashPeople={cf.people[ei]}
             onMarkOpen={openMark}
             onOpen={entry.dateRow && onDateOpen ? () => onDateOpen?.(entry.dateRow!) : undefined}
           />
