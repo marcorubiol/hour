@@ -49,6 +49,8 @@
   import { workspacesQueryOptions } from '$lib/nav-queries';
   import { accentVarFor } from '$lib/utils/accent';
   import IdentityMark from '$lib/components/IdentityMark.svelte';
+  import Slip from '$lib/components/planner/Slip.svelte';
+  import { performanceSlip, dateSlip } from '$lib/month-events';
   import { performanceStatusFamily, performanceStatusLabel } from '$lib/performance';
   import { dateStatusFamily } from '$lib/date';
 
@@ -166,6 +168,11 @@
   let workspaceTzById = $derived(
     new Map(($workspacesQuery.data?.items ?? []).map((w) => [w.id, w.timezone])),
   );
+  /** ADR-002 — the hold convention, per workspace: `1st hold` only means
+      something where the company runs a priority queue. */
+  let workspaceModeById = $derived(
+    new Map(($workspacesQuery.data?.items ?? []).map((w) => [w.id, w.booking_mode ?? 'simple'])),
+  );
 
   // ── Rows per day ───────────────────────────────────────────────────────
   type Row =
@@ -199,6 +206,45 @@
   });
 
   // The book shows every day of the span — no inclusion filter.
+  /* ONE NORMALISER FOR THE WHOLE PLANNER. The diary hands its two primitives
+     to the same `performanceSlip` / `dateSlip` the month uses, so a field can
+     never mean one thing here and another there. */
+  let slipCtx = $derived({
+    workspaceSlug,
+    workspaceSlugById,
+    workspaceTzById,
+    workspaceModeById,
+    viewerTz,
+    kindLabel: (k: string) => dateKindLabel(k),
+    dualTime,
+  });
+  /** Released says `let go`; a hold says its rank and, if the clock is
+      running, when. A firm gig and a proposal both say nothing — the
+      geometry carries them (ADR-095 §4). */
+  function slipState(sl: ReturnType<typeof dateSlip>): string | null {
+    if (sl.cert === 'released') return releasedWord;
+    if (sl.cert === 'hold' && sl.hold) {
+      const rank = sl.hold.rank ? statusLabel(`hold_${sl.hold.rank}`) : statusLabel('hold');
+      return sl.hold.expires ? `${rank} · ${localeWeekdayShort(sl.hold.expires, locale)}` : rank;
+    }
+    return null;
+  }
+  /** The pair a clash names — the same test the month uses, so the rule and
+      the day mark can never disagree about how bad it is. */
+  function clashOf(row: Row): { clash: 'none' | 'soft' | 'hard'; people: boolean } {
+    const id = row.kind === 'perf' ? row.perf.id : row.date.id;
+    const day = row.kind === 'perf' ? perfDayKey(row.perf) : dateDayKey(row.date, viewerTz);
+    const list = clashesByDay?.get(day) ?? [];
+    const mine = list.filter((c) => c.event_ids?.includes(id));
+    if (mine.length === 0) return { clash: 'none', people: false };
+    const confirmed =
+      row.kind === 'perf' && performanceStatusFamily(row.perf.status) === 'confirmed';
+    return {
+      clash: confirmed ? 'hard' : 'soft',
+      people: mine.some((c) => c.severity === 'people' || c.severity === 'blackout'),
+    };
+  }
+
   let shownDays = $derived(days);
 
   /* ── THE WEEK IS A BAND, AND A QUIET RUN IS ONE LINE ───────────────────
@@ -264,8 +310,23 @@
           j++;
         const len = j - i + 1;
         const key = `r${day}`;
-        if (len >= RUN_MIN && !openRuns.has(key)) {
+        // A RUN NEVER SWALLOWS TODAY. Today is usually a free day, so the
+        // collapse I just added could remove the one row `Now` navigates to —
+        // and then the button silently did nothing, which is exactly what
+        // Marco hit. A day you can be sent to has to exist.
+        const holdsToday = day <= todayIso && todayIso <= shownDays[j];
+        // A WEEK THAT IS ENTIRELY FREE SAYS IT ONCE. Its band already reads
+        // «7 nights free»; a run under it reading «7 days free» is the same
+        // sentence twice, and it was the loudest pattern in the whole diary
+        // — every quiet week printed two identical lines.
+        const wholeWeek = out[out.length - 1]?.t === 'week' && len >= 7;
+        if (len >= RUN_MIN && !holdsToday && !wholeWeek && !openRuns.has(key)) {
           out.push({ t: 'run', key, from: day, to: shownDays[j], n: len });
+          i = j + 1;
+          continue;
+        }
+        if (wholeWeek && !holdsToday && !openRuns.has(key)) {
+          // …and it draws no day rows at all: the band was the answer.
           i = j + 1;
           continue;
         }
@@ -648,14 +709,11 @@
           <span class="ag__num">{Number(day.slice(8, 10))}</span>
         </header>
         <div class="ag__rows">
-          {#each banners as c, ci (ci)}
-            <p class="ag__clash" data-severity={c.severity}>
-              <span class="ag__clash-mark" data-severity={c.severity} aria-hidden="true"
-                >!</span
-              >
-              <span class="ag__clash-text">{c.body}</span>
-            </p>
-          {/each}
+          <!-- NO BANNER BOXES. A clash used to print a grey slab per pair
+               above the day — «! No team data — could clash.» twice over —
+               while the two rows it was about sat underneath saying nothing.
+               The rule down the pair says WHICH two, in place, and the margin
+               card says what to do about it. Three tellings became one. -->
           {#each items as it, ii (ii)}
             {#if 'contest' in it}
               <div class="ag__contest" data-severity={it.contest.dec.severity}>
@@ -706,117 +764,36 @@
 </div>
 
 {#snippet eventRow(row: Row)}
-  <!-- THE IDENTITY OPENS THE ROW (ADR-095). Three columns: a fixed identity
-       column, the name, and a slot reserved for the verbs.
-
-       In the identity column the PACK comes first — monogram + the kind word —
-       then the state, and the HOUR SITS UNDER THEM. That is the one place the
-       Flow differs from the month on purpose: here the hour is a COLUMN of the
-       sheet, so it aligns down the page and you can scan time with your eye.
-       Before this the row opened with the hour and buried the project in a
-       second line of the BODY, so the token the whole app is colour-coded by
-       was the last thing you reached. -->
-  {#if row.kind === 'perf'}
-    {@const p = row.perf}
-    {@const t = perfDual(p)}
-    {@const href = perfHref(p)}
-    {@const family = performanceStatusFamily(p.status)}
-    {@const held = family === 'hold' || family === 'proposed'}
-    <svelte:element
-      this={href ? 'a' : 'div'}
-      class="ag__row ag__row--perf"
-      data-family={family}
-      style={p.project ? `--c: ${accentVarFor(p.project)}` : undefined}
-      href={href ?? undefined}
-    >
-      <span class="ag__id">
-        <span class="ag__pack">
-          {#if p.project}<IdentityMark
-              mini
-              variant="compact"
-              accent={accentVarFor(p.project)}
-              initials={p.project.initials}
-              name={p.project.name}
-            />{/if}
-          <span class="ag__kind" class:ag__kind--q={held}
-            >{showWord}{#if held}?{/if}</span
-          >
-        </span>
-        {#if family === 'hold'}
-          <!-- Plain text, never a pill: a pill here reads louder than the venue
-               you came to read. It is allowed to turn a line in 118px. -->
-          <span class="ag__hold">{statusLabel(p.status)}</span>
-        {:else if family === 'released'}
-          <span class="ag__hold">{releasedWord}</span>
-        {/if}
-        <!-- NO HOUR IS A FACT, not a typographic shrug. A hold is a date
-             somebody ASKED for, so most arrive without one; a dash reads as an
-             hour that failed to print. -->
-        <span class="ag__time" class:ag__time--none={!t?.primary}
-          >{t?.primary ? hourMark(t.primary) : noHourWord}</span
-        >
-        {#if t?.secondary}<span class="ag__courtesy">{viewerTimeLabel(hourMark(t.secondary))}</span>{/if}
-      </span>
-      <span class="ag__body">
-        <!-- The name is NEVER truncated: a row may grow, and «Teatre Nacional
-             de Cataluny…» is a name you cannot look up. The city sits UNDER
-             it — one line for what it is, one for where it is. -->
-        <span class="ag__title">{perfName(p)}</span>
-        {#if perfCity(p)}<span class="ag__city">{perfCity(p)}</span>{/if}
-      </span>
-      <span class="ag__acts"></span>
-    </svelte:element>
-  {:else}
-    {@const d = row.date}
-    {@const t = dateDual(d)}
-    {@const fam = dateStatusFamily(d.status)}
-    {@const held = fam === 'hold' || fam === 'proposed'}
-    <svelte:element
-      this={onDateOpen ? 'button' : 'div'}
-      class="ag__row ag__row--date"
-      class:ag__row--openable={onDateOpen}
-      class:ag__row--travel={d.kind === 'travel_day'}
-      data-family={fam}
-      style={d.project ? `--c: ${accentVarFor(d.project)}` : undefined}
-      {...rowShellProps(d)}
-    >
-      <span class="ag__id">
-        <span class="ag__pack">
-          {#if d.project}<IdentityMark
-              mini
-              variant="compact"
-              accent={accentVarFor(d.project)}
-              initials={d.project.initials}
-              name={d.project.name}
-            />{/if}
-          <span class="ag__kind" class:ag__kind--q={held}
-            >{dateKindLabel(d.kind)}{#if held}?{/if}</span
-          >
-        </span>
-        {#if fam === 'released'}
-          <span class="ag__hold">{releasedWord}</span>
-        {/if}
-        {#if d.all_day}
-          <span class="ag__time ag__time--none">{allDayWord}</span>
-        {:else}
-          <span class="ag__time" class:ag__time--none={!t?.primary}
-            >{t?.primary ? hourMark(t.primary) : noHourWord}</span
-          >
-        {/if}
-        {#if t?.secondary}<span class="ag__courtesy">{viewerTimeLabel(hourMark(t.secondary))}</span>{/if}
-      </span>
-      <span class="ag__body">
-        <span class="ag__title">{d.kind === 'travel_day' ? travelText(d) : dateText(d)}</span>
-        {#if d.city && d.kind !== 'travel_day'}<span class="ag__city">{d.city}</span>{/if}
-      </span>
-      <span class="ag__acts"></span>
-    </svelte:element>
-  {/if}
+  <!-- THE DIARY DRAWS THE MONTH'S SLIP. It used to draw `ag__row`, a
+       hand-built lookalike that had already drifted: no country code, a
+       different released treatment, its own hold wording, no clash rule, and
+       a verbs column that was reserved and never filled. That is exactly the
+       history ADR-095 §0 exists to end — «three implementations of one card
+       is how the month came to print a country code the board could not».
+       One object, one vocabulary; the diary only asks for the `row` PLACING,
+       where the clock sits under the pack so hours align down the page. -->
+  {@const slip =
+    row.kind === 'perf'
+      ? performanceSlip(row.perf, slipCtx)
+      : dateSlip(row.date, slipCtx)}
+  {@const flags = clashOf(row)}
+  <Slip
+    {slip}
+    placing="row"
+    kindLabel={(k) => (k === 'show' ? showWord : dateKindLabel(k))}
+    stateLabel={slipState}
+    stateUrgent={false}
+    showCountry={true}
+    clash={flags.clash}
+    clashPeople={flags.people}
+    onOpen={row.kind === 'date' && onDateOpen ? () => onDateOpen?.(row.date) : undefined}
+  />
 {/snippet}
+
 
 <style>
   @layer components {
-    .ag {
+.ag {
       /* One neutral availability accent for every person (never per-person
          hues); company blackouts sink to ink. */
       --ag-black-accent: var(--cal-accent, var(--warning));
@@ -826,16 +803,15 @@
       align-content: start;
       transition: opacity var(--transition);
     }
-    /* The book stacks in column 1; the notes margin spans every row in 2. */
+/* The book stacks in column 1; the notes margin spans every row in 2. */
     .ag > :not(.ag__notes) {
       grid-column: 1;
       min-inline-size: 0;
     }
-    .ag--loading {
+.ag--loading {
       opacity: 0.6;
     }
-
-    /* ── NOTES margin — a dot-grid bullet-journal column on the right. ── */
+/* ── NOTES margin — a dot-grid bullet-journal column on the right. ── */
     .ag__notes {
       grid-column: 2;
       grid-row: 1 / -1;
@@ -850,7 +826,7 @@
       background-position: 18px 44px;
       z-index: 0;
     }
-    .ag__notes-head {
+.ag__notes-head {
       position: sticky;
       top: 0;
       display: block;
@@ -861,16 +837,14 @@
       text-transform: uppercase;
       color: var(--text-faint);
     }
-
-    .ag__empty {
+.ag__empty {
       padding-block: var(--space-xl);
       text-align: center;
       font-family: var(--font-display);
       font-style: italic;
       color: var(--text-faint);
     }
-
-    /* Top "earlier months" — quiet, centered, prepends with anchoring. */
+/* Top "earlier months" — quiet, centered, prepends with anchoring. */
 
     /* ── Serif month divider — the book's chapter head. ── */
     /* ── THE WEEK'S BAND · number, range, shape ───────────────────────
@@ -890,14 +864,14 @@
       text-transform: uppercase;
       color: var(--text-faint);
     }
-    .ag__week-n {
+.ag__week-n {
       color: var(--text-muted);
     }
-    .ag__week-t {
+.ag__week-t {
       margin-inline-start: auto;
       text-align: end;
     }
-    /* ── A RUN OF QUIET DAYS · one line, and a door back to the days ───── */
+/* ── A RUN OF QUIET DAYS · one line, and a door back to the days ───── */
     .ag__run {
       display: flex;
       align-items: baseline;
@@ -910,10 +884,10 @@
       text-transform: uppercase;
       color: var(--text-faint);
     }
-    .ag__run-n {
+.ag__run-n {
       color: var(--text-muted);
     }
-    .ag__run-do {
+.ag__run-do {
       margin-inline-start: auto;
       padding: 0;
       border: 0;
@@ -924,11 +898,10 @@
       color: var(--text-faint);
       cursor: pointer;
     }
-    .ag__run-do:hover {
+.ag__run-do:hover {
       color: var(--text-color);
     }
-
-    .ag__monthdiv {
+.ag__monthdiv {
       display: flex;
       align-items: baseline;
       gap: var(--space-s);
@@ -936,22 +909,21 @@
       padding-inline-start: var(--space-xs);
       font-weight: 400;
     }
-    .ag__monthdiv:first-child {
+.ag__monthdiv:first-child {
       margin-block-start: var(--space-2xs);
     }
-    .ag__monthdiv-name {
+.ag__monthdiv-name {
       font-family: var(--font-display);
       font-size: var(--text-xl);
       color: var(--text-color);
     }
-    .ag__monthdiv-year {
+.ag__monthdiv-year {
       font-family: var(--font-mono);
       font-size: var(--text-xs);
       letter-spacing: var(--mono-letter-spacing-loose);
       color: var(--text-faint);
     }
-
-    /* ── Day group: header column + rows, a ledger rule beneath. ── */
+/* ── Day group: header column + rows, a ledger rule beneath. ── */
     .ag__day {
       position: relative;
       display: grid;
@@ -959,26 +931,25 @@
       align-items: start;
       border-block-end: 1px solid var(--border-color-light);
     }
-    .ag__day--empty {
+.ag__day--empty {
       min-block-size: 2.5rem;
     }
-
-    .ag__head {
+.ag__head {
       display: flex;
       flex-direction: column;
       padding: var(--space-s) 0 var(--space-xs) var(--space-xs);
     }
-    .ag__day--empty .ag__head {
+.ag__day--empty .ag__head {
       padding-block: var(--space-xs);
     }
-    .ag__wd {
+.ag__wd {
       font-family: var(--font-mono);
       font-size: var(--text-xs);
       letter-spacing: var(--mono-letter-spacing-loose);
       text-transform: uppercase;
       color: var(--text-faint);
     }
-    .ag__num {
+.ag__num {
       font-family: var(--font-display);
       font-size: var(--text-xxl);
       line-height: 1.05;
@@ -986,254 +957,44 @@
       font-variant-numeric: tabular-nums;
       margin-block-start: var(--space-2xs);
     }
-    .ag__day--empty .ag__num {
+.ag__day--empty .ag__num {
       font-size: var(--text-l);
       color: var(--text-muted);
     }
-    .ag__day--today .ag__wd,
+.ag__day--today .ag__wd,
     .ag__day--today .ag__num {
       color: var(--ag-black-accent);
     }
-
-    .ag__rows {
+.ag__rows {
       padding-block: var(--space-s);
       padding-inline-end: calc(var(--ag-rail-reserve) + var(--space-s));
       min-inline-size: 0;
     }
-    .ag__day:not(.ag__day--empty) .ag__rows {
+.ag__day:not(.ag__day--empty) .ag__rows {
       border-inline-start: 1px solid var(--border-color-light);
     }
-    .ag__day--empty .ag__rows {
+.ag__day--empty .ag__rows {
       padding-block: var(--space-xs);
       min-block-size: 0;
     }
-
-    /* ── Row DNA: meta[time·status | badge] · body. ── */
-    .ag__row {
-      position: relative;
-      display: grid;
-      /* identity · the name · the verbs' reserved slot. The identity column is
-         fixed so the names line up down the page; the verb slot is reserved so
-         the row cannot change height when the pointer crosses it. */
-      grid-template-columns: 7.5rem minmax(0, 1fr) auto;
-      gap: 0 var(--space-m);
-      align-items: baseline;
-      padding: var(--space-xs) var(--space-s) var(--space-xs) var(--space-m);
-      color: inherit;
-      text-decoration: none;
-      border-radius: var(--radius-s);
-    }
-    a.ag__row:hover,
-    .ag__row--openable:hover {
-      background: var(--bg-light);
-    }
-    /* An openable date row is a <button>: undo the widget defaults the
+/* An openable date row is a <button>: undo the widget defaults the
        grid layout above assumes (font, centred text, intrinsic width,
-       chrome border) without touching the row DNA itself. */
-    .ag__row--openable {
-      inline-size: 100%;
-      border: none;
-      background: none;
-      font: inherit;
-      text-align: start;
-      cursor: pointer;
-    }
-    /* Timeline node on the day line — the status family redeclares the
-       node variables (solid = confirmed, outline = hold, faint = rest). */
-    .ag__row::before {
-      --node-bg: var(--bg);
-      --node-border: var(--border-color-dark);
-      content: '';
-      position: absolute;
-      inset-inline-start: calc(-1 * var(--space-2xs) - 3.5px);
-      top: 0.85em;
-      inline-size: 7px;
-      block-size: 7px;
-      border-radius: var(--radius-circle);
-      background: var(--node-bg);
-      border: 1.5px solid var(--node-border);
-    }
-    .ag__row--perf[data-family='confirmed']::before {
-      --node-bg: var(--c, var(--text-muted));
-      --node-border: var(--c, var(--text-muted));
-    }
-    .ag__row--perf[data-family='hold']::before {
-      --node-border: var(--c, var(--border-color-dark));
-    }
-
-    .ag__meta {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-2xs);
-      min-inline-size: 0;
-    }
-    .ag__time {
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      font-variant-numeric: tabular-nums;
-      color: var(--text-muted);
-      white-space: nowrap;
-    }
-    .ag__time--date {
-      color: var(--text-faint);
-    }
-    /* Status pill — bordered, project-accent tinted (CONFIRMAT / 1R HOLD). */
-    .ag__state {
-      align-self: flex-start;
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      letter-spacing: var(--mono-letter-spacing);
-      text-transform: uppercase;
-      color: color-mix(in oklch, var(--c, var(--text-muted)) 55%, var(--text-muted));
-      border: 1px solid color-mix(in oklch, var(--c, var(--border-color-dark)) 40%, var(--border-color-light));
-      border-radius: var(--radius-s);
-      padding: 1px var(--space-xs);
-      white-space: nowrap;
-    }
-    .ag__row--perf[data-family='hold'] .ag__state {
-      border-style: dashed;
-    }
-    /* Type badge for dates — ASSAIG / PREMSA / VIATGE … */
-    .ag__badge {
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      letter-spacing: var(--mono-letter-spacing-loose);
-      text-transform: uppercase;
-      color: var(--text-faint);
-      white-space: nowrap;
-    }
-
-    .ag__body {
-      min-inline-size: 0;
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-2xs);
-    }
-    /* NO VIEW TRUNCATES A NAME (ADR-095). A row is allowed to grow, and
+/* NO VIEW TRUNCATES A NAME (ADR-095). A row is allowed to grow, and
        «Teatre Nacional de Cataluny…» is a name you cannot look up. The
        ellipsis was not arbitrary — the name used to be `nowrap` with VISIBLE
        overflow and printed over the row's actions — but wrapping fixes that
        too: inside a `minmax(0, 1fr)` column a wrapped name cannot leave its
-       track. */
-    .ag__title {
-      font-size: var(--text-s);
-      color: var(--text-color);
-      overflow: visible;
-      text-overflow: clip;
-      white-space: normal;
-      text-wrap: pretty;
-      overflow-wrap: break-word;
-      line-height: 1.2;
-    }
-    .ag__title b {
-      font-weight: 600;
-    }
-    /* ── THE ROW · three columns (ADR-095) ────────────────────────────
+/* ── THE ROW · three columns (ADR-095) ────────────────────────────
        identity (fixed) · the name · a slot reserved for the verbs, so the row
-       never changes height when the pointer crosses it. */
-    .ag__id {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-start;
-      gap: 2px;
-      min-inline-size: 0;
-    }
-    .ag__pack {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      flex: none;
-    }
-    .ag__kind {
-      font-family: var(--font-mono);
-      font-size: 9px;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      color: var(--text-faint);
-      white-space: nowrap;
-    }
-    .ag__kind--q {
-      font-style: italic;
-    }
-    /* Plain text, and allowed to turn a line in a 118px column. */
-    .ag__hold {
-      display: block;
-      font-family: var(--font-mono);
-      font-size: 9px;
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-      color: var(--text-muted);
-      line-height: 1.2;
-      white-space: normal;
-    }
-    /* One hour, one size, one colour. It used to grow and darken when a date
+/* One hour, one size, one colour. It used to grow and darken when a date
        became firm, so certainty was said twice in the clock on top of every
-       other mark that already says it. An hour is an hour. */
-    .ag__time--none {
-      font-family: var(--font-mono);
-      font-size: 9px;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      color: var(--text-faint);
-      font-variant-numeric: normal;
-    }
-    .ag__acts {
-      display: flex;
-      align-items: center;
-      justify-content: flex-end;
-      gap: 6px;
-      min-inline-size: 7rem;
-    }
-
-    .ag__row[data-family='proposed'] .ag__title {
-      color: var(--text-muted);
-    }
-    /* RELEASED — the fourth certainty (ADR-095 §0). Kept as memory: struck
+/* RELEASED — the fourth certainty (ADR-095 §0). Kept as memory: struck
        through at the faintest ink, in the row exactly as on the month slip.
        Without this rule a released row inherits the plain title, which is the
-       confirmed treatment — the loudest possible lie about a gig you lost. */
-    .ag__row[data-family='released'] .ag__title,
-    .ag__row[data-family='released'] .ag__time {
-      color: var(--text-faint);
-      text-decoration: line-through;
-      text-decoration-thickness: 1px;
-    }
-    .ag__title--date {
-      font-style: italic;
-      color: var(--text-muted);
-    }
-    .ag__title--travel {
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      color: color-mix(in oklch, var(--c, var(--text-muted)) 50%, var(--text-muted));
-    }
-    /* THE CITY SITS UNDER THE NAME — one line for what it is, one for where
+/* THE CITY SITS UNDER THE NAME — one line for what it is, one for where
        it is — and it is QUIETER: the name is the assertion, the place is the
        gloss. It used to ride inline behind the name, where it inherited the
-       name's size and read as part of it. */
-    .ag__city {
-      display: block;
-      margin-inline-start: 0;
-      margin-block-start: 1px;
-      font-size: var(--text-xs);
-      font-weight: 400;
-      color: var(--text-faint);
-    }
-    .ag__sub {
-      display: flex;
-      align-items: center;
-      gap: var(--space-xs);
-      font-size: var(--text-xs);
-      color: var(--text-faint);
-      min-inline-size: 0;
-      overflow: hidden;
-      white-space: nowrap;
-    }
-    .ag__courtesy {
-      color: color-mix(in oklch, var(--ag-black-accent) 50%, var(--text-faint));
-    }
-
-    /* ── Contested holds — a heavier clash band wrapping the two rows. ── */
+/* ── Contested holds — a heavier clash band wrapping the two rows. ── */
     .ag__contest {
       margin: var(--space-2xs) var(--space-s) var(--space-xs) var(--space-m);
       border: 1px solid color-mix(in oklch, var(--danger) 22%, var(--border-color-light));
@@ -1241,11 +1002,11 @@
       background: color-mix(in oklch, var(--danger) 4%, transparent);
       overflow: hidden;
     }
-    .ag__contest[data-severity='possible'] {
+.ag__contest[data-severity='possible'] {
       border-color: var(--border-color-dark);
       background: var(--bg-light);
     }
-    .ag__contest-head {
+.ag__contest-head {
       display: flex;
       align-items: center;
       gap: var(--space-xs);
@@ -1254,10 +1015,10 @@
       color: var(--text-muted);
       border-block-end: 1px solid color-mix(in oklch, var(--danger) 12%, var(--border-color-light));
     }
-    .ag__contest[data-severity='possible'] .ag__contest-head {
+.ag__contest[data-severity='possible'] .ag__contest-head {
       border-block-end-color: var(--border-color-light);
     }
-    .ag__contest-mark {
+.ag__contest-mark {
       inline-size: 1rem;
       block-size: 1rem;
       border-radius: var(--radius-circle);
@@ -1271,16 +1032,16 @@
       color: var(--bg);
       flex: none;
     }
-    .ag__contest-mark[data-severity='possible'] {
+.ag__contest-mark[data-severity='possible'] {
       background: var(--bg);
       color: var(--text-faint);
       border: 1px dashed var(--border-color-dark);
     }
-    .ag__contest-reason {
+.ag__contest-reason {
       min-inline-size: 0;
       flex: 1;
     }
-    .ag__contest-jump {
+.ag__contest-jump {
       font-family: var(--font-mono);
       font-size: var(--text-xs);
       letter-spacing: var(--mono-letter-spacing-loose);
@@ -1292,64 +1053,10 @@
       flex: none;
       white-space: nowrap;
     }
-    .ag__contest-jump:hover {
+.ag__contest-jump:hover {
       color: var(--text-muted);
     }
-    .ag__contest .ag__row {
-      padding-inline-start: var(--space-s);
-    }
-    .ag__contest .ag__row::before {
-      display: none;
-    }
-
-    /* ── Clash banners — same grammar as the month day-marks. ── */
-    .ag__clash {
-      --clash-bg: var(--bg-light);
-      --clash-fg: var(--text-muted);
-      display: flex;
-      align-items: center;
-      gap: var(--space-xs);
-      margin: var(--space-2xs) var(--space-s) var(--space-2xs) var(--space-m);
-      padding: var(--space-xs) var(--space-s);
-      border-radius: var(--radius-m);
-      background: var(--clash-bg);
-      color: var(--clash-fg);
-      font-size: var(--text-xs);
-    }
-    .ag__clash[data-severity='people'] {
-      --clash-bg: color-mix(in oklch, var(--danger) 8%, transparent);
-      --clash-fg: color-mix(in oklch, var(--danger) 45%, var(--text-muted));
-    }
-    .ag__clash[data-severity='blackout'] {
-      --clash-bg: color-mix(in oklch, var(--danger) 5%, transparent);
-      --clash-fg: color-mix(in oklch, var(--danger) 40%, var(--text-muted));
-    }
-    .ag__clash[data-severity='blackout-tentative'] {
-      --clash-bg: color-mix(in oklch, var(--ag-black-accent) 8%, transparent);
-      --clash-fg: var(--text-muted);
-    }
-    /* ONE MARK, ONE MEANING — the same law the month draws (see MonthGrid).
-       Four circular badges said four kinds of problem where there is one:
-       something to decide on this day. Red is a real clash of people and
-       nothing else earns it; everything else is a call to make. */
-    .ag__clash-mark {
-      --mark-fg: var(--info);
-      flex: none;
-      font-family: var(--font-mono);
-      font-size: 12px;
-      font-weight: 500;
-      line-height: 1;
-      color: var(--mark-fg);
-    }
-    .ag__clash-mark[data-severity='people'],
-    .ag__clash-mark[data-severity='blackout'] {
-      --mark-fg: var(--danger);
-    }
-    .ag__clash-text {
-      min-inline-size: 0;
-    }
-
-    /* ── Blackout / festival rail — per-day segments; contiguity comes
+/* ── Blackout / festival rail — per-day segments; contiguity comes
        free because every day inside a stored blackout is included. ── */
     .ag__cap {
       position: absolute;
@@ -1370,37 +1077,37 @@
       overflow: hidden;
       z-index: 3;
     }
-    .ag__cap--start {
+.ag__cap--start {
       border-start-start-radius: var(--radius-circle);
       border-start-end-radius: var(--radius-circle);
       border-block-start: 1px solid color-mix(in oklch, var(--ag-black-accent) 45%, var(--border-color-light));
       padding-block-start: var(--space-s);
       top: var(--space-xs);
     }
-    .ag__cap--end {
+.ag__cap--end {
       border-end-start-radius: var(--radius-circle);
       border-end-end-radius: var(--radius-circle);
       border-block-end: 1px solid color-mix(in oklch, var(--ag-black-accent) 45%, var(--border-color-light));
       bottom: var(--space-xs);
     }
-    .ag__cap--tentative {
+.ag__cap--tentative {
       background: repeating-linear-gradient(
         135deg,
         color-mix(in oklch, var(--ag-black-accent) 30%, var(--bg)) 0 5px,
         color-mix(in oklch, var(--ag-black-accent) 11%, var(--bg)) 5px 10px
       );
     }
-    .ag__cap--company {
+.ag__cap--company {
       background: color-mix(in oklch, var(--text-color) 12%, var(--bg));
       border-color: var(--border-color-dark);
     }
-    .ag__cap--away {
+.ag__cap--away {
       background: none;
       border-inline: none;
       border-inline-end: 2px dotted color-mix(in oklch, var(--ag-black-accent) 55%, var(--border-color-dark));
       border-radius: 0;
     }
-    .ag__cap-name {
+.ag__cap-name {
       writing-mode: vertical-rl;
       transform: rotate(180deg);
       font-family: var(--font-mono);
@@ -1410,24 +1117,22 @@
       color: color-mix(in oklch, var(--ag-black-accent) 42%, var(--text-color));
       white-space: nowrap;
     }
-    .ag__cap--company .ag__cap-name {
+.ag__cap--company .ag__cap-name {
       color: var(--text-muted);
     }
-    .ag--panel .ag__cap:not(.ag__cap--away) {
+.ag--panel .ag__cap:not(.ag__cap--away) {
       box-shadow: -12px 0 18px -10px color-mix(in oklch, var(--text-color) 35%, transparent);
     }
-
-    .ag__sentinel {
+.ag__sentinel {
       block-size: 1px;
     }
-
-    /* ── Narrow toggle pill. ── */
+/* ── Narrow toggle pill. ── */
     .ag__railbar {
       display: flex;
       justify-content: flex-end;
       padding-block-end: var(--space-xs);
     }
-    .ag__railtoggle {
+.ag__railtoggle {
       display: inline-flex;
       align-items: center;
       gap: var(--space-xs);
@@ -1442,26 +1147,19 @@
       padding: var(--space-2xs) var(--space-s);
       cursor: pointer;
     }
-    .ag__railtoggle-dot {
+.ag__railtoggle-dot {
       inline-size: 7px;
       block-size: 7px;
       border-radius: var(--radius-circle);
       background: var(--border-color-dark);
     }
-    .ag__railtoggle--on .ag__railtoggle-dot {
+.ag__railtoggle--on .ag__railtoggle-dot {
       background: var(--ag-black-accent);
     }
-
-    @media (max-width: 560px) {
+@media (max-width: 560px) {
       .ag__day {
         grid-template-columns: 4.25rem 1fr;
       }
-      .ag__row {
-        grid-template-columns: 4.25rem 1fr;
-        gap: var(--space-xs);
-        padding-inline: var(--space-xs) var(--space-xs);
-      }
-      .ag__clash,
       .ag__contest {
         margin-inline: var(--space-xs);
       }
@@ -1472,5 +1170,5 @@
         );
       }
     }
-  }
+}
 </style>

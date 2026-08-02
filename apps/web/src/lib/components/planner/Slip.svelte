@@ -85,6 +85,26 @@
      * Folding them into one value is how a «solid» started meaning «urgent».
      */
     clashPeople?: boolean;
+    /**
+     * WHERE THIS SLIP IS BEING DRAWN — and the ONLY thing that differs
+     * between the four placings (ADR-095 §0).
+     *
+     * `cell` (month, board): the clock sits BESIDE the pack, so the head
+     * reads as a sentence — `MM SHOW? 18h30`.
+     * `row` (the diary): the clock sits UNDER the pack in a fixed column, so
+     * it aligns down the page and time can be scanned with the eye. That is
+     * the one difference the design grants, and it is a difference of
+     * PLACING, not of object: same markup, same fields, same order.
+     *
+     * It is a variant and not a second component because a second component
+     * is exactly how the month came to print a country code the board could
+     * not — and how the diary grew an `ag__row` that had drifted from this
+     * one in five ways by the time anybody compared them.
+     */
+    placing?: 'cell' | 'row';
+    /** The verbs — `confirm`, `let go`. Drawn in the row placing's third
+        column, which is reserved for them and empty everywhere else. */
+    actions?: import('svelte').Snippet;
   }
 
   let {
@@ -97,6 +117,8 @@
     onOpen,
     clash = 'none',
     clashPeople = false,
+    placing = 'cell',
+    actions,
   }: Props = $props();
 
   let state = $derived(stateLabel(slip));
@@ -180,6 +202,8 @@
   {#if slip.time?.secondary}
     <span class="slip__tz">{slip.time.secondary}</span>
   {/if}
+
+  {#if actions}<span class="slip__acts">{@render actions()}</span>{/if}
 {/snippet}
 
 {#if slip.href}
@@ -187,6 +211,7 @@
     class="slip"
     data-family={slip.cert}
     data-kind={slip.kind}
+    data-placing={placing}
     data-clash={clash === 'none' ? undefined : clash}
     data-clash-people={clash !== 'none' && clashPeople ? '' : undefined}
     style={slip.project ? `--c: ${accentVarFor(slip.project)}` : undefined}
@@ -199,6 +224,7 @@
     class="slip"
     data-family={slip.cert}
     data-kind={slip.kind}
+    data-placing={placing}
     data-clash={clash === 'none' ? undefined : clash}
     data-clash-people={clash !== 'none' && clashPeople ? '' : undefined}
     style={slip.project ? `--c: ${accentVarFor(slip.project)}` : undefined}
@@ -210,6 +236,7 @@
     class="slip"
     data-family={slip.cert}
     data-kind={slip.kind}
+    data-placing={placing}
     data-clash={clash === 'none' ? undefined : clash}
     data-clash-people={clash !== 'none' && clashPeople ? '' : undefined}
     style={slip.project ? `--c: ${accentVarFor(slip.project)}` : undefined}
@@ -393,6 +420,70 @@
       color: var(--text-faint);
       font-variant-numeric: tabular-nums;
       white-space: nowrap;
+    }
+
+    /* ══ THE ROW PLACING · the diary ═══════════════════════════════════
+       Same markup, placed differently. The identity column is fixed so the
+       hours line up down the page — the whole reason the diary puts the
+       clock under the pack instead of beside it — and the third column is
+       reserved for the verbs whether or not a row has any, so a `confirm`
+       appearing never shifts the name it belongs to. */
+    .slip[data-placing='row'] {
+      display: grid;
+      grid-template-columns: 8.5rem minmax(0, 1fr) auto;
+      align-items: baseline;
+      column-gap: var(--space-s);
+      row-gap: 1px;
+      padding: 5px 8px;
+      border: 0;
+      border-radius: 0;
+      background: none;
+    }
+    .slip[data-placing='row'] .slip__h {
+      grid-column: 1;
+      grid-row: 1;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 2px;
+    }
+    .slip[data-placing='row'] .slip__state {
+      grid-column: 1;
+      grid-row: 2;
+      margin: 0;
+    }
+    .slip[data-placing='row'] .slip__n {
+      grid-column: 2;
+      grid-row: 1;
+      -webkit-line-clamp: unset;
+      line-clamp: unset;
+      display: block;
+    }
+    .slip[data-placing='row'] .slip__c {
+      grid-column: 2;
+      grid-row: 2;
+      margin: 0;
+    }
+    .slip[data-placing='row'] .slip__tz {
+      grid-column: 2;
+      grid-row: 3;
+    }
+    .slip[data-placing='row'] .slip__acts {
+      grid-column: 3;
+      grid-row: 1 / -1;
+      align-self: center;
+    }
+    /* A ROW HAS THE WIDTH THE CELL NEVER HAD, so the gig takes the step the
+       design gives it here: 16 over 13, where the month says 13 over 11. */
+    .slip[data-placing='row'][data-kind='show'] .slip__n {
+      font-size: 16px;
+    }
+    .slip[data-placing='row'] .slip__n {
+      font-size: 13.5px;
+    }
+    .slip__acts {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-xs);
     }
 
     /* ══ THE CERTAINTY VOCABULARY ═══════════════════════════════════════

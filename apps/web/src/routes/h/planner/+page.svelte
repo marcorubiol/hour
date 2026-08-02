@@ -1595,14 +1595,28 @@
    * that finishes the job instantly if something moved under it. The second
    * pass is a no-op in the ordinary case.
    */
+  /**
+   * `Now` IS A JUMP, NOT A JOURNEY — and therefore instant.
+   *
+   * It was a smooth `scrollIntoView` plus a correction a beat later. Two ways
+   * that fails, both reported: across a diary of months the animation is
+   * still running when the correction lands and simply carries on over the
+   * top of it; and while it runs the diary may prepend, which moves the
+   * target under the animation. Months of travel is not a nice transition
+   * anyway — it is a long ride through days nobody asked to see.
+   *
+   * If today is not rendered the diary is asked to grow towards it first.
+   */
   async function scrollToToday() {
     const at = () => document.querySelector(`[data-day="${todayIso}"]`);
-    at()?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    await new Promise((r) => setTimeout(r, 600));
+    for (let tries = 0; tries < 3 && !at(); tries++) {
+      if (todayIso < agendaFromIso) await loadEarlier();
+      else extendAgendaEnd();
+      await tick();
+    }
     const el = at();
     if (!el) return;
-    const off = el.getBoundingClientRect().top;
-    if (Math.abs(off) > 4) window.scrollBy({ top: off, behavior: 'instant' });
+    window.scrollBy({ top: el.getBoundingClientRect().top, behavior: 'instant' });
   }
   /** `T` — one verb, and each projection knows what "today" means for it. */
   /** The window steps by whatever the drawing's window IS. */
