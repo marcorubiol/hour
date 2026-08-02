@@ -1396,11 +1396,51 @@
 
   // Prepend an earlier month with scroll-anchoring so the viewport stays
   // pixel-stable (inserting days above would otherwise shove content down).
+  /* PREPENDING IS ANCHORED TO A ROW, NOT TO A HEIGHT.
+     
+     It measured `document.scrollHeight` before and after and scrolled by the
+     difference — which is right in principle and wrong in practice: `tick()`
+     resolves when Svelte has updated the DOM, not when the browser has laid
+     it out, so «after» was frequently the same number as «before» and the
+     correction was zero. The reader was then silently thrown up by a month,
+     which left the top sentinel still in view, which asked for another month.
+     That is the whole of the runaway: on 2026-08-02 the diary fetched 822
+     days and two years of history before anyone had touched it.
+
+     Pinning a REAL ROW is immune to the timing: remember which day is at the
+     top of the viewport and how far down it sits, then put it back exactly
+     there once the new rows have been laid out. Plus a latch (one prepend in
+     flight) and a floor, because nobody plans two years backwards. */
+  let prepending = false;
+  const AGENDA_FLOOR = 24; // months back from today
   async function loadEarlier() {
-    const before = document.documentElement.scrollHeight;
+    if (prepending) return;
+    const floor = firstOfMonth(
+      addMonths(Number(todayIso.slice(0, 4)), Number(todayIso.slice(5, 7)), -AGENDA_FLOOR),
+    );
+    if (agendaFromIso <= floor) return;
+    prepending = true;
+    const anchor = visibleAgendaDay();
+    const was = anchor
+      ? (document.querySelector(`[data-day="${anchor}"]`)?.getBoundingClientRect().top ?? null)
+      : null;
     extendAgendaStart();
     await tick();
-    window.scrollBy(0, document.documentElement.scrollHeight - before);
+    await new Promise(requestAnimationFrame);
+    if (anchor && was !== null) {
+      const now = document.querySelector(`[data-day="${anchor}"]`)?.getBoundingClientRect().top;
+      // INSTANT, AND THIS IS THE WHOLE BUG. `html` carries
+      // `scroll-behavior: smooth`, so `scrollBy` ANIMATES — and an anchoring
+      // correction is not a journey, it is compensation for content that
+      // appeared above the reader. Animated, it had not finished before the
+      // next prepend measured, so no correction ever landed: the reader stayed
+      // pinned at the top, the sentinel stayed in view, and one flick of the
+      // wheel walked the diary 24 months to its floor. Three wrong theories
+      // (stale observer entries, short months, reach margins) died before the
+      // trace showed `y: 0` on all 25 calls.
+      if (now !== undefined) window.scrollBy({ top: now - was, behavior: 'instant' });
+    }
+    prepending = false;
   }
 
   // Band open/collapsed — UI state only (ADR-080 §5: "Deixa-ho obert"
@@ -1545,10 +1585,24 @@
   }
   // Agenda "Avui" scrolls the book to today's day header instead of moving
   // the single-month window (which the agenda no longer uses).
-  function scrollToToday() {
-    document
-      .querySelector(`[data-day="${todayIso}"]`)
-      ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  /**
+   * `Now` HAS TO LAND. A smooth scroll across a diary is a long animation,
+   * and the diary is loading while it runs — one anchoring correction landing
+   * mid-flight leaves the reader thousands of pixels short of today with no
+   * sign anything went wrong. Measured: 5.760px short.
+   *
+   * So it is asked twice: the smooth journey, and then a check a beat later
+   * that finishes the job instantly if something moved under it. The second
+   * pass is a no-op in the ordinary case.
+   */
+  async function scrollToToday() {
+    const at = () => document.querySelector(`[data-day="${todayIso}"]`);
+    at()?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    await new Promise((r) => setTimeout(r, 600));
+    const el = at();
+    if (!el) return;
+    const off = el.getBoundingClientRect().top;
+    if (Math.abs(off) > 4) window.scrollBy({ top: off, behavior: 'instant' });
   }
   /** `T` — one verb, and each projection knows what "today" means for it. */
   /** The window steps by whatever the drawing's window IS. */
@@ -1566,21 +1620,53 @@
     if (view === 'day') {
       dayIso = addDaysIso(selectedDay, -1);
       syncUrl();
-    } else if (view === 'agenda') extendAgendaStart();
+    } else if (view === 'agenda') scrollAgendaMonth(-1);
     else prevMonth();
   }
   function stepNext() {
     if (view === 'day') {
       dayIso = addDaysIso(selectedDay, 1);
       syncUrl();
-    } else if (view === 'agenda') {
-      // Forward is where the diary already goes; the arrow is the same act as
-      // reaching the foot of it, without the scrolling.
-      const y = Number(agendaFromIso.slice(0, 4));
-      const m = Number(agendaFromIso.slice(5, 7));
-      agendaFromIso = firstOfMonth(addMonths(y, m, 1));
-    } else nextMonth();
+    } else if (view === 'agenda') scrollAgendaMonth(1);
+    else nextMonth();
   }
+  /**
+   * ON A DIARY THE ARROWS MOVE YOU, THEY DO NOT CROP THE WINDOW.
+   *
+   * They used to edit `agendaFromIso` — back loaded a month, forward THREW
+   * ONE AWAY — so on the drawing that has no edges the one control that
+   * looks like «go back» quietly deleted history, and «go forward» appeared
+   * to do nothing because the reader stayed put while the data under them
+   * changed. A diary's window is everything it has loaded; what you move is
+   * your place in it.
+   *
+   * Landing on a month it has not loaded yet asks for it and tries again on
+   * the next frame — the diary grows towards you rather than refusing.
+   */
+  async function scrollAgendaMonth(step: -1 | 1) {
+    const here = visibleAgendaDay() ?? todayIso;
+    const target = firstOfMonth(
+      addMonths(Number(here.slice(0, 4)), Number(here.slice(5, 7)), step),
+    );
+    for (let tries = 0; tries < 3; tries++) {
+      const el = document.querySelector(`[data-day="${target}"]`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        return;
+      }
+      if (step < 0) await loadEarlier();
+      else extendAgendaEnd();
+      await tick();
+    }
+  }
+  /** The first day row whose top is at or below the viewport's top edge. */
+  function visibleAgendaDay(): string | null {
+    for (const el of document.querySelectorAll<HTMLElement>('[data-day]')) {
+      if (el.getBoundingClientRect().bottom > 0) return el.dataset.day ?? null;
+    }
+    return null;
+  }
+
   function goToday() {
     if (view === 'agenda') scrollToToday();
     else if (view === 'day') {
@@ -1992,7 +2078,6 @@
       travelDirLabel={(dir) => t(`planner.travel_${dir}`, locale)}
       emptyLabel={t('planner.empty_month', locale)}
       blackoutsToggleLabel={t('planner.blackouts_toggle', locale)}
-      earlierLabel={t('planner.agenda_earlier', locale)}
       decideLabel={t('planner.agenda_decide', locale)}
       notesLabel={t('planner.agenda_notes', locale)}
       showWord={t('planner.kind_show', locale)}

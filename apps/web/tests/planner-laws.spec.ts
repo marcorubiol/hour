@@ -461,3 +461,53 @@ test.describe('the clash', () => {
     }
   });
 });
+
+test.describe('the diary', () => {
+  test.skip(!EMAIL || !PASSWORD, 'Set PW_TEST_EMAIL / PW_TEST_PASSWORD.');
+
+  test('IT OPENS AT TODAY AND GROWS ONE MONTH PER GESTURE — never runs away', async ({ page }) => {
+    // A flick of the wheel used to fetch 822 days: `html` carries
+    // `scroll-behavior: smooth`, so the anchoring correction ANIMATED, never
+    // landed before the next prepend measured, and the reader stayed pinned
+    // at the top with the sentinel permanently in view.
+    await planner(page, 'agenda');
+    const span = () =>
+      page.evaluate(() => {
+        const d = [...document.querySelectorAll('[data-day]')]
+          .map((e) => (e as HTMLElement).dataset.day ?? '')
+          .sort();
+        return { n: d.length, first: d[0] ?? '', y: Math.round(window.scrollY) };
+      });
+    const start = await span();
+    // Opens on today, not on two years of history.
+    expect(start.n, 'the diary opened with a runaway span').toBeLessThan(200);
+
+    await page.mouse.move(800, 500);
+    await page.mouse.wheel(0, -600);
+    await page.waitForTimeout(1800);
+    const back = await span();
+    expect(back.n, 'scrolling up loaded nothing').toBeGreaterThan(start.n);
+    expect(back.n - start.n, 'one gesture fetched more than two months').toBeLessThan(70);
+    // …and the reader was pinned to their row rather than thrown backwards.
+    expect(back.y, 'the prepend was not anchored').toBeGreaterThan(0);
+  });
+
+  test('`NOW` LANDS ON TODAY', async ({ page }) => {
+    // A long smooth journey across a diary that is loading while it runs can
+    // be cut short by one anchoring correction — measured 5.760px short.
+    await planner(page, 'agenda');
+    await page.mouse.move(800, 500);
+    await page.mouse.wheel(0, -600);
+    await page.waitForTimeout(1500);
+    await page.click('.cal__now');
+    await page.waitForTimeout(2500);
+    const off = await page.evaluate(() => {
+      const el = document.querySelector('[data-day].is-today, [data-day]');
+      const today = new Date().toISOString().slice(0, 10);
+      const t = document.querySelector(`[data-day="${today}"]`);
+      return t ? Math.round(t.getBoundingClientRect().top) : (el ? 9999 : null);
+    });
+    if (off === null) test.skip(true, 'today is not in this diary');
+    expect(Math.abs(off!), '`Now` did not land on today').toBeLessThan(8);
+  });
+});

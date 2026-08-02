@@ -76,7 +76,6 @@
     travelDirLabel?: (dir: string) => string;
     emptyLabel?: string;
     blackoutsToggleLabel?: string;
-    earlierLabel?: string;
     decideLabel?: string;
     /** Header of the right-hand dot-grid notes column. */
     notesLabel?: string;
@@ -120,7 +119,6 @@
     travelDirLabel = (dir: string) => dir,
     emptyLabel = 'Nothing this month.',
     blackoutsToggleLabel = 'blackouts',
-    earlierLabel = '↑ earlier',
     decideLabel = 'decide ↑',
     notesLabel = 'NOTES',
     showWord = 'show',
@@ -396,22 +394,87 @@
     return out;
   }
 
-  // ── Lazy end-extension: a sentinel below the last day asks the page to
-  // append the next month. Re-observed on every span change so a sentinel
-  // still in view after one extension re-fires (fills the viewport). ─────
+  /* ── THE DIARY LOADS AT BOTH EDGES ────────────────────────────────────
+     A sentinel above the first day and one below the last: come within
+     800px of either and the page is asked for another month. Re-observed on
+     every span change, so a sentinel still in view after one extension fires
+     again and fills the viewport.
+
+     BACKWARDS USED TO BE A BUTTON («↑ earlier months»), and a button is the
+     wrong shape for a diary: forwards flowed and backwards asked permission,
+     so the same gesture — keep reading — worked in one direction and stopped
+     in the other.
+
+     BUT BACKWARDS ONLY GROWS WHEN THE READER GOES LOOKING, and that is not a
+     nicety. The diary opens AT today, so its first day is on screen and the
+     top sentinel is intersecting from the first frame: with no gate it asked
+     for a month, the span changed, this effect re-ran, a fresh observer fired
+     immediately on the still-visible sentinel, and the loop only stopped
+     against the page's 24-month floor. Measured on 2026-08-02: 822 days and
+     two years of history fetched before the reader had touched anything.
+     Forwards has no such problem — it opens at the top of its own span. */
+  let readerMoved = $state(false);
   let endSentinel = $state<HTMLElement>();
-  $effect(() => {
-    void days.length;
-    const el = endSentinel;
-    if (!el || !onReachEnd) return;
+  let startSentinel = $state<HTMLElement>();
+  /**
+   * FORWARDS LOOKS AHEAD; BACKWARDS DOES NOT.
+   *
+   * 800px of anticipation is right at the foot: you are travelling that way,
+   * and the next month should already be there when you arrive. At the head
+   * it is a trap — a quiet month of empty day rows is about 850px tall, so a
+   * prepend barely clears the margin and the sentinel is immediately inside
+   * it again. One flick of the wheel walked the diary to its 24-month floor,
+   * 822 days, three times through three different theories of why.
+   * Backwards loads when the top is actually REACHED. The prepend is
+   * anchored to the reader's own row, so there is no gap to pre-empt.
+   */
+  const REACH_END = 800;
+  const REACH_START = 80;
+  /**
+   * THE CALLBACK RE-MEASURES; IT DOES NOT TRUST ITS OWN ENTRY.
+   *
+   * An IntersectionObserver delivers the state it saw when it observed, and
+   * it delivers it LATER — after the page has prepended a month and pinned
+   * the reader back to their row. So the entry says «still at the top» about
+   * a layout that no longer exists, the page is asked for another month, and
+   * the diary walks to its floor: 822 days on one flick of the wheel,
+   * measured 2026-08-02, twice, through two different anchoring bugs.
+   * Asking the element where it actually is costs one layout read and cannot
+   * be stale.
+   */
+  function watch(el: HTMLElement | undefined, fire: (() => void) | undefined, reach: number) {
+    if (!el || !fire) return;
     const io = new IntersectionObserver(
-      (entries) => {
-        for (const e of entries) if (e.isIntersecting) onReachEnd?.();
+      () => {
+        const r = el.getBoundingClientRect();
+        if (r.bottom > -reach && r.top < window.innerHeight + reach) fire();
       },
-      { rootMargin: '800px 0px' },
+      { rootMargin: `${reach}px 0px` },
     );
     io.observe(el);
     return () => io.disconnect();
+  }
+  $effect(() => {
+    void days.length;
+    return watch(endSentinel, onReachEnd, REACH_END);
+  });
+  $effect(() => {
+    void days.length;
+    if (!readerMoved) return;
+    return watch(startSentinel, onReachStart, REACH_START);
+  });
+  $effect(() => {
+    if (readerMoved) return;
+    const arm = () => (readerMoved = true);
+    // `once` so it costs one listener and nothing per frame afterwards.
+    window.addEventListener('scroll', arm, { once: true, passive: true });
+    window.addEventListener('wheel', arm, { once: true, passive: true });
+    window.addEventListener('keydown', arm, { once: true });
+    return () => {
+      window.removeEventListener('scroll', arm);
+      window.removeEventListener('wheel', arm);
+      window.removeEventListener('keydown', arm);
+    };
   });
 </script>
 
@@ -449,7 +512,7 @@
     <p class="ag__empty">{emptyLabel}</p>
   {:else}
     {#if onReachStart}
-      <button type="button" class="ag__earlier" onclick={onReachStart}>{earlierLabel}</button>
+      <div class="ag__sentinel" bind:this={startSentinel} aria-hidden="true"></div>
     {/if}
 
     {#each shownDays as day (day)}
@@ -696,25 +759,6 @@
     }
 
     /* Top "earlier months" — quiet, centered, prepends with anchoring. */
-    .ag__earlier {
-      justify-self: center;
-      margin-block: var(--space-s);
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      letter-spacing: var(--mono-letter-spacing-loose);
-      text-transform: uppercase;
-      color: var(--text-faint);
-      background: none;
-      border: 1px solid var(--border-color-light);
-      border-radius: var(--radius-circle);
-      padding: var(--space-2xs) var(--space-m);
-      cursor: pointer;
-      transition: color var(--transition), border-color var(--transition);
-    }
-    .ag__earlier:hover {
-      color: var(--text-muted);
-      border-color: var(--border-color-dark);
-    }
 
     /* ── Serif month divider — the book's chapter head. ── */
     .ag__monthdiv {
