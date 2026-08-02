@@ -43,7 +43,8 @@
     type DateEvent,
     type PerformanceEvent,
   } from '$lib/month-events';
-  import { assignBandLanes, dayKeyInTz } from '$lib/planner';
+  import { assignBandLanes, dayKeyInTz, isoWeek } from '$lib/planner';
+  import { SvelteSet } from 'svelte/reactivity';
   import { dualTime, hourMark, localeWeekdayShort } from '$lib/datetime';
   import { workspacesQueryOptions } from '$lib/nav-queries';
   import { accentVarFor } from '$lib/utils/accent';
@@ -88,6 +89,13 @@
     /** «all day» — a row that lasts the day, which is not the same as no hour. */
     allDayWord?: string;
     /** Scroll reached the end → page appends the next month. */
+    /** «week 29», «2 confirmed · 4 options · 1 night free», «5 days free»,
+        «show» — the diary's own summary vocabulary. */
+    weekLabel?: (n: number) => string;
+    weekRange?: (from: string, to: string) => string;
+    weekTally?: (firm: number, held: number, free: number) => string;
+    runLabel?: (n: number) => string;
+    showLabel?: string;
     onReachEnd?: () => void;
     /** Top "earlier months" action → page prepends (scroll-anchored). */
     onReachStart?: () => void;
@@ -125,6 +133,14 @@
     releasedWord = 'let go',
     noHourWord = 'no hour',
     allDayWord = 'all day',
+    weekLabel = (n: number) => `week ${n}`,
+    weekRange = (from: string, to: string) => `${from} → ${to}`,
+    weekTally = (firm: number, held: number, free: number) =>
+      [firm ? `${firm} confirmed` : '', held ? `${held} options` : '', free ? `${free} nights free` : '']
+        .filter(Boolean)
+        .join(' · '),
+    runLabel = (n: number) => `${n} days free`,
+    showLabel = 'show',
     onReachEnd,
     onReachStart,
     onDecideJump,
@@ -184,6 +200,81 @@
 
   // The book shows every day of the span — no inclusion filter.
   let shownDays = $derived(days);
+
+  /* ── THE WEEK IS A BAND, AND A QUIET RUN IS ONE LINE ───────────────────
+     Two facts the diary could not say. A week has a SHAPE — «2 confirmed · 4
+     options · 1 night free» — and reading it day by day is arithmetic the eye
+     should not be doing; the month draws that shape in its gutter and the
+     diary drew nothing. And a diary that prints every empty day between two
+     gigs makes the reader scroll through a fortnight of blank rows to reach
+     the next thing that happens: the run of free days is ONE fact («5 days
+     free, 3 aug → 7 aug») and it opens if you want the days themselves.
+
+     Both are derived here, from the same `days` the diary already renders —
+     nothing new is fetched, and an empty week still draws its band, because
+     «nothing this week» is an answer. */
+  let openRuns = $state(new SvelteSet<string>());
+
+  type Chunk =
+    | { t: 'week'; key: string; n: number; from: string; to: string; firm: number; held: number; free: number }
+    | { t: 'day'; key: string; day: string }
+    | { t: 'run'; key: string; from: string; to: string; n: number }
+    | { t: 'month'; key: string; day: string };
+
+  /** A day nobody has written anything on. Away bands do not count: they are
+      about a person, not about the company's calendar. */
+  function isFree(day: string): boolean {
+    return (rowsByDay.get(day) ?? []).length === 0 && !(clashesByDay?.get(day)?.length);
+  }
+  const RUN_MIN = 3; // two blank rows are cheaper to read than a control
+
+  let chunks = $derived.by((): Chunk[] => {
+    const out: Chunk[] = [];
+    let wk = -1;
+    let i = 0;
+    while (i < shownDays.length) {
+      const day = shownDays[i];
+      // The month opens BEFORE its first week band: a serif `August 2026`
+      // arriving under `week 31` reads as a footnote to the week.
+      if (monthBreaks.has(day)) out.push({ t: 'month', key: `m${day}`, day });
+      const n = isoWeek(day);
+      if (n !== wk) {
+        wk = n;
+        const rest = shownDays.slice(i);
+        const last = rest.find((d, k) => k + 1 === rest.length || isoWeek(rest[k + 1]) !== n) ?? day;
+        let firm = 0;
+        let held = 0;
+        let free = 0;
+        for (let d = i; d < shownDays.length && isoWeek(shownDays[d]) === n; d++) {
+          const rows = rowsByDay.get(shownDays[d]) ?? [];
+          if (rows.length === 0) free++;
+          for (const r of rows) {
+            if (r.kind !== 'perf') continue;
+            const f = performanceStatusFamily(r.perf.status);
+            if (f === 'confirmed') firm++;
+            else if (f === 'hold' || f === 'proposed') held++;
+          }
+        }
+        out.push({ t: 'week', key: `w${day}`, n, from: day, to: last, firm, held, free });
+      }
+      // A run of quiet days inside this week collapses to one line.
+      if (isFree(day)) {
+        let j = i;
+        while (j + 1 < shownDays.length && isFree(shownDays[j + 1]) && isoWeek(shownDays[j + 1]) === n)
+          j++;
+        const len = j - i + 1;
+        const key = `r${day}`;
+        if (len >= RUN_MIN && !openRuns.has(key)) {
+          out.push({ t: 'run', key, from: day, to: shownDays[j], n: len });
+          i = j + 1;
+          continue;
+        }
+      }
+      out.push({ t: 'day', key: day, day });
+      i++;
+    }
+    return out;
+  });
 
   // First day of each month → where the serif divider opens.
   let monthBreaks = $derived.by(() => {
@@ -515,13 +606,33 @@
       <div class="ag__sentinel" bind:this={startSentinel} aria-hidden="true"></div>
     {/if}
 
-    {#each shownDays as day (day)}
-      {#if monthBreaks.has(day)}
+    {#each chunks as ch (ch.key)}
+      {#if ch.t === 'month'}
         <h2 class="ag__monthdiv">
-          <span class="ag__monthdiv-name">{monthDivName(day)}</span>
-          <span class="ag__monthdiv-year">{monthDivYear(day)}</span>
+          <span class="ag__monthdiv-name">{monthDivName(ch.day)}</span>
+          <span class="ag__monthdiv-year">{monthDivYear(ch.day)}</span>
         </h2>
-      {/if}
+      {:else if ch.t === 'week'}
+        <!-- THE WEEK'S OWN LINE. Its shape, once, instead of seven days of
+             arithmetic — the same three counts the month draws in its gutter. -->
+        <div class="ag__week">
+          <span class="ag__week-n">{weekLabel(ch.n)}</span>
+          <span class="ag__week-r">{weekRange(ch.from, ch.to)}</span>
+          <span class="ag__week-t">{weekTally(ch.firm, ch.held, ch.free)}</span>
+        </div>
+      {:else if ch.t === 'run'}
+        <!-- A RUN OF QUIET DAYS IS ONE FACT. Printing them one by one makes
+             the reader scroll a fortnight of blank rows to reach the next
+             thing that happens — and «free» is the number this trade sells. -->
+        <div class="ag__run">
+          <span class="ag__run-n">{runLabel(ch.n)}</span>
+          <span class="ag__run-r">{weekRange(ch.from, ch.to)}</span>
+          <button type="button" class="ag__run-do" onclick={() => openRuns.add(ch.key)}
+            >{showLabel}</button
+          >
+        </div>
+      {:else}
+        {@const day = ch.day}
       {@const items = dayItems(day)}
       {@const banners = clashesByDay?.get(day) ?? []}
       {@const segs = railSegs(day)}
@@ -587,6 +698,7 @@
           </span>
         {/each}
       </section>
+      {/if}
     {/each}
 
     {#if onReachEnd}<div class="ag__sentinel" bind:this={endSentinel} aria-hidden="true"></div>{/if}
@@ -761,6 +873,61 @@
     /* Top "earlier months" — quiet, centered, prepends with anchoring. */
 
     /* ── Serif month divider — the book's chapter head. ── */
+    /* ── THE WEEK'S BAND · number, range, shape ───────────────────────
+       All mono, all margin voice: this is the machine reporting on a stretch
+       of the diary, not a thing that happens in it. The tally goes right, so
+       seven days of shape line up down the page and can be scanned without
+       reading a word of them. */
+    .ag__week {
+      display: flex;
+      align-items: baseline;
+      gap: var(--space-s);
+      padding: var(--space-s) 0 var(--space-2xs);
+      border-block-start: 1px solid var(--border-color-light);
+      font-family: var(--font-mono);
+      font-size: 9px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+    }
+    .ag__week-n {
+      color: var(--text-muted);
+    }
+    .ag__week-t {
+      margin-inline-start: auto;
+      text-align: end;
+    }
+    /* ── A RUN OF QUIET DAYS · one line, and a door back to the days ───── */
+    .ag__run {
+      display: flex;
+      align-items: baseline;
+      gap: var(--space-s);
+      padding: var(--space-xs) 0;
+      border-block-start: 1px dotted var(--border-color-light);
+      font-family: var(--font-mono);
+      font-size: 9px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+    }
+    .ag__run-n {
+      color: var(--text-muted);
+    }
+    .ag__run-do {
+      margin-inline-start: auto;
+      padding: 0;
+      border: 0;
+      background: none;
+      font: inherit;
+      letter-spacing: inherit;
+      text-transform: inherit;
+      color: var(--text-faint);
+      cursor: pointer;
+    }
+    .ag__run-do:hover {
+      color: var(--text-color);
+    }
+
     .ag__monthdiv {
       display: flex;
       align-items: baseline;

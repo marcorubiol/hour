@@ -2086,6 +2086,20 @@
       allDayWord={t('planner.all_day', locale)}
       onReachEnd={extendAgendaEnd}
       onReachStart={loadEarlier}
+      weekLabel={(n) => `${t('planner.week_n', locale)} ${n}`}
+      weekRange={(from, to) => `${localeDayMonth(from, localeTag)} → ${localeDayMonth(to, localeTag)}`}
+      weekTally={(firm, held, free) =>
+        [
+          firm ? `${firm} ${t('planner.week_confirmed', locale)}` : '',
+          // ONE IS NOT «1 OPTIONS». The month's gutter kept its counts in a
+          // tooltip, so nobody had ever read them as a sentence.
+          held ? `${held} ${t(held === 1 ? 'planner.week_option_one' : 'planner.week_options', locale)}` : '',
+          free ? `${free} ${t(free === 1 ? 'planner.week_free_one' : 'planner.week_free', locale)}` : '',
+        ]
+          .filter(Boolean)
+          .join(' · ') || t('planner.week_nothing', locale)}
+      runLabel={(n) => t('planner.agenda_run', locale, { n })}
+      showLabel={t('planner.agenda_show', locale)}
       onDecideJump={jumpToDecisions}
       onDateOpen={openDate}
     />
