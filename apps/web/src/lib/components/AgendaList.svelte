@@ -45,7 +45,7 @@
   } from '$lib/month-events';
   import { assignBandLanes, dayKeyInTz, isoWeek } from '$lib/planner';
   import { SvelteSet } from 'svelte/reactivity';
-  import { dualTime, hourMark, localeWeekdayShort } from '$lib/datetime';
+  import { dualTime, hourMark, localeDayMonth, localeWeekdayShort } from '$lib/datetime';
   import { workspacesQueryOptions } from '$lib/nav-queries';
   import { accentVarFor } from '$lib/utils/accent';
   import IdentityMark from '$lib/components/IdentityMark.svelte';
@@ -98,6 +98,22 @@
     weekTally?: (firm: number, held: number, free: number) => string;
     runLabel?: (n: number) => string;
     showLabel?: string;
+    /**
+     * THE VERBS, on the row itself. A hold is a question the diary is asking
+     * you; answering it belonged three clicks away in a drawer, so the row
+     * that poses the question could not resolve it.
+     */
+    onConfirm?: (perfId: string) => void;
+    onRelease?: (perfId: string) => void;
+    /** Performance id with a write in flight. */
+    pendingId?: string | null;
+    confirmLabel?: string;
+    releaseLabel?: string;
+    /** «until», «5 days left», «back tomorrow» — the absence's own words. */
+    awayUntilWord?: string;
+    awayLeftWord?: string;
+    awayLeftOneWord?: string;
+    awayBackWord?: string;
     onReachEnd?: () => void;
     /** Top "earlier months" action → page prepends (scroll-anchored). */
     onReachStart?: () => void;
@@ -143,6 +159,15 @@
         .join(' · '),
     runLabel = (n: number) => `${n} days free`,
     showLabel = 'show',
+    awayUntilWord = 'until',
+    awayLeftWord = '{n} days left',
+    awayLeftOneWord = '1 day left',
+    awayBackWord = 'back tomorrow',
+    onConfirm,
+    onRelease,
+    pendingId = null,
+    confirmLabel = 'confirm',
+    releaseLabel = 'let go',
     onReachEnd,
     onReachStart,
     onDecideJump,
@@ -536,6 +561,34 @@
     return g + n * (w + g);
   });
 
+  /**
+   * The absence, as a sentence for one day: «Mia away · until 20 jul · 5 days
+   * left», and «back tomorrow» on the last one. Derived from the same rail
+   * items — nothing new is fetched, and when the rail is off they are still
+   * here, because an absence is a fact about the day and not a decoration.
+   */
+  function awayLines(day: string) {
+    const out: Array<{ key: string; who: string; rest: string; tentative: boolean }> = [];
+    railItems.forEach((item, i) => {
+      if (day < item.from || day > item.to) return;
+      const left = daysBetween(day, item.to);
+      const rest =
+        left === 0
+          ? awayBackWord
+          : `${awayUntilWord} ${localeDayMonth(item.to, locale)} · ${
+              left === 1 ? awayLeftOneWord : awayLeftWord.replace('{n}', String(left))
+            }`;
+      out.push({ key: `${i}:${day}`, who: item.label, rest, tentative: Boolean(item.tentative) });
+    });
+    return out;
+  }
+  /** Whole days from a to b, both ISO, b >= a. */
+  function daysBetween(a: string, b: string): number {
+    return Math.round(
+      (Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 86400000,
+    );
+  }
+
   function railSegs(day: string): Array<{ item: RailItem; lane: number; i: number }> {
     const out: Array<{ item: RailItem; lane: number; i: number }> = [];
     railItems.forEach((item, i) => {
@@ -709,6 +762,17 @@
           <span class="ag__num">{Number(day.slice(8, 10))}</span>
         </header>
         <div class="ag__rows">
+          <!-- AN ABSENCE IS A LINE INSIDE THE DAY IT AFFECTS, not a capsule
+               in a rail off to the side. The rail draws a shape you have to
+               decode against a legend; the line says the sentence — who,
+               until when, and how much of it is left — in the day where it
+               matters, which is where you are already looking. -->
+          {#each awayLines(day) as a (a.key)}
+            <p class="ag__away" class:ag__away--tent={a.tentative}>
+              <span class="ag__away-who">{a.who}</span>
+              <span class="ag__away-w">{a.rest}</span>
+            </p>
+          {/each}
           <!-- NO BANNER BOXES. A clash used to print a grey slab per pair
                above the day — «! No team data — could clash.» twice over —
                while the two rows it was about sat underneath saying nothing.
@@ -787,7 +851,36 @@
     clash={flags.clash}
     clashPeople={flags.people}
     onOpen={row.kind === 'date' && onDateOpen ? () => onDateOpen?.(row.date) : undefined}
-  />
+  >
+    {#snippet actions()}
+      {#if row.kind === 'perf' && onConfirm}
+        {@const fam = performanceStatusFamily(row.perf.status)}
+        {#if fam === 'hold' || fam === 'proposed'}
+          <button
+            type="button"
+            class="ag__do"
+            disabled={pendingId === row.perf.id}
+            onclick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onConfirm?.(row.perf.id);
+            }}>{confirmLabel}</button
+          >
+        {:else if fam === 'confirmed' && onRelease}
+          <button
+            type="button"
+            class="ag__do ag__do--quiet"
+            disabled={pendingId === row.perf.id}
+            onclick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onRelease?.(row.perf.id);
+            }}>{releaseLabel}</button
+          >
+        {/if}
+      {/if}
+    {/snippet}
+  </Slip>
 {/snippet}
 
 
@@ -1123,6 +1216,56 @@
 .ag--panel .ag__cap:not(.ag__cap--away) {
       box-shadow: -12px 0 18px -10px color-mix(in oklch, var(--text-color) 35%, transparent);
     }
+/* THE VERB WAITS TO BE NEEDED. It is the only thing on a diary row that
+   writes, so it stays in the margin voice and appears under the pointer — a
+   column of `CONFIRM` down a page of options reads as a demand, and most of
+   what you do here is read. */
+/* The absence's line: margin voice, one step above the row it precedes so it
+   reads as the condition the day happens under. */
+.ag__away {
+  margin: 0;
+  padding: 2px 8px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  color: var(--text-faint);
+}
+.ag__away-who {
+  color: var(--text-muted);
+}
+.ag__away-w {
+  margin-inline-start: 7px;
+}
+/* Provisional leans, like every other maybe in this drawing. */
+.ag__away--tent {
+  font-style: italic;
+}
+
+.ag__do {
+  padding: 0;
+  border: 0;
+  background: none;
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.1s;
+}
+:global(.slip:hover) .ag__do,
+.ag__do:focus-visible {
+  opacity: 1;
+}
+.ag__do:hover {
+  color: var(--text-color);
+}
+.ag__do:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
+
 .ag__sentinel {
       block-size: 1px;
     }

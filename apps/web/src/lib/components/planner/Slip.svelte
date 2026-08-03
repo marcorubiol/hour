@@ -501,6 +501,16 @@
       border-color: color-mix(in oklch, var(--text-color) 13%, var(--border-color-light));
       background: var(--bg-ultra-light);
     }
+    /* …BUT NOT IN THE DIARY, and the difference is what the slip IS in each
+       placing. In a month cell it is an OBJECT sitting on a sheet, so it has
+       a ground of its own and the grain lies on that ground. In the diary it
+       is a LINE ON THE PAGE — there is no card, so the paper is the ground
+       and a white fill turns the row into a floating box the design does not
+       have. Marco caught it in the diary and, correctly, only there. */
+    .slip[data-placing='row'][data-family='hold'],
+    .slip[data-placing='row'][data-family='proposed'] {
+      background: none;
+    }
     .slip[data-family='hold']::before,
     .slip[data-family='proposed']::before {
       content: '';
