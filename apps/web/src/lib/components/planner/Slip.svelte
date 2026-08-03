@@ -437,10 +437,20 @@
     .slip[data-placing='row'] {
       display: grid;
       grid-template-columns: 8.5rem minmax(0, 1fr) auto;
-      align-items: baseline;
+      /* START, NOT BASELINE. Baseline-aligning a 16px serif against a 9px
+         mono makes the grid reserve the tallest line box in every row, so the
+         name and its city sat sixteen pixels apart with a `row-gap` of four.
+         The pack keeps its own alignment inside its column. */
+      align-items: start;
       column-gap: var(--space-s);
-      row-gap: 1px;
-      padding: 5px 8px;
+      /* THE NAME AND ITS PLACE NEED AIR. At 1px the venue and the city
+         touched — one block of text where there are two facts, and the row
+         read as a paragraph instead of a line with a subtitle. The month cell
+         gets away with `-1px` because its name is 13px in a 76px box; a
+         diary row is 16px across a full page and the same leading reads as a
+         collision. */
+      row-gap: 2px;
+      padding: 7px 8px;
       border: 0;
       border-radius: 0;
       background: none;
