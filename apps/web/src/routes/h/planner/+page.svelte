@@ -2114,6 +2114,10 @@
           .join(' · ') || t('planner.week_nothing', locale)}
       runLabel={(n) => t('planner.agenda_run', locale, { n })}
       showLabel={t('planner.agenda_show', locale)}
+      onDayOpen={(iso) => {
+        dayIso = iso;
+        setView('day');
+      }}
       awayUntilWord={t('planner.away_until', locale)}
       awayLeftWord={t('planner.away_left', locale, { n: '{n}' })}
       awayLeftOneWord={t('planner.away_left_one', locale)}

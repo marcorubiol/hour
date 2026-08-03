@@ -258,7 +258,13 @@
       text-align: left;
       text-decoration: none;
       background: var(--bg-ultra-light);
-      border: 1px solid var(--border-color-light);
+      /* THE EDGE HAS TO BE THERE BEFORE YOU POINT AT IT. `--border-color-light`
+         is the neutral at 9% alpha — a hairline meant for dividing rows of
+         text, and on a white card over cream paper it is simply not visible.
+         The card then appeared to gain its outline on hover, which reads as
+         the hover DRAWING the box rather than darkening it. This is the
+         prototype's own value: the ink mixed 15% into the line colour. */
+      border: 1px solid color-mix(in oklch, var(--text-color) 15%, var(--border-color-light));
       /* 3px, not the 4 of `--radius-s`: «solo un poquito en redondito».
          At the size of a month cell the extra point reads as a chip. */
       border-radius: 3px;

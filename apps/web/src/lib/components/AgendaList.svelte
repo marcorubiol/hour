@@ -114,6 +114,10 @@
     awayLeftWord?: string;
     awayLeftOneWord?: string;
     awayBackWord?: string;
+    /** The day's own number is a door to that day's drawing — the same door
+        the month's number is. A diary tells you a date has weight; the next
+        question is always what that day looks like. */
+    onDayOpen?: (isoDate: string) => void;
     onReachEnd?: () => void;
     /** Top "earlier months" action → page prepends (scroll-anchored). */
     onReachStart?: () => void;
@@ -163,6 +167,7 @@
     awayLeftWord = '{n} days left',
     awayLeftOneWord = '1 day left',
     awayBackWord = 'back tomorrow',
+    onDayOpen,
     onConfirm,
     onRelease,
     pendingId = null,
@@ -686,33 +691,23 @@
 <div
   class="ag"
   class:ag--loading={loading}
-  class:ag--panel={railMode === 'panel'}
-  data-rail={railMode}
-  style={`--ag-rail-reserve: ${reservedW}px; --ag-cap-w: ${capW}px; --ag-lane-gap: ${laneGap}px; --ag-notes-w: ${notesW}px;`}
 >
-  {#if notesW > 0}
-    <!-- The dot-grid notes margin (mock) — a real bullet-journal column;
-         the blackout rail floats over its left edge ("blackouts encima"). -->
-    <aside class="ag__notes">
-      <span class="ag__notes-head">{notesLabel}</span>
-    </aside>
-  {/if}
+  <!-- THE NOTES COLUMN AND THE ABSENCE RAIL ARE GONE (Marco, 2026-08-03).
 
-  {#if narrow && railItems.length > 0}
-    <div class="ag__railbar">
-      <button
-        type="button"
-        class="ag__railtoggle"
-        class:ag__railtoggle--on={panelOpen}
-        aria-pressed={panelOpen}
-        onclick={() => (panelOpen = !panelOpen)}
-      >
-        <span class="ag__railtoggle-dot" aria-hidden="true"></span>
-        {blackoutsToggleLabel}
-      </button>
-    </div>
-  {/if}
+       The notes column reserved 240px of every diary to draw a dot grid and
+       the word NOTES. There is nothing to put in it: the `note` table is
+       ADR-093's, committed and not applied, so the column was a promise the
+       app could not keep — and an empty margin is worse than no margin,
+       because it makes the page look like it failed to load. It comes back
+       when it has something to hold.
 
+       The rail drew each absence as a vertical capsule off to the right, with
+       the person's name set sideways. It was already redundant the moment an
+       absence became a SENTENCE inside the day it affects — «Mia away · until
+       20 jul · 5 days left» — and what was left was a stray `MEMI` running
+       vertically down the margin of a day that had nothing to do with it. Two
+       drawings of one fact, and the one that survives is the one you can
+       read. -->
   {#if shownDays.length === 0}
     <p class="ag__empty">{emptyLabel}</p>
   {:else}
@@ -749,7 +744,6 @@
         {@const day = ch.day}
       {@const items = dayItems(day)}
       {@const banners = clashesByDay?.get(day) ?? []}
-      {@const segs = railSegs(day)}
       {@const empty = items.length === 0 && banners.length === 0}
       <section
         class="ag__day"
@@ -757,10 +751,20 @@
         class:ag__day--today={day === todayIso}
         data-day={day}
       >
-        <header class="ag__head">
-          <span class="ag__wd">{headWeekday(day)}</span>
-          <span class="ag__num">{Number(day.slice(8, 10))}</span>
-        </header>
+        <!-- TWO BRANCHES, NOT `<svelte:element>`: a real `<button>` carries
+             the role, the keyboard and the focus ring for free, and a
+             dynamic tag cannot be checked for any of the three. -->
+        {#if onDayOpen}
+          <button type="button" class="ag__head" onclick={() => onDayOpen?.(day)}>
+            <span class="ag__wd">{headWeekday(day)}</span>
+            <span class="ag__num">{Number(day.slice(8, 10))}</span>
+          </button>
+        {:else}
+          <header class="ag__head">
+            <span class="ag__wd">{headWeekday(day)}</span>
+            <span class="ag__num">{Number(day.slice(8, 10))}</span>
+          </header>
+        {/if}
         <div class="ag__rows">
           <!-- AN ABSENCE IS A LINE INSIDE THE DAY IT AFFECTS, not a capsule
                in a rail off to the side. The rail draws a shape you have to
@@ -802,23 +806,6 @@
             {/if}
           {/each}
         </div>
-        {#each segs as seg (seg.i)}
-          <span
-            class="ag__cap"
-            class:ag__cap--away={seg.item.away}
-            class:ag__cap--company={seg.item.company}
-            class:ag__cap--tentative={seg.item.tentative}
-            class:ag__cap--start={day === seg.item.from}
-            class:ag__cap--end={day === seg.item.to}
-            style={`--lane: ${seg.lane};`}
-            title={seg.item.label}
-            aria-hidden="true"
-          >
-            {#if railMode !== 'threads' && day === railLabelDay[seg.i]}
-              <span class="ag__cap-name">{seg.item.label}</span>
-            {/if}
-          </span>
-        {/each}
       </section>
       {/if}
     {/each}
@@ -903,32 +890,6 @@
     }
 .ag--loading {
       opacity: 0.6;
-    }
-/* ── NOTES margin — a dot-grid bullet-journal column on the right. ── */
-    .ag__notes {
-      grid-column: 2;
-      grid-row: 1 / -1;
-      position: relative;
-      border-inline-start: 1px solid var(--border-color-light);
-      background-image: radial-gradient(
-        circle,
-        color-mix(in oklch, var(--text-faint) 45%, transparent) 1px,
-        transparent 1.5px
-      );
-      background-size: 22px 22px;
-      background-position: 18px 44px;
-      z-index: 0;
-    }
-.ag__notes-head {
-      position: sticky;
-      top: 0;
-      display: block;
-      padding: var(--space-m) var(--space-s) var(--space-s) var(--space-l);
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      letter-spacing: 0.28em;
-      text-transform: uppercase;
-      color: var(--text-faint);
     }
 .ag__empty {
       padding-block: var(--space-xl);
@@ -1149,73 +1110,6 @@
 .ag__contest-jump:hover {
       color: var(--text-muted);
     }
-/* ── Blackout / festival rail — per-day segments; contiguity comes
-       free because every day inside a stored blackout is included. ── */
-    .ag__cap {
-      position: absolute;
-      top: 0;
-      bottom: 0;
-      /* Negative → the capsule crosses the book/notes boundary and floats
-         OVER the dot-grid notes column ("blackouts encima"). Narrow mode
-         flips this back to a positive in-content reserve (media query). */
-      inset-inline-end: calc(
-        -1 * (var(--ag-lane-gap) + var(--lane) * (var(--ag-cap-w) + var(--ag-lane-gap)) + var(--ag-cap-w))
-      );
-      inline-size: var(--ag-cap-w);
-      background: color-mix(in oklch, var(--ag-black-accent) 26%, var(--bg));
-      border-inline: 1px solid color-mix(in oklch, var(--ag-black-accent) 45%, var(--border-color-light));
-      display: flex;
-      align-items: flex-start;
-      justify-content: center;
-      overflow: hidden;
-      z-index: 3;
-    }
-.ag__cap--start {
-      border-start-start-radius: var(--radius-circle);
-      border-start-end-radius: var(--radius-circle);
-      border-block-start: 1px solid color-mix(in oklch, var(--ag-black-accent) 45%, var(--border-color-light));
-      padding-block-start: var(--space-s);
-      top: var(--space-xs);
-    }
-.ag__cap--end {
-      border-end-start-radius: var(--radius-circle);
-      border-end-end-radius: var(--radius-circle);
-      border-block-end: 1px solid color-mix(in oklch, var(--ag-black-accent) 45%, var(--border-color-light));
-      bottom: var(--space-xs);
-    }
-.ag__cap--tentative {
-      background: repeating-linear-gradient(
-        135deg,
-        color-mix(in oklch, var(--ag-black-accent) 30%, var(--bg)) 0 5px,
-        color-mix(in oklch, var(--ag-black-accent) 11%, var(--bg)) 5px 10px
-      );
-    }
-.ag__cap--company {
-      background: color-mix(in oklch, var(--text-color) 12%, var(--bg));
-      border-color: var(--border-color-dark);
-    }
-.ag__cap--away {
-      background: none;
-      border-inline: none;
-      border-inline-end: 2px dotted color-mix(in oklch, var(--ag-black-accent) 55%, var(--border-color-dark));
-      border-radius: 0;
-    }
-.ag__cap-name {
-      writing-mode: vertical-rl;
-      transform: rotate(180deg);
-      font-family: var(--font-mono);
-      font-size: 0.6rem;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      color: color-mix(in oklch, var(--ag-black-accent) 42%, var(--text-color));
-      white-space: nowrap;
-    }
-.ag__cap--company .ag__cap-name {
-      color: var(--text-muted);
-    }
-.ag--panel .ag__cap:not(.ag__cap--away) {
-      box-shadow: -12px 0 18px -10px color-mix(in oklch, var(--text-color) 35%, transparent);
-    }
 /* THE VERB WAITS TO BE NEEDED. It is the only thing on a diary row that
    writes, so it stays in the margin voice and appears under the pointer — a
    column of `CONFIRM` down a page of options reads as a demand, and most of
@@ -1239,6 +1133,17 @@
 /* Provisional leans, like every other maybe in this drawing. */
 .ag__away--tent {
   font-style: italic;
+}
+
+button.ag__head {
+  padding: 0;
+  border: 0;
+  background: none;
+  text-align: start;
+  cursor: pointer;
+}
+button.ag__head:hover .ag__num {
+  color: var(--text-color);
 }
 
 .ag__do {
@@ -1269,48 +1174,12 @@
 .ag__sentinel {
       block-size: 1px;
     }
-/* ── Narrow toggle pill. ── */
-    .ag__railbar {
-      display: flex;
-      justify-content: flex-end;
-      padding-block-end: var(--space-xs);
-    }
-.ag__railtoggle {
-      display: inline-flex;
-      align-items: center;
-      gap: var(--space-xs);
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      letter-spacing: var(--mono-letter-spacing-loose);
-      text-transform: uppercase;
-      color: var(--text-muted);
-      background: none;
-      border: 1px solid var(--border-color-dark);
-      border-radius: var(--radius-circle);
-      padding: var(--space-2xs) var(--space-s);
-      cursor: pointer;
-    }
-.ag__railtoggle-dot {
-      inline-size: 7px;
-      block-size: 7px;
-      border-radius: var(--radius-circle);
-      background: var(--border-color-dark);
-    }
-.ag__railtoggle--on .ag__railtoggle-dot {
-      background: var(--ag-black-accent);
-    }
 @media (max-width: 560px) {
       .ag__day {
         grid-template-columns: 4.25rem 1fr;
       }
       .ag__contest {
         margin-inline: var(--space-xs);
-      }
-      /* No notes column here — the rail reserves a thread strip in-content. */
-      .ag__cap {
-        inset-inline-end: calc(
-          var(--ag-lane-gap) + var(--lane) * (var(--ag-cap-w) + var(--ag-lane-gap))
-        );
       }
     }
 }
