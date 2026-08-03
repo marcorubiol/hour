@@ -935,7 +935,17 @@
       grid-template-columns: 1fr var(--ag-notes-w, 0px);
       align-content: start;
       transition: opacity var(--transition);
-    }
+      /* ONE CONTINUOUS RULE DOWN THE MARGIN, drawn by the diary and not by each
+     day. On the day it worked, but only days that render rows have a margin
+     box — and most of this page is week bands and collapsed runs, so the line
+     came in dashes wherever something happened and vanished in between. A
+     column is a column all the way down or it is not a column, which is what
+     Marco kept reporting as «no existe». */
+  background-image: linear-gradient(to right, var(--border-color-dark) 0 1px, transparent 1px);
+  background-size: 1px 100%;
+  background-position: right 15rem top;
+  background-repeat: no-repeat;
+}
 /* The book stacks in column 1; the notes margin spans every row in 2. */
     .ag > :not(.ag__notes) {
       grid-column: 1;
@@ -970,7 +980,10 @@
       letter-spacing: 0.1em;
       text-transform: uppercase;
       color: var(--text-faint);
-    }
+      /* Stops at the margin's rule: the tally belongs to the days, not to
+     the column that annotates them. */
+  padding-inline-end: 15rem;
+}
 .ag__week-n {
       color: var(--text-muted);
     }
@@ -990,7 +1003,10 @@
       letter-spacing: 0.1em;
       text-transform: uppercase;
       color: var(--text-faint);
-    }
+      /* Stops at the margin's rule: the tally belongs to the days, not to
+     the column that annotates them. */
+  padding-inline-end: 15rem;
+}
 .ag__run-n {
       color: var(--text-muted);
     }
@@ -1142,7 +1158,12 @@ button.ag__head:hover .ag__num {
 
 .ag__marg {
   padding: var(--space-xs) 0 var(--space-xs) var(--space-s);
-  border-inline-start: 1px solid var(--border-color-light);
+  /* THE SAME 9% NEUTRAL THAT WAS INVISIBLE ON THE CARD IS INVISIBLE HERE,
+     and for the same reason plus one: a SHORT VERTICAL hairline reads far
+     weaker than a long horizontal one, so the day dividers get away with 9%
+     and this does not. The column measured 240px wide on every day and Marco
+     still reported it missing — because the only thing that says a column is
+     there is the line down its edge. */
 }
 /* An accent RULE along the top, not a box: the app draws no dashed
    containers, and a filled card here would outweigh the two rows it is
