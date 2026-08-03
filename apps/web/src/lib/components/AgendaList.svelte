@@ -118,6 +118,8 @@
         the month's number is. A diary tells you a date has weight; the next
         question is always what that day looks like. */
     onDayOpen?: (isoDate: string) => void;
+    /** «to decide» — the margin card's own eyebrow. */
+    decideCardLabel?: string;
     onReachEnd?: () => void;
     /** Top "earlier months" action → page prepends (scroll-anchored). */
     onReachStart?: () => void;
@@ -168,6 +170,7 @@
     awayLeftOneWord = '1 day left',
     awayBackWord = 'back tomorrow',
     onDayOpen,
+    decideCardLabel = 'to decide',
     onConfirm,
     onRelease,
     pendingId = null,
@@ -572,6 +575,37 @@
    * items — nothing new is fetched, and when the rail is off they are still
    * here, because an absence is a fact about the day and not a decoration.
    */
+  /**
+   * THE CALL, IN THE MARGIN OF THE DAY THAT CAUSES IT.
+   *
+   * The drawer at the head of the page lists every call in the window; this
+   * says the same thing where it happens, beside the two rows it is about.
+   * They are not a duplicate: the drawer is the QUEUE (what is left to
+   * decide, in order) and this is the ANNOTATION (why this day is loud).
+   *
+   * The margin only exists on days that have one. An empty margin is worse
+   * than no margin — it makes the page look half-loaded, which is exactly
+   * why the notes column came out.
+   */
+  function marginCards(day: string) {
+    const decs = decisionsByDay?.get(day) ?? [];
+    if (decs.length === 0) return [];
+    const rows = rowsByDay.get(day) ?? [];
+    const byId = new Map(rows.filter((r) => r.kind === 'perf').map((r) => [r.perf.id, r]));
+    return decs.map((d, i) => ({
+      key: `${day}:${i}`,
+      reason: d.reason,
+      severity: d.severity,
+      sides: d.ids
+        .map((id) => byId.get(id))
+        .filter(Boolean)
+        .map((r) => {
+          const sl = performanceSlip(r!.perf, slipCtx);
+          return { id: sl.id, name: sl.name, time: sl.time?.primary ?? null, project: sl.project };
+        }),
+    }));
+  }
+
   function awayLines(day: string) {
     const out: Array<{ key: string; who: string; rest: string; tentative: boolean }> = [];
     railItems.forEach((item, i) => {
@@ -784,20 +818,13 @@
                card says what to do about it. Three tellings became one. -->
           {#each items as it, ii (ii)}
             {#if 'contest' in it}
-              <div class="ag__contest" data-severity={it.contest.dec.severity}>
-                <p class="ag__contest-head">
-                  <span
-                    class="ag__contest-mark"
-                    data-severity={it.contest.dec.severity}
-                    aria-hidden="true">{it.contest.dec.severity === 'possible' ? '?' : '!'}</span
-                  >
-                  <span class="ag__contest-reason">{it.contest.dec.reason}</span>
-                  {#if onDecideJump}<button
-                      type="button"
-                      class="ag__contest-jump"
-                      onclick={onDecideJump}>{decideLabel}</button
-                    >{/if}
-                </p>
+              <!-- THE PAIR STAYS TOGETHER AND SAYS NOTHING EXTRA. It used to
+                   wear a grey head — «? No team data — they could clash.» with
+                   a `DECIDE ↑` — which is now the THIRD telling of one fact:
+                   the dotted rule marks exactly the two rows, and the margin
+                   card beside them says why and what to do. The wrapper keeps
+                   the two rows adjacent; the words are gone. -->
+              <div class="ag__pair">
                 {@render eventRow(it.contest.a)}
                 {@render eventRow(it.contest.b)}
               </div>
@@ -806,6 +833,28 @@
             {/if}
           {/each}
         </div>
+          {#if marginCards(day).length > 0}
+            <aside class="ag__marg">
+              {#each marginCards(day) as card (card.key)}
+                <div class="ag__card" data-severity={card.severity}>
+                  <p class="ag__card-eyebrow">{decideCardLabel}</p>
+                  <p class="ag__card-say">{card.reason}</p>
+                  {#each card.sides as side (side.id)}
+                    <p class="ag__card-side">
+                      {#if side.project}<IdentityMark
+                          mini
+                          accent={accentVarFor(side.project)}
+                          name={side.project.name}
+                          initials={side.project.initials}
+                        />{/if}
+                      <span class="ag__card-venue">{side.name}</span>
+                      {#if side.time}<span class="ag__card-time">{side.time}</span>{/if}
+                    </p>
+                  {/each}
+                </div>
+              {/each}
+            </aside>
+          {/if}
       </section>
       {/if}
     {/each}
@@ -981,7 +1030,10 @@
     .ag__day {
       position: relative;
       display: grid;
-      grid-template-columns: 6rem 1fr;
+      /* Three columns: the date, the day, and a margin that only draws when
+         the day has a call to make. `auto` collapses to nothing on the days
+         that do not — no reserved emptiness. */
+      grid-template-columns: 6rem minmax(0, 1fr) auto;
       align-items: start;
       border-block-end: 1px solid var(--border-color-light);
     }
@@ -1048,68 +1100,6 @@
 /* THE CITY SITS UNDER THE NAME — one line for what it is, one for where
        it is — and it is QUIETER: the name is the assertion, the place is the
        gloss. It used to ride inline behind the name, where it inherited the
-/* ── Contested holds — a heavier clash band wrapping the two rows. ── */
-    .ag__contest {
-      margin: var(--space-2xs) var(--space-s) var(--space-xs) var(--space-m);
-      border: 1px solid color-mix(in oklch, var(--danger) 22%, var(--border-color-light));
-      border-radius: var(--radius-m);
-      background: color-mix(in oklch, var(--danger) 4%, transparent);
-      overflow: hidden;
-    }
-.ag__contest[data-severity='possible'] {
-      border-color: var(--border-color-dark);
-      background: var(--bg-light);
-    }
-.ag__contest-head {
-      display: flex;
-      align-items: center;
-      gap: var(--space-xs);
-      padding: var(--space-xs) var(--space-s);
-      font-size: var(--text-xs);
-      color: var(--text-muted);
-      border-block-end: 1px solid color-mix(in oklch, var(--danger) 12%, var(--border-color-light));
-    }
-.ag__contest[data-severity='possible'] .ag__contest-head {
-      border-block-end-color: var(--border-color-light);
-    }
-.ag__contest-mark {
-      inline-size: 1rem;
-      block-size: 1rem;
-      border-radius: var(--radius-circle);
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      line-height: 1;
-      background: var(--danger);
-      color: var(--bg);
-      flex: none;
-    }
-.ag__contest-mark[data-severity='possible'] {
-      background: var(--bg);
-      color: var(--text-faint);
-      border: 1px dashed var(--border-color-dark);
-    }
-.ag__contest-reason {
-      min-inline-size: 0;
-      flex: 1;
-    }
-.ag__contest-jump {
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      letter-spacing: var(--mono-letter-spacing-loose);
-      text-transform: uppercase;
-      color: var(--text-faint);
-      background: none;
-      border: none;
-      cursor: pointer;
-      flex: none;
-      white-space: nowrap;
-    }
-.ag__contest-jump:hover {
-      color: var(--text-muted);
-    }
 /* THE VERB WAITS TO BE NEEDED. It is the only thing on a diary row that
    writes, so it stays in the margin voice and appears under the pointer — a
    column of `CONFIRM` down a page of options reads as a demand, and most of
@@ -1146,6 +1136,67 @@ button.ag__head:hover .ag__num {
   color: var(--text-color);
 }
 
+.ag__marg {
+  inline-size: 15rem;
+  padding: var(--space-xs) 0 var(--space-xs) var(--space-s);
+}
+/* An accent RULE along the top, not a box: the app draws no dashed
+   containers, and a filled card here would outweigh the two rows it is
+   annotating. */
+.ag__card {
+  padding-block-start: var(--space-2xs);
+  border-block-start: 1.5px solid var(--info);
+}
+.ag__card[data-severity='people'] {
+  border-block-start-color: var(--danger);
+}
+.ag__card + .ag__card {
+  margin-block-start: var(--space-s);
+}
+.ag__card-eyebrow {
+  margin: 0 0 3px;
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--info);
+}
+.ag__card[data-severity='people'] .ag__card-eyebrow {
+  color: var(--danger);
+}
+.ag__card-say {
+  margin: 0 0 var(--space-xs);
+  font-size: var(--text-s);
+  line-height: 1.35;
+  color: var(--text-color);
+}
+.ag__card-side {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0 0 2px;
+  min-inline-size: 0;
+}
+.ag__card-venue {
+  font-size: var(--text-s);
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ag__card-time {
+  margin-inline-start: auto;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.ag__pair {
+  display: contents;
+}
+
 .ag__do {
   padding: 0;
   border: 0;
@@ -1177,9 +1228,6 @@ button.ag__head:hover .ag__num {
 @media (max-width: 560px) {
       .ag__day {
         grid-template-columns: 4.25rem 1fr;
-      }
-      .ag__contest {
-        margin-inline: var(--space-xs);
       }
     }
 }

@@ -338,6 +338,7 @@
   "planner.dec_row_expires": "expires {day}",
   "planner.dec_row_no_deadline": "no deadline yet",
   "planner.dec_also_busy": "also busy · nothing to decide",
+  "planner.dec_card": "to decide",
   "planner.dec_no_one_in_both": "two projects · no one in both",
   "planner.dec_not_saved": "Change not saved",
   "planner.dec_try_again": "{message} — try again.",

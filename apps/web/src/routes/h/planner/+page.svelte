@@ -2118,6 +2118,7 @@
         dayIso = iso;
         setView('day');
       }}
+      decideCardLabel={t('planner.dec_card', locale)}
       awayUntilWord={t('planner.away_until', locale)}
       awayLeftWord={t('planner.away_left', locale, { n: '{n}' })}
       awayLeftOneWord={t('planner.away_left_one', locale)}

@@ -329,6 +329,7 @@
   "planner.dec_row_expires": "venç {day}",
   "planner.dec_row_no_deadline": "encara sense termini",
   "planner.dec_also_busy": "també ocupat · res a decidir",
+  "planner.dec_card": "per decidir",
   "planner.dec_no_one_in_both": "dos projectes · ningú a totes dues",
   "planner.dec_not_saved": "Canvi no desat",
   "planner.dec_try_again": "{message} — torna-ho a provar.",
