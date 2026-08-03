@@ -833,9 +833,14 @@
             {/if}
           {/each}
         </div>
-          {#if marginCards(day).length > 0}
-            <aside class="ag__marg">
-              {#each marginCards(day) as card (card.key)}
+          <!-- THE MARGIN IS A COLUMN OF THE DIARY, not a thing that appears.
+               It was drawn only on days that had a call, so the page's right
+               edge moved from day to day and the rule that separates reading
+               from annotating came and went. What had to go was the DECORATION
+               it used to hold — a dot grid and the word NOTES over nothing —
+               not the column. An empty margin is fine; a jumping one is not. -->
+          <aside class="ag__marg">
+            {#each marginCards(day) as card (card.key)}
                 <div class="ag__card" data-severity={card.severity}>
                   <p class="ag__card-eyebrow">{decideCardLabel}</p>
                   <p class="ag__card-say">{card.reason}</p>
@@ -852,9 +857,8 @@
                     </p>
                   {/each}
                 </div>
-              {/each}
-            </aside>
-          {/if}
+            {/each}
+          </aside>
       </section>
       {/if}
     {/each}
@@ -1033,7 +1037,7 @@
       /* Three columns: the date, the day, and a margin that only draws when
          the day has a call to make. `auto` collapses to nothing on the days
          that do not — no reserved emptiness. */
-      grid-template-columns: 6rem minmax(0, 1fr) auto;
+      grid-template-columns: 6rem minmax(0, 1fr) 15rem;
       align-items: start;
       border-block-end: 1px solid var(--border-color-light);
     }
@@ -1137,8 +1141,8 @@ button.ag__head:hover .ag__num {
 }
 
 .ag__marg {
-  inline-size: 15rem;
   padding: var(--space-xs) 0 var(--space-xs) var(--space-s);
+  border-inline-start: 1px solid var(--border-color-light);
 }
 /* An accent RULE along the top, not a box: the app draws no dashed
    containers, and a filled card here would outweigh the two rows it is
@@ -1228,6 +1232,16 @@ button.ag__head:hover .ag__num {
 @media (max-width: 560px) {
       .ag__day {
         grid-template-columns: 4.25rem 1fr;
+      }
+      /* On a phone the margin has nowhere to go: the annotation falls under
+         the day it annotates rather than squeezing the reading to a gutter. */
+      .ag__marg {
+        grid-column: 1 / -1;
+        padding-inline-start: 4.25rem;
+        border-inline-start: 0;
+      }
+      .ag__marg:empty {
+        display: none;
       }
     }
 }
