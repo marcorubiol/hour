@@ -10,13 +10,13 @@
  * inside `toStore`, so the queries keep tracking the page's `$state`/
  * `$derived` across the module boundary.
  */
-import { createQuery } from '@tanstack/svelte-query';
+import { createQuery, type QueryClient } from '@tanstack/svelte-query';
 import { toStore } from 'svelte/store';
 import { fetchJSON } from '$lib/api';
 import { addDaysIso, type PlannerView } from '$lib/planner';
 import { teamQueryOptions } from '$lib/nav-queries';
 import type { AvailabilityItem } from '$lib/availability';
-import type { DateEvent, PerformanceEvent } from '$lib/month-events';
+import type { DateEvent, NoteEvent, PerformanceEvent } from '$lib/month-events';
 import type { TeamItem } from '$lib/people';
 
 /** Canonical in $lib/people; re-exported so existing importers keep working. */
@@ -70,6 +70,99 @@ async function pagedFeed<T extends { id: string }>(
     cursor = lastDay;
   }
   return { items };
+}
+
+/**
+ * Pre-seed the agenda caches for a WINDOW ABOUT TO EXIST (2026-08-03).
+ *
+ * The probes JUMP the window — back to where history begins, forward over
+ * gaps to the next planned month — and a window change renders at once
+ * while its feed refetches, so the jumped-to months flashed EMPTY, the
+ * book dimmed, and the rows popped in under the reader a beat later:
+ * three visual hits that read as an error. Fetching just the missing
+ * stretch and seeding the coming window's keys means the window only
+ * moves once its rows are in hand — one render, fully formed, `isLoading`
+ * never true (the query wakes up already fed), and the background refetch
+ * confirms silently. Availability bands still arrive on their own beat:
+ * additive lines, not layout.
+ */
+export async function primeAgendaWindow(
+  queryClient: QueryClient,
+  args: {
+    newFrom: string;
+    newTo: string;
+    oldFrom: string;
+    oldTo: string;
+    unresolved: boolean;
+    filterIds: { projectIds: string[]; workspaceIds: string[] };
+  },
+): Promise<void> {
+  const { newFrom, newTo, oldFrom, oldTo, unresolved, filterIds } = args;
+  const stretches: Array<[string, string]> = [];
+  if (newFrom < oldFrom) stretches.push([newFrom, addDaysIso(oldFrom, -1)]);
+  if (newTo > oldTo) stretches.push([addDaysIso(oldTo, 1), newTo]);
+  if (stretches.length === 0) return;
+
+  const signal = new AbortController().signal;
+  const perfs: PerformanceEvent[] = [];
+  const dates: DateEvent[] = [];
+  const notes: NoteEvent[] = [];
+  for (const [f, t] of stretches) {
+    const [p, d, n] = await Promise.all([
+      pagedFeed<PerformanceEvent>(
+        (from) =>
+          `/api/performances?status=any&rosters=1&notice=1&${feedParams(filterIds, from, t)}`,
+        (r) => r.performed_at.slice(0, 10),
+        f,
+        signal,
+      ),
+      pagedFeed<DateEvent>(
+        // Same ±1-day pad as the live feed (tz bucketing at the edges).
+        (from) => `/api/dates?${feedParams(filterIds, addDaysIso(from, -1), addDaysIso(t, 1))}`,
+        (r) => r.starts_at.slice(0, 10),
+        f,
+        signal,
+      ),
+      fetchJSON<{ items: NoteEvent[] }>(`/api/notes?from=${f}&to=${t}`, signal).catch(() => ({
+        items: [] as NoteEvent[],
+      })),
+    ]);
+    perfs.push(...p.items);
+    dates.push(...d.items);
+    notes.push(...n.items);
+  }
+
+  const merge = <T extends { id: string }>(a: T[], b: T[]): T[] => {
+    const seen = new Set<string>();
+    const out: T[] = [];
+    for (const it of [...a, ...b]) {
+      if (!seen.has(it.id)) {
+        seen.add(it.id);
+        out.push(it);
+      }
+    }
+    return out;
+  };
+  const oldKey = { from: oldFrom, to: oldTo, unresolved, ...filterIds };
+  const newKey = { from: newFrom, to: newTo, unresolved, ...filterIds };
+  const curP =
+    queryClient.getQueryData<{ items: PerformanceEvent[] }>([
+      'planner-agenda-performances',
+      oldKey,
+    ])?.items ?? [];
+  const curD =
+    queryClient.getQueryData<{ items: DateEvent[] }>(['planner-agenda-dates', oldKey])?.items ??
+    [];
+  const curN =
+    queryClient.getQueryData<{ items: NoteEvent[] }>([
+      'planner-agenda-notes',
+      { from: oldFrom, to: oldTo },
+    ])?.items ?? [];
+  queryClient.setQueryData(['planner-agenda-performances', newKey], { items: merge(curP, perfs) });
+  queryClient.setQueryData(['planner-agenda-dates', newKey], { items: merge(curD, dates) });
+  queryClient.setQueryData(['planner-agenda-notes', { from: newFrom, to: newTo }], {
+    items: merge(curN, notes),
+  });
 }
 
 export interface PlannerFeedInputs {
@@ -287,6 +380,32 @@ export function createPlannerFeeds(inputs: PlannerFeedInputs) {
     };
   });
 
+  // My post-its across the book's window (ADR-093). NO scope filter, on
+  // purpose: the pins narrow the company's calendar, and a note is not the
+  // company's — it is the author's marginalia, and hiding your own note
+  // because a project fell out of scope reads as losing it. Graceful
+  // absence (contract §6): a pre-migration DB 404s the feed — the margin
+  // reads empty and the `absent` marker hides the writer.
+  const agendaNotesOptions = toStore(() => {
+    const k = agendaFeedKey;
+    return {
+      queryKey: ['planner-agenda-notes', { from: k.from, to: k.to }] as const,
+      enabled: inputs.view() === 'agenda',
+      queryFn: async ({ signal }: { signal: AbortSignal }) => {
+        try {
+          return await fetchJSON<{ items: NoteEvent[]; absent?: boolean }>(
+            `/api/notes?from=${k.from}&to=${k.to}`,
+            signal,
+          );
+        } catch (err) {
+          if (err instanceof Error && err.message === 'Unauthorized') throw err;
+          console.warn('[calendar] notes feed absent:', err);
+          return { items: [] as NoteEvent[], absent: true };
+        }
+      },
+    };
+  });
+
   return {
     perfQuery: createQuery(perfOptions),
     datesQuery: createQuery(datesOptions),
@@ -296,5 +415,6 @@ export function createPlannerFeeds(inputs: PlannerFeedInputs) {
     agendaPerfQuery: createQuery(agendaPerfOptions),
     agendaDatesQuery: createQuery(agendaDatesOptions),
     agendaAvailabilityQuery: createQuery(agendaAvailabilityOptions),
+    agendaNotesQuery: createQuery(agendaNotesOptions),
   };
 }

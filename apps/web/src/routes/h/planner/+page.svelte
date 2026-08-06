@@ -48,10 +48,11 @@
     type BlackoutBandVM,
     type ClashVM,
     type DateEvent,
+    type NoteEvent,
     type PerformanceEvent,
     performanceSlip,
     dateSlip,} from '$lib/month-events';
-  import AgendaList, { type AgendaDecision } from '$lib/components/AgendaList.svelte';
+  import AgendaList, { type AgendaDecision, type NoteDraft } from '$lib/components/AgendaList.svelte';
   import DecisionBand, {
     type ConcurrenceVM,
     type DecisionOptionVM,
@@ -109,7 +110,7 @@
     personRowKeys,
     noCastProjectId,
   } from '$lib/people';
-  import { createPlannerFeeds } from '$lib/planner-feeds.svelte';
+  import { createPlannerFeeds, primeAgendaWindow } from '$lib/planner-feeds.svelte';
   import {
     normalizeLaneAxis,
     prepRuns,
@@ -179,19 +180,22 @@
 
   // ── Agenda span (ADR-076 continuous book) — the agenda projection is a
   // multi-month scroll, INDEPENDENT of `ym` (which stays the single-month
-  // truth for Month/Carrils). Seed = current month → +2 (a 3-month book);
-  // `extendAgendaEnd` appends the next month as the reader scrolls, and
-  // `extendAgendaStart` prepends earlier history on request. The whole
+  // truth for Month/Carrils). Seed = today's month; every growth — scroll,
+  // door, arrows — goes through the probes (jump-to-planned or honest
+  // end), so no path ever mints a month the plan does not contain. The whole
   // downstream engine reads the agenda window only while view === 'agenda'
   // (the source-switch below), so nothing here perturbs the other two. ──
   function firstOfMonth(m: { year: number; month: number }): string {
     return `${m.year}-${String(m.month).padStart(2, '0')}-01`;
   }
   // The book OPENS on today (not the 1st) — a diary starts where you are.
-  // "Earlier" first fills the rest of today's month, then walks back a
-  // month at a time (extendAgendaStart).
+  // "Earlier" probes down to where history begins and jumps there.
+  // The seed is TODAY'S MONTH ALONE (Marco, 2026-08-03): it used to be +2,
+  // and with honest ends those two months surfaced as empty chapters
+  // between the last gig and «nothing more planned». The forward probe
+  // pulls the future in only where it exists.
   let agendaFromIso = $state(todayIso);
-  let agendaEnd = $state(addMonths(now.getFullYear(), now.getMonth() + 1, 2));
+  let agendaEnd = $state(addMonths(now.getFullYear(), now.getMonth() + 1, 0));
   let agendaToIso = $derived(
     addDaysIso(firstOfMonth(addMonths(agendaEnd.year, agendaEnd.month, 1)), -1),
   );
@@ -206,17 +210,9 @@
     }
     return out;
   });
-  function extendAgendaEnd() {
-    agendaEnd = addMonths(agendaEnd.year, agendaEnd.month, 1);
-  }
-  function extendAgendaStart() {
-    const y = Number(agendaFromIso.slice(0, 4));
-    const m = Number(agendaFromIso.slice(5, 7));
-    const d = Number(agendaFromIso.slice(8, 10));
-    // Mid-month start → back-fill this month first; already at the 1st →
-    // prepend the whole previous month.
-    agendaFromIso = d > 1 ? firstOfMonth({ year: y, month: m }) : firstOfMonth(addMonths(y, m, -1));
-  }
+  // The blind one-month steppers (`extendAgendaStart`/`extendAgendaEnd`)
+  // died 2026-08-03: every way the window grows now goes through the
+  // probes, so the book never mints a month the plan does not contain.
 
   // ── Projection (ADR-076 + ADR-078 §10) ───────────────────────────────
   // Resolution: explicit ?view= → localStorage (per device) → form factor.
@@ -440,6 +436,7 @@
     agendaPerfQuery,
     agendaDatesQuery,
     agendaAvailabilityQuery,
+    agendaNotesQuery,
   } = createPlannerFeeds({
     view: () => view,
     gridFrom: () => gridFrom,
@@ -1413,22 +1410,27 @@
      flight) and a floor, because nobody plans two years backwards. */
   let prepending = false;
   const AGENDA_FLOOR = 24; // months back from today
-  async function loadEarlier() {
+  // The floor is a fact the UI needs too: at it, the head's «earlier» act
+  // is not passed down at all, so the line and the gesture disappear
+  // instead of lying.
+  let agendaFloorIso = $derived(
+    firstOfMonth(addMonths(Number(todayIso.slice(0, 4)), Number(todayIso.slice(5, 7)), -AGENDA_FLOOR)),
+  );
+  /** The anchored-growth shell both loaders share: pin the reader's row,
+      mutate the window, put the row back exactly where it was. */
+  async function anchoredGrow(mutate: () => void) {
     if (prepending) return;
-    const floor = firstOfMonth(
-      addMonths(Number(todayIso.slice(0, 4)), Number(todayIso.slice(5, 7)), -AGENDA_FLOOR),
-    );
-    if (agendaFromIso <= floor) return;
+    if (agendaFromIso <= agendaFloorIso) return;
     prepending = true;
+    // The anchor may be a SHUT chapter's head (no day rows exist there) —
+    // `agendaPlaceEl` pins whichever element the place actually draws.
     const anchor = visibleAgendaDay();
-    const was = anchor
-      ? (document.querySelector(`[data-day="${anchor}"]`)?.getBoundingClientRect().top ?? null)
-      : null;
-    extendAgendaStart();
+    const was = anchor ? (agendaPlaceEl(anchor)?.getBoundingClientRect().top ?? null) : null;
+    mutate();
     await tick();
     await new Promise(requestAnimationFrame);
     if (anchor && was !== null) {
-      const now = document.querySelector(`[data-day="${anchor}"]`)?.getBoundingClientRect().top;
+      const now = agendaPlaceEl(anchor)?.getBoundingClientRect().top;
       // INSTANT, AND THIS IS THE WHOLE BUG. `html` carries
       // `scroll-behavior: smooth`, so `scrollBy` ANIMATES — and an anchoring
       // correction is not a journey, it is compensation for content that
@@ -1441,6 +1443,192 @@
       if (now !== undefined) window.scrollBy({ top: now - was, behavior: 'instant' });
     }
     prepending = false;
+  }
+  /* ── THE BOOK ENDS WHERE THE PLAN ENDS, BOTH WAYS (Marco, 2026-08-03) ──
+     A collapsed chapter is ~36px, so blind growth in either direction
+     mills out mountains of quiet months (the forward sentinel never left
+     its own 800px reach; the backward door gulped 24 months of nothing).
+     Before growing past quiet, the page LOOKS once: a 1-row scoped fetch
+     for the nearest planned thing in the unloaded stretch. Found → the
+     window jumps straight to its month, and the nothing in between is
+     never loaded. Not found → the book ends with a sentence. Deliberate
+     travel (the ‹ › arrows) still walks anywhere.
+     The verdicts are monotonic while the data stands still — «nothing
+     beyond X» covers every later X — and reset on Now and on scope
+     change; a far event created mid-session shows after either. */
+  let agendaExhausted = $state(false); // forward: nothing planned ahead
+  let pastExhausted = $state(false); // backward: nothing further back
+  let probing = false;
+  let agendaHorizonIso = $derived(
+    addDaysIso(
+      firstOfMonth(
+        addMonths(Number(todayIso.slice(0, 4)), Number(todayIso.slice(5, 7)), AGENDA_FLOOR + 1),
+      ),
+      -1,
+    ),
+  );
+  $effect(() => {
+    void filterIds;
+    agendaExhausted = false;
+    pastExhausted = false;
+  });
+  /** Earliest planned day in [from, to] under the current scope, or null.
+      Both feeds return ascending, so `limit=1` IS the earliest. */
+  async function probePlan(from: string, to: string): Promise<string | null> {
+    if (from > to) return null;
+    const base = new URLSearchParams({ from, to, limit: '1' });
+    if (filterIds.projectIds.length > 0) base.set('project_ids', filterIds.projectIds.join(','));
+    if (filterIds.workspaceIds.length > 0)
+      base.set('workspace_ids', filterIds.workspaceIds.join(','));
+    const pparams = new URLSearchParams(base);
+    pparams.set('status', 'any');
+    const [perfs, dates] = await Promise.all([
+      fetchJSON<{ items: Array<{ performed_at: string }> }>(`/api/performances?${pparams}`),
+      fetchJSON<{ items: Array<{ starts_at: string }> }>(`/api/dates?${base}`),
+    ]);
+    const found = [perfs.items[0]?.performed_at, dates.items[0]?.starts_at]
+      .filter((s): s is string => Boolean(s))
+      .map((s) => s.slice(0, 10));
+    return found.sort()[0] ?? null;
+  }
+  /** The tail went quiet (the diary's sentinel is off): look ahead once.
+      The window only moves AFTER its rows are primed — an unprimed jump
+      rendered the new months empty, dimmed the book, then popped the rows
+      in under the reader, which read as an error (Marco, 2026-08-03). */
+  async function probePlanAhead() {
+    if (probing || agendaExhausted) return;
+    probing = true;
+    try {
+      const next = await probePlan(addDaysIso(agendaToIso, 1), agendaHorizonIso);
+      if (!next) {
+        agendaExhausted = true;
+        return;
+      }
+      const y = Number(next.slice(0, 4));
+      const m = Number(next.slice(5, 7));
+      const newTo = addDaysIso(firstOfMonth(addMonths(y, m, 1)), -1);
+      await primeAgendaWindow(queryClient, {
+        newFrom: agendaFromIso,
+        newTo,
+        oldFrom: agendaFromIso,
+        oldTo: agendaToIso,
+        unresolved: scopeUnresolved,
+        filterIds,
+      });
+      agendaEnd = { year: y, month: m };
+    } finally {
+      probing = false;
+    }
+  }
+  /**
+   * The past's door: open history down to where it BEGINS. It briefly
+   * jumped blind to the 24-month floor — the mirror of the forward
+   * treadmill, just in one gulp. Probing first means the quiet stretch
+   * before the company's first-ever date is never loaded at all; nothing
+   * back there → the head line becomes the fact instead of the door.
+   */
+  async function loadAllEarlier() {
+    if (probing || pastExhausted) return;
+    probing = true;
+    try {
+      const first = await probePlan(agendaFloorIso, addDaysIso(agendaFromIso, -1));
+      if (!first) {
+        pastExhausted = true;
+        return;
+      }
+      const newFrom = `${first.slice(0, 7)}-01`;
+      // Rows in hand BEFORE the window moves — see probePlanAhead.
+      await primeAgendaWindow(queryClient, {
+        newFrom,
+        newTo: agendaToIso,
+        oldFrom: agendaFromIso,
+        oldTo: agendaToIso,
+        unresolved: scopeUnresolved,
+        filterIds,
+      });
+      await anchoredGrow(() => (agendaFromIso = newFrom));
+      // The probe's answer covers this too: `first` was the EARLIEST thing
+      // in the whole stretch down to the floor, so behind the month it
+      // lives in there is nothing — say so with the same pull, not on a
+      // second ask (Marco had to pull twice to hear it, 2026-08-03).
+      pastExhausted = true;
+    } finally {
+      probing = false;
+    }
+  }
+
+  // ── The margin's post-its (ADR-093) — my notes over the book's window. ──
+  let notesByDay = $derived.by(() => {
+    const map = new Map<string, NoteEvent[]>();
+    for (const n of $agendaNotesQuery.data?.items ?? []) {
+      (map.get(n.on_day) ?? map.set(n.on_day, []).get(n.on_day)!).push(n);
+    }
+    return map;
+  });
+  // Pre-migration DB → the feed marks itself absent → the margin reads
+  // empty and the writer is simply not passed down (no write UI over a
+  // missing table — same convention as blackouts).
+  let notesAbsent = $derived(Boolean($agendaNotesQuery.data?.absent));
+  /**
+   * Where an anchorless note falls (_tasks §23): exactly one pinned
+   * container → that container; anything else → «the company», which is a
+   * workspace-anchored note in the pinned space or the default one. The
+   * margin writer only asks when the day itself offers a choice; this is
+   * the answer for every other day.
+   */
+  let noteFallback = $derived.by(
+    (): { label: string; project_id?: string; line_id?: string; workspace_id?: string } => {
+      const solo =
+        scope.projects.length + scope.lines.length + scope.workspaceIds.length === 1;
+      if (solo && scope.projects.length === 1) {
+        const p = scope.projects[0];
+        return { label: p.name, project_id: p.id };
+      }
+      if (solo && scope.lines.length === 1) {
+        const l = scope.lines[0];
+        return { label: l.name, line_id: l.id };
+      }
+      const wss = ($workspacesQuery.data?.items ?? []) as NavWorkspace[];
+      const pinned = solo ? wss.find((w) => w.id === scope.workspaceIds[0]) : undefined;
+      const home = pinned ?? wss.find((w) => w.slug === defaultWorkspaceSlug) ?? wss[0];
+      if (home) return { label: home.name, workspace_id: home.id };
+      return { label: t('planner.note_company', locale) };
+    },
+  );
+  async function createNote(draft: NoteDraft): Promise<boolean> {
+    const anchored = Boolean(draft.performance_id || draft.date_id);
+    try {
+      await mutateJSON('POST', '/api/notes', {
+        body: draft.body,
+        on_day: draft.on_day,
+        ...(draft.performance_id ? { performance_id: draft.performance_id } : {}),
+        ...(draft.date_id ? { date_id: draft.date_id } : {}),
+        ...(!anchored && noteFallback.project_id ? { project_id: noteFallback.project_id } : {}),
+        ...(!anchored && noteFallback.line_id ? { line_id: noteFallback.line_id } : {}),
+        ...(!anchored && !noteFallback.project_id && !noteFallback.line_id && noteFallback.workspace_id
+          ? { workspace_id: noteFallback.workspace_id }
+          : {}),
+      });
+      void queryClient.invalidateQueries({ queryKey: ['planner-agenda-notes'] });
+      return true;
+    } catch (err) {
+      addToast({
+        tone: 'danger',
+        message: err instanceof Error ? err.message : 'Could not save the note.',
+      });
+      return false;
+    }
+  }
+  async function deleteNote(id: string) {
+    try {
+      await mutateJSON('DELETE', `/api/notes/${encodeURIComponent(id)}`);
+    } catch (err) {
+      addToast({
+        tone: 'danger',
+        message: err instanceof Error ? err.message : 'Could not delete the note.',
+      });
+    }
+    void queryClient.invalidateQueries({ queryKey: ['planner-agenda-notes'] });
   }
 
   // Band open/collapsed — UI state only (ADR-080 §5: "Deixa-ho obert"
@@ -1608,15 +1796,28 @@
    * If today is not rendered the diary is asked to grow towards it first.
    */
   async function scrollToToday() {
+    // THE PRESENT CLOSES THE PAST (Marco, 2026-08-03). `Now` is not a
+    // scroll — the book goes back to its first-load shape: opened at
+    // today, loaded history released, future back to the seed. The diary
+    // sees its first day JUMP FORWARD (the one move loading can never
+    // make) and resets its own furniture: doors to defaults, the past's
+    // line hidden again.
+    agendaFromIso = todayIso;
+    agendaEnd = addMonths(now.getFullYear(), now.getMonth() + 1, 0);
+    agendaExhausted = false;
+    pastExhausted = false;
+    await tick();
+    // The reset guarantees today's row: the book starts at today, and
+    // today's month and week always default open.
     const at = () => document.querySelector(`[data-day="${todayIso}"]`);
-    for (let tries = 0; tries < 3 && !at(); tries++) {
-      if (todayIso < agendaFromIso) await loadEarlier();
-      else extendAgendaEnd();
-      await tick();
-    }
-    const el = at();
+    // Today's month and week default open, but the reader can shut them by
+    // hand — then the day row does not exist and the chapter head is the
+    // honest landing (`data-month` on the divider).
+    const el = at() ?? document.querySelector(`[data-month="${todayIso.slice(0, 7)}"]`);
     if (!el) return;
-    window.scrollBy({ top: el.getBoundingClientRect().top, behavior: 'instant' });
+    // `scrollIntoView`, not `scrollBy`: only it reads the day's
+    // scroll-margin, and the day must land BELOW the stuck chrome.
+    el.scrollIntoView({ behavior: 'instant', block: 'start' });
   }
   /** `T` — one verb, and each projection knows what "today" means for it. */
   /** The window steps by whatever the drawing's window IS. */
@@ -1625,10 +1826,12 @@
    *
    * The agenda carried `today` and nothing else, on the argument that a
    * control which can never fire is not drawn. That was true only while the
-   * agenda ran forwards: it loads BACKWARDS too (`extendAgendaStart`), so its
-   * start is a thing you can move, and the arrows move it exactly as they
-   * move the month. The title says where the window BEGINS, and these two
-   * move that beginning — which is the whole reason they belong beside it.
+   * agenda ran forwards: it loads BACKWARDS too (through the probes), so
+   * its start is a thing you can move, and the arrows move it exactly as
+   * they move the month. The title says where the window BEGINS, and these
+   * two move that beginning — which is the whole reason they belong beside
+   * it. At the plan's end in either direction they answer with the end
+   * line instead of minting empty months.
    */
   function stepBack() {
     if (view === 'day') {
@@ -1663,22 +1866,54 @@
       addMonths(Number(here.slice(0, 4)), Number(here.slice(5, 7)), step),
     );
     for (let tries = 0; tries < 3; tries++) {
-      const el = document.querySelector(`[data-day="${target}"]`);
+      // A collapsed month draws no day rows — its chapter head is the stop.
+      const el = agendaPlaceEl(target);
       if (el) {
         el.scrollIntoView({ behavior: 'smooth', block: 'start' });
         return;
       }
-      if (step < 0) await loadEarlier();
-      else extendAgendaEnd();
+      // The target is beyond the loaded span. The arrows do not mint empty
+      // months past the plan (Marco, 2026-08-03): they grow toward planned
+      // content only — the probes jump the gaps for them.
+      if (step < 0) await loadAllEarlier();
+      else await probePlanAhead();
       await tick();
     }
+    // Nothing appeared: the plan is finished that way, and the stop IS the
+    // message — the press answers by showing it instead of doing nothing.
+    if (step < 0 ? pastExhausted : agendaExhausted) {
+      const lines = document.querySelectorAll('.ag__end');
+      const line = step < 0 ? lines[0] : lines[lines.length - 1];
+      line?.scrollIntoView({ behavior: 'smooth', block: step < 0 ? 'start' : 'end' });
+    }
   }
-  /** The first day row whose top is at or below the viewport's top edge. */
+  /**
+   * The first day-or-chapter row at or below the viewport's top edge. A
+   * shut month draws no day rows, so its chapter head has to count as a
+   * place — without it the arrows lose their bearings inside a stack of
+   * shut chapters (null → fell back to today → ‹ › teleported the reader
+   * to the present instead of stepping from where they stood).
+   */
   function visibleAgendaDay(): string | null {
-    for (const el of document.querySelectorAll<HTMLElement>('[data-day]')) {
-      if (el.getBoundingClientRect().bottom > 0) return el.dataset.day ?? null;
+    // The reading edge is the STUCK toolbar's underside, not the viewport's
+    // 0: a row can sit behind the chrome with bottom > 0, and taking it as
+    // "where the reader is" makes the next ‹ › step a no-op.
+    const bar = document.querySelector('.cal__toolbar');
+    const edge = bar ? bar.getBoundingClientRect().bottom : 0;
+    for (const el of document.querySelectorAll<HTMLElement>('[data-day], [data-month]')) {
+      if (el.getBoundingClientRect().bottom > edge) {
+        return el.dataset.day ?? `${el.dataset.month}-01`;
+      }
     }
     return null;
+  }
+  /** The element a place resolves to: its day row, or — when the month is
+      shut and the row does not exist — its chapter head. */
+  function agendaPlaceEl(place: string): Element | null {
+    return (
+      document.querySelector(`[data-day="${place}"]`) ??
+      document.querySelector(`[data-month="${place.slice(0, 7)}"]`)
+    );
   }
 
   function goToday() {
@@ -2098,8 +2333,15 @@
       releasedWord={t('planner.released', locale)}
       noHourWord={t('planner.no_hour', locale)}
       allDayWord={t('planner.all_day', locale)}
-      onReachEnd={extendAgendaEnd}
-      onReachStart={loadEarlier}
+      onReachEnd={probePlanAhead}
+      onReachStart={agendaFromIso <= agendaFloorIso || pastExhausted ? undefined : loadAllEarlier}
+      earlierLabel={t('planner.agenda_earlier', locale)}
+      loadingLabel={t('planner.agenda_loading', locale)}
+      noEarlierLabel={agendaFromIso <= agendaFloorIso || pastExhausted
+        ? t('planner.agenda_no_earlier', locale)
+        : undefined}
+      onPlanEnds={probePlanAhead}
+      endLabel={agendaExhausted ? t('planner.agenda_end', locale) : undefined}
       weekLabel={(n) => `${t('planner.week_n', locale)} ${n}`}
       weekRange={(from, to) => `${localeDayMonth(from, localeTag)} → ${localeDayMonth(to, localeTag)}`}
       weekTally={(firm, held, free) =>
@@ -2112,8 +2354,6 @@
         ]
           .filter(Boolean)
           .join(' · ') || t('planner.week_nothing', locale)}
-      runLabel={(n) => t('planner.agenda_run', locale, { n })}
-      showLabel={t('planner.agenda_show', locale)}
       onDayOpen={(iso) => {
         dayIso = iso;
         setView('day');
@@ -2130,6 +2370,13 @@
       releaseLabel={t('planner.released', locale)}
       onDecideJump={jumpToDecisions}
       onDateOpen={openDate}
+      {notesByDay}
+      onNoteCreate={notesAbsent ? undefined : createNote}
+      onNoteDelete={notesAbsent ? undefined : deleteNote}
+      noteFallbackLabel={noteFallback.label}
+      notePlaceholder={t('planner.note_placeholder', locale)}
+      noteAddLabel={t('planner.note_add', locale)}
+      noteDeleteLabel={t('planner.note_delete', locale)}
     />
   {:else}
     <!-- Carrils (ADR-080 §7/§8) — desktop-first; at 390px the strip

@@ -12,6 +12,18 @@
     reason: string;
     severity: 'people' | 'possible' | 'double';
   };
+
+  /**
+   * What the margin writer hands back (ADR-093). At most one of the two
+   * anchor ids is set — a day's own entry the writer chose. Neither set
+   * means the note falls to the page's fallback (pinned scope → company).
+   */
+  export type NoteDraft = {
+    body: string;
+    on_day: string;
+    performance_id?: string;
+    date_id?: string;
+  };
 </script>
 
 <script lang="ts">
@@ -41,10 +53,12 @@
     type BlackoutBandVM,
     type ClashVM,
     type DateEvent,
+    type NoteEvent,
     type PerformanceEvent,
   } from '$lib/month-events';
-  import { assignBandLanes, dayKeyInTz, isoWeek } from '$lib/planner';
-  import { SvelteSet } from 'svelte/reactivity';
+  import { assignBandLanes, dayKeyInTz } from '$lib/planner';
+  import { agendaChunks, emptyTailMonths, type AgendaDayStats } from '$lib/agenda-chunks';
+  import { SvelteMap } from 'svelte/reactivity';
   import { dualTime, hourMark, localeDayMonth, localeWeekdayShort } from '$lib/datetime';
   import { workspacesQueryOptions } from '$lib/nav-queries';
   import { accentVarFor } from '$lib/utils/accent';
@@ -90,14 +104,13 @@
     noHourWord?: string;
     /** «all day» — a row that lasts the day, which is not the same as no hour. */
     allDayWord?: string;
-    /** Scroll reached the end → page appends the next month. */
+    /** Scroll nears the foot → the page grows the book forward (it probes
+        and jumps to the next planned month, or answers with `endLabel`). */
     /** «week 29», «2 confirmed · 4 options · 1 night free», «5 days free»,
         «show» — the diary's own summary vocabulary. */
     weekLabel?: (n: number) => string;
     weekRange?: (from: string, to: string) => string;
     weekTally?: (firm: number, held: number, free: number) => string;
-    runLabel?: (n: number) => string;
-    showLabel?: string;
     /**
      * THE VERBS, on the row itself. A hold is a question the diary is asking
      * you; answering it belonged three clicks away in a drawer, so the row
@@ -120,9 +133,36 @@
     onDayOpen?: (isoDate: string) => void;
     /** «to decide» — the margin card's own eyebrow. */
     decideCardLabel?: string;
+    /** My post-its (ADR-093), keyed by on_day. */
+    notesByDay?: Map<string, NoteEvent[]>;
+    /** Absent ⇒ the margin only reads (pre-migration DB hides the writer). */
+    onNoteCreate?: (draft: NoteDraft) => Promise<boolean>;
+    onNoteDelete?: (id: string) => void;
+    /** Where an anchorless note falls — «the company» or the pinned scope. */
+    noteFallbackLabel?: string;
+    notePlaceholder?: string;
+    noteAddLabel?: string;
+    noteDeleteLabel?: string;
     onReachEnd?: () => void;
-    /** Top "earlier months" action → page prepends (scroll-anchored). */
-    onReachStart?: () => void;
+    /** The past, on request: fired by the head's «earlier» line and by the
+        overpull gesture at the very top. Absent (page at its floor) ⇒ both
+        disappear — an act that can do nothing is not drawn. Awaited, so
+        the door can wear «loading…» while the jump is in flight. */
+    onReachStart?: () => void | Promise<void>;
+    /** «↑ earlier months» — the head line's own words. */
+    earlierLabel?: string;
+    /** «loading…» — the door's promised/in-flight state. */
+    loadingLabel?: string;
+    /** «nothing further back» — shown at the head instead of the door once
+        the page knows the past holds nothing (or the floor is reached). */
+    noEarlierLabel?: string;
+    /** The book's tail went quiet: the sentinel is off, and the page is
+        asked to look ahead ONCE — jump the gap to the next planned month,
+        or declare the plan finished by passing `endLabel`. */
+    onPlanEnds?: () => void;
+    /** «nothing more planned» — the book's honest end, printed only when
+        the page's look-ahead came back empty. */
+    endLabel?: string;
     /** Jump to the DecisionBand (where the pick/release actions live). */
     onDecideJump?: () => void;
     /**
@@ -163,14 +203,19 @@
       [firm ? `${firm} confirmed` : '', held ? `${held} options` : '', free ? `${free} nights free` : '']
         .filter(Boolean)
         .join(' · '),
-    runLabel = (n: number) => `${n} days free`,
-    showLabel = 'show',
     awayUntilWord = 'until',
     awayLeftWord = '{n} days left',
     awayLeftOneWord = '1 day left',
     awayBackWord = 'back tomorrow',
     onDayOpen,
     decideCardLabel = 'to decide',
+    notesByDay,
+    onNoteCreate,
+    onNoteDelete,
+    noteFallbackLabel = 'the company',
+    notePlaceholder = 'Write a note…',
+    noteAddLabel = 'Add a note',
+    noteDeleteLabel = 'Delete note',
     onConfirm,
     onRelease,
     pendingId = null,
@@ -178,6 +223,11 @@
     releaseLabel = 'let go',
     onReachEnd,
     onReachStart,
+    earlierLabel = '↑ earlier months',
+    loadingLabel = 'loading…',
+    noEarlierLabel,
+    onPlanEnds,
+    endLabel,
     onDecideJump,
     onDateOpen,
   }: Props = $props();
@@ -280,108 +330,71 @@
 
   let shownDays = $derived(days);
 
-  /* ── THE WEEK IS A BAND, AND A QUIET RUN IS ONE LINE ───────────────────
-     Two facts the diary could not say. A week has a SHAPE — «2 confirmed · 4
-     options · 1 night free» — and reading it day by day is arithmetic the eye
-     should not be doing; the month draws that shape in its gutter and the
-     diary drew nothing. And a diary that prints every empty day between two
-     gigs makes the reader scroll through a fortnight of blank rows to reach
-     the next thing that happens: the run of free days is ONE fact («5 days
-     free, 3 aug → 7 aug») and it opens if you want the days themselves.
+  /* ── MONTH > WEEK > DAY — every level a door (Marco, 2026-08-03) ───────
+     The book's structure lives in $lib/agenda-chunks, pure and tested;
+     this file only hands it the day facts and holds the reader's toggles.
+     What died here: the run-of-quiet-days line (an open week now prints
+     every day it has, and the collapsed week above does the run's old
+     job), and the day-walked month divider — which a free week straddling
+     the month turn could swallow whole, hanging May's weeks under April.
+     Session state only, like every open/closed in this book (ADR-080 §5). */
+  const monthOverride = new SvelteMap<string, boolean>();
+  const weekOverride = new SvelteMap<string, boolean>();
 
-     Both are derived here, from the same `days` the diary already renders —
-     nothing new is fetched, and an empty week still draws its band, because
-     «nothing this week» is an answer. */
-  let openRuns = $state(new SvelteSet<string>());
-
-  type Chunk =
-    | { t: 'week'; key: string; n: number; from: string; to: string; firm: number; held: number; free: number }
-    | { t: 'day'; key: string; day: string }
-    | { t: 'run'; key: string; from: string; to: string; n: number }
-    | { t: 'month'; key: string; day: string };
-
-  /** A day nobody has written anything on. Away bands do not count: they are
-      about a person, not about the company's calendar. */
-  function isFree(day: string): boolean {
-    return (rowsByDay.get(day) ?? []).length === 0 && !(clashesByDay?.get(day)?.length);
-  }
-  const RUN_MIN = 3; // two blank rows are cheaper to read than a control
-
-  let chunks = $derived.by((): Chunk[] => {
-    const out: Chunk[] = [];
-    let wk = -1;
-    let i = 0;
-    while (i < shownDays.length) {
-      const day = shownDays[i];
-      // The month opens BEFORE its first week band: a serif `August 2026`
-      // arriving under `week 31` reads as a footnote to the week.
-      if (monthBreaks.has(day)) out.push({ t: 'month', key: `m${day}`, day });
-      const n = isoWeek(day);
-      if (n !== wk) {
-        wk = n;
-        const rest = shownDays.slice(i);
-        const last = rest.find((d, k) => k + 1 === rest.length || isoWeek(rest[k + 1]) !== n) ?? day;
-        let firm = 0;
-        let held = 0;
-        let free = 0;
-        for (let d = i; d < shownDays.length && isoWeek(shownDays[d]) === n; d++) {
-          const rows = rowsByDay.get(shownDays[d]) ?? [];
-          if (rows.length === 0) free++;
-          for (const r of rows) {
-            if (r.kind !== 'perf') continue;
-            const f = performanceStatusFamily(r.perf.status);
-            if (f === 'confirmed') firm++;
-            else if (f === 'hold' || f === 'proposed') held++;
-          }
-        }
-        out.push({ t: 'week', key: `w${day}`, n, from: day, to: last, firm, held, free });
-      }
-      // A run of quiet days inside this week collapses to one line.
-      if (isFree(day)) {
-        let j = i;
-        while (j + 1 < shownDays.length && isFree(shownDays[j + 1]) && isoWeek(shownDays[j + 1]) === n)
-          j++;
-        const len = j - i + 1;
-        const key = `r${day}`;
-        // A RUN NEVER SWALLOWS TODAY. Today is usually a free day, so the
-        // collapse I just added could remove the one row `Now` navigates to —
-        // and then the button silently did nothing, which is exactly what
-        // Marco hit. A day you can be sent to has to exist.
-        const holdsToday = day <= todayIso && todayIso <= shownDays[j];
-        // A WEEK THAT IS ENTIRELY FREE SAYS IT ONCE. Its band already reads
-        // «7 nights free»; a run under it reading «7 days free» is the same
-        // sentence twice, and it was the loudest pattern in the whole diary
-        // — every quiet week printed two identical lines.
-        const wholeWeek = out[out.length - 1]?.t === 'week' && len >= 7;
-        if (len >= RUN_MIN && !holdsToday && !wholeWeek && !openRuns.has(key)) {
-          out.push({ t: 'run', key, from: day, to: shownDays[j], n: len });
-          i = j + 1;
-          continue;
-        }
-        if (wholeWeek && !holdsToday && !openRuns.has(key)) {
-          // …and it draws no day rows at all: the band was the answer.
-          i = j + 1;
-          continue;
-        }
-      }
-      out.push({ t: 'day', key: day, day });
-      i++;
+  /* `Now` RESETS THE BOOK (Marco, 2026-08-03): the page snaps the span's
+     start back to today, and the diary notices its first day JUMPING
+     FORWARD — loading only ever moves it back — and returns to its
+     first-load shape: doors to their defaults, the past's line hidden
+     until it is asked for again. */
+  let prevStart = '';
+  $effect(() => {
+    const start = days[0] ?? '';
+    if (prevStart && start > prevStart) {
+      earlierRevealed = false;
+      monthOverride.clear();
+      weekOverride.clear();
     }
-    return out;
+    prevStart = start;
   });
 
-  // First day of each month → where the serif divider opens.
-  let monthBreaks = $derived.by(() => {
-    const s = new Set<string>();
-    let prev = '';
-    for (const d of days) {
-      const mk = d.slice(0, 7);
-      if (mk !== prev) {
-        s.add(d);
-        prev = mk;
-      }
+  /** The day's facts, in the chunker's vocabulary. `free` is a night the
+      trade can sell (no rows); `marked` is a clash or a note — not a
+      booking, but reason enough to keep the day's containers open. Away
+      bands count for neither: they are about a person, not the calendar. */
+  function dayStats(day: string): AgendaDayStats {
+    const rows = rowsByDay.get(day) ?? [];
+    let firm = 0;
+    let held = 0;
+    for (const r of rows) {
+      if (r.kind !== 'perf') continue;
+      const f = performanceStatusFamily(r.perf.status);
+      if (f === 'confirmed') firm++;
+      else if (f === 'hold' || f === 'proposed') held++;
     }
-    return s;
+    return {
+      free: rows.length === 0,
+      marked:
+        Boolean(clashesByDay?.get(day)?.length) || Boolean(notesByDay?.get(day)?.length),
+      firm,
+      held,
+    };
+  }
+
+  let chunks = $derived(
+    agendaChunks({ days: shownDays, todayIso, dayStats, monthOverride, weekOverride }),
+  );
+
+  /* ── THE BOOK STOPS GROWING WHERE THE PLAN STOPS (Marco, 2026-08-03) ──
+     A collapsed chapter is ~36px, so the end sentinel never left its own
+     800px reach and one scroll milled out months of quiet future. When the
+     tail goes quiet the sentinel goes OFF and the page is asked to look
+     ahead once — jump the gap to the next planned month, or come back with
+     `endLabel` and the book ends with a sentence instead of a treadmill.
+     Deliberate travel (the ‹ › arrows) still walks past the end. */
+  let endStop = $derived(emptyTailMonths(shownDays, todayIso, dayStats) >= 1);
+  $effect(() => {
+    void days.length;
+    if (endStop) onPlanEnds?.();
   });
 
   // ── Render items per day: loose rows, with contested holds folded into a
@@ -606,6 +619,65 @@
     }));
   }
 
+  /* ── THE POST-IT'S WRITER (ADR-093) ────────────────────────────────────
+     A note is about SOMETHING (§1): a day with one entry pre-fills that
+     anchor, a day with several asks which, and an empty day says where it
+     will fall — the page's fallback (pinned scope → the company). The
+     component only ever answers with an entry of the day it can see;
+     resolving the fallback into ids is the page's business. */
+  type NoteAnchorOption = { key: string; label: string; performance_id?: string; date_id?: string };
+  function noteAnchorOptions(day: string): NoteAnchorOption[] {
+    const out: NoteAnchorOption[] = [];
+    for (const r of rowsByDay.get(day) ?? []) {
+      if (r.kind === 'perf') {
+        const sl = performanceSlip(r.perf, slipCtx);
+        out.push({ key: `p:${r.perf.id}`, label: sl.name, performance_id: r.perf.id });
+      } else {
+        const sl = dateSlip(r.date, slipCtx);
+        out.push({ key: `d:${r.date.id}`, label: sl.name, date_id: r.date.id });
+      }
+    }
+    return out;
+  }
+  let writingDay = $state<string | null>(null);
+  let noteDraft = $state('');
+  /** '' = the fallback (company/scope); otherwise a NoteAnchorOption key. */
+  let noteAnchorKey = $state('');
+  let notePending = $state(false);
+  function openNoteWriter(day: string) {
+    writingDay = day;
+    noteDraft = '';
+    noteAnchorKey = noteAnchorOptions(day)[0]?.key ?? '';
+  }
+  function closeNoteWriter() {
+    writingDay = null;
+    noteDraft = '';
+    notePending = false;
+  }
+  async function saveNote(day: string) {
+    if (!onNoteCreate || notePending) return;
+    const body = noteDraft.trim();
+    if (!body) return;
+    const opt = noteAnchorOptions(day).find((o) => o.key === noteAnchorKey);
+    notePending = true;
+    const ok = await onNoteCreate({
+      body,
+      on_day: day,
+      ...(opt?.performance_id ? { performance_id: opt.performance_id } : {}),
+      ...(opt?.date_id ? { date_id: opt.date_id } : {}),
+    });
+    notePending = false;
+    if (ok) closeNoteWriter();
+  }
+  function noteKeydown(e: KeyboardEvent, day: string) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      void saveNote(day);
+    } else if (e.key === 'Escape') {
+      closeNoteWriter();
+    }
+  }
+
   function awayLines(day: string) {
     const out: Array<{ key: string; who: string; rest: string; tentative: boolean }> = [];
     railItems.forEach((item, i) => {
@@ -638,54 +710,33 @@
     return out;
   }
 
-  /* ── THE DIARY LOADS AT BOTH EDGES ────────────────────────────────────
-     A sentinel above the first day and one below the last: come within
-     800px of either and the page is asked for another month. Re-observed on
-     every span change, so a sentinel still in view after one extension fires
-     again and fills the viewport.
+  /* ── THE DIARY LOADS FORWARDS BY ITSELF, AND BACKWARDS ON PURPOSE ─────
+     One sentinel below the last day: come within 800px of the foot and the
+     page is asked for another month — you are travelling that way, and the
+     next month should already be there when you arrive.
 
-     BACKWARDS USED TO BE A BUTTON («↑ earlier months»), and a button is the
-     wrong shape for a diary: forwards flowed and backwards asked permission,
-     so the same gesture — keep reading — worked in one direction and stopped
-     in the other.
+     THE HEAD HAS NO SENTINEL ANY MORE, and this is the second reversal of
+     that decision, so here is the whole of it. Backwards began as a button;
+     the button became a sentinel on the argument that one gesture — keep
+     reading — should work in both directions. But UP is not the mirror of
+     DOWN. Above the book sits the page's chrome, so the same flick means
+     «more past» on one day and «let me out» on another, and the diary
+     cannot tell which; with an anchored prepend the trap completes itself —
+     every approach to the top inserts a month above the reader and pins
+     them where they were, so the top RECEDES as you reach for it. The
+     runaway of 2026-08-02 (822 days on one flick) was patched with gates
+     and floors, and the gates treated the symptom: the disease was that
+     reaching the top and loading the past were one gesture.
 
-     BUT BACKWARDS ONLY GROWS WHEN THE READER GOES LOOKING, and that is not a
-     nicety. The diary opens AT today, so its first day is on screen and the
-     top sentinel is intersecting from the first frame: with no gate it asked
-     for a month, the span changed, this effect re-ran, a fresh observer fired
-     immediately on the still-visible sentinel, and the loop only stopped
-     against the page's 24-month floor. Measured on 2026-08-02: 822 days and
-     two years of history fetched before the reader had touched anything.
-     Forwards has no such problem — it opens at the top of its own span. */
-  let readerMoved = $state(false);
+     So backwards is an ACT again, in two forms: the quiet line at the head
+     of the book («↑ earlier months»), and the overpull — already at the
+     very top, a second deliberate pull asks for one month (below). Reaching
+     the top now costs nothing and loads nothing. */
   let endSentinel = $state<HTMLElement>();
-  let startSentinel = $state<HTMLElement>();
-  /**
-   * FORWARDS LOOKS AHEAD; BACKWARDS DOES NOT.
-   *
-   * 800px of anticipation is right at the foot: you are travelling that way,
-   * and the next month should already be there when you arrive. At the head
-   * it is a trap — a quiet month of empty day rows is about 850px tall, so a
-   * prepend barely clears the margin and the sentinel is immediately inside
-   * it again. One flick of the wheel walked the diary to its 24-month floor,
-   * 822 days, three times through three different theories of why.
-   * Backwards loads when the top is actually REACHED. The prepend is
-   * anchored to the reader's own row, so there is no gap to pre-empt.
-   */
   const REACH_END = 800;
-  const REACH_START = 80;
-  /**
-   * THE CALLBACK RE-MEASURES; IT DOES NOT TRUST ITS OWN ENTRY.
-   *
-   * An IntersectionObserver delivers the state it saw when it observed, and
-   * it delivers it LATER — after the page has prepended a month and pinned
-   * the reader back to their row. So the entry says «still at the top» about
-   * a layout that no longer exists, the page is asked for another month, and
-   * the diary walks to its floor: 822 days on one flick of the wheel,
-   * measured 2026-08-02, twice, through two different anchoring bugs.
-   * Asking the element where it actually is costs one layout read and cannot
-   * be stale.
-   */
+  /* The callback re-measures instead of trusting its entry: an observer
+     delivers the state it SAW, later — stale by one layout whenever the
+     span just changed. One layout read, and it cannot lie. */
   function watch(el: HTMLElement | undefined, fire: (() => void) | undefined, reach: number) {
     if (!el || !fire) return;
     const io = new IntersectionObserver(
@@ -702,22 +753,95 @@
     void days.length;
     return watch(endSentinel, onReachEnd, REACH_END);
   });
+
+  /* ── THE OVERPULL · a second gesture at the top asks for one month ────
+     The flick that ARRIVES at the top must not count: on a trackpad its
+     momentum tail keeps emitting upward deltas after the page has stopped,
+     which is exactly the auto-load this replaces. A deliberate second pull
+     is a NEW gesture, and the seam between two gestures is a pause in the
+     event stream — so the counter only arms after a quiet gap, and a tail
+     (continuous, ~16ms apart) never arms it. One month per pull: the
+     anchored prepend leaves the reader below the new month, so the next
+     pull travels through it before it can ask again. */
+  const OVERPULL_PX = 120;
+  const GESTURE_GAP_MS = 160;
+  /** Quiet on the wheel stream for this long = the hand came off. The
+      browser exposes NO touch state for wheel gestures — no mouseup, no
+      contact phase — so a resting hand and a lifted one emit exactly the
+      same silence, and quiet-time is the only release there is. 400ms
+      keeps a mid-gesture breather from firing; a deliberate half-second
+      hold still will, and cannot not. */
+  const RELEASE_QUIET_MS = 400;
+  let pullArmed = false;
+  let pullAcc = 0;
+  let lastPullAt = 0;
+  let pullTimer: ReturnType<typeof setTimeout> | undefined;
+  /** The «↑ earlier months» line hides until the reader tries to scroll
+      past the top (Marco, 2026-08-03) — the gesture that needs the door is
+      the one that draws it. Session-sticky once shown. */
+  let earlierRevealed = $state(false);
+  /** Threshold crossed, hand still on the wheel — the load is PROMISED. */
+  let pullPending = $state(false);
+  /** The jump itself is in flight (released, or the line was clicked). */
+  let pullLoading = $state(false);
+  async function fireEarlier() {
+    if (!onReachStart || pullLoading) return;
+    pullLoading = true;
+    try {
+      await onReachStart();
+    } finally {
+      pullLoading = false;
+    }
+  }
+  /* THE LOAD WAITS FOR THE HAND TO COME OFF (Marco, 2026-08-04). Firing
+     mid-gesture moved the book under fingers that were still pulling —
+     and with the primed jump landing whole months at once, that read as
+     the page misbehaving. Crossing the threshold now only PROMISES the
+     load (the line turns to «loading…»); the fetch fires when the stream
+     goes quiet, because a wheel has no mouseup — quiet IS the release.
+     Pulling back down before the quiet cancels the promise. */
   $effect(() => {
-    void days.length;
-    if (!readerMoved) return;
-    return watch(startSentinel, onReachStart, REACH_START);
-  });
-  $effect(() => {
-    if (readerMoved) return;
-    const arm = () => (readerMoved = true);
-    // `once` so it costs one listener and nothing per frame afterwards.
-    window.addEventListener('scroll', arm, { once: true, passive: true });
-    window.addEventListener('wheel', arm, { once: true, passive: true });
-    window.addEventListener('keydown', arm, { once: true });
+    if (!onReachStart) return;
+    const release = () => {
+      if (!pullPending) return;
+      pullPending = false;
+      pullArmed = false;
+      pullAcc = 0;
+      void fireEarlier();
+    };
+    const onWheel = (e: WheelEvent) => {
+      // deltaMode 1 = lines (a notched wheel on some browsers) → ~16px each.
+      const dy = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;
+      const gap = performance.now() - lastPullAt;
+      lastPullAt = performance.now();
+      if (dy >= 0 || window.scrollY > 0) {
+        pullArmed = false;
+        pullAcc = 0;
+        if (pullPending) {
+          pullPending = false; // the reader pulled back — promise cancelled
+          clearTimeout(pullTimer);
+        }
+        return;
+      }
+      if (!pullArmed) {
+        if (gap < GESTURE_GAP_MS) return; // the arriving flick's tail
+        pullArmed = true;
+        pullAcc = 0;
+        earlierRevealed = true; // the attempt itself summons the door
+      } else if (gap > GESTURE_GAP_MS && !pullPending) {
+        pullAcc = 0; // a new pull, still deliberate — it starts fresh
+      }
+      pullAcc += -dy;
+      if (pullAcc >= OVERPULL_PX) pullPending = true;
+      if (pullPending) {
+        clearTimeout(pullTimer);
+        pullTimer = setTimeout(release, RELEASE_QUIET_MS);
+      }
+    };
+    window.addEventListener('wheel', onWheel, { passive: true });
     return () => {
-      window.removeEventListener('scroll', arm);
-      window.removeEventListener('wheel', arm);
-      window.removeEventListener('keydown', arm);
+      window.removeEventListener('wheel', onWheel);
+      clearTimeout(pullTimer);
     };
   });
 </script>
@@ -745,35 +869,68 @@
   {#if shownDays.length === 0}
     <p class="ag__empty">{emptyLabel}</p>
   {:else}
+    <!-- THE HEAD IS AN ACT, NOT AN EDGE. This line is the past's door, and
+         the overpull gesture is its shortcut — the same callback, two ways
+         in. It HIDES until the reader tries to scroll past the top: the
+         gesture that needs it is the one that draws it. Still in the DOM
+         (focus reveals it — the keyboard's way up), and it vanishes with
+         the callback at the page's floor. -->
     {#if onReachStart}
-      <div class="ag__sentinel" bind:this={startSentinel} aria-hidden="true"></div>
+      <button
+        type="button"
+        class="ag__earlier"
+        class:ag__earlier--in={earlierRevealed}
+        disabled={pullLoading}
+        onclick={() => void fireEarlier()}
+        >{pullPending || pullLoading ? loadingLabel : earlierLabel}</button
+      >
+    {:else if noEarlierLabel}
+      <!-- The head's honest end: the past was asked for and holds nothing
+           (or the floor is reached). A fact, not a door. -->
+      <p class="ag__end">{noEarlierLabel}</p>
     {/if}
 
     {#each chunks as ch (ch.key)}
       {#if ch.t === 'month'}
-        <h2 class="ag__monthdiv">
-          <span class="ag__monthdiv-name">{monthDivName(ch.day)}</span>
-          <span class="ag__monthdiv-year">{monthDivYear(ch.day)}</span>
+        <!-- THE CHAPTER HEAD IS A DOOR. Shut, it carries the month's whole
+             shape on its own line — the same three counts its week bands
+             would have said — and the word that opens it. An empty month
+             arrives shut in both directions, so two years of quiet history
+             prepend as chapter heads, not as 850px each. `data-month` is
+             the page's scroll target when the days inside are not drawn. -->
+        <h2 class="ag__monthdiv" data-month={ch.mk}>
+          <button
+            type="button"
+            class="ag__monthdiv-btn"
+            aria-expanded={!ch.collapsed}
+            onclick={() => monthOverride.set(ch.mk, ch.collapsed)}
+          >
+            <span class="ag__monthdiv-name">{monthDivName(ch.day)}</span>
+            <span class="ag__monthdiv-year">{monthDivYear(ch.day)}</span>
+            <!-- No door word: «show» is what this trade calls a gig, so the
+                 verb read as a noun. The whole head is the handle; the tally
+                 alone is the shut month's sentence. -->
+            {#if ch.collapsed}
+              <span class="ag__monthdiv-t">{weekTally(ch.firm, ch.held, ch.free)}</span>
+            {/if}
+          </button>
         </h2>
       {:else if ch.t === 'week'}
-        <!-- THE WEEK'S OWN LINE. Its shape, once, instead of seven days of
-             arithmetic — the same three counts the month draws in its gutter. -->
-        <div class="ag__week">
+        <!-- THE WEEK'S OWN LINE — and a door. Shut, the band IS the fact
+             («7 nights free» needs no seven rows under it); open, it prints
+             every day it has, empty ones included — the run line died for
+             this. A straddling week appears once per month it touches. -->
+        <button
+          type="button"
+          class="ag__week"
+          class:ag__week--shut={!ch.open}
+          aria-expanded={ch.open}
+          onclick={() => weekOverride.set(ch.key, !ch.open)}
+        >
           <span class="ag__week-n">{weekLabel(ch.n)}</span>
           <span class="ag__week-r">{weekRange(ch.from, ch.to)}</span>
           <span class="ag__week-t">{weekTally(ch.firm, ch.held, ch.free)}</span>
-        </div>
-      {:else if ch.t === 'run'}
-        <!-- A RUN OF QUIET DAYS IS ONE FACT. Printing them one by one makes
-             the reader scroll a fortnight of blank rows to reach the next
-             thing that happens — and «free» is the number this trade sells. -->
-        <div class="ag__run">
-          <span class="ag__run-n">{runLabel(ch.n)}</span>
-          <span class="ag__run-r">{weekRange(ch.from, ch.to)}</span>
-          <button type="button" class="ag__run-do" onclick={() => openRuns.add(ch.key)}
-            >{showLabel}</button
-          >
-        </div>
+        </button>
       {:else}
         {@const day = ch.day}
       {@const items = dayItems(day)}
@@ -858,12 +1015,68 @@
                   {/each}
                 </div>
             {/each}
+            <!-- THE POST-ITS (ADR-093). Mine, always private: serif italic —
+                 marginalia voice, a hand in the margin, not the machine — and
+                 the delete waits under the pointer like every verb here. -->
+            {#each notesByDay?.get(day) ?? [] as n (n.id)}
+              <div class="ag__note">
+                <p class="ag__note-body">{n.body}</p>
+                {#if onNoteDelete}
+                  <button
+                    type="button"
+                    class="ag__note-x"
+                    aria-label={noteDeleteLabel}
+                    onclick={() => onNoteDelete?.(n.id)}>×</button
+                  >
+                {/if}
+              </div>
+            {/each}
+            {#if onNoteCreate}
+              {#if writingDay === day}
+                {@const opts = noteAnchorOptions(day)}
+                <div class="ag__note ag__note--edit">
+                  <!-- svelte-ignore a11y_autofocus — the writer exists because
+                       the reader just asked to write; focus IS the answer. -->
+                  <textarea
+                    class="ag__note-input"
+                    rows="2"
+                    autofocus
+                    placeholder={notePlaceholder}
+                    bind:value={noteDraft}
+                    disabled={notePending}
+                    onkeydown={(e) => noteKeydown(e, day)}
+                  ></textarea>
+                  {#if opts.length > 1}
+                    <select class="ag__note-anchor" bind:value={noteAnchorKey} disabled={notePending}>
+                      {#each opts as o (o.key)}<option value={o.key}>{o.label}</option>{/each}
+                      <option value="">{noteFallbackLabel}</option>
+                    </select>
+                  {:else}
+                    <p class="ag__note-anchorword">{opts[0]?.label ?? noteFallbackLabel}</p>
+                  {/if}
+                </div>
+              {:else}
+                <button
+                  type="button"
+                  class="ag__note-add"
+                  aria-label={noteAddLabel}
+                  onclick={() => openNoteWriter(day)}>＋</button
+                >
+              {/if}
+            {/if}
           </aside>
       </section>
       {/if}
     {/each}
 
-    {#if onReachEnd}<div class="ag__sentinel" bind:this={endSentinel} aria-hidden="true"></div>{/if}
+    <!-- The sentinel yields to the VERDICT, not just to a quiet tail: with
+         content in today's month the tail is never quiet, yet the plan can
+         still be finished — the line must win over the sentinel then. -->
+    {#if endLabel}
+      <p class="ag__end">{endLabel}</p>
+    {:else if onReachEnd && !endStop}
+      <div class="ag__sentinel" bind:this={endSentinel} aria-hidden="true"></div>
+    {/if}
   {/if}
 </div>
 
@@ -961,7 +1174,79 @@
       font-style: italic;
       color: var(--text-faint);
     }
-/* Top "earlier months" — quiet, centered, prepends with anchoring. */
+/* Top «↑ earlier months» — margin voice, centred on the book's text column
+   (the 15rem stops at the margin rule, same as the week bands). Hidden and
+   heightless until summoned by the overpull's first armed gesture, or by
+   keyboard focus; never display:none, so it stays reachable by tab. */
+    .ag__earlier {
+      max-block-size: 0;
+      padding-block: 0;
+      opacity: 0;
+      overflow: hidden;
+      pointer-events: none;
+      /* Tucked under the row above; the reveal slides it out from beneath. */
+      transform: translateY(-0.5rem);
+      padding-inline-end: 15rem;
+      border: 0;
+      background: none;
+      text-align: center;
+      font-family: var(--font-mono);
+      font-size: 9px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+      cursor: pointer;
+      transition:
+        max-block-size 0.3s ease,
+        padding-block 0.3s ease,
+        transform 0.3s ease,
+        opacity 0.25s;
+    }
+    .ag__earlier--in,
+    .ag__earlier:focus-visible {
+      max-block-size: 3rem;
+      padding-block: var(--space-s);
+      opacity: 1;
+      transform: none;
+      pointer-events: auto;
+    }
+    .ag__earlier:hover {
+      color: var(--text-color);
+    }
+    .ag__earlier:disabled {
+      cursor: default;
+    }
+/* The book's honest ends — «nothing more planned» · «nothing further
+   back». Margin voice, centred on the text column like the door above. */
+    .ag__end {
+      margin: 0;
+      padding-block: var(--space-s);
+      padding-inline-end: 15rem;
+      text-align: center;
+      font-family: var(--font-mono);
+      font-size: 9px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+      overflow: hidden;
+      /* Mounted by an {#if}, so it POPPED. It slides out from beneath the
+         row above instead — same motion as the door it often replaces. */
+      animation: ag-endrise 0.3s ease-out;
+    }
+    @keyframes ag-endrise {
+      from {
+        max-block-size: 0;
+        padding-block: 0;
+        opacity: 0;
+        transform: translateY(-0.5rem);
+      }
+      to {
+        max-block-size: 3rem;
+        padding-block: var(--space-s);
+        opacity: 1;
+        transform: none;
+      }
+    }
 
     /* ── Serif month divider — the book's chapter head. ── */
     /* ── THE WEEK'S BAND · number, range, shape ───────────────────────
@@ -969,20 +1254,27 @@
        of the diary, not a thing that happens in it. The tally goes right, so
        seven days of shape line up down the page and can be scanned without
        reading a word of them. */
+    /* A DOOR, whole-row: the band was a <div>, now a bare <button>. */
     .ag__week {
       display: flex;
       align-items: baseline;
       gap: var(--space-s);
+      inline-size: 100%;
       padding: var(--space-s) 0 var(--space-2xs);
+      border: 0;
       border-block-start: 1px solid var(--border-color-light);
+      background: none;
+      text-align: start;
+      cursor: pointer;
       font-family: var(--font-mono);
       font-size: 9px;
       letter-spacing: 0.1em;
       text-transform: uppercase;
       color: var(--text-faint);
-      /* Stops at the margin's rule: the tally belongs to the days, not to
-     the column that annotates them. */
-  padding-inline-end: 15rem;
+      /* Stops BEFORE the margin's rule: the tally belongs to the days, not
+     to the column that annotates them — and 15rem exactly is where the
+     rule itself is drawn, so without the extra step the words touch it. */
+  padding-inline-end: calc(15rem + var(--space-s));
 }
 .ag__week-n {
       color: var(--text-muted);
@@ -991,49 +1283,59 @@
       margin-inline-start: auto;
       text-align: end;
     }
-/* ── A RUN OF QUIET DAYS · one line, and a door back to the days ───── */
-    .ag__run {
+/* SHUT IS A VISIBLE STATE, NOT AN INFERENCE (Marco, 2026-08-03). Two
+   identical bands in a row read as a stuttered heading — one is a drawer,
+   the other the title of the days on show, and nothing said which. The
+   code is the house's own, learned from the dead run line: DOTTED holds
+   folded days, SOLID heads visible ones. The drawer also breathes a step
+   more and its number drops to the faint ink of the rest of its line. */
+.ag__week--shut {
+      border-block-start-style: dotted;
+      padding-block: var(--space-s);
+    }
+.ag__week--shut .ag__week-n {
+      color: var(--text-faint);
+    }
+.ag__week:hover .ag__week-n {
+      color: var(--text-color);
+    }
+.ag__week:hover .ag__week-t {
+      color: var(--text-muted);
+    }
+.ag__monthdiv {
+      margin-block: var(--space-l) var(--space-2xs);
+      font-weight: 400;
+    }
+.ag__monthdiv:first-child {
+      margin-block-start: var(--space-2xs);
+    }
+/* The chapter head is the door's handle — full row, bare button. */
+.ag__monthdiv-btn {
       display: flex;
       align-items: baseline;
       gap: var(--space-s);
-      padding: var(--space-xs) 0;
-      border-block-start: 1px dotted var(--border-color-light);
+      inline-size: 100%;
+      padding: 0;
+      padding-inline: var(--space-xs) calc(15rem + var(--space-s));
+      border: 0;
+      background: none;
+      text-align: start;
+      cursor: pointer;
+      font: inherit;
+    }
+/* The shut month's shape — margin voice, ending where its bands would. */
+.ag__monthdiv-t {
+      margin-inline-start: auto;
       font-family: var(--font-mono);
       font-size: 9px;
       letter-spacing: 0.1em;
       text-transform: uppercase;
       color: var(--text-faint);
-      /* Stops at the margin's rule: the tally belongs to the days, not to
-     the column that annotates them. */
-  padding-inline-end: 15rem;
-}
-.ag__run-n {
+      text-align: end;
+    }
+.ag__monthdiv-btn:hover .ag__monthdiv-t,
+.ag__monthdiv-btn:hover .ag__monthdiv-year {
       color: var(--text-muted);
-    }
-.ag__run-do {
-      margin-inline-start: auto;
-      padding: 0;
-      border: 0;
-      background: none;
-      font: inherit;
-      letter-spacing: inherit;
-      text-transform: inherit;
-      color: var(--text-faint);
-      cursor: pointer;
-    }
-.ag__run-do:hover {
-      color: var(--text-color);
-    }
-.ag__monthdiv {
-      display: flex;
-      align-items: baseline;
-      gap: var(--space-s);
-      margin-block: var(--space-l) var(--space-2xs);
-      padding-inline-start: var(--space-xs);
-      font-weight: 400;
-    }
-.ag__monthdiv:first-child {
-      margin-block-start: var(--space-2xs);
     }
 .ag__monthdiv-name {
       font-family: var(--font-display);
@@ -1045,6 +1347,14 @@
       font-size: var(--text-xs);
       letter-spacing: var(--mono-letter-spacing-loose);
       color: var(--text-faint);
+    }
+/* A landing (`Now`, the ‹ › steps) goes under TWO stuck bars now — the
+   shell's and the toolbar's. `scrollIntoView` reads this; the line page
+   set the precedent for the shape of the calc. */
+    .ag__day,
+    .ag__monthdiv,
+    .ag__end {
+      scroll-margin-block-start: calc(var(--header-height) + 3rem);
     }
 /* ── Day group: header column + rows, a ledger rule beneath. ── */
     .ag__day {
@@ -1218,6 +1528,107 @@ button.ag__head:hover .ag__num {
   white-space: nowrap;
 }
 
+/* ── THE POST-IT (ADR-093) · marginalia voice ──────────────────────────
+   Serif italic, a hand writing in the margin — the cards above are the
+   machine annotating; this is the reader. No box, no fill: the margin IS
+   the paper. */
+.ag__note {
+  position: relative;
+  padding-block: var(--space-2xs);
+}
+.ag__card + .ag__note {
+  margin-block-start: var(--space-s);
+}
+.ag__note-body {
+  margin: 0;
+  padding-inline-end: 14px; /* room for the × */
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: var(--text-s);
+  line-height: 1.4;
+  color: var(--text-muted);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.ag__note-x {
+  position: absolute;
+  inset-inline-end: 0;
+  inset-block-start: var(--space-2xs);
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: 11px;
+  line-height: 1;
+  color: var(--text-faint);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.1s;
+}
+.ag__note:hover .ag__note-x,
+.ag__note-x:focus-visible {
+  opacity: 1;
+}
+.ag__note-x:hover {
+  color: var(--text-color);
+}
+/* The writer: a bare seam, not a widget. Same voice as the note it becomes. */
+.ag__note-input {
+  display: block;
+  inline-size: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  resize: none;
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: var(--text-s);
+  line-height: 1.4;
+  color: var(--text-color);
+}
+.ag__note-input:focus {
+  outline: none;
+}
+.ag__note-input::placeholder {
+  color: var(--text-faint);
+}
+/* The anchor line under the box — margin voice, like the card eyebrow.
+   A word when the day answered it, a select when the day asks. */
+.ag__note-anchor,
+.ag__note-anchorword {
+  margin: 2px 0 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.ag__note-anchor {
+  cursor: pointer;
+  max-inline-size: 100%;
+}
+/* `＋` waits to be needed, like the verbs on the rows. */
+.ag__note-add {
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: 12px;
+  line-height: 1;
+  color: var(--text-faint);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.1s;
+}
+.ag__day:hover .ag__note-add,
+.ag__note-add:focus-visible {
+  opacity: 1;
+}
+.ag__note-add:hover {
+  color: var(--text-color);
+}
+
 .ag__pair {
   display: contents;
 }
@@ -1263,6 +1674,10 @@ button.ag__head:hover .ag__num {
       }
       .ag__marg:empty {
         display: none;
+      }
+      /* No hover on glass: the `＋` is simply there. */
+      .ag__note-add {
+        opacity: 1;
       }
     }
 }
