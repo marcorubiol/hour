@@ -160,7 +160,7 @@
                   name={t.project.name}
                   size="15px"
                 />{/if}
-              <span class="ds__kind">{kindLabel(t.kind)}</span>
+              <span class="ds__kind">{kindLabel(t.kind)}{#if t.cert === 'hold' || t.cert === 'proposed'}?{/if}</span>
               {#if t.roadSheetHref}
                 <a class="ds__rs" href={t.roadSheetHref}>{roadSheetWord} ↗</a>
               {/if}
@@ -229,7 +229,7 @@
                     name={t.project.name}
                     size="15px"
                   />{/if}
-                <span class="ds__kind">{kindLabel(t.kind)}</span>
+                <span class="ds__kind">{kindLabel(t.kind)}{#if t.cert === 'hold' || t.cert === 'proposed'}?{/if}</span>
                 {#if t.roadSheetHref}
                   <a class="ds__rs" href={t.roadSheetHref}>{roadSheetWord} ↗</a>
                 {/if}
@@ -488,6 +488,31 @@
     .ds__r[data-family='proposed'] .ds__n {
       color: var(--text-muted);
       font-style: italic;
+    }
+    /* held / proposed — THE GRAIN, the slip's own token verbatim (0.75px
+       dots, 7px grid, 0.62, the 150° fade): seen before it is read, and
+       calibrated ONCE so every drawing says «not sure» at the same volume.
+       The label is the ground here — the track is geometry, not paper — so
+       the grain lies on the label. ::after, because the clash rule owns
+       ::before. */
+    .ds__r[data-family='hold'] .ds__l,
+    .ds__r[data-family='proposed'] .ds__l {
+      position: relative;
+    }
+    .ds__r[data-family='hold'] .ds__l::after,
+    .ds__r[data-family='proposed'] .ds__l::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      z-index: -1;
+      opacity: 0.62;
+      background-image: radial-gradient(
+        color-mix(in oklch, var(--text-color) 22%, transparent) 0.75px,
+        transparent 1.4px
+      );
+      background-size: 7px 7px;
+      -webkit-mask-image: linear-gradient(150deg, #000 0 20%, transparent 82%);
+      mask-image: linear-gradient(150deg, #000 0 20%, transparent 82%);
     }
 
     /* A step is a tick; only the show is ink. */
