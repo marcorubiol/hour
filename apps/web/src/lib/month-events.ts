@@ -83,6 +83,24 @@ export type DateEvent = {
   label?: string | null;
 };
 
+/**
+ * A private post-it (ADR-093), as `/api/notes` returns it. The anchor says
+ * what it is about (at most one id set); `on_day` says where it lives in the
+ * diary. Always mine — RLS scopes the feed to the author.
+ */
+export type NoteEvent = {
+  id: string;
+  workspace_id: string;
+  project_id: string | null;
+  line_id: string | null;
+  performance_id: string | null;
+  date_id: string | null;
+  person_id: string | null;
+  on_day: string;
+  body: string;
+  created_at: string;
+};
+
 /** A stored blackout, page-shaped for rendering (label already built). */
 export type BlackoutBandVM = {
   id: string;
