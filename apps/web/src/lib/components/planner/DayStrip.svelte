@@ -151,7 +151,7 @@
                label as a pseudo-element, never a border: a border on the row
                would push the TRACK off the grid it is measured against. The
                indent is eaten here; the label's outer width does not change. -->
-          <span class="ds__l" style={t.project ? `--c: ${accentVarFor(t.project)}` : undefined}>
+          <span class="ds__l" class:grain={t.cert === 'hold' || t.cert === 'proposed'} style={t.project ? `--c: ${accentVarFor(t.project)}` : undefined}>
             <span class="ds__pack">
               {#if t.project}<IdentityMark
                   variant="compact"
@@ -220,7 +220,7 @@
       <div class="ds__unp">
         {#each unplaced as t (t.id)}
           <div class="ds__r ds__r--unp" data-family={t.cert} data-kind={t.kind} data-clash={t.clash ?? undefined}>
-            <span class="ds__l" style={t.project ? `--c: ${accentVarFor(t.project)}` : undefined}>
+            <span class="ds__l" class:grain={t.cert === 'hold' || t.cert === 'proposed'} style={t.project ? `--c: ${accentVarFor(t.project)}` : undefined}>
               <span class="ds__pack">
                 {#if t.project}<IdentityMark
                     variant="compact"
@@ -489,31 +489,8 @@
       color: var(--text-muted);
       font-style: italic;
     }
-    /* held / proposed — THE GRAIN, the slip's own token verbatim (0.75px
-       dots, 7px grid, 0.62, the 150° fade): seen before it is read, and
-       calibrated ONCE so every drawing says «not sure» at the same volume.
-       The label is the ground here — the track is geometry, not paper — so
-       the grain lies on the label. ::after, because the clash rule owns
-       ::before. */
-    .ds__r[data-family='hold'] .ds__l,
-    .ds__r[data-family='proposed'] .ds__l {
-      position: relative;
-    }
-    .ds__r[data-family='hold'] .ds__l::after,
-    .ds__r[data-family='proposed'] .ds__l::after {
-      content: '';
-      position: absolute;
-      inset: 0;
-      z-index: -1;
-      opacity: 0.62;
-      background-image: radial-gradient(
-        color-mix(in oklch, var(--text-color) 22%, transparent) 0.75px,
-        transparent 1.4px
-      );
-      background-size: 7px 7px;
-      -webkit-mask-image: linear-gradient(150deg, #000 0 20%, transparent 82%);
-      mask-image: linear-gradient(150deg, #000 0 20%, transparent 82%);
-    }
+    /* The grain lives in styles/certainty.css (`.grain`) — the label opts
+       in; the token is defined once for every drawing. */
 
     /* A step is a tick; only the show is ink. */
     .ds__m {

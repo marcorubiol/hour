@@ -208,7 +208,7 @@
 
 {#if slip.href}
   <a
-    class="slip"
+    class="slip" class:grain={held}
     data-family={slip.cert}
     data-kind={slip.kind}
     data-placing={placing}
@@ -221,7 +221,7 @@
 {:else if onOpen}
   <button
     type="button"
-    class="slip"
+    class="slip" class:grain={held}
     data-family={slip.cert}
     data-kind={slip.kind}
     data-placing={placing}
@@ -233,7 +233,7 @@
   >
 {:else}
   <span
-    class="slip"
+    class="slip" class:grain={held}
     data-family={slip.cert}
     data-kind={slip.kind}
     data-placing={placing}
@@ -527,21 +527,8 @@
     .slip[data-placing='row'][data-family='proposed'] {
       background: none;
     }
-    .slip[data-family='hold']::before,
-    .slip[data-family='proposed']::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      z-index: -1;
-      opacity: 0.62;
-      background-image: radial-gradient(
-        color-mix(in oklch, var(--text-color) 22%, transparent) 0.75px,
-        transparent 1.4px
-      );
-      background-size: 7px 7px;
-      -webkit-mask-image: linear-gradient(150deg, #000 0 20%, transparent 82%);
-      mask-image: linear-gradient(150deg, #000 0 20%, transparent 82%);
-    }
+    /* The grain itself lives in styles/certainty.css (`.grain`) — one
+       token, calibrated once, shared with the day strip's labels. */
     /* The title takes the quieter ink here and in every other drawing: one
        value for one state. And it leans — an option is written in italic
        wherever its name appears. */

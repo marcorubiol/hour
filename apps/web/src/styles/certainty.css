@@ -1,0 +1,32 @@
+/*
+  Certainty — the doubt's MATERIAL, defined once (AGENDA-SYSTEM invariante:
+  «la geometría dice la certeza; el tema solo elige el material»).
+
+  The grain is calibrated ONCE so every drawing says «not sure» at the same
+  volume — a second, similar grain is two opinions about one doubt, and
+  duplicated tokens drift (ADR-095 §0 is the history of exactly that).
+  Components decide WHERE the ground is — a card, a diary row, the day
+  strip's label — and opt in with `class="grain"`; this file decides what
+  doubt looks like. A theme repaints these values; it may never re-shape
+  the geometry that carries them.
+*/
+
+@layer components {
+  .grain {
+    position: relative;
+  }
+  .grain::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    opacity: 0.62;
+    background-image: radial-gradient(
+      color-mix(in oklch, var(--text-color) 22%, transparent) 0.75px,
+      transparent 1.4px
+    );
+    background-size: 7px 7px;
+    -webkit-mask-image: linear-gradient(150deg, #000 0 20%, transparent 82%);
+    mask-image: linear-gradient(150deg, #000 0 20%, transparent 82%);
+  }
+}
