@@ -1179,42 +1179,64 @@
     if (mine.length === 0) return null;
     return confirmed ? 'hard' : 'soft';
   }
-  let dayThreads = $derived.by(() => {
-    const out = [];
+  /* One walk, two ledgers: the threads the strip can PLACE, and the
+     asked-for dates it cannot — a hold without an hour has no position,
+     but it counts and the day's card must say it (design law: «no hour»,
+     at the end, implying nothing about what sits above). */
+  let dayWalk = $derived.by(() => {
+    const threads = [];
+    const unplaced = [];
     for (const p of shownPerfs) {
       if (perfDayKey(p) !== selectedDay) continue;
       const sl = performanceSlip(p, slipCtxPage);
       const t = performanceThread(p, viewerTz, sl.name, sl.city, sl.cert);
-      if (!t) continue;
       const ws = p.project ? workspaceSlugById.get(p.project.workspace_id) : undefined;
-      out.push({
-        ...t,
+      const shared = {
         project: p.project,
         // Data or the honest word — the project-team inference is not drawn
         // here (design law: four people affirmed at a radio at 10h).
         cast: (p.person_ids ?? [])
           .map((id) => personNames.get(id))
           .filter((n): n is string => Boolean(n)),
-        roadSheetHref:
-          p.slug && ws ? `/h/${ws}/performance/${p.slug}/roadsheet` : null,
+        roadSheetHref: p.slug && ws ? `/h/${ws}/performance/${p.slug}/roadsheet` : null,
         clash: dayClashOf(p.id, performanceStatusFamily(p.status) === 'confirmed'),
-      });
+      };
+      if (t) threads.push({ ...t, ...shared });
+      else
+        unplaced.push({
+          id: p.id,
+          kind: sl.kind,
+          cert: sl.cert,
+          name: sl.name,
+          city: sl.city ?? null,
+          ...shared,
+        });
     }
     for (const d of shownDates) {
       if (dateDayKey(d, viewerTz) !== selectedDay) continue;
       const sl = dateSlip(d, slipCtxPage);
       const t = dateThread(d, viewerTz, sl.name, sl.city, sl.cert);
-      if (!t) continue;
-      out.push({
-        ...t,
+      const shared = {
         project: d.project,
         cast: null,
         roadSheetHref: null,
         clash: dayClashOf(d.id, false),
-      });
+      };
+      if (t) threads.push({ ...t, ...shared });
+      else
+        unplaced.push({
+          id: d.id,
+          kind: sl.kind,
+          cert: sl.cert,
+          name: sl.name,
+          city: sl.city ?? null,
+          ...shared,
+        });
     }
-    return out;
+    return { threads, unplaced };
   });
+  let dayThreads = $derived(dayWalk.threads);
+  let dayUnplaced = $derived(dayWalk.unplaced);
   /* THE DAY DRAGS ITS MONTH. The feeds are windowed by `ym`, so a Day view
      pointing at 3 August while `ym` still said July fetched a month that does
      not contain the day being drawn — the strip came up with one thread and
@@ -2433,6 +2455,8 @@
       axisLabel={t('planner.day_axis', locale)}
       noCastWord={t('planner.no_cast', locale)}
       roadSheetWord={t('desk.roadsheet', locale)}
+      unplaced={dayUnplaced}
+      noHourWord={t('planner.no_hour', locale)}
     />
     <DayFoot
       notes={dayNotes}

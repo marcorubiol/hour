@@ -50,6 +50,26 @@
     /** «no cast on file» — the Board's word, shared on purpose. */
     noCastWord?: string;
     roadSheetWord?: string;
+    /**
+     * A HOLD WITHOUT AN HOUR IS AN ASKED-FOR DATE, and the drawing cannot
+     * give it a place — no hour, no position. But it COUNTS, and the day's
+     * card says it: label-only rows at the END, below the diagram, where
+     * they imply nothing about what sits above (design law). Same label,
+     * and the word `no hour` where the track would be.
+     */
+    unplaced?: Array<{
+      id: string;
+      kind: SlipKind;
+      cert: string;
+      name: string;
+      city: string | null;
+      project: ProjectLite | null;
+      cast?: string[] | null;
+      roadSheetHref?: string | null;
+      clash?: 'soft' | 'hard' | null;
+    }>;
+    /** «no hour» — never a dash, never the weight of an hour. */
+    noHourWord?: string;
   }
 
   let {
@@ -63,6 +83,8 @@
     axisLabel = 'the day',
     noCastWord = 'no cast on file',
     roadSheetWord = 'road sheet',
+    unplaced = [],
+    noHourWord = 'no hour',
   }: Props = $props();
 
   /** The now label, one cell per character: a digit that changes remounts
@@ -79,10 +101,11 @@
   let sorted = $derived([...threads].sort((a, b) => a.a - b.a || a.b - b.b));
 </script>
 
-{#if sorted.length === 0}
+{#if sorted.length === 0 && unplaced.length === 0}
   <p class="ds__empty">{emptyLabel}</p>
 {:else}
   <div class="ds">
+    {#if sorted.length > 0}
     <div class="ds__hd">
       <span class="ds__l ds__l--k">{axisLabel}</span>
       <span class="ds__t">
@@ -188,6 +211,42 @@
         </div>
       {/each}
     </div>
+    {/if}
+
+    {#if unplaced.length > 0}
+      <!-- THE ASKED-FOR DATES: below the diagram, implying nothing about
+           what sits above. The same label; where the track would be, the
+           honest word — meta voice, never the weight of an hour. -->
+      <div class="ds__unp">
+        {#each unplaced as t (t.id)}
+          <div class="ds__r ds__r--unp" data-family={t.cert} data-kind={t.kind} data-clash={t.clash ?? undefined}>
+            <span class="ds__l" style={t.project ? `--c: ${accentVarFor(t.project)}` : undefined}>
+              <span class="ds__pack">
+                {#if t.project}<IdentityMark
+                    variant="compact"
+                    accent={accentVarFor(t.project)}
+                    initials={t.project.initials}
+                    name={t.project.name}
+                    size="15px"
+                  />{/if}
+                <span class="ds__kind">{kindLabel(t.kind)}</span>
+                {#if t.roadSheetHref}
+                  <a class="ds__rs" href={t.roadSheetHref}>{roadSheetWord} ↗</a>
+                {/if}
+              </span>
+              <span class="ds__n">{t.name}</span>
+              {#if t.city}<span class="ds__c"><span>{t.city}</span></span>{/if}
+              {#if t.cast !== null && t.cast !== undefined}
+                <span class="ds__cast" class:ds__cast--none={t.cast.length === 0}
+                  >{t.cast.length > 0 ? t.cast.join(' · ') : noCastWord}</span
+                >
+              {/if}
+            </span>
+            <span class="ds__t ds__t--unp"><em class="ds__nohour">{noHourWord}</em></span>
+          </div>
+        {/each}
+      </div>
+    {/if}
   </div>
 {/if}
 
@@ -494,6 +553,27 @@
       block-size: 34px;
       border-inline-start: 1px solid color-mix(in oklch, var(--c, var(--text-faint)) 26%, transparent);
     }
+    /* ── The asked-for dates: the day's ledger of the unplaced ───────── */
+    .ds__unp {
+      border-block-start: 1px dotted var(--border-color-light);
+    }
+    .ds__r--unp {
+      min-block-size: 0;
+      padding-block: 4px;
+    }
+    .ds__t--unp {
+      display: flex;
+      align-items: center;
+    }
+    .ds__nohour {
+      font-style: normal;
+      font-family: var(--font-mono);
+      font-size: 8.5px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+    }
+
     /* THE GLOSS FALLS BEFORE THE ASSERTION: on a narrow track the step's NAME
        goes first, and the hour — the assertion — is what stays. */
     @container (max-width: 560px) {
