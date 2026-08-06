@@ -14,6 +14,13 @@
 @layer components {
   .grain {
     position: relative;
+    /* The ground must be its OWN stacking context: the dots sit at
+       z-index -1, and without isolation a negative child escapes past
+       every ancestor until it paints BEHIND the shell's background —
+       grain drawn and invisible. The slip carried this privately
+       (`isolation: isolate` on its root), which is why it showed there
+       and not on the strip's labels until this moved into the token. */
+    isolation: isolate;
   }
   .grain::after {
     content: '';
