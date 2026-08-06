@@ -68,6 +68,7 @@
   import Button from '$lib/components/Button.svelte';
   import CalLegend from '$lib/components/planner/CalLegend.svelte';
   import DayStrip from '$lib/components/planner/DayStrip.svelte';
+  import DayFoot, { type DayNextVM } from '$lib/components/planner/DayFoot.svelte';
   import { performanceThread, dateThread, stripWindow, hourOf } from '$lib/day-strip';
   import Dialog from '$lib/components/Dialog.svelte';
   import FeedDialog from '$lib/components/planner/FeedDialog.svelte';
@@ -437,6 +438,7 @@
     agendaDatesQuery,
     agendaAvailabilityQuery,
     agendaNotesQuery,
+    dayNotesQuery,
   } = createPlannerFeeds({
     view: () => view,
     gridFrom: () => gridFrom,
@@ -446,6 +448,7 @@
     scopeUnresolved: () => scopeUnresolved,
     filterIds: () => filterIds,
     teamWorkspaceIds: () => ($workspacesQuery.data?.items ?? []).map((w) => w.id),
+    selectedDay: () => dayIso ?? todayIso,
     todayIso,
   });
 
@@ -1211,6 +1214,77 @@
   let dayWin = $derived(stripWindow(dayThreads));
   let dayNow = $derived(selectedDay === todayIso ? hourOf(new Date().toISOString(), viewerTz) : null);
 
+  // ── The Day's foot: notes + next (the design's margin, risen into the
+  // flow), and the absence as a line above the drawing. ─────────────────
+  let dayNotes = $derived($dayNotesQuery.data?.items ?? []);
+  let dayNotesAbsent = $derived(Boolean($dayNotesQuery.data?.absent));
+  /** The absences covering this day, as sentences — same voice as the
+      agenda's away lines: who, until when, how much is left. */
+  let dayAwayLines = $derived.by(() => {
+    const out: Array<{ key: string; who: string; rest: string }> = [];
+    [...blackoutVMs, ...awayVMs].forEach((it, i) => {
+      if (selectedDay < it.from || selectedDay > it.to) return;
+      const left = Math.round(
+        (Date.parse(`${it.to}T00:00:00Z`) - Date.parse(`${selectedDay}T00:00:00Z`)) / 86400000,
+      );
+      const rest =
+        left === 0
+          ? t('planner.away_back', locale)
+          : `${t('planner.away_until', locale)} ${localeDayMonth(it.to, localeTag)} · ${
+              left === 1
+                ? t('planner.away_left_one', locale)
+                : t('planner.away_left', locale, { n: String(left) })
+            }`;
+      const who = 'subject' in it && it.subject ? it.subject : it.label;
+      out.push({ key: `${i}:${it.from}`, who, rest });
+    });
+    return out;
+  });
+  /** What comes after this day — the decisions window already holds every
+      performance in [today, +90d], so next is a pick, not a fetch. */
+  let dayNextVMs = $derived.by((): DayNextVM[] => {
+    const items = ($decisionsPerfQuery.data?.items ?? [])
+      .filter((p) => {
+        if (perfDayKey(p) <= selectedDay) return false;
+        const fam = performanceStatusFamily(p.status);
+        return fam === 'confirmed' || fam === 'hold' || fam === 'proposed';
+      })
+      .sort((a, b) => (a.performed_at < b.performed_at ? -1 : 1))
+      .slice(0, 4);
+    return items.map((p) => {
+      const sl = performanceSlip(p, slipCtxPage);
+      const fam = performanceStatusFamily(p.status);
+      const held = fam !== 'confirmed';
+      const ws = p.project ? workspaceSlugById.get(p.project.workspace_id) : undefined;
+      return {
+        id: p.id,
+        day: localeDayMonth(perfDayKey(p), localeTag),
+        kind: held
+          ? `${t('planner.kind_show', locale)}?`
+          : t('planner.kind_show', locale),
+        name: sl.name,
+        city: sl.city ?? null,
+        country: p.country ?? null,
+        project: p.project,
+        href: p.slug && ws ? `/h/${ws}/performance/${p.slug}` : null,
+        held,
+      };
+    });
+  });
+  /** §23's anchor rule, the Day's half: exactly one calendar entry on the
+      day pre-fills the anchor; anything else falls to the page's fallback. */
+  async function createDayNote(body: string): Promise<boolean> {
+    const perfs = shownPerfs.filter((p) => perfDayKey(p) === selectedDay);
+    const dates = shownDates.filter((d) => dateDayKey(d, viewerTz) === selectedDay);
+    const single = perfs.length + dates.length === 1;
+    return createNote({
+      body,
+      on_day: selectedDay,
+      ...(single && perfs.length === 1 ? { performance_id: perfs[0].id } : {}),
+      ...(single && dates.length === 1 ? { date_id: dates[0].id } : {}),
+    });
+  }
+
   // ── Masthead stats — counts of the visible month, every figure a real
   // row (ADR-078 §12; no read:money gate — nothing monetary here). ──────
   let stats = $derived.by(() => {
@@ -1610,6 +1684,7 @@
           : {}),
       });
       void queryClient.invalidateQueries({ queryKey: ['planner-agenda-notes'] });
+      void queryClient.invalidateQueries({ queryKey: ['planner-day-notes'] });
       return true;
     } catch (err) {
       addToast({
@@ -1629,6 +1704,7 @@
       });
     }
     void queryClient.invalidateQueries({ queryKey: ['planner-agenda-notes'] });
+    void queryClient.invalidateQueries({ queryKey: ['planner-day-notes'] });
   }
 
   // Band open/collapsed — UI state only (ADR-080 §5: "Deixa-ho obert"
@@ -2258,6 +2334,18 @@
   {#if errorMsg}
     <p class="cal__state cal__state--danger">{errorMsg}</p>
   {:else if view === 'day'}
+    <!-- The absence is a LINE above the drawing, not a band of its own —
+         the Day compresses (design: la composición del Day). -->
+    {#if dayAwayLines.length > 0}
+      <div class="cal__aways">
+        {#each dayAwayLines as a (a.key)}
+          <p class="cal__awayline">
+            <span class="cal__awayline-who">{a.who}</span>
+            <span>{a.rest}</span>
+          </p>
+        {/each}
+      </div>
+    {/if}
     <DayStrip
       threads={dayThreads}
       win={dayWin}
@@ -2271,6 +2359,19 @@
       }}
       emptyLabel={t('planner.day_empty', locale)}
       axisLabel={t('planner.day_axis', locale)}
+    />
+    <DayFoot
+      notes={dayNotes}
+      canWrite={!dayNotesAbsent}
+      onCreate={createDayNote}
+      onDelete={deleteNote}
+      next={dayNextVMs}
+      notesWord={t('planner.agenda_notes', locale)}
+      nextWord={t('planner.day_next', locale)}
+      emptyWord={t('planner.lid_empty', locale)}
+      privateWord={t('planner.note_private', locale)}
+      placeholder={t('planner.note_placeholder', locale)}
+      deleteLabel={t('planner.note_delete', locale)}
     />
   {:else if view === 'month'}
     <MonthGrid
@@ -2482,6 +2583,23 @@
     .cal__pulse-decide:hover {
       color: var(--danger-dark);
       border-color: var(--danger);
+    }
+
+    /* The absence's line above the Day's drawing — same voice as the
+       agenda's away sentences: who, then the rest, quieter. */
+    .cal__aways {
+      margin-block-end: var(--space-s);
+    }
+    .cal__awayline {
+      margin: 0;
+      font-family: var(--font-mono);
+      font-size: 9px;
+      letter-spacing: 0.06em;
+      color: var(--text-faint);
+    }
+    .cal__awayline-who {
+      color: var(--text-muted);
+      margin-inline-end: 7px;
     }
 
     .cal__state {

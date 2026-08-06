@@ -180,6 +180,8 @@ export interface PlannerFeedInputs {
   filterIds: () => { projectIds: string[]; workspaceIds: string[] };
   /** Every visible workspace id — the team feed's fan-out. */
   teamWorkspaceIds: () => string[];
+  /** The Day view's selected day — its notes band reads exactly one day. */
+  selectedDay: () => string;
   /** Viewer-tz day key for "today" — constant for the page's lifetime. */
   todayIso: string;
 }
@@ -406,6 +408,28 @@ export function createPlannerFeeds(inputs: PlannerFeedInputs) {
     };
   });
 
+  // The Day's post-its — one day, mine, same graceful absence as the
+  // agenda's margin (a pre-migration DB hides the writer, never errors).
+  const dayNotesOptions = toStore(() => {
+    const day = inputs.selectedDay();
+    return {
+      queryKey: ['planner-day-notes', day] as const,
+      enabled: inputs.view() === 'day',
+      queryFn: async ({ signal }: { signal: AbortSignal }) => {
+        try {
+          return await fetchJSON<{ items: NoteEvent[]; absent?: boolean }>(
+            `/api/notes?from=${day}&to=${day}`,
+            signal,
+          );
+        } catch (err) {
+          if (err instanceof Error && err.message === 'Unauthorized') throw err;
+          console.warn('[calendar] day notes feed absent:', err);
+          return { items: [] as NoteEvent[], absent: true };
+        }
+      },
+    };
+  });
+
   return {
     perfQuery: createQuery(perfOptions),
     datesQuery: createQuery(datesOptions),
@@ -416,5 +440,6 @@ export function createPlannerFeeds(inputs: PlannerFeedInputs) {
     agendaDatesQuery: createQuery(agendaDatesOptions),
     agendaAvailabilityQuery: createQuery(agendaAvailabilityOptions),
     agendaNotesQuery: createQuery(agendaNotesOptions),
+    dayNotesQuery: createQuery(dayNotesOptions),
   };
 }
