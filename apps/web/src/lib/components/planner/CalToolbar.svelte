@@ -313,11 +313,43 @@
       border-block-end: 1px solid var(--text-color);
     }
     /* Toolbar: ‹ month › · today · [projection] · [lanes] · + · ⋯ */
+    /* ── THE BAR DOES NOT LIVE IN THE DOCUMENT (2026-08-03) ──────────────
+       On a diary of months, changing the drawing meant scrolling back to
+       wherever this row had gone — and the head of the book used to load
+       history as you approached it, so the journey grew while you made it.
+       These controls are chrome, not content: they stick under the shell's
+       top bar and are simply always there. Translucency + blur is the
+       shell's own voice for a stuck band (.shell__top, .shell__address). */
     .cal__toolbar {
       display: flex;
       align-items: center;
       gap: var(--space-s);
       flex-wrap: wrap;
+      position: sticky;
+      inset-block-start: var(--header-height);
+      z-index: calc(var(--z-sticky) - 1);
+      background: color-mix(in oklch, var(--bg) 88%, transparent);
+      backdrop-filter: blur(8px);
+      padding-block: var(--space-2xs);
+      container-type: scroll-state;
+    }
+    /* The hairline only WHEN stuck — at rest it would draw a rule the
+       three-band head does not have. `scroll-state` is a progressive
+       enhancement: without it the blur stays the only seam. */
+    .cal__toolbar::after {
+      content: '';
+      position: absolute;
+      inset-inline: 0;
+      inset-block-end: 0;
+      block-size: 1px;
+      background: var(--border-color-light);
+      opacity: 0;
+      transition: opacity var(--transition);
+    }
+    @container scroll-state(stuck: block-start) {
+      .cal__toolbar::after {
+        opacity: 1;
+      }
     }
     .cal__spacer {
       flex: 1;
