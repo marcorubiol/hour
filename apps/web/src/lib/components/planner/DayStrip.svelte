@@ -21,7 +21,20 @@
   import { pct, overlaps, type StripThread } from '$lib/day-strip';
 
   interface Props {
-    threads: Array<StripThread & { project: ProjectLite | null }>;
+    threads: Array<
+      StripThread & {
+        project: ProjectLite | null;
+        /** Names on file for classes that HAVE a cast (show/studio); [] says
+            «no cast on file»; null = a class where cast would be a lie (a
+            press call is not four people at a radio at 10h). Data only —
+            the project-team inference is never drawn here. */
+        cast?: string[] | null;
+        /** The document this row acts through — shows only. */
+        roadSheetHref?: string | null;
+        /** The pair's rule: soft while both are options, hard once one is ink. */
+        clash?: 'soft' | 'hard' | null;
+      }
+    >;
     /** The track's window, in fractional hours. */
     win: { from: number; to: number };
     /** Now, in fractional hours — only drawn when this IS today. */
@@ -34,6 +47,9 @@
     /** «nothing on this day» */
     emptyLabel?: string;
     axisLabel?: string;
+    /** «no cast on file» — the Board's word, shared on purpose. */
+    noCastWord?: string;
+    roadSheetWord?: string;
   }
 
   let {
@@ -45,7 +61,13 @@
     hourLabel,
     emptyLabel = 'Nothing on this day.',
     axisLabel = 'the day',
+    noCastWord = 'no cast on file',
+    roadSheetWord = 'road sheet',
   }: Props = $props();
+
+  /** The now label, one cell per character: a digit that changes remounts
+      alone and rises — one movement per minute, and it means something. */
+  let nowChars = $derived(now !== null ? hourLabel(now).split('') : []);
 
   /** A rule every two hours, labelled once at the top. */
   let ticks = $derived.by(() => {
@@ -81,17 +103,31 @@
           ></span>
         {/each}
         {#if now !== null && now >= win.from && now <= win.to}
-          <!-- NOW IS A TIME, NOT A CALL TO MAKE: ink, never colour. And it says
-               its hour on ONE side always — a mark that changes sides is two. -->
-          <span class="ds__now" style="left: {pct(now, win)}%"
-            ><b>{hourLabel(now)}</b></span
-          >
+          <!-- NOW IS A TIME, NOT A CALL TO MAKE: ink, never colour. It says
+               its hour on ONE side always — a mark that changes sides is two —
+               and when the minute turns, ONLY the digit that changed rises
+               (a keyed cell per character; tabular cifras so 9→10 cannot
+               reflow its neighbours). -->
+          <span class="ds__now" style="left: {pct(now, win)}%">
+            <b>
+              {#each nowChars as c, i (`${i}:${c}`)}<i class="ds__nowd">{c}</i>{/each}
+            </b>
+          </span>
         {/if}
       </span>
 
       {#each sorted as t (t.id)}
-        <div class="ds__r" data-family={t.cert} data-kind={t.kind} data-steps={t.steps.join(',')}>
-          <!-- THE LABEL FINISHES THE SENTENCE. -->
+        <div
+          class="ds__r"
+          data-family={t.cert}
+          data-kind={t.kind}
+          data-steps={t.steps.join(',')}
+          data-clash={t.clash ?? undefined}
+        >
+          <!-- THE LABEL FINISHES THE SENTENCE. The clash's rule lives on the
+               label as a pseudo-element, never a border: a border on the row
+               would push the TRACK off the grid it is measured against. The
+               indent is eaten here; the label's outer width does not change. -->
           <span class="ds__l" style={t.project ? `--c: ${accentVarFor(t.project)}` : undefined}>
             <span class="ds__pack">
               {#if t.project}<IdentityMark
@@ -102,6 +138,9 @@
                   size="15px"
                 />{/if}
               <span class="ds__kind">{kindLabel(t.kind)}</span>
+              {#if t.roadSheetHref}
+                <a class="ds__rs" href={t.roadSheetHref}>{roadSheetWord} ↗</a>
+              {/if}
             </span>
             <span class="ds__n">{t.name}</span>
             <span class="ds__c">
@@ -111,6 +150,13 @@
                   )}{:else}{hourLabel(t.marks[0].at)}{/if}</b
               >{#if t.city}<span>{t.city}</span>{/if}
             </span>
+            {#if t.cast !== null && t.cast !== undefined}
+              <!-- Who is inside the thread — data or the honest word, never
+                   the inference. -->
+              <span class="ds__cast" class:ds__cast--none={t.cast.length === 0}
+                >{t.cast.length > 0 ? t.cast.join(' · ') : noCastWord}</span
+              >
+            {/if}
           </span>
 
           <span class="ds__t">
@@ -184,9 +230,54 @@
     }
     .ds__pack {
       grid-column: 1 / -1;
-      display: inline-flex;
+      display: flex;
       align-items: center;
       gap: 6px;
+    }
+    /* The document this row acts through — a quiet door, far right of the
+       kind word. */
+    .ds__rs {
+      margin-inline-start: auto;
+      font-family: var(--font-mono);
+      font-size: 8.5px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+      text-decoration: none;
+      white-space: nowrap;
+    }
+    .ds__rs:hover {
+      color: var(--text-color);
+    }
+    /* Who is on file. The honest absence is quieter than a name. */
+    .ds__cast {
+      grid-column: 1 / -1;
+      font-family: var(--font-mono);
+      font-size: 8.5px;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+    }
+    .ds__cast--none {
+      color: var(--text-faint);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+    /* ── THE PAIR'S RULE — on the label, never a border on the row ─────
+       2px dashed while both are options; 3px solid the moment one is ink.
+       Red is conflict, and only conflict. */
+    .ds__r[data-clash] .ds__l {
+      position: relative;
+      padding-inline-start: 10px;
+    }
+    .ds__r[data-clash] .ds__l::before {
+      content: '';
+      position: absolute;
+      inset-block: 8px;
+      inset-inline-start: 0;
+      border-inline-start: 2px dashed var(--danger);
+    }
+    .ds__r[data-clash='hard'] .ds__l::before {
+      border-inline-start: 3px solid var(--danger);
     }
     .ds__kind {
       font-family: var(--font-mono);
@@ -272,12 +363,28 @@
       position: absolute;
       inset-block-start: 2px;
       inset-inline-start: 6px;
+      display: inline-flex;
+      overflow: hidden;
       font-family: var(--font-mono);
       font-size: 8.5px;
       font-weight: 400;
       color: var(--text-muted);
       white-space: nowrap;
       font-variant-numeric: tabular-nums;
+    }
+    /* One movement per minute: a changed digit is a NEW cell, and it rises
+       into place — its neighbours, keyed unchanged, never move. */
+    .ds__nowd {
+      font-style: normal;
+      animation: ds-minute 130ms ease-out;
+    }
+    @keyframes ds-minute {
+      from {
+        transform: translateY(0.9em);
+      }
+      to {
+        transform: none;
+      }
     }
     .ds__now::before {
       content: '';

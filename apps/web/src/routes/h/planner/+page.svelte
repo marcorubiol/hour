@@ -1172,19 +1172,46 @@
     kindLabel,
     dualTime,
   });
+  /** The pair's rule for one event of the day — soft while both are
+      options, hard the moment one of the two is ink. */
+  function dayClashOf(id: string, confirmed: boolean): 'soft' | 'hard' | null {
+    const mine = (clashesByDay?.get(selectedDay) ?? []).filter((c) => c.event_ids?.includes(id));
+    if (mine.length === 0) return null;
+    return confirmed ? 'hard' : 'soft';
+  }
   let dayThreads = $derived.by(() => {
     const out = [];
     for (const p of shownPerfs) {
       if (perfDayKey(p) !== selectedDay) continue;
       const sl = performanceSlip(p, slipCtxPage);
       const t = performanceThread(p, viewerTz, sl.name, sl.city, sl.cert);
-      if (t) out.push({ ...t, project: p.project });
+      if (!t) continue;
+      const ws = p.project ? workspaceSlugById.get(p.project.workspace_id) : undefined;
+      out.push({
+        ...t,
+        project: p.project,
+        // Data or the honest word — the project-team inference is not drawn
+        // here (design law: four people affirmed at a radio at 10h).
+        cast: (p.person_ids ?? [])
+          .map((id) => personNames.get(id))
+          .filter((n): n is string => Boolean(n)),
+        roadSheetHref:
+          p.slug && ws ? `/h/${ws}/performance/${p.slug}/roadsheet` : null,
+        clash: dayClashOf(p.id, performanceStatusFamily(p.status) === 'confirmed'),
+      });
     }
     for (const d of shownDates) {
       if (dateDayKey(d, viewerTz) !== selectedDay) continue;
       const sl = dateSlip(d, slipCtxPage);
       const t = dateThread(d, viewerTz, sl.name, sl.city, sl.cert);
-      if (t) out.push({ ...t, project: d.project });
+      if (!t) continue;
+      out.push({
+        ...t,
+        project: d.project,
+        cast: null,
+        roadSheetHref: null,
+        clash: dayClashOf(d.id, false),
+      });
     }
     return out;
   });
@@ -1212,7 +1239,42 @@
     }),
   );
   let dayWin = $derived(stripWindow(dayThreads));
-  let dayNow = $derived(selectedDay === todayIso ? hourOf(new Date().toISOString(), viewerTz) : null);
+  /* WRITING THE RIGHT HOUR IS NEVER OPTIONAL (design law): the now mark
+     follows the minute. The interval only ticks a counter; the derived
+     below re-reads the clock. No ticking while the tab is hidden — the
+     visibility handler catches the mark up the moment anyone looks. */
+  let minuteTick = $state(0);
+  $effect(() => {
+    if (view !== 'day') return;
+    const bump = () => {
+      if (!document.hidden) minuteTick++;
+    };
+    const iv = setInterval(bump, 15_000);
+    document.addEventListener('visibilitychange', bump);
+    return () => {
+      clearInterval(iv);
+      document.removeEventListener('visibilitychange', bump);
+    };
+  });
+  let dayNow = $derived.by(() => {
+    void minuteTick;
+    return selectedDay === todayIso ? hourOf(new Date().toISOString(), viewerTz) : null;
+  });
+  /** «06h → 02h» — where the day's plan begins and ends, for the meta. */
+  let daySpanLabel = $derived.by(() => {
+    if (dayThreads.length === 0) return null;
+    const f = (h: number) => {
+      const hh = String(Math.floor(((h % 24) + 24) % 24)).padStart(2, '0');
+      const mm = Math.round((h % 1) * 60);
+      return mm ? `${hh}h${String(mm).padStart(2, '0')}` : `${hh}h`;
+    };
+    return `${f(dayWin.from)} → ${f(dayWin.to)}`;
+  });
+  /** The reason no bar can say — the pair's sentence, pre-localized in the
+      clash VM. One line per pair, above the drawing. */
+  let dayClashLines = $derived(
+    (clashesByDay?.get(selectedDay) ?? []).map((c, i) => ({ key: `c${i}`, body: c.body })),
+  );
 
   // ── The Day's foot: notes + next (the design's margin, risen into the
   // flow), and the absence as a line above the drawing. ─────────────────
@@ -2249,6 +2311,11 @@
             })}</span
           >
         {/if}
+        <!-- The Day names its span — where the plan begins and where it
+             lets go (first call → last out). A day with nothing says nothing. -->
+        {#if view === 'day' && daySpanLabel}
+          <span class="cal__stat cal__stat--soft">{daySpanLabel}</span>
+        {/if}
         {#if view !== 'agenda'}
         <span class="cal__stat"><b>{stats.confirmed}</b> {t('planner.stat_confirmed', locale)}</span>
         <!-- `1 holds` was printing on every single-hold month. The design's own
@@ -2336,8 +2403,13 @@
   {:else if view === 'day'}
     <!-- The absence is a LINE above the drawing, not a band of its own —
          the Day compresses (design: la composición del Day). -->
-    {#if dayAwayLines.length > 0}
+    {#if dayAwayLines.length > 0 || dayClashLines.length > 0}
       <div class="cal__aways">
+        <!-- The reason no bar can draw: a rule on two rows says THAT they
+             relate, never why — the why is a sentence, and it lives here. -->
+        {#each dayClashLines as c (c.key)}
+          <p class="cal__clashline">{c.body}</p>
+        {/each}
         {#each dayAwayLines as a (a.key)}
           <p class="cal__awayline">
             <span class="cal__awayline-who">{a.who}</span>
@@ -2359,6 +2431,8 @@
       }}
       emptyLabel={t('planner.day_empty', locale)}
       axisLabel={t('planner.day_axis', locale)}
+      noCastWord={t('planner.no_cast', locale)}
+      roadSheetWord={t('desk.roadsheet', locale)}
     />
     <DayFoot
       notes={dayNotes}
@@ -2600,6 +2674,14 @@
     .cal__awayline-who {
       color: var(--text-muted);
       margin-inline-end: 7px;
+    }
+    /* Red is conflict, and only conflict. */
+    .cal__clashline {
+      margin: 0;
+      font-family: var(--font-mono);
+      font-size: 9px;
+      letter-spacing: 0.06em;
+      color: var(--danger);
     }
 
     .cal__state {
