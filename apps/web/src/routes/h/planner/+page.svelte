@@ -1674,6 +1674,10 @@
         filterIds,
       });
       agendaEnd = { year: y, month: m };
+    } catch (err) {
+      // A DEAD NETWORK IS NOT A VERDICT: no growth, and above all no
+      // «nothing more planned» — the sentinel simply asks again later.
+      console.warn('[calendar] plan probe failed:', err);
     } finally {
       probing = false;
     }
@@ -1710,6 +1714,10 @@
       // lives in there is nothing — say so with the same pull, not on a
       // second ask (Marco had to pull twice to hear it, 2026-08-03).
       pastExhausted = true;
+    } catch (err) {
+      // A dead network is not «nothing further back»: no verdict, no
+      // uncaught rejection — the door stays and the pull can retry.
+      console.warn('[calendar] earlier probe failed:', err);
     } finally {
       probing = false;
     }
