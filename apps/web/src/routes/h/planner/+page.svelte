@@ -232,8 +232,12 @@
       matchMedia('(max-width: 640px)').matches,
     ),
   );
-  // The Board's lane axis (ADR-080 §8, ADR-095 §9) — same persistence chain
-  // as the projection: ?lanes= → localStorage → 'workspace'.
+  // The Board's lane axis (ADR-094, ADR-095 §9) — same persistence chain
+  // as the projection: ?lanes= → localStorage → 'scope'. The dial says
+  // «by scope | person» now; the entity generation (workspace/project) and
+  // the Catalan one are translated once on entry by resolveLaneAxis, so a
+  // stored old word in this key lands on the current vocabulary and the
+  // first write replaces it.
   const GROUP_STORAGE_KEY = 'hour:calendar:group';
   function storedGroup(): string | null {
     try {
@@ -906,7 +910,14 @@
 
   let carrilsLanes = $derived.by((): LaneVM[] => {
     if (view !== 'board') return [];
-    const byProject = laneAxis === 'project';
+    /* INTERIM SHIM (axis migration, ADR-094). The dial says 'scope' |
+       'person' now, but this builder still speaks the old three-way grammar
+       — it predates the board-lanes engine that will replace it wholesale.
+       Until then, 'scope' draws exactly what 'workspace' drew (one lane per
+       workspace), so `byProject` is pinned false rather than deleted: the
+       branches below stay legible as what they are — the old drawing,
+       awaiting demolition, not a new law. */
+    const byProject = false;
     const byPerson = laneAxis === 'person';
     const lanes = new Map<string, LaneVM>();
     /** A person lane's label: their name, or «no cast» for the ghost row. */
@@ -1120,7 +1131,9 @@
   let eventById = $derived(new Map(engineEvents.map((e) => [e.id, e])));
   let carrilsConnectors = $derived.by((): ConnectorVM[] => {
     if (view !== 'board' || laneAxis === 'person') return [];
-    const byProject = laneAxis === 'project';
+    // Same INTERIM SHIM as carrilsLanes above: 'scope' keys connectors by
+    // workspace, the way 'workspace' did, until the engine takes over.
+    const byProject = false;
     const out: ConnectorVM[] = [];
     const seen = new Set<string>();
     for (const c of conflicts) {

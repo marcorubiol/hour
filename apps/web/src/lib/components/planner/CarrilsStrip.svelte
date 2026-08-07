@@ -1,8 +1,10 @@
 <script module lang="ts">
   /**
-   * Carrils — the horizontal month ribbon (ADR-080 §7/§8): one lane per
-   * workspace/project/person — ONE drawing on three axes (ADR-095 §2);
-   * per Persona. Pure presentation over page-built VMs; day math is % of
+   * Carrils — the horizontal month ribbon (ADR-080 §7/§8): ONE drawing on
+   * both axes of the dial (ADR-094, ADR-095 §2) — 'scope' draws one lane
+   * per workspace (the interim shim of the axis migration; the v3 board
+   * rebuild replaces this component), 'person' one lane per person.
+   * Pure presentation over page-built VMs; day math is % of
    * the month, pixel math (pip row stacking, connector geometry, the
    * center-on-today scroll) happens in ONE measured pass after render —
    * the calPostRender pattern the prototype validated, re-run on resize
@@ -283,12 +285,11 @@
           {@const bands = bandRows(lane.bands)}
           <div class="strip__lane" data-lane-key={lane.key}>
             <span class="strip__lab" data-lane-label>
-              <i
-                class="strip__dot"
-                class:strip__dot--sq={group === 'project'}
-                style="--c: {lane.accent}"
-                aria-hidden="true"
-              ></i>
+              <!-- The square dot was the project-axis marker. The dial says
+                   'scope' | 'person' now (ADR-094) and the interim scope
+                   drawing groups by workspace — round dot — so the square
+                   variant has no speaker until the v3 board rebuild. -->
+              <i class="strip__dot" style="--c: {lane.accent}" aria-hidden="true"></i>
               <span class="strip__lab-name" title={lane.label}>{lane.label}</span>
             </span>
             <span class="strip__track" data-pip-track data-band-rows={bands.rowCount}>

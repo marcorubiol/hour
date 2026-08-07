@@ -75,7 +75,7 @@ describe('CarrilsStrip — lanes', () => {
   const props = {
     monthDays: JULY,
     todayIso: '2026-07-18',
-    group: 'workspace' as const,
+    group: 'scope' as const,
     lanes,
     connectors,
     onConnectorJump: () => {},
@@ -89,8 +89,8 @@ describe('CarrilsStrip — lanes', () => {
     );
     expect(labels).toContain('MüK Cia');
     expect(labels).toContain('Demo');
-    // Axis header speaks the grouping.
-    expect(labels[0]).toBe('Space');
+    // Axis header speaks the dial's word, not the entity's (ADR-094).
+    expect(labels[0]).toBe('Scope');
   });
 
   it('renders the pip grammar: solid/hold dots, mono travel and date pips', () => {

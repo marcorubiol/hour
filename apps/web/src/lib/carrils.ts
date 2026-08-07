@@ -16,41 +16,53 @@
 import { addDaysIso } from './planner';
 
 /**
- * The Board's lane axis — what one row IS (ADR-080 §8, renamed by ADR-095 §9).
+ * The Board's dial — «by scope | person» (ADR-094).
+ *
+ * The dial stopped naming entity types. `workspace` and `project` were both
+ * answers to «how do I narrow?», and the app already has one machine for
+ * that: the scope bar. So the scope axis draws one lane per scope token and
+ * the dial's only real question survives — is a row a THING you booked, or
+ * a PERSON who has to be there. This is the CANONICAL definition;
+ * $lib/board-lanes' `BoardAxis` is an alias of it.
  *
  * The dial only ever relabels the lanes; it can never change the fact that a
  * Board row is an entity. That is the whole of ADR-094: a dial in the
  * furniture, a view in the model.
  */
-export type LaneAxis = 'workspace' | 'project' | 'person';
+export type LaneAxis = 'scope' | 'person';
 
 /**
- * Legacy lane tokens, translated ONCE on entry. These were Catalan words in
- * an otherwise English URL vocabulary — the site is translated, the address
- * bar is not (ADR-095 §9).
+ * Legacy lane tokens, translated ONCE on entry and never written back
+ * (ADR-095 §9). Two dead generations live here now: the Catalan words that
+ * shipped in an otherwise English URL vocabulary (the site is translated,
+ * the address bar is not), and the entity generation — workspace/project —
+ * that the scope axis replaced. A link somebody sent last month is not a
+ * bug, so every old word still opens; it just lands on the current one.
  */
 const LANE_ALIASES: Record<string, LaneAxis> = {
-  espai: 'workspace',
-  projecte: 'project',
+  workspace: 'scope',
+  project: 'scope',
+  espai: 'scope',
+  projecte: 'scope',
   persona: 'person',
 };
 
 /** A token from a URL or storage → a lane axis, or null if it is neither. */
 export function normalizeLaneAxis(v: string | null | undefined): LaneAxis | null {
-  if (v === 'workspace' || v === 'project' || v === 'person') return v;
+  if (v === 'scope' || v === 'person') return v;
   return (v && LANE_ALIASES[v]) || null;
 }
 
 /**
  * Lane resolution — same persistence chain as the projection (ADR-078 §10 via
  * ADR-080 §8): explicit `&lanes=` → the device's stored preference →
- * 'workspace'. Unknown values fall through.
+ * 'scope'. Unknown values fall through.
  */
 export function resolveLaneAxis(
   urlLanes: string | null | undefined,
   stored: string | null | undefined,
 ): LaneAxis {
-  return normalizeLaneAxis(urlLanes) ?? normalizeLaneAxis(stored) ?? 'workspace';
+  return normalizeLaneAxis(urlLanes) ?? normalizeLaneAxis(stored) ?? 'scope';
 }
 
 /** Sunday/Saturday check on a plain ISO date (UTC math, tz-free). */

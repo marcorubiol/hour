@@ -21,14 +21,14 @@ describe('resolvePlannerView (board, ADR-080 §7)', () => {
 });
 
 describe('resolveLaneAxis', () => {
-  it('URL wins, then storage, then espai', () => {
-    expect(resolveLaneAxis('person', 'project')).toBe('person');
-    expect(resolveLaneAxis(null, 'project')).toBe('project');
-    expect(resolveLaneAxis(undefined, undefined)).toBe('workspace');
+  it('URL wins, then storage, then scope', () => {
+    expect(resolveLaneAxis('person', 'scope')).toBe('person');
+    expect(resolveLaneAxis(null, 'person')).toBe('person');
+    expect(resolveLaneAxis(undefined, undefined)).toBe('scope');
   });
 
   it('unknown values fall through', () => {
-    expect(resolveLaneAxis('venue', 'nope')).toBe('workspace');
+    expect(resolveLaneAxis('venue', 'nope')).toBe('scope');
     expect(resolveLaneAxis('week', 'person')).toBe('person');
   });
 });
@@ -108,30 +108,64 @@ describe('prepRuns', () => {
   });
 });
 
-describe('normalizeLaneAxis (ADR-095 §9)', () => {
-  it('the English vocabulary passes through', () => {
-    expect(normalizeLaneAxis('workspace')).toBe('workspace');
-    expect(normalizeLaneAxis('project')).toBe('project');
+describe('normalizeLaneAxis (ADR-094, ADR-095 §9)', () => {
+  it('the current vocabulary passes through', () => {
+    expect(normalizeLaneAxis('scope')).toBe('scope');
     expect(normalizeLaneAxis('person')).toBe('person');
+  });
+
+  it('the entity generation lands on scope — the dial stopped naming entity types', () => {
+    // `workspace` and `project` were both answers to «how do I narrow?»,
+    // and the scope bar already answers that. A row is a thing or a person;
+    // both old words meant «a thing», so both land on 'scope'.
+    expect(normalizeLaneAxis('workspace')).toBe('scope');
+    expect(normalizeLaneAxis('project')).toBe('scope');
   });
 
   it('the Catalan generation still opens — translated once, never written back', () => {
     // The site is translated; the address bar is not. These three shipped in
     // an otherwise English URL vocabulary and somebody has them bookmarked.
-    expect(normalizeLaneAxis('espai')).toBe('workspace');
-    expect(normalizeLaneAxis('projecte')).toBe('project');
+    expect(normalizeLaneAxis('espai')).toBe('scope');
+    expect(normalizeLaneAxis('projecte')).toBe('scope');
     expect(normalizeLaneAxis('persona')).toBe('person');
   });
 
   it('anything else falls through to the caller default', () => {
     expect(normalizeLaneAxis('line')).toBeNull();
     expect(normalizeLaneAxis(null)).toBeNull();
-    expect(resolveLaneAxis('nope', 'alsonope')).toBe('workspace');
+    expect(resolveLaneAxis('nope', 'alsonope')).toBe('scope');
   });
 
-  it('a stored Catalan preference is honoured too, not just the URL', () => {
+  it('a stored legacy preference is honoured too, not just the URL', () => {
     // localStorage carries the old word on every device that used the app
-    // before today; dropping it would silently reset everyone to workspace.
+    // before today; dropping it would silently reset everyone to scope.
     expect(resolveLaneAxis(null, 'persona')).toBe('person');
+    expect(resolveLaneAxis(null, 'workspace')).toBe('scope');
+    expect(resolveLaneAxis(null, 'projecte')).toBe('scope');
+  });
+
+  it('a legacy URL beats a stored preference — the pasted link is the request', () => {
+    // Somebody sends ?lanes=project to a device whose stored dial says
+    // person: the link wins, translated. The chain order never changed.
+    expect(resolveLaneAxis('project', 'person')).toBe('scope');
+    expect(resolveLaneAxis('espai', 'person')).toBe('scope');
+  });
+
+  it('the writer can never emit a legacy token (law 6/25)', () => {
+    // The page writes `lanes=` straight from the resolved axis, so the
+    // writer's whole vocabulary is this function's RANGE. Prove the range:
+    // every word any generation ever used resolves to a current one.
+    const everyKnownToken = [
+      'scope',
+      'person',
+      'workspace',
+      'project',
+      'espai',
+      'projecte',
+      'persona',
+    ];
+    for (const token of everyKnownToken) {
+      expect(['scope', 'person']).toContain(resolveLaneAxis(token, null));
+    }
   });
 });

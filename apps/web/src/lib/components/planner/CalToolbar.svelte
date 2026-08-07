@@ -75,10 +75,12 @@
      the same order as the keys 1 2 3 4.
 
      And the dial is METADATA and looks like it: mono, in this row, right
-     behind the last view word, with ONE word of grammar — `Board by workspace
-     project person`. `by` is a preposition, so the row reads as a SENTENCE
-     instead of a form. It was a label («Group by») on a row of its own, which
-     is what made nine states of the board look like nine views. -->
+     behind the last view word, with ONE word of grammar — `Board by scope
+     person`. `by` is a preposition, so the row reads as a SENTENCE instead
+     of a form. It was a label («Group by») on a row of its own, which is
+     what made nine states of the board look like nine views. Two values now,
+     not three (ADR-094): workspace and project were both «a thing you
+     booked», and the scope bar already owns how many of those you see. -->
 <div class="cal__toolbar">
   <!-- THE WINDOW'S CONTROLS OPEN THE ROW, before the view words.
 
@@ -124,7 +126,7 @@
   {#if view === 'board'}
     <span class="cal__dial">
       <span class="cal__dial-by">{t('planner.lanes_label', locale)}</span>
-      {#each ['workspace', 'project', 'person'] as const as g (g)}
+      {#each ['scope', 'person'] as const as g (g)}
         <button
           type="button"
           class="cal__dial-v"

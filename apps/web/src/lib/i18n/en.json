@@ -363,6 +363,7 @@
   "planner.pulse_inferred": "{n} by project, not by cast",
   "planner.view_board": "Board",
   "planner.lanes_label": "by",
+  "planner.lanes_scope": "Scope",
   "planner.lanes_workspace": "Space",
   "planner.lanes_project": "Project",
   "planner.lanes_person": "Person",

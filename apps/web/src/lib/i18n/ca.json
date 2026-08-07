@@ -354,6 +354,7 @@
   "planner.pulse_inferred": "{n} per projecte, sense repartiment",
   "planner.view_board": "Tauler",
   "planner.lanes_label": "per",
+  "planner.lanes_scope": "Abast",
   "planner.lanes_workspace": "Espai",
   "planner.lanes_project": "Projecte",
   "planner.lanes_person": "Persona",
