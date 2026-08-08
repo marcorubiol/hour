@@ -1,879 +1,876 @@
-<script module lang="ts">
-  /**
-   * Carrils — the horizontal month ribbon (ADR-080 §7/§8): ONE drawing on
-   * both axes of the dial (ADR-094, ADR-095 §2) — 'scope' draws one lane
-   * per workspace (the interim shim of the axis migration; the v3 board
-   * rebuild replaces this component), 'person' one lane per person.
-   * Pure presentation over page-built VMs; day math is % of
-   * the month, pixel math (pip row stacking, connector geometry, the
-   * center-on-today scroll) happens in ONE measured pass after render —
-   * the calPostRender pattern the prototype validated, re-run on resize
-   * and font load.
-   *
-   * Prototype render bugs fixed here by construction:
-   * - right-edge label collisions → labels flip side late in the month
-   *   AND every pip carries a max-inline-size clamp (ellipsis + full
-   *   title), so text can never overflow the strip;
-   * - overlapping "fora" pills → in-lane bands and loom outs get lane
-   *   assignment (`assignBandLanes`) and stack, growing the row;
-   * - axis/person labels clipped at the left edge → the label column is
-   *   sticky (position: sticky; left: 0) inside the scroll container, so
-   *   it survives horizontal scroll at any width (390px scrolls the strip,
-   *   never the page).
-   */
-  import type { LaneAxis } from '$lib/carrils';
-
-  /** One event pip on a lane. */
-  export type LanePipVM = {
-    id: string;
-    /** Day of month, 1-based. */
-    day: number;
-    kind: 'perf' | 'date' | 'travel';
-    /** perf only — solid dot vs dashed-ring dot. */
-    state?: 'confirmed' | 'hold';
-    label: string;
-    /** perf only — mono time after the venue. */
-    time?: string | null;
-    /** CSS color value (accent var). */
-    accent: string;
-    /** Full text for the title attr (the clamp's honest exit). */
-    title: string;
-    href?: string | null;
-  };
-
-  /** One quiet in-lane band (prep run / blackout / derived away). */
-  export type LaneBandVM = {
-    id: string;
-    /** Day of month, 1-based, both ends inclusive, pre-clipped. */
-    from: number;
-    to: number;
-    kind: 'prep' | 'blackout' | 'away';
-    company?: boolean;
-    tentative?: boolean;
-    label: string;
-    /** prep only — project accent. */
-    accent?: string;
-    title?: string;
-  };
-
-  export type LaneVM = {
-    key: string;
-    label: string;
-    /** CSS color value for the lane dot. */
-    accent: string;
-    /** Square dot (line-level convention) — espai lanes use round. */
-    pips: LanePipVM[];
-    bands: LaneBandVM[];
-  };
-
-  /** A cross-lane conflict connector (ADR-080 §7). */
-  export type ConnectorVM = {
-    /** Decision pair id — the band card jump target. */
-    id: string;
-    /** Day of month, 1-based. */
-    day: number;
-    aKey: string;
-    bKey: string;
-    severity: 'people' | 'possible';
-    label: string;
-  };
-
-
-
-</script>
-
 <script lang="ts">
-  import { tick } from 'svelte';
-  import { t, type Locale } from '$lib/i18n';
-  import { stackIntervals, isWeekendIso } from '$lib/carrils';
+  /**
+   * The Board (Planner v3, ADR-094/ADR-095) — ONE CSS grid, and that is the
+   * whole architecture: a frozen label column, one column per drawn day, one
+   * row per lane, and a band row per group with a real (empty) cell in every
+   * column. The old ribbon drew pips on a percentage track; the v3 board
+   * draws THE SLIP — the app's one card (ADR-095: never a lookalike) —
+   * inside cells whose width is a container query away from the month's.
+   *
+   * Two structural laws, both paid for in the design prototype:
+   *
+   * 1. **The band is a row of cells, never a `1 / -1` spanner.** The spanner
+   *    version put two boxes in track 1, dropped a 10px phantom row per
+   *    group (70px of dead space over seven groups) and broke the frozen
+   *    column's vertical rule five times. If a fact crosses the drawing —
+   *    the who|when rule, a week edge, a month edge — EVERY row draws it.
+   *
+   * 2. **One writer per fact.** Counts come from the engine
+   *    ($lib/board-lanes): tallies, group sums, clash weights, away
+   *    segments and fold ticks are all computed there and only WORDED here,
+   *    through t()-backed callbacks the page passes down. This component
+   *    never re-derives a number the engine owns — the prototype's lane
+   *    count said «12 lanes» over nine rows because two sites each counted
+   *    their own way.
+   *
+   * WHAT IS STILL STATIC, on purpose (the measured passes are the next
+   * step, each with a seam left here):
+   * - the pinned axis (`--hdy`) and the travelling group label (`--gy`):
+   *   the head keeps an inert `position: sticky` as belt-and-braces;
+   * - the away band sits at a CSS `bottom` inside its grid area instead of
+   *   the measured 21px-above-floor drawer;
+   * - the now line, the minute flap and the growing horizon do not exist
+   *   yet — the page still hands down the month window;
+   * - the hold's hover CONFIRM verb (law 28's second half) and the identity
+   *   quick panel on the monogram are not wired.
+   */
+  import { SvelteSet } from 'svelte/reactivity';
+  import Slip from '$lib/components/planner/Slip.svelte';
+  import IdentityMark from '$lib/components/IdentityMark.svelte';
+  import type { LaneAxis } from '$lib/carrils';
+  import {
+    awayFloorCols,
+    awaySegments,
+    clashDayMarks,
+    clashMarks,
+    foldTicks,
+    groupTally,
+    laneTally,
+    type AwayRun,
+    type BoardClash,
+    type BoardColumn,
+    type BoardGroup,
+    type BoardLaneRef,
+    type LaneTally,
+    type PlacedEvent,
+  } from '$lib/board-lanes';
+  import type { Slip as SlipVM, SlipKind } from '$lib/month-events';
 
   interface Props {
-    /** Ordered ISO days of the visible month. */
-    monthDays: string[];
-    /** YYYY-MM-DD — paints the "avui" line when inside the month. */
-    todayIso: string;
-    group: LaneAxis;
-    lanes: LaneVM[];
-    connectors: ConnectorVM[];
-    /** Connector gesture — the page opens the decision band at the card. */
-    onConnectorJump: (decisionId: string) => void;
-    locale: Locale;
+    /** The dial — 'scope' | 'person'. Decides what the + door knows. */
+    axis: LaneAxis;
+    /** The engine's folded timeline. The page words the month names before
+        passing (the engine speaks its own lowercase register). */
+    columns: BoardColumn[];
+    /** Groups + lanes, post-`laneEvents` (nocast lanes already born). */
+    groups: BoardGroup[];
+    /** laneKey → isoDay → placed events, from the engine's `laneEvents`. */
+    cells: ReadonlyMap<string, ReadonlyMap<string, readonly PlacedEvent[]>>;
+    /** Normalised absence runs — both record shapes already one fact. */
+    awayRuns: AwayRun[];
+    /** The day's clashes, resolved to their ISO day by the page. */
+    clashes: BoardClash[];
+
+    /* ── words · every one t()-backed by the page ───────────────────── */
+    /** The corner: the axis's own name ('Scope' | 'Person'). */
+    axisWord: string;
+    todayWord: string;
+    weekdayWord: (iso: string) => string;
+    /** The italic month name at a month start. */
+    monthWord: (iso: string) => string;
+    /** The lane's total line — counts and the three silences, worded. */
+    laneTallyText: (tally: LaneTally) => string;
+    /** The shut lid's line — units + summed counts, worded. */
+    groupTallyText: (sums: {
+      units: number;
+      confirmed: number;
+      options: number;
+      notCast: number;
+    }) => string;
+    sharedWord: string;
+    /** The ghost lane's name — the engine says 'team', the page words it. */
+    teamWord: string;
+    /** The nocast lane's suffix — «{project} · no cast». */
+    noCastWord: string;
+    /** The absence band's kind word ('away'). */
+    awayWord: string;
+    /** The band's terminus phrase ('until 20 jul'). */
+    untilLabel: (iso: string) => string;
+    emptyLabel: string;
+    createLabel: (iso: string) => string;
+    clashDayLabel: (iso: string) => string;
+
+    /* ── the slip's contract, passed straight through ───────────────── */
+    kindLabel: (kind: SlipKind) => string;
+    stateLabel: (slip: SlipVM) => string | null;
+    stateUrgent?: (slip: SlipVM) => boolean;
+
+    /* ── gestures ───────────────────────────────────────────────────── */
+    /** The empty cell is the door: day + the lane's project (null on the
+        person axis — the dialog asks, ADR-094 §3b). */
+    onDayCreate: (iso: string, projectId: string | null) => void;
+    /** The head's red '!' — the page opens the decision at that day. */
+    onClashDay: (iso: string) => void;
+    /** A date slip has no page of its own; its edit dialog opens here. */
+    onDateOpen?: (dateId: string) => void;
+    /** The group band's monogram/ring — identity is the page's to resolve. */
+    groupMark?: (group: BoardGroup) => { accent: string; initials: string | null } | null;
   }
 
   let {
-    monthDays,
-    todayIso,
-    group,
-    lanes,
-    connectors,
-    onConnectorJump,
-    locale,
+    axis,
+    columns,
+    groups,
+    cells,
+    awayRuns,
+    clashes,
+    axisWord,
+    todayWord,
+    weekdayWord,
+    monthWord,
+    laneTallyText,
+    groupTallyText,
+    sharedWord,
+    teamWord,
+    noCastWord,
+    awayWord,
+    untilLabel,
+    emptyLabel,
+    createLabel,
+    clashDayLabel,
+    kindLabel,
+    stateLabel,
+    stateUrgent = () => false,
+    onDayCreate,
+    onClashDay,
+    onDateOpen,
+    groupMark,
   }: Props = $props();
 
-  let nDays = $derived(monthDays.length);
-  let todayNum = $derived(
-    monthDays.includes(todayIso) ? Number(todayIso.slice(8, 10)) : null,
+  /* Lid state is FURNITURE, not URL (ADR-094 §4 draws that line): folding a
+     group is arranging your desk, and it dies with the component. */
+  const shut = new SvelteSet<string>();
+
+  /** 168px frozen labels + 118px per day / 58px per fold — the proto's
+      measured widths, TODAY INCLUDED: equal width, its marks are ink (the
+      number, the word, and — next step — the hour line), never extra room. */
+  let gridTemplate = $derived(
+    `168px ${columns.map((c) => (c.kind === 'gap' ? '58px' : '118px')).join(' ')}`,
   );
-  /** Past ~68% of the month, labels flip to the left of their dot. */
-  let flipAfter = $derived(Math.ceil(nDays * 0.68));
 
-  function center(day: number): number {
-    return ((day - 0.5) / nDays) * 100;
-  }
-  function leftPct(day: number): number {
-    return ((day - 1) / nDays) * 100;
-  }
-  function spanPct(from: number, to: number): number {
-    return ((to - from + 1) / nDays) * 100;
-  }
+  /* ── the engine's facts, worded below, never re-derived ───────────── */
+  let marks = $derived(clashMarks(clashes, cells));
+  let clashDays = $derived(clashDayMarks(clashes));
+  let segs = $derived(awaySegments(awayRuns, columns));
+  let floors = $derived(awayFloorCols(awayRuns, columns));
 
-  /** Pip placement + overflow clamp — flipped pips grow leftwards. */
-  function pipStyle(pip: LanePipVM): string {
-    const c = center(pip.day);
-    const flip = pip.day > flipAfter;
-    const pos = flip
-      ? `right: ${100 - c}%; max-inline-size: ${Math.max(c - 1, 4)}%;`
-      : `left: ${c}%; max-inline-size: ${Math.max(100 - c - 1, 4)}%;`;
-    return `--c: ${pip.accent}; ${pos}`;
-  }
-
-  /** Stacked rows for a lane's bands (kept pure — ISO-free day ints). */
-  function bandRows(bands: LaneBandVM[]): { rows: number[]; rowCount: number } {
-    return stackIntervals(bands.map((b) => ({ start: b.from, end: b.to + 0.5 })));
-  }
-
-  // ── Measured pass (the calPostRender pattern) ────────────────────────
-  // Pip x-extents depend on rendered text, so row stacking and connector
-  // geometry are pixel work: measure, assign tops, grow tracks, place
-  // connectors, then (once) scroll today into the center.
-  let rootEl = $state<HTMLElement | null>(null);
-  let lanesEl = $state<HTMLElement | null>(null);
-  let scrolledOnce = false;
-
-  const PIP_ROW_H = 20;
-  const PIP_TOP = 6;
-  const BAND_ROW_H = 17;
-
-  function layout() {
-    const root = rootEl;
-    const wrap = lanesEl;
-    if (!root || !wrap) return;
-
-    for (const track of wrap.querySelectorAll<HTMLElement>('[data-pip-track]')) {
-      const pips = [...track.querySelectorAll<HTMLElement>('[data-pip]')];
-      const tr = track.getBoundingClientRect();
-      const { rows, rowCount } = stackIntervals(
-        pips.map((p) => {
-          const r = p.getBoundingClientRect();
-          return { start: r.left - tr.left, end: r.right - tr.left };
-        }),
-        6,
-      );
-      pips.forEach((p, i) => {
-        p.style.top = `${PIP_TOP + rows[i] * PIP_ROW_H}px`;
-      });
-      const bandCount = Number(track.dataset.bandRows ?? '0');
-      const h = PIP_TOP + Math.max(rowCount, 1) * PIP_ROW_H + 6 + bandCount * BAND_ROW_H + 4;
-      track.style.blockSize = `${Math.max(h, 58)}px`;
-    }
-
-    // Connectors: x from the day, y from the two lanes' track centres —
-    // same offsetParent (the lanes wrap), so offsets compose directly.
-    const labW = wrap.querySelector<HTMLElement>('[data-lane-label]')?.offsetWidth ?? 0;
-    const trackW = wrap.clientWidth - labW;
-    for (const conn of wrap.querySelectorAll<HTMLElement>('[data-connector]')) {
-      const a = wrap.querySelector<HTMLElement>(
-        `[data-lane-key="${CSS.escape(conn.dataset.a ?? '')}"] [data-pip-track]`,
-      );
-      const b = wrap.querySelector<HTMLElement>(
-        `[data-lane-key="${CSS.escape(conn.dataset.b ?? '')}"] [data-pip-track]`,
-      );
-      if (!a || !b) {
-        conn.style.display = 'none';
-        continue;
-      }
-      const wrapTop = wrap.getBoundingClientRect().top;
-      const ra = a.getBoundingClientRect();
-      const rb = b.getBoundingClientRect();
-      const y0 = ra.top - wrapTop + ra.height / 2;
-      const y1 = rb.top - wrapTop + rb.height / 2;
-      conn.style.display = '';
-      conn.style.left = `${labW + (center(Number(conn.dataset.day)) / 100) * trackW}px`;
-      conn.style.top = `${Math.min(y0, y1)}px`;
-      conn.style.blockSize = `${Math.abs(y1 - y0)}px`;
-    }
-
-    // Scroll affordance + one-time centring of today (55% like the mock).
-    const overflows = root.scrollWidth > root.clientWidth + 4;
-    root.classList.toggle('strip--scrolls', overflows);
-    if (overflows && !scrolledOnce && todayNum !== null) {
-      scrolledOnce = true;
-      const inner = root.firstElementChild as HTMLElement | null;
-      if (inner) {
-        const w = inner.getBoundingClientRect().width - labW;
-        root.scrollLeft = Math.max(0, labW + (center(todayNum) / 100) * w - root.clientWidth * 0.55);
+  let tallies = $derived.by(() => {
+    const touched = new Set(awayRuns.map((r) => r.laneKey));
+    const m = new Map<string, LaneTally>();
+    for (const g of groups) {
+      for (const l of g.lanes) {
+        const placed = [...(cells.get(l.key)?.values() ?? [])].flat();
+        m.set(l.key, {
+          ...laneTally({ placed, ghost: l.kind === 'ghost', touched: touched.has(l.key) }),
+        });
       }
     }
+    return m;
+  });
+
+  /** Each visible lane's grid ROW — the away bands are absolutely
+      positioned INTO their grid area, so this map must mirror the template
+      below exactly: row 1 is the head, every group adds its band row, every
+      open group adds one row per lane. */
+  let laneRow = $derived.by(() => {
+    const m = new Map<string, number>();
+    let r = 1;
+    for (const g of groups) {
+      r++;
+      if (shut.has(g.key)) continue;
+      for (const l of g.lanes) {
+        r++;
+        m.set(l.key, r);
+      }
+    }
+    return m;
+  });
+
+  function placedAt(lane: BoardLaneRef, col: BoardColumn): readonly PlacedEvent[] {
+    return cells.get(lane.key)?.get(col.from) ?? [];
   }
-
-  $effect(() => {
-    // Re-run whenever the rendered data changes …
-    void lanes;
-    void connectors;
-    void group;
-    void nDays;
-    let cancelled = false;
-    void tick().then(() => {
-      if (!cancelled) layout();
-    });
-    return () => {
-      cancelled = true;
-    };
-  });
-  $effect(() => {
-    // … and on the pixel-level triggers: resize and font swap.
-    const rerun = () => layout();
-    window.addEventListener('resize', rerun);
-    document.fonts?.ready.then(rerun).catch(() => {});
-    return () => window.removeEventListener('resize', rerun);
-  });
-
-  let axisLabel = $derived(t(`planner.lanes_${group}`, locale));
+  /** A multi-day fold can hold a marked day whose events are off the sheet —
+      the '!' never asked the filter, so the fold's head still carries it. */
+  function gapClash(col: BoardColumn): boolean {
+    for (const d of clashDays) if (d >= col.from && d <= col.to) return true;
+    return false;
+  }
+  /** The fold's ruler step, or null when a day stops being a mark (law 15:
+      under 6px a measure becomes a texture, and a texture is not drawn). */
+  function foldStep(col: BoardColumn): number | null {
+    const ticks = foldTicks(col.span, 58);
+    return ticks.length > 1 ? ticks[1] : null;
+  }
+  function laneName(lane: BoardLaneRef): string {
+    if (lane.kind === 'ghost') return teamWord;
+    if (lane.kind === 'nocast') return `${lane.name} · ${noCastWord}`;
+    return lane.name;
+  }
+  function toggle(key: string) {
+    if (shut.has(key)) shut.delete(key);
+    else shut.add(key);
+  }
 </script>
 
-<div class="strip" bind:this={rootEl}>
-  <div class="strip__inner">
-    <p class="strip__hint" aria-hidden="true">{t('planner.carrils_hint', locale)}</p>
-
-
-    <div class="strip__axis">
-      <span class="strip__lab strip__lab--axis" data-lane-label>{axisLabel}</span>
-      <span class="strip__axtrack">
-        {#each monthDays as iso (iso)}
-          {@const d = Number(iso.slice(8, 10))}
-          <span
-            class="strip__daynum"
-            class:strip__daynum--we={isWeekendIso(iso)}
-            class:strip__daynum--today={iso === todayIso}
-            style="left: {center(d)}%">{d}</span
-          >
-        {/each}
-        {#if todayNum !== null}
-          <span class="strip__now-label" style="left: {center(todayNum)}%"
-            >{t('planner.today', locale)}</span
-          >
-        {/if}
-      </span>
-    </div>
-
-    <div class="strip__lanes" bind:this={lanesEl}>
-      <div class="strip__bg" aria-hidden="true">
-        {#each monthDays as iso (iso)}
-          {#if isWeekendIso(iso)}
-            <span
-              class="strip__we"
-              style="left: {leftPct(Number(iso.slice(8, 10)))}%; inline-size: {100 / nDays}%"
-            ></span>
+{#if groups.length === 0}
+  <p class="board__empty">{emptyLabel}</p>
+{:else}
+  <!-- The strip scrolls sideways INSIDE itself; the page never does. -->
+  <div class="board__wrap">
+    <div class="board" style="grid-template-columns: {gridTemplate}">
+      <!-- ══ ROW 1 · the date axis ══════════════════════════════════════
+           Mono weekday over serif number. TODAY is the word and full ink —
+           EQUAL width, NO fill (Marco's ruling 2): its three marks are ink,
+           never room. Week and month boundaries are border-lefts drawn by
+           every row's cells, so the vertical never blinks. -->
+      <span class="board__corner">{axisWord}</span>
+      {#each columns as col (col.from)}
+        <span
+          class="board__head"
+          class:gap={col.kind === 'gap'}
+          class:today={col.today}
+          class:we={col.kind === 'gap' && col.weekend}
+          class:wstart={col.wstart}
+          class:mstart={col.mstart}
+          style={col.kind === 'gap' && foldStep(col) !== null ? `--dw: ${foldStep(col)}px` : undefined}
+        >
+          {#if col.monthStartName}<i class="board__mo">{monthWord(col.from)}</i>{/if}
+          {#if col.kind === 'gap'}
+            <span class="board__gaplab"
+              >{col.gapLabel}{#if gapClash(col)}<button
+                  type="button"
+                  class="board__dmk board__dmk--dim"
+                  aria-label={clashDayLabel(col.from)}
+                  onclick={() => onClashDay(col.from)}>!</button
+                >{/if}</span
+            >
+          {:else}
+            <span class="board__wd">{weekdayWord(col.from)}</span>
+            <b class="board__num"
+              >{Number(col.from.slice(8, 10))}{#if clashDays.has(col.from)}<button
+                  type="button"
+                  class="board__dmk"
+                  aria-label={clashDayLabel(col.from)}
+                  onclick={() => onClashDay(col.from)}>!</button
+                >{/if}</b
+            >
+            {#if col.today}<i class="board__todayw">{todayWord}</i>{/if}
           {/if}
-        {/each}
-        {#if todayNum !== null}
-          <span class="strip__now" style="left: {center(todayNum)}%"></span>
-        {/if}
-      </div>
+        </span>
+      {/each}
 
-        {#each lanes as lane (lane.key)}
-          {@const bands = bandRows(lane.bands)}
-          <div class="strip__lane" data-lane-key={lane.key}>
-            <span class="strip__lab" data-lane-label>
-              <!-- The square dot was the project-axis marker. The dial says
-                   'scope' | 'person' now (ADR-094) and the interim scope
-                   drawing groups by workspace — round dot — so the square
-                   variant has no speaker until the v3 board rebuild. -->
-              <i class="strip__dot" style="--c: {lane.accent}" aria-hidden="true"></i>
-              <span class="strip__lab-name" title={lane.label}>{lane.label}</span>
+      {#each groups as group (group.key)}
+        {@const isShut = shut.has(group.key)}
+        {@const mark = groupMark?.(group) ?? null}
+        <!-- ══ the group band · a LID ═══════════════════════════════════
+             The sticky label is a button; folded, it still says what it
+             holds (law 11) — the tally prints INSIDE the label, because a
+             sibling outside it clipped when the label pins (next step). -->
+        <button
+          type="button"
+          class="board__grpl"
+          class:shut={isShut}
+          aria-expanded={!isShut}
+          onclick={() => toggle(group.key)}
+        >
+          <span class="board__grp-l">
+            <span class="board__mark">
+              {#if mark}
+                <IdentityMark
+                  mini
+                  accent={mark.accent}
+                  initials={mark.initials}
+                  name={group.name}
+                  variant={mark.initials ? 'compact' : 'bare'}
+                />
+              {/if}
             </span>
-            <span class="strip__track" data-pip-track data-band-rows={bands.rowCount}>
-              {#each lane.bands as band, i (band.id)}
-                <span
-                  class="strip__band strip__band--{band.kind}"
-                  class:strip__band--company={band.company}
-                  class:strip__band--tent={band.tentative}
-                  style="{band.accent ? `--c: ${band.accent};` : ''} left: {leftPct(
-                    band.from,
-                  )}%; inline-size: {spanPct(band.from, band.to)}%; bottom: {4 +
-                    bands.rows[i] * BAND_ROW_H}px"
-                  title={band.title ?? band.label}>{band.label}</span
-                >
-              {/each}
-              {#each lane.pips as pip (pip.id)}
-                <span
-                  class="strip__pip strip__pip--{pip.kind}"
-                  class:strip__pip--hold={pip.state === 'hold'}
-                  class:strip__pip--flip={pip.day > flipAfter}
-                  style={pipStyle(pip)}
-                  data-pip
-                  title={pip.title}
-                >
-                  {#if pip.kind !== 'travel'}
-                    <i class="strip__pip-dot" aria-hidden="true"></i>
-                  {/if}
-                  {#if pip.href}
-                    <a class="strip__pip-lab" href={pip.href}
-                      >{pip.label}{#if pip.time}<i class="strip__pip-time"> {pip.time}</i>{/if}</a
-                    >
-                  {:else}
-                    <span class="strip__pip-lab"
-                      >{pip.label}{#if pip.time}<i class="strip__pip-time"> {pip.time}</i>{/if}</span
-                    >
-                  {/if}
-                </span>
-              {/each}
-            </span>
-          </div>
+            <span class="board__grp-n">{group.name}</span>
+            <span class="board__grp-x" aria-hidden="true">{isShut ? '+' : '–'}</span>
+          </span>
+          {#if isShut}
+            <span class="board__grp-c">{groupTallyText(groupTally(group, tallies))}</span>
+          {/if}
+        </button>
+        <!-- ONE empty cell per column — never a `1 / -1` spanner (the
+             phantom-row law). Empty, but it stretches to the band row's
+             height, so the week/month rules cross the band unbroken. -->
+        {#each columns as col (`${group.key}:${col.from}`)}
+          <span
+            class="board__grpc"
+            class:gap={col.kind === 'gap'}
+            class:shut={isShut}
+            class:wstart={col.wstart}
+            class:mstart={col.mstart}
+          ></span>
         {/each}
-        {#if lanes.length === 0}
-          <p class="strip__empty">{t('planner.empty_month', locale)}</p>
+
+        {#if !isShut}
+          {#each group.lanes as lane (lane.key)}
+            {@const tally = tallies.get(lane.key)}
+            <!-- ══ the lane · frozen label + a cell per column ══════════ -->
+            <span
+              class="board__lab"
+              class:board__lab--ghost={lane.kind === 'ghost'}
+              class:board__lab--nocast={lane.kind === 'nocast'}
+            >
+              <span class="board__mark">
+                {#if lane.accent}
+                  <IdentityMark
+                    mini
+                    accent={lane.accent}
+                    initials={lane.initials}
+                    name={lane.name}
+                  />
+                {/if}
+              </span>
+              <span class="board__lab-body">
+                <span class="board__name"
+                  >{laneName(lane)}{#if lane.shared}<i class="board__badge">{sharedWord}</i
+                    >{/if}</span
+                >
+                {#if tally}
+                  <span
+                    class="board__tally"
+                    class:board__tally--q={tally.confirmed === 0 && tally.options === 0}
+                    >{laneTallyText(tally)}</span
+                  >
+                {/if}
+              </span>
+            </span>
+            {#each columns as col, colIdx (`${lane.key}:${col.from}`)}
+              {@const placed = col.kind === 'day' ? placedAt(lane, col) : []}
+              <span
+                class="board__cell"
+                class:gap={col.kind === 'gap'}
+                class:today={col.today}
+                class:wstart={col.wstart}
+                class:mstart={col.mstart}
+                data-lane={lane.key}
+                data-day={col.from}
+                data-weekend={col.weekend ? '' : undefined}
+              >
+                {#each placed as p (p.event.id)}
+                  {@const m = marks.get(p.event.id)}
+                  <!-- The slot is the slip's size container — the CELL
+                       decides what a slip can afford (Slip's own ladder).
+                       An INFERRED placement is a weaker CLAIM, not fainter
+                       INK: dotted edge, italic name, never an opacity fade
+                       — set from outside, Slip internals untouched. -->
+                  <span class="board__slot" class:board__slot--inf={p.link === 'inferred'}>
+                    <Slip
+                      slip={p.event.slip}
+                      {kindLabel}
+                      {stateLabel}
+                      stateUrgent={stateUrgent(p.event.slip)}
+                      showCountry={true}
+                      clash={m ? m.clash : 'none'}
+                      clashPeople={m?.people ?? false}
+                      onOpen={onDateOpen && p.event.kind !== 'perf'
+                        ? () => onDateOpen(p.event.id)
+                        : undefined}
+                    />
+                  </span>
+                {/each}
+                {#if placed.length === 0 && (col.kind === 'day' || col.span === 1)}
+                  <!-- The empty cell IS the door: day and lane are already
+                       known, so nothing is chosen twice. The person axis
+                       passes no project — the dialog asks (ADR-094 §3b:
+                       never the prototype's silent group default). -->
+                  <button
+                    type="button"
+                    class="board__add"
+                    aria-label={createLabel(col.from)}
+                    onclick={() => onDayCreate(col.from, axis === 'scope' ? lane.id : null)}
+                    >+</button
+                  >
+                {/if}
+                {#if floors.get(lane.key)?.has(colIdx)}
+                  <!-- The 15px floor: the ROW grows, not the marked cell —
+                       a row is as tall as its tallest cell, and the band's
+                       sentence must never land on a chip's name. -->
+                  <span class="board__awsp" aria-hidden="true"></span>
+                {/if}
+              </span>
+            {/each}
+          {/each}
         {/if}
-        {#each connectors as c (c.id)}
-          <button
-            type="button"
-            class="strip__conn"
-            class:strip__conn--possible={c.severity === 'possible'}
-            data-connector
-            data-a={c.aKey}
-            data-b={c.bKey}
-            data-day={c.day}
-            aria-label={c.label}
-            title={c.label}
-            onclick={() => onConnectorJump(c.id)}
-          ></button>
-        {/each}
+      {/each}
+
+      <!-- ══ the absence bands · ONE drawn sentence per segment ═════════
+           Absolutely positioned INTO their grid area (grid-row × the
+           column span), so one band runs unbroken across day cells beneath
+           its span. Static seam: `bottom` is CSS for now; the measured
+           21px-above-floor drawer is the next step. -->
+      {#each segs as s (`${s.laneKey}:${s.run.from}:${s.startCol}`)}
+        {#if laneRow.has(s.laneKey)}
+          <span
+            class="board__aw"
+            class:board__aw--tent={s.run.tentative}
+            class:board__aw--cont={s.cont}
+            class:board__aw--end={s.end}
+            style="grid-row: {laneRow.get(s.laneKey)}; grid-column: {s.startCol + 2} / {s.endCol +
+              3}"
+          >
+            <i class="board__aw-k">{awayWord}</i><b class="board__aw-n">{s.run.who}</b><em
+              class="board__aw-u">{untilLabel(s.run.to)}</em
+            ><i class="board__aw-r" aria-hidden="true"></i>
+          </span>
+        {/if}
+      {/each}
     </div>
   </div>
-</div>
+{/if}
 
 <style>
   @layer components {
-    /* The strip scrolls horizontally as a whole; the page never does. */
-    .strip {
-      --strip-label-w: 9.5rem;
+    /* ── the scrollport · sideways inside, never the page ────────────── */
+    .board__wrap {
       overflow-x: auto;
+      overflow-y: clip;
+      /* The scrollbar used to sit ON the last row. */
+      padding-block-end: 9px;
       scrollbar-width: thin;
     }
-    .strip__inner {
-      min-inline-size: 47.5rem;
-    }
-    .strip__hint {
-      display: none;
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      letter-spacing: var(--mono-letter-spacing-loose);
-      text-transform: uppercase;
-      color: var(--text-faint);
-      text-align: end;
-      padding-block-end: var(--space-2xs);
-    }
-    :global(.strip--scrolls) .strip__hint {
-      display: block;
+    .board {
+      display: grid;
+      min-inline-size: max-content;
+      border-block-start: 1px solid var(--border-color-light);
+      position: relative;
     }
 
-    /* ── Sticky label column — labels never clip, never scroll away. ── */
-    .strip__lab {
+    /* ── Z-ORDER, LEGISLATED (law 19): axis 10/11 above group labels 8
+       above lane names 6 above away bands 4. No edge gradients anywhere —
+       a border is a border, the board cuts where the panel ends. ──────── */
+
+    /* ── the date axis ───────────────────────────────────────────────── */
+    .board__head,
+    .board__corner {
+      /* Inert belt-and-braces: the measured `--hdy` transform is what will
+         pin (the wrap's overflow makes sticky a no-op here) — next step. */
       position: sticky;
-      left: 0;
-      z-index: 7;
-      flex: 0 0 var(--strip-label-w);
-      inline-size: var(--strip-label-w);
-      display: flex;
-      align-items: center;
-      gap: var(--space-xs);
-      padding-inline-end: var(--space-s);
+      inset-block-start: 0;
       background: var(--bg);
-      font-size: var(--text-s);
-      color: var(--text-color);
-      min-inline-size: 0;
+      border-block-end: 1px solid var(--border-color-dark);
+      padding: 9px 9px 8px;
     }
-    .strip__lab-name {
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+    .board__head {
+      position: sticky;
+      z-index: 10;
     }
-    .strip__lab--axis {
+    .board__corner {
+      inset-inline-start: 0;
+      z-index: 11;
+      border-inline-end: 1px solid var(--border-color-light);
       font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      letter-spacing: var(--mono-letter-spacing-loose);
+      font-size: 9px;
+      letter-spacing: 0.06em;
       text-transform: uppercase;
       color: var(--text-faint);
-      align-items: flex-end;
-      padding-block-end: var(--space-2xs);
-    }
-    .strip__dot {
-      inline-size: 0.5625rem;
-      block-size: 0.5625rem;
-      border-radius: var(--radius-50);
-      background: var(--c);
-      flex: none;
-    }
-    .strip__dot--sq {
-      border-radius: var(--radius-s);
-    }
-
-    .strip__axis {
       display: flex;
-      border-block-end: 1px solid var(--border-color-light);
+      align-items: flex-end;
+      padding: 9px 15px 8px;
     }
-    .strip__axtrack {
-      position: relative;
-      flex: 1;
-      block-size: 2.25rem;
-      min-inline-size: 0;
-    }
-    .strip__daynum {
-      position: absolute;
-      bottom: var(--space-2xs);
-      transform: translateX(-50%);
+    .board__wd {
+      display: block;
       font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      color: var(--text-muted);
-    }
-    .strip__daynum--we {
+      font-size: 9px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
       color: var(--text-faint);
     }
-    .strip__daynum--today {
-      color: var(--info);
+    .board__num {
+      display: block;
+      font-size: 15px;
       font-weight: 500;
-    }
-    .strip__now-label {
-      position: absolute;
-      top: 0;
-      transform: translateX(-50%);
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      letter-spacing: var(--mono-letter-spacing-loose);
-      text-transform: lowercase;
-      color: var(--info);
-    }
-
-    .strip__lanes {
-      position: relative;
-    }
-    .strip__bg {
-      position: absolute;
-      inset-block: 0;
-      left: var(--strip-label-w);
-      right: 0;
-      z-index: 0;
-      pointer-events: none;
-    }
-    .strip__we {
-      position: absolute;
-      inset-block: 0;
-      background: color-mix(in oklch, var(--neutral) 6%, transparent);
-    }
-    .strip__now {
-      position: absolute;
-      inset-block: 0;
-      inline-size: 1.5px;
-      background: var(--info);
-      z-index: 4;
-    }
-
-    .strip__lane {
-      display: flex;
-      border-block-end: 1px solid var(--border-color-light);
-      position: relative;
-      z-index: 1;
-    }
-    .strip__track {
-      position: relative;
-      flex: 1;
-      block-size: 3.625rem;
-      min-inline-size: 0;
-    }
-
-    /* ── Pips — the chip grammar at ribbon scale. ─────────────────────── */
-    .strip__pip {
-      position: absolute;
-      top: 6px;
-      display: flex;
-      align-items: center;
-      gap: var(--space-2xs);
-      white-space: nowrap;
-      z-index: 3;
-      min-inline-size: 0;
-    }
-    .strip__pip--flip {
-      flex-direction: row-reverse;
-    }
-    .strip__pip-dot {
-      inline-size: 0.75rem;
-      block-size: 0.75rem;
-      border-radius: var(--radius-50);
-      background: var(--c);
-      flex: none;
-      box-shadow: 0 0 0 3px color-mix(in oklch, var(--c) 18%, transparent);
-    }
-    .strip__pip--hold .strip__pip-dot {
-      background: var(--bg);
-      border: 2px dashed var(--c);
-      box-shadow: none;
-    }
-    .strip__pip--date .strip__pip-dot {
-      inline-size: 0.5rem;
-      block-size: 0.5rem;
-      box-shadow: none;
-    }
-    .strip__pip-lab {
-      font-size: var(--text-xs);
-      font-weight: 500;
-      color: var(--text-color);
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      min-inline-size: 0;
-      text-decoration: none;
-    }
-    a.strip__pip-lab:hover {
-      text-decoration: underline;
-      text-underline-offset: 2px;
-    }
-    .strip__pip--hold .strip__pip-lab {
-      font-weight: 400;
       color: var(--text-muted);
     }
-    .strip__pip-time {
+    /* Today: ink in the number and the word — and NOTHING else. No fill,
+       no width, never gray: the wash CSS simply is not written (ruling 3). */
+    .board__head.today .board__num {
+      color: var(--text-color);
+    }
+    .board__todayw {
+      display: block;
       font-style: normal;
       font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      color: var(--text-faint);
-      /* The leading space in the markup is collapsed away by the compiler, so
-         the hour printed welded to the venue: `Teatre Principal22h`. A word
-         space that has to survive whitespace handling is not a word space. */
-      margin-inline-start: 5px;
-    }
-    .strip__pip--date .strip__pip-lab,
-    .strip__pip--travel .strip__pip-lab {
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      font-weight: 400;
+      font-size: 8px;
+      letter-spacing: 0.12em;
       text-transform: uppercase;
-      letter-spacing: var(--mono-letter-spacing);
       color: var(--text-muted);
     }
-    .strip__pip--travel .strip__pip-lab {
-      color: color-mix(in oklch, var(--c) 50%, var(--text-muted));
-    }
-
-    /* ── In-lane quiet bands: prep hatched accent, blackout person/company,
-       derived away dotted (quieter than everything). Modifiers redeclare
-       the --band-* contract, never the properties. ────────────────────── */
-    .strip__band {
-      --band-bg: transparent;
-      --band-fg: var(--text-muted);
-      --band-border: transparent;
-      position: absolute;
-      block-size: 0.875rem;
-      border-radius: var(--radius-circle);
-      font-family: var(--font-mono);
-      font-size: 0.5625rem;
-      letter-spacing: var(--mono-letter-spacing);
-      text-transform: uppercase;
-      display: flex;
-      align-items: center;
-      padding-inline: var(--space-xs);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      background: var(--band-bg);
-      color: var(--band-fg);
-      border: 1px solid var(--band-border);
-      z-index: 2;
-    }
-    .strip__band--prep {
-      --band-bg: repeating-linear-gradient(
-        135deg,
-        color-mix(in oklch, var(--c) 13%, transparent) 0 6px,
-        transparent 6px 12px
-      );
-      --band-border: color-mix(in oklch, var(--c) 30%, var(--border-color-light));
-      --band-fg: color-mix(in oklch, var(--c) 45%, var(--text-muted));
-      border-radius: var(--radius-s);
-    }
-    .strip__band--blackout {
-      --band-bg: color-mix(in oklch, var(--info) 13%, transparent);
-      --band-fg: color-mix(in oklch, var(--info) 45%, var(--text-muted));
-    }
-    .strip__band--blackout.strip__band--company {
-      --band-bg: color-mix(in oklch, var(--neutral) 10%, transparent);
-      --band-fg: var(--text-muted);
-    }
-    .strip__band--blackout.strip__band--tent {
-      --band-bg: repeating-linear-gradient(
-        135deg,
-        color-mix(in oklch, var(--info) 11%, transparent) 0 5px,
-        transparent 5px 10px
-      );
-      --band-border: var(--border-color-light);
-      border-style: dashed;
-    }
-    .strip__band--away {
-      --band-bg: transparent;
-      --band-fg: var(--text-faint);
-      --band-border: var(--border-color-dark);
-      border-style: dotted;
-    }
-
-    /* ── Cross-lane conflict connector (ADR-080 §7) ───────────────────── */
-    .strip__conn {
-      position: absolute;
-      inline-size: 3px;
-      padding: 0;
-      border: none;
-      border-radius: var(--radius-s);
-      background: var(--danger);
-      cursor: pointer;
-      z-index: 5;
-    }
-    .strip__conn::before,
-    .strip__conn::after {
-      content: '!';
-      position: absolute;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      inline-size: 1rem;
-      block-size: 1rem;
-      border-radius: var(--radius-50);
-      background: var(--danger);
-      color: var(--white);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-family: var(--font-mono);
-      font-size: 0.5625rem;
-    }
-    .strip__conn::before {
-      top: 0;
-    }
-    .strip__conn::after {
-      top: 100%;
-    }
-    .strip__conn--possible {
-      background: var(--neutral-semi-light);
-    }
-    .strip__conn--possible::before,
-    .strip__conn--possible::after {
-      content: '?';
-      background: var(--bg-ultra-light);
-      color: var(--text-muted);
-      border: 1px dashed var(--border-color-dark);
-    }
-
-    /* ── The Loom (Agrupa per Persona) ────────────────────────────────── */
-    .strip__legend {
-      display: flex;
-      flex-wrap: wrap;
-      gap: var(--space-xs) var(--space-m);
-      padding-block-end: var(--space-s);
-      position: sticky;
-      left: 0;
-      inline-size: fit-content;
-    }
-    .strip__leg {
-      display: inline-flex;
-      align-items: center;
-      gap: var(--space-xs);
-      font-size: var(--text-xs);
-      color: var(--text-muted);
-    }
-    .strip__leg-th {
-      inline-size: 1.875rem;
-      block-size: 0.5625rem;
-      border-radius: var(--radius-circle);
-      flex: none;
-    }
-    .strip__leg-th--avail {
-      block-size: 2px;
-      background: var(--border-color-dark);
-    }
-    .strip__leg-th--commit {
-      background: var(--neutral);
-    }
-    .strip__leg-th--hold {
-      block-size: 0.5rem;
-      background: repeating-linear-gradient(
-        90deg,
-        var(--neutral) 0 5px,
-        transparent 5px 9px
-      );
-    }
-    .strip__leg-th--out {
-      block-size: 0.875rem;
-      border-radius: var(--radius-s);
-      background: repeating-linear-gradient(
-        135deg,
-        color-mix(in oklch, var(--info) 14%, transparent) 0 4px,
-        transparent 4px 8px
-      );
-      border: 1px dashed var(--border-color-dark);
-    }
-    .strip__leg-th--knot {
-      inline-size: 0.875rem;
-      block-size: 0.875rem;
-      border-radius: var(--radius-50);
-      background: var(--bg-ultra-light);
-      border: 2.5px solid var(--danger);
-    }
-
-    .strip__grp {
-      display: flex;
-      border-block-start: 1px solid var(--border-color-light);
-      padding-block: var(--space-xs) var(--space-2xs);
-      position: relative;
-      z-index: 1;
-    }
-    .strip__grp:first-of-type {
-      border-block-start: none;
-    }
-    .strip__grp-name {
-      position: sticky;
-      left: 0;
-      display: inline-flex;
-      align-items: center;
-      gap: var(--space-xs);
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      letter-spacing: var(--mono-letter-spacing-loose);
-      text-transform: uppercase;
-      color: var(--text-faint);
-      background: var(--bg);
-      padding-inline-end: var(--space-s);
-    }
-    .strip__grp-sq {
-      inline-size: 0.5625rem;
-      block-size: 0.5625rem;
-      border-radius: var(--radius-s);
-      background: var(--c);
-      flex: none;
-    }
-
-    .strip__lane--thread {
-      border-block-end: none;
-    }
-    .strip__lab--person {
-      font-size: var(--text-s);
-      color: var(--text-muted);
-    }
-    .strip__lab--shared {
-      color: var(--text-color);
-      font-weight: 500;
-    }
-    .strip__lab--ghost {
-      color: var(--text-faint);
+    .board__mo {
+      display: block;
+      font-family: var(--font-display);
       font-style: italic;
+      font-size: 11.5px;
+      color: var(--text-muted);
     }
-    .strip__badge {
+    /* The red '!' rides the day NUMBER — red means conflict and only
+       conflict (law 2). Dimmed on a fold's head: the fact survives the
+       filter, quieter where its evidence is off the sheet. */
+    .board__dmk {
+      margin-inline-start: 3px;
+      padding: 0;
+      border: 0;
+      background: none;
       font-family: var(--font-mono);
-      font-size: 0.5rem;
-      letter-spacing: var(--mono-letter-spacing);
-      text-transform: uppercase;
-      color: var(--text-faint);
-      border: 1px solid var(--border-color-dark);
-      border-radius: var(--radius-circle);
-      padding: 1px var(--space-xs);
-      flex: none;
+      font-size: 11px;
+      color: var(--danger);
+      vertical-align: super;
+      line-height: 0;
+      cursor: pointer;
+    }
+    .board__dmk--dim {
+      color: color-mix(in oklch, var(--danger) 70%, transparent);
     }
 
-    .strip__thread {
-      position: absolute;
-      top: 50%;
-      left: 0;
-      right: 0;
-      block-size: 2px;
-      transform: translateY(-50%);
-      background: var(--border-color-dark);
-    }
-    .strip__thread--ghost {
-      background: repeating-linear-gradient(
-        90deg,
-        var(--border-color-dark) 0 4px,
-        transparent 4px 8px
-      );
-    }
-    .strip__seg {
-      position: absolute;
-      top: 50%;
-      transform: translateY(-50%);
-      block-size: 0.5625rem;
-      border-radius: var(--radius-circle);
-      background: var(--c);
-      min-inline-size: 0.5rem;
-    }
-    .strip__seg--hold {
-      background: repeating-linear-gradient(90deg, var(--c) 0 5px, transparent 5px 9px);
-      block-size: 0.5rem;
-    }
-    .strip__seg--prep {
-      opacity: 0.5;
-    }
-    .strip__out {
-      position: absolute;
-      top: 50%;
-      transform: translateY(-50%);
-      block-size: 1.25rem;
-      border-radius: var(--radius-s);
-      background: color-mix(in oklch, var(--info) 12%, transparent);
-      border: 1px dashed color-mix(in oklch, var(--info) 30%, var(--border-color-light));
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-family: var(--font-mono);
-      font-size: 0.5rem;
-      letter-spacing: var(--mono-letter-spacing);
-      text-transform: uppercase;
-      color: color-mix(in oklch, var(--info) 45%, var(--text-muted));
-      overflow: hidden;
-      white-space: nowrap;
-      z-index: 2;
-    }
-    .strip__out--tent {
-      background: repeating-linear-gradient(
-        135deg,
-        color-mix(in oklch, var(--info) 12%, transparent) 0 5px,
-        transparent 5px 10px
-      );
-    }
-    .strip__knot {
-      position: absolute;
-      top: 50%;
-      transform: translate(-50%, -50%);
-      inline-size: 1rem;
-      block-size: 1rem;
-      border-radius: var(--radius-50);
-      background: var(--bg-ultra-light);
-      border: 2.5px solid var(--danger);
-      z-index: 5;
-    }
-    .strip__knot::after {
+    /* The day tick: a 7px × 1px MARK off the axis, not a line — suppressed
+       on the first column and wherever a week/month rule already stands
+       (one mark per pixel). */
+    .board__head::before {
       content: '';
       position: absolute;
-      inset: 3px;
-      border-radius: var(--radius-50);
-      background: var(--danger);
+      inset-inline-start: 0;
+      inset-block-end: 0;
+      inline-size: 1px;
+      block-size: 7px;
+      background: color-mix(in oklch, var(--text-color) 30%, transparent);
     }
-    .strip__kflag {
-      position: absolute;
-      top: 1px;
-      transform: translateX(-50%);
-      font-family: var(--font-mono);
-      font-size: 0.5rem;
-      letter-spacing: var(--mono-letter-spacing);
-      text-transform: uppercase;
-      color: var(--danger);
-      white-space: nowrap;
-      z-index: 6;
+    .board__head:nth-child(2)::before,
+    .board__head.wstart::before,
+    .board__head.mstart::before {
+      display: none;
     }
 
-    .strip__empty {
+    /* The fold's head: the range word, small and faint, centered. */
+    .board__head.gap {
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+    }
+    .board__gaplab {
+      font-family: var(--font-mono);
+      font-size: 8.5px;
+      letter-spacing: 0.04em;
+      color: var(--text-faint);
+      white-space: nowrap;
+    }
+    /* A fold of ONE day is still that day: it compresses nothing, so its
+       head keeps the weekend it has (law 16) — the one wash on the board. */
+    .board__head.gap.we {
+      background: color-mix(in oklch, var(--text-color) 3%, var(--bg));
+    }
+    /* The folded run's ruler: one 1px fillet per swallowed day at `--dw`,
+       only while a day can still be a mark (the engine's foldTicks said
+       so — below 6px no `--dw` is set and one tick per 58px remains). */
+    .board__head.gap::after {
+      content: '';
+      position: absolute;
+      inset-inline: 0;
+      inset-block-end: 0;
+      block-size: 3px;
+      background: repeating-linear-gradient(
+        90deg,
+        color-mix(in oklch, var(--text-color) 20%, transparent) 0 1px,
+        transparent 1px var(--dw, 58px)
+      );
+    }
+
+    /* ── WEEK AND MONTH EDGES · full-height, drawn by EVERY row ───────
+       (law 18 as amended: the boundaries ARE border-lefts, and because the
+       head, the band's filler cells and the lane cells all draw them, the
+       vertical never breaks). The 18px gutter stays countable: 9px flat,
+       1px rule + 8px at a week, 3px double + 6px at a month. */
+    .wstart {
+      border-inline-start: 1px solid
+        color-mix(in oklch, var(--text-color) 11%, var(--border-color-light));
+      padding-inline-start: 8px;
+    }
+    .mstart {
+      border-inline-start: 3px double
+        color-mix(in oklch, var(--text-color) 24%, var(--border-color-light));
+      padding-inline-start: 6px;
+    }
+    .gap.wstart,
+    .gap.mstart,
+    .board__grpc.wstart,
+    .board__grpc.mstart {
+      padding-inline-start: 0;
+    }
+
+    /* ── the group band · a lid over a row of real cells ─────────────── */
+    .board__grpl {
+      grid-column: 1;
+      position: sticky;
+      inset-inline-start: 0;
+      z-index: 8;
+      background: var(--bg);
+      border: 0;
+      border-inline-end: 1px solid var(--border-color-light);
+      /* Open: air IS the group boundary — no second rule. */
+      padding: 22px 15px 5px;
+      text-align: start;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .board__grp-l {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 7px;
+    }
+    .board__grp-n {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+    }
+    .board__grp-x {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-faint);
+    }
+    /* Shut: a closed section is a row of a list — the rule comes back,
+       drawn by the label AND every filler cell, and the lid still says
+       what it holds (law 11). */
+    .board__grpl.shut {
+      padding: 11px 15px;
+      border-block-end: 1px solid var(--border-color-light);
+    }
+    .board__grp-c {
+      display: block;
+      margin-block-start: 4px;
+      font-family: var(--font-mono);
+      font-size: 8.5px;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+      line-height: 1.4;
+    }
+    /* Empty, but it STRETCHES to the band row and draws the verticals. */
+    .board__grpc {
+      padding: 0;
+    }
+    .board__grpc.shut {
+      border-block-end: 1px solid var(--border-color-light);
+    }
+
+    /* ── the lane · frozen name + tally, then cells ───────────────────── */
+    .board__lab {
+      position: sticky;
+      inset-inline-start: 0;
+      z-index: 6;
+      background: var(--bg);
+      border-inline-end: 1px solid var(--border-color-light);
+      border-block-end: 1px solid var(--border-color-light);
+      min-block-size: 58px;
+      padding: 14px 15px;
+      display: flex;
+      gap: 7px;
+      min-inline-size: 0;
+    }
+    /* The 22px mark slot — the monogram's, kept even when empty so names
+       align down the column whatever kind of lane they head. */
+    .board__mark {
+      inline-size: 22px;
+      flex: none;
+      display: inline-flex;
+      padding-block-start: 2px;
+    }
+    .board__lab-body {
+      min-inline-size: 0;
+    }
+    .board__name {
+      display: block;
+      font-family: var(--font-display);
+      font-size: 15px;
+      line-height: 1.2;
+      color: var(--text-color);
+      overflow-wrap: anywhere;
+    }
+    .board__lab--ghost .board__name,
+    .board__lab--nocast .board__name {
+      font-style: italic;
+      color: var(--text-faint);
+    }
+    .board__tally {
+      display: block;
+      margin-block-start: 4px;
+      font-family: var(--font-mono);
+      font-size: 8.5px;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+      line-height: 1.4;
+    }
+    .board__tally--q {
+      opacity: 0.7;
+    }
+    .board__badge {
+      font-style: normal;
+      font-family: var(--font-mono);
+      font-size: 8.5px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+      margin-inline-start: 6px;
+    }
+
+    /* ── the cells · NO CAGE: border-bottom only, never a right edge ──── */
+    .board__cell {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      border-block-end: 1px solid var(--border-color-light);
+      padding: 10px 9px;
+      min-block-size: 0;
+      min-inline-size: 0;
+    }
+    /* NO WEEKEND WASH ON BODY CELLS (Marco's ruling 3): the engine still
+       stamps `data-weekend` on every cell unconditionally — the fact is
+       kept (law 17), the paint simply is not written. */
+
+    /* The slip's size container — its degradation ladder reads THIS width. */
+    .board__slot {
+      position: relative;
+      display: block;
+      container-type: inline-size;
+    }
+    .board__slot + .board__slot {
+      margin-block-start: 4px;
+    }
+    /* Inferred: a weaker CLAIM is not fainter INK — dotted edge, italic
+       name, explicitly NO opacity fade (the old .62 put the venue at
+       2.0:1). Set from the slot so Slip's own grammar stays untouched. */
+    .board__slot--inf :global(.slip) {
+      border-style: dotted;
+      border-color: color-mix(in oklch, var(--text-color) 20%, var(--border-color-light));
+    }
+    .board__slot--inf :global(.slip__n) {
+      font-style: italic;
+      color: var(--text-muted);
+    }
+
+    /* ── the empty cell's door ────────────────────────────────────────── */
+    .board__add {
+      flex: 1;
+      min-block-size: 20px;
+      opacity: 0;
+      border: 0;
+      border-block-start: 1px dashed color-mix(in oklch, var(--text-color) 18%, transparent);
+      background: none;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-muted);
+      padding: 4px 0 0;
+      cursor: pointer;
+      transition: opacity 0.1s;
+    }
+    .board__cell:hover .board__add,
+    .board__add:focus-visible {
+      opacity: 1;
+    }
+
+    /* ── the absence band · one sentence over its exact days ─────────── */
+    .board__aw {
+      position: absolute;
+      z-index: 4;
+      inset-inline: 0;
+      /* Static seam: the measured pass lays this 21px above the row floor. */
+      inset-block-end: 4px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      block-size: 12px;
+      pointer-events: none;
+      padding-inline-start: 9px;
+    }
+    .board__aw-k {
+      font-style: normal;
+      font-family: var(--font-mono);
+      font-size: 9px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+    .board__aw-n {
+      font-weight: 400;
+      font-size: 11px;
+      color: var(--text-color);
+      white-space: nowrap;
+    }
+    .board__aw-u {
+      font-style: normal;
+      font-family: var(--font-mono);
+      font-size: 9px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+      white-space: nowrap;
+    }
+    .board__aw-r {
+      flex: 1;
+      min-inline-size: 14px;
+      block-size: 0;
+      border-block-start: 1px solid color-mix(in oklch, var(--text-color) 45%, transparent);
+      position: relative;
+    }
+    /* The arrowhead is the TERMINUS: only the final segment draws it. */
+    .board__aw--end .board__aw-r::after {
+      content: '';
+      position: absolute;
+      inline-size: 5px;
+      block-size: 5px;
+      border-block-start: 1px solid color-mix(in oklch, var(--text-color) 58%, transparent);
+      border-inline-end: 1px solid color-mix(in oklch, var(--text-color) 58%, transparent);
+      transform: rotate(45deg);
+      inset-inline-end: -1px;
+      inset-block-start: -3.5px;
+    }
+    /* A RESUMED segment ('away Mia ⟶' after a cut) opens with a left arrow. */
+    .board__aw--cont::before {
+      content: '';
+      position: absolute;
+      inset-inline-start: 3px;
+      inset-block-start: 3.5px;
+      inline-size: 5px;
+      block-size: 5px;
+      border-block-start: 1px solid color-mix(in oklch, var(--text-color) 30%, transparent);
+      border-inline-start: 1px solid color-mix(in oklch, var(--text-color) 30%, transparent);
+      transform: rotate(-45deg);
+    }
+    /* Tentative: the doubt is the register — quieter text, dotted rule. */
+    .board__aw--tent .board__aw-k,
+    .board__aw--tent .board__aw-n {
+      color: var(--text-faint);
+    }
+    .board__aw--tent .board__aw-r {
+      border-block-start-style: dotted;
+      border-block-start-color: color-mix(in oklch, var(--text-color) 20%, transparent);
+    }
+    .board__aw--tent.board__aw--end .board__aw-r::after {
+      border-color: color-mix(in oklch, var(--text-color) 24%, transparent);
+    }
+    /* The floor the row reserves under a band's touched week. */
+    .board__awsp {
+      block-size: 15px;
+      margin-block-start: auto;
+      flex: none;
+    }
+
+    .board__empty {
       padding-block: var(--space-l);
       font-size: var(--text-s);
       color: var(--text-faint);

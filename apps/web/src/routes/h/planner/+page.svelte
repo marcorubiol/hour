@@ -51,19 +51,30 @@
     type NoteEvent,
     type PerformanceEvent,
     performanceSlip,
-    dateSlip,} from '$lib/month-events';
+    dateSlip,
+    type Slip as SlipVM,
+  } from '$lib/month-events';
   import AgendaList, { type AgendaDecision, type NoteDraft } from '$lib/components/AgendaList.svelte';
   import DecisionBand, {
     type ConcurrenceVM,
     type DecisionOptionVM,
     type DecisionVM,
   } from '$lib/components/planner/DecisionBand.svelte';
-  import CarrilsStrip, {
-    type ConnectorVM,
-    type LaneBandVM,
-    type LanePipVM,
-    type LaneVM,
-  } from '$lib/components/planner/CarrilsStrip.svelte';
+  import CarrilsStrip from '$lib/components/planner/CarrilsStrip.svelte';
+  import {
+    activeDaySet,
+    buildColumns,
+    laneEvents,
+    normalizeAway,
+    personGroups,
+    scopeGroups,
+    type AwayRun,
+    type BoardClash,
+    type BoardColumn,
+    type BoardEventIn,
+    type BoardGroup,
+    type LaneTally,
+  } from '$lib/board-lanes';
   import CalToolbar from '$lib/components/planner/CalToolbar.svelte';
   import Button from '$lib/components/Button.svelte';
   import CalLegend from '$lib/components/planner/CalLegend.svelte';
@@ -105,20 +116,9 @@
     nightsFree,
     daysCoveredBy,
     isoWeek,} from '$lib/planner';
-  import {
-    buildPersonScope,
-    peopleOf,
-    personRowKeys,
-    noCastProjectId,
-  } from '$lib/people';
+  import { buildPersonScope } from '$lib/people';
   import { createPlannerFeeds, primeAgendaWindow } from '$lib/planner-feeds.svelte';
-  import {
-    normalizeLaneAxis,
-    prepRuns,
-    resolveLaneAxis,
-    type LaneAxis,
-    type PrepDay,
-  } from '$lib/carrils';
+  import { normalizeLaneAxis, resolveLaneAxis, type LaneAxis } from '$lib/carrils';
   import type { AvailabilityItem } from '$lib/availability';
   import type { DateRow } from '$lib/date';
   import { localeDayMonth, localeWeekdayShort, timeInTz, hourMark, dualTime } from '$lib/datetime';
@@ -817,23 +817,6 @@
     return byDay;
   });
 
-  // ── Carrils VMs (ADR-080 §7/§8) — the ribbon speaks day-of-month
-  // numbers. Pips/bands follow the status filter like the other two
-  // projections; connectors read the truth-level conflict engine, same
-  // rule as the month marks. ────────────────────────────────────────────
-  let monthKey = $derived(monthFirst.slice(0, 7));
-  function inMonthDay(iso: string): number | null {
-    return iso.slice(0, 7) === monthKey ? Number(iso.slice(8, 10)) : null;
-  }
-  /** Clip an inclusive ISO range to the visible month (null = outside). */
-  function clipToMonth(from: string, to: string): { from: number; to: number } | null {
-    if (to < monthFirst || from > monthLast) return null;
-    return {
-      from: from < monthFirst ? 1 : Number(from.slice(8, 10)),
-      to: to > monthLast ? monthDays.length : Number(to.slice(8, 10)),
-    };
-  }
-
   type ProjectRef = {
     initials?: string | null;
     slug: string | null;
@@ -851,28 +834,6 @@
   function workspaceAccent(id: string): string {
     return accentVarFor({ slug: workspaceSlugById.get(id) ?? null });
   }
-  function projectAccent(id: string): string {
-    const p = projectById.get(id);
-    return p ? accentVarFor(p) : 'var(--accent-1)';
-  }
-  function blackoutLabel(b: AvailabilityItem): string {
-    if (b.person_id === null) return workspaceNameById.get(b.workspace_id) ?? '—';
-    const person = b.person?.full_name ?? personNames.get(b.person_id);
-    return t('planner.band_person', locale, { person: person ?? '—' });
-  }
-
-  /** Rehearsal/residency rows render as quiet run-bands, not pips. */
-  const PREP_KINDS = new Set(['rehearsal', 'residency']);
-  let prepRunsIso = $derived.by(() => {
-    const days: PrepDay[] = [];
-    for (const d of shownDates) {
-      if (!PREP_KINDS.has(d.kind) || d.status === 'cancelled' || !d.project) continue;
-      const day = dateDayKey(d, viewerTz);
-      if (day.slice(0, 7) !== monthKey) continue;
-      days.push({ project_id: d.project.id, day, label: d.title ?? kindLabel(d.kind) });
-    }
-    return prepRuns(days);
-  });
 
   // Person ↔ project attribution (roster-derived) — where a person block
   // lands under Agrupa per Projecte, and the loom's prep attribution.
@@ -886,283 +847,340 @@
     return m;
   });
 
-  /* ── THE BOARD IS ONE DRAWING ON THREE AXES (ADR-095 §2) ───────────────
-     `by person` is the SAME board — same columns, same cells, same chips —
-     with one row per person. It is not a different drawing, which is what the
-     Loom had become: a second implementation of «rows are people», with its
-     own segments, its own knots and its own vocabulary.
-     The proof it was a mistake is in the prototype itself: `calLoom()` is
-     still in the file and HAS NO CALLERS. The thread drawing is dead there.
-     So person lanes go through `personRowKeys()` — the resolver that has been
-     exported and unused in `$lib/people` since 30 July — and the one thing a
-     person axis adds is that a row can land in SEVERAL lanes at once: a
-     workspace and a project PARTITION, a person COVERS. That is ADR-092's own
-     distinction, finally drawn. */
-  /** Who is recorded as away on a given day — the door the inference stops at. */
-  function awayPersonIdsOn(day: string): Set<string> {
-    const out = new Set<string>();
+  /* ── THE BOARD IS ONE DRAWING ON TWO AXES (ADR-094, ADR-095 §2) ────────
+     `by person` is the SAME board — same columns, same cells, same slips —
+     with one row per person. The page's job here is ASSEMBLY only: it owns
+     the feeds, so it feeds the engine ($lib/board-lanes) and hands the
+     result down. Every count, placement, fold and clash weight has ONE
+     writer over there; every word is t()-backed here. The old carrilsLanes/
+     carrilsConnectors builders — the interim shim that still drew the month
+     ribbon — died with this block. This step keeps the board on the month
+     window (`monthFirst..monthLast`); the growing horizon is the next step,
+     and nothing below assumes an end date. */
+
+  /** The scope, expanded to project ids — null = Everything. One writer
+      for «what is on the sheet», shared by both axes. */
+  let boardScopeProjectIds = $derived.by((): string[] | null => {
+    if (scope.isEmpty) return null;
+    const ids = new Set(scope.projectIds);
+    for (const [id, p] of projectById) {
+      if (scope.workspaceIds.includes(p.workspace_id)) ids.add(id);
+    }
+    return [...ids];
+  });
+  /** Canonical project order — the app's, never token-add order (law 7). */
+  let boardProjects = $derived.by(() =>
+    [...projectById.entries()].map(([id, p]) => ({
+      id,
+      workspace_id: p.workspace_id,
+      name: p.name,
+      accent: accentVarFor(p),
+      initials: p.initials ?? null,
+    })),
+  );
+  /** The inference pool per project — the team feed's `project_ids`
+      inverted, the SAME source `personGroups` builds lanes from, so an
+      inferred placement always lands on a lane that exists. */
+  let boardCast = $derived.by(() => {
+    const m = new Map<string, string[]>();
+    for (const member of $teamQuery.data?.items ?? []) {
+      for (const pid of member.project_ids ?? []) {
+        (m.get(pid) ?? m.set(pid, []).get(pid)!).push(member.person_id);
+      }
+    }
+    return m;
+  });
+  /** A person on file in MORE THAN ONE workspace is a shared identity —
+      the portable person, present in two dossiers. The dossier didn't
+      define the word; this derivation is the honest reading of the feed. */
+  let sharedPersonIds = $derived.by(() => {
+    const spaces = new Map<string, Set<string>>();
+    for (const member of $teamQuery.data?.items ?? []) {
+      (spaces.get(member.person_id) ?? spaces.set(member.person_id, new Set()).get(member.person_id)!).add(
+        member.workspace_id,
+      );
+    }
+    return new Set([...spaces].filter(([, ws]) => ws.size > 1).map(([id]) => id));
+  });
+  /** Who is recorded as away on each day — the door the inference stops
+      at (ADR-092 §3): the engine subtracts these from a date's cast. */
+  let boardAwayByDay = $derived.by(() => {
+    const m = new Map<string, Set<string>>();
+    if (view !== 'board') return m;
     for (const b of visibleBlackouts) {
       if (!b.person_id) continue;
-      if (day >= b.starts_on && day <= b.ends_on) out.add(b.person_id);
+      const from = b.starts_on < monthFirst ? monthFirst : b.starts_on;
+      const to = b.ends_on > monthLast ? monthLast : b.ends_on;
+      for (let d = from; d <= to; d = addDaysIso(d, 1)) {
+        (m.get(d) ?? m.set(d, new Set()).get(d)!).add(b.person_id);
+      }
     }
-    return out;
-  }
+    return m;
+  });
 
-  let carrilsLanes = $derived.by((): LaneVM[] => {
+  /** Every calendar row as the board consumes it — THE SLIP travels inside
+      (ADR-095: the board renders the app's one card, never a lookalike). */
+  let boardEvents = $derived.by((): BoardEventIn[] => {
     if (view !== 'board') return [];
-    /* INTERIM SHIM (axis migration, ADR-094). The dial says 'scope' |
-       'person' now, but this builder still speaks the old three-way grammar
-       — it predates the board-lanes engine that will replace it wholesale.
-       Until then, 'scope' draws exactly what 'workspace' drew (one lane per
-       workspace), so `byProject` is pinned false rather than deleted: the
-       branches below stay legible as what they are — the old drawing,
-       awaiting demolition, not a new law. */
-    const byProject = false;
-    const byPerson = laneAxis === 'person';
-    const lanes = new Map<string, LaneVM>();
-    /** A person lane's label: their name, or «no cast» for the ghost row. */
-    const personLabel = (key: string): string => {
-      const proj = noCastProjectId(key);
-      if (proj) return `${projectNameById.get(proj) ?? '—'} · ${noCastWord}`;
-      return personNames.get(key) ?? '—';
-    };
-    const laneFor = (projectId: string | null, workspaceId: string | null): LaneVM | null => {
-      const key = byProject ? projectId : workspaceId;
-      if (!key) return null;
-      let lane = lanes.get(key);
-      if (!lane) {
-        lane = {
-          key,
-          label: byProject
-            ? (projectNameById.get(key) ?? '—')
-            : (workspaceNameById.get(key) ?? '—'),
-          accent: byProject ? projectAccent(key) : workspaceAccent(key),
-          pips: [],
-          bands: [],
-        };
-        lanes.set(key, lane);
-      }
-      return lane;
-    };
-    /** The person axis resolves its own keys, and there may be several. */
-    const personLaneFor = (key: string, projectId: string | null): LaneVM => {
-      let lane = lanes.get(key);
-      if (!lane) {
-        lane = {
-          key,
-          label: personLabel(key),
-          accent: projectId ? projectAccent(projectId) : 'var(--text-faint)',
-          pips: [],
-          bands: [],
-        };
-        lanes.set(key, lane);
-      }
-      return lane;
-    };
-
-    // Pips, chronological — insertion order = first-appearance lane order.
-    const perfs = [...shownPerfs].sort((a, b) => (perfDayKey(a) < perfDayKey(b) ? -1 : 1));
-    for (const p of perfs) {
-      if (p.status === 'cancelled' || !p.project) continue;
-      const day = inMonthDay(perfDayKey(p));
-      if (day === null) continue;
-      const venue = p.venue?.name ?? p.venue_name ?? p.city ?? p.project.name;
-      const city = p.venue?.city ?? p.city;
-      const pip = {
+    const out: BoardEventIn[] = [];
+    for (const p of shownPerfs) {
+      const day = perfDayKey(p);
+      if (day < monthFirst || day > monthLast) continue;
+      out.push({
         id: p.id,
         day,
-        kind: 'perf' as const,
-        state: (performanceStatusFamily(p.status) === 'confirmed' ? 'confirmed' : 'hold') as
-          | 'confirmed'
-          | 'hold',
-        label: venue,
-        time: p.start_at ? hourMark(timeInTz(p.start_at, p.venue?.timezone || viewerTz)) : null,
-        accent: accentVarFor(p.project),
-        title: `${p.project.name} · ${venue}${city ? `, ${city}` : ''} · ${performanceStatusLabel(p.status)}`,
-        href: p.slug
-          ? `/h/${workspaceSlugById.get(p.project.workspace_id) ?? defaultWorkspaceSlug}/performance/${p.slug}`
-          : null,
-      };
-      if (byPerson) {
-        // A PERSON COVERS: the same night lands in every lane that touches it,
-        // and a gig with nobody cast lands in its project's `no cast` row —
-        // which is a row, not a hole, because «nobody is on this» is an answer.
-        const { keys } = personRowKeys(
-          peopleOf({ roster: p.person_ids ?? null }),
-          p.project.id,
-        );
-        for (const key of keys) personLaneFor(key, p.project.id).pips.push({ ...pip });
-      } else {
-        const lane = laneFor(p.project.id, p.project.workspace_id);
-        if (!lane) continue;
-        lane.pips.push(pip);
-      }
+        project_id: p.project?.id ?? null,
+        kind: 'perf',
+        cert: performanceStatusFamily(p.status),
+        roster: p.person_ids ?? null,
+        // This feed carries no venue id, so the tally's gig identity falls
+        // back to the slip's name — the engine's own documented fallback.
+        venue_id: null,
+        slip: performanceSlip(p, slipCtxPage),
+      });
     }
-    const dates = [...shownDates].sort((a, b) =>
-      dateDayKey(a, viewerTz) < dateDayKey(b, viewerTz) ? -1 : 1,
-    );
-    for (const d of dates) {
-      if (d.status === 'cancelled' || !d.project || PREP_KINDS.has(d.kind)) continue;
-      const day = inMonthDay(dateDayKey(d, viewerTz));
-      if (day === null) continue;
-      const dateLanes: LaneVM[] = [];
-      if (byPerson) {
-        // A date carries no roster of its own, so its people are INFERRED from
-        // the project's canonical cast — and the inference stops at the door of
-        // an absence (ADR-092 §3). `peopleOf` owns that rule; here we only ask.
-        const { keys } = personRowKeys(
-          peopleOf({
-            projectCast: [...(projectRosters.get(d.project.id) ?? [])],
-            awayPersonIds: awayPersonIdsOn(dateDayKey(d, viewerTz)),
-          }),
-          d.project.id,
-        );
-        for (const key of keys) dateLanes.push(personLaneFor(key, d.project.id));
-      } else {
-        const l = laneFor(d.project.id, d.project.workspace_id);
-        if (l) dateLanes.push(l);
-      }
-      if (dateLanes.length === 0) continue;
-      const lane = dateLanes[0];
-      if (d.kind === 'travel_day') {
-        // Mono "→ City" — direction is the arrow (ADR-080 §7).
-        const place = d.city ?? d.title ?? d.venue_name ?? kindLabel(d.kind);
-        const arrow = d.travel_direction === 'return' ? '←' : '→';
-        lane.pips.push({
-          id: d.id,
-          day,
-          kind: 'travel',
-          label: `${arrow} ${place}`,
-          accent: accentVarFor(d.project),
-          title: `${d.project.name} · ${kindLabel(d.kind)} · ${place}`,
-        });
-      } else {
-        lane.pips.push({
-          id: d.id,
-          day,
-          kind: 'date',
-          label: kindLabel(d.kind),
-          accent: accentVarFor(d.project),
-          title: `${d.project.name} · ${d.title ?? kindLabel(d.kind)}`,
-        });
-      }
+    for (const d of shownDates) {
+      const day = dateDayKey(d, viewerTz);
+      if (day < monthFirst || day > monthLast) continue;
+      out.push({
+        id: d.id,
+        day,
+        project_id: d.project?.id ?? null,
+        kind: d.kind === 'travel_day' ? 'travel' : 'date',
+        cert: dateStatusFamily(d.status),
+        roster: null,
+        venue_id: null,
+        slip: dateSlip(d, slipCtxPage),
+      });
     }
-    /* A LANE THE PERSON AXIS DOES NOT OWN IS NOT A LANE. `laneFor` keys by
-       project or workspace, so on the person axis it invented a lane keyed by
-       WORKSPACE and labelled with the workspace's name — a rehearsal block and
-       an absence landed in a row that is not a person at all. Seen on screen,
-       2026-07-31. Now each band resolves the rows it actually belongs to. */
-    const bandLanesFor = (projectId: string): LaneVM[] => {
-      if (!byPerson) {
-        const l = laneFor(projectId, projectById.get(projectId)?.workspace_id ?? null);
-        return l ? [l] : [];
-      }
-      const { keys } = personRowKeys(
-        peopleOf({ projectCast: [...(projectRosters.get(projectId) ?? [])] }),
-        projectId,
-      );
-      return keys.map((k) => personLaneFor(k, projectId));
-    };
+    return out;
+  });
 
-    // Prep runs — quiet in-lane bands, project accent, hatched.
-    for (const run of prepRunsIso) {
-      const range = clipToMonth(run.from, run.to);
-      if (!range) continue;
-      for (const lane of bandLanesFor(run.project_id)) lane.bands.push({
-        id: `prep:${run.project_id}:${run.from}`,
-        ...range,
-        kind: 'prep',
-        label: run.label,
-        accent: projectAccent(run.project_id),
-      });
-    }
-    // Derived away bands — dotted, quieter than everything (ADR-078 §6).
-    for (const band of aways) {
-      const range = clipToMonth(band.from, band.to);
-      if (!range) continue;
-      for (const lane of bandLanesFor(band.project_id)) lane.bands.push({
-        id: `away:${band.project_id}:${band.from}`,
-        ...range,
-        kind: 'away',
-        label: t('planner.away', locale, {
-          project: projectNameById.get(band.project_id) ?? '—',
-        }),
-      });
-    }
-    /* AN ABSENCE BELONGS TO A PERSON, and the person axis is the one place it
-       can say so directly: a personal blackout rides that person's lane and
-       nobody else's, a company one rides every lane of its workspace. On the
-       other two axes it keeps the roster-based attribution it had. */
-    // Blackouts. Per espai they own (and may create) their workspace lane
-    // — a closed month with no gigs is still a fact. Per projecte a
-    // blackout has no project of its own: a person block rides the lanes
-    // whose rosters name the person, a company block rides every existing
-    // lane of its workspace.
+  /** Groups + cells in ONE call — lane-birth and placement share a writer
+      (a nocast lane is born the moment an event resolves to nobody). */
+  let boardBase = $derived.by(() => {
+    const groups =
+      view !== 'board'
+        ? []
+        : laneAxis === 'person'
+          ? personGroups({
+              projects: boardProjects,
+              visibleProjectIds: new Set(boardScopeProjectIds ?? boardProjects.map((p) => p.id)),
+              team: $teamQuery.data?.items ?? [],
+              personNames,
+              sharedPersonIds,
+            })
+          : scopeGroups({
+              scopeProjectIds: boardScopeProjectIds,
+              workspaces: ($workspacesQuery.data?.items ?? []).map((w) => ({
+                id: w.id,
+                name: w.name,
+              })),
+              projects: boardProjects,
+            });
+    return laneEvents({
+      axis: laneAxis,
+      groups,
+      events: boardEvents,
+      castByProject: boardCast,
+      awayByDay: boardAwayByDay,
+    });
+  });
+
+  /* AN ABSENCE BELONGS TO A PERSON, and each axis says so in its own rows:
+     on the person axis a personal blackout rides that person's lane in
+     every group that has them and a company one rides every person lane of
+     its workspace; on the scope axis a person block rides the project lanes
+     whose rosters name the person, a company block rides every lane of its
+     workspace, and a derived tour rides its own project's lane. Lane KEYS
+     are read off the built groups — the key grammar has one writer (the
+     engine) and this page never re-spells it. */
+  let boardAwayRuns = $derived.by((): AwayRun[] => {
+    if (view !== 'board') return [];
+    const runs: AwayRun[] = [];
+    const inWindow = (from: string, to: string) => to >= monthFirst && from <= monthLast;
+    const subject = (b: AvailabilityItem): string =>
+      b.person_id === null
+        ? (workspaceNameById.get(b.workspace_id) ?? '—')
+        : (b.person?.full_name ?? personNames.get(b.person_id) ?? '—');
     for (const b of visibleBlackouts) {
-      const range = clipToMonth(b.starts_on, b.ends_on);
-      if (!range) continue;
-      const vm: LaneBandVM = {
-        id: `blk:${b.id}`,
-        ...range,
-        kind: 'blackout',
-        company: b.person_id === null,
-        tentative: b.certainty === 'tentative',
-        label: blackoutLabel(b),
-        title: b.note ? `${blackoutLabel(b)} · ${b.note}` : blackoutLabel(b),
-      };
-      if (!byProject) {
-        laneFor(null, b.workspace_id)?.bands.push(vm);
-      } else {
-        for (const lane of lanes.values()) {
-          const belongs =
-            b.person_id === null
-              ? projectById.get(lane.key)?.workspace_id === b.workspace_id
-              : (projectRosters.get(lane.key)?.has(b.person_id) ?? false);
-          if (belongs) lane.bands.push({ ...vm, id: `${vm.id}:${lane.key}` });
+      if (!inWindow(b.starts_on, b.ends_on)) continue;
+      for (const g of boardBase.groups) {
+        for (const lane of g.lanes) {
+          let belongs = false;
+          if (laneAxis === 'person') {
+            belongs = b.person_id
+              ? lane.id === b.person_id
+              : lane.kind === 'person' && projectById.get(g.id)?.workspace_id === b.workspace_id;
+          } else if (lane.kind === 'project' && lane.id) {
+            belongs = b.person_id
+              ? (projectRosters.get(lane.id)?.has(b.person_id) ?? false)
+              : projectById.get(lane.id)?.workspace_id === b.workspace_id;
+          }
+          if (belongs) {
+            runs.push(
+              normalizeAway(
+                {
+                  starts_on: b.starts_on,
+                  ends_on: b.ends_on,
+                  certainty: b.certainty,
+                  who: subject(b),
+                },
+                lane.key,
+              ),
+            );
+          }
         }
       }
     }
-    return [...lanes.values()];
+    if (laneAxis === 'scope') {
+      // The derived tour (two travel legs) is the project's own absence.
+      for (const band of aways) {
+        if (!inWindow(band.from, band.to)) continue;
+        for (const g of boardBase.groups) {
+          const lane = g.lanes.find((l) => l.kind === 'project' && l.id === band.project_id);
+          if (lane) {
+            runs.push(
+              normalizeAway(
+                {
+                  from: band.from,
+                  to: band.to,
+                  who: projectNameById.get(band.project_id) ?? '—',
+                },
+                lane.key,
+              ),
+            );
+          }
+        }
+      }
+    }
+    return runs;
   });
 
-  // Cross-lane conflict connectors (ADR-080 §7): people = red !, possible
-  // = quiet ? — the two cross-project severities the engine emits here.
-  // The id IS the decision pair id, so a click lands on the band's card.
-  let eventById = $derived(new Map(engineEvents.map((e) => [e.id, e])));
-  let carrilsConnectors = $derived.by((): ConnectorVM[] => {
-    if (view !== 'board' || laneAxis === 'person') return [];
-    // Same INTERIM SHIM as carrilsLanes above: 'scope' keys connectors by
-    // workspace, the way 'workspace' did, until the engine takes over.
-    const byProject = false;
-    const out: ConnectorVM[] = [];
-    const seen = new Set<string>();
-    for (const c of conflicts) {
-      if ((c.severity !== 'people' && c.severity !== 'possible') || c.event_ids.length !== 2) {
-        continue;
-      }
-      const a = eventById.get(c.event_ids[0]);
-      const b = eventById.get(c.event_ids[1]);
-      if (!a || !b) continue;
-      const aKey = byProject ? a.project_id : a.workspace_id;
-      const bKey = byProject ? b.project_id : b.workspace_id;
-      if (aKey === bKey) continue;
-      const day = inMonthDay(a.day);
-      if (day === null) continue;
-      const dedup = `${day}:${[aKey, bKey].sort().join('|')}`;
-      if (seen.has(dedup)) continue;
-      seen.add(dedup);
-      out.push({
-        id: `${a.day}:${[a.id, b.id].sort().join('+')}`,
-        day,
-        aKey,
-        bKey,
-        severity: c.severity,
-        label: t('planner.conn_jump', locale, { day }),
-      });
+  /** The folded timeline. Today is seeded ACTIVE by this page — whether
+      today may fold is the caller's claim, and this caller says never. */
+  let boardColumns = $derived.by((): BoardColumn[] => {
+    if (view !== 'board') return [];
+    const active = activeDaySet({
+      axis: laneAxis,
+      cells: boardBase.cells,
+      prepDays: [],
+      awayRuns: boardAwayRuns,
+    });
+    if (todayIso >= monthFirst && todayIso <= monthLast) active.add(todayIso);
+    return buildColumns({ baseIso: monthFirst, endIso: monthLast, active, todayIso });
+  });
+  /** The engine's month register is unlocalised ('aug' is the fact); the
+      page re-words the whole-month fold label. The italic month-start name
+      goes through the `monthWord` prop instead — same writer, one word. */
+  function boardMonthWord(iso: string): string {
+    return new Date(`${iso}T00:00:00Z`)
+      .toLocaleDateString(localeTag, { month: 'short', timeZone: 'UTC' })
+      .replace(/\.$/, '')
+      .toLowerCase();
+  }
+  let boardWordedColumns = $derived(
+    boardColumns.map((c) => ({
+      ...c,
+      gapLabel:
+        c.kind === 'gap' && c.gapLabel && /^[a-z]+$/.test(c.gapLabel)
+          ? boardMonthWord(c.from)
+          : c.gapLabel,
+    })),
+  );
+
+  /** The month's clashes with their ISO day. The full by-day book, not the
+      drawn cells' — the head '!' never asks the filter (law 22). */
+  let boardClashes = $derived.by((): BoardClash[] => {
+    if (view !== 'board') return [];
+    const out: BoardClash[] = [];
+    for (const [day, list] of clashesByDay) {
+      if (day < monthFirst || day > monthLast) continue;
+      for (const vm of list) out.push({ ...vm, day });
     }
     return out;
   });
 
+  /* ── the board's words (the component is t()-free) ─────────────────── */
+  function boardTallyCounts(confirmed: number, options: number, notCast: number): string {
+    const parts: string[] = [];
+    if (confirmed > 0) parts.push(`${confirmed} ${t('planner.week_confirmed', locale)}`);
+    if (options > 0) {
+      parts.push(
+        `${options} ${t(options === 1 ? 'planner.week_option_one' : 'planner.week_options', locale)}`,
+      );
+    }
+    if (notCast > 0) parts.push(`${notCast} ${t('planner.no_cast', locale)}`);
+    return parts.join(' · ');
+  }
+  /** The three silences are three different facts (law 9), worded here. */
+  function boardLaneTallyText(ta: LaneTally): string {
+    if (ta.silence === 'dash') return '—';
+    if (ta.silence === 'no_dates') return t('planner.board_no_dates', locale);
+    if (ta.silence === 'no_data_yet') return t('planner.board_no_data', locale);
+    return boardTallyCounts(ta.confirmed, ta.options, ta.notCast);
+  }
+  function boardGroupTallyText(g: {
+    units: number;
+    confirmed: number;
+    options: number;
+    notCast: number;
+  }): string {
+    const unitKey =
+      laneAxis === 'person'
+        ? g.units === 1
+          ? 'planner.board_person_one'
+          : 'planner.board_people'
+        : g.units === 1
+          ? 'planner.board_project_one'
+          : 'planner.board_projects';
+    const counts = boardTallyCounts(g.confirmed, g.options, g.notCast);
+    const head = `${g.units} ${t(unitKey, locale)}`;
+    return counts ? `${head} · ${counts}` : head;
+  }
+  /** The slip's state line — the month's own wording, said by this caller
+      too: a board is a different placing, never a different law. */
+  function boardSlipState(sl: SlipVM): string | null {
+    if (sl.cert === 'released') return t('planner.released', locale);
+    if (sl.cert === 'hold' && sl.hold) {
+      const key = statusFootKey(sl.hold.rank ? `hold_${sl.hold.rank}` : 'hold');
+      const rank = key ? t(key, locale) : performanceStatusLabel('hold');
+      if (!sl.hold.expires) return rank;
+      return `${rank} · ${localeWeekdayShort(sl.hold.expires, localeTag)}`;
+    }
+    return null;
+  }
+  function boardGroupMark(g: BoardGroup): { accent: string; initials: string | null } | null {
+    if (g.kind === 'project') {
+      const p = projectById.get(g.id);
+      return p ? { accent: accentVarFor(p), initials: p.initials ?? null } : null;
+    }
+    return { accent: workspaceAccent(g.id), initials: null };
+  }
+
+  /* ── the board's gestures ──────────────────────────────────────────── */
+  /** The '+' door already knows its day AND its lane's project — nothing
+      is chosen twice (law 28). The person axis passes null: the dialog
+      asks (ADR-094 §3b). `openCreate` clears the preset first, so the
+      toolbar's own «+ date» never inherits a stale lane. */
+  let boardPresetProjectId = $state<string | null>(null);
+  function openBoardCreate(iso: string, projectId: string | null) {
+    openCreate(iso);
+    boardPresetProjectId = projectId;
+  }
+  /** The head's '!' lands on that day's decision card — the same door the
+      old connectors used (jumpToDecisionCard), the band as fallback. */
+  function openClashDay(iso: string) {
+    const d = decisionVMs.find((x) => x.day === iso);
+    if (d) void jumpToDecisionCard(d.id);
+    else jumpToDecisions();
+  }
+  /** A date slip has no page of its own — its edit dialog opens here,
+      exactly as it does from the month and the agenda. */
+  function openBoardDate(dateId: string) {
+    const d = shownDates.find((x) => x.id === dateId);
+    if (d) openDate(d);
+  }
   /** Connector gesture — open the band scrolled to that card (§7). */
   async function jumpToDecisionCard(pairId: string) {
     setDecisionsOpen(true);
@@ -2192,6 +2210,10 @@
   let presetLineId = $derived(scope.lines.length === 1 ? scope.lines[0].id : null);
 
   function openCreate(dayIso?: string) {
+    // Every door resets the board's lane preset — only openBoardCreate
+    // re-arms it, AFTER this runs, so a toolbar «+ date» never inherits
+    // the last cell's project.
+    boardPresetProjectId = null;
     createDate = dayIso ?? todayIso;
     createOpen = true;
   }
@@ -2599,23 +2621,43 @@
       noteDeleteLabel={t('planner.note_delete', locale)}
     />
   {:else}
-    <!-- Carrils (ADR-080 §7/§8) — desktop-first; at 390px the strip
-         itself scrolls horizontally, never the page. -->
+    <!-- The Board (ADR-094/ADR-095) — one grid, the Slip in its cells; the
+         strip scrolls sideways inside itself, never the page. -->
     <CarrilsStrip
-      {monthDays}
-      {todayIso}
-      group={laneAxis}
-      lanes={carrilsLanes}
-      connectors={carrilsConnectors}
-      onConnectorJump={jumpToDecisionCard}
-      {locale}
+      axis={laneAxis}
+      columns={boardWordedColumns}
+      groups={boardBase.groups}
+      cells={boardBase.cells}
+      awayRuns={boardAwayRuns}
+      clashes={boardClashes}
+      axisWord={t(`planner.lanes_${laneAxis}`, locale)}
+      todayWord={t('planner.today', locale)}
+      weekdayWord={(iso) => localeWeekdayShort(iso, localeTag)}
+      monthWord={boardMonthWord}
+      laneTallyText={boardLaneTallyText}
+      groupTallyText={boardGroupTallyText}
+      sharedWord={t('planner.board_shared', locale)}
+      teamWord={t('planner.board_team', locale)}
+      noCastWord={t('planner.no_cast', locale)}
+      awayWord={t('planner.band_away', locale)}
+      untilLabel={(iso) => t('planner.band_until', locale, { day: localeDayMonth(iso, localeTag) })}
+      emptyLabel={t('planner.empty_month', locale)}
+      createLabel={(iso) => t('planner.new_on', locale, { day: iso })}
+      clashDayLabel={(iso) => t('planner.conn_jump', locale, { day: Number(iso.slice(8, 10)) })}
+      kindLabel={(k) => kindLabel(k)}
+      stateLabel={boardSlipState}
+      stateUrgent={(sl) => Boolean(sl.hold?.expires && sl.hold.expires <= todayIso)}
+      onDayCreate={openBoardCreate}
+      onClashDay={openClashDay}
+      onDateOpen={openBoardDate}
+      groupMark={boardGroupMark}
     />
   {/if}
 </section>
 
 <CreateEventDialog
   bind:open={createOpen}
-  {presetProjectId}
+  presetProjectId={boardPresetProjectId ?? presetProjectId}
   {presetLineId}
   presetDate={createDate}
   showBlackoutAction={canBlackout}
