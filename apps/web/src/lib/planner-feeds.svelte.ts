@@ -337,7 +337,7 @@ export function createPlannerFeeds(inputs: PlannerFeedInputs) {
     const k = agendaFeedKey;
     return {
       queryKey: ['planner-agenda-performances', k] as const,
-      enabled: inputs.view() === 'agenda' && !k.unresolved,
+      enabled: (inputs.view() === 'agenda' || inputs.view() === 'board') && !k.unresolved,
       queryFn: ({ signal }: { signal: AbortSignal }) =>
         pagedFeed<PerformanceEvent>(
           (from) => `/api/performances?status=any&rosters=1&notice=1&${feedParams(k, from, k.to)}`,
@@ -351,7 +351,7 @@ export function createPlannerFeeds(inputs: PlannerFeedInputs) {
     const k = agendaFeedKey;
     return {
       queryKey: ['planner-agenda-dates', k] as const,
-      enabled: inputs.view() === 'agenda' && !k.unresolved,
+      enabled: (inputs.view() === 'agenda' || inputs.view() === 'board') && !k.unresolved,
       queryFn: ({ signal }: { signal: AbortSignal }) =>
         pagedFeed<DateEvent>(
           // Same ±1-day pad as the grid dates feed (tz bucketing at edges).
@@ -366,7 +366,7 @@ export function createPlannerFeeds(inputs: PlannerFeedInputs) {
     const k = agendaFeedKey;
     return {
       queryKey: ['planner-agenda-availability', { from: k.from, to: k.to }] as const,
-      enabled: inputs.view() === 'agenda' && !k.unresolved,
+      enabled: (inputs.view() === 'agenda' || inputs.view() === 'board') && !k.unresolved,
       queryFn: async ({ signal }: { signal: AbortSignal }) => {
         try {
           return await fetchJSON<{ items: AvailabilityItem[]; absent?: boolean }>(

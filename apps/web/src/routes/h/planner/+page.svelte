@@ -63,6 +63,7 @@
   import CarrilsStrip from '$lib/components/planner/CarrilsStrip.svelte';
   import {
     activeDaySet,
+    boardLaneCount,
     buildColumns,
     laneEvents,
     normalizeAway,
@@ -273,7 +274,8 @@
     url.searchParams.set('view', view);
     if (view === 'board') url.searchParams.set('lanes', laneAxis);
     else url.searchParams.delete('lanes');
-    if (view === 'agenda') url.searchParams.delete('ym');
+    // A horizon has no month: the two book-window drawings carry no ym.
+    if (view === 'agenda' || view === 'board') url.searchParams.delete('ym');
     else url.searchParams.set('ym', `${ym.year}-${String(ym.month).padStart(2, '0')}`);
     if (view === 'day') url.searchParams.set('d', dayIso ?? todayIso);
     else url.searchParams.delete('d');
@@ -508,14 +510,19 @@
   // over whichever window is active with zero duplication. The two windows
   // are byte-identical shapes, so when view !== 'agenda' the engine sees
   // exactly what it saw before this change. ─────────────────────────────
+  /* THE BOARD SHARES THE BOOK'S WINDOW (plan step 4): a horizon that grows
+     is the agenda's own machinery — same span state, same probes, same
+     honest end — so switching between the two drawings keeps the loaded
+     stretch. Month/Carrils-era single-month feeds stay for Month alone. */
+  let onBookWindow = $derived(view === 'agenda' || view === 'board');
   let activePerfRows = $derived(
-    view === 'agenda' ? ($agendaPerfQuery.data?.items ?? []) : ($perfQuery.data?.items ?? []),
+    onBookWindow ? ($agendaPerfQuery.data?.items ?? []) : ($perfQuery.data?.items ?? []),
   );
   let activeDateRows = $derived(
-    view === 'agenda' ? ($agendaDatesQuery.data?.items ?? []) : ($datesQuery.data?.items ?? []),
+    onBookWindow ? ($agendaDatesQuery.data?.items ?? []) : ($datesQuery.data?.items ?? []),
   );
   let activeBlackoutRows = $derived(
-    view === 'agenda'
+    onBookWindow
       ? ($agendaAvailabilityQuery.data?.items ?? [])
       : ($availabilityQuery.data?.items ?? []),
   );
@@ -998,7 +1005,7 @@
   let boardAwayRuns = $derived.by((): AwayRun[] => {
     if (view !== 'board') return [];
     const runs: AwayRun[] = [];
-    const inWindow = (from: string, to: string) => to >= monthFirst && from <= monthLast;
+    const inWindow = (from: string, to: string) => to >= agendaFromIso && from <= agendaToIso;
     const subject = (b: AvailabilityItem): string =>
       b.person_id === null
         ? (workspaceNameById.get(b.workspace_id) ?? '—')
@@ -1067,8 +1074,8 @@
       prepDays: [],
       awayRuns: boardAwayRuns,
     });
-    if (todayIso >= monthFirst && todayIso <= monthLast) active.add(todayIso);
-    return buildColumns({ baseIso: monthFirst, endIso: monthLast, active, todayIso });
+    if (todayIso >= agendaFromIso && todayIso <= agendaToIso) active.add(todayIso);
+    return buildColumns({ baseIso: agendaFromIso, endIso: agendaToIso, active, todayIso });
   });
   /** The engine's month register is unlocalised ('aug' is the fact); the
       page re-words the whole-month fold label. The italic month-start name
@@ -1095,10 +1102,20 @@
     if (view !== 'board') return [];
     const out: BoardClash[] = [];
     for (const [day, list] of clashesByDay) {
-      if (day < monthFirst || day > monthLast) continue;
+      if (day < agendaFromIso || day > agendaToIso) continue;
       for (const vm of list) out.push({ ...vm, day });
     }
     return out;
+  });
+
+  /** Minutes since midnight, viewer clock — the board's now line. Null
+      when today is off the sheet (the mark is only drawn where it is true). */
+  let boardNowMinutes = $derived.by((): number | null => {
+    void minuteTick;
+    if (view !== 'board') return null;
+    if (todayIso < agendaFromIso || todayIso > agendaToIso) return null;
+    const d = new Date();
+    return d.getHours() * 60 + d.getMinutes();
   });
 
   /* ── the board's words (the component is t()-free) ─────────────────── */
@@ -1298,7 +1315,7 @@
      visibility handler catches the mark up the moment anyone looks. */
   let minuteTick = $state(0);
   $effect(() => {
-    if (view !== 'day') return;
+    if (view !== 'day' && view !== 'board') return;
     const bump = () => {
       if (!document.hidden) minuteTick++;
     };
@@ -2037,6 +2054,7 @@
       dayIso = addDaysIso(selectedDay, -1);
       syncUrl();
     } else if (view === 'agenda') scrollAgendaMonth(-1);
+    else if (view === 'board') panBoard(-1);
     else prevMonth();
   }
   function stepNext() {
@@ -2044,6 +2062,7 @@
       dayIso = addDaysIso(selectedDay, 1);
       syncUrl();
     } else if (view === 'agenda') scrollAgendaMonth(1);
+    else if (view === 'board') panBoard(1);
     else nextMonth();
   }
   /**
@@ -2059,6 +2078,23 @@
    * Landing on a month it has not loaded yet asks for it and tries again on
    * the next frame — the diary grows towards you rather than refusing.
    */
+  /** ON THE BOARD THE ARROWS PAN — a screenful at a time. The horizon has
+      no pages and no month steps: growing is the scroll's job (the strip
+      asks the agenda's own probe when the pan reaches the rim). */
+  function panBoard(step: -1 | 1) {
+    const wrap = document.querySelector<HTMLElement>('.board__wrap');
+    wrap?.scrollBy({ left: step * wrap.clientWidth * 0.8, behavior: 'smooth' });
+  }
+  function boardToToday() {
+    const wrap = document.querySelector<HTMLElement>('.board__wrap');
+    const today = wrap?.querySelector<HTMLElement>('.board__head:not(.gap).today');
+    if (wrap && today)
+      wrap.scrollTo({
+        left: Math.max(0, today.offsetLeft - wrap.clientWidth * 0.4),
+        behavior: 'smooth',
+      });
+  }
+
   async function scrollAgendaMonth(step: -1 | 1) {
     const here = visibleAgendaDay() ?? todayIso;
     const target = firstOfMonth(
@@ -2120,7 +2156,8 @@
     else if (view === 'day') {
       dayIso = todayIso;
       syncUrl();
-    } else thisMonth();
+    } else if (view === 'board') boardToToday();
+    else thisMonth();
   }
 
   /* ── THE KEYBOARD (ADR-095) ───────────────────────────────────────────
@@ -2361,7 +2398,9 @@
              announcing it: the range proves what a row is. The Day has no
              range to give — a day counts itself — and the agenda's horizon
              grows, so neither prints one. -->
-        {#if view === 'month' || view === 'board'}
+        <!-- Weeks range: BOUNDED drawings only — the board grew a horizon
+             and what grows is never counted. -->
+        {#if view === 'month'}
           <span class="cal__stat cal__stat--soft"
             >{t('planner.week_range', locale, {
               a: String(isoWeek(monthFirst)),
@@ -2376,12 +2415,31 @@
             })}</span
           >
         {/if}
+        <!-- The board names its grain and its horizon: a window that grows
+             names where it begins and says NO END — what grows is never
+             counted (law: el horizonte del tablero). Lanes from the one
+             writer (boardLaneCount); folding is furniture and the meta
+             does not chase it. -->
+        {#if view === 'board'}
+          <span class="cal__stat cal__stat--soft"
+            >{t('planner.agenda_from', locale, {
+              day: localeDayMonth(agendaFromIso, localeTag),
+            })}</span
+          >
+          <span class="cal__stat cal__stat--soft">{t('planner.board_no_end', locale)}</span>
+          <span class="cal__stat cal__stat--soft">{t('planner.board_grain', locale)}</span>
+          <span class="cal__stat cal__stat--soft"
+            >{t('planner.board_lanes_n', locale, {
+              n: String(boardLaneCount(boardBase.groups, new Set())),
+            })}</span
+          >
+        {/if}
         <!-- The Day names its span — where the plan begins and where it
              lets go (first call → last out). A day with nothing says nothing. -->
         {#if view === 'day' && daySpanLabel}
           <span class="cal__stat cal__stat--soft">{daySpanLabel}</span>
         {/if}
-        {#if view !== 'agenda'}
+        {#if view !== 'agenda' && view !== 'board'}
         <span class="cal__stat"><b>{stats.confirmed}</b> {t('planner.stat_confirmed', locale)}</span>
         <!-- `1 holds` was printing on every single-hold month. The design's own
              word for this counter is `option`, and it agrees in number. -->
@@ -2651,6 +2709,8 @@
       onClashDay={openClashDay}
       onDateOpen={openBoardDate}
       groupMark={boardGroupMark}
+      nowMinutes={boardNowMinutes}
+      onReachEnd={probePlanAhead}
     />
   {/if}
 </section>

@@ -23,14 +23,15 @@
    *    count said «12 lanes» over nine rows because two sites each counted
    *    their own way.
    *
-   * WHAT IS STILL STATIC, on purpose (the measured passes are the next
-   * step, each with a seam left here):
-   * - the pinned axis (`--hdy`) and the travelling group label (`--gy`):
-   *   the head keeps an inert `position: sticky` as belt-and-braces;
+   * THE MEASURED PASSES live at the foot of this script — the pinned axis
+   * (`--hdy`) with its travelling group labels (`--gy`), the now line
+   * measured against today's own column, and the horizon that grows when
+   * the scroll reaches for it. Their clamps are pure functions in
+   * $lib/board-lanes (fake-rect tested); this component only feeds rects.
+   *
+   * STILL STATIC, on purpose (seams honest):
    * - the away band sits at a CSS `bottom` inside its grid area instead of
    *   the measured 21px-above-floor drawer;
-   * - the now line, the minute flap and the growing horizon do not exist
-   *   yet — the page still hands down the month window;
    * - the hold's hover CONFIRM verb (law 28's second half) and the identity
    *   quick panel on the monogram are not wired.
    */
@@ -44,8 +45,11 @@
     clashDayMarks,
     clashMarks,
     foldTicks,
+    groupLabelY,
     groupTally,
     laneTally,
+    nowLineX,
+    pinHeadY,
     type AwayRun,
     type BoardClash,
     type BoardColumn,
@@ -115,6 +119,12 @@
     onDateOpen?: (dateId: string) => void;
     /** The group band's monogram/ring — identity is the page's to resolve. */
     groupMark?: (group: BoardGroup) => { accent: string; initials: string | null } | null;
+    /** Minutes since midnight, viewer clock — null when today is off the
+        sheet. The page owns the tick; this component only measures. */
+    nowMinutes?: number | null;
+    /** The horizon grows when the scroll reaches for it (no arrows on the
+        board's own edge): fired once per columns-length near the right rim. */
+    onReachEnd?: () => void;
   }
 
   let {
@@ -145,6 +155,8 @@
     onClashDay,
     onDateOpen,
     groupMark,
+    nowMinutes = null,
+    onReachEnd,
   }: Props = $props();
 
   /* Lid state is FURNITURE, not URL (ADR-094 §4 draws that line): folding a
@@ -220,14 +232,155 @@
     if (shut.has(key)) shut.delete(key);
     else shut.add(key);
   }
+
+  /* ══ THE MEASURED PASSES ═══════════════════════════════════════════════
+     jsdom cannot see pixels, so every clamp below lives as a pure function
+     in $lib/board-lanes (pinHeadY, groupLabelY, nowLineX) with fake-rect
+     tests; this component only feeds real rects and writes CSS variables. */
+  let wrapEl = $state<HTMLDivElement>();
+  let boardEl = $state<HTMLDivElement>();
+
+  /** «7h24» — hours unpadded, minutes two digits, the register the day's
+      own now-mark uses. One cell per character so a changed digit rises
+      alone (keyed each below). */
+  let nowChars = $derived.by(() => {
+    if (nowMinutes === null) return [];
+    const h = Math.floor(nowMinutes / 60) % 24;
+    const m = Math.round(nowMinutes % 60);
+    return `${h}h${String(m).padStart(2, '0')}`.split('');
+  });
+
+  /* THE NOW LINE IS MEASURED AGAINST TODAY'S OWN COLUMN — folds shift
+     everything left of it, so only the DOM knows where today landed. Ink
+     at 40%, never blue (Marco's ruling 1): now is an hour, a fact. */
+  $effect(() => {
+    void columns;
+    void groups;
+    const board = boardEl;
+    if (!board) return;
+    const today = board.querySelector<HTMLElement>('.board__head:not(.gap).today');
+    if (!today || nowMinutes === null) {
+      board.style.removeProperty('--nowx');
+      return;
+    }
+    const apply = () => {
+      const b = board.getBoundingClientRect();
+      const t = today.getBoundingClientRect();
+      const { x } = nowLineX({ todayLeft: t.left - b.left, todayWidth: t.width, minutes: nowMinutes });
+      board.style.setProperty('--nowx', `${x}px`);
+      board.style.setProperty('--nowtop', `${Math.round(t.bottom - b.top)}px`);
+    };
+    apply();
+    const ro = new ResizeObserver(apply);
+    ro.observe(board);
+    return () => ro.disconnect();
+  });
+
+  /* THE AXIS PINS BY MEASURE — the wrap's overflow-x makes vertical sticky
+     a no-op, so the page's scroll drives a translateY through the engine's
+     clamps: the head never leaves the board, and each group label travels
+     inside its own group under it. */
+  $effect(() => {
+    void columns;
+    void groups;
+    const board = boardEl;
+    if (!board) return;
+    let raf = 0;
+    const apply = () => {
+      raf = 0;
+      const b = board.getBoundingClientRect();
+      const corner = board.querySelector<HTMLElement>('.board__corner');
+      if (!corner) return;
+      const chrome =
+        document.querySelector('.cal__toolbar')?.getBoundingClientRect().bottom ?? 0;
+      const hh = corner.offsetHeight;
+      const y = pinHeadY({
+        boardTop: b.top,
+        boardHeight: b.height,
+        headOffsetTop: chrome,
+        headHeight: hh,
+      });
+      board.style.setProperty('--hdy', `${y}px`);
+      for (const g of board.querySelectorAll<HTMLElement>('.board__grpl')) {
+        const gr = g.getBoundingClientRect();
+        const groupTop = gr.top - b.top - Number.parseFloat(g.style.getPropertyValue('--gy') || '0');
+        // the group's floor: the next band's top, or the board's end
+        const next = g.nextElementSibling;
+        let end = b.height;
+        const all = [...board.querySelectorAll<HTMLElement>('.board__grpl')];
+        const i = all.indexOf(g);
+        if (i >= 0 && i + 1 < all.length) {
+          const nr = all[i + 1].getBoundingClientRect();
+          end =
+            nr.top -
+            b.top -
+            Number.parseFloat(all[i + 1].style.getPropertyValue('--gy') || '0');
+        }
+        void next;
+        const gy = groupLabelY({
+          pinY: y + hh,
+          groupTop,
+          groupEnd: end,
+          labelHeight: g.offsetHeight,
+        });
+        g.style.setProperty('--gy', `${gy}px`);
+      }
+    };
+    const onScroll = () => {
+      if (!raf) raf = requestAnimationFrame(apply);
+    };
+    apply();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll);
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onScroll);
+      if (raf) cancelAnimationFrame(raf);
+    };
+  });
+
+  /* THE HORIZON GROWS WHEN THE SCROLL REACHES FOR IT — append-only, so the
+     left content never shifts and no correction is owed. One firing per
+     columns-length: the latch re-arms when the sheet actually grew. */
+  $effect(() => {
+    const wrap = wrapEl;
+    const len = columns.length;
+    if (!wrap || !onReachEnd) return;
+    let fired = false;
+    const onScroll = () => {
+      if (fired) return;
+      if (wrap.scrollLeft + wrap.clientWidth > wrap.scrollWidth - 240) {
+        fired = true;
+        onReachEnd();
+      }
+    };
+    void len;
+    wrap.addEventListener('scroll', onScroll, { passive: true });
+    return () => wrap.removeEventListener('scroll', onScroll);
+  });
+
+  /* First paint lands on today — 40% in, like the old ribbon's centring. */
+  let centred = false;
+  $effect(() => {
+    void columns;
+    const wrap = wrapEl;
+    const board = boardEl;
+    if (centred || !wrap || !board) return;
+    const today = board.querySelector<HTMLElement>('.board__head:not(.gap).today');
+    if (!today) return;
+    centred = true;
+    // Property assignment, not scrollTo(): same instant scroll, and jsdom
+    // (which has no scroll methods) stays silent in the component tests.
+    wrap.scrollLeft = Math.max(0, today.offsetLeft - wrap.clientWidth * 0.4);
+  });
 </script>
 
 {#if groups.length === 0}
   <p class="board__empty">{emptyLabel}</p>
 {:else}
   <!-- The strip scrolls sideways INSIDE itself; the page never does. -->
-  <div class="board__wrap">
-    <div class="board" style="grid-template-columns: {gridTemplate}">
+  <div class="board__wrap" bind:this={wrapEl}>
+    <div class="board" bind:this={boardEl} style="grid-template-columns: {gridTemplate}">
       <!-- ══ ROW 1 · the date axis ══════════════════════════════════════
            Mono weekday over serif number. TODAY is the word and full ink —
            EQUAL width, NO fill (Marco's ruling 2): its three marks are ink,
@@ -428,6 +581,16 @@
           </span>
         {/if}
       {/each}
+
+      <!-- ══ now · ink at 40%, never blue (ruling 1) ════════════════════
+           One measured line from the axis's foot to the board's — a fact
+           crossing the whole drawing. The minute label rolls one digit at
+           a time (keyed cells, tabular cifras). -->
+      {#if nowMinutes !== null && nowChars.length > 0}
+        <span class="board__now" aria-hidden="true">
+          <b>{#each nowChars as c, i (`${i}:${c}`)}<i class="board__nowd">{c}</i>{/each}</b>
+        </span>
+      {/if}
     </div>
   </div>
 {/if}
@@ -456,8 +619,9 @@
     /* ── the date axis ───────────────────────────────────────────────── */
     .board__head,
     .board__corner {
-      /* Inert belt-and-braces: the measured `--hdy` transform is what will
-         pin (the wrap's overflow makes sticky a no-op here) — next step. */
+      /* The measured `--hdy` transform pins (the wrap's overflow makes
+         vertical sticky a no-op); sticky stays as inert belt-and-braces. */
+      transform: translateY(var(--hdy, 0px));
       position: sticky;
       inset-block-start: 0;
       background: var(--bg);
@@ -875,6 +1039,61 @@
       font-size: var(--text-s);
       color: var(--text-faint);
       font-style: italic;
+    }
+
+    /* ── now · ink at 40%, never blue (Marco's ruling 1) ──────────────
+       One line from the axis's foot to the board's, at a measured x inside
+       today's own column. z 9: under the pinned axis (10), over the group
+       labels — the line must never print on the date it names. */
+    .board__now {
+      position: absolute;
+      inset-block-start: var(--nowtop, 0px);
+      inset-block-end: 0;
+      inset-inline-start: var(--nowx, -9999px);
+      inline-size: 1px;
+      background: color-mix(in oklch, var(--text-color) 40%, transparent);
+      z-index: 9;
+      pointer-events: none;
+    }
+    .board__now::before {
+      content: '';
+      position: absolute;
+      inset-block-start: -2px;
+      inset-inline-start: -2px;
+      inline-size: 5px;
+      block-size: 5px;
+      border-radius: 50%;
+      background: var(--text-muted);
+    }
+    .board__now b {
+      position: absolute;
+      inset-block-start: 2px;
+      inset-inline-start: 6px;
+      display: inline-flex;
+      overflow: hidden;
+      font-family: var(--font-mono);
+      font-size: 8.5px;
+      font-weight: 400;
+      color: var(--text-muted);
+      white-space: nowrap;
+      font-variant-numeric: tabular-nums;
+    }
+    /* One movement per minute: a changed digit is a NEW cell and rises. */
+    .board__nowd {
+      font-style: normal;
+      animation: board-minute 130ms ease-out;
+    }
+    @keyframes board-minute {
+      from {
+        transform: translateY(0.9em);
+      }
+      to {
+        transform: none;
+      }
+    }
+    /* The travelling group label — pinned inside its own group's span. */
+    .board__grpl {
+      transform: translateY(var(--gy, 0px));
     }
   }
 </style>
