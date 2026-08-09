@@ -147,14 +147,27 @@ function props(over: Record<string, unknown> = {}) {
 }
 
 describe('CarrilsStrip — the board grid', () => {
-  it('is ONE grid: frozen corner with the axis word, a head per column, 118/58 tracks', () => {
+  it('is ONE grid: the rail, the frozen corner, a head per column, 118/58 tracks', () => {
     const { container } = render(CarrilsStrip, props());
     expect(container.querySelector('.board__corner')!.textContent).toBe('Scope');
     expect(container.querySelectorAll('.board__head')).toHaveLength(columns.length);
     const tpl = (container.querySelector('.board') as HTMLElement).style.gridTemplateColumns;
-    expect(tpl.startsWith('168px')).toBe(true);
+    // 26px of rail — the space's own strip — then the frozen labels.
+    expect(tpl.startsWith('26px 168px')).toBe(true);
     expect(tpl).toContain('118px');
     expect(tpl).toContain('58px');
+  });
+
+  it('the SPACE is a rail beside its lanes, and it carries no mark of its own', () => {
+    const { container } = render(CarrilsStrip, props());
+    const rail = container.querySelector('.board__rail') as HTMLElement;
+    expect(rail).not.toBeNull();
+    expect(rail.querySelector('.board__rail-n')!.textContent).toBe('MüK Cia');
+    // A space is an address, not a subject: no monogram anywhere in the rail.
+    expect(rail.querySelector('.mark')).toBeNull();
+    // It spans exactly its lanes' rows: three lanes → rows 2..5 (head is 1).
+    expect(rail.style.gridRow).toBe('2 / 5');
+    expect(rail.style.gridColumn).toBe('1');
   });
 
   it('today is the word and the ink — never a fill class', () => {
@@ -166,9 +179,11 @@ describe('CarrilsStrip — the board grid', () => {
     expect(today.classList.contains('we')).toBe(false);
   });
 
-  it("the group band is a row of real cells — one per column, never a '1 / -1' spanner", () => {
+  it("nothing ever spans the whole sheet with '1 / -1' (the phantom-row law)", () => {
     const { container } = render(CarrilsStrip, props());
-    expect(container.querySelectorAll('.board__grpc')).toHaveLength(columns.length);
+    // An open group has no band row at all — its name runs down the rail —
+    // so the filler cells only exist while it is shut (asserted below).
+    expect(container.querySelectorAll('.board__grpc')).toHaveLength(0);
     for (const el of container.querySelectorAll<HTMLElement>('.board *')) {
       expect(el.style.gridColumn).not.toBe('1 / -1');
     }
@@ -228,12 +243,15 @@ describe('CarrilsStrip — the board grid', () => {
     }
   });
 
-  it('a shut group keeps its filler cells and still says what it holds', async () => {
+  it('shut, the rail lies flat: a lid with its words horizontal, still saying what it keeps', async () => {
     const { container } = render(CarrilsStrip, props());
+    // The rail IS the handle: folding is done where the name is.
+    await fireEvent.click(container.querySelector('.board__rail') as HTMLButtonElement);
+    expect(container.querySelector('.board__rail')).toBeNull();
     const lid = container.querySelector('.board__grpl') as HTMLButtonElement;
-    await fireEvent.click(lid);
-    // The lanes are gone, the vertical row of cells is not, and the lid
-    // prints the tally INSIDE the label (law 11).
+    expect(lid).not.toBeNull();
+    // The lanes are gone, the row of cells is not, and the lid prints the
+    // tally INSIDE the label (law 11).
     expect(container.querySelectorAll('.board__lab')).toHaveLength(0);
     expect(container.querySelectorAll('.board__grpc')).toHaveLength(columns.length);
     expect(container.querySelector('.board__grp-c')!.textContent).toBe(
@@ -249,11 +267,12 @@ describe('CarrilsStrip — the board grid', () => {
     expect(band.textContent).toContain('away');
     expect(band.textContent).toContain('Mia');
     expect(band.textContent).toContain('until 15');
-    // Column 14 is index 3 → grid tracks 5/6; Última is the second lane of
-    // the first (only) group → grid row 4. The map and the markup must
-    // agree or the band floats over the wrong lane.
-    expect(band.style.gridColumn).toBe('5 / 6');
-    expect(band.style.gridRow).toBe('4');
+    // Column 14 is index 3 → grid tracks 6/7 (the rail took track 1);
+    // Última is the second lane, and with no band row above it that is grid
+    // row 3. The map and the markup must agree or the band floats over the
+    // wrong lane — which it did, measured on screen, before this law.
+    expect(band.style.gridColumn).toBe('6 / 7');
+    expect(band.style.gridRow).toBe('3');
     // The touched ISO week reserves the 15px floor on BOTH its day columns
     // (14 and 18) — the row grows, not the marked cell.
     expect(

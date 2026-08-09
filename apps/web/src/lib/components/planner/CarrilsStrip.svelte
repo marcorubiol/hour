@@ -117,8 +117,10 @@
     onClashDay: (iso: string) => void;
     /** A date slip has no page of its own; its edit dialog opens here. */
     onDateOpen?: (dateId: string) => void;
-    /** The group band's monogram/ring — identity is the page's to resolve. */
-    groupMark?: (group: BoardGroup) => { accent: string; initials: string | null } | null;
+    /* THE GROUP HAS NO MARK. A space is an address, not a subject — its
+       name runs down the rail, and identity belongs to the projects in the
+       rows (see IdentityMark's «one mark, two levels»). The `groupMark`
+       prop died with the band it decorated. */
     /** Minutes since midnight, viewer clock — null when today is off the
         sheet. The page owns the tick; this component only measures. */
     nowMinutes?: number | null;
@@ -160,7 +162,6 @@
     onDayCreate,
     onClashDay,
     onDateOpen,
-    groupMark,
     nowMinutes = null,
     onReachEnd,
     shut,
@@ -171,7 +172,7 @@
       measured widths, TODAY INCLUDED: equal width, its marks are ink (the
       number, the word, and — next step — the hour line), never extra room. */
   let gridTemplate = $derived(
-    `168px ${columns.map((c) => (c.kind === 'gap' ? '58px' : '118px')).join(' ')}`,
+    `26px 168px ${columns.map((c) => (c.kind === 'gap' ? '58px' : '118px')).join(' ')}`,
   );
 
   /* ── the engine's facts, worded below, never re-derived ───────────── */
@@ -213,17 +214,24 @@
   let rows = $derived.by(() => {
     const lane = new Map<string, number>();
     const group = new Map<string, number>();
+    /** An OPEN group has no row of its own — its name runs down the rail
+        beside its lanes — so it records the span the rail must cover. */
+    const rail = new Map<string, { from: number; to: number }>();
     let r = 1;
     for (const g of groups) {
-      r++;
-      group.set(g.key, r);
-      if (shut.has(g.key)) continue;
+      if (shut.has(g.key)) {
+        r++;
+        group.set(g.key, r);
+        continue;
+      }
+      const from = r + 1;
       for (const l of g.lanes) {
         r++;
         lane.set(l.key, r);
       }
+      rail.set(g.key, { from, to: r + 1 });
     }
-    return { lane, group };
+    return { lane, group, rail };
   });
   let laneRow = $derived(rows.lane);
 
@@ -425,12 +433,12 @@
            EQUAL width, NO fill (Marco's ruling 2): its three marks are ink,
            never room. Week and month boundaries are border-lefts drawn by
            every row's cells, so the vertical never blinks. -->
-      <span class="board__corner" style="grid-row: 1; grid-column: 1">{axisWord}</span>
+      <span class="board__corner" style="grid-row: 1; grid-column: 1 / 3">{axisWord}</span>
       {#each columns as col, colIdx (col.from)}
         <span
           class="board__head"
           style:grid-row="1"
-          style:grid-column={colIdx + 2}
+          style:grid-column={colIdx + 3}
           class:gap={col.kind === 'gap'}
           class:today={col.today}
           class:wstart={col.wstart}
@@ -467,53 +475,61 @@
 
       {#each groups as group (group.key)}
         {@const isShut = shut.has(group.key)}
-        {@const mark = groupMark?.(group) ?? null}
         <!-- ══ the group band · a LID ═══════════════════════════════════
              The sticky label is a button; folded, it still says what it
              holds (law 11) — the tally prints INSIDE the label, because a
              sibling outside it clipped when the label pins (next step). -->
-        <button
-          type="button"
-          class="board__grpl"
-          style:grid-row={rows.group.get(group.key)}
-          style:grid-column="1"
-          class:shut={isShut}
-          aria-expanded={!isShut}
-          onclick={() => toggle(group.key)}
-        >
-          <span class="board__grp-l">
-            <span class="board__mark">
-              {#if mark}
-                <IdentityMark
-                  mini
-                  accent={mark.accent}
-                  initials={mark.initials}
-                  name={group.name}
-                  variant={mark.initials ? 'compact' : 'bare'}
-                />
-              {/if}
-            </span>
-            <span class="board__grp-n">{group.name}</span>
-            <span class="board__grp-x" aria-hidden="true">{isShut ? '+' : '–'}</span>
-          </span>
-          {#if isShut}
-            <span class="board__grp-c">{groupTallyText(groupTally(group, tallies))}</span>
-          {/if}
-        </button>
-        <!-- ONE empty cell per column — never a `1 / -1` spanner (the
-             phantom-row law). Empty, but it stretches to the band row's
-             height, so the week/month rules cross the band unbroken. -->
-        {#each columns as col, colIdx (`${group.key}:${col.from}`)}
-          <span
-            class="board__grpc"
+        <!-- ══ THE SPACE IS A RAIL, NOT A ROW (Marco, 2026-08-09) ═══════
+             There is no space MARK in this app: a space is the address a
+             project lives at, not a subject. So the workspace runs DOWN THE
+             SIDE of its lanes in furniture voice — set low, small, along a
+             hairline — and the identity in the rows belongs to the projects.
+             Folded there is no height to run along, so the same button lays
+             its words flat and says what it keeps: a lid that goes quiet
+             about its shape, never about its contents. -->
+        {#if isShut}
+          <button
+            type="button"
+            class="board__grpl shut"
             style:grid-row={rows.group.get(group.key)}
-            style:grid-column={colIdx + 2}
-            class:gap={col.kind === 'gap'}
-            class:shut={isShut}
-            class:wstart={col.wstart}
-            class:mstart={col.mstart}
-          ></span>
-        {/each}
+            style:grid-column="1 / 3"
+            aria-expanded="false"
+            onclick={() => toggle(group.key)}
+          >
+            <span class="board__grp-l">
+              <span class="board__grp-n">{group.name}</span>
+              <span class="board__grp-x" aria-hidden="true">+</span>
+            </span>
+            <span class="board__grp-c">{groupTallyText(groupTally(group, tallies))}</span>
+          </button>
+          <!-- ONE empty cell per column — never a `1 / -1` spanner (the
+               phantom-row law), so the week and month rules cross unbroken. -->
+          {#each columns as col, colIdx (`${group.key}:${col.from}`)}
+            <span
+              class="board__grpc"
+              style:grid-row={rows.group.get(group.key)}
+              style:grid-column={colIdx + 3}
+              class:gap={col.kind === 'gap'}
+              class:shut={true}
+              class:wstart={col.wstart}
+              class:mstart={col.mstart}
+            ></span>
+          {/each}
+        {:else}
+          {@const span = rows.rail.get(group.key)}
+          {#if span}
+            <button
+              type="button"
+              class="board__rail"
+              style:grid-row="{span.from} / {span.to}"
+              style:grid-column="1"
+              aria-expanded="true"
+              onclick={() => toggle(group.key)}
+            >
+              <span class="board__rail-n">{group.name}</span>
+            </button>
+          {/if}
+        {/if}
 
         {#if !isShut}
           {#each group.lanes as lane (lane.key)}
@@ -522,17 +538,22 @@
             <span
               class="board__lab"
               style:grid-row={rows.lane.get(lane.key)}
-              style:grid-column="1"
+              style:grid-column="2"
               class:board__lab--ghost={lane.kind === 'ghost'}
               class:board__lab--nocast={lane.kind === 'nocast'}
             >
               <span class="board__mark">
                 {#if lane.accent}
+                  <!-- ONE MARK, TWO LEVELS. On the scope axis the rail already
+                       says the space beside these rows, so the mark stays a
+                       monogram; anywhere the address must travel alone the
+                       page hands `space` down and it grows its left cell. -->
                   <IdentityMark
                     mini
                     accent={lane.accent}
                     initials={lane.initials}
                     name={lane.name}
+                    space={lane.space ?? null}
                   />
                 {/if}
               </span>
@@ -555,7 +576,7 @@
               <span
                 class="board__cell"
                 style:grid-row={rows.lane.get(lane.key)}
-                style:grid-column={colIdx + 2}
+                style:grid-column={colIdx + 3}
                 class:gap={col.kind === 'gap'}
                 class:today={col.today}
                 class:wstart={col.wstart}
@@ -623,8 +644,8 @@
             class:board__aw--tent={s.run.tentative}
             class:board__aw--cont={s.cont}
             class:board__aw--end={s.end}
-            style="grid-row: {laneRow.get(s.laneKey)}; grid-column: {s.startCol + 2} / {s.endCol +
-              3}"
+            style="grid-row: {laneRow.get(s.laneKey)}; grid-column: {s.startCol + 3} / {s.endCol +
+              4}"
           >
             <i class="board__aw-k">{awayWord}</i><b class="board__aw-n">{s.run.who}</b><em
               class="board__aw-u">{untilLabel(s.run.to)}</em
@@ -886,9 +907,46 @@
     }
 
     /* ── the lane · frozen name + tally, then cells ───────────────────── */
-    .board__lab {
+    /* ── THE RAIL · the space, in furniture voice ─────────────────────
+       Set low and small, running up the side of the lanes it addresses,
+       along a hairline. It is the fold's handle too: the whole strip is the
+       button, so the gesture is where the name is. */
+    .board__rail {
       position: sticky;
       inset-inline-start: 0;
+      z-index: 7;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 14px 0 14px 4px;
+      border: 0;
+      border-inline-end: 1px solid var(--border-color-light);
+      border-block-end: 1px solid var(--border-color-light);
+      background: var(--bg);
+      cursor: pointer;
+    }
+    .board__rail-n {
+      writing-mode: vertical-rl;
+      /* Bottom-up: the reading a spine takes, and the one that puts the
+         first letter next to the first lane. */
+      transform: rotate(180deg);
+      font-family: var(--font-mono);
+      font-size: 8.5px;
+      letter-spacing: 0.14em;
+      text-transform: lowercase;
+      color: var(--text-faint);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-block-size: 100%;
+    }
+    .board__rail:hover .board__rail-n {
+      color: var(--text-muted);
+    }
+
+    .board__lab {
+      position: sticky;
+      inset-inline-start: 26px;
       z-index: 6;
       background: var(--bg);
       border-inline-end: 1px solid var(--border-color-light);

@@ -67,6 +67,11 @@ export interface BoardLaneRef {
   accent: string | null;
   initials: string | null;
   shared: boolean;
+  /** THE ADDRESS (one mark, two levels): the space this lane lives at, for
+      the surfaces that must carry it — a list that crosses spaces, a lane
+      whose rail is off screen. Absent where the space is already said
+      beside the row, which is the board's own case. */
+  space?: { name: string; initials: string | null } | null;
 }
 
 export interface BoardGroup {

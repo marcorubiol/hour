@@ -1175,13 +1175,6 @@
     }
     return null;
   }
-  function boardGroupMark(g: BoardGroup): { accent: string; initials: string | null } | null {
-    if (g.kind === 'project') {
-      const p = projectById.get(g.id);
-      return p ? { accent: accentVarFor(p), initials: p.initials ?? null } : null;
-    }
-    return { accent: workspaceAccent(g.id), initials: null };
-  }
 
   /* ── the board's gestures ──────────────────────────────────────────── */
   /** The '+' door already knows its day AND its lane's project — nothing
@@ -2811,7 +2804,6 @@
       onDayCreate={openBoardCreate}
       onClashDay={openClashDay}
       onDateOpen={openBoardDate}
-      groupMark={boardGroupMark}
       nowMinutes={boardNowMinutes}
       onReachEnd={probePlanAhead}
       shut={boardShut}

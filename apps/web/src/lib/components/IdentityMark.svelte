@@ -22,6 +22,18 @@
    *   - bare               — tint only, no letters. The anti-dot fallback for
    *                          contexts too tight for text (same silhouette, so
    *                          it never regresses to a foreign circle).
+   *
+   * ── ONE MARK, TWO LEVELS (Marco, 2026-08-09) ────────────────────────────
+   * There is no such thing as a SPACE mark anywhere in this app: a space is
+   * not a subject you look at, it is the address a project lives at. So the
+   * monogram grows ONE CELL TO THE LEFT and reads as one — `mk│MM` — with
+   * the space in LOWERCASE and untinted, and the project in caps with its
+   * hue. The lowercase is what orders the reading: the eye lands on the
+   * tinted block first and takes the space as context. Inside one box,
+   * because that is the only thing that keeps it from reading as loose text.
+   *
+   * The space cell is OPEN ON THE RIGHT — square corner, no edge — so it
+   * also works alone: a space with no project yet is a cell waiting for one.
    */
   import { markText } from '$lib/utils/identity';
 
@@ -49,19 +61,41 @@
      * board all sit inside a cell that gives a monogram about thirty pixels.
      */
     mini?: boolean;
+    /**
+     * THE ADDRESS. Give it the space and the mark grows a cell to the left:
+     * `mk│MM`, one box, two levels. Pass it WITHOUT an accent/name and the
+     * space stands alone, still open on its right — the selector's form.
+     */
+    space?: { name?: string | null; initials?: string | null } | null;
   }
 
-  let { accent, initials, name, variant = 'compact', size, mini = false }: Props = $props();
+  let {
+    accent,
+    initials,
+    name,
+    variant = 'compact',
+    size,
+    mini = false,
+    space = null,
+  }: Props = $props();
 
   let text = $derived(variant === 'bare' ? '' : markText({ initials, name }));
   let label = $derived(name ?? text ?? 'project');
+  /** The space's cell — the SAME derivation as any monogram, set low: one
+      writer for what a mark's letters are, two registers for what it is. */
+  let spaceText = $derived(space ? markText(space).toLocaleLowerCase() : '');
+  let spaceLabel = $derived(space?.name ?? spaceText);
 </script>
 
 <span
   class="mark mark--{variant}"
   class:mark--mini={mini}
+  class:mark--addr={Boolean(space)}
   style={`--c: ${accent}${size ? `; --mark: ${size}` : ''}`}
 >
+  {#if space}
+    <span class="mark__space" role="img" aria-label={spaceLabel}>{spaceText}</span>
+  {/if}
   <span
     class="mark__chip"
     class:mark__chip--bare={variant === 'bare'}
@@ -141,6 +175,53 @@
     .mark__chip--bare {
       padding-inline: 0;
       inline-size: var(--_m);
+    }
+
+    /* ── the address · space cell + project cell, ONE box ─────────────
+       The space is a NEUTRAL tile: hue belongs to the project, and a second
+       tinted cell would make the address read as two subjects. It is open on
+       the right (square corner, no divider of its own) so the pair closes as
+       one shape — and so a space without a project is a cell still waiting. */
+    .mark__space {
+      flex: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      block-size: var(--_m);
+      min-inline-size: var(--_m);
+      padding-inline: calc(var(--_m) * 0.22);
+      border-start-start-radius: calc(var(--_m) * 0.28);
+      border-end-start-radius: calc(var(--_m) * 0.28);
+      background: color-mix(in oklch, var(--neutral) 7%, var(--bg-ultra-light));
+      color: var(--text-faint);
+      font-size: calc(var(--_m) * 0.46);
+      font-weight: 500;
+      line-height: 1;
+      letter-spacing: 0.04em;
+      white-space: nowrap;
+    }
+    /* The two cells touch: an address is one object, so no gap between its
+       halves — the gap the mark keeps is for the NAME beside it. */
+    .mark--addr {
+      gap: 0;
+    }
+    .mark--addr .mark__name {
+      margin-inline-start: var(--space-2xs, 0.375rem);
+    }
+    .mark--addr .mark__chip {
+      border-start-start-radius: 0;
+      border-end-start-radius: 0;
+    }
+    .mark--mini .mark__space {
+      padding-inline: 3px;
+      border-start-start-radius: 3px;
+      border-end-start-radius: 3px;
+      font-size: 7.5px;
+      letter-spacing: 0.03em;
+    }
+    .mark--mini.mark--addr .mark__chip {
+      border-start-start-radius: 0;
+      border-end-start-radius: 0;
     }
 
     .mark__name {
