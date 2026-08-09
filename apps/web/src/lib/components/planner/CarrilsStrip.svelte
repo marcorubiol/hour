@@ -871,16 +871,26 @@
       min-block-size: 58px;
       padding: 14px 15px;
       display: flex;
+      /* THE TAG HANGS FROM THE NAME, and only an explicit alignment keeps
+         it there. Stretch is the default, and it cascades: the mark column
+         grows to the row's height, IdentityMark (inline-flex, no height of
+         its own, align-items:center) grows with it and CENTRES the badge —
+         so on a row as tall as a slip the monogram floated 35px below its
+         name, onto the tally's line. Measured 2026-08-09. */
+      align-items: flex-start;
       gap: 7px;
       min-inline-size: 0;
     }
     /* The 22px mark slot — the monogram's, kept even when empty so names
        align down the column whatever kind of lane they head. */
+    /* Cap height, not the box's top edge: a 14px chip against a 15px serif
+       needs three pixels to sit on the line the eye reads the word from. */
     .board__mark {
       inline-size: 22px;
       flex: none;
       display: inline-flex;
-      padding-block-start: 2px;
+      align-items: flex-start;
+      padding-block-start: 3px;
     }
     .board__lab-body {
       min-inline-size: 0;
