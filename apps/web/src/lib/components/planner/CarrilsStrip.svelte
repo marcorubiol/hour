@@ -223,7 +223,11 @@
       // A SPACE runs down the rail; a PROJECT keeps its band, because a
       // project is a subject and a space is an address. Shut, everything
       // lies flat — there is no height left to run along.
-      const railed = g.kind === 'workspace' && !shut.has(g.key);
+      // THE RAIL IS THE BOARD'S WAY OF GROUPING, whatever the group is: on
+      // the person axis a project plays the same role a space plays on the
+      // scope axis — it is the context those rows hang from. What differs
+      // is the REGISTER, not the shape (see the rail's own styles).
+      const railed = !shut.has(g.key);
       if (!railed) {
         r++;
         group.set(g.key, r);
@@ -495,7 +499,7 @@
              Folded there is no height to run along, so the same button lays
              its words flat and says what it keeps: a lid that goes quiet
              about its shape, never about its contents. -->
-        {#if group.kind !== 'workspace' || isShut}
+        {#if isShut}
           <!-- THE BAND · a project is a SUBJECT: its monogram, its own case,
                its tint. Only a space gives up all three for the rail. -->
           <button
@@ -548,18 +552,31 @@
                  its own name, set low, and it is the fold's handle; a
                  project already said its name in the band, so its strip
                  goes down bare — the rule alone, hanging from the heading. -->
-            {#if group.kind === 'workspace'}
-              <button
-                type="button"
-                class="board__rail"
-                style:grid-row="{span.from} / {span.to}"
-                style:grid-column="1"
-                aria-expanded="true"
-                onclick={() => toggle(group.key)}
+            <button
+              type="button"
+              class="board__rail"
+              class:board__rail--proj={group.kind === 'project'}
+              style:grid-row="{span.from} / {span.to}"
+              style:grid-column="1"
+              aria-expanded="true"
+              onclick={() => toggle(group.key)}
+            >
+              {#if group.kind === 'project' && group.accent}
+                <!-- A GLYPH STAYS UPRIGHT: it is a symbol, not a word (the
+                     prototype's own law). Only the name turns. -->
+                <span class="board__rail-m">
+                  <IdentityMark
+                    mini
+                    accent={group.accent}
+                    initials={group.initials}
+                    name={group.name}
+                  />
+                </span>
+              {/if}
+              <span class="board__rail-n"
+                >{group.kind === 'workspace' ? spaceName(group.name) : group.name}</span
               >
-                <span class="board__rail-n">{spaceName(group.name)}</span>
-              </button>
-            {/if}
+            </button>
           {/if}
         {/if}
 
@@ -569,7 +586,6 @@
             <!-- ══ the lane · frozen label + a cell per column ══════════ -->
             <span
               class="board__lab"
-              class:board__lab--under={group.kind !== 'workspace'}
               style:grid-row={rows.lane.get(lane.key)}
               style:grid-column="2"
               class:board__lab--ghost={lane.kind === 'ghost'}
@@ -989,14 +1005,30 @@
       inset-inline-start: 0;
       z-index: 7;
       display: flex;
-      align-items: flex-start;
-      justify-content: center;
+      flex-direction: column;
+      align-items: center;
       padding: 14px 0 14px 4px;
       border: 0;
       border-inline-end: 1px solid var(--border-color-light);
       border-block-end: 1px solid var(--border-color-light);
       background: var(--bg);
       cursor: pointer;
+    }
+    /* TWO REGISTERS, ONE SHAPE. A space gives up its mark and its case —
+       it is an address. A project keeps both, because it is a subject; it
+       just happens to be doing a container's job on this axis. */
+    .board__rail--proj {
+      padding-block-start: 10px;
+    }
+    .board__rail-m {
+      flex: none;
+      margin-block-end: 7px;
+    }
+    .board__rail--proj .board__rail-n {
+      font-family: var(--font-display);
+      font-size: 12.5px;
+      letter-spacing: 0;
+      color: var(--text-muted);
     }
     .board__rail-n {
       writing-mode: vertical-rl;
@@ -1014,22 +1046,6 @@
     }
     .board__rail:hover .board__rail-n {
       color: var(--text-muted);
-    }
-
-    /* ── THE VERTICAL HANGS FROM THE WORD (Marco, 2026-08-09) ─────────
-       It was drawn at the label column's left EDGE — x 26, while the
-       heading's name starts at 41 — so it read as a column boundary, not
-       as a bracket: «no acabo de entender esa línea». A line that groups
-       rows has to descend from the thing it groups them under, so it
-       starts at the group name's own x and runs down its lanes. On the
-       space axis the rail already does this job with its name inside it. */
-    .board__lab--under::before {
-      content: '';
-      position: absolute;
-      inset-block: 0;
-      inset-inline-start: 15px;
-      inline-size: 1px;
-      background: var(--border-color-light);
     }
 
     .board__lab {
