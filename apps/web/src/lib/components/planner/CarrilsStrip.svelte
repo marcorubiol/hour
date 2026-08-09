@@ -881,17 +881,16 @@
     .board__grpc.mstart {
       padding-inline-start: 0;
     }
-    /* …EXCEPT ACROSS A HEADING (Marco, 2026-08-09). The band is not part of
-       the timeline — it is the sentence that names the rows under it — so
-       the calendar's own edges pause there and it reads as ONE merged row,
-       with no column seams inside it. The law that says «every row draws a
-       fact that crosses the drawing» is about ROWS OF DAYS; a heading has
-       no days. The cells stay (that is structure: one per column, so
-       nothing shifts) — only their ink goes. */
-    .board__grpc.wstart,
-    .board__grpc.mstart {
-      border-inline-start: 0;
-    }
+    /* AND THEY CROSS A HEADING TOO — but only THESE two (Marco, 2026-08-09,
+       after seeing it both ways). The lines on this sheet are not one
+       family: a seam between two cells belongs to the cells, and a heading
+       has none, so the frozen column's rule pauses there and the band reads
+       as one merged row. A WEEK and a MONTH edge are not cell borders —
+       they are the sheet's own time structure, the only vertical you track
+       from top to bottom to find where September starts, and their whole
+       value is that they do not stop. Broken by every group, that double
+       rule arrives in five pieces. So: no cell seams across a heading, and
+       the calendar's own edges unbroken. */
 
     /* ── the group band · a lid over a row of real cells ─────────────── */
     .board__grpl {
