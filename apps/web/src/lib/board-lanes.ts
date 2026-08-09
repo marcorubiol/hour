@@ -821,9 +821,15 @@ export type BoardClash = ClashVM & { day: string };
 
 /** The head '!' days. It never asked the filter: a clash with one half off
     the sheet still marks its day — the rule hides, the fact does not. */
-export function clashDayMarks(clashes: readonly BoardClash[]): Set<string> {
-  const out = new Set<string>();
-  for (const c of clashes) out.add(c.day);
+export function clashDayMarks(
+  clashes: readonly BoardClash[],
+): Map<string, { people: boolean }> {
+  const out = new Map<string, { people: boolean }>();
+  for (const c of clashes) {
+    const people = c.severity === 'people' || c.severity === 'blackout';
+    const prev = out.get(c.day);
+    out.set(c.day, { people: (prev?.people ?? false) || people });
+  }
   return out;
 }
 

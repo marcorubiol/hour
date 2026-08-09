@@ -217,9 +217,13 @@
   }
   /** A multi-day fold can hold a marked day whose events are off the sheet —
       the '!' never asked the filter, so the fold's head still carries it. */
-  function gapClash(col: BoardColumn): boolean {
-    for (const d of clashDays) if (d >= col.from && d <= col.to) return true;
-    return false;
+  function gapClash(col: BoardColumn): { people: boolean } | null {
+    let hit: { people: boolean } | null = null;
+    for (const [d, m] of clashDays) {
+      if (d < col.from || d > col.to) continue;
+      hit = { people: (hit !== null && hit.people) || m.people };
+    }
+    return hit;
   }
   /** The fold's ruler step, or null when a day stops being a mark (law 15:
       under 6px a measure becomes a texture, and a texture is not drawn). */
@@ -418,10 +422,12 @@
         >
           {#if col.monthStartName}<i class="board__mo">{monthWord(col.from)}</i>{/if}
           {#if col.kind === 'gap'}
+            {@const gc = gapClash(col)}
             <span class="board__gaplab"
-              >{col.gapLabel}{#if gapClash(col)}<button
+              >{col.gapLabel}{#if gc}<button
                   type="button"
                   class="board__dmk board__dmk--dim"
+                  class:board__dmk--people={gc.people}
                   aria-label={clashDayLabel(col.from)}
                   onclick={() => onClashDay(col.from)}>!</button
                 >{/if}</span
@@ -432,6 +438,7 @@
               >{Number(col.from.slice(8, 10))}{#if clashDays.has(col.from)}<button
                   type="button"
                   class="board__dmk"
+                  class:board__dmk--people={clashDays.get(col.from)?.people}
                   aria-label={clashDayLabel(col.from)}
                   onclick={() => onClashDay(col.from)}>!</button
                 >{/if}</b
@@ -702,20 +709,28 @@
     /* The red '!' rides the day NUMBER — red means conflict and only
        conflict (law 2). Dimmed on a fold's head: the fact survives the
        filter, quieter where its evidence is off the sheet. */
+    /* The mark says THAT there is a call to make — the Slip's own ink law
+       (--clash-ink): a call is blue, and red is spent on PEOPLE only. The
+       board said red for everything while every other drawing said blue;
+       Marco caught the drift across two screenshots. */
     .board__dmk {
+      --dmk-ink: var(--info);
       margin-inline-start: 3px;
       padding: 0;
       border: 0;
       background: none;
       font-family: var(--font-mono);
       font-size: 11px;
-      color: var(--danger);
+      color: var(--dmk-ink);
       vertical-align: super;
       line-height: 0;
       cursor: pointer;
     }
+    .board__dmk--people {
+      --dmk-ink: var(--danger);
+    }
     .board__dmk--dim {
-      color: color-mix(in oklch, var(--danger) 70%, transparent);
+      color: color-mix(in oklch, var(--dmk-ink) 70%, transparent);
     }
 
     /* The day tick: a 7px × 1px MARK off the axis, not a line — suppressed

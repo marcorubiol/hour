@@ -617,7 +617,11 @@ describe('clashDayMarks (law 22)', () => {
       { ...mkClash(['e1', 'gone']), day: '2026-07-18' },
       { ...mkClash(['e3', 'e4']), day: '2026-07-20' },
     ];
-    expect([...clashDayMarks(clashes)].sort()).toEqual(['2026-07-18', '2026-07-20']);
+    const marks = clashDayMarks(clashes);
+    expect([...marks.keys()].sort()).toEqual(['2026-07-18', '2026-07-20']);
+    // and the mark knows its CLASS: blue is a call to make, red is people
+    // (the Slip's own --clash-ink law, spoken by the head too).
+    expect([...marks.values()].some((m) => typeof m.people === 'boolean')).toBe(true);
   });
 });
 
