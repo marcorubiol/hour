@@ -15,6 +15,7 @@
   import Select from '$lib/components/Select.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
   import { workspacesQueryOptions } from '$lib/nav-queries';
+  import { spaceName } from '$lib/utils/identity';
   import AccentSwatchPicker from './AccentSwatchPicker.svelte';
 
   interface Props {
@@ -36,10 +37,12 @@
   let description = $state('');
 
   let workspaces = $derived($workspacesQ.data?.items ?? []);
-  let workspaceOptions = $derived(workspaces.map((w) => ({ value: w.id, label: w.name })));
+  // <option> text: a stylesheet cannot be trusted here, so the writer runs
+  // where the labels are built.
+  let workspaceOptions = $derived(workspaces.map((w) => ({ value: w.id, label: spaceName(w.name) })));
   let effectiveWorkspaceId = $derived(workspaceId ?? wsSelected);
   let targetWorkspaceName = $derived(
-    workspaces.find((w) => w.id === effectiveWorkspaceId)?.name ?? '',
+    spaceName(workspaces.find((w) => w.id === effectiveWorkspaceId)?.name ?? ''),
   );
 
   // Live preview of the color Auto would pick for the typed name.

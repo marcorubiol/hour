@@ -140,6 +140,9 @@
     onNoteDelete?: (id: string) => void;
     /** Where an anchorless note falls — «the company» or the pinned scope. */
     noteFallbackLabel?: string;
+    /** That fallback is a SPACE (not a project/line): it comes down already
+        lowercase, so the anchor's mono-caps register must stand aside. */
+    noteFallbackIsSpace?: boolean;
     notePlaceholder?: string;
     noteAddLabel?: string;
     noteDeleteLabel?: string;
@@ -213,6 +216,7 @@
     onNoteCreate,
     onNoteDelete,
     noteFallbackLabel = 'the company',
+    noteFallbackIsSpace = false,
     notePlaceholder = 'Write a note…',
     noteAddLabel = 'Add a note',
     noteDeleteLabel = 'Delete note',
@@ -1049,10 +1053,15 @@
                   {#if opts.length > 1}
                     <select class="ag__note-anchor" bind:value={noteAnchorKey} disabled={notePending}>
                       {#each opts as o (o.key)}<option value={o.key}>{o.label}</option>{/each}
-                      <option value="">{noteFallbackLabel}</option>
+                      <option value="" class:ag__note-anchor--space={noteFallbackIsSpace}
+                        >{noteFallbackLabel}</option
+                      >
                     </select>
                   {:else}
-                    <p class="ag__note-anchorword">{opts[0]?.label ?? noteFallbackLabel}</p>
+                    <p
+                      class="ag__note-anchorword"
+                      class:ag__note-anchor--space={!opts[0] && noteFallbackIsSpace}
+                    >{opts[0]?.label ?? noteFallbackLabel}</p>
                   {/if}
                 </div>
               {:else}
@@ -1608,6 +1617,11 @@ button.ag__head:hover .ag__num {
 .ag__note-anchor {
   cursor: pointer;
   max-inline-size: 100%;
+}
+/* The label register is caps — except when the anchor IS a space, which is
+   written lowercase. The letter-spacing stays; only the case steps aside. */
+.ag__note-anchor--space {
+  text-transform: none;
 }
 /* `＋` waits to be needed, like the verbs on the rows. */
 .ag__note-add {

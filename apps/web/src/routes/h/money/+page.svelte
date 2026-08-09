@@ -52,6 +52,7 @@
     type RawLine,
   } from '$lib/nav';
   import { activeProjectsQueryOptions, allLinesQueryOptions } from '$lib/nav-queries';
+  import { spaceName } from '$lib/utils/identity';
   import { goto } from '$app/navigation';
 
   type InvoicingMode = 'off' | 'interno' | 'legal';
@@ -616,7 +617,9 @@
   let dealCity = $state('');
   let dealFee = $state('');
   let dealCurrency = $state('EUR');
-  let dealOptions = $derived(projectIndex.map((p) => ({ value: p.id, label: `${p.name} · ${p.workspaceName}` })));
+  let dealOptions = $derived(
+    projectIndex.map((p) => ({ value: p.id, label: `${p.name} · ${spaceName(p.workspaceName)}` })),
+  );
   function openDeal() {
     dealProjectId = scope.projects[0]?.id ?? projectIndex[0]?.id ?? '';
     dealVenue = '';

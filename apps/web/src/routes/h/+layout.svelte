@@ -51,6 +51,7 @@
   } from '$lib/nav';
   import { activeProjectsQueryOptions, allLinesQueryOptions, teamQueryOptions } from '$lib/nav-queries';
   import { accentVarFor } from '$lib/utils/accent';
+  import { spaceName } from '$lib/utils/identity';
   import { saveMasterViewPath } from '$lib/master-view';
   import {
     provideNetworkPresence,
@@ -157,7 +158,9 @@
 
   function tokenLabel(tok: string): string {
     const { kind, key } = parsePin(tok);
-    if (kind === 'space') return wsItems.find((w) => w.slug === key)?.name ?? key;
+    // The one chokepoint for a space name in the shell: the scope pill, its ×
+    // aria-label and the auto-name of a saved scope all read from here.
+    if (kind === 'space') return spaceName(wsItems.find((w) => w.slug === key)?.name ?? key);
     if (kind === 'project') return projectIndex.find((p) => p.id === key)?.name ?? 'project';
     // Still loading, or a person who left the team: say the word, never the id.
     if (kind === 'person') return personNameById.get(key) ?? 'person';

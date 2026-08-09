@@ -25,6 +25,7 @@
   import { dayMonth } from '$lib/datetime';
   import { t, type Locale } from '$lib/i18n';
   import { lineKindLabel } from '$lib/utils/line-kind';
+  import { spaceName } from '$lib/utils/identity';
   import { taskTargetFields, type TaskItem, type TasksCache, type TaskTarget, type TaskTargetKind } from '$lib/task';
 
   interface EntityLite {
@@ -235,7 +236,7 @@
               <span class="tc__leaf" aria-hidden="true"></span>
             {/if}
             <span class="tc__target-kind">{targetKindLabel}</span>
-            <span class="tc__target-name">{chosen.name}</span>
+            <span class="tc__target-name">{chosen.kind === 'space' ? spaceName(chosen.name) : chosen.name}</span>
             <span class="tc__caret" aria-hidden="true">›</span>
           </button>
           {#if pickerOpen}

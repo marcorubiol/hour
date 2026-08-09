@@ -27,6 +27,7 @@
   import { buildProjectIndex, buildLineIndex, type NavWorkspace } from '$lib/nav';
   import { parsePin } from '$lib/stores/pins.svelte';
   import { accentVarFor } from '$lib/utils/accent';
+  import { spaceName } from '$lib/utils/identity';
   import { lineKindLabel } from '$lib/utils/line-kind';
   import ScopeGlyph from '$lib/components/ScopeGlyph.svelte';
   import { t, type Locale } from '$lib/i18n';
@@ -73,8 +74,10 @@
   }
 
   function spaceRow(w: NavWorkspace, canDrill: boolean): Row {
+    // Chokepoint: `name` is display only (the POST takes `id`), and it feeds the
+    // row, its "Open …" aria-label and the composer's chosen-target pill.
     return {
-      target: { kind: 'space', id: w.id, name: w.name, accent: accentVarFor(w) },
+      target: { kind: 'space', id: w.id, name: spaceName(w.name), accent: accentVarFor(w) },
       drill: canDrill ? `s:${w.slug}` : null,
     };
   }
@@ -104,7 +107,7 @@
       const spaces = workspaces.filter((w) => hit(w.name, w.slug)).map((w) => spaceRow(w, false));
       const projects = projectIndex
         .filter((p) => hit(p.name, p.slug, p.workspaceName))
-        .map((p) => projectRow(p, false, p.workspaceName));
+        .map((p) => projectRow(p, false, spaceName(p.workspaceName)));
       const lines = lineIndex
         .filter((l) => hit(l.name, l.projectName, l.kind))
         .map((l) => lineRow(l, l.projectName));
@@ -158,7 +161,11 @@
   });
 
   // Breadcrumb (All › space › project) — clickable, like ⌘K.
-  let crumb = $derived.by<{ label: string; up: string | null | ''; here: boolean }[]>(() => {
+  // `space: true` marks the one crumb that is a space name — it opts out of the
+  // trail's uppercase (see .tp__crumb--space) so the norm is not fought by CSS.
+  let crumb = $derived.by<
+    { label: string; up: string | null | ''; here: boolean; space?: boolean }[]
+  >(() => {
     if (query.trim())
       return [
         { label: t('picker.all', locale), up: '', here: false },
@@ -170,13 +177,18 @@
       const w = workspaces.find((x) => x.slug === key);
       return [
         { label: t('picker.all', locale), up: '', here: false },
-        { label: w?.name ?? key, up: null, here: true },
+        { label: spaceName(w?.name ?? key), up: null, here: true, space: true },
       ];
     }
     const proj = projectIndex.find((p) => p.id === key);
     return [
       { label: t('picker.all', locale), up: '', here: false },
-      { label: proj?.workspaceName ?? '', up: proj ? `s:${proj.workspaceSlug}` : '', here: false },
+      {
+        label: spaceName(proj?.workspaceName ?? ''),
+        up: proj ? `s:${proj.workspaceSlug}` : '',
+        here: false,
+        space: true,
+      },
       { label: proj?.name ?? key, up: null, here: true },
     ];
   });
@@ -279,13 +291,13 @@
     {#each crumb as c, i (i)}
       {#if i > 0}<span class="tp__crumb-sep" aria-hidden="true">›</span>{/if}
       {#if c.here}
-        <span>{c.label}</span>
+        <span class:tp__crumb--space={c.space}>{c.label}</span>
       {:else if c.up === ''}
-        <button type="button" class="tp__crumb-link" onclick={goHome}>{c.label}</button>
+        <button type="button" class="tp__crumb-link" class:tp__crumb--space={c.space} onclick={goHome}>{c.label}</button>
       {:else if c.up}
-        <button type="button" class="tp__crumb-link" onclick={() => c.up && drillTo(c.up)}>{c.label}</button>
+        <button type="button" class="tp__crumb-link" class:tp__crumb--space={c.space} onclick={() => c.up && drillTo(c.up)}>{c.label}</button>
       {:else}
-        <span>{c.label}</span>
+        <span class:tp__crumb--space={c.space}>{c.label}</span>
       {/if}
     {/each}
   </p>
@@ -403,6 +415,11 @@
     .tp__crumb-link:hover {
       color: var(--text-color);
       text-decoration: underline;
+    }
+    /* Only the space crumb drops the trail's uppercase — the rest keeps its
+       caps and every crumb keeps the mono letter-spacing. */
+    .tp__crumb--space {
+      text-transform: none;
     }
     .tp__list {
       max-block-size: 40vh;

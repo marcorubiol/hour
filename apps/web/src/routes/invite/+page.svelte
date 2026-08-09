@@ -4,6 +4,7 @@
   import BrandMark from '$lib/components/BrandMark.svelte';
   import { ApiError, mutateJSON } from '$lib/api';
   import { ensureSession } from '$lib/session.svelte';
+  import { spaceName } from '$lib/utils/identity';
 
   type Invitation = {
     workspace_id: string;
@@ -102,7 +103,7 @@
       <h1>Checking your <em>place.</em></h1>
       <p class="invitation-card__lede">Verifying the account and invitation boundary…</p>
     {:else if invitation}
-      <h1>Join <em>{invitation.workspace_name}.</em></h1>
+      <h1>Join <em>{spaceName(invitation.workspace_name)}.</em></h1>
       <p class="invitation-card__lede">
         This invitation is addressed to {invitation.email}. Review the access below before
         entering the workspace.

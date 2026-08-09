@@ -18,6 +18,7 @@
   import { dayLabel, dayMonthYearTs } from '$lib/datetime';
   import { useBreadcrumb } from '$lib/stores/breadcrumb.svelte';
   import { accentVar } from '$lib/utils/accent';
+  import { spaceName } from '$lib/utils/identity';
   import { safeHref } from '$lib/utils/safe-url';
 
   type PersonFile = {
@@ -102,7 +103,7 @@
 
   const breadcrumb = useBreadcrumb();
   let activeWorkspaceName = $derived(
-    $workspacesQuery.data?.items.find((w) => w.slug === workspaceSlug)?.name ?? workspaceSlug,
+    spaceName($workspacesQuery.data?.items.find((w) => w.slug === workspaceSlug)?.name ?? workspaceSlug),
   );
 
   // A person is cross-cutting (global, appears across projects), not a tree

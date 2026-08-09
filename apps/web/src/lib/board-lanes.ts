@@ -79,6 +79,11 @@ export interface BoardGroup {
   kind: 'workspace' | 'project';
   id: string;
   name: string;
+  /** A PROJECT group is a subject and wears its identity in the band; a
+      SPACE is an address and wears none — its name runs down the rail, low
+      (styles/identity.css). Absent on workspace groups by construction. */
+  accent?: string | null;
+  initials?: string | null;
   lanes: BoardLaneRef[];
 }
 
@@ -190,7 +195,15 @@ export function personGroups(input: {
         shared: false,
       });
     }
-    groups.push({ key: projectLaneKey(p.id), kind: 'project', id: p.id, name: p.name, lanes });
+    groups.push({
+      key: projectLaneKey(p.id),
+      kind: 'project',
+      id: p.id,
+      name: p.name,
+      accent: p.accent,
+      initials: p.initials,
+      lanes,
+    });
   }
   return groups;
 }

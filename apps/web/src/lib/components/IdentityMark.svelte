@@ -35,7 +35,7 @@
    * The space cell is OPEN ON THE RIGHT — square corner, no edge — so it
    * also works alone: a space with no project yet is a cell waiting for one.
    */
-  import { markText } from '$lib/utils/identity';
+  import { markText, spaceName } from '$lib/utils/identity';
 
   interface Props {
     /** Accent as a CSS value: var(--accent-N) or a literal color. */
@@ -81,10 +81,11 @@
 
   let text = $derived(variant === 'bare' ? '' : markText({ initials, name }));
   let label = $derived(name ?? text ?? 'project');
-  /** The space's cell — the SAME derivation as any monogram, set low: one
-      writer for what a mark's letters are, two registers for what it is. */
-  let spaceText = $derived(space ? markText(space).toLocaleLowerCase() : '');
-  let spaceLabel = $derived(space?.name ?? spaceText);
+  /** The space's cell — the SAME derivation as any monogram, set low by the
+      one writer of the norm: one writer for what a mark's letters are, one
+      for the register a space is written in. */
+  let spaceText = $derived(space ? spaceName(markText(space)) : '');
+  let spaceLabel = $derived(spaceName(space?.name ?? spaceText));
 </script>
 
 <span

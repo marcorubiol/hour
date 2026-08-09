@@ -59,6 +59,25 @@ export function deriveInitials(name?: string | null, max = MONOGRAM_MAX): string
  * The monogram to render for an entity: its stored `initials` when present,
  * else the derived suggestion. Empty/whitespace stored value → derive.
  */
+/**
+ * THE SPACE IS ALWAYS LOWERCASE (Marco, 2026-08-09) — a norm, everywhere.
+ *
+ * A space is not a subject you look at, it is the ADDRESS a project lives
+ * at, and the case is what says so: the eye lands on the tinted, capitalised
+ * thing and takes the space as context. Same argument as the two-level mark
+ * (`mk│MM`), which is only this rule with a box around it.
+ *
+ * It is a WRITER, not a stylesheet, and that is deliberate. Half the places
+ * a space is named cannot be reached by CSS — aria-labels, the composed name
+ * of a saved scope, a sentence a translation interpolates it into — and a
+ * norm with two mechanisms is a norm that drifts (this repo has the scars).
+ * The stored value never changes: settings still edit the name its owner
+ * typed, and a copy carries the real one.
+ */
+export function spaceName(name?: string | null): string {
+	return (name ?? '').toLocaleLowerCase();
+}
+
 export function markText(entity: {
 	initials?: string | null;
 	name?: string | null;

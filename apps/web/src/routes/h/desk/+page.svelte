@@ -24,6 +24,7 @@
   import LensHeader from '$lib/components/LensHeader.svelte';
   import LensTitle from '$lib/components/LensTitle.svelte';
   import { accentVar, accentVarFor } from '$lib/utils/accent';
+  import { spaceName } from '$lib/utils/identity';
   import { detectLocale, t } from '$lib/i18n';
   import { dayMonth } from '$lib/datetime';
   import { usePins } from '$lib/stores/pins.svelte';
@@ -279,7 +280,7 @@
   let composerTarget = $derived.by<TaskTarget>(() => {
     const ws = workspaces.find((w) => w.id === defaultWsId) ?? workspaces[0];
     return ws
-      ? { kind: 'space', id: ws.id, name: ws.name, accent: accentVarFor(ws) }
+      ? { kind: 'space', id: ws.id, name: spaceName(ws.name), accent: accentVarFor(ws) }
       : { kind: 'space', id: '', name: '', accent: 'var(--text-faint)' };
   });
   // Parents the Desk already has in cache — handed to the picker, no new fetch.
@@ -309,14 +310,16 @@
       tone: 'info',
       title: t('composer.outside_scope_title', locale),
       message: t('composer.outside_scope_msg', locale, {
-        space: space?.name ?? t('composer.outside_scope_fallback', locale),
+        space: space ? spaceName(space.name) : t('composer.outside_scope_fallback', locale),
       }),
     });
   }
 
   // On the cross-space (Everything) view, prepend the space so rows from
   // different spaces don't blur; when scoped to one space it's redundant.
-  let spaceNameByProjectId = $derived(new Map(projectIndex.map((p) => [p.id, p.workspaceName])));
+  // Chokepoint: contextPath composes «space · project · line», so only the
+  // space segment may be lowercased — here, not on the row's class.
+  let spaceNameByProjectId = $derived(new Map(projectIndex.map((p) => [p.id, spaceName(p.workspaceName)])));
   const contextPath = (i: DeskItem) => {
     const space = scope.isEmpty && i.projectId ? spaceNameByProjectId.get(i.projectId) : null;
     return [space, i.projectName, i.lineName].filter(Boolean).join(' · ');

@@ -134,6 +134,7 @@
   } from '$lib/performance';
   import { dateStatusFamily } from '$lib/date';
   import { accentVarFor } from '$lib/utils/accent';
+  import { spaceName } from '$lib/utils/identity';
 
   type WorkspaceLite = { id: string; slug: string; name: string };
 
@@ -683,11 +684,13 @@
         to: b.ends_on,
         company,
         tentative: b.certainty === 'tentative',
+        // The one place a company absence is named: month band, its tooltip
+        // and the agenda's away line all read from here.
         label: company
-          ? (workspaceNameById.get(b.workspace_id) ?? '—')
+          ? spaceName(workspaceNameById.get(b.workspace_id) ?? '—')
           : t('planner.band_person', locale, { person: personName ?? '—' }),
         subject: company
-          ? (workspaceNameById.get(b.workspace_id) ?? '—')
+          ? spaceName(workspaceNameById.get(b.workspace_id) ?? '—')
           : (personName ?? '—'),
         note: b.note,
       };
@@ -793,7 +796,8 @@
     const block = c.availability_block_id ? blackoutById.get(c.availability_block_id) : undefined;
     const company = c.person_ids.length === 0;
     const person = company ? '' : (personNames.get(c.person_ids[0]) ?? '—');
-    const workspace = block ? (workspaceNameById.get(block.workspace_id) ?? '—') : '—';
+    // Lowercase the VALUE, never the sentence it lands mid-way through.
+    const workspace = spaceName(block ? (workspaceNameById.get(block.workspace_id) ?? '—') : '—');
     return {
       severity: c.severity,
       title: t(tentative ? 'planner.clash_blackout_t_title' : 'planner.clash_blackout_title', locale),
@@ -1012,7 +1016,7 @@
     const inWindow = (from: string, to: string) => to >= agendaFromIso && from <= agendaToIso;
     const subject = (b: AvailabilityItem): string =>
       b.person_id === null
-        ? (workspaceNameById.get(b.workspace_id) ?? '—')
+        ? spaceName(workspaceNameById.get(b.workspace_id) ?? '—')
         : (b.person?.full_name ?? personNames.get(b.person_id) ?? '—');
     for (const b of visibleBlackouts) {
       if (!inWindow(b.starts_on, b.ends_on)) continue;
@@ -1827,7 +1831,7 @@
       const wss = ($workspacesQuery.data?.items ?? []) as NavWorkspace[];
       const pinned = solo ? wss.find((w) => w.id === scope.workspaceIds[0]) : undefined;
       const home = pinned ?? wss.find((w) => w.slug === defaultWorkspaceSlug) ?? wss[0];
-      if (home) return { label: home.name, workspace_id: home.id };
+      if (home) return { label: spaceName(home.name), workspace_id: home.id };
       return { label: t('planner.note_company', locale) };
     },
   );
@@ -2770,6 +2774,7 @@
       onNoteCreate={notesAbsent ? undefined : createNote}
       onNoteDelete={notesAbsent ? undefined : deleteNote}
       noteFallbackLabel={noteFallback.label}
+      noteFallbackIsSpace={Boolean(noteFallback.workspace_id)}
       notePlaceholder={t('planner.note_placeholder', locale)}
       noteAddLabel={t('planner.note_add', locale)}
       noteDeleteLabel={t('planner.note_delete', locale)}

@@ -12,6 +12,7 @@
   import Select from '$lib/components/Select.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
   import { copyText } from '$lib/clipboard';
+  import { spaceName } from '$lib/utils/identity';
 
   type FeedShare = { id: string; token: string; workspace_id: string; created_at: string };
 
@@ -30,7 +31,9 @@
   let chosenWs = $state<string | null>(null);
   let feedWs = $derived(chosenWs ?? workspaces[0]?.id ?? '');
 
-  let feedWsOptions = $derived(workspaces.map((w) => ({ value: w.id, label: w.name })));
+  let feedWsOptions = $derived(
+    workspaces.map((w) => ({ value: w.id, label: spaceName(w.name) })),
+  );
 
   const feedSharesOptions = toStore(() => {
     const ws = feedWs;

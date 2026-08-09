@@ -3,6 +3,7 @@
   import { SvelteSet } from 'svelte/reactivity';
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { accentVar } from '$lib/utils/accent';
+  import { spaceName } from '$lib/utils/identity';
   import { fetchJSON, mutateJSON, ApiError } from '$lib/api';
   import { copyText } from '$lib/clipboard';
   import { addToast } from '$lib/components/Toast.svelte';
@@ -196,8 +197,8 @@
         tone: 'success',
         message:
           req.status === 'approved'
-            ? `Alias /h/${req.alias} granted to ${req.workspace_name}.`
-            : `Alias request from ${req.workspace_name} rejected.`,
+            ? `Alias /h/${req.alias} granted to ${spaceName(req.workspace_name)}.`
+            : `Alias request from ${spaceName(req.workspace_name)} rejected.`,
       });
     },
     onError: (err) => {
@@ -263,7 +264,7 @@
         <div class="set-ws" style={`--c: ${accentVar(w.slug)}`}>
           <div class="set-ws__rail"></div>
           <div class="set-ws__name">
-            <h3>{w.name}</h3>
+            <h3>{spaceName(w.name)}</h3>
           </div>
           <!-- personal/team label + kind-derived role badges removed
                (ADR-064): personal/team is not a real distinction, and
@@ -293,7 +294,7 @@
     <div class="set-group__head set-access__head">
       <div>
         <span class="eyebrow set-group__kicker">Access desk</span>
-        <h2 class="set-group__title">{currentWorkspace.name}</h2>
+        <h2 class="set-group__title">{spaceName(currentWorkspace.name)}</h2>
       </div>
       <span class="set-access__count">{activeMembers.length} active</span>
     </div>
@@ -425,7 +426,7 @@
           <div class="set-alias">
             <div class="set-alias__what">
               <span class="set-alias__url">/h/{r.alias}</span>
-              <span class="set-alias__ws">for {r.workspace_name}</span>
+              <span class="set-alias__ws">for {spaceName(r.workspace_name)}</span>
             </div>
             {#if r.requested_by === session.user?.sub}
               <span class="set-alias__state">pending review</span>

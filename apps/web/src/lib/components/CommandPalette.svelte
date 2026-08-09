@@ -35,6 +35,7 @@
   } from '$lib/nav';
   import { parsePin, personPin } from '$lib/stores/pins.svelte';
   import { accentVarFor } from '$lib/utils/accent';
+  import { spaceName } from '$lib/utils/identity';
   import { lineKindLabel } from '$lib/utils/line-kind';
   import ScopeGlyph from '$lib/components/ScopeGlyph.svelte';
 
@@ -145,7 +146,8 @@
 
   function labelFor(token: string): string {
     const { kind, key } = parsePin(token);
-    if (kind === 'space') return workspaces.find((w) => w.slug === key)?.name ?? key;
+    // Chokepoint: this label is the staged chip AND its "Unstage …" aria-label.
+    if (kind === 'space') return spaceName(workspaces.find((w) => w.slug === key)?.name ?? key);
     if (kind === 'project') return projectIndex.find((p) => p.id === key)?.name ?? 'project';
     if (kind === 'person')
       return people.find((p) => p.person_id === key)?.full_name ?? 'person';
@@ -195,7 +197,8 @@
   );
 
   function spaceRow(w: NavWorkspace, canDrill: boolean): Row {
-    return { token: `s:${w.slug}`, kind: 'space', name: w.name, path: '', drill: canDrill ? `s:${w.slug}` : null };
+    // Chokepoint: `name` feeds both the row and its "Drill into …" aria-label.
+    return { token: `s:${w.slug}`, kind: 'space', name: spaceName(w.name), path: '', drill: canDrill ? `s:${w.slug}` : null };
   }
   function projectRow(p: (typeof projectIndex)[number], canDrill: boolean, path: string): Row {
     return { token: `p:${p.id}`, kind: 'project', name: p.name, path, drill: canDrill ? `p:${p.id}` : null };
@@ -223,7 +226,7 @@
             p.slug.includes(q) ||
             p.workspaceName.toLowerCase().includes(q),
         )
-        .map((p) => projectRow(p, false, p.workspaceName));
+        .map((p) => projectRow(p, false, spaceName(p.workspaceName)));
       const lines = lineIndex
         .filter(
           (l) =>
@@ -238,7 +241,7 @@
       const nq = fold(q);
       const persons = people
         .filter((p) => fold(p.full_name).includes(nq) || p.slug.includes(q))
-        .map((p) => personRow(p, p.workspaceName));
+        .map((p) => personRow(p, spaceName(p.workspaceName)));
       // An empty People group has three different meanings and they must not
       // look alike: still fetching · the feed could not be read · nobody
       // matches. Only the last one is silence.
@@ -323,7 +326,9 @@
   }
 
   // Breadcrumb parts (label + optional up-target for the clickable crumbs).
-  let crumb = $derived.by<{ label: string; up: string | null; here: boolean }[]>(() => {
+  // `space: true` marks the one crumb that is a space name — it opts out of the
+  // trail's uppercase (see .cmdk__crumb--space) so the norm is not fought by CSS.
+  let crumb = $derived.by<{ label: string; up: string | null; here: boolean; space?: boolean }[]>(() => {
     if (query.trim())
       return [
         { label: 'All', up: '', here: false },
@@ -335,13 +340,18 @@
       const w = workspaces.find((x) => x.slug === key);
       return [
         { label: 'All', up: '', here: false },
-        { label: w?.name ?? key, up: null, here: true },
+        { label: spaceName(w?.name ?? key), up: null, here: true, space: true },
       ];
     }
     const proj = projectIndex.find((p) => p.id === key);
     return [
       { label: 'All', up: '', here: false },
-      { label: proj?.workspaceName ?? '', up: proj ? `s:${proj.workspaceSlug}` : '', here: false },
+      {
+        label: spaceName(proj?.workspaceName ?? ''),
+        up: proj ? `s:${proj.workspaceSlug}` : '',
+        here: false,
+        space: true,
+      },
       { label: proj?.name ?? key, up: null, here: true },
     ];
   });
@@ -487,13 +497,13 @@
           {#each crumb as c, i (i)}
             {#if i > 0}<span class="cmdk__crumb-sep" aria-hidden="true">›</span>{/if}
             {#if c.here}
-              <span>{c.label}</span>
+              <span class:cmdk__crumb--space={c.space}>{c.label}</span>
             {:else if c.up === ''}
-              <button type="button" class="cmdk__crumb-link" onclick={goHome}>{c.label}</button>
+              <button type="button" class="cmdk__crumb-link" class:cmdk__crumb--space={c.space} onclick={goHome}>{c.label}</button>
             {:else if c.up}
-              <button type="button" class="cmdk__crumb-link" onclick={() => c.up && drillTo(c.up)}>{c.label}</button>
+              <button type="button" class="cmdk__crumb-link" class:cmdk__crumb--space={c.space} onclick={() => c.up && drillTo(c.up)}>{c.label}</button>
             {:else}
-              <span>{c.label}</span>
+              <span class:cmdk__crumb--space={c.space}>{c.label}</span>
             {/if}
           {/each}
         </p>
@@ -661,6 +671,11 @@
   .cmdk__crumb-link:hover {
     color: var(--text-color);
     text-decoration: underline;
+  }
+  /* Only the space crumb drops the trail's uppercase — the rest keeps its caps
+     and every crumb keeps the mono letter-spacing. */
+  .cmdk__crumb--space {
+    text-transform: none;
   }
   .cmdk__group {
     margin: 0;

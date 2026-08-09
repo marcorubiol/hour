@@ -27,6 +27,7 @@
   import { teamQueryOptions, workspacesQueryOptions } from '$lib/nav-queries';
   import type { AvailabilityCertainty, AvailabilityItem } from '$lib/availability';
   import { AVAILABILITY_CERTAINTIES } from '$lib/availability';
+  import { spaceName } from '$lib/utils/identity';
 
   interface Props {
     open?: boolean;
@@ -55,7 +56,7 @@
 
   const workspacesQuery = createQuery(workspacesQueryOptions());
   let workspaceOptions = $derived(
-    ($workspacesQuery.data?.items ?? []).map((w) => ({ value: w.id, label: w.name })),
+    ($workspacesQuery.data?.items ?? []).map((w) => ({ value: w.id, label: spaceName(w.name) })),
   );
 
   // One builder, one warm cache — shared with the planner feed and the shell.

@@ -29,6 +29,7 @@
   import StateBadge from '$lib/components/StateBadge.svelte';
   import { lineKindGlyph, lineKindLabel } from '$lib/utils/line-kind';
   import { accentVar } from '$lib/utils/accent';
+  import { spaceName } from '$lib/utils/identity';
   import { useBreadcrumb } from '$lib/stores/breadcrumb.svelte';
   import { fmtMoneyCompact } from '$lib/money';
   import { dayMonth, dayMonthYear } from '$lib/datetime';
@@ -78,7 +79,7 @@
     $workspacesQuery.data?.items.find((w) => w.slug === workspaceSlug)?.id ?? null,
   );
   let activeWorkspaceName = $derived(
-    $workspacesQuery.data?.items.find((w) => w.slug === workspaceSlug)?.name ?? workspaceSlug,
+    spaceName($workspacesQuery.data?.items.find((w) => w.slug === workspaceSlug)?.name ?? workspaceSlug),
   );
   let activeProject = $derived(
     routeWorkspaceId

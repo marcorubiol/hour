@@ -1,5 +1,6 @@
 <script lang="ts">
   import { useBreadcrumb } from '$lib/stores/breadcrumb.svelte';
+  import { spaceName } from '$lib/utils/identity';
 
   // The provider lives in the /h layout (which renders this component), so
   // entity pages downstream have already had a place to write their crumbs.
@@ -19,7 +20,7 @@
               href={c.href}
               style={c.accent ? `--c: ${c.accent}` : undefined}
             >
-              {#if c.kind === 'space'}<span class="shell__crumb-dot" aria-hidden="true"></span>{/if}{c.label}
+              {#if c.kind === 'space'}<span class="shell__crumb-dot" aria-hidden="true"></span>{spaceName(c.label)}{:else}{c.label}{/if}
             </a>
           {:else}
             <span class="shell__crumb shell__crumb--here">{c.label}</span>
@@ -79,7 +80,8 @@
     font-family: var(--font-mono);
     font-size: var(--text-xs);
     letter-spacing: var(--mono-letter-spacing-loose);
-    text-transform: uppercase;
+    /* The mono kicker keeps its wide tracking, but not its shouting: the case
+       of a space is written by `spaceName`, and a stylesheet must not fight it. */
   }
   .shell__crumb-dot {
     inline-size: 0.5rem;

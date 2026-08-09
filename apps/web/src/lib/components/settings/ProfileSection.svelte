@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { accentVar } from '$lib/utils/accent';
+  import { spaceName } from '$lib/utils/identity';
   import { session } from '$lib/session.svelte';
   import { ApiError, mutateJSON } from '$lib/api';
   import { meQueryOptions, workspacesQueryOptions } from '$lib/nav-queries';
@@ -207,7 +208,7 @@
         {@const on = Boolean(dossier?.profile_sync_enabled)}
         <div class="set-row">
           <div class="set-row__lead">
-            <div class="set-row__label">{w.name}</div>
+            <div class="set-row__label">{spaceName(w.name)}</div>
             <div class="set-row__hint">
               {#if on}
                 Known here as <b>{dossier?.full_name}</b>

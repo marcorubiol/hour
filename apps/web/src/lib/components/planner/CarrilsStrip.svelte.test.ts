@@ -162,7 +162,8 @@ describe('CarrilsStrip — the board grid', () => {
     const { container } = render(CarrilsStrip, props());
     const rail = container.querySelector('.board__rail') as HTMLElement;
     expect(rail).not.toBeNull();
-    expect(rail.querySelector('.board__rail-n')!.textContent).toBe('MüK Cia');
+    // Written lowercase (`spaceName`) — the space is the address, not the subject.
+    expect(rail.querySelector('.board__rail-n')!.textContent).toBe('mük cia');
     // A space is an address, not a subject: no monogram anywhere in the rail.
     expect(rail.querySelector('.mark')).toBeNull();
     // It spans exactly its lanes' rows: three lanes → rows 2..5 (head is 1).

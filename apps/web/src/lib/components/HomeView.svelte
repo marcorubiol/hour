@@ -39,6 +39,7 @@
 
   const locale = detectLocale(navigator.language);
   import { accentVar } from '$lib/utils/accent';
+  import { spaceName } from '$lib/utils/identity';
   import { useBreadcrumb } from '$lib/stores/breadcrumb.svelte';
   import EditWorkspaceDialog from '$lib/components/EditWorkspaceDialog.svelte';
   import { goto } from '$app/navigation';
@@ -248,7 +249,7 @@
     if (!currentWorkspace) return;
     breadcrumb.set([
       {
-        label: currentWorkspace.name,
+        label: spaceName(currentWorkspace.name),
         href: `/h/${currentWorkspace.slug}/`,
         kind: 'space',
         accent: accentVar(currentWorkspace.slug),
@@ -262,7 +263,7 @@
   }
 </script>
 
-<svelte:head><title>{currentWorkspace ? `${currentWorkspace.name} — Hour` : 'Hour'}</title></svelte:head>
+<svelte:head><title>{currentWorkspace ? `${spaceName(currentWorkspace.name)} — Hour` : 'Hour'}</title></svelte:head>
 
 <!-- Plain <div> (not <section>) so it dodges base.css's section defaults (big
      padding-block + a space-l flex gap between children); the vertical rhythm
@@ -277,7 +278,7 @@
           </div>
         {/if}
         <div class="space-head__namerow">
-          <h1 class="space-head__name">{currentWorkspace.name}</h1>
+          <h1 class="space-head__name">{spaceName(currentWorkspace.name)}</h1>
           <button
             type="button"
             class="space-head__edit"
@@ -320,7 +321,7 @@
     <div class="home__projects-head">
       <span class="eyebrow">{t('hall.projects', locale)}</span>
       {#if currentWorkspace}
-        <span class="home__projects-hint">{t('hall.projects_hint', locale, { name: currentWorkspace.name })}</span>
+        <span class="home__projects-hint">{t('hall.projects_hint', locale, { name: spaceName(currentWorkspace.name) })}</span>
       {/if}
     </div>
     <div class="home__projects">

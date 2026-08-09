@@ -40,6 +40,7 @@
   import type { VenueContact } from '$lib/venue';
   import { workspacesQueryOptions } from '$lib/nav-queries';
   import { accentVar } from '$lib/utils/accent';
+  import { spaceName } from '$lib/utils/identity';
   import { useBreadcrumb, type Crumb } from '$lib/stores/breadcrumb.svelte';
 
   type PersonEmbed = {
@@ -156,7 +157,7 @@
   const breadcrumb = useBreadcrumb();
   const wsQuery = createQuery(workspacesQueryOptions());
   let activeWorkspaceName = $derived(
-    $wsQuery.data?.items.find((w) => w.slug === workspaceSlug)?.name ?? workspaceSlug,
+    spaceName($wsQuery.data?.items.find((w) => w.slug === workspaceSlug)?.name ?? workspaceSlug),
   );
 
   // ── Write path (ADR-043): status menu + details dialog ─────────────────

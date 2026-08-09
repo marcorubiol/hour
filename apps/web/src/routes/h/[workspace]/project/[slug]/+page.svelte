@@ -20,6 +20,7 @@
     allLinesQueryOptions,
   } from '$lib/nav-queries';
   import { accentVar, accentVarFor } from '$lib/utils/accent';
+  import { spaceName } from '$lib/utils/identity';
   import { useBreadcrumb } from '$lib/stores/breadcrumb.svelte';
   import CastPanel from '$lib/components/CastPanel.svelte';
   import ProjectIdentityPopover from '$lib/components/ProjectIdentityPopover.svelte';
@@ -43,7 +44,7 @@
     $workspacesQuery.data?.items.find((w) => w.slug === workspaceSlug)?.id ?? null,
   );
   let activeWorkspaceName = $derived(
-    $workspacesQuery.data?.items.find((w) => w.slug === workspaceSlug)?.name ?? workspaceSlug,
+    spaceName($workspacesQuery.data?.items.find((w) => w.slug === workspaceSlug)?.name ?? workspaceSlug),
   );
   let project = $derived(
     workspaceId

@@ -58,6 +58,7 @@
     type LaneTally,
     type PlacedEvent,
   } from '$lib/board-lanes';
+  import { spaceName } from '$lib/utils/identity';
   import type { Slip as SlipVM, SlipKind } from '$lib/month-events';
 
   interface Props {
@@ -219,17 +220,21 @@
     const rail = new Map<string, { from: number; to: number }>();
     let r = 1;
     for (const g of groups) {
-      if (shut.has(g.key)) {
+      // A SPACE runs down the rail; a PROJECT keeps its band, because a
+      // project is a subject and a space is an address. Shut, everything
+      // lies flat — there is no height left to run along.
+      const railed = g.kind === 'workspace' && !shut.has(g.key);
+      if (!railed) {
         r++;
         group.set(g.key, r);
-        continue;
       }
+      if (shut.has(g.key)) continue;
       const from = r + 1;
       for (const l of g.lanes) {
         r++;
         lane.set(l.key, r);
       }
-      rail.set(g.key, { from, to: r + 1 });
+      if (railed) rail.set(g.key, { from, to: r + 1 });
     }
     return { lane, group, rail };
   });
@@ -487,20 +492,37 @@
              Folded there is no height to run along, so the same button lays
              its words flat and says what it keeps: a lid that goes quiet
              about its shape, never about its contents. -->
-        {#if isShut}
+        {#if group.kind !== 'workspace' || isShut}
+          <!-- THE BAND · a project is a SUBJECT: its monogram, its own case,
+               its tint. Only a space gives up all three for the rail. -->
           <button
             type="button"
-            class="board__grpl shut"
+            class="board__grpl"
+            class:shut={isShut}
             style:grid-row={rows.group.get(group.key)}
             style:grid-column="1 / 3"
-            aria-expanded="false"
+            aria-expanded={!isShut}
             onclick={() => toggle(group.key)}
           >
             <span class="board__grp-l">
-              <span class="board__grp-n">{group.name}</span>
-              <span class="board__grp-x" aria-hidden="true">+</span>
+              {#if group.kind === 'project' && group.accent}
+                <IdentityMark
+                  mini
+                  accent={group.accent}
+                  initials={group.initials}
+                  name={group.name}
+                />
+              {/if}
+              <span
+                class="board__grp-n"
+                class:board__grp-n--proj={group.kind === 'project'}
+                >{group.kind === 'workspace' ? spaceName(group.name) : group.name}</span
+              >
+              <span class="board__grp-x" aria-hidden="true">{isShut ? '+' : '–'}</span>
             </span>
-            <span class="board__grp-c">{groupTallyText(groupTally(group, tallies))}</span>
+            {#if isShut}
+              <span class="board__grp-c">{groupTallyText(groupTally(group, tallies))}</span>
+            {/if}
           </button>
           <!-- ONE empty cell per column — never a `1 / -1` spanner (the
                phantom-row law), so the week and month rules cross unbroken. -->
@@ -510,7 +532,7 @@
               style:grid-row={rows.group.get(group.key)}
               style:grid-column={colIdx + 3}
               class:gap={col.kind === 'gap'}
-              class:shut={true}
+              class:shut={isShut}
               class:wstart={col.wstart}
               class:mstart={col.mstart}
             ></span>
@@ -526,7 +548,7 @@
               aria-expanded="true"
               onclick={() => toggle(group.key)}
             >
-              <span class="board__rail-n">{group.name}</span>
+              <span class="board__rail-n">{spaceName(group.name)}</span>
             </button>
           {/if}
         {/if}
@@ -847,6 +869,17 @@
     .board__grpc.mstart {
       padding-inline-start: 0;
     }
+    /* …EXCEPT ACROSS A HEADING (Marco, 2026-08-09). The band is not part of
+       the timeline — it is the sentence that names the rows under it — so
+       the calendar's own edges pause there and it reads as ONE merged row,
+       with no column seams inside it. The law that says «every row draws a
+       fact that crosses the drawing» is about ROWS OF DAYS; a heading has
+       no days. The cells stay (that is structure: one per column, so
+       nothing shifts) — only their ink goes. */
+    .board__grpc.wstart,
+    .board__grpc.mstart {
+      border-inline-start: 0;
+    }
 
     /* ── the group band · a lid over a row of real cells ─────────────── */
     .board__grpl {
@@ -857,8 +890,12 @@
       background: var(--bg);
       border: 0;
       border-inline-end: 1px solid var(--border-color-light);
-      /* Open: air IS the group boundary — no second rule. */
-      padding: 22px 15px 5px;
+      /* OPEN, THE BAND IS A LINE — it names the lanes and gets out of the
+         way. It used to keep a lane's worth of padding, so every group cost
+         a band of empty sheet nobody asked for; the air above it is the
+         group boundary, and that is all it needs. */
+      padding: 13px 15px 4px;
+      align-self: end;
       text-align: start;
       cursor: pointer;
       font-family: inherit;
@@ -869,12 +906,23 @@
       align-items: center;
       gap: 7px;
     }
+    /* Mono and spaced, but NOT uppercased: this lid is a space on the scope
+       axis, and the space is written lowercase by `spaceName` — a stylesheet
+       must not fight the norm. */
     .board__grp-n {
       font-family: var(--font-mono);
       font-size: 9px;
       letter-spacing: 0.1em;
-      text-transform: uppercase;
       color: var(--text-faint);
+    }
+    /* A project group is a SUBJECT: its own case, its serif, its monogram
+       beside it — the mono-caps register belongs to the space's rail. */
+    .board__grp-n--proj {
+      font-family: var(--font-display);
+      font-size: 14px;
+      letter-spacing: 0;
+      text-transform: none;
+      color: var(--text-color);
     }
     .board__grp-x {
       font-family: var(--font-mono);
@@ -898,9 +946,12 @@
       color: var(--text-faint);
       line-height: 1.4;
     }
-    /* Empty, but it STRETCHES to the band row and draws the verticals. */
+    /* Empty and WEIGHTLESS: the heading's height is its words, never a
+       stretched cell (the fillers exist for placement, not for air). */
     .board__grpc {
       padding: 0;
+      block-size: 0;
+      min-block-size: 0;
     }
     .board__grpc.shut {
       border-block-end: 1px solid var(--border-color-light);
@@ -933,7 +984,6 @@
       font-family: var(--font-mono);
       font-size: 8.5px;
       letter-spacing: 0.14em;
-      text-transform: lowercase;
       color: var(--text-faint);
       white-space: nowrap;
       overflow: hidden;

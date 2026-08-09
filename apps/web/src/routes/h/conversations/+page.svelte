@@ -26,6 +26,7 @@
   import { addToast } from '$lib/components/Toast.svelte';
   import { CONVERSATION_STATUSES, statusLabel, type ConversationItem } from '$lib/conversation';
   import { usePins } from '$lib/stores/pins.svelte';
+  import { spaceName } from '$lib/utils/identity';
   import {
     buildLineIndex,
     buildProjectIndex,
@@ -139,7 +140,8 @@
     for (const p of allProjects) {
       let g = byWs.get(p.workspace_id);
       if (!g) {
-        g = { wsId: p.workspace_id, wsName: wsName.get(p.workspace_id) ?? 'Space', projects: [] };
+        // Chokepoint: the only place this group's space label is built.
+        g = { wsId: p.workspace_id, wsName: spaceName(wsName.get(p.workspace_id) ?? 'Space'), projects: [] };
         byWs.set(p.workspace_id, g);
       }
       g.projects.push({ id: p.id, name: p.name ?? p.slug });
@@ -430,7 +432,7 @@
       font-family: var(--font-mono);
       font-size: var(--text-xs);
       letter-spacing: 0.06em;
-      text-transform: uppercase;
+      /* No uppercase: this label is only ever a space name. */
       color: var(--text-faint);
       margin-block-end: var(--space-2xs);
     }
