@@ -900,8 +900,12 @@
       inset-inline-start: 0;
       z-index: 8;
       background: var(--bg);
+      /* NOT EVEN THE FROZEN COLUMN'S OWN SEAM (Marco, 2026-08-09). It was
+         the last line left crossing a heading, and it read as a cut through
+         a row that is one thing. The rule between labels and days belongs
+         to the ROWS OF DAYS; a heading has none, so it pauses there too —
+         the same argument that took the week and month edges out. */
       border: 0;
-      border-inline-end: 1px solid var(--border-color-light);
       /* OPEN, THE BAND IS A LINE — it names the lanes and gets out of the
          way. It used to keep a lane's worth of padding, so every group cost
          a band of empty sheet nobody asked for; the air above it is the
