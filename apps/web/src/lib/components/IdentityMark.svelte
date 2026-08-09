@@ -250,10 +250,17 @@
     }
 
     /* ── run: down · the same pack, turned ─────────────────────────────
-       The name turns bottom-up (the spine reading) and the glyph does not,
-       so the stack is REVERSED: last in the box is first off the bottom.
-       That is the whole trick — DOM order stays mark-then-name, and the
-       reversal is what keeps it true once the axis flips. */
+       THE WHOLE PACK TURNS, tile included (Marco, 2026-08-09): a monogram
+       left upright in a vertical run stops being part of the object and
+       starts being a badge stuck to it. Everything reads bottom-up — the
+       spine reading — so the stack is REVERSED too: last in the box is
+       first off the bottom. That is what keeps DOM order (mark, then name)
+       true once the axis flips.
+
+       The tile needs no new geometry: its box is written in logical
+       properties, so `block-size` becomes its width and the inline padding
+       becomes its height the moment the writing mode turns. A vertical pill
+       of the same 12px, by construction. */
     .mark--down {
       flex-direction: column-reverse;
       align-items: center;
@@ -261,9 +268,13 @@
          glyph never does. */
       min-block-size: 0;
     }
+    .mark--down .mark__chip,
+    .mark--down .mark__space,
     .mark--down .mark__name {
       writing-mode: vertical-rl;
       transform: rotate(180deg);
+    }
+    .mark--down .mark__name {
       /* A rail borrows the voice of whatever it hangs off. */
       color: inherit;
       max-block-size: 100%;
