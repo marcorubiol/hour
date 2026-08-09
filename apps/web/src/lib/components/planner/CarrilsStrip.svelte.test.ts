@@ -323,6 +323,23 @@ describe('CarrilsStrip — the person axis', () => {
     });
   }
 
+  it('a PROJECT rail is the pack itself — one mark, glyph leading, never hand-stacked', () => {
+    const { container } = render(CarrilsStrip, personProps());
+    const rail = container.querySelector('.board__rail') as HTMLElement;
+    expect(rail.classList.contains('board__rail--proj')).toBe(true);
+    // The pack is IdentityMark's to assemble: ONE mark, and it is the whole
+    // content of the rail — no sibling name span built beside it.
+    expect(rail.querySelectorAll('.mark')).toHaveLength(1);
+    expect(rail.querySelector('.board__rail-n')).toBeNull();
+    const chip = rail.querySelector('.mark__chip')!;
+    const name = rail.querySelector('.mark__name')!;
+    expect(chip.textContent).toBe('MM');
+    expect(name.textContent).toBe('MaMeMi');
+    // MONOGRAM FIRST, whichever way the pack runs: the order is DOM order,
+    // and turning it is CSS's job (column-reverse against a bottom-up read).
+    expect(chip.compareDocumentPosition(name) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it('an inferred placement is dotted and italic FROM THE SLOT — Slip untouched, no fade', () => {
     const { container } = render(CarrilsStrip, personProps());
     const slot = container.querySelector('.board__slot--inf')!;

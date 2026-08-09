@@ -511,20 +511,20 @@
             aria-expanded={!isShut}
             onclick={() => toggle(group.key)}
           >
-            <span class="board__grp-l">
+            <span class="board__grp-l" class:board__grp-l--proj={group.kind === 'project'}>
               {#if group.kind === 'project' && group.accent}
+                <!-- The SAME pack the rail carries, only lying down: one
+                     object, glyph leading, assembled by the mark itself. -->
                 <IdentityMark
                   mini
+                  variant="full"
                   accent={group.accent}
                   initials={group.initials}
                   name={group.name}
                 />
+              {:else}
+                <span class="board__grp-n">{spaceName(group.name)}</span>
               {/if}
-              <span
-                class="board__grp-n"
-                class:board__grp-n--proj={group.kind === 'project'}
-                >{group.kind === 'workspace' ? spaceName(group.name) : group.name}</span
-              >
               <span class="board__grp-x" aria-hidden="true">{isShut ? '+' : '–'}</span>
             </span>
             {#if isShut}
@@ -548,10 +548,12 @@
         {#if !isShut}
           {@const span = rows.rail.get(group.key)}
           {#if span}
-            <!-- THE VERTICAL SAYS WHOSE THE ROWS ARE. A space fills it with
-                 its own name, set low, and it is the fold's handle; a
-                 project already said its name in the band, so its strip
-                 goes down bare — the rule alone, hanging from the heading. -->
+            <!-- THE VERTICAL SAYS WHOSE THE ROWS ARE, and it is the fold's
+                 handle too. Two registers, one shape: a SPACE gives up its
+                 mark and its case — it is an address, so it goes down as a
+                 bare lowercase name; a PROJECT is a subject, so it goes down
+                 as its pack, and the pack is IdentityMark's to assemble, not
+                 this rail's. -->
             <button
               type="button"
               class="board__rail"
@@ -562,20 +564,17 @@
               onclick={() => toggle(group.key)}
             >
               {#if group.kind === 'project' && group.accent}
-                <!-- A GLYPH STAYS UPRIGHT: it is a symbol, not a word (the
-                     prototype's own law). Only the name turns. -->
-                <span class="board__rail-m">
-                  <IdentityMark
-                    mini
-                    accent={group.accent}
-                    initials={group.initials}
-                    name={group.name}
-                  />
-                </span>
+                <IdentityMark
+                  mini
+                  run="down"
+                  variant="full"
+                  accent={group.accent}
+                  initials={group.initials}
+                  name={group.name}
+                />
+              {:else}
+                <span class="board__rail-n">{spaceName(group.name)}</span>
               {/if}
-              <span class="board__rail-n"
-                >{group.kind === 'workspace' ? spaceName(group.name) : group.name}</span
-              >
             </button>
           {/if}
         {/if}
@@ -934,7 +933,9 @@
     }
     .board__grp-l {
       display: grid;
-      grid-template-columns: auto minmax(0, 1fr) auto;
+      /* TWO tracks, not three: the pack is ONE object, and the fold's `+`
+         is what gets pinned to the far end. */
+      grid-template-columns: minmax(0, 1fr) auto;
       align-items: center;
       gap: 7px;
     }
@@ -948,8 +949,10 @@
       color: var(--text-faint);
     }
     /* A project group is a SUBJECT: its own case, its serif, its monogram
-       beside it — the mono-caps register belongs to the space's rail. */
-    .board__grp-n--proj {
+       beside it — the mono-caps register belongs to the space's rail. The
+       voice is set on the lid and the pack inherits it, exactly as on the
+       rail: the surface says how loud, the mark says what the shape is. */
+    .board__grp-l--proj {
       font-family: var(--font-display);
       font-size: 14px;
       letter-spacing: 0;
@@ -1016,19 +1019,17 @@
     }
     /* TWO REGISTERS, ONE SHAPE. A space gives up its mark and its case —
        it is an address. A project keeps both, because it is a subject; it
-       just happens to be doing a container's job on this axis. */
+       just happens to be doing a container's job on this axis. The project's
+       voice is set HERE and the pack inherits it: the rail says how loud, the
+       mark says what the shape is. */
     .board__rail--proj {
-      padding-block-start: 10px;
-    }
-    .board__rail-m {
-      flex: none;
-      margin-block-end: 7px;
-    }
-    .board__rail--proj .board__rail-n {
       font-family: var(--font-display);
       font-size: 12.5px;
       letter-spacing: 0;
       color: var(--text-muted);
+    }
+    .board__rail--proj:hover {
+      color: var(--text-color);
     }
     .board__rail-n {
       writing-mode: vertical-rl;

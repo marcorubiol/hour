@@ -34,6 +34,13 @@
    *
    * The space cell is OPEN ON THE RIGHT — square corner, no edge — so it
    * also works alone: a space with no project yet is a cell waiting for one.
+   *
+   * ── MONOGRAM + NAME IS ALWAYS A PACK (Marco, 2026-08-09) ────────────────
+   * The mark and the name are one object, and the mark comes FIRST — in the
+   * reading direction, whichever direction that is. So no surface assembles
+   * that pair by hand: it asks for `variant="full"`, and if it needs the pair
+   * turned it asks for `run="down"`. The board's rail learned this the hard
+   * way — hand-stacked, its glyph ended up last in a bottom-up read.
    */
   import { markText, spaceName } from '$lib/utils/identity';
 
@@ -67,6 +74,14 @@
      * space stands alone, still open on its right — the selector's form.
      */
     space?: { name?: string | null; initials?: string | null } | null;
+    /**
+     * WHICH WAY THE PACK RUNS. `across` is the sentence; `down` is the spine —
+     * a rail up the side of the rows it names. The pack does not change, only
+     * its axis: the glyph still comes first, and it stays UPRIGHT while the
+     * name turns, because a monogram is a symbol and symbols are not read
+     * letter by letter.
+     */
+    run?: 'across' | 'down';
   }
 
   let {
@@ -77,6 +92,7 @@
     size,
     mini = false,
     space = null,
+    run = 'across',
   }: Props = $props();
 
   let text = $derived(variant === 'bare' ? '' : markText({ initials, name }));
@@ -92,6 +108,7 @@
   class="mark mark--{variant}"
   class:mark--mini={mini}
   class:mark--addr={Boolean(space)}
+  class:mark--down={run === 'down'}
   style={`--c: ${accent}${size ? `; --mark: ${size}` : ''}`}
 >
   {#if space}
@@ -230,6 +247,26 @@
       text-overflow: ellipsis;
       white-space: nowrap;
       color: var(--text-color);
+    }
+
+    /* ── run: down · the same pack, turned ─────────────────────────────
+       The name turns bottom-up (the spine reading) and the glyph does not,
+       so the stack is REVERSED: last in the box is first off the bottom.
+       That is the whole trick — DOM order stays mark-then-name, and the
+       reversal is what keeps it true once the axis flips. */
+    .mark--down {
+      flex-direction: column-reverse;
+      align-items: center;
+      /* The name may be longer than the rows it addresses; it gives, the
+         glyph never does. */
+      min-block-size: 0;
+    }
+    .mark--down .mark__name {
+      writing-mode: vertical-rl;
+      transform: rotate(180deg);
+      /* A rail borrows the voice of whatever it hangs off. */
+      color: inherit;
+      max-block-size: 100%;
     }
   }
 
