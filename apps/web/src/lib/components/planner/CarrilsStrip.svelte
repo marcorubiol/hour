@@ -929,12 +929,15 @@
       font-size: 11px;
       color: var(--text-faint);
     }
-    /* Shut: a closed section is a row of a list — the rule comes back,
-       drawn by the label AND every filler cell, and the lid still says
-       what it holds (law 11). */
+    /* THE HEADING'S RULE IS THE ROW'S, AND IT CROSSES EVERYTHING (Marco,
+       2026-08-09). With the column seams gone the band needed the other
+       axis or it floated: the horizontal is what makes it read as ONE
+       merged row instead of a label with a gap after it. Drawn by the
+       label AND every filler cell, so it runs the full width of the sheet.
+       Shut it also takes its own air, because a closed section is a row of
+       a list and still says what it holds (law 11). */
     .board__grpl.shut {
       padding: 11px 15px;
-      border-block-end: 1px solid var(--border-color-light);
     }
     .board__grp-c {
       display: block;
@@ -953,7 +956,8 @@
       block-size: 0;
       min-block-size: 0;
     }
-    .board__grpc.shut {
+    .board__grpl,
+    .board__grpc {
       border-block-end: 1px solid var(--border-color-light);
     }
 
