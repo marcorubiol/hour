@@ -198,19 +198,34 @@
       positioned INTO their grid area, so this map must mirror the template
       below exactly: row 1 is the head, every group adds its band row, every
       open group adds one row per lane. */
-  let laneRow = $derived.by(() => {
-    const m = new Map<string, number>();
+  /* EVERY CHILD STATES ITS ROW AND ITS COLUMN, and that is not tidiness —
+     it is the fix for two measured defects. The away bands are grid items with an explicit
+     `grid-row`, and an explicitly placed item is laid down BEFORE the
+     auto-placed ones: the cursor then skips its cells and pushes whole
+     rows along, so a band drawn for the first lane surfaced under the
+     second (measured 2026-08-09: Mia's absence, cast in Duo Cendra, drew
+     in Fira Nova's row). And a band that SPANS columns occupies those
+     cells, so with auto-placed columns it shoved a lane's own slips one
+     column right (Mia's gigs landed on the 18th and the 30th instead of
+     the 11th and the 18th). Explicit everywhere: grid items may then
+     overlap — which is exactly what a band over its days is — and nothing
+     pushes anything. */
+  let rows = $derived.by(() => {
+    const lane = new Map<string, number>();
+    const group = new Map<string, number>();
     let r = 1;
     for (const g of groups) {
       r++;
+      group.set(g.key, r);
       if (shut.has(g.key)) continue;
       for (const l of g.lanes) {
         r++;
-        m.set(l.key, r);
+        lane.set(l.key, r);
       }
     }
-    return m;
+    return { lane, group };
   });
+  let laneRow = $derived(rows.lane);
 
   function placedAt(lane: BoardLaneRef, col: BoardColumn): readonly PlacedEvent[] {
     return cells.get(lane.key)?.get(col.from) ?? [];
@@ -410,10 +425,12 @@
            EQUAL width, NO fill (Marco's ruling 2): its three marks are ink,
            never room. Week and month boundaries are border-lefts drawn by
            every row's cells, so the vertical never blinks. -->
-      <span class="board__corner">{axisWord}</span>
-      {#each columns as col (col.from)}
+      <span class="board__corner" style="grid-row: 1; grid-column: 1">{axisWord}</span>
+      {#each columns as col, colIdx (col.from)}
         <span
           class="board__head"
+          style:grid-row="1"
+          style:grid-column={colIdx + 2}
           class:gap={col.kind === 'gap'}
           class:today={col.today}
           class:wstart={col.wstart}
@@ -458,6 +475,8 @@
         <button
           type="button"
           class="board__grpl"
+          style:grid-row={rows.group.get(group.key)}
+          style:grid-column="1"
           class:shut={isShut}
           aria-expanded={!isShut}
           onclick={() => toggle(group.key)}
@@ -484,9 +503,11 @@
         <!-- ONE empty cell per column — never a `1 / -1` spanner (the
              phantom-row law). Empty, but it stretches to the band row's
              height, so the week/month rules cross the band unbroken. -->
-        {#each columns as col (`${group.key}:${col.from}`)}
+        {#each columns as col, colIdx (`${group.key}:${col.from}`)}
           <span
             class="board__grpc"
+            style:grid-row={rows.group.get(group.key)}
+            style:grid-column={colIdx + 2}
             class:gap={col.kind === 'gap'}
             class:shut={isShut}
             class:wstart={col.wstart}
@@ -500,6 +521,8 @@
             <!-- ══ the lane · frozen label + a cell per column ══════════ -->
             <span
               class="board__lab"
+              style:grid-row={rows.lane.get(lane.key)}
+              style:grid-column="1"
               class:board__lab--ghost={lane.kind === 'ghost'}
               class:board__lab--nocast={lane.kind === 'nocast'}
             >
@@ -531,6 +554,8 @@
               {@const placed = col.kind === 'day' ? placedAt(lane, col) : []}
               <span
                 class="board__cell"
+                style:grid-row={rows.lane.get(lane.key)}
+                style:grid-column={colIdx + 2}
                 class:gap={col.kind === 'gap'}
                 class:today={col.today}
                 class:wstart={col.wstart}
@@ -991,18 +1016,25 @@
     }
 
     /* ── the absence band · one sentence over its exact days ─────────── */
+    /* THE BAND IS A GRID ITEM, NOT AN ABSOLUTE ONE — measured 2026-08-09:
+       `position:absolute` made its containing block the BOARD (the nearest
+       positioned ancestor), so `inset-block-end: 4px` pinned it to the foot
+       of the whole drawing: an absence drawn for the first lane surfaced
+       at the bottom of the last one, 130px from the row it is about. Placed
+       by the grid instead — its row, its column span, sitting on its own
+       row's floor — the geometry cannot lie, and the 15px `.board__awsp`
+       floor is what keeps it off the chips' names. */
     .board__aw {
-      position: absolute;
       z-index: 4;
-      inset-inline: 0;
-      /* Static seam: the measured pass lays this 21px above the row floor. */
-      inset-block-end: 4px;
+      align-self: end;
+      margin-block-end: 4px;
       display: flex;
       align-items: center;
       gap: 8px;
       block-size: 12px;
       pointer-events: none;
       padding-inline-start: 9px;
+      min-inline-size: 0;
     }
     .board__aw-k {
       font-style: normal;
