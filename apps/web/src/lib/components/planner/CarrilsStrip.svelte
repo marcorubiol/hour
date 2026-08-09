@@ -680,9 +680,11 @@
             style="grid-row: {laneRow.get(s.laneKey)}; grid-column: {s.startCol + 3} / {s.endCol +
               4}"
           >
-            <i class="board__aw-k">{awayWord}</i><b class="board__aw-n">{s.run.who}</b><em
-              class="board__aw-u">{untilLabel(s.run.to)}</em
-            ><i class="board__aw-r" aria-hidden="true"></i>
+            <i class="board__aw-k">{awayWord}</i><b class="board__aw-n">{s.run.who}</b
+            >{#if !s.cont}<em class="board__aw-u">{untilLabel(s.run.to)}</em>{/if}<i
+              class="board__aw-r"
+              aria-hidden="true"
+            ></i>
           </span>
         {/if}
       {/each}
@@ -1171,6 +1173,13 @@
     .board__aw {
       z-index: 4;
       align-self: end;
+      /* A BAND STAYS INSIDE ITS OWN DAYS. Its box is as wide as the span it
+         is about, and its sentence can be longer — so without this the text
+         spilled right and the trailing rule drew straight through the
+         neighbouring band's first word: «la palabra away sale tachada».
+         What overflows is clipped, and the reading order already says what
+         to lose first (the terminus is the last thing in the line). */
+      overflow: hidden;
       margin-block-end: 4px;
       display: flex;
       align-items: center;

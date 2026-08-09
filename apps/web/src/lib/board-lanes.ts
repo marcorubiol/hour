@@ -718,7 +718,15 @@ export function awaySegments(
         flush(); // the fold cuts the band; the gap cell says 'away' itself
         continue;
       }
-      if (start !== -1 && (i !== prev + 1 || c.wstart || c.mstart)) flush();
+      // A WEEK EDGE IS NOT A CUT ON A BOARD (Marco, 2026-08-09). The month
+      // grid had to break a band at every week because its weeks are
+      // separate ROWS — a band cannot span two of them. A board lane is one
+      // continuous row, so cutting there only produced the same sentence
+      // twice, side by side, with the first one's rule striking through the
+      // second one's word. One absence is one fact and gets one band; the
+      // only thing that may interrupt it is a FOLD, where the days it
+      // covers are not drawn at all.
+      if (start !== -1 && i !== prev + 1) flush();
       if (start === -1) start = i;
       prev = i;
     }

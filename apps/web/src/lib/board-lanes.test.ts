@@ -520,17 +520,19 @@ describe('normalizeAway (law 21)', () => {
 describe('awaySegments (law 21)', () => {
   const run = (from: string, to: string): AwayRun => ({ laneKey: 'L1', from, to, who: 'Mia', tentative: false });
 
-  it('a week cut splits the band; the resumed piece carries cont, the last the arrowhead', () => {
+  it('a week edge does NOT cut a band: one absence, one sentence, across the week', () => {
     const cols = buildColumns({
       baseIso: '2026-07-16',
       endIso: '2026-07-22',
       active: new Set(['2026-07-16', '2026-07-17', '2026-07-18', '2026-07-19', '2026-07-20', '2026-07-21', '2026-07-22']),
       todayIso: '2026-07-16',
     });
+    // 17→21 July crosses the Monday of week 30 and stays ONE band: a board
+    // lane is a continuous row, unlike the month's week-per-row grid, so a
+    // cut there only printed the same sentence twice side by side.
     const segs = awaySegments([run('2026-07-17', '2026-07-21')], cols);
-    expect(segs).toHaveLength(2);
-    expect(segs[0]).toMatchObject({ startCol: 1, endCol: 3, cont: false, end: false });
-    expect(segs[1]).toMatchObject({ startCol: 4, endCol: 5, cont: true, end: true });
+    expect(segs).toHaveLength(1);
+    expect(segs[0]).toMatchObject({ startCol: 1, endCol: 5, cont: false, end: true });
   });
 
   it('the fold cuts the band and it resumes after — the gap cell speaks for itself', () => {
