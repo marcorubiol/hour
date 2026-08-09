@@ -548,20 +548,18 @@
                  its own name, set low, and it is the fold's handle; a
                  project already said its name in the band, so its strip
                  goes down bare — the rule alone, hanging from the heading. -->
-            <button
-              type="button"
-              class="board__rail"
-              class:board__rail--bare={group.kind !== 'workspace'}
-              style:grid-row="{span.from} / {span.to}"
-              style:grid-column="1"
-              aria-expanded="true"
-              aria-label={group.name}
-              onclick={() => toggle(group.key)}
-            >
-              {#if group.kind === 'workspace'}
+            {#if group.kind === 'workspace'}
+              <button
+                type="button"
+                class="board__rail"
+                style:grid-row="{span.from} / {span.to}"
+                style:grid-column="1"
+                aria-expanded="true"
+                onclick={() => toggle(group.key)}
+              >
                 <span class="board__rail-n">{spaceName(group.name)}</span>
-              {/if}
-            </button>
+              </button>
+            {/if}
           {/if}
         {/if}
 
@@ -571,6 +569,7 @@
             <!-- ══ the lane · frozen label + a cell per column ══════════ -->
             <span
               class="board__lab"
+              class:board__lab--under={group.kind !== 'workspace'}
               style:grid-row={rows.lane.get(lane.key)}
               style:grid-column="2"
               class:board__lab--ghost={lane.kind === 'ghost'}
@@ -997,12 +996,6 @@
       background: var(--bg);
       cursor: pointer;
     }
-    /* Bare: no name, no ground of its own — only the vertical, so it reads
-       as a bracket and never as a second column of furniture. */
-    .board__rail--bare {
-      background: none;
-      border-block-end: 0;
-    }
     .board__rail-n {
       writing-mode: vertical-rl;
       /* Bottom-up: the reading a spine takes, and the one that puts the
@@ -1019,6 +1012,22 @@
     }
     .board__rail:hover .board__rail-n {
       color: var(--text-muted);
+    }
+
+    /* ── THE VERTICAL HANGS FROM THE WORD (Marco, 2026-08-09) ─────────
+       It was drawn at the label column's left EDGE — x 26, while the
+       heading's name starts at 41 — so it read as a column boundary, not
+       as a bracket: «no acabo de entender esa línea». A line that groups
+       rows has to descend from the thing it groups them under, so it
+       starts at the group name's own x and runs down its lanes. On the
+       space axis the rail already does this job with its name inside it. */
+    .board__lab--under::before {
+      content: '';
+      position: absolute;
+      inset-block: 0;
+      inset-inline-start: 15px;
+      inline-size: 1px;
+      background: var(--border-color-light);
     }
 
     .board__lab {
