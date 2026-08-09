@@ -961,11 +961,13 @@
       color: var(--text-faint);
       line-height: 1.4;
     }
-    /* Empty and WEIGHTLESS: the heading's height is its words, never a
-       stretched cell (the fillers exist for placement, not for air). */
+    /* Empty and weightless — the heading's height is its WORDS, never a
+       cell's padding — but NOT zero-height: a collapsed cell draws its
+       bottom rule at the top of the row, which is why the heading's line
+       stopped dead at the label column. It stretches to whatever the label
+       sets and adds nothing of its own. */
     .board__grpc {
       padding: 0;
-      block-size: 0;
       min-block-size: 0;
     }
     .board__grpl,
