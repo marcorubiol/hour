@@ -234,7 +234,10 @@
         r++;
         lane.set(l.key, r);
       }
-      if (railed) rail.set(g.key, { from, to: r + 1 });
+      // EVERY open group gets the rail span, not only a railed one: the
+      // vertical is what says «these rows hang from that heading», and a
+      // project needs it as much as a space. It just goes down bare.
+      rail.set(g.key, { from, to: r + 1 });
     }
     return { lane, group, rail };
   });
@@ -537,18 +540,27 @@
               class:mstart={col.mstart}
             ></span>
           {/each}
-        {:else}
+        {/if}
+        {#if !isShut}
           {@const span = rows.rail.get(group.key)}
           {#if span}
+            <!-- THE VERTICAL SAYS WHOSE THE ROWS ARE. A space fills it with
+                 its own name, set low, and it is the fold's handle; a
+                 project already said its name in the band, so its strip
+                 goes down bare — the rule alone, hanging from the heading. -->
             <button
               type="button"
               class="board__rail"
+              class:board__rail--bare={group.kind !== 'workspace'}
               style:grid-row="{span.from} / {span.to}"
               style:grid-column="1"
               aria-expanded="true"
+              aria-label={group.name}
               onclick={() => toggle(group.key)}
             >
-              <span class="board__rail-n">{spaceName(group.name)}</span>
+              {#if group.kind === 'workspace'}
+                <span class="board__rail-n">{spaceName(group.name)}</span>
+              {/if}
             </button>
           {/if}
         {/if}
@@ -979,6 +991,12 @@
       border-block-end: 1px solid var(--border-color-light);
       background: var(--bg);
       cursor: pointer;
+    }
+    /* Bare: no name, no ground of its own — only the vertical, so it reads
+       as a bracket and never as a second column of furniture. */
+    .board__rail--bare {
+      background: none;
+      border-block-end: 0;
     }
     .board__rail-n {
       writing-mode: vertical-rl;
