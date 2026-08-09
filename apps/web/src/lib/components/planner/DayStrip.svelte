@@ -16,8 +16,8 @@
    * estimate, no dash. See `$lib/day-strip`, where that law is tested.
    */
   import { accentVarFor } from '$lib/utils/accent';
-  import IdentityMark from '$lib/components/IdentityMark.svelte';
-  import type { ProjectLite, SlipKind } from '$lib/month-events';
+  import Slip from '$lib/components/planner/Slip.svelte';
+  import type { ProjectLite, SlipKind, Slip as SlipVM } from '$lib/month-events';
   import { pct, overlaps, type StripThread } from '$lib/day-strip';
 
   interface Props {
@@ -33,6 +33,11 @@
         roadSheetHref?: string | null;
         /** The pair's rule: soft while both are options, hard once one is ink. */
         clash?: 'soft' | 'hard' | null;
+        clashPeople?: boolean;
+        /** THE CARD ITSELF (ADR-095): the label renders the app's Slip —
+            the same object the agenda's rows and the board's cells draw —
+            never the hand-built lookalike this file used to carry. */
+        slip: SlipVM;
       }
     >;
     /** The track's window, in fractional hours. */
@@ -40,6 +45,9 @@
     /** Now, in fractional hours — only drawn when this IS today. */
     now?: number | null;
     kindLabel: (kind: SlipKind) => string;
+    /** The slip's state line (hold rank, released) — the page's words. */
+    stateLabel?: (slip: SlipVM) => string | null;
+    stateUrgent?: (slip: SlipVM) => boolean;
     /** The step's word: `load-in`, `soundcheck`… */
     stepLabel: (step: string) => string;
     /** `20:30` for a fractional hour, in the reader's format. */
@@ -67,6 +75,8 @@
       cast?: string[] | null;
       roadSheetHref?: string | null;
       clash?: 'soft' | 'hard' | null;
+      clashPeople?: boolean;
+      slip: SlipVM;
     }>;
     /** «no hour» — never a dash, never the weight of an hour. */
     noHourWord?: string;
@@ -77,6 +87,8 @@
     win,
     now = null,
     kindLabel,
+    stateLabel = () => null,
+    stateUrgent = () => false,
     stepLabel,
     hourLabel,
     emptyLabel = 'Nothing on this day.',
@@ -147,32 +159,26 @@
           data-steps={t.steps.join(',')}
           data-clash={t.clash ?? undefined}
         >
-          <!-- THE LABEL FINISHES THE SENTENCE. The clash's rule lives on the
-               label as a pseudo-element, never a border: a border on the row
-               would push the TRACK off the grid it is measured against. The
-               indent is eaten here; the label's outer width does not change. -->
-          <span class="ds__l" class:grain={t.cert === 'hold' || t.cert === 'proposed'} style={t.project ? `--c: ${accentVarFor(t.project)}` : undefined}>
-            <span class="ds__pack">
-              {#if t.project}<IdentityMark
-                  variant="compact"
-                  accent={accentVarFor(t.project)}
-                  initials={t.project.initials}
-                  name={t.project.name}
-                  size="15px"
-                />{/if}
-              <span class="ds__kind">{kindLabel(t.kind)}{#if t.cert === 'hold' || t.cert === 'proposed'}?{/if}</span>
-              {#if t.roadSheetHref}
-                <a class="ds__rs" href={t.roadSheetHref}>{roadSheetWord} ↗</a>
-              {/if}
-            </span>
-            <span class="ds__n">{t.name}</span>
-            <span class="ds__c">
-              <b class="ds__hr"
-                >{#if t.spans.length}{hourLabel(t.spans[0].from)}–{hourLabel(
-                    t.spans[t.spans.length - 1].to,
-                  )}{:else}{hourLabel(t.marks[0].at)}{/if}</b
-              >{#if t.city}<span>{t.city}</span>{/if}
-            </span>
+          <!-- THE LABEL IS THE SLIP (ADR-095: one card, N placings — the
+               hand-built lookalike this label used to be is how the day's
+               hour came to read «22:30» while the agenda said «22h30»).
+               The strip only ADDS what is its own: the road-sheet door in
+               the corner and the cast line under the card. Grain, clash
+               rule, italics and the state word all come with the object. -->
+          <span class="ds__l" style={t.project ? `--c: ${accentVarFor(t.project)}` : undefined}>
+            <Slip
+              slip={t.slip}
+              placing="cell"
+              {kindLabel}
+              {stateLabel}
+              stateUrgent={stateUrgent(t.slip)}
+              showCountry={true}
+              clash={t.clash ?? 'none'}
+              clashPeople={t.clashPeople ?? false}
+            />
+            {#if t.roadSheetHref}
+              <a class="ds__rs ds__rs--corner" href={t.roadSheetHref}>{roadSheetWord} ↗</a>
+            {/if}
             {#if t.cast !== null && t.cast !== undefined}
               <!-- Who is inside the thread — data or the honest word, never
                    the inference. -->
@@ -220,22 +226,20 @@
       <div class="ds__unp">
         {#each unplaced as t (t.id)}
           <div class="ds__r ds__r--unp" data-family={t.cert} data-kind={t.kind} data-clash={t.clash ?? undefined}>
-            <span class="ds__l" class:grain={t.cert === 'hold' || t.cert === 'proposed'} style={t.project ? `--c: ${accentVarFor(t.project)}` : undefined}>
-              <span class="ds__pack">
-                {#if t.project}<IdentityMark
-                    variant="compact"
-                    accent={accentVarFor(t.project)}
-                    initials={t.project.initials}
-                    name={t.project.name}
-                    size="15px"
-                  />{/if}
-                <span class="ds__kind">{kindLabel(t.kind)}{#if t.cert === 'hold' || t.cert === 'proposed'}?{/if}</span>
-                {#if t.roadSheetHref}
-                  <a class="ds__rs" href={t.roadSheetHref}>{roadSheetWord} ↗</a>
-                {/if}
-              </span>
-              <span class="ds__n">{t.name}</span>
-              {#if t.city}<span class="ds__c"><span>{t.city}</span></span>{/if}
+            <span class="ds__l" style={t.project ? `--c: ${accentVarFor(t.project)}` : undefined}>
+              <Slip
+                slip={t.slip}
+                placing="cell"
+                {kindLabel}
+                {stateLabel}
+                stateUrgent={stateUrgent(t.slip)}
+                showCountry={true}
+                clash={t.clash ?? 'none'}
+                clashPeople={t.clashPeople ?? false}
+              />
+              {#if t.roadSheetHref}
+                <a class="ds__rs ds__rs--corner" href={t.roadSheetHref}>{roadSheetWord} ↗</a>
+              {/if}
               {#if t.cast !== null && t.cast !== undefined}
                 <span class="ds__cast" class:ds__cast--none={t.cast.length === 0}
                   >{t.cast.length > 0 ? t.cast.join(' · ') : noCastWord}</span
@@ -269,15 +273,23 @@
       border-block-end: 1px solid color-mix(in oklch, var(--border-color-light) 55%, transparent);
     }
     .ds__l {
+      position: relative;
       flex: 0 0 var(--ds-l);
       inline-size: var(--ds-l);
       min-inline-size: 0;
-      display: grid;
-      grid-template-columns: auto minmax(0, 1fr);
-      align-items: baseline;
-      column-gap: 8px;
-      row-gap: 1px;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
       padding: 8px 14px 8px 2px;
+    }
+    /* The label hosts THE SLIP — sizing only; the card owns its reading. */
+    .ds__l :global(.slip) {
+      inline-size: 100%;
+    }
+    .ds__rs--corner {
+      position: absolute;
+      inset-block-start: 12px;
+      inset-inline-end: 14px;
     }
     .ds__l--k {
       display: flex;
@@ -286,12 +298,6 @@
       letter-spacing: 0.14em;
       text-transform: uppercase;
       color: var(--text-faint);
-    }
-    .ds__pack {
-      grid-column: 1 / -1;
-      display: flex;
-      align-items: center;
-      gap: 6px;
     }
     /* The document this row acts through — a quiet door, far right of the
        kind word. */
@@ -321,58 +327,8 @@
       text-transform: uppercase;
       letter-spacing: 0.1em;
     }
-    /* ── THE PAIR'S RULE — on the label, never a border on the row ─────
-       2px dashed while both are options; 3px solid the moment one is ink.
-       Red is conflict, and only conflict. */
-    .ds__r[data-clash] .ds__l {
-      position: relative;
-      padding-inline-start: 10px;
-    }
-    .ds__r[data-clash] .ds__l::before {
-      content: '';
-      position: absolute;
-      inset-block: 8px;
-      inset-inline-start: 0;
-      border-inline-start: 2px dashed var(--danger);
-    }
-    .ds__r[data-clash='hard'] .ds__l::before {
-      border-inline-start: 3px solid var(--danger);
-    }
-    .ds__kind {
-      font-family: var(--font-mono);
-      font-size: 9px;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      color: var(--text-faint);
-    }
-    .ds__n {
-      grid-column: 1 / -1;
-      font-size: var(--text-s);
-      color: var(--text-color);
-      text-wrap: pretty;
-      overflow-wrap: break-word;
-    }
-    .ds__r[data-kind='show'] .ds__n {
-      font-family: var(--font-display);
-      font-size: var(--text-m);
-    }
-    /* The line the list used to carry: the exact range, then where. */
-    .ds__c {
-      grid-column: 1 / -1;
-      font-size: var(--text-xs);
-      color: var(--text-faint);
-      line-height: 1.42;
-    }
-    .ds__hr {
-      font-family: var(--font-mono);
-      font-weight: 400;
-      font-variant-numeric: tabular-nums;
-      color: var(--text-muted);
-      margin-inline-end: 8px;
-      /* An hour is never broken in two: the en-dash inside a range must not
-         become a line-break opportunity. */
-      white-space: nowrap;
-    }
+    /* The pair's rule now rides THE SLIP itself (same classes as the
+       agenda's rows) — the label draws no second version of it. */
     .ds__t {
       position: relative;
       flex: 1;
@@ -479,15 +435,6 @@
     .ds__r[data-family='proposed'] .ds__b {
       border-style: dashed;
       background: none;
-    }
-    .ds__r[data-family='released'] .ds__n {
-      color: var(--text-faint);
-      text-decoration: line-through;
-    }
-    .ds__r[data-family='hold'] .ds__n,
-    .ds__r[data-family='proposed'] .ds__n {
-      color: var(--text-muted);
-      font-style: italic;
     }
     /* The grain lives in styles/certainty.css (`.grain`) — the label opts
        in; the token is defined once for every drawing. */

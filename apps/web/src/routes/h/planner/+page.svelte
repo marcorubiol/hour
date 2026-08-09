@@ -1230,10 +1230,16 @@
   });
   /** The pair's rule for one event of the day — soft while both are
       options, hard the moment one of the two is ink. */
-  function dayClashOf(id: string, confirmed: boolean): 'soft' | 'hard' | null {
+  function dayClashOf(
+    id: string,
+    confirmed: boolean,
+  ): { clash: 'soft' | 'hard'; people: boolean } | null {
     const mine = (clashesByDay?.get(selectedDay) ?? []).filter((c) => c.event_ids?.includes(id));
     if (mine.length === 0) return null;
-    return confirmed ? 'hard' : 'soft';
+    return {
+      clash: confirmed ? 'hard' : 'soft',
+      people: mine.some((c) => c.severity === 'people' || c.severity === 'blackout'),
+    };
   }
   /* One walk, two ledgers: the threads the strip can PLACE, and the
      asked-for dates it cannot — a hold without an hour has no position,
@@ -1247,15 +1253,20 @@
       const sl = performanceSlip(p, slipCtxPage);
       const t = performanceThread(p, viewerTz, sl.name, sl.city, sl.cert);
       const ws = p.project ? workspaceSlugById.get(p.project.workspace_id) : undefined;
+      const cl = dayClashOf(p.id, performanceStatusFamily(p.status) === 'confirmed');
       const shared = {
         project: p.project,
+        // THE CARD TRAVELS WHOLE: the label renders this very slip, so the
+        // day and the agenda cannot drift again (ADR-095).
+        slip: sl,
         // Data or the honest word — the project-team inference is not drawn
         // here (design law: four people affirmed at a radio at 10h).
         cast: (p.person_ids ?? [])
           .map((id) => personNames.get(id))
           .filter((n): n is string => Boolean(n)),
         roadSheetHref: p.slug && ws ? `/h/${ws}/performance/${p.slug}/roadsheet` : null,
-        clash: dayClashOf(p.id, performanceStatusFamily(p.status) === 'confirmed'),
+        clash: cl?.clash ?? null,
+        clashPeople: cl?.people ?? false,
       };
       if (t) threads.push({ ...t, ...shared });
       else
@@ -1272,11 +1283,14 @@
       if (dateDayKey(d, viewerTz) !== selectedDay) continue;
       const sl = dateSlip(d, slipCtxPage);
       const t = dateThread(d, viewerTz, sl.name, sl.city, sl.cert);
+      const cl = dayClashOf(d.id, false);
       const shared = {
         project: d.project,
+        slip: sl,
         cast: null,
         roadSheetHref: null,
-        clash: dayClashOf(d.id, false),
+        clash: cl?.clash ?? null,
+        clashPeople: cl?.people ?? false,
       };
       if (t) threads.push({ ...t, ...shared });
       else
@@ -1350,9 +1364,16 @@
   });
   /** The reason no bar can say — the pair's sentence, pre-localized in the
       clash VM. One line per pair, above the drawing. */
-  let dayClashLines = $derived(
-    (clashesByDay?.get(selectedDay) ?? []).map((c, i) => ({ key: `c${i}`, body: c.body })),
-  );
+  let dayClashLines = $derived.by(() => {
+    const seen = new Set<string>();
+    const out: Array<{ key: string; body: string }> = [];
+    for (const c of clashesByDay?.get(selectedDay) ?? []) {
+      if (seen.has(c.body)) continue; // one reason, said once
+      seen.add(c.body);
+      out.push({ key: `c${out.length}`, body: c.body });
+    }
+    return out;
+  });
 
   // ── The Day's foot: notes + next (the design's margin, risen into the
   // flow), and the absence as a line above the drawing. ─────────────────
@@ -2624,11 +2645,15 @@
       win={dayWin}
       now={dayNow}
       kindLabel={(k) => kindLabel(k)}
+      stateLabel={boardSlipState}
+      stateUrgent={(sl) => Boolean(sl.hold?.expires && sl.hold.expires <= todayIso)}
       stepLabel={(k) => t(`desk.anchor_${k === 'load_in' ? 'loadin' : k}`, locale)}
       hourLabel={(h) => {
-        const hh = String(Math.floor(h)).padStart(2, '0');
-        const mm = String(Math.round((h % 1) * 60)).padStart(2, '0');
-        return `${hh}:${mm}`;
+        // The house register («22h30», «10h») — the day's hour must read
+        // exactly as the agenda's, or the two drawings drift by a colon.
+        const hh = Math.floor(((h % 24) + 24) % 24);
+        const mm = Math.round((h % 1) * 60);
+        return mm ? `${hh}h${String(mm).padStart(2, '0')}` : `${hh}h`;
       }}
       emptyLabel={t('planner.day_empty', locale)}
       axisLabel={t('planner.day_axis', locale)}
