@@ -761,8 +761,7 @@ export interface SlipClashMark {
   people: boolean;
   /** The pair stacks in one cell and this slip has a later marked sibling —
       the rule runs across the 4px gap as ONE rule, not two marks. */
-  bridge: boolean;
-}
+  }
 
 /**
  * The per-slip marks — drawn ONLY when BOTH event ids are on the sheet: a
@@ -797,18 +796,18 @@ export function clashMarks(
     if (!wa || !wb) continue;
     const weight = clashWeight(wa[0].cert, wb[0].cert);
     const people = c.severity === 'people';
-    for (const [id, own, other] of [
+    // The BRIDGE across the stacked pair's gap was computed here once and
+    // died a killed experiment: Slip's own law is «no bridge across the
+    // gap — the rule on each of the two says which pair, the gap stays
+    // clean», so a flag no drawing reads is a claim without a speaker.
+    for (const [id] of [
       [a, wa, wb],
       [b, wb, wa],
     ] as const) {
-      const bridge = own.some((o) =>
-        other.some((x) => x.laneKey === o.laneKey && x.day === o.day && x.idx > o.idx),
-      );
       const prev = out.get(id);
       out.set(id, {
         clash: prev?.clash === 'hard' ? 'hard' : weight,
         people: (prev?.people ?? false) || people,
-        bridge: (prev?.bridge ?? false) || bridge,
       });
     }
   }

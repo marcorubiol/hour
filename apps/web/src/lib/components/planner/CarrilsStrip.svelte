@@ -125,6 +125,12 @@
     /** The horizon grows when the scroll reaches for it (no arrows on the
         board's own edge): fired once per columns-length near the right rim. */
     onReachEnd?: () => void;
+    /** Fold state, owned by the PAGE so the meta's lane count and these
+        rows can never disagree (one writer). Still furniture: session
+        state, never the URL (ADR-094 §4). */
+    shut: SvelteSet<string>;
+    /** The book feeds are in flight — an empty board must not say «quiet». */
+    loading?: boolean;
   }
 
   let {
@@ -157,11 +163,9 @@
     groupMark,
     nowMinutes = null,
     onReachEnd,
+    shut,
+    loading = false,
   }: Props = $props();
-
-  /* Lid state is FURNITURE, not URL (ADR-094 §4 draws that line): folding a
-     group is arranging your desk, and it dies with the component. */
-  const shut = new SvelteSet<string>();
 
   /** 168px frozen labels + 118px per day / 58px per fold — the proto's
       measured widths, TODAY INCLUDED: equal width, its marks are ink (the
@@ -266,9 +270,22 @@
     const apply = () => {
       const b = board.getBoundingClientRect();
       const t = today.getBoundingClientRect();
-      const { x } = nowLineX({ todayLeft: t.left - b.left, todayWidth: t.width, minutes: nowMinutes });
+      const { x, labelLeftMax } = nowLineX({
+        todayLeft: t.left - b.left,
+        todayWidth: t.width,
+        minutes: nowMinutes,
+      });
       board.style.setProperty('--nowx', `${x}px`);
       board.style.setProperty('--nowtop', `${Math.round(t.bottom - b.top)}px`);
+      // The caption never leaves today's column: pulled left at the rim
+      // (the engine's clamp; what cedes is the foot, never the mark).
+      const cap = board.querySelector<HTMLElement>('.board__now b');
+      if (cap) {
+        board.style.setProperty(
+          '--nowlx',
+          `${Math.min(6, labelLeftMax(cap.offsetWidth) - x)}px`,
+        );
+      }
     };
     apply();
     const ro = new ResizeObserver(apply);
@@ -283,6 +300,7 @@
   $effect(() => {
     void columns;
     void groups;
+    void shut.size; // a fold reshapes the rows — the pin must re-measure
     const board = boardEl;
     if (!board) return;
     let raf = 0;
@@ -294,29 +312,28 @@
       const chrome =
         document.querySelector('.cal__toolbar')?.getBoundingClientRect().bottom ?? 0;
       const hh = corner.offsetHeight;
+      // The chrome folds into boardTop: pinHeadY's travel is «how far the
+      // top has scrolled past the reading edge», and the reading edge is
+      // the stuck toolbar's underside, not the viewport's zero.
       const y = pinHeadY({
-        boardTop: b.top,
+        boardTop: b.top - chrome,
         boardHeight: b.height,
-        headOffsetTop: chrome,
+        headOffsetTop: 0,
         headHeight: hh,
       });
       board.style.setProperty('--hdy', `${y}px`);
-      for (const g of board.querySelectorAll<HTMLElement>('.board__grpl')) {
+      const all = [...board.querySelectorAll<HTMLElement>('.board__grpl')];
+      all.forEach((g, i) => {
         const gr = g.getBoundingClientRect();
-        const groupTop = gr.top - b.top - Number.parseFloat(g.style.getPropertyValue('--gy') || '0');
+        const groupTop =
+          gr.top - b.top - Number.parseFloat(g.style.getPropertyValue('--gy') || '0');
         // the group's floor: the next band's top, or the board's end
-        const next = g.nextElementSibling;
         let end = b.height;
-        const all = [...board.querySelectorAll<HTMLElement>('.board__grpl')];
-        const i = all.indexOf(g);
-        if (i >= 0 && i + 1 < all.length) {
+        if (i + 1 < all.length) {
           const nr = all[i + 1].getBoundingClientRect();
           end =
-            nr.top -
-            b.top -
-            Number.parseFloat(all[i + 1].style.getPropertyValue('--gy') || '0');
+            nr.top - b.top - Number.parseFloat(all[i + 1].style.getPropertyValue('--gy') || '0');
         }
-        void next;
         const gy = groupLabelY({
           pinY: y + hh,
           groupTop,
@@ -324,7 +341,7 @@
           labelHeight: g.offsetHeight,
         });
         g.style.setProperty('--gy', `${gy}px`);
-      }
+      });
     };
     const onScroll = () => {
       if (!raf) raf = requestAnimationFrame(apply);
@@ -356,6 +373,9 @@
     };
     void len;
     wrap.addEventListener('scroll', onScroll, { passive: true });
+    // A board that does not overflow never scrolls — ask once on arrival;
+    // the probes' honest end bounds the march.
+    onScroll();
     return () => wrap.removeEventListener('scroll', onScroll);
   });
 
@@ -376,7 +396,7 @@
 </script>
 
 {#if groups.length === 0}
-  <p class="board__empty">{emptyLabel}</p>
+  {#if !loading}<p class="board__empty">{emptyLabel}</p>{/if}
 {:else}
   <!-- The strip scrolls sideways INSIDE itself; the page never does. -->
   <div class="board__wrap" bind:this={wrapEl}>
@@ -392,7 +412,6 @@
           class="board__head"
           class:gap={col.kind === 'gap'}
           class:today={col.today}
-          class:we={col.kind === 'gap' && col.weekend}
           class:wstart={col.wstart}
           class:mstart={col.mstart}
           style={col.kind === 'gap' && foldStep(col) !== null ? `--dw: ${foldStep(col)}px` : undefined}
@@ -543,7 +562,7 @@
                   <button
                     type="button"
                     class="board__add"
-                    aria-label={createLabel(col.from)}
+                    aria-label={`${createLabel(col.from)} · ${laneName(lane)}`}
                     onclick={() => onDayCreate(col.from, axis === 'scope' ? lane.id : null)}
                     >+</button
                   >
@@ -730,11 +749,6 @@
       color: var(--text-faint);
       white-space: nowrap;
     }
-    /* A fold of ONE day is still that day: it compresses nothing, so its
-       head keeps the weekend it has (law 16) — the one wash on the board. */
-    .board__head.gap.we {
-      background: color-mix(in oklch, var(--text-color) 3%, var(--bg));
-    }
     /* The folded run's ruler: one 1px fillet per swallowed day at `--dw`,
        only while a day can still be a mark (the engine's foldTicks said
        so — below 6px no `--dw` is set and one tick per 58px remains). */
@@ -918,9 +932,13 @@
     /* Inferred: a weaker CLAIM is not fainter INK — dotted edge, italic
        name, explicitly NO opacity fade (the old .62 put the venue at
        2.0:1). Set from the slot so Slip's own grammar stays untouched. */
+    /* INFERRED is a weaker CLAIM, and the claim channel must not borrow
+       the certainty stroke: dotted already means RELEASED on a slip. The
+       inference speaks OUTSIDE the box — a dotted outline offset off the
+       edge — plus the italic name the slot already sets. */
     .board__slot--inf :global(.slip) {
-      border-style: dotted;
-      border-color: color-mix(in oklch, var(--text-color) 20%, var(--border-color-light));
+      outline: 1px dotted color-mix(in oklch, var(--text-color) 22%, transparent);
+      outline-offset: 2px;
     }
     .board__slot--inf :global(.slip__n) {
       font-style: italic;

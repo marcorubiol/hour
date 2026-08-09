@@ -8,6 +8,7 @@
  * slip in the cell is THE Slip, the '!' and the '+' report through their
  * contracts, and the weekend is an attribute with no wash.
  */
+import { SvelteSet } from 'svelte/reactivity';
 import { render, fireEvent } from '@testing-library/svelte';
 import { describe, expect, it, vi } from 'vitest';
 import CarrilsStrip from './CarrilsStrip.svelte';
@@ -115,6 +116,8 @@ function laneTallyText(ta: LaneTally): string {
 function props(over: Record<string, unknown> = {}) {
   return {
     axis: 'scope' as const,
+    // The fold set is the PAGE's (one writer with the meta); tests own one.
+    shut: new SvelteSet<string>(),
     columns,
     groups: scopeBase.groups,
     cells: scopeBase.cells,

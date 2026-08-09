@@ -60,6 +60,7 @@
     type DecisionOptionVM,
     type DecisionVM,
   } from '$lib/components/planner/DecisionBand.svelte';
+  import { SvelteSet } from 'svelte/reactivity';
   import CarrilsStrip from '$lib/components/planner/CarrilsStrip.svelte';
   import {
     activeDaySet,
@@ -461,12 +462,12 @@
   // isLoading (isPending && isFetching) — a disabled query is pending but
   // not loading, so an unresolved selection reads as empty, not stuck.
   let loading = $derived(
-    view === 'agenda'
+    view === 'agenda' || view === 'board'
       ? $agendaPerfQuery.isLoading || $agendaDatesQuery.isLoading
       : $perfQuery.isLoading || $datesQuery.isLoading,
   );
   let errorMsg = $derived(
-    view === 'agenda'
+    view === 'agenda' || view === 'board'
       ? $agendaPerfQuery.error instanceof Error
         ? $agendaPerfQuery.error.message
         : $agendaDatesQuery.error instanceof Error
@@ -862,7 +863,7 @@
      writer over there; every word is t()-backed here. The old carrilsLanes/
      carrilsConnectors builders — the interim shim that still drew the month
      ribbon — died with this block. This step keeps the board on the month
-     window (`monthFirst..monthLast`); the growing horizon is the next step,
+     window (`monthFirst..monthLast`); the board spans the BOOK's window (agendaFromIso..agendaToIso),
      and nothing below assumes an end date. */
 
   /** The scope, expanded to project ids — null = Everything. One writer
@@ -914,10 +915,13 @@
   let boardAwayByDay = $derived.by(() => {
     const m = new Map<string, Set<string>>();
     if (view !== 'board') return m;
-    for (const b of visibleBlackouts) {
+    // D · THE GATE READS THE UNFILTERED FACTS: calm hides bands, it never
+    // makes anybody available (the same rule personScope already keeps) —
+    // and the clamp is the BOOK's window, which is the board's.
+    for (const b of allBlackouts) {
       if (!b.person_id) continue;
-      const from = b.starts_on < monthFirst ? monthFirst : b.starts_on;
-      const to = b.ends_on > monthLast ? monthLast : b.ends_on;
+      const from = b.starts_on < agendaFromIso ? agendaFromIso : b.starts_on;
+      const to = b.ends_on > agendaToIso ? agendaToIso : b.ends_on;
       for (let d = from; d <= to; d = addDaysIso(d, 1)) {
         (m.get(d) ?? m.set(d, new Set()).get(d)!).add(b.person_id);
       }
@@ -932,7 +936,7 @@
     const out: BoardEventIn[] = [];
     for (const p of shownPerfs) {
       const day = perfDayKey(p);
-      if (day < monthFirst || day > monthLast) continue;
+      if (day < agendaFromIso || day > agendaToIso) continue;
       out.push({
         id: p.id,
         day,
@@ -948,7 +952,7 @@
     }
     for (const d of shownDates) {
       const day = dateDayKey(d, viewerTz);
-      if (day < monthFirst || day > monthLast) continue;
+      if (day < agendaFromIso || day > agendaToIso) continue;
       out.push({
         id: d.id,
         day,
@@ -1110,6 +1114,10 @@
 
   /** Minutes since midnight, viewer clock — the board's now line. Null
       when today is off the sheet (the mark is only drawn where it is true). */
+  /** Fold state — hoisted so the meta's lane count and the rendered rows
+      share one writer. Furniture: session-only, never the URL. */
+  const boardShut = new SvelteSet<string>();
+
   let boardNowMinutes = $derived.by((): number | null => {
     void minuteTick;
     if (view !== 'board') return null;
@@ -2051,16 +2059,14 @@
    */
   function stepBack() {
     if (view === 'day') {
-      dayIso = addDaysIso(selectedDay, -1);
-      syncUrl();
+      void stepDayToPlanned(-1);
     } else if (view === 'agenda') scrollAgendaMonth(-1);
     else if (view === 'board') panBoard(-1);
     else prevMonth();
   }
   function stepNext() {
     if (view === 'day') {
-      dayIso = addDaysIso(selectedDay, 1);
-      syncUrl();
+      void stepDayToPlanned(1);
     } else if (view === 'agenda') scrollAgendaMonth(1);
     else if (view === 'board') panBoard(1);
     else nextMonth();
@@ -2078,6 +2084,83 @@
    * Landing on a month it has not loaded yet asks for it and tries again on
    * the next frame — the diary grows towards you rather than refusing.
    */
+  /** THE DAY'S ARROWS TRAVEL TO PLAN (Marco, 2026-08-08): the next or the
+      previous day that HOLDS something — never a minted empty day, the
+      same law the book and the board already keep. The loaded window
+      answers first; beyond it, the probes. Nothing found = the arrow
+      rests: there is no more plan that way. */
+  async function stepDayToPlanned(step: -1 | 1) {
+    const days = [
+      ...new Set([
+        ...shownPerfs.map((p) => perfDayKey(p)),
+        ...shownDates.map((d) => dateDayKey(d, viewerTz)),
+      ]),
+    ].sort();
+    const inWindow =
+      step > 0 ? days.find((d) => d > selectedDay) : days.findLast((d) => d < selectedDay);
+    if (inWindow) {
+      dayIso = inWindow;
+      syncUrl();
+      return;
+    }
+    if (step > 0) {
+      // Forwards the ascending probe IS the answer: the earliest planned
+      // day beyond this one, scoped, one row.
+      const next = await probePlan(addDaysIso(selectedDay, 1), agendaHorizonIso);
+      if (next) {
+        dayIso = next;
+        syncUrl();
+      }
+      return;
+    }
+    // Backwards needs the LATEST day before this one, and the feeds only
+    // speak ascending — so widen a window and walk each page's tail.
+    for (const span of [45, 180, 730]) {
+      const from0 = addDaysIso(selectedDay, -span);
+      const from = from0 < agendaFloorIso ? agendaFloorIso : from0;
+      const last = await lastPlannedDay(from, addDaysIso(selectedDay, -1));
+      if (last) {
+        dayIso = last;
+        syncUrl();
+        return;
+      }
+      if (from <= agendaFloorIso) return;
+    }
+  }
+  /** Latest planned day in [from, to] under the current scope — ascending
+      feeds cursor-walked to their tail (a capped page truncates the LATE
+      end, which is exactly the end this caller wants). */
+  async function lastPlannedDay(from: string, to: string): Promise<string | null> {
+    if (from > to) return null;
+    const mk = (extra: Record<string, string>) => {
+      const q = new URLSearchParams({ from, to, limit: '200', ...extra });
+      if (filterIds.projectIds.length > 0) q.set('project_ids', filterIds.projectIds.join(','));
+      if (filterIds.workspaceIds.length > 0)
+        q.set('workspace_ids', filterIds.workspaceIds.join(','));
+      return q;
+    };
+    let latest: string | null = null;
+    const walk = async (path: string, q: URLSearchParams, dayOf: (r: never) => string) => {
+      let cursor = from;
+      for (;;) {
+        q.set('from', cursor);
+        const batch = await fetchJSON<{ items: never[] }>(`${path}?${q}`);
+        if (batch.items.length === 0) break;
+        const d = dayOf(batch.items[batch.items.length - 1]);
+        if (!latest || d > latest) latest = d;
+        if (batch.items.length < 200 || d <= cursor) break;
+        cursor = d;
+      }
+    };
+    await walk(
+      '/api/performances',
+      mk({ status: 'any' }),
+      (r: { performed_at: string }) => r.performed_at.slice(0, 10),
+    );
+    await walk('/api/dates', mk({}), (r: { starts_at: string }) => r.starts_at.slice(0, 10));
+    return latest;
+  }
+
   /** ON THE BOARD THE ARROWS PAN — a screenful at a time. The horizon has
       no pages and no month steps: growing is the scroll's job (the strip
       asks the agenda's own probe when the pan reaches the rim). */
@@ -2191,7 +2274,8 @@
       // A dialog is open: it owns the keyboard until it closes.
       if (createOpen || editOpen || marksOpen) return;
 
-      const views: PlannerView[] = ['day', 'month', 'agenda', 'board'];
+      // The SAME order as the words on screen (CalToolbar's VIEW_ORDER).
+      const views: PlannerView[] = ['day', 'agenda', 'month', 'board'];
       const n = Number(e.key);
       if (n >= 1 && n <= views.length) {
         e.preventDefault();
@@ -2205,20 +2289,14 @@
           goToday();
           return;
         case 'ArrowLeft':
-          if (view === 'agenda') return; // a continuous book has no window to step
+          // ONE DOOR: keys go through the same verbs as the ‹ › buttons —
+          // day travels to plan, agenda scrolls its month, board pans.
           e.preventDefault();
-          if (view === 'day') {
-            dayIso = addDaysIso(selectedDay, -1);
-            syncUrl();
-          } else prevMonth();
+          stepBack();
           return;
         case 'ArrowRight':
-          if (view === 'agenda') return;
           e.preventDefault();
-          if (view === 'day') {
-            dayIso = addDaysIso(selectedDay, 1);
-            syncUrl();
-          } else nextMonth();
+          stepNext();
           return;
         case 'n':
         case 'N':
@@ -2430,7 +2508,7 @@
           <span class="cal__stat cal__stat--soft">{t('planner.board_grain', locale)}</span>
           <span class="cal__stat cal__stat--soft"
             >{t('planner.board_lanes_n', locale, {
-              n: String(boardLaneCount(boardBase.groups, new Set())),
+              n: String(boardLaneCount(boardBase.groups, boardShut)),
             })}</span
           >
         {/if}
@@ -2711,7 +2789,13 @@
       groupMark={boardGroupMark}
       nowMinutes={boardNowMinutes}
       onReachEnd={probePlanAhead}
+      shut={boardShut}
+      {loading}
     />
+    <!-- DEFERRED, said where it costs: the lane tallies count the DRAWN
+         events, so calm (which hides options from the drawing) also thins
+         the counts. The window-counting version needs a drawn-flag through
+         the engine — noted in the review, not smuggled in. -->
   {/if}
 </section>
 

@@ -605,16 +605,10 @@ describe('clashMarks (law 22)', () => {
       ['project:aur', new Map([['2026-07-18', [placed(e2)]]])],
     ]);
     const marks = clashMarks([mkClash(['e1', 'e2'], 'people')], cells);
-    expect(marks.get('e1')).toEqual({ clash: 'hard', people: true, bridge: false });
-    expect(marks.get('e2')).toEqual({ clash: 'hard', people: true, bridge: false });
+    expect(marks.get('e1')).toEqual({ clash: 'hard', people: true });
+    expect(marks.get('e2')).toEqual({ clash: 'hard', people: true });
   });
 
-  it('stacked in one cell the pair bridges as ONE rule, carried by the upper slip', () => {
-    const cells = new Map([['person:tres:mia', new Map([['2026-07-18', [placed(e1), placed(e2)]]])]]);
-    const marks = clashMarks([mkClash(['e1', 'e2'])], cells);
-    expect(marks.get('e1')?.bridge).toBe(true);
-    expect(marks.get('e2')?.bridge).toBe(false);
-  });
 });
 
 describe('clashDayMarks (law 22)', () => {

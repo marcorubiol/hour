@@ -203,7 +203,7 @@ export function createPlannerFeeds(inputs: PlannerFeedInputs) {
       queryKey: ['planner-performances', k] as const,
       // Agenda has its own multi-month feed (below); don't double-fetch the
       // grid window while it is showing.
-      enabled: inputs.view() !== 'agenda' && !k.unresolved,
+      enabled: inputs.view() !== 'agenda' && inputs.view() !== 'board' && !k.unresolved,
       queryFn: ({ signal }: { signal: AbortSignal }) =>
         fetchJSON<{ items: PerformanceEvent[] }>(
           `/api/performances?status=any&rosters=1&notice=1&${feedParams(k, k.from, k.to)}`,
@@ -219,7 +219,7 @@ export function createPlannerFeeds(inputs: PlannerFeedInputs) {
     const k = feedKey;
     return {
       queryKey: ['planner-dates', k] as const,
-      enabled: inputs.view() !== 'agenda' && !k.unresolved,
+      enabled: inputs.view() !== 'agenda' && inputs.view() !== 'board' && !k.unresolved,
       queryFn: ({ signal }: { signal: AbortSignal }) =>
         fetchJSON<{ items: DateEvent[] }>(
           `/api/dates?${feedParams(k, addDaysIso(k.from, -1), addDaysIso(k.to, 1))}`,
@@ -237,7 +237,7 @@ export function createPlannerFeeds(inputs: PlannerFeedInputs) {
     const k = feedKey;
     return {
       queryKey: ['planner-availability', { from: k.from, to: k.to }] as const,
-      enabled: inputs.view() !== 'agenda' && !k.unresolved,
+      enabled: inputs.view() !== 'agenda' && inputs.view() !== 'board' && !k.unresolved,
       queryFn: async ({ signal }: { signal: AbortSignal }) => {
         try {
           return await fetchJSON<{ items: AvailabilityItem[]; absent?: boolean }>(
