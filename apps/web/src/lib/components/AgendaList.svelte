@@ -994,11 +994,15 @@
                made a quiet day look like an event. The board already sits
                its band on the row's floor; the diary does the same. An
                absence is the condition the day ends under. -->
-          {#each awayLines(day) as a (a.key)}
-            <p class="away-line ag__away" class:away-line--tent={a.tentative}>
-              <span class="away-line__who">{a.who}</span>{a.rest}
-            </p>
-          {/each}
+          {#if awayLines(day).length > 0}
+            <div class="ag__aways">
+              {#each awayLines(day) as a (a.key)}
+                <p class="away-line ag__away" class:away-line--tent={a.tentative}>
+                  <span class="away-line__who">{a.who}</span>{a.rest}
+                </p>
+              {/each}
+            </div>
+          {/if}
         </div>
           <!-- THE MARGIN IS A COLUMN OF THE DIARY, not a thing that appears.
                It was drawn only on days that had a call, so the page's right
@@ -1417,9 +1421,22 @@
       color: var(--ag-black-accent);
     }
 .ag__rows {
+      /* STRETCHED, so that «at the foot» has a floor to sit on. The day is a
+         grid with `align-items: start`, so this cell used to be exactly as
+         tall as its own content — and on a day with no rows at all that made
+         the foot and the head the same place: the absence stood where a
+         heading stands, which is what the move was meant to stop. */
+      align-self: stretch;
+      display: flex;
+      flex-direction: column;
       padding-block: var(--space-s);
       padding-inline-end: calc(var(--ag-rail-reserve) + var(--space-s));
       min-inline-size: 0;
+    }
+    /* The foot itself: after the rows when there are rows, and pushed down to
+       the day's floor when there are none. */
+    .ag__aways {
+      margin-block-start: auto;
     }
 .ag__day:not(.ag__day--empty) .ag__rows {
       border-inline-start: 1px solid var(--border-color-light);
