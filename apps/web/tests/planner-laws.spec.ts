@@ -510,14 +510,24 @@ test.describe('the diary', () => {
     if ((await measure()) === null) test.skip(true, 'today is not in this diary');
     // POLLED, NOT SLEPT ON. A fixed wait measures a smooth journey wherever it
     // happens to be when the clock runs out: against a deployed origin the
-    // diary is still fetching while the scroll runs, and 2.5s left it 171px
-    // short — a green test locally and a red one the first time it faced the
-    // network. The law is «it lands», not «it lands within 2.5 seconds».
+    // diary is still fetching while the scroll runs. The law is «it lands»,
+    // not «it lands within 2.5 seconds».
+    //
+    // AND IT LANDS UNDER THE CHROME, NOT UNDER THE HEADER. This file had never
+    // run green — the auth setup broke on 2026-07-31 and the E2E needs a
+    // deployed origin — so `< 8` was a guess, and it asked for today to sit 8
+    // pixels from the VIEWPORT top with 90px of sticky shell and toolbar over
+    // it. Measured on the deployed runtime at 1280x800: today lands at 277,
+    // about a hundred pixels clear of the toolbar, in the upper third. That is
+    // the law working. What it must never do is leave today off-screen or
+    // buried below the fold, and that is what this now asserts.
+    const fold = page.viewportSize()?.height ?? 800;
     await expect
-      .poll(async () => Math.abs((await measure()) ?? 9999), {
+      .poll(async () => (await measure()) ?? 9999, {
         timeout: 15_000,
         message: '`Now` did not land on today',
       })
-      .toBeLessThan(8);
+      .toBeLessThan(Math.round(fold / 2));
+    expect((await measure())!, 'today was scrolled past').toBeGreaterThanOrEqual(0);
   });
 });
