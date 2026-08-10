@@ -961,17 +961,6 @@
           </header>
         {/if}
         <div class="ag__rows">
-          <!-- AN ABSENCE IS A LINE INSIDE THE DAY IT AFFECTS, not a capsule
-               in a rail off to the side. The rail draws a shape you have to
-               decode against a legend; the line says the sentence — who,
-               until when, and how much of it is left — in the day where it
-               matters, which is where you are already looking. -->
-          {#each awayLines(day) as a (a.key)}
-            <p class="ag__away" class:ag__away--tent={a.tentative}>
-              <span class="ag__away-who">{a.who}</span>
-              <span class="ag__away-w">{a.rest}</span>
-            </p>
-          {/each}
           <!-- NO BANNER BOXES. A clash used to print a grey slab per pair
                above the day — «! No team data — could clash.» twice over —
                while the two rows it was about sat underneath saying nothing.
@@ -992,6 +981,23 @@
             {:else}
               {@render eventRow(it.row)}
             {/if}
+          {/each}
+          <!-- AN ABSENCE IS A LINE INSIDE THE DAY IT AFFECTS, not a capsule
+               in a rail off to the side. The rail draws a shape you have to
+               decode against a legend; the line says the sentence — who,
+               until when, and how much of it is left — in the day where it
+               matters, which is where you are already looking.
+
+               AND IT GOES AT THE FOOT (Marco, 2026-08-10). Over the rows it
+               read as a heading — as if the day were ABOUT the absence — and
+               on an empty day it was the only thing there, at the top, which
+               made a quiet day look like an event. The board already sits
+               its band on the row's floor; the diary does the same. An
+               absence is the condition the day ends under. -->
+          {#each awayLines(day) as a (a.key)}
+            <p class="away-line ag__away" class:away-line--tent={a.tentative}>
+              <span class="away-line__who">{a.who}</span>{a.rest}
+            </p>
           {/each}
         </div>
           <!-- THE MARGIN IS A COLUMN OF THE DIARY, not a thing that appears.
@@ -1443,25 +1449,11 @@
    writes, so it stays in the margin voice and appears under the pointer — a
    column of `CONFIRM` down a page of options reads as a demand, and most of
    what you do here is read. */
-/* The absence's line: margin voice, one step above the row it precedes so it
-   reads as the condition the day happens under. */
+/* The absence's line is `.away-line` (styles/absence.css) — one voice for
+   every view. What belongs to the DIARY is only where it sits: at the foot
+   of the day's rows, on the rows' own indent. */
 .ag__away {
-  margin: 0;
-  padding: 2px 8px;
-  font-family: var(--font-mono);
-  font-size: 9px;
-  letter-spacing: 0.06em;
-  color: var(--text-faint);
-}
-.ag__away-who {
-  color: var(--text-muted);
-}
-.ag__away-w {
-  margin-inline-start: 7px;
-}
-/* Provisional leans, like every other maybe in this drawing. */
-.ag__away--tent {
-  font-style: italic;
+  padding: 3px 8px 1px;
 }
 
 button.ag__head {

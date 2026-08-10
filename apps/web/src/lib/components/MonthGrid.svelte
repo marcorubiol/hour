@@ -1155,14 +1155,14 @@
       font-size: 9px;
       letter-spacing: 0.06em;
       text-transform: uppercase;
-      color: var(--text-muted);
+      color: var(--away-word);
     }
     /* The subject is the thing you are reading, so it is TEXT, not a label:
        the one field on the band drawn in the body voice. */
     .cal__band-n {
       flex: none;
       font-size: 11px;
-      color: var(--text-color);
+      color: var(--away-subject);
       overflow: hidden;
       text-overflow: ellipsis;
     }
@@ -1173,7 +1173,7 @@
       font-size: 9px;
       letter-spacing: 0.1em;
       text-transform: uppercase;
-      color: var(--text-faint);
+      color: var(--away-phrase);
     }
     /* A rule with a terminus — never a box. An absence is a stretch of days,
        and a box says «a thing that happened», which is what it is not. */
@@ -1182,7 +1182,7 @@
       min-inline-size: 12px;
       position: relative;
       block-size: 0;
-      border-block-start: 1px solid color-mix(in oklch, var(--text-color) 45%, transparent);
+      border-block-start: 1px solid var(--away-rule);
     }
     .cal__band-r::after {
       content: '';
@@ -1191,8 +1191,8 @@
       inset-block-start: -2.5px;
       inline-size: 5px;
       block-size: 5px;
-      border-block-start: 1px solid color-mix(in oklch, var(--text-color) 58%, transparent);
-      border-inline-end: 1px solid color-mix(in oklch, var(--text-color) 58%, transparent);
+      border-block-start: 1px solid var(--away-terminus);
+      border-inline-end: 1px solid var(--away-terminus);
       transform: rotate(45deg);
     }
     /* Runs past the week's edge: no terminus on that side. */
@@ -1207,14 +1207,14 @@
     }
     .cal__band--away .cal__band-n {
       font-size: 10.5px;
-      color: var(--text-faint);
+      color: var(--away-phrase);
     }
     .cal__band--away .cal__band-w {
-      color: var(--text-faint);
+      color: var(--away-phrase);
     }
     .cal__band--away .cal__band-r {
       border-block-start-style: dotted;
-      border-block-start-color: color-mix(in oklch, var(--text-color) 16%, transparent);
+      border-block-start-color: var(--away-rule-derived);
     }
     .cal__band--away .cal__band-r::after {
       display: none;
@@ -1225,11 +1225,17 @@
       border-block-start-style: dashed;
     }
     .cal__band--tent .cal__band-n {
-      color: var(--text-faint);
+      color: var(--away-phrase);
       font-style: italic;
     }
+    /* Dotted AND one ink lighter — the board says doubt this way and the
+       month said it half-way, keeping the settled 45% under a dotted rule. */
     .cal__band--tent .cal__band-r {
       border-block-start-style: dotted;
+      border-block-start-color: var(--away-rule-tent);
+    }
+    .cal__band--tent .cal__band-r::after {
+      border-color: var(--away-terminus-tent);
     }
 
     /* The day NUMBER is its own cell on row 1 of the week's grid, so a run of

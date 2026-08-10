@@ -1218,12 +1218,12 @@
       font-size: 9px;
       letter-spacing: 0.1em;
       text-transform: uppercase;
-      color: var(--text-muted);
+      color: var(--away-word);
     }
     .board__aw-n {
       font-weight: 400;
       font-size: 11px;
-      color: var(--text-color);
+      color: var(--away-subject);
       white-space: nowrap;
       /* THE SUBJECT MAY BE SHORTENED, THE PHRASE MAY NOT. A name cut with an
          ellipsis still reads as a name and admits there is more; the
@@ -1240,14 +1240,14 @@
       font-size: 9px;
       letter-spacing: 0.1em;
       text-transform: uppercase;
-      color: var(--text-faint);
+      color: var(--away-phrase);
       white-space: nowrap;
     }
     .board__aw-r {
       flex: 1;
       min-inline-size: 14px;
       block-size: 0;
-      border-block-start: 1px solid color-mix(in oklch, var(--text-color) 45%, transparent);
+      border-block-start: 1px solid var(--away-rule);
       position: relative;
     }
     /* The arrowhead is the TERMINUS: only the final segment draws it. */
@@ -1256,8 +1256,8 @@
       position: absolute;
       inline-size: 5px;
       block-size: 5px;
-      border-block-start: 1px solid color-mix(in oklch, var(--text-color) 58%, transparent);
-      border-inline-end: 1px solid color-mix(in oklch, var(--text-color) 58%, transparent);
+      border-block-start: 1px solid var(--away-terminus);
+      border-inline-end: 1px solid var(--away-terminus);
       transform: rotate(45deg);
       inset-inline-end: -1px;
       inset-block-start: -3.5px;
@@ -1270,21 +1270,22 @@
       inset-block-start: 3.5px;
       inline-size: 5px;
       block-size: 5px;
-      border-block-start: 1px solid color-mix(in oklch, var(--text-color) 30%, transparent);
-      border-inline-start: 1px solid color-mix(in oklch, var(--text-color) 30%, transparent);
+      border-block-start: 1px solid var(--away-resume);
+      border-inline-start: 1px solid var(--away-resume);
       transform: rotate(-45deg);
     }
     /* Tentative: the doubt is the register — quieter text, dotted rule. */
     .board__aw--tent .board__aw-k,
     .board__aw--tent .board__aw-n {
-      color: var(--text-faint);
+      color: var(--away-phrase);
+      font-style: italic;
     }
     .board__aw--tent .board__aw-r {
       border-block-start-style: dotted;
-      border-block-start-color: color-mix(in oklch, var(--text-color) 20%, transparent);
+      border-block-start-color: var(--away-rule-tent);
     }
     .board__aw--tent.board__aw--end .board__aw-r::after {
-      border-color: color-mix(in oklch, var(--text-color) 24%, transparent);
+      border-color: var(--away-terminus-tent);
     }
     /* The floor the row reserves under a band's touched week. */
     .board__awsp {

@@ -136,6 +136,44 @@
     --border-color-light: color-mix(in oklch, var(--neutral) 9%, transparent);
 
     /* ============================================================ */
+    /* CONTEXTUAL — absence (Marco, 2026-08-10)                       */
+    /* «ese gris de away es el mismo para todas las vistas.»          */
+    /*                                                                */
+    /* An absence is drawn in four places — the board's band, the     */
+    /* month's week foot, the agenda's day line and the Day view's —  */
+    /* and each had picked its own greys: six different `--text-color`*/
+    /* mixes and FOUR different answers to what «tentative» looks     */
+    /* like. Absence is one fact, so it has one voice; a view chooses */
+    /* the PLACING (a band across days, a line inside a day), never   */
+    /* the volume.                                                    */
+    /*                                                                */
+    /* The ladder is structure, not drift: inside one drawing the     */
+    /* terminus is louder than its rule and the phrase is quieter     */
+    /* than the subject. What must never differ is which view says it.*/
+    /* ============================================================ */
+
+    /* the kind word — AWAY / ON TOUR */
+    --away-word: var(--text-muted);
+    /* the subject, in the body voice a band gives it */
+    --away-subject: var(--text-color);
+    /* the subject inside a mono LINE (agenda, Day) — the line is margin
+       voice throughout, so its loudest field still sits a step down */
+    --away-subject-line: var(--text-muted);
+    /* «until 20 aug · 5 days left» */
+    --away-phrase: var(--text-faint);
+    /* the duration rule and its two ends */
+    --away-rule: color-mix(in oklch, var(--text-color) 45%, transparent);
+    --away-terminus: color-mix(in oklch, var(--text-color) 58%, transparent);
+    --away-resume: color-mix(in oklch, var(--text-color) 30%, transparent);
+    /* not settled yet: the same drawing, one ink lighter (and it leans —
+       the certainty axis, geometry not colour) */
+    --away-rule-tent: color-mix(in oklch, var(--text-color) 20%, transparent);
+    --away-terminus-tent: color-mix(in oklch, var(--text-color) 24%, transparent);
+    /* DEDUCED rather than written down (the tour band, read off two travel
+       legs): quieter than anything somebody actually recorded */
+    --away-rule-derived: color-mix(in oklch, var(--text-color) 16%, transparent);
+
+    /* ============================================================ */
     /* CONTEXTUAL — accents (12 hues, mapped by hash(slug) % 12)      */
     /* Give each project/workspace a stable identifying color on the  */
     /* sidebar rail, identity monogram, and avatar. Helper:           */

@@ -1,0 +1,43 @@
+/*
+  Absence — the away SENTENCE, defined once (Marco, 2026-08-10: «ese gris de
+  away es el mismo para todas las vistas»).
+
+  An absence gets drawn two ways, and they are two PLACINGS of one fact, not
+  two designs:
+
+    · a BAND, when the drawing has a horizontal axis of days to lay it over —
+      the board's lane, the month's week foot. Its parts read
+      `away · who · until X · ————→`, and its colours are the `--away-*`
+      tokens (see tokens.css).
+    · a LINE, when the day is the unit and there is no span to draw across —
+      the agenda's day, the Day view. That is this file: one mono sentence in
+      margin voice, `who · until X · N days left`.
+
+  The line lived twice, near-identically, in AgendaList and in the planner
+  page, and the copies had already drifted: the Day's had lost the italic
+  that says «not settled». One home, so the next view that needs it gets the
+  same voice for free.
+
+  The HOST decides the box — padding, margins, where in the day it sits (at
+  the FOOT of the day: an absence is the condition the day ends under, not a
+  heading it opens with). This file decides how it sounds.
+*/
+
+@layer components {
+  .away-line {
+    margin: 0;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.06em;
+    color: var(--away-phrase);
+  }
+  .away-line__who {
+    color: var(--away-subject-line);
+    margin-inline-end: 7px;
+  }
+  /* Provisional leans, like every other maybe in this drawing — the
+     certainty axis is geometry, and colour only follows it. */
+  .away-line--tent {
+    font-style: italic;
+  }
+}

@@ -1379,7 +1379,7 @@
   /** The absences covering this day, as sentences — same voice as the
       agenda's away lines: who, until when, how much is left. */
   let dayAwayLines = $derived.by(() => {
-    const out: Array<{ key: string; who: string; rest: string }> = [];
+    const out: Array<{ key: string; who: string; rest: string; tentative: boolean }> = [];
     [...blackoutVMs, ...awayVMs].forEach((it, i) => {
       if (selectedDay < it.from || selectedDay > it.to) return;
       const left = Math.round(
@@ -1394,7 +1394,10 @@
                 : t('planner.away_left', locale, { n: String(left) })
             }`;
       const who = 'subject' in it && it.subject ? it.subject : it.label;
-      out.push({ key: `${i}:${it.from}`, who, rest });
+      // The doubt travels with the sentence. It did not, and the Day was the
+      // one view where a tentative absence read exactly like a settled one.
+      const tentative = 'tentative' in it ? it.tentative === true : false;
+      out.push({ key: `${i}:${it.from}`, who, rest, tentative });
     });
     return out;
   });
@@ -2630,9 +2633,8 @@
           <p class="cal__clashline">{c.body}</p>
         {/each}
         {#each dayAwayLines as a (a.key)}
-          <p class="cal__awayline">
-            <span class="cal__awayline-who">{a.who}</span>
-            <span>{a.rest}</span>
+          <p class="away-line" class:away-line--tent={a.tentative}>
+            <span class="away-line__who">{a.who}</span>{a.rest}
           </p>
         {/each}
       </div>
@@ -2912,21 +2914,11 @@
       border-color: var(--danger);
     }
 
-    /* The absence's line above the Day's drawing — same voice as the
-       agenda's away sentences: who, then the rest, quieter. */
+    /* The absence's line is `.away-line` (styles/absence.css) — the SAME
+       sentence the diary draws, and it used to be a copy of it here, one
+       that had already lost the italic that says «not settled». */
     .cal__aways {
       margin-block-end: var(--space-s);
-    }
-    .cal__awayline {
-      margin: 0;
-      font-family: var(--font-mono);
-      font-size: 9px;
-      letter-spacing: 0.06em;
-      color: var(--text-faint);
-    }
-    .cal__awayline-who {
-      color: var(--text-muted);
-      margin-inline-end: 7px;
     }
     /* Red is conflict, and only conflict. */
     .cal__clashline {
