@@ -673,12 +673,23 @@ export function normalizeAway(
 }
 
 /**
- * One drawn segment of a run: consecutive DAY columns, cut at every week
- * or month boundary and at every fold (a gap column carries its own
- * compact mark instead of the band). `cont` = something of the run came
- * before this segment ('away Mia ⟶' resumes with an open left arrow);
- * `end` = the run's terminus is inside this segment (the arrowhead — a
- * run clipped by the board edge or ending inside a fold shows none).
+ * The drawn stretch of a run. `cont` = the run began before the first drawn
+ * column ('⟵ away Mia' opens with a left arrow); `end` = its terminus is
+ * inside the last one (the arrowhead — a run clipped by the board's edge or
+ * ending inside a fold shows none).
+ *
+ * ONE ABSENCE IS ONE SENTENCE (Marco, 2026-08-09 and again 2026-08-10). The
+ * week edge went first — a board lane is one continuous row, unlike the
+ * month's week-per-row grid, so cutting there printed the same sentence
+ * twice side by side with the first rule striking through the second word.
+ * THE FOLD went next, for the same reason and one worse: the code promised
+ * that «the gap cell says away itself» and no such mark was ever drawn, so a
+ * fold inside an absence silently split one fact into two `away Mia Serra`s
+ * with a blank between them. A fold is days we are not SHOWING, not days
+ * that are not THERE — the line crossing it is what says so.
+ *
+ * So a run yields at most one segment, and the only thing that still ends it
+ * is the board's own edge.
  */
 export interface AwaySegment {
   laneKey: string;
@@ -695,42 +706,34 @@ export function awaySegments(
 ): AwaySegment[] {
   const segs: AwaySegment[] = [];
   for (const run of runs) {
-    let start = -1;
-    let prev = -1;
-    const flush = () => {
-      if (start === -1) return;
-      segs.push({
-        laneKey: run.laneKey,
-        run,
-        startCol: start,
-        endCol: prev,
-        // Both flags are clipping facts, not bookkeeping: the run began
-        // before this segment's first day / ends by its last day.
-        cont: columns[start].from > run.from,
-        end: columns[prev].to >= run.to,
-      });
-      start = -1;
-    };
+    // Every column the run touches, folds included.
+    const hit: number[] = [];
     for (let i = 0; i < columns.length; i++) {
       const c = columns[i];
-      if (c.to < run.from || c.from > run.to) continue;
-      if (c.kind === 'gap') {
-        flush(); // the fold cuts the band; the gap cell says 'away' itself
-        continue;
-      }
-      // A WEEK EDGE IS NOT A CUT ON A BOARD (Marco, 2026-08-09). The month
-      // grid had to break a band at every week because its weeks are
-      // separate ROWS — a band cannot span two of them. A board lane is one
-      // continuous row, so cutting there only produced the same sentence
-      // twice, side by side, with the first one's rule striking through the
-      // second one's word. One absence is one fact and gets one band; the
-      // only thing that may interrupt it is a FOLD, where the days it
-      // covers are not drawn at all.
-      if (start !== -1 && i !== prev + 1) flush();
-      if (start === -1) start = i;
-      prev = i;
+      if (c.to >= run.from && c.from <= run.to) hit.push(i);
     }
-    flush();
+    // Then trimmed to real days at both ends: a band begins and finishes on
+    // a day it is actually about, and crosses only a fold INSIDE it. A fold
+    // at either end is the run leaving the drawing, which `cont`/`end`
+    // already say — drawing over it would claim 58px of days nobody sees.
+    let a = 0;
+    let b = hit.length - 1;
+    while (a <= b && columns[hit[a]].kind === 'gap') a++;
+    while (b >= a && columns[hit[b]].kind === 'gap') b--;
+    // A run that lives ENTIRELY inside a fold has no day to hang off. It is
+    // the one thing a fold can still swallow, and the fold cell is where it
+    // would have to be said.
+    if (a > b) continue;
+    segs.push({
+      laneKey: run.laneKey,
+      run,
+      startCol: hit[a],
+      endCol: hit[b],
+      // Both flags are clipping facts, not bookkeeping: the run began before
+      // the first drawn day / ends by the last one.
+      cont: columns[hit[a]].from > run.from,
+      end: columns[hit[b]].to >= run.to,
+    });
   }
   return segs;
 }

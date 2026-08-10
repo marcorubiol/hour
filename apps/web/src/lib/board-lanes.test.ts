@@ -538,17 +538,43 @@ describe('awaySegments (law 21)', () => {
     expect(segs[0]).toMatchObject({ startCol: 1, endCol: 5, cont: false, end: true });
   });
 
-  it('the fold cuts the band and it resumes after — the gap cell speaks for itself', () => {
+  it('the fold does NOT cut it either: the band crosses the fold, one sentence', () => {
     const cols = buildColumns({
       baseIso: '2026-07-16',
       endIso: '2026-07-24',
       active: new Set(['2026-07-16', '2026-07-17', '2026-07-18', '2026-07-22', '2026-07-23', '2026-07-24']),
       todayIso: '2026-07-16',
     });
+    // Cut in two, this printed `away Mia` twice with a blank between — and
+    // the gap cell's promised mark never existed. A fold is days we are not
+    // showing, not days that are not there.
     const segs = awaySegments([run('2026-07-18', '2026-07-23')], cols);
-    expect(segs).toHaveLength(2);
-    expect(segs[0]).toMatchObject({ startCol: 2, endCol: 2, cont: false, end: false });
-    expect(segs[1]).toMatchObject({ startCol: 4, endCol: 5, cont: true, end: true });
+    expect(segs).toHaveLength(1);
+    expect(segs[0]).toMatchObject({ startCol: 2, endCol: 5, cont: false, end: true });
+  });
+
+  it('a fold at the END is not crossed: the band stops on the last day it is about', () => {
+    const cols = buildColumns({
+      baseIso: '2026-07-16',
+      endIso: '2026-07-24',
+      active: new Set(['2026-07-16', '2026-07-17', '2026-07-18', '2026-07-24']),
+      todayIso: '2026-07-16',
+    });
+    // 18 → 22: the 22nd is inside the fold, so the run leaves the drawing
+    // there. No arrowhead, and no 58px of days nobody sees.
+    const segs = awaySegments([run('2026-07-18', '2026-07-22')], cols);
+    expect(segs).toHaveLength(1);
+    expect(segs[0]).toMatchObject({ startCol: 2, endCol: 2, end: false });
+  });
+
+  it('a run that lives entirely inside a fold draws nothing — it has no day to hang off', () => {
+    const cols = buildColumns({
+      baseIso: '2026-07-16',
+      endIso: '2026-07-24',
+      active: new Set(['2026-07-16', '2026-07-24']),
+      todayIso: '2026-07-16',
+    });
+    expect(awaySegments([run('2026-07-19', '2026-07-21')], cols)).toHaveLength(0);
   });
 
   it("a run clipped by the board's edges resumes cont and never claims the arrowhead", () => {
