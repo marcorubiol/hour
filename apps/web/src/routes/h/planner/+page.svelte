@@ -2541,23 +2541,25 @@
         {#if view === 'day' && daySpanLabel}
           <span class="cal__stat cal__stat--soft">{daySpanLabel}</span>
         {/if}
-        {#if view !== 'agenda' && view !== 'board'}
-        <!-- EVERY WINDOW SAYS WHICH ONE IT IS, and the Day was the only view
-             that did not (Marco, 2026-08-10: «¿qué datos me da esta barra?»).
-             The month names its weeks, the agenda and the board name where
-             they begin — but the Day printed the MONTH's counters under a
-             title that says one day, so «Monday 17 August · nothing on this
-             day» sat beside `1 confirmed · 28 nights free` and those numbers
-             looked like the day's.
-             The counters stay monthly on purpose: what the Day gives you is
-             the season around the day you are standing on. It just has to
-             say so, and only here — on the month view the title above IS the
-             window, and repeating it would be noise. -->
-        {#if view === 'day'}
-          <span class="cal__stat cal__stat--soft"
-            >{t('planner.pulse_window', locale, { month: monthTitle })}</span
-          >
-        {/if}
+        <!-- THE CENSUS BELONGS TO THE MONTH, AND ONLY TO THE MONTH.
+             (Marco, 2026-08-10: «las cifras mensuales cuando estamos en la
+             vista day confunden».)
+
+             It used to print on the Day as well, and naming the window («in
+             august») stopped it LYING without stopping it confusing: you are
+             reading one day and the bar is talking about a stretch you cannot
+             see. So the Day stops counting. It keeps the two things that are
+             its own — the queue, which is about now and not about a window,
+             and its span — and the census stays whole one click away, in the
+             drawing whose title IS its window.
+
+             The rule this leaves is clean enough to check by looking: A VIEW
+             COUNTS WHAT IT DRAWS, OR IT COUNTS NOTHING. The month draws a
+             month and counts it. The Day draws a day, and a day does not need
+             counting — the drawing is the count. The agenda and the board
+             have no last day, so they name where they begin and count
+             nothing. -->
+        {#if view === 'month'}
         <span class="cal__stat"><b>{stats.confirmed}</b> {t('planner.stat_confirmed', locale)}</span>
         <!-- `1 holds` was printing on every single-hold month. The design's own
              word for this counter is `option`, and it agrees in number. -->
@@ -2573,12 +2575,11 @@
         >
         <!-- THESE TWO COUNT THE MONTH TOO, so they live inside the same gate
              and not after it. Outside, the agenda printed `3 people away · 2
-             trips` under `from 10 aug onwards` and the board under `no end` —
-             August's numbers on two drawings whose horizon grows as you
-             scroll, which is the exact thing the law above forbids. What
-             grows is never counted; and on the board the bands are ON the
-             sheet anyway, so the counter was saying twice what one of the
-             two sayings had wrong. -->
+             trips` under `from 10 aug onwards`, the board under `no end` and
+             the Day under a single date — August's numbers on three drawings
+             that are not a month. On the board the bands are ON the sheet
+             anyway, so the counter was saying twice what one of the two
+             sayings had wrong. -->
         {#if pulseAwayPersons > 0}
           <span class="cal__stat cal__stat--soft"
             >{pulseAwayPersons === 1

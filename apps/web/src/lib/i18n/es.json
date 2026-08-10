@@ -411,7 +411,6 @@
   "planner.day_empty": "Nada en este día.",
   "planner.day_axis": "el día",
   "planner.no_cast": "sin reparto",
-  "planner.pulse_window": "en {month}",
   "planner.agenda_from": "desde {day}",
   "planner.week_range": "semanas {a} → {b}",
   "planner.new_date": "Nueva fecha",
