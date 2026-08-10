@@ -2437,20 +2437,24 @@
        states the date, the machine reports on THAT window in 9.5px mono, and
        the controls that change it close the band. With the meta underneath,
        the line summarising July sat below the buttons that leave July. -->
-  <p class="cal__meta">
+  <!-- TWO LINES, BECAUSE THE STRIP DOES TWO JOBS (Marco, 2026-08-10: «en el
+       mes, baja la información del mes abajo, en una segunda línea»).
+
+       The first says WHAT NEEDS YOU — the queue and the next date. It is
+       about now, it does not belong to any window, and it is the same on
+       every view. The second says WHAT YOU ARE LOOKING AT — the drawing's
+       window, its census when it has one, and the words that qualify it
+       (calm, inferred). Run together they read as one list of nine things
+       and the red figure, which is the only one that asks for an action,
+       had to compete with a nights-free count.
+
+       The second line simply is not there when the drawing has nothing to
+       say about itself — an empty Day. -->
+  <p class="cal__meta cal__meta--queue">
       <!-- Pulse strip (ADR-080 §6) — every figure maps to fetched rows; a
            segment whose feed is absent (or count is zero) drops instead of
            lying. The shared .lenshead__sub inserts the · between items. -->
       {#if !errorMsg}
-        <!-- CALM IS A WORD, ON THE FACTS SIDE (ADR-095 §3). It lives in the
-             Desk — global and non-destructive — and the Planner does not draw
-             its switch: it draws what it DOES. An active filter you cannot see
-             is a filter that lies, and this one hides two thirds of the month.
-             The counters beside it do not move: they count the WINDOW, not the
-             drawing, so the word is what explains why only one is on paper. -->
-        {#if calm.on}
-          <span class="cal__stat cal__stat--soft">{t('planner.calm_state', locale)}</span>
-        {/if}
         <!-- CALM QUIETS VOLUME, NOT OBLIGATIONS. This control was gated on
              `!calm.on`, so the one line on the page that says «you have to
              decide something» disappeared in the mode people leave switched
@@ -2481,6 +2485,20 @@
               venue: pulseNext.venue,
             })}</span
           >
+        {/if}
+      {/if}
+    </p>
+  {#if !errorMsg && (calm.on || view !== 'day' || Boolean(daySpanLabel) || pulseInferred > 0)}
+    <p class="cal__meta cal__meta--window">
+        <!-- CALM IS A WORD, ON THE FACTS SIDE (ADR-095 §3). It lives in the
+             Desk — global and non-destructive — and the Planner does not draw
+             its switch: it draws what it DOES. An active filter you cannot see
+             is a filter that lies, and this one hides two thirds of the month.
+             It opens THIS line and not the other one because it is about the
+             drawing: the counters beside it do not move — they count the
+             window — so the word is what explains why only one is on paper. -->
+        {#if calm.on}
+          <span class="cal__stat cal__stat--soft">{t('planner.calm_state', locale)}</span>
         {/if}
         <!-- COUNTERS FOLLOW THE GEOMETRY, NOT THE WORD (ADR-095).
              A BOUNDED drawing that announces a range has to count it; a drawing
@@ -2604,11 +2622,13 @@
             >{t('planner.pulse_inferred', locale, { n: String(pulseInferred) })}</span
           >
         {/if}
-      {/if}
     </p>
-  <!-- THE DRAWER OPENS UNDER THE LINE THAT COUNTS IT — the meta says
-       `3 to decide · 1 urgent`, and what it names unfolds directly beneath,
-       above the controls. -->
+  {/if}
+  <!-- THE DRAWER OPENS UNDER THE STRIP THAT NAMES IT — the queue line says
+       `3 to decide · 1 urgent`, and what it names unfolds beneath both lines,
+       above the controls. Not between them: the window line is a caption of
+       the drawing, and a drawer opening through the middle of a caption
+       would push half of it away from what it captions. -->
   {#if !errorMsg && !decisionsAbsent}
     <DecisionBand
       decisions={decisionVMs}
@@ -2903,6 +2923,17 @@
       font-size: 9.5px;
       letter-spacing: 0.1em;
       text-transform: uppercase;
+      color: var(--text-faint);
+    }
+    /* The queue is the line that asks for something, so it keeps the ink and
+       sits tight above the caption that follows it. */
+    .cal__meta--queue {
+      margin-block-end: var(--space-2xs);
+    }
+    /* The window line is a CAPTION of the drawing, so it is one step quieter
+       than the line above and the drawing below — the only field in it that
+       carries full ink is a number (`.cal__stat b`). */
+    .cal__meta--window {
       color: var(--text-faint);
     }
     .cal__meta :global(.cal__stat) {
