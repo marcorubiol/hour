@@ -1361,7 +1361,19 @@
    * and putting digits on it turns it into a false fact.
    */
   let daySpanLabel = $derived.by(() => {
-    if (dayThreads.length === 0) return null;
+    /* A DAY OFF SAYS «DAY OFF» WHERE THE HOURS GO. It has none, so the line
+       used to go silent — and a line that disappears takes its own height with
+       it, so `‹` and `›` moved up a notch on every day off and back down on
+       the next day. Paging a week became a game of chasing the button
+       (Marco, 2026-08-10).
+       The word is not a spacer bought to stop the jump: a day off IS what you
+       are looking at, which is exactly what this line is for. The jump stops
+       because the line has something true to say, not the other way round. */
+    if (dayThreads.length === 0) {
+      return dayUnplaced.some((u) => u.kind === 'day_off')
+        ? t('planner.kind_day_off', locale)
+        : null;
+    }
     const from = Math.min(...dayThreads.map((x) => x.a));
     const to = Math.max(...dayThreads.map((x) => x.b));
     const f = (h: number) => {

@@ -171,6 +171,44 @@ describe('stripWindow — the track is the DAY’s extent, not a fixed 00→24',
   it('an empty day still has a window, so the ruler can draw', () => {
     expect(stripWindow([])).toEqual({ from: 9, to: 24 });
   });
+
+  it('a night that runs long stretches the track past midnight', () => {
+    const t = performanceThread(
+      gig({
+        load_in_at: '2026-07-18T15:00:00Z',
+        start_at: '2026-07-18T20:30:00Z',
+        loadout_at: '2026-07-18T23:30:00Z',
+      }),
+      'Europe/Madrid', 'X', null, 'confirmed',
+    )!;
+    // 17h load-in, 22h30 show, 01h30 load-out — which is 25h30 on this axis.
+    expect(t.a).toBe(17);
+    expect(t.b).toBe(25.5);
+    const w = stripWindow([t]);
+    expect(w.from).toBe(16);
+    expect(w.to).toBe(26);
+  });
+});
+
+describe('a thread that crosses midnight', () => {
+  it('a gig’s load-out never lands before its own load-in', () => {
+    const t = performanceThread(
+      gig({ load_in_at: '2026-07-18T15:00:00Z', loadout_at: '2026-07-18T23:30:00Z' }),
+      'Europe/Madrid', 'X', null, 'confirmed',
+    )!;
+    const at = t.marks.map((m) => m.at);
+    expect(at).toEqual([...at].sort((x, y) => x - y)); // the running order IS the order
+    expect(at).toEqual([17, 25.5]);
+  });
+
+  it('a date that ends after midnight keeps its span instead of collapsing', () => {
+    const t = dateThread(
+      dateRow({ starts_at: '2026-07-18T21:00:00Z', ends_at: '2026-07-19T00:00:00Z' }),
+      'Europe/Madrid', 'X', null, 'confirmed',
+    )!;
+    expect(t.spans).toEqual([{ from: 23, to: 26 }]); // 23h → 02h, not an instant
+    expect(t.marks).toEqual([]);
+  });
 });
 
 describe('pct', () => {

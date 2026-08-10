@@ -189,23 +189,39 @@
           </span>
 
           <span class="ds__t">
+            <!-- A BAR SAYS WHEN IT STARTS AND WHEN IT STOPS. It used to say
+                 neither: a rehearsal 12h–13h30 drew a tinted rule between two
+                 axis ticks two hours apart and left you to estimate its ends
+                 off the ruler (Marco, 2026-08-10). The hours are the data; the
+                 ruler is scaffolding.
+                 An end that ALREADY carries a mark says nothing here — a gig's
+                 bar runs from its first written hour to its last, and both are
+                 marks with their own labels. Two prints of one number is not
+                 twice as clear. -->
             {#each t.spans as sp, i (i)}
+              {@const onA = t.marks.some((m) => Math.abs(m.at - sp.from) < 0.01)}
+              {@const onB = t.marks.some((m) => Math.abs(m.at - sp.to) < 0.01)}
               <span
                 class="ds__b"
                 style="left: {pct(sp.from, win)}%; width: {Math.max(
                   0.4,
                   pct(sp.to, win) - pct(sp.from, win),
                 )}%"
-              ></span>
+              >
+                {#if !onA}<b class="ds__bh ds__bh--a">{hourLabel(sp.from)}</b>{/if}
+                {#if !onB}<b class="ds__bh ds__bh--b">{hourLabel(sp.to)}</b>{/if}
+              </span>
             {/each}
             {#each t.marks as m, i (i)}
+              {@const at = pct(m.at, win)}
               <span
                 class="ds__m"
                 class:ds__m--show={m.show}
                 class:ds__m--solo={m.solo}
                 class:ds__m--up={i % 2 === 1}
+                class:ds__m--flip={at > 50}
                 data-step={m.step}
-                style="left: {pct(m.at, win)}%"
+                style="left: {at}%"
               >
                 <i></i>
                 <b
@@ -436,6 +452,30 @@
       border-style: dashed;
       background: none;
     }
+    /* The bar's own two hours, OUTSIDE it and on its line. Outside, because a
+       9px rule has no room to hold a number without becoming a box; on its
+       line, because a span has two ends and each label belongs to one of them
+       — the stem-and-caption placing a MARK uses exists to answer «which side
+       of me?», and a span never has to ask.
+       The window always clears half an hour past the day at both edges (see
+       `stripWindow`), which is the room these two hang in. */
+    .ds__bh {
+      position: absolute;
+      inset-block-start: 50%;
+      transform: translateY(-50%);
+      font-family: var(--font-mono);
+      font-size: 9px;
+      font-weight: 400;
+      color: var(--text-faint);
+      white-space: nowrap;
+      font-variant-numeric: tabular-nums;
+    }
+    .ds__bh--a {
+      inset-inline-end: calc(100% + 6px);
+    }
+    .ds__bh--b {
+      inset-inline-start: calc(100% + 6px);
+    }
     /* The grain lives in styles/certainty.css (`.grain`) — the label opts
        in; the token is defined once for every drawing. */
 
@@ -478,6 +518,19 @@
       letter-spacing: 0.09em;
       text-transform: uppercase;
       color: var(--text-faint);
+    }
+    /* THE GLOSS FALLS TOWARDS THE MIDDLE, never towards the wall. It always
+       hung to the right of its hour, which is free real estate for a load-in
+       at 17h and a cliff for a load-out at the far end — `1h30 LOAD-OUT` ran
+       off the track and printed `LOAD-O`. Past the halfway line it hangs left
+       instead, so the word is on the inside of the drawing wherever the mark
+       is. Same priority as the narrow-track rule below: the hour is the
+       assertion and never moves; the gloss is what gives way. */
+    .ds__m--flip b em {
+      inset-inline-start: auto;
+      inset-inline-end: 100%;
+      margin-inline-start: 0;
+      margin-inline-end: 6px;
     }
     .ds__m--show i {
       inline-size: 7px;

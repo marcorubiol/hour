@@ -86,9 +86,23 @@ export function performanceThread(
 ): StripThread | null {
   const steps = runSheetSteps(p);
   const marks: StripMark[] = [];
+  /* THE TRACK KEEPS COUNTING PAST MIDNIGHT (Marco, 2026-08-10: «la pista se
+     alarga»). `hourOf` reads a clock, and a clock has no memory of which day
+     it is on: a load-out at 01h30 came back as 1.5 and the strip drew it at
+     dawn — BEFORE its own load-in, with the whole day stretched from 01h30 to
+     22h30 to hold a point that belongs to tomorrow. The gig did not start at
+     one in the morning; the night ran long.
+     `RUN_SHEET_ORDER` is the running order, so the hours must not go
+     backwards: a step earlier on the clock than the one before it is the next
+     morning, and the axis goes to 25h30. The hour LABEL still says «1h30» —
+     that is what the clock on the wall says — but its place on the track is
+     where it happened. */
+  let prev = -Infinity;
   for (const s of steps) {
-    const at = hourOf(s.at, timeZone);
+    let at = hourOf(s.at, timeZone);
     if (at === null) continue;
+    while (at < prev) at += 24;
+    prev = at;
     marks.push({ at, step: s.key, show: s.key === 'start', solo: false });
   }
   if (marks.length === 0) return null;
@@ -130,7 +144,12 @@ export function dateThread(
   if (d.all_day) return null;
   const from = hourOf(d.starts_at, timeZone);
   if (from === null) return null;
-  const to = d.ends_at ? hourOf(d.ends_at, timeZone) : null;
+  // Same rule as a run sheet: an end earlier on the clock than its own start
+  // is tomorrow morning, and the track goes with it. It used to fail the
+  // `to > from` test and lose the end altogether — a party 23h→02h drew as an
+  // instant at 23h, which is the one hour of it that was never in doubt.
+  const end = d.ends_at ? hourOf(d.ends_at, timeZone) : null;
+  const to = end !== null && end < from ? end + 24 : end;
   const marks: StripMark[] = [];
   const spans: StripSpan[] = [];
   if (to !== null && to > from) spans.push({ from, to });
@@ -162,8 +181,12 @@ export function stripWindow(threads: StripThread[]): { from: number; to: number 
   if (threads.length === 0) return { from: 9, to: 24 };
   const a = Math.min(...threads.map((t) => t.a));
   const b = Math.max(...threads.map((t) => t.b));
+  // The right wall is midnight — UNLESS the day itself runs past it. A day
+  // that ends inside the clock keeps the old bound exactly; one that does not
+  // gets the hours it actually used (25h30 is a real place on this axis).
+  const wall = Math.max(24, Math.ceil(b));
   let from = Math.max(0, Math.floor(a - 0.5));
-  let to = Math.min(24, Math.ceil(b + 0.5));
+  let to = Math.min(wall, Math.ceil(b + 0.5));
   /* THE MINIMUM GROWS AROUND THE DAY, NOT AWAY FROM IT. The whole four hours
      used to be paid by `to`: one meeting at 12h–13h30 opened a window of
      11h→15h, an hour of dead air in front and an hour and a half behind, with
@@ -177,7 +200,7 @@ export function stripWindow(threads: StripThread[]): { from: number; to: number 
     from = mid - 2;
     to = mid + 2;
     if (from < 0) ({ from, to } = { from: 0, to: 4 });
-    if (to > 24) ({ from, to } = { from: 20, to: 24 });
+    if (to > wall) ({ from, to } = { from: wall - 4, to: wall });
   }
   return { from, to };
 }
