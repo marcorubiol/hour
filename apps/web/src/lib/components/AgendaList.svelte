@@ -58,6 +58,7 @@
   } from '$lib/month-events';
   import { assignBandLanes, dayKeyInTz } from '$lib/planner';
   import { agendaChunks, emptyTailMonths, type AgendaDayStats } from '$lib/agenda-chunks';
+  import { awayRest, coversDay } from '$lib/away';
   import { SvelteMap } from 'svelte/reactivity';
   import { dualTime, hourMark, localeDayMonth, localeWeekdayShort } from '$lib/datetime';
   import { workspacesQueryOptions } from '$lib/nav-queries';
@@ -682,26 +683,28 @@
     }
   }
 
+  /** The words this view lends the shared grammar ($lib/away). */
+  let awayWords = $derived({
+    until: awayUntilWord,
+    back: awayBackWord,
+    left: awayLeftWord,
+    leftOne: awayLeftOneWord,
+  });
   function awayLines(day: string) {
     const out: Array<{ key: string; who: string; rest: string; tentative: boolean }> = [];
     railItems.forEach((item, i) => {
-      if (day < item.from || day > item.to) return;
-      const left = daysBetween(day, item.to);
-      const rest =
-        left === 0
-          ? awayBackWord
-          : `${awayUntilWord} ${localeDayMonth(item.to, locale)} · ${
-              left === 1 ? awayLeftOneWord : awayLeftWord.replace('{n}', String(left))
-            }`;
-      out.push({ key: `${i}:${day}`, who: item.label, rest, tentative: Boolean(item.tentative) });
+      if (!coversDay(day, item.from, item.to)) return;
+      out.push({
+        key: `${i}:${day}`,
+        // `label` and not `subject`: the naming that already carries the verb
+        // («Mia Serra — away»). The Day view read `subject` and printed «Mia
+        // Serra until 20 Aug», a sentence about nothing.
+        who: item.label,
+        rest: awayRest(day, item.to, awayWords, (iso) => localeDayMonth(iso, locale)),
+        tentative: Boolean(item.tentative),
+      });
     });
     return out;
-  }
-  /** Whole days from a to b, both ISO, b >= a. */
-  function daysBetween(a: string, b: string): number {
-    return Math.round(
-      (Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 86400000,
-    );
   }
 
   function railSegs(day: string): Array<{ item: RailItem; lane: number; i: number }> {

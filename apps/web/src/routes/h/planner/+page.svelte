@@ -77,6 +77,7 @@
     type BoardGroup,
     type LaneTally,
   } from '$lib/board-lanes';
+  import { awayRest, coversDay } from '$lib/away';
   import CalToolbar from '$lib/components/planner/CalToolbar.svelte';
   import Button from '$lib/components/Button.svelte';
   import CalLegend from '$lib/components/planner/CalLegend.svelte';
@@ -1379,25 +1380,27 @@
   /** The absences covering this day, as sentences — same voice as the
       agenda's away lines: who, until when, how much is left. */
   let dayAwayLines = $derived.by(() => {
+    const words = {
+      until: t('planner.away_until', locale),
+      back: t('planner.away_back', locale),
+      left: t('planner.away_left', locale, { n: '{n}' }),
+      leftOne: t('planner.away_left_one', locale),
+    };
     const out: Array<{ key: string; who: string; rest: string; tentative: boolean }> = [];
     [...blackoutVMs, ...awayVMs].forEach((it, i) => {
-      if (selectedDay < it.from || selectedDay > it.to) return;
-      const left = Math.round(
-        (Date.parse(`${it.to}T00:00:00Z`) - Date.parse(`${selectedDay}T00:00:00Z`)) / 86400000,
-      );
-      const rest =
-        left === 0
-          ? t('planner.away_back', locale)
-          : `${t('planner.away_until', locale)} ${localeDayMonth(it.to, localeTag)} · ${
-              left === 1
-                ? t('planner.away_left_one', locale)
-                : t('planner.away_left', locale, { n: String(left) })
-            }`;
-      const who = 'subject' in it && it.subject ? it.subject : it.label;
-      // The doubt travels with the sentence. It did not, and the Day was the
-      // one view where a tentative absence read exactly like a settled one.
-      const tentative = 'tentative' in it ? it.tentative === true : false;
-      out.push({ key: `${i}:${it.from}`, who, rest, tentative });
+      if (!coversDay(selectedDay, it.from, it.to)) return;
+      out.push({
+        key: `${i}:${it.from}`,
+        // `label`, NOT `subject`. The label is the one place an absence is
+        // named and it carries the verb («Mia Serra — away»); reaching past
+        // it for the bare subject printed «Mia Serra until 20 Aug», which
+        // says nothing about what she is doing.
+        who: it.label,
+        rest: awayRest(selectedDay, it.to, words, (iso) => localeDayMonth(iso, localeTag)),
+        // The doubt travels with the sentence. It did not, and the Day was the
+        // one view where a tentative absence read exactly like a settled one.
+        tentative: 'tentative' in it ? it.tentative === true : false,
+      });
     });
     return out;
   });
@@ -2623,19 +2626,13 @@
   {#if errorMsg}
     <p class="cal__state cal__state--danger">{errorMsg}</p>
   {:else if view === 'day'}
-    <!-- The absence is a LINE above the drawing, not a band of its own —
-         the Day compresses (design: la composición del Day). -->
-    {#if dayAwayLines.length > 0 || dayClashLines.length > 0}
+    <!-- A CLASH IS ABOUT WHAT IS *IN* THE DAY, so it goes above the drawing:
+         a rule on two rows says THAT they relate, never why — the why is a
+         sentence, and it belongs with the two things it is about. -->
+    {#if dayClashLines.length > 0}
       <div class="cal__aways">
-        <!-- The reason no bar can draw: a rule on two rows says THAT they
-             relate, never why — the why is a sentence, and it lives here. -->
         {#each dayClashLines as c (c.key)}
           <p class="cal__clashline">{c.body}</p>
-        {/each}
-        {#each dayAwayLines as a (a.key)}
-          <p class="away-line" class:away-line--tent={a.tentative}>
-            <span class="away-line__who">{a.who}</span>{a.rest}
-          </p>
         {/each}
       </div>
     {/if}
@@ -2661,6 +2658,22 @@
       unplaced={dayUnplaced}
       noHourWord={t('planner.no_hour', locale)}
     />
+    <!-- THE ABSENCE IS THE DAY'S FOOTING (Marco, 2026-08-10). Above the
+         drawing it floated on its own, far from anything, and Marco could
+         not read it: «no acabamos de ver bien el mensaje, quizás ponerlo más
+         cerca del título de las notas». Down here it does what it does in
+         the other two views — the diary sets it on the day's floor, the
+         board on the lane's — and it lands against the notes' rule, which
+         gives it something to be next to. -->
+    {#if dayAwayLines.length > 0}
+      <div class="cal__dayaway">
+        {#each dayAwayLines as a (a.key)}
+          <p class="away-line" class:away-line--tent={a.tentative}>
+            <span class="away-line__who">{a.who}</span>{a.rest}
+          </p>
+        {/each}
+      </div>
+    {/if}
     <DayFoot
       notes={dayNotes}
       canWrite={!dayNotesAbsent}
@@ -2914,11 +2927,19 @@
       border-color: var(--danger);
     }
 
-    /* The absence's line is `.away-line` (styles/absence.css) — the SAME
-       sentence the diary draws, and it used to be a copy of it here, one
-       that had already lost the italic that says «not settled». */
+    /* The absence's line is `.away-line` (styles/absence.css) and its
+       sentence is $lib/away — it used to be a copy of the diary's, one that
+       had already lost the italic that says «not settled» AND the verb. */
     .cal__aways {
       margin-block-end: var(--space-s);
+    }
+    /* THE AIR IS ALL ON ONE SIDE. Centred between the drawing and the foot
+       band, the line belonged to neither and read as floating — which is
+       what Marco could not see. Pushed off the drawing and set down almost
+       on the NOTES rule, it becomes the band's first line. */
+    .cal__dayaway {
+      margin-block: var(--space-l) 0;
+      padding-block-end: var(--space-2xs);
     }
     /* Red is conflict, and only conflict. */
     .cal__clashline {
