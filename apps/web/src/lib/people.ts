@@ -112,6 +112,20 @@ export function peopleOf(input: {
 export type PersonMatch = 'explicit' | 'inferred' | 'no';
 
 /**
+ * The same verdict with the third state kept: `unattributed` is a row that
+ * says nothing about anybody — no roster, and no cast on file to guess from.
+ *
+ * It exists because "not yours" and "nobody knows" are different facts and
+ * only one of them may be silently dropped. A view that FILTERS can collapse
+ * them (`matchesPinnedPeople` below): it removes the row and draws the rest,
+ * and the reader never learns a claim that wasn't made. A view that then
+ * says «free» cannot — dropping the unattributed and announcing an empty
+ * evening IS printing "free" off an `unknown`, which `peopleOf` forbids in
+ * as many words. So the pulse asks for this shape instead.
+ */
+export type PersonAttribution = PersonMatch | 'unattributed';
+
+/**
  * Does this row involve any of the pinned people, and on what evidence?
  *
  * An EMPTY pin set does not narrow: the person axis simply is not in play,
@@ -120,15 +134,27 @@ export type PersonMatch = 'explicit' | 'inferred' | 'no';
  * skip it — and it is the honest answer, because with nobody pinned no row
  * is being included *because of* an inference.
  */
-export function matchesPinnedPeople(
+export function attributionFor(
   people: PeopleOf,
   pinnedPersonIds: ReadonlySet<string>,
-): PersonMatch {
+): PersonAttribution {
   if (pinnedPersonIds.size === 0) return 'explicit';
   for (const id of people.personIds) {
     if (pinnedPersonIds.has(id)) return people.link === 'inferred' ? 'inferred' : 'explicit';
   }
-  return 'no';
+  return people.link === 'unknown' ? 'unattributed' : 'no';
+}
+
+/**
+ * The filtering answer: `unattributed` collapses to `no`, because a filter
+ * that keeps every row nobody is on file for keeps everything.
+ */
+export function matchesPinnedPeople(
+  people: PeopleOf,
+  pinnedPersonIds: ReadonlySet<string>,
+): PersonMatch {
+  const verdict = attributionFor(people, pinnedPersonIds);
+  return verdict === 'unattributed' ? 'no' : verdict;
 }
 
 /** A person-level unavailability, as this module consumes it. */
@@ -224,6 +250,17 @@ export interface PersonScope {
   }): PersonMatch;
 }
 
+/** The same axis, answering with the third state (see `PersonAttribution`). */
+export interface PersonAttributionScope {
+  active: boolean;
+  attribute(row: {
+    projectId: string | null;
+    /** ISO day the row is bucketed into — the away gate is per day. */
+    day: string;
+    roster?: readonly string[] | null;
+  }): PersonAttribution;
+}
+
 /**
  * Resolve the person axis for a whole view: the pinned set, the per-project
  * cast pool inverted out of the team feed, and a lazily-built away index.
@@ -231,17 +268,21 @@ export interface PersonScope {
  * The away index is per day and memoised because the month asks 42 times and
  * the agenda book once per day of a multi-month span; scanning every block per
  * row would be quadratic for no reason.
+ *
+ * This is the one place the team feed is inverted. `buildPersonScope` is a
+ * projection of it, not a second copy — a view that filters and a view that
+ * speaks read the same pool.
  */
-export function buildPersonScope(input: {
+export function buildPersonAttribution(input: {
   pinnedPersonIds: readonly string[];
   /** GET /api/team — `project_ids` is the inference pool. */
   team: readonly TeamItem[];
   /** Availability rows; company closures are ignored (see `awayPersonIdsOn`). */
   blocks: readonly AwayInput[];
-}): PersonScope {
+}): PersonAttributionScope {
   const pinned = new Set(input.pinnedPersonIds);
   if (pinned.size === 0) {
-    return { active: false, verdict: () => 'explicit' };
+    return { active: false, attribute: () => 'explicit' };
   }
 
   // project → the people on file for it. Inverted from the team feed, which
@@ -269,13 +310,30 @@ export function buildPersonScope(input: {
 
   return {
     active: true,
-    verdict(row) {
+    attribute(row) {
       const people = peopleOf({
         roster: row.roster,
         projectCast: row.projectId ? castByProject.get(row.projectId) : null,
         awayPersonIds: awayOn(row.day),
       });
-      return matchesPinnedPeople(people, pinned);
+      return attributionFor(people, pinned);
+    },
+  };
+}
+
+/** The filtering view of the axis — see `matchesPinnedPeople` for what the
+    collapse of `unattributed` costs and why a filter can afford it. */
+export function buildPersonScope(input: {
+  pinnedPersonIds: readonly string[];
+  team: readonly TeamItem[];
+  blocks: readonly AwayInput[];
+}): PersonScope {
+  const axis = buildPersonAttribution(input);
+  return {
+    active: axis.active,
+    verdict(row) {
+      const verdict = axis.attribute(row);
+      return verdict === 'unattributed' ? 'no' : verdict;
     },
   };
 }

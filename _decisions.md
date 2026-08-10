@@ -3107,3 +3107,89 @@ Triggered by Marco's pre-scaffold doubt (Phase 0.0 day 5). Five alternatives eva
   call»; (b) ADR-089 (Travel v2) dé el otro extremo de un trayecto, que es lo
   único que bloquea el slip de viaje a dos sitios; (c) comms abra, que es cuando
   `note` gana audiencia e hilo y el margen puede volver a ser una pila.
+
+## [2026-08-10] — ADR-096 · El pulse es el rail: qué está pasando ahora y qué viene. Y la tira del Planner deja de llamarse así
+
+> Marco, sobre el mock del rail: *«utiliza pulse para esto y rehaz lo otro con
+> otro nombre. ESTO es el pulse»*. La palabra estaba ocupada por una tira de
+> recuentos del masthead del Planner (ADR-080 §6) y por los fragmentos del
+> lens-head del Desk; ninguna de las dos es un pulso — las dos son recuentos.
+
+- **1 · El pulse es el bloque del rail, bajo el reloj.** Dos frases: `NOW`
+  (qué estás haciendo, y hasta cuándo) y `NEXT` (qué viene: monograma, hora,
+  call, y la sala en una línea propia). El reloj dice *cuándo* estás; el pulse
+  dice *en qué* estás. Vive en `$lib/pulse.ts` (puro, `now` inyectado, sin
+  palabras) + `shell/RailPulse.svelte` (fetch + traducción).
+
+- **2 · El día son TRAMOS, no eventos.** Una escaleta es una lista de momentos
+  sin duraciones, así que «qué está pasando» solo se lee en el hueco entre dos
+  momentos: load-in 15h30 y soundcheck 17h significa que a las 16h la respuesta
+  es *load-in*, sin que nadie guarde una duración. El último momento corre
+  **blando** hasta el final de su día local: el pulse dice en qué estás y **no
+  inventa la hora en que acaba** (`until` queda a null y el rail pinta una
+  raya). Excepción: un momento que **es** el final (`wrap`) cierra la hoja en
+  vez de abrir tramo — lo cazó su propio test, que decía «wrap» hasta
+  medianoche. Es propiedad del vocabulario, no del módulo: cuando ADR-090
+  (`schedule_slot`) libere los momentos, un slot tendrá que declarar si es
+  terminal, y ese `Set` pasa a ser esa bandera.
+
+- **3 · Ni un `*_at` se lee en el pulse: todo pasa por `runSheetSteps`**, la
+  costura declarada de ADR-090. Y las palabras que devuelve son claves, nunca
+  etiquetas: el rail traduce con el vocabulario que ya existe
+  (`desk.anchor_*`, `planner.kind_*`), y `start` reusa `desk.anchor_show`
+  porque un momento no puede tener dos nombres.
+
+- **4 · El pulse es por persona, y por eso NO puede usar el filtro que usa
+  todo lo demás.** `matchesPinnedPeople` colapsa `unknown` a «no» y descarta la
+  fila; una vista que descarta esas filas **y luego dice «libre»** ha impreso
+  «free» sobre un `unknown`, que es exactamente lo que `$lib/people` prohíbe
+  por escrito. Así que el eje gana un cuarto estado —`PersonAttribution` =
+  `explicit | inferred | unattributed | no`— y `matchesPinnedPeople` pasa a ser
+  su proyección, no una segunda copia. El pulse descarta **solo** `no`: quedarse
+  una fila de más hace más difícil decir «libre», que es el error que no cuesta
+  nada. Sin esto, el rail de MüK Cia —que no tiene reparto— estaría en blanco,
+  y en blanco se lee igual que «no hay nada».
+
+- **5 · Nunca filtra por scope, y calma no lo toca.** Va **encima** de la lista
+  de scopes a propósito: la lente estrecha lo que estás mirando; el pulse dice
+  lo que te está pasando, mires donde mires. Y saber qué viene es lo contrario
+  del ruido.
+
+- **6 · No cambia de altura nunca.** Tres líneas siempre —cargando, vacío o
+  lleno—, y lo que no tiene verdad pinta una raya. Un bloque que aparece y
+  desaparece encima de la lista de scopes hace saltar el rail entero cada vez
+  que una query aterriza, y el rail es mobiliario: tiene que estar donde estaba
+  hace un segundo.
+
+- **7 · La tira del Planner pasa a `stat_*`** (`planner.pulse_*` →
+  `planner.stat_*`, `cal__pulse-decide` → `cal__stat--decide`). No es una
+  palabra nueva: la mitad de esa tira ya se llamaba `stat` (`planner.stat_free`,
+  `planner.stat_confirmed`, la clase `cal__stat`), así que el rename **cierra un
+  nombre partido** en vez de abrir otro. «Tally» se descartó porque el Board ya
+  lo usa (`laneTally`). El Desk pasa a `desk.digest_*`, que es la palabra con la
+  que `_context.md` ya describe esa lente. **ADR-080 §6 no se reescribe** — sigue
+  llamándola pulse strip, y el código lo anota donde estaba.
+
+- **8 · La inferencia gana casa compartida.** El italic —la voz de «esto es una
+  conjetura, no un hecho»— sale del Board y se define una vez en
+  `styles/certainty.css` (`.guess`). El contorno punteado se queda en
+  CarrilsStrip porque necesita una caja y solo ese dibujo la tiene.
+
+- **9 · Y un guardián que faltaba:** `t()` acepta cualquier string, así que una
+  clave que no existe se pinta a sí misma en pantalla, en minúsculas y con
+  puntos, sin que salte ningún gate. Este rename lo demostró: un call site se
+  quedó apuntando a una clave movida y lo cazó una captura, no la suite.
+  `i18n/keys.test.ts` lee lo que la app pide de verdad (289 claves literales) y
+  comprueba que los tres diccionarios saben contestar.
+
+- **Coste**: el rail abre `['me']` y dos feeds propios (funciones desde hoy con
+  `rosters=1`, fechas desde hace 14 días para pillar una residencia en curso);
+  team y availability **solo** si el login es una persona. No comparte
+  `['today-performances']` con el Hall y el Desk a propósito: ensanchar esa URL
+  haría pagar el roster a tres superficies para beneficio de una.
+
+- **Re-evaluate when**: (a) ADR-090 aterrice — entonces `TERMINAL_STEPS` deja de
+  ser una constante y pasa a ser un campo del slot; (b) el reparto exista de
+  verdad en producción — hoy casi todo resuelve `unattributed` y el eje de
+  persona no estrecha nada, que es honesto pero no es lo que va a pasar; (c) el
+  pulse quiera decir una llamada **por persona**, que hoy no existe en el modelo.

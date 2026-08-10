@@ -1154,7 +1154,14 @@
     /* INFERRED is a weaker CLAIM, and the claim channel must not borrow
        the certainty stroke: dotted already means RELEASED on a slip. The
        inference speaks OUTSIDE the box — a dotted outline offset off the
-       edge — plus the italic name the slot already sets. */
+       edge — plus the italic name the slot already sets.
+
+       THE ITALIC IS THE SHARED PART, and it now has a home: `.guess` in
+       styles/certainty.css, which the rail's pulse opts into (a claim
+       leaning is legible at 9px and at 30px; a dotted outline needs a box,
+       and only this drawing has one). It stays written out here because
+       the name lives INSIDE Slip and can only be reached through
+       `:global` — one voice, two ways in, not two opinions. */
     .board__slot--inf :global(.slip) {
       outline: 1px dotted color-mix(in oklch, var(--text-color) 22%, transparent);
       outline-offset: 2px;

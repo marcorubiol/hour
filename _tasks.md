@@ -55,6 +55,27 @@
     a ciegas: primero el diseño. **Decidido el 2026-07-30:** se construye
     dentro del pase de UI del Planner v3, no antes y no suelto.
 
+## Cerrado — el pulse del rail (2026-08-10, ADR-096) · SIN DESPLEGAR
+
+27. [x] **`NOW` / `NEXT` bajo el reloj del rail.** `$lib/pulse.ts` (puro, con
+    `now` inyectado) + `shell/RailPulse.svelte`, montado en `ScopeRail` encima
+    de Scopes. El día son tramos entre hitos, todos leídos por `runSheetSteps`;
+    el último tramo corre blando y `until` se queda a null antes que inventar
+    una hora. Por persona, con el cuarto estado `unattributed` que ADR-096 §4
+    tuvo que abrir para que «libre» no se dijera sobre una ignorancia.
+    Verificado: **check 0/0 (1870 ficheros) · unit 555/555 (era 527) · build
+    verde**, y comprobación visual contra la base local (`NOW free UNTIL 11h ·
+    NEXT [NO] 11h residency · Girona`).
+28. [x] **El rename**, porque la palabra estaba ocupada: la tira del Planner es
+    `stat_*` (cierra el nombre partido que ya usaba `cal__stat` y
+    `planner.stat_free`), el Desk es `desk.digest_*`. ADR-080 §6 no se
+    reescribe. Y sale un guardián nuevo, `i18n/keys.test.ts`, porque el rename
+    dejó un call site apuntando a una clave movida y **no lo cazó ningún gate**
+    — lo cazó una captura de pantalla.
+29. [ ] **Pendiente de este bloque**: no hay E2E del pulse (la suite exige un
+    origen desplegado), y el `href` del NEXT solo existe para funciones — una
+    fecha no tiene página a la que ir.
+
 ## AHORA — preparar el Planner v3 (revisión de viabilidad, 2026-07-30)
 
 > Del contraste entre `Hour Views - Scope v3 - Agenda.html` (proyecto
@@ -105,7 +126,16 @@
     vive en la URL y se comparte; como dial es mobiliario que no sobrevive a un
     reload. **Decisión de Marco, antes de construir.**
 
-25. [ ] **Fontanería del Planner v3 — barata, y va antes que la UI.**
+25. [x] **Fontanería del Planner v3 — HECHA ENTERA, la casilla estaba stale**
+    (verificado contra el árbol el 2026-08-10, no contra este documento). Los
+    tres puntos cayeron el 31 de julio: los cinco hitos se declaran en
+    `month-events.ts:32-36` y el adaptador es `runSheetSteps()` (`:461`, con
+    5 tests que fijan la costura); `PlannerView` es
+    `'day'|'month'|'agenda'|'board'` (`planner.ts:667`); y el modo de holds por
+    espacio vive en `settings->>booking_mode`, proyectado por `/api/workspaces`
+    y consumido por 5 dibujos. El adaptador devuelve `{key, at}` y no
+    `{label, at}`: la clave es vocabulario, la etiqueta la pone quien dibuja.
+    Texto original abajo, sin tocar.
     - El **run sheet ya viaja y se tira**: `/api/performances` hace SELECT de
       los cinco (`load_in_at, soundcheck_at, start_at, loadout_at, wrap_at`,
       `+server.ts:187`) y el VM de `month-events.ts` solo declara `load_in_at` y

@@ -4,6 +4,7 @@
   import { useCalm } from '$lib/stores/calm.svelte';
   import { usePins } from '$lib/stores/pins.svelte';
   import { useScopes, sameSet as scopesSameSet, type Scope } from '$lib/stores/scopes.svelte';
+  import RailPulse from './RailPulse.svelte';
 
   interface Props {
     /** The hall greets outside any scope — no row lights up there. */
@@ -98,6 +99,10 @@
       <span>{t('desk.calm', locale)}</span><span class="side-calm__k">C</span>
     </button>
   </div>
+  <!-- THE PULSE reads the clock's own tick: one timer in the rail, and the
+       two can never disagree about what minute it is. It sits ABOVE the
+       scopes because it is not filtered by them — see RailPulse. -->
+  <RailPulse now={clockNow} {locale} />
   <div class="side-sec">
     <div class="side-sec__h">Scopes</div>
     <!-- The hall greets outside any scope: no row lights up there, not

@@ -12,6 +12,25 @@
 */
 
 @layer components {
+  /*
+    INFERENCE — a weaker CLAIM, which is not the same doubt as the grain.
+
+    The grain says «this booking might not happen». This says «nobody put
+    you on this; we worked it out from your project's cast» — a doubt about
+    the ATTRIBUTION, not about the event. They must not borrow each other's
+    material, and neither may use an opacity fade: a weaker claim is not
+    fainter ink (the board tried .62 opacity and put the venue at 2.0:1).
+
+    The voice is the italic, and it is all that travels: a claim leaning is
+    legible at 9px in a rail and at 30px in a board cell. A component that
+    also has a BOX may add the dotted outline offset off its edge — that is
+    geometry the box owns, and CarrilsStrip's `.board__slot--inf` is where
+    it lives. Everything else opts in with `class="guess"`.
+  */
+  .guess {
+    font-style: italic;
+  }
+
   .grain {
     position: relative;
     /* The ground must be its OWN stacking context: the dots sit at
