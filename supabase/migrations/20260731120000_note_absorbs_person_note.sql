@@ -409,9 +409,58 @@ FROM public.person_note pn
 WHERE EXISTS (SELECT 1 FROM public.workspace w WHERE w.id = pn.workspace_id)
   AND EXISTS (SELECT 1 FROM public.person p WHERE p.id = pn.person_id);
 
-DROP FUNCTION IF EXISTS public.create_person_note(uuid, uuid, text, public.person_note_visibility);
-DROP FUNCTION IF EXISTS public.delete_person_note(uuid);
+-- BY NAME, NOT BY SIGNATURE (2026-08-10, and this is the whole reason the
+-- first production apply failed and rolled back).
+--
+-- `DROP FUNCTION IF EXISTS f(uuid, uuid, text, person_note_visibility)` drops
+-- exactly one overload and stays SILENT when nothing matches — so on a
+-- database carrying a different overload than the checkpoint records, both
+-- drops succeeded at doing nothing, the table went, and `DROP TYPE` then
+-- failed on a function nobody could see. It rolled back cleanly (`note`
+-- absent, `person_note` intact), which is the only reason this is a footnote
+-- and not an incident.
+--
+-- A retirement must not depend on guessing the argument list of what it is
+-- retiring. The catalog knows; ask it.
+DO $$
+DECLARE fn record;
+BEGIN
+  FOR fn IN
+    SELECT oid::regprocedure::text AS signature
+    FROM pg_proc
+    WHERE pronamespace = 'public'::regnamespace
+      AND proname IN ('create_person_note', 'delete_person_note')
+  LOOP
+    EXECUTE format('DROP FUNCTION IF EXISTS %s', fn.signature);
+  END LOOP;
+END;
+$$;
 
 DROP TABLE IF EXISTS public.person_note;
+
+-- And if ANYTHING still holds the type, name it instead of failing with a
+-- symptom. `deptype = 'i'` is the enum's own array type, which goes with it.
+DO $$
+DECLARE holders text;
+BEGIN
+  SELECT string_agg(DISTINCT holder, ', ')
+  INTO holders
+  FROM (
+    SELECT CASE
+             WHEN d.classid = 'pg_proc'::regclass THEN 'function ' || d.objid::regprocedure::text
+             WHEN d.classid = 'pg_class'::regclass THEN 'relation ' || d.objid::regclass::text
+             ELSE d.classid::regclass::text || ' oid ' || d.objid::text
+           END AS holder
+    FROM pg_depend d
+    WHERE d.refclassid = 'pg_type'::regclass
+      AND d.refobjid = 'public.person_note_visibility'::regtype
+      AND d.deptype <> 'i'
+  ) s;
+
+  IF holders IS NOT NULL THEN
+    RAISE EXCEPTION 'person_note_visibility is still held by: %', holders;
+  END IF;
+END;
+$$;
 
 DROP TYPE IF EXISTS public.person_note_visibility;
