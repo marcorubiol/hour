@@ -146,6 +146,28 @@ describe('stripWindow — the track is the DAY’s extent, not a fixed 00→24',
     expect(w.to - w.from).toBeGreaterThanOrEqual(4);
   });
 
+  it('and the four hours grow around the day, not away from it', () => {
+    // One meeting, 12h–13h30. The minimum used to be paid entirely by `to`
+    // (11h→15h): the day against the left wall with an hour and a half of
+    // dead air behind it. Centred, the same four hours hold it in the middle.
+    const t = dateThread(
+      dateRow({ starts_at: '2026-07-18T12:00:00Z', ends_at: '2026-07-18T13:30:00Z' }),
+      TZ, 'X', null, 'confirmed',
+    )!;
+    const w = stripWindow([t]);
+    expect(w.to - w.from).toBe(4);
+    expect((w.from + w.to) / 2).toBe(12.75); // the meeting's own middle
+    expect(w.from).toBeLessThanOrEqual(12 - 0.5); // still clears the margin…
+    expect(w.to).toBeGreaterThanOrEqual(13.5 + 0.5); // …on both sides
+  });
+
+  it('a short day at the wall keeps its four hours inside the clock', () => {
+    const early = dateThread(dateRow({ starts_at: '2026-07-18T00:30:00Z' }), TZ, 'X', null, 'confirmed')!;
+    expect(stripWindow([early])).toEqual({ from: 0, to: 4 });
+    const late = dateThread(dateRow({ starts_at: '2026-07-18T23:30:00Z' }), TZ, 'X', null, 'confirmed')!;
+    expect(stripWindow([late])).toEqual({ from: 20, to: 24 });
+  });
+
   it('an empty day still has a window, so the ruler can draw', () => {
     expect(stripWindow([])).toEqual({ from: 9, to: 24 });
   });

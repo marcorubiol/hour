@@ -160,11 +160,25 @@ export function dateThread(
  */
 export function stripWindow(threads: StripThread[]): { from: number; to: number } {
   if (threads.length === 0) return { from: 9, to: 24 };
-  let from = Math.min(...threads.map((t) => t.a));
-  let to = Math.max(...threads.map((t) => t.b));
-  from = Math.max(0, Math.floor(from - 0.5));
-  to = Math.min(24, Math.ceil(to + 0.5));
-  if (to - from < 4) to = Math.min(24, from + 4);
+  const a = Math.min(...threads.map((t) => t.a));
+  const b = Math.max(...threads.map((t) => t.b));
+  let from = Math.max(0, Math.floor(a - 0.5));
+  let to = Math.min(24, Math.ceil(b + 0.5));
+  /* THE MINIMUM GROWS AROUND THE DAY, NOT AWAY FROM IT. The whole four hours
+     used to be paid by `to`: one meeting at 12h–13h30 opened a window of
+     11h→15h, an hour of dead air in front and an hour and a half behind, with
+     the day shoved against the left wall (Marco, 2026-08-10). Centred on the
+     day's own middle it is 10h45→14h45 — the same four hours, the same
+     proportions, and the thing you came to look at in the middle of them.
+     A window this short always clears the half-hour of margin on both sides:
+     four hours minus at most three of content leaves half an hour each way. */
+  if (to - from < 4) {
+    const mid = (a + b) / 2;
+    from = mid - 2;
+    to = mid + 2;
+    if (from < 0) ({ from, to } = { from: 0, to: 4 });
+    if (to > 24) ({ from, to } = { from: 20, to: 24 });
+  }
   return { from, to };
 }
 

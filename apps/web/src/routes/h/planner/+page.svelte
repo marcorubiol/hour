@@ -1350,15 +1350,27 @@
     void minuteTick;
     return selectedDay === todayIso ? hourOf(new Date().toISOString(), viewerTz) : null;
   });
-  /** «06h → 02h» — where the day's plan begins and ends, for the meta. */
+  /**
+   * «06h → 02h» — where the day's plan begins and ends, for the meta.
+   *
+   * THE DAY'S OWN EXTENT, NOT THE TRACK'S. It used to read `dayWin`, which is
+   * the drawing's window: half an hour of margin each side and never narrower
+   * than four hours. So one meeting at 12h–13h30 announced a plan from 11h to
+   * 15h — a sentence stating, in numbers, hours in which nothing happens. A
+   * track needs margins; a sentence does not. The margin is a drawing device,
+   * and putting digits on it turns it into a false fact.
+   */
   let daySpanLabel = $derived.by(() => {
     if (dayThreads.length === 0) return null;
+    const from = Math.min(...dayThreads.map((x) => x.a));
+    const to = Math.max(...dayThreads.map((x) => x.b));
     const f = (h: number) => {
       const hh = String(Math.floor(((h % 24) + 24) % 24)).padStart(2, '0');
       const mm = Math.round((h % 1) * 60);
       return mm ? `${hh}h${String(mm).padStart(2, '0')}` : `${hh}h`;
     };
-    return `${f(dayWin.from)} → ${f(dayWin.to)}`;
+    // One instant is not a span. `12h → 12h` is an arrow that goes nowhere.
+    return to > from ? `${f(from)} → ${f(to)}` : f(from);
   });
   /** The reason no bar can say — the pair's sentence, pre-localized in the
       clash VM. One line per pair, above the drawing. */
