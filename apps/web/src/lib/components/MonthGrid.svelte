@@ -524,6 +524,8 @@
   type SeriesCell = { iso: string; row: DateEvent | null; hours: SlipVM['time'][] };
   type WeekSeries = {
     key: string;
+    /** The row this run sits on, 0-based — packed, not stacked. */
+    lane: number;
     colStart: number;
     colEnd: number;
     project: ProjectLite | null;
@@ -564,6 +566,7 @@
       }
       out.push({
         key: `${sid}:${week[0].iso}`,
+        lane: 0,
         colStart: a + 1,
         colEnd: b + 2,
         project: g.rows[0].project,
@@ -575,7 +578,21 @@
         cells,
       });
     }
-    return out.sort((x, y) => x.colStart - y.colStart);
+    out.sort((x, y) => x.colStart - y.colStart);
+    /* LANES ARE PACKED, NOT STACKED. Nth-in-the-list was the row, so a run on
+       Saturday sat on the third row because two unrelated runs earlier in the
+       week had taken the first two — two empty lanes above it, and its own
+       days pushed a third of a cell down for nothing. Two runs that do not
+       share a column share a row. (Unlike a BAND, whose lane is reserved for
+       the whole week precisely so it cannot jump.) */
+    const ends: number[] = [];
+    for (const s of out) {
+      let lane = ends.findIndex((e) => e <= s.colStart);
+      if (lane === -1) lane = ends.length;
+      ends[lane] = s.colEnd;
+      s.lane = lane;
+    }
+    return out;
   }
 
   /**
@@ -591,9 +608,16 @@
    */
   function runRowsOver(series: WeekSeries[], di: number): number {
     let n = 0;
-    series.forEach((s, si) => {
-      if (s.colStart <= di + 1 && di + 1 < s.colEnd) n = si + 1;
-    });
+    for (const s of series) {
+      if (s.colStart <= di + 1 && di + 1 < s.colEnd) n = Math.max(n, s.lane + 1);
+    }
+    return n;
+  }
+
+  /** How many run rows the week needs at all — one more than its last lane. */
+  function runRowCount(series: WeekSeries[]): number {
+    let n = 0;
+    for (const s of series) n = Math.max(n, s.lane + 1);
     return n;
   }
 
@@ -925,11 +949,11 @@
             {/each}
           </div>
         {/each}
-        {#each series as s, si (s.key)}
+        {#each series as s (s.key)}
           <div
             class="cal__run"
             data-family={s.cert}
-            style="grid-row: {si + 2}; grid-column: {s.colStart} / {s.colEnd}; --run-cols: {s.cells
+            style="grid-row: {s.lane + 2}; grid-column: {s.colStart} / {s.colEnd}; --run-cols: {s.cells
               .length}{s.project ? `; --c: ${accentVarFor(s.project)}` : ''}"
             title={s.title}
           >
@@ -982,6 +1006,7 @@
     {#each week as day, di (day.iso)}
       {@const perfs = performancesByDay.get(day.iso) ?? []}
       {@const runRows = runRowsOver(series, di)}
+      {@const runLanes = runRowCount(series)}
       {@const dateGroups = groupDates(datesByDay.get(day.iso) ?? [])}
       {@const entries = cellSlips(perfs, dateGroups)}
       {@const overflow = entries.length - CELL_CAP}
@@ -1000,7 +1025,7 @@
         class="cal__day"
         class:cal__day--out={!day.inMonth}
         class:cal__day--today={day.iso === todayIso}
-        style="grid-row: {runRows + 2} / {series.length + 3}; grid-column: {di + 1}"
+        style="grid-row: {runRows + 2} / {runLanes + 3}; grid-column: {di + 1}"
         onmouseenter={() => (hoverDay = day.iso)}
         onmouseleave={() => (hoverDay = hoverDay === day.iso ? null : hoverDay)}
         role="presentation"
@@ -1285,7 +1310,10 @@
       display: flex;
       flex-direction: column;
       min-inline-size: 0;
-      margin: 4px var(--cal-cell-pad) 1px;
+      /* 1px over, so a run and a card on the day beside it begin at the same
+         line — the cell's own top padding is 1px too. 2px under, so the run
+         and the first card below it are the 3px apart that two cards are. */
+      margin: 1px var(--cal-cell-pad) 2px;
       padding: 3px 6px;
       background: var(--bg-ultra-light);
       border: 1px solid color-mix(in oklch, var(--text-color) 15%, var(--border-color-light));
