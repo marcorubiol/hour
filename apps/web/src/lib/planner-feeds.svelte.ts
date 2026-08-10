@@ -260,7 +260,7 @@ export function createPlannerFeeds(inputs: PlannerFeedInputs) {
   // ── Decisions window (ADR-080 §4) — same scope filter as the month
   // feed; ?notice=1 opts into hold_notice_days (ADR-080 §2) and is what
   // exposes this fetch to a pre-migration DB — so it degrades to `absent`
-  // (contract § Graceful absence: band + decision segments of the pulse
+  // (contract § Graceful absence: band + decision segments of the stats strip
   // simply stay off, zero errors surfaced). ─────────────────────────────
   const decisionsPerfOptions = toStore(() => {
     const k = feedKey;
@@ -286,7 +286,7 @@ export function createPlannerFeeds(inputs: PlannerFeedInputs) {
           // The API caps `limit` at 200 — sized for a one-month grid,
           // while this window spans 90 days across the whole scope. Page
           // with a day cursor (rows arrive performed_at.asc; the boundary
-          // day is re-fetched and deduped) so the queue and the pulse's
+          // day is re-fetched and deduped) so the queue and the strip's
           // "per decidir" never under-report silently (ADR-080 §1/§6:
           // every figure maps to fetched rows — ALL of them).
           const seen = new Set<string>();

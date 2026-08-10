@@ -115,7 +115,7 @@
       fetchJSON<{ items: TaskItem[] }>('/api/tasks?status=open&limit=200', signal),
   });
   // Money is fee-gated: a viewer without read:money gets 403 → isError → the
-  // whole money concern (rows + € pulse) is suppressed silently (masked and
+  // whole money concern (rows + € digest) is suppressed silently (masked and
   // unset are indistinguishable by design).
   const invoicesQuery = createQuery({
     queryKey: ['desk-invoices'],
@@ -216,22 +216,22 @@
     n === 0 ? t('desk.need_you_zero', locale) : n === 1 ? t('desk.need_you_one', locale) : t('desk.need_you_many', locale, { n });
   const personHref = (slug: string | null) => (slug && workspaceSlug ? `/h/${workspaceSlug}/person/${slug}` : null);
 
-  let pulse = $derived.by(() => {
+  let digest = $derived.by(() => {
     const f: { text: string; href: string }[] = [];
     if (summary.live)
       f.push({
-        text: summary.live === 1 ? t('desk.pulse_live_one', locale) : t('desk.pulse_live_many', locale, { n: summary.live }),
+        text: summary.live === 1 ? t('desk.digest_live_one', locale) : t('desk.digest_live_many', locale, { n: summary.live }),
         href: '/h/conversations',
       });
     if (summary.holds)
       f.push({
-        text: summary.holds === 1 ? t('desk.pulse_holds_one', locale) : t('desk.pulse_holds_many', locale, { n: summary.holds }),
+        text: summary.holds === 1 ? t('desk.digest_holds_one', locale) : t('desk.digest_holds_many', locale, { n: summary.holds }),
         href: '/h/conversations',
       });
     if (summary.pipeline != null && summary.pipeline > 0)
-      f.push({ text: t('desk.pulse_pipeline', locale, { amount: money(summary.pipeline, summary.currency) }), href: '/h/money' });
+      f.push({ text: t('desk.digest_pipeline', locale, { amount: money(summary.pipeline, summary.currency) }), href: '/h/money' });
     if (summary.nextShowCity)
-      f.push({ text: t('desk.pulse_next_show', locale, { place: summary.nextShowCity }), href: '/h/planner' });
+      f.push({ text: t('desk.digest_next_show', locale, { place: summary.nextShowCity }), href: '/h/planner' });
     return f;
   });
 
@@ -341,7 +341,7 @@
     {/snippet}
     {#snippet sub()}
       {#if !loading && !errored}
-        {#each pulse as frag (frag.text)}<a class="lenshead__frag" href={frag.href}>{frag.text}</a>{/each}
+        {#each digest as frag (frag.text)}<a class="lenshead__frag" href={frag.href}>{frag.text}</a>{/each}
       {/if}
     {/snippet}
   </LensHeader>

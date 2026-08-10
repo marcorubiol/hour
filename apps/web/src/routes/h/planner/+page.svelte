@@ -574,8 +574,8 @@
 
   let allBlackouts = $derived(activeBlackoutRows);
   // The bands/rail show the scope's workspaces only; the engine reads all.
-  // Calm hides the blackout bands/lanes entirely (and, via pulseAwayPersons,
-  // the "away" pulse) — but the conflict engine reads allBlackouts, so a real
+  // Calm hides the blackout bands/lanes entirely (and, via statAwayPersons,
+  // the "away" stat) — but the conflict engine reads allBlackouts, so a real
   // clash against an unavailability still surfaces.
   let visibleBlackouts = $derived(
     calm.on
@@ -1971,11 +1971,13 @@
     $decideMutation.isPending ? ($decideMutation.variables?.id ?? null) : null,
   );
 
-  // ── Pulse strip (ADR-080 §6) — every figure maps to fetched rows;
+  // ── Stats strip (ADR-080 §6, where it is called the PULSE strip — that
+  //    word now belongs to the shell rail's now/next block, ADR-096) —
+  //    every figure maps to fetched rows;
   // segments whose feed is absent simply drop. ──────────────────────────
   // Next confirmed gig from today — the decisions window rows (scope-
   // filtered, [today, +90d]) already hold exactly that horizon.
-  let pulseNext = $derived.by(() => {
+  let statNext = $derived.by(() => {
     let best: { day: string; venue: string } | null = null;
     for (const p of decisionPerfs) {
       if (performanceStatusFamily(p.status) !== 'confirmed') continue;
@@ -1990,7 +1992,7 @@
   // Distinct persons with a blackout overlapping the visible month
   // (person-level blocks of the scope's workspaces — company closures are
   // not a person count).
-  let pulseAwayPersons = $derived.by(() => {
+  let statAwayPersons = $derived.by(() => {
     const ids = new Set<string>();
     for (const b of visibleBlackouts) {
       if (b.person_id && b.starts_on <= monthLast && b.ends_on >= monthFirst) ids.add(b.person_id);
@@ -2009,7 +2011,7 @@
    * axis is inactive or everything matched a real roster, like every other
    * segment of this strip.
    */
-  let pulseInferred = $derived.by(() => {
+  let statInferred = $derived.by(() => {
     if (!personScope.active) return 0;
     let n = 0;
     for (const p of shownPerfs) if (perfPersonVerdict(p) === 'inferred') n++;
@@ -2017,7 +2019,7 @@
     return n;
   });
 
-  let pulseTrips = $derived.by(() => {
+  let statTrips = $derived.by(() => {
     let n = 0;
     for (const d of scopedDates) {
       if (d.kind !== 'travel_day' || d.status === 'cancelled') continue;
@@ -2476,7 +2478,8 @@
        say about itself — an empty Day. -->
   <div class="cal__facts">
   <p class="cal__meta cal__meta--queue">
-      <!-- Pulse strip (ADR-080 §6) — every figure maps to fetched rows; a
+      <!-- Stats strip (ADR-080 §6 calls it the pulse strip; the pulse is now
+           the rail block, ADR-096) — every figure maps to fetched rows; a
            segment whose feed is absent (or count is zero) drops instead of
            lying. The shared .lenshead__sub inserts the · between items. -->
       {#if !errorMsg}
@@ -2489,31 +2492,31 @@
         {#if !decisionsAbsent && decisionVMs.length > 0}
           <button
             type="button"
-            class="cal__stat cal__pulse-decide"
+            class="cal__stat cal__stat--decide"
             aria-expanded={decisionsOpen}
             aria-controls="cal-decisions"
             onclick={() => setDecisionsOpen(!decisionsOpen)}
           >
-            {t('planner.pulse_decide', locale, { n: decisionVMs.length })}{#if urgentCount > 0}{' · '}{urgentCount ===
+            {t('planner.stat_decide', locale, { n: decisionVMs.length })}{#if urgentCount > 0}{' · '}{urgentCount ===
               1
-                ? t('planner.pulse_urgent_one', locale)
-                : t('planner.pulse_urgent', locale, { m: urgentCount })}{/if}<i
-              class="cal__pulse-chev"
+                ? t('planner.stat_urgent_one', locale)
+                : t('planner.stat_urgent', locale, { m: urgentCount })}{/if}<i
+              class="cal__stat-chev"
               aria-hidden="true">{decisionsOpen ? '▴' : '▾'}</i
             >
           </button>
         {/if}
-        {#if !decisionsAbsent && pulseNext}
+        {#if !decisionsAbsent && statNext}
           <span class="cal__stat cal__stat--soft"
-            >{t('planner.pulse_next', locale, {
-              day: localeDayMonth(pulseNext.day, localeTag),
-              venue: pulseNext.venue,
+            >{t('planner.stat_next', locale, {
+              day: localeDayMonth(statNext.day, localeTag),
+              venue: statNext.venue,
             })}</span
           >
         {/if}
       {/if}
     </p>
-  {#if !errorMsg && (calm.on || view !== 'day' || Boolean(daySpanLabel) || pulseInferred > 0)}
+  {#if !errorMsg && (calm.on || view !== 'day' || Boolean(daySpanLabel) || statInferred > 0)}
     <p class="cal__meta cal__meta--window">
         <!-- CALM IS A WORD, ON THE FACTS SIDE (ADR-095 §3). It lives in the
              Desk — global and non-destructive — and the Planner does not draw
@@ -2615,28 +2618,28 @@
              that are not a month. On the board the bands are ON the sheet
              anyway, so the counter was saying twice what one of the two
              sayings had wrong. -->
-        {#if pulseAwayPersons > 0}
+        {#if statAwayPersons > 0}
           <span class="cal__stat cal__stat--soft"
-            >{pulseAwayPersons === 1
-              ? t('planner.pulse_away_one', locale)
-              : t('planner.pulse_away', locale, { z: pulseAwayPersons })}</span
+            >{statAwayPersons === 1
+              ? t('planner.stat_away_one', locale)
+              : t('planner.stat_away', locale, { z: statAwayPersons })}</span
           >
         {/if}
-        {#if pulseTrips > 0}
+        {#if statTrips > 0}
           <span class="cal__stat cal__stat--soft"
-            >{pulseTrips === 1
-              ? t('planner.pulse_trips_one', locale)
-              : t('planner.pulse_trips', locale, { w: pulseTrips })}</span
+            >{statTrips === 1
+              ? t('planner.stat_trips_one', locale)
+              : t('planner.stat_trips', locale, { w: statTrips })}</span
           >
         {/if}
         {/if}
         <!-- NOT a window count: it counts the rows actually DRAWN, so it is
              true on every view, horizon or no horizon. -->
-        {#if pulseInferred > 0}
+        {#if statInferred > 0}
           <!-- The person filter is showing rows nobody is cast on. Say so:
                a guess must never read as a fact. -->
           <span class="cal__stat cal__stat--soft"
-            >{t('planner.pulse_inferred', locale, { n: String(pulseInferred) })}</span
+            >{t('planner.stat_inferred', locale, { n: String(statInferred) })}</span
           >
         {/if}
     </p>
@@ -3033,14 +3036,14 @@
       color: var(--text-color);
       margin-inline-end: var(--space-2xs);
     }
-    /* Pulse "per decidir" — the one red figure; a jump, not a decoration. */
-    .cal__pulse-chev {
+    /* The stat "per decidir" — the one red figure; a jump, not a decoration. */
+    .cal__stat-chev {
       font-style: normal;
       margin-inline-start: 5px;
       font-size: 8px;
       vertical-align: 1px;
     }
-    .cal__pulse-decide {
+    .cal__stat--decide {
       font-family: var(--font-mono);
       font-size: var(--text-xs);
       letter-spacing: var(--mono-letter-spacing-loose);
@@ -3053,7 +3056,7 @@
       border-block-end: 1px solid color-mix(in oklch, var(--danger) 40%, transparent);
       transition: color var(--transition), border-color var(--transition);
     }
-    .cal__pulse-decide:hover {
+    .cal__stat--decide:hover {
       color: var(--danger-dark);
       border-color: var(--danger);
     }
