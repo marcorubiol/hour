@@ -331,7 +331,18 @@
       (params.get('view') && params.get('view') !== nextView) ||
       params.has('group') ||
       (params.get('lanes') && params.get('lanes') !== nextLanes);
-    if (legacy) syncUrl();
+
+    /* AND A BOARD WITH NO `lanes` IN THE BAR IS THE SAME HALF-TRANSLATION.
+       An address that names the view but not the dial hands the next reader
+       their OWN axis — the value falls back to their localStorage — so the
+       same link draws people-rows for you and project-rows for them. That is
+       the thing ADR-094 put the dial in the URL to stop, and only a link
+       arriving without it could show it: `setView` has always written it.
+       Caught by the ported law on its first run against a deployed origin. */
+    const boardWithoutLanes =
+      (nextView ?? untrack(() => view)) === 'board' && !params.get('lanes');
+
+    if (legacy || boardWithoutLanes) syncUrl();
 
     const rawD = params.get('d');
     if (rawD && /^\d{4}-\d{2}-\d{2}$/.test(rawD) && rawD !== untrack(() => dayIso)) dayIso = rawD;

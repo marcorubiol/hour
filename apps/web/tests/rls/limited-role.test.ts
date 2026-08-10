@@ -38,7 +38,7 @@ interface WorkspaceMembershipRow {
   role: 'owner' | 'admin' | 'member' | 'viewer' | 'guest';
 }
 
-interface PersonNoteRow {
+interface NoteRow {
   id: string;
   body: string;
   visibility: string;
@@ -93,7 +93,7 @@ describe.skipIf(!envReady() || !limitedEnvReady())('RLS — limited performer fi
 
   async function deleteFixtureNote() {
     if (!noteId) return;
-    await pgRpc('delete_person_note', adminJwt, { p_note_id: noteId });
+    await pgRpc('delete_note', adminJwt, { p_note_id: noteId });
     noteId = null;
   }
 
@@ -332,26 +332,30 @@ describe.skipIf(!envReady() || !limitedEnvReady())('RLS — limited performer fi
     }
   });
 
+  // Re-pointed at `note` (ADR-093): `person_note` and its two RPCs died into
+  // it on 2026-08-10, and this was the last spec still asking the old table
+  // for a person's note. The assertion is UNCHANGED and now stronger — a note
+  // is private full stop, so «another author's» is the only case there is.
   test('another author private note stays invisible', async () => {
     try {
-      const created = await pgRpc<PersonNoteRow>('create_person_note', adminJwt, {
+      const created = await pgRpc<NoteRow>('create_note', adminJwt, {
+        p_body: 'ZZZ limited-role private note',
+        p_on_day: new Date().toISOString().slice(0, 10),
         p_workspace_id: workspaceId,
         p_person_id: personId,
-        p_body: 'ZZZ limited-role private note',
-        p_visibility: 'private',
       });
       expect(created.status).toBe(200);
       expect(created.data).not.toBeNull();
       noteId = created.data?.id ?? null;
       expect(noteId).not.toBeNull();
 
-      const visibleToAuthor = await pgGet<PersonNoteRow>(
-        'person_note',
+      const visibleToAuthor = await pgGet<NoteRow>(
+        'note',
         adminJwt,
         new URLSearchParams({ id: `eq.${noteId}`, select: 'id,body,visibility' }),
       );
-      const hiddenFromLimited = await pgGet<PersonNoteRow>(
-        'person_note',
+      const hiddenFromLimited = await pgGet<NoteRow>(
+        'note',
         limitedJwt,
         new URLSearchParams({ id: `eq.${noteId}`, select: 'id,body,visibility' }),
       );

@@ -500,14 +500,24 @@ test.describe('the diary', () => {
     await page.mouse.wheel(0, -600);
     await page.waitForTimeout(1500);
     await page.click('.cal__now');
-    await page.waitForTimeout(2500);
-    const off = await page.evaluate(() => {
-      const el = document.querySelector('[data-day].is-today, [data-day]');
-      const today = new Date().toISOString().slice(0, 10);
-      const t = document.querySelector(`[data-day="${today}"]`);
-      return t ? Math.round(t.getBoundingClientRect().top) : (el ? 9999 : null);
-    });
-    if (off === null) test.skip(true, 'today is not in this diary');
-    expect(Math.abs(off!), '`Now` did not land on today').toBeLessThan(8);
+    const measure = () =>
+      page.evaluate(() => {
+        const el = document.querySelector('[data-day].is-today, [data-day]');
+        const today = new Date().toISOString().slice(0, 10);
+        const t = document.querySelector(`[data-day="${today}"]`);
+        return t ? Math.round(t.getBoundingClientRect().top) : el ? 9999 : null;
+      });
+    if ((await measure()) === null) test.skip(true, 'today is not in this diary');
+    // POLLED, NOT SLEPT ON. A fixed wait measures a smooth journey wherever it
+    // happens to be when the clock runs out: against a deployed origin the
+    // diary is still fetching while the scroll runs, and 2.5s left it 171px
+    // short — a green test locally and a red one the first time it faced the
+    // network. The law is «it lands», not «it lands within 2.5 seconds».
+    await expect
+      .poll(async () => Math.abs((await measure()) ?? 9999), {
+        timeout: 15_000,
+        message: '`Now` did not land on today',
+      })
+      .toBeLessThan(8);
   });
 });

@@ -56,7 +56,10 @@ test.describe('performance write path', () => {
 
     // Create from the header button (ADR-078: unified dialog — pick the
     // Performance type pill, then the shared PerformanceForm).
-    await page.getByRole('button', { name: 'Add to planner', exact: true }).click();
+    // The toolbar's writer is `＋ date` since the Planner v3 rework — it says
+    // what it makes, and `Add to planner` survives only on a day cell. Located
+    // by its class, because the label is one glyph and a translated word.
+    await page.locator('button.cal__add').click();
     const dialog = page.locator('dialog[open]');
     await expect(dialog).toBeVisible();
     await dialog

@@ -198,7 +198,10 @@ test.describe('date edit path (task 15)', () => {
     if (!created) test.skip(true, 'no fixture date from the first test');
 
     await page.goto(`/h/planner?view=agenda&scope=${FIXTURE_SPACE_TOKEN}`);
-    const row = page.locator('.ag__row--date', { hasText: title });
+    // THE DIARY DRAWS THE MONTH'S SLIP now (ADR-095 §0) — `ag__row` was the
+    // second implementation of one card and died with the rework, so the row
+    // is located as what it is, and by the kind the slip itself declares.
+    const row = page.locator('.slip', { hasText: title });
     await expect(row).toBeVisible({ timeout: 15_000 });
     await row.click();
 
@@ -218,7 +221,7 @@ test.describe('date edit path (task 15)', () => {
     // Back to a rehearsal — the endpoint clears travel_direction on the
     // way out instead of tripping the DB CHECK (a 400 here means the
     // kind-scoped field rode along when it shouldn't have).
-    await page.locator('.ag__row--travel', { hasText: 'Testville' }).first().click();
+    await page.locator('.slip[data-kind="travel_day"]', { hasText: 'Testville' }).first().click();
     const back = page.locator('dialog[open]');
     await expect(back).toBeVisible();
     await back.getByRole('button', { name: 'Rehearsal', exact: true }).click();
