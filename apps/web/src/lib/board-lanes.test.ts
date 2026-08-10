@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
   activeDaySet,
   awayFloorCols,
+  awayBandWidth,
   awaySegments,
+  awayTerminusFits,
+  COL_PX,
   boardLaneCount,
   boardMeta,
   buildColumns,
@@ -559,6 +562,67 @@ describe('awaySegments (law 21)', () => {
     expect(awaySegments([run('2026-07-14', '2026-07-17')], cols)[0].cont).toBe(true);
     // Ends past the board: the terminus is not on the sheet, no arrowhead.
     expect(awaySegments([run('2026-07-17', '2026-07-26')], cols).at(-1)?.end).toBe(false);
+  });
+});
+
+describe('awayTerminusFits — half a word is worse than no word', () => {
+  const run = (from: string, to: string, who = 'Mia Serra'): AwayRun => ({
+    laneKey: 'L1',
+    from,
+    to,
+    who,
+    tentative: false,
+  });
+  const week = buildColumns({
+    baseIso: '2026-08-10',
+    endIso: '2026-08-16',
+    active: new Set([
+      '2026-08-10',
+      '2026-08-11',
+      '2026-08-12',
+      '2026-08-13',
+      '2026-08-14',
+      '2026-08-15',
+      '2026-08-16',
+    ]),
+    todayIso: '2026-08-10',
+  });
+
+  it('a ONE-DAY absence keeps quiet about when: 118px cannot hold the phrase', () => {
+    // The reported bug: 118px drew `away Mia Serra UNT` and the sentence
+    // stopped mid-word. 9+25.2+8+50.4+8+75.6+8+14 = 198.2 > 118.
+    const seg = awaySegments([run('2026-08-12', '2026-08-12')], week)[0];
+    expect(awayBandWidth(seg, week)).toBe(118);
+    expect(awayTerminusFits(seg, week, 'away', 'Mia Serra', 'until 12 Aug')).toBe(false);
+  });
+
+  it('two days is enough, and the width is the columns it spans — nothing else', () => {
+    const seg = awaySegments([run('2026-08-12', '2026-08-13')], week)[0];
+    expect(awayBandWidth(seg, week)).toBe(236);
+    expect(awayTerminusFits(seg, week, 'away', 'Mia Serra', 'until 13 Aug')).toBe(true);
+  });
+
+  it('the SUBJECT is what pushes it out: the same span, a longer name, no phrase', () => {
+    const seg = awaySegments([run('2026-08-12', '2026-08-13')], week)[0];
+    // A 24-character name eats 134px of the same 236px box.
+    expect(
+      awayTerminusFits(seg, week, 'away', 'playwright staging admin', 'until 13 Aug'),
+    ).toBe(false);
+  });
+
+  it('a folded span is measured at the fold price, not the day price', () => {
+    const folded = buildColumns({
+      baseIso: '2026-08-10',
+      endIso: '2026-08-24',
+      active: new Set(['2026-08-10', '2026-08-11', '2026-08-24']),
+      todayIso: '2026-08-10',
+    });
+    // The band never spans a gap (the fold cuts it), so its width is only
+    // ever days — the gap price exists so the TEMPLATE and the measurement
+    // read the same two numbers.
+    const seg = awaySegments([run('2026-08-10', '2026-08-11')], folded)[0];
+    expect(awayBandWidth(seg, folded)).toBe(236);
+    expect(COL_PX).toEqual({ day: 118, gap: 58 });
   });
 });
 

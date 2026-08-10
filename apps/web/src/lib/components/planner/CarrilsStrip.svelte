@@ -42,7 +42,9 @@
   import {
     awayFloorCols,
     awaySegments,
+    awayTerminusFits,
     clashDayMarks,
+    COL_PX,
     clashMarks,
     foldTicks,
     groupLabelY,
@@ -169,11 +171,13 @@
     loading = false,
   }: Props = $props();
 
-  /** 168px frozen labels + 118px per day / 58px per fold — the proto's
-      measured widths, TODAY INCLUDED: equal width, its marks are ink (the
-      number, the word, and — next step — the hour line), never extra room. */
+  /** 168px frozen labels + a day / a fold per column — the proto's measured
+      widths, TODAY INCLUDED: equal width, its marks are ink (the number, the
+      word, and — next step — the hour line), never extra room. The two
+      numbers come from the engine, because the absence band has to know how
+      much room a span is before it decides what it can say. */
   let gridTemplate = $derived(
-    `26px 168px ${columns.map((c) => (c.kind === 'gap' ? '58px' : '118px')).join(' ')}`,
+    `26px 168px ${columns.map((c) => `${c.kind === 'gap' ? COL_PX.gap : COL_PX.day}px`).join(' ')}`,
   );
 
   /* ── the engine's facts, worded below, never re-derived ───────────── */
@@ -696,7 +700,9 @@
               4}"
           >
             <i class="board__aw-k">{awayWord}</i><b class="board__aw-n">{s.run.who}</b
-            >{#if !s.cont}<em class="board__aw-u">{untilLabel(s.run.to)}</em>{/if}<i
+            >{#if !s.cont && awayTerminusFits(s, columns, awayWord, s.run.who, untilLabel(s.run.to))}<em
+                class="board__aw-u">{untilLabel(s.run.to)}</em
+              >{/if}<i
               class="board__aw-r"
               aria-hidden="true"
             ></i>
@@ -1219,6 +1225,14 @@
       font-size: 11px;
       color: var(--text-color);
       white-space: nowrap;
+      /* THE SUBJECT MAY BE SHORTENED, THE PHRASE MAY NOT. A name cut with an
+         ellipsis still reads as a name and admits there is more; the
+         terminus cut mid-word («UNT») reads as information and carries none,
+         so that one is all-or-nothing and the engine decides
+         (`awayTerminusFits`). */
+      overflow: hidden;
+      text-overflow: ellipsis;
+      min-inline-size: 0;
     }
     .board__aw-u {
       font-style: normal;

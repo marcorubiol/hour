@@ -267,7 +267,12 @@ describe('CarrilsStrip — the board grid', () => {
     expect(band).not.toBeNull();
     expect(band.textContent).toContain('away');
     expect(band.textContent).toContain('Mia');
-    expect(band.textContent).toContain('until 15');
+    // …and NOT when. This band is one day wide (the 15th is folded away), and
+    // 118px cannot hold `until 15 jul` — so the phrase goes rather than be
+    // cut to `UNT`. The rule and its arrowhead carry the ending instead.
+    expect(band.textContent).not.toContain('until');
+    expect(band.querySelector('.board__aw-u')).toBeNull();
+    expect(band.querySelector('.board__aw-r')).not.toBeNull();
     // Column 14 is index 3 → grid tracks 6/7 (the rail took track 1);
     // Última is the second lane, and with no band row above it that is grid
     // row 3. The map and the markup must agree or the band floats over the
@@ -279,6 +284,22 @@ describe('CarrilsStrip — the board grid', () => {
     expect(
       container.querySelectorAll(`.board__cell[data-lane="${p2Key}"] .board__awsp`),
     ).toHaveLength(2);
+  });
+
+  it('given the room, the same band DOES say when — the phrase is dropped, never cut', () => {
+    // The same absence over an unfolded week: 5 day columns instead of 1.
+    const openWeek = buildColumns({
+      baseIso: '2026-07-13',
+      endIso: '2026-07-17',
+      active: new Set(['2026-07-13', '2026-07-14', '2026-07-15', '2026-07-16', '2026-07-17']),
+      todayIso: TODAY,
+    });
+    const { container } = render(
+      CarrilsStrip,
+      props({ columns: openWeek, awayRuns, cells: new Map() }),
+    );
+    const band = container.querySelector('.board__aw') as HTMLElement;
+    expect(band.querySelector('.board__aw-u')!.textContent).toContain('until 15');
   });
 });
 

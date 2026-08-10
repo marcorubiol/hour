@@ -736,6 +736,71 @@ export function awaySegments(
 }
 
 /**
+ * The board's own column widths, in px. The grid template and everything
+ * that has to fit inside a span read the SAME two numbers.
+ */
+export const COL_PX = { day: 118, gap: 58 } as const;
+
+/** How wide a segment's box is: the columns it spans, and nothing else. */
+export function awayBandWidth(seg: AwaySegment, columns: readonly BoardColumn[]): number {
+  let w = 0;
+  for (let i = seg.startCol; i <= seg.endCol && i < columns.length; i++) {
+    w += columns[i].kind === 'gap' ? COL_PX.gap : COL_PX.day;
+  }
+  return w;
+}
+
+/* The band's fixed costs, MEASURED off the rendered band (2026-08-10):
+   9px of lead-in, three 8px gaps, a 14px minimum rule. */
+const AW_PAD = 9;
+const AW_GAP = 8;
+const AW_RULE = 14;
+/* Mono at 9px with 0.1em tracking is exactly 6.3px a character — 25.2/4
+   for `away`, 75.61/12 for `until 13 Aug`. Both parts use it. */
+const AW_MONO = 6.3;
+/* The name is proportional, so this one IS an estimate: 5.6 is the measured
+   ceiling (`Mia Serra` 5.55, a 24-character space name 5.44). It errs LONG
+   on purpose — see the law below. */
+const AW_NAME = 5.6;
+
+/**
+ * DOES THE BAND HAVE ROOM TO SAY *WHEN* (Marco, 2026-08-10)?
+ *
+ * The band clips what overflows, and the terminus is last in the line, so a
+ * one-day absence — 118px — drew `away Nils Bru UNT` and Marco asked the
+ * only question that phrase deserves: «¿es until cuándo?». Half a word is
+ * worse than no word: it looks like information and carries none.
+ *
+ * So the phrase is ALL OR NOTHING. If the sentence does not fit whole, the
+ * band drops it and lets the rule and its arrowhead say the same thing in
+ * the register that never runs out of room. The subject is different: a
+ * name may be shortened with an ellipsis, because an ellipsis is a mark
+ * that admits it (see `.board__aw-n`).
+ *
+ * The name's width is estimated, so the answer is not exact — and the error
+ * is aimed: erring LONG drops a phrase that would have fitted, which reads
+ * fine. Erring short brings `UNT` back.
+ */
+export function awayTerminusFits(
+  seg: AwaySegment,
+  columns: readonly BoardColumn[],
+  word: string,
+  who: string,
+  until: string,
+): boolean {
+  const need =
+    AW_PAD +
+    word.length * AW_MONO +
+    AW_GAP +
+    who.length * AW_NAME +
+    AW_GAP +
+    until.length * AW_MONO +
+    AW_GAP +
+    AW_RULE;
+  return need <= awayBandWidth(seg, columns);
+}
+
+/**
  * Which columns reserve the 15px floor under their slips: every non-gap
  * column of a touched ISO week — the ROW grows, not just the marked cell,
  * because a row is as tall as its tallest cell and the band's sentence
