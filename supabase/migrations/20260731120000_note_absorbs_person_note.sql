@@ -438,29 +438,59 @@ $$;
 
 DROP TABLE IF EXISTS public.person_note;
 
--- And if ANYTHING still holds the type, name it instead of failing with a
--- symptom. `deptype = 'i'` is the enum's own array type, which goes with it.
+-- THE TYPE GOES ONLY IF THE LIVING SCHEMA IS DONE WITH IT.
+--
+-- Production said, when asked: `hour_backup_20260720.person_note`. A frozen
+-- copy left by the 2026-07-20 squash still carries a column of this enum —
+-- and a feature migration retiring a feature has no business reaching into
+-- an archive to do it. So a dependent in a `hour_backup_*` schema does not
+-- block the migration and does not get dropped; it just keeps the type
+-- alive, which is exactly what an archive is for.
+--
+-- Anything else holding it IS the living schema, and that stops the
+-- migration with a name and an address rather than a symptom.
+-- `deptype = 'i'` is the enum's own array type, which goes with it.
 DO $$
-DECLARE holders text;
+DECLARE
+  live_holders text;
+  frozen_holders text;
 BEGIN
-  SELECT string_agg(DISTINCT holder, ', ')
-  INTO holders
+  SELECT
+    string_agg(DISTINCT h.holder, ', ') FILTER (WHERE NOT h.frozen),
+    string_agg(DISTINCT h.holder, ', ') FILTER (WHERE h.frozen)
+  INTO live_holders, frozen_holders
   FROM (
-    SELECT CASE
-             WHEN d.classid = 'pg_proc'::regclass THEN 'function ' || d.objid::regprocedure::text
-             WHEN d.classid = 'pg_class'::regclass THEN 'relation ' || d.objid::regclass::text
-             ELSE d.classid::regclass::text || ' oid ' || d.objid::text
-           END AS holder
+    SELECT
+      CASE
+        WHEN d.classid = 'pg_proc'::regclass THEN 'function ' || d.objid::regprocedure::text
+        WHEN d.classid = 'pg_class'::regclass THEN 'relation ' || d.objid::regclass::text
+        ELSE d.classid::regclass::text || ' oid ' || d.objid::text
+      END AS holder,
+      COALESCE(
+        CASE
+          WHEN d.classid = 'pg_class'::regclass THEN (
+            SELECT n.nspname LIKE 'hour\_backup\_%'
+            FROM pg_class c
+            JOIN pg_namespace n ON n.oid = c.relnamespace
+            WHERE c.oid = d.objid
+          )
+        END,
+        false
+      ) AS frozen
     FROM pg_depend d
     WHERE d.refclassid = 'pg_type'::regclass
       AND d.refobjid = 'public.person_note_visibility'::regtype
       AND d.deptype <> 'i'
-  ) s;
+  ) h;
 
-  IF holders IS NOT NULL THEN
-    RAISE EXCEPTION 'person_note_visibility is still held by: %', holders;
+  IF live_holders IS NOT NULL THEN
+    RAISE EXCEPTION 'person_note_visibility is still held by: %', live_holders;
+  END IF;
+
+  IF frozen_holders IS NOT NULL THEN
+    RAISE NOTICE 'person_note_visibility stays — held only by a frozen backup schema (%)', frozen_holders;
+  ELSE
+    EXECUTE 'DROP TYPE IF EXISTS public.person_note_visibility';
   END IF;
 END;
 $$;
-
-DROP TYPE IF EXISTS public.person_note_visibility;
