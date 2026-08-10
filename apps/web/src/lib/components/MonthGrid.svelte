@@ -578,6 +578,25 @@
     return out.sort((x, y) => x.colStart - y.colStart);
   }
 
+  /**
+   * HOW MANY RUN ROWS ACTUALLY SIT OVER THIS DAY — the day's contents start
+   * under the last one, and NOT under the last one of the week.
+   *
+   * The run rows used to be reserved for the whole week: every cell began
+   * below every band, so a Monday with no run at all opened with forty pixels
+   * of nothing between its number and its first card, and a run two days long
+   * put that hole in the other five days (Marco, day 10). A lane is reserved
+   * for a BAND, which must keep its height across the days it spans; a run is
+   * one element on one row, and the days it does not cross owe it nothing.
+   */
+  function runRowsOver(series: WeekSeries[], di: number): number {
+    let n = 0;
+    series.forEach((s, si) => {
+      if (s.colStart <= di + 1 && di + 1 < s.colEnd) n = si + 1;
+    });
+    return n;
+  }
+
   /* THE LEGEND IS NOT A FILTER ANY MORE (ADR-095 §3). Its project entries were
      the month's own narrowing machine — a second one, a hundred pixels under
      the scope bar that already does exactly this. What the legend keeps is the
@@ -843,7 +862,7 @@
            BETWEEN the number and the day's own contents: above the number it
            reads as a header for the week, below the contents it lands under
            the `+N more` door. It is the frame the days sit inside. -->
-      <div class="cal__wkc" style="--cr: {series.length + 2}">
+      <div class="cal__wkc">
         {#each week as day, di (day.iso)}
           {@const clashes = clashesByDay?.get(day.iso) ?? []}
           <div
@@ -962,6 +981,7 @@
         {/each}
     {#each week as day, di (day.iso)}
       {@const perfs = performancesByDay.get(day.iso) ?? []}
+      {@const runRows = runRowsOver(series, di)}
       {@const dateGroups = groupDates(datesByDay.get(day.iso) ?? [])}
       {@const entries = cellSlips(perfs, dateGroups)}
       {@const overflow = entries.length - CELL_CAP}
@@ -980,7 +1000,7 @@
         class="cal__day"
         class:cal__day--out={!day.inMonth}
         class:cal__day--today={day.iso === todayIso}
-        style="grid-row: var(--cr); grid-column: {di + 1}"
+        style="grid-row: {runRows + 2} / {series.length + 3}; grid-column: {di + 1}"
         onmouseenter={() => (hoverDay = day.iso)}
         onmouseleave={() => (hoverDay = hoverDay === day.iso ? null : hoverDay)}
         role="presentation"
@@ -1075,6 +1095,10 @@
     .cal__grid {
       --cal-wk-gutter: 66px;
       --cal-cell-h: 128px;
+      /* The air between a card and the column rule beside it. One number,
+         because the day cell and the run that crosses it have to agree —
+         they are siblings of the week grid, not parent and child. */
+      --cal-cell-pad: 5px;
       display: flex;
       flex-direction: column;
       transition: opacity var(--transition);
@@ -1249,18 +1273,23 @@
 
     /* ── THE RUN · one band, its days' hours under it ─────────────────── */
     /* The same box as a slip — a run IS a slip with a longer life, and giving
-       it its own shape is how a fifth vocabulary gets invented. */
+       it its own shape is how a fifth vocabulary gets invented. SAME MEANS
+       SAME: the slip's edge (the ink mixed 15% into the line colour, not the
+       9% hairline this box used to wear), the slip's 3px corner, and the
+       slip's own 5px of air on both sides — the run ran to the column rules
+       and printed its border over them, which is the one thing no other card
+       in the sheet does (Marco, 2026-08-10). */
     .cal__run {
       position: relative;
       isolation: isolate;
       display: flex;
       flex-direction: column;
       min-inline-size: 0;
-      margin: 4px 0 1px;
-      padding: 3px 8px;
+      margin: 4px var(--cal-cell-pad) 1px;
+      padding: 3px 6px;
       background: var(--bg-ultra-light);
-      border: 1px solid var(--border-color-light);
-      border-radius: var(--radius-s);
+      border: 1px solid color-mix(in oklch, var(--text-color) 15%, var(--border-color-light));
+      border-radius: 3px;
     }
     /* …and the same certainty grammar, so a tentative run says «not sure» at
        exactly the volume a tentative gig does. */
@@ -1283,6 +1312,12 @@
        measured in days. Drawn back on top — same hairline, same pitch, no
        pointer events — the band is visibly four days long without a word.
        (Marco's experiment, 2026-07-31.) */
+    /* The pitch is the COLUMN's, not the box's: now that the run sits 5px
+       inside its columns, dividing its own width by `--run-cols` puts the
+       rules a couple of pixels off the verticals they are meant to continue.
+       `100%` here is the run's padding box — its border box less the two 1px
+       edges — so the column is that plus the two margins and the two borders,
+       and the first rule starts one border and one margin to the left. */
     .cal__run::after {
       content: '';
       position: absolute;
@@ -1293,8 +1328,8 @@
         var(--border-color-light) 0 1px,
         transparent 1px
       );
-      background-size: calc(100% / var(--run-cols, 1)) 100%;
-      background-position: -1px 0;
+      background-size: calc((100% + 2px + var(--cal-cell-pad) * 2) / var(--run-cols, 1)) 100%;
+      background-position: calc(-1px - var(--cal-cell-pad)) 0;
       background-repeat: repeat-x;
     }
     .cal__run-h {
@@ -1424,7 +1459,7 @@
          than no affordance: you cannot read what is already there.
          (Marco asked to see this exact case before trusting it. He was
          right to: 2026-07-31, day 9, two gigs and a clash.) */
-      padding: 1px 5px 13px;
+      padding: 1px var(--cal-cell-pad) 13px;
       overflow: hidden;
     }
 

@@ -118,7 +118,7 @@
     normalizePlannerView,
     nightsFree,
     daysCoveredBy,
-    isoWeek,} from '$lib/planner';
+  } from '$lib/planner';
   import { buildPersonScope } from '$lib/people';
   import { createPlannerFeeds, primeAgendaWindow } from '$lib/planner-feeds.svelte';
   import { normalizeLaneAxis, resolveLaneAxis, type LaneAxis } from '$lib/carrils';
@@ -2450,6 +2450,7 @@
 
        The second line simply is not there when the drawing has nothing to
        say about itself — an empty Day. -->
+  <div class="cal__facts">
   <p class="cal__meta cal__meta--queue">
       <!-- Pulse strip (ADR-080 §6) — every figure maps to fetched rows; a
            segment whose feed is absent (or count is zero) drops instead of
@@ -2464,7 +2465,7 @@
         {#if !decisionsAbsent && decisionVMs.length > 0}
           <button
             type="button"
-            class="cal__pulse-decide"
+            class="cal__stat cal__pulse-decide"
             aria-expanded={decisionsOpen}
             aria-controls="cal-decisions"
             onclick={() => setDecisionsOpen(!decisionsOpen)}
@@ -2520,14 +2521,6 @@
              grows, so neither prints one. -->
         <!-- Weeks range: BOUNDED drawings only — the board grew a horizon
              and what grows is never counted. -->
-        {#if view === 'month'}
-          <span class="cal__stat cal__stat--soft"
-            >{t('planner.week_range', locale, {
-              a: String(isoWeek(monthFirst)),
-              b: String(isoWeek(monthLast)),
-            })}</span
-          >
-        {/if}
         {#if view === 'agenda'}
           <span class="cal__stat cal__stat--soft"
             >{t('planner.agenda_from', locale, {
@@ -2624,6 +2617,7 @@
         {/if}
     </p>
   {/if}
+  </div>
   <!-- THE DRAWER OPENS UNDER THE STRIP THAT NAMES IT — the queue line says
        `3 to decide · 1 urgent`, and what it names unfolds beneath both lines,
        above the controls. Not between them: the window line is a caption of
@@ -2925,16 +2919,42 @@
       text-transform: uppercase;
       color: var(--text-faint);
     }
-    /* The queue is the line that asks for something, so it keeps the ink and
-       sits tight above the caption that follows it. */
-    .cal__meta--queue {
-      margin-block-end: var(--space-2xs);
+    /* ── THE FACTS ARE ONE BLOCK ──────────────────────────────────────
+       `.cal` is a flex column with a `--space-m` gap, so title, queue, window
+       and controls were four bands at the same interval: nothing grouped with
+       anything. Wrapping the two lines makes them ONE child of that gap — the
+       air between them is 7px and the whole gap goes BELOW, where it belongs,
+       because the cut that matters is facts | controls and not line | line.
+
+       The rule is what closes the block. It is the line that was missing:
+       without it the pair ends in air and the controls underneath look like
+       a third band of the same list. */
+    .cal__facts {
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+      padding-block-end: 10px;
+      border-block-end: 1px solid var(--border-color-light);
     }
-    /* The window line is a CAPTION of the drawing, so it is one step quieter
-       than the line above and the drawing below — the only field in it that
-       carries full ink is a number (`.cal__stat b`). */
+    .cal__facts .cal__meta {
+      margin: 0;
+    }
+    /* TWO LINES, TWO REGISTERS — and this is the step I claimed and did not
+       make: both lines were 9.5px, 0.1em and the same faint ink, so the cut
+       read as a badly-wrapped paragraph. The pair now DESCENDS with the head
+       (42px serif → 11 → 9.5) instead of repeating: the queue is bigger, its
+       tracking is short because it is read as words, and it is one ink up. */
+    .cal__meta--queue {
+      font-size: 11px;
+      letter-spacing: 0.055em;
+      color: var(--text-muted);
+    }
+    /* The window line is a CAPTION of the drawing: smallest, widest tracking,
+       faintest — a field you consult, not one you read. Its numbers keep the
+       one step of ink the strip gives them (`.cal__stat b`), because a census
+       is scanned by its digits. */
     .cal__meta--window {
-      color: var(--text-faint);
+      letter-spacing: 0.13em;
     }
     .cal__meta :global(.cal__stat) {
       white-space: nowrap;

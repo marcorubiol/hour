@@ -414,6 +414,96 @@ ON CONFLICT (id) DO UPDATE SET
   travel_direction = EXCLUDED.travel_direction, title = EXCLUDED.title, notes = EXCLUDED.notes;
 
 -- ---------------------------------------------------------------------------
+-- 8b · MULTI-DAY BLOCKS (ADR-084 §1). A run of days is one band, not N loose
+--      cards, and what makes it a band is a shared `series_id` — the rows
+--      above had none, so the month drew them as separate slips.
+--
+--      Each row keeps its OWN hours on purpose: that per-day difference is
+--      the entire argument for storing a run as N rows, and the strip under
+--      the band is where it shows.
+--
+--      Placed roughly every three weeks so EVERY month of the window has at
+--      least one, whatever weekday the seed is run on. Two of them straddle
+--      a month edge and one is seven days long, so the week edge and the
+--      month edge both have a band that must not be cut.
+-- ---------------------------------------------------------------------------
+
+-- The runs already seeded above were loose rows. Make them bands.
+UPDATE public.date SET series_id = '5e5e0001-0000-4000-8000-000000000001'
+  WHERE id IN ('44440003-0000-4000-8000-000000000003','44440004-0000-4000-8000-000000000004');
+UPDATE public.date SET series_id = '5e5e0002-0000-4000-8000-000000000002'
+  WHERE id IN ('44440008-0000-4000-8000-000000000008','44440009-0000-4000-8000-000000000009',
+               '4444000a-0000-4000-8000-00000000000a','4444000b-0000-4000-8000-00000000000b');
+-- A band whose last day is only tentative: the status is per row, not per band.
+UPDATE public.date SET series_id = '5e5e0003-0000-4000-8000-000000000003'
+  WHERE id IN ('44440019-0000-4000-8000-000000000019','4444001a-0000-4000-8000-00000000001a',
+               '4444001b-0000-4000-8000-00000000001b');
+UPDATE public.date SET series_id = '5e5e0004-0000-4000-8000-000000000004'
+  WHERE id IN ('4444001e-0000-4000-8000-00000000001e','4444001f-0000-4000-8000-00000000001f',
+               '44440020-0000-4000-8000-000000000020');
+
+INSERT INTO public.date
+  (id, workspace_id, project_id, line_id, series_id, kind, status, title, starts_at, ends_at, all_day, city, country, notes, created_by)
+VALUES
+  -- ── three days · Última òrbita · the shortest useful run after the pair
+  ('4a4a0001-0000-4000-8000-000000000001', :'ws', :'uo', '22220003-0000-4000-8000-000000000003', '5e5e0005-0000-4000-8000-000000000005', 'rehearsal', 'confirmed', 'Assaig de represa', :f0 + 25 + time '10:00', :f0 + 25 + time '14:00', false, 'Barcelona', 'ES', NULL, :'by'),
+  ('4a4a0002-0000-4000-8000-000000000002', :'ws', :'uo', '22220003-0000-4000-8000-000000000003', '5e5e0005-0000-4000-8000-000000000005', 'rehearsal', 'confirmed', 'Assaig de represa', :f0 + 26 + time '10:00', :f0 + 26 + time '13:00', false, 'Barcelona', 'ES', NULL, :'by'),
+  ('4a4a0003-0000-4000-8000-000000000003', :'ws', :'uo', '22220003-0000-4000-8000-000000000003', '5e5e0005-0000-4000-8000-000000000005', 'rehearsal', 'confirmed', 'Assaig de represa', :f0 + 27 + time '16:00', :f0 + 27 + time '20:00', false, 'Barcelona', 'ES', NULL, :'by'),
+
+  -- ── five days · MaMeMi · la setmana intensiva, justament quan el Jordi és fora
+  ('4a4a0004-0000-4000-8000-000000000004', :'ws', :'mm', '22220002-0000-4000-8000-000000000002', '5e5e0006-0000-4000-8000-000000000006', 'rehearsal', 'confirmed', 'Setmana intensiva', :f0 + 47 + time '10:00', :f0 + 47 + time '18:00', false, 'Barcelona', 'ES', NULL, :'by'),
+  ('4a4a0005-0000-4000-8000-000000000005', :'ws', :'mm', '22220002-0000-4000-8000-000000000002', '5e5e0006-0000-4000-8000-000000000006', 'rehearsal', 'confirmed', 'Setmana intensiva', :f0 + 48 + time '10:00', :f0 + 48 + time '18:00', false, 'Barcelona', 'ES', NULL, :'by'),
+  ('4a4a0006-0000-4000-8000-000000000006', :'ws', :'mm', '22220002-0000-4000-8000-000000000002', '5e5e0006-0000-4000-8000-000000000006', 'rehearsal', 'confirmed', 'Setmana intensiva', :f0 + 49 + time '10:00', :f0 + 49 + time '14:00', false, 'Barcelona', 'ES', NULL, :'by'),
+  ('4a4a0007-0000-4000-8000-000000000007', :'ws', :'mm', '22220002-0000-4000-8000-000000000002', '5e5e0006-0000-4000-8000-000000000006', 'rehearsal', 'confirmed', 'Setmana intensiva', :f0 + 50 + time '11:00', :f0 + 50 + time '15:00', false, 'Barcelona', 'ES', NULL, :'by'),
+  ('4a4a0008-0000-4000-8000-000000000008', :'ws', :'mm', '22220002-0000-4000-8000-000000000002', '5e5e0006-0000-4000-8000-000000000006', 'rehearsal', 'confirmed', 'Setmana intensiva', :f0 + 51 + time '10:00', :f0 + 51 + time '13:00', false, 'Barcelona', 'ES', NULL, :'by'),
+
+  -- ── SEVEN days · Zoo Elèctric · prou llarga per creuar segur un canvi de
+  --    setmana: la banda no s''ha de partir al diumenge
+  ('4a4a0009-0000-4000-8000-000000000009', :'ws', :'ze', '22220006-0000-4000-8000-000000000006', '5e5e0007-0000-4000-8000-000000000007', 'residency', 'confirmed', 'Residència llarga · Fabra i Coats', :f0 + 69 + time '09:30', :f0 + 69 + time '18:00', false, 'Barcelona', 'ES', NULL, :'by'),
+  ('4a4a000a-0000-4000-8000-00000000000a', :'ws', :'ze', '22220006-0000-4000-8000-000000000006', '5e5e0007-0000-4000-8000-000000000007', 'residency', 'confirmed', 'Residència llarga · Fabra i Coats', :f0 + 70 + time '09:30', :f0 + 70 + time '18:00', false, 'Barcelona', 'ES', NULL, :'by'),
+  ('4a4a000b-0000-4000-8000-00000000000b', :'ws', :'ze', '22220006-0000-4000-8000-000000000006', '5e5e0007-0000-4000-8000-000000000007', 'residency', 'confirmed', 'Residència llarga · Fabra i Coats', :f0 + 71 + time '09:30', :f0 + 71 + time '14:00', false, 'Barcelona', 'ES', NULL, :'by'),
+  ('4a4a000c-0000-4000-8000-00000000000c', :'ws', :'ze', '22220006-0000-4000-8000-000000000006', '5e5e0007-0000-4000-8000-000000000007', 'residency', 'confirmed', 'Residència llarga · Fabra i Coats', :f0 + 72 + time '09:30', :f0 + 72 + time '18:00', false, 'Barcelona', 'ES', NULL, :'by'),
+  ('4a4a000d-0000-4000-8000-00000000000d', :'ws', :'ze', '22220006-0000-4000-8000-000000000006', '5e5e0007-0000-4000-8000-000000000007', 'residency', 'confirmed', 'Residència llarga · Fabra i Coats', :f0 + 73 + time '11:00', :f0 + 73 + time '20:00', false, 'Barcelona', 'ES', 'Assaig amb públic convidat.', :'by'),
+  ('4a4a000e-0000-4000-8000-00000000000e', :'ws', :'ze', '22220006-0000-4000-8000-000000000006', '5e5e0007-0000-4000-8000-000000000007', 'residency', 'confirmed', 'Residència llarga · Fabra i Coats', :f0 + 74 + time '09:30', :f0 + 74 + time '18:00', false, 'Barcelona', 'ES', NULL, :'by'),
+  ('4a4a000f-0000-4000-8000-00000000000f', :'ws', :'ze', '22220006-0000-4000-8000-000000000006', '5e5e0007-0000-4000-8000-000000000007', 'residency', 'confirmed', 'Residència llarga · Fabra i Coats', :f0 + 75 + time '09:30', :f0 + 75 + time '13:00', false, 'Barcelona', 'ES', NULL, :'by'),
+
+  -- ── quatre dies encara TENTATIUS: una banda sencera que és una hipòtesi
+  ('4a4a0010-0000-4000-8000-000000000010', :'ws', :'mm', NULL, '5e5e0008-0000-4000-8000-000000000008', 'other', 'tentative', 'Muntatge i proves de llum', :f0 + 94 + time '09:00', :f0 + 94 + time '20:00', false, 'Barcelona', 'ES', NULL, :'by'),
+  ('4a4a0011-0000-4000-8000-000000000011', :'ws', :'mm', NULL, '5e5e0008-0000-4000-8000-000000000008', 'other', 'tentative', 'Muntatge i proves de llum', :f0 + 95 + time '09:00', :f0 + 95 + time '20:00', false, 'Barcelona', 'ES', NULL, :'by'),
+  ('4a4a0012-0000-4000-8000-000000000012', :'ws', :'mm', NULL, '5e5e0008-0000-4000-8000-000000000008', 'other', 'tentative', 'Muntatge i proves de llum', :f0 + 96 + time '09:00', :f0 + 96 + time '14:00', false, 'Barcelona', 'ES', NULL, :'by'),
+  ('4a4a0013-0000-4000-8000-000000000013', :'ws', :'mm', NULL, '5e5e0008-0000-4000-8000-000000000008', 'other', 'tentative', 'Muntatge i proves de llum', :f0 + 97 + time '09:00', :f0 + 97 + time '20:00', false, 'Barcelona', 'ES', NULL, :'by'),
+
+  -- ── CINC DIES A CAVALL DE DOS MESOS. Ancorada al primer dia del mes, no a
+  --    :f0 — així creua el canvi de mes corri el dia que corri el seed.
+  ('4a4a0014-0000-4000-8000-000000000014', :'ws', :'uo', '22220003-0000-4000-8000-000000000003', '5e5e0009-0000-4000-8000-000000000009', 'rehearsal', 'confirmed', 'Assaig de manteniment', (date_trunc('month', CURRENT_DATE + interval '125 days')::date - 2) + time '10:00', (date_trunc('month', CURRENT_DATE + interval '125 days')::date - 2) + time '14:00', false, 'Barcelona', 'ES', NULL, :'by'),
+  ('4a4a0015-0000-4000-8000-000000000015', :'ws', :'uo', '22220003-0000-4000-8000-000000000003', '5e5e0009-0000-4000-8000-000000000009', 'rehearsal', 'confirmed', 'Assaig de manteniment', (date_trunc('month', CURRENT_DATE + interval '125 days')::date - 1) + time '10:00', (date_trunc('month', CURRENT_DATE + interval '125 days')::date - 1) + time '14:00', false, 'Barcelona', 'ES', NULL, :'by'),
+  ('4a4a0016-0000-4000-8000-000000000016', :'ws', :'uo', '22220003-0000-4000-8000-000000000003', '5e5e0009-0000-4000-8000-000000000009', 'rehearsal', 'confirmed', 'Assaig de manteniment', (date_trunc('month', CURRENT_DATE + interval '125 days')::date)     + time '10:00', (date_trunc('month', CURRENT_DATE + interval '125 days')::date)     + time '13:00', false, 'Barcelona', 'ES', 'Primer dia del mes: la banda no s''ha de tallar aquí.', :'by'),
+  ('4a4a0017-0000-4000-8000-000000000017', :'ws', :'uo', '22220003-0000-4000-8000-000000000003', '5e5e0009-0000-4000-8000-000000000009', 'rehearsal', 'confirmed', 'Assaig de manteniment', (date_trunc('month', CURRENT_DATE + interval '125 days')::date + 1) + time '10:00', (date_trunc('month', CURRENT_DATE + interval '125 days')::date + 1) + time '14:00', false, 'Barcelona', 'ES', NULL, :'by'),
+  ('4a4a0018-0000-4000-8000-000000000018', :'ws', :'uo', '22220003-0000-4000-8000-000000000003', '5e5e0009-0000-4000-8000-000000000009', 'rehearsal', 'confirmed', 'Assaig de manteniment', (date_trunc('month', CURRENT_DATE + interval '125 days')::date + 2) + time '16:00', (date_trunc('month', CURRENT_DATE + interval '125 days')::date + 2) + time '20:00', false, 'Barcelona', 'ES', NULL, :'by'),
+
+  -- ── quatre dies de festa: un day_off també pot ser una banda, i va tot el dia
+  ('4a4a0019-0000-4000-8000-000000000019', :'ws', :'mm', NULL, '5e5e000a-0000-4000-8000-00000000000a', 'day_off', 'confirmed', 'Aturada de Nadal', :f0 + 131 + time '00:00', NULL, true, NULL, NULL, NULL, :'by'),
+  ('4a4a001a-0000-4000-8000-00000000001a', :'ws', :'mm', NULL, '5e5e000a-0000-4000-8000-00000000000a', 'day_off', 'confirmed', 'Aturada de Nadal', :f0 + 132 + time '00:00', NULL, true, NULL, NULL, NULL, :'by'),
+  ('4a4a001b-0000-4000-8000-00000000001b', :'ws', :'mm', NULL, '5e5e000a-0000-4000-8000-00000000000a', 'day_off', 'confirmed', 'Aturada de Nadal', :f0 + 133 + time '00:00', NULL, true, NULL, NULL, NULL, :'by'),
+  ('4a4a001c-0000-4000-8000-00000000001c', :'ws', :'mm', NULL, '5e5e000a-0000-4000-8000-00000000000a', 'day_off', 'confirmed', 'Aturada de Nadal', :f0 + 134 + time '00:00', NULL, true, NULL, NULL, NULL, :'by'),
+
+  -- ── quatre dies · Zoo · la represa de gener
+  ('4a4a001d-0000-4000-8000-00000000001d', :'ws', :'ze', '22220006-0000-4000-8000-000000000006', '5e5e000b-0000-4000-8000-00000000000b', 'residency', 'confirmed', 'Represa de gener', :f0 + 140 + time '10:00', :f0 + 140 + time '18:00', false, 'Girona', 'ES', NULL, :'by'),
+  ('4a4a001e-0000-4000-8000-00000000001e', :'ws', :'ze', '22220006-0000-4000-8000-000000000006', '5e5e000b-0000-4000-8000-00000000000b', 'residency', 'confirmed', 'Represa de gener', :f0 + 141 + time '10:00', :f0 + 141 + time '18:00', false, 'Girona', 'ES', NULL, :'by'),
+  ('4a4a001f-0000-4000-8000-00000000001f', :'ws', :'ze', '22220006-0000-4000-8000-000000000006', '5e5e000b-0000-4000-8000-00000000000b', 'residency', 'confirmed', 'Represa de gener', :f0 + 142 + time '10:00', :f0 + 142 + time '14:00', false, 'Girona', 'ES', NULL, :'by'),
+  ('4a4a0020-0000-4000-8000-000000000020', :'ws', :'ze', '22220006-0000-4000-8000-000000000006', '5e5e000b-0000-4000-8000-00000000000b', 'residency', 'confirmed', 'Represa de gener', :f0 + 143 + time '10:00', :f0 + 143 + time '18:00', false, 'Girona', 'ES', NULL, :'by'),
+
+  -- ── quatre dies · MaMeMi · l''última del calendari, al fons de l''horitzó
+  ('4a4a0021-0000-4000-8000-000000000021', :'ws', :'mm', '22220002-0000-4000-8000-000000000002', '5e5e000c-0000-4000-8000-00000000000c', 'rehearsal', 'confirmed', 'Assaig de reposició', :f0 + 172 + time '10:00', :f0 + 172 + time '14:00', false, 'Barcelona', 'ES', NULL, :'by'),
+  ('4a4a0022-0000-4000-8000-000000000022', :'ws', :'mm', '22220002-0000-4000-8000-000000000002', '5e5e000c-0000-4000-8000-00000000000c', 'rehearsal', 'confirmed', 'Assaig de reposició', :f0 + 173 + time '10:00', :f0 + 173 + time '14:00', false, 'Barcelona', 'ES', NULL, :'by'),
+  ('4a4a0023-0000-4000-8000-000000000023', :'ws', :'mm', '22220002-0000-4000-8000-000000000002', '5e5e000c-0000-4000-8000-00000000000c', 'rehearsal', 'confirmed', 'Assaig de reposició', :f0 + 174 + time '16:00', :f0 + 174 + time '20:00', false, 'Barcelona', 'ES', NULL, :'by'),
+  ('4a4a0024-0000-4000-8000-000000000024', :'ws', :'mm', '22220002-0000-4000-8000-000000000002', '5e5e000c-0000-4000-8000-00000000000c', 'rehearsal', 'confirmed', 'Assaig de reposició', :f0 + 175 + time '10:00', :f0 + 175 + time '13:00', false, 'Barcelona', 'ES', NULL, :'by')
+ON CONFLICT (id) DO UPDATE SET
+  starts_at = EXCLUDED.starts_at, ends_at = EXCLUDED.ends_at, status = EXCLUDED.status,
+  kind = EXCLUDED.kind, series_id = EXCLUDED.series_id, all_day = EXCLUDED.all_day,
+  title = EXCLUDED.title, notes = EXCLUDED.notes;
+
+-- ---------------------------------------------------------------------------
 -- 9 · Absences. Both certainties, one for the whole company, one that spans
 --     today, one single day, three that overlap (so the bands have to stack
 --     into lanes) and one 26-day band that crosses weeks, the month edge and
@@ -690,3 +780,16 @@ WHERE workspace_id = :'ws' AND deleted_at IS NULL GROUP BY status ORDER BY statu
 \echo '— date kinds covered —'
 SELECT kind, status, count(*) FROM public.date
 WHERE workspace_id = :'ws' AND deleted_at IS NULL GROUP BY kind, status ORDER BY kind, status;
+
+\echo '— multi-day bands: at least one per month —'
+SELECT to_char(min(starts_at), 'YYYY-MM') AS month,
+       coalesce(max(title), '(sense títol)') AS band,
+       max(kind::text) AS kind,
+       count(*) AS days,
+       min(starts_at)::date AS from_day,
+       max(starts_at)::date AS to_day,
+       (min(starts_at)::date <> max(starts_at)::date
+        AND to_char(min(starts_at), 'MM') <> to_char(max(starts_at), 'MM')) AS crosses_month
+FROM public.date
+WHERE workspace_id = :'ws' AND deleted_at IS NULL AND series_id IS NOT NULL
+GROUP BY series_id ORDER BY min(starts_at);
