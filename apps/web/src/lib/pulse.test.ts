@@ -136,7 +136,7 @@ describe('next — the first moment still ahead', () => {
     expect(next?.at).toBe(`${DAY}T18:00:00Z`);
     expect(next?.call).toBe(`${DAY}T13:30:00Z`);
     expect(next?.today).toBe(true);
-    expect(next?.ref.place).toBe('Teatre Principal');
+    expect((next?.ref.row as PerformanceEvent).venue_name).toBe('Teatre Principal');
   });
 
   test('a lone start time is a start, not a call', () => {

@@ -3,18 +3,27 @@
    * THE PULSE — the rail's second sentence, under the clock.
    *
    *   NOW   free  UNTIL 15h30
-   *   NEXT  [ÚO] 20h  CALL 15h30
+   *   NEXT  ÚO SHOW 20h
    *         Teatre Principal
+   *         Palma ES · CALL 15h30
    *
    * The clock says when you are; this says what you are in. The truth layer
    * is `$lib/pulse` (pure, `now` injected, no words); this file fetches, and
    * translates the keys it gets back.
    *
-   * IT NEVER CHANGES HEIGHT. Three lines, always — loading, empty, or full.
-   * A block that appears and disappears above the scope list makes the whole
-   * rail jump every time a query settles, and the rail is furniture: it must
-   * be where it was a second ago. What has no truth draws a dash, which is
-   * not the same as drawing nothing and not the same as drawing a guess.
+   * WHAT COMES NEXT IS A SLIP, the same object the month cell, the board, the
+   * diary and the day card draw — with its ground taken away, which is the
+   * only thing a rail cannot afford. It is not a copy of the card's type
+   * rules: the first version of this block resolved its own name out of
+   * `venue_name ?? city ?? title` and drew a production meeting called
+   * «Barcelona». ADR-095 §0 had already written down what a second opinion
+   * about one card costs.
+   *
+   * IT NEVER CHANGES HEIGHT WHILE ONE ANSWER IS BEING DRAWN. What has no
+   * truth yet draws a dash in the space the answer will take. A block that
+   * appears and disappears above the scope list makes the whole rail jump
+   * every time a query settles, and the rail is furniture: it must be where
+   * it was a second ago.
    *
    * IT NEVER FILTERS BY SCOPE. It sits ABOVE the scope list on purpose: the
    * lens narrows what you are looking at, and this says what is happening to
@@ -29,14 +38,20 @@
   import { fetchJSON } from '$lib/api';
   import { dualTime, hourMark, localeDayMonth, localeWeekdayShort } from '$lib/datetime';
   import { t, type Locale } from '$lib/i18n';
-  import type { DateEvent, PerformanceEvent } from '$lib/month-events';
+  import {
+    dateSlip,
+    performanceSlip,
+    type DateEvent,
+    type PerformanceEvent,
+    type SlipContext,
+    type SlipKind,
+  } from '$lib/month-events';
   import { meQueryOptions, teamQueryOptions, workspacesQueryOptions } from '$lib/nav-queries';
   import { buildPersonAttribution } from '$lib/people';
   import { dayKeyInTz } from '$lib/planner';
   import { computePulse, type PulseWord } from '$lib/pulse';
   import type { AvailabilityItem } from '$lib/availability';
-  import { accentVarFor } from '$lib/utils/accent';
-  import IdentityMark from '$lib/components/IdentityMark.svelte';
+  import Slip from '$lib/components/planner/Slip.svelte';
 
   interface Props {
     /** The rail's clock, already ticking on the minute — one timer in the
@@ -149,6 +164,26 @@
   // statement about the day and an empty cache is not one.
   let settled = $derived($perfQuery.isSuccess && $datesQuery.isSuccess);
 
+  const kindLabel = (kind: SlipKind) => t(`planner.kind_${kind}`, locale);
+
+  let slipCtx = $derived<SlipContext>({
+    workspaceSlug: workspaces[0]?.slug ?? '',
+    workspaceSlugById: new Map(workspaces.map((w) => [w.id, w.slug])),
+    workspaceTzById: new Map(workspaces.map((w) => [w.id, w.timezone])),
+    workspaceModeById: new Map(workspaces.map((w) => [w.id, w.booking_mode ?? 'simple'])),
+    viewerTz,
+    kindLabel,
+    dualTime,
+  });
+
+  let nextSlip = $derived.by(() => {
+    const ref = pulse.next?.ref;
+    if (!ref) return null;
+    return ref.of === 'performance'
+      ? performanceSlip(ref.row as PerformanceEvent, slipCtx)
+      : dateSlip(ref.row as DateEvent, slipCtx);
+  });
+
   /** A run-sheet key or a date kind → the words the app already owns.
       `start` has no anchor key of its own; the Desk calls that moment the
       show, and one moment may not have two names. */
@@ -157,30 +192,24 @@
       const key = word.key === 'load_in' ? 'loadin' : word.key === 'start' ? 'show' : word.key;
       return t(`desk.anchor_${key}`, locale);
     }
-    return word.label ?? t(`planner.kind_${word.key}`, locale);
+    return word.label ?? kindLabel(word.key as SlipKind);
   }
 
-  /** Venue-first, the planner's clock. No viewer gloss: the rail has 13rem
-      and the clock right above it already says where the reader is. */
+  /** Venue-first, the planner's clock. No viewer gloss on the two margin
+      hours: the rail has 13rem, and the slip prints its own gloss already. */
   function hour(iso: string, tz: string | null): string {
     return hourMark(dualTime(iso, tz, viewerTz).primary);
   }
 
   let doingLabel = $derived(pulse.now.doing ? wordLabel(pulse.now.doing.word) : null);
-  let untilLabel = $derived(
-    pulse.now.until ? hour(pulse.now.until.at, pulse.now.until.tz) : null,
-  );
+  let untilLabel = $derived(pulse.now.until ? hour(pulse.now.until.at, pulse.now.until.tz) : null);
   /** Anything but a fact is a claim, and a claim is drawn as one. */
-  let nowGuess = $derived(
-    pulse.now.doing ? pulse.now.doing.ref.attribution !== 'explicit' : false,
-  );
+  let nowGuess = $derived(pulse.now.doing ? pulse.now.doing.ref.attribution !== 'explicit' : false);
   let nextGuess = $derived(pulse.next ? pulse.next.ref.attribution !== 'explicit' : false);
 
-  let nextHour = $derived(pulse.next?.at ? hour(pulse.next.at, pulse.next.ref.tz) : null);
+  /** The one fact the slip cannot carry: a gig is ONE instant on the sheet
+      (see `performanceSlip`), and the call is the moment before it. */
   let nextCall = $derived(pulse.next?.call ? hour(pulse.next.call, pulse.next.ref.tz) : null);
-  /** A gig is named by its hour and its venue; a rehearsal has to say what
-      it is, or the row reads as a show at 10 in the morning. */
-  let nextWord = $derived(pulse.next ? wordLabel(pulse.next.word) : '');
 
   /** Another day gets named; today does not — the clock above already did. */
   let nextDay = $derived.by(() => {
@@ -191,13 +220,6 @@
     return days <= 6
       ? `${localeWeekdayShort(pulse.next.day, locale)} ${Number(pulse.next.day.slice(8, 10))}`
       : localeDayMonth(pulse.next.day, locale);
-  });
-
-  let nextHref = $derived.by(() => {
-    const ref = pulse.next?.ref;
-    if (!ref || ref.of !== 'performance' || !ref.slug || !ref.project) return null;
-    const ws = workspaces.find((w) => w.id === ref.project?.workspace_id);
-    return ws ? `/h/${ws.slug}/performance/${ref.slug}` : null;
   });
 </script>
 
@@ -222,43 +244,30 @@
   </span>
 
   <span class="pulse__k pulse__k--next">{t('pulse.next', locale)}</span>
-  <span class="pulse__v pulse__v--next">
-    {#if !settled || !pulse.next}
+  <div class="pulse__next">
+    {#if !settled || !nextSlip}
       <span class="pulse__dash">—</span>
     {:else}
-      {#if pulse.next.ref.project}
-        <IdentityMark
-          mini
-          accent={accentVarFor(pulse.next.ref.project)}
-          name={pulse.next.ref.project.name}
-          initials={pulse.next.ref.project.initials}
+      <span class="pulse__slip" class:guess={nextGuess}>
+        <Slip
+          slip={nextSlip}
+          {kindLabel}
+          stateLabel={() => null}
+          showCountry
+          ground="bare"
+          placing="cell"
         />
-      {/if}
-      {#if nextDay}<span class="pulse__note">{nextDay}</span>{/if}
-      <span class="pulse__at" class:guess={nextGuess}>{nextHour ?? nextWord}</span>
-      {#if nextHour && pulse.next.ref.of === 'date'}
-        <span class="pulse__word">{nextWord}</span>
-      {/if}
-      {#if nextCall}
-        <span class="pulse__note"
-          ><span class="pulse__lab">{t('pulse.call', locale)}</span> {nextCall}</span
-        >
+      </span>
+      {#if nextDay || nextCall}
+        <span class="pulse__note">
+          {#if nextDay}{nextDay}{/if}{#if nextDay && nextCall}<i class="pulse__sep">·</i>{/if}{#if nextCall}<span
+              class="pulse__lab">{t('pulse.call', locale)}</span
+            >
+            {nextCall}{/if}
+        </span>
       {/if}
     {/if}
-  </span>
-
-  <!-- The place holds its line whether or not it has anything to say: it is
-       the row that would make the rail jump, because a venue name is the last
-       thing to arrive and the first thing to be missing. -->
-  <p class="pulse__place" class:guess={nextGuess}>
-    {#if settled && pulse.next?.ref.place}
-      {#if nextHref}
-        <a href={nextHref}>{pulse.next.ref.place}</a>
-      {:else}
-        {pulse.next.ref.place}
-      {/if}
-    {/if}
-  </p>
+  </div>
 </div>
 
 <style>
@@ -269,11 +278,18 @@
     column-gap: var(--space-s);
     padding-inline: var(--space-xs);
   }
-  /* The air goes BETWEEN the two sentences, not inside one: the venue
-     belongs to NEXT and stays tucked under it. */
+  /* The air goes BETWEEN the two sentences, not inside one. */
   .pulse__k--next,
-  .pulse__v--next {
+  .pulse__next {
     margin-block-start: var(--space-xs);
+    /* AND THE SECOND ROW DOES NOT SIT ON A BASELINE. Every child of this
+       grid measured identically in both states and the block still grew two
+       pixels when the answer landed — because a baseline-aligned row is as
+       tall as its items' baselines make it, and a lone dash puts its first
+       baseline nowhere near a slip's 9px head. Top-aligned, the row is the
+       height of its tallest item and nothing else, which is the only version
+       of it that cannot move. */
+    align-self: start;
   }
   /* The rail's own micro-label voice — the same one .side-sec__h and the
      clock's date already speak (uppercase mono, faint, loose). */
@@ -290,19 +306,48 @@
     flex-wrap: wrap;
     gap: 0 var(--space-xs);
     min-inline-size: 0;
+    /* Same reserve as the NEXT area, one line of it: a lone dash makes a
+       shorter line box than a figure with a margin word beside it, and those
+       two pixels were the whole block settling when the answer landed. Stated
+       here so the two states share a line-height instead of inheriting two. */
+    font-size: var(--text-s);
+    line-height: 1.55;
+    min-block-size: 1lh;
   }
-  /* What you are in, and the hour of what is next: the two figures that
-     carry the block. Mono, because they are read as data. */
-  .pulse__doing,
-  .pulse__at {
+  .pulse__next {
+    display: flex;
+    flex-direction: column;
+    min-inline-size: 0;
+    /* THE ANSWER'S SPACE IS HELD BEFORE THE ANSWER ARRIVES, so the dash sits
+       in it rather than collapsing the block and pulling the scopes up the
+       rail while a query lands.
+       `lh` resolves against THIS element's font, so the reserve has to be
+       stated in the slip's terms and not the shell's: inheriting the body's
+       16px/1.55 reserved 76px for a card that is 38px tall, and half the
+       block was air. Three lines of the slip's own size, a hair loose, so the
+       reserve always wins and neither state moves. A name long enough to
+       wrap grows the block — that is content, not settling. */
+    font-size: var(--text-s);
+    line-height: 1.06;
+    min-block-size: 3lh;
+  }
+  /* The slip is measured, never declared (see Slip's header): the rail is
+     its cell, and it gives 13.25rem. */
+  .pulse__slip {
+    container-type: inline-size;
+    display: block;
+    min-inline-size: 0;
+  }
+  /* What you are in — the only figure NOW carries. Mono, because it is read
+     as data, and at the same size as the slip's name below it. */
+  .pulse__doing {
     font-family: var(--font-mono);
     font-size: var(--text-s);
     color: var(--heading-color);
   }
   /* Everything that qualifies a figure — until, call, the day — is margin
      voice: it must never compete with the figure it qualifies. */
-  .pulse__note,
-  .pulse__word {
+  .pulse__note {
     font-family: var(--font-mono);
     font-size: var(--text-xs);
     letter-spacing: var(--mono-letter-spacing-loose);
@@ -316,38 +361,13 @@
   .pulse__lab {
     text-transform: uppercase;
   }
-  /* A kind is a value too, not a label: a rehearsal says what it is at the
-     volume of the hour beside it, and the venue below still gets to speak. */
-  .pulse__word {
-    color: var(--text-muted);
+  .pulse__sep {
+    font-style: normal;
+    margin-inline: 0.35em;
   }
   .pulse__dash {
     font-family: var(--font-mono);
     font-size: var(--text-s);
     color: var(--text-faint);
-  }
-  /* THE ONE THING THE BLOCK IS ABOUT. Body size, in the sans, under a rail
-     that is otherwise all mono furniture — where you are going next is a
-     place with a name, and the two hours above it are its coordinates. */
-  .pulse__place {
-    grid-column: 2;
-    margin: 0;
-    /* The line is held whether or not it says anything — see the markup. */
-    min-block-size: 1lh;
-    font-family: var(--font-sans);
-    font-size: var(--text-m);
-    line-height: 1.25;
-    color: var(--text-color);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .pulse__place a {
-    color: inherit;
-    text-decoration: none;
-  }
-  .pulse__place a:hover {
-    text-decoration: underline;
-    text-underline-offset: 2px;
   }
 </style>

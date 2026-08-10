@@ -301,7 +301,7 @@ export type Slip = {
   title: string;
 };
 
-type SlipContext = {
+export type SlipContext = {
   workspaceSlug: string;
   workspaceSlugById: Map<string, string>;
   workspaceTzById: Map<string, string | undefined>;

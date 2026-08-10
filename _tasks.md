@@ -63,9 +63,15 @@
     el último tramo corre blando y `until` se queda a null antes que inventar
     una hora. Por persona, con el cuarto estado `unattributed` que ADR-096 §4
     tuvo que abrir para que «libre» no se dijera sobre una ignorancia.
+    Lo que viene **es un `Slip`** con el ground quitado (`ground="bare"`), el
+    mismo objeto que dibujan el mes, el board, la agenda y el día: el pulse no
+    tiene una segunda opinión sobre cómo se llama una fila. Addendum de
+    ADR-096 §10-12.
     Verificado: **check 0/0 (1870 ficheros) · unit 555/555 (era 527) · build
-    verde**, y comprobación visual contra la base local (`NOW free UNTIL 11h ·
-    NEXT [NO] 11h residency · Girona`).
+    verde**, y contra la base local: `NOW free UNTIL 11h · NEXT [NO]
+    RESIDENCY 11h–20h · Residència La Fàbrica · Girona ES`, con la altura
+    medida **abortando las dos peticiones a propósito** — 66.42px con las
+    rayas y 66.42px con la respuesta.
 28. [x] **El rename**, porque la palabra estaba ocupada: la tira del Planner es
     `stat_*` (cierra el nombre partido que ya usaba `cal__stat` y
     `planner.stat_free`), el Desk es `desk.digest_*`. ADR-080 §6 no se

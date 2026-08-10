@@ -57,7 +57,6 @@ import {
   runSheetSteps,
   type DateEvent,
   type PerformanceEvent,
-  type ProjectLite,
   type RunSheetStepKey,
 } from './month-events';
 import type { PersonAttribution, PersonAttributionScope } from './people';
@@ -73,11 +72,18 @@ export type PulseWord =
 export interface PulseRef {
   of: 'performance' | 'date';
   id: string;
-  /** A performance has a page; a date is edited in place. */
-  slug: string | null;
-  project: ProjectLite | null;
-  /** Venue, else city, else the row's own title — the second line. */
-  place: string | null;
+  /**
+   * THE ROW ITSELF, so the caller can turn it into a `Slip`.
+   *
+   * The pulse does NOT decide what a thing is called, where it is, or where
+   * it links to. `performanceSlip`/`dateSlip` already answer that for the
+   * month, the board, the diary and the day, and ADR-095 §0 is explicit
+   * about what a second opinion costs: this module tried its own
+   * `venue_name ?? city ?? title` and lost a rehearsal's actual title
+   * («Reunió de producció» drew as «Barcelona») the first time a real row
+   * met it. One vocabulary, five drawings.
+   */
+  row: PerformanceEvent | DateEvent;
   /** The venue's zone when it has one: every hour here is venue-first. */
   tz: string | null;
   /** How the row reached you. Anything but `explicit` is a claim, not a
@@ -206,9 +212,7 @@ function performanceEntry(
   const ref: PulseRef = {
     of: 'performance',
     id: p.id,
-    slug: p.slug,
-    project: p.project,
-    place: p.venue?.name ?? p.venue_name ?? p.city ?? null,
+    row: p,
     tz: p.venue?.timezone ?? null,
     attribution,
     tentative: isTentative(p.status),
@@ -252,9 +256,7 @@ function dateEntry(d: DateEvent, viewerTz: string, attribution: PersonAttributio
   const ref: PulseRef = {
     of: 'date',
     id: d.id,
-    slug: null,
-    project: d.project,
-    place: d.venue_name ?? d.city ?? d.title ?? null,
+    row: d,
     tz: d.venue?.timezone ?? null,
     attribution,
     tentative: isTentative(d.status),

@@ -3193,3 +3193,31 @@ Triggered by Marco's pre-scaffold doubt (Phase 0.0 day 5). Five alternatives eva
   verdad en producción — hoy casi todo resuelve `unattributed` y el eje de
   persona no estrecha nada, que es honesto pero no es lo que va a pasar; (c) el
   pulse quiera decir una llamada **por persona**, que hoy no existe en el modelo.
+
+> **Addendum a ADR-096, el mismo día, después de ver el bloque con datos
+> reales** (Marco: *«como es "other" no sé lo que es. creo que esa línea falta
+> en todos los casos. además, Barcelona se ve grande. ¿y si copiamos los
+> estilos de la card de month? en texto, no en background ni border»*).
+>
+> - **10 · Lo que viene es un SLIP, no una copia de sus estilos.** El pulse se
+>   había resuelto su propio nombre —`venue_name ?? city ?? title`— y una
+>   reunión de producción se dibujó como «Barcelona»: el título, que es lo
+>   único que dice qué es, no llegaba a la pantalla. ADR-095 §0 ya tenía
+>   escrito lo que cuesta una segunda opinión sobre una misma card. Así que
+>   `PulseRef` deja de llevar `place`/`slug`/`project` y lleva **la fila**, y
+>   el rail construye `performanceSlip`/`dateSlip` como el mes, el board, la
+>   agenda y el día. Gratis vienen el título, la ciudad bajo el nombre sin
+>   repetirla, el país, el rango `11h–20h`, el `href` y el grano del hold.
+> - **11 · `ground: 'card' | 'bare'` en `Slip`.** Segundo eje, no un segundo
+>   componente: `placing` decide dónde vive el reloj, `ground` decide si hay
+>   papel debajo. El rail pidió «el texto de la card sin su caja» y eso es
+>   exactamente un ground.
+> - **12 · Y la altura estable no se consigue reservando líneas.** Tres
+>   intentos: `3lh` reservaba **76px para una card de 38** (`lh` se resuelve
+>   con la tipografía de ESTE elemento, y heredaba los 16px del body, no los
+>   12.8 de la card); corregido eso quedaban 2px que no estaban en ninguna
+>   altura —los cuatro hijos medían idéntico en los dos estados— sino en la
+>   **línea base**: una fila alineada por baseline es tan alta como la ponen
+>   las bases de sus hijos, y una raya sola no tiene la base donde la tiene la
+>   cabecera de 9px de un slip. `align-self: start` en la segunda fila. Medido
+>   con las dos peticiones abortadas a propósito, no a ojo.

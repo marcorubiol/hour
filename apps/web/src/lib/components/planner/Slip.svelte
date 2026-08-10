@@ -102,6 +102,22 @@
      * one in five ways by the time anybody compared them.
      */
     placing?: 'cell' | 'row';
+    /**
+     * WHETHER THERE IS A CARD UNDER IT.
+     *
+     * A second axis from `placing`, and two props because they are two facts:
+     * the placing decides where the clock lives, this decides whether the
+     * slip sits on paper. `bare` drops the ground, the edge and the padding
+     * and keeps every word exactly as it is — which is what the shell rail
+     * needs, where the slip is a sentence in a column of furniture and not an
+     * object you can point at.
+     *
+     * It is a prop and not a copy of the type rules somewhere else, because
+     * copying them is precisely how the month came to print a country code
+     * the board could not (see the header). The rail asked for «the card's
+     * text, without its box»; this is that, and it stays one component.
+     */
+    ground?: 'card' | 'bare';
     /** The verbs — `confirm`, `let go`. Drawn in the row placing's third
         column, which is reserved for them and empty everywhere else. */
     actions?: import('svelte').Snippet;
@@ -118,6 +134,7 @@
     clash = 'none',
     clashPeople = false,
     placing = 'cell',
+    ground = 'card',
     actions,
   }: Props = $props();
 
@@ -212,6 +229,7 @@
     data-family={slip.cert}
     data-kind={slip.kind}
     data-placing={placing}
+    data-ground={ground}
     data-clash={clash === 'none' ? undefined : clash}
     data-clash-people={clash !== 'none' && clashPeople ? '' : undefined}
     style={slip.project ? `--c: ${accentVarFor(slip.project)}` : undefined}
@@ -225,6 +243,7 @@
     data-family={slip.cert}
     data-kind={slip.kind}
     data-placing={placing}
+    data-ground={ground}
     data-clash={clash === 'none' ? undefined : clash}
     data-clash-people={clash !== 'none' && clashPeople ? '' : undefined}
     style={slip.project ? `--c: ${accentVarFor(slip.project)}` : undefined}
@@ -237,6 +256,7 @@
     data-family={slip.cert}
     data-kind={slip.kind}
     data-placing={placing}
+    data-ground={ground}
     data-clash={clash === 'none' ? undefined : clash}
     data-clash-people={clash !== 'none' && clashPeople ? '' : undefined}
     style={slip.project ? `--c: ${accentVarFor(slip.project)}` : undefined}
@@ -272,6 +292,16 @@
     }
     .slip + :global(.slip) {
       margin-block-start: 3px;
+    }
+    /* NO PAPER. Every word keeps its size, its ink and its order; only the
+       object it was sitting on goes. `border: 0` and not a transparent edge
+       because a bare slip is not a card pretending — the 2px it gives back
+       matter in a 13rem rail. */
+    .slip[data-ground='bare'] {
+      background: none;
+      border: 0;
+      border-radius: 0;
+      padding: 0;
     }
 
     /* ── the head line ──────────────────────────────────────────────── */
