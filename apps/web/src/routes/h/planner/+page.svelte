@@ -2900,6 +2900,22 @@
 <style>
   @layer components {
     .cal {
+      /* ── THE REPORT'S OWN SCALE, NAMED ─────────────────────────────
+         The house pattern for a drawing's own measurements is a NAMED LOCAL
+         (`--eyebrow-tracking`, `--cal-wk-gutter`), not a number dropped into
+         a declaration. The global tokens are for what the whole app shares —
+         space, colour, the reading scale — and these four are this page's.
+
+         FIXED px, and not the fluid `--text-*` clamps, ON PURPOSE: this is a
+         mono line whose grid is made of `·` separators and tabular numbers,
+         and `--text-xs` (9.7→10.2 with the viewport) would slide that grid
+         between one screen width and another. The reading scale breathes
+         because prose should; a report's ruler must not. */
+      --meta-line: 11px; /* the queue — mono read as WORDS, so short tracking */
+      --meta-caption: 9.5px; /* the window — a field you consult, so wide */
+      --meta-track-line: 0.055em;
+      --meta-track-caption: 0.13em;
+
       display: flex;
       flex-direction: column;
       gap: var(--space-m);
@@ -2914,8 +2930,11 @@
       gap: var(--space-2xs) var(--space-s);
       margin: 0 0 var(--space-s);
       font-family: var(--font-mono);
-      font-size: 9.5px;
-      letter-spacing: 0.1em;
+      /* The caption size is the band's floor: the queue line steps UP from it,
+         nothing steps down. Named on `.cal__facts`, which is the block both
+         lines belong to. */
+      font-size: var(--meta-caption);
+      letter-spacing: var(--meta-track-caption);
       text-transform: uppercase;
       color: var(--text-faint);
     }
@@ -2930,10 +2949,21 @@
        without it the pair ends in air and the controls underneath look like
        a third band of the same list. */
     .cal__facts {
+      /* ── THE REPORT'S OWN SCALE, NAMED ─────────────────────────────
+         The house pattern for a drawing's own measurements is a NAMED LOCAL
+         (`--eyebrow-tracking`, `--cal-wk-gutter`), not a number dropped into
+         a declaration. The global tokens are for what the whole app shares —
+         space, colour, the reading scale — and these four are this band's.
+
+         FIXED px, and not the fluid `--text-*` clamps, ON PURPOSE: this is a
+         mono line whose grid is made of `·` separators and tabular numbers,
+         and `--text-xs` (9.7→10.2 with the viewport) would slide that grid
+         between one screen width and another. The reading scale breathes
+         because prose should; a report's ruler must not. */
       display: flex;
       flex-direction: column;
-      gap: 7px;
-      padding-block-end: 10px;
+      gap: var(--space-xs);
+      padding-block-end: var(--space-s);
       border-block-end: 1px solid var(--border-color-light);
     }
     .cal__facts .cal__meta {
@@ -2945,17 +2975,16 @@
        (42px serif → 11 → 9.5) instead of repeating: the queue is bigger, its
        tracking is short because it is read as words, and it is one ink up. */
     .cal__meta--queue {
-      font-size: 11px;
-      letter-spacing: 0.055em;
+      font-size: var(--meta-line);
+      letter-spacing: var(--meta-track-line);
       color: var(--text-muted);
     }
     /* The window line is a CAPTION of the drawing: smallest, widest tracking,
        faintest — a field you consult, not one you read. Its numbers keep the
        one step of ink the strip gives them (`.cal__stat b`), because a census
        is scanned by its digits. */
-    .cal__meta--window {
-      letter-spacing: 0.13em;
-    }
+    /* No `.cal__meta--window` rule: the caption IS the base, and the queue is
+       the one that steps up from it. The class stays as the markup's hook. */
     .cal__meta :global(.cal__stat) {
       white-space: nowrap;
     }
