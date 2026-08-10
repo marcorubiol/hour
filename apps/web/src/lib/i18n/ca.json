@@ -411,6 +411,7 @@
   "planner.day_empty": "Res en aquest dia.",
   "planner.day_axis": "el dia",
   "planner.no_cast": "sense repartiment",
+  "planner.pulse_window": "durant {month}",
   "planner.agenda_from": "des de {day}",
   "planner.week_range": "setmanes {a} → {b}",
   "planner.new_date": "Nova data",

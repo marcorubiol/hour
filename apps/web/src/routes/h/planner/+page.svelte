@@ -2542,6 +2542,22 @@
           <span class="cal__stat cal__stat--soft">{daySpanLabel}</span>
         {/if}
         {#if view !== 'agenda' && view !== 'board'}
+        <!-- EVERY WINDOW SAYS WHICH ONE IT IS, and the Day was the only view
+             that did not (Marco, 2026-08-10: «¿qué datos me da esta barra?»).
+             The month names its weeks, the agenda and the board name where
+             they begin — but the Day printed the MONTH's counters under a
+             title that says one day, so «Monday 17 August · nothing on this
+             day» sat beside `1 confirmed · 28 nights free` and those numbers
+             looked like the day's.
+             The counters stay monthly on purpose: what the Day gives you is
+             the season around the day you are standing on. It just has to
+             say so, and only here — on the month view the title above IS the
+             window, and repeating it would be noise. -->
+        {#if view === 'day'}
+          <span class="cal__stat cal__stat--soft"
+            >{t('planner.pulse_window', locale, { month: monthTitle })}</span
+          >
+        {/if}
         <span class="cal__stat"><b>{stats.confirmed}</b> {t('planner.stat_confirmed', locale)}</span>
         <!-- `1 holds` was printing on every single-hold month. The design's own
              word for this counter is `option`, and it agrees in number. -->
@@ -2555,7 +2571,14 @@
           ><b>{stats.free}</b>
           {t(stats.free === 1 ? 'planner.stat_free_one' : 'planner.stat_free', locale)}</span
         >
-        {/if}
+        <!-- THESE TWO COUNT THE MONTH TOO, so they live inside the same gate
+             and not after it. Outside, the agenda printed `3 people away · 2
+             trips` under `from 10 aug onwards` and the board under `no end` —
+             August's numbers on two drawings whose horizon grows as you
+             scroll, which is the exact thing the law above forbids. What
+             grows is never counted; and on the board the bands are ON the
+             sheet anyway, so the counter was saying twice what one of the
+             two sayings had wrong. -->
         {#if pulseAwayPersons > 0}
           <span class="cal__stat cal__stat--soft"
             >{pulseAwayPersons === 1
@@ -2570,6 +2593,9 @@
               : t('planner.pulse_trips', locale, { w: pulseTrips })}</span
           >
         {/if}
+        {/if}
+        <!-- NOT a window count: it counts the rows actually DRAWN, so it is
+             true on every view, horizon or no horizon. -->
         {#if pulseInferred > 0}
           <!-- The person filter is showing rows nobody is cast on. Say so:
                a guess must never read as a fact. -->
