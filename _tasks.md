@@ -55,7 +55,7 @@
     a ciegas: primero el diseño. **Decidido el 2026-07-30:** se construye
     dentro del pase de UI del Planner v3, no antes y no suelto.
 
-## Cerrado — el pulse del rail (2026-08-10, ADR-096) · SIN DESPLEGAR
+## Cerrado — el pulse del rail (2026-08-10, ADR-096) · DESPLEGADO
 
 27. [x] **`NOW` / `NEXT` bajo el reloj del rail.** `$lib/pulse.ts` (puro, con
     `now` inyectado) + `shell/RailPulse.svelte`, montado en `ScopeRail` encima
@@ -78,9 +78,16 @@
     reescribe. Y sale un guardián nuevo, `i18n/keys.test.ts`, porque el rename
     dejó un call site apuntando a una clave movida y **no lo cazó ningún gate**
     — lo cazó una captura de pantalla.
-29. [ ] **Pendiente de este bloque**: no hay E2E del pulse (la suite exige un
-    origen desplegado), y el `href` del NEXT solo existe para funciones — una
-    fecha no tiene página a la que ir.
+29. [x] **Desplegado con el Planner v3 entero** (93 commits + la migración de
+    `note`). Gate completo: backup → CI → plan → apply → deploy →
+    **RLS 150/150 · E2E 52/52** contra el runtime `7d8b1c3`. Detalle del
+    apply fallido dos veces y del esquema `hour_backup_20260720` que se
+    queda: cabecera de `_context.md`.
+30. [ ] **Pendiente**: no hay E2E propio del pulse (las 52 lo cruzan pero
+    ninguna lo afirma), el `href` del NEXT solo existe para funciones —una
+    fecha no tiene página a la que ir—, y `date-edit.spec.ts:194` es **flaky
+    en paralelo**: pasa sola 4/4 y cae en la suite completa, así que su
+    fixture se pisa con otro spec.
 
 ## AHORA — preparar el Planner v3 (revisión de viabilidad, 2026-07-30)
 

@@ -1,5 +1,33 @@
 # Hour — estado canónico del proyecto
 
+> **Reconciliación 2026-08-10 — EL PLANNER V3 ESTÁ EN PRODUCCIÓN.** Runtime
+> **`7d8b1c3`** (builtAt 2026-08-10T08:31Z), `main` == prod salvo un commit de
+> solo tests. Se desplegaron **93 commits** (`feat/planner-v3` mergeada por
+> fast-forward y borrada) **con una migración destructiva**: `note` nace y
+> `person_note` muere dentro (ADR-093), más `cast_member_writers`. Gate
+> completo: backup a R2 (run 31367463611) → CI verde → plan → apply →
+> deploy → verificación contra el runtime **RLS 150/150 · E2E 52/52**.
+> Encima va el pulse del rail (ADR-096).
+>
+> **El apply falló dos veces antes de entrar, y las dos veces revirtió limpio**
+> (verificado en caliente: `note` ausente, `person_note` intacta, el plan
+> seguía dándola pendiente). Causa 1: `DROP FUNCTION IF EXISTS f(firma)` borra
+> UNA sobrecarga y calla si no encuentra nada — producción llevaba otra que la
+> base local no, así que el tipo se quedó sujeto por una función invisible.
+> Causa 2, la que solo dijo el catálogo: **existe un esquema `hour_backup_20260720`
+> en producción** con una copia de `person_note` que aún usa el enum. Es un
+> archivo del squash de julio y **sigue ahí a propósito**: una migración que
+> retira una función no entra en un archivo a borrarlo. `person_note_visibility`
+> se queda vivo por eso, y está escrito en la migración.
+>
+> **Y cuatro specs del Planner v3 se corrieron por primera vez** — el E2E exige
+> origen desplegado y el setup de auth llevaba roto desde el 31 de julio, así
+> que **ninguna de las leyes de ADR-095 había corrido nunca**. Salió **un fallo
+> real** (un tablero sin `lanes` en la barra reparte los carriles del lector,
+> contra ADR-094) y tres locators caducados (`Hour — home` → el reloj del rail;
+> `Add to planner` → `＋ date`; `ag__row--date` → el Slip). Regla que se repite:
+> un spec que no ha corrido es una hipótesis.
+
 > **FUENTE DE VERDAD ACTUAL.** Cualquier agente o persona debe empezar aquí.
 > Última verificación: **2026-07-20**, contrastada con Git, el código, producción,
 > Supabase y las suites; no reconstruida desde documentos antiguos.
