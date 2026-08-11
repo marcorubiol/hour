@@ -85,6 +85,26 @@ test.describe('the rail pulse (ADR-096)', () => {
     }
   });
 
+  test('WHAT COMES NEXT IS SOMEWHERE YOU CAN GO', async ({ page }) => {
+    // A performance has a page; a date does not, and the rail cannot open the
+    // planner's edit dialog from another lens — so it addresses the DAY that
+    // holds it. Either way the row is a link, never a dead end.
+    await page.goto('/h/conversations');
+    await expect(page.locator('.pulse')).toBeVisible({ timeout: 20_000 });
+    await expect
+      .poll(async () => (await pulseBox(page))?.text ?? '', { timeout: 20_000 })
+      .not.toMatch(/^\s*NOW\s*—/i);
+
+    const slip = page.locator('.pulse .slip');
+    if ((await slip.count()) === 0) test.skip(true, 'nothing ahead for this fixture');
+    const href = await slip.first().getAttribute('href');
+    expect(href, 'the next thing is not reachable').toBeTruthy();
+    expect(href!).toMatch(/^\/h\/(?:[\w-]+\/performance\/[\w-]+|planner\?view=day&d=\d{4}-\d{2}-\d{2})$/);
+
+    await slip.first().click();
+    await expect(page).toHaveURL(/\/h\/(?:[\w-]+\/performance\/|planner)/, { timeout: 20_000 });
+  });
+
   test('IT SPEAKS THE PLANNER’S CLOCK, AND NEVER A RAW KEY', async ({ page }) => {
     await page.goto('/h/planner');
     await expect(page.locator('.pulse')).toBeVisible({ timeout: 20_000 });

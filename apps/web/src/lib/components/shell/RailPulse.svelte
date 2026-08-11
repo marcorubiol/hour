@@ -177,11 +177,24 @@
   });
 
   let nextSlip = $derived.by(() => {
-    const ref = pulse.next?.ref;
-    if (!ref) return null;
-    return ref.of === 'performance'
-      ? performanceSlip(ref.row as PerformanceEvent, slipCtx)
-      : dateSlip(ref.row as DateEvent, slipCtx);
+    const next = pulse.next;
+    if (!next) return null;
+    if (next.ref.of === 'performance') return performanceSlip(next.ref.row as PerformanceEvent, slipCtx);
+
+    /**
+     * A DATE HAS NO PAGE, BUT IT HAS A DAY — and the rail must not be the one
+     * dead end in the block.
+     *
+     * `dateSlip` returns `href: null` correctly: on the month and the diary a
+     * date opens its edit dialog, and those views own that dialog. The rail
+     * does not, and it cannot grow one — it is furniture in every lens,
+     * including the three that have nothing to do with the planner. So it
+     * sends you to the day that holds it, which is a real address the Planner
+     * already answers (`?view=day&d=`), and a link you can middle-click and
+     * copy rather than a button that only works from here.
+     */
+    const slip = dateSlip(next.ref.row as DateEvent, slipCtx);
+    return { ...slip, href: `/h/planner?view=day&d=${next.day}` };
   });
 
   /** A run-sheet key or a date kind → the words the app already owns.
