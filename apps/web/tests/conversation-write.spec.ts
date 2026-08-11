@@ -46,14 +46,50 @@ function rowByName(page: Page, name: string) {
 }
 
 /** First page of the difusión list (same rows the lens can reach), raw values. */
-async function fetchListRaw(page: Page): Promise<RawConversation[]> {
-  return await page.evaluate(async () => {
-    const res = await fetch(
-      '/api/conversations?status=any&project_slug=mamemi&season=2026-27&limit=50',
+/**
+ * THIS SUITE OWNS ITS ROW. IT DID NOT, AND THAT WAS A REAL LEAK.
+ *
+ * Until 2026-08-11 this helper asked for `project_slug=mamemi&season=2026-27`
+ * with NO workspace filter, and took `[0]` to mutate. The fixture login is a
+ * member of `muk-cia` — Marco's actual company — the fixture workspace holds
+ * ZERO conversations, and MaMeMi is a real project there. So every run of the
+ * three write tests below stamped `contacted today` on a REAL difusión row:
+ * verified after the fact on `Teatre Principal d'Olot`, whose last-contact
+ * date this suite overwrote.
+ *
+ * A test may not read its subject out of the world. It creates one, in the
+ * fixture workspace, and deletes it — the shape `conversation-create.spec.ts`
+ * already used.
+ */
+async function fixtureProjectId(page: Page): Promise<string> {
+  return await page.evaluate(async (): Promise<string> => {
+    type Ws = { id: string; slug: string };
+    type Pr = { id: string; slug: string; workspace_id: string };
+    const wsBody = (await fetch('/api/workspaces').then((r) => r.json())) as { items: Ws[] };
+    const fixture = wsBody.items.find((w) => w.slug === 'playwright');
+    if (!fixture) throw new Error('no fixture workspace');
+    const prBody = (await fetch('/api/projects?status=active').then((r) => r.json())) as {
+      items: Pr[];
+    };
+    const project = prBody.items.find(
+      (pr) => pr.workspace_id === fixture.id && pr.slug === 'zzz-e2e-collab',
     );
-    const data = (await res.json()) as { items: RawConversation[] };
-    return data.items;
+    if (!project) throw new Error('no fixture project in the fixture workspace');
+    return project.id;
   });
+}
+
+/** The one row these tests are allowed to touch, created and torn down here. */
+let fixtureConversationId: string | null = null;
+
+async function fetchListRaw(page: Page): Promise<RawConversation[]> {
+  return await page.evaluate(async (id) => {
+    const res = await fetch(`/api/conversations?status=any&limit=100&q=${'ZZZ E2E write'}`);
+    const data = (await res.json()) as { items: RawConversation[] };
+    const mine = data.items.filter((c) => c.id === id);
+    if (mine.length === 0) throw new Error('the fixture conversation is not in the list');
+    return mine;
+  }, fixtureConversationId);
 }
 
 /**
@@ -102,10 +138,50 @@ async function patchOk(page: Page, expectedId: string, doClick: () => Promise<vo
 }
 
 test.describe('conversation inline write', () => {
-  test.skip(
-    !EMAIL || !PASSWORD,
-    'Set PW_TEST_EMAIL and PW_TEST_PASSWORD (test user with edit:conversation where the MaMeMi conversations live).',
-  );
+  test.skip(!EMAIL || !PASSWORD, 'Set PW_TEST_EMAIL and PW_TEST_PASSWORD.');
+  // Serial: one fixture row, created once, mutated by each test in turn.
+  test.describe.configure({ mode: 'serial' });
+
+  test.beforeAll(async ({ browser }) => {
+    const page = await browser.newPage();
+    await page.goto('/h/conversations');
+    const projectId = await fixtureProjectId(page);
+    fixtureConversationId = await page.evaluate(async (project_id) => {
+      const res = await fetch('/api/conversations', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          project_id,
+          person: { full_name: 'ZZZ E2E write fixture', email: 'zzz-e2e-write@hour.test' },
+        }),
+      });
+      if (res.ok) {
+        const body = (await res.json()) as { item?: { id: string } };
+        if (body.item?.id) return body.item.id;
+      }
+      // 409 = it is still there from a previous run. A soft-deleted
+      // conversation resurrects rather than duplicating (same rule
+      // `conversation-create.spec.ts` relies on), so reuse it.
+      const found = (await fetch(
+        `/api/conversations?status=any&limit=100&q=${encodeURIComponent('ZZZ E2E write fixture')}`,
+      ).then((r) => r.json())) as { items: Array<{ id: string }> };
+      if (found.items?.[0]?.id) return found.items[0].id;
+      throw new Error(`could not create or find the fixture (${res.status})`);
+    }, projectId);
+    await page.close();
+  });
+
+  test.afterAll(async ({ browser }) => {
+    if (!fixtureConversationId) return;
+    const page = await browser.newPage();
+    await page.goto('/h/conversations');
+    await page.evaluate(
+      (id) => fetch(`/api/conversations/${id}`, { method: 'DELETE' }).then(() => undefined),
+      fixtureConversationId,
+    );
+    await page.close();
+    fixtureConversationId = null;
+  });
 
   test('status change persists and reverts', async ({ page }) => {
     await openConversations(page);
