@@ -83,11 +83,27 @@
     **RLS 150/150 · E2E 52/52** contra el runtime `7d8b1c3`. Detalle del
     apply fallido dos veces y del esquema `hour_backup_20260720` que se
     queda: cabecera de `_context.md`.
-30. [ ] **Pendiente**: no hay E2E propio del pulse (las 52 lo cruzan pero
-    ninguna lo afirma), el `href` del NEXT solo existe para funciones —una
-    fecha no tiene página a la que ir—, y `date-edit.spec.ts:194` es **flaky
-    en paralelo**: pasa sola 4/4 y cae en la suite completa, así que su
-    fixture se pisa con otro spec.
+30. [x] **Cerrado el 2026-08-11 — no queda nada abierto de este bloque.**
+    - **E2E del pulse**: `tests/pulse.spec.ts`, tres leyes (viaja en las cuatro
+      lentes · no se mueve cuando aterriza la respuesta, medido **abortando los
+      dos feeds** · habla el reloj del Planner sin colar una clave cruda). Cazó
+      un salto real de 4,64px que solo aparecía a 1280 de ancho.
+    - **El flaky no era `date-edit`**: con `--workers=1` la suite da **55/55**
+      dos veces seguidas, y en paralelo cae **un test distinto cada vez**
+      (`date-edit`, luego `collab`). El suite firma contra el workspace VIVO de
+      producción y un solo Durable Object, así que `fullyParallel` era una
+      promesa de aislamiento falsa. `workers: 1` en la config, con la evidencia
+      escrita al lado.
+    - **El setup de auth** sube a 120s: había fallado dos veces seguidas
+      segundos después de un `wrangler deploy`, y un Worker frío en la puerta
+      de las 55 pruebas se lee como una suite rota.
+    - **`hardening/audit-fixes` borrada** (contenida en `main`, cero commits
+      propios). Queda solo `feat/comms-threads`.
+    - **`hour_backup_20260720`**: decidido que se queda, con la condición para
+      revisarlo — addendum 2 de ADR-096. Deja de ser una pregunta.
+    - **Único hueco vivo, y es de producto**: el `href` del NEXT solo existe
+      para funciones, porque una fecha no tiene página a la que ir. Eso es
+      contenedores (bloque 5), no del pulse.
 
 ## AHORA — preparar el Planner v3 (revisión de viabilidad, 2026-07-30)
 

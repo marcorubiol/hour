@@ -27,6 +27,28 @@ export default defineConfig({
   timeout: 30_000,
   expect: { timeout: 5_000 },
   fullyParallel: true,
+  /**
+   * ONE WORKER, BECAUSE THERE IS ONE WORKSPACE.
+   *
+   * This suite does not run against a fixture database: it signs into the
+   * LIVE `playwright` workspace and mutates it — creates gigs, edits dates,
+   * deletes them, and drives one Yjs Durable Object. `fullyParallel` over
+   * shared mutable state is a claim of isolation that is simply not true,
+   * and it showed: measured 2026-08-11 against the deployed runtime, four
+   * parallel runs failed ONE test each and never the same one
+   * (`date-edit` twice, then `collab`), while `--workers=1` came back
+   * **55/55** twice in a row.
+   *
+   * A release gate that cries wolf once per run is worse than a slow one:
+   * every red has to be triaged by hand, and the day one of them is real it
+   * will look like the others. 2.9 minutes instead of 35 seconds is the
+   * price of a green that means something.
+   *
+   * `fullyParallel` stays true on purpose — it is what keeps the ORDER
+   * honest (no test may rely on another's leftovers, and the serial
+   * describes still declare their own chains). Only the concurrency goes.
+   */
+  workers: 1,
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? [['github'], ['html', { open: 'never' }]] : 'list',
   use: {

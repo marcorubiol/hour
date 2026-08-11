@@ -3221,3 +3221,23 @@ Triggered by Marco's pre-scaffold doubt (Phase 0.0 day 5). Five alternatives eva
 >   las bases de sus hijos, y una raya sola no tiene la base donde la tiene la
 >   cabecera de 9px de un slip. `align-self: start` en la segunda fila. Medido
 >   con las dos peticiones abortadas a propósito, no a ojo.
+
+> **Addendum 2 a ADR-096 (2026-08-11) — el archivo `hour_backup_20260720` se
+> queda, y eso es una decisión, no un pendiente.**
+>
+> - **13 · Qué es y por qué no se toca.** Un esquema de copia que dejó el squash
+>   del 2026-07-20 en la base de producción. Retiene `person_note_visibility` a
+>   través de su copia de `person_note`, y por eso ese enum sigue vivo en
+>   `public` (ver §12 y la migración, que lo dice donde ocurre). **Se queda por
+>   tres razones:** una migración de feature no entra en un archivo a borrarlo;
+>   el enum huérfano no cuesta nada —ninguna tabla viva lo usa, ninguna función
+>   viva lo referencia, la migración lo comprueba en cada corrida y falla con
+>   nombre y dirección si eso cambia—; y desde fuera del catálogo **no se puede
+>   enumerar qué más contiene**, así que borrarlo sería destruir sin mirar.
+> - **Cuándo revisarlo:** cuando alguien con acceso al catálogo pueda listar sus
+>   tablas y confirmar que todas viven además en un backup de R2 recuperable.
+>   Entonces es un `DROP SCHEMA ... CASCADE` con su propio backup y su propio
+>   gate — nunca de paso, dentro de otra cosa.
+> - **Lo que NO es:** no es deuda del Planner v3 ni del pulse, y no bloquea
+>   nada. Está escrito aquí para que la próxima sesión encuentre una decisión y
+>   no una pregunta.

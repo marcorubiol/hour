@@ -28,6 +28,12 @@ const EMAIL = process.env.PW_TEST_EMAIL;
 const PASSWORD = process.env.PW_TEST_PASSWORD;
 
 setup('authenticate', async ({ page }) => {
+  // A JUST-DEPLOYED WORKER IS COLD, and this gate is the door to all 50+
+  // tests: the default 30s has failed twice in a row seconds after a
+  // `wrangler deploy`, reporting `1 failed, 50 did not run` — which looks
+  // exactly like a broken suite and is a slow first request. The setup is
+  // not where speed is being asserted.
+  setup.setTimeout(120_000);
   if (!EMAIL || !PASSWORD) {
     // No credentials: write an empty state so dependent projects can still
     // build a context. Their own test.skip(!EMAIL || !PASSWORD) guards do
