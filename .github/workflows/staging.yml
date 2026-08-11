@@ -79,7 +79,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - uses: supabase/setup-cli@v1
         with:
-          version: 2.109.1
+          version: 2.113.0
 
       - name: Rebuild the database from zero
         run: supabase db reset --db-url "$STAGING_DB_URL" --no-seed --yes

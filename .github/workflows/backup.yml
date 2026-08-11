@@ -45,7 +45,7 @@ jobs:
         if: env.SOURCE_STAMP == ''
         uses: supabase/setup-cli@v1
         with:
-          version: 2.109.1
+          version: 2.113.0
 
       - name: Dump schema + data + roles
         if: env.SOURCE_STAMP == ''
