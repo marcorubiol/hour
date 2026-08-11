@@ -215,7 +215,11 @@ orientativo, no una verdad comercial cerrada.
 - **Ramas de trabajo: ninguna — `main` es la única verdad.** El 2026-07-24
   `feat/money-v3-build` se mergeó a `main` por fast-forward y se borró (local
   y origin), con `feat/identity-colour-picker` ya dentro (merge `05c84d3`);
-  `feat/money-v3-design` se borró contenida. Queda solo `feat/comms-threads`:
+  `feat/money-v3-design` se borró contenida. **2026-08-10:** `feat/planner-v3`
+  se mergeó a `main` por fast-forward y se borró (local y origin) — el Planner
+  v3 y el pulse ya están desplegados. Quedan dos ramas, y una es basura:
+  `hardening/audit-fixes` está **contenida en `main` con cero commits propios**
+  (verificado 2026-08-11), o sea borrable sin pérdida; y `feat/comms-threads`:
   - `feat/comms-threads` — comms + acceso. **Su canon ya está en `main`**
     (ADR-082/083/085, las dos escaleras y la faceta en `structure-model.md`, el
     digest del grill y el review de 32 hallazgos). Lo que queda en la rama es
