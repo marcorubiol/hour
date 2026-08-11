@@ -129,7 +129,17 @@
 
     <div class="ds__rows">
       <span class="ds__grid" aria-hidden="true">
-        {#each ticks as h (h)}<span class="ds__g" style="left: {pct(h, win)}%"></span>{/each}
+        <!-- MIDNIGHT IS THE ONE RULE THAT IS NOT AN HOUR. On a night that runs
+             long the ruler reads 20h · 22h · 0h, and the numbers going back to
+             zero is the only thing saying the day changed — which is a
+             contradiction, not a statement. Every other rule is the same
+             hairline; this one is a step darker, so the axis says where the
+             day ends before you have read a digit. -->
+        {#each ticks as h (h)}<span
+            class="ds__g"
+            class:ds__g--day={h > 0 && h % 24 === 0}
+            style="left: {pct(h, win)}%"
+          ></span>{/each}
         <!-- Two threads live at once: the column says so before you read. -->
         {#each live as o, i (i)}
           <span
@@ -378,6 +388,12 @@
       inset-block: 0;
       inline-size: 1px;
       background: color-mix(in oklch, var(--border-color-light) 62%, transparent);
+    }
+    /* Still a hairline — a day boundary is a seam, not a wall. The step up is
+       in the INK, so it reads as the same kind of line said harder, and never
+       as a second kind of thing on the axis. */
+    .ds__g--day {
+      background: color-mix(in oklch, var(--text-color) 22%, var(--border-color-light));
     }
     .ds__ov {
       position: absolute;
