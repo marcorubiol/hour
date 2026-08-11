@@ -1,8 +1,8 @@
 # Hour — estado canónico del proyecto
 
 > **Reconciliación 2026-08-11 — EL PLANNER V3 ESTÁ EN PRODUCCIÓN.** Runtime
-> **`5c306f5`** (builtAt 2026-08-11T13:05Z), `main` == prod salvo dos commits de
-> solo tests. Suites contra ese runtime: **RLS 150/150 · E2E 55/55**. Se desplegaron **93 commits** (`feat/planner-v3` mergeada por
+> **`ea2db77`** (builtAt 2026-08-11T14:01Z), `main` == prod. Suites contra ese
+> runtime: **RLS 150/150 · E2E 56/56 · unit 555/555**. Se desplegaron **93 commits** (`feat/planner-v3` mergeada por
 > fast-forward y borrada) **con una migración destructiva**: `note` nace y
 > `person_note` muere dentro (ADR-093), más `cast_member_writers`. Gate
 > completo: backup a R2 (run 31367463611) → CI verde → plan → apply →

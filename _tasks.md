@@ -101,9 +101,14 @@
       propios). Queda solo `feat/comms-threads`.
     - **`hour_backup_20260720`**: decidido que se queda, con la condición para
       revisarlo — addendum 2 de ADR-096. Deja de ser una pregunta.
-    - **Único hueco vivo, y es de producto**: el `href` del NEXT solo existe
-      para funciones, porque una fecha no tiene página a la que ir. Eso es
-      contenedores (bloque 5), no del pulse.
+    - **El `href` del NEXT, cerrado el 2026-08-11**: una fecha no tiene página,
+      pero tiene un DÍA, y el rail la manda a `?view=day&d=` — una dirección
+      real que el Planner ya contesta, y un enlace que se puede copiar, en vez
+      de un botón que solo funciona desde aquí. El diálogo de edición se queda
+      donde vive (mes y agenda): el rail es mobiliario en las cuatro lentes y
+      no puede crecer uno. Cuarta ley del spec: lo que viene es siempre un
+      sitio al que se puede ir — se afirma el href y se pulsa.
+    **No queda nada abierto de este bloque.**
 
 ## AHORA — preparar el Planner v3 (revisión de viabilidad, 2026-07-30)
 
