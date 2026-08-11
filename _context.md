@@ -40,8 +40,9 @@
 > un spec que no ha corrido es una hipótesis.
 
 > **FUENTE DE VERDAD ACTUAL.** Cualquier agente o persona debe empezar aquí.
-> Última verificación: **2026-07-20**, contrastada con Git, el código, producción,
-> Supabase y las suites; no reconstruida desde documentos antiguos.
+> Última verificación: **2026-08-11**, contrastada con Git, el código, producción,
+> Supabase y las cuatro suites; no reconstruida desde documentos antiguos. Las
+> reconciliaciones anteriores se conservan abajo, en orden inverso.
 > **Reconciliación 2026-07-23:** money v3 (ADR-086/087/088) se desplegó a prod
 > ese día — runtime **`a35e8c4`**; ver «Producción» y «Git» abajo y
 > `_tasks.md § bloque 7`. El resto del doc no se re-verificó en esa fecha.
@@ -112,17 +113,23 @@ orientativo, no una verdad comercial cerrada.
 
 - Web: `https://hour.zerosense.studio`
 - Worker: `hour-web`
-- `/health/live`: sano, `dirty:false`, SHA **`0f8e12f`** (builtAt 2026-07-30T21:23Z).
+- `/health/live`: sano, `dirty:false`, SHA **`ea2db77`** (builtAt 2026-08-11T14:01Z).
 - `/health/ready`: sano, Supabase `ok`.
-- **`main` == `origin/main` == prod.** No hay código de aplicación sin desplegar.
-  El deploy del 2026-07-30 por la noche subió el eje de persona, el enlace
-  login↔persona y la tarea 15 (editar fecha). Verificado inmediatamente después
-  contra el runtime desplegado: **RLS 137/137 · E2E 30/30**, cero skips.
+- **`main` == `origin/main` == prod.** No hay código de aplicación sin desplegar
+  (encima solo documentación). El deploy del 2026-08-10/11 subió el **Planner v3
+  entero y el pulse del rail**, con la migración de `note`. Verificado contra el
+  runtime desplegado: **RLS 150/150 · E2E 56/56 · unit 555/555 · collab 11/11**.
+  Detalle del gate y de los dos applies que revirtieron: cabecera de este
+  documento.
+- Debajo va **`0f8e12f`** (2026-07-30), que fue el runtime hasta el 2026-08-10:
+  el eje de persona, el enlace login↔persona y la tarea 15. Verificado entonces:
+  RLS 137/137 · E2E 30/30.
 - *Cómo se despliega, porque el comando documentado no funciona:* es
   **`pnpm --filter web run deploy`**. `pnpm deploy` desde la raíz choca con el
   subcomando propio de pnpm y muere con `ERR_PNPM_NOTHING_TO_DEPLOY` sin tocar
   nada.
-- **DB por delante del Worker, a propósito:** el runtime es `09f512a` pero la
+- **DB por delante del Worker, a propósito (julio 2026, ya historia):** el
+  runtime de entonces era `09f512a` pero la
   base lleva además la migración **`20260725100000_unexpose_project_id_helpers`**
   (aplicada el 2026-07-25, run 30160118066). No requiere desplegar: saca las 3
   funciones `project_id_of_*` del esquema expuesto —eran un oráculo de
