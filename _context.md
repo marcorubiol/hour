@@ -39,23 +39,31 @@
 > `Add to planner` → `＋ date`; `ag__row--date` → el Slip). Regla que se repite:
 > un spec que no ha corrido es una hipótesis.
 
-> **AVISO 2026-08-11 — EL USUARIO DEL E2E ESCRIBE EN DATOS REALES.**
-> `playwright@hour.test` es miembro de **`muk-cia`** y **`marco-rubiol`**,
-> no solo de su propio espacio, y el espacio `playwright` tiene **cero
-> conversaciones**. `conversation-write.spec.ts` pedía
-> `project_slug=mamemi&season=2026-27` sin filtro de espacio y mutaba `[0]`:
-> llevaba desde que existe sellando «contacted today» sobre difusión real de
-> MüK Cia. **Daño verificado y acotado a una fila** — `Teatre Principal
-> d'Olot`, `last_contacted_at` sobrescrito el 2026-08-11T14:02:51Z; el
-> `first_contacted_at` no se toca nunca si ya existe. El valor anterior vive
-> en el backup de R2 del 2026-08-09 y se recupera restaurándolo en staging
-> (workflow `restore-drill`) — **no se ha hecho**: solo Marco sabe si esa
-> fecha significaba algo o si ya la había pisado una corrida anterior.
-> El spec ya no lo hace (crea su propia fila en el espacio de fixtures y la
-> borra), pero **la membresía sigue ahí**: cualquier spec nuevo puede volver
-> a alcanzar datos reales. Sacar al usuario de esos dos espacios es una
-> decisión de acceso pendiente, y puede romper specs que hoy dan por hecho
-> ver más de un espacio (⌘K, scope-url).
+> **AVISO 2026-08-11 — EL USUARIO DEL E2E ES ADMIN DE `muk-cia` Y `marco-rubiol`.**
+> No es un miembro: es **admin** de los dos espacios reales
+> (`build/runbooks/test-user-setup.md:11-13`, y la suite RLS lo da por hecho).
+> `conversation-write.spec.ts` pedía `project_slug=mamemi&season=2026-27` sin
+> filtro de espacio y mutaba `[0]`, así que escribía en filas de `muk-cia`.
+> **Ya no**: crea su propia fila en el espacio de fixtures y la borra.
+>
+> **Y la alarma que dio esta sesión estaba sobredimensionada, dicho aquí para
+> que nadie la repita.** El `audit_log` (trigger `conversation_audit` sobre
+> `conversation`) guarda before/after: las 200 entradas de esa fila —desde el
+> primer `null →` del 2026-07-20 hasta hoy— **las escribió el mismo actor**,
+> `65419d0a…`, que es el propio usuario del E2E. Esa fila **nunca tuvo un valor
+> puesto por una persona**. No había nada que restaurar, y no se restauró nada.
+> `muk-cia` tiene 1 proyecto (`mamemi`) y las **154 conversaciones sintéticas**
+> que este documento ya describía; `marco-rubiol` tiene 5 proyectos y **0**
+> conversaciones. Ningún proyecto tiene `owner_id`, así que la FK
+> `project_owner_id_fkey ON DELETE SET NULL` no es un riesgo hoy.
+>
+> **Por eso NO se han quitado las membresías.** Quitarlas rompe 2 tests E2E y 4
+> ficheros RLS que están construidos sobre ese acceso (`cross-tenant.test.ts:48`
+> afirma la lista exacta de tres espacios; las pruebas de conversación necesitan
+> las 154 filas, que solo existen en `muk-cia`). El trabajo real es **mudar el
+> juego sintético de difusión al espacio `playwright`** y después quitar el
+> acceso — ver `_tasks.md § 31`. La urgencia aparece el día que MüK Cia empiece
+> a usarse para difusión de verdad en ese mismo espacio.
 
 > **FUENTE DE VERDAD ACTUAL.** Cualquier agente o persona debe empezar aquí.
 > Última verificación: **2026-08-11**, contrastada con Git, el código, producción,

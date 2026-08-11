@@ -110,16 +110,22 @@
       sitio al que se puede ir — se afirma el href y se pulsa.
     **No queda nada abierto de este bloque.**
 
-31. [ ] **DECISIÓN DE ACCESO PENDIENTE — sacar al usuario del E2E de los
-    espacios reales.** `playwright@hour.test` es miembro de `muk-cia` y
-    `marco-rubiol`. El spec que escribía en difusión real ya está arreglado
-    (crea su fila y la borra), pero la puerta sigue abierta para cualquier spec
-    nuevo. Quitar las dos membresías es una línea; el riesgo es que ⌘K y
-    `scope-url.spec.ts` den por hecho ver más de un espacio, así que hay que
-    correr la suite después. **Y una fila por restaurar si te importa la
-    fecha:** `Teatre Principal d'Olot`, `last_contacted_at` pisado el
-    2026-08-11T14:02:51Z; el valor anterior está en el backup de R2 del
-    2026-08-09, recuperable con `restore-drill` sobre staging.
+31. [ ] **Mudar el juego sintético de difusión a `playwright`, y solo entonces
+    quitarle al usuario del E2E el acceso a los espacios reales.**
+    El usuario es **admin** de `muk-cia` y `marco-rubiol`. El spec que escribía
+    ahí ya está arreglado, y **no hubo daño**: el `audit_log` demuestra que las
+    200 entradas de la fila tocada las escribió ese mismo usuario, desde el
+    primer valor. Nada humano se perdió y no se restauró nada.
+    Quitar el acceso hoy rompe 2 tests E2E (`person.spec.ts:27`,
+    `smoke.spec.ts:70,80`) y 4 ficheros RLS — entre ellos
+    `cross-tenant.test.ts:48`, que afirma la lista exacta de tres espacios, y las
+    pruebas que necesitan las 154 conversaciones, **que solo existen en
+    `muk-cia`**. O sea que el acceso no es un descuido: es el cimiento del
+    fixture. El orden correcto es: sembrar el juego sintético en `playwright`,
+    re-apuntar los 6 ficheros, y entonces revocar con
+    `DELETE /api/workspaces/[id]/access` (el propio usuario puede hacerlo: es
+    admin y la RPC no se excluye a sí misma). Urgente el día que MüK Cia se use
+    para difusión real en ese espacio.
 
 ## AHORA — preparar el Planner v3 (revisión de viabilidad, 2026-07-30)
 
