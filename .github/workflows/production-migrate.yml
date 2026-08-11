@@ -10,6 +10,7 @@ on:
         type: choice
         options:
           - plan
+          - inspect
           - repair-baseline-history
           - apply
       confirm:
@@ -49,6 +50,7 @@ jobs:
           fi
           case "$MODE" in
             plan) expected='PLAN PRODUCTION' ;;
+            inspect) expected='INSPECT PRODUCTION' ;;
             repair-baseline-history) expected="REPAIR BASELINE $PRODUCTION_PROJECT_REF" ;;
             apply) expected="MIGRATE PRODUCTION $PRODUCTION_PROJECT_REF" ;;
             *) echo "Unsupported mode: $MODE" >&2; exit 1 ;;
@@ -93,7 +95,51 @@ jobs:
               --status reverted "${legacy_versions[@]}"
           fi
 
+      # READ-ONLY INTROSPECTION, because twice in one day (2026-08-10) a
+      # production apply failed on something only the catalog could name, and
+      # there was no way to ask from outside: the first cause had to be guessed
+      # wrong once, and the second only surfaced because the migration itself
+      # was taught to say who was holding a type. This mode asks the questions
+      # that a destructive migration needs answered BEFORE it runs. Fixed
+      # SELECTs, no input reaches the SQL, and it never runs alongside apply.
+      - name: Inspect the production catalog
+        if: inputs.mode == 'inspect'
+        run: |
+          set -euo pipefail
+          run_sql() {
+            docker run --rm postgres:17-alpine \
+              psql "$SUPABASE_DB_URL" --no-psqlrc --set ON_ERROR_STOP=1 --command "$1"
+          }
+
+          echo '### Archive schemas (the squash leaves these behind)'
+          run_sql "select n.nspname as schema,
+                          count(c.oid) filter (where c.relkind = 'r') as tables,
+                          coalesce(sum(c.reltuples)::bigint, 0) as approx_rows
+                     from pg_namespace n
+                     left join pg_class c on c.relnamespace = n.oid
+                    where n.nspname like 'hour\_backup\_%'
+                    group by n.nspname order by n.nspname;"
+
+          echo '### What each archive schema holds'
+          run_sql "select n.nspname as schema, c.relname as table, c.reltuples::bigint as approx_rows
+                     from pg_class c join pg_namespace n on n.oid = c.relnamespace
+                    where n.nspname like 'hour\_backup\_%' and c.relkind = 'r'
+                    order by 1, 2;"
+
+          echo '### Types in public that nothing living uses'
+          run_sql "select t.typname as orphan_type,
+                          coalesce(string_agg(distinct n.nspname || '.' || c.relname, ', '), '(nothing)') as held_by
+                     from pg_type t
+                     left join pg_depend d on d.refobjid = t.oid and d.refclassid = 'pg_type'::regclass and d.deptype <> 'i'
+                     left join pg_class c on c.oid = d.objid
+                     left join pg_namespace n on n.oid = c.relnamespace
+                    where t.typnamespace = 'public'::regnamespace and t.typtype = 'e'
+                    group by t.typname
+                   having count(*) filter (where n.nspname = 'public') = 0
+                    order by 1;"
+
       - name: Print the migration plan
+        if: inputs.mode != 'inspect'
         # --include-all: money v3's migrations are timestamped before an
         # out-of-band migration already on prod (accent_custom_hue), so they must
         # be applied out of order. Safe — the sets are orthogonal.
