@@ -334,7 +334,15 @@
 
        A row that brings an extra line of its own — a venue abroad adds the
        slip's timezone gloss — grows the block. That is content, not settling,
-       and the spec says so where it checks. */
+       and the spec says so where it checks.
+
+       THE LINE-HEIGHT IS LOAD-BEARING, not decoration: the slip's city and
+       the margin line set no line-height of their own, so they inherit from
+       here. Dropping it while «fixing» the reserve let them inherit the
+       body's 1.55 and the answer grew from 44.7 to 54.1 — the reserve was
+       right and the content had moved under it. Measured, twice. */
+    font-size: var(--text-s);
+    line-height: 1.06;
     min-block-size: 2.95rem;
   }
   /* The slip is measured, never declared (see Slip's header): the rail is
