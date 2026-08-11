@@ -1,13 +1,24 @@
 # Hour — estado canónico del proyecto
 
-> **Reconciliación 2026-08-10 — EL PLANNER V3 ESTÁ EN PRODUCCIÓN.** Runtime
-> **`7d8b1c3`** (builtAt 2026-08-10T08:31Z), `main` == prod salvo un commit de
-> solo tests. Se desplegaron **93 commits** (`feat/planner-v3` mergeada por
+> **Reconciliación 2026-08-11 — EL PLANNER V3 ESTÁ EN PRODUCCIÓN.** Runtime
+> **`5c306f5`** (builtAt 2026-08-11T13:05Z), `main` == prod salvo dos commits de
+> solo tests. Suites contra ese runtime: **RLS 150/150 · E2E 55/55**. Se desplegaron **93 commits** (`feat/planner-v3` mergeada por
 > fast-forward y borrada) **con una migración destructiva**: `note` nace y
 > `person_note` muere dentro (ADR-093), más `cast_member_writers`. Gate
 > completo: backup a R2 (run 31367463611) → CI verde → plan → apply →
-> deploy → verificación contra el runtime **RLS 150/150 · E2E 52/52**.
-> Encima va el pulse del rail (ADR-096).
+> deploy → verificación contra el runtime. Encima va el pulse del rail
+> (ADR-096), con tres correcciones posteriores que solo se vieron con datos
+> reales delante: la card del mes entera en vez de un nombre inventado, y dos
+> pasadas sobre la altura —la reserva estaba en `lh`, que sigue a la
+> tipografía del hueco y no a la de lo que sostiene—.
+>
+> **El E2E pasa a `workers: 1`** (2026-08-11): la suite firma contra el
+> workspace VIVO y un solo Durable Object, así que `fullyParallel` prometía un
+> aislamiento que no existe — en paralelo caía **un test distinto cada vez**,
+> en serie da 55/55. Y dos rojos más que no eran de la app: un Worker recién
+> desplegado tarda más que los 30s del setup de auth, y un test comparaba el
+> reloj del servidor con el de esta máquina a tolerancia cero (11ms de deriva
+> lo mataba).
 >
 > **El apply falló dos veces antes de entrar, y las dos veces revirtió limpio**
 > (verificado en caliente: `note` ausente, `person_note` intacta, el plan
