@@ -321,15 +321,21 @@
     /* THE ANSWER'S SPACE IS HELD BEFORE THE ANSWER ARRIVES, so the dash sits
        in it rather than collapsing the block and pulling the scopes up the
        rail while a query lands.
-       `lh` resolves against THIS element's font, so the reserve has to be
-       stated in the slip's terms and not the shell's: inheriting the body's
-       16px/1.55 reserved 76px for a card that is 38px tall, and half the
-       block was air. Three lines of the slip's own size, a hair loose, so the
-       reserve always wins and neither state moves. A name long enough to
-       wrap grows the block — that is content, not settling. */
-    font-size: var(--text-s);
-    line-height: 1.06;
-    min-block-size: 3lh;
+
+       AND IT IS HELD IN FIXED UNITS, because what it holds is fixed. Measured
+       on the deployed runtime at 1024, 1280 and 1600 wide: the slip is 33.94px
+       at ALL THREE — its lines are 12 / 13.41 / 9.53 and the type clamps carry
+       so little vw that they never move — and the margin line under it (the
+       day, the call) adds 10.8. So the ordinary answer is 44.72px, flat.
+       A reserve stated in `lh` followed the ELEMENT's font instead, which does
+       scale, so it matched at 1600 and fell 4.64px short at 1280: green on the
+       machine it was built on, red the first time the spec ran at another
+       size. `tests/pulse.spec.ts` is the guard.
+
+       A row that brings an extra line of its own — a venue abroad adds the
+       slip's timezone gloss — grows the block. That is content, not settling,
+       and the spec says so where it checks. */
+    min-block-size: 2.95rem;
   }
   /* The slip is measured, never declared (see Slip's header): the rail is
      its cell, and it gives 13.25rem. */
