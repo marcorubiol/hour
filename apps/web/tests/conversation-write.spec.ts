@@ -239,7 +239,14 @@ test.describe('conversation inline write', () => {
     const body = (await response.json()) as { item: RawConversation };
     expect(body.item.first_contacted_at).toBeTruthy();
     expect(body.item.last_contacted_at).toBeTruthy();
-    expect(Date.parse(body.item.last_contacted_at!)).toBeLessThanOrEqual(Date.now());
+    // TWO CLOCKS, AND THE POINT OF THIS TEST IS THAT ONLY ONE OF THEM COUNTS.
+    // `<= Date.now()` compares the SERVER's stamp against this laptop's clock
+    // with zero tolerance, so it passes only while the local clock happens to
+    // run ahead. On 2026-08-11 it drifted 11ms behind and the test went red
+    // for good — with nothing wrong anywhere. The law is that the stamp is
+    // NOW and not a fabricated date, so it is asserted as a distance.
+    const skew = Math.abs(Date.parse(body.item.last_contacted_at!) - Date.now());
+    expect(skew, 'the server stamped something that is not now').toBeLessThan(60_000);
     await expect(row.locator('.last-contact')).toContainText('today');
 
     await page.reload();
