@@ -61,7 +61,7 @@ jobs:
       - name: Install Supabase CLI
         uses: supabase/setup-cli@v1
         with:
-          version: 2.109.1
+          version: 2.113.0
 
       - name: Finalize the reconstructive baseline history
         if: inputs.mode == 'repair-baseline-history'
