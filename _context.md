@@ -39,6 +39,24 @@
 > `Add to planner` → `＋ date`; `ag__row--date` → el Slip). Regla que se repite:
 > un spec que no ha corrido es una hipótesis.
 
+> **AVISO 2026-08-11 — EL USUARIO DEL E2E ESCRIBE EN DATOS REALES.**
+> `playwright@hour.test` es miembro de **`muk-cia`** y **`marco-rubiol`**,
+> no solo de su propio espacio, y el espacio `playwright` tiene **cero
+> conversaciones**. `conversation-write.spec.ts` pedía
+> `project_slug=mamemi&season=2026-27` sin filtro de espacio y mutaba `[0]`:
+> llevaba desde que existe sellando «contacted today» sobre difusión real de
+> MüK Cia. **Daño verificado y acotado a una fila** — `Teatre Principal
+> d'Olot`, `last_contacted_at` sobrescrito el 2026-08-11T14:02:51Z; el
+> `first_contacted_at` no se toca nunca si ya existe. El valor anterior vive
+> en el backup de R2 del 2026-08-09 y se recupera restaurándolo en staging
+> (workflow `restore-drill`) — **no se ha hecho**: solo Marco sabe si esa
+> fecha significaba algo o si ya la había pisado una corrida anterior.
+> El spec ya no lo hace (crea su propia fila en el espacio de fixtures y la
+> borra), pero **la membresía sigue ahí**: cualquier spec nuevo puede volver
+> a alcanzar datos reales. Sacar al usuario de esos dos espacios es una
+> decisión de acceso pendiente, y puede romper specs que hoy dan por hecho
+> ver más de un espacio (⌘K, scope-url).
+
 > **FUENTE DE VERDAD ACTUAL.** Cualquier agente o persona debe empezar aquí.
 > Última verificación: **2026-08-11**, contrastada con Git, el código, producción,
 > Supabase y las cuatro suites; no reconstruida desde documentos antiguos. Las
