@@ -68,7 +68,21 @@
     `20260730164435`. O se borra, o el banner se queda para siempre; lo que no
     puede es seguir pareciendo un schema.
 
-20. [ ] **El reparto no se puede escribir desde la app — el eslabón que falta.**
+20. [~] **El reparto YA se puede escribir — la casilla estaba stale**
+    (verificado contra el árbol el 2026-08-27). Existe `CastPanel.svelte`,
+    montado en la portada de proyecto
+    (`h/[workspace]/project/[slug]/+page.svelte:188`), contra
+    `/api/projects/[id]/cast` **GET + POST** y `/cast/[memberId]` **DELETE**.
+    Su propia cabecera lo dice: «the first surface in Hour that can WRITE a
+    roster». Así que el eje de persona ya puede incluir a gente nueva, y ADR-094
+    §5 —«sin reparto no hay eje»— deja de ser un bloqueo.
+    **Lo que sigue abierto es solo la mitad de diseño**, y el propio componente
+    la nombra: «deliberately plain… the Planner v3 redesign will decide where
+    casting really lives». O sea, dónde vive el casting de verdad, dentro del
+    pase de UI del Planner v3 — que es lo que esta tarea ya decía el 2026-07-30.
+    Texto original abajo, sin tocar, porque describe bien el problema que era.
+
+20b. [ ] ~~**El reparto no se puede escribir desde la app — el eslabón que falta.**~~
     Verificado: `/api/lines/[id]/people` exporta **solo `GET`** y **ningún**
     endpoint escribe `cast_member`; las 6 filas que existen se sembraron. Sin
     esto el eje de persona funciona pero **no puede incluirte a ti**: `/api/team`
@@ -241,14 +255,29 @@
       solo** — murió cuatro veces a medias y dejó filas que hubo que barrer a
       mano, así que la barrida va ahora a los dos extremos.
 
-24. [ ] **Persona: ¿dial o vista?** ADR-092 dice que si cambia qué es una fila,
-    cambió el dibujo → **vista**. El prototipo lo tiene como dial
-    (`calState.lanes='persona'|'scope'`). No es cosmética: por scope una fila
-    es un proyecto y cada cosa cae en **una**; por persona un bolo que tocan
-    tres cae en **tres** filas a la vez, el `+` de una celda vacía ya no sabe
-    para qué proyecto crea, y el total de la lane cuenta otra cosa. Como vista
-    vive en la URL y se comparte; como dial es mobiliario que no sobrevive a un
-    reload. **Decisión de Marco, antes de construir.**
+24. [x] **Persona: ¿dial o vista? — DECIDIDO Y CONSTRUIDO. La casilla llevaba
+    27 días stale** (verificado contra los ADR y el árbol el 2026-08-27).
+    Esta tarea citaba ADR-092 como si fuera vigente, **sin su nota de
+    superseded**, y pedía «decisión de Marco antes de construir». Las dos
+    mitades eran falsas:
+    - **`ADR-094` (2026-07-31) lo decidió**, y se titula literalmente «El eje de
+      carriles es un dial, y su valor vive en la URL. Y ya estaba construido».
+      Supera a ADR-092 §1 **solo en la conclusión de mobiliario**: el
+      razonamiento partir-vs-cubrir sigue entero, y con él `inScope()`
+      container-only e `isEmpty`. Rechazó explícitamente las dos alternativas —
+      persona como quinta proyección, y el dial efímero del prototipo.
+    - **Lo único que ADR-094 dejó abierto —qué DIBUJA `persona`— lo cerró
+      ADR-095 §2**: el Loom se borró (260 líneas dibujando «las filas son
+      personas» por segunda vez) y ganaron los carriles del Board. El propio
+      ADR-094 dio la señal para saberlo: «si gana el Board se estrenan
+      `personRowKeys`/`noCastKey`, si gana el Loom se borran». **Se estrenaron**
+      — `board-lanes.ts:324` las usa.
+    Y los tres avisos que ADR-094 §3 exigía al girar a persona **están los tres**:
+    (a) el tally dice «N personas» y cuenta `notCast`; (b) `CarrilsStrip:671`
+    pasa `axis === 'scope' ? lane.id : null`, o sea que en persona el `+` no
+    sabe el proyecto y el diálogo tiene que preguntar; (c) el board suelta el
+    censo del mes y cuenta compromisos. Todo desplegado el 2026-08-10, y la
+    mitad de la URL la guarda un E2E desde `7d8b1c3`.
 
 25. [x] **Fontanería del Planner v3 — HECHA ENTERA, la casilla estaba stale**
     (verificado contra el árbol el 2026-08-10, no contra este documento). Los

@@ -617,36 +617,45 @@ profundidad de producto, no en SvelteKit/Supabase/Cloudflare.
 
 ## Siguiente paso
 
-Abrir `_tasks.md`. Nada bloquea: prod == `ad3cf67`, encima solo un commit de
-spec, y **las cuatro suites en verde** contra ese runtime (2026-08-27).
-Todo lo que sigue sirve al **Planner v3**, que es la pieza en curso. Por orden
-—y el primero ya no es un punto de partida sino una corrección, porque llevaba
-dieciséis días dado por pendiente estando hecho—:
+Abrir `_tasks.md`. Nada bloquea: prod == `ad3cf67` y **las cuatro suites en
+verde** contra ese runtime (2026-08-27); encima solo van tests y documentación,
+más la migración `20260827100000`, que no toca el bundle. Todo lo que sigue
+sirve al **Planner v3**, que es la pieza en curso — pero léelo con el aviso de
+abajo delante, porque la mitad de esta lista ya no era cierta:
 
-1. ~~**`note`, el post-it privado**~~ — **ya está construido y desplegado**
-   (`_tasks.md § 23`, ADR-093; en prod desde el 2026-08-11 con la migración
-   `20260731120000`). Esta lista lo dio por pendiente dieciséis días, y lo
-   llamaba «la única maquinaria que el Planner v3 necesita y no existe»:
-   corregido el 2026-08-27 comprobando la migración, la RLS (13 casos dentro
-   del 150/150), la API (`/api/notes`) y el margen en la UI del Planner. La
-   decisión que lo cerró sigue en pie —la nota es siempre privada, lo que ve el
-   equipo es comunicación— y `person_note` murió dentro. **Sus dos restos se
-   cerraron el mismo 2026-08-27** (`§ 32`): el margen ya tiene E2E
-   (`tests/note-margin.spec.ts`, suite **60/60**) y `read:person_note_private`
-   está **retirado en producción** (`20260827100000`, RLS **151/151**).
-2. **Persona: ¿dial o vista?** (`§ 24`) — ADR-092 y el prototipo no dicen lo
-   mismo, y de eso depende si vive en la URL.
-3. **La fontanería barata** (`§ 25`): los 3 campos del run sheet que ya viajan y
-   se tiran, `'day'` como cuarta proyección, y la convención de holds en
-   `workspace.settings`.
-4. **El escritor de reparto** (`§ 20`), que no existe en ninguna forma: sin él
-   el eje de persona no puede incluir a nadie que no esté ya sembrado. Es
-   **pantalla**, y se construye dentro del pase de UI del Planner v3.
+> **PARA CUANDO SE LEA ESTA LISTA: EL 2026-08-27 TRES DE SUS SIETE PUNTOS
+> ESTABAN HECHOS Y SEGUÍAN ESCRITOS COMO PENDIENTES**, y un cuarto a medias. No
+> es descuido de nadie en concreto: se construye, se despliega, se escribe el
+> ADR — y nadie vuelve a la lista a tacharlo. Es la misma forma que los tres
+> rojos del E2E de ese día. **Antes de tratar un punto de aquí como abierto,
+> compruébalo contra el árbol y contra `_decisions.md`, no contra esta lista.**
+
+1. ~~**`note`, el post-it privado**~~ — **construido y desplegado** desde el
+   2026-08-11 (`_tasks.md § 23`, ADR-093, migración `20260731120000`). La lista
+   lo llamó dieciséis días «la única maquinaria que el Planner v3 necesita y no
+   existe». Sus dos restos se cerraron el 2026-08-27: el margen ya tiene E2E
+   (`tests/note-margin.spec.ts`) y `read:person_note_private` está retirado en
+   producción (`20260827100000`).
+2. ~~**Persona: ¿dial o vista?**~~ — **decidido y construido** (`§ 24`).
+   **ADR-094** (2026-07-31) lo cerró —dial, con su valor en la URL, y ya estaba
+   construido— superando a ADR-092 §1 solo en la conclusión de mobiliario; y
+   **ADR-095 §2** cerró lo único que ADR-094 dejó abierto, borrando el Loom en
+   favor de los carriles del Board. Los tres avisos de ADR-094 §3 están los
+   tres. Desplegado el 2026-08-10.
+3. ~~**La fontanería barata**~~ — **hecha entera** el 31 de julio (`§ 25`, que
+   ya lo decía en su propio texto): los cinco hitos del run sheet, `'day'` como
+   cuarta proyección y `booking_mode` en `workspace.settings`.
+4. **El escritor de reparto** (`§ 20`) — **la tubería y una pantalla mínima
+   existen**: `CastPanel.svelte`, montado en la portada de proyecto, escribe
+   `cast_member` por `/api/projects/[id]/cast`. Así que ADR-094 §5 —«sin reparto
+   no hay eje»— ya no bloquea. **Lo abierto es dónde vive el casting de
+   verdad**, y eso es el pase de UI del Planner v3.
 5. **Follow-up de money v3 (no bloquea):** UX de **enlazar una función nueva a un
    bolo** — las performances creadas en Planner nacen sin bolo hasta que exista.
-6. **Travel v2 (ADR-089):** modelo decidido, nada de schema construido. Su
-   dependencia dura —la tarea 15, editar una fecha desde la UI— **ya está
-   construida, desplegada y con E2E verde**.
+6. **Travel v2 (ADR-089):** modelo decidido, **nada de schema construido**. Su
+   dependencia dura —la tarea 15, editar una fecha desde la UI— ya está
+   construida, desplegada y con E2E verde. **Es el primer punto de esta lista
+   que es trabajo de verdad y no una casilla mal puesta.**
 7. **Contenedores (bloque 5)** y los flecos de planner (multi-día de
    performances, escaleta ADR-090) van después.
 
