@@ -1,5 +1,66 @@
 # Hour — estado canónico del proyecto
 
+> **Reconciliación 2026-08-27 — SUPABASE SE PAUSÓ SOLA, Y AL VOLVER EL E2E
+> ENCONTRÓ TRES ROJOS QUE NADIE HABÍA ESCRITO.** Runtime **`ad3cf67`**
+> (builtAt 2026-08-27T07:21Z), `main` == `origin/main` == `bd333f0`. Suites
+> contra ese runtime: **RLS 150/150 · E2E 56/56 · unit 555/555 ·
+> svelte-check 0/0**. Cero cambios de schema.
+>
+> **EL PLAN FREE PAUSA EL PROYECTO A LOS ~7 DÍAS SIN ACTIVIDAD**, y pasó entre
+> el 16 y el 23 de agosto. El Worker siguió sano todo el tiempo, así que la
+> app cargaba y el login no podía completarse. La firma son tres cosas a la
+> vez: `dig lqlyorlccnniybezugme.supabase.co` **vacío** —se retira el registro
+> DNS—, `/health/ready` con `{"supabase":"status_530"}`, y el backup semanal a
+> R2 muriendo en 28 s con `FATAL: (ENOTFOUND) tenant/user postgres.<ref> not
+> found`. **Cuando algo de Supabase falle tras días sin tocar el proyecto, lo
+> primero es `dig`** — no las credenciales, no `.env`, no RLS.
+>
+> **No se perdió nada:** un proyecto pausado conserva los datos, y el dump del
+> 16 de agosto está en R2 (run 31925297252). Se despierta con un botón del
+> dashboard; no hay comando de CLI. **`hour-staging` sigue pausado**, y solo
+> hace falta el día que se toque schema. Y el detalle que importa para que no
+> se repita: **el backup semanal era el único latido automático**, y una
+> semana entre ejecuciones es exactamente el ancho de la ventana de pausa.
+>
+> **LOS TRES ROJOS DEL E2E, CON EL CÓDIGO SIN TOCAR DESDE EL 11.** Lo que
+> cambió no fue la app: fue lo que había en la agenda. Los tres eran **una
+> medida de un día concreto escrita como si fuera norma**.
+>
+> 1. **El pulse del rail era un fallo real** y su spec lo cazó. La reserva
+>    (`min-block-size`) se dimensionó contra un slip cuyo nombre va a 11px,
+>    pero un `show` lo dibuja a 13px (`Slip § the gig keeps its step`), así que
+>    su línea son 15,86 y no 13,41: **la reserva cubría un show de una línea
+>    por 0,01px**, por suerte, porque el rail solo dibuja el tipo que toca
+>    estar próximo. El 27 tocaba un show —FiraTàrrega— y el nombre **envolvió**
+>    (`.slip__n` clampa a tres líneas y 13,25rem no sostienen el nombre de una
+>    feria): el rail saltó 72,19 → 88,03. Arreglado abriendo el número, no
+>    copiando el tratamiento: el clamp se queda en el `Slip`, que es su casa, y
+>    el rail estrecha `--slip-name-lines`/`--slip-city-lines` a 1. Reserva
+>    2,95rem → **3rem**, porque con el clamp la respuesta más alta mide
+>    47,03 / 47,17 / **47,23** a 1024 / 1280 / 1600 y 2,95rem son 47,2 —
+>    seguía corta a 1600, por el mismo pelo de siempre.
+> 2. **`planner-laws` pedía `< fold/2`**, que no era la ley sino el 277 que se
+>    midió el día que ese spec corrió verde por primera vez. Lo lejos que cae
+>    hoy depende del cromo que tenga encima, y ser el primer día de su banda
+>    semanal lo puso en 413. Ahora afirma lo que su propio comentario ya decía
+>    —en pantalla y libre del cromo pegado— con el cromo por **hit-test**. El
+>    primer intento de arreglarlo volvió a poner un número: midió todas las
+>    cajas sticky, se comió el rail (720 de alto) y exigía que hoy cayera
+>    *bajo* el fold que debía mantenerlo *sobre*.
+> 3. **`date-edit` murió de strict mode, y solo después del deploy.** Desde
+>    ADR-096 **el pulse del rail dibuja un `Slip`**, y la fecha del fixture ES
+>    lo próximo mientras exista, así que un `.slip` sin ámbito resuelve a dos.
+>    El locator hermano del mes se libraba por accidente —busca `button.slip` y
+>    el del rail es un `<a>`—, y había un tercero con `.first()` que **no
+>    habría fallado: habría clicado el del rail**, que navega al día en vez de
+>    abrir el diálogo. Los dos van ahora contra `main`; la furniture vive en el
+>    `complementary` y el diario en `main`.
+>
+> **Regla que sale de aquí, y es la de siempre con una vuelta más:** un spec
+> que no ha corrido es una hipótesis, **y uno que corrió verde es una hipótesis
+> sobre los datos de aquel día**. Nunca escribir un píxel medido como umbral:
+> enunciar la ley y medir sus términos en tiempo de ejecución.
+
 > **Reconciliación 2026-08-11 — EL PLANNER V3 ESTÁ EN PRODUCCIÓN.** Runtime
 > **`ea2db77`** (builtAt 2026-08-11T14:01Z), `main` == prod. Suites contra ese
 > runtime: **RLS 150/150 · E2E 56/56 · unit 555/555**. Se desplegaron **93 commits** (`feat/planner-v3` mergeada por
@@ -66,7 +127,7 @@
 > a usarse para difusión de verdad en ese mismo espacio.
 
 > **FUENTE DE VERDAD ACTUAL.** Cualquier agente o persona debe empezar aquí.
-> Última verificación: **2026-08-11**, contrastada con Git, el código, producción,
+> Última verificación: **2026-08-27**, contrastada con Git, el código, producción,
 > Supabase y las cuatro suites; no reconstruida desde documentos antiguos. Las
 > reconciliaciones anteriores se conservan abajo, en orden inverso.
 > **Reconciliación 2026-07-23:** money v3 (ADR-086/087/088) se desplegó a prod
@@ -139,12 +200,18 @@ orientativo, no una verdad comercial cerrada.
 
 - Web: `https://hour.zerosense.studio`
 - Worker: `hour-web`
-- `/health/live`: sano, `dirty:false`, SHA **`ea2db77`** (builtAt 2026-08-11T14:01Z).
-- `/health/ready`: sano, Supabase `ok`.
-- **`main` == `origin/main` == prod.** No hay código de aplicación sin desplegar
-  (encima solo documentación). El deploy del 2026-08-10/11 subió el **Planner v3
-  entero y el pulse del rail**, con la migración de `note`. Verificado contra el
-  runtime desplegado: **RLS 150/150 · E2E 56/56 · unit 555/555 · collab 11/11**.
+- `/health/live`: sano, `dirty:false`, SHA **`ad3cf67`** (builtAt 2026-08-27T07:21Z).
+- `/health/ready`: sano, Supabase `ok`. **Estuvo en rojo del ~23 al 27 de agosto**
+  con `status_530`, y no era la app: Supabase se pausó sola. Ver la cabecera.
+- **`main` == `origin/main` == `bd333f0`.** No hay código de aplicación sin
+  desplegar: encima del runtime solo va `bd333f0`, que toca un único spec y no
+  entra en el bundle. El deploy del 2026-08-27 sube **el arreglo del pulse**
+  (el `Slip` abre su presupuesto de líneas, el rail lo estrecha a 1, reserva
+  2,95rem → 3rem), sin schema. Verificado contra el runtime desplegado:
+  **RLS 150/150 · E2E 56/56 · unit 555/555 · svelte-check 0/0**.
+- Debajo va **`ea2db77`** (2026-08-11), que fue el runtime hasta el 2026-08-27:
+  el **Planner v3 entero y el pulse del rail**, con la migración de `note`.
+  Verificado entonces: RLS 150/150 · E2E 56/56 · unit 555/555 · collab 11/11.
   Detalle del gate y de los dos applies que revirtieron: cabecera de este
   documento.
 - Debajo va **`0f8e12f`** (2026-07-30), que fue el runtime hasta el 2026-08-10:
@@ -229,6 +296,11 @@ orientativo, no una verdad comercial cerrada.
 - Repo: `https://github.com/marcorubiol/hour` (privado).
 - Checkout: `/Users/marcorubiol/Developer/hour`.
 - Rama principal: `main`.
+- **2026-08-27: `main` == `origin/main` == `bd333f0`; prod == `ad3cf67`.**
+  Los tres commits del día: `fix(pulse)` —el presupuesto de líneas del rail,
+  que es el único que entra en el bundle—, `test(planner)` y
+  `test(date-edit)`. Que `main` vaya un commit por delante de `/health/live`
+  es estado limpio aquí: ese commit es solo un spec.
 - **2026-07-30 (noche): `main` == `origin/main` == prod == `0f8e12f`.**
   El eje de persona (`$lib/people`, pin `pe:`, `/api/me`,
   `/api/me/profile-share`, `project_ids` en `/api/team`, la puerta en
@@ -275,9 +347,21 @@ orientativo, no una verdad comercial cerrada.
 ### Supabase
 
 - Proyecto: `hour-phase0` · ref `lqlyorlccnniybezugme` · `eu-central-1`.
-- Plan: **Free**.
+- Plan: **Free** — y eso **pausa el proyecto a los ~7 días sin actividad**.
+  Ocurrió entre el 16 y el 23 de agosto de 2026 —el backup del 23 ya la
+  encontró caída— y costó **al menos cuatro días** de app inutilizable sin que
+  nada lo avisara: el Worker sigue sano y `/health/live`
+  verde, así que la pantalla carga y solo el login falla. **La firma es que el
+  DNS desaparece** (`dig <ref>.supabase.co` vacío); comprobar eso ANTES que
+  credenciales, `.env` o RLS. Se despierta con un botón del dashboard, sin CLI,
+  y los datos sobreviven. El backup semanal a R2 es el único tráfico automático
+  y **no basta como latido** — una semana es justo el ancho de la ventana.
+- **`hour-staging` está pausado** desde la misma fecha y se ha dejado así a
+  propósito: solo hace falta el día que se toque schema, y despertarlo es el
+  primer paso de ese gate.
 - Auth: email+password, cookies httpOnly en la app, hook de access token activo.
-- RLS: FORCE en las superficies tenant-scoped; suite live **120/120**.
+- RLS: FORCE en las superficies tenant-scoped; suite live **150/150**
+  (2026-08-27; el 120/120 que decía esta línea era de julio).
 - Identidad 2026-07-20: `workspace_person` y `workspace_organization` aplicadas,
   perfil portable y dossier local por workspace, share/revoke explícitos.
 - Fixture limitado: `limited@hour.test`, member solo de `playwright`, performer
@@ -335,6 +419,17 @@ documento dice que no se pueden correr, está desactualizado):
   existen. Cualquier «invalid_credentials» empieza por preguntar **contra qué
   base** se está mirando. Al build de producción no le afecta: `PUBLIC_SUPABASE_*`
   no se hornea en el bundle.
+
+**Pase 2026-08-27** — Supabase despertada, deploy y verificación completa contra
+el runtime desplegado `ad3cf67`: `svelte-check` **0/0** (1.871 ficheros), unit
+**555/555**, RLS **150/150** (20 ficheros, 74 s) y E2E **56/56** (2,4 min), cero
+skips. Antes del deploy el E2E daba 55/56, y el único rojo era el pulse contra
+el CSS viejo — o sea el spec funcionando. **El arreglo del pulse se verificó
+midiendo, no razonando**: con el clamp inyectado sobre el runtime desplegado la
+respuesta mide 47,03 / 47,17 / 47,23 a 1024 / 1280 / 1600, y el mecanismo
+(`var()` dentro de `-webkit-line-clamp`) se comprobó en chromium dando
+31,72 → 15,86, los mismos números que producción. Cero cambios de schema, así
+que no hubo backup ni staging en el gate.
 
 **Pase 2026-07-30 (noche)** — deploy y verificación completa contra el runtime
 desplegado `0f8e12f`: **RLS 137/137** (19 ficheros, 23 s) y **E2E 30/30**
@@ -487,7 +582,8 @@ profundidad de producto, no en SvelteKit/Supabase/Cloudflare.
 
 ## Siguiente paso
 
-Abrir `_tasks.md`. Nada bloquea: `main` == prod y las dos suites están en verde.
+Abrir `_tasks.md`. Nada bloquea: prod == `ad3cf67`, encima solo un commit de
+spec, y **las cuatro suites en verde** contra ese runtime (2026-08-27).
 Todo lo que sigue sirve al **Planner v3**, que es la pieza en curso. Por orden:
 
 1. **`note`, el post-it privado** (`_tasks.md § 23`, ADR-093). Es la única
