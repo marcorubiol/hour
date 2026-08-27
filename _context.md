@@ -607,9 +607,10 @@ dieciséis días dado por pendiente estando hecho—:
    corregido el 2026-08-27 comprobando la migración, la RLS (13 casos dentro
    del 150/150), la API (`/api/notes`) y el margen en la UI del Planner. La
    decisión que lo cerró sigue en pie —la nota es siempre privada, lo que ve el
-   equipo es comunicación— y `person_note` murió dentro. **Quedan dos restos
-   pequeños en `§ 32`**: un permiso muerto todavía sembrado
-   (`read:person_note_private`) y que el margen del Planner no tiene E2E.
+   equipo es comunicación— y `person_note` murió dentro. **Queda un resto en
+   `§ 32`**: `read:person_note_private`, un permiso muerto todavía sembrado en
+   seis roles. El otro —que el margen no tenía E2E— se cerró el mismo día con
+   `tests/note-margin.spec.ts`, y la suite pasa a **60/60**.
 2. **Persona: ¿dial o vista?** (`§ 24`) — ADR-092 y el prototipo no dicen lo
    mismo, y de eso depende si vive en la URL.
 3. **La fontanería barata** (`§ 25`): los 3 campos del run sheet que ya viajan y

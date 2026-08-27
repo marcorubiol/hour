@@ -191,8 +191,8 @@
     **Se cumplió:** backup a R2 (run 31367463611) → CI → plan → apply → deploy,
     y el apply revirtió limpio dos veces antes de entrar (ver `_context.md`).
 
-32. [ ] **Los dos restos de `note` (ADR-093).** Ninguno bloquea nada; se
-    escriben porque si no, no existen.
+32. [ ] **El resto de `note` (ADR-093).** Queda uno; el E2E del margen ya está
+    hecho (abajo). No bloquea nada; se escribe porque si no, no existe.
     - **`read:person_note_private` es un permiso muerto que sigue sembrado.**
       La migración de `note` lo dice y lo aplaza a propósito: «va muerto hoy,
       pero está sembrado en seis roles y nombrado en el comentario de
@@ -201,13 +201,17 @@
       `20260720172431_complete_rbac_read_matrix.sql`. Retirarlo es una
       migración pequeña y aditiva-por-omisión, y de paso deja el vocabulario
       cerrado diciendo la verdad.
-    - **El margen del Planner no tiene E2E.** `person.spec.ts` cubre la nota
-      del dossier de persona de punta a punta, y la RLS cubre la base; lo que
-      no tiene guardián es la pieza titular de ADR-093 —escribir una nota en un
-      día desde el Planner, con el ancla rellena, elegida o caída al scope—.
-      Hoy eso solo lo prueba el navegador de Marco. Vale la pena por lo que
-      enseñó el 2026-08-27: un spec que no existe no es cobertura, y uno que
-      corrió verde es una hipótesis sobre los datos de aquel día.
+    - [x] ~~**El margen del Planner no tiene E2E.**~~ **Hecho el 2026-08-27**:
+      `tests/note-margin.spec.ts`, 4 tests, fija las tres ramas de la regla
+      (ancla puesta · selector · fallback) y lee de la API la mitad que la
+      pantalla no enseña —que la anclada vuelve con su `date_id` y la caída
+      vuelve sin ancla pero con casa—. Suite **60/60**, verde tres pasadas
+      seguidas y sin residuo. Dos cosas aprendidas escribiéndolo, ambas en el
+      fichero: **el día no se elige, se pregunta** (hoy ya tiene entradas, así
+      que suponerlo vacío probaba la rama del selector informando en verde la
+      del ancla puesta), y **un spec que solo limpia cuando pasa no se limpia
+      solo** — murió cuatro veces a medias y dejó filas que hubo que barrer a
+      mano, así que la barrida va ahora a los dos extremos.
 
 24. [ ] **Persona: ¿dial o vista?** ADR-092 dice que si cambia qué es una fila,
     cambió el dibujo → **vista**. El prototipo lo tiene como dial
