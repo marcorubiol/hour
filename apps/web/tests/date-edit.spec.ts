@@ -201,7 +201,16 @@ test.describe('date edit path (task 15)', () => {
     // THE DIARY DRAWS THE MONTH'S SLIP now (ADR-095 §0) — `ag__row` was the
     // second implementation of one card and died with the rework, so the row
     // is located as what it is, and by the kind the slip itself declares.
-    const row = page.locator('.slip', { hasText: title });
+    //
+    // AND IT IS LOOKED FOR INSIDE `main`, because the diary is no longer the
+    // only place that draws this object. Since ADR-096 the rail's pulse draws
+    // a slip too — whatever is next — and this spec's fixture date IS what is
+    // next for as long as it exists, so an unscoped `.slip` resolved to two on
+    // 2026-08-27 and the test died of strict mode. The furniture lives in the
+    // `complementary`, the diary in `main`; the day the pulse and the diary
+    // agree is exactly the day the distinction matters.
+    const diary = page.locator('main');
+    const row = diary.locator('.slip', { hasText: title });
     await expect(row).toBeVisible({ timeout: 15_000 });
     await row.click();
 
@@ -221,7 +230,10 @@ test.describe('date edit path (task 15)', () => {
     // Back to a rehearsal — the endpoint clears travel_direction on the
     // way out instead of tripping the DB CHECK (a 400 here means the
     // kind-scoped field rode along when it shouldn't have).
-    await page.locator('.slip[data-kind="travel_day"]', { hasText: 'Testville' }).first().click();
+    // `main` again, and for a sharper reason than above: this one carries
+    // `.first()`, so a pulse slip would not have failed — it would have been
+    // CLICKED, and the pulse's slip is a link to the day, not the dialog.
+    await diary.locator('.slip[data-kind="travel_day"]', { hasText: 'Testville' }).first().click();
     const back = page.locator('dialog[open]');
     await expect(back).toBeVisible();
     await back.getByRole('button', { name: 'Rehearsal', exact: true }).click();
