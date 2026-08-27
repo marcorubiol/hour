@@ -353,17 +353,45 @@
        the margin line set no line-height of their own, so they inherit from
        here. Dropping it while «fixing» the reserve let them inherit the
        body's 1.55 and the answer grew from 44.7 to 54.1 — the reserve was
-       right and the content had moved under it. Measured, twice. */
+       right and the content had moved under it. Measured, twice.
+
+       AND THE 44.72 ABOVE WAS ONE KIND'S ANSWER, NOT THE TALLEST ONE. It was
+       measured on a slip whose name is 11px; a `show` draws its name at 13px
+       (Slip § «the gig keeps its step»), so that line is 15.86 and not 13.41.
+       The old reserve covered a one-line show by 0.01px and nobody knew,
+       because the rail only ever draws the kind that happens to be next.
+
+       On 2026-08-27 it was a show — FiraTàrrega — and THE NAME WRAPPED:
+       `.slip__n` clamps at three lines and 13.25rem does not hold a festival's
+       name. The rail jumped 72.19 → 88.03 and `tests/pulse.spec.ts` caught it,
+       sixteen days after the deploy, because the next thing on file had
+       changed. Nothing in the code had.
+
+       So the budget is now STATED rather than hoped for: the rail narrows the
+       slip to one line of name and one of city (`--slip-name-lines`), which
+       makes the tallest possible answer a show at 12 + 15.86 + 9.53 + 10.8.
+       Measured with that clamp on the deployed runtime: 47.03 / 47.17 / 47.23
+       at 1024 / 1280 / 1600 — the margin line drifts a little with width, the
+       slip does not. 2.95rem is 47.2, still short at 1600 by exactly the kind
+       of hair that made this comment necessary. 3rem is 48. */
     font-size: var(--text-s);
     line-height: 1.06;
-    min-block-size: 2.95rem;
+    min-block-size: 3rem;
   }
   /* The slip is measured, never declared (see Slip's header): the rail is
-     its cell, and it gives 13.25rem. */
+     its cell, and it gives 13.25rem.
+
+     WHAT THE RAIL DOES DECLARE IS HOW MANY LINES IT CAN AFFORD. Everywhere
+     else a long name may wrap — a month cell has three lines for it. Here it
+     may not, because this block sits above the scope list and ADR-096 says it
+     must not change height when the answer lands. One line each, ellipsis by
+     the Slip's own treatment. */
   .pulse__slip {
     container-type: inline-size;
     display: block;
     min-inline-size: 0;
+    --slip-name-lines: 1;
+    --slip-city-lines: 1;
   }
   /* What you are in — the only figure NOW carries. Mono, because it is read
      as data, and at the same size as the slip's name below it. */

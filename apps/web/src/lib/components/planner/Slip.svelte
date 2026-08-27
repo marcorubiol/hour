@@ -402,12 +402,17 @@
       color: var(--info);
     }
 
-    /* ── name · clamps to three lines, never one with an ellipsis ─────── */
+    /* ── name · three lines here, but the BUDGET IS THE CALLER'S ────────
+       A placing that cannot afford a wrap says so by narrowing
+       `--slip-name-lines`; the treatment (box, clamp, ellipsis) stays here so
+       there is one truncation in the app and not one per caller. The rail is
+       the first to need it: at 13.25rem a venue name wraps, and ADR-096 says
+       that block may not change height. See `RailPulse.svelte`. */
     .slip__n {
       display: -webkit-box;
       -webkit-box-orient: vertical;
-      -webkit-line-clamp: 3;
-      line-clamp: 3;
+      -webkit-line-clamp: var(--slip-name-lines, 3);
+      line-clamp: var(--slip-name-lines, 3);
       overflow: hidden;
       text-overflow: ellipsis;
       max-width: 100%;
@@ -431,8 +436,8 @@
     .slip__c {
       display: -webkit-box;
       -webkit-box-orient: vertical;
-      -webkit-line-clamp: 2;
-      line-clamp: 2;
+      -webkit-line-clamp: var(--slip-city-lines, 2);
+      line-clamp: var(--slip-city-lines, 2);
       overflow: hidden;
       text-overflow: ellipsis;
       margin-block-start: -1px;
