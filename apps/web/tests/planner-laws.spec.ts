@@ -517,17 +517,47 @@ test.describe('the diary', () => {
     // run green — the auth setup broke on 2026-07-31 and the E2E needs a
     // deployed origin — so `< 8` was a guess, and it asked for today to sit 8
     // pixels from the VIEWPORT top with 90px of sticky shell and toolbar over
-    // it. Measured on the deployed runtime at 1280x800: today lands at 277,
-    // about a hundred pixels clear of the toolbar, in the upper third. That is
-    // the law working. What it must never do is leave today off-screen or
-    // buried below the fold, and that is what this now asserts.
+    // it.
+    //
+    // `< fold / 2` WAS THE NEXT GUESS, and it lasted sixteen days. It was
+    // written the day this first ran green, when today happened to land at
+    // 277 — «the upper third» — and that number was read back as if it were
+    // the law. It is not. How far down today lands depends on how much diary
+    // chrome sits above it: the month heading, and the week band's own header
+    // when today is the FIRST day of its band. On 2026-08-27 it was, today
+    // landed at 413, and this went red at 800 tall without the app having
+    // changed a line since the deploy.
+    //
+    // So it now asserts the law the paragraph above already stated, and only
+    // that: today is ON SCREEN and CLEAR OF THE STICKY CHROME. Neither half
+    // carries a number of its own — twice now a measurement taken on one day's
+    // data has been written down as if it were a law.
     const fold = page.viewportSize()?.height ?? 800;
     await expect
       .poll(async () => (await measure()) ?? 9999, {
         timeout: 15_000,
         message: '`Now` did not land on today',
       })
-      .toBeLessThan(Math.round(fold / 2));
-    expect((await measure())!, 'today was scrolled past').toBeGreaterThanOrEqual(0);
+      .toBeLessThan(fold);
+    const top = (await measure())!;
+    expect(top, 'today was scrolled past').toBeGreaterThanOrEqual(0);
+    // …AND IT IS NOT SITTING UNDER THE SHELL. Hit-tested, not compared against
+    // a chrome height: the first attempt at that measured every sticky box on
+    // the page and caught the rail, which is 720 tall, so it demanded today
+    // land below the fold it was meant to keep it above. The point just inside
+    // today's own top edge must belong to today; if the furniture pinned over
+    // the page owns it, today is buried.
+    const occluded = await page.evaluate(() => {
+      const key = new Date().toISOString().slice(0, 10);
+      const el = document.querySelector(`[data-day="${key}"]`);
+      if (!el) return true;
+      const r = el.getBoundingClientRect();
+      const hit = document.elementFromPoint(
+        Math.round(r.left + Math.min(40, r.width / 2)),
+        Math.round(r.top + 4),
+      );
+      return !hit || !(el === hit || el.contains(hit));
+    });
+    expect(occluded, 'today landed under the sticky chrome').toBe(false);
   });
 });
