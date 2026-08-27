@@ -56,6 +56,18 @@
 >    abrir el diálogo. Los dos van ahora contra `main`; la furniture vive en el
 >    `complementary` y el diario en `main`.
 >
+> **Y UNA TAREA LLEVABA DIECISÉIS DÍAS DADA POR PENDIENTE ESTANDO HECHA.**
+> `_tasks.md § 23` (`note`, el post-it privado de ADR-093) seguía en `[ ]`, y
+> «Siguiente paso» aquí arriba lo llamaba «la única maquinaria que el Planner v3
+> necesita y no existe». La migración entró el 2026-08-11 **en este mismo
+> documento, dos párrafos más abajo**: tabla, RLS (13 casos dentro del 150/150),
+> `/api/notes`, el margen del Planner que lo escribe, y `person_note` muerta
+> dentro. Nadie mintió — se desplegó y no se volvió a la cola a tacharlo. De ahí
+> salen los dos restos reales, ahora en `§ 32`: `read:person_note_private` es un
+> permiso muerto todavía sembrado en seis roles, y **el margen del Planner no
+> tiene E2E** (la RLS cubre la base y `person.spec.ts` cubre el dossier; la pieza
+> titular de ADR-093 solo la prueba el navegador de Marco).
+>
 > **Regla que sale de aquí, y es la de siempre con una vuelta más:** un spec
 > que no ha corrido es una hipótesis, **y uno que corrió verde es una hipótesis
 > sobre los datos de aquel día**. Nunca escribir un píxel medido como umbral:
@@ -584,13 +596,20 @@ profundidad de producto, no en SvelteKit/Supabase/Cloudflare.
 
 Abrir `_tasks.md`. Nada bloquea: prod == `ad3cf67`, encima solo un commit de
 spec, y **las cuatro suites en verde** contra ese runtime (2026-08-27).
-Todo lo que sigue sirve al **Planner v3**, que es la pieza en curso. Por orden:
+Todo lo que sigue sirve al **Planner v3**, que es la pieza en curso. Por orden
+—y el primero ya no es un punto de partida sino una corrección, porque llevaba
+dieciséis días dado por pendiente estando hecho—:
 
-1. **`note`, el post-it privado** (`_tasks.md § 23`, ADR-093). Es la única
-   maquinaria que el Planner v3 necesita y no existe. **Ya está decidida:** la
-   nota es siempre privada, lo que ve el equipo es comunicación, y la tabla nace
-   con la forma que `message` va a necesitar. Incluye absorber `person_note`
-   (cero filas — solo hoy es gratis).
+1. ~~**`note`, el post-it privado**~~ — **ya está construido y desplegado**
+   (`_tasks.md § 23`, ADR-093; en prod desde el 2026-08-11 con la migración
+   `20260731120000`). Esta lista lo dio por pendiente dieciséis días, y lo
+   llamaba «la única maquinaria que el Planner v3 necesita y no existe»:
+   corregido el 2026-08-27 comprobando la migración, la RLS (13 casos dentro
+   del 150/150), la API (`/api/notes`) y el margen en la UI del Planner. La
+   decisión que lo cerró sigue en pie —la nota es siempre privada, lo que ve el
+   equipo es comunicación— y `person_note` murió dentro. **Quedan dos restos
+   pequeños en `§ 32`**: un permiso muerto todavía sembrado
+   (`read:person_note_private`) y que el margen del Planner no tiene E2E.
 2. **Persona: ¿dial o vista?** (`§ 24`) — ADR-092 y el prototipo no dicen lo
    mismo, y de eso depende si vive en la URL.
 3. **La fontanería barata** (`§ 25`): los 3 campos del run sheet que ya viajan y

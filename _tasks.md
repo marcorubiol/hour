@@ -1,6 +1,7 @@
 # Hour — cola vigente
 
-> **ÚNICA COLA ACTIVA.** Última reconciliación: 2026-07-30.
+> **ÚNICA COLA ACTIVA.** Última reconciliación: 2026-08-27 (§ 23 y § 32; el
+> resto de la cola sigue con la reconciliación del 2026-07-30).
 > Estado general y evidencia: `_context.md`. Historia: `_decisions.md` y
 > `_notes/sessions-log.md`. Los documentos de `build/archive/` no crean tareas.
 
@@ -137,13 +138,33 @@
 > `peopleOf()` de `$lib/people`, incluida la parada de la inferencia en la
 > puerta de la ausencia). Lo que sigue es lo que NO está.
 
-23. [ ] **`note` — el post-it privado, y absorber `person_note`. CERRADO EN
-    GRILL, listo para construir (ADR-093, 2026-07-31).**
+23. [x] **`note` — el post-it privado, y absorber `person_note`. CONSTRUIDO Y
+    DESPLEGADO (ADR-093; migración `20260731120000_note_absorbs_person_note`,
+    en prod desde el 2026-08-11).**
+    *Corregido el 2026-08-27:* esta tarea llevaba dieciséis días en `[ ]` con
+    todo hecho, y `_context.md § Siguiente paso` la seguía llamando «la única
+    maquinaria que el Planner v3 necesita y no existe». Verificado contra el
+    código y la base, no contra documentos:
+    - La tabla y su forma exacta —`note_at_most_one_anchor`, `on_day`, el enum
+      `note_visibility`— en la migración desplegada.
+    - **RLS**: `tests/rls/note.test.ts`, 13 casos, dentro del 150/150.
+    - **`person_note` muerta**: la tabla no resuelve (lo afirma el propio test),
+      `person.spec.ts` y `limited-role.test.ts` re-apuntados a `note`.
+    - **API**: `/api/notes` GET+POST (vía `create_note`), `/api/notes/[id]`
+      DELETE, y `/api/persons/[key]/notes` para el dossier.
+    - **El margen, en la UI**: `planner-feeds.svelte.ts` lo lee y
+      `h/planner/+page.svelte` escribe y borra.
+    Lo que quedó fuera a propósito está escrito en la cabecera de la migración
+    (`conversation_id`, `bolo_id`, `parent_id`, la política de
+    `visibility='workspace'`). Lo que quedó fuera **sin querer** sale a la
+    tarea 32.
+    Se conserva abajo el grill que la cerró, porque explica por qué la nota es
+    privada y por qué comms es lo siguiente.
     La pregunta («¿las notas cuelgan de Conversations?») se cerró girándola: **la
     nota es siempre privada, y lo que ve el equipo es comunicación.** El margen
     del Planner v3 sale como una caja de texto mía, sin firmas ni pila. Las notas
     de equipo esperan a comms — que pasa a ser **lo siguiente grande**.
-    Lo que hay que construir, por orden:
+    Lo que se construyó, por orden (todo hecho — ver arriba):
     - **Migración aditiva `note`**: `workspace_id, author_id, body`,
       `on_day date NOT NULL`, `visibility DEFAULT 'private'`, y anclajes
       anulables `project_id · line_id · performance_id · date_id · person_id`
@@ -167,6 +188,26 @@
       línea.
     Regla 8: la parte destructiva es pequeña pero es destructiva — backup/
     preflight proporcional, tipos regenerados y RLS verde antes de prod.
+    **Se cumplió:** backup a R2 (run 31367463611) → CI → plan → apply → deploy,
+    y el apply revirtió limpio dos veces antes de entrar (ver `_context.md`).
+
+32. [ ] **Los dos restos de `note` (ADR-093).** Ninguno bloquea nada; se
+    escriben porque si no, no existen.
+    - **`read:person_note_private` es un permiso muerto que sigue sembrado.**
+      La migración de `note` lo dice y lo aplaza a propósito: «va muerto hoy,
+      pero está sembrado en seis roles y nombrado en el comentario de
+      vocabulario cerrado de `workspace_role.permissions`; eso es su propia
+      migración». Sigue en los seis roles de
+      `20260720172431_complete_rbac_read_matrix.sql`. Retirarlo es una
+      migración pequeña y aditiva-por-omisión, y de paso deja el vocabulario
+      cerrado diciendo la verdad.
+    - **El margen del Planner no tiene E2E.** `person.spec.ts` cubre la nota
+      del dossier de persona de punta a punta, y la RLS cubre la base; lo que
+      no tiene guardián es la pieza titular de ADR-093 —escribir una nota en un
+      día desde el Planner, con el ancla rellena, elegida o caída al scope—.
+      Hoy eso solo lo prueba el navegador de Marco. Vale la pena por lo que
+      enseñó el 2026-08-27: un spec que no existe no es cobertura, y uno que
+      corrió verde es una hipótesis sobre los datos de aquel día.
 
 24. [ ] **Persona: ¿dial o vista?** ADR-092 dice que si cambia qué es una fila,
     cambió el dibujo → **vista**. El prototipo lo tiene como dial
