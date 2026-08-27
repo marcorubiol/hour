@@ -37,6 +37,30 @@
     en preview no hay Supabase y el login no puede completarse. Eso también
     explica los viejos «skips intencionados» de collab contra preview.
 
+34. [ ] **`hour-staging` está pausado, y eso cambió el gate — dicho aquí porque
+    pasó, no porque pueda pasar.** El gate documentado para schema (el de money
+    v3) es *backup → **staging** → prod plan+apply*. El 2026-08-27, retirando
+    `read:person_note_private` (§ 32), se corrió **sin el ensayo en staging**
+    porque staging llevaba pausado desde el 16 de agosto. Se sustituyó por una
+    reconstrucción local desde cero con la migración dentro y una verificación
+    del catálogo antes de escribirla; salió bien y el riesgo era bajo
+    —idempotente, sin DDL destructivo—, pero **no es lo mismo**: staging es una
+    copia hosted con datos, y es ahí donde aparece lo que solo dice el catálogo,
+    que es justo lo que tumbó dos applies el 2026-08-10.
+    Lo que hay que hacer, en este orden: **despertar staging antes del próximo
+    cambio de schema** (workflow `Supabase staging baseline`, confirmación
+    `REBUILD STAGING`), y decidir si el ensayo en staging es **obligatorio** en
+    el gate o si la reconstrucción local basta para migraciones no destructivas.
+    Hoy el gate dice una cosa y la práctica hizo otra, y eso es lo que no puede
+    quedarse así. Depende de § 33: staging también se pausa solo.
+
+35. [ ] **Los advisors no se comprobaron tras la migración del 2026-08-27.**
+    La práctica del proyecto es correrlos después de cada migración (0 ERROR y
+    los 73 WARN conocidos). Esta vez no se hizo: no había MCP de Supabase
+    autenticado en la sesión. El razonamiento es que `20260827100000` sustituye
+    una función `SECURITY DEFINER` que ya existía y no añade superficie — pero
+    eso es un razonamiento, no una medición, y este documento distingue.
+
 22. [ ] **`build/schema.sql`: decidir si se borra.** Lleva desde hoy un banner
     de «histórico, no ejecutar» porque contiene una versión **vieja y falsa** de
     `handle_new_user` (sin la capa de cuenta). Su último motivo para existir
@@ -485,7 +509,29 @@ Marco: «no quiero ningún diferido». Cerrados los tres, cada uno como tocaba.
 
 9. [ ] **Supabase leaked-password protection (HIBP).** El proyecto está en plan
    Free y la función requiere Pro. Marco debe decidir el upgrade; después activar
-   `password_hibp_enabled` y volver a ejecutar el advisor.
+   `password_hibp_enabled` y volver a ejecutar el advisor. **Ojo: el upgrade que
+   pide esta tarea resuelve también la § 33**, así que las dos son la misma
+   decisión mirada desde dos sitios.
+
+33. [ ] **La pausa del plan Free volverá — decidir qué se hace con ella.**
+    Pasó entre el 16 y el 23 de agosto de 2026 y costó **al menos cuatro días**
+    de app inutilizable: el Worker sigue verde, la pantalla carga y solo el
+    login falla, así que nada avisa. La firma está en `_context.md` (el DNS
+    desaparece; `dig` antes que credenciales). Lo que no hay es decisión.
+    La causa es que **Hour se usa a ráfagas** y el backup semanal a R2 es el
+    único tráfico automático — una semana entre ejecuciones es exactamente el
+    ancho de la ventana de pausa, así que no sirve de latido. Tres salidas, y
+    hay que elegir una a sabiendas:
+    - **Pro.** Se acaba la pausa, y de paso cae la § 9 (HIBP). Cuesta dinero
+      todos los meses para un producto que aún no cobra.
+    - **Un latido.** Un cron barato a mitad de semana que toque la base. Es la
+      opción de coste cero, y es la que hay que escribir con cuidado: tiene que
+      **fallar ruidosamente**, porque un latido que se rompe en silencio deja
+      exactamente el mismo agujero y encima da sensación de cubierto.
+    - **Asumirla.** Ya está documentada y ahora se reconoce en un minuto. Es
+      una respuesta legítima mientras el único usuario sea Marco; **deja de
+      serlo el día que haya una beta externa**, que es Phase 0.9.
+    Afecta también a `hour-staging`, que sigue pausado — ver § 34.
 
 ## Cerrado — bloque 4: Money v2
 

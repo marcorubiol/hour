@@ -68,6 +68,25 @@
 > tiene E2E** (la RLS cubre la base y `person.spec.ts` cubre el dossier; la pieza
 > titular de ADR-093 solo la prueba el navegador de Marco).
 >
+> **Y ESE MISMO DÍA ENTRÓ UNA MIGRACIÓN A PRODUCCIÓN**, la única desde el 11 de
+> agosto: **`20260827100000_retire_person_note_private_permission`** retira el
+> permiso que ADR-093 §5 dejó muerto pero sembrado en seis roles. La función de
+> seed deja de darlo, `array_remove` lo saca de las filas que ya lo llevaban y
+> el COMMENT de vocabulario cerrado vuelve a decir la verdad. No toca tipos
+> (regenerados byte a byte idénticos) ni código de aplicación, así que **la base
+> va por delante del Worker a propósito y no hay nada que desplegar**. Después:
+> **RLS 151/151 · E2E 60/60 · unit 555/555**.
+>
+> **El gate se corrió SIN staging, y eso queda dicho porque es una desviación.**
+> El gate documentado es *backup → staging → prod plan+apply*; se hizo *backup
+> (run 33058807600, el primero desde el 16 de agosto) → CI → plan → apply (run
+> 33059043384)*, sin el ensayo en staging, **porque `hour-staging` también está
+> pausado**. Se sustituyó por una reconstrucción local desde cero con la
+> migración dentro y una comprobación del catálogo antes de escribirla, y salió
+> bien; pero staging es una copia hosted con datos, que es donde aparece lo que
+> solo dice el catálogo — lo que tumbó dos applies el 2026-08-10. Ver
+> `_tasks.md § 34`. **Y los advisors no se corrieron** (§ 35).
+>
 > **Regla que sale de aquí, y es la de siempre con una vuelta más:** un spec
 > que no ha corrido es una hipótesis, **y uno que corrió verde es una hipótesis
 > sobre los datos de aquel día**. Nunca escribir un píxel medido como umbral:
@@ -368,9 +387,13 @@ orientativo, no una verdad comercial cerrada.
   credenciales, `.env` o RLS. Se despierta con un botón del dashboard, sin CLI,
   y los datos sobreviven. El backup semanal a R2 es el único tráfico automático
   y **no basta como latido** — una semana es justo el ancho de la ventana.
-- **`hour-staging` está pausado** desde la misma fecha y se ha dejado así a
-  propósito: solo hace falta el día que se toque schema, y despertarlo es el
-  primer paso de ese gate.
+- **`hour-staging` está pausado** desde la misma fecha. Se dejó así, y el
+  2026-08-27 eso **ya cambió un gate real**: la migración de ese día se aplicó
+  sin el ensayo en staging. No es una nota preventiva, es algo que pasó — ver
+  `_tasks.md § 34`.
+- **Última migración aplicada: `20260827100000_retire_person_note_private_permission`**
+  (2026-08-27, run 33059043384). Cierra ADR-093 §5. La base va por delante del
+  Worker y no hay nada que desplegar: no toca ni tipos ni código.
 - Auth: email+password, cookies httpOnly en la app, hook de access token activo.
 - RLS: FORCE en las superficies tenant-scoped; suite live **151/151**
   (2026-08-27; el 120/120 que decía esta línea era de julio).
