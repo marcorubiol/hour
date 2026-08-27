@@ -209,6 +209,32 @@ describe.skipIf(!envReady())('note RLS (ADR-093)', () => {
     expect(res.rows[0]?.body).toBe(`${BODY} rewritten`);
   });
 
+  test('read:person_note_private is retired — no role still carries it', async () => {
+    // The permission outlived the policy that asked for it by sixteen days:
+    // ADR-093 dropped `person_note_select` and said, in the migration itself,
+    // that retiring the permission was its own job — it is seeded into six
+    // system roles by a trigger and named in the column's closed-vocabulary
+    // comment. `20260827100000` did that job, and this is what holds it down.
+    //
+    // Read as the fixture user, so it only sees the roles of the workspaces it
+    // belongs to; that is enough, because a permission that survived anywhere
+    // would survive here — the six are seeded identically into every space.
+    const { status, rows } = await pgGet<{ code: string; permissions: string[] }>(
+      'workspace_role',
+      jwt,
+      new URLSearchParams({ select: 'code,permissions' }),
+    );
+    expect(status, 'roles must be readable to a member').toBe(200);
+    expect(rows.length, 'the fixture user sees no roles at all').toBeGreaterThan(0);
+    const carriers = rows.filter((r) => r.permissions?.includes('read:person_note_private'));
+    expect(carriers.map((r) => r.code), 'a role still carries the retired permission').toEqual([]);
+    // And the rest of the vocabulary did not go with it.
+    expect(
+      rows.some((r) => r.permissions?.includes('read:internal_notes')),
+      'array_remove took more than it was asked for',
+    ).toBe(true);
+  });
+
   test('person_note is gone — table and both RPCs', async () => {
     const table = await pgGet('person_note', jwt, new URLSearchParams({ select: 'id', limit: '1' }));
     expect(table.status, 'person_note must not resolve').toBeGreaterThanOrEqual(400);
