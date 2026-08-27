@@ -191,16 +191,20 @@
     **Se cumplió:** backup a R2 (run 31367463611) → CI → plan → apply → deploy,
     y el apply revirtió limpio dos veces antes de entrar (ver `_context.md`).
 
-32. [ ] **El resto de `note` (ADR-093).** Queda uno; el E2E del margen ya está
-    hecho (abajo). No bloquea nada; se escribe porque si no, no existe.
-    - **`read:person_note_private` es un permiso muerto que sigue sembrado.**
-      La migración de `note` lo dice y lo aplaza a propósito: «va muerto hoy,
-      pero está sembrado en seis roles y nombrado en el comentario de
-      vocabulario cerrado de `workspace_role.permissions`; eso es su propia
-      migración». Sigue en los seis roles de
-      `20260720172431_complete_rbac_read_matrix.sql`. Retirarlo es una
-      migración pequeña y aditiva-por-omisión, y de paso deja el vocabulario
-      cerrado diciendo la verdad.
+32. [x] **Los restos de `note` (ADR-093) — CERRADOS los dos el 2026-08-27.**
+    - [x] ~~**`read:person_note_private` es un permiso muerto que sigue
+      sembrado.**~~ **Retirado y aplicado a producción**
+      (`20260827100000_retire_person_note_private_permission`). Tres
+      movimientos: la función de seed deja de darlo, `array_remove` lo saca de
+      las filas que ya lo llevaban, y el COMMENT de vocabulario cerrado vuelve
+      a decir la verdad. Probado antes en la base local —un espacio sembrado
+      ANTES pasa de 6 de 16 roles a 0 conservando sus 16, uno creado DESPUÉS
+      nace con 0, y repetir el UPDATE da `UPDATE 0`—, tipos regenerados byte a
+      byte idénticos. Gate: backup a R2 (run 33058807600, **el primero desde el
+      16 de agosto**) → CI verde → plan (una sola migración pendiente) → apply
+      (run 33059043384). Después: **RLS 151/151 · E2E 60/60 · unit 555/555 ·
+      check 0/0**. Lo sujeta `note.test.ts`, que ya contaba el bug del que
+      salió.
     - [x] ~~**El margen del Planner no tiene E2E.**~~ **Hecho el 2026-08-27**:
       `tests/note-margin.spec.ts`, 4 tests, fija las tres ramas de la regla
       (ancla puesta · selector · fallback) y lee de la API la mitad que la

@@ -372,7 +372,7 @@ orientativo, no una verdad comercial cerrada.
   propósito: solo hace falta el día que se toque schema, y despertarlo es el
   primer paso de ese gate.
 - Auth: email+password, cookies httpOnly en la app, hook de access token activo.
-- RLS: FORCE en las superficies tenant-scoped; suite live **150/150**
+- RLS: FORCE en las superficies tenant-scoped; suite live **151/151**
   (2026-08-27; el 120/120 que decía esta línea era de julio).
 - Identidad 2026-07-20: `workspace_person` y `workspace_organization` aplicadas,
   perfil portable y dossier local por workspace, share/revoke explícitos.
@@ -607,10 +607,10 @@ dieciséis días dado por pendiente estando hecho—:
    corregido el 2026-08-27 comprobando la migración, la RLS (13 casos dentro
    del 150/150), la API (`/api/notes`) y el margen en la UI del Planner. La
    decisión que lo cerró sigue en pie —la nota es siempre privada, lo que ve el
-   equipo es comunicación— y `person_note` murió dentro. **Queda un resto en
-   `§ 32`**: `read:person_note_private`, un permiso muerto todavía sembrado en
-   seis roles. El otro —que el margen no tenía E2E— se cerró el mismo día con
-   `tests/note-margin.spec.ts`, y la suite pasa a **60/60**.
+   equipo es comunicación— y `person_note` murió dentro. **Sus dos restos se
+   cerraron el mismo 2026-08-27** (`§ 32`): el margen ya tiene E2E
+   (`tests/note-margin.spec.ts`, suite **60/60**) y `read:person_note_private`
+   está **retirado en producción** (`20260827100000`, RLS **151/151**).
 2. **Persona: ¿dial o vista?** (`§ 24`) — ADR-092 y el prototipo no dicen lo
    mismo, y de eso depende si vive en la URL.
 3. **La fontanería barata** (`§ 25`): los 3 campos del run sheet que ya viajan y
