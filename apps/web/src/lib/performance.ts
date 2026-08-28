@@ -244,6 +244,26 @@ export const PerformancePatchSchema = v.object({
   venue_id: v.optional(v.nullable(v.pipe(v.string(), v.uuid()))),
   conversation_id: v.optional(v.nullable(v.pipe(v.string(), v.uuid()))),
   line_id: v.optional(v.nullable(v.pipe(v.string(), v.uuid()))),
+  /**
+   * ADR-087 — la costura con el dinero: de qué trato cuelga esta función.
+   *
+   * PATCH y no create: `create_performance` no conoce la columna, igual que
+   * con `hold_notice_days`, así que crear-y-enlazar son dos pasos. Y el orden
+   * del oficio es ese de todas formas — el bolo suele existir antes que la
+   * fecha, porque el trato se cierra hablando (Marco, 2026-08-28).
+   *
+   * `null` lo suelta. La coherencia NO se valida aquí: la sujeta el trigger
+   * `performance_guard_bolo` (20260828100000), porque `authenticated` ya podía
+   * escribir esta columna por PostgREST y una comprobación solo en la API
+   * sería una puerta con la pared abierta al lado.
+   *
+   * OJO, tensión conocida: la puerta de escritura es `edit:performance` pero
+   * la de lectura del bolo es `read:money`, así que quien coloca fechas sin
+   * leer dinero puede ENLAZAR y no VER lo enlazado. Es coherente con la
+   * frontera que ya existe (el feed no proyecta `bolo_id` a propósito), pero
+   * es una decisión de producto abierta, no un descuido.
+   */
+  bolo_id: v.optional(v.nullable(v.pipe(v.string(), v.uuid()))),
   // ADR-084 §3 — the readiness ticks. The KEY SET is closed on purpose: the
   // DB only guarantees "an object", so this is where the vocabulary is
   // actually enforced. A client cannot invent `readiness.whatever` and have
