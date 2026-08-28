@@ -61,6 +61,38 @@
     una función `SECURITY DEFINER` que ya existía y no añade superficie — pero
     eso es un razonamiento, no una medición, y este documento distingue.
 
+36. [~] **Enlazar una función a su bolo (ADR-087) — la mitad de abajo HECHA,
+    la pantalla pendiente.** El seguimiento de money v3 que la lista de
+    «Siguiente paso» llevaba como punto 5.
+    **Decidido por Marco el 2026-08-28, preguntado con los datos delante:** el
+    bolo **ya existe** cuando llegas al calendario, porque el trato se cierra
+    hablando; y un bolo lleva **1..N funciones** de verdad (residencias, dobles,
+    una tanda corta en la misma sala). O sea que el gesto primario es **colgar
+    de un bolo**, no crear uno, y añadir la segunda función a un bolo tiene que
+    ser tan normal como la primera. Crear bolo desde el Planner es el respaldo,
+    no el camino.
+    *Lo construido el 2026-08-28:* `bolo_id` abierto en `PerformancePatchSchema`
+    (PATCH y no create, como `hold_notice_days`), y el trigger
+    `performance_guard_bolo` (`20260828100000`) que exige mismo proyecto —
+    aplicado a producción, con `tests/rls/performance-bolo.test.ts` (5 casos)
+    sujetándolo. RLS 151 → **156**.
+    *Lo que queda, y es lo que Marco tiene que dibujar:* el selector de bolo en
+    la ficha de función y/o en el alta del Planner. Con una **tensión de
+    producto abierta** que no me toca resolver: escribir el enlace es
+    `edit:performance` pero leer el bolo es `read:money`, así que quien coloca
+    fechas sin leer dinero puede **enlazar y no ver lo enlazado**. Es coherente
+    con la frontera que ya existe, pero la pantalla tendrá que decir algo.
+    *Dato para dibujarla:* hoy hay 15 bolos y **los 15 tienen exactamente 1
+    función**, con ~3 funciones sin bolo. Ese «todos a 1» no es prueba de nada
+    todavía — hasta hoy no había manera de enlazar la segunda.
+
+37. [ ] **`create_performance` sigue sin saber de bolos.** Enlazar son dos
+    pasos (crear y después PATCH), que es el mismo patrón que
+    `hold_notice_days` y funciona. Si el alta del Planner acaba preguntando
+    siempre por el bolo —que es lo que sugiere la decisión de arriba—, merece
+    la pena que la RPC acepte `p_bolo_id` y nazca enlazada, para que no exista
+    la ventana en la que la función ya está y el dinero todavía no.
+
 22. [ ] **`build/schema.sql`: decidir si se borra.** Lleva desde hoy un banner
     de «histórico, no ejecutar» porque contiene una versión **vieja y falsa** de
     `handle_new_user` (sin la capa de cuenta). Su último motivo para existir

@@ -391,12 +391,23 @@ orientativo, no una verdad comercial cerrada.
   2026-08-27 eso **ya cambió un gate real**: la migración de ese día se aplicó
   sin el ensayo en staging. No es una nota preventiva, es algo que pasó — ver
   `_tasks.md § 34`.
-- **Última migración aplicada: `20260827100000_retire_person_note_private_permission`**
-  (2026-08-27, run 33059043384). Cierra ADR-093 §5. La base va por delante del
-  Worker y no hay nada que desplegar: no toca ni tipos ni código.
+- **Última migración aplicada: `20260828100000_guard_performance_bolo_same_project`**
+  (2026-08-28, run 33163749816). Una función solo cuelga de un bolo de SU
+  proyecto: hasta ese día lo único que sujetaba `performance.bolo_id` era la FK,
+  y **se verificó en producción que enlazar a un bolo de otro proyecto devolvía
+  204**. Con el UUID en la mano se le movía a un tercero el `function_count`.
+  RLS 151 → **156**. Debajo, `20260827100000_retire_person_note_private_permission`
+  (2026-08-27, run 33059043384), que cierra ADR-093 §5. Las dos dejan la base
+  por delante del Worker sin nada que desplegar: no tocan tipos ni bundle.
+- **La trampa que casi esconde ese agujero, escrita porque volverá:** el mismo
+  PATCH da 403 con `Prefer: return=representation` y 204 con `return=minimal`.
+  El 403 no era la regla, era el revoke de SELECT sobre las columnas de dinero
+  (`20260720172431`) al devolver la fila entera. **Un test escrito con el helper
+  de siempre salía verde rechazando por el motivo equivocado.** La API real ya
+  lo esquiva nombrando sus columnas en el `select`.
 - Auth: email+password, cookies httpOnly en la app, hook de access token activo.
-- RLS: FORCE en las superficies tenant-scoped; suite live **151/151**
-  (2026-08-27; el 120/120 que decía esta línea era de julio).
+- RLS: FORCE en las superficies tenant-scoped; suite live **156/156**
+  (2026-08-28; el 120/120 que decía esta línea era de julio).
 - Identidad 2026-07-20: `workspace_person` y `workspace_organization` aplicadas,
   perfil portable y dossier local por workspace, share/revoke explícitos.
 - Fixture limitado: `limited@hour.test`, member solo de `playwright`, performer
