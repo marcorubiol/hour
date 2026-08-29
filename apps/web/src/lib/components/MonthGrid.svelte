@@ -1177,14 +1177,6 @@
               style="grid-column: {b.colStart} / {b.colEnd}"
               title={b.note ? `${b.label} · ${b.note}` : b.label}
             >
-              <!-- LAS PALABRAS ROMPEN LA PAUTA, NO AL REVÉS. Desde que las
-                   verticales bajan hasta el pie (para que la banda pertenezca
-                   a los días), cruzaban por detrás del texto y lo ensuciaban.
-                   Una tira de papel bajo las palabras las deja pasar por los
-                   huecos y las corta donde hay algo que leer — que es lo que
-                   hace cualquier rótulo sobre una pauta. Marco, en pantalla,
-                   2026-08-29. -->
-              <span class="cal__band-lead" class:grain={b.tentative}>
               <span class="cal__band-k">
                 {#if b.accent}
                   <IdentityMark
@@ -1198,7 +1190,6 @@
               </span>
               {#if b.subject}<span class="cal__band-n">{b.subject}</span>{/if}
               {#if b.span}<em class="cal__band-s">{b.span}</em>{/if}
-              </span>
               <!-- The rule with its terminus. It is not drawn when the band runs
                    past the week's edge: an arrowhead there would claim an end
                    the calendar cannot show. -->
@@ -1311,26 +1302,15 @@
       overflow: visible;
       white-space: nowrap;
     }
-    /* El papel bajo las palabras. `--bg` y no un `--card`: la banda no es una
-       caja —una ausencia es un TRAMO de días, y una caja diría «una cosa que
-       pasó»— así que esto no pinta un objeto, solo tapa la pauta donde hay
-       texto. El aire de la derecha evita que la primera vertical roce la
-       última letra.
-
-       Y LLEVA EL GRANO ÉL TAMBIÉN, no solo la banda. El papel es opaco, así
-       que tapaba los puntos justo donde hay que leer — Marco lo vio: «no
-       funciona porque hemos pedido el punteado». Funciona porque el fondo de
-       un elemento se pinta ANTES que su propio `::after` de z-index negativo:
-       papel → puntos → texto. No se duplica el patrón, se apunta al mismo
-       token (`certainty.css`). */
-    .cal__band-lead {
-      flex: none;
-      display: inline-flex;
-      align-items: center;
-      gap: 9px;
-      background: var(--bg);
-      padding-inline-end: 7px;
-    }
+    /* SIN PAPEL BAJO LAS PALABRAS, y es una decisión, no una omisión.
+       Cuando las verticales pasaron a llegar hasta el pie, cruzaban por detrás
+       del texto; el arreglo fue una tira de papel que las rompiera donde hay
+       algo que leer. Se fue por dos vueltas: opaca se comía el grano, y con
+       grano propio quedaba peor todavía — `.grain::after` lleva una máscara
+       diagonal pensada para una caja grande, y en una tira estrecha alrededor
+       de unas palabras produce un borde y una fase rota.
+       Marco lo zanjó mirándolo: «limpia el background de las letras y déjame
+       ver las líneas verticales, prefiero eso». La pauta cruza, y ya está. */
     .cal__band-k {
       flex: none;
       display: inline-flex;
