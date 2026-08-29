@@ -1184,7 +1184,7 @@
                    huecos y las corta donde hay algo que leer — que es lo que
                    hace cualquier rótulo sobre una pauta. Marco, en pantalla,
                    2026-08-29. -->
-              <span class="cal__band-lead">
+              <span class="cal__band-lead" class:grain={b.tentative}>
               <span class="cal__band-k">
                 {#if b.accent}
                   <IdentityMark
@@ -1315,7 +1315,14 @@
        caja —una ausencia es un TRAMO de días, y una caja diría «una cosa que
        pasó»— así que esto no pinta un objeto, solo tapa la pauta donde hay
        texto. El aire de la derecha evita que la primera vertical roce la
-       última letra. */
+       última letra.
+
+       Y LLEVA EL GRANO ÉL TAMBIÉN, no solo la banda. El papel es opaco, así
+       que tapaba los puntos justo donde hay que leer — Marco lo vio: «no
+       funciona porque hemos pedido el punteado». Funciona porque el fondo de
+       un elemento se pinta ANTES que su propio `::after` de z-index negativo:
+       papel → puntos → texto. No se duplica el patrón, se apunta al mismo
+       token (`certainty.css`). */
     .cal__band-lead {
       flex: none;
       display: inline-flex;
