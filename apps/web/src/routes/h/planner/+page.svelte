@@ -1380,10 +1380,19 @@
        The word is not a spacer bought to stop the jump: a day off IS what you
        are looking at, which is exactly what this line is for. The jump stops
        because the line has something true to say, not the other way round. */
+    /* Y UN DÍA VACÍO TAMBIÉN TIENE ALGO VERDADERO QUE DECIR (Marco,
+       2026-08-29). El párrafo de arriba arregló el día libre y dejó fuera el
+       día a secas: sin hilos y sin `day_off` la línea volvía a callarse, así
+       que la banda medía UNA línea en el Día y DOS en la Agenda, y las flechas
+       daban un brinco al cambiar de vista.
+       La palabra es `free`, la misma que el pulse del rail usa para esto, y se
+       dice SOLO con los feeds asentados: mientras cargan no se sabe si el día
+       está libre o si aún no ha llegado, y nadie puede imprimir «libre» sobre
+       un dato que falta. Cargando, la línea calla — y ahí el brinco es honesto,
+       porque de verdad no hay respuesta todavía. */
     if (dayThreads.length === 0) {
-      return dayUnplaced.some((u) => u.kind === 'day_off')
-        ? t('planner.kind_day_off', locale)
-        : null;
+      if (dayUnplaced.some((u) => u.kind === 'day_off')) return t('planner.kind_day_off', locale);
+      return loading ? null : t('pulse.free', locale);
     }
     const from = Math.min(...dayThreads.map((x) => x.a));
     const to = Math.max(...dayThreads.map((x) => x.b));
