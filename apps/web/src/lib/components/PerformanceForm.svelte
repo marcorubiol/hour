@@ -41,6 +41,7 @@
     isValidHoldNotice,
     performanceStatusLabel,
     type PerformanceCreate,
+    type PerformanceSeriesCreate,
   } from '$lib/performance';
 
   type ProjectLite = { id: string; slug: string; name: string };
@@ -56,6 +57,14 @@
     lockProject?: boolean;
     /** ISO day to prefill on open; defaults to the viewer's today. */
     presetDate?: string | null;
+    /**
+     * ADR-084 §1 — los días RESUELTOS de una tanda, o null para una sola
+     * función. Los calcula `BlockDays` en el diálogo anfitrión (regla de tramo
+     * + días de la semana con excepciones punzadas) y llegan aquí ya hechos:
+     * este formulario no vuelve a derivarlos, igual que no lo hace el
+     * servidor. Con dos o más, `submit()` escribe la tanda de una sentencia.
+     */
+    days?: string[] | null;
     /** Mirrors the mutation's isPending for the host's footer button. */
     pending?: boolean;
     onCreated?: (perf: CreatedPerformance) => void;
@@ -67,6 +76,7 @@
     presetLineId = null,
     lockProject = false,
     presetDate = null,
+    days = null,
     pending = $bindable(false),
     onCreated,
   }: Props = $props();
@@ -184,10 +194,63 @@
     },
   });
 
+  /**
+   * ADR-084 §1 — la tanda es UNA escritura atómica de N filas con una serie.
+   *
+   * Ruta aparte y no un bucle sobre la de arriba, por la misma razón que el
+   * endpoint existe: una tanda a medio crear es indistinguible, más tarde, de
+   * una que alguien dejó incompleta a propósito.
+   */
+  const createPerfSeries = createMutation({
+    mutationFn: async (input: PerformanceSeriesCreate) => {
+      const body = await mutateJSON<{ performances: CreatedPerformance[] }>(
+        'POST',
+        '/api/performances/series',
+        input,
+      );
+      const rows = body?.performances ?? [];
+      if (rows.length === 0) throw new Error('Malformed response');
+      // El aviso de hold viaja por PATCH igual que en la ruta de una sola
+      // (la RPC no conoce la columna). Una por fila, y un fallo NO deshace la
+      // tanda: se avisa y se sigue, misma tolerancia que arriba.
+      const notice = holdNoticeToSend(input.status);
+      if (notice !== undefined) {
+        try {
+          await Promise.all(
+            rows.map((r) =>
+              mutateJSON('PATCH', `/api/performances/${r.id}`, { hold_notice_days: notice }),
+            ),
+          );
+        } catch {
+          addToast({ tone: 'warning', message: t('perf.hold_notice_not_saved', locale) });
+        }
+      }
+      return rows;
+    },
+    onSuccess: (rows) => {
+      cVenue = '';
+      cCity = '';
+      cHoldNotice = null;
+      void queryClient.invalidateQueries({ queryKey: ['planner-performances'] });
+      void queryClient.invalidateQueries({ queryKey: ['line-performances'] });
+      void queryClient.invalidateQueries({ queryKey: ['line-money-fees'] });
+      void queryClient.invalidateQueries({ queryKey: ['today-performances'] });
+      // El anfitrión cierra con la primera, que es la que abre la tanda.
+      onCreated?.(rows[0]);
+    },
+    onError: (err) => {
+      addToast({
+        tone: 'danger',
+        title: 'Not created',
+        message: `${err instanceof Error ? err.message : 'Unexpected error'} — try again.`,
+      });
+    },
+  });
+
   // The host's footer button reads pending through the bindable — a store
   // value can't cross the instance boundary reactively any other way.
   $effect(() => {
-    pending = $createPerf.isPending;
+    pending = $createPerf.isPending || $createPerfSeries.isPending;
   });
 
   /**
@@ -201,9 +264,25 @@
     return cHoldNotice;
   }
 
+  /** La tanda manda: dos días o más resueltos por el anfitrión. */
+  let isRun = $derived(Boolean(days && days.length >= 2));
+
   export function submit() {
     if (!cProject) {
       addToast({ tone: 'warning', message: 'Pick a project.' });
+      return;
+    }
+    // UNA TANDA ES OTRA ESCRITURA, no la misma repetida. Con los días ya
+    // resueltos por `BlockDays`, dos o más van por la ruta atómica.
+    if (days && days.length >= 2) {
+      $createPerfSeries.mutate({
+        project_id: cProject,
+        performed_at: days,
+        venue_name: cVenue.trim() || null,
+        city: cCity.trim() || null,
+        status: cStatus as PerformanceCreate['status'],
+        line_id: cLine || null,
+      });
       return;
     }
     if (!cDay) {
@@ -237,7 +316,12 @@
     disabled={lockProject}
     onchange={() => (cLine = '')}
   />
-  <Input label="Date" type="date" bind:value={cDay} required />
+  <!-- UN SOLO CONTROL PARA LOS DÍAS. Con la tanda puesta, el tramo de
+       `BlockDays` ya dice cuándo, y dejar además este campo sería preguntar
+       dos veces lo mismo con dos respuestas posibles. -->
+  {#if !isRun}
+    <Input label="Date" type="date" bind:value={cDay} required />
+  {/if}
   <Input label="Venue" bind:value={cVenue} placeholder="Venue name (optional)" />
   <Input label="City" bind:value={cCity} placeholder="City (optional)" />
   <Select label="Status" options={statusOptions} bind:value={cStatus} />

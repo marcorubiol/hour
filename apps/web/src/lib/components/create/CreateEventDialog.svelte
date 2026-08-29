@@ -142,6 +142,11 @@
   let dTo = $state('');
   let dWeekdays = $state<number[]>([0, 1, 2, 3, 4, 5, 6]);
   let dExceptions = $state<string[]>([]);
+  /** Los días de la tanda, resueltos aquí una sola vez: el formulario de
+      función los recibe hechos y el servidor tampoco los re-deriva. */
+  let perfRunDays = $derived(
+    blockDays({ from: dFrom, to: dTo, weekdays: dWeekdays, exceptions: dExceptions }),
+  );
   let dStartTime = $state('10:00');
   let dEndTime = $state('');
   let dStartWall = $state(''); // timed start (datetime-local)
@@ -460,6 +465,29 @@
     </div>
 
     {#if type === 'performance'}
+      <!-- ADR-084 §1 — una función también puede durar varios días. Cardinalidad,
+           no tipo: la pastilla de arriba ya dijo QUÉ es esto; esto solo dice
+           sobre cuántos días corre. Mismo conmutador y mismo panel que las
+           fechas, porque es la misma pregunta. -->
+      <Checkbox label={t('block.several_days', locale)} bind:checked={dMulti} />
+      {#if dMulti}
+        <BlockDays
+          bind:from={dFrom}
+          bind:to={dTo}
+          bind:weekdays={dWeekdays}
+          bind:exceptions={dExceptions}
+          locale={navigator.language}
+          labels={{
+            from: t('block.from', locale),
+            to: t('block.to', locale),
+            pickSpan: t('block.pick_span', locale),
+            daysUnit: t('block.days_unit', locale),
+            tooFew: t('block.too_few', locale),
+            tooMany: t('block.too_many', locale, { max: String(BLOCK_MAX_DAYS) }),
+            removed: (n: number) => t('block.removed', locale, { n: String(n) }),
+          }}
+        />
+      {/if}
       <PerformanceForm
         bind:this={perfForm}
         bind:pending={perfPending}
@@ -467,6 +495,7 @@
         {presetProjectId}
         {presetLineId}
         {presetDate}
+        days={dMulti ? perfRunDays : null}
         onCreated={handlePerfCreated}
       />
     {:else}
