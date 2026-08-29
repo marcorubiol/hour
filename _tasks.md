@@ -890,6 +890,18 @@ entre empresas sin construirlo.
     desde el cliente. Verificado en vivo: 1 día → 400, día repetido → 400,
     proyecto ajeno → 403, y 3 días → 201 con **una sola serie** y tres slugs.
     Guardián: `tests/rls/performance-series.test.ts`, 7 casos. RLS 156 → **163**.
+    *Hecho también el 2026-08-29: LA BANDA DEL MES.* `MonthGrid` dibuja una
+    tanda de funciones como un elemento —nombre dicho una vez, una celda por
+    día— y la tanda **sale de la celda** para no dibujarse dos veces. La celda
+    de banda dejó de llevar un `DateEvent` y lleva lo que el dibujo necesita;
+    la única asimetría real es que una fecha abre su diálogo y una función es
+    un ENLACE, porque tiene página. Verificado en vivo sobre la tanda de
+    octubre: 1 banda, 3 días, 3 enlaces, 0 botones, 0 cards duplicadas.
+    **Y costó una rotura en producción**, contada en `_context.md`: el GRANT de
+    SELECT sobre `performance` es por columnas, `series_id` nació hoy y no
+    entra sola, así que meterla en el `select` del feed tumbó
+    `/api/performances` con 403 — y con él el mes, la agenda y el tablero.
+    Arreglado por `20260829120000`.
     *Lo que falta, y es pantalla:*
     - El conmutador «varios días» en el alta de función, **reusando
       `BlockDays.svelte`** tal cual — ya devuelve la lista de días resuelta, que

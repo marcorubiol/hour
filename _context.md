@@ -399,6 +399,20 @@ orientativo, no una verdad comercial cerrada.
   RLS 151 → **156**. Debajo, `20260827100000_retire_person_note_private_permission`
   (2026-08-27, run 33059043384), que cierra ADR-093 §5. Las dos dejan la base
   por delante del Worker sin nada que desplegar: no tocan tipos ni bundle.
+- **ROTURA EN PRODUCCIÓN EL 2026-08-29, y duró unos minutos.** Al añadir
+  `series_id` al `select` de `/api/performances`, el endpoint pasó a **403
+  «permission denied for table performance»** — y con él el mes, la agenda y el
+  tablero, que leen todos de ahí. Causa: `20260720172431` devolvió el SELECT
+  sobre `performance` **por columnas**, con una lista de julio, y una columna
+  nueva **no entra sola en un grant por columnas**. Arreglado por
+  `20260829120000` concediendo `series_id` —que es una etiqueta de agrupación,
+  no dinero, a diferencia de `bolo_id`, que sigue fuera a propósito—.
+  **La regla:** una columna nueva de `performance` no existe para PostgREST
+  hasta que se la nombra en el grant, y meterla en un `select` sin el grant
+  rompe el endpoint ENTERO, no solo ese campo. Y la lección de proceso: el E2E
+  exige origen desplegado, así que desplegar un cambio de feed y probar
+  DESPUÉS deja una ventana rota — cuando se toca el `select` de un feed, hay
+  que pegarle al endpoint justo después del deploy, sin esperar a la suite.
 - **La trampa que casi esconde ese agujero, escrita porque volverá:** el mismo
   PATCH da 403 con `Prefer: return=representation` y 204 con `return=minimal`.
   El 403 no era la regla, era el revoke de SELECT sobre las columnas de dinero
