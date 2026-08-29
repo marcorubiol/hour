@@ -37,7 +37,33 @@
     en preview no hay Supabase y el login no puede completarse. Eso también
     explica los viejos «skips intencionados» de collab contra preview.
 
-34. [ ] **`hour-staging` está pausado, y eso cambió el gate — dicho aquí porque
+34. [x] **El gate de schema, decidido — y staging NO era lo que yo creía.**
+    (Marco, 2026-08-29: «lo que tú recomiendes».) La recomendación salió de
+    **leer el workflow**, no de suponerlo, y da la vuelta al problema:
+    `staging.yml` hace `supabase db reset --no-seed` contra staging y carga
+    fixtures sintéticos. O sea que **staging se reconstruye desde las mismas
+    migraciones que la base local** — no es una copia de producción. Por tanto
+    el ensayo en staging **no protege contra la deriva que solo tiene
+    producción**, que es exactamente lo que tumbó los dos applies del
+    2026-08-10 (una sobrecarga de función que solo prod tenía; el esquema
+    `hour_backup_20260720`). Ninguno de los dos lo habría visto staging.
+    **La regla que queda:**
+    - **Migración aditiva / no destructiva** → reconstrucción local desde cero
+      con la migración dentro, tipos regenerados, RLS después. Staging es
+      opcional: no añade nada que la local no dé. Es lo que se hizo el 27 y el
+      28, y ahora está justificado en vez de disculpado.
+    - **Migración destructiva** (DROP, cambio de tipo, reescritura de datos) →
+      **staging obligatorio**, y hay que despertarlo. No por la deriva —que no
+      la ve— sino porque corre las suites completas contra un Postgres hosted y
+      da un ensayo que se puede tirar.
+    - **Y el modo `inspect` pasa a ser obligatorio antes de cualquier migración
+      destructiva.** Es lo ÚNICO del gate que mira el catálogo de producción, y
+      por eso existe (se añadió el 2026-08-11, justo después de los dos
+      applies). Si la migración toca un tipo, una función o algo que otro
+      objeto pueda estar sujetando, se pregunta al catálogo antes.
+    Texto original abajo, que describe el caso que lo provocó.
+
+34b. [x] ~~Histórico — lo decidido está en § 34.~~ **`hour-staging` está pausado — dicho aquí porque
     pasó, no porque pueda pasar.** El gate documentado para schema (el de money
     v3) es *backup → **staging** → prod plan+apply*. El 2026-08-27, retirando
     `read:person_note_private` (§ 32), se corrió **sin el ensayo en staging**
@@ -54,12 +80,27 @@
     Hoy el gate dice una cosa y la práctica hizo otra, y eso es lo que no puede
     quedarse así. Depende de § 33: staging también se pausa solo.
 
-35. [ ] **Los advisors no se comprobaron tras la migración del 2026-08-27.**
-    La práctica del proyecto es correrlos después de cada migración (0 ERROR y
-    los 73 WARN conocidos). Esta vez no se hizo: no había MCP de Supabase
-    autenticado en la sesión. El razonamiento es que `20260827100000` sustituye
-    una función `SECURITY DEFINER` que ya existía y no añade superficie — pero
-    eso es un razonamiento, no una medición, y este documento distingue.
+35. [ ] **Los advisors siguen sin comprobarse — y el MCP de Supabase NO se
+    puede autenticar.** Pendientes desde las dos migraciones del 27 y el 28. La
+    práctica del proyecto es correrlos después de cada una (0 ERROR y los 73
+    WARN conocidos), y el razonamiento de que ninguna añade superficie
+    —`20260827100000` sustituye una `SECURITY DEFINER` que ya existía;
+    `20260828100000` añade un trigger— sigue siendo eso, un razonamiento y no
+    una medición.
+    **Intentado el 2026-08-29 y bloqueado del lado de Supabase:** el flujo
+    OAuth del plugin muere en `api.supabase.com` con
+    `{"message":"Unrecognized client_id"}`. El `client_id` que trae el plugin no
+    está registrado, así que reintentar da lo mismo. Tres salidas:
+    - **Mirarlos en el dashboard** (Advisors → Security / Performance). Treinta
+      segundos y cero infraestructura; es lo que hay que hacer ya.
+    - **Un personal access token** de Supabase + la Management API
+      (`/v1/projects/<ref>/advisors/security`), que permitiría automatizarlo.
+      Es un secreto nuevo que gestionar.
+    - **Meter los checks de nivel ERROR en el modo `inspect`** del workflow de
+      migración, que ahora es parte formal del gate (§ 34) y es lo único que
+      mira el catálogo de producción. La opción que no depende de un OAuth roto
+      ni de un secreto nuevo, y la que yo recomendaría si se quiere que esto
+      deje de olvidarse.
 
 36. [~] **Enlazar una función a su bolo (ADR-087) — la mitad de abajo HECHA,
     la pantalla pendiente.** El seguimiento de money v3 que la lista de
@@ -574,7 +615,16 @@ Marco: «no quiero ningún diferido». Cerrados los tres, cada uno como tocaba.
    pide esta tarea resuelve también la § 33**, así que las dos son la misma
    decisión mirada desde dos sitios.
 
-33. [ ] **La pausa del plan Free volverá — decidir qué se hace con ella.**
+33. [x] **La pausa del plan Free volverá — DECIDIDO: se acepta, con fecha de
+    caducidad.** (Marco, 2026-08-29: «mientras la app no esté activa al
+    público, acepto la pausa».) O sea la tercera salida de las tres que había,
+    y es una decisión, no un olvido: la firma está documentada, se reconoce en
+    un minuto y despertar cuesta un botón. **Deja de valer el día que haya un
+    usuario que no sea Marco** — es decir, al abrir la beta externa (Phase 0.9),
+    y ese día vuelve la elección entre Pro (que arrastra también la § 9 del
+    HIBP) y un latido que falle ruidosamente. Hasta entonces, lo único que hay
+    que hacer es reconocerla: `dig <ref>.supabase.co` vacío. Texto original
+    abajo con las tres opciones y su coste, por si hay que reabrirlo.
     Pasó entre el 16 y el 23 de agosto de 2026 y costó **al menos cuatro días**
     de app inutilizable: el Worker sigue verde, la pantalla carga y solo el
     login falla, así que nada avisa. La firma está en `_context.md` (el DNS
