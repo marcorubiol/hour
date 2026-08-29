@@ -30,8 +30,11 @@
      * agenda's start), so the page owns the arithmetic and hands down three
      * verbs. `onNow` moves you to the present in whatever drawing you are in.
      */
-    onStepBack: () => void;
-    onStepNext: () => void;
+    /** `shift` = una muesca literal, no un salto a plan. El teclado ya lo dice
+        así (`Shift+← →` en el Planner); esto es el mismo gesto con el ratón,
+        para que no haya que saberse el atajo para llegar a un hueco. */
+    onStepBack: (shift?: boolean) => void;
+    onStepNext: (shift?: boolean) => void;
     onNow: () => void;
     onSetView: (v: PlannerView) => void;
     onSetLaneAxis: (g: LaneAxis) => void;
@@ -100,13 +103,15 @@
       type="button"
       class="cal__arw"
       aria-label={t('planner.prev_month', locale)}
-      onclick={onStepBack}>‹</button
+      title={t('planner.step_hint', locale)}
+      onclick={(e) => onStepBack(e.shiftKey)}>‹</button
     >
     <button
       type="button"
       class="cal__arw"
       aria-label={t('planner.next_month', locale)}
-      onclick={onStepNext}>›</button
+      title={t('planner.step_hint', locale)}
+      onclick={(e) => onStepNext(e.shiftKey)}>›</button
     >
   </span>
   <button type="button" class="cal__now" onclick={onNow}>{t('planner.now', locale)}</button>

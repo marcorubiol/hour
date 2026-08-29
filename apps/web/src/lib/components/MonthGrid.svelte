@@ -83,6 +83,10 @@
     /** i18n hooks — the page passes t()-backed fns; defaults stay English. */
     dateKindLabel?: (kind: string) => string;
     createLabel?: (isoDate: string) => string;
+    /** Qué dice el número del día, que ES la puerta al Día. Sin nombre, un
+        número en una esquina no se lee como control ni lo anuncia un lector
+        de pantalla. */
+    openDayLabel?: (isoDate: string) => string;
     /**
      * The word on a card's FOOT — "confirmat", "1r hold", "proposat".
      * EVERY card carries one: without it a confirmed gig is a row shorter
@@ -145,6 +149,7 @@
     locale = 'en-GB',
     dateKindLabel = (kind: string) => kind.replace(/_/g, ' '),
     createLabel = (iso: string) => `New performance on ${iso}`,
+    openDayLabel = (iso: string) => `Open ${iso}`,
     stateLabel = (status: string) => EN_STATE_WORDS[status] ?? null,
     readinessItems = [
       { key: 'hotel', label: 'hotel' },
@@ -1003,6 +1008,8 @@
                 <button
                   type="button"
                   class="cal__day-num"
+                  title={openDayLabel(day.iso)}
+                  aria-label={openDayLabel(day.iso)}
                   onclick={() => onDayOpen?.(day.iso)}>{Number(day.iso.slice(8, 10))}</button
                 >
               {:else}
@@ -1681,12 +1688,28 @@
       color: var(--text-muted);
       font-variant-numeric: tabular-nums;
     }
+    /* EL NÚMERO ES LA PUERTA AL DÍA, y hasta hoy no lo parecía.
+       Solo se oscurecía al pasar, que es lo que hace la tinta cuando algo se
+       enfoca — no dice «esto se pulsa». El subrayado sí, y es el registro más
+       callado que hay para decirlo: no añade forma, no compite con las cards,
+       y desaparece cuando no hace falta. Nada de píldoras — hoy mismo es una
+       tinta y un lavado, no un disco. */
     button.cal__day-num {
       cursor: pointer;
-      transition: color 0.12s;
+      text-decoration: underline solid transparent 1px;
+      text-underline-offset: 3px;
+      transition:
+        color 0.12s,
+        text-decoration-color 0.12s;
     }
     button.cal__day-num:hover {
       color: var(--text-color);
+      text-decoration-color: currentColor;
+    }
+    button.cal__day-num:focus-visible {
+      outline: var(--focus-width) solid var(--focus-color);
+      outline-offset: 2px;
+      border-radius: 2px;
     }
 
     /* THREE COLUMNS, so the middle is a TRUE centre: the number holds the

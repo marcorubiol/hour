@@ -34,10 +34,20 @@
     type NavWorkspace,
   } from '$lib/nav';
   import { parsePin, personPin } from '$lib/stores/pins.svelte';
+  import { parseDayQuery } from '$lib/day-query';
+  import { dayKeyInTz } from '$lib/planner';
+  import { localeDayMonth } from '$lib/datetime';
+  import { detectLocale } from '$lib/i18n';
   import { accentVarFor } from '$lib/utils/accent';
   import { spaceName } from '$lib/utils/identity';
   import { lineKindLabel } from '$lib/utils/line-kind';
   import ScopeGlyph from '$lib/components/ScopeGlyph.svelte';
+
+  // El mismo par que usa el Planner: el locale detectado y su etiqueta BCP-47.
+  const localeTag = { en: 'en-GB', es: 'es-ES', ca: 'ca-ES' }[detectLocale(navigator.language)];
+  const viewerTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  /** Hoy, en el huso del lector. `parseDayQuery` es puro y lo exige inyectado. */
+  let todayIso = $derived(dayKeyInTz(new Date().toISOString(), viewerTz));
 
   type CreateAction = 'new-line' | 'new-project' | 'new-space';
 
@@ -125,7 +135,14 @@
   let cur = $state(0);
   let inputEl = $state<HTMLInputElement | null>(null);
 
-  type Kind = 'space' | 'project' | 'line' | 'person';
+  /**
+   * `day` NO ES UN CONTENEDOR, y por eso va el último y no se puede fijar.
+   * Los otros cuatro son cosas que existen y se pueden apilar en el scope; un
+   * día es un DESTINO. Comparte la lista porque comparte el gesto —escribes y
+   * te lleva— y porque el ⌘K ya es la única puerta de navegación que esta app
+   * tiene: inventarle otra ventana para escribir una fecha sería la segunda.
+   */
+  type Kind = 'space' | 'project' | 'line' | 'person' | 'day';
   interface Row {
     token: string;
     kind: Kind;
@@ -239,6 +256,21 @@
       // types them: "ville" has to find "Anouk Villé". The other three match
       // on slugs and kinds, which are already ASCII, so only people normalise.
       const nq = fold(q);
+      // Una fecha escrita es un destino, y solo aparece si se puede leer
+      // ENTERA: `parseDayQuery` devuelve el día o nada, nunca una aproximación.
+      const parsedDay = parseDayQuery(q, { today: todayIso, locales: [localeTag, 'es', 'ca', 'en'] });
+      const dayRows: Row[] = parsedDay
+        ? [
+            {
+              token: `d:${parsedDay}`,
+              kind: 'day',
+              name: localeDayMonth(parsedDay, localeTag),
+              path: parsedDay,
+              // No se fija: un día no es un contenedor (ver `Kind`).
+              drill: null,
+            },
+          ]
+        : [];
       const persons = people
         .filter((p) => fold(p.full_name).includes(nq) || p.slug.includes(q))
         .map((p) => personRow(p, spaceName(p.workspaceName)));
@@ -262,6 +294,7 @@
           { key: 'line', header: 'Working lines', rows: lines },
           // Last, because it is the axis that is not a level of the others.
           { key: 'person', header: 'People', rows: persons, note: peopleNote },
+          { key: 'day', header: 'Day', rows: dayRows },
         ] as Group[]
       ).filter((g) => g.rows.length > 0 || g.note);
     }
@@ -308,6 +341,12 @@
   });
 
   function openRow(r: Row) {
+    // Antes de `parsePin`: `d:` no es un pin y su gramática no lo conoce.
+    if (r.kind === 'day') {
+      void goto(`/h/planner?view=day&d=${r.path}`);
+      open = false;
+      return;
+    }
     const { kind, key } = parsePin(r.token);
     if (kind === 'space') void goto(`/h/${key}/`);
     else if (kind === 'project') {
@@ -520,24 +559,38 @@
           {#each g.rows as r, i (r.token)}
             {@const gi = groupOffsets[gIdx] + i}
             <div class="cmdk__row" class:cmdk__row--on={gi === cur} class:cmdk__row--staged={isStaged(r.token)}>
+              <!-- UN DÍA NO SE FIJA, SE ABRE. La fila principal apila un
+                   contenedor en el scope, y eso solo tiene sentido para algo
+                   que existe y filtra. Un día es un destino: su fila entera
+                   hace lo que hace el botón `open` de las demás, así que no
+                   hay dos gestos donde solo hay uno. -->
               <button
                 type="button"
                 class="cmdk__main"
                 role="option"
                 aria-selected={gi === cur}
                 onmouseenter={() => (cur = gi)}
-                onclick={() => toggleStage(r.token)}
+                onclick={() => (r.kind === 'day' ? openRow(r) : toggleStage(r.token))}
               >
-                <ScopeGlyph kind={r.kind} accent={accentFor(r.token)} lineKind={r.lineKind ?? ''} />
+                {#if r.kind === 'day'}
+                  <!-- No es `ScopeGlyph`: eso dibuja SCOPES, y un día no lo es
+                       (ver `Kind`). Añadirle un caso sería estirar su
+                       significado para un solo llamador. -->
+                  <span class="cmdk__dayglyph" aria-hidden="true">◷</span>
+                {:else}
+                  <ScopeGlyph kind={r.kind} accent={accentFor(r.token)} lineKind={r.lineKind ?? ''} />
+                {/if}
                 <span class="cmdk__kind">{r.kind === 'line' ? lineKindLabel(r.lineKind ?? '') : r.kind}</span>
                 <span class="cmdk__name">
                   {r.name}{#if r.path}<span class="cmdk__path"> · {r.path}</span>{/if}
                 </span>
                 {#if isStaged(r.token)}<span class="cmdk__added">✓ added</span>{/if}
               </button>
-              <button type="button" class="cmdk__open" onclick={() => openRow(r)}>
-                open <span aria-hidden="true">↗</span>
-              </button>
+              {#if r.kind !== 'day'}
+                <button type="button" class="cmdk__open" onclick={() => openRow(r)}>
+                  open <span aria-hidden="true">↗</span>
+                </button>
+              {/if}
               {#if r.drill}
                 <button
                   type="button"
@@ -588,6 +641,17 @@
 {/if}
 
 <style>
+  /* El glifo del día: mismo hueco y mismo peso que `ScopeGlyph`, para que la
+     fila no se descuadre; distinto símbolo, porque no es un scope. */
+  .cmdk__dayglyph {
+    display: inline-grid;
+    place-items: center;
+    inline-size: 1rem;
+    block-size: 1rem;
+    font-size: 0.8rem;
+    color: var(--text-faint);
+  }
+
   .cmdk__scrim {
     position: fixed;
     inset: 0;

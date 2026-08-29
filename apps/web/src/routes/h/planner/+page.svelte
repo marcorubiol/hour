@@ -2118,15 +2118,17 @@
    * it. At the plan's end in either direction they answer with the end
    * line instead of minting empty months.
    */
-  function stepBack() {
+  function stepBack(shift = false) {
     if (view === 'day') {
+      if (shift) return stepDayByOne(-1);
       void stepDayToPlanned(-1);
     } else if (view === 'agenda') scrollAgendaMonth(-1);
     else if (view === 'board') panBoard(-1);
     else prevMonth();
   }
-  function stepNext() {
+  function stepNext(shift = false) {
     if (view === 'day') {
+      if (shift) return stepDayByOne(1);
       void stepDayToPlanned(1);
     } else if (view === 'agenda') scrollAgendaMonth(1);
     else if (view === 'board') panBoard(1);
@@ -2150,6 +2152,20 @@
       same law the book and the board already keep. The loaded window
       answers first; beyond it, the probes. Nothing found = the arrow
       rests: there is no more plan that way. */
+  let dayPickerEl = $state<HTMLInputElement | null>(null);
+  /** El picker nativo del sistema: es el que la gente ya sabe usar y el que
+      llega bien a teclado y a lector. Si `showPicker` no está, el foco deja
+      el campo listo para escribir la fecha. */
+  function openDayPicker() {
+    const el = dayPickerEl;
+    if (!el) return;
+    try {
+      el.showPicker();
+    } catch {
+      el.focus();
+    }
+  }
+
   /** Un día exacto, vacío incluido. El acompañante de la ley de arriba: sin
       esto no había forma de aterrizar en un hueco para poner algo en él. */
   function stepDayByOne(step: -1 | 1) {
@@ -2493,7 +2509,41 @@
 
 <section class="cal">
   <LensHeader>
-    {#snippet title()}<LensTitle text={view === 'day' ? dayLabel : monthLabel} />{/snippet}
+    {#snippet title()}
+      {#if view === 'day'}
+        <!-- LA FECHA EN LA QUE ESTÁS ES EL CONTROL (Marco, 2026-08-29).
+             Las flechas viajan a plan y Shift mueve una muesca; lo que ninguna
+             de las dos resuelve es el salto largo — del 10 de julio al 3 de
+             octubre— ni se ve sin saberlo. Así que el título abre el día.
+             No hay mueble nuevo: el objeto que ya dice DÓNDE estás es el que
+             te lleva a otro sitio, y lleva el MISMO subrayado que el número
+             del día en el mes, porque significa lo mismo.
+             `LensTitle` no se toca: es de las cuatro lentes y solo pinta
+             tipografía, así que se envuelve desde aquí. -->
+        <button
+          type="button"
+          class="cal__daytitle"
+          title={t('planner.pick_day', locale)}
+          onclick={openDayPicker}><LensTitle text={dayLabel} /></button
+        >
+        <!-- Visible para el navegador (`showPicker()` no abre sobre algo que
+             no está en el layout) e invisible para el lector. -->
+        <input
+          type="date"
+          class="cal__daypick"
+          tabindex="-1"
+          aria-hidden="true"
+          bind:this={dayPickerEl}
+          value={selectedDay}
+          onchange={(e) => {
+            const v = e.currentTarget.value;
+            if (!v) return;
+            dayIso = v;
+            syncUrl();
+          }}
+        />
+      {:else}<LensTitle text={monthLabel} />{/if}
+    {/snippet}
   </LensHeader>
 
 
@@ -2818,6 +2868,7 @@
       locale={localeTag}
       dateKindLabel={kindLabel}
       createLabel={(iso) => t('planner.new_on', locale, { day: iso })}
+      openDayLabel={(iso) => t('planner.open_day', locale, { day: iso })}
       stateLabel={(status) => {
         const key = statusFootKey(status);
         return key ? t(key, locale) : null;
@@ -2968,6 +3019,43 @@
 <FeedDialog bind:open={feedOpen} workspaces={$workspacesQuery.data?.items ?? []} />
 
 <style>
+  /* EL TÍTULO DEL DÍA ES UNA PUERTA, y no debe parecer otra cosa que el
+     título. Hereda la tipografía entera —`LensTitle` aplica sus reglas dentro—
+     y solo añade el subrayado al pasar, el MISMO que el número del día en el
+     mes: dos sitios, un tratamiento, un significado. */
+  .cal__daytitle {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    color: inherit;
+    letter-spacing: inherit;
+    cursor: pointer;
+    text-decoration: underline solid transparent 1px;
+    text-underline-offset: 4px;
+    transition: text-decoration-color 0.12s;
+  }
+  .cal__daytitle:hover {
+    text-decoration-color: currentColor;
+  }
+  .cal__daytitle:focus-visible {
+    outline: var(--focus-width) solid var(--focus-color);
+    outline-offset: 3px;
+    border-radius: 2px;
+  }
+  /* En el layout (si no, `showPicker()` no tiene dónde abrirse) y fuera de la
+     vista. `display:none` lo mataría; `visibility:hidden` también. */
+  .cal__daypick {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    padding: 0;
+    border: 0;
+    opacity: 0;
+    pointer-events: none;
+  }
+
   @layer components {
     .cal {
       /* ── THE REPORT'S OWN SCALE, NAMED ─────────────────────────────
