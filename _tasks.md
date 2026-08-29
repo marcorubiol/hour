@@ -80,8 +80,24 @@
     Hoy el gate dice una cosa y la práctica hizo otra, y eso es lo que no puede
     quedarse así. Depende de § 33: staging también se pausa solo.
 
-35. [ ] **Los advisors siguen sin comprobarse — y el MCP de Supabase NO se
-    puede autenticar.** Pendientes desde las dos migraciones del 27 y el 28. La
+35. [x] **Los advisors, comprobados — y metidos en el gate para que no vuelvan
+    a olvidarse** (2026-08-29, run 33236614106). Los cinco chequeos de nivel
+    ERROR salen **(0 rows)** contra producción tras las migraciones del 27 y el
+    28: ninguna tabla alcanzable sin RLS, ninguna vista que no sea
+    `security_invoker`, `auth.users` fuera del alcance de anon/authenticated,
+    ninguna policy que confíe en `user_metadata`, y ninguna `SECURITY DEFINER`
+    sin `search_path` fijado (que aquí son ~70).
+    Viven ahora dentro del modo `inspect`, que desde § 34 es parte formal del
+    gate. **No sustituyen al advisor hospedado** —el dashboard sigue siendo la
+    autoridad— y así está escrito en el workflow: son el subconjunto
+    preguntable por SQL. Verificados creando cada condición a propósito en la
+    base local, porque cinco consultas que devuelven vacío no prueban nada:
+    una errata también devuelve vacío.
+    *Lo que queda muerto:* el OAuth del MCP de Supabase, que falla con
+    `Unrecognized client_id` — no es de la cuenta de Marco, es el `client_id`
+    del plugin. Si algún día se arregla, sobra la mitad de esto.
+
+35b. [x] ~~Texto original de § 35~~ **Los advisors seguían sin comprobarse.** Pendientes desde las dos migraciones del 27 y el 28. La
     práctica del proyecto es correrlos después de cada una (0 ERROR y los 73
     WARN conocidos), y el razonamiento de que ninguna añade superficie
     —`20260827100000` sustituye una `SECURITY DEFINER` que ya existía;
