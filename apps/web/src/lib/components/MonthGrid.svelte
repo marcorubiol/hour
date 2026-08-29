@@ -1376,6 +1376,16 @@
     .cal__band--tent .cal__band-n {
       color: var(--away-phrase);
       font-style: italic;
+      /* EL HUECO SE MIDE ENTRE CAJAS Y LA CURSIVA VUELA FUERA DE LA SUYA.
+         Con `gap: 9px` la caja está separada, pero la última letra inclinada
+         —la «l» de «marco rubiol»— cae encima del `3 DEC` que viene detrás y
+         se lee como un RECORTE: Marco lo vio así y preguntó si el nombre
+         estaba cortado. No lo estaba (`scrollWidth == clientWidth` a 900,
+         1024, 1280 y 1600); lo que fallaba era el aire, no el texto.
+         Va en `em` porque el que vuela es el glifo: si el cuerpo cambia, el
+         vuelo cambia con él. Y solo en la cursiva — la redonda no lo necesita
+         y no debe pagarlo. */
+      padding-inline-end: 0.18em;
     }
     /* Dotted AND one ink lighter — the board says doubt this way and the
        month said it half-way, keeping the settled 45% under a dotted rule. */
