@@ -217,6 +217,35 @@ export const PerformanceCreateSchema = v.object({
 export type PerformanceCreate = v.InferOutput<typeof PerformanceCreateSchema>;
 
 /**
+ * POST /api/performances/series body (ADR-084 §1) — la tanda de varios días.
+ *
+ * Mismo cuerpo que crear una, con `performed_at` en plural. Deliberadamente NO
+ * lleva un `from`/`to`: los días llegan **resueltos**, porque quien decide qué
+ * días entran es `BlockDays` (una regla de tramo + días de la semana con
+ * excepciones punzadas), y el servidor no debe re-derivar una lista que ya se
+ * negoció en pantalla — sería una segunda opinión sobre el mismo cálculo.
+ *
+ * El tope de 92 lo repite la RPC; aquí está para dar un 400 honesto antes de
+ * cruzar la red, no para ser la autoridad.
+ */
+export const PerformanceSeriesCreateSchema = v.object({
+  project_id: v.pipe(v.string(), v.uuid()),
+  performed_at: v.pipe(
+    v.array(isoDateField),
+    v.minLength(2, 'a series needs at least 2 days'),
+    v.maxLength(92, 'a series is capped at 92 days'),
+  ),
+  venue_name: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(200)))),
+  city: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(120)))),
+  country: v.optional(v.nullable(countryField)),
+  status: v.optional(v.picklist(PERFORMANCE_STATUSES)),
+  conversation_id: v.optional(v.nullable(v.pipe(v.string(), v.uuid()))),
+  line_id: v.optional(v.nullable(v.pipe(v.string(), v.uuid()))),
+});
+
+export type PerformanceSeriesCreate = v.InferOutput<typeof PerformanceSeriesCreateSchema>;
+
+/**
  * PATCH /api/performances/:key body. Whitelist of the operational fields
  * (status lifecycle, day, the 5 timeslots, denormalized venue trio,
  * conversation/line links). NO fee columns (edit:money trigger + Money
