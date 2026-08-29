@@ -1294,7 +1294,13 @@
        which is the whole point of measuring it. */
     .cal__band {
       display: flex;
-      align-items: center;
+      /* TODAS LAS PALABRAS EN EL MISMO SUELO. Con `center` cada trozo se
+         centraba en SU caja, y las tres voces de la banda tienen cuerpos
+         distintos —`AWAY` a 9px mono, el sujeto a 10.5px, el tramo a 9px—, así
+         que ninguna se apoyaba donde las otras y el conjunto no leía ni
+         centrado ni alineado (Marco, en pantalla, 2026-08-29). La línea base
+         es lo que comparten, y es lo que hay que alinear. */
+      align-items: baseline;
       gap: 9px;
       min-inline-size: 0;
       padding: 1px 8px 2px;
@@ -1345,6 +1351,10 @@
     /* A rule with a terminus — never a box. An absence is a stretch of days,
        and a box says «a thing that happened», which is what it is not. */
     .cal__band-r {
+      /* La regla NO tiene línea base: es una caja vacía con un borde arriba, y
+         alineada por baseline se colgaría por su borde inferior. Se centra
+         ella sola — el suelo es de las palabras. */
+      align-self: center;
       flex: 1;
       min-inline-size: 12px;
       position: relative;
