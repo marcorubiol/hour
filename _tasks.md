@@ -878,7 +878,35 @@ entre empresas sin construirlo.
     construidos pero ningún componente los usa, y el chip del mes es un `span`
     y no un enlace»*.
 
-16. [ ] **Multi-día para PERFORMANCES.** Hoy `performance.performed_at` es un
+16. [~] **Multi-día para PERFORMANCES — BASE Y API HECHAS Y DESPLEGADAS, falta
+    la pantalla** (2026-08-29).
+    *Construido:* `performance.series_id` + índice parcial calcado del de
+    `date`, y `create_performance_series` — atómica, SECURITY DEFINER, con las
+    validaciones de `create_performance` dentro y una que el molde no
+    necesitaba: **una serie no puede repetir día**. Migración
+    `20260829100000`, aplicada a producción (run 33237067289) tras backup y CI.
+    Encima, `POST /api/performances/series`, calcado de `/api/dates/series`; la
+    atomicidad es la razón de que la ruta exista en vez de un bucle de POST
+    desde el cliente. Verificado en vivo: 1 día → 400, día repetido → 400,
+    proyecto ajeno → 403, y 3 días → 201 con **una sola serie** y tres slugs.
+    Guardián: `tests/rls/performance-series.test.ts`, 7 casos. RLS 156 → **163**.
+    *Lo que falta, y es pantalla:*
+    - El conmutador «varios días» en el alta de función, **reusando
+      `BlockDays.svelte`** tal cual — ya devuelve la lista de días resuelta, que
+      es justo lo que el endpoint espera (por eso el cuerpo lleva días y no un
+      `from`/`to`: el servidor no debe re-derivar lo que ya se negoció en
+      pantalla).
+    - **La agrupación en `MonthGrid`**, que hoy solo agrupa `date`. Y con ella
+      LA LEY, que ya está escrita para las fechas y hay que respetar igual: dos
+      funciones **distintas** el mismo día no se colapsan nunca — los dos
+      nombres tienen que poder leerse. Colapsar es solo para la misma serie.
+    *Dato:* hay una tanda real de tres noches en `marco-rubiol · Project`
+    (5–7 oct, «Sala Demo») creada al verificar el endpoint. Hoy el mes la
+    dibuja como tres cards sueltas — que es exactamente el «antes» de lo que
+    falta.
+    Texto original abajo.
+
+16b. [ ] ~~histórico~~ **Multi-día para PERFORMANCES.** Hoy `performance.performed_at` es un
     solo día. Es simétrico a lo que ya existe para `date`: `performance.series_id`
     + índice, RPC `create_performance_series` atómica calcada de
     `create_date_series` (mismo gate `edit:performance`, conversión día a día
