@@ -1392,6 +1392,13 @@
        porque de verdad no hay respuesta todavía. */
     if (dayThreads.length === 0) {
       if (dayUnplaced.some((u) => u.kind === 'day_off')) return t('planner.kind_day_off', locale);
+      /* «SIN HILOS» NO ES «SIN NADA», y confundirlos hizo que el 18 de
+         septiembre dijera FREE con un bolo dentro (Marco, en pantalla, el
+         mismo día que se escribió el párrafo de abajo). `dayThreads` son las
+         entradas CON hora; las que no la traen viven en `dayUnplaced`. Un día
+         con un bolo sin hora no está libre: lo que no tiene es horario, que es
+         justo lo que esta línea mide. */
+      if (dayUnplaced.length > 0) return t('planner.no_hour', locale);
       return loading ? null : t('pulse.free', locale);
     }
     const from = Math.min(...dayThreads.map((x) => x.a));
