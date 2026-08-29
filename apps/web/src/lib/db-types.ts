@@ -1713,6 +1713,7 @@ export type Database = {
           previous_slugs: string[]
           project_id: string
           readiness: Json
+          series_id: string | null
           slug: string | null
           soundcheck_at: string | null
           start_at: string | null
@@ -1745,6 +1746,7 @@ export type Database = {
           previous_slugs?: string[]
           project_id: string
           readiness?: Json
+          series_id?: string | null
           slug?: string | null
           soundcheck_at?: string | null
           start_at?: string | null
@@ -1777,6 +1779,7 @@ export type Database = {
           previous_slugs?: string[]
           project_id?: string
           readiness?: Json
+          series_id?: string | null
           slug?: string | null
           soundcheck_at?: string | null
           start_at?: string | null
@@ -3298,6 +3301,7 @@ export type Database = {
           previous_slugs: string[]
           project_id: string
           readiness: Json
+          series_id: string | null
           slug: string | null
           soundcheck_at: string | null
           start_at: string | null
@@ -3314,6 +3318,57 @@ export type Database = {
           to: "performance"
           isOneToOne: true
           isSetofReturn: false
+        }
+      }
+      create_performance_series: {
+        Args: {
+          p_city?: string
+          p_conversation_id?: string
+          p_country?: string
+          p_line_id?: string
+          p_performed_at: string[]
+          p_project_id: string
+          p_status?: Database["public"]["Enums"]["performance_status"]
+          p_venue_name?: string
+        }
+        Returns: {
+          bolo_id: string | null
+          city: string | null
+          conversation_id: string | null
+          country: string | null
+          created_at: string
+          created_by: string | null
+          custom_fields: Json
+          deleted_at: string | null
+          hold_notice_days: number | null
+          hospitality: Json
+          id: string
+          line_id: string | null
+          load_in_at: string | null
+          loadout_at: string | null
+          logistics: Json
+          notes: string | null
+          performed_at: string
+          previous_slugs: string[]
+          project_id: string
+          readiness: Json
+          series_id: string | null
+          slug: string | null
+          soundcheck_at: string | null
+          start_at: string | null
+          status: Database["public"]["Enums"]["performance_status"]
+          technical: Json
+          updated_at: string
+          venue_id: string | null
+          venue_name: string | null
+          workspace_id: string
+          wrap_at: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "performance"
+          isOneToOne: false
+          isSetofReturn: true
         }
       }
       create_project: {
