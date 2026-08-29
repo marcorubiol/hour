@@ -16,6 +16,7 @@ import type { RequestHandler } from './$types';
 import * as v from 'valibot';
 import { extractAccessToken } from '$lib/auth';
 import { pgPostRpc, type SupabaseEnv } from '$lib/supabase';
+import { BOLO_OPEN_STATUSES } from '$lib/money';
 import { pgErrorResponse } from '$lib/server/errors';
 
 const QuerySchema = v.object({
@@ -127,6 +128,14 @@ const CreateSchema = v.object({
   fee_currency: v.optional(v.pipe(v.string(), v.regex(/^[A-Za-z]{3}$/, 'ISO 4217')), 'EUR'),
   line_id: v.optional(v.nullable(v.pipe(v.string(), v.uuid()))),
   conversation_id: v.optional(v.nullable(v.pipe(v.string(), v.uuid()))),
+  /**
+   * Dónde nace el trato. Antes no se aceptaba y la RPC ponía `confirmed` por
+   * defecto, así que Hour no sabía registrar una negociación — solo un trato
+   * ya cerrado (ADR-087, 20260829140000). El default pasa a `proposed`: lo
+   * normal es que un bolo empiece siendo una conversación.
+   * La lista la sujeta también la base; esto da el 400 antes de la red.
+   */
+  status: v.optional(v.picklist(BOLO_OPEN_STATUSES)),
 });
 
 export const POST: RequestHandler = async ({ request, platform, locals }) => {
@@ -167,6 +176,8 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
       p_fee_currency: (input.fee_currency ?? 'EUR').toUpperCase(),
       p_line_id: input.line_id ?? null,
       p_conversation_id: input.conversation_id ?? null,
+      // Sin esto, TODO trato nacía `confirmed` (ADR-087; el default de la RPC).
+      p_status: input.status ?? 'proposed',
     });
     if (data.length === 0 || !data[0]) return json({ error: 'create_failed' }, 502);
     return json({ bolo: data[0] }, 201);

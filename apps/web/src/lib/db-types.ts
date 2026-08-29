@@ -2798,6 +2798,14 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      bolo_status_can_move: {
+        Args: { p_status: Database["public"]["Enums"]["performance_status"] }
+        Returns: boolean
+      }
+      bolo_status_can_open: {
+        Args: { p_status: Database["public"]["Enums"]["performance_status"] }
+        Returns: boolean
+      }
       can_access_project: { Args: { p_project_id: string }; Returns: boolean }
       can_edit_project: { Args: { p_project_id: string }; Returns: boolean }
       can_read_workspace_money: {
@@ -3926,6 +3934,16 @@ export type Database = {
           fee_amount: number
           fee_currency: string
           id: string
+        }[]
+      }
+      update_bolo_status: {
+        Args: {
+          p_bolo_id: string
+          p_status: Database["public"]["Enums"]["performance_status"]
+        }
+        Returns: {
+          id: string
+          status: Database["public"]["Enums"]["performance_status"]
         }[]
       }
       update_invoice: {

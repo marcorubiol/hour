@@ -352,3 +352,34 @@ export function invoiceTone(status: string): 'neutral' | 'warning' | 'faint' | '
 	if (status === 'cancelled') return 'danger';
 	return 'neutral';
 }
+
+/**
+ * EL EMBUDO DE UN TRATO (ADR-087) — dónde puede nacer y adónde puede moverse.
+ *
+ * `bolo.status` comparte enum con `performance`, y ahí dentro hay dos palabras
+ * que NO son suyas: `invoiced` y `paid`. Money v3 deriva lo cobrado de los
+ * pagos contra el caché, no de esta columna, así que dejar que alguien las
+ * escriba a mano crearía un segundo sitio donde vive la verdad del dinero.
+ *
+ * Y `cancelled`/`done` no son estados de nacimiento: un trato no se abre
+ * muerto ni acabado.
+ *
+ * Estas dos listas son el ESPEJO de `bolo_status_can_open` /
+ * `bolo_status_can_move` en la base (`20260829140000`). La base es la
+ * autoridad —la API no es la única puerta— y esto está aquí para dar un 400
+ * honesto antes de cruzar la red, y para que el desplegable de una pantalla no
+ * tenga que inventarse la lista.
+ */
+export const BOLO_OPEN_STATUSES = [
+  'proposed',
+  'hold',
+  'hold_1',
+  'hold_2',
+  'hold_3',
+  'confirmed',
+] as const;
+
+export const BOLO_MOVE_STATUSES = [...BOLO_OPEN_STATUSES, 'cancelled', 'done'] as const;
+
+export type BoloOpenStatus = (typeof BOLO_OPEN_STATUSES)[number];
+export type BoloMoveStatus = (typeof BOLO_MOVE_STATUSES)[number];
