@@ -878,8 +878,8 @@ entre empresas sin construirlo.
     construidos pero ningún componente los usa, y el chip del mes es un `span`
     y no un enlace»*.
 
-16. [~] **Multi-día para PERFORMANCES — BASE Y API HECHAS Y DESPLEGADAS, falta
-    la pantalla** (2026-08-29).
+16. [x] **Multi-día para PERFORMANCES — CERRADA ENTERA Y DESPLEGADA**
+    (2026-08-29).
     *Construido:* `performance.series_id` + índice parcial calcado del de
     `date`, y `create_performance_series` — atómica, SECURITY DEFINER, con las
     validaciones de `create_performance` dentro y una que el molde no
@@ -902,7 +902,19 @@ entre empresas sin construirlo.
     entra sola, así que meterla en el `select` del feed tumbó
     `/api/performances` con 403 — y con él el mes, la agenda y el tablero.
     Arreglado por `20260829120000`.
-    *Lo que falta, y es pantalla:*
+    *Hecho también: LA PANTALLA.* El alta de función lleva el mismo conmutador
+    y el mismo `BlockDays` que las fechas —cardinalidad, no tipo— y los días
+    llegan **resueltos**, calculados una sola vez en el diálogo: ni el
+    formulario ni el servidor los re-derivan. Con la tanda puesta **el campo
+    «Date» desaparece**, porque preguntar dos veces lo mismo admite dos
+    respuestas. Ruta de escritura aparte, no un bucle: una tanda a medio crear
+    es indistinguible de una que alguien dejó incompleta.
+    Guardián de punta a punta: `tests/performance-run.spec.ts` (E2E 60 → **62**).
+    *Descubierto escribiéndolo:* la banda se recorta **por semana ISO**, así
+    que una tanda que cruza domingo son dos bandas. Es correcto y viejo
+    —heredado de las tandas de `date`— y el spec elige lunes-miércoles para
+    fijar lo suyo y no eso.
+    *Texto original de lo que faltaba, ya hecho:*
     - El conmutador «varios días» en el alta de función, **reusando
       `BlockDays.svelte`** tal cual — ya devuelve la lista de días resuelta, que
       es justo lo que el endpoint espera (por eso el cuerpo lleva días y no un

@@ -420,7 +420,7 @@ orientativo, no una verdad comercial cerrada.
   de siempre salía verde rechazando por el motivo equivocado.** La API real ya
   lo esquiva nombrando sus columnas en el `select`.
 - Auth: email+password, cookies httpOnly en la app, hook de access token activo.
-- RLS: FORCE en las superficies tenant-scoped; suite live **156/156**
+- RLS: FORCE en las superficies tenant-scoped; suite live **163/163**
   (2026-08-28; el 120/120 que decía esta línea era de julio).
 - Identidad 2026-07-20: `workspace_person` y `workspace_organization` aplicadas,
   perfil portable y dossier local por workspace, share/revoke explícitos.
