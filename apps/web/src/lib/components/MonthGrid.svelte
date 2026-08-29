@@ -1177,6 +1177,14 @@
               style="grid-column: {b.colStart} / {b.colEnd}"
               title={b.note ? `${b.label} · ${b.note}` : b.label}
             >
+              <!-- LAS PALABRAS ROMPEN LA PAUTA, NO AL REVÉS. Desde que las
+                   verticales bajan hasta el pie (para que la banda pertenezca
+                   a los días), cruzaban por detrás del texto y lo ensuciaban.
+                   Una tira de papel bajo las palabras las deja pasar por los
+                   huecos y las corta donde hay algo que leer — que es lo que
+                   hace cualquier rótulo sobre una pauta. Marco, en pantalla,
+                   2026-08-29. -->
+              <span class="cal__band-lead">
               <span class="cal__band-k">
                 {#if b.accent}
                   <IdentityMark
@@ -1190,6 +1198,7 @@
               </span>
               {#if b.subject}<span class="cal__band-n">{b.subject}</span>{/if}
               {#if b.span}<em class="cal__band-s">{b.span}</em>{/if}
+              </span>
               <!-- The rule with its terminus. It is not drawn when the band runs
                    past the week's edge: an arrowhead there would claim an end
                    the calendar cannot show. -->
@@ -1301,6 +1310,19 @@
       border-block-start: 1px solid var(--border-color-light);
       overflow: visible;
       white-space: nowrap;
+    }
+    /* El papel bajo las palabras. `--bg` y no un `--card`: la banda no es una
+       caja —una ausencia es un TRAMO de días, y una caja diría «una cosa que
+       pasó»— así que esto no pinta un objeto, solo tapa la pauta donde hay
+       texto. El aire de la derecha evita que la primera vertical roce la
+       última letra. */
+    .cal__band-lead {
+      flex: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      background: var(--bg);
+      padding-inline-end: 7px;
     }
     .cal__band-k {
       flex: none;
