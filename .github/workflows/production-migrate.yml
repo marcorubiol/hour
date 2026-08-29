@@ -138,6 +138,69 @@ jobs:
                    having count(*) filter (where n.nspname = 'public') = 0
                     order by 1;"
 
+          # ── LOS CHEQUEOS QUE EL ADVISOR LLAMA «ERROR», PREGUNTADOS AQUÍ ──
+          #
+          # NO SUSTITUYEN AL ADVISOR HOSPEDADO, y decirlo importa más que el
+          # código: el dashboard sigue siendo la autoridad. Esto es el
+          # subconjunto que se puede preguntar por SQL, puesto aquí porque el
+          # OAuth del MCP de Supabase está roto («Unrecognized client_id»,
+          # 2026-08-29) y porque un chequeo que hay que acordarse de hacer a
+          # mano es un chequeo que no se hace. Cada uno debe salir VACÍO.
+          #
+          # Silencio = bien. Cualquier fila es algo que mirar antes de aplicar.
+
+          echo '### [ERROR] Tablas alcanzables sin RLS — debe salir vacío'
+          run_sql "select c.relname as tabla,
+                          c.relrowsecurity as rls,
+                          (select count(*) from pg_policies p
+                            where p.schemaname = 'public' and p.tablename = c.relname) as policies
+                     from pg_class c
+                     join pg_namespace n on n.oid = c.relnamespace
+                    where n.nspname = 'public' and c.relkind = 'r'
+                      and not c.relrowsecurity
+                      and exists (
+                        select 1 from information_schema.role_table_grants g
+                         where g.table_schema = 'public' and g.table_name = c.relname
+                           and g.grantee in ('anon', 'authenticated'))
+                    order by 1;"
+
+          echo '### [ERROR] Vistas que no son security_invoker — pueden saltarse RLS'
+          run_sql "select c.relname as vista, coalesce(array_to_string(c.reloptions, ','), '(sin opciones)') as opts
+                     from pg_class c
+                     join pg_namespace n on n.oid = c.relnamespace
+                    where n.nspname = 'public' and c.relkind = 'v'
+                      and not coalesce('security_invoker=true' = any(c.reloptions), false)
+                      and exists (
+                        select 1 from information_schema.role_table_grants g
+                         where g.table_schema = 'public' and g.table_name = c.relname
+                           and g.grantee in ('anon', 'authenticated'))
+                    order by 1;"
+
+          echo '### [ERROR] auth.users alcanzable por anon/authenticated — debe salir vacío'
+          run_sql "select grantee, privilege_type
+                     from information_schema.role_table_grants
+                    where table_schema = 'auth' and table_name = 'users'
+                      and grantee in ('anon', 'authenticated')
+                    order by 1, 2;"
+
+          echo '### [ERROR] Policies que confían en user_metadata (lo edita el usuario)'
+          run_sql "select schemaname || '.' || tablename || '.' || policyname as policy
+                     from pg_policies
+                    where coalesce(qual, '') like '%user_metadata%'
+                       or coalesce(with_check, '') like '%user_metadata%'
+                    order by 1;"
+
+          # Convención propia de este repo, no del advisor: TODA función
+          # SECURITY DEFINER fija su search_path. Una sin fijar es escalable
+          # por búsqueda de esquema, y aquí son ~70.
+          echo '### [ERROR] SECURITY DEFINER sin search_path fijado — debe salir vacío'
+          run_sql "select n.nspname || '.' || p.proname as funcion
+                     from pg_proc p
+                     join pg_namespace n on n.oid = p.pronamespace
+                    where n.nspname = 'public' and p.prosecdef
+                      and not coalesce(p.proconfig::text like '%search_path%', false)
+                    order by 1;"
+
       - name: Print the migration plan
         if: inputs.mode != 'inspect'
         # --include-all: money v3's migrations are timestamped before an
