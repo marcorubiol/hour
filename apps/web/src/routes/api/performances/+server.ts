@@ -184,6 +184,10 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
     [
       'id,slug,performed_at,status,venue_id,venue_name,city,country',
       'project_id,line_id,conversation_id',
+      // ADR-084 §1 — sin esto el mes no puede saber que tres noches son una
+      // tanda. NO es dinero: es una etiqueta de agrupación, así que no toca la
+      // frontera de `read:money` (a diferencia de `bolo_id`, que sigue fuera).
+      'series_id',
       'load_in_at,soundcheck_at,start_at,loadout_at,wrap_at',
       // ADR-084 §3 — the operator's readiness ticks; the card's foot reads
       // them. The logistics/hospitality/technical CONTENT stays out of the

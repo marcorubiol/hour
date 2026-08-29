@@ -332,6 +332,11 @@
       sortAt: string;
     }> = [];
     for (const p of perfs) {
+      // Una tanda salió de la celda: ahora es la banda de la semana, dibujada
+      // UNA vez sobre los días que cubre. Sin esto se dibujaría dos veces.
+      // Y la ley que esto NO rompe: dos funciones DISTINTAS el mismo día
+      // siguen siendo dos cards — solo se va la que comparte serie.
+      if (isRun(p.series_id)) continue;
       const slip = performanceSlip(p, slipCtx);
       out.push({ key: p.id, slip, sortAt: perfInstant(p) ?? '~' });
     }
@@ -458,13 +463,22 @@
   // fall out of sync with the days it claims to cover.
   let seriesDays = $derived.by(() => {
     const m = new Map<string, Set<string>>();
-    for (const d of dates) {
-      if (!d.series_id) continue;
-      const day = dateDayKey(d, viewerTz);
-      (m.get(d.series_id) ?? m.set(d.series_id, new Set<string>()).get(d.series_id)!).add(day);
-    }
+    const add = (sid: string | null | undefined, day: string) => {
+      if (!sid) return;
+      (m.get(sid) ?? m.set(sid, new Set<string>()).get(sid)!).add(day);
+    };
+    for (const d of dates) add(d.series_id, dateDayKey(d, viewerTz));
+    // ADR-084 §1 — las funciones también duran varios días desde
+    // `20260829100000`. La cuenta es la misma: una tanda es una serie que
+    // toca dos días o más, sea de ensayos o de bolos.
+    for (const p of performances) add(p.series_id, perfDayKey(p));
     return m;
   });
+
+  /** ¿Esta serie es una tanda de verdad? Dos días o más. */
+  function isRun(sid: string | null | undefined): boolean {
+    return Boolean(sid && (seriesDays.get(sid)?.size ?? 0) >= 2);
+  }
 
   /**
    * Sessions of ONE block on one day collapse into a single chip with a
@@ -500,8 +514,7 @@
   /** True while these rows are a real multi-day run — the test the cell uses
       to hand the group to the band instead of drawing it as a slip. */
   function isSeriesBand(g: DateEvent[]): boolean {
-    const sid = g[0]?.series_id;
-    return Boolean(sid && (seriesDays.get(sid)?.size ?? 0) >= 2);
+    return isRun(g[0]?.series_id);
   }
 
   /* ── A RUN OF DAYS IS ONE BAND, NOT N LOOSE CARDS ──────────────────────
@@ -521,7 +534,29 @@
      line with a separator: at a 72px column `10h–14h · 16h–18h` needs 93px
      and the cell hides its overflow, so it printed `10h–14h · 16h—` and lost
      an hour. A clipped hour is the one thing this drawing will not do. */
-  type SeriesCell = { iso: string; row: DateEvent | null; hours: SlipVM['time'][] };
+  /**
+   * UNA CELDA DE BANDA NO SABE DE QUÉ ESTÁ HECHA (ADR-084 §1).
+   *
+   * La banda dibujaba solo tandas de `date`. Desde `20260829100000` una
+   * FUNCIÓN también puede durar varios días, y la ley de arriba —«una tanda es
+   * un elemento, y lleva las horas de cada día»— no cambia por el tipo de fila.
+   * Así que la celda deja de llevar un `DateEvent` y lleva lo que el dibujo
+   * necesita: si hay algo ese día, sus horas, y QUÉ HACE al pulsarla.
+   *
+   * Y ahí está la única asimetría real: una fecha no tiene página y abre su
+   * diálogo (`onDateOpen`), una función SÍ la tiene y es un enlace. Por eso
+   * hay `open` y `href`, y no un solo callback: convertir el enlace de una
+   * función en un botón le quitaría el clic central, el copiar-enlace y el
+   * foco que trae gratis.
+   */
+  type SeriesCell = {
+    iso: string;
+    hours: SlipVM['time'][];
+    /** Hay fila ese día. Un hueco en medio de la tanda es un día sin nada. */
+    filled: boolean;
+    open: (() => void) | null;
+    href: string | null;
+  };
   type WeekSeries = {
     key: string;
     /** The row this run sits on, 0-based — packed, not stacked. */
@@ -536,32 +571,85 @@
     title: string;
     cells: SeriesCell[];
   };
+  /** Una fila de tanda, ya normalizada: el mínimo que la banda dibuja. */
+  type RunRow = {
+    sid: string;
+    iso: string;
+    /** Para ordenar dentro de un día. Las fechas traen instante; las
+        funciones, la hora que el slip resuelva. */
+    at: string;
+    time: SlipVM['time'];
+    open: (() => void) | null;
+    href: string | null;
+  };
+
   function weekSeries(week: { iso: string }[]): WeekSeries[] {
-    const grouped = new Map<string, { rows: DateEvent[]; cols: number[] }>();
+    const grouped = new Map<
+      string,
+      { rows: RunRow[]; cols: number[]; head: SlipVM; project: ProjectLite | null; kindWord: string }
+    >();
     week.forEach((day, ci) => {
-      for (const d of datesByDay.get(day.iso) ?? []) {
-        if (!isSeriesBand([d])) continue;
-        const g = grouped.get(d.series_id!) ?? { rows: [], cols: [] };
-        g.rows.push(d);
+      const push = (r: RunRow, head: SlipVM, project: ProjectLite | null, kindWord: string) => {
+        const g = grouped.get(r.sid) ?? { rows: [], cols: [], head, project, kindWord };
+        g.rows.push(r);
         if (!g.cols.includes(ci)) g.cols.push(ci);
-        grouped.set(d.series_id!, g);
+        grouped.set(r.sid, g);
+      };
+      for (const d of datesByDay.get(day.iso) ?? []) {
+        if (!isRun(d.series_id)) continue;
+        const sl = dateSlip(d, slipCtx);
+        push(
+          {
+            sid: d.series_id!,
+            iso: day.iso,
+            at: d.starts_at,
+            time: sl.time,
+            open: onDateOpen ? () => onDateOpen?.(d) : null,
+            href: null,
+          },
+          sl,
+          d.project,
+          dateKindLabel(d.kind),
+        );
+      }
+      for (const p of performancesByDay.get(day.iso) ?? []) {
+        if (!isRun(p.series_id)) continue;
+        const sl = performanceSlip(p, slipCtx);
+        push(
+          {
+            sid: p.series_id!,
+            iso: day.iso,
+            at: perfInstant(p) ?? '~',
+            time: sl.time,
+            open: null,
+            href: sl.href ?? null,
+          },
+          sl,
+          p.project,
+          // La misma resolución que el resto del mes usa para cualquier slip
+          // (`slipCtx.kindLabel`): un bolo dice «show» con la palabra del
+          // vocabulario, no con una segunda opinión propia de esta banda.
+          dateKindLabel(sl.kind),
+        );
       }
     });
     const out: WeekSeries[] = [];
     for (const [sid, g] of grouped) {
       const a = Math.min(...g.cols);
       const b = Math.max(...g.cols);
-      const head = dateSlip(g.rows[0], slipCtx);
+      const head = g.head;
       const cells: SeriesCell[] = [];
       for (let c = a; c <= b; c++) {
         const iso = week[c].iso;
         const rows = g.rows
-          .filter((r) => dateDayKey(r, viewerTz) === iso)
-          .sort((x, y) => (x.starts_at < y.starts_at ? -1 : 1));
+          .filter((r) => r.iso === iso)
+          .sort((x, y) => (x.at < y.at ? -1 : 1));
         cells.push({
           iso,
-          row: rows[0] ?? null,
-          hours: rows.map((r) => dateSlip(r, slipCtx).time),
+          hours: rows.map((r) => r.time),
+          filled: rows.length > 0,
+          open: rows[0]?.open ?? null,
+          href: rows[0]?.href ?? null,
         });
       }
       out.push({
@@ -569,8 +657,8 @@
         lane: 0,
         colStart: a + 1,
         colEnd: b + 2,
-        project: g.rows[0].project,
-        kindWord: dateKindLabel(g.rows[0].kind),
+        project: g.project,
+        kindWord: g.kindWord,
         label: head.name,
         city: head.city,
         cert: head.cert,
@@ -783,7 +871,10 @@
       // nothing, so a week whose only content was one rehearsal block drew as
       // tall as the busiest week of the month (seen on screen, 2026-07-31).
       const inCell = (datesByDay.get(d.iso) ?? []).filter((x) => !isSeriesBand([x])).length;
-      const n = (performancesByDay.get(d.iso) ?? []).length + inCell;
+      const perfsInCell = (performancesByDay.get(d.iso) ?? []).filter(
+        (x) => !isRun(x.series_id),
+      ).length;
+      const n = perfsInCell + inCell;
       max = Math.max(max, Math.min(n, CELL_CAP));
     }
     return WEEK_FILL[max];
@@ -979,20 +1070,22 @@
                 style="grid-template-columns: repeat({s.cells.length}, minmax(0, 1fr))"
               >
                 {#each s.cells as c (c.iso)}
-                  {#if c.row && onDateOpen}
-                    <button
-                      type="button"
-                      class="cal__run-d"
-                      onclick={() => onDateOpen?.(c.row!)}
-                      title={c.iso}
-                    >
+                  {#if c.filled && c.href}
+                    <!-- Una función tiene página: enlace, no botón. -->
+                    <a class="cal__run-d" href={c.href} title={c.iso}>
+                      {#each c.hours as h, hi (hi)}
+                        <i>{h?.primary ?? '·'}{#if h?.end}<u>–{h.end}</u>{/if}</i>
+                      {/each}
+                    </a>
+                  {:else if c.filled && c.open}
+                    <button type="button" class="cal__run-d" onclick={c.open} title={c.iso}>
                       {#each c.hours as h, hi (hi)}
                         <i>{h?.primary ?? '·'}{#if h?.end}<u>–{h.end}</u>{/if}</i>
                       {/each}
                     </button>
                   {:else}
-                    <span class="cal__run-d" class:cal__run-d--off={!c.row}>
-                      {#if c.row}
+                    <span class="cal__run-d" class:cal__run-d--off={!c.filled}>
+                      {#if c.filled}
                         {#each c.hours as h, hi (hi)}
                           <i>{h?.primary ?? '·'}{#if h?.end}<u>–{h.end}</u>{/if}</i>
                         {/each}

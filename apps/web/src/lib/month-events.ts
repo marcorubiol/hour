@@ -34,6 +34,9 @@ export type PerformanceEvent = {
   start_at: string | null;
   loadout_at?: string | null;
   wrap_at?: string | null;
+  /** ADR-084 §1 — filas que lo comparten son UNA tanda de varios días y el
+      mes las dibuja como una banda. Simétrico a `DateEvent.series_id`. */
+  series_id?: string | null;
   venue_name: string | null;
   city: string | null;
   country: string | null;
