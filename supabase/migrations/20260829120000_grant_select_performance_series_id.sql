@@ -1,0 +1,27 @@
+-- ADR-084 §1 — `performance.series_id` se puede LEER.
+--
+-- ROTURA EN PRODUCCIÓN, arreglada en caliente el 2026-08-29, y escrita entera
+-- porque el mecanismo va a volver.
+--
+-- `20260720172431` retiró el SELECT de tabla sobre `performance` y lo devolvió
+-- **por columnas**, con una lista explícita, para que RLS no tuviera que
+-- proteger el caché. Esa lista se escribió en julio. `series_id` nació el
+-- 2026-08-29 y, como cualquier columna nueva, **no entra sola en un grant por
+-- columnas**. Al añadirla al `select` del feed, `/api/performances` empezó a
+-- responder **403 «permission denied for table performance»** — y con él el
+-- mes, la agenda y el tablero, que leen todos de ahí.
+--
+-- Es la MISMA trampa que `bolo_id` el 2026-08-28, vista desde el otro lado: allí
+-- un 403 de lectura escondía que la escritura sí pasaba; aquí una columna sin
+-- grant tumba una lectura que antes iba. La regla que sale de las dos:
+-- **cualquier columna nueva de `performance` no existe para PostgREST hasta que
+-- se la nombra en el grant**, y por tanto añadirla a un `select` sin el grant
+-- rompe el endpoint entero, no solo ese campo.
+--
+-- `series_id` SÍ se concede, a diferencia de `bolo_id`, y la diferencia es de
+-- fondo: `bolo_id` es la puerta del dinero y se queda fuera a propósito
+-- (ADR-087); `series_id` es una ETIQUETA DE AGRUPACIÓN — dice que tres noches
+-- son la misma tanda— y sin poder leerla el mes no puede dibujar la banda.
+-- No revela nada que la fila no cuente ya.
+
+GRANT SELECT (series_id) ON public.performance TO authenticated;
