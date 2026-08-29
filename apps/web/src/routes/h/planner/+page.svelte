@@ -2150,6 +2150,13 @@
       same law the book and the board already keep. The loaded window
       answers first; beyond it, the probes. Nothing found = the arrow
       rests: there is no more plan that way. */
+  /** Un día exacto, vacío incluido. El acompañante de la ley de arriba: sin
+      esto no había forma de aterrizar en un hueco para poner algo en él. */
+  function stepDayByOne(step: -1 | 1) {
+    dayIso = addDaysIso(selectedDay, step);
+    syncUrl();
+  }
+
   async function stepDayToPlanned(step: -1 | 1) {
     const days = [
       ...new Set([
@@ -2171,7 +2178,9 @@
       if (next) {
         dayIso = next;
         syncUrl();
+        return;
       }
+      noMorePlan();
       return;
     }
     // Backwards needs the LATEST day before this one, and the feeds only
@@ -2185,8 +2194,22 @@
         syncUrl();
         return;
       }
-      if (from <= agendaFloorIso) return;
+      if (from <= agendaFloorIso) break;
     }
+    noMorePlan();
+  }
+
+  /**
+   * NO MOVERSE ES UNA RESPUESTA, Y HAY QUE DARLA.
+   *
+   * El viaje a plan salía en silencio cuando no encontraba nada: ni se movía,
+   * ni avisaba, ni se deshabilitaba — y un control que no responde se lee como
+   * roto. No se deshabilita porque saber si hay plan delante cuesta una
+   * consulta, y una barra que consulta para dibujarse es peor que una que
+   * contesta cuando la pulsas.
+   */
+  function noMorePlan() {
+    addToast({ tone: 'info', message: t('planner.no_more_plan', locale) });
   }
   /** Latest planned day in [from, to] under the current scope — ascending
       feeds cursor-walked to their tail (a capped page truncates the LATE
@@ -2352,12 +2375,21 @@
         case 'ArrowLeft':
           // ONE DOOR: keys go through the same verbs as the ‹ › buttons —
           // day travels to plan, agenda scrolls its month, board pans.
+          //
+          // SHIFT ES LA EXCEPCIÓN, Y SOLO EN EL DÍA (Marco, 2026-08-29): la
+          // ley de viajar a plan es buena para RECORRER la temporada y mala
+          // para COLOCAR algo en un hueco — un día vacío no era un destino
+          // alcanzable. La flecha sigue significando «mover»; Shift dice
+          // «literalmente, una muesca». No es otra puerta: es la misma con un
+          // modificador, y fuera del Día cae al mismo verbo de siempre.
           e.preventDefault();
-          stepBack();
+          if (e.shiftKey && view === 'day') stepDayByOne(-1);
+          else stepBack();
           return;
         case 'ArrowRight':
           e.preventDefault();
-          stepNext();
+          if (e.shiftKey && view === 'day') stepDayByOne(1);
+          else stepNext();
           return;
         case 'n':
         case 'N':

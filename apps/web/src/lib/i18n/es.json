@@ -95,6 +95,7 @@
   "planner.note_company": "la compañía",
   "planner.note_delete": "Borra la nota",
   "planner.day_next": "después",
+  "planner.no_more_plan": "no hay más plan por ahí — Mayús+← → para ir día a día",
   "planner.lid_empty": "vacío",
   "planner.note_private": "privada",
   "planner.agenda_run": "{n} días libres",

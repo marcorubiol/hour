@@ -96,6 +96,7 @@
   "planner.note_company": "the company",
   "planner.note_delete": "Delete note",
   "planner.day_next": "next",
+  "planner.no_more_plan": "no more plan that way — Shift+← → moves a day at a time",
   "planner.lid_empty": "empty",
   "planner.note_private": "private",
   "planner.agenda_run": "{n} days free",

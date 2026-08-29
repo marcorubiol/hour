@@ -95,6 +95,7 @@
   "planner.note_company": "la companyia",
   "planner.note_delete": "Esborra la nota",
   "planner.day_next": "després",
+  "planner.no_more_plan": "no hi ha més pla per aquí — Maj+← → per anar dia a dia",
   "planner.lid_empty": "buit",
   "planner.note_private": "privada",
   "planner.agenda_run": "{n} dies lliures",
