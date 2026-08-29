@@ -982,6 +982,13 @@
            BETWEEN the number and the day's own contents: above the number it
            reads as a header for the week, below the contents it lands under
            the `+N more` door. It is the frame the days sit inside. -->
+      <!-- EL CUERPO DE LA SEMANA: las celdas y su pie, dentro del mismo
+           reglado. Las siete verticales eran un gradiente sobre `.cal__wkc`,
+           que es solo la fila de celdas, así que las líneas morían encima de
+           la banda y una ausencia se leía como algo pegado por debajo del mes
+           en vez de como parte de los días que mide (Marco, en pantalla,
+           2026-08-29). La regla sube aquí: no se duplica, se muda. -->
+      <div class="cal__wkbody">
       <div class="cal__wkc">
         {#each week as day, di (day.iso)}
           {@const clashes = clashesByDay?.get(day.iso) ?? []}
@@ -1164,6 +1171,7 @@
               class="cal__band"
               class:cal__band--away={b.kind === 'away'}
               class:cal__band--tent={b.tentative}
+              class:grain={b.tentative}
               class:cal__band--cutl={b.cutLeft}
               class:cal__band--cutr={b.cutRight}
               style="grid-column: {b.colStart} / {b.colEnd}"
@@ -1190,6 +1198,7 @@
           {/each}
         </div>
       {/if}
+      </div>
     </div>
   {/each}
 </div>
@@ -1269,10 +1278,10 @@
        ruling, so a cell can never be pushed out of alignment by a border. */
     /* THE FOOT OF THE WEEK · absences and tours. */
     .cal__wkb {
-      /* The week block is `gutter | content`; without this the band row lands
-         in the GUTTER column and every band draws under the week number
-         instead of over the days it measures. Seen on screen, 2026-07-31. */
-      grid-column: 2;
+      /* Ya no necesita `grid-column: 2`: vive dentro de `.cal__wkbody`, que es
+         la columna de contenido. Antes era hermana del gutter y sin esto la
+         banda dibujaba bajo el número de semana (visto en pantalla el
+         2026-07-31); el envoltorio lo resuelve por posición. */
       display: grid;
       grid-template-columns: repeat(7, minmax(0, 1fr));
       gap: 2px 0;
@@ -1555,15 +1564,21 @@
       opacity: 0.6;
     }
 
-    .cal__wkc {
+    /* Las siete verticales viven AQUÍ y no en la fila de celdas, para que
+       lleguen hasta abajo del día — el pie de la semana es parte del día que
+       mide, no una tira suelta debajo del mes. */
+    .cal__wkbody {
       grid-column: 2;
-      display: grid;
-      grid-template-columns: repeat(7, minmax(0, 1fr));
-      align-items: stretch;
+      min-inline-size: 0;
       background-image: linear-gradient(to right, var(--border-color-light) 0 1px, transparent 1px);
       background-size: calc(100% / 7) 100%;
       background-position: -1px 0;
       background-repeat: repeat-x;
+    }
+    .cal__wkc {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      align-items: stretch;
     }
 
     .cal__grid--loading {
