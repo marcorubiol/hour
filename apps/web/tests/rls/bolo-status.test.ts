@@ -64,6 +64,15 @@ describe.skipIf(!envReady())('bolo status lifecycle (ADR-087)', () => {
     }
   });
 
+  /**
+   * `RETURNS TABLE` sale como ARRAY por PostgREST y `create_bolo` sale como
+   * objeto: dos formas para dos declaraciones, y el helper no normaliza
+   * ninguna. Se dice aquí porque el primer intento leyó `.status` del array y
+   * comparó `undefined` — un fallo del test que parecía uno de la RPC.
+   */
+  const moved = (data: unknown): { status?: string } =>
+    (Array.isArray(data) ? data[0] : data) ?? {};
+
   it('MOVES through the funnel, and the move sticks', async () => {
     const r = await open('proposed');
     expect(r.status).toBe(200);
@@ -75,7 +84,7 @@ describe.skipIf(!envReady())('bolo status lifecycle (ADR-087)', () => {
         p_status: s,
       });
       expect(m.status, `${s}: ${m.error}`).toBe(200);
-      expect(m.data!.status).toBe(s);
+      expect(moved(m.data).status).toBe(s);
     }
   });
 
