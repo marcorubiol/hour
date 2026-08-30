@@ -98,6 +98,7 @@
   "planner.no_more_plan": "no hay más plan por ahí — Mayús+← → para ir día a día",
   "planner.open_day": "Abrir el día {day}",
   "planner.pick_day": "Ir a otro día",
+  "planner.run_from": "desde {day}",
   "planner.step_hint": "Mayús para ir día a día",
   "planner.lid_empty": "vacío",
   "planner.note_private": "privada",

@@ -98,6 +98,7 @@
   "planner.no_more_plan": "no hi ha més pla per aquí — Maj+← → per anar dia a dia",
   "planner.open_day": "Obre el dia {day}",
   "planner.pick_day": "Vés a un altre dia",
+  "planner.run_from": "des de {day}",
   "planner.step_hint": "Maj per anar dia a dia",
   "planner.lid_empty": "buit",
   "planner.note_private": "privada",

@@ -2885,6 +2885,10 @@
       dateKindLabel={kindLabel}
       createLabel={(iso) => t('planner.new_on', locale, { day: iso })}
       openDayLabel={(iso) => t('planner.open_day', locale, { day: iso })}
+      runUntilLabel={(iso, n) =>
+        `${t('planner.band_until', locale, { day: localeDayMonth(iso, localeTag) })} · ${n} ${t('block.days_unit', locale)}`}
+      runFromLabel={(iso, n) =>
+        `${t('planner.run_from', locale, { day: localeDayMonth(iso, localeTag) })} · ${n} ${t('block.days_unit', locale)}`}
       stateLabel={(status) => {
         const key = statusFootKey(status);
         return key ? t(key, locale) : null;

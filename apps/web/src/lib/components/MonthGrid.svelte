@@ -83,6 +83,10 @@
     /** i18n hooks — the page passes t()-backed fns; defaults stay English. */
     dateKindLabel?: (kind: string) => string;
     createLabel?: (isoDate: string) => string;
+    /** «hasta 15 jul · 10 días» / «desde 6 jul · 10 días» — la frase que una
+        mitad de tanda le debe a la otra. */
+    runUntilLabel?: (isoDate: string, days: number) => string;
+    runFromLabel?: (isoDate: string, days: number) => string;
     /** Qué dice el número del día, que ES la puerta al Día. Sin nombre, un
         número en una esquina no se lee como control ni lo anuncia un lector
         de pantalla. */
@@ -150,6 +154,8 @@
     dateKindLabel = (kind: string) => kind.replace(/_/g, ' '),
     createLabel = (iso: string) => `New performance on ${iso}`,
     openDayLabel = (iso: string) => `Open ${iso}`,
+    runUntilLabel = (iso: string, n: number) => `until ${iso} · ${n} days`,
+    runFromLabel = (iso: string, n: number) => `from ${iso} · ${n} days`,
     stateLabel = (status: string) => EN_STATE_WORDS[status] ?? null,
     readinessItems = [
       { key: 'hotel', label: 'hotel' },
@@ -579,6 +585,11 @@
         la tanda no tiene ahí (Marco, 2026-08-30). */
     cutLeft: boolean;
     cutRight: boolean;
+    /** CADA MITAD NOMBRA EL EXTREMO QUE NO ENSEÑA: la de arriba no ve el
+        final y dice «hasta»; la de abajo no ve el principio y dice «desde». Y
+        las dos dicen cuántos días son, que es lo que ninguna de las dos puede
+        contar sola. */
+    note: string | null;
     cells: SeriesCell[];
   };
   /** Una fila de tanda, ya normalizada: el mínimo que la banda dibuja. */
@@ -665,13 +676,20 @@
       // Los días de la SERIE ENTERA, no los de esta semana: la tanda continúa
       // si tiene algún día fuera del tramo que esta hoja dibuja aquí.
       const all = [...(seriesDays.get(sid) ?? [])].sort();
+      const cutL = Boolean(all.length) && all[0] < week[a].iso;
+      const cutR = Boolean(all.length) && all[all.length - 1] > week[b].iso;
       out.push({
         key: `${sid}:${week[0].iso}`,
         lane: 0,
         colStart: a + 1,
         colEnd: b + 2,
-        cutLeft: Boolean(all.length) && all[0] < week[a].iso,
-        cutRight: Boolean(all.length) && all[all.length - 1] > week[b].iso,
+        cutLeft: cutL,
+        cutRight: cutR,
+        note: cutR
+          ? runUntilLabel(all[all.length - 1], all.length)
+          : cutL
+            ? runFromLabel(all[0], all.length)
+            : null,
         project: g.project,
         kindWord: g.kindWord,
         label: head.name,
@@ -1088,6 +1106,7 @@
                 </span>
                 <b>{s.label}</b>
                 {#if s.city}<span class="cal__run-c">{s.city}</span>{/if}
+                {#if s.note}<span class="cal__run-n">{s.note}</span>{/if}
               </span>
               <!-- Each day's OWN hours. This strip is the whole reason a run
                    is stored as per-day rows rather than a span. -->
@@ -1513,6 +1532,18 @@
        existen. El de arriba queda abierto a la derecha y el de abajo a la
        izquierda, y por ese lado se va también el margen: una caja abierta que
        no llega al borde de la celda parece rota, no continuada. */
+    /* La frase va al otro extremo de la cabecera, en voz de margen: es una
+       nota sobre la tanda, no una segunda medida de ella. */
+    .cal__run-n {
+      margin-inline-start: auto;
+      flex: none;
+      font-family: var(--font-mono);
+      font-size: 9px;
+      letter-spacing: var(--mono-letter-spacing-loose);
+      text-transform: uppercase;
+      color: var(--text-faint);
+      white-space: nowrap;
+    }
     .cal__run--cutr {
       margin-inline-end: 0;
       border-inline-end: 0;
