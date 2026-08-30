@@ -1727,10 +1727,13 @@
        dice «quizá no pase»: dice «esto no es de esta hoja», que es exactamente
        lo que el número ya dice bajando de tinta. El sangrado del mes vecino es
        CONTEXTO, y el contexto puede bajar la voz.
-       El valor está medido, no elegido: a 0.62 el nombre de sala queda en
-       5.4:1 sobre el papel — por encima de AA — y la tarjeta sigue siendo
-       legible sin competir con el mes que estás leyendo. */
-    .cal__day--out > :not(.cal__day-head) {
+       Y va con `:global()` a propósito: las entradas son componentes `<Slip>`,
+       así que el CSS con ámbito de este fichero no las alcanza — el primer
+       intento fue `> :not(.cal__day-head)` y Svelte lo dejó sin efecto, cosa
+       que solo se vio midiendo la opacidad en la página. */
+    .cal__day--out :global(.slip),
+    .cal__day--out .cal__more,
+    .cal__day--out .cal__marks {
       opacity: 0.62;
     }
 
