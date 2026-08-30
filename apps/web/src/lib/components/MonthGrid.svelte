@@ -1546,8 +1546,37 @@
        cabecera pide 76 (marca + tipo) + 118 (nombre) + 43 (ciudad) + 118
        (nota), más 12 de padding y tres huecos de 8 = 391. Por debajo de eso
        algo tiene que irse, y se va la nota. */
+    /* EL ORDEN EN QUE SE SUELTA LO QUE NO CABE, y no es una preferencia mía:
+       lo copia de la tarjeta, que ya lo tenía resuelto —«un gloss es lo PRIMERO
+       que se va, y nunca la hora»— y de la regla que este mismo fichero escribe
+       para la banda a una columna: «lo único que sobrevive es el monograma».
+       Nada se recorta a medias; se suelta entero.
+
+       MEDIDO sobre la residencia de enero, a 1600: monograma 15 · palabra de
+       tipo 57 · nombre 118 · ciudad 43 · nota 118 · padding 12 · huecos de 8.
+       De ahí salen los tres umbrales, sumando lo que queda en cada escalón:
+
+         391 = 76 + 118 + 43 + 118 + 12 + 3×8   todo
+         265 = 76 + 118 + 43      + 12 + 2×8   sin nota
+         214 = 76 + 118           + 12 + 1×8   sin ciudad
+         153 = 15 + 118           + 12 + 1×8   solo el monograma
+
+       Por debajo de 153 el nombre se recorta, y ahí ya no queda nada que dar
+       sin borrar la identidad de la tanda. */
     @container (max-width: 391px) {
       .cal__run-n {
+        display: none;
+      }
+    }
+    /* La ciudad es el gloss de la tanda: dice DÓNDE, y el nombre dice QUÉ. */
+    @container (max-width: 265px) {
+      .cal__run-c {
+        display: none;
+      }
+    }
+    /* Y al final solo el monograma, que en un glifo dice de quién es. */
+    @container (max-width: 214px) {
+      .cal__run-w {
         display: none;
       }
     }
