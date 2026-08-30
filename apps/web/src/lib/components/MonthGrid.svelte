@@ -1186,7 +1186,13 @@
                     initials={b.initials}
                   />
                 {/if}
-                <span class="cal__band-w">{b.word}</span>
+                <!-- UNA OPCIÓN PREGUNTA, igual que en la tarjeta: allí el
+                     `SHOW` de un hold se dibuja `SHOW?` y se inclina
+                     (`Slip § slip__kind--q`). La banda tiene que hablar el
+                     mismo idioma o son dos vocabularios para una duda. -->
+                <span class="cal__band-w" class:cal__band-w--q={b.tentative}
+                  >{b.word}{#if b.tentative}?{/if}</span
+                >
               </span>
               {#if b.subject}<span class="cal__band-n" class:guess={b.kind === 'away'}
                   >{b.subject}</span
@@ -1336,6 +1342,10 @@
       align-items: center;
       gap: 6px;
     }
+    /* La palabra y su `?` se inclinan juntas, calcado de `.slip__kind--q`. */
+    .cal__band-w--q {
+      font-style: italic;
+    }
     .cal__band-w {
       font-family: var(--font-mono);
       font-size: 9px;
@@ -1422,10 +1432,16 @@
        la cursiva, el grano y la regla de puntos de la derecha. */
     .cal__band--tent .cal__band-n {
       color: var(--away-phrase);
-      /* SIN CURSIVA: la cursiva es de `.guess` —la inferencia— y una ausencia
-         tentativa no se dedujo, se escribió con dudas. Su duda la dicen el
-         grano y el trazo de puntos. Tenerla aquí era la otra mitad de la
-         colisión con la gira. */
+      /* CON CURSIVA, y el intento de quitarla fue un error mío corregido por
+         Marco el 2026-08-30. El razonamiento era que la cursiva pertenece a
+         `.guess` —la inferencia— y que una tentativa no se dedujo. Cierto en
+         la teoría del token y falso en la app: LA TARJETA YA INCLINA SUS
+         OPCIONES (`Slip § slip__kind--q`), así que una banda tentativa que no
+         se inclina habla otro idioma que la card del mismo día. Manda el
+         vocabulario que ya está en pantalla, no el mapa de ejes.
+         La gira sigue distinguiéndose por lo demás: regla continua, sin grano
+         y sin `?`. */
+      font-style: italic;
       /* EL HUECO SE MIDE ENTRE CAJAS Y LA CURSIVA VUELA FUERA DE LA SUYA.
          Con `gap: 9px` la caja está separada, pero la última letra inclinada
          —la «l» de «marco rubiol»— cae encima del `3 DEC` que viene detrás y
