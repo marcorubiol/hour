@@ -1188,7 +1188,9 @@
                 {/if}
                 <span class="cal__band-w">{b.word}</span>
               </span>
-              {#if b.subject}<span class="cal__band-n">{b.subject}</span>{/if}
+              {#if b.subject}<span class="cal__band-n" class:guess={b.kind === 'away'}
+                  >{b.subject}</span
+                >{/if}
               {#if b.span}<em class="cal__band-s">{b.span}</em>{/if}
               <!-- The rule with its terminus. It is not drawn when the band runs
                    past the week's edge: an arrowhead there would claim an end
@@ -1389,10 +1391,18 @@
     }
     /* ON TOUR is QUIETER THAN AN ABSENCE: an absence is a fact somebody wrote
        down, this is deduced from two travel legs, and they cannot weigh the
-       same. Dotted where away is solid, and one ink lighter. */
-    .cal__band--away {
-      border-block-start-style: dotted;
-    }
+       same.
+       PERO LA DIFERENCIA NO ES EL TRAZO, Y ASÍ ESTABA MAL. La gira iba de
+       puntos «porque pesa menos», y una ausencia TENTATIVA también va de
+       puntos — porque duda. Dos significados con un material, separados solo
+       por 4 puntos de tinta (20% contra 16%), que a ojo no es nada: Marco leyó
+       la gira como algo sin confirmar, que es justo lo que no es.
+       `certainty.css` ya tiene los dos ejes separados y avisa de esto — «no
+       deben tomarse prestado el material el uno al otro»: `.grain` es la duda
+       sobre el HECHO, `.guess` es la duda sobre la ATRIBUCIÓN, y su voz es la
+       cursiva. Una gira es exactamente un `guess`: nadie la escribió, se
+       dedujo. Así que va con regla CONTINUA y en cursiva, y lo que la mantiene
+       más callada es la tinta, no el trazo. */
     .cal__band--away .cal__band-n {
       font-size: 10.5px;
       color: var(--away-phrase);
@@ -1401,7 +1411,6 @@
       color: var(--away-phrase);
     }
     .cal__band--away .cal__band-r {
-      border-block-start-style: dotted;
       border-block-start-color: var(--away-rule-derived);
     }
     .cal__band--away .cal__band-r::after {
@@ -1413,7 +1422,10 @@
        la cursiva, el grano y la regla de puntos de la derecha. */
     .cal__band--tent .cal__band-n {
       color: var(--away-phrase);
-      font-style: italic;
+      /* SIN CURSIVA: la cursiva es de `.guess` —la inferencia— y una ausencia
+         tentativa no se dedujo, se escribió con dudas. Su duda la dicen el
+         grano y el trazo de puntos. Tenerla aquí era la otra mitad de la
+         colisión con la gira. */
       /* EL HUECO SE MIDE ENTRE CAJAS Y LA CURSIVA VUELA FUERA DE LA SUYA.
          Con `gap: 9px` la caja está separada, pero la última letra inclinada
          —la «l» de «marco rubiol»— cae encima del `3 DEC` que viene detrás y
