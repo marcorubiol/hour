@@ -1285,7 +1285,10 @@
       display: grid;
       grid-template-columns: repeat(7, minmax(0, 1fr));
       gap: 2px 0;
-      padding: 2px 0 5px;
+      /* Aire ARRIBA y ninguno abajo (Marco, 2026-08-30): la banda se separa de
+         las cards que la preceden y se apoya en el borde de la semana, que es
+         donde acaba el día que mide. */
+      padding: 8px 0 0;
     }
     /* THE RULE BELONGS TO THE BAND, NOT TO THE ROW. A `border-block-start` on
        the container drew a hairline the full width of the week whenever ANY
@@ -1307,6 +1310,14 @@
       border-block-start: 1px solid var(--border-color-light);
       overflow: visible;
       white-space: nowrap;
+    }
+    /* UNA AUSENCIA NO LLEVA TAPA (Marco, 2026-08-30). El `--away` de estas
+       clases son las GIRAS, no las ausencias: lo que rotula «AWAY» es un
+       `blackout`, que no tiene clase propia. La línea de arriba le ponía un
+       techo que la leía como una fila más del mes; lo que la banda tiene que
+       decir ya lo dice su propia regla con terminus, a la derecha. */
+    .cal__band:not(.cal__band--away) {
+      border-block-start: 0;
     }
     /* SIN PAPEL BAJO LAS PALABRAS, y es una decisión, no una omisión.
        Cuando las verticales pasaron a llegar hasta el pie, cruzaban por detrás
@@ -1397,10 +1408,9 @@
       display: none;
     }
     /* An absence that is settled is ink; one that is not is faint and leans —
-       the certainty axis, same as everywhere else. */
-    .cal__band--tent {
-      border-block-start-style: dashed;
-    }
+       the certainty axis, same as everywhere else. La tapa discontinua que
+       había aquí murió con la línea superior (arriba): la duda la dicen ahora
+       la cursiva, el grano y la regla de puntos de la derecha. */
     .cal__band--tent .cal__band-n {
       color: var(--away-phrase);
       font-style: italic;
@@ -1705,6 +1715,23 @@
        «findable, never read». */
     .cal__day--out .cal__day-num {
       color: var(--border-color-dark);
+    }
+    /* LO QUE NO ES DE ESTA HOJA SE LEE COMO NO SIENDO DE ESTA HOJA.
+       El número del día ya lo decía —los del mes vecino van en tinta de
+       borde— y lo que caía dentro seguía a plena voz: una función del 4 de
+       diciembre gritaba en la hoja de noviembre (Marco, en pantalla,
+       2026-08-30).
+       Y ES OTRO EJE, no el de la certeza. La ley «un reclamo más débil no es
+       tinta más pálida» gobierna la duda: una opción no es un confirmado
+       desvaído, y por eso el board tuvo que quitar su `.62 opacity`. Esto no
+       dice «quizá no pase»: dice «esto no es de esta hoja», que es exactamente
+       lo que el número ya dice bajando de tinta. El sangrado del mes vecino es
+       CONTEXTO, y el contexto puede bajar la voz.
+       El valor está medido, no elegido: a 0.62 el nombre de sala queda en
+       5.4:1 sobre el papel — por encima de AA — y la tarjeta sigue siendo
+       legible sin competir con el mes que estás leyendo. */
+    .cal__day--out > :not(.cal__day-head) {
+      opacity: 0.62;
     }
 
     /* TODAY IS INK AND A WASH — never a filled pill. The pill was the loudest
