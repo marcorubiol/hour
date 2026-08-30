@@ -574,6 +574,11 @@
     city: string | null;
     cert: SlipVM['cert'];
     title: string;
+    /** La tanda sigue antes / después de esta semana: el lado se dibuja
+        ABIERTO, porque una caja cerrada en los dos lados afirma un final que
+        la tanda no tiene ahí (Marco, 2026-08-30). */
+    cutLeft: boolean;
+    cutRight: boolean;
     cells: SeriesCell[];
   };
   /** Una fila de tanda, ya normalizada: el mínimo que la banda dibuja. */
@@ -657,11 +662,16 @@
           href: rows[0]?.href ?? null,
         });
       }
+      // Los días de la SERIE ENTERA, no los de esta semana: la tanda continúa
+      // si tiene algún día fuera del tramo que esta hoja dibuja aquí.
+      const all = [...(seriesDays.get(sid) ?? [])].sort();
       out.push({
         key: `${sid}:${week[0].iso}`,
         lane: 0,
         colStart: a + 1,
         colEnd: b + 2,
+        cutLeft: Boolean(all.length) && all[0] < week[a].iso,
+        cutRight: Boolean(all.length) && all[all.length - 1] > week[b].iso,
         project: g.project,
         kindWord: g.kindWord,
         label: head.name,
@@ -1057,6 +1067,8 @@
         {#each series as s (s.key)}
           <div
             class="cal__run"
+            class:cal__run--cutl={s.cutLeft}
+            class:cal__run--cutr={s.cutRight}
             data-family={s.cert}
             style="grid-row: {s.lane + 2}; grid-column: {s.colStart} / {s.colEnd}; --run-cols: {s.cells
               .length}{s.project ? `; --c: ${accentVarFor(s.project)}` : ''}"
@@ -1494,6 +1506,24 @@
       background: var(--bg-ultra-light);
       border: 1px solid color-mix(in oklch, var(--text-color) 15%, var(--border-color-light));
       border-radius: 3px;
+    }
+    /* UNA TANDA QUE SIGUE NO SE CIERRA POR ESE LADO (Marco, 2026-08-30).
+       La banda se recorta por semana ISO, así que una tanda de diez días son
+       dos dibujos; cerrarlos por los cuatro costados afirma dos finales que no
+       existen. El de arriba queda abierto a la derecha y el de abajo a la
+       izquierda, y por ese lado se va también el margen: una caja abierta que
+       no llega al borde de la celda parece rota, no continuada. */
+    .cal__run--cutr {
+      margin-inline-end: 0;
+      border-inline-end: 0;
+      border-start-end-radius: 0;
+      border-end-end-radius: 0;
+    }
+    .cal__run--cutl {
+      margin-inline-start: 0;
+      border-inline-start: 0;
+      border-start-start-radius: 0;
+      border-end-start-radius: 0;
     }
     /* …and the same certainty grammar, so a tentative run says «not sure» at
        exactly the volume a tentative gig does. */
