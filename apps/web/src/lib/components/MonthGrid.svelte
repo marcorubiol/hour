@@ -1512,6 +1512,10 @@
        and printed its border over them, which is the one thing no other card
        in the sheet does (Marco, 2026-08-10). */
     .cal__run {
+      /* Contenedor de sí misma: la nota de arriba se pregunta por el ancho de
+         LA TANDA, no el de la celda — una tanda de cuatro días y otra de dos
+         viven en la misma semana y no pueden responder lo mismo. */
+      container-type: inline-size;
       position: relative;
       isolation: isolate;
       display: flex;
@@ -1533,7 +1537,20 @@
        izquierda, y por ese lado se va también el margen: una caja abierta que
        no llega al borde de la celda parece rota, no continuada. */
     /* La frase va al otro extremo de la cabecera, en voz de margen: es una
-       nota sobre la tanda, no una segunda medida de ella. */
+       nota sobre la tanda, no una segunda medida de ella.
+       Y SE VA CUANDO NO CABE, porque EL NOMBRE MANDA (Marco, 2026-08-30). Una
+       mitad de dos días no da para las dos cosas y el título salía cortado —
+       «Reside…»—, que es peor que no saber cuántos días dura: el nombre es lo
+       que identifica la tanda; la nota solo la sitúa.
+       El umbral está MEDIDO sobre la residencia de enero, no elegido: la
+       cabecera pide 76 (marca + tipo) + 118 (nombre) + 43 (ciudad) + 118
+       (nota), más 12 de padding y tres huecos de 8 = 391. Por debajo de eso
+       algo tiene que irse, y se va la nota. */
+    @container (max-width: 391px) {
+      .cal__run-n {
+        display: none;
+      }
+    }
     .cal__run-n {
       margin-inline-start: auto;
       flex: none;
