@@ -150,6 +150,33 @@
     la pena que la RPC acepte `p_bolo_id` y nazca enlazada, para que no exista
     la ventana en la que la función ya está y el dinero todavía no.
 
+38. [ ] **La gira deducida no dice que la dedujimos, y no se puede aceptar.**
+    (Marco, 2026-08-30, mirando el mes: «no podemos añadir cosas nosotros sin
+    decirlo».) `awayBands()` infiere una banda `ON TOUR` emparejando un
+    `travel_day` `outbound` con el `return` siguiente — es **pura**, no existe
+    nada en la base. La banda aparece y ya está: no declara que la inventó la
+    app, y no hay forma de aceptarla ni rechazarla. La cursiva insinúa «esto es
+    nuestro», pero insinuar no es decir.
+    **Descartado en la misma conversación:** pintarla como duda. Una tentativa
+    dice «alguien lo escribió y no está seguro»; una gira dice «nadie lo
+    escribió, lo dedujimos de dos viajes que SÍ están confirmados». Los hechos
+    no son dudosos — lo que no es del usuario es la frase. Pintarla como duda
+    diría «quizá no pase», que es falso. Es la separación que `certainty.css`
+    ya hace: `.grain` duda del hecho, `.guess` duda de la atribución.
+    **Dos pasos, y el segundo es una función de verdad:**
+    - **Barato:** que la banda DIGA que es deducida y de dónde sale, con
+      palabras y no solo con una inclinación. Cero schema.
+    - **Caro y por decidir:** poder **confirmarla**. Marco propuso además un
+      fondo de color. Dos costes que hay que resolver ANTES de tocar nada:
+      (a) un relleno sería **el primer objeto pintado de la hoja** —el mes es
+      papel a propósito, «las reglas de la rejilla son las únicas líneas»—, así
+      que es una decisión de lenguaje, no un detalle; y (b) confirmar exige
+      **guardar** algo que hoy no existe, y con ello la pregunta difícil: si
+      mañana borras uno de los dos viajes, ¿qué le pasa a la gira confirmada?
+    Encaja con la dirección del producto ya escrita —la IA propone, una persona
+    aprueba, el sistema ejecuta y deja auditoría— llegando temprano y desde una
+    deducción tonta en vez de desde un modelo.
+
 22. [ ] **`build/schema.sql`: decidir si se borra.** Lleva desde hoy un banner
     de «histórico, no ejecutar» porque contiene una versión **vieja y falsa** de
     `handle_new_user` (sin la capa de cuenta). Su último motivo para existir
