@@ -1265,6 +1265,28 @@
        ground is the page's own, and nothing is clipped at a corner. The fill
        also broke the column ruling — the cells painted `--card` OVER the
        gradient that draws the seven verticals (see `.cal__wkc`). */
+    /* LA REJILLA NO ANIMA SU COLOR, Y ESTO ARREGLA EL FLASH.
+       `:where(html, body, *)` en base.css da a TODO elemento
+       `transition: background-color, color, border-color` — pensado para que
+       un cambio de tema funda en vez de saltar. El efecto colateral: cada
+       hairline anima su color cuando cambia por cualquier motivo, incluido que
+       Svelte reutilice el elemento al pasar de mes. La interpolación arranca
+       en tinta plena y baja hasta el 9% del token, así que durante ~0,2s se
+       pinta una regla SEIS VECES más oscura cruzando la hoja entera. Marco lo
+       vio tres veces y no se reproducía: es un transitorio, y solo apareció
+       ralentizando la CPU a 1/8 y midiendo píxeles —el DOM decía «0.547 de
+       alfa en oklab», que es una interpolación en vuelo—.
+       Una pauta de calendario es ESTRUCTURA, no estado: no tiene nada que
+       fundir. El apagado es local a propósito; estrechar la regla global es
+       otra conversación (`_tasks.md § 39`). */
+    .cal__wk,
+    .cal__wkh,
+    .cal__wkbody,
+    .cal__wkc,
+    .cal__day {
+      transition: none;
+    }
+
     .cal__grid {
       --cal-wk-gutter: 66px;
       --cal-cell-h: 128px;
