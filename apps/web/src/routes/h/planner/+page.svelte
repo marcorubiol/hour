@@ -42,6 +42,7 @@
   import MonthGrid from '$lib/components/MonthGrid.svelte';
   import {
     dateDayKey,
+    deducedPhrase,
     monthName,
     perfDayKey,
     type AwayBandVM,
@@ -750,6 +751,13 @@
         initials: proj?.initials ?? null,
         projectName: proj?.name ?? null,
         place: tourPlaceFor(b),
+        deduced: {
+          word: t('planner.tour_inferred', locale),
+          legs: t('planner.tour_legs', locale, {
+            out: localeDayMonth(b.out, localeTag),
+            back: localeDayMonth(b.back, localeTag),
+          }),
+        },
       };
     }),
   );
@@ -1447,7 +1455,12 @@
         // it for the bare subject printed «Mia Serra until 20 Aug», which
         // says nothing about what she is doing.
         who: it.label,
-        rest: awayRest(selectedDay, it.to, words, (iso) => localeDayMonth(iso, localeTag)),
+        // A tour says it was deduced, and from which two trips (§ 38), in the
+        // same sentence as the rest: the Day is not a band and has no margin
+        // voice to put it in.
+        rest:
+          awayRest(selectedDay, it.to, words, (iso) => localeDayMonth(iso, localeTag)) +
+          ('deduced' in it ? ` · ${deducedPhrase(it.deduced)}` : ''),
         // The doubt travels with the sentence. It did not, and the Day was the
         // one view where a tentative absence read exactly like a settled one.
         tentative: 'tentative' in it ? it.tentative === true : false,

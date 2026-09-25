@@ -547,6 +547,15 @@ export interface AwayBand {
   to: string;
   project_id: string;
   line_id?: string;
+  /**
+   * WHERE THE BAND CAME FROM: the days of the outbound and the return it was
+   * deduced from. Nobody wrote the tour down, so the drawing has to say it
+   * inferred it and out of what (§ 38; Marco, 2026-08-30: «no podemos añadir
+   * cosas nosotros sin decirlo»). Both halves of a band split by an own event
+   * carry the same pair, because they are the same trip.
+   */
+  out: string;
+  back: string;
 }
 
 /**
@@ -623,13 +632,14 @@ export function awayBands(
         continue;
       }
       if (openDay === null) continue; // unpaired return — no band
+      const trip = { out: openDay, back: t.day };
       // Contiguous runs of in-between days that carry no own event.
       let runStart: string | null = null;
       let prev: string | null = null;
       for (let day = addDaysIso(openDay, 1); day < t.day; day = addDaysIso(day, 1)) {
         if (eventDays.has(day)) {
           if (runStart !== null && prev !== null) {
-            bands.push(makeBand(runStart, prev, group.project_id, group.line_id));
+            bands.push(makeBand(runStart, prev, group.project_id, group.line_id, trip));
           }
           runStart = null;
           prev = null;
@@ -639,7 +649,7 @@ export function awayBands(
         }
       }
       if (runStart !== null && prev !== null) {
-        bands.push(makeBand(runStart, prev, group.project_id, group.line_id));
+        bands.push(makeBand(runStart, prev, group.project_id, group.line_id, trip));
       }
       openDay = null;
     }
@@ -652,8 +662,11 @@ function makeBand(
   to: string,
   project_id: string,
   line_id: string | null,
+  trip: { out: string; back: string },
 ): AwayBand {
-  return line_id === null ? { from, to, project_id } : { from, to, project_id, line_id };
+  return line_id === null
+    ? { from, to, project_id, ...trip }
+    : { from, to, project_id, line_id, ...trip };
 }
 
 /**

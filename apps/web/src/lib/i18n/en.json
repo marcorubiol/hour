@@ -65,6 +65,8 @@
   "planner.band_away": "away",
   "planner.band_tour": "on tour",
   "planner.band_until": "until {day}",
+  "planner.tour_inferred": "inferred",
+  "planner.tour_legs": "out {out} · back {back}",
   "planner.clash_people_title": "People conflict",
   "planner.clash_people_body": "{people} on two bookings the same day.",
   "planner.clash_possible_title": "Possible conflict",

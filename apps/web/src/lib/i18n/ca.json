@@ -64,6 +64,8 @@
   "planner.band_away": "fora",
   "planner.band_tour": "de gira",
   "planner.band_until": "fins {day}",
+  "planner.tour_inferred": "deduïda",
+  "planner.tour_legs": "anada {out} · tornada {back}",
   "planner.clash_people_title": "Conflicte de persones",
   "planner.clash_people_body": "{people} a dues reserves el mateix dia.",
   "planner.clash_possible_title": "Possible conflicte",
