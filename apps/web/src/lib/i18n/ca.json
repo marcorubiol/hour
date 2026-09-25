@@ -55,7 +55,7 @@
   "planner.more": "Més accions",
   "planner.feed": "Feed del calendari…",
   "planner.empty_month": "Cap data aquest mes. Un mes tranquil.",
-  "planner.away": "fora · {project}",
+  "planner.away": "de gira · {project}",
   "planner.away_until": "fins",
   "planner.away_left": "queden {n} dies",
   "planner.away_left_one": "queda 1 dia",

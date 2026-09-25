@@ -55,7 +55,7 @@
   "planner.more": "Más acciones",
   "planner.feed": "Feed del calendario…",
   "planner.empty_month": "Nada este mes. Un mes tranquilo.",
-  "planner.away": "fuera · {project}",
+  "planner.away": "de gira · {project}",
   "planner.away_until": "hasta",
   "planner.away_left": "quedan {n} días",
   "planner.away_left_one": "queda 1 día",

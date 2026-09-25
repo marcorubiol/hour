@@ -56,7 +56,7 @@
   "planner.more": "More actions",
   "planner.feed": "Calendar feed…",
   "planner.empty_month": "Nothing this month. A quiet month.",
-  "planner.away": "away · {project}",
+  "planner.away": "on tour · {project}",
   "planner.away_until": "until",
   "planner.away_left": "{n} days left",
   "planner.away_left_one": "1 day left",
