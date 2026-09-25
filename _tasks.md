@@ -1,7 +1,9 @@
 # Hour — cola vigente
 
-> **ÚNICA COLA ACTIVA.** Última reconciliación: 2026-08-27 (§ 23 y § 32; el
-> resto de la cola sigue con la reconciliación del 2026-07-30).
+> **ÚNICA COLA ACTIVA.** Última reconciliación: 2026-09-25 (§ 17 y § 18:
+> la tarea 15 sí existe, y Travel v2 no está en curso sino esperando a Marco).
+> Antes, 2026-08-27 (§ 23 y § 32); el resto de la cola sigue con la
+> reconciliación del 2026-07-30.
 > Estado general y evidencia: `_context.md`. Historia: `_decisions.md` y
 > `_notes/sessions-log.md`. Los documentos de `build/archive/` no crean tareas.
 
@@ -988,16 +990,24 @@ entre empresas sin construirlo.
     tests RLS) · P2 `Y.Array` y materialización en el worker de collab · P3 UI: la
     **vista de momento** dentro del día.
 
-    **Dependencia dura:** el día de un ensayo desde la UI pasa por la **tarea 15**
-    (editar una `date`, que no existe) — la misma que bloquea Travel v2 P3.
+    **Dependencia de la UI, ya resuelta:** el día de un ensayo desde la UI pasa
+    por la **tarea 15** (editar una `date`), y la tarea 15 **existe**: hecha,
+    desplegada y con E2E verde desde el 2026-07-30 (§ 15). Esta línea decía
+    «que no existe» y era falsa desde esa noche (corregido el 2026-09-25).
     **Ojo al backfill:** `start_at` lo leen Desk, MonthGrid y tasks; es la
     superficie que decide si la migración va de una tacada.
 
-    > **No empieza hasta cerrar Travel v2**, que está EN CURSO y también sin
-    > schema escrito. Dos modelos nuevos a la vez es como se pierde el hilo.
+    > **No empieza hasta cerrar Travel v2**, que tampoco tiene schema escrito y
+    > está parado esperando tres respuestas de Marco (§ 18). Dos modelos nuevos
+    > a la vez es como se pierde el hilo.
 
-## EN CURSO — Travel v2: el viaje como trayecto multi-etapa (ADR-089)
+## ESPERANDO A MARCO: Travel v2, el viaje como trayecto multi-etapa (ADR-089)
 
+> **Parado desde el 2026-07-23, a la espera de tres respuestas de Marco**
+> (abajo, «PENDIENTE de Marco»). Esta sección decía «EN CURSO» y nadie la ha
+> tocado desde ese día (reconciliado el 2026-09-25). No se escribe la
+> migración hasta tener las tres.
+>
 > **Sesión 2026-07-23. Modelo DECIDIDO (ADR-089), NADA de schema construido.**
 > Empezó como retoque visual de las cards del mes y creció hasta un modelo de
 > viaje nuevo. "Modelo primero" (Marco): primero el schema, los documentos
@@ -1024,8 +1034,10 @@ entre empresas sin construirlo.
       tests RLS. Molde exacto a copiar: `supabase/migrations/20260722102000_money_v3_bolo.sql`.
     - **P2:** card muestra `Barcelona → Sevilla` en `MonthGrid` (`travelText`,
       fallback a `city`/dirección). Actualizar la data demo (abajo) con extremos.
-    - **P3:** editor de tramos en el diálogo/detalle de fecha (depende de la
-      tarea 15 — editar fecha desde la UI, que NO EXISTE aún).
+    - **P3:** editor de tramos en el diálogo/detalle de fecha. Se apoya en la
+      tarea 15 (editar fecha desde la UI), que **ya existe**:
+      `EditDateDialog.svelte`, desplegada con E2E verde el 2026-07-30 (§ 15).
+      Esta línea decía «que NO EXISTE aún»; corregido el 2026-09-25.
     - **Diferido (P3+):** **documentos por tramo** → requieren el **primer
       pipeline de archivos R2** de Hour (`MEDIA` está declarado pero SIN uso;
       materials y `expense.receipt_url` solo guardan una URL ya formada). Es
@@ -1035,15 +1047,19 @@ entre empresas sin construirlo.
     **Deuda anotada:** `travel_direction` (outbound/return/leg) **se queda** porque
     alimenta `awayBands()` (ADR-078 §6); reconciliar dirección↔extremos = después.
 
-    **PENDIENTE de Marco antes de escribir la migración** (le pregunté, no
-    respondió — cerró sesión):
+    **PENDIENTE de Marco antes de escribir la migración** (preguntado el
+    2026-07-23, sin respuesta; sigue así el 2026-09-25):
     1. ¿Aprueba el modelo del ADR-089? (mantener `travel_direction`; gate
        `edit:performance`; extender `create_date`/`update_date`).
-    2. **Rama**: tenía cambios sin commitear (`AgendaList`, `planner/+page`, i18n,
-       un brief borrado). NO tocar. ¿Migración a rama nueva `feat/travel-stages`
-       o dejar archivos sin crear rama?
-    3. ¿Aplicar a `hour-staging` tras escribir, o solo dejar el archivo para
-       revisar antes de tocar DB?
+    2. ¿La migración va en una rama nueva `feat/travel-stages`, o solo se dejan
+       los ficheros sin crear rama? (El motivo original de la pregunta, cambios
+       sin commitear en `AgendaList`, `planner/+page` e i18n, ya no existe: el
+       árbol está limpio.)
+    3. ¿Aplicar a `hour-staging` tras escribirla, o solo dejar el fichero para
+       revisarlo antes de tocar ninguna base? *Dato para contestar, no
+       respuesta:* desde § 34, una migración con DROP cuenta como destructiva
+       y pide staging e `inspect`, y P1 hace DROP+CREATE de `create_date`/
+       `update_date`/`create_date_series` por firma. Y staging sigue pausado.
 
     **Ya hecho esta sesión (CSS de las cards, cerrado):** unificación en
     `MonthGrid.svelte` — todas las opciones (hold/proposed, bolo y date)

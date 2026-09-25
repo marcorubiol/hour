@@ -1,5 +1,46 @@
 # Hour — estado canónico del proyecto
 
+> **Reconciliación 2026-09-25: NADA NUEVO DESDE EL 31 DE AGOSTO, Y ESTE
+> DOCUMENTO SE HABÍA QUEDADO EN EL 27.** Runtime **`795b6a5`** (builtAt
+> 2026-08-31T05:45Z), `main` == `origin/main` == prod, sin commits desde
+> entonces. Comprobado hoy contra `/health/live`, `/health/ready` (Supabase
+> `ok`), git y los runs de GitHub Actions. **Las suites no se han vuelto a
+> correr**: RLS y E2E pegan contra producción y esta pasada no tenía OK para
+> lanzarlas. Las últimas cifras escritas son las de `_tasks.md § 16`
+> (2026-08-29): **RLS 163 · E2E 62**. Después entraron los 6 casos de
+> `tests/rls/bolo-status.test.ts`, así que el total de hoy no está medido.
+>
+> **Entre el 27 y el 31 de agosto entraron 45 commits (`bd333f0..795b6a5`),
+> todos desplegados:**
+> - **Funciones de varios días** (`_tasks.md § 16`, cerrada): `series_id`,
+>   `create_performance_series`, `POST /api/performances/series`, el alta con
+>   «varios días» y la banda del mes que dibuja una tanda como un elemento.
+> - **Función↔bolo, la mitad de abajo** (§ 36): `bolo_id` en el PATCH y un
+>   trigger que exige mismo proyecto. Falta la pantalla, que dibuja Marco.
+> - **Un trato tiene vida**: `update_bolo_status` y el PATCH de
+>   `/api/money/bolos/[id]` mueven el estado de un bolo. Hasta entonces todo
+>   bolo creado desde Hour nacía `confirmed` y no podía cambiar.
+> - **Cuatro migraciones a producción**, cada una con su plan y su apply por el
+>   workflow: `20260828100000_guard_performance_bolo_same_project` (run
+>   33163749816), `20260829100000_performance_series` (run 33237067289),
+>   `20260829120000_grant_select_performance_series_id` (run 33237741473, el
+>   arreglo de la rotura de esa misma mañana, contada en «Supabase») y
+>   `20260829140000_bolo_status_lifecycle` (run 33260401928).
+> - Una tanda de ajustes del mes del Planner v3 (banda, pie de semana,
+>   ausencias, pauta) y **§ 38 anotada**: la gira deducida no dice que la
+>   dedujimos.
+>
+> **Supabase se volvió a pausar en septiembre.** El backup programado del
+> 2026-09-13 murió con la firma de siempre (`ENOTFOUND tenant/user
+> postgres.<ref> not found`); el del 2026-09-16, lanzado a mano, ya pasó, y el
+> programado del 20 también. Quién la despertó y a qué hora, no lo tengo. Es la
+> pausa que § 33 decidió aceptar mientras no haya usuarios que no sean Marco.
+>
+> **Y «Siguiente paso» afirmaba algo falso:** que nada del rediseño del Planner
+> (Scope v3 Agenda) estaba implementado. Está en producción desde el
+> 2026-08-10 (ADR-095/096); el proyecto de diseño queda como referencia de
+> dibujo, no como spec. Corregido abajo.
+
 > **Reconciliación 2026-08-27 — SUPABASE SE PAUSÓ SOLA, Y AL VOLVER EL E2E
 > ENCONTRÓ TRES ROJOS QUE NADIE HABÍA ESCRITO.** Runtime **`ad3cf67`**
 > (builtAt 2026-08-27T07:21Z), `main` == `origin/main` == `bd333f0`. Suites
@@ -158,8 +199,9 @@
 > a usarse para difusión de verdad en ese mismo espacio.
 
 > **FUENTE DE VERDAD ACTUAL.** Cualquier agente o persona debe empezar aquí.
-> Última verificación: **2026-08-27**, contrastada con Git, el código, producción,
-> Supabase y las cuatro suites; no reconstruida desde documentos antiguos. Las
+> Última verificación: **2026-09-25**, contrastada con Git, producción
+> (`/health/live` y `/health/ready`) y los runs de GitHub Actions; **sin
+> re-correr las suites**, cuyo último pase completo fue el del 2026-08-27. Las
 > reconciliaciones anteriores se conservan abajo, en orden inverso.
 > **Reconciliación 2026-07-23:** money v3 (ADR-086/087/088) se desplegó a prod
 > ese día — runtime **`a35e8c4`**; ver «Producción» y «Git» abajo y
@@ -231,12 +273,17 @@ orientativo, no una verdad comercial cerrada.
 
 - Web: `https://hour.zerosense.studio`
 - Worker: `hour-web`
-- `/health/live`: sano, `dirty:false`, SHA **`ad3cf67`** (builtAt 2026-08-27T07:21Z).
-- `/health/ready`: sano, Supabase `ok`. **Estuvo en rojo del ~23 al 27 de agosto**
-  con `status_530`, y no era la app: Supabase se pausó sola. Ver la cabecera.
-- **`main` == `origin/main` == `bd333f0`.** No hay código de aplicación sin
-  desplegar: encima del runtime solo va `bd333f0`, que toca un único spec y no
-  entra en el bundle. El deploy del 2026-08-27 sube **el arreglo del pulse**
+- `/health/live`: sano, `dirty:false`, SHA **`795b6a5`** (builtAt 2026-08-31T05:45Z).
+  Comprobado el 2026-09-25.
+- `/health/ready`: sano, Supabase `ok` (2026-09-25). **Estuvo en rojo del ~23 al
+  27 de agosto** con `status_530`, y no era la app: Supabase se pausó sola. Ver
+  la cabecera del 2026-08-27. Volvió a pausarse hacia el 13 de septiembre (ver
+  la cabecera del 2026-09-25).
+- **`main` == `origin/main` == prod == `795b6a5`** (2026-09-25). No hay nada sin
+  desplegar ni commits desde el 31 de agosto. Lo que subió entre el 27 y el 31
+  está en la cabecera del 2026-09-25.
+- Debajo va **`ad3cf67`** (2026-08-27), que fue el runtime hasta el 31 de
+  agosto. El deploy del 2026-08-27 sube **el arreglo del pulse**
   (el `Slip` abre su presupuesto de líneas, el rail lo estrecha a 1, reserva
   2,95rem → 3rem), sin schema. Verificado contra el runtime desplegado:
   **RLS 150/150 · E2E 56/56 · unit 555/555 · svelte-check 0/0**.
@@ -327,6 +374,8 @@ orientativo, no una verdad comercial cerrada.
 - Repo: `https://github.com/marcorubiol/hour` (privado).
 - Checkout: `/Users/marcorubiol/Developer/hour`.
 - Rama principal: `main`.
+- **2026-09-25: `main` == `origin/main` == prod == `795b6a5`**, sin commits
+  desde el 2026-08-31. Los 45 del 27 al 31 están en la cabecera.
 - **2026-08-27: `main` == `origin/main` == `bd333f0`; prod == `ad3cf67`.**
   Los tres commits del día: `fix(pulse)` —el presupuesto de líneas del rail,
   que es el único que entra en el bundle—, `test(planner)` y
@@ -364,16 +413,21 @@ orientativo, no una verdad comercial cerrada.
   y origin), con `feat/identity-colour-picker` ya dentro (merge `05c84d3`);
   `feat/money-v3-design` se borró contenida. **2026-08-10:** `feat/planner-v3`
   se mergeó a `main` por fast-forward y se borró (local y origin) — el Planner
-  v3 y el pulse ya están desplegados. Quedan dos ramas, y una es basura:
-  `hardening/audit-fixes` está **contenida en `main` con cero commits propios**
-  (verificado 2026-08-11), o sea borrable sin pérdida; y `feat/comms-threads`:
-  - `feat/comms-threads` — comms + acceso. **Su canon ya está en `main`**
+  v3 y el pulse ya están desplegados. `hardening/audit-fixes`, que estaba
+  contenida en `main` sin commits propios, **ya no existe** (ni local ni en
+  origin, 2026-09-25). **Queda una sola rama además de `main`:**
+  - `feat/comms-threads`: comms + acceso. **Tiene un solo commit propio**
+    (`0f1ff5c`, 2026-07-21, «reduce comms-threads to its build material») sobre
+    `2176eec`, que ya está en `main`. **Su canon ya está en `main`**
     (ADR-082/083/085, las dos escaleras y la faceta en `structure-model.md`, el
-    digest del grill y el review de 32 hallazgos). Lo que queda en la rama es
-    solo material de construcción: 604 líneas de SQL **sin aplicar** y los 7
-    prototipos de `app design/`. Cero código de aplicación. Dos bloqueantes de
-    arquitectura abiertos — ver `_tasks.md § Bloqueado`. **La rama no se mergea
-    entera**: el pensamiento sí sube, el SQL re-aplicable no.
+    digest del grill y el review de 32 hallazgos). Lo que ese commit añade es
+    solo material de construcción: 604 líneas de SQL **sin aplicar**
+    (`2026-07-20_comms_threads_and_membership.sql`), seis prototipos HTML de
+    `app design/` con su índice y su `_kit.css`, `_comms-wip.md`, un review de
+    prototipos y un prompt de diseño. Cero código de aplicación. Dos
+    bloqueantes de arquitectura abiertos: ver `_tasks.md § Bloqueado`.
+    **Por decisión, la rama no se mergea entera**: el pensamiento ya subió, el
+    SQL re-aplicable no.
 
 ### Supabase
 
@@ -387,11 +441,26 @@ orientativo, no una verdad comercial cerrada.
   credenciales, `.env` o RLS. Se despierta con un botón del dashboard, sin CLI,
   y los datos sobreviven. El backup semanal a R2 es el único tráfico automático
   y **no basta como latido** — una semana es justo el ancho de la ventana.
-- **`hour-staging` está pausado** desde la misma fecha. Se dejó así, y el
+  **Volvió a pasar en septiembre**: el backup del 2026-09-13 falló con la misma
+  firma y el del 16 ya pasó. Aceptado a propósito mientras no haya usuarios
+  externos (`_tasks.md § 33`).
+- **`hour-staging` está pausado** desde la misma fecha (su DNS seguía vacío el
+  2026-09-25). Se dejó así, y el
   2026-08-27 eso **ya cambió un gate real**: la migración de ese día se aplicó
   sin el ensayo en staging. No es una nota preventiva, es algo que pasó — ver
   `_tasks.md § 34`.
-- **Última migración aplicada: `20260828100000_guard_performance_bolo_same_project`**
+- **Última migración aplicada: `20260829140000_bolo_status_lifecycle`**
+  (2026-08-29, run 33260401928). Un bolo nace en el estado que toca
+  (`proposed`, `hold`, `hold_1..3` o `confirmed`) y se mueve después por
+  `update_bolo_status`, con la puerta de `update_bolo_fee` (`edit:money`).
+  `invoiced` y `paid` quedan fuera de los dos caminos: money v3 deriva lo
+  cobrado de los pagos, y escribirlos a mano sería un segundo sitio para la
+  verdad del dinero. Guardián: `tests/rls/bolo-status.test.ts` (6 casos).
+  Debajo, las dos del mismo día: `20260829100000_performance_series` (run
+  33237067289, funciones de varios días) y
+  `20260829120000_grant_select_performance_series_id` (run 33237741473, el
+  arreglo de la rotura que se cuenta más abajo).
+- Debajo va **`20260828100000_guard_performance_bolo_same_project`**
   (2026-08-28, run 33163749816). Una función solo cuelga de un bolo de SU
   proyecto: hasta ese día lo único que sujetaba `performance.bolo_id` era la FK,
   y **se verificó en producción que enlazar a un bolo de otro proyecto devolvía
@@ -420,8 +489,9 @@ orientativo, no una verdad comercial cerrada.
   de siempre salía verde rechazando por el motivo equivocado.** La API real ya
   lo esquiva nombrando sus columnas en el `select`.
 - Auth: email+password, cookies httpOnly en la app, hook de access token activo.
-- RLS: FORCE en las superficies tenant-scoped; suite live **163/163**
-  (2026-08-28; el 120/120 que decía esta línea era de julio).
+- RLS: FORCE en las superficies tenant-scoped; suite live **163/163** el
+  2026-08-29 (`_tasks.md § 16`). Después entraron los 6 casos de
+  `bolo-status.test.ts` y la suite no se ha vuelto a correr (2026-09-25).
 - Identidad 2026-07-20: `workspace_person` y `workspace_organization` aplicadas,
   perfil portable y dossier local por workspace, share/revoke explícitos.
 - Fixture limitado: `limited@hour.test`, member solo de `playwright`, performer
@@ -549,9 +619,11 @@ colgado con datos ya llegados) anotado en `_tasks.md` — el spec es su guardiá
 - **Hall** `/h`: puerta de entrada y frase de estado.
 - **Desk** `/h/desk`: feed mixto real de tareas, agenda, conversaciones y
   dinero; modo calma y propuestas IA representadas como tareas reales.
-- **Planner** `/h/planner`: mes, agenda y carriles; performances, dates,
-  disponibilidad, viajes, conflictos y decisiones derivadas. `Calendar` queda
-  solo para iCalendar/ICS e URLs legacy con redirect.
+- **Planner** `/h/planner` (v3, ADR-095/096): día, agenda, mes y tablero;
+  performances (también de varios días, en tanda), dates, disponibilidad,
+  viajes, gira deducida, conflictos, decisiones derivadas y el margen privado
+  de `note`. `Calendar` queda solo para iCalendar/ICS e URLs legacy con
+  redirect.
 - **Conversations** `/h/conversations`: libro operativo con last contact,
   “Contacted today” con reloj de servidor, agrupación conversación/contacto,
   project chips, escritura de estado/próxima acción y estado vacío de importación.
@@ -565,7 +637,8 @@ colgado con datos ya llegados) anotado en `_tasks.md` — el spec es su guardiá
   invoice/proforma con numeración correlativa atómica; pago desacoplado del
   facturar (cobrado = pagos-vs-caché-del-bolo); impuesto genérico country-agnostic
   (`invoice_tax_line`, preset ES relleno) que **se para antes de la emisión legal
-  certificada**. Vencido → tarea a Desk.
+  certificada**. Vencido → tarea a Desk. Desde el 2026-08-29 el estado de un
+  bolo se mueve (`update_bolo_status`) y ya no nace siempre `confirmed`.
 - Contenedores: workspace → project → line; los módulos editan a nivel line.
 - Performance detail, road sheet interno/público, venues, cast/crew, assets,
   expenses, tasks, calendar shares y colaboración Yjs están operativos.
@@ -642,11 +715,12 @@ profundidad de producto, no en SvelteKit/Supabase/Cloudflare.
 
 ## Siguiente paso
 
-Abrir `_tasks.md`. Nada bloquea: prod == `ad3cf67` y **las cuatro suites en
-verde** contra ese runtime (2026-08-27); encima solo van tests y documentación,
-más la migración `20260827100000`, que no toca el bundle. Todo lo que sigue
-sirve al **Planner v3**, que es la pieza en curso — pero léelo con el aviso de
-abajo delante, porque la mitad de esta lista ya no era cierta:
+Abrir `_tasks.md`. Nada bloquea: prod == `main` == `795b6a5` (2026-09-25), sin
+nada pendiente de desplegar. Las suites estaban en verde en el último pase
+completo (2026-08-27) y no se han re-corrido desde el deploy del 31: antes de
+tocar schema o dar algo por verificado, correrlas. Todo lo que sigue sirve al
+**Planner v3**, que es la pieza en curso. Pero léelo con el aviso de abajo
+delante, porque la mitad de esta lista ya no era cierta:
 
 > **PARA CUANDO SE LEA ESTA LISTA: EL 2026-08-27 TRES DE SUS SIETE PUNTOS
 > ESTABAN HECHOS Y SEGUÍAN ESCRITOS COMO PENDIENTES**, y un cuarto a medias. No
@@ -676,13 +750,17 @@ abajo delante, porque la mitad de esta lista ya no era cierta:
    no hay eje»— ya no bloquea. **Lo abierto es dónde vive el casting de
    verdad**, y eso es el pase de UI del Planner v3.
 5. **Follow-up de money v3 (no bloquea):** UX de **enlazar una función nueva a un
-   bolo** — las performances creadas en Planner nacen sin bolo hasta que exista.
-6. **Travel v2 (ADR-089):** modelo decidido, **nada de schema construido**. Su
-   dependencia dura —la tarea 15, editar una fecha desde la UI— ya está
-   construida, desplegada y con E2E verde. **Es el primer punto de esta lista
-   que es trabajo de verdad y no una casilla mal puesta.**
-7. **Contenedores (bloque 5)** y los flecos de planner (multi-día de
-   performances, escaleta ADR-090) van después.
+   bolo**. La mitad de abajo está hecha y en producción desde el 2026-08-28
+   (`bolo_id` en el PATCH + trigger de mismo proyecto); falta el selector, que
+   dibuja Marco, y `create_performance` con `p_bolo_id` (`_tasks.md § 36`, `§ 37`).
+6. **Travel v2 (ADR-089):** modelo decidido, **nada de schema construido**, y
+   **esperando a Marco** desde el 2026-07-23: tres preguntas sin responder en
+   `_tasks.md § 18`. Su dependencia dura, la tarea 15 (editar una fecha desde
+   la UI), ya está construida, desplegada y con E2E verde.
+7. **La gira deducida tiene que decir que la dedujimos** (`_tasks.md § 38`).
+   Un paso barato sin schema y uno caro por decidir.
+8. **Contenedores (bloque 5)** y la escaleta (ADR-090, `§ 17`) van después.
+   El multi-día de performances **ya está hecho** (`§ 16`, 2026-08-29).
 
 > **Y DESPUÉS DEL PLANNER, COMMS — esto es nuevo y no estaba escrito en ningún
 > sitio.** La capa de comunicación (ADR-082 + ADR-083: un hilo polimórfico sobre
@@ -697,13 +775,17 @@ abajo delante, porque la mitad de esta lista ya no era cierta:
 > instrumento que la va a especificar. Quien lea esto y planifique más allá del
 > Planner: lo siguiente grande es comms, no una lente nueva.
 
-> **Rediseño del Planner (Scope v3 Agenda), en curso y fuera del repo:** el
-> diseño vive en un proyecto de claude.ai/design (`Hour Views - Scope v3 -
-> Agenda.html` + `AGENDA-SYSTEM.md`), se lee con la herramienta `DesignSync`, y
-> **nada de él está implementado**. Ese documento se declaró a sí mismo
+> **Rediseño del Planner (Scope v3 Agenda): IMPLEMENTADO Y EN PRODUCCIÓN desde
+> el 2026-08-10** (ADR-095/096; corregido el 2026-09-25, este párrafo decía que
+> nada de él estaba implementado). Las cuatro vistas (día, agenda, mes y
+> tablero), el `Slip` como la única card, el dial de carriles, el margen de
+> `note` y el pulse del rail. El diseño sigue en un proyecto de
+> claude.ai/design (`Hour Views - Scope v3 - Agenda.html` + `AGENDA-SYSTEM.md`),
+> que se lee con `DesignSync`, pero **ya no es lo que se implementa**: el repo
+> va por delante en varios sitios y el propio documento se declaró
 > no-especificación tras descubrir que ocho de sus leyes eran falsas en
-> pantalla: cuando se implemente, se destila a ADRs de aquí más aserciones
-> ejecutables — no se trata como spec.
+> pantalla. Sirve para resolver una duda de dibujo; lo que manda son los ADRs
+> y las aserciones de `tests/planner-laws.spec.ts`.
 
 `_tasks.md` es la cola detallada con el estado exacto de cada uno.
 
