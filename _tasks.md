@@ -152,7 +152,35 @@
     la pena que la RPC acepte `p_bolo_id` y nazca enlazada, para que no exista
     la ventana en la que la función ya está y el dinero todavía no.
 
-38. [ ] **La gira deducida no dice que la dedujimos, y no se puede aceptar.**
+38. [~] **El paso barato, HECHO en la rama `feat/planner-tour-deduced`
+    (2026-09-26), sin desplegar y pendiente de que Marco lo mire.** Cero schema.
+    `awayBands()` guarda de qué dos viajes sale cada banda (`out`/`back`), y la
+    gira lo dice con palabras en las tres vistas que la dibujan:
+    - **Mes:** en la voz del tramo, el hueco donde una ausencia pone sus
+      fechas: «DE GIRA *Sevilla* DEDUCIDA · IDA 7 OCT · VUELTA 12 OCT». Una
+      banda estrecha suelta entero lo que no cabe, primero los viajes y luego
+      la palabra; el lugar nunca. Umbrales medidos, con la suma escrita en el
+      CSS (419 todo · 205 sin viajes). El tooltip lo lleva siempre entero.
+    - **Agenda y Día:** la línea termina en «· deducida · ida 7 oct · vuelta
+      12 oct».
+    - **De paso, y en commit aparte para poder revertirlo solo:** el nombre de
+      la gira en tooltip y líneas decía «fuera · MaMeMi», la palabra de la
+      ausencia. `MonthGrid` ya escribía la ley contraria («una ausencia dice
+      fuera, una gira dice de gira; nunca la misma palabra») y el texto era un
+      resto de la v2 (07-18), anterior a separarlas (07-31). Ahora «de gira ·
+      MaMeMi».
+    *Verificado:* `svelte-check` 0/0, unit 562/562, y capturas contra la base
+    local con tres giras de 4, 2 y 1 día a 1024, 1280 y 1600 en es/en/ca.
+    RLS y E2E no se corrieron: pegan contra producción.
+    *Lo que el paso barato NO cubre, dicho para que no se dé por cerrado:*
+    (a) una gira de **un día** a 1280 o menos no cabe ni sin la palabra
+    (marca, tipo y lugar ya desbordaban antes de esto), así que en el mes solo
+    lo dice el tooltip; (b) el **Tablero** dibuja la gira con la palabra de la
+    ausencia («fuera») y sin procedencia, y eso es una decisión de dibujo del
+    Tablero, no se tocó. El paso caro (confirmarla, y el fondo) sigue igual.
+    Texto original abajo.
+
+38b. [ ] **La gira deducida no dice que la dedujimos, y no se puede aceptar.**
     (Marco, 2026-08-30, mirando el mes: «no podemos añadir cosas nosotros sin
     decirlo».) `awayBands()` infiere una banda `ON TOUR` emparejando un
     `travel_day` `outbound` con el `return` siguiente — es **pura**, no existe
