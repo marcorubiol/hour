@@ -61,7 +61,7 @@
     type PlacedEvent,
   } from '$lib/board-lanes';
   import { spaceName } from '$lib/utils/identity';
-  import type { Slip as SlipVM, SlipKind } from '$lib/month-events';
+  import { deducedPhrase, type Slip as SlipVM, type SlipKind } from '$lib/month-events';
 
   interface Props {
     /** The dial — 'scope' | 'person'. Decides what the + door knows. */
@@ -101,6 +101,9 @@
     noCastWord: string;
     /** The absence band's kind word ('away'). */
     awayWord: string;
+    /** A derived tour's kind word ('on tour'). An absence is a fact somebody
+        wrote down, a tour is inferred: two claims, never the same word. */
+    tourWord?: string;
     /** The band's terminus phrase ('until 20 jul'). */
     untilLabel: (iso: string) => string;
     emptyLabel: string;
@@ -155,6 +158,7 @@
     teamWord,
     noCastWord,
     awayWord,
+    tourWord = 'on tour',
     untilLabel,
     emptyLabel,
     createLabel,
@@ -184,6 +188,24 @@
   let marks = $derived(clashMarks(clashes, cells));
   let clashDays = $derived(clashDayMarks(clashes));
   let segs = $derived(awaySegments(awayRuns, columns));
+
+  /** An absence says «away», a derived tour says «on tour» (§ 38). */
+  function awWord(run: AwayRun): string {
+    return run.deduced ? tourWord : awayWord;
+  }
+  /**
+   * The phrase after the name, ALL OR NOTHING (see `awayTerminusFits`). An
+   * absence says until when. A tour says where it came from instead, like
+   * the month's band: the whole provenance if it fits, else the bare word
+   * «inferred», else nothing. The tooltip always carries all of it.
+   */
+  function awTail(s: (typeof segs)[number]): string | null {
+    const word = awWord(s.run);
+    const options = s.run.deduced
+      ? [deducedPhrase(s.run.deduced), s.run.deduced.word]
+      : [untilLabel(s.run.to)];
+    return options.find((p) => awayTerminusFits(s, columns, word, s.run.who, p)) ?? null;
+  }
   let floors = $derived(awayFloorCols(awayRuns, columns));
 
   let tallies = $derived.by(() => {
@@ -698,11 +720,12 @@
             class:board__aw--end={s.end}
             style="grid-row: {laneRow.get(s.laneKey)}; grid-column: {s.startCol + 3} / {s.endCol +
               4}"
+            title={s.run.deduced
+              ? `${tourWord} · ${s.run.who} · ${deducedPhrase(s.run.deduced)}`
+              : undefined}
           >
-            <i class="board__aw-k">{awayWord}</i><b class="board__aw-n">{s.run.who}</b
-            >{#if !s.cont && awayTerminusFits(s, columns, awayWord, s.run.who, untilLabel(s.run.to))}<em
-                class="board__aw-u">{untilLabel(s.run.to)}</em
-              >{/if}<i
+            <i class="board__aw-k">{awWord(s.run)}</i><b class="board__aw-n">{s.run.who}</b
+            >{#if !s.cont && awTail(s)}<em class="board__aw-u">{awTail(s)}</em>{/if}<i
               class="board__aw-r"
               aria-hidden="true"
             ></i>
@@ -1219,7 +1242,13 @@
       padding-inline-start: 9px;
       min-inline-size: 0;
     }
+    /* THE KIND WORD NEVER BREAKS. With «away» alone it could not: one word has
+       nothing to break at. «On tour» / «de gira» has a space, and in a
+       one-day band it split into two lines that the 12px box clipped to «--».
+       The name is the part that gives way (below), not this. */
     .board__aw-k {
+      flex: none;
+      white-space: nowrap;
       font-style: normal;
       font-family: var(--font-mono);
       font-size: 9px;

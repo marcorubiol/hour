@@ -1070,7 +1070,7 @@
     }
     if (laneAxis === 'scope') {
       // The derived tour (two travel legs) is the project's own absence.
-      for (const band of aways) {
+      for (const [i, band] of aways.entries()) {
         if (!inWindow(band.from, band.to)) continue;
         for (const g of boardBase.groups) {
           const lane = g.lanes.find((l) => l.kind === 'project' && l.id === band.project_id);
@@ -1081,6 +1081,9 @@
                   from: band.from,
                   to: band.to,
                   who: projectNameById.get(band.project_id) ?? '—',
+                  // Same words as the month's band: `awayVMs` is `aways`
+                  // mapped one to one, so the index is the band.
+                  deduced: awayVMs[i]?.deduced,
                 },
                 lane.key,
               ),
@@ -3009,6 +3012,7 @@
       teamWord={t('planner.board_team', locale)}
       noCastWord={t('planner.no_cast', locale)}
       awayWord={t('planner.band_away', locale)}
+      tourWord={t('planner.band_tour', locale)}
       untilLabel={(iso) => t('planner.band_until', locale, { day: localeDayMonth(iso, localeTag) })}
       emptyLabel={t('planner.empty_month', locale)}
       createLabel={(iso) => t('planner.new_on', locale, { day: iso })}

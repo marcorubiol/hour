@@ -645,6 +645,11 @@ export interface AwayRun {
   to: string;
   who: string;
   tentative: boolean;
+  /**
+   * Only a derived tour has one (§ 38): nobody wrote it down, so the band
+   * says it was inferred and from which two trips, like the month's does.
+   */
+  deduced?: { word: string; legs: string };
 }
 
 export function normalizeAway(
@@ -659,6 +664,7 @@ export function normalizeAway(
     ends_on?: string;
     certainty?: string | null;
     who: string;
+    deduced?: { word: string; legs: string };
   },
   laneKey: string,
 ): AwayRun {
@@ -669,6 +675,7 @@ export function normalizeAway(
     to: rec.t ?? rec.to ?? rec.ends_on ?? from,
     who: rec.who,
     tentative: rec.tent === true || rec.certainty === 'tentative',
+    ...(rec.deduced ? { deduced: rec.deduced } : {}),
   };
 }
 
