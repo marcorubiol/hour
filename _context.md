@@ -4,11 +4,15 @@
 > DOCUMENTO SE HABÍA QUEDADO EN EL 27.** Runtime **`795b6a5`** (builtAt
 > 2026-08-31T05:45Z), `main` == `origin/main` == prod, sin commits desde
 > entonces. Comprobado hoy contra `/health/live`, `/health/ready` (Supabase
-> `ok`), git y los runs de GitHub Actions. **Las suites no se han vuelto a
-> correr**: RLS y E2E pegan contra producción y esta pasada no tenía OK para
-> lanzarlas. Las últimas cifras escritas son las de `_tasks.md § 16`
-> (2026-08-29): **RLS 163 · E2E 62**. Después entraron los 6 casos de
-> `tests/rls/bolo-status.test.ts`, así que el total de hoy no está medido.
+> `ok`), git y los runs de GitHub Actions. **Suites, corridas por Marco el
+> 2026-09-26 contra el runtime `795b6a5`: RLS 169/169 y E2E 61/62.** Las 169
+> son las 163 de agosto más los 6 casos de `bolo-status.test.ts`, que no
+> habían entrado en ningún pase completo. El único rojo del E2E fue el smoke,
+> por tiempo y no por la app: su test entero tiene 30 s para siete
+> navegaciones, y se cortó con Conversations todavía cargando mientras los
+> cinco specs que cargan esa lente pasaban. Solo, pasa en 15 s. Producción va
+> hoy más lenta que en agosto (RLS 216 s frente a 74 s; E2E 4,9 min frente a
+> 2,4), y el smoke queda marcado `test.slow()`.
 >
 > **Entre el 27 y el 31 de agosto entraron 45 commits (`bd333f0..795b6a5`),
 > todos desplegados:**
@@ -199,10 +203,10 @@
 > a usarse para difusión de verdad en ese mismo espacio.
 
 > **FUENTE DE VERDAD ACTUAL.** Cualquier agente o persona debe empezar aquí.
-> Última verificación: **2026-09-25**, contrastada con Git, producción
-> (`/health/live` y `/health/ready`) y los runs de GitHub Actions; **sin
-> re-correr las suites**, cuyo último pase completo fue el del 2026-08-27. Las
-> reconciliaciones anteriores se conservan abajo, en orden inverso.
+> Última verificación: **2026-09-25/26**, contrastada con Git, producción
+> (`/health/live` y `/health/ready`), los runs de GitHub Actions y las suites
+> RLS y E2E contra el runtime `795b6a5` (2026-09-26). Las reconciliaciones
+> anteriores se conservan abajo, en orden inverso.
 > **Reconciliación 2026-07-23:** money v3 (ADR-086/087/088) se desplegó a prod
 > ese día — runtime **`a35e8c4`**; ver «Producción» y «Git» abajo y
 > `_tasks.md § bloque 7`. El resto del doc no se re-verificó en esa fecha.
@@ -489,9 +493,8 @@ orientativo, no una verdad comercial cerrada.
   de siempre salía verde rechazando por el motivo equivocado.** La API real ya
   lo esquiva nombrando sus columnas en el `select`.
 - Auth: email+password, cookies httpOnly en la app, hook de access token activo.
-- RLS: FORCE en las superficies tenant-scoped; suite live **163/163** el
-  2026-08-29 (`_tasks.md § 16`). Después entraron los 6 casos de
-  `bolo-status.test.ts` y la suite no se ha vuelto a correr (2026-09-25).
+- RLS: FORCE en las superficies tenant-scoped; suite live **169/169** el
+  2026-09-26 (23 ficheros, 216 s).
 - Identidad 2026-07-20: `workspace_person` y `workspace_organization` aplicadas,
   perfil portable y dossier local por workspace, share/revoke explícitos.
 - Fixture limitado: `limited@hour.test`, member solo de `playwright`, performer
@@ -535,6 +538,17 @@ pasa nunca por esa puerta. Cerrado por `20260730164435`.
 **CÓMO SE CORREN LAS SUITES** (aprendido a golpes el 2026-07-30; si algún
 documento dice que no se pueden correr, está desactualizado):
 
+- **Desde el checkout principal** (`~/Developer/hour`), nunca desde un
+  worktree de `.claude/worktrees/`: los worktrees no llevan `.env` ni
+  `.env.test`, así que RLS sale todo saltado y el login del E2E falla. Pasó
+  el 2026-09-26.
+- **Si el E2E dice «Looks like Playwright was just installed»**, falta la
+  revisión exacta de Chromium que pide esa versión de Playwright (el
+  2026-09-26 pedía la 1217 y la caché solo tenía 1223 y 1228). El config ya
+  trae la salida: `PW_CHROMIUM` apuntando a otra revisión instalada, p. ej.
+  `~/Library/Caches/ms-playwright/chromium-1228/chrome-mac-arm64/Google Chrome
+  for Testing.app/Contents/MacOS/Google Chrome for Testing`. Sin descargar
+  nada.
 - `pnpm --filter web test:rls` → **contra producción siempre**. Carga `.env` +
   `.env.test` explícitamente y **no** mira `.env.local`.
 - E2E → **contra un origen desplegado**:
@@ -549,6 +563,14 @@ documento dice que no se pueden correr, está desactualizado):
   existen. Cualquier «invalid_credentials» empieza por preguntar **contra qué
   base** se está mirando. Al build de producción no le afecta: `PUBLIC_SUPABASE_*`
   no se hornea en el bundle.
+
+**Pase 2026-09-26** (Marco, contra el runtime `795b6a5`, sin deploy ni schema):
+RLS **169/169** (23 ficheros, 216 s) y E2E **61/62** (4,9 min). El rojo fue
+el smoke por su presupuesto de 30 s, con Conversations aún cargando; solo,
+pasa en 15 s, y queda marcado `test.slow()`. La misma suite tardó 74 s y
+2,4 min el 27 de agosto: producción va hoy más lenta, y un umbral de tiempo
+medido aquel día es la misma hipótesis sobre los datos de un día que ya
+tumbó tres specs en agosto.
 
 **Pase 2026-08-27** — Supabase despertada, deploy y verificación completa contra
 el runtime desplegado `ad3cf67`: `svelte-check` **0/0** (1.871 ficheros), unit
@@ -715,10 +737,11 @@ profundidad de producto, no en SvelteKit/Supabase/Cloudflare.
 
 ## Siguiente paso
 
-Abrir `_tasks.md`. Nada bloquea: prod == `main` == `795b6a5` (2026-09-25), sin
-nada pendiente de desplegar. Las suites estaban en verde en el último pase
-completo (2026-08-27) y no se han re-corrido desde el deploy del 31: antes de
-tocar schema o dar algo por verificado, correrlas. Todo lo que sigue sirve al
+Abrir `_tasks.md`. Nada bloquea: prod == `795b6a5` y `main` solo lleva encima
+documentación y el `test.slow()` del smoke, que no entran en el bundle. RLS
+169/169 y E2E 61/62 el 2026-09-26; el único rojo fue el smoke por tiempo, y
+solo pasa (ver «Verificación»).
+Todo lo que sigue sirve al
 **Planner v3**, que es la pieza en curso. Pero léelo con el aviso de abajo
 delante, porque la mitad de esta lista ya no era cierta:
 
