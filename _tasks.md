@@ -1,7 +1,7 @@
 # Hour — cola vigente
 
-> **ÚNICA COLA ACTIVA.** Última reconciliación: 2026-09-26 (§ 38 en `main`
-> con el deploy pendiente; § 18 con P1 escrita en rama). Antes, 2026-09-25
+> **ÚNICA COLA ACTIVA.** Última reconciliación: 2026-09-26 (§ 38 desplegado,
+> runtime `a67e99c`; § 18 con P1 escrita en rama). Antes, 2026-09-25
 > (§ 17 y § 18: la tarea 15 sí existe).
 > Antes, 2026-08-27 (§ 23 y § 32); el resto de la cola sigue con la
 > reconciliación del 2026-07-30.
@@ -153,8 +153,9 @@
     la pena que la RPC acepte `p_bolo_id` y nazca enlazada, para que no exista
     la ventana en la que la función ya está y el dinero todavía no.
 
-38. [~] **El paso barato, HECHO y en `main` (`677f342`, 2026-09-26); el
-    deploy, pendiente de Marco.** Cero schema. Marco lo aprobó mirando las
+38. [~] **El paso barato, HECHO Y DESPLEGADO el 2026-09-26** (entró en
+    `main` con `677f342`; runtime `a67e99c`). El E2E contra ese runtime queda
+    por correr. Cero schema. Marco lo aprobó mirando las
     capturas; entró por fast-forward desde `feat/planner-tour-deduced`, ya
     borrada.
     `awayBands()` guarda de qué dos viajes sale cada banda (`out`/`back`), y la

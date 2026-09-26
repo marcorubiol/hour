@@ -1,16 +1,13 @@
 # Hour — estado canónico del proyecto
 
-> **Reconciliación 2026-09-26: `main` VA POR DELANTE DE PRODUCCIÓN CON CÓDIGO,
-> Y ESO ES LO PRIMERO QUE HAY QUE MIRAR.** El § 38 entró en `main` con
-> **`677f342`**, y encima solo van documentos. Producción sigue en
-> **`795b6a5`** hasta que corra el deploy, que quedó pendiente de Marco
-> (`pnpm --filter web run deploy` desde el checkout principal) y publicará la
-> SHA que tenga `main` en ese momento. Encima de prod va **el paso barato de `_tasks.md § 38`**:
-> la gira deducida dice «deducida · ida 7 oct · vuelta 12 oct» en el mes, la
-> agenda, el día y el Tablero, y se nombra «de gira» y no «fuera». Cero schema.
-> Verificado antes del push: `svelte-check` 0/0 y unit **563/563**. Cuando
-> `/health/live` deje de decir `795b6a5`, esta cabecera deja de ser cierta:
-> comprobarlo ahí, no aquí.
+> **Reconciliación 2026-09-26: EL § 38 ESTÁ EN PRODUCCIÓN.** Runtime
+> **`a67e99c`** (builtAt 2026-09-26T21:14:55Z, `dirty:false`), desplegado por
+> Marco desde el checkout principal; `/health/ready` con Supabase `ok`. Es
+> **el paso barato de `_tasks.md § 38`**: la gira deducida dice «deducida ·
+> ida 7 oct · vuelta 12 oct» en el mes, la agenda, el día y el Tablero, y se
+> nombra «de gira» y no «fuera». Cero schema. Verificado antes del push:
+> `svelte-check` 0/0 y unit **563/563**. **El E2E contra este runtime no ha
+> corrido todavía**: el último es el de `795b6a5`, de ese mismo día.
 >
 > **Travel v2 P1 está escrita y NO aplicada en ninguna base hosted.** Rama
 > `feat/travel-stages` en `origin`, con la migración `20260926100000`, su
@@ -305,10 +302,12 @@ orientativo, no una verdad comercial cerrada.
   27 de agosto** con `status_530`, y no era la app: Supabase se pausó sola. Ver
   la cabecera del 2026-08-27. Volvió a pausarse hacia el 13 de septiembre (ver
   la cabecera del 2026-09-25).
-- **2026-09-26: prod == `795b6a5`, y `main` lleva encima el § 38** (entró con
-  `677f342`; después solo documentos). Código de aplicación sin schema, con el
-  deploy pendiente de Marco. Mientras `/health/live` diga `795b6a5`, `main`
-  lleva código sin desplegar, y este es el caso que esta sección avisa.
+- **2026-09-26: prod == `a67e99c`** (builtAt 2026-09-26T21:14:55Z), con el
+  § 38 dentro: entró en `main` con `677f342` y lo demás son documentos.
+  Desplegado por Marco con `pnpm --filter web run deploy`. Sin schema. El E2E
+  contra este runtime queda por correr.
+- Debajo va **`795b6a5`** (2026-08-31), que fue el runtime hasta el
+  2026-09-26.
 - **2026-09-25: `main` == `origin/main` == prod == `795b6a5`**. No había nada
   sin desplegar ni commits desde el 31 de agosto. Lo que subió entre el 27 y
   el 31 está en la cabecera del 2026-09-25.
@@ -404,9 +403,9 @@ orientativo, no una verdad comercial cerrada.
 - Repo: `https://github.com/marcorubiol/hour` (privado).
 - Checkout: `/Users/marcorubiol/Developer/hour`.
 - Rama principal: `main`.
-- **2026-09-26: `main` == `origin/main`, con el § 38 dentro desde `677f342`;
-  prod == `795b6a5`** hasta el deploy. Encima de `795b6a5`: los documentos del 25 y el
-  26, el `test.slow()` del smoke y el § 38 (cinco commits de aplicación).
+- **2026-09-26: prod == `a67e99c`, y `main` solo lleva encima documentos.**
+  Lo que entró sobre `795b6a5`: los documentos del 25 y el 26, el
+  `test.slow()` del smoke y el § 38 (cinco commits de aplicación).
 - **2026-09-25: `main` == `origin/main` == prod == `795b6a5`**, sin commits
   desde el 2026-08-31. Los 45 del 27 al 31 están en la cabecera.
 - **2026-08-27: `main` == `origin/main` == `bd333f0`; prod == `ad3cf67`.**
@@ -770,11 +769,10 @@ profundidad de producto, no en SvelteKit/Supabase/Cloudflare.
 
 ## Siguiente paso
 
-Abrir `_tasks.md`. Lo primero es el deploy del § 38 (en `main` desde
-`677f342`), pendiente de Marco: `main` va por delante de prod con código. RLS 169/169 y E2E 61/62 el
-2026-09-26 contra `795b6a5`; el único rojo fue el smoke por tiempo, y solo
-pasa (ver «Verificación»). Después, despertar `hour-staging` para ensayar
-Travel v2 P1.
+Abrir `_tasks.md`. Prod == `a67e99c`, con el § 38 desplegado el 2026-09-26.
+Queda por correr el E2E contra ese runtime (el último, 61/62, fue contra
+`795b6a5`, con el único rojo por tiempo; ver «Verificación»). Después,
+despertar `hour-staging` para ensayar Travel v2 P1.
 Todo lo que sigue sirve al
 **Planner v3**, que es la pieza en curso. Pero léelo con el aviso de abajo
 delante, porque la mitad de esta lista ya no era cierta:

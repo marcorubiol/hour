@@ -16,8 +16,9 @@ Convención: secciones por fecha descendente. Cada sesión queda con commits cit
 
 Encargo de la sesión coordinadora «Revisión de proyectos de desarrollo»:
 poner los documentos de estado al día y hacer el paso barato de § 38. Acabó
-con § 38 en `main`, Travel v2 P1 escrita en rama y las dos suites contra
-producción. Aquí va lo que no sale del diff.
+con § 38 desplegado (runtime `a67e99c`, deploy de Marco), Travel v2 P1
+escrita en rama y las dos suites corridas contra `795b6a5`. El E2E contra
+`a67e99c` quedó por correr. Aquí va lo que no sale del diff.
 
 **Los documentos se habían quedado en el 27 de agosto con 45 commits y cuatro
 migraciones encima.** Nada mentía a propósito: se construía, se desplegaba y
