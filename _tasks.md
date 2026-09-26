@@ -169,15 +169,21 @@
       fuera, una gira dice de gira; nunca la misma palabra») y el texto era un
       resto de la v2 (07-18), anterior a separarlas (07-31). Ahora «de gira ·
       MaMeMi».
-    *Verificado:* `svelte-check` 0/0, unit 562/562, y capturas contra la base
+    *Verificado:* `svelte-check` 0/0, unit 563/563, y capturas contra la base
     local con tres giras de 4, 2 y 1 día a 1024, 1280 y 1600 en es/en/ca.
     RLS y E2E no se corrieron: pegan contra producción.
-    *Lo que el paso barato NO cubre, dicho para que no se dé por cerrado:*
-    (a) una gira de **un día** a 1280 o menos no cabe ni sin la palabra
-    (marca, tipo y lugar ya desbordaban antes de esto), así que en el mes solo
-    lo dice el tooltip; (b) el **Tablero** dibuja la gira con la palabra de la
-    ausencia («fuera») y sin procedencia, y eso es una decisión de dibujo del
-    Tablero, no se tocó. El paso caro (confirmarla, y el fondo) sigue igual.
+    **Marco, 2026-09-26, sobre lo que quedaba:** aprueba la rama tal cual,
+    mantiene «de gira» en vez de «fuera», y acepta que una gira de **un día**
+    a 1280 o menos solo lo diga en el tooltip del mes (marca, tipo y lugar ya
+    desbordaban antes): eso se resuelve con el paso caro, que redibuja la
+    banda de todos modos.
+    - **Tablero, hecho el mismo día a petición suya:** la gira dice «DE GIRA»
+      y no «fuera», y en el hueco del «hasta» pone la procedencia entera si
+      cabe, si no solo «deducida», si no nada (la misma ley de todo o nada que
+      el «hasta»). El tooltip la lleva siempre. De paso, la palabra de tipo del
+      Tablero no podía partirse porque «away» era una sola palabra; «de gira»
+      tiene espacio y se partía en dos líneas recortadas. Ahora no se parte.
+    El paso caro (confirmarla, y el fondo) sigue sin decidir.
     Texto original abajo.
 
 38b. [ ] **La gira deducida no dice que la dedujimos, y no se puede aceptar.**
