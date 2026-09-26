@@ -26,6 +26,13 @@ test.describe('smoke', () => {
    * its own playwright workspace; NOT demo.
    */
   test('shell → ⌘K → project → views', async ({ page }) => {
+    // SEVEN NAVIGATIONS AGAINST PRODUCTION IN ONE TEST. The default 30 s was
+    // a budget measured on a fast day, not a law: on 2026-09-26, with the
+    // suite running at half its August speed, it ran out with Conversations
+    // still loading, while the five specs that load that lens passed. Alone
+    // it took 15 s. What this test asserts is that every door opens, not how
+    // fast; `slow()` triples the budget and keeps that honest.
+    test.slow();
     // ADR-068: `/h` is the HALL — greeting + the "posa'm al dia" door to
     // /h/desk. The cross-space digest died; the projects grid lives on the
     // space portada now. Note the bare path: sign-in lands on `/h`.
