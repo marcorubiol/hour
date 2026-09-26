@@ -1,7 +1,8 @@
 # Hour — cola vigente
 
-> **ÚNICA COLA ACTIVA.** Última reconciliación: 2026-09-25 (§ 17 y § 18:
-> la tarea 15 sí existe, y Travel v2 no está en curso sino esperando a Marco).
+> **ÚNICA COLA ACTIVA.** Última reconciliación: 2026-09-26 (§ 38 en `main`
+> con el deploy pendiente; § 18 con P1 escrita en rama). Antes, 2026-09-25
+> (§ 17 y § 18: la tarea 15 sí existe).
 > Antes, 2026-08-27 (§ 23 y § 32); el resto de la cola sigue con la
 > reconciliación del 2026-07-30.
 > Estado general y evidencia: `_context.md`. Historia: `_decisions.md` y
@@ -152,8 +153,10 @@
     la pena que la RPC acepte `p_bolo_id` y nazca enlazada, para que no exista
     la ventana en la que la función ya está y el dinero todavía no.
 
-38. [~] **El paso barato, HECHO en la rama `feat/planner-tour-deduced`
-    (2026-09-26), sin desplegar y pendiente de que Marco lo mire.** Cero schema.
+38. [~] **El paso barato, HECHO y en `main` (`677f342`, 2026-09-26); el
+    deploy, pendiente de Marco.** Cero schema. Marco lo aprobó mirando las
+    capturas; entró por fast-forward desde `feat/planner-tour-deduced`, ya
+    borrada.
     `awayBands()` guarda de qué dos viajes sale cada banda (`out`/`back`), y la
     gira lo dice con palabras en las tres vistas que la dibujan:
     - **Mes:** en la voz del tramo, el hueco donde una ausencia pone sus
@@ -1031,16 +1034,22 @@ entre empresas sin construirlo.
     **Ojo al backfill:** `start_at` lo leen Desk, MonthGrid y tasks; es la
     superficie que decide si la migración va de una tacada.
 
-    > **No empieza hasta cerrar Travel v2**, que tampoco tiene schema escrito y
-    > está parado esperando tres respuestas de Marco (§ 18). Dos modelos nuevos
-    > a la vez es como se pierde el hilo.
+    > **No empieza hasta cerrar Travel v2** (§ 18), que desde el 2026-09-26
+    > tiene P1 escrita y sin aplicar. Dos modelos nuevos a la vez es como se
+    > pierde el hilo.
 
-## ESPERANDO A MARCO: Travel v2, el viaje como trayecto multi-etapa (ADR-089)
+## EN CURSO: Travel v2, el viaje como trayecto multi-etapa (ADR-089)
 
-> **Parado desde el 2026-07-23, a la espera de tres respuestas de Marco**
-> (abajo, «PENDIENTE de Marco»). Esta sección decía «EN CURSO» y nadie la ha
-> tocado desde ese día (reconciliado el 2026-09-25). No se escribe la
-> migración hasta tener las tres.
+> **Estado 2026-09-26.** Marco respondió las tres preguntas: aprueba el
+> modelo, rama `feat/travel-stages`, ensayo en `hour-staging`. P1 (schema) está
+> escrita en esa rama, que ya está en `origin`, y no aplicada en ninguna base
+> hosted. Verificada solo en la base local. Sus decisiones de implementación
+> son ADR-097, en la misma rama. Lo que la separa de producción: `hour-staging`
+> sigue pausado, y § 34 exige ensayo en staging e `inspect` porque la
+> migración hace DROP de `create_date`.
+>
+> **Antes (2026-09-25):** parado desde el 2026-07-23, a la espera de las tres
+> respuestas de Marco (abajo).
 >
 > **Sesión 2026-07-23. Modelo DECIDIDO (ADR-089), NADA de schema construido.**
 > Empezó como retoque visual de las cards del mes y creció hasta un modelo de
@@ -1081,8 +1090,8 @@ entre empresas sin construirlo.
     **Deuda anotada:** `travel_direction` (outbound/return/leg) **se queda** porque
     alimenta `awayBands()` (ADR-078 §6); reconciliar dirección↔extremos = después.
 
-    **PENDIENTE de Marco antes de escribir la migración** (preguntado el
-    2026-07-23, sin respuesta; sigue así el 2026-09-25):
+    **CONTESTADO por Marco el 2026-09-26: sí al modelo, rama, staging.** Las
+    preguntas, tal como se hicieron:
     1. ¿Aprueba el modelo del ADR-089? (mantener `travel_direction`; gate
        `edit:performance`; extender `create_date`/`update_date`).
     2. ¿La migración va en una rama nueva `feat/travel-stages`, o solo se dejan

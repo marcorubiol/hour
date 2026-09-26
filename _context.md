@@ -1,5 +1,26 @@
 # Hour — estado canónico del proyecto
 
+> **Reconciliación 2026-09-26: `main` VA POR DELANTE DE PRODUCCIÓN CON CÓDIGO,
+> Y ESO ES LO PRIMERO QUE HAY QUE MIRAR.** `main` == `origin/main` ==
+> **`677f342`**; producción sigue en **`795b6a5`** hasta que corra el deploy,
+> que quedó pendiente de Marco (`pnpm --filter web run deploy` desde el
+> checkout principal). Encima de prod va **el paso barato de `_tasks.md § 38`**:
+> la gira deducida dice «deducida · ida 7 oct · vuelta 12 oct» en el mes, la
+> agenda, el día y el Tablero, y se nombra «de gira» y no «fuera». Cero schema.
+> Verificado antes del push: `svelte-check` 0/0 y unit **563/563**. Cuando
+> `/health/live` diga `677f342`, esta cabecera deja de ser cierta: comprobarlo
+> ahí, no aquí.
+>
+> **Travel v2 P1 está escrita y NO aplicada en ninguna base hosted.** Rama
+> `feat/travel-stages` en `origin`, con la migración `20260926100000`, su
+> rollback, los tipos y `tests/rls/travel-stage.test.ts`. Las decisiones de
+> implementación son **ADR-097, que vive en esa rama** hasta que se mergee.
+> Probada solo en la base local. Espera a que Marco despierte `hour-staging`
+> para el ensayo que § 34 exige a una migración con DROP.
+>
+> Suites contra `795b6a5` (2026-09-26): **RLS 169/169 · E2E 61/62**, el rojo
+> por tiempo y no por la app (ver «Verificación»).
+
 > **Reconciliación 2026-09-25: NADA NUEVO DESDE EL 31 DE AGOSTO, Y ESTE
 > DOCUMENTO SE HABÍA QUEDADO EN EL 27.** Runtime **`795b6a5`** (builtAt
 > 2026-08-31T05:45Z), `main` == `origin/main` == prod, sin commits desde
@@ -283,9 +304,13 @@ orientativo, no una verdad comercial cerrada.
   27 de agosto** con `status_530`, y no era la app: Supabase se pausó sola. Ver
   la cabecera del 2026-08-27. Volvió a pausarse hacia el 13 de septiembre (ver
   la cabecera del 2026-09-25).
-- **`main` == `origin/main` == prod == `795b6a5`** (2026-09-25). No hay nada sin
-  desplegar ni commits desde el 31 de agosto. Lo que subió entre el 27 y el 31
-  está en la cabecera del 2026-09-25.
+- **2026-09-26: `main` == `origin/main` == `677f342`, prod == `795b6a5`.**
+  Encima de prod va el paso barato de § 38 (código de aplicación, sin schema),
+  con el deploy pendiente de Marco. Hasta que `/health/live` diga `677f342`,
+  `main` lleva código sin desplegar, y este es el caso que esta sección avisa.
+- **2026-09-25: `main` == `origin/main` == prod == `795b6a5`**. No había nada
+  sin desplegar ni commits desde el 31 de agosto. Lo que subió entre el 27 y
+  el 31 está en la cabecera del 2026-09-25.
 - Debajo va **`ad3cf67`** (2026-08-27), que fue el runtime hasta el 31 de
   agosto. El deploy del 2026-08-27 sube **el arreglo del pulse**
   (el `Slip` abre su presupuesto de líneas, el rail lo estrecha a 1, reserva
@@ -378,6 +403,9 @@ orientativo, no una verdad comercial cerrada.
 - Repo: `https://github.com/marcorubiol/hour` (privado).
 - Checkout: `/Users/marcorubiol/Developer/hour`.
 - Rama principal: `main`.
+- **2026-09-26: `main` == `origin/main` == `677f342`; prod == `795b6a5`**
+  hasta el deploy del § 38. Encima de `795b6a5`: los documentos del 25 y el
+  26, el `test.slow()` del smoke y el § 38 (cinco commits de aplicación).
 - **2026-09-25: `main` == `origin/main` == prod == `795b6a5`**, sin commits
   desde el 2026-08-31. Los 45 del 27 al 31 están en la cabecera.
 - **2026-08-27: `main` == `origin/main` == `bd333f0`; prod == `ad3cf67`.**
@@ -419,7 +447,11 @@ orientativo, no una verdad comercial cerrada.
   se mergeó a `main` por fast-forward y se borró (local y origin) — el Planner
   v3 y el pulse ya están desplegados. `hardening/audit-fixes`, que estaba
   contenida en `main` sin commits propios, **ya no existe** (ni local ni en
-  origin, 2026-09-25). **Queda una sola rama además de `main`:**
+  origin, 2026-09-25). `feat/planner-tour-deduced` entró en `main` por
+  fast-forward y se borró (2026-09-26). **Quedan dos ramas además de `main`:**
+  - `feat/travel-stages`: Travel v2 P1 (ADR-089, ADR-097), en `origin` desde
+    el 2026-09-26. Migración escrita y probada solo en local; espera el ensayo
+    en staging.
   - `feat/comms-threads`: comms + acceso. **Tiene un solo commit propio**
     (`0f1ff5c`, 2026-07-21, «reduce comms-threads to its build material») sobre
     `2176eec`, que ya está en `main`. **Su canon ya está en `main`**
@@ -737,10 +769,11 @@ profundidad de producto, no en SvelteKit/Supabase/Cloudflare.
 
 ## Siguiente paso
 
-Abrir `_tasks.md`. Nada bloquea: prod == `795b6a5` y `main` solo lleva encima
-documentación y el `test.slow()` del smoke, que no entran en el bundle. RLS
-169/169 y E2E 61/62 el 2026-09-26; el único rojo fue el smoke por tiempo, y
-solo pasa (ver «Verificación»).
+Abrir `_tasks.md`. Lo primero es el deploy de `677f342` (§ 38), pendiente de
+Marco: `main` va por delante de prod con código. RLS 169/169 y E2E 61/62 el
+2026-09-26 contra `795b6a5`; el único rojo fue el smoke por tiempo, y solo
+pasa (ver «Verificación»). Después, despertar `hour-staging` para ensayar
+Travel v2 P1.
 Todo lo que sigue sirve al
 **Planner v3**, que es la pieza en curso. Pero léelo con el aviso de abajo
 delante, porque la mitad de esta lista ya no era cierta:

@@ -12,6 +12,50 @@ Convención: secciones por fecha descendente. Cada sesión queda con commits cit
 
 ---
 
+## 2026-09-25/26: documentos al día, la gira que dice que la dedujimos, y Travel v2 P1
+
+Encargo de la sesión coordinadora «Revisión de proyectos de desarrollo»:
+poner los documentos de estado al día y hacer el paso barato de § 38. Acabó
+con § 38 en `main`, Travel v2 P1 escrita en rama y las dos suites contra
+producción. Aquí va lo que no sale del diff.
+
+**Los documentos se habían quedado en el 27 de agosto con 45 commits y cuatro
+migraciones encima.** Nada mentía a propósito: se construía, se desplegaba y
+nadie volvía a `_context.md`. Y el propio documento afirmaba que nada del
+Planner v3 estaba implementado, seis semanas después de desplegarlo. Supabase,
+además, se había vuelto a pausar hacia el 13 de septiembre: la firma de
+siempre, en el log del backup programado.
+
+**El ADR-089 describía un catálogo que no existía.** Pedía extender
+`update_date`, que no existe (las fechas se editan por PATCH directo), y
+`create_date_series`, que rechaza `travel_day`. Se vio al escribir la
+migración contra la base local y no antes. De ahí sale ADR-097, que vive en la
+rama. Un ADR escrito antes de mirar el catálogo es una hipótesis sobre él.
+
+**«De gira» se partía en dos líneas en el Tablero**, y solo porque tiene un
+espacio: «away» era una sola palabra y nunca pudo partirse. Cambiar una
+palabra por otra más larga es un cambio de dibujo, no de texto.
+
+**El smoke del E2E cayó por su presupuesto de 30 s**, no por la app: siete
+navegaciones en un test, con producción al doble de lento que en agosto (RLS
+216 s frente a 74 s). Solo pasó en 15 s. Queda con `test.slow()`: un umbral de
+tiempo medido un día es la misma hipótesis sobre los datos de un día que tumbó
+tres specs en agosto.
+
+**Dos trampas para quien corra las suites**, ya escritas en
+`_context.md § Verificación`: desde un worktree de `.claude/worktrees/` no hay
+`.env` ni `.env.test`, así que RLS sale todo saltado; y si falta la revisión
+exacta de Chromium, `PW_CHROMIUM` apunta a otra sin descargar nada.
+
+**El agente no pudo hacer nada que saliera de la máquina salvo el push de
+`main` cuando Marco lo pidió explícitamente.** El control de permisos de la
+sesión bloqueó el deploy, las suites contra producción (las corrió Marco) y
+despertar `hour-staging`. Queda dicho porque cambia qué se puede delegar.
+
+Commits: `e9a542f` y `55c1b21` (documentos), `05f46e6` (smoke), `c69a61f`,
+`2ef7cc8`, `2285edb` (§ 38) y sus docs; `feat/travel-stages` lleva la
+migración, el rollback, los tipos, el test RLS y ADR-097.
+
 ## 2026-07-30 (noche) — La red que nunca estuvo rota
 
 Sesión de revisión: leer el diseño del Planner v3 y decir si es construible.
