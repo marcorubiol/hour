@@ -3241,3 +3241,43 @@ Triggered by Marco's pre-scaffold doubt (Phase 0.0 day 5). Five alternatives eva
 > - **Lo que NO es:** no es deuda del Planner v3 ni del pulse, y no bloquea
 >   nada. Está escrito aquí para que la próxima sesión encuentre una decisión y
 >   no una pregunta.
+
+## [2026-09-26] ADR-097 · Travel v2 P1 contra el catálogo: una sola firma cambia, y cómo se comportan los tramos
+
+- **Contexto.** Marco aprobó el modelo de ADR-089 el 2026-09-26 (rama
+  `feat/travel-stages`, ensayo en staging). Al escribir la migración
+  (`20260926100000_travel_stages.sql`) contra el catálogo, dos de las
+  extensiones que el ADR daba por hechas no tenían sentido, y hubo que decidir
+  cinco comportamientos que el ADR no decía.
+- **Solo `create_date` cambia de firma.** `update_date` **no existe**: una
+  fecha se edita por PATCH directo con la policy `date_update` y un GRANT de
+  tabla, así que las columnas nuevas ya son editables; lo que falta es
+  `DatePatchSchema`, que es P2. Y `create_date_series` **rechaza
+  `travel_day`**, así que darle extremos sería un parámetro inservible.
+- **Los cuatro parámetros nuevos van al final con DEFAULT NULL.** El Worker
+  desplegado llama por nombre y sigue resolviendo a la función nueva: la base
+  puede ir por delante del Worker sin romper el alta de fechas. Lo fija un
+  test RLS.
+- **Extremos solo en un viaje** (`date_travel_endpoints`), como ya pasa con
+  `travel_direction`.
+- **Un tramo se borra de verdad**, sin `deleted_at`: el `audit_log` guarda la
+  fila, y un tramo borrado no tiene nada que recuperar que no esté allí.
+- **Las posiciones son siempre 1..N.** Alta al final, reorden solo con la
+  lista completa y sin repetidos, y el borrado cierra el hueco. La UNIQUE
+  `(date_id, position)` es diferida porque reordenar pasa por estados
+  intermedios con empates.
+- **`update_travel_stage` sustituye el tramo entero**: lo que no se envía se
+  vacía. El editor manda el tramo completo, y un parcial obligaría a
+  distinguir «no lo toques» de «vacíalo».
+- **Un viaje borrado se lleva sus tramos**: la policy exige el viaje vivo, y
+  las RPC no alcanzan un tramo de un viaje borrado.
+- **Es destructiva según § 34** por el DROP de `create_date`, que se hace por
+  nombre preguntando al catálogo (la lección del 2026-08-10). Así que antes
+  de producción van **staging e `inspect`**, obligatorios. El rollback está en
+  `build/runbooks/rollback-20260926-travel-stages.sql`, probado en local: la
+  vuelta deja la `create_date` anterior idéntica byte a byte.
+- **Estado.** En la rama, sin aplicar a ninguna base hosted. Verificado en la
+  base local: ida, vuelta e ida limpias, y 15 comprobaciones de humo como
+  usuario autenticado. El test RLS (`tests/rls/travel-stage.test.ts`) está
+  escrito y **no ha corrido**: va rojo contra cualquier base sin la
+  migración.
