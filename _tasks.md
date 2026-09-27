@@ -154,8 +154,8 @@
     la ventana en la que la función ya está y el dinero todavía no.
 
 38. [~] **El paso barato, HECHO Y DESPLEGADO el 2026-09-26** (entró en
-    `main` con `677f342`; runtime `a67e99c`). El E2E contra ese runtime queda
-    por correr. Cero schema. Marco lo aprobó mirando las
+    `main` con `677f342`; runtime `a67e99c`). E2E después del deploy: 61/62,
+    con el rojo en Books por tiempo, que solo pasa. Cero schema. Marco lo aprobó mirando las
     capturas; entró por fast-forward desde `feat/planner-tour-deduced`, ya
     borrada.
     `awayBands()` guarda de qué dos viajes sale cada banda (`out`/`back`), y la

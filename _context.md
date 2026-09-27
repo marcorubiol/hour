@@ -6,8 +6,11 @@
 > **el paso barato de `_tasks.md § 38`**: la gira deducida dice «deducida ·
 > ida 7 oct · vuelta 12 oct» en el mes, la agenda, el día y el Tablero, y se
 > nombra «de gira» y no «fuera». Cero schema. Verificado antes del push:
-> `svelte-check` 0/0 y unit **563/563**. **El E2E contra este runtime no ha
-> corrido todavía**: el último es el de `795b6a5`, de ese mismo día.
+> `svelte-check` 0/0 y unit **563/563**. Después del deploy, **E2E 61/62**
+> contra `a67e99c` (9,9 min): el único rojo fue Books, que no pintó sus
+> totales en 5 s al principio de la pasada, justo tras el deploy, cuando cada
+> test tardaba 10-22 s; solo, pasa en 4,7 s, y el smoke, que abre la misma
+> página, pasó en la misma pasada.
 >
 > **Travel v2 P1 está escrita y NO aplicada en ninguna base hosted.** Rama
 > `feat/travel-stages` en `origin`, con la migración `20260926100000`, su
@@ -304,8 +307,8 @@ orientativo, no una verdad comercial cerrada.
   la cabecera del 2026-09-25).
 - **2026-09-26: prod == `a67e99c`** (builtAt 2026-09-26T21:14:55Z), con el
   § 38 dentro: entró en `main` con `677f342` y lo demás son documentos.
-  Desplegado por Marco con `pnpm --filter web run deploy`. Sin schema. El E2E
-  contra este runtime queda por correr.
+  Desplegado por Marco con `pnpm --filter web run deploy`. Sin schema.
+  Después: E2E 61/62 contra `a67e99c` (9,9 min); el rojo fue Books por tiempo, y solo pasa en 4,7 s.
 - Debajo va **`795b6a5`** (2026-08-31), que fue el runtime hasta el
   2026-09-26.
 - **2026-09-25: `main` == `origin/main` == prod == `795b6a5`**. No había nada
@@ -596,6 +599,14 @@ documento dice que no se pueden correr, está desactualizado):
   base** se está mirando. Al build de producción no le afecta: `PUBLIC_SUPABASE_*`
   no se hornea en el bundle.
 
+**Pase 2026-09-26, después del deploy** (Marco, contra `a67e99c`): E2E
+**61/62** en 9,9 min. El rojo fue `money.spec.ts`, que no vio los totales de
+`/h/money` en 5 s; los primeros 25 tests de la pasada tardaron 10-22 s cada
+uno y los últimos 2-9 s. Solo, pasa en 4,7 s. **Dos pasadas, dos rojos de
+tiempo en specs distintos**: el patrón es la latencia de producción, no un
+spec concreto. Si vuelve, el sitio es el presupuesto del primer `expect` de
+cada spec, no otro `slow()` suelto.
+
 **Pase 2026-09-26** (Marco, contra el runtime `795b6a5`, sin deploy ni schema):
 RLS **169/169** (23 ficheros, 216 s) y E2E **61/62** (4,9 min). El rojo fue
 el smoke por su presupuesto de 30 s, con Conversations aún cargando; solo,
@@ -769,10 +780,10 @@ profundidad de producto, no en SvelteKit/Supabase/Cloudflare.
 
 ## Siguiente paso
 
-Abrir `_tasks.md`. Prod == `a67e99c`, con el § 38 desplegado el 2026-09-26.
-Queda por correr el E2E contra ese runtime (el último, 61/62, fue contra
-`795b6a5`, con el único rojo por tiempo; ver «Verificación»). Después,
-despertar `hour-staging` para ensayar Travel v2 P1.
+Abrir `_tasks.md`. Prod == `a67e99c`, con el § 38 desplegado el 2026-09-26 y
+verificado: RLS 169/169 (antes del deploy) y E2E 61/62 contra `a67e99c` (9,9 min); el rojo fue Books por tiempo, y solo pasa en 4,7 s (ver
+«Verificación»). Lo siguiente es despertar `hour-staging` para ensayar Travel
+v2 P1.
 Todo lo que sigue sirve al
 **Planner v3**, que es la pieza en curso. Pero léelo con el aviso de abajo
 delante, porque la mitad de esta lista ya no era cierta:
