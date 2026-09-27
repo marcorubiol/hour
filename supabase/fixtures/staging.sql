@@ -12,6 +12,42 @@ begin
 end
 $$;
 
+-- THIS FIXTURE OWNS ITS WORLD, so it first removes what the signup trigger
+-- made for its three users (_tasks.md § 39). `handle_new_user` gives every
+-- new login a personal account and workspace, and since
+-- 20260730164435_bind_auth_user_trigger that trigger is in the migrations, so
+-- a rebuilt staging runs it for each fixture user. This file was written
+-- before that and builds its own four spaces with fixed ids; with the
+-- trigger's three on top, the shape check counted 7 and cross-tenant would see
+-- a space nobody seeded. The fixed ids are excluded so a re-run on a loaded
+-- base keeps the fixture's own rows. Workspaces go first: `workspace.account_id`
+-- does not cascade, and everything hanging from a workspace does.
+delete from public.workspace w
+where w.id not in (
+    '20000000-0000-4000-8000-000000000001', '20000000-0000-4000-8000-000000000002',
+    '20000000-0000-4000-8000-000000000003', '20000000-0000-4000-8000-000000000004'
+  )
+  and exists (
+    select 1
+    from public.workspace_membership m
+    join auth.users u on u.id = m.user_id
+    where m.workspace_id = w.id
+      and u.email in ('playwright@hour.test', 'limited@hour.test', 'external@hour.test')
+  );
+
+delete from public.account a
+where a.id not in (
+    '10000000-0000-4000-8000-000000000001', '10000000-0000-4000-8000-000000000002',
+    '10000000-0000-4000-8000-000000000003', '10000000-0000-4000-8000-000000000004'
+  )
+  and exists (
+    select 1
+    from public.account_membership m
+    join auth.users u on u.id = m.user_id
+    where m.account_id = a.id
+      and u.email in ('playwright@hour.test', 'limited@hour.test', 'external@hour.test')
+  );
+
 insert into public.account (id, slug, name, kind, billing_email)
 values
   ('10000000-0000-4000-8000-000000000001', 'playwright-acc', 'Playwright Account', 'personal', 'playwright@hour.test'),

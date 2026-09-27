@@ -104,6 +104,9 @@ jobs:
                 'conversations', (select count(*) from public.conversation where deleted_at is null)
               )::text;
             ")"
+          # Say what was found: a bare exit 1 hid for two months that the
+          # count was 7 and not 4 (_tasks.md § 39).
+          echo "fixture shape: $actual"
           echo "$actual" | jq -e \
             '. == {"users": 3, "workspaces": 4, "conversations": 154}' >/dev/null
 
