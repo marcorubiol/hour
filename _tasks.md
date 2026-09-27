@@ -190,6 +190,24 @@
     El paso caro (confirmarla, y el fondo) sigue sin decidir.
     Texto original abajo.
 
+39. [ ] **El baseline de staging está roto desde el 2026-07-30, y nadie lo
+    había visto porque nadie lo corría.** Encontrado el 2026-09-27 al ensayar
+    Travel v2 (run 36297342639). `staging.sql` construye su propio mundo
+    (cuatro workspaces con ids fijos) dando por hecho que un alta no crea
+    nada. Era verdad cuando se escribió; dejó de serlo con
+    `20260730164435_bind_auth_user_trigger`, que metió en las migraciones el
+    trigger que da a cada login su cuenta y su workspace personal. Medido en
+    staging tras el run: **3 usuarios, 154 conversaciones y 7 workspaces**,
+    no 4; los tres de más (`71a201ee`, `7718a56c`, `89e62a0e`) son los
+    personales de los tres usuarios de prueba. El paso «Verify synthetic
+    fixture shape» falla, y aunque se relajara, `cross-tenant.test.ts` exige
+    la lista exacta de tres espacios y fallaría también.
+    **Lo que hay que decidir:** que `staging.sql` retire lo que el trigger
+    creó para sus tres usuarios antes de construir su mundo (recomendado: el
+    fixture es dueño de su mundo), o que lo adopte. Y que la comprobación
+    imprima lo que encontró: hoy solo dice «exit 1». Hasta entonces, § 34
+    exige un ensayo que no se puede hacer.
+
 38b. [ ] **La gira deducida no dice que la dedujimos, y no se puede aceptar.**
     (Marco, 2026-08-30, mirando el mes: «no podemos añadir cosas nosotros sin
     decirlo».) `awayBands()` infiere una banda `ON TOUR` emparejando un
@@ -1045,8 +1063,12 @@ entre empresas sin construirlo.
 > modelo, rama `feat/travel-stages`, ensayo en `hour-staging`. P1 (schema) está
 > escrita en esa rama, que ya está en `origin`, y no aplicada en ninguna base
 > hosted. Verificada solo en la base local. Sus decisiones de implementación
-> son ADR-097, en la misma rama. Lo que la separa de producción: `hour-staging`
-> sigue pausado, y § 34 exige ensayo en staging e `inspect` porque la
+> son ADR-097, en la misma rama. **Ensayo en staging, 2026-09-27** (run
+> 36297342639): la migración se aplicó limpia sobre la base hosted
+> reconstruida desde cero (`travel_stage` existe, `create_date` con 18
+> argumentos), pero el run murió antes de RLS por § 39, un fallo del baseline
+> de staging anterior a Travel. Lo que la separa de producción: arreglar
+> § 39, repetir el ensayo con RLS, y el `inspect` que § 34 exige porque la
 > migración hace DROP de `create_date`.
 >
 > **Antes (2026-09-25):** parado desde el 2026-07-23, a la espera de las tres
