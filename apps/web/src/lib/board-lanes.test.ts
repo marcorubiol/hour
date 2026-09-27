@@ -518,6 +518,14 @@ describe('normalizeAway (law 21)', () => {
     expect(run.tentative).toBe(false);
     expect(run.from).toBe('2026-07-18');
   });
+
+  it('a derived tour keeps its provenance; an absence never grows one (§ 38)', () => {
+    const deduced = { word: 'inferred', legs: 'out 7 Oct · back 12 Oct' };
+    const tour = normalizeAway({ from: '2026-10-08', to: '2026-10-11', who: 'MaMeMi', deduced }, 'L1');
+    expect(tour.deduced).toEqual(deduced);
+    const absence = normalizeAway({ from: '2026-10-08', to: '2026-10-11', who: 'Mia' }, 'L1');
+    expect('deduced' in absence).toBe(false);
+  });
 });
 
 describe('awaySegments (law 21)', () => {

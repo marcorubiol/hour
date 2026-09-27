@@ -847,7 +847,9 @@ describe('awayBands', () => {
       travel({ travel_direction: 'outbound', starts_at: '2026-07-01T08:00:00Z' }),
       travel({ travel_direction: 'return', starts_at: '2026-07-05T18:00:00Z' }),
     ]);
-    expect(bands).toEqual([{ from: '2026-07-02', to: '2026-07-04', project_id: 'proj-a' }]);
+    expect(bands).toEqual([
+      { from: '2026-07-02', to: '2026-07-04', project_id: 'proj-a', out: '2026-07-01', back: '2026-07-05' },
+    ]);
   });
 
   it('adjacent or same-day pairs leave no strictly-between days — no band', () => {
@@ -875,7 +877,9 @@ describe('awayBands', () => {
       travel({ travel_direction: 'leg', starts_at: '2026-07-03T08:00:00Z' }),
       travel({ travel_direction: 'return', starts_at: '2026-07-05T18:00:00Z' }),
     ]);
-    expect(bands).toEqual([{ from: '2026-07-02', to: '2026-07-04', project_id: 'proj-a' }]);
+    expect(bands).toEqual([
+      { from: '2026-07-02', to: '2026-07-04', project_id: 'proj-a', out: '2026-07-01', back: '2026-07-05' },
+    ]);
   });
 
   it('ignores non-travel kinds and travel days without a direction', () => {
@@ -899,12 +903,16 @@ describe('awayBands', () => {
       to: '2026-07-04',
       project_id: 'proj-a',
       line_id: 'line-a',
+      out: '2026-07-01',
+      back: '2026-07-05',
     });
     expect(bands).toContainEqual({
       from: '2026-07-03',
       to: '2026-07-05',
       project_id: 'proj-a',
       line_id: 'line-b',
+      out: '2026-07-02',
+      back: '2026-07-06',
     });
     expect(bands).toHaveLength(2);
   });
@@ -925,8 +933,20 @@ describe('awayBands', () => {
       travel({ project_id: 'proj-a', travel_direction: 'return', starts_at: '2026-07-04T18:00:00Z' }),
       travel({ project_id: 'proj-b', travel_direction: 'return', starts_at: '2026-07-06T18:00:00Z' }),
     ]);
-    expect(bands).toContainEqual({ from: '2026-07-02', to: '2026-07-03', project_id: 'proj-a' });
-    expect(bands).toContainEqual({ from: '2026-07-03', to: '2026-07-05', project_id: 'proj-b' });
+    expect(bands).toContainEqual({
+      from: '2026-07-02',
+      to: '2026-07-03',
+      project_id: 'proj-a',
+      out: '2026-07-01',
+      back: '2026-07-04',
+    });
+    expect(bands).toContainEqual({
+      from: '2026-07-03',
+      to: '2026-07-05',
+      project_id: 'proj-b',
+      out: '2026-07-02',
+      back: '2026-07-06',
+    });
     expect(bands).toHaveLength(2);
   });
 
@@ -939,8 +959,8 @@ describe('awayBands', () => {
       { 'proj-a': ['2026-07-04'] },
     );
     expect(bands).toEqual([
-      { from: '2026-07-02', to: '2026-07-03', project_id: 'proj-a' },
-      { from: '2026-07-05', to: '2026-07-06', project_id: 'proj-a' },
+      { from: '2026-07-02', to: '2026-07-03', project_id: 'proj-a', out: '2026-07-01', back: '2026-07-07' },
+      { from: '2026-07-05', to: '2026-07-06', project_id: 'proj-a', out: '2026-07-01', back: '2026-07-07' },
     ]);
   });
 
@@ -964,7 +984,9 @@ describe('awayBands', () => {
       ],
       { 'proj-b': ['2026-07-03'] },
     );
-    expect(bands).toEqual([{ from: '2026-07-02', to: '2026-07-04', project_id: 'proj-a' }]);
+    expect(bands).toEqual([
+      { from: '2026-07-02', to: '2026-07-04', project_id: 'proj-a', out: '2026-07-01', back: '2026-07-05' },
+    ]);
   });
 
   /**
@@ -981,7 +1003,9 @@ describe('awayBands', () => {
       travel({ travel_direction: 'outbound', starts_at: '2026-07-03T08:00:00Z' }),
       travel({ travel_direction: 'return', starts_at: '2026-07-06T18:00:00Z' }),
     ]);
-    expect(bands).toEqual([{ from: '2026-07-04', to: '2026-07-05', project_id: 'proj-a' }]);
+    expect(bands).toEqual([
+      { from: '2026-07-04', to: '2026-07-05', project_id: 'proj-a', out: '2026-07-03', back: '2026-07-06' },
+    ]);
   });
 
   /**
@@ -999,7 +1023,9 @@ describe('awayBands', () => {
       travel({ travel_direction: 'outbound', starts_at: '2026-07-24T08:00:00Z' }),
       travel({ travel_direction: 'return', starts_at: '2026-07-26T18:00:00Z' }),
     ]);
-    expect(bands).toEqual([{ from: '2026-07-25', to: '2026-07-25', project_id: 'proj-a' }]);
+    expect(bands).toEqual([
+      { from: '2026-07-25', to: '2026-07-25', project_id: 'proj-a', out: '2026-07-24', back: '2026-07-26' },
+    ]);
   });
 
   it('sequential pairs produce sequential bands', () => {
@@ -1010,8 +1036,8 @@ describe('awayBands', () => {
       travel({ travel_direction: 'return', starts_at: '2026-07-08T18:00:00Z' }),
     ]);
     expect(bands).toEqual([
-      { from: '2026-07-02', to: '2026-07-02', project_id: 'proj-a' },
-      { from: '2026-07-06', to: '2026-07-07', project_id: 'proj-a' },
+      { from: '2026-07-02', to: '2026-07-02', project_id: 'proj-a', out: '2026-07-01', back: '2026-07-03' },
+      { from: '2026-07-06', to: '2026-07-07', project_id: 'proj-a', out: '2026-07-05', back: '2026-07-08' },
     ]);
   });
 
@@ -1020,7 +1046,9 @@ describe('awayBands', () => {
       travel({ travel_direction: 'return', starts_at: '2026-07-05T18:00:00Z' }),
       travel({ travel_direction: 'outbound', starts_at: '2026-07-01T08:00:00Z' }),
     ]);
-    expect(bands).toEqual([{ from: '2026-07-02', to: '2026-07-04', project_id: 'proj-a' }]);
+    expect(bands).toEqual([
+      { from: '2026-07-02', to: '2026-07-04', project_id: 'proj-a', out: '2026-07-01', back: '2026-07-05' },
+    ]);
   });
 
   it('bands cross month boundaries', () => {
@@ -1028,7 +1056,9 @@ describe('awayBands', () => {
       travel({ travel_direction: 'outbound', starts_at: '2026-07-30T08:00:00Z' }),
       travel({ travel_direction: 'return', starts_at: '2026-08-02T18:00:00Z' }),
     ]);
-    expect(bands).toEqual([{ from: '2026-07-31', to: '2026-08-01', project_id: 'proj-a' }]);
+    expect(bands).toEqual([
+      { from: '2026-07-31', to: '2026-08-01', project_id: 'proj-a', out: '2026-07-30', back: '2026-08-02' },
+    ]);
   });
 });
 

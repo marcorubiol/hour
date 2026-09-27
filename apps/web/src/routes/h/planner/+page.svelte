@@ -42,6 +42,7 @@
   import MonthGrid from '$lib/components/MonthGrid.svelte';
   import {
     dateDayKey,
+    deducedPhrase,
     monthName,
     perfDayKey,
     type AwayBandVM,
@@ -750,6 +751,13 @@
         initials: proj?.initials ?? null,
         projectName: proj?.name ?? null,
         place: tourPlaceFor(b),
+        deduced: {
+          word: t('planner.tour_inferred', locale),
+          legs: t('planner.tour_legs', locale, {
+            out: localeDayMonth(b.out, localeTag),
+            back: localeDayMonth(b.back, localeTag),
+          }),
+        },
       };
     }),
   );
@@ -1062,7 +1070,7 @@
     }
     if (laneAxis === 'scope') {
       // The derived tour (two travel legs) is the project's own absence.
-      for (const band of aways) {
+      for (const [i, band] of aways.entries()) {
         if (!inWindow(band.from, band.to)) continue;
         for (const g of boardBase.groups) {
           const lane = g.lanes.find((l) => l.kind === 'project' && l.id === band.project_id);
@@ -1073,6 +1081,9 @@
                   from: band.from,
                   to: band.to,
                   who: projectNameById.get(band.project_id) ?? '—',
+                  // Same words as the month's band: `awayVMs` is `aways`
+                  // mapped one to one, so the index is the band.
+                  deduced: awayVMs[i]?.deduced,
                 },
                 lane.key,
               ),
@@ -1447,7 +1458,12 @@
         // it for the bare subject printed «Mia Serra until 20 Aug», which
         // says nothing about what she is doing.
         who: it.label,
-        rest: awayRest(selectedDay, it.to, words, (iso) => localeDayMonth(iso, localeTag)),
+        // A tour says it was deduced, and from which two trips (§ 38), in the
+        // same sentence as the rest: the Day is not a band and has no margin
+        // voice to put it in.
+        rest:
+          awayRest(selectedDay, it.to, words, (iso) => localeDayMonth(iso, localeTag)) +
+          ('deduced' in it ? ` · ${deducedPhrase(it.deduced)}` : ''),
         // The doubt travels with the sentence. It did not, and the Day was the
         // one view where a tentative absence read exactly like a settled one.
         tentative: 'tentative' in it ? it.tentative === true : false,
@@ -2996,6 +3012,7 @@
       teamWord={t('planner.board_team', locale)}
       noCastWord={t('planner.no_cast', locale)}
       awayWord={t('planner.band_away', locale)}
+      tourWord={t('planner.band_tour', locale)}
       untilLabel={(iso) => t('planner.band_until', locale, { day: localeDayMonth(iso, localeTag) })}
       emptyLabel={t('planner.empty_month', locale)}
       createLabel={(iso) => t('planner.new_on', locale, { day: iso })}

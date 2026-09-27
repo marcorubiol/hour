@@ -144,7 +144,24 @@ export type AwayBandVM = {
   projectName: string | null;
   /** Where the tour is. Without it, «on tour» cannot tell London from anywhere. */
   place: string | null;
+  /**
+   * THAT WE DEDUCED IT, AND OUT OF WHAT (§ 38). Nobody wrote a tour down: the
+   * app paired two travel days. The italic insinuated it; Marco asked for it
+   * to be SAID: «no podemos añadir cosas nosotros sin decirlo».
+   *
+   * Two pieces and not one sentence, because a narrow band has to let one go
+   * before the other: `legs` («out 3 Oct · back 9 Oct») names the two trips,
+   * which the sheet also draws as the cards either side of the band; `word`
+   * («inferred») is the claim itself, and it outlives the legs.
+   */
+  deduced: { word: string; legs: string };
 };
+
+/** The tour's provenance as one phrase, for the surfaces that print a line
+    or a tooltip instead of a band: «inferred · out 3 Oct · back 9 Oct». */
+export function deducedPhrase(d: { word: string; legs: string }): string {
+  return `${d.word} · ${d.legs}`;
+}
 
 /** One conflict, page-shaped for the day mark + clash card. */
 export type ClashVM = {

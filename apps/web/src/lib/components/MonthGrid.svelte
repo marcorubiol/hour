@@ -35,6 +35,7 @@
     type Slip as SlipVM,
     perfDayKey,
     dateDayKey,
+    deducedPhrase,
     formatMonthLabel,
     perfInstant,
     type ProjectLite,
@@ -802,6 +803,11 @@
     subject: string;
     span: string | null;
     /**
+     * A tour's provenance (§ 38), in the span's voice: the slot where an
+     * absence prints its dates. Null for an absence: somebody wrote that one.
+     */
+    deduced: { word: string; legs: string } | null;
+    /**
      * Tours travel with their project: at one column wide the coloured
      * monogram is the only thing that survives.
      *
@@ -854,13 +860,16 @@
         // An absence names a PERSON; a tour names a PLACE — and when nobody
         // wrote the place down it names the project instead of inventing one.
         subject: isBlackout ? (bo.subject ?? bo.label) : (aw.place ?? aw.projectName ?? ''),
-        // A tour says no dates: it is inferred from two travel legs, and the
-        // legs are already drawn on the sheet as the days they are.
+        // A tour prints no range of its own. What goes in that slot instead is
+        // WHERE IT CAME FROM (§ 38): nobody wrote it down, so the band says it
+        // was deduced and names the two trips. «No podemos añadir cosas
+        // nosotros sin decirlo» (Marco, 2026-08-30). The italic only hinted.
         span: isBlackout ? bandSpan(slot.from, slot.to, cutLeft) : null,
+        deduced: isBlackout ? null : aw.deduced,
         accent: isBlackout ? null : aw.accent,
         initials: isBlackout ? null : aw.initials,
         projectName: isBlackout ? null : aw.projectName,
-        label: slot.band.label,
+        label: isBlackout ? slot.band.label : `${aw.label} · ${deducedPhrase(aw.deduced)}`,
         note: isBlackout ? bo.note : null,
         tentative: isBlackout ? bo.tentative : false,
         cutLeft,
@@ -1229,6 +1238,11 @@
                   >{b.subject}</span
                 >{/if}
               {#if b.span}<em class="cal__band-s">{b.span}</em>{/if}
+              {#if b.deduced}<em class="cal__band-s cal__band-d"
+                  ><span>{b.deduced.word}</span><span class="cal__band-dl"
+                    >&nbsp;· {b.deduced.legs}</span
+                  ></em
+                >{/if}
               <!-- The rule with its terminus. It is not drawn when the band runs
                    past the week's edge: an arrowhead there would claim an end
                    the calendar cannot show. -->
@@ -1478,6 +1492,37 @@
     }
     .cal__band--away .cal__band-r::after {
       display: none;
+    }
+    /* LA GIRA DICE QUE LA DEDUJIMOS, Y DE QUÉ DOS VIAJES (§ 38). Va en la voz
+       del tramo, el hueco donde una ausencia imprime sus fechas, porque es lo
+       mismo: de dónde sale esta banda.
+       Una banda estrecha suelta lo que no cabe ENTERO, en este orden: primero
+       los viajes (la hoja ya los dibuja como las dos cards a cada lado de la
+       banda, y el tooltip y las líneas de la agenda y el día los dicen), luego
+       la palabra. El lugar no se suelta nunca: es el sujeto, lo que se lee,
+       como el nombre de una tanda.
+       Contenedor de sí misma, como `.cal__run`: la pregunta es el ancho de
+       ESTA banda, no el de la celda. MEDIDO a 1600 con «Barcelona» de lugar y
+       los viajes más largos de los tres idiomas (ca, «anada 27 febr · tornada
+       28 febr»): marca y tipo 66 · lugar 50 · palabra 50 · viajes 214 ·
+       regla 12 · huecos de 9. Contra el ancho de contenido de la banda:
+
+         419 = 66 + 50 + 50 + 214 + 12 + 3×9   todo
+         205 = 66 + 50 + 50       + 12 + 3×9   sin los viajes
+
+       Por debajo de 205 solo queda lo de antes, y lo dice el tooltip. */
+    .cal__band--away {
+      container: tourband / inline-size;
+    }
+    @container tourband (max-width: 418px) {
+      .cal__band-dl {
+        display: none;
+      }
+    }
+    @container tourband (max-width: 204px) {
+      .cal__band-d {
+        display: none;
+      }
     }
     /* An absence that is settled is ink; one that is not is faint and leans —
        the certainty axis, same as everywhere else. La tapa discontinua que

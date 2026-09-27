@@ -48,6 +48,7 @@
   import { createQuery } from '@tanstack/svelte-query';
   import {
     dateDayKey,
+    deducedPhrase,
     perfDayKey,
     type AwayBandVM,
     type BlackoutBandVM,
@@ -530,6 +531,8 @@
     company: boolean;
     tentative: boolean;
     label: string;
+    /** Only a tour has one: that it was deduced, and from which trips (§ 38). */
+    deduced?: string;
   };
   let railItems = $derived.by((): RailItem[] => [
     ...blackouts.map((b) => ({
@@ -547,6 +550,7 @@
       company: false,
       tentative: false,
       label: a.label,
+      deduced: deducedPhrase(a.deduced),
     })),
   ]);
   let railLanes = $derived(assignBandLanes(railItems));
@@ -700,7 +704,11 @@
         // («Mia Serra — away»). The Day view read `subject` and printed «Mia
         // Serra until 20 Aug», a sentence about nothing.
         who: item.label,
-        rest: awayRest(day, item.to, awayWords, (iso) => localeDayMonth(iso, locale)),
+        // A tour ends by saying it was deduced and from which two trips:
+        // the same words as the month's band, in this view's sentence.
+        rest:
+          awayRest(day, item.to, awayWords, (iso) => localeDayMonth(iso, locale)) +
+          (item.deduced ? ` · ${item.deduced}` : ''),
         tentative: Boolean(item.tentative),
       });
     });

@@ -1,7 +1,8 @@
 # Hour — cola vigente
 
-> **ÚNICA COLA ACTIVA.** Última reconciliación: 2026-09-25 (§ 17 y § 18:
-> la tarea 15 sí existe, y Travel v2 no está en curso sino esperando a Marco).
+> **ÚNICA COLA ACTIVA.** Última reconciliación: 2026-09-26 (§ 38 desplegado,
+> runtime `a67e99c`; § 18 con P1 escrita en rama). Antes, 2026-09-25
+> (§ 17 y § 18: la tarea 15 sí existe).
 > Antes, 2026-08-27 (§ 23 y § 32); el resto de la cola sigue con la
 > reconciliación del 2026-07-30.
 > Estado general y evidencia: `_context.md`. Historia: `_decisions.md` y
@@ -152,7 +153,62 @@
     la pena que la RPC acepte `p_bolo_id` y nazca enlazada, para que no exista
     la ventana en la que la función ya está y el dinero todavía no.
 
-38. [ ] **La gira deducida no dice que la dedujimos, y no se puede aceptar.**
+38. [~] **El paso barato, HECHO Y DESPLEGADO el 2026-09-26** (entró en
+    `main` con `677f342`; runtime `a67e99c`). E2E después del deploy: 61/62,
+    con el rojo en Books por tiempo, que solo pasa. Cero schema. Marco lo aprobó mirando las
+    capturas; entró por fast-forward desde `feat/planner-tour-deduced`, ya
+    borrada.
+    `awayBands()` guarda de qué dos viajes sale cada banda (`out`/`back`), y la
+    gira lo dice con palabras en las tres vistas que la dibujan:
+    - **Mes:** en la voz del tramo, el hueco donde una ausencia pone sus
+      fechas: «DE GIRA *Sevilla* DEDUCIDA · IDA 7 OCT · VUELTA 12 OCT». Una
+      banda estrecha suelta entero lo que no cabe, primero los viajes y luego
+      la palabra; el lugar nunca. Umbrales medidos, con la suma escrita en el
+      CSS (419 todo · 205 sin viajes). El tooltip lo lleva siempre entero.
+    - **Agenda y Día:** la línea termina en «· deducida · ida 7 oct · vuelta
+      12 oct».
+    - **De paso, y en commit aparte para poder revertirlo solo:** el nombre de
+      la gira en tooltip y líneas decía «fuera · MaMeMi», la palabra de la
+      ausencia. `MonthGrid` ya escribía la ley contraria («una ausencia dice
+      fuera, una gira dice de gira; nunca la misma palabra») y el texto era un
+      resto de la v2 (07-18), anterior a separarlas (07-31). Ahora «de gira ·
+      MaMeMi».
+    *Verificado:* `svelte-check` 0/0, unit 563/563, y capturas contra la base
+    local con tres giras de 4, 2 y 1 día a 1024, 1280 y 1600 en es/en/ca.
+    RLS y E2E no se corrieron: pegan contra producción.
+    **Marco, 2026-09-26, sobre lo que quedaba:** aprueba la rama tal cual,
+    mantiene «de gira» en vez de «fuera», y acepta que una gira de **un día**
+    a 1280 o menos solo lo diga en el tooltip del mes (marca, tipo y lugar ya
+    desbordaban antes): eso se resuelve con el paso caro, que redibuja la
+    banda de todos modos.
+    - **Tablero, hecho el mismo día a petición suya:** la gira dice «DE GIRA»
+      y no «fuera», y en el hueco del «hasta» pone la procedencia entera si
+      cabe, si no solo «deducida», si no nada (la misma ley de todo o nada que
+      el «hasta»). El tooltip la lleva siempre. De paso, la palabra de tipo del
+      Tablero no podía partirse porque «away» era una sola palabra; «de gira»
+      tiene espacio y se partía en dos líneas recortadas. Ahora no se parte.
+    El paso caro (confirmarla, y el fondo) sigue sin decidir.
+    Texto original abajo.
+
+39. [ ] **El baseline de staging está roto desde el 2026-07-30, y nadie lo
+    había visto porque nadie lo corría.** Encontrado el 2026-09-27 al ensayar
+    Travel v2 (run 36297342639). `staging.sql` construye su propio mundo
+    (cuatro workspaces con ids fijos) dando por hecho que un alta no crea
+    nada. Era verdad cuando se escribió; dejó de serlo con
+    `20260730164435_bind_auth_user_trigger`, que metió en las migraciones el
+    trigger que da a cada login su cuenta y su workspace personal. Medido en
+    staging tras el run: **3 usuarios, 154 conversaciones y 7 workspaces**,
+    no 4; los tres de más (`71a201ee`, `7718a56c`, `89e62a0e`) son los
+    personales de los tres usuarios de prueba. El paso «Verify synthetic
+    fixture shape» falla, y aunque se relajara, `cross-tenant.test.ts` exige
+    la lista exacta de tres espacios y fallaría también.
+    **Lo que hay que decidir:** que `staging.sql` retire lo que el trigger
+    creó para sus tres usuarios antes de construir su mundo (recomendado: el
+    fixture es dueño de su mundo), o que lo adopte. Y que la comprobación
+    imprima lo que encontró: hoy solo dice «exit 1». Hasta entonces, § 34
+    exige un ensayo que no se puede hacer.
+
+38b. [ ] **La gira deducida no dice que la dedujimos, y no se puede aceptar.**
     (Marco, 2026-08-30, mirando el mes: «no podemos añadir cosas nosotros sin
     decirlo».) `awayBands()` infiere una banda `ON TOUR` emparejando un
     `travel_day` `outbound` con el `return` siguiente — es **pura**, no existe
@@ -997,16 +1053,26 @@ entre empresas sin construirlo.
     **Ojo al backfill:** `start_at` lo leen Desk, MonthGrid y tasks; es la
     superficie que decide si la migración va de una tacada.
 
-    > **No empieza hasta cerrar Travel v2**, que tampoco tiene schema escrito y
-    > está parado esperando tres respuestas de Marco (§ 18). Dos modelos nuevos
-    > a la vez es como se pierde el hilo.
+    > **No empieza hasta cerrar Travel v2** (§ 18), que desde el 2026-09-26
+    > tiene P1 escrita y sin aplicar. Dos modelos nuevos a la vez es como se
+    > pierde el hilo.
 
-## ESPERANDO A MARCO: Travel v2, el viaje como trayecto multi-etapa (ADR-089)
+## EN CURSO: Travel v2, el viaje como trayecto multi-etapa (ADR-089)
 
-> **Parado desde el 2026-07-23, a la espera de tres respuestas de Marco**
-> (abajo, «PENDIENTE de Marco»). Esta sección decía «EN CURSO» y nadie la ha
-> tocado desde ese día (reconciliado el 2026-09-25). No se escribe la
-> migración hasta tener las tres.
+> **Estado 2026-09-26.** Marco respondió las tres preguntas: aprueba el
+> modelo, rama `feat/travel-stages`, ensayo en `hour-staging`. P1 (schema) está
+> escrita en esa rama, que ya está en `origin`, y no aplicada en ninguna base
+> hosted. Verificada solo en la base local. Sus decisiones de implementación
+> son ADR-097, en la misma rama. **Ensayo en staging, 2026-09-27** (run
+> 36297342639): la migración se aplicó limpia sobre la base hosted
+> reconstruida desde cero (`travel_stage` existe, `create_date` con 18
+> argumentos), pero el run murió antes de RLS por § 39, un fallo del baseline
+> de staging anterior a Travel. Lo que la separa de producción: arreglar
+> § 39, repetir el ensayo con RLS, y el `inspect` que § 34 exige porque la
+> migración hace DROP de `create_date`.
+>
+> **Antes (2026-09-25):** parado desde el 2026-07-23, a la espera de las tres
+> respuestas de Marco (abajo).
 >
 > **Sesión 2026-07-23. Modelo DECIDIDO (ADR-089), NADA de schema construido.**
 > Empezó como retoque visual de las cards del mes y creció hasta un modelo de
@@ -1047,8 +1113,8 @@ entre empresas sin construirlo.
     **Deuda anotada:** `travel_direction` (outbound/return/leg) **se queda** porque
     alimenta `awayBands()` (ADR-078 §6); reconciliar dirección↔extremos = después.
 
-    **PENDIENTE de Marco antes de escribir la migración** (preguntado el
-    2026-07-23, sin respuesta; sigue así el 2026-09-25):
+    **CONTESTADO por Marco el 2026-09-26: sí al modelo, rama, staging.** Las
+    preguntas, tal como se hicieron:
     1. ¿Aprueba el modelo del ADR-089? (mantener `travel_direction`; gate
        `edit:performance`; extender `create_date`/`update_date`).
     2. ¿La migración va en una rama nueva `feat/travel-stages`, o solo se dejan
