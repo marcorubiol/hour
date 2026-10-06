@@ -2,7 +2,7 @@
 
 ## Coordinación de sesiones
 
-Este proyecto usa la skill `coordinador` (`.claude/skills/coordinador/SKILL.md`) cuando hay varias sesiones de Claude
+Este proyecto usa la skill `coordinador` (skill universal de Marco, en `~/.claude/skills/coordinador/`) cuando hay varias sesiones de Claude
 en paralelo, o cuando Marco te abre como «coordinador» o pregunta «¿cómo vamos?». Con una sola sesión no hace falta.
 
 Ficha del proyecto:
