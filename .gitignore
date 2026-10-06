@@ -58,3 +58,6 @@ apps/*/worker-configuration.d.ts
 apps/web/test-results/
 apps/web/playwright-report/
 apps/web/.playwright/
+
+# coordinación de sesiones (estado local, no va a git)
+/build/coordination/
