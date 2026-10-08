@@ -1,4 +1,10 @@
 @_context.md
+@vault/_context.md
+
+Si tu herramienta no ha expandido los `@` de arriba, lee antes de trabajar `_context.md` (en la raíz de este repo) y
+`vault/_context.md` (el contexto del proyecto en el vault, si existe en tu máquina). El núcleo del sistema llega por
+`~/Developer/AGENTS.md`. No hay `CLAUDE.md` a propósito: si existe uno (o un `CLAUDE.local.md`), Claude Code deja de
+leer los `AGENTS.md`.
 
 ## Coordinación de sesiones
 
@@ -16,5 +22,5 @@ Ficha del proyecto:
   `claude/<nombre>`.
 - **Entornos que se bloquean:** el E2E se corre contra un origen desplegado, no contra `vite preview` (ver `_tasks.md`,
   tarea 21); una sola sesión a la vez contra producción.
-- **Diario de uso:** ninguno por ahora.
+- **Drop:** ninguno por ahora.
 - **Repo público:** sí. No escribas en git nada que no pueda ser público (claves, estado interno de carriles).
