@@ -22,5 +22,16 @@ Ficha del proyecto:
   `claude/<nombre>`.
 - **Entornos que se bloquean:** el E2E se corre contra un origen desplegado, no contra `vite preview` (ver `_tasks.md`,
   tarea 21); una sola sesión a la vez contra producción.
-- **Drop:** ninguno por ahora.
+- **Checkout principal:** `/Users/marcorubiol/Developer/hour`.
+- **Puerta** (verde antes de integrar y empujar): `pnpm --filter web check` 0/0 y `pnpm --filter web test:unit`;
+  si toca schema o permisos, `pnpm --filter web test:rls`; si toca pantalla, el E2E contra un origen desplegado tras
+  el deploy. Una migración a producción sigue su gate propio (`_tasks.md § 34`: backup, staging si es destructiva,
+  plan, apply).
+- **Producto (skill `producto`):** el roadmap es `_tasks.md`, no hay `ROADMAP.md` (Marco, 2026-10-09). Hour no tiene
+  versiones: un destino es una sección de `_tasks.md` («AHORA», «Producto — después», un `§`), y el tamaño se mide en
+  carriles. `CHANGELOG.md` en la raíz, por meses. Commit de un cambio que solo toca la cola o el CHANGELOG: directo a
+  `main` con push en el mismo paso. Un bug mandado arreglar no se integra antes de que Marco valide su línea.
+- **Drop:** https://claude.ai/artifact/31K3hLooqc7ak2JujNNHS7 (vista de la cola: copia de `_tasks.md` como
+  `roadmap.md`). Tipos: `bug` (roto), `x` (interfaz confusa o mejorable), `idea`. Archivo de notas:
+  `~/Zerø System/03_AGENCY/Hour/drop-archive.md` (en el vault y no en el repo, que es público).
 - **Repo público:** sí. No escribas en git nada que no pueda ser público (claves, estado interno de carriles).
