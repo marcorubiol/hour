@@ -634,6 +634,14 @@ documento dice que no se pueden correr, está desactualizado):
   base** se está mirando. Al build de producción no le afecta: `PUBLIC_SUPABASE_*`
   no se hornea en el bundle.
 
+**2026-10-09, contra `3f6eb44`: el rojo de tiempo sigue, y subir el
+presupuesto global no lo arregló.** Tres pasadas completas: 4 rojos justo
+tras el deploy, luego 62/62, y una tercera con `expect.timeout` a 15 s solo
+contra origen desplegado (probado y **revertido**, sin commit): 2 rojos y
+1 sin correr, en specs distintos, y los dos pasan solos. Un número más
+grande no es la ley; si se ataca, será esperando a que la página diga que
+ha cargado, spec por spec, no con otro umbral.
+
 **Pase 2026-09-26, después del deploy** (Marco, contra `a67e99c`): E2E
 **61/62** en 9,9 min. El rojo fue `money.spec.ts`, que no vio los totales de
 `/h/money` en 5 s; los primeros 25 tests de la pasada tardaron 10-22 s cada
