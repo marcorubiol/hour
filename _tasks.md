@@ -190,7 +190,12 @@
     El paso caro (confirmarla, y el fondo) sigue sin decidir.
     Texto original abajo.
 
-39. [ ] **El baseline de staging está roto desde el 2026-07-30, y nadie lo
+39. [x] **CERRADA el 2026-09-27** (`355f63d`): `staging.sql` retira lo que
+    el trigger de alta crea para sus tres usuarios antes de montar su mundo, y
+    la comprobación imprime la forma que encuentra. Verificado en local sobre
+    un usuario con workspace del trigger (transacción deshecha) y en staging:
+    run 36297834709, forma 3/4/154, RLS 179/179, smoke 2/2. Texto original:
+    **El baseline de staging está roto desde el 2026-07-30, y nadie lo
     había visto porque nadie lo corría.** Encontrado el 2026-09-27 al ensayar
     Travel v2 (run 36297342639). `staging.sql` construye su propio mundo
     (cuatro workspaces con ids fijos) dando por hecho que un alta no crea
@@ -1063,13 +1068,13 @@ entre empresas sin construirlo.
 > modelo, rama `feat/travel-stages`, ensayo en `hour-staging`. P1 (schema) está
 > escrita en esa rama, que ya está en `origin`, y no aplicada en ninguna base
 > hosted. Verificada solo en la base local. Sus decisiones de implementación
-> son ADR-097, en la misma rama. **Ensayo en staging, 2026-09-27** (run
-> 36297342639): la migración se aplicó limpia sobre la base hosted
-> reconstruida desde cero (`travel_stage` existe, `create_date` con 18
-> argumentos), pero el run murió antes de RLS por § 39, un fallo del baseline
-> de staging anterior a Travel. Lo que la separa de producción: arreglar
-> § 39, repetir el ensayo con RLS, y el `inspect` que § 34 exige porque la
-> migración hace DROP de `create_date`.
+> son ADR-097, en la misma rama. **Ensayo en staging VERDE, 2026-09-27**
+> (run 36297834709): base reconstruida desde cero con la migración, RLS
+> **179/179** con los 10 casos de `travel-stage.test.ts`, build y smoke. El
+> primer intento (run 36297342639) destapó § 39, ya cerrada. Lo que la separa
+> de producción: el `inspect` que § 34 exige porque la migración hace DROP de
+> `create_date` (y comparar con el rollback, que se capturó de la base local),
+> y después backup, plan y apply.
 >
 > **Antes (2026-09-25):** parado desde el 2026-07-23, a la espera de las tres
 > respuestas de Marco (abajo).

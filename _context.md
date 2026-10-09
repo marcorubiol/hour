@@ -16,11 +16,13 @@
 > `feat/travel-stages` en `origin`, con la migración `20260926100000`, su
 > rollback, los tipos y `tests/rls/travel-stage.test.ts`. Las decisiones de
 > implementación son **ADR-097, que vive en esa rama** hasta que se mergee.
-> Ensayo en staging el 2026-09-27 (run 36297342639): la migración **se aplicó
-> limpia** sobre un Postgres hosted reconstruido desde cero, pero el run
-> murió antes de RLS por un fallo **anterior y ajeno a Travel**: el baseline
-> de staging está roto desde el 2026-07-30 (`_tasks.md § 39`). Así que el
-> ensayo de § 34 no está completo.
+> **Ensayo en staging VERDE el 2026-09-27** (run 36297834709): base hosted
+> reconstruida desde cero con la migración dentro, fixtures con la forma
+> esperada, **RLS 179/179** (los 169 de producción más los 10 de
+> `travel-stage.test.ts`), build y smoke 2/2. El primer intento (run
+> 36297342639) había destapado que el baseline de staging estaba roto desde
+> el 2026-07-30, ajeno a Travel; arreglado en `main` (`355f63d`, § 39). Para
+> producción falta el `inspect`, y después backup, plan y apply.
 >
 > Suites contra `795b6a5` (2026-09-26): **RLS 169/169 · E2E 61/62**, el rojo
 > por tiempo y no por la app (ver «Verificación»).
@@ -406,7 +408,7 @@ orientativo, no una verdad comercial cerrada.
 
 ### Git
 
-- Repo: `https://github.com/marcorubiol/hour` (privado).
+- Repo: `https://github.com/marcorubiol/hour` (público).
 - Checkout: `/Users/marcorubiol/Developer/hour`.
 - Rama principal: `main`.
 - **2026-09-26: prod == `a67e99c`, y `main` solo lleva encima documentos.**
