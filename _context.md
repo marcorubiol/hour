@@ -408,7 +408,7 @@ orientativo, no una verdad comercial cerrada.
 
 ### Git
 
-- Repo: `https://github.com/marcorubiol/hour` (privado).
+- Repo: `https://github.com/marcorubiol/hour` (público).
 - Checkout: `/Users/marcorubiol/Developer/hour`.
 - Rama principal: `main`.
 - **2026-09-26: prod == `a67e99c`, y `main` solo lleva encima documentos.**
