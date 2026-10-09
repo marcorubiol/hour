@@ -473,7 +473,7 @@ orientativo, no una verdad comercial cerrada.
   v3 y el pulse ya están desplegados. `hardening/audit-fixes`, que estaba
   contenida en `main` sin commits propios, **ya no existe** (ni local ni en
   origin, 2026-09-25). `feat/planner-tour-deduced` entró en `main` por
-  fast-forward y se borró (2026-09-26). **Quedan dos ramas además de `main`:**
+  fast-forward y se borró (2026-09-26). **2026-10-09: solo queda `feat/comms-threads`**; `feat/travel-stages` entró en `main` vía `claude/travel-v2-prod` y se borró. Lo de abajo es el estado del 2026-09-26: **quedaban dos ramas además de `main`:**
   - `feat/travel-stages`: Travel v2 P1 (ADR-089, ADR-097), en `origin` desde
     el 2026-09-26. Migración escrita y probada solo en local; espera el ensayo
     en staging.
