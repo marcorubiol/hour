@@ -54,8 +54,8 @@ describe.skipIf(!envReady())('RLS — ADR-051/052 write-path RPCs', () => {
       new URLSearchParams({
         select: 'id,workspace:workspace_id!inner(slug)',
         'workspace.slug': 'eq.playwright',
+        slug: 'eq.zzz-e2e-collab',
         deleted_at: 'is.null',
-        order: 'id.asc',
         limit: '1',
       }),
     );

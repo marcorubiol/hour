@@ -55,8 +55,8 @@ describe.skipIf(!envReady())('RLS — ADR-056 line modules', () => {
       new URLSearchParams({
         select: 'id,workspace:workspace_id!inner(slug)',
         'workspace.slug': 'eq.playwright',
+        slug: 'eq.zzz-e2e-collab',
         deleted_at: 'is.null',
-        order: 'id.asc',
         limit: '1',
       }),
     );
@@ -167,8 +167,8 @@ describe.skipIf(!envReady())('RLS — ADR-056 line modules', () => {
 
   // ── conversation.line_id via create_conversation ────────────────────────
   test('create_conversation with a cross-project line → 400; with the right line → assigned; resurrect keeps it', async () => {
-    // Cross-project: the real difusion line belongs to muk-cia, not here —
-    // an unknown-but-valid uuid is enough (guard collapses to 22023).
+    // Cross-project: an unknown-but-valid uuid is enough (guard collapses
+    // to 22023).
     const cross = await pgRpc('create_conversation', jwt, {
       p_project_id: projectId,
       p_full_name: 'ZZZ Cross Project',
@@ -298,19 +298,20 @@ describe.skipIf(!envReady())('RLS — ADR-056 line modules', () => {
     }
   });
 
-  // ── backfill canary (read-only — never mutates the real campaign) ────
-  test('the difusión backfill left conversations carrying line_id', async () => {
+  // ── difusión line canary (read-only) ─────────────────────────────────
+  // Was a canary on MüK Cia's real campaign until § 31 (2026-10); it now
+  // reads the synthetic set, which carries line_id the same way.
+  test('the difusión conversations carry their line_id', async () => {
     const line = await pgGet<{ id: string }>(
       'line',
       jwt,
       new URLSearchParams({
         select: 'id',
-        slug: 'eq.difusion-2026-27',
+        slug: 'eq.zzz-difusion-2026-27',
         deleted_at: 'is.null',
         limit: '1',
       }),
     );
-    // The real campaign is visible to the fixture user (admin of muk-cia).
     expect(line.rows).toHaveLength(1);
     const linked = await pgGet<{ id: string }>(
       'conversation',

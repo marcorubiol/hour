@@ -217,9 +217,9 @@ jobs:
           set -euo pipefail
           supabase db reset --db-url "$STAGING_DB_URL" --no-seed --yes
           node supabase/fixtures/provision-auth.mjs
-          docker run --rm -i postgres:17-alpine \
-            psql "$STAGING_DB_URL" --no-psqlrc --set ON_ERROR_STOP=1 \
-            < supabase/fixtures/staging.sql
+          cat supabase/fixtures/staging.sql supabase/fixtures/playwright-difusion.sql \
+            | docker run --rm -i postgres:17-alpine \
+            psql "$STAGING_DB_URL" --no-psqlrc --set ON_ERROR_STOP=1
 
       - name: Summary
         if: always()

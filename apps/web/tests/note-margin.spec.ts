@@ -28,7 +28,7 @@ const PASSWORD = process.env.PW_TEST_PASSWORD;
  * ── Safety ────────────────────────────────────────────────────────────
  * Everything happens in the `playwright` fixture workspace, scoped by URL
  * token, on rows this run created and titled with its own timestamp. The test
- * user is admin of `muk-cia` (REAL production data): never widen these
+ * user was admin of `muk-cia` (REAL production data) until § 31: never widen these
  * filters. Notes are author-scoped by RLS, so the sweep can only reach its
  * own. Self-cleaning per ADR-052.
  *

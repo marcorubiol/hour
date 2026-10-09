@@ -6,12 +6,12 @@
  * `deleted_at IS NULL`. These tests hit PostgREST directly — the same
  * surface `PATCH /api/conversations/:id` wraps.
  *
- * Fixtures (see cross-tenant.test.ts header for the full picture): user
- * `playwright@hour.test` is workspace admin where the MaMeMi conversations
- * live, so the positive case PATCHes a real row — writing back the exact
- * values it already has. Data is unchanged; only `updated_at` bumps (the
- * `set_updated_at` trigger fires on any UPDATE) and an `audit_log` row is
- * appended. Deliberate: a write test that never writes proves nothing.
+ * Fixtures (see cross-tenant.test.ts header for the full picture): the
+ * positive case PATCHes a row of the synthetic difusión set in the user's own
+ * `playwright` space, writing back the exact values it already has. Only
+ * `updated_at` bumps and an `audit_log` row is appended. Deliberate: a write
+ * test that never writes proves nothing. Until § 31 (2026-10) this picked the
+ * first conversation of `muk-cia`, a REAL contact, on every run.
  */
 
 import { beforeAll, describe, expect, test } from 'vitest';
@@ -57,25 +57,27 @@ describe.skipIf(!envReady())('RLS — conversation write path', () => {
   });
 
   test('member with edit:conversation can update a row (no-op values, real UPDATE)', async () => {
-    // Pin the pick to the workspace where the fixture user is admin
-    // (`muk-cia`, renamed from `mamemi` on 2026-05-19) — read:conversation
-    // does NOT imply edit:conversation, so an arbitrary readable row could
-    // be read-only and turn this test red for the wrong reason. Admin
-    // bypass in has_permission() guarantees edit here. order makes the
-    // pick deterministic.
-    const readable = await pgGet<ConversationRow & { workspace: { slug: string } }>(
+    // Pin the pick to the fixture's own space, where the user is owner —
+    // read:conversation does NOT imply edit:conversation, so an arbitrary
+    // readable row could be read-only and turn this test red for the wrong
+    // reason. Owner bypass in has_permission() guarantees edit here. order
+    // makes the pick deterministic.
+    const readable = await pgGet<
+      ConversationRow & { workspace: { slug: string }; project: { slug: string } }
+    >(
       'conversation',
       jwt,
       new URLSearchParams({
-        select: 'id,status,next_action_note,workspace!inner(slug)',
-        'workspace.slug': 'eq.muk-cia',
+        select: 'id,status,next_action_note,workspace!inner(slug),project!inner(slug)',
+        'workspace.slug': 'eq.playwright',
+        'project.slug': 'eq.zzz-difusion',
         deleted_at: 'is.null',
         order: 'id.asc',
         limit: '1',
       }),
     );
     expect(readable.rows.length).toBe(1);
-    const { workspace: _ws, ...row } = readable.rows[0];
+    const { workspace: _ws, project: _project, ...row } = readable.rows[0];
 
     // …and write back exactly what it already holds. RLS must let the
     // UPDATE through and return the representation.

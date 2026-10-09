@@ -77,13 +77,21 @@ values
 on conflict (id) do update
 set name = excluded.name, domain = excluded.domain, city = excluded.city, updated_at = now(), deleted_at = null;
 
+-- The fixture user belongs to its own space only (_tasks.md § 31). The
+-- synthetic `muk-cia` and `marco-rubiol` stand in for real tenants it must
+-- never see; its difusión set lives in `playwright-difusion.sql`. The delete
+-- drops the admin rows an older version of this file wrote.
+delete from public.workspace_membership m
+using auth.users u
+where u.id = m.user_id
+  and u.email = 'playwright@hour.test'
+  and m.workspace_id in ('20000000-0000-4000-8000-000000000002', '20000000-0000-4000-8000-000000000003');
+
 insert into public.workspace_membership (workspace_id, user_id, role, accepted_at)
 select fixture.workspace_id, users.id, fixture.role::public.membership_role, fixture.accepted_at
 from (
   values
     ('playwright@hour.test', '20000000-0000-4000-8000-000000000001'::uuid, 'owner', '2026-01-01T00:00:00Z'::timestamptz),
-    ('playwright@hour.test', '20000000-0000-4000-8000-000000000002'::uuid, 'admin', '2026-01-02T00:00:00Z'::timestamptz),
-    ('playwright@hour.test', '20000000-0000-4000-8000-000000000003'::uuid, 'admin', '2026-01-03T00:00:00Z'::timestamptz),
     ('limited@hour.test', '20000000-0000-4000-8000-000000000001'::uuid, 'member', '2026-01-04T00:00:00Z'::timestamptz)
 ) as fixture(email, workspace_id, role, accepted_at)
 join auth.users users on users.email = fixture.email

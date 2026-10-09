@@ -157,8 +157,8 @@ test.describe('performance write path', () => {
     const day = runDay();
 
     // CRITICAL: scope every list to the `playwright` fixture workspace AND
-    // the fixture venue prefix. The test user is admin of `muk-cia` (real
-    // production data) — an unscoped date query would return, and the
+    // the fixture venue prefix. The test user was admin of `muk-cia` (real
+    // production data) until § 31, and any real space it can reach — an unscoped date query would return, and the
     // sweep would hard-delete, any real gig that happens to share the run
     // day. Never let this test see a row it didn't create.
     const fixture = await page.evaluate(

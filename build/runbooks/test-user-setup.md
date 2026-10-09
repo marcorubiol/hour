@@ -8,9 +8,12 @@ Re-run idempotently on password rotation.
 
 Three confirmed synthetic Auth users with deliberately different access:
 
-- `playwright@hour.test` is the broad test operator. It has
-  `workspace_membership` in three workspaces (all `admin`, all accepted):
-  `marco-rubiol`, `muk-cia` and `playwright`.
+- `playwright@hour.test` is the broad test operator. It is owner of its own
+  `playwright` workspace and of nothing else. **Until § 31 (2026-10) it was
+  also admin of `marco-rubiol` and `muk-cia`, which hold real data**; the
+  conversations the suites read there were MüK Cia's real difusión list. Never
+  give it access to a real workspace again: its difusión set is synthetic and
+  lives in `playwright` (see below).
 - `limited@hour.test` is a plain accepted `member` of `playwright` only. In
   project `zzz-e2e-collab` it has role `performer`, with no explicit grants or
   revokes. It has no personal account/workspace and no access to real data.
@@ -24,7 +27,12 @@ The `playwright` fixture workspace contains:
   performance, money/invoice, roadsheet share, venue link, collab) do
   their mutations here;
 - project `zzz-rls-foreign-project` with line `ZZZ RLS Foreign Line`, which
-  gives the date suite a stable cross-project line guard.
+  gives the date suite a stable cross-project line guard;
+- project `zzz-difusion` with line `zzz-difusion-2026-27` and 24 synthetic
+  conversations (`@example.test` contacts), loaded by
+  `supabase/fixtures/playwright-difusion.sql`. Smoke, person, cross-tenant,
+  conversation-write and line-modules read it. Idempotent: re-running it
+  resets those rows.
 
 The limited identity drives the negative authorization matrix: workspace
 identity edits are denied, performer permissions are exact, grant/revoke
@@ -87,18 +95,18 @@ BEGIN
     RAISE EXCEPTION 'Both confirmed fixture Auth users must exist first.';
   END IF;
 
-  INSERT INTO workspace_membership (workspace_id, user_id, role, accepted_at)
-  SELECT w.id, v_admin_id, 'admin', now()
-  FROM workspace w
-  WHERE w.slug IN ('marco-rubiol', 'muk-cia', 'playwright')
-  ON CONFLICT (workspace_id, user_id) DO UPDATE
-    SET role = EXCLUDED.role,
-        accepted_at = COALESCE(workspace_membership.accepted_at, now()),
-        updated_at = now();
-
   SELECT id INTO v_workspace_id FROM workspace WHERE slug = 'playwright';
   IF v_workspace_id IS NULL THEN
     RAISE EXCEPTION 'playwright workspace fixture is missing.';
+  END IF;
+
+  -- Its own space only (§ 31). It is the workspace owner there; the
+  -- membership row is kept accepted so the auth hook issues the claim.
+  UPDATE workspace_membership
+     SET accepted_at = COALESCE(accepted_at, now()), updated_at = now()
+   WHERE workspace_id = v_workspace_id AND user_id = v_admin_id;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'playwright@hour.test has no membership in its own workspace.';
   END IF;
 
   INSERT INTO workspace_membership (workspace_id, user_id, role, accepted_at)
@@ -131,6 +139,9 @@ END $$;
 ```
 
 Expected: `NOTICE: Admin and limited fixtures wired`. No error rows.
+
+Then load the synthetic difusión set (same SQL editor, or `psql -f`):
+`supabase/fixtures/playwright-difusion.sql`.
 
 `accepted_at` is required for the auth hook to inject `current_workspace_id` into the JWT and for `has_permission()`'s admin bypass to apply.
 
@@ -188,7 +199,6 @@ Object. If the pinned Playwright browser is missing, point
 
 - DB password rotated → no impact on test user (independent password).
 - Either fixture password rotated → update `.env.test` (and the limited-user Keychain item).
-- Workspace `marco-rubiol` slug changed → update the SQL snippet's `WHERE slug = ...` and re-run.
 - New project added to the workspace → no impact (admin bypass covers any project).
 
 ## Why synthetic test users (not Marco's account)

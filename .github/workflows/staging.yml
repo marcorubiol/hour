@@ -89,9 +89,9 @@ jobs:
 
       - name: Load deterministic synthetic fixtures
         run: |
-          docker run --rm -i postgres:17-alpine \
-            psql "$STAGING_DB_URL" --no-psqlrc --set ON_ERROR_STOP=1 \
-            < supabase/fixtures/staging.sql
+          cat supabase/fixtures/staging.sql supabase/fixtures/playwright-difusion.sql \
+            | docker run --rm -i postgres:17-alpine \
+            psql "$STAGING_DB_URL" --no-psqlrc --set ON_ERROR_STOP=1
 
       - name: Verify synthetic fixture shape
         run: |
@@ -108,7 +108,7 @@ jobs:
           # count was 7 and not 4 (_tasks.md § 39).
           echo "fixture shape: $actual"
           echo "$actual" | jq -e \
-            '. == {"users": 3, "workspaces": 4, "conversations": 154}' >/dev/null
+            '. == {"users": 3, "workspaces": 4, "conversations": 178}' >/dev/null
 
       - name: RLS contract
         run: pnpm --filter web test:rls

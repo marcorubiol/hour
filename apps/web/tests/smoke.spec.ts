@@ -22,8 +22,9 @@ test.describe('smoke', () => {
    * storageState (tests/auth.setup.ts) and the login flow itself is covered
    * by auth-session.spec.ts.
    *
-   * Test user (playwright@hour.test) is member of marco-rubiol, muk-cia and
-   * its own playwright workspace; NOT demo.
+   * Test user (playwright@hour.test) belongs to its own playwright workspace
+   * only (§ 31, 2026-10); the conversations it reads are the synthetic set in
+   * project `zzz-difusion`.
    */
   test('shell → ⌘K → project → views', async ({ page }) => {
     // SEVEN NAVIGATIONS AGAINST PRODUCTION IN ONE TEST. The default 30 s was
@@ -63,14 +64,14 @@ test.describe('smoke', () => {
     await expect(page.locator('.mny__total').first()).toContainText(/sold/);
 
     // Old space-scoped lens bookmarks 308 to the space-less lens.
-    await page.goto('/h/muk-cia/desk');
+    await page.goto('/h/playwright/desk');
     await page.waitForURL(/\/h\/desk\/?$/);
     // Lens headers were unified to the shared LensHeader (.lenshead) in a6cd10e.
     await expect(page.locator('.lenshead').first()).toBeVisible();
 
     // Project detail proves the read path: session survived, RLS let the
     // conversations through, the count renders. Entities stay space-scoped.
-    await page.goto('/h/muk-cia/project/mamemi/');
+    await page.goto('/h/playwright/project/zzz-difusion/');
     const countLabel = page.locator('.rel-stub__count');
     await expect(countLabel).toBeVisible();
     await expect(countLabel).toContainText(/\d+\s+conversations?/);
