@@ -742,7 +742,34 @@ Marco: «no quiero ningún diferido». Cerrados los tres, cada uno como tocaba.
    Free y la función requiere Pro. Marco debe decidir el upgrade; después activar
    `password_hibp_enabled` y volver a ejecutar el advisor. **Ojo: el upgrade que
    pide esta tarea resuelve también la § 33**, así que las dos son la misma
-   decisión mirada desde dos sitios.
+   decisión mirada desde dos sitios. **2026-10-09:** con Anouk entrando, la
+   recomendación es pasar a Pro antes de la beta (quita la pausa).
+
+41. [ ] **Hosting: pensar en el «camino A» de Scalingo cuando se decida
+    (Marco, 2026-10-09, para pensar, no decidido).** A Marco le atrae la alta
+    disponibilidad de Scalingo (PostgreSQL Business: dos servidores con cambio
+    automático, desde 40 €/mes con 1 GB). Salir de Supabase no es mover la
+    base: Hour usa su Auth (y un hook de claims), RLS sobre `auth.uid()` /
+    `auth.jwt()` (119 usos, 100 grants a `authenticated`), PostgREST como única
+    vía de datos (56 ficheros de API, 48 RPC) y Realtime para la presencia; no
+    usa Storage ni Edge Functions.
+    - **Camino A (el realista):** en Scalingo, PostgreSQL Business más GoTrue y
+      PostgREST (los dos libres) en contenedores; la app solo cambia de URL;
+      `auth.uid()`, `auth.jwt()` y el hook se recrean; la presencia pasa a
+      Durable Objects. Unos 100 €/mes con todo duplicado (frente a ~25 $ de
+      Supabase Pro); a ojo una o dos semanas con verificación.
+    - **Camino B:** reescribir a SQL directo (Hyperdrive, auth propio, RLS por
+      transacción). Varias semanas; descartado salvo motivo nuevo.
+    - **Antes de decidir, comprobar en una cuenta de prueba de Scalingo:** que
+      se pueden crear los roles `anon` / `authenticated` / `service_role` y que
+      el usuario de la app no tiene BYPASSRLS; las extensiones `citext`,
+      `pg_trgm`, `pgcrypto` y `unaccent`; la conexión desde fuera de su red; y
+      que la alta disponibilidad exige duplicar también GoTrue y PostgREST.
+    - **Mientras tanto:** no añadir dependencias nuevas de Supabase, para que el
+      camino A no se encarezca.
+    - Contexto: la pila sigue en Cloudflare (empresa de EE. UU.), así que mover
+      solo la base no resuelve la soberanía; si un día es argumento de venta, se
+      decide para toda la pila.
 
 33. [x] **La pausa del plan Free volverá — DECIDIDO: se acepta, con fecha de
     caducidad.** (Marco, 2026-08-29: «mientras la app no esté activa al
@@ -1273,6 +1300,11 @@ entre empresas sin construirlo.
     mobile, light/dark y accesibilidad.
 
 ## Producto — después
+
+- [ ] **La app no cabe a 390 px (chat 09-10, visto por el carril de § 40).** El
+  rail ocupa ~250 px y el shell entero desborda en un móvil. Pesa más ahora que
+  Anouk va a usar Conversations; es diseño (dónde va el rail en móvil), parte del
+  «Polish de beta» de abajo.
 
 - [ ] **Poll de fechas candidatas (à la Doodle/When2meet, integrado).** Al buscar
   fecha para una residencia, un ensayo o una reunión, proponer **varias `date`
