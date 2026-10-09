@@ -3281,3 +3281,58 @@ Triggered by Marco's pre-scaffold doubt (Phase 0.0 day 5). Five alternatives eva
   usuario autenticado. El test RLS (`tests/rls/travel-stage.test.ts`) está
   escrito y **no ha corrido**: va rojo contra cualquier base sin la
   migración.
+
+## [2026-10-09] ADR-098 · `conversation_event`: el historial de una conversación, y cómo convive con los sellos de contacto
+
+- **Contexto.** Anouk va a usar Hour para la difusión real de MüK Cia, y
+  «Contacted today» pisaba la fecha anterior: Hour sabía el último contacto,
+  no cuándo se mandó cada cosa (`_tasks.md § 40`). El contrato estaba
+  congelado (`build/conversation-event-contract.md`) y se materializa tal
+  cual en `20261009100000_conversation_event.sql`. Lo que el contrato no
+  decía es cómo convive con el trigger `conversation_contact_timestamps`,
+  que ya sellaba el último contacto en cada cambio de estado.
+- **Un contacto es un evento.** «Contacted today» deja de existir como
+  acción: el menú de estado dice «Log contact…» y abre el historial con el
+  alta rápida en el día de hoy. La acción `contacted_today` del PATCH se
+  retira, porque escribía el sello sin dejar rastro, que es justo lo que
+  había que dejar de hacer. No se inventa un canal: el alta propone
+  `email`/`Sent` (la difusión es correo) y la persona lo cambia si no es.
+- **El último contacto lo escriben dos sitios, y no se contradicen.** Un
+  evento de contacto lo mueve al máximo entre el sello actual y
+  `occurred_at`, en la misma transacción, así que apuntar hoy algo de la
+  semana pasada no lo hace retroceder. Un cambio de estado lo sigue sellando
+  con la hora del servidor y **sin crear evento**: el estado no es una
+  interacción con un canal, y su historia ya está en `audit_log`.
+  `first_contacted_at` se rellena solo si está vacío, y el trigger ya lo
+  protege después. El trigger no se toca.
+- **La frontera se hereda literalmente.** La policy de lectura es un
+  `EXISTS` sobre `conversation`, que corre con la RLS de la conversación del
+  invocador: un evento se ve si y solo si se ve su conversación (con
+  `read:conversation` y viva). La única escritura es
+  `record_conversation_event`, con `edit:conversation`, y «no existe» y «no
+  es tuyo» dan el mismo 42501.
+- **Append-only de verdad.** `authenticated` tiene solo SELECT, y a tabla
+  entera: sin grant por columnas no hay columna que se quede fuera de un
+  `select` (la rotura de `performance` del 2026-08-29). Ni UPDATE ni DELETE:
+  una corrección es otro evento. El camino de redacción del contrato es
+  administrativo y no se construye aquí.
+- **Lo que ocurrió no está en el futuro** (con cinco minutos de holgura para
+  el reloj de un conector), y sin `occurred_at` el servidor pone la hora: la
+  app manda un instante solo para un día que no es hoy, el mediodía local de
+  ese día.
+- **`external_ref` es idempotente**: la segunda captura del mismo original
+  devuelve el evento ya guardado y no vuelve a tocar el contacto.
+- **Aditiva según § 34**: una tabla, tres enums y una RPC; nada de
+  `conversation` cambia. Rollback en
+  `build/runbooks/rollback-20261009-conversation-event.sql`, probado en
+  local (bajada y subida limpias). Lo que el rollback no deshace: los eventos
+  apuntados entre medias, y los sellos que movieron.
+- **La pantalla es la mínima**: el historial vive en un diálogo que se abre
+  desde «Last contact» de la fila y desde «Log contact…», con el alta encima
+  y la lista debajo. La ficha propia de la conversación sigue siendo un stub;
+  cuando exista, el historial se muda allí.
+- **Estado.** En la rama `claude/conversation-event`, sin aplicar a ninguna
+  base hosted. Verificado en una base local reconstruida desde cero: RLS
+  190/190 (los 179 de producción más los 11 de
+  `tests/rls/conversation-event.test.ts`) y el E2E de conversaciones 5/5
+  contra `vite dev` sobre esa base.
