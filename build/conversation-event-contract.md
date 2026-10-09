@@ -1,6 +1,9 @@
 # `conversation_event` — contrato de integración
 
-Estado: **contrato fijado; tabla, API y timeline todavía no construidos**.
+Estado: **materializado por ADR-098** (`20261009100000_conversation_event.sql`,
+`/api/conversations/:id/events` y el historial de la fila). Fuera de ese
+bloque sigue todo lo de «Fuera de este bloque» menos la tabla, la API y el
+timeline.
 
 Este documento cierra el sobre común para una futura llamada, reunión, nota,
 email o mensaje sin adelantar la UI ni escoger todavía el proveedor de correo o

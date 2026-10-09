@@ -27,6 +27,7 @@
   import { fetchJSON, mutateJSON } from '$lib/api';
   import { dayMonth, dayMonthYear } from '$lib/datetime';
   import Button from '$lib/components/Button.svelte';
+  import ConversationHistory from '$lib/components/ConversationHistory.svelte';
   import Dialog from '$lib/components/Dialog.svelte';
   import Input from '$lib/components/Input.svelte';
   import Menu from '$lib/components/Menu.svelte';
@@ -161,11 +162,10 @@
           ...data,
           items: data.items.map((it) => {
             if (it.id !== id) return it;
-            const { contacted_today: _action, ...fields } = patch;
-            const touched = patch.contacted_today || patch.status !== undefined;
+            const touched = patch.status !== undefined && patch.status !== it.status;
             return {
               ...it,
-              ...fields,
+              ...patch,
               ...(touched
                 ? {
                     last_contacted_at: optimisticNow,
@@ -211,8 +211,15 @@
     $patchMutation.mutate({ id: item.id, patch: { status } });
   }
 
-  function contactedToday(item: ConversationItem) {
-    $patchMutation.mutate({ id: item.id, patch: { contacted_today: true } });
+  // ── History (ADR-098): the timeline and its quick add ──────────────────
+  // A contact is an event now; recording one moves the last contact on the
+  // server, so the row repaints from the invalidated list, not optimistically.
+  let historyOpen = $state(false);
+  let historyFor = $state<ConversationItem | null>(null);
+
+  function openHistory(item: ConversationItem) {
+    historyFor = item;
+    historyOpen = true;
   }
 
   // ── Next action editor (dialog) ─────────────────────────────────────────
@@ -394,7 +401,7 @@
             <td class="cell--meta" data-label="Location">{locationOf(item)}</td>
             <td data-label="Status">
               <Menu
-                label="Change status or mark contacted"
+                label="Change status or log contact"
                 triggerClass={statusBadgeClass(item.status)}
                 direction={i >= visibleItems.length - 2 && i > 2 ? 'up' : 'down'}
               >
@@ -425,18 +432,25 @@
                       class="menu__item"
                       onclick={() => {
                         close();
-                        contactedToday(item);
+                        openHistory(item);
                       }}
-                    >Contacted today</button>
+                    >Log contact…</button>
                   </li>
                 {/snippet}
               </Menu>
             </td>
             <td class="last-contact" data-label="Last contact">
-              <time
-                datetime={item.last_contacted_at ?? undefined}
-                title={contactTitle(item.last_contacted_at)}
-              >{relativeContactDate(item.last_contacted_at)}</time>
+              <button
+                type="button"
+                class="last-contact__open"
+                onclick={() => openHistory(item)}
+                title={contactTitle(item.last_contacted_at) ?? 'History'}
+                aria-label={`History · last contact ${relativeContactDate(item.last_contacted_at)}`}
+              >
+                <time datetime={item.last_contacted_at ?? undefined}
+                  >{relativeContactDate(item.last_contacted_at)}</time
+                >
+              </button>
             </td>
             <td data-label="Next action">
               <button
@@ -495,6 +509,22 @@
     </button>
   </div>
 {/if}
+
+<Dialog bind:open={historyOpen} title="History" size="m" onclose={() => (historyFor = null)}>
+  {#if historyFor}
+    <p class="next-action-who">
+      {historyFor.person?.full_name ?? 'Conversation'}{historyFor.person?.organization_name
+        ? ` — ${historyFor.person.organization_name}`
+        : ''}
+    </p>
+    {#key historyFor.id}
+      <ConversationHistory conversationId={historyFor.id} />
+    {/key}
+  {/if}
+  {#snippet actions()}
+    <Button variant="outline" onclick={() => (historyOpen = false)}>Close</Button>
+  {/snippet}
+</Dialog>
 
 <Dialog bind:open={dialogOpen} title="Next action" size="s" onclose={() => (editing = null)}>
   {#if editing}
@@ -643,6 +673,18 @@
       font-family: var(--font-mono);
       font-size: var(--text-xs);
       letter-spacing: var(--mono-letter-spacing);
+    }
+
+    .last-contact__open {
+      color: inherit;
+      font: inherit;
+      letter-spacing: inherit;
+      text-align: start;
+    }
+    .last-contact__open:hover {
+      color: var(--text-color);
+      text-decoration: underline;
+      text-underline-offset: 0.2em;
     }
 
     .contact-projects {

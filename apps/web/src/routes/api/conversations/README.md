@@ -63,8 +63,18 @@ Invalid values return `400 invalid_query` with per-field issues from Valibot.
 
 ## `PATCH /api/conversations/:id`
 
-The inline editor accepts `status`, `next_action_at`, `next_action_note`,
-`line_id`, and the semantic action `contacted_today: true`. It never accepts a
-client-supplied contact timestamp: the Worker owns the clock. A genuine status
-transition and `contacted_today` both update `last_contacted_at`; the database
-trigger fills `first_contacted_at` once and preserves it thereafter.
+The inline editor accepts `status`, `next_action_at`, `next_action_note` and
+`line_id`. It never accepts a contact timestamp. A genuine status transition
+updates `last_contacted_at` (database trigger); the database fills
+`first_contacted_at` once and preserves it thereafter.
+
+## `GET` / `POST /api/conversations/:id/events` (ADR-098)
+
+The history of a conversation (`conversation_event`, contract in
+`build/conversation-event-contract.md`). `GET` lists the events, most recent
+first; a conversation the caller cannot read yields an empty list, never a
+404 that would confirm it exists. `POST` takes `{ kind, direction?, body?,
+occurred_at? }` and goes through `record_conversation_event`, gated on
+`edit:conversation`; without `occurred_at` the server stamps now. Every kind
+except a note without a direction moves `last_contacted_at` to the latest
+contact in the same transaction. The log is append-only: no edit, no delete.

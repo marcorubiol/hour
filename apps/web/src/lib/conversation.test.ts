@@ -3,7 +3,9 @@ import * as v from 'valibot';
 import {
   CONVERSATION_STATUSES,
   ConversationCreateSchema,
+  ConversationEventCreateSchema,
   ConversationPatchSchema,
+  occurredAtForDay,
   STATUS_LABELS,
   groupConversationsByContact,
   normalizeConversationItem,
@@ -46,13 +48,8 @@ describe('ConversationPatchSchema', () => {
     if (r.success) expect(r.output).toEqual({ status: 'in_conversation' });
   });
 
-  it('accepts only the server-clock contacted-today action', () => {
-    const action = v.safeParse(ConversationPatchSchema, { contacted_today: true });
-    expect(action.success).toBe(true);
-    if (action.success) expect(action.output).toEqual({ contacted_today: true });
-    expect(
-      v.safeParse(ConversationPatchSchema, { contacted_today: false }).success,
-    ).toBe(false);
+  it('never carries a contact stamp: contact is an event since ADR-098', () => {
+    expect(v.safeParse(ConversationPatchSchema, { contacted_today: true }).output).toEqual({});
     expect(
       v.safeParse(ConversationPatchSchema, {
         last_contacted_at: '2040-01-01T00:00:00.000Z',
@@ -324,5 +321,41 @@ describe('ConversationCreateSchema', () => {
     expect(both.success).toBe(true);
     const neither = v.safeParse(ConversationCreateSchema, { project_id: PROJECT });
     expect(neither.success).toBe(true);
+  });
+});
+
+describe('conversation history (ADR-098)', () => {
+  it('leaves today to the server clock and pins any other day to local noon', () => {
+    const now = new Date(2026, 9, 9, 23, 30);
+    expect(occurredAtForDay('2026-10-09', now)).toBeUndefined();
+    const past = occurredAtForDay('2026-10-02', now);
+    expect(past).toBe(new Date(2026, 9, 2, 12, 0).toISOString());
+  });
+
+  it('accepts the quick add and strips what a person cannot claim', () => {
+    const r = v.safeParse(ConversationEventCreateSchema, {
+      kind: 'email',
+      direction: 'outbound',
+      body: '  dossier sent  ',
+      source: 'whatsapp',
+      workspace_id: '00000000-0000-4000-8000-000000000000',
+      external_ref: 'x',
+    });
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.output).toEqual({ kind: 'email', direction: 'outbound', body: 'dossier sent' });
+    }
+  });
+
+  it('rejects an unknown kind, a bad direction and an unparseable instant', () => {
+    expect(v.safeParse(ConversationEventCreateSchema, { kind: 'fax' }).success).toBe(false);
+    expect(
+      v.safeParse(ConversationEventCreateSchema, { kind: 'call', direction: 'sideways' }).success,
+    ).toBe(false);
+    expect(
+      v.safeParse(ConversationEventCreateSchema, { kind: 'call', occurred_at: 'yesterday' })
+        .success,
+    ).toBe(false);
+    expect(v.safeParse(ConversationEventCreateSchema, { kind: 'note' }).success).toBe(true);
   });
 });

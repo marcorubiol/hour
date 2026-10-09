@@ -8,7 +8,7 @@
 
 import * as v from 'valibot';
 import { Constants, type Enums, type Tables } from './db-types';
-import { realIsoDate } from './datetime';
+import { localDayISO, realIsoDate, realIsoInstant } from './datetime';
 
 export type ConversationStatus = Enums<'conversation_status'>;
 
@@ -43,8 +43,6 @@ export function statusBadgeClass(status: string): string {
  */
 export const ConversationPatchSchema = v.object({
   status: v.optional(v.picklist(CONVERSATION_STATUSES)),
-  /** Semantic action: the server owns the timestamp; clients cannot forge it. */
-  contacted_today: v.optional(v.literal(true)),
   next_action_at: v.optional(v.nullable(realIsoDate)),
   next_action_note: v.optional(
     v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500))),
@@ -56,6 +54,61 @@ export const ConversationPatchSchema = v.object({
 });
 
 export type ConversationPatch = v.InferOutput<typeof ConversationPatchSchema>;
+
+// ── The history (ADR-098, contract: build/conversation-event-contract.md) ──
+
+export type ConversationEventKind = Enums<'conversation_event_kind'>;
+export type ConversationEventDirection = Enums<'conversation_event_direction'>;
+export type ConversationEvent = Tables<'conversation_event'>;
+
+export const CONVERSATION_EVENT_KINDS = Constants.public.Enums.conversation_event_kind;
+export const CONVERSATION_EVENT_DIRECTIONS = Constants.public.Enums.conversation_event_direction;
+
+export const EVENT_KIND_LABELS: Record<ConversationEventKind, string> = {
+  email: 'Email',
+  call: 'Call',
+  meeting: 'Meeting',
+  message: 'Message',
+  note: 'Note',
+};
+
+export const EVENT_DIRECTION_LABELS: Record<ConversationEventDirection, string> = {
+  outbound: 'Sent',
+  inbound: 'Received',
+};
+
+/**
+ * POST /api/conversations/:id/events body. `source` is not here: what the app
+ * records is always `manual`, and the provenance of a connector is not a field
+ * a person can claim. `occurred_at` absent means now, on the SERVER clock.
+ */
+export const ConversationEventCreateSchema = v.object({
+  kind: v.picklist(CONVERSATION_EVENT_KINDS),
+  direction: v.optional(v.nullable(v.picklist(CONVERSATION_EVENT_DIRECTIONS))),
+  body: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(5000)))),
+  occurred_at: v.optional(realIsoInstant),
+});
+
+export type ConversationEventCreate = v.InferOutput<typeof ConversationEventCreateSchema>;
+
+/**
+ * The instant to send for a day picked in the quick add. Today sends nothing,
+ * so the server stamps it; any other day is that day at noon in the viewer's
+ * zone, which survives every timezone without changing the day it reads as.
+ */
+export function occurredAtForDay(day: string, now: Date = new Date()): string | undefined {
+  if (day === localDayISO(now)) return undefined;
+  return new Date(`${day}T12:00:00`).toISOString();
+}
+
+/** Columns the timeline reads; the whole envelope stays server-side. */
+export const CONVERSATION_EVENT_SELECT =
+  'id,conversation_id,occurred_at,recorded_at,kind,source,direction,body';
+
+export type ConversationEventItem = Pick<
+  ConversationEvent,
+  'id' | 'conversation_id' | 'occurred_at' | 'recorded_at' | 'kind' | 'source' | 'direction' | 'body'
+>;
 
 /**
  * POST /api/conversations body (ADR-051). Two shapes, exactly one:

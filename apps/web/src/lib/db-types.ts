@@ -743,6 +743,81 @@ export type Database = {
           },
         ]
       }
+      conversation_event: {
+        Row: {
+          body: string | null
+          conversation_id: string
+          created_by: string | null
+          direction:
+            | Database["public"]["Enums"]["conversation_event_direction"]
+            | null
+          external_ref: string | null
+          id: string
+          kind: Database["public"]["Enums"]["conversation_event_kind"]
+          metadata: Json
+          occurred_at: string
+          original_url: string | null
+          participants: Json
+          provenance: Json
+          recorded_at: string
+          source: Database["public"]["Enums"]["conversation_event_source"]
+          workspace_id: string
+        }
+        Insert: {
+          body?: string | null
+          conversation_id: string
+          created_by?: string | null
+          direction?:
+            | Database["public"]["Enums"]["conversation_event_direction"]
+            | null
+          external_ref?: string | null
+          id?: string
+          kind: Database["public"]["Enums"]["conversation_event_kind"]
+          metadata?: Json
+          occurred_at: string
+          original_url?: string | null
+          participants?: Json
+          provenance?: Json
+          recorded_at?: string
+          source?: Database["public"]["Enums"]["conversation_event_source"]
+          workspace_id: string
+        }
+        Update: {
+          body?: string | null
+          conversation_id?: string
+          created_by?: string | null
+          direction?:
+            | Database["public"]["Enums"]["conversation_event_direction"]
+            | null
+          external_ref?: string | null
+          id?: string
+          kind?: Database["public"]["Enums"]["conversation_event_kind"]
+          metadata?: Json
+          occurred_at?: string
+          original_url?: string | null
+          participants?: Json
+          provenance?: Json
+          recorded_at?: string
+          source?: Database["public"]["Enums"]["conversation_event_source"]
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_event_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversation"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_event_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspace"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       crew_assignment: {
         Row: {
           contact_override: Json
@@ -3961,6 +4036,46 @@ export type Database = {
           workspace_slug: string
         }[]
       }
+      record_conversation_event: {
+        Args: {
+          p_body?: string
+          p_conversation_id: string
+          p_direction?: Database["public"]["Enums"]["conversation_event_direction"]
+          p_external_ref?: string
+          p_kind: Database["public"]["Enums"]["conversation_event_kind"]
+          p_metadata?: Json
+          p_occurred_at?: string
+          p_original_url?: string
+          p_participants?: Json
+          p_provenance?: Json
+          p_source?: Database["public"]["Enums"]["conversation_event_source"]
+        }
+        Returns: {
+          body: string | null
+          conversation_id: string
+          created_by: string | null
+          direction:
+            | Database["public"]["Enums"]["conversation_event_direction"]
+            | null
+          external_ref: string | null
+          id: string
+          kind: Database["public"]["Enums"]["conversation_event_kind"]
+          metadata: Json
+          occurred_at: string
+          original_url: string | null
+          participants: Json
+          provenance: Json
+          recorded_at: string
+          source: Database["public"]["Enums"]["conversation_event_source"]
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "conversation_event"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       remove_cast_member: {
         Args: { p_cast_member_id: string }
         Returns: {
@@ -4296,6 +4411,14 @@ export type Database = {
         | "photo"
         | "video"
         | "other"
+      conversation_event_direction: "inbound" | "outbound"
+      conversation_event_kind: "note" | "call" | "email" | "meeting" | "message"
+      conversation_event_source:
+        | "manual"
+        | "email"
+        | "whatsapp"
+        | "import"
+        | "integration"
       conversation_status:
         | "contacted"
         | "in_conversation"
@@ -4517,6 +4640,15 @@ export const Constants = {
         "photo",
         "video",
         "other",
+      ],
+      conversation_event_direction: ["inbound", "outbound"],
+      conversation_event_kind: ["note", "call", "email", "meeting", "message"],
+      conversation_event_source: [
+        "manual",
+        "email",
+        "whatsapp",
+        "import",
+        "integration",
       ],
       conversation_status: [
         "contacted",
