@@ -1,5 +1,15 @@
 # Hour — estado canónico del proyecto
 
+> **Reconciliación 2026-10-09 (tarde): § 31 Y § 40 EN PRODUCCIÓN.** Runtime
+> **`3f6eb44`** (builtAt 2026-10-09T14:48Z), `main` == prod. **Migración
+> `20261009100000_conversation_event` aplicada** (backup 37944973422, plan
+> 37945388593, apply 37946632931): el historial de cada conversación (ADR-098);
+> «Contacted today» se retira y queda «Log contact…». `muk-cia` contiene solo
+> los 154 contactos reales; los tests viven en `playwright` y el usuario del
+> E2E ya no pertenece a `muk-cia` ni a `marco-rubiol`. Suites: **RLS 190/190 ·
+> E2E 62/62** contra `3f6eb44` (una primera pasada justo tras el deploy dio 4
+> rojos por tiempo que pasan solos; la segunda, limpia).
+
 > **Reconciliación 2026-10-09: TRAVEL V2 P1 EN PRODUCCIÓN, Y LAS 154 DE
 > `muk-cia` SON REALES.** Supabase estaba pausada otra vez (DNS vacío; el backup
 > del 2026-10-04 falló); despertada por MCP y backup a mano (run 37935960177,
@@ -510,7 +520,8 @@ orientativo, no una verdad comercial cerrada.
   2026-08-27 eso **ya cambió un gate real**: la migración de ese día se aplicó
   sin el ensayo en staging. No es una nota preventiva, es algo que pasó — ver
   `_tasks.md § 34`.
-- **Última migración aplicada: `20260926100000_travel_stages`** (2026-10-09,
+- **Última migración aplicada: `20261009100000_conversation_event`** (2026-10-09,
+  run 37946632931; ADR-098). Debajo va **`20260926100000_travel_stages`** (2026-10-09,
   run 37939208092; Travel v2 P1, ADR-097). Debajo va
   **`20260829140000_bolo_status_lifecycle`**
   (2026-08-29, run 33260401928). Un bolo nace en el estado que toca

@@ -358,7 +358,9 @@
     **Ese día llegó el 2026-10-09:** Anouk quiere usar Hour para la difusión
     de MüK Cia. Detrás va invitar a Anouk a `muk-cia` (no tiene cuenta) y § 40.
 
-40. [ ] **`conversation_event`: el historial de una conversación (chat 09-10).**
+40. [x] **HECHO 2026-10-09 (ADR-098).** Migración `20261009100000` aplicada (run
+    37946632931), Worker `3f6eb44`, RLS 190/190 y E2E 62/62 contra producción.
+    Texto original: **`conversation_event`: el historial de una conversación (chat 09-10).**
     Hoy «contactado hoy» pisa la fecha anterior: Hour sabe el último contacto,
     no cuándo se envió cada cosa, que es lo que Anouk necesita para la difusión.
     Construir la tabla y un timeline mínimo en la ficha de la conversación sobre

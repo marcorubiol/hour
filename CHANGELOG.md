@@ -6,6 +6,9 @@ hasta entonces, sacado de esos documentos; lo anterior a julio de 2026 está sol
 
 ## Octubre 2026 (en curso)
 
+- Cada conversación guarda su historial: cada contacto (email, llamada, reunión, mensaje o nota) queda apuntado con su fecha y su texto, y se ve desde la celda «Last contact». «Contacted today» pasa a ser «Log contact…». (2026-10-09, `3f6eb44`)
+- Los datos de muestra salen del espacio de MüK Cia: queda solo vuestra lista real de contactos de difusión. (2026-10-09)
+
 ## Septiembre 2026
 
 - La gira deducida dice que es deducida y de qué viajes sale («deducida · ida 7 oct · vuelta 12 oct») en el mes, la agenda, el día y el Tablero, y se llama «de gira» en vez de «fuera». (2026-09-26, `a67e99c`)
