@@ -823,11 +823,15 @@ export type Database = {
           created_by: string | null
           custom_fields: Json
           deleted_at: string | null
+          destination_city: string | null
+          destination_country: string | null
           ends_at: string | null
           id: string
           kind: Database["public"]["Enums"]["date_kind"]
           line_id: string | null
           notes: string | null
+          origin_city: string | null
+          origin_country: string | null
           performance_id: string | null
           project_id: string
           season: string | null
@@ -849,11 +853,15 @@ export type Database = {
           created_by?: string | null
           custom_fields?: Json
           deleted_at?: string | null
+          destination_city?: string | null
+          destination_country?: string | null
           ends_at?: string | null
           id?: string
           kind?: Database["public"]["Enums"]["date_kind"]
           line_id?: string | null
           notes?: string | null
+          origin_city?: string | null
+          origin_country?: string | null
           performance_id?: string | null
           project_id: string
           season?: string | null
@@ -875,11 +883,15 @@ export type Database = {
           created_by?: string | null
           custom_fields?: Json
           deleted_at?: string | null
+          destination_city?: string | null
+          destination_country?: string | null
           ends_at?: string | null
           id?: string
           kind?: Database["public"]["Enums"]["date_kind"]
           line_id?: string | null
           notes?: string | null
+          origin_city?: string | null
+          origin_country?: string | null
           performance_id?: string | null
           project_id?: string
           season?: string | null
@@ -2177,6 +2189,94 @@ export type Database = {
           },
         ]
       }
+      travel_stage: {
+        Row: {
+          arrive_at: string | null
+          created_at: string
+          created_by: string | null
+          date_id: string
+          depart_at: string | null
+          from_city: string | null
+          from_country: string | null
+          from_place: string | null
+          id: string
+          mode: Database["public"]["Enums"]["transport_mode"]
+          notes: string | null
+          position: number
+          project_id: string
+          reference: string | null
+          to_city: string | null
+          to_country: string | null
+          to_place: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          arrive_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          date_id: string
+          depart_at?: string | null
+          from_city?: string | null
+          from_country?: string | null
+          from_place?: string | null
+          id?: string
+          mode?: Database["public"]["Enums"]["transport_mode"]
+          notes?: string | null
+          position: number
+          project_id: string
+          reference?: string | null
+          to_city?: string | null
+          to_country?: string | null
+          to_place?: string | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          arrive_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          date_id?: string
+          depart_at?: string | null
+          from_city?: string | null
+          from_country?: string | null
+          from_place?: string | null
+          id?: string
+          mode?: Database["public"]["Enums"]["transport_mode"]
+          notes?: string | null
+          position?: number
+          project_id?: string
+          reference?: string | null
+          to_city?: string | null
+          to_country?: string | null
+          to_place?: string | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "travel_stage_date_id_fkey"
+            columns: ["date_id"]
+            isOneToOne: false
+            referencedRelation: "date"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "travel_stage_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "project"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "travel_stage_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspace"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_profile: {
         Row: {
           avatar_url: string | null
@@ -2980,10 +3080,14 @@ export type Database = {
           p_all_day?: boolean
           p_city?: string
           p_country?: string
+          p_destination_city?: string
+          p_destination_country?: string
           p_ends_at?: string
           p_kind: Database["public"]["Enums"]["date_kind"]
           p_label?: string
           p_line_id?: string
+          p_origin_city?: string
+          p_origin_country?: string
           p_performance_id?: string
           p_project_id: string
           p_starts_at: string
@@ -3000,11 +3104,15 @@ export type Database = {
           created_by: string | null
           custom_fields: Json
           deleted_at: string | null
+          destination_city: string | null
+          destination_country: string | null
           ends_at: string | null
           id: string
           kind: Database["public"]["Enums"]["date_kind"]
           line_id: string | null
           notes: string | null
+          origin_city: string | null
+          origin_country: string | null
           performance_id: string | null
           project_id: string
           season: string | null
@@ -3048,11 +3156,15 @@ export type Database = {
           created_by: string | null
           custom_fields: Json
           deleted_at: string | null
+          destination_city: string | null
+          destination_country: string | null
           ends_at: string | null
           id: string
           kind: Database["public"]["Enums"]["date_kind"]
           line_id: string | null
           notes: string | null
+          origin_city: string | null
+          origin_country: string | null
           performance_id: string | null
           project_id: string
           season: string | null
@@ -3475,6 +3587,49 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      create_travel_stage: {
+        Args: {
+          p_arrive_at?: string
+          p_date_id: string
+          p_depart_at?: string
+          p_from_city?: string
+          p_from_country?: string
+          p_from_place?: string
+          p_mode?: Database["public"]["Enums"]["transport_mode"]
+          p_notes?: string
+          p_reference?: string
+          p_to_city?: string
+          p_to_country?: string
+          p_to_place?: string
+        }
+        Returns: {
+          arrive_at: string | null
+          created_at: string
+          created_by: string | null
+          date_id: string
+          depart_at: string | null
+          from_city: string | null
+          from_country: string | null
+          from_place: string | null
+          id: string
+          mode: Database["public"]["Enums"]["transport_mode"]
+          notes: string | null
+          position: number
+          project_id: string
+          reference: string | null
+          to_city: string | null
+          to_country: string | null
+          to_place: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "travel_stage"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       create_venue: {
         Args: {
           p_address?: string
@@ -3593,6 +3748,7 @@ export type Database = {
         Returns: undefined
       }
       delete_task: { Args: { p_task_id: string }; Returns: undefined }
+      delete_travel_stage: { Args: { p_stage_id: string }; Returns: undefined }
       fiscal_identity_snapshot: { Args: { p_id: string }; Returns: Json }
       generate_workspace_sid: { Args: never; Returns: string }
       get_public_calendar: { Args: { p_token: string }; Returns: Json }
@@ -3828,6 +3984,36 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      reorder_travel_stages: {
+        Args: { p_date_id: string; p_stage_ids: string[] }
+        Returns: {
+          arrive_at: string | null
+          created_at: string
+          created_by: string | null
+          date_id: string
+          depart_at: string | null
+          from_city: string | null
+          from_country: string | null
+          from_place: string | null
+          id: string
+          mode: Database["public"]["Enums"]["transport_mode"]
+          notes: string | null
+          position: number
+          project_id: string
+          reference: string | null
+          to_city: string | null
+          to_country: string | null
+          to_place: string | null
+          updated_at: string
+          workspace_id: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "travel_stage"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       request_workspace_alias: {
         Args: { p_alias: string; p_workspace_id: string }
         Returns: {
@@ -4013,6 +4199,49 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      update_travel_stage: {
+        Args: {
+          p_arrive_at?: string
+          p_depart_at?: string
+          p_from_city?: string
+          p_from_country?: string
+          p_from_place?: string
+          p_mode: Database["public"]["Enums"]["transport_mode"]
+          p_notes?: string
+          p_reference?: string
+          p_stage_id: string
+          p_to_city?: string
+          p_to_country?: string
+          p_to_place?: string
+        }
+        Returns: {
+          arrive_at: string | null
+          created_at: string
+          created_by: string | null
+          date_id: string
+          depart_at: string | null
+          from_city: string | null
+          from_country: string | null
+          from_place: string | null
+          id: string
+          mode: Database["public"]["Enums"]["transport_mode"]
+          notes: string | null
+          position: number
+          project_id: string
+          reference: string | null
+          to_city: string | null
+          to_country: string | null
+          to_place: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "travel_stage"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       update_workspace: {
         Args: { p_patch: Json; p_workspace_id: string }
         Returns: {
@@ -4121,6 +4350,16 @@ export type Database = {
       project_status: "draft" | "active" | "archived"
       task_origin: "manual" | "protocol" | "ai"
       task_status: "open" | "done"
+      transport_mode:
+        | "plane"
+        | "train"
+        | "bus"
+        | "car"
+        | "taxi"
+        | "metro"
+        | "walk"
+        | "ferry"
+        | "other"
       workspace_domain:
         | "theatre"
         | "dance"
@@ -4338,6 +4577,17 @@ export const Constants = {
       project_status: ["draft", "active", "archived"],
       task_origin: ["manual", "protocol", "ai"],
       task_status: ["open", "done"],
+      transport_mode: [
+        "plane",
+        "train",
+        "bus",
+        "car",
+        "taxi",
+        "metro",
+        "walk",
+        "ferry",
+        "other",
+      ],
       workspace_domain: [
         "theatre",
         "dance",
