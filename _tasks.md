@@ -344,6 +344,17 @@
     `DELETE /api/workspaces/[id]/access` (el propio usuario puede hacerlo: es
     admin y la RPC no se excluye a sí misma). Urgente el día que MüK Cia se use
     para difusión real en ese espacio.
+    **Ese día es ahora (2026-10-09):** Anouk quiere usar Hour para la difusión
+    de MüK Cia. En carril desde esa fecha. Detrás va invitar a Anouk a
+    `muk-cia` (no tiene cuenta) y § 40.
+
+40. [ ] **`conversation_event`: el historial de una conversación (chat 09-10).**
+    Hoy «contactado hoy» pisa la fecha anterior: Hour sabe el último contacto,
+    no cuándo se envió cada cosa, que es lo que Anouk necesita para la difusión.
+    Construir la tabla y un timeline mínimo en la ficha de la conversación sobre
+    el contrato ya congelado (`build/conversation-event-contract.md`), con RLS y
+    E2E. Schema aditivo: gate de § 34 sin staging obligatorio. Va detrás de
+    § 31, que vacía `muk-cia` de datos sintéticos.
 
 ## AHORA — preparar el Planner v3 (revisión de viabilidad, 2026-07-30)
 
