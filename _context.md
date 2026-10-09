@@ -1,5 +1,22 @@
 # Hour — estado canónico del proyecto
 
+> **Reconciliación 2026-10-09: TRAVEL V2 P1 EN PRODUCCIÓN, Y LAS 154 DE
+> `muk-cia` SON REALES.** Supabase estaba pausada otra vez (DNS vacío; el backup
+> del 2026-10-04 falló); despertada por MCP y backup a mano (run 37935960177,
+> sello `2026-10-09T13-19-04Z`). **Migración `20260926100000_travel_stages`
+> aplicada** (apply run 37939208092, tras inspect 37938291019 y plan
+> 37938415844); catálogo verificado y **RLS 179/179** contra la base migrada.
+> Mergeada en `main` (`d540641`). **El Worker sigue en `a67e99c`**: la base va
+> por delante a propósito, y el código de P1 son tipos y tests, sin pantalla.
+>
+> **Corrección:** las 154 conversaciones vivas de `muk-cia` NO son el juego
+> sintético que este documento describía desde agosto. Son la lista real de
+> difusión de MaMeMi, importada el 2026-04-19 (emails reales, 0 de prueba); lo
+> sintético con 154 filas es `supabase/fixtures/staging.sql`, que solo carga
+> staging. 28 llevan encima un overlay de muestra del 2026-07-04
+> (`custom_fields._sample`). Anouk quiere usar Hour para la difusión: `§ 31`
+> está en carril y `§ 40` (`conversation_event`) en cola.
+
 > **Reconciliación 2026-09-26: EL § 38 ESTÁ EN PRODUCCIÓN.** Runtime
 > **`a67e99c`** (builtAt 2026-09-26T21:14:55Z, `dirty:false`), desplegado por
 > Marco desde el checkout principal; `/health/ready` con Supabase `ok`. Es
@@ -493,7 +510,9 @@ orientativo, no una verdad comercial cerrada.
   2026-08-27 eso **ya cambió un gate real**: la migración de ese día se aplicó
   sin el ensayo en staging. No es una nota preventiva, es algo que pasó — ver
   `_tasks.md § 34`.
-- **Última migración aplicada: `20260829140000_bolo_status_lifecycle`**
+- **Última migración aplicada: `20260926100000_travel_stages`** (2026-10-09,
+  run 37939208092; Travel v2 P1, ADR-097). Debajo va
+  **`20260829140000_bolo_status_lifecycle`**
   (2026-08-29, run 33260401928). Un bolo nace en el estado que toca
   (`proposed`, `hold`, `hold_1..3` o `confirmed`) y se mueve después por
   `update_bolo_status`, con la puerta de `update_bolo_fee` (`edit:money`).

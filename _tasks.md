@@ -1075,6 +1075,10 @@ entre empresas sin construirlo.
 
 ## EN CURSO: Travel v2, el viaje como trayecto multi-etapa (ADR-089)
 
+> **2026-10-09: P1 APLICADA EN PRODUCCIÓN** (apply run 37939208092, RLS
+> 179/179, mergeada en `main` como `d540641`). Lo siguiente de Travel es la
+> pantalla (P2), que pide diseño.
+
 > **Estado 2026-09-26.** Marco respondió las tres preguntas: aprueba el
 > modelo, rama `feat/travel-stages`, ensayo en `hour-staging`. P1 (schema) está
 > escrita en esa rama, que ya está en `origin`, y no aplicada en ninguna base
