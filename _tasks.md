@@ -328,7 +328,18 @@
       sitio al que se puede ir — se afirma el href y se pulsa.
     **No queda nada abierto de este bloque.**
 
-31. [ ] **Mudar el juego sintético de difusión a `playwright`, y solo entonces
+31. [x] **HECHO 2026-10-09.** Juego de prueba en `playwright` (proyecto
+    `zzz-difusion`, 24 contactos `@example.test`) y tests re-apuntados (merge
+    en `main`); el usuario del E2E ya solo pertenece a `playwright`. En
+    `muk-cia`: las 154 conversaciones son la lista REAL de difusión (no
+    sintética), su overlay `_sample` de 28 filas revertido, las fechas que puso
+    el E2E en Olot borradas, y por decisión de Marco borradas (soft-delete) las
+    16 funciones, 11 fechas, 12 bolos y 12 salas de muestra. Después: RLS
+    179/179 y E2E 62/62 contra producción. Ojo para quien toque estados a mano:
+    el trigger `conversation_contact_timestamps` pone `last_contacted_at = now()`
+    en cada cambio de estado y no deja vaciar `first_contacted_at`.
+    Texto original:
+    **Mudar el juego sintético de difusión a `playwright`, y solo entonces
     quitarle al usuario del E2E el acceso a los espacios reales.**
     El usuario es **admin** de `muk-cia` y `marco-rubiol`. El spec que escribía
     ahí ya está arreglado, y **no hubo daño**: el `audit_log` demuestra que las
@@ -344,9 +355,8 @@
     `DELETE /api/workspaces/[id]/access` (el propio usuario puede hacerlo: es
     admin y la RPC no se excluye a sí misma). Urgente el día que MüK Cia se use
     para difusión real en ese espacio.
-    **Ese día es ahora (2026-10-09):** Anouk quiere usar Hour para la difusión
-    de MüK Cia. En carril desde esa fecha. Detrás va invitar a Anouk a
-    `muk-cia` (no tiene cuenta) y § 40.
+    **Ese día llegó el 2026-10-09:** Anouk quiere usar Hour para la difusión
+    de MüK Cia. Detrás va invitar a Anouk a `muk-cia` (no tiene cuenta) y § 40.
 
 40. [ ] **`conversation_event`: el historial de una conversación (chat 09-10).**
     Hoy «contactado hoy» pisa la fecha anterior: Hour sabe el último contacto,
