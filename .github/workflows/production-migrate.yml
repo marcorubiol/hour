@@ -138,6 +138,56 @@ jobs:
                    having count(*) filter (where n.nspname = 'public') = 0
                     order by 1;"
 
+          # Lo que una migración que borra funciones por nombre necesita saber
+          # (20260926100000 lo hace con create_date): todas las sobrecargas
+          # vivas con su firma y un hash del cuerpo, quién depende de cada una,
+          # y la definición completa para compararla con el rollback, que se
+          # capturó de la base local y no de esta.
+          echo '### Funciones de fechas y tramos: firmas y hash del cuerpo'
+          run_sql "select n.nspname as schema, p.oid::regprocedure as firma,
+                          md5(pg_get_functiondef(p.oid)) as def_md5,
+                          p.prosecdef as definer
+                     from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+                    where p.proname in ('create_date', 'update_date', 'create_date_series',
+                                        'create_travel_stage', 'update_travel_stage',
+                                        'delete_travel_stage', 'reorder_travel_stages')
+                    order by 1, 2;"
+
+          echo '### Quién depende de esas funciones (debe salir vacío)'
+          run_sql "select p.oid::regprocedure as funcion, d.classid::regclass as catalogo,
+                          d.objid, d.deptype,
+                          pg_describe_object(d.classid, d.objid, d.objsubid) as dependiente
+                     from pg_proc p
+                     join pg_depend d on d.refclassid = 'pg_proc'::regclass and d.refobjid = p.oid
+                    where p.proname in ('create_date', 'update_date', 'create_date_series')
+                    order by 1, 5;"
+
+          echo '### Nombres que la migración va a crear (debe salir vacío)'
+          run_sql "select 'type' as kind, n.nspname || '.' || t.typname as nombre
+                     from pg_type t join pg_namespace n on n.oid = t.typnamespace
+                    where t.typname in ('transport_mode', 'travel_stage')
+                   union all
+                   select 'relation', n.nspname || '.' || c.relname
+                     from pg_class c join pg_namespace n on n.oid = c.relnamespace
+                    where c.relname = 'travel_stage'
+                   union all
+                   select 'column', 'public.date.' || a.attname
+                     from pg_attribute a
+                    where a.attrelid = 'public.date'::regclass and not a.attisdropped
+                      and a.attname in ('origin_city', 'origin_country',
+                                        'destination_city', 'destination_country')
+                    order by 1, 2;"
+
+          echo '### Definición viva de public.create_date (para el rollback)'
+          run_sql "select pg_get_functiondef(p.oid)
+                     from pg_proc p
+                    where p.pronamespace = 'public'::regnamespace and p.proname = 'create_date';"
+
+          echo '### Grants de public.create_date'
+          run_sql "select p.oid::regprocedure as firma, coalesce(p.proacl::text, '(default)') as acl
+                     from pg_proc p
+                    where p.pronamespace = 'public'::regnamespace and p.proname = 'create_date';"
+
           # ── LOS CHEQUEOS QUE EL ADVISOR LLAMA «ERROR», PREGUNTADOS AQUÍ ──
           #
           # NO SUSTITUYEN AL ADVISOR HOSPEDADO, y decirlo importa más que el
