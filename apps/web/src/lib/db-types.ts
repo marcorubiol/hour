@@ -2257,18 +2257,21 @@ export type Database = {
           {
             foreignKeyName: "travel_stage_date_id_fkey"
             columns: ["date_id"]
+            isOneToOne: false
             referencedRelation: "date"
             referencedColumns: ["id"]
           },
           {
             foreignKeyName: "travel_stage_project_id_fkey"
             columns: ["project_id"]
+            isOneToOne: false
             referencedRelation: "project"
             referencedColumns: ["id"]
           },
           {
             foreignKeyName: "travel_stage_workspace_id_fkey"
             columns: ["workspace_id"]
+            isOneToOne: false
             referencedRelation: "workspace"
             referencedColumns: ["id"]
           },
