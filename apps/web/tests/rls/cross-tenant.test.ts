@@ -9,13 +9,13 @@
  *
  * Fixtures used (no test data created):
  *   - User `playwright@hour.test`:
- *     - workspace_membership: admin of `mamemi`, admin of `marco-rubiol`
- *       (legacy from initial test user setup, see runbook), owner of
- *       `playwright`.
- *     - account_membership: owner of `playwright-acc` ONLY. NOT a member
- *       of `mamemi-acc` or `marco-rubiol-acc` despite workspace access.
- *       This is the intended account-vs-workspace separation per ADR-032:
- *       you can WORK in a workspace without being an admin of its account.
+ *     - workspace_membership: owner of `playwright` ONLY. Until § 31
+ *       (2026-10) it was also admin of `muk-cia` and `marco-rubiol`, which
+ *       hold real data; its difusión set now lives in `playwright`
+ *       (`supabase/fixtures/playwright-difusion.sql`).
+ *     - account_membership: owner of `playwright-acc` ONLY. ADR-032's
+ *       account-vs-workspace separation is still asserted: the other
+ *       accounts exist and stay invisible.
  *   - Anonymous (no JWT).
  */
 
@@ -40,13 +40,13 @@ describe.skipIf(!envReady())('RLS — cross-tenant isolation', () => {
       new URLSearchParams({ select: 'slug', deleted_at: 'is.null' }),
     );
     const slugs = rows.map((r) => r.slug).sort();
-    // marco-rubiol is included as legacy admin (test-user-setup); muk-cia
-    // (renamed from mamemi, ADR-036 2026-05-19) added on the multi-workspace
-    // split; playwright is the user's own. What matters for RLS: playwright
-    // must NEVER see a workspace they are NOT a member of — the `demo`
-    // workspace exists in the DB and must stay invisible here.
-    expect(slugs).toEqual(['marco-rubiol', 'muk-cia', 'playwright']);
-    expect(slugs).not.toContain('demo');
+    // Its own space and nothing else. `muk-cia`, `marco-rubiol` and `demo`
+    // exist in the DB (real tenants in production, synthetic stand-ins in
+    // staging) and must stay invisible here.
+    expect(slugs).toEqual(['playwright']);
+    for (const other of ['muk-cia', 'marco-rubiol', 'demo']) {
+      expect(slugs).not.toContain(other);
+    }
   });
 
   test('account RLS: playwright sees only accounts where they have account_membership', async () => {
@@ -56,9 +56,7 @@ describe.skipIf(!envReady())('RLS — cross-tenant isolation', () => {
       new URLSearchParams({ select: 'slug', deleted_at: 'is.null' }),
     );
     const slugs = rows.map((r) => r.slug).sort();
-    // Critical ADR-032 separation: playwright has workspace_membership
-    // in `mamemi` (admin) but NOT account_membership in `mamemi-acc`.
-    // They should see only their own account.
+    // Critical ADR-032 separation: they should see only their own account.
     expect(slugs).toEqual(['playwright-acc']);
     expect(slugs).not.toContain('mamemi-acc');
     expect(slugs).not.toContain('marco-rubiol-acc');
@@ -80,18 +78,18 @@ describe.skipIf(!envReady())('RLS — cross-tenant isolation', () => {
   });
 
   test('playwright user sees conversations only in workspaces they belong to', async () => {
-    const { rows } = await pgGet<{ workspace_id: string }>(
+    const { rows } = await pgGet<{ workspace_id: string; project: { slug: string } }>(
       'conversation',
       playwrightJwt,
       new URLSearchParams({
-        select: 'workspace_id',
+        select: 'workspace_id,project:project_id!inner(slug)',
         deleted_at: 'is.null',
         limit: '500',
       }),
     );
-    // Playwright is admin of `muk-cia` (which holds the 154 imported
-    // conversations). They have no conversation access via marco-rubiol.
-    expect(rows.length).toBeGreaterThanOrEqual(154);
+    // The synthetic difusión set (24 rows in `zzz-difusion`) is visible, so
+    // the boundary below is checked against real rows, not an empty answer.
+    expect(rows.filter((r) => r.project.slug === 'zzz-difusion').length).toBeGreaterThanOrEqual(24);
 
     // The security invariant is MEMBERSHIP-BOUNDED visibility: every
     // visible conversation must live in a workspace the caller belongs to.

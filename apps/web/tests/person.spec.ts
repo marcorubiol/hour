@@ -22,15 +22,17 @@ test.describe('person file', () => {
     test.setTimeout(60_000);
     const marker = `note-e2e-${Date.now()}`;
 
-    // ADR-067: the Conversations lens is space-less and cross-space.
-    await page.goto('/h/conversations');
+    // ADR-067: the Conversations lens is space-less and cross-space, so it is
+    // scoped here to the fixture space: this spec WRITES a note on whoever is
+    // first, and until § 31 (2026-10) that was a real MüK Cia contact.
+    await page.goto('/h/conversations?scope=s:playwright');
     await expect(page.locator('tbody tr').first()).toBeVisible();
 
     // Into the person file via the linked name. The workspace segment on a
     // person URL is browsing context, not ownership — `person` is a global
     // entity resolved by RLS, so any accessible segment renders it (verified:
-    // the same person opens under /h/marco-rubiol/ and /h/muk-cia/). Don't
-    // pin the test to one space.
+    // the same person opened under two spaces). Don't pin the URL to one
+    // space.
     const firstName = page.locator('tbody tr').first().getByRole('link').first();
     const personName = (await firstName.innerText()).trim();
     await firstName.click();
@@ -38,7 +40,7 @@ test.describe('person file', () => {
     await expect(page.getByRole('heading', { name: personName, level: 1 })).toBeVisible();
 
     // The conversation context renders (this person has at least the
-    // MaMeMi conversation — that's why they were in the list).
+    // fixture difusión conversation — that's why they were in the list).
     const conversations = page.getByRole('region', { name: 'Conversations' });
     await expect(conversations.getByRole('listitem').first()).toBeVisible();
 

@@ -35,7 +35,7 @@ const PASSWORD = process.env.PW_TEST_PASSWORD;
  * ── Safety ────────────────────────────────────────────────────────────
  * Everything happens in the `playwright` fixture workspace, scoped by URL
  * token, on rows carrying a unique title this run created. The test user
- * is admin of `muk-cia` (REAL production data): an unscoped list here
+ * was admin of `muk-cia` (REAL production data) until § 31: an unscoped list here
  * would return real rehearsals, and the sweep would delete them. Never
  * widen these filters. Self-cleaning per ADR-052.
  */
