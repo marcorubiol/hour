@@ -227,7 +227,9 @@ async function eielProvince(dir, prov) {
       const inner = fs.readdirSync(tmp).find((f) => f.endsWith('.zip'));
       const list = inner ? (await run('unzip', ['-l', path.join(tmp, inner)])).split('\n') : [];
       const line = list.find((l) => l.trim().endsWith(`_CENT_CULTURAL_${prov}.txt`));
-      if (line && Number(line.trim().split(/\s+/)[0]) > 0) {
+      // A phase still being published may ship the centres without their uses.
+      const complete = EIEL_TABLES.every((t) => list.some((l) => l.trim().endsWith(`_${t}_${prov}.txt`)));
+      if (complete && line && Number(line.trim().split(/\s+/)[0]) > 0) {
         await run('unzip', ['-o', '-q', '-j', path.join(tmp, inner), ...EIEL_TABLES.map((t) => `*_${t}_${prov}.txt`), '-d', dir]);
         console.log(`${String(fs.statSync(zip).size).padStart(10)}  eiel/${prov} periodo ${period}: ${line.trim().split(/\s+/).pop()}`);
         return;

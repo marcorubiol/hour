@@ -312,30 +312,29 @@ function madridEiel() {
 
 // ── EIEL, Secretaría de Estado de Política Territorial ──────────────────
 // One province per file set; no coordinates (zone from the province).
+const EIEL_DIR = path.join(RAW, 'eiel');
+const EIEL_FILES = new Set(fs.existsSync(EIEL_DIR) ? fs.readdirSync(EIEL_DIR) : []);
+const eielFile = (fase, table, prov) => `${fase}_${table}_${prov}.txt`;
+// The phase of each province: the newest one with its three tables (the
+// last complete phase differs by province).
+const EIEL_FASES = {};
+for (const f of [...EIEL_FILES].sort()) {
+  const m = /^(\d{4})_CENT_CULTURAL_(\d{2})\.txt$/.exec(f);
+  if (m && ['CENT_CULTURAL_USOS', 'MUNICIPIO'].every((t) => EIEL_FILES.has(eielFile(m[1], t, m[2])))) EIEL_FASES[m[2]] = m[1];
+}
 function eiel() {
-  const dir = path.join(RAW, 'eiel');
-  const files = fs.readdirSync(dir);
-  const latin1 = (f) => fs.readFileSync(path.join(dir, f), 'latin1');
+  const latin1 = (f) => fs.readFileSync(path.join(EIEL_DIR, f), 'latin1');
   const out = [];
-  for (const centres of files.filter((f) => /^\d{4}_CENT_CULTURAL_\d{2}\.txt$/.test(f)).sort()) {
-    const [fase, , , prov] = centres.replace('.txt', '').split('_');
+  for (const [prov, fase] of Object.entries(EIEL_FASES).sort()) {
     const tables = {
-      centres: latin1(centres),
-      uses: latin1(`${fase}_CENT_CULTURAL_USOS_${prov}.txt`),
-      municipalities: latin1(`${fase}_MUNICIPIO_${prov}.txt`),
+      centres: latin1(eielFile(fase, 'CENT_CULTURAL', prov)),
+      uses: latin1(eielFile(fase, 'CENT_CULTURAL_USOS', prov)),
+      municipalities: latin1(eielFile(fase, 'MUNICIPIO', prov)),
     };
     out.push(...eielRecords(tables, normPlace, kindFromName, (w) => skip('eiel', w)).map(rec));
   }
   return out;
 }
-// The phase of each province (the last complete one differs by province).
-const EIEL_FASES = Object.fromEntries(
-  fs
-    .readdirSync(path.join(RAW, 'eiel'))
-    .filter((x) => /^\d{4}_CENT_CULTURAL_\d{2}\.txt$/.test(x))
-    .map((x) => [x.slice(-6, -4), x.slice(0, 4)])
-    .sort(),
-);
 const EIEL_FASE = (() => {
   const f = [...new Set(Object.values(EIEL_FASES))].sort();
   return f.length === 0 ? null : f.length === 1 ? f[0] : `${f[0]}-${f[f.length - 1]}`;
@@ -364,9 +363,14 @@ function fold(r) {
   let best = null;
   if (r.qid && qidOwner.has(r.qid)) best = { row: qidOwner.get(r.qid), m: { by: 'qid', distanceM: null } };
   if (!best && r.lat != null) {
+    // Wikidata names Paris, Lyon and Marseille as the commune; Basilic by
+    // arrondissement («Paris 15e Arrondissement»). Only for the French
+    // Wikidata records of fase 2, so the phase 1 merges stay as they were.
+    const loose = r.source === 'wikidata' && r.country !== 'ES';
+    const city = (x) => (loose ? x.cityNorm.replace(/ \d+(er|e) arrondissement$/, '') : x.cityNorm);
     for (const row of nearbyRows(r)) {
       if (row.country !== r.country) continue;
-      const m = sameVenue(asMatch(row), asMatch(r));
+      const m = sameVenue({ ...asMatch(row), city: city(row) }, { ...asMatch(r), city: city(r) });
       if (m && (!best || (m.distanceM ?? 0) < (best.m.distanceM ?? 0))) best = { row, m };
     }
   }
