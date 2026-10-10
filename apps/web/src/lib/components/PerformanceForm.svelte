@@ -10,11 +10,11 @@
    * `pending`, so each host renders its own actions row without
    * duplicating the mutation.
    *
-   * Timezone rule (ADR-078 §11): a typed hour is VENUE-LOCAL. This form
-   * carries no hour field — `performed_at` is a plain calendar day, so
-   * there is nothing to convert; the rule bites where hours exist: the
-   * unified dialog's date form and the performance detail timeslots, both
-   * of which convert through `wallClockToInstant(wall, entryTz)`.
+   * NO HOURS HERE, on purpose (ADR-090 P3, Marco 2026-10-10): a gig is
+   * created on a day, and its hours are written only in its running order
+   * (`RunningOrder`, on the day view and on the performance page). So
+   * `performed_at` is a plain calendar day and the POST never carries a
+   * time; the venue-local rule (ADR-078 §11) bites where hours exist.
    *
    * The create RPC returns the full row — this is the slice consumers
    * need (workspace_id resolves the navigation target's slug).
