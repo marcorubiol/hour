@@ -23,19 +23,34 @@
    * after that only a move changes its place: drag a row, Alt+↑/↓ on a
    * focused row, or the up/down verbs while editing it.
    *
-   * HOW IT WRITES: the whole order to `PUT /api/schedule/:target/:id`
-   * (`replace_schedule_slots`), a move to `PATCH` (`reorder_schedule_slots`).
-   * P2 (live editing over the collab DO) changes only those two lines: the
-   * order will be a `Y.Array` in the same doc as the notes, and this component
-   * will edit the array instead. The editing UI and the rules stay.
+   * HOW IT WRITES (ADR-090 P2, Marco 2026-10-10: the doc manda, like the
+   * notes): into the `schedule` Y.Array of the target's collab doc, the same
+   * doc that holds a performance's notes. Every change is still the WHOLE next
+   * order, and `writeSchedule` turns it into the fewest CRDT operations, so
+   * two people editing during a rehearsal merge instead of overwriting. The
+   * Durable Object materializes the array into `schedule_slot` and says so;
+   * then the other surfaces refetch. Nothing else writes these rows.
+   *
+   * WHO SEES WHAT: an editor reads the live doc once it has synced (before
+   * that, the rows, read-only). A reader cannot open the doc (the upgrade
+   * gates on the edit permission) and reads the rows from `GET
+   * /api/schedule`.
    */
   import { tick } from 'svelte';
-  import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
+  import { createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
-  import { fetchJSON, mutateJSON } from '$lib/api';
+  import { fetchJSON } from '$lib/api';
   import { LOCALES, t, type Locale } from '$lib/i18n';
   import { addToast } from './Toast.svelte';
-  import type { ScheduleSlotInput, ScheduleSlotRow } from '$lib/schedule-slot';
+  import { openCollabDoc } from '$lib/collab-doc';
+  import { readSchedule, scheduleArray, writeSchedule } from '$lib/schedule-doc';
+  import {
+    timeslotsFromSlots,
+    timeslotsOrdered,
+    type ScheduleSlotInput,
+    type ScheduleSlotRow,
+  } from '$lib/schedule-slot';
+  import type * as Y from 'yjs';
   import {
     KIND_WORD_KEYS,
     LEGACY_KINDS,
@@ -83,8 +98,49 @@
   }));
   const feed = createQuery(feedStore);
 
-  let order = $derived(inputsOf($feed.data?.slots ?? []));
   let canEdit = $derived($feed.data?.can_edit ?? false);
+
+  // ── The live doc: opened for an editor, closed when this order goes ────
+  /** The doc, once it has synced with the server: only then is it written. */
+  let live = $state.raw<Y.Doc | null>(null);
+  /** The order as the doc has it; null until it has synced. */
+  let liveOrder = $state.raw<ScheduleSlotInput[] | null>(null);
+  let connection = $state<'connecting' | 'live' | 'offline'>('connecting');
+
+  $effect(() => {
+    if (!canEdit) return;
+    const collab = openCollabDoc(target, id);
+    const { doc, provider } = collab;
+    const array = scheduleArray(doc);
+    let synced = false;
+    const pull = () => {
+      if (synced) liveOrder = readSchedule(doc);
+    };
+    array.observeDeep(pull);
+    provider.once('synced', () => {
+      synced = true;
+      live = doc;
+      pull();
+    });
+    provider.on('status', ({ status }: { status: string }) => {
+      connection = status === 'connected' ? 'live' : 'offline';
+    });
+    // The DO wrote the rows: every surface that reads them refetches.
+    provider.on('custom-message', (message: string) => {
+      if (message === 'schedule:materialized') settle();
+    });
+    return () => {
+      array.unobserveDeep(pull);
+      collab.close();
+      live = null;
+      liveOrder = null;
+      connection = 'connecting';
+    };
+  });
+
+  let order = $derived(liveOrder ?? inputsOf($feed.data?.slots ?? []));
+  /** An editor whose doc has not arrived yet: drawn, not written. */
+  let waiting = $derived(live === null);
   let isToday = $derived(dayOf(new Date().toISOString(), tz) === dayIso);
 
   /** The word for a kind, in the app's language (the strip's, Desk's). */
@@ -104,14 +160,12 @@
     return mine === clockText(iso, tz) ? null : mine;
   }
 
-  function settle(rows: ScheduleSlotRow[]) {
-    queryClient.setQueryData<Feed>(queryKey, (prev) => ({
-      slots: rows,
-      can_edit: prev?.can_edit ?? true,
-    }));
+  /** The rows moved: this order's feed and every surface that reads them. */
+  function settle() {
     // The strip, the agenda, Desk and the performance page read the order
     // from their own feeds.
     for (const key of [
+      queryKey,
       ['planner-performances'],
       ['today-performances'],
       ['planner-dates'],
@@ -121,64 +175,31 @@
     }
   }
 
-  function failed(err: unknown) {
-    const msg = err instanceof Error ? err.message : '';
-    addToast({
-      tone: 'danger',
-      message: msg.startsWith('Timeslots must be ordered')
-        ? t('planner.ro_out_of_order', locale)
-        : t('planner.ro_save_error', locale),
-    });
-  }
-
-  const save = createMutation({
-    mutationFn: (slots: ScheduleSlotInput[]) =>
-      mutateJSON<{ slots: ScheduleSlotRow[] }>('PUT', `/api/schedule/${target}/${id}`, { slots }),
-    onSuccess: (res) => res && settle(res.slots),
-    onError: failed,
-  });
-
-  /* A MOVE IS DRAWN BEFORE IT IS WRITTEN: the row goes where the hand put it
-     at once, and comes back (with a word) only if the write fails. */
-  const reorder = createMutation({
-    mutationFn: (ids: string[]) =>
-      mutateJSON<{ slots: ScheduleSlotRow[] }>('PATCH', `/api/schedule/${target}/${id}`, { order: ids }),
-    onMutate: (ids: string[]) => {
-      const prev = queryClient.getQueryData<Feed>(queryKey);
-      if (prev) {
-        const byId = new Map(prev.slots.map((s) => [s.id, s]));
-        queryClient.setQueryData<Feed>(queryKey, {
-          ...prev,
-          slots: ids.map((sid, i) => ({ ...byId.get(sid)!, sort: i + 1 })),
-        });
-      }
-      return { prev };
-    },
-    onSuccess: (res) => res && settle(res.slots),
-    onError: (err, _ids, ctx) => {
-      if (ctx?.prev) queryClient.setQueryData(queryKey, ctx.prev);
-      failed(err);
-    },
-  });
-  let pending = $derived($save.isPending || $reorder.isPending);
-
-  async function write(next: ScheduleSlotInput[]): Promise<boolean> {
-    try {
-      await $save.mutateAsync(next);
-      return true;
-    } catch {
+  /**
+   * Write the whole next order into the doc. Synchronous and local: the CRDT
+   * takes it at once, here and offline, and syncs when it can. The one rule
+   * a CRDT cannot refuse later is checked HERE, before writing: the five of
+   * the road sheet keep their order (load in ≤ soundcheck ≤ show ≤ load out
+   * ≤ wrap), as the PUT of P3 and the old CHECK held it. A move only changes
+   * places, never an hour, and is not checked (the reorder of P3 was not).
+   */
+  function write(next: ScheduleSlotInput[], checkOrder = true): boolean {
+    if (!live) return false;
+    if (checkOrder && !timeslotsOrdered(timeslotsFromSlots(next.map((s, i) => ({ ...s, sort: i + 1 }))))) {
+      addToast({ tone: 'danger', message: t('planner.ro_out_of_order', locale) });
       return false;
     }
+    writeSchedule(live, next);
+    return true;
   }
 
   let listEl = $state<HTMLOListElement | null>(null);
 
   /** Move a moment and keep the keyboard on it. */
   async function move(from: number, to: number, refocus: 'line' | 'edit' = 'line') {
-    if (pending || to < 0 || to >= order.length || from === to) return;
-    const ids = moveSlot(order, from, to).map((s) => s.id!);
+    if (waiting || to < 0 || to >= order.length || from === to) return;
+    if (!write(moveSlot(order, from, to), false)) return;
     if (editing === from) editing = to;
-    $reorder.mutate(ids);
     await tick();
     const sel = refocus === 'line' ? `[data-index="${to}"] .hours__line` : `[data-index="${to}"] .ro__act--move`;
     listEl?.querySelector<HTMLElement>(sel)?.focus();
@@ -227,19 +248,19 @@
   let aWord = $state('');
   let aBad = $state(false);
 
-  async function add(e: SubmitEvent) {
+  function add(e: SubmitEvent) {
     e.preventDefault();
     const clock = parseClock(aClock);
     const named = namedSlot(aWord, null, known);
     aBad = clock === null;
-    if (!clock || !named || pending) return;
+    if (!clock || !named || waiting) return;
     const at = instantFor(dayIso, clock, tz, order);
     if (!at) {
       aBad = true;
       return;
     }
     const slot: ScheduleSlotInput = { ...named, at, ends_at: null, notes: null };
-    if (await write(placeByTime(order, slot))) {
+    if (write(placeByTime(order, slot))) {
       aClock = '';
       aWord = '';
     }
@@ -267,9 +288,9 @@
     editing = null;
   }
 
-  async function commitEdit(e: SubmitEvent) {
+  function commitEdit(e: SubmitEvent) {
     e.preventDefault();
-    if (editing === null || pending) return;
+    if (editing === null || waiting) return;
     const i = editing;
     const prev = order[i];
     const clock = parseClock(eClock);
@@ -291,13 +312,13 @@
     const ends_at = endClock ? endFor(at, endClock, tz) : null;
     const slot: ScheduleSlotInput = { ...prev, ...named, at, ends_at, notes: eNotes.trim() || null };
     const next = order.map((s, j) => (j === i ? slot : s));
-    if (await write(next)) editing = null;
+    if (write(next)) editing = null;
   }
 
-  async function remove() {
-    if (editing === null || pending) return;
+  function remove() {
+    if (editing === null || waiting) return;
     const i = editing;
-    if (await write(order.filter((_, j) => j !== i))) editing = null;
+    if (write(order.filter((_, j) => j !== i))) editing = null;
   }
 
   function onEditKey(e: KeyboardEvent) {
@@ -331,6 +352,10 @@
       {#each offered as [k, w] (k)}<option value={w}></option>{/each}
     </datalist>
 
+    {#if live && connection === 'offline'}
+      <!-- Written offline is still written: the doc syncs on reconnect. -->
+      <p class="ro__zone" role="status">{t('perf.notes_offline', locale)}</p>
+    {/if}
     {#if viewerTz && order.some((s) => viewerClock(s.at))}
       <!-- Said once, not on every row: whose clock the hours are, and that
            the small one under each is the reader's. -->
@@ -354,7 +379,7 @@
                   autocomplete="off"
                   bind:value={eClock}
                   onkeydown={onEditKey}
-                  disabled={pending}
+                  disabled={waiting}
                 />
                 <span class="hours__dash" aria-hidden="true">–</span>
                 <input
@@ -365,7 +390,7 @@
                   autocomplete="off"
                   bind:value={eEnd}
                   onkeydown={onEditKey}
-                  disabled={pending}
+                  disabled={waiting}
                 />
               </span>
               <span class="hours__body">
@@ -377,7 +402,7 @@
                   autocomplete="off"
                   bind:value={eWord}
                   onkeydown={onEditKey}
-                  disabled={pending}
+                  disabled={waiting}
                 />
                 <input
                   class="hours__in hours__in--notes"
@@ -386,27 +411,27 @@
                   autocomplete="off"
                   bind:value={eNotes}
                   onkeydown={onEditKey}
-                  disabled={pending}
+                  disabled={waiting}
                 />
               </span>
               <span class="hours__acts">
-                <button type="submit" class="hours__act" disabled={pending}>{t('planner.ro_save', locale)}</button>
-                <button type="button" class="hours__act" onclick={cancelEdit} disabled={pending}
+                <button type="submit" class="hours__act" disabled={waiting}>{t('planner.ro_save', locale)}</button>
+                <button type="button" class="hours__act" onclick={cancelEdit} disabled={waiting}
                   >{t('planner.ro_cancel', locale)}</button
                 >
                 <button
                   type="button"
                   class="hours__act hours__act--quiet ro__act--move"
                   onclick={() => move(i, i - 1, 'edit')}
-                  disabled={pending || i === 0}>{t('planner.ro_up', locale)}</button
+                  disabled={waiting || i === 0}>{t('planner.ro_up', locale)}</button
                 >
                 <button
                   type="button"
                   class="hours__act hours__act--quiet"
                   onclick={() => move(i, i + 1, 'edit')}
-                  disabled={pending || i === order.length - 1}>{t('planner.ro_down', locale)}</button
+                  disabled={waiting || i === order.length - 1}>{t('planner.ro_down', locale)}</button
                 >
-                <button type="button" class="hours__act hours__act--quiet" onclick={remove} disabled={pending}
+                <button type="button" class="hours__act hours__act--quiet" onclick={remove} disabled={waiting}
                   >{t('planner.ro_remove', locale)}</button
                 >
               </span>
@@ -419,7 +444,7 @@
             class:ro__row--dragging={dragFrom === i}
             data-index={i}
             data-kind={s.kind ?? undefined}
-            draggable={canEdit && !pending}
+            draggable={canEdit && !waiting}
             ondragstart={(e) => onDragStart(e, i)}
             ondragover={(e) => onDragOver(e, i)}
             ondrop={(e) => onDrop(e, i)}
@@ -469,7 +494,7 @@
                 inputmode="numeric"
                 autocomplete="off"
                 bind:value={aClock}
-                disabled={pending}
+                disabled={waiting}
               />
               {#if isToday}
                 <button
@@ -490,14 +515,14 @@
                 list={listId}
                 autocomplete="off"
                 bind:value={aWord}
-                disabled={pending}
+                disabled={waiting}
               />
             </span>
             <span class="hours__acts">
               <button
                 type="submit"
                 class="hours__act"
-                disabled={pending || !aClock.trim() || !aWord.trim()}>{t('planner.ro_add', locale)}</button
+                disabled={waiting || !aClock.trim() || !aWord.trim()}>{t('planner.ro_add', locale)}</button
               >
             </span>
           </form>

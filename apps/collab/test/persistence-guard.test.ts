@@ -81,7 +81,7 @@ test('failed snapshot persistence never updates the marker or notes column', asy
       persistHydration: async () => {
         calls.push('marker');
       },
-      materializeNotes: async () => {
+      materialize: async () => {
         calls.push('notes');
       },
     }),
@@ -103,7 +103,7 @@ test('failed marker persistence never materializes notes', async () => {
         calls.push('marker');
         throw new Error('durable storage unavailable');
       },
-      materializeNotes: async () => {
+      materialize: async () => {
         calls.push('notes');
       },
     }),
@@ -125,7 +125,7 @@ test('successful saves preserve snapshot, marker, notes ordering', async () => {
       persistHydration: async (marker) => {
         calls.push(`marker:${marker.version}`);
       },
-      materializeNotes: async () => {
+      materialize: async () => {
         calls.push('notes');
       },
     },

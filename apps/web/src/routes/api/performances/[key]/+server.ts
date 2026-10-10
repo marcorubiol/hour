@@ -21,20 +21,19 @@ import { PerformancePatchSchema } from '$lib/performance';
 import { fetchPerformanceBundle, isUuid } from '$lib/server/performance-bundle';
 import { pgGet, pgPatch, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
+import { rezoneScheduleInDoc } from '$lib/server/collab-schedule';
+import { decodeJwtPayload } from '$lib/server/session';
 import {
   SCHEDULE_SLOT_EMBED,
-  applyTimeslotPatch,
-  reinterpretSlots,
-  splitTimeslotPatch,
-  timeslotsFromSlots,
-  timeslotsOrdered,
+  TIMESLOT_FIELDS,
   withTimeslots,
   type ScheduleSlotRow,
 } from '$lib/schedule-slot';
 
 /** The two clocks a running order can be typed in: its venue's, else home. */
 const CLOCK_EMBED = 'venue_id,venue:venue_id(timezone)';
-const ORDER_HINT = 'Timeslots must be ordered: load in ≤ soundcheck ≤ start ≤ load out ≤ wrap.';
+const SCHEDULE_HINT =
+  'The running order is written through its collab doc (/api/collab/performance/<id>), not this PATCH.';
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -79,12 +78,14 @@ export const GET: RequestHandler = async ({ request, params, url, platform, loca
 
 /**
  * PATCH /api/performances/:key — update the operational fields of a gig
- * (ADR-043): status, performed_at, the 5 timeslots, denormalized venue
- * trio, conversation/line links. The timeslots are `schedule_slot` rows
- * since ADR-090: they are written with `replace_schedule_slots` (whole
- * running order, one transaction) and the response derives the five fields. Whitelisted by PerformancePatchSchema; no
- * money, no notes (collab doc owns notes, ADR-042). RLS enforces
- * has_permission(project_id, 'edit:performance') on UPDATE.
+ * (ADR-043): status, performed_at, denormalized venue trio,
+ * conversation/line links. Whitelisted by PerformancePatchSchema; no money,
+ * no notes (collab doc owns notes, ADR-042) and NO TIMESLOTS: the running
+ * order is the collab doc's too (ADR-090 P2, Marco 2026-10-10), so a body
+ * that names one of the five is refused with 400 `schedule_is_live` instead
+ * of being silently dropped. The response still derives the five fields
+ * from the rows. RLS enforces has_permission(project_id, 'edit:performance')
+ * on UPDATE.
  *
  * PostgREST mutations can't filter through embedded joins, so slug keys
  * resolve to an id first.
@@ -110,6 +111,13 @@ export const PATCH: RequestHandler = async ({ request, params, url, platform, lo
     raw = await request.json();
   } catch {
     return json({ error: 'invalid_body' }, 400);
+  }
+  if (
+    typeof raw === 'object' &&
+    raw !== null &&
+    TIMESLOT_FIELDS.some((field) => Object.hasOwn(raw as object, field))
+  ) {
+    return json({ error: 'schedule_is_live', hint: SCHEDULE_HINT }, 400);
   }
   const parsed = v.safeParse(PerformancePatchSchema, raw);
   if (!parsed.success) {
@@ -223,37 +231,6 @@ export const PATCH: RequestHandler = async ({ request, params, url, platform, lo
         ? { from: clockBefore, to: clockAfter }
         : null;
 
-    const { timeslots, rest } = splitTimeslotPatch(patch);
-
-    // The running order first (ADR-090). The order rule the old CHECK held
-    // for the five fields is checked here, on the order that would result,
-    // before anything is written.
-    let scheduleMoved = false;
-    if (Object.keys(timeslots).length > 0 || rezone) {
-      const current = new URLSearchParams();
-      current.set('select', 'id,kind,label,at,ends_at,sort,notes');
-      current.set('performance_id', `eq.${id}`);
-      current.set('order', 'sort.asc');
-      const { data: slots } = await pgGet<ScheduleSlotRow>(env, 'schedule_slot', jwt, {
-        search: current,
-      });
-      // Rezone first, then the explicit timeslots: a value in the body is
-      // already an instant and wins over the reinterpretation.
-      const base = rezone ? reinterpretSlots(slots, rezone.from, rezone.to) : slots;
-      const next = applyTimeslotPatch(base, timeslots);
-      if (!timeslotsOrdered(timeslotsFromSlots(next.map((s, i) => ({ ...s, sort: i + 1 }))))) {
-        return json({ error: 'constraint_violation', hint: ORDER_HINT }, 400);
-      }
-      if (Object.keys(timeslots).length > 0 || slots.length > 0) {
-        await pgPostRpc(env, 'replace_schedule_slots', jwt, {
-          p_target_table: 'performance',
-          p_target_id: id,
-          p_slots: next,
-        });
-      }
-      scheduleMoved = Boolean(rezone) && slots.length > 0;
-    }
-
     const search = new URLSearchParams();
     search.set('id', `eq.${id}`);
     search.set('deleted_at', 'is.null');
@@ -267,42 +244,77 @@ export const PATCH: RequestHandler = async ({ request, params, url, platform, lo
         'created_by,created_at,updated_at,deleted_at,previous_slugs,hold_notice_days,readiness',
       ].join(','),
     );
-    // Only the timeslots changed → nothing to PATCH on the row; read it back.
-    const { data } =
-      Object.keys(rest).length > 0
-        ? await pgPatch<Record<string, unknown> & { schedule_slot: ScheduleSlotRow[] }>(
-            env,
-            'performance',
-            jwt,
-            rest,
-            { search },
-          )
-        : await pgGet<Record<string, unknown> & { schedule_slot: ScheduleSlotRow[] }>(
+    const { data } = await pgPatch<Record<string, unknown> & { schedule_slot: ScheduleSlotRow[] }>(
+      env,
+      'performance',
+      jwt,
+      patch,
+      { search },
+    );
+    if (data.length === 0) return json({ error: 'not_found' }, 404);
+
+    // Relinked to a venue in another zone: the running order keeps its wall
+    // clock and gets new instants. AFTER the row (the venue is what the
+    // person asked for; the hours follow it), and THROUGH the collab doc,
+    // which manda on the running order (ADR-090 P2): a write around it would
+    // be undone by its next save. If the doc cannot be reached the venue
+    // change stands and the screen says the hours did not move.
+    let rezoned: { moved: boolean; failed: boolean } = { moved: false, failed: false };
+    if (rezone) {
+      const userId = decodeJwtPayload(jwt)?.sub;
+      try {
+        if (typeof userId !== 'string' || !platform.env.ROADSHEET_COLLAB) {
+          throw new Error('collab binding or session subject unavailable');
+        }
+        const r = await rezoneScheduleInDoc(
+          platform.env.ROADSHEET_COLLAB,
+          'performance',
+          id,
+          userId,
+          rezone.from,
+          rezone.to,
+        );
+        rezoned = { moved: r.applied > 0, failed: false };
+        if (r.applied > 0 && r.materialized) {
+          // Read the row again so its five fields already say the new hours.
+          const fresh = await pgGet<Record<string, unknown> & { schedule_slot: ScheduleSlotRow[] }>(
             env,
             'performance',
             jwt,
             { search },
           );
-    if (data.length === 0) return json({ error: 'not_found' }, 404);
+          if (fresh.data.length > 0) data[0] = fresh.data[0];
+        }
+      } catch (error) {
+        console.error(
+          JSON.stringify({
+            level: 'error',
+            kind: 'schedule_rezone_failed',
+            request_id: locals.requestId ?? null,
+            performance_id: id,
+            message: error instanceof Error ? error.message : String(error),
+          }),
+        );
+        rezoned = { moved: false, failed: true };
+      }
+    }
+
     return json({
       performance: withTimeslots(data[0]),
-      // The screen says the hours were moved to the new venue's clock.
-      ...(scheduleMoved && rezone ? { schedule_rezoned: rezone } : {}),
+      // The screen says the hours were moved to the new venue's clock, or
+      // that they could not be.
+      ...(rezoned.moved && rezone ? { schedule_rezoned: rezone } : {}),
+      ...(rezoned.failed && rezone ? { schedule_rezone_failed: rezone } : {}),
     });
   } catch (err) {
-    // 23514 = CHECK violation (country format, a slot ending before it
-    // starts) → the caller sent an impossible combination, not a gateway
-    // fault. 42501 from replace_schedule_slots = no edit:performance.
+    // 23514 = CHECK violation (country format) → the caller sent an
+    // impossible combination, not a gateway fault.
     return pgErrorResponse(
       err,
       { route: 'PATCH /api/performances/[key]', requestId: locals.requestId },
       {
         codes: {
-          '23514': {
-            status: 400,
-            error: 'constraint_violation',
-            hint: ORDER_HINT,
-          },
+          '23514': { status: 400, error: 'constraint_violation' },
           '42501': { status: 404, error: 'not_found' },
         },
         passUpstream: [401, 403],

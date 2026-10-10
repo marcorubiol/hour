@@ -27,21 +27,22 @@ export interface CollabAuthFail {
 
 export type CollabAuthResult = CollabAuthOk | CollabAuthFail;
 
-export type CollabTargetTable = 'performance' | 'project' | 'line';
-
-const ALLOWED_TABLES = new Set(['performance', 'project', 'line']);
-
-export function isAllowedTargetTable(t: string): t is CollabTargetTable {
-  return ALLOWED_TABLES.has(t);
-}
+export type CollabTargetTable = 'performance' | 'project' | 'line' | 'date';
 
 /** Permission required to EDIT the collab doc, per target table. Line
- * notes gate on the parent project's meta permission (ADR-056). */
+ * notes gate on the parent project's meta permission (ADR-056). A day's doc
+ * holds only its running order (ADR-090 P2), whose gate is the performance's.
+ * Mirrors `can_user_write_collab`, which re-checks it live. */
 const EDIT_PERMISSION: Record<CollabTargetTable, string> = {
   performance: 'edit:performance',
   project: 'edit:project_meta',
   line: 'edit:project_meta',
+  date: 'edit:performance',
 };
+
+export function isAllowedTargetTable(t: string): t is CollabTargetTable {
+  return Object.hasOwn(EDIT_PERMISSION, t);
+}
 
 export async function authorizeCollab(
   env: CollabAuthEnv,

@@ -173,6 +173,7 @@
       const body = await mutateJSON<{
         performance?: unknown;
         schedule_rezoned?: { from: string; to: string };
+        schedule_rezone_failed?: { from: string; to: string };
       }>(
         'PATCH',
         `/api/performances/${encodeURIComponent(slug)}?ws=${encodeURIComponent(workspaceSlug)}`,
@@ -188,13 +189,16 @@
       // Mover una función de bolo cambia el enlace y el recuento de los dos.
       if ('bolo_id' in patch) void queryClient.invalidateQueries({ queryKey: ['money-bolos'] });
       // Relinked to a venue in another zone: the running order kept its wall
-      // clock and moved to new instants (the PATCH does it). Say so.
+      // clock and moved to new instants (the PATCH asks the collab doc, which
+      // owns the order, ADR-090 P2). Say so, or say it could not.
       if (body.schedule_rezoned) {
         void queryClient.invalidateQueries({ queryKey: ['schedule'] });
         addToast({
           tone: 'info',
           message: t('planner.ro_rezoned', locale, body.schedule_rezoned),
         });
+      } else if (body.schedule_rezone_failed) {
+        addToast({ tone: 'warning', message: t('planner.ro_rezone_failed', locale) });
       }
     },
     onError: (err) => {
