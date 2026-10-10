@@ -240,7 +240,8 @@
     aprueba, el sistema ejecuta y deja auditoría— llegando temprano y desde una
     deducción tonta en vez de desde un modelo.
 
-22. [ ] **`build/schema.sql`: decidir si se borra.** Lleva desde hoy un banner
+22. [x] **BORRADO el 2026-10-09** (Marco: «sí»); su historia está en git.
+    Texto original: **`build/schema.sql`: decidir si se borra.** Lleva desde hoy un banner
     de «histórico, no ejecutar» porque contiene una versión **vieja y falsa** de
     `handle_new_user` (sin la capa de cuenta). Su último motivo para existir
     —ser el único sitio con el `CREATE TRIGGER`— se cerró con

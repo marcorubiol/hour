@@ -248,8 +248,9 @@ carpeta Supabase normalizada. Por eso existen dos series:
 - `supabase/migrations/`: checkpoint remoto y migraciones administradas desde
   2026-07-20.
 
-`build/schema.sql` y `build/rls-policies.sql` son snapshots congelados. No deben
-editarse como si fueran el schema actual.
+`build/rls-policies.sql` es un snapshot congelado. No debe editarse como si
+fuera el schema actual. `build/schema.sql` se borró el 2026-10-09 (§ 22): el
+schema vivo es `supabase/migrations/`.
 
 El checkpoint de `supabase/migrations` es reconstructivo y se ha probado tanto
 en Supabase local como en staging alojado. Las migraciones posteriores añaden la

@@ -10,8 +10,8 @@
 > Written: 2026-07-17 by .zerø, cold (no prior dump from Marco — his real-use contrast
 > happens in the joint review sessions, screen by screen).
 > Method: every proposal measured against `structure-model.md` (lens / module / entity edit
-> surface) and the live schema (`schema.sql` + migrations through `2026-07-17_task_entity.sql`
-> — schema.sql alone is stale by design; migrations are the truth).
+> surface) and the live schema (the migrations through `2026-07-17_task_entity.sql`; the old
+> `schema.sql` snapshot was deleted on 2026-10-09).
 > UI baseline: working tree 2026-07-17 (shell redesign in flight: `/h` is a greeting hall,
 > ScopeStrip removed, lens routes space-less per ADR-067).
 > Design checklist stays in `screens-inventory.md`; this doc owns the data dimension.

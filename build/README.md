@@ -30,7 +30,8 @@ una operación que todavía puede repetirse.
 
 ## Schema y migraciones
 
-- `schema.sql` y `rls-policies.sql` son snapshots históricos, no el schema vivo.
+- `rls-policies.sql` es un snapshot histórico, no el schema vivo. `schema.sql` se
+  borró el 2026-10-09 (`_tasks.md § 22`); su historia está en git.
 - `migrations/` conserva el historial SQL anterior al uso normalizado de
   `supabase/migrations/`.
 - `../supabase/migrations/` contiene el checkpoint y las migraciones gestionadas
