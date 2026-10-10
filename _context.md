@@ -1,5 +1,14 @@
 # Hour — estado canónico del proyecto
 
+> **Reconciliación 2026-10-10: § 17 P1 (LA ESCALETA) EN PRODUCCIÓN.** Runtime
+> **`db6a343`**. Las cinco franjas de `performance` viven ahora en
+> `schedule_slot` (ADR-090): migración A `20261009200000` (expand, run
+> 38030572363), deploy, y B `20261009210000` (contract: DROP de las columnas,
+> run 38031613191), sin ventana rota. Antes, el mismo día: `aria-busy` en cada
+> lente y `waitForLoaded` en el E2E (deploy `5fd46f0`), keepalive diario de
+> Supabase y `build/schema.sql` borrado. Suites contra `db6a343` con B
+> aplicada: **RLS 203/203 · E2E 62/62**.
+
 > **Reconciliación 2026-10-09 (tarde): § 31 Y § 40 EN PRODUCCIÓN.** Runtime
 > **`3f6eb44`** (builtAt 2026-10-09T14:48Z), `main` == prod. **Migración
 > `20261009100000_conversation_event` aplicada** (backup 37944973422, plan
@@ -520,7 +529,9 @@ orientativo, no una verdad comercial cerrada.
   2026-08-27 eso **ya cambió un gate real**: la migración de ese día se aplicó
   sin el ensayo en staging. No es una nota preventiva, es algo que pasó — ver
   `_tasks.md § 34`.
-- **Última migración aplicada: `20261009100000_conversation_event`** (2026-10-09,
+- **Última migración aplicada: `20261009210000_schedule_slot_contract`**
+  (2026-10-10, run 38031613191; § 17 P1, con `20261009200000_schedule_slot`
+  justo antes). Debajo va **`20261009100000_conversation_event`** (2026-10-09,
   run 37946632931; ADR-098). Debajo va **`20260926100000_travel_stages`** (2026-10-09,
   run 37939208092; Travel v2 P1, ADR-097). Debajo va
   **`20260829140000_bolo_status_lifecycle`**

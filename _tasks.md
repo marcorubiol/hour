@@ -1083,12 +1083,13 @@ entre empresas sin construirlo.
     colapsan nunca** — los dos nombres tienen que verse.
 
 17. [ ] **Escaleta de momentos — el orden del día, en vivo (ADR-090).**
-    **2026-10-10: P1 escrita y probada en local** (rama `claude/schedule-slot`,
-    `37b248c`): tabla, 5 RPC, backfill, DROP de las 5 columnas, tipos, rollback;
-    check 0/0, unit 582/582, RLS local 203/203, rollback bajada/subida limpio.
-    **NO es compatible con el Worker desplegado** (pide las 5 columnas): o apply
-    y deploy seguidos, o partirla en dos (aditiva, deploy, y luego el DROP).
-    Decisión de Marco. Destructiva: staging e `inspect` antes de producción.
+    **2026-10-10: P1 EN PRODUCCIÓN.** Partida en dos (Marco): A
+    `20261009200000_schedule_slot` (expand, con espejo temporal columnas↔slots,
+    apply run 38030572363), deploy `db6a343`, y B
+    `20261009210000_schedule_slot_contract` (quita el espejo y borra las 5
+    columnas, apply run 38031613191). Staging desde cero verde (38029827890).
+    Después: RLS 203/203 y E2E 62/62. Faltan P2 (collab) y P3 (pantalla, la
+    dibuja Marco).
     **Modelo DECIDIDO el 2026-07-25, nada de schema construido.** Absorbe la vieja
     tarea «tipos de horario añadibles por el usuario»: las cinco franjas de
     ADR-023 son **columnas fijas** en `performance` con un CHECK de orden — una
