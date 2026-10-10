@@ -716,7 +716,7 @@
     return statusWordIn(status, locale);
   }
 
-  const KIND_KEYS = new Set(['rehearsal', 'residency', 'travel_day', 'press', 'other', 'day_off']);
+  const KIND_KEYS = new Set(['show', 'rehearsal', 'residency', 'travel_day', 'press', 'other', 'day_off']);
   function kindLabel(kind: string): string {
     return KIND_KEYS.has(kind) ? t(`planner.kind_${kind}`, locale) : kind.replace(/_/g, ' ');
   }
