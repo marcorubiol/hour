@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import * as v from 'valibot';
+import ca from './i18n/ca.json';
+import en from './i18n/en.json';
+import es from './i18n/es.json';
 import {
   HOLD_NOTICE_DEFAULT,
+  PERFORMANCE_CREATE_STATUSES,
   PERFORMANCE_STATUSES,
   PerformanceCreateSchema,
   PerformancePatchSchema,
@@ -188,5 +192,16 @@ describe('decideBy (ADR-080 §2)', () => {
   it('accepts a full instant and crosses month/year boundaries', () => {
     expect(decideBy('2031-08-15T20:30:00.000Z', 15)).toBe('2031-07-31');
     expect(decideBy('2031-01-10', 30)).toBe('2030-12-11');
+  });
+});
+
+describe('PERFORMANCE_CREATE_STATUSES', () => {
+  it('every birth status has its word in the three dictionaries', () => {
+    for (const dict of [ca, en, es] as Record<string, string>[]) {
+      for (const s of PERFORMANCE_CREATE_STATUSES) expect(dict[`perf.status_${s}`]).toBeTruthy();
+    }
+  });
+  it('is a subset of the enum', () => {
+    for (const s of PERFORMANCE_CREATE_STATUSES) expect(PERFORMANCE_STATUSES).toContain(s);
   });
 });

@@ -1,5 +1,10 @@
 import { describe, expect, test } from 'vitest';
-import { boloLabel, boloOf, boloOptions, boloPatch, boloPrefill, type BoloLite } from './bolo-pick';
+import {
+  boloDefault,
+  booksHref,
+  boloLabel,
+  boloOf,
+  boloOptions, boloPatch, boloPrefill, type BoloLite } from './bolo-pick';
 
 const lliure: BoloLite = {
   id: 'b1',
@@ -84,6 +89,29 @@ describe('boloOf', () => {
     expect(boloOf(lliure, 'es')).toBe('bolo de 2 funciones');
     expect(boloOf(sevilla, 'ca')).toBe("bolo d'1 funció");
     expect(boloOf(null, 'en')).toBe('no deal');
+  });
+});
+
+describe('boloDefault', () => {
+  test('un solo bolo abierto: ese', () => {
+    expect(boloDefault([lliure, dead])).toBe('b1');
+  });
+  test('dos abiertos, o ninguno: sin bolo', () => {
+    expect(boloDefault([lliure, sevilla])).toBe('');
+    expect(boloDefault([dead])).toBe('');
+    expect(boloDefault([])).toBe('');
+  });
+});
+
+describe('booksHref', () => {
+  test('Cuentas con el proyecto en el ámbito', () => {
+    expect(booksHref('p1')).toBe('/h/money?scope=p:p1');
+  });
+  test('con el alta de bolo abierta', () => {
+    expect(booksHref('p1', { newBolo: true })).toBe('/h/money?scope=p:p1&new_bolo=p1');
+  });
+  test('hasta la tarjeta de un bolo', () => {
+    expect(booksHref('p1', { boloId: 'b1' })).toBe('/h/money?scope=p:p1#bolo-b1');
   });
 });
 

@@ -17,6 +17,20 @@ export type PerformanceStatus = Enums<'performance_status'>;
 
 export const PERFORMANCE_STATUSES = Constants.public.Enums.performance_status;
 
+/**
+ * Los estados con los que nace una función: los de después (done, invoiced,
+ * paid, cancelled) se alcanzan desde la ficha. Cada uno tiene su palabra en
+ * `perf.status_<estado>` (ca/es/en; lo fija `performance.test.ts`).
+ */
+export const PERFORMANCE_CREATE_STATUSES = [
+  'proposed',
+  'hold',
+  'hold_1',
+  'hold_2',
+  'hold_3',
+  'confirmed',
+] as const;
+
 export type StatusTone = 'neutral' | 'info' | 'success' | 'warning' | 'danger' | 'faint';
 
 const TONES: Record<PerformanceStatus, StatusTone> = {

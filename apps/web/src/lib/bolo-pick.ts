@@ -100,3 +100,26 @@ export function boloPatch(
   const next = picked || null;
   return next === original ? {} : { bolo_id: next };
 }
+
+/**
+ * El bolo que el alta propone sin preguntar: el único abierto del proyecto.
+ * Con dos o más no adivina, y «sin bolo» sigue siendo lo de partida (Marco,
+ * 2026-10-10). Cancelado no cuenta como abierto.
+ */
+export function boloDefault(bolos: readonly BoloLite[]): string {
+  const open = bolos.filter((b) => !CLOSED.has(b.status));
+  return open.length === 1 ? open[0].id : '';
+}
+
+/**
+ * Cuentas filtrada a un proyecto. `scope=p:<id>` es el enlace con ámbito de
+ * siempre (ADR-067, lo aplica el shell); `new_bolo` abre su alta de bolo con
+ * ese proyecto puesto; `#bolo-<id>` lleva a la tarjeta de un bolo.
+ */
+export function booksHref(
+  projectId: string,
+  opts: { newBolo?: boolean; boloId?: string } = {},
+): string {
+  const q = `scope=p:${projectId}${opts.newBolo ? `&new_bolo=${projectId}` : ''}`;
+  return `/h/money?${q}${opts.boloId ? `#bolo-${opts.boloId}` : ''}`;
+}

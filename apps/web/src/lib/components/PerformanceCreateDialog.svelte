@@ -14,6 +14,7 @@
   import Button from './Button.svelte';
   import Dialog from './Dialog.svelte';
   import PerformanceForm, { type CreatedPerformance } from './PerformanceForm.svelte';
+  import { detectLocale, t } from '$lib/i18n';
 
   interface Props {
     open?: boolean;
@@ -37,6 +38,7 @@
     onCreated,
   }: Props = $props();
 
+  const locale = detectLocale(navigator.language);
   let form: { submit: () => void } | undefined = $state();
   let pending = $state(false);
 
@@ -46,7 +48,7 @@
   }
 </script>
 
-<Dialog bind:open title="New performance" size="s">
+<Dialog bind:open title={t('perf.new_title', locale)} size="s">
   <PerformanceForm
     bind:this={form}
     bind:pending
@@ -58,7 +60,7 @@
     onCreated={handleCreated}
   />
   {#snippet actions()}
-    <Button variant="outline" onclick={() => (open = false)}>Cancel</Button>
-    <Button onclick={() => form?.submit()} loading={pending}>Create</Button>
+    <Button variant="outline" onclick={() => (open = false)}>{t('create.cancel', locale)}</Button>
+    <Button onclick={() => form?.submit()} loading={pending}>{t('create.submit_performance', locale)}</Button>
   {/snippet}
 </Dialog>
