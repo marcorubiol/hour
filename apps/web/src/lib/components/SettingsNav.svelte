@@ -15,19 +15,20 @@
 
   type Section = {
     id: SectionId;
-    label: string;
+    /** i18n key; resolved with t() where the label is drawn. */
+    labelKey: string;
     glyph: string;
     danger?: boolean;
   };
 
   export const SECTIONS: Section[] = [
-    { id: 'profile', label: 'Profile', glyph: '◯' },
-    { id: 'workspaces', label: 'Workspaces & roles', glyph: '▸' },
-    { id: 'privacy', label: 'Visibility & privacy', glyph: '◌' },
-    { id: 'languages', label: 'Languages', glyph: '¶' },
-    { id: 'notifications', label: 'Notifications', glyph: '◉' },
-    { id: 'billing', label: 'Billing', glyph: '€' },
-    { id: 'danger', label: 'Danger zone', glyph: '⚠', danger: true },
+    { id: 'profile', labelKey: 'settings.nav_profile', glyph: '◯' },
+    { id: 'workspaces', labelKey: 'settings.nav_workspaces', glyph: '▸' },
+    { id: 'privacy', labelKey: 'settings.nav_privacy', glyph: '◌' },
+    { id: 'languages', labelKey: 'settings.nav_languages', glyph: '¶' },
+    { id: 'notifications', labelKey: 'settings.nav_notifications', glyph: '◉' },
+    { id: 'billing', labelKey: 'settings.nav_billing', glyph: '€' },
+    { id: 'danger', labelKey: 'settings.nav_danger', glyph: '⚠', danger: true },
   ];
 </script>
 
@@ -43,6 +44,9 @@
    */
 
   import { page } from '$app/state';
+  import { t, appLocale } from '$lib/i18n';
+
+  const locale = appLocale();
 
   let workspaceSlug = $derived(page.params.workspace ?? '');
   let active = $derived<SectionId>(
@@ -54,8 +58,8 @@
   }
 </script>
 
-<nav class="set-nav" aria-label="Settings sections">
-  <p class="eyebrow set-nav__eyebrow">Settings</p>
+<nav class="set-nav" aria-label={t('settings.nav_aria', locale)}>
+  <p class="eyebrow set-nav__eyebrow">{t('settings.title', locale)}</p>
 
   <ul class="set-nav__list" role="list">
     {#each SECTIONS as s (s.id)}
@@ -72,7 +76,7 @@
           aria-current={active === s.id ? 'page' : undefined}
         >
           <span class="set-nav__glyph" aria-hidden="true">{s.glyph}</span>
-          <span class="set-nav__label">{s.label}</span>
+          <span class="set-nav__label">{t(s.labelKey, locale)}</span>
         </a>
       </li>
     {/each}

@@ -7,6 +7,9 @@
   import { ApiError, mutateJSON } from '$lib/api';
   import { meQueryOptions, workspacesQueryOptions } from '$lib/nav-queries';
   import { addToast } from '$lib/components/Toast.svelte';
+  import { t, appLocale } from '$lib/i18n';
+
+  const locale = appLocale();
 
   let { workspaceSlug }: { workspaceSlug: string } = $props();
 
@@ -64,13 +67,14 @@
     mutationFn: (full_name: string) => mutateJSON('PATCH', '/api/me', { full_name }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['me'] });
-      addToast({ tone: 'success', message: 'Name saved' });
+      addToast({ tone: 'success', message: t('settings.profile_name_saved', locale) });
     },
     onError: (err) => {
       addToast({
         tone: 'danger',
-        title: 'Not saved',
-        message: err instanceof ApiError || err instanceof Error ? err.message : 'Unexpected error',
+        title: t('edit.not_saved', locale),
+        message:
+          err instanceof ApiError || err instanceof Error ? err.message : t('perf.unexpected', locale),
       });
     },
   });
@@ -110,14 +114,17 @@
       void queryClient.invalidateQueries({ queryKey: ['planner-team'] });
       addToast({
         tone: 'success',
-        message: input.on ? 'Your name is now in this space' : 'Sharing stopped',
+        message: input.on
+          ? t('settings.profile_share_on', locale)
+          : t('settings.profile_share_off', locale),
       });
     },
     onError: (err) => {
       addToast({
         tone: 'danger',
-        title: 'Not saved',
-        message: err instanceof ApiError || err instanceof Error ? err.message : 'Unexpected error',
+        title: t('edit.not_saved', locale),
+        message:
+          err instanceof ApiError || err instanceof Error ? err.message : t('perf.unexpected', locale),
       });
     },
     onSettled: () => {
@@ -127,19 +134,17 @@
 </script>
 
 <header class="set-mast">
-  <p class="eyebrow set-mast__kicker">Account</p>
-  <h1 class="set-mast__title"><em>Profile</em></h1>
-  <p class="set-mast__sub">
-    The basics. Used across your projects and on press kits.
-  </p>
+  <p class="eyebrow set-mast__kicker">{t('settings.profile_kicker', locale)}</p>
+  <h1 class="set-mast__title"><em>{t('settings.nav_profile', locale)}</em></h1>
+  <p class="set-mast__sub">{t('settings.profile_sub', locale)}</p>
 </header>
 
 <section class="set-group">
   <div class="set-group__body">
     <div class="set-row">
       <div class="set-row__lead">
-        <div class="set-row__label">Avatar</div>
-        <div class="set-row__hint">A monogram for now. Drop an image later.</div>
+        <div class="set-row__label">{t('settings.profile_avatar', locale)}</div>
+        <div class="set-row__hint">{t('settings.profile_avatar_hint', locale)}</div>
       </div>
       <div class="set-row__ctrl">
         <div class="set-avatar-pick">
@@ -149,19 +154,16 @@
           >
             {initials}
           </span>
-          <button type="button" class="btn--primary btn--s">Upload image</button>
-          <span class="set-row__hint">PNG, square, ≥ 256px</span>
+          <button type="button" class="btn--primary btn--s">{t('settings.profile_upload', locale)}</button>
+          <span class="set-row__hint">{t('settings.profile_upload_hint', locale)}</span>
         </div>
       </div>
     </div>
 
     <div class="set-row">
       <div class="set-row__lead">
-        <div class="set-row__label">Full name</div>
-        <div class="set-row__hint">
-          How every company you work with sees you — it is the name copied into
-          each space below.
-        </div>
+        <div class="set-row__label">{t('settings.profile_name', locale)}</div>
+        <div class="set-row__hint">{t('settings.profile_name_hint', locale)}</div>
       </div>
       <div class="set-row__ctrl">
         <input
@@ -178,8 +180,8 @@
 
     <div class="set-row">
       <div class="set-row__lead">
-        <div class="set-row__label">Email</div>
-        <div class="set-row__hint">Sign-in and project invitations.</div>
+        <div class="set-row__label">{t('settings.email', locale)}</div>
+        <div class="set-row__hint">{t('settings.profile_email_hint', locale)}</div>
       </div>
       <div class="set-row__ctrl">
         <input type="email" bind:value={userEmail} readonly />
@@ -190,16 +192,14 @@
 
 <section class="set-group">
   <div class="set-group__head">
-    <span class="eyebrow set-group__kicker">Identity</span>
-    <h2 class="set-group__title">Where you exist as a person</h2>
+    <span class="eyebrow set-group__kicker">{t('settings.profile_identity_kicker', locale)}</span>
+    <h2 class="set-group__title">{t('settings.profile_identity_title', locale)}</h2>
   </div>
   <div class="set-group__body">
     <p class="set-row__hint set-person__lead">
-      Signing in makes you an operator. Sharing your name with a space makes
-      you a <em>person</em> there — someone who can be cast in a production,
-      appear on a road sheet, carry an absence, and be found by name. Only
-      your name is shared; stopping later keeps the name the space already has
-      but sends nothing new.
+      {t('settings.profile_identity_lead_a', locale)}
+      <em>{t('settings.profile_identity_lead_person', locale)}</em>
+      {t('settings.profile_identity_lead_b', locale)}
     </p>
 
     {#if $meQuery.isSuccess && $workspacesQuery.isSuccess}
@@ -211,11 +211,11 @@
             <div class="set-row__label">{spaceName(w.name)}</div>
             <div class="set-row__hint">
               {#if on}
-                Known here as <b>{dossier?.full_name}</b>
+                {t('settings.profile_known_as', locale)} <b>{dossier?.full_name}</b>
               {:else if dossier}
-                Your name is here, but nothing new is being shared
+                {t('settings.profile_name_stale', locale)}
               {:else}
-                Not a person in this space yet
+                {t('settings.profile_not_person', locale)}
               {/if}
             </div>
           </div>
@@ -226,16 +226,20 @@
               disabled={pendingWorkspace === w.id}
               onclick={() => $shareProfile.mutate({ workspaceId: w.id, on: !on })}
             >
-              {pendingWorkspace === w.id ? '…' : on ? 'Stop sharing' : 'Share my name'}
+              {pendingWorkspace === w.id
+                ? '…'
+                : on
+                  ? t('settings.profile_stop_sharing', locale)
+                  : t('settings.profile_share_name', locale)}
             </button>
           </div>
         </div>
       {/each}
       {#if myWorkspaces.length === 0}
-        <p class="set-row__hint">You are not a member of any space yet.</p>
+        <p class="set-row__hint">{t('settings.profile_no_spaces', locale)}</p>
       {/if}
     {:else}
-      <p class="set-row__hint">Loading…</p>
+      <p class="set-row__hint">{t('desk.loading', locale)}</p>
     {/if}
   </div>
 </section>
