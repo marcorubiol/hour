@@ -85,6 +85,8 @@
   import DayStrip from '$lib/components/planner/DayStrip.svelte';
   import DayFoot, { type DayNextVM } from '$lib/components/planner/DayFoot.svelte';
   import { performanceThread, dateThread, stripWindow, hourOf } from '$lib/day-strip';
+  import RunningOrder from '$lib/components/planner/RunningOrder.svelte';
+  import { ORDERED_DATE_KINDS, type RunningOrderTarget } from '$lib/running-order';
   import Dialog from '$lib/components/Dialog.svelte';
   import FeedDialog from '$lib/components/planner/FeedDialog.svelte';
   import CreateEventDialog from '$lib/components/create/CreateEventDialog.svelte';
@@ -1348,6 +1350,43 @@
   });
   let dayThreads = $derived(dayWalk.threads);
   let dayUnplaced = $derived(dayWalk.unplaced);
+  /* THE RUNNING ORDER OF EACH THING THE DAY HOLDS (ADR-090 P3): the gigs,
+     and the dates that have a day to order. In the order they start, so the
+     orders read down the page the way the strip reads across it. Each one
+     types its hours in ITS clock: the venue's, else its space's. */
+  let dayOrders = $derived.by(() => {
+    const out: Array<{
+      target: RunningOrderTarget;
+      id: string;
+      name: string;
+      tz: string;
+      from: string;
+    }> = [];
+    const clockOf = (venueTz: string | null | undefined, wsId: string | undefined) =>
+      venueTz || (wsId ? workspaceTzById.get(wsId) : undefined) || viewerTz;
+    for (const p of shownPerfs) {
+      if (perfDayKey(p) !== selectedDay) continue;
+      out.push({
+        target: 'performance',
+        id: p.id,
+        name: performanceSlip(p, slipCtxPage).name,
+        tz: clockOf(p.venue?.timezone, p.project?.workspace_id),
+        from: p.start_at ?? p.performed_at,
+      });
+    }
+    for (const d of shownDates) {
+      if (dateDayKey(d, viewerTz) !== selectedDay) continue;
+      if (!ORDERED_DATE_KINDS.includes(d.kind)) continue;
+      out.push({
+        target: 'date',
+        id: d.id,
+        name: dateSlip(d, slipCtxPage).name,
+        tz: clockOf(d.venue?.timezone, d.project?.workspace_id),
+        from: d.starts_at,
+      });
+    }
+    return out.sort((a, b) => a.from.localeCompare(b.from));
+  });
   /* THE DAY DRAGS ITS MONTH. The feeds are windowed by `ym`, so a Day view
      pointing at 3 August while `ym` still said July fetched a month that does
      not contain the day being drawn — the strip came up with one thread and
@@ -2872,6 +2911,21 @@
       unplaced={dayUnplaced}
       noHourWord={t('planner.no_hour', locale)}
     />
+    <!-- THE DAY IN WORDS, ONE THING AT A TIME (ADR-090 P3). The strip draws
+         the shape; the running order under it says the hours and lets them
+         be written, on the day. A name on the lid only when the day holds
+         more than one order: with one, the strip above already says whose. -->
+    {#each dayOrders as o (o.id)}
+      <RunningOrder
+        target={o.target}
+        id={o.id}
+        dayIso={selectedDay}
+        tz={o.tz}
+        {locale}
+        isToday={selectedDay === todayIso}
+        name={dayOrders.length > 1 ? o.name : null}
+      />
+    {/each}
     <!-- THE ABSENCE IS THE DAY'S FOOTING (Marco, 2026-08-10). Above the
          drawing it floated on its own, far from anything, and Marco could
          not read it: «no acabamos de ver bien el mensaje, quizás ponerlo más
