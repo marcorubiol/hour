@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { waitForLoaded } from './loaded';
 
 const EMAIL = process.env.PW_TEST_EMAIL;
 const PASSWORD = process.env.PW_TEST_PASSWORD;
@@ -62,10 +63,11 @@ test.describe('a performance that lasts several days (ADR-084 §1)', () => {
   test('THE SPAN REPLACES THE DAY, and one run comes out — not N loose gigs', async ({ page }) => {
     test.setTimeout(90_000);
     await page.goto(`/h/planner?view=month&scope=${FIXTURE_SPACE_TOKEN}`);
+    await waitForLoaded(page);
     await page.getByRole('button', { name: /date/i }).first().click();
 
     const dlg = page.locator('dialog[open]');
-    await expect(dlg).toBeVisible({ timeout: 15_000 });
+    await expect(dlg).toBeVisible();
 
     // El alta abre en «performance»; el campo de un solo día está ahí.
     await expect(dlg.getByLabel('Date'), 'a single gig asks for its day').toHaveCount(1);
@@ -99,7 +101,8 @@ test.describe('a performance that lasts several days (ADR-084 §1)', () => {
   test('the month draws it as ONE band, not three cards', async ({ page }) => {
     test.setTimeout(90_000);
     await page.goto(`/h/planner?view=month&ym=2031-05&scope=${FIXTURE_SPACE_TOKEN}`);
-    await expect(page.locator('.cal__run').first()).toBeVisible({ timeout: 20_000 });
+    await waitForLoaded(page);
+    await expect(page.locator('.cal__run').first()).toBeVisible();
     const seen = await page.evaluate((v) => {
       const runs = [...document.querySelectorAll('.cal__run')].filter((el) =>
         (el.textContent ?? '').includes(v),

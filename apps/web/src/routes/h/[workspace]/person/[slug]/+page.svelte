@@ -265,7 +265,7 @@
   <title>{file?.person.full_name ?? slug} — Hour</title>
 </svelte:head>
 
-<article class="person">
+<article class="person" aria-busy={loading}>
   {#if loading}
     <p class="person__state">Loading…</p>
   {:else if errorMsg}

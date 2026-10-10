@@ -165,6 +165,16 @@
     $conversationsQuery.isPending || $tasksQuery.isPending || $performancesQuery.isPending || $datesQuery.isPending,
   );
   let errored = $derived($conversationsQuery.isError || $tasksQuery.isError || $performancesQuery.isError);
+  // aria-busy: every feed the Desk folds, plus the indexes the pins resolve
+  // against and the fee-gated invoices (a 403 settles it too). Read by the
+  // E2E (`tests/lens.ts`) as «the lens has loaded».
+  let busy = $derived(
+    loading ||
+      $workspacesQuery.isPending ||
+      $projectsQuery.isPending ||
+      $linesQuery.isPending ||
+      $invoicesQuery.isPending,
+  );
 
   // ── Calm mode — the toggle lives in the shell sidebar (by the clock); the
   //    Desk only consumes the shared store to fold the feed. ──────────────
@@ -334,7 +344,7 @@
 
 <svelte:head><title>Desk — Hour</title></svelte:head>
 
-<div class="desk">
+<div class="desk" aria-busy={busy}>
   <LensHeader>
     {#snippet title()}
       <LensTitle text={needYouText(headline)} />{#if calm.on && calmFolded}<span class="desk__rest">{t('desk.rest_waits', locale)}</span>{/if}

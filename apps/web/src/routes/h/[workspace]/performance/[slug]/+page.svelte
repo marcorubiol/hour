@@ -593,7 +593,7 @@
   <title>{title} — Performance — Hour</title>
 </svelte:head>
 
-<article class="perf">
+<article class="perf" aria-busy={loading}>
   {#if loading}
     <p class="perf__state">Loading…</p>
   {:else if errorMsg}

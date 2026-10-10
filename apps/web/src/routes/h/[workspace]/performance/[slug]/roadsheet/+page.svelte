@@ -125,7 +125,7 @@
   <title>{sheet ? `${sheet.title} — Road sheet` : 'Road sheet'} — Hour</title>
 </svelte:head>
 
-<article class="rs">
+<article class="rs" aria-busy={loading}>
   <nav class="rs__roles" aria-label="Preview as role">
     <span class="rs__roles-label">View as</span>
     {#each ROADSHEET_ROLES as r (r)}

@@ -261,6 +261,9 @@
   );
   let contactGroups = $derived(groupConversationsByContact(items));
   let loading = $derived($query.isLoading);
+  // Busy also while a placeholder (the previous page of rows) stands in for
+  // the slice being fetched: what is on screen is not yet the answer.
+  let busy = $derived(loading || ($query.isPlaceholderData && $query.isFetching));
   let errorMsg = $derived($query.error instanceof Error ? $query.error.message : '');
 
   function formatDate(iso: string | null): string {
@@ -322,7 +325,7 @@
   {/if}
 </div>
 
-<div class="table-wrap">
+<div class="table-wrap" aria-busy={busy}>
   {#if view === 'contact' && groupable}
     <table class="contact-table">
       <thead>

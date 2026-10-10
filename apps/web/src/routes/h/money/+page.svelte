@@ -316,6 +316,12 @@
   });
 
   let loading = $derived($bolosQuery.isLoading || $invoicesQuery.isLoading || $expensesQuery.isLoading);
+  // aria-busy: the lens does not know what to draw until the pins resolve
+  // against the indexes AND its feeds have answered. One honest signal for
+  // assistive tech and for the E2E (`tests/lens.ts`), instead of a guessed wait.
+  let busy = $derived(
+    $workspacesQuery.isPending || $projectsQuery.isPending || $linesQuery.isPending || loading,
+  );
   let errorMsg = $derived.by(() => {
     const error = $bolosQuery.error ?? $invoicesQuery.error ?? $expensesQuery.error;
     return error instanceof Error ? error.message : '';
@@ -657,7 +663,7 @@
   <title>Money — Hour</title>
 </svelte:head>
 
-<section class="mny">
+<section class="mny" aria-busy={busy}>
   <LensHeader>
     {#snippet title()}<LensTitle text={t('lens.money', locale)} />{/snippet}
     <!-- TEMP sub — placeholder until this lens's real subtitle is defined. -->

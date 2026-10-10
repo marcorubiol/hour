@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { waitForLoaded } from './loaded';
 
 const EMAIL = process.env.PW_TEST_EMAIL;
 const PASSWORD = process.env.PW_TEST_PASSWORD;
@@ -31,8 +32,8 @@ const SPACE = 's:playwright';
 
 async function planner(page: Page, view: string, extra = '') {
   await page.goto(`/h/planner?view=${view}&scope=${SPACE}${extra}`);
-  // The head is the one thing every projection renders.
-  await expect(page.locator('.cal, .lenshead').first()).toBeVisible({ timeout: 20_000 });
+  // The lens holds aria-busy until every feed of this view has answered.
+  await waitForLoaded(page);
   await page.waitForTimeout(1200);
 }
 

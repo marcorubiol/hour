@@ -338,7 +338,7 @@
   </title>
 </svelte:head>
 
-<article class="line-detail">
+<article class="line-detail" aria-busy={isLoading}>
   {#if isLoading}
     <p class="line-detail__state">Loading…</p>
   {:else if isError}

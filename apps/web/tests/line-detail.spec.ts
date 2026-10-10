@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { waitForLoaded } from './loaded';
 
 const EMAIL = process.env.PW_TEST_EMAIL;
 const PASSWORD = process.env.PW_TEST_PASSWORD;
@@ -75,6 +76,7 @@ test.describe('line detail — module composition', () => {
       await page.waitForURL(/\/line\//, { timeout: 15_000 });
     } else {
       await page.goto(`/h/playwright/project/zzz-e2e-collab/line/${line.slug ?? line.id}`);
+      await waitForLoaded(page);
     }
 
     // Booking template stack: Conversations · Calendar · Materials · Notes.

@@ -116,7 +116,7 @@
   <title>{displayName} — Hour</title>
 </svelte:head>
 
-<article class="project" style={`--c: ${project ? accentVarFor(project) : accentVar(projectSlug)}`}>
+<article class="project" aria-busy={projectLoading} style={`--c: ${project ? accentVarFor(project) : accentVar(projectSlug)}`}>
   <header class="project__head">
     <div class="project__kicker">
       {#if project}

@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { waitForLoaded } from './loaded';
 
 const EMAIL = process.env.PW_TEST_EMAIL;
 const PASSWORD = process.env.PW_TEST_PASSWORD;
@@ -52,6 +53,7 @@ test.describe('performance write path', () => {
     const venue = `E2E Venue ${Date.now()}`;
 
     await page.goto('/h/planner'); // ADR-067: lens is space-less
+    await waitForLoaded(page);
     await expect(page.locator('.cal__grid')).toBeVisible();
 
     // Create from the header button (ADR-078: unified dialog — pick the
@@ -98,6 +100,7 @@ test.describe('performance write path', () => {
 
     // Reload — everything survived the round-trip.
     await page.reload();
+    await waitForLoaded(page);
     await expect(page.locator('.state-badge')).toContainText('confirmed');
     await expect(page.locator('.schedule')).toContainText('11:00');
 
@@ -187,6 +190,7 @@ test.describe('performance write path', () => {
     // confirm dialog → lands on the planner.
     const first = fixture.items[0];
     await page.goto(`/h/playwright/performance/${first.slug ?? first.id}`);
+    await waitForLoaded(page);
     await page.getByRole('button', { name: 'Edit details' }).click();
     const edit = page.locator('dialog[open]').filter({ hasText: 'Edit performance' });
     await edit.getByRole('button', { name: 'Delete performance…' }).click();

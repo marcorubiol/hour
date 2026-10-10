@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { waitForLoaded } from './loaded';
 
 const EMAIL = process.env.PW_TEST_EMAIL;
 const PASSWORD = process.env.PW_TEST_PASSWORD;
@@ -145,9 +146,8 @@ test.describe('tasks — Desk feed + line module', () => {
     }, { lineId: line!.id });
 
     await page.goto(`/h/playwright/project/zzz-e2e-collab/line/${line!.slug ?? line!.id}`);
-    await expect(page.getByRole('heading', { name: LINE_NAME })).toBeVisible({
-      timeout: 15_000,
-    });
+    await waitForLoaded(page);
+    await expect(page.getByRole('heading', { name: LINE_NAME })).toBeVisible();
 
     // Add the Tasks module through the menu.
     await page.getByRole('button', { name: /add module/i }).click();

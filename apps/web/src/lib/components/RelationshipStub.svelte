@@ -70,7 +70,7 @@
   }
 </script>
 
-<section class="rel-stub" aria-labelledby="rel-stub-title">
+<section class="rel-stub" aria-labelledby="rel-stub-title" aria-busy={loading}>
   <header class="rel-stub__header">
     <div class="rel-stub__head-lead">
       <p class="eyebrow">Conversations</p>

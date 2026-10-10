@@ -118,6 +118,13 @@
     ),
   );
 
+  // aria-busy: the hall stays quiet while it loads (silence over lies), so
+  // the DOM says it instead. The workspaces cache only sharpens a fallback,
+  // so it does not hold the hall busy.
+  let busy = $derived(
+    $conversationsQuery.isPending || $performancesQuery.isPending || $tasksQuery.isPending,
+  );
+
   // Truth rule: only settled data speaks. Pending or errored → null →
   // no sentence element at all (no placeholder, no spinner text).
   let status = $derived.by(() => {
@@ -181,7 +188,7 @@
   let hasTeaser = $derived(teaserTimes.length > 0 || notesLabel !== null);
 </script>
 
-<section class="hall" aria-label="Home">
+<section class="hall" aria-label="Home" aria-busy={busy}>
   <div class="hall__center">
     <time class="hall__clock" datetime={clockTime}>{clockTime}</time>
 

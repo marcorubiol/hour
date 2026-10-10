@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { waitForLoaded } from './loaded';
 
 const EMAIL = process.env.PW_TEST_EMAIL;
 const PASSWORD = process.env.PW_TEST_PASSWORD;
@@ -22,6 +23,7 @@ test.describe('venue linking', () => {
     test.setTimeout(90_000);
 
     await page.goto('/h/playwright/performance/zzz-e2e-1');
+    await waitForLoaded(page);
     await expect(page.getByRole('button', { name: 'Edit details' })).toBeVisible();
 
     // Open the dialog, type a venue trio, promote it.
@@ -41,6 +43,7 @@ test.describe('venue linking', () => {
 
     // Persists: reopen and the select still points at the venue.
     await page.reload();
+    await waitForLoaded(page);
     await page.getByRole('button', { name: 'Edit details' }).click();
     const dialog2 = page.locator('dialog[open]');
     await expect(dialog2.locator('#f-venue-entity')).toHaveValue(venueId, {
@@ -54,6 +57,7 @@ test.describe('venue linking', () => {
     await expect(dialog2).not.toBeVisible({ timeout: 10_000 });
 
     await page.reload();
+    await waitForLoaded(page);
     await page.getByRole('button', { name: 'Edit details' }).click();
     await expect(page.locator('dialog[open] #f-venue-entity')).toHaveValue('', {
       timeout: 10_000,
@@ -66,6 +70,7 @@ test.describe('venue linking', () => {
     test.setTimeout(90_000);
 
     await page.goto('/h/playwright/performance/zzz-e2e-1');
+    await waitForLoaded(page);
     await page.getByRole('button', { name: 'Edit details' }).click();
     const dialog = page.locator('dialog[open]').filter({ hasText: 'Edit performance' });
 
@@ -114,6 +119,7 @@ test.describe('venue linking', () => {
 
     // Survives a full reload (server round-trip, not cache).
     await page.reload();
+    await waitForLoaded(page);
     await expect(page.locator('.production__venue-meta')).toContainText('Europe/Paris');
     await expect(page.locator('.production__contacts')).toContainText('+34 600 000 001');
 
