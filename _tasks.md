@@ -1437,6 +1437,9 @@ entre empresas sin construirlo.
   sala (una función suya enlazada a la sala) si los datos de la corrección son
   ciertos. Todo con historial y vuelta atrás; el dato oficial nunca se pisa en
   silencio.
+  **Salas nuevas desde las compañías (chat 10-10):** una compañía puede proponer una sala que no está en el
+  directorio (la que crea en su espacio) y entra en el directorio común cuando la validan 3 compañías, con el mismo
+  mecanismo de propuesta, fuente e historial que las correcciones.
 - [ ] **Directorio de salas, fase 2 (Marco, 2026-10-10).** España fuera de Cataluña y CyL con los datos abiertos
   autonómicos (Andalucía, Madrid, Valencia primero, mirando antes cada licencia) y los ~1.250 teatros de Wikidata de
   Francia. Criterios de la fase 1 que siguen: centros cívicos solo con aforo declarado, ningún contacto de ayuntamiento,
