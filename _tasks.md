@@ -1102,7 +1102,8 @@ entre empresas sin construirlo.
     vacío y borraría las franjas al materializar: sembrar si el doc no trae
     escaleta, con una marca; (2) mientras el PATCH y el doc escriban los dos, se
     pisan: **quién manda sobre la escaleta lo decide P3**. Recomendación del
-    coordinador: hacer P2 junto con P3, no antes.
+    coordinador: hacer P2 junto con P3, no antes. **DECIDIDO por Marco el
+    2026-10-10: P2 va con P3.**
     **Modelo DECIDIDO el 2026-07-25, nada de schema construido.** Absorbe la vieja
     tarea «tipos de horario añadibles por el usuario»: las cinco franjas de
     ADR-023 son **columnas fijas** en `performance` con un CHECK de orden — una
