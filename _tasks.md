@@ -1349,9 +1349,9 @@ entre empresas sin construirlo.
   `base.css`; el gutter del shell es una sola variable (`--shell-gutter`). En
   la cabecera de lente el selector baja bajo el título. Escritorio idéntico
   píxel a píxel a 1440. Queda fuera: Ajustes en móvil (su nav se oculta y las
-  filas desbordan), la agenda del Planner (la columna de semana se apila en
-  tres líneas) y la vista «By contact» de Conversations, que conserva la
-  ficha con etiquetas.
+  filas desbordan) y la agenda del Planner (la columna de semana se apila en
+  tres líneas). La vista «By contact» usa la misma ficha compacta, con los
+  chips de proyecto en la última línea.
 
 - [ ] **Poll de fechas candidatas (à la Doodle/When2meet, integrado).** Al buscar
   fecha para una residencia, un ensayo o una reunión, proponer **varias `date`
