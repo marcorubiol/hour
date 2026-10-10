@@ -6,7 +6,7 @@ import {
   ConversationEventCreateSchema,
   ConversationPatchSchema,
   occurredAtForDay,
-  STATUS_LABELS,
+  STATUS_KEYS,
   groupConversationsByContact,
   normalizeConversationItem,
   relativeContactDate,
@@ -192,24 +192,26 @@ describe('contact-book projection', () => {
 
   it('formats contact age coarsely and calmly', () => {
     const now = Date.parse('2026-07-20T12:00:00Z');
-    expect(relativeContactDate(null, now)).toBe('—');
-    expect(relativeContactDate('2026-07-20T08:00:00Z', now)).toBe('today');
-    expect(relativeContactDate('2026-07-19T08:00:00Z', now)).toBe('yesterday');
-    expect(relativeContactDate('2026-06-29T08:00:00Z', now)).toBe('3 weeks ago');
-    expect(relativeContactDate('2025-07-20T08:00:00Z', now)).toBe('12 months ago');
+    expect(relativeContactDate(null, 'en', now)).toBe('—');
+    expect(relativeContactDate('2026-07-20T08:00:00Z', 'en', now)).toBe('today');
+    expect(relativeContactDate('2026-07-19T08:00:00Z', 'en', now)).toBe('yesterday');
+    expect(relativeContactDate('2026-06-29T08:00:00Z', 'en', now)).toBe('3 weeks ago');
+    expect(relativeContactDate('2025-07-20T08:00:00Z', 'en', now)).toBe('12 months ago');
+    expect(relativeContactDate('2026-06-29T08:00:00Z', 'es', now)).toBe('hace 3 semanas');
   });
 });
 
 describe('status vocabulary', () => {
   it('has a label and a badge class for every enum value', () => {
     for (const s of CONVERSATION_STATUSES) {
-      expect(STATUS_LABELS[s]).toBeTruthy();
+      expect(STATUS_KEYS[s]).toBeTruthy();
+      expect(statusLabel(s, 'en')).not.toBe(STATUS_KEYS[s]);
       expect(statusBadgeClass(s)).toBe(`badge--${s.replace(/_/g, '-')}`);
     }
   });
 
   it('falls back to the raw value for unknown statuses', () => {
-    expect(statusLabel('mystery')).toBe('mystery');
+    expect(statusLabel('mystery', 'en')).toBe('mystery');
   });
 });
 

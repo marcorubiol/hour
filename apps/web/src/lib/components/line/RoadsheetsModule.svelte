@@ -13,6 +13,7 @@
   import { fetchJSON } from '$lib/api';
   import StateBadge from '$lib/components/StateBadge.svelte';
   import { dayLabel } from '$lib/datetime';
+  import { appLocale, t } from '$lib/i18n';
   import { performanceStatusLabel, performanceStatusTone } from '$lib/performance';
 
   type PerformanceItem = {
@@ -39,6 +40,8 @@
   }
 
   let { line, workspaceSlug }: Props = $props();
+
+  const locale = appLocale();
 
   // Reactive to line.id — the route component is reused across lines.
   const performancesOptions = toStore(() => ({
@@ -67,18 +70,18 @@
 {#if errorMsg}
   <p class="rsm__state rsm__state--danger">{errorMsg}</p>
 {:else if loading}
-  <p class="rsm__state">Loading…</p>
+  <p class="rsm__state">{t('desk.loading', locale)}</p>
 {:else if items.length === 0}
-  <p class="rsm__state">No performances on this line yet.</p>
+  <p class="rsm__state">{t('line.roadsheets_empty', locale)}</p>
 {:else}
   <div class="table-wrap">
     <table>
       <thead>
         <tr>
-          <th>Date</th>
-          <th>Status</th>
-          <th>Where</th>
-          <th aria-label="Road sheet"></th>
+          <th>{t('perf.date', locale)}</th>
+          <th>{t('edit.status', locale)}</th>
+          <th>{t('line.where', locale)}</th>
+          <th aria-label={t('line.roadsheet', locale)}></th>
         </tr>
       </thead>
       <tbody>
@@ -87,7 +90,7 @@
             <td class="rsm__cell-date">{dayLabel(p.performed_at)}</td>
             <td>
               <StateBadge
-                label={performanceStatusLabel(p.status)}
+                label={performanceStatusLabel(p.status, locale)}
                 tone={performanceStatusTone(p.status)}
               />
             </td>
@@ -95,10 +98,10 @@
             <td class="rsm__cell-sheet">
               {#if p.slug}
                 <a class="link-arrow" href={`/h/${workspaceSlug}/performance/${p.slug}/roadsheet`}>
-                  Road sheet →
+                  {t('line.roadsheet', locale)} →
                 </a>
               {:else}
-                <span class="rsm__sheet--unlinked">Road sheet →</span>
+                <span class="rsm__sheet--unlinked">{t('line.roadsheet', locale)} →</span>
               {/if}
             </td>
           </tr>

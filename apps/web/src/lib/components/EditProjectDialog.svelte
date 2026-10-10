@@ -6,9 +6,6 @@
    * description. PATCHed via update_project (owner/admin/member). Seeds from the
    * project on open; on success invalidates the projects caches so every
    * IdentityMark across the app repaints in place.
-   *
-   * i18n: strings are literal English here, matching the sibling create/edit
-   * dialogs (not yet keyed); folds into the i18n sweep later.
    */
   import { createMutation, useQueryClient } from '@tanstack/svelte-query';
   import { ApiError, mutateJSON } from '$lib/api';
@@ -19,6 +16,7 @@
   import { addToast } from '$lib/components/Toast.svelte';
   import AccentSwatchPicker from '$lib/components/create/AccentSwatchPicker.svelte';
   import { accentVarFor } from '$lib/utils/accent';
+  import { appLocale, t } from '$lib/i18n';
   import { MONOGRAM_MAX, type EditableProject, type IdentitySibling } from '$lib/utils/identity';
 
   interface Props {
@@ -31,6 +29,7 @@
   let { open = $bindable(false), project, siblings = [] }: Props = $props();
 
   const queryClient = useQueryClient();
+  const locale = appLocale();
 
   let name = $state('');
   let accent = $state<string | null>(null); // null = auto (hash of slug)
@@ -86,19 +85,19 @@
       // Calendar chips read the perf/date feeds — refetch so they repaint too.
       await queryClient.invalidateQueries({ queryKey: ['planner-performances'] });
       await queryClient.invalidateQueries({ queryKey: ['planner-dates'] });
-      addToast({ tone: 'success', message: 'Project updated.' });
+      addToast({ tone: 'success', message: t('project.updated', locale) });
       close();
     },
     onError: (err) => {
       addToast({
         tone: 'danger',
-        title: 'Not saved',
+        title: t('edit.not_saved', locale),
         message:
           err instanceof ApiError && err.status === 403
-            ? "You don't have permission to edit this project."
+            ? t('project.no_permission', locale)
             : err instanceof Error
               ? err.message
-              : 'Unexpected error',
+              : t('perf.unexpected', locale),
       });
     },
   });
@@ -106,17 +105,17 @@
   function submit(event?: Event) {
     event?.preventDefault();
     if (!name.trim()) {
-      addToast({ tone: 'warning', message: 'Name cannot be empty.' });
+      addToast({ tone: 'warning', message: t('project.name_empty', locale) });
       return;
     }
     $save.mutate();
   }
 </script>
 
-<Dialog bind:open title="Edit project" size="s">
+<Dialog bind:open title={t('project.edit_title', locale)} size="s">
   <form class="epj__form" onsubmit={submit}>
-    <section class="epj__identity" aria-label="Project identity">
-      <span class="eyebrow">Identity</span>
+    <section class="epj__identity" aria-label={t('project.identity_aria', locale)}>
+      <span class="eyebrow">{t('project.identity', locale)}</span>
       <div class="epj__preview">
         <IdentityMark
           variant="full"
@@ -128,34 +127,33 @@
       </div>
 
       <Input
-        label="Monogram"
+        label={t('project.monogram', locale)}
         name="project-initials"
         bind:value={initials}
         oninput={() => {
           if (initials.length > MONOGRAM_MAX) initials = initials.slice(0, MONOGRAM_MAX);
         }}
-        placeholder="e.g. MdA"
+        placeholder={t('project.monogram_ph', locale)}
         autocomplete="off"
-        helper="Up to 3 characters. Blank = derived from the name."
+        helper={t('project.monogram_help', locale)}
         disabled={$save.isPending}
       />
       {#if collision}
         <p class="epj__collision" role="status">
-          Another project already uses “{initials.trim()}”. It still works — the color keeps
-          them apart — but you may want a distinct monogram.
+          {t('project.monogram_collision', locale, { initials: initials.trim() })}
         </p>
       {/if}
 
       <AccentSwatchPicker
         bind:accent
         autoSlug={project?.slug || name.trim() || 'project'}
-        label="Project color"
+        label={t('project.color', locale)}
         disabled={$save.isPending}
       />
     </section>
 
     <Input
-      label="Name"
+      label={t('conversations.col_name', locale)}
       name="project-name"
       bind:value={name}
       required
@@ -164,13 +162,13 @@
     />
 
     <label class="field">
-      <span>Description</span>
+      <span>{t('project.description', locale)}</span>
       <textarea
         class="epj__desc"
         bind:value={description}
         maxlength="280"
         rows="3"
-        placeholder="Optional. What is this project?"
+        placeholder={t('project.description_ph', locale)}
         disabled={$save.isPending}
       ></textarea>
       <span class="epj__desc-count">{description.length} / 280</span>
@@ -180,8 +178,8 @@
   </form>
 
   {#snippet actions()}
-    <Button variant="outline" disabled={$save.isPending} onclick={close}>Cancel</Button>
-    <Button loading={$save.isPending} onclick={submit}>Save</Button>
+    <Button variant="outline" disabled={$save.isPending} onclick={close}>{t('create.cancel', locale)}</Button>
+    <Button loading={$save.isPending} onclick={submit}>{t('blackout.save', locale)}</Button>
   {/snippet}
 </Dialog>
 

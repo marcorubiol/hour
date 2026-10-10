@@ -19,6 +19,7 @@
   import { addToast } from '$lib/components/Toast.svelte';
   import AccentSwatchPicker from '$lib/components/create/AccentSwatchPicker.svelte';
   import type { NavWorkspace } from '$lib/nav';
+  import { appLocale, t } from '$lib/i18n';
 
   interface Props {
     open?: boolean;
@@ -28,15 +29,16 @@
   let { open = $bindable(false), workspace }: Props = $props();
 
   const queryClient = useQueryClient();
+  const locale = appLocale();
 
   const DOMAIN_OPTIONS = [
-    { value: '', label: '— No discipline —' },
-    { value: 'theatre', label: 'Theatre' },
-    { value: 'dance', label: 'Dance' },
-    { value: 'circus', label: 'Circus' },
-    { value: 'music', label: 'Music' },
-    { value: 'mixed', label: 'Mixed' },
-    { value: 'other', label: 'Other' },
+    { value: '', label: t('workspace.domain_none', locale) },
+    { value: 'theatre', label: t('workspace.domain_theatre', locale) },
+    { value: 'dance', label: t('workspace.domain_dance', locale) },
+    { value: 'circus', label: t('workspace.domain_circus', locale) },
+    { value: 'music', label: t('workspace.domain_music', locale) },
+    { value: 'mixed', label: t('workspace.domain_mixed', locale) },
+    { value: 'other', label: t('workspace.domain_other', locale) },
   ];
 
   /**
@@ -45,8 +47,8 @@
    * one representation instead of two that mean the same thing.
    */
   const BOOKING_MODE_OPTIONS = [
-    { value: '', label: 'Simple holds — theatre, dance' },
-    { value: 'prioritized', label: 'Ranked holds — music (1st, 2nd, 3rd)' },
+    { value: '', label: t('workspace.holds_simple', locale) },
+    { value: 'prioritized', label: t('workspace.holds_ranked', locale) },
   ];
 
   let name = $state('');
@@ -100,19 +102,19 @@
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['workspaces'] });
-      addToast({ tone: 'success', message: 'Space updated.' });
+      addToast({ tone: 'success', message: t('workspace.updated', locale) });
       close();
     },
     onError: (err) => {
       addToast({
         tone: 'danger',
-        title: 'Not saved',
+        title: t('edit.not_saved', locale),
         message:
           err instanceof ApiError && err.status === 403
-            ? "You don't have permission to edit this space."
+            ? t('workspace.no_permission', locale)
             : err instanceof Error
               ? err.message
-              : 'Unexpected error',
+              : t('perf.unexpected', locale),
       });
     },
   });
@@ -120,7 +122,7 @@
   function submit(event?: Event) {
     event?.preventDefault();
     if (!name.trim()) {
-      addToast({ tone: 'warning', message: 'Name cannot be empty.' });
+      addToast({ tone: 'warning', message: t('project.name_empty', locale) });
       return;
     }
     $save.mutate();
@@ -168,20 +170,20 @@
     onSuccess: async () => {
       aliasInput = '';
       await queryClient.invalidateQueries({ queryKey: ['alias-requests'] });
-      addToast({ tone: 'success', message: 'Alias requested — pending review.' });
+      addToast({ tone: 'success', message: t('workspace.alias_requested', locale) });
     },
     onError: (err) => {
       const msg =
         err instanceof ApiError && err.status === 409
-          ? 'That alias is already taken.'
+          ? t('workspace.alias_taken', locale)
           : err instanceof ApiError && err.status === 400
-            ? 'Invalid alias — lowercase letters, digits and hyphens.'
+            ? t('workspace.alias_invalid', locale)
             : err instanceof ApiError && err.status === 403
-              ? 'Only the space owner or an admin can request an alias.'
+              ? t('workspace.alias_forbidden', locale)
               : err instanceof Error
                 ? err.message
-                : 'Unexpected error';
-      addToast({ tone: 'danger', title: 'Alias not requested', message: msg });
+                : t('perf.unexpected', locale);
+      addToast({ tone: 'danger', title: t('workspace.alias_not_requested', locale), message: msg });
     },
   });
 
@@ -191,10 +193,10 @@
   }
 </script>
 
-<Dialog bind:open title="Edit space" size="s">
+<Dialog bind:open title={t('workspace.edit_title', locale)} size="s">
   <form class="ews__form" onsubmit={submit}>
     <Input
-      label="Name"
+      label={t('conversations.col_name', locale)}
       name="space-name"
       bind:value={name}
       required
@@ -203,42 +205,42 @@
     />
 
     <Select
-      label="Discipline"
+      label={t('workspace.discipline', locale)}
       name="space-domain"
       bind:value={domain}
       options={DOMAIN_OPTIONS}
-      helper="Drives the vocabulary this space uses."
+      helper={t('workspace.discipline_help', locale)}
       disabled={$save.isPending}
     />
 
     <Select
-      label="Holds"
+      label={t('workspace.holds', locale)}
       name="space-booking-mode"
       bind:value={bookingMode}
       options={BOOKING_MODE_OPTIONS}
-      helper="Theatre holds coexist on a date; music holds queue by rank."
+      helper={t('workspace.holds_help', locale)}
       disabled={$save.isPending}
     />
 
     <Input
-      label="Home base"
+      label={t('workspace.home_base', locale)}
       name="space-city"
       bind:value={city}
-      placeholder="e.g. Barcelona"
+      placeholder={t('workspace.home_base_ph', locale)}
       autocomplete="off"
       disabled={$save.isPending}
     />
 
-    <AccentSwatchPicker bind:accent autoSlug={autoAccentSlug} label="Space color" disabled={$save.isPending} />
+    <AccentSwatchPicker bind:accent autoSlug={autoAccentSlug} label={t('workspace.color', locale)} disabled={$save.isPending} />
 
     <label class="field">
-      <span>Description</span>
+      <span>{t('project.description', locale)}</span>
       <textarea
         class="ews__desc"
         bind:value={description}
         maxlength="280"
         rows="3"
-        placeholder="Optional. What is this space for?"
+        placeholder={t('workspace.description_ph', locale)}
         disabled={$save.isPending}
       ></textarea>
       <span class="ews__desc-count">{description.length} / 280</span>
@@ -248,23 +250,23 @@
   </form>
 
   <div class="ews__address">
-    <span class="eyebrow">Web address</span>
+    <span class="eyebrow">{t('workspace.web_address', locale)}</span>
     <p class="ews__address-current">
       <span class="ews__address-url">/h/{workspace?.slug}</span>
       {#if workspace?.alias}
-        <span class="ews__address-alias">alias: /h/{workspace.alias}</span>
+        <span class="ews__address-alias">{t('workspace.alias_current', locale, { alias: workspace.alias })}</span>
       {/if}
     </p>
     {#if pendingAlias}
-      <p class="ews__address-pending">Requested: /h/{pendingAlias} — pending review.</p>
+      <p class="ews__address-pending">{t('workspace.alias_pending', locale, { alias: pendingAlias })}</p>
     {:else}
       <div class="ews__address-claim">
         <Input
-          label="Request an alias"
+          label={t('workspace.alias_request_label', locale)}
           name="space-alias"
           bind:value={aliasInput}
-          placeholder="e.g. mocia"
-          helper="Lowercase letters, digits, hyphens. Granted after review; the address above keeps working either way."
+          placeholder={t('workspace.alias_ph', locale)}
+          helper={t('workspace.alias_help', locale)}
           autocomplete="off"
           disabled={$requestAlias.isPending}
         />
@@ -274,15 +276,15 @@
           disabled={!aliasInput.trim()}
           onclick={submitAlias}
         >
-          Request
+          {t('workspace.alias_request', locale)}
         </Button>
       </div>
     {/if}
   </div>
 
   {#snippet actions()}
-    <Button variant="outline" disabled={$save.isPending} onclick={close}>Cancel</Button>
-    <Button loading={$save.isPending} onclick={submit}>Save</Button>
+    <Button variant="outline" disabled={$save.isPending} onclick={close}>{t('create.cancel', locale)}</Button>
+    <Button loading={$save.isPending} onclick={submit}>{t('blackout.save', locale)}</Button>
   {/snippet}
 </Dialog>
 

@@ -13,6 +13,7 @@
   import { toStore } from 'svelte/store';
   import { fetchJSON } from '$lib/api';
   import { dayLabel } from '$lib/datetime';
+  import { appLocale, t } from '$lib/i18n';
 
   type PersonLite = {
     id: string;
@@ -69,6 +70,8 @@
     workspaceSlug: string;
   } = $props();
 
+  const locale = appLocale();
+
   const peopleOptions = toStore(() => {
     const id = line.id;
     return {
@@ -97,13 +100,13 @@
 </script>
 
 {#if loading}
-  <p class="ppl__state">Loading…</p>
+  <p class="ppl__state">{t('desk.loading', locale)}</p>
 {:else if errorMsg}
   <p class="ppl__state ppl__state--danger">{errorMsg}</p>
 {:else if people}
   <div class="ppl">
-    <section class="ppl__section" aria-label="Own team">
-      <p class="eyebrow eyebrow--sub ppl__sub">Own team</p>
+    <section class="ppl__section" aria-label={t('line.team_own', locale)}>
+      <p class="eyebrow eyebrow--sub ppl__sub">{t('line.team_own', locale)}</p>
       {#if people.cast.length > 0}
         <ul class="ppl__rows" role="list">
           {#each people.cast as c (c.id)}
@@ -130,12 +133,12 @@
           {/each}
         </ul>
       {:else}
-        <p class="ppl__state">No team on this project yet.</p>
+        <p class="ppl__state">{t('line.team_own_empty', locale)}</p>
       {/if}
     </section>
 
-    <section class="ppl__section" aria-label="Crew">
-      <p class="eyebrow eyebrow--sub ppl__sub">Crew</p>
+    <section class="ppl__section" aria-label={t('line.team_crew', locale)}>
+      <p class="eyebrow eyebrow--sub ppl__sub">{t('line.team_crew', locale)}</p>
       {#if people.crew.length > 0}
         <ul class="ppl__rows" role="list">
           {#each people.crew as c (c.id)}
@@ -178,12 +181,12 @@
           {/each}
         </ul>
       {:else}
-        <p class="ppl__state">No crew assigned on this line yet.</p>
+        <p class="ppl__state">{t('line.team_crew_empty', locale)}</p>
       {/if}
     </section>
 
-    <section class="ppl__section" aria-label="Venue contacts">
-      <p class="eyebrow eyebrow--sub ppl__sub">Venue contacts</p>
+    <section class="ppl__section" aria-label={t('line.team_venues', locale)}>
+      <p class="eyebrow eyebrow--sub ppl__sub">{t('line.team_venues', locale)}</p>
       {#if venueGroups.length > 0}
         {#each venueGroups as g (g.venue.id)}
           <div class="ppl__venue">
@@ -210,9 +213,7 @@
           </div>
         {/each}
       {:else}
-        <p class="ppl__state">
-          No venue contacts yet — add them from a performance's venue dialog.
-        </p>
+        <p class="ppl__state">{t('line.team_venues_empty', locale)}</p>
       {/if}
     </section>
   </div>

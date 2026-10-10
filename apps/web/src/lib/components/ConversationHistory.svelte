@@ -12,14 +12,15 @@
   import { toStore } from 'svelte/store';
   import { fetchJSON, mutateJSON } from '$lib/api';
   import { dayMonthYear, localDayISO } from '$lib/datetime';
+  import { appLocale, t } from '$lib/i18n';
   import Button from '$lib/components/Button.svelte';
   import Input from '$lib/components/Input.svelte';
   import Select from '$lib/components/Select.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
   import {
     CONVERSATION_EVENT_KINDS,
-    EVENT_DIRECTION_LABELS,
-    EVENT_KIND_LABELS,
+    eventDirectionLabel,
+    eventKindLabel,
     occurredAtForDay,
     type ConversationEventCreate,
     type ConversationEventDirection,
@@ -34,6 +35,7 @@
   let { conversationId }: Props = $props();
 
   const queryClient = useQueryClient();
+  const locale = appLocale();
 
   const query = createQuery(
     toStore(() => ({
@@ -53,11 +55,11 @@
 
   const kindOptions = CONVERSATION_EVENT_KINDS.map((k) => ({
     value: k,
-    label: EVENT_KIND_LABELS[k],
+    label: eventKindLabel(k, locale),
   }));
   const directionOptions = [
-    { value: 'outbound', label: EVENT_DIRECTION_LABELS.outbound },
-    { value: 'inbound', label: EVENT_DIRECTION_LABELS.inbound },
+    { value: 'outbound', label: eventDirectionLabel('outbound', locale) },
+    { value: 'inbound', label: eventDirectionLabel('inbound', locale) },
     { value: '', label: '—' },
   ];
 
@@ -75,8 +77,10 @@
     onError: (err) => {
       addToast({
         tone: 'danger',
-        title: 'Not recorded',
-        message: `${err instanceof Error ? err.message : 'Unexpected error'} — try again.`,
+        title: t('conversations.not_recorded', locale),
+        message: t('perf.try_again', locale, {
+          error: err instanceof Error ? err.message : t('perf.unexpected', locale),
+        }),
       });
     },
     onSettled: () => {
@@ -103,47 +107,47 @@
 
 <form class="history-add" onsubmit={submit}>
   <div class="history-add__row">
-    <Select label="Kind" bind:value={kind} options={kindOptions} />
-    <Select label="Direction" bind:value={direction} options={directionOptions} />
+    <Select label={t('conversations.event_kind', locale)} bind:value={kind} options={kindOptions} />
+    <Select label={t('create.direction', locale)} bind:value={direction} options={directionOptions} />
     <Input
-      label="Day"
+      label={t('conversations.event_day', locale)}
       type="date"
       bind:value={day}
       required
-      error={futureDay ? 'Not in the future' : undefined}
+      error={futureDay ? t('conversations.not_future', locale) : undefined}
     />
   </div>
   <div class="field">
-    <label for="history-body">Note</label>
+    <label for="history-body">{t('blackout.note', locale)}</label>
     <textarea
       id="history-body"
       rows="2"
       maxlength="5000"
       bind:value={body}
-      placeholder="What was said or sent"
+      placeholder={t('conversations.event_body_ph', locale)}
     ></textarea>
   </div>
   <div class="history-add__submit">
-    <Button type="submit" size="s" disabled={$addMutation.isPending || !day || futureDay}>Record</Button>
+    <Button type="submit" size="s" disabled={$addMutation.isPending || !day || futureDay}>{t('conversations.record', locale)}</Button>
   </div>
 </form>
 
 {#if $query.isLoading}
-  <p class="history-msg">Loading...</p>
+  <p class="history-msg">{t('conversations.loading', locale)}</p>
 {:else if $query.error}
   <p class="history-msg history-msg--error">
-    {$query.error instanceof Error ? $query.error.message : 'Could not load the history.'}
+    {$query.error instanceof Error ? $query.error.message : t('conversations.history_error', locale)}
   </p>
 {:else if items.length === 0}
-  <p class="history-msg">Nothing recorded yet.</p>
+  <p class="history-msg">{t('conversations.history_empty', locale)}</p>
 {:else}
-  <ol class="history" aria-label="History">
+  <ol class="history" aria-label={t('conversations.history', locale)}>
     {#each items as item (item.id)}
       <li class="history__item">
         <time class="history__when" datetime={item.occurred_at}>{dayMonthYear(item.occurred_at)}</time>
         <span class="history__what">
-          {EVENT_KIND_LABELS[item.kind]}{#if item.direction}<span class="history__dir"
-              >{EVENT_DIRECTION_LABELS[item.direction]}</span
+          {eventKindLabel(item.kind, locale)}{#if item.direction}<span class="history__dir"
+              >{eventDirectionLabel(item.direction, locale)}</span
             >{/if}
         </span>
         {#if item.body}<p class="history__body">{item.body}</p>{/if}
