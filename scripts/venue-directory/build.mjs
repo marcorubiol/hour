@@ -30,6 +30,7 @@ import path from 'node:path';
 import { normPlace } from '../../apps/web/src/lib/places.ts';
 import {
   genericEmail,
+  townHallEmail,
   kindFromName,
   landlinePhone,
   sameVenue,
@@ -202,8 +203,9 @@ function gencat() {
       designation: clean(st) ?? clean(t), address: clean(x.adre_a), postal_code: clean(x.codi_postal),
       city: gencatCity(clean(x.municipi)), region: 'Catalunya', country: 'ES',
       lat: num(x.latitud), lon: num(x.longitud), capacity: cap,
-      website: websiteUrl(clean(x.adre_a_web)), email: genericEmail(x.adre_a_electr_nica),
-      phone: landlinePhone(x.tel_fon, 'ES'),
+      website: websiteUrl(clean(x.adre_a_web)),
+      email: townHallEmail(x.adre_a_electr_nica) ? null : genericEmail(x.adre_a_electr_nica),
+      phone: townHallEmail(x.adre_a_electr_nica) ? null : landlinePhone(x.tel_fon, 'ES'),
     }));
   }
   return out;

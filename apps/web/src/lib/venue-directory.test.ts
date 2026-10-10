@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { normPlace } from './places';
 import {
+  townHallEmail,
   directoryQueryWords,
   genericEmail,
   kindFromName,
@@ -16,6 +17,10 @@ describe('genericEmail: only a role of the venue, never a person', () => {
     expect(genericEmail('info@angles.cat')).toBe('info@angles.cat');
     expect(genericEmail('Teatre@Bescano.cat')).toBe('teatre@bescano.cat');
     expect(genericEmail('cultura.ajuntament@x.cat')).toBe('cultura.ajuntament@x.cat');
+    expect(townHallEmail('cultura.ajuntament@x.cat')).toBe(true);
+    expect(townHallEmail('ajuntament@x.cat')).toBe(true);
+    expect(townHallEmail('info@teatre.cat')).toBe(false);
+    expect(townHallEmail(null)).toBe(false);
     expect(genericEmail('taquilla2@teatre.cat')).toBe('taquilla2@teatre.cat');
   });
   it('drops anything that may be a person or is doubtful', () => {

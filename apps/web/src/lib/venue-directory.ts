@@ -75,6 +75,17 @@ const ROLE_WORDS = new Set([
   'spectacles', 'musique', 'musica', 'dansa', 'danza', 'danse', 'joventut', 'juventud',
 ]);
 
+/** Words that make a mailbox the town hall's, not the venue's (Marco, 10-10: those stay out). */
+const TOWN_HALL_WORDS = new Set(['ajuntament', 'ayuntamiento', 'mairie', 'municipal', 'mpal']);
+
+/** True when the email is the town hall's: its contact is not the venue's, so neither email nor phone is kept. */
+export function townHallEmail(raw: string | null | undefined): boolean {
+  const first = raw?.split(/[;,\s]+/).find((s) => s.includes('@'));
+  if (!first) return false;
+  const parts = first.trim().toLowerCase().split('@')[0].split(/[._\-+]|\d+/);
+  return parts.some((p) => TOWN_HALL_WORDS.has(p));
+}
+
 /** A generic email of the venue, or null (also null when in doubt). */
 export function genericEmail(raw: string | null | undefined): string | null {
   if (!raw) return null;
