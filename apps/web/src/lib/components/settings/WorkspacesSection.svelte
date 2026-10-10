@@ -658,11 +658,17 @@
     border: 1px solid var(--border-color-dark);
     background: var(--bg-light);
   }
-  .set-access__head {
-    display: flex;
+  /* The page's generic .set-group__head stacks and rules its head; the access
+     box is a framed panel, so its head reads across (name left, count right),
+     inside the same padding as the invite row, whose top border is the rule. */
+  .set-access .set-access__head {
+    flex-direction: row;
     align-items: end;
     justify-content: space-between;
     gap: var(--space-m);
+    margin: 0;
+    padding: var(--space-m);
+    border: 0;
   }
   .set-access__count,
   .set-access__status,
