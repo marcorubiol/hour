@@ -634,6 +634,13 @@ documento dice que no se pueden correr, está desactualizado):
   base** se está mirando. Al build de producción no le afecta: `PUBLIC_SUPABASE_*`
   no se hornea en el bundle.
 
+**2026-10-10, contra `5fd46f0`: el rojo de tiempo, resuelto (de momento).**
+Cada lente y detalle lleva `aria-busy` mientras le faltan datos, y cada spec
+espera a `waitForLoaded` (`tests/loaded.ts`) tras cada `goto`/`reload` en vez
+de a 5 s fijos. Dos pasadas seguidas, la primera justo tras el deploy: **62/62
+y 62/62**. Dos pasadas son evidencia, no ley: si vuelve un rojo de tiempo,
+mirar primero si un `aria-busy` se quedó en `true`.
+
 **2026-10-09, contra `3f6eb44`: el rojo de tiempo sigue, y subir el
 presupuesto global no lo arregló.** Tres pasadas completas: 4 rojos justo
 tras el deploy, luego 62/62, y una tercera con `expect.timeout` a 15 s solo
