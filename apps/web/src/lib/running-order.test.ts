@@ -49,6 +49,10 @@ describe('clockText', () => {
     expect(clockText('2026-10-10T18:30:00Z', TZ)).toBe('20h30');
     expect(clockText('2026-10-10T14:00:00Z', TZ)).toBe('16h');
   });
+  test('no leading zero, as the strip writes it', () => {
+    expect(clockText('2026-10-10T07:05:00Z', TZ)).toBe('9h05');
+    expect(clockText('2026-10-10T22:30:00Z', TZ)).toBe('0h30');
+  });
 });
 
 describe('instantFor', () => {

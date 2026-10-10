@@ -72,9 +72,14 @@ function pad(c: Clock): string {
   return `${String(c.h).padStart(2, '0')}:${String(c.m).padStart(2, '0')}`;
 }
 
-/** An instant as the Planner's clock in `tz`: `20h30`, `16h` (never `20:30`). */
+/**
+ * An instant as the Planner's clock in `tz`: `20h30`, `16h`, `0h30` (never
+ * `20:30`). No leading zero: the running order sits right under the day
+ * strip, whose ruler and marks say `9h30` and `0h30`, and the same hour must
+ * not read two ways on one screen.
+ */
 export function clockText(iso: string, tz: string): string {
-  return hourMark(timeInTz(iso, tz));
+  return hourMark(timeInTz(iso, tz)).replace(/^0(?=\d)/, '');
 }
 
 /** The calendar day an instant falls on in `tz`, `YYYY-MM-DD`. */

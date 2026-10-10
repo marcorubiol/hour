@@ -387,6 +387,7 @@
        construction, not by matching paddings. */
     .ro {
       --ro-at: 11ch;
+      container-type: inline-size;
       margin-block-start: var(--space-m);
     }
     .ro__list {
@@ -503,6 +504,10 @@
     .ro__in::placeholder {
       color: var(--text-faint);
     }
+    /* The five words still come up as you type; the arrow is chrome. */
+    .ro__in::-webkit-calendar-picker-indicator {
+      display: none;
+    }
     .ro__in[aria-invalid='true'] {
       border-block-end-color: var(--danger);
     }
@@ -554,10 +559,13 @@
       color: var(--text-faint);
     }
 
-    /* A phone: the verbs drop under the moment, the hour keeps its column. */
-    @media (max-width: 640px) {
+    /* A NARROW HOST (the day on a phone): the hour column shrinks to the
+       widest hour it holds — still one column, still aligned — and the verbs
+       drop under the moment. The CONTAINER decides, not the viewport. */
+    @container (max-width: 30rem) {
       .ro__list {
-        grid-template-columns: var(--ro-at) minmax(0, 1fr);
+        grid-template-columns: max-content minmax(0, 1fr);
+        column-gap: var(--space-s);
       }
       .ro__acts {
         grid-column: 2;
