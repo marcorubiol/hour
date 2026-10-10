@@ -53,7 +53,7 @@
   } from '$lib/nav';
   import { activeProjectsQueryOptions, allLinesQueryOptions } from '$lib/nav-queries';
   import { spaceName } from '$lib/utils/identity';
-  import { goto } from '$app/navigation';
+  import { goto, replaceState } from '$app/navigation';
 
   type InvoicingMode = 'off' | 'interno' | 'legal';
   type WorkspaceLite = { id: string; slug: string; invoicing_mode: InvoicingMode | null };
@@ -657,6 +657,32 @@
     },
     onError: (err) => addToast({ tone: 'danger', title: 'Deal not created', message: err instanceof Error ? err.message : 'Unexpected error' }),
   });
+
+  // ── Llegadas desde el alta y la ficha de una función (`_tasks.md § 36`) ──
+  // `?new_bolo=<proyecto>` abre «New deal» con ese proyecto puesto (el ámbito
+  // ya viene en `scope=`, que aplica el shell). Una vez, y el parámetro se
+  // quita para que recargar no vuelva a abrirlo.
+  let newBoloHandled = false;
+  $effect(() => {
+    const want = new URL(location.href).searchParams.get('new_bolo');
+    if (!want || newBoloHandled || !projectIndex.some((p) => p.id === want)) return;
+    newBoloHandled = true;
+    openDeal();
+    dealProjectId = want;
+    const url = new URL(location.href);
+    url.searchParams.delete('new_bolo');
+    replaceState(url, {});
+  });
+  // `#bolo-<id>`: la tarjeta existe solo cuando el feed llega, así que el
+  // navegador no puede desplazarse solo. Una vez, cuando aparece.
+  let targetHandled = false;
+  $effect(() => {
+    if (targetHandled || bolos.length === 0 || !location.hash.startsWith('#bolo-')) return;
+    const el = document.getElementById(location.hash.slice(1));
+    if (!el) return;
+    targetHandled = true;
+    el.scrollIntoView({ block: 'center' });
+  });
 </script>
 
 <svelte:head>
@@ -731,7 +757,7 @@
             {@const cp = fee > 0 ? Math.min(100, Math.round((coll / fee) * 100)) : 0}
             {@const mode = obra.mode}
             {@const docs = invoicesByBolo.get(b.id) ?? []}
-            <div class="fee" data-st={b.fee_amount === null ? 'none' : st}>
+            <div class="fee" id={`bolo-${b.id}`} data-st={b.fee_amount === null ? 'none' : st}>
               <div class="fee__top">
                 <span class="fee__date">
                   {b.next_performed_at ? dayLabel(b.next_performed_at) : 'no date'}
@@ -950,7 +976,7 @@
       padding: var(--space-m); border: 1px solid var(--border-color-dark);
       border-inline-start-width: 3px; border-radius: var(--radius-l); background: var(--bg-ultra-light);
     }
-    .fee:hover { border-color: var(--text-faint); }
+    .fee:hover, .fee:target { border-color: var(--text-faint); }
     .fee[data-st='full'] { border-inline-start-color: var(--success); }
     .fee[data-st='partial'] { border-inline-start-color: var(--warning); }
     .fee[data-st='unpaid'], .fee[data-st='none'] { border-inline-start-color: var(--border-color-dark); }
