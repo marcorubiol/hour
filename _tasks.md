@@ -747,14 +747,14 @@ Marco: «no quiero ningún diferido». Cerrados los tres, cada uno como tocaba.
 - [ ] Marco: hacer — **Recorrer la app él mismo antes de invitar a Anouk** (Marco, 10-10); después, pasar su email para invitarla a `muk-cia`.
 - [x] **Primeras versiones de diseño integradas y desplegadas (2026-10-10, `6d5276c`).** Antes: Marco: hacer — **Revisar las primeras versiones de diseño** (selector de bolo, escaleta, móvil y fichas de Conversations, Travel P2) con sus capturas, antes de integrarlas juntas.
 
-9. [ ] Marco: decidir — **Supabase Pro antes de la beta (y con él, HIBP).** El proyecto está en plan
+9. [ ] **Supabase Pro antes de la beta (y con él, HIBP).** **DECIDIDO por Marco el 2026-10-10: de momento sigue en Free, con el keepalive diario; HIBP espera al upgrade.** El proyecto está en plan
    Free y la función requiere Pro. Marco debe decidir el upgrade; después activar
    `password_hibp_enabled` y volver a ejecutar el advisor. **Ojo: el upgrade que
    pide esta tarea resuelve también la § 33**, así que las dos son la misma
    decisión mirada desde dos sitios. **2026-10-09:** con Anouk entrando, la
    recomendación es pasar a Pro antes de la beta (quita la pausa).
 
-41. [ ] Marco: decidir — **Hosting: pensar en el «camino A» de Scalingo cuando se decida
+41. [ ] **Hosting: estudio de coste del «camino A» de Scalingo, ahora (Marco, 2026-10-10: opción b). Lo hace el coordinador; Marco decide con el estudio delante. Antes:** pensar en el «camino A» de Scalingo cuando se decida
     (Marco, 2026-10-09, para pensar, no decidido).** A Marco le atrae la alta
     disponibilidad de Scalingo (PostgreSQL Business: dos servidores con cambio
     automático, desde 40 €/mes con 1 GB). Salir de Supabase no es mover la
@@ -1111,7 +1111,8 @@ entre empresas sin construirlo.
     escaleta, con una marca; (2) mientras el PATCH y el doc escriban los dos, se
     pisan: **quién manda sobre la escaleta lo decide P3**. Recomendación del
     coordinador: hacer P2 junto con P3, no antes. **DECIDIDO por Marco el
-    2026-10-10: P2 va con P3.**
+    2026-10-10: P2 va con P3.** **Y quién manda, DECIDIDO el 2026-10-10: siempre el doc en directo,
+    como las notas; el PATCH deja de escribir franjas.**
     **Modelo DECIDIDO el 2026-07-25, nada de schema construido.** Absorbe la vieja
     tarea «tipos de horario añadibles por el usuario»: las cinco franjas de
     ADR-023 son **columnas fijas** en `performance` con un CHECK de orden — una
@@ -1400,7 +1401,7 @@ entre empresas sin construirlo.
   fusionar las entidades** — 1:1 con estado vs N:N sin estado; lo que unifica es
   la lente, no la tabla.
 
-- [ ] Marco: decidir — **La puerta de producto de comms, que es de Marco y no técnica.** ADR-085 lleva
+- [ ] **Comms: diseño en papel, sin código (Marco, 2026-10-10: se abre ya; la puerta de construir sigue).** Antes: la puerta de producto de comms, que es de Marco y no técnica. ADR-085 lleva
   escrita su propia condición: *usar la app en una temporada de difusión real
   antes de construir nada de esto*. Mientras no se cumpla, resolver los dos
   bloqueantes es trabajo especulativo por bueno que sea el modelo.
@@ -1442,7 +1443,7 @@ entre empresas sin construirlo.
   profesional, art. 19 LOPDGDD), informar a esas personas (art. 14 RGPD) y
   atender su oposición. Antes de construir esa parte, una consulta legal.
   Desbloquea: «Directorio global de salas».
-- [ ] Marco: decidir — **Escribir a la Red Española de Teatros y a DGArtes**
+- [ ] **Escribir ya a la Red Española de Teatros y a DGArtes (Marco, 2026-10-10)**: el coordinador redacta en el chat, se itera y Marco da el OK antes de crear borrador o enviar. Antes: escribir a la Red Española de Teatros y a DGArtes
   para pedir sus listados como dato (Marco, 10-10: lo quiere pensar).
 
 - [ ] **Pase de idioma de toda la app (Marco, 10-10).** Cuentas («New deal»,
