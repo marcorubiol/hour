@@ -27,12 +27,17 @@ Ficha del proyecto:
   si toca schema o permisos, `pnpm --filter web test:rls`; si toca pantalla, el E2E contra un origen desplegado tras
   el deploy. Una migración a producción sigue su gate propio (`_tasks.md § 34`: backup, staging si es destructiva,
   plan, apply).
-- **Producto (skill `producto`):** el roadmap es `_tasks.md`, no hay `ROADMAP.md` (Marco, 2026-10-09). Hour no tiene
-  versiones: un destino es una sección de `_tasks.md` («AHORA», «Producto — después», un `§`), y el tamaño se mide en
-  carriles. `CHANGELOG.md` en la raíz, por meses. Commit de un cambio que solo toca la cola o el CHANGELOG: directo a
-  `main` con push en el mismo paso. Un bug mandado arreglar no se integra antes de que Marco valide su línea.
-- **Drop:** https://claude.ai/artifact/31K3hLooqc7ak2JujNNHS7 (vista de la cola: copia de `_tasks.md` como
-  `roadmap.md`). Tipos: `bug` (roto), `x` (interfaz confusa o mejorable), `idea`. Sin archivo de notas (skill `producto`, 10-10).
-- **Mesa de Marco:** documento `proyectos/hour` en https://claude.ai/artifact/NsscS7X5U6ixvvFB8Fmnmj (copia de lo que
-  espera de Marco; la verdad sigue en `_tasks.md` y en el Drop). El Drop usa el `drop.js` común de la skill `producto`.
 - **Repo público:** sí. No escribas en git nada que no pueda ser público (claves, estado interno de carriles).
+
+## Producto
+- Skill: producto al día con: 2026-10-10.5. Coordinación: skill coordinador sólo con carriles.
+- Checkout principal: `/Users/marcorubiol/Developer/hour`
+- Roadmap: `_tasks.md` · CHANGELOG: `CHANGELOG.md` (raíz, por meses) · Tareas: `_tasks.md`
+- Versión: Hour no tiene versiones; un destino es una sección de `_tasks.md` («AHORA», «Producto — después», un `§`) y
+  el tamaño se mide en carriles.
+- Autonomía: la de la regla 3; un bug se integra después de que Marco valide su línea.
+- Drop: https://claude.ai/artifact/31K3hLooqc7ak2JujNNHS7 · tipos: `bug` (roto), `x` (interfaz confusa o mejorable),
+  `idea` · Mesa: proyectos/hour (https://claude.ai/artifact/NsscS7X5U6ixvvFB8Fmnmj)
+- Diferencias: no hay `ROADMAP.md` (Marco, 2026-10-09): el roadmap y la lista de tareas son el mismo `_tasks.md`, que
+  el Drop publica como `roadmap.md`; lo aparcado vive en sus secciones de después, no en «Sin versión». Un commit que
+  solo toca la cola o el CHANGELOG va directo a `main` con push en el mismo paso.
