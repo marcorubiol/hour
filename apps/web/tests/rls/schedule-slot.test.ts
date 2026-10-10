@@ -4,6 +4,7 @@ import {
   limitedEnvReady,
   login,
   pgGet,
+  pgPatch,
   pgPost,
   pgRpc,
   requireEnv,
@@ -113,9 +114,40 @@ describe.skipIf(!envReady())('schedule slots (ADR-090 P1)', () => {
       )
     ).rows;
 
-  it('THE FIVE COLUMNS ARE GONE from performance', async () => {
-    const r = await pgGet('performance?select=start_at&limit=1', jwt);
-    expect(r.status).toBe(400);
+  /**
+   * Expand/contract: entre la fase A (20261009200000) y la B
+   * (20261009210000) las cinco columnas conviven con los slots y un espejo
+   * las mantiene iguales en los dos sentidos; tras la B ya no existen. El
+   * test pregunta en qué fase está la base y exige lo que toca en cada una.
+   */
+  it('the five columns: mirrored both ways in phase A, gone after phase B', async () => {
+    const g = await gig();
+    const probe = await pgGet<Record<string, string | null>>(
+      `performance?select=start_at,load_in_at&id=eq.${g}`,
+      jwt,
+    );
+    if (probe.status === 400) return; // fase B: las columnas ya no existen
+    expect(probe.status).toBe(200);
+
+    // El Worker nuevo escribe un slot → la columna lo sigue al confirmar.
+    await add('performance', g, { p_at: '2031-04-10T20:00:00Z', p_kind: 'start' });
+    const after = await pgGet<Record<string, string | null>>(
+      `performance?select=start_at&id=eq.${g}`,
+      jwt,
+    );
+    expect(iso(after.rows[0]!.start_at!)).toBe(iso('2031-04-10T20:00:00Z'));
+
+    // El Worker viejo escribe la columna → el slot la sigue.
+    const w = await pgPatch(
+      'performance',
+      jwt,
+      { load_in_at: '2031-04-10T15:00:00Z' },
+      new URLSearchParams({ id: `eq.${g}`, select: 'id' }),
+    );
+    expect(w.status).toBe(200);
+    const slots = await slotsOf('performance_id', g);
+    expect(slots.map((s) => s.kind)).toEqual(['start', 'load_in']);
+    expect(iso(slots[1]!.at)).toBe(iso('2031-04-10T15:00:00Z'));
   });
 
   it('slots append 1..N on a gig and on a day, names trimmed', async () => {
