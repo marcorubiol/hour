@@ -480,6 +480,27 @@
       ? $agendaPerfQuery.isLoading || $agendaDatesQuery.isLoading
       : $perfQuery.isLoading || $datesQuery.isLoading,
   );
+  // aria-busy: wider than `loading` on purpose. Every feed the current view
+  // has enabled (a disabled one is not loading), plus the indexes the pins
+  // resolve against. Read by the E2E (`tests/lens.ts`) as «the lens has
+  // loaded», so a spec waits for the paper, not for a guessed number.
+  let busy = $derived(
+    $workspacesQuery.isPending ||
+      $projectsQuery.isPending ||
+      $linesQuery.isPending ||
+      [
+        $perfQuery,
+        $datesQuery,
+        $availabilityQuery,
+        $teamQuery,
+        $decisionsPerfQuery,
+        $agendaPerfQuery,
+        $agendaDatesQuery,
+        $agendaAvailabilityQuery,
+        $agendaNotesQuery,
+        $dayNotesQuery,
+      ].some((q) => q.isLoading),
+  );
   let errorMsg = $derived(
     view === 'agenda' || view === 'board'
       ? $agendaPerfQuery.error instanceof Error
@@ -2539,7 +2560,7 @@
   <title>Calendar — Hour</title>
 </svelte:head>
 
-<section class="cal">
+<section class="cal" aria-busy={busy}>
   <LensHeader>
     {#snippet title()}
       {#if view === 'day'}

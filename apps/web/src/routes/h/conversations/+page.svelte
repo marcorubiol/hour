@@ -103,6 +103,10 @@
     ...CONVERSATION_STATUSES.map((s) => ({ value: s, label: statusLabel(s) })),
   ];
 
+  // aria-busy: until the indexes answer, the pins cannot resolve and the
+  // table would fetch the wrong slice. The table says its own busy below.
+  let busy = $derived($workspacesQuery.isPending || $projectsQuery.isPending || $linesQuery.isPending);
+
   let filters = $derived({
     projectIds: filterIds.projectIds,
     workspaceIds: filterIds.workspaceIds,
@@ -293,7 +297,7 @@
   <title>Conversations — Hour</title>
 </svelte:head>
 
-<section class="conversations">
+<section class="conversations" aria-busy={busy}>
   <LensHeader>
     {#snippet title()}<LensTitle text="Conversations" />{/snippet}
     <!-- TEMP sub — placeholder until this lens's real subtitle is defined. -->
