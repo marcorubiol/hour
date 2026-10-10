@@ -1,5 +1,11 @@
 # Hour — estado canónico del proyecto
 
+> **Reconciliación 2026-10-10 (mediodía): § 37 EN PRODUCCIÓN.** Runtime
+> **`d835b86`**. Migración `20261010100000_create_performance_bolo` (run
+> 38037261162): una función nace enlazada a su bolo, y las 8 funciones de
+> trigger dejan de ser ejecutables por anon/authenticated. **RLS 212/212 ·
+> E2E 61/62** (el rojo, una ley de `planner-laws`, pasa sola dos veces).
+
 > **Reconciliación 2026-10-10: § 17 P1 (LA ESCALETA) EN PRODUCCIÓN.** Runtime
 > **`db6a343`**. Las cinco franjas de `performance` viven ahora en
 > `schedule_slot` (ADR-090): migración A `20261009200000` (expand, run
@@ -529,7 +535,9 @@ orientativo, no una verdad comercial cerrada.
   2026-08-27 eso **ya cambió un gate real**: la migración de ese día se aplicó
   sin el ensayo en staging. No es una nota preventiva, es algo que pasó — ver
   `_tasks.md § 34`.
-- **Última migración aplicada: `20261009210000_schedule_slot_contract`**
+- **Última migración aplicada: `20261010100000_create_performance_bolo`**
+  (2026-10-10, run 38037261162; § 37). Debajo va
+  **`20261009210000_schedule_slot_contract`**
   (2026-10-10, run 38031613191; § 17 P1, con `20261009200000_schedule_slot`
   justo antes). Debajo va **`20261009100000_conversation_event`** (2026-10-09,
   run 37946632931; ADR-098). Debajo va **`20260926100000_travel_stages`** (2026-10-09,

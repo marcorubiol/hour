@@ -146,7 +146,12 @@
     función**, con ~3 funciones sin bolo. Ese «todos a 1» no es prueba de nada
     todavía — hasta hoy no había manera de enlazar la segunda.
 
-37. [ ] **`create_performance` sigue sin saber de bolos.** Enlazar son dos
+37. [x] **HECHO 2026-10-10.** `create_performance` y `create_performance_series`
+    aceptan `p_bolo_id` (migración `20261010100000`, apply run 38037261162;
+    Worker `d835b86`); de paso, EXECUTE retirado a anon/authenticated en las 8
+    funciones de trigger expuestas (el advisor ya no lo marca). RLS 212/212, E2E
+    61/62 (el rojo, una ley de `planner-laws`, pasa sola).
+    Texto original: **`create_performance` sigue sin saber de bolos.** Enlazar son dos
     pasos (crear y después PATCH), que es el mismo patrón que
     `hold_notice_days` y funciona. Si el alta del Planner acaba preguntando
     siempre por el bolo —que es lo que sugiere la decisión de arriba—, merece
@@ -1352,6 +1357,12 @@ entre empresas sin construirlo.
   notificaciones y ratificación visual/naming con usuarios externos.
 
 ## Deuda aceptada / observar en uso
+
+- [ ] **`planner-laws` da un rojo suelto en la suite completa (2026-10-10).**
+  Dos pasadas, dos leyes distintas (el diario 469, el choque 421), y las dos
+  pasan solas. Desde que el E2E espera a `waitForLoaded`, son los únicos rojos.
+  Sospecha: las esperas de layout (`waitForTimeout`) o datos que dejan los
+  specs anteriores en `playwright`. Mirar si se repite.
 
 - Tareas cuyo padre se soft-borra pueden quedar sin contexto en Desk.
 - `update_workspace` directo por PostgREST permite a owner/admin saltar las
