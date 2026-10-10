@@ -1444,7 +1444,7 @@ entre empresas sin construirlo.
   autonómicos (Andalucía, Madrid, Valencia primero, mirando antes cada licencia) y los ~1.250 teatros de Wikidata de
   Francia. Criterios de la fase 1 que siguen: centros cívicos solo con aforo declarado, ningún contacto de ayuntamiento,
   y al adoptar se copia el contacto genérico con el nombre de la sala.
-- [ ] Marco: hacer — **Consulta legal sobre datos personales en el directorio global (salas y
+- [ ] Marco: decidir — **Datos personales en el directorio: investigación hecha (2026-10-10, `research/product/22-venue-directory-personal-data-legal.md`, no es asesoramiento jurídico).** Recomienda: contactos genéricos para todas las salas y una persona solo si ella misma se da de alta o reclama su ficha aceptando propuestas (la LSSI pide consentimiento previo también entre empresas). Falta decidir el diseño y si se lleva a un abogado con las 9 preguntas del informe. Antes: **Consulta legal sobre datos personales en el directorio global (salas y
   programadores)** (Marco, 10-10: de acuerdo, antes de construir esa parte). Nombres, emails y teléfonos de personas de otras entidades
   en una base compartida necesitan base jurídica (interés legítimo para contacto
   profesional, art. 19 LOPDGDD), informar a esas personas (art. 14 RGPD) y
