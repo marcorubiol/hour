@@ -754,7 +754,7 @@ Marco: «no quiero ningún diferido». Cerrados los tres, cada uno como tocaba.
    decisión mirada desde dos sitios. **2026-10-09:** con Anouk entrando, la
    recomendación es pasar a Pro antes de la beta (quita la pausa).
 
-41. [ ] **Hosting: estudio de coste del «camino A» de Scalingo, ahora (Marco, 2026-10-10: opción b). Lo hace el coordinador; Marco decide con el estudio delante. Antes:** pensar en el «camino A» de Scalingo cuando se decida
+41. [ ] **Hosting: estudio de coste del «camino A» de Scalingo, ahora (Marco, 2026-10-10: opción b). Estudio hecho: `research/infra/2026-10-10-scalingo-camino-a.md` (camino A con HA ~83 €/mes y 10-13 días; Pro 25 $). Marco: decidir — qué hacer con él. Antes:** pensar en el «camino A» de Scalingo cuando se decida
     (Marco, 2026-10-09, para pensar, no decidido).** A Marco le atrae la alta
     disponibilidad de Scalingo (PostgreSQL Business: dos servidores con cambio
     automático, desde 40 €/mes con 1 GB). Salir de Supabase no es mover la
