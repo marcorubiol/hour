@@ -215,6 +215,18 @@
     align-items: center;
     gap: var(--space-s);
   }
+  /* On a phone the two columns (180 + 280 at least) cannot sit side by
+     side in 358px: the control drops under its label, the hint keeps its
+     place between them. */
+  @media (max-width: 47.999rem) {
+    .set-page :global(.set-row) {
+      grid-template-columns: minmax(0, 1fr);
+      gap: var(--space-s);
+    }
+    .set-page :global(.set-row__lead) {
+      padding-block-start: 0;
+    }
+  }
   .set-page :global(.set-row.is-danger .set-row__label) {
     color: var(--danger);
   }

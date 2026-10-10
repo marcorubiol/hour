@@ -147,5 +147,16 @@
     .set-nav__item.is-danger .set-nav__glyph {
       color: var(--danger);
     }
+
+    /* On a phone the shell lays the nav as a band above the page (layout
+       § settings nav). The items keep their own face; only the list turns
+       from a column into lines that wrap, so all seven stay in view with
+       no sideways scroll. Each item is as wide as its words. */
+    @media (max-width: 47.999rem) {
+      .set-nav__list {
+        flex-direction: row;
+        flex-wrap: wrap;
+      }
+    }
   }
 </style>
