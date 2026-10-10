@@ -30,7 +30,7 @@ Ficha del proyecto:
 - **Repo público:** sí. No escribas en git nada que no pueda ser público (claves, estado interno de carriles).
 
 ## Producto
-- Skill: producto al día con: 2026-10-10.5. Coordinación: skill coordinador sólo con carriles.
+- Skill: producto al día con: 2026-10-10.6. Coordinación: skill coordinador sólo con carriles.
 - Checkout principal: `/Users/marcorubiol/Developer/hour`
 - Roadmap: `_tasks.md` · CHANGELOG: `CHANGELOG.md` (raíz, por meses) · Tareas: `_tasks.md`
 - Versión: Hour no tiene versiones; un destino es una sección de `_tasks.md` («AHORA», «Producto — después», un `§`) y
