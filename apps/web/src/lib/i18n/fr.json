@@ -497,6 +497,7 @@
   "planner.ro_yours": "chez vous",
   "planner.ro_zones": "Heures de {tz} ; la petite en dessous est la vôtre ({yours}).",
   "planner.ro_rezoned": "Le conducteur garde ses heures à l’horloge du nouveau lieu ({from} → {to}).",
+  "planner.ro_rezone_failed": "Le lieu a changé de fuseau, mais le conducteur n’a pas bougé : vérifiez ses heures.",
   "create.trip_from": "Départ",
   "create.trip_to": "Arrivée",
   "planner.trip_title": "trajet",

@@ -124,15 +124,34 @@ test.describe('performance write path', () => {
     const created = raw.find((i) => i.venue_name === venue);
     expect(created).toBeTruthy();
     expect(created!.status).toBe('confirmed');
-    expect(created!.load_in_at).toBeTruthy();
+    // ADR-090 P2: the order lives in the collab doc and the DO writes the
+    // rows after its save debounce; by now it has, or does shortly.
+    await expect
+      .poll(
+        () =>
+          page.evaluate(
+            async ({ d, v }) => {
+              const res = await fetch(`/api/performances?status=any&from=${d}&to=${d}`);
+              const data = (await res.json()) as {
+                items: Array<{ venue_name: string | null; load_in_at: string | null }>;
+              };
+              return data.items.find((i) => i.venue_name === v)?.load_in_at ?? null;
+            },
+            { d: day, v: venue },
+          ),
+        { timeout: 30_000 },
+      )
+      .toBeTruthy();
   });
 
-  test('timeslot ordering violation surfaces as a clear error', async ({ page }) => {
+  test('a PATCH that names a timeslot is refused: the running order is the doc’s', async ({
+    page,
+  }) => {
     await openApp(page);
     const day = runDay();
-    // The DB CHECK orders ADJACENT pairs (NULL-safe — partial schedules
-    // are legal, so load-in + wrap with gaps in between never violates).
-    // soundcheck before load-in IS adjacent → must bounce with a 400.
+    // ADR-090 P2 (Marco, 2026-10-10): the running order is written only
+    // through its collab doc. The PATCH refuses the five fields outright
+    // (400 `schedule_is_live`) instead of dropping them in silence.
     const result = await page.evaluate(
       async ({ d }) => {
         // Find the run's created performance (previous test) or any fixture gig.
@@ -153,6 +172,7 @@ test.describe('performance write path', () => {
     );
     if (result.skipped) test.skip(true, 'no fixture gig for this run');
     expect(result.status).toBe(400);
+    expect((result.body as { error?: string }).error).toBe('schedule_is_live');
   });
 
   test('delete performance: UI confirm removes the gig, API sweeps the rest (ADR-052)', async ({

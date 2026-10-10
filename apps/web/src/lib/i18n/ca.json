@@ -528,6 +528,7 @@
   "planner.ro_yours": "la teva hora",
   "planner.ro_zones": "Hores de {tz}; la petita de sota és la teva ({yours}).",
   "planner.ro_rezoned": "L’escaleta manté les hores al rellotge del nou local ({from} → {to}).",
+  "planner.ro_rezone_failed": "El local ha canviat de zona, però l’escaleta no s’ha mogut: revisa’n les hores.",
   "create.trip_from": "Origen",
   "create.trip_to": "Destinació",
   "planner.trip_title": "trajecte",

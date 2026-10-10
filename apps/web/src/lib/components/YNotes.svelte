@@ -6,7 +6,8 @@
   /**
    * YNotes — collaborative free-text notes over Yjs (ADR-025 / D-PRE-07).
    *
-   * Transport: y-partyserver YProvider through the authenticated proxy at
+   * Transport (`$lib/collab-doc`, shared with the running order):
+   * y-partyserver YProvider through the authenticated proxy at
    * /api/collab/<table>/<id> (the endpoint gates on membership + edit
    * permission via the httpOnly session cookie — same-origin WS upgrades
    * carry cookies, so no token rides the URL since Phase 0.9 — then
@@ -25,10 +26,9 @@
    */
 
   import { onMount } from 'svelte';
-  import * as Y from 'yjs';
-  import YProvider from 'y-partyserver/provider';
-  import { IndexeddbPersistence } from 'y-indexeddb';
-  import { getAccessToken, session } from '$lib/session.svelte';
+  import type YProvider from 'y-partyserver/provider';
+  import { openCollabDoc } from '$lib/collab-doc';
+  import { session } from '$lib/session.svelte';
   import { appLocale, t, type Locale } from '$lib/i18n';
   import { createQuery } from '@tanstack/svelte-query';
   import { meQueryOptions } from '$lib/nav-queries';
@@ -69,24 +69,9 @@
     // so the store is ready.
     if (!session.user) return;
 
-    const doc = new Y.Doc();
+    const collab = openCollabDoc(targetTable, targetId);
+    const { doc, provider } = collab;
     const ytext = doc.getText('notes');
-    const idb = new IndexeddbPersistence(`hour-collab-${targetTable}-${targetId}`, doc);
-
-    // With `prefix`, YProvider uses it as the FULL path (the room only
-    // names the BroadcastChannel) — so the target id goes in the prefix.
-    const provider = new YProvider(location.host, targetId, doc, {
-      prefix: `/api/collab/${targetTable}/${targetId}`,
-      protocol: location.protocol === 'https:' ? 'wss' : 'ws',
-      // Auth rides the httpOnly session cookie on the same-origin upgrade.
-      // Async params run on every (re)connect: awaiting the token endpoint
-      // refreshes a stale access cookie BEFORE the handshake, so reconnects
-      // after a laptop-lid nap don't hit the gate with a dead cookie.
-      params: async () => {
-        await getAccessToken();
-        return {};
-      },
-    });
 
     let lastSeen = '';
 
@@ -125,10 +110,11 @@
       lastSeen = next;
     };
 
+    // The local mirror's load and the server's sync both arrive here as
+    // remote transactions.
     ytext.observe((_event, txn) => {
       if (txn.origin !== 'local') pull();
     });
-    idb.once('synced', pull);
     provider.once('synced', pull);
 
     provider.on('status', ({ status: s }: { status: string }) => {
@@ -162,10 +148,7 @@
       el?.removeEventListener('blur', blur);
       awareness.off('change', onAwareness);
       presence = null;
-      provider.destroy();
-      // Closes the IndexedDB connection (clearData() would wipe it).
-      void idb.destroy();
-      doc.destroy();
+      collab.close();
     };
   });
 </script>
