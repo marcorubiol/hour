@@ -6,6 +6,7 @@
    * technical) rendered generically via JsonKV.
    */
 
+  import type { Snippet } from 'svelte';
   import type { Json } from '$lib/db-types';
   import JsonKV, { hasJsonContent } from './JsonKV.svelte';
   import ScheduleTable from './ScheduleTable.svelte';
@@ -49,6 +50,13 @@
         has none (timezone rule: entry and display must agree; never
         silently the browser's). */
     fallbackTz?: string | null;
+    /**
+     * The running order, when the host draws it (ADR-090 P3: the detail page
+     * hosts the same `RunningOrder` as the Planner's day, so there is one
+     * way to write an hour in the whole app). Without it the block falls back
+     * to the read-only five (the playground).
+     */
+    schedule?: Snippet;
   }
 
   let {
@@ -66,6 +74,7 @@
     technical = {},
     viewerTz,
     fallbackTz = null,
+    schedule,
   }: Props = $props();
 
   // The venue meta line shows only the venue's OWN timezone; the schedule
@@ -138,6 +147,9 @@
     {/if}
   </div>
 
+  {#if schedule}
+    {@render schedule()}
+  {:else}
   <ScheduleTable
     slots={{
       load_in_at: loadInAt,
@@ -149,6 +161,7 @@
     venueTz={scheduleTz}
     {viewerTz}
   />
+  {/if}
 
   {#each jsonSections as [label, value] (label)}
     <details class="production__section" open>

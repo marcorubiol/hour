@@ -19,10 +19,11 @@
   import Menu from '$lib/components/Menu.svelte';
   import StateBadge from '$lib/components/StateBadge.svelte';
   import ProductionStub from '$lib/components/ProductionStub.svelte';
+  import RunningOrder from '$lib/components/RunningOrder.svelte';
   import YNotes from '$lib/components/YNotes.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
   import type { Json } from '$lib/db-types';
-  import { dayLabel, dayMonth, instantToWallClock, wallClockToInstant } from '$lib/datetime';
+  import { dayLabel, dayMonth } from '$lib/datetime';
   import { detectLocale, t } from '$lib/i18n';
   import {
     HOLD_NOTICE_DEFAULT,
@@ -215,28 +216,6 @@
   // ADR-080 §2 — hold decision notice; the field only exists in the dialog
   // while the gig's status is hold*. null = empty = standard default.
   let fHoldNotice = $state<number | null>(null);
-  let fLoadIn = $state('');
-  let fSoundcheck = $state('');
-  let fStart = $state('');
-  let fLoadout = $state('');
-  let fWrap = $state('');
-
-  // The zone the timeslot fields were POPULATED in, plus their populated
-  // values — lets the cache-flip guard below tell "user typed something"
-  // apart from "the workspaces/venues cache landed late".
-  let populatedTz = $state('');
-  let populatedSlots = $state<string[]>([]);
-
-  function populateSlots() {
-    if (!perf) return;
-    fLoadIn = instantToWallClock(perf.load_in_at, entryTz);
-    fSoundcheck = instantToWallClock(perf.soundcheck_at, entryTz);
-    fStart = instantToWallClock(perf.start_at, entryTz);
-    fLoadout = instantToWallClock(perf.loadout_at, entryTz);
-    fWrap = instantToWallClock(perf.wrap_at, entryTz);
-    populatedTz = entryTz;
-    populatedSlots = [fLoadIn, fSoundcheck, fStart, fLoadout, fWrap];
-  }
 
   function openEdit() {
     if (!perf) return;
@@ -246,33 +225,8 @@
     fCountry = perf.country ?? '';
     fVenueId = perf.venue_id ?? '';
     fHoldNotice = perf.hold_notice_days;
-    // Stored instants → wall times in the entry zone (venue-local when a
-    // venue is linked). entryTz reads fVenueId, set just above.
-    populateSlots();
     dialogOpen = true;
   }
-
-  // Cache-flip guard: if entryTz changes under the OPEN dialog because a
-  // cold cache landed (not because the user re-linked the venue — that
-  // deliberately keeps the typed wall times), re-derive untouched fields
-  // from the stored instants so what's shown still means what will be
-  // saved. If the user already typed, leave their input — the hint above
-  // the fields always names the zone that will be used.
-  $effect(() => {
-    if (!dialogOpen || !perf || entryTz === populatedTz) return;
-    if (fVenueId !== (perf.venue_id ?? '')) return;
-    const untouched =
-      fLoadIn === populatedSlots[0] &&
-      fSoundcheck === populatedSlots[1] &&
-      fStart === populatedSlots[2] &&
-      fLoadout === populatedSlots[3] &&
-      fWrap === populatedSlots[4];
-    if (untouched) {
-      populateSlots();
-    } else {
-      populatedTz = entryTz;
-    }
-  });
 
   function saveEdit() {
     if (!fDay) {
@@ -288,19 +242,12 @@
       addToast({ tone: 'warning', message: t('perf.hold_notice_invalid', locale) });
       return;
     }
-    // Wall times → instants in the CURRENTLY selected venue's zone: re-link
-    // mid-edit and "show at 20:30" stays 20:30 in the new place.
     $patchMutation.mutate({
       performed_at: fDay,
       venue_name: fVenue.trim() || null,
       city: fCity.trim() || null,
       country: fCountry.trim() || null,
       venue_id: fVenueId || null,
-      load_in_at: wallClockToInstant(fLoadIn, entryTz),
-      soundcheck_at: wallClockToInstant(fSoundcheck, entryTz),
-      start_at: wallClockToInstant(fStart, entryTz),
-      loadout_at: wallClockToInstant(fLoadout, entryTz),
-      wrap_at: wallClockToInstant(fWrap, entryTz),
       // ADR-080 §2 — only while the field is on screen (hold* status);
       // emptied field = null = back to the standard default.
       ...(showHoldNotice ? { hold_notice_days: fHoldNotice } : {}),
@@ -529,30 +476,13 @@
 
   const viewerTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-  // Timezone rule (spec § Timezone rule): the timeslot inputs speak the
-  // VENUE's wall clock, falling back to the home space's timezone when no
-  // venue is linked — never silently the browser's (contracts don't move
-  // with the laptop). Derived from the venue SELECTED in the dialog, so
-  // re-linking mid-edit keeps the typed wall times and reinterprets them
-  // in the new zone.
+  // Timezone rule (spec § Timezone rule): hours are the VENUE's wall clock,
+  // falling back to the home space's when no venue is linked, never silently
+  // the browser's. The running order (ADR-090 P3) types its hours here; the
+  // details dialog no longer carries the five slots.
   let workspaceTz = $derived(
     $wsQuery.data?.items.find((w) => w.slug === workspaceSlug)?.timezone ?? null,
   );
-  let entryTzInfo = $derived.by<{
-    tz: string;
-    source: 'venue' | 'workspace' | 'viewer';
-    place: string | null;
-  }>(() => {
-    if (fVenueId) {
-      const picked = venues.find((vn) => vn.id === fVenueId);
-      const linked = fVenueId === perf?.venue_id ? perf?.venue : null;
-      const tz = picked?.timezone ?? linked?.timezone;
-      if (tz) return { tz, source: 'venue', place: picked?.name ?? linked?.name ?? null };
-    }
-    if (workspaceTz) return { tz: workspaceTz, source: 'workspace', place: null };
-    return { tz: viewerTz, source: 'viewer', place: null };
-  });
-  let entryTz = $derived(entryTzInfo.tz);
 
   let title = $derived(
     perf?.venue?.name ?? perf?.venue_name ?? perf?.project?.name ?? slug,
@@ -659,7 +589,20 @@
       technical={perf.technical}
       {viewerTz}
       fallbackTz={workspaceTz}
-    />
+    >
+      <!-- ADR-090 P3: the same running order as the Planner's day, in place
+           of the fixed five. One way to write an hour in the whole app. -->
+      {#snippet schedule()}
+        <RunningOrder
+          target="performance"
+          id={perf.id}
+          dayIso={perf.performed_at.slice(0, 10)}
+          tz={perf.venue?.timezone ?? workspaceTz ?? viewerTz}
+          {viewerTz}
+          {locale}
+        />
+      {/snippet}
+    </ProductionStub>
 
     <!-- ADR-084 §3 — the answer to "is it sorted?", which the month card's
          foot reads. Deliberately separate from the logistics/technical
@@ -835,40 +778,6 @@
     A linked venue brings its timezone (dual-time on the road sheet), address and
     contacts. The free-text fields stay as the display fallback.
   </p>
-  <p class="perf__dialog-hint" id="perf-times-tz">
-    {#if entryTzInfo.source === 'venue'}
-      Times below are the venue's local time{entryTzInfo.place ? ` at ${entryTzInfo.place}` : ''}
-      ({entryTz}).
-    {:else if entryTzInfo.source === 'workspace'}
-      Times below are home-space time ({entryTz}) —
-      {fVenueId ? 'set the venue’s timezone (Edit venue…) for its local time.' : 'link the venue for its local time.'}
-    {:else}
-      Times below are your device's time ({entryTz}) —
-      {fVenueId ? 'set the venue’s timezone (Edit venue…) for its local time.' : 'link the venue for its local time.'}
-    {/if}
-  </p>
-  <div class="perf__form-grid">
-    <div class="field">
-      <label for="f-loadin">Load in</label>
-      <input id="f-loadin" type="datetime-local" bind:value={fLoadIn} aria-describedby="perf-times-tz" />
-    </div>
-    <div class="field">
-      <label for="f-soundcheck">Soundcheck</label>
-      <input id="f-soundcheck" type="datetime-local" bind:value={fSoundcheck} aria-describedby="perf-times-tz" />
-    </div>
-    <div class="field">
-      <label for="f-start">Start</label>
-      <input id="f-start" type="datetime-local" bind:value={fStart} aria-describedby="perf-times-tz" />
-    </div>
-    <div class="field">
-      <label for="f-loadout">Load out</label>
-      <input id="f-loadout" type="datetime-local" bind:value={fLoadout} aria-describedby="perf-times-tz" />
-    </div>
-    <div class="field">
-      <label for="f-wrap">Wrap</label>
-      <input id="f-wrap" type="datetime-local" bind:value={fWrap} aria-describedby="perf-times-tz" />
-    </div>
-  </div>
   <div class="perf__danger">
     <Button variant="outline" tone="warn" size="s" onclick={() => (confirmDeleteOpen = true)}>
       Delete performance…
