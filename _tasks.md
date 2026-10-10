@@ -747,14 +747,14 @@ Marco: «no quiero ningún diferido». Cerrados los tres, cada uno como tocaba.
 - [ ] Marco: hacer — **Recorrer la app él mismo antes de invitar a Anouk** (Marco, 10-10); después, pasar su email para invitarla a `muk-cia`.
 - [x] **Primeras versiones de diseño integradas y desplegadas (2026-10-10, `6d5276c`).** Antes: Marco: hacer — **Revisar las primeras versiones de diseño** (selector de bolo, escaleta, móvil y fichas de Conversations, Travel P2) con sus capturas, antes de integrarlas juntas.
 
-9. [ ] **Supabase Pro antes de la beta (y con él, HIBP).** **DECIDIDO por Marco el 2026-10-10: de momento sigue en Free, con el keepalive diario; HIBP espera al upgrade.** El proyecto está en plan
+9. [ ] Marco: hacer — **Pasar `hour-phase0` a Supabase Pro (25 $/mes) en el dashboard; después el coordinador activa HIBP y corre el advisor.** Marco, 2026-10-10: tras el estudio de Scalingo, Pro antes de la beta (revoca el «sigue en Free» de esa misma mañana). El proyecto está en plan
    Free y la función requiere Pro. Marco debe decidir el upgrade; después activar
    `password_hibp_enabled` y volver a ejecutar el advisor. **Ojo: el upgrade que
    pide esta tarea resuelve también la § 33**, así que las dos son la misma
    decisión mirada desde dos sitios. **2026-10-09:** con Anouk entrando, la
    recomendación es pasar a Pro antes de la beta (quita la pausa).
 
-41. [ ] **Hosting: estudio de coste del «camino A» de Scalingo, ahora (Marco, 2026-10-10: opción b). Estudio hecho: `research/infra/2026-10-10-scalingo-camino-a.md` (camino A con HA ~83 €/mes y 10-13 días; Pro 25 $). Marco: decidir — qué hacer con él. Antes:** pensar en el «camino A» de Scalingo cuando se decida
+41. [ ] **Hosting: estudio de coste del «camino A» de Scalingo, ahora (Marco, 2026-10-10: opción b). Estudio hecho: `research/infra/2026-10-10-scalingo-camino-a.md` (camino A con HA ~83 €/mes y 10-13 días; Pro 25 $). **DECIDIDO por Marco el 2026-10-10: Supabase Pro ya (§ 9); el camino A se aparca hasta un motivo que Supabase no cubra.** Antes:** pensar en el «camino A» de Scalingo cuando se decida
     (Marco, 2026-10-09, para pensar, no decidido).** A Marco le atrae la alta
     disponibilidad de Scalingo (PostgreSQL Business: dos servidores con cambio
     automático, desde 40 €/mes con 1 GB). Salir de Supabase no es mover la
@@ -1437,6 +1437,10 @@ entre empresas sin construirlo.
   sala (una función suya enlazada a la sala) si los datos de la corrección son
   ciertos. Todo con historial y vuelta atrás; el dato oficial nunca se pisa en
   silencio.
+- [ ] **Directorio de salas, fase 2 (Marco, 2026-10-10).** España fuera de Cataluña y CyL con los datos abiertos
+  autonómicos (Andalucía, Madrid, Valencia primero, mirando antes cada licencia) y los ~1.250 teatros de Wikidata de
+  Francia. Criterios de la fase 1 que siguen: centros cívicos solo con aforo declarado, ningún contacto de ayuntamiento,
+  y al adoptar se copia el contacto genérico con el nombre de la sala.
 - [ ] Marco: hacer — **Consulta legal sobre datos personales en el directorio global (salas y
   programadores)** (Marco, 10-10: de acuerdo, antes de construir esa parte). Nombres, emails y teléfonos de personas de otras entidades
   en una base compartida necesitan base jurídica (interés legítimo para contacto
