@@ -80,7 +80,6 @@ export interface TaskItem extends Tables<'task'> {
     project_id: string;
     venue_name: string | null;
     city: string | null;
-    start_at: string | null;
   } | null;
   conversation: {
     id: string;
@@ -131,7 +130,7 @@ export const TASK_SELECT = [
   '*',
   'project:project_id(id,slug,name)',
   'line:line_id(id,slug,name,project_id)',
-  'performance:performance_id(id,slug,project_id,venue_name,city,start_at)',
+  'performance:performance_id(id,slug,project_id,venue_name,city)',
   'conversation:conversation_id(id,project_id,person:workspace_person!conversation_workspace_person_fkey(slug,full_name,organization:workspace_organization!workspace_person_organization_fkey(name)))',
 ].join(',');
 

@@ -289,7 +289,7 @@ describe('taskProjectId', () => {
     expect(
       taskProjectId(
         item({
-          performance: { id: 'x', slug: 'g', project_id: PARENT, venue_name: null, city: null, start_at: null },
+          performance: { id: 'x', slug: 'g', project_id: PARENT, venue_name: null, city: null },
         }),
       ),
     ).toBe(PARENT);
@@ -320,7 +320,6 @@ describe('taskContextLabel', () => {
         project_id: PARENT,
         venue_name: 'Teatre Lliure',
         city: 'Barcelona',
-        start_at: null,
       },
     });
     expect(taskContextLabel(t)).toBe('Teatre Lliure, Barcelona');

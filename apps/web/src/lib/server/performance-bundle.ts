@@ -15,6 +15,12 @@
 
 import { pgGet, PostgrestError, type SupabaseEnv } from '$lib/supabase';
 import type { Json, Tables } from '$lib/db-types';
+import {
+  SCHEDULE_SLOT_EMBED,
+  timeslotsFromSlots,
+  type ScheduleSlotRow,
+  type TimeslotFields,
+} from '$lib/schedule-slot';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -38,7 +44,9 @@ type PersonDbEmbed = Omit<PersonEmbed, 'organization_name'> & {
 export type PerformanceDetail = Omit<
   Tables<'performance'>,
   'fee_amount' | 'fee_currency' | 'deleted_at' | 'created_by' | 'previous_slugs'
-> & {
+> &
+  // ADR-090: derived from `schedule_slot`, not columns any more.
+  TimeslotFields & {
   venue: {
     id: string;
     slug: string | null;
@@ -102,8 +110,9 @@ export type CastMemberRow = {
 
 type PerformanceDbDetail = Omit<
   PerformanceDetail,
-  'conversation' | 'crew_assignment' | 'cast_override'
+  'conversation' | 'crew_assignment' | 'cast_override' | keyof TimeslotFields
 > & {
+  schedule_slot: ScheduleSlotRow[];
   conversation: (Omit<NonNullable<PerformanceDetail['conversation']>, 'person'> & {
     person: PersonDbEmbed | null;
   }) | null;
@@ -141,9 +150,10 @@ function normalizePerson(person: PersonDbEmbed | null): PersonEmbed | null {
   return { ...fields, organization_name: organization?.name ?? null };
 }
 
-function normalizePerformance(row: PerformanceDbDetail): PerformanceDetail {
+function normalizePerformance({ schedule_slot, ...row }: PerformanceDbDetail): PerformanceDetail {
   return {
     ...row,
+    ...timeslotsFromSlots(schedule_slot),
     conversation: row.conversation
       ? { ...row.conversation, person: normalizePerson(row.conversation.person) }
       : null,
@@ -199,11 +209,9 @@ const PERFORMANCE_COLS = [
   'venue_name',
   'city',
   'country',
-  'load_in_at',
-  'soundcheck_at',
-  'start_at',
-  'loadout_at',
-  'wrap_at',
+  // ADR-090: the five timeslots are `schedule_slot` rows now; the bundle
+  // derives the five fields from this embed.
+  SCHEDULE_SLOT_EMBED,
   'logistics',
   'hospitality',
   'technical',

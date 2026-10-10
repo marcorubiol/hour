@@ -44,6 +44,13 @@ import { PerformanceCreateSchema } from '$lib/performance';
 import { pgGet, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
 import { fetchPerformanceRosters } from '$lib/server/rosters';
+import {
+  EMPTY_TIMESLOTS,
+  SCHEDULE_SLOT_EMBED,
+  withTimeslots,
+  type ScheduleSlotRow,
+  type TimeslotField,
+} from '$lib/schedule-slot';
 
 const ALLOWED_STATUSES = [
   'any',
@@ -136,6 +143,10 @@ type PerformanceItem = {
   hold_notice_days?: number | null;
 };
 
+type PerformanceDbItem = Omit<PerformanceItem, TimeslotField> & {
+  schedule_slot: ScheduleSlotRow[];
+};
+
 export const GET: RequestHandler = async ({ request, url, platform, locals }) => {
   if (!platform?.env) {
     return json({ error: 'platform_unavailable' }, 500);
@@ -188,7 +199,9 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
       // tanda. NO es dinero: es una etiqueta de agrupación, así que no toca la
       // frontera de `read:money` (a diferencia de `bolo_id`, que sigue fuera).
       'series_id',
-      'load_in_at,soundcheck_at,start_at,loadout_at,wrap_at',
+      // ADR-090: the five timeslots are `schedule_slot` rows; the items keep
+      // their five fields, derived below.
+      SCHEDULE_SLOT_EMBED,
       // ADR-084 §3 — the operator's readiness ticks; the card's foot reads
       // them. The logistics/hospitality/technical CONTENT stays out of the
       // feed (heavy, and the month never shows it).
@@ -219,7 +232,8 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
   search.set('limit', String(limit));
 
   try {
-    const { data } = await pgGet<PerformanceItem>(env, 'performance', jwt, { search });
+    const { data: rows } = await pgGet<PerformanceDbItem>(env, 'performance', jwt, { search });
+    const data: PerformanceItem[] = rows.map(withTimeslots);
     if (rosters !== '1') return json({ items: data });
 
     const personIdsByPerformance = await fetchPerformanceRosters(
@@ -288,7 +302,9 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
       p_line_id: input.line_id ?? null,
     });
     if (data.length === 0) return json({ error: 'create_failed' }, 502);
-    return json({ performance: data[0] }, 201);
+    // A new gig has no running order yet (ADR-090): the five fields are null,
+    // as the five columns used to be.
+    return json({ performance: { ...data[0], ...EMPTY_TIMESLOTS } }, 201);
   } catch (err) {
     // RPC RAISEs: 22023 invalid input → 400, 42501 permission → 403.
     return pgErrorResponse(
