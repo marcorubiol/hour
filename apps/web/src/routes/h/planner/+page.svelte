@@ -1881,6 +1881,8 @@
   let agendaExhausted = $state(false); // forward: nothing planned ahead
   let pastExhausted = $state(false); // backward: nothing further back
   let probing = false;
+  /** The probe in flight, so a pull that lands mid-probe can wait its turn. */
+  let inFlight: Promise<void> | null = null;
   let agendaHorizonIso = $derived(
     addDaysIso(
       firstOfMonth(
@@ -1917,9 +1919,13 @@
       The window only moves AFTER its rows are primed — an unprimed jump
       rendered the new months empty, dimmed the book, then popped the rows
       in under the reader, which read as an error (Marco, 2026-08-03). */
-  async function probePlanAhead() {
+  function probePlanAhead(): Promise<void> | undefined {
     if (probing || agendaExhausted) return;
     probing = true;
+    inFlight = lookAhead();
+    return inFlight;
+  }
+  async function lookAhead() {
     try {
       const next = await probePlan(addDaysIso(agendaToIso, 1), agendaHorizonIso);
       if (!next) {
@@ -1954,8 +1960,18 @@
    * back there → the head line becomes the fact instead of the door.
    */
   async function loadAllEarlier() {
+    if (pastExhausted) return;
+    // The two loads share one lock (the cache is primed between them), but a
+    // pull is a person asking: if the look-ahead is still running, the pull
+    // waits for it instead of vanishing. It used to `return` here, and the
+    // door said «loading…» for an instant and then nothing (2026-10-10).
+    while (probing && inFlight) await inFlight;
     if (probing || pastExhausted) return;
     probing = true;
+    inFlight = lookBehind();
+    await inFlight;
+  }
+  async function lookBehind() {
     try {
       const first = await probePlan(agendaFloorIso, addDaysIso(agendaFromIso, -1));
       if (!first) {
