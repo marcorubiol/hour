@@ -1,10 +1,19 @@
--- ADR-090 P1 · `schedule_slot`: la escaleta, una lista de momentos colgada de
--- la función o del día (`_tasks.md § 17`).
+-- ADR-090 P1 · `schedule_slot`, fase A (expand): la escaleta, una lista de
+-- momentos colgada de la función o del día (`_tasks.md § 17`).
 --
 -- Hasta hoy el orden del día de una función eran CINCO COLUMNAS fijas en
 -- `performance` (`load_in_at`, `soundcheck_at`, `start_at`, `loadout_at`,
 -- `wrap_at`) con un CHECK de orden: una lista disfrazada de columnas, y nadie
 -- podía añadir «photo call» sin migración. Un ensayo no tenía ninguna.
+--
+-- EXPAND/CONTRACT, en dos migraciones para que la app no esté rota ni un
+-- minuto (Marco, 2026-10-10):
+--   · A (esta): crea la tabla y la rellena. NO BORRA NADA: las cinco columnas,
+--     su CHECK y sus grants siguen ahí, y un espejo temporal las mantiene
+--     iguales a los slots en los dos sentidos. El Worker desplegado sigue
+--     funcionando tal cual.
+--   · B (`20261009210000_schedule_slot_contract`): quita el espejo y borra las
+--     columnas. Va DESPUÉS de desplegar el Worker que lee slots.
 --
 -- LO QUE ESTA MIGRACIÓN HACE:
 --
@@ -13,13 +22,13 @@
 --   2. Cinco RPC de escritura, todas con la puerta `edit:performance` sobre el
 --      proyecto del padre: create / update / delete / reorder, y
 --      `replace_schedule_slots`, la que diffea una lista entera por id (la
---      materialización que el worker de collab usará en P2, y la que usa hoy
---      el PATCH de la función).
+--      materialización que el worker de collab usará en P2, y la que usa el
+--      PATCH de la función en el Worker nuevo).
 --   3. Backfill: cada franja con hora se convierte en un slot con su `kind`
 --      (`load_in · soundcheck · start · loadout · wrap`), en ese orden.
 --   4. `get_public_calendar` y `get_public_roadsheet` leen las franjas de
 --      `schedule_slot`, con EL MISMO JSON de salida que antes.
---   5. DROP de las cinco columnas y del CHECK `performance_timeslots_ordered`.
+--   5. El espejo temporal columnas ↔ slots (ver § 6).
 --
 -- Decisiones mínimas sobre la letra del ADR (anotadas para el coordinador):
 --   · `label` es NULLABLE: un slot con `kind` conocido se nombra desde el kind
@@ -34,20 +43,12 @@
 --     hora: el CHECK viejo solo ordenaba pares ADYACENTES, así que con huecos
 --     la hora podía no seguir el orden de columnas.
 --   · La regla de orden de las cinco franjas no desaparece para el usuario:
---     la valida ahora el PATCH de la app (`$lib/schedule-slot.ts`), porque
---     con labels libres no tiene sentido como CHECK de tabla.
+--     la valida el PATCH de la app (`$lib/schedule-slot.ts`), porque con
+--     labels libres no tiene sentido como CHECK de tabla.
 --
--- NO ES COMPATIBLE CON EL WORKER DESPLEGADO. El Worker de hoy nombra las cinco
--- columnas en el `select` de `/api/performances`, del detalle y del PATCH:
--- con la base migrada, esos endpoints dan 400/42703 y caen el mes, la agenda,
--- el tablero, el detalle y el road sheet. Esta migración y el Worker que lee
--- `schedule_slot` van JUNTOS, en una ventana corta: apply y deploy seguidos.
---
--- DESTRUCTIVA SEGÚN § 34 (DROP COLUMN). Staging obligatorio e `inspect` antes.
--- Sin CASCADE a propósito: si algo que solo tiene producción depende de una
--- de las columnas (una vista en `hour_backup_20260720`, por ejemplo), el DROP
--- falla y la transacción entera revierte. Y antes del DROP se pregunta al
--- catálogo por cualquier función que nombre las columnas (ver § 6).
+-- COMPATIBLE CON EL WORKER DESPLEGADO: no quita ni renombra nada que él lea o
+-- escriba. Según § 34 es aditiva salvo por el CREATE OR REPLACE de las dos
+-- proyecciones públicas (misma firma, mismos grants, mismo JSON).
 
 -- ── 1 · la tabla ──────────────────────────────────────────────────────────
 CREATE TABLE public.schedule_slot (
@@ -542,7 +543,8 @@ $$;
 -- CREATE OR REPLACE con la MISMA firma y el mismo tipo de retorno, para
 -- conservar los grants a anon que dan vida a los enlaces públicos. Si
 -- producción lleva otra sobrecarga que el repo no registra, la comprobación
--- del § 6 la encuentra (nombraría las columnas) y aborta antes del DROP.
+-- de catálogo de la migración B la encuentra (nombraría las columnas) y
+-- aborta antes del DROP.
 
 -- Las cinco franjas de una función como el jsonb de siempre. Privada: solo la
 -- llaman las dos proyecciones públicas, que son SECURITY DEFINER.
@@ -695,42 +697,127 @@ $$;
 
 ALTER FUNCTION public.get_public_roadsheet(text) OWNER TO postgres;
 
-
--- ── 6 · el catálogo, antes del DROP ───────────────────────────────────────
--- Una función plpgsql que nombre una columna no la sujeta (no hay dependencia
--- registrada): el DROP pasaría y la función moriría en la primera llamada.
--- Se pregunta al catálogo, en TODOS los esquemas de usuario (también
--- `hour_backup_20260720`), por cualquier cuerpo que nombre una de las cinco.
--- Las dos proyecciones públicas ya no las nombran como columnas; las claves
--- del JSON las pone la función privada de arriba, que por eso se excluye.
-DO $$
+-- ── 6 · el espejo temporal entre columnas y slots ─────────────────────────
+-- Expand/contract: esta migración NO borra las cinco columnas; lo hace la
+-- siguiente (`20261009210000_schedule_slot_contract`), cuando el Worker que
+-- lee slots ya esté desplegado. Mientras conviven, dos triggers mantienen las
+-- dos verdades iguales en los dos sentidos:
+--
+--   · columnas → slots: el Worker viejo escribe columnas (PATCH directo a
+--     `performance`). Cada franja que cambia crea, mueve o borra el primer
+--     slot de su kind.
+--   · slots → columnas: el Worker nuevo escribe slots (RPC). Cada cambio en
+--     un slot de una función recalcula sus cinco columnas desde los slots.
+--     Así, si hubiera que volver al Worker viejo en la ventana, lee columnas
+--     al día; y la comprobación de la migración B tiene sentido.
+--
+-- Sin bucle: cada trigger sale si lo ha disparado el otro
+-- (`pg_trigger_depth() > 1`), y los dos solo escriben si el valor cambia.
+-- Mientras viva el espejo, el CHECK `performance_timeslots_ordered` sigue
+-- mandando también sobre los slots de los cinco kinds: un slot que deje las
+-- columnas fuera de orden se rechaza con 23514, igual que antes.
+CREATE FUNCTION private.mirror_timeslot_columns_to_slots()
+RETURNS trigger
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path TO 'public', 'pg_temp'
+AS $$
 DECLARE
-  v_hits text;
+  v_kind  text;
+  v_new   timestamptz;
+  v_slot  public.schedule_slot;
+  v_dirty boolean := false;
 BEGIN
-  SELECT string_agg(p.oid::regprocedure::text, ', ') INTO v_hits
-  FROM pg_proc p
-  JOIN pg_namespace n ON n.oid = p.pronamespace
-  WHERE n.nspname NOT IN ('pg_catalog', 'information_schema')
-    AND n.nspname NOT LIKE 'pg_toast%'
-    AND p.oid <> 'private.performance_timeslots(uuid)'::regprocedure
-    AND p.prosrc ~ '\m(load_in_at|soundcheck_at|start_at|loadout_at|wrap_at)\M';
-  IF v_hits IS NOT NULL THEN
-    RAISE EXCEPTION 'functions still name the dropped timeslot columns: %', v_hits;
+  IF pg_trigger_depth() > 1 THEN
+    RETURN NULL;
   END IF;
+
+  FOR v_kind, v_new IN
+    SELECT * FROM (VALUES
+      ('load_in',    NEW.load_in_at),
+      ('soundcheck', NEW.soundcheck_at),
+      ('start',      NEW.start_at),
+      ('loadout',    NEW.loadout_at),
+      ('wrap',       NEW.wrap_at)
+    ) AS t(kind, at)
+  LOOP
+    SELECT * INTO v_slot FROM public.schedule_slot
+    WHERE performance_id = NEW.id AND kind = v_kind
+    ORDER BY sort LIMIT 1;
+
+    IF v_new IS NULL THEN
+      IF v_slot.id IS NOT NULL THEN
+        DELETE FROM public.schedule_slot WHERE id = v_slot.id;
+        v_dirty := true;
+      END IF;
+    ELSIF v_slot.id IS NULL THEN
+      INSERT INTO public.schedule_slot (
+        workspace_id, project_id, performance_id, kind, at, sort, created_by
+      ) VALUES (
+        NEW.workspace_id, NEW.project_id, NEW.id, v_kind, v_new,
+        (SELECT coalesce(max(sort), 0) + 1 FROM public.schedule_slot WHERE performance_id = NEW.id),
+        auth.uid()
+      );
+    ELSIF v_slot.at IS DISTINCT FROM v_new THEN
+      UPDATE public.schedule_slot SET at = v_new WHERE id = v_slot.id;
+    END IF;
+  END LOOP;
+
+  IF v_dirty THEN
+    PERFORM private.schedule_slot_compact('performance', NEW.id);
+  END IF;
+  RETURN NULL;
 END;
 $$;
 
--- ── 7 · las cinco columnas se van ─────────────────────────────────────────
--- Sin CASCADE: una vista o un objeto que dependa de ellas hace fallar el DROP
--- y revertir la migración entera, que es justo lo que se quiere. Los grants
--- de SELECT por columnas (20260720172431) se van con las columnas.
-ALTER TABLE public.performance
-  DROP CONSTRAINT performance_timeslots_ordered,
-  DROP COLUMN load_in_at,
-  DROP COLUMN soundcheck_at,
-  DROP COLUMN start_at,
-  DROP COLUMN loadout_at,
-  DROP COLUMN wrap_at;
+REVOKE ALL ON FUNCTION private.mirror_timeslot_columns_to_slots() FROM PUBLIC, anon, authenticated;
 
-COMMENT ON COLUMN public.performance.hold_notice_days IS
-  'ADR-079 §2: hold decision notice as lead time. NULL = standard default (30) · 0 = no notice · N = notify N days before the start slot (schedule_slot kind=start, ADR-090). Urgency is derived (start − notice), never stored.';
+CREATE TRIGGER performance_timeslots_mirror
+AFTER INSERT OR UPDATE OF load_in_at, soundcheck_at, start_at, loadout_at, wrap_at
+ON public.performance
+FOR EACH ROW EXECUTE FUNCTION private.mirror_timeslot_columns_to_slots();
+
+CREATE FUNCTION private.mirror_timeslot_slots_to_columns()
+RETURNS trigger
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path TO 'public', 'pg_temp'
+AS $$
+DECLARE
+  v_pid uuid;
+  v_t   jsonb;
+BEGIN
+  IF pg_trigger_depth() > 1 THEN
+    RETURN NULL;
+  END IF;
+
+  v_pid := coalesce(
+    CASE WHEN TG_OP <> 'DELETE' THEN NEW.performance_id END,
+    CASE WHEN TG_OP <> 'INSERT' THEN OLD.performance_id END);
+  IF v_pid IS NULL THEN
+    RETURN NULL;
+  END IF;
+
+  v_t := private.performance_timeslots(v_pid);
+  UPDATE public.performance SET
+    load_in_at    = (v_t->>'load_in_at')::timestamptz,
+    soundcheck_at = (v_t->>'soundcheck_at')::timestamptz,
+    start_at      = (v_t->>'start_at')::timestamptz,
+    loadout_at    = (v_t->>'loadout_at')::timestamptz,
+    wrap_at       = (v_t->>'wrap_at')::timestamptz
+  WHERE id = v_pid
+    AND (load_in_at, soundcheck_at, start_at, loadout_at, wrap_at) IS DISTINCT FROM (
+      (v_t->>'load_in_at')::timestamptz, (v_t->>'soundcheck_at')::timestamptz,
+      (v_t->>'start_at')::timestamptz, (v_t->>'loadout_at')::timestamptz,
+      (v_t->>'wrap_at')::timestamptz);
+  RETURN NULL;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION private.mirror_timeslot_slots_to_columns() FROM PUBLIC, anon, authenticated;
+
+-- DIFERIDO a la confirmación: `replace_schedule_slots` mueve varios slots en
+-- sentencias sucesivas y un estado intermedio podría romper el CHECK de orden
+-- de las columnas. Al confirmar se recalcula desde el estado final.
+CREATE CONSTRAINT TRIGGER schedule_slot_timeslots_mirror
+AFTER INSERT OR UPDATE OR DELETE ON public.schedule_slot
+DEFERRABLE INITIALLY DEFERRED
+FOR EACH ROW EXECUTE FUNCTION private.mirror_timeslot_slots_to_columns();

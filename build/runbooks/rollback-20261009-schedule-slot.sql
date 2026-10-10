@@ -1,60 +1,29 @@
--- ROLLBACK for 20261009200000_schedule_slot.sql (ADR-090 P1, § 17)
+-- ROLLBACK for 20261009200000_schedule_slot.sql (ADR-090 P1, fase A · expand)
 --
--- Written with the migration on 2026-10-09. The two public projections below
--- are copied verbatim from the checkpoint (20260720105713), which is what every
--- migration up to 20261009100000 leaves in place; before using this against
--- production, compare them with what `inspect` reports, because production is
--- where a body nobody wrote down can live.
+-- Only valid while fase B (20261009210000) is NOT applied: if it is, run
+-- rollback-20261009-schedule-slot-contract.sql first, which brings the five
+-- columns back.
 --
--- What it undoes: the table, its five RPCs and three private helpers, and the
--- new bodies of get_public_calendar / get_public_roadsheet. It puts the five
--- timeslot columns back on `performance`, refills them from the slots of kind
--- load_in | soundcheck | start | loadout | wrap (the first of each kind, by
--- sort), restores the CHECK and the column SELECT grant.
+-- What it undoes: the mirror triggers, the table, its five RPCs and the
+-- private helpers, and the new bodies of get_public_calendar /
+-- get_public_roadsheet (restored verbatim from the checkpoint 20260720105713;
+-- compare with `inspect` before using it against production). The five
+-- timeslot columns were never touched by fase A and the mirror kept them equal
+-- to the slots, so nothing has to be copied back.
 --
 -- What it cannot undo: slots that are not one of the five kinds (a "photo
--- call", a rehearsal day's running order). Those rows go with the table, so
--- after the first real use this stops being a pure rollback and loses data;
--- take a backup first. And if someone saved an out-of-order schedule through
--- replace_schedule_slots, restoring `performance_timeslots_ordered` fails and
--- the whole rollback reverts: fix those rows first (the error names the
--- constraint).
+-- call", a rehearsal day's running order). They go with the table; after the
+-- first real use take a backup first.
 --
--- ROLL THE WORKER BACK FIRST. The Worker that ships with this migration reads
--- `schedule_slot` and no longer names the five columns; with the table gone,
--- its feeds 4xx. Roll the Worker back to the previous build, then run this.
+-- Worker: the previous Worker reads columns and keeps working. The Worker that
+-- reads schedule_slot does NOT: roll it back first.
 
 BEGIN;
 
-ALTER TABLE public.performance
-  ADD COLUMN load_in_at    timestamptz,
-  ADD COLUMN soundcheck_at timestamptz,
-  ADD COLUMN start_at      timestamptz,
-  ADD COLUMN loadout_at    timestamptz,
-  ADD COLUMN wrap_at       timestamptz;
-
-UPDATE public.performance p SET
-  load_in_at    = (SELECT s.at FROM public.schedule_slot s WHERE s.performance_id = p.id AND s.kind = 'load_in'    ORDER BY s.sort LIMIT 1),
-  soundcheck_at = (SELECT s.at FROM public.schedule_slot s WHERE s.performance_id = p.id AND s.kind = 'soundcheck' ORDER BY s.sort LIMIT 1),
-  start_at      = (SELECT s.at FROM public.schedule_slot s WHERE s.performance_id = p.id AND s.kind = 'start'      ORDER BY s.sort LIMIT 1),
-  loadout_at    = (SELECT s.at FROM public.schedule_slot s WHERE s.performance_id = p.id AND s.kind = 'loadout'    ORDER BY s.sort LIMIT 1),
-  wrap_at       = (SELECT s.at FROM public.schedule_slot s WHERE s.performance_id = p.id AND s.kind = 'wrap'       ORDER BY s.sort LIMIT 1)
-WHERE EXISTS (SELECT 1 FROM public.schedule_slot s WHERE s.performance_id = p.id);
-
-ALTER TABLE public.performance
-  ADD CONSTRAINT performance_timeslots_ordered CHECK (((("load_in_at" IS NULL) OR ("soundcheck_at" IS NULL) OR ("load_in_at" <= "soundcheck_at")) AND (("soundcheck_at" IS NULL) OR ("start_at" IS NULL) OR ("soundcheck_at" <= "start_at")) AND (("start_at" IS NULL) OR ("loadout_at" IS NULL) OR ("start_at" <= "loadout_at")) AND (("loadout_at" IS NULL) OR ("wrap_at" IS NULL) OR ("loadout_at" <= "wrap_at"))));
-
-COMMENT ON COLUMN public.performance.load_in_at IS 'ADR-023: crew arrival / venue access begins.';
-COMMENT ON COLUMN public.performance.soundcheck_at IS 'ADR-023: soundcheck start.';
-COMMENT ON COLUMN public.performance.start_at IS 'ADR-023: doors-open / actual performance start. May differ from performed_at (which is just a date).';
-COMMENT ON COLUMN public.performance.loadout_at IS 'ADR-023: load-out start.';
-COMMENT ON COLUMN public.performance.wrap_at IS 'ADR-023: crew leaves venue.';
-COMMENT ON COLUMN public.performance.hold_notice_days IS 'ADR-079 §2: hold decision notice as lead time. NULL = standard default (30) · 0 = no notice · N = notify N days before start_at. Urgency is derived (start_at − notice), never stored.';
-
--- The column SELECT grant of 20260720172431 (the other privileges on
--- `performance` are table-level and cover new columns by themselves).
-GRANT SELECT (load_in_at, soundcheck_at, start_at, loadout_at, wrap_at)
-  ON public.performance TO authenticated;
+DROP TRIGGER IF EXISTS performance_timeslots_mirror ON public.performance;
+DROP TRIGGER IF EXISTS schedule_slot_timeslots_mirror ON public.schedule_slot;
+DROP FUNCTION IF EXISTS private.mirror_timeslot_columns_to_slots();
+DROP FUNCTION IF EXISTS private.mirror_timeslot_slots_to_columns();
 
 -- The previous public projections, verbatim from the checkpoint. Same
 -- signature, so CREATE OR REPLACE keeps their grants to anon.
@@ -196,7 +165,6 @@ $$;
 
 
 ALTER FUNCTION "public"."get_public_roadsheet"("p_token" "text") OWNER TO "postgres";
-
 
 DROP FUNCTION IF EXISTS public.replace_schedule_slots(text, uuid, jsonb);
 DROP FUNCTION IF EXISTS public.reorder_schedule_slots(text, uuid, uuid[]);
