@@ -1418,7 +1418,7 @@ entre empresas sin construirlo.
 
 ## Producto — después
 
-- [ ] **Directorio global de salas desde bases públicas (Marco, 10-10).** Que una
+- [ ] **Directorio global de salas: lo que sigue a la fase 1** (la fase 1 está en producción desde el 2026-10-10, ver CHANGELOG; aquí quedan las decisiones para las fases siguientes). **Directorio global de salas desde bases públicas (Marco, 10-10).** Que una
   compañía no tenga que crear cada sala a mano: un directorio global de solo
   lectura del que «adopta» una sala a su `venue`. Investigación y recomendación en
   `research/product/21-venue-directory-sources.md` (fase 1: Basilic + Equipaments

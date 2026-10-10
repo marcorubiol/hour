@@ -6,6 +6,7 @@ hasta entonces, sacado de esos documentos; lo anterior a julio de 2026 está sol
 
 ## Octubre 2026 (en curso)
 
+- Directorio de salas: al vincular el lugar de una función se puede buscar entre 4.659 salas públicas de España y Francia (teatros, auditorios, salas polivalentes, casas de cultura y ateneos) y adoptarla en vuestro espacio con un clic. Solo datos públicos, con sus fuentes y licencias en «Créditos y licencias». (2026-10-10, `3649036`)
 - Hour habla francés, además de catalán, castellano e inglés, según el idioma del navegador. Cuentas, la ficha de la función, el editor de salas, el Planner, Conversations, Ajustes y las fechas ya salen enteros en el idioma de la app; la hoja de ruta pública, en el del navegador (inglés si no es uno de los cuatro). (2026-10-10, `3649036`)
 - El Hall saluda por tu nombre de pila, el del perfil, y el menú de cuenta muestra tu nombre completo. (2026-10-10, `3649036`)
 - En el diario del Planner, pedir meses anteriores ya no se pierde si la app estaba buscando lo que viene. (2026-10-10, `2f48370`)
