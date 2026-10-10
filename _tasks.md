@@ -1333,9 +1333,16 @@ entre empresas sin construirlo.
   **Primera versión en `claude/mobile-shell` (2026-10-10), pendiente de que Marco
   la corrija.** Por debajo de 48rem (el corte que ya usaba el proyecto) el rail
   es un **cajón** desde la izquierda, con el mismo contenido y el mismo orden
-  (reloj que lleva a casa, calma, pulse, scopes, ⌘K); se abre con un botón en la
-  celda izquierda de la barra superior, que estaba vacía, y se cierra con el
-  fondo, Escape o al navegar. Se eligió cajón y no barra inferior porque el rail
+  (reloj que lleva a casa, calma, pulse, scopes, ⌘K); se abre tocando **el
+  reloj**, que en móvil se dibuja en la celda izquierda de la barra superior
+  (que estaba vacía) con la misma cara que en el rail y en el mismo sitio que
+  el del cajón, y se cierra con el fondo, Escape o al navegar (Marco,
+  2026-10-10: cajón sí, la puerta es el reloj, lo próximo se queda dentro). El
+  shell tiene un solo reloj (el layout lo marca y el rail lo recibe) y una sola
+  cara tipográfica, `.clock-face`. **Ficha de Conversations compacta** (misma
+  fecha): las mismas celdas de la fila de escritorio colocadas en tres líneas
+  (nombre y estado; organización · ciudad; `LAST` y `NEXT`), sin etiquetas
+  salvo en las dos fechas. Se eligió cajón y no barra inferior porque el rail
   no son destinos de navegación sino mobiliario (ADR-096): el pulse y los scopes
   no caben en una barra, y las lentes ya tienen su selector en la cabecera. El
   esqueleto muerto del `Sidebar` de mayo pasa a ser el contrato `.drawer` de
@@ -1343,8 +1350,8 @@ entre empresas sin construirlo.
   la cabecera de lente el selector baja bajo el título. Escritorio idéntico
   píxel a píxel a 1440. Queda fuera: Ajustes en móvil (su nav se oculta y las
   filas desbordan), la agenda del Planner (la columna de semana se apila en
-  tres líneas) y las tarjetas de Conversations, que gastan media anchura en
-  etiquetas.
+  tres líneas) y la vista «By contact» de Conversations, que conserva la
+  ficha con etiquetas.
 
 - [ ] **Poll de fechas candidatas (à la Doodle/When2meet, integrado).** Al buscar
   fecha para una residencia, un ensayo o una reunión, proponer **varias `date`
