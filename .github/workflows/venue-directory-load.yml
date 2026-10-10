@@ -30,7 +30,7 @@ concurrency:
 jobs:
   build-and-load:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     env:
       MODE: ${{ inputs.mode }}
       CONFIRM: ${{ inputs.confirm }}
@@ -65,7 +65,7 @@ jobs:
           set -euo pipefail
           node scripts/venue-directory/build.mjs
           ls -l .cache/venue-directory/out/
-          node -e 'const r=require("./.cache/venue-directory/out/report.json"); console.log(JSON.stringify({rows:r.rows, by_country:r.by_country, by_kind:r.by_kind}, null, 2))'
+          node -e 'const r=require("./.cache/venue-directory/out/report.json"); console.log(JSON.stringify({rows:r.rows, by_source:r.by_source, by_country:r.by_country, by_kind:r.by_kind, by_region_es:r.by_region_es, eiel_fase_by_province:r.eiel_fase_by_province}, null, 2))'
 
       - name: Load into production
         if: inputs.mode == 'load'

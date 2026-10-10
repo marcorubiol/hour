@@ -15,15 +15,20 @@
  * nominative emails and mobiles are dropped by the rules of
  * `$lib/venue-directory` (genericEmail, landlinePhone); when in doubt, none.
  *
- * Dedup: records are folded into rows in source priority (Basilic, Gencat,
- * Castilla y León, Wikidata), each only by a reason `sameVenue` accepts
- * (QID; distance + name). Every folded record stays in the row's `sources`
- * with its reason and distance; a field filled from a folded record is
- * named in `field_sources`.
+ * Dedup: records are folded into rows in source order (Basilic, Gencat,
+ * Castilla y León, Wikidata, then the fase 2 sources Comunidad de Madrid EIEL
+ * and national EIEL), each only by a reason `sameVenue` accepts (QID;
+ * distance + name), or, for a record without coordinates (EIEL),
+ * `sameVenueByName` (same municipality, same distinctive name). The fase 2
+ * sources go LAST so that every row of phase 1 keeps its (source, source_id):
+ * an adopted entry must not turn «missing» because a new source arrived.
+ * Every folded record stays in the row's `sources` with its reason and
+ * distance; a field filled from a folded record is named in `field_sources`.
  *
  * Zone: the IANA zone of the nearest GeoNames populated place to the
  * venue's coordinates (ES, FR, and cities500 for overseas France), within
- * 25 km. No coordinates or nothing near: NULL, never guessed.
+ * 25 km. No coordinates: the zone of its Spanish province when the source
+ * gives one (EIEL), otherwise NULL, never guessed.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -34,10 +39,12 @@ import {
   kindFromName,
   landlinePhone,
   sameVenue,
+  sameVenueByName,
   tidyName,
   websiteUrl,
   POLYVALENT_KINDS,
 } from '../../apps/web/src/lib/venue-directory.ts';
+import { eielRecords, frenchRegion, idemMadridRecords } from '../../apps/web/src/lib/venue-directory-sources.ts';
 
 const RAW = path.resolve(process.argv[2] ?? '.cache/venue-directory/raw');
 const OUT = path.resolve(process.argv[3] ?? '.cache/venue-directory/out');
@@ -135,7 +142,7 @@ const rec = (r) => {
     city,
     norm: normPlace(name),
     cityNorm: city ? normPlace(city) : '',
-    timezone: near && validTz(near.tz) ? near.tz : null,
+    timezone: near && validTz(near.tz) ? near.tz : r.lat == null && r.timezone && validTz(r.timezone) ? r.timezone : null,
     near,
   };
 };
@@ -243,19 +250,25 @@ function cyl() {
 }
 
 // ── Wikidata (CC0) ───────────────────────────────────────────────────────
-const { WIKIDATA_CLASSES } = await import('./fetch.mjs');
-function wikidata() {
+const { WIKIDATA_CLASSES, EIEL_PROVINCES } = await import('./fetch.mjs');
+/**
+ * Wikidata in one country. Spain as in phase 1; France (fase 2) with French
+ * labels, the commune as city, and the region (or overseas territory) of the
+ * nearest GeoNames place, named as Basilic names it.
+ */
+function wikidata(cc) {
+  const fr = cc === 'FR';
   const munis = new Map();
-  for (const b of JSON.parse(read('wikidata/municipalities.json')).results.bindings) {
-    munis.set(b.muni.value.split('/').pop(), { es: b.es?.value, ca: b.ca?.value, gl: b.gl?.value });
+  for (const b of JSON.parse(read(fr ? 'wikidata/municipalities_fr.json' : 'wikidata/municipalities.json')).results.bindings) {
+    munis.set(b.muni.value.split('/').pop(), { es: b.es?.value, ca: b.ca?.value, gl: b.gl?.value, fr: b.fr?.value });
   }
   const items = new Map();
-  for (const b of JSON.parse(read('wikidata/es.json')).results.bindings) {
+  for (const b of JSON.parse(read(fr ? 'wikidata/fr.json' : 'wikidata/es.json')).results.bindings) {
     const qid = b.item.value.split('/').pop();
     let it = items.get(qid);
     if (!it) items.set(qid, (it = { qid, kinds: new Set(), caps: [], v: {} }));
     it.kinds.add(WIKIDATA_CLASSES[b.t.value.split('/').pop()]);
-    for (const k of ['coord', 'es', 'ca', 'gl', 'eu', 'en', 'muni', 'postal', 'addr', 'web', 'useLabel']) {
+    for (const k of ['coord', 'es', 'ca', 'gl', 'eu', 'fr', 'en', 'muni', 'postal', 'addr', 'web', 'useLabel']) {
       if (b[k] && it.v[k] == null) it.v[k] = b[k].value;
     }
     if (b.cap) it.caps.push(Number(b.cap.value));
@@ -263,30 +276,70 @@ function wikidata() {
   const out = [];
   for (const it of items.values()) {
     const v = it.v;
-    if (v.useLabel && /demol|ruin|abandon|disus|closed|derrib|desapar|destro/i.test(v.useLabel)) { skip('wikidata', `estado de uso: ${v.useLabel}`); continue; }
+    if (v.useLabel && /demol|ruin|abandon|disus|closed|derrib|desapar|destro/i.test(v.useLabel)) { skip(`wikidata ${cc}`, `estado de uso: ${v.useLabel}`); continue; }
     const m = /Point\(([-\d.]+) ([-\d.]+)\)/.exec(v.coord ?? '');
-    if (!m) { skip('wikidata', 'sin coordenadas'); continue; }
+    if (!m) { skip(`wikidata ${cc}`, 'sin coordenadas'); continue; }
     const lon = Number(m[1]), lat = Number(m[2]);
-    const near = nearestPlace(lat, lon, ES_ONLY);
-    if (!near) { skip('wikidata', 'fuera de España (P17 España, sede en el extranjero)'); continue; }
+    const near = nearestPlace(lat, lon, fr ? FR_ALL : ES_ONLY);
+    if (!near) { skip(`wikidata ${cc}`, `fuera de ${fr ? 'Francia' : 'España'} (P17 ${cc}, sede en el extranjero)`); continue; }
     const admin1 = near?.cc === 'ES' ? near.admin1 : null;
-    const pref = ['56', '60', '07'].includes(admin1) ? ['ca', 'es'] : admin1 === '58' ? ['gl', 'es'] : ['es', 'ca', 'gl', 'eu'];
-    const name = [...pref, 'es', 'ca', 'gl', 'eu', 'en'].map((l) => v[l]).find(Boolean);
-    if (!name) { skip('wikidata', 'sin etiqueta'); continue; }
+    const pref = fr ? ['fr', 'en'] : ['56', '60', '07'].includes(admin1) ? ['ca', 'es'] : admin1 === '58' ? ['gl', 'es'] : ['es', 'ca', 'gl', 'eu'];
+    const name = (fr ? [...pref] : [...pref, 'es', 'ca', 'gl', 'eu', 'en']).map((l) => v[l]).find(Boolean);
+    if (!name) { skip(`wikidata ${cc}`, 'sin etiqueta'); continue; }
     const kind = KIND_RANK.find((k) => it.kinds.has(k)) ?? 'other_stage';
     // The municipality in the language its venue's name is in (Banyoles, not Bañolas).
     const muni = (v.muni && munis.get(v.muni.split('/').pop())) ?? {};
-    const city = [...pref, 'es', 'ca', 'gl'].map((l) => muni[l]).find(Boolean) ?? null;
+    const city = (fr ? ['fr'] : [...pref, 'es', 'ca', 'gl']).map((l) => muni[l]).find(Boolean) ?? null;
     const caps = it.caps.filter((c) => c > 0 && c < 200000);
-    out.push(rec({
+    const r = rec({
       source: 'wikidata', source_id: it.qid, qid: it.qid, name, kind, designation: null,
-      address: clean(v.addr), postal_code: clean(v.postal), city, region: admin1 ? ES_REGIONS[admin1] ?? null : null,
-      country: 'ES', lat, lon, capacity: caps.length ? Math.max(...caps) : null, website: websiteUrl(v.web),
+      address: clean(v.addr), postal_code: clean(v.postal), city,
+      region: fr ? frenchRegion(near.cc, near.admin1) : admin1 ? ES_REGIONS[admin1] ?? null : null,
+      country: cc, lat, lon, capacity: caps.length ? Math.max(...caps) : null, website: websiteUrl(v.web),
       email: null, phone: null,
-    }));
+    });
+    if (fr && FR_OVERSEAS.has(near.cc)) r.country = near.cc;
+    out.push(r);
   }
   return out;
 }
+
+// ── Comunidad de Madrid, EIEL fase 2023 (CC BY 4.0) ─────────────────────
+function madridEiel() {
+  const why = (w) => skip('madrid_eiel', w);
+  return idemMadridRecords(JSON.parse(read('madrid/eiel_cent_cultural.json')), normPlace, kindFromName, why).map(rec);
+}
+
+// ── EIEL, Secretaría de Estado de Política Territorial ──────────────────
+// One province per file set; no coordinates (zone from the province).
+function eiel() {
+  const dir = path.join(RAW, 'eiel');
+  const files = fs.readdirSync(dir);
+  const latin1 = (f) => fs.readFileSync(path.join(dir, f), 'latin1');
+  const out = [];
+  for (const centres of files.filter((f) => /^\d{4}_CENT_CULTURAL_\d{2}\.txt$/.test(f)).sort()) {
+    const [fase, , , prov] = centres.replace('.txt', '').split('_');
+    const tables = {
+      centres: latin1(centres),
+      uses: latin1(`${fase}_CENT_CULTURAL_USOS_${prov}.txt`),
+      municipalities: latin1(`${fase}_MUNICIPIO_${prov}.txt`),
+    };
+    out.push(...eielRecords(tables, normPlace, kindFromName, (w) => skip('eiel', w)).map(rec));
+  }
+  return out;
+}
+// The phase of each province (the last complete one differs by province).
+const EIEL_FASES = Object.fromEntries(
+  fs
+    .readdirSync(path.join(RAW, 'eiel'))
+    .filter((x) => /^\d{4}_CENT_CULTURAL_\d{2}\.txt$/.test(x))
+    .map((x) => [x.slice(-6, -4), x.slice(0, 4)])
+    .sort(),
+);
+const EIEL_FASE = (() => {
+  const f = [...new Set(Object.values(EIEL_FASES))].sort();
+  return f.length === 0 ? null : f.length === 1 ? f[0] : `${f[0]}-${f[f.length - 1]}`;
+})();
 
 // ── fold ─────────────────────────────────────────────────────────────────
 const FILL = ['address', 'postal_code', 'city', 'region', 'capacity', 'website', 'email', 'phone', 'designation'];
@@ -303,15 +356,29 @@ function nearbyRows(r) {
   return out;
 }
 const asMatch = (r) => ({ norm: r.norm, city: r.cityNorm, lat: r.lat, lon: r.lon, qid: r.qid });
+// Rows by municipality, for the records without coordinates (EIEL).
+const rowsByCity = new Map();
+const NAME_ONLY_SOURCES = new Set(['eiel']);
+const ckey = (r) => `${r.country}|${r.cityNorm}`;
 function fold(r) {
   let best = null;
   if (r.qid && qidOwner.has(r.qid)) best = { row: qidOwner.get(r.qid), m: { by: 'qid', distanceM: null } };
-  if (!best) {
+  if (!best && r.lat != null) {
     for (const row of nearbyRows(r)) {
       if (row.country !== r.country) continue;
       const m = sameVenue(asMatch(row), asMatch(r));
       if (m && (!best || (m.distanceM ?? 0) < (best.m.distanceM ?? 0))) best = { row, m };
     }
+  }
+  // Without coordinates, only the strict name rule, against any row of the
+  // same municipality. Only for the national EIEL: the coordinate-less
+  // records of phase 1 (a few Gencat and Castilla y León ones) keep their
+  // phase 1 behaviour, so no phase 1 row changes.
+  if (!best && r.lat == null && r.cityNorm && NAME_ONLY_SOURCES.has(r.source)) {
+    const hits = (rowsByCity.get(ckey(r)) ?? []).filter((row) => sameVenueByName(asMatch(row), asMatch(r)));
+    // Two candidates: ambiguous, so none.
+    if (hits.length === 1) best = { row: hits[0], m: sameVenueByName(asMatch(hits[0]), asMatch(r)) };
+    if (hits.length > 1) skip(r.source, 'fusión ambigua sin coordenadas: queda aparte');
   }
   if (!best) {
     const row = { ...r, field_sources: {}, sources: [{ source: r.source, source_id: r.source_id }] };
@@ -320,6 +387,10 @@ function fold(r) {
       const k = gkey(row.lat, row.lon);
       if (!rowGrid.has(k)) rowGrid.set(k, []);
       rowGrid.get(k).push(row);
+    }
+    if (row.cityNorm) {
+      if (!rowsByCity.has(ckey(row))) rowsByCity.set(ckey(row), []);
+      rowsByCity.get(ckey(row)).push(row);
     }
     if (row.qid) qidOwner.set(row.qid, row);
     return;
@@ -339,12 +410,19 @@ function fold(r) {
   }
 }
 
-const bySource = { basilic: basilic(), gencat: gencat(), jcyl: cyl(), wikidata: wikidata() };
+const bySource = {
+  basilic: basilic(),
+  gencat: gencat(),
+  jcyl: cyl(),
+  wikidata: [...wikidata('ES'), ...wikidata('FR')],
+  madrid_eiel: madridEiel(),
+  eiel: eiel(),
+};
 const order = (a, b) =>
   KIND_RANK.indexOf(a.kind) - KIND_RANK.indexOf(b.kind) ||
   (b.capacity ? 1 : 0) - (a.capacity ? 1 : 0) ||
   a.source_id.localeCompare(b.source_id);
-for (const src of ['basilic', 'gencat', 'jcyl', 'wikidata']) for (const r of [...bySource[src]].sort(order)) fold(r);
+for (const src of ['basilic', 'gencat', 'jcyl', 'wikidata', 'madrid_eiel', 'eiel']) for (const r of [...bySource[src]].sort(order)) fold(r);
 
 // ── output ───────────────────────────────────────────────────────────────
 const out = rows.map((r) => ({
@@ -366,6 +444,9 @@ const DATA_DATES = {
     .sort()
     .pop(),
   wikidata: FETCHED_AT.slice(0, 10),
+  // Neither EIEL ships a date of its own: the survey's phase goes in the name.
+  madrid_eiel: null,
+  eiel: null,
 };
 const SOURCES = [
   {
@@ -390,6 +471,21 @@ const SOURCES = [
     key: 'wikidata', name: 'Wikidata', publisher: 'Wikimedia Foundation y colaboradores de Wikidata',
     license: 'CC0 1.0', license_url: 'https://creativecommons.org/publicdomain/zero/1.0/',
     source_url: 'https://www.wikidata.org', attribution: 'Wikidata (CC0).',
+  },
+  {
+    key: 'madrid_eiel', name: 'EIEL fase 2023, centros culturales de la Comunidad de Madrid',
+    publisher: 'Comunidad de Madrid (IDEM)',
+    license: 'CC BY 4.0', license_url: 'https://creativecommons.org/licenses/by/4.0/legalcode.es',
+    source_url: 'https://datos.gob.es/es/catalogo/a13002908-encuesta-de-infraestructuras-y-equipamientos-locales-eiel-fase-2023-centro-cultural',
+    attribution: 'Comunidad de Madrid, Encuesta de Infraestructuras y Equipamientos Locales (EIEL) fase 2023: centros culturales (IDEM). Cambios: solo teatros, auditorios, casas de cultura y otros espacios con uso escénico.',
+  },
+  {
+    key: 'eiel', name: `Encuesta de Infraestructura y Equipamientos Locales (EIEL)${EIEL_FASE ? `, fases ${EIEL_FASE}` : ''}: centros culturales`,
+    publisher: 'Secretaría de Estado de Política Territorial',
+    license: 'Uso libre citando la fuente («©Secretaría de Estado de Política Territorial»)',
+    license_url: 'https://mptmd.gob.es/portal/politica-territorial/local/coop_econom_local_estado_fondos_europeos/eiel.html',
+    source_url: 'https://eiel.redsara.es/descargas/',
+    attribution: '©Secretaría de Estado de Política Territorial. Encuesta de Infraestructura y Equipamientos Locales (EIEL). Cambios: solo teatros, auditorios, casas de cultura y otros espacios con uso escénico.',
   },
 ];
 for (const s of SOURCES) s.data_date = DATA_DATES[s.key];
@@ -457,13 +553,20 @@ const report = {
   fetched_at: FETCHED_AT,
   records_in: Object.fromEntries(Object.entries(bySource).map(([k, v]) => [k, v.length])),
   rows: out.length,
+  by_source: tally((r) => r.source),
   by_source_country: tally((r) => `${r.source} ${r.country}`),
   by_country: tally((r) => r.country),
   by_kind: tally((r) => r.kind),
+  by_country_kind: tally((r) => `${r.country} ${r.kind}`),
   polyvalent: out.filter((r) => POLYVALENT_KINDS.includes(r.kind)).length,
   polyvalent_by_country: tally((r) => (POLYVALENT_KINDS.includes(r.kind) ? r.country : '-')),
   by_region_es: tally((r) => (r.country === 'ES' ? r.region ?? '(sin región)' : '-')),
+  by_region_es_source: tally((r) => (r.country === 'ES' ? `${r.region ?? '(sin región)'} · ${r.source}` : '-')),
+  by_region_es_kind: tally((r) => (r.country === 'ES' ? `${r.region ?? '(sin región)'} · ${r.kind}` : '-')),
+  by_region_fr: tally((r) => (r.country !== 'ES' ? r.region ?? '(sin región)' : '-')),
   merges,
+  eiel_fase_by_province: EIEL_FASES,
+  eiel_provinces_without_data: EIEL_PROVINCES.filter((p) => !EIEL_FASES[p]),
   skipped,
   fill,
   timezones: tally((r) => r.timezone ?? '(null)'),
