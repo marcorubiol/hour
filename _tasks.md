@@ -1504,7 +1504,15 @@ entre empresas sin construirlo.
 
 ## Deuda aceptada / observar en uso
 
-- [ ] **`planner-laws` da un rojo suelto en la suite completa (2026-10-10).**
+- [x] **El rojo del diario de `planner-laws`, RESUELTO (2026-10-10).** Causa: una
+  espera fija más corta que la red y un tirón tragado por el cerrojo `probing`; el
+  spec espera ahora a sus respuestas (`8e464b4`) y la config guarda traza si falla.
+  El del choque (421) no se reprodujo en 4 suites: si vuelve, habrá traza.
+- [ ] **Bug: el tirón de «meses anteriores» se pierde si coincide con la búsqueda
+  hacia delante** (`loadAllEarlier` y `probePlanAhead` comparten `probing` en
+  `routes/h/planner/+page.svelte`; la primera hace `return` sin avisar). Arreglo
+  mínimo: que espere a la búsqueda en curso. Visto el 10-10 al arreglar el test.
+  Antes: **`planner-laws` da un rojo suelto en la suite completa (2026-10-10).**
   Dos pasadas, dos leyes distintas (el diario 469, el choque 421), y las dos
   pasan solas. Desde que el E2E espera a `waitForLoaded`, son los únicos rojos.
   Sospecha: las esperas de layout (`waitForTimeout`) o datos que dejan los
