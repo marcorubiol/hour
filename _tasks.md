@@ -772,7 +772,10 @@ Marco: «no quiero ningún diferido». Cerrados los tres, cada uno como tocaba.
       solo la base no resuelve la soberanía; si un día es argumento de venta, se
       decide para toda la pila.
 
-33. [x] **La pausa del plan Free volverá — DECIDIDO: se acepta, con fecha de
+33. [x] **2026-10-10: keepalive diario** (`.github/workflows/keepalive.yml`, una
+    consulta a la base a las 06:37 UTC; un run rojo avisa de una pausa). Se borra
+    al pasar a Pro. Texto anterior:
+    **La pausa del plan Free volverá — DECIDIDO: se acepta, con fecha de
     caducidad.** (Marco, 2026-08-29: «mientras la app no esté activa al
     público, acepto la pausa».) O sea la tercera salida de las tres que había,
     y es una decisión, no un olvido: la firma está documentada, se reconoce en
@@ -1080,6 +1083,12 @@ entre empresas sin construirlo.
     colapsan nunca** — los dos nombres tienen que verse.
 
 17. [ ] **Escaleta de momentos — el orden del día, en vivo (ADR-090).**
+    **2026-10-10: P1 escrita y probada en local** (rama `claude/schedule-slot`,
+    `37b248c`): tabla, 5 RPC, backfill, DROP de las 5 columnas, tipos, rollback;
+    check 0/0, unit 582/582, RLS local 203/203, rollback bajada/subida limpio.
+    **NO es compatible con el Worker desplegado** (pide las 5 columnas): o apply
+    y deploy seguidos, o partirla en dos (aditiva, deploy, y luego el DROP).
+    Decisión de Marco. Destructiva: staging e `inspect` antes de producción.
     **Modelo DECIDIDO el 2026-07-25, nada de schema construido.** Absorbe la vieja
     tarea «tipos de horario añadibles por el usuario»: las cinco franjas de
     ADR-023 son **columnas fijas** en `performance` con un CHECK de orden — una
