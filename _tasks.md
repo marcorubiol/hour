@@ -1417,6 +1417,17 @@ entre empresas sin construirlo.
 
 ## Producto — después
 
+- [ ] **Directorio global de salas desde bases públicas (Marco, 10-10).** Que una
+  compañía no tenga que crear cada sala a mano: un directorio global de solo
+  lectura del que «adopta» una sala a su `venue`. Investigación y recomendación en
+  `research/product/21-venue-directory-sources.md` (fase 1: Basilic + Equipaments
+  de Catalunya + Wikidata; OSM fuera salvo capa ODbL publicable).
+  (espera: seis decisiones de Marco del informe, tareas)
+- [ ] Marco: decidir — **Directorio de salas:** alcance (¿polivalentes y casas de
+  cultura?), capa ODbL de OSM sí/no, si las correcciones vuelven al global, si el
+  email genérico va al global, qué países tras FR y CAT, y si se piden listados a
+  la Red Española de Teatros y a DGArtes. Desbloquea: «Directorio global de salas».
+
 - [ ] **Pase de idioma de toda la app (Marco, 10-10).** Cuentas («New deal»,
   «Record payment»…), la ficha de la función fuera del formulario («Edit
   details», «Readiness», «Team»), el editor de salas, y las fechas de
