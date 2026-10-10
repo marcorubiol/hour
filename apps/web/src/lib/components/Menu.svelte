@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
+  import { appLocale, t } from '$lib/i18n';
 
   export interface MenuAction {
     label: string;
@@ -31,7 +32,7 @@
     items,
     align = 'start',
     direction = 'down',
-    label = 'Open menu',
+    label = t('ui.open_menu', appLocale()),
     triggerClass = 'btn--outline btn--s',
     triggerAttrs = {},
     trigger,

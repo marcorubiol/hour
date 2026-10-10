@@ -36,18 +36,24 @@
   }
 </script>
 
+<script lang="ts">
+  import { appLocale, t } from '$lib/i18n';
+
+  const locale = appLocale();
+</script>
+
 <aside class="toast-region" aria-live="polite" aria-atomic="false">
-  {#each stack as t (t.id)}
-    <article class={`toast toast--${t.tone}`}>
+  {#each stack as item (item.id)}
+    <article class={`toast toast--${item.tone}`}>
       <div class="toast__body">
-        {#if t.title}<h3 class="toast__title">{t.title}</h3>{/if}
-        <p class="toast__message">{t.message}</p>
+        {#if item.title}<h3 class="toast__title">{item.title}</h3>{/if}
+        <p class="toast__message">{item.message}</p>
       </div>
       <button
         type="button"
         class="toast__dismiss"
-        aria-label="Dismiss"
-        onclick={() => removeToast(t.id)}
+        aria-label={t('ui.dismiss', locale)}
+        onclick={() => removeToast(item.id)}
       >×</button>
     </article>
   {/each}

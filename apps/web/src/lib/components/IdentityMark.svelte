@@ -43,6 +43,7 @@
    * way — hand-stacked, its glyph ended up last in a bottom-up read.
    */
   import { markText, spaceName } from '$lib/utils/identity';
+  import { appLocale, t } from '$lib/i18n';
 
   interface Props {
     /** Accent as a CSS value: var(--accent-N) or a literal color. */
@@ -96,7 +97,7 @@
   }: Props = $props();
 
   let text = $derived(variant === 'bare' ? '' : markText({ initials, name }));
-  let label = $derived(name ?? text ?? 'project');
+  let label = $derived(name ?? text ?? t('picker.kind_project', appLocale()));
   /** The space's cell — the SAME derivation as any monogram, set low by the
       one writer of the norm: one writer for what a mark's letters are, one
       for the register a space is written in. */

@@ -9,6 +9,8 @@
  *              campaign | comms | misc | other
  */
 
+import { appLocale, t, type Locale } from '$lib/i18n';
+
 export type LineKind =
   | 'tour'
   | 'season'
@@ -35,24 +37,27 @@ const GLYPHS: Record<string, string> = {
   oneoff: '·',
 };
 
+/** Dictionary keys of the label (English: tour, season, … comms → press,
+    oneoff → one-offs). */
 const LABELS: Record<string, string> = {
-  tour: 'tour',
-  season: 'season',
-  phase: 'phase',
-  circuit: 'circuit',
-  residency: 'residency',
-  creation: 'creation',
-  campaign: 'campaign',
-  comms: 'press',
-  misc: 'misc',
-  other: 'other',
-  oneoff: 'one-offs',
+  tour: 'ui.line_kind_tour',
+  season: 'ui.line_kind_season',
+  phase: 'ui.line_kind_phase',
+  circuit: 'ui.line_kind_circuit',
+  residency: 'ui.line_kind_residency',
+  creation: 'ui.line_kind_creation',
+  campaign: 'ui.line_kind_campaign',
+  comms: 'ui.line_kind_comms',
+  misc: 'ui.line_kind_misc',
+  other: 'ui.line_kind_other',
+  oneoff: 'ui.line_kind_oneoff',
 };
 
 export function lineKindGlyph(kind: string | null | undefined): string {
   return (kind && GLYPHS[kind]) || '·';
 }
 
-export function lineKindLabel(kind: string | null | undefined): string {
-  return (kind && LABELS[kind]) || (kind ?? 'line');
+export function lineKindLabel(kind: string | null | undefined, locale: Locale = appLocale()): string {
+  if (kind && LABELS[kind]) return t(LABELS[kind], locale);
+  return kind ?? t('picker.kind_line', locale);
 }

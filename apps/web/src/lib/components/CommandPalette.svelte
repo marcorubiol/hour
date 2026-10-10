@@ -37,14 +37,15 @@
   import { parseDayQuery } from '$lib/day-query';
   import { dayKeyInTz } from '$lib/planner';
   import { localeDayMonth } from '$lib/datetime';
-  import { detectLocale } from '$lib/i18n';
+  import { detectLocale, LOCALE_TAG, t } from '$lib/i18n';
   import { accentVarFor } from '$lib/utils/accent';
   import { spaceName } from '$lib/utils/identity';
   import { lineKindLabel } from '$lib/utils/line-kind';
   import ScopeGlyph from '$lib/components/ScopeGlyph.svelte';
 
   // El mismo par que usa el Planner: el locale detectado y su etiqueta BCP-47.
-  const localeTag = { en: 'en-GB', es: 'es-ES', ca: 'ca-ES' }[detectLocale(navigator.language)];
+  const locale = detectLocale(navigator.language);
+  const localeTag = LOCALE_TAG[locale];
   const viewerTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
   /** Hoy, en el huso del lector. `parseDayQuery` es puro y lo exige inyectado. */
   let todayIso = $derived(dayKeyInTz(new Date().toISOString(), viewerTz));
@@ -161,14 +162,23 @@
     note?: string;
   }
 
+  /** The row's small kind word, in the session's language. */
+  const KIND_KEY: Record<Kind, string> = {
+    space: 'picker.kind_space',
+    project: 'picker.kind_project',
+    line: 'picker.kind_line',
+    person: 'planner.board_person_one',
+    day: 'palette.kind_day',
+  };
+
   function labelFor(token: string): string {
     const { kind, key } = parsePin(token);
     // Chokepoint: this label is the staged chip AND its "Unstage …" aria-label.
     if (kind === 'space') return spaceName(workspaces.find((w) => w.slug === key)?.name ?? key);
-    if (kind === 'project') return projectIndex.find((p) => p.id === key)?.name ?? 'project';
+    if (kind === 'project') return projectIndex.find((p) => p.id === key)?.name ?? t('picker.kind_project', locale);
     if (kind === 'person')
-      return people.find((p) => p.person_id === key)?.full_name ?? 'person';
-    return lineIndex.find((l) => l.id === key)?.name ?? 'line';
+      return people.find((p) => p.person_id === key)?.full_name ?? t('planner.board_person_one', locale);
+    return lineIndex.find((l) => l.id === key)?.name ?? t('picker.kind_line', locale);
   }
   function accentFor(token: string): string {
     const { kind, key } = parsePin(token);
@@ -209,8 +219,8 @@
   );
   let placeholder = $derived(
     examples.length > 0
-      ? `Filter spaces, projects, lines, people… (try ${examples.map((e) => `“${e}”`).join(', ')})`
-      : 'Filter spaces, projects, lines, people…',
+      ? t('palette.placeholder_try', locale, { examples: examples.map((e) => `“${e}”`).join(', ') })
+      : t('palette.placeholder', locale),
   );
 
   function spaceRow(w: NavWorkspace, canDrill: boolean): Row {
@@ -281,32 +291,32 @@
         persons.length > 0
           ? undefined
           : $teamQuery.isLoading
-            ? 'Looking up the team…'
+            ? t('palette.team_loading', locale)
             : $teamQuery.data?.absent
-              ? 'The team feed is unavailable right now'
+              ? t('palette.team_absent', locale)
               : people.length === 0
-                ? 'Nobody is on a cast or crew yet'
+                ? t('palette.team_empty', locale)
                 : undefined;
       return (
         [
-          { key: 'space', header: 'Spaces', rows: spaces },
-          { key: 'project', header: 'Projects', rows: projects },
-          { key: 'line', header: 'Working lines', rows: lines },
+          { key: 'space', header: t('picker.spaces', locale), rows: spaces },
+          { key: 'project', header: t('picker.projects', locale), rows: projects },
+          { key: 'line', header: t('picker.lines', locale), rows: lines },
           // Last, because it is the axis that is not a level of the others.
-          { key: 'person', header: 'People', rows: persons, note: peopleNote },
-          { key: 'day', header: 'Day', rows: dayRows },
+          { key: 'person', header: t('palette.people', locale), rows: persons, note: peopleNote },
+          { key: 'day', header: t('palette.day', locale), rows: dayRows },
         ] as Group[]
       ).filter((g) => g.rows.length > 0 || g.note);
     }
     if (drill === null) {
-      return [{ key: 'space', header: 'Spaces', rows: workspaces.map((w) => spaceRow(w, true)) }];
+      return [{ key: 'space', header: t('picker.spaces', locale), rows: workspaces.map((w) => spaceRow(w, true)) }];
     }
     const { kind, key } = parsePin(drill);
     if (kind === 'space') {
       return [
         {
           key: 'project',
-          header: 'Projects',
+          header: t('picker.projects', locale),
           rows: projectIndex.filter((p) => p.workspaceSlug === key).map((p) => projectRow(p, true, '')),
         },
       ];
@@ -319,12 +329,12 @@
       [
         {
           key: 'line',
-          header: 'Working lines',
+          header: t('picker.lines', locale),
           rows: lineIndex.filter((l) => l.projectId === key).map((l) => lineRow(l, '')),
         },
         {
           key: 'person',
-          header: 'People',
+          header: t('palette.people', locale),
           rows: people.filter((p) => p.projectIds.includes(key)).map((p) => personRow(p, '')),
         },
       ] as Group[]
@@ -370,21 +380,21 @@
   let crumb = $derived.by<{ label: string; up: string | null; here: boolean; space?: boolean }[]>(() => {
     if (query.trim())
       return [
-        { label: 'All', up: '', here: false },
-        { label: `results for “${query.trim()}”`, up: null, here: true },
+        { label: t('picker.all', locale), up: '', here: false },
+        { label: t('palette.results_for', locale, { query: query.trim() }), up: null, here: true },
       ];
-    if (drill === null) return [{ label: 'All', up: null, here: true }];
+    if (drill === null) return [{ label: t('picker.all', locale), up: null, here: true }];
     const { kind, key } = parsePin(drill);
     if (kind === 'space') {
       const w = workspaces.find((x) => x.slug === key);
       return [
-        { label: 'All', up: '', here: false },
+        { label: t('picker.all', locale), up: '', here: false },
         { label: spaceName(w?.name ?? key), up: null, here: true, space: true },
       ];
     }
     const proj = projectIndex.find((p) => p.id === key);
     return [
-      { label: 'All', up: '', here: false },
+      { label: t('picker.all', locale), up: '', here: false },
       {
         label: spaceName(proj?.workspaceName ?? ''),
         up: proj ? `s:${proj.workspaceSlug}` : '',
@@ -507,7 +517,7 @@
       class="cmdk"
       role="dialog"
       aria-modal="true"
-      aria-label="Build a scope"
+      aria-label={t('palette.aria', locale)}
       tabindex={-1}
       onmousedown={(e) => e.stopPropagation()}
     >
@@ -521,17 +531,17 @@
           bind:value={query}
           type="text"
           {placeholder}
-          aria-label="Filter spaces, projects, lines and people"
+          aria-label={t('palette.filter_aria', locale)}
           oninput={() => {
             drill = null;
             cur = 0;
           }}
           onkeydown={onInputKey}
         />
-        <span class="cmdk__esc">esc to close</span>
+        <span class="cmdk__esc">{t('palette.esc', locale)}</span>
       </div>
 
-      <div class="cmdk__list" role="listbox" aria-label="Results">
+      <div class="cmdk__list" role="listbox" aria-label={t('palette.results', locale)}>
         <p class="cmdk__crumb">
           {#each crumb as c, i (i)}
             {#if i > 0}<span class="cmdk__crumb-sep" aria-hidden="true">›</span>{/if}
@@ -548,7 +558,7 @@
         </p>
 
         {#if flatRows.length === 0 && !groups.some((g) => g.note)}
-          <p class="cmdk__empty">No match.</p>
+          <p class="cmdk__empty">{t('picker.no_match', locale)}</p>
         {/if}
 
         {#each groups as g, gIdx (g.key)}
@@ -580,22 +590,22 @@
                 {:else}
                   <ScopeGlyph kind={r.kind} accent={accentFor(r.token)} lineKind={r.lineKind ?? ''} />
                 {/if}
-                <span class="cmdk__kind">{r.kind === 'line' ? lineKindLabel(r.lineKind ?? '') : r.kind}</span>
+                <span class="cmdk__kind">{r.kind === 'line' ? lineKindLabel(r.lineKind ?? '', locale) : t(KIND_KEY[r.kind], locale)}</span>
                 <span class="cmdk__name">
                   {r.name}{#if r.path}<span class="cmdk__path"> · {r.path}</span>{/if}
                 </span>
-                {#if isStaged(r.token)}<span class="cmdk__added">✓ added</span>{/if}
+                {#if isStaged(r.token)}<span class="cmdk__added">✓ {t('palette.added', locale)}</span>{/if}
               </button>
               {#if r.kind !== 'day'}
                 <button type="button" class="cmdk__open" onclick={() => openRow(r)}>
-                  open <span aria-hidden="true">↗</span>
+                  {t('palette.open', locale)} <span aria-hidden="true">↗</span>
                 </button>
               {/if}
               {#if r.drill}
                 <button
                   type="button"
                   class="cmdk__chev"
-                  aria-label={`Drill into ${r.name}`}
+                  aria-label={t('palette.drill_into', locale, { name: r.name })}
                   onclick={() => r.drill && drillTo(r.drill)}>›</button
                 >
               {/if}
@@ -605,35 +615,37 @@
       </div>
 
       <div class="cmdk__staged">
-        <span class="cmdk__staged-lead">Building</span>
+        <span class="cmdk__staged-lead">{t('palette.building', locale)}</span>
         {#if staged.length === 0}
-          <span class="cmdk__staged-all">Everything (no filters)</span>
+          <span class="cmdk__staged-all">{t('palette.everything_none', locale)}</span>
         {:else}
-          {#each staged as t (t)}
+          {#each staged as tok (tok)}
             <span class="cmdk__tok">
-              <ScopeGlyph kind={parsePin(t).kind} accent={accentFor(t)} lineKind={lineKindFor(t)} />
-              <span class="cmdk__tok-label">{labelFor(t)}</span>
-              <button type="button" class="cmdk__tok-x" aria-label={`Unstage ${labelFor(t)}`} onclick={() => toggleStage(t)}>×</button>
+              <ScopeGlyph kind={parsePin(tok).kind} accent={accentFor(tok)} lineKind={lineKindFor(tok)} />
+              <span class="cmdk__tok-label">{labelFor(tok)}</span>
+              <button type="button" class="cmdk__tok-x" aria-label={t('palette.unstage', locale, { name: labelFor(tok) })} onclick={() => toggleStage(tok)}>×</button>
             </span>
           {/each}
         {/if}
         <button type="button" class="cmdk__apply" onclick={apply}>
-          {staged.length === 0 ? 'Apply' : `Apply ${staged.length} filter${staged.length > 1 ? 's' : ''}`}
+          {staged.length === 0
+            ? t('palette.apply', locale)
+            : t(staged.length > 1 ? 'palette.apply_n_other' : 'palette.apply_n_one', locale, { n: staged.length })}
         </button>
       </div>
 
       <div class="cmdk__foot">
-        <span><b>↑↓</b> move</span>
-        <span><b>→</b> drill in</span>
-        <span><b>←</b> back</span>
-        <span><b>↵</b> add / remove</span>
-        <span><b>⌘↵</b> open</span>
-        <span><b>⇧↵</b> apply</span>
+        <span><b>↑↓</b> {t('picker.hint_move', locale)}</span>
+        <span><b>→</b> {t('palette.hint_drill', locale)}</span>
+        <span><b>←</b> {t('picker.hint_back', locale)}</span>
+        <span><b>↵</b> {t('palette.hint_toggle', locale)}</span>
+        <span><b>⌘↵</b> {t('palette.open', locale)}</span>
+        <span><b>⇧↵</b> {t('palette.hint_apply', locale)}</span>
         <span class="cmdk__foot-new">
-          New:
-          <button type="button" onclick={() => onPickAction('new-space')}>space</button>
-          <button type="button" onclick={() => onPickAction('new-project')}>project</button>
-          <button type="button" onclick={() => onPickAction('new-line')}>line</button>
+          {t('palette.new', locale)}
+          <button type="button" onclick={() => onPickAction('new-space')}>{t('picker.kind_space', locale)}</button>
+          <button type="button" onclick={() => onPickAction('new-project')}>{t('picker.kind_project', locale)}</button>
+          <button type="button" onclick={() => onPickAction('new-line')}>{t('picker.kind_line', locale)}</button>
         </span>
       </div>
     </div>

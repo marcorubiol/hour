@@ -188,7 +188,7 @@
   let hasTeaser = $derived(teaserTimes.length > 0 || notesLabel !== null);
 </script>
 
-<section class="hall" aria-label="Home" aria-busy={busy}>
+<section class="hall" aria-label={t('hall.aria', locale)} aria-busy={busy}>
   <div class="hall__center">
     <time class="hall__clock" datetime={clockTime}>{clockTime}</time>
 

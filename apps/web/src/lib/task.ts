@@ -12,6 +12,7 @@
 import * as v from 'valibot';
 import { Constants, type Enums, type Tables } from './db-types';
 import { localDayISO, realIsoDate } from './datetime';
+import { t, type Locale } from './i18n';
 
 export type TaskStatus = Enums<'task_status'>;
 
@@ -212,17 +213,22 @@ export function taskProjectId(t: TaskItem): string | null {
 }
 
 /** One-line context label for a task row ("where does this verb hang"). */
-export function taskContextLabel(t: TaskItem): string | null {
-  if (t.line) return t.line.name;
-  if (t.performance) {
-    return [t.performance.venue_name, t.performance.city].filter(Boolean).join(', ') || 'Performance';
-  }
-  if (t.conversation) {
+export function taskContextLabel(task: TaskItem, locale: Locale = 'en'): string | null {
+  if (task.line) return task.line.name;
+  if (task.performance) {
     return (
-      t.conversation.person?.full_name || t.conversation.person?.organization_name || 'Conversation'
+      [task.performance.venue_name, task.performance.city].filter(Boolean).join(', ') ||
+      t('desk.fallback_performance', locale)
     );
   }
-  if (t.project) return t.project.name;
+  if (task.conversation) {
+    return (
+      task.conversation.person?.full_name ||
+      task.conversation.person?.organization_name ||
+      t('desk.fallback_conversation', locale)
+    );
+  }
+  if (task.project) return task.project.name;
   return null;
 }
 

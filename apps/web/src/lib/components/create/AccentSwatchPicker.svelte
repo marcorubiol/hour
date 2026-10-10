@@ -24,6 +24,9 @@
     hueDistance,
     isCustomAccent,
   } from '$lib/utils/accent';
+  import { appLocale, t } from '$lib/i18n';
+
+  const locale = appLocale();
 
   interface Props {
     /** Selected accent: "1".."10", a custom hue "h<0-360>", or null for auto. */
@@ -111,7 +114,7 @@
 </script>
 
 <fieldset class="picker">
-  <legend class:legend--hidden={hideLegend}>Color</legend>
+  <legend class:legend--hidden={hideLegend}>{t('ui.color', locale)}</legend>
 
   <div
     class="track"
@@ -146,14 +149,14 @@
     {#if isCustom}
       <span class="hint-state">
         <span class="hint-dot" style={`background: ${currentColor}`} aria-hidden="true"></span>
-        Custom {hue}°
+        {t('ui.color_custom', locale, { hue })}
       </span>
     {:else}
       <span></span>
     {/if}
     {#if accent}
       <button type="button" class="hint-reset" onclick={() => (accent = null)} {disabled}
-        >auto</button
+        >{t('ui.color_auto', locale)}</button
       >
     {/if}
   </p>

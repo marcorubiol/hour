@@ -18,6 +18,9 @@
    */
 
   import { useTheme, type ThemeMode } from '$lib/theme.svelte';
+  import { appLocale, t } from '$lib/i18n';
+
+  const locale = appLocale();
 
   type Variant = 'boxed' | 'plain';
 
@@ -37,15 +40,18 @@
   }
 
   const NAME: Record<ThemeMode, string> = {
-    light: 'Light',
-    system: 'Auto',
-    dark: 'Dark',
+    light: t('ui.theme_light', locale),
+    system: t('ui.theme_auto', locale),
+    dark: t('ui.theme_dark', locale),
   };
 
   let label = $derived(
     theme.mode === 'system'
-      ? `Auto (currently ${theme.resolvedMode}) — click for ${NAME[next(theme.mode)]}`
-      : `${NAME[theme.mode]} — click for ${NAME[next(theme.mode)]}`,
+      ? t('ui.theme_label_auto', locale, {
+          current: t(theme.resolvedMode === 'dark' ? 'ui.theme_now_dark' : 'ui.theme_now_light', locale),
+          next: NAME[next(theme.mode)],
+        })
+      : t('ui.theme_label', locale, { mode: NAME[theme.mode], next: NAME[next(theme.mode)] }),
   );
 
   let classes = $derived(`theme-toggle theme-toggle--${variant}`);

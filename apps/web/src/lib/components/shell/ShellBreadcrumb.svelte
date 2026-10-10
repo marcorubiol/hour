@@ -1,6 +1,9 @@
 <script lang="ts">
   import { useBreadcrumb } from '$lib/stores/breadcrumb.svelte';
   import { spaceName } from '$lib/utils/identity';
+  import { appLocale, t } from '$lib/i18n';
+
+  const locale = appLocale();
 
   // The provider lives in the /h layout (which renders this component), so
   // entity pages downstream have already had a place to write their crumbs.
@@ -10,7 +13,7 @@
 {#if breadcrumb.crumbs.length > 0}
   <div class="shell__address">
     <div class="shell__address-inner">
-      <nav class="shell__crumbs" aria-label="Breadcrumb">
+      <nav class="shell__crumbs" aria-label={t('shell.breadcrumb', locale)}>
         {#each breadcrumb.crumbs as c, i (i)}
           {#if i > 0}<span class="shell__crumb-sep" aria-hidden="true">›</span>{/if}
           {#if c.href}

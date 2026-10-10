@@ -25,7 +25,7 @@
   import LensTitle from '$lib/components/LensTitle.svelte';
   import { accentVar, accentVarFor } from '$lib/utils/accent';
   import { spaceName } from '$lib/utils/identity';
-  import { detectLocale, t } from '$lib/i18n';
+  import { detectLocale, LOCALE_TAG, t } from '$lib/i18n';
   import { dayMonth } from '$lib/datetime';
   import { usePins } from '$lib/stores/pins.svelte';
   import { useCalm } from '$lib/stores/calm.svelte';
@@ -87,7 +87,7 @@
   const timeFmt = new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
   const fmtTime = (iso: string | null) => (iso ? timeFmt.format(new Date(iso)) : '');
   const money = (n: number, cur: string | null) =>
-    new Intl.NumberFormat(locale, { style: 'currency', currency: cur || 'EUR', maximumFractionDigits: 0 }).format(n);
+    new Intl.NumberFormat(LOCALE_TAG[locale], { style: 'currency', currency: cur || 'EUR', maximumFractionDigits: 0 }).format(n);
 
   // ── Data ─────────────────────────────────────────────────────────────
   const workspacesQuery = createQuery(workspacesQueryOptions());
@@ -260,7 +260,7 @@
     },
     onError: (err, _v, ctx) => {
       for (const [key, data] of ctx?.snapshots ?? []) queryClient.setQueryData(key, data);
-      addToast({ tone: 'danger', title: 'Change not saved', message: err instanceof ApiError ? err.message : 'Unexpected error' });
+      addToast({ tone: 'danger', title: t('desk.toast_change_failed', locale), message: err instanceof ApiError ? err.message : t('perf.unexpected', locale) });
     },
     onSettled: () => void queryClient.invalidateQueries({ queryKey: ['tasks'] }),
   });
@@ -268,7 +268,7 @@
     mutationFn: (id: string) => mutateJSON('DELETE', `/api/tasks/${id}`),
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['tasks'] }),
     onError: (err) =>
-      addToast({ tone: 'danger', title: 'Task not removed', message: err instanceof ApiError ? err.message : 'Unexpected error' }),
+      addToast({ tone: 'danger', title: t('desk.toast_remove_failed', locale), message: err instanceof ApiError ? err.message : t('perf.unexpected', locale) }),
   });
 
   // AI consent inbox: dismiss = complete it (real PATCH). Accept = keep as a
@@ -297,7 +297,7 @@
   let composerPerformances = $derived(
     performances.map((p) => ({
       id: p.id,
-      name: [p.venue?.name || p.venue_name || p.project?.name || 'Show', p.city]
+      name: [p.venue?.name || p.venue_name || p.project?.name || t('desk.fallback_show', locale), p.city]
         .filter(Boolean)
         .join(' · '),
     })),
@@ -310,7 +310,7 @@
         c.person?.organization_name ||
         c.next_action_note ||
         c.project?.name ||
-        'Conversation',
+        t('desk.fallback_conversation', locale),
     })),
   );
   function onTaskCreated(task: TaskItem) {
@@ -342,7 +342,7 @@
   };
 </script>
 
-<svelte:head><title>Desk — Hour</title></svelte:head>
+<svelte:head><title>{t('desk.title', locale)}</title></svelte:head>
 
 <div class="desk" aria-busy={busy}>
   <LensHeader>
@@ -478,7 +478,7 @@
                         <button
                           type="button"
                           class="drow__remove"
-                          aria-label={`Remove: ${item.subject}`}
+                          aria-label={t('desk.remove_aria', locale, { subject: item.subject })}
                           onclick={() => item.taskId && $removeTask.mutate(item.taskId)}>×</button
                         >
                       </span>
