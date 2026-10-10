@@ -331,6 +331,11 @@
       {#each offered as [k, w] (k)}<option value={w}></option>{/each}
     </datalist>
 
+    {#if viewerTz && order.some((s) => viewerClock(s.at))}
+      <!-- Said once, not on every row: whose clock the hours are, and that
+           the small one under each is the reader's. -->
+      <p class="ro__zone">{t('planner.ro_zones', locale, { tz, yours: viewerTz })}</p>
+    {/if}
     <ol class="ro__list" bind:this={listEl}>
       {#each order as s, i (s.id ?? i)}
         {@const tomorrow = dayOf(s.at, tz) !== dayIso}
@@ -667,7 +672,10 @@
     }
     /* The five words still come up as you type; the arrow is chrome. */
     .ro__in::-webkit-calendar-picker-indicator {
-      display: none;
+      inline-size: 0;
+      margin: 0;
+      padding: 0;
+      opacity: 0;
     }
     .ro__in[aria-invalid='true'] {
       border-block-end-color: var(--danger);
@@ -712,6 +720,13 @@
       cursor: default;
     }
     .ro__act--quiet {
+      color: var(--text-faint);
+    }
+    .ro__zone {
+      margin: var(--space-2xs) 0 0;
+      font-family: var(--font-mono);
+      font-size: 9px;
+      letter-spacing: 0.08em;
       color: var(--text-faint);
     }
     .ro__hint {

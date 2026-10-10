@@ -439,6 +439,7 @@
   "planner.ro_down": "baixa",
   "planner.ro_out_of_time": "Va després d’una hora més tardana",
   "planner.ro_yours": "la teva hora",
+  "planner.ro_zones": "Hores de {tz}; la petita de sota és la teva ({yours}).",
   "planner.no_cast": "sense repartiment",
   "planner.agenda_from": "des de {day}",
   "planner.new_date": "Nova data",
