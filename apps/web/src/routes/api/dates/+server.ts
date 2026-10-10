@@ -37,6 +37,7 @@ import * as v from 'valibot';
 import { extractAccessToken } from '$lib/auth';
 import { DateCreateSchema, type DateRow } from '$lib/date';
 import { pgGet, pgPostRpc, PostgrestError, type SupabaseEnv } from '$lib/supabase';
+import { SCHEDULE_SLOT_EMBED, scheduleOf, type ScheduleMoment, type ScheduleSlotRow } from '$lib/schedule-slot';
 import { pgErrorResponse } from '$lib/server/errors';
 
 const QuerySchema = v.object({
@@ -101,6 +102,8 @@ type DateItem = {
   series_id?: string | null;
   travel_direction?: string | null;
   label?: string | null;
+  /** ADR-090 P3 — the running order, compacted (`scheduleOf`). */
+  schedule?: ScheduleMoment[];
 };
 
 export const GET: RequestHandler = async ({ request, url, platform, locals }) => {
@@ -156,6 +159,9 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
     // consecutive rows of one series into a band; NULL = a standalone date.
     'series_id',
     'label:custom_fields->>label',
+    // ADR-090 P3 — the running order, so the day strip can draw a
+    // rehearsal's moments as it draws a gig's.
+    SCHEDULE_SLOT_EMBED,
   ];
   search.set('select', EXTENDED_SELECT.join(','));
 
@@ -179,8 +185,12 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
   search.set('limit', String(limit));
 
   try {
-    const { data } = await pgGet<DateItem>(env, 'date', jwt, { search });
-    return json({ items: data });
+    const { data } = await pgGet<DateItem & { schedule_slot?: ScheduleSlotRow[] }>(env, 'date', jwt, {
+      search,
+    });
+    return json({
+      items: data.map(({ schedule_slot, ...row }) => ({ ...row, schedule: scheduleOf(schedule_slot) })),
+    });
   } catch (err) {
     // Pre-migration DB: the cascade columns don't exist yet. Retry once
     // with the legacy select — the calendar keeps working, the new fields

@@ -251,3 +251,87 @@ describe('overlaps — where two threads are live at once', () => {
     expect(overlaps([a, b], { from: 9, to: 17 })).toEqual([]);
   });
 });
+
+describe('the running order on the strip (ADR-090 P3)', () => {
+  const m = (kind: string | null, label: string | null, at: string) => ({ kind, label, at, ends_at: null });
+
+  it('a free moment is a tick: drawn, flagged free, out of the steps an audit counts', () => {
+    const t = performanceThread(
+      gig({
+        schedule: [
+          m('load_in', null, '2026-07-18T10:00:00Z'),
+          m(null, 'photo call', '2026-07-18T17:00:00Z'),
+          m('start', null, '2026-07-18T20:00:00Z'),
+        ],
+      }),
+      TZ,
+      'n',
+      null,
+      'confirmed',
+    )!;
+    expect(t.marks.map((x) => [x.at, x.step, !!x.free])).toEqual([
+      [10, 'load_in', false],
+      [17, 'moment', true],
+      [20, 'start', false],
+    ]);
+    expect(t.marks[1].label).toBe('photo call');
+    expect(t.steps).toEqual(['load_in', 'start']);
+  });
+
+  it('the strip is a time axis: a hand-made order is drawn by its hours', () => {
+    const t = performanceThread(
+      gig({
+        schedule: [m('start', null, '2026-07-18T20:00:00Z'), m('load_in', null, '2026-07-18T10:00:00Z')],
+      }),
+      TZ,
+      'n',
+      null,
+      'confirmed',
+    )!;
+    expect(t.marks.map((x) => x.at)).toEqual([10, 20]);
+  });
+
+  it('the night still runs long, measured by instant', () => {
+    const t = performanceThread(
+      gig({
+        schedule: [m('start', null, '2026-07-18T22:00:00Z'), m(null, 'party', '2026-07-19T01:30:00Z')],
+      }),
+      TZ,
+      'n',
+      null,
+      'confirmed',
+    )!;
+    expect(t.marks.map((x) => x.at)).toEqual([22, 25.5]);
+  });
+
+  it('a rehearsal with a running order draws its moments on its span', () => {
+    const t = dateThread(
+      dateRow({
+        starts_at: '2026-07-18T10:00:00Z',
+        ends_at: '2026-07-18T14:00:00Z',
+        schedule: [m(null, 'warm-up', '2026-07-18T10:00:00Z'), m(null, 'pass', '2026-07-18T11:15:00Z')],
+      }),
+      TZ,
+      'n',
+      null,
+      'confirmed',
+    )!;
+    expect(t.spans).toEqual([{ from: 10, to: 14 }]);
+    expect(t.marks.map((x) => x.at)).toEqual([10, 11.25]);
+  });
+
+  it('an all-day rehearsal is placed by its running order, and not without one', () => {
+    expect(dateThread(dateRow({ all_day: true }), TZ, 'n', null, 'c')).toBeNull();
+    const t = dateThread(
+      dateRow({
+        all_day: true,
+        schedule: [m(null, 'a', '2026-07-18T09:00:00Z'), m(null, 'b', '2026-07-18T13:00:00Z')],
+      }),
+      TZ,
+      'n',
+      null,
+      'c',
+    )!;
+    expect(t.spans).toEqual([{ from: 9, to: 13 }]);
+  });
+});

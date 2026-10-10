@@ -89,9 +89,9 @@
 <div class="df">
   <section class="df__col df__col--notes">
     <!-- The lid: fold state + the count, one row, one button. -->
-    <button type="button" class="df__lid" aria-expanded={notesOpen} onclick={() => (notesOpen = !notesOpen)}>
-      <span class="df__lid-w">{notesWord}</span>
-      <span class="df__lid-n">{notes.length === 0 ? emptyWord : notes.length} {notesOpen ? '−' : '+'}</span>
+    <button type="button" class="lid" aria-expanded={notesOpen} onclick={() => (notesOpen = !notesOpen)}>
+      <span class="lid__w">{notesWord}</span>
+      <span class="lid__n">{notes.length === 0 ? emptyWord : notes.length} {notesOpen ? '−' : '+'}</span>
     </button>
     {#if notesOpen}
       {#if canWrite}
@@ -119,9 +119,9 @@
   </section>
 
   <section class="df__col df__col--next">
-    <button type="button" class="df__lid" aria-expanded={nextOpen} onclick={() => (nextOpen = !nextOpen)}>
-      <span class="df__lid-w">{nextWord}</span>
-      <span class="df__lid-n">{next.length === 0 ? emptyWord : next[0].day} {nextOpen ? '−' : '+'}</span>
+    <button type="button" class="lid" aria-expanded={nextOpen} onclick={() => (nextOpen = !nextOpen)}>
+      <span class="lid__w">{nextWord}</span>
+      <span class="lid__n">{next.length === 0 ? emptyWord : next[0].day} {nextOpen ? '−' : '+'}</span>
     </button>
     {#if nextOpen}
       {#each next as it (it.id)}
@@ -163,29 +163,8 @@
     .df__col {
       min-inline-size: 0;
     }
-    /* ── The lid · one fold mechanism for the whole tool ─────────────── */
-    .df__lid {
-      display: flex;
-      align-items: baseline;
-      justify-content: space-between;
-      inline-size: 100%;
-      padding: 0 0 var(--space-2xs);
-      border: 0;
-      border-block-end: 1px solid var(--border-color-light);
-      background: none;
-      cursor: pointer;
-      font-family: var(--font-mono);
-      font-size: 9px;
-      letter-spacing: 0.14em;
-      text-transform: uppercase;
-      color: var(--text-faint);
-    }
-    .df__lid:hover .df__lid-w {
-      color: var(--text-muted);
-    }
-    .df__lid-n {
-      font-variant-numeric: tabular-nums;
-    }
+    /* The lid lives in `styles/lid.css`: one fold mechanism for the whole
+       tool, shared with the running order. */
     /* ── Notes · mine, always private (ADR-093) ──────────────────────── */
     .df__writer {
       padding-block: var(--space-s) var(--space-2xs);

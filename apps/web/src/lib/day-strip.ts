@@ -19,14 +19,26 @@
  */
 
 import type { PerformanceEvent, DateEvent, SlipKind } from './month-events';
-import { runSheetSteps, type RunSheetStepKey } from './month-events';
+import { dayMoments, type DayMoment, type RunSheetStepKey } from './month-events';
 
 /** A moment on the track: an hour somebody wrote down. */
 export type StripMark = {
   /** Hours since midnight, fractional (14.5 = 14:30). */
   at: number;
-  /** The vocabulary word for the step; the caller translates it. */
-  step: RunSheetStepKey | 'start';
+  /** The vocabulary word for the step; the caller translates it. `moment`
+      is a free moment (ADR-090 P3): its name is `label`. */
+  step: RunSheetStepKey | 'start' | 'moment';
+  /** What somebody called it, when it is not just one of the five words. */
+  label?: string | null;
+  /**
+   * A FREE MOMENT IS A TICK, NOT A LABEL (ADR-090 P3, Marco 2026-10-10: the
+   * free moments go on the strip, but the strip must not saturate). The five
+   * steps keep their hour and word; a «photo call» is drawn as a short tick
+   * on the bar, its hour and name in the tooltip and the accessible name. The
+   * running order right under the strip says it in words — the strip only
+   * has to say THAT something happens there.
+   */
+  free?: boolean;
   /** The show mark is the only one in full ink — it is why the row exists. */
   show: boolean;
   /** An instant with nothing around it: drawn as a point, never as a bar. */
@@ -69,9 +81,37 @@ export function hourOf(iso: string, timeZone: string): number | null {
 }
 
 /**
- * A performance becomes ONE thread. Its marks are exactly the run-sheet steps
- * the data holds — `runSheetSteps` is the seam, so when ADR-090's
- * `schedule_slot` lands only that adapter changes.
+ * The running order's moments as marks, in TIME order (the strip is an axis;
+ * the list's hand-made order is the running order's business, not the
+ * ruler's). THE TRACK KEEPS COUNTING PAST MIDNIGHT: sorted by instant, a
+ * clock that goes backwards is the next morning.
+ */
+function momentMarks(moments: DayMoment[], timeZone: string): StripMark[] {
+  const sorted = [...moments].sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
+  const marks: StripMark[] = [];
+  let prev = -Infinity;
+  for (const m of sorted) {
+    let at = hourOf(m.at, timeZone);
+    if (at === null) continue;
+    while (at < prev) at += 24;
+    prev = at;
+    const free = m.key === null;
+    marks.push({
+      at,
+      step: m.key ?? 'moment',
+      label: m.label,
+      show: m.key === 'start',
+      solo: false,
+      free,
+    });
+  }
+  return marks;
+}
+
+/**
+ * A performance becomes ONE thread. Its marks are exactly the moments its
+ * running order holds (`dayMoments`, ADR-090): the five steps with their
+ * words, free moments as ticks.
  *
  * With more than one step the thread gets a bar from the first written hour to
  * the last; with a single hour it is an INSTANT and is drawn as one. A bar
@@ -84,27 +124,8 @@ export function performanceThread(
   city: string | null,
   cert: string,
 ): StripThread | null {
-  const steps = runSheetSteps(p);
-  const marks: StripMark[] = [];
-  /* THE TRACK KEEPS COUNTING PAST MIDNIGHT (Marco, 2026-08-10: «la pista se
-     alarga»). `hourOf` reads a clock, and a clock has no memory of which day
-     it is on: a load-out at 01h30 came back as 1.5 and the strip drew it at
-     dawn — BEFORE its own load-in, with the whole day stretched from 01h30 to
-     22h30 to hold a point that belongs to tomorrow. The gig did not start at
-     one in the morning; the night ran long.
-     `RUN_SHEET_ORDER` is the running order, so the hours must not go
-     backwards: a step earlier on the clock than the one before it is the next
-     morning, and the axis goes to 25h30. The hour LABEL still says «1h30» —
-     that is what the clock on the wall says — but its place on the track is
-     where it happened. */
-  let prev = -Infinity;
-  for (const s of steps) {
-    let at = hourOf(s.at, timeZone);
-    if (at === null) continue;
-    while (at < prev) at += 24;
-    prev = at;
-    marks.push({ at, step: s.key, show: s.key === 'start', solo: false });
-  }
+  const marks = momentMarks(dayMoments(p), timeZone);
+  const steps = marks.filter((m) => !m.free);
   if (marks.length === 0) return null;
   const spans: StripSpan[] = [];
   if (marks.length > 1) {
@@ -123,16 +144,18 @@ export function performanceThread(
     city,
     spans,
     marks,
-    steps: steps.map((s) => s.key),
+    steps: steps.map((m) => m.step),
     a: Math.min(...all),
     b: Math.max(...all, ...spans.map((s) => s.to)),
   };
 }
 
 /**
- * A date becomes one thread too. It has no run sheet — the road sheet hangs off
- * a performance only (ADR-090) — so it draws its span and NO marks, which is
- * exactly what «never a step that is not in the data» requires.
+ * A date becomes one thread too. It draws its span, and the moments of its
+ * running order if it has one (ADR-090 P3: a rehearsal day is ordered like a
+ * gig, and an all-day rehearsal with a running order is placed by it).
+ * Without moments it draws NO marks, which is exactly what «never a step that
+ * is not in the data» requires.
  */
 export function dateThread(
   d: DateEvent,
@@ -141,7 +164,26 @@ export function dateThread(
   city: string | null,
   cert: string,
 ): StripThread | null {
-  if (d.all_day) return null;
+  const marks = momentMarks(dayMoments(d), timeZone);
+  const ats = marks.map((m) => m.at);
+  const thread = (spans: StripSpan[], a: number, b: number): StripThread => ({
+    id: d.id,
+    kind: (d.kind as SlipKind) ?? 'other',
+    cert,
+    name,
+    city,
+    spans,
+    marks,
+    steps: marks.filter((m) => !m.free).map((m) => m.step),
+    a: Math.min(a, ...ats),
+    b: Math.max(b, ...ats),
+  });
+  if (d.all_day) {
+    if (marks.length === 0) return null;
+    if (marks.length === 1) marks[0].solo = true;
+    const spans = marks.length > 1 ? [{ from: Math.min(...ats), to: Math.max(...ats) }] : [];
+    return thread(spans, ats[0], ats[0]);
+  }
   const from = hourOf(d.starts_at, timeZone);
   if (from === null) return null;
   // Same rule as a run sheet: an end earlier on the clock than its own start
@@ -150,22 +192,10 @@ export function dateThread(
   // instant at 23h, which is the one hour of it that was never in doubt.
   const end = d.ends_at ? hourOf(d.ends_at, timeZone) : null;
   const to = end !== null && end < from ? end + 24 : end;
-  const marks: StripMark[] = [];
   const spans: StripSpan[] = [];
   if (to !== null && to > from) spans.push({ from, to });
-  else marks.push({ at: from, step: 'start', show: false, solo: true });
-  return {
-    id: d.id,
-    kind: (d.kind as SlipKind) ?? 'other',
-    cert,
-    name,
-    city,
-    spans,
-    marks,
-    steps: [],
-    a: from,
-    b: to !== null && to > from ? to : from,
-  };
+  else if (marks.length === 0) marks.push({ at: from, step: 'start', show: false, solo: true });
+  return thread(spans, from, to !== null && to > from ? to : from);
 }
 
 /**

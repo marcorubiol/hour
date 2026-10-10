@@ -224,19 +224,31 @@
             {/each}
             {#each t.marks as m, i (i)}
               {@const at = pct(m.at, win)}
+              {@const word = m.label ?? stepLabel(m.step)}
+              {@const quiet = m.free && !m.solo}
+              <!-- A FREE MOMENT IS A TICK (ADR-090 P3): its hour and name
+                   are the tooltip, and the running order under the strip
+                   says them in words. Only the five keep a printed label,
+                   and they alternate up/down among THEMSELVES — a tick
+                   takes no turn. -->
+              {@const turn = t.marks.slice(0, i).filter((x) => !(x.free && !x.solo)).length}
               <span
                 class="ds__m"
                 class:ds__m--show={m.show}
                 class:ds__m--solo={m.solo}
-                class:ds__m--up={i % 2 === 1}
+                class:ds__m--free={quiet}
+                class:ds__m--up={turn % 2 === 1}
                 class:ds__m--flip={at > 50}
                 data-step={m.step}
                 style="left: {at}%"
+                title={quiet ? `${hourLabel(m.at)} ${word}` : undefined}
+                role={quiet ? 'img' : undefined}
+                aria-label={quiet ? `${hourLabel(m.at)} ${word}` : undefined}
               >
                 <i></i>
-                <b
-                  >{hourLabel(m.at)}{#if !m.show && !m.solo}<em>{stepLabel(m.step)}</em>{/if}</b
-                >
+                {#if !quiet}<b
+                    >{hourLabel(m.at)}{#if (!m.show && !m.solo) || (m.free && m.solo)}<em>{word}</em>{/if}</b
+                  >{/if}
               </span>
             {/each}
           </span>
@@ -547,6 +559,12 @@
       inset-inline-end: 100%;
       margin-inline-start: 0;
       margin-inline-end: 6px;
+    }
+    /* The free moment: a shorter, fainter tick, so five words and a dozen
+       ticks still read as five words. */
+    .ds__m--free i {
+      block-size: 8px;
+      background: color-mix(in oklch, var(--c, var(--text-faint)) 35%, var(--text-faint));
     }
     .ds__m--show i {
       inline-size: 7px;

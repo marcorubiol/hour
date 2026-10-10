@@ -52,7 +52,7 @@
   {#if sheet.schedule}
     <section class="rsv__section" aria-label="Schedule">
       <h2 class="eyebrow eyebrow--sub rsv__section-title">Schedule</h2>
-      <ScheduleTable slots={sheet.schedule} {venueTz} {viewerTz} />
+      <ScheduleTable slots={sheet.schedule} moments={sheet.schedule.moments ?? null} {venueTz} {viewerTz} />
     </section>
   {/if}
 
