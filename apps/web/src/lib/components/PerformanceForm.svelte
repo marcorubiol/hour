@@ -387,7 +387,10 @@
   />
   {#snippet boloMessage()}
     {t('perf.bolo_helper_short', locale)}
-    <a href={booksHref(cProject, { newBolo: true })}>{t('perf.bolo_create_link', locale)}</a>
+    <!-- Otra pestaña: el alta a medio escribir no se pierde (Marco, 2026-10-10). -->
+    <a href={booksHref(cProject, { newBolo: true })} target="_blank" rel="noopener"
+      >{t('perf.bolo_create_link', locale)}</a
+    >
   {/snippet}
   {#if showBoloSelect}
     <Select
