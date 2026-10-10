@@ -169,6 +169,8 @@
   "hall.greeting_night": "Buenas noches",
   "hall.door": "ponme al día",
   "hall.home": "Recibidor",
+  "shell.menu_open": "Abrir el menú",
+  "shell.menu_close": "Cerrar el menú",
   "hall.action_note": "Nueva nota",
   "hall.relation_hours": "dentro de {h} h",
   "hall.relation_minutes": "dentro de {m} min",

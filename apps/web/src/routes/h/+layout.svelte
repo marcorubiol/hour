@@ -20,10 +20,10 @@
    */
 
   import { page } from '$app/state';
-  import { goto, replaceState } from '$app/navigation';
+  import { afterNavigate, goto, replaceState } from '$app/navigation';
   import { env } from '$env/dynamic/public';
   import type { Snippet } from 'svelte';
-  import { onDestroy, onMount, untrack } from 'svelte';
+  import { onDestroy, onMount, tick, untrack } from 'svelte';
   import { toStore } from 'svelte/store';
   import SettingsNav from '$lib/components/SettingsNav.svelte';
   import PresenceBadge from '$lib/components/PresenceBadge.svelte';
@@ -34,6 +34,7 @@
   import ScopeRail from '$lib/components/shell/ScopeRail.svelte';
   import ShellBreadcrumb from '$lib/components/shell/ShellBreadcrumb.svelte';
   import { isReservedWorkspaceSlug } from '$lib/reserved-slugs';
+  import { detectLocale, t } from '$lib/i18n';
   import { provideLens, type Lens } from '$lib/stores/lens.svelte';
   import { provideCalm } from '$lib/stores/calm.svelte';
   import { providePins, parsePin, type PinKind } from '$lib/stores/pins.svelte';
@@ -483,6 +484,39 @@
     else creation.openWorkspace();
   }
 
+  // ── The rail on a phone (base.css § Drawer) ──────────────────────────
+  // Below 48rem the rail cannot sit beside the page — it alone is 248px of
+  // a 390px screen — so it leaves the flow and the top bar's empty left
+  // cell gets the one button that brings it out. Same rail, same contents,
+  // same order: the clock that goes home, calm, the pulse, the scopes. On a
+  // desktop the button is not drawn and `railOpen` is never true.
+  const locale = detectLocale(navigator.language);
+  let railOpen = $state(false);
+  let menuButtonEl = $state<HTMLButtonElement | null>(null);
+  function openRail() {
+    railOpen = true;
+    // Into the drawer, so the keyboard and a screen reader land where the
+    // eye does: the clock, its first control.
+    void tick().then(() =>
+      document.getElementById('shell-rail')?.querySelector<HTMLElement>('a, button')?.focus(),
+    );
+  }
+  function closeRail({ returnFocus = false } = {}) {
+    if (!railOpen) return;
+    railOpen = false;
+    if (returnFocus) menuButtonEl?.focus();
+  }
+  // Anything that goes somewhere closes it: a scope, the clock, ⌘K.
+  afterNavigate(() => closeRail());
+  function applyScopeFromRail(s: Scope) {
+    closeRail();
+    applyScope(s);
+  }
+  function openPaletteFromRail() {
+    closeRail();
+    openPaletteFresh();
+  }
+
   /** Clear from the scope bar = abandoning the working combo too. */
   function clearScope() {
     rememberWorkingScope();
@@ -492,7 +526,12 @@
 
 <!-- Tab close / hard navigation away: the working combo registers before
      the page dies (remember() persists synchronously to localStorage). -->
-<svelte:window onpagehide={() => rememberWorkingScope()} />
+<svelte:window
+  onpagehide={() => rememberWorkingScope()}
+  onkeydown={(e) => {
+    if (e.key === 'Escape' && railOpen) closeRail({ returnFocus: true });
+  }}
+/>
 
 {#if authChecked && !blocked}
   <div class="shell" class:shell--settings={inSettings}>
@@ -503,7 +542,23 @@
            can never change and can never be acted on. The door it was is not
            lost: the CLOCK is the way home now, which is the object at the top
            of the rail that already says «here, now». -->
-      <div class="shell__left"></div>
+      <div class="shell__left">
+        <!-- Only a phone draws it (see .shell__menu): there the rail is a
+             drawer and this is its door. -->
+        <button
+          type="button"
+          class="shell__menu"
+          bind:this={menuButtonEl}
+          aria-label={t('shell.menu_open', locale)}
+          aria-controls="shell-rail"
+          aria-expanded={railOpen}
+          onclick={() => (railOpen ? closeRail() : openRail())}
+        >
+          <svg viewBox="0 0 14 14" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true">
+            <path d="M2.5 3.5h9M2.5 7h9M2.5 10.5h9" />
+          </svg>
+        </button>
+      </div>
 
       <button
         type="button"
@@ -526,7 +581,13 @@
       </div>
     </header>
 
-    <ScopeRail {atHome} {applyScope} {openPaletteFresh} />
+    <ScopeRail
+      {atHome}
+      applyScope={applyScopeFromRail}
+      openPaletteFresh={openPaletteFromRail}
+      open={railOpen}
+      onclose={() => closeRail({ returnFocus: true })}
+    />
 
     {#if inSettings}
       <aside class="shell__settings-nav">
@@ -575,6 +636,10 @@
        Sticky offsets and anchor scroll-margins consume this instead of
        hardcoding approximations. */
     --header-height: 3.6rem;
+    /* The page's side gutter, ONE value for every band that has to land on
+       the same left edge: the top bar, the scope bar, the address bar and
+       the content. A phone redeclares it (below); nobody else does. */
+    --shell-gutter: var(--space-l);
 
     /* The rail owns the full block axis (top to bottom, wordmark first);
        the top bar covers only the remaining columns. The header is a
@@ -621,7 +686,7 @@
     align-items: center;
     gap: var(--space-m);
     padding-block: var(--space-s);
-    padding-inline: var(--space-l);
+    padding-inline: var(--shell-gutter);
     background: color-mix(in oklch, var(--bg) 88%, transparent);
     backdrop-filter: blur(8px);
     border-block-end: 1px solid var(--border-color-light);
@@ -681,12 +746,12 @@
     /* One shared header→content distance for every route — pages used to
        borrow the (now neutralized) global <section> padding unevenly. */
     padding-block: var(--space-l) var(--space-xxl);
-    padding-inline: var(--space-l);
+    padding-inline: var(--shell-gutter);
     /* One measure for every route. Lives here so no page re-declares it.
        border-box puts the padding inside the cap, so the body itself lands
        on --page-width. */
     inline-size: 100%;
-    max-inline-size: calc(var(--page-width) + var(--space-l) * 2);
+    max-inline-size: calc(var(--page-width) + var(--shell-gutter) * 2);
     margin-inline: auto;
   }
 
@@ -706,15 +771,61 @@
     }
   }
 
+  /* The rail's door. Same circle and line as the search beside it, without
+     the field's ground: it is a control, not a place to type. */
+  .shell__menu {
+    display: none;
+    place-items: center;
+    inline-size: 2rem;
+    block-size: 2rem;
+    padding: 0;
+    border: 1px solid var(--border-color-dark);
+    border-radius: var(--radius-circle);
+    background: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition:
+      color var(--transition),
+      border-color var(--transition);
+  }
+  .shell__menu:hover {
+    color: var(--text-color);
+    border-color: var(--text-muted);
+  }
+
   @media (max-width: 47.999rem) {
+    /* One column: the rail is a drawer now (ScopeRail + base.css § Drawer),
+       out of the flow, so the bar and the page take the whole width. */
+    .shell,
+    .shell--settings {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .shell {
+      --shell-gutter: var(--space-m);
+    }
+    /* Door · search · you. The search takes what is left instead of
+       floating as a lone icon, and says what it is until it runs out of
+       room. ⌘K is a keyboard's promise; a phone has none. */
+    .shell__top {
+      grid-column: 1 / -1;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      gap: var(--space-s);
+    }
+    .shell__menu {
+      display: grid;
+    }
     .shell__search {
+      justify-self: stretch;
+      inline-size: auto;
       min-inline-size: 0;
     }
     .shell__search-label {
-      display: none;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
-    .shell__content {
-      padding-inline: var(--space-m);
+    .shell__search .kbd {
+      display: none;
     }
     .shell__settings-nav {
       display: none;

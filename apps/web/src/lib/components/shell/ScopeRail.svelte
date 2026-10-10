@@ -14,9 +14,14 @@
     applyScope: (s: Scope) => void;
     /** ⌘K palette lives in the layout. */
     openPaletteFresh: () => void;
+    /** On a phone the rail is a drawer (base.css § Drawer) and the layout
+        owns whether it is out: the menu button lives in the top bar. On a
+        desktop this changes nothing — the rail is always there. */
+    open?: boolean;
+    onclose?: () => void;
   }
 
-  let { atHome, applyScope, openPaletteFresh }: Props = $props();
+  let { atHome, applyScope, openPaletteFresh, open = false, onclose }: Props = $props();
 
   const pins = usePins();
   const scopes = useScopes();
@@ -78,7 +83,15 @@
   }
 </script>
 
-<aside class="shell__side" aria-label="Scopes">
+{#if open}
+  <button
+    type="button"
+    class="drawer__backdrop"
+    aria-label={t('shell.menu_close', locale)}
+    onclick={() => onclose?.()}
+  ></button>
+{/if}
+<aside id="shell-rail" class="shell__side drawer" data-open={open || undefined} aria-label="Scopes">
   <div class="side-clock">
     <!-- THE CLOCK IS THE WAY HOME. It took the door the wordmark used to
          hold: «here, now» is already what it says, and a clock you can press
@@ -175,14 +188,7 @@
      one-click named scopes (Everything, each space, saved bundles) + the
      recents. Replaces the ADR-057 space rail. */
   .shell__side {
-    grid-column: 1;
-    grid-row: 1 / -1;
-    position: sticky;
-    inset-block-start: 0;
-    align-self: start;
-    z-index: var(--z-sticky);
     inline-size: 15.5rem;
-    min-block-size: 100vh;
     display: flex;
     flex-direction: column;
     gap: var(--space-l);
@@ -192,6 +198,21 @@
     padding-inline: var(--space-m);
     border-inline-end: 1px solid var(--border-color-light);
     background: var(--bg-light);
+  }
+  /* In the flow only where there is room for it. Below 48rem `.drawer`
+     (base.css) places it instead: off-canvas until the menu opens it. These
+     are the only rules the two places disagree on, so they are the only
+     ones fenced — everything inside the rail draws the same in both. */
+  @media (min-width: 48rem) {
+    .shell__side {
+      grid-column: 1;
+      grid-row: 1 / -1;
+      position: sticky;
+      inset-block-start: 0;
+      align-self: start;
+      z-index: var(--z-sticky);
+      min-block-size: 100vh;
+    }
   }
   .side-clock {
     display: flex;

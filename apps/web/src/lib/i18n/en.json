@@ -178,6 +178,8 @@
   "hall.greeting_night": "Good night",
   "hall.door": "catch me up",
   "hall.home": "Hall",
+  "shell.menu_open": "Open the menu",
+  "shell.menu_close": "Close the menu",
   "hall.action_note": "New note",
   "hall.relation_hours": "in {h}h",
   "hall.relation_minutes": "in {m} min",
