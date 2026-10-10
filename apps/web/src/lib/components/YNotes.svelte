@@ -29,6 +29,9 @@
   import YProvider from 'y-partyserver/provider';
   import { IndexeddbPersistence } from 'y-indexeddb';
   import { getAccessToken, session } from '$lib/session.svelte';
+  import { createQuery } from '@tanstack/svelte-query';
+  import { meQueryOptions } from '$lib/nav-queries';
+  import { userDisplayName } from '$lib/utils/identity';
 
   interface Props {
     targetTable: CollabTarget;
@@ -43,6 +46,18 @@
   let status = $state<'connecting' | 'live' | 'offline'>('connecting');
   let peers = $state(0);
   let editingNames = $state<string[]>([]);
+
+  // Presence label: the person's name (see userDisplayName), re-announced
+  // when /api/me lands so peers never see the email handle for long.
+  const meQuery = createQuery(meQueryOptions());
+  let presence = $state.raw<YProvider['awareness'] | null>(null);
+  let myName = $derived(
+    userDisplayName($meQuery.data?.full_name, session.user?.name, session.user?.email) ||
+      'someone',
+  );
+  $effect(() => {
+    presence?.setLocalStateField('user', { name: myName });
+  });
 
   onMount(() => {
     // Session gate — the layout's auth gate resolved before rendering us,
@@ -116,9 +131,7 @@
     });
 
     const awareness = provider.awareness;
-    awareness.setLocalStateField('user', {
-      name: session.user?.email?.split('@')[0] ?? 'someone',
-    });
+    presence = awareness;
     const onAwareness = () => {
       const others = [...awareness.getStates().entries()].filter(
         ([id]) => id !== awareness.clientID,
@@ -143,6 +156,7 @@
       el?.removeEventListener('focus', focus);
       el?.removeEventListener('blur', blur);
       awareness.off('change', onAwareness);
+      presence = null;
       provider.destroy();
       // Closes the IndexedDB connection (clearData() would wipe it).
       void idb.destroy();
