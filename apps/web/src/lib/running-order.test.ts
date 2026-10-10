@@ -5,6 +5,9 @@ import {
   inputsOf,
   instantFor,
   kindForLabel,
+  moveSlot,
+  outOfTime,
+  recognisedWords,
   namedSlot,
   parseClock,
   placeByTime,
@@ -157,5 +160,70 @@ describe('order', () => {
     const hand = [order[2], order[0], order[1]];
     const next = placeByTime(hand, s('n', '2026-10-10T23:00:00Z'));
     expect(next.map((x) => x.id)).toEqual(['c', 'a', 'b', 'n']);
+  });
+});
+
+describe('moving by hand (the hand-made order is the order)', () => {
+  test('moveSlot moves one and keeps the rest', () => {
+    expect(moveSlot(['a', 'b', 'c', 'd'], 0, 2)).toEqual(['b', 'c', 'a', 'd']);
+    expect(moveSlot(['a', 'b', 'c'], 2, 1)).toEqual(['a', 'c', 'b']);
+  });
+  test('out of range is a no-op, never a wrap-around', () => {
+    expect(moveSlot(['a', 'b'], 0, -1)).toEqual(['a', 'b']);
+    expect(moveSlot(['a', 'b'], 1, 2)).toEqual(['a', 'b']);
+  });
+  test('outOfTime says when the hand put a moment after a later hour', () => {
+    const o = [
+      { at: '2026-10-10T18:00:00Z' },
+      { at: '2026-10-10T17:00:00Z' },
+      { at: '2026-10-11T00:30:00Z' },
+    ];
+    expect(outOfTime(o, 0)).toBe(false);
+    expect(outOfTime(o, 1)).toBe(true);
+    expect(outOfTime(o, 2)).toBe(false);
+  });
+});
+
+describe('the five words in every language', () => {
+  const dict: Record<string, Record<string, string>> = {
+    es: {
+      'desk.anchor_loadin': 'carga',
+      'desk.anchor_soundcheck': 'prueba de sonido',
+      'desk.anchor_show': 'función',
+      'desk.anchor_loadout': 'desmontaje',
+      'desk.anchor_wrap': 'fin',
+    },
+    ca: {
+      'desk.anchor_loadin': 'càrrega',
+      'desk.anchor_soundcheck': 'prova de so',
+      'desk.anchor_show': 'funció',
+      'desk.anchor_loadout': 'desmuntatge',
+      'desk.anchor_wrap': 'fi',
+    },
+    en: {
+      'desk.anchor_loadin': 'load-in',
+      'desk.anchor_soundcheck': 'soundcheck',
+      'desk.anchor_show': 'show',
+      'desk.anchor_loadout': 'load-out',
+      'desk.anchor_wrap': 'wrap',
+    },
+  };
+  const known = recognisedWords((k, l) => dict[l][k], ['ca', 'es', 'en']);
+
+  test.each([
+    ['Prova de so', 'soundcheck'],
+    ['técnica', 'soundcheck'],
+    ['carga', 'load_in'],
+    ['load in', 'load_in'],
+    ['funció', 'start'],
+    ['show', 'start'],
+    ['desmuntatge', 'loadout'],
+    ['fin', 'wrap'],
+  ])('%s → %s', (word, kind) => {
+    expect(kindForLabel(word, known)).toBe(kind);
+  });
+
+  test('anything else is a free moment', () => {
+    expect(kindForLabel('photo call', known)).toBeNull();
   });
 });

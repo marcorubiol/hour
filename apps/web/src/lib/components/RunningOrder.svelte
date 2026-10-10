@@ -7,36 +7,49 @@
    * can extend, and it is filled IN THE MOMENT: during a rehearsal somebody
    * types `17h05 photo call` and it lands where its hour says.
    *
-   * It lives in the Planner's Day view, under the strip, because that is the
-   * only place that already holds BOTH kinds of parent: a performance has a
-   * page, a rehearsal (`date`) has none. The strip says the shape of the day;
-   * this says it in words, one thing at a time.
+   * ONE COMPONENT, TWO PLACES (Marco, 2026-10-10): the Planner's Day view,
+   * under the strip (the only place that holds both parents: a rehearsal has
+   * no page), and the performance's own page, where it replaces the fixed
+   * five-slot table. There is one way to write an hour in the whole app, and
+   * this is it. Nothing varies by place yet, so there is no placing axis; when
+   * something does, it is a prop here (the `Slip`'s `placing`/`ground` rule),
+   * never a copy.
    *
    * WHAT IT DRAWS: only what somebody wrote down, the strip's law. No
    * estimated durations, no placeholder five. An empty order is one line.
    *
-   * HOW IT WRITES: the whole order to `PUT /api/schedule/:target/:id`, which
-   * is `replace_schedule_slots`. P2 (live editing over the collab DO) changes
-   * only that line: the order will be a `Y.Array` in the same doc as the
-   * notes, and this component will edit the array instead of PUTting it. The
-   * editing UI and the order rules (`$lib/running-order`) stay.
+   * THE ORDER RULE (`placeByTime` in `$lib/running-order`): the hand-made
+   * order is the order. The hour places a moment once, when it is added;
+   * after that only a move changes its place: drag a row, Alt+↑/↓ on a
+   * focused row, or the up/down verbs while editing it.
+   *
+   * HOW IT WRITES: the whole order to `PUT /api/schedule/:target/:id`
+   * (`replace_schedule_slots`), a move to `PATCH` (`reorder_schedule_slots`).
+   * P2 (live editing over the collab DO) changes only those two lines: the
+   * order will be a `Y.Array` in the same doc as the notes, and this component
+   * will edit the array instead. The editing UI and the rules stay.
    */
+  import { tick } from 'svelte';
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
   import { fetchJSON, mutateJSON } from '$lib/api';
   import { t, type Locale } from '$lib/i18n';
-  import { addToast } from '../Toast.svelte';
+  import { addToast } from './Toast.svelte';
   import type { ScheduleSlotInput, ScheduleSlotRow } from '$lib/schedule-slot';
   import {
+    KIND_WORD_KEYS,
     LEGACY_KINDS,
     clockText,
     dayOf,
     endFor,
     inputsOf,
     instantFor,
+    moveSlot,
     namedSlot,
+    outOfTime,
     parseClock,
     placeByTime,
+    recognisedWords,
     slotWord,
     type RunningOrderTarget,
   } from '$lib/running-order';
@@ -46,16 +59,18 @@
     id: string;
     /** The day being looked at, `YYYY-MM-DD`: where a typed hour lands. */
     dayIso: string;
-    /** The zone a typed hour means (ADR-078 §11: the space's wall clock). */
+    /** The zone a typed hour means (ADR-078 §11: the venue's wall clock,
+        else the space's). */
     tz: string;
+    /** The reader's zone. When it reads another hour, the row says it too
+        (D-PRE-10, the road sheet's dual time). */
+    viewerTz?: string;
     locale: Locale;
-    /** True on today: offers «now» for the moment that is happening. */
-    isToday?: boolean;
     /** Whose order this is, when the day holds more than one. */
     name?: string | null;
   }
 
-  let { target, id, dayIso, tz, locale, isToday = false, name = null }: Props = $props();
+  let { target, id, dayIso, tz, viewerTz, locale, name = null }: Props = $props();
 
   const queryClient = useQueryClient();
   const queryKey = $derived(['schedule', target, id] as const);
@@ -70,42 +85,82 @@
 
   let order = $derived(inputsOf($feed.data?.slots ?? []));
   let canEdit = $derived($feed.data?.can_edit ?? false);
+  let isToday = $derived(dayOf(new Date().toISOString(), tz) === dayIso);
 
-  /** The word for a kind — the strip's and the agenda's, shared on purpose. */
+  /** The word for a kind, in the app's language (the strip's, Desk's). */
   function kindWord(kind: string): string {
-    if (kind === 'load_in') return t('desk.anchor_loadin', locale);
-    if (kind === 'start') return t('desk.anchor_show', locale);
-    if ((LEGACY_KINDS as readonly string[]).includes(kind)) return t(`desk.anchor_${kind}`, locale);
-    return kind.replace(/_/g, ' ');
+    const key = KIND_WORD_KEYS[kind];
+    return key ? t(key, locale) : kind.replace(/_/g, ' ');
   }
-  let words = $derived(LEGACY_KINDS.map((k) => [k, kindWord(k)] as const));
+  /** Offered while typing: the five in the reader's language. */
+  let offered = $derived(LEGACY_KINDS.map((k) => [k, kindWord(k)] as const));
+  /** Recognised when written: the five in all three languages, and synonyms. */
+  const known = recognisedWords((key, loc) => t(key, loc as Locale), ['ca', 'es', 'en']);
+
+  /** The other hour, only when the reader's clock says something else. */
+  function viewerClock(iso: string): string | null {
+    if (!viewerTz || viewerTz === tz) return null;
+    const mine = clockText(iso, viewerTz);
+    return mine === clockText(iso, tz) ? null : mine;
+  }
+
+  function settle(rows: ScheduleSlotRow[]) {
+    queryClient.setQueryData<Feed>(queryKey, (prev) => ({
+      slots: rows,
+      can_edit: prev?.can_edit ?? true,
+    }));
+    // The strip, the agenda, Desk and the performance page read the order
+    // from their own feeds.
+    for (const key of [
+      ['planner-performances'],
+      ['today-performances'],
+      ['planner-dates'],
+      ['performance'],
+    ]) {
+      void queryClient.invalidateQueries({ queryKey: key });
+    }
+  }
+
+  function failed(err: unknown) {
+    const msg = err instanceof Error ? err.message : '';
+    addToast({
+      tone: 'danger',
+      message: msg.startsWith('Timeslots must be ordered')
+        ? t('planner.ro_out_of_order', locale)
+        : t('planner.ro_save_error', locale),
+    });
+  }
 
   const save = createMutation({
     mutationFn: (slots: ScheduleSlotInput[]) =>
       mutateJSON<{ slots: ScheduleSlotRow[] }>('PUT', `/api/schedule/${target}/${id}`, { slots }),
-    onSuccess: (res) => {
-      if (res) queryClient.setQueryData<Feed>(queryKey, (prev) => ({
-        slots: res.slots,
-        can_edit: prev?.can_edit ?? true,
-      }));
-      // The five legacy kinds are read by the strip, the agenda and Desk
-      // from the performance feeds. A date's order feeds nothing else yet.
-      if (target === 'performance') {
-        void queryClient.invalidateQueries({ queryKey: ['planner-performances'] });
-        void queryClient.invalidateQueries({ queryKey: ['today-performances'] });
+    onSuccess: (res) => res && settle(res.slots),
+    onError: failed,
+  });
+
+  /* A MOVE IS DRAWN BEFORE IT IS WRITTEN: the row goes where the hand put it
+     at once, and comes back (with a word) only if the write fails. */
+  const reorder = createMutation({
+    mutationFn: (ids: string[]) =>
+      mutateJSON<{ slots: ScheduleSlotRow[] }>('PATCH', `/api/schedule/${target}/${id}`, { order: ids }),
+    onMutate: (ids: string[]) => {
+      const prev = queryClient.getQueryData<Feed>(queryKey);
+      if (prev) {
+        const byId = new Map(prev.slots.map((s) => [s.id, s]));
+        queryClient.setQueryData<Feed>(queryKey, {
+          ...prev,
+          slots: ids.map((sid, i) => ({ ...byId.get(sid)!, sort: i + 1 })),
+        });
       }
+      return { prev };
     },
-    onError: (err) => {
-      const msg = err instanceof Error ? err.message : '';
-      addToast({
-        tone: 'danger',
-        message: msg.startsWith('Timeslots must be ordered')
-          ? t('planner.ro_out_of_order', locale)
-          : t('planner.ro_save_error', locale),
-      });
+    onSuccess: (res) => res && settle(res.slots),
+    onError: (err, _ids, ctx) => {
+      if (ctx?.prev) queryClient.setQueryData(queryKey, ctx.prev);
+      failed(err);
     },
   });
-  let pending = $derived($save.isPending);
+  let pending = $derived($save.isPending || $reorder.isPending);
 
   async function write(next: ScheduleSlotInput[]): Promise<boolean> {
     try {
@@ -116,21 +171,66 @@
     }
   }
 
+  let listEl = $state<HTMLOListElement | null>(null);
+
+  /** Move a moment and keep the keyboard on it. */
+  async function move(from: number, to: number, refocus: 'line' | 'edit' = 'line') {
+    if (pending || to < 0 || to >= order.length || from === to) return;
+    const ids = moveSlot(order, from, to).map((s) => s.id!);
+    if (editing === from) editing = to;
+    $reorder.mutate(ids);
+    await tick();
+    const sel = refocus === 'line' ? `[data-index="${to}"] .ro__line` : `[data-index="${to}"] .ro__act--move`;
+    listEl?.querySelector<HTMLElement>(sel)?.focus();
+  }
+
+  function onLineKey(e: KeyboardEvent, i: number) {
+    if (!e.altKey) return;
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      void move(i, i - 1);
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      void move(i, i + 1);
+    }
+  }
+
+  // ── Dragging: the native medium (HTML drag and drop), rows as targets ──
+  let dragFrom = $state<number | null>(null);
+  let dragOver = $state<number | null>(null);
+
+  function onDragStart(e: DragEvent, i: number) {
+    dragFrom = i;
+    e.dataTransfer?.setData('text/plain', String(i));
+    if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
+  }
+  function onDragOver(e: DragEvent, i: number) {
+    if (dragFrom === null) return;
+    e.preventDefault();
+    dragOver = i;
+  }
+  function onDrop(e: DragEvent, i: number) {
+    e.preventDefault();
+    if (dragFrom !== null) void move(dragFrom, i);
+    dragFrom = null;
+    dragOver = null;
+  }
+  function onDragEnd() {
+    dragFrom = null;
+    dragOver = null;
+  }
+
   let open = $state(true);
 
-  // ── Adding: an hour and a word, Enter. ────────────────────────────────
+  // ── Adding: an hour and a word, Enter. The hour places it, once. ───────
   let aClock = $state('');
   let aWord = $state('');
   let aBad = $state(false);
 
-  function nowClock(): string {
-    return clockText(new Date().toISOString(), tz);
-  }
-
   async function add(e: SubmitEvent) {
     e.preventDefault();
     const clock = parseClock(aClock);
-    const named = namedSlot(aWord, null, words);
+    const named = namedSlot(aWord, null, known);
     aBad = clock === null;
     if (!clock || !named || pending) return;
     const at = instantFor(dayIso, clock, tz, order);
@@ -145,7 +245,7 @@
     }
   }
 
-  // ── Editing one moment: the row becomes its form. ─────────────────────
+  // ── Editing one moment: the row becomes its form, in its place. ────────
   let editing = $state<number | null>(null);
   let eClock = $state('');
   let eEnd = $state('');
@@ -174,11 +274,12 @@
     const prev = order[i];
     const clock = parseClock(eClock);
     const endClock = eEnd.trim() ? parseClock(eEnd) : null;
-    const named = namedSlot(eWord, prev.kind, words);
+    const named = namedSlot(eWord, prev.kind, known);
     eBad = clock === null || (eEnd.trim() !== '' && endClock === null);
     if (eBad || !clock || !named) return;
     // An untouched hour keeps its instant (a 1h30 that already ran past
-    // midnight stays tomorrow); a new hour is placed like a new moment.
+    // midnight stays tomorrow); a new hour is read on the day, like a new
+    // moment. Either way the moment KEEPS ITS PLACE: the order is the hand's.
     const unchanged = parseClock(clockText(prev.at, tz));
     const same = unchanged !== null && unchanged.h === clock.h && unchanged.m === clock.m;
     const others = order.filter((_, j) => j !== i);
@@ -188,14 +289,9 @@
       return;
     }
     const ends_at = endClock ? endFor(at, endClock, tz) : null;
-    const slot: ScheduleSlotInput = {
-      ...prev,
-      ...named,
-      at,
-      ends_at,
-      notes: eNotes.trim() || null,
-    };
-    if (await write(placeByTime(order, slot, i))) editing = null;
+    const slot: ScheduleSlotInput = { ...prev, ...named, at, ends_at, notes: eNotes.trim() || null };
+    const next = order.map((s, j) => (j === i ? slot : s));
+    if (await write(next)) editing = null;
   }
 
   async function remove() {
@@ -232,14 +328,16 @@
 
   {#if open}
     <datalist id={listId}>
-      {#each words as [k, w] (k)}<option value={w}></option>{/each}
+      {#each offered as [k, w] (k)}<option value={w}></option>{/each}
     </datalist>
 
-    <ol class="ro__list">
+    <ol class="ro__list" bind:this={listEl}>
       {#each order as s, i (s.id ?? i)}
         {@const tomorrow = dayOf(s.at, tz) !== dayIso}
+        {@const alt = viewerClock(s.at)}
+        {@const off = outOfTime(order, i)}
         {#if editing === i}
-          <li class="ro__row ro__row--edit">
+          <li class="ro__row ro__row--edit" data-index={i}>
             <form class="ro__form" onsubmit={commitEdit} use:focusFirst>
               <span class="ro__at ro__at--edit">
                 <input
@@ -291,6 +389,18 @@
                 <button type="button" class="ro__act" onclick={cancelEdit} disabled={pending}
                   >{t('planner.ro_cancel', locale)}</button
                 >
+                <button
+                  type="button"
+                  class="ro__act ro__act--quiet ro__act--move"
+                  onclick={() => move(i, i - 1, 'edit')}
+                  disabled={pending || i === 0}>{t('planner.ro_up', locale)}</button
+                >
+                <button
+                  type="button"
+                  class="ro__act ro__act--quiet"
+                  onclick={() => move(i, i + 1, 'edit')}
+                  disabled={pending || i === order.length - 1}>{t('planner.ro_down', locale)}</button
+                >
                 <button type="button" class="ro__act ro__act--quiet" onclick={remove} disabled={pending}
                   >{t('planner.ro_remove', locale)}</button
                 >
@@ -298,7 +408,18 @@
             </form>
           </li>
         {:else}
-          <li class="ro__row" data-kind={s.kind ?? undefined}>
+          <li
+            class="ro__row"
+            class:ro__row--drop={dragOver === i && dragFrom !== null && dragFrom !== i}
+            class:ro__row--dragging={dragFrom === i}
+            data-index={i}
+            data-kind={s.kind ?? undefined}
+            draggable={canEdit && !pending}
+            ondragstart={(e) => onDragStart(e, i)}
+            ondragover={(e) => onDragOver(e, i)}
+            ondrop={(e) => onDrop(e, i)}
+            ondragend={onDragEnd}
+          >
             <svelte:element
               this={canEdit ? 'button' : 'div'}
               class="ro__line"
@@ -306,20 +427,26 @@
                 ? {
                     type: 'button',
                     'aria-label': t('planner.ro_edit', locale, { moment: slotWord(s, kindWord) }),
+                    'aria-keyshortcuts': 'Alt+ArrowUp Alt+ArrowDown',
                     onclick: () => startEdit(i),
+                    onkeydown: (e: KeyboardEvent) => onLineKey(e, i),
                   }
                 : {}}
             >
-              <span class="ro__at"
+              <span class="ro__at" class:ro__at--off={off} title={off ? t('planner.ro_out_of_time', locale) : undefined}
                 >{clockText(s.at, tz)}{#if tomorrow}<sup
                     class="ro__plus"
                     title={t('planner.ro_next_day', locale)}>+1</sup
-                  >{/if}{#if s.ends_at}<span class="ro__end">–{clockText(s.ends_at, tz)}</span>{/if}</span
+                  >{/if}{#if s.ends_at}<span class="ro__end">–{clockText(s.ends_at, tz)}</span>{/if}{#if alt}<span
+                    class="ro__alt"
+                    title={t('planner.ro_yours', locale)}>{alt}</span
+                  >{/if}</span
               >
               <span class="ro__body">
                 <span class="ro__w" class:ro__w--show={s.kind === 'start'}>{slotWord(s, kindWord)}</span>
                 {#if s.notes}<span class="ro__n">{s.notes}</span>{/if}
               </span>
+              {#if canEdit}<span class="ro__grip" aria-hidden="true"></span>{/if}
             </svelte:element>
           </li>
         {/if}
@@ -344,7 +471,7 @@
                   type="button"
                   class="ro__act ro__act--quiet"
                   onclick={() => {
-                    aClock = nowClock();
+                    aClock = clockText(new Date().toISOString(), tz);
                     aBad = false;
                   }}>{t('planner.ro_now', locale)}</button
                 >
@@ -472,6 +599,40 @@
       white-space: pre-wrap;
       overflow-wrap: anywhere;
     }
+    /* The reader's own hour, when it is another (D-PRE-10): a gloss under
+       the hour, never beside it, so the column keeps its width. */
+    .ro__alt {
+      display: block;
+      font-size: var(--text-xs);
+      color: var(--text-faint);
+    }
+    /* The hand put it after a later hour: allowed, and said quietly. */
+    .ro__at--off {
+      font-style: italic;
+      color: var(--text-muted);
+    }
+    /* ── Moving: the grip says a row can be dragged; the line shows where
+       it lands. Alt+↑/↓ does the same from the keyboard. ───────────── */
+    .ro__grip {
+      align-self: center;
+      justify-self: end;
+      inline-size: 6px;
+      block-size: 12px;
+      background: radial-gradient(circle, var(--text-faint) 1px, transparent 1.2px) 0 0 / 3px 3px;
+      opacity: 0;
+      cursor: grab;
+      transition: opacity 0.1s;
+    }
+    .ro__row:hover .ro__grip,
+    .ro__line:focus-visible .ro__grip {
+      opacity: 1;
+    }
+    .ro__row--dragging {
+      opacity: 0.4;
+    }
+    .ro__row.ro__row--drop {
+      border-block-start: 1px solid var(--text-muted);
+    }
     .ro__row--empty {
       display: block;
       padding-block: var(--space-xs);
@@ -566,6 +727,9 @@
       .ro__list {
         grid-template-columns: max-content minmax(0, 1fr);
         column-gap: var(--space-s);
+      }
+      .ro__grip {
+        display: none;
       }
       .ro__acts {
         grid-column: 2;

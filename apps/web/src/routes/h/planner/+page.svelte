@@ -85,7 +85,7 @@
   import DayStrip from '$lib/components/planner/DayStrip.svelte';
   import DayFoot, { type DayNextVM } from '$lib/components/planner/DayFoot.svelte';
   import { performanceThread, dateThread, stripWindow, hourOf } from '$lib/day-strip';
-  import RunningOrder from '$lib/components/planner/RunningOrder.svelte';
+  import RunningOrder from '$lib/components/RunningOrder.svelte';
   import { ORDERED_DATE_KINDS, type RunningOrderTarget } from '$lib/running-order';
   import Dialog from '$lib/components/Dialog.svelte';
   import FeedDialog from '$lib/components/planner/FeedDialog.svelte';
@@ -2921,8 +2921,8 @@
         id={o.id}
         dayIso={selectedDay}
         tz={o.tz}
+        {viewerTz}
         {locale}
-        isToday={selectedDay === todayIso}
         name={dayOrders.length > 1 ? o.name : null}
       />
     {/each}

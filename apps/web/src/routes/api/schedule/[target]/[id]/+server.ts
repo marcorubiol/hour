@@ -14,6 +14,11 @@
  * contract. When P2 lands, this PUT is what the doc replaces (ADR-090: «the
  * doc wins»), and the screen writes through the doc instead.
  *
+ * PATCH `{ order: uuid[] }` → a MOVE: the same slots, in a new order, with
+ * `reorder_schedule_slots` (positions only, nothing else is rewritten). The
+ * ids must be exactly this order's slots (22023 otherwise → 400). The hand-
+ * made order is the order (`placeByTime` in `$lib/running-order`).
+ *
  * The order rule the old CHECK held for the five legacy kinds (load in ≤
  * soundcheck ≤ start ≤ load out ≤ wrap) is kept here, as the PATCH of
  * /api/performances keeps it: a running order where the show starts before
@@ -195,6 +200,62 @@ export const PUT: RequestHandler = async ({ request, params, platform, locals })
           '42501': { status: 404, error: 'not_found' },
           '22023': { status: 400, error: 'invalid_body' },
           '23514': { status: 400, error: 'constraint_violation' },
+        },
+        passUpstream: [401, 403],
+      },
+    );
+  }
+};
+
+const PatchSchema = v.object({
+  order: v.pipe(v.array(v.pipe(v.string(), v.uuid())), v.maxLength(200)),
+});
+
+export const PATCH: RequestHandler = async ({ request, params, platform, locals }) => {
+  if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);
+  const env = platform.env as unknown as SupabaseEnv;
+  const jwt = extractAccessToken(request);
+  if (!jwt) return json({ error: 'missing_authorization' }, 401);
+
+  const p = v.safeParse(ParamsSchema, params);
+  if (!p.success) return json({ error: 'invalid_target' }, 400);
+  const { target, id } = p.output;
+
+  let raw: unknown;
+  try {
+    raw = await request.json();
+  } catch {
+    return json({ error: 'invalid_body' }, 400);
+  }
+  const parsed = v.safeParse(PatchSchema, raw);
+  if (!parsed.success) return json({ error: 'invalid_body' }, 400);
+
+  try {
+    const { data } = await pgPostRpc<ScheduleSlotRow>(env, 'reorder_schedule_slots', jwt, {
+      p_target_table: target,
+      p_target_id: id,
+      p_slot_ids: parsed.output.order,
+    });
+    const rows = data.map(({ id: sid, kind, label, at, ends_at, sort, notes }) => ({
+      id: sid,
+      kind,
+      label,
+      at,
+      ends_at,
+      sort,
+      notes,
+    }));
+    return json({ slots: rows });
+  } catch (err) {
+    // 42501 = no edit:performance or not there; 22023 = the ids are not
+    // exactly this running order's slots (somebody else changed it).
+    return pgErrorResponse(
+      err,
+      { route: 'PATCH /api/schedule/[target]/[id]', requestId: locals.requestId },
+      {
+        codes: {
+          '42501': { status: 404, error: 'not_found' },
+          '22023': { status: 409, error: 'stale_order' },
         },
         passUpstream: [401, 403],
       },

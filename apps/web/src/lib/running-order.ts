@@ -148,6 +148,55 @@ export function slotWord(
 }
 
 /**
+ * The dictionary key that says each of the five kinds (ADR-090 P3, Marco
+ * 2026-10-10: the words go to the app's language — `carga`, `prueba de
+ * sonido`, `función`, `desmontaje`, `fin`). The `kind` in the database does
+ * not change; only how it is said. The keys are the ones Desk and the rail
+ * already used, so every surface says the same word.
+ */
+export const KIND_WORD_KEYS: Readonly<Record<string, string>> = {
+  load_in: 'desk.anchor_loadin',
+  soundcheck: 'desk.anchor_soundcheck',
+  start: 'desk.anchor_show',
+  loadout: 'desk.anchor_loadout',
+  wrap: 'desk.anchor_wrap',
+};
+
+/**
+ * Words people type for the five that are not the dictionaries' own: the
+ * trade's habits (`técnica` for the soundcheck) and the English the road
+ * sheet always printed (`load in`, `start`). Recognised, never printed.
+ */
+export const KIND_SYNONYMS: ReadonlyArray<readonly [kind: string, word: string]> = [
+  ['load_in', 'load in'],
+  ['load_in', 'load-in'],
+  ['soundcheck', 'técnica'],
+  ['soundcheck', 'tècnica'],
+  ['soundcheck', 'sound check'],
+  ['soundcheck', 'soundcheck'],
+  ['start', 'start'],
+  ['loadout', 'load out'],
+  ['loadout', 'load-out'],
+  ['wrap', 'wrap'],
+];
+
+/**
+ * Every word that names one of the five, in every language the app speaks,
+ * plus the synonyms. Writing recognises all of them: a Catalan crew member
+ * typing «prova de so» in a Spanish session still writes the soundcheck.
+ */
+export function recognisedWords(
+  wordIn: (key: string, locale: string) => string,
+  locales: readonly string[],
+): Array<readonly [kind: string, word: string]> {
+  const out: Array<readonly [string, string]> = [];
+  for (const [kind, key] of Object.entries(KIND_WORD_KEYS)) {
+    for (const locale of locales) out.push([kind, wordIn(key, locale)]);
+  }
+  return [...out, ...KIND_SYNONYMS];
+}
+
+/**
  * A typed name that IS one of the five words (`soundcheck`, `función`…)
  * becomes that kind, not a free label: the road sheet and the strip only
  * know the five by kind, so «función» typed by hand must be the show and not
@@ -191,15 +240,21 @@ export function inputsOf(rows: readonly ScheduleSlotRow[]): ScheduleSlotInput[] 
 }
 
 /**
- * Put one slot where its hour says, and return the new order.
+ * THE ORDER RULE (Marco, 2026-10-10: reordering by hand comes before P2).
  *
- * `index` is the slot's current place when it is being edited (it leaves it
- * first); absent for a new one. Equal hours keep arrival order: the new one
- * goes AFTER the moments already at that hour, which is how a list filled in
- * on the day reads.
+ * The hand-made order is the order. The hour PLACES a moment once, when it is
+ * added: it goes before the first moment whose hour is later, which on a list
+ * nobody has touched is simply chronological. After that the hour never moves
+ * it again — editing a moment's hour keeps it where it is, and only a move
+ * (drag, the arrows, Alt+↑/↓) changes its place. Two rules that both moved
+ * rows would fight: somebody puts the photo call before the dinner on
+ * purpose, fixes a typo in its hour, and the list undoes their order.
  *
- * Only this slot moves. An order somebody arranged by hand (P2's CRDT will
- * allow it) is not re-sorted around it.
+ * `index` is kept for a caller that wants to re-place an existing slot by
+ * its hour on purpose; the editor does not.
+ *
+ * Equal hours keep arrival order: the new one goes AFTER the moments already
+ * at that hour, which is how a list filled in on the day reads.
  */
 export function placeByTime(
   order: readonly ScheduleSlotInput[],
@@ -211,4 +266,31 @@ export function placeByTime(
   const at = rest.findIndex((s) => new Date(s.at).getTime() > t);
   if (at < 0) return [...rest, slot];
   return [...rest.slice(0, at), slot, ...rest.slice(at)];
+}
+
+/**
+ * Move one moment from `from` to `to` (both indexes in the current order) and
+ * return the new order. Out of range is a no-op, never a wrap-around: the
+ * first moment does not go up to the end.
+ */
+export function moveSlot<T>(order: readonly T[], from: number, to: number): T[] {
+  if (from < 0 || from >= order.length || to < 0 || to >= order.length || from === to) {
+    return [...order];
+  }
+  const next = [...order];
+  const [item] = next.splice(from, 1);
+  next.splice(to, 0, item);
+  return next;
+}
+
+/**
+ * True when a moment's hour is earlier than the one listed above it: the
+ * hand-made order and the clock disagree. The editor says so quietly (it is
+ * allowed: a list may put a note-to-self after the show on purpose). The
+ * night that runs long is not a disagreement: `0h30` tomorrow is a later
+ * instant than `22h30`.
+ */
+export function outOfTime(order: ReadonlyArray<Pick<ScheduleSlotInput, 'at'>>, i: number): boolean {
+  if (i <= 0 || i >= order.length) return false;
+  return Date.parse(order[i].at) < Date.parse(order[i - 1].at);
 }
