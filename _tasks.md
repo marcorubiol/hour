@@ -1508,7 +1508,7 @@ entre empresas sin construirlo.
   espera fija más corta que la red y un tirón tragado por el cerrojo `probing`; el
   spec espera ahora a sus respuestas (`8e464b4`) y la config guarda traza si falla.
   El del choque (421) no se reprodujo en 4 suites: si vuelve, habrá traza.
-- [ ] **Bug: el tirón de «meses anteriores» se pierde si coincide con la búsqueda
+- [x] **ARREGLADO 2026-10-10 (`2f48370`, desplegado; E2E 62/62).** Bug: el tirón de «meses anteriores» se pierde si coincide con la búsqueda
   hacia delante** (`loadAllEarlier` y `probePlanAhead` comparten `probing` en
   `routes/h/planner/+page.svelte`; la primera hace `return` sin avisar). Arreglo
   mínimo: que espere a la búsqueda en curso. Visto el 10-10 al arreglar el test.
