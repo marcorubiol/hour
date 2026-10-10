@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { deriveInitials, markText, MONOGRAM_MAX } from './identity';
+import { deriveInitials, markText, MONOGRAM_MAX, userDisplayName } from './identity';
 
 describe('deriveInitials', () => {
   it('takes the first letter of up to 3 words, upper-cased', () => {
@@ -42,5 +42,19 @@ describe('markText', () => {
     expect(markText({ initials: '   ', name: 'Memorias del agua' })).toBe('MDA');
     expect(markText({ initials: null, name: 'MaMeMi' })).toBe('Ma');
     expect(markText({ name: 'Cuaderno cero' })).toBe('CC');
+  });
+});
+
+describe('userDisplayName', () => {
+  it('prefers the stored profile name over the auth metadata name', () => {
+    expect(userDisplayName('Marco Rubiol', 'marcorubiol', 'marcorubiol@gmail.com')).toBe(
+      'Marco Rubiol',
+    );
+  });
+
+  it('falls back to the session name, then the email local part', () => {
+    expect(userDisplayName(null, 'Anouk', 'a@x.test')).toBe('Anouk');
+    expect(userDisplayName('  ', null, 'anouk@x.test')).toBe('anouk');
+    expect(userDisplayName(undefined, undefined, undefined)).toBe('');
   });
 });

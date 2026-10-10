@@ -24,7 +24,8 @@
   import { goto } from '$app/navigation';
   import { createQuery } from '@tanstack/svelte-query';
   import { fetchJSON } from '$lib/api';
-  import { workspacesQueryOptions } from '$lib/nav-queries';
+  import { meQueryOptions, workspacesQueryOptions } from '$lib/nav-queries';
+  import { userDisplayName } from '$lib/utils/identity';
   import { session } from '$lib/session.svelte';
   import { detectLocale, t } from '$lib/i18n';
   import Button from '$lib/components/Button.svelte';
@@ -80,8 +81,16 @@
     );
   });
 
+  // The person's stored name (user_profile.full_name), not the auth metadata
+  // one; see userDisplayName. Held back while /api/me is in flight so the
+  // greeting never flashes the email handle before the real name lands.
+  const meQuery = createQuery(meQueryOptions());
   let firstName = $derived(
-    (session.user?.name ?? session.user?.email?.split('@')[0] ?? '').split(/\s+/)[0] ?? '',
+    $meQuery.isPending
+      ? ''
+      : (userDisplayName($meQuery.data?.full_name, session.user?.name, session.user?.email).split(
+          /\s+/,
+        )[0] ?? ''),
   );
 
   // ── Status-sentence inputs ─────────────────────────────────────────
