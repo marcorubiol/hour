@@ -744,7 +744,7 @@ Marco: «no quiero ningún diferido». Cerrados los tres, cada uno como tocaba.
 
 ## Decisiones con coste o autoridad externa
 
-- [ ] Marco: hacer — **Pasar el email de Anouk** para invitarla a `muk-cia` (§ 31 cerrada; es lo único que falta para que empiece la difusión).
+- [ ] Marco: hacer — **Recorrer la app él mismo antes de invitar a Anouk** (Marco, 10-10); después, pasar su email para invitarla a `muk-cia`.
 - [ ] Marco: hacer — **Revisar las primeras versiones de diseño** (selector de bolo, escaleta, móvil y fichas de Conversations, Travel P2) con sus capturas, antes de integrarlas juntas.
 
 9. [ ] Marco: decidir — **Supabase Pro antes de la beta (y con él, HIBP).** El proyecto está en plan
