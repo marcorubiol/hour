@@ -11,39 +11,65 @@
 
 <script lang="ts">
   /**
-   * ScheduleTable — the 5-timeslot table with dual-timezone display
+   * ScheduleTable — the running order with dual-timezone display
    * (D-PRE-10): venue wall time first, viewer time alongside when it
    * differs. Shared by ProductionStub (performance detail) and the road
    * sheet.
+   *
+   * ADR-090 P3: when the caller has the whole running order (`moments`), it
+   * draws every moment in its order, free ones included («photo call»).
+   * Without it (the public sheet, whose SQL projection still serializes the
+   * five) it draws the five fields, as it always did.
    */
 
   import { dualTime } from '$lib/datetime';
+  import type { ScheduleMoment } from '$lib/schedule-slot';
 
   interface Props {
     slots: ScheduleSlots;
+    moments?: ScheduleMoment[] | null;
     venueTz: string | null;
     viewerTz: string;
+    /** The word for one of the five kinds. Defaults to the document's
+        English, which is what the road sheet has always printed. */
+    kindWord?: (kind: string) => string;
   }
 
-  let { slots, venueTz, viewerTz }: Props = $props();
+  const ENGLISH: Record<string, string> = {
+    load_in: 'load in',
+    soundcheck: 'soundcheck',
+    start: 'start',
+    loadout: 'load out',
+    wrap: 'wrap',
+  };
 
-  const LABELS: ReadonlyArray<[string, keyof ScheduleSlots]> = [
-    ['load in', 'load_in_at'],
+  let {
+    slots,
+    moments = null,
+    venueTz,
+    viewerTz,
+    kindWord = (k) => ENGLISH[k] ?? k.replace(/_/g, ' '),
+  }: Props = $props();
+
+  const FIELDS: ReadonlyArray<[string, keyof ScheduleSlots]> = [
+    ['load_in', 'load_in_at'],
     ['soundcheck', 'soundcheck_at'],
     ['start', 'start_at'],
-    ['load out', 'loadout_at'],
+    ['loadout', 'loadout_at'],
     ['wrap', 'wrap_at'],
   ];
 
   let rows = $derived(
-    LABELS.map(([label, key]) => ({ label, at: slots[key] })).filter((r) => r.at),
+    moments
+      ? moments.map((m) => ({ label: m.label ?? (m.kind ? kindWord(m.kind) : ''), at: m.at }))
+      : FIELDS.map(([kind, key]) => ({ label: kindWord(kind), at: slots[key] })).filter((r) => r.at),
   );
 </script>
 
 {#if rows.length > 0}
   <table class="schedule" aria-label="Schedule">
     <tbody>
-      {#each rows as row (row.label)}
+      {#each rows as row, i (i)}
         {@const t = dualTime(row.at!, venueTz, viewerTz)}
         <tr>
           <th scope="row">{row.label}</th>

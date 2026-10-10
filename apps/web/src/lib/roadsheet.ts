@@ -34,7 +34,7 @@
  */
 
 import type { Json, Tables } from './db-types';
-import type { TimeslotFields } from './schedule-slot';
+import type { ScheduleMoment, TimeslotFields } from './schedule-slot';
 
 export const ROADSHEET_ROLES = ['full', 'venue', 'performer', 'tech_manager'] as const;
 export type RoadsheetRole = (typeof ROADSHEET_ROLES)[number];
@@ -125,6 +125,8 @@ export interface PerformanceBundle {
   > &
     // ADR-090: derived from `schedule_slot` by the bundle.
     TimeslotFields & {
+    /** ADR-090 P3: the whole order. Absent from the public projection. */
+    schedule?: ScheduleMoment[];
     logistics: Json;
     hospitality: Json;
     technical: Json;
@@ -150,6 +152,9 @@ export interface Roadsheet {
     start_at: string | null;
     loadout_at: string | null;
     wrap_at: string | null;
+    /** ADR-090 P3: the whole running order. Absent on the public sheet,
+        whose projection (`get_public_roadsheet`) still serializes the five. */
+    moments?: ScheduleMoment[];
   } | null;
   venue: VenueBlock | null;
   /** Denormalized fallback when there is no venue row. */
@@ -214,6 +219,7 @@ export function buildRoadsheet(bundle: PerformanceBundle, role: RoadsheetRole): 
           start_at: p.start_at,
           loadout_at: p.loadout_at,
           wrap_at: p.wrap_at,
+          moments: p.schedule,
         }
       : null,
     venue: has('venue') ? bundle.venue : null,
