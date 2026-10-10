@@ -6,6 +6,10 @@
   import ThemeToggle from '$lib/components/ThemeToggle.svelte';
   import { useTheme } from '$lib/theme.svelte';
   import { clearSession, session } from '$lib/session.svelte';
+  import { appLocale, t } from '$lib/i18n';
+  import { createQuery } from '@tanstack/svelte-query';
+  import { meQueryOptions } from '$lib/nav-queries';
+  import { userDisplayName as displayNameFor } from '$lib/utils/identity';
 
   interface Props {
     /** Current URL's workspace segment — Avatar-name fallback of last resort. */
@@ -22,12 +26,14 @@
   let { workspaceSlug, menuWorkspaceSlug, inSettings, rememberWorkingScope }: Props = $props();
 
   const theme = useTheme();
+  const locale = appLocale();
 
-  // Identity from the session store (display name → email local-part).
-  // The JWT is httpOnly now — the server decoded it in /api/auth/session.
+  // Identity: the person's stored name (user_profile.full_name via /api/me),
+  // then the session's auth-metadata name, then the email local-part.
+  const meQuery = createQuery(meQueryOptions());
   let userEmail = $derived(session.user?.email ?? '');
   let userDisplayName = $derived(
-    session.user?.name ?? session.user?.email?.split('@')[0] ?? '',
+    displayNameFor($meQuery.data?.full_name, session.user?.name, session.user?.email),
   );
 
   // Theme style picker — accordion inside the account menu.
@@ -42,7 +48,7 @@
   let activeThemeStyleId = $derived(theme.theme);
   let themeStyleExpanded = $state(false);
   let activeThemeStyle = $derived(
-    themeStyles.find((t) => t.id === activeThemeStyleId) ?? themeStyles[0],
+    themeStyles.find((s) => s.id === activeThemeStyleId) ?? themeStyles[0],
   );
 
   // Do Not Disturb — quick toggle in the account menu.
@@ -81,7 +87,7 @@
 <Menu
   direction="down"
   align="end"
-  label="Open account menu"
+  label={t('shell.account_menu', locale)}
   triggerClass="account-row__kebab"
   onclose={() => (themeStyleExpanded = false)}
 >
@@ -102,8 +108,8 @@
       <button
         type="button"
         class="menu-header__logout"
-        aria-label="Sign out"
-        title="Sign out"
+        aria-label={t('shell.sign_out', locale)}
+        title={t('shell.sign_out', locale)}
         onclick={() => {
           close(false);
           logout();
@@ -124,7 +130,7 @@
         tabindex="0"
         onclick={() => close(false)}
       >
-        {inSettings ? 'Dashboard' : 'All settings'}
+        {inSettings ? t('shell.dashboard', locale) : t('shell.all_settings', locale)}
       </a>
     </li>
     <li role="none" class="settings-row">
@@ -135,15 +141,15 @@
         tabindex="0"
         onclick={() => close(false)}
       >
-        Notifications
+        {t('shell.notifications', locale)}
       </a>
       <button
         type="button"
         class="settings-row__action settings-row__action--toggle"
         class:is-muted={dnd}
-        aria-label={dnd ? 'Notifications muted — click to unmute' : 'Notifications on — click to mute'}
+        aria-label={dnd ? t('shell.notif_muted_aria', locale) : t('shell.notif_on_aria', locale)}
         aria-pressed={dnd}
-        title={dnd ? 'Muted' : 'On — click to mute'}
+        title={dnd ? t('shell.notif_muted', locale) : t('shell.notif_on', locale)}
         onclick={toggleDnd}
       >
         <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -165,7 +171,7 @@
           aria-expanded={themeStyleExpanded}
           onclick={() => (themeStyleExpanded = !themeStyleExpanded)}
         >
-          <span class="theme-accordion__label">Theme style</span>
+          <span class="theme-accordion__label">{t('shell.theme_style', locale)}</span>
           <span class="theme-accordion__current">
             <span class="theme-accordion__current-name">{activeThemeStyle.name}</span>
             <span class="theme-accordion__chevron" data-expanded={themeStyleExpanded || undefined} aria-hidden="true">›</span>
@@ -175,16 +181,16 @@
       </div>
       {#if themeStyleExpanded}
         <ul class="theme-accordion__list" role="list">
-          {#each themeStyles as t (t.id)}
+          {#each themeStyles as ts (ts.id)}
             <li class="theme-accordion__item">
               <button
                 type="button"
                 class="theme-accordion__select"
-                aria-pressed={t.id === activeThemeStyleId}
-                data-active={t.id === activeThemeStyleId || undefined}
-                onclick={() => theme.setTheme(t.id)}
+                aria-pressed={ts.id === activeThemeStyleId}
+                data-active={ts.id === activeThemeStyleId || undefined}
+                onclick={() => theme.setTheme(ts.id)}
               >
-                {t.name}
+                {ts.name}
               </button>
             </li>
           {/each}

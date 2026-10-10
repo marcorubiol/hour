@@ -1,5 +1,6 @@
 <script lang="ts">
   import { accentVar } from '$lib/utils/accent';
+  import { appLocale, t } from '$lib/i18n';
 
   type Size = 'xs' | 's' | 'm' | 'l';
   type Tone =
@@ -48,7 +49,7 @@
       ? `--avatar-bg: ${accentVar(accentSlug)}; --avatar-color: var(--bg);`
       : undefined,
   );
-  let label = $derived(alt ?? name ?? 'avatar');
+  let label = $derived(alt ?? name ?? t('ui.avatar', appLocale()));
 
   let imageFailed = $state(false);
 

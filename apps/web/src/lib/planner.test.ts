@@ -19,6 +19,7 @@ import {
   type BlackoutInput,
   type PlannerEvent,
   type DecisionPerformance,
+  statusWord,
 } from './planner';
 
 describe('normalizePlannerView', () => {
@@ -1211,5 +1212,16 @@ describe('daysCoveredBy', () => {
     // Cheap insurance: this walks day by day, and a `to` before `from` used to
     // be the shape that hangs a render.
     expect(daysCoveredBy([{ from: '2026-07-05', to: '2026-07-01' }]).size).toBe(0);
+  });
+});
+
+describe('statusWord', () => {
+  it('words a hold rank and the rest of a deal in the reader language', () => {
+    expect(statusWord('hold_1', 'en')).toBe('1st hold');
+    expect(statusWord('confirmed', 'es')).toBe('confirmado');
+    expect(statusWord('paid', 'ca')).toBe('cobrat');
+  });
+  it('keeps an unknown value raw, underscores as spaces', () => {
+    expect(statusWord('on_the_road', 'en')).toBe('on the road');
   });
 });

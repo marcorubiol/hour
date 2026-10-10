@@ -15,7 +15,7 @@
  */
 
 import { dualTime, localDayISO } from './datetime';
-import { t, type Locale } from './i18n';
+import { LOCALE_TAG, t, type Locale } from './i18n';
 
 /** Structural subset of the /api/conversations row the hall needs. */
 export interface HallConversation {
@@ -251,12 +251,12 @@ function whenLabel(next: { day: string; inDays: number }, locale: Locale): strin
   if (next.inDays === 1) return t('hall.when_tomorrow', locale);
   const date = new Date(`${next.day}T00:00:00Z`);
   if (next.inDays < 7) {
-    const weekday = new Intl.DateTimeFormat(locale, { weekday: 'long', timeZone: 'UTC' }).format(
+    const weekday = new Intl.DateTimeFormat(LOCALE_TAG[locale], { weekday: 'long', timeZone: 'UTC' }).format(
       date,
     );
     return t('hall.when_weekday', locale, { weekday });
   }
-  const label = new Intl.DateTimeFormat(locale, {
+  const label = new Intl.DateTimeFormat(LOCALE_TAG[locale], {
     day: 'numeric',
     month: 'long',
     timeZone: 'UTC',

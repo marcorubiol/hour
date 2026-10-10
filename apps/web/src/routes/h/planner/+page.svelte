@@ -97,7 +97,7 @@
   import type { CreatedPerformance } from '$lib/components/PerformanceForm.svelte';
   import { usePins } from '$lib/stores/pins.svelte';
   import { useCalm } from '$lib/stores/calm.svelte';
-  import { detectLocale, t } from '$lib/i18n';
+  import { LOCALE_TAG, detectLocale, t } from '$lib/i18n';
   import {
     buildLineIndex,
     buildProjectIndex,
@@ -123,6 +123,7 @@
     normalizePlannerView,
     nightsFree,
     daysCoveredBy,
+    statusWord as statusWordIn,
   } from '$lib/planner';
   import { buildPersonScope } from '$lib/people';
   import { createPlannerFeeds, primeAgendaWindow } from '$lib/planner-feeds.svelte';
@@ -133,7 +134,6 @@
   import {
     isHoldStatus,
     performanceStatusFamily,
-    performanceStatusLabel,
     READINESS_KEYS,
     readinessLabelKey,
     statusFootKey,
@@ -162,7 +162,7 @@
     })(),
   );
   const locale = detectLocale(navigator.language);
-  const localeTag = { en: 'en-GB', es: 'es-ES', ca: 'ca-ES' }[locale];
+  const localeTag = LOCALE_TAG[locale];
   /** The ghost row's word: «nobody is on this» is an answer, not a hole. */
   const noCastWord = t('planner.no_cast', locale);
 
@@ -712,7 +712,11 @@
     return m;
   });
 
-  const KIND_KEYS = new Set(['rehearsal', 'residency', 'travel_day', 'press', 'other', 'day_off']);
+  function statusWord(status: string): string {
+    return statusWordIn(status, locale);
+  }
+
+  const KIND_KEYS = new Set(['show', 'rehearsal', 'residency', 'travel_day', 'press', 'other', 'day_off']);
   function kindLabel(kind: string): string {
     return KIND_KEYS.has(kind) ? t(`planner.kind_${kind}`, locale) : kind.replace(/_/g, ' ');
   }
@@ -797,10 +801,10 @@
   let eventSummaryById = $derived.by(() => {
     const m = new Map<string, { label: string; status: string; accent: string | null }>();
     for (const p of scopedPerfs) {
-      const name = p.venue?.name ?? p.venue_name ?? p.city ?? 'Performance';
+      const name = p.venue?.name ?? p.venue_name ?? p.city ?? t('create.type_performance', locale);
       m.set(p.id, {
         label: p.project ? `${p.project.name} · ${name}` : name,
-        status: performanceStatusLabel(p.status),
+        status: statusWord(p.status),
         accent: p.project ? accentVarFor(p.project) : null,
       });
     }
@@ -808,7 +812,7 @@
       const name = d.title ?? kindLabel(d.kind);
       m.set(d.id, {
         label: d.project ? `${d.project.name} · ${name}` : name,
-        status: d.status,
+        status: statusWord(d.status),
         accent: d.project ? accentVarFor(d.project) : null,
       });
     }
@@ -1227,7 +1231,7 @@
     if (sl.cert === 'released') return t('planner.released', locale);
     if (sl.cert === 'hold' && sl.hold) {
       const key = statusFootKey(sl.hold.rank ? `hold_${sl.hold.rank}` : 'hold');
-      const rank = key ? t(key, locale) : performanceStatusLabel('hold');
+      const rank = key ? t(key, locale) : statusWord('hold');
       if (!sl.hold.expires) return rank;
       return `${rank} · ${localeWeekdayShort(sl.hold.expires, localeTag)}`;
     }
@@ -1277,6 +1281,9 @@
     workspaceModeById,
     viewerTz,
     kindLabel,
+    statusLabel: statusWord,
+    viewerTimeLabel: (time: string) => t('planner.viewer_time', locale, { time }),
+    fallbackName: t('create.type_performance', locale),
     dualTime,
   });
   /** The pair's rule for one event of the day — soft while both are
@@ -1736,7 +1743,7 @@
       venue: side.venue ?? side.city ?? side.project,
       city: side.venue ? side.city : null,
       time: side.time,
-      statusLabel: performanceStatusLabel(side.status),
+      statusLabel: statusWord(side.status),
       hold: isHoldStatus(side.status),
       confirmed: performanceStatusFamily(side.status) === 'confirmed',
     };
@@ -1810,7 +1817,7 @@
   // (statusFootKey already maps both); anything else keeps the plain label.
   function agendaStatusLabel(status: string): string {
     const key = statusFootKey(status);
-    return key ? t(key, locale) : performanceStatusLabel(status);
+    return key ? t(key, locale) : statusWord(status);
   }
 
   // Prepend an earlier month with scroll-anchoring so the viewport stays
@@ -2061,7 +2068,7 @@
     } catch (err) {
       addToast({
         tone: 'danger',
-        message: err instanceof Error ? err.message : 'Could not save the note.',
+        message: err instanceof Error ? err.message : t('planner.note_save_error', locale),
       });
       return false;
     }
@@ -2072,7 +2079,7 @@
     } catch (err) {
       addToast({
         tone: 'danger',
-        message: err instanceof Error ? err.message : 'Could not delete the note.',
+        message: err instanceof Error ? err.message : t('planner.note_delete_error', locale),
       });
     }
     void queryClient.invalidateQueries({ queryKey: ['planner-agenda-notes'] });
@@ -2134,7 +2141,7 @@
         tone: 'danger',
         title: t('planner.dec_not_saved', locale),
         message: t('planner.dec_try_again', locale, {
-          message: err instanceof Error ? err.message : 'Unexpected error',
+          message: err instanceof Error ? err.message : t('perf.unexpected', locale),
         }),
       });
     },
@@ -2669,7 +2676,7 @@
 </script>
 
 <svelte:head>
-  <title>Calendar — Hour</title>
+  <title>{t('lens.planner', locale)} — Hour</title>
 </svelte:head>
 
 <section class="cal" aria-busy={busy}>

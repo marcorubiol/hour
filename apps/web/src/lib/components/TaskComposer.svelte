@@ -111,7 +111,7 @@
   const isGlyph = (k: TaskTargetKind) => k === 'space' || k === 'project' || k === 'line';
   let targetKindLabel = $derived(
     chosen.kind === 'line'
-      ? lineKindLabel(chosen.lineKind ?? '')
+      ? lineKindLabel(chosen.lineKind ?? '', locale)
       : t(`picker.kind_${chosen.kind}`, locale),
   );
 
@@ -201,7 +201,7 @@
   }}
 >
   <div class="tc__line">
-    <span class="tc__cap" aria-hidden="true">Capture</span>
+    <span class="tc__cap" aria-hidden="true">{t('composer.capture', locale)}</span>
     <input
       class="tc__title"
       type="text"

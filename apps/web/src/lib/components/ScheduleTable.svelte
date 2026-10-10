@@ -23,6 +23,8 @@
    */
 
   import { dualTime } from '$lib/datetime';
+  import { appLocale, t, type Locale } from '$lib/i18n';
+  import { KIND_WORD_KEYS } from '$lib/running-order';
   import type { ScheduleMoment } from '$lib/schedule-slot';
 
   interface Props {
@@ -30,25 +32,20 @@
     moments?: ScheduleMoment[] | null;
     venueTz: string | null;
     viewerTz: string;
-    /** The word for one of the five kinds. Defaults to the document's
-        English, which is what the road sheet has always printed. */
+    /** The word for one of the five kinds. Defaults to the reader's
+        language, with the words the running order and Desk use. */
     kindWord?: (kind: string) => string;
+    /** The reader's language; defaults to the session's. */
+    locale?: Locale;
   }
-
-  const ENGLISH: Record<string, string> = {
-    load_in: 'load in',
-    soundcheck: 'soundcheck',
-    start: 'start',
-    loadout: 'load out',
-    wrap: 'wrap',
-  };
 
   let {
     slots,
     moments = null,
     venueTz,
     viewerTz,
-    kindWord = (k) => ENGLISH[k] ?? k.replace(/_/g, ' '),
+    locale = appLocale(),
+    kindWord = (k) => (KIND_WORD_KEYS[k] ? t(KIND_WORD_KEYS[k], locale) : k.replace(/_/g, ' ')),
   }: Props = $props();
 
   const FIELDS: ReadonlyArray<[string, keyof ScheduleSlots]> = [
@@ -67,16 +64,16 @@
 </script>
 
 {#if rows.length > 0}
-  <table class="schedule" aria-label="Schedule">
+  <table class="schedule" aria-label={t('perf.schedule', locale)}>
     <tbody>
       {#each rows as row, i (i)}
-        {@const t = dualTime(row.at!, venueTz, viewerTz)}
+        {@const time = dualTime(row.at!, venueTz, viewerTz)}
         <tr>
           <th scope="row">{row.label}</th>
           <td>
-            <span class="schedule__time">{t.primary}</span>
-            {#if t.secondary}
-              <span class="schedule__time-alt">({t.secondary} yours)</span>
+            <span class="schedule__time">{time.primary}</span>
+            {#if time.secondary}
+              <span class="schedule__time-alt">{t('roadsheet.time_yours', locale, { time: time.secondary })}</span>
             {/if}
           </td>
         </tr>
@@ -84,7 +81,7 @@
     </tbody>
   </table>
 {:else}
-  <p class="schedule__empty">No schedule yet.</p>
+  <p class="schedule__empty">{t('perf.no_schedule', locale)}</p>
 {/if}
 
 <style>

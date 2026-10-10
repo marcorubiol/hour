@@ -20,6 +20,7 @@
   import { env } from '$env/dynamic/public';
   import YNotes from '$lib/components/YNotes.svelte';
   import { getAccessToken } from '$lib/session.svelte';
+  import { appLocale, t } from '$lib/i18n';
 
   interface Props {
     line: {
@@ -34,6 +35,8 @@
   }
 
   let { line }: Props = $props();
+
+  const locale = appLocale();
 
   async function canEditProjectMeta(projectId: string, signal: AbortSignal): Promise<boolean> {
     // Cross-origin PostgREST RPC — needs the raw access token (the
@@ -68,17 +71,15 @@
 </script>
 
 {#if $permQuery.isPending}
-  <p class="lnm__state">Loading…</p>
+  <p class="lnm__state">{t('desk.loading', locale)}</p>
 {:else if $permQuery.isError}
-  <p class="lnm__state">Couldn't check notes access — reload to retry.</p>
+  <p class="lnm__state">{t('line.notes_perm_error', locale)}</p>
 {:else if $permQuery.data === true}
   {#key line.id}
-    <YNotes targetTable="line" targetId={line.id} placeholder="Line notes — shared, live." rows={6} />
+    <YNotes targetTable="line" targetId={line.id} placeholder={t('line.notes_ph', locale)} rows={6} />
   {/key}
 {:else}
-  <p class="lnm__state">
-    Line notes need the project-meta permission — ask a project admin.
-  </p>
+  <p class="lnm__state">{t('line.notes_no_perm', locale)}</p>
 {/if}
 
 <style>

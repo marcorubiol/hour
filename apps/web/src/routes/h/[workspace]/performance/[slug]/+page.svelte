@@ -24,7 +24,7 @@
   import { addToast } from '$lib/components/Toast.svelte';
   import type { Json } from '$lib/db-types';
   import { dayLabel, dayMonth } from '$lib/datetime';
-  import { detectLocale, t } from '$lib/i18n';
+  import { LOCALE_TAG, detectLocale, t } from '$lib/i18n';
   import {
     HOLD_NOTICE_DEFAULT,
     PERFORMANCE_STATUSES,
@@ -39,6 +39,7 @@
     isReady,
   } from '$lib/performance';
   import type { VenueContact } from '$lib/venue';
+  import DirectoryPicker from '$lib/components/DirectoryPicker.svelte';
   import Select from '$lib/components/Select.svelte';
   import { boloOf, boloOptions, boloPatch, booksHref, type BoloLite } from '$lib/bolo-pick';
   import { performanceBoloQueryOptions, projectBolosQueryOptions } from '$lib/bolo-queries';
@@ -177,7 +178,7 @@
         `/api/performances/${encodeURIComponent(slug)}?ws=${encodeURIComponent(workspaceSlug)}`,
         patch,
       );
-      if (!body?.performance) throw new Error('Unexpected response');
+      if (!body?.performance) throw new Error(t('perf.unexpected_response', locale));
       return body;
     },
     onSuccess: (body, patch) => {
@@ -350,7 +351,7 @@
         }
       }
       crumbs.push({
-        label: perf.venue?.name ?? perf.venue_name ?? 'Performance',
+        label: perf.venue?.name ?? perf.venue_name ?? t('perf.label', locale),
         kind: 'node',
       });
       breadcrumb.set(crumbs);
@@ -428,7 +429,7 @@
         city: fCity.trim() || null,
         country: fCountry.trim() || null,
       });
-      if (!body?.venue) throw new Error('Unexpected response');
+      if (!body?.venue) throw new Error(t('perf.unexpected_response', locale));
       return body.venue;
     },
     onSuccess: (venue) => {
@@ -444,6 +445,18 @@
       });
     },
   });
+  // A venue adopted from the directory is linked at once; the free-text
+  // fields take its words only when they are empty (never overwritten).
+  function onDirectoryAdopt(venue: { id: string; name: string; city: string | null; country: string | null }) {
+    fVenueId = venue.id;
+    if (!fVenue.trim()) {
+      fVenue = venue.name;
+      fCity = venue.city ?? '';
+      fCountry = venue.country ?? '';
+    }
+    void queryClient.invalidateQueries({ queryKey: ['venues'] });
+  }
+
   // ── Venue edit (ADR-053): address, timezone (feeds dual-time on the
   // road sheet), contacts, capacity, notes. PATCH /api/venues/:id — no
   // RPC (venue_update RLS covers workspace members; ADR-048 only bites
@@ -514,20 +527,23 @@
       venueEditOpen = false;
       void queryClient.invalidateQueries({ queryKey: ['venues'] });
       void queryClient.invalidateQueries({ queryKey: ['performance'] });
-      addToast({ tone: 'success', message: `Venue "${result?.venue.name ?? vName}" updated.` });
+      addToast({
+        tone: 'success',
+        message: t('venue.updated', locale, { name: result?.venue.name ?? vName }),
+      });
     },
     onError: (err) => {
       addToast({
         tone: 'danger',
-        title: 'Venue not saved',
-        message: err instanceof Error ? err.message : 'Unexpected error',
+        title: t('venue.not_saved', locale),
+        message: err instanceof Error ? err.message : t('perf.unexpected', locale),
       });
     },
   });
 
   function saveVenue() {
     if (!vName.trim()) {
-      addToast({ tone: 'warning', message: 'The venue needs a name.' });
+      addToast({ tone: 'warning', message: t('venue.needs_name', locale) });
       return;
     }
     $venuePatch.mutate();
@@ -567,11 +583,19 @@
   }): string {
     if (d.all_day) return dayMonth(d.starts_at);
     const tz = d.venue?.timezone ?? perf?.venue?.timezone ?? workspaceTz ?? viewerTz;
-    return new Date(d.starts_at).toLocaleDateString('en-GB', {
+    return new Date(d.starts_at).toLocaleDateString(LOCALE_TAG[locale], {
       day: '2-digit',
       month: 'short',
       timeZone: tz,
     });
+  }
+
+  /** The word for a DB enum value (date kind, asset direction/kind); the raw
+      value with spaces when the dictionary has no word for it. */
+  function enumWord(prefix: string, value: string): string {
+    const key = prefix + value;
+    const word = t(key, locale);
+    return word === key ? value.replace(/_/g, ' ') : word;
   }
 
   let hasTeam = $derived(
@@ -582,18 +606,18 @@
 </script>
 
 <svelte:head>
-  <title>{title} — Performance — Hour</title>
+  <title>{title} — {t('perf.label', locale)} — Hour</title>
 </svelte:head>
 
 <article class="perf" aria-busy={loading}>
   {#if loading}
-    <p class="perf__state">Loading…</p>
+    <p class="perf__state">{t('desk.loading', locale)}</p>
   {:else if errorMsg}
     <p class="perf__state perf__state--danger">{errorMsg}</p>
   {:else if perf}
     <header class="perf__head">
       <p class="eyebrow">
-        Performance
+        {t('perf.label', locale)}
         {#if perf.project}
           · <a href={`/h/${workspaceSlug}/project/${perf.project.slug}`}>{perf.project.name}</a>
         {/if}
@@ -608,8 +632,8 @@
       </p>
       <h1 class="perf__title"><em>{title}</em></h1>
       <div class="perf__meta">
-        <Menu label="Change status" triggerClass="state-badge" triggerAttrs={{ 'data-tone': performanceStatusTone(perf.status) }}>
-          {#snippet trigger()}{performanceStatusLabel(perf.status)}<span class="status-caret" aria-hidden="true">▾</span>{/snippet}
+        <Menu label={t('perf.change_status', locale)} triggerClass="state-badge" triggerAttrs={{ 'data-tone': performanceStatusTone(perf.status) }}>
+          {#snippet trigger()}{performanceStatusLabel(perf.status, locale)}<span class="status-caret" aria-hidden="true">▾</span>{/snippet}
           {#snippet children({ close })}
             {#each PERFORMANCE_STATUSES as s (s)}
               <li role="none">
@@ -622,7 +646,7 @@
                     changeStatus(s);
                   }}
                 >
-                  {performanceStatusLabel(s)}
+                  {performanceStatusLabel(s, locale)}
                 </button>
               </li>
             {/each}
@@ -636,8 +660,8 @@
         {/if}
       </div>
       <p class="perf__roadsheet-link">
-        <a class="link-arrow" href={`/h/${workspaceSlug}/performance/${slug}/roadsheet`}>Open road sheet →</a>
-        <Button variant="outline" size="xs" onclick={openEdit}>Edit details</Button>
+        <a class="link-arrow" href={`/h/${workspaceSlug}/performance/${slug}/roadsheet`}>{t('roadsheet.open', locale)}</a>
+        <Button variant="outline" size="xs" onclick={openEdit}>{t('perf.edit_details', locale)}</Button>
       </p>
     </header>
 
@@ -656,6 +680,7 @@
       technical={perf.technical}
       {viewerTz}
       fallbackTz={workspaceTz}
+      {locale}
     >
       <!-- ADR-090 P3: the same running order as the Planner's day, in place
            of the fixed five. One way to write an hour in the whole app. -->
@@ -674,8 +699,8 @@
     <!-- ADR-084 §3 — the answer to "is it sorted?", which the month card's
          foot reads. Deliberately separate from the logistics/technical
          CONTENT above: that is where the detail lives, this is the verdict. -->
-    <section class="perf__section" aria-label="Readiness">
-      <p class="eyebrow">Readiness</p>
+    <section class="perf__section" aria-label={t('perf.readiness', locale)}>
+      <p class="eyebrow">{t('perf.readiness', locale)}</p>
       <ul class="perf__ready" role="list">
         {#each READINESS_KEYS as key (key)}
           {@const on = isReady(perf.readiness, key)}
@@ -697,23 +722,23 @@
     </section>
 
     {#if hasTeam}
-      <section class="perf__section" aria-label="Team">
-        <p class="eyebrow">Team</p>
+      <section class="perf__section" aria-label={t('perf.team', locale)}>
+        <p class="eyebrow">{t('perf.team', locale)}</p>
         <ul class="perf__people" role="list">
           {#each bundle!.cast_members as m (m.id)}
             <li>
-              <span class="perf__person-role">cast · {m.role}</span>
+              <span class="perf__person-role">{t('perf.role_cast', locale)} · {m.role}</span>
               <span class="perf__person-name">{m.person?.full_name ?? '—'}</span>
             </li>
           {/each}
           {#each perf.cast_override as o (o.id)}
             <li>
-              <span class="perf__person-role">cast · {o.role}</span>
+              <span class="perf__person-role">{t('perf.role_cast', locale)} · {o.role}</span>
               <span class="perf__person-name">
                 {o.person?.full_name ?? '—'}
                 {#if o.replaces_person}
                   <span class="perf__person-note">
-                    replaces {o.replaces_person.full_name}{#if o.reason} — {o.reason}{/if}
+                    {t('perf.replaces', locale, { name: o.replaces_person.full_name })}{#if o.reason} — {o.reason}{/if}
                   </span>
                 {/if}
               </span>
@@ -721,7 +746,7 @@
           {/each}
           {#each perf.crew_assignment as c (c.id)}
             <li>
-              <span class="perf__person-role">crew · {c.role}</span>
+              <span class="perf__person-role">{t('perf.role_crew', locale)} · {c.role}</span>
               <span class="perf__person-name">
                 {c.person?.full_name ?? '—'}
                 {#if c.notes}<span class="perf__person-note">{c.notes}</span>{/if}
@@ -733,13 +758,13 @@
     {/if}
 
     {#if perf.date.length > 0}
-      <section class="perf__section" aria-label="Related dates">
-        <p class="eyebrow">Dates</p>
+      <section class="perf__section" aria-label={t('perf.related_dates', locale)}>
+        <p class="eyebrow">{t('perf.dates', locale)}</p>
         <ul class="perf__dates" role="list">
           {#each perf.date as d (d.id)}
             <li>
               <span class="perf__date-when">{formatDateRow(d)}</span>
-              <span class="perf__date-kind">{d.kind.replace(/_/g, ' ')}</span>
+              <span class="perf__date-kind">{enumWord('perf.date_kind_', d.kind)}</span>
               <span class="perf__date-title">{d.title ?? ''}</span>
             </li>
           {/each}
@@ -748,8 +773,8 @@
     {/if}
 
     {#if perf.conversation?.person}
-      <section class="perf__section" aria-label="Programmer">
-        <p class="eyebrow">Programmer</p>
+      <section class="perf__section" aria-label={t('perf.programmer', locale)}>
+        <p class="eyebrow">{t('perf.programmer', locale)}</p>
         <p class="perf__programmer">
           <a href={`/h/${workspaceSlug}/person/${perf.conversation.person.slug}`}>
             {perf.conversation.person.full_name}
@@ -762,26 +787,27 @@
     {/if}
 
     {#if perf.asset_version.length > 0}
-      <section class="perf__section" aria-label="Assets">
-        <p class="eyebrow">Assets</p>
+      <section class="perf__section" aria-label={t('perf.assets', locale)}>
+        <p class="eyebrow">{t('perf.assets', locale)}</p>
         <ul class="perf__assets" role="list">
           {#each perf.asset_version as a (a.id)}
             <li>
-              <span class="perf__asset-dir">{a.direction}</span>
-              <span class="perf__asset-kind">{a.kind.replace(/_/g, ' ')}</span>
-              <span class="perf__person-note">registered — upload arrives Phase 0.3+</span>
+              <span class="perf__asset-dir">{enumWord('perf.asset_dir_', a.direction)}</span>
+              <span class="perf__asset-kind">{enumWord('perf.asset_kind_', a.kind)}</span>
+              <span class="perf__person-note">{t('perf.asset_registered', locale)}</span>
             </li>
           {/each}
         </ul>
       </section>
     {/if}
 
-    <section class="perf__section" aria-label="Notes">
-      <p class="eyebrow">Notes</p>
+    <section class="perf__section" aria-label={t('perf.notes', locale)}>
+      <p class="eyebrow">{t('perf.notes', locale)}</p>
       <YNotes
         targetTable="performance"
         targetId={perf.id}
-        placeholder="Production notes — shared, live."
+        placeholder={t('perf.notes_placeholder', locale)}
+        {locale}
       />
     </section>
   {/if}
@@ -869,6 +895,11 @@
     </Button>
   </div>
   <p class="perf__dialog-hint">{t('perf.linked_venue_hint', locale)}</p>
+  {#if perf?.workspace_id}
+    <!-- Directorio global de salas: adopt a venue instead of typing it. -->
+    <DirectoryPicker workspaceId={perf.workspace_id} {locale} onadopt={onDirectoryAdopt} />
+    <p class="perf__dialog-hint">{t('directory.hint', locale)}</p>
+  {/if}
   <div class="perf__danger">
     <Button variant="outline" tone="warn" size="s" onclick={() => (confirmDeleteOpen = true)}>
       {t('perf.delete', locale)}
@@ -881,21 +912,18 @@
   {/snippet}
 </Dialog>
 
-<Dialog bind:open={venueEditOpen} title="Edit venue" size="m">
-  <p class="perf__dialog-hint">
-    The timezone drives dual-time on the road sheet. Contacts show in the
-    production block.
-  </p>
+<Dialog bind:open={venueEditOpen} title={t('venue.edit_title', locale)} size="m">
+  <p class="perf__dialog-hint">{t('venue.edit_hint', locale)}</p>
   <div class="perf__form-grid">
-    <Input label="Name" bind:value={vName} required />
-    <Input label="City" bind:value={vCity} />
-    <Input label="Country" bind:value={vCountry} placeholder="ES" />
-    <Input label="Capacity" type="number" bind:value={vCapacity} />
+    <Input label={t('venue.name', locale)} bind:value={vName} required />
+    <Input label={t('create.city', locale)} bind:value={vCity} />
+    <Input label={t('perf.country', locale)} bind:value={vCountry} placeholder="ES" />
+    <Input label={t('venue.capacity', locale)} type="number" bind:value={vCapacity} />
   </div>
   <div class="perf__form-grid">
-    <Input label="Address" bind:value={vAddress} placeholder="Street, number, zip" />
+    <Input label={t('venue.address', locale)} bind:value={vAddress} placeholder={t('venue.address_placeholder', locale)} />
     <div class="field">
-      <label for="v-timezone">Timezone</label>
+      <label for="v-timezone">{t('venue.timezone', locale)}</label>
       <input
         id="v-timezone"
         type="text"
@@ -911,30 +939,30 @@
     </div>
   </div>
   <div class="perf__venue-contacts">
-    <p class="eyebrow">Contacts</p>
+    <p class="eyebrow">{t('venue.contacts', locale)}</p>
     {#each vContacts as _, i (i)}
       <div class="perf__contact-row">
-        <Input label={i === 0 ? 'Name' : undefined} bind:value={vContacts[i].name} placeholder="Name" />
-        <Input label={i === 0 ? 'Role' : undefined} bind:value={vContacts[i].role} placeholder="Tech manager…" />
-        <Input label={i === 0 ? 'Email' : undefined} type="email" bind:value={vContacts[i].email} placeholder="Email" />
-        <Input label={i === 0 ? 'Phone' : undefined} type="tel" bind:value={vContacts[i].phone} placeholder="Phone" />
+        <Input label={i === 0 ? t('venue.name', locale) : undefined} bind:value={vContacts[i].name} placeholder={t('venue.name', locale)} />
+        <Input label={i === 0 ? t('venue.contact_role', locale) : undefined} bind:value={vContacts[i].role} placeholder={t('venue.contact_role_placeholder', locale)} />
+        <Input label={i === 0 ? t('settings.email', locale) : undefined} type="email" bind:value={vContacts[i].email} placeholder={t('settings.email', locale)} />
+        <Input label={i === 0 ? t('venue.phone', locale) : undefined} type="tel" bind:value={vContacts[i].phone} placeholder={t('venue.phone', locale)} />
         <button
           type="button"
           class="perf__contact-remove"
-          aria-label="Remove contact"
+          aria-label={t('venue.remove_contact', locale)}
           onclick={() => removeContactRow(i)}
         >×</button>
       </div>
     {/each}
-    <Button variant="outline" size="xs" onclick={addContactRow}>Add contact</Button>
+    <Button variant="outline" size="xs" onclick={addContactRow}>{t('venue.add_contact', locale)}</Button>
   </div>
   <div class="field perf__venue-notes">
-    <label for="v-notes">Notes</label>
+    <label for="v-notes">{t('perf.notes', locale)}</label>
     <textarea id="v-notes" rows="3" bind:value={vNotes}></textarea>
   </div>
   {#snippet actions()}
-    <Button variant="outline" onclick={() => (venueEditOpen = false)}>Cancel</Button>
-    <Button onclick={saveVenue} loading={$venuePatch.isPending}>Save venue</Button>
+    <Button variant="outline" onclick={() => (venueEditOpen = false)}>{t('create.cancel', locale)}</Button>
+    <Button onclick={saveVenue} loading={$venuePatch.isPending}>{t('venue.save', locale)}</Button>
   {/snippet}
 </Dialog>
 

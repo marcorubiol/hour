@@ -8,6 +8,14 @@
   import { copyText } from '$lib/clipboard';
   import { addToast } from '$lib/components/Toast.svelte';
   import { session } from '$lib/session.svelte';
+  import { t, appLocale } from '$lib/i18n';
+
+  const locale = appLocale();
+
+  /** Workspace role, in the session's language. */
+  function roleLabel(role: string): string {
+    return t(`settings.role_${role}`, locale);
+  }
 
   type Workspace = {
     id: string;
@@ -79,7 +87,7 @@
 
   const inviteMember = createMutation({
     mutationFn: async () => {
-      if (!currentWorkspace) throw new Error('Workspace unavailable');
+      if (!currentWorkspace) throw new Error(t('settings.access_ws_unavailable', locale));
       const response = await mutateJSON<{
         invitation: { email: string; invite_url: string };
       }>('POST', `/api/workspaces/${currentWorkspace.id}/access`, {
@@ -88,7 +96,7 @@
         project_id: inviteProjectId || null,
         project_role_code: inviteProjectId ? inviteProjectRole : null,
       });
-      if (!response?.invitation) throw new Error('Invitation returned no link');
+      if (!response?.invitation) throw new Error(t('settings.access_invite_no_link', locale));
       return response.invitation;
     },
     onSuccess: async (invitation) => {
@@ -97,14 +105,14 @@
       await queryClient.invalidateQueries({ queryKey: ['workspace-access'] });
       addToast({
         tone: 'success',
-        message: `Invitation created for ${invitation.email}. Copy and send the private link.`,
+        message: t('settings.access_invite_created', locale, { email: invitation.email }),
       });
     },
     onError: (error) => {
       addToast({
         tone: 'danger',
-        title: 'Invitation not created',
-        message: error instanceof Error ? error.message : 'Unexpected error',
+        title: t('settings.access_invite_failed', locale),
+        message: error instanceof Error ? error.message : t('perf.unexpected', locale),
       });
     },
   });
@@ -113,8 +121,8 @@
     if (!latestInviteUrl) return;
     addToast(
       (await copyText(latestInviteUrl))
-        ? { tone: 'success', message: 'Private invitation link copied.' }
-        : { tone: 'danger', message: 'Could not copy the private invitation link.' },
+        ? { tone: 'success', message: t('settings.access_link_copied', locale) }
+        : { tone: 'danger', message: t('settings.access_link_copy_failed', locale) },
     );
   }
 
@@ -126,12 +134,12 @@
         role,
       });
       await queryClient.invalidateQueries({ queryKey: ['workspace-access'] });
-      addToast({ tone: 'success', message: 'Workspace role updated.' });
+      addToast({ tone: 'success', message: t('settings.access_role_updated', locale) });
     } catch (error) {
       addToast({
         tone: 'danger',
-        title: 'Role not updated',
-        message: error instanceof Error ? error.message : 'Unexpected error',
+        title: t('settings.access_role_not_updated', locale),
+        message: error instanceof Error ? error.message : t('perf.unexpected', locale),
       });
     }
   }
@@ -139,19 +147,19 @@
   async function revokeAccess(item: AccessItem) {
     if (!currentWorkspace) return;
     const label = item.access_kind === 'member' ? item.display_name : item.email;
-    if (!window.confirm(`Revoke access for ${label}? Open sessions will be reauthorized.`)) return;
+    if (!window.confirm(t('settings.access_revoke_confirm', locale, { label }))) return;
     try {
       await mutateJSON('DELETE', `/api/workspaces/${currentWorkspace.id}/access`, {
         kind: item.access_kind === 'member' ? 'member' : 'invitation',
         id: item.id,
       });
       await queryClient.invalidateQueries({ queryKey: ['workspace-access'] });
-      addToast({ tone: 'success', message: `Access revoked for ${label}.` });
+      addToast({ tone: 'success', message: t('settings.access_revoked', locale, { label }) });
     } catch (error) {
       addToast({
         tone: 'danger',
-        title: 'Access not revoked',
-        message: error instanceof Error ? error.message : 'Unexpected error',
+        title: t('settings.access_not_revoked', locale),
+        message: error instanceof Error ? error.message : t('perf.unexpected', locale),
       });
     }
   }
@@ -187,7 +195,7 @@
         `/api/workspaces/alias-requests/${input.id}`,
         { approve: input.approve },
       );
-      if (!res?.request) throw new Error('Empty response');
+      if (!res?.request) throw new Error(t('settings.alias_empty_response', locale));
       return res.request;
     },
     onSuccess: async (req) => {
@@ -197,22 +205,25 @@
         tone: 'success',
         message:
           req.status === 'approved'
-            ? `Alias /h/${req.alias} granted to ${spaceName(req.workspace_name)}.`
-            : `Alias request from ${spaceName(req.workspace_name)} rejected.`,
+            ? t('settings.alias_granted', locale, {
+                alias: req.alias,
+                space: spaceName(req.workspace_name),
+              })
+            : t('settings.alias_rejected', locale, { space: spaceName(req.workspace_name) }),
       });
     },
     onError: (err) => {
       addToast({
         tone: 'danger',
-        title: 'Review failed',
+        title: t('settings.alias_review_failed', locale),
         message:
           err instanceof ApiError && err.status === 403
-            ? 'Only the platform operator can review alias requests.'
+            ? t('settings.alias_forbidden', locale)
             : err instanceof ApiError && err.status === 409
-              ? 'That alias is no longer available.'
+              ? t('settings.alias_taken', locale)
               : err instanceof Error
                 ? err.message
-                : 'Unexpected error',
+                : t('perf.unexpected', locale),
       });
     },
   });
@@ -244,18 +255,15 @@
 </script>
 
 <header class="set-mast">
-  <p class="eyebrow set-mast__kicker">Roster</p>
-  <h1 class="set-mast__title"><em>Workspaces &amp; roles</em></h1>
-  <p class="set-mast__sub">
-    A workspace holds the company boundary. Project assignments decide
-    which productions each collaborator can enter.
-  </p>
+  <p class="eyebrow set-mast__kicker">{t('settings.ws_kicker', locale)}</p>
+  <h1 class="set-mast__title"><em>{t('settings.nav_workspaces', locale)}</em></h1>
+  <p class="set-mast__sub">{t('settings.ws_sub', locale)}</p>
 </header>
 
 <section class="set-group">
   <div class="set-group__head">
-    <span class="eyebrow set-group__kicker">{workspaces.length} active</span>
-    <h2 class="set-group__title">My projects</h2>
+    <span class="eyebrow set-group__kicker">{t(workspaces.length === 1 ? 'settings.ws_active_one' : 'settings.ws_active_other', locale, { n: workspaces.length })}</span>
+    <h2 class="set-group__title">{t('settings.ws_my_projects', locale)}</h2>
   </div>
   <div class="set-group__body">
     <div class="set-ws-list">
@@ -272,19 +280,19 @@
                endpoint — no fabricated badges. -->
           <div class="set-ws__roles"></div>
           <div class="set-ws__meta">
-            <span>— people</span>
+            <span>{t('settings.ws_people_unknown', locale)}</span>
             <span class="sep">·</span>
-            <span>{projectCount} {projectCount === 1 ? 'project' : 'projects'}</span>
+            <span>{t(projectCount === 1 ? 'settings.ws_projects_one' : 'settings.ws_projects_other', locale, { n: projectCount })}</span>
           </div>
           <div class="set-ws__actions">
-            <button type="button" class="btn--outline btn--s">Edit role</button>
-            <button type="button" class="btn--outline btn--s is-warn">Leave</button>
+            <button type="button" class="btn--outline btn--s">{t('settings.ws_edit_role', locale)}</button>
+            <button type="button" class="btn--outline btn--s is-warn">{t('settings.ws_leave', locale)}</button>
           </div>
         </div>
       {/each}
     </div>
     <button type="button" class="set-add">
-      + Create or join a workspace
+      {t('settings.ws_create_join', locale)}
     </button>
   </div>
 </section>
@@ -293,43 +301,45 @@
   <section class="set-group set-access">
     <div class="set-group__head set-access__head">
       <div>
-        <span class="eyebrow set-group__kicker">Access desk</span>
+        <span class="eyebrow set-group__kicker">{t('settings.access_kicker', locale)}</span>
         <h2 class="set-group__title">{spaceName(currentWorkspace.name)}</h2>
       </div>
-      <span class="set-access__count">{activeMembers.length} active</span>
+      <span class="set-access__count"
+        >{t(activeMembers.length === 1 ? 'settings.ws_active_one' : 'settings.ws_active_other', locale, { n: activeMembers.length })}</span
+      >
     </div>
 
     <div class="set-access__invite">
       <label>
-        <span class="eyebrow">Email</span>
+        <span class="eyebrow">{t('settings.email', locale)}</span>
         <input type="email" placeholder="collaborator@example.com" bind:value={inviteEmail} />
       </label>
       <label>
-        <span class="eyebrow">Workspace role</span>
+        <span class="eyebrow">{t('settings.access_ws_role', locale)}</span>
         <select bind:value={inviteRole}>
-          <option value="guest">Guest · assigned work only</option>
-          <option value="viewer">Viewer · internal read-only</option>
-          <option value="member">Member · internal collaborator</option>
-          <option value="admin">Admin · manages access</option>
+          <option value="guest">{t('settings.access_opt_guest', locale)}</option>
+          <option value="viewer">{t('settings.access_opt_viewer', locale)}</option>
+          <option value="member">{t('settings.access_opt_member', locale)}</option>
+          <option value="admin">{t('settings.access_opt_admin', locale)}</option>
         </select>
       </label>
       <label>
-        <span class="eyebrow">Project assignment</span>
+        <span class="eyebrow">{t('settings.access_project', locale)}</span>
         <select bind:value={inviteProjectId}>
-          <option value="">No project yet</option>
+          <option value="">{t('settings.access_no_project', locale)}</option>
           {#each currentProjects as project (project.id)}
             <option value={project.id}>{project.name}</option>
           {/each}
         </select>
       </label>
       <label>
-        <span class="eyebrow">Project role</span>
+        <span class="eyebrow">{t('settings.access_project_role', locale)}</span>
         <select bind:value={inviteProjectRole} disabled={!inviteProjectId}>
-          <option value="performer">Performer · production read</option>
-          <option value="viewer">Viewer · production read</option>
-          <option value="director">Director · production edit</option>
-          <option value="production_manager">Production manager</option>
-          <option value="distribution">Distribution</option>
+          <option value="performer">{t('settings.prole_performer', locale)}</option>
+          <option value="viewer">{t('settings.prole_viewer', locale)}</option>
+          <option value="director">{t('settings.prole_director', locale)}</option>
+          <option value="production_manager">{t('settings.prole_production_manager', locale)}</option>
+          <option value="distribution">{t('settings.prole_distribution', locale)}</option>
         </select>
       </label>
       <button
@@ -338,18 +348,20 @@
         disabled={!inviteEmail || $inviteMember.isPending}
         onclick={() => $inviteMember.mutate()}
       >
-        {$inviteMember.isPending ? 'Creating…' : 'Create private link'}
+        {$inviteMember.isPending
+          ? t('settings.access_creating', locale)
+          : t('settings.access_create_link', locale)}
       </button>
     </div>
 
     {#if latestInviteUrl}
       <div class="set-access__link" role="status">
         <div>
-          <span class="eyebrow">Ready to send</span>
-          <p>The link expires in 7 days and works only for the invited email.</p>
+          <span class="eyebrow">{t('settings.access_ready', locale)}</span>
+          <p>{t('settings.access_link_expiry', locale)}</p>
         </div>
         <button type="button" class="btn--outline btn--s" onclick={copyInviteLink}>
-          Copy invitation link
+          {t('settings.access_copy_link', locale)}
         </button>
       </div>
     {/if}
@@ -363,29 +375,29 @@
             <span>{member.email}</span>
           </div>
           {#if member.role === 'owner'}
-            <span class="set-access__role">Owner</span>
+            <span class="set-access__role">{roleLabel('owner')}</span>
           {:else}
             <label class="set-access__role-select">
-              <span class="sr-only">Role for {member.display_name}</span>
+              <span class="sr-only">{t('settings.access_role_for', locale, { name: member.display_name })}</span>
               <select
                 value={member.role}
                 onchange={(event) =>
                   changeMemberRole(member.id, event.currentTarget.value)}
               >
-                <option value="admin">Admin</option>
-                <option value="member">Member</option>
-                <option value="viewer">Viewer</option>
-                <option value="guest">Guest</option>
+                <option value="admin">{roleLabel('admin')}</option>
+                <option value="member">{roleLabel('member')}</option>
+                <option value="viewer">{roleLabel('viewer')}</option>
+                <option value="guest">{roleLabel('guest')}</option>
               </select>
             </label>
           {/if}
-          <span class="set-access__status">active</span>
+          <span class="set-access__status">{t('settings.access_status_active', locale)}</span>
           {#if member.role !== 'owner'}
             <button
               type="button"
               class="btn--outline btn--s is-warn"
               onclick={() => revokeAccess(member)}
-            >Revoke</button>
+            >{t('settings.access_revoke', locale)}</button>
           {/if}
         </div>
       {/each}
@@ -398,16 +410,16 @@
             <span>
               {invitation.project_name
                 ? `${invitation.project_name} · ${invitation.project_role_code}`
-                : 'Workspace only'}
+                : t('settings.access_workspace_only', locale)}
             </span>
           </div>
-          <span class="set-access__role">{invitation.role}</span>
-          <span class="set-access__status">pending</span>
+          <span class="set-access__role">{roleLabel(invitation.role)}</span>
+          <span class="set-access__status">{t('settings.access_status_pending', locale)}</span>
           <button
             type="button"
             class="btn--outline btn--s is-warn"
             onclick={() => revokeAccess(invitation)}
-          >Cancel</button>
+          >{t('create.cancel', locale)}</button>
         </div>
       {/each}
     </div>
@@ -417,8 +429,10 @@
 {#if aliasRequests.length > 0}
   <section class="set-group">
     <div class="set-group__head">
-      <span class="eyebrow set-group__kicker">{aliasRequests.length} pending</span>
-      <h2 class="set-group__title">Alias requests</h2>
+      <span class="eyebrow set-group__kicker"
+        >{t(aliasRequests.length === 1 ? 'settings.alias_pending_one' : 'settings.alias_pending_other', locale, { n: aliasRequests.length })}</span
+      >
+      <h2 class="set-group__title">{t('settings.alias_title', locale)}</h2>
     </div>
     <div class="set-group__body">
       <div class="set-alias-list">
@@ -426,10 +440,12 @@
           <div class="set-alias">
             <div class="set-alias__what">
               <span class="set-alias__url">/h/{r.alias}</span>
-              <span class="set-alias__ws">for {spaceName(r.workspace_name)}</span>
+              <span class="set-alias__ws"
+                >{t('settings.alias_for', locale, { space: spaceName(r.workspace_name) })}</span
+              >
             </div>
             {#if r.requested_by === session.user?.sub}
-              <span class="set-alias__state">pending review</span>
+              <span class="set-alias__state">{t('settings.alias_pending_review', locale)}</span>
             {:else}
               <div class="set-alias__actions">
                 <button
@@ -438,7 +454,7 @@
                   disabled={$reviewAlias.isPending}
                   onclick={() => $reviewAlias.mutate({ id: r.id, approve: true })}
                 >
-                  Approve
+                  {t('settings.alias_approve', locale)}
                 </button>
                 <button
                   type="button"
@@ -446,7 +462,7 @@
                   disabled={$reviewAlias.isPending}
                   onclick={() => $reviewAlias.mutate({ id: r.id, approve: false })}
                 >
-                  Reject
+                  {t('settings.alias_reject', locale)}
                 </button>
               </div>
             {/if}
@@ -459,13 +475,12 @@
 
 <section class="set-group">
   <div class="set-group__head">
-    <span class="eyebrow set-group__kicker">By role</span>
-    <h2 class="set-group__title">Roles I take on</h2>
+    <span class="eyebrow set-group__kicker">{t('settings.roles_kicker', locale)}</span>
+    <h2 class="set-group__title">{t('settings.roles_title', locale)}</h2>
   </div>
   <div class="set-group__body">
     <p class="set-prose">
-      Hour groups your work by the role you play. Toggle which roles to
-      surface in the side filter.
+      {t('settings.roles_prose', locale)}
     </p>
     <div class="set-roles-grid">
       {#each ALL_ROLES as role (role)}
@@ -477,7 +492,7 @@
           onclick={() => toggleRole(role)}
         >
           <span class="set-role-chip__dot" aria-hidden="true"></span>
-          <span>{role}</span>
+          <span>{t(`settings.hat_${role}`, locale)}</span>
         </button>
       {/each}
     </div>

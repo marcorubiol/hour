@@ -41,7 +41,7 @@
   >
     {t('lens.desk', locale)}
   </button>
-  <div class="lensswitch" role="tablist" aria-label="View as">
+  <div class="lensswitch" role="tablist" aria-label={t('roadsheet.view_as', locale)}>
     {#each VIEW_AS as v (v.id)}
       <button
         type="button"

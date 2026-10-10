@@ -57,7 +57,7 @@
     type NoteEvent,
     type PerformanceEvent,
   } from '$lib/month-events';
-  import { assignBandLanes, dayKeyInTz } from '$lib/planner';
+  import { assignBandLanes, dayKeyInTz, statusWord } from '$lib/planner';
   import { agendaChunks, emptyTailMonths, type AgendaDayStats } from '$lib/agenda-chunks';
   import { awayRest, coversDay } from '$lib/away';
   import { SvelteMap } from 'svelte/reactivity';
@@ -67,7 +67,8 @@
   import IdentityMark from '$lib/components/IdentityMark.svelte';
   import Slip from '$lib/components/planner/Slip.svelte';
   import { performanceSlip, dateSlip } from '$lib/month-events';
-  import { performanceStatusFamily, performanceStatusLabel } from '$lib/performance';
+  import { performanceStatusFamily } from '$lib/performance';
+  import { appLocale, appLocaleTag, t } from '$lib/i18n';
   import { dateStatusFamily } from '$lib/date';
 
   interface Props {
@@ -178,6 +179,9 @@
     onDateOpen?: (d: DateEvent) => void;
   }
 
+  /** Defaults in the session's language; the page passes its own t(). */
+  const L = appLocale();
+
   let {
     days,
     performances,
@@ -188,49 +192,53 @@
     aways = [],
     clashesByDay,
     decisionsByDay,
-    locale = 'en-GB',
+    locale = appLocaleTag(),
     todayIso = dayKeyInTz(new Date().toISOString(), Intl.DateTimeFormat().resolvedOptions().timeZone),
     dateKindLabel = (kind: string) => kind.replace(/_/g, ' '),
-    viewerTimeLabel = (time: string) => `${time}`,
-    statusLabel = performanceStatusLabel,
-    travelDirLabel = (dir: string) => dir,
-    emptyLabel = 'Nothing this month.',
-    blackoutsToggleLabel = 'blackouts',
-    decideLabel = 'decide ↑',
-    notesLabel = 'NOTES',
-    showWord = 'show',
-    releasedWord = 'let go',
-    noHourWord = 'no hour',
-    allDayWord = 'all day',
-    weekLabel = (n: number) => `week ${n}`,
+    viewerTimeLabel = (time: string) => t('planner.viewer_time', L, { time }),
+    statusLabel = (status: string) => statusWord(status, L),
+    travelDirLabel = (dir: string) => t(`planner.travel_${dir}`, L),
+    emptyLabel = t('planner.empty_month', L),
+    blackoutsToggleLabel = t('planner.blackouts_toggle', L),
+    decideLabel = t('planner.agenda_decide', L),
+    notesLabel = t('planner.agenda_notes', L),
+    showWord = t('planner.kind_show', L),
+    releasedWord = t('planner.released', L),
+    noHourWord = t('planner.no_hour', L),
+    allDayWord = t('planner.all_day', L),
+    weekLabel = (n: number) => `${t('planner.week_n', L)} ${n}`,
     weekRange = (from: string, to: string) => `${from} → ${to}`,
     weekTally = (firm: number, held: number, free: number) =>
-      [firm ? `${firm} confirmed` : '', held ? `${held} options` : '', free ? `${free} nights free` : '']
+      [
+        firm ? `${firm} ${t('planner.week_confirmed', L)}` : '',
+        held ? `${held} ${t(held === 1 ? 'planner.week_option_one' : 'planner.week_options', L)}` : '',
+        free ? `${free} ${t(free === 1 ? 'planner.week_free_one' : 'planner.week_free', L)}` : '',
+      ]
         .filter(Boolean)
-        .join(' · '),
-    awayUntilWord = 'until',
-    awayLeftWord = '{n} days left',
-    awayLeftOneWord = '1 day left',
-    awayBackWord = 'back tomorrow',
+        .join(' · ') || t('planner.week_nothing', L),
+    awayUntilWord = t('planner.away_until', L),
+    awayLeftWord = t('planner.away_left', L, { n: '{n}' }),
+    awayLeftOneWord = t('planner.away_left_one', L),
+    awayBackWord = t('planner.away_back', L),
     onDayOpen,
-    decideCardLabel = 'to decide',
+    decideCardLabel = t('planner.dec_card', L),
     notesByDay,
     onNoteCreate,
     onNoteDelete,
-    noteFallbackLabel = 'the company',
+    noteFallbackLabel = t('planner.note_company', L),
     noteFallbackIsSpace = false,
-    notePlaceholder = 'Write a note…',
-    noteAddLabel = 'Add a note',
-    noteDeleteLabel = 'Delete note',
+    notePlaceholder = t('planner.note_placeholder', L),
+    noteAddLabel = t('planner.note_add', L),
+    noteDeleteLabel = t('planner.note_delete', L),
     onConfirm,
     onRelease,
     pendingId = null,
-    confirmLabel = 'confirm',
-    releaseLabel = 'let go',
+    confirmLabel = t('planner.dec_confirm_short', L),
+    releaseLabel = t('planner.released', L),
     onReachEnd,
     onReachStart,
-    earlierLabel = '↑ earlier months',
-    loadingLabel = 'loading…',
+    earlierLabel = t('planner.agenda_earlier', L),
+    loadingLabel = t('planner.agenda_loading', L),
     noEarlierLabel,
     onPlanEnds,
     endLabel,
@@ -305,6 +313,9 @@
     workspaceModeById,
     viewerTz,
     kindLabel: (k: string) => dateKindLabel(k),
+    statusLabel: (st: string) => statusWord(st, L),
+    viewerTimeLabel: (time: string) => t('planner.viewer_time', L, { time }),
+    fallbackName: t('create.type_performance', L),
     dualTime,
   });
   /** Released says `let go`; a hold says its rank and, if the clock is
@@ -479,7 +490,7 @@
     return `/h/${ws}/performance/${p.slug}`;
   }
   function perfName(p: PerformanceEvent): string {
-    return p.venue?.name ?? p.venue_name ?? p.city ?? p.project?.name ?? 'Performance';
+    return p.venue?.name ?? p.venue_name ?? p.city ?? p.project?.name ?? t('create.type_performance', L);
   }
   function perfCity(p: PerformanceEvent): string | null {
     return p.venue?.city ?? p.city;

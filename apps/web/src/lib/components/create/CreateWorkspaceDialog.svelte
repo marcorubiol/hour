@@ -14,6 +14,7 @@
   import Input from '$lib/components/Input.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
   import AccentSwatchPicker from './AccentSwatchPicker.svelte';
+  import { appLocale, t } from '$lib/i18n';
 
   interface Props {
     open?: boolean;
@@ -24,6 +25,7 @@
   type CreatedWorkspace = { id: string; slug: string; name: string };
 
   const queryClient = useQueryClient();
+  const locale = appLocale();
 
   let name = $state('');
   let accent = $state<string | null>(null); // null = auto (hash of slug)
@@ -66,13 +68,13 @@
     onError: (err) => {
       addToast({
         tone: 'danger',
-        title: 'Workspace not created',
+        title: t('workspace.not_created', locale),
         message:
           err instanceof ApiError && err.status === 409
-            ? 'A workspace with that name already exists.'
+            ? t('workspace.name_taken', locale)
             : err instanceof Error
               ? err.message
-              : 'Unexpected error',
+              : t('perf.unexpected', locale),
       });
     },
   });
@@ -81,7 +83,7 @@
     event?.preventDefault();
     const trimmed = name.trim();
     if (!trimmed) {
-      addToast({ tone: 'warning', message: 'Name cannot be empty.' });
+      addToast({ tone: 'warning', message: t('project.name_empty', locale) });
       return;
     }
     $create.mutate({ name: trimmed, accent, description });
@@ -90,33 +92,33 @@
 
 <Dialog
   bind:open
-  title="New workspace"
-  description="A workspace groups your projects under your personal account."
+  title={t('workspace.new_title', locale)}
+  description={t('workspace.new_desc', locale)}
   size="s"
   onclose={reset}
 >
   <form class="cws__form" onsubmit={submit}>
     <Input
-      label="Name"
+      label={t('conversations.col_name', locale)}
       name="workspace-name"
       bind:value={name}
-      placeholder="e.g. Side projects"
+      placeholder={t('workspace.name_ph', locale)}
       required
       autofocus
       autocomplete="off"
       disabled={$create.isPending}
     />
 
-    <AccentSwatchPicker bind:accent autoSlug={autoAccentSlug} label="Space color" disabled={$create.isPending} />
+    <AccentSwatchPicker bind:accent autoSlug={autoAccentSlug} label={t('workspace.color', locale)} disabled={$create.isPending} />
 
     <label class="field">
-      <span>Description</span>
+      <span>{t('project.description', locale)}</span>
       <textarea
         class="cws__desc"
         bind:value={description}
         maxlength="280"
         rows="3"
-        placeholder="Optional. What is this workspace for?"
+        placeholder={t('workspace.new_description_ph', locale)}
         disabled={$create.isPending}
       ></textarea>
       <span class="cws__desc-count">{description.length} / 280</span>
@@ -127,8 +129,8 @@
   </form>
 
   {#snippet actions()}
-    <Button variant="outline" disabled={$create.isPending} onclick={close}>Cancel</Button>
-    <Button loading={$create.isPending} onclick={submit}>Create</Button>
+    <Button variant="outline" disabled={$create.isPending} onclick={close}>{t('create.cancel', locale)}</Button>
+    <Button loading={$create.isPending} onclick={submit}>{t('project.create', locale)}</Button>
   {/snippet}
 </Dialog>
 

@@ -5,6 +5,10 @@
   import { ApiError, mutateJSON } from '$lib/api';
   import { ensureSession } from '$lib/session.svelte';
   import { spaceName } from '$lib/utils/identity';
+  import { appLocale, appLocaleTag, t } from '$lib/i18n';
+
+  const locale = appLocale();
+  const MEMBERSHIP_ROLES = new Set(['owner', 'admin', 'member', 'viewer', 'guest']);
 
   type Invitation = {
     workspace_id: string;
@@ -25,13 +29,14 @@
   let errorMessage = $state('');
 
   function roleLabel(role: string): string {
+    if (MEMBERSHIP_ROLES.has(role)) return t(`invite.role_${role}`, locale);
     return role.charAt(0).toUpperCase() + role.slice(1).replaceAll('_', ' ');
   }
 
   onMount(async () => {
     token = window.location.hash.slice(1);
     if (!token) {
-      errorMessage = 'This invitation link is incomplete.';
+      errorMessage = t('invite.err_incomplete', locale);
       loading = false;
       return;
     }
@@ -49,14 +54,14 @@
         { token },
       );
       invitation = response?.invitation ?? null;
-      if (!invitation) errorMessage = 'This invitation is no longer available.';
+      if (!invitation) errorMessage = t('invite.err_gone', locale);
     } catch (error) {
       errorMessage =
         error instanceof ApiError && error.status === 404
-          ? 'This invitation has expired, was revoked, or belongs to another email address.'
+          ? t('invite.err_expired', locale)
           : error instanceof Error
             ? error.message
-            : 'The invitation could not be checked.';
+            : t('invite.err_check', locale);
     } finally {
       loading = false;
     }
@@ -73,23 +78,23 @@
         { token },
       );
       const accepted = response?.invitation;
-      if (!accepted) throw new Error('The invitation returned no workspace.');
+      if (!accepted) throw new Error(t('invite.err_no_workspace', locale));
       history.replaceState(null, '', '/invite');
       await goto(`/h/${accepted.workspace_slug}`, { replaceState: true });
     } catch (error) {
       errorMessage =
         error instanceof ApiError && error.status === 404
-          ? 'This invitation is no longer available.'
+          ? t('invite.err_gone', locale)
           : error instanceof Error
             ? error.message
-            : 'The invitation could not be accepted.';
+            : t('invite.err_accept', locale);
       accepting = false;
     }
   }
 </script>
 
 <svelte:head>
-  <title>Workspace invitation — Hour</title>
+  <title>{t('invite.title', locale)}</title>
 </svelte:head>
 
 <main class="invitation-page">
@@ -97,36 +102,35 @@
 
   <section class="invitation-card" aria-busy={loading}>
     <div class="invitation-card__rail" aria-hidden="true"></div>
-    <p class="eyebrow invitation-card__kicker">Private invitation</p>
+    <p class="eyebrow invitation-card__kicker">{t('invite.kicker', locale)}</p>
 
     {#if loading}
-      <h1>Checking your <em>place.</em></h1>
-      <p class="invitation-card__lede">Verifying the account and invitation boundary…</p>
+      <h1>{t('invite.checking_a', locale)} <em>{t('invite.checking_b', locale)}</em></h1>
+      <p class="invitation-card__lede">{t('invite.verifying', locale)}</p>
     {:else if invitation}
-      <h1>Join <em>{spaceName(invitation.workspace_name)}.</em></h1>
+      <h1>{t('invite.join', locale)} <em>{spaceName(invitation.workspace_name)}.</em></h1>
       <p class="invitation-card__lede">
-        This invitation is addressed to {invitation.email}. Review the access below before
-        entering the workspace.
+        {t('invite.addressed', locale, { email: invitation.email })}
       </p>
 
       <dl class="invitation-card__terms">
         <div>
-          <dt>Workspace role</dt>
+          <dt>{t('invite.workspace_role', locale)}</dt>
           <dd>{roleLabel(invitation.role)}</dd>
         </div>
         {#if invitation.project_name}
           <div>
-            <dt>Assigned project</dt>
+            <dt>{t('invite.assigned_project', locale)}</dt>
             <dd>{invitation.project_name}</dd>
           </div>
           <div>
-            <dt>Project role</dt>
+            <dt>{t('invite.project_role', locale)}</dt>
             <dd>{roleLabel(invitation.project_role_code ?? '')}</dd>
           </div>
         {/if}
         <div>
-          <dt>Valid until</dt>
-          <dd>{new Date(invitation.expires_at).toLocaleDateString()}</dd>
+          <dt>{t('invite.valid_until', locale)}</dt>
+          <dd>{new Date(invitation.expires_at).toLocaleDateString(appLocaleTag())}</dd>
         </div>
       </dl>
 
@@ -137,21 +141,20 @@
         disabled={accepting}
         onclick={acceptInvitation}
       >
-        <span>{accepting ? 'Joining…' : 'Accept and enter'}</span>
+        <span>{accepting ? t('invite.joining', locale) : t('invite.accept', locale)}</span>
         <span aria-hidden="true">→</span>
       </button>
       <p class="invitation-card__fineprint">
-        Acceptance grants only the role and project shown here. Your personal profile remains
-        separate from the workspace’s private contact dossier.
+        {t('invite.fineprint', locale)}
       </p>
     {:else}
-      <h1>Invitation <em>unavailable.</em></h1>
+      <h1>{t('invite.unavailable_a', locale)} <em>{t('invite.unavailable_b', locale)}</em></h1>
       <p class="invitation-card__lede">{errorMessage}</p>
-      <a class="btn--outline invitation-card__accept" href="/login">Return to sign in</a>
+      <a class="btn--outline invitation-card__accept" href="/login">{t('invite.return', locale)}</a>
     {/if}
   </section>
 
-  <footer class="invitation-page__foot">Hour · access is explicit, scoped and revocable</footer>
+  <footer class="invitation-page__foot">{t('invite.foot', locale)}</footer>
 </main>
 
 <style>

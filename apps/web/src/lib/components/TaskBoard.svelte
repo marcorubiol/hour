@@ -16,6 +16,9 @@
   import Checkbox from '$lib/components/Checkbox.svelte';
   import { dayMonth } from '$lib/datetime';
   import { taskContextLabel, taskSurfaceState, type TaskItem, type TasksCache } from '$lib/task';
+  import { appLocale, t } from '$lib/i18n';
+
+  const locale = appLocale();
 
   interface Props {
     tasks: TaskItem[];
@@ -35,7 +38,7 @@
     loading = false,
     error = false,
     showContext = true,
-    emptyText = 'Nothing to do in this scope. Add tasks and they land here.',
+    emptyText = t('desk.tasks_empty', locale),
   }: Props = $props();
 
   const queryClient = useQueryClient();
@@ -84,8 +87,10 @@
       }
       addToast({
         tone: 'danger',
-        title: 'Change not saved',
-        message: `${err instanceof ApiError ? err.message : 'Unexpected error'} — try again.`,
+        title: t('desk.toast_change_failed', locale),
+        message: t('desk.toast_try_again', locale, {
+          reason: err instanceof ApiError ? err.message : t('perf.unexpected', locale),
+        }),
       });
     },
     onSettled: invalidate,
@@ -97,8 +102,8 @@
     onError: (err) => {
       addToast({
         tone: 'danger',
-        title: 'Task not removed',
-        message: err instanceof ApiError ? err.message : 'Unexpected error',
+        title: t('desk.toast_remove_failed', locale),
+        message: err instanceof ApiError ? err.message : t('perf.unexpected', locale),
       });
     },
   });
@@ -106,57 +111,57 @@
 
 <div class="taskboard">
   {#if loading}
-    <p class="taskboard__empty">Loading…</p>
+    <p class="taskboard__empty">{t('desk.loading', locale)}</p>
   {:else if error}
-    <p class="taskboard__empty taskboard__empty--err">Couldn't load tasks.</p>
+    <p class="taskboard__empty taskboard__empty--err">{t('desk.tasks_error', locale)}</p>
   {:else if rows.length === 0}
     <p class="taskboard__empty">{emptyText}</p>
   {:else}
     <ul class="taskboard__list">
-      {#each rows as t (t.id)}
-        {@const surface = taskSurfaceState(t, now)}
-        {@const ctx = showContext ? taskContextLabel(t) : null}
-        <li class="taskrow" class:taskrow--done={t.status === 'done'}>
+      {#each rows as task (task.id)}
+        {@const surface = taskSurfaceState(task, now)}
+        {@const ctx = showContext ? taskContextLabel(task, locale) : null}
+        <li class="taskrow" class:taskrow--done={task.status === 'done'}>
           <Checkbox
-            label={t.title}
-            checked={t.status === 'done'}
+            label={task.title}
+            checked={task.status === 'done'}
             onchange={(e) => {
-              // Target status from the EVENT, not the row: t.status is the
+              // Target status from the EVENT, not the row: task.status is the
               // cached value and a rapid check/uncheck would send 'done'
               // twice before the first round trip settles.
               const el = e.currentTarget as HTMLInputElement;
-              $toggleTask.mutate({ id: t.id, status: el.checked ? 'done' : 'open' });
+              $toggleTask.mutate({ id: task.id, status: el.checked ? 'done' : 'open' });
             }}
           />
           <span class="taskrow__meta">
-            {#if t.note}<span class="taskrow__note" title={t.note}>{t.note}</span>{/if}
+            {#if task.note}<span class="taskrow__note" title={task.note}>{task.note}</span>{/if}
             {#if surface.state === 'dormant' && surface.surfacesAt}
               <span class="taskrow__due taskrow__due--dormant">
-                sleeps until {dayMonth(surface.surfacesAt)}
+                {t('composer.hint_defer', locale, { date: dayMonth(surface.surfacesAt) })}
               </span>
-            {:else if t.due_at}
+            {:else if task.due_at}
               <span
                 class="taskrow__due"
                 class:taskrow__due--overdue={surface.state === 'overdue'}
                 class:taskrow__due--urgent={surface.state === 'urgent'}
               >
-                {surface.state === 'overdue' ? 'overdue · ' : ''}{dayMonth(t.due_at)}
+                {surface.state === 'overdue' ? `${t('desk.due_overdue', locale)} · ` : ''}{dayMonth(task.due_at)}
               </span>
             {/if}
             {#if ctx}<span class="taskrow__ctx">{ctx}</span>{/if}
             <button
               type="button"
               class="taskrow__remove"
-              aria-label={`Remove task: ${t.title}`}
-              title="Remove task"
-              onclick={() => $removeTask.mutate(t.id)}
+              aria-label={t('desk.remove_task_aria', locale, { title: task.title })}
+              title={t('desk.remove_task', locale)}
+              onclick={() => $removeTask.mutate(task.id)}
             >×</button>
           </span>
         </li>
       {/each}
     </ul>
     {#if moreCount > 0 && moreHref}
-      <a class="taskboard__more" href={moreHref}>+ {moreCount} more → Desk</a>
+      <a class="taskboard__more" href={moreHref}>+ {t('desk.calm_more', locale, { n: moreCount })} → {t('lens.desk', locale)}</a>
     {/if}
   {/if}
 </div>

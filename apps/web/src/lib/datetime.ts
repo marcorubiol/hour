@@ -5,6 +5,7 @@
  */
 
 import * as v from 'valibot';
+import { appLocaleTag } from '$lib/i18n';
 
 /**
  * The date-only API contract: "YYYY-MM-DD that is a real calendar day".
@@ -49,8 +50,12 @@ export interface DualTime {
  * read). UTC-anchored: a plain date must never shift a day through the
  * viewer's zone.
  */
-export function dayLabel(iso: string, style: 'short' | 'long' = 'short'): string {
-  return new Date(`${iso.slice(0, 10)}T00:00:00Z`).toLocaleDateString('en-GB', {
+export function dayLabel(
+  iso: string,
+  style: 'short' | 'long' = 'short',
+  locale: string = appLocaleTag(),
+): string {
+  return new Date(`${iso.slice(0, 10)}T00:00:00Z`).toLocaleDateString(locale, {
     weekday: style,
     day: '2-digit',
     month: style,
@@ -63,8 +68,8 @@ export function dayLabel(iso: string, style: 'short' | 'long' = 'short'): string
  * "09 Jul" — day + month, no weekday/year. Same UTC-anchored contract as
  * dayLabel. For tight metadata columns (next-action dates, agenda rows).
  */
-export function dayMonth(iso: string): string {
-  return new Date(`${iso.slice(0, 10)}T00:00:00Z`).toLocaleDateString('en-GB', {
+export function dayMonth(iso: string, locale: string = appLocaleTag()): string {
+  return new Date(`${iso.slice(0, 10)}T00:00:00Z`).toLocaleDateString(locale, {
     day: '2-digit',
     month: 'short',
     timeZone: 'UTC',
@@ -74,8 +79,8 @@ export function dayMonth(iso: string): string {
 /**
  * "09 Jul 2026" — no weekday. Same UTC-anchored contract as dayLabel.
  */
-export function dayMonthYear(iso: string): string {
-  return new Date(`${iso.slice(0, 10)}T00:00:00Z`).toLocaleDateString('en-GB', {
+export function dayMonthYear(iso: string, locale: string = appLocaleTag()): string {
+  return new Date(`${iso.slice(0, 10)}T00:00:00Z`).toLocaleDateString(locale, {
     day: '2-digit',
     month: 'short',
     year: 'numeric',
@@ -90,8 +95,8 @@ export function dayMonthYear(iso: string): string {
  * — never feed it a plain date, which must not shift through the viewer's
  * zone.
  */
-export function dayMonthYearTs(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-GB', {
+export function dayMonthYearTs(iso: string, locale: string = appLocaleTag()): string {
+  return new Date(iso).toLocaleDateString(locale, {
     day: '2-digit',
     month: 'short',
     year: 'numeric',
@@ -301,7 +306,7 @@ export function localeDayMonth(iso: string, locale: string): string {
  * weekday rule chips) — hardcoding a second English array in the form would
  * have been the same words written twice, wrong in every other language.
  */
-export function weekdayLabels(locale = 'en-GB'): string[] {
+export function weekdayLabels(locale: string = appLocaleTag()): string[] {
   const fmt = new Intl.DateTimeFormat(locale, { weekday: 'short', timeZone: 'UTC' });
   // 2026-06-29 is a Monday.
   return Array.from({ length: 7 }, (_, i) =>

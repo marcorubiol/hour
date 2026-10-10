@@ -21,6 +21,7 @@
   import { page } from '$app/state';
   import { createQuery } from '@tanstack/svelte-query';
   import { fetchJSON } from '$lib/api';
+  import { t, appLocale } from '$lib/i18n';
   import { type SectionId } from '$lib/components/SettingsNav.svelte';
   import ProfileSection from '$lib/components/settings/ProfileSection.svelte';
   import WorkspacesSection from '$lib/components/settings/WorkspacesSection.svelte';
@@ -29,6 +30,8 @@
   import NotificationsSection from '$lib/components/settings/NotificationsSection.svelte';
   import BillingSection from '$lib/components/settings/BillingSection.svelte';
   import DangerSection from '$lib/components/settings/DangerSection.svelte';
+
+  const locale = appLocale();
 
   let workspaceSlug = $derived(page.params.workspace ?? '');
   let active = $derived<SectionId>(
@@ -71,7 +74,7 @@
 </script>
 
 <svelte:head>
-  <title>Settings — Hour</title>
+  <title>{t('settings.title', locale)} — Hour</title>
 </svelte:head>
 
 <article class="set-page">

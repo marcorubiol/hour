@@ -16,6 +16,7 @@
   import { session } from '$lib/session.svelte';
   import { CONVERSATION_STATUSES, statusBadgeClass, statusLabel } from '$lib/conversation';
   import { dayLabel, dayMonthYearTs } from '$lib/datetime';
+  import { appLocale, t } from '$lib/i18n';
   import { useBreadcrumb } from '$lib/stores/breadcrumb.svelte';
   import { accentVar } from '$lib/utils/accent';
   import { spaceName } from '$lib/utils/identity';
@@ -72,6 +73,8 @@
   };
 
   type WorkspaceLite = { id: string; slug: string; name: string };
+
+  const locale = appLocale();
 
   let workspaceSlug = $derived(page.params.workspace ?? '');
   let slug = $derived(page.params.slug ?? '');
@@ -148,7 +151,7 @@
         },
       );
       if (!body?.note) {
-        throw new Error(body?.detail || body?.error || 'Error');
+        throw new Error(body?.detail || body?.error || t('perf.unexpected', locale));
       }
       return body.note;
     },
@@ -161,8 +164,10 @@
     onError: (err) => {
       addToast({
         tone: 'danger',
-        title: 'Note not saved',
-        message: `${err instanceof Error ? err.message : 'Unexpected error'} — try again.`,
+        title: t('person.note_not_saved', locale),
+        message: t('perf.try_again', locale, {
+          error: err instanceof Error ? err.message : t('perf.unexpected', locale),
+        }),
       });
     },
   });
@@ -170,7 +175,7 @@
   function addNote() {
     if (!noteBody.trim()) return;
     if (!contextWorkspaceId) {
-      addToast({ tone: 'warning', message: 'Workspace context not resolved yet.' });
+      addToast({ tone: 'warning', message: t('person.workspace_unresolved', locale) });
       return;
     }
     $noteMutation.mutate();
@@ -192,8 +197,8 @@
     onError: (err) => {
       addToast({
         tone: 'danger',
-        title: 'Note not deleted',
-        message: err instanceof Error ? err.message : 'Unexpected error',
+        title: t('person.note_not_deleted', locale),
+        message: err instanceof Error ? err.message : t('perf.unexpected', locale),
       });
     },
   });
@@ -220,7 +225,7 @@
   });
   let addStatusOptions = CONVERSATION_STATUSES.map((s) => ({
     value: s,
-    label: statusLabel(s),
+    label: statusLabel(s, locale),
   }));
 
   const addConversation = createMutation({
@@ -237,20 +242,20 @@
         queryKey: ['person', contextWorkspaceId, slug],
       });
       void queryClient.invalidateQueries({ queryKey: ['conversations'] });
-      addToast({ tone: 'success', message: 'Added to project.' });
+      addToast({ tone: 'success', message: t('person.added_to_project', locale) });
     },
     onError: (err) => {
       addToast({
         tone: 'danger',
-        title: 'Not added',
-        message: err instanceof Error ? err.message : 'Unexpected error',
+        title: t('person.not_added', locale),
+        message: err instanceof Error ? err.message : t('perf.unexpected', locale),
       });
     },
   });
 
   function submitAddConversation() {
     if (!aProject) {
-      addToast({ tone: 'warning', message: 'Pick a project.' });
+      addToast({ tone: 'warning', message: t('create.pick_project', locale) });
       return;
     }
     $addConversation.mutate();
@@ -267,12 +272,12 @@
 
 <article class="person" aria-busy={loading}>
   {#if loading}
-    <p class="person__state">Loading…</p>
+    <p class="person__state">{t('desk.loading', locale)}</p>
   {:else if errorMsg}
     <p class="person__state person__state--danger">{errorMsg}</p>
   {:else if file}
     <header class="person__head">
-      <p class="eyebrow">Person</p>
+      <p class="eyebrow">{t('person.eyebrow', locale)}</p>
       <h1 class="person__title"><em>{file.person.full_name}</em></h1>
       <div class="person__meta">
         {#if file.person.title}<span>{file.person.title}</span>{/if}
@@ -283,8 +288,8 @@
       </div>
     </header>
 
-    <section class="person__section" aria-label="Contact">
-      <p class="eyebrow">Contact</p>
+    <section class="person__section" aria-label={t('conversations.col_contact', locale)}>
+      <p class="eyebrow">{t('conversations.col_contact', locale)}</p>
       <ul class="person__contact" role="list">
         {#if file.person.email}
           <li><a href={`mailto:${file.person.email}`}>{file.person.email}</a></li>
@@ -305,18 +310,18 @@
       </ul>
     </section>
 
-    <section class="person__section" aria-label="Conversations">
+    <section class="person__section" aria-label={t('lens.conversations', locale)}>
       <div class="person__section-head">
-        <p class="eyebrow">Conversations</p>
+        <p class="eyebrow">{t('lens.conversations', locale)}</p>
         <Button variant="outline" size="xs" onclick={() => (addOpen = true)}>
-          Add to project
+          {t('person.add_to_project', locale)}
         </Button>
       </div>
       {#if file.conversations.length > 0}
         <ul class="person__rows" role="list">
           {#each file.conversations as e (e.id)}
             <li>
-              <span class={statusBadgeClass(e.status)}>{statusLabel(e.status)}</span>
+              <span class={statusBadgeClass(e.status)}>{statusLabel(e.status, locale)}</span>
               <span class="person__row-main">
                 {e.project?.name ?? '—'}
                 {#if e.next_action_note}
@@ -332,22 +337,22 @@
       {/if}
     </section>
 
-    <section class="person__section" aria-label="Notes">
-      <p class="eyebrow">Notes</p>
+    <section class="person__section" aria-label={t('person.notes', locale)}>
+      <p class="eyebrow">{t('person.notes', locale)}</p>
       <div class="person__composer">
         <textarea
           rows="3"
           maxlength="4000"
-          placeholder="What happened with this person?"
+          placeholder={t('person.note_ph', locale)}
           bind:value={noteBody}
         ></textarea>
         <div class="person__composer-row">
           <!-- No visibility control: a note is always private (ADR-093 §2).
                The line says so once, instead of a checkbox implying a choice
                that no longer exists. -->
-          <span class="person__composer-hint">Only you can see this</span>
+          <span class="person__composer-hint">{t('person.only_you', locale)}</span>
           <Button size="s" onclick={addNote} loading={$noteMutation.isPending}>
-            Add note
+            {t('person.add_note', locale)}
           </Button>
         </div>
       </div>
@@ -364,7 +369,7 @@
                     disabled={$deleteNote.isPending}
                     onclick={() => $deleteNote.mutate(n.id)}
                   >
-                    delete
+                    {t('person.note_delete', locale)}
                   </button>
                 {/if}
               </span>
@@ -376,18 +381,18 @@
     </section>
 
     {#if file.cast.length > 0 || file.crew.length > 0}
-      <section class="person__section" aria-label="Appearances">
-        <p class="eyebrow">Appearances</p>
+      <section class="person__section" aria-label={t('person.appearances', locale)}>
+        <p class="eyebrow">{t('person.appearances', locale)}</p>
         <ul class="person__rows" role="list">
           {#each file.cast as c (c.id)}
             <li>
-              <span class="person__row-kind">cast · {c.role}</span>
+              <span class="person__row-kind">{t('person.cast', locale)} · {c.role}</span>
               <span class="person__row-main">{c.project?.name ?? '—'}</span>
             </li>
           {/each}
           {#each file.crew as c (c.id)}
             <li>
-              <span class="person__row-kind">crew · {c.role}</span>
+              <span class="person__row-kind">{t('person.crew', locale)} · {c.role}</span>
               <span class="person__row-main">
                 {c.performance?.venue_name ?? c.performance?.city ?? '—'}
               </span>
@@ -402,25 +407,25 @@
   {/if}
 </article>
 
-<Dialog bind:open={addOpen} title="Add to project" size="s">
+<Dialog bind:open={addOpen} title={t('person.add_to_project', locale)} size="s">
   <div class="person__add-grid">
     <Select
-      label="Project"
+      label={t('create.project', locale)}
       options={projectOptions}
       bind:value={aProject}
-      placeholder={projectOptions.length === 0 ? 'Already in every active project' : undefined}
+      placeholder={projectOptions.length === 0 ? t('person.in_every_project', locale) : undefined}
       required
     />
-    <Select label="Status" options={addStatusOptions} bind:value={aStatus} />
+    <Select label={t('edit.status', locale)} options={addStatusOptions} bind:value={aStatus} />
   </div>
   {#snippet actions()}
-    <Button variant="outline" onclick={() => (addOpen = false)}>Cancel</Button>
+    <Button variant="outline" onclick={() => (addOpen = false)}>{t('create.cancel', locale)}</Button>
     <Button
       onclick={submitAddConversation}
       loading={$addConversation.isPending}
       disabled={projectOptions.length === 0}
     >
-      Add
+      {t('composer.add', locale)}
     </Button>
   {/snippet}
 </Dialog>

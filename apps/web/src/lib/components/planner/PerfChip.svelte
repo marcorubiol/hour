@@ -11,6 +11,8 @@
   import IdentityMark from '$lib/components/IdentityMark.svelte';
   import { isReady, performanceStatusFamily } from '$lib/performance';
   import { perfInstant, type PerformanceEvent, type ProjectLite } from '$lib/month-events';
+  import { appLocale, t } from '$lib/i18n';
+  import { statusWord } from '$lib/planner';
 
   interface Props {
     p: PerformanceEvent;
@@ -48,7 +50,7 @@
   }
 
   function perfLabel(p: PerformanceEvent): string {
-    return p.venue?.name ?? p.venue_name ?? p.city ?? p.project?.name ?? 'Performance';
+    return p.venue?.name ?? p.venue_name ?? p.city ?? p.project?.name ?? t('create.type_performance', appLocale());
   }
 
   // Chip times follow the timezone rule: venue wall time on the chip, the
@@ -64,15 +66,17 @@
   function perfTime(p: PerformanceEvent): { primary: string; secondary: string | null } | null {
     const at = perfInstant(p);
     if (!at) return null;
-    const t = dualTime(at, perfTz(p), viewerTz);
-    return { primary: t.primary, secondary: t.secondary };
+    const dt = dualTime(at, perfTz(p), viewerTz);
+    return { primary: dt.primary, secondary: dt.secondary };
   }
   function perfTitle(p: PerformanceEvent): string {
-    const base = `${perfLabel(p)} — ${p.status.replace(/_/g, ' ')}`;
+    const base = `${perfLabel(p)} — ${statusWord(p.status, appLocale())}`;
     const at = perfInstant(p);
     if (!at) return base;
-    const t = dualTime(at, perfTz(p), viewerTz);
-    return t.secondary ? `${base} · ${t.primary} (${t.secondary} yours)` : `${base} · ${t.primary}`;
+    const dt = dualTime(at, perfTz(p), viewerTz);
+    return dt.secondary
+      ? `${base} · ${dt.primary} (${t('planner.viewer_time', appLocale(), { time: dt.secondary })})`
+      : `${base} · ${dt.primary}`;
   }
 
   // The chip's second row (venue on top, city underneath). Suppressed when

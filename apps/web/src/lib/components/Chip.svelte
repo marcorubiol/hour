@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
+  import { appLocale, t } from '$lib/i18n';
 
   type Tone =
     | 'neutral'
@@ -30,7 +31,7 @@
     disabled = false,
     onclick,
     onRemove,
-    removeLabel = 'Remove',
+    removeLabel = t('line.remove', appLocale()),
     children,
     lead,
     tail,

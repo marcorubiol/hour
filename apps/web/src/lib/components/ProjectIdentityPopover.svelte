@@ -14,6 +14,7 @@
   import IdentityMark from '$lib/components/IdentityMark.svelte';
   import IdentityQuickPanel from '$lib/components/IdentityQuickPanel.svelte';
   import { accentVarFor } from '$lib/utils/accent';
+  import { appLocale, t } from '$lib/i18n';
   import type { EditableProject, IdentitySibling } from '$lib/utils/identity';
 
   interface Props {
@@ -56,7 +57,7 @@
     <button
       type="button"
       class="idpop-trigger"
-      title="Project identity"
+      title={t('project.identity_aria', appLocale())}
       aria-haspopup="dialog"
       aria-expanded={open}
       onclick={() => (open = !open)}

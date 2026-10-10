@@ -14,6 +14,7 @@
    */
   import Input from '$lib/components/Input.svelte';
   import { weekdayLabels } from '$lib/datetime';
+  import { appLocaleTag } from '$lib/i18n';
   import { addDaysIso } from '$lib/planner';
   import { blockDays, blockLimit, weekdayOf, WEEKDAY_ORDER, BLOCK_MAX_DAYS } from '$lib/block';
 
@@ -43,7 +44,7 @@
     weekdays = $bindable([0, 1, 2, 3, 4, 5, 6]),
     exceptions = $bindable([]),
     accent = null,
-    locale = 'en-GB',
+    locale = appLocaleTag(),
     labels,
   }: Props = $props();
 

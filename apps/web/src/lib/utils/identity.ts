@@ -85,3 +85,21 @@ export function markText(entity: {
 	const stored = entity.initials?.trim();
 	return stored && stored.length > 0 ? stored : deriveInitials(entity.name);
 }
+
+/**
+ * The name the app calls the signed-in user by (Hall greeting, account menu).
+ *
+ * `user_profile.full_name` wins: it is the name the person edits in
+ * Settings → Profile and the one copied into every dossier. The session's
+ * name comes from Supabase Auth `user_metadata`, written at signup and never
+ * again, so a login provisioned from an email address stays `marcorubiol`
+ * there. It is only the fallback while the profile is unknown, and the
+ * email's local part comes last, when there is no name at all.
+ */
+export function userDisplayName(
+	profileName?: string | null,
+	sessionName?: string | null,
+	email?: string | null,
+): string {
+	return profileName?.trim() || sessionName?.trim() || email?.split('@')[0] || '';
+}

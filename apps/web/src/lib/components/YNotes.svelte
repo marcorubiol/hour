@@ -29,20 +29,40 @@
   import YProvider from 'y-partyserver/provider';
   import { IndexeddbPersistence } from 'y-indexeddb';
   import { getAccessToken, session } from '$lib/session.svelte';
+  import { appLocale, t, type Locale } from '$lib/i18n';
+  import { createQuery } from '@tanstack/svelte-query';
+  import { meQueryOptions } from '$lib/nav-queries';
+  import { userDisplayName } from '$lib/utils/identity';
 
   interface Props {
     targetTable: CollabTarget;
     targetId: string;
     placeholder?: string;
     rows?: number;
+    /** The reader's language; defaults to the session's. */
+    locale?: Locale;
   }
 
-  let { targetTable, targetId, placeholder = 'Notes…', rows = 5 }: Props = $props();
+  let { targetTable, targetId, placeholder, rows = 5, locale = appLocale() }: Props = $props();
+
+  let shownPlaceholder = $derived(placeholder ?? t('perf.notes_placeholder_short', locale));
 
   let el: HTMLTextAreaElement | undefined = $state();
   let status = $state<'connecting' | 'live' | 'offline'>('connecting');
   let peers = $state(0);
   let editingNames = $state<string[]>([]);
+
+  // Presence label: the person's name (see userDisplayName), re-announced
+  // when /api/me lands so peers never see the email handle for long.
+  const meQuery = createQuery(meQueryOptions());
+  let presence = $state.raw<YProvider['awareness'] | null>(null);
+  let myName = $derived(
+    userDisplayName($meQuery.data?.full_name, session.user?.name, session.user?.email) ||
+      'someone',
+  );
+  $effect(() => {
+    presence?.setLocalStateField('user', { name: myName });
+  });
 
   onMount(() => {
     // Session gate — the layout's auth gate resolved before rendering us,
@@ -116,9 +136,7 @@
     });
 
     const awareness = provider.awareness;
-    awareness.setLocalStateField('user', {
-      name: session.user?.email?.split('@')[0] ?? 'someone',
-    });
+    presence = awareness;
     const onAwareness = () => {
       const others = [...awareness.getStates().entries()].filter(
         ([id]) => id !== awareness.clientID,
@@ -126,7 +144,7 @@
       peers = others.length;
       editingNames = others
         .filter(([, s]) => (s as { editing?: boolean }).editing)
-        .map(([, s]) => (s as { user?: { name?: string } }).user?.name ?? 'someone');
+        .map(([, s]) => (s as { user?: { name?: string } }).user?.name ?? t('perf.someone', locale));
     };
     awareness.on('change', onAwareness);
     onAwareness();
@@ -143,6 +161,7 @@
       el?.removeEventListener('focus', focus);
       el?.removeEventListener('blur', blur);
       awareness.off('change', onAwareness);
+      presence = null;
       provider.destroy();
       // Closes the IndexedDB connection (clearData() would wipe it).
       void idb.destroy();
@@ -156,18 +175,18 @@
     <span class="ynotes__dot" aria-hidden="true"></span>
     <span class="ynotes__status">
       {#if status === 'live'}
-        live{#if peers > 0} · {peers + 1} here{/if}
+        {t('perf.notes_live', locale)}{#if peers > 0} · {t('perf.notes_here', locale, { n: peers + 1 })}{/if}
       {:else if status === 'offline'}
-        offline — edits sync on reconnect
+        {t('perf.notes_offline', locale)}
       {:else}
-        connecting…
+        {t('perf.notes_connecting', locale)}
       {/if}
     </span>
     {#if editingNames.length > 0}
-      <span class="ynotes__editing">{editingNames.join(', ')} editing</span>
+      <span class="ynotes__editing">{t('perf.notes_editing', locale, { names: editingNames.join(', ') })}</span>
     {/if}
   </div>
-  <textarea bind:this={el} {rows} {placeholder} aria-label="Notes"></textarea>
+  <textarea bind:this={el} {rows} placeholder={shownPlaceholder} aria-label={t('perf.notes', locale)}></textarea>
 </div>
 
 <style>

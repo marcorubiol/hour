@@ -31,17 +31,20 @@
   import {
     agingState,
     applyTaxLines,
+    boloStatusLabel,
     esTaxLines,
     fmtFee,
     fmtMoney,
     observedPayerTermsDays,
+    invoiceStatusLabel,
     PAYMENT_METHODS,
+    paymentMethodLabel,
     totalsByCurrency,
     type MoneyInvoiceItem,
     type MoneyPayer,
   } from '$lib/money';
   import { detectLocale, t } from '$lib/i18n';
-  import { performanceStatusLabel, performanceStatusTone } from '$lib/performance';
+  import { performanceStatusTone } from '$lib/performance';
   import { usePins } from '$lib/stores/pins.svelte';
   import {
     buildLineIndex,
@@ -73,13 +76,6 @@
     function_count: number;
     next_performed_at: string | null;
     project: { id: string; slug: string; name: string; accent: string | null; workspace_id: string } | null;
-  };
-
-  const PAYMENT_METHOD_LABELS: Record<string, string> = {
-    transfer: 'Transfer',
-    card: 'Card',
-    cash: 'Cash',
-    other: 'Other',
   };
 
   const CONTRACTED = ['confirmed', 'done', 'invoiced', 'paid'];
@@ -233,9 +229,9 @@
     return 'partial';
   }
   const FEE_PILL: Record<FeeState, { tone: string; label: string }> = {
-    full: { tone: 'ok', label: 'collected' },
-    partial: { tone: 'warn', label: 'part-collected' },
-    unpaid: { tone: 'faint', label: 'uncollected' },
+    full: { tone: 'ok', label: t('books.collected', locale) },
+    partial: { tone: 'warn', label: t('books.pill_partial', locale) },
+    unpaid: { tone: 'faint', label: t('books.pill_unpaid', locale) },
   };
 
   // ── Per-currency truth, grouped by obra (ADR-087) ─────────────────────
@@ -411,7 +407,7 @@
         fee_amount: input.fee_amount,
         fee_currency: input.fee_currency,
       });
-      if (!body?.bolo) throw new Error('Unexpected response');
+      if (!body?.bolo) throw new Error(t('books.unexpected_response', locale));
       return body.bolo;
     },
     onSuccess: () => {
@@ -419,14 +415,14 @@
       feeEditing = null;
       void queryClient.invalidateQueries({ queryKey: ['money-bolos'] });
     },
-    onError: (err) => addToast({ tone: 'danger', title: 'Fee not saved', message: `${err instanceof Error ? err.message : 'Unexpected error'} — try again.` }),
+    onError: (err) => addToast({ tone: 'danger', title: t('books.fee_not_saved', locale), message: t('books.try_again', locale, { error: err instanceof Error ? err.message : t('perf.unexpected', locale) }) }),
   });
   function saveFee() {
     if (!feeEditing || $feeMutation.isPending) return;
     const trimmed = String(fAmount ?? '').trim();
     const amount = trimmed === '' ? null : Number(trimmed);
     if (amount !== null && (Number.isNaN(amount) || amount < 0)) {
-      addToast({ tone: 'warning', message: 'Fee must be a positive number (or empty to clear).' });
+      addToast({ tone: 'warning', message: t('books.fee_invalid', locale) });
       return;
     }
     $feeMutation.mutate({ id: feeEditing.id, fee_amount: amount, fee_currency: fCurrency });
@@ -461,7 +457,7 @@
   const payMutation = createMutation({
     mutationFn: async () => {
       const amount = Number(String(payAmount).trim());
-      if (!Number.isFinite(amount) || amount <= 0) throw new Error('Amount must be greater than zero');
+      if (!Number.isFinite(amount) || amount <= 0) throw new Error(t('books.amount_gt_zero', locale));
       const body = await mutateJSON<{ payment?: unknown }>('POST', '/api/payments', {
         amount,
         received_on: payReceivedOn || localDayISO(),
@@ -472,16 +468,16 @@
         reference: payReference.trim() || null,
         idempotency_key: payIdempotencyKey,
       });
-      if (!body?.payment) throw new Error('Unexpected response');
+      if (!body?.payment) throw new Error(t('books.unexpected_response', locale));
       return body.payment;
     },
     onSuccess: () => {
       payOpen = false;
       payBolo = null;
       void queryClient.invalidateQueries({ queryKey: ['money-bolos'] });
-      addToast({ tone: 'success', message: 'Payment recorded against the fee.' });
+      addToast({ tone: 'success', message: t('books.payment_recorded_fee', locale) });
     },
-    onError: (err) => addToast({ tone: 'danger', title: 'Payment not recorded', message: err instanceof Error ? err.message : 'Unexpected error' }),
+    onError: (err) => addToast({ tone: 'danger', title: t('books.payment_not_recorded', locale), message: err instanceof Error ? err.message : t('perf.unexpected', locale) }),
   });
 
   // ── Invoice creation (ADR-050) — doc_type driven by workspace mode ─────
@@ -528,22 +524,22 @@
         payer_person_id: iPayerId || null,
         doc_type: invDocType,
       });
-      if (!body?.invoice) throw new Error('Unexpected response');
+      if (!body?.invoice) throw new Error(t('books.unexpected_response', locale));
       return body.invoice;
     },
     onSuccess: () => {
       invOpen = false;
       invBolo = null;
       void queryClient.invalidateQueries({ queryKey: ['invoices'] });
-      addToast({ tone: 'success', message: `Draft ${invDocType} created.` });
+      addToast({ tone: 'success', message: t(invDocType === 'proforma' ? 'books.draft_proforma_created' : 'books.draft_invoice_created', locale) });
     },
-    onError: (err) => addToast({ tone: 'danger', title: 'Document not created', message: err instanceof Error ? err.message : 'Unexpected error' }),
+    onError: (err) => addToast({ tone: 'danger', title: t('books.doc_not_created', locale), message: err instanceof Error ? err.message : t('perf.unexpected', locale) }),
   });
   function submitInvoice() {
     if ($createInvoice.isPending) return;
     for (const p of [pctOrNull(iVat), pctOrNull(iIrpf)]) {
       if (p !== null && (Number.isNaN(p) || p < 0 || p > 100)) {
-        addToast({ tone: 'warning', message: 'VAT / IRPF must be a percentage 0–100 (or empty).' });
+        addToast({ tone: 'warning', message: t('books.vat_irpf_invalid', locale) });
         return;
       }
     }
@@ -572,10 +568,10 @@
     return [...seen.values()];
   });
   let expenseAnchorOptions = $derived([
-    ...scopedLines.map((l) => ({ value: `line:${l.id}`, label: `Line · ${l.name} — ${l.projectName}` })),
+    ...scopedLines.map((l) => ({ value: `line:${l.id}`, label: t('books.anchor_line', locale, { name: l.name, project: l.projectName }) })),
     ...bolos.map((b) => ({
       value: `bolo:${b.id}`,
-      label: `Deal · ${[b.venue_name, b.city].filter(Boolean).join(', ') || b.project?.name || '—'}`,
+      label: t('books.anchor_deal', locale, { where: [b.venue_name, b.city].filter(Boolean).join(', ') || b.project?.name || '—' }),
     })),
   ]);
   function openExpense(b?: MoneyBolo) {
@@ -591,27 +587,27 @@
   const createExpense = createMutation({
     mutationFn: async () => {
       const amount = Number(String(eAmount).trim());
-      if (!Number.isFinite(amount) || amount <= 0) throw new Error('Amount must be greater than zero');
-      if (!eAnchor) throw new Error('Pick a line or deal to anchor the expense');
+      if (!Number.isFinite(amount) || amount <= 0) throw new Error(t('books.amount_gt_zero', locale));
+      if (!eAnchor) throw new Error(t('books.pick_anchor', locale));
       const [kind, id] = eAnchor.split(':');
       const body = await mutateJSON<{ expense?: unknown }>('POST', '/api/expenses', {
         ...(kind === 'bolo' ? { bolo_id: id } : { line_id: id }),
         category: eCategory,
-        description: eDescription.trim() || 'Expense',
+        description: eDescription.trim() || t('books.expense_default', locale),
         amount,
         currency: eCurrency,
         incurred_on: eIncurredOn || null,
         counterparty: eCounterparty.trim() || null,
       });
-      if (!body?.expense) throw new Error('Unexpected response');
+      if (!body?.expense) throw new Error(t('books.unexpected_response', locale));
       return body.expense;
     },
     onSuccess: () => {
       expOpen = false;
       void queryClient.invalidateQueries({ queryKey: ['expenses'] });
-      addToast({ tone: 'success', message: 'Expense added.' });
+      addToast({ tone: 'success', message: t('books.expense_added', locale) });
     },
-    onError: (err) => addToast({ tone: 'danger', title: 'Expense not added', message: err instanceof Error ? err.message : 'Unexpected error' }),
+    onError: (err) => addToast({ tone: 'danger', title: t('books.expense_not_added', locale), message: err instanceof Error ? err.message : t('perf.unexpected', locale) }),
   });
 
   // ── New deal — create a bolo by hand (ADR-087) ─────────────────────────
@@ -636,10 +632,10 @@
   }
   const createBolo = createMutation({
     mutationFn: async () => {
-      if (!dealProjectId) throw new Error('Pick a project');
+      if (!dealProjectId) throw new Error(t('books.pick_project', locale));
       const trimmed = String(dealFee).trim();
       const fee = trimmed === '' ? null : Number(trimmed);
-      if (fee !== null && (Number.isNaN(fee) || fee < 0)) throw new Error('Fee must be a positive number (or empty)');
+      if (fee !== null && (Number.isNaN(fee) || fee < 0)) throw new Error(t('books.fee_invalid_short', locale));
       const body = await mutateJSON<{ bolo?: unknown }>('POST', '/api/money/bolos', {
         project_id: dealProjectId,
         venue_name: dealVenue.trim() || null,
@@ -647,15 +643,15 @@
         fee_amount: fee,
         fee_currency: dealCurrency.trim() || 'EUR',
       });
-      if (!body?.bolo) throw new Error('Unexpected response');
+      if (!body?.bolo) throw new Error(t('books.unexpected_response', locale));
       return body.bolo;
     },
     onSuccess: () => {
       dealOpen = false;
       void queryClient.invalidateQueries({ queryKey: ['money-bolos'] });
-      addToast({ tone: 'success', message: 'Deal created.' });
+      addToast({ tone: 'success', message: t('books.deal_created', locale) });
     },
-    onError: (err) => addToast({ tone: 'danger', title: 'Deal not created', message: err instanceof Error ? err.message : 'Unexpected error' }),
+    onError: (err) => addToast({ tone: 'danger', title: t('books.deal_not_created', locale), message: err instanceof Error ? err.message : t('perf.unexpected', locale) }),
   });
 
   // ── Llegadas desde el alta y la ficha de una función (`_tasks.md § 36`) ──
@@ -686,7 +682,7 @@
 </script>
 
 <svelte:head>
-  <title>Money — Hour</title>
+  <title>{t('books.head_title', locale)}</title>
 </svelte:head>
 
 <section class="mny" aria-busy={busy}>
@@ -697,7 +693,7 @@
   </LensHeader>
 
   <div class="mny__actions">
-    <Button size="xs" variant="outline" onclick={openDeal} disabled={projectIndex.length === 0}>New deal</Button>
+    <Button size="xs" variant="outline" onclick={openDeal} disabled={projectIndex.length === 0}>{t('books.new_deal', locale)}</Button>
   </div>
 
   <div class="mny__totals">
@@ -715,15 +711,15 @@
         {/if}
       </span>
     {/each}
-    <span class="mny__total-note">current pins · currencies kept separate · owed = contracted deals not yet collected</span>
+    <span class="mny__total-note">{t('books.totals_note', locale)}</span>
   </div>
 
   {#if errorMsg}
     <p class="mny__state mny__state--danger">{errorMsg}</p>
   {:else if loading}
-    <p class="mny__state">Loading…</p>
+    <p class="mny__state">{t('desk.loading', locale)}</p>
   {:else if bolos.length === 0}
-    <p class="mny__state">No deals in the current pins.</p>
+    <p class="mny__state">{t('books.empty_pins', locale)}</p>
   {:else}
     {#each byObra as obra (obra.projectId)}
       <section class="obra" style={`--c: ${obra.accent}`} aria-label={obra.name}>
@@ -731,17 +727,17 @@
           <button type="button" class="obra__title" onclick={() => obra.slug && openProject(obra.slug, obra.workspaceId)} disabled={!obra.slug}>
             <span class="obra__dot"></span>
             <span class="obra__name">{obra.name}</span>
-            <span class="obra__count">{obra.bolos.length} {obra.bolos.length === 1 ? 'deal' : 'deals'}</span>
+            <span class="obra__count">{t(obra.bolos.length === 1 ? 'books.deal_count_one' : 'books.deal_count_other', locale, { n: obra.bolos.length })}</span>
           </button>
           <div class="obra__rolls">
             {#each obra.currencies as roll (roll.currency)}
               <span class="obra__roll">
                 <span class="obra__cur">{roll.currency}</span>
-                <span class="obra__stat"><span class="obra__stat-l">contracted</span>{fmtMoney(roll.contratado)}</span>
-                <span class="obra__stat"><span class="obra__stat-l">collected</span>{fmtMoney(roll.collected)}</span>
-                <span class="obra__stat"><span class="obra__stat-l">pending</span>{fmtMoney(Math.max(0, roll.contratado - roll.collected))}</span>
+                <span class="obra__stat"><span class="obra__stat-l">{t('books.contracted', locale)}</span>{fmtMoney(roll.contratado)}</span>
+                <span class="obra__stat"><span class="obra__stat-l">{t('books.collected', locale)}</span>{fmtMoney(roll.collected)}</span>
+                <span class="obra__stat"><span class="obra__stat-l">{t('books.pending', locale)}</span>{fmtMoney(Math.max(0, roll.contratado - roll.collected))}</span>
                 {#if roll.expenses > 0}
-                  <span class="obra__stat obra__stat--soft"><span class="obra__stat-l">net</span>{fmtMoney(roll.contratado - roll.expenses)}</span>
+                  <span class="obra__stat obra__stat--soft"><span class="obra__stat-l">{t('books.net', locale)}</span>{fmtMoney(roll.contratado - roll.expenses)}</span>
                 {/if}
               </span>
             {/each}
@@ -760,18 +756,18 @@
             <div class="fee" id={`bolo-${b.id}`} data-st={b.fee_amount === null ? 'none' : st}>
               <div class="fee__top">
                 <span class="fee__date">
-                  {b.next_performed_at ? dayLabel(b.next_performed_at) : 'no date'}
-                  {#if b.function_count > 1}<span class="fee__fns">· {b.function_count} fns</span>{/if}
+                  {b.next_performed_at ? dayLabel(b.next_performed_at) : t('books.no_date', locale)}
+                  {#if b.function_count > 1}<span class="fee__fns">· {t('books.fn_count', locale, { n: b.function_count })}</span>{/if}
                 </span>
                 <span class="fee__where">
                   <span class="fee__venue-main">{b.venue_name || '—'}{#if b.city}<span class="fee__city"> · {b.city}</span>{/if}</span>
                   {#if docs.length > 0}
-                    <a class="fee__doc" href="#mny-documents" title="Document lives on this deal">{docs[0]!.number ?? docs[0]!.status}</a>
+                    <a class="fee__doc" href="#mny-documents" title={t('books.doc_title', locale)}>{docs[0]!.number ?? invoiceStatusLabel(docs[0]!.status, locale)}</a>
                   {/if}
                 </span>
-                <span class="fee__badge"><StateBadge label={performanceStatusLabel(b.status)} tone={performanceStatusTone(b.status)} /></span>
+                <span class="fee__badge"><StateBadge label={boloStatusLabel(b.status, locale)} tone={performanceStatusTone(b.status)} /></span>
                 <span class="fee__amt">
-                  <button type="button" class="fee__fee" title="Edit fee" onclick={() => openFee(b)}>{fmtFee(b.fee_amount, b.fee_currency)}</button>
+                  <button type="button" class="fee__fee" title={t('books.edit_fee', locale)} onclick={() => openFee(b)}>{fmtFee(b.fee_amount, b.fee_currency)}</button>
                   {#if docs.length > 0 && (docs[0]!.status === 'issued' || docs[0]!.status === 'paid') && Number(docs[0]!.total) !== Number(docs[0]!.subtotal)}
                     <span class="fee__net">{t('books.net', locale)} {fmtMoney(Number(docs[0]!.total))} {docs[0]!.currency}</span>
                   {/if}
@@ -781,12 +777,12 @@
               {#if b.fee_amount !== null}
                 <div class="fee__bar"><span class="fee__coll" style={`inline-size:${cp}%`}></span></div>
                 <div class="fee__foot">
-                  <span class="fee__collected">collected {fmtMoney(coll)} / {fmtMoney(fee)}{#if rem > 0} · <span class="fee__rem">{fmtMoney(rem)} left</span>{/if}</span>
+                  <span class="fee__collected">{t('books.collected_of', locale, { collected: fmtMoney(coll), fee: fmtMoney(fee) })}{#if rem > 0} · <span class="fee__rem">{t('books.left', locale, { amount: fmtMoney(rem) })}</span>{/if}</span>
                   <span class="fee__acts">
-                    <Button size="xs" variant="outline" onclick={() => openPay(b)}>Record payment</Button>
-                    <Button size="xs" variant="outline" onclick={() => openExpense(b)}>Add expense</Button>
+                    <Button size="xs" variant="outline" onclick={() => openPay(b)}>{t('books.record_payment', locale)}</Button>
+                    <Button size="xs" variant="outline" onclick={() => openExpense(b)}>{t('books.add_expense', locale)}</Button>
                     {#if mode !== 'off'}
-                      <Button size="xs" variant="outline" onclick={() => openInvoice(b)}>{mode === 'interno' ? 'Create proforma' : 'Create invoice'}</Button>
+                      <Button size="xs" variant="outline" onclick={() => openInvoice(b)}>{t(mode === 'interno' ? 'books.create_proforma' : 'books.create_invoice', locale)}</Button>
                     {/if}
                   </span>
                 </div>
@@ -798,33 +794,33 @@
     {/each}
 
     {#if anyDocMode}
-      <section class="mny__section" id="mny-documents" aria-label="Documents">
-        <p class="eyebrow">Documents</p>
+      <section class="mny__section" id="mny-documents" aria-label={t('books.documents', locale)}>
+        <p class="eyebrow">{t('books.documents', locale)}</p>
         <MoneyInvoices {invoices} />
       </section>
     {/if}
 
-    <section class="mny__section" aria-label="Expenses">
+    <section class="mny__section" aria-label={t('books.expenses', locale)}>
       <div class="mny__section-head">
-        <p class="eyebrow">Expenses</p>
+        <p class="eyebrow">{t('books.expenses', locale)}</p>
         <div class="mny__section-headr">
           {#if expenseTotals.length > 0}
             <p class="mny__expense-totals">
               {#each expenseTotals as [currency, amount] (currency)}<span>− {fmtMoney(amount)} {currency}</span>{/each}
             </p>
           {/if}
-          <Button size="xs" variant="outline" onclick={() => openExpense()} disabled={expenseAnchorOptions.length === 0}>Add expense</Button>
+          <Button size="xs" variant="outline" onclick={() => openExpense()} disabled={expenseAnchorOptions.length === 0}>{t('books.add_expense', locale)}</Button>
         </div>
       </div>
       {#if expenses.length === 0}
-        <p class="mny__state">No expenses in the current scope.</p>
+        <p class="mny__state">{t('books.no_expenses_scope', locale)}</p>
       {:else}
         <ul class="mny__expenses" role="list">
           {#each expenses as expense (expense.id)}
             <li>
               <span class="mny__cell-date">{expense.incurred_on ? dayLabel(expense.incurred_on) : '—'}</span>
               <span class="mny__expense-description"><b>{expense.description}</b>{#if expense.counterparty}<span class="mny__expense-counter"> · {expense.counterparty}</span>{/if}</span>
-              <span class="mny__expense-category">{categoryLabel(expense.category)}</span>
+              <span class="mny__expense-category">{categoryLabel(expense.category, locale)}</span>
               <strong>− {fmtMoney(expense.amount)} {expense.currency}</strong>
             </li>
           {/each}
@@ -834,99 +830,99 @@
   {/if}
 </section>
 
-<Dialog bind:open={feeOpen} title="Fee" size="s" onclose={() => (feeEditing = null)}>
+<Dialog bind:open={feeOpen} title={t('books.fee', locale)} size="s" onclose={() => (feeEditing = null)}>
   {#if feeEditing}
     <p class="mny__dialog-who">{feeEditing.project?.name ?? ''} — {[feeEditing.venue_name, feeEditing.city].filter(Boolean).join(', ')}</p>
   {/if}
   <div class="mny__fee-form">
-    <Input label="Amount" type="number" bind:value={fAmount} placeholder="Empty clears the fee" />
-    <Input label="Currency" bind:value={fCurrency} placeholder="EUR" />
+    <Input label={t('books.amount', locale)} type="number" bind:value={fAmount} placeholder={t('books.ph_fee_clear', locale)} />
+    <Input label={t('books.currency', locale)} bind:value={fCurrency} placeholder="EUR" />
   </div>
   {#snippet actions()}
-    <Button variant="outline" onclick={() => (feeOpen = false)}>Cancel</Button>
-    <Button onclick={saveFee} loading={$feeMutation.isPending}>Save</Button>
+    <Button variant="outline" onclick={() => (feeOpen = false)}>{t('create.cancel', locale)}</Button>
+    <Button onclick={saveFee} loading={$feeMutation.isPending}>{t('blackout.save', locale)}</Button>
   {/snippet}
 </Dialog>
 
-<Dialog bind:open={payOpen} title="Record payment" size="s" description={payBolo ? `${[payBolo.venue_name, payBolo.city].filter(Boolean).join(', ')}` : ''} onclose={() => (payBolo = null)}>
+<Dialog bind:open={payOpen} title={t('books.record_payment', locale)} size="s" description={payBolo ? `${[payBolo.venue_name, payBolo.city].filter(Boolean).join(', ')}` : ''} onclose={() => (payBolo = null)}>
   <div class="mny__pay-form">
     <div class="mny__row2">
-      <Input label={`Amount (${payBolo?.fee_currency ?? 'EUR'})`} type="number" bind:value={payAmount} />
-      <Input label="Received on" type="date" bind:value={payReceivedOn} />
+      <Input label={t('books.amount_cur', locale, { currency: payBolo?.fee_currency ?? 'EUR' })} type="number" bind:value={payAmount} />
+      <Input label={t('books.received_on', locale)} type="date" bind:value={payReceivedOn} />
     </div>
     <div class="mny__row2">
-      <Select label="Method" bind:value={payMethod} options={PAYMENT_METHODS.map((m) => ({ value: m, label: PAYMENT_METHOD_LABELS[m] ?? m }))} />
-      <Input label="Counterparty (who paid)" bind:value={payCounterparty} placeholder="e.g. Teatre Municipal" />
+      <Select label={t('books.method', locale)} bind:value={payMethod} options={PAYMENT_METHODS.map((m) => ({ value: m, label: paymentMethodLabel(m, locale) }))} />
+      <Input label={t('books.counterparty_payer', locale)} bind:value={payCounterparty} placeholder={t('books.ph_venue', locale)} />
     </div>
-    <Input label="Reference (optional)" bind:value={payReference} placeholder="Transfer no., concept…" />
+    <Input label={t('books.reference_opt', locale)} bind:value={payReference} placeholder={t('books.ph_reference', locale)} />
   </div>
-  <p class="mny__dialog-note">Collected derives from payments against the fee — not from a document.</p>
+  <p class="mny__dialog-note">{t('books.pay_note', locale)}</p>
   {#snippet actions()}
-    <Button variant="outline" onclick={() => (payOpen = false)}>Cancel</Button>
-    <Button onclick={() => !$payMutation.isPending && $payMutation.mutate()} loading={$payMutation.isPending}>Record</Button>
+    <Button variant="outline" onclick={() => (payOpen = false)}>{t('create.cancel', locale)}</Button>
+    <Button onclick={() => !$payMutation.isPending && $payMutation.mutate()} loading={$payMutation.isPending}>{t('books.record', locale)}</Button>
   {/snippet}
 </Dialog>
 
-<Dialog bind:open={invOpen} title={invDocType === 'proforma' ? 'New proforma' : 'New invoice'} size="m" onclose={() => (invBolo = null)}>
+<Dialog bind:open={invOpen} title={t(invDocType === 'proforma' ? 'books.new_proforma' : 'books.new_invoice', locale)} size="m" onclose={() => (invBolo = null)}>
   {#if invBolo}
     <p class="mny__dialog-who">{invBolo.project?.name ?? ''} — {[invBolo.venue_name, invBolo.city].filter(Boolean).join(', ')}</p>
-    <p class="mny__inv-fee-line">Fee (subtotal): <strong>{fmtFee(invBolo.fee_amount, invBolo.fee_currency)}</strong> — amounts snapshot the fee at creation.</p>
+    <p class="mny__inv-fee-line">{t('books.fee_subtotal', locale)} <strong>{fmtFee(invBolo.fee_amount, invBolo.fee_currency)}</strong> {t('books.snapshot_note', locale)}</p>
     <div class="mny__inv-form">
-      <Input label="VAT %" type="number" bind:value={iVat} placeholder="e.g. 21 — empty = none" />
-      <Input label="IRPF %" type="number" bind:value={iIrpf} placeholder="e.g. 15 — empty = none" />
-      <Input label="Due on" type="date" bind:value={iDueOn} />
-      <Input label="Expected collection" type="date" bind:value={iExpectedOn} />
-      <Select label="Payer" bind:value={iPayerId}>
-        <option value="">Use the linked conversation</option>
+      <Input label={t('books.vat_pct', locale)} type="number" bind:value={iVat} placeholder={t('books.ph_vat', locale)} />
+      <Input label={t('books.irpf_pct', locale)} type="number" bind:value={iIrpf} placeholder={t('books.ph_irpf', locale)} />
+      <Input label={t('books.due_on', locale)} type="date" bind:value={iDueOn} />
+      <Input label={t('books.expected_collection', locale)} type="date" bind:value={iExpectedOn} />
+      <Select label={t('books.payer', locale)} bind:value={iPayerId}>
+        <option value="">{t('books.payer_linked', locale)}</option>
         {#each availablePayers as payer (payer.id)}
           <option value={payer.id}>{payer.organization_name ? `${payer.organization_name} · ${payer.full_name}` : payer.full_name}</option>
         {/each}
       </Select>
     </div>
-    <Input label="Payment condition" bind:value={iPaymentCondition} placeholder="e.g. pays when the town hall pays them — says October" />
-    <p class="mny__inv-total-preview">Total: <strong>{fmtMoney(invTotal)} {invBolo.fee_currency ?? 'EUR'}</strong></p>
+    <Input label={t('books.payment_condition', locale)} bind:value={iPaymentCondition} placeholder={t('books.ph_condition', locale)} />
+    <p class="mny__inv-total-preview">{t('books.total_label', locale)} <strong>{fmtMoney(invTotal)} {invBolo.fee_currency ?? 'EUR'}</strong></p>
   {/if}
   {#snippet actions()}
-    <Button variant="outline" onclick={() => (invOpen = false)}>Cancel</Button>
-    <Button onclick={submitInvoice} loading={$createInvoice.isPending}>Create draft</Button>
+    <Button variant="outline" onclick={() => (invOpen = false)}>{t('create.cancel', locale)}</Button>
+    <Button onclick={submitInvoice} loading={$createInvoice.isPending}>{t('books.create_draft', locale)}</Button>
   {/snippet}
 </Dialog>
 
-<Dialog bind:open={dealOpen} title="New deal" size="s" description="A deal with one venue — the money unit. Schedule its functions later in Planner.">
+<Dialog bind:open={dealOpen} title={t('books.new_deal', locale)} size="s" description={t('books.deal_desc', locale)}>
   <div class="mny__pay-form">
-    <Select label="Project (obra)" bind:value={dealProjectId} options={dealOptions} />
+    <Select label={t('books.project_obra', locale)} bind:value={dealProjectId} options={dealOptions} />
     <div class="mny__row2">
-      <Input label="Venue" bind:value={dealVenue} placeholder="e.g. Teatre Municipal" />
-      <Input label="City" bind:value={dealCity} placeholder="e.g. Girona" />
+      <Input label={t('create.venue', locale)} bind:value={dealVenue} placeholder={t('books.ph_venue', locale)} />
+      <Input label={t('create.city', locale)} bind:value={dealCity} placeholder={t('books.ph_city', locale)} />
     </div>
     <div class="mny__row2">
-      <Input label="Fee (optional)" type="number" bind:value={dealFee} placeholder="Set it later if unknown" />
-      <Input label="Currency" bind:value={dealCurrency} placeholder="EUR" />
+      <Input label={t('books.fee_optional', locale)} type="number" bind:value={dealFee} placeholder={t('books.ph_fee_later', locale)} />
+      <Input label={t('books.currency', locale)} bind:value={dealCurrency} placeholder="EUR" />
     </div>
   </div>
   {#snippet actions()}
-    <Button variant="outline" onclick={() => (dealOpen = false)}>Cancel</Button>
-    <Button onclick={() => !$createBolo.isPending && $createBolo.mutate()} loading={$createBolo.isPending}>Create deal</Button>
+    <Button variant="outline" onclick={() => (dealOpen = false)}>{t('create.cancel', locale)}</Button>
+    <Button onclick={() => !$createBolo.isPending && $createBolo.mutate()} loading={$createBolo.isPending}>{t('books.create_deal', locale)}</Button>
   {/snippet}
 </Dialog>
 
-<Dialog bind:open={expOpen} title="Add expense" size="s" description="Money out · anchored to a line or a deal">
+<Dialog bind:open={expOpen} title={t('books.add_expense', locale)} size="s" description={t('books.expense_desc', locale)}>
   <div class="mny__pay-form">
     <div class="mny__row2">
-      <Input label="Amount" type="number" bind:value={eAmount} />
-      <Input label="Currency" bind:value={eCurrency} placeholder="EUR" />
+      <Input label={t('books.amount', locale)} type="number" bind:value={eAmount} />
+      <Input label={t('books.currency', locale)} bind:value={eCurrency} placeholder="EUR" />
     </div>
-    <Input label="Description" bind:value={eDescription} placeholder="e.g. Van rental" />
+    <Input label={t('books.description', locale)} bind:value={eDescription} placeholder={t('books.ph_expense', locale)} />
     <div class="mny__row2">
-      <Input label="Date" type="date" bind:value={eIncurredOn} />
-      <Select label="Category" bind:value={eCategory} options={EXPENSE_CATEGORIES.map((c) => ({ value: c, label: categoryLabel(c) }))} />
+      <Input label={t('perf.date', locale)} type="date" bind:value={eIncurredOn} />
+      <Select label={t('books.category', locale)} bind:value={eCategory} options={EXPENSE_CATEGORIES.map((c) => ({ value: c, label: categoryLabel(c, locale) }))} />
     </div>
-    <Select label="Anchor (line or deal)" bind:value={eAnchor} options={expenseAnchorOptions} />
-    <Input label="Counterparty (optional — who's paid)" bind:value={eCounterparty} placeholder="e.g. Rent-a-Car Vic" />
+    <Select label={t('books.anchor', locale)} bind:value={eAnchor} options={expenseAnchorOptions} />
+    <Input label={t('books.counterparty_paid', locale)} bind:value={eCounterparty} placeholder={t('books.ph_counterparty', locale)} />
   </div>
   {#snippet actions()}
-    <Button variant="outline" onclick={() => (expOpen = false)}>Cancel</Button>
-    <Button onclick={() => !$createExpense.isPending && $createExpense.mutate()} loading={$createExpense.isPending}>Add</Button>
+    <Button variant="outline" onclick={() => (expOpen = false)}>{t('create.cancel', locale)}</Button>
+    <Button onclick={() => !$createExpense.isPending && $createExpense.mutate()} loading={$createExpense.isPending}>{t('composer.add', locale)}</Button>
   {/snippet}
 </Dialog>
 

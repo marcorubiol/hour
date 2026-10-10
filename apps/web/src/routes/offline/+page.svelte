@@ -1,6 +1,9 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import BrandMark from '$lib/components/BrandMark.svelte';
+  import { appLocale, t } from '$lib/i18n';
+
+  const locale = appLocale();
 
   let online = $state(true);
 
@@ -22,16 +25,16 @@
 </script>
 
 <svelte:head>
-  <title>Offline — Hour</title>
+  <title>{t('offline.title', locale)}</title>
 </svelte:head>
 
 <main class="offline">
   <BrandMark size="l" />
   <p class="offline__status">
     {#if online}
-      You're back online. <button type="button" class="offline__retry" onclick={retry}>Reload</button>
+      {t('offline.back', locale)} <button type="button" class="offline__retry" onclick={retry}>{t('offline.reload', locale)}</button>
     {:else}
-      You're offline. The app will reconnect when your network is back.
+      {t('offline.away', locale)}
     {/if}
   </p>
 </main>

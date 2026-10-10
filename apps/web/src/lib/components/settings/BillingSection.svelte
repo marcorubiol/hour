@@ -1,38 +1,36 @@
 <script lang="ts">
   import { session } from '$lib/session.svelte';
+  import { t, appLocale } from '$lib/i18n';
+
+  const locale = appLocale();
 
   let userEmail = $derived(session.user?.email ?? '');
 </script>
 
 <header class="set-mast">
-  <p class="eyebrow set-mast__kicker">Money</p>
-  <h1 class="set-mast__title"><em>Billing</em></h1>
-  <p class="set-mast__sub">
-    Hour is a small Barcelona-based tool. Your money goes a long way here.
-  </p>
+  <p class="eyebrow set-mast__kicker">{t('settings.bill_kicker', locale)}</p>
+  <h1 class="set-mast__title"><em>{t('settings.nav_billing', locale)}</em></h1>
+  <p class="set-mast__sub">{t('settings.bill_sub', locale)}</p>
 </header>
 
 <section class="set-group">
   <div class="set-group__body">
     <div class="set-plan">
       <div class="set-plan__head">
-        <span class="eyebrow set-plan__kicker">Current plan</span>
+        <span class="eyebrow set-plan__kicker">{t('settings.bill_current_plan', locale)}</span>
         <h2 class="set-plan__name">
-          Solo <em>·</em> <span>€9/mo</span>
+          Solo <em>·</em> <span>{t('settings.bill_price_month', locale)}</span>
         </h2>
-        <p class="set-plan__sub">
-          All features, unlimited projects, one person. Next billing 1
-          May 2026.
-        </p>
+        <p class="set-plan__sub">{t('settings.bill_plan_sub', locale)}</p>
       </div>
       <div class="set-plan__actions">
         <button type="button" class="btn--primary btn--s">
-          Switch to yearly · save 20%
+          {t('settings.bill_yearly', locale)}
         </button>
         <button type="button" class="btn--outline btn--s">
-          Upgrade to Collective (€19/mo, up to 6 people)
+          {t('settings.bill_upgrade', locale)}
         </button>
-        <button type="button" class="btn--outline btn--s is-warn">Cancel plan</button>
+        <button type="button" class="btn--outline btn--s is-warn">{t('settings.bill_cancel_plan', locale)}</button>
       </div>
     </div>
   </div>
@@ -40,26 +38,26 @@
 
 <section class="set-group">
   <div class="set-group__head">
-    <span class="eyebrow set-group__kicker">Payment</span>
+    <span class="eyebrow set-group__kicker">{t('settings.bill_payment', locale)}</span>
   </div>
   <div class="set-group__body">
     <div class="set-row">
       <div class="set-row__lead">
-        <div class="set-row__label">Method</div>
+        <div class="set-row__label">{t('settings.bill_method', locale)}</div>
       </div>
       <div class="set-row__ctrl">
         <div class="set-card">
           <span class="set-card__brand">VISA</span>
           <span>•••• 4242</span>
-          <span class="set-row__hint">exp 11/27</span>
-          <button type="button" class="btn--outline btn--s">Update</button>
+          <span class="set-row__hint">{t('settings.bill_card_exp', locale, { date: '11/27' })}</span>
+          <button type="button" class="btn--outline btn--s">{t('settings.bill_update', locale)}</button>
         </div>
       </div>
     </div>
     <div class="set-row">
       <div class="set-row__lead">
-        <div class="set-row__label">Billing email</div>
-        <div class="set-row__hint">Receipts and VAT documents.</div>
+        <div class="set-row__label">{t('settings.bill_email', locale)}</div>
+        <div class="set-row__hint">{t('settings.bill_email_hint', locale)}</div>
       </div>
       <div class="set-row__ctrl">
         <input  type="email" value={userEmail} readonly />
@@ -67,8 +65,8 @@
     </div>
     <div class="set-row">
       <div class="set-row__lead">
-        <div class="set-row__label">Tax ID</div>
-        <div class="set-row__hint">ES NIF / EU VAT — for proper invoices.</div>
+        <div class="set-row__label">{t('settings.bill_tax_id', locale)}</div>
+        <div class="set-row__hint">{t('settings.bill_tax_hint', locale)}</div>
       </div>
       <div class="set-row__ctrl">
         <input class="input--short" type="text" value="ES 41XXXXXXX-A" />
@@ -79,16 +77,16 @@
 
 <section class="set-group">
   <div class="set-group__head">
-    <span class="eyebrow set-group__kicker">History</span>
+    <span class="eyebrow set-group__kicker">{t('settings.bill_history', locale)}</span>
   </div>
   <div class="set-group__body">
     <div class="set-invoices">
       {#each ['2026-04-01', '2026-03-01', '2026-02-01', '2026-01-01'] as d (d)}
         <div class="set-invoice">
           <span class="set-invoice__date">{d}</span>
-          <span class="set-invoice__plan">Solo · monthly</span>
+          <span class="set-invoice__plan">{t('settings.bill_invoice_plan', locale)}</span>
           <span class="set-invoice__amt">€9.00</span>
-          <span class="set-invoice__status">paid</span>
+          <span class="set-invoice__status">{t('settings.bill_paid', locale)}</span>
           <button type="button" class="btn--outline btn--s">PDF</button>
         </div>
       {/each}

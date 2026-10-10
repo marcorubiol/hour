@@ -17,6 +17,7 @@
    */
   import { accentVarFor } from '$lib/utils/accent';
   import Slip from '$lib/components/planner/Slip.svelte';
+  import { appLocale, t } from '$lib/i18n';
   import type { ProjectLite, SlipKind, Slip as SlipVM } from '$lib/month-events';
   import { pct, overlaps, type StripThread } from '$lib/day-strip';
 
@@ -91,12 +92,12 @@
     stateUrgent = () => false,
     stepLabel,
     hourLabel,
-    emptyLabel = 'Nothing on this day.',
-    axisLabel = 'the day',
-    noCastWord = 'no cast on file',
-    roadSheetWord = 'road sheet',
+    emptyLabel = t('planner.day_empty', appLocale()),
+    axisLabel = t('planner.day_axis', appLocale()),
+    noCastWord = t('planner.no_cast', appLocale()),
+    roadSheetWord = t('desk.roadsheet', appLocale()),
     unplaced = [],
-    noHourWord = 'no hour',
+    noHourWord = t('planner.no_hour', appLocale()),
   }: Props = $props();
 
   /** The now label, one cell per character: a digit that changes remounts
