@@ -1430,15 +1430,14 @@ entre empresas sin construirlo.
   toda España y Francia, y Europa entera en cuanto se abra la app.
   **Lo mismo quiere Marco para programadores:** una base común global de
   programadores, dentro de la ley.
-- [ ] Marco: decidir — **Directorio de salas: cómo corrige una compañía la ficha
-  global sin que nadie la destroce.** A Marco le gusta que una compañera pueda
-  arreglar datos de una sala para todos, pero quiere control. Propuesta del
-  coordinador por pensar: la corrección entra como propuesta con su fuente, se
-  aplica sola si viene de quien tiene historial bueno o la confirman otras dos
-  compañías, todo con historial y vuelta atrás, y la fuente oficial nunca se
-  pisa en silencio. Desbloquea: «Directorio global de salas».
-- [ ] Marco: decidir — **Datos personales en el directorio global (salas y
-  programadores).** Nombres, emails y teléfonos de personas de otras entidades
+  **Corregir la ficha global, DECIDIDO por Marco (10-10):** una corrección entra
+  como propuesta con su fuente y se aplica cuando la validan al menos otras dos
+  compañías. Para que pase de verdad, Hour pregunta a quien va a actuar en esa
+  sala (una función suya enlazada a la sala) si los datos de la corrección son
+  ciertos. Todo con historial y vuelta atrás; el dato oficial nunca se pisa en
+  silencio.
+- [ ] Marco: hacer — **Consulta legal sobre datos personales en el directorio global (salas y
+  programadores)** (Marco, 10-10: de acuerdo, antes de construir esa parte). Nombres, emails y teléfonos de personas de otras entidades
   en una base compartida necesitan base jurídica (interés legítimo para contacto
   profesional, art. 19 LOPDGDD), informar a esas personas (art. 14 RGPD) y
   atender su oposición. Antes de construir esa parte, una consulta legal.
