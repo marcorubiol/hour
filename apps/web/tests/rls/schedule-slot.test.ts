@@ -349,6 +349,61 @@ describe.skipIf(!envReady())('schedule slots (ADR-090 P1)', () => {
     }
   });
 
+  /**
+   * § 17 P3 (20261010180000): el road sheet público lleva la escaleta ENTERA,
+   * en su orden y con los momentos libres, igual que la hoja interna. Sin
+   * `notes`: la proyección pública no las ha llevado nunca. Va rojo contra un
+   * origen sin esa migración (no hay `schedule`).
+   */
+  it('the public road sheet carries the whole running order, in order, without notes', async () => {
+    const g = await gig();
+    const empty = await gig();
+    await add('performance', g, { p_at: '2031-04-10T15:00:00Z', p_kind: 'load_in' });
+    await add('performance', g, {
+      p_at: '2031-04-10T17:00:00Z',
+      p_label: 'Photo call',
+      p_notes: 'ZZZ private note',
+    });
+    await add('performance', g, {
+      p_at: '2031-04-10T20:00:00Z',
+      p_ends_at: '2031-04-10T21:15:00Z',
+      p_kind: 'start',
+    });
+    const shares: { id: string; token: string }[] = [];
+    for (const id of [g, empty]) {
+      const s = await pgRpc<{ id: string; token: string }>('create_roadsheet_share', jwt, {
+        p_performance_id: id,
+        p_role: 'venue',
+      });
+      expect(s.status, s.error).toBe(200);
+      shares.push(s.data!);
+    }
+    type Moment = { kind: string | null; label: string | null; at: string; ends_at: string | null };
+    try {
+      const pub = await pgRpc<{ performance: { schedule?: Moment[] } }>('get_public_roadsheet', null, {
+        p_token: shares[0].token,
+      });
+      expect(pub.status).toBe(200);
+      const schedule = pub.data!.performance.schedule!;
+      expect(schedule.map((m) => [m.kind, m.label, iso(m.at)])).toEqual([
+        ['load_in', null, iso('2031-04-10T15:00:00Z')],
+        [null, 'Photo call', iso('2031-04-10T17:00:00Z')],
+        ['start', null, iso('2031-04-10T20:00:00Z')],
+      ]);
+      expect(iso(schedule[2].ends_at!)).toBe(iso('2031-04-10T21:15:00Z'));
+      expect(JSON.stringify(pub.data)).not.toContain('ZZZ private note');
+      for (const m of schedule) expect(Object.keys(m).sort()).toEqual(['at', 'ends_at', 'kind', 'label']);
+
+      // Sin momentos, una lista vacía y no null: la vista no distingue casos.
+      const bare = await pgRpc<{ performance: { schedule?: Moment[] } }>('get_public_roadsheet', null, {
+        p_token: shares[1].token,
+      });
+      expect(bare.data!.performance.schedule).toEqual([]);
+    } finally {
+      for (const s of shares) await pgRpc('revoke_roadsheet_share', jwt, { p_share_id: s.id });
+    }
+  });
+
   describe.skipIf(!limitedEnvReady())('the limited performer', () => {
     let limitedJwt: string;
 
