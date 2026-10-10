@@ -1401,7 +1401,7 @@ entre empresas sin construirlo.
   fusionar las entidades** — 1:1 con estado vs N:N sin estado; lo que unifica es
   la lente, no la tabla.
 
-- [ ] **Comms: diseño en papel, sin código (Marco, 2026-10-10: se abre ya; la puerta de construir sigue).** Antes: la puerta de producto de comms, que es de Marco y no técnica. ADR-085 lleva
+- [ ] Marco: decidir — **Comms: reaccionar al borrador en papel `build/comms-paper-draft.md` (2026-10-10)** y sus cinco preguntas (registro o hilo, de qué cuelga el tablón del día, primer corte, invitado, dirección de captura). **Comms: diseño en papel, sin código (Marco, 2026-10-10: se abre ya; la puerta de construir sigue).** Antes: la puerta de producto de comms, que es de Marco y no técnica. ADR-085 lleva
   escrita su propia condición: *usar la app en una temporada de difusión real
   antes de construir nada de esto*. Mientras no se cumpla, resolver los dos
   bloqueantes es trabajo especulativo por bueno que sea el modelo.
