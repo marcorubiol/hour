@@ -32,8 +32,7 @@ Ficha del proyecto:
   carriles. `CHANGELOG.md` en la raíz, por meses. Commit de un cambio que solo toca la cola o el CHANGELOG: directo a
   `main` con push en el mismo paso. Un bug mandado arreglar no se integra antes de que Marco valide su línea.
 - **Drop:** https://claude.ai/artifact/31K3hLooqc7ak2JujNNHS7 (vista de la cola: copia de `_tasks.md` como
-  `roadmap.md`). Tipos: `bug` (roto), `x` (interfaz confusa o mejorable), `idea`. Archivo de notas:
-  `~/Zerø System/03_AGENCY/Hour/drop-archive.md` (en el vault y no en el repo, que es público).
+  `roadmap.md`). Tipos: `bug` (roto), `x` (interfaz confusa o mejorable), `idea`. Sin archivo de notas (skill `producto`, 10-10).
 - **Mesa de Marco:** documento `proyectos/hour` en https://claude.ai/artifact/NsscS7X5U6ixvvFB8Fmnmj (copia de lo que
   espera de Marco; la verdad sigue en `_tasks.md` y en el Drop). El Drop usa el `drop.js` común de la skill `producto`.
 - **Repo público:** sí. No escribas en git nada que no pueda ser público (claves, estado interno de carriles).
