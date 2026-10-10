@@ -1090,6 +1090,19 @@ entre empresas sin construirlo.
     columnas, apply run 38031613191). Staging desde cero verde (38029827890).
     Después: RLS 203/203 y E2E 62/62. Faltan P2 (collab) y P3 (pantalla, la
     dibuja Marco).
+    **P2 (collab), revisada el 2026-10-10 y PARADA antes de código: pide
+    schema y una decisión.** El DO entra como `service_role` sin el JWT del
+    usuario, y P1 le cerró a `service_role` la RPC `replace_schedule_slots` y la
+    lectura de `schedule_slot`; además `collab_snapshot` y `can_user_write_collab`
+    no admiten `date`. Propuesta (aditiva): `date` en el CHECK de snapshots y en
+    `can_user_write_collab`; una `replace_schedule_slots_for_user` solo para
+    `service_role` con el usuario explícito (cuerpo común en `private`); lectura
+    para `service_role`. Dos riesgos de ADR-090 a cerrar antes: (1) un doc con
+    snapshot pero sin `schedule` (hoy hay 4 de funciones) cargaría el array
+    vacío y borraría las franjas al materializar: sembrar si el doc no trae
+    escaleta, con una marca; (2) mientras el PATCH y el doc escriban los dos, se
+    pisan: **quién manda sobre la escaleta lo decide P3**. Recomendación del
+    coordinador: hacer P2 junto con P3, no antes.
     **Modelo DECIDIDO el 2026-07-25, nada de schema construido.** Absorbe la vieja
     tarea «tipos de horario añadibles por el usuario»: las cinco franjas de
     ADR-023 son **columnas fijas** en `performance` con un CHECK de orden — una
