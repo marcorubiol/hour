@@ -2522,6 +2522,7 @@ export type Database = {
           created_by: string | null
           custom_fields: Json
           deleted_at: string | null
+          directory_id: string | null
           id: string
           name: string
           notes: string | null
@@ -2541,6 +2542,7 @@ export type Database = {
           created_by?: string | null
           custom_fields?: Json
           deleted_at?: string | null
+          directory_id?: string | null
           id?: string
           name: string
           notes?: string | null
@@ -2560,6 +2562,7 @@ export type Database = {
           created_by?: string | null
           custom_fields?: Json
           deleted_at?: string | null
+          directory_id?: string | null
           id?: string
           name?: string
           notes?: string | null
@@ -2571,6 +2574,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "venue_directory_id_fkey"
+            columns: ["directory_id"]
+            isOneToOne: false
+            referencedRelation: "venue_directory"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "venue_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
@@ -2578,6 +2588,140 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      venue_directory: {
+        Row: {
+          address: string | null
+          capacity: number | null
+          city: string | null
+          country: string
+          created_at: string
+          designation: string | null
+          email: string | null
+          field_sources: Json
+          first_seen_at: string
+          id: string
+          kind: string
+          last_seen_at: string
+          latitude: number | null
+          longitude: number | null
+          name: string
+          phone: string | null
+          postal_code: string | null
+          region: string | null
+          search_key: string
+          source: string
+          source_id: string
+          sources: Json
+          status: string
+          timezone: string | null
+          updated_at: string
+          website: string | null
+          wikidata_qid: string | null
+        }
+        Insert: {
+          address?: string | null
+          capacity?: number | null
+          city?: string | null
+          country: string
+          created_at?: string
+          designation?: string | null
+          email?: string | null
+          field_sources?: Json
+          first_seen_at?: string
+          id?: string
+          kind: string
+          last_seen_at?: string
+          latitude?: number | null
+          longitude?: number | null
+          name: string
+          phone?: string | null
+          postal_code?: string | null
+          region?: string | null
+          search_key: string
+          source: string
+          source_id: string
+          sources?: Json
+          status?: string
+          timezone?: string | null
+          updated_at?: string
+          website?: string | null
+          wikidata_qid?: string | null
+        }
+        Update: {
+          address?: string | null
+          capacity?: number | null
+          city?: string | null
+          country?: string
+          created_at?: string
+          designation?: string | null
+          email?: string | null
+          field_sources?: Json
+          first_seen_at?: string
+          id?: string
+          kind?: string
+          last_seen_at?: string
+          latitude?: number | null
+          longitude?: number | null
+          name?: string
+          phone?: string | null
+          postal_code?: string | null
+          region?: string | null
+          search_key?: string
+          source?: string
+          source_id?: string
+          sources?: Json
+          status?: string
+          timezone?: string | null
+          updated_at?: string
+          website?: string | null
+          wikidata_qid?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "venue_directory_source_fkey"
+            columns: ["source"]
+            isOneToOne: false
+            referencedRelation: "venue_directory_source"
+            referencedColumns: ["key"]
+          },
+        ]
+      }
+      venue_directory_source: {
+        Row: {
+          attribution: string
+          data_date: string | null
+          imported_at: string | null
+          key: string
+          license: string
+          license_url: string
+          name: string
+          publisher: string
+          source_url: string
+        }
+        Insert: {
+          attribution: string
+          data_date?: string | null
+          imported_at?: string | null
+          key: string
+          license: string
+          license_url: string
+          name: string
+          publisher: string
+          source_url: string
+        }
+        Update: {
+          attribution?: string
+          data_date?: string | null
+          imported_at?: string | null
+          key?: string
+          license?: string
+          license_url?: string
+          name?: string
+          publisher?: string
+          source_url?: string
+        }
+        Relationships: []
       }
       workspace: {
         Row: {
@@ -3060,6 +3204,35 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "cast_member"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      adopt_directory_venue: {
+        Args: { p_directory_id: string; p_workspace_id: string }
+        Returns: {
+          address: string | null
+          capacity: number | null
+          city: string | null
+          contacts: Json
+          country: string | null
+          created_at: string
+          created_by: string | null
+          custom_fields: Json
+          deleted_at: string | null
+          directory_id: string | null
+          id: string
+          name: string
+          notes: string | null
+          previous_slugs: string[]
+          slug: string | null
+          timezone: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "venue"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -3849,6 +4022,7 @@ export type Database = {
           created_by: string | null
           custom_fields: Json
           deleted_at: string | null
+          directory_id: string | null
           id: string
           name: string
           notes: string | null
@@ -4974,4 +5148,3 @@ export const Constants = {
     },
   },
 } as const
-

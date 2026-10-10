@@ -39,6 +39,7 @@
     isReady,
   } from '$lib/performance';
   import type { VenueContact } from '$lib/venue';
+  import DirectoryPicker from '$lib/components/DirectoryPicker.svelte';
   import Select from '$lib/components/Select.svelte';
   import { boloOf, boloOptions, boloPatch, booksHref, type BoloLite } from '$lib/bolo-pick';
   import { performanceBoloQueryOptions, projectBolosQueryOptions } from '$lib/bolo-queries';
@@ -444,6 +445,18 @@
       });
     },
   });
+  // A venue adopted from the directory is linked at once; the free-text
+  // fields take its words only when they are empty (never overwritten).
+  function onDirectoryAdopt(venue: { id: string; name: string; city: string | null; country: string | null }) {
+    fVenueId = venue.id;
+    if (!fVenue.trim()) {
+      fVenue = venue.name;
+      fCity = venue.city ?? '';
+      fCountry = venue.country ?? '';
+    }
+    void queryClient.invalidateQueries({ queryKey: ['venues'] });
+  }
+
   // ── Venue edit (ADR-053): address, timezone (feeds dual-time on the
   // road sheet), contacts, capacity, notes. PATCH /api/venues/:id — no
   // RPC (venue_update RLS covers workspace members; ADR-048 only bites
@@ -882,6 +895,11 @@
     </Button>
   </div>
   <p class="perf__dialog-hint">{t('perf.linked_venue_hint', locale)}</p>
+  {#if perf?.workspace_id}
+    <!-- Directorio global de salas: adopt a venue instead of typing it. -->
+    <DirectoryPicker workspaceId={perf.workspace_id} {locale} onadopt={onDirectoryAdopt} />
+    <p class="perf__dialog-hint">{t('directory.hint', locale)}</p>
+  {/if}
   <div class="perf__danger">
     <Button variant="outline" tone="warn" size="s" onclick={() => (confirmDeleteOpen = true)}>
       {t('perf.delete', locale)}
