@@ -1340,6 +1340,9 @@ entre empresas sin construirlo.
   `dayLabel` («Fri, 13 Nov 2026») siguen en inglés en una app i18n ca/es/en.
   Va DESPUÉS de integrar las cuatro primeras versiones de diseño, porque todas
   tocan los diccionarios y se pisarían.
+  **La hoja de ruta también (Marco, 10-10):** en el idioma de la app, con el
+  inglés por defecto cuando no se sabe cuál. La interna, en el idioma de quien la
+  mira; la pública (anónima), en el del navegador si es ca/es/en, y si no, inglés.
 
 - [ ] **La app no cabe a 390 px (chat 09-10, visto por el carril de § 40).** El
   rail ocupa ~250 px y el shell entero desborda en un móvil. Pesa más ahora que
