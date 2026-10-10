@@ -180,6 +180,8 @@
   "hall.home": "Hall",
   "shell.menu_open": "Open the menu",
   "shell.menu_close": "Close the menu",
+  "conversations.card_last": "last",
+  "conversations.card_next": "next",
   "hall.action_note": "New note",
   "hall.relation_hours": "in {h}h",
   "hall.relation_minutes": "in {m} min",

@@ -26,6 +26,7 @@
   import { toStore } from 'svelte/store';
   import { fetchJSON, mutateJSON } from '$lib/api';
   import { dayMonth, dayMonthYear } from '$lib/datetime';
+  import { detectLocale, t } from '$lib/i18n';
   import Button from '$lib/components/Button.svelte';
   import ConversationHistory from '$lib/components/ConversationHistory.svelte';
   import Dialog from '$lib/components/Dialog.svelte';
@@ -69,6 +70,10 @@
     offset: number;
     items: ConversationItem[];
   };
+
+  // Only the compact phone card speaks through the dictionary for now; the
+  // rest of this table is still English-only.
+  const locale = detectLocale(navigator.language);
 
   const LIMIT = 50;
   const VIEW_STORAGE_KEY = 'hour:conversations:view';
@@ -398,11 +403,17 @@
                 {item.person?.full_name ?? '—'}
               {/if}
             </td>
-            <td class="cell--muted" data-label="Organization">
+            <td
+              class="cell--muted"
+              data-label="Organization"
+              data-empty={!item.person?.organization_name || undefined}
+            >
               {item.person?.organization_name ?? '—'}
             </td>
-            <td class="cell--meta" data-label="Location">{locationOf(item)}</td>
-            <td data-label="Status">
+            <td class="cell--meta" data-label="Location" data-empty={locationOf(item) === '—' || undefined}
+              >{locationOf(item)}</td
+            >
+            <td class="cell--status" data-label="Status">
               <Menu
                 label="Change status or log contact"
                 triggerClass={statusBadgeClass(item.status)}
@@ -442,7 +453,7 @@
                 {/snippet}
               </Menu>
             </td>
-            <td class="last-contact" data-label="Last contact">
+            <td class="last-contact" data-label="Last contact" data-short={t('conversations.card_last', locale)}>
               <button
                 type="button"
                 class="last-contact__open"
@@ -455,7 +466,7 @@
                 >
               </button>
             </td>
-            <td data-label="Next action">
+            <td class="cell--next" data-label="Next action" data-short={t('conversations.card_next', locale)}>
               <button
                 type="button"
                 class="next-action"
@@ -826,6 +837,121 @@
         margin-block-start: var(--space-2xs);
       }
       .next-action {
+        min-inline-size: 0;
+      }
+
+      /* THE CONVERSATION CARD, compact (Marco, 2026-10-10: Anouk works the
+         difusión from here). The same cells as the desktop row, only placed
+         differently: no markup of its own, so nothing can drift from the
+         table. Labels go wherever the datum explains itself:
+
+           Name ……………………………………… [Status ▾]
+           Organization · City
+           LAST 3 d ago        NEXT 12 Oct · note
+
+         The status keeps its pill and its menu (with «Log contact…»); last
+         contact keeps its button to the history; next action its button. */
+      /* A flex line per row of the card, broken by the row's own two
+         pseudo-elements: a grid would line the organization up with the
+         date below it and open a hole in «Organization · City». Margins,
+         not a row gap, so a line with nothing on it costs nothing. */
+      .conversation-table tbody tr {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        column-gap: var(--space-s);
+      }
+      .conversation-table tbody tr::before,
+      .conversation-table tbody tr::after {
+        content: '';
+        flex-basis: 100%;
+      }
+      .conversation-table tbody tr::before {
+        order: 2;
+      }
+      .conversation-table tbody tr::after {
+        order: 4;
+      }
+      .conversation-table tbody td {
+        display: block;
+        inline-size: auto;
+        padding-block: 0;
+      }
+      .conversation-table tbody td::before {
+        content: none;
+      }
+      .conversation-table .cell--name {
+        order: 1;
+        flex: 1 1 0;
+        min-inline-size: 0;
+        align-self: center;
+      }
+      /* The status menu opens out of this cell, so it must not clip. */
+      .conversation-table .cell--status {
+        order: 1;
+        align-self: center;
+        overflow: visible;
+      }
+      /* …and the pill sits at the card's end, so its menu opens toward the
+         start (Menu's own `.menu--end` placement) instead of off the screen. */
+      .conversation-table .cell--status :global(.menu) {
+        inset-inline: auto 0;
+      }
+      .conversation-table .cell--muted,
+      .conversation-table .cell--meta {
+        order: 3;
+        margin-block-start: var(--space-2xs);
+        font-size: var(--text-s);
+      }
+      /* «Organization · City», and neither shouts a dash when empty: a
+         missing datum is simply not on the line. */
+      /* The dot takes the gap's place: the cell pulls back by the difference
+         (the cell clips its overflow, so the dot cannot hang outside it). */
+      .conversation-table .cell--muted:not([data-empty]) + .cell--meta:not([data-empty]) {
+        margin-inline-start: calc(var(--space-xs) - var(--space-s));
+      }
+      .conversation-table .cell--muted:not([data-empty]) + .cell--meta:not([data-empty])::before {
+        content: '·';
+        margin-inline-end: var(--space-xs);
+        color: var(--text-faint);
+      }
+      .conversation-table [data-empty] {
+        display: none;
+      }
+      .conversation-table .last-contact,
+      .conversation-table .cell--next {
+        order: 5;
+        margin-block-start: var(--space-xs);
+      }
+      .conversation-table .cell--next {
+        flex: 1 1 0;
+        min-inline-size: 0;
+      }
+      /* The two dates are the only data that do NOT explain themselves: «3 d
+         ago» could be either. They keep a micro-label, short, inline, in the
+         margin voice the old card used for every field. */
+      .conversation-table .last-contact::before,
+      .conversation-table .cell--next::before {
+        content: attr(data-short);
+        margin-inline-end: var(--space-xs);
+        color: var(--text-faint);
+        font-family: var(--font-mono);
+        font-size: var(--text-xs);
+        letter-spacing: var(--mono-letter-spacing-loose);
+        text-transform: uppercase;
+      }
+      /* Date and note on the one line, the note giving way first. */
+      .conversation-table .cell--next {
+        display: flex;
+        align-items: baseline;
+      }
+      .conversation-table .cell--next .next-action {
+        flex-direction: row;
+        align-items: baseline;
+        gap: var(--space-xs);
+        min-inline-size: 0;
+      }
+      .conversation-table .cell--next .next-action__note {
         min-inline-size: 0;
       }
     }
