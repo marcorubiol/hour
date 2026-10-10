@@ -24,6 +24,24 @@ export function projectBolosQueryOptions(projectId: string, enabled = true) {
   };
 }
 
+/**
+ * ¿Lee dinero en este proyecto? Solo para distinguir «sin bolos» de «no te
+ * toca» cuando el feed viene vacío. Un fallo cuenta como «no».
+ */
+export function moneyAccessQueryOptions(projectId: string, enabled = true) {
+  return {
+    queryKey: ['money-access', projectId] as const,
+    enabled: enabled && Boolean(projectId),
+    retry: false,
+    staleTime: 5 * 60_000,
+    queryFn: ({ signal }: { signal: AbortSignal }) =>
+      fetchJSON<{ read_money: boolean }>(
+        `/api/money/access?project_id=${encodeURIComponent(projectId)}`,
+        signal,
+      ),
+  };
+}
+
 export function performanceBoloQueryOptions(performanceId: string, enabled = true) {
   return {
     queryKey: ['money-bolos', 'performance', performanceId] as const,
