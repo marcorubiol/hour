@@ -138,6 +138,25 @@ export const PATCH: RequestHandler = async ({ request, params, platform, locals 
       patch.travel_direction = null;
     }
 
+    // ADR-089: the two ends are a trip's alone (DB CHECK
+    // `date_travel_endpoints`). Leaving travel clears them, like the
+    // direction; on a trip, `city` follows the destination, because the away
+    // bands and every older reader still read `city` as where the trip goes.
+    if (effectiveKind !== 'travel_day') {
+      if (input.origin_city || input.destination_city) {
+        return json(
+          { error: 'invalid_body', hint: "origin/destination require kind='travel_day'." },
+          400,
+        );
+      }
+      if (input.kind && row.kind === 'travel_day') {
+        patch.origin_city = null;
+        patch.destination_city = null;
+      }
+    } else if (input.destination_city !== undefined) {
+      patch.city = input.destination_city;
+    }
+
     // Label ↔ custom_fields (ADR-078 §8): only the `label` key, ever.
     const stored =
       row.custom_fields && typeof row.custom_fields === 'object' && !Array.isArray(row.custom_fields)

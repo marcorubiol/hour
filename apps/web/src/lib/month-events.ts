@@ -47,6 +47,8 @@ export type PerformanceEvent = {
   line_id: string | null;
   project: ProjectLite | null;
   venue: {
+    /** Present on the planner feeds (`/api/performances` selects it). */
+    id?: string;
     name: string;
     city: string | null;
     country?: string | null;
@@ -87,6 +89,10 @@ export type DateEvent = {
       (graceful absence: chips render directionless, no away bands). */
   line_id?: string | null;
   travel_direction?: string | null;
+  /** ADR-089 — a trip's two ends, written by hand. Absent on old rows,
+      where `city` is the destination and the origin is deduced. */
+  origin_city?: string | null;
+  destination_city?: string | null;
   label?: string | null;
   /** ADR-090 P3 — a rehearsal's running order (see `dayMoments`). */
   schedule?: ScheduleMoment[] | null;
@@ -406,7 +412,11 @@ export function performanceSlip(p: PerformanceEvent, ctx: SlipContext): Slip {
 
 export function dateSlip(d: DateEvent, ctx: SlipContext): Slip {
   const kind = (d.kind as SlipKind) ?? 'other';
-  const name = d.title ?? d.venue_name ?? d.city ?? ctx.kindLabel(kind);
+  // ADR-089: a trip names where it goes. The written destination first; an
+  // old row's `city` already meant the same thing.
+  const trip = kind === 'travel_day';
+  const goesTo = trip ? (d.destination_city ?? d.city) : d.city;
+  const name = d.title ?? d.venue_name ?? goesTo ?? ctx.kindLabel(kind);
   // A venue-less DATE stays on the reader's clock on purpose: it buckets on
   // the reader's day (dateDayKey), and a slip must not print a wall time from
   // a zone other than the one that placed it in its cell.
@@ -435,10 +445,14 @@ export function dateSlip(d: DateEvent, ctx: SlipContext): Slip {
    * `Barcelona` on a travel day could be read as «this happens in Barcelona»,
    * which is exactly what a travel day is not.
    *
-   * The second place («from …») is deduced, not invented — see `origin`.
+   * The second place («from …») is WRITTEN when the trip has its origin
+   * (ADR-089), and deduced, not invented, when it has not — see `origin`.
+   * A written destination earns the `to` even without a direction: it says
+   * which end it is by itself.
    */
-  const lead = kind === 'travel_day' && d.travel_direction ? 'to' : null;
-  const origin = lead ? (ctx.originOf?.(d) ?? null) : null;
+  const lead = trip && (d.travel_direction || d.destination_city) ? 'to' : null;
+  const from = lead ? (d.origin_city ?? ctx.originOf?.(d) ?? null) : null;
+  const origin = from && from !== name ? from : null;
   return {
     id: d.id,
     kind,
@@ -448,7 +462,7 @@ export function dateSlip(d: DateEvent, ctx: SlipContext): Slip {
     name,
     lead,
     origin,
-    city: cityUnder(name, d.city),
+    city: cityUnder(name, goesTo),
     country: cc ? cc.toUpperCase() : null,
     time,
     project: d.project,

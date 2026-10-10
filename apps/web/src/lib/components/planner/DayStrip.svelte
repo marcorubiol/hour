@@ -210,7 +210,13 @@
                  twice as clear. -->
             {#each t.spans as sp, i (i)}
               {@const onA = t.marks.some((m) => Math.abs(m.at - sp.from) < 0.01)}
-              {@const onB = t.marks.some((m) => Math.abs(m.at - sp.to) < 0.01)}
+              {@const next = t.spans[i + 1]}
+              <!-- TWO BARS CLOSE TOGETHER (a trip's stages: the train lands at
+                   10h40, the car leaves at 11h) cannot both print an hour in
+                   the gap. The departure that follows keeps it; the arrival
+                   before it is in the list under the strip. -->
+              {@const crowded = next ? pct(next.from, win) - pct(sp.to, win) < 8 : false}
+              {@const onB = crowded || t.marks.some((m) => Math.abs(m.at - sp.to) < 0.01)}
               <span
                 class="ds__b"
                 style="left: {pct(sp.from, win)}%; width: {Math.max(

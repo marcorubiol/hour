@@ -89,23 +89,23 @@ test.describe('performance write path', () => {
     // (ADR-090 P3: the details dialog no longer carries the five slots;
     // there is one way to write an hour). The words are recognised in any
     // of the app's languages, so the spec does not depend on the locale.
-    const order = page.locator('.ro');
-    const add = order.locator('.ro__row--add');
+    const order = page.locator('.hours');
+    const add = order.locator('.hours__row--add');
     await add.getByLabel(/hour|hora/i).fill('11');
     await add.getByLabel(/moment/i).fill('load-in');
     await add.locator('button[type=submit]').click();
-    await expect(order.locator('.ro__line')).toHaveCount(1, { timeout: 10_000 });
+    await expect(order.locator('.hours__line')).toHaveCount(1, { timeout: 10_000 });
     await add.getByLabel(/hour|hora/i).fill('19h30');
     await add.getByLabel(/moment/i).fill('show');
     await add.locator('button[type=submit]').click();
-    await expect(order.locator('.ro__line')).toHaveCount(2, { timeout: 10_000 });
+    await expect(order.locator('.hours__line')).toHaveCount(2, { timeout: 10_000 });
     await expect(order).toContainText('19h30');
 
     // Reload — everything survived the round-trip.
     await page.reload();
     await waitForLoaded(page);
     await expect(page.locator('.state-badge')).toContainText('confirmed');
-    await expect(page.locator('.ro')).toContainText('11h', { timeout: 10_000 });
+    await expect(page.locator('.hours')).toContainText('11h', { timeout: 10_000 });
 
     // The gig shows up on its calendar day.
     await page.goto('/h/planner'); // ADR-067: lens is space-less

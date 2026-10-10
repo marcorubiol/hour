@@ -1151,6 +1151,89 @@ entre empresas sin construirlo.
 > 179/179, mergeada en `main` como `d540641`). Lo siguiente de Travel es la
 > pantalla (P2), que pide diseño.
 
+> **2026-10-10: PRIMERA VERSIÓN DE LA PANTALLA, para que Marco la corrija.**
+> Rama `claude/travel-screen` (sale de `claude/schedule-screen`, la escaleta,
+> y la necesita). Cero schema. Sin ADR todavía: se escribe cuando Marco valide.
+> Lo decidido en esta versión:
+> - **Los extremos van en los diálogos de alta y edición.** En un viaje, el
+>   campo «Ciudad» se parte en «Origen» y «Destino». `city` sigue siendo el
+>   destino (lo escribe el endpoint, un solo dueño), porque `awayBands()` y
+>   los lectores viejos lo leen. Salir de viaje en el PATCH limpia los
+>   extremos, como ya hacía con la dirección.
+> - **La card dice `TO Sevilla / FROM Barcelona` con datos escritos**: el
+>   destino escrito manda, el origen escrito gana al deducido (`dateSlip`).
+>   Mes, agenda, día y tablero lo heredan sin tocar cada vista.
+> - **Los tramos viven en la vista día, en el sitio de la escaleta**, con su
+>   misma tapa, columna de hora y reloj (`20h30`). Un viaje no tiene escaleta:
+>   su día son sus tramos. No van al diálogo (que edita los hechos gruesos) ni
+>   a la agenda ni al mes (sería pedir los tramos de cada fila).
+> - **Escribir un tramo pide hora, modo y destino.** El origen se encadena
+>   solo: donde llegó el tramo anterior según la hora tecleada, o el origen del
+>   viaje. Estación, referencia y nota esperan en el formulario de edición.
+> - **Un tramo cae donde dice su hora**, como en la escaleta: el endpoint lo
+>   coloca y llama a `reorder_travel_stages` solo si el orden cambia. Sin
+>   hora, se queda donde está. No hay reordenar a mano.
+> - **El estilo de la lista sale de `RunningOrder` a `styles/hours.css`** y lo
+>   comparten los dos; el tramo solo añade su rejilla de ruta.
+> **v2, tras la revisión de Marco (2026-10-10):**
+> - **Zona por extremo del tramo**: migración aditiva
+>   `20261010160000_travel_stage_zones` (`depart_tz`/`arrive_tz`, IANA,
+>   nullable = la del espacio; las RPC create/update las aceptan y rechazan
+>   una zona desconocida con 22023). Rollback en
+>   `build/runbooks/rollback-20261010-travel-stage-zones.sql`, probado en la
+>   Supabase local (ida, vuelta con funciones idénticas byte a byte, ida).
+>   RLS: `tests/rls/travel-stage-zones.test.ts` (5 casos, en `playwright`).
+>   **No aplicada en ninguna base hosted**: sigue el gate de § 34.
+> - Cada hora se escribe y se lee en la zona de su extremo; la zona se dice
+>   bajo la hora solo si no es la del espacio (`→ London`). El tramo nuevo
+>   sale en la zona en que llegó el anterior y llega en la que nombra su
+>   ciudad (tabla corta + nombres IANA, sin servicio externo); el formulario
+>   muestra la sugerencia y acepta cualquier zona IANA.
+> - La tira del día dibuja cada tramo como su propia barra, en el reloj del
+>   lector. «TO»/«FROM» de la card van al pase de idioma; países, no por ahora.
+>
+> **v3 (2026-10-10): la zona se SABE, no se adivina.** Fuera la tabla corta
+> de ciudades. Cada ciudad de un tramo ofrece candidatos con país y zona
+> desde un índice offline que sirve el Worker (`/api/places`, sobre
+> `static/data/places.json`, 6,2 MB / 2 MB gzip): GeoNames `cities5000`
+> (CC BY 4.0, con su crédito en la lista y en `static/data/ATTRIBUTION.txt`)
+> y los aeropuertos con IATA de `airportsdata` (MIT). Se regenera con
+> `scripts/build-places.mjs`. Lo ambiguo se pregunta («Valencia»: España,
+> Venezuela…); los que comparten país y zona se funden en uno. Sin elegir,
+> el extremo va en la hora del espacio y se dice bajo el campo. El país
+> elegido se guarda en `from_country`/`to_country`, que ya existían: sin
+> schema nuevo. Un lugar fuera del índice puede llevar su zona a mano en el
+> formulario de edición. Ninguna ciudad sale hacia un tercero.
+>
+> **v4 (2026-10-10): pueblos pequeños.** El índice es GeoNames `cities500`
+> para el mundo más TODOS los lugares poblados (clase P, sin históricos ni
+> barrios) de ES FR PT IT AD BE NL LU CH DE GB IE: 518.779 lugares. Partido
+> por prefijo del nombre (2 letras, 3 o más si el trozo pasa de 200 KB) en
+> `static/data/places/`: 2.856 ficheros, 37 MB crudo / 10,5 MB gzip, ningún
+> fichero de más de 200 KB. Una búsqueda lee un trozo: en frío, mediana
+> 0,3 ms (máx. 6,5 ms con los aeropuertos); en caliente, 0,06 ms. Medido en
+> Node; en un Worker desplegado, no. Lo ambiguo deja sitio a cada zona antes
+> de rellenar con más lugares de la misma.
+>
+> **v5 (2026-10-10): salas y hoteles.** Un extremo puede ser una sala del
+> espacio (primera en la lista, por nombre; zona = `venue.timezone`, si no
+> la de su ciudad si el índice da una sola, si no la del espacio, dicho), un
+> lugar del índice, o un hotel (pueblo elegido para la zona + nombre en
+> `*_place`). La sala de la función del día se ofrece como destino del tramo
+> nuevo hasta que un tramo llega a ella. Schema: `from_venue_id`/`to_venue_id`
+> en la MISMA migración, renombrada `20261010160000_travel_stage_ends`
+> (rollback `rollback-20261010-travel-stage-ends.sql`, probado en local;
+> RLS `tests/rls/travel-stage-ends.test.ts`, 8 casos).
+>
+> **v6 (2026-10-10): el índice va a R2, no al repo.** `scripts/build-places.mjs`
+> lo genera en `.cache/places/` (ignorada) y `scripts/upload-places.sh` lo
+> sube al bucket MEDIA (`hour-media`) bajo `places/v1/`, con la atribución;
+> `/api/places` lee de ahí con caché en memoria del isolate, y en `vite dev`
+> (R2 vacío del proxy) lee de disco, solo en dev. **Pendiente en la
+> integración:** subir el índice a R2 con OK de Marco, y antes reconstruirlo
+> (las fuentes de GeoNames y airportsdata, citadas en el script). Las salas
+> de un pueblo salen justo debajo de él; las que coinciden por nombre, arriba.
+
 > **Estado 2026-09-26.** Marco respondió las tres preguntas: aprueba el
 > modelo, rama `feat/travel-stages`, ensayo en `hour-staging`. P1 (schema) está
 > escrita en esa rama, que ya está en `origin`, y no aplicada en ninguna base

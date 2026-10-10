@@ -31,7 +31,8 @@
    * itself while the availability/team feeds are absent.
    */
 
-  import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
+  import { createMutation, createQueries, createQuery, useQueryClient } from '@tanstack/svelte-query';
+  import { toStore } from 'svelte/store';
   import { tick, untrack } from 'svelte';
   import { page } from '$app/state';
   import { goto, replaceState } from '$app/navigation';
@@ -86,6 +87,7 @@
   import DayFoot, { type DayNextVM } from '$lib/components/planner/DayFoot.svelte';
   import { performanceThread, dateThread, stripWindow, hourOf } from '$lib/day-strip';
   import RunningOrder from '$lib/components/RunningOrder.svelte';
+  import TravelStages, { stagesQuery, type StagesFeed } from '$lib/components/planner/TravelStages.svelte';
   import { ORDERED_DATE_KINDS, type RunningOrderTarget } from '$lib/running-order';
   import Dialog from '$lib/components/Dialog.svelte';
   import FeedDialog from '$lib/components/planner/FeedDialog.svelte';
@@ -400,6 +402,12 @@
   let defaultWorkspaceSlug = $derived($workspacesQuery.data?.items[0]?.slug ?? '');
   // The two maps the slip normaliser needs: a venue-less gig reads its home
   // space's clock, and the hold convention is resolved per workspace.
+  /** Each space's country: the first candidates a trip's places offer. */
+  let workspaceCountryById = $derived(
+    new Map(
+      ($workspacesQuery.data?.items ?? []).map((w) => [w.id, (w as { country?: string | null }).country ?? null]),
+    ),
+  );
   let workspaceTzById = $derived(
     new Map(
       ($workspacesQuery.data?.items ?? []).map((w) => [
@@ -1288,6 +1296,22 @@
      asked-for dates it cannot — a hold without an hour has no position,
      but it counts and the day's card must say it (design law: «no hour»,
      at the end, implying nothing about what sits above). */
+  /* THE STAGES OF THE DAY'S TRIPS (ADR-089 P2), for the strip: each stage is
+     its own bar. The same cache entry the list under the strip reads, so a
+     stage written there moves its bar here. Only fetched on the Day view. */
+  let dayTripIds = $derived(
+    view === 'day'
+      ? shownDates
+          .filter((d) => d.kind === 'travel_day' && dateDayKey(d, viewerTz) === selectedDay)
+          .map((d) => d.id)
+      : [],
+  );
+  const dayTripStages = createQueries({ queries: toStore(() => dayTripIds.map(stagesQuery)) });
+  let stagesByTrip = $derived(
+    new Map(
+      dayTripIds.map((id, i) => [id, ($dayTripStages[i]?.data as StagesFeed | undefined)?.stages ?? []]),
+    ),
+  );
   let dayWalk = $derived.by(() => {
     const threads = [];
     const unplaced = [];
@@ -1325,7 +1349,7 @@
     for (const d of shownDates) {
       if (dateDayKey(d, viewerTz) !== selectedDay) continue;
       const sl = dateSlip(d, slipCtxPage);
-      const t = dateThread(d, viewerTz, sl.name, sl.city, sl.cert);
+      const t = dateThread(d, viewerTz, sl.name, sl.city, sl.cert, stagesByTrip.get(d.id));
       const cl = dayClashOf(d.id, false);
       const shared = {
         project: d.project,
@@ -1353,14 +1377,28 @@
   /* THE RUNNING ORDER OF EACH THING THE DAY HOLDS (ADR-090 P3): the gigs,
      and the dates that have a day to order. In the order they start, so the
      orders read down the page the way the strip reads across it. Each one
-     types its hours in ITS clock: the venue's, else its space's. */
+     types its hours in ITS clock: the venue's, else its space's.
+     A TRIP takes the same place with its STAGES instead (ADR-089 P2): its
+     day is how it gets there, not a running order. */
+  /** The venue of the day's show of a project, if it has a linked one. */
+  function tonightsVenue(projectId: string | null): { venueId: string; name: string } | null {
+    if (!projectId) return null;
+    const p = shownPerfs.find(
+      (x) => perfDayKey(x) === selectedDay && x.project?.id === projectId && x.venue?.id,
+    );
+    return p?.venue?.id ? { venueId: p.venue.id, name: p.venue.name } : null;
+  }
   let dayOrders = $derived.by(() => {
     const out: Array<{
-      target: RunningOrderTarget;
+      target: RunningOrderTarget | 'trip';
       id: string;
       name: string;
       tz: string;
       from: string;
+      origin?: string | null;
+      country?: string | null;
+      workspaceId?: string | null;
+      suggestVenue?: { venueId: string; name: string } | null;
     }> = [];
     const clockOf = (venueTz: string | null | undefined, wsId: string | undefined) =>
       venueTz || (wsId ? workspaceTzById.get(wsId) : undefined) || viewerTz;
@@ -1376,6 +1414,25 @@
     }
     for (const d of shownDates) {
       if (dateDayKey(d, viewerTz) !== selectedDay) continue;
+      if (d.kind === 'travel_day') {
+        const sl = dateSlip(d, slipCtxPage);
+        out.push({
+          target: 'trip',
+          id: d.id,
+          name: sl.origin ? `${sl.origin} → ${sl.name}` : sl.name,
+          tz: clockOf(d.venue?.timezone, d.project?.workspace_id),
+          from: d.starts_at,
+          // Only a WRITTEN origin seeds the first stage: a deduced one is a
+          // guess about where you slept, and a stage stores what it is given.
+          origin: d.origin_city ?? null,
+          country: d.project ? (workspaceCountryById.get(d.project.workspace_id) ?? null) : null,
+          workspaceId: d.project?.workspace_id ?? null,
+          // THE SHOW OF THE DAY IS WHERE THE TRIP ENDS, most days: its venue
+          // is OFFERED as the new stage's destination (Marco, 2026-10-10).
+          suggestVenue: tonightsVenue(d.project?.id ?? null),
+        });
+        continue;
+      }
       if (!ORDERED_DATE_KINDS.includes(d.kind)) continue;
       out.push({
         target: 'date',
@@ -2916,15 +2973,29 @@
          be written, on the day. A name on the lid only when the day holds
          more than one order: with one, the strip above already says whose. -->
     {#each dayOrders as o (o.id)}
-      <RunningOrder
-        target={o.target}
-        id={o.id}
-        dayIso={selectedDay}
-        tz={o.tz}
-        {viewerTz}
-        {locale}
-        name={dayOrders.length > 1 ? o.name : null}
-      />
+      {#if o.target === 'trip'}
+        <TravelStages
+          id={o.id}
+          dayIso={selectedDay}
+          tz={o.tz}
+          {locale}
+          origin={o.origin}
+          spaceCountry={o.country}
+          workspaceId={o.workspaceId}
+          suggestVenue={o.suggestVenue}
+          name={dayOrders.length > 1 ? o.name : null}
+        />
+      {:else}
+        <RunningOrder
+          target={o.target}
+          id={o.id}
+          dayIso={selectedDay}
+          tz={o.tz}
+          {viewerTz}
+          {locale}
+          name={dayOrders.length > 1 ? o.name : null}
+        />
+      {/if}
     {/each}
     <!-- THE ABSENCE IS THE DAY'S FOOTING (Marco, 2026-08-10). Above the
          drawing it floated on its own, far from anything, and Marco could

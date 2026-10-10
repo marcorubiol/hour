@@ -101,6 +101,8 @@ type DateItem = {
   /** ADR-084 §1 — multi-day block key; NULL/absent = standalone date. */
   series_id?: string | null;
   travel_direction?: string | null;
+  origin_city?: string | null;
+  destination_city?: string | null;
   label?: string | null;
   /** ADR-090 P3 — the running order, compacted (`scheduleOf`). */
   schedule?: ScheduleMoment[];
@@ -155,6 +157,8 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
   const EXTENDED_SELECT = [
     ...BASE_SELECT,
     'line_id,travel_direction',
+    // ADR-089 — a trip's two ends. The card reads origin → destination.
+    'origin_city,destination_city',
     // ADR-084 §1 — the multi-day block's grouping key. The planner joins
     // consecutive rows of one series into a band; NULL = a standalone date.
     'series_id',
@@ -252,6 +256,16 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
       400,
     );
   }
+  // ADR-089: a trip's two ends ride only a travel day (DB CHECK
+  // `date_travel_endpoints`), and for a trip `city` IS the destination.
+  const isTrip = input.kind === 'travel_day';
+  if (!isTrip && (input.origin_city || input.destination_city)) {
+    return json(
+      { error: 'invalid_body', hint: "origin/destination require kind='travel_day'." },
+      400,
+    );
+  }
+  const city = isTrip && input.destination_city !== undefined ? input.destination_city : input.city;
   if (input.label && input.kind !== 'other') {
     return json(
       { error: 'invalid_body', hint: "label is only accepted for kind='other'." },
@@ -268,13 +282,15 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
       p_all_day: input.all_day ?? false,
       p_title: input.title ?? null,
       p_venue_name: input.venue_name ?? null,
-      p_city: input.city ?? null,
+      p_city: city ?? null,
       p_country: input.country ? input.country.toUpperCase() : null,
       p_status: input.status ?? 'tentative',
       p_performance_id: input.performance_id ?? null,
       p_line_id: input.line_id ?? null,
       p_travel_direction: input.travel_direction ?? null,
       p_label: input.label ?? null,
+      p_origin_city: isTrip ? (input.origin_city ?? null) : null,
+      p_destination_city: isTrip ? (input.destination_city ?? null) : null,
     });
     if (data.length === 0 || !data[0]) return json({ error: 'create_failed' }, 502);
     return json({ date: data[0] }, 201);

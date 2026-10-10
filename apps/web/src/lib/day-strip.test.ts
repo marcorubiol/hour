@@ -127,6 +127,59 @@ describe('dateThread', () => {
     expect(t.spans).toEqual([]);
     expect(t.marks[0].solo).toBe(true);
   });
+
+  describe('a trip with stages (ADR-089 P2)', () => {
+    const trip = dateRow({
+      kind: 'travel_day',
+      starts_at: '2026-07-18T08:00:00Z',
+      ends_at: '2026-07-18T12:00:00Z',
+    });
+
+    it('draws each stage as its own bar, with the gap between them', () => {
+      const t = dateThread(trip, TZ, 'Sevilla', null, 'confirmed', [
+        { depart_at: '2026-07-18T08:15:00Z', arrive_at: '2026-07-18T10:40:00Z' },
+        { depart_at: '2026-07-18T11:00:00Z', arrive_at: '2026-07-18T11:40:00Z' },
+      ])!;
+      expect(t.spans).toEqual([
+        { from: 8.25, to: 10 + 40 / 60 },
+        { from: 11, to: 11 + 40 / 60 },
+      ]);
+      expect(t.a).toBe(8.25);
+      expect(t.b).toBeCloseTo(11.667, 2);
+    });
+
+    it('a stage with one hour is an instant', () => {
+      const t = dateThread(trip, TZ, 'X', null, 'confirmed', [{ depart_at: '2026-07-18T09:00:00Z', arrive_at: null }])!;
+      expect(t.spans).toEqual([]);
+      expect(t.marks).toEqual([{ at: 9, step: 'start', show: false, solo: true }]);
+    });
+
+    it('a night stage runs past midnight on the axis', () => {
+      const t = dateThread(trip, TZ, 'X', null, 'confirmed', [
+        { depart_at: '2026-07-18T23:00:00Z', arrive_at: '2026-07-19T01:30:00Z' },
+      ])!;
+      expect(t.spans).toEqual([{ from: 23, to: 25.5 }]);
+    });
+
+    it('stages without hours leave the trip as it was', () => {
+      const t = dateThread(trip, TZ, 'X', null, 'confirmed', [{ depart_at: null, arrive_at: null }])!;
+      expect(t.spans).toEqual([{ from: 8, to: 12 }]);
+    });
+
+    it('an all-day trip with timed stages still draws them', () => {
+      const t = dateThread({ ...trip, all_day: true }, TZ, 'X', null, 'confirmed', [
+        { depart_at: '2026-07-18T08:00:00Z', arrive_at: '2026-07-18T09:00:00Z' },
+      ]);
+      expect(t?.spans).toEqual([{ from: 8, to: 9 }]);
+    });
+
+    it('only a trip reads stages', () => {
+      const t = dateThread(dateRow(), TZ, 'X', null, 'confirmed', [
+        { depart_at: '2026-07-18T08:00:00Z', arrive_at: '2026-07-18T09:00:00Z' },
+      ])!;
+      expect(t.spans).not.toEqual([{ from: 8, to: 9 }]);
+    });
+  });
 });
 
 describe('stripWindow — the track is the DAY’s extent, not a fixed 00→24', () => {

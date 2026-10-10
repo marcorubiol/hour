@@ -28,6 +28,10 @@ Thumbs.db
 
 # logs
 *.log
+
+# The places index (scripts/build-places.mjs): built here, served from R2
+# (`places/v1/` in the MEDIA bucket), never committed.
+.cache/
 npm-debug.log*
 pnpm-debug.log*
 

@@ -41,6 +41,7 @@ export type DateRow = Tables<'date'>;
 
 const countryField = v.pipe(v.string(), v.regex(/^[A-Za-z]{2}$/, 'ISO 3166 alpha-2'));
 const labelField = v.pipe(v.string(), v.trim(), v.maxLength(120));
+const placeField = v.pipe(v.string(), v.trim(), v.maxLength(120));
 
 /**
  * POST /api/dates body. Creation rides the `create_date` RPC —
@@ -62,6 +63,11 @@ export const DateCreateSchema = v.object({
   line_id: v.optional(v.nullable(v.pipe(v.string(), v.uuid()))),
   performance_id: v.optional(v.nullable(v.pipe(v.string(), v.uuid()))),
   travel_direction: v.optional(v.nullable(v.picklist(TRAVEL_DIRECTIONS))),
+  /** ADR-089: a trip's two ends. Only a travel day carries them (DB CHECK
+      `date_travel_endpoints`). For a trip, `city` is kept equal to the
+      destination: it is what the away bands and old readers still read. */
+  origin_city: v.optional(v.nullable(placeField)),
+  destination_city: v.optional(v.nullable(placeField)),
   label: v.optional(v.nullable(labelField)),
 });
 
@@ -119,6 +125,11 @@ export const DatePatchSchema = v.object({
   line_id: v.optional(v.nullable(v.pipe(v.string(), v.uuid()))),
   performance_id: v.optional(v.nullable(v.pipe(v.string(), v.uuid()))),
   travel_direction: v.optional(v.nullable(v.picklist(TRAVEL_DIRECTIONS))),
+  /** ADR-089: a trip's two ends. Only a travel day carries them (DB CHECK
+      `date_travel_endpoints`). For a trip, `city` is kept equal to the
+      destination: it is what the away bands and old readers still read. */
+  origin_city: v.optional(v.nullable(placeField)),
+  destination_city: v.optional(v.nullable(placeField)),
   label: v.optional(v.nullable(labelField)),
 });
 

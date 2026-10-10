@@ -2332,13 +2332,16 @@ export type Database = {
       travel_stage: {
         Row: {
           arrive_at: string | null
+          arrive_tz: string | null
           created_at: string
           created_by: string | null
           date_id: string
           depart_at: string | null
+          depart_tz: string | null
           from_city: string | null
           from_country: string | null
           from_place: string | null
+          from_venue_id: string | null
           id: string
           mode: Database["public"]["Enums"]["transport_mode"]
           notes: string | null
@@ -2348,18 +2351,22 @@ export type Database = {
           to_city: string | null
           to_country: string | null
           to_place: string | null
+          to_venue_id: string | null
           updated_at: string
           workspace_id: string
         }
         Insert: {
           arrive_at?: string | null
+          arrive_tz?: string | null
           created_at?: string
           created_by?: string | null
           date_id: string
           depart_at?: string | null
+          depart_tz?: string | null
           from_city?: string | null
           from_country?: string | null
           from_place?: string | null
+          from_venue_id?: string | null
           id?: string
           mode?: Database["public"]["Enums"]["transport_mode"]
           notes?: string | null
@@ -2369,18 +2376,22 @@ export type Database = {
           to_city?: string | null
           to_country?: string | null
           to_place?: string | null
+          to_venue_id?: string | null
           updated_at?: string
           workspace_id: string
         }
         Update: {
           arrive_at?: string | null
+          arrive_tz?: string | null
           created_at?: string
           created_by?: string | null
           date_id?: string
           depart_at?: string | null
+          depart_tz?: string | null
           from_city?: string | null
           from_country?: string | null
           from_place?: string | null
+          from_venue_id?: string | null
           id?: string
           mode?: Database["public"]["Enums"]["transport_mode"]
           notes?: string | null
@@ -2390,6 +2401,7 @@ export type Database = {
           to_city?: string | null
           to_country?: string | null
           to_place?: string | null
+          to_venue_id?: string | null
           updated_at?: string
           workspace_id?: string
         }
@@ -2402,10 +2414,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "travel_stage_from_venue_id_fkey"
+            columns: ["from_venue_id"]
+            isOneToOne: false
+            referencedRelation: "venue"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "travel_stage_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "project"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "travel_stage_to_venue_id_fkey"
+            columns: ["to_venue_id"]
+            isOneToOne: false
+            referencedRelation: "venue"
             referencedColumns: ["id"]
           },
           {
@@ -3755,27 +3781,34 @@ export type Database = {
       create_travel_stage: {
         Args: {
           p_arrive_at?: string
+          p_arrive_tz?: string
           p_date_id: string
           p_depart_at?: string
+          p_depart_tz?: string
           p_from_city?: string
           p_from_country?: string
           p_from_place?: string
+          p_from_venue_id?: string
           p_mode?: Database["public"]["Enums"]["transport_mode"]
           p_notes?: string
           p_reference?: string
           p_to_city?: string
           p_to_country?: string
           p_to_place?: string
+          p_to_venue_id?: string
         }
         Returns: {
           arrive_at: string | null
+          arrive_tz: string | null
           created_at: string
           created_by: string | null
           date_id: string
           depart_at: string | null
+          depart_tz: string | null
           from_city: string | null
           from_country: string | null
           from_place: string | null
+          from_venue_id: string | null
           id: string
           mode: Database["public"]["Enums"]["transport_mode"]
           notes: string | null
@@ -3785,6 +3818,7 @@ export type Database = {
           to_city: string | null
           to_country: string | null
           to_place: string | null
+          to_venue_id: string | null
           updated_at: string
           workspace_id: string
         }
@@ -4230,13 +4264,16 @@ export type Database = {
         Args: { p_date_id: string; p_stage_ids: string[] }
         Returns: {
           arrive_at: string | null
+          arrive_tz: string | null
           created_at: string
           created_by: string | null
           date_id: string
           depart_at: string | null
+          depart_tz: string | null
           from_city: string | null
           from_country: string | null
           from_place: string | null
+          from_venue_id: string | null
           id: string
           mode: Database["public"]["Enums"]["transport_mode"]
           notes: string | null
@@ -4246,6 +4283,7 @@ export type Database = {
           to_city: string | null
           to_country: string | null
           to_place: string | null
+          to_venue_id: string | null
           updated_at: string
           workspace_id: string
         }[]
@@ -4377,6 +4415,11 @@ export type Database = {
         Returns: undefined
       }
       touch_line_visit: { Args: { p_line_id: string }; Returns: undefined }
+      travel_stage_venue: {
+        Args: { p_venue_id: string; p_workspace_id: string }
+        Returns: string
+      }
+      travel_stage_zone: { Args: { p_tz: string }; Returns: string }
       update_bolo_fee: {
         Args: {
           p_bolo_id: string
@@ -4501,10 +4544,13 @@ export type Database = {
       update_travel_stage: {
         Args: {
           p_arrive_at?: string
+          p_arrive_tz?: string
           p_depart_at?: string
+          p_depart_tz?: string
           p_from_city?: string
           p_from_country?: string
           p_from_place?: string
+          p_from_venue_id?: string
           p_mode: Database["public"]["Enums"]["transport_mode"]
           p_notes?: string
           p_reference?: string
@@ -4512,16 +4558,20 @@ export type Database = {
           p_to_city?: string
           p_to_country?: string
           p_to_place?: string
+          p_to_venue_id?: string
         }
         Returns: {
           arrive_at: string | null
+          arrive_tz: string | null
           created_at: string
           created_by: string | null
           date_id: string
           depart_at: string | null
+          depart_tz: string | null
           from_city: string | null
           from_country: string | null
           from_place: string | null
+          from_venue_id: string | null
           id: string
           mode: Database["public"]["Enums"]["transport_mode"]
           notes: string | null
@@ -4531,6 +4581,7 @@ export type Database = {
           to_city: string | null
           to_country: string | null
           to_place: string | null
+          to_venue_id: string | null
           updated_at: string
           workspace_id: string
         }

@@ -150,6 +150,40 @@ export function performanceThread(
   };
 }
 
+/** A trip's stage, as the strip reads it (ADR-089 P2): only its two instants. */
+export type StripStage = { depart_at: string | null; arrive_at: string | null };
+
+/**
+ * A TRIP WITH STAGES DRAWS EACH STAGE (Marco, 2026-10-10): the train is one
+ * bar, the car another, and the wait at the station between them is the gap
+ * it is. A stage with one hour only is an instant. The strip keeps ONE clock
+ * (the reader's): a flight that lands in London is drawn where it lands on
+ * this axis, and its London hour is the list's business, under the strip.
+ *
+ * Null when no stage has an hour: the trip then draws as any date does.
+ */
+function stagesThread(
+  stages: readonly StripStage[],
+  timeZone: string,
+): Pick<StripThread, 'spans' | 'marks' | 'a' | 'b'> | null {
+  const spans: StripSpan[] = [];
+  const marks: StripMark[] = [];
+  for (const st of stages) {
+    const from = st.depart_at ? hourOf(st.depart_at, timeZone) : null;
+    const end = st.arrive_at ? hourOf(st.arrive_at, timeZone) : null;
+    if (from !== null && end !== null) {
+      const to = end < from ? end + 24 : end;
+      if (to > from) spans.push({ from, to });
+      else marks.push({ at: from, step: 'start', show: false, solo: true });
+    } else if (from !== null || end !== null) {
+      marks.push({ at: (from ?? end) as number, step: 'start', show: false, solo: true });
+    }
+  }
+  const ends = [...spans.flatMap((x) => [x.from, x.to]), ...marks.map((m) => m.at)];
+  if (ends.length === 0) return null;
+  return { spans, marks, a: Math.min(...ends), b: Math.max(...ends) };
+}
+
 /**
  * A date becomes one thread too. It draws its span, and the moments of its
  * running order if it has one (ADR-090 P3: a rehearsal day is ordered like a
@@ -163,6 +197,7 @@ export function dateThread(
   name: string,
   city: string | null,
   cert: string,
+  stages: readonly StripStage[] = [],
 ): StripThread | null {
   const marks = momentMarks(dayMoments(d), timeZone);
   const ats = marks.map((m) => m.at);
@@ -178,6 +213,13 @@ export function dateThread(
     a: Math.min(a, ...ats),
     b: Math.max(b, ...ats),
   });
+  // A trip with timed stages draws its stages (ADR-089 P2), and the moments
+  // of its running order, if it has any, ride on top as on any other day.
+  const staged = d.kind === 'travel_day' ? stagesThread(stages, timeZone) : null;
+  if (staged) {
+    const own = thread(staged.spans, staged.a, staged.b);
+    return { ...own, kind: 'travel_day', marks: [...staged.marks, ...marks] };
+  }
   if (d.all_day) {
     if (marks.length === 0) return null;
     if (marks.length === 1) marks[0].solo = true;

@@ -251,4 +251,39 @@ describe('dateSlip', () => {
   test('a date has no page of its own yet, so it carries no href', () => {
     expect(dateSlip(dateRow(), CTX).href).toBeNull();
   });
+
+  describe('a trip (ADR-089)', () => {
+    const trip = (over: Partial<DateEvent> = {}) => dateRow({ kind: 'travel_day', ...over });
+
+    test('names the written destination, with its origin under it', () => {
+      const s = dateSlip(trip({ origin_city: 'Barcelona', destination_city: 'Sevilla', city: 'Sevilla' }), CTX);
+      expect(s.name).toBe('Sevilla');
+      expect(s.lead).toBe('to');
+      expect(s.origin).toBe('Barcelona');
+      // The destination is the name, so it is not printed again as a city.
+      expect(s.city).toBeNull();
+    });
+
+    test('a written origin wins over the deduced one', () => {
+      const ctx = { ...CTX, originOf: () => 'Girona' };
+      const s = dateSlip(trip({ origin_city: 'Barcelona', destination_city: 'Sevilla' }), ctx);
+      expect(s.origin).toBe('Barcelona');
+    });
+
+    test('an old trip still reads its city and deduces where it left from', () => {
+      const ctx = { ...CTX, originOf: () => 'Girona' };
+      const s = dateSlip(trip({ city: 'Sevilla', travel_direction: 'outbound' }), ctx);
+      expect(s.name).toBe('Sevilla');
+      expect(s.origin).toBe('Girona');
+    });
+
+    test('never says it leaves from where it goes', () => {
+      const s = dateSlip(trip({ origin_city: 'Sevilla', destination_city: 'Sevilla' }), CTX);
+      expect(s.origin).toBeNull();
+    });
+
+    test('a trip with neither end nor direction has no lead', () => {
+      expect(dateSlip(trip(), CTX).lead).toBeNull();
+    });
+  });
 });

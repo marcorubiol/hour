@@ -130,6 +130,8 @@
   let dTitle = $state('');
   let dVenue = $state('');
   let dCity = $state('');
+  /** ADR-089: where a trip leaves from. On a trip, `dCity` is where it goes. */
+  let dOrigin = $state('');
   let dLabel = $state('');
   let dAllDay = $state(false);
   let dDay = $state(''); // all-day start (date)
@@ -273,6 +275,7 @@
       dTitle = '';
       dVenue = '';
       dCity = '';
+      dOrigin = '';
       dLabel = '';
       dPerformance = '';
       dOption = true;
@@ -434,7 +437,11 @@
     }
     // Kind-scoped fields stay OUT of the body unless the kind admits them
     // (the endpoint 400s a travel_direction on a rehearsal — by design).
-    if (type === 'travel_day') input.travel_direction = dDirection;
+    if (type === 'travel_day') {
+      input.travel_direction = dDirection;
+      input.origin_city = dOrigin.trim() || null;
+      input.destination_city = dCity.trim() || null;
+    }
     if (type === 'other') input.label = dLabel.trim() || null;
     $createDate.mutate(input);
   }
@@ -532,7 +539,17 @@
           <Input label={t('create.event_title', locale)} bind:value={dTitle} />
           <Input label={t('create.venue', locale)} bind:value={dVenue} />
         {/if}
-        <Input label={t('create.city', locale)} bind:value={dCity} />
+        {#if type === 'travel_day'}
+          <!-- A TRIP HAS TWO ENDS (ADR-089), so the one place becomes two:
+               where it leaves from, where it goes. The stages in between are
+               written in the day view, under the strip. -->
+          <div class="ced__pair">
+            <Input label={t('create.trip_from', locale)} bind:value={dOrigin} autocomplete="off" />
+            <Input label={t('create.trip_to', locale)} bind:value={dCity} autocomplete="off" />
+          </div>
+        {:else}
+          <Input label={t('create.city', locale)} bind:value={dCity} />
+        {/if}
 
         {#if type === 'other'}
           <Input label={t('create.label', locale)} bind:value={dLabel} list="ced-labels" autocomplete="off" />
@@ -662,7 +679,8 @@
       gap: var(--space-s);
     }
 
-    .ced__times {
+    .ced__times,
+    .ced__pair {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
       gap: var(--space-s);

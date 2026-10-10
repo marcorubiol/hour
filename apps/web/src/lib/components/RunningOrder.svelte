@@ -180,7 +180,7 @@
     if (editing === from) editing = to;
     $reorder.mutate(ids);
     await tick();
-    const sel = refocus === 'line' ? `[data-index="${to}"] .ro__line` : `[data-index="${to}"] .ro__act--move`;
+    const sel = refocus === 'line' ? `[data-index="${to}"] .hours__line` : `[data-index="${to}"] .ro__act--move`;
     listEl?.querySelector<HTMLElement>(sel)?.focus();
   }
 
@@ -318,7 +318,7 @@
   );
 </script>
 
-<section class="ro" aria-busy={$feed.isPending}>
+<section class="hours" aria-busy={$feed.isPending}>
   <button type="button" class="lid" aria-expanded={open} onclick={() => (open = !open)}>
     <span class="lid__w">{lidWord}</span>
     <span class="lid__n"
@@ -336,17 +336,17 @@
            the small one under each is the reader's. -->
       <p class="ro__zone">{t('planner.ro_zones', locale, { tz, yours: viewerTz })}</p>
     {/if}
-    <ol class="ro__list" bind:this={listEl}>
+    <ol class="hours__list" bind:this={listEl}>
       {#each order as s, i (s.id ?? i)}
         {@const tomorrow = dayOf(s.at, tz) !== dayIso}
         {@const alt = viewerClock(s.at)}
         {@const off = outOfTime(order, i)}
         {#if editing === i}
-          <li class="ro__row ro__row--edit" data-index={i}>
-            <form class="ro__form" onsubmit={commitEdit} use:focusFirst>
-              <span class="ro__at ro__at--edit">
+          <li class="hours__row hours__row--edit" data-index={i}>
+            <form class="hours__form" onsubmit={commitEdit} use:focusFirst>
+              <span class="hours__at hours__at--edit">
                 <input
-                  class="ro__in ro__in--clock"
+                  class="hours__in hours__in--clock"
                   aria-label={t('planner.ro_clock', locale)}
                   aria-invalid={eBad}
                   placeholder="20h30"
@@ -356,9 +356,9 @@
                   onkeydown={onEditKey}
                   disabled={pending}
                 />
-                <span class="ro__dash" aria-hidden="true">–</span>
+                <span class="hours__dash" aria-hidden="true">–</span>
                 <input
-                  class="ro__in ro__in--clock"
+                  class="hours__in hours__in--clock"
                   aria-label={t('planner.ro_until', locale)}
                   placeholder={t('planner.ro_until', locale)}
                   inputmode="numeric"
@@ -368,9 +368,9 @@
                   disabled={pending}
                 />
               </span>
-              <span class="ro__body">
+              <span class="hours__body">
                 <input
-                  class="ro__in ro__in--word"
+                  class="hours__in hours__in--word"
                   aria-label={t('planner.ro_moment', locale)}
                   placeholder={t('planner.ro_moment_ph', locale)}
                   list={listId}
@@ -380,7 +380,7 @@
                   disabled={pending}
                 />
                 <input
-                  class="ro__in ro__in--notes"
+                  class="hours__in hours__in--notes"
                   aria-label={t('planner.ro_notes', locale)}
                   placeholder={t('planner.ro_notes_ph', locale)}
                   autocomplete="off"
@@ -389,24 +389,24 @@
                   disabled={pending}
                 />
               </span>
-              <span class="ro__acts">
-                <button type="submit" class="ro__act" disabled={pending}>{t('planner.ro_save', locale)}</button>
-                <button type="button" class="ro__act" onclick={cancelEdit} disabled={pending}
+              <span class="hours__acts">
+                <button type="submit" class="hours__act" disabled={pending}>{t('planner.ro_save', locale)}</button>
+                <button type="button" class="hours__act" onclick={cancelEdit} disabled={pending}
                   >{t('planner.ro_cancel', locale)}</button
                 >
                 <button
                   type="button"
-                  class="ro__act ro__act--quiet ro__act--move"
+                  class="hours__act hours__act--quiet ro__act--move"
                   onclick={() => move(i, i - 1, 'edit')}
                   disabled={pending || i === 0}>{t('planner.ro_up', locale)}</button
                 >
                 <button
                   type="button"
-                  class="ro__act ro__act--quiet"
+                  class="hours__act hours__act--quiet"
                   onclick={() => move(i, i + 1, 'edit')}
                   disabled={pending || i === order.length - 1}>{t('planner.ro_down', locale)}</button
                 >
-                <button type="button" class="ro__act ro__act--quiet" onclick={remove} disabled={pending}
+                <button type="button" class="hours__act hours__act--quiet" onclick={remove} disabled={pending}
                   >{t('planner.ro_remove', locale)}</button
                 >
               </span>
@@ -414,7 +414,7 @@
           </li>
         {:else}
           <li
-            class="ro__row"
+            class="hours__row"
             class:ro__row--drop={dragOver === i && dragFrom !== null && dragFrom !== i}
             class:ro__row--dragging={dragFrom === i}
             data-index={i}
@@ -427,7 +427,7 @@
           >
             <svelte:element
               this={canEdit ? 'button' : 'div'}
-              class="ro__line"
+              class="hours__line"
               {...canEdit
                 ? {
                     type: 'button',
@@ -438,18 +438,18 @@
                   }
                 : {}}
             >
-              <span class="ro__at" class:ro__at--off={off} title={off ? t('planner.ro_out_of_time', locale) : undefined}
+              <span class="hours__at" class:ro__at--off={off} title={off ? t('planner.ro_out_of_time', locale) : undefined}
                 >{clockText(s.at, tz)}{#if tomorrow}<sup
-                    class="ro__plus"
+                    class="hours__plus"
                     title={t('planner.ro_next_day', locale)}>+1</sup
-                  >{/if}{#if s.ends_at}<span class="ro__end">–{clockText(s.ends_at, tz)}</span>{/if}{#if alt}<span
+                  >{/if}{#if s.ends_at}<span class="hours__end">–{clockText(s.ends_at, tz)}</span>{/if}{#if alt}<span
                     class="ro__alt"
                     title={t('planner.ro_yours', locale)}>{alt}</span
                   >{/if}</span
               >
-              <span class="ro__body">
-                <span class="ro__w" class:ro__w--show={s.kind === 'start'}>{slotWord(s, kindWord)}</span>
-                {#if s.notes}<span class="ro__n">{s.notes}</span>{/if}
+              <span class="hours__body">
+                <span class="hours__w" class:ro__w--show={s.kind === 'start'}>{slotWord(s, kindWord)}</span>
+                {#if s.notes}<span class="hours__n">{s.notes}</span>{/if}
               </span>
               {#if canEdit}<span class="ro__grip" aria-hidden="true"></span>{/if}
             </svelte:element>
@@ -458,11 +458,11 @@
       {/each}
 
       {#if canEdit}
-        <li class="ro__row ro__row--add">
-          <form class="ro__form" onsubmit={add}>
-            <span class="ro__at ro__at--edit">
+        <li class="hours__row hours__row--add">
+          <form class="hours__form" onsubmit={add}>
+            <span class="hours__at hours__at--edit">
               <input
-                class="ro__in ro__in--clock"
+                class="hours__in hours__in--clock"
                 aria-label={t('planner.ro_clock', locale)}
                 aria-invalid={aBad}
                 placeholder="20h30"
@@ -474,7 +474,7 @@
               {#if isToday}
                 <button
                   type="button"
-                  class="ro__act ro__act--quiet"
+                  class="hours__act hours__act--quiet"
                   onclick={() => {
                     aClock = clockText(new Date().toISOString(), tz);
                     aBad = false;
@@ -482,9 +482,9 @@
                 >
               {/if}
             </span>
-            <span class="ro__body">
+            <span class="hours__body">
               <input
-                class="ro__in ro__in--word"
+                class="hours__in hours__in--word"
                 aria-label={t('planner.ro_moment', locale)}
                 placeholder={t('planner.ro_moment_ph', locale)}
                 list={listId}
@@ -493,116 +493,33 @@
                 disabled={pending}
               />
             </span>
-            <span class="ro__acts">
+            <span class="hours__acts">
               <button
                 type="submit"
-                class="ro__act"
+                class="hours__act"
                 disabled={pending || !aClock.trim() || !aWord.trim()}>{t('planner.ro_add', locale)}</button
               >
             </span>
           </form>
         </li>
       {:else if order.length === 0 && !$feed.isPending}
-        <li class="ro__row ro__row--empty">{t('planner.ro_empty', locale)}</li>
+        <li class="hours__row hours__row--empty">{t('planner.ro_empty', locale)}</li>
       {/if}
     </ol>
-    {#if aBad}<p class="ro__hint" role="status">{t('planner.ro_bad_clock', locale)}</p>{/if}
-    {#if eBad}<p class="ro__hint" role="status">{t('planner.ro_bad_clock', locale)}</p>{/if}
+    {#if aBad}<p class="hours__hint" role="status">{t('planner.ro_bad_clock', locale)}</p>{/if}
+    {#if eBad}<p class="hours__hint" role="status">{t('planner.ro_bad_clock', locale)}</p>{/if}
   {/if}
 </section>
 
 <style>
   @layer components {
-    /* THREE COLUMNS, DECLARED ONCE: the hour, the moment, the verbs. Every
-       row — read, edit, add — takes them by subgrid, so an hour typed in the
-       add row sits exactly under the hours above it. Alignment by
-       construction, not by matching paddings. */
-    .ro {
-      --ro-at: 11ch;
-      container-type: inline-size;
-      margin-block-start: var(--space-m);
-    }
-    .ro__list {
-      display: grid;
-      grid-template-columns: var(--ro-at) minmax(0, 1fr) auto;
-      column-gap: var(--space-m);
-      margin: 0;
-      padding: 0;
-      list-style: none;
-    }
-    .ro__row {
-      display: grid;
-      grid-column: 1 / -1;
-      grid-template-columns: subgrid;
-      align-items: baseline;
-    }
-    .ro__row + .ro__row {
-      border-block-start: 1px dotted var(--border-color-light);
-    }
-    .ro__line,
-    .ro__form {
-      display: grid;
-      grid-column: 1 / -1;
-      grid-template-columns: subgrid;
-      align-items: baseline;
-      padding-block: var(--space-xs);
-    }
-    /* The read row is a button only to whoever may edit; it must not look
-       like one. */
-    .ro__line {
-      inline-size: 100%;
-      margin: 0;
-      padding-inline: 0;
-      border: 0;
-      background: none;
-      font: inherit;
-      color: inherit;
-      text-align: start;
-    }
-    button.ro__line {
-      cursor: pointer;
-    }
-    button.ro__line:hover .ro__w {
-      text-decoration: underline;
-      text-decoration-thickness: 1px;
-      text-underline-offset: 3px;
-    }
-    /* The hour: the Planner's clock, tabular so the column reads down. */
-    .ro__at {
-      font-size: var(--text-s);
-      font-variant-numeric: tabular-nums;
-      color: var(--text-color);
-      white-space: nowrap;
-    }
-    .ro__end {
-      color: var(--text-faint);
-    }
-    .ro__plus {
-      margin-inline-start: 1px;
-      font-size: 0.7em;
-      color: var(--text-faint);
-    }
-    .ro__body {
-      display: flex;
-      flex-direction: column;
-      gap: 1px;
-      min-inline-size: 0;
-    }
-    .ro__w {
-      font-size: var(--text-s);
-      color: var(--text-color);
-      overflow-wrap: anywhere;
-    }
+    /* The list itself (columns, rows, fields, verbs) lives in
+       `styles/hours.css`, shared with the travel stages. Only what is the
+       running order's own stays here. */
     /* The show is why the day exists: the serif, the strip's full ink. */
     .ro__w--show {
       font-family: var(--font-display);
       font-size: var(--text-m);
-    }
-    .ro__n {
-      font-size: var(--text-xs);
-      color: var(--text-faint);
-      white-space: pre-wrap;
-      overflow-wrap: anywhere;
     }
     /* The reader's own hour, when it is another (D-PRE-10): a gloss under
        the hour, never beside it, so the column keeps its width. */
@@ -616,8 +533,8 @@
       font-style: italic;
       color: var(--text-muted);
     }
-    /* ── Moving: the grip says a row can be dragged; the line shows where
-       it lands. Alt+↑/↓ does the same from the keyboard. ───────────── */
+    /* Moving: the grip says a row can be dragged; the line shows where
+       it lands. Alt+Up/Down does the same from the keyboard. */
     .ro__grip {
       align-self: center;
       justify-self: end;
@@ -628,99 +545,15 @@
       cursor: grab;
       transition: opacity 0.1s;
     }
-    .ro__row:hover .ro__grip,
-    .ro__line:focus-visible .ro__grip {
+    .hours__row:hover .ro__grip,
+    .hours__line:focus-visible .ro__grip {
       opacity: 1;
     }
     .ro__row--dragging {
       opacity: 0.4;
     }
-    .ro__row.ro__row--drop {
+    .hours__row.ro__row--drop {
       border-block-start: 1px solid var(--text-muted);
-    }
-    .ro__row--empty {
-      display: block;
-      padding-block: var(--space-xs);
-      font-family: var(--font-display);
-      font-style: italic;
-      font-size: var(--text-s);
-      color: var(--text-faint);
-    }
-
-    /* ── The forms: bare fields on the same lines as the text they edit ── */
-    .ro__at--edit {
-      display: flex;
-      align-items: baseline;
-      gap: 2px;
-    }
-    .ro__in {
-      min-inline-size: 0;
-      padding: 0 0 1px;
-      border: 0;
-      border-block-end: 1px solid var(--border-color-light);
-      background: none;
-      font: inherit;
-      font-size: var(--text-s);
-      color: var(--text-color);
-    }
-    .ro__in:focus {
-      outline: none;
-      border-block-end-color: var(--text-muted);
-    }
-    .ro__in::placeholder {
-      color: var(--text-faint);
-    }
-    /* The five words still come up as you type; the arrow is chrome. */
-    .ro__in::-webkit-calendar-picker-indicator {
-      inline-size: 0;
-      margin: 0;
-      padding: 0;
-      opacity: 0;
-    }
-    .ro__in[aria-invalid='true'] {
-      border-block-end-color: var(--danger);
-    }
-    .ro__in--clock {
-      inline-size: 5ch;
-      font-variant-numeric: tabular-nums;
-    }
-    .ro__in--notes {
-      font-size: var(--text-xs);
-    }
-    .ro__dash {
-      color: var(--text-faint);
-    }
-    .ro__row--add .ro__in {
-      border-block-end-style: dotted;
-    }
-
-    /* ── The verbs: margin voice, never buttons that shout ──────────── */
-    .ro__acts {
-      display: flex;
-      gap: var(--space-s);
-      justify-content: end;
-    }
-    .ro__act {
-      padding: 0;
-      border: 0;
-      background: none;
-      cursor: pointer;
-      font-family: var(--font-mono);
-      font-size: 9px;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      color: var(--text-muted);
-      white-space: nowrap;
-    }
-    .ro__act:hover:not(:disabled) {
-      color: var(--text-color);
-    }
-    .ro__act:disabled {
-      opacity: 0.4;
-      cursor: default;
-    }
-    .ro__act--quiet {
-      color: var(--text-faint);
     }
     .ro__zone {
       margin: var(--space-2xs) 0 0;
@@ -729,27 +562,9 @@
       letter-spacing: 0.08em;
       color: var(--text-faint);
     }
-    .ro__hint {
-      margin: var(--space-2xs) 0 0;
-      font-size: var(--text-xs);
-      color: var(--text-faint);
-    }
-
-    /* A NARROW HOST (the day on a phone): the hour column shrinks to the
-       widest hour it holds — still one column, still aligned — and the verbs
-       drop under the moment. The CONTAINER decides, not the viewport. */
     @container (max-width: 30rem) {
-      .ro__list {
-        grid-template-columns: max-content minmax(0, 1fr);
-        column-gap: var(--space-s);
-      }
       .ro__grip {
         display: none;
-      }
-      .ro__acts {
-        grid-column: 2;
-        justify-content: start;
-        padding-block-start: var(--space-2xs);
       }
     }
   }

@@ -69,6 +69,8 @@
   let dTitle = $state('');
   let dVenue = $state('');
   let dCity = $state('');
+  /** ADR-089: where a trip leaves from. On a trip, `dCity` is where it goes. */
+  let dOrigin = $state('');
   let dLabel = $state('');
   let dLine = $state('');
   let dPerformance = $state('');
@@ -176,7 +178,8 @@
     status = d.status;
     dTitle = d.title ?? '';
     dVenue = d.venue_name ?? '';
-    dCity = d.city ?? '';
+    dCity = (d.kind === 'travel_day' ? d.destination_city : null) ?? d.city ?? '';
+    dOrigin = d.origin_city ?? '';
     dLabel = d.label ?? '';
     dLine = d.line_id ?? '';
     dPerformance = d.performance_id ?? '';
@@ -276,7 +279,11 @@
     // Kind-scoped fields ride ONLY on the kind that admits them. Left out,
     // the endpoint clears what the old kind carried (travel_direction on a
     // kind change, the custom_fields label) instead of tripping a CHECK.
-    if (kind === 'travel_day') input.travel_direction = dDirection;
+    if (kind === 'travel_day') {
+      input.travel_direction = dDirection;
+      input.origin_city = dOrigin.trim() || null;
+      input.destination_city = dCity.trim() || null;
+    }
     if (kind === 'other') input.label = dLabel.trim() || null;
     $savePatch.mutate(input);
   }
@@ -344,7 +351,17 @@
           <Input label={t('create.event_title', locale)} bind:value={dTitle} />
           <Input label={t('create.venue', locale)} bind:value={dVenue} />
         {/if}
-        <Input label={t('create.city', locale)} bind:value={dCity} />
+        {#if kind === 'travel_day'}
+          <!-- A TRIP HAS TWO ENDS (ADR-089), so the one place becomes two:
+               where it leaves from, where it goes. The stages in between are
+               written in the day view, under the strip. -->
+          <div class="edd__pair">
+            <Input label={t('create.trip_from', locale)} bind:value={dOrigin} autocomplete="off" />
+            <Input label={t('create.trip_to', locale)} bind:value={dCity} autocomplete="off" />
+          </div>
+        {:else}
+          <Input label={t('create.city', locale)} bind:value={dCity} />
+        {/if}
 
         {#if kind === 'other'}
           <Input
@@ -456,7 +473,8 @@
       color: var(--text-muted);
     }
 
-    .edd__times {
+    .edd__times,
+    .edd__pair {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
       gap: var(--space-s);
