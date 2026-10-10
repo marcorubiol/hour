@@ -1423,10 +1423,28 @@ entre empresas sin construirlo.
   `research/product/21-venue-directory-sources.md` (fase 1: Basilic + Equipaments
   de Catalunya + Wikidata; OSM fuera salvo capa ODbL publicable).
   (espera: seis decisiones de Marco del informe, tareas)
-- [ ] Marco: decidir — **Directorio de salas:** alcance (¿polivalentes y casas de
-  cultura?), capa ODbL de OSM sí/no, si las correcciones vuelven al global, si el
-  email genérico va al global, qué países tras FR y CAT, y si se piden listados a
-  la Red Española de Teatros y a DGArtes. Desbloquea: «Directorio global de salas».
+  **Decidido por Marco (10-10):** (1) entran las salas polivalentes, casas de
+  cultura y ateneos, no solo teatros; (2) se puede publicar una capa ODbL de OSM
+  si no cuesta dinero; (4) la ficha global lleva los contactos de la sala:
+  email, teléfono y nombres de contacto, siempre dentro de la ley; (5) ahora
+  toda España y Francia, y Europa entera en cuanto se abra la app.
+  **Lo mismo quiere Marco para programadores:** una base común global de
+  programadores, dentro de la ley.
+- [ ] Marco: decidir — **Directorio de salas: cómo corrige una compañía la ficha
+  global sin que nadie la destroce.** A Marco le gusta que una compañera pueda
+  arreglar datos de una sala para todos, pero quiere control. Propuesta del
+  coordinador por pensar: la corrección entra como propuesta con su fuente, se
+  aplica sola si viene de quien tiene historial bueno o la confirman otras dos
+  compañías, todo con historial y vuelta atrás, y la fuente oficial nunca se
+  pisa en silencio. Desbloquea: «Directorio global de salas».
+- [ ] Marco: decidir — **Datos personales en el directorio global (salas y
+  programadores).** Nombres, emails y teléfonos de personas de otras entidades
+  en una base compartida necesitan base jurídica (interés legítimo para contacto
+  profesional, art. 19 LOPDGDD), informar a esas personas (art. 14 RGPD) y
+  atender su oposición. Antes de construir esa parte, una consulta legal.
+  Desbloquea: «Directorio global de salas».
+- [ ] Marco: decidir — **Escribir a la Red Española de Teatros y a DGArtes**
+  para pedir sus listados como dato (Marco, 10-10: lo quiere pensar).
 
 - [ ] **Pase de idioma de toda la app (Marco, 10-10).** Cuentas («New deal»,
   «Record payment»…), la ficha de la función fuera del formulario («Edit
