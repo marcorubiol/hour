@@ -1450,16 +1450,6 @@ entre empresas sin construirlo.
 - [ ] Marco: hacer — **Revisar y enviar los dos borradores de Mail (cuenta Google)** a la Red Española de Teatros (`redteatros@redescena.net`) y a DGArtes (`geral@dgartes.pt`, en portugués, pidiendo la Rede de Teatros e Cineteatros Portugueses). Creados el 2026-10-10. Antes: escribir a la Red Española de Teatros y a DGArtes
   para pedir sus listados como dato (Marco, 10-10: lo quiere pensar).
 
-- [ ] **Pase de idioma de toda la app (Marco, 10-10).** Cuentas («New deal»,
-  «Record payment»…), la ficha de la función fuera del formulario («Edit
-  details», «Readiness», «Team»), el editor de salas, y las fechas de
-  `dayLabel` («Fri, 13 Nov 2026») siguen en inglés en una app i18n ca/es/en.
-  Va DESPUÉS de integrar las cuatro primeras versiones de diseño, porque todas
-  tocan los diccionarios y se pisarían.
-  **La hoja de ruta también (Marco, 10-10):** en el idioma de la app, con el
-  inglés por defecto cuando no se sabe cuál. La interna, en el idioma de quien la
-  mira; la pública (anónima), en el del navegador si es ca/es/en, y si no, inglés.
-
 - [ ] **La app no cabe a 390 px (chat 09-10, visto por el carril de § 40).** El
   rail ocupa ~250 px y el shell entero desborda en un móvil. Pesa más ahora que
   Anouk va a usar Conversations; es diseño (dónde va el rail en móvil), parte del

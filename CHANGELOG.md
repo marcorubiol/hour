@@ -6,6 +6,8 @@ hasta entonces, sacado de esos documentos; lo anterior a julio de 2026 está sol
 
 ## Octubre 2026 (en curso)
 
+- Hour habla francés, además de catalán, castellano e inglés, según el idioma del navegador. Cuentas, la ficha de la función, el editor de salas, el Planner, Conversations, Ajustes y las fechas ya salen enteros en el idioma de la app; la hoja de ruta pública, en el del navegador (inglés si no es uno de los cuatro). (2026-10-10, `3649036`)
+- El Hall saluda por tu nombre de pila, el del perfil, y el menú de cuenta muestra tu nombre completo. (2026-10-10, `3649036`)
 - En el diario del Planner, pedir meses anteriores ya no se pierde si la app estaba buscando lo que viene. (2026-10-10, `2f48370`)
 - Al crear o editar una función se elige su bolo (el trato con la sala); con un solo bolo abierto se propone solo, y la ficha enlaza al bolo en Cuentas. (2026-10-10, `6d5276c`)
 - La escaleta: el orden del día de una función o de un ensayo, con sus momentos y horas, se escribe en la vista Día y en la ficha de la función, se reordena a mano y sale en la hoja de ruta, también la pública. (2026-10-10, `6d5276c`)
