@@ -51,10 +51,10 @@
     align-items: center;
     justify-content: space-between;
     gap: var(--space-m);
-    max-inline-size: calc(var(--page-width) + var(--space-l) * 2);
+    max-inline-size: calc(var(--page-width) + var(--shell-gutter) * 2);
     margin-inline: auto;
     padding-block: var(--space-xs);
-    padding-inline: var(--space-l);
+    padding-inline: var(--shell-gutter);
     min-block-size: 2.75rem;
   }
   .shell__crumbs {

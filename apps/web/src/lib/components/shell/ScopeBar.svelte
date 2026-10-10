@@ -130,11 +130,11 @@
     flex-direction: column;
     gap: var(--space-m);
     padding-block: var(--space-m) 0;
-    padding-inline: var(--space-l);
+    padding-inline: var(--shell-gutter);
     /* Sibling of .shell__content, so it needs the same cap to stay aligned
        with the body underneath it. */
     inline-size: 100%;
-    max-inline-size: calc(var(--page-width) + var(--space-l) * 2);
+    max-inline-size: calc(var(--page-width) + var(--shell-gutter) * 2);
     margin-inline: auto;
   }
   .scopebar {
