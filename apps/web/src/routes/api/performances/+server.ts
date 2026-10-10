@@ -260,6 +260,9 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
  * RPC (SECURITY DEFINER): claim-independent, gated on
  * has_permission(project_id, 'edit:performance'), slug auto-generated
  * (slugify(venue|city|'gig')-YYYY-MM-DD, numeric suffix on collision).
+ * Optional `bolo_id` (ADR-087 · § 37) hangs the gig from its deal at birth;
+ * the `performance_guard_bolo` trigger refuses a foreign or missing bolo with
+ * 42501 → 403, both the same way.
  * Returns { performance } — the full created row.
  */
 export const POST: RequestHandler = async ({ request, platform, locals }) => {
@@ -300,6 +303,7 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
       p_status: input.status ?? 'proposed',
       p_conversation_id: input.conversation_id ?? null,
       p_line_id: input.line_id ?? null,
+      p_bolo_id: input.bolo_id ?? null,
     });
     if (data.length === 0) return json({ error: 'create_failed' }, 502);
     // A new gig has no running order yet (ADR-090): the five fields are null,

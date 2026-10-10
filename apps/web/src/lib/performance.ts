@@ -212,6 +212,14 @@ export const PerformanceCreateSchema = v.object({
   status: v.optional(v.picklist(PERFORMANCE_STATUSES)),
   conversation_id: v.optional(v.nullable(v.pipe(v.string(), v.uuid()))),
   line_id: v.optional(v.nullable(v.pipe(v.string(), v.uuid()))),
+  /**
+   * ADR-087 · § 37 — la función nace colgada de su trato, sin la ventana de
+   * crear y después PATCH. Misma puerta que el PATCH (`edit:performance`); la
+   * coherencia (bolo vivo y del mismo proyecto) la sujeta el trigger
+   * `performance_guard_bolo`, que la RPC dispara al insertar: aquí no se
+   * repite. Un bolo ajeno o inexistente sale 403, los dos igual.
+   */
+  bolo_id: v.optional(v.nullable(v.pipe(v.string(), v.uuid()))),
 });
 
 export type PerformanceCreate = v.InferOutput<typeof PerformanceCreateSchema>;
@@ -241,6 +249,8 @@ export const PerformanceSeriesCreateSchema = v.object({
   status: v.optional(v.picklist(PERFORMANCE_STATUSES)),
   conversation_id: v.optional(v.nullable(v.pipe(v.string(), v.uuid()))),
   line_id: v.optional(v.nullable(v.pipe(v.string(), v.uuid()))),
+  /** ADR-087 · § 37 — todas las filas de la tanda cuelgan del mismo bolo. */
+  bolo_id: v.optional(v.nullable(v.pipe(v.string(), v.uuid()))),
 });
 
 export type PerformanceSeriesCreate = v.InferOutput<typeof PerformanceSeriesCreateSchema>;
@@ -276,10 +286,10 @@ export const PerformancePatchSchema = v.object({
   /**
    * ADR-087 — la costura con el dinero: de qué trato cuelga esta función.
    *
-   * PATCH y no create: `create_performance` no conoce la columna, igual que
-   * con `hold_notice_days`, así que crear-y-enlazar son dos pasos. Y el orden
-   * del oficio es ese de todas formas — el bolo suele existir antes que la
-   * fecha, porque el trato se cierra hablando (Marco, 2026-08-28).
+   * También en create desde § 37 (`create_performance` acepta `p_bolo_id`):
+   * aquí queda para cambiar o soltar el enlace de una función que ya existe.
+   * El bolo suele existir antes que la fecha, porque el trato se cierra
+   * hablando (Marco, 2026-08-28).
    *
    * `null` lo suelta. La coherencia NO se valida aquí: la sujeta el trigger
    * `performance_guard_bolo` (20260828100000), porque `authenticated` ya podía
