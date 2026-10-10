@@ -1184,6 +1184,11 @@
       /* One neutral availability accent for every person (never per-person
          hues); company blackouts sink to ink. */
       --ag-black-accent: var(--cal-accent, var(--warning));
+      /* THE MARGIN'S WIDTH, said once. The rule down it, the day's third
+         column and every band that stops short of it (week, month head, the
+         book's two ends) read this, so a phone that has no margin sets it to
+         nothing in one place and the bands take the whole measure. */
+      --ag-margin: 15rem;
       position: relative;
       display: grid;
       grid-template-columns: 1fr var(--ag-notes-w, 0px);
@@ -1197,7 +1202,7 @@
      Marco kept reporting as «no existe». */
   background-image: linear-gradient(to right, var(--border-color-dark) 0 1px, transparent 1px);
   background-size: 1px 100%;
-  background-position: right 15rem top;
+  background-position: right var(--ag-margin) top;
   background-repeat: no-repeat;
 }
 /* The book stacks in column 1; the notes margin spans every row in 2. */
@@ -1216,7 +1221,7 @@
       color: var(--text-faint);
     }
 /* Top «↑ earlier months» — margin voice, centred on the book's text column
-   (the 15rem stops at the margin rule, same as the week bands). Hidden and
+   (the --ag-margin stops at the margin rule, same as the week bands). Hidden and
    heightless until summoned by the overpull's first armed gesture, or by
    keyboard focus; never display:none, so it stays reachable by tab. */
     .ag__earlier {
@@ -1227,7 +1232,7 @@
       pointer-events: none;
       /* Tucked under the row above; the reveal slides it out from beneath. */
       transform: translateY(-0.5rem);
-      padding-inline-end: 15rem;
+      padding-inline-end: var(--ag-margin);
       border: 0;
       background: none;
       text-align: center;
@@ -1262,7 +1267,7 @@
     .ag__end {
       margin: 0;
       padding-block: var(--space-s);
-      padding-inline-end: 15rem;
+      padding-inline-end: var(--ag-margin);
       text-align: center;
       font-family: var(--font-mono);
       font-size: 9px;
@@ -1313,9 +1318,9 @@
       text-transform: uppercase;
       color: var(--text-faint);
       /* Stops BEFORE the margin's rule: the tally belongs to the days, not
-     to the column that annotates them — and 15rem exactly is where the
+     to the column that annotates them — and --ag-margin exactly is where the
      rule itself is drawn, so without the extra step the words touch it. */
-  padding-inline-end: calc(15rem + var(--space-s));
+  padding-inline-end: calc(var(--ag-margin) + var(--space-s));
 }
 .ag__week-n {
       color: var(--text-muted);
@@ -1357,7 +1362,7 @@
       gap: var(--space-s);
       inline-size: 100%;
       padding: 0;
-      padding-inline: var(--space-xs) calc(15rem + var(--space-s));
+      padding-inline: var(--space-xs) calc(var(--ag-margin) + var(--space-s));
       border: 0;
       background: none;
       text-align: start;
@@ -1404,7 +1409,7 @@
       /* Three columns: the date, the day, and a margin that only draws when
          the day has a call to make. `auto` collapses to nothing on the days
          that do not — no reserved emptiness. */
-      grid-template-columns: 6rem minmax(0, 1fr) 15rem;
+      grid-template-columns: 6rem minmax(0, 1fr) var(--ag-margin);
       align-items: start;
       border-block-end: 1px solid var(--border-color-light);
     }
@@ -1707,6 +1712,29 @@ button.ag__head:hover .ag__num {
       block-size: 1px;
     }
 @media (max-width: 560px) {
+      /* No margin column on a phone (its card falls under the day, below),
+         so nothing reserves room for it and no rule runs down through the
+         rows: the week band is one line again, number · range · tally. */
+      .ag {
+        --ag-margin: 0px;
+        background-image: none;
+      }
+      /* When the tally is long (two counts and the free nights) it drops
+         whole to a second line, still right-aligned, instead of breaking
+         a word per line. */
+      .ag__week {
+        flex-wrap: wrap;
+        row-gap: var(--space-2xs);
+      }
+      /* With no rule to stop short of, the tallies end on the page's edge,
+         the same edge the toolbar's last button ends on. */
+      .ag__week,
+      .ag__monthdiv-btn {
+        padding-inline-end: 0;
+      }
+      .ag__week > span {
+        white-space: nowrap;
+      }
       .ag__day {
         grid-template-columns: 4.25rem 1fr;
       }

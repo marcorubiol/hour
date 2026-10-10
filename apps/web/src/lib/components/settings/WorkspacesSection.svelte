@@ -743,6 +743,31 @@
     .set-access__invite { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .set-access__invite-button { grid-column: 1 / -1; }
   }
+  /* On a phone a space's row reads down instead of across: the name, its
+     counts under it, then the two buttons, all beside the one colour rail
+     that now runs the row's whole height. The empty roles cell takes no
+     line. */
+  @media (max-width: 47.999rem) {
+    .set-ws {
+      grid-template-columns: 4px minmax(0, 1fr);
+      grid-auto-flow: row;
+      row-gap: var(--space-xs);
+      align-items: start;
+    }
+    .set-ws__rail {
+      grid-row: 1 / span 4;
+      block-size: 100%;
+    }
+    .set-ws > :not(.set-ws__rail) {
+      grid-column: 2;
+    }
+    .set-ws__roles:empty {
+      display: none;
+    }
+    .set-ws__actions {
+      margin-block-start: var(--space-xs);
+    }
+  }
   @media (max-width: 44rem) {
     .set-access__invite { grid-template-columns: 1fr; }
     .set-access__row {

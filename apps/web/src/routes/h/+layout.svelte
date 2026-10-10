@@ -859,8 +859,23 @@
     .shell__search .kbd {
       display: none;
     }
+    /* Settings keeps its nav on a phone: no longer a column beside the
+       page but a band above it, its own row between the bar and the page,
+       so the sections are one tap away and the scroll is the page's. The
+       inline padding gives back what each item pads inside itself, so the
+       labels land on the gutter the page's text starts on. */
+    .shell--settings {
+      grid-template-rows: auto auto 1fr;
+    }
     .shell__settings-nav {
-      display: none;
+      position: static;
+      inline-size: auto;
+      block-size: auto;
+      align-self: stretch;
+      overflow: visible;
+      border-inline-end: 0;
+      border-block-end: 1px solid var(--border-color-light);
+      padding-inline: calc(var(--shell-gutter) - var(--space-s));
     }
   }
 </style>
