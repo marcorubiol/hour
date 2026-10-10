@@ -33,17 +33,17 @@ de Phase 0.9 en `_tasks.md`. Pricing orientativo, no decidido.
 
 ## Producción (verificado 2026-10-10)
 
-- Web `https://hour.zerosense.studio`, Worker `hour-web`. `/health/live`: SHA **`2f48370`**, `dirty:false`, builtAt
-  2026-10-10T13:48Z. `main` lleva encima solo documentos (`_tasks.md`, `CHANGELOG.md`, `AGENTS.md`, `research/`).
+- Web `https://hour.zerosense.studio`, Worker `hour-web`. `/health/live`: SHA **`3649036`**, `dirty:false`, builtAt
+  2026-10-10T18:30Z (idioma con francés, saludo del Hall, directorio de salas). `main` lleva encima solo documentos y
+  el workflow `venue-directory-load.yml`.
 - Despliegue: `pnpm --filter web run deploy` (no `pnpm deploy` desde la raíz). Exige árbol limpio.
 - Supabase `hour-phase0` · ref `lqlyorlccnniybezugme` · `eu-central-1`. Plan Free, con keepalive diario
-  (`.github/workflows/keepalive.yml`) contra la pausa por inactividad. Pasar a Pro: decidido, lo hace Marco
+  (`.github/workflows/keepalive.yml`) contra la pausa por inactividad. Pasar a Pro antes de la beta, aún no
   (`_tasks.md § 9`). Si algo de Supabase falla tras días sin uso, lo primero es `dig <ref>.supabase.co`.
-- **Última migración aplicada: `20261010180000_public_roadsheet_schedule`** (comprobado contra el catálogo de
-  migraciones de producción). Las migraciones van por `production-migrate.yml`: backup, plan, apply (`_tasks.md § 34`).
+- **Última migración aplicada: `20261010200000_venue_directory`** (2026-10-10, apply run 38073493631). El
+  directorio tiene 4.659 salas, cargadas con `venue-directory-load.yml` (run 38077136839). Las migraciones van por `production-migrate.yml`: backup, plan, apply (`_tasks.md § 34`).
 - `hour-staging` (ref `slccyknqpgmzhyiyclsq`, `eu-west-1`): pausado.
-- Últimas suites, según `_tasks.md` y la reconciliación del 2026-10-10 (sin re-correr): E2E 62/62 contra `2f48370`;
-  RLS 225/225 contra `6d5276c`.
+- Últimas suites contra `3649036` (2026-10-10): E2E 62/62 y RLS 233/233.
 
 ## Cómo se corren las suites
 
