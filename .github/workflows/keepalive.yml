@@ -2,9 +2,11 @@ name: Supabase keepalive
 
 # The Free plan pauses a project after ~7 days without activity (_tasks.md § 33),
 # and the weekly backup was the only automatic traffic: exactly the width of
-# that window. One real query a day keeps hour-phase0 awake, and the readiness
-# check turns a pause that slips through into a failed run instead of a login
-# that silently cannot complete. Delete this file the day the project is on Pro.
+# that window. One real query a day keeps hour-phase0 awake, and a pause that
+# slips through fails the query, so it shows up as a red run instead of a login
+# that silently cannot complete. (No call to /health/ready: Cloudflare answers
+# GitHub's runners with a bot challenge.) Delete this file the day the project
+# is on Pro.
 
 on:
   schedule:
@@ -26,8 +28,3 @@ jobs:
           test -n "$SUPABASE_DB_URL" || { echo "SUPABASE_DB_URL is not set" >&2; exit 1; }
           psql "$SUPABASE_DB_URL" --no-psqlrc --tuples-only --no-align --command 'select 1'
 
-      - name: Production says it is ready
-        run: |
-          body="$(curl --silent --show-error --max-time 20 https://hour.zerosense.studio/health/ready)"
-          echo "$body"
-          echo "$body" | grep -q '"ok":true'
