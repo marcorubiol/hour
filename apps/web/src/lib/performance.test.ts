@@ -124,6 +124,12 @@ describe('status vocabulary', () => {
       expect(performanceStatusLabel(s)).not.toContain('_');
     }
   });
+
+  it('says the status in the reader language when given a locale', () => {
+    expect(performanceStatusLabel('confirmed', 'es')).toBe(es['perf.status_confirmed']);
+    expect(performanceStatusLabel('hold_1', 'ca')).toBe(ca['perf.status_hold_1']);
+    expect(performanceStatusLabel('hold_2', 'en')).toBe(en['perf.status_hold_2']);
+  });
 });
 
 describe('performanceStatusFamily', () => {

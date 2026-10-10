@@ -20,7 +20,8 @@
   import Select from '$lib/components/Select.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
   import { mutateJSON, ApiError } from '$lib/api';
-  import { CONVERSATION_STATUSES, STATUS_LABELS } from '$lib/conversation';
+  import { CONVERSATION_STATUSES, statusLabel } from '$lib/conversation';
+  import { appLocale, t } from '$lib/i18n';
 
   interface Props {
     line: {
@@ -37,6 +38,7 @@
   let { line, workspaceSlug }: Props = $props();
 
   const queryClient = useQueryClient();
+  const locale = appLocale();
 
   let filters = $derived({ lineId: line.id, status: 'any' as const });
 
@@ -51,7 +53,7 @@
 
   const statusOptions = CONVERSATION_STATUSES.map((s) => ({
     value: s,
-    label: STATUS_LABELS[s],
+    label: statusLabel(s, locale),
   }));
 
   function openAdd() {
@@ -88,15 +90,14 @@
         addOpen = false;
         addToast({
           tone: 'warning',
-          title: 'Already in this project',
-          message:
-            'This person already has a conversation here — find them in the table (they may sit on another line).',
+          title: t('line.conv_exists_title', locale),
+          message: t('line.conv_exists_msg', locale),
         });
         return;
       }
       addToast({
         tone: 'danger',
-        title: 'Could not add conversation',
+        title: t('line.conv_add_error', locale),
         message: err instanceof ApiError ? err.message : String(err),
       });
     },
@@ -104,7 +105,11 @@
 
   function submitAdd() {
     if (!aName.trim()) {
-      addToast({ tone: 'warning', title: 'Name required', message: 'Give the contact a name.' });
+      addToast({
+        tone: 'warning',
+        title: t('line.name_required', locale),
+        message: t('line.name_required_msg', locale),
+      });
       return;
     }
     $addMutation.mutate();
@@ -113,12 +118,12 @@
 
 <div class="lcm">
   <div class="lcm__bar">
-    <Button size="xs" variant="outline" onclick={openAdd}>Add conversation</Button>
+    <Button size="xs" variant="outline" onclick={openAdd}>{t('conversations.add', locale)}</Button>
   </div>
   <ConversationTable {filters} personBase={`/h/${workspaceSlug}/person`} />
 </div>
 
-<Dialog bind:open={addOpen} title="Add conversation" size="s" onclose={() => (addOpen = false)}>
+<Dialog bind:open={addOpen} title={t('conversations.add', locale)} size="s" onclose={() => (addOpen = false)}>
   <form
     class="lcm__form"
     onsubmit={(e) => {
@@ -126,16 +131,16 @@
       submitAdd();
     }}
   >
-    <Input label="Full name" bind:value={aName} required />
-    <Input label="Email" type="email" bind:value={aEmail} />
-    <Input label="Organization" bind:value={aOrg} />
-    <Select label="Status" options={statusOptions} bind:value={aStatus} />
-    <Input label="Next action" type="date" bind:value={aNextAt} />
-    <Input label="Next action note" bind:value={aNextNote} />
+    <Input label={t('conversations.full_name', locale)} bind:value={aName} required />
+    <Input label={t('conversations.email', locale)} type="email" bind:value={aEmail} />
+    <Input label={t('conversations.col_organization', locale)} bind:value={aOrg} />
+    <Select label={t('edit.status', locale)} options={statusOptions} bind:value={aStatus} />
+    <Input label={t('conversations.col_next_action', locale)} type="date" bind:value={aNextAt} />
+    <Input label={t('conversations.next_note', locale)} bind:value={aNextNote} />
   </form>
   {#snippet actions()}
-    <Button variant="outline" onclick={() => (addOpen = false)}>Cancel</Button>
-    <Button loading={$addMutation.isPending} onclick={submitAdd}>Add</Button>
+    <Button variant="outline" onclick={() => (addOpen = false)}>{t('create.cancel', locale)}</Button>
+    <Button loading={$addMutation.isPending} onclick={submitAdd}>{t('composer.add', locale)}</Button>
   {/snippet}
 </Dialog>
 

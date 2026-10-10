@@ -17,7 +17,8 @@
   import Select from '$lib/components/Select.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
   import { dayLabel } from '$lib/datetime';
-  import { ASSET_KINDS, KIND_LABELS, kindLabel, type MaterialItem } from '$lib/material';
+  import { ASSET_KINDS, directionLabel, kindLabel, type MaterialItem } from '$lib/material';
+  import { appLocale, t } from '$lib/i18n';
   import { safeHref } from '$lib/utils/safe-url';
 
   interface Props {
@@ -34,7 +35,8 @@
 
   let { line, workspaceSlug }: Props = $props();
 
-  const kindOptions = ASSET_KINDS.map((k) => ({ value: k, label: KIND_LABELS[k] }));
+  const locale = appLocale();
+  const kindOptions = ASSET_KINDS.map((k) => ({ value: k, label: kindLabel(k, locale) }));
 
   const queryClient = useQueryClient();
 
@@ -74,8 +76,8 @@
     onError: (err) => {
       addToast({
         tone: 'danger',
-        title: 'Material not registered',
-        message: err instanceof Error ? err.message : 'Unexpected error',
+        title: t('line.material_not_registered', locale),
+        message: err instanceof Error ? err.message : t('perf.unexpected', locale),
       });
     },
   });
@@ -83,7 +85,7 @@
   function submitCreate() {
     const url = fUrl.trim();
     if (!fKind) {
-      addToast({ tone: 'warning', message: 'Pick what kind of material this is.' });
+      addToast({ tone: 'warning', message: t('line.material_pick_kind', locale) });
       return;
     }
     let valid = false;
@@ -94,7 +96,7 @@
       valid = false;
     }
     if (!valid) {
-      addToast({ tone: 'warning', message: 'Enter a full URL (https://…).' });
+      addToast({ tone: 'warning', message: t('line.material_full_url', locale) });
       return;
     }
     $createMaterial.mutate({ kind: fKind, url, notes: fNotes.trim() || null });
@@ -108,42 +110,42 @@
     onError: (err) => {
       addToast({
         tone: 'danger',
-        title: 'Material not removed',
-        message: err instanceof Error ? err.message : 'Unexpected error',
+        title: t('line.material_not_removed', locale),
+        message: err instanceof Error ? err.message : t('perf.unexpected', locale),
       });
     },
   });
 </script>
 
-<section class="mat" aria-label="Materials">
+<section class="mat" aria-label={t('line.module_materials', locale)}>
   <header class="mat__head">
-    <Button size="xs" variant="outline" onclick={openCreate}>Register material</Button>
+    <Button size="xs" variant="outline" onclick={openCreate}>{t('line.material_register', locale)}</Button>
   </header>
 
   {#if errorMsg}
     <p class="mat__state mat__state--danger">{errorMsg}</p>
   {:else if loading}
-    <p class="mat__state">Loading…</p>
+    <p class="mat__state">{t('desk.loading', locale)}</p>
   {:else if items.length === 0}
-    <p class="mat__state">No materials yet — riders, dossiers and plots live here.</p>
+    <p class="mat__state">{t('line.material_empty', locale)}</p>
   {:else}
     <div class="table-wrap">
       <table>
         <thead>
           <tr>
-            <th>Kind</th>
-            <th>Direction</th>
-            <th>Link</th>
-            <th>Notes</th>
-            <th>Registered</th>
-            <th aria-label="Actions"></th>
+            <th>{t('conversations.event_kind', locale)}</th>
+            <th>{t('create.direction', locale)}</th>
+            <th>{t('line.material_link', locale)}</th>
+            <th>{t('person.notes', locale)}</th>
+            <th>{t('line.material_registered', locale)}</th>
+            <th aria-label={t('line.actions', locale)}></th>
           </tr>
         </thead>
         <tbody>
           {#each items as m (m.id)}
             <tr>
-              <td>{kindLabel(m.kind)}</td>
-              <td class="mat__cell-direction">{m.direction}</td>
+              <td>{kindLabel(m.kind, locale)}</td>
+              <td class="mat__cell-direction">{directionLabel(m.direction, locale)}</td>
               <td>
                 <a class="mat__link" href={safeHref(m.url)} target="_blank" rel="noopener noreferrer">
                   {m.url}
@@ -159,12 +161,12 @@
               <td class="mat__cell-date">{dayLabel(m.uploaded_at)}</td>
               <td class="mat__cell-actions">
                 <Menu
-                  label="Material actions"
+                  label={t('line.material_actions', locale)}
                   align="end"
                   triggerClass="btn--outline btn--xs"
                   items={[
                     {
-                      label: 'Remove',
+                      label: t('line.remove', locale),
                       danger: true,
                       onclick: () => $deleteMaterial.mutate(m.id),
                     },
@@ -181,24 +183,28 @@
 
 <Dialog
   bind:open={createOpen}
-  title="Register material"
-  description="v1 registers links — paste the URL where the version lives."
+  title={t('line.material_register', locale)}
+  description={t('line.material_dialog_desc', locale)}
   size="s"
 >
   <div class="mat__form">
     <Select
-      label="Kind"
+      label={t('conversations.event_kind', locale)}
       bind:value={fKind}
       options={kindOptions}
-      placeholder="Choose a kind…"
+      placeholder={t('line.material_kind_ph', locale)}
       required
     />
     <Input label="URL" type="url" bind:value={fUrl} placeholder="https://…" required />
-    <Input label="Notes" bind:value={fNotes} placeholder="Optional — what changed, which venue…" />
+    <Input
+      label={t('person.notes', locale)}
+      bind:value={fNotes}
+      placeholder={t('line.material_notes_ph', locale)}
+    />
   </div>
   {#snippet actions()}
-    <Button variant="outline" onclick={() => (createOpen = false)}>Cancel</Button>
-    <Button onclick={submitCreate} loading={$createMaterial.isPending}>Register</Button>
+    <Button variant="outline" onclick={() => (createOpen = false)}>{t('create.cancel', locale)}</Button>
+    <Button onclick={submitCreate} loading={$createMaterial.isPending}>{t('line.material_register_short', locale)}</Button>
   {/snippet}
 </Dialog>
 

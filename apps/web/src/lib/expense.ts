@@ -6,24 +6,18 @@
 
 import * as v from 'valibot';
 import { Constants, type Enums, type Tables } from './db-types';
+import { t, type Locale } from './i18n';
 
 export type ExpenseCategory = Enums<'expense_category'>;
 
 /** All categories in schema enum order (runtime mirror of the DB enum). */
 export const EXPENSE_CATEGORIES = Constants.public.Enums.expense_category;
 
-export const CATEGORY_LABELS: Record<ExpenseCategory, string> = {
-  travel: 'Travel',
-  lodging: 'Lodging',
-  per_diem: 'Per diem',
-  freight: 'Freight',
-  production: 'Production',
-  fees: 'Fees',
-  other: 'Other',
-};
-
-export function categoryLabel(category: string): string {
-  return CATEGORY_LABELS[category as ExpenseCategory] ?? category;
+/** A category in the session's language; an unknown value shows as itself. */
+export function categoryLabel(category: string, locale: Locale): string {
+  const key = `books.cat_${category}`;
+  const out = t(key, locale);
+  return out === key ? category : out;
 }
 
 /** "YYYY-MM-DD that is a real calendar day" — same contract as conversation. */

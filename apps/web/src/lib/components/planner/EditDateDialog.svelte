@@ -222,7 +222,7 @@
       addToast({
         tone: 'danger',
         title: t('edit.not_saved', locale),
-        message: err instanceof ApiError || err instanceof Error ? err.message : 'Unexpected error',
+        message: err instanceof ApiError || err instanceof Error ? err.message : t('perf.unexpected', locale),
       });
     },
   });
@@ -238,7 +238,7 @@
       addToast({
         tone: 'danger',
         title: t('edit.not_deleted', locale),
-        message: err instanceof ApiError || err instanceof Error ? err.message : 'Unexpected error',
+        message: err instanceof ApiError || err instanceof Error ? err.message : t('perf.unexpected', locale),
       });
     },
   });

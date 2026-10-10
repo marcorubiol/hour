@@ -337,7 +337,7 @@
             <button
               type="button"
               class="tp__chev"
-              aria-label={`Open ${r.target.name}`}
+              aria-label={t('create.open_target', locale, { name: r.target.name })}
               onclick={() => r.drill && drillTo(r.drill)}>›</button
             >
           {/if}

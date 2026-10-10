@@ -2,8 +2,11 @@ import { describe, expect, it } from 'vitest';
 import {
 	agingState,
 	applyTaxLines,
+	boloStatusLabel,
 	esTaxLines,
+	invoiceStatusLabel,
 	observedPayerTermsDays,
+	paymentMethodLabel,
 	type TermsPayment,
 } from './money';
 
@@ -149,5 +152,18 @@ describe('esTaxLines / applyTaxLines (generic country-agnostic tax)', () => {
 				{ label: 'Exempt', kind: 'exempt', rate_pct: 0, exempt_reason: 'intra-EU' },
 			]),
 		).toBe(2500);
+	});
+});
+
+describe('money labels', () => {
+	it('reads a status the way the English screen always did', () => {
+		expect(boloStatusLabel('hold_1', 'en')).toBe('hold 1');
+		expect(boloStatusLabel('confirmed', 'en')).toBe('confirmed');
+		expect(invoiceStatusLabel('draft', 'en')).toBe('draft');
+	});
+	it('shows an unknown value as itself instead of a dictionary key', () => {
+		expect(boloStatusLabel('on_tour', 'es')).toBe('on tour');
+		expect(invoiceStatusLabel('void', 'ca')).toBe('void');
+		expect(paymentMethodLabel('cheque', 'fr')).toBe('cheque');
 	});
 });

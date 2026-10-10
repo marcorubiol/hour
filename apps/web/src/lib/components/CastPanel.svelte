@@ -20,12 +20,15 @@
   import Button from '$lib/components/Button.svelte';
   import Select from '$lib/components/Select.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
+  import { appLocale, t } from '$lib/i18n';
 
   interface Props {
     projectId: string;
   }
 
   let { projectId }: Props = $props();
+
+  const locale = appLocale();
 
   type CastMember = {
     id: string;
@@ -71,7 +74,7 @@
         `/api/projects/${projectId}/cast`,
         { person_id: personId, role: role.trim() },
       );
-      if (!body?.member) throw new Error(body?.detail || body?.error || 'Error');
+      if (!body?.member) throw new Error(body?.detail || body?.error || t('perf.unexpected', locale));
       return body.member;
     },
     onSuccess: () => {
@@ -85,8 +88,8 @@
     onError: (err) => {
       addToast({
         tone: 'danger',
-        title: 'Not cast',
-        message: err instanceof Error ? err.message : 'Unexpected error — try again.',
+        title: t('perf.cast_not_added', locale),
+        message: err instanceof Error ? err.message : t('composer.toast_fail_msg', locale),
       });
     },
   });
@@ -103,8 +106,8 @@
     onError: (err) => {
       addToast({
         tone: 'danger',
-        title: 'Not removed',
-        message: err instanceof Error ? err.message : 'Unexpected error — try again.',
+        title: t('perf.cast_not_removed', locale),
+        message: err instanceof Error ? err.message : t('composer.toast_fail_msg', locale),
       });
     },
   });
@@ -118,57 +121,57 @@
 
 <div class="cast">
   {#if $castQuery.isPending}
-    <p class="cast__quiet">Loading…</p>
+    <p class="cast__quiet">{t('desk.loading', locale)}</p>
   {:else if $castQuery.error}
-    <p class="cast__quiet">Could not load the cast.</p>
+    <p class="cast__quiet">{t('perf.cast_load_error', locale)}</p>
   {:else}
     {#if cast.length > 0}
       <ul class="cast__list" role="list">
         {#each cast as m (m.id)}
           <li class="cast__row">
-            <span class="cast__name">{m.person?.full_name ?? 'Unknown person'}</span>
+            <span class="cast__name">{m.person?.full_name ?? t('perf.cast_unknown_person', locale)}</span>
             <span class="cast__role">{m.role}</span>
             <Button
               variant="outline"
               size="s"
               tone="warn"
-              label={`Remove ${m.person?.full_name ?? 'this person'}`}
+              label={t('perf.cast_remove_named', locale, {
+                name: m.person?.full_name ?? t('perf.cast_this_person', locale),
+              })}
               disabled={$removeMutation.isPending}
-              onclick={() => $removeMutation.mutate(m.id)}>Remove</Button
+              onclick={() => $removeMutation.mutate(m.id)}>{t('perf.cast_remove', locale)}</Button
             >
           </li>
         {/each}
       </ul>
     {:else}
-      <p class="cast__quiet">Nobody cast yet.</p>
+      <p class="cast__quiet">{t('perf.cast_empty', locale)}</p>
     {/if}
 
     {#if people.length === 0}
       <!-- Casting requires a local dossier (cast_member_workspace_person_fkey),
            so with no dossiers there is nobody to offer. Say which of the two
            empty states this is instead of showing a dead picker. -->
-      <p class="cast__quiet">
-        No people on file in this workspace yet — add someone to the workspace before casting.
-      </p>
+      <p class="cast__quiet">{t('perf.cast_no_people', locale)}</p>
     {:else}
       <form class="cast__add" onsubmit={add}>
         <Select
-          label="Person"
+          label={t('blackout.person', locale)}
           bind:value={personId}
           options={personOptions}
-          placeholder="Choose…"
+          placeholder={t('perf.cast_choose', locale)}
         />
         <label class="cast__field">
-          <span class="cast__label">Role</span>
+          <span class="cast__label">{t('perf.cast_role', locale)}</span>
           <input
             class="cast__input"
             bind:value={role}
-            placeholder="performer, lighting, sound…"
+            placeholder={t('perf.cast_role_placeholder', locale)}
             maxlength="120"
           />
         </label>
         <Button type="submit" size="s" disabled={!canAdd} loading={$addMutation.isPending}>
-          Add
+          {t('composer.add', locale)}
         </Button>
       </form>
     {/if}

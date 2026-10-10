@@ -70,6 +70,8 @@
 
   let { children }: Props = $props();
 
+  const locale = detectLocale(navigator.language);
+
   let workspaceSlug = $derived(page.params.workspace ?? '');
   let hasWorkspace = $derived(workspaceSlug.length > 0);
   let blocked = $derived(hasWorkspace && isReservedWorkspaceSlug(workspaceSlug));
@@ -162,10 +164,10 @@
     // The one chokepoint for a space name in the shell: the scope pill, its ×
     // aria-label and the auto-name of a saved scope all read from here.
     if (kind === 'space') return spaceName(wsItems.find((w) => w.slug === key)?.name ?? key);
-    if (kind === 'project') return projectIndex.find((p) => p.id === key)?.name ?? 'project';
+    if (kind === 'project') return projectIndex.find((p) => p.id === key)?.name ?? t('picker.kind_project', locale);
     // Still loading, or a person who left the team: say the word, never the id.
-    if (kind === 'person') return personNameById.get(key) ?? 'person';
-    return lineIndex.find((l) => l.id === key)?.name ?? 'line';
+    if (kind === 'person') return personNameById.get(key) ?? t('planner.board_person_one', locale);
+    return lineIndex.find((l) => l.id === key)?.name ?? t('picker.kind_line', locale);
   }
   function tokenAccent(tok: string): string {
     const { kind, key } = parsePin(tok);
@@ -490,7 +492,6 @@
   // cell gets the one button that brings it out. Same rail, same contents,
   // same order: the clock that goes home, calm, the pulse, the scopes. On a
   // desktop the button is not drawn and `railOpen` is never true.
-  const locale = detectLocale(navigator.language);
 
   // ── The shell's clock ───────────────────────────────────────────────
   // ONE timer for the whole shell: the rail draws it with the date and feeds
@@ -589,13 +590,13 @@
         type="button"
         class="shell__search"
         onclick={openPaletteFresh}
-        aria-label="Search or jump to a project or line"
+        aria-label={t('shell.search_aria', locale)}
       >
         <svg viewBox="0 0 14 14" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true">
           <circle cx="6.2" cy="6.2" r="4.2" />
           <path d="M9.4 9.4 12 12" />
         </svg>
-        <span class="shell__search-label">Search or jump to a project or line…</span>
+        <span class="shell__search-label">{t('shell.search_label', locale)}</span>
         <kbd class="kbd">⌘K</kbd>
       </button>
 

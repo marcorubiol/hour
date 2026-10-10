@@ -35,11 +35,12 @@
   import { dayMonth, dayMonthYear } from '$lib/datetime';
   import {
     MODULE_KEYS,
-    MODULE_LABELS,
-    MODULE_DESCRIPTIONS,
+    moduleDescription,
+    moduleLabel,
     modulesForLine,
     type ModuleKey,
   } from '$lib/line-templates';
+  import { appLocale, t } from '$lib/i18n';
   import { workspacesQueryOptions, activeProjectsQueryOptions } from '$lib/nav-queries';
   import PlannerModule from '$lib/components/line/PlannerModule.svelte';
   import ConversationsModule from '$lib/components/line/ConversationsModule.svelte';
@@ -65,6 +66,7 @@
 
   const queryClient = useQueryClient();
   const breadcrumb = useBreadcrumb();
+  const locale = appLocale();
 
   let workspaceSlug = $derived(page.params.workspace ?? '');
   let projectSlug = $derived(page.params.slug ?? '');
@@ -174,7 +176,7 @@
       localModules = null;
       addToast({
         tone: 'danger',
-        title: 'Could not save modules',
+        title: t('line.modules_not_saved', locale),
         message: err instanceof ApiError ? err.message : String(err),
       });
     },
@@ -297,6 +299,14 @@
     archived: 'faint',
   };
 
+  /** Line status in the viewer's language; an unknown value shows as itself. */
+  function lineStatusLabel(status: string): string {
+    if (status === 'open') return t('line.status_open', locale);
+    if (status === 'closed') return t('line.status_closed', locale);
+    if (status === 'archived') return t('line.status_archived', locale);
+    return status;
+  }
+
   // ── Visit touch (last_navigated_at ordering) ──────────────────────────
   let lastTouchedLineId = '';
   $effect(() => {
@@ -327,48 +337,52 @@
   function formatDateRange(start: string | null, end: string | null): string {
     if (!start && !end) return '';
     if (start && end) return `${dayMonthYear(start)} → ${dayMonthYear(end)}`;
-    if (start) return `From ${dayMonthYear(start)}`;
-    return `Until ${dayMonthYear(end!)}`;
+    if (start) return t('line.from', locale, { date: dayMonthYear(start) });
+    return t('line.until', locale, { date: dayMonthYear(end!) });
   }
 </script>
 
 <svelte:head>
   <title>
-    {activeLine ? `${activeLine.name} · ${activeProject?.name ?? ''}` : 'Line'}
+    {activeLine ? `${activeLine.name} · ${activeProject?.name ?? ''}` : t('create.line', locale)}
   </title>
 </svelte:head>
 
 <article class="line-detail" aria-busy={isLoading}>
   {#if isLoading}
-    <p class="line-detail__state">Loading…</p>
+    <p class="line-detail__state">{t('desk.loading', locale)}</p>
   {:else if isError}
     <p class="line-detail__state line-detail__state--danger">
-      Couldn't load line.
+      {t('line.load_error', locale)}
     </p>
   {:else if notFound}
     <div class="line-detail__missing">
-      <p class="eyebrow">Line</p>
+      <p class="eyebrow">{t('create.line', locale)}</p>
       <h1 class="line-detail__missing-title">{lineParam}</h1>
       <p class="line-detail__state">
-        This line doesn't exist in {activeProject?.name ?? 'this project'}.
+        {activeProject
+          ? t('line.missing_in', locale, { name: activeProject.name })
+          : t('line.missing', locale)}
       </p>
       <a
         class="line-detail__back"
         href={`/h/${workspaceSlug}/project/${projectSlug}/`}
       >
-        ← Back to {activeProject?.name ?? 'project'}
+        {activeProject
+          ? t('line.back_to', locale, { name: activeProject.name })
+          : t('line.back_to_project', locale)}
       </a>
     </div>
   {:else if activeLine}
     <header class="line-detail__header">
-      <p class="eyebrow">Line</p>
+      <p class="eyebrow">{t('create.line', locale)}</p>
       <h1 class="line-detail__title"><em>{activeLine.name}</em></h1>
       <p class="line-detail__meta">
         <span class="line-detail__kind">
           {lineKindGlyph(activeLine.kind)} {lineKindLabel(activeLine.kind)}
         </span>
         <span class="line-detail__sep">·</span>
-        <StateBadge label={activeLine.status} tone={LINE_STATUS_TONE[activeLine.status] ?? 'neutral'} />
+        <StateBadge label={lineStatusLabel(activeLine.status)} tone={LINE_STATUS_TONE[activeLine.status] ?? 'neutral'} />
         {#if formatDateRange(activeLine.start_date, activeLine.end_date)}
           <span class="line-detail__sep">·</span>
           <span class="line-detail__dates">
@@ -380,18 +394,20 @@
           class="line-detail__project-link"
           href={`/h/${workspaceSlug}/project/${projectSlug}/`}
         >
-          in {activeProject?.name ?? projectSlug}
+          {t('line.in_project', locale, { name: activeProject?.name ?? projectSlug })}
         </a>
       </p>
 
       {#if isBooking && $engStatsQuery.data}
         {@const st = $engStatsQuery.data}
         <p class="line-detail__stats">
-          <span class="line-detail__stat"><b>{st.total}</b> conversations</span>
-          <span class="line-detail__stat"><b>{st.holds}</b> holds</span>
-          <span class="line-detail__stat"><b>{st.confirmed}</b> confirmed</span>
+          <span class="line-detail__stat"><b>{st.total}</b> {t('line.stat_conversations', locale)}</span>
+          <span class="line-detail__stat"><b>{st.holds}</b> {t('line.stat_holds', locale)}</span>
+          <span class="line-detail__stat"><b>{st.confirmed}</b> {t('line.stat_confirmed', locale)}</span>
           {#if st.overdue > 0}
-            <span class="line-detail__stat line-detail__stat--danger"><b>{st.overdue}</b> overdue</span>
+            <span class="line-detail__stat line-detail__stat--danger"
+              ><b>{st.overdue}</b> {t('line.stat_overdue', locale)}</span
+            >
           {/if}
         </p>
       {:else if isTour && $perfStatsQuery.data}
@@ -399,22 +415,24 @@
         <p class="line-detail__stats">
           {#if st.next}
             <span class="line-detail__stat">
-              next <b>{dayMonth(st.next.performed_at)}</b>
+              {t('line.stat_next', locale)} <b>{dayMonth(st.next.performed_at)}</b>
               {st.next.venue?.name ?? st.next.venue_name ?? ''}
             </span>
           {/if}
-          <span class="line-detail__stat"><b>{st.confirmed}</b> confirmed</span>
-          <span class="line-detail__stat"><b>{st.holds}</b> holds</span>
+          <span class="line-detail__stat"><b>{st.confirmed}</b> {t('line.stat_confirmed', locale)}</span>
+          <span class="line-detail__stat"><b>{st.holds}</b> {t('line.stat_holds', locale)}</span>
           {#if st.hasFees && st.pipeline > 0}
-            <span class="line-detail__stat"><b>{fmtMoneyCompact(st.pipeline)}</b> pipeline</span>
+            <span class="line-detail__stat"
+              ><b>{fmtMoneyCompact(st.pipeline)}</b> {t('line.stat_pipeline', locale)}</span
+            >
           {/if}
         </p>
       {/if}
     </header>
 
     {#if siblings.length > 1}
-      <nav class="line-detail__siblings" aria-label="Lines in this project">
-        <p class="eyebrow eyebrow--sub">Lines in this project</p>
+      <nav class="line-detail__siblings" aria-label={t('line.siblings', locale)}>
+        <p class="eyebrow eyebrow--sub">{t('line.siblings', locale)}</p>
         <div class="line-detail__sib-row">
           {#each siblings as l (l.id)}
             {#if l.id === activeLine.id}
@@ -439,9 +457,9 @@
     {/if}
 
     {#if stack.length > 1}
-      <nav class="line-detail__chips" aria-label="Modules">
+      <nav class="line-detail__chips" aria-label={t('line.modules', locale)}>
         {#each stack as key (key)}
-          <a class="pill--sm pill--mono line-detail__chip" href={`#mod-${key}`}>{MODULE_LABELS[key]}</a>
+          <a class="pill--sm pill--mono line-detail__chip" href={`#mod-${key}`}>{moduleLabel(key, locale)}</a>
         {/each}
       </nav>
     {/if}
@@ -451,25 +469,30 @@
         {@const Module = REGISTRY[key]}
         <section class="line-detail__module" id={`mod-${key}`}>
           <header class="line-detail__module-head">
-            <p class="eyebrow">{MODULE_LABELS[key]}</p>
-            <Menu direction="down" align="end" triggerClass="btn--none" label={`Module actions — ${MODULE_LABELS[key]}`}>
+            <p class="eyebrow">{moduleLabel(key, locale)}</p>
+            <Menu
+              direction="down"
+              align="end"
+              triggerClass="btn--none"
+              label={t('line.module_actions', locale, { name: moduleLabel(key, locale) })}
+            >
               {#snippet trigger()}
                 <span class="line-detail__module-kebab" aria-hidden="true">⋯</span>
               {/snippet}
               {#snippet children({ close }: { close: (focus?: boolean) => void })}
                 <li role="none">
                   <button type="button" role="menuitem" class="menu__item" onclick={() => { close(false); moveModule(key, -1); }}>
-                    Move up
+                    {t('line.move_up', locale)}
                   </button>
                 </li>
                 <li role="none">
                   <button type="button" role="menuitem" class="menu__item" onclick={() => { close(false); moveModule(key, 1); }}>
-                    Move down
+                    {t('line.move_down', locale)}
                   </button>
                 </li>
                 <li role="none">
                   <button type="button" role="menuitem" class="menu__item menu__item--danger" onclick={() => { close(false); removeModule(key); }}>
-                    Remove module
+                    {t('line.remove_module', locale)}
                   </button>
                 </li>
               {/snippet}
@@ -482,9 +505,9 @@
 
     {#if missingModules.length > 0}
       <div class="line-detail__addwrap">
-        <Menu direction="up" align="start" triggerClass="btn--none" label="Add module">
+        <Menu direction="up" align="start" triggerClass="btn--none" label={t('line.add_module', locale)}>
           {#snippet trigger()}
-            <span class="creator">+ Add module</span>
+            <span class="creator">+ {t('line.add_module', locale)}</span>
           {/snippet}
           {#snippet children({ close }: { close: (focus?: boolean) => void })}
             {#each missingModules as key (key)}
@@ -495,8 +518,8 @@
                   class="menu__item line-detail__add-item"
                   onclick={() => { close(false); addModule(key); }}
                 >
-                  <span class="line-detail__add-name">{MODULE_LABELS[key]}</span>
-                  <span class="line-detail__add-desc">{MODULE_DESCRIPTIONS[key]}</span>
+                  <span class="line-detail__add-name">{moduleLabel(key, locale)}</span>
+                  <span class="line-detail__add-desc">{moduleDescription(key, locale)}</span>
                 </button>
               </li>
             {/each}

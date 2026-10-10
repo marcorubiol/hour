@@ -16,6 +16,7 @@
   import { createQuery } from '@tanstack/svelte-query';
   import { writable, derived } from 'svelte/store';
   import { fetchJSON } from '$lib/api';
+  import { appLocale, t } from '$lib/i18n';
   import {
     statusBadgeClass,
     statusLabel,
@@ -28,6 +29,8 @@
   }
 
   let { projectSlug }: Props = $props();
+
+  const locale = appLocale();
 
   // Mirror the rune-prop into a legacy store so `createQuery` (which
   // accepts StoreOrVal<options>) re-runs when the slug changes via
@@ -73,22 +76,22 @@
 <section class="rel-stub" aria-labelledby="rel-stub-title" aria-busy={loading}>
   <header class="rel-stub__header">
     <div class="rel-stub__head-lead">
-      <p class="eyebrow">Conversations</p>
-      <h2 class="rel-stub__title" id="rel-stub-title">Relationships</h2>
+      <p class="eyebrow">{t('lens.conversations', locale)}</p>
+      <h2 class="rel-stub__title" id="rel-stub-title">{t('perf.rel_title', locale)}</h2>
     </div>
     {#if !loading && !errored}
       <span class="rel-stub__count">
-        {total === 1 ? '1 conversation' : `${total} conversations`}
+        {t(total === 1 ? 'perf.rel_count_one' : 'perf.rel_count_other', locale, { n: total })}
       </span>
     {/if}
   </header>
 
   {#if loading}
-    <p class="rel-stub__state">Loading…</p>
+    <p class="rel-stub__state">{t('desk.loading', locale)}</p>
   {:else if errored}
-    <p class="rel-stub__state rel-stub__state--danger">Couldn't load conversations.</p>
+    <p class="rel-stub__state rel-stub__state--danger">{t('perf.rel_error', locale)}</p>
   {:else if items.length === 0}
-    <p class="rel-stub__state">No conversations on this project yet.</p>
+    <p class="rel-stub__state">{t('perf.rel_empty', locale)}</p>
   {:else}
     <ul class="rel-stub__list">
       {#each items as e (e.id)}
@@ -112,7 +115,7 @@
     {#if total > items.length}
       <footer class="rel-stub__footer">
         <a class="link-arrow" href="/h/conversations">
-          View all {total} conversations →
+          {t('perf.rel_view_all', locale, { n: total })}
         </a>
       </footer>
     {/if}

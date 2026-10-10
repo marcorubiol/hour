@@ -25,6 +25,7 @@
   import Select from '$lib/components/Select.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
   import { CONVERSATION_STATUSES, statusLabel, type ConversationItem } from '$lib/conversation';
+  import { appLocale, t } from '$lib/i18n';
   import { usePins } from '$lib/stores/pins.svelte';
   import { spaceName } from '$lib/utils/identity';
   import {
@@ -46,6 +47,7 @@
   } from '$lib/nav-queries';
 
   const pins = usePins();
+  const locale = appLocale();
 
   const workspacesQuery = createQuery(workspacesQueryOptions());
   const linesQuery = createQuery(allLinesQueryOptions());
@@ -91,16 +93,16 @@
   let q = $state('');
   $effect(() => {
     const next = qRaw;
-    const t = setTimeout(() => {
+    const timer = setTimeout(() => {
       q = next.trim();
     }, 300);
-    return () => clearTimeout(t);
+    return () => clearTimeout(timer);
   });
 
   let statusFilter = $state('any');
   let statusOptions = [
-    { value: 'any', label: 'All statuses' },
-    ...CONVERSATION_STATUSES.map((s) => ({ value: s, label: statusLabel(s) })),
+    { value: 'any', label: t('conversations.all_statuses', locale) },
+    ...CONVERSATION_STATUSES.map((s) => ({ value: s, label: statusLabel(s, locale) })),
   ];
 
   // aria-busy: until the indexes answer, the pins cannot resolve and the
@@ -145,7 +147,7 @@
       let g = byWs.get(p.workspace_id);
       if (!g) {
         // Chokepoint: the only place this group's space label is built.
-        g = { wsId: p.workspace_id, wsName: spaceName(wsName.get(p.workspace_id) ?? 'Space'), projects: [] };
+        g = { wsId: p.workspace_id, wsName: spaceName(wsName.get(p.workspace_id) ?? t('workspace.fallback', locale)), projects: [] };
         byWs.set(p.workspace_id, g);
       }
       g.projects.push({ id: p.id, name: p.name ?? p.slug });
@@ -165,7 +167,7 @@
   });
   let addStatusOptions = CONVERSATION_STATUSES.map((s) => ({
     value: s,
-    label: statusLabel(s),
+    label: statusLabel(s, locale),
   }));
 
   function toggleProject(id: string) {
@@ -241,7 +243,7 @@
             // Already has a conversation in this project — not an error.
             out.existed += 1;
           } else {
-            out.failed.push(e instanceof Error ? e.message : 'Unexpected error');
+            out.failed.push(e instanceof Error ? e.message : t('perf.unexpected', locale));
           }
         }
       }
@@ -263,9 +265,14 @@
       aLineByProject = {};
       void queryClient.invalidateQueries({ queryKey: ['conversations'] });
       const parts: string[] = [];
-      if (r.created) parts.push(`Added to ${r.created} ${r.created === 1 ? 'space' : 'spaces'}`);
-      if (r.existed) parts.push(`already in ${r.existed}`);
-      if (r.failed.length) parts.push(`${r.failed.length} failed`);
+      if (r.created)
+        parts.push(
+          t(r.created === 1 ? 'conversations.added_one' : 'conversations.added_other', locale, {
+            n: r.created,
+          }),
+        );
+      if (r.existed) parts.push(t('conversations.already_in', locale, { n: r.existed }));
+      if (r.failed.length) parts.push(t('conversations.failed_n', locale, { n: r.failed.length }));
       addToast({
         tone: r.failed.length ? 'warning' : 'success',
         message: `${parts.join(' · ')}.`,
@@ -274,19 +281,19 @@
     onError: (err) => {
       addToast({
         tone: 'danger',
-        title: 'Conversation not added',
-        message: `${err instanceof Error ? err.message : 'Unexpected error'}`,
+        title: t('conversations.not_added', locale),
+        message: `${err instanceof Error ? err.message : t('perf.unexpected', locale)}`,
       });
     },
   });
 
   function submitAdd() {
     if (aProjectIds.length === 0) {
-      addToast({ tone: 'warning', message: 'Pick at least one space.' });
+      addToast({ tone: 'warning', message: t('conversations.pick_space', locale) });
       return;
     }
     if (!aName.trim()) {
-      addToast({ tone: 'warning', message: 'The contact needs a name.' });
+      addToast({ tone: 'warning', message: t('conversations.needs_name', locale) });
       return;
     }
     $addMutation.mutate();
@@ -294,12 +301,12 @@
 </script>
 
 <svelte:head>
-  <title>Conversations — Hour</title>
+  <title>{t('lens.conversations', locale)} — Hour</title>
 </svelte:head>
 
 <section class="conversations" aria-busy={busy}>
   <LensHeader>
-    {#snippet title()}<LensTitle text="Conversations" />{/snippet}
+    {#snippet title()}<LensTitle text={t('lens.conversations', locale)} />{/snippet}
     <!-- TEMP sub — placeholder until this lens's real subtitle is defined. -->
     {#snippet sub()}<span class="lenshead__todo">temporal · define esta lente</span>{/snippet}
   </LensHeader>
@@ -307,30 +314,27 @@
   <div class="conversations__controls">
     <div class="conversations__search">
       <Input
-        label="Search"
+        label={t('conversations.search', locale)}
         type="search"
-        placeholder="People or organizations…"
+        placeholder={t('conversations.search_ph', locale)}
         bind:value={qRaw}
       />
     </div>
-    <Select label="Status" options={statusOptions} bind:value={statusFilter} />
-    <Button size="s" onclick={openAdd}>Add conversation</Button>
+    <Select label={t('edit.status', locale)} options={statusOptions} bind:value={statusFilter} />
+    <Button size="s" onclick={openAdd}>{t('conversations.add', locale)}</Button>
   </div>
 
   <ConversationTable {filters} {personHref} groupable importEmptyState />
 </section>
 
-<Dialog bind:open={addOpen} title="Add conversation" size="m">
-  <p class="conversations__dialog-hint">
-    Pick one or more spaces — the same contact lives in all of them. A known
-    email links the same person across spaces instead of duplicating it.
-  </p>
+<Dialog bind:open={addOpen} title={t('conversations.add', locale)} size="m">
+  <p class="conversations__dialog-hint">{t('conversations.add_hint', locale)}</p>
   <fieldset class="conversations__spaces">
     <legend class="conversations__field-label">
-      Spaces <span class="conversations__field-hint">— where does this contact belong?</span>
+      {t('picker.spaces', locale)} <span class="conversations__field-hint">{t('conversations.spaces_hint', locale)}</span>
     </legend>
     {#if projectGroups.length === 0}
-      <p class="conversations__field-hint">No projects to add to yet.</p>
+      <p class="conversations__field-hint">{t('conversations.no_projects', locale)}</p>
     {:else}
       <div class="conversations__space-groups">
         {#each projectGroups as g (g.wsId)}
@@ -345,8 +349,8 @@
               {#if aProjectIds.includes(p.id) && (linesByProject.get(p.id)?.length ?? 0) > 0}
                 <div class="conversations__line">
                   <Select
-                    label="Line"
-                    options={[{ value: '', label: 'No line' }, ...(linesByProject.get(p.id) ?? [])]}
+                    label={t('create.line', locale)}
+                    options={[{ value: '', label: t('create.line_none', locale) }, ...(linesByProject.get(p.id) ?? [])]}
                     bind:value={aLineByProject[p.id]}
                   />
                 </div>
@@ -358,19 +362,27 @@
     {/if}
   </fieldset>
   <div class="conversations__form-grid">
-    <Input label="Full name" bind:value={aName} required />
-    <Input label="Organization" bind:value={aOrg} placeholder="Theatre, festival…" />
-    <Input label="Email" type="email" bind:value={aEmail} />
-    <Input label="Phone" type="tel" bind:value={aPhone} />
-    <Select label="Status" options={addStatusOptions} bind:value={aStatus} />
+    <Input label={t('conversations.full_name', locale)} bind:value={aName} required />
+    <Input
+      label={t('conversations.col_organization', locale)}
+      bind:value={aOrg}
+      placeholder={t('conversations.org_ph', locale)}
+    />
+    <Input label={t('conversations.email', locale)} type="email" bind:value={aEmail} />
+    <Input label={t('conversations.phone', locale)} type="tel" bind:value={aPhone} />
+    <Select label={t('edit.status', locale)} options={addStatusOptions} bind:value={aStatus} />
   </div>
   <div class="conversations__form-grid">
-    <Input label="Next action" type="date" bind:value={aNextAt} />
-    <Input label="Next action note" bind:value={aNextNote} placeholder="Call back after summer…" />
+    <Input label={t('conversations.col_next_action', locale)} type="date" bind:value={aNextAt} />
+    <Input
+      label={t('conversations.next_note', locale)}
+      bind:value={aNextNote}
+      placeholder={t('conversations.next_note_ph', locale)}
+    />
   </div>
   {#snippet actions()}
-    <Button variant="outline" onclick={() => (addOpen = false)}>Cancel</Button>
-    <Button onclick={submitAdd} loading={$addMutation.isPending}>Add conversation</Button>
+    <Button variant="outline" onclick={() => (addOpen = false)}>{t('create.cancel', locale)}</Button>
+    <Button onclick={submitAdd} loading={$addMutation.isPending}>{t('conversations.add', locale)}</Button>
   {/snippet}
 </Dialog>
 

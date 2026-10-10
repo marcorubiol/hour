@@ -1,6 +1,6 @@
 <script lang="ts">
   import { tick } from 'svelte';
-  import { detectLocale, t } from '$lib/i18n';
+  import { detectLocale, LOCALE_TAG, t } from '$lib/i18n';
   import { useCalm } from '$lib/stores/calm.svelte';
   import { usePins } from '$lib/stores/pins.svelte';
   import { useScopes, sameSet as scopesSameSet, type Scope } from '$lib/stores/scopes.svelte';
@@ -52,7 +52,7 @@
   // "dilluns · 13 jul" — CSS mono-caps does the shouting; strip the
   // abbreviation dot some locales append to the short month.
   let clockDate = $derived(
-    `${new Intl.DateTimeFormat(locale, { weekday: 'long' }).format(clockNow)} · ${clockNow.getDate()} ${new Intl.DateTimeFormat(locale, { month: 'short' }).format(clockNow).replace(/\.$/, '')}`,
+    `${new Intl.DateTimeFormat(LOCALE_TAG[locale], { weekday: 'long' }).format(clockNow)} · ${clockNow.getDate()} ${new Intl.DateTimeFormat(LOCALE_TAG[locale], { month: 'short' }).format(clockNow).replace(/\.$/, '')}`,
   );
 
   // Inline rename of a saved scope (double-click its name).
@@ -82,7 +82,7 @@
     onclick={() => onclose?.()}
   ></button>
 {/if}
-<aside id="shell-rail" class="shell__side drawer" data-open={open || undefined} aria-label="Scopes">
+<aside id="shell-rail" class="shell__side drawer" data-open={open || undefined} aria-label={t('shell.scopes', locale)}>
   <div class="side-clock">
     <!-- THE CLOCK IS THE WAY HOME. It took the door the wordmark used to
          hold: «here, now» is already what it says, and a clock you can press
@@ -108,7 +108,7 @@
        scopes because it is not filtered by them — see RailPulse. -->
   <RailPulse now={clockNow} {locale} />
   <div class="side-sec">
-    <div class="side-sec__h">Scopes</div>
+    <div class="side-sec__h">{t('shell.scopes', locale)}</div>
     <!-- The hall greets outside any scope: no row lights up there, not
          even Everything — highlighting starts once you're on a surface
          the scope actually filters. -->
@@ -119,7 +119,7 @@
       onclick={() => applyScope(everything)}
     >
       <span class="sglyph sglyph--every" aria-hidden="true">∑</span>
-      <span class="srow__name">Everything</span>
+      <span class="srow__name">{t('shell.everything', locale)}</span>
     </button>
     {#each scopes.saved as s (s.tokens.join(','))}
       {#if editingScopeKey === scopeKey(s)}
@@ -142,7 +142,7 @@
           class:is-on={!atHome && scopesSameSet(s.tokens, pins.pins)}
           onclick={() => applyScope(s)}
           ondblclick={() => startRename(s)}
-          title="Double-click to rename"
+          title={t('shell.rename_hint', locale)}
         >
           <span class="srow__name">{s.name}</span>
         </button>
@@ -152,7 +152,7 @@
 
   {#if scopes.recent.length > 0}
     <div class="side-sec">
-      <div class="side-sec__h">Recent</div>
+      <div class="side-sec__h">{t('shell.recent', locale)}</div>
       {#each scopes.recent as r (r.name + r.tokens.join(','))}
         <button
           type="button"
@@ -168,7 +168,7 @@
 
   <div class="side-foot">
     <button type="button" class="side-browse" onclick={openPaletteFresh}>
-      ⌘K · browse &amp; combine
+      ⌘K · {t('shell.browse', locale)}
     </button>
   </div>
 </aside>

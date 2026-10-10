@@ -27,6 +27,7 @@
   import { addMonths, addDaysIso, monthGrid } from '$lib/planner';
   import { performanceStatusLabel, performanceStatusTone } from '$lib/performance';
   import { dayLabel } from '$lib/datetime';
+  import { appLocale, t } from '$lib/i18n';
 
   interface Props {
     line: {
@@ -41,6 +42,8 @@
   }
 
   let { line, workspaceSlug }: Props = $props();
+
+  const locale = appLocale();
 
   let mode = $state<'list' | 'month'>('list');
   const today = new Date();
@@ -95,8 +98,8 @@
   );
 
   let upcoming = $derived.by(() => {
-    const t = new Date().toISOString().slice(0, 10);
-    return perfs.filter((p) => p.performed_at >= t && p.status !== 'cancelled');
+    const todayIso = new Date().toISOString().slice(0, 10);
+    return perfs.filter((p) => p.performed_at >= todayIso && p.status !== 'cancelled');
   });
   let pastCount = $derived(perfs.length - upcoming.length);
 
@@ -118,45 +121,45 @@
 
 <div class="lcal">
   <div class="lcal__bar">
-    <div class="lcal__modes" role="group" aria-label="Planner view">
+    <div class="lcal__modes" role="group" aria-label={t('line.planner_view', locale)}>
       <button
         type="button"
         class="lcal__mode"
         class:lcal__mode--on={mode === 'list'}
         onclick={() => (mode = 'list')}
-      >List</button>
+      >{t('line.planner_list', locale)}</button>
       <button
         type="button"
         class="lcal__mode"
         class:lcal__mode--on={mode === 'month'}
         onclick={() => (mode = 'month')}
-      >Month</button>
+      >{t('planner.view_month', locale)}</button>
     </div>
     {#if mode === 'month'}
       <div class="lcal__nav">
-        <button type="button" class="lcal__navbtn" onclick={prevMonth} aria-label="Previous month">‹</button>
+        <button type="button" class="lcal__navbtn" onclick={prevMonth} aria-label={t('planner.prev_month', locale)}>‹</button>
         <span class="lcal__month">{formatMonthLabel(ym.year, ym.month)}</span>
-        <button type="button" class="lcal__navbtn" onclick={nextMonth} aria-label="Next month">›</button>
+        <button type="button" class="lcal__navbtn" onclick={nextMonth} aria-label={t('planner.next_month', locale)}>›</button>
       </div>
     {/if}
-    <Button size="xs" variant="outline" onclick={() => openCreate()}>New performance</Button>
+    <Button size="xs" variant="outline" onclick={() => openCreate()}>{t('perf.new_title', locale)}</Button>
   </div>
 
   {#if $perfsQuery.isError}
-    <p class="lcal__state lcal__state--danger">Couldn't load performances.</p>
+    <p class="lcal__state lcal__state--danger">{t('line.planner_error', locale)}</p>
   {:else if $perfsQuery.isPending}
-    <p class="lcal__state">Loading…</p>
+    <p class="lcal__state">{t('desk.loading', locale)}</p>
   {:else if mode === 'list'}
     {#if upcoming.length === 0}
-      <p class="lcal__state">No upcoming performances on this line yet.</p>
+      <p class="lcal__state">{t('line.planner_empty', locale)}</p>
     {:else}
       <div class="table-wrap">
         <table>
           <thead>
             <tr>
-              <th>Date</th>
-              <th>Status</th>
-              <th>Where</th>
+              <th>{t('perf.date', locale)}</th>
+              <th>{t('edit.status', locale)}</th>
+              <th>{t('line.where', locale)}</th>
               <th></th>
             </tr>
           </thead>
@@ -166,7 +169,7 @@
                 <td class="lcal__cell-date">{dayLabel(p.performed_at)}</td>
                 <td>
                   <StateBadge
-                    label={performanceStatusLabel(p.status)}
+                    label={performanceStatusLabel(p.status, locale)}
                     tone={performanceStatusTone(p.status)}
                   />
                 </td>
@@ -177,7 +180,7 @@
                 </td>
                 <td class="lcal__cell-link">
                   {#if p.slug}
-                    <a class="link-arrow" href={`/h/${workspaceSlug}/performance/${p.slug}`}>Open →</a>
+                    <a class="link-arrow" href={`/h/${workspaceSlug}/performance/${p.slug}`}>{t('line.open', locale)}</a>
                   {/if}
                 </td>
               </tr>
@@ -187,7 +190,7 @@
       </div>
     {/if}
     {#if pastCount > 0}
-      <p class="lcal__past">{pastCount} past or cancelled — see Month view.</p>
+      <p class="lcal__past">{t('line.planner_past', locale, { n: pastCount })}</p>
     {/if}
   {:else}
     <MonthGrid

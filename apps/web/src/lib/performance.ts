@@ -12,6 +12,7 @@ import * as v from 'valibot';
 import { addDaysIso } from './planner';
 import { Constants, type Enums } from './db-types';
 import { realIsoDate } from './datetime';
+import { t, type Locale } from './i18n';
 
 export type PerformanceStatus = Enums<'performance_status'>;
 
@@ -154,8 +155,16 @@ export function isReady(
   return readiness?.[key] === true;
 }
 
-/** UI label — holds keep their rank visible (hold 1 beats hold 3). */
-export function performanceStatusLabel(status: string): string {
+/**
+ * UI label — holds keep their rank visible (hold 1 beats hold 3). With a
+ * `locale`, the word comes from `perf.status_<estado>` (every enum value has
+ * one); without it, the raw enum with spaces, for callers not yet passing a
+ * locale.
+ */
+export function performanceStatusLabel(status: string, locale?: Locale): string {
+  if (locale && (PERFORMANCE_STATUSES as readonly string[]).includes(status)) {
+    return t(`perf.status_${status}`, locale);
+  }
   return status.replace(/_/g, ' ');
 }
 

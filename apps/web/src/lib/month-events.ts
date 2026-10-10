@@ -6,6 +6,7 @@
  */
 import { dayKeyInTz } from '$lib/planner';
 import { hourMark } from '$lib/datetime';
+import { appLocaleTag } from '$lib/i18n';
 import { decideBy, performanceStatusFamily, type StatusFamily } from '$lib/performance';
 import { dateStatusFamily } from '$lib/date';
 import type { ScheduleMoment } from '$lib/schedule-slot';
@@ -208,7 +209,7 @@ export function dateDayKey(d: DateEvent, timeZone: string): string {
 }
 
 /** "July 2026" — shared by the page's h1 and the grid's aria-label. */
-export function formatMonthLabel(year: number, month: number, locale = 'en-GB'): string {
+export function formatMonthLabel(year: number, month: number, locale: string = appLocaleTag()): string {
   return new Date(Date.UTC(year, month - 1, 1)).toLocaleDateString(locale, {
     month: 'long',
     year: 'numeric',
@@ -217,7 +218,7 @@ export function formatMonthLabel(year: number, month: number, locale = 'en-GB'):
 }
 
 /** Month name alone ("May", "maig") — the masthead's serif em. */
-export function monthName(year: number, month: number, locale = 'en-GB'): string {
+export function monthName(year: number, month: number, locale: string = appLocaleTag()): string {
   return new Date(Date.UTC(year, month - 1, 1)).toLocaleDateString(locale, {
     month: 'long',
     timeZone: 'UTC',
@@ -340,6 +341,12 @@ export type SlipContext = {
   viewerTz: string;
   /** Injected so this file stays free of i18n — the caller owns the words. */
   kindLabel: (kind: SlipKind) => string;
+  /** The status word in the title sentence. Raw enum spelling when absent. */
+  statusLabel?: (status: string) => string;
+  /** «20h30 yours»: the viewer's clock in the title sentence. */
+  viewerTimeLabel?: (time: string) => string;
+  /** The name a performance with no venue, city or project falls back to. */
+  fallbackName?: string;
   /** ADR-002 — the workspace's hold convention, resolved PER SLIP. */
   workspaceModeById?: Map<string, string>;
   /** Where a travel leg began — see `Slip.origin`. The DRAWING supplies it,
@@ -351,6 +358,10 @@ export type SlipContext = {
     viewerTz: string,
   ) => { primary: string; secondary: string | null };
 };
+
+function statusWordOf(status: string, ctx: SlipContext): string {
+  return ctx.statusLabel ? ctx.statusLabel(status) : status.replace(/_/g, ' ');
+}
 
 /** A city is only a second line when it is not already the name. A slip never
     prints the same place twice. */
@@ -365,7 +376,8 @@ function clock(t: string | null): string | null {
 }
 
 export function performanceSlip(p: PerformanceEvent, ctx: SlipContext): Slip {
-  const name = p.venue?.name ?? p.venue_name ?? p.city ?? p.project?.name ?? 'Performance';
+  const name =
+    p.venue?.name ?? p.venue_name ?? p.city ?? p.project?.name ?? ctx.fallbackName ?? 'Performance';
   const at = perfInstant(p);
   // A venue-less gig falls back to its home space's zone — the one its times
   // were entered in — never silently the browser's.
@@ -378,7 +390,7 @@ export function performanceSlip(p: PerformanceEvent, ctx: SlipContext): Slip {
     : null;
   const ws = ctx.workspaceSlugById.get(p.project?.workspace_id ?? '') ?? ctx.workspaceSlug;
   const cc = p.venue?.country ?? p.country ?? null;
-  const base = `${name} — ${p.status.replace(/_/g, ' ')}`;
+  const base = `${name} — ${statusWordOf(p.status, ctx)}`;
   const cert = performanceStatusFamily(p.status);
   // The rank only means something where the convention is a priority queue.
   const mode = ctx.workspaceModeById?.get(p.project?.workspace_id ?? '') ?? 'simple';
@@ -404,7 +416,7 @@ export function performanceSlip(p: PerformanceEvent, ctx: SlipContext): Slip {
     href: p.slug && p.project ? `/h/${ws}/performance/${p.slug}` : null,
     title: time
       ? time.secondary
-        ? `${base} · ${time.primary} (${time.secondary} yours)`
+        ? `${base} · ${time.primary} (${ctx.viewerTimeLabel ? ctx.viewerTimeLabel(time.secondary) : `${time.secondary} yours`})`
         : `${base} · ${time.primary}`
       : base,
   };
@@ -434,7 +446,7 @@ export function dateSlip(d: DateEvent, ctx: SlipContext): Slip {
       }
     : null;
   const cc = d.country ?? null;
-  const base = `${ctx.kindLabel(kind)} — ${d.status.replace(/_/g, ' ')}`;
+  const base = `${ctx.kindLabel(kind)} — ${statusWordOf(d.status, ctx)}`;
   /**
    * `to`, and it is `to` for all three directions — see `Slip.lead`.
    *

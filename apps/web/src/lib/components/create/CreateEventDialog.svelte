@@ -69,7 +69,7 @@
   import { blockDays, blockLimit, BLOCK_MAX_DAYS } from '$lib/block';
   import { dayKeyInTz } from '$lib/planner';
   import { dayMonthYear, wallClockToInstant } from '$lib/datetime';
-  import { detectLocale, t } from '$lib/i18n';
+  import { LOCALE_TAG, detectLocale, t } from '$lib/i18n';
   import { activeProjectsQueryOptions, allLinesQueryOptions, workspacesQueryOptions } from '$lib/nav-queries';
   import {
     TRAVEL_DIRECTIONS,
@@ -368,7 +368,7 @@
       addToast({
         tone: 'danger',
         title: t('create.not_created', locale),
-        message: err instanceof Error ? err.message : 'Unexpected error',
+        message: err instanceof Error ? err.message : t('perf.unexpected', locale),
       });
     },
   });
@@ -483,7 +483,7 @@
           bind:to={dTo}
           bind:weekdays={dWeekdays}
           bind:exceptions={dExceptions}
-          locale={navigator.language}
+          locale={LOCALE_TAG[locale]}
           labels={{
             from: t('block.from', locale),
             to: t('block.to', locale),
@@ -591,7 +591,7 @@
             bind:to={dTo}
             bind:weekdays={dWeekdays}
             bind:exceptions={dExceptions}
-            locale={navigator.language}
+            locale={LOCALE_TAG[locale]}
             labels={{
               from: t('block.from', locale),
               to: t('block.to', locale),

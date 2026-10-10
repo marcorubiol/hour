@@ -214,7 +214,7 @@
         '/api/performances',
         input,
       );
-      if (!body?.performance) throw new Error('Malformed response');
+      if (!body?.performance) throw new Error(t('perf.malformed_response', locale));
       // ADR-080 §2 — the create RPC doesn't know hold_notice_days, so a
       // typed notice rides a follow-up PATCH (the column is PATCH-whitelist
       // only; minimal path chosen over widening the RPC). A PATCH failure
@@ -269,7 +269,7 @@
         input,
       );
       const rows = body?.performances ?? [];
-      if (rows.length === 0) throw new Error('Malformed response');
+      if (rows.length === 0) throw new Error(t('perf.malformed_response', locale));
       // El aviso de hold viaja por PATCH igual que en la ruta de una sola
       // (la RPC no conoce la columna). Una por fila, y un fallo NO deshace la
       // tanda: se avisa y se sigue, misma tolerancia que arriba.

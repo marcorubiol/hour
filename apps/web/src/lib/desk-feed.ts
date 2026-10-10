@@ -24,7 +24,7 @@
 
 import { localDayISO } from './datetime';
 import { taskSurfaceState, taskContextLabel, taskProjectId, type TaskItem } from './task';
-import type { Locale } from './i18n';
+import { LOCALE_TAG, t, type Locale } from './i18n';
 
 export type DeskConcern = 'task' | 'agenda' | 'conversation' | 'money';
 
@@ -199,7 +199,8 @@ export function dayBucket(
   // always the first 10 chars (the date-only contract).
   const d = new Date(`${dayISO.slice(0, 10)}T00:00:00`);
   const diff = Math.floor((d.getTime() - start.getTime()) / DAY);
-  const dateLabel = `${new Intl.DateTimeFormat(locale, { weekday: 'short' }).format(d)} · ${d.getDate()} ${new Intl.DateTimeFormat(locale, { month: 'short' }).format(d).replace(/\.$/, '')}`;
+  const tag = LOCALE_TAG[locale];
+  const dateLabel = `${new Intl.DateTimeFormat(tag, { weekday: 'short' }).format(d)} · ${d.getDate()} ${new Intl.DateTimeFormat(tag, { month: 'short' }).format(d).replace(/\.$/, '')}`;
   if (diff < 0) return { sortKey: -1, labelKey: 'overdue', weekday: '', dateLabel: '' };
   if (diff === 0) return { sortKey: 0, labelKey: 'today', weekday: '', dateLabel };
   if (diff === 1) return { sortKey: 1, labelKey: 'tomorrow', weekday: '', dateLabel };
@@ -207,18 +208,26 @@ export function dayBucket(
     return {
       sortKey: diff,
       labelKey: 'weekday',
-      weekday: new Intl.DateTimeFormat(locale, { weekday: 'long' }).format(d),
+      weekday: new Intl.DateTimeFormat(tag, { weekday: 'long' }).format(d),
       dateLabel,
     };
   if (diff < 14) return { sortKey: 7, labelKey: 'next_week', weekday: '', dateLabel };
   return { sortKey: 98, labelKey: 'later', weekday: '', dateLabel };
 }
 
-function convSubject(e: DeskConvInput): string {
-  return e.person?.full_name || e.person?.organization_name || e.next_action_note || 'Untitled';
+function convSubject(e: DeskConvInput, locale: Locale): string {
+  return (
+    e.person?.full_name || e.person?.organization_name || e.next_action_note || t('desk.untitled', locale)
+  );
 }
-function payerName(i: DeskInvoiceInput): string {
-  return i.payer?.full_name || i.payer?.organization_name || i.number || 'Invoice';
+function payerName(i: DeskInvoiceInput, locale: Locale): string {
+  return i.payer?.full_name || i.payer?.organization_name || i.number || t('desk.fallback_invoice', locale);
+}
+/** A date with no title says its kind, in words; an unknown kind stays raw. */
+function dateKindWord(kind: string, locale: Locale): string {
+  const key = `planner.kind_${kind}`;
+  const word = t(key, locale);
+  return word === key ? kind : word;
 }
 
 type Entry = {
@@ -288,7 +297,7 @@ export function buildDeskFeed(input: DeskFeedInput, now: Date, locale: Locale = 
         id: `task-${t.id}`,
         concern: 'task',
         subject: t.title,
-        projectName: t.project?.name ?? t.line?.name ?? taskContextLabel(t) ?? '',
+        projectName: t.project?.name ?? t.line?.name ?? taskContextLabel(t, locale) ?? '',
         lineName: t.line?.name ?? null,
         projectId: taskProjectId(t),
         overdue,
@@ -351,7 +360,7 @@ export function buildDeskFeed(input: DeskFeedInput, now: Date, locale: Locale = 
       blankItem({
         id: `date-${d.id}`,
         concern: 'agenda',
-        subject: d.title ?? d.kind,
+        subject: d.title ?? dateKindWord(d.kind, locale),
         projectName: d.project?.name ?? d.city ?? '—',
         projectId: d.project?.id ?? null,
         atISO: d.all_day ? null : d.starts_at,
@@ -377,7 +386,7 @@ export function buildDeskFeed(input: DeskFeedInput, now: Date, locale: Locale = 
       blankItem({
         id: `conv-${e.id}`,
         concern: 'conversation',
-        subject: convSubject(e),
+        subject: convSubject(e, locale),
         projectName: e.project?.name ?? '—',
         projectId: e.project?.id ?? null,
         verbKey: conversationVerbKey(e.status, overdue),
@@ -399,7 +408,7 @@ export function buildDeskFeed(input: DeskFeedInput, now: Date, locale: Locale = 
         blankItem({
           id: `revive-${e.id}`,
           concern: 'conversation',
-          subject: e.person?.full_name || e.person?.organization_name || 'Contact',
+          subject: e.person?.full_name || e.person?.organization_name || t('desk.fallback_contact', locale),
           projectName: e.project?.name ?? '—',
           projectId: e.project?.id ?? null,
           verbKey: 'revive',
@@ -421,7 +430,7 @@ export function buildDeskFeed(input: DeskFeedInput, now: Date, locale: Locale = 
       blankItem({
         id: `inv-${inv.id}`,
         concern: 'money',
-        subject: payerName(inv),
+        subject: payerName(inv, locale),
         projectName: inv.project?.name ?? '—',
         projectId: inv.project?.id ?? null,
         verbKey: 'remind',

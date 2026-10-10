@@ -37,6 +37,7 @@
    */
   import { SvelteSet } from 'svelte/reactivity';
   import Slip from '$lib/components/planner/Slip.svelte';
+  import { appLocale, t } from '$lib/i18n';
   import IdentityMark from '$lib/components/IdentityMark.svelte';
   import type { LaneAxis } from '$lib/carrils';
   import {
@@ -158,7 +159,7 @@
     teamWord,
     noCastWord,
     awayWord,
-    tourWord = 'on tour',
+    tourWord = t('planner.band_tour', appLocale()),
     untilLabel,
     emptyLabel,
     createLabel,

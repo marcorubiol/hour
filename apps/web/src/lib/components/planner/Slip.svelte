@@ -37,6 +37,10 @@
   import { accentVarFor } from '$lib/utils/accent';
   import type { Slip, SlipKind } from '$lib/month-events';
   import type { ProjectLite } from '$lib/month-events';
+  import { appLocale, t } from '$lib/i18n';
+
+  /** `to` / `from`, the margin voice, in the session's language. */
+  const L = appLocale();
 
   interface Props {
     slip: Slip;
@@ -200,14 +204,14 @@
        or an arrival depending on a column nobody can see — so the direction
        governs the name, in the margin voice. -->
   <span class="slip__n"
-    >{#if slip.lead}<i class="slip__pre">{slip.lead}</i>{/if}{slip.name}</span
+    >{#if slip.lead}<i class="slip__pre">{slip.lead === 'to' ? t('planner.slip_to', L) : slip.lead}</i>{/if}{slip.name}</span
   >
 
   <!-- WHERE THE LEG BEGAN, under where it goes — the shape the design draws
        for a travel day: `to Brussels` over `from Barcelona`. It is deduced
        from the sheet, and absent rather than guessed when nothing precedes. -->
   {#if slip.origin}
-    <span class="slip__c"><i class="slip__pre">from</i>{slip.origin}</span>
+    <span class="slip__c"><i class="slip__pre">{t('planner.slip_from', L)}</i>{slip.origin}</span>
   {:else if slip.city}
     <span class="slip__c"
       >{slip.city}{#if showCountry && slip.country}<i class="slip__cc">{slip.country}</i>{/if}</span

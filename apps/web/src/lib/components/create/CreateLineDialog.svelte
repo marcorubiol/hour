@@ -15,7 +15,8 @@
   import Input from '$lib/components/Input.svelte';
   import Select from '$lib/components/Select.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
-  import { LINE_TEMPLATES, MODULE_LABELS, type LineTemplate } from '$lib/line-templates';
+  import { LINE_TEMPLATES, moduleLabel, type LineTemplate } from '$lib/line-templates';
+  import { appLocale, t } from '$lib/i18n';
   import { workspacesQueryOptions } from '$lib/nav-queries';
   import { accentVar } from '$lib/utils/accent';
   import AccentSwatchPicker from './AccentSwatchPicker.svelte';
@@ -34,6 +35,7 @@
   type CreatedLine = { id: string; slug: string | null; project_id: string; workspace_id: string };
 
   const queryClient = useQueryClient();
+  const locale = appLocale();
   const workspacesQ = createQuery(workspacesQueryOptions());
   const projectsQ = createQuery({
     queryKey: ['projects', { status: 'active' }],
@@ -46,7 +48,7 @@
   let name = $state('');
   let accent = $state<string | null>(null); // null = auto (hash of slug)
 
-  let template = $derived(LINE_TEMPLATES.find((t) => t.key === templateKey) ?? LINE_TEMPLATES[0]);
+  let template = $derived(LINE_TEMPLATES.find((tpl) => tpl.key === templateKey) ?? LINE_TEMPLATES[0]);
 
   let projects = $derived($projectsQ.data?.items ?? []);
   let projectOptions = $derived(
@@ -61,8 +63,10 @@
   const nextYear = new Date().getFullYear() + 1;
   let nameSuggestion = $derived(
     template.key === 'booking'
-      ? `Difusión ${nextYear}-${String((nextYear + 1) % 100).padStart(2, '0')}`
-      : `${template.name} ${nextYear}`,
+      ? t('line.suggest_booking', locale, {
+          season: `${nextYear}-${String((nextYear + 1) % 100).padStart(2, '0')}`,
+        })
+      : `${t(template.nameKey, locale)} ${nextYear}`,
   );
 
   // Live preview of the color Auto would pick; also feeds the selected
@@ -115,13 +119,13 @@
     onError: (err) => {
       addToast({
         tone: 'danger',
-        title: 'Line not created',
+        title: t('line.not_created', locale),
         message:
           err instanceof ApiError && err.status === 409
-            ? 'A line with that name already exists in this project.'
+            ? t('line.name_taken', locale)
             : err instanceof Error
               ? err.message
-              : 'Unexpected error',
+              : t('perf.unexpected', locale),
       });
     },
   });
@@ -129,12 +133,12 @@
   function submit(event?: Event) {
     event?.preventDefault();
     if (!effectiveProjectId) {
-      addToast({ tone: 'warning', message: 'Pick a project.' });
+      addToast({ tone: 'warning', message: t('create.pick_project', locale) });
       return;
     }
     const trimmed = name.trim();
     if (!trimmed) {
-      addToast({ tone: 'warning', message: 'Name cannot be empty.' });
+      addToast({ tone: 'warning', message: t('project.name_empty', locale) });
       return;
     }
     $create.mutate({
@@ -149,29 +153,29 @@
 
 <Dialog
   bind:open
-  title="New line"
-  description="Pick a template — it sets the line's kind and starting modules."
+  title={t('line.new_title', locale)}
+  description={t('line.new_desc', locale)}
   size="m"
   onclose={reset}
 >
   <form class="cln__form" onsubmit={submit} style={`--c: ${accentPreview}`}>
     <fieldset class="cln__templates">
-      <legend>Template</legend>
-      <div class="cln__template-grid" role="radiogroup" aria-label="Line template">
-        {#each LINE_TEMPLATES as t (t.key)}
-          {@const isOn = templateKey === t.key}
+      <legend>{t('line.template', locale)}</legend>
+      <div class="cln__template-grid" role="radiogroup" aria-label={t('line.template_aria', locale)}>
+        {#each LINE_TEMPLATES as tpl (tpl.key)}
+          {@const isOn = templateKey === tpl.key}
           <button
             type="button"
             role="radio"
             aria-checked={isOn}
             class={['cln__template', isOn && 'cln__template--on'].filter(Boolean).join(' ')}
             disabled={$create.isPending}
-            onclick={() => (templateKey = t.key)}
+            onclick={() => (templateKey = tpl.key)}
           >
-            <span class="cln__template-name">{t.name}</span>
-            <span class="cln__template-desc">{t.description}</span>
+            <span class="cln__template-name">{t(tpl.nameKey, locale)}</span>
+            <span class="cln__template-desc">{t(tpl.descriptionKey, locale)}</span>
             <span class="cln__template-modules">
-              {t.modules.map((m) => MODULE_LABELS[m]).join(' · ')}
+              {tpl.modules.map((m) => moduleLabel(m, locale)).join(' · ')}
             </span>
           </button>
         {/each}
@@ -180,34 +184,34 @@
 
     {#if !projectId}
       <Select
-        label="Project"
+        label={t('create.project', locale)}
         bind:value={projSelected}
         options={projectOptions}
-        placeholder="Pick a project"
+        placeholder={t('line.pick_project_ph', locale)}
         required
         disabled={$create.isPending}
       />
     {/if}
 
     <Input
-      label="Name"
+      label={t('conversations.col_name', locale)}
       name="line-name"
       bind:value={name}
-      placeholder={`e.g. ${nameSuggestion}`}
+      placeholder={t('line.name_ph', locale, { example: nameSuggestion })}
       required
       autocomplete="off"
       disabled={$create.isPending}
     />
 
-    <AccentSwatchPicker bind:accent autoSlug={autoAccentSlug} label="Line color" disabled={$create.isPending} />
+    <AccentSwatchPicker bind:accent autoSlug={autoAccentSlug} label={t('line.color', locale)} disabled={$create.isPending} />
 
     <!-- Hidden submit lets Enter inside an input trigger submit. -->
     <button type="submit" hidden aria-hidden="true"></button>
   </form>
 
   {#snippet actions()}
-    <Button variant="outline" disabled={$create.isPending} onclick={close}>Cancel</Button>
-    <Button loading={$create.isPending} onclick={submit}>Create</Button>
+    <Button variant="outline" disabled={$create.isPending} onclick={close}>{t('create.cancel', locale)}</Button>
+    <Button loading={$create.isPending} onclick={submit}>{t('project.create', locale)}</Button>
   {/snippet}
 </Dialog>
 

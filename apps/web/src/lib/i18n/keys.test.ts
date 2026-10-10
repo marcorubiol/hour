@@ -21,6 +21,8 @@ import { describe, expect, test } from 'vitest';
 import ca from './ca.json';
 import en from './en.json';
 import es from './es.json';
+import fr from './fr.json';
+import { LOCALES } from './index';
 
 const SRC = join(import.meta.dirname, '..', '..');
 
@@ -67,22 +69,24 @@ describe('i18n keys', () => {
     expect(missing).toEqual([]);
   });
 
-  test('ca and es answer everything en does, bar the pre-session screen', () => {
+  /** Every language but the reference one. Adding a dictionary to
+      index.ts without listing it here fails the next test. */
+  const others = { ca, es, fr } as Record<string, Record<string, string>>;
+
+  test('the app speaks exactly the languages this guard checks', () => {
+    expect([...LOCALES].sort()).toEqual(['en', ...Object.keys(others)].sort());
+  });
+
+  test('every other language answers everything en does, bar the pre-session screen', () => {
     const expected = Object.keys(en).filter((k) => !EN_ONLY.has(k));
-    for (const [name, dict] of [
-      ['ca', ca],
-      ['es', es],
-    ] as const) {
+    for (const [name, dict] of Object.entries(others)) {
       const have = new Set(Object.keys(dict));
       expect({ [name]: expected.filter((k) => !have.has(k)) }).toEqual({ [name]: [] });
     }
   });
 
-  test('and neither carries a key en has never heard of', () => {
-    for (const [name, dict] of [
-      ['ca', ca],
-      ['es', es],
-    ] as const) {
+  test('and none carries a key en has never heard of', () => {
+    for (const [name, dict] of Object.entries(others)) {
       const orphans = Object.keys(dict).filter((k) => !(k in en));
       expect({ [name]: orphans }).toEqual({ [name]: [] });
     }

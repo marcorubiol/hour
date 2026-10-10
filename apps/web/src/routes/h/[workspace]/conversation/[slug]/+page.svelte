@@ -1,5 +1,8 @@
 <script lang="ts">
   import { page } from '$app/state';
+  import { appLocale, t } from '$lib/i18n';
+
+  const locale = appLocale();
 
   let slug = $derived(page.params.slug ?? '');
 
@@ -15,20 +18,17 @@
 </script>
 
 <svelte:head>
-  <title>{title} — Conversation — Hour</title>
+  <title>{title} — {t('conversations.conversation', locale)} — Hour</title>
 </svelte:head>
 
 <section class="entity">
   <header>
-    <p class="eyebrow">Conversation</p>
+    <p class="eyebrow">{t('conversations.conversation', locale)}</p>
     <h1 class="entity__title"><em>{title}</em></h1>
   </header>
-  <p class="text--dark-muted">
-    The full conversation view — status timeline, notes, linked person and
-    performances — isn't built yet. Manage this conversation from Conversations meanwhile.
-  </p>
+  <p class="text--dark-muted">{t('conversations.stub_body', locale)}</p>
   <p>
-    <a class="link-arrow" href="/h/conversations">← Back to conversations</a>
+    <a class="link-arrow" href="/h/conversations">{t('conversations.back', locale)}</a>
   </p>
 </section>
 

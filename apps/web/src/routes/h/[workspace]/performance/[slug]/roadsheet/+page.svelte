@@ -21,12 +21,22 @@
   import RoadsheetView from '$lib/components/RoadsheetView.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
   import { dayMonthYearTs } from '$lib/datetime';
+  import { appLocale, t } from '$lib/i18n';
   import { ROADSHEET_ROLES, type Roadsheet, type RoadsheetRole } from '$lib/roadsheet';
 
   type Response = { roadsheet: Roadsheet; venue_timezone: string | null };
   type Share = { id: string; token: string; role: string; created_at: string };
 
   const PUBLIC_ROLES = ['venue', 'performer', 'tech_manager'] as const;
+
+  const locale = appLocale();
+
+  /** The word for a road sheet role; the raw value with spaces if unknown. */
+  function roleWord(r: string): string {
+    const key = `roadsheet.role_${r}`;
+    const word = t(key, locale);
+    return word === key ? r.replace(/_/g, ' ') : word;
+  }
 
   let workspaceSlug = $derived(page.params.workspace ?? '');
   let slug = $derived(page.params.slug ?? '');
@@ -83,8 +93,8 @@
     onError: (err) => {
       addToast({
         tone: 'danger',
-        title: 'Link not created',
-        message: err instanceof Error ? err.message : 'Unexpected error',
+        title: t('roadsheet.link_not_created', locale),
+        message: err instanceof Error ? err.message : t('perf.unexpected', locale),
       });
     },
   });
@@ -101,8 +111,8 @@
     onError: (err) => {
       addToast({
         tone: 'danger',
-        title: 'Link not revoked',
-        message: err instanceof Error ? err.message : 'Unexpected error',
+        title: t('roadsheet.link_not_revoked', locale),
+        message: err instanceof Error ? err.message : t('perf.unexpected', locale),
       });
     },
   });
@@ -114,49 +124,46 @@
   async function copyShare(token: string): Promise<void> {
     addToast(
       (await copyText(shareUrl(token)))
-        ? { tone: 'success', message: 'Link copied.' }
-        : { tone: 'danger', message: 'Could not copy the road sheet link.' },
+        ? { tone: 'success', message: t('roadsheet.link_copied', locale) }
+        : { tone: 'danger', message: t('roadsheet.link_copy_failed', locale) },
     );
   }
 
 </script>
 
 <svelte:head>
-  <title>{sheet ? `${sheet.title} — Road sheet` : 'Road sheet'} — Hour</title>
+  <title>{sheet ? `${sheet.title} — ${t('roadsheet.title', locale)}` : t('roadsheet.title', locale)} — Hour</title>
 </svelte:head>
 
 <article class="rs" aria-busy={loading}>
-  <nav class="rs__roles" aria-label="Preview as role">
-    <span class="rs__roles-label">View as</span>
+  <nav class="rs__roles" aria-label={t('roadsheet.preview_as', locale)}>
+    <span class="rs__roles-label">{t('roadsheet.view_as', locale)}</span>
     {#each ROADSHEET_ROLES as r (r)}
       <Pill size="sm" active={role === r} onclick={() => (role = r)}>
-        {r.replace(/_/g, ' ')}
+        {roleWord(r)}
       </Pill>
     {/each}
   </nav>
 
   {#if loading}
-    <p class="rs__state">Loading…</p>
+    <p class="rs__state">{t('desk.loading', locale)}</p>
   {:else if errorMsg}
     <p class="rs__state rs__state--danger">{errorMsg}</p>
   {:else if sheet}
-    <RoadsheetView {sheet} {venueTz} backHref={`/h/${workspaceSlug}/performance/${slug}`} />
+    <RoadsheetView {sheet} {venueTz} {locale} backHref={`/h/${workspaceSlug}/performance/${slug}`} />
 
-    <section class="rs__share" aria-label="Public links">
-      <h2 class="eyebrow eyebrow--sub rs__share-title">Public links</h2>
-      <p class="rs__share-hint">
-        Anyone with a link sees that role's road sheet — no account. Revoking kills the link
-        immediately.
-      </p>
+    <section class="rs__share" aria-label={t('roadsheet.public_links', locale)}>
+      <h2 class="eyebrow eyebrow--sub rs__share-title">{t('roadsheet.public_links', locale)}</h2>
+      <p class="rs__share-hint">{t('roadsheet.public_links_hint', locale)}</p>
       {#if shares.length > 0}
         <ul class="rs__share-list" role="list">
           {#each shares as s (s.id)}
             <li>
-              <span class="rs__share-role">{s.role.replace(/_/g, ' ')}</span>
+              <span class="rs__share-role">{roleWord(s.role)}</span>
               <span class="rs__share-date">{dayMonthYearTs(s.created_at)}</span>
               <span class="rs__share-actions">
                 <Button size="s" variant="outline" onclick={() => copyShare(s.token)}>
-                  Copy link
+                  {t('roadsheet.copy_link', locale)}
                 </Button>
                 <Button
                   size="s"
@@ -165,7 +172,7 @@
                   loading={$revokeShare.isPending}
                   onclick={() => $revokeShare.mutate(s.id)}
                 >
-                  Revoke
+                  {t('roadsheet.revoke', locale)}
                 </Button>
               </span>
             </li>
@@ -174,15 +181,15 @@
       {/if}
       <div class="rs__share-create">
         <label class="rs__share-pick">
-          <span class="eyebrow eyebrow--sub">Role</span>
+          <span class="eyebrow eyebrow--sub">{t('roadsheet.role', locale)}</span>
           <select bind:value={shareRole}>
             {#each PUBLIC_ROLES as r (r)}
-              <option value={r}>{r.replace(/_/g, ' ')}</option>
+              <option value={r}>{roleWord(r)}</option>
             {/each}
           </select>
         </label>
         <Button size="s" loading={$createShare.isPending} onclick={() => $createShare.mutate()}>
-          Create link
+          {t('roadsheet.create_link', locale)}
         </Button>
       </div>
     </section>

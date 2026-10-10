@@ -4,6 +4,7 @@
   import { copyText } from '$lib/clipboard';
   import { usePins, type PinKind } from '$lib/stores/pins.svelte';
   import { useScopes, type Scope } from '$lib/stores/scopes.svelte';
+  import { appLocale, t } from '$lib/i18n';
 
   interface Props {
     /** Token → display helpers stay in the /h layout (they feed its
@@ -42,14 +43,24 @@
 
   const pins = usePins();
   const scopes = useScopes();
+  const locale = appLocale();
+
+  /** The pill's small kind word, in the session's language. */
+  const KIND_KEY: Record<PinKind, string> = {
+    space: 'picker.kind_space',
+    project: 'picker.kind_project',
+    line: 'picker.kind_line',
+    person: 'planner.board_person_one',
+  };
+  const kindLabel = (kind: PinKind) => t(KIND_KEY[kind], locale);
 
   // Copy link — the ADR-022 level-3 gesture: the URL already carries the
   // scope, canonical id-form by construction (pins hold slugs, never aliases).
   async function copyScopeLink() {
     if (await copyText(location.href)) {
-      addToast({ tone: 'success', message: 'Link copied — scope included.' });
+      addToast({ tone: 'success', message: t('shell.link_copied', locale) });
     } else {
-      addToast({ tone: 'danger', message: 'Could not copy the link.' });
+      addToast({ tone: 'danger', message: t('shell.link_copy_failed', locale) });
     }
   }
 </script>
@@ -58,65 +69,65 @@
   <div class="scopebar">
     {#if pins.pins.length === 0}
       <span class="scopebar__scope">
-        <span class="scopebar__lead">Scope</span>
+        <span class="scopebar__lead">{t('planner.lanes_scope', locale)}</span>
         <!-- Names every axis you can narrow by, and it has to name them ALL:
              the line has to earn its place in the sentence, and a person is
              now a fourth thing you can pin. A band that lists two of four
              teaches that the other two do not exist. -->
-        <span class="scopebar__all">Everything · all spaces, projects, lines &amp; people</span>
+        <span class="scopebar__all">{t('shell.everything_all', locale)}</span>
       </span>
       <button type="button" class="scopebar__add" onclick={openPaletteAdd}>
-        + narrow
+        {t('shell.narrow', locale)}
       </button>
       <span class="scopebar__right">
         <button type="button" class="scopebar__save" onclick={copyScopeLink}
-          >⧉ Copy link</button
+          >⧉ {t('shell.copy_link', locale)}</button
         >
       </span>
     {:else}
-      <span class="scopebar__lead">Scope</span>
+      <span class="scopebar__lead">{t('planner.lanes_scope', locale)}</span>
       {#each pins.pins as tok (tok)}
         <span class="tok tok--{tokenKind(tok)}">
           <ScopeGlyph kind={tokenKind(tok)} accent={tokenAccent(tok)} lineKind={tokenLineKind(tok)} />
           <span class="tok__label">
-            <span class="tok__kind">{tokenKind(tok)}</span>
+            <span class="tok__kind">{kindLabel(tokenKind(tok))}</span>
             <span class="tok__name">{tokenLabel(tok)}</span>
           </span>
           <button
             type="button"
             class="tok__x"
             onclick={() => pins.remove(tok)}
-            aria-label={`Remove ${tokenLabel(tok)}`}>×</button
+            aria-label={t('shell.remove_pin', locale, { name: tokenLabel(tok) })}>×</button
           >
         </span>
       {/each}
       <button type="button" class="scopebar__add" onclick={openPaletteAdd}>
-        + add
+        {t('shell.add', locale)}
       </button>
       <span class="scopebar__right">
         {#if exactSaved}
           <button
             type="button"
             class="scopebar__save"
-            onclick={() => scopes.remove(pins.pins)}>× Delete scope</button
+            onclick={() => scopes.remove(pins.pins)}>× {t('shell.delete_scope', locale)}</button
           >
         {:else if isModified}
           <button type="button" class="scopebar__save" onclick={updateScope}
-            >↺ Update scope</button
+            >↺ {t('shell.update_scope', locale)}</button
           >
           <button type="button" class="scopebar__save" onclick={saveCurrentScope}
-            >☆ Save new scope</button
+            >☆ {t('shell.save_new_scope', locale)}</button
           >
         {:else}
           <button type="button" class="scopebar__save" onclick={saveCurrentScope}
-            >☆ Save scope</button
+            >☆ {t('shell.save_scope', locale)}</button
           >
         {/if}
         <button type="button" class="scopebar__save" onclick={copyScopeLink}
-          >⧉ Copy link</button
+          >⧉ {t('shell.copy_link', locale)}</button
         >
         <button type="button" class="scopebar__clear" onclick={clearScope}
-          >Clear</button
+          >{t('shell.clear', locale)}</button
         >
       </span>
     {/if}

@@ -28,6 +28,17 @@
   import StateBadge from '$lib/components/StateBadge.svelte';
   import YNotes from '$lib/components/YNotes.svelte';
   import { dayMonthYear } from '$lib/datetime';
+  import { appLocale, t } from '$lib/i18n';
+
+  const locale = appLocale();
+
+  /** Project status in the viewer's language; an unknown value shows as itself. */
+  function projectStatusLabel(status: string): string {
+    if (status === 'draft') return t('project.status_draft', locale);
+    if (status === 'active') return t('project.status_active', locale);
+    if (status === 'archived') return t('project.status_archived', locale);
+    return status;
+  }
 
   const workspacesQuery = createQuery(workspacesQueryOptions());
   const projectsQuery = createQuery(activeProjectsQueryOptions());
@@ -122,7 +133,7 @@
       {#if project}
         <ProjectIdentityPopover {project} {siblings} size="30px" />
       {/if}
-      <p class="eyebrow">Project</p>
+      <p class="eyebrow">{t('create.project', locale)}</p>
     </div>
     <h1 class="project__title">
       {#if projectLoading}
@@ -133,7 +144,7 @@
     </h1>
     {#if project}
       <div class="project__meta">
-        <StateBadge label={project.status} tone={statusTone} />
+        <StateBadge label={projectStatusLabel(project.status)} tone={statusTone} />
         {#if project.starts_on || project.ends_on}
           <span class="project__meta-sep" aria-hidden="true">·</span>
           <span class="project__meta-dates">
@@ -149,19 +160,19 @@
   <RelationshipStub projectSlug={projectSlug} />
 
   {#if project}
-    <section class="project__notes" aria-label="Notes">
-      <p class="eyebrow">Notes</p>
+    <section class="project__notes" aria-label={t('person.notes', locale)}>
+      <p class="eyebrow">{t('person.notes', locale)}</p>
       <YNotes
         targetTable="project"
         targetId={project.id}
-        placeholder="Project notes — shared, live."
+        placeholder={t('project.notes_ph', locale)}
       />
     </section>
   {/if}
 
-  <section class="project__stubs" aria-label="Pending sections">
+  <section class="project__stubs" aria-label={t('project.pending_sections', locale)}>
     <div class="project__stub">
-      <p class="eyebrow">Lines</p>
+      <p class="eyebrow">{t('project.lines', locale)}</p>
       {#if projectLines.length > 0}
         <ul class="project__lines" role="list">
           {#each projectLines as l (l.id)}
@@ -173,17 +184,15 @@
           {/each}
         </ul>
       {:else}
-        <p class="project__stub-body">No lines yet.</p>
+        <p class="project__stub-body">{t('project.no_lines', locale)}</p>
       {/if}
     </div>
     <div class="project__stub">
-      <p class="eyebrow">Assets</p>
-      <p class="project__stub-body">
-        Riders, dossiers and stage plots will live here.
-      </p>
+      <p class="eyebrow">{t('project.assets', locale)}</p>
+      <p class="project__stub-body">{t('project.assets_body', locale)}</p>
     </div>
     <div class="project__stub">
-      <p class="eyebrow">Cast</p>
+      <p class="eyebrow">{t('project.cast', locale)}</p>
       {#if project}
         <CastPanel projectId={project.id} />
       {:else}

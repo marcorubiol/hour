@@ -8,6 +8,7 @@
 
   import type { Snippet } from 'svelte';
   import type { Json } from '$lib/db-types';
+  import { appLocale, t, type Locale } from '$lib/i18n';
   import JsonKV, { hasJsonContent } from './JsonKV.svelte';
   import ScheduleTable from './ScheduleTable.svelte';
 
@@ -57,6 +58,8 @@
      * to the read-only five (the playground).
      */
     schedule?: Snippet;
+    /** The reader's language; defaults to the session's. */
+    locale?: Locale;
   }
 
   let {
@@ -75,6 +78,7 @@
     viewerTz,
     fallbackTz = null,
     schedule,
+    locale = appLocale(),
   }: Props = $props();
 
   // The venue meta line shows only the venue's OWN timezone; the schedule
@@ -107,29 +111,29 @@
   let jsonSections = $derived(
     (
       [
-        ['Logistics', logistics],
-        ['Hospitality', hospitality],
-        ['Technical', technical],
+        [t('perf.logistics', locale), logistics],
+        [t('perf.hospitality', locale), hospitality],
+        [t('perf.technical', locale), technical],
       ] as const
     ).filter(([, v]) => hasJsonContent(v)),
   );
 </script>
 
-<section class="production" aria-label="Production">
+<section class="production" aria-label={t('perf.production', locale)}>
   <header class="production__header">
-    <p class="eyebrow">Production</p>
+    <p class="eyebrow">{t('perf.production', locale)}</p>
   </header>
 
   <div class="production__venue">
     {#if venue?.name ?? venueName}
       <strong class="production__venue-name">{venue?.name ?? venueName}</strong>
     {:else}
-      <p class="production__empty">No venue yet.</p>
+      <p class="production__empty">{t('venue.none_yet', locale)}</p>
     {/if}
     {#if placeLine}<span class="production__venue-place">{placeLine}</span>{/if}
     {#if venue?.address}<span class="production__venue-address">{venue.address}</span>{/if}
     <span class="production__venue-meta">
-      {#if venue?.capacity}cap. {venue.capacity}{/if}
+      {#if venue?.capacity}{t('venue.capacity_short', locale, { n: venue.capacity })}{/if}
       {#if venue?.capacity && venueTz} · {/if}
       {#if venueTz}{venueTz}{/if}
     </span>
@@ -160,6 +164,7 @@
     }}
     venueTz={scheduleTz}
     {viewerTz}
+    {locale}
   />
   {/if}
 

@@ -16,6 +16,7 @@
   import { addToast } from '$lib/components/Toast.svelte';
   import { workspacesQueryOptions } from '$lib/nav-queries';
   import { spaceName } from '$lib/utils/identity';
+  import { appLocale, t } from '$lib/i18n';
   import AccentSwatchPicker from './AccentSwatchPicker.svelte';
 
   interface Props {
@@ -29,6 +30,7 @@
   type CreatedProject = { id: string; slug: string; name: string; workspace_id: string };
 
   const queryClient = useQueryClient();
+  const locale = appLocale();
   const workspacesQ = createQuery(workspacesQueryOptions());
 
   let wsSelected = $state('');
@@ -88,13 +90,13 @@
     onError: (err) => {
       addToast({
         tone: 'danger',
-        title: 'Project not created',
+        title: t('project.not_created', locale),
         message:
           err instanceof ApiError && err.status === 409
-            ? 'A project with that name already exists in this workspace.'
+            ? t('project.name_taken', locale)
             : err instanceof Error
               ? err.message
-              : 'Unexpected error',
+              : t('perf.unexpected', locale),
       });
     },
   });
@@ -102,12 +104,12 @@
   function submit(event?: Event) {
     event?.preventDefault();
     if (!effectiveWorkspaceId) {
-      addToast({ tone: 'warning', message: 'Pick a workspace.' });
+      addToast({ tone: 'warning', message: t('workspace.pick', locale) });
       return;
     }
     const trimmed = name.trim();
     if (!trimmed) {
-      addToast({ tone: 'warning', message: 'Name cannot be empty.' });
+      addToast({ tone: 'warning', message: t('project.name_empty', locale) });
       return;
     }
     $create.mutate({
@@ -121,48 +123,48 @@
 
 <Dialog
   bind:open
-  title="New project"
+  title={t('project.new_title', locale)}
   description={targetWorkspaceName
-    ? `Adds a project under ${targetWorkspaceName}.`
-    : 'Adds a project under the selected workspace.'}
+    ? t('project.new_desc', locale, { space: targetWorkspaceName })
+    : t('project.new_desc_none', locale)}
   size="s"
   onclose={reset}
 >
   <form class="cpj__form" onsubmit={submit}>
     {#if workspaceId}
-      <Select label="Workspace" value={workspaceId} options={workspaceOptions} disabled />
+      <Select label={t('workspace.label', locale)} value={workspaceId} options={workspaceOptions} disabled />
     {:else}
       <Select
-        label="Workspace"
+        label={t('workspace.label', locale)}
         bind:value={wsSelected}
         options={workspaceOptions}
-        placeholder="Pick a workspace"
+        placeholder={t('workspace.pick_ph', locale)}
         required
         disabled={$create.isPending}
       />
     {/if}
 
     <Input
-      label="Name"
+      label={t('conversations.col_name', locale)}
       name="project-name"
       bind:value={name}
-      placeholder="e.g. Nightshade"
+      placeholder={t('project.name_ph', locale)}
       required
       autofocus
       autocomplete="off"
       disabled={$create.isPending}
     />
 
-    <AccentSwatchPicker bind:accent autoSlug={autoAccentSlug} label="Project color" disabled={$create.isPending} />
+    <AccentSwatchPicker bind:accent autoSlug={autoAccentSlug} label={t('project.color', locale)} disabled={$create.isPending} />
 
     <label class="field">
-      <span>Description</span>
+      <span>{t('project.description', locale)}</span>
       <textarea
         class="cpj__desc"
         bind:value={description}
         maxlength="280"
         rows="3"
-        placeholder="Optional. What is this project?"
+        placeholder={t('project.description_ph', locale)}
         disabled={$create.isPending}
       ></textarea>
       <span class="cpj__desc-count">{description.length} / 280</span>
@@ -173,8 +175,8 @@
   </form>
 
   {#snippet actions()}
-    <Button variant="outline" disabled={$create.isPending} onclick={close}>Cancel</Button>
-    <Button loading={$create.isPending} onclick={submit}>Create</Button>
+    <Button variant="outline" disabled={$create.isPending} onclick={close}>{t('create.cancel', locale)}</Button>
+    <Button loading={$create.isPending} onclick={submit}>{t('project.create', locale)}</Button>
   {/snippet}
 </Dialog>
 

@@ -140,7 +140,7 @@
       addToast({
         tone: 'danger',
         title: t('blackout.not_saved', locale),
-        message: err instanceof ApiError ? err.message : 'Unexpected error',
+        message: err instanceof ApiError ? err.message : t('perf.unexpected', locale),
       });
     },
     onSuccess: () => {

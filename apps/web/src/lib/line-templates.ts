@@ -13,6 +13,7 @@
 
 import * as v from 'valibot';
 import type { Enums } from './db-types';
+import { t, type Locale } from './i18n';
 
 export const MODULE_KEYS = [
   'planner',
@@ -30,28 +31,37 @@ export type ModuleKey = (typeof MODULE_KEYS)[number];
 // ADR-065: `conversations` = the line's booking conversations (the Conversations lens scoped to it —
 // people AND organizations); `team` = its cast/crew. Keys, labels, components and the DB
 // all agree — no legacy.
-export const MODULE_LABELS: Record<ModuleKey, string> = {
-  planner: 'Planner',
-  conversations: 'Conversations',
-  roadsheets: 'Road sheets',
-  notes: 'Notes',
-  materials: 'Materials',
-  money: 'Money',
-  team: 'Team',
-  tasks: 'Tasks',
+// Labels live in the dictionaries (lib/i18n), one explicit key per module.
+const MODULE_LABEL_KEYS: Record<ModuleKey, string> = {
+  planner: 'line.module_planner',
+  conversations: 'line.module_conversations',
+  roadsheets: 'line.module_roadsheets',
+  notes: 'line.module_notes',
+  materials: 'line.module_materials',
+  money: 'line.module_money',
+  team: 'line.module_team',
+  tasks: 'line.module_tasks',
 };
 
 /** Shown in the "Add module" menu and module empty states. */
-export const MODULE_DESCRIPTIONS: Record<ModuleKey, string> = {
-  planner: 'Performances and dates of this line',
-  conversations: 'Conversations tied to this line',
-  roadsheets: 'Road sheets of the line’s performances',
-  notes: 'Collaborative notes',
-  materials: 'Versioned assets — what was sent where',
-  money: 'Fees, invoices and expenses of this line',
-  team: 'Team on the road + venue conversations, per performance',
-  tasks: 'To-dos of this line — they feed the Desk too',
+const MODULE_DESCRIPTION_KEYS: Record<ModuleKey, string> = {
+  planner: 'line.module_planner_desc',
+  conversations: 'line.module_conversations_desc',
+  roadsheets: 'line.module_roadsheets_desc',
+  notes: 'line.module_notes_desc',
+  materials: 'line.module_materials_desc',
+  money: 'line.module_money_desc',
+  team: 'line.module_team_desc',
+  tasks: 'line.module_tasks_desc',
 };
+
+export function moduleLabel(key: ModuleKey, locale: Locale): string {
+  return t(MODULE_LABEL_KEYS[key], locale);
+}
+
+export function moduleDescription(key: ModuleKey, locale: Locale): string {
+  return t(MODULE_DESCRIPTION_KEYS[key], locale);
+}
 
 /** `line.modules` API boundary — order matters, unknown keys rejected. */
 export const LineModulesSchema = v.pipe(
@@ -67,10 +77,10 @@ type LineKind = Enums<'line_kind'>;
 
 export interface LineTemplate {
   key: string;
-  /** Card title in the template picker. */
-  name: string;
-  /** One-line card description. */
-  description: string;
+  /** Dictionary key of the card title in the template picker. */
+  nameKey: string;
+  /** Dictionary key of the one-line card description. */
+  descriptionKey: string;
   kind: LineKind;
   modules: ModuleKey[];
 }
@@ -84,43 +94,43 @@ export interface LineTemplate {
 export const LINE_TEMPLATES: LineTemplate[] = [
   {
     key: 'tour',
-    name: 'Tour',
-    description: 'Performances on the road — calendar, road sheets, team, money.',
+    nameKey: 'line.template_tour',
+    descriptionKey: 'line.template_tour_desc',
     kind: 'tour',
     modules: ['planner', 'tasks', 'roadsheets', 'team', 'money', 'materials', 'notes'],
   },
   {
     key: 'booking',
-    name: 'Booking',
-    description: 'A season of difusión — conversations, dates, materials.',
+    nameKey: 'line.template_booking',
+    descriptionKey: 'line.template_booking_desc',
     kind: 'campaign',
     modules: ['conversations', 'planner', 'tasks', 'materials', 'notes'],
   },
   {
     key: 'creation',
-    name: 'Creation',
-    description: 'Building a new piece — schedule, notes, costs.',
+    nameKey: 'line.template_creation',
+    descriptionKey: 'line.template_creation_desc',
     kind: 'creation',
     modules: ['planner', 'tasks', 'notes', 'materials', 'money'],
   },
   {
     key: 'press',
-    name: 'Press & comms',
-    description: 'Press conversations and communication materials.',
+    nameKey: 'line.template_press',
+    descriptionKey: 'line.template_press_desc',
     kind: 'comms',
     modules: ['conversations', 'planner', 'materials', 'notes'],
   },
   {
     key: 'fair',
-    name: 'Fair',
-    description: 'A fair or showcase — conversations, calendar, materials.',
+    nameKey: 'line.template_fair',
+    descriptionKey: 'line.template_fair_desc',
     kind: 'campaign',
     modules: ['conversations', 'planner', 'materials', 'notes'],
   },
   {
     key: 'blank',
-    name: 'Blank',
-    description: 'Just notes. Add modules as you go.',
+    nameKey: 'line.template_blank',
+    descriptionKey: 'line.template_blank_desc',
     kind: 'other',
     modules: ['notes'],
   },

@@ -33,6 +33,7 @@
    * it. The team's signed notes are comms, and comms is not built.
    */
   import type { NoteEvent } from '$lib/month-events';
+  import { appLocale, t } from '$lib/i18n';
   import { accentVarFor } from '$lib/utils/accent';
   import IdentityMark from '$lib/components/IdentityMark.svelte';
 
@@ -57,12 +58,12 @@
     onCreate,
     onDelete,
     next,
-    notesWord = 'notes',
-    nextWord = 'next',
-    emptyWord = 'empty',
-    privateWord = 'private',
-    placeholder = 'write it down…',
-    deleteLabel = 'Delete note',
+    notesWord = t('planner.agenda_notes', appLocale()),
+    nextWord = t('planner.day_next', appLocale()),
+    emptyWord = t('planner.lid_empty', appLocale()),
+    privateWord = t('planner.note_private', appLocale()),
+    placeholder = t('planner.note_placeholder', appLocale()),
+    deleteLabel = t('planner.note_delete', appLocale()),
   }: Props = $props();
 
   let notesOpen = $state(true);

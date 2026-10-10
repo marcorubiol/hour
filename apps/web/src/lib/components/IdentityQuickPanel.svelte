@@ -17,6 +17,9 @@
   import { addToast } from '$lib/components/Toast.svelte';
   import { accentVarFor, accentHue, hueDistance } from '$lib/utils/accent';
   import { MONOGRAM_MAX, type EditableProject, type IdentitySibling } from '$lib/utils/identity';
+  import { appLocale, t } from '$lib/i18n';
+
+  const locale = appLocale();
 
   interface Props {
     project: EditableProject;
@@ -48,7 +51,7 @@
     for (const s of siblings) {
       if (s.id === project.id) continue;
       if (hueDistance(accentHue({ slug: s.slug, accent: s.accent }), mine) <= COLOR_CLASH_DEG)
-        return s.name ?? 'another project';
+        return s.name ?? t('ui.another_project', locale);
     }
     return null;
   });
@@ -75,11 +78,11 @@
     onError: (err) => {
       addToast({
         tone: 'danger',
-        title: 'Not saved',
+        title: t('edit.not_saved', locale),
         message:
           err instanceof ApiError && err.status === 403
-            ? "You don't have permission to edit this project."
-            : 'Unexpected error',
+            ? t('project.no_permission', locale)
+            : t('perf.unexpected', locale),
       });
     },
   });
@@ -96,7 +99,7 @@
   }
 </script>
 
-<div class="iqp" role="dialog" aria-label="Project identity">
+<div class="iqp" role="dialog" aria-label={t('project.identity_aria', locale)}>
   <header class="iqp__head">
     <p class="iqp__name">{project.name}</p>
     <IdentityMark
@@ -108,7 +111,7 @@
     />
   </header>
   <div class="iqp__identity">
-    <span class="eyebrow">Identity</span>
+    <span class="eyebrow">{t('project.identity', locale)}</span>
     <input
       class="iqp__input"
       bind:value={initials}
@@ -116,21 +119,21 @@
       oninput={() => {
         if (initials.length > MONOGRAM_MAX) initials = initials.slice(0, MONOGRAM_MAX);
       }}
-      placeholder="e.g. MdA"
+      placeholder={t('project.monogram_ph', locale)}
       autocomplete="off"
-      aria-label="Monogram"
+      aria-label={t('project.monogram', locale)}
     />
-    <p class="iqp__hint">1–{MONOGRAM_MAX} characters, upper or lower case</p>
+    <p class="iqp__hint">{t('ui.monogram_hint', locale, { max: MONOGRAM_MAX })}</p>
     {#if collision}
-      <p class="iqp__collision">Another project already uses “{initials.trim()}”.</p>
+      <p class="iqp__collision">{t('ui.monogram_taken', locale, { initials: initials.trim() })}</p>
     {/if}
   </div>
 
   <div class="iqp__color">
-    <AccentSwatchPicker bind:accent autoSlug={project.slug} label="Project color" hideLegend />
+    <AccentSwatchPicker bind:accent autoSlug={project.slug} label={t('project.color', locale)} hideLegend />
     <!-- Space is always reserved so the warning appears without a layout jump. -->
     <p class="iqp__clash">
-      {#if colorClash}A similar colour is used by {colorClash}.{/if}
+      {#if colorClash}{t('ui.color_clash', locale, { name: colorClash })}{/if}
     </p>
   </div>
 
@@ -141,12 +144,12 @@
       onclick={() => $save.mutate()}
       disabled={$save.isPending}
     >
-      Save identity
+      {t('ui.save_identity', locale)}
     </button>
 
     <hr class="iqp__rule" />
 
-    <button type="button" class="iqp__link" onclick={openFull}>Edit project →</button>
+    <button type="button" class="iqp__link" onclick={openFull}>{t('project.edit_title', locale)} →</button>
   </div>
 </div>
 

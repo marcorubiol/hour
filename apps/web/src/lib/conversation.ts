@@ -9,24 +9,29 @@
 import * as v from 'valibot';
 import { Constants, type Enums, type Tables } from './db-types';
 import { localDayISO, realIsoDate, realIsoInstant } from './datetime';
+import { appLocale, t, type Locale } from './i18n';
 
 export type ConversationStatus = Enums<'conversation_status'>;
 
 /** All statuses in schema enum order (runtime mirror of the DB enum). */
 export const CONVERSATION_STATUSES = Constants.public.Enums.conversation_status;
 
-export const STATUS_LABELS: Record<ConversationStatus, string> = {
-  contacted: 'Contacted',
-  in_conversation: 'In conversation',
-  hold: 'Hold',
-  confirmed: 'Confirmed',
-  declined: 'Declined',
-  dormant: 'Dormant',
-  recurring: 'Recurring',
+/** Dictionary key of each status label (lib/i18n). */
+export const STATUS_KEYS: Record<ConversationStatus, string> = {
+  contacted: 'conversations.status_contacted',
+  in_conversation: 'conversations.status_in_conversation',
+  hold: 'conversations.status_hold',
+  confirmed: 'conversations.status_confirmed',
+  declined: 'conversations.status_declined',
+  dormant: 'conversations.status_dormant',
+  recurring: 'conversations.status_recurring',
 };
 
-export function statusLabel(status: string): string {
-  return STATUS_LABELS[status as ConversationStatus] ?? status;
+/** The status in the viewer's language; an unknown value shows as itself.
+    `locale` defaults to the session's, so callers outside this zone keep working. */
+export function statusLabel(status: string, locale: Locale = appLocale()): string {
+  const key = STATUS_KEYS[status as ConversationStatus];
+  return key ? t(key, locale) : status;
 }
 
 /** Badge variants in base.css mirror the enum with underscores → dashes. */
@@ -64,18 +69,26 @@ export type ConversationEvent = Tables<'conversation_event'>;
 export const CONVERSATION_EVENT_KINDS = Constants.public.Enums.conversation_event_kind;
 export const CONVERSATION_EVENT_DIRECTIONS = Constants.public.Enums.conversation_event_direction;
 
-export const EVENT_KIND_LABELS: Record<ConversationEventKind, string> = {
-  email: 'Email',
-  call: 'Call',
-  meeting: 'Meeting',
-  message: 'Message',
-  note: 'Note',
+export const EVENT_KIND_KEYS: Record<ConversationEventKind, string> = {
+  email: 'conversations.kind_email',
+  call: 'conversations.kind_call',
+  meeting: 'conversations.kind_meeting',
+  message: 'conversations.kind_message',
+  note: 'conversations.kind_note',
 };
 
-export const EVENT_DIRECTION_LABELS: Record<ConversationEventDirection, string> = {
-  outbound: 'Sent',
-  inbound: 'Received',
+export const EVENT_DIRECTION_KEYS: Record<ConversationEventDirection, string> = {
+  outbound: 'conversations.dir_outbound',
+  inbound: 'conversations.dir_inbound',
 };
+
+export function eventKindLabel(kind: ConversationEventKind, locale: Locale): string {
+  return t(EVENT_KIND_KEYS[kind], locale);
+}
+
+export function eventDirectionLabel(direction: ConversationEventDirection, locale: Locale): string {
+  return t(EVENT_DIRECTION_KEYS[direction], locale);
+}
 
 /**
  * POST /api/conversations/:id/events body. `source` is not here: what the app
@@ -205,18 +218,22 @@ export function groupConversationsByContact(
 }
 
 /** Calm, coarse relative copy: informative without implying urgency. */
-export function relativeContactDate(iso: string | null, nowMs = Date.now()): string {
+export function relativeContactDate(
+  iso: string | null,
+  locale: Locale,
+  nowMs = Date.now(),
+): string {
   if (!iso) return '—';
   const atMs = Date.parse(iso);
   if (Number.isNaN(atMs)) return '—';
 
   const days = Math.max(0, Math.floor((nowMs - atMs) / 86_400_000));
-  if (days === 0) return 'today';
-  if (days === 1) return 'yesterday';
-  if (days < 14) return `${days} days ago`;
-  if (days < 60) return `${Math.floor(days / 7)} weeks ago`;
-  if (days < 730) return `${Math.floor(days / 30)} months ago`;
-  return `${Math.floor(days / 365)} years ago`;
+  if (days === 0) return t('conversations.rel_today', locale);
+  if (days === 1) return t('conversations.rel_yesterday', locale);
+  if (days < 14) return t('conversations.rel_days', locale, { n: days });
+  if (days < 60) return t('conversations.rel_weeks', locale, { n: Math.floor(days / 7) });
+  if (days < 730) return t('conversations.rel_months', locale, { n: Math.floor(days / 30) });
+  return t('conversations.rel_years', locale, { n: Math.floor(days / 365) });
 }
 
 type WorkspacePersonEmbed = Omit<PersonLite, 'id' | 'organization_name'> & {

@@ -1,4 +1,8 @@
 <script lang="ts">
+  import { t, appLocale } from '$lib/i18n';
+
+  const locale = appLocale();
+
   // ─── privacy state ────────────────────────────────────────────────────
   let privTasksDefault = $state<'shared' | 'private'>('shared');
   let privMoneyVis = $state<'me-only' | 'project' | 'all'>('me-only');
@@ -7,23 +11,20 @@
 </script>
 
 <header class="set-mast">
-  <p class="eyebrow set-mast__kicker">Boundaries</p>
-  <h1 class="set-mast__title"><em>Visibility &amp; privacy</em></h1>
-  <p class="set-mast__sub">
-    Across your collectives, some things are shared and some are yours
-    alone. Defaults here apply to every new project.
-  </p>
+  <p class="eyebrow set-mast__kicker">{t('settings.priv_kicker', locale)}</p>
+  <h1 class="set-mast__title"><em>{t('settings.nav_privacy', locale)}</em></h1>
+  <p class="set-mast__sub">{t('settings.priv_sub', locale)}</p>
 </header>
 
 <section class="set-group">
   <div class="set-group__head">
-    <span class="eyebrow set-group__kicker">Defaults</span>
+    <span class="eyebrow set-group__kicker">{t('settings.priv_defaults', locale)}</span>
   </div>
   <div class="set-group__body">
     <div class="set-row">
       <div class="set-row__lead">
-        <div class="set-row__label">New tasks default to</div>
-        <div class="set-row__hint">You can flip any individual task later.</div>
+        <div class="set-row__label">{t('settings.priv_tasks', locale)}</div>
+        <div class="set-row__hint">{t('settings.priv_tasks_hint', locale)}</div>
       </div>
       <div class="set-row__ctrl">
         <div class="set-seg">
@@ -31,20 +32,20 @@
             type="button"
             class={privTasksDefault === 'shared' ? 'is-on' : ''}
             onclick={() => (privTasksDefault = 'shared')}
-          >Shared</button>
+          >{t('settings.priv_shared', locale)}</button>
           <button
             type="button"
             class={privTasksDefault === 'private' ? 'is-on' : ''}
             onclick={() => (privTasksDefault = 'private')}
-          >Private</button>
+          >{t('settings.priv_private', locale)}</button>
         </div>
       </div>
     </div>
 
     <div class="set-row">
       <div class="set-row__lead">
-        <div class="set-row__label">Money visibility</div>
-        <div class="set-row__hint">Who can see fees, invoices, chases.</div>
+        <div class="set-row__label">{t('settings.priv_money', locale)}</div>
+        <div class="set-row__hint">{t('settings.priv_money_hint', locale)}</div>
       </div>
       <div class="set-row__ctrl">
         <div class="set-seg">
@@ -52,25 +53,25 @@
             type="button"
             class={privMoneyVis === 'me-only' ? 'is-on' : ''}
             onclick={() => (privMoneyVis = 'me-only')}
-          >Only me</button>
+          >{t('settings.priv_only_me', locale)}</button>
           <button
             type="button"
             class={privMoneyVis === 'project' ? 'is-on' : ''}
             onclick={() => (privMoneyVis = 'project')}
-          >Per-project rule</button>
+          >{t('settings.priv_per_project', locale)}</button>
           <button
             type="button"
             class={privMoneyVis === 'all' ? 'is-on' : ''}
             onclick={() => (privMoneyVis = 'all')}
-          >All collaborators</button>
+          >{t('settings.priv_all_collab', locale)}</button>
         </div>
       </div>
     </div>
 
     <div class="set-row">
       <div class="set-row__lead">
-        <div class="set-row__label">Private notes</div>
-        <div class="set-row__hint">Your tech notes, drafts, hot takes.</div>
+        <div class="set-row__label">{t('settings.priv_notes', locale)}</div>
+        <div class="set-row__hint">{t('settings.priv_notes_hint', locale)}</div>
       </div>
       <div class="set-row__ctrl">
         <button
@@ -78,7 +79,7 @@
           class={['set-toggle', privNotesPrivate && 'is-on']
             .filter(Boolean)
             .join(' ')}
-          aria-label="Private notes"
+          aria-label={t('settings.priv_notes', locale)}
           aria-pressed={privNotesPrivate}
           onclick={() => (privNotesPrivate = !privNotesPrivate)}
         >
@@ -89,8 +90,8 @@
 
     <div class="set-row">
       <div class="set-row__lead">
-        <div class="set-row__label">Distribution pipeline</div>
-        <div class="set-row__hint">Letters out, warm replies, dead leads.</div>
+        <div class="set-row__label">{t('settings.priv_distribution', locale)}</div>
+        <div class="set-row__hint">{t('settings.priv_distribution_hint', locale)}</div>
       </div>
       <div class="set-row__ctrl">
         <div class="set-seg">
@@ -98,17 +99,17 @@
             type="button"
             class={privDistribution === 'me-only' ? 'is-on' : ''}
             onclick={() => (privDistribution = 'me-only')}
-          >Only me</button>
+          >{t('settings.priv_only_me', locale)}</button>
           <button
             type="button"
             class={privDistribution === 'distributors' ? 'is-on' : ''}
             onclick={() => (privDistribution = 'distributors')}
-          >Distributors only</button>
+          >{t('settings.priv_distributors_only', locale)}</button>
           <button
             type="button"
             class={privDistribution === 'all' ? 'is-on' : ''}
             onclick={() => (privDistribution = 'all')}
-          >Everyone</button>
+          >{t('settings.priv_everyone', locale)}</button>
         </div>
       </div>
     </div>

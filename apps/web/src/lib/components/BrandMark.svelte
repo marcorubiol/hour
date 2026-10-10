@@ -15,6 +15,8 @@
    * plain inline element.
    */
 
+  import { appLocale, t } from '$lib/i18n';
+
   type Size = 's' | 'm' | 'l';
 
   interface Props {
@@ -29,7 +31,7 @@
     href,
     size = 'm',
     compact = false,
-    ariaLabel = 'Hour — home',
+    ariaLabel = t('ui.brand_home', appLocale()),
   }: Props = $props();
 
   let label = $derived(compact ? 'h' : 'hour');

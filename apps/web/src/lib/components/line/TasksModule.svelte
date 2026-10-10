@@ -12,7 +12,7 @@
   import TaskBoard from '$lib/components/TaskBoard.svelte';
   import TaskComposer from '$lib/components/TaskComposer.svelte';
   import { fetchJSON } from '$lib/api';
-  import { detectLocale } from '$lib/i18n';
+  import { detectLocale, t } from '$lib/i18n';
   import type { TaskItem, TaskTarget } from '$lib/task';
 
   interface Props {
@@ -64,12 +64,12 @@
     showContext={false}
     loading={$tasksQuery.isPending}
     error={$tasksQuery.isError}
-    emptyText="No tasks on this line yet."
+    emptyText={t('line.tasks_empty', locale)}
   />
 
   {#if doneTasks.length > 0}
     <button type="button" class="ltm__done-toggle" onclick={() => (showDone = !showDone)}>
-      {showDone ? 'Hide' : 'Show'} {doneTasks.length} done
+      {t(showDone ? 'line.tasks_hide_done' : 'line.tasks_show_done', locale, { n: doneTasks.length })}
     </button>
     {#if showDone}
       <TaskBoard tasks={doneTasks} showContext={false} emptyText="" />

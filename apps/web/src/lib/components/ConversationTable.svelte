@@ -71,8 +71,6 @@
     items: ConversationItem[];
   };
 
-  // Only the compact phone card speaks through the dictionary for now; the
-  // rest of this table is still English-only.
   const locale = detectLocale(navigator.language);
 
   const LIMIT = 50;
@@ -152,7 +150,7 @@
         `/api/conversations/${id}`,
         patch,
       );
-      if (!body?.item) throw new Error('Unexpected response');
+      if (!body?.item) throw new Error(t('conversations.unexpected_response', locale));
       return body.item;
     },
     onMutate: async ({ id, patch }: PatchInput) => {
@@ -189,8 +187,10 @@
       }
       addToast({
         tone: 'danger',
-        title: 'Change not saved',
-        message: `${err instanceof Error ? err.message : 'Unexpected error'} — try again.`,
+        title: t('conversations.change_not_saved', locale),
+        message: t('perf.try_again', locale, {
+          error: err instanceof Error ? err.message : t('perf.unexpected', locale),
+        }),
       });
     },
     onSuccess: (item, _vars, ctx) => {
@@ -297,35 +297,37 @@
 <div class="status-bar">
   <div class="status-bar__summary">
     {#if loading}
-      <span>Loading...</span>
+      <span>{t('conversations.loading', locale)}</span>
     {:else if !errorMsg}
-      <span class="status-bar__count">{total} conversations</span>
+      <span class="status-bar__count"
+        >{t(total === 1 ? 'conversations.count_one' : 'conversations.count_other', locale, { n: total })}</span
+      >
       {#if total > 0}
-        <span>Showing {offset + 1}-{rangeEnd}</span>
+        <span>{t('conversations.showing', locale, { from: offset + 1, to: rangeEnd })}</span>
       {/if}
       {#if focusedConversationId}
         <button
           type="button"
           class="status-bar__clear"
           onclick={() => (focusedConversationId = null)}
-        >Show all loaded</button>
+        >{t('conversations.show_all_loaded', locale)}</button>
       {/if}
     {/if}
   </div>
   {#if groupable}
-    <div class="view-toggle" role="group" aria-label="Group conversations">
+    <div class="view-toggle" role="group" aria-label={t('conversations.group_aria', locale)}>
       <button
         type="button"
         class:view-toggle__active={view === 'conversation'}
         aria-pressed={view === 'conversation'}
         onclick={() => setView('conversation')}
-      >By conversation</button>
+      >{t('conversations.by_conversation', locale)}</button>
       <button
         type="button"
         class:view-toggle__active={view === 'contact'}
         aria-pressed={view === 'contact'}
         onclick={() => setView('contact')}
-      >By contact</button>
+      >{t('conversations.by_contact', locale)}</button>
     </div>
   {/if}
 </div>
@@ -335,11 +337,11 @@
     <table class="contact-table">
       <thead>
         <tr>
-          <th>Contact</th>
-          <th>Organization</th>
-          <th>Location</th>
-          <th>Conversations</th>
-          <th>Last contact</th>
+          <th>{t('conversations.col_contact', locale)}</th>
+          <th>{t('conversations.col_organization', locale)}</th>
+          <th>{t('conversations.col_location', locale)}</th>
+          <th>{t('lens.conversations', locale)}</th>
+          <th>{t('conversations.col_last_contact', locale)}</th>
         </tr>
       </thead>
       <tbody>
@@ -347,7 +349,7 @@
           {@const representative = group.conversations[0]}
           {@const path = personPath(representative)}
           <tr>
-            <td class="cell--name" data-label="Contact">
+            <td class="cell--name" data-label={t('conversations.col_contact', locale)}>
               {#if path && group.person}
                 <a class="cell--name-link" href={path}>{group.person.full_name}</a>
               {:else}
@@ -356,31 +358,31 @@
             </td>
             <td
               class="cell--muted"
-              data-label="Organization"
+              data-label={t('conversations.col_organization', locale)}
               data-empty={!group.person?.organization_name || undefined}
             >
               {group.person?.organization_name ?? '—'}
             </td>
             <td
               class="cell--meta"
-              data-label="Location"
+              data-label={t('conversations.col_location', locale)}
               data-empty={locationOf(representative) === '—' || undefined}>{locationOf(representative)}</td
             >
-            <td class="contact-projects" data-label="Conversations">
+            <td class="contact-projects" data-label={t('lens.conversations', locale)}>
               {#each group.conversations as conversation (conversation.id)}
                 <button
                   type="button"
                   class={`project-chip ${statusBadgeClass(conversation.status)}`}
-                  title={`${conversation.project?.name ?? 'Conversation'} · ${statusLabel(conversation.status)}`}
+                  title={`${conversation.project?.name ?? t('conversations.conversation', locale)} · ${statusLabel(conversation.status, locale)}`}
                   onclick={() => focusConversation(conversation.id)}
-                >{conversation.project?.name ?? 'Conversation'}</button>
+                >{conversation.project?.name ?? t('conversations.conversation', locale)}</button>
               {/each}
             </td>
-            <td class="last-contact" data-label="Last contact" data-short={t('conversations.card_last', locale)}>
+            <td class="last-contact" data-label={t('conversations.col_last_contact', locale)} data-short={t('conversations.card_last', locale)}>
               <time
                 datetime={group.last_contacted_at ?? undefined}
                 title={contactTitle(group.last_contacted_at)}
-              >{relativeContactDate(group.last_contacted_at)}</time>
+              >{relativeContactDate(group.last_contacted_at, locale)}</time>
             </td>
           </tr>
         {/each}
@@ -390,19 +392,19 @@
     <table class="conversation-table">
       <thead>
         <tr>
-          <th>Name</th>
-          <th>Organization</th>
-          <th>Location</th>
-          <th>Status</th>
-          <th>Last contact</th>
-          <th>Next action</th>
+          <th>{t('conversations.col_name', locale)}</th>
+          <th>{t('conversations.col_organization', locale)}</th>
+          <th>{t('conversations.col_location', locale)}</th>
+          <th>{t('edit.status', locale)}</th>
+          <th>{t('conversations.col_last_contact', locale)}</th>
+          <th>{t('conversations.col_next_action', locale)}</th>
         </tr>
       </thead>
       <tbody>
         {#each visibleItems as item, i (item.id)}
           {@const path = personPath(item)}
           <tr>
-            <td class="cell--name" data-label="Name">
+            <td class="cell--name" data-label={t('conversations.col_name', locale)}>
               {#if path && item.person}
                 <a class="cell--name-link" href={path}>
                   {item.person.full_name}
@@ -413,22 +415,22 @@
             </td>
             <td
               class="cell--muted"
-              data-label="Organization"
+              data-label={t('conversations.col_organization', locale)}
               data-empty={!item.person?.organization_name || undefined}
             >
               {item.person?.organization_name ?? '—'}
             </td>
-            <td class="cell--meta" data-label="Location" data-empty={locationOf(item) === '—' || undefined}
+            <td class="cell--meta" data-label={t('conversations.col_location', locale)} data-empty={locationOf(item) === '—' || undefined}
               >{locationOf(item)}</td
             >
-            <td class="cell--status" data-label="Status">
+            <td class="cell--status" data-label={t('edit.status', locale)}>
               <Menu
-                label="Change status or log contact"
+                label={t('conversations.status_menu', locale)}
                 triggerClass={statusBadgeClass(item.status)}
                 direction={i >= visibleItems.length - 2 && i > 2 ? 'up' : 'down'}
               >
                 {#snippet trigger()}
-                  {statusLabel(item.status)}<span class="status-caret" aria-hidden="true">▾</span>
+                  {statusLabel(item.status, locale)}<span class="status-caret" aria-hidden="true">▾</span>
                 {/snippet}
                 {#snippet children({ close })}
                   {#each CONVERSATION_STATUSES as s (s)}
@@ -442,7 +444,7 @@
                           changeStatus(item, s);
                         }}
                       >
-                        {statusLabel(s)}
+                        {statusLabel(s, locale)}
                       </button>
                     </li>
                   {/each}
@@ -456,30 +458,32 @@
                         close();
                         openHistory(item);
                       }}
-                    >Log contact…</button>
+                    >{t('conversations.log_contact', locale)}</button>
                   </li>
                 {/snippet}
               </Menu>
             </td>
-            <td class="last-contact" data-label="Last contact" data-short={t('conversations.card_last', locale)}>
+            <td class="last-contact" data-label={t('conversations.col_last_contact', locale)} data-short={t('conversations.card_last', locale)}>
               <button
                 type="button"
                 class="last-contact__open"
                 onclick={() => openHistory(item)}
-                title={contactTitle(item.last_contacted_at) ?? 'History'}
-                aria-label={`History · last contact ${relativeContactDate(item.last_contacted_at)}`}
+                title={contactTitle(item.last_contacted_at) ?? t('conversations.history', locale)}
+                aria-label={t('conversations.history_aria', locale, {
+                  when: relativeContactDate(item.last_contacted_at, locale),
+                })}
               >
                 <time datetime={item.last_contacted_at ?? undefined}
-                  >{relativeContactDate(item.last_contacted_at)}</time
+                  >{relativeContactDate(item.last_contacted_at, locale)}</time
                 >
               </button>
             </td>
-            <td class="cell--next" data-label="Next action" data-short={t('conversations.card_next', locale)}>
+            <td class="cell--next" data-label={t('conversations.col_next_action', locale)} data-short={t('conversations.card_next', locale)}>
               <button
                 type="button"
                 class="next-action"
                 onclick={() => openNextAction(item)}
-                title={item.next_action_note ?? 'Set next action'}
+                title={item.next_action_note ?? t('conversations.set_next_action', locale)}
               >
                 <span class="next-action__date">{formatDate(item.next_action_at)}</span>
                 {#if item.next_action_note}
@@ -499,17 +503,17 @@
 {:else if !loading && items.length === 0}
   {#if importEmptyState && !filters.q && (!filters.status || filters.status === 'any')}
     <div class="empty-book">
-      <p class="empty-book__title">Bring your book.</p>
-      <p>Import the spreadsheet you already use, then keep each relationship here.</p>
+      <p class="empty-book__title">{t('conversations.empty_title', locale)}</p>
+      <p>{t('conversations.empty_body', locale)}</p>
     </div>
   {:else}
-    <div class="msg">No conversations match these filters.</div>
+    <div class="msg">{t('conversations.no_match', locale)}</div>
   {/if}
 {/if}
 
 {#if view === 'contact' && showPagination}
   <p class="grouping-note">
-    Grouping this loaded page ({items.length} of {total}). A contact may continue on another page.
+    {t('conversations.grouping_note', locale, { n: items.length, total })}
   </p>
 {/if}
 
@@ -520,22 +524,22 @@
       onclick={() => (offset = Math.max(0, offset - LIMIT))}
       disabled={offset === 0}
     >
-      Previous
+      {t('conversations.prev_page', locale)}
     </button>
     <button
       class="btn--outline btn--s"
       onclick={() => (offset = offset + LIMIT)}
       disabled={offset + LIMIT >= total}
     >
-      Next
+      {t('conversations.next_page', locale)}
     </button>
   </div>
 {/if}
 
-<Dialog bind:open={historyOpen} title="History" size="m" onclose={() => (historyFor = null)}>
+<Dialog bind:open={historyOpen} title={t('conversations.history', locale)} size="m" onclose={() => (historyFor = null)}>
   {#if historyFor}
     <p class="next-action-who">
-      {historyFor.person?.full_name ?? 'Conversation'}{historyFor.person?.organization_name
+      {historyFor.person?.full_name ?? t('conversations.conversation', locale)}{historyFor.person?.organization_name
         ? ` — ${historyFor.person.organization_name}`
         : ''}
     </p>
@@ -544,32 +548,32 @@
     {/key}
   {/if}
   {#snippet actions()}
-    <Button variant="outline" onclick={() => (historyOpen = false)}>Close</Button>
+    <Button variant="outline" onclick={() => (historyOpen = false)}>{t('conversations.close', locale)}</Button>
   {/snippet}
 </Dialog>
 
-<Dialog bind:open={dialogOpen} title="Next action" size="s" onclose={() => (editing = null)}>
+<Dialog bind:open={dialogOpen} title={t('conversations.col_next_action', locale)} size="s" onclose={() => (editing = null)}>
   {#if editing}
     <p class="next-action-who">
-      {editing.person?.full_name ?? 'Conversation'}{editing.person?.organization_name
+      {editing.person?.full_name ?? t('conversations.conversation', locale)}{editing.person?.organization_name
         ? ` — ${editing.person.organization_name}`
         : ''}
     </p>
   {/if}
-  <Input label="Date" type="date" bind:value={formDate} />
+  <Input label={t('perf.date', locale)} type="date" bind:value={formDate} />
   <div class="field">
-    <label for="next-action-note">Note</label>
+    <label for="next-action-note">{t('blackout.note', locale)}</label>
     <textarea
       id="next-action-note"
       rows="3"
       maxlength="500"
       bind:value={formNote}
-      placeholder="What's the next move?"
+      placeholder={t('conversations.next_move_ph', locale)}
     ></textarea>
   </div>
   {#snippet actions()}
-    <Button variant="outline" onclick={closeNextAction}>Cancel</Button>
-    <Button onclick={saveNextAction}>Save</Button>
+    <Button variant="outline" onclick={closeNextAction}>{t('create.cancel', locale)}</Button>
+    <Button onclick={saveNextAction}>{t('blackout.save', locale)}</Button>
   {/snippet}
 </Dialog>
 
