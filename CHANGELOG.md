@@ -6,6 +6,10 @@ hasta entonces, sacado de esos documentos; lo anterior a julio de 2026 está sol
 
 ## Octubre 2026 (en curso)
 
+- Al crear o editar una función se elige su bolo (el trato con la sala); con un solo bolo abierto se propone solo, y la ficha enlaza al bolo en Cuentas. (2026-10-10, `6d5276c`)
+- La escaleta: el orden del día de una función o de un ensayo, con sus momentos y horas, se escribe en la vista Día y en la ficha de la función, se reordena a mano y sale en la hoja de ruta, también la pública. (2026-10-10, `6d5276c`)
+- Los viajes tienen origen, destino y tramos (tren, coche, avión…), cada uno con su hora en la zona de su lugar; el lugar se elige entre pueblos, ciudades, aeropuertos o vuestras salas, nunca se adivina. (2026-10-10, `6d5276c`)
+- Hour se usa en el móvil: el menú se abre tocando el reloj y Conversations se lee en fichas compactas. (2026-10-10, `6d5276c`)
 - Cada conversación guarda su historial: cada contacto (email, llamada, reunión, mensaje o nota) queda apuntado con su fecha y su texto, y se ve desde la celda «Last contact». «Contacted today» pasa a ser «Log contact…». (2026-10-09, `3f6eb44`)
 - Los datos de muestra salen del espacio de MüK Cia: queda solo vuestra lista real de contactos de difusión. (2026-10-09)
 

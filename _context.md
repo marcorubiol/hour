@@ -1,5 +1,15 @@
 # Hour — estado canónico del proyecto
 
+> **Reconciliación 2026-10-10 (tarde): LAS CUATRO PRIMERAS VERSIONES DE DISEÑO EN
+> PRODUCCIÓN.** Runtime **`6d5276c`** (después, `main` solo con tests y docs). Selector
+> función↔bolo (§ 36), escaleta en la vista Día y en la ficha (§ 17 P3, sin
+> directo), viajes con tramos, zonas por extremo y lugares de un índice en R2
+> (`hour-media/places/v1/`, GeoNames CC BY + airportsdata MIT, ~519.000 lugares),
+> y el shell móvil. Tres migraciones: `20261010140000_list_performance_bolo_links`,
+> `20261010160000_travel_stage_ends`, `20261010180000_public_roadsheet_schedule`
+> (apply run 38049924115). **RLS 225/225**; E2E 59/62 con dos specs de textos ya
+> traducidos (arreglados en `30216ae`, 6/6 solos).
+
 > **Reconciliación 2026-10-10 (mediodía): § 37 EN PRODUCCIÓN.** Runtime
 > **`d835b86`**. Migración `20261010100000_create_performance_bolo` (run
 > 38037261162): una función nace enlazada a su bolo, y las 8 funciones de
@@ -535,7 +545,9 @@ orientativo, no una verdad comercial cerrada.
   2026-08-27 eso **ya cambió un gate real**: la migración de ese día se aplicó
   sin el ensayo en staging. No es una nota preventiva, es algo que pasó — ver
   `_tasks.md § 34`.
-- **Última migración aplicada: `20261010100000_create_performance_bolo`**
+- **Última migración aplicada: `20261010180000_public_roadsheet_schedule`**
+  (2026-10-10, run 38049924115, con `20261010140000` y `20261010160000`). Debajo
+  va **`20261010100000_create_performance_bolo`**
   (2026-10-10, run 38037261162; § 37). Debajo va
   **`20261009210000_schedule_slot_contract`**
   (2026-10-10, run 38031613191; § 17 P1, con `20261009200000_schedule_slot`
