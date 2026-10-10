@@ -71,6 +71,7 @@ function toProjectionBundle(result: PerformanceBundleResult): PerformanceBundle 
       start_at: p.start_at,
       loadout_at: p.loadout_at,
       wrap_at: p.wrap_at,
+      schedule: p.schedule,
       notes: p.notes,
       logistics: p.logistics,
       hospitality: p.hospitality,
