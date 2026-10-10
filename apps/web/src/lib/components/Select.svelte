@@ -15,6 +15,8 @@
     options?: SelectOption[];
     placeholder?: string;
     helper?: string;
+    /** Helper with markup (a link): same slot and treatment as `helper`. */
+    message?: Snippet;
     error?: string;
     required?: boolean;
     disabled?: boolean;
@@ -30,6 +32,7 @@
     options,
     placeholder,
     helper,
+    message,
     error,
     required = false,
     disabled = false,
@@ -40,7 +43,7 @@
   let fieldId = $derived(
     id ?? name ?? `field-${Math.random().toString(36).slice(2, 8)}`
   );
-  let hasMessage = $derived(Boolean(error || helper));
+  let hasMessage = $derived(Boolean(error || helper || message));
   let messageId = $derived(`${fieldId}-msg`);
 
   let wrapperClasses = $derived(
@@ -83,7 +86,7 @@
 
   {#if hasMessage}
     <p id={messageId} class="field__msg" role={error ? 'alert' : undefined}>
-      {error ?? helper}
+      {#if error || helper}{error ?? helper}{:else if message}{@render message()}{/if}
     </p>
   {/if}
 </div>
