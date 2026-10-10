@@ -28,6 +28,7 @@
 
 <script lang="ts">
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
+  import { toStore } from 'svelte/store';
   import { fetchJSON, mutateJSON } from '$lib/api';
   import Input from './Input.svelte';
   import Select from './Select.svelte';
@@ -35,6 +36,8 @@
   import { dayKeyInTz } from '$lib/planner';
   import { detectLocale, t } from '$lib/i18n';
   import { allLinesQueryOptions } from '$lib/nav-queries';
+  import { boloOptions, boloPrefill, type BoloLite } from '$lib/bolo-pick';
+  import { projectBolosQueryOptions } from '$lib/bolo-queries';
   import {
     HOLD_NOTICE_DEFAULT,
     isHoldStatus,
@@ -129,6 +132,27 @@
   ]);
   let showLineSelect = $derived(!presetLineId && projectLines.length > 0);
 
+  // ADR-087 · § 36 — EL BOLO DEL QUE CUELGA. El trato suele existir antes que
+  // la fecha (se cierra hablando), así que el alta ofrece los del proyecto y
+  // no crea ninguno: eso es de Books. Las opciones salen del feed de dinero, y
+  // sin filas no hay campo: quien no lee dinero no ve un selector vacío ni un
+  // aviso, lo mismo que un proyecto sin tratos (ver `$lib/bolo-pick`).
+  let cBolo = $state('');
+  const bolosQuery = createQuery(toStore(() => projectBolosQueryOptions(cProject, open)));
+  let projectBolos = $derived<BoloLite[]>($bolosQuery.data?.items ?? []);
+  let bolosOptions = $derived(boloOptions(projectBolos, locale));
+  let showBoloSelect = $derived(bolosOptions.length > 1);
+
+  /** Un bolo es una sala: lo que el alta tenga vacío lo trae él. */
+  function pickBolo(id: string) {
+    const filled = boloPrefill(
+      projectBolos.find((b) => b.id === id),
+      { venue: cVenue, city: cCity },
+    );
+    cVenue = filled.venue;
+    cCity = filled.city;
+  }
+
   // Apply presets on each open transition; day is refreshed every open.
   // When the CONTEXT dictates the target (presetProjectId/presetLineId —
   // line modules, locked projects) the preset ALWAYS wins: the component
@@ -141,11 +165,13 @@
     if (open && !wasOpen) {
       cDay = presetDate ?? dayKeyInTz(new Date().toISOString(), viewerTz);
       if (presetProjectId) {
+        if (cProject !== presetProjectId) cBolo = '';
         cProject = presetProjectId;
         cLine = presetLineId ?? '';
       } else if (!cProject) {
         cProject = projectOptions.length === 1 ? projectOptions[0].value : '';
         cLine = presetLineId ?? '';
+        cBolo = '';
       }
     }
     wasOpen = open;
@@ -178,10 +204,12 @@
     onSuccess: (perf) => {
       cVenue = '';
       cCity = '';
+      cBolo = '';
       cHoldNotice = null;
       void queryClient.invalidateQueries({ queryKey: ['planner-performances'] });
       void queryClient.invalidateQueries({ queryKey: ['line-performances'] });
       void queryClient.invalidateQueries({ queryKey: ['line-money-fees'] });
+      void queryClient.invalidateQueries({ queryKey: ['money-bolos'] });
       void queryClient.invalidateQueries({ queryKey: ['today-performances'] });
       onCreated?.(perf);
     },
@@ -230,10 +258,12 @@
     onSuccess: (rows) => {
       cVenue = '';
       cCity = '';
+      cBolo = '';
       cHoldNotice = null;
       void queryClient.invalidateQueries({ queryKey: ['planner-performances'] });
       void queryClient.invalidateQueries({ queryKey: ['line-performances'] });
       void queryClient.invalidateQueries({ queryKey: ['line-money-fees'] });
+      void queryClient.invalidateQueries({ queryKey: ['money-bolos'] });
       void queryClient.invalidateQueries({ queryKey: ['today-performances'] });
       // El anfitrión cierra con la primera, que es la que abre la tanda.
       onCreated?.(rows[0]);
@@ -282,6 +312,7 @@
         city: cCity.trim() || null,
         status: cStatus as PerformanceCreate['status'],
         line_id: cLine || null,
+        bolo_id: cBolo || null,
       });
       return;
     }
@@ -296,6 +327,7 @@
       city: cCity.trim() || null,
       status: cStatus as PerformanceCreate['status'],
       line_id: cLine || null,
+      bolo_id: cBolo || null,
     });
   }
 </script>
@@ -314,8 +346,20 @@
     bind:value={cProject}
     required
     disabled={lockProject}
-    onchange={() => (cLine = '')}
+    onchange={() => {
+      cLine = '';
+      cBolo = '';
+    }}
   />
+  {#if showBoloSelect}
+    <Select
+      label={t('perf.bolo', locale)}
+      options={bolosOptions}
+      bind:value={cBolo}
+      helper={t('perf.bolo_helper', locale)}
+      onchange={(e) => pickBolo((e.currentTarget as HTMLSelectElement).value)}
+    />
+  {/if}
   <!-- UN SOLO CONTROL PARA LOS DÍAS. Con la tanda puesta, el tramo de
        `BlockDays` ya dice cuándo, y dejar además este campo sería preguntar
        dos veces lo mismo con dos respuestas posibles. -->
