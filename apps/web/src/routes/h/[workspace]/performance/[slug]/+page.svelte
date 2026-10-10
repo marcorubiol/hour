@@ -38,6 +38,9 @@
     isReady,
   } from '$lib/performance';
   import type { VenueContact } from '$lib/venue';
+  import Select from '$lib/components/Select.svelte';
+  import { boloOf, boloOptions, boloPatch, type BoloLite } from '$lib/bolo-pick';
+  import { performanceBoloQueryOptions, projectBolosQueryOptions } from '$lib/bolo-queries';
   import { workspacesQueryOptions } from '$lib/nav-queries';
   import { accentVar } from '$lib/utils/accent';
   import { spaceName } from '$lib/utils/identity';
@@ -173,10 +176,12 @@
       if (!body?.performance) throw new Error('Unexpected response');
       return body.performance;
     },
-    onSuccess: () => {
+    onSuccess: (_row, patch) => {
       dialogOpen = false;
       void queryClient.invalidateQueries({ queryKey: ['performance'] });
       void queryClient.invalidateQueries({ queryKey: ['planner-performances'] });
+      // Mover una función de bolo cambia el enlace y el recuento de los dos.
+      if ('bolo_id' in patch) void queryClient.invalidateQueries({ queryKey: ['money-bolos'] });
     },
     onError: (err) => {
       addToast({
@@ -215,6 +220,8 @@
   // ADR-080 §2 — hold decision notice; the field only exists in the dialog
   // while the gig's status is hold*. null = empty = standard default.
   let fHoldNotice = $state<number | null>(null);
+  // ADR-087 · § 36 — el bolo del que cuelga; '' = sin bolo.
+  let fBolo = $state('');
   let fLoadIn = $state('');
   let fSoundcheck = $state('');
   let fStart = $state('');
@@ -246,6 +253,7 @@
     fCountry = perf.country ?? '';
     fVenueId = perf.venue_id ?? '';
     fHoldNotice = perf.hold_notice_days;
+    fBolo = currentBoloId ?? '';
     // Stored instants → wall times in the entry zone (venue-local when a
     // venue is linked). entryTz reads fVenueId, set just above.
     populateSlots();
@@ -304,11 +312,39 @@
       // ADR-080 §2 — only while the field is on screen (hold* status);
       // emptied field = null = back to the standard default.
       ...(showHoldNotice ? { hold_notice_days: fHoldNotice } : {}),
+      // § 36 — solo si el campo está en pantalla y cambió (ver boloPatch).
+      ...(showBoloSelect ? boloPatch(currentBoloId, fBolo) : {}),
     });
   }
 
   let bundle = $derived($query.data ?? null);
   let perf = $derived(bundle?.performance ?? null);
+
+  // ADR-087 · § 36 — DE QUÉ BOLO CUELGA. `bolo_id` no viaja en el bundle (es
+  // dinero, fuera del SELECT por columnas), así que se lee aparte por la
+  // puerta de `read:money`. Sin fila, la ficha no dice nada del trato ni
+  // ofrece cambiarlo: «no te toca» y «sin bolo» no se distinguen.
+  const boloLinkQuery = createQuery(
+    toStore(() => performanceBoloQueryOptions(perf?.id ?? '')),
+  );
+  let boloLink = $derived($boloLinkQuery.data ?? null);
+  let boloReadable = $derived(boloLink?.readable === true);
+  let currentBoloId = $derived(boloLink?.readable ? boloLink.bolo_id : null);
+  const projectBolosQuery = createQuery(
+    toStore(() => projectBolosQueryOptions(perf?.project?.id ?? '', boloReadable)),
+  );
+  let projectBolos = $derived<BoloLite[]>($projectBolosQuery.data?.items ?? []);
+  let currentBolo = $derived(projectBolos.find((b) => b.id === currentBoloId) ?? null);
+  let bolosOptions = $derived(boloOptions(projectBolos, locale, currentBoloId));
+  // El campo solo existe si el enlace se pudo leer Y hay algo que elegir:
+  // guardar sin saber el valor actual lo borraría.
+  // Y si el bolo actual no está entre las opciones (borrado, fuera del
+  // límite), tampoco: el desplegable diría «sin bolo» sobre uno que existe.
+  let showBoloSelect = $derived(
+    boloReadable &&
+      bolosOptions.length > 1 &&
+      (currentBoloId === null || currentBolo !== null),
+  );
 
   // ADR-080 §2 — the notice field rides the dialog only for hold* gigs,
   // and only while the DB has the column (a pre-migration bundle flags
@@ -608,6 +644,9 @@
         {#if perf.line}
           · {perf.line.name}
         {/if}
+        {#if boloReadable && (currentBoloId === null || currentBolo)}
+          · {boloOf(currentBolo, locale)}
+        {/if}
       </p>
       <h1 class="perf__title"><em>{title}</em></h1>
       <div class="perf__meta">
@@ -778,6 +817,16 @@
 </article>
 
 <Dialog bind:open={dialogOpen} title="Edit performance" size="m">
+  {#if showBoloSelect}
+    <!-- ADR-087 · § 36 — el mismo campo que el alta, en el mismo orden: el
+         trato antes que la fecha. Mover de bolo no toca sala ni ciudad. -->
+    <Select
+      label={t('perf.bolo', locale)}
+      options={bolosOptions}
+      bind:value={fBolo}
+      helper={t('perf.bolo_helper', locale)}
+    />
+  {/if}
   <div class="perf__form-grid">
     <Input label="Date" type="date" bind:value={fDay} required />
     <Input label="Venue" bind:value={fVenue} placeholder="Venue name" />
