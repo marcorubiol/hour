@@ -747,7 +747,7 @@ Marco: «no quiero ningún diferido». Cerrados los tres, cada uno como tocaba.
 - [ ] Marco: hacer — **Recorrer la app él mismo antes de invitar a Anouk** (Marco, 10-10); después, pasar su email para invitarla a `muk-cia`.
 - [x] **Primeras versiones de diseño integradas y desplegadas (2026-10-10, `6d5276c`).** Antes: Marco: hacer — **Revisar las primeras versiones de diseño** (selector de bolo, escaleta, móvil y fichas de Conversations, Travel P2) con sus capturas, antes de integrarlas juntas.
 
-9. [ ] Marco: hacer — **Pasar `hour-phase0` a Supabase Pro (25 $/mes) en el dashboard; después el coordinador activa HIBP y corre el advisor.** Marco, 2026-10-10: tras el estudio de Scalingo, Pro antes de la beta (revoca el «sigue en Free» de esa misma mañana). El proyecto está en plan
+9. [ ] **Pasar `hour-phase0` a Supabase Pro (25 $/mes) antes de la beta; después el coordinador activa HIBP y corre el advisor.** Marco, 2026-10-10: Pro antes de la beta, pero **aún no**; sigue en Free con el keepalive diario. El proyecto está en plan
    Free y la función requiere Pro. Marco debe decidir el upgrade; después activar
    `password_hibp_enabled` y volver a ejecutar el advisor. **Ojo: el upgrade que
    pide esta tarea resuelve también la § 33**, así que las dos son la misma
