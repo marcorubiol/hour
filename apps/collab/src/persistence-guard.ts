@@ -1,4 +1,23 @@
-export type CollabTargetTable = 'performance' | 'project' | 'line';
+export type CollabTargetTable = 'performance' | 'project' | 'line' | 'date';
+
+/**
+ * What each kind of doc holds and materializes. The notes (ADR-025) are the
+ * doc's on a performance, a project and a line. The running order (ADR-090)
+ * is the doc's on a performance and on a day; a day's NOTES are not: they are
+ * written by its form (task 15), so its doc never seeds nor writes them.
+ */
+export const DOC_FIELDS: Readonly<
+  Record<CollabTargetTable, { notes: boolean; schedule: boolean }>
+> = {
+  performance: { notes: true, schedule: true },
+  date: { notes: false, schedule: true },
+  project: { notes: true, schedule: false },
+  line: { notes: true, schedule: false },
+};
+
+export function isCollabTargetTable(table: string): table is CollabTargetTable {
+  return Object.hasOwn(DOC_FIELDS, table);
+}
 
 export interface CollabTarget {
   table: CollabTargetTable;
@@ -91,13 +110,14 @@ export async function loadHydrationInputs<TMeta, TSnapshot>(
 interface SaveActions {
   persistSnapshot: (version: number) => Promise<void>;
   persistHydration: (marker: HydratedMarker) => Promise<void>;
-  materializeNotes: () => Promise<void>;
+  materialize: () => Promise<void>;
 }
 
 /**
  * Preserve the only safe write order: immutable snapshot first, durable
- * version marker second, denormalized notes column last. If either of the
- * first two operations fails, notes are never materialized.
+ * version marker second, the denormalized projections last (the notes column,
+ * the running order's rows). If either of the first two operations fails,
+ * nothing is materialized.
  */
 export async function commitSnapshotThenMaterialize(
   current: HydratedMarker,
@@ -106,6 +126,6 @@ export async function commitSnapshotThenMaterialize(
   const next = createHydratedMarker(current, current.version + 1);
   await actions.persistSnapshot(next.version);
   await actions.persistHydration(next);
-  await actions.materializeNotes();
+  await actions.materialize();
   return next;
 }
