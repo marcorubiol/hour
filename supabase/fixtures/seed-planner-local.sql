@@ -38,7 +38,15 @@ INSERT INTO public.venue (id, workspace_id, name, city, country, slug, timezone,
   ('eeee0002-0000-4000-8000-000000000002', :'ws', 'Sala Ferro',  'Lisboa', 'PT', 'sala-ferro',  'Europe/Lisbon', :'by')
 ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name;
 
-INSERT INTO public.performance
+-- ADR-090: the five timeslots are schedule_slot rows now. The rows below keep
+-- their old shape in a scratch table, and are split into performance +
+-- schedule_slot right after.
+CREATE TEMP TABLE _seed_perf (LIKE public.performance INCLUDING DEFAULTS) ON COMMIT DROP;
+ALTER TABLE _seed_perf
+  ADD COLUMN load_in_at timestamptz, ADD COLUMN soundcheck_at timestamptz,
+  ADD COLUMN start_at timestamptz, ADD COLUMN loadout_at timestamptz,
+  ADD COLUMN wrap_at timestamptz;
+INSERT INTO _seed_perf
   (id, workspace_id, project_id, performed_at, venue_id, venue_name, city, country, status, slug,
    created_by, load_in_at, soundcheck_at, start_at, loadout_at, hold_notice_days)
 VALUES
@@ -59,11 +67,25 @@ VALUES
    CURRENT_DATE + 9 + time '17:00', NULL, CURRENT_DATE + 9 + time '21:00', NULL, NULL),
   -- +21 · a lone proposal, so the fold and the horizon have work to do
   ('ffff0005-0000-4000-8000-000000000005', :'ws', 'bbbb0001-0000-4000-8000-000000000001', CURRENT_DATE + 21,
-   NULL, 'Cafè Nòmada', 'Palma', 'ES', 'proposed', 'nomada-prop', :'by', NULL, NULL, NULL, NULL, NULL)
+   NULL, 'Cafè Nòmada', 'Palma', 'ES', 'proposed', 'nomada-prop', :'by', NULL, NULL, NULL, NULL, NULL);
+
+INSERT INTO public.performance (id, workspace_id, project_id, performed_at, venue_id, venue_name, city, country, status, slug, created_by, hold_notice_days)
+SELECT id, workspace_id, project_id, performed_at, venue_id, venue_name, city, country, status, slug, created_by, hold_notice_days FROM _seed_perf
 ON CONFLICT (id) DO UPDATE SET
-  performed_at = EXCLUDED.performed_at, status = EXCLUDED.status,
-  start_at = EXCLUDED.start_at, load_in_at = EXCLUDED.load_in_at,
-  soundcheck_at = EXCLUDED.soundcheck_at, loadout_at = EXCLUDED.loadout_at;
+  performed_at = EXCLUDED.performed_at,
+  status = EXCLUDED.status;
+
+DELETE FROM public.schedule_slot WHERE performance_id IN (SELECT id FROM _seed_perf);
+INSERT INTO public.schedule_slot (workspace_id, project_id, performance_id, kind, at, sort, created_by)
+SELECT p.workspace_id, p.project_id, p.id, t.kind, t.at,
+       row_number() OVER (PARTITION BY p.id ORDER BY t.ord)::smallint, p.created_by
+FROM _seed_perf p
+CROSS JOIN LATERAL (VALUES
+  (1, 'load_in', p.load_in_at), (2, 'soundcheck', p.soundcheck_at), (3, 'start', p.start_at),
+  (4, 'loadout', p.loadout_at), (5, 'wrap', p.wrap_at)
+) AS t(ord, kind, at)
+WHERE t.at IS NOT NULL;
+DROP TABLE _seed_perf;
 
 INSERT INTO public.date
   (id, workspace_id, project_id, kind, title, starts_at, ends_at, city, country, travel_direction, created_by)
@@ -130,7 +152,15 @@ INSERT INTO public.venue (id, workspace_id, name, city, country, slug, timezone,
   ('eeee0004-0000-4000-8000-000000000004', :'ws', 'La Fàbrica',     'Girona',  'ES', 'la-fabrica',     'Europe/Madrid', :'by')
 ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name;
 
-INSERT INTO public.performance
+-- ADR-090: the five timeslots are schedule_slot rows now. The rows below keep
+-- their old shape in a scratch table, and are split into performance +
+-- schedule_slot right after.
+CREATE TEMP TABLE _seed_perf (LIKE public.performance INCLUDING DEFAULTS) ON COMMIT DROP;
+ALTER TABLE _seed_perf
+  ADD COLUMN load_in_at timestamptz, ADD COLUMN soundcheck_at timestamptz,
+  ADD COLUMN start_at timestamptz, ADD COLUMN loadout_at timestamptz,
+  ADD COLUMN wrap_at timestamptz;
+INSERT INTO _seed_perf
   (id, workspace_id, project_id, performed_at, venue_id, venue_name, city, country, status, slug,
    created_by, load_in_at, soundcheck_at, start_at, loadout_at, hold_notice_days)
 VALUES
@@ -154,8 +184,25 @@ VALUES
   -- A CLASH WITH NO TEAM DATA: the honest «possible» (blue), against the
   -- people clash on +2 (red) — the two registers side by side.
   ('ffff000b-0000-4000-8000-00000000000b', :'ws', 'bbbb0003-0000-4000-8000-000000000003', CURRENT_DATE + 14,
-   NULL, 'Sala Zero', 'Tarragona', 'ES', 'hold_2', 'zero-hold', :'by', NULL, NULL, CURRENT_DATE + 14 + time '21:00', NULL, 5)
-ON CONFLICT (id) DO UPDATE SET performed_at = EXCLUDED.performed_at, status = EXCLUDED.status;
+   NULL, 'Sala Zero', 'Tarragona', 'ES', 'hold_2', 'zero-hold', :'by', NULL, NULL, CURRENT_DATE + 14 + time '21:00', NULL, 5);
+
+INSERT INTO public.performance (id, workspace_id, project_id, performed_at, venue_id, venue_name, city, country, status, slug, created_by, hold_notice_days)
+SELECT id, workspace_id, project_id, performed_at, venue_id, venue_name, city, country, status, slug, created_by, hold_notice_days FROM _seed_perf
+ON CONFLICT (id) DO UPDATE SET
+  performed_at = EXCLUDED.performed_at,
+  status = EXCLUDED.status;
+
+DELETE FROM public.schedule_slot WHERE performance_id IN (SELECT id FROM _seed_perf);
+INSERT INTO public.schedule_slot (workspace_id, project_id, performance_id, kind, at, sort, created_by)
+SELECT p.workspace_id, p.project_id, p.id, t.kind, t.at,
+       row_number() OVER (PARTITION BY p.id ORDER BY t.ord)::smallint, p.created_by
+FROM _seed_perf p
+CROSS JOIN LATERAL (VALUES
+  (1, 'load_in', p.load_in_at), (2, 'soundcheck', p.soundcheck_at), (3, 'start', p.start_at),
+  (4, 'loadout', p.loadout_at), (5, 'wrap', p.wrap_at)
+) AS t(ord, kind, at)
+WHERE t.at IS NOT NULL;
+DROP TABLE _seed_perf;
 
 INSERT INTO public.date
   (id, workspace_id, project_id, kind, status, title, starts_at, ends_at, city, country, travel_direction, created_by)
