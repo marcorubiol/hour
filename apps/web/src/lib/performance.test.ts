@@ -5,6 +5,7 @@ import {
   PERFORMANCE_STATUSES,
   PerformanceCreateSchema,
   PerformancePatchSchema,
+  PerformanceSeriesCreateSchema,
   decideBy,
   isHoldStatus,
   performanceStatusFamily,
@@ -51,6 +52,20 @@ describe('PerformanceCreateSchema', () => {
       expect('fee_amount' in r.output).toBe(false);
       expect('workspace_id' in r.output).toBe(false);
     }
+  });
+
+  it('carries bolo_id when given, and only as a uuid (§ 37)', () => {
+    const base = { project_id: PROJECT, performed_at: '2031-01-15' };
+    const linked = v.safeParse(PerformanceCreateSchema, { ...base, bolo_id: PROJECT });
+    expect(linked.success && linked.output.bolo_id).toBe(PROJECT);
+    expect(v.safeParse(PerformanceCreateSchema, { ...base, bolo_id: null }).success).toBe(true);
+    expect(v.safeParse(PerformanceCreateSchema, { ...base, bolo_id: 'nope' }).success).toBe(false);
+    const series = v.safeParse(PerformanceSeriesCreateSchema, {
+      project_id: PROJECT,
+      performed_at: ['2031-01-15', '2031-01-16'],
+      bolo_id: PROJECT,
+    });
+    expect(series.success && series.output.bolo_id).toBe(PROJECT);
   });
 });
 

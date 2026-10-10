@@ -75,6 +75,7 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
         p_status: input.status ?? 'proposed',
         p_conversation_id: input.conversation_id ?? null,
         p_line_id: input.line_id ?? null,
+      p_bolo_id: input.bolo_id ?? null,
       },
     );
     if (data.length === 0) return json({ error: 'create_failed' }, 502);
