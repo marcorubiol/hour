@@ -199,7 +199,7 @@ test.describe('performance write path', () => {
     await edit.getByRole('button', { name: 'Delete performance…' }).click();
     const confirm = page
       .locator('dialog[open]')
-      .filter({ hasText: 'There is no undo from the UI.' });
+      .filter({ hasText: 'There is no undo from the app.' });
     await confirm.getByRole('button', { name: 'Delete', exact: true }).click();
     // ADR-067: delete returns to the space-less Planner lens.
     await page.waitForURL(/\/h\/planner/, { timeout: 15_000 });

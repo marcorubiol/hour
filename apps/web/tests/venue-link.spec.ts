@@ -38,7 +38,7 @@ test.describe('venue linking', () => {
     await expect(select).not.toHaveValue('', { timeout: 10_000 });
     const venueId = await select.inputValue();
 
-    await dialog.getByRole('button', { name: 'Save', exact: true }).click();
+    await dialog.getByRole('button', { name: 'Save changes', exact: true }).click();
     await expect(dialog).not.toBeVisible({ timeout: 10_000 });
 
     // Persists: reopen and the select still points at the venue.
@@ -53,7 +53,7 @@ test.describe('venue linking', () => {
     // Unlink (leave the fixture gig as it was; the venue row remains as a
     // stable fixture).
     await dialog2.locator('#f-venue-entity').selectOption('');
-    await dialog2.getByRole('button', { name: 'Save', exact: true }).click();
+    await dialog2.getByRole('button', { name: 'Save changes', exact: true }).click();
     await expect(dialog2).not.toBeVisible({ timeout: 10_000 });
 
     await page.reload();
@@ -105,7 +105,7 @@ test.describe('venue linking', () => {
     await expect(venueDialog).not.toBeVisible({ timeout: 10_000 });
 
     // Persist the link itself, then close the edit dialog.
-    await dialog.getByRole('button', { name: 'Save', exact: true }).click();
+    await dialog.getByRole('button', { name: 'Save changes', exact: true }).click();
     await expect(dialog).not.toBeVisible({ timeout: 10_000 });
 
     // The production block shows the venue timezone and the contact.
@@ -127,7 +127,7 @@ test.describe('venue linking', () => {
     await page.getByRole('button', { name: 'Edit details' }).click();
     const dialog2 = page.locator('dialog[open]').filter({ hasText: 'Edit performance' });
     await dialog2.locator('#f-venue-entity').selectOption('');
-    await dialog2.getByRole('button', { name: 'Save', exact: true }).click();
+    await dialog2.getByRole('button', { name: 'Save changes', exact: true }).click();
     await expect(dialog2).not.toBeVisible({ timeout: 10_000 });
   });
 });
