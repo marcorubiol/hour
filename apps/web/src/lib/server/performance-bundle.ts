@@ -18,6 +18,8 @@ import type { Json, Tables } from '$lib/db-types';
 import {
   SCHEDULE_SLOT_EMBED,
   timeslotsFromSlots,
+  scheduleOf,
+  type ScheduleMoment,
   type ScheduleSlotRow,
   type TimeslotFields,
 } from '$lib/schedule-slot';
@@ -47,6 +49,8 @@ export type PerformanceDetail = Omit<
 > &
   // ADR-090: derived from `schedule_slot`, not columns any more.
   TimeslotFields & {
+  /** The whole running order, free moments included (ADR-090 P3). */
+  schedule: ScheduleMoment[];
   venue: {
     id: string;
     slug: string | null;
@@ -110,7 +114,7 @@ export type CastMemberRow = {
 
 type PerformanceDbDetail = Omit<
   PerformanceDetail,
-  'conversation' | 'crew_assignment' | 'cast_override' | keyof TimeslotFields
+  'conversation' | 'crew_assignment' | 'cast_override' | 'schedule' | keyof TimeslotFields
 > & {
   schedule_slot: ScheduleSlotRow[];
   conversation: (Omit<NonNullable<PerformanceDetail['conversation']>, 'person'> & {
@@ -154,6 +158,7 @@ function normalizePerformance({ schedule_slot, ...row }: PerformanceDbDetail): P
   return {
     ...row,
     ...timeslotsFromSlots(schedule_slot),
+    schedule: scheduleOf(schedule_slot),
     conversation: row.conversation
       ? { ...row.conversation, person: normalizePerson(row.conversation.person) }
       : null,

@@ -47,7 +47,8 @@ import { fetchPerformanceRosters } from '$lib/server/rosters';
 import {
   EMPTY_TIMESLOTS,
   SCHEDULE_SLOT_EMBED,
-  withTimeslots,
+  withSchedule,
+  type ScheduleMoment,
   type ScheduleSlotRow,
   type TimeslotField,
 } from '$lib/schedule-slot';
@@ -137,13 +138,15 @@ type PerformanceItem = {
   start_at: string | null;
   loadout_at: string | null;
   wrap_at: string | null;
+  /** The whole running order, free moments included (ADR-090 P3). */
+  schedule: ScheduleMoment[];
   venue: VenueLite | null;
   project: ProjectLite | null;
   /** Present only on ?notice=1 fetches (decisions queue, ADR-080 §2). */
   hold_notice_days?: number | null;
 };
 
-type PerformanceDbItem = Omit<PerformanceItem, TimeslotField> & {
+type PerformanceDbItem = Omit<PerformanceItem, TimeslotField | 'schedule'> & {
   schedule_slot: ScheduleSlotRow[];
 };
 
@@ -233,7 +236,7 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
 
   try {
     const { data: rows } = await pgGet<PerformanceDbItem>(env, 'performance', jwt, { search });
-    const data: PerformanceItem[] = rows.map(withTimeslots);
+    const data: PerformanceItem[] = rows.map(withSchedule);
     if (rosters !== '1') return json({ items: data });
 
     const personIdsByPerformance = await fetchPerformanceRosters(

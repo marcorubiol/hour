@@ -8,6 +8,7 @@ import { dayKeyInTz } from '$lib/planner';
 import { hourMark } from '$lib/datetime';
 import { decideBy, performanceStatusFamily, type StatusFamily } from '$lib/performance';
 import { dateStatusFamily } from '$lib/date';
+import type { ScheduleMoment } from '$lib/schedule-slot';
 
 export type ProjectLite = {
   id: string;
@@ -34,6 +35,9 @@ export type PerformanceEvent = {
   start_at: string | null;
   loadout_at?: string | null;
   wrap_at?: string | null;
+  /** ADR-090 P3 — the whole running order, free moments included, in its
+      order. Read through `dayMoments`, never directly. */
+  schedule?: ScheduleMoment[] | null;
   /** ADR-084 §1 — filas que lo comparten son UNA tanda de varios días y el
       mes las dibuja como una banda. Simétrico a `DateEvent.series_id`. */
   series_id?: string | null;
@@ -84,6 +88,8 @@ export type DateEvent = {
   line_id?: string | null;
   travel_direction?: string | null;
   label?: string | null;
+  /** ADR-090 P3 — a rehearsal's running order (see `dayMoments`). */
+  schedule?: ScheduleMoment[] | null;
 };
 
 /**
@@ -485,4 +491,34 @@ export function runSheetSteps(p: PerformanceEvent): RunSheetStep[] {
     if (at) out.push({ key, at });
   }
   return out;
+}
+
+const LEGACY_STEP_KEYS: ReadonlySet<string> = new Set(RUN_SHEET_ORDER.map(([k]) => k));
+
+/**
+ * One moment of a day's running order, for the drawings that read it whole
+ * (the day strip): one of the five steps (`key`) or a free moment somebody
+ * named (`key: null`, `label: 'photo call'`). A legacy step renamed by hand
+ * keeps its key and carries its label too.
+ */
+export type DayMoment = { key: RunSheetStepKey | null; label: string | null; at: string };
+
+/**
+ * The running order of a performance or a date, as it was written (ADR-090
+ * P3), in its order. Falls back to the five fields for a feed that does not
+ * carry `schedule` yet, so nothing that drew the five stops drawing them.
+ *
+ * `runSheetSteps` stays the five on purpose: the rail's pulse reads it, and a
+ * free moment has no word in its vocabulary.
+ */
+export function dayMoments(e: PerformanceEvent | DateEvent): DayMoment[] {
+  if (e.schedule) {
+    return e.schedule.map((m) => ({
+      key: m.kind && LEGACY_STEP_KEYS.has(m.kind) ? (m.kind as RunSheetStepKey) : null,
+      label: m.label,
+      at: m.at,
+    }));
+  }
+  if (!('performed_at' in e)) return [];
+  return runSheetSteps(e).map((s) => ({ key: s.key, label: null, at: s.at }));
 }

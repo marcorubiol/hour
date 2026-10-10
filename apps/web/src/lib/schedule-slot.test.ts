@@ -5,6 +5,7 @@ import {
   timeslotsFromSlots,
   timeslotsOrdered,
   withTimeslots,
+  withSchedule,
   EMPTY_TIMESLOTS,
   type ScheduleSlotRow,
 } from './schedule-slot';
@@ -42,6 +43,24 @@ describe('withTimeslots', () => {
   it('swaps the embed for the five fields and keeps the rest of the row', () => {
     const row = withTimeslots({ id: 'p', schedule_slot: [slot('wrap', '23:30', 1)] });
     expect(row).toEqual({ id: 'p', ...EMPTY_TIMESLOTS, wrap_at: at('23:30') });
+    expect('schedule_slot' in row).toBe(false);
+  });
+});
+
+describe('withSchedule', () => {
+  it('keeps the five AND the whole order, free moments included, in their order', () => {
+    const row = withSchedule({
+      id: 'p',
+      schedule_slot: [
+        slot('start', '20:00', 2),
+        slot(null, '17:00', 1, { label: 'photo call', notes: 'not in a feed' }),
+      ],
+    });
+    expect(row.start_at).toBe(at('20:00'));
+    expect(row.schedule).toEqual([
+      { kind: null, label: 'photo call', at: at('17:00'), ends_at: null },
+      { kind: 'start', label: null, at: at('20:00'), ends_at: null },
+    ]);
     expect('schedule_slot' in row).toBe(false);
   });
 });
