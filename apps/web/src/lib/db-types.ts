@@ -4067,6 +4067,13 @@ export type Database = {
           workspace_id: string
         }[]
       }
+      list_performance_bolo_links: {
+        Args: { p_performance_ids: string[] }
+        Returns: {
+          bolo_id: string
+          performance_id: string
+        }[]
+      }
       list_roadsheet_shares: {
         Args: { p_performance_id: string }
         Returns: {

@@ -38,6 +38,9 @@
     isReady,
   } from '$lib/performance';
   import type { VenueContact } from '$lib/venue';
+  import Select from '$lib/components/Select.svelte';
+  import { boloOf, boloOptions, boloPatch, booksHref, type BoloLite } from '$lib/bolo-pick';
+  import { performanceBoloQueryOptions, projectBolosQueryOptions } from '$lib/bolo-queries';
   import { workspacesQueryOptions } from '$lib/nav-queries';
   import { accentVar } from '$lib/utils/accent';
   import { spaceName } from '$lib/utils/identity';
@@ -173,16 +176,20 @@
       if (!body?.performance) throw new Error('Unexpected response');
       return body.performance;
     },
-    onSuccess: () => {
+    onSuccess: (_row, patch) => {
       dialogOpen = false;
       void queryClient.invalidateQueries({ queryKey: ['performance'] });
       void queryClient.invalidateQueries({ queryKey: ['planner-performances'] });
+      // Mover una función de bolo cambia el enlace y el recuento de los dos.
+      if ('bolo_id' in patch) void queryClient.invalidateQueries({ queryKey: ['money-bolos'] });
     },
     onError: (err) => {
       addToast({
         tone: 'danger',
-        title: 'Change not saved',
-        message: `${err instanceof Error ? err.message : 'Unexpected error'} — try again.`,
+        title: t('edit.not_saved', locale),
+        message: t('perf.try_again', locale, {
+          error: err instanceof Error ? err.message : t('perf.unexpected', locale),
+        }),
       });
     },
   });
@@ -215,6 +222,8 @@
   // ADR-080 §2 — hold decision notice; the field only exists in the dialog
   // while the gig's status is hold*. null = empty = standard default.
   let fHoldNotice = $state<number | null>(null);
+  // ADR-087 · § 36 — el bolo del que cuelga; '' = sin bolo.
+  let fBolo = $state('');
   let fLoadIn = $state('');
   let fSoundcheck = $state('');
   let fStart = $state('');
@@ -246,6 +255,7 @@
     fCountry = perf.country ?? '';
     fVenueId = perf.venue_id ?? '';
     fHoldNotice = perf.hold_notice_days;
+    fBolo = currentBoloId ?? '';
     // Stored instants → wall times in the entry zone (venue-local when a
     // venue is linked). entryTz reads fVenueId, set just above.
     populateSlots();
@@ -276,7 +286,7 @@
 
   function saveEdit() {
     if (!fDay) {
-      addToast({ tone: 'warning', message: 'The performance needs a date.' });
+      addToast({ tone: 'warning', message: t('perf.needs_date', locale) });
       return;
     }
     // Same validation rule as PerformanceForm (isValidHoldNotice — THE
@@ -304,11 +314,47 @@
       // ADR-080 §2 — only while the field is on screen (hold* status);
       // emptied field = null = back to the standard default.
       ...(showHoldNotice ? { hold_notice_days: fHoldNotice } : {}),
+      // § 36 — solo si el campo está en pantalla y cambió (ver boloPatch).
+      ...(showBoloSelect ? boloPatch(currentBoloId, fBolo) : {}),
     });
   }
 
   let bundle = $derived($query.data ?? null);
   let perf = $derived(bundle?.performance ?? null);
+
+  // ADR-087 · § 36 — DE QUÉ BOLO CUELGA. `bolo_id` no viaja en el bundle (es
+  // dinero, fuera del SELECT por columnas), así que se lee aparte por la
+  // puerta de `read:money`. Sin fila, la ficha no dice nada del trato ni
+  // ofrece cambiarlo: «no te toca» y «sin bolo» no se distinguen.
+  const boloLinkQuery = createQuery(
+    toStore(() => performanceBoloQueryOptions(perf?.id ?? '')),
+  );
+  let boloLink = $derived($boloLinkQuery.data ?? null);
+  let boloReadable = $derived(boloLink?.readable === true);
+  let currentBoloId = $derived(boloLink?.readable ? boloLink.bolo_id : null);
+  const projectBolosQuery = createQuery(
+    toStore(() => projectBolosQueryOptions(perf?.project?.id ?? '', boloReadable)),
+  );
+  let projectBolos = $derived<BoloLite[]>($projectBolosQuery.data?.items ?? []);
+  let currentBolo = $derived(projectBolos.find((b) => b.id === currentBoloId) ?? null);
+  let bolosOptions = $derived(boloOptions(projectBolos, locale, currentBoloId));
+  // El campo solo existe si el enlace se pudo leer Y hay algo que elegir:
+  // guardar sin saber el valor actual lo borraría.
+  // Y si el bolo actual no está entre las opciones (borrado, fuera del
+  // límite), tampoco: el desplegable diría «sin bolo» sobre uno que existe.
+  let showBoloSelect = $derived(
+    boloReadable &&
+      bolosOptions.length > 1 &&
+      (currentBoloId === null || currentBolo !== null),
+  );
+  // Quien lee dinero en un proyecto sin bolos: el campo apagado y el enlace
+  // a Cuentas, igual que en el alta.
+  let showBoloEmpty = $derived(
+    boloReadable &&
+      currentBoloId === null &&
+      $projectBolosQuery.isSuccess &&
+      bolosOptions.length === 1,
+  );
 
   // ADR-080 §2 — the notice field rides the dialog only for hold* gigs,
   // and only while the DB has the column (a pre-migration bundle flags
@@ -369,16 +415,20 @@
       confirmDeleteOpen = false;
       dialogOpen = false;
       void queryClient.invalidateQueries({ queryKey: ['planner-performances'] });
-      void queryClient.invalidateQueries({ queryKey: ['money-performances'] });
+      // money v3: lo que cuenta una función borrada es su bolo, no un feed
+      // de funciones con caché (`money-performances` ya no existe).
+      void queryClient.invalidateQueries({ queryKey: ['money-bolos'] });
       void queryClient.invalidateQueries({ queryKey: ['invoices'] });
-      addToast({ tone: 'success', message: 'Performance deleted.' });
-      await goto(`/h/${workspaceSlug}/calendar`);
+      addToast({ tone: 'success', message: t('perf.deleted', locale) });
+      // Calendar se llama Planner desde ADR-088; la ruta vieja solo vive como
+      // redirect del servidor, y desde aquí costaba una recarga entera.
+      await goto('/h/planner');
     },
     onError: (err) => {
       addToast({
         tone: 'danger',
-        title: 'Not deleted',
-        message: err instanceof Error ? err.message : 'Unexpected error',
+        title: t('edit.not_deleted', locale),
+        message: err instanceof Error ? err.message : t('perf.unexpected', locale),
       });
     },
   });
@@ -425,13 +475,13 @@
     onSuccess: (venue) => {
       fVenueId = venue.id;
       void queryClient.invalidateQueries({ queryKey: ['venues'] });
-      addToast({ tone: 'success', message: `Linked to venue "${venue.name}".` });
+      addToast({ tone: 'success', message: t('perf.linked_to_venue', locale, { name: venue.name }) });
     },
     onError: (err) => {
       addToast({
         tone: 'danger',
-        title: 'Venue not created',
-        message: err instanceof Error ? err.message : 'Unexpected error',
+        title: t('perf.venue_not_created', locale),
+        message: err instanceof Error ? err.message : t('perf.unexpected', locale),
       });
     },
   });
@@ -608,6 +658,11 @@
         {#if perf.line}
           · {perf.line.name}
         {/if}
+        {#if boloReadable && currentBolo && perf.project}
+          · <a href={booksHref(perf.project.id, { boloId: currentBolo.id })}>{boloOf(currentBolo, locale)}</a>
+        {:else if boloReadable && currentBoloId === null}
+          · {boloOf(null, locale)}
+        {/if}
       </p>
       <h1 class="perf__title"><em>{title}</em></h1>
       <div class="perf__meta">
@@ -777,12 +832,39 @@
   {/if}
 </article>
 
-<Dialog bind:open={dialogOpen} title="Edit performance" size="m">
+{#snippet boloMessage()}
+  {t('perf.bolo_helper_short', locale)}
+  {#if perf?.project}
+    <!-- Otra pestaña: la edición a medio escribir no se pierde (Marco, 2026-10-10). -->
+    <a href={booksHref(perf.project.id, { newBolo: true })} target="_blank" rel="noopener"
+      >{t('perf.bolo_create_link', locale)}</a
+    >
+  {/if}
+{/snippet}
+
+<Dialog bind:open={dialogOpen} title={t('perf.edit_title', locale)} size="m">
+  {#if showBoloSelect}
+    <!-- ADR-087 · § 36 — el mismo campo que el alta, en el mismo orden: el
+         trato antes que la fecha. Mover de bolo no toca sala ni ciudad. -->
+    <Select
+      label={t('perf.bolo', locale)}
+      options={bolosOptions}
+      bind:value={fBolo}
+      message={boloMessage}
+    />
+  {:else if showBoloEmpty}
+    <Select
+      label={t('perf.bolo', locale)}
+      options={[{ value: '', label: t('perf.bolo_empty', locale) }]}
+      disabled
+      message={boloMessage}
+    />
+  {/if}
   <div class="perf__form-grid">
-    <Input label="Date" type="date" bind:value={fDay} required />
-    <Input label="Venue" bind:value={fVenue} placeholder="Venue name" />
-    <Input label="City" bind:value={fCity} />
-    <Input label="Country" bind:value={fCountry} placeholder="ES" />
+    <Input label={t('perf.date', locale)} type="date" bind:value={fDay} required />
+    <Input label={t('create.venue', locale)} bind:value={fVenue} placeholder={t('perf.venue_placeholder', locale)} />
+    <Input label={t('create.city', locale)} bind:value={fCity} />
+    <Input label={t('perf.country', locale)} bind:value={fCountry} placeholder="ES" />
     {#if showHoldNotice}
       <!-- ADR-080 §2 — discreet, hold-only. Empty = default 30 (the
            placeholder says it), 0 = no notice. -->
@@ -810,9 +892,9 @@
   </div>
   <div class="perf__venue-link">
     <div class="field">
-      <label for="f-venue-entity">Linked venue</label>
+      <label for="f-venue-entity">{t('perf.linked_venue', locale)}</label>
       <select id="f-venue-entity" bind:value={fVenueId}>
-        <option value="">— none (free text above)</option>
+        <option value="">{t('perf.linked_venue_none', locale)}</option>
         {#each venues as vn (vn.id)}
           <option value={vn.id}>{vn.name}{vn.city ? ` — ${vn.city}` : ''}</option>
         {/each}
@@ -825,59 +907,54 @@
       loading={$promoteVenue.isPending}
       onclick={() => $promoteVenue.mutate()}
     >
-      Save fields as venue
+      {t('perf.save_as_venue', locale)}
     </Button>
     <Button variant="outline" size="s" disabled={!fVenueId} onclick={openVenueEdit}>
-      Edit venue…
+      {t('perf.edit_venue', locale)}
     </Button>
   </div>
-  <p class="perf__dialog-hint">
-    A linked venue brings its timezone (dual-time on the road sheet), address and
-    contacts. The free-text fields stay as the display fallback.
-  </p>
+  <p class="perf__dialog-hint">{t('perf.linked_venue_hint', locale)}</p>
   <p class="perf__dialog-hint" id="perf-times-tz">
     {#if entryTzInfo.source === 'venue'}
-      Times below are the venue's local time{entryTzInfo.place ? ` at ${entryTzInfo.place}` : ''}
-      ({entryTz}).
-    {:else if entryTzInfo.source === 'workspace'}
-      Times below are home-space time ({entryTz}) —
-      {fVenueId ? 'set the venue’s timezone (Edit venue…) for its local time.' : 'link the venue for its local time.'}
+      {entryTzInfo.place
+        ? t('perf.tz_venue_at', locale, { place: entryTzInfo.place, tz: entryTz })
+        : t('perf.tz_venue', locale, { tz: entryTz })}
     {:else}
-      Times below are your device's time ({entryTz}) —
-      {fVenueId ? 'set the venue’s timezone (Edit venue…) for its local time.' : 'link the venue for its local time.'}
+      {t(entryTzInfo.source === 'workspace' ? 'perf.tz_workspace' : 'perf.tz_device', locale, { tz: entryTz })}
+      {t(fVenueId ? 'perf.tz_set_venue' : 'perf.tz_link_venue', locale)}
     {/if}
   </p>
   <div class="perf__form-grid">
     <div class="field">
-      <label for="f-loadin">Load in</label>
+      <label for="f-loadin">{t('perf.slot_load_in', locale)}</label>
       <input id="f-loadin" type="datetime-local" bind:value={fLoadIn} aria-describedby="perf-times-tz" />
     </div>
     <div class="field">
-      <label for="f-soundcheck">Soundcheck</label>
+      <label for="f-soundcheck">{t('perf.slot_soundcheck', locale)}</label>
       <input id="f-soundcheck" type="datetime-local" bind:value={fSoundcheck} aria-describedby="perf-times-tz" />
     </div>
     <div class="field">
-      <label for="f-start">Start</label>
+      <label for="f-start">{t('perf.slot_start', locale)}</label>
       <input id="f-start" type="datetime-local" bind:value={fStart} aria-describedby="perf-times-tz" />
     </div>
     <div class="field">
-      <label for="f-loadout">Load out</label>
+      <label for="f-loadout">{t('perf.slot_load_out', locale)}</label>
       <input id="f-loadout" type="datetime-local" bind:value={fLoadout} aria-describedby="perf-times-tz" />
     </div>
     <div class="field">
-      <label for="f-wrap">Wrap</label>
+      <label for="f-wrap">{t('perf.slot_wrap', locale)}</label>
       <input id="f-wrap" type="datetime-local" bind:value={fWrap} aria-describedby="perf-times-tz" />
     </div>
   </div>
   <div class="perf__danger">
     <Button variant="outline" tone="warn" size="s" onclick={() => (confirmDeleteOpen = true)}>
-      Delete performance…
+      {t('perf.delete', locale)}
     </Button>
-    <span class="perf__dialog-hint">For gigs created by mistake — a gig that fell through is status “cancelled”.</span>
+    <span class="perf__dialog-hint">{t('perf.delete_hint', locale)}</span>
   </div>
   {#snippet actions()}
-    <Button variant="outline" onclick={() => (dialogOpen = false)}>Cancel</Button>
-    <Button onclick={saveEdit} loading={$patchMutation.isPending}>Save</Button>
+    <Button variant="outline" onclick={() => (dialogOpen = false)}>{t('create.cancel', locale)}</Button>
+    <Button onclick={saveEdit} loading={$patchMutation.isPending}>{t('edit.save', locale)}</Button>
   {/snippet}
 </Dialog>
 
@@ -938,16 +1015,18 @@
   {/snippet}
 </Dialog>
 
-<Dialog bind:open={confirmDeleteOpen} title="Delete performance" size="s">
+<Dialog bind:open={confirmDeleteOpen} title={t('perf.delete_title', locale)} size="s">
   <p>
-    This removes <strong>{title}</strong> ({perf ? dayLabel(perf.performed_at, 'short') : ''})
-    from the calendar, money and road sheet. Active invoices block deletion.
+    {t('perf.delete_body', locale, {
+      what: title,
+      when: perf ? dayLabel(perf.performed_at, 'short') : '',
+    })}
   </p>
-  <p class="perf__dialog-hint">There is no undo from the UI.</p>
+  <p class="perf__dialog-hint">{t('perf.delete_no_undo', locale)}</p>
   {#snippet actions()}
-    <Button variant="outline" onclick={() => (confirmDeleteOpen = false)}>Keep it</Button>
+    <Button variant="outline" onclick={() => (confirmDeleteOpen = false)}>{t('perf.keep', locale)}</Button>
     <Button variant="danger" onclick={() => $deleteMutation.mutate()} loading={$deleteMutation.isPending}>
-      Delete
+      {t('edit.delete', locale)}
     </Button>
   {/snippet}
 </Dialog>
@@ -1022,6 +1101,14 @@
       color: var(--text-faint);
     }
 
+    .perf__danger > :global(button) {
+      flex: none;
+    }
+
+    .perf__danger .perf__dialog-hint {
+      flex: 1 1 14rem;
+    }
+
     .perf__form-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
@@ -1029,20 +1116,26 @@
       margin-block-start: var(--space-s);
     }
 
+    /* Wraps: at phone width the select was squeezed to its caret by the
+       two buttons beside it. */
     .perf__venue-link {
       display: flex;
+      flex-wrap: wrap;
       align-items: end;
-      gap: var(--space-m);
+      gap: var(--space-s) var(--space-m);
       margin-block-start: var(--space-s);
     }
     .perf__venue-link .field {
-      flex: 1;
+      flex: 1 1 14rem;
     }
 
+    /* The button keeps its one line; the hint is what wraps (it broke
+       «Delete performance…» in two at every width). */
     .perf__danger {
       display: flex;
+      flex-wrap: wrap;
       align-items: center;
-      gap: var(--space-m);
+      gap: var(--space-s) var(--space-m);
       margin-block-start: var(--space-m);
       padding-block-start: var(--space-m);
       border-block-start: 1px solid var(--border-color-light);

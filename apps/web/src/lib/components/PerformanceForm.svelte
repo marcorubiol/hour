@@ -28,6 +28,7 @@
 
 <script lang="ts">
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
+  import { toStore } from 'svelte/store';
   import { fetchJSON, mutateJSON } from '$lib/api';
   import Input from './Input.svelte';
   import Select from './Select.svelte';
@@ -36,10 +37,18 @@
   import { detectLocale, t } from '$lib/i18n';
   import { allLinesQueryOptions } from '$lib/nav-queries';
   import {
+    boloDefault,
+    boloOptions,
+    boloPrefill,
+    booksHref,
+    type BoloLite,
+  } from '$lib/bolo-pick';
+  import { moneyAccessQueryOptions, projectBolosQueryOptions } from '$lib/bolo-queries';
+  import {
     HOLD_NOTICE_DEFAULT,
+    PERFORMANCE_CREATE_STATUSES,
     isHoldStatus,
     isValidHoldNotice,
-    performanceStatusLabel,
     type PerformanceCreate,
     type PerformanceSeriesCreate,
   } from '$lib/performance';
@@ -100,11 +109,8 @@
   let cHoldNotice = $state<number | null>(null);
   let showHoldNotice = $derived(isHoldStatus(cStatus));
 
-  // Only the statuses that make sense at creation time — later lifecycle
-  // states (done/invoiced/paid/cancelled) are reached from the detail page.
-  const CREATE_STATUSES = ['proposed', 'hold', 'hold_1', 'hold_2', 'hold_3', 'confirmed'];
   let statusOptions = $derived(
-    CREATE_STATUSES.map((s) => ({ value: s, label: performanceStatusLabel(s) })),
+    PERFORMANCE_CREATE_STATUSES.map((s) => ({ value: s, label: t(`perf.status_${s}`, locale) })),
   );
 
   const projectsQuery = createQuery({
@@ -124,10 +130,58 @@
     ($linesQuery.data?.items ?? []).filter((l) => l.project?.id === cProject),
   );
   let lineOptions = $derived([
-    { value: '', label: 'No line' },
+    { value: '', label: t('create.line_none', locale) },
     ...projectLines.map((l) => ({ value: l.id, label: l.name })),
   ]);
   let showLineSelect = $derived(!presetLineId && projectLines.length > 0);
+
+  // ADR-087 · § 36 — EL BOLO DEL QUE CUELGA. El trato suele existir antes que
+  // la fecha (se cierra hablando), así que el alta ofrece los del proyecto y
+  // no crea ninguno: crear es de Cuentas, y el campo enlaza allí. Las opciones
+  // salen del feed de dinero; quien no lee dinero no ve el campo.
+  let cBolo = $state('');
+  const bolosQuery = createQuery(toStore(() => projectBolosQueryOptions(cProject, open)));
+  let projectBolos = $derived<BoloLite[]>($bolosQuery.data?.items ?? []);
+  let bolosOptions = $derived(boloOptions(projectBolos, locale));
+  let showBoloSelect = $derived(bolosOptions.length > 1);
+  // Sin filas, el feed no distingue «sin bolos» de «no te toca». Solo entonces
+  // se pregunta, y solo a quien lee dinero se le ofrece crear uno en Cuentas.
+  const accessQuery = createQuery(
+    toStore(() =>
+      moneyAccessQueryOptions(cProject, open && $bolosQuery.isSuccess && projectBolos.length === 0),
+    ),
+  );
+  let showBoloEmpty = $derived(
+    !showBoloSelect && $bolosQuery.isSuccess && $accessQuery.data?.read_money === true,
+  );
+  let emptyBoloOptions = $derived([{ value: '', label: t('perf.bolo_empty', locale) }]);
+
+  // Con UN solo bolo abierto, el alta lo propone (Marco, 2026-10-10); con
+  // varios, «sin bolo». Una vez por proyecto: lo que elija la persona después
+  // no se vuelve a pisar.
+  let boloSeededFor = $state('');
+  $effect(() => {
+    if (!cProject || boloSeededFor === cProject || !$bolosQuery.isSuccess) return;
+    boloSeededFor = cProject;
+    cBolo = boloDefault(projectBolos);
+    if (cBolo) pickBolo(cBolo);
+  });
+
+  /** Otro proyecto, u otra alta: el bolo se vuelve a proponer desde cero. */
+  function resetBolo() {
+    cBolo = '';
+    boloSeededFor = '';
+  }
+
+  /** Un bolo es una sala: lo que el alta tenga vacío lo trae él. */
+  function pickBolo(id: string) {
+    const filled = boloPrefill(
+      projectBolos.find((b) => b.id === id),
+      { venue: cVenue, city: cCity },
+    );
+    cVenue = filled.venue;
+    cCity = filled.city;
+  }
 
   // Apply presets on each open transition; day is refreshed every open.
   // When the CONTEXT dictates the target (presetProjectId/presetLineId —
@@ -141,11 +195,13 @@
     if (open && !wasOpen) {
       cDay = presetDate ?? dayKeyInTz(new Date().toISOString(), viewerTz);
       if (presetProjectId) {
+        if (cProject !== presetProjectId) resetBolo();
         cProject = presetProjectId;
         cLine = presetLineId ?? '';
       } else if (!cProject) {
         cProject = projectOptions.length === 1 ? projectOptions[0].value : '';
         cLine = presetLineId ?? '';
+        resetBolo();
       }
     }
     wasOpen = open;
@@ -178,18 +234,22 @@
     onSuccess: (perf) => {
       cVenue = '';
       cCity = '';
+      resetBolo();
       cHoldNotice = null;
       void queryClient.invalidateQueries({ queryKey: ['planner-performances'] });
       void queryClient.invalidateQueries({ queryKey: ['line-performances'] });
       void queryClient.invalidateQueries({ queryKey: ['line-money-fees'] });
+      void queryClient.invalidateQueries({ queryKey: ['money-bolos'] });
       void queryClient.invalidateQueries({ queryKey: ['today-performances'] });
       onCreated?.(perf);
     },
     onError: (err) => {
       addToast({
         tone: 'danger',
-        title: 'Not created',
-        message: `${err instanceof Error ? err.message : 'Unexpected error'} — try again.`,
+        title: t('create.not_created', locale),
+        message: t('perf.try_again', locale, {
+          error: err instanceof Error ? err.message : t('perf.unexpected', locale),
+        }),
       });
     },
   });
@@ -230,10 +290,12 @@
     onSuccess: (rows) => {
       cVenue = '';
       cCity = '';
+      resetBolo();
       cHoldNotice = null;
       void queryClient.invalidateQueries({ queryKey: ['planner-performances'] });
       void queryClient.invalidateQueries({ queryKey: ['line-performances'] });
       void queryClient.invalidateQueries({ queryKey: ['line-money-fees'] });
+      void queryClient.invalidateQueries({ queryKey: ['money-bolos'] });
       void queryClient.invalidateQueries({ queryKey: ['today-performances'] });
       // El anfitrión cierra con la primera, que es la que abre la tanda.
       onCreated?.(rows[0]);
@@ -241,8 +303,10 @@
     onError: (err) => {
       addToast({
         tone: 'danger',
-        title: 'Not created',
-        message: `${err instanceof Error ? err.message : 'Unexpected error'} — try again.`,
+        title: t('create.not_created', locale),
+        message: t('perf.try_again', locale, {
+          error: err instanceof Error ? err.message : t('perf.unexpected', locale),
+        }),
       });
     },
   });
@@ -269,7 +333,7 @@
 
   export function submit() {
     if (!cProject) {
-      addToast({ tone: 'warning', message: 'Pick a project.' });
+      addToast({ tone: 'warning', message: t('create.pick_project', locale) });
       return;
     }
     // UNA TANDA ES OTRA ESCRITURA, no la misma repetida. Con los días ya
@@ -282,11 +346,12 @@
         city: cCity.trim() || null,
         status: cStatus as PerformanceCreate['status'],
         line_id: cLine || null,
+        bolo_id: cBolo || null,
       });
       return;
     }
     if (!cDay) {
-      addToast({ tone: 'warning', message: 'Pick a date.' });
+      addToast({ tone: 'warning', message: t('perf.pick_date', locale) });
       return;
     }
     $createPerf.mutate({
@@ -296,6 +361,7 @@
       city: cCity.trim() || null,
       status: cStatus as PerformanceCreate['status'],
       line_id: cLine || null,
+      bolo_id: cBolo || null,
     });
   }
 </script>
@@ -308,23 +374,51 @@
   }}
 >
   <Select
-    label="Project"
-    placeholder="Pick a project…"
+    label={t('create.project', locale)}
+    placeholder={t('create.project_placeholder', locale)}
     options={projectOptions}
     bind:value={cProject}
     required
     disabled={lockProject}
-    onchange={() => (cLine = '')}
+    onchange={() => {
+      cLine = '';
+      resetBolo();
+    }}
   />
+  {#snippet boloMessage()}
+    {t('perf.bolo_helper_short', locale)}
+    <!-- Otra pestaña: el alta a medio escribir no se pierde (Marco, 2026-10-10). -->
+    <a href={booksHref(cProject, { newBolo: true })} target="_blank" rel="noopener"
+      >{t('perf.bolo_create_link', locale)}</a
+    >
+  {/snippet}
+  {#if showBoloSelect}
+    <Select
+      label={t('perf.bolo', locale)}
+      options={bolosOptions}
+      bind:value={cBolo}
+      message={boloMessage}
+      onchange={(e) => pickBolo((e.currentTarget as HTMLSelectElement).value)}
+    />
+  {:else if showBoloEmpty}
+    <!-- Quien lee dinero en un proyecto sin bolos: el mismo campo, apagado,
+         dice que no hay ninguno y dónde se crea. Misma forma que con bolos,
+         así el formulario no salta de sitio. -->
+    <Select label={t('perf.bolo', locale)} options={emptyBoloOptions} disabled message={boloMessage} />
+  {/if}
   <!-- UN SOLO CONTROL PARA LOS DÍAS. Con la tanda puesta, el tramo de
        `BlockDays` ya dice cuándo, y dejar además este campo sería preguntar
        dos veces lo mismo con dos respuestas posibles. -->
   {#if !isRun}
-    <Input label="Date" type="date" bind:value={cDay} required />
+    <Input label={t('perf.date', locale)} type="date" bind:value={cDay} required />
   {/if}
-  <Input label="Venue" bind:value={cVenue} placeholder="Venue name (optional)" />
-  <Input label="City" bind:value={cCity} placeholder="City (optional)" />
-  <Select label="Status" options={statusOptions} bind:value={cStatus} />
+  <Input
+    label={t('create.venue', locale)}
+    bind:value={cVenue}
+    placeholder={t('perf.venue_placeholder', locale)}
+  />
+  <Input label={t('create.city', locale)} bind:value={cCity} placeholder={t('perf.optional', locale)} />
+  <Select label={t('edit.status', locale)} options={statusOptions} bind:value={cStatus} />
   {#if showHoldNotice}
     <!-- ADR-080 §2 — discreet, hold-only. Empty = default (the placeholder
          says it), 0 = no notice. Raw .field: the house Input doesn't carry
@@ -351,7 +445,7 @@
     </div>
   {/if}
   {#if showLineSelect}
-    <Select label="Line" options={lineOptions} bind:value={cLine} />
+    <Select label={t('create.line', locale)} options={lineOptions} bind:value={cLine} />
   {/if}
   <!-- Hidden submit lets Enter inside an input trigger submit. -->
   <button type="submit" hidden aria-hidden="true"></button>
