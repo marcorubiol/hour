@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { waitForLoaded } from './loaded';
 
 const EMAIL = process.env.PW_TEST_EMAIL;
 const PASSWORD = process.env.PW_TEST_PASSWORD;
@@ -26,6 +27,7 @@ test.describe('person file', () => {
     // scoped here to the fixture space: this spec WRITES a note on whoever is
     // first, and until § 31 (2026-10) that was a real MüK Cia contact.
     await page.goto('/h/conversations?scope=s:playwright');
+    await waitForLoaded(page);
     await expect(page.locator('tbody tr').first()).toBeVisible();
 
     // Into the person file via the linked name. The workspace segment on a
@@ -38,6 +40,9 @@ test.describe('person file', () => {
     await firstName.click();
     await page.waitForURL(/\/h\/[^/]+\/person\//);
     await expect(page.getByRole('heading', { name: personName, level: 1 })).toBeVisible();
+    // The heading is the person page's own, so the list's settled root is
+    // gone: from here «loaded» speaks about this page.
+    await waitForLoaded(page);
 
     // The conversation context renders (this person has at least the
     // fixture difusión conversation — that's why they were in the list).
@@ -54,9 +59,8 @@ test.describe('person file', () => {
 
     // Persists across reload.
     await page.reload();
-    await expect(notes.getByText(marker, { exact: true })).toBeVisible({
-      timeout: 10_000,
-    });
+    await waitForLoaded(page);
+    await expect(notes.getByText(marker, { exact: true })).toBeVisible();
 
     // Cleanup IS the delete-button test: the button only renders on the
     // author's own notes and goes through the delete_note RPC (a direct PATCH

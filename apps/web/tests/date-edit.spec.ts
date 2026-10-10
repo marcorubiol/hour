@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { waitForLoaded } from './loaded';
 
 const EMAIL = process.env.PW_TEST_EMAIL;
 const PASSWORD = process.env.PW_TEST_PASSWORD;
@@ -145,7 +146,8 @@ test.describe('date edit path (task 15)', () => {
 
     // Land on a real page first so the relative fetch resolves an origin.
     await page.goto(`/h/planner?view=month&scope=${FIXTURE_SPACE_TOKEN}`);
-    await expect(page.locator('.cal__grid')).toBeVisible({ timeout: 15_000 });
+    await waitForLoaded(page);
+    await expect(page.locator('.cal__grid')).toBeVisible();
 
     const made = await createFixtureDate(page, title, day);
     expect(made.status, 'fixture date created').toBe(201);
@@ -154,7 +156,8 @@ test.describe('date edit path (task 15)', () => {
     const storedAt = created!.starts_at;
 
     await page.reload();
-    await expect(page.locator('.cal__grid')).toBeVisible({ timeout: 15_000 });
+    await waitForLoaded(page);
+    await expect(page.locator('.cal__grid')).toBeVisible();
 
     // The chip is the openable date card carrying this run's title. Since
     // ADR-095 §0 the month draws ONE object for both primitives — `Slip` — and
@@ -162,7 +165,7 @@ test.describe('date edit path (task 15)', () => {
     // target any more. (`.cal__event--date` + `button.cal__event-hit` was the
     // DateChip markup, which now survives only for multi-day series.)
     const chip = page.locator('button.slip', { hasText: title });
-    await expect(chip).toBeVisible({ timeout: 15_000 });
+    await expect(chip).toBeVisible();
     await chip.click();
 
     const dialog = page.locator('dialog[open]');
@@ -186,9 +189,8 @@ test.describe('date edit path (task 15)', () => {
 
     // And the grid shows the edit after a reload, not just the API.
     await page.reload();
-    await expect(page.locator('button.slip', { hasText: edited })).toBeVisible({
-      timeout: 15_000,
-    });
+    await waitForLoaded(page);
+    await expect(page.locator('button.slip', { hasText: edited })).toBeVisible();
   });
 
   test('the agenda opens the same dialog — a kind change clears what the old kind carried', async ({
@@ -198,6 +200,7 @@ test.describe('date edit path (task 15)', () => {
     if (!created) test.skip(true, 'no fixture date from the first test');
 
     await page.goto(`/h/planner?view=agenda&scope=${FIXTURE_SPACE_TOKEN}`);
+    await waitForLoaded(page);
     // THE DIARY DRAWS THE MONTH'S SLIP now (ADR-095 §0) — `ag__row` was the
     // second implementation of one card and died with the rework, so the row
     // is located as what it is, and by the kind the slip itself declares.
@@ -211,7 +214,7 @@ test.describe('date edit path (task 15)', () => {
     // agree is exactly the day the distinction matters.
     const diary = page.locator('main');
     const row = diary.locator('.slip', { hasText: title });
-    await expect(row).toBeVisible({ timeout: 15_000 });
+    await expect(row).toBeVisible();
     await row.click();
 
     const dialog = page.locator('dialog[open]');
@@ -248,11 +251,12 @@ test.describe('date edit path (task 15)', () => {
   }) => {
     test.setTimeout(90_000);
     await page.goto(`/h/planner?view=month&scope=${FIXTURE_SPACE_TOKEN}`);
-    await expect(page.locator('.cal__grid')).toBeVisible({ timeout: 15_000 });
+    await waitForLoaded(page);
+    await expect(page.locator('.cal__grid')).toBeVisible();
 
     if (created) {
       const chip = page.locator('button.slip', { hasText: title });
-      await expect(chip).toBeVisible({ timeout: 15_000 });
+      await expect(chip).toBeVisible();
       await chip.click();
 
       const dialog = page.locator('dialog[open]');

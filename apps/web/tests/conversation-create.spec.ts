@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { waitForLoaded } from './loaded';
 
 const EMAIL = process.env.PW_TEST_EMAIL;
 const PASSWORD = process.env.PW_TEST_PASSWORD;
@@ -25,6 +26,7 @@ test.describe('contact capture', () => {
     test.setTimeout(90_000);
 
     await page.goto('/h/conversations'); // ADR-067: lens is space-less + cross-space
+    await waitForLoaded(page);
     await expect(page.getByRole('button', { name: 'Add conversation' })).toBeVisible();
 
     // Crash recovery: a run killed after create but before the tail

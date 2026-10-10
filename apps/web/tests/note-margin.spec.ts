@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { waitForLoaded } from './loaded';
 
 const EMAIL = process.env.PW_TEST_EMAIL;
 const PASSWORD = process.env.PW_TEST_PASSWORD;
@@ -200,17 +201,19 @@ test.describe('the margin — a private post-it on a day (ADR-093)', () => {
    * would read as the fallback branch passing when nothing was tested.
    */
   async function waitForEntry(page: Page, title: string) {
+    await waitForLoaded(page);
     const cell = dayCell(page);
-    await expect(cell, 'the diary did not draw the fixture day').toBeVisible({ timeout: 20_000 });
+    await expect(cell, 'the diary did not draw the fixture day').toBeVisible();
     await expect(
       cell.locator('.slip', { hasText: title }),
       `the diary never drew «${title}»`,
-    ).toBeVisible({ timeout: 20_000 });
+    ).toBeVisible();
   }
 
   async function openWriter(page: Page) {
+    await waitForLoaded(page);
     const cell = dayCell(page);
-    await expect(cell, 'the diary did not draw the fixture day').toBeVisible({ timeout: 20_000 });
+    await expect(cell, 'the diary did not draw the fixture day').toBeVisible();
     await cell.locator('.ag__note-add').click();
     await expect(cell.locator('.ag__note-input')).toBeVisible();
   }
@@ -240,7 +243,8 @@ test.describe('the margin — a private post-it on a day (ADR-093)', () => {
       console.log(`[note-margin] cleared ${stale} row(s) a previous run left behind`);
       await page.reload();
     }
-    await expect(page.locator('main [data-day]').first()).toBeVisible({ timeout: 20_000 });
+    await waitForLoaded(page);
+    await expect(page.locator('main [data-day]').first()).toBeVisible();
     day = await pickEmptyDay(page);
 
     const madeA = await createFixtureDate(page, titleA, day);
@@ -322,13 +326,14 @@ test.describe('the margin — a private post-it on a day (ADR-093)', () => {
   test('the sweep leaves nothing behind (ADR-052)', async ({ page }) => {
     test.setTimeout(90_000);
     await page.goto(`/h/planner?view=agenda&scope=${FIXTURE_SPACE_TOKEN}`);
+    await waitForLoaded(page);
     const cell = dayCell(page);
-    await expect(cell).toBeVisible({ timeout: 20_000 });
+    await expect(cell).toBeVisible();
 
     // Deleted through the UI, because the × is part of the margin too.
     for (const body of [bodyOne, bodyChosen, bodyFallback]) {
       const note = cell.locator('.ag__note', { hasText: body });
-      await expect(note, `«${body}» was not on the day`).toBeVisible({ timeout: 15_000 });
+      await expect(note, `«${body}» was not on the day`).toBeVisible();
       await note.locator('.ag__note-x').click();
       await expect(note).toBeHidden({ timeout: 15_000 });
     }

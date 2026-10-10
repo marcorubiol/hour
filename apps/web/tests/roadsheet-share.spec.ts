@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { waitForLoaded } from './loaded';
 
 const EMAIL = process.env.PW_TEST_EMAIL;
 const PASSWORD = process.env.PW_TEST_PASSWORD;
@@ -17,6 +18,7 @@ test.describe('public road sheet link', () => {
     test.setTimeout(90_000);
 
     await page.goto('/h/playwright/performance/zzz-e2e-1/roadsheet');
+    await waitForLoaded(page);
     await expect(page.locator('.rsv__title')).toBeVisible();
 
     // Pre-clean via API: revoke strays from previously failed runs so the
@@ -30,6 +32,7 @@ test.describe('public road sheet link', () => {
       }
     });
     await page.reload();
+    await waitForLoaded(page);
     await expect(page.locator('.rsv__title')).toBeVisible();
 
     // Create a venue-role link; capture the token from the API response.

@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { waitForLoaded } from './loaded';
 
 const EMAIL = process.env.PW_TEST_EMAIL;
 const PASSWORD = process.env.PW_TEST_PASSWORD;
@@ -38,6 +39,7 @@ test.describe('smoke', () => {
     // /h/desk. The cross-space digest died; the projects grid lives on the
     // space portada now. Note the bare path: sign-in lands on `/h`.
     await page.goto('/h');
+    await waitForLoaded(page);
     // THE WAY HOME IS THE CLOCK (2026-07-31): the wordmark used to hold this
     // door and the rail's clock took it, so `Hour — home` stopped existing and
     // this assertion had been failing since — unrun, because the E2E needs a
@@ -59,6 +61,7 @@ test.describe('smoke', () => {
     // ADR-067: lens routes are SPACE-LESS — scope rides in pins / ?scope=,
     // never in the path.
     await page.goto('/h/money');
+    await waitForLoaded(page);
     await expect(page.locator('.mny__totals')).toBeVisible();
     // Books header leads with Vendido/sold now (grill ADR-088); pipeline is demoted.
     await expect(page.locator('.mny__total').first()).toContainText(/sold/);
@@ -66,12 +69,14 @@ test.describe('smoke', () => {
     // Old space-scoped lens bookmarks 308 to the space-less lens.
     await page.goto('/h/playwright/desk');
     await page.waitForURL(/\/h\/desk\/?$/);
+    await waitForLoaded(page);
     // Lens headers were unified to the shared LensHeader (.lenshead) in a6cd10e.
     await expect(page.locator('.lenshead').first()).toBeVisible();
 
     // Project detail proves the read path: session survived, RLS let the
     // conversations through, the count renders. Entities stay space-scoped.
     await page.goto('/h/playwright/project/zzz-difusion/');
+    await waitForLoaded(page);
     const countLabel = page.locator('.rel-stub__count');
     await expect(countLabel).toBeVisible();
     await expect(countLabel).toContainText(/\d+\s+conversations?/);
@@ -79,11 +84,13 @@ test.describe('smoke', () => {
 
     // Calendar month grid.
     await page.goto('/h/planner');
+    await waitForLoaded(page);
     await expect(page.locator('.cal__grid')).toBeVisible();
     expect(await page.locator('.cal__weekday').count()).toBe(7);
 
     // Conversations.
     await page.goto('/h/conversations');
+    await waitForLoaded(page);
     await expect(page.locator('.status-bar__count')).toContainText(/\d+ conversations/);
     expect(await page.locator('tbody tr').count()).toBeGreaterThan(0);
   });

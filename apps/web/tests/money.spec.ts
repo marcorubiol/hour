@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { waitForLoaded } from './loaded';
 
 const EMAIL = process.env.PW_TEST_EMAIL;
 const PASSWORD = process.env.PW_TEST_PASSWORD;
@@ -22,6 +23,7 @@ test.describe('books lens', () => {
   test('fee set → persists in totals → clear', async ({ page }) => {
     test.setTimeout(60_000);
     await page.goto('/h/money'); // ADR-067: lens is space-less + cross-space
+    await waitForLoaded(page);
     await expect(page.locator('.mny__totals')).toBeVisible();
 
     // Pin the STABLE collab-fixture deal. The obra section carries the
@@ -30,9 +32,10 @@ test.describe('books lens', () => {
     // (dayLabel → en-GB "Wed, 15 Jan 2031") and resolve the deal ONCE so
     // every later step, including the cleanup, speaks about the same one.
     // The spine waits on the pins-gated bolos/invoices/expenses queries
-    // behind the nav caches — give the first paint a real window.
+    // behind the nav caches; `waitForLoaded` above already waited for them
+    // (the lens holds aria-busy until they answer), so no window is guessed.
     const obra = page.locator('section.obra[aria-label="ZZZ e2e collab"]');
-    await expect(obra).toBeVisible({ timeout: 15_000 });
+    await expect(obra).toBeVisible();
     const deal = obra.locator('.fee').filter({ hasText: '15 Jan 2031' });
     const fee = deal.locator('.fee__fee');
     await expect(fee).toBeVisible();

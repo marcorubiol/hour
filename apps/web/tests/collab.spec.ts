@@ -1,4 +1,5 @@
 import { test, expect, type Browser, type Page } from '@playwright/test';
+import { waitForLoaded } from './loaded';
 import { STORAGE_STATE } from '../playwright.config';
 
 const EMAIL = process.env.PW_TEST_EMAIL;
@@ -131,6 +132,7 @@ async function openAsClient(browser: Browser, path: string): Promise<Page> {
   const context = await browser.newContext({ storageState: STORAGE_STATE });
   const page = await context.newPage();
   await page.goto(path);
+  await waitForLoaded(page);
   return page;
 }
 
@@ -226,6 +228,7 @@ test.describe('collaborative notes (Yjs over the RoadsheetCollab DO)', () => {
 
     // Target isolation: the sibling performance's doc never sees the marker.
     await b.goto('/h/playwright/performance/zzz-e2e-2');
+    await waitForLoaded(b);
     await expect(notesBox(b)).toBeVisible();
     await expect(b.locator('.ynotes')).toHaveAttribute('data-collab-status', 'live', {
       timeout: 15_000,

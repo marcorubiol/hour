@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { waitForLoaded } from './loaded';
 
 /**
  * Scope ⇄ URL sync (ADR-067) — regression suite.
@@ -22,9 +23,10 @@ const FIXTURE_PROJECT_TOKEN = 'p:019f21d2-7482-77e6-9ad9-27d881cff305';
 
 test('Everything clears ?scope= from the URL after opening a scoped link', async ({ page }) => {
   await page.goto(`/h/desk?scope=${FIXTURE_SPACE_TOKEN}`);
+  await waitForLoaded(page);
 
   // The scope chip renders once the caches resolve and the token applies.
-  await expect(page.locator('.tok').first()).toBeVisible({ timeout: 15000 });
+  await expect(page.locator('.tok').first()).toBeVisible();
   expect(page.url()).toContain('scope=');
 
   await page.getByRole('button', { name: /Everything/ }).click();
@@ -51,7 +53,8 @@ test('rail-applied saved scope, then Everything, cleans the URL (replaceState st
 
   // 1. Land on the hall.
   await page.goto('/h');
-  await expect(page.getByRole('region', { name: 'Home' })).toBeVisible({ timeout: 15000 });
+  await waitForLoaded(page);
+  await expect(page.getByRole('region', { name: 'Home' })).toBeVisible();
 
   // 2. Everything → lands on /h/desk, clean.
   await page.getByRole('button', { name: /Everything/ }).click();
@@ -71,8 +74,9 @@ test('rail-applied saved scope, then Everything, cleans the URL (replaceState st
 
 test('Everything from the HALL with a scoped link also lands clean on /h/desk', async ({ page }) => {
   await page.goto(`/h?scope=${FIXTURE_SPACE_TOKEN}`);
+  await waitForLoaded(page);
   // Hall greets; the scope applies underneath (no chip on the hall).
-  await expect(page.getByRole('region', { name: 'Home' })).toBeVisible({ timeout: 15000 });
+  await expect(page.getByRole('region', { name: 'Home' })).toBeVisible();
 
   await page.getByRole('button', { name: /Everything/ }).click();
   await page.waitForURL(/\/h\/desk/, { timeout: 10000 });
@@ -84,8 +88,9 @@ test('Everything from the HALL with a scoped link also lands clean on /h/desk', 
 test('Conversations is a scoped lens and copies its canonical scoped URL', async ({ page, context }) => {
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
   await page.goto(`/h/conversations?scope=${FIXTURE_SPACE_TOKEN}`);
+  await waitForLoaded(page);
 
-  await expect(page.locator('.tok').first()).toBeVisible({ timeout: 15000 });
+  await expect(page.locator('.tok').first()).toBeVisible();
   await expect(page.getByRole('tab', { name: 'Conversations' })).toHaveAttribute(
     'aria-selected',
     'true',

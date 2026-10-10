@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { waitForLoaded } from './loaded';
 
 const EMAIL = process.env.PW_TEST_EMAIL;
 const PASSWORD = process.env.PW_TEST_PASSWORD;
@@ -33,6 +34,7 @@ type RawConversation = {
 /** Session comes from the shared storageState (tests/auth.setup.ts). */
 async function openConversations(page: Page, searchName?: string) {
   await page.goto('/h/conversations'); // ADR-067: lens is space-less + cross-space
+  await waitForLoaded(page);
   if (searchName) {
     // The lens is pins-scoped (unscoped = everything RLS allows) — narrow
     // to the target person server-side so the row is on the first page.
@@ -378,6 +380,7 @@ test.describe('conversation inline write', () => {
     ).toBe('contact');
 
     await page.reload();
+    await waitForLoaded(page);
     await expect(page.getByRole('button', { name: 'By contact', exact: true })).toHaveAttribute(
       'aria-pressed',
       'true',
