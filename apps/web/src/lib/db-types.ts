@@ -3531,6 +3531,7 @@ export type Database = {
       }
       create_performance: {
         Args: {
+          p_bolo_id?: string
           p_city?: string
           p_conversation_id?: string
           p_country?: string
@@ -3577,6 +3578,7 @@ export type Database = {
       }
       create_performance_series: {
         Args: {
+          p_bolo_id?: string
           p_city?: string
           p_conversation_id?: string
           p_country?: string
