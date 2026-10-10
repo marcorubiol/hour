@@ -28,6 +28,27 @@ export const VENUE_KINDS = [
 ] as const;
 export type VenueKind = (typeof VENUE_KINDS)[number];
 
+/** What the picker reads. No contact fields: they travel only on adopt. */
+export const DIRECTORY_COLS =
+  'id,name,kind,designation,address,city,region,country,capacity,timezone,source,status,last_seen_at';
+
+/** One entry as the picker sees it. */
+export type DirectoryEntry = {
+  id: string;
+  name: string;
+  kind: VenueKind;
+  designation: string | null;
+  address: string | null;
+  city: string | null;
+  region: string | null;
+  country: string;
+  capacity: number | null;
+  timezone: string | null;
+  source: string;
+  status: 'active' | 'missing';
+  last_seen_at: string;
+};
+
 /** Salas polivalentes, casas de cultura, ateneos (Marco's word «polivalentes»). */
 export const POLYVALENT_KINDS: readonly VenueKind[] = ['multipurpose', 'cultural_centre'];
 
