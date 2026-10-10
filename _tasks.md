@@ -1447,7 +1447,7 @@ entre empresas sin construirlo.
   profesional, art. 19 LOPDGDD), informar a esas personas (art. 14 RGPD) y
   atender su oposición. Antes de construir esa parte, una consulta legal.
   Desbloquea: «Directorio global de salas».
-- [ ] **Escribir ya a la Red Española de Teatros y a DGArtes (Marco, 2026-10-10)**: el coordinador redacta en el chat, se itera y Marco da el OK antes de crear borrador o enviar. Antes: escribir a la Red Española de Teatros y a DGArtes
+- [ ] Marco: hacer — **Revisar y enviar los dos borradores de Mail (cuenta Google)** a la Red Española de Teatros (`redteatros@redescena.net`) y a DGArtes (`geral@dgartes.pt`, en portugués, pidiendo la Rede de Teatros e Cineteatros Portugueses). Creados el 2026-10-10. Antes: escribir a la Red Española de Teatros y a DGArtes
   para pedir sus listados como dato (Marco, 10-10: lo quiere pensar).
 
 - [ ] **Pase de idioma de toda la app (Marco, 10-10).** Cuentas («New deal»,
