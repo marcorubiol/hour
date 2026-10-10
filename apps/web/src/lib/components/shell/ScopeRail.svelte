@@ -19,9 +19,23 @@
         desktop this changes nothing — the rail is always there. */
     open?: boolean;
     onclose?: () => void;
+    /** THE SHELL'S ONE CLOCK, ticking in the layout: on a phone the same
+        time is drawn in the top bar as the door to this drawer, and two
+        timers could disagree about the minute. `clockTime` is its HH:MM,
+        formatted once for both faces. */
+    clockNow: Date;
+    clockTime: string;
   }
 
-  let { atHome, applyScope, openPaletteFresh, open = false, onclose }: Props = $props();
+  let {
+    atHome,
+    applyScope,
+    openPaletteFresh,
+    open = false,
+    onclose,
+    clockNow,
+    clockTime,
+  }: Props = $props();
 
   const pins = usePins();
   const scopes = useScopes();
@@ -35,29 +49,6 @@
   // labels). /h is client-only (ssr = false), so navigator is safe at init.
   const locale = detectLocale(navigator.language);
 
-  // ── Rail clock ─────────────────────────────────────────────────────
-  // The shell is long-lived, so unlike the hall's mount-computed date this
-  // ticks: re-render exactly on the minute (the clock shows HH:MM), which
-  // also rolls the date line over at midnight.
-  let clockNow = $state(new Date());
-  $effect(() => {
-    let timer: ReturnType<typeof setTimeout>;
-    const tick = () => {
-      timer = setTimeout(() => {
-        clockNow = new Date();
-        tick();
-      }, 60_000 - (Date.now() % 60_000));
-    };
-    tick();
-    return () => clearTimeout(timer);
-  });
-  let clockTime = $derived(
-    new Intl.DateTimeFormat(locale, {
-      hour: '2-digit',
-      minute: '2-digit',
-      hourCycle: 'h23',
-    }).format(clockNow),
-  );
   // "dilluns · 13 jul" — CSS mono-caps does the shouting; strip the
   // abbreviation dot some locales append to the short month.
   let clockDate = $derived(
@@ -98,7 +89,7 @@
          to get back to the top of the app is a smaller promise than a logo
          that navigates. -->
     <a class="side-clock__now" href="/h" aria-label={t('hall.home', locale)}>
-      <time class="side-clock__time" datetime={clockTime}>{clockTime}</time>
+      <time class="side-clock__time clock-face" datetime={clockTime}>{clockTime}</time>
       <p class="side-clock__date">{clockDate}</p>
     </a>
     <button
@@ -287,16 +278,8 @@
     opacity: 0.6;
     text-transform: none;
   }
-  .side-clock__time {
-    font-family: var(--font-mono);
-    /* One step down the scale (was --text-xl): the clock states the day, it
-       does not head the page. */
-    font-size: var(--text-l);
-    font-weight: 400;
-    line-height: 1;
-    letter-spacing: 0.02em;
-    color: var(--heading-color);
-  }
+  /* The face itself is `.clock-face` (base.css): the top bar draws the same
+     time on a phone, and one face cannot have two type rules. */
   .side-clock__date {
     margin: 0;
     font-family: var(--font-mono);

@@ -491,6 +491,32 @@
   // same order: the clock that goes home, calm, the pulse, the scopes. On a
   // desktop the button is not drawn and `railOpen` is never true.
   const locale = detectLocale(navigator.language);
+
+  // ── The shell's clock ───────────────────────────────────────────────
+  // ONE timer for the whole shell: the rail draws it with the date and feeds
+  // the pulse from it; on a phone the top bar draws the same face as the
+  // rail's door. Re-renders exactly on the minute (it shows HH:MM), which
+  // also rolls the date over at midnight.
+  let clockNow = $state(new Date());
+  $effect(() => {
+    let timer: ReturnType<typeof setTimeout>;
+    const next = () => {
+      timer = setTimeout(() => {
+        clockNow = new Date();
+        next();
+      }, 60_000 - (Date.now() % 60_000));
+    };
+    next();
+    return () => clearTimeout(timer);
+  });
+  let clockTime = $derived(
+    new Intl.DateTimeFormat(locale, {
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    }).format(clockNow),
+  );
+
   let railOpen = $state(false);
   let menuButtonEl = $state<HTMLButtonElement | null>(null);
   function openRail() {
@@ -544,19 +570,18 @@
            of the rail that already says «here, now». -->
       <div class="shell__left">
         <!-- Only a phone draws it (see .shell__menu): there the rail is a
-             drawer and this is its door. -->
+             drawer, and its door is the rail's own clock (Marco, 2026-10-10).
+             Inside the drawer the clock still goes home, as on a desktop. -->
         <button
           type="button"
           class="shell__menu"
           bind:this={menuButtonEl}
-          aria-label={t('shell.menu_open', locale)}
+          aria-label={t(railOpen ? 'shell.menu_close' : 'shell.menu_open', locale)}
           aria-controls="shell-rail"
           aria-expanded={railOpen}
           onclick={() => (railOpen ? closeRail() : openRail())}
         >
-          <svg viewBox="0 0 14 14" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true">
-            <path d="M2.5 3.5h9M2.5 7h9M2.5 10.5h9" />
-          </svg>
+          <time class="clock-face" datetime={clockTime}>{clockTime}</time>
         </button>
       </div>
 
@@ -587,6 +612,8 @@
       openPaletteFresh={openPaletteFromRail}
       open={railOpen}
       onclose={() => closeRail({ returnFocus: true })}
+      {clockNow}
+      {clockTime}
     />
 
     {#if inSettings}
@@ -771,26 +798,25 @@
     }
   }
 
-  /* The rail's door. Same circle and line as the search beside it, without
-     the field's ground: it is a control, not a place to type. */
+  /* The rail's door on a phone: the clock, bare, as the rail draws it — no
+     frame it does not have on a desktop. What says it can be pressed is the
+     target, not a border: the button spans the whole bar (the negative margin
+     cancels the bar's own padding) and is never narrower than 44px, and the
+     face sits where the drawer's clock sits — same inset, same top — so
+     opening the drawer leaves the time exactly where it was. Focus uses the
+     global ring. */
   .shell__menu {
     display: none;
-    place-items: center;
-    inline-size: 2rem;
-    block-size: 2rem;
-    padding: 0;
-    border: 1px solid var(--border-color-dark);
-    border-radius: var(--radius-circle);
+    align-items: flex-start;
+    align-self: stretch;
+    min-inline-size: 2.75rem;
+    min-block-size: 2.75rem;
+    margin-block: calc(-1 * var(--space-s));
+    padding-block: calc((var(--header-height) - var(--text-xl)) / 2) 0;
+    padding-inline: var(--space-xs);
+    border: 0;
     background: none;
-    color: var(--text-muted);
     cursor: pointer;
-    transition:
-      color var(--transition),
-      border-color var(--transition);
-  }
-  .shell__menu:hover {
-    color: var(--text-color);
-    border-color: var(--text-muted);
   }
 
   @media (max-width: 47.999rem) {
@@ -811,8 +837,13 @@
       grid-template-columns: auto minmax(0, 1fr) auto;
       gap: var(--space-s);
     }
+    /* The door's cell takes the bar's whole height, so the face can be
+       placed from the top of the screen exactly as the drawer places it. */
+    .shell__left {
+      align-self: stretch;
+    }
     .shell__menu {
-      display: grid;
+      display: flex;
     }
     .shell__search {
       justify-self: stretch;

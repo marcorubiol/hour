@@ -1827,6 +1827,20 @@
     container-type: inline-size;
   }
 
+  /* Clock face — the shell's HH:MM. Drawn in the rail under the date, and on
+     a phone also in the top bar, where it is the door to the rail. One type
+     rule for both, so the two can never look like two clocks. One step down
+     the scale from --text-xl: the clock states the day, it does not head the
+     page. */
+  .clock-face {
+    font-family: var(--font-mono);
+    font-size: var(--text-l);
+    font-weight: 400;
+    line-height: 1;
+    letter-spacing: 0.02em;
+    color: var(--heading-color);
+  }
+
   /* Drawer — the shell's furniture on a phone. Below 48rem a `.drawer` leaves
      the flow and waits off-canvas at the inline-start edge; `data-open` slides
      it in over a backdrop. Above 48rem the class adds NOTHING: the element
