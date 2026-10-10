@@ -27,7 +27,9 @@
   import { workspacesQueryOptions } from '$lib/nav-queries';
   import type { IdentitySibling } from '$lib/utils/identity';
   import IdentityQuickPanel from '$lib/components/IdentityQuickPanel.svelte';
-  import { performanceStatusFamily } from '$lib/performance';
+  import { performanceStatusFamily, statusFootKey } from '$lib/performance';
+  import { appLocale, appLocaleTag, t } from '$lib/i18n';
+  import { statusWord } from '$lib/planner';
   import { dualTime } from '$lib/datetime';
   import {
     performanceSlip,
@@ -81,7 +83,7 @@
     clashesByDay?: Map<string, ClashVM[]>;
     /** BCP47/locale tag for weekday + month labels. */
     locale?: string;
-    /** i18n hooks — the page passes t()-backed fns; defaults stay English. */
+    /** i18n hooks — the page passes t()-backed fns; defaults follow the session language. */
     dateKindLabel?: (kind: string) => string;
     createLabel?: (isoDate: string) => string;
     /** «hasta 15 jul · 10 días» / «desde 6 jul · 10 días» — la frase que una
@@ -125,18 +127,8 @@
     untilLabel?: (day: string) => string;
   }
 
-  /** English fallbacks for the card foot; the page overrides these with t(). */
-  const EN_STATE_WORDS: Record<string, string> = {
-    hold_1: '1st hold',
-    hold_2: '2nd hold',
-    hold_3: '3rd hold',
-    hold: 'hold',
-    confirmed: 'confirmed',
-    proposed: 'proposed',
-    invoiced: 'invoiced',
-    paid: 'paid',
-    done: 'done',
-  };
+  /** Defaults in the session's language; the page passes its own t(). */
+  const L = appLocale();
 
   let {
     year,
@@ -151,24 +143,29 @@
     blackouts = [],
     aways = [],
     clashesByDay,
-    locale = 'en-GB',
+    locale = appLocaleTag(),
     dateKindLabel = (kind: string) => kind.replace(/_/g, ' '),
-    createLabel = (iso: string) => `New performance on ${iso}`,
-    openDayLabel = (iso: string) => `Open ${iso}`,
-    runUntilLabel = (iso: string, n: number) => `until ${iso} · ${n} days`,
-    runFromLabel = (iso: string, n: number) => `from ${iso} · ${n} days`,
-    stateLabel = (status: string) => EN_STATE_WORDS[status] ?? null,
+    createLabel = (iso: string) => t('planner.new_on', L, { day: iso }),
+    openDayLabel = (iso: string) => t('planner.open_day', L, { day: iso }),
+    runUntilLabel = (iso: string, n: number) =>
+      `${t('planner.band_until', L, { day: iso })} · ${n} ${t('block.days_unit', L)}`,
+    runFromLabel = (iso: string, n: number) =>
+      `${t('planner.run_from', L, { day: iso })} · ${n} ${t('block.days_unit', L)}`,
+    stateLabel = (status: string) => {
+      const key = statusFootKey(status);
+      return key ? t(key, L) : null;
+    },
     readinessItems = [
-      { key: 'hotel', label: 'hotel' },
-      { key: 'technical', label: 'technical' },
+      { key: 'hotel', label: t('planner.ready_hotel', L) },
+      { key: 'technical', label: t('planner.ready_technical', L) },
     ],
-    moreLabel = 'more',
-    isoWeekLabel = (n: number) => `week ${n}`,
-    releasedLabel = 'let go',
-    expiresLabel = (iso: string) => `expires ${iso.slice(8, 10)}/${iso.slice(5, 7)}`,
-    awayWord = 'away',
-    tourWord = 'on tour',
-    untilLabel = (day: string) => `until ${day}`,
+    moreLabel = t('planner.more_n', L),
+    isoWeekLabel = (n: number) => `${t('planner.week_n', L)} ${n}`,
+    releasedLabel = t('planner.released', L),
+    expiresLabel = (iso: string) => t('planner.expires_on', L, { day: `${iso.slice(8, 10)}/${iso.slice(5, 7)}` }),
+    awayWord = t('planner.band_away', L),
+    tourWord = t('planner.band_tour', L),
+    untilLabel = (day: string) => t('planner.band_until', L, { day }),
   }: Props = $props();
 
   // ── Identity quick-edit (ADR-081): a monogram click opens the editor at a
@@ -275,6 +272,9 @@
     workspaceModeById,
     viewerTz,
     kindLabel: (k: string) => dateKindLabel(k),
+    statusLabel: (s: string) => statusWord(s, L),
+    viewerTimeLabel: (time: string) => t('planner.viewer_time', L, { time }),
+    fallbackName: t('create.type_performance', L),
     dualTime,
     originOf: travelOrigin,
   });

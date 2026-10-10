@@ -12,6 +12,7 @@
 import type { AvailabilityItem } from './availability';
 import type { DateRow } from './date';
 import { decideBy, isHoldStatus, performanceStatusFamily } from './performance';
+import { t, type Locale } from './i18n';
 
 export interface PlannerDay {
   /** ISO date, YYYY-MM-DD. */
@@ -834,4 +835,18 @@ export function agendaDayKeys(
       withEvent.has(day) ||
       blackouts.some((b) => day >= b.starts_on && day <= b.ends_on),
   );
+}
+
+const STATE_WORDS = new Set(['proposed', 'invoiced', 'paid', 'done', 'cancelled', 'tentative']);
+
+/**
+ * A performance's or a date's status as a word in the reader's language.
+ * The hold ranks and «confirmed» are `perf.status_*`; the rest of the life of
+ * a deal (and a date's own statuses) are `planner.state_*`. A value with no
+ * word keeps its raw spelling, underscores as spaces.
+ */
+export function statusWord(status: string, locale: Locale): string {
+  const key = STATE_WORDS.has(status) ? `planner.state_${status}` : `perf.status_${status}`;
+  const word = t(key, locale);
+  return word === key ? status.replace(/_/g, ' ') : word;
 }
