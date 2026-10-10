@@ -658,6 +658,11 @@
     border: 1px solid var(--border-color-dark);
     background: var(--bg-light);
   }
+  /* A framed panel: its parts meet at their rules, so the group's gap between
+     blocks would only open empty bands inside the frame. */
+  .set-group.set-access {
+    row-gap: 0;
+  }
   /* The page's generic .set-group__head stacks and rules its head; the access
      box is a framed panel, so its head reads across (name left, count right),
      inside the same padding as the invite row, whose top border is the rule. */
