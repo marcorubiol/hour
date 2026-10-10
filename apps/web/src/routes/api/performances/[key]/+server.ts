@@ -21,6 +21,17 @@ import { PerformancePatchSchema } from '$lib/performance';
 import { fetchPerformanceBundle, isUuid } from '$lib/server/performance-bundle';
 import { pgGet, pgPatch, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
+import {
+  SCHEDULE_SLOT_EMBED,
+  applyTimeslotPatch,
+  splitTimeslotPatch,
+  timeslotsFromSlots,
+  timeslotsOrdered,
+  withTimeslots,
+  type ScheduleSlotRow,
+} from '$lib/schedule-slot';
+
+const ORDER_HINT = 'Timeslots must be ordered: load in ≤ soundcheck ≤ start ≤ load out ≤ wrap.';
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -66,7 +77,9 @@ export const GET: RequestHandler = async ({ request, params, url, platform, loca
 /**
  * PATCH /api/performances/:key — update the operational fields of a gig
  * (ADR-043): status, performed_at, the 5 timeslots, denormalized venue
- * trio, conversation/line links. Whitelisted by PerformancePatchSchema; no
+ * trio, conversation/line links. The timeslots are `schedule_slot` rows
+ * since ADR-090: they are written with `replace_schedule_slots` (whole
+ * running order, one transaction) and the response derives the five fields. Whitelisted by PerformancePatchSchema; no
  * money, no notes (collab doc owns notes, ADR-042). RLS enforces
  * has_permission(project_id, 'edit:performance') on UPDATE.
  *
@@ -181,6 +194,30 @@ export const PATCH: RequestHandler = async ({ request, params, url, platform, lo
       }
     }
 
+    const { timeslots, rest } = splitTimeslotPatch(patch);
+
+    // The running order first (ADR-090). The order rule the old CHECK held
+    // for the five fields is checked here, on the order that would result,
+    // before anything is written.
+    if (Object.keys(timeslots).length > 0) {
+      const current = new URLSearchParams();
+      current.set('select', 'id,kind,label,at,ends_at,sort,notes');
+      current.set('performance_id', `eq.${id}`);
+      current.set('order', 'sort.asc');
+      const { data: slots } = await pgGet<ScheduleSlotRow>(env, 'schedule_slot', jwt, {
+        search: current,
+      });
+      const next = applyTimeslotPatch(slots, timeslots);
+      if (!timeslotsOrdered(timeslotsFromSlots(next.map((s, i) => ({ ...s, sort: i + 1 }))))) {
+        return json({ error: 'constraint_violation', hint: ORDER_HINT }, 400);
+      }
+      await pgPostRpc(env, 'replace_schedule_slots', jwt, {
+        p_target_table: 'performance',
+        p_target_id: id,
+        p_slots: next,
+      });
+    }
+
     const search = new URLSearchParams();
     search.set('id', `eq.${id}`);
     search.set('deleted_at', 'is.null');
@@ -188,23 +225,34 @@ export const PATCH: RequestHandler = async ({ request, params, url, platform, lo
       'select',
       [
         'id,workspace_id,project_id,line_id,conversation_id,slug,performed_at,status',
-        'venue_id,venue_name,city,country,load_in_at,soundcheck_at,start_at',
-        'loadout_at,wrap_at,logistics,hospitality,technical,notes,custom_fields',
+        'venue_id,venue_name,city,country',
+        SCHEDULE_SLOT_EMBED,
+        'logistics,hospitality,technical,notes,custom_fields',
         'created_by,created_at,updated_at,deleted_at,previous_slugs,hold_notice_days,readiness',
       ].join(','),
     );
-    const { data } = await pgPatch<Record<string, unknown>>(
-      env,
-      'performance',
-      jwt,
-      patch,
-      { search },
-    );
+    // Only the timeslots changed → nothing to PATCH on the row; read it back.
+    const { data } =
+      Object.keys(rest).length > 0
+        ? await pgPatch<Record<string, unknown> & { schedule_slot: ScheduleSlotRow[] }>(
+            env,
+            'performance',
+            jwt,
+            rest,
+            { search },
+          )
+        : await pgGet<Record<string, unknown> & { schedule_slot: ScheduleSlotRow[] }>(
+            env,
+            'performance',
+            jwt,
+            { search },
+          );
     if (data.length === 0) return json({ error: 'not_found' }, 404);
-    return json({ performance: data[0] });
+    return json({ performance: withTimeslots(data[0]) });
   } catch (err) {
-    // 23514 = CHECK violation (timeslot ordering, country format) → the
-    // caller sent an impossible combination, not a gateway fault.
+    // 23514 = CHECK violation (country format, a slot ending before it
+    // starts) → the caller sent an impossible combination, not a gateway
+    // fault. 42501 from replace_schedule_slots = no edit:performance.
     return pgErrorResponse(
       err,
       { route: 'PATCH /api/performances/[key]', requestId: locals.requestId },
@@ -213,8 +261,9 @@ export const PATCH: RequestHandler = async ({ request, params, url, platform, lo
           '23514': {
             status: 400,
             error: 'constraint_violation',
-            hint: 'Timeslots must be ordered: load in ≤ soundcheck ≤ start ≤ load out ≤ wrap.',
+            hint: ORDER_HINT,
           },
+          '42501': { status: 404, error: 'not_found' },
         },
         passUpstream: [401, 403],
       },

@@ -34,6 +34,7 @@
  */
 
 import type { Json, Tables } from './db-types';
+import type { TimeslotFields } from './schedule-slot';
 
 export const ROADSHEET_ROLES = ['full', 'venue', 'performer', 'tech_manager'] as const;
 export type RoadsheetRole = (typeof ROADSHEET_ROLES)[number];
@@ -120,13 +121,10 @@ export interface PerformanceBundle {
     | 'venue_name'
     | 'city'
     | 'country'
-    | 'load_in_at'
-    | 'soundcheck_at'
-    | 'start_at'
-    | 'loadout_at'
-    | 'wrap_at'
     | 'notes'
-  > & {
+  > &
+    // ADR-090: derived from `schedule_slot` by the bundle.
+    TimeslotFields & {
     logistics: Json;
     hospitality: Json;
     technical: Json;

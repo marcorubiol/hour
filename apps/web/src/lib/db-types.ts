@@ -1792,8 +1792,6 @@ export type Database = {
           hospitality: Json
           id: string
           line_id: string | null
-          load_in_at: string | null
-          loadout_at: string | null
           logistics: Json
           notes: string | null
           performed_at: string
@@ -1802,15 +1800,12 @@ export type Database = {
           readiness: Json
           series_id: string | null
           slug: string | null
-          soundcheck_at: string | null
-          start_at: string | null
           status: Database["public"]["Enums"]["performance_status"]
           technical: Json
           updated_at: string
           venue_id: string | null
           venue_name: string | null
           workspace_id: string
-          wrap_at: string | null
         }
         Insert: {
           bolo_id?: string | null
@@ -1825,8 +1820,6 @@ export type Database = {
           hospitality?: Json
           id?: string
           line_id?: string | null
-          load_in_at?: string | null
-          loadout_at?: string | null
           logistics?: Json
           notes?: string | null
           performed_at: string
@@ -1835,15 +1828,12 @@ export type Database = {
           readiness?: Json
           series_id?: string | null
           slug?: string | null
-          soundcheck_at?: string | null
-          start_at?: string | null
           status?: Database["public"]["Enums"]["performance_status"]
           technical?: Json
           updated_at?: string
           venue_id?: string | null
           venue_name?: string | null
           workspace_id: string
-          wrap_at?: string | null
         }
         Update: {
           bolo_id?: string | null
@@ -1858,8 +1848,6 @@ export type Database = {
           hospitality?: Json
           id?: string
           line_id?: string | null
-          load_in_at?: string | null
-          loadout_at?: string | null
           logistics?: Json
           notes?: string | null
           performed_at?: string
@@ -1868,15 +1856,12 @@ export type Database = {
           readiness?: Json
           series_id?: string | null
           slug?: string | null
-          soundcheck_at?: string | null
-          start_at?: string | null
           status?: Database["public"]["Enums"]["performance_status"]
           technical?: Json
           updated_at?: string
           venue_id?: string | null
           venue_name?: string | null
           workspace_id?: string
-          wrap_at?: string | null
         }
         Relationships: [
           {
@@ -2158,6 +2143,86 @@ export type Database = {
           },
           {
             foreignKeyName: "roadsheet_share_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspace"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      schedule_slot: {
+        Row: {
+          at: string
+          created_at: string
+          created_by: string | null
+          date_id: string | null
+          ends_at: string | null
+          id: string
+          kind: string | null
+          label: string | null
+          notes: string | null
+          performance_id: string | null
+          project_id: string
+          sort: number
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          at: string
+          created_at?: string
+          created_by?: string | null
+          date_id?: string | null
+          ends_at?: string | null
+          id?: string
+          kind?: string | null
+          label?: string | null
+          notes?: string | null
+          performance_id?: string | null
+          project_id: string
+          sort: number
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          at?: string
+          created_at?: string
+          created_by?: string | null
+          date_id?: string | null
+          ends_at?: string | null
+          id?: string
+          kind?: string | null
+          label?: string | null
+          notes?: string | null
+          performance_id?: string | null
+          project_id?: string
+          sort?: number
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "schedule_slot_date_id_fkey"
+            columns: ["date_id"]
+            isOneToOne: false
+            referencedRelation: "date"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "schedule_slot_performance_id_fkey"
+            columns: ["performance_id"]
+            isOneToOne: false
+            referencedRelation: "performance"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "schedule_slot_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "project"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "schedule_slot_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspace"
@@ -3488,8 +3553,6 @@ export type Database = {
           hospitality: Json
           id: string
           line_id: string | null
-          load_in_at: string | null
-          loadout_at: string | null
           logistics: Json
           notes: string | null
           performed_at: string
@@ -3498,15 +3561,12 @@ export type Database = {
           readiness: Json
           series_id: string | null
           slug: string | null
-          soundcheck_at: string | null
-          start_at: string | null
           status: Database["public"]["Enums"]["performance_status"]
           technical: Json
           updated_at: string
           venue_id: string | null
           venue_name: string | null
           workspace_id: string
-          wrap_at: string | null
         }
         SetofOptions: {
           from: "*"
@@ -3539,8 +3599,6 @@ export type Database = {
           hospitality: Json
           id: string
           line_id: string | null
-          load_in_at: string | null
-          loadout_at: string | null
           logistics: Json
           notes: string | null
           performed_at: string
@@ -3549,15 +3607,12 @@ export type Database = {
           readiness: Json
           series_id: string | null
           slug: string | null
-          soundcheck_at: string | null
-          start_at: string | null
           status: Database["public"]["Enums"]["performance_status"]
           technical: Json
           updated_at: string
           venue_id: string | null
           venue_name: string | null
           workspace_id: string
-          wrap_at: string | null
         }[]
         SetofOptions: {
           from: "*"
@@ -3618,6 +3673,39 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "roadsheet_share"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      create_schedule_slot: {
+        Args: {
+          p_at: string
+          p_ends_at?: string
+          p_kind?: string
+          p_label?: string
+          p_notes?: string
+          p_target_id: string
+          p_target_table: string
+        }
+        Returns: {
+          at: string
+          created_at: string
+          created_by: string | null
+          date_id: string | null
+          ends_at: string | null
+          id: string
+          kind: string | null
+          label: string | null
+          notes: string | null
+          performance_id: string | null
+          project_id: string
+          sort: number
+          updated_at: string
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "schedule_slot"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -3822,6 +3910,7 @@ export type Database = {
         Args: { p_performance_id: string }
         Returns: undefined
       }
+      delete_schedule_slot: { Args: { p_slot_id: string }; Returns: undefined }
       delete_task: { Args: { p_task_id: string }; Returns: undefined }
       delete_travel_stage: { Args: { p_stage_id: string }; Returns: undefined }
       fiscal_identity_snapshot: { Args: { p_id: string }; Returns: Json }
@@ -4099,6 +4188,35 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      reorder_schedule_slots: {
+        Args: {
+          p_slot_ids: string[]
+          p_target_id: string
+          p_target_table: string
+        }
+        Returns: {
+          at: string
+          created_at: string
+          created_by: string | null
+          date_id: string | null
+          ends_at: string | null
+          id: string
+          kind: string | null
+          label: string | null
+          notes: string | null
+          performance_id: string | null
+          project_id: string
+          sort: number
+          updated_at: string
+          workspace_id: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "schedule_slot"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       reorder_travel_stages: {
         Args: { p_date_id: string; p_stage_ids: string[] }
         Returns: {
@@ -4125,6 +4243,31 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "travel_stage"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      replace_schedule_slots: {
+        Args: { p_slots: Json; p_target_id: string; p_target_table: string }
+        Returns: {
+          at: string
+          created_at: string
+          created_by: string | null
+          date_id: string | null
+          ends_at: string | null
+          id: string
+          kind: string | null
+          label: string | null
+          notes: string | null
+          performance_id: string | null
+          project_id: string
+          sort: number
+          updated_at: string
+          workspace_id: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "schedule_slot"
           isOneToOne: false
           isSetofReturn: true
         }
@@ -4310,6 +4453,38 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "project"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      update_schedule_slot: {
+        Args: {
+          p_at: string
+          p_ends_at?: string
+          p_kind?: string
+          p_label?: string
+          p_notes?: string
+          p_slot_id: string
+        }
+        Returns: {
+          at: string
+          created_at: string
+          created_by: string | null
+          date_id: string | null
+          ends_at: string | null
+          id: string
+          kind: string | null
+          label: string | null
+          notes: string | null
+          performance_id: string | null
+          project_id: string
+          sort: number
+          updated_at: string
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "schedule_slot"
           isOneToOne: true
           isSetofReturn: false
         }

@@ -173,7 +173,15 @@ ON CONFLICT (id) DO UPDATE SET fee_amount = EXCLUDED.fee_amount, fee_currency = 
 -- 7 · Performances. Every status of the enum has a row; the conflict cases
 --     are laid out on purpose and each one is named where it sits.
 -- ---------------------------------------------------------------------------
-INSERT INTO public.performance
+-- ADR-090: the five timeslots are schedule_slot rows now. The rows below keep
+-- their old shape in a scratch table, and are split into performance +
+-- schedule_slot right after.
+CREATE TEMP TABLE _seed_perf (LIKE public.performance INCLUDING DEFAULTS) ON COMMIT DROP;
+ALTER TABLE _seed_perf
+  ADD COLUMN load_in_at timestamptz, ADD COLUMN soundcheck_at timestamptz,
+  ADD COLUMN start_at timestamptz, ADD COLUMN loadout_at timestamptz,
+  ADD COLUMN wrap_at timestamptz;
+INSERT INTO _seed_perf
   (id, workspace_id, project_id, line_id, bolo_id, performed_at, venue_id, venue_name, city, country, status, slug,
    created_by, load_in_at, soundcheck_at, start_at, loadout_at, wrap_at, hold_notice_days, readiness, notes)
 VALUES
@@ -346,14 +354,34 @@ VALUES
    NULL, NULL, :f0 + 168 + time '19:30', NULL, NULL, 60, '{}', NULL),
   ('3333002b-0000-4000-8000-00000000002b', :'ws', :'mm', '22220002-0000-4000-8000-000000000002', NULL, :f0 + 175,
    '11110001-0000-4000-8000-000000000001', 'Mercat de les Flors', 'Barcelona', 'ES', 'proposed', 'flors-2027', :'by',
-   NULL, NULL, NULL, NULL, NULL, NULL, '{}', 'Proposta per tancar la temporada.')
+   NULL, NULL, NULL, NULL, NULL, NULL, '{}', 'Proposta per tancar la temporada.');
+
+INSERT INTO public.performance (id, workspace_id, project_id, line_id, bolo_id, performed_at, venue_id, venue_name, city, country, status, slug, created_by, hold_notice_days, readiness, notes)
+SELECT id, workspace_id, project_id, line_id, bolo_id, performed_at, venue_id, venue_name, city, country, status, slug, created_by, hold_notice_days, readiness, notes FROM _seed_perf
 ON CONFLICT (id) DO UPDATE SET
-  performed_at = EXCLUDED.performed_at, status = EXCLUDED.status, line_id = EXCLUDED.line_id,
-  bolo_id = EXCLUDED.bolo_id, venue_id = EXCLUDED.venue_id, venue_name = EXCLUDED.venue_name,
-  city = EXCLUDED.city, country = EXCLUDED.country,
-  load_in_at = EXCLUDED.load_in_at, soundcheck_at = EXCLUDED.soundcheck_at,
-  start_at = EXCLUDED.start_at, loadout_at = EXCLUDED.loadout_at, wrap_at = EXCLUDED.wrap_at,
-  hold_notice_days = EXCLUDED.hold_notice_days, readiness = EXCLUDED.readiness, notes = EXCLUDED.notes;
+  performed_at = EXCLUDED.performed_at,
+  status = EXCLUDED.status,
+  line_id = EXCLUDED.line_id,
+  bolo_id = EXCLUDED.bolo_id,
+  venue_id = EXCLUDED.venue_id,
+  venue_name = EXCLUDED.venue_name,
+  city = EXCLUDED.city,
+  country = EXCLUDED.country,
+  hold_notice_days = EXCLUDED.hold_notice_days,
+  readiness = EXCLUDED.readiness,
+  notes = EXCLUDED.notes;
+
+DELETE FROM public.schedule_slot WHERE performance_id IN (SELECT id FROM _seed_perf);
+INSERT INTO public.schedule_slot (workspace_id, project_id, performance_id, kind, at, sort, created_by)
+SELECT p.workspace_id, p.project_id, p.id, t.kind, t.at,
+       row_number() OVER (PARTITION BY p.id ORDER BY t.ord)::smallint, p.created_by
+FROM _seed_perf p
+CROSS JOIN LATERAL (VALUES
+  (1, 'load_in', p.load_in_at), (2, 'soundcheck', p.soundcheck_at), (3, 'start', p.start_at),
+  (4, 'loadout', p.loadout_at), (5, 'wrap', p.wrap_at)
+) AS t(ord, kind, at)
+WHERE t.at IS NOT NULL;
+DROP TABLE _seed_perf;
 
 -- ---------------------------------------------------------------------------
 -- 8 · Dates — every kind, every status, and the travel legs that make (and
