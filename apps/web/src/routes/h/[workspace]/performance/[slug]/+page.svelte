@@ -835,7 +835,10 @@
 {#snippet boloMessage()}
   {t('perf.bolo_helper_short', locale)}
   {#if perf?.project}
-    <a href={booksHref(perf.project.id, { newBolo: true })}>{t('perf.bolo_create_link', locale)}</a>
+    <!-- Otra pestaña: la edición a medio escribir no se pierde (Marco, 2026-10-10). -->
+    <a href={booksHref(perf.project.id, { newBolo: true })} target="_blank" rel="noopener"
+      >{t('perf.bolo_create_link', locale)}</a
+    >
   {/if}
 {/snippet}
 
