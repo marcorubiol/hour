@@ -8,6 +8,7 @@
 
 import * as v from 'valibot';
 import { Constants, type Enums } from './db-types';
+import { t, type Locale } from './i18n';
 
 export type PaymentMethod = Enums<'payment_method'>;
 export const PAYMENT_METHODS = Constants.public.Enums.payment_method;
@@ -343,6 +344,27 @@ export function fmtFee(amount: number | null, currency: string | null): string {
 /** "22,900" — whole-number form for header stats where decimals are noise. */
 export function fmtMoneyCompact(amount: number): string {
 	return moneyCompact.format(amount);
+}
+
+/** A dictionary word for `books.<prefix><value>`, or the raw value if none. */
+function wordOr(key: string, locale: Locale, fallback: string): string {
+	const out = t(key, locale);
+	return out === key ? fallback : out;
+}
+
+/** A bolo's status in the session's language ("hold 1", "confirmed"…). */
+export function boloStatusLabel(status: string, locale: Locale): string {
+	return wordOr(`books.status_${status}`, locale, status.replace(/_/g, ' '));
+}
+
+/** An invoice's lifecycle word (draft · issued · paid · cancelled). */
+export function invoiceStatusLabel(status: string, locale: Locale): string {
+	return wordOr(`books.inv_status_${status}`, locale, status);
+}
+
+/** How a payment came in (Transfer · Card · Cash · Other). */
+export function paymentMethodLabel(method: string, locale: Locale): string {
+	return wordOr(`books.method_${method}`, locale, method);
 }
 
 /** Invoice lifecycle → StateBadge tone. */

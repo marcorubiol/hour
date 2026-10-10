@@ -5,12 +5,15 @@
     PAYMENT_METHODS,
     agingState,
     fmtMoney,
+    invoiceStatusLabel,
     invoiceTone,
     observedPayerTermsDays,
+    paymentMethodLabel,
     type MoneyInvoiceItem,
     type PaymentMethod,
   } from '$lib/money';
   import { dayLabel } from '$lib/datetime';
+  import { appLocale, t } from '$lib/i18n';
   import Button from './Button.svelte';
   import Dialog from './Dialog.svelte';
   import Input from './Input.svelte';
@@ -28,12 +31,7 @@
   const queryClient = useQueryClient();
   const today = new Date();
   const EDITABLE_STATUSES = ['draft', 'issued', 'cancelled'] as const;
-  const METHOD_LABELS: Record<PaymentMethod, string> = {
-    transfer: 'Transfer',
-    card: 'Card',
-    cash: 'Cash',
-    other: 'Other',
-  };
+  const locale = appLocale();
 
   let allPayments = $derived(invoices.flatMap((invoice) => invoice.payments));
   let termsByPayer = $derived(observedPayerTermsDays(invoices, allPayments));
@@ -53,14 +51,14 @@
   }
 
   function payerName(invoice: MoneyInvoiceItem): string {
-    return invoice.payer?.organization_name ?? invoice.payer?.full_name ?? 'payer';
+    return invoice.payer?.organization_name ?? invoice.payer?.full_name ?? t('books.payer_fallback', locale);
   }
 
   function agingCopy(invoice: MoneyInvoiceItem): string {
     const aging = agingFor(invoice);
-    if (aging.state === 'paid') return 'collected';
-    if (aging.expectedDays === null) return `${aging.daysRunning} days · no expectation`;
-    return `${aging.daysRunning} of ~${aging.expectedDays} days`;
+    if (aging.state === 'paid') return t('books.collected', locale);
+    if (aging.expectedDays === null) return t('books.aging_no_expect', locale, { days: aging.daysRunning });
+    return t('books.aging_of', locale, { days: aging.daysRunning, expected: aging.expectedDays });
   }
 
   function statusChoices(invoice: MoneyInvoiceItem): readonly string[] {
@@ -74,15 +72,15 @@
         `/api/invoices/${input.id}`,
         input.patch,
       );
-      if (!body?.invoice) throw new Error('Unexpected response');
+      if (!body?.invoice) throw new Error(t('books.unexpected_response', locale));
       return body.invoice;
     },
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['invoices'] }),
     onError: (err) => {
       addToast({
         tone: 'danger',
-        title: 'Invoice not updated',
-        message: err instanceof Error ? err.message : 'Unexpected error',
+        title: t('books.invoice_not_updated', locale),
+        message: err instanceof Error ? err.message : t('perf.unexpected', locale),
       });
     },
   });
@@ -93,8 +91,8 @@
     onError: (err) => {
       addToast({
         tone: 'danger',
-        title: 'Draft not discarded',
-        message: err instanceof Error ? err.message : 'Unexpected error',
+        title: t('books.draft_not_discarded', locale),
+        message: err instanceof Error ? err.message : t('perf.unexpected', locale),
       });
     },
   });
@@ -119,7 +117,7 @@
 
   const createPayment = createMutation({
     mutationFn: async () => {
-      if (!paymentInvoice) throw new Error('No invoice selected');
+      if (!paymentInvoice) throw new Error(t('books.no_invoice_selected', locale));
       const body = await mutateJSON<{ payment?: unknown }>('POST', '/api/payments', {
         invoice_id: paymentInvoice.id,
         amount: Number(pAmount),
@@ -128,7 +126,7 @@
         reference: pReference.trim() || null,
         notes: pNotes.trim() || null,
       });
-      if (!body?.payment) throw new Error('Unexpected response');
+      if (!body?.payment) throw new Error(t('books.unexpected_response', locale));
       return body.payment;
     },
     onSuccess: () => {
@@ -139,13 +137,13 @@
       // Collected on the deal cards derives from payments (ADR-087).
       void queryClient.invalidateQueries({ queryKey: ['money-bolos'] });
       void queryClient.invalidateQueries({ queryKey: ['line-money-fees'] });
-      addToast({ tone: 'success', message: 'Payment recorded.' });
+      addToast({ tone: 'success', message: t('books.payment_recorded', locale) });
     },
     onError: (err) => {
       addToast({
         tone: 'danger',
-        title: 'Payment not recorded',
-        message: err instanceof Error ? err.message : 'Unexpected error',
+        title: t('books.payment_not_recorded', locale),
+        message: err instanceof Error ? err.message : t('perf.unexpected', locale),
       });
     },
   });
@@ -153,7 +151,7 @@
   function submitPayment() {
     const amount = Number(pAmount);
     if (!Number.isFinite(amount) || amount <= 0) {
-      addToast({ tone: 'warning', message: 'Payment amount must be greater than zero.' });
+      addToast({ tone: 'warning', message: t('books.payment_amount_gt_zero', locale) });
       return;
     }
     $createPayment.mutate();
@@ -166,13 +164,13 @@
       void queryClient.invalidateQueries({ queryKey: ['payments'] });
       void queryClient.invalidateQueries({ queryKey: ['money-bolos'] });
       void queryClient.invalidateQueries({ queryKey: ['line-money-fees'] });
-      addToast({ tone: 'info', message: 'Payment removed; invoice status recalculated.' });
+      addToast({ tone: 'info', message: t('books.payment_removed', locale) });
     },
     onError: (err) => {
       addToast({
         tone: 'danger',
-        title: 'Payment not removed',
-        message: err instanceof Error ? err.message : 'Unexpected error',
+        title: t('books.payment_not_removed', locale),
+        message: err instanceof Error ? err.message : t('perf.unexpected', locale),
       });
     },
   });
@@ -180,12 +178,12 @@
   const createFollowUp = createMutation({
     mutationFn: async (invoice: MoneyInvoiceItem) => {
       const expectedOn = agingFor(invoice).expectedOn;
-      if (!expectedOn) throw new Error('Set an expected collection date first.');
+      if (!expectedOn) throw new Error(t('books.set_expected_first', locale));
       const parent = invoice.project_id
         ? { project_id: invoice.project_id }
         : { workspace_id: invoice.workspace_id };
       return mutateJSON('POST', '/api/tasks', {
-        title: `Ask ${payerName(invoice)} if they've collected`,
+        title: t('books.followup_task', locale, { payer: payerName(invoice) }),
         note: invoice.payment_condition,
         from_at: expectedOn,
         ...parent,
@@ -194,13 +192,13 @@
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['tasks', 'open'] });
       void queryClient.invalidateQueries({ queryKey: ['tasks'] });
-      addToast({ tone: 'success', message: 'Follow-up added to Desk for that date.' });
+      addToast({ tone: 'success', message: t('books.followup_added', locale) });
     },
     onError: (err) => {
       addToast({
         tone: 'danger',
-        title: 'Follow-up not created',
-        message: err instanceof Error ? err.message : 'Unexpected error',
+        title: t('books.followup_not_created', locale),
+        message: err instanceof Error ? err.message : t('perf.unexpected', locale),
       });
     },
   });
@@ -219,7 +217,7 @@
 </script>
 
 {#if invoices.length === 0}
-  <p class="mny-inv__empty">No invoices yet — create one from a deal's fee above.</p>
+  <p class="mny-inv__empty">{t('books.no_invoices', locale)}</p>
 {:else}
   <ul class="mny__invoices" role="list">
     {#each invoices as invoice (invoice.id)}
@@ -227,7 +225,7 @@
       {@const observed = invoice.payer_person_id ? termsByPayer.get(invoice.payer_person_id) : null}
       <li class:expanded={expandedId === invoice.id}>
         <div class="mny-inv__row">
-          <span class="mny-inv__number">{invoice.number ?? 'no number'}</span>
+          <span class="mny-inv__number">{invoice.number ?? t('books.no_number', locale)}</span>
           <span class="mny-inv__main">
             {invoice.payer?.organization_name ?? invoice.payer?.full_name ?? '—'}
             {#if invoice.project}<span class="mny-inv__muted"> · {invoice.project.name}</span>{/if}
@@ -241,11 +239,11 @@
               aria-expanded={expandedId === invoice.id}
               onclick={() => (expandedId = expandedId === invoice.id ? null : invoice.id)}
             >
-              {expandedId === invoice.id ? 'Close' : 'Details'}
+              {expandedId === invoice.id ? t('books.close', locale) : t('books.details', locale)}
             </button>
-            <Menu label="Change invoice status" triggerClass="btn--outline btn--xs">
+            <Menu label={t('books.change_status', locale)} triggerClass="btn--outline btn--xs">
               {#snippet trigger()}
-                <StateBadge label={invoice.status} tone={invoiceTone(invoice.status)} />
+                <StateBadge label={invoiceStatusLabel(invoice.status, locale)} tone={invoiceTone(invoice.status)} />
                 <span aria-hidden="true">▾</span>
               {/snippet}
               {#snippet children({ close })}
@@ -262,7 +260,7 @@
                         }
                       }}
                     >
-                      {status}
+                      {invoiceStatusLabel(status, locale)}
                     </button>
                   </li>
                 {/each}
@@ -275,7 +273,7 @@
                 tone="warn"
                 loading={$discardInvoice.isPending}
                 onclick={() => $discardInvoice.mutate(invoice.id)}
-              >Discard</Button>
+              >{t('books.discard', locale)}</Button>
             {/if}
           </span>
         </div>
@@ -284,19 +282,19 @@
           <div class="mny-inv__detail">
             <div class="mny-inv__dates">
               <div>
-                <span class="mny-inv__label">Issued</span>
+                <span class="mny-inv__label">{t('books.issued', locale)}</span>
                 <span>{dayLabel(invoice.issued_on)}</span>
               </div>
               <div>
-                <span class="mny-inv__label">Contractual due</span>
-                <span>{invoice.due_on ? dayLabel(invoice.due_on) : 'not set'}</span>
+                <span class="mny-inv__label">{t('books.contractual_due', locale)}</span>
+                <span>{invoice.due_on ? dayLabel(invoice.due_on) : t('books.not_set', locale)}</span>
               </div>
               <label>
-                <span class="mny-inv__label">Expected collection</span>
+                <span class="mny-inv__label">{t('books.expected_collection', locale)}</span>
                 <input
                   type="date"
                   value={invoice.expected_on ?? ''}
-                  aria-label={`Expected collection date for ${invoice.number ?? 'invoice'}`}
+                  aria-label={t('books.expected_aria', locale, { number: invoice.number ?? t('books.invoice_lc', locale) })}
                   onchange={(event) => updateExpectedOn(invoice, event)}
                 />
               </label>
@@ -304,17 +302,17 @@
 
             {#if aging.source === 'observed' && observed}
               <p class="mny-inv__provenance">
-                Usually pays in ~{Math.round(observed.days)} days · {observed.samples} observed invoices.
-                Set a date above to correct this estimate.
+                {t('books.usually_pays', locale, { days: Math.round(observed.days), n: observed.samples })}
+                {t('books.set_date_correct', locale)}
               </p>
             {/if}
 
             <div class="mny-inv__condition">
-              <label for={`condition-${invoice.id}`} class="mny-inv__label">Payment condition</label>
+              <label for={`condition-${invoice.id}`} class="mny-inv__label">{t('books.payment_condition', locale)}</label>
               <textarea
                 id={`condition-${invoice.id}`}
                 rows="2"
-                placeholder="e.g. pays when the town hall pays them — says October"
+                placeholder={t('books.ph_condition', locale)}
                 value={invoice.payment_condition ?? ''}
                 onblur={(event) => updateCondition(invoice, event)}
               ></textarea>
@@ -324,17 +322,17 @@
                 disabled={!aging.expectedOn}
                 loading={$createFollowUp.isPending}
                 onclick={() => $createFollowUp.mutate(invoice)}
-              >Follow up later</Button>
+              >{t('books.follow_up', locale)}</Button>
             </div>
 
             <div class="mny-inv__progress-head">
               <span>
-                <span class="mny-inv__label">Collected</span>
+                <span class="mny-inv__label">{t('books.collected_cap', locale)}</span>
                 {fmtMoney(invoice.paid_amount)} / {fmtMoney(invoice.total)} {invoice.currency}
               </span>
               {#if invoice.status === 'issued' || invoice.status === 'paid'}
                 <Button size="xs" variant="outline" onclick={() => openPayment(invoice)}>
-                  Record payment
+                  {t('books.record_payment', locale)}
                 </Button>
               {/if}
             </div>
@@ -343,11 +341,11 @@
             </span>
 
             {#if invoice.payments.length > 0}
-              <ul class="mny-inv__payments" aria-label="Payments">
+              <ul class="mny-inv__payments" aria-label={t('books.payments', locale)}>
                 {#each invoice.payments as payment (payment.id)}
                   <li>
                     <span>{dayLabel(payment.received_on)}</span>
-                    <span>{METHOD_LABELS[payment.method]}</span>
+                    <span>{paymentMethodLabel(payment.method, locale)}</span>
                     <span>{payment.reference ?? '—'}</span>
                     <strong>{fmtMoney(payment.amount)} {invoice.currency}</strong>
                     <Button
@@ -356,29 +354,29 @@
                       tone="warn"
                       loading={$deletePayment.isPending}
                       onclick={() => $deletePayment.mutate(payment.id)}
-                    >Remove</Button>
+                    >{t('books.remove', locale)}</Button>
                   </li>
                 {/each}
               </ul>
             {:else}
-              <p class="mny-inv__empty">No payments recorded.</p>
+              <p class="mny-inv__empty">{t('books.no_payments', locale)}</p>
             {/if}
 
             <dl class="mny-inv__tax">
-              <div><dt>Subtotal</dt><dd>{fmtMoney(invoice.subtotal)} {invoice.currency}</dd></div>
+              <div><dt>{t('books.subtotal', locale)}</dt><dd>{fmtMoney(invoice.subtotal)} {invoice.currency}</dd></div>
               {#each invoice.tax_lines as tax (tax.id)}
                 <div>
                   <dt>{tax.label}{#if tax.kind !== 'exempt'} {tax.rate_pct}%{/if}</dt>
                   <dd>
                     {#if tax.kind === 'exempt'}
-                      exempt{#if tax.exempt_reason} · {tax.exempt_reason}{/if}
+                      {t('books.exempt', locale)}{#if tax.exempt_reason} · {tax.exempt_reason}{/if}
                     {:else}
                       {tax.kind === 'withhold' ? '−' : '+'} {fmtMoney(Math.abs(tax.amount))}
                     {/if}
                   </dd>
                 </div>
               {/each}
-              <div><dt>Total</dt><dd>{fmtMoney(invoice.total)} {invoice.currency}</dd></div>
+              <div><dt>{t('books.total', locale)}</dt><dd>{fmtMoney(invoice.total)} {invoice.currency}</dd></div>
             </dl>
           </div>
         {/if}
@@ -387,27 +385,27 @@
   </ul>
 {/if}
 
-<Dialog bind:open={paymentOpen} title="Record payment" size="s" onclose={() => (paymentInvoice = null)}>
+<Dialog bind:open={paymentOpen} title={t('books.record_payment', locale)} size="s" onclose={() => (paymentInvoice = null)}>
   {#if paymentInvoice}
     <p class="mny-inv__dialog-who">
-      {paymentInvoice.number ?? 'Invoice'} · {payerName(paymentInvoice)} ·
+      {paymentInvoice.number ?? t('books.invoice', locale)} · {payerName(paymentInvoice)} ·
       {fmtMoney(paymentInvoice.total)} {paymentInvoice.currency}
     </p>
     <div class="mny-inv__payment-form">
-      <Input label="Amount" type="number" bind:value={pAmount} required />
-      <Input label="Received on" type="date" bind:value={pReceivedOn} required />
+      <Input label={t('books.amount', locale)} type="number" bind:value={pAmount} required />
+      <Input label={t('books.received_on', locale)} type="date" bind:value={pReceivedOn} required />
       <Select
-        label="Method"
+        label={t('books.method', locale)}
         bind:value={pMethod}
-        options={PAYMENT_METHODS.map((method) => ({ value: method, label: METHOD_LABELS[method] }))}
+        options={PAYMENT_METHODS.map((method) => ({ value: method, label: paymentMethodLabel(method, locale) }))}
       />
-      <Input label="Reference" bind:value={pReference} placeholder="Optional" />
+      <Input label={t('books.reference', locale)} bind:value={pReference} placeholder={t('books.optional', locale)} />
     </div>
-    <Input label="Notes" bind:value={pNotes} placeholder="Optional" />
+    <Input label={t('books.notes', locale)} bind:value={pNotes} placeholder={t('books.optional', locale)} />
   {/if}
   {#snippet actions()}
-    <Button variant="outline" onclick={() => (paymentOpen = false)}>Cancel</Button>
-    <Button onclick={submitPayment} loading={$createPayment.isPending}>Record</Button>
+    <Button variant="outline" onclick={() => (paymentOpen = false)}>{t('create.cancel', locale)}</Button>
+    <Button onclick={submitPayment} loading={$createPayment.isPending}>{t('books.record', locale)}</Button>
   {/snippet}
 </Dialog>
 

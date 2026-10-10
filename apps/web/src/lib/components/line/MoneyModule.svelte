@@ -25,9 +25,17 @@
   import StateBadge from '$lib/components/StateBadge.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
   import { dayLabel, localDayISO } from '$lib/datetime';
-  import { fmtFee, fmtMoney, invoiceTone, totalsByCurrency } from '$lib/money';
-  import { CATEGORY_LABELS, EXPENSE_CATEGORIES, categoryLabel } from '$lib/expense';
-  import { performanceStatusLabel, performanceStatusTone } from '$lib/performance';
+  import {
+    boloStatusLabel,
+    fmtFee,
+    fmtMoney,
+    invoiceStatusLabel,
+    invoiceTone,
+    totalsByCurrency,
+  } from '$lib/money';
+  import { EXPENSE_CATEGORIES, categoryLabel } from '$lib/expense';
+  import { appLocale, t } from '$lib/i18n';
+  import { performanceStatusTone } from '$lib/performance';
 
   interface Props {
     line: {
@@ -84,6 +92,7 @@
   };
 
   const queryClient = useQueryClient();
+  const locale = appLocale();
 
   // ── Fees ──────────────────────────────────────────────────────────────
   const feesOptions = toStore(() => ({
@@ -155,7 +164,7 @@
   // ── Add expense dialog ────────────────────────────────────────────────
   const categoryOptions = EXPENSE_CATEGORIES.map((c) => ({
     value: c,
-    label: CATEGORY_LABELS[c],
+    label: categoryLabel(c, locale),
   }));
 
   let expOpen = $state(false);
@@ -196,8 +205,8 @@
     onError: (err) => {
       addToast({
         tone: 'danger',
-        title: 'Expense not added',
-        message: err instanceof Error ? err.message : 'Unexpected error',
+        title: t('books.expense_not_added', locale),
+        message: err instanceof Error ? err.message : t('perf.unexpected', locale),
       });
     },
   });
@@ -205,7 +214,7 @@
   function submitExpense() {
     const description = eDescription.trim();
     if (!description) {
-      addToast({ tone: 'warning', message: 'Description is required.' });
+      addToast({ tone: 'warning', message: t('books.description_required', locale) });
       return;
     }
     // type=number binds a number (or undefined on empty) through Svelte —
@@ -213,12 +222,12 @@
     const rawAmount = String(eAmount ?? '').trim();
     const amount = Number(rawAmount);
     if (rawAmount === '' || Number.isNaN(amount) || amount <= 0) {
-      addToast({ tone: 'warning', message: 'Amount must be a positive number.' });
+      addToast({ tone: 'warning', message: t('books.amount_positive', locale) });
       return;
     }
     const currency = eCurrency.trim().toUpperCase();
     if (!/^[A-Z]{3}$/.test(currency)) {
-      addToast({ tone: 'warning', message: 'Currency must be a 3-letter code (e.g. EUR).' });
+      addToast({ tone: 'warning', message: t('books.currency_code', locale) });
       return;
     }
     $createExpense.mutate({
@@ -238,37 +247,37 @@
     onError: (err) => {
       addToast({
         tone: 'danger',
-        title: 'Expense not removed',
-        message: err instanceof Error ? err.message : 'Unexpected error',
+        title: t('books.expense_not_removed', locale),
+        message: err instanceof Error ? err.message : t('perf.unexpected', locale),
       });
     },
   });
 </script>
 
 <section class="lmm">
-  <section class="lmm__section" aria-label="Fees">
-    <p class="eyebrow eyebrow--sub lmm__sub">Fees</p>
+  <section class="lmm__section" aria-label={t('books.fees', locale)}>
+    <p class="eyebrow eyebrow--sub lmm__sub">{t('books.fees', locale)}</p>
     {#if feesError}
       <p class="lmm__state lmm__state--danger">{feesError}</p>
     {:else if $feesQuery.isLoading}
-      <p class="lmm__state">Loading…</p>
+      <p class="lmm__state">{t('desk.loading', locale)}</p>
     {:else if fees.length === 0}
-      <p class="lmm__state">No deals on this line yet.</p>
+      <p class="lmm__state">{t('books.no_deals_line', locale)}</p>
     {:else}
       {#if allFeesNull}
-        <p class="lmm__state">Fees hidden or unset.</p>
+        <p class="lmm__state">{t('books.fees_hidden', locale)}</p>
       {:else}
         <div class="lmm__totals">
           <span class="lmm__total">
-            <span class="eyebrow eyebrow--sub lmm__total-label">pipeline</span>
+            <span class="eyebrow eyebrow--sub lmm__total-label">{t('books.pipeline', locale)}</span>
             {fmtMoney(totals.pipeline)}
           </span>
           <span class="lmm__total">
-            <span class="eyebrow eyebrow--sub lmm__total-label">invoiced</span>
+            <span class="eyebrow eyebrow--sub lmm__total-label">{t('books.invoiced', locale)}</span>
             {fmtMoney(totals.invoiced)}
           </span>
           <span class="lmm__total">
-            <span class="eyebrow eyebrow--sub lmm__total-label">collected</span>
+            <span class="eyebrow eyebrow--sub lmm__total-label">{t('books.collected', locale)}</span>
             {fmtMoney(totals.collected)}
           </span>
         </div>
@@ -277,10 +286,10 @@
         <table>
           <thead>
             <tr>
-              <th>Date</th>
-              <th>Status</th>
-              <th>Where</th>
-              <th>Fee</th>
+              <th>{t('perf.date', locale)}</th>
+              <th>{t('edit.status', locale)}</th>
+              <th>{t('books.where', locale)}</th>
+              <th>{t('books.fee', locale)}</th>
             </tr>
           </thead>
           <tbody>
@@ -288,11 +297,11 @@
               <tr>
                 <td class="lmm__cell-date">
                   {f.next_performed_at ? dayLabel(f.next_performed_at) : '—'}
-                  {#if f.function_count > 1}<span class="lmm__fn-count"> · {f.function_count} fns</span>{/if}
+                  {#if f.function_count > 1}<span class="lmm__fn-count"> · {t('books.fn_count', locale, { n: f.function_count })}</span>{/if}
                 </td>
                 <td>
                   <StateBadge
-                    label={performanceStatusLabel(f.status)}
+                    label={boloStatusLabel(f.status, locale)}
                     tone={performanceStatusTone(f.status)}
                   />
                 </td>
@@ -308,20 +317,20 @@
     {/if}
   </section>
 
-  <section class="lmm__section" aria-label="Invoices">
-    <p class="eyebrow eyebrow--sub lmm__sub">Invoices</p>
+  <section class="lmm__section" aria-label={t('books.invoices', locale)}>
+    <p class="eyebrow eyebrow--sub lmm__sub">{t('books.invoices', locale)}</p>
     {#if invoicesError}
       <p class="lmm__state lmm__state--danger">{invoicesError}</p>
     {:else if $invoicesQuery.isLoading}
-      <p class="lmm__state">Loading…</p>
+      <p class="lmm__state">{t('desk.loading', locale)}</p>
     {:else if lineInvoices.length === 0}
-      <p class="lmm__state">No invoices on this line yet.</p>
+      <p class="lmm__state">{t('books.no_invoices_line', locale)}</p>
     {:else}
       <ul class="lmm__invoices" role="list">
         {#each lineInvoices as inv (inv.id)}
           <li>
-            <span class="lmm__inv-number">{inv.number ?? 'no number'}</span>
-            <StateBadge label={inv.status} tone={invoiceTone(inv.status)} />
+            <span class="lmm__inv-number">{inv.number ?? t('books.no_number', locale)}</span>
+            <StateBadge label={invoiceStatusLabel(inv.status, locale)} tone={invoiceTone(inv.status)} />
             <span class="lmm__inv-total">{fmtMoney(inv.total)} {inv.currency}</span>
             <span class="lmm__cell-date">{dayLabel(inv.issued_on)}</span>
           </li>
@@ -330,44 +339,44 @@
     {/if}
   </section>
 
-  <section class="lmm__section" aria-label="Expenses">
+  <section class="lmm__section" aria-label={t('books.expenses', locale)}>
     <header class="lmm__section-head">
-      <p class="eyebrow eyebrow--sub lmm__sub">Expenses</p>
-      <Button size="xs" variant="outline" onclick={openExpense}>Add expense</Button>
+      <p class="eyebrow eyebrow--sub lmm__sub">{t('books.expenses', locale)}</p>
+      <Button size="xs" variant="outline" onclick={openExpense}>{t('books.add_expense', locale)}</Button>
     </header>
     {#if expensesError}
       <p class="lmm__state lmm__state--danger">{expensesError}</p>
     {:else if $expensesQuery.isLoading}
-      <p class="lmm__state">Loading…</p>
+      <p class="lmm__state">{t('desk.loading', locale)}</p>
     {:else if expenses.length === 0}
-      <p class="lmm__state">No expenses on this line yet.</p>
+      <p class="lmm__state">{t('books.no_expenses_line', locale)}</p>
     {:else}
       <div class="table-wrap">
         <table>
           <thead>
             <tr>
-              <th>Date</th>
-              <th>Category</th>
-              <th>Description</th>
-              <th>Amount</th>
-              <th aria-label="Actions"></th>
+              <th>{t('perf.date', locale)}</th>
+              <th>{t('books.category', locale)}</th>
+              <th>{t('books.description', locale)}</th>
+              <th>{t('books.amount', locale)}</th>
+              <th aria-label={t('books.actions', locale)}></th>
             </tr>
           </thead>
           <tbody>
             {#each expenses as e (e.id)}
               <tr>
                 <td class="lmm__cell-date">{e.incurred_on ? dayLabel(e.incurred_on) : '—'}</td>
-                <td class="lmm__cell-muted">{categoryLabel(e.category)}</td>
+                <td class="lmm__cell-muted">{categoryLabel(e.category, locale)}</td>
                 <td>{e.description}</td>
                 <td class="lmm__cell-amount">{fmtMoney(e.amount)} {e.currency}</td>
                 <td class="lmm__cell-actions">
                   <Menu
-                    label="Expense actions"
+                    label={t('books.expense_actions', locale)}
                     align="end"
                     triggerClass="btn--outline btn--xs"
                     items={[
                       {
-                        label: 'Remove',
+                        label: t('books.remove', locale),
                         danger: true,
                         onclick: () => $removeExpense.mutate(e.id),
                       },
@@ -380,18 +389,18 @@
         </table>
       </div>
       <p class="lmm__exp-total">
-        Total: {expenseTotals.map(([c, sum]) => `${fmtMoney(sum)} ${c}`).join(' · ')}
+        {t('books.total_label', locale)} {expenseTotals.map(([c, sum]) => `${fmtMoney(sum)} ${c}`).join(' · ')}
       </p>
     {/if}
   </section>
 </section>
 
-<Dialog bind:open={expOpen} title="Add expense" size="m">
+<Dialog bind:open={expOpen} title={t('books.add_expense', locale)} size="m">
   <div class="lmm__form-grid">
-    <Select label="Category" bind:value={eCategory} options={categoryOptions} />
-    <Input label="Description" bind:value={eDescription} required />
+    <Select label={t('books.category', locale)} bind:value={eCategory} options={categoryOptions} />
+    <Input label={t('books.description', locale)} bind:value={eDescription} required />
     <div class="field">
-      <label for="lmm-exp-amount">Amount<span aria-hidden="true"> *</span></label>
+      <label for="lmm-exp-amount">{t('books.amount', locale)}<span aria-hidden="true"> *</span></label>
       <input
         id="lmm-exp-amount"
         type="number"
@@ -401,13 +410,13 @@
         required
       />
     </div>
-    <Input label="Currency" bind:value={eCurrency} placeholder="EUR" />
-    <Input label="Date" type="date" bind:value={eDate} />
-    <Input label="Notes" bind:value={eNotes} placeholder="Optional" />
+    <Input label={t('books.currency', locale)} bind:value={eCurrency} placeholder="EUR" />
+    <Input label={t('perf.date', locale)} type="date" bind:value={eDate} />
+    <Input label={t('books.notes', locale)} bind:value={eNotes} placeholder={t('books.optional', locale)} />
   </div>
   {#snippet actions()}
-    <Button variant="outline" onclick={() => (expOpen = false)}>Cancel</Button>
-    <Button onclick={submitExpense} loading={$createExpense.isPending}>Add</Button>
+    <Button variant="outline" onclick={() => (expOpen = false)}>{t('create.cancel', locale)}</Button>
+    <Button onclick={submitExpense} loading={$createExpense.isPending}>{t('composer.add', locale)}</Button>
   {/snippet}
 </Dialog>
 
