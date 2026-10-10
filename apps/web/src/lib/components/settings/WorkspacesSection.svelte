@@ -661,7 +661,7 @@
   /* The page's generic .set-group__head stacks and rules its head; the access
      box is a framed panel, so its head reads across (name left, count right),
      inside the same padding as the invite row, whose top border is the rule. */
-  .set-access .set-access__head {
+  .set-group.set-access .set-access__head {
     flex-direction: row;
     align-items: end;
     justify-content: space-between;
