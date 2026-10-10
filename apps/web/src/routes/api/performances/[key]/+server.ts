@@ -24,6 +24,7 @@ import { pgErrorResponse } from '$lib/server/errors';
 import {
   SCHEDULE_SLOT_EMBED,
   applyTimeslotPatch,
+  reinterpretSlots,
   splitTimeslotPatch,
   timeslotsFromSlots,
   timeslotsOrdered,
@@ -31,6 +32,8 @@ import {
   type ScheduleSlotRow,
 } from '$lib/schedule-slot';
 
+/** The two clocks a running order can be typed in: its venue's, else home. */
+const CLOCK_EMBED = 'venue_id,venue:venue_id(timezone)';
 const ORDER_HINT = 'Timeslots must be ordered: load in ≤ soundcheck ≤ start ≤ load out ≤ wrap.';
 
 function json(body: unknown, status = 200): Response {
@@ -132,16 +135,26 @@ export const PATCH: RequestHandler = async ({ request, params, url, platform, lo
     // project is needed to guard relinks below).
     const lookup = new URLSearchParams();
     if (isUuid(key)) {
-      lookup.set('select', 'id,project_id,workspace_id');
+      lookup.set('select', `id,project_id,workspace_id,${CLOCK_EMBED},workspace:workspace_id(timezone)`);
       lookup.set('id', `eq.${key}`);
     } else {
-      lookup.set('select', 'id,project_id,workspace_id,workspace:workspace_id!inner(slug)');
+      lookup.set(
+        'select',
+        `id,project_id,workspace_id,${CLOCK_EMBED},workspace:workspace_id!inner(slug,timezone)`,
+      );
       lookup.set('slug', `eq.${key}`);
       lookup.set('workspace.slug', `eq.${ws}`);
     }
     lookup.set('deleted_at', 'is.null');
     lookup.set('limit', '1');
-    const found = await pgGet<{ id: string; project_id: string; workspace_id: string }>(
+    const found = await pgGet<{
+      id: string;
+      project_id: string;
+      workspace_id: string;
+      venue_id: string | null;
+      venue: { timezone: string | null } | null;
+      workspace: { timezone: string | null } | null;
+    }>(
       env,
       'performance',
       jwt,
@@ -151,6 +164,10 @@ export const PATCH: RequestHandler = async ({ request, params, url, platform, lo
     const id = found.data[0].id;
     const projectId = found.data[0].project_id;
     const workspaceId = found.data[0].workspace_id;
+    const homeTz = found.data[0].workspace?.timezone ?? null;
+    /** The running order's clock before this PATCH: the venue's, else home. */
+    const clockBefore = found.data[0].venue?.timezone ?? homeTz;
+    let clockAfter = clockBefore;
 
     // Relink guard — the create RPC enforces that conversation/line belong
     // to the performance's project; updates must hold the same invariant
@@ -180,26 +197,39 @@ export const PATCH: RequestHandler = async ({ request, params, url, platform, lo
     // one level up (ADR-049).
     if (patch.venue_id) {
       const check = new URLSearchParams();
-      check.set('select', 'id');
+      check.set('select', 'id,timezone');
       check.set('id', `eq.${patch.venue_id}`);
       check.set('workspace_id', `eq.${workspaceId}`);
       check.set('deleted_at', 'is.null');
       check.set('limit', '1');
-      const row = await pgGet<{ id: string }>(env, 'venue', jwt, { search: check });
+      const row = await pgGet<{ id: string; timezone: string | null }>(env, 'venue', jwt, {
+        search: check,
+      });
       if (row.data.length === 0) {
         return json(
           { error: 'cross_workspace_link', hint: "venue_id must belong to the performance's workspace." },
           400,
         );
       }
+      clockAfter = row.data[0].timezone ?? homeTz;
+    } else if ('venue_id' in patch) {
+      clockAfter = homeTz; // unlinked: back to the home space's clock
     }
+    // Relinked to a venue in another zone: the running order keeps its wall
+    // clock and gets new instants (`reinterpretSlots`). The only writer of
+    // that rule, so the screens never have to remember it.
+    const rezone =
+      clockBefore !== null && clockAfter !== null && clockBefore !== clockAfter
+        ? { from: clockBefore, to: clockAfter }
+        : null;
 
     const { timeslots, rest } = splitTimeslotPatch(patch);
 
     // The running order first (ADR-090). The order rule the old CHECK held
     // for the five fields is checked here, on the order that would result,
     // before anything is written.
-    if (Object.keys(timeslots).length > 0) {
+    let scheduleMoved = false;
+    if (Object.keys(timeslots).length > 0 || rezone) {
       const current = new URLSearchParams();
       current.set('select', 'id,kind,label,at,ends_at,sort,notes');
       current.set('performance_id', `eq.${id}`);
@@ -207,15 +237,21 @@ export const PATCH: RequestHandler = async ({ request, params, url, platform, lo
       const { data: slots } = await pgGet<ScheduleSlotRow>(env, 'schedule_slot', jwt, {
         search: current,
       });
-      const next = applyTimeslotPatch(slots, timeslots);
+      // Rezone first, then the explicit timeslots: a value in the body is
+      // already an instant and wins over the reinterpretation.
+      const base = rezone ? reinterpretSlots(slots, rezone.from, rezone.to) : slots;
+      const next = applyTimeslotPatch(base, timeslots);
       if (!timeslotsOrdered(timeslotsFromSlots(next.map((s, i) => ({ ...s, sort: i + 1 }))))) {
         return json({ error: 'constraint_violation', hint: ORDER_HINT }, 400);
       }
-      await pgPostRpc(env, 'replace_schedule_slots', jwt, {
-        p_target_table: 'performance',
-        p_target_id: id,
-        p_slots: next,
-      });
+      if (Object.keys(timeslots).length > 0 || slots.length > 0) {
+        await pgPostRpc(env, 'replace_schedule_slots', jwt, {
+          p_target_table: 'performance',
+          p_target_id: id,
+          p_slots: next,
+        });
+      }
+      scheduleMoved = Boolean(rezone) && slots.length > 0;
     }
 
     const search = new URLSearchParams();
@@ -248,7 +284,11 @@ export const PATCH: RequestHandler = async ({ request, params, url, platform, lo
             { search },
           );
     if (data.length === 0) return json({ error: 'not_found' }, 404);
-    return json({ performance: withTimeslots(data[0]) });
+    return json({
+      performance: withTimeslots(data[0]),
+      // The screen says the hours were moved to the new venue's clock.
+      ...(scheduleMoved && rezone ? { schedule_rezoned: rezone } : {}),
+    });
   } catch (err) {
     // 23514 = CHECK violation (country format, a slot ending before it
     // starts) → the caller sent an impossible combination, not a gateway

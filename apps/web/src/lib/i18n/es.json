@@ -440,6 +440,7 @@
   "planner.ro_out_of_time": "Va después de una hora más tardía",
   "planner.ro_yours": "tu hora",
   "planner.ro_zones": "Horas de {tz}; la pequeña de debajo es la tuya ({yours}).",
+  "planner.ro_rezoned": "La escaleta mantiene sus horas en el reloj del nuevo local ({from} → {to}).",
   "planner.no_cast": "sin reparto",
   "planner.agenda_from": "desde {day}",
   "planner.new_date": "Nueva fecha",

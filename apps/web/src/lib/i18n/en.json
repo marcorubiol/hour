@@ -449,6 +449,7 @@
   "planner.ro_out_of_time": "Listed after a later hour",
   "planner.ro_yours": "your time",
   "planner.ro_zones": "Hours in {tz}; the small one under each is yours ({yours}).",
+  "planner.ro_rezoned": "The running order keeps its hours on the new venue’s clock ({from} → {to}).",
   "planner.no_cast": "no cast",
   "planner.agenda_from": "from {day} onwards",
   "planner.new_date": "New date",

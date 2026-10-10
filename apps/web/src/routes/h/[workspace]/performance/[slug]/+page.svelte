@@ -166,18 +166,30 @@
 
   const patchMutation = createMutation({
     mutationFn: async (patch: PerformancePatch) => {
-      const body = await mutateJSON<{ performance?: unknown }>(
+      const body = await mutateJSON<{
+        performance?: unknown;
+        schedule_rezoned?: { from: string; to: string };
+      }>(
         'PATCH',
         `/api/performances/${encodeURIComponent(slug)}?ws=${encodeURIComponent(workspaceSlug)}`,
         patch,
       );
       if (!body?.performance) throw new Error('Unexpected response');
-      return body.performance;
+      return body;
     },
-    onSuccess: () => {
+    onSuccess: (body) => {
       dialogOpen = false;
       void queryClient.invalidateQueries({ queryKey: ['performance'] });
       void queryClient.invalidateQueries({ queryKey: ['planner-performances'] });
+      // Relinked to a venue in another zone: the running order kept its wall
+      // clock and moved to new instants (the PATCH does it). Say so.
+      if (body.schedule_rezoned) {
+        void queryClient.invalidateQueries({ queryKey: ['schedule'] });
+        addToast({
+          tone: 'info',
+          message: t('planner.ro_rezoned', locale, body.schedule_rezoned),
+        });
+      }
     },
     onError: (err) => {
       addToast({

@@ -12,6 +12,8 @@
  * PATCH that only moves the soundcheck.
  */
 
+import { instantToWallClock, wallClockToInstant } from './datetime';
+
 /** The five legacy timeslots, in their canonical order (ADR-023). */
 export const TIMESLOT_KINDS = [
   ['load_in', 'load_in_at'],
@@ -105,6 +107,26 @@ export function withSchedule<T extends { schedule_slot?: ScheduleSlotRow[] | nul
   row: T,
 ): Omit<T, 'schedule_slot'> & TimeslotFields & { schedule: ScheduleMoment[] } {
   return { ...withTimeslots(row), schedule: scheduleOf(row.schedule_slot) };
+}
+
+/**
+ * THE VENUE MOVED ZONE, THE CLOCK STAYS (Marco, 2026-10-10). A running order
+ * is typed in the venue's wall clock; relinking a gig to a venue in another
+ * timezone keeps «load-in at 10h» at 10h ON THE NEW VENUE'S CLOCK, which is
+ * a new instant. Same rule the details dialog used to apply to the five.
+ *
+ * Every slot's `at` and `ends_at` are read as wall time in `fromTz` and
+ * rewritten as that wall time in `toTz`. Ids, order and words are kept, so
+ * `replace_schedule_slots` diffs it as pure updates. Same zone → untouched.
+ */
+export function reinterpretSlots<T extends Pick<ScheduleSlotRow, 'at' | 'ends_at'>>(
+  slots: readonly T[],
+  fromTz: string,
+  toTz: string,
+): T[] {
+  if (fromTz === toTz) return [...slots];
+  const move = (iso: string) => wallClockToInstant(instantToWallClock(iso, fromTz), toTz) ?? iso;
+  return slots.map((s) => ({ ...s, at: move(s.at), ends_at: s.ends_at ? move(s.ends_at) : null }));
 }
 
 /** The subset of a PATCH body that names a timeslot (absent ≠ null). */
