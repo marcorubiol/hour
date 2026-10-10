@@ -354,10 +354,18 @@
                 {group.person?.full_name ?? '—'}
               {/if}
             </td>
-            <td class="cell--muted" data-label="Organization">
+            <td
+              class="cell--muted"
+              data-label="Organization"
+              data-empty={!group.person?.organization_name || undefined}
+            >
               {group.person?.organization_name ?? '—'}
             </td>
-            <td class="cell--meta" data-label="Location">{locationOf(representative)}</td>
+            <td
+              class="cell--meta"
+              data-label="Location"
+              data-empty={locationOf(representative) === '—' || undefined}>{locationOf(representative)}</td
+            >
             <td class="contact-projects" data-label="Conversations">
               {#each group.conversations as conversation (conversation.id)}
                 <button
@@ -368,7 +376,7 @@
                 >{conversation.project?.name ?? 'Conversation'}</button>
               {/each}
             </td>
-            <td class="last-contact" data-label="Last contact">
+            <td class="last-contact" data-label="Last contact" data-short={t('conversations.card_last', locale)}>
               <time
                 datetime={group.last_contacted_at ?? undefined}
                 title={contactTitle(group.last_contacted_at)}
@@ -855,32 +863,32 @@
          pseudo-elements: a grid would line the organization up with the
          date below it and open a hole in «Organization · City». Margins,
          not a row gap, so a line with nothing on it costs nothing. */
-      .conversation-table tbody tr {
+      :is(.conversation-table, .contact-table) tbody tr {
         display: flex;
         flex-wrap: wrap;
         align-items: baseline;
         column-gap: var(--space-s);
       }
-      .conversation-table tbody tr::before,
-      .conversation-table tbody tr::after {
+      :is(.conversation-table, .contact-table) tbody tr::before,
+      :is(.conversation-table, .contact-table) tbody tr::after {
         content: '';
         flex-basis: 100%;
       }
-      .conversation-table tbody tr::before {
+      :is(.conversation-table, .contact-table) tbody tr::before {
         order: 2;
       }
-      .conversation-table tbody tr::after {
+      :is(.conversation-table, .contact-table) tbody tr::after {
         order: 4;
       }
-      .conversation-table tbody td {
+      :is(.conversation-table, .contact-table) tbody td {
         display: block;
         inline-size: auto;
         padding-block: 0;
       }
-      .conversation-table tbody td::before {
+      :is(.conversation-table, .contact-table) tbody td::before {
         content: none;
       }
-      .conversation-table .cell--name {
+      :is(.conversation-table, .contact-table) .cell--name {
         order: 1;
         flex: 1 1 0;
         min-inline-size: 0;
@@ -897,8 +905,8 @@
       .conversation-table .cell--status :global(.menu) {
         inset-inline: auto 0;
       }
-      .conversation-table .cell--muted,
-      .conversation-table .cell--meta {
+      :is(.conversation-table, .contact-table) .cell--muted,
+      :is(.conversation-table, .contact-table) .cell--meta {
         order: 3;
         margin-block-start: var(--space-2xs);
         font-size: var(--text-s);
@@ -907,31 +915,45 @@
          missing datum is simply not on the line. */
       /* The dot takes the gap's place: the cell pulls back by the difference
          (the cell clips its overflow, so the dot cannot hang outside it). */
-      .conversation-table .cell--muted:not([data-empty]) + .cell--meta:not([data-empty]) {
+      :is(.conversation-table, .contact-table) .cell--muted:not([data-empty]) + .cell--meta:not([data-empty]) {
         margin-inline-start: calc(var(--space-xs) - var(--space-s));
       }
-      .conversation-table .cell--muted:not([data-empty]) + .cell--meta:not([data-empty])::before {
+      :is(.conversation-table, .contact-table) .cell--muted:not([data-empty]) + .cell--meta:not([data-empty])::before {
         content: '·';
         margin-inline-end: var(--space-xs);
         color: var(--text-faint);
       }
-      .conversation-table [data-empty] {
+      :is(.conversation-table, .contact-table) [data-empty] {
         display: none;
       }
-      .conversation-table .last-contact,
-      .conversation-table .cell--next {
+      :is(.conversation-table, .contact-table) .last-contact,
+      :is(.conversation-table, .contact-table) .cell--next {
         order: 5;
         margin-block-start: var(--space-xs);
       }
-      .conversation-table .cell--next {
+      :is(.conversation-table, .contact-table) .cell--next {
         flex: 1 1 0;
         min-inline-size: 0;
+      }
+      /* «By contact» (Marco, 2026-10-10): the same card, the project chips
+         taking the status's line role on the last line, before the date. */
+      .contact-table .contact-projects {
+        order: 5;
+        display: flex;
+        flex: 1 1 0;
+        flex-wrap: wrap;
+        gap: var(--space-2xs);
+        min-inline-size: 0;
+        margin-block-start: var(--space-xs);
+      }
+      .contact-table .contact-projects .project-chip {
+        margin: 0;
       }
       /* The two dates are the only data that do NOT explain themselves: «3 d
          ago» could be either. They keep a micro-label, short, inline, in the
          margin voice the old card used for every field. */
-      .conversation-table .last-contact::before,
-      .conversation-table .cell--next::before {
+      :is(.conversation-table, .contact-table) .last-contact::before,
+      :is(.conversation-table, .contact-table) .cell--next::before {
         content: attr(data-short);
         margin-inline-end: var(--space-xs);
         color: var(--text-faint);
@@ -941,7 +963,7 @@
         text-transform: uppercase;
       }
       /* Date and note on the one line, the note giving way first. */
-      .conversation-table .cell--next {
+      :is(.conversation-table, .contact-table) .cell--next {
         display: flex;
         align-items: baseline;
       }
