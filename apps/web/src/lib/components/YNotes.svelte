@@ -29,15 +29,20 @@
   import YProvider from 'y-partyserver/provider';
   import { IndexeddbPersistence } from 'y-indexeddb';
   import { getAccessToken, session } from '$lib/session.svelte';
+  import { appLocale, t, type Locale } from '$lib/i18n';
 
   interface Props {
     targetTable: CollabTarget;
     targetId: string;
     placeholder?: string;
     rows?: number;
+    /** The reader's language; defaults to the session's. */
+    locale?: Locale;
   }
 
-  let { targetTable, targetId, placeholder = 'Notes…', rows = 5 }: Props = $props();
+  let { targetTable, targetId, placeholder, rows = 5, locale = appLocale() }: Props = $props();
+
+  let shownPlaceholder = $derived(placeholder ?? t('perf.notes_placeholder_short', locale));
 
   let el: HTMLTextAreaElement | undefined = $state();
   let status = $state<'connecting' | 'live' | 'offline'>('connecting');
@@ -126,7 +131,7 @@
       peers = others.length;
       editingNames = others
         .filter(([, s]) => (s as { editing?: boolean }).editing)
-        .map(([, s]) => (s as { user?: { name?: string } }).user?.name ?? 'someone');
+        .map(([, s]) => (s as { user?: { name?: string } }).user?.name ?? t('perf.someone', locale));
     };
     awareness.on('change', onAwareness);
     onAwareness();
@@ -156,18 +161,18 @@
     <span class="ynotes__dot" aria-hidden="true"></span>
     <span class="ynotes__status">
       {#if status === 'live'}
-        live{#if peers > 0} · {peers + 1} here{/if}
+        {t('perf.notes_live', locale)}{#if peers > 0} · {t('perf.notes_here', locale, { n: peers + 1 })}{/if}
       {:else if status === 'offline'}
-        offline — edits sync on reconnect
+        {t('perf.notes_offline', locale)}
       {:else}
-        connecting…
+        {t('perf.notes_connecting', locale)}
       {/if}
     </span>
     {#if editingNames.length > 0}
-      <span class="ynotes__editing">{editingNames.join(', ')} editing</span>
+      <span class="ynotes__editing">{t('perf.notes_editing', locale, { names: editingNames.join(', ') })}</span>
     {/if}
   </div>
-  <textarea bind:this={el} {rows} {placeholder} aria-label="Notes"></textarea>
+  <textarea bind:this={el} {rows} placeholder={shownPlaceholder} aria-label={t('perf.notes', locale)}></textarea>
 </div>
 
 <style>

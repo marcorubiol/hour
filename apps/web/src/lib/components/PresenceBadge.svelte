@@ -13,13 +13,21 @@
    * in via opacity transition.
    */
 
+  import { appLocale, t } from '$lib/i18n';
+
   interface Props {
     count: number | null;
   }
 
   let { count = null }: Props = $props();
 
-  let label = $derived(count === 1 ? '1 online' : `${count} online`);
+  const locale = appLocale();
+
+  let label = $derived(
+    t(count === 1 ? 'perf.presence_online_one' : 'perf.presence_online_other', locale, {
+      n: count ?? 0,
+    }),
+  );
   let isAlone = $derived(count !== null && count <= 1);
 </script>
 
@@ -29,7 +37,9 @@
       .filter(Boolean)
       .join(' ')}
     aria-live="polite"
-    title={count > 1 ? `${count} users online in this workspace` : 'You are the only one here'}
+    title={count > 1
+      ? t('perf.presence_others', locale, { n: count })
+      : t('perf.presence_alone', locale)}
   >
     <span class="presence-badge__dot" aria-hidden="true"></span>
     <span class="presence-badge__label">{label}</span>

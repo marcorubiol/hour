@@ -33,7 +33,7 @@
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
   import { fetchJSON, mutateJSON } from '$lib/api';
-  import { t, type Locale } from '$lib/i18n';
+  import { LOCALES, t, type Locale } from '$lib/i18n';
   import { addToast } from './Toast.svelte';
   import type { ScheduleSlotInput, ScheduleSlotRow } from '$lib/schedule-slot';
   import {
@@ -94,8 +94,8 @@
   }
   /** Offered while typing: the five in the reader's language. */
   let offered = $derived(LEGACY_KINDS.map((k) => [k, kindWord(k)] as const));
-  /** Recognised when written: the five in all three languages, and synonyms. */
-  const known = recognisedWords((key, loc) => t(key, loc as Locale), ['ca', 'es', 'en']);
+  /** Recognised when written: the five in every language the app speaks, and synonyms. */
+  const known = recognisedWords((key, loc) => t(key, loc as Locale), LOCALES);
 
   /** The other hour, only when the reader's clock says something else. */
   function viewerClock(iso: string): string | null {

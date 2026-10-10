@@ -10,16 +10,21 @@
   import { createQuery } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
   import RoadsheetView from '$lib/components/RoadsheetView.svelte';
+  import { appLocale, t } from '$lib/i18n';
   import type { Roadsheet } from '$lib/roadsheet';
 
   type Response = { roadsheet: Roadsheet; venue_timezone: string | null };
 
   let token = $derived(page.params.token ?? '');
 
+  /** An anonymous reader: the browser's language if Hour speaks it (ca, es,
+      en, fr), else English. That is exactly `appLocale()`. */
+  const locale = appLocale();
+
   async function fetchPublic(url: string, signal: AbortSignal): Promise<Response> {
     const res = await fetch(url, { signal });
     if (res.status === 404) throw new Error('gone');
-    if (!res.ok) throw new Error(`Error ${res.status}`);
+    if (!res.ok) throw new Error(t('roadsheet.error_status', locale, { status: res.status }));
     return (await res.json()) as Response;
   }
 
@@ -46,22 +51,22 @@
 </script>
 
 <svelte:head>
-  <title>{sheet ? `${sheet.title} — Road sheet` : 'Road sheet'} — Hour</title>
+  <title>{sheet ? `${sheet.title} — ${t('roadsheet.title', locale)}` : t('roadsheet.title', locale)} — Hour</title>
   <meta name="robots" content="noindex" />
 </svelte:head>
 
 <main class="prs">
   {#if loading}
-    <p class="prs__state">Loading…</p>
+    <p class="prs__state">{t('desk.loading', locale)}</p>
   {:else if gone}
     <div class="prs__gone">
-      <h1>This link is no longer active</h1>
-      <p>Ask whoever sent it for a fresh one.</p>
+      <h1>{t('roadsheet.gone_title', locale)}</h1>
+      <p>{t('roadsheet.gone_body', locale)}</p>
     </div>
   {:else if errorMsg}
     <p class="prs__state prs__state--danger">{errorMsg}</p>
   {:else if sheet}
-    <RoadsheetView {sheet} {venueTz} />
+    <RoadsheetView {sheet} {venueTz} {locale} />
   {/if}
 </main>
 
