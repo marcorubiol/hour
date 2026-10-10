@@ -1330,6 +1330,21 @@ entre empresas sin construirlo.
   rail ocupa ~250 px y el shell entero desborda en un móvil. Pesa más ahora que
   Anouk va a usar Conversations; es diseño (dónde va el rail en móvil), parte del
   «Polish de beta» de abajo.
+  **Primera versión en `claude/mobile-shell` (2026-10-10), pendiente de que Marco
+  la corrija.** Por debajo de 48rem (el corte que ya usaba el proyecto) el rail
+  es un **cajón** desde la izquierda, con el mismo contenido y el mismo orden
+  (reloj que lleva a casa, calma, pulse, scopes, ⌘K); se abre con un botón en la
+  celda izquierda de la barra superior, que estaba vacía, y se cierra con el
+  fondo, Escape o al navegar. Se eligió cajón y no barra inferior porque el rail
+  no son destinos de navegación sino mobiliario (ADR-096): el pulse y los scopes
+  no caben en una barra, y las lentes ya tienen su selector en la cabecera. El
+  esqueleto muerto del `Sidebar` de mayo pasa a ser el contrato `.drawer` de
+  `base.css`; el gutter del shell es una sola variable (`--shell-gutter`). En
+  la cabecera de lente el selector baja bajo el título. Escritorio idéntico
+  píxel a píxel a 1440. Queda fuera: Ajustes en móvil (su nav se oculta y las
+  filas desbordan), la agenda del Planner (la columna de semana se apila en
+  tres líneas) y las tarjetas de Conversations, que gastan media anchura en
+  etiquetas.
 
 - [ ] **Poll de fechas candidatas (à la Doodle/When2meet, integrado).** Al buscar
   fecha para una residencia, un ensayo o una reunión, proponer **varias `date`
