@@ -6,6 +6,9 @@
   import ThemeToggle from '$lib/components/ThemeToggle.svelte';
   import { useTheme } from '$lib/theme.svelte';
   import { clearSession, session } from '$lib/session.svelte';
+  import { createQuery } from '@tanstack/svelte-query';
+  import { meQueryOptions } from '$lib/nav-queries';
+  import { userDisplayName as displayNameFor } from '$lib/utils/identity';
 
   interface Props {
     /** Current URL's workspace segment — Avatar-name fallback of last resort. */
@@ -23,11 +26,12 @@
 
   const theme = useTheme();
 
-  // Identity from the session store (display name → email local-part).
-  // The JWT is httpOnly now — the server decoded it in /api/auth/session.
+  // Identity: the person's stored name (user_profile.full_name via /api/me),
+  // then the session's auth-metadata name, then the email local-part.
+  const meQuery = createQuery(meQueryOptions());
   let userEmail = $derived(session.user?.email ?? '');
   let userDisplayName = $derived(
-    session.user?.name ?? session.user?.email?.split('@')[0] ?? '',
+    displayNameFor($meQuery.data?.full_name, session.user?.name, session.user?.email),
   );
 
   // Theme style picker — accordion inside the account menu.
