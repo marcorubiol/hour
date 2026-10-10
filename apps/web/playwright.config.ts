@@ -53,7 +53,10 @@ export default defineConfig({
   reporter: process.env.CI ? [['github'], ['html', { open: 'never' }]] : 'list',
   use: {
     baseURL: BASE_URL,
-    trace: 'on-first-retry',
+    // A red that passes alone is only diagnosable from the run it happened
+    // in. Locally there are no retries, so `on-first-retry` never recorded
+    // anything: the 2026-10-10 planner-laws reds left no trace behind.
+    trace: 'retain-on-failure',
     // Timezone rule: timeslot entry resolves to the workspace's home zone
     // when no venue is linked. Pin the browser zone to the seed
     // workspace's so time assertions are deterministic on any runner.

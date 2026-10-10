@@ -34,7 +34,16 @@ async function planner(page: Page, view: string, extra = '') {
   await page.goto(`/h/planner?view=${view}&scope=${SPACE}${extra}`);
   // The lens holds aria-busy until every feed of this view has answered.
   await waitForLoaded(page);
-  await page.waitForTimeout(1200);
+  // THESE LAWS ARE GEOMETRY, AND GEOMETRY NEEDS THE PAGE'S OWN TYPE. A wrap,
+  // a clipped name or a tile height measured in a fallback face is a fact
+  // about the wrong font. This used to be a flat 1.2 s sleep: a guess about
+  // how long fonts and layout take, paid on every load whether it was enough
+  // or not. The two things it stood for are both observable: the fonts the
+  // page uses have arrived, and one frame has been laid out after them.
+  await page.evaluate(async () => {
+    await document.fonts.ready;
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+  });
 }
 
 test.describe('planner laws (ADR-095)', () => {
@@ -204,7 +213,7 @@ test.describe('planner laws (ADR-095)', () => {
 
     await planner(page, 'board');
     await expect(page.locator('.cal__dial')).toHaveCount(1);
-    expect(page.url()).toContain('lanes=');
+    await expect(page).toHaveURL(/lanes=/);
   });
 
   test('THE PLANNER HAS NO FILTER — narrowing is scope, and only scope', async ({ page }) => {
@@ -276,7 +285,9 @@ test.describe('planner laws (ADR-095)', () => {
     for (const view of ['day', 'month', 'agenda', 'board']) {
       await planner(page, view);
       await page.reload();
-      await page.waitForTimeout(1000);
+      // Asked once the reloaded lens has mounted and settled: anything that
+      // would rewrite the URL on the way in has run by then.
+      await waitForLoaded(page);
       expect(page.url(), `${view} did not survive the reload`).toContain(`view=${view}`);
     }
   });
@@ -284,8 +295,8 @@ test.describe('planner laws (ADR-095)', () => {
   test('A LEGACY LINK STILL OPENS — carrils/espai are translated, once', async ({ page }) => {
     // A link somebody sent last month is not a bug.
     await page.goto(`/h/planner?view=carrils&group=persona&scope=${SPACE}`);
-    await page.waitForTimeout(1500);
-    expect(page.url()).toContain('view=board');
+    await waitForLoaded(page);
+    await expect(page).toHaveURL(/view=board/);
     expect(page.url()).toContain('lanes=person');
     expect(page.url(), 'the old vocabulary was written back').not.toContain('group=');
   });
@@ -466,40 +477,92 @@ test.describe('the clash', () => {
 test.describe('the diary', () => {
   test.skip(!EMAIL || !PASSWORD, 'Set PW_TEST_EMAIL / PW_TEST_PASSWORD.');
 
+  /**
+   * A PULL IS ONLY HEARD ON A DIARY AT REST.
+   *
+   * The diary has two loaders and ONE latch: the look-ahead (which runs on
+   * its own as soon as the book opens and its tail is in reach) and the
+   * past's door. While the look-ahead holds the latch, a pull at the top is
+   * dropped without a word: the door says «loading…» for a beat and goes
+   * back to «earlier months». The old flat sleeps (1.2 s after the load,
+   * then 0.4 s of release quiet) happened to outlast the look-ahead on a
+   * fast day, and lost the race on a slow one. Seen here with every API
+   * call delayed 800 ms: one red in three, door idle, nothing loaded.
+   *
+   * So the gesture waits for the look-ahead's answer, which the page prints:
+   * the book's last line becomes «nothing more planned». That is a fact
+   * about THIS workspace (its future is empty, or ends within reach of the
+   * tail); a diary whose plan runs on past the reach never prints it, and
+   * this would then fail loudly by name instead of guessing.
+   */
+  async function lookAheadAnswered(page: Page) {
+    await expect(
+      page.locator('.ag > .ag__end:last-child'),
+      'the look-ahead never answered',
+    ).toBeAttached({ timeout: 0 });
+  }
+
   test('IT OPENS AT TODAY AND GROWS ONE MONTH PER GESTURE — never runs away', async ({ page }) => {
     // A flick of the wheel used to fetch 822 days: `html` carries
     // `scroll-behavior: smooth`, so the anchoring correction ANIMATED, never
     // landed before the next prepend measured, and the reader stayed pinned
     // at the top with the sentinel permanently in view.
     await planner(page, 'agenda');
-    const span = () =>
-      page.evaluate(() => {
-        const d = [...document.querySelectorAll('[data-day]')]
+    const days = () =>
+      page.evaluate(() =>
+        [...document.querySelectorAll('[data-day]')]
           .map((e) => (e as HTMLElement).dataset.day ?? '')
-          .sort();
-        return { n: d.length, first: d[0] ?? '', y: Math.round(window.scrollY) };
-      });
-    const start = await span();
+          .sort(),
+      );
+    const start = await days();
     // Opens on today, not on two years of history.
-    expect(start.n, 'the diary opened with a runaway span').toBeLessThan(200);
+    expect(start.length, 'the diary opened with a runaway span').toBeLessThan(200);
 
+    // THE GESTURE IS ANSWERED WHEN THE DOOR CLOSES, NOT WHEN A CLOCK RUNS
+    // OUT. This slept 1.8 s and then counted, and the pull it measures is
+    // network: the quiet that counts as the hand coming off, a probe for
+    // where history begins, the primed rows, and only then the anchored
+    // prepend. That is three round trips that do not raise `aria-busy` on
+    // purpose (the window moves only once its rows are in hand), so on a
+    // slow afternoon in production the count was taken before the answer
+    // came: «scrolling up loaded nothing», red in 6.4 s, green alone.
+    // Reproduced by delaying each API call 800 ms: red twice out of two.
+    //
+    // The answer is visible. `.ag__earlier` is the past's door; once the
+    // pull has been served the page knows nothing lies further back, and
+    // the door is not drawn at all. Its leaving is also AFTER the anchoring
+    // correction, so the scroll position read below is the settled one.
+    const door = page.locator('.ag__earlier');
+    await expect(door, 'the diary has no door to the past').toHaveCount(1);
+    await lookAheadAnswered(page);
     await page.mouse.move(800, 500);
     await page.mouse.wheel(0, -600);
-    await page.waitForTimeout(1800);
-    const back = await span();
-    expect(back.n, 'scrolling up loaded nothing').toBeGreaterThan(start.n);
-    expect(back.n - start.n, 'one gesture fetched more than two months').toBeLessThan(70);
+    await expect(door, 'the pull was never answered').toHaveCount(0, { timeout: 0 });
+
+    // Counted against the first day the diary opened with, not against the
+    // total: the tail grows on its own (the look ahead) and is not this
+    // gesture's doing.
+    const earlier = (await days()).filter((d) => d < start[0]).length;
+    expect(earlier, 'scrolling up loaded nothing').toBeGreaterThan(0);
+    expect(earlier, 'one gesture fetched more than two months').toBeLessThan(70);
     // …and the reader was pinned to their row rather than thrown backwards.
-    expect(back.y, 'the prepend was not anchored').toBeGreaterThan(0);
+    const y = await page.evaluate(() => Math.round(window.scrollY));
+    expect(y, 'the prepend was not anchored').toBeGreaterThan(0);
   });
 
   test('`NOW` LANDS ON TODAY', async ({ page }) => {
     // A long smooth journey across a diary that is loading while it runs can
     // be cut short by one anchoring correction — measured 5.760px short.
     await planner(page, 'agenda');
+    // History first, then `Now`: the journey only exists once the past has
+    // been loaded. Waited on as the door closing (see the law above), not on
+    // a 1.5 s sleep that a slow pull outlasts.
+    const door = page.locator('.ag__earlier');
+    await expect(door, 'the diary has no door to the past').toHaveCount(1);
+    await lookAheadAnswered(page);
     await page.mouse.move(800, 500);
     await page.mouse.wheel(0, -600);
-    await page.waitForTimeout(1500);
+    await expect(door, 'the pull was never answered').toHaveCount(0, { timeout: 0 });
     await page.click('.cal__now');
     const measure = () =>
       page.evaluate(() => {
