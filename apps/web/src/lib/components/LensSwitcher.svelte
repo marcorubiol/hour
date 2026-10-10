@@ -114,4 +114,12 @@
     background: var(--text-color);
     color: var(--bg);
   }
+  /* On a phone the four have to fit one measure (390 less the gutters):
+     the pills keep their shape and give up half their side air. */
+  @media (max-width: 47.999rem) {
+    .lensswitch__home,
+    .lensswitch button {
+      padding-inline: var(--space-s);
+    }
+  }
 </style>
