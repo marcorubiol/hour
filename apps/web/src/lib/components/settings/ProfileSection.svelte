@@ -8,6 +8,7 @@
   import { meQueryOptions, workspacesQueryOptions } from '$lib/nav-queries';
   import { addToast } from '$lib/components/Toast.svelte';
   import { t, appLocale } from '$lib/i18n';
+  import MailSignature from './MailSignature.svelte';
 
   const locale = appLocale();
 
@@ -87,6 +88,7 @@
   }
 
   let myWorkspaces = $derived($workspacesQuery.data?.items ?? []);
+  let currentWorkspaceId = $derived(myWorkspaces.find((w) => w.slug === workspaceSlug)?.id);
   let sharedByWorkspace = $derived(
     new Map(($meQuery.data?.dossiers ?? []).map((d) => [d.workspace_id, d])),
   );
@@ -189,6 +191,8 @@
     </div>
   </div>
 </section>
+
+<MailSignature scope="personal" workspaceId={currentWorkspaceId} />
 
 <section class="set-group">
   <div class="set-group__head">

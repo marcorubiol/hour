@@ -104,6 +104,11 @@
   // ── Componer: responder a un correo (replyTo) o uno nuevo ('new') ──
   let composing = $state<string | null>(null);
   let fromAccount = $state('');
+  /** Con qué firma sale: la tuya en este espacio, o la de la compañía desde el común. */
+  let fromSignature = $derived.by(() => {
+    const scope = sendable.find((a) => a.id === fromAccount)?.scope;
+    return scope ? ($mailQuery.data?.signatures?.[scope] ?? '') : '';
+  });
   let subject = $state('');
   let body = $state('');
 
@@ -396,8 +401,8 @@
       <input type="text" maxlength="500" bind:value={subject} required />
     </label>
     <textarea rows="5" maxlength="20000" aria-label={t('mail.body', locale)} bind:value={body} required></textarea>
-    {#if sendable.find((a) => a.id === fromAccount)?.signature}
-      <p class="reply__sig">-- <br />{sendable.find((a) => a.id === fromAccount)?.signature}</p>
+    {#if fromSignature}
+      <p class="reply__sig">-- <br />{fromSignature}</p>
     {/if}
     <div class="reply__row">
       <span class="muted">{t('mail.send_hint', locale, { address: sendable.find((a) => a.id === fromAccount)?.address ?? '' })}</span>

@@ -3142,13 +3142,16 @@ export type Database = {
           id: string
           kind: Database["public"]["Enums"]["workspace_kind"]
           logo_url: string | null
+          mail_signature: string | null
           name: string
           new_conversations_private: boolean
+          phone: string | null
           previous_slugs: string[]
           settings: Json
           slug: string
           timezone: string
           updated_at: string
+          website: string | null
         }
         Insert: {
           accent?: string | null
@@ -3165,13 +3168,16 @@ export type Database = {
           id?: string
           kind?: Database["public"]["Enums"]["workspace_kind"]
           logo_url?: string | null
+          mail_signature?: string | null
           name: string
           new_conversations_private?: boolean
+          phone?: string | null
           previous_slugs?: string[]
           settings?: Json
           slug: string
           timezone?: string
           updated_at?: string
+          website?: string | null
         }
         Update: {
           accent?: string | null
@@ -3188,13 +3194,16 @@ export type Database = {
           id?: string
           kind?: Database["public"]["Enums"]["workspace_kind"]
           logo_url?: string | null
+          mail_signature?: string | null
           name?: string
           new_conversations_private?: boolean
+          phone?: string | null
           previous_slugs?: string[]
           settings?: Json
           slug?: string
           timezone?: string
           updated_at?: string
+          website?: string | null
         }
         Relationships: [
           {
@@ -3371,6 +3380,7 @@ export type Database = {
           created_at: string
           id: string
           invited_by: string | null
+          mail_signature: string | null
           role: Database["public"]["Enums"]["membership_role"]
           updated_at: string
           user_id: string
@@ -3381,6 +3391,7 @@ export type Database = {
           created_at?: string
           id?: string
           invited_by?: string | null
+          mail_signature?: string | null
           role?: Database["public"]["Enums"]["membership_role"]
           updated_at?: string
           user_id: string
@@ -3391,6 +3402,7 @@ export type Database = {
           created_at?: string
           id?: string
           invited_by?: string | null
+          mail_signature?: string | null
           role?: Database["public"]["Enums"]["membership_role"]
           updated_at?: string
           user_id?: string
@@ -4539,13 +4551,16 @@ export type Database = {
           id: string
           kind: Database["public"]["Enums"]["workspace_kind"]
           logo_url: string | null
+          mail_signature: string | null
           name: string
           new_conversations_private: boolean
+          phone: string | null
           previous_slugs: string[]
           settings: Json
           slug: string
           timezone: string
           updated_at: string
+          website: string | null
         }
         SetofOptions: {
           from: "*"
@@ -4924,6 +4939,18 @@ export type Database = {
         }
         Returns: undefined
       }
+      my_mail_signature: {
+        Args: { p_workspace_id: string }
+        Returns: {
+          company_name: string
+          company_phone: string
+          company_signature: string
+          company_website: string
+          full_name: string
+          signature: string
+          title: string
+        }[]
+      }
       next_invoice_number: {
         Args: {
           p_doc_type: string
@@ -5188,6 +5215,10 @@ export type Database = {
         Args: { p_account_id: string; p_signature: string }
         Returns: undefined
       }
+      set_my_mail_signature: {
+        Args: { p_signature: string; p_workspace_id: string }
+        Returns: undefined
+      }
       share_my_profile_with_workspace: {
         Args: { p_fields?: string[]; p_workspace_id: string }
         Returns: {
@@ -5422,13 +5453,16 @@ export type Database = {
           id: string
           kind: Database["public"]["Enums"]["workspace_kind"]
           logo_url: string | null
+          mail_signature: string | null
           name: string
           new_conversations_private: boolean
+          phone: string | null
           previous_slugs: string[]
           settings: Json
           slug: string
           timezone: string
           updated_at: string
+          website: string | null
         }
         SetofOptions: {
           from: "*"
