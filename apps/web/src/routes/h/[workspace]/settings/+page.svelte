@@ -88,7 +88,7 @@
   {/if}
 
   {#if active === 'privacy'}
-    <PrivacySection />
+    <PrivacySection workspaceId={currentWorkspace?.id} />
   {/if}
 
   {#if active === 'languages'}

@@ -1508,7 +1508,7 @@
   "mail.not_configured": "Email is not enabled on this Hour server yet.",
   "mail.reads_kicker": "What Hour reads",
   "mail.reads_in": "Comes in",
-  "mail.reads_in_body": "Emails sent to and received from an address that is already a Hour contact, matched by exact address, from 60 days before connecting.",
+  "mail.reads_in_body": "Emails sent to and received from an address that is already a Hour contact, matched by exact address. For each contact, the last 12 months; also when you add them later.",
   "mail.reads_out": "Stays out",
   "mail.reads_out_body": "Everything else. Hour only asks your mailbox about your contacts' addresses: the rest is neither read nor stored.",
   "mail.reads_who": "Who sees it",
@@ -1572,5 +1572,16 @@
   "mail.send_hint": "Leaves from {address} and stays in the record.",
   "mail.sent": "Sent",
   "mail.not_sent": "Not sent",
-  "conversations.open_full": "Open the conversation, with its emails"
+  "conversations.open_full": "Open the conversation, with its emails",
+  "mail.signature": "Signature",
+  "mail.signature_saved": "Signature saved",
+  "mail.signature_save": "Save signature",
+  "mail.signature_personal": "Your Hour signature: it goes under what you send from this mailbox.",
+  "mail.signature_shared": "The space's signature: it goes under what is sent from the shared mailbox.",
+  "settings.conv_privacy_kicker": "Conversations",
+  "settings.conv_privacy_label": "New conversations start",
+  "settings.conv_privacy_hint": "Private: only their creator sees them, emails included. Everyone can share their own later. Existing ones do not change.",
+  "settings.conv_privacy_private": "Private",
+  "settings.conv_privacy_shared": "Shared",
+  "settings.conv_privacy_admin_only": "A space admin decides."
 }

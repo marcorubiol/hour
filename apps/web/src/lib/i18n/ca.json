@@ -1499,7 +1499,7 @@
   "mail.not_configured": "El correu encara no està activat en aquest servidor de Hour.",
   "mail.reads_kicker": "Què llegeix Hour",
   "mail.reads_in": "Entra",
-  "mail.reads_in_body": "Els correus enviats i rebuts amb una adreça que ja és en un contacte de Hour, aparellats per adreça exacta, des de 60 dies abans de connectar.",
+  "mail.reads_in_body": "Els correus enviats i rebuts amb una adreça que ja és en un contacte de Hour, aparellats per adreça exacta. De cada contacte, els darrers 12 mesos; també si l'afegeixes després.",
   "mail.reads_out": "No entra",
   "mail.reads_out_body": "Tota la resta. Hour només pregunta a la teva bústia per les adreces dels teus contactes: la resta no es llegeix ni es guarda.",
   "mail.reads_who": "Qui ho veu",
@@ -1563,5 +1563,16 @@
   "mail.send_hint": "Surt de {address} i queda al registre.",
   "mail.sent": "Enviat",
   "mail.not_sent": "No s'ha enviat",
-  "conversations.open_full": "Obrir la conversa, amb els seus correus"
+  "conversations.open_full": "Obrir la conversa, amb els seus correus",
+  "mail.signature": "Signatura",
+  "mail.signature_saved": "Signatura desada",
+  "mail.signature_save": "Desar signatura",
+  "mail.signature_personal": "La teva signatura de Hour: va al peu del que envies des d'aquesta bústia.",
+  "mail.signature_shared": "Signatura de l'espai: va al peu del que s'envia des de la bústia comuna.",
+  "settings.conv_privacy_kicker": "Converses",
+  "settings.conv_privacy_label": "Les converses noves neixen",
+  "settings.conv_privacy_hint": "Privades: només les veu qui les crea, amb els seus correus. Cada persona pot compartir després les seves. Les que ja existeixen no canvien.",
+  "settings.conv_privacy_private": "Privades",
+  "settings.conv_privacy_shared": "Compartides",
+  "settings.conv_privacy_admin_only": "Ho decideix un admin de l'espai."
 }

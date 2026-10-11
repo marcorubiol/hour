@@ -396,6 +396,9 @@
       <input type="text" maxlength="500" bind:value={subject} required />
     </label>
     <textarea rows="5" maxlength="20000" aria-label={t('mail.body', locale)} bind:value={body} required></textarea>
+    {#if sendable.find((a) => a.id === fromAccount)?.signature}
+      <p class="reply__sig">-- <br />{sendable.find((a) => a.id === fromAccount)?.signature}</p>
+    {/if}
     <div class="reply__row">
       <span class="muted">{t('mail.send_hint', locale, { address: sendable.find((a) => a.id === fromAccount)?.address ?? '' })}</span>
       <span class="reply__btns">
@@ -670,6 +673,12 @@
       font: inherit;
       font-size: var(--text-s);
       resize: vertical;
+    }
+    .reply__sig {
+      margin: 0;
+      color: var(--text-faint);
+      font-size: var(--text-xs);
+      white-space: pre-line;
     }
     .reply__row {
       display: flex;

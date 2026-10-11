@@ -1499,7 +1499,7 @@
   "mail.not_configured": "L'e-mail n'est pas encore activé sur ce serveur Hour.",
   "mail.reads_kicker": "Ce que lit Hour",
   "mail.reads_in": "Entre",
-  "mail.reads_in_body": "Les e-mails envoyés et reçus avec une adresse déjà présente dans un contact Hour, appariés par adresse exacte, depuis 60 jours avant la connexion.",
+  "mail.reads_in_body": "Les e-mails envoyés et reçus avec une adresse déjà présente dans un contact Hour, appariés par adresse exacte. Pour chaque contact, les 12 derniers mois ; aussi s'il est ajouté plus tard.",
   "mail.reads_out": "N'entre pas",
   "mail.reads_out_body": "Tout le reste. Hour ne demande à votre boîte que les adresses de vos contacts : le reste n'est ni lu ni conservé.",
   "mail.reads_who": "Qui le voit",
@@ -1563,5 +1563,16 @@
   "mail.send_hint": "Part de {address} et reste dans le registre.",
   "mail.sent": "Envoyé",
   "mail.not_sent": "Non envoyé",
-  "conversations.open_full": "Ouvrir la conversation, avec ses e-mails"
+  "conversations.open_full": "Ouvrir la conversation, avec ses e-mails",
+  "mail.signature": "Signature",
+  "mail.signature_saved": "Signature enregistrée",
+  "mail.signature_save": "Enregistrer la signature",
+  "mail.signature_personal": "Votre signature Hour : elle va sous ce que vous envoyez depuis cette boîte.",
+  "mail.signature_shared": "Signature de l'espace : elle va sous ce qui est envoyé depuis la boîte commune.",
+  "settings.conv_privacy_kicker": "Conversations",
+  "settings.conv_privacy_label": "Les nouvelles conversations naissent",
+  "settings.conv_privacy_hint": "Privées : seul leur créateur les voit, e-mails compris. Chacun peut ensuite partager les siennes. Celles qui existent ne changent pas.",
+  "settings.conv_privacy_private": "Privées",
+  "settings.conv_privacy_shared": "Partagées",
+  "settings.conv_privacy_admin_only": "Un admin de l'espace décide."
 }
