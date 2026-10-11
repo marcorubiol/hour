@@ -1,7 +1,13 @@
 <script lang="ts">
   /**
    * Pantalla 1: una conversación de difusión con su historial unificado.
-   * Dos lecturas para decidir ADR-099 §5:
+   *
+   * Repaso del 2026-10-11 (`research/product/2026-10-11-comms-conversacion-repaso.md`):
+   * al abrir una conversación la pregunta es «¿dónde estamos y qué toca?», así
+   * que lo primero es la situación (siguiente paso, turno, último contacto,
+   * quién la lleva) y, al lado del registro, el trato en juego. El registro y
+   * lo que el equipo habla por dentro siguen teniendo las dos lecturas para
+   * decidir ADR-099 §5:
    *  - «aparte»: lo hablado con fuera es registro (`conversation_event`) y lo
    *    que el equipo dice por dentro va en su propio hilo, al lado;
    *  - «hilo»: todo en un solo hilo, como ADR-083 §1 al pie de la letra.
@@ -9,9 +15,21 @@
   import { page } from '$app/state';
   import { goto } from '$app/navigation';
   import Avatar from '$lib/components/Avatar.svelte';
-  import Badge from '$lib/components/Badge.svelte';
   import Button from '$lib/components/Button.svelte';
-  import { MAILBOXES, conversation as c, record, team, type RecordEvent, type TeamComment } from './data';
+  import StateBadge from '$lib/components/StateBadge.svelte';
+  import { statusBadgeClass } from '$lib/conversation';
+  import { isHoldStatus, performanceStatusTone } from '$lib/performance';
+  import {
+    MAILBOXES,
+    TODAY,
+    conversation as c,
+    deal,
+    record,
+    team,
+    type Mailbox,
+    type RecordEvent,
+    type TeamComment,
+  } from './data';
 
   type Reading = 'aparte' | 'hilo';
   let reading = $derived<Reading>(page.url.searchParams.get('lectura') === 'hilo' ? 'hilo' : 'aparte');
@@ -24,7 +42,7 @@
   let privada = $state(false);
   let open = $state<Set<string>>(new Set(['e7']));
   let replyTo = $state<string | null>(null);
-  let replyFrom = $state<'anouk' | 'comun'>('anouk');
+  let replyFrom = $state<Mailbox>('anouk');
   let sentNote = $state(false);
 
   function toggle(id: string) {
@@ -40,6 +58,9 @@
     open = new Set(open).add(e.id);
   }
 
+  /** El buzón de quien la lleva: el registro solo nombra el buzón cuando es otro. */
+  const HOME_MAILBOX: Mailbox = 'anouk';
+
   const KIND: Record<string, string> = {
     email: 'Correo',
     call: 'Llamada',
@@ -48,13 +69,36 @@
     message: 'Mensaje',
   };
   function what(e: RecordEvent): string {
-    const dir = e.direction === 'inbound' ? 'recibido' : e.direction === 'outbound' ? 'enviado' : '';
     if (e.kind === 'call') return `Llamada ${e.direction === 'inbound' ? 'recibida' : 'hecha'} · ${e.minutes} min`;
+    const dir = e.direction === 'inbound' ? 'recibido' : e.direction === 'outbound' ? 'enviado' : '';
     return dir ? `${KIND[e.kind]} ${dir}` : KIND[e.kind];
   }
   function firstLine(body: string | null): string {
     return (body ?? '').split('\n').filter((l) => l.trim() && !/^(hola|buenos)/i.test(l.trim()))[0] ?? '';
   }
+  function daysAgo(iso: string): number {
+    return Math.round((Date.parse(TODAY) - Date.parse(iso)) / 86_400_000);
+  }
+
+  /**
+   * El turno se deriva del registro, no se guarda: si lo último con
+   * dirección vino de fuera, toca responder; si salió de aquí, se espera.
+   */
+  let turn = $derived.by(() => {
+    const last = record.find((e) => e.direction);
+    if (!last) return null;
+    const n = daysAgo(last.occurred_at);
+    const ago = n === 0 ? 'hoy' : n === 1 ? 'ayer' : `hace ${n} días`;
+    return last.direction === 'inbound'
+      ? { label: 'Toca responder', note: `su último correo es de ${ago}`, ours: true }
+      : { label: 'Esperando respuesta', note: `escribisteis ${ago}`, ours: false };
+  });
+
+  let mailboxesUsed = $derived(
+    [...new Set(record.map((e) => e.mailbox).filter((m): m is Mailbox => !!m))].map((m) =>
+      MAILBOXES[m].label.replace(/^B/, 'b'),
+    ),
+  );
 
   type Merged = { at: string; ext?: RecordEvent; int?: TeamComment };
   let merged = $derived<Merged[]>(
@@ -63,6 +107,8 @@
       ...team.map((t) => ({ at: t.occurred_at, int: t })),
     ].sort((a, b) => a.at.localeCompare(b.at)),
   );
+
+  const dealHeld = isHoldStatus(deal.status);
 </script>
 
 <section class="conv">
@@ -72,10 +118,36 @@
     <p class="conv__sub">
       <span>{c.person}, {c.role.toLowerCase()}</span>
       <span>{c.city}</span>
-      <span><Badge size="xs" tone="warning">{c.status}</Badge></span>
+      <span><span class="badge--xs {statusBadgeClass(c.status)}">{c.statusLabel}</span></span>
       {#if privada}<span class="conv__private">Privada · solo la ves tú</span>{/if}
     </p>
   </header>
+
+  <!-- La situación: lo que se mira antes de leer nada. -->
+  <dl class="state">
+    <div class="state__cell state__cell--lead">
+      <dt>Siguiente paso</dt>
+      <dd>{c.nextStep}</dd>
+      <dd class="state__note">{c.nextDue} · en 6 días</dd>
+    </div>
+    {#if turn}
+      <div class="state__cell">
+        <dt>Turno</dt>
+        <dd class:state__ours={turn.ours}>{turn.label}</dd>
+        <dd class="state__note">{turn.note}</dd>
+      </div>
+    {/if}
+    <div class="state__cell">
+      <dt>Último contacto</dt>
+      <dd>{c.lastContact}</dd>
+      <dd class="state__note">desde el {c.firstContact}</dd>
+    </div>
+    <div class="state__cell">
+      <dt>La lleva</dt>
+      <dd>{c.owner}</dd>
+      <dd class="state__note">por su buzón</dd>
+    </div>
+  </dl>
 
   <div class="conv__bar">
     <div class="seg" role="group" aria-label="Lectura">
@@ -100,6 +172,7 @@
           <h2 class="eyebrow eyebrow--sub">Con fuera · {record.length}</h2>
           <Button size="xs" variant="outline">Escribir correo</Button>
         </div>
+        <p class="block-foot">Entra por {mailboxesUsed.join(' y ')}.</p>
         <ol class="rec" aria-label="Registro">
           {#each record as e (e.id)}
             {@render recordItem(e)}
@@ -123,78 +196,122 @@
     </div>
 
     <aside class="conv__aside">
-      <dl class="facts">
-        <div><dt>Último contacto</dt><dd>{c.lastContact}</dd></div>
-        <div><dt>Siguiente paso</dt><dd>{c.nextStep} <span class="muted">· {c.nextDue}</span></dd></div>
-        <div><dt>Lleva</dt><dd>{c.owner}</dd></div>
-      </dl>
-
-      <div class="privacy">
-        <div class="privacy__row">
-          <span class="privacy__label">Conversación privada</span>
-          <button
-            type="button"
-            class="toggle"
-            class:is-on={privada}
-            role="switch"
-            aria-checked={privada}
-            aria-label="Conversación privada"
-            onclick={() => (privada = !privada)}
-          ><span class="toggle__dot"></span></button>
+      <!-- El trato: el bolo que cuelga de esta conversación (ADR-087). -->
+      <section class="side side--deal" aria-labelledby="deal-h">
+        <div class="block-head">
+          <h2 id="deal-h" class="eyebrow eyebrow--sub">En juego</h2>
+          <StateBadge label={deal.statusLabel} tone={performanceStatusTone(deal.status)} />
         </div>
-        <p class="privacy__hint">
-          {privada
-            ? 'Solo la ves tú. Para el resto del espacio no existe, tampoco en los recuentos.'
-            : 'La ve todo el que ve conversaciones en MüK Cia, con sus correos.'}
-        </p>
-      </div>
-
-      <div class="legend">
-        <p class="eyebrow eyebrow--sub">Buzones que traen correo aquí</p>
-        {#each Object.entries(MAILBOXES) as [key, mb] (key)}
-          <p class="legend__row"><span class="mb mb--{key}">{mb.label}</span><span class="muted">{mb.address}</span></p>
-        {/each}
-      </div>
+        <p class="deal__title">{deal.title}</p>
+        <ul class="days">
+          {#each deal.days as d (d.day)}
+            <li class="days__row" class:grain={dealHeld}>
+              <span class="days__day">{d.day}</span>
+              <span class="days__times">{d.times.join(' · ')}</span>
+            </li>
+          {/each}
+        </ul>
+        <dl class="kv">
+          <div><dt>Caché</dt><dd>{deal.fee} <span class="muted">· {deal.feeNote}</span></dd></div>
+          <div><dt>Sala</dt><dd>{deal.venue} <span class="muted">· {deal.capacity}</span></dd></div>
+          <div>
+            <dt>Enviado</dt>
+            <dd>
+              {#each deal.sent as s, i (s.label)}<span>{s.label}&nbsp;<span class="muted">{s.when}</span>{i < deal.sent.length - 1 ? ', ' : ''}</span>{/each}
+            </dd>
+          </div>
+        </dl>
+      </section>
 
       {#if reading === 'aparte'}
-        <div class="inside">
+        <section class="side side--inside" aria-labelledby="inside-h">
           <div class="block-head">
-            <h2 class="eyebrow eyebrow--sub">Por dentro · equipo</h2>
+            <h2 id="inside-h" class="eyebrow eyebrow--sub">Por dentro · {team.length}</h2>
           </div>
-          <p class="inside__aud">Lo ven 3, por ver esta conversación</p>
           <ol class="inside__list">
             {#each [...team].reverse() as t (t.id)}
               <li>{@render comment(t)}</li>
             {/each}
           </ol>
           {@render composer('Escribe al equipo…')}
-        </div>
+        </section>
       {/if}
+
+      <section class="side side--who" aria-labelledby="who-h">
+        <div class="block-head">
+          <h2 id="who-h" class="eyebrow eyebrow--sub">Contacto</h2>
+        </div>
+        <p class="who__name">{c.person}<span class="muted">, {c.role.toLowerCase()} · {c.counterpartKind.toLowerCase()}</span></p>
+        <p class="who__line">{c.email}</p>
+        <p class="who__line">{c.phone}</p>
+        <p class="who__line muted">{c.consent}.</p>
+        <p class="who__note">{c.dossierNote}</p>
+        {#each c.sameOrganization as o (o.person)}
+          <p class="who__line"><span class="muted">También en {c.counterpart}:</span> {o.person}, {o.role.charAt(0).toLowerCase() + o.role.slice(1)}</p>
+        {/each}
+      </section>
+
+      <section class="side side--access" aria-labelledby="access-h">
+        <div class="privacy__row">
+          <h2 id="access-h" class="privacy__label">
+            {privada ? 'Solo la ves tú' : `La ven ${c.audience} en MüK Cia`}
+          </h2>
+          <span class="privacy__switch">
+            <span class="muted">Privada</span>
+            <button
+              type="button"
+              class="toggle"
+              class:is-on={privada}
+              role="switch"
+              aria-checked={privada}
+              aria-label="Conversación privada"
+              onclick={() => (privada = !privada)}
+            ><span class="toggle__dot"></span></button>
+          </span>
+        </div>
+        <p class="privacy__hint">
+          {privada
+            ? 'Para el resto del espacio no existe, tampoco en los recuentos.'
+            : 'Todo el que ve conversaciones, con sus correos y lo que se habla por dentro.'}
+        </p>
+      </section>
     </aside>
   </div>
 </section>
 
-{#snippet mailbox(e: RecordEvent)}
-  {#if e.mailbox}
-    <span class="mb mb--{e.mailbox}" title={MAILBOXES[e.mailbox].address}>vía {MAILBOXES[e.mailbox].label.replace(/^B/, 'b')}</span>
+{#snippet mailboxNote(e: RecordEvent)}
+  {#if e.mailbox && e.mailbox !== HOME_MAILBOX}
+    <span class="rec__mb" title={MAILBOXES[e.mailbox].address}>{MAILBOXES[e.mailbox].label.replace(/^B/, 'b')}</span>
+  {/if}
+{/snippet}
+
+{#snippet attachments(e: RecordEvent)}
+  {#if e.attachments?.length}
+    <p class="rec__att"><span>Adjuntos</span> {e.attachments.join(', ')}</p>
   {/if}
 {/snippet}
 
 {#snippet recordItem(e: RecordEvent)}
   <li class="rec__item" class:rec__item--in={e.direction === 'inbound'}>
-    <time class="rec__when" datetime={e.occurred_at}>{e.when}</time>
+    <p class="rec__meta">
+      <time class="rec__when" datetime={e.occurred_at}>{e.when}</time>
+      <span class="rec__what">{what(e)}</span>
+      {@render mailboxNote(e)}
+    </p>
     <div class="rec__body">
       {#if e.kind === 'email'}
         <button type="button" class="rec__head" aria-expanded={open.has(e.id)} onclick={() => toggle(e.id)}>
-          <span class="rec__what">{what(e)}{@render mailbox(e)}</span>
           <span class="rec__subject">{e.subject}</span>
           {#if !open.has(e.id)}<span class="rec__snippet">{firstLine(e.body)}</span>{/if}
         </button>
+        {#if !open.has(e.id)}{@render attachments(e)}{/if}
         {#if open.has(e.id)}
           <div class="mail">
             <p class="mail__meta"><span>De</span> {e.from}</p>
             <p class="mail__meta"><span>Para</span> {e.to}</p>
+            {#if e.mailbox}<p class="mail__meta"><span>Buzón</span> {MAILBOXES[e.mailbox].label}</p>{/if}
             <p class="mail__text">{e.body}</p>
+            {@render attachments(e)}
             {#if replyTo !== e.id}
               <div class="mail__actions">
                 <Button size="xs" variant="outline" onclick={() => reply(e)}>Responder</Button>
@@ -205,8 +322,8 @@
           </div>
         {/if}
       {:else}
-        <span class="rec__what">{what(e)} <span class="muted">· {e.by}</span></span>
         <p class="rec__note">{e.body}</p>
+        <p class="rec__by">{e.by}</p>
       {/if}
     </div>
   </li>
@@ -215,11 +332,12 @@
 {#snippet recordCard(e: RecordEvent)}
   <div class="card" class:card--in={e.direction === 'inbound'}>
     <p class="card__head">
-      <span class="rec__what">{what(e)}</span>{@render mailbox(e)}
+      <span class="rec__what">{what(e)}</span>{@render mailboxNote(e)}
       <time class="rec__when" datetime={e.occurred_at}>{e.when}</time>
     </p>
     {#if e.subject}<p class="rec__subject">{e.subject}</p>{/if}
     <p class="rec__snippet">{e.kind === 'email' ? firstLine(e.body) : e.body}</p>
+    {@render attachments(e)}
   </div>
 {/snippet}
 
@@ -275,6 +393,9 @@ Perfecto. Te paso el rider simplificado hoy mismo.</textarea>
 <style>
   @layer components {
     .conv {
+      /* La columna de cuándo y qué del registro; en el móvil se pliega. */
+      --conv-meta: 8.5rem;
+
       display: flex;
       flex-direction: column;
       gap: var(--space-m);
@@ -304,6 +425,43 @@ Perfecto. Te paso el rider simplificado hoy mismo.</textarea>
     .conv__private {
       color: var(--heading-color);
       font-weight: 500;
+    }
+
+    /* La situación: cuatro hechos en fila, sin cajas; filetes arriba y abajo. */
+    .state {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+      gap: var(--space-s) var(--space-l);
+      margin: 0;
+      padding-block: var(--space-s);
+      border-block: 1px solid var(--border-color-light);
+    }
+    .state__cell {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2xs);
+      min-inline-size: 0;
+    }
+    .state dt {
+      color: var(--text-faint);
+      font-size: var(--text-xs);
+    }
+    .state dd {
+      margin: 0;
+      color: var(--text-color);
+      font-size: var(--text-s);
+    }
+    .state__cell--lead dd:not(.state__note) {
+      color: var(--heading-color);
+      font-weight: 500;
+    }
+    dd.state__ours {
+      color: var(--heading-color);
+      font-weight: 500;
+    }
+    .state dd.state__note {
+      color: var(--text-faint);
+      font-size: var(--text-xs);
     }
 
     .conv__bar {
@@ -345,15 +503,9 @@ Perfecto. Te paso el rider simplificado hoy mismo.</textarea>
 
     .conv__grid {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) minmax(16rem, 22rem);
+      grid-template-columns: minmax(0, 1fr) minmax(17rem, 22rem);
       gap: var(--space-xl);
       align-items: start;
-    }
-    @media (max-width: 63.999rem) {
-      .conv__grid {
-        grid-template-columns: minmax(0, 1fr);
-        gap: var(--space-l);
-      }
     }
 
     .block-head {
@@ -368,8 +520,15 @@ Perfecto. Te paso el rider simplificado hoy mismo.</textarea>
     .block-head h2 {
       margin: 0;
     }
+    .block-foot {
+      margin: var(--space-xs) 0 0;
+      color: var(--text-faint);
+      font-size: var(--text-xs);
+    }
 
-    /* Registro: misma rejilla que ConversationHistory (fecha | qué). */
+    /* Registro: la columna de la izquierda dice cuándo y qué; la de la
+       derecha, lo que se dijo. Todas las filas tienen la misma rejilla, sea
+       correo, llamada o nota, así que el ojo baja por una sola línea. */
     .rec {
       list-style: none;
       margin: 0;
@@ -377,17 +536,38 @@ Perfecto. Te paso el rider simplificado hoy mismo.</textarea>
     }
     .rec__item {
       display: grid;
-      grid-template-columns: 7.5rem minmax(0, 1fr);
-      gap: var(--space-2xs) var(--space-s);
+      grid-template-columns: var(--conv-meta) minmax(0, 1fr);
+      gap: var(--space-2xs) var(--space-m);
       padding-block: var(--space-s);
       border-block-end: var(--divider);
     }
+    .rec__meta {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2xs);
+      margin: 0;
+      padding-block-start: 0.15em;
+    }
     .rec__when {
-      padding-block-start: 0.1em;
       color: var(--text-faint);
       font-family: var(--font-mono);
       font-size: var(--text-xs);
       letter-spacing: var(--mono-letter-spacing);
+    }
+    .rec__what {
+      color: var(--text-muted);
+      font-size: var(--text-xs);
+    }
+    /* Lo que llega de fuera pesa más que lo que salió: es lo que hay que leer. */
+    .rec__item--in .rec__what,
+    .card--in .rec__what {
+      color: var(--heading-color);
+      font-weight: 500;
+    }
+    .rec__mb {
+      color: var(--text-faint);
+      font-size: var(--text-xs);
+      font-style: italic;
     }
     .rec__body {
       display: flex;
@@ -407,22 +587,19 @@ Perfecto. Te paso el rider simplificado hoy mismo.</textarea>
       font: inherit;
       cursor: pointer;
     }
-    .rec__what {
-      display: inline-flex;
-      flex-wrap: wrap;
-      align-items: baseline;
-      gap: var(--space-xs);
-      color: var(--text-dark-muted);
-      font-size: var(--text-xs);
-    }
-    .rec__item--in .rec__what {
-      color: var(--heading-color);
+    .rec__head:hover .rec__subject {
+      text-decoration: underline;
+      text-decoration-color: var(--border-color-dark);
+      text-underline-offset: 0.2em;
     }
     .rec__subject {
       margin: 0;
       color: var(--heading-color);
       font-size: var(--text-s);
       font-weight: 500;
+    }
+    .rec__item:not(.rec__item--in) .rec__subject {
+      font-weight: 400;
     }
     .rec__snippet {
       margin: 0;
@@ -437,20 +614,19 @@ Perfecto. Te paso el rider simplificado hoy mismo.</textarea>
       color: var(--text-color);
       font-size: var(--text-s);
     }
-
-    /* El buzón que trajo el correo: una marca, no un color nuevo. */
-    .mb {
-      padding-inline: var(--space-xs);
-      color: var(--text-dark-muted);
-      background: var(--tag-neutral-bg);
-      border-radius: var(--radius-s);
-      font-family: var(--font-mono);
+    .rec__by {
+      margin: 0;
+      color: var(--text-faint);
       font-size: var(--text-xs);
-      letter-spacing: var(--mono-letter-spacing);
     }
-    .mb--comun {
-      color: var(--tag-blue-fg);
-      background: var(--tag-blue-bg);
+    .rec__att {
+      margin: 0;
+      color: var(--text-muted);
+      font-size: var(--text-xs);
+      overflow-wrap: anywhere;
+    }
+    .rec__att span {
+      color: var(--text-faint);
     }
 
     .mail {
@@ -476,7 +652,7 @@ Perfecto. Te paso el rider simplificado hoy mismo.</textarea>
       color: var(--text-faint);
     }
     .mail__text {
-      margin: var(--space-s) 0 0;
+      margin: var(--space-s) 0 var(--space-xs);
       font-size: var(--text-s);
       white-space: pre-line;
     }
@@ -548,29 +724,104 @@ Perfecto. Te paso el rider simplificado hoy mismo.</textarea>
       color: var(--text-faint);
     }
 
-    /* Aside */
+    /* Aside: cuatro bloques con la misma cabecera que el registro. */
     .conv__aside {
       display: flex;
       flex-direction: column;
       gap: var(--space-l);
     }
-    .facts {
+    .side {
       display: flex;
       flex-direction: column;
-      gap: var(--space-s);
+      gap: var(--space-xs);
+    }
+    .side p {
       margin: 0;
     }
-    .facts dt {
+
+    .deal__title {
+      padding-block-start: var(--space-xs);
+      color: var(--heading-color);
+      font-family: var(--font-display);
+      font-size: var(--text-m);
+      font-style: italic;
+    }
+    /* Las fechas en juego: el grano de la duda es el del Planner
+       (`certainty.css`), así una opción se lee igual aquí que en el mes. */
+    .days {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2xs);
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+    .days__row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: var(--space-s);
+      padding: var(--space-xs) var(--space-s);
+      border: 1px solid var(--border-color-light);
+      border-radius: var(--radius-s);
+      font-size: var(--text-s);
+    }
+    .days__day {
+      color: var(--heading-color);
+    }
+    .days__times {
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      letter-spacing: var(--mono-letter-spacing);
+    }
+
+    .kv {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-xs);
+      margin: var(--space-xs) 0 0;
+    }
+    .kv > div {
+      display: grid;
+      grid-template-columns: 4.5rem minmax(0, 1fr);
+      gap: var(--space-s);
+      align-items: baseline;
+    }
+    .kv dt {
       color: var(--text-faint);
       font-size: var(--text-xs);
     }
-    .facts dd {
+    .kv dd {
       margin: 0;
       font-size: var(--text-s);
     }
-    .privacy {
-      padding-block: var(--space-s);
-      border-block: 1px solid var(--border-color-light);
+
+    .who__name {
+      padding-block-start: var(--space-xs);
+      color: var(--heading-color);
+      font-size: var(--text-s);
+      font-weight: 500;
+    }
+    .who__name .muted {
+      font-weight: 400;
+    }
+    .who__line {
+      font-size: var(--text-xs);
+      color: var(--text-muted);
+      overflow-wrap: anywhere;
+    }
+    .side .who__note {
+      margin-block: var(--space-2xs);
+      padding-inline-start: var(--space-s);
+      color: var(--text-color);
+      border-inline-start: 2px solid var(--border-color-dark);
+      font-size: var(--text-xs);
+    }
+
+    .side--access {
+      padding-block-start: var(--space-s);
+      border-block-start: 1px solid var(--border-color-light);
     }
     .privacy__row {
       display: flex;
@@ -579,11 +830,19 @@ Perfecto. Te paso el rider simplificado hoy mismo.</textarea>
       gap: var(--space-s);
     }
     .privacy__label {
+      margin: 0;
+      color: var(--heading-color);
+      font-family: var(--font-sans);
       font-size: var(--text-s);
       font-weight: 500;
     }
+    .privacy__switch {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-xs);
+      font-size: var(--text-xs);
+    }
     .privacy__hint {
-      margin: var(--space-xs) 0 0;
       color: var(--text-faint);
       font-size: var(--text-xs);
     }
@@ -614,32 +873,6 @@ Perfecto. Te paso el rider simplificado hoy mismo.</textarea>
       transform: translateX(16px);
     }
 
-    .legend {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-xs);
-    }
-    .legend p {
-      margin: 0;
-    }
-    .legend__row {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: baseline;
-      gap: var(--space-xs);
-      font-size: var(--text-xs);
-    }
-
-    .inside {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-s);
-    }
-    .inside__aud {
-      margin: 0;
-      color: var(--text-faint);
-      font-size: var(--text-xs);
-    }
     .inside__list,
     .flow {
       display: flex;
@@ -648,6 +881,9 @@ Perfecto. Te paso el rider simplificado hoy mismo.</textarea>
       list-style: none;
       margin: 0;
       padding: 0;
+    }
+    .inside__list {
+      padding-block: var(--space-xs);
     }
     .flow {
       padding-block: var(--space-m);
@@ -665,6 +901,10 @@ Perfecto. Te paso el rider simplificado hoy mismo.</textarea>
     .msg__head {
       color: var(--text-faint);
       font-size: var(--text-xs);
+    }
+    .msg__head time {
+      font-family: var(--font-mono);
+      letter-spacing: var(--mono-letter-spacing);
     }
     .msg__by {
       color: var(--heading-color);
@@ -707,9 +947,50 @@ Perfecto. Te paso el rider simplificado hoy mismo.</textarea>
       gap: var(--space-xs);
     }
 
+    /* Una columna: el aside se deshace y cada bloque toma su sitio por
+       importancia. El trato sube encima del registro; el contacto y quién
+       la ve bajan al final. */
+    @media (max-width: 63.999rem) {
+      .conv__grid {
+        grid-template-columns: minmax(0, 1fr);
+        gap: var(--space-l);
+      }
+      .conv__aside {
+        display: contents;
+      }
+      .side--deal {
+        order: -1;
+      }
+      .side--inside {
+        order: 1;
+      }
+      .side--who {
+        order: 2;
+      }
+      .side--access {
+        order: 3;
+      }
+    }
+
     @media (max-width: 47.999rem) {
+      .conv {
+        --conv-meta: auto;
+      }
       .rec__item {
         grid-template-columns: minmax(0, 1fr);
+      }
+      .rec__meta {
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: var(--space-xs);
+      }
+      .rec__meta > * + *::before {
+        content: '·';
+        margin-inline-end: var(--space-xs);
+        color: var(--text-faint);
+      }
+      .state {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
       }
       .card {
         margin-inline-start: 0;

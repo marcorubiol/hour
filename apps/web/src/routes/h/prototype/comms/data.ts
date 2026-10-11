@@ -26,6 +26,8 @@ export type RecordEvent = ConversationEventItem & {
   subject?: string;
   /** Una llamada: duración. */
   minutes?: number;
+  /** Adjuntos: no existen en el modelo (el contrato los deja fuera). */
+  attachments?: string[];
 };
 
 export type TeamComment = {
@@ -39,18 +41,72 @@ export type TeamComment = {
 const CONV = 'conv-pradillo';
 const base = { conversation_id: CONV, recorded_at: '' } as const;
 
+/** El «hoy» de la maqueta: lo que se deriva (turno, días) se cuenta desde aquí. */
+export const TODAY = '2026-10-11T10:00:00+02:00';
+
+/**
+ * La conversación y lo que cuelga de ella. Cada campo dice de dónde saldría
+ * (repaso del 2026-10-11, `research/product/2026-10-11-comms-conversacion-repaso.md`).
+ */
 export const conversation = {
+  /** `workspace_organization.name` vía `workspace_person.organization_id`. */
   counterpart: 'Teatro Pradillo',
+  /** `workspace_organization.kind`. */
+  counterpartKind: 'Teatro',
+  /** `person.full_name` (la conversación es con una persona: `conversation.person_id`). */
   person: 'Inés Valcárcel',
+  /** `conversation.role`. */
   role: 'Programación',
+  /** `workspace_person.email` / `.phone`. */
+  email: 'programacion@teatropradillo.com',
+  phone: '+34 914 16 90 11',
   city: 'Madrid',
+  /** `project.name` y `line.name`. */
   project: 'MaMeMi',
   line: 'Gira 26/27',
-  status: 'En conversación',
+  /** `conversation.status`, con su clase de siempre (`statusBadgeClass`). */
+  status: 'in_conversation',
+  statusLabel: 'En conversación',
+  /** `conversation.first_contacted_at` / `last_contacted_at`. */
+  firstContact: '8 sep',
   lastContact: '7 oct',
+  /** `conversation.next_action_note` / `next_action_at`. */
   nextStep: 'Recibir el precontrato',
   nextDue: 'vie 17 oct',
+  /** No existe en el modelo: hoy solo hay `created_by`. */
   owner: 'Anouk Delmas',
+  /** No existe en el modelo (ADR-099 §4). */
+  audience: 3,
+  /** No existe en el modelo: si la sala acepta propuestas y por qué canal (LSSI). */
+  consent: 'Acepta propuestas por correo a programación',
+  /** `workspace_person.notes`: un dato de la persona, no algo hablado con fuera. */
+  dossierNote: 'Deja Pradillo en enero. Desde entonces, la programación familiar la lleva Jordi Sastre.',
+  /** Otras personas de la misma organización con conversación en el espacio. */
+  sameOrganization: [{ person: 'Jordi Sastre', role: 'Programación familiar, desde enero', status: 'sin conversación' }],
+};
+
+/**
+ * El bolo en juego: `bolo` con `conversation_id`, y sus funciones
+ * (`performance.bolo_id`). El estado es el de siempre (`performance_status`).
+ */
+export const deal = {
+  title: 'MaMeMi en Pradillo',
+  status: 'hold_1',
+  statusLabel: '1ª opción',
+  fee: '1.800 € por día',
+  feeNote: 'fijo, más desplazamiento',
+  venue: 'Teatro Pradillo · sala pequeña',
+  capacity: 'aforo 60',
+  days: [
+    { day: 'sáb 14 feb', times: ['11h', '12h30'] },
+    { day: 'dom 15 feb', times: ['11h', '12h30'] },
+  ],
+  /** Lo que ya se le ha mandado: `asset_version` (dossier, rider…) por adjunto de un correo. */
+  sent: [
+    { label: 'Dossier', when: '8 sep' },
+    { label: 'Ficha técnica', when: '2 oct' },
+    { label: 'Rider simplificado', when: '2 oct' },
+  ],
 };
 
 /** Lo que pasó con fuera, lo más reciente primero. */
@@ -59,7 +115,7 @@ export const record: RecordEvent[] = [
     ...base,
     id: 'e7',
     occurred_at: '2026-10-07T11:20:00+02:00',
-    when: '7 oct · 11:20',
+    when: '7 oct · 11h20',
     kind: 'email',
     source: 'email',
     direction: 'inbound',
@@ -78,7 +134,7 @@ export const record: RecordEvent[] = [
     ...base,
     id: 'e6',
     occurred_at: '2026-10-02T09:05:00+02:00',
-    when: '2 oct · 09:05',
+    when: '2 oct · 9h05',
     kind: 'email',
     source: 'email',
     direction: 'outbound',
@@ -87,6 +143,7 @@ export const record: RecordEvent[] = [
     from: 'Anouk Delmas <anouk@mukcia.com>',
     to: 'programacion@teatropradillo.com',
     subject: 'MaMeMi, fechas de febrero y condiciones',
+    attachments: ['Ficha técnica MaMeMi.pdf', 'Rider simplificado.pdf'],
     body:
       'Hola, Inés:\n\nGracias por la llamada. Te resumo lo que hablamos: 14 y 15 de febrero, dos ' +
       'funciones por día. Fijo de 1.800 € por día, más desplazamiento. Te adjunto la ficha técnica ' +
@@ -94,20 +151,9 @@ export const record: RecordEvent[] = [
   },
   {
     ...base,
-    id: 'e5',
-    occurred_at: '2026-10-01T16:40:00+02:00',
-    when: '1 oct',
-    kind: 'note',
-    source: 'manual',
-    direction: null,
-    by: 'Anouk Delmas',
-    body: 'Inés deja Pradillo en enero. A partir de entonces, la programación familiar la lleva Jordi Sastre.',
-  },
-  {
-    ...base,
     id: 'e4',
     occurred_at: '2026-09-30T12:15:00+02:00',
-    when: '30 sep · 12:15',
+    when: '30 sep · 12h15',
     kind: 'call',
     source: 'manual',
     direction: 'outbound',
@@ -121,7 +167,7 @@ export const record: RecordEvent[] = [
     ...base,
     id: 'e3',
     occurred_at: '2026-09-29T10:42:00+02:00',
-    when: '29 sep · 10:42',
+    when: '29 sep · 10h42',
     kind: 'email',
     source: 'email',
     direction: 'inbound',
@@ -139,7 +185,7 @@ export const record: RecordEvent[] = [
     ...base,
     id: 'e2',
     occurred_at: '2026-09-22T09:30:00+02:00',
-    when: '22 sep · 09:30',
+    when: '22 sep · 9h30',
     kind: 'email',
     source: 'email',
     direction: 'outbound',
@@ -156,7 +202,7 @@ export const record: RecordEvent[] = [
     ...base,
     id: 'e1',
     occurred_at: '2026-09-08T10:00:00+02:00',
-    when: '8 sep · 10:00',
+    when: '8 sep · 10h',
     kind: 'email',
     source: 'email',
     direction: 'outbound',
@@ -165,6 +211,7 @@ export const record: RecordEvent[] = [
     from: 'Anouk Delmas <anouk@mukcia.com>',
     to: 'programacion@teatropradillo.com',
     subject: 'MaMeMi, propuesta para la temporada 26/27',
+    attachments: ['Dossier MaMeMi 2026.pdf'],
     body:
       'Hola, Inés:\n\nOs escribo desde MüK Cia para proponeros MaMeMi, nuestra pieza para bebés de ' +
       '0 a 3 años: 35 minutos, aforo de 60 personas, montaje en 3 horas. Te dejo el dossier y el ' +
@@ -177,28 +224,28 @@ export const team: TeamComment[] = [
   {
     id: 'c4',
     occurred_at: '2026-10-07T12:02:00+02:00',
-    when: '7 oct · 12:02',
+    when: '7 oct · 12h02',
     by: 'Marco Rubiol',
     body: 'Bien. El fijo a 1.800 está bien; que el precontrato diga desplazamiento aparte.',
   },
   {
     id: 'c3',
     occurred_at: '2026-10-01T08:50:00+02:00',
-    when: '1 oct · 08:50',
+    when: '1 oct · 8h50',
     by: 'Pau Riera',
     body: 'Sí, la versión sin suelo de danza. Te la paso esta mañana.',
   },
   {
     id: 'c2',
     occurred_at: '2026-09-30T12:40:00+02:00',
-    when: '30 sep · 12:40',
+    when: '30 sep · 12h40',
     by: 'Anouk Delmas',
     body: 'Le he propuesto el 14-15. Pide rider simplificado: ¿lo tenemos, Pau?',
   },
   {
     id: 'c1',
     occurred_at: '2026-09-29T11:15:00+02:00',
-    when: '29 sep · 11:15',
+    when: '29 sep · 11h15',
     by: 'Marco Rubiol',
     body: 'Febrero lo tenemos libre salvo el 7, que es Vic. Prioriza el 14-15.',
   },
