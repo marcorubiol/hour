@@ -115,10 +115,10 @@
     ytext.observe((_event, txn) => {
       if (txn.origin !== 'local') pull();
     });
-    provider.once('synced', pull);
+    collab.onSynced(pull);
 
-    provider.on('status', ({ status: s }: { status: string }) => {
-      status = s === 'connected' ? 'live' : 'offline';
+    collab.onStatus((connected) => {
+      status = connected ? 'live' : 'offline';
     });
 
     const awareness = provider.awareness;

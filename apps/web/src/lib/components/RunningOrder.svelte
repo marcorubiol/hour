@@ -110,23 +110,23 @@
   $effect(() => {
     if (!canEdit) return;
     const collab = openCollabDoc(target, id);
-    const { doc, provider } = collab;
+    const { doc } = collab;
     const array = scheduleArray(doc);
     let synced = false;
     const pull = () => {
       if (synced) liveOrder = readSchedule(doc);
     };
     array.observeDeep(pull);
-    provider.once('synced', () => {
+    collab.onSynced(() => {
       synced = true;
       live = doc;
       pull();
     });
-    provider.on('status', ({ status }: { status: string }) => {
-      connection = status === 'connected' ? 'live' : 'offline';
+    collab.onStatus((connected) => {
+      connection = connected ? 'live' : 'offline';
     });
     // The DO wrote the rows: every surface that reads them refetches.
-    provider.on('custom-message', (message: string) => {
+    collab.onMessage((message) => {
       if (message === 'schedule:materialized') settle();
     });
     return () => {
