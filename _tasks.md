@@ -1413,8 +1413,14 @@ entre empresas sin construirlo.
 - [ ] **Comms, carril 2: hilos con facetas (ADR-099).** Facetas configurables por espacio: estándar sembradas (con Comidas) y traducidas por clave; renombrar, desactivar y crear propias, con nombre por idioma opcional (Marco, 2026-10-11). Empieza por pasar todo el sistema de permisos al modelo nuevo
   (expand/contract con staging); después hilos sin invitados, tablón del día colgado del bolo (la maqueta enseña
   también la variante por faceta).
-- [ ] **Investigar un SMTP propio de Hour** (envío como Hour en nombre de la compañía): entregabilidad, LSSI y qué
-  prefieren las compañías, que quieren usar su correo (Marco, 2026-10-11).
+- [ ] **Correo con el dominio propio de cada compañía (Marco, 2026-10-11), en tres conectores:**
+  1. Google Workspace / Microsoft 365 por OAuth (el carril 1; con dominio propio funciona igual).
+  2. **IMAP/SMTP** para el resto (hosting propio, IONOS, cPanel…): lee por IMAP y envía por su SMTP, con contraseña
+     de aplicación cifrada en Hour. Siguiente conector tras Google. Riesgo a probar: IMAP desde Cloudflare Workers.
+  3. **Envío propio de Hour en bloque** (Postmark, SES o Resend) con el dominio de la compañía verificado por SPF/DKIM,
+     para campañas. **Llega pronto, Marco lo quiere en breve.** Antes: entregabilidad, cómo vuelven las respuestas a
+     Hour y al buzón de la compañía, bajas, y la LSSI (consentimiento previo también entre empresas; pregunta abierta al
+     abogado).
 - [x] Comms: borrador en papel respondido el 2026-10-11 (ADR-099). **Comms: diseño en papel, sin código (Marco, 2026-10-10: se abre ya; la puerta de construir sigue).** Antes: la puerta de producto de comms, que es de Marco y no técnica. ADR-085 lleva
   escrita su propia condición: *usar la app en una temporada de difusión real
   antes de construir nada de esto*. Mientras no se cumpla, resolver los dos
