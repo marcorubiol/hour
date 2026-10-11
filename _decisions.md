@@ -3375,3 +3375,37 @@ Marco, `research/product/22-venue-directory-personal-data-legal.md`). Registrar 
 - **Facetas configurables.** «Comidas» existe como faceta estándar. Hour siembra un juego de facetas estándar y cada
   espacio puede renombrarlas, desactivarlas y crear las suyas. Multilingüe: las estándar se traducen por clave en los
   cuatro idiomas de la app; las propias llevan el nombre que les dé el espacio, con traducciones opcionales por idioma.
+
+## [2026-10-11] ADR-100 · Permisos: el modelo de facetas sustituye al de hoy (decisiones para las fases 2 y 3)
+
+**Contexto.** ADR-099 punto 8 decidió pasar todo el sistema de permisos al modelo de facetas en expand/contract. La
+fase expand está escrita y probada en local (`claude/permissions-facets`, `build/permissions-facets-plan.md`).
+Marco aceptó las seis recomendaciones del plan (§ 8):
+
+1. **Ver la producción de un proyecto es el acceso al contenedor** (`container_verb`), lo que da la membresía
+   (ADR-082); Tècnica, Logística y Full de ruta gatean después los campos y los hilos que les tocan. No hay faceta
+   «Planificació».
+2. **No existe el miembro sin acceso al contenedor**: ser miembro es ver; en el contract `container_verb` es
+   obligatorio.
+3. **Invitar no es una capacidad**: manda el techo del delegante (ADR-085 §12); `edit:membership` y
+   `can_manage_members` mueren en la fase 3.
+4. **El rol del espacio se queda** como dimensión propia del nivel espacio (crear proyectos, directorio, tareas,
+   sedes); Direcció en el espacio equivale a admin.
+5. **El cuarto nivel es el bolo**, y Full de ruta existe además en la función (la hoja de ruta es de la función).
+   `structure-model.md` se corrige.
+6. **Paquetes:** Mínim ve el contenedor; Equip lo ve con Materials, Tècnica, Logística y Full de ruta; Coordinació
+   edita todo y ve Diners y los metadatos; Direcció edita todo, Diners y miembros incluidos. Las facetas son
+   configurables por espacio (ADR-099, añadido): los paquetes se expanden sobre las facetas estándar.
+
+**Añadido el 2026-10-11, tras el carril del buzón de Google (`claude/mail-google`):**
+- **Sincronización en segundo plano:** el cron del Worker usa la clave de servicio, acotada a las RPC `mail_*`, que
+  comprueban el dueño de cada buzón. Excepción explícita a «el Worker nunca sustituye RLS», solo para el correo.
+- **Buzón común:** envía quien puede editar la conversación.
+- **Auditoría:** el texto de los correos no se copia a `audit_log`; queda que hubo un correo, no su cuerpo.
+- **Conversación privada cuyo dueño sale del espacio:** sigue oculta para siempre (Marco: puede ser la conversación con
+  una amiga programadora, que nadie más debe ver).
+- **Contacto añadido más tarde:** se trae su correo de los últimos 12 meses.
+- **Firma:** propia de Hour, no la de Gmail.
+- **Privacidad por defecto (sustituye la primera frase del punto 4):** el admin del espacio elige si las conversaciones
+  nuevas nacen privadas o compartidas, y cada persona cambia después las suyas; por defecto, privadas. Las
+  conversaciones que ya existen siguen compartidas (las 154 de MüK Cia, entre ellas), para no quitar acceso sin avisar.
