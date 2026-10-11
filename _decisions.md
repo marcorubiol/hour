@@ -3436,3 +3436,16 @@ Marco, tras el repaso del panel «Conversación» de la maqueta de comms
 - Por diseñar en el plan de migración: el contacto con su rol y sus fechas, qué pasa con las conversaciones que hoy no
   tienen organización, y el gate de § 34 (es destructiva: staging e `inspect` obligatorios; las 154 conversaciones de
   `muk-cia` son reales).
+
+**Añadido el 2026-10-11, respuestas de Marco al plan (`build/plans/2026-10-11-conversation-with-venue.md`):**
+1. Sin conversación sin organización: con un programador independiente se crea una organización con su nombre.
+2. El enlace de la organización con el directorio de salas, más adelante.
+3. Una conversación por organización y proyecto.
+4. Los correos de un contacto entran entre su fecha de entrada y de salida, **pero un correo posterior que sigue un
+   hilo de esta conversación también entra** (Marco: el «gracias» de quien ya se fue). Regla propuesta, sin
+   confirmar: una respuesta a un hilo que ya está en la conversación entra siempre; un hilo nuevo, solo dentro de las
+   fechas.
+5. **El pagador es la organización**, no el contacto principal. Toca Books: la factura apunta a la organización y sus
+   datos fiscales.
+6. Los posibles duplicados se revisan a mano antes de la fase 4, sin fusión automática.
+7. El slug de la conversación pasa al de la organización; el antiguo sigue funcionando (`previous_slugs`).
