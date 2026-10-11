@@ -213,6 +213,34 @@ No crear usuarios insertando en `auth.users`: usar Auth Admin API/Dashboard.
 - Soft-delete que deja la fila invisible al updater se hace por RPC, no por
   PATCH directo.
 - El Worker nunca sustituye RLS; valida forma/contrato y reenvía identidad.
+- Única excepción, acotada: la sincronización de buzones (ADR-099) corre sin
+  persona detrás (cron) con `SUPABASE_SERVICE_ROLE_KEY`. Solo la usa
+  `$lib/server/mail/db.ts` y solo para las RPC `mail_*` concedidas a
+  service_role; enviar, conectar y desconectar siguen pidiendo antes permiso a
+  la base con el JWT de la persona.
+
+### Buzón sincronizado (ADR-099, carril 1)
+
+- `mail_account` (personal o común del espacio) guarda el refresh token
+  cifrado por el Worker (AES-GCM, `MAIL_TOKEN_KEY`, AAD = espacio + dirección);
+  `authenticated` no tiene grant sobre esa columna. `mail_message` recuerda
+  qué mensajes de cada buzón ya se miraron (solo ids).
+- Un correo es un `conversation_event` (`source = email`) en las
+  conversaciones cuyo contacto tiene esa dirección; idempotente por buzón y
+  por Message-ID. Hour pregunta al proveedor solo por las direcciones de sus
+  contactos y no lista el resto del buzón.
+- Proveedores detrás de `MailAdapter` (`$lib/server/mail/provider.ts`); hoy
+  Google. Microsoft será otro adaptador.
+- Cron cada 10 min: `wrangler deploy worker-entry.js` envuelve la salida del
+  adaptador de SvelteKit y le añade `scheduled` (`src/worker-cron.ts`).
+- `conversation.private_to`: una conversación privada solo la ve quien la
+  marcó, para siempre (sin clave foránea); las policies y las RPC por id lo
+  respetan. `workspace.new_conversations_private` (admin, por defecto true)
+  decide si las nuevas nacen privadas de quien las crea.
+- De cada contacto se traen sus últimos 12 meses, también si entra después
+  (`mail_account_address`). Firma propia de Hour por buzón
+  (`mail_account.signature`). La auditoría de `conversation_event` no copia
+  cuerpo ni asunto de un correo (`write_audit_conversation_event`).
 
 La suite `apps/web/tests/rls/` golpea Supabase como anon, admin, fixture limitado
 y usuario externo. Baseline actual: 120/120. Incluye cero acceso → invitación →
@@ -278,7 +306,8 @@ Después de cualquier cambio DB:
 - El enlace de invitación es copy/send manual; envío transaccional de email no
   se finge como construido.
 - Offline actual es scaffold, no road mode garantizado.
-- Correo/WhatsApp todavía no aterrizan en `conversation_event`.
+- El correo de Google aterriza en `conversation_event` (ADR-099); Microsoft,
+  IMAP y WhatsApp todavía no.
 - HIBP requiere plan Supabase Pro.
 - Totales cross-currency no son económicamente fiables.
 

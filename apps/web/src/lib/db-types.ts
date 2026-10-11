@@ -34,6 +34,56 @@ export type Database = {
   }
   public: {
     Tables: {
+      access_preset: {
+        Row: {
+          can_edit_meta: boolean
+          can_manage_members: boolean
+          container_verb: Database["public"]["Enums"]["access_verb"]
+          key: string
+          sort: number
+        }
+        Insert: {
+          can_edit_meta?: boolean
+          can_manage_members?: boolean
+          container_verb: Database["public"]["Enums"]["access_verb"]
+          key: string
+          sort?: number
+        }
+        Update: {
+          can_edit_meta?: boolean
+          can_manage_members?: boolean
+          container_verb?: Database["public"]["Enums"]["access_verb"]
+          key?: string
+          sort?: number
+        }
+        Relationships: []
+      }
+      access_preset_facet: {
+        Row: {
+          facet_key: string
+          preset_key: string
+          verb: Database["public"]["Enums"]["access_verb"]
+        }
+        Insert: {
+          facet_key: string
+          preset_key: string
+          verb: Database["public"]["Enums"]["access_verb"]
+        }
+        Update: {
+          facet_key?: string
+          preset_key?: string
+          verb?: Database["public"]["Enums"]["access_verb"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "access_preset_facet_preset_key_fkey"
+            columns: ["preset_key"]
+            isOneToOne: false
+            referencedRelation: "access_preset"
+            referencedColumns: ["key"]
+          },
+        ]
+      }
       account: {
         Row: {
           billing_email: string | null
@@ -658,6 +708,7 @@ export type Database = {
           next_action_note: string | null
           person_id: string
           previous_slugs: string[]
+          private_to: string | null
           project_id: string
           role: string | null
           slug: string
@@ -678,6 +729,7 @@ export type Database = {
           next_action_note?: string | null
           person_id: string
           previous_slugs?: string[]
+          private_to?: string | null
           project_id: string
           role?: string | null
           slug: string
@@ -698,6 +750,7 @@ export type Database = {
           next_action_note?: string | null
           person_id?: string
           previous_slugs?: string[]
+          private_to?: string | null
           project_id?: string
           role?: string | null
           slug?: string
@@ -1102,6 +1155,73 @@ export type Database = {
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspace"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      facet: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          key: string
+          label: string | null
+          labels: Json
+          sort: number
+          updated_at: string
+          workspace_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          key: string
+          label?: string | null
+          labels?: Json
+          sort?: number
+          updated_at?: string
+          workspace_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          key?: string
+          label?: string | null
+          labels?: Json
+          sort?: number
+          updated_at?: string
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "facet_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspace"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      facet_level: {
+        Row: {
+          facet_id: string
+          level: Database["public"]["Enums"]["container_level"]
+        }
+        Insert: {
+          facet_id: string
+          level: Database["public"]["Enums"]["container_level"]
+        }
+        Update: {
+          facet_id?: string
+          level?: Database["public"]["Enums"]["container_level"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "facet_level_facet_id_fkey"
+            columns: ["facet_id"]
+            isOneToOne: false
+            referencedRelation: "facet"
             referencedColumns: ["id"]
           },
         ]
@@ -1581,6 +1701,289 @@ export type Database = {
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspace"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mail_account: {
+        Row: {
+          address: string
+          connected_by: string | null
+          created_at: string
+          id: string
+          last_error: string | null
+          last_synced_at: string | null
+          messages_ingested: number
+          owner_user_id: string | null
+          provider: Database["public"]["Enums"]["mail_provider"]
+          refresh_token_ciphertext: string
+          scope: Database["public"]["Enums"]["mail_account_scope"]
+          signature: string | null
+          status: Database["public"]["Enums"]["mail_account_status"]
+          sync_cursor: string | null
+          sync_from: string
+          sync_started_at: string | null
+          token_key_version: number
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          address: string
+          connected_by?: string | null
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          last_synced_at?: string | null
+          messages_ingested?: number
+          owner_user_id?: string | null
+          provider: Database["public"]["Enums"]["mail_provider"]
+          refresh_token_ciphertext: string
+          scope: Database["public"]["Enums"]["mail_account_scope"]
+          signature?: string | null
+          status?: Database["public"]["Enums"]["mail_account_status"]
+          sync_cursor?: string | null
+          sync_from?: string
+          sync_started_at?: string | null
+          token_key_version?: number
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          address?: string
+          connected_by?: string | null
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          last_synced_at?: string | null
+          messages_ingested?: number
+          owner_user_id?: string | null
+          provider?: Database["public"]["Enums"]["mail_provider"]
+          refresh_token_ciphertext?: string
+          scope?: Database["public"]["Enums"]["mail_account_scope"]
+          signature?: string | null
+          status?: Database["public"]["Enums"]["mail_account_status"]
+          sync_cursor?: string | null
+          sync_from?: string
+          sync_started_at?: string | null
+          token_key_version?: number
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mail_account_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspace"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mail_account_address: {
+        Row: {
+          address: string
+          backfilled_at: string
+          mail_account_id: string
+        }
+        Insert: {
+          address: string
+          backfilled_at?: string
+          mail_account_id: string
+        }
+        Update: {
+          address?: string
+          backfilled_at?: string
+          mail_account_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mail_account_address_mail_account_id_fkey"
+            columns: ["mail_account_id"]
+            isOneToOne: false
+            referencedRelation: "mail_account"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mail_message: {
+        Row: {
+          events_created: number
+          mail_account_id: string
+          processed_at: string
+          provider_message_id: string
+          provider_thread_id: string | null
+          rfc_message_id: string | null
+        }
+        Insert: {
+          events_created?: number
+          mail_account_id: string
+          processed_at?: string
+          provider_message_id: string
+          provider_thread_id?: string | null
+          rfc_message_id?: string | null
+        }
+        Update: {
+          events_created?: number
+          mail_account_id?: string
+          processed_at?: string
+          provider_message_id?: string
+          provider_thread_id?: string | null
+          rfc_message_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mail_message_mail_account_id_fkey"
+            columns: ["mail_account_id"]
+            isOneToOne: false
+            referencedRelation: "mail_account"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      membership: {
+        Row: {
+          accepted_at: string | null
+          bolo_id: string | null
+          can_edit_meta: boolean
+          can_manage_members: boolean
+          container_verb: Database["public"]["Enums"]["access_verb"] | null
+          created_at: string
+          id: string
+          invited_by: string | null
+          level: Database["public"]["Enums"]["container_level"]
+          line_id: string | null
+          performance_id: string | null
+          preset: string | null
+          project_id: string | null
+          roles: string[]
+          updated_at: string
+          user_id: string
+          workspace_id: string
+          workspace_role: Database["public"]["Enums"]["membership_role"] | null
+        }
+        Insert: {
+          accepted_at?: string | null
+          bolo_id?: string | null
+          can_edit_meta?: boolean
+          can_manage_members?: boolean
+          container_verb?: Database["public"]["Enums"]["access_verb"] | null
+          created_at?: string
+          id?: string
+          invited_by?: string | null
+          level: Database["public"]["Enums"]["container_level"]
+          line_id?: string | null
+          performance_id?: string | null
+          preset?: string | null
+          project_id?: string | null
+          roles?: string[]
+          updated_at?: string
+          user_id: string
+          workspace_id: string
+          workspace_role?: Database["public"]["Enums"]["membership_role"] | null
+        }
+        Update: {
+          accepted_at?: string | null
+          bolo_id?: string | null
+          can_edit_meta?: boolean
+          can_manage_members?: boolean
+          container_verb?: Database["public"]["Enums"]["access_verb"] | null
+          created_at?: string
+          id?: string
+          invited_by?: string | null
+          level?: Database["public"]["Enums"]["container_level"]
+          line_id?: string | null
+          performance_id?: string | null
+          preset?: string | null
+          project_id?: string | null
+          roles?: string[]
+          updated_at?: string
+          user_id?: string
+          workspace_id?: string
+          workspace_role?: Database["public"]["Enums"]["membership_role"] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "membership_bolo_id_fkey"
+            columns: ["bolo_id"]
+            isOneToOne: false
+            referencedRelation: "bolo"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "membership_line_id_fkey"
+            columns: ["line_id"]
+            isOneToOne: false
+            referencedRelation: "line"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "membership_performance_id_fkey"
+            columns: ["performance_id"]
+            isOneToOne: false
+            referencedRelation: "performance"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "membership_preset_fkey"
+            columns: ["preset"]
+            isOneToOne: false
+            referencedRelation: "access_preset"
+            referencedColumns: ["key"]
+          },
+          {
+            foreignKeyName: "membership_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "project"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "membership_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspace"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      membership_facet: {
+        Row: {
+          created_at: string
+          facet_id: string
+          granted_by: string | null
+          membership_id: string
+          source: string
+          verb: Database["public"]["Enums"]["access_verb"]
+        }
+        Insert: {
+          created_at?: string
+          facet_id: string
+          granted_by?: string | null
+          membership_id: string
+          source: string
+          verb: Database["public"]["Enums"]["access_verb"]
+        }
+        Update: {
+          created_at?: string
+          facet_id?: string
+          granted_by?: string | null
+          membership_id?: string
+          source?: string
+          verb?: Database["public"]["Enums"]["access_verb"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "membership_facet_facet_id_fkey"
+            columns: ["facet_id"]
+            isOneToOne: false
+            referencedRelation: "facet"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "membership_facet_membership_id_fkey"
+            columns: ["membership_id"]
+            isOneToOne: false
+            referencedRelation: "membership"
             referencedColumns: ["id"]
           },
         ]
@@ -2740,6 +3143,7 @@ export type Database = {
           kind: Database["public"]["Enums"]["workspace_kind"]
           logo_url: string | null
           name: string
+          new_conversations_private: boolean
           previous_slugs: string[]
           settings: Json
           slug: string
@@ -2762,6 +3166,7 @@ export type Database = {
           kind?: Database["public"]["Enums"]["workspace_kind"]
           logo_url?: string | null
           name: string
+          new_conversations_private?: boolean
           previous_slugs?: string[]
           settings?: Json
           slug: string
@@ -2784,6 +3189,7 @@ export type Database = {
           kind?: Database["public"]["Enums"]["workspace_kind"]
           logo_url?: string | null
           name?: string
+          new_conversations_private?: boolean
           previous_slugs?: string[]
           settings?: Json
           slug?: string
@@ -2844,6 +3250,51 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "workspace_alias_request_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspace"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workspace_facet_setting: {
+        Row: {
+          active: boolean
+          facet_id: string
+          label: string | null
+          labels: Json
+          sort: number | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          active?: boolean
+          facet_id: string
+          label?: string | null
+          labels?: Json
+          sort?: number | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          active?: boolean
+          facet_id?: string
+          label?: string | null
+          labels?: Json
+          sort?: number | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_facet_setting_facet_id_fkey"
+            columns: ["facet_id"]
+            isOneToOne: false
+            referencedRelation: "facet"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workspace_facet_setting_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspace"
@@ -3184,6 +3635,17 @@ export type Database = {
           workspace_slug: string
         }[]
       }
+      access_parity_report: {
+        Args: never
+        Returns: {
+          legacy: boolean
+          model: boolean
+          probe: string
+          project_id: string
+          user_id: string
+          workspace_id: string
+        }[]
+      }
       accessible_project_ids: { Args: { p_perm: string }; Returns: string[] }
       add_cast_member: {
         Args: { p_person_id: string; p_project_id: string; p_role: string }
@@ -3247,6 +3709,10 @@ export type Database = {
       }
       can_access_project: { Args: { p_project_id: string }; Returns: boolean }
       can_edit_project: { Args: { p_project_id: string }; Returns: boolean }
+      can_manage_mail_account: {
+        Args: { p_account_id: string }
+        Returns: boolean
+      }
       can_read_workspace_money: {
         Args: { p_workspace_id: string }
         Returns: boolean
@@ -3255,6 +3721,17 @@ export type Database = {
       can_user_write_collab: {
         Args: { p_target_id: string; p_target_table: string; p_user_id: string }
         Returns: boolean
+      }
+      connect_mail_account: {
+        Args: {
+          p_address: string
+          p_provider: Database["public"]["Enums"]["mail_provider"]
+          p_refresh_token_ciphertext: string
+          p_scope: Database["public"]["Enums"]["mail_account_scope"]
+          p_token_key_version?: number
+          p_workspace_id: string
+        }
+        Returns: string
       }
       create_asset_version: {
         Args: {
@@ -3400,6 +3877,7 @@ export type Database = {
           next_action_note: string | null
           person_id: string
           previous_slugs: string[]
+          private_to: string | null
           project_id: string
           role: string | null
           slug: string
@@ -4062,6 +4540,7 @@ export type Database = {
           kind: Database["public"]["Enums"]["workspace_kind"]
           logo_url: string | null
           name: string
+          new_conversations_private: boolean
           previous_slugs: string[]
           settings: Json
           slug: string
@@ -4123,11 +4602,28 @@ export type Database = {
       delete_schedule_slot: { Args: { p_slot_id: string }; Returns: undefined }
       delete_task: { Args: { p_task_id: string }; Returns: undefined }
       delete_travel_stage: { Args: { p_stage_id: string }; Returns: undefined }
+      disconnect_mail_account: {
+        Args: { p_account_id: string }
+        Returns: undefined
+      }
       fiscal_identity_snapshot: { Args: { p_id: string }; Returns: Json }
       generate_workspace_sid: { Args: never; Returns: string }
       get_public_calendar: { Args: { p_token: string }; Returns: Json }
       get_public_roadsheet: { Args: { p_token: string }; Returns: Json }
+      grant_container_preset: {
+        Args: {
+          p_container_id: string
+          p_level: Database["public"]["Enums"]["container_level"]
+          p_preset: string
+          p_user_id: string
+        }
+        Returns: string
+      }
       has_permission: {
+        Args: { p_perm: string; p_project_id: string }
+        Returns: boolean
+      }
+      has_permission_by_facets: {
         Args: { p_perm: string; p_project_id: string }
         Returns: boolean
       }
@@ -4318,6 +4814,115 @@ export type Database = {
           status: string
           user_id: string
         }[]
+      }
+      mail_account_eligible_conversation: {
+        Args: {
+          p_account: Database["public"]["Tables"]["mail_account"]["Row"]
+          p_conversation: Database["public"]["Tables"]["conversation"]["Row"]
+        }
+        Returns: boolean
+      }
+      mail_account_secret: {
+        Args: { p_account_id: string }
+        Returns: {
+          address: string
+          connected_by: string | null
+          created_at: string
+          id: string
+          last_error: string | null
+          last_synced_at: string | null
+          messages_ingested: number
+          owner_user_id: string | null
+          provider: Database["public"]["Enums"]["mail_provider"]
+          refresh_token_ciphertext: string
+          scope: Database["public"]["Enums"]["mail_account_scope"]
+          signature: string | null
+          status: Database["public"]["Enums"]["mail_account_status"]
+          sync_cursor: string | null
+          sync_from: string
+          sync_started_at: string | null
+          token_key_version: number
+          updated_at: string
+          workspace_id: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "mail_account"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      mail_contact_addresses: {
+        Args: { p_account_id: string }
+        Returns: {
+          address: string
+          backfilled: boolean
+        }[]
+      }
+      mail_ingest_message: {
+        Args: { p_account_id: string; p_created_by?: string; p_message: Json }
+        Returns: number
+      }
+      mail_known_messages: {
+        Args: { p_account_id: string; p_ids: string[] }
+        Returns: string[]
+      }
+      mail_mark_backfilled: {
+        Args: { p_account_id: string; p_addresses: string[] }
+        Returns: undefined
+      }
+      mail_send_authorize: {
+        Args: { p_account_id: string; p_conversation_id: string }
+        Returns: {
+          account_address: string
+          recipient_address: string
+          recipient_name: string
+        }[]
+      }
+      mail_sync_claim: {
+        Args: {
+          p_account_id?: string
+          p_limit?: number
+          p_min_interval?: string
+        }
+        Returns: {
+          address: string
+          connected_by: string | null
+          created_at: string
+          id: string
+          last_error: string | null
+          last_synced_at: string | null
+          messages_ingested: number
+          owner_user_id: string | null
+          provider: Database["public"]["Enums"]["mail_provider"]
+          refresh_token_ciphertext: string
+          scope: Database["public"]["Enums"]["mail_account_scope"]
+          signature: string | null
+          status: Database["public"]["Enums"]["mail_account_status"]
+          sync_cursor: string | null
+          sync_from: string
+          sync_started_at: string | null
+          token_key_version: number
+          updated_at: string
+          workspace_id: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "mail_account"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      mail_sync_finish: {
+        Args: {
+          p_account_id: string
+          p_complete?: boolean
+          p_cursor?: string
+          p_error?: string
+          p_ingested?: number
+          p_status: Database["public"]["Enums"]["mail_account_status"]
+        }
+        Returns: undefined
       }
       next_invoice_number: {
         Args: {
@@ -4579,6 +5184,10 @@ export type Database = {
         Args: { p_membership_id: string }
         Returns: undefined
       }
+      set_mail_signature: {
+        Args: { p_account_id: string; p_signature: string }
+        Returns: undefined
+      }
       share_my_profile_with_workspace: {
         Args: { p_fields?: string[]; p_workspace_id: string }
         Returns: {
@@ -4814,6 +5423,7 @@ export type Database = {
           kind: Database["public"]["Enums"]["workspace_kind"]
           logo_url: string | null
           name: string
+          new_conversations_private: boolean
           previous_slugs: string[]
           settings: Json
           slug: string
@@ -4837,6 +5447,7 @@ export type Database = {
       uuid_generate_v7: { Args: never; Returns: string }
     }
     Enums: {
+      access_verb: "view" | "edit"
       account_kind: "personal" | "team"
       account_role: "owner" | "admin"
       asset_direction: "outbound" | "inbound" | "adapted"
@@ -4850,6 +5461,7 @@ export type Database = {
         | "photo"
         | "video"
         | "other"
+      container_level: "workspace" | "project" | "line" | "bolo" | "performance"
       conversation_event_direction: "inbound" | "outbound"
       conversation_event_kind: "note" | "call" | "email" | "meeting" | "message"
       conversation_event_source:
@@ -4895,6 +5507,9 @@ export type Database = {
         | "comms"
         | "misc"
       line_status: "open" | "closed" | "archived"
+      mail_account_scope: "personal" | "workspace"
+      mail_account_status: "active" | "revoked" | "error"
+      mail_provider: "google"
       membership_role: "owner" | "admin" | "member" | "viewer" | "guest"
       note_visibility: "private" | "workspace"
       payment_method: "transfer" | "card" | "cash" | "other"
@@ -5066,6 +5681,7 @@ export const Constants = {
   },
   public: {
     Enums: {
+      access_verb: ["view", "edit"],
       account_kind: ["personal", "team"],
       account_role: ["owner", "admin"],
       asset_direction: ["outbound", "inbound", "adapted"],
@@ -5080,6 +5696,7 @@ export const Constants = {
         "video",
         "other",
       ],
+      container_level: ["workspace", "project", "line", "bolo", "performance"],
       conversation_event_direction: ["inbound", "outbound"],
       conversation_event_kind: ["note", "call", "email", "meeting", "message"],
       conversation_event_source: [
@@ -5130,6 +5747,9 @@ export const Constants = {
         "misc",
       ],
       line_status: ["open", "closed", "archived"],
+      mail_account_scope: ["personal", "workspace"],
+      mail_account_status: ["active", "revoked", "error"],
+      mail_provider: ["google"],
       membership_role: ["owner", "admin", "member", "viewer", "guest"],
       note_visibility: ["private", "workspace"],
       payment_method: ["transfer", "card", "cash", "other"],
@@ -5178,3 +5798,4 @@ export const Constants = {
     },
   },
 } as const
+

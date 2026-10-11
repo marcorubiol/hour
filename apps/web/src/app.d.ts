@@ -50,6 +50,16 @@ declare global {
      * native gate composes with RATE_LIMIT's 10/five-minute KV window.
      */
     LOGIN_RATE_LIMIT?: RateLimit;
+    /**
+     * Buzón sincronizado (ADR-099), secretos de Wrangler. Sin ellos el correo
+     * está apagado: Ajustes lo dice y el cron no hace nada.
+     * SUPABASE_SERVICE_ROLE_KEY solo la usa $lib/server/mail/db.ts, y solo para las
+     * RPC `mail_*` concedidas a service_role.
+     */
+    GOOGLE_OAUTH_CLIENT_ID?: string;
+    GOOGLE_OAUTH_CLIENT_SECRET?: string;
+    MAIL_TOKEN_KEY?: string;
+    SUPABASE_SERVICE_ROLE_KEY?: string;
   }
 
   /**

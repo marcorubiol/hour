@@ -1,5 +1,8 @@
 <script lang="ts">
   import { t, appLocale } from '$lib/i18n';
+  import ConversationPrivacyDefault from './ConversationPrivacyDefault.svelte';
+
+  let { workspaceId }: { workspaceId?: string } = $props();
 
   const locale = appLocale();
 
@@ -15,6 +18,8 @@
   <h1 class="set-mast__title"><em>{t('settings.nav_privacy', locale)}</em></h1>
   <p class="set-mast__sub">{t('settings.priv_sub', locale)}</p>
 </header>
+
+<ConversationPrivacyDefault {workspaceId} />
 
 <section class="set-group">
   <div class="set-group__head">

@@ -79,20 +79,33 @@ task (no verb).
 **Which facets exist depends on the level** — that is the whole point, and it is a table, not
 code (moving one has to be an `UPDATE`, never a migration):
 
-|              | space | project | line | performance |
-|--------------|:-----:|:-------:|:----:|:-----------:|
-| Converses    |   ●   |    ●    |  ●   |      —      |
-| Materials    |   —   |    ●    |  ●   |      ●      |
-| Tècnica      |   —   |    ●    |  ●   |      ●      |
-| Logística    |   —   |    —    |  ●   |      ●      |
-| Full de ruta |   —   |    —    |  —   |      ●      |
-| Diners       |   ●   |    ●    |  ●   |      ●      |
+|              | space | project | line | bolo | performance |
+|--------------|:-----:|:-------:|:----:|:----:|:-----------:|
+| Converses    |   ●   |    ●    |  ●   |  —   |      —      |
+| Materials    |   —   |    ●    |  ●   |  ●   |      —      |
+| Tècnica      |   —   |    ●    |  ●   |  ●   |      —      |
+| Logística    |   —   |    —    |  ●   |  ●   |      —      |
+| Full de ruta |   —   |    —    |  —   |  ●   |      ●      |
+| Comidas      |   —   |    —    |  —   |  ●   |      ●      |
+| Diners       |   ●   |    ●    |  ●   |  ●   |      —      |
+
+Corrected 2026-10-11 (ADR-100 §5, ADR-099 añadido): the fourth column is the bolo; Full de
+ruta exists also at the performance; **Comidas** is a standard facet, at the bolo and at each
+performance (Marco, 2026-10-11). The table lives in `facet_level`
+(`20261011100000_permissions_facets_expand`).
+
+**Facets are configurable per space** (ADR-099 añadido): Hour seeds the standard ones,
+translated by key (`facet.<key>` in the four locales); each space can rename or deactivate
+them and create its own, named by the space with optional translations. Deactivating hides a
+facet from threads and the UI; it does not change who reads the data a facet gates. The access
+presets (Mínim · Equip · Coordinació · Direcció, ADR-100 §6) expand over the standard facets
+only; a space's own facets are granted by hand.
 
 `General` is **not** a facet: it is membership in the container. Its thread always exists and
 its audience is exactly the container's members — so it can never be a permission row.
 **Absent is not denied**: a facet that does not exist at a level is not "set to res", it is
-not there, and the UI must say it in those words. **Diners is the only facet at all four
-levels**, which is precisely why it is the sensitive one.
+not there, and the UI must say it in those words. **Diners is the only facet at every level
+above the performance**, which is precisely why it is the sensitive one.
 
 **Task** — the **verb layer**, not a concern-domain. Polymorphic: attaches to project / line /
 performance / conversation — at most one; none = a free workspace task (D3 **live since 2026-07-17**,
@@ -118,14 +131,19 @@ answers:
 | ladder | question | levels |
 |---|---|---|
 | **Edit** | where is content *authored*? | space · project · line → modules — **three** |
-| **Scope / access** | where can you *scope into*, grant permissions, and hang a conversation? | space · project · line · **performance** — **four** |
+| **Scope / access** | where can you *scope into*, grant permissions, and hang a conversation? | space · project · line · **bolo** · performance |
 
-The performance was always in the nesting chain; what this doc never said is that you can
-scope into it. You must be able to: a technician gets access **for one night**, and the crew
+Corrected 2026-10-11 (ADR-100 §5, ADR-099 §6): the fourth access level is the **bolo** (the
+deal with a venue, 1..N performances, ADR-087), and the day's board hangs there. The
+**performance** stays below it as the level of **Full de ruta** only, because the road sheet
+belongs to the performance. The earlier text said «performance» for the fourth level; it was
+written before ADR-087 split the bolo from the función.
+
+You must be able to scope that low: a technician gets access **for one night**, and the crew
 of that night talks in that gig's hub. That is the narrowest and most common grant there is.
 
-**This does not touch the module rule.** A performance carries access and a conversation; it
-does **not** compose modules. Modules still exist only at the line. If modules ever appear at
+**This does not touch the module rule.** A bolo or a performance carries access and a
+conversation; it does **not** compose modules. Modules still exist only at the line. If modules ever appear at
 the performance, that is drift — the two ladders are separate on purpose.
 
 ## Narrowing vs the ladders (ADR-092)
