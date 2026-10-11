@@ -1090,7 +1090,7 @@ entre empresas sin construirlo.
     y agrupación en `MonthGrid`. **Dos funciones DISTINTAS el mismo día no se
     colapsan nunca** — los dos nombres tienen que verse.
 
-17. [ ] **Escaleta de momentos — el orden del día, en vivo (ADR-090).**
+17. [x] **Escaleta de momentos — el orden del día, en vivo (ADR-090).** **2026-10-11: P2 EN PRODUCCIÓN** (migración `20261010220000_schedule_slot_live`, apply run 38106943458; collab y web `fffa2cd`; RLS 237/237, E2E 64/64): la escaleta la manda el doc en directo y el PATCH rechaza franjas (`schedule_is_live`). Queda abierto: las reglas de orden de las franjas solo se validan en el cliente.
     **2026-10-10: P1 EN PRODUCCIÓN.** Partida en dos (Marco): A
     `20261009200000_schedule_slot` (expand, con espejo temporal columnas↔slots,
     apply run 38030572363), deploy `db6a343`, y B
@@ -1440,7 +1440,7 @@ entre empresas sin construirlo.
   **Salas nuevas desde las compañías (chat 10-10):** una compañía puede proponer una sala que no está en el
   directorio (la que crea en su espacio) y entra en el directorio común cuando la validan 3 compañías, con el mismo
   mecanismo de propuesta, fuente e historial que las correcciones.
-- [ ] **Directorio de salas, fase 2 (Marco, 2026-10-10).** España fuera de Cataluña y CyL con los datos abiertos
+- [ ] Marco: decidir — **Cuándo cargar la fase 2 del directorio (construida y en `main`, 2026-10-11):** de 4.659 a 6.802 salas (EIEL nacional y de Madrid, Wikidata Francia; casas de cultura solo con uso escénico). La descarga tarda ~45 min y bloquea el canal de migraciones; se lanza con `venue-directory-load.yml` (plan y después load). Quedan ~130 posibles duplicados Wikidata FR/Basilic y ~35 EIEL/Wikidata sin fundir a propósito. **Directorio de salas, fase 2 (Marco, 2026-10-10).** España fuera de Cataluña y CyL con los datos abiertos
   autonómicos (Andalucía, Madrid, Valencia primero, mirando antes cada licencia) y los ~1.250 teatros de Wikidata de
   Francia. Criterios de la fase 1 que siguen: centros cívicos solo con aforo declarado, ningún contacto de ayuntamiento,
   y al adoptar se copia el contacto genérico con el nombre de la sala.
