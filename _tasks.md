@@ -376,6 +376,8 @@
 
 ## AHORA — preparar el Planner v3 (revisión de viabilidad, 2026-07-30)
 
+- [ ] **Desk: el detalle se queda en lo cercano (hoy, mañana y esta semana); «Más adelante» se resume en una línea ("25 cosas hasta el 15 dic") que abre la Agenda, y una tanda de varios días sale como una sola fila ("Residencia de invierno · 6 días")** (drop 11-10). En `claude/desk-horizon`.
+
 
 > Del contraste entre `Hour Views - Scope v3 - Agenda.html` (proyecto
 > claude.ai/design `f1741f1f`, leído con `DesignSync`) y el modelo real.
