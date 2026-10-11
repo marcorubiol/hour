@@ -3415,5 +3415,5 @@ Marco aceptó las seis recomendaciones del plan (§ 8):
 Marco: lo que diferencia a Hour es que programadores y profesionales estén dados de alta en la plataforma por sí
 mismos. El marketing se centra en eso, no en tener más datos de terceros. Encaja con el diseño legal del directorio
 (`research/product/22-venue-directory-personal-data-legal.md`: una persona entra solo si se da de alta o reclama su
-ficha, aceptando propuestas) y con la LSSI, que pide consentimiento previo para escribirles. Primera acción: pedir a las
-instituciones que inviten a sus programadores a darse de alta (`_tasks.md`, «Marketing»).
+ficha, aceptando propuestas) y con la LSSI, que pide consentimiento previo para escribirles. Cómo se consiguen las altas está por
+pensar; pedir a las instituciones que inviten a sus programadores queda descartado por ahora (Marco).

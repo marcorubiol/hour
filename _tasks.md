@@ -1478,10 +1478,9 @@ entre empresas sin construirlo.
 - [ ] Marco: hacer — **Revisar y enviar los dos borradores de Mail (cuenta Google)** a la Red Española de Teatros (`redteatros@redescena.net`) y a DGArtes (`geral@dgartes.pt`, en portugués, pidiendo la Rede de Teatros e Cineteatros Portugueses). Creados el 2026-10-10. Antes: escribir a la Red Española de Teatros y a DGArtes
   para pedir sus listados como dato (Marco, 10-10: lo quiere pensar).
 
-- [ ] **Marketing: que la gente se dé de alta en Hour (Marco, 2026-10-11, ADR-101).** Primera acción: escribir a
-  instituciones (Red Española de Teatros, INAEM, DGArtes, ICEC…) para pedir sus listados públicos de salas y, sobre
-  todo, que inviten a sus programadores a darse de alta en Hour ellos mismos y aceptar propuestas. Presenta Hour y
-  trae altas con consentimiento.
+- [ ] **Marketing: que la gente se dé de alta en Hour (Marco, 2026-10-11, ADR-101).** Cómo se consiguen las altas
+  está por pensar (Marco, 2026-10-11: pedir a las instituciones que inviten a sus programadores no es el momento ni la
+  manera; los borradores a la Red y a DGArtes piden solo los listados de salas).
 - [ ] **Poll de fechas candidatas (à la Doodle/When2meet, integrado).** Al buscar
   fecha para una residencia, un ensayo o una reunión, proponer **varias `date`
   candidatas de golpe**; cada participante confirma las que puede; cuando todos
