@@ -377,6 +377,7 @@
 ## AHORA — preparar el Planner v3 (revisión de viabilidad, 2026-07-30)
 
 - [ ] **Conversations: «Add to project» solo ofrece los proyectos del ámbito actual** (drop 11-10). Hecho en `claude/conversations-scope` (`c1a3c59`), sin integrar.
+- [ ] **Conversations: cambiar de ámbito filtra la lista sin salir de Conversations** (drop 11-10). Pasa en la propia lista (Marco); el arreglo de `claude/conversations-scope` cubre solo la ficha de persona: falta reproducirlo en la lista.
 
 
 
