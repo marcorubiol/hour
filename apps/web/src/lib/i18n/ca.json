@@ -1278,7 +1278,7 @@
   "person.cast": "repartiment",
   "person.crew": "equip tècnic",
   "person.eyebrow": "Persona",
-  "person.in_every_project": "Ja és a tots els projectes actius",
+  "person.in_every_project": "Ja és a tots els projectes actius d’aquest àmbit",
   "person.not_added": "No afegit",
   "person.note_delete": "esborra",
   "person.note_not_deleted": "Nota no esborrada",

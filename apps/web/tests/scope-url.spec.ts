@@ -103,3 +103,22 @@ test('Conversations is a scoped lens and copies its canonical scoped URL', async
   const copied = await page.evaluate(() => navigator.clipboard.readText());
   expect(copied).toBe(page.url());
 });
+
+test('a scope change on a person opened from Conversations lands back on Conversations', async ({ page }) => {
+  // Drop 11-10: off a lens route a scope click went to Desk, so leaving the
+  // list for a person and changing the scope threw you out of Conversations.
+  await page.goto(`/h/conversations?scope=${FIXTURE_SPACE_TOKEN}`);
+  await waitForLoaded(page);
+  await expect(page.locator('tbody tr').first()).toBeVisible();
+
+  await page.locator('tbody tr').first().getByRole('link').first().click();
+  await page.waitForURL(/\/h\/[^/]+\/person\//);
+  await waitForLoaded(page);
+
+  await page.getByRole('button', { name: /Everything/ }).click();
+  await page.waitForURL(/\/h\/conversations/, { timeout: 10000 });
+  await expect(page.getByRole('tab', { name: 'Conversations' })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
+});

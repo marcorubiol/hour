@@ -1287,7 +1287,7 @@
   "person.cast": "cast",
   "person.crew": "crew",
   "person.eyebrow": "Person",
-  "person.in_every_project": "Already in every active project",
+  "person.in_every_project": "Already in every active project in this scope",
   "person.not_added": "Not added",
   "person.note_delete": "delete",
   "person.note_not_deleted": "Note not deleted",

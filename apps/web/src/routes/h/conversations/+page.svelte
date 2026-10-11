@@ -34,6 +34,7 @@
     resolveScope,
     lineUrl,
     projectUrl,
+    projectsInScope,
     type NavLine,
     type NavProject,
     type NavWorkspace,
@@ -137,13 +138,18 @@
   let aNextAt = $state('');
   let aNextNote = $state('');
 
-  let allProjects = $derived<RawProject[]>($projectsQuery.data?.items ?? []);
+  // The picker offers only the projects of the current scope (drop 11-10):
+  // a space offers its projects, a project or line that project, Everything
+  // all of them.
+  let scopedProjects = $derived<RawProject[]>(
+    projectsInScope(scope, $projectsQuery.data?.items ?? []),
+  );
   // Projects grouped under the space (workspace) they belong to — the picker
   // reads as "which spaces (and which project inside them)".
   let projectGroups = $derived.by(() => {
     const wsName = new Map(workspaces.map((w) => [w.id, w.name]));
     const byWs = new Map<string, { wsId: string; wsName: string; projects: { id: string; name: string }[] }>();
-    for (const p of allProjects) {
+    for (const p of scopedProjects) {
       let g = byWs.get(p.workspace_id);
       if (!g) {
         // Chokepoint: the only place this group's space label is built.
@@ -186,14 +192,14 @@
     aNextAt = '';
     aNextNote = '';
     aStatus = CONVERSATION_STATUSES[0];
-    // Pre-select when the pinned scope, or the whole workspace, collapses to
+    // Pre-select when the scope collapses to
     // a single project — otherwise start empty and let the user pick spaces.
     // A single pinned line also preselects that line for its project.
     aProjectIds =
       scope.lines.length === 1
         ? [scope.lines[0].projectId]
-        : allProjects.length === 1
-          ? [allProjects[0].id]
+        : scopedProjects.length === 1
+          ? [scopedProjects[0].id]
           : [];
     aLineByProject =
       scope.lines.length === 1 ? { [scope.lines[0].projectId]: scope.lines[0].id } : {};

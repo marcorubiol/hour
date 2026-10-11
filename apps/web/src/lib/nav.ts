@@ -268,3 +268,14 @@ export function inScope(
   if (item.projectId && scope.projectIds.includes(item.projectId)) return true;
   return false;
 }
+
+/** The projects a picker offers under the current scope: a pinned space
+ *  offers its projects, a pinned project or line offers that project, an
+ *  empty scope (Everything) offers them all. One `inScope` reading, so a
+ *  picker never disagrees with the list it sits on. */
+export function projectsInScope<P extends { id: string; workspace_id: string }>(
+  scope: ResolvedScope,
+  projects: P[],
+): P[] {
+  return projects.filter((p) => inScope(scope, { workspaceId: p.workspace_id, projectId: p.id }));
+}
