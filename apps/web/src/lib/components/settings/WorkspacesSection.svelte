@@ -9,6 +9,7 @@
   import { addToast } from '$lib/components/Toast.svelte';
   import { session } from '$lib/session.svelte';
   import { t, appLocale } from '$lib/i18n';
+  import MailSignature from './MailSignature.svelte';
 
   const locale = appLocale();
 
@@ -425,6 +426,8 @@
     </div>
   </section>
 {/if}
+
+<MailSignature scope="workspace" workspaceId={currentWorkspace?.id} />
 
 {#if aliasRequests.length > 0}
   <section class="set-group">
