@@ -71,8 +71,11 @@ describe.skipIf(!envReady())('RLS — ADR-051/052 write-path RPCs', () => {
       'conversation',
       jwt,
       new URLSearchParams({
-        select: 'id,person:person_id!inner(email)',
-        'person.email': `eq.${FIXTURE_EMAIL}`,
+        // Por el dossier del espacio (la persona global no guarda el correo) y
+        // por cualquier contacto, no solo el principal (ADR-102).
+        select:
+          'id,contact:conversation_contact!inner(person:workspace_person!conversation_contact_workspace_person_fkey!inner(email))',
+        'contact.person.email': `eq.${FIXTURE_EMAIL}`,
         project_id: `eq.${projectId}`,
         deleted_at: 'is.null',
       }),

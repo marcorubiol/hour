@@ -72,9 +72,29 @@
         `/api/conversations/${conversationId}/events`,
         event,
       ),
-    onSuccess: () => {
+    onSuccess: (data) => {
       body = '';
       day = localDayISO();
+      // Lo apuntado sale ya en el registro, sin esperar a la recarga (que
+      // llega después y manda): con la red lenta de producción la lista podía
+      // seguir enseñando la versión anterior más de 5 s.
+      const item = data?.item;
+      if (item) {
+        queryClient.setQueryData<{ items: ConversationEventItem[] }>(
+          ['conversation-events', conversationId],
+          (old) =>
+            old && !old.items.some((e) => e.id === item.id)
+              ? {
+                  ...old,
+                  items: [item, ...old.items].sort(
+                    (a, b) =>
+                      Date.parse(b.occurred_at) - Date.parse(a.occurred_at) ||
+                      Date.parse(b.recorded_at) - Date.parse(a.recorded_at),
+                  ),
+                }
+              : old,
+        );
+      }
     },
     onError: (err) => {
       addToast({

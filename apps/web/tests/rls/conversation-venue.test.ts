@@ -37,6 +37,9 @@ const ORG_A = 'ZZZ F2 Venue A';
 const ORG_B = 'ZZZ F2 Venue B';
 const ORG_C = 'ZZZ F2 Venue C';
 const ORG_D = 'ZZZ F2 Venue D';
+const ORG_E1 = 'ZZZ F2 Venue E1';
+const ORG_E2 = 'ZZZ F2 Venue E2';
+const P5 = { name: 'ZZZ F2 Contact Moves', email: 'zzz-f2-moves@hour.test' };
 const SOLO_NAME = 'ZZZ F2 Solo Programmer';
 const SOLO_EMAIL = 'zzz-f2-solo@hour.test';
 const P1 = { name: 'ZZZ F2 Contact One', email: 'zzz-f2-one@hour.test' };
@@ -126,7 +129,7 @@ describe.skipIf(!envReady())('conversation with the venue (ADR-102, fase 2)', ()
 
   const sweep = async () => {
     // Una pasada muerta a medias deja conversaciones vivas: se recogen.
-    for (const name of [ORG_A, ORG_B, ORG_C, ORG_D, SOLO_NAME]) {
+    for (const name of [ORG_A, ORG_B, ORG_C, ORG_D, ORG_E1, ORG_E2, SOLO_NAME]) {
       const id = await orgId(name);
       if (!id) continue;
       const r = await pgGet<{ id: string }>(
@@ -269,6 +272,26 @@ describe.skipIf(!envReady())('conversation with the venue (ADR-102, fase 2)', ()
     const r = await create({ p_organization_id: await orgId(ORG_A) });
     expect(r.status, r.error).toBe(200);
     expect(one(r.data)!.id).toBe(conv);
+  });
+
+  test('re-adding a person without an organization revives THEIR last conversation, even with another organization than the dossier', async () => {
+    // El dossier se queda la primera organización (E1); la conversación borrada es con E2.
+    const first = await create({ p_organization_name: ORG_E1, p_full_name: P5.name, p_email: P5.email });
+    expect(first.status, first.error).toBe(200);
+    await pgRpc('delete_conversation', jwt, { p_conversation_id: one(first.data)!.id });
+    const second = await create({ p_organization_name: ORG_E2, p_full_name: P5.name, p_email: P5.email });
+    expect(second.status, second.error).toBe(200);
+    const theirs = one(second.data)!;
+    expect(theirs.organization_id).toBe(await orgId(ORG_E2));
+    await pgRpc('delete_conversation', jwt, { p_conversation_id: theirs.id });
+
+    const again = await create({ p_full_name: P5.name, p_email: P5.email, p_status: 'in_conversation' });
+    expect(again.status, again.error).toBe(200);
+    made.add(one(again.data)!.id);
+    expect(one(again.data)!.id).toBe(theirs.id);
+    expect(one(again.data)!.organization_id).toBe(await orgId(ORG_E2));
+    // Y viva, otra vez la misma persona sin organización: 409, como siempre.
+    expect((await create({ p_full_name: P5.name, p_email: P5.email })).status).toBe(409);
   });
 
   test('add_conversation_contact: a person without a dossier joins as a contact (primary if none)', async () => {
