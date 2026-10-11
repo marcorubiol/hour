@@ -17,6 +17,7 @@ import {
 } from './crypto';
 import {
   buildAddressQueries,
+  parseMessageIds,
   buildRawMessage,
   decodeMimeWords,
   googleAdapter,
@@ -28,7 +29,7 @@ import {
   trimQuoted,
   type GmailRawMessage,
 } from './gmail';
-import { matchMessage } from './provider';
+import { matchMessage, oldestFirst } from './provider';
 import { syncAccount } from './sync';
 import type { IngestPayload, MailAccountRow, MailDb } from './db';
 import { displayWebsite, effectiveSignature, proposedSignature, withSignature, type SignatureParts } from '../../mail';
@@ -411,6 +412,7 @@ function memoryDb(contacts: string[], backfilledFrom: string[] = []) {
       for (const a of addresses) backfilled.add(a);
     },
     knownMessages: async (_a, ids) => ids.filter((id) => processed.has(id)),
+    deferredReady: async () => [],
     ingest: async (_a, p) => {
       if (processed.has(p.provider_message_id)) return 0;
       processed.add(p.provider_message_id);
@@ -473,11 +475,12 @@ describe('sync', () => {
     // Nunca se pidió un correo que no fuera de un contacto.
     const fetchedIds = g.calls.filter((c) => /\/messages\/[^/]+$/.test(c)).map((c) => c.split('/').pop());
     expect(fetchedIds.sort()).toEqual(['in1', 'out1']);
-    expect(mem.events.map((e) => [e.payload.provider_message_id, e.payload.direction])).toEqual([
+    // Mismo instante: el orden entre los dos no importa (se ingiere del más viejo al más nuevo).
+    expect(mem.events.map((e) => [e.payload.provider_message_id, e.payload.direction]).sort()).toEqual([
       ['in1', 'inbound'],
       ['out1', 'outbound'],
     ]);
-    expect(mem.events[0].payload).toMatchObject({ subject: 'Asunto in1', body: 'Cuerpo in1', rfc_message_id: '<in1@mail.test>' });
+    expect(mem.events.find((e) => e.payload.provider_message_id === 'in1')!.payload).toMatchObject({ subject: 'Asunto in1', body: 'Cuerpo in1', rfc_message_id: '<in1@mail.test>' });
     // El cursor sale del perfil, tomado antes de buscar.
     expect(mem.finishes.at(-1)).toMatchObject({ cursor: '500', complete: true, status: 'active' });
   });
@@ -653,5 +656,127 @@ describe('GmailClient on a Worker', () => {
     }
     const adapter = googleAdapter(strictFetch as typeof fetch, { clientId: 'c', clientSecret: 's' });
     await expect(adapter.profile('tok')).resolves.toEqual({ address: 'marco@example.com', cursor: '42' });
+  });
+});
+
+describe('thread rule (ADR-102, añadido, punto 4)', () => {
+  test('In-Reply-To and References are read with their angle brackets, in order', () => {
+    expect(parseMessageIds('<a@x.test>')).toEqual(['<a@x.test>']);
+    expect(parseMessageIds(' <a@x.test>\r\n <b@y.test> <c@z.test>')).toEqual(['<a@x.test>', '<b@y.test>', '<c@z.test>']);
+    expect(parseMessageIds('')).toEqual([]);
+    expect(parseMessageIds(null)).toEqual([]);
+    expect(parseMessageIds('not an id')).toEqual([]);
+  });
+
+  test('oldest first, stable for equal or unreadable dates', () => {
+    const m = (id: string, occurredAt: string) => ({ id, occurredAt });
+    const sorted = oldestFirst([
+      m('c', '2026-10-09T10:00:00Z'),
+      m('a', '2026-10-07T10:00:00Z'),
+      m('x', 'nope'),
+      m('b', '2026-10-07T10:00:00Z'),
+    ]);
+    expect(sorted.map((x) => x.id)).toEqual(['x', 'a', 'b', 'c']);
+  });
+
+  test('a pass registers the thread from its first message, and sends the reply headers', async () => {
+    const at = (iso: string) => String(Date.parse(iso));
+    const first = message('q1', 'Inés <ines@pradillo.test>', 'anouk@muk.test', {
+      threadId: 't-1',
+      internalDate: at('2026-10-01T09:00:00Z'),
+    });
+    const reply = message('q2', 'Inés <ines@pradillo.test>', 'anouk@muk.test', {
+      threadId: 't-1',
+      internalDate: at('2026-10-05T09:00:00Z'),
+    });
+    reply.payload!.headers!.push(
+      { name: 'In-Reply-To', value: '<q1@mail.test>' },
+      { name: 'References', value: '<q0@mail.test> <q1@mail.test>' },
+    );
+    // Gmail lists the newest first.
+    const g = gmailWith([reply, first]);
+    const mem = memoryDb(['ines@pradillo.test']);
+    const key = await importMailKey(KEY_B64);
+    const adapter = googleAdapter(fakeFetch(g), { clientId: 'c', clientSecret: 's' });
+    await syncAccount({ db: mem.db, adapter: () => adapter, key }, await accountRow());
+
+    expect(mem.events.map((e) => e.payload.provider_message_id)).toEqual(['q1', 'q2']);
+    const sent = mem.events[1]!.payload;
+    expect(sent.in_reply_to).toBe('<q1@mail.test>');
+    expect(sent.references).toEqual(['<q0@mail.test>', '<q1@mail.test>']);
+    expect(mem.events[0]!.payload.in_reply_to).toBeNull();
+  });
+
+  test('an unmatched message carries no thread headers either', async () => {
+    const stray = message('s1', 'newsletter@shop.test', 'anouk@muk.test');
+    stray.payload!.headers!.push({ name: 'In-Reply-To', value: '<zz@mail.test>' });
+    const g = gmailWith([stray, message('in1', 'Inés <ines@pradillo.test>', 'anouk@muk.test')]);
+    const seen: IngestPayload[] = [];
+    const mem = memoryDb(['ines@pradillo.test']);
+    const ingest = mem.db.ingest;
+    mem.db.ingest = async (a, p, c) => {
+      seen.push(p);
+      return ingest(a, p, c);
+    };
+    const key = await importMailKey(KEY_B64);
+    const adapter = googleAdapter(fakeFetch(g), { clientId: 'c', clientSecret: 's' });
+    await syncAccount({ db: mem.db, adapter: () => adapter, key }, await accountRow());
+    for (const p of seen.filter((x) => x.counterparts.length === 0)) {
+      expect(p.in_reply_to ?? null).toBeNull();
+      expect(p.references ?? []).toEqual([]);
+    }
+  });
+});
+
+describe('a reply that arrives before its thread waits, it is not lost (ADR-102)', () => {
+  test('deferred on the first pass, ingested once the original is in (from another mailbox)', async () => {
+    const at = (iso: string) => String(Date.parse(iso));
+    const reply = message('late', 'Inés <ines@pradillo.test>', 'anouk@muk.test', {
+      threadId: 't-9',
+      internalDate: at('2026-10-05T09:00:00Z'),
+    });
+    reply.payload!.headers!.push({ name: 'In-Reply-To', value: '<orig@mail.test>' });
+
+    // Una base en memoria con la regla del hilo: sin el original, espera.
+    const processed = new Map<string, { deferred: boolean; refs: string[] }>();
+    const rfcIn = new Set<string>();
+    const entered: string[] = [];
+    const db: MailDb = {
+      claim: async () => [],
+      account: async () => null,
+      contactAddresses: async () => [{ address: 'ines@pradillo.test', backfilled: true }],
+      markBackfilled: async () => {},
+      knownMessages: async (_a, ids) => ids.filter((id) => processed.has(id)),
+      deferredReady: async () =>
+        [...processed.entries()].filter(([, m]) => m.deferred && m.refs.some((r) => rfcIn.has(r))).map(([id]) => id),
+      ingest: async (_a, p) => {
+        const prev = processed.get(p.provider_message_id);
+        if (prev && !prev.deferred) return 0;
+        const refs = [p.in_reply_to, ...(p.references ?? [])].filter((x): x is string => Boolean(x));
+        if (refs.length && !refs.some((r) => rfcIn.has(r))) {
+          processed.set(p.provider_message_id, { deferred: true, refs });
+          return 0;
+        }
+        processed.set(p.provider_message_id, { deferred: false, refs: [] });
+        if (p.rfc_message_id) rfcIn.add(p.rfc_message_id);
+        entered.push(p.provider_message_id);
+        return 1;
+      },
+      finish: async () => {},
+    };
+    const g = gmailWith([reply]);
+    const key = await importMailKey(KEY_B64);
+    const adapter = googleAdapter(fakeFetch(g), { clientId: 'c', clientSecret: 's' });
+    const row = await accountRow({ sync_cursor: '400', last_synced_at: '2026-10-06T00:00:00Z' });
+
+    await syncAccount({ db, adapter: () => adapter, key }, row);
+    expect(entered).toEqual([]);
+    expect(processed.get('late')?.deferred).toBe(true);
+
+    // El original entra por el buzón común.
+    rfcIn.add('<orig@mail.test>');
+    await syncAccount({ db, adapter: () => adapter, key }, row);
+    expect(entered).toEqual(['late']);
+    expect(processed.get('late')?.deferred).toBe(false);
   });
 });

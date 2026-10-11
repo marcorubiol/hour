@@ -268,6 +268,15 @@ export function trimQuoted(text: string): string {
   return lines.slice(0, cut).join('\n').trim();
 }
 
+/**
+ * Los Message-ID de una cabecera In-Reply-To o References, con sus ángulos
+ * (como se guarda `rfc_message_id`), en el orden en que vienen.
+ */
+export function parseMessageIds(header: string | null | undefined): string[] {
+  if (!header) return [];
+  return [...header.matchAll(/<[^<>\s]+>/g)].map((m) => m[0]).filter((id) => id.length <= 998);
+}
+
 /** El correo de Gmail en la forma neutra del proveedor. */
 export function parseGmailMessage(raw: GmailRawMessage): MailMessage {
   const p = raw.payload;
@@ -281,6 +290,8 @@ export function parseGmailMessage(raw: GmailRawMessage): MailMessage {
     providerMessageId: raw.id,
     providerThreadId: raw.threadId ?? null,
     rfcMessageId: header(p, 'Message-ID') ?? header(p, 'Message-Id'),
+    inReplyTo: parseMessageIds(header(p, 'In-Reply-To'))[0] ?? null,
+    references: parseMessageIds(header(p, 'References')).slice(-50),
     subject: decodeMimeWords(header(p, 'Subject') ?? '').trim() || null,
     fromHeader: decodeMimeWords(header(p, 'From') ?? ''),
     from: parseAddressList(header(p, 'From')),

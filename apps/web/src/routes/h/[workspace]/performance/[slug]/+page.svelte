@@ -98,6 +98,7 @@
         slug: string;
         status: string;
         person: PersonEmbed | null;
+        organization?: { name: string } | null;
       } | null;
       crew_assignment: Array<{
         id: string;
@@ -776,15 +777,17 @@
       </section>
     {/if}
 
-    {#if perf.conversation?.person}
+    {#if perf.conversation?.person || perf.conversation?.organization}
       <section class="perf__section" aria-label={t('perf.programmer', locale)}>
         <p class="eyebrow">{t('perf.programmer', locale)}</p>
         <p class="perf__programmer">
-          <a href={`/h/${workspaceSlug}/person/${perf.conversation.person.slug}`}>
-            {perf.conversation.person.full_name}
-          </a>
-          {#if perf.conversation.person.organization_name}
-            <span class="perf__person-note">{perf.conversation.person.organization_name}</span>
+          {#if perf.conversation.person}
+            <a href={`/h/${workspaceSlug}/person/${perf.conversation.person.slug}`}>
+              {perf.conversation.person.full_name}
+            </a>
+          {/if}
+          {#if perf.conversation.organization?.name || perf.conversation.person?.organization_name}
+            <span class="perf__person-note">{perf.conversation.organization?.name || perf.conversation.person?.organization_name}</span>
           {/if}
         </p>
       </section>

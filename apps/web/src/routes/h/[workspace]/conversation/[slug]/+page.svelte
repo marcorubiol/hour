@@ -29,6 +29,7 @@
   import {
     eventDirectionLabel,
     eventKindLabel,
+    conversationTitle,
     relativeContactDate,
     statusBadgeClass,
     statusLabel,
@@ -169,7 +170,14 @@
     return `${a.address} · ${a.scope === 'personal' ? t('mail.your_mailbox', locale) : t('mail.shared_mailbox', locale)}`;
   }
 
-  let title = $derived(conv?.person?.organization_name || conv?.person?.full_name || slug);
+  // ADR-102: el título es la organización; debajo, el contacto principal.
+  let title = $derived((conv && conversationTitle(conv)) || slug);
+  /** A quién sale un correo: el contacto principal (`mail_send_authorize`). */
+  let recipient = $derived.by(() => {
+    const p = conv?.contacts.find((c) => c.is_primary)?.person ?? null;
+    if (p?.email) return { full_name: p.full_name, email: p.email };
+    return conv?.person?.email ? { full_name: conv.person.full_name, email: conv.person.email } : null;
+  });
 </script>
 
 <svelte:head>
@@ -194,7 +202,7 @@
       <p class="conv__sub">
         {#if conv.person && conv.person.full_name !== title}<span>{conv.person.full_name}</span>{/if}
         {#if conv.person?.email}<span>{conv.person.email}</span>{/if}
-        {#if conv.person?.city}<span>{conv.person.city}</span>{/if}
+        {#if conv.person?.city || conv.organization?.city}<span>{conv.person?.city || conv.organization?.city}</span>{/if}
         <span><span class={`badge badge--xs ${statusBadgeClass(conv.status)}`}>{statusLabel(conv.status, locale)}</span></span>
         {#if conv.private}<span class="conv__private">{t('mail.private_badge', locale)}</span>{/if}
       </p>
@@ -216,7 +224,7 @@
         {#if reading === 'registro'}
           <div class="block-head">
             <h2 class="eyebrow eyebrow--sub">{t('mail.outside', locale)} · {events.length}</h2>
-            <Button size="xs" variant="outline" disabled={!sendable.length || !conv.person?.email} onclick={() => startCompose(null)}>
+            <Button size="xs" variant="outline" disabled={!sendable.length || !recipient?.email} onclick={() => startCompose(null)}>
               {t('mail.write', locale)}
             </Button>
           </div>
@@ -239,7 +247,7 @@
         {:else}
           <div class="block-head">
             <h2 class="eyebrow eyebrow--sub">{t('mail.thread', locale)} · {events.length}</h2>
-            <Button size="xs" variant="outline" disabled={!sendable.length || !conv.person?.email} onclick={() => startCompose(null)}>
+            <Button size="xs" variant="outline" disabled={!sendable.length || !recipient?.email} onclick={() => startCompose(null)}>
               {t('mail.write', locale)}
             </Button>
           </div>
@@ -342,7 +350,7 @@
             {#if e.body}<p class="mail__text">{e.body}</p>{/if}
             {#if composing !== e.id}
               <div class="mail__actions">
-                <Button size="xs" variant="outline" disabled={!sendable.length || !conv?.person?.email} onclick={() => startCompose(e)}>
+                <Button size="xs" variant="outline" disabled={!sendable.length || !recipient?.email} onclick={() => startCompose(e)}>
                   {t('mail.reply', locale)}
                 </Button>
               </div>
@@ -369,7 +377,7 @@
     {#if e.body}<p class="card__text">{e.body}</p>{/if}
     {#if e.kind === 'email' && e.source === 'email' && composing !== e.id}
       <div class="mail__actions">
-        <Button size="xs" variant="outline" disabled={!sendable.length || !conv?.person?.email} onclick={() => startCompose(e)}>
+        <Button size="xs" variant="outline" disabled={!sendable.length || !recipient?.email} onclick={() => startCompose(e)}>
           {t('mail.reply', locale)}
         </Button>
       </div>
@@ -395,7 +403,7 @@
         {/each}
       </select>
     </label>
-    <p class="reply__field"><span>{t('mail.to', locale)}</span> {conv?.person?.full_name} &lt;{conv?.person?.email}&gt;</p>
+    <p class="reply__field"><span>{t('mail.to', locale)}</span> {recipient?.full_name} &lt;{recipient?.email}&gt;</p>
     <label class="reply__field">
       <span>{t('mail.subject', locale)}</span>
       <input type="text" maxlength="500" bind:value={subject} required />

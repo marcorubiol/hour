@@ -131,15 +131,29 @@ export type ConversationEventItem = Pick<
 /** La lectura de la ficha: el registro más lo que se enseña de un correo. */
 export const CONVERSATION_EVENT_FULL_SELECT = `${CONVERSATION_EVENT_SELECT},created_by,${EVENT_MAIL_SELECT}`;
 
+/** The database caps a contact's role at 200 characters (ADR-102). */
+export const CONTACT_ROLE_MAX = 200;
+
 /**
- * POST /api/conversations body (ADR-051). Two shapes, exactly one:
- *   · person_id — link an existing person (server re-checks visibility)
- *   · person    — inline fields; the RPC find-or-creates on email
- * The endpoint enforces the exactly-one rule; the schema keeps both
- * optional so the error message can be specific.
+ * POST /api/conversations body (ADR-051, ADR-102). The conversation is with an
+ * organization; the person is optional and becomes its primary contact.
+ *   · organization_id — an existing organization of the workspace
+ *   · organization    — by name: found (case-insensitive) or created
+ *   · person_id       — link an existing person (server re-checks visibility)
+ *   · person          — inline fields; the RPC find-or-creates on email
+ * At most one of each pair, and at least one of the four: with only a person,
+ * the organization is the person's, or one named after them (an independent
+ * programmer). The endpoint enforces the pairs; the schema keeps all optional
+ * so the error message can be specific.
  */
 export const ConversationCreateSchema = v.object({
   project_id: v.pipe(v.string(), v.uuid()),
+  organization_id: v.optional(v.pipe(v.string(), v.uuid())),
+  organization: v.optional(
+    v.object({
+      name: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(200)),
+    }),
+  ),
   person_id: v.optional(v.pipe(v.string(), v.uuid())),
   person: v.optional(
     v.object({
@@ -151,7 +165,7 @@ export const ConversationCreateSchema = v.object({
     }),
   ),
   status: v.optional(v.picklist(CONVERSATION_STATUSES), 'contacted'),
-  role: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(120)))),
+  role: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(CONTACT_ROLE_MAX)))),
   next_action_at: v.optional(v.nullable(realIsoDate)),
   next_action_note: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(500)))),
   // ADR-056: capture straight into a line (the module context or the
@@ -159,6 +173,123 @@ export const ConversationCreateSchema = v.object({
   // membership of the line.
   line_id: v.optional(v.nullable(v.pipe(v.string(), v.uuid()))),
 });
+
+/** Why a create body is not acceptable beyond its shape, or null if it is. */
+export function conversationCreateProblem(input: ConversationCreate): string | null {
+  if (input.organization_id && input.organization) return 'Send at most one of organization_id or organization.';
+  if (input.person_id && input.person) return 'Send at most one of person_id or person.';
+  if (!input.organization_id && !input.organization && !input.person_id && !input.person) {
+    return 'Send an organization (organization_id or organization) or a person (person_id or person).';
+  }
+  return null;
+}
+
+/**
+ * The id of the conversation a create clashed with, from the PostgREST error
+ * body of `create_conversation`'s 23505 (DETAIL `conversation_id=<uuid>`).
+ * Only the organization clash carries it; the caller can see that row.
+ */
+export function existingConversationId(errorBody: string): string | null {
+  try {
+    const details = (JSON.parse(errorBody) as { details?: unknown }).details;
+    const m = typeof details === 'string' ? /^conversation_id=([0-9a-f-]{36})$/i.exec(details) : null;
+    return m ? m[1]!.toLowerCase() : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * What the capture dialogs send for "who": the person (with the organization
+ * by name) when there is a name, or the organization alone (ADR-102). Null
+ * when there is neither: the dialog asks for one.
+ */
+export function conversationWhoBody(fields: {
+  name: string;
+  email?: string;
+  phone?: string;
+  organization: string;
+}):
+  | { person: { full_name: string; email: string | null; phone?: string | null; organization_name: string | null } }
+  | { organization: { name: string } }
+  | null {
+  const name = fields.name.trim();
+  const organization = fields.organization.trim();
+  if (name) {
+    return {
+      person: {
+        full_name: name,
+        email: fields.email?.trim() || null,
+        ...(fields.phone !== undefined ? { phone: fields.phone.trim() || null } : {}),
+        organization_name: organization || null,
+      },
+    };
+  }
+  return organization ? { organization: { name: organization } } : null;
+}
+
+// ── Contacts (ADR-102): the people of a conversation with a venue ──
+
+/**
+ * POST /api/conversations/:id/contacts — add a contact or redo theirs.
+ * `since` absent keeps the one they already have (the RPC would clear it).
+ */
+export const ContactSetSchema = v.object({
+  person_id: v.pipe(v.string(), v.uuid()),
+  role: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(CONTACT_ROLE_MAX)))),
+  since: v.optional(v.nullable(realIsoDate)),
+  is_primary: v.optional(v.boolean()),
+});
+export type ContactSet = v.InferOutput<typeof ContactSetSchema>;
+
+/**
+ * POST /api/conversations/:id/contacts with a person who may have no dossier
+ * yet («Añadir como contacto» after the create 409): found by email in the
+ * workspace, or created (`add_conversation_contact`).
+ */
+export const ContactAddInlineSchema = v.object({
+  person: v.object({
+    full_name: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(200)),
+    email: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(254), v.email()))),
+    phone: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(40)))),
+  }),
+  role: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(CONTACT_ROLE_MAX)))),
+});
+export type ContactAddInline = v.InferOutput<typeof ContactAddInlineSchema>;
+
+/** PATCH /api/conversations/:id/contacts — close a contact (until, default today). */
+export const ContactEndSchema = v.object({
+  person_id: v.pipe(v.string(), v.uuid()),
+  until: v.optional(v.nullable(realIsoDate)),
+});
+export type ContactEnd = v.InferOutput<typeof ContactEndSchema>;
+
+export interface ContactRowLite {
+  person_id: string;
+  role: string | null;
+  since: string | null;
+  until: string | null;
+  is_primary: boolean;
+}
+
+/**
+ * The arguments for `set_conversation_contact`. The RPC rewrites `since` and
+ * `role` on every call, so what the body leaves out is carried over from the
+ * contact as it is (review of phase 1: a role change must not erase since).
+ */
+export function contactSetArgs(
+  conversationId: string,
+  input: ContactSet,
+  current: ContactRowLite | null,
+): Record<string, unknown> {
+  return {
+    p_conversation_id: conversationId,
+    p_person_id: input.person_id,
+    p_role: input.role !== undefined ? input.role : (current?.role ?? null),
+    p_since: input.since !== undefined ? input.since : (current?.since ?? null),
+    p_is_primary: input.is_primary ?? current?.is_primary ?? false,
+  };
+}
 
 export type ConversationCreate = v.InferOutput<typeof ConversationCreateSchema>;
 
@@ -173,9 +304,49 @@ export type PersonLite = Pick<
 >;
 export type ProjectLite = Pick<Tables<'project'>, 'id' | 'slug' | 'name' | 'status'>;
 
+export type OrganizationLite = Pick<
+  Tables<'workspace_organization'>,
+  'id' | 'slug' | 'name' | 'kind' | 'city'
+>;
+
+/** A contact of the conversation, with their dossier (ADR-102). */
+export interface ConversationContact extends ContactRowLite {
+  person: { slug: string; full_name: string; email: string | null; phone: string | null } | null;
+}
+
 export interface ConversationItem extends Tables<'conversation'> {
+  /** The primary contact, kept for consumers that predate ADR-102. */
   person: PersonLite | null;
   project: ProjectLite | null;
+  /** Who the conversation is with (ADR-102). Null only for pre-phase-1 rows. */
+  organization: OrganizationLite | null;
+  /** Primary first, then current, then closed; empty if none is readable. */
+  contacts: ConversationContact[];
+}
+
+/** The title of a conversation: its organization, or its person before ADR-102. */
+export function conversationTitle(
+  item: Pick<ConversationItem, 'organization' | 'person'>,
+): string {
+  return item.organization?.name || item.person?.full_name || item.person?.organization_name || '';
+}
+
+/** Current contacts (until empty or not past), primary first. */
+export function currentContacts(
+  contacts: readonly ConversationContact[],
+  today: string = localDayISO(new Date()),
+): ConversationContact[] {
+  return contacts.filter((c) => !c.until || c.until >= today);
+}
+
+/** Order the contacts embed: primary, then current by name, then closed by until desc. */
+export function sortContacts(contacts: readonly ConversationContact[]): ConversationContact[] {
+  return [...contacts].sort((a, b) => {
+    if (a.is_primary !== b.is_primary) return a.is_primary ? -1 : 1;
+    if (!a.until !== !b.until) return a.until ? 1 : -1;
+    if (a.until && b.until && a.until !== b.until) return a.until < b.until ? 1 : -1;
+    return (a.person?.full_name ?? '').localeCompare(b.person?.full_name ?? '');
+  });
 }
 
 export interface ConversationContactGroup {
@@ -252,12 +423,16 @@ type WorkspacePersonEmbed = Omit<PersonLite, 'id' | 'organization_name'> & {
 export interface ConversationDbItem extends Tables<'conversation'> {
   person: WorkspacePersonEmbed | null;
   project: ProjectLite | null;
+  organization?: OrganizationLite | null;
+  contacts?: ConversationContact[] | null;
 }
 
 /** Keep the public API stable while contact data moves to workspace_person. */
 export function normalizeConversationItem(item: ConversationDbItem): ConversationItem {
   return {
     ...item,
+    organization: item.organization ?? null,
+    contacts: sortContacts(item.contacts ?? []),
     person: item.person
       ? {
           id: item.person.person_id,
@@ -278,4 +453,6 @@ export const CONVERSATION_SELECT = [
   '*',
   'person:workspace_person!conversation_workspace_person_fkey(person_id,slug,full_name,email,country,city,website,organization:workspace_organization!workspace_person_organization_fkey(name))',
   'project:project_id(id,slug,name,status)',
+  'organization:workspace_organization!conversation_workspace_organization_fkey(id,slug,name,kind,city)',
+  'contacts:conversation_contact(person_id,role,since,until,is_primary,person:workspace_person!conversation_contact_workspace_person_fkey(slug,full_name,email,phone))',
 ].join(',');

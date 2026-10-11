@@ -287,6 +287,20 @@ ajenas.
 Rollback: restaurar las funciones anteriores (cuerpos de `20261011500000` y `20261011200000`) y los slugs desde
 `previous_slugs`; drop de los índices nuevos.
 
+**Construida (2026-10-11, rama `claude/conversation-venue-f2`, sin aplicar ni desplegar).** Tres migraciones:
+`20261011800000_conversation_with_organization_reads` (alta y lecturas por organización, correo por fechas y por
+hilo con espera de los que llegan antes que su hilo, destinatario = contacto principal, grant por columnas),
+`20261011810000_conversation_slug_organization` (reescribe slugs) y `20261011820000_conversation_contact_inline`
+(«Añadir como contacto» desde el alta). Rollbacks en `build/runbooks/`.
+
+**Orden de despliegue (de la revisión):**
+1. `20261011800000` y `20261011820000` por `production-migrate.yml` (`inspect`, backup, plan, apply). Cambian firmas
+   (`create_conversation`): `inspect` antes. El Worker viejo sigue funcionando con ellas: llama a `create_conversation`
+   sin `p_organization_id` (tiene valor por defecto), busca con su embed de persona (la FK sigue) y su sincronización
+   no manda cabeceras de hilo (entra solo por fechas).
+2. El Worker (`pnpm --filter web run deploy`).
+3. `20261011810000` (slugs), con backup: el Worker nuevo resuelve también el slug viejo por `previous_slugs`.
+
 ### Fase 2b · Books: el pagador es la organización
 
 Depende solo de la fase 1 (necesita `conversation.organization_id` relleno); puede ir antes o después de la 2.

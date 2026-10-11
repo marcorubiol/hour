@@ -336,3 +336,15 @@ describe('taskContextLabel', () => {
     expect(taskContextLabel(t)).toBe('Anna Puig');
   });
 });
+
+describe('taskContextLabel — ADR-102', () => {
+  it('a conversation without a person is labelled by its organization', async () => {
+    const { taskContextLabel } = await import('./task');
+    const base = { line: null, performance: null, project: null } as const;
+    const label = taskContextLabel({
+      ...base,
+      conversation: { id: 'c', project_id: 'p', person: null, organization: { name: 'Teatro Pradillo' } },
+    } as unknown as Parameters<typeof taskContextLabel>[0]);
+    expect(label).toBe('Teatro Pradillo');
+  });
+});

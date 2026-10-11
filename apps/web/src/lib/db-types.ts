@@ -707,7 +707,7 @@ export type Database = {
           next_action_at: string | null
           next_action_note: string | null
           organization_id: string | null
-          person_id: string
+          person_id: string | null
           previous_slugs: string[]
           private_to: string | null
           project_id: string
@@ -729,7 +729,7 @@ export type Database = {
           next_action_at?: string | null
           next_action_note?: string | null
           organization_id?: string | null
-          person_id: string
+          person_id?: string | null
           previous_slugs?: string[]
           private_to?: string | null
           project_id: string
@@ -751,7 +751,7 @@ export type Database = {
           next_action_at?: string | null
           next_action_note?: string | null
           organization_id?: string | null
-          person_id?: string
+          person_id?: string | null
           previous_slugs?: string[]
           private_to?: string | null
           project_id?: string
@@ -1881,27 +1881,33 @@ export type Database = {
       }
       mail_message: {
         Row: {
+          deferred: boolean
           events_created: number
           mail_account_id: string
           processed_at: string
           provider_message_id: string
           provider_thread_id: string | null
+          refs: string[]
           rfc_message_id: string | null
         }
         Insert: {
+          deferred?: boolean
           events_created?: number
           mail_account_id: string
           processed_at?: string
           provider_message_id: string
           provider_thread_id?: string | null
+          refs?: string[]
           rfc_message_id?: string | null
         }
         Update: {
+          deferred?: boolean
           events_created?: number
           mail_account_id?: string
           processed_at?: string
           provider_message_id?: string
           provider_thread_id?: string | null
+          refs?: string[]
           rfc_message_id?: string | null
         }
         Relationships: [
@@ -3756,6 +3762,34 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      add_conversation_contact: {
+        Args: {
+          p_conversation_id: string
+          p_email?: string
+          p_full_name: string
+          p_phone?: string
+          p_role?: string
+        }
+        Returns: {
+          conversation_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          is_primary: boolean
+          person_id: string
+          role: string | null
+          since: string | null
+          until: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "conversation_contact"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       adopt_directory_venue: {
         Args: { p_directory_id: string; p_workspace_id: string }
         Returns: {
@@ -3833,7 +3867,7 @@ export type Database = {
           next_action_at: string | null
           next_action_note: string | null
           organization_id: string | null
-          person_id: string
+          person_id: string | null
           previous_slugs: string[]
           private_to: string | null
           project_id: string
@@ -3848,6 +3882,41 @@ export type Database = {
           to: "conversation"
           isOneToOne: true
           isSetofReturn: false
+        }
+      }
+      conversation_free_slug: {
+        Args: { p_base: string; p_id: string; p_workspace_id: string }
+        Returns: string
+      }
+      conversation_search: {
+        Args: { p_q: string }
+        Returns: {
+          created_at: string
+          created_by: string | null
+          custom_fields: Json
+          deleted_at: string | null
+          first_contacted_at: string | null
+          id: string
+          last_contacted_at: string | null
+          line_id: string | null
+          next_action_at: string | null
+          next_action_note: string | null
+          organization_id: string | null
+          person_id: string | null
+          previous_slugs: string[]
+          private_to: string | null
+          project_id: string
+          role: string | null
+          slug: string
+          status: Database["public"]["Enums"]["conversation_status"]
+          updated_at: string
+          workspace_id: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "conversation"
+          isOneToOne: false
+          isSetofReturn: true
         }
       }
       create_asset_version: {
@@ -3973,6 +4042,7 @@ export type Database = {
           p_line_id?: string
           p_next_action_at?: string
           p_next_action_note?: string
+          p_organization_id?: string
           p_organization_name?: string
           p_person_id?: string
           p_phone?: string
@@ -3993,7 +4063,7 @@ export type Database = {
           next_action_at: string | null
           next_action_note: string | null
           organization_id: string | null
-          person_id: string
+          person_id: string | null
           previous_slugs: string[]
           private_to: string | null
           project_id: string
@@ -5005,6 +5075,10 @@ export type Database = {
           address: string
           backfilled: boolean
         }[]
+      }
+      mail_deferred_ready: {
+        Args: { p_account_id: string; p_limit?: number }
+        Returns: string[]
       }
       mail_ingest_message: {
         Args: { p_account_id: string; p_created_by?: string; p_message: Json }

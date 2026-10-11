@@ -113,6 +113,8 @@ export async function sendFromConversation(
       provider_message_id: sent.providerMessageId,
       provider_thread_id: sent.providerThreadId,
       rfc_message_id: messageId,
+      in_reply_to: reply?.rfc_message_id ?? null,
+      references: reply?.rfc_message_id ? [reply.rfc_message_id] : [],
       occurred_at: new Date().toISOString(),
       direction: 'outbound',
       subject: req.subject,

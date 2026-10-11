@@ -90,6 +90,8 @@ export interface TaskItem extends Tables<'task'> {
       full_name: string | null;
       organization_name: string | null;
     } | null;
+    /** ADR-102: who the conversation is with; the label when it has no person. */
+    organization?: { name: string } | null;
   } | null;
 }
 
@@ -105,6 +107,7 @@ export interface TaskDbItem extends Omit<TaskItem, 'conversation'> {
       full_name: string | null;
       organization: { name: string } | null;
     } | null;
+    organization?: { name: string } | null;
   } | null;
 }
 
@@ -114,6 +117,7 @@ export function normalizeTaskItem(item: TaskDbItem): TaskItem {
     conversation: item.conversation
       ? {
           ...item.conversation,
+          organization: item.conversation.organization ?? null,
           person: item.conversation.person
             ? {
                 slug: item.conversation.person.slug,
@@ -132,7 +136,7 @@ export const TASK_SELECT = [
   'project:project_id(id,slug,name)',
   'line:line_id(id,slug,name,project_id)',
   'performance:performance_id(id,slug,project_id,venue_name,city)',
-  'conversation:conversation_id(id,project_id,person:workspace_person!conversation_workspace_person_fkey(slug,full_name,organization:workspace_organization!workspace_person_organization_fkey(name)))',
+  'conversation:conversation_id(id,project_id,person:workspace_person!conversation_workspace_person_fkey(slug,full_name,organization:workspace_organization!workspace_person_organization_fkey(name)),organization:workspace_organization!conversation_workspace_organization_fkey(name))',
 ].join(',');
 
 // ── Surfacing (ADR-070) ─────────────────────────────────────────────────
@@ -225,6 +229,7 @@ export function taskContextLabel(task: TaskItem, locale: Locale = 'en'): string 
     return (
       task.conversation.person?.full_name ||
       task.conversation.person?.organization_name ||
+      task.conversation.organization?.name ||
       t('desk.fallback_conversation', locale)
     );
   }

@@ -210,6 +210,24 @@ describe('buildDeskFeed — fixed within-day order', () => {
     expect(b.runs.map((r) => r.concern)).toEqual(['task', 'agenda', 'conversation']);
     expect(b.runs[2].items[0]).toMatchObject({ verbKey: 'confirm', subject: 'Anna Prat' });
   });
+
+  it('ADR-102: a conversation is titled by its organization, also without a person', () => {
+    const feed = buildDeskFeed(
+      {
+        conversations: [
+          conv('c', { status: 'hold', next_action_at: actionAt(3), organization: { name: 'Teatro Pradillo' } }),
+          conv('d', { status: 'hold', next_action_at: actionAt(3), person: null, organization: { name: 'Sala Beckett' } }),
+        ],
+        tasks: [],
+        performances: [],
+        dates: [],
+      },
+      NOW,
+      'en',
+    );
+    const items = feed.find((x) => x.sortKey === 3)!.runs[0].items;
+    expect(items.map((i) => i.subject).sort()).toEqual(['Sala Beckett', 'Teatro Pradillo']);
+  });
 });
 
 describe('buildDeskFeed — tasks, AI, money', () => {

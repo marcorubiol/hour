@@ -63,6 +63,8 @@ export class ApiError extends Error {
   constructor(
     public readonly status: number,
     message: string,
+    /** The parsed error body, for callers that read a field of it (e.g. the 409's `conversation_id`). */
+    public readonly body: Record<string, unknown> | null = null,
   ) {
     super(message);
     this.name = 'ApiError';
@@ -106,6 +108,7 @@ export async function mutateJSON<T = unknown>(
     throw new ApiError(
       res.status,
       parsed.hint || parsed.detail || parsed.error || `Error ${res.status}`,
+      parsed as Record<string, unknown>,
     );
   }
   return parsed as T;
