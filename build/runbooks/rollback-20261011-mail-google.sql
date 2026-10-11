@@ -78,6 +78,8 @@ BEGIN
     RAISE EXCEPTION 'authentication required' USING ERRCODE = '42501';
   END IF;
 
+  -- FOR UPDATE: dos capturas a la vez sobre la misma conversación se ponen
+  -- en fila y el máximo del último contacto no se pierde entre ellas.
   SELECT * INTO v_conv
   FROM public.conversation
   WHERE id = p_conversation_id AND deleted_at IS NULL
@@ -91,6 +93,8 @@ BEGIN
     RAISE EXCEPTION 'kind is required' USING ERRCODE = '22023';
   END IF;
 
+  -- Lo que ocurrió no puede estar en el futuro. Cinco minutos de holgura
+  -- para el reloj de un conector; la app deja la hora al servidor.
   IF v_occurred > statement_timestamp() + interval '5 minutes' THEN
     RAISE EXCEPTION 'occurred_at is in the future' USING ERRCODE = '22023';
   END IF;
@@ -115,6 +119,7 @@ BEGIN
   RETURNING * INTO v_row;
 
   IF v_row.id IS NULL THEN
+    -- Ya estaba: idempotente, sin segundo efecto sobre el contacto.
     SELECT * INTO v_row
     FROM public.conversation_event
     WHERE workspace_id = v_conv.workspace_id
@@ -123,6 +128,7 @@ BEGIN
     RETURN v_row;
   END IF;
 
+  -- Regla de contacto del contrato: todo menos una nota sin dirección.
   IF p_kind <> 'note' OR p_direction IS NOT NULL THEN
     UPDATE public.conversation
     SET last_contacted_at = greatest(coalesce(last_contacted_at, v_occurred), v_occurred),
