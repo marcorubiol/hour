@@ -45,6 +45,8 @@ export interface DeskConvInput {
   next_action_at: string | null;
   next_action_note: string | null;
   person: { full_name: string | null; organization_name: string | null; slug: string | null } | null;
+  /** ADR-102: who the conversation is with; it titles the item when present. */
+  organization?: { name: string } | null;
   project: { id: string; slug: string; name: string } | null;
 }
 
@@ -270,7 +272,7 @@ function runHeads<R extends { series_id?: string | null }>(
 
 function convSubject(e: DeskConvInput, locale: Locale): string {
   return (
-    e.person?.full_name || e.person?.organization_name || e.next_action_note || t('desk.untitled', locale)
+    e.organization?.name || e.person?.full_name || e.person?.organization_name || e.next_action_note || t('desk.untitled', locale)
   );
 }
 function payerName(i: DeskInvoiceInput, locale: Locale): string {
@@ -480,7 +482,7 @@ export function buildDeskFeed(input: DeskFeedInput, now: Date, locale: Locale = 
         blankItem({
           id: `revive-${e.id}`,
           concern: 'conversation',
-          subject: e.person?.full_name || e.person?.organization_name || t('desk.fallback_contact', locale),
+          subject: e.organization?.name || e.person?.full_name || e.person?.organization_name || t('desk.fallback_contact', locale),
           projectName: e.project?.name ?? '—',
           projectId: e.project?.id ?? null,
           verbKey: 'revive',

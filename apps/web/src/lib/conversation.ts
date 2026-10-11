@@ -199,6 +199,35 @@ export function existingConversationId(errorBody: string): string | null {
   }
 }
 
+/**
+ * What the capture dialogs send for "who": the person (with the organization
+ * by name) when there is a name, or the organization alone (ADR-102). Null
+ * when there is neither: the dialog asks for one.
+ */
+export function conversationWhoBody(fields: {
+  name: string;
+  email?: string;
+  phone?: string;
+  organization: string;
+}):
+  | { person: { full_name: string; email: string | null; phone?: string | null; organization_name: string | null } }
+  | { organization: { name: string } }
+  | null {
+  const name = fields.name.trim();
+  const organization = fields.organization.trim();
+  if (name) {
+    return {
+      person: {
+        full_name: name,
+        email: fields.email?.trim() || null,
+        ...(fields.phone !== undefined ? { phone: fields.phone.trim() || null } : {}),
+        organization_name: organization || null,
+      },
+    };
+  }
+  return organization ? { organization: { name: organization } } : null;
+}
+
 // ── Contacts (ADR-102): the people of a conversation with a venue ──
 
 /**

@@ -21,7 +21,7 @@
   import Select from '$lib/components/Select.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
   import { mutateJSON, ApiError } from '$lib/api';
-  import { CONVERSATION_STATUSES, statusLabel } from '$lib/conversation';
+  import { CONVERSATION_STATUSES, conversationWhoBody, statusLabel } from '$lib/conversation';
   import { appLocale, t } from '$lib/i18n';
 
   interface Props {
@@ -71,11 +71,8 @@
     mutationFn: () =>
       mutateJSON('POST', '/api/conversations', {
         project_id: line.project_id,
-        person: {
-          full_name: aName.trim(),
-          email: aEmail.trim() || null,
-          organization_name: aOrg.trim() || null,
-        },
+        // ADR-102: the person is optional; the organization alone is enough.
+        ...conversationWhoBody({ name: aName, email: aEmail, organization: aOrg }),
         status: aStatus,
         next_action_at: aNextAt || null,
         next_action_note: aNextNote.trim() || null,
@@ -105,7 +102,7 @@
   });
 
   function submitAdd() {
-    if (!aName.trim()) {
+    if (!aName.trim() && !aOrg.trim()) {
       addToast({
         tone: 'warning',
         title: t('line.name_required', locale),
@@ -121,7 +118,7 @@
   <div class="lcm__bar">
     <Button size="xs" variant="outline" onclick={openAdd}>{t('conversations.add', locale)}</Button>
   </div>
-  <ConversationTable {filters} personBase={`/h/${workspaceSlug}/person`} />
+  <ConversationTable {filters} personBase={`/h/${workspaceSlug}/person`} conversationHref={(item) => `/h/${workspaceSlug}/conversation/${item.id}`} />
 </div>
 
 <Dialog bind:open={addOpen} title={t('conversations.add', locale)} size="s" onclose={() => (addOpen = false)}>
@@ -132,7 +129,7 @@
       submitAdd();
     }}
   >
-    <Input label={t('conversations.full_name', locale)} bind:value={aName} required />
+    <Input label={t('conversations.full_name', locale)} bind:value={aName} />
     <Input label={t('conversations.email', locale)} type="email" bind:value={aEmail} />
     <Input label={t('conversations.col_organization', locale)} bind:value={aOrg} />
     <Select label={t('edit.status', locale)} options={statusOptions} bind:value={aStatus} />

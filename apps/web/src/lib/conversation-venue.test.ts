@@ -8,6 +8,7 @@ import {
   contactSetArgs,
   conversationCreateProblem,
   conversationTitle,
+  conversationWhoBody,
   currentContacts,
   existingConversationId,
   normalizeConversationItem,
@@ -154,5 +155,20 @@ describe('contacts and title', () => {
   it('the select embeds the organization by the FK the contract keeps', () => {
     expect(CONVERSATION_SELECT).toContain('workspace_organization!conversation_workspace_organization_fkey');
     expect(CONVERSATION_SELECT).toContain('contacts:conversation_contact(');
+  });
+});
+
+describe('what the capture dialogs send', () => {
+  it('a name sends the person, with the organization by name', () => {
+    expect(conversationWhoBody({ name: ' Inés ', email: '', organization: 'Pradillo' })).toEqual({
+      person: { full_name: 'Inés', email: null, organization_name: 'Pradillo' },
+    });
+    expect(conversationWhoBody({ name: 'Inés', phone: ' 600 ', organization: '' })).toEqual({
+      person: { full_name: 'Inés', email: null, phone: '600', organization_name: null },
+    });
+  });
+  it('only an organization sends the organization; neither sends nothing', () => {
+    expect(conversationWhoBody({ name: ' ', organization: ' Pradillo ' })).toEqual({ organization: { name: 'Pradillo' } });
+    expect(conversationWhoBody({ name: '', organization: '' })).toBeNull();
   });
 });

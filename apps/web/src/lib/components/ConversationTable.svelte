@@ -39,6 +39,7 @@
     relativeContactDate,
     statusBadgeClass,
     statusLabel,
+    conversationTitle,
     type ConversationItem,
     type ConversationPatch,
     type ConversationStatus,
@@ -50,6 +51,8 @@
     personBase?: string;
     /** Cross-space lenses resolve the dossier from each conversation's workspace. */
     personHref?: (item: ConversationItem) => string | null;
+    /** The conversation file; without it, derived from the person path (ADR-102: a conversation may have no person). */
+    conversationHref?: (item: ConversationItem) => string | null;
     /** The global lens may switch between operational rows and the contact book. */
     groupable?: boolean;
     /** The global lens points an empty book at the existing import path. */
@@ -60,6 +63,7 @@
     filters,
     personBase,
     personHref,
+    conversationHref,
     groupable = false,
     importEmptyState = false,
   }: Props = $props();
@@ -281,8 +285,20 @@
   }
 
   function locationOf(item: ConversationItem): string {
-    if (!item.person) return '—';
+    if (!item.person) return item.organization?.city || '—';
     return [item.person.city, item.person.country].filter(Boolean).join(', ') || '—';
+  }
+
+  /** ADR-102: who the conversation is with; before the organization, the dossier's. */
+  function organizationOf(item: ConversationItem): string | null {
+    return item.organization?.name ?? item.person?.organization_name ?? null;
+  }
+
+  /** The line of the dialogs: the organization, and the primary contact when there is one. */
+  function whoLine(item: ConversationItem): string {
+    const title = conversationTitle(item) || t('conversations.conversation', locale);
+    const person = item.person?.full_name;
+    return person && person !== title ? `${title} — ${person}` : title;
   }
 
   function personPath(item: ConversationItem): string | null {
@@ -292,6 +308,8 @@
 
   /** La ficha vive en el mismo espacio que el dossier: /h/<ws>/conversation/<id>. */
   function conversationPath(item: ConversationItem): string | null {
+    const direct = conversationHref?.(item);
+    if (direct) return direct;
     const person = personPath(item);
     return person ? person.replace(/\/person\/[^/]+$/, `/conversation/${item.id}`) : null;
   }
@@ -365,9 +383,9 @@
             <td
               class="cell--muted"
               data-label={t('conversations.col_organization', locale)}
-              data-empty={!group.person?.organization_name || undefined}
+              data-empty={!organizationOf(representative) || undefined}
             >
-              {group.person?.organization_name ?? '—'}
+              {organizationOf(representative) ?? '—'}
             </td>
             <td
               class="cell--meta"
@@ -422,9 +440,9 @@
             <td
               class="cell--muted"
               data-label={t('conversations.col_organization', locale)}
-              data-empty={!item.person?.organization_name || undefined}
+              data-empty={!organizationOf(item) || undefined}
             >
-              {item.person?.organization_name ?? '—'}
+              {organizationOf(item) ?? '—'}
             </td>
             <td class="cell--meta" data-label={t('conversations.col_location', locale)} data-empty={locationOf(item) === '—' || undefined}
               >{locationOf(item)}</td
@@ -545,9 +563,7 @@
 <Dialog bind:open={historyOpen} title={t('conversations.history', locale)} size="m" onclose={() => (historyFor = null)}>
   {#if historyFor}
     <p class="next-action-who">
-      {historyFor.person?.full_name ?? t('conversations.conversation', locale)}{historyFor.person?.organization_name
-        ? ` — ${historyFor.person.organization_name}`
-        : ''}
+      {whoLine(historyFor)}
     </p>
     {@const fullPath = conversationPath(historyFor)}
     {#if fullPath}
@@ -565,9 +581,7 @@
 <Dialog bind:open={dialogOpen} title={t('conversations.col_next_action', locale)} size="s" onclose={() => (editing = null)}>
   {#if editing}
     <p class="next-action-who">
-      {editing.person?.full_name ?? t('conversations.conversation', locale)}{editing.person?.organization_name
-        ? ` — ${editing.person.organization_name}`
-        : ''}
+      {whoLine(editing)}
     </p>
   {/if}
   <Input label={t('perf.date', locale)} type="date" bind:value={formDate} />

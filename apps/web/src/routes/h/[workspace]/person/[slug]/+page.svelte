@@ -50,6 +50,8 @@
       next_action_at: string | null;
       next_action_note: string | null;
       project: { id: string; slug: string; name: string; workspace_id: string } | null;
+      /** ADR-102: with whom (the person is one of its contacts). */
+      organization: { id: string; slug: string; name: string } | null;
     }>;
     notes: Array<{
       id: string;
@@ -331,7 +333,7 @@
             <li>
               <span class={statusBadgeClass(e.status)}>{statusLabel(e.status, locale)}</span>
               <span class="person__row-main">
-                {e.project?.name ?? '—'}
+                {e.project?.name ?? '—'}{#if e.organization} · {e.organization.name}{/if}
                 {#if e.next_action_note}
                   <span class="person__row-note">{e.next_action_note}</span>
                 {/if}

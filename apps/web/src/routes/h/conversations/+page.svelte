@@ -23,7 +23,7 @@
   import Input from '$lib/components/Input.svelte';
   import Select from '$lib/components/Select.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
-  import { CONVERSATION_STATUSES, statusLabel, type ConversationItem } from '$lib/conversation';
+  import { CONVERSATION_STATUSES, conversationWhoBody, statusLabel, type ConversationItem } from '$lib/conversation';
   import { appLocale, t } from '$lib/i18n';
   import { usePins } from '$lib/stores/pins.svelte';
   import { spaceName } from '$lib/utils/identity';
@@ -57,6 +57,12 @@
     return workspaceSlug && item.person?.slug
       ? `/h/${workspaceSlug}/person/${item.person.slug}`
       : null;
+  }
+
+  /** ADR-102: the file of a conversation, also one without a person. */
+  function conversationHref(item: ConversationItem): string | null {
+    const workspaceSlug = workspaceSlugById.get(item.workspace_id);
+    return workspaceSlug ? `/h/${workspaceSlug}/conversation/${item.id}` : null;
   }
 
   // ── Pins → scope (Adaptive Digest) ────────────────────────────────────
@@ -205,12 +211,8 @@
     mutationFn: async (): Promise<AddResult> => {
       const targets = [...aProjectIds];
       const lineFor = { ...aLineByProject };
-      const person = {
-        full_name: aName.trim(),
-        email: aEmail.trim() || null,
-        phone: aPhone.trim() || null,
-        organization_name: aOrg.trim() || null,
-      };
+      // ADR-102: the person is optional; the organization alone is enough.
+      const who = conversationWhoBody({ name: aName, email: aEmail, phone: aPhone, organization: aOrg }) ?? {};
       const base = {
         status: aStatus,
         next_action_at: aNextAt || null,
@@ -223,7 +225,7 @@
         const line_id = lineFor[projectId] || null;
         const body: Record<string, unknown> = personId
           ? { project_id: projectId, person_id: personId, line_id, ...base }
-          : { project_id: projectId, person, line_id, ...base };
+          : { project_id: projectId, ...who, line_id, ...base };
         try {
           const data = await mutateJSON<{ conversation?: { person_id?: string } }>(
             'POST',
@@ -286,7 +288,7 @@
       addToast({ tone: 'warning', message: t('conversations.pick_space', locale) });
       return;
     }
-    if (!aName.trim()) {
+    if (!aName.trim() && !aOrg.trim()) {
       addToast({ tone: 'warning', message: t('conversations.needs_name', locale) });
       return;
     }
@@ -318,7 +320,7 @@
     <Button size="s" onclick={openAdd}>{t('conversations.add', locale)}</Button>
   </div>
 
-  <ConversationTable {filters} {personHref} groupable importEmptyState />
+  <ConversationTable {filters} {personHref} {conversationHref} groupable importEmptyState />
 </section>
 
 <Dialog bind:open={addOpen} title={t('conversations.add', locale)} size="m">
@@ -356,7 +358,7 @@
     {/if}
   </fieldset>
   <div class="conversations__form-grid">
-    <Input label={t('conversations.full_name', locale)} bind:value={aName} required />
+    <Input label={t('conversations.full_name', locale)} bind:value={aName} />
     <Input
       label={t('conversations.col_organization', locale)}
       bind:value={aOrg}
