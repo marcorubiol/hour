@@ -3406,3 +3406,6 @@ Marco aceptó las seis recomendaciones del plan (§ 8):
   una amiga programadora, que nadie más debe ver).
 - **Contacto añadido más tarde:** se trae su correo de los últimos 12 meses.
 - **Firma:** propia de Hour, no la de Gmail.
+- **Privacidad por defecto (sustituye la primera frase del punto 4):** el admin del espacio elige si las conversaciones
+  nuevas nacen privadas o compartidas, y cada persona cambia después las suyas; por defecto, privadas. Las
+  conversaciones que ya existen siguen compartidas (las 154 de MüK Cia, entre ellas), para no quitar acceso sin avisar.
