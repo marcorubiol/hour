@@ -39,8 +39,10 @@ de Phase 0.9 en `_tasks.md`. Pricing orientativo, no decidido.
 - Supabase `hour-phase0` · ref `lqlyorlccnniybezugme` · `eu-central-1`. Plan Free, con keepalive diario
   (`.github/workflows/keepalive.yml`) contra la pausa por inactividad. Pasar a Pro antes de la beta, aún no
   (`_tasks.md § 9`). Si algo de Supabase falla tras días sin uso, lo primero es `dig <ref>.supabase.co`.
-- **Última migración aplicada: `20261010200000_venue_directory`** (2026-10-10, apply run 38073493631). El
-  directorio tiene 4.659 salas, cargadas con `venue-directory-load.yml` (run 38077136839). Las migraciones van por `production-migrate.yml`: backup, plan, apply (`_tasks.md § 34`).
+- **Última migración aplicada: `20261011500000_conversation_revive_privacy`** (2026-10-11; comprobado con
+  `list_migrations`). Las del 11-10: facetas (expand y lecturas), buzón de Google, firma por persona y privacidad al
+  revivir una conversación. El directorio tiene 6.802 salas. Las migraciones van por `production-migrate.yml`: backup,
+  plan, apply (`_tasks.md § 34`).
 - `hour-staging` (ref `slccyknqpgmzhyiyclsq`, `eu-west-1`): pausado.
 - Últimas suites contra `3649036` (2026-10-10): E2E 62/62 y RLS 233/233.
 
