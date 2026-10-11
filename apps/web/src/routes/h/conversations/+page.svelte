@@ -13,7 +13,6 @@
    */
 
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
-  import { goto } from '$app/navigation';
   import { fetchJSON, mutateJSON, ApiError } from '$lib/api';
   import Button from '$lib/components/Button.svelte';
   import LensHeader from '$lib/components/LensHeader.svelte';
@@ -32,11 +31,7 @@
     buildLineIndex,
     buildProjectIndex,
     resolveScope,
-    lineUrl,
-    projectUrl,
     projectsInScope,
-    type NavLine,
-    type NavProject,
     type NavWorkspace,
     type RawLine,
     type RawProject,
@@ -80,13 +75,6 @@
     (pins.lineIds().length > 0 && scope.lines.length !== pins.lineIds().length) ||
       (pins.projectIds().length > 0 && scope.projects.length !== pins.projectIds().length),
   );
-
-  function openLine(line: NavLine) {
-    void goto(lineUrl(line));
-  }
-  function openProject(project: NavProject) {
-    void goto(projectUrl(project));
-  }
 
   // Debounced search — the raw input updates instantly, the query key
   // only after the pause.
