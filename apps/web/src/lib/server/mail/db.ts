@@ -47,8 +47,6 @@ export interface MailAccountRow {
   sync_cursor: string | null;
   sync_from: string;
   last_synced_at: string | null;
-  /** Firma de Hour del buzón (la del personal, de su dueño; la del común, del espacio). */
-  signature: string | null;
 }
 
 export interface ContactAddress {

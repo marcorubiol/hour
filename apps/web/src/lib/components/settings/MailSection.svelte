@@ -60,16 +60,6 @@
     onSettled: invalidate,
   });
 
-  /** Firma de Hour por buzón: borradores mientras se escribe. */
-  let drafts = $state<Record<string, string>>({});
-  const saveSignature = createMutation({
-    mutationFn: (v: { id: string; signature: string }) =>
-      mutateJSON('PUT', `/api/mail/accounts/${v.id}`, { signature: v.signature.trim() || null }),
-    onSuccess: () => addToast({ tone: 'success', title: t('mail.signature', locale), message: t('mail.signature_saved', locale) }),
-    onError: (err) => addToast({ tone: 'danger', title: t('mail.action_failed', locale), message: String(err instanceof Error ? err.message : err) }),
-    onSettled: invalidate,
-  });
-
   const syncNow = createMutation({
     mutationFn: (id: string) =>
       mutateJSON<{ ingested?: number; error?: string | null; status?: string }>('POST', `/api/mail/accounts/${id}/sync`),
@@ -219,29 +209,6 @@
         {t('mail.disconnect', locale)}
       </Button>
     </div>
-    <form
-      class="sig"
-      onsubmit={(ev) => {
-        ev.preventDefault();
-        $saveSignature.mutate({ id: a.id, signature: drafts[a.id] ?? a.signature ?? '' });
-      }}
-    >
-      <label class="sig__label" for={`sig-${a.id}`}>
-        {a.scope === 'personal' ? t('mail.signature_personal', locale) : t('mail.signature_shared', locale)}
-      </label>
-      <textarea
-        id={`sig-${a.id}`}
-        rows="3"
-        maxlength="2000"
-        value={drafts[a.id] ?? a.signature ?? ''}
-        oninput={(ev) => (drafts[a.id] = (ev.currentTarget as HTMLTextAreaElement).value)}
-      ></textarea>
-      <div class="sig__row">
-        <Button size="s" variant="outline" type="submit" disabled={$saveSignature.isPending}>{t('mail.signature_save', locale)}</Button>
-      </div>
-    </form>
-  {:else if a.signature}
-    <p class="conn__meta sig__ro">{a.signature}</p>
   {/if}
 {/snippet}
 
@@ -289,34 +256,6 @@
     }
     .conn__meta--warn {
       color: var(--danger-dark);
-    }
-    .sig {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-xs);
-      inline-size: 100%;
-    }
-    .sig__label {
-      color: var(--text-faint);
-      font-size: var(--text-xs);
-    }
-    .sig textarea {
-      inline-size: 100%;
-      padding: var(--space-xs) var(--space-s);
-      color: var(--text-color);
-      background: var(--bg-ultra-light);
-      border: 1px solid var(--border-color-dark);
-      border-radius: var(--radius-s);
-      font: inherit;
-      font-size: var(--text-s);
-      resize: vertical;
-    }
-    .sig__row {
-      display: flex;
-      justify-content: flex-end;
-    }
-    .sig__ro {
-      white-space: pre-line;
     }
     .conn__actions {
       display: inline-flex;

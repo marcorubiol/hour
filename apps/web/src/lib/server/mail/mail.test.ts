@@ -31,7 +31,7 @@ import {
 import { matchMessage } from './provider';
 import { syncAccount } from './sync';
 import type { IngestPayload, MailAccountRow, MailDb } from './db';
-import { withSignature } from '../../mail';
+import { displayWebsite, effectiveSignature, proposedSignature, withSignature, type SignatureParts } from '../../mail';
 
 const KEY_B64 = toBase64Url(new Uint8Array(32).map((_, i) => i + 1));
 const b64url = (s: string) => toBase64Url(new TextEncoder().encode(s));
@@ -266,6 +266,33 @@ describe('signature', () => {
     expect(withSignature('Hola.', '  ')).toBe('Hola.');
     expect(withSignature('Hola.', null)).toBe('Hola.');
   });
+
+  const parts: SignatureParts = {
+    full_name: 'Anouk Martí',
+    title: 'Distribució',
+    company_name: 'MüK Cia',
+    company_website: 'https://www.mukcia.com/',
+    company_phone: '+34 600 000 000',
+    signature: null,
+    company_signature: null,
+  };
+
+  test('Hour proposes one per person and company, with what exists', () => {
+    expect(proposedSignature(parts, 'personal')).toBe('Anouk Martí\nDistribució, MüK Cia\nmukcia.com · +34 600 000 000');
+    expect(proposedSignature(parts, 'workspace')).toBe('MüK Cia\nmukcia.com · +34 600 000 000');
+    const bare = { ...parts, title: null, company_website: null, company_phone: '  ' };
+    expect(proposedSignature(bare, 'personal')).toBe('Anouk Martí\nMüK Cia');
+    expect(proposedSignature(bare, 'workspace')).toBe('MüK Cia');
+    expect(displayWebsite('http://example.org')).toBe('example.org');
+  });
+
+  test('the stored signature wins; empty or null falls back to the proposal', () => {
+    expect(effectiveSignature({ ...parts, signature: 'Anouk' }, 'personal')).toBe('Anouk');
+    expect(effectiveSignature({ ...parts, signature: '  ' }, 'personal')).toBe(proposedSignature(parts, 'personal'));
+    // El buzón común firma con la de la compañía, nunca con la de quien envía.
+    expect(effectiveSignature({ ...parts, signature: 'Anouk', company_signature: 'MüK' }, 'workspace')).toBe('MüK');
+    expect(effectiveSignature({ ...parts, signature: 'Anouk' }, 'workspace')).toBe(proposedSignature(parts, 'workspace'));
+  });
 });
 
 describe('outgoing message', () => {
@@ -419,7 +446,6 @@ async function accountRow(over: Partial<MailAccountRow> = {}): Promise<MailAccou
     sync_cursor: null,
     sync_from: '2026-08-01T00:00:00Z',
     last_synced_at: null,
-    signature: null,
     ...over,
   };
 }

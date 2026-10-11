@@ -13,7 +13,7 @@ import { pgGet, pgPostRpc, type SupabaseEnv } from '../../supabase';
 import { decryptSecret, importMailKey, refreshTokenAad } from './crypto';
 import { serviceMailDb, type MailEnv } from './db';
 import { googleAdapter } from './gmail';
-import { withSignature } from '../../mail';
+import { effectiveSignature, withSignature, type SignatureParts } from '../../mail';
 
 export interface SendRequest {
   conversationId: string;
@@ -84,8 +84,14 @@ export async function sendFromConversation(
   const access = await adapter.accessToken(refreshToken);
 
   const messageId = `<${crypto.randomUUID()}@${messageIdDomain}>`;
-  // La firma es de Hour (ADR-099, añadido): la del buzón, no la de Gmail.
-  const body = withSignature(req.body, account.signature);
+  // La firma es de Hour, no la de Gmail, y es de la persona en esa compañía
+  // (ADR-099, añadido): la de quien envía en el espacio de la conversación, o
+  // la de la compañía si sale por el buzón común. Con su JWT: solo la propia.
+  const sig = await pgPostRpc<SignatureParts>(supa, 'my_mail_signature', jwt, {
+    p_workspace_id: account.workspace_id,
+  });
+  const parts = sig.data[0];
+  const body = withSignature(req.body, parts ? effectiveSignature(parts, account.scope) : null);
   const sent = await adapter.send(access, {
     from: account.address,
     to: target.recipient_address,
