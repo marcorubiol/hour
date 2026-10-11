@@ -168,6 +168,12 @@ describe('buildDeskFeed — agenda dates', () => {
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ concern: 'agenda', subject: 'Assaig' });
   });
+
+  it('an agenda row opens the Agenda at its own day', () => {
+    const feed = buildDeskFeed({ ...EMPTY, dates: [dateEv('ev', { starts_at: at(2, 18) })] }, NOW, 'en');
+    const row = feed.flatMap((b) => b.runs).flatMap((r) => r.items)[0];
+    expect(row.href).toBe(`/h/planner?view=agenda&d=${at(2, 18).slice(0, 10)}`);
+  });
 });
 
 describe('buildDeskFeed — fixed within-day order', () => {

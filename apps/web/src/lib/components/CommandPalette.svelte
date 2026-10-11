@@ -35,7 +35,7 @@
   } from '$lib/nav';
   import { parsePin, personPin } from '$lib/stores/pins.svelte';
   import { parseDayQuery } from '$lib/day-query';
-  import { dayKeyInTz } from '$lib/planner';
+  import { dayKeyInTz, plannerDayHref } from '$lib/planner';
   import { localeDayMonth } from '$lib/datetime';
   import { detectLocale, LOCALE_TAG, t } from '$lib/i18n';
   import { accentVarFor } from '$lib/utils/accent';
@@ -353,7 +353,7 @@
   function openRow(r: Row) {
     // Antes de `parsePin`: `d:` no es un pin y su gramática no lo conoce.
     if (r.kind === 'day') {
-      void goto(`/h/planner?view=day&d=${r.path}`);
+      void goto(plannerDayHref('day', r.path));
       open = false;
       return;
     }

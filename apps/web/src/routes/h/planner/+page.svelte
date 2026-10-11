@@ -204,8 +204,24 @@
   // and with honest ends those two months surfaced as empty chapters
   // between the last gig and «nothing more planned». The forward probe
   // pulls the future in only where it exists.
-  let agendaFromIso = $state(todayIso);
-  let agendaEnd = $state(addMonths(now.getFullYear(), now.getMonth() + 1, 0));
+  // A link that names a day (`?view=agenda&d=`, the Desk's agenda doors)
+  // opens the book AT that day instead of today: the day is the book's first
+  // row, and the window reaches at least to today's month so the present
+  // stays one scroll away. `Now` restores the ordinary shape.
+  const agendaOpenIso = (() => {
+    const params = new URL(location.href).searchParams;
+    const raw = params.get('d');
+    return normalizePlannerView(params.get('view')) === 'agenda' && raw && /^\d{4}-\d{2}-\d{2}$/.test(raw)
+      ? raw
+      : null;
+  })();
+  const agendaSeedEnd = addMonths(now.getFullYear(), now.getMonth() + 1, 0);
+  let agendaFromIso = $state(agendaOpenIso ?? todayIso);
+  let agendaEnd = $state(
+    agendaOpenIso && agendaOpenIso.slice(0, 7) > firstOfMonth(agendaSeedEnd).slice(0, 7)
+      ? { year: Number(agendaOpenIso.slice(0, 4)), month: Number(agendaOpenIso.slice(5, 7)) }
+      : agendaSeedEnd,
+  );
   let agendaToIso = $derived(
     addDaysIso(firstOfMonth(addMonths(agendaEnd.year, agendaEnd.month, 1)), -1),
   );
