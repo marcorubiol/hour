@@ -3336,3 +3336,33 @@ Triggered by Marco's pre-scaffold doubt (Phase 0.0 day 5). Five alternatives eva
   190/190 (los 179 de producción más los 11 de
   `tests/rls/conversation-event.test.ts`) y el E2E de conversaciones 5/5
   contra `vite dev` sobre esa base.
+
+## [2026-10-11] ADR-099 · Comms: primer corte con el buzón sincronizado y los hilos con facetas, en dos carriles
+
+**Contexto.** Borrador en papel `build/comms-paper-draft.md` (2026-10-10) y sesión de preguntas con Marco
+(2026-10-11). Comms es la razón de ser de Hour (ADR-082, ADR-083, ADR-085); la temporada de difusión que pedía
+ADR-085 empieza con Anouk.
+
+**Decidido por Marco:**
+1. **Difusión e hilos a la vez, en dos carriles.** El de hilos empieza por los permisos de faceta (punto 8).
+2. **Sincronizar el buzón de cada persona en los dos sentidos**: conexión con Google o Microsoft (IMAP/SMTP para el
+   resto); Hour lee lo enviado y lo recibido y puede enviar por ese mismo buzón, con su dirección y su firma. Sustituye
+   la captura por copia oculta del borrador y deja sin objeto ADR-028 (dirección de captura por conversación). Un SMTP
+   propio de Hour queda por investigar, para Hour y para las compañías, sabiendo que ellas quieren usar su correo.
+3. **Solo entran los correos con contactos que ya están en Hour**, emparejados por dirección. El resto del buzón no se
+   lee ni se guarda (minimización).
+4. **Los ve todo el que ve la conversación en el espacio.** Una conversación puede marcarse **privada**: entonces solo
+   la ve quien la marcó, y desaparece para los demás, también de los recuentos.
+5. **Lo hablado con fuera es registro** (`conversation_event`, ADR-098), no mensajes de hilo; los hilos son lo que el
+   equipo habla por dentro. **Provisional hasta que Marco lo vea en una maqueta** antes de construir.
+6. **El tablón del día cuelga del bolo.** La maqueta enseña también la variante por faceta (comidas en el bolo, técnica
+   en la función) para comparar.
+7. **Sin invitados externos en el primer corte de hilos**: lo que se habla con fuera llega por el buzón sincronizado.
+8. **Todo el sistema de permisos pasa al modelo nuevo** (los paquetes escriben las facetas), en expand/contract con
+   ensayo en staging; una sola fuente de verdad sobre quién ve qué.
+9. **Se conectan los dos tipos de buzón**: el de cada persona, y uno común del espacio que conecta un admin y comparte
+   el equipo.
+
+**Pendiente.** Si enviar desde el buzón conectado es comunicación comercial y qué exige la LSSI (consulta legal de
+Marco, `research/product/22-venue-directory-personal-data-legal.md`). Registrar las apps OAuth en Google y Microsoft
+(cuentas de Marco).

@@ -1401,7 +1401,17 @@ entre empresas sin construirlo.
   fusionar las entidades** — 1:1 con estado vs N:N sin estado; lo que unifica es
   la lente, no la tabla.
 
-- [ ] Marco: decidir — **Comms: reaccionar al borrador en papel `build/comms-paper-draft.md` (2026-10-10)** y sus cinco preguntas (registro o hilo, de qué cuelga el tablón del día, primer corte, invitado, dirección de captura). **Comms: diseño en papel, sin código (Marco, 2026-10-10: se abre ya; la puerta de construir sigue).** Antes: la puerta de producto de comms, que es de Marco y no técnica. ADR-085 lleva
+- [ ] **Comms, carril 1: difusión con el buzón sincronizado (ADR-099, 2026-10-11).** Primero una maqueta para Marco
+  (conversación con correos, llamadas y notas juntos; el registro de ADR-098 es provisional hasta que lo vea). Después,
+  conexión de buzón personal y común (Google, Microsoft, IMAP/SMTP), solo correos con contactos de Hour, envío por el
+  buzón conectado y conversaciones privadas.
+- [ ] Marco: hacer — **Registrar las apps OAuth de Hour en Google y Microsoft** para conectar buzones (ADR-099).
+- [ ] **Comms, carril 2: hilos con facetas (ADR-099).** Empieza por pasar todo el sistema de permisos al modelo nuevo
+  (expand/contract con staging); después hilos sin invitados, tablón del día colgado del bolo (la maqueta enseña
+  también la variante por faceta).
+- [ ] **Investigar un SMTP propio de Hour** (envío como Hour en nombre de la compañía): entregabilidad, LSSI y qué
+  prefieren las compañías, que quieren usar su correo (Marco, 2026-10-11).
+- [x] Comms: borrador en papel respondido el 2026-10-11 (ADR-099). **Comms: diseño en papel, sin código (Marco, 2026-10-10: se abre ya; la puerta de construir sigue).** Antes: la puerta de producto de comms, que es de Marco y no técnica. ADR-085 lleva
   escrita su propia condición: *usar la app en una temporada de difusión real
   antes de construir nada de esto*. Mientras no se cumpla, resolver los dos
   bloqueantes es trabajo especulativo por bueno que sea el modelo.
