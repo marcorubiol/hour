@@ -47,7 +47,19 @@ export const PUT: RequestHandler = async ({ request, params, platform, locals })
     return pgErrorResponse(
       err,
       { route: 'PUT /api/conversations/[id]/private', requestId: locals.requestId },
-      { codes: { '42501': { status: 404, error: 'not_found' } } },
+      {
+        codes: {
+          '42501': { status: 404, error: 'not_found' },
+          // 20261011500000: entre las vivas, una compartida por persona y
+          // proyecto, y una privada por persona, proyecto y dueño. Las dos
+          // filas que pueden chocar son visibles para quien llama.
+          '23505': {
+            status: 409,
+            error: 'conversation_exists',
+            hint: 'This person already has a conversation like this one in this project.',
+          },
+        },
+      },
     );
   }
 };

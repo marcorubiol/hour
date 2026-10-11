@@ -9,32 +9,46 @@
 -- diga «privadas», y si era privada de OTRA persona seguía siendo de esa otra
 -- (y quien la recuperaba la recibía en la respuesta de la RPC).
 --
+-- Y el hueco hermano (decisión de Marco, 2026-10-11): si quien crea topa con
+-- una conversación VIVA y privada de otro miembro con esa persona, se crea
+-- igualmente una suya (cada uno la suya), sin 23505 ni ninguna pista de que
+-- la otra existe.
+--
 -- WHAT THIS DOES:
---   1. La unicidad (workspace, proyecto, persona) pasa a contar solo las
---      conversaciones vivas: la restricción de tabla
---      `conversation_workspace_id_project_id_person_id_key` se sustituye por un
---      índice único parcial (`deleted_at IS NULL`). Así una conversación
---      borrada y privada de otra persona puede quedarse donde está, invisible,
---      mientras quien crea recibe una nueva. Dos vivas con la misma persona en
---      el mismo proyecto siguen siendo imposibles (23505, el 409 de la API).
+--   1. La unicidad deja de ser la restricción de tabla
+--      `conversation_workspace_id_project_id_person_id_key`, que contaba
+--      también las borradas y las privadas de otros. Entre las vivas pasa a
+--      ser: una compartida por (espacio, proyecto, persona) y una privada por
+--      (espacio, proyecto, persona, private_to). Dos índices únicos parciales.
+--      Lo que puede chocar con lo que alguien escribe es siempre visible para
+--      él: la compartida, o su propia privada.
 --   2. `create_conversation` (misma firma, mismos permisos; el resto del
---      cuerpo igual que en 20260720105713) solo recupera una borrada que sea
---      compartida o privada de quien crea, la más reciente; y al recuperarla
---      fija `private_to` según el ajuste del espacio para quien crea, como si
---      naciera. La guarda no cambia: quien llama solo se pone a sí mismo o
---      quita su propia marca.
+--      cuerpo igual que en 20260720105713):
+--      · si quien crea ya ve una viva con esa persona en el proyecto
+--        (compartida o privada suya), 23505 como antes (el 409 de la API);
+--        las privadas de otros no cuentan;
+--      · si no, recupera una borrada solo si es compartida o privada suya, la
+--        más reciente, y le fija `private_to` según el ajuste del espacio para
+--        quien crea, como si naciera;
+--      · si no, inserta una nueva.
+--      La guarda no cambia: quien llama solo se pone a sí mismo o quita su
+--      propia marca.
 --
 -- Datos: no toca filas. Reescribe una función SECURITY DEFINER y cambia una
 -- restricción: «destructiva» para § 34 (inspect + staging + plan + apply).
 -- Rollback: build/runbooks/rollback-20261011-conversation-revive-privacy.sql.
 
--- ── 1 · unicidad solo entre vivas ────────────────────────────────────────
+-- ── 1 · unicidad entre vivas: una compartida, y una privada por dueño ────
 ALTER TABLE public.conversation
   DROP CONSTRAINT conversation_workspace_id_project_id_person_id_key;
 
-CREATE UNIQUE INDEX conversation_project_person_live_uidx
+CREATE UNIQUE INDEX conversation_project_person_shared_uidx
   ON public.conversation (workspace_id, project_id, person_id)
-  WHERE deleted_at IS NULL;
+  WHERE deleted_at IS NULL AND private_to IS NULL;
+
+CREATE UNIQUE INDEX conversation_project_person_private_uidx
+  ON public.conversation (workspace_id, project_id, person_id, private_to)
+  WHERE deleted_at IS NULL AND private_to IS NOT NULL;
 
 -- ── 2 · create_conversation ──────────────────────────────────────────────
 CREATE OR REPLACE FUNCTION public.create_conversation(
@@ -172,6 +186,19 @@ begin
       phone = coalesce(workspace_person.phone, excluded.phone),
       organization_id = coalesce(workspace_person.organization_id, excluded.organization_id),
       title = coalesce(workspace_person.title, excluded.title);
+  end if;
+
+  -- Ya hay una viva que quien crea ve (compartida o privada suya): el 409 de
+  -- siempre. Una privada de otro no cuenta ni se nombra: quien crea recibe la
+  -- suya.
+  if exists (
+    select 1 from public.conversation
+    where workspace_id = v_workspace_id and project_id = p_project_id
+      and person_id = v_person_id and deleted_at is null
+      and (private_to is null or private_to = v_caller)
+  ) then
+    raise exception 'this person already has a conversation in this project'
+      using errcode = '23505';
   end if;
 
   -- Se recupera una borrada solo si quien crea podría verla: compartida o

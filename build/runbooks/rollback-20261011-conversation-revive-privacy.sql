@@ -9,11 +9,15 @@
 --
 -- La restricción solo se puede volver a poner si no hay dos filas con la
 -- misma terna, cosa que esta migración permite (una borrada privada de otra
--- persona más la nueva). Si las hay, se deja el índice parcial y se avisa: la
--- función vieja funciona igual con él (su SELECT INTO toma una fila, y el
--- 23505 de dos vivas sale del índice). No se borra ninguna fila.
+-- persona más la nueva, o una viva compartida y privadas de distintos
+-- dueños). Si las hay, se dejan los dos índices parciales y se avisa: la
+-- función vieja funciona con ellos (su SELECT INTO toma una fila y los
+-- índices siguen impidiendo duplicar una compartida o una privada del mismo
+-- dueño). No se borra ninguna fila; separar esas filas es una decisión aparte.
 --
--- DATOS QUE SE PIERDEN: ninguno. Worker: no depende de esta migración.
+-- DATOS QUE SE PIERDEN: ninguno. Worker: el 409 de
+-- `PUT /api/conversations/:id/private` sigue siendo inofensivo sin la
+-- migración.
 
 BEGIN;
 
@@ -205,9 +209,10 @@ BEGIN
     GROUP BY workspace_id, project_id, person_id
     HAVING count(*) > 1
   ) THEN
-    RAISE NOTICE 'duplicate (workspace, project, person) rows exist: keeping conversation_project_person_live_uidx';
+    RAISE NOTICE 'duplicate (workspace, project, person) rows exist: keeping the shared/private partial unique indexes';
   ELSE
-    DROP INDEX public.conversation_project_person_live_uidx;
+    DROP INDEX public.conversation_project_person_shared_uidx;
+    DROP INDEX public.conversation_project_person_private_uidx;
     ALTER TABLE public.conversation
       ADD CONSTRAINT conversation_workspace_id_project_id_person_id_key
       UNIQUE (workspace_id, project_id, person_id);

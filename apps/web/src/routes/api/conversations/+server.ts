@@ -188,8 +188,10 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
  * (SECURITY DEFINER): the direct INSERT is claim-bound — sixth case of
  * the pattern. Gated on has_permission(project, 'edit:conversation').
  *
- * 409 conversation_exists: the (workspace, project, person) pair already
- * has a conversation — the UI links to it instead of silently merging.
+ * 409 conversation_exists: the person already has a conversation in this
+ * project that the caller can see (shared, or private to the caller) — the UI
+ * links to it instead of silently merging. Someone else's private one never
+ * counts and is never hinted at (20261011500000): the caller gets their own.
  */
 export const POST: RequestHandler = async ({ request, platform, locals }) => {
   if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);

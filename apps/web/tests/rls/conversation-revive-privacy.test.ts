@@ -15,10 +15,10 @@ import {
  * ADR-099 · recuperar una conversación borrada no se salta la privacidad
  * (20261011500000_conversation_revive_privacy).
  *
- * `create_conversation`, si ya hay en el proyecto una conversación borrada con
- * esa persona, la recupera. Lo que fija este fichero:
- * - una borrada privada de OTRA persona no se recupera: quien crea recibe una
- *   conversación suya, nunca la otra;
+ * Lo que fija este fichero sobre `create_conversation`:
+ * - una privada de OTRA persona, viva o borrada, no cuenta ni se nombra: quien
+ *   crea recibe una conversación suya (sin 409), nunca la otra;
+ * - una que quien crea sí ve (la suya) sigue dando 409;
  * - al recuperar, `private_to` lo decide el ajuste del espacio para quien
  *   crea, como al nacer.
  *
@@ -132,7 +132,7 @@ describe.skipIf(!envReady())('reviving a deleted conversation keeps privacy (ADR
   });
 
   test.skipIf(!limitedEnvReady())(
-    "someone else's deleted private conversation is never revived for me",
+    "someone else's private conversation, live or deleted, never blocks me nor comes back to me",
     async () => {
       const limited = requireLimitedEnv();
       const other = await login(limited.email, limited.password);
@@ -167,18 +167,32 @@ describe.skipIf(!envReady())('reviving a deleted conversation keeps privacy (ADR
         await setSetting(true);
         const mine = await create(jwt, 'ZZZ RLS Revive Other', OTHER_EMAIL);
         expect(mine.private_to).toBe(me);
-        await remove(jwt, mine.id);
 
+        // Viva y privada mía: la otra persona crea la suya, sin 409 ni pista.
         const theirs = await create(other, 'ZZZ RLS Revive Other', OTHER_EMAIL);
         expect(theirs.id).not.toBe(mine.id);
         expect(theirs.private_to).toBe(otherSub);
-
-        // La mía sigue siendo invisible para la otra persona.
         const peek = await pgGet('conversation', other, new URLSearchParams({ id: `eq.${mine.id}`, select: 'id' }));
         expect(peek.rows).toHaveLength(0);
 
-        // Se borra privada suya: la próxima pasada, cada uno recupera la suya.
+        // La suya sí la ve: crear otra vez es el 409 de siempre.
+        const again = await pgRpc('create_conversation', other, {
+          p_project_id: projectId,
+          p_full_name: 'ZZZ RLS Revive Other',
+          p_email: OTHER_EMAIL,
+        });
+        expect(again.status).toBe(409);
+        expect(again.error ?? '').not.toContain(mine.id);
         await remove(other, theirs.id);
+
+        // Borrada y privada mía: nunca se le recupera a la otra persona.
+        await remove(jwt, mine.id);
+        const back = await create(other, 'ZZZ RLS Revive Other', OTHER_EMAIL);
+        expect(back.id).not.toBe(mine.id);
+        expect(back.private_to).toBe(otherSub);
+
+        // Se borra privada suya: la próxima pasada, cada uno recupera la suya.
+        await remove(other, back.id);
       } finally {
         await pgPatch(
           'project_membership',

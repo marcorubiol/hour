@@ -6,10 +6,11 @@
    * that auto-assigns line_id at capture (the module context is the line —
    * no select needed, unlike the global dialog).
    *
-   * 409 conversation_exists: the (workspace, project, person) UNIQUE ignores
-   * line_id — the person already has a conversation in this project
-   * (possibly on another line). v1 surfaces it honestly instead of
-   * silently relinking.
+   * 409 conversation_exists: uniqueness ignores line_id — the person already
+   * has a conversation in this project that the caller can see (the shared
+   * one, or their own private one; possibly on another line). Someone else's
+   * private one never counts (20261011500000). v1 surfaces it honestly
+   * instead of silently relinking.
    */
 
   import { createMutation, useQueryClient } from '@tanstack/svelte-query';
