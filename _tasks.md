@@ -1401,7 +1401,7 @@ entre empresas sin construirlo.
   fusionar las entidades** — 1:1 con estado vs N:N sin estado; lo que unifica es
   la lente, no la tabla.
 
-- [ ] Marco: hacer — **Conectar tu Gmail en Ajustes → Buzones y comprobar que entran los correos con un contacto** (primer uso real; en producción desde el 2026-10-11, `6c4cd0a`, modo prueba de Google). **Comms, carril 1: difusión con el buzón sincronizado (ADR-099, 2026-10-11): construido y desplegado (`6c4cd0a`); falta el estreno con un buzón real.** Primero una maqueta para Marco
+- [x] Marco: hecho (2026-10-11, tras arreglar «Illegal invocation» en `aec8da6`) — **Conectar tu Gmail en Ajustes → Buzones y comprobar que entran los correos con un contacto** (primer uso real; en producción desde el 2026-10-11, `6c4cd0a`, modo prueba de Google). **Comms, carril 1: difusión con el buzón sincronizado (ADR-099, 2026-10-11): construido y desplegado (`6c4cd0a`); falta el estreno con un buzón real.** Primero una maqueta para Marco
   (conversación con correos, llamadas y notas juntos; el registro de ADR-098 es provisional hasta que lo vea). Después,
   conversación con dos vistas conmutables (registro con el hilo del equipo al lado, o todo en un hilo; Marco, 2026-10-11),
   conexión de buzón personal y común (Google, Microsoft, IMAP/SMTP), solo correos con contactos de Hour, envío por el
@@ -1481,6 +1481,8 @@ entre empresas sin construirlo.
 - [ ] **Marketing: que la gente se dé de alta en Hour (Marco, 2026-10-11, ADR-101).** Cómo se consiguen las altas
   está por pensar (Marco, 2026-10-11: pedir a las instituciones que inviten a sus programadores no es el momento ni la
   manera; los borradores a la Red y a DGArtes piden solo los listados de salas).
+- [ ] **Bug menor: algo pide `/h/<espacio>/sw.js` (ruta relativa del service worker) y el Worker registra un 404 en
+  cada carga de Ajustes** (visto en los registros el 2026-10-11). Ruido en los errores; buscar quién lo registra.
 - [ ] **Poll de fechas candidatas (à la Doodle/When2meet, integrado).** Al buscar
   fecha para una residencia, un ensayo o una reunión, proponer **varias `date`
   candidatas de golpe**; cada participante confirma las que puede; cuando todos
