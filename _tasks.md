@@ -378,6 +378,7 @@
 
 - [x] **Conversations: «Add to project» solo ofrece los proyectos del ámbito actual** (drop 11-10). Desplegado (`9f867e4`, 2026-10-11).
 - [x] **Conversations: cambiar de ámbito filtra la lista sin salir de Conversations** (drop 11-10). Reproducido (11-10): en la lista ya filtra en el sitio; lo que te sacaba a Desk era cambiar el ámbito desde una ficha abierta desde Conversations (persona o conversación). `c1a3c59` lo arregla. Desplegado (`9f867e4`, 2026-10-11); E2E 64/65 y el rojo (ley del Planner por tiempo) pasa solo.
+- [ ] **Planner: lo deducido se aprueba o se retira; `date` gana «quién va», opcional (ADR-103, chat 11-10).** «Voy / no voy» en el rail (NEXT) y en la ficha; sin lista, un `date` se sigue deduciendo del reparto del proyecto. Migración aditiva. Arranca después de la fase 2 de la conversación con la sala, para no llevar dos migraciones a la vez. (sin estimar)
 
 
 
@@ -1439,8 +1440,6 @@ entre empresas sin construirlo.
   escrita su propia condición: *usar la app en una temporada de difusión real
   antes de construir nada de esto*. Mientras no se cumpla, resolver los dos
   bloqueantes es trabajo especulativo por bueno que sea el modelo.
-
-- [ ] **Planner: lo deducido se aprueba o se retira; `date` gana «quién va», opcional (ADR-103, chat 11-10).** «Voy / no voy» en el rail (NEXT) y en la ficha; sin lista, un `date` se sigue deduciendo del reparto del proyecto. Migración aditiva. Arranca después de la fase 2 de la conversación con la sala, para no llevar dos migraciones a la vez. (sin estimar)
 
 ## Después de money v3 — contenedores (bloque 5)
 
