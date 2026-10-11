@@ -35,11 +35,14 @@ import {
  */
 const ORG_A = 'ZZZ F2 Venue A';
 const ORG_B = 'ZZZ F2 Venue B';
+const ORG_C = 'ZZZ F2 Venue C';
+const ORG_D = 'ZZZ F2 Venue D';
 const SOLO_NAME = 'ZZZ F2 Solo Programmer';
 const SOLO_EMAIL = 'zzz-f2-solo@hour.test';
 const P1 = { name: 'ZZZ F2 Contact One', email: 'zzz-f2-one@hour.test' };
 const P2 = { name: 'ZZZ F2 Contact Two', email: 'zzz-f2-two@hour.test' };
 const P3 = { name: 'ZZZ F2 Contact Old', email: 'zzz-f2-old@hour.test' };
+const P4 = { name: 'ZZZ F2 Contact Main', email: 'zzz-f2-main@hour.test' };
 const FAKE_SEALED = 'v1.zzzzzzzzzzzzzzzz.zzzzzzzzzzzzzzzzzzzz';
 const RUN = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 
@@ -123,7 +126,7 @@ describe.skipIf(!envReady())('conversation with the venue (ADR-102, fase 2)', ()
 
   const sweep = async () => {
     // Una pasada muerta a medias deja conversaciones vivas: se recogen.
-    for (const name of [ORG_A, ORG_B, SOLO_NAME]) {
+    for (const name of [ORG_A, ORG_B, ORG_C, ORG_D, SOLO_NAME]) {
       const id = await orgId(name);
       if (!id) continue;
       const r = await pgGet<{ id: string }>(
@@ -132,7 +135,8 @@ describe.skipIf(!envReady())('conversation with the venue (ADR-102, fase 2)', ()
         new URLSearchParams({ select: 'id', organization_id: `eq.${id}`, project_id: `eq.${projectId}` }),
       );
       for (const row of r.rows) {
-        await pgPatch('conversation', jwt, { private_to: null }, new URLSearchParams({ id: `eq.${row.id}` }));
+        // Sin principal: la pasada siguiente las revive como nacen, sin persona.
+        await pgPatch('conversation', jwt, { private_to: null, person_id: null }, new URLSearchParams({ id: `eq.${row.id}` }));
         await pgRpc('delete_conversation', jwt, { p_conversation_id: row.id });
       }
     }
@@ -170,7 +174,7 @@ describe.skipIf(!envReady())('conversation with the venue (ADR-102, fase 2)', ()
 
   afterAll(async () => {
     for (const id of made) {
-      await pgPatch('conversation', jwt, { private_to: null }, new URLSearchParams({ id: `eq.${id}` }));
+      await pgPatch('conversation', jwt, { private_to: null, person_id: null }, new URLSearchParams({ id: `eq.${id}` }));
       await pgRpc('delete_conversation', jwt, { p_conversation_id: id });
     }
     if (originalSetting !== undefined) {
@@ -265,6 +269,38 @@ describe.skipIf(!envReady())('conversation with the venue (ADR-102, fase 2)', ()
     const r = await create({ p_organization_id: await orgId(ORG_A) });
     expect(r.status, r.error).toBe(200);
     expect(one(r.data)!.id).toBe(conv);
+  });
+
+  test('add_conversation_contact: a person without a dossier joins as a contact (primary if none)', async () => {
+    const c = await create({ p_organization_name: ORG_C });
+    expect(c.status, c.error).toBe(200);
+    const conv = one(c.data)!.id;
+    made.add(conv);
+    const email = 'zzz-f2-inline@hour.test';
+    const r = await pgRpc<{ person_id: string; is_primary: boolean; until: string | null }>('add_conversation_contact', jwt, {
+      p_conversation_id: conv,
+      p_full_name: 'ZZZ F2 Inline',
+      p_email: email,
+      p_role: 'producción',
+    });
+    expect(r.status, r.error).toBe(200);
+    const row = one(r.data)!;
+    expect(row.until).toBeNull();
+    const dossier = await pgGet<{ person_id: string }>(
+      'workspace_person',
+      jwt,
+      new URLSearchParams({ select: 'person_id', workspace_id: `eq.${workspaceId}`, email: `eq.${email}` }),
+    );
+    expect(dossier.rows[0]?.person_id).toBe(row.person_id);
+    // Otra vez: ya es contacto vigente, la misma fila.
+    const again = await pgRpc<{ person_id: string }>('add_conversation_contact', jwt, {
+      p_conversation_id: conv,
+      p_full_name: 'ZZZ F2 Inline',
+      p_email: email,
+    });
+    expect(one(again.data)!.person_id).toBe(row.person_id);
+    expect((await pgRpc('add_conversation_contact', null, { p_conversation_id: conv, p_full_name: 'x' })).status).toBeGreaterThanOrEqual(400);
+    expect((await pgRpc('add_conversation_contact', jwt, { p_conversation_id: '00000000-0000-4000-8000-000000000000', p_full_name: 'x' })).status).toBe(403);
   });
 
   describe.skipIf(!limitedEnvReady())('with a second member', () => {
@@ -406,11 +442,13 @@ describe.skipIf(!envReady())('conversation with the venue (ADR-102, fase 2)', ()
         new URLSearchParams({ select: 'id', organization_id: `eq.${await orgId(ORG_B)}`, project_id: `eq.${projectId}`, deleted_at: 'is.null' }),
       );
       convB = b.rows[0]!.id;
-      for (const p of [P1, P2, P3]) person[p.email] = await ensurePerson(p);
+      for (const p of [P1, P2, P3, P4]) person[p.email] = await ensurePerson(p);
       const set = (conv: string, email: string, args: Record<string, unknown> = {}) =>
         pgRpc('set_conversation_contact', jwt, { p_conversation_id: conv, p_person_id: person[email], ...args });
       // A: P1 vigente; P2 se fue hace 60 días (estuvo desde hace 200); P3 se fue hace 400.
       expect((await set(convA, P1.email, { p_since: day(-300) })).status).toBe(200);
+      // El principal de A (P1 ya es el de B, y la unicidad vieja por persona sigue viva).
+      expect((await set(convA, P4.email, { p_is_primary: true })).status).toBe(200);
       expect((await set(convA, P2.email, { p_since: day(-200) })).status).toBe(200);
       expect((await set(convA, P3.email)).status).toBe(200);
       expect((await pgRpc('end_conversation_contact', jwt, { p_conversation_id: convA, p_person_id: person[P2.email], p_until: day(-60) })).status).toBe(200);
@@ -489,16 +527,41 @@ describe.skipIf(!envReady())('conversation with the venue (ADR-102, fase 2)', ()
       }
     });
 
-    test('sending goes to the current contacts with an address, the primary first', async () => {
+    test('a reply that arrives before its original waits, and enters once the original is in', async () => {
+      const orig = `<${RUN}-orig@f2.test>`;
+      // La respuesta llega antes, por el otro buzón: P2 ya no es contacto ese día y su hilo no está.
+      expect((await ingest(boxB, msg('early', P2.email, noonUtc(-15), { in_reply_to: orig }))).data).toBe(0);
+      const before = await serviceRpc<string[]>('mail_deferred_ready', { p_account_id: boxB });
+      expect(before.status, before.error).toBe(200);
+      expect(before.data).not.toContain(`${RUN}-early`);
+      // Llega el original (dentro de las fechas de P2) por el buzón A.
+      expect((await ingest(boxA, msg('orig', P2.email, noonUtc(-100)))).data).toBe(1);
+      const ready = await serviceRpc<string[]>('mail_deferred_ready', { p_account_id: boxB });
+      expect(ready.data).toContain(`${RUN}-early`);
+      // La sincronización la vuelve a registrar: ahora entra, y deja de esperar.
+      expect((await ingest(boxB, msg('early', P2.email, noonUtc(-15), { in_reply_to: orig }))).data).toBe(1);
+      expect(await eventsOf(convA)).toContain(`${RUN}-early`);
+      const after = await serviceRpc<string[]>('mail_deferred_ready', { p_account_id: boxB });
+      expect(after.data).not.toContain(`${RUN}-early`);
+      // Un correo sin hilo de alguien que nunca fue contacto no espera: no vuelve.
+      expect((await ingest(boxB, msg('stranger', 'zzz-f2-nobody@hour.test', noonUtc(-1), { in_reply_to: orig }))).data).toBe(0);
+      expect((await serviceRpc<string[]>('mail_deferred_ready', { p_account_id: boxB })).data).not.toContain(`${RUN}-stranger`);
+    });
+
+    test('sending goes to the primary contact only; without one, a clear 400', async () => {
       const r = await pgRpc<{ recipient_address: string }[]>('mail_send_authorize', jwt, {
         p_conversation_id: convA,
         p_account_id: boxA,
       });
       expect(r.status, r.error).toBe(200);
-      const to = r.data!.map((x) => x.recipient_address);
-      expect(to).toContain(P1.email);
-      expect(to).not.toContain(P2.email);
-      expect(to).not.toContain(P3.email);
+      expect(r.data!.map((x) => x.recipient_address)).toEqual([P4.email]);
+
+      const bare = await create({ p_organization_name: ORG_D });
+      expect(bare.status, bare.error).toBe(200);
+      made.add(one(bare.data)!.id);
+      const none = await pgRpc('mail_send_authorize', jwt, { p_conversation_id: one(bare.data)!.id, p_account_id: boxA });
+      expect(none.status).toBe(400);
+      expect(JSON.parse(none.error!)).toMatchObject({ code: '22023', message: 'the conversation has no primary contact' });
     });
   });
 });

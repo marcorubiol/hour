@@ -3,7 +3,9 @@
 --
 -- Si 20261011810000 (slugs) está aplicada, primero su rollback.
 --
--- Deshace: la búsqueda `conversation_search`, el índice del hilo de correo,
+-- Deshace: la búsqueda `conversation_search`, los índices del hilo de correo,
+-- la espera de correos (`mail_message.deferred` y `refs`, `mail_deferred_ready`;
+-- los que esperaban quedan como procesados),
 -- las versiones nuevas de `mail_contact_addresses`, `mail_ingest_message` y
 -- `mail_send_authorize` (vuelven las de 20261011200000), de
 -- `set_conversation_contact` y `conversation_sync_primary_contact` (vuelven
@@ -23,7 +25,7 @@
 -- sabiendo cuáles son:
 --   SELECT id, workspace_id, slug FROM public.conversation WHERE person_id IS NULL;
 --
--- DATOS: no se pierde nada. Los correos que entraron por la regla del hilo y
+-- DATOS: no se pierde nada salvo la marca de espera de `mail_message`. Los correos que entraron por la regla del hilo y
 -- los contactos añadidos se quedan (son filas, no reglas).
 
 BEGIN;
@@ -37,7 +39,15 @@ END
 $$;
 
 DROP FUNCTION IF EXISTS public.conversation_search(text);
+DROP FUNCTION IF EXISTS public.mail_deferred_ready(uuid, integer);
 DROP INDEX IF EXISTS public.conversation_event_mail_thread_idx;
+DROP INDEX IF EXISTS public.conversation_event_mail_rfc_idx;
+DROP INDEX IF EXISTS public.mail_message_deferred_idx;
+-- Los correos en espera quedan como procesados (como antes de la migración).
+ALTER TABLE public.mail_message
+  DROP CONSTRAINT IF EXISTS mail_message_refs_size,
+  DROP COLUMN IF EXISTS refs,
+  DROP COLUMN IF EXISTS deferred;
 DROP INDEX IF EXISTS public.conversation_project_organization_shared_uidx;
 DROP INDEX IF EXISTS public.conversation_project_organization_private_uidx;
 

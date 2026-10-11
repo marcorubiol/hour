@@ -13,10 +13,13 @@
  *  4. contactos ya traídos: con cursor, pregunta si hubo correo nuevo; si lo
  *     hubo, busca SOLO por esas direcciones desde la última pasada (con una
  *     hora de solape);
- *  5. descarta los ids ya procesados, baja el resto, lo ordena del más viejo
- *     al más nuevo (regla del hilo, ADR-102), empareja (provider.ts) y
- *     registra; lo que no empareja se apunta como procesado sin asunto ni
+ *  5. descarta los ids ya procesados y baja el resto empezando por el más
+ *     viejo de todo lo pendiente (regla del hilo, ADR-102), empareja
+ *     (provider.ts) y registra; lo que no empareja se apunta como procesado sin asunto ni
  *     cuerpo, para no volver a bajarlo;
+ *  5b. vuelve a bajar los que esperaban su hilo y ya lo encuentran
+ *     (`mail_deferred_ready`): una respuesta que llegó antes que su original
+ *     no se pierde;
  *  6. avanza el cursor solo si la parte incremental terminó entera. Si se cortó
  *     por el tope, la siguiente repite la búsqueda y salta lo ya procesado.
  *
@@ -126,16 +129,10 @@ export async function syncAccount(deps: SyncDeps, account: MailAccountRow): Prom
     const counts = { ...base };
     let budget = max;
 
-    /** Baja y registra lo pendiente de una búsqueda; true si no quedó nada. */
-    const drain = async (found: { ids: string[]; truncated: boolean }): Promise<boolean> => {
-      const known = new Set(await db.knownMessages(account.id, found.ids));
-      const pending = found.ids.filter((id) => !known.has(id));
-      const batch = pending.slice(0, Math.max(0, budget));
-      // Se bajan todos y se registran del más viejo al más nuevo: la regla
-      // del hilo (ADR-102) deja entrar una respuesta solo si el correo al que
-      // responde ya está en la conversación.
+    /** Baja y registra estos ids, del más viejo al más nuevo (regla del hilo, ADR-102). */
+    const ingestIds = async (ids: string[]) => {
       const fetched: MailMessage[] = [];
-      for (const id of batch) {
+      for (const id of ids) {
         fetched.push(await adapter.fetchMessage(access, id));
         counts.fetched++;
         budget--;
@@ -159,6 +156,19 @@ export async function syncAccount(deps: SyncDeps, account: MailAccountRow): Prom
           body: match ? msg.body || null : null,
         });
       }
+    };
+
+    /** Baja y registra lo pendiente de una búsqueda; true si no quedó nada. */
+    const drain = async (found: { ids: string[]; truncated: boolean }): Promise<boolean> => {
+      const known = new Set(await db.knownMessages(account.id, found.ids));
+      // Gmail lista cada búsqueda del más nuevo al más viejo: se empieza por el
+      // final de TODO lo pendiente, no solo del lote, para que el correo al que
+      // responde otro entre casi siempre antes que la respuesta. La garantía no
+      // es este orden sino la espera de `mail_message` (más abajo): una
+      // respuesta que llega antes que su hilo se reintenta cuando el hilo está.
+      const pending = found.ids.filter((id) => !known.has(id)).reverse();
+      const batch = pending.slice(0, Math.max(0, budget));
+      await ingestIds(batch);
       return !found.truncated && batch.length === pending.length;
     };
 
@@ -174,6 +184,13 @@ export async function syncAccount(deps: SyncDeps, account: MailAccountRow): Prom
       const fromMs = Math.max(syncFromMs, (lastMs ?? syncFromMs) - OVERLAP_MS);
       const found = await adapter.search(access, settled, Math.floor(fromMs / 1000), MAX_IDS_PER_PASS);
       incrementalDone = await drain(found);
+    }
+
+    // Los que esperaban su hilo y ya lo encuentran (llegó el original en esta
+    // pasada, o por otro buzón): se vuelven a bajar y registrar.
+    if (budget > 0) {
+      const ready = await db.deferredReady(account.id);
+      await ingestIds(ready.slice(0, budget));
     }
 
     return finish({ status: 'active', cursor, complete: incrementalDone, error: null }, counts);

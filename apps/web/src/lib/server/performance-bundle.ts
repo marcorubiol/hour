@@ -69,6 +69,8 @@ export type PerformanceDetail = Omit<
     slug: string;
     status: string;
     person: PersonEmbed | null;
+    /** ADR-102: who the conversation is with; shown when it has no person. */
+    organization?: { name: string } | null;
   } | null;
   crew_assignment: Array<{
     id: string;
@@ -244,7 +246,7 @@ function detailSelect(withNotice: boolean): string {
     'venue:venue_id(id,slug,name,city,country,address,capacity,timezone,contacts)',
     'line:line_id(id,slug,name,kind)',
     'project:project_id(id,slug,name,accent)',
-    `conversation:conversation_id(id,slug,status,person:workspace_person!conversation_workspace_person_fkey(${PERSON_COLS}))`,
+    `conversation:conversation_id(id,slug,status,person:workspace_person!conversation_workspace_person_fkey(${PERSON_COLS}),organization:workspace_organization!conversation_workspace_organization_fkey(name))`,
     `crew_assignment(id,role,notes,contact_override,person:workspace_person!crew_assignment_workspace_person_fkey(${PERSON_COLS}))`,
     `cast_override(id,role,reason,person:workspace_person!cast_override_workspace_person_fkey(${PERSON_COLS}),replaces_person:workspace_person!cast_override_workspace_replaces_person_fkey(id:person_id,full_name))`,
     'date(id,kind,status,title,starts_at,ends_at,all_day,venue_name,city,venue:venue_id(timezone))',

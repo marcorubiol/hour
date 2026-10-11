@@ -412,6 +412,7 @@ function memoryDb(contacts: string[], backfilledFrom: string[] = []) {
       for (const a of addresses) backfilled.add(a);
     },
     knownMessages: async (_a, ids) => ids.filter((id) => processed.has(id)),
+    deferredReady: async () => [],
     ingest: async (_a, p) => {
       if (processed.has(p.provider_message_id)) return 0;
       processed.add(p.provider_message_id);
@@ -474,11 +475,12 @@ describe('sync', () => {
     // Nunca se pidió un correo que no fuera de un contacto.
     const fetchedIds = g.calls.filter((c) => /\/messages\/[^/]+$/.test(c)).map((c) => c.split('/').pop());
     expect(fetchedIds.sort()).toEqual(['in1', 'out1']);
-    expect(mem.events.map((e) => [e.payload.provider_message_id, e.payload.direction])).toEqual([
+    // Mismo instante: el orden entre los dos no importa (se ingiere del más viejo al más nuevo).
+    expect(mem.events.map((e) => [e.payload.provider_message_id, e.payload.direction]).sort()).toEqual([
       ['in1', 'inbound'],
       ['out1', 'outbound'],
     ]);
-    expect(mem.events[0].payload).toMatchObject({ subject: 'Asunto in1', body: 'Cuerpo in1', rfc_message_id: '<in1@mail.test>' });
+    expect(mem.events.find((e) => e.payload.provider_message_id === 'in1')!.payload).toMatchObject({ subject: 'Asunto in1', body: 'Cuerpo in1', rfc_message_id: '<in1@mail.test>' });
     // El cursor sale del perfil, tomado antes de buscar.
     expect(mem.finishes.at(-1)).toMatchObject({ cursor: '500', complete: true, status: 'active' });
   });
@@ -723,5 +725,58 @@ describe('thread rule (ADR-102, añadido, punto 4)', () => {
       expect(p.in_reply_to ?? null).toBeNull();
       expect(p.references ?? []).toEqual([]);
     }
+  });
+});
+
+describe('a reply that arrives before its thread waits, it is not lost (ADR-102)', () => {
+  test('deferred on the first pass, ingested once the original is in (from another mailbox)', async () => {
+    const at = (iso: string) => String(Date.parse(iso));
+    const reply = message('late', 'Inés <ines@pradillo.test>', 'anouk@muk.test', {
+      threadId: 't-9',
+      internalDate: at('2026-10-05T09:00:00Z'),
+    });
+    reply.payload!.headers!.push({ name: 'In-Reply-To', value: '<orig@mail.test>' });
+
+    // Una base en memoria con la regla del hilo: sin el original, espera.
+    const processed = new Map<string, { deferred: boolean; refs: string[] }>();
+    const rfcIn = new Set<string>();
+    const entered: string[] = [];
+    const db: MailDb = {
+      claim: async () => [],
+      account: async () => null,
+      contactAddresses: async () => [{ address: 'ines@pradillo.test', backfilled: true }],
+      markBackfilled: async () => {},
+      knownMessages: async (_a, ids) => ids.filter((id) => processed.has(id)),
+      deferredReady: async () =>
+        [...processed.entries()].filter(([, m]) => m.deferred && m.refs.some((r) => rfcIn.has(r))).map(([id]) => id),
+      ingest: async (_a, p) => {
+        const prev = processed.get(p.provider_message_id);
+        if (prev && !prev.deferred) return 0;
+        const refs = [p.in_reply_to, ...(p.references ?? [])].filter((x): x is string => Boolean(x));
+        if (refs.length && !refs.some((r) => rfcIn.has(r))) {
+          processed.set(p.provider_message_id, { deferred: true, refs });
+          return 0;
+        }
+        processed.set(p.provider_message_id, { deferred: false, refs: [] });
+        if (p.rfc_message_id) rfcIn.add(p.rfc_message_id);
+        entered.push(p.provider_message_id);
+        return 1;
+      },
+      finish: async () => {},
+    };
+    const g = gmailWith([reply]);
+    const key = await importMailKey(KEY_B64);
+    const adapter = googleAdapter(fakeFetch(g), { clientId: 'c', clientSecret: 's' });
+    const row = await accountRow({ sync_cursor: '400', last_synced_at: '2026-10-06T00:00:00Z' });
+
+    await syncAccount({ db, adapter: () => adapter, key }, row);
+    expect(entered).toEqual([]);
+    expect(processed.get('late')?.deferred).toBe(true);
+
+    // El original entra por el buzón común.
+    rfcIn.add('<orig@mail.test>');
+    await syncAccount({ db, adapter: () => adapter, key }, row);
+    expect(entered).toEqual(['late']);
+    expect(processed.get('late')?.deferred).toBe(false);
   });
 });

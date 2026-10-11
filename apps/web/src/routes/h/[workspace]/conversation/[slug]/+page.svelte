@@ -30,7 +30,6 @@
     eventDirectionLabel,
     eventKindLabel,
     conversationTitle,
-    currentContacts,
     relativeContactDate,
     statusBadgeClass,
     statusLabel,
@@ -173,13 +172,11 @@
 
   // ADR-102: el título es la organización; debajo, el contacto principal.
   let title = $derived((conv && conversationTitle(conv)) || slug);
-  /** A quién sale un correo: el primer contacto vigente con correo, el principal
-      primero (el mismo orden que `mail_send_authorize`). */
+  /** A quién sale un correo: el contacto principal (`mail_send_authorize`). */
   let recipient = $derived.by(() => {
-    if (!conv) return null;
-    const c = currentContacts(conv.contacts).find((x) => x.person?.email);
-    if (c?.person) return { full_name: c.person.full_name, email: c.person.email };
-    return conv.person?.email ? { full_name: conv.person.full_name, email: conv.person.email } : null;
+    const p = conv?.contacts.find((c) => c.is_primary)?.person ?? null;
+    if (p?.email) return { full_name: p.full_name, email: p.email };
+    return conv?.person?.email ? { full_name: conv.person.full_name, email: conv.person.email } : null;
   });
 </script>
 

@@ -79,6 +79,8 @@ export interface MailDb {
   contactAddresses(accountId: string): Promise<ContactAddress[]>;
   markBackfilled(accountId: string, addresses: string[]): Promise<void>;
   knownMessages(accountId: string, ids: string[]): Promise<string[]>;
+  /** Correos que esperaban su hilo y ya lo encuentran (ADR-102): se vuelven a bajar. */
+  deferredReady(accountId: string): Promise<string[]>;
   ingest(accountId: string, message: IngestPayload, createdBy?: string | null): Promise<number>;
   finish(
     accountId: string,
@@ -135,6 +137,7 @@ export function serviceMailDb(env: MailEnv & { SUPABASE_SERVICE_ROLE_KEY: string
     },
     knownMessages: (accountId, ids) =>
       ids.length ? rpc<string[]>('mail_known_messages', { p_account_id: accountId, p_ids: ids }) : Promise.resolve([]),
+    deferredReady: (accountId) => rpc<string[]>('mail_deferred_ready', { p_account_id: accountId }),
     ingest: (accountId, message, createdBy) =>
       rpc<number>('mail_ingest_message', {
         p_account_id: accountId,

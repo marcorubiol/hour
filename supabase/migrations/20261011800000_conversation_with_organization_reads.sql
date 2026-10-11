@@ -42,8 +42,14 @@
 --        hilo del mismo buzón, o In-Reply-To/References a un correo suyo);
 --        el recuento que devuelve no cuenta lo que entró en privadas que el
 --        resto del buzón no ve;
---      · `mail_send_authorize`: los contactos vigentes con correo, el
---        principal primero;
+--      · un correo que podría entrar por hilo pero cuyo hilo aún no está
+--        (llega antes la respuesta que el original, en esta pasada o por otro
+--        buzón) no queda procesado para siempre: `mail_message` lo guarda
+--        «en espera» con sus ids de hilo (sin contenido) y
+--        `mail_deferred_ready` dice cuáles ya encuentran su hilo, para que la
+--        sincronización los vuelva a bajar;
+--      · `mail_send_authorize`: el contacto principal, o un 22023 que dice
+--        por qué no hay destinatario;
 --      · índice del hilo del proveedor en `conversation_event`.
 --   8. `conversation_search(p_q)`: conversaciones cuya organización o algún
 --      contacto (nombre o correo) contiene el texto, con la RLS de quien llama.
@@ -144,7 +150,9 @@ $$;
 -- ── 5 · slug libre para una conversación ──────────────────────────────────
 -- La base (el slug de la organización) llevada al formato de slug de la
 -- conversación; si está reservada o la usa otra conversación viva del
--- espacio, con el sufijo del id.
+-- espacio, con el sufijo del id. El sufijo son los ÚLTIMOS 6 hex: un uuid v7
+-- empieza por la marca de tiempo, y dos del mismo milisegundo comparten el
+-- principio.
 CREATE FUNCTION public.conversation_free_slug(
   p_workspace_id uuid,
   p_base         text,
@@ -168,7 +176,7 @@ BEGIN
     WHERE workspace_id = p_workspace_id AND slug = v_slug
       AND deleted_at IS NULL AND id <> p_id
   ) THEN
-    v_slug := rtrim(left(v_slug, 56), '-') || '-' || substring(replace(p_id::text, '-', '') from 1 for 6);
+    v_slug := rtrim(left(v_slug, 56), '-') || '-' || right(replace(p_id::text, '-', ''), 6);
   END IF;
   RETURN v_slug;
 END;
@@ -274,8 +282,8 @@ begin
       insert into public.person (id, slug, full_name, email, created_by)
       values (
         v_person_id,
-        'person-' || substring(replace(v_person_id::text, '-', '') from 1 for 12),
-        'Person ' || substring(replace(v_person_id::text, '-', '') from 1 for 8),
+        'person-' || right(replace(v_person_id::text, '-', ''), 12),
+        'Person ' || right(replace(v_person_id::text, '-', ''), 8),
         null,
         v_caller
       );
@@ -290,7 +298,7 @@ begin
       where wp.workspace_id = v_workspace_id and wp.slug = v_person_slug
         and wp.person_id <> v_person_id and wp.deleted_at is null
     ) then
-      v_person_slug := rtrim(left(v_person_slug, 56), '-') || '-' || substring(replace(v_person_id::text, '-', '') from 1 for 6);
+      v_person_slug := rtrim(left(v_person_slug, 56), '-') || '-' || right(replace(v_person_id::text, '-', ''), 6);
     end if;
   elsif p_organization_id is null and v_org_name is null then
     raise exception 'an organization or a person is required' using errcode = '22023';
@@ -327,7 +335,7 @@ begin
         select 1 from public.workspace_organization
         where workspace_id = v_workspace_id and slug = v_organization_slug and deleted_at is null
       ) then
-        v_organization_slug := rtrim(left(v_organization_slug, 56), '-') || '-' || substring(replace(v_organization_id::text, '-', '') from 1 for 6);
+        v_organization_slug := rtrim(left(v_organization_slug, 56), '-') || '-' || right(replace(v_organization_id::text, '-', ''), 6);
       end if;
       insert into public.workspace_organization (id, workspace_id, slug, name, created_by)
       values (v_organization_id, v_workspace_id, v_organization_slug, v_org_name, v_caller);
@@ -414,7 +422,19 @@ begin
         else v_conversation.previous_slugs || v_conversation.slug
       end,
       organization_id = v_organization_id,
-      person_id = coalesce(v_person_id, person_id),
+      -- Sin persona nueva se queda la principal de antes, salvo que esa
+      -- persona ya sea la principal de otra viva del proyecto (la unicidad
+      -- vieja por persona): entonces revive sin principal.
+      person_id = case
+        when v_person_id is not null then v_person_id
+        when exists (
+          select 1 from public.conversation o
+          where o.workspace_id = v_workspace_id and o.project_id = p_project_id
+            and o.person_id = v_conversation.person_id and o.deleted_at is null
+            and o.id <> v_conversation.id
+        ) then null
+        else person_id
+      end,
       status = p_status,
       role = case when v_person_id is not null then v_role else role end,
       last_contacted_at = now(),
@@ -506,10 +526,57 @@ END;
 $$;
 
 -- ── 7 · correo ────────────────────────────────────────────────────────────
--- El hilo del proveedor de un correo ya registrado (regla del hilo).
+-- El hilo del proveedor y el Message-ID de un correo ya registrado (regla del
+-- hilo y reintento de los que esperan su hilo).
 CREATE INDEX conversation_event_mail_thread_idx
   ON public.conversation_event ((metadata ->> 'provider_thread_id'))
   WHERE source = 'email';
+CREATE INDEX conversation_event_mail_rfc_idx
+  ON public.conversation_event ((metadata ->> 'rfc_message_id'))
+  WHERE source = 'email';
+
+-- Un correo en espera de su hilo: de un contacto (vigente o no) de una
+-- conversación elegible, con hilo o referencias, que no entró en ninguna. Solo
+-- identificadores, como el resto de `mail_message`.
+ALTER TABLE public.mail_message
+  ADD COLUMN deferred boolean NOT NULL DEFAULT false,
+  ADD COLUMN refs text[] NOT NULL DEFAULT '{}',
+  ADD CONSTRAINT mail_message_refs_size CHECK (cardinality(refs) <= 51);
+CREATE INDEX mail_message_deferred_idx
+  ON public.mail_message (mail_account_id) WHERE deferred;
+
+-- Los correos en espera de este buzón que ya encuentran su hilo: otro correo
+-- del mismo hilo del proveedor entró desde este buzón, o uno al que responden
+-- (In-Reply-To/References) entró desde cualquier buzón del espacio. La
+-- sincronización los vuelve a bajar y a registrar.
+CREATE FUNCTION public.mail_deferred_ready(p_account_id uuid, p_limit integer DEFAULT 50)
+RETURNS SETOF text
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path TO 'public', 'pg_temp'
+AS $$
+  SELECT m.provider_message_id
+  FROM public.mail_message m
+  JOIN public.mail_account a ON a.id = m.mail_account_id
+  WHERE m.mail_account_id = p_account_id AND m.deferred
+    AND (
+      (m.provider_thread_id IS NOT NULL AND EXISTS (
+        SELECT 1 FROM public.conversation_event e
+        WHERE e.source = 'email'
+          AND e.metadata ->> 'provider_thread_id' = m.provider_thread_id
+          AND e.metadata ->> 'mail_account_id' = a.id::text
+      ))
+      OR EXISTS (
+        SELECT 1 FROM public.conversation_event e
+        WHERE e.source = 'email' AND e.workspace_id = a.workspace_id
+          AND e.metadata ->> 'rfc_message_id' = ANY (m.refs)
+      )
+    )
+  ORDER BY m.processed_at
+  LIMIT greatest(1, least(coalesce(p_limit, 50), 200));
+$$;
+ALTER FUNCTION public.mail_deferred_ready(uuid, integer) OWNER TO postgres;
+REVOKE ALL ON FUNCTION public.mail_deferred_ready(uuid, integer) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.mail_deferred_ready(uuid, integer) TO service_role;
 
 -- Las direcciones que este buzón busca: las de los contactos de las
 -- conversaciones elegibles, vigentes o cerrados hace menos de 12 meses (para
@@ -570,6 +637,7 @@ DECLARE
   v_ref_base   text;
   v_created    integer := 0;
   v_visible    integer := 0;
+  v_wait       boolean;
   v_conv       public.conversation;
   v_event_id   uuid;
 BEGIN
@@ -608,11 +676,15 @@ BEGIN
     v_refs := v_refs[1:50];
   END IF;
 
-  -- Ya procesado en este buzón: nada que hacer.
+  -- Ya procesado en este buzón: nada que hacer, salvo que esperara su hilo
+  -- (entonces se vuelve a intentar).
   INSERT INTO public.mail_message (mail_account_id, provider_message_id, provider_thread_id, rfc_message_id)
   VALUES (v_acc.id, v_msg_id, v_thread, v_rfc)
   ON CONFLICT DO NOTHING;
-  IF NOT FOUND THEN
+  IF NOT FOUND AND NOT EXISTS (
+    SELECT 1 FROM public.mail_message
+    WHERE mail_account_id = v_acc.id AND provider_message_id = v_msg_id AND deferred
+  ) THEN
     RETURN 0;
   END IF;
 
@@ -695,16 +767,36 @@ BEGIN
     END IF;
   END LOOP;
 
-  UPDATE public.mail_message SET events_created = v_created
+  -- No entró en ninguna, pero es de alguien que es o fue contacto de una
+  -- conversación elegible y sigue un hilo: espera a que su hilo llegue.
+  v_wait := v_created = 0
+    AND (v_thread IS NOT NULL OR cardinality(v_refs) > 0)
+    AND EXISTS (
+      SELECT 1
+      FROM public.conversation c
+      JOIN public.conversation_contact cc ON cc.conversation_id = c.id
+      JOIN public.workspace_person wp
+        ON wp.workspace_id = cc.workspace_id AND wp.person_id = cc.person_id
+       AND wp.deleted_at IS NULL
+      WHERE c.workspace_id = v_acc.workspace_id
+        AND lower(wp.email::text) = ANY (v_counter)
+        AND public.mail_account_eligible_conversation(v_acc, c)
+    );
+
+  UPDATE public.mail_message
+  SET events_created = events_created + v_created,
+      deferred = v_wait,
+      refs = CASE WHEN v_wait THEN v_refs ELSE '{}' END
   WHERE mail_account_id = v_acc.id AND provider_message_id = v_msg_id;
   RETURN v_visible;
 END;
 $$;
 
 -- Antes de enviar: ¿puede quien llama escribir a esta conversación desde este
--- buzón? Igual que en 20261011200000; los destinatarios posibles son ahora los
--- contactos vigentes con correo, el principal primero (el envío toma el
--- primero). El cliente nunca manda la dirección.
+-- buzón? Igual que en 20261011200000; el destinatario es ahora el contacto
+-- principal de la conversación, nunca uno escogido por orden. Sin principal, o
+-- con un principal sin correo, 22023 con un mensaje que lo dice. El cliente
+-- nunca manda la dirección.
 CREATE OR REPLACE FUNCTION public.mail_send_authorize(p_conversation_id uuid, p_account_id uuid)
 RETURNS TABLE (recipient_address text, recipient_name text, account_address text)
 LANGUAGE plpgsql STABLE SECURITY DEFINER
@@ -714,6 +806,8 @@ DECLARE
   v_caller uuid := auth.uid();
   v_conv   public.conversation;
   v_acc    public.mail_account;
+  v_email  text;
+  v_name   text;
 BEGIN
   IF v_caller IS NULL THEN
     RAISE EXCEPTION 'authentication required' USING ERRCODE = '42501';
@@ -730,19 +824,19 @@ BEGIN
   IF v_acc.id IS NULL THEN
     RAISE EXCEPTION 'mail account % not usable', p_account_id USING ERRCODE = '42501';
   END IF;
-  RETURN QUERY
-  SELECT wp.email::text, wp.full_name, v_acc.address::text
+  SELECT wp.email::text, wp.full_name INTO v_email, v_name
   FROM public.conversation_contact cc
   JOIN public.workspace_person wp
     ON wp.workspace_id = cc.workspace_id AND wp.person_id = cc.person_id
-   AND wp.deleted_at IS NULL AND wp.email IS NOT NULL
-  WHERE cc.conversation_id = v_conv.id
-    AND (cc.since IS NULL OR cc.since <= current_date)
-    AND (cc.until IS NULL OR cc.until >= current_date)
-  ORDER BY cc.is_primary DESC, wp.full_name, wp.email;
+   AND wp.deleted_at IS NULL
+  WHERE cc.conversation_id = v_conv.id AND cc.is_primary;
   IF NOT FOUND THEN
-    RAISE EXCEPTION 'the contact has no email address' USING ERRCODE = '22023';
+    RAISE EXCEPTION 'the conversation has no primary contact' USING ERRCODE = '22023';
   END IF;
+  IF v_email IS NULL THEN
+    RAISE EXCEPTION 'the primary contact has no email address' USING ERRCODE = '22023';
+  END IF;
+  RETURN QUERY SELECT v_email, v_name, v_acc.address::text;
 END;
 $$;
 
@@ -770,6 +864,7 @@ AS $$
         FROM public.conversation_contact cc
         JOIN public.workspace_person wp
           ON wp.workspace_id = cc.workspace_id AND wp.person_id = cc.person_id
+         AND wp.deleted_at IS NULL
         WHERE cc.conversation_id = c.id
           AND (strpos(lower(wp.full_name), lower(btrim(p_q))) > 0
                OR strpos(lower(coalesce(wp.email::text, '')), lower(btrim(p_q))) > 0)

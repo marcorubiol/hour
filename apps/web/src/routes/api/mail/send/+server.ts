@@ -57,7 +57,12 @@ export const POST: RequestHandler = async ({ request, url, platform, locals }) =
       {
         codes: {
           '42501': { status: 404, error: 'not_found' },
-          '22023': { status: 400, error: 'no_recipient' },
+          // ADR-102: el correo sale al contacto principal; sin él, o sin su correo, no hay a quién.
+          '22023': {
+            status: 400,
+            error: 'no_recipient',
+            hint: 'The conversation needs a primary contact with an email address.',
+          },
         },
       },
     );
