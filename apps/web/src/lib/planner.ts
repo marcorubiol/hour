@@ -697,6 +697,16 @@ export function normalizePlannerView(v: string | null | undefined): PlannerView 
 }
 
 /**
+ * The address of one day in the planner. `d` is the day the Day view reads
+ * and the day the Agenda book opens at; the other drawings have no day.
+ * Scope is not in it: it rides in the pins, which the shell writes to the
+ * bar on arrival, like every other door between lenses.
+ */
+export function plannerDayHref(view: 'day' | 'agenda', day: string): string {
+  return `/h/planner?view=${view}&d=${day}`;
+}
+
+/**
  * Projection resolution (ADR-078 §10): explicit `?view=` → the device's
  * stored preference (localStorage) → form-factor default (narrow reads as
  * agenda, wide as month — the board is never a default; ADR-080 §7 changed

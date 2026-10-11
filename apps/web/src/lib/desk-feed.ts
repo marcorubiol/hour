@@ -25,6 +25,7 @@
 import { localDayISO } from './datetime';
 import { taskSurfaceState, taskContextLabel, taskProjectId, type TaskItem } from './task';
 import { LOCALE_TAG, t, type Locale } from './i18n';
+import { plannerDayHref } from './planner';
 
 export type DeskConcern = 'task' | 'agenda' | 'conversation' | 'money';
 
@@ -106,7 +107,7 @@ export interface DeskItem {
   overdue: boolean;
   /** Conversation → person page (page builds the href with its ws slug). */
   personSlug: string | null;
-  /** A ready lens href (money → /h/money) or null. */
+  /** A ready lens href (money → /h/money, agenda → its day in the Agenda) or null. */
   href: string | null;
   /** Task rows. */
   taskId: string | null;
@@ -345,7 +346,7 @@ export function buildDeskFeed(input: DeskFeedInput, now: Date, locale: Locale = 
         projectName: p.project?.name ?? '—',
         projectId: p.project?.id ?? null,
         atISO: at,
-        href: '/h/planner',
+        href: plannerDayHref('agenda', day),
       }),
     );
   }
@@ -365,7 +366,7 @@ export function buildDeskFeed(input: DeskFeedInput, now: Date, locale: Locale = 
         projectId: d.project?.id ?? null,
         atISO: d.all_day ? null : d.starts_at,
         allDay: d.all_day,
-        href: '/h/planner',
+        href: plannerDayHref('agenda', day),
       }),
     );
   }

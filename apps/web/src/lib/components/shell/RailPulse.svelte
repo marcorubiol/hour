@@ -48,7 +48,7 @@
   } from '$lib/month-events';
   import { meQueryOptions, teamQueryOptions, workspacesQueryOptions } from '$lib/nav-queries';
   import { buildPersonAttribution } from '$lib/people';
-  import { dayKeyInTz } from '$lib/planner';
+  import { dayKeyInTz, plannerDayHref } from '$lib/planner';
   import { computePulse, type PulseWord } from '$lib/pulse';
   import type { AvailabilityItem } from '$lib/availability';
   import Slip from '$lib/components/planner/Slip.svelte';
@@ -194,7 +194,7 @@
      * copy rather than a button that only works from here.
      */
     const slip = dateSlip(next.ref.row as DateEvent, slipCtx);
-    return { ...slip, href: `/h/planner?view=day&d=${next.day}` };
+    return { ...slip, href: plannerDayHref('day', next.day) };
   });
 
   /** A run-sheet key or a date kind → the words the app already owns.

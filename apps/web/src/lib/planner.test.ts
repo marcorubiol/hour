@@ -14,6 +14,7 @@ import {
   nightsFree,
   normalizePlannerView,
   performanceRoster,
+  plannerDayHref,
   resolvePlannerView,
   rosterPersonIds,
   type BlackoutInput,
@@ -21,6 +22,13 @@ import {
   type DecisionPerformance,
   statusWord,
 } from './planner';
+
+describe('plannerDayHref', () => {
+  it('names the view and the day', () => {
+    expect(plannerDayHref('agenda', '2026-10-14')).toBe('/h/planner?view=agenda&d=2026-10-14');
+    expect(plannerDayHref('day', '2026-10-14')).toBe('/h/planner?view=day&d=2026-10-14');
+  });
+});
 
 describe('normalizePlannerView', () => {
   it.each([

@@ -52,6 +52,7 @@
     type DeskInvoiceInput,
     type DeskItem,
     type DeskPerfInput,
+    type DeskRun,
     type ShowAnchor,
   } from '$lib/desk-feed';
 
@@ -182,29 +183,6 @@
   // Count shown on the right of each day header (the show banner counts as one).
   const bucketTotal = (b: (typeof feed)[number]) => bucketCount(b) + (b.anchor ? 1 : 0);
 
-  // ── Collapsible day buckets ────────────────────────────────────────────
-  // Every day header folds (click); the count on its right says what's hidden.
-  // Persisted by labelKey so folding the OVERDUE backlog once keeps it folded.
-  const COLLAPSE_KEY = 'hour_desk_collapsed';
-  function loadCollapsed(): Set<string> {
-    try {
-      return new Set(JSON.parse(localStorage.getItem(COLLAPSE_KEY) ?? '[]') as string[]);
-    } catch {
-      return new Set();
-    }
-  }
-  let collapsed = $state(loadCollapsed());
-  function toggleCollapse(key: string) {
-    const next = new Set(collapsed);
-    if (next.has(key)) next.delete(key);
-    else next.add(key);
-    collapsed = next;
-    try {
-      localStorage.setItem(COLLAPSE_KEY, JSON.stringify([...next]));
-    } catch {
-      /* storage disabled — in-session fold still works */
-    }
-  }
   let visibleBuckets = $derived(calm.on ? feed.filter((b) => b.sortKey === 0) : feed);
   let foldedRest = $derived(
     calm.on ? feed.filter((b) => b.sortKey > 0).reduce((n, b) => n + bucketCount(b), 0) : 0,
@@ -214,13 +192,16 @@
     calm.on ? visibleBuckets.reduce((n, b) => n + bucketCount(b), 0) : summary.needYou,
   );
 
-  // ── Gutter labels are doors to their lens (scope rides in the pins store). ──
+  // ── Gutter labels are doors to the view they name (scope rides in the pins
+  //    store). A run that carries its own door (agenda → its day in the
+  //    Agenda) uses it; otherwise the lens. ──
   const LENS_HREF: Record<DeskConcern, string | null> = {
     task: null,
-    agenda: '/h/planner',
+    agenda: '/h/planner?view=agenda',
     conversation: '/h/conversations',
     money: '/h/money',
   };
+  const runHref = (run: DeskRun) => run.items[0]?.href ?? LENS_HREF[run.concern];
   const concernLabel = (c: DeskConcern) => t(`desk.concern_${c}`, locale);
   const needYouText = (n: number) =>
     n === 0 ? t('desk.need_you_zero', locale) : n === 1 ? t('desk.need_you_one', locale) : t('desk.need_you_many', locale, { n });
@@ -378,22 +359,14 @@
     <div class="timeline">
       {#each visibleBuckets as bucket (bucket.sortKey)}
         <section class="bucket" class:bucket--today={bucket.sortKey === 0}>
-          <button
-            type="button"
-            class="bucket__head"
-            class:bucket__head--overdue={bucket.overdue}
-            aria-expanded={!collapsed.has(bucket.labelKey)}
-            onclick={() => toggleCollapse(bucket.labelKey)}
-          >
+          <header class="bucket__head" class:bucket__head--overdue={bucket.overdue}>
             <span class="bucket__label"
               >{bucket.labelKey === 'weekday' ? bucket.weekday : t(`desk.bucket_${bucket.labelKey}`, locale)}</span
             >
-            <span class="bucket__caret" aria-hidden="true">›</span>
             {#if bucket.dateLabel}<span class="bucket__date">{bucket.dateLabel}</span>{/if}
             <span class="bucket__count">{bucketTotal(bucket)}</span>
-          </button>
+          </header>
 
-          {#if !collapsed.has(bucket.labelKey)}
           {#if bucket.anchor}
             {@const rsHref = roadsheetHref(bucket.anchor)}
             <div class="anchor" style={`--c: ${accentVar(bucket.anchor.accentSlug)}`}>
@@ -431,8 +404,8 @@
 
           {#each bucket.runs as run (run.concern + run.items[0].id)}
             <div class="run run--{run.concern}">
-              {#if LENS_HREF[run.concern]}
-                <a class="run__label" href={LENS_HREF[run.concern]}>{concernLabel(run.concern)}</a>
+              {#if runHref(run)}
+                <a class="run__label" href={runHref(run)}>{concernLabel(run.concern)}</a>
               {:else}
                 <span class="run__label">{concernLabel(run.concern)}</span>
               {/if}
@@ -509,7 +482,6 @@
               </div>
             </div>
           {/each}
-          {/if}
         </section>
       {/each}
 
@@ -570,32 +542,10 @@
     .bucket:first-child {
       margin-block-start: 0;
     }
-    /* The whole day header is the collapse toggle. */
     .bucket__head {
       display: flex;
       align-items: baseline;
       gap: var(--space-s);
-      inline-size: 100%;
-      padding: 0;
-      background: none;
-      border: 0;
-      text-align: start;
-      cursor: pointer;
-    }
-    /* Whisper-quiet disclosure caret, to the right of the word. */
-    .bucket__caret {
-      color: color-mix(in oklch, var(--text-faint) 50%, transparent);
-      font-size: var(--text-xs);
-      line-height: 1;
-      transition:
-        transform var(--transition),
-        color var(--transition);
-    }
-    .bucket__head[aria-expanded='true'] .bucket__caret {
-      transform: rotate(90deg);
-    }
-    .bucket__head:hover .bucket__caret {
-      color: var(--text-faint);
     }
     .bucket__count {
       margin-inline-start: auto;
