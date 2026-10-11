@@ -376,8 +376,8 @@
 
 ## AHORA — preparar el Planner v3 (revisión de viabilidad, 2026-07-30)
 
-- [ ] **Conversations: «Add to project» solo ofrece los proyectos del ámbito actual** (drop 11-10). En `main` (`586e95a`), sin desplegar.
-- [ ] **Conversations: cambiar de ámbito filtra la lista sin salir de Conversations** (drop 11-10). Reproducido (11-10): en la lista ya filtra en el sitio; lo que te sacaba a Desk era cambiar el ámbito desde una ficha abierta desde Conversations (persona o conversación). `c1a3c59` lo arregla; en `main` (`586e95a`), sin desplegar.
+- [x] **Conversations: «Add to project» solo ofrece los proyectos del ámbito actual** (drop 11-10). Desplegado (`9f867e4`, 2026-10-11).
+- [x] **Conversations: cambiar de ámbito filtra la lista sin salir de Conversations** (drop 11-10). Reproducido (11-10): en la lista ya filtra en el sitio; lo que te sacaba a Desk era cambiar el ámbito desde una ficha abierta desde Conversations (persona o conversación). `c1a3c59` lo arregla. Desplegado (`9f867e4`, 2026-10-11); E2E 64/65 y el rojo (ley del Planner por tiempo) pasa solo.
 
 
 

@@ -6,6 +6,7 @@ hasta entonces, sacado de esos documentos; lo anterior a julio de 2026 está sol
 
 ## Octubre 2026 (en curso)
 
+- En Conversations, cambiar de ámbito desde la ficha de una persona o de una conversación te devuelve a Conversations ya filtrado, en vez de mandarte a Desk; y «Add to project» solo ofrece los proyectos de ese ámbito. (2026-10-11, `9f867e4`)
 - Desk se queda en lo cercano: los próximos 7 días, día a día; lo demás es una línea («Más adelante · 25 cosas hasta el 15 dic») que abre la Agenda, y una tanda de varios días sale como una sola fila. (2026-10-11, `d2fe32c`)
 - En Desk, «Agenda» abre la Agenda del Planner en el día de esa entrada, y los días salen siempre abiertos. (2026-10-11, `35bf4c0`)
 - Una conversación privada sigue siendo solo tuya aunque alguien del equipo vuelva a crear una con la misma persona: cada uno tiene la suya. (2026-10-11, `762192f`)
