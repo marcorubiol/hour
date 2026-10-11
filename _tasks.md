@@ -376,8 +376,8 @@
 
 ## AHORA — preparar el Planner v3 (revisión de viabilidad, 2026-07-30)
 
-- [ ] **Conversations: «Add to project» solo ofrece los proyectos del ámbito actual** (drop 11-10). Hecho en `claude/conversations-scope` (`c1a3c59`), sin integrar.
-- [ ] **Conversations: cambiar de ámbito filtra la lista sin salir de Conversations** (drop 11-10). Pasa en la propia lista (Marco); el arreglo de `claude/conversations-scope` cubre solo la ficha de persona: falta reproducirlo en la lista.
+- [ ] **Conversations: «Add to project» solo ofrece los proyectos del ámbito actual** (drop 11-10). En `main` (`586e95a`), sin desplegar.
+- [ ] **Conversations: cambiar de ámbito filtra la lista sin salir de Conversations** (drop 11-10). Reproducido (11-10): en la lista ya filtra en el sitio; lo que te sacaba a Desk era cambiar el ámbito desde una ficha abierta desde Conversations (persona o conversación). `c1a3c59` lo arregla; en `main` (`586e95a`), sin desplegar.
 
 
 
