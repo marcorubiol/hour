@@ -376,6 +376,8 @@
 
 ## AHORA — preparar el Planner v3 (revisión de viabilidad, 2026-07-30)
 
+- [ ] **Conversations: «Add to project» solo ofrece los proyectos del ámbito actual** (drop 11-10). Hecho en `claude/conversations-scope` (`c1a3c59`), sin integrar.
+
 
 
 > Del contraste entre `Hour Views - Scope v3 - Agenda.html` (proyecto
