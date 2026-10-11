@@ -40,6 +40,47 @@ function json(body: unknown, status = 200): Response {
   });
 }
 
+/**
+ * GET /api/conversations/:id — una conversación, por id o por slug (la ficha
+ * llega por `/h/[workspace]/conversation/[slug]`; con slug, `?workspace=` es el
+ * slug del espacio). RLS decide: privada de otro o sin permiso = 404.
+ */
+export const GET: RequestHandler = async ({ request, params, url, platform, locals }) => {
+  if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);
+  const env = platform.env as unknown as SupabaseEnv;
+  const jwt = extractAccessToken(request);
+  if (!jwt) return json({ error: 'missing_authorization' }, 401);
+
+  const byId = v.safeParse(IdSchema, params.id).success;
+  const workspace = url.searchParams.get('workspace');
+  if (!byId && (!/^[a-z0-9-]{1,64}$/.test(params.id) || !workspace)) {
+    return json({ error: 'invalid_id' }, 400);
+  }
+  const search = new URLSearchParams({
+    select: `${CONVERSATION_SELECT},private_to,workspace:workspace_id!inner(slug)`,
+    deleted_at: 'is.null',
+    limit: '1',
+  });
+  if (byId) search.set('id', `eq.${params.id}`);
+  else {
+    search.set('slug', `eq.${params.id}`);
+    search.set('workspace.slug', `eq.${workspace}`);
+  }
+  try {
+    const { data } = await pgGet<ConversationDbItem & { private_to: string | null }>(
+      env,
+      'conversation',
+      jwt,
+      { search },
+    );
+    const row = data[0];
+    if (!row) return json({ error: 'not_found' }, 404);
+    return json({ item: { ...normalizeConversationItem(row), private: row.private_to !== null } });
+  } catch (err) {
+    return pgErrorResponse(err, { route: 'GET /api/conversations/[id]', requestId: locals.requestId });
+  }
+};
+
 export const PATCH: RequestHandler = async ({ request, params, platform, locals }) => {
   if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);
   const env = platform.env as unknown as SupabaseEnv;

@@ -20,7 +20,7 @@ import type { RequestHandler } from './$types';
 import * as v from 'valibot';
 import { extractAccessToken } from '$lib/auth';
 import {
-  CONVERSATION_EVENT_SELECT,
+  CONVERSATION_EVENT_FULL_SELECT,
   ConversationEventCreateSchema,
   type ConversationEventItem,
 } from '$lib/conversation';
@@ -51,7 +51,7 @@ export const GET: RequestHandler = async ({ request, params, platform, locals })
 
   try {
     const search = new URLSearchParams({
-      select: CONVERSATION_EVENT_SELECT,
+      select: CONVERSATION_EVENT_FULL_SELECT,
       conversation_id: `eq.${idParsed.output}`,
       order: 'occurred_at.desc,recorded_at.desc',
       limit: String(LIMIT),
