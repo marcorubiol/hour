@@ -1401,7 +1401,7 @@ entre empresas sin construirlo.
   fusionar las entidades** — 1:1 con estado vs N:N sin estado; lo que unifica es
   la lente, no la tabla.
 
-- [ ] **Comms, carril 1: difusión con el buzón sincronizado (ADR-099, 2026-10-11).** Primero una maqueta para Marco
+- [ ] Marco: hacer — **Conectar tu Gmail en Ajustes → Buzones y comprobar que entran los correos con un contacto** (primer uso real; en producción desde el 2026-10-11, `6c4cd0a`, modo prueba de Google). **Comms, carril 1: difusión con el buzón sincronizado (ADR-099, 2026-10-11): construido y desplegado (`6c4cd0a`); falta el estreno con un buzón real.** Primero una maqueta para Marco
   (conversación con correos, llamadas y notas juntos; el registro de ADR-098 es provisional hasta que lo vea). Después,
   conversación con dos vistas conmutables (registro con el hilo del equipo al lado, o todo en un hilo; Marco, 2026-10-11),
   conexión de buzón personal y común (Google, Microsoft, IMAP/SMTP), solo correos con contactos de Hour, envío por el
@@ -1410,7 +1410,7 @@ entre empresas sin construirlo.
 - [ ] **Microsoft (Outlook) aparcado hasta que una compañía lo pida (Marco, 2026-10-11).** Una cuenta personal ya no puede registrar apps sin directorio: hará falta darse de alta en Azure (crea el directorio) y después registrar la app por Chrome. La capa de proveedor se construye para que sea solo otro adaptador.
 - [x] Marco: hecho (2026-10-11, comprobado con `wrangler secret list`) — **Guardar en Wrangler (`hour-web`) `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET` y `MAIL_TOKEN_KEY`** (esta última, una clave aleatoria para cifrar los tokens; p. ej. `openssl rand -base64 32`). Hoy en Wrangler solo está `SUPABASE_SERVICE_ROLE_KEY` (comprobado el 2026-10-11).
 - [ ] **Google: verificación de la app y auditoría CASA antes de pasar de 100 usuarios** (permisos restringidos de Gmail; coste de cientos a miles de dólares al año según las fuentes, por confirmar). Mientras, modo prueba (Marco, 2026-10-11).
-- [ ] **Comms, carril 2: hilos con facetas (ADR-099).** Facetas configurables por espacio: estándar sembradas (con Comidas) y traducidas por clave; renombrar, desactivar y crear propias, con nombre por idioma opcional (Marco, 2026-10-11). Empieza por pasar todo el sistema de permisos al modelo nuevo
+- [ ] **Comms, carril 2: hilos con facetas (ADR-099).** **Permisos fases expand y lecturas en producción (2026-10-11, migraciones `20261011100000` y `20261011300000`, RLS 260/260, E2E 64/64). Falta la fase 3 (escrituras al modelo nuevo y contract) y los hilos.** Facetas configurables por espacio: estándar sembradas (con Comidas) y traducidas por clave; renombrar, desactivar y crear propias, con nombre por idioma opcional (Marco, 2026-10-11). Empieza por pasar todo el sistema de permisos al modelo nuevo
   (expand/contract con staging); después hilos sin invitados, tablón del día colgado del bolo (la maqueta enseña
   también la variante por faceta).
 - [ ] **Correo con el dominio propio de cada compañía (Marco, 2026-10-11), en tres conectores:**
