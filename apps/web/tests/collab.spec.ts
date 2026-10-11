@@ -240,6 +240,75 @@ test.describe('collaborative notes (Yjs over the RoadsheetCollab DO)', () => {
     await b.context().close();
   });
 
+  test('the running order is live: two clients converge and the DO writes the rows (ADR-090 P2)', async ({
+    browser,
+  }) => {
+    test.setTimeout(120_000);
+    // A word of its own per run, so the fixture's leftovers never match.
+    const marker = `zzz ro ${Date.now().toString(36)}`;
+    const path = '/h/playwright/performance/zzz-e2e-2';
+    const rowsSay = (page: Page) =>
+      page.evaluate(
+        async ({ perfId, word }) => {
+          const res = await fetch(`/api/schedule/performance/${perfId}`);
+          if (!res.ok) return `http-${res.status}`;
+          const data = (await res.json()) as { slots: Array<{ label: string | null }> };
+          return data.slots.some((s) => s.label === word) ? 'there' : 'absent';
+        },
+        { perfId: fx.perf2, word: marker },
+      );
+
+    const a = await openAsClient(browser, path);
+    const b = await openAsClient(browser, path);
+    const addA = a.locator('.hours .hours__row--add');
+    // The editor writes only once its doc has synced: the field says when.
+    await expect(addA.getByLabel(/hour|hora/i)).toBeEnabled({ timeout: 15_000 });
+    await expect(b.locator('.hours .hours__row--add').getByLabel(/hour|hora/i)).toBeEnabled({
+      timeout: 15_000,
+    });
+
+    // A adds a moment; B sees it without reloading.
+    await addA.getByLabel(/hour|hora/i).fill('14h');
+    await addA.getByLabel(/moment/i).fill(marker);
+    await addA.locator('button[type=submit]').click();
+    await expect(a.locator('.hours__line', { hasText: marker })).toHaveCount(1);
+    await expect(b.locator('.hours__line', { hasText: marker })).toHaveCount(1, {
+      timeout: 15_000,
+    });
+
+    // The DO materializes it into schedule_slot (save debounce ~2 s).
+    await expect.poll(() => rowsSay(a), { timeout: 30_000 }).toBe('there');
+
+    // B removes it; A converges, and the row goes too. Leaves the fixture clean.
+    await b.locator('.hours__line', { hasText: marker }).click();
+    await b
+      .locator('.hours__row--edit')
+      .getByRole('button', { name: /remove|quitar/i })
+      .click();
+    await expect(a.locator('.hours__line', { hasText: marker })).toHaveCount(0, {
+      timeout: 15_000,
+    });
+    await expect.poll(() => rowsSay(a), { timeout: 30_000 }).toBe('absent');
+
+    await a.context().close();
+    await b.context().close();
+  });
+
+  test('a PATCH cannot write the running order around the doc', async ({ page }) => {
+    await page.goto('/h/planner');
+    await waitForLoaded(page);
+    const result = await page.evaluate(async (perfId) => {
+      const res = await fetch(`/api/performances/${perfId}`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ start_at: '2031-01-16T20:00:00.000Z' }),
+      });
+      return { status: res.status, body: (await res.json()) as { error?: string } };
+    }, fx.perf2);
+    expect(result.status).toBe(400);
+    expect(result.body.error).toBe('schedule_is_live');
+  });
+
   test('upgrade is denied without a valid token', async ({ browser }) => {
     // Deliberately signed OUT. Two traps here, both learned the hard way:
     //   1. the `page` fixture now carries the suite's shared session

@@ -224,6 +224,27 @@ export function sameVenue(a: MatchInput, b: MatchInput): MatchReason | null {
 }
 
 /**
+ * Are two records the same venue when ONE OF THEM HAS NO COORDINATES (the
+ * national EIEL has none)? Only in the same municipality and with the same
+ * name word for word once the town's own name is set aside, and only when
+ * that name says WHICH venue it is: «Teatro Saavedra» merges with «Teatro
+ * Saavedra»; «Teatro Municipal», «Casa de la Cultura» or «Teatro» never merge
+ * on the name alone, since a town may have two. Stricter than `sameVenue` on
+ * purpose (fase 2: «criterios prudentes»).
+ */
+export function sameVenueByName(a: MatchInput, b: MatchInput): MatchReason | null {
+  if (a.qid && b.qid) return a.qid === b.qid ? { by: 'qid', distanceM: null } : null;
+  if (!a.city || a.city !== b.city) return null;
+  const town = new Set(a.city.split(' ').filter(Boolean));
+  const words = (n: string) => nameWords(n).filter((w) => !town.has(w));
+  const wa = words(a.norm);
+  const wb = words(b.norm);
+  if (wa.length === 0 || wa.join(' ') !== wb.join(' ')) return null;
+  if (!wa.some((w) => !GENERIC.has(w))) return null;
+  return { by: 'city_name', distanceM: null };
+}
+
+/**
  * The kind of a venue from its own name, for sources with no type (Castilla y
  * León). Ordered: «Teatro Auditorio» is a theatre.
  */

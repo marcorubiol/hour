@@ -15,6 +15,9 @@ export interface PersistEnv {
   SUPABASE_SECRET_KEY: string;
 }
 
+import type { CollabTargetTable } from './persistence-guard';
+import type { ScheduleSlot } from './schedule';
+
 const TABLE = 'collab_snapshot';
 
 function bytesToHex(bytes: Uint8Array): string {
@@ -46,7 +49,8 @@ function authHeaders(env: PersistEnv): Record<string, string> {
 
 export interface TargetMeta {
   workspace_id: string;
-  /** Current text of the target's notes column — seeds a fresh doc. */
+  /** Current text of the target's notes column — seeds a fresh doc. Null for
+   *  a target whose doc does not own its notes (a `date`). */
   notes: string | null;
 }
 
@@ -60,12 +64,13 @@ export interface TargetMeta {
  */
 export async function fetchTargetMeta(
   env: PersistEnv,
-  targetTable: 'performance' | 'project' | 'line',
+  targetTable: CollabTargetTable,
   targetId: string,
+  withNotes = true,
 ): Promise<TargetMeta | null> {
   const url = new URL(`/rest/v1/${targetTable}`, env.PUBLIC_SUPABASE_URL);
   url.searchParams.set('id', `eq.${targetId}`);
-  url.searchParams.set('select', 'workspace_id,notes');
+  url.searchParams.set('select', withNotes ? 'workspace_id,notes' : 'workspace_id');
   url.searchParams.set('deleted_at', 'is.null');
   url.searchParams.set('limit', '1');
 
@@ -74,8 +79,10 @@ export async function fetchTargetMeta(
   if (!res.ok) {
     throw new Error(`fetchTargetMeta(${targetTable}/${targetId}): ${res.status}`);
   }
-  const rows = (body ? JSON.parse(body) : []) as TargetMeta[];
-  return rows[0] ?? null;
+  const rows = (body ? JSON.parse(body) : []) as Array<Partial<TargetMeta>>;
+  const row = rows[0];
+  if (!row?.workspace_id) return null;
+  return { workspace_id: row.workspace_id, notes: row.notes ?? null };
 }
 
 /**
@@ -86,7 +93,7 @@ export async function fetchTargetMeta(
  */
 export async function writeNotesColumn(
   env: PersistEnv,
-  targetTable: 'performance' | 'project' | 'line',
+  targetTable: CollabTargetTable,
   targetId: string,
   text: string,
 ): Promise<void> {
@@ -192,5 +199,79 @@ export async function pruneSnapshots(
   });
   if (!res.ok) {
     throw new Error(`pruneSnapshots: ${res.status} ${await res.text()}`);
+  }
+}
+
+/**
+ * The running order's rows, in their order: what seeds a doc that has never
+ * held a `schedule` (ADR-090 risk 1). `service_role` reads `schedule_slot`
+ * since 20261010220000 (SELECT only).
+ */
+export async function fetchScheduleRows(
+  env: PersistEnv,
+  targetTable: 'performance' | 'date',
+  targetId: string,
+): Promise<ScheduleSlot[]> {
+  const url = new URL('/rest/v1/schedule_slot', env.PUBLIC_SUPABASE_URL);
+  url.searchParams.set(
+    targetTable === 'performance' ? 'performance_id' : 'date_id',
+    `eq.${targetId}`,
+  );
+  url.searchParams.set('select', 'id,kind,label,at,ends_at,notes');
+  url.searchParams.set('order', 'sort.asc');
+
+  const res = await fetch(url, { headers: authHeaders(env) });
+  if (!res.ok) {
+    throw new Error(
+      `fetchScheduleRows(${targetTable}/${targetId}): ${res.status} ${await res.text()}`,
+    );
+  }
+  return (await res.json()) as ScheduleSlot[];
+}
+
+/** A PostgREST refusal, carrying the status so a caller can tell «not this user». */
+export class PostgrestError extends Error {
+  readonly status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.status = status;
+  }
+}
+
+/**
+ * Materialize the doc's running order into `schedule_slot` (ADR-090 P2): the
+ * whole order, diffed by id in one transaction, through the service-only RPC
+ * that gates on `edit:performance` OF `userId` and signs the audit with them.
+ * A 401/403 means that user may not write this order (any more).
+ */
+export async function replaceScheduleSlots(
+  env: PersistEnv,
+  userId: string,
+  targetTable: 'performance' | 'date',
+  targetId: string,
+  slots: readonly ScheduleSlot[],
+): Promise<void> {
+  const res = await fetch(
+    new URL('/rest/v1/rpc/replace_schedule_slots_for_user', env.PUBLIC_SUPABASE_URL),
+    {
+      method: 'POST',
+      headers: {
+        ...authHeaders(env),
+        'content-type': 'application/json',
+        Prefer: 'return=minimal',
+      },
+      body: JSON.stringify({
+        p_user_id: userId,
+        p_target_table: targetTable,
+        p_target_id: targetId,
+        p_slots: slots,
+      }),
+    },
+  );
+  if (!res.ok) {
+    throw new PostgrestError(
+      `replaceScheduleSlots: ${res.status} ${await res.text()}`,
+      res.status,
+    );
   }
 }

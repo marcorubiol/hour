@@ -537,6 +537,7 @@
   "planner.ro_yours": "your time",
   "planner.ro_zones": "Hours in {tz}; the small one under each is yours ({yours}).",
   "planner.ro_rezoned": "The running order keeps its hours on the new venue’s clock ({from} → {to}).",
+  "planner.ro_rezone_failed": "The venue moved zone, but the running order did not move: check its hours.",
   "create.trip_from": "From",
   "create.trip_to": "To",
   "planner.trip_title": "route",

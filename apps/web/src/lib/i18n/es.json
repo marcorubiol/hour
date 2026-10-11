@@ -528,6 +528,7 @@
   "planner.ro_yours": "tu hora",
   "planner.ro_zones": "Horas de {tz}; la pequeña de debajo es la tuya ({yours}).",
   "planner.ro_rezoned": "La escaleta mantiene sus horas en el reloj del nuevo local ({from} → {to}).",
+  "planner.ro_rezone_failed": "El local cambió de zona, pero la escaleta no se movió: revisa sus horas.",
   "create.trip_from": "Origen",
   "create.trip_to": "Destino",
   "planner.trip_title": "trayecto",

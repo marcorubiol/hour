@@ -17,19 +17,29 @@
  *     Llicència oberta d'ús d'informació de Catalunya.
  *   - Junta de Castilla y León: Red de Teatros and Red de Circuitos
  *     Escénicos, CC BY 4.0. (Castilla-La Mancha is CC BY-SA: NOT used.)
- *   - Wikidata (SPARQL), CC0: the rest of Spain, and the QID bridge.
+ *   - Comunidad de Madrid, EIEL fase 2023, centros culturales (IDEM WFS),
+ *     CC BY 4.0 (fase 2).
+ *   - Encuesta de Infraestructura y Equipamientos Locales (EIEL), Secretaría
+ *     de Estado de Política Territorial: free use naming the source
+ *     («©Secretaría de Estado de Política Territorial»). The rest of Spain
+ *     outside Catalunya, Castilla y León and Madrid; Euskadi and Navarra are
+ *     not in the EIEL (fase 2).
+ *   - Wikidata (SPARQL), CC0: Spain and France, and the QID bridge.
  *   - GeoNames (ES, FR, cities500), CC BY 4.0: only to derive each venue's
  *     IANA zone (and, for Wikidata, its region) from its coordinates.
  * OpenStreetMap is NOT used in this phase (Marco, 2026-10-10).
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
+import { promisify } from 'node:util';
+
+const run = async (cmd, argv) => (await promisify(execFile)(cmd, argv, { maxBuffer: 1 << 26 })).stdout;
 
 const args = process.argv.slice(2);
 const flag = (name) => args.find((a) => a.startsWith(`--${name}=`))?.split('=')[1];
 const RAW = path.resolve(flag('raw') ?? '.cache/venue-directory/raw');
-/** `--only=wikidata` (or a folder: basilic, gencat, cyl, geonames) re-fetches just that. */
+/** `--only=wikidata` (or a folder: basilic, gencat, cyl, madrid, eiel, geonames) re-fetches just that. */
 const ONLY = flag('only');
 const UA = 'HourVenueDirectory/0.1 (+https://hour.zerosense.studio; marcorubiol@gmail.com)';
 
@@ -54,6 +64,12 @@ export const DOWNLOADS = [
   {
     file: 'cyl/espacios-circuitos-escenicos.json',
     url: 'https://analisis.datosabiertos.jcyl.es/api/explore/v2.1/catalog/datasets/espacios-circuitos-escenicos/exports/json',
+  },
+  // Comunidad de Madrid, EIEL fase 2023: «centros culturales», with coordinates
+  // (CC BY 4.0, declared in the service's own AccessConstraints and on datos.gob.es).
+  {
+    file: 'madrid/eiel_cent_cultural.json',
+    url: 'https://idem.comunidad.madrid/geoidem/ServiciosPublicos/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=ServiciosPublicos:IDEM_EIEL_CENT_CULTURAL_23&outputFormat=application/json&srsName=EPSG:4326',
   },
   { file: 'geonames/ES.zip', url: 'https://download.geonames.org/export/dump/ES.zip' },
   { file: 'geonames/FR.zip', url: 'https://download.geonames.org/export/dump/FR.zip' },
@@ -114,15 +130,60 @@ function wikidataQuery() {
 }`;
 }
 
-/** The municipalities' names in Spanish, Catalan and Galician, by QID. */
-function municipalityQuery(qids) {
-  return `SELECT ?muni ?es ?ca ?gl WHERE {
-  VALUES ?muni { ${qids.map((q) => `wd:${q}`).join(' ')} }
-  OPTIONAL { ?muni rdfs:label ?es FILTER(lang(?es) = "es") }
-  OPTIONAL { ?muni rdfs:label ?ca FILTER(lang(?ca) = "ca") }
-  OPTIONAL { ?muni rdfs:label ?gl FILTER(lang(?gl) = "gl") }
+/**
+ * Wikidata in France (P17 = Q142), fase 2: the same classes, exclusions and
+ * filters as Spain (Marco, 2026-10-10: «tipos de sala igual»), French labels,
+ * and the commune (Q484170) as municipality.
+ */
+function wikidataQueryFr() {
+  const cls = Object.keys(WIKIDATA_CLASSES).map((q) => `wd:${q}`).join(' ');
+  const ex = WIKIDATA_EXCLUDE.map((q) => `wd:${q}`).join(' ');
+  return `SELECT ?item ?t ?coord ?fr ?en ?muni ?postal ?addr ?cap ?web ?useLabel WHERE {
+  VALUES ?t { ${cls} }
+  ?item wdt:P31 ?t ; wdt:P17 wd:Q142 ; wdt:P625 ?coord .
+  FILTER NOT EXISTS { ?item wdt:P576 [] }
+  FILTER NOT EXISTS { ?item wdt:P3999 [] }
+  FILTER NOT EXISTS { VALUES ?x { ${ex} } ?item wdt:P31 ?x }
+  OPTIONAL { ?item rdfs:label ?fr FILTER(lang(?fr) = "fr") }
+  OPTIONAL { ?item rdfs:label ?en FILTER(lang(?en) = "en") }
+  OPTIONAL { ?item wdt:P131+ ?muni . ?muni wdt:P31/wdt:P279* wd:Q484170 }
+  OPTIONAL { ?item wdt:P281 ?postal }
+  OPTIONAL { ?item wdt:P6375 ?addr }
+  OPTIONAL { ?item wdt:P1083 ?cap }
+  OPTIONAL { ?item wdt:P856 ?web }
+  OPTIONAL { ?item wdt:P5817 ?use }
+  SERVICE wikibase:label { bd:serviceParam wikibase:language "en,fr". ?use rdfs:label ?useLabel . }
 }`;
 }
+
+/** The municipalities' names in Spanish, Catalan and Galician (or French), by QID. */
+function municipalityQuery(qids, langs = ['es', 'ca', 'gl']) {
+  return `SELECT ?muni ${langs.map((l) => `?${l}`).join(' ')} WHERE {
+  VALUES ?muni { ${qids.map((q) => `wd:${q}`).join(' ')} }
+${langs.map((l) => `  OPTIONAL { ?muni rdfs:label ?${l} FILTER(lang(?${l}) = "${l}") }`).join('\n')}
+}`;
+}
+
+/**
+ * EIEL (Encuesta de Infraestructura y Equipamientos Locales), Secretaría de
+ * Estado de Política Territorial: one zip per province holding one inner zip
+ * with every table of the survey (pipe-separated, Latin-1, no header, NO
+ * coordinates). Only three tables are kept: CENT_CULTURAL,
+ * CENT_CULTURAL_USOS and MUNICIPIO. The survey covers the municipalities
+ * under 50.000 inhabitants and leaves out Euskadi and Navarra. Catalunya and
+ * Castilla y León have their official sources of phase 1 and Madrid its own
+ * EIEL with coordinates, so their provinces are not fetched here.
+ * The last complete phase differs by province (on 2026-10-10 Almería's was
+ * under `periodo=2023`, named 2024_*, and Granada's under 2021), so each
+ * province takes the first period of EIEL_PERIODS whose CENT_CULTURAL table
+ * is not empty. The phase travels in the file names; build.mjs reports it.
+ */
+export const EIEL_PERIODS = ['2025', '2024', '2023', '2022', '2021', '2020'];
+export const EIEL_PROVINCES = [
+  '02', '03', '04', '06', '07', '10', '11', '12', '13', '14', '15', '16', '18', '19', '21', '22', '23', '26',
+  '27', '29', '30', '32', '33', '35', '36', '38', '39', '41', '44', '45', '46', '50', '51', '52',
+];
+const EIEL_TABLES = ['CENT_CULTURAL', 'CENT_CULTURAL_USOS', 'MUNICIPIO'];
 
 const sparql = (query) => ({
   method: 'POST',
@@ -148,14 +209,66 @@ async function download(url, file, init = {}) {
   console.log(`${String(buf.length).padStart(10)}  ${file}  ← ${url.slice(0, 110)}`);
 }
 
+/**
+ * One province of the EIEL: outer zip → one inner zip («2023_04.zip») → only
+ * the three tables, read later as data. Tries EIEL_PERIODS in order until the
+ * CENT_CULTURAL table has rows. curl, not fetch: eiel.redsara.es can take
+ * ~20 s to accept a connection, past undici's fixed 10 s connect timeout.
+ */
+async function eielProvince(dir, prov) {
+  for (const period of EIEL_PERIODS) {
+    const url = `https://eiel.redsara.es/descargas/descargar-fichero?periodo=${period}&cuadro=Todos+los+cuadros&nivel=P&provincia=${prov}`;
+    const zip = path.join(dir, `${prov}-${period}.zip`);
+    const tmp = path.join(dir, `tmp-${prov}-${period}`);
+    await run('curl', ['-sSfL', '--retry', '4', '--retry-all-errors', '--connect-timeout', '90', '-A', UA, '-o', zip, url]);
+    try {
+      // A period without data answers with an HTML page, not a zip.
+      await run('unzip', ['-o', '-q', zip, '-d', tmp]);
+      const inner = fs.readdirSync(tmp).find((f) => f.endsWith('.zip'));
+      const list = inner ? (await run('unzip', ['-l', path.join(tmp, inner)])).split('\n') : [];
+      const line = list.find((l) => l.trim().endsWith(`_CENT_CULTURAL_${prov}.txt`));
+      // A phase still being published may ship the centres without their uses.
+      const complete = EIEL_TABLES.every((t) => list.some((l) => l.trim().endsWith(`_${t}_${prov}.txt`)));
+      if (complete && line && Number(line.trim().split(/\s+/)[0]) > 0) {
+        await run('unzip', ['-o', '-q', '-j', path.join(tmp, inner), ...EIEL_TABLES.map((t) => `*_${t}_${prov}.txt`), '-d', dir]);
+        console.log(`${String(fs.statSync(zip).size).padStart(10)}  eiel/${prov} periodo ${period}: ${line.trim().split(/\s+/).pop()}`);
+        return;
+      }
+    } catch {
+      // not a zip, or a table missing: try the previous period
+    } finally {
+      fs.rmSync(tmp, { recursive: true, force: true });
+      fs.rmSync(zip, { force: true });
+    }
+  }
+  // Some provinces have the table empty in every period (Albacete on
+  // 2026-10-10): said, not fatal; build.mjs lists them in report.json.
+  console.warn(`EIEL ${prov}: no period of ${EIEL_PERIODS.join(', ')} has its centros culturales`);
+}
+
 if (import.meta.url === `file://${process.argv[1]}`) {
   for (const d of DOWNLOADS) if (!ONLY || d.file.startsWith(`${ONLY}/`)) await download(d.url, d.file);
-  const q = wikidataQuery();
+  const munisOf = (file) => {
+    const res = JSON.parse(fs.readFileSync(path.join(RAW, file), 'utf8'));
+    return [...new Set(res.results.bindings.filter((b) => b.muni).map((b) => b.muni.value.split('/').pop()))];
+  };
   if (!ONLY || ONLY === 'wikidata') {
-    await download('https://query.wikidata.org/sparql', 'wikidata/es.json', sparql(q));
-    const es = JSON.parse(fs.readFileSync(path.join(RAW, 'wikidata/es.json'), 'utf8'));
-    const munis = [...new Set(es.results.bindings.filter((b) => b.muni).map((b) => b.muni.value.split('/').pop()))];
-    await download('https://query.wikidata.org/sparql', 'wikidata/municipalities.json', sparql(municipalityQuery(munis)));
+    await download('https://query.wikidata.org/sparql', 'wikidata/es.json', sparql(wikidataQuery()));
+    await download('https://query.wikidata.org/sparql', 'wikidata/municipalities.json', sparql(municipalityQuery(munisOf('wikidata/es.json'))));
+    await download('https://query.wikidata.org/sparql', 'wikidata/fr.json', sparql(wikidataQueryFr()));
+    await download(
+      'https://query.wikidata.org/sparql',
+      'wikidata/municipalities_fr.json',
+      sparql(municipalityQuery(munisOf('wikidata/fr.json'), ['fr'])),
+    );
+  }
+  if (!ONLY || ONLY === 'eiel') {
+    const dir = path.join(RAW, 'eiel');
+    fs.rmSync(dir, { recursive: true, force: true });
+    fs.mkdirSync(dir, { recursive: true });
+    // One province at a time: in parallel the server answered some requests
+    // with another period or with nothing (2026-10-10).
+    for (const prov of EIEL_PROVINCES) await eielProvince(dir, prov);
   }
   fs.writeFileSync(path.join(RAW, 'fetched_at.txt'), new Date().toISOString() + '\n');
   const geo = path.join(RAW, 'geonames');

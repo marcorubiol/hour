@@ -7,9 +7,11 @@
  * here, at the server boundary: the API keeps its shape and no screen changes.
  * The first slot of each kind (by `sort`) is the one that counts.
  *
- * Writing the five fields goes through `replace_schedule_slots` with the whole
- * running order, so a slot of another kind (a future "photo call") survives a
- * PATCH that only moves the soundcheck.
+ * Writing is not here (ADR-090 P2): the running order is written into its
+ * collab doc (`schedule-doc.ts`) and the Durable Object materializes these
+ * rows. What stays is the read side and the two rules a writer applies: the
+ * order of the five (`timeslotsOrdered`) and the venue's clock
+ * (`reinterpretSlots`).
  */
 
 import { instantToWallClock, wallClockToInstant } from './datetime';
@@ -40,7 +42,7 @@ export interface ScheduleSlotRow {
   notes: string | null;
 }
 
-/** What `replace_schedule_slots` takes: the order of the array is the order. */
+/** One moment as an editor writes it: the order of the array is the order. */
 export interface ScheduleSlotInput {
   id?: string;
   kind: string | null;
@@ -116,8 +118,9 @@ export function withSchedule<T extends { schedule_slot?: ScheduleSlotRow[] | nul
  * a new instant. Same rule the details dialog used to apply to the five.
  *
  * Every slot's `at` and `ends_at` are read as wall time in `fromTz` and
- * rewritten as that wall time in `toTz`. Ids, order and words are kept, so
- * `replace_schedule_slots` diffs it as pure updates. Same zone → untouched.
+ * rewritten as that wall time in `toTz`. Ids, order and words are kept: only
+ * hours move (`rezoneScheduleInDoc` writes them into the doc). Same zone →
+ * untouched.
  */
 export function reinterpretSlots<T extends Pick<ScheduleSlotRow, 'at' | 'ends_at'>>(
   slots: readonly T[],
@@ -127,24 +130,6 @@ export function reinterpretSlots<T extends Pick<ScheduleSlotRow, 'at' | 'ends_at
   if (fromTz === toTz) return [...slots];
   const move = (iso: string) => wallClockToInstant(instantToWallClock(iso, fromTz), toTz) ?? iso;
   return slots.map((s) => ({ ...s, at: move(s.at), ends_at: s.ends_at ? move(s.ends_at) : null }));
-}
-
-/** The subset of a PATCH body that names a timeslot (absent ≠ null). */
-export type TimeslotPatch = Partial<TimeslotFields>;
-
-export function splitTimeslotPatch<T extends Record<string, unknown>>(
-  patch: T,
-): { timeslots: TimeslotPatch; rest: Omit<T, TimeslotField> } {
-  const timeslots: TimeslotPatch = {};
-  const rest: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(patch)) {
-    if ((TIMESLOT_FIELDS as readonly string[]).includes(key)) {
-      timeslots[key as TimeslotField] = value as string | null;
-    } else {
-      rest[key] = value;
-    }
-  }
-  return { timeslots, rest: rest as Omit<T, TimeslotField> };
 }
 
 /**
@@ -161,42 +146,3 @@ export function timeslotsOrdered(t: TimeslotFields): boolean {
   return true;
 }
 
-/**
- * Apply a timeslot PATCH to the current running order and return the whole
- * new order for `replace_schedule_slots`.
- *
- * - absent field → its slot is untouched
- * - null         → its slot (the first of that kind) is removed
- * - a value      → the first slot of that kind moves to it, or a new slot is
- *                  inserted before the first legacy slot that comes later in
- *                  the canonical order (so the five keep their order)
- *
- * Slots of any other kind keep their place and their fields.
- */
-export function applyTimeslotPatch(
-  current: readonly ScheduleSlotRow[],
-  patch: TimeslotPatch,
-): ScheduleSlotInput[] {
-  const order: ScheduleSlotInput[] = [...current]
-    .sort((a, b) => a.sort - b.sort)
-    .map(({ id, kind, label, at, ends_at, notes }) => ({ id, kind, label, at, ends_at, notes }));
-  const rank = (kind: string | null) => TIMESLOT_KINDS.findIndex(([k]) => k === kind);
-
-  for (const [kind, field] of TIMESLOT_KINDS) {
-    if (!(field in patch)) continue;
-    const value = patch[field] ?? null;
-    const index = order.findIndex((s) => s.kind === kind);
-    if (value === null) {
-      if (index >= 0) order.splice(index, 1);
-    } else if (index >= 0) {
-      order[index] = { ...order[index], at: value };
-    } else {
-      const mine = rank(kind);
-      const before = order.findIndex((s) => rank(s.kind) > mine);
-      const slot: ScheduleSlotInput = { kind, label: null, at: value, ends_at: null, notes: null };
-      if (before < 0) order.push(slot);
-      else order.splice(before, 0, slot);
-    }
-  }
-  return order;
-}

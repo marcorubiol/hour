@@ -87,3 +87,38 @@ desaparecen; sobrescribir el `venue` de una compañía; usar Overpass en producc
 
 Pendiente de verificar: la categoría de teatro en la taxonomía nueva de Overture, la licencia de la UiTdatabank, el
 recuento OSM fuera de España y los campos del dataset de Castilla-La Mancha.
+
+## Fase 2 (carril `claude/venue-directory-2`, 2026-10-11)
+
+Fuentes nuevas, con la licencia comprobada en la página oficial de cada una:
+
+- **EIEL nacional** (Encuesta de Infraestructura y Equipamientos Locales, Secretaría de Estado de Política Territorial).
+  La página del ministerio dice: «Se permite el tratamiento de estos datos, siempre que se mencione la fuente y
+  propiedad del siguiente modo: ©Secretaría de Estado de Política Territorial» [V]. Sin share-alike. Descarga por
+  provincia en `eiel.redsara.es/descargas/`, tablas `CENT_CULTURAL` y `CENT_CULTURAL_USOS`: tipo de centro y usos, sin
+  coordenadas, sin aforo y sin contactos. Solo municipios de menos de 50.000 habitantes; sin Euskadi ni Navarra. La
+  última fase completa cambia por provincia (de 2020 a 2025) y en 11 provincias la tabla está vacía en todas las fases
+  (Albacete, A Coruña, Guadalajara, Huelva, Huesca, La Rioja, Lugo, Ourense, Zaragoza, Ceuta, Melilla) [V].
+- **EIEL fase 2023 de la Comunidad de Madrid** (IDEM, WFS con coordenadas): CC BY 4.0, declarada en el propio servicio
+  (`AccessConstraints`) y en datos.gob.es [V].
+- **Wikidata en Francia**: CC0, las mismas clases que en España.
+
+Sin dataset autonómico utilizable [V, búsqueda en los portales y en datos.gob.es]: **Andalucía** (el catálogo de
+centros de la Junta solo trae sus 4 teatros propios; DERA e ISE no tienen capa de salas) y **Comunitat Valenciana**
+(dadesobertes.gva.es no tiene salas; la agenda del IVC es de actos). Las cubre la EIEL nacional. La Comunidad de Madrid
+solo publica, además, estadísticas por municipio; el Ayuntamiento de Madrid publica 12 teatros municipales (no usado).
+
+Reglas: entran teatro/cine (salvo un cine sin uso escénico), auditorio, casa de cultura y «otros» con uso de teatro o
+auditorio; nunca un centro social o cívico (la EIEL no da aforo); nada en construcción. Una ficha sin coordenadas solo
+se fusiona con otra del mismo municipio y el mismo nombre distintivo («Teatro Saavedra» sí; «Teatro Municipal» no).
+Las fuentes nuevas se pliegan después de las de la fase 1, así que ninguna ficha de la fase 1 cambia de
+`(source, source_id)` ni pasa a `missing`.
+
+Cifras del build del 2026-10-11: 4.659 → 8.631 fichas. España 3.318 → 6.432 (Andalucía 136 → 941, Comunidad de
+Madrid 103 → 275, Comunitat Valenciana 53 → 669); Francia con ultramar 1.340 → 2.199 (Wikidata aporta 858 fichas
+nuevas y se funde con 354 de Basilic).
+
+Dudas abiertas: de las ~2.190 casas de cultura de la EIEL solo 314 declaran uso de teatro o auditorio; entran todas
+porque la fase 1 admite casas de cultura sin aforo. Quedan posibles duplicados sin fundir (Wikidata FR frente a
+Basilic con la geolocalización desplazada; EIEL frente a Wikidata con nombres genéricos), a propósito: un duplicado se
+ve, una fusión equivocada esconde una sala.

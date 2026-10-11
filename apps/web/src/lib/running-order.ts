@@ -6,13 +6,11 @@
  * on the day: type an hour the way the Planner writes it, name the moment,
  * and have it land where it belongs in the order.
  *
- * Pure functions only. The screen (`RunningOrder.svelte`) and the endpoint
- * (`/api/schedule/[target]/[id]`) are the two callers.
+ * Pure functions only. The screen (`RunningOrder.svelte`) is the caller.
  *
- * P2 (live editing over the collab DO) replaces how the list is WRITTEN, not
+ * P2 (live editing over the collab DO) replaced how the list is WRITTEN, not
  * what it is: the editor keeps producing a whole `ScheduleSlotInput[]`, and
- * whether that goes to `replace_schedule_slots` or into a `Y.Array` is the
- * caller's business.
+ * `schedule-doc.ts` writes it into the doc's `Y.Array`.
  */
 
 import { hourMark, timeInTz, wallClockToInstant, instantToWallClock } from './datetime';

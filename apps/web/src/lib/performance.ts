@@ -211,14 +211,6 @@ export function statusFootKey(status: string): string | null {
 // Date-only contract — the one shared realIsoDate (see $lib/datetime).
 const isoDateField = realIsoDate;
 
-const isoInstantField = v.pipe(
-  v.string(),
-  v.check((s) => {
-    const t = new Date(s).getTime();
-    return !Number.isNaN(t);
-  }, 'Not a valid timestamp'),
-);
-
 const countryField = v.pipe(v.string(), v.regex(/^[A-Za-z]{2}$/, 'ISO 3166 alpha-2'));
 
 /**
@@ -280,11 +272,11 @@ export type PerformanceSeriesCreate = v.InferOutput<typeof PerformanceSeriesCrea
 
 /**
  * PATCH /api/performances/:key body. Whitelist of the operational fields
- * (status lifecycle, day, the 5 timeslots, denormalized venue trio,
- * conversation/line links). NO fee columns (edit:money trigger + Money
- * lens own the money path) and NO notes (the collab doc owns it,
- * ADR-042). Timeslot ordering is enforced by the DB CHECK — the endpoint
- * maps that violation to a 400.
+ * (status lifecycle, day, denormalized venue trio, conversation/line
+ * links). NO fee columns (edit:money trigger + Money lens own the money
+ * path), NO notes (the collab doc owns it, ADR-042) and NO timeslots: the
+ * running order is the collab doc's too (ADR-090 P2), and the endpoint
+ * refuses a body that names one of the five before it gets here.
  */
 export const PerformancePatchSchema = v.object({
   status: v.optional(v.picklist(PERFORMANCE_STATUSES)),
@@ -295,11 +287,6 @@ export const PerformancePatchSchema = v.object({
   hold_notice_days: v.optional(
     v.nullable(v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(365))),
   ),
-  load_in_at: v.optional(v.nullable(isoInstantField)),
-  soundcheck_at: v.optional(v.nullable(isoInstantField)),
-  start_at: v.optional(v.nullable(isoInstantField)),
-  loadout_at: v.optional(v.nullable(isoInstantField)),
-  wrap_at: v.optional(v.nullable(isoInstantField)),
   venue_name: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(200)))),
   city: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(120)))),
   country: v.optional(v.nullable(countryField)),

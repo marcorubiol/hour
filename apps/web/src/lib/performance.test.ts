@@ -74,20 +74,26 @@ describe('PerformanceCreateSchema', () => {
 });
 
 describe('PerformancePatchSchema', () => {
-  it('accepts a status-only patch and a full schedule patch', () => {
+  it('accepts a status-only patch and a full details patch', () => {
     expect(v.safeParse(PerformancePatchSchema, { status: 'confirmed' }).success).toBe(
       true,
     );
     const r = v.safeParse(PerformancePatchSchema, {
       performed_at: '2031-01-15',
-      load_in_at: '2031-01-15T11:00:00.000Z',
-      soundcheck_at: null,
-      start_at: '2031-01-15T19:00:00.000Z',
       venue_name: '  Sala X ',
       city: null,
     });
     expect(r.success).toBe(true);
     if (r.success) expect(r.output.venue_name).toBe('Sala X');
+  });
+
+  it('carries no timeslot: the running order is the collab doc’s (ADR-090 P2)', () => {
+    const r = v.safeParse(PerformancePatchSchema, {
+      status: 'confirmed',
+      start_at: '2031-01-15T19:00:00.000Z',
+    });
+    expect(r.success).toBe(true);
+    if (r.success) expect('start_at' in r.output).toBe(false);
   });
 
   it('hold_notice_days: 0..365 or null pass, out-of-range and fractions fail (ADR-080 §2)', () => {
@@ -100,10 +106,7 @@ describe('PerformancePatchSchema', () => {
     expect(v.safeParse(PerformancePatchSchema, { hold_notice_days: 12.5 }).success).toBe(false);
   });
 
-  it('rejects garbage timestamps and money fields never pass', () => {
-    expect(
-      v.safeParse(PerformancePatchSchema, { start_at: 'not-a-time' }).success,
-    ).toBe(false);
+  it('money fields and notes never pass', () => {
     const r = v.safeParse(PerformancePatchSchema, {
       status: 'hold',
       fee_amount: 9000,

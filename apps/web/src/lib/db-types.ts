@@ -4493,6 +4493,36 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      replace_schedule_slots_for_user: {
+        Args: {
+          p_slots: Json
+          p_target_id: string
+          p_target_table: string
+          p_user_id: string
+        }
+        Returns: {
+          at: string
+          created_at: string
+          created_by: string | null
+          date_id: string | null
+          ends_at: string | null
+          id: string
+          kind: string | null
+          label: string | null
+          notes: string | null
+          performance_id: string | null
+          project_id: string
+          sort: number
+          updated_at: string
+          workspace_id: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "schedule_slot"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       request_workspace_alias: {
         Args: { p_alias: string; p_workspace_id: string }
         Returns: {
