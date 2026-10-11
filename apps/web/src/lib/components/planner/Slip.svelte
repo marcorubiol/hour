@@ -122,6 +122,10 @@
      * text, without its box»; this is that, and it stays one component.
      */
     ground?: 'card' | 'bare';
+    /** Nobody put you on this; it was worked out from the project's cast
+        (`certainty.css` § INFERENCE). Only the name leans: the doubt is
+        about whose it is, not about the hour or the place. */
+    guess?: boolean;
     /** The verbs — `confirm`, `let go`. Drawn in the row placing's third
         column, which is reserved for them and empty everywhere else. */
     actions?: import('svelte').Snippet;
@@ -139,6 +143,7 @@
     clashPeople = false,
     placing = 'cell',
     ground = 'card',
+    guess = false,
     actions,
   }: Props = $props();
 
@@ -203,7 +208,7 @@
   <!-- A travel day's place is ambiguous on its own — «London» is a departure
        or an arrival depending on a column nobody can see — so the direction
        governs the name, in the margin voice. -->
-  <span class="slip__n"
+  <span class="slip__n" class:guess
     >{#if slip.lead}<i class="slip__pre">{slip.lead === 'to' ? t('planner.slip_to', L) : slip.lead}</i>{/if}{slip.name}</span
   >
 

@@ -261,7 +261,7 @@
     {#if !settled || !nextSlip}
       <span class="pulse__dash">—</span>
     {:else}
-      <span class="pulse__slip" class:guess={nextGuess}>
+      <span class="pulse__slip">
         <Slip
           slip={nextSlip}
           {kindLabel}
@@ -269,6 +269,7 @@
           showCountry
           ground="bare"
           placing="cell"
+          guess={nextGuess}
         />
       </span>
       {#if nextDay || nextCall}
