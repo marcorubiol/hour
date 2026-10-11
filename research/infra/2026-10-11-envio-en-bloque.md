@@ -53,4 +53,9 @@ del primer corte: aperturas y clics, IP dedicada, automatizaciones.
 
 **Queda para el abogado:** si una propuesta de espectáculo a un programador es comunicación comercial en el sentido de
 la LSSI; si un «envíen propuestas a…» publicado por la sala cuenta como solicitado; y la base para escribir a contactos
-genéricos de salas en España.
+genéricos de salas en España. Además: qué prueba de consentimiento basta y si cubre la excepción por relación
+contractual previa; qué responsabilidad LSSI tiene Hour como plataforma de envío; qué ley manda para destinatarios en
+Francia; si hay que consultar listas Robinson entre empresas; y si el píxel de apertura necesita consentimiento.
+
+**Consecuencia para el diseño:** todos los proveedores exigen opt-in igual que la LSSI, así que el primer corte lleva
+una puerta de consentimiento por destinatario (quién lo aceptó, cuándo y cómo) antes de poder incluirlo en una campaña.
