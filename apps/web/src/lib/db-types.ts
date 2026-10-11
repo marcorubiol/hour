@@ -36,18 +36,53 @@ export type Database = {
     Tables: {
       access_preset: {
         Row: {
+          can_edit_meta: boolean
+          can_manage_members: boolean
+          container_verb: Database["public"]["Enums"]["access_verb"]
           key: string
           sort: number
         }
         Insert: {
+          can_edit_meta?: boolean
+          can_manage_members?: boolean
+          container_verb: Database["public"]["Enums"]["access_verb"]
           key: string
           sort?: number
         }
         Update: {
+          can_edit_meta?: boolean
+          can_manage_members?: boolean
+          container_verb?: Database["public"]["Enums"]["access_verb"]
           key?: string
           sort?: number
         }
         Relationships: []
+      }
+      access_preset_facet: {
+        Row: {
+          facet_key: string
+          preset_key: string
+          verb: Database["public"]["Enums"]["access_verb"]
+        }
+        Insert: {
+          facet_key: string
+          preset_key: string
+          verb: Database["public"]["Enums"]["access_verb"]
+        }
+        Update: {
+          facet_key?: string
+          preset_key?: string
+          verb?: Database["public"]["Enums"]["access_verb"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "access_preset_facet_preset_key_fkey"
+            columns: ["preset_key"]
+            isOneToOne: false
+            referencedRelation: "access_preset"
+            referencedColumns: ["key"]
+          },
+        ]
       }
       account: {
         Row: {
@@ -1124,41 +1159,67 @@ export type Database = {
       facet: {
         Row: {
           created_at: string
+          created_by: string | null
+          id: string
           key: string
+          label: string | null
+          labels: Json
           sort: number
+          updated_at: string
+          workspace_id: string | null
         }
         Insert: {
           created_at?: string
+          created_by?: string | null
+          id?: string
           key: string
+          label?: string | null
+          labels?: Json
           sort?: number
+          updated_at?: string
+          workspace_id?: string | null
         }
         Update: {
           created_at?: string
+          created_by?: string | null
+          id?: string
           key?: string
+          label?: string | null
+          labels?: Json
           sort?: number
+          updated_at?: string
+          workspace_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "facet_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspace"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       facet_level: {
         Row: {
-          facet_key: string
+          facet_id: string
           level: Database["public"]["Enums"]["container_level"]
         }
         Insert: {
-          facet_key: string
+          facet_id: string
           level: Database["public"]["Enums"]["container_level"]
         }
         Update: {
-          facet_key?: string
+          facet_id?: string
           level?: Database["public"]["Enums"]["container_level"]
         }
         Relationships: [
           {
-            foreignKeyName: "facet_level_facet_key_fkey"
-            columns: ["facet_key"]
+            foreignKeyName: "facet_level_facet_id_fkey"
+            columns: ["facet_id"]
             isOneToOne: false
             referencedRelation: "facet"
-            referencedColumns: ["key"]
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -1653,6 +1714,7 @@ export type Database = {
           invited_by: string | null
           level: Database["public"]["Enums"]["container_level"]
           line_id: string | null
+          performance_id: string | null
           preset: string | null
           project_id: string | null
           roles: string[]
@@ -1672,6 +1734,7 @@ export type Database = {
           invited_by?: string | null
           level: Database["public"]["Enums"]["container_level"]
           line_id?: string | null
+          performance_id?: string | null
           preset?: string | null
           project_id?: string | null
           roles?: string[]
@@ -1691,6 +1754,7 @@ export type Database = {
           invited_by?: string | null
           level?: Database["public"]["Enums"]["container_level"]
           line_id?: string | null
+          performance_id?: string | null
           preset?: string | null
           project_id?: string | null
           roles?: string[]
@@ -1712,6 +1776,13 @@ export type Database = {
             columns: ["line_id"]
             isOneToOne: false
             referencedRelation: "line"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "membership_performance_id_fkey"
+            columns: ["performance_id"]
+            isOneToOne: false
+            referencedRelation: "performance"
             referencedColumns: ["id"]
           },
           {
@@ -1740,7 +1811,7 @@ export type Database = {
       membership_facet: {
         Row: {
           created_at: string
-          facet_key: string
+          facet_id: string
           granted_by: string | null
           membership_id: string
           source: string
@@ -1748,7 +1819,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
-          facet_key: string
+          facet_id: string
           granted_by?: string | null
           membership_id: string
           source: string
@@ -1756,7 +1827,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
-          facet_key?: string
+          facet_id?: string
           granted_by?: string | null
           membership_id?: string
           source?: string
@@ -1764,11 +1835,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "membership_facet_facet_key_fkey"
-            columns: ["facet_key"]
+            foreignKeyName: "membership_facet_facet_id_fkey"
+            columns: ["facet_id"]
             isOneToOne: false
             referencedRelation: "facet"
-            referencedColumns: ["key"]
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "membership_facet_membership_id_fkey"
@@ -3038,6 +3109,51 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "workspace_alias_request_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspace"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workspace_facet_setting: {
+        Row: {
+          active: boolean
+          facet_id: string
+          label: string | null
+          labels: Json
+          sort: number | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          active?: boolean
+          facet_id: string
+          label?: string | null
+          labels?: Json
+          sort?: number | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          active?: boolean
+          facet_id?: string
+          label?: string | null
+          labels?: Json
+          sort?: number | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_facet_setting_facet_id_fkey"
+            columns: ["facet_id"]
+            isOneToOne: false
+            referencedRelation: "facet"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workspace_facet_setting_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspace"
@@ -4332,6 +4448,15 @@ export type Database = {
       generate_workspace_sid: { Args: never; Returns: string }
       get_public_calendar: { Args: { p_token: string }; Returns: Json }
       get_public_roadsheet: { Args: { p_token: string }; Returns: Json }
+      grant_container_preset: {
+        Args: {
+          p_container_id: string
+          p_level: Database["public"]["Enums"]["container_level"]
+          p_preset: string
+          p_user_id: string
+        }
+        Returns: string
+      }
       has_permission: {
         Args: { p_perm: string; p_project_id: string }
         Returns: boolean
@@ -5060,7 +5185,7 @@ export type Database = {
         | "photo"
         | "video"
         | "other"
-      container_level: "workspace" | "project" | "line" | "bolo"
+      container_level: "workspace" | "project" | "line" | "bolo" | "performance"
       conversation_event_direction: "inbound" | "outbound"
       conversation_event_kind: "note" | "call" | "email" | "meeting" | "message"
       conversation_event_source:
@@ -5292,7 +5417,7 @@ export const Constants = {
         "video",
         "other",
       ],
-      container_level: ["workspace", "project", "line", "bolo"],
+      container_level: ["workspace", "project", "line", "bolo", "performance"],
       conversation_event_direction: ["inbound", "outbound"],
       conversation_event_kind: ["note", "call", "email", "meeting", "message"],
       conversation_event_source: [

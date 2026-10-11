@@ -1,19 +1,21 @@
 -- ROLLBACK for 20261011100000_permissions_facets_expand.sql (permisos al modelo
 -- de facetas, fase expand)
 --
--- Drops the three mirror triggers, the new readers, the two check RPCs, the
--- five new tables and the two new types.
+-- Si la fase 2 (20261011300000_permissions_facets_reads) está aplicada, se
+-- revierte ANTES con su propio rollback: la fase 2 hace que los lectores de hoy
+-- lean las tablas que este fichero borra.
 --
--- DATA LOST: none that is not derivable. Every row of membership and
--- membership_facet is a copy computed from workspace_membership,
--- project_membership and workspace_role, which this migration never wrote.
--- Re-applying the migration rebuilds them. (Once the preset RPC of phase 2
--- writes rows with source preset/override, this stops being true: those rows
--- are original data and this rollback would lose them.)
+-- Drops the three mirror triggers, the new readers, the preset RPC, the two
+-- check RPCs, the seven new tables and the two new types.
+--
+-- DATA LOST: the rows of membership/membership_facet written by the mirror are
+-- copies and come back on re-apply. NOT derivable: the memberships of line,
+-- bolo and performance written by grant_container_preset, the facets a space
+-- created and the renames or deactivations in workspace_facet_setting.
 --
 -- Worker: the deployed Worker never reads any of it. Only the RLS tests of
--- tests/rls/permissions-facets.test.ts call has_permission_by_facets and
--- access_parity_report; they fail after this rollback, the rest do not.
+-- tests/rls/permissions-facets.test.ts call the new RPCs; they fail after
+-- this rollback, the rest do not.
 
 BEGIN;
 
@@ -23,24 +25,37 @@ DROP TRIGGER IF EXISTS workspace_role_mirror_access ON public.workspace_role;
 
 DROP FUNCTION IF EXISTS public.access_parity_report();
 DROP FUNCTION IF EXISTS public.has_permission_by_facets(uuid, text);
+DROP FUNCTION IF EXISTS public.grant_container_preset(public.container_level, uuid, uuid, text);
 DROP FUNCTION IF EXISTS private.access_parity_mismatches();
 DROP FUNCTION IF EXISTS private.mirror_workspace_role();
 DROP FUNCTION IF EXISTS private.mirror_project_membership();
 DROP FUNCTION IF EXISTS private.mirror_workspace_membership();
 DROP FUNCTION IF EXISTS private.sync_workspace_access(uuid, uuid);
 DROP FUNCTION IF EXISTS private.sync_project_access(uuid, uuid);
+DROP FUNCTION IF EXISTS private.can_grant_preset(public.container_level, uuid, text, uuid);
+DROP FUNCTION IF EXISTS private.expand_preset(uuid, text, uuid);
+DROP FUNCTION IF EXISTS private.model_container_verb_at(public.container_level, uuid, uuid);
+DROP FUNCTION IF EXISTS private.model_has_facet_at(public.container_level, uuid, uuid, public.access_verb, uuid);
+DROP FUNCTION IF EXISTS private.chain_memberships(public.container_level, uuid, uuid);
+DROP FUNCTION IF EXISTS private.container_chain(public.container_level, uuid);
 DROP FUNCTION IF EXISTS private.model_can_read_workspace_money(uuid, uuid);
 DROP FUNCTION IF EXISTS private.model_can_access_project(uuid, uuid);
 DROP FUNCTION IF EXISTS private.model_has_permission(uuid, text, uuid);
 DROP FUNCTION IF EXISTS private.model_has_facet(uuid, text, public.access_verb, uuid);
+DROP FUNCTION IF EXISTS private.model_has_workspace_role(uuid, uuid, public.membership_role[]);
 DROP FUNCTION IF EXISTS private.model_workspace_role(uuid, uuid);
+DROP FUNCTION IF EXISTS private.standard_facet_id(text);
 
 DROP TABLE IF EXISTS public.membership_facet;
-DROP FUNCTION IF EXISTS private.guard_membership_facet_level();
+DROP FUNCTION IF EXISTS private.guard_membership_facet();
 DROP TABLE IF EXISTS public.membership;
+DROP TABLE IF EXISTS public.access_preset_facet;
 DROP TABLE IF EXISTS public.access_preset;
+DROP TABLE IF EXISTS public.workspace_facet_setting;
+DROP FUNCTION IF EXISTS private.guard_workspace_facet_setting();
 DROP TABLE IF EXISTS public.facet_level;
 DROP TABLE IF EXISTS public.facet;
+DROP FUNCTION IF EXISTS private.guard_facet_key();
 
 DROP TYPE IF EXISTS public.access_verb;
 DROP TYPE IF EXISTS public.container_level;

@@ -1493,5 +1493,12 @@
   "ui.monogram_hint": "D'1 a {max} caràcters, en majúscula o minúscula",
   "ui.monogram_taken": "Un altre projecte ja fa servir «{initials}».",
   "ui.color_clash": "{name} fa servir un color semblant.",
-  "ui.save_identity": "Desa la identitat"
+  "ui.save_identity": "Desa la identitat",
+  "facet.converses": "Converses",
+  "facet.materials": "Materials",
+  "facet.tecnica": "Tècnica",
+  "facet.logistica": "Logística",
+  "facet.full_de_ruta": "Full de ruta",
+  "facet.comidas": "Àpats",
+  "facet.diners": "Diners"
 }

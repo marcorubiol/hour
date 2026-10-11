@@ -1493,5 +1493,12 @@
   "ui.monogram_hint": "De 1 a {max} caracteres, en mayúscula o minúscula",
   "ui.monogram_taken": "Otro proyecto ya usa «{initials}».",
   "ui.color_clash": "{name} usa un color parecido.",
-  "ui.save_identity": "Guardar identidad"
+  "ui.save_identity": "Guardar identidad",
+  "facet.converses": "Conversaciones",
+  "facet.materials": "Materiales",
+  "facet.tecnica": "Técnica",
+  "facet.logistica": "Logística",
+  "facet.full_de_ruta": "Hoja de ruta",
+  "facet.comidas": "Comidas",
+  "facet.diners": "Dinero"
 }

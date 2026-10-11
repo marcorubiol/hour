@@ -1502,5 +1502,12 @@
   "ui.monogram_hint": "1–{max} characters, upper or lower case",
   "ui.monogram_taken": "Another project already uses “{initials}”.",
   "ui.color_clash": "A similar colour is used by {name}.",
-  "ui.save_identity": "Save identity"
+  "ui.save_identity": "Save identity",
+  "facet.converses": "Conversations",
+  "facet.materials": "Materials",
+  "facet.tecnica": "Technical",
+  "facet.logistica": "Logistics",
+  "facet.full_de_ruta": "Road sheet",
+  "facet.comidas": "Meals",
+  "facet.diners": "Money"
 }

@@ -158,13 +158,69 @@ BEGIN
     RETURN;
   END IF;
   BEGIN
-    INSERT INTO public.membership_facet (membership_id, facet_key, verb, source)
-    VALUES (v_mid, 'logistica', 'view', 'override');
+    INSERT INTO public.membership_facet (membership_id, facet_id, verb, source)
+    VALUES (v_mid, private.standard_facet_id('logistica'), 'view', 'override');
     RAISE EXCEPTION 'level guard let logistica in at project level';
   EXCEPTION WHEN check_violation THEN
     RAISE NOTICE 'ok: logistica rejected at project level';
   END;
 END $$;
+
+-- Paquetes: el owner da Equip en un bolo; quien tiene Equip puede dar Mínim y
+-- Equip, no Coordinació; proyecto y espacio esperan a la fase 3.
+INSERT INTO auth.users (id, instance_id, aud, role, email, created_at, updated_at)
+VALUES ('00000000-0000-7000-8000-00000000f003', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'rehearsal-c@hour.test', now(), now()),
+       ('00000000-0000-7000-8000-00000000f004', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'rehearsal-d@hour.test', now(), now());
+INSERT INTO public.workspace_membership (workspace_id, user_id, role, accepted_at)
+SELECT t.ws, u.id, 'member', now()
+FROM t, (VALUES ('00000000-0000-7000-8000-00000000f003'::uuid), ('00000000-0000-7000-8000-00000000f004'::uuid)) u (id);
+
+DO $$
+DECLARE
+  v_ws    uuid := (SELECT ws FROM t);
+  v_owner uuid := (SELECT owner_id FROM t);
+  v_bolo  uuid;
+  v_mid   uuid;
+  v_keys  text;
+BEGIN
+  SELECT b.id INTO v_bolo FROM public.bolo b WHERE b.workspace_id = v_ws AND b.deleted_at IS NULL LIMIT 1;
+  IF v_bolo IS NULL THEN
+    RAISE NOTICE 'skip presets: no bolo in this workspace';
+    RETURN;
+  END IF;
+
+  PERFORM set_config('request.jwt.claim.sub', v_owner::text, true);
+  v_mid := public.grant_container_preset('bolo', v_bolo, '00000000-0000-7000-8000-00000000f003', 'equip');
+  SELECT string_agg(f.key || ':' || mf.verb || ':' || mf.source, ',' ORDER BY f.key) INTO v_keys
+  FROM public.membership_facet mf JOIN public.facet f ON f.id = mf.facet_id
+  WHERE mf.membership_id = v_mid;
+  IF v_keys IS DISTINCT FROM 'full_de_ruta:view:preset,logistica:view:preset,materials:view:preset,tecnica:view:preset' THEN
+    RAISE EXCEPTION 'equip on a bolo expanded to %', v_keys;
+  END IF;
+  RAISE NOTICE 'ok: owner grants equip on a bolo (%)', v_keys;
+
+  BEGIN
+    PERFORM public.grant_container_preset('project', (SELECT project_id FROM public.bolo WHERE id = v_bolo),
+                                          '00000000-0000-7000-8000-00000000f003', 'equip');
+    RAISE EXCEPTION 'project-level preset accepted in phase 2';
+  EXCEPTION WHEN feature_not_supported THEN
+    RAISE NOTICE 'ok: project-level preset waits for phase 3';
+  END;
+
+  PERFORM set_config('request.jwt.claim.sub', '00000000-0000-7000-8000-00000000f003', true);
+  PERFORM public.grant_container_preset('bolo', v_bolo, '00000000-0000-7000-8000-00000000f004', 'minim');
+  PERFORM public.grant_container_preset('bolo', v_bolo, '00000000-0000-7000-8000-00000000f004', 'equip');
+  RAISE NOTICE 'ok: equip holder delegates minim and equip';
+  BEGIN
+    PERFORM public.grant_container_preset('bolo', v_bolo, '00000000-0000-7000-8000-00000000f004', 'coordinacio');
+    RAISE EXCEPTION 'equip holder granted coordinacio';
+  EXCEPTION WHEN insufficient_privilege THEN
+    RAISE NOTICE 'ok: equip holder cannot grant coordinacio (ceiling)';
+  END;
+
+  PERFORM set_config('request.jwt.claim.sub', '', true);
+END $$;
+SELECT pg_temp.assert_parity('presets on a bolo leave project parity intact');
 
 DO $$ BEGIN RAISE NOTICE 'rehearsal ok'; END $$;
 

@@ -1493,5 +1493,12 @@
   "legal.not_loaded": "L’annuaire n’a pas encore été chargé.",
   "legal.unavailable": "Les sources n’ont pas pu être lues pour le moment.",
   "legal.places_title": "Lieux et fuseaux horaires",
-  "legal.places_body": "La recherche de villes et les fuseaux horaires proviennent de"
+  "legal.places_body": "La recherche de villes et les fuseaux horaires proviennent de",
+  "facet.converses": "Conversations",
+  "facet.materials": "Matériel",
+  "facet.tecnica": "Technique",
+  "facet.logistica": "Logistique",
+  "facet.full_de_ruta": "Feuille de route",
+  "facet.comidas": "Repas",
+  "facet.diners": "Argent"
 }
