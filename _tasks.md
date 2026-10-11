@@ -1431,6 +1431,7 @@ entre empresas sin construirlo.
      para campañas. **Llega pronto, Marco lo quiere en breve.** Antes: entregabilidad, cómo vuelven las respuestas a
      Hour y al buzón de la compañía, bajas, y la LSSI (consentimiento previo también entre empresas; pregunta abierta al
      abogado).
+     - [ ] **Editor de mailing visual para las campañas, del nivel de Brevo** (drop 11-10): bloques arrastrables (texto, imagen, botón, dossier o vídeo de la obra), plantillas por compañía con su marca, vista previa en móvil y escritorio, y personalización con los datos del contacto y de la sala. Espera al proveedor del envío en bloque.
   - Marco: decidir — **Proveedor y cuenta del envío en bloque** (informe `research/infra/2026-10-11-envio-en-bloque.md`).
     Proveedor: a) Amazon SES con un tenant por compañía (recomendada: UE, aislamiento y coste); b) Emailit (cuenta de
     Marco); c) Mailgun. Cuenta: a) las dos vías, por defecto la de Hour con cada compañía aislada y, si quiere, la suya
