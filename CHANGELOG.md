@@ -6,6 +6,7 @@ hasta entonces, sacado de esos documentos; lo anterior a julio de 2026 está sol
 
 ## Octubre 2026 (en curso)
 
+- Una conversación privada sigue siendo solo tuya aunque alguien del equipo vuelva a crear una con la misma persona: cada uno tiene la suya. (2026-10-11, `762192f`)
 - La firma de los correos es tuya en cada compañía: Hour te propone una con tu nombre, tu rol y los datos de la compañía, la editas en tu perfil de ese espacio, y el buzón común firma con la de la compañía. (2026-10-11, `b42f799`)
 - Cada persona puede conectar su Gmail, y un admin el buzón común de la compañía: los correos con los contactos de Hour entran solos en su conversación, se responde desde Hour con una firma propia, y la conversación se lee como historial o como un solo hilo. Las conversaciones nuevas nacen privadas salvo que el admin elija lo contrario. En modo prueba de Google (hasta 100 cuentas). (2026-10-11, `6c4cd0a`)
 - Los permisos pasan por dentro al modelo de facetas (Conversaciones, Materiales, Técnica, Logística, Hoja de ruta, Comidas, Dinero), sin cambiar lo que ve cada persona. (2026-10-11, `6c4cd0a`)
