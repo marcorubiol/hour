@@ -242,6 +242,21 @@ export const ContactSetSchema = v.object({
 });
 export type ContactSet = v.InferOutput<typeof ContactSetSchema>;
 
+/**
+ * POST /api/conversations/:id/contacts with a person who may have no dossier
+ * yet («Añadir como contacto» after the create 409): found by email in the
+ * workspace, or created (`add_conversation_contact`).
+ */
+export const ContactAddInlineSchema = v.object({
+  person: v.object({
+    full_name: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(200)),
+    email: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(254), v.email()))),
+    phone: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(40)))),
+  }),
+  role: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(CONTACT_ROLE_MAX)))),
+});
+export type ContactAddInline = v.InferOutput<typeof ContactAddInlineSchema>;
+
 /** PATCH /api/conversations/:id/contacts — close a contact (until, default today). */
 export const ContactEndSchema = v.object({
   person_id: v.pipe(v.string(), v.uuid()),

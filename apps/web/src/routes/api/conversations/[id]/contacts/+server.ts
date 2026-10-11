@@ -1,6 +1,9 @@
 /**
  * Los contactos de una conversación con una sala (ADR-102).
  *
+ * POST  /api/conversations/:id/contacts — { person: { full_name, email?, phone? }, role? }
+ *   La persona aún sin dossier («Añadir como contacto» tras el 409 del alta):
+ *   se busca por correo en el espacio o se crea (`add_conversation_contact`).
  * POST  /api/conversations/:id/contacts — { person_id, role?, since?, is_primary? }
  *   Añade un contacto o rehace el suyo, y lo deja vigente
  *   (`set_conversation_contact`). Lo que el cuerpo no trae se conserva: la RPC
@@ -18,6 +21,7 @@ import type { RequestHandler } from './$types';
 import * as v from 'valibot';
 import { extractAccessToken } from '$lib/auth';
 import {
+  ContactAddInlineSchema,
   ContactEndSchema,
   ContactSetSchema,
   contactSetArgs,
@@ -53,7 +57,27 @@ export const POST: RequestHandler = async ({ request, params, platform, locals }
   if (!jwt) return json({ error: 'missing_authorization' }, 401);
   if (!UUID_RE.test(params.id)) return json({ error: 'invalid_id' }, 400);
 
-  const parsed = v.safeParse(ContactSetSchema, await readBody(request));
+  const body = await readBody(request);
+  const inline = v.safeParse(ContactAddInlineSchema, body);
+  if (inline.success) {
+    try {
+      const { data } = await pgPostRpc<ContactRowLite>(env, 'add_conversation_contact', jwt, {
+        p_conversation_id: params.id,
+        p_full_name: inline.output.person.full_name,
+        p_email: inline.output.person.email ?? null,
+        p_phone: inline.output.person.phone ?? null,
+        p_role: inline.output.role ?? null,
+      });
+      return json({ contact: data[0] ?? null }, 201);
+    } catch (err) {
+      return pgErrorResponse(
+        err,
+        { route: 'POST /api/conversations/[id]/contacts', requestId: locals.requestId },
+        { codes: CODES },
+      );
+    }
+  }
+  const parsed = v.safeParse(ContactSetSchema, body);
   if (!parsed.success) return json({ error: 'invalid_body' }, 400);
 
   try {

@@ -13,7 +13,7 @@
    * instead of silently relinking.
    */
 
-  import { createMutation, useQueryClient } from '@tanstack/svelte-query';
+  import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import ConversationTable from '$lib/components/ConversationTable.svelte';
   import Button from '$lib/components/Button.svelte';
   import Dialog from '$lib/components/Dialog.svelte';
@@ -22,6 +22,7 @@
   import { addToast } from '$lib/components/Toast.svelte';
   import { mutateJSON, ApiError } from '$lib/api';
   import { CONVERSATION_STATUSES, conversationWhoBody, statusLabel } from '$lib/conversation';
+  import { organizationNames, organizationsQueryOptions } from '$lib/organizations';
   import { appLocale, t } from '$lib/i18n';
 
   interface Props {
@@ -40,6 +41,10 @@
 
   const queryClient = useQueryClient();
   const locale = appLocale();
+
+  const organizationsQuery = createQuery(organizationsQueryOptions());
+  let orgSuggestions = $derived(organizationNames($organizationsQuery.data?.items ?? [], [line.workspace_id]));
+  const orgListId = `lcm-org-list-${Math.random().toString(36).slice(2, 8)}`;
 
   let filters = $derived({ lineId: line.id, status: 'any' as const });
 
@@ -81,6 +86,7 @@
     onSuccess: () => {
       addOpen = false;
       void queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      void queryClient.invalidateQueries({ queryKey: ['organizations'] });
       void queryClient.invalidateQueries({ queryKey: ['line-eng-stats'] });
     },
     onError: (err) => {
@@ -129,9 +135,12 @@
       submitAdd();
     }}
   >
+    <Input label={t('conversations.col_organization', locale)} bind:value={aOrg} list={orgListId} autocomplete="off" />
+    <datalist id={orgListId}>
+      {#each orgSuggestions as name (name)}<option value={name}></option>{/each}
+    </datalist>
     <Input label={t('conversations.full_name', locale)} bind:value={aName} />
     <Input label={t('conversations.email', locale)} type="email" bind:value={aEmail} />
-    <Input label={t('conversations.col_organization', locale)} bind:value={aOrg} />
     <Select label={t('edit.status', locale)} options={statusOptions} bind:value={aStatus} />
     <Input label={t('conversations.col_next_action', locale)} type="date" bind:value={aNextAt} />
     <Input label={t('conversations.next_note', locale)} bind:value={aNextNote} />

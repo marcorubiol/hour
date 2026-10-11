@@ -8,11 +8,14 @@ const PASSWORD = process.env.PW_TEST_PASSWORD;
  * E2E — ADR-102, fase 2: la conversación es con la organización.
  *
  * 1. Desde la lente, el alta con solo la organización (sin persona) crea la
- *    conversación y la lente la enseña por su organización.
- * 2. Por la API, con la misma sesión: el segundo alta con esa organización es
- *    un 409 que nombra la primera; la búsqueda encuentra por organización y
- *    por contacto; un contacto se añade, sale en la ficha de persona y se
- *    cierra sin perder su `since`; un papel de más de 200 caracteres es 400.
+ *    conversación; la fila la titula la organización, enlazada a la ficha.
+ * 2. El campo Organización va primero y autocompleta con las del espacio.
+ * 3. El alta de una persona de esa organización en el mismo proyecto ofrece
+ *    «Añadir como contacto» y la deja de contacto de la que ya existe.
+ * 4. Por la API, con la misma sesión: el segundo alta con esa organización es
+ *    un 409 que nombra la primera; la búsqueda encuentra por contacto; cambiar
+ *    el papel no borra el `since`; un papel de más de 200 caracteres es 400;
+ *    el contacto, que entró de principal, no se cierra sin nombrar otro.
  *
  * Fixture: `playwright`, proyecto `ZZZ e2e collab`; organización y persona
  * `ZZZ E2E Venue` propias. Se recoge al empezar (por si una pasada murió a
@@ -41,17 +44,44 @@ test.describe('conversation with the venue', () => {
       }, ORG);
     await sweep();
 
-    // 1. La lente: solo la organización.
+    // 1. La lente: solo la organización. La fila la titula y abre la ficha.
     await page.getByRole('button', { name: 'Add conversation' }).click();
-    const dialog = page.locator('dialog[open]');
+    let dialog = page.locator('dialog[open]');
     await dialog.getByLabel('ZZZ e2e collab').check({ force: true });
     await dialog.getByLabel('Organization').fill(ORG);
     await dialog.getByRole('button', { name: 'Add conversation' }).click();
     await expect(dialog).not.toBeVisible({ timeout: 10_000 });
     await page.getByPlaceholder('People or organizations…').fill(ORG);
-    await expect(page.locator('main')).toContainText(ORG, { timeout: 10_000 });
+    const link = page.locator('main table').getByRole('link', { name: ORG, exact: true });
+    await expect(link).toBeVisible({ timeout: 10_000 });
+    await link.click();
+    await expect(page).toHaveURL(/\/conversation\//);
+    await expect(page.locator('h1')).toContainText(ORG);
+    await page.goto('/h/conversations');
+    await waitForLoaded(page);
 
-    // 2. La API.
+    // 2. El alta: Organización primero, con las del espacio para autocompletar.
+    await page.getByRole('button', { name: 'Add conversation' }).click();
+    dialog = page.locator('dialog[open]');
+    await dialog.getByLabel('ZZZ e2e collab').check({ force: true });
+    const labels = await dialog.locator('.conversations__form-grid').first().locator('label').allTextContents();
+    expect(labels[0]).toContain('Organization');
+    const orgInput = dialog.getByLabel('Organization');
+    const listId = await orgInput.getAttribute('list');
+    expect(listId).toBeTruthy();
+    await expect(page.locator(`datalist#${listId} option[value="${ORG}"]`)).toHaveCount(1);
+
+    // 3. Una persona de esa organización en el mismo proyecto: «Añadir como contacto».
+    await orgInput.fill(ORG);
+    await dialog.getByLabel('Full name').fill(CONTACT.full_name);
+    await dialog.getByLabel('Email').fill(CONTACT.email);
+    await dialog.getByRole('button', { name: 'Add conversation' }).click();
+    const join = dialog.getByRole('button', { name: 'Add as contact' });
+    await expect(join).toBeVisible({ timeout: 10_000 });
+    await join.click();
+    await expect(dialog).not.toBeVisible({ timeout: 10_000 });
+
+    // 4. La API.
     const r = await page.evaluate(
       async ({ org, contact }) => {
         const json = { 'content-type': 'application/json' };
@@ -77,27 +107,12 @@ test.describe('conversation with the venue', () => {
         });
         const dupBody = (await dup.json()) as { conversation_id?: string };
 
-        // Un contacto nuevo (el dossier se crea con una conversación propia que se borra).
-        const seed = await fetch('/api/conversations', {
-          method: 'POST',
-          headers: json,
-          body: JSON.stringify({
-            project_id: conv.project_id,
-            person: { ...contact, organization_name: `${org} Seed` },
-          }),
-        });
-        let personId: string | null = null;
-        if (seed.status === 201) {
-          const s = (await seed.json()) as { conversation: { id: string; person_id: string } };
-          personId = s.conversation.person_id;
-          await fetch(`/api/conversations/${s.conversation.id}`, { method: 'DELETE' });
-        } else {
-          const persons = (await (await fetch(`/api/conversations?status=any&q=${encodeURIComponent(contact.email)}`)).json()) as {
-            items: Array<{ contacts: Array<{ person_id: string; person: { email: string | null } | null }> }>;
-          };
-          personId =
-            persons.items.flatMap((i) => i.contacts).find((c) => c.person?.email === contact.email)?.person_id ?? null;
-        }
+        // El contacto que añadió «Añadir como contacto».
+        const full = (await (await fetch(`/api/conversations/${conv.id}`)).json()) as {
+          item: { contacts: Array<{ person_id: string; person: { email: string | null } | null }> };
+        };
+        const personId = full.item.contacts.find((c) => c.person?.email === contact.email)?.person_id ?? null;
+        const joined = personId !== null;
 
         const add = await fetch(`/api/conversations/${conv.id}/contacts`, {
           method: 'POST',
@@ -128,6 +143,7 @@ test.describe('conversation with the venue', () => {
         return {
           found: true as const,
           id: conv.id,
+          joined,
           personNull: conv.person_id === null,
           dupStatus: dup.status,
           dupId: dupBody.conversation_id ?? null,
@@ -146,16 +162,17 @@ test.describe('conversation with the venue', () => {
 
     expect(r.found).toBe(true);
     if (!r.found) return;
-    expect(r.personNull).toBe(true);
+    expect(r.joined).toBe(true);
     expect(r.dupStatus).toBe(409);
     expect(r.dupId).toBe(r.id);
-    expect([200, 201]).toContain(r.addStatus);
+    expect(r.addStatus).toBe(200);
     expect(r.roleStatus).toBe(200);
     expect(r.longStatus).toBe(400);
     expect(r.contactFound).toBe(1);
     expect(r.since).toBe('2026-01-01');
     expect(r.role).toBe('dirección');
-    expect(r.closeStatus).toBe(200);
+    // Entró como principal (la conversación no tenía): el principal no se cierra sin nombrar otro.
+    expect(r.closeStatus).toBe(400);
     expect(r.delStatus).toBeLessThan(300);
   });
 });

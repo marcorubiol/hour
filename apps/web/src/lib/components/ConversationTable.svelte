@@ -416,8 +416,8 @@
     <table class="conversation-table">
       <thead>
         <tr>
-          <th>{t('conversations.col_name', locale)}</th>
           <th>{t('conversations.col_organization', locale)}</th>
+          <th>{t('conversations.col_contact', locale)}</th>
           <th>{t('conversations.col_location', locale)}</th>
           <th>{t('edit.status', locale)}</th>
           <th>{t('conversations.col_last_contact', locale)}</th>
@@ -427,22 +427,26 @@
       <tbody>
         {#each visibleItems as item, i (item.id)}
           {@const path = personPath(item)}
+          {@const file = conversationPath(item)}
           <tr>
-            <td class="cell--name" data-label={t('conversations.col_name', locale)}>
-              {#if path && item.person}
-                <a class="cell--name-link" href={path}>
-                  {item.person.full_name}
-                </a>
+            <!-- ADR-102: the conversation is with the organization; it titles the row and opens the file. -->
+            <td class="cell--name" data-label={t('conversations.col_organization', locale)}>
+              {#if file && organizationOf(item)}
+                <a class="cell--name-link" href={file}>{organizationOf(item)}</a>
               {:else}
-                {item.person?.full_name ?? '—'}
+                {organizationOf(item) ?? '—'}
               {/if}
             </td>
             <td
               class="cell--muted"
-              data-label={t('conversations.col_organization', locale)}
-              data-empty={!organizationOf(item) || undefined}
+              data-label={t('conversations.col_contact', locale)}
+              data-empty={!item.person || undefined}
             >
-              {organizationOf(item) ?? '—'}
+              {#if path && item.person}
+                <a class="cell--name-link" href={path}>{item.person.full_name}</a>
+              {:else if item.person}
+                {item.person.full_name}
+              {/if}
             </td>
             <td class="cell--meta" data-label={t('conversations.col_location', locale)} data-empty={locationOf(item) === '—' || undefined}
               >{locationOf(item)}</td

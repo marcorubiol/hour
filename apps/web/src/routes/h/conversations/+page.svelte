@@ -25,6 +25,7 @@
   import { addToast } from '$lib/components/Toast.svelte';
   import { CONVERSATION_STATUSES, conversationWhoBody, statusLabel, type ConversationItem } from '$lib/conversation';
   import { appLocale, t } from '$lib/i18n';
+  import { organizationNames, organizationsQueryOptions } from '$lib/organizations';
   import { usePins } from '$lib/stores/pins.svelte';
   import { spaceName } from '$lib/utils/identity';
   import {
@@ -48,6 +49,7 @@
   const workspacesQuery = createQuery(workspacesQueryOptions());
   const linesQuery = createQuery(allLinesQueryOptions());
   const projectsQuery = createQuery(activeProjectsQueryOptions());
+  const organizationsQuery = createQuery(organizationsQueryOptions());
 
   let workspaces = $derived<NavWorkspace[]>($workspacesQuery.data?.items ?? []);
   let workspaceSlugById = $derived(new Map(workspaces.map((w) => [w.id, w.slug])));
@@ -176,7 +178,23 @@
       : [...aProjectIds, id];
   }
 
+  // ADR-102: the organization completes from those of the chosen spaces (all
+  // of yours while none is chosen).
+  let orgSuggestions = $derived.by(() => {
+    const chosen = new Set(aProjectIds);
+    const wsIds = ($projectsQuery.data?.items ?? []).filter((p) => chosen.has(p.id)).map((p) => p.workspace_id);
+    return organizationNames($organizationsQuery.data?.items ?? [], wsIds);
+  });
+
+  /** The 409 of a person whose organization already has a conversation in that
+      project: offered as «Añadir como contacto» instead of «ya existía». */
+  type Join = { conversationId: string; projectName: string };
+  let aJoin = $state<Join[]>([]);
+  let aJoinPersonId = $state<string | null>(null);
+
   function openAdd() {
+    aJoin = [];
+    aJoinPersonId = null;
     // Open fresh every time — leftover text from a cancelled attempt must
     // never ride into a new contact.
     aName = '';
@@ -200,7 +218,7 @@
     addOpen = true;
   }
 
-  type AddResult = { created: number; existed: number; failed: string[] };
+  type AddResult = { created: number; existed: number; failed: string[]; joinable: Join[]; personId: string | null };
 
   const addMutation = createMutation({
     // One contact, N spaces → N conversations. Sequential, not parallel: the
@@ -219,7 +237,9 @@
         next_action_note: aNextNote.trim() || null,
       };
       let personId: string | null = null;
-      const out: AddResult = { created: 0, existed: 0, failed: [] };
+      const out: AddResult = { created: 0, existed: 0, failed: [], joinable: [], personId: null };
+      const projectName = (id: string) =>
+        ($projectsQuery.data?.items ?? []).find((p) => p.id === id)?.name ?? t('conversations.conversation', locale);
 
       for (const projectId of targets) {
         const line_id = lineFor[projectId] || null;
@@ -235,7 +255,12 @@
           out.created += 1;
           if (!personId && data?.conversation?.person_id) personId = data.conversation.person_id;
         } catch (e) {
-          if (e instanceof ApiError && e.status === 409) {
+          const clash = e instanceof ApiError && e.status === 409 ? e.body?.conversation_id : null;
+          if (typeof clash === 'string' && ('person' in who || Boolean(personId))) {
+            // Its organization already talks with this project: offer the
+            // person as a contact of that conversation (ADR-102).
+            out.joinable.push({ conversationId: clash, projectName: projectName(projectId) });
+          } else if (e instanceof ApiError && e.status === 409) {
             // Already has a conversation in this project — not an error.
             out.existed += 1;
           } else {
@@ -244,12 +269,21 @@
         }
       }
       // Nothing landed and something broke → surface it as an error.
-      if (out.created === 0 && out.existed === 0 && out.failed.length > 0) {
+      out.personId = personId;
+      if (out.created === 0 && out.existed === 0 && out.joinable.length === 0 && out.failed.length > 0) {
         throw new Error(out.failed[0]);
       }
       return out;
     },
     onSuccess: (r) => {
+      if (r.joinable.length > 0) {
+        // The dialog stays open with the offer; what was created is already in.
+        aJoin = r.joinable;
+        aJoinPersonId = r.personId;
+        if (r.created) void queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      void queryClient.invalidateQueries({ queryKey: ['organizations'] });
+        return;
+      }
       addOpen = false;
       aName = '';
       aEmail = '';
@@ -273,6 +307,31 @@
         tone: r.failed.length ? 'warning' : 'success',
         message: `${parts.join(' · ')}.`,
       });
+    },
+    onError: (err) => {
+      addToast({
+        tone: 'danger',
+        title: t('conversations.not_added', locale),
+        message: `${err instanceof Error ? err.message : t('perf.unexpected', locale)}`,
+      });
+    },
+  });
+
+  const joinMutation = createMutation({
+    mutationFn: async () => {
+      const body = aJoinPersonId
+        ? { person_id: aJoinPersonId }
+        : { person: { full_name: aName.trim(), email: aEmail.trim() || null, phone: aPhone.trim() || null } };
+      for (const j of aJoin) {
+        await mutateJSON('POST', `/api/conversations/${j.conversationId}/contacts`, body);
+      }
+    },
+    onSuccess: () => {
+      addToast({ tone: 'success', message: t('conversations.contact_added', locale, { name: aName.trim() }) });
+      addOpen = false;
+      aJoin = [];
+      aJoinPersonId = null;
+      void queryClient.invalidateQueries({ queryKey: ['conversations'] });
     },
     onError: (err) => {
       addToast({
@@ -357,13 +416,31 @@
       </div>
     {/if}
   </fieldset>
+  {#if aJoin.length > 0}
+    <div class="conversations__join" role="status">
+      <p>
+        {t('conversations.org_has_conversation', locale, {
+          org: aOrg.trim() || t('conversations.col_organization', locale),
+          projects: aJoin.map((j) => j.projectName).join(', '),
+        })}
+      </p>
+      <Button size="s" onclick={() => $joinMutation.mutate()} loading={$joinMutation.isPending}>
+        {t('conversations.add_as_contact', locale)}
+      </Button>
+    </div>
+  {/if}
   <div class="conversations__form-grid">
-    <Input label={t('conversations.full_name', locale)} bind:value={aName} />
     <Input
       label={t('conversations.col_organization', locale)}
       bind:value={aOrg}
       placeholder={t('conversations.org_ph', locale)}
+      list="conversations-org-list"
+      autocomplete="off"
     />
+    <datalist id="conversations-org-list">
+      {#each orgSuggestions as name (name)}<option value={name}></option>{/each}
+    </datalist>
+    <Input label={t('conversations.full_name', locale)} bind:value={aName} />
     <Input label={t('conversations.email', locale)} type="email" bind:value={aEmail} />
     <Input label={t('conversations.phone', locale)} type="tel" bind:value={aPhone} />
     <Select label={t('edit.status', locale)} options={addStatusOptions} bind:value={aStatus} />
@@ -402,6 +479,19 @@
       flex: 1;
       min-inline-size: 16rem;
       max-inline-size: 28rem;
+    }
+
+    .conversations__join {
+      display: flex;
+      gap: var(--space-s);
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      margin-block-start: var(--space-m);
+      padding: var(--space-s) var(--space-m);
+      border: var(--border);
+      border-radius: var(--radius-s);
+      font-size: var(--text-s);
     }
 
     .conversations__dialog-hint {
