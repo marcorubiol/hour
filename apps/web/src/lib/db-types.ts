@@ -708,6 +708,7 @@ export type Database = {
           next_action_note: string | null
           person_id: string
           previous_slugs: string[]
+          private_to: string | null
           project_id: string
           role: string | null
           slug: string
@@ -728,6 +729,7 @@ export type Database = {
           next_action_note?: string | null
           person_id: string
           previous_slugs?: string[]
+          private_to?: string | null
           project_id: string
           role?: string | null
           slug: string
@@ -748,6 +750,7 @@ export type Database = {
           next_action_note?: string | null
           person_id?: string
           previous_slugs?: string[]
+          private_to?: string | null
           project_id?: string
           role?: string | null
           slug?: string
@@ -1698,6 +1701,141 @@ export type Database = {
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspace"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mail_account: {
+        Row: {
+          address: string
+          connected_by: string | null
+          created_at: string
+          id: string
+          last_error: string | null
+          last_synced_at: string | null
+          messages_ingested: number
+          owner_user_id: string | null
+          provider: Database["public"]["Enums"]["mail_provider"]
+          refresh_token_ciphertext: string
+          scope: Database["public"]["Enums"]["mail_account_scope"]
+          signature: string | null
+          status: Database["public"]["Enums"]["mail_account_status"]
+          sync_cursor: string | null
+          sync_from: string
+          sync_started_at: string | null
+          token_key_version: number
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          address: string
+          connected_by?: string | null
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          last_synced_at?: string | null
+          messages_ingested?: number
+          owner_user_id?: string | null
+          provider: Database["public"]["Enums"]["mail_provider"]
+          refresh_token_ciphertext: string
+          scope: Database["public"]["Enums"]["mail_account_scope"]
+          signature?: string | null
+          status?: Database["public"]["Enums"]["mail_account_status"]
+          sync_cursor?: string | null
+          sync_from?: string
+          sync_started_at?: string | null
+          token_key_version?: number
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          address?: string
+          connected_by?: string | null
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          last_synced_at?: string | null
+          messages_ingested?: number
+          owner_user_id?: string | null
+          provider?: Database["public"]["Enums"]["mail_provider"]
+          refresh_token_ciphertext?: string
+          scope?: Database["public"]["Enums"]["mail_account_scope"]
+          signature?: string | null
+          status?: Database["public"]["Enums"]["mail_account_status"]
+          sync_cursor?: string | null
+          sync_from?: string
+          sync_started_at?: string | null
+          token_key_version?: number
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mail_account_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspace"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mail_account_address: {
+        Row: {
+          address: string
+          backfilled_at: string
+          mail_account_id: string
+        }
+        Insert: {
+          address: string
+          backfilled_at?: string
+          mail_account_id: string
+        }
+        Update: {
+          address?: string
+          backfilled_at?: string
+          mail_account_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mail_account_address_mail_account_id_fkey"
+            columns: ["mail_account_id"]
+            isOneToOne: false
+            referencedRelation: "mail_account"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mail_message: {
+        Row: {
+          events_created: number
+          mail_account_id: string
+          processed_at: string
+          provider_message_id: string
+          provider_thread_id: string | null
+          rfc_message_id: string | null
+        }
+        Insert: {
+          events_created?: number
+          mail_account_id: string
+          processed_at?: string
+          provider_message_id: string
+          provider_thread_id?: string | null
+          rfc_message_id?: string | null
+        }
+        Update: {
+          events_created?: number
+          mail_account_id?: string
+          processed_at?: string
+          provider_message_id?: string
+          provider_thread_id?: string | null
+          rfc_message_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mail_message_mail_account_id_fkey"
+            columns: ["mail_account_id"]
+            isOneToOne: false
+            referencedRelation: "mail_account"
             referencedColumns: ["id"]
           },
         ]
@@ -3005,6 +3143,7 @@ export type Database = {
           kind: Database["public"]["Enums"]["workspace_kind"]
           logo_url: string | null
           name: string
+          new_conversations_private: boolean
           previous_slugs: string[]
           settings: Json
           slug: string
@@ -3027,6 +3166,7 @@ export type Database = {
           kind?: Database["public"]["Enums"]["workspace_kind"]
           logo_url?: string | null
           name: string
+          new_conversations_private?: boolean
           previous_slugs?: string[]
           settings?: Json
           slug: string
@@ -3049,6 +3189,7 @@ export type Database = {
           kind?: Database["public"]["Enums"]["workspace_kind"]
           logo_url?: string | null
           name?: string
+          new_conversations_private?: boolean
           previous_slugs?: string[]
           settings?: Json
           slug?: string
@@ -3568,6 +3709,10 @@ export type Database = {
       }
       can_access_project: { Args: { p_project_id: string }; Returns: boolean }
       can_edit_project: { Args: { p_project_id: string }; Returns: boolean }
+      can_manage_mail_account: {
+        Args: { p_account_id: string }
+        Returns: boolean
+      }
       can_read_workspace_money: {
         Args: { p_workspace_id: string }
         Returns: boolean
@@ -3576,6 +3721,17 @@ export type Database = {
       can_user_write_collab: {
         Args: { p_target_id: string; p_target_table: string; p_user_id: string }
         Returns: boolean
+      }
+      connect_mail_account: {
+        Args: {
+          p_address: string
+          p_provider: Database["public"]["Enums"]["mail_provider"]
+          p_refresh_token_ciphertext: string
+          p_scope: Database["public"]["Enums"]["mail_account_scope"]
+          p_token_key_version?: number
+          p_workspace_id: string
+        }
+        Returns: string
       }
       create_asset_version: {
         Args: {
@@ -3721,6 +3877,7 @@ export type Database = {
           next_action_note: string | null
           person_id: string
           previous_slugs: string[]
+          private_to: string | null
           project_id: string
           role: string | null
           slug: string
@@ -4383,6 +4540,7 @@ export type Database = {
           kind: Database["public"]["Enums"]["workspace_kind"]
           logo_url: string | null
           name: string
+          new_conversations_private: boolean
           previous_slugs: string[]
           settings: Json
           slug: string
@@ -4444,6 +4602,10 @@ export type Database = {
       delete_schedule_slot: { Args: { p_slot_id: string }; Returns: undefined }
       delete_task: { Args: { p_task_id: string }; Returns: undefined }
       delete_travel_stage: { Args: { p_stage_id: string }; Returns: undefined }
+      disconnect_mail_account: {
+        Args: { p_account_id: string }
+        Returns: undefined
+      }
       fiscal_identity_snapshot: { Args: { p_id: string }; Returns: Json }
       generate_workspace_sid: { Args: never; Returns: string }
       get_public_calendar: { Args: { p_token: string }; Returns: Json }
@@ -4652,6 +4814,115 @@ export type Database = {
           status: string
           user_id: string
         }[]
+      }
+      mail_account_eligible_conversation: {
+        Args: {
+          p_account: Database["public"]["Tables"]["mail_account"]["Row"]
+          p_conversation: Database["public"]["Tables"]["conversation"]["Row"]
+        }
+        Returns: boolean
+      }
+      mail_account_secret: {
+        Args: { p_account_id: string }
+        Returns: {
+          address: string
+          connected_by: string | null
+          created_at: string
+          id: string
+          last_error: string | null
+          last_synced_at: string | null
+          messages_ingested: number
+          owner_user_id: string | null
+          provider: Database["public"]["Enums"]["mail_provider"]
+          refresh_token_ciphertext: string
+          scope: Database["public"]["Enums"]["mail_account_scope"]
+          signature: string | null
+          status: Database["public"]["Enums"]["mail_account_status"]
+          sync_cursor: string | null
+          sync_from: string
+          sync_started_at: string | null
+          token_key_version: number
+          updated_at: string
+          workspace_id: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "mail_account"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      mail_contact_addresses: {
+        Args: { p_account_id: string }
+        Returns: {
+          address: string
+          backfilled: boolean
+        }[]
+      }
+      mail_ingest_message: {
+        Args: { p_account_id: string; p_created_by?: string; p_message: Json }
+        Returns: number
+      }
+      mail_known_messages: {
+        Args: { p_account_id: string; p_ids: string[] }
+        Returns: string[]
+      }
+      mail_mark_backfilled: {
+        Args: { p_account_id: string; p_addresses: string[] }
+        Returns: undefined
+      }
+      mail_send_authorize: {
+        Args: { p_account_id: string; p_conversation_id: string }
+        Returns: {
+          account_address: string
+          recipient_address: string
+          recipient_name: string
+        }[]
+      }
+      mail_sync_claim: {
+        Args: {
+          p_account_id?: string
+          p_limit?: number
+          p_min_interval?: string
+        }
+        Returns: {
+          address: string
+          connected_by: string | null
+          created_at: string
+          id: string
+          last_error: string | null
+          last_synced_at: string | null
+          messages_ingested: number
+          owner_user_id: string | null
+          provider: Database["public"]["Enums"]["mail_provider"]
+          refresh_token_ciphertext: string
+          scope: Database["public"]["Enums"]["mail_account_scope"]
+          signature: string | null
+          status: Database["public"]["Enums"]["mail_account_status"]
+          sync_cursor: string | null
+          sync_from: string
+          sync_started_at: string | null
+          token_key_version: number
+          updated_at: string
+          workspace_id: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "mail_account"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      mail_sync_finish: {
+        Args: {
+          p_account_id: string
+          p_complete?: boolean
+          p_cursor?: string
+          p_error?: string
+          p_ingested?: number
+          p_status: Database["public"]["Enums"]["mail_account_status"]
+        }
+        Returns: undefined
       }
       next_invoice_number: {
         Args: {
@@ -4913,6 +5184,10 @@ export type Database = {
         Args: { p_membership_id: string }
         Returns: undefined
       }
+      set_mail_signature: {
+        Args: { p_account_id: string; p_signature: string }
+        Returns: undefined
+      }
       share_my_profile_with_workspace: {
         Args: { p_fields?: string[]; p_workspace_id: string }
         Returns: {
@@ -5148,6 +5423,7 @@ export type Database = {
           kind: Database["public"]["Enums"]["workspace_kind"]
           logo_url: string | null
           name: string
+          new_conversations_private: boolean
           previous_slugs: string[]
           settings: Json
           slug: string
@@ -5231,6 +5507,9 @@ export type Database = {
         | "comms"
         | "misc"
       line_status: "open" | "closed" | "archived"
+      mail_account_scope: "personal" | "workspace"
+      mail_account_status: "active" | "revoked" | "error"
+      mail_provider: "google"
       membership_role: "owner" | "admin" | "member" | "viewer" | "guest"
       note_visibility: "private" | "workspace"
       payment_method: "transfer" | "card" | "cash" | "other"
@@ -5468,6 +5747,9 @@ export const Constants = {
         "misc",
       ],
       line_status: ["open", "closed", "archived"],
+      mail_account_scope: ["personal", "workspace"],
+      mail_account_status: ["active", "revoked", "error"],
+      mail_provider: ["google"],
       membership_role: ["owner", "admin", "member", "viewer", "guest"],
       note_visibility: ["private", "workspace"],
       payment_method: ["transfer", "card", "cash", "other"],

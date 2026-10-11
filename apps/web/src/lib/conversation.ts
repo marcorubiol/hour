@@ -10,6 +10,7 @@ import * as v from 'valibot';
 import { Constants, type Enums, type Tables } from './db-types';
 import { localDayISO, realIsoDate, realIsoInstant } from './datetime';
 import { appLocale, t, type Locale } from './i18n';
+import { EVENT_MAIL_SELECT, type EventMailFields } from './mail';
 
 export type ConversationStatus = Enums<'conversation_status'>;
 
@@ -121,7 +122,14 @@ export const CONVERSATION_EVENT_SELECT =
 export type ConversationEventItem = Pick<
   ConversationEvent,
   'id' | 'conversation_id' | 'occurred_at' | 'recorded_at' | 'kind' | 'source' | 'direction' | 'body'
->;
+> &
+  EventMailFields & {
+    /** Quien lo apuntó o lo envió desde Hour; null si lo trajo la sincronización. */
+    created_by?: string | null;
+  };
+
+/** La lectura de la ficha: el registro más lo que se enseña de un correo. */
+export const CONVERSATION_EVENT_FULL_SELECT = `${CONVERSATION_EVENT_SELECT},created_by,${EVENT_MAIL_SELECT}`;
 
 /**
  * POST /api/conversations body (ADR-051). Two shapes, exactly one:

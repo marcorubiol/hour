@@ -290,6 +290,12 @@
     return personHref?.(item) ?? (personBase ? `${personBase}/${item.person.slug}` : null);
   }
 
+  /** La ficha vive en el mismo espacio que el dossier: /h/<ws>/conversation/<id>. */
+  function conversationPath(item: ConversationItem): string | null {
+    const person = personPath(item);
+    return person ? person.replace(/\/person\/[^/]+$/, `/conversation/${item.id}`) : null;
+  }
+
   let showPagination = $derived(total > LIMIT);
   let rangeEnd = $derived(Math.min(offset + LIMIT, total));
 </script>
@@ -543,6 +549,10 @@
         ? ` — ${historyFor.person.organization_name}`
         : ''}
     </p>
+    {@const fullPath = conversationPath(historyFor)}
+    {#if fullPath}
+      <p><a class="link-arrow" href={fullPath}>{t('conversations.open_full', locale)}</a></p>
+    {/if}
     {#key historyFor.id}
       <ConversationHistory conversationId={historyFor.id} />
     {/key}

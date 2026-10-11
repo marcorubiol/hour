@@ -30,9 +30,11 @@
 
   interface Props {
     conversationId: string;
+    /** false: solo el alta (la ficha pinta el registro con su propia vista). */
+    showList?: boolean;
   }
 
-  let { conversationId }: Props = $props();
+  let { conversationId, showList = true }: Props = $props();
 
   const queryClient = useQueryClient();
   const locale = appLocale();
@@ -132,7 +134,9 @@
   </div>
 </form>
 
-{#if $query.isLoading}
+{#if !showList}
+  <!-- la lista la pinta quien embebe el alta -->
+{:else if $query.isLoading}
   <p class="history-msg">{t('conversations.loading', locale)}</p>
 {:else if $query.error}
   <p class="history-msg history-msg--error">
