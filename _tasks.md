@@ -1481,6 +1481,9 @@ entre empresas sin construirlo.
 - [ ] **Marketing: que la gente se dé de alta en Hour (Marco, 2026-10-11, ADR-101).** Cómo se consiguen las altas
   está por pensar (Marco, 2026-10-11: pedir a las instituciones que inviten a sus programadores no es el momento ni la
   manera; los borradores a la Red y a DGArtes piden solo los listados de salas).
+- [ ] **Bug (en carril, 2026-10-11): una conversación borrada que se vuelve a crear conserva su privacidad vieja.**
+  `create_conversation` la recupera con UPDATE y el ajuste «nacen privadas» solo se aplica al INSERT; si era privada
+  de otra persona, seguiría siendo suya. Lo destapó el test RLS de `mail-google.test.ts`.
 - [ ] **Bug menor: algo pide `/h/<espacio>/sw.js` (ruta relativa del service worker) y el Worker registra un 404 en
   cada carga de Ajustes** (visto en los registros el 2026-10-11). Ruido en los errores; buscar quién lo registra.
 - [ ] **Poll de fechas candidatas (à la Doodle/When2meet, integrado).** Al buscar
