@@ -374,7 +374,10 @@ export class GmailClient {
   ) {}
 
   private async call<T>(path: string, init?: RequestInit): Promise<T> {
-    const res = await this.fetchFn(`${API}${path}`, {
+    // Called detached, never as `this.fetchFn(...)`: in a Worker the global
+    // fetch throws «Illegal invocation» when its `this` is another object.
+    const fetchFn = this.fetchFn;
+    const res = await fetchFn(`${API}${path}`, {
       ...init,
       headers: {
         authorization: `Bearer ${this.accessToken}`,

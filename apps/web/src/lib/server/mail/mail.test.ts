@@ -616,3 +616,16 @@ describe('sync', () => {
     await expect(adapter.accessToken('rt')).rejects.toBeInstanceOf(ProviderAuthError);
   });
 });
+
+describe('GmailClient on a Worker', () => {
+  test('calls fetch detached: a Worker throws «Illegal invocation» when fetch runs as a method', async () => {
+    function strictFetch(this: unknown, _url: string | URL | Request, _init?: RequestInit): Promise<Response> {
+      if (this !== undefined && this !== globalThis) throw new TypeError('Illegal invocation');
+      return Promise.resolve(
+        new Response(JSON.stringify({ emailAddress: 'Marco@Example.com', historyId: '42' }), { status: 200 }),
+      );
+    }
+    const adapter = googleAdapter(strictFetch as typeof fetch, { clientId: 'c', clientSecret: 's' });
+    await expect(adapter.profile('tok')).resolves.toEqual({ address: 'marco@example.com', cursor: '42' });
+  });
+});
