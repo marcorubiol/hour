@@ -3449,3 +3449,18 @@ Marco, tras el repaso del panel «Conversación» de la maqueta de comms
    datos fiscales.
 6. Los posibles duplicados se revisan a mano antes de la fase 4, sin fusión automática.
 7. El slug de la conversación pasa al de la organización; el antiguo sigue funcionando (`previous_slugs`).
+
+## [2026-10-11] ADR-103 · Un `date` puede tener «quién va»; lo deducido se aprueba o se retira
+
+Marco, a raíz del rail (una residencia salía entera en cursiva sin forma de resolverlo). Hoy un `date` (ensayo,
+viaje, residencia) no tiene personas: quién va se deduce siempre del reparto del proyecto (`lib/people.ts`), y esa
+deducción no se puede confirmar ni quitar.
+- **La cursiva sigue diciendo «deducido»** (`styles/certainty.css`, INFERENCE), y desde hoy solo en el nombre
+  (`e85dc1e`).
+- **Lo deducido se aprueba o se retira.** Quien ve un compromiso deducido puede confirmarlo («voy», pasa a explícito
+  y deja la cursiva) o retirarlo («no voy», deja de salirle). Desde el rail (NEXT) y desde la ficha.
+- **`date` gana «quién va», opcional.** No es obligatorio rellenarlo: sin lista, un `date` sigue deduciéndose del
+  reparto del proyecto como ahora. La lista solo existe cuando alguien confirma, retira o la edita en la ficha.
+- Una función ya tiene su reparto; el mismo «voy / no voy» sobre una función deducida escribe en ese reparto.
+- Por diseñar: el modelo (tabla de personas por `date` con su estado confirmado o retirado), sus permisos (quién puede
+  confirmar o retirar a otra persona) y el editor en la ficha. Migración aditiva, gate de § 34.

@@ -1440,6 +1440,8 @@ entre empresas sin construirlo.
   antes de construir nada de esto*. Mientras no se cumpla, resolver los dos
   bloqueantes es trabajo especulativo por bueno que sea el modelo.
 
+- [ ] **Planner: lo deducido se aprueba o se retira; `date` gana «quién va», opcional (ADR-103, chat 11-10).** «Voy / no voy» en el rail (NEXT) y en la ficha; sin lista, un `date` se sigue deduciendo del reparto del proyecto. Migración aditiva. Arranca después de la fase 2 de la conversación con la sala, para no llevar dos migraciones a la vez. (sin estimar)
+
 ## Después de money v3 — contenedores (bloque 5)
 
 12. [ ] **Revisión diseño+datos — contenedores.** Portada de workspace, project
