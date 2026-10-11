@@ -1403,10 +1403,14 @@ entre empresas sin construirlo.
 
 - [ ] **Comms, carril 1: difusión con el buzón sincronizado (ADR-099, 2026-10-11).** Primero una maqueta para Marco
   (conversación con correos, llamadas y notas juntos; el registro de ADR-098 es provisional hasta que lo vea). Después,
+  conversación con dos vistas conmutables (registro con el hilo del equipo al lado, o todo en un hilo; Marco, 2026-10-11),
   conexión de buzón personal y común (Google, Microsoft, IMAP/SMTP), solo correos con contactos de Hour, envío por el
   buzón conectado y conversaciones privadas.
-- [ ] Marco: hacer — **Registrar las apps OAuth de Hour en Google y Microsoft** para conectar buzones (ADR-099).
-- [ ] **Comms, carril 2: hilos con facetas (ADR-099).** Empieza por pasar todo el sistema de permisos al modelo nuevo
+- [x] Marco: hecho (2026-10-11) — **Copiar a Wrangler el ID y el secreto del cliente OAuth de Google «Hour web»** (proyecto `hour-511305`, creado el 2026-10-11 en modo prueba, público externo, redirects `https://hour.zerosense.studio/api/mail/oauth/google/callback` y `http://localhost:5173/...`), y añadir como usuarios de prueba las cuentas que se conecten.
+- [ ] **Microsoft (Outlook) aparcado hasta que una compañía lo pida (Marco, 2026-10-11).** Una cuenta personal ya no puede registrar apps sin directorio: hará falta darse de alta en Azure (crea el directorio) y después registrar la app por Chrome. La capa de proveedor se construye para que sea solo otro adaptador.
+- [ ] Marco: hacer — **Guardar en Wrangler (`hour-web`) `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET` y `MAIL_TOKEN_KEY`** (esta última, una clave aleatoria para cifrar los tokens; p. ej. `openssl rand -base64 32`). Hoy en Wrangler solo está `SUPABASE_SERVICE_ROLE_KEY` (comprobado el 2026-10-11).
+- [ ] **Google: verificación de la app y auditoría CASA antes de pasar de 100 usuarios** (permisos restringidos de Gmail; coste de cientos a miles de dólares al año según las fuentes, por confirmar). Mientras, modo prueba (Marco, 2026-10-11).
+- [ ] **Comms, carril 2: hilos con facetas (ADR-099).** Facetas configurables por espacio: estándar sembradas (con Comidas) y traducidas por clave; renombrar, desactivar y crear propias, con nombre por idioma opcional (Marco, 2026-10-11). Empieza por pasar todo el sistema de permisos al modelo nuevo
   (expand/contract con staging); después hilos sin invitados, tablón del día colgado del bolo (la maqueta enseña
   también la variante por faceta).
 - [ ] **Investigar un SMTP propio de Hour** (envío como Hour en nombre de la compañía): entregabilidad, LSSI y qué
@@ -1450,7 +1454,7 @@ entre empresas sin construirlo.
   **Salas nuevas desde las compañías (chat 10-10):** una compañía puede proponer una sala que no está en el
   directorio (la que crea en su espacio) y entra en el directorio común cuando la validan 3 compañías, con el mismo
   mecanismo de propuesta, fuente e historial que las correcciones.
-- [ ] Marco: decidir — **Cuándo cargar la fase 2 del directorio (construida y en `main`, 2026-10-11):** de 4.659 a 6.802 salas (EIEL nacional y de Madrid, Wikidata Francia; casas de cultura solo con uso escénico). La descarga tarda ~45 min y bloquea el canal de migraciones; se lanza con `venue-directory-load.yml` (plan y después load). Quedan ~130 posibles duplicados Wikidata FR/Basilic y ~35 EIEL/Wikidata sin fundir a propósito. **Directorio de salas, fase 2 (Marco, 2026-10-10).** España fuera de Cataluña y CyL con los datos abiertos
+- [x] **Directorio de salas, fase 2: cargada en producción el 2026-10-11 (run 38113880531, 6.802 salas activas).** Quedan ~130 posibles duplicados Wikidata FR/Basilic y ~35 EIEL/Wikidata sin fundir a propósito. **Directorio de salas, fase 2 (Marco, 2026-10-10).** España fuera de Cataluña y CyL con los datos abiertos
   autonómicos (Andalucía, Madrid, Valencia primero, mirando antes cada licencia) y los ~1.250 teatros de Wikidata de
   Francia. Criterios de la fase 1 que siguen: centros cívicos solo con aforo declarado, ningún contacto de ayuntamiento,
   y al adoptar se copia el contacto genérico con el nombre de la sala.
