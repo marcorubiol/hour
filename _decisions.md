@@ -3375,3 +3375,24 @@ Marco, `research/product/22-venue-directory-personal-data-legal.md`). Registrar 
 - **Facetas configurables.** «Comidas» existe como faceta estándar. Hour siembra un juego de facetas estándar y cada
   espacio puede renombrarlas, desactivarlas y crear las suyas. Multilingüe: las estándar se traducen por clave en los
   cuatro idiomas de la app; las propias llevan el nombre que les dé el espacio, con traducciones opcionales por idioma.
+
+## [2026-10-11] ADR-100 · Permisos: el modelo de facetas sustituye al de hoy (decisiones para las fases 2 y 3)
+
+**Contexto.** ADR-099 punto 8 decidió pasar todo el sistema de permisos al modelo de facetas en expand/contract. La
+fase expand está escrita y probada en local (`claude/permissions-facets`, `build/permissions-facets-plan.md`).
+Marco aceptó las seis recomendaciones del plan (§ 8):
+
+1. **Ver la producción de un proyecto es el acceso al contenedor** (`container_verb`), lo que da la membresía
+   (ADR-082); Tècnica, Logística y Full de ruta gatean después los campos y los hilos que les tocan. No hay faceta
+   «Planificació».
+2. **No existe el miembro sin acceso al contenedor**: ser miembro es ver; en el contract `container_verb` es
+   obligatorio.
+3. **Invitar no es una capacidad**: manda el techo del delegante (ADR-085 §12); `edit:membership` y
+   `can_manage_members` mueren en la fase 3.
+4. **El rol del espacio se queda** como dimensión propia del nivel espacio (crear proyectos, directorio, tareas,
+   sedes); Direcció en el espacio equivale a admin.
+5. **El cuarto nivel es el bolo**, y Full de ruta existe además en la función (la hoja de ruta es de la función).
+   `structure-model.md` se corrige.
+6. **Paquetes:** Mínim ve el contenedor; Equip lo ve con Materials, Tècnica, Logística y Full de ruta; Coordinació
+   edita todo y ve Diners y los metadatos; Direcció edita todo, Diners y miembros incluidos. Las facetas son
+   configurables por espacio (ADR-099, añadido): los paquetes se expanden sobre las facetas estándar.
