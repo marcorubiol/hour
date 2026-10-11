@@ -59,6 +59,9 @@ export interface IngestPayload {
   provider_message_id: string;
   provider_thread_id: string | null;
   rfc_message_id: string | null;
+  /** Regla del hilo (ADR-102, añadido, punto 4): a qué correo responde. */
+  in_reply_to?: string | null;
+  references?: string[];
   occurred_at: string;
   direction: 'inbound' | 'outbound';
   subject: string | null;

@@ -18,10 +18,12 @@ import {
   CONVERSATION_SELECT,
   CONVERSATION_STATUSES,
   ConversationCreateSchema,
+  conversationCreateProblem,
+  existingConversationId,
   normalizeConversationItem,
   type ConversationDbItem,
 } from '$lib/conversation';
-import { pgGet, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
+import { PostgrestError, pgGet, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
 
 const QuerySchema = v.object({
@@ -108,19 +110,17 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
   const workspaceIds = parseIds(workspace_ids);
 
   const search = new URLSearchParams();
-  // !inner joins: project when filtering by its slug; person when the
-  // free-text search runs over its columns.
+  // !inner join on project when filtering by its slug. The free-text search
+  // runs over the organization and every contact (ADR-102) through the
+  // `conversation_search` RPC, which returns conversation rows: the same
+  // embeds, filters and order apply.
   let select = CONVERSATION_SELECT;
   if (project_slug) {
     select = select.replace('project:project_id(', 'project:project_id!inner(');
   }
-  if (q) {
-    select = select.replace(
-      'person:workspace_person!conversation_workspace_person_fkey(',
-      'person:workspace_person!conversation_workspace_person_fkey!inner(',
-    );
-  }
   search.set('select', select);
+  const qTrim = q?.trim() ?? '';
+  if (qTrim) search.set('p_q', qTrim);
 
   if (project_slug) search.set('project.slug', `eq.${project_slug}`);
   if (projectIds.length > 0 && workspaceIds.length > 0) {
@@ -136,19 +136,6 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
   if (line_id) search.set('line_id', `eq.${line_id}`);
   search.set('deleted_at', 'is.null');
 
-  if (q) {
-    // Escape PostgREST pattern/logic chars, then substring-match fields in
-    // this workspace's dossier. Organization search moves to the dedicated
-    // organization projection rather than reading a global person field.
-    const safe = q.replace(/[%_*(),.]/g, ' ').trim();
-    if (safe) {
-      search.set(
-        'person.or',
-        `(full_name.ilike.*${safe}*,email.ilike.*${safe}*)`,
-      );
-    }
-  }
-
   if (status !== 'any') search.set('status', `eq.${status}`);
   if (season !== 'any') search.set('custom_fields->>season', `eq.${season}`);
 
@@ -157,7 +144,7 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
   search.set('offset', String(offset));
 
   try {
-    const { data, total } = await pgGet<ConversationDbItem>(env, 'conversation', jwt, {
+    const { data, total } = await pgGet<ConversationDbItem>(env, qTrim ? 'rpc/conversation_search' : 'conversation', jwt, {
       search,
       exactCount: true,
     });
@@ -182,14 +169,17 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
 /**
  * POST /api/conversations — capture a contact/conversation (ADR-051).
  *
- * Body: ConversationCreateSchema — project_id plus EXACTLY ONE of
- * `person_id` (existing person) or `person` (inline fields; the RPC
- * find-or-creates on email). Goes through the `create_conversation` RPC
+ * Body: ConversationCreateSchema — project_id plus the organization
+ * (`organization_id` or `organization`) and/or the person (`person_id` or
+ * `person`, the primary contact). ADR-102: the conversation is with the
+ * organization; with only a person it is theirs, or one named after them. Goes through the `create_conversation` RPC
  * (SECURITY DEFINER): the direct INSERT is claim-bound — sixth case of
  * the pattern. Gated on has_permission(project, 'edit:conversation').
  *
- * 409 conversation_exists: the person already has a conversation in this
- * project that the caller can see (shared, or private to the caller) — the UI
+ * 409 conversation_exists (+ `conversation_id` when the clash is the
+ * organization's, so the UI can open it): the organization, or until the
+ * contract the person, already has a conversation in this project that the
+ * caller can see (shared, or private to the caller) — the UI
  * links to it instead of silently merging. Someone else's private one never
  * counts and is never hinted at (20261011500000): the caller gets their own.
  */
@@ -221,12 +211,8 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
   }
   const input = parsed.output;
 
-  if (Boolean(input.person_id) === Boolean(input.person)) {
-    return json(
-      { error: 'invalid_body', hint: 'Send exactly one of person_id or person.' },
-      400,
-    );
-  }
+  const problem = conversationCreateProblem(input);
+  if (problem) return json({ error: 'invalid_body', hint: problem }, 400);
 
   try {
     const { data } = await pgPostRpc<Record<string, unknown>>(env, 'create_conversation', jwt, {
@@ -235,7 +221,8 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
       p_full_name: input.person?.full_name ?? null,
       p_email: input.person?.email ?? null,
       p_phone: input.person?.phone ?? null,
-      p_organization_name: input.person?.organization_name ?? null,
+      p_organization_id: input.organization_id ?? null,
+      p_organization_name: input.organization?.name ?? input.person?.organization_name ?? null,
       p_title: input.person?.title ?? null,
       p_status: input.status,
       p_role: input.role ?? null,
@@ -246,6 +233,17 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
     if (data.length === 0 || !data[0]) return json({ error: 'create_failed' }, 502);
     return json({ conversation: data[0] }, 201);
   } catch (err) {
+    const existing = err instanceof PostgrestError && err.code === '23505' ? existingConversationId(err.body) : null;
+    if (existing) {
+      return json(
+        {
+          error: 'conversation_exists',
+          hint: 'This organization already has a conversation in this project.',
+          conversation_id: existing,
+        },
+        409,
+      );
+    }
     return pgErrorResponse(
       err,
       { route: 'POST /api/conversations', requestId: locals.requestId },

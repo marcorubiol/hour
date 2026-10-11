@@ -17,6 +17,7 @@ import {
 } from './crypto';
 import {
   buildAddressQueries,
+  parseMessageIds,
   buildRawMessage,
   decodeMimeWords,
   googleAdapter,
@@ -28,7 +29,7 @@ import {
   trimQuoted,
   type GmailRawMessage,
 } from './gmail';
-import { matchMessage } from './provider';
+import { matchMessage, oldestFirst } from './provider';
 import { syncAccount } from './sync';
 import type { IngestPayload, MailAccountRow, MailDb } from './db';
 import { displayWebsite, effectiveSignature, proposedSignature, withSignature, type SignatureParts } from '../../mail';
@@ -653,5 +654,74 @@ describe('GmailClient on a Worker', () => {
     }
     const adapter = googleAdapter(strictFetch as typeof fetch, { clientId: 'c', clientSecret: 's' });
     await expect(adapter.profile('tok')).resolves.toEqual({ address: 'marco@example.com', cursor: '42' });
+  });
+});
+
+describe('thread rule (ADR-102, añadido, punto 4)', () => {
+  test('In-Reply-To and References are read with their angle brackets, in order', () => {
+    expect(parseMessageIds('<a@x.test>')).toEqual(['<a@x.test>']);
+    expect(parseMessageIds(' <a@x.test>\r\n <b@y.test> <c@z.test>')).toEqual(['<a@x.test>', '<b@y.test>', '<c@z.test>']);
+    expect(parseMessageIds('')).toEqual([]);
+    expect(parseMessageIds(null)).toEqual([]);
+    expect(parseMessageIds('not an id')).toEqual([]);
+  });
+
+  test('oldest first, stable for equal or unreadable dates', () => {
+    const m = (id: string, occurredAt: string) => ({ id, occurredAt });
+    const sorted = oldestFirst([
+      m('c', '2026-10-09T10:00:00Z'),
+      m('a', '2026-10-07T10:00:00Z'),
+      m('x', 'nope'),
+      m('b', '2026-10-07T10:00:00Z'),
+    ]);
+    expect(sorted.map((x) => x.id)).toEqual(['x', 'a', 'b', 'c']);
+  });
+
+  test('a pass registers the thread from its first message, and sends the reply headers', async () => {
+    const at = (iso: string) => String(Date.parse(iso));
+    const first = message('q1', 'Inés <ines@pradillo.test>', 'anouk@muk.test', {
+      threadId: 't-1',
+      internalDate: at('2026-10-01T09:00:00Z'),
+    });
+    const reply = message('q2', 'Inés <ines@pradillo.test>', 'anouk@muk.test', {
+      threadId: 't-1',
+      internalDate: at('2026-10-05T09:00:00Z'),
+    });
+    reply.payload!.headers!.push(
+      { name: 'In-Reply-To', value: '<q1@mail.test>' },
+      { name: 'References', value: '<q0@mail.test> <q1@mail.test>' },
+    );
+    // Gmail lists the newest first.
+    const g = gmailWith([reply, first]);
+    const mem = memoryDb(['ines@pradillo.test']);
+    const key = await importMailKey(KEY_B64);
+    const adapter = googleAdapter(fakeFetch(g), { clientId: 'c', clientSecret: 's' });
+    await syncAccount({ db: mem.db, adapter: () => adapter, key }, await accountRow());
+
+    expect(mem.events.map((e) => e.payload.provider_message_id)).toEqual(['q1', 'q2']);
+    const sent = mem.events[1]!.payload;
+    expect(sent.in_reply_to).toBe('<q1@mail.test>');
+    expect(sent.references).toEqual(['<q0@mail.test>', '<q1@mail.test>']);
+    expect(mem.events[0]!.payload.in_reply_to).toBeNull();
+  });
+
+  test('an unmatched message carries no thread headers either', async () => {
+    const stray = message('s1', 'newsletter@shop.test', 'anouk@muk.test');
+    stray.payload!.headers!.push({ name: 'In-Reply-To', value: '<zz@mail.test>' });
+    const g = gmailWith([stray, message('in1', 'Inés <ines@pradillo.test>', 'anouk@muk.test')]);
+    const seen: IngestPayload[] = [];
+    const mem = memoryDb(['ines@pradillo.test']);
+    const ingest = mem.db.ingest;
+    mem.db.ingest = async (a, p, c) => {
+      seen.push(p);
+      return ingest(a, p, c);
+    };
+    const key = await importMailKey(KEY_B64);
+    const adapter = googleAdapter(fakeFetch(g), { clientId: 'c', clientSecret: 's' });
+    await syncAccount({ db: mem.db, adapter: () => adapter, key }, await accountRow());
+    for (const p of seen.filter((x) => x.counterparts.length === 0)) {
+      expect(p.in_reply_to ?? null).toBeNull();
+      expect(p.references ?? []).toEqual([]);
+    }
   });
 });

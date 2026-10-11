@@ -67,12 +67,17 @@ export const GET: RequestHandler = async ({ request, params, url, platform, loca
     search.set('workspace.slug', `eq.${workspace}`);
   }
   try {
-    const { data } = await pgGet<ConversationDbItem & { private_to: string | null }>(
-      env,
-      'conversation',
-      jwt,
-      { search },
-    );
+    type Row = ConversationDbItem & { private_to: string | null };
+    let { data } = await pgGet<Row>(env, 'conversation', jwt, { search });
+    // ADR-102, añadido, punto 7: un slug anterior (el de la persona, antes de
+    // pasar al de la organización) sigue llevando a la conversación.
+    if (!data[0] && !byId) {
+      const previous = new URLSearchParams(search);
+      previous.delete('slug');
+      previous.set('previous_slugs', `cs.{${params.id}}`);
+      previous.set('order', 'updated_at.desc');
+      ({ data } = await pgGet<Row>(env, 'conversation', jwt, { search: previous }));
+    }
     const row = data[0];
     if (!row) return json({ error: 'not_found' }, 404);
     return json({ item: { ...normalizeConversationItem(row), private: row.private_to !== null } });

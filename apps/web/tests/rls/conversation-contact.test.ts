@@ -209,10 +209,10 @@ describe.skipIf(!envReady())('conversation_contact (ADR-102, fase 1)', () => {
     });
   });
 
-  test('every conversation I see has exactly one primary contact: its person', async () => {
+  test('every conversation I see has exactly one primary contact: its person (none without one)', async () => {
     const r = await pgGet<{
       id: string;
-      person_id: string;
+      person_id: string | null;
       contacts: { person_id: string; is_primary: boolean }[];
     }>(
       'conversation',
@@ -226,6 +226,11 @@ describe.skipIf(!envReady())('conversation_contact (ADR-102, fase 1)', () => {
     expect(r.rows.length).toBeGreaterThan(0);
     for (const c of r.rows) {
       const primaries = c.contacts.filter((x) => x.is_primary);
+      // ADR-102, fase 2: una conversación puede nacer solo con su organización.
+      if (c.person_id === null) {
+        expect(primaries, c.id).toHaveLength(0);
+        continue;
+      }
       expect(primaries, c.id).toHaveLength(1);
       expect(primaries[0]!.person_id, c.id).toBe(c.person_id);
     }

@@ -13,7 +13,8 @@
  *  4. contactos ya traídos: con cursor, pregunta si hubo correo nuevo; si lo
  *     hubo, busca SOLO por esas direcciones desde la última pasada (con una
  *     hora de solape);
- *  5. descarta los ids ya procesados, baja el resto, empareja (provider.ts) y
+ *  5. descarta los ids ya procesados, baja el resto, lo ordena del más viejo
+ *     al más nuevo (regla del hilo, ADR-102), empareja (provider.ts) y
  *     registra; lo que no empareja se apunta como procesado sin asunto ni
  *     cuerpo, para no volver a bajarlo;
  *  6. avanza el cursor solo si la parte incremental terminó entera. Si se cortó
@@ -25,7 +26,7 @@
 import { decryptSecret, importMailKey, refreshTokenAad } from './crypto';
 import { serviceMailDb, mailConfigured, type MailAccountRow, type MailDb, type MailEnv } from './db';
 import { googleAdapter, ProviderAuthError } from './gmail';
-import { matchMessage, type MailAdapter } from './provider';
+import { matchMessage, oldestFirst, type MailAdapter, type MailMessage } from './provider';
 
 /** Tope de correos que se bajan por buzón y pasada (CPU del Worker). */
 export const MAX_MESSAGES_PER_PASS = 100;
@@ -130,15 +131,23 @@ export async function syncAccount(deps: SyncDeps, account: MailAccountRow): Prom
       const known = new Set(await db.knownMessages(account.id, found.ids));
       const pending = found.ids.filter((id) => !known.has(id));
       const batch = pending.slice(0, Math.max(0, budget));
+      // Se bajan todos y se registran del más viejo al más nuevo: la regla
+      // del hilo (ADR-102) deja entrar una respuesta solo si el correo al que
+      // responde ya está en la conversación.
+      const fetched: MailMessage[] = [];
       for (const id of batch) {
-        const msg = await adapter.fetchMessage(access, id);
+        fetched.push(await adapter.fetchMessage(access, id));
         counts.fetched++;
         budget--;
+      }
+      for (const msg of oldestFirst(fetched)) {
         const match = matchMessage(msg, account.address, contacts);
         counts.ingested += await db.ingest(account.id, {
           provider_message_id: msg.providerMessageId,
           provider_thread_id: msg.providerThreadId,
           rfc_message_id: msg.rfcMessageId,
+          in_reply_to: match ? msg.inReplyTo : null,
+          references: match ? msg.references : [],
           occurred_at: msg.occurredAt,
           direction: match?.direction ?? 'inbound',
           // Sin emparejado no se guarda ni asunto ni cuerpo: solo que ya se miró.

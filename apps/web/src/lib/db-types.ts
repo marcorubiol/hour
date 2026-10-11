@@ -707,7 +707,7 @@ export type Database = {
           next_action_at: string | null
           next_action_note: string | null
           organization_id: string | null
-          person_id: string
+          person_id: string | null
           previous_slugs: string[]
           private_to: string | null
           project_id: string
@@ -729,7 +729,7 @@ export type Database = {
           next_action_at?: string | null
           next_action_note?: string | null
           organization_id?: string | null
-          person_id: string
+          person_id?: string | null
           previous_slugs?: string[]
           private_to?: string | null
           project_id: string
@@ -751,7 +751,7 @@ export type Database = {
           next_action_at?: string | null
           next_action_note?: string | null
           organization_id?: string | null
-          person_id?: string
+          person_id?: string | null
           previous_slugs?: string[]
           private_to?: string | null
           project_id?: string
@@ -3833,7 +3833,7 @@ export type Database = {
           next_action_at: string | null
           next_action_note: string | null
           organization_id: string | null
-          person_id: string
+          person_id: string | null
           previous_slugs: string[]
           private_to: string | null
           project_id: string
@@ -3848,6 +3848,41 @@ export type Database = {
           to: "conversation"
           isOneToOne: true
           isSetofReturn: false
+        }
+      }
+      conversation_free_slug: {
+        Args: { p_base: string; p_id: string; p_workspace_id: string }
+        Returns: string
+      }
+      conversation_search: {
+        Args: { p_q: string }
+        Returns: {
+          created_at: string
+          created_by: string | null
+          custom_fields: Json
+          deleted_at: string | null
+          first_contacted_at: string | null
+          id: string
+          last_contacted_at: string | null
+          line_id: string | null
+          next_action_at: string | null
+          next_action_note: string | null
+          organization_id: string | null
+          person_id: string | null
+          previous_slugs: string[]
+          private_to: string | null
+          project_id: string
+          role: string | null
+          slug: string
+          status: Database["public"]["Enums"]["conversation_status"]
+          updated_at: string
+          workspace_id: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "conversation"
+          isOneToOne: false
+          isSetofReturn: true
         }
       }
       create_asset_version: {
@@ -3973,6 +4008,7 @@ export type Database = {
           p_line_id?: string
           p_next_action_at?: string
           p_next_action_note?: string
+          p_organization_id?: string
           p_organization_name?: string
           p_person_id?: string
           p_phone?: string
@@ -3993,7 +4029,7 @@ export type Database = {
           next_action_at: string | null
           next_action_note: string | null
           organization_id: string | null
-          person_id: string
+          person_id: string | null
           previous_slugs: string[]
           private_to: string | null
           project_id: string

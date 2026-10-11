@@ -26,6 +26,10 @@ export interface MailMessage {
   providerThreadId: string | null;
   /** Cabecera Message-ID: la misma en todos los buzones que lo tienen. */
   rfcMessageId: string | null;
+  /** Message-ID al que responde (In-Reply-To), si lo hay. */
+  inReplyTo: string | null;
+  /** Los Message-ID del hilo (References), del más viejo al más nuevo; hasta 50. */
+  references: string[];
   subject: string | null;
   fromHeader: string;
   from: string[];
@@ -104,4 +108,12 @@ export function matchMessage(
   }
   const counterparts = from.filter((a) => contacts.has(a));
   return counterparts.length ? { direction: 'inbound', counterparts } : null;
+}
+
+/** Del más viejo al más nuevo; a igual fecha, el orden en que llegaron. */
+export function oldestFirst<T extends Pick<MailMessage, 'occurredAt'>>(messages: readonly T[]): T[] {
+  return messages
+    .map((m, i) => ({ m, i, t: Date.parse(m.occurredAt) || 0 }))
+    .sort((a, b) => (a.t - b.t) || (a.i - b.i))
+    .map((x) => x.m);
 }

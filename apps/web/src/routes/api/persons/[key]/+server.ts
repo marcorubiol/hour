@@ -77,11 +77,14 @@ export const GET: RequestHandler = async ({ request, params, url, platform, loca
     const p = person.data[0];
     const personId = p.person_id;
 
+    // ADR-102: the person's conversations are those where they are a contact
+    // (current or past), not only the primary. The `!inner` contact embed
+    // filters; the conversation's own RLS hides someone else's private one.
     const engSearch = new URLSearchParams({
       select:
-        'id,slug,status,next_action_at,next_action_note,last_contacted_at,custom_fields,project:project_id(id,slug,name,workspace_id)',
+        'id,slug,status,next_action_at,next_action_note,last_contacted_at,custom_fields,project:project_id(id,slug,name,workspace_id),organization:workspace_organization!conversation_workspace_organization_fkey(id,slug,name),contact:conversation_contact!inner(role,since,until,is_primary)',
       workspace_id: `eq.${workspaceId}`,
-      person_id: `eq.${personId}`,
+      'contact.person_id': `eq.${personId}`,
       deleted_at: 'is.null',
       order: 'updated_at.desc',
     });
