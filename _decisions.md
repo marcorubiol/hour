@@ -3421,3 +3421,18 @@ pensar; pedir a las instituciones que inviten a sus programadores queda descarta
   persona y espacio), vive en su perfil de ese espacio y no en Buzones. Hour siempre propone una, montada con su
   nombre, su rol en esa compañía y el nombre, la web y el teléfono de la compañía; se edita. El buzón común firma con
   la firma de la compañía.
+
+## [2026-10-11] ADR-102 · La conversación de difusión es con la sala, no con una persona
+
+Marco, tras el repaso del panel «Conversación» de la maqueta de comms
+(`research/product/2026-10-11-comms-conversacion-repaso.md`, rama `claude/comms-conversation-review`):
+- **Con la sala.** Una conversación de difusión es entre la compañía y la organización que programa (la sala o quien
+  la programa), por proyecto. Las personas son sus contactos y cambian con el tiempo (Inés deja Pradillo, entra Jordi
+  Sastre: es la misma conversación). Sustituye a `conversation.person_id` obligatorio y único por proyecto.
+- **Antes del emparejado por buzón.** Un correo se asigna por su dirección a una persona y, por ella, a la
+  conversación con su organización; por eso el modelo cambia antes de seguir con comms.
+- **El panel sigue la dirección A** de ese informe: franja de estado (siguiente paso, turno, último contacto, quién la
+  lleva) bajo el título y «En juego» (fechas, caché, sala, material) al lado del registro.
+- Por diseñar en el plan de migración: el contacto con su rol y sus fechas, qué pasa con las conversaciones que hoy no
+  tienen organización, y el gate de § 34 (es destructiva: staging e `inspect` obligatorios; las 154 conversaciones de
+  `muk-cia` son reales).
