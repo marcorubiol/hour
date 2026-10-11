@@ -1421,6 +1421,11 @@ entre empresas sin construirlo.
      para campañas. **Llega pronto, Marco lo quiere en breve.** Antes: entregabilidad, cómo vuelven las respuestas a
      Hour y al buzón de la compañía, bajas, y la LSSI (consentimiento previo también entre empresas; pregunta abierta al
      abogado).
+  - Marco: decidir — **Proveedor y cuenta del envío en bloque** (informe `research/infra/2026-10-11-envio-en-bloque.md`).
+    Proveedor: a) Amazon SES con un tenant por compañía (recomendada: UE, aislamiento y coste); b) Emailit (cuenta de
+    Marco); c) Mailgun. Cuenta: a) las dos vías, por defecto la de Hour con cada compañía aislada y, si quiere, la suya
+    propia con su clave (recomendada); b) solo la de Hour; c) solo la de cada compañía. Ante la LSSI responde la
+    compañía, en cuyo nombre se envía (art. 20); ante el proveedor, el titular de la cuenta.
 - [x] Comms: borrador en papel respondido el 2026-10-11 (ADR-099). **Comms: diseño en papel, sin código (Marco, 2026-10-10: se abre ya; la puerta de construir sigue).** Antes: la puerta de producto de comms, que es de Marco y no técnica. ADR-085 lleva
   escrita su propia condición: *usar la app en una temporada de difusión real
   antes de construir nada de esto*. Mientras no se cumpla, resolver los dos
@@ -1473,6 +1478,10 @@ entre empresas sin construirlo.
 - [ ] Marco: hacer — **Revisar y enviar los dos borradores de Mail (cuenta Google)** a la Red Española de Teatros (`redteatros@redescena.net`) y a DGArtes (`geral@dgartes.pt`, en portugués, pidiendo la Rede de Teatros e Cineteatros Portugueses). Creados el 2026-10-10. Antes: escribir a la Red Española de Teatros y a DGArtes
   para pedir sus listados como dato (Marco, 10-10: lo quiere pensar).
 
+- [ ] **Marketing: que la gente se dé de alta en Hour (Marco, 2026-10-11, ADR-101).** Primera acción: escribir a
+  instituciones (Red Española de Teatros, INAEM, DGArtes, ICEC…) para pedir sus listados públicos de salas y, sobre
+  todo, que inviten a sus programadores a darse de alta en Hour ellos mismos y aceptar propuestas. Presenta Hour y
+  trae altas con consentimiento.
 - [ ] **Poll de fechas candidatas (à la Doodle/When2meet, integrado).** Al buscar
   fecha para una residencia, un ensayo o una reunión, proponer **varias `date`
   candidatas de golpe**; cada participante confirma las que puede; cuando todos

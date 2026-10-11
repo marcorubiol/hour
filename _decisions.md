@@ -3409,3 +3409,11 @@ Marco aceptó las seis recomendaciones del plan (§ 8):
 - **Privacidad por defecto (sustituye la primera frase del punto 4):** el admin del espacio elige si las conversaciones
   nuevas nacen privadas o compartidas, y cada persona cambia después las suyas; por defecto, privadas. Las
   conversaciones que ya existen siguen compartidas (las 154 de MüK Cia, entre ellas), para no quitar acceso sin avisar.
+
+## [2026-10-11] ADR-101 · El marketing de Hour se centra en que la gente se dé de alta
+
+Marco: lo que diferencia a Hour es que programadores y profesionales estén dados de alta en la plataforma por sí
+mismos. El marketing se centra en eso, no en tener más datos de terceros. Encaja con el diseño legal del directorio
+(`research/product/22-venue-directory-personal-data-legal.md`: una persona entra solo si se da de alta o reclama su
+ficha, aceptando propuestas) y con la LSSI, que pide consentimiento previo para escribirles. Primera acción: pedir a las
+instituciones que inviten a sus programadores a darse de alta (`_tasks.md`, «Marketing»).
