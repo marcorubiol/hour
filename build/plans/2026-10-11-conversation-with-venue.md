@@ -1,9 +1,23 @@
 # Plan: la conversación de difusión es con la sala (ADR-102)
 
 > 2026-10-11. Solo plan: nada aplicado, nada desplegado. Rama `claude/conversation-venue-plan`.
+> Actualizado el mismo día con las respuestas de Marco (ADR-102, añadido): § 6 queda contestada y el plan las recoge.
 > Fuentes: ADR-098, ADR-099, ADR-100, ADR-102, `_tasks.md § 34`, el repaso del panel
 > (`research/product/2026-10-11-comms-conversacion-repaso.md`, rama `claude/comms-conversation-review`),
 > el catálogo de producción leído con SELECT el 2026-10-11 y `grep` sobre `supabase/migrations` y `apps/web`.
+
+## Decidido (ADR-102, añadido del 2026-10-11)
+
+1. Sin conversación sin organización: con un programador independiente se crea una organización con su nombre.
+2. El enlace organización-directorio, más adelante (fuera de este plan).
+3. Una conversación por organización y proyecto.
+4. Un correo entra por las fechas del contacto **y además por hilo**: una respuesta a un hilo que ya está en la
+   conversación entra siempre (el «gracias» de quien ya se fue); un hilo nuevo, solo dentro de las fechas (§ 3,
+   «Emparejado de correos»).
+5. **El pagador es la organización**, no el contacto principal: la factura apunta a la organización y a su identidad
+   fiscal (§ 3, «Dinero»; fase 2b).
+6. Los posibles duplicados se revisan a mano en la fase 3, antes del contract; sin fusión automática.
+7. El slug de la conversación pasa al de la organización, con el viejo en `previous_slugs`.
 
 ## 0. Estado de partida, verificado
 
@@ -21,7 +35,7 @@
 
 | Objeto | Qué hace con `person_id` |
 |---|---|
-| Columna | `NOT NULL`; grants por columna a `authenticated` (y `anon`, sin policy) de SELECT, INSERT, UPDATE |
+| Columna | `NOT NULL`; grant a tabla entera (ALL) a `authenticated` y `anon` (este sin policy). `column_privileges` lo lista por columna, pero no hay grant por columnas: una columna nueva queda cubierta sola |
 | FK `conversation_person_id_fkey` | `-> person(id) ON DELETE RESTRICT` |
 | FK `conversation_workspace_person_fkey` | `(workspace_id, person_id) -> workspace_person`. **Es el nombre que usan los embeds de PostgREST** |
 | Índices | `conversation_person_idx`, `conversation_workspace_person_idx`, los dos `*_project_person_*_uidx` |
@@ -134,11 +148,24 @@ panel. Es la P1 de § 6.
 ### Emparejado de correos (ADR-099 §3)
 
 Dirección -> dossier (`workspace_person.email`) -> sus filas de `conversation_contact` -> conversación. Un correo entra
-en una conversación si la persona era contacto **en la fecha del correo**: `since IS NULL OR occurred_at::date >= since`
-y `until IS NULL OR occurred_at::date <= until`. Así el correo de Inés desde su sitio nuevo no cae en Pradillo. Si una
-dirección casa con varias conversaciones (dos proyectos con Pradillo), entra en todas, como hoy; la idempotencia por
-`external_ref` no cambia. `mail_contact_addresses` sincroniza las direcciones de los contactos vigentes, más los
-cerrados hace menos de 12 meses (para traer su historial, ADR-100). `mail_send_authorize` devuelve los contactos
+en una conversación por una de dos vías (decisión 4):
+
+1. **Por fechas.** Alguna contraparte era contacto **en la fecha del correo**: `since IS NULL OR occurred_at::date >= since`
+   y `until IS NULL OR occurred_at::date <= until`. Así un hilo nuevo de Inés desde su sitio nuevo no cae en Pradillo.
+2. **Por hilo.** Alguna contraparte es o fue contacto de la conversación (cualquier fecha) **y** el correo sigue un hilo
+   que ya tiene un evento en esa conversación: mismo `metadata.provider_thread_id` en el mismo buzón
+   (`metadata.mail_account_id`; el id de hilo de Gmail es por buzón), o un `In-Reply-To`/`References` que nombra el
+   `rfc_message_id` de un evento de la conversación (esto cruza buzones: el personal y el común). Es el «gracias» de
+   quien ya se fue. Un hilo nuevo fuera de fechas no entra.
+
+La vía 2 exige que el conector mande `in_reply_to` y `references` en `p_message` (hoy no los manda: cambio en
+`lib/server/mail/`) y un índice de expresión sobre `conversation_event ((metadata ->> 'provider_thread_id'))` donde
+`source = 'email'`. El orden importa en una pasada: los correos de un hilo se ingieren del más viejo al más nuevo, para
+que la respuesta encuentre ya dentro el correo al que responde.
+
+Si una dirección casa con varias conversaciones (dos proyectos con Pradillo), entra en todas, como hoy; la idempotencia
+por `external_ref` no cambia. `mail_contact_addresses` sincroniza las direcciones de los contactos vigentes, más los
+cerrados hace menos de 12 meses (para traer su historial, ADR-100, y para ver las respuestas de la vía 2). `mail_send_authorize` devuelve los contactos
 vigentes con email, el principal primero; enviar elige uno.
 
 ### Privacidad (ADR-099 §4, ADR-100)
@@ -160,10 +187,24 @@ como hoy); el nombre de una sala no es secreto, lo hablado con ella sí, y eso v
 
 ### Dinero
 
-- `create_invoice_from_bolo` infiere el pagador del **contacto principal vigente** (hoy, de `person_id`).
-- `list_money_payers` lista los contactos de las conversaciones visibles.
-- Que el pagador de una factura sea la organización (con su identidad fiscal) es otra decisión (§ 6, P5); este plan no
-  la toca.
+El pagador es la organización (decisión 5). Hoy la factura lleva dos punteros: `payer_person_id` (a quién, inferido de
+`conversation.person_id`) y `payer_fiscal_identity_id` (una `fiscal_identity` `kind = 'receiver'` del espacio, que
+`issue_invoice` congela en `payer_snapshot`). 0 de 354 facturas tienen `payer_person_id`.
+
+- `invoice.payer_organization_id uuid`, FK compuesta `(workspace_id, payer_organization_id) -> workspace_organization`.
+  Sustituye a `payer_person_id`, que se borra en el contract (fase 4).
+- `workspace_organization.fiscal_identity_id uuid -> fiscal_identity` (receptora del mismo espacio): los datos fiscales
+  de la sala. Mismo patrón que `workspace.fiscal_identity_id` para el emisor, y `fiscal_identity` no cambia. Un guard
+  exige `kind = 'receiver'` y mismo espacio.
+- `create_invoice_from_bolo` infiere `payer_organization_id` de `conversation.organization_id` del bolo y, si la factura
+  no trae `payer_fiscal_identity_id`, toma el de la organización. `issue_invoice` no cambia: sigue congelando la
+  identidad fiscal en el snapshot. El parámetro `p_payer_person_id` se sustituye por `p_payer_organization_id`.
+- `update_invoice` acepta `payer_organization_id` en el patch (borrador), con la misma regla de espacio.
+- `list_money_payers` lista organizaciones (id, slug, nombre, si tienen identidad fiscal) de las conversaciones que
+  quien llama puede ver. **Hoy no filtra `private_to`** (es SECURITY DEFINER y une `conversation` sin la condición de
+  ADR-099): enseña a otro editor de dinero la persona de una conversación privada ajena. La reescritura lo corrige.
+- Books (web): el desplegable de pagador pasa a organizaciones; la factura enseña la organización y avisa si no tiene
+  datos fiscales antes de emitir. Crear o editar la identidad fiscal de una organización vive en su ficha.
 
 ## 4. Fases (expand/contract), cada una desplegable
 
@@ -206,8 +247,9 @@ Migración `..._conversation_with_organization_reads.sql`:
    principal). Unicidad, revivir y 409 por organización. Si la organización ya tiene conversación en el proyecto y llega
    una persona nueva, devuelve el 23505 con el id existente para que la UI ofrezca «añadirla como contacto».
    Slug de la organización para las nuevas.
-3. `mail_contact_addresses`, `mail_ingest_message`, `mail_send_authorize` leen de `conversation_contact` con las fechas
-   (§ 3). `list_money_payers` y `create_invoice_from_bolo` leen el principal vigente.
+3. `mail_contact_addresses`, `mail_ingest_message`, `mail_send_authorize` leen de `conversation_contact` con las
+   fechas y la regla del hilo (§ 3), más el índice de `provider_thread_id`. El conector manda `in_reply_to` y
+   `references` y ordena los mensajes de un hilo del más viejo al más nuevo. El dinero va aparte (fase 2b).
 4. Slugs de las existentes: pasan al de su organización, el viejo a `previous_slugs` (resuelve igual). Es reescritura
    de datos: va con `inspect` y backup.
 
@@ -227,11 +269,42 @@ por contacto.
 
 Tests RLS nuevos: unicidad por organización (compartida y privada conviven; dos compartidas no); revivir por
 organización; el correo de una persona con `until` pasado no entra; uno con fecha dentro sí; un correo cuya dirección
-es contacto de dos conversaciones entra en las dos; `mail_send_authorize` no da contactos de una privada ajena; pagador
-inferido del principal; la ficha de persona no filtra conversaciones privadas ajenas.
+es contacto de dos conversaciones entra en las dos; la respuesta de un contacto cerrado a un hilo que ya está en la
+conversación entra (por `provider_thread_id` del mismo buzón y por `In-Reply-To` desde otro buzón); un hilo nuevo del
+mismo contacto cerrado no entra; un hilo de otro buzón con el mismo `provider_thread_id` no cuenta;
+`mail_send_authorize` no da contactos de una privada ajena; la ficha de persona no filtra conversaciones privadas
+ajenas.
 
 Rollback: restaurar las funciones anteriores (cuerpos de `20261011500000` y `20261011200000`) y los slugs desde
 `previous_slugs`; drop de los índices nuevos.
+
+### Fase 2b · Books: el pagador es la organización
+
+Depende solo de la fase 1 (necesita `conversation.organization_id` relleno); puede ir antes o después de la 2.
+Migración `..._invoice_payer_organization.sql`, aditiva salvo funciones:
+1. `invoice.payer_organization_id` con su FK compuesta e índice; `workspace_organization.fiscal_identity_id` con su
+   guard (receptora, mismo espacio, viva).
+2. Relleno: ninguno que hacer (0 facturas con `payer_person_id`); la migración lo comprueba y aborta si hay alguna, para
+   no perder un pagador sin traducirlo.
+3. `create_invoice_from_bolo` (firma nueva con `p_payer_organization_id`; la vieja se borra en la misma migración tras
+   comprobar que no la llama nadie más), `update_invoice`, `list_money_payers` (organizaciones, con `private_to`).
+4. `payer_person_id` se queda hasta la fase 4, sin escritores.
+
+API y UI: `/api/money/payers` devuelve organizaciones; `/api/invoices` POST y PATCH aceptan `payer_organization_id`;
+`MoneyInvoices.svelte`, `line/MoneyModule.svelte`, `h/money`, `money.ts`, `moneybook.ts`, `desk-feed.ts` (que lee el
+pagador) y la i18n. La ficha de organización gana «Datos fiscales» (crear o enlazar una `fiscal_identity` receptora,
+con `edit:money`).
+
+Gate: cambia firmas de función (borra la vieja de `create_invoice_from_bolo`): `inspect` antes, por la deriva de
+sobrecargas que tumbó los applies del 2026-08-10; local desde cero, RLS (`money-v3.test.ts` reescrito), E2E de Books.
+
+Tests RLS nuevos: el pagador inferido es la organización de la conversación del bolo; la identidad fiscal de la
+organización se toma por defecto y `issue_invoice` la congela; una organización de otro espacio se rechaza; una
+identidad `issuer` no se puede enlazar a una organización; `list_money_payers` no lista la organización de una
+conversación privada ajena (hoy la persona sí sale: es el hueco que cierra).
+
+Rollback: restaurar los cuerpos anteriores (`20260722104500`, `20260724092000`, `20260724093000`) y borrar las dos
+columnas.
 
 ### Fase 3 · Contactos en la UI
 
@@ -256,10 +329,11 @@ Migración `..._conversation_with_organization_contract.sql`:
    `conversation_workspace_person_idx`, `conversation_workspace_person_fkey`, `conversation_person_id_fkey`, columnas
    `person_id` y `role`; firma vieja de `create_conversation` (con persona obligatoria). Los índices nuevos dejan de ser
    parciales por `organization_id IS NOT NULL`.
+5. Books: drop de `invoice.payer_person_id`, su FK compuesta y sus dos índices (sin escritores desde la fase 2b).
 
 Antes, en el código (desplegado en un deploy previo, no en el mismo): fuera el `person` derivado del normalizador, fuera
-`person_id` del POST, fuera cualquier `select` que nombre `person_id` en `conversation` (con grant por columnas, nombrar
-una columna que ya no existe rompe el `select` entero).
+`person_id` del POST, fuera cualquier `select` que nombre `person_id` en `conversation` o `payer_person_id` en `invoice`
+(nombrar una columna que ya no existe rompe el `select` entero).
 
 Gate (§ 34, destructiva): staging despierto y reconstruido con las cuatro migraciones, suites completas allí;
 `inspect` contra producción (nada fuera de las migraciones sujeta `person_id`: funciones, vistas, el esquema
@@ -285,10 +359,13 @@ nulo hasta asignarles uno).
 
 - «Quién la lleva» (responsable), consentimiento y canal (LSSI), adjuntos por evento: salen del mismo repaso pero son
   columnas aparte; pueden ir en la migración de la fase 1 si Marco lo quiere, no lo he metido.
-- El pagador como organización (P5).
 - El enlace organización-directorio (P2).
 
-## 6. Preguntas para Marco
+## 6. Preguntas para Marco (contestadas el 2026-10-11)
+
+Respuestas en «Decidido», arriba, y en ADR-102 (añadido). P1, P2, P3, P6 y P7: la recomendada. P4: las fechas, más la
+regla del hilo. P5: la organización (la opción 2), que añade la fase 2b. Se conserva el texto de las preguntas como
+estaba.
 
 **P1. ¿Puede haber conversación sin organización?**
 1. **No: siempre hay organización, y si es un programador independiente se crea con su nombre** (recomendada). Una
