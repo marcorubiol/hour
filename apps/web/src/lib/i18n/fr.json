@@ -198,6 +198,8 @@
   "desk.bucket_tomorrow": "Demain",
   "desk.bucket_next_week": "Semaine prochaine",
   "desk.bucket_later": "Plus tard",
+  "desk.later_one": "1 chose le {day}",
+  "desk.later_many": "{n} choses jusqu’au {day}",
   "desk.bucket_anytime": "N’importe quand",
   "desk.all_day": "toute la journée",
   "desk.concern_task": "note",

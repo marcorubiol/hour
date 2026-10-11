@@ -193,7 +193,7 @@ export type ClashVM = {
 };
 
 /** Day bucket of a performance — performed_at is day-level truth. */
-export function perfDayKey(p: PerformanceEvent): string {
+export function perfDayKey(p: Pick<PerformanceEvent, 'performed_at'>): string {
   return p.performed_at.slice(0, 10);
 }
 
@@ -206,6 +206,35 @@ export function perfDayKey(p: PerformanceEvent): string {
 export function dateDayKey(d: DateEvent, timeZone: string): string {
   if (d.all_day) return d.starts_at.slice(0, 10);
   return dayKeyInTz(d.starts_at, d.venue?.timezone || timeZone);
+}
+
+/**
+ * ADR-084 §1 — the days each series touches, across dates AND performances
+ * (since `20260829100000` a gig can run several days too). A block is N rows
+ * sharing a series_id; which day starts it is derived here on every read,
+ * never stored. The month draws it as a band, the Desk as one row.
+ *
+ * The date's day is the caller's: the month buckets by venue timezone, the
+ * Desk by the stored day.
+ */
+export function seriesDayMap<D extends { series_id?: string | null }>(
+  dates: readonly D[],
+  dayOfDate: (d: D) => string,
+  performances: readonly Pick<PerformanceEvent, 'series_id' | 'performed_at'>[],
+): Map<string, Set<string>> {
+  const m = new Map<string, Set<string>>();
+  const add = (sid: string | null | undefined, day: string) => {
+    if (!sid) return;
+    (m.get(sid) ?? m.set(sid, new Set<string>()).get(sid)!).add(day);
+  };
+  for (const d of dates) add(d.series_id, dayOfDate(d));
+  for (const p of performances) add(p.series_id, perfDayKey(p));
+  return m;
+}
+
+/** ¿Esta serie es una tanda de verdad? Dos días o más. */
+export function isMultiDayRun(days: Map<string, Set<string>>, sid: string | null | undefined): boolean {
+  return Boolean(sid && (days.get(sid)?.size ?? 0) >= 2);
 }
 
 /** "July 2026" — shared by the page's h1 and the grid's aria-label. */

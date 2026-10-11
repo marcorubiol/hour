@@ -36,6 +36,8 @@
     dateSlip,
     type Slip as SlipVM,
     perfDayKey,
+    seriesDayMap,
+    isMultiDayRun,
     dateDayKey,
     deducedPhrase,
     formatMonthLabel,
@@ -473,23 +475,14 @@
   // That is the whole reason for per-day rows — confirm one day of a run and
   // it simply shows as itself inside the band; there is no stored span to
   // fall out of sync with the days it claims to cover.
-  let seriesDays = $derived.by(() => {
-    const m = new Map<string, Set<string>>();
-    const add = (sid: string | null | undefined, day: string) => {
-      if (!sid) return;
-      (m.get(sid) ?? m.set(sid, new Set<string>()).get(sid)!).add(day);
-    };
-    for (const d of dates) add(d.series_id, dateDayKey(d, viewerTz));
-    // ADR-084 §1 — las funciones también duran varios días desde
-    // `20260829100000`. La cuenta es la misma: una tanda es una serie que
-    // toca dos días o más, sea de ensayos o de bolos.
-    for (const p of performances) add(p.series_id, perfDayKey(p));
-    return m;
-  });
+  // ADR-084 §1 — las funciones también duran varios días desde
+  // `20260829100000`: una tanda es una serie que toca dos días o más, sea de
+  // ensayos o de bolos. La cuenta vive en `seriesDayMap` (la comparte el Desk).
+  let seriesDays = $derived(seriesDayMap(dates, (d) => dateDayKey(d, viewerTz), performances));
 
   /** ¿Esta serie es una tanda de verdad? Dos días o más. */
   function isRun(sid: string | null | undefined): boolean {
-    return Boolean(sid && (seriesDays.get(sid)?.size ?? 0) >= 2);
+    return isMultiDayRun(seriesDays, sid);
   }
 
   /**

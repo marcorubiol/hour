@@ -27,6 +27,7 @@
   import { spaceName } from '$lib/utils/identity';
   import { detectLocale, LOCALE_TAG, t } from '$lib/i18n';
   import { dayMonth } from '$lib/datetime';
+  import { plannerDayHref } from '$lib/planner';
   import { usePins } from '$lib/stores/pins.svelte';
   import { useCalm } from '$lib/stores/calm.svelte';
   import {
@@ -46,6 +47,7 @@
   import {
     buildDeskFeed,
     deskSummary,
+    laterSummary,
     type DeskConcern,
     type DeskConvInput,
     type DeskDateInput,
@@ -161,6 +163,12 @@
   });
   let feed = $derived(buildDeskFeed(feedInput, clockNow, locale));
   let summary = $derived(deskSummary(feedInput, clockNow));
+  // Past this week the Desk stops itemising: one line, opening the Agenda on
+  // the first day of that stretch (scope rides in the pins store).
+  let later = $derived(laterSummary(feed));
+  const laterText = (l: NonNullable<typeof later>) =>
+    t(l.count === 1 ? 'desk.later_one' : 'desk.later_many', locale, { n: l.count, day: dayMonth(l.until) });
+  const runDaysText = (n: number) => ` · ${n} ${t('block.days_unit', locale)}`;
 
   let loading = $derived(
     $conversationsQuery.isPending || $tasksQuery.isPending || $performancesQuery.isPending || $datesQuery.isPending,
@@ -358,131 +366,145 @@
   {:else}
     <div class="timeline">
       {#each visibleBuckets as bucket (bucket.sortKey)}
-        <section class="bucket" class:bucket--today={bucket.sortKey === 0}>
-          <header class="bucket__head" class:bucket__head--overdue={bucket.overdue}>
-            <span class="bucket__label"
-              >{bucket.labelKey === 'weekday' ? bucket.weekday : t(`desk.bucket_${bucket.labelKey}`, locale)}</span
-            >
-            {#if bucket.dateLabel}<span class="bucket__date">{bucket.dateLabel}</span>{/if}
-            <span class="bucket__count">{bucketTotal(bucket)}</span>
-          </header>
-
-          {#if bucket.anchor}
-            {@const rsHref = roadsheetHref(bucket.anchor)}
-            <div class="anchor" style={`--c: ${accentVar(bucket.anchor.accentSlug)}`}>
-              <div class="anchor__eye">
-                {t('desk.anchor_show_today', locale, { project: bucket.anchor.projectName })}
-              </div>
-              <div class="anchor__venue">
-                {bucket.anchor.venue}{bucket.anchor.city ? ` · ${bucket.anchor.city}` : ''}
-              </div>
-              <div class="anchor__foot">
-                <div class="anchor__slots">
-                  {#if bucket.anchor.loadInAt}<span
-                      ><span class="anchor__k">{t('desk.anchor_loadin', locale)}</span> {fmtTime(bucket.anchor.loadInAt)}</span
-                    >{/if}
-                  {#if bucket.anchor.soundcheckAt}<span
-                      ><span class="anchor__k">{t('desk.anchor_soundcheck', locale)}</span>
-                      {fmtTime(bucket.anchor.soundcheckAt)}</span
-                    >{/if}
-                  {#if bucket.anchor.startAt}<span
-                      ><span class="anchor__k">{t('desk.anchor_show', locale)}</span> {fmtTime(bucket.anchor.startAt)}</span
-                    >{/if}
-                  {#if bucket.anchor.loadOutAt}<span
-                      ><span class="anchor__k">{t('desk.anchor_loadout', locale)}</span> {fmtTime(bucket.anchor.loadOutAt)}</span
-                    >{/if}
-                  {#if bucket.anchor.wrapAt}<span
-                      ><span class="anchor__k">{t('desk.anchor_wrap', locale)}</span> {fmtTime(bucket.anchor.wrapAt)}</span
-                    >{/if}
-                </div>
-                {#if rsHref}
-                  <a class="anchor__rs" href={rsHref}>{t('desk.roadsheet', locale)} ↗</a>
-                {/if}
-              </div>
-            </div>
+        {#if bucket.labelKey === 'later'}
+          {#if later}
+            <section class="bucket">
+              <a class="bucket__head later" href={plannerDayHref('agenda', later.from)}>
+                <span class="bucket__label">{t('desk.bucket_later', locale)}</span>
+                <span class="bucket__date">{laterText(later)}</span>
+                <span class="bucket__count" aria-hidden="true">→</span>
+              </a>
+            </section>
           {/if}
+        {:else}
+          <section class="bucket" class:bucket--today={bucket.sortKey === 0}>
+            <header class="bucket__head" class:bucket__head--overdue={bucket.overdue}>
+              <span class="bucket__label"
+                >{bucket.labelKey === 'weekday' ? bucket.weekday : t(`desk.bucket_${bucket.labelKey}`, locale)}</span
+              >
+              {#if bucket.dateLabel}<span class="bucket__date">{bucket.dateLabel}</span>{/if}
+              <span class="bucket__count">{bucketTotal(bucket)}</span>
+            </header>
 
-          {#each bucket.runs as run (run.concern + run.items[0].id)}
-            <div class="run run--{run.concern}">
-              {#if runHref(run)}
-                <a class="run__label" href={runHref(run)}>{concernLabel(run.concern)}</a>
-              {:else}
-                <span class="run__label">{concernLabel(run.concern)}</span>
-              {/if}
-              <div class="run__rows">
-                {#each run.items as item (item.id)}
-                  {#if isGhost(item)}
-                    <div class="ghost">
-                      <div class="ghost__head">
-                        <span class="ghost__badge">{t('desk.proposed', locale)}</span>
-                        <span class="ghost__subject">{item.subject}</span>
-                      </div>
-                      {#if item.reason}<p class="ghost__reason">{item.reason}</p>{/if}
-                      <div class="ghost__actions">
-                        <button type="button" class="ghost__add" onclick={() => item.taskId && acceptProposal(item.taskId)}
-                          >{t('desk.proposal_add', locale)}</button
-                        >
-                        <button
-                          type="button"
-                          class="ghost__dismiss"
-                          onclick={() => item.taskId && $toggleTask.mutate({ id: item.taskId, status: 'done' })}
-                          >{t('desk.proposal_dismiss', locale)}</button
-                        >
-                      </div>
-                    </div>
-                  {:else if item.concern === 'task'}
-                    <div class="drow drow--task" class:drow--overdue={item.overdue}>
-                      <input
-                        type="checkbox"
-                        class="drow__check"
-                        aria-label={item.subject}
-                        checked={item.taskDone}
-                        onchange={(e) =>
-                          item.taskId && $toggleTask.mutate({ id: item.taskId, status: (e.currentTarget as HTMLInputElement).checked ? 'done' : 'open' })}
-                      />
-                      <span class="drow__subject">{item.subject}</span>
-                      <span class="drow__tail">
-                        {#if item.dueLabel}<span class="drow__due" class:drow__due--overdue={item.overdue}
-                            >{t(`desk.due_${item.dueLabel}`, locale)}</span
-                          >{:else if item.surfacesDay}<span class="drow__surfaces"
-                            >{t('desk.surfaces', locale, { day: dayMonth(item.surfacesDay) })}</span
-                          >{/if}
-                        {#if contextPath(item)}<span class="drow__ctx">{contextPath(item)}</span>{/if}
-                        <button
-                          type="button"
-                          class="drow__remove"
-                          aria-label={t('desk.remove_aria', locale, { subject: item.subject })}
-                          onclick={() => item.taskId && $removeTask.mutate(item.taskId)}>×</button
-                        >
-                      </span>
-                    </div>
-                  {:else}
-                    <div class="drow" class:drow--overdue={item.overdue} class:drow--proposal={item.isProposal}>
-                      <span class="drow__lead">
-                        {#if item.concern === 'agenda'}{item.allDay
-                            ? t('desk.all_day', locale)
-                            : item.atISO
-                              ? fmtTime(item.atISO)
-                              : '—'}{:else}{t(`desk.verb_${item.verbKey}`, locale)}{/if}
-                      </span>
-                      {#if personHref(item.personSlug)}
-                        <a class="drow__subject" href={personHref(item.personSlug)}>{item.subject}</a>
-                      {:else if item.href}
-                        <a class="drow__subject" href={item.href}>{item.subject}</a>
-                      {:else}
-                        <span class="drow__subject">{item.subject}</span>
-                      {/if}
-                      <span class="drow__tail">
-                        {#if item.amount != null}<span class="drow__amount">{money(item.amount, item.currency)}</span>{/if}
-                        {#if contextPath(item)}<span class="drow__ctx">{contextPath(item)}</span>{/if}
-                      </span>
-                    </div>
+            {#if bucket.anchor}
+              {@const rsHref = roadsheetHref(bucket.anchor)}
+              <div class="anchor" style={`--c: ${accentVar(bucket.anchor.accentSlug)}`}>
+                <div class="anchor__eye">
+                  {t('desk.anchor_show_today', locale, { project: bucket.anchor.projectName })}{#if bucket.anchor.runDays}{runDaysText(bucket.anchor.runDays)}{/if}
+                </div>
+                <div class="anchor__venue">
+                  {bucket.anchor.venue}{bucket.anchor.city ? ` · ${bucket.anchor.city}` : ''}
+                </div>
+                <div class="anchor__foot">
+                  <div class="anchor__slots">
+                    {#if bucket.anchor.loadInAt}<span
+                        ><span class="anchor__k">{t('desk.anchor_loadin', locale)}</span> {fmtTime(bucket.anchor.loadInAt)}</span
+                      >{/if}
+                    {#if bucket.anchor.soundcheckAt}<span
+                        ><span class="anchor__k">{t('desk.anchor_soundcheck', locale)}</span>
+                        {fmtTime(bucket.anchor.soundcheckAt)}</span
+                      >{/if}
+                    {#if bucket.anchor.startAt}<span
+                        ><span class="anchor__k">{t('desk.anchor_show', locale)}</span> {fmtTime(bucket.anchor.startAt)}</span
+                      >{/if}
+                    {#if bucket.anchor.loadOutAt}<span
+                        ><span class="anchor__k">{t('desk.anchor_loadout', locale)}</span> {fmtTime(bucket.anchor.loadOutAt)}</span
+                      >{/if}
+                    {#if bucket.anchor.wrapAt}<span
+                        ><span class="anchor__k">{t('desk.anchor_wrap', locale)}</span> {fmtTime(bucket.anchor.wrapAt)}</span
+                      >{/if}
+                  </div>
+                  {#if rsHref}
+                    <a class="anchor__rs" href={rsHref}>{t('desk.roadsheet', locale)} ↗</a>
                   {/if}
-                {/each}
+                </div>
               </div>
-            </div>
-          {/each}
-        </section>
+            {/if}
+
+            {#each bucket.runs as run (run.concern + run.items[0].id)}
+              <div class="run run--{run.concern}">
+                {#if runHref(run)}
+                  <a class="run__label" href={runHref(run)}>{concernLabel(run.concern)}</a>
+                {:else}
+                  <span class="run__label">{concernLabel(run.concern)}</span>
+                {/if}
+                <div class="run__rows">
+                  {#each run.items as item (item.id)}
+                    {#if isGhost(item)}
+                      <div class="ghost">
+                        <div class="ghost__head">
+                          <span class="ghost__badge">{t('desk.proposed', locale)}</span>
+                          <span class="ghost__subject">{item.subject}</span>
+                        </div>
+                        {#if item.reason}<p class="ghost__reason">{item.reason}</p>{/if}
+                        <div class="ghost__actions">
+                          <button type="button" class="ghost__add" onclick={() => item.taskId && acceptProposal(item.taskId)}
+                            >{t('desk.proposal_add', locale)}</button
+                          >
+                          <button
+                            type="button"
+                            class="ghost__dismiss"
+                            onclick={() => item.taskId && $toggleTask.mutate({ id: item.taskId, status: 'done' })}
+                            >{t('desk.proposal_dismiss', locale)}</button
+                          >
+                        </div>
+                      </div>
+                    {:else if item.concern === 'task'}
+                      <div class="drow drow--task" class:drow--overdue={item.overdue}>
+                        <input
+                          type="checkbox"
+                          class="drow__check"
+                          aria-label={item.subject}
+                          checked={item.taskDone}
+                          onchange={(e) =>
+                            item.taskId && $toggleTask.mutate({ id: item.taskId, status: (e.currentTarget as HTMLInputElement).checked ? 'done' : 'open' })}
+                        />
+                        <span class="drow__subject">{item.subject}</span>
+                        <span class="drow__tail">
+                          {#if item.dueLabel}<span class="drow__due" class:drow__due--overdue={item.overdue}
+                              >{t(`desk.due_${item.dueLabel}`, locale)}</span
+                            >{:else if item.surfacesDay}<span class="drow__surfaces"
+                              >{t('desk.surfaces', locale, { day: dayMonth(item.surfacesDay) })}</span
+                            >{/if}
+                          {#if contextPath(item)}<span class="drow__ctx">{contextPath(item)}</span>{/if}
+                          <button
+                            type="button"
+                            class="drow__remove"
+                            aria-label={t('desk.remove_aria', locale, { subject: item.subject })}
+                            onclick={() => item.taskId && $removeTask.mutate(item.taskId)}>×</button
+                          >
+                        </span>
+                      </div>
+                    {:else}
+                      <div class="drow" class:drow--overdue={item.overdue} class:drow--proposal={item.isProposal}>
+                        <span class="drow__lead">
+                          {#if item.concern === 'agenda'}{item.allDay
+                              ? t('desk.all_day', locale)
+                              : item.atISO
+                                ? fmtTime(item.atISO)
+                                : '—'}{:else}{t(`desk.verb_${item.verbKey}`, locale)}{/if}
+                        </span>
+                        {#if personHref(item.personSlug)}
+                          <a class="drow__subject" href={personHref(item.personSlug)}>{item.subject}</a>
+                        {:else if item.href}
+                          <a class="drow__subject" href={item.href}
+                            >{item.subject}{#if item.runDays}<span class="drow__run">{runDaysText(item.runDays)}</span>{/if}</a
+                          >
+                        {:else}
+                          <span class="drow__subject">{item.subject}</span>
+                        {/if}
+                        <span class="drow__tail">
+                          {#if item.amount != null}<span class="drow__amount">{money(item.amount, item.currency)}</span>{/if}
+                          {#if contextPath(item)}<span class="drow__ctx">{contextPath(item)}</span>{/if}
+                        </span>
+                      </div>
+                    {/if}
+                  {/each}
+                </div>
+              </div>
+            {/each}
+          </section>
+        {/if}
       {/each}
 
       {#if calm.on && calmFolded}
@@ -717,6 +739,21 @@
     a.drow__subject:hover {
       text-decoration: underline;
       text-underline-offset: 3px;
+    }
+    /* A run's span reads as part of its name, one voice quieter. */
+    .drow__run {
+      color: var(--text-muted);
+    }
+
+    /* ── Later: the stretch past this week, folded into one line that opens
+       the Agenda. Drawn as a bucket head, so it aligns with the days above. */
+    .later {
+      color: inherit;
+      text-decoration: none;
+    }
+    .later:hover .bucket__date,
+    .later:hover .bucket__count {
+      color: var(--text-muted);
     }
     .drow__tail {
       display: inline-flex;
