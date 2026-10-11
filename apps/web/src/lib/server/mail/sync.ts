@@ -28,6 +28,8 @@ import { matchMessage, type MailAdapter } from './provider';
 
 /** Tope de correos que se bajan por buzón y pasada (CPU del Worker). */
 export const MAX_MESSAGES_PER_PASS = 100;
+/** Tope de ids que se listan por pasada (listar es barato: 100 por llamada). */
+export const MAX_IDS_PER_PASS = 1000;
 /** Solape con la pasada anterior: el reloj y la indexación de Gmail no son exactos. */
 const OVERLAP_MS = 60 * 60 * 1000;
 
@@ -114,12 +116,12 @@ export async function syncAccount(deps: SyncDeps, account: MailAccountRow): Prom
 
     if (contacts.size === 0) return finish({ status: 'active', cursor, complete: true, error: null });
 
-    const found = await adapter.search(access, [...contacts], Math.floor(fromMs / 1000), max);
+    const found = await adapter.search(access, [...contacts], Math.floor(fromMs / 1000), MAX_IDS_PER_PASS);
     const known = new Set(await db.knownMessages(account.id, found.ids));
+    const pending = found.ids.filter((id) => !known.has(id));
     const counts = { ...base };
 
-    for (const id of found.ids) {
-      if (known.has(id)) continue;
+    for (const id of pending.slice(0, max)) {
       const msg = await adapter.fetchMessage(access, id);
       counts.fetched++;
       const match = matchMessage(msg, account.address, contacts);
@@ -139,7 +141,7 @@ export async function syncAccount(deps: SyncDeps, account: MailAccountRow): Prom
       });
     }
 
-    return finish({ status: 'active', cursor, complete: !found.truncated, error: null }, counts);
+    return finish({ status: 'active', cursor, complete: !found.truncated && pending.length <= max, error: null }, counts);
   } catch (err) {
     if (err instanceof ProviderAuthError) {
       return finish({ status: 'revoked', cursor: null, complete: false, error: 'access_revoked' });
