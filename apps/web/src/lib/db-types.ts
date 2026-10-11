@@ -706,6 +706,7 @@ export type Database = {
           line_id: string | null
           next_action_at: string | null
           next_action_note: string | null
+          organization_id: string | null
           person_id: string
           previous_slugs: string[]
           private_to: string | null
@@ -727,6 +728,7 @@ export type Database = {
           line_id?: string | null
           next_action_at?: string | null
           next_action_note?: string | null
+          organization_id?: string | null
           person_id: string
           previous_slugs?: string[]
           private_to?: string | null
@@ -748,6 +750,7 @@ export type Database = {
           line_id?: string | null
           next_action_at?: string | null
           next_action_note?: string | null
+          organization_id?: string | null
           person_id?: string
           previous_slugs?: string[]
           private_to?: string | null
@@ -788,7 +791,78 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "conversation_workspace_organization_fkey"
+            columns: ["workspace_id", "organization_id"]
+            isOneToOne: false
+            referencedRelation: "workspace_organization"
+            referencedColumns: ["workspace_id", "id"]
+          },
+          {
             foreignKeyName: "conversation_workspace_person_fkey"
+            columns: ["workspace_id", "person_id"]
+            isOneToOne: false
+            referencedRelation: "workspace_person"
+            referencedColumns: ["workspace_id", "person_id"]
+          },
+        ]
+      }
+      conversation_contact: {
+        Row: {
+          conversation_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          is_primary: boolean
+          person_id: string
+          role: string | null
+          since: string | null
+          until: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          conversation_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_primary?: boolean
+          person_id: string
+          role?: string | null
+          since?: string | null
+          until?: string | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          conversation_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_primary?: boolean
+          person_id?: string
+          role?: string | null
+          since?: string | null
+          until?: string | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_contact_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversation"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_contact_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspace"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_contact_workspace_person_fkey"
             columns: ["workspace_id", "person_id"]
             isOneToOne: false
             referencedRelation: "workspace_person"
@@ -3745,6 +3819,37 @@ export type Database = {
         }
         Returns: string
       }
+      conversation_for_contact_write: {
+        Args: { p_conversation_id: string }
+        Returns: {
+          created_at: string
+          created_by: string | null
+          custom_fields: Json
+          deleted_at: string | null
+          first_contacted_at: string | null
+          id: string
+          last_contacted_at: string | null
+          line_id: string | null
+          next_action_at: string | null
+          next_action_note: string | null
+          organization_id: string | null
+          person_id: string
+          previous_slugs: string[]
+          private_to: string | null
+          project_id: string
+          role: string | null
+          slug: string
+          status: Database["public"]["Enums"]["conversation_status"]
+          updated_at: string
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "conversation"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       create_asset_version: {
         Args: {
           p_direction?: Database["public"]["Enums"]["asset_direction"]
@@ -3887,6 +3992,7 @@ export type Database = {
           line_id: string | null
           next_action_at: string | null
           next_action_note: string | null
+          organization_id: string | null
           person_id: string
           previous_slugs: string[]
           private_to: string | null
@@ -4621,6 +4727,32 @@ export type Database = {
         Args: { p_account_id: string }
         Returns: undefined
       }
+      end_conversation_contact: {
+        Args: {
+          p_conversation_id: string
+          p_person_id: string
+          p_until?: string
+        }
+        Returns: {
+          conversation_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          is_primary: boolean
+          person_id: string
+          role: string | null
+          since: string | null
+          until: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "conversation_contact"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       fiscal_identity_snapshot: { Args: { p_id: string }; Returns: Json }
       generate_workspace_sid: { Args: never; Returns: string }
       get_public_calendar: { Args: { p_token: string }; Returns: Json }
@@ -5210,6 +5342,34 @@ export type Database = {
       revoke_workspace_member: {
         Args: { p_membership_id: string }
         Returns: undefined
+      }
+      set_conversation_contact: {
+        Args: {
+          p_conversation_id: string
+          p_is_primary?: boolean
+          p_person_id: string
+          p_role?: string
+          p_since?: string
+        }
+        Returns: {
+          conversation_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          is_primary: boolean
+          person_id: string
+          role: string | null
+          since: string | null
+          until: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "conversation_contact"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       set_mail_signature: {
         Args: { p_account_id: string; p_signature: string }

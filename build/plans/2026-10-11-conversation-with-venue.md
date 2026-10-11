@@ -208,35 +208,44 @@ El pagador es la organización (decisión 5). Hoy la factura lleva dos punteros:
 
 ## 4. Fases (expand/contract), cada una desplegable
 
-### Fase 1 · Expand: columna, tabla y relleno (aditiva)
+### Fase 1 · Expand: columna, tabla y relleno (aditiva) · construida
 
-Migración `2026xxxx_conversation_with_organization_expand.sql`:
-1. `conversation.organization_id` nullable con la FK compuesta y su índice.
+Migración `20261011600000_conversation_organization_expand.sql` (rama `claude/conversation-venue-plan`, sin aplicar en
+ninguna base alojada):
+1. `conversation.organization_id` nullable con la FK compuesta `conversation_workspace_organization_fkey` (sin
+   `ON DELETE`: la organización se borra en blando) y su índice parcial.
 2. `conversation_contact` con RLS forzada, policy de lectura heredada, `write_audit`, `set_updated_at`,
-   `guard_immutable_workspace_id`.
-3. Backfill en la misma transacción:
-   `organization_id = wp.organization_id` (154 + 3 filas); una fila de contacto por conversación con
-   `person_id`, `role = conversation.role`, `since = first_contacted_at::date`, `is_primary = true`.
-   Las borradas también (2), para que revivir no pierda el contacto.
-4. Trigger de doble escritura `conversation_sync_primary_contact`: en INSERT o UPDATE de `person_id` en `conversation`,
-   asegura la fila de contacto principal y, si la conversación no tiene organización y el dossier sí, la copia. Sostiene
-   la coherencia mientras el código viejo sigue escribiendo `person_id`.
-5. RPCs nuevas, aún sin uso en la UI: `set_conversation_contact(conversation_id, person_id, role, since, is_primary)`,
-   `end_conversation_contact(conversation_id, person_id, until)`.
+   `guard_immutable_workspace_id`. FK compuesta al dossier (`ON DELETE CASCADE`), `UNIQUE (conversation_id, person_id)`,
+   `until >= since`, y dos reglas para el principal: uno como mucho (índice único parcial) y siempre vigente
+   (`CHECK (NOT is_primary OR until IS NULL)`). Solo SELECT para `authenticated`.
+3. Relleno en la misma transacción: `organization_id` desde el dossier (solo si la organización está viva), sin tocar
+   `updated_at` (se desactiva su trigger durante el UPDATE; la auditoría sí lo apunta); un contacto principal por
+   conversación, también las borradas. Comprobaciones que abortan si algo no cuadra.
+   **Desviación:** `since` queda NULL, no `first_contacted_at::date`. Las 154 de `muk-cia` se dieron de alta en
+   octubre y ese sello es la fecha del alta: con él, el emparejado por fechas dejaría fuera todo el correo anterior.
+4. Doble escritura: `conversation_fill_organization` (BEFORE INSERT o cambio de `person_id`: organización del dossier
+   si falta) y `conversation_sync_primary_contact` (AFTER INSERT o cambio de `person_id`/`role`: el principal es
+   `(person_id, role)`; si cambia la persona, el anterior sigue de contacto sin la marca).
+5. RPC, sin uso en la UI: `set_conversation_contact(conversation_id, person_id, role, since, is_primary)` (añade o
+   rehace, y deja vigente) y `end_conversation_contact(conversation_id, person_id, until)` (hoy por defecto).
+   Regla de convivencia hasta la fase 4: el principal es `conversation.person_id`, así que no se puede cerrar ni
+   degradar sin nombrar antes a otro (22023), y nombrar principal a otra persona cambia `person_id` y `role` (23505 si
+   esa persona ya tiene otra conversación compartida en el proyecto).
 6. No se crea todavía la unicidad por organización (el alta vieja la rompería con un 23505 sin salida en la UI).
 
 Gate (§ 34, aditiva): reconstrucción local desde cero con la migración, tipos regenerados, RLS completa. Producción por
 `production-migrate.yml` (`backup`, `plan`, `apply`). Recomiendo además `inspect` antes: el backfill escribe en las 154
 reales aunque no reescriba nada existente.
 
-Tests RLS nuevos (`tests/rls/conversation-contact.test.ts`): lectura heredada (sin `read:conversation` no se ve; privada
-ajena no se ve; otro espacio no se ve); escritura solo por RPC y con `edit:conversation`; 42501 uniforme; persona de
-otro espacio rechazada por la FK compuesta; un solo principal vigente; `until >= since`; el backfill deja exactamente un
-principal por conversación con persona; el trigger de doble escritura crea el contacto al crear por `create_conversation`.
+Tests RLS (`tests/rls/conversation-contact.test.ts`, 9): el alta por `create_conversation` deja organización y un
+principal con su papel; toda conversación visible tiene un principal y es su `person_id`; anon no lee ni escribe; sin
+INSERT, UPDATE ni DELETE directos; añadir, cerrar (`until < since` da 400) y volver; el principal no se cierra ni se
+degrada; nombrar otro principal mueve `person_id`, deja uno solo y el anterior sigue vigente; dossier o conversación
+inexistentes dan el mismo 403; sin `read:conversation` no se ve ni se escribe, y una privada ajena es «no existe».
 
-API y UI: nada cambia. Rollback: `rollback-YYYYMMDD-conversation-organization-expand.sql` (drop trigger, RPCs, tabla y
-columna), probado en local bajada y subida. Lo que no deshace: contactos añadidos a mano entre medias (no hay UI, así que
-ninguno).
+API y UI: nada cambia (la columna nueva sale en los `select=*`, y ningún normalizador la mira). Rollback:
+`build/runbooks/rollback-20261011-conversation-organization-expand.sql`, probado en local bajada y subida con datos. Lo
+que no deshace: contactos añadidos por RPC entre medias (no hay UI, así que ninguno salvo a mano).
 
 ### Fase 2 · Lecturas y alta por organización
 
