@@ -3366,3 +3366,12 @@ ADR-085 empieza con Anouk.
 **Pendiente.** Si enviar desde el buzón conectado es comunicación comercial y qué exige la LSSI (consulta legal de
 Marco, `research/product/22-venue-directory-personal-data-legal.md`). Registrar las apps OAuth en Google y Microsoft
 (cuentas de Marco).
+
+**Añadido el 2026-10-11, tras ver la maqueta (`claude/comms-mock`):**
+- **Punto 5, cerrado: los dos.** El dato es el registro (`conversation_event`, ADR-098); la conversación ofrece dos vistas
+  conmutables sobre lo mismo: registro con el hilo del equipo al lado, o todo junto en un hilo. Es presentación, no dos
+  modelos.
+- **Punto 6, cerrado: el tablón del día cuelga del bolo.**
+- **Facetas configurables.** «Comidas» existe como faceta estándar. Hour siembra un juego de facetas estándar y cada
+  espacio puede renombrarlas, desactivarlas y crear las suyas. Multilingüe: las estándar se traducen por clave en los
+  cuatro idiomas de la app; las propias llevan el nombre que les dé el espacio, con traducciones opcionales por idioma.
