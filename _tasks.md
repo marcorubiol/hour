@@ -377,6 +377,7 @@
 ## AHORA — preparar el Planner v3 (revisión de viabilidad, 2026-07-30)
 
 - [ ] **Desk: la etiqueta «Agenda» de una entrada lleva a la vista Agenda del Planner en ese día, no al mes** (drop 11-10). En arreglo en `claude/desk-agenda-link`.
+- [ ] **Desk: los días salen abiertos siempre y se quita la opción de plegarlos; un día con mucho se lee con scroll, no escondido** (drop 11-10). En `claude/desk-agenda-link`, que toca el mismo fichero.
 
 > Del contraste entre `Hour Views - Scope v3 - Agenda.html` (proyecto
 > claude.ai/design `f1741f1f`, leído con `DesignSync`) y el modelo real.
