@@ -33,17 +33,19 @@ de Phase 0.9 en `_tasks.md`. Pricing orientativo, no decidido.
 
 ## Producción (verificado 2026-10-11)
 
-- Web `https://hour.zerosense.studio`, Worker `hour-web`. `/health/live`: SHA **`9f867e4`**, `dirty:false`, builtAt
-  2026-10-11T15:41Z (el ámbito en Conversations). `main` == prod.
+- Web `https://hour.zerosense.studio`, Worker `hour-web`. `/health/live`: SHA **`be17af8`**, `dirty:false`, builtAt
+  2026-10-11T19:23Z (la conversación con la organización, fase 2). `main` lleva encima la migración de slugs, ya
+  aplicada, y documentos.
 - Despliegue: `pnpm --filter web run deploy` (no `pnpm deploy` desde la raíz). Exige árbol limpio.
 - Supabase `hour-phase0` · ref `lqlyorlccnniybezugme` · `eu-central-1`. Plan Free, con keepalive diario
   (`.github/workflows/keepalive.yml`) contra la pausa por inactividad. Pasar a Pro antes de la beta, aún no
   (`_tasks.md § 9`). Si algo de Supabase falla tras días sin uso, lo primero es `dig <ref>.supabase.co`.
-- **Última migración aplicada: `20261011700000_money_payers_private`** (2026-10-11, apply run 38159654243; antes
-  `20261011600000_conversation_organization_expand`, run 38158709680, fase 1 de ADR-102). El directorio tiene 6.802
-  salas. Las migraciones van por `production-migrate.yml`: backup, plan, apply (`_tasks.md § 34`).
+- **Última migración aplicada: `20261011810000_conversation_slug_organization`** (2026-10-11, run 38168021396),
+  tras `20261011800000` y `20261011820000` (run 38167738361): fase 2 de ADR-102. El directorio tiene 6.802 salas. Las
+  migraciones van por `production-migrate.yml`: backup, plan, apply (`_tasks.md § 34`).
 - `hour-staging` (ref `slccyknqpgmzhyiyclsq`, `eu-west-1`): pausado.
-- Últimas suites (2026-10-11, tras las dos migraciones): RLS 280/281 (1 saltado) y E2E 65/65.
+- Últimas suites contra `be17af8` (2026-10-11): RLS 289/298 (8 saltados, 1 rojo: revivir una conversación de una
+  persona con otra organización da 409) y E2E 64/65 (rojo en `conversation-write.spec.ts:303`). Arreglo en curso.
 
 ## Cómo se corren las suites
 

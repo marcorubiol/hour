@@ -6,6 +6,8 @@ hasta entonces, sacado de esos documentos; lo anterior a julio de 2026 está sol
 
 ## Octubre 2026 (en curso)
 
+- Las conversaciones de difusión son con la sala (la organización que programa), con sus contactos: la tabla de Conversations empieza por la organización, el alta pide primero la organización y la autocompleta, y si alguien de una sala que ya tiene conversación entra, se añade como contacto en vez de abrir otra. Los correos del Gmail entran en la conversación de la sala, también la respuesta de alguien que ya no está. (2026-10-11, `be17af8`)
+- En el rail, cuando el próximo compromiso es deducido (nadie te ha puesto en él), solo su nombre va en cursiva. (2026-10-11, `be17af8`)
 - En Cuentas, la lista de pagadores y las facturas creadas desde un bolo ya no muestran a la persona de una conversación privada de otra persona del equipo. (2026-10-11, `6cf690c`)
 - Por dentro, cada conversación de difusión queda ligada a su organización y a sus contactos, el primer paso para que la conversación sea con la sala y no con una persona (ADR-102). Nada cambia todavía en pantalla. (2026-10-11, `f036b19`)
 - En Conversations, cambiar de ámbito desde la ficha de una persona o de una conversación te devuelve a Conversations ya filtrado, en vez de mandarte a Desk; y «Add to project» solo ofrece los proyectos de ese ámbito. (2026-10-11, `9f867e4`)
