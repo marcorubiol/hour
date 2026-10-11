@@ -34,6 +34,21 @@ export type Database = {
   }
   public: {
     Tables: {
+      access_preset: {
+        Row: {
+          key: string
+          sort: number
+        }
+        Insert: {
+          key: string
+          sort?: number
+        }
+        Update: {
+          key?: string
+          sort?: number
+        }
+        Relationships: []
+      }
       account: {
         Row: {
           billing_email: string | null
@@ -1106,6 +1121,47 @@ export type Database = {
           },
         ]
       }
+      facet: {
+        Row: {
+          created_at: string
+          key: string
+          sort: number
+        }
+        Insert: {
+          created_at?: string
+          key: string
+          sort?: number
+        }
+        Update: {
+          created_at?: string
+          key?: string
+          sort?: number
+        }
+        Relationships: []
+      }
+      facet_level: {
+        Row: {
+          facet_key: string
+          level: Database["public"]["Enums"]["container_level"]
+        }
+        Insert: {
+          facet_key: string
+          level: Database["public"]["Enums"]["container_level"]
+        }
+        Update: {
+          facet_key?: string
+          level?: Database["public"]["Enums"]["container_level"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "facet_level_facet_key_fkey"
+            columns: ["facet_key"]
+            isOneToOne: false
+            referencedRelation: "facet"
+            referencedColumns: ["key"]
+          },
+        ]
+      }
       fiscal_identity: {
         Row: {
           account_id: string | null
@@ -1581,6 +1637,144 @@ export type Database = {
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspace"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      membership: {
+        Row: {
+          accepted_at: string | null
+          bolo_id: string | null
+          can_edit_meta: boolean
+          can_manage_members: boolean
+          container_verb: Database["public"]["Enums"]["access_verb"] | null
+          created_at: string
+          id: string
+          invited_by: string | null
+          level: Database["public"]["Enums"]["container_level"]
+          line_id: string | null
+          preset: string | null
+          project_id: string | null
+          roles: string[]
+          updated_at: string
+          user_id: string
+          workspace_id: string
+          workspace_role: Database["public"]["Enums"]["membership_role"] | null
+        }
+        Insert: {
+          accepted_at?: string | null
+          bolo_id?: string | null
+          can_edit_meta?: boolean
+          can_manage_members?: boolean
+          container_verb?: Database["public"]["Enums"]["access_verb"] | null
+          created_at?: string
+          id?: string
+          invited_by?: string | null
+          level: Database["public"]["Enums"]["container_level"]
+          line_id?: string | null
+          preset?: string | null
+          project_id?: string | null
+          roles?: string[]
+          updated_at?: string
+          user_id: string
+          workspace_id: string
+          workspace_role?: Database["public"]["Enums"]["membership_role"] | null
+        }
+        Update: {
+          accepted_at?: string | null
+          bolo_id?: string | null
+          can_edit_meta?: boolean
+          can_manage_members?: boolean
+          container_verb?: Database["public"]["Enums"]["access_verb"] | null
+          created_at?: string
+          id?: string
+          invited_by?: string | null
+          level?: Database["public"]["Enums"]["container_level"]
+          line_id?: string | null
+          preset?: string | null
+          project_id?: string | null
+          roles?: string[]
+          updated_at?: string
+          user_id?: string
+          workspace_id?: string
+          workspace_role?: Database["public"]["Enums"]["membership_role"] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "membership_bolo_id_fkey"
+            columns: ["bolo_id"]
+            isOneToOne: false
+            referencedRelation: "bolo"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "membership_line_id_fkey"
+            columns: ["line_id"]
+            isOneToOne: false
+            referencedRelation: "line"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "membership_preset_fkey"
+            columns: ["preset"]
+            isOneToOne: false
+            referencedRelation: "access_preset"
+            referencedColumns: ["key"]
+          },
+          {
+            foreignKeyName: "membership_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "project"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "membership_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspace"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      membership_facet: {
+        Row: {
+          created_at: string
+          facet_key: string
+          granted_by: string | null
+          membership_id: string
+          source: string
+          verb: Database["public"]["Enums"]["access_verb"]
+        }
+        Insert: {
+          created_at?: string
+          facet_key: string
+          granted_by?: string | null
+          membership_id: string
+          source: string
+          verb: Database["public"]["Enums"]["access_verb"]
+        }
+        Update: {
+          created_at?: string
+          facet_key?: string
+          granted_by?: string | null
+          membership_id?: string
+          source?: string
+          verb?: Database["public"]["Enums"]["access_verb"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "membership_facet_facet_key_fkey"
+            columns: ["facet_key"]
+            isOneToOne: false
+            referencedRelation: "facet"
+            referencedColumns: ["key"]
+          },
+          {
+            foreignKeyName: "membership_facet_membership_id_fkey"
+            columns: ["membership_id"]
+            isOneToOne: false
+            referencedRelation: "membership"
             referencedColumns: ["id"]
           },
         ]
@@ -3184,6 +3378,17 @@ export type Database = {
           workspace_slug: string
         }[]
       }
+      access_parity_report: {
+        Args: never
+        Returns: {
+          legacy: boolean
+          model: boolean
+          probe: string
+          project_id: string
+          user_id: string
+          workspace_id: string
+        }[]
+      }
       accessible_project_ids: { Args: { p_perm: string }; Returns: string[] }
       add_cast_member: {
         Args: { p_person_id: string; p_project_id: string; p_role: string }
@@ -4131,6 +4336,10 @@ export type Database = {
         Args: { p_perm: string; p_project_id: string }
         Returns: boolean
       }
+      has_permission_by_facets: {
+        Args: { p_perm: string; p_project_id: string }
+        Returns: boolean
+      }
       has_permission_for_user: {
         Args: { p_perm: string; p_project_id: string; p_user_id: string }
         Returns: boolean
@@ -4837,6 +5046,7 @@ export type Database = {
       uuid_generate_v7: { Args: never; Returns: string }
     }
     Enums: {
+      access_verb: "view" | "edit"
       account_kind: "personal" | "team"
       account_role: "owner" | "admin"
       asset_direction: "outbound" | "inbound" | "adapted"
@@ -4850,6 +5060,7 @@ export type Database = {
         | "photo"
         | "video"
         | "other"
+      container_level: "workspace" | "project" | "line" | "bolo"
       conversation_event_direction: "inbound" | "outbound"
       conversation_event_kind: "note" | "call" | "email" | "meeting" | "message"
       conversation_event_source:
@@ -5066,6 +5277,7 @@ export const Constants = {
   },
   public: {
     Enums: {
+      access_verb: ["view", "edit"],
       account_kind: ["personal", "team"],
       account_role: ["owner", "admin"],
       asset_direction: ["outbound", "inbound", "adapted"],
@@ -5080,6 +5292,7 @@ export const Constants = {
         "video",
         "other",
       ],
+      container_level: ["workspace", "project", "line", "bolo"],
       conversation_event_direction: ["inbound", "outbound"],
       conversation_event_kind: ["note", "call", "email", "meeting", "message"],
       conversation_event_source: [
@@ -5178,3 +5391,4 @@ export const Constants = {
     },
   },
 } as const
+
