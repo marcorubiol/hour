@@ -26,6 +26,7 @@ import { localDayISO } from './datetime';
 import { taskSurfaceState, taskContextLabel, taskProjectId, type TaskItem } from './task';
 import { LOCALE_TAG, t, type Locale } from './i18n';
 import { plannerDayHref } from './planner';
+import { isMultiDayRun, seriesDayMap } from './month-events';
 
 export type DeskConcern = 'task' | 'agenda' | 'conversation' | 'money';
 
@@ -59,6 +60,8 @@ export interface DeskPerfInput {
   start_at: string | null;
   loadout_at: string | null;
   wrap_at: string | null;
+  /** ADR-084 §1 — rows sharing it are one multi-day run (see `seriesDayMap`). */
+  series_id?: string | null;
   venue: { name: string | null } | null;
   project: { id: string; slug: string | null; name: string; workspace_id: string } | null;
 }
@@ -75,6 +78,7 @@ export interface DeskDateInput {
   all_day: boolean;
   city: string | null;
   performance_id: string | null;
+  series_id?: string | null;
   project: { id: string; slug: string | null; name: string } | null;
 }
 
@@ -120,6 +124,10 @@ export interface DeskItem {
   /** Money amount (remind / confirm rows only). */
   amount: number | null;
   currency: string | null;
+  /** The calendar day it sits on (YYYY-MM-DD), null for the anytime tail. */
+  day: string | null;
+  /** Agenda rows that head a multi-day run: how many days it spans. */
+  runDays: number | null;
 }
 
 export interface ShowAnchor {
@@ -135,6 +143,8 @@ export interface ShowAnchor {
   /** Performance slug + its workspace id → the road-sheet link. */
   performanceSlug: string | null;
   workspaceId: string;
+  /** The gig opens a multi-day run: how many days it spans. */
+  runDays: number | null;
 }
 
 export interface DeskRun {
@@ -216,6 +226,48 @@ export function dayBucket(
   return { sortKey: 98, labelKey: 'later', weekday: '', dateLabel };
 }
 
+/**
+ * The Desk's horizon: detail stays near (today, tomorrow, the rest of the
+ * week, a block per day); everything past it folds into ONE `later` bucket
+ * the page draws as a single line (`laterSummary`) that opens the Agenda.
+ * `dayBucket` itself keeps «next week» for the hall rail.
+ */
+function horizonBucket(b: ReturnType<typeof dayBucket>): ReturnType<typeof dayBucket> {
+  return b.sortKey >= 7 && b.sortKey < 99 ? { ...b, sortKey: 98, labelKey: 'later', weekday: '' } : b;
+}
+
+/** The later bucket as one line: how many things, from which day to which. */
+export function laterSummary(feed: DeskBucket[]): { count: number; from: string; until: string } | null {
+  const later = feed.find((b) => b.labelKey === 'later');
+  const days = (later?.runs ?? [])
+    .flatMap((r) => r.items.map((i) => i.day))
+    .filter((d): d is string => !!d)
+    .sort();
+  if (!later || !days.length) return null;
+  return { count: later.runs.reduce((n, r) => n + r.items.length, 0), from: days[0], until: days[days.length - 1] };
+}
+
+/**
+ * Of each multi-day run, only the first row (by `order`) is drawn: it maps to
+ * the run's day count, the run's other rows to 0 (skip). Rows outside a run
+ * are absent from the map.
+ */
+function runHeads<R extends { series_id?: string | null }>(
+  rows: R[],
+  order: (r: R) => string,
+  days: Map<string, Set<string>>,
+): Map<R, number> {
+  const out = new Map<R, number>();
+  const seen = new Set<string>();
+  for (const r of [...rows].sort((a, b) => (order(a) < order(b) ? -1 : order(a) > order(b) ? 1 : 0))) {
+    const sid = r.series_id;
+    if (!sid || !isMultiDayRun(days, sid)) continue;
+    out.set(r, seen.has(sid) ? 0 : days.get(sid)!.size);
+    seen.add(sid);
+  }
+  return out;
+}
+
 function convSubject(e: DeskConvInput, locale: Locale): string {
   return (
     e.person?.full_name || e.person?.organization_name || e.next_action_note || t('desk.untitled', locale)
@@ -260,6 +312,8 @@ function blankItem(over: Partial<DeskItem> & Pick<DeskItem, 'id' | 'concern' | '
     reason: null,
     amount: null,
     currency: null,
+    day: null,
+    runDays: null,
     ...over,
   };
 }
@@ -271,7 +325,8 @@ export function buildDeskFeed(input: DeskFeedInput, now: Date, locale: Locale = 
   const anchors = new Map<number, ShowAnchor>();
 
   const push = (dayISO: string | null, concern: DeskConcern, sub: number, item: DeskItem) => {
-    const b = dayBucket(dayISO, now, locale);
+    const b = horizonBucket(dayBucket(dayISO, now, locale));
+    item.day = dayISO ? dayISO.slice(0, 10) : null;
     entries.push({
       sortKey: b.sortKey,
       labelKey: b.labelKey,
@@ -313,8 +368,20 @@ export function buildDeskFeed(input: DeskFeedInput, now: Date, locale: Locale = 
 
   // ── Agenda: performances + pure date events, leading with their hour.
   //    Today's / tomorrow's gig is the bucket BANNER (anchor), not a row.
-  for (const p of input.performances) {
-    if (p.status === 'cancelled' || p.performed_at.slice(0, 10) < todayISO) continue;
+  //    A multi-day run (ADR-084 §1) is ONE row on the day it starts, with its
+  //    span; its other days are not repeated (`runHeads`).
+  const livePerfs = input.performances.filter(
+    (p) => p.status !== 'cancelled' && p.performed_at.slice(0, 10) >= todayISO,
+  );
+  const liveDates = input.dates.filter(
+    (d) => d.status !== 'cancelled' && !d.performance_id && d.starts_at.slice(0, 10) >= todayISO,
+  );
+  const runDays = seriesDayMap(liveDates, (d) => d.starts_at.slice(0, 10), livePerfs);
+  const perfRuns = runHeads(livePerfs, (p) => p.performed_at.slice(0, 10) + (p.start_at ?? p.load_in_at ?? ''), runDays);
+  const dateRuns = runHeads(liveDates, (d) => d.starts_at, runDays);
+  for (const p of livePerfs) {
+    const span = perfRuns.get(p);
+    if (span === 0) continue;
     const day = p.performed_at.slice(0, 10);
     const b = dayBucket(day, now, locale);
     const place = p.venue?.name ?? p.venue_name ?? p.city ?? '—';
@@ -331,6 +398,7 @@ export function buildDeskFeed(input: DeskFeedInput, now: Date, locale: Locale = 
         accentSlug: p.project?.slug ?? '',
         performanceSlug: p.slug,
         workspaceId: p.project?.workspace_id ?? '',
+        runDays: span ?? null,
       });
       continue;
     }
@@ -347,13 +415,15 @@ export function buildDeskFeed(input: DeskFeedInput, now: Date, locale: Locale = 
         projectId: p.project?.id ?? null,
         atISO: at,
         href: plannerDayHref('agenda', day),
+        runDays: span ?? null,
       }),
     );
   }
-  for (const d of input.dates) {
-    if (d.status === 'cancelled' || d.performance_id) continue; // gig slots come from performances
+  for (const d of liveDates) {
+    // (gig slots — a date with a performance_id — come from performances)
+    const span = dateRuns.get(d);
+    if (span === 0) continue;
     const day = d.starts_at.slice(0, 10);
-    if (day < todayISO) continue;
     push(
       day,
       'agenda',
@@ -367,6 +437,7 @@ export function buildDeskFeed(input: DeskFeedInput, now: Date, locale: Locale = 
         atISO: d.all_day ? null : d.starts_at,
         allDay: d.all_day,
         href: plannerDayHref('agenda', day),
+        runDays: span ?? null,
       }),
     );
   }

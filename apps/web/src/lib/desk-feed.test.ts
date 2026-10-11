@@ -3,6 +3,7 @@ import {
   buildDeskFeed,
   dayBucket,
   deskSummary,
+  laterSummary,
   type DeskConcern,
   type DeskConvInput,
   type DeskDateInput,
@@ -303,5 +304,101 @@ describe('deskSummary', () => {
 
   it('pipeline is null when fees are not visible (no invoices passed)', () => {
     expect(deskSummary({ ...EMPTY, conversations: [conv('a', { next_action_at: actionAt(0) })] }, NOW).pipeline).toBeNull();
+  });
+});
+
+describe('buildDeskFeed — horizon', () => {
+  it('keeps a block per day up to the end of this week; everything past it is ONE later bucket', () => {
+    const feed = buildDeskFeed(
+      {
+        ...EMPTY,
+        conversations: [
+          conv('near', { next_action_at: actionAt(6) }),
+          conv('nextweek', { next_action_at: actionAt(8) }),
+          conv('far', { next_action_at: actionAt(40) }),
+        ],
+        tasks: [task('t', { due_at: isoDay(20) } as Partial<TaskItem>)],
+      },
+      NOW,
+      'en',
+    );
+    expect(feed.map((b) => b.labelKey)).toEqual(['weekday', 'later']);
+    expect(feed[1].runs.flatMap((r) => r.items)).toHaveLength(3);
+  });
+
+  it('laterSummary counts the later things and spans first to last day', () => {
+    const feed = buildDeskFeed(
+      {
+        ...EMPTY,
+        conversations: [conv('a', { next_action_at: actionAt(40) }), conv('b', { next_action_at: actionAt(9) })],
+        dates: [dateEv('ev', { starts_at: `${isoDay(15)}T10:00:00Z`, title: 'Assaig' })],
+      },
+      NOW,
+      'en',
+    );
+    expect(laterSummary(feed)).toEqual({ count: 3, from: isoDay(9), until: isoDay(40) });
+  });
+
+  it('laterSummary is null when nothing lies past this week', () => {
+    const feed = buildDeskFeed({ ...EMPTY, conversations: [conv('a', { next_action_at: actionAt(2) })] }, NOW, 'en');
+    expect(laterSummary(feed)).toBeNull();
+  });
+});
+
+describe('buildDeskFeed — multi-day runs', () => {
+  const allRows = (feed: ReturnType<typeof buildDeskFeed>) => feed.flatMap((b) => b.runs).flatMap((r) => r.items);
+
+  it('a date series is ONE row on the day it starts, carrying its span', () => {
+    const days = [2, 3, 4, 5, 6, 9];
+    const feed = buildDeskFeed(
+      {
+        ...EMPTY,
+        dates: days.map((o) =>
+          dateEv(`r${o}`, { starts_at: `${isoDay(o)}T10:00:00Z`, title: 'Residència', series_id: 's1' }),
+        ),
+      },
+      NOW,
+      'en',
+    );
+    const rows = allRows(feed);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ id: 'date-r2', day: isoDay(2), runDays: 6 });
+    // its later days do not leak into the later line
+    expect(laterSummary(feed)).toBeNull();
+  });
+
+  it('a performance series is one row too; a lone series_id is not a run', () => {
+    const feed = buildDeskFeed(
+      {
+        ...EMPTY,
+        performances: [
+          perf('a', { performed_at: isoDay(3), series_id: 'f', venue: { name: 'Grec' } }),
+          perf('b', { performed_at: isoDay(4), series_id: 'f', venue: { name: 'Grec' } }),
+          perf('solo', { performed_at: isoDay(5), series_id: 'g', venue: { name: 'Sala' } }),
+        ],
+      },
+      NOW,
+      'en',
+    );
+    expect(allRows(feed).map((r) => [r.id, r.runDays])).toEqual([
+      ['perf-a', 2],
+      ['perf-solo', null],
+    ]);
+  });
+
+  it('a run starting today is the banner, with its span, and does not repeat tomorrow', () => {
+    const feed = buildDeskFeed(
+      {
+        ...EMPTY,
+        performances: [0, 1, 2].map((o) =>
+          perf(`d${o}`, { performed_at: isoDay(o), series_id: 'fest', venue: { name: 'Kursaal' } }),
+        ),
+      },
+      NOW,
+      'en',
+    );
+    expect(feed).toHaveLength(1);
+    expect(feed[0].anchor).toMatchObject({ venue: 'Kursaal', runDays: 3 });
+    expect(allRows(feed)).toEqual([]);
   });
 });
