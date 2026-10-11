@@ -229,13 +229,19 @@
     scopes.remember(scopeAutoName(current), current);
   }
 
+  /** Off a lens route, a scope change goes to the lens you were working in
+   *  (from the hall, Desk: the catch-up surface). On a lens route it stays
+   *  put: the lens refilters in place. */
+  function landOnScopedLens() {
+    if (!routedLens) void goto(`/h/${lens.current}`);
+  }
+
   function applyScope(s: Scope) {
     rememberWorkingScope(s.tokens);
     pins.set(s.tokens);
     // A scope click must SHOW the scoped view: from a lens, the lens just
-    // refilters in place; from anywhere else (hall, portada, entity pages)
-    // it lands on Desk — the catch-up surface.
-    if (!routedLens) void goto('/h/desk');
+    // refilters in place; from anywhere else it lands on a lens.
+    landOnScopedLens();
     // If it's a saved scope, it becomes the base being edited; else no base.
     editingBaseTokens = scopes.saved.some((x) => scopesSameSet(x.tokens, s.tokens))
       ? [...s.tokens]
@@ -313,12 +319,15 @@
   // <ScopeStrip>.
   let scopeSurface = $derived(routedLens !== null || atHome);
 
-  // Keep the pill state honest when navigation happens outside the pills.
+  // The lens store holds the lens you are working in. A lens route sets it;
+  // an entity page reached from a lens (a person or a conversation opened
+  // from Conversations) KEEPS it, so a scope change there lands back on that
+  // lens instead of on Desk (drop 11-10). The hall resets it: it is no lens.
   $effect(() => {
     const current = untrack(() => lens.current);
     if (routedLens) {
       if (current !== routedLens) lens.set(routedLens);
-    } else if (current !== 'desk') {
+    } else if (atHome && current !== 'desk') {
       lens.set('desk');
     }
   });
@@ -472,7 +481,7 @@
   function onApplyScope(tokens: string[]) {
     rememberWorkingScope(tokens);
     pins.set(tokens);
-    if (!routedLens) void goto('/h/desk');
+    landOnScopedLens();
     // Applied a verbatim saved scope → that's the base; otherwise keep the
     // current base (you may be modifying it) — the effect nulls it when empty.
     if (scopes.saved.some((s) => scopesSameSet(s.tokens, tokens))) {

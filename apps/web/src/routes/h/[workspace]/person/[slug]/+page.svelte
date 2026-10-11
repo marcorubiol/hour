@@ -18,6 +18,13 @@
   import { dayLabel, dayMonthYearTs } from '$lib/datetime';
   import { appLocale, t } from '$lib/i18n';
   import { useBreadcrumb } from '$lib/stores/breadcrumb.svelte';
+  import { usePins } from '$lib/stores/pins.svelte';
+  import { buildLineIndex, buildProjectIndex, projectsInScope, resolveScope } from '$lib/nav';
+  import {
+    activeProjectsQueryOptions,
+    allLinesQueryOptions,
+    workspacesQueryOptions,
+  } from '$lib/nav-queries';
   import { accentVar } from '$lib/utils/accent';
   import { spaceName } from '$lib/utils/identity';
   import { safeHref } from '$lib/utils/safe-url';
@@ -72,18 +79,12 @@
     }>;
   };
 
-  type WorkspaceLite = { id: string; slug: string; name: string };
-
   const locale = appLocale();
 
   let workspaceSlug = $derived(page.params.workspace ?? '');
   let slug = $derived(page.params.slug ?? '');
 
-  const workspacesQuery = createQuery({
-    queryKey: ['workspaces'],
-    queryFn: ({ signal }: { signal: AbortSignal }) =>
-      fetchJSON<{ items: WorkspaceLite[] }>('/api/workspaces', signal),
-  });
+  const workspacesQuery = createQuery(workspacesQueryOptions());
 
   let contextWorkspaceId = $derived(
     ($workspacesQuery.data?.items ?? []).find((w) => w.slug === workspaceSlug)?.id ?? '',
@@ -204,12 +205,19 @@
   });
 
   // ── Add to project (ADR-051): a new conversation for this person ────
-  type ProjectItem = { id: string; slug: string; name?: string };
-
-  const projectsQuery = createQuery({
-    queryKey: ['projects', { status: 'active' }],
-    queryFn: ({ signal }: { signal: AbortSignal }) =>
-      fetchJSON<{ items: ProjectItem[] }>('/api/projects?status=active', signal),
+  // The picker offers only the projects of the current scope (drop 11-10),
+  // resolved the same way the lenses resolve it.
+  const pins = usePins();
+  const projectsQuery = createQuery(activeProjectsQueryOptions());
+  const linesQuery = createQuery(allLinesQueryOptions());
+  let scope = $derived.by(() => {
+    const workspaces = $workspacesQuery.data?.items ?? [];
+    return resolveScope(
+      pins.pins,
+      workspaces,
+      buildLineIndex(workspaces, $linesQuery.data?.items ?? []),
+      buildProjectIndex(workspaces, $projectsQuery.data?.items ?? []),
+    );
   });
 
   let addOpen = $state(false);
@@ -219,7 +227,7 @@
   let projectOptions = $derived.by(() => {
     // Offer only projects without a live conversation for this person.
     const taken = new Set((file?.conversations ?? []).map((e) => e.project?.id));
-    return ($projectsQuery.data?.items ?? [])
+    return projectsInScope(scope, $projectsQuery.data?.items ?? [])
       .filter((p) => !taken.has(p.id))
       .map((p) => ({ value: p.id, label: p.name ?? p.slug }));
   });

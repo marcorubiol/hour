@@ -5,6 +5,7 @@ import {
   inScope,
   lineUrl,
   projectUrl,
+  projectsInScope,
   resolveScope,
   type NavWorkspace,
   type RawLine,
@@ -224,6 +225,30 @@ describe('inScope', () => {
     const scope = resolveScope([personPin('person-laia')], WS, lineIndex, projectIndex);
     expect(inScope(scope, { projectId: 'proj-orbita' })).toBe(true);
     expect(inScope(scope, {})).toBe(true);
+  });
+});
+
+describe('projectsInScope', () => {
+  const projectIndex = buildProjectIndex(WS, PROJECTS);
+  const lineIndex = buildLineIndex(WS, LINES);
+  const ids = (pins: string[]) =>
+    projectsInScope(resolveScope(pins, WS, lineIndex, projectIndex), PROJECTS).map((p) => p.id);
+
+  it('Everything offers every project', () => {
+    expect(ids([])).toEqual(['proj-mamemi', 'proj-orbita', 'proj-ghost']);
+  });
+
+  it('a space offers only its projects', () => {
+    expect(ids([spacePin('demo')])).toEqual(['proj-orbita']);
+  });
+
+  it('a project or a line offers that project', () => {
+    expect(ids([projectPin('proj-orbita')])).toEqual(['proj-orbita']);
+    expect(ids([linePin('line-difusion')])).toEqual(['proj-mamemi']);
+  });
+
+  it('a person pin alone does not narrow the picker', () => {
+    expect(ids([personPin('person-laia')])).toHaveLength(3);
   });
 });
 
