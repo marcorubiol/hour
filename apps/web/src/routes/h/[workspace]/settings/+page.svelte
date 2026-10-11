@@ -27,6 +27,7 @@
   import WorkspacesSection from '$lib/components/settings/WorkspacesSection.svelte';
   import PrivacySection from '$lib/components/settings/PrivacySection.svelte';
   import LanguagesSection from '$lib/components/settings/LanguagesSection.svelte';
+  import MailSection from '$lib/components/settings/MailSection.svelte';
   import NotificationsSection from '$lib/components/settings/NotificationsSection.svelte';
   import BillingSection from '$lib/components/settings/BillingSection.svelte';
   import DangerSection from '$lib/components/settings/DangerSection.svelte';
@@ -98,6 +99,10 @@
        Spotify, Bandcamp, Drive, Bank...) ZERO actually wired —
        vapor visual. Resurrects when an integration ships. Same
        goes for Personal API token (Phase 1 public API). -->
+
+  {#if active === 'mail'}
+    <MailSection workspaceId={currentWorkspace?.id} />
+  {/if}
 
   {#if active === 'notifications'}
     <NotificationsSection />
