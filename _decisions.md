@@ -3417,3 +3417,7 @@ mismos. El marketing se centra en eso, no en tener más datos de terceros. Encaj
 (`research/product/22-venue-directory-personal-data-legal.md`: una persona entra solo si se da de alta o reclama su
 ficha, aceptando propuestas) y con la LSSI, que pide consentimiento previo para escribirles. Cómo se consiguen las altas está por
 pensar; pedir a las instituciones que inviten a sus programadores queda descartado por ahora (Marco).
+- **Firma (sustituye «una por buzón»; Marco, 2026-10-11):** la firma es de la persona en cada compañía (una por
+  persona y espacio), vive en su perfil de ese espacio y no en Buzones. Hour siempre propone una, montada con su
+  nombre, su rol en esa compañía y el nombre, la web y el teléfono de la compañía; se edita. El buzón común firma con
+  la firma de la compañía.
