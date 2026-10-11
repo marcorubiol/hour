@@ -1,8 +1,14 @@
 -- ADR-099 · Comms, carril 1: el buzón sincronizado (primero Google).
 --
 -- Aditiva según § 34:
---   · tres enums y dos tablas nuevas (`mail_account`, `mail_message`);
---   · una columna nueva en `conversation` (`private_to`), con su guarda;
+--   · tres enums y tres tablas nuevas (`mail_account`, `mail_message`,
+--     `mail_account_address`);
+--   · una columna nueva en `conversation` (`private_to`), con su guarda, y una
+--     en `workspace` (`new_conversations_private`): el admin decide si las
+--     conversaciones nuevas nacen privadas (por defecto) o compartidas. No se
+--     toca ninguna fila: las que ya existen siguen compartidas;
+--   · el registro de auditoría de `conversation_event` deja de copiar el texto
+--     de los correos (ADR-099, añadido del 2026-10-11);
 --   · las policies de lectura y edición de `conversation` ganan la condición
 --     de privada (ADR-099 punto 4), y las dos RPC que leen una conversación por
 --     id con privilegios (`record_conversation_event`, `delete_conversation`)
@@ -43,8 +49,11 @@ CREATE TABLE public.mail_account (
   status                    public.mail_account_status NOT NULL DEFAULT 'active',
   -- Cursor incremental del proveedor (Gmail: historyId).
   sync_cursor               text,
-  -- Desde cuándo se lee: la primera sincronización no va más atrás.
-  sync_from                 timestamptz NOT NULL DEFAULT (now() - interval '60 days'),
+  -- Desde cuándo se lee: la primera sincronización trae los últimos 12 meses.
+  sync_from                 timestamptz NOT NULL DEFAULT (now() - interval '12 months'),
+  -- Firma propia de Hour (no la de Gmail): la del personal es de su dueño; la
+  -- del común, del espacio.
+  signature                 text,
   sync_started_at           timestamptz,
   last_synced_at            timestamptz,
   last_error                text,
@@ -59,7 +68,9 @@ CREATE TABLE public.mail_account (
   CONSTRAINT mail_account_ciphertext_format
     CHECK (refresh_token_ciphertext ~ '^v[0-9]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$'),
   CONSTRAINT mail_account_last_error_length
-    CHECK (last_error IS NULL OR length(last_error) <= 500)
+    CHECK (last_error IS NULL OR length(last_error) <= 500),
+  CONSTRAINT mail_account_signature_length
+    CHECK (signature IS NULL OR length(signature) <= 2000)
 );
 
 COMMENT ON TABLE public.mail_account IS
@@ -87,7 +98,7 @@ REVOKE ALL ON TABLE public.mail_account FROM PUBLIC, anon, authenticated;
 GRANT SELECT (
   id, workspace_id, scope, owner_user_id, provider, address, status,
   sync_from, last_synced_at, last_error, messages_ingested, connected_by,
-  created_at, updated_at
+  signature, created_at, updated_at
 ) ON TABLE public.mail_account TO authenticated;
 GRANT ALL ON TABLE public.mail_account TO service_role;
 
@@ -127,30 +138,57 @@ ALTER TABLE public.mail_message OWNER TO postgres;
 REVOKE ALL ON TABLE public.mail_message FROM PUBLIC, anon, authenticated;
 GRANT ALL ON TABLE public.mail_message TO service_role;
 
+-- ── mail_account_address: qué contactos ya trajeron su historia ───────────
+-- Cuando un contacto entra en Hour después de conectar el buzón, la siguiente
+-- pasada trae su correo de los últimos 12 meses (ADR-099, añadido). Esta tabla
+-- recuerda a quién ya se le hizo. Solo service_role.
+CREATE TABLE public.mail_account_address (
+  mail_account_id  uuid NOT NULL REFERENCES public.mail_account(id) ON DELETE CASCADE,
+  address          extensions.citext NOT NULL,
+  backfilled_at    timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (mail_account_id, address)
+);
+ALTER TABLE public.mail_account_address ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.mail_account_address FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.mail_account_address OWNER TO postgres;
+REVOKE ALL ON TABLE public.mail_account_address FROM PUBLIC, anon, authenticated;
+GRANT ALL ON TABLE public.mail_account_address TO service_role;
+
 -- Los eventos de correo de un buzón, para el recuento y el hilo de Gmail.
 CREATE INDEX conversation_event_mail_account_idx
   ON public.conversation_event ((metadata ->> 'mail_account_id'))
   WHERE source = 'email';
 
 -- ── Conversación privada (ADR-099 punto 4) ────────────────────────────────
--- Quien la marcó. NULL = la ve quien ve conversaciones. Si esa cuenta se
--- borra, la conversación vuelve a ser del equipo (SET NULL), no se pierde.
+-- Quien la marcó. NULL = la ve quien ve conversaciones. Sin clave foránea a
+-- propósito: si quien la marcó sale del espacio o borra su cuenta, sigue
+-- oculta para siempre (ADR-099, añadido: puede ser la conversación con una
+-- amiga que nadie más debe ver).
 ALTER TABLE public.conversation
-  ADD COLUMN private_to uuid REFERENCES auth.users(id) ON DELETE SET NULL;
+  ADD COLUMN private_to uuid;
+
+-- El admin decide cómo nacen las conversaciones nuevas del espacio. Por
+-- defecto, privadas de quien las crea. Las que ya existen no cambian.
+ALTER TABLE public.workspace
+  ADD COLUMN new_conversations_private boolean NOT NULL DEFAULT true;
+
+COMMENT ON COLUMN public.workspace.new_conversations_private IS
+  'ADR-099: new conversations are born private to their creator (true, default) or shared (false). Admins set it (workspace_update policy); each person changes their own conversations afterwards.';
 
 COMMENT ON COLUMN public.conversation.private_to IS
-  'ADR-099: the user who marked the conversation private. Only that user sees it (and its events); for everyone else it does not exist, counts included.';
+  'ADR-099: the user who marked the conversation private. Only that user sees it (and its events); for everyone else it does not exist, counts included. No FK on purpose: it stays hidden forever.';
 
 CREATE INDEX conversation_private_to_idx
   ON public.conversation (private_to) WHERE private_to IS NOT NULL;
 
 -- `conversation` tiene UPDATE a tabla entera para `authenticated`, así que la
 -- columna nueva es escribible por PATCH. La guarda pone la regla en la base:
--- solo te marcas a ti, y solo quien la marcó la desmarca. service_role (sin
--- auth.uid()) pasa.
+-- solo te marcas a ti, y solo quien la marcó la desmarca. Al crear, si el
+-- espacio dice que nacen privadas, la conversación nace privada de quien la
+-- crea. service_role (sin auth.uid()) pasa.
 CREATE FUNCTION public.guard_conversation_private()
 RETURNS trigger
-LANGUAGE plpgsql
+LANGUAGE plpgsql SECURITY DEFINER
 SET search_path TO 'public', 'pg_temp'
 AS $$
 DECLARE
@@ -162,6 +200,11 @@ BEGIN
   IF TG_OP = 'INSERT' THEN
     IF NEW.private_to IS NOT NULL AND NEW.private_to <> v_caller THEN
       RAISE EXCEPTION 'a conversation can only be made private to yourself' USING ERRCODE = '42501';
+    END IF;
+    IF NEW.private_to IS NULL AND coalesce((
+      SELECT w.new_conversations_private FROM public.workspace w WHERE w.id = NEW.workspace_id
+    ), true) THEN
+      NEW.private_to := v_caller;
     END IF;
     RETURN NEW;
   END IF;
@@ -414,6 +457,7 @@ BEGIN
     RETURNING id INTO v_id;
     IF v_prev.address <> v_address THEN
       DELETE FROM public.mail_message WHERE mail_account_id = v_id;
+      DELETE FROM public.mail_account_address WHERE mail_account_id = v_id;
     END IF;
     RETURN v_id;
   END IF;
@@ -446,6 +490,22 @@ AS $$
            END
     FROM public.mail_account a WHERE a.id = p_account_id
   ), false);
+$$;
+
+-- La firma de Hour de un buzón: la edita quien lo gestiona.
+CREATE FUNCTION public.set_mail_signature(p_account_id uuid, p_signature text)
+RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path TO 'public', 'pg_temp'
+AS $$
+BEGIN
+  IF auth.uid() IS NULL OR NOT public.can_manage_mail_account(p_account_id) THEN
+    RAISE EXCEPTION 'mail account % not found', p_account_id USING ERRCODE = '42501';
+  END IF;
+  UPDATE public.mail_account
+  SET signature = nullif(btrim(coalesce(p_signature, '')), ''), updated_at = now()
+  WHERE id = p_account_id;
+END;
 $$;
 
 -- Desconectar borra la conexión y lo procesado; los correos ya registrados
@@ -544,11 +604,13 @@ $$;
 -- una conversación elegible. Es lo único que la sincronización pregunta al
 -- proveedor; lo demás del buzón no se lista.
 CREATE FUNCTION public.mail_contact_addresses(p_account_id uuid)
-RETURNS SETOF text
+RETURNS TABLE (address text, backfilled boolean)
 LANGUAGE sql STABLE SECURITY DEFINER
 SET search_path TO 'public', 'pg_temp'
 AS $$
-  SELECT DISTINCT lower(wp.email::text)
+  SELECT DISTINCT lower(wp.email::text),
+         EXISTS (SELECT 1 FROM public.mail_account_address m
+                 WHERE m.mail_account_id = a.id AND m.address = lower(wp.email::text))
   FROM public.mail_account a
   JOIN public.conversation c ON c.workspace_id = a.workspace_id AND c.deleted_at IS NULL
   JOIN public.workspace_person wp
@@ -557,6 +619,17 @@ AS $$
   WHERE a.id = p_account_id
     AND lower(wp.email::text) <> lower(a.address::text)
     AND public.mail_account_eligible_conversation(a, c);
+$$;
+
+-- Estas direcciones ya trajeron sus últimos 12 meses.
+CREATE FUNCTION public.mail_mark_backfilled(p_account_id uuid, p_addresses text[])
+RETURNS void
+LANGUAGE sql VOLATILE SECURITY DEFINER
+SET search_path TO 'public', 'pg_temp'
+AS $$
+  INSERT INTO public.mail_account_address (mail_account_id, address)
+  SELECT p_account_id, lower(btrim(a)) FROM unnest(p_addresses) a WHERE btrim(a) <> ''
+  ON CONFLICT DO NOTHING;
 $$;
 
 -- De estos ids del proveedor, cuáles ya se procesaron.
@@ -697,6 +770,46 @@ AS $$
   WHERE id = p_account_id;
 $$;
 
+-- ── Auditoría de conversation_event sin el texto de los correos ───────────
+-- Igual que write_audit, pero de un evento de correo (source = email) no copia
+-- ni el cuerpo ni el asunto: queda que hubo un correo, no lo que decía.
+CREATE FUNCTION public.write_audit_conversation_event()
+RETURNS trigger
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path TO 'public', 'pg_temp'
+AS $$
+DECLARE
+  v_row     public.conversation_event := COALESCE(NEW, OLD);
+  v_ws      uuid := v_row.workspace_id;
+  v_new     jsonb := CASE WHEN TG_OP <> 'DELETE' THEN to_jsonb(NEW) END;
+  v_old     jsonb := CASE WHEN TG_OP <> 'INSERT' THEN to_jsonb(OLD) END;
+  v_changes jsonb;
+BEGIN
+  IF v_row.source = 'email' THEN
+    v_new := CASE WHEN v_new IS NOT NULL THEN (v_new - 'body') #- '{metadata,subject}' END;
+    v_old := CASE WHEN v_old IS NOT NULL THEN (v_old - 'body') #- '{metadata,subject}' END;
+  END IF;
+  IF v_ws IS NOT NULL AND NOT EXISTS (SELECT 1 FROM public.workspace WHERE id = v_ws) THEN
+    v_ws := NULL;
+  END IF;
+  v_changes := CASE TG_OP
+    WHEN 'INSERT' THEN v_new
+    WHEN 'UPDATE' THEN jsonb_build_object('before', v_old, 'after', v_new)
+    ELSE v_old
+  END;
+  INSERT INTO audit_log (workspace_id, actor_id, entity_type, entity_id, action, changes)
+  VALUES (v_ws, auth.uid(), TG_TABLE_NAME, v_row.id, lower(TG_OP), v_changes);
+  RETURN COALESCE(NEW, OLD);
+END;
+$$;
+ALTER FUNCTION public.write_audit_conversation_event() OWNER TO postgres;
+REVOKE ALL ON FUNCTION public.write_audit_conversation_event() FROM PUBLIC, anon, authenticated;
+
+DROP TRIGGER conversation_event_audit ON public.conversation_event;
+CREATE TRIGGER conversation_event_audit
+AFTER INSERT OR DELETE OR UPDATE ON public.conversation_event
+FOR EACH ROW EXECUTE FUNCTION public.write_audit_conversation_event();
+
 -- ── Propiedad y grants ────────────────────────────────────────────────────
 DO $$
 DECLARE
@@ -705,6 +818,8 @@ BEGIN
   FOREACH f IN ARRAY ARRAY[
     'public.connect_mail_account(uuid, public.mail_account_scope, public.mail_provider, text, text, smallint)',
     'public.can_manage_mail_account(uuid)',
+    'public.set_mail_signature(uuid, text)',
+    'public.mail_mark_backfilled(uuid, text[])',
     'public.disconnect_mail_account(uuid)',
     'public.mail_send_authorize(uuid, uuid)',
     'public.mail_sync_claim(integer, interval, uuid)',
@@ -724,4 +839,5 @@ $$;
 GRANT EXECUTE ON FUNCTION public.connect_mail_account(uuid, public.mail_account_scope, public.mail_provider, text, text, smallint) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.can_manage_mail_account(uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.disconnect_mail_account(uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.set_mail_signature(uuid, text) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.mail_send_authorize(uuid, uuid) TO authenticated;

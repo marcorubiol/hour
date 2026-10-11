@@ -8,6 +8,8 @@
  */
 
 import type { RequestHandler } from './$types';
+import * as v from 'valibot';
+import { SignatureSchema } from '$lib/mail';
 import { extractAccessToken } from '$lib/auth';
 import { pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
@@ -15,6 +17,38 @@ import { decryptSecret, importMailKey, refreshTokenAad } from '$lib/server/mail/
 import { mailConfigured, serviceMailDb } from '$lib/server/mail/db';
 import { googleAdapter } from '$lib/server/mail/gmail';
 import { json, UUID_RE } from '$lib/server/mail/http';
+
+/**
+ * PUT /api/mail/accounts/:id — { signature }: la firma de Hour del buzón
+ * (ADR-099, añadido). La edita quien lo gestiona (`set_mail_signature`).
+ */
+export const PUT: RequestHandler = async ({ request, params, platform, locals }) => {
+  if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);
+  const jwt = extractAccessToken(request);
+  if (!jwt) return json({ error: 'missing_authorization' }, 401);
+  if (!UUID_RE.test(params.id)) return json({ error: 'invalid_id' }, 400);
+  let raw: unknown;
+  try {
+    raw = await request.json();
+  } catch {
+    return json({ error: 'invalid_body' }, 400);
+  }
+  const parsed = v.safeParse(SignatureSchema, raw);
+  if (!parsed.success) return json({ error: 'invalid_body' }, 400);
+  try {
+    await pgPostRpc(platform.env as unknown as SupabaseEnv, 'set_mail_signature', jwt, {
+      p_account_id: params.id,
+      p_signature: parsed.output.signature,
+    });
+    return json({ signature: parsed.output.signature?.trim() || null });
+  } catch (err) {
+    return pgErrorResponse(
+      err,
+      { route: 'PUT /api/mail/accounts/[id]', requestId: locals.requestId },
+      { codes: { '42501': { status: 404, error: 'not_found' } } },
+    );
+  }
+};
 
 export const DELETE: RequestHandler = async ({ request, params, platform, locals }) => {
   if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);

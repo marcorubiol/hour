@@ -13,6 +13,7 @@ import { pgGet, pgPostRpc, type SupabaseEnv } from '../../supabase';
 import { decryptSecret, importMailKey, refreshTokenAad } from './crypto';
 import { serviceMailDb, type MailEnv } from './db';
 import { googleAdapter } from './gmail';
+import { withSignature } from '../../mail';
 
 export interface SendRequest {
   conversationId: string;
@@ -33,7 +34,7 @@ interface ReplyContext {
 }
 
 export async function sendFromConversation(
-  env: MailEnv & Required<Pick<MailEnv, 'SUPABASE_SECRET_KEY' | 'GOOGLE_OAUTH_CLIENT_ID' | 'GOOGLE_OAUTH_CLIENT_SECRET' | 'MAIL_TOKEN_KEY'>>,
+  env: MailEnv & Required<Pick<MailEnv, 'SUPABASE_SERVICE_ROLE_KEY' | 'GOOGLE_OAUTH_CLIENT_ID' | 'GOOGLE_OAUTH_CLIENT_SECRET' | 'MAIL_TOKEN_KEY'>>,
   jwt: string,
   userId: string,
   req: SendRequest,
@@ -83,12 +84,14 @@ export async function sendFromConversation(
   const access = await adapter.accessToken(refreshToken);
 
   const messageId = `<${crypto.randomUUID()}@${messageIdDomain}>`;
+  // La firma es de Hour (ADR-099, añadido): la del buzón, no la de Gmail.
+  const body = withSignature(req.body, account.signature);
   const sent = await adapter.send(access, {
     from: account.address,
     to: target.recipient_address,
     toName: target.recipient_name,
     subject: req.subject,
-    body: req.body,
+    body,
     messageId,
     inReplyTo: reply?.rfc_message_id ?? null,
     references: reply?.rfc_message_id ?? null,
@@ -111,7 +114,7 @@ export async function sendFromConversation(
       to: [target.recipient_address],
       cc: [],
       counterparts: [target.recipient_address.toLowerCase()],
-      body: req.body,
+      body,
     },
     userId,
   );

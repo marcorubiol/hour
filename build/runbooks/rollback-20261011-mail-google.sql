@@ -1,13 +1,16 @@
 -- ROLLBACK for 20261011200000_mail_google.sql (comms carril 1: buzón de Google)
 --
--- Deshace: las RPC de correo, `mail_message`, `mail_account`, sus enums, el
--- índice de eventos por buzón, `conversation.private_to` con su guarda, y
+-- Deshace: las RPC de correo, `mail_message`, `mail_account_address`,
+-- `mail_account`, sus enums, el índice de eventos por buzón,
+-- `conversation.private_to` con su guarda, `workspace.new_conversations_private`,
+-- la auditoría de eventos sin texto de correo (vuelve `write_audit`), y
 -- devuelve las policies de `conversation` y las RPC `record_conversation_event`
 -- y `delete_conversation` a su forma anterior (sin la condición de privada).
 --
 -- DATOS QUE SE PIERDEN: las conexiones de buzón (hay que volver a conectar, y
 -- los refresh tokens cifrados se van con ellas; conviene revocarlos antes desde
--- Ajustes o en la cuenta de Google) y la marca de privada de cada conversación:
+-- Ajustes o en la cuenta de Google), las firmas de Hour, el ajuste del espacio
+-- sobre cómo nacen las conversaciones, y la marca de privada de cada conversación:
 -- TODAS LAS CONVERSACIONES PRIVADAS VUELVEN A SER VISIBLES PARA EL EQUIPO. Si
 -- eso importa, avisar antes de aplicar.
 -- Lo que se queda: los correos ya registrados (`conversation_event` con
@@ -18,6 +21,15 @@
 -- efecto en datos). Volver atrás el Worker primero, o a la vez.
 
 BEGIN;
+
+DROP TRIGGER IF EXISTS conversation_event_audit ON public.conversation_event;
+CREATE TRIGGER conversation_event_audit
+AFTER INSERT OR DELETE OR UPDATE ON public.conversation_event
+FOR EACH ROW EXECUTE FUNCTION public.write_audit();
+DROP FUNCTION IF EXISTS public.write_audit_conversation_event();
+
+DROP FUNCTION IF EXISTS public.set_mail_signature(uuid, text);
+DROP FUNCTION IF EXISTS public.mail_mark_backfilled(uuid, text[]);
 
 DROP FUNCTION IF EXISTS public.mail_sync_finish(uuid, public.mail_account_status, text, boolean, integer, text);
 DROP FUNCTION IF EXISTS public.mail_ingest_message(uuid, jsonb, uuid);
@@ -33,6 +45,7 @@ DROP FUNCTION IF EXISTS public.mail_account_eligible_conversation(public.mail_ac
 
 DROP INDEX IF EXISTS public.conversation_event_mail_account_idx;
 DROP TABLE IF EXISTS public.mail_message;
+DROP TABLE IF EXISTS public.mail_account_address;
 DROP TABLE IF EXISTS public.mail_account;
 DROP TYPE IF EXISTS public.mail_account_status;
 DROP TYPE IF EXISTS public.mail_account_scope;
@@ -183,6 +196,7 @@ DROP TRIGGER IF EXISTS conversation_private_guard ON public.conversation;
 DROP FUNCTION IF EXISTS public.guard_conversation_private();
 DROP INDEX IF EXISTS public.conversation_private_to_idx;
 ALTER TABLE public.conversation DROP COLUMN IF EXISTS private_to;
+ALTER TABLE public.workspace DROP COLUMN IF EXISTS new_conversations_private;
 
 DELETE FROM supabase_migrations.schema_migrations WHERE version = '20261011200000';
 

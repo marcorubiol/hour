@@ -1,6 +1,7 @@
 /**
  * El acceso a la base de la sincronización, que corre sin persona detrás
- * (cron) y por eso con la clave secreta de Supabase (`SUPABASE_SECRET_KEY`).
+ * (cron) y por eso con la clave de servicio que ya está en Wrangler
+ * (`SUPABASE_SERVICE_ROLE_KEY`; ADR-099, añadido del 2026-10-11).
  *
  * Frontera: este módulo SOLO llama a las RPC `mail_*` que la migración
  * 20261011200000 concede a service_role, ninguna tabla. La clave no se usa en
@@ -11,7 +12,7 @@
 export interface MailEnv {
   PUBLIC_SUPABASE_URL: string;
   PUBLIC_SUPABASE_ANON_KEY: string;
-  SUPABASE_SECRET_KEY?: string;
+  SUPABASE_SERVICE_ROLE_KEY?: string;
   GOOGLE_OAUTH_CLIENT_ID?: string;
   GOOGLE_OAUTH_CLIENT_SECRET?: string;
   MAIL_TOKEN_KEY?: string;
@@ -19,14 +20,14 @@ export interface MailEnv {
 
 /** Lo que la sincronización y el envío necesitan; falta algo → el correo está apagado. */
 export function mailConfigured(env: Partial<MailEnv> | undefined | null): env is MailEnv & {
-  SUPABASE_SECRET_KEY: string;
+  SUPABASE_SERVICE_ROLE_KEY: string;
   GOOGLE_OAUTH_CLIENT_ID: string;
   GOOGLE_OAUTH_CLIENT_SECRET: string;
   MAIL_TOKEN_KEY: string;
 } {
   return Boolean(
     env?.PUBLIC_SUPABASE_URL &&
-      env.SUPABASE_SECRET_KEY &&
+      env.SUPABASE_SERVICE_ROLE_KEY &&
       env.GOOGLE_OAUTH_CLIENT_ID &&
       env.GOOGLE_OAUTH_CLIENT_SECRET &&
       env.MAIL_TOKEN_KEY,
@@ -46,6 +47,14 @@ export interface MailAccountRow {
   sync_cursor: string | null;
   sync_from: string;
   last_synced_at: string | null;
+  /** Firma de Hour del buzón (la del personal, de su dueño; la del común, del espacio). */
+  signature: string | null;
+}
+
+export interface ContactAddress {
+  address: string;
+  /** Ya se trajeron sus últimos 12 meses en este buzón. */
+  backfilled: boolean;
 }
 
 export interface IngestPayload {
@@ -66,7 +75,8 @@ export interface IngestPayload {
 export interface MailDb {
   claim(limit: number, accountId?: string): Promise<MailAccountRow[]>;
   account(accountId: string): Promise<MailAccountRow | null>;
-  contactAddresses(accountId: string): Promise<string[]>;
+  contactAddresses(accountId: string): Promise<ContactAddress[]>;
+  markBackfilled(accountId: string, addresses: string[]): Promise<void>;
   knownMessages(accountId: string, ids: string[]): Promise<string[]>;
   ingest(accountId: string, message: IngestPayload, createdBy?: string | null): Promise<number>;
   finish(
@@ -90,8 +100,8 @@ export class MailDbError extends Error {
   }
 }
 
-export function serviceMailDb(env: MailEnv & { SUPABASE_SECRET_KEY: string }, fetchFn: typeof fetch = fetch): MailDb {
-  const key = env.SUPABASE_SECRET_KEY;
+export function serviceMailDb(env: MailEnv & { SUPABASE_SERVICE_ROLE_KEY: string }, fetchFn: typeof fetch = fetch): MailDb {
+  const key = env.SUPABASE_SERVICE_ROLE_KEY;
   // Las claves nuevas (`sb_secret_…`) van solo en `apikey`; la legada
   // service_role es un JWT y va también como Bearer.
   const headers: Record<string, string> = {
@@ -118,7 +128,10 @@ export function serviceMailDb(env: MailEnv & { SUPABASE_SECRET_KEY: string }, fe
       }),
     account: async (accountId) =>
       (await rpc<MailAccountRow[]>('mail_account_secret', { p_account_id: accountId }))[0] ?? null,
-    contactAddresses: (accountId) => rpc<string[]>('mail_contact_addresses', { p_account_id: accountId }),
+    contactAddresses: (accountId) => rpc<ContactAddress[]>('mail_contact_addresses', { p_account_id: accountId }),
+    markBackfilled: async (accountId, addresses) => {
+      if (addresses.length) await rpc('mail_mark_backfilled', { p_account_id: accountId, p_addresses: addresses });
+    },
     knownMessages: (accountId, ids) =>
       ids.length ? rpc<string[]>('mail_known_messages', { p_account_id: accountId, p_ids: ids }) : Promise.resolve([]),
     ingest: (accountId, message, createdBy) =>

@@ -21,7 +21,9 @@ import {
  *   el común lo conecta solo un admin;
  * - las RPC de sincronización (`mail_*`) son solo de service_role;
  * - conversación privada: solo te la marcas a ti, y quien la marcó la sigue
- *   viendo.
+ *   viendo; con el ajuste del espacio en «privadas», una nueva nace privada de
+ *   quien la crea, y solo un admin cambia ese ajuste;
+ * - la firma de Hour de un buzón la edita quien lo gestiona.
  *
  * El texto cifrado de las pruebas es falso (`v1.zzz.zzz`): nunca se descifra.
  * Fixture: `playwright`, conversación propia en `zzz-difusion`. Nunca toca
@@ -41,6 +43,7 @@ describe.skipIf(!envReady())('mail_account and private conversations (ADR-099)',
   let projectId: string;
   let personalId: string | undefined;
   let conversationId: string | undefined;
+  let originalSetting: boolean | undefined;
 
   beforeAll(async () => {
     const env = requireEnv();
@@ -63,6 +66,9 @@ describe.skipIf(!envReady())('mail_account and private conversations (ADR-099)',
   });
 
   afterAll(async () => {
+    if (originalSetting !== undefined) {
+      await pgPatch('workspace', jwt, { new_conversations_private: originalSetting }, new URLSearchParams({ id: `eq.${workspaceId}` }));
+    }
     if (personalId) await pgRpc('disconnect_mail_account', jwt, { p_account_id: personalId });
     if (conversationId) {
       await pgPatch('conversation', jwt, { private_to: null }, new URLSearchParams({ id: `eq.${conversationId}` }));
@@ -174,6 +180,21 @@ describe.skipIf(!envReady())('mail_account and private conversations (ADR-099)',
     },
   );
 
+  test('the space setting: only an admin changes it, and new conversations are born private to their creator', async () => {
+    const ws = new URLSearchParams({ id: `eq.${workspaceId}`, select: 'new_conversations_private' });
+    const r = await pgGet<{ new_conversations_private: boolean }>('workspace', jwt, ws);
+    originalSetting = r.rows[0]?.new_conversations_private;
+    expect(typeof originalSetting).toBe('boolean');
+    if (limitedEnvReady()) {
+      const limited = requireLimitedEnv();
+      const other = await login(limited.email, limited.password);
+      const denied = await pgPatch('workspace', other, { new_conversations_private: false }, ws);
+      expect(denied.rows).toHaveLength(0);
+    }
+    const set = await pgPatch<{ new_conversations_private: boolean }>('workspace', jwt, { new_conversations_private: true }, ws);
+    expect(set.rows[0]?.new_conversations_private).toBe(true);
+  });
+
   test('a conversation is private only to who marks it', async () => {
     const created = await pgRpc<{ id: string }>('create_conversation', jwt, {
       p_project_id: projectId,
@@ -183,6 +204,8 @@ describe.skipIf(!envReady())('mail_account and private conversations (ADR-099)',
     expect(created.status).toBe(200);
     conversationId = one(created.data)!.id;
     const byId = new URLSearchParams({ id: `eq.${conversationId}`, select: 'id,private_to' });
+    const born = await pgGet<{ private_to: string | null }>('conversation', jwt, byId);
+    expect(born.rows[0]?.private_to).toBe(me);
 
     if (limitedEnvReady()) {
       const limited = requireLimitedEnv();
@@ -206,6 +229,19 @@ describe.skipIf(!envReady())('mail_account and private conversations (ADR-099)',
     expect(ev.status).toBe(200);
     const back = await pgPatch<{ private_to: string | null }>('conversation', jwt, { private_to: null }, byId);
     expect(back.rows[0]?.private_to).toBeNull();
+  });
+
+  test('the Hour signature of a mailbox: its manager sets it, nobody else', async () => {
+    const ok = await pgRpc('set_mail_signature', jwt, { p_account_id: personalId, p_signature: ' ZZZ firma ' });
+    expect(ok.status).toBeLessThan(300);
+    const r = await pgGet<{ signature: string }>('mail_account', jwt, new URLSearchParams({ select: 'signature', id: `eq.${personalId}` }));
+    expect(r.rows[0]?.signature).toBe('ZZZ firma');
+    if (limitedEnvReady()) {
+      const limited = requireLimitedEnv();
+      const other = await login(limited.email, limited.password);
+      const denied = await pgRpc('set_mail_signature', other, { p_account_id: personalId, p_signature: 'x' });
+      expect(denied.status).toBe(403);
+    }
   });
 
   test('send authorisation: unknown conversation or mailbox is 403', async () => {

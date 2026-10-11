@@ -214,7 +214,7 @@ No crear usuarios insertando en `auth.users`: usar Auth Admin API/Dashboard.
   PATCH directo.
 - El Worker nunca sustituye RLS; valida forma/contrato y reenvía identidad.
 - Única excepción, acotada: la sincronización de buzones (ADR-099) corre sin
-  persona detrás (cron) con `SUPABASE_SECRET_KEY`. Solo la usa
+  persona detrás (cron) con `SUPABASE_SERVICE_ROLE_KEY`. Solo la usa
   `$lib/server/mail/db.ts` y solo para las RPC `mail_*` concedidas a
   service_role; enviar, conectar y desconectar siguen pidiendo antes permiso a
   la base con el JWT de la persona.
@@ -234,7 +234,13 @@ No crear usuarios insertando en `auth.users`: usar Auth Admin API/Dashboard.
 - Cron cada 10 min: `wrangler deploy worker-entry.js` envuelve la salida del
   adaptador de SvelteKit y le añade `scheduled` (`src/worker-cron.ts`).
 - `conversation.private_to`: una conversación privada solo la ve quien la
-  marcó; las policies y las RPC por id lo respetan.
+  marcó, para siempre (sin clave foránea); las policies y las RPC por id lo
+  respetan. `workspace.new_conversations_private` (admin, por defecto true)
+  decide si las nuevas nacen privadas de quien las crea.
+- De cada contacto se traen sus últimos 12 meses, también si entra después
+  (`mail_account_address`). Firma propia de Hour por buzón
+  (`mail_account.signature`). La auditoría de `conversation_event` no copia
+  cuerpo ni asunto de un correo (`write_audit_conversation_event`).
 
 La suite `apps/web/tests/rls/` golpea Supabase como anon, admin, fixture limitado
 y usuario externo. Baseline actual: 120/120. Incluye cero acceso → invitación →

@@ -31,6 +31,7 @@ import {
 import { matchMessage } from './provider';
 import { syncAccount } from './sync';
 import type { IngestPayload, MailAccountRow, MailDb } from './db';
+import { withSignature } from '../../mail';
 
 const KEY_B64 = toBase64Url(new Uint8Array(32).map((_, i) => i + 1));
 const b64url = (s: string) => toBase64Url(new TextEncoder().encode(s));
@@ -65,6 +66,13 @@ describe('crypto', () => {
     await expect(decryptSecret(key, flipped, 'aad')).rejects.toThrow();
     await expect(decryptSecret(other, sealed, 'aad')).rejects.toThrow();
     await expect(decryptSecret(key, 'v2.' + iv + '.' + ct, 'aad')).rejects.toThrow();
+  });
+
+  test('a standard base64 key (openssl rand -base64 32) works', async () => {
+    const std = btoa(String.fromCharCode(...new Uint8Array(32).map((_, i) => 250 - i)));
+    expect(std).toMatch(/[+/=]/);
+    const key = await importMailKey(std);
+    expect(await decryptSecret(key, await encryptSecret(key, 'x', 'a'), 'a')).toBe('x');
   });
 
   test('the key must be 32 bytes and present', async () => {
@@ -252,6 +260,14 @@ describe('address queries (minimisation)', () => {
   });
 });
 
+describe('signature', () => {
+  test('Hour signature goes under the standard delimiter; none, nothing added', () => {
+    expect(withSignature('Hola.\n\n', 'Anouk\nMüK Cia')).toBe('Hola.\n\n-- \nAnouk\nMüK Cia');
+    expect(withSignature('Hola.', '  ')).toBe('Hola.');
+    expect(withSignature('Hola.', null)).toBe('Hola.');
+  });
+});
+
 describe('outgoing message', () => {
   test('RFC 5322 with UTF-8 subject, threading headers and base64 body; no header injection', () => {
     const raw = buildRawMessage({
@@ -355,14 +371,18 @@ function fakeFetch(g: FakeGmail): typeof fetch {
 }
 
 /** La base en memoria, con la misma idempotencia que mail_ingest_message. */
-function memoryDb(contacts: string[]) {
+function memoryDb(contacts: string[], backfilledFrom: string[] = []) {
   const processed = new Set<string>();
+  const backfilled = new Set<string>(backfilledFrom);
   const events: { ref: string; payload: IngestPayload }[] = [];
   const finishes: Parameters<MailDb['finish']>[1][] = [];
   const db: MailDb = {
     claim: async () => [],
     account: async () => null,
-    contactAddresses: async () => contacts,
+    contactAddresses: async () => contacts.map((address) => ({ address, backfilled: backfilled.has(address) })),
+    markBackfilled: async (_a, addresses) => {
+      for (const a of addresses) backfilled.add(a);
+    },
     knownMessages: async (_a, ids) => ids.filter((id) => processed.has(id)),
     ingest: async (_a, p) => {
       if (processed.has(p.provider_message_id)) return 0;
@@ -381,7 +401,7 @@ function memoryDb(contacts: string[]) {
       finishes.push(r);
     },
   };
-  return { db, processed, events, finishes };
+  return { db, processed, events, finishes, backfilled };
 }
 
 async function accountRow(over: Partial<MailAccountRow> = {}): Promise<MailAccountRow> {
@@ -399,6 +419,7 @@ async function accountRow(over: Partial<MailAccountRow> = {}): Promise<MailAccou
     sync_cursor: null,
     sync_from: '2026-08-01T00:00:00Z',
     last_synced_at: null,
+    signature: null,
     ...over,
   };
 }
@@ -456,7 +477,7 @@ describe('sync', () => {
     const g = gmailWith(INBOX());
     g.historyChanged = false;
     g.historyId = '777';
-    const mem = memoryDb(['ines@pradillo.test']);
+    const mem = memoryDb(['ines@pradillo.test'], ['ines@pradillo.test']);
     const adapter = googleAdapter(fakeFetch(g), { clientId: 'c', clientSecret: 's' });
     const r = await syncAccount(
       { db: mem.db, adapter: () => adapter, key: await importMailKey(KEY_B64) },
@@ -471,7 +492,7 @@ describe('sync', () => {
     const g = gmailWith(INBOX());
     g.historyExpired = true;
     g.historyId = '900';
-    const mem = memoryDb(['ines@pradillo.test']);
+    const mem = memoryDb(['ines@pradillo.test'], ['ines@pradillo.test']);
     const adapter = googleAdapter(fakeFetch(g), { clientId: 'c', clientSecret: 's' });
     const r = await syncAccount(
       { db: mem.db, adapter: () => adapter, key: await importMailKey(KEY_B64) },
@@ -481,19 +502,33 @@ describe('sync', () => {
     expect(mem.finishes.at(-1)).toMatchObject({ cursor: '900' });
   });
 
-  test('a truncated pass does not advance the cursor, and the next one finishes the job', async () => {
+  test('a truncated incremental pass does not advance the cursor, and the next one finishes the job', async () => {
+    const many = Array.from({ length: 5 }, (_, i) => message(`m${i}`, 'ines@pradillo.test', 'anouk@muk.test'));
+    const g = gmailWith(many);
+    const mem = memoryDb(['ines@pradillo.test'], ['ines@pradillo.test']);
+    const adapter = googleAdapter(fakeFetch(g), { clientId: 'c', clientSecret: 's' });
+    const deps = { db: mem.db, adapter: () => adapter, key: await importMailKey(KEY_B64), maxMessages: 3 };
+    const row = { sync_cursor: '400', last_synced_at: '2026-10-07T08:00:00Z' };
+    const first = await syncAccount(deps, await accountRow(row));
+    expect(first).toMatchObject({ ingested: 3, complete: false });
+    expect(mem.finishes.at(-1)).toMatchObject({ complete: false });
+    const second = await syncAccount(deps, await accountRow(row));
+    // La segunda lista otra vez, salta las tres conocidas y baja las otras dos.
+    expect(mem.events).toHaveLength(5);
+    expect(second).toMatchObject({ fetched: 2, complete: true });
+  });
+
+  test('a truncated backfill leaves the contact pending until it finishes', async () => {
     const many = Array.from({ length: 5 }, (_, i) => message(`m${i}`, 'ines@pradillo.test', 'anouk@muk.test'));
     const g = gmailWith(many);
     const mem = memoryDb(['ines@pradillo.test']);
     const adapter = googleAdapter(fakeFetch(g), { clientId: 'c', clientSecret: 's' });
     const deps = { db: mem.db, adapter: () => adapter, key: await importMailKey(KEY_B64), maxMessages: 3 };
-    const first = await syncAccount(deps, await accountRow());
-    expect(first).toMatchObject({ ingested: 3, complete: false });
-    expect(mem.finishes.at(-1)).toMatchObject({ complete: false });
-    const second = await syncAccount(deps, await accountRow());
-    // La segunda lista otra vez, salta las tres conocidas y baja las otras dos.
+    await syncAccount(deps, await accountRow());
+    expect(mem.backfilled.size).toBe(0);
+    await syncAccount(deps, await accountRow({ sync_cursor: '500', last_synced_at: '2026-10-07T10:00:00Z' }));
     expect(mem.events).toHaveLength(5);
-    expect(second.fetched).toBe(2);
+    expect(mem.backfilled.has('ines@pradillo.test')).toBe(true);
   });
 
   test('a contact copied by a stranger is marked processed without subject or body', async () => {
@@ -513,6 +548,43 @@ describe('sync', () => {
     const adapter = googleAdapter(fakeFetch(g), { clientId: 'c', clientSecret: 's' });
     await syncAccount({ db: mem.db, adapter: () => adapter, key: await importMailKey(KEY_B64) }, await accountRow());
     expect(g.calls.some((c) => c.includes('/messages'))).toBe(false);
+  });
+
+  test('first pass brings 12 months per contact and marks them; a contact added later gets its 12 months too', async () => {
+    const g = gmailWith([
+      message('a1', 'ines@pradillo.test', 'anouk@muk.test'),
+      message('b1', 'prog@nau.test', 'anouk@muk.test'),
+    ]);
+    const contacts = ['ines@pradillo.test'];
+    const mem = memoryDb(contacts);
+    const adapter = googleAdapter(fakeFetch(g), { clientId: 'c', clientSecret: 's' });
+    const now = Date.parse('2026-10-11T12:00:00Z');
+    const deps = { db: mem.db, adapter: () => adapter, key: await importMailKey(KEY_B64), now: () => now };
+    const seen: string[] = [];
+    const spy = fakeFetch(g);
+    const spying: typeof fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const u = new URL(String(input instanceof Request ? input.url : input));
+      if (u.pathname.endsWith('/messages')) seen.push(u.searchParams.get('q') ?? '');
+      return spy(input, init);
+    }) as typeof fetch;
+    const spyAdapter = googleAdapter(spying, { clientId: 'c', clientSecret: 's' });
+    await syncAccount({ ...deps, adapter: () => spyAdapter }, await accountRow());
+    const yearAgo = Math.floor((now - 365 * 86_400_000) / 1000);
+    expect(seen[0]).toBe(`after:${yearAgo} {from:ines@pradillo.test to:ines@pradillo.test cc:ines@pradillo.test}`);
+    expect([...mem.backfilled]).toEqual(['ines@pradillo.test']);
+    expect(mem.events.map((e) => e.payload.provider_message_id)).toEqual(['a1']);
+
+    // Entra un contacto nuevo: la siguiente pasada trae sus 12 meses aunque no haya historia nueva.
+    contacts.push('prog@nau.test');
+    g.historyChanged = false;
+    seen.length = 0;
+    await syncAccount(
+      { ...deps, adapter: () => spyAdapter },
+      await accountRow({ sync_cursor: '500', last_synced_at: '2026-10-11T11:00:00Z' }),
+    );
+    expect(seen).toEqual([`after:${yearAgo} {from:prog@nau.test to:prog@nau.test cc:prog@nau.test}`]);
+    expect(mem.events.map((e) => e.payload.provider_message_id)).toEqual(['a1', 'b1']);
+    expect(mem.backfilled.has('prog@nau.test')).toBe(true);
   });
 
   test('a revoked grant marks the mailbox revoked', async () => {

@@ -1601,6 +1601,7 @@ export type Database = {
           provider: Database["public"]["Enums"]["mail_provider"]
           refresh_token_ciphertext: string
           scope: Database["public"]["Enums"]["mail_account_scope"]
+          signature: string | null
           status: Database["public"]["Enums"]["mail_account_status"]
           sync_cursor: string | null
           sync_from: string
@@ -1621,6 +1622,7 @@ export type Database = {
           provider: Database["public"]["Enums"]["mail_provider"]
           refresh_token_ciphertext: string
           scope: Database["public"]["Enums"]["mail_account_scope"]
+          signature?: string | null
           status?: Database["public"]["Enums"]["mail_account_status"]
           sync_cursor?: string | null
           sync_from?: string
@@ -1641,6 +1643,7 @@ export type Database = {
           provider?: Database["public"]["Enums"]["mail_provider"]
           refresh_token_ciphertext?: string
           scope?: Database["public"]["Enums"]["mail_account_scope"]
+          signature?: string | null
           status?: Database["public"]["Enums"]["mail_account_status"]
           sync_cursor?: string | null
           sync_from?: string
@@ -1655,6 +1658,32 @@ export type Database = {
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspace"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mail_account_address: {
+        Row: {
+          address: string
+          backfilled_at: string
+          mail_account_id: string
+        }
+        Insert: {
+          address: string
+          backfilled_at?: string
+          mail_account_id: string
+        }
+        Update: {
+          address?: string
+          backfilled_at?: string
+          mail_account_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mail_account_address_mail_account_id_fkey"
+            columns: ["mail_account_id"]
+            isOneToOne: false
+            referencedRelation: "mail_account"
             referencedColumns: ["id"]
           },
         ]
@@ -2849,6 +2878,7 @@ export type Database = {
           kind: Database["public"]["Enums"]["workspace_kind"]
           logo_url: string | null
           name: string
+          new_conversations_private: boolean
           previous_slugs: string[]
           settings: Json
           slug: string
@@ -2871,6 +2901,7 @@ export type Database = {
           kind?: Database["public"]["Enums"]["workspace_kind"]
           logo_url?: string | null
           name: string
+          new_conversations_private?: boolean
           previous_slugs?: string[]
           settings?: Json
           slug: string
@@ -2893,6 +2924,7 @@ export type Database = {
           kind?: Database["public"]["Enums"]["workspace_kind"]
           logo_url?: string | null
           name?: string
+          new_conversations_private?: boolean
           previous_slugs?: string[]
           settings?: Json
           slug?: string
@@ -4187,6 +4219,7 @@ export type Database = {
           kind: Database["public"]["Enums"]["workspace_kind"]
           logo_url: string | null
           name: string
+          new_conversations_private: boolean
           previous_slugs: string[]
           settings: Json
           slug: string
@@ -4469,6 +4502,7 @@ export type Database = {
           provider: Database["public"]["Enums"]["mail_provider"]
           refresh_token_ciphertext: string
           scope: Database["public"]["Enums"]["mail_account_scope"]
+          signature: string | null
           status: Database["public"]["Enums"]["mail_account_status"]
           sync_cursor: string | null
           sync_from: string
@@ -4486,7 +4520,10 @@ export type Database = {
       }
       mail_contact_addresses: {
         Args: { p_account_id: string }
-        Returns: string[]
+        Returns: {
+          address: string
+          backfilled: boolean
+        }[]
       }
       mail_ingest_message: {
         Args: { p_account_id: string; p_created_by?: string; p_message: Json }
@@ -4495,6 +4532,10 @@ export type Database = {
       mail_known_messages: {
         Args: { p_account_id: string; p_ids: string[] }
         Returns: string[]
+      }
+      mail_mark_backfilled: {
+        Args: { p_account_id: string; p_addresses: string[] }
+        Returns: undefined
       }
       mail_send_authorize: {
         Args: { p_account_id: string; p_conversation_id: string }
@@ -4522,6 +4563,7 @@ export type Database = {
           provider: Database["public"]["Enums"]["mail_provider"]
           refresh_token_ciphertext: string
           scope: Database["public"]["Enums"]["mail_account_scope"]
+          signature: string | null
           status: Database["public"]["Enums"]["mail_account_status"]
           sync_cursor: string | null
           sync_from: string
@@ -4808,6 +4850,10 @@ export type Database = {
         Args: { p_membership_id: string }
         Returns: undefined
       }
+      set_mail_signature: {
+        Args: { p_account_id: string; p_signature: string }
+        Returns: undefined
+      }
       share_my_profile_with_workspace: {
         Args: { p_fields?: string[]; p_workspace_id: string }
         Returns: {
@@ -5043,6 +5089,7 @@ export type Database = {
           kind: Database["public"]["Enums"]["workspace_kind"]
           logo_url: string | null
           name: string
+          new_conversations_private: boolean
           previous_slugs: string[]
           settings: Json
           slug: string

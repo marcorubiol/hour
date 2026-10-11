@@ -10,7 +10,7 @@ export type MailAccountStatus = 'active' | 'revoked' | 'error';
 
 /** Las columnas que `authenticated` puede leer (grant por columnas). */
 export const MAIL_ACCOUNT_SELECT =
-  'id,workspace_id,scope,owner_user_id,provider,address,status,sync_from,last_synced_at,last_error,messages_ingested,connected_by,created_at';
+  'id,workspace_id,scope,owner_user_id,provider,address,status,sync_from,last_synced_at,last_error,messages_ingested,connected_by,signature,created_at';
 
 export interface MailAccountItem {
   id: string;
@@ -25,6 +25,8 @@ export interface MailAccountItem {
   last_error: string | null;
   messages_ingested: number;
   connected_by: string | null;
+  /** Firma de Hour: la del personal, de su dueño; la del común, del espacio. */
+  signature: string | null;
   created_at: string;
 }
 
@@ -77,3 +79,13 @@ export function replySubject(subject: string | null | undefined): string {
 export function firstLine(body: string | null | undefined): string {
   return (body ?? '').split('\n').map((l) => l.trim()).find(Boolean) ?? '';
 }
+
+/** El cuerpo con la firma de Hour al pie, tras el separador estándar «-- ». */
+export function withSignature(body: string, signature: string | null | undefined): string {
+  const sig = (signature ?? '').trim();
+  return sig ? `${body.replace(/\s+$/, '')}\n\n-- \n${sig}` : body;
+}
+
+export const SignatureSchema = v.object({
+  signature: v.nullable(v.pipe(v.string(), v.maxLength(2000))),
+});

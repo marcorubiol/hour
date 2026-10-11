@@ -7,16 +7,17 @@
  *  1. descifra el refresh token y pide uno de acceso (revocado → `revoked`);
  *  2. pide a la base las direcciones de los contactos que este buzón puede
  *     traer; sin contactos no se pregunta nada al proveedor;
- *  3. con cursor, pregunta si hubo correo nuevo desde él; si no, termina;
- *  4. busca en el proveedor SOLO por esas direcciones desde la última pasada
- *     (con una hora de solape), descarta los ids ya procesados y baja el resto;
- *  5. empareja (provider.ts) y registra; lo que no empareja se apunta como
- *     procesado sin asunto ni cuerpo, para no volver a bajarlo;
- *  6. avanza el cursor solo si la pasada terminó entera. Si se cortó por el
- *     tope, la siguiente repite la búsqueda y salta lo ya procesado.
- *
- * Límite conocido: un contacto que se añade a Hour después no trae su correo
- * anterior a la última pasada (no hay relleno hacia atrás por contacto nuevo).
+ *  3. contactos nuevos (también todos, la primera vez): busca su correo de los
+ *     últimos 12 meses y, cuando termina, los marca como traídos (ADR-099,
+ *     añadido del 2026-10-11);
+ *  4. contactos ya traídos: con cursor, pregunta si hubo correo nuevo; si lo
+ *     hubo, busca SOLO por esas direcciones desde la última pasada (con una
+ *     hora de solape);
+ *  5. descarta los ids ya procesados, baja el resto, empareja (provider.ts) y
+ *     registra; lo que no empareja se apunta como procesado sin asunto ni
+ *     cuerpo, para no volver a bajarlo;
+ *  6. avanza el cursor solo si la parte incremental terminó entera. Si se cortó
+ *     por el tope, la siguiente repite la búsqueda y salta lo ya procesado.
  *
  * Solo imports relativos (lo empaqueta también el cron, fuera de SvelteKit).
  */
@@ -30,6 +31,8 @@ import { matchMessage, type MailAdapter } from './provider';
 export const MAX_MESSAGES_PER_PASS = 100;
 /** Tope de ids que se listan por pasada (listar es barato: 100 por llamada). */
 export const MAX_IDS_PER_PASS = 1000;
+/** Lo que se trae de un contacto nuevo. */
+export const BACKFILL_MS = 365 * 24 * 60 * 60 * 1000;
 /** Solape con la pasada anterior: el reloj y la indexación de Gmail no son exactos. */
 const OVERLAP_MS = 60 * 60 * 1000;
 
@@ -38,6 +41,7 @@ export interface SyncDeps {
   adapter: (provider: MailAccountRow['provider']) => MailAdapter;
   key: CryptoKey;
   maxMessages?: number;
+  now?: () => number;
 }
 
 export interface SyncResult {
@@ -93,55 +97,77 @@ export async function syncAccount(deps: SyncDeps, account: MailAccountRow): Prom
   }
 
   try {
-    const contacts = new Set((await db.contactAddresses(account.id)).map((a) => a.toLowerCase()));
+    const all = await db.contactAddresses(account.id);
+    const contacts = new Set(all.map((a) => a.address.toLowerCase()));
+    const fresh = all.filter((a) => !a.backfilled).map((a) => a.address.toLowerCase());
+    const settled = all.filter((a) => a.backfilled).map((a) => a.address.toLowerCase());
+    const now = deps.now?.() ?? Date.now();
 
-    // Dónde estamos y desde cuándo buscar.
+    // Dónde estamos y si hubo correo nuevo desde el cursor.
     let cursor: string | null;
-    let fromMs: number;
+    let changed = true;
     const syncFromMs = Date.parse(account.sync_from);
     const lastMs = account.last_synced_at ? Date.parse(account.last_synced_at) : null;
     if (!account.sync_cursor) {
       cursor = (await adapter.profile(access)).cursor;
-      fromMs = syncFromMs;
     } else {
       const c = await adapter.changesSince(access, account.sync_cursor);
       if (c.expired) {
         cursor = (await adapter.profile(access)).cursor;
       } else {
         cursor = c.cursor;
-        if (!c.changed) return finish({ status: 'active', cursor, complete: true, error: null });
+        changed = c.changed;
       }
-      fromMs = Math.max(syncFromMs, (lastMs ?? syncFromMs) - OVERLAP_MS);
     }
 
     if (contacts.size === 0) return finish({ status: 'active', cursor, complete: true, error: null });
 
-    const found = await adapter.search(access, [...contacts], Math.floor(fromMs / 1000), MAX_IDS_PER_PASS);
-    const known = new Set(await db.knownMessages(account.id, found.ids));
-    const pending = found.ids.filter((id) => !known.has(id));
     const counts = { ...base };
+    let budget = max;
 
-    for (const id of pending.slice(0, max)) {
-      const msg = await adapter.fetchMessage(access, id);
-      counts.fetched++;
-      const match = matchMessage(msg, account.address, contacts);
-      counts.ingested += await db.ingest(account.id, {
-        provider_message_id: msg.providerMessageId,
-        provider_thread_id: msg.providerThreadId,
-        rfc_message_id: msg.rfcMessageId,
-        occurred_at: msg.occurredAt,
-        direction: match?.direction ?? 'inbound',
-        // Sin emparejado no se guarda ni asunto ni cuerpo: solo que ya se miró.
-        subject: match ? msg.subject : null,
-        from: match ? msg.fromHeader : '',
-        to: match ? msg.to : [],
-        cc: match ? msg.cc : [],
-        counterparts: match?.counterparts ?? [],
-        body: match ? msg.body || null : null,
-      });
+    /** Baja y registra lo pendiente de una búsqueda; true si no quedó nada. */
+    const drain = async (found: { ids: string[]; truncated: boolean }): Promise<boolean> => {
+      const known = new Set(await db.knownMessages(account.id, found.ids));
+      const pending = found.ids.filter((id) => !known.has(id));
+      const batch = pending.slice(0, Math.max(0, budget));
+      for (const id of batch) {
+        const msg = await adapter.fetchMessage(access, id);
+        counts.fetched++;
+        budget--;
+        const match = matchMessage(msg, account.address, contacts);
+        counts.ingested += await db.ingest(account.id, {
+          provider_message_id: msg.providerMessageId,
+          provider_thread_id: msg.providerThreadId,
+          rfc_message_id: msg.rfcMessageId,
+          occurred_at: msg.occurredAt,
+          direction: match?.direction ?? 'inbound',
+          // Sin emparejado no se guarda ni asunto ni cuerpo: solo que ya se miró.
+          subject: match ? msg.subject : null,
+          from: match ? msg.fromHeader : '',
+          to: match ? msg.to : [],
+          cc: match ? msg.cc : [],
+          counterparts: match?.counterparts ?? [],
+          body: match ? msg.body || null : null,
+        });
+      }
+      return !found.truncated && batch.length === pending.length;
+    };
+
+    // Contactos nuevos: sus últimos 12 meses.
+    if (fresh.length) {
+      const found = await adapter.search(access, fresh, Math.floor((now - BACKFILL_MS) / 1000), MAX_IDS_PER_PASS);
+      if (await drain(found)) await db.markBackfilled(account.id, fresh);
     }
 
-    return finish({ status: 'active', cursor, complete: !found.truncated && pending.length <= max, error: null }, counts);
+    // Contactos ya traídos: lo nuevo desde la última pasada.
+    let incrementalDone = true;
+    if (settled.length && changed) {
+      const fromMs = Math.max(syncFromMs, (lastMs ?? syncFromMs) - OVERLAP_MS);
+      const found = await adapter.search(access, settled, Math.floor(fromMs / 1000), MAX_IDS_PER_PASS);
+      incrementalDone = await drain(found);
+    }
+
+    return finish({ status: 'active', cursor, complete: incrementalDone, error: null }, counts);
   } catch (err) {
     if (err instanceof ProviderAuthError) {
       return finish({ status: 'revoked', cursor: null, complete: false, error: 'access_revoked' });
