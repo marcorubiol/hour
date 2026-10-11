@@ -86,12 +86,12 @@ code (moving one has to be an `UPDATE`, never a migration):
 | Tècnica      |   —   |    ●    |  ●   |  ●   |      —      |
 | Logística    |   —   |    —    |  ●   |  ●   |      —      |
 | Full de ruta |   —   |    —    |  —   |  ●   |      ●      |
-| Comidas      |   —   |    —    |  —   |  ●   |      —      |
+| Comidas      |   —   |    —    |  —   |  ●   |      ●      |
 | Diners       |   ●   |    ●    |  ●   |  ●   |      —      |
 
 Corrected 2026-10-11 (ADR-100 §5, ADR-099 añadido): the fourth column is the bolo; Full de
-ruta exists also at the performance; **Comidas** is a standard facet (placed at the bolo, where
-ADR-099 §6 hangs it; more levels are rows). The table lives in `facet_level`
+ruta exists also at the performance; **Comidas** is a standard facet, at the bolo and at each
+performance (Marco, 2026-10-11). The table lives in `facet_level`
 (`20261011100000_permissions_facets_expand`).
 
 **Facets are configurable per space** (ADR-099 añadido): Hour seeds the standard ones,

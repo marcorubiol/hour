@@ -26,7 +26,7 @@ niveles y las propias facetas como filas.
 | `container_level` | `workspace`, `project`, `line`, `bolo`, `performance` (ADR-100 §5). |
 | `access_verb` | `view`, `edit`; `edit` implica `view`. Sin fila = res. |
 | `facet` | Estándar de Hour (`workspace_id` NULL, nombre por clave i18n `facet.<key>`): converses, materials, tecnica, logistica, full_de_ruta, comidas, diners. Propias de un espacio (`workspace_id`, `label`, `labels` por idioma). La clave no cambia. |
-| `facet_level` | Dónde existe cada faceta, como filas. Full de ruta en bolo y función; Comidas en el bolo. |
+| `facet_level` | Dónde existe cada faceta, como filas. Full de ruta y Comidas en bolo y función. |
 | `workspace_facet_setting` | Un espacio renombra, desactiva u ordena una faceta (estándar o suya). |
 | `access_preset`, `access_preset_facet` | Los cuatro paquetes de ADR-100 §6 (abajo). |
 | `membership` | Una fila por persona con login y contenedor: `workspace_role` (solo espacio), `container_verb`, `can_edit_meta`, `can_manage_members`, `roles` (etiqueta), `preset`. |
@@ -37,7 +37,7 @@ Paquetes (ADR-100 §6), expandidos sobre las facetas estándar que existen en el
 | Paquete | Contenedor | Facetas | Metadatos | Miembros |
 |---|---|---|---|---|
 | Mínim | view | ninguna | no | no |
-| Equip | view | Materials, Tècnica, Logística, Full de ruta: view | no | no |
+| Equip | view | Materials, Tècnica, Logística, Full de ruta, Comidas: view | no | no |
 | Coordinació | edit | todas edit, Diners view | sí | no |
 | Direcció | edit | todas edit, Diners incluido | sí | sí (muere en la fase 3, ADR-100 §3) |
 
@@ -129,11 +129,9 @@ paquetes en un bolo en 5 pasos más, y exige paridad cero tras cada uno. Corre i
   revocar). El test RLS deja una para la fixture limitada; es idempotente.
 - **Tests contra producción.** `permissions-facets.test.ts` falla allí mientras las migraciones no estén aplicadas.
 
-## 7. Dudas
+## 7. Dudas cerradas (Marco, 2026-10-11)
 
-1. **Comidas en Equip.** ADR-100 §6 lista para Equip Materials, Tècnica, Logística y Full de ruta; Comidas no. Lo dejé
-   fuera de Equip y dentro de «todo» en Coordinació y Direcció. Si la tripulación tiene que ver las comidas, es una
-   fila.
-2. **Niveles de Comidas.** Solo en el bolo, por ADR-099 §6. Si debe existir en la línea o en la función, son filas.
-3. **Etiquetas de las facetas estándar.** Las escribí en los cuatro idiomas (CA Àpats, ES Comidas, EN Meals, FR
-   Repas; Diners es Dinero, Money, Argent): revisar el tono.
+1. Equip ve Comidas.
+2. Comidas existe en el bolo y en cada función.
+3. Las etiquetas de las facetas estándar valen como están (CA Àpats, ES Comidas, EN Meals, FR Repas; Diners es
+   Dinero, Money, Argent).

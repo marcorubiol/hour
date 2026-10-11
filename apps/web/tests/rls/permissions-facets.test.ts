@@ -51,7 +51,7 @@ const DECIDED_LEVELS: Record<string, string[]> = {
   tecnica: ['project', 'line', 'bolo'],
   logistica: ['line', 'bolo'],
   full_de_ruta: ['bolo', 'performance'],
-  comidas: ['bolo'],
+  comidas: ['bolo', 'performance'],
   diners: ['workspace', 'project', 'line', 'bolo'],
 };
 
@@ -496,6 +496,7 @@ describe.skipIf(!envReady())('RLS: permisos por facetas', () => {
       );
       const keyOf = Object.fromEntries(Object.entries(standard).map(([key, id]) => [id, key]));
       expect(rows.rows.map((row) => `${keyOf[row.facet_id]}:${row.verb}:${row.source}`).sort()).toEqual([
+        'comidas:view:preset',
         'full_de_ruta:view:preset',
         'logistica:view:preset',
         'materials:view:preset',

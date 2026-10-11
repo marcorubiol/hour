@@ -194,7 +194,7 @@ BEGIN
   SELECT string_agg(f.key || ':' || mf.verb || ':' || mf.source, ',' ORDER BY f.key) INTO v_keys
   FROM public.membership_facet mf JOIN public.facet f ON f.id = mf.facet_id
   WHERE mf.membership_id = v_mid;
-  IF v_keys IS DISTINCT FROM 'full_de_ruta:view:preset,logistica:view:preset,materials:view:preset,tecnica:view:preset' THEN
+  IF v_keys IS DISTINCT FROM 'comidas:view:preset,full_de_ruta:view:preset,logistica:view:preset,materials:view:preset,tecnica:view:preset' THEN
     RAISE EXCEPTION 'equip on a bolo expanded to %', v_keys;
   END IF;
   RAISE NOTICE 'ok: owner grants equip on a bolo (%)', v_keys;

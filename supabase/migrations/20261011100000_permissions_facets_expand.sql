@@ -169,8 +169,7 @@ INSERT INTO public.facet (key, sort) VALUES
   ('diners',       60);
 
 -- La tabla de la enmienda de ADR-082, con la función (ADR-100 §5: Full de ruta
--- también ahí) y Comidas en el bolo (ADR-099: «comidas en el bolo»; si debe
--- existir en más niveles, son filas).
+-- también ahí) y Comidas en el bolo y en cada función (Marco, 2026-10-11).
 INSERT INTO public.facet_level (facet_id, level)
 SELECT f.id, l.level::public.container_level
 FROM (VALUES
@@ -179,7 +178,7 @@ FROM (VALUES
   ('tecnica',      'project'),   ('tecnica',   'line'),    ('tecnica',   'bolo'),
   ('logistica',    'line'),      ('logistica', 'bolo'),
   ('full_de_ruta', 'bolo'),      ('full_de_ruta', 'performance'),
-  ('comidas',      'bolo'),
+  ('comidas',      'bolo'),      ('comidas', 'performance'),
   ('diners',       'workspace'), ('diners',    'project'), ('diners',    'line'), ('diners', 'bolo')
 ) AS l (key, level)
 JOIN public.facet f ON f.key = l.key AND f.workspace_id IS NULL;
@@ -210,15 +209,15 @@ INSERT INTO public.access_preset (key, sort, container_verb, can_edit_meta, can_
   ('coordinacio', 30, 'edit', true,  false),
   ('direccio',    40, 'edit', true,  true);
 
--- Mínim: el contenedor. Equip: lo ve con Materials, Tècnica, Logística y Full
--- de ruta. Coordinació: edita todo y ve Diners. Direcció: edita todo, Diners
--- incluido. Comidas no aparece en ADR-100 §6 para Equip: va con «todo» en
--- Coordinació y Direcció (plan § Dudas).
+-- Mínim: el contenedor. Equip: lo ve con Materials, Tècnica, Logística, Full
+-- de ruta y Comidas (Marco, 2026-10-11). Coordinació: edita todo y ve Diners.
+-- Direcció: edita todo, Diners incluido.
 INSERT INTO public.access_preset_facet (preset_key, facet_key, verb) VALUES
   ('equip',       'materials',    'view'),
   ('equip',       'tecnica',      'view'),
   ('equip',       'logistica',    'view'),
   ('equip',       'full_de_ruta', 'view'),
+  ('equip',       'comidas',      'view'),
   ('coordinacio', 'converses',    'edit'),
   ('coordinacio', 'materials',    'edit'),
   ('coordinacio', 'tecnica',      'edit'),
