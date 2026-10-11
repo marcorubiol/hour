@@ -3396,3 +3396,13 @@ Marco aceptó las seis recomendaciones del plan (§ 8):
 6. **Paquetes:** Mínim ve el contenedor; Equip lo ve con Materials, Tècnica, Logística y Full de ruta; Coordinació
    edita todo y ve Diners y los metadatos; Direcció edita todo, Diners y miembros incluidos. Las facetas son
    configurables por espacio (ADR-099, añadido): los paquetes se expanden sobre las facetas estándar.
+
+**Añadido el 2026-10-11, tras el carril del buzón de Google (`claude/mail-google`):**
+- **Sincronización en segundo plano:** el cron del Worker usa la clave de servicio, acotada a las RPC `mail_*`, que
+  comprueban el dueño de cada buzón. Excepción explícita a «el Worker nunca sustituye RLS», solo para el correo.
+- **Buzón común:** envía quien puede editar la conversación.
+- **Auditoría:** el texto de los correos no se copia a `audit_log`; queda que hubo un correo, no su cuerpo.
+- **Conversación privada cuyo dueño sale del espacio:** sigue oculta para siempre (Marco: puede ser la conversación con
+  una amiga programadora, que nadie más debe ver).
+- **Contacto añadido más tarde:** se trae su correo de los últimos 12 meses.
+- **Firma:** propia de Hour, no la de Gmail.
