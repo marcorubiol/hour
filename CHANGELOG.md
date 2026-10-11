@@ -6,6 +6,7 @@ hasta entonces, sacado de esos documentos; lo anterior a julio de 2026 está sol
 
 ## Octubre 2026 (en curso)
 
+- El directorio de salas pasa a 6.802 salas: más de España (Andalucía, Madrid, Valencia y el resto de municipios pequeños) y de Francia. (2026-10-11)
 - La escaleta se edita en directo entre varias personas, como las notas, en la vista Día y en la ficha de la función o del ensayo; la presencia cuenta a cada persona una sola vez. (2026-10-11, `fffa2cd`)
 - En el móvil, Ajustes se navega desde una banda arriba y sus filas ya no desbordan, y la agenda del Planner usa todo el ancho, con cada semana en una línea. El Access desk de Workspaces se lee de izquierda a derecha, sin huecos dentro de su marco. (2026-10-10, `a6c5695`)
 - Directorio de salas: al vincular el lugar de una función se puede buscar entre 4.659 salas públicas de España y Francia (teatros, auditorios, salas polivalentes, casas de cultura y ateneos) y adoptarla en vuestro espacio con un clic. Solo datos públicos, con sus fuentes y licencias en «Créditos y licencias». (2026-10-10, `3649036`)
