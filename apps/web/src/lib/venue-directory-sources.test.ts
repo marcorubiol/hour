@@ -60,7 +60,8 @@ describe('eielVerdict: the phase 1 kinds, no civic centre without capacity', () 
   });
   it('auditorio, casa de cultura, otros with a stage use', () => {
     expect(v('AU', [], 'AUDITORIO ADOLFO SUAREZ')).toMatchObject({ kind: 'auditorium' });
-    expect(v('CC', [], 'CASA DE LA CULTURA')).toMatchObject({ kind: 'cultural_centre' });
+    expect(v('CC', ['TE'], 'CASA DE LA CULTURA')).toMatchObject({ kind: 'cultural_centre' });
+    expect(v('CC', [], 'CASA DE LA CULTURA')).toEqual({ skip: 'casa de cultura sin uso escénico' });
     expect(v('OT', ['AO'], 'NAVE POLIVALENTE')).toMatchObject({ kind: 'multipurpose' });
     expect(v('OT', ['MO'], 'CASTILLO')).toBeNull();
   });
@@ -82,7 +83,7 @@ describe('eielRecords: one province of the national survey', () => {
     '2024|CU|04|031|0001|01|004|TEATRO SAAVEDRA|TC|MU|MU|500|0|500|SI|R',
     '2024|CU|04|031|0001|01|005|USOS MULTIPLES|CS|MU|MU|500|0|500|SI|R',
   ].join('\r\n');
-  const uses = ['2024|CU|04|031|0001|01|004|TE|300', '2024|CU|04|031|0001|01|005|TE|200'].join('\r\n');
+  const uses = ['2024|CU|04|001|0001|01|001|AO|150', '2024|CU|04|031|0001|01|004|TE|300', '2024|CU|04|031|0001|01|005|TE|200'].join('\r\n');
   const municipalities = ['2024|04|001||Abla', '2024|04|031||Ejido, El'].join('\r\n');
   const skipped: string[] = [];
   const recs = eielRecords({ centres, uses, municipalities }, normPlace, kindFromName, (w) => skipped.push(w));

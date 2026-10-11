@@ -149,8 +149,8 @@ export type EielVerdict = { kind: Kind; designation: string } | { skip: string }
  * - TC (teatro/cine): a stage, unless its name says cinema and nothing else
  *   and it declares no theatre use («Cine de verano»).
  * - AU (auditorio): an auditorium (a theatre when its name says so).
- * - CC (casa de cultura): a cultural centre, like the casas de cultura of
- *   phase 1.
+ * - CC (casa de cultura): a cultural centre, only with a theatre or auditorium
+ *   use: one without a stage is no use for programming (Marco, 2026-10-11).
  * - OT (otros): only with a theatre or auditorium use, as a multipurpose hall.
  * - CS (centro social/cívico): never, even with a stage use: the EIEL gives
  *   no capacity, and a civic centre enters only with one (Marco, 10-10).
@@ -176,7 +176,7 @@ export function eielVerdict(
     return { kind: byName === 'other_stage' || byName === 'cultural_centre' ? 'theatre' : byName, designation };
   }
   if (type === 'AU') return { kind: byName === 'theatre' ? 'theatre' : 'auditorium', designation };
-  if (type === 'CC') return { kind: 'cultural_centre', designation };
+  if (type === 'CC') return stageUse ? { kind: 'cultural_centre', designation } : { skip: 'casa de cultura sin uso escénico' };
   return { kind: 'multipurpose', designation };
 }
 
