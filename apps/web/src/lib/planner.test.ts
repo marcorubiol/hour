@@ -295,6 +295,32 @@ function blk(overrides: Partial<BlackoutInput> = {}): BlackoutInput {
 }
 
 describe('conflictsFor', () => {
+  /**
+   * ADR-103 — «voy» is a fact. On a date (no roster of its own) it is what
+   * lets the engine say «she said she'd go, and she is away», and two
+   * events sharing a «voy» are a people clash, not a possibility. But a
+   * «voy» is not the whole team, so it never proves two events disjoint.
+   */
+  it('a «voy» on a date meets an absence', () => {
+    const d = ev({ id: 'd' });
+    const block = blk({ id: 'blk-firm', person_id: 'p1', certainty: 'unavailable' });
+    expect(conflictsFor([d], {}, [block])).toEqual([]);
+    expect(conflictsFor([d], {}, [block], { d: ['p1'] })).toEqual([
+      { severity: 'blackout', event_ids: ['d'], person_ids: ['p1'], availability_block_id: 'blk-firm' },
+    ]);
+  });
+
+  it('a shared «voy» is a people clash; a lone one stays a possibility', () => {
+    const a = ev({ id: 'a', project_id: 'proj-a' });
+    const b = ev({ id: 'b', project_id: 'proj-b' });
+    expect(conflictsFor([a, b], { a: ['p1'] }, [], { b: ['p1'] })).toEqual([
+      { severity: 'people', event_ids: ['a', 'b'], person_ids: ['p1'] },
+    ]);
+    expect(conflictsFor([a, b], { a: ['p1'] }, [], { b: ['p2'] })).toEqual([
+      { severity: 'possible', event_ids: ['a', 'b'], person_ids: [] },
+    ]);
+  });
+
   it('flags a people conflict when both rosters are known and share a person', () => {
     const a = ev({ id: 'a', project_id: 'proj-a' });
     const b = ev({ id: 'b', project_id: 'proj-b' });
