@@ -32,6 +32,7 @@
   import Input from '../Input.svelte';
   import Pill from '../Pill.svelte';
   import Select from '../Select.svelte';
+  import WhoGoes from './WhoGoes.svelte';
   import { addToast } from '../Toast.svelte';
   import {
     DATE_TYPE_KEYS,
@@ -423,6 +424,18 @@
         <!-- Hidden submit lets Enter inside an input trigger submit. -->
         <button type="submit" hidden aria-hidden="true"></button>
       </form>
+
+      {#if date.project}
+        <!-- ADR-103: who goes is its own write, outside the form's save. -->
+        <WhoGoes
+          target="date"
+          id={date.id}
+          projectId={date.project.id}
+          workspaceId={date.project.workspace_id}
+          commitments={date.commitments}
+          {locale}
+        />
+      {/if}
     </div>
   {/if}
 

@@ -33,7 +33,7 @@
    * Calm does not touch it (Marco, 2026-08-10): knowing what comes next is
    * the opposite of noise.
    */
-  import { createQuery } from '@tanstack/svelte-query';
+  import { createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
   import { fetchJSON } from '$lib/api';
   import { dualTime, hourMark, localeDayMonth, localeWeekdayShort } from '$lib/datetime';
@@ -47,7 +47,8 @@
     type SlipKind,
   } from '$lib/month-events';
   import { meQueryOptions, teamQueryOptions, workspacesQueryOptions } from '$lib/nav-queries';
-  import { buildPersonAttribution } from '$lib/people';
+  import { buildPersonAttribution, type CommitmentState } from '$lib/people';
+  import { setCommitment } from '$lib/commitments';
   import { dayKeyInTz, plannerDayHref } from '$lib/planner';
   import { computePulse, type PulseWord } from '$lib/pulse';
   import type { AvailabilityItem } from '$lib/availability';
@@ -220,6 +221,27 @@
   let nowGuess = $derived(pulse.now.doing ? pulse.now.doing.ref.attribution !== 'explicit' : false);
   let nextGuess = $derived(pulse.next ? pulse.next.ref.attribution !== 'explicit' : false);
 
+  /**
+   * ADR-103 — a guess about YOU can be answered from here: «voy» turns it into
+   * a fact, «no voy» takes it off your rail. Only an `inferred` row asks: an
+   * `unattributed` one is the company's day, not a guess about you.
+   */
+  const queryClient = useQueryClient();
+  let answering = $state(false);
+  let canAnswer = $derived(
+    Boolean(personId) && pulse.next?.ref.attribution === 'inferred' && !answering,
+  );
+  async function answer(state: CommitmentState) {
+    const next = pulse.next;
+    if (!next || !personId) return;
+    answering = true;
+    try {
+      await setCommitment(queryClient, next.ref.of, next.ref.id, personId, state);
+    } finally {
+      answering = false;
+    }
+  }
+
   /** The one fact the slip cannot carry: a gig is ONE instant on the sheet
       (see `performanceSlip`), and the call is the moment before it. */
   let nextCall = $derived(pulse.next?.call ? hour(pulse.next.call, pulse.next.ref.tz) : null);
@@ -278,6 +300,17 @@
               class="pulse__lab">{t('pulse.call', locale)}</span
             >
             {nextCall}{/if}
+        </span>
+      {/if}
+      {#if canAnswer}
+        <span class="pulse__answer">
+          <button type="button" class="pulse__btn" onclick={() => answer('going')}
+            >{t('pulse.going', locale)}</button
+          ><i class="pulse__sep">·</i><button
+            type="button"
+            class="pulse__btn"
+            onclick={() => answer('not_going')}>{t('pulse.not_going', locale)}</button
+          >
         </span>
       {/if}
     {/if}
@@ -416,6 +449,27 @@
      part of the number. Uppercasing the whole note turned 11h into 11H. */
   .pulse__lab {
     text-transform: uppercase;
+  }
+  /* ADR-103 — the answer to a guess speaks in the margin's voice: it is a
+     question the rail asks, not a call to action. */
+  .pulse__answer {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    letter-spacing: var(--mono-letter-spacing-loose);
+    color: var(--text-faint);
+    white-space: nowrap;
+  }
+  .pulse__btn {
+    all: unset;
+    cursor: pointer;
+    color: var(--text-muted);
+  }
+  .pulse__btn:hover {
+    color: var(--text-color);
+  }
+  .pulse__btn:focus-visible {
+    outline: var(--focus-width) solid var(--focus-color);
+    outline-offset: var(--focus-offset);
   }
   .pulse__sep {
     font-style: normal;

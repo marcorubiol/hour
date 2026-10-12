@@ -30,10 +30,12 @@
 import { isWeekendIso, type LaneAxis } from '$lib/carrils';
 import type { ClashVM, Slip } from '$lib/month-events';
 import {
+  linkOf,
   noCastKey,
   noCastProjectId,
   peopleOf,
   personRowKeys,
+  type Commitment,
   type PersonLink,
   type TeamItem,
 } from '$lib/people';
@@ -238,6 +240,8 @@ export interface BoardEventIn {
   cert: StatusFamily;
   /** The row's own roster, when it has one (a performance does). */
   roster?: readonly string[] | null;
+  /** Each person's word on the row (ADR-103). */
+  commitments?: readonly Commitment[] | null;
   /** Gig identity, with the venue name as fallback — see `laneTally`. */
   venue_id?: string | null;
   slip: Slip;
@@ -320,6 +324,7 @@ export function laneEvents(input: {
       roster: e.roster,
       projectCast: input.castByProject.get(e.project_id),
       awayPersonIds: input.awayByDay.get(e.day),
+      commitments: e.commitments,
     });
     const { keys, link } = personRowKeys(people, e.project_id);
     for (const k of keys) {
@@ -352,7 +357,8 @@ export function laneEvents(input: {
         );
         laneKeys.add(laneKey);
       }
-      place(laneKey, e.day, e, link);
+      // Per person: a row can be mixed (one confirmed, one still a guess).
+      place(laneKey, e.day, e, noCastProjectId(k) !== null ? link : linkOf(people, k));
     }
   }
   return { groups, cells };

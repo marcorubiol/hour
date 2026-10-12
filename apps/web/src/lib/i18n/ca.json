@@ -1594,5 +1594,13 @@
   "settings.conv_privacy_hint": "Privades: només les veu qui les crea, amb els seus correus. Cada persona pot compartir després les seves. Les que ja existeixen no canvien.",
   "settings.conv_privacy_private": "Privades",
   "settings.conv_privacy_shared": "Compartides",
-  "settings.conv_privacy_admin_only": "Ho decideix un admin de l'espai."
+  "settings.conv_privacy_admin_only": "Ho decideix un admin de l'espai.",
+  "pulse.going": "hi vaig",
+  "pulse.not_going": "no hi vaig",
+  "commitment.who_goes": "Qui hi va",
+  "commitment.inferred": "deduït",
+  "commitment.going": "Hi va",
+  "commitment.not_going": "No hi va",
+  "commitment.clear": "Treure",
+  "commitment.refused": "No pots canviar el d'una altra persona aquí."
 }

@@ -40,6 +40,9 @@
   } from '$lib/performance';
   import type { VenueContact } from '$lib/venue';
   import DirectoryPicker from '$lib/components/DirectoryPicker.svelte';
+  import WhoGoes from '$lib/components/planner/WhoGoes.svelte';
+  import type { Commitment } from '$lib/people';
+  import { performanceRoster } from '$lib/planner';
   import Select from '$lib/components/Select.svelte';
   import { boloOf, boloOptions, boloPatch, booksHref, type BoloLite } from '$lib/bolo-pick';
   import { performanceBoloQueryOptions, projectBolosQueryOptions } from '$lib/bolo-queries';
@@ -113,6 +116,8 @@
         person: PersonEmbed | null;
         replaces_person: { id: string; full_name: string } | null;
       }>;
+      /** ADR-103 — each person's «voy / no voy». */
+      commitments?: Commitment[];
       date: Array<{
         id: string;
         kind: string;
@@ -761,6 +766,22 @@
         </ul>
       </section>
     {/if}
+
+    <!-- ADR-103: «quién va». Next to a roster it only adds people; without
+         one it answers the inference from the project cast. The roster is
+         drawn above, so it is passed to be left out, not drawn twice. -->
+    <section class="perf__section">
+      <WhoGoes
+        target="performance"
+        id={perf.id}
+        projectId={bundle!.performance.project?.id ?? null}
+        workspaceId={perf.workspace_id}
+        commitments={perf.commitments}
+        roster={performanceRoster(bundle!)}
+        showRoster={false}
+        {locale}
+      />
+    </section>
 
     {#if perf.date.length > 0}
       <section class="perf__section" aria-label={t('perf.related_dates', locale)}>

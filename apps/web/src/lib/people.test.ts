@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   awayIndex,
+  attributionFor,
   awayPersonIdsOn,
+  buildPersonAttribution,
   buildPersonScope,
+  linkOf,
   matchesPinnedPeople,
   noCastKey,
   noCastProjectId,
@@ -18,6 +21,8 @@ describe('peopleOf', () => {
     expect(peopleOf({ roster: ['laia', 'cloe'], projectCast: ['mia'] })).toEqual({
       personIds: ['laia', 'cloe'],
       link: 'explicit',
+      inferredIds: [],
+      withdrawnIds: [],
     });
   });
 
@@ -40,6 +45,8 @@ describe('peopleOf', () => {
     expect(peopleOf({ roster: [], projectCast: ['mia', 'jordi'] })).toEqual({
       personIds: ['mia', 'jordi'],
       link: 'inferred',
+      inferredIds: ['mia', 'jordi'],
+      withdrawnIds: [],
     });
     // A null roster is the same fact as an empty one.
     expect(peopleOf({ roster: null, projectCast: ['mia'] }).link).toBe('inferred');
@@ -64,11 +71,9 @@ describe('peopleOf', () => {
    * data, which is the one thing the person axis must never do.
    */
   it('gives up as `unknown` rather than guessing, and unknown is its own word', () => {
-    expect(peopleOf({})).toEqual({ personIds: [], link: 'unknown' });
-    expect(peopleOf({ projectCast: ['mia'], awayPersonIds: away(['mia']) })).toEqual({
-      personIds: [],
-      link: 'unknown',
-    });
+    const nobody = { personIds: [], link: 'unknown', inferredIds: [], withdrawnIds: [] };
+    expect(peopleOf({})).toEqual(nobody);
+    expect(peopleOf({ projectCast: ['mia'], awayPersonIds: away(['mia']) })).toEqual(nobody);
   });
 
   it('dedupes and keeps the order the inputs offered', () => {
@@ -245,5 +250,82 @@ describe('personRowKeys', () => {
   it('the synthetic key round-trips and cannot be mistaken for a person', () => {
     expect(noCastProjectId(noCastKey('mamemi'))).toBe('mamemi');
     expect(noCastProjectId('019f21d2-7482-77e6-9ad9-27d881cff305')).toBeNull();
+  });
+});
+
+/**
+ * ADR-103 — the inference can be answered, person by person. «Voy» makes a
+ * fact of a guess, «no voy» takes it out, and one answer settles nobody else.
+ */
+describe('commitments (ADR-103)', () => {
+  const going = (id: string) => ({ person_id: id, state: 'going' as const });
+  const notGoing = (id: string) => ({ person_id: id, state: 'not_going' as const });
+
+  it('«voy» turns one guess into a fact and leaves the others guessed', () => {
+    const got = peopleOf({ projectCast: ['laia', 'pau'], commitments: [going('laia')] });
+    expect(got.personIds).toEqual(['laia', 'pau']);
+    expect(got.link).toBe('explicit');
+    expect(got.inferredIds).toEqual(['pau']);
+    expect(linkOf(got, 'laia')).toBe('explicit');
+    expect(linkOf(got, 'pau')).toBe('inferred');
+  });
+
+  it('«no voy» takes a person out of the inference', () => {
+    const got = peopleOf({ projectCast: ['laia', 'pau'], commitments: [notGoing('laia')] });
+    expect(got.personIds).toEqual(['pau']);
+    expect(got.link).toBe('inferred');
+    expect(got.withdrawnIds).toEqual(['laia']);
+  });
+
+  it('«voy» counts even when the person is away: a fact is never second-guessed', () => {
+    const got = peopleOf({
+      projectCast: ['laia'],
+      awayPersonIds: away(['laia']),
+      commitments: [going('laia')],
+    });
+    expect(got.personIds).toEqual(['laia']);
+    expect(got.link).toBe('explicit');
+  });
+
+  it('«voy» from outside the cast adds the person', () => {
+    const got = peopleOf({ projectCast: ['laia'], commitments: [going('anouk')] });
+    expect(got.personIds).toEqual(['anouk', 'laia']);
+    expect(got.inferredIds).toEqual(['laia']);
+  });
+
+  it('next to a roster nobody is inferred, and «voy» joins it', () => {
+    const got = peopleOf({ roster: ['cloe'], projectCast: ['laia'], commitments: [going('pau')] });
+    expect(got.personIds).toEqual(['cloe', 'pau']);
+    expect(got.inferredIds).toEqual([]);
+  });
+
+  it('the pinned verdict follows the person, not the row', () => {
+    const people = peopleOf({ projectCast: ['laia', 'pau'], commitments: [going('laia')] });
+    expect(attributionFor(people, new Set(['laia']))).toBe('explicit');
+    expect(attributionFor(people, new Set(['pau']))).toBe('inferred');
+  });
+
+  /**
+   * The trap: everyone withdrew, the row resolves to nobody, and `unknown`
+   * would read as «the company's day, still yours» — the rail would keep
+   * showing the very thing you just said no to.
+   */
+  it('a «no voy» is a «no» for whoever said it, even on an emptied row', () => {
+    const people = peopleOf({ projectCast: ['laia'], commitments: [notGoing('laia')] });
+    expect(people.link).toBe('unknown');
+    expect(attributionFor(people, new Set(['laia']))).toBe('no');
+    expect(attributionFor(people, new Set(['pau']))).toBe('unattributed');
+  });
+
+  it('reaches the axis the rail reads', () => {
+    const axis = buildPersonAttribution({
+      pinnedPersonIds: ['laia'],
+      team: [{ person_id: 'laia', workspace_id: 'w', slug: 'laia', full_name: 'Laia', project_ids: ['p'] }],
+      blocks: [],
+    });
+    const row = { projectId: 'p', day: '2026-10-20' };
+    expect(axis.attribute(row)).toBe('inferred');
+    expect(axis.attribute({ ...row, commitments: [going('laia')] })).toBe('explicit');
+    expect(axis.attribute({ ...row, commitments: [notGoing('laia')] })).toBe('no');
   });
 });

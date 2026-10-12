@@ -309,6 +309,7 @@ export function computePulse(input: PulseInput, now: Date): Pulse {
           projectId: p.project?.id ?? null,
           day: p.performed_at.slice(0, 10),
           roster: p.person_ids,
+          commitments: p.commitments,
         })
       : 'explicit';
     if (attribution === 'no') continue;
@@ -321,6 +322,7 @@ export function computePulse(input: PulseInput, now: Date): Pulse {
       ? axis.attribute({
           projectId: d.project?.id ?? null,
           day: dayKeyInTz(d.starts_at, d.venue?.timezone || viewerTz),
+          commitments: d.commitments,
         })
       : 'explicit';
     if (attribution === 'no') continue;

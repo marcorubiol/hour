@@ -615,12 +615,14 @@
       projectId: p.project?.id ?? null,
       day: perfDayKey(p),
       roster: p.person_ids,
+      commitments: p.commitments,
     });
   }
   function datePersonVerdict(d: DateEvent) {
     return personScope.verdict({
       projectId: d.project?.id ?? null,
       day: dateDayKey(d, viewerTz),
+      commitments: d.commitments,
     });
   }
 
@@ -1019,6 +1021,7 @@
         kind: 'perf',
         cert: performanceStatusFamily(p.status),
         roster: p.person_ids ?? null,
+        commitments: p.commitments ?? null,
         // This feed carries no venue id, so the tally's gig identity falls
         // back to the slip's name — the engine's own documented fallback.
         venue_id: null,
@@ -1035,6 +1038,7 @@
         kind: d.kind === 'travel_day' ? 'travel' : 'date',
         cert: dateStatusFamily(d.status),
         roster: null,
+        commitments: d.commitments ?? null,
         venue_id: null,
         slip: dateSlip(d, slipCtxPage),
       });

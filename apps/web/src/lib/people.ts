@@ -1,13 +1,14 @@
 /**
  * The person axis — who a calendar row involves, and how sure we are.
  *
- * Hour has no date↔person table: a `performance` carries a real roster
- * (project cast − replaced + overrides + its crew, `rosterPersonIds` in
- * $lib/planner), and a `date` row carries nobody at all. So the only
- * honest way to say "this rehearsal is Laia's" is to INFER it from the
- * project's canonical cast (`cast_member`, which hangs off the project) —
- * and an inference that is allowed to say anything is worse than no
- * inference.
+ * A `performance` carries a real roster (project cast − replaced +
+ * overrides + its crew, `rosterPersonIds` in $lib/planner); a `date` row
+ * carries nobody unless somebody gave their word on it. So the honest
+ * default for "this rehearsal is Laia's" is to INFER it from the project's
+ * canonical cast (`cast_member`, which hangs off the project) — and an
+ * inference that is allowed to say anything is worse than no inference.
+ * Since ADR-103 the inference can be answered person by person
+ * (`commitment_person`): «voy» turns it into a fact, «no voy» removes it.
  *
  * Two rules govern this whole module, and they pull in opposite
  * directions on purpose:
@@ -60,10 +61,31 @@ export interface TeamItem {
 export type PersonLink = 'explicit' | 'inferred' | 'unknown';
 
 export interface PeopleOf {
-  /** Person ids, deduped, in the order the inputs offered them. */
+  /** Person ids, deduped, in the order the inputs offered them: the facts
+      first (roster, then whoever said «voy»), then the inference. */
   personIds: string[];
+  /** How the row as a whole was reached: `explicit` as soon as one person
+      on it is a fact. A row can be MIXED since ADR-103 (Laia confirmed, Pau
+      is still a guess), so a drawing that is per person reads `inferredIds`. */
   link: PersonLink;
+  /** The subset of `personIds` that is a guess. */
+  inferredIds: string[];
+  /** Who said «no voy» (ADR-103): out of the inference, and a «no» for them
+      even when nobody else is left on the row. */
+  withdrawnIds: string[];
 }
+
+/** One person's word on a commitment (ADR-103, `commitment_person`). */
+export type CommitmentState = 'going' | 'not_going';
+
+export interface Commitment {
+  person_id: string;
+  state: CommitmentState;
+}
+
+/** The PostgREST embed every feed of performances or dates selects, so the
+    attribution can read each person's word (ADR-103). */
+export const COMMITMENTS_EMBED = 'commitments:commitment_person(person_id,state)';
 
 const EMPTY_AWAY: ReadonlySet<string> = new Set<string>();
 
@@ -83,9 +105,12 @@ function dedupe(ids: readonly string[]): string[] {
  * Who a calendar row involves.
  *
  * - A non-empty `roster` wins outright and comes back `explicit` — **never
- *   filtered by `awayPersonIds`** (rule 1 above).
+ *   filtered by `awayPersonIds`** (rule 1 above). Whoever said «voy» joins
+ *   it; nobody is inferred next to a roster.
  * - With no roster, the project's canonical cast minus whoever is away that
- *   day comes back `inferred` (rule 2).
+ *   day comes back `inferred` (rule 2), minus whoever already gave their
+ *   word (ADR-103): «voy» makes a person a fact, «no voy» takes them out.
+ *   The word is per person: one confirmation does not settle the others.
  * - Nothing left to say: `unknown` with an empty list. That is not the same
  *   fact as "nobody is on it" — a caller must not print "free" off an
  *   `unknown`, which is why it has its own word.
@@ -97,15 +122,37 @@ export function peopleOf(input: {
   projectCast?: readonly string[] | null;
   /** Person ids unavailable on this row's day (see `awayPersonIdsOn`). */
   awayPersonIds?: ReadonlySet<string> | null;
+  /** Each person's word on this row (ADR-103). */
+  commitments?: readonly Commitment[] | null;
 }): PeopleOf {
   const roster = dedupe(input.roster ?? []);
-  if (roster.length > 0) return { personIds: roster, link: 'explicit' };
+  const commitments = input.commitments ?? [];
+  const going = commitments.filter((c) => c.state === 'going').map((c) => c.person_id);
+  const withdrawnIds = dedupe(
+    commitments.filter((c) => c.state === 'not_going').map((c) => c.person_id),
+  );
+  const facts = dedupe([...roster, ...going]);
+
+  if (roster.length > 0) {
+    return { personIds: facts, link: 'explicit', inferredIds: [], withdrawnIds };
+  }
 
   const away = input.awayPersonIds ?? EMPTY_AWAY;
-  const candidates = dedupe(input.projectCast ?? []).filter((id) => !away.has(id));
-  if (candidates.length > 0) return { personIds: candidates, link: 'inferred' };
+  const withdrawn = new Set(withdrawnIds);
+  const known = new Set(facts);
+  const inferredIds = dedupe(input.projectCast ?? []).filter(
+    (id) => !away.has(id) && !withdrawn.has(id) && !known.has(id),
+  );
+  const personIds = [...facts, ...inferredIds];
+  const link: PersonLink =
+    facts.length > 0 ? 'explicit' : inferredIds.length > 0 ? 'inferred' : 'unknown';
+  return { personIds, link, inferredIds, withdrawnIds };
+}
 
-  return { personIds: [], link: 'unknown' };
+/** How one person on a row was reached — the per-person view of `link`. */
+export function linkOf(people: PeopleOf, personId: string): PersonLink {
+  if (!people.personIds.includes(personId)) return 'unknown';
+  return people.inferredIds.includes(personId) ? 'inferred' : 'explicit';
 }
 
 /** The verdict of narrowing a row by a set of pinned people. */
@@ -139,9 +186,16 @@ export function attributionFor(
   pinnedPersonIds: ReadonlySet<string>,
 ): PersonAttribution {
   if (pinnedPersonIds.size === 0) return 'explicit';
+  let guessed = false;
   for (const id of people.personIds) {
-    if (pinnedPersonIds.has(id)) return people.link === 'inferred' ? 'inferred' : 'explicit';
+    if (!pinnedPersonIds.has(id)) continue;
+    if (!people.inferredIds.includes(id)) return 'explicit';
+    guessed = true;
   }
+  if (guessed) return 'inferred';
+  // «No voy» is an answer: a row everybody withdrew from is not the
+  // company's unknown day any more for whoever said it.
+  if (people.withdrawnIds.some((id) => pinnedPersonIds.has(id))) return 'no';
   return people.link === 'unknown' ? 'unattributed' : 'no';
 }
 
@@ -247,6 +301,7 @@ export interface PersonScope {
     /** ISO day the row is bucketed into — the away gate is per day. */
     day: string;
     roster?: readonly string[] | null;
+    commitments?: readonly Commitment[] | null;
   }): PersonMatch;
 }
 
@@ -258,6 +313,7 @@ export interface PersonAttributionScope {
     /** ISO day the row is bucketed into — the away gate is per day. */
     day: string;
     roster?: readonly string[] | null;
+    commitments?: readonly Commitment[] | null;
   }): PersonAttribution;
 }
 
@@ -315,6 +371,7 @@ export function buildPersonAttribution(input: {
         roster: row.roster,
         projectCast: row.projectId ? castByProject.get(row.projectId) : null,
         awayPersonIds: awayOn(row.day),
+        commitments: row.commitments,
       });
       return attributionFor(people, pinned);
     },
