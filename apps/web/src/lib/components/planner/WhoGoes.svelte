@@ -125,6 +125,8 @@
   const nameOf = (personId: string) => names.get(personId) ?? '—';
 </script>
 
+<!-- Nobody on file and nobody to add: nothing to say, so no empty heading. -->
+{#if (showRoster && rosterIds.length > 0) || rows.length > 0 || addable.length > 0}
 <section class="who" aria-label={t('commitment.who_goes', locale)}>
   <h3 class="who__h">{t('commitment.who_goes', locale)}</h3>
   <ul class="who__list">
@@ -197,6 +199,7 @@
     <p class="who__err" role="alert">{t('commitment.refused', locale)}</p>
   {/if}
 </section>
+{/if}
 
 <style>
   @layer components {
