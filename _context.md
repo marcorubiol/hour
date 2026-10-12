@@ -31,19 +31,18 @@ aprueba, el sistema ejecuta y deja auditoría. UI manual e IA leen y escriben lo
 fixtures. Sin billing ni self-service. Modelo ya multi-workspace y multi-account. La beta externa espera a cerrar lo
 de Phase 0.9 en `_tasks.md`. Pricing orientativo, no decidido.
 
-## Producción (verificado 2026-10-11)
+## Producción (verificado 2026-10-12)
 
-- Web `https://hour.zerosense.studio`, Worker `hour-web`. `/health/live`: SHA **`c5fdaac`**, `dirty:false`, builtAt
-  2026-10-12T04:32Z (fase 2 de la conversación con la sala, su arreglo y el historial). `main` == prod salvo documentos.
+- Web `https://hour.zerosense.studio`, Worker `hour-web`. `/health/live`: SHA **`1d042bb`**, `dirty:false`, builtAt
+  2026-10-12T19:55Z (ADR-103: «voy / no voy» sobre lo deducido). `main` == prod salvo documentos.
 - Despliegue: `pnpm --filter web run deploy` (no `pnpm deploy` desde la raíz). Exige árbol limpio.
 - Supabase `hour-phase0` · ref `lqlyorlccnniybezugme` · `eu-central-1`. Plan Free, con keepalive diario
   (`.github/workflows/keepalive.yml`) contra la pausa por inactividad. Pasar a Pro antes de la beta, aún no
   (`_tasks.md § 9`). Si algo de Supabase falla tras días sin uso, lo primero es `dig <ref>.supabase.co`.
-- **Última migración aplicada: `20261011900000_create_conversation_revive_person`** (2026-10-12, run 38169733513),
-  tras la fase 2 de ADR-102 (800000, 820000, 810000). El directorio tiene 6.802 salas. Las migraciones van por
-  `production-migrate.yml`: backup, plan, apply (`_tasks.md § 34`).
+- **Última migración aplicada: `20261012100000_commitment_person`** (2026-10-12, run 38297869183), ADR-103. El
+  directorio tiene 6.802 salas. Las migraciones van por `production-migrate.yml`: backup, plan, apply (`_tasks.md § 34`).
 - `hour-staging` (ref `slccyknqpgmzhyiyclsq`, `eu-west-1`): pausado.
-- Últimas suites (2026-10-12): RLS 291/299 (8 saltados) contra `ed7d34d` y E2E 66/66 contra `c5fdaac`.
+- Últimas suites (2026-10-12): RLS 297/305 (8 saltados) y E2E 66/66 contra `7163ded` (ADR-103).
 - Desde el checkout principal (`~/Developer/hour`), nunca desde un worktree: los worktrees no llevan `.env` ni
   `.env.test` (RLS sale saltado, el login del E2E falla).
 - `pnpm --filter web test:rls`: siempre contra producción; carga `.env` + `.env.test` y no mira `.env.local`.
