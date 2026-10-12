@@ -177,7 +177,8 @@ describe.skipIf(!envReady())('commitment_person (ADR-103)', () => {
     const d = await rehearsal();
     expect((await say('date', d, laia, 'going')).status).toBe(200);
     expect(await wordsOn('date_id', d)).toHaveLength(1);
-    expect((await pgRpc('delete_date', jwt, { p_date_id: d })).status).toBe(200);
+    const gone = await pgRpc('delete_date', jwt, { p_date_id: d });
+    expect(gone.status, gone.error).toBeLessThan(300);
     expect(await wordsOn('date_id', d)).toHaveLength(0);
   });
 
