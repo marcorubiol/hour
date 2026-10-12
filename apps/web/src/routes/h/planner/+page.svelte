@@ -686,7 +686,19 @@
     }
     return map;
   });
-  let conflicts = $derived(conflictsFor(engineEvents, rosters, allBlackouts));
+  /** ADR-103 — whoever said «voy»: on the event for the engine, even on a
+      date, which has no roster of its own. */
+  let committed = $derived.by(() => {
+    const map: Record<string, string[]> = {};
+    for (const row of [...scopedPerfs, ...scopedDates]) {
+      const going = (row.commitments ?? [])
+        .filter((c) => c.state === 'going')
+        .map((c) => c.person_id);
+      if (going.length > 0) map[row.id] = going;
+    }
+    return map;
+  });
+  let conflicts = $derived(conflictsFor(engineEvents, rosters, allBlackouts, committed));
   let eventDayById = $derived(new Map(engineEvents.map((e) => [e.id, e.day])));
 
   // ── Derived away bands (ADR-078 §6) — display-only inference. ────────

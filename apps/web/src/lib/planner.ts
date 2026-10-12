@@ -278,12 +278,20 @@ function isHoldPerf(e: PlannerEvent): boolean {
  * 'blackout-tentative' → 'possible' → 'concurrence'), stable within a
  * rank. Away bands are NEVER an input here (ADR-078 §6 — display-only
  * inference).
+ *
+ * `committed` (ADR-103) is whoever said «voy» on an event: a fact, so it
+ * joins the roster for every claim that needs a person ON the event (a
+ * shared person, a person away). It is NOT a full roster — the rest of the
+ * team may still be a guess — so it never makes two events «known and
+ * disjoint»; that stays a claim only full rosters can make.
  */
 export function conflictsFor(
   events: PlannerEvent[],
   rosters: Record<string, string[]>,
   blackouts: BlackoutInput[],
+  committed: Record<string, string[]> = {},
 ): Conflict[] {
+  const onEvent = (id: string) => [...new Set([...(rosters[id] ?? []), ...(committed[id] ?? [])])];
   const out: Conflict[] = [];
 
   // Pairwise same-day clashes, grouped by day so the scan is n² per day.
@@ -323,7 +331,15 @@ export function conflictsFor(
           // Both rosters known and disjoint otherwise: no conflict —
           // that's the point.
         } else {
-          out.push({ severity: 'possible', event_ids: [a.id, b.id], person_ids: [] });
+          // A roster is missing, but somebody's «voy» may already be on
+          // both sides: that is a fact, not a possibility.
+          const setB = new Set(onEvent(b.id));
+          const shared = onEvent(a.id).filter((id) => setB.has(id));
+          out.push(
+            shared.length > 0
+              ? { severity: 'people', event_ids: [a.id, b.id], person_ids: shared }
+              : { severity: 'possible', event_ids: [a.id, b.id], person_ids: [] },
+          );
         }
       }
     }
@@ -334,7 +350,7 @@ export function conflictsFor(
   // free by design, ADR-078 §5); company-wide blocks apply to the block's
   // own workspace only.
   for (const e of events) {
-    const roster = rosters[e.id] ?? [];
+    const roster = onEvent(e.id);
     for (const block of blackouts) {
       if (e.day < block.starts_on || e.day > block.ends_on) continue;
       const involved =

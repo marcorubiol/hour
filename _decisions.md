@@ -3470,3 +3470,6 @@ deducción no se puede confirmar ni quitar.
   compromiso; quien edita el Planner (`edit:performance`) toca la lista de cualquiera desde la ficha. «No voy» no
   existe para quien está en el reparto explícito de una función: eso es editar el reparto; «no voy» solo resuelve lo
   deducido. Migración `20261012100000_commitment_person`.
+- **«Voy» entra en el detector de conflictos (Marco, 2026-10-12, opción a).** Quien dijo «voy» está en el compromiso
+  para el motor: choca con su ausencia, y dos compromisos con el mismo «voy» son un choque de personas. No es un
+  reparto completo, así que nunca demuestra que dos compromisos no comparten a nadie.
