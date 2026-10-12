@@ -235,13 +235,18 @@
       text-decoration: line-through;
       color: var(--text-faint);
     }
+    .who__name {
+      min-inline-size: 0;
+    }
     .who__state {
+      white-space: nowrap;
       font-family: var(--font-mono);
       font-size: var(--text-xs);
       color: var(--text-faint);
     }
     .who__acts {
       margin-inline-start: auto;
+      white-space: nowrap;
       display: flex;
       gap: var(--space-xs);
     }
