@@ -1486,6 +1486,7 @@ export type Database = {
           notes: string | null
           number: string | null
           payer_fiscal_identity_id: string | null
+          payer_organization_id: string | null
           payer_person_id: string | null
           payer_snapshot: Json | null
           payment_condition: string | null
@@ -1513,6 +1514,7 @@ export type Database = {
           notes?: string | null
           number?: string | null
           payer_fiscal_identity_id?: string | null
+          payer_organization_id?: string | null
           payer_person_id?: string | null
           payer_snapshot?: Json | null
           payment_condition?: string | null
@@ -1540,6 +1542,7 @@ export type Database = {
           notes?: string | null
           number?: string | null
           payer_fiscal_identity_id?: string | null
+          payer_organization_id?: string | null
           payer_person_id?: string | null
           payer_snapshot?: Json | null
           payment_condition?: string | null
@@ -1585,6 +1588,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "workspace"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_workspace_payer_organization_fkey"
+            columns: ["workspace_id", "payer_organization_id"]
+            isOneToOne: false
+            referencedRelation: "workspace_organization"
+            referencedColumns: ["workspace_id", "id"]
           },
           {
             foreignKeyName: "invoice_workspace_payer_person_fkey"
@@ -3583,6 +3593,7 @@ export type Database = {
           custom_fields: Json
           deleted_at: string | null
           email: string | null
+          fiscal_identity_id: string | null
           id: string
           kind: string
           name: string
@@ -3602,6 +3613,7 @@ export type Database = {
           custom_fields?: Json
           deleted_at?: string | null
           email?: string | null
+          fiscal_identity_id?: string | null
           id?: string
           kind?: string
           name: string
@@ -3621,6 +3633,7 @@ export type Database = {
           custom_fields?: Json
           deleted_at?: string | null
           email?: string | null
+          fiscal_identity_id?: string | null
           id?: string
           kind?: string
           name?: string
@@ -3632,6 +3645,13 @@ export type Database = {
           workspace_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "workspace_organization_fiscal_identity_id_fkey"
+            columns: ["fiscal_identity_id"]
+            isOneToOne: false
+            referencedRelation: "fiscal_identity"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "workspace_organization_workspace_id_fkey"
             columns: ["workspace_id"]
@@ -3904,6 +3924,10 @@ export type Database = {
       }
       can_access_project: { Args: { p_project_id: string }; Returns: boolean }
       can_edit_project: { Args: { p_project_id: string }; Returns: boolean }
+      can_edit_workspace_money: {
+        Args: { p_workspace_id: string }
+        Returns: boolean
+      }
       can_manage_mail_account: {
         Args: { p_account_id: string }
         Returns: boolean
@@ -4315,6 +4339,7 @@ export type Database = {
           p_notes?: string
           p_number?: string
           p_payer_fiscal_identity_id?: string
+          p_payer_organization_id?: string
           p_payer_person_id?: string
           p_payment_condition?: string
           p_tax_lines?: Json
@@ -4336,6 +4361,7 @@ export type Database = {
           notes: string | null
           number: string | null
           payer_fiscal_identity_id: string | null
+          payer_organization_id: string | null
           payer_person_id: string | null
           payer_snapshot: Json | null
           payment_condition: string | null
@@ -4952,6 +4978,7 @@ export type Database = {
           notes: string | null
           number: string | null
           payer_fiscal_identity_id: string | null
+          payer_organization_id: string | null
           payer_person_id: string | null
           payer_snapshot: Json | null
           payment_condition: string | null
@@ -5047,6 +5074,20 @@ export type Database = {
           project_id: string
           status: Database["public"]["Enums"]["performance_status"]
           venue_name: string
+        }[]
+      }
+      list_money_payer_organizations: {
+        Args: {
+          p_limit?: number
+          p_project_ids?: string[]
+          p_workspace_ids?: string[]
+        }
+        Returns: {
+          has_fiscal_identity: boolean
+          id: string
+          name: string
+          slug: string
+          workspace_id: string
         }[]
       }
       list_money_payers: {
@@ -5554,6 +5595,40 @@ export type Database = {
         Args: { p_signature: string; p_workspace_id: string }
         Returns: undefined
       }
+      set_organization_fiscal_identity: {
+        Args: { p_fiscal: Json; p_organization_id: string }
+        Returns: {
+          account_id: string | null
+          address_line_1: string | null
+          address_line_2: string | null
+          archived: boolean
+          city: string | null
+          country: string | null
+          created_at: string
+          created_by: string | null
+          custom_fields: Json
+          default_irpf_pct: number | null
+          default_vat_pct: number | null
+          deleted_at: string | null
+          iban: string | null
+          id: string
+          kind: string
+          label: string
+          legal_name: string
+          postal_code: string | null
+          region: string | null
+          swift_bic: string | null
+          tax_id: string | null
+          updated_at: string
+          workspace_id: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "fiscal_identity"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       share_my_profile_with_workspace: {
         Args: { p_fields?: string[]; p_workspace_id: string }
         Returns: {
@@ -5640,6 +5715,7 @@ export type Database = {
           notes: string | null
           number: string | null
           payer_fiscal_identity_id: string | null
+          payer_organization_id: string | null
           payer_person_id: string | null
           payer_snapshot: Json | null
           payment_condition: string | null

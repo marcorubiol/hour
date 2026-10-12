@@ -1,4 +1,9 @@
-/** GET /api/money/payers — relevant conversation people the caller may invoice. */
+/**
+ * GET /api/money/payers — the organizations the caller may invoice: those of
+ * conversations it sees in projects where it edits money (ADR-102 decision 5).
+ * `list_money_payers` (persons) stays for the Worker before phase 2b; phase 4
+ * drops it.
+ */
 
 import type { RequestHandler } from './$types';
 import * as v from 'valibot';
@@ -37,7 +42,7 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
   const workspaceIds = parseUuidList(parsed.output.workspace_ids);
 
   try {
-    const { data } = await pgPostRpc<MoneyPayer>(env, 'list_money_payers', jwt, {
+    const { data } = await pgPostRpc<MoneyPayer>(env, 'list_money_payer_organizations', jwt, {
       p_project_ids: projectIds.length > 0 ? projectIds : null,
       p_workspace_ids: workspaceIds.length > 0 ? workspaceIds : null,
       p_limit: 500,

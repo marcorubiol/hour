@@ -76,7 +76,7 @@
     subtotal: number;
     total: number;
     currency: string;
-    payer: { full_name: string; organization_name: string | null } | null;
+    payer: { name: string } | null;
     lines: { bolo_id: string | null }[];
   };
 

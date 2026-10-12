@@ -51,12 +51,25 @@ export interface PaymentItem {
 	deleted_at?: string | null;
 }
 
+/**
+ * Who an invoice can go to: an organization of a conversation the caller sees
+ * (ADR-102 decision 5, `list_money_payer_organizations`). `has_fiscal_identity`
+ * says whether a factura can be issued to it.
+ */
 export interface MoneyPayer {
 	id: string;
 	workspace_id: string;
 	slug: string;
-	full_name: string;
-	organization_name: string | null;
+	name: string;
+	has_fiscal_identity: boolean;
+}
+
+/** An invoice's payer as the invoice feed embeds it: the organization. */
+export interface InvoicePayer {
+	id: string;
+	slug: string;
+	name: string;
+	fiscal_identity_id: string | null;
 }
 
 /**
@@ -117,7 +130,9 @@ export interface MoneyInvoiceItem {
 	id: string;
 	workspace_id: string;
 	project_id: string | null;
-	payer_person_id: string | null;
+	payer_organization_id: string | null;
+	payer_fiscal_identity_id: string | null;
+	doc_type: 'factura' | 'proforma';
 	number: string | null;
 	status: string;
 	issued_on: string;
@@ -132,19 +147,14 @@ export interface MoneyInvoiceItem {
 	notes: string | null;
 	paid_amount: number;
 	project: { id: string; slug: string; name: string; workspace_id: string } | null;
-	payer: {
-		id: string;
-		slug: string;
-		full_name: string;
-		organization_name: string | null;
-	} | null;
+	payer: InvoicePayer | null;
 	lines: { bolo_id: string | null }[];
 	payments: PaymentItem[];
 }
 
 export interface TermsInvoice {
 	id: string;
-	payer_person_id: string | null;
+	payer_organization_id: string | null;
 	issued_on: string;
 	total: number;
 }
@@ -195,7 +205,7 @@ export function observedPayerTermsDays(
 
 	const samplesByPayer = new Map<string, number[]>();
 	for (const invoice of invoices) {
-		if (!invoice.payer_person_id) continue;
+		if (!invoice.payer_organization_id) continue;
 		const invoicePayments = activeByInvoice.get(invoice.id) ?? [];
 		const paid = invoicePayments.reduce((sum, payment) => sum + Number(payment.amount), 0);
 		if (paid < Number(invoice.total) || invoicePayments.length === 0) continue;
@@ -205,9 +215,9 @@ export function observedPayerTermsDays(
 			.at(-1);
 		if (!finalReceivedOn) continue;
 		const days = Math.max(0, daysBetween(invoice.issued_on, finalReceivedOn));
-		const bucket = samplesByPayer.get(invoice.payer_person_id) ?? [];
+		const bucket = samplesByPayer.get(invoice.payer_organization_id) ?? [];
 		bucket.push(days);
-		samplesByPayer.set(invoice.payer_person_id, bucket);
+		samplesByPayer.set(invoice.payer_organization_id, bucket);
 	}
 
 	const result = new Map<string, ObservedPayerTerms>();
@@ -222,6 +232,25 @@ export function observedPayerTermsDays(
 		result.set(payerId, { days: median, samples: sorted.length });
 	}
 	return result;
+}
+
+/**
+ * Whether a draft carries its payer's fiscal data into `issue_invoice`, which
+ * freezes `payer_fiscal_identity_id` and nothing else:
+ *  - `ready`: the draft has a receiver identity;
+ *  - `stale`: the organization has one the draft does not (added after the
+ *    draft was made): setting the payer again picks it up;
+ *  - `missing`: the organization has none yet;
+ *  - `no_payer`: the draft has no payer organization.
+ */
+export type PayerFiscalState = 'ready' | 'stale' | 'missing' | 'no_payer';
+
+export function payerFiscalState(
+	invoice: Pick<MoneyInvoiceItem, 'payer_fiscal_identity_id' | 'payer'>,
+): PayerFiscalState {
+	if (invoice.payer_fiscal_identity_id) return 'ready';
+	if (!invoice.payer) return 'no_payer';
+	return invoice.payer.fiscal_identity_id ? 'stale' : 'missing';
 }
 
 export type AgingStateName = 'within' | 'approaching' | 'past-expected' | 'paid';

@@ -79,3 +79,36 @@ export function isValidIban(value: string): boolean {
 	if (v === '') return true;
 	return /^[A-Za-z]{2}[0-9]{2}[0-9A-Za-z]{11,30}$/.test(v);
 }
+
+/**
+ * A receiver's fiscal data as `set_organization_fiscal_identity` writes it
+ * (ADR-102 phase 2b): what a factura prints for the payer. Every field is
+ * written; a blank one clears it. `legal_name` is required.
+ */
+export const RECEIVER_FISCAL_FIELDS = [
+	'legal_name',
+	'tax_id',
+	'address_line_1',
+	'address_line_2',
+	'postal_code',
+	'city',
+	'region',
+	'country',
+] as const;
+export type ReceiverFiscalField = (typeof RECEIVER_FISCAL_FIELDS)[number];
+export type ReceiverFiscal = Record<ReceiverFiscalField, string | null>;
+
+/**
+ * GET /api/organizations/[id]/fiscal. `fiscal` is null when the organization
+ * has none, or when the caller cannot read money (RLS on fiscal_identity).
+ */
+export interface OrganizationFiscalResponse {
+	organization: { id: string; workspace_id: string; name: string };
+	fiscal: (ReceiverFiscal & { id: string }) | null;
+	can_edit: boolean;
+}
+
+/** One line for a receiver: legal name · tax id · city. */
+export function receiverFiscalSummary(f: Pick<ReceiverFiscal, 'legal_name' | 'tax_id' | 'city'>): string {
+	return [f.legal_name, f.tax_id, f.city].filter((x) => x && x.trim()).join(' · ');
+}

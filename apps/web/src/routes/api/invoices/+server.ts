@@ -5,7 +5,9 @@
  * POST /api/invoices — create a draft invoice FROM a bolo's fee (ADR-050 +
  *      ADR-087) via the `create_invoice_from_bolo` RPC (the direct INSERT is
  *      claim-bound — sixth case of the pattern). One line, amounts
- *      snapshot the fee + optional VAT/IRPF percentages.
+ *      snapshot the fee + optional VAT/IRPF percentages. The payer is the
+ *      organization of the bolo's conversation (ADR-102 decision 5), inferred
+ *      by the RPC unless `payer_organization_id` names another.
  */
 
 import type { RequestHandler } from './$types';
@@ -44,14 +46,7 @@ function parseUuidList(raw: string | undefined): string[] {
   return [...new Set(raw.split(',').map((s) => s.trim()).filter((s) => UUID.test(s)))];
 }
 
-type InvoiceDbItem = Omit<MoneyInvoiceItem, 'payer' | 'paid_amount'> & {
-  payer: {
-    id: string;
-    slug: string;
-    full_name: string;
-    organization: { name: string } | null;
-  } | null;
-};
+type InvoiceDbItem = Omit<MoneyInvoiceItem, 'paid_amount'>;
 
 export const GET: RequestHandler = async ({ request, url, platform, locals }) => {
   if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);
@@ -76,10 +71,10 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
   search.set(
     'select',
     [
-      'id,number,status,issued_on,due_on,subtotal,total,currency',
-      'workspace_id,project_id,payer_person_id,expected_on,payment_condition,country,notes',
+      'id,number,status,doc_type,issued_on,due_on,subtotal,total,currency',
+      'workspace_id,project_id,payer_organization_id,payer_fiscal_identity_id,expected_on,payment_condition,country,notes',
       'project:project_id(id,slug,name,workspace_id)',
-      'payer:workspace_person!invoice_workspace_payer_person_fkey(id:person_id,slug,full_name,organization:workspace_organization!workspace_person_organization_fkey(name))',
+      'payer:workspace_organization!invoice_workspace_payer_organization_fkey(id,slug,name,fiscal_identity_id)',
       'lines:invoice_line(bolo_id)',
       'tax_lines:invoice_tax_line(id,label,kind,rate_pct,base_amount,amount,exempt_reason,ordinal)',
       'payments:payment!payment_invoice_id_fkey(id,workspace_id,invoice_id,amount,received_on,method,reference,notes,created_at)',
@@ -106,14 +101,6 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
     const items: MoneyInvoiceItem[] = data.map((item) => ({
       ...item,
       paid_amount: item.payments.reduce((sum, payment) => sum + Number(payment.amount), 0),
-      payer: item.payer
-        ? {
-            id: item.payer.id,
-            slug: item.payer.slug,
-            full_name: item.payer.full_name,
-            organization_name: item.payer.organization?.name ?? null,
-          }
-        : null,
     }));
     return json({ items });
   } catch (err) {
@@ -148,7 +135,7 @@ const CreateSchema = v.object({
   due_on: v.optional(v.nullable(v.pipe(v.string(), v.isoDate()))),
   expected_on: v.optional(v.nullable(v.pipe(v.string(), v.isoDate()))),
   payment_condition: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(2000)))),
-  payer_person_id: v.optional(v.nullable(v.pipe(v.string(), v.uuid()))),
+  payer_organization_id: v.optional(v.nullable(v.pipe(v.string(), v.uuid()))),
   notes: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(2000)))),
   // Money v3 (ADR-086): factura|proforma; null lets the RPC derive it from the
   // workspace invoicing_mode. Optional receiver fiscal identity.
@@ -194,7 +181,7 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
       p_notes: input.notes ?? null,
       p_expected_on: input.expected_on ?? null,
       p_payment_condition: input.payment_condition ?? null,
-      p_payer_person_id: input.payer_person_id ?? null,
+      p_payer_organization_id: input.payer_organization_id ?? null,
       p_doc_type: input.doc_type ?? null,
       p_payer_fiscal_identity_id: input.payer_fiscal_identity_id ?? null,
     });
