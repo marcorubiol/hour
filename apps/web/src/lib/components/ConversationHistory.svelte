@@ -76,8 +76,8 @@
       body = '';
       day = localDayISO();
       // Lo apuntado sale ya en el registro, sin esperar a la recarga (que
-      // llega después y manda): con la red lenta de producción la lista podía
-      // seguir enseñando la versión anterior más de 5 s.
+      // llega después y manda). Si la lista aún no ha cargado no hay dónde
+      // ponerlo: lo trae la recarga de onSettled.
       const item = data?.item;
       if (item) {
         queryClient.setQueryData<{ items: ConversationEventItem[] }>(
@@ -105,7 +105,13 @@
         }),
       });
     },
-    onSettled: () => {
+    onSettled: async () => {
+      // Si se apunta antes de que llegue la primera lectura, esa GET salió
+      // antes del POST y vuelve sin lo apuntado. Sin datos en caché,
+      // invalidateQueries no la reinicia: se suma a ella y la lista se queda
+      // con la versión anterior. Se cancela primero para que la recarga sea
+      // una petición nueva, posterior al POST.
+      await queryClient.cancelQueries({ queryKey: ['conversation-events', conversationId] });
       void queryClient.invalidateQueries({ queryKey: ['conversation-events', conversationId] });
       void queryClient.invalidateQueries({ queryKey: ['conversations'] });
       void queryClient.invalidateQueries({ queryKey: ['line-eng-stats'] });
