@@ -1594,5 +1594,13 @@
   "settings.conv_privacy_hint": "Privées : seul leur créateur les voit, e-mails compris. Chacun peut ensuite partager les siennes. Celles qui existent ne changent pas.",
   "settings.conv_privacy_private": "Privées",
   "settings.conv_privacy_shared": "Partagées",
-  "settings.conv_privacy_admin_only": "Un admin de l'espace décide."
+  "settings.conv_privacy_admin_only": "Un admin de l'espace décide.",
+  "pulse.going": "j'y vais",
+  "pulse.not_going": "je n'y vais pas",
+  "commitment.who_goes": "Qui y va",
+  "commitment.inferred": "déduit",
+  "commitment.going": "Y va",
+  "commitment.not_going": "N'y va pas",
+  "commitment.clear": "Effacer",
+  "commitment.refused": "Vous ne pouvez pas changer la réponse de quelqu'un d'autre ici."
 }

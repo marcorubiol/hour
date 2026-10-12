@@ -3464,3 +3464,9 @@ deducción no se puede confirmar ni quitar.
 - Una función ya tiene su reparto; el mismo «voy / no voy» sobre una función deducida escribe en ese reparto.
 - Por diseñar: el modelo (tabla de personas por `date` con su estado confirmado o retirado), sus permisos (quién puede
   confirmar o retirar a otra persona) y el editor en la ficha. Migración aditiva, gate de § 34.
+- **Diseño decidido (Marco, 2026-10-12, sobre la propuesta):** una tabla `commitment_person` (persona × función XOR
+  `date`, estado `going | not_going`), escrita solo por la RPC `set_commitment_person`. La palabra es por persona, no
+  por fila: si Laia confirma, Pau sigue deducido. Permisos: cada uno confirma o retira lo suyo con poder leer el
+  compromiso; quien edita el Planner (`edit:performance`) toca la lista de cualquiera desde la ficha. «No voy» no
+  existe para quien está en el reparto explícito de una función: eso es editar el reparto; «no voy» solo resuelve lo
+  deducido. Migración `20261012100000_commitment_person`.

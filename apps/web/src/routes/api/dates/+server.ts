@@ -37,6 +37,7 @@ import * as v from 'valibot';
 import { extractAccessToken } from '$lib/auth';
 import { DateCreateSchema, type DateRow } from '$lib/date';
 import { pgGet, pgPostRpc, PostgrestError, type SupabaseEnv } from '$lib/supabase';
+import { COMMITMENTS_EMBED } from '$lib/people';
 import { SCHEDULE_SLOT_EMBED, scheduleOf, type ScheduleMoment, type ScheduleSlotRow } from '$lib/schedule-slot';
 import { pgErrorResponse } from '$lib/server/errors';
 
@@ -166,6 +167,8 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
     // ADR-090 P3 — the running order, so the day strip can draw a
     // rehearsal's moments as it draws a gig's.
     SCHEDULE_SLOT_EMBED,
+    // ADR-103 — each person's «voy / no voy»; without it who goes is inferred.
+    COMMITMENTS_EMBED,
   ];
   search.set('select', EXTENDED_SELECT.join(','));
 

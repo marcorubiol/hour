@@ -10,6 +10,7 @@ import { appLocaleTag } from '$lib/i18n';
 import { decideBy, performanceStatusFamily, type StatusFamily } from '$lib/performance';
 import { dateStatusFamily } from '$lib/date';
 import type { ScheduleMoment } from '$lib/schedule-slot';
+import type { Commitment } from '$lib/people';
 
 export type ProjectLite = {
   id: string;
@@ -66,6 +67,8 @@ export type PerformanceEvent = {
   hold_notice_days?: number | null;
   /** Present only on ?rosters=1 fetches (conflict engine feed). */
   person_ids?: string[];
+  /** ADR-103 — each person's «voy / no voy» on it. */
+  commitments?: Commitment[] | null;
 };
 
 export type DateEvent = {
@@ -97,6 +100,9 @@ export type DateEvent = {
   label?: string | null;
   /** ADR-090 P3 — a rehearsal's running order (see `dayMoments`). */
   schedule?: ScheduleMoment[] | null;
+  /** ADR-103 — each person's «voy / no voy» on it. Without any, who goes is
+      inferred from the project cast. */
+  commitments?: Commitment[] | null;
 };
 
 /**

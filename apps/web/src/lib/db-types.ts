@@ -694,6 +694,81 @@ export type Database = {
           },
         ]
       }
+      commitment_person: {
+        Row: {
+          created_at: string
+          date_id: string | null
+          id: string
+          performance_id: string | null
+          person_id: string
+          project_id: string
+          set_by: string | null
+          state: Database["public"]["Enums"]["commitment_state"]
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          date_id?: string | null
+          id?: string
+          performance_id?: string | null
+          person_id: string
+          project_id: string
+          set_by?: string | null
+          state: Database["public"]["Enums"]["commitment_state"]
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          date_id?: string | null
+          id?: string
+          performance_id?: string | null
+          person_id?: string
+          project_id?: string
+          set_by?: string | null
+          state?: Database["public"]["Enums"]["commitment_state"]
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commitment_person_date_id_fkey"
+            columns: ["date_id"]
+            isOneToOne: false
+            referencedRelation: "date"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commitment_person_performance_id_fkey"
+            columns: ["performance_id"]
+            isOneToOne: false
+            referencedRelation: "performance"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commitment_person_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "person"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commitment_person_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "project"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commitment_person_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspace"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       conversation: {
         Row: {
           created_at: string
@@ -5417,6 +5492,32 @@ export type Database = {
         Args: { p_membership_id: string }
         Returns: undefined
       }
+      set_commitment_person: {
+        Args: {
+          p_person_id: string
+          p_state: Database["public"]["Enums"]["commitment_state"]
+          p_target_id: string
+          p_target_table: string
+        }
+        Returns: {
+          created_at: string
+          date_id: string | null
+          id: string
+          performance_id: string | null
+          person_id: string
+          project_id: string
+          set_by: string | null
+          state: Database["public"]["Enums"]["commitment_state"]
+          updated_at: string
+          workspace_id: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "commitment_person"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       set_conversation_contact: {
         Args: {
           p_conversation_id: string
@@ -5729,6 +5830,7 @@ export type Database = {
         | "photo"
         | "video"
         | "other"
+      commitment_state: "going" | "not_going"
       container_level: "workspace" | "project" | "line" | "bolo" | "performance"
       conversation_event_direction: "inbound" | "outbound"
       conversation_event_kind: "note" | "call" | "email" | "meeting" | "message"
@@ -5964,6 +6066,7 @@ export const Constants = {
         "video",
         "other",
       ],
+      commitment_state: ["going", "not_going"],
       container_level: ["workspace", "project", "line", "bolo", "performance"],
       conversation_event_direction: ["inbound", "outbound"],
       conversation_event_kind: ["note", "call", "email", "meeting", "message"],

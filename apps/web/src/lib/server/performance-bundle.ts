@@ -15,6 +15,7 @@
 
 import { pgGet, PostgrestError, type SupabaseEnv } from '$lib/supabase';
 import type { Json, Tables } from '$lib/db-types';
+import { COMMITMENTS_EMBED, type Commitment } from '$lib/people';
 import {
   SCHEDULE_SLOT_EMBED,
   timeslotsFromSlots,
@@ -104,7 +105,8 @@ export type PerformanceDetail = Omit<
     url: string;
     notes: string | null;
     uploaded_at: string | null;
-  }>;
+  }>;  /** ADR-103 — each person's «voy / no voy». */
+  commitments: Commitment[];
 };
 
 export type CastMemberRow = {
@@ -251,6 +253,8 @@ function detailSelect(withNotice: boolean): string {
     `cast_override(id,role,reason,person:workspace_person!cast_override_workspace_person_fkey(${PERSON_COLS}),replaces_person:workspace_person!cast_override_workspace_replaces_person_fkey(id:person_id,full_name))`,
     'date(id,kind,status,title,starts_at,ends_at,all_day,venue_name,city,venue:venue_id(timezone))',
     'asset_version(id,kind,direction,url,notes,uploaded_at)',
+    // ADR-103 — each person's «voy / no voy».
+    COMMITMENTS_EMBED,
   ].join(',');
 }
 

@@ -1603,5 +1603,13 @@
   "settings.conv_privacy_hint": "Private: only their creator sees them, emails included. Everyone can share their own later. Existing ones do not change.",
   "settings.conv_privacy_private": "Private",
   "settings.conv_privacy_shared": "Shared",
-  "settings.conv_privacy_admin_only": "A space admin decides."
+  "settings.conv_privacy_admin_only": "A space admin decides.",
+  "pulse.going": "going",
+  "pulse.not_going": "not going",
+  "commitment.who_goes": "Who goes",
+  "commitment.inferred": "inferred",
+  "commitment.going": "Going",
+  "commitment.not_going": "Not going",
+  "commitment.clear": "Clear",
+  "commitment.refused": "You can't change someone else's answer here."
 }
