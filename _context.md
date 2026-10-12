@@ -33,8 +33,8 @@ de Phase 0.9 en `_tasks.md`. Pricing orientativo, no decidido.
 
 ## Producción (verificado 2026-10-12)
 
-- Web `https://hour.zerosense.studio`, Worker `hour-web`. `/health/live`: SHA **`1d042bb`**, `dirty:false`, builtAt
-  2026-10-12T19:55Z (ADR-103: «voy / no voy» sobre lo deducido). `main` == prod salvo documentos.
+- Web `https://hour.zerosense.studio`, Worker `hour-web`. `/health/live`: SHA **`9e3835b`**, `dirty:false`, builtAt
+  2026-10-12T20:05Z (ADR-103: «voy / no voy» sobre lo deducido, y el «voy» en los conflictos). `main` == prod salvo documentos.
 - Despliegue: `pnpm --filter web run deploy` (no `pnpm deploy` desde la raíz). Exige árbol limpio.
 - Supabase `hour-phase0` · ref `lqlyorlccnniybezugme` · `eu-central-1`. Plan Free, con keepalive diario
   (`.github/workflows/keepalive.yml`) contra la pausa por inactividad. Pasar a Pro antes de la beta, aún no
@@ -42,7 +42,7 @@ de Phase 0.9 en `_tasks.md`. Pricing orientativo, no decidido.
 - **Última migración aplicada: `20261012100000_commitment_person`** (2026-10-12, run 38297869183), ADR-103. El
   directorio tiene 6.802 salas. Las migraciones van por `production-migrate.yml`: backup, plan, apply (`_tasks.md § 34`).
 - `hour-staging` (ref `slccyknqpgmzhyiyclsq`, `eu-west-1`): pausado.
-- Últimas suites (2026-10-12): RLS 297/305 (8 saltados) y E2E 66/66 contra `7163ded` (ADR-103).
+- Últimas suites (2026-10-12): RLS 297/305 (8 saltados) y E2E 66/66 contra `9e3835b` (ADR-103).
 - Desde el checkout principal (`~/Developer/hour`), nunca desde un worktree: los worktrees no llevan `.env` ni
   `.env.test` (RLS sale saltado, el login del E2E falla).
 - `pnpm --filter web test:rls`: siempre contra producción; carga `.env` + `.env.test` y no mira `.env.local`.

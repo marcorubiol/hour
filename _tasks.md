@@ -378,7 +378,7 @@
 
 - [x] **Conversations: «Add to project» solo ofrece los proyectos del ámbito actual** (drop 11-10). Desplegado (`9f867e4`, 2026-10-11).
 - [x] **Conversations: cambiar de ámbito filtra la lista sin salir de Conversations** (drop 11-10). Reproducido (11-10): en la lista ya filtra en el sitio; lo que te sacaba a Desk era cambiar el ámbito desde una ficha abierta desde Conversations (persona o conversación). `c1a3c59` lo arregla. Desplegado (`9f867e4`, 2026-10-11); E2E 64/65 y el rojo (ley del Planner por tiempo) pasa solo.
-- [x] **Planner: lo deducido se aprueba o se retira; `date` gana «quién va», opcional (ADR-103, chat 11-10).** Desplegado (`1d042bb`, 2026-10-12): migración `20261012100000_commitment_person` (run 38297869183), RLS 297/305 (8 saltados), E2E 66/66. Diseño decidido por Marco el 12-10 (permisos a, «no voy» solo sobre lo deducido).
+- [x] **Planner: lo deducido se aprueba o se retira; `date` gana «quién va», opcional (ADR-103, chat 11-10).** Desplegado (`1d042bb`, y el «voy» en los conflictos en `9e3835b`, 2026-10-12): migración `20261012100000_commitment_person` (run 38297869183), RLS 297/305 (8 saltados), E2E 66/66. Diseño decidido por Marco el 12-10 (permisos a, «no voy» solo sobre lo deducido).
 
 
 
