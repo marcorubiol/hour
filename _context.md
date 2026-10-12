@@ -33,8 +33,8 @@ de Phase 0.9 en `_tasks.md`. Pricing orientativo, no decidido.
 
 ## Producción (verificado 2026-10-11)
 
-- Web `https://hour.zerosense.studio`, Worker `hour-web`. `/health/live`: SHA **`ed7d34d`**, `dirty:false`, builtAt
-  2026-10-12T00:06Z (fase 2 de la conversación con la sala y su arreglo). `main` == prod salvo documentos.
+- Web `https://hour.zerosense.studio`, Worker `hour-web`. `/health/live`: SHA **`c5fdaac`**, `dirty:false`, builtAt
+  2026-10-12T04:32Z (fase 2 de la conversación con la sala, su arreglo y el historial). `main` == prod salvo documentos.
 - Despliegue: `pnpm --filter web run deploy` (no `pnpm deploy` desde la raíz). Exige árbol limpio.
 - Supabase `hour-phase0` · ref `lqlyorlccnniybezugme` · `eu-central-1`. Plan Free, con keepalive diario
   (`.github/workflows/keepalive.yml`) contra la pausa por inactividad. Pasar a Pro antes de la beta, aún no
@@ -43,9 +43,7 @@ de Phase 0.9 en `_tasks.md`. Pricing orientativo, no decidido.
   tras la fase 2 de ADR-102 (800000, 820000, 810000). El directorio tiene 6.802 salas. Las migraciones van por
   `production-migrate.yml`: backup, plan, apply (`_tasks.md § 34`).
 - `hour-staging` (ref `slccyknqpgmzhyiyclsq`, `eu-west-1`): pausado.
-- Últimas suites contra `ed7d34d` (2026-10-12): RLS 291/299 (8 saltados) y E2E 64/65. El rojo,
-  `conversation-write.spec.ts:303`: el diálogo History no muestra el evento recién apuntado en producción (en la base
-  sí está). Diagnóstico en `claude/history-refresh`.
+- Últimas suites (2026-10-12): RLS 291/299 (8 saltados) contra `ed7d34d` y E2E 66/66 contra `c5fdaac`.
 - Desde el checkout principal (`~/Developer/hour`), nunca desde un worktree: los worktrees no llevan `.env` ni
   `.env.test` (RLS sale saltado, el login del E2E falla).
 - `pnpm --filter web test:rls`: siempre contra producción; carga `.env` + `.env.test` y no mira `.env.local`.

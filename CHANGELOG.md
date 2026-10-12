@@ -6,6 +6,7 @@ hasta entonces, sacado de esos documentos; lo anterior a julio de 2026 está sol
 
 ## Octubre 2026 (en curso)
 
+- En el historial de una conversación, lo que apuntas sale arriba al momento, aunque la lista aún estuviera cargando. (2026-10-12, `c5fdaac`)
 - Las conversaciones de difusión son con la sala (la organización que programa), con sus contactos: la tabla de Conversations empieza por la organización, el alta pide primero la organización y la autocompleta, y si alguien de una sala que ya tiene conversación entra, se añade como contacto en vez de abrir otra. Los correos del Gmail entran en la conversación de la sala, también la respuesta de alguien que ya no está. (2026-10-11, `be17af8`)
 - En el rail, cuando el próximo compromiso es deducido (nadie te ha puesto en él), solo su nombre va en cursiva. (2026-10-11, `be17af8`)
 - En Cuentas, la lista de pagadores y las facturas creadas desde un bolo ya no muestran a la persona de una conversación privada de otra persona del equipo. (2026-10-11, `6cf690c`)
