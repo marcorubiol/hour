@@ -81,22 +81,24 @@ set name = excluded.name, domain = excluded.domain, city = excluded.city, update
 -- synthetic `muk-cia` and `marco-rubiol` stand in for real tenants it must
 -- never see; its difusión set lives in `playwright-difusion.sql`. The delete
 -- drops the admin rows an older version of this file wrote.
-delete from public.workspace_membership m
+-- Desde la fase 3 de facetas el acceso se escribe en `membership`; las tablas
+-- viejas (workspace_membership, project_membership) son su proyección.
+delete from public.membership m
 using auth.users u
 where u.id = m.user_id
   and u.email = 'playwright@hour.test'
   and m.workspace_id in ('20000000-0000-4000-8000-000000000002', '20000000-0000-4000-8000-000000000003');
 
-insert into public.workspace_membership (workspace_id, user_id, role, accepted_at)
-select fixture.workspace_id, users.id, fixture.role::public.membership_role, fixture.accepted_at
+insert into public.membership (workspace_id, level, user_id, workspace_role, accepted_at)
+select fixture.workspace_id, 'workspace', users.id, fixture.role::public.membership_role, fixture.accepted_at
 from (
   values
     ('playwright@hour.test', '20000000-0000-4000-8000-000000000001'::uuid, 'owner', '2026-01-01T00:00:00Z'::timestamptz),
     ('limited@hour.test', '20000000-0000-4000-8000-000000000001'::uuid, 'member', '2026-01-04T00:00:00Z'::timestamptz)
 ) as fixture(email, workspace_id, role, accepted_at)
 join auth.users users on users.email = fixture.email
-on conflict (workspace_id, user_id) do update
-set role = excluded.role, accepted_at = excluded.accepted_at;
+on conflict (workspace_id, user_id) where level = 'workspace' do update
+set workspace_role = excluded.workspace_role, accepted_at = excluded.accepted_at;
 
 insert into public.project (id, workspace_id, slug, name, status, created_by)
 values
@@ -105,20 +107,34 @@ values
   ('30000000-0000-4000-8000-000000000003', '20000000-0000-4000-8000-000000000002', 'mamemi', 'Synthetic MaMeMi Project', 'active', (select id from auth.users where email = 'playwright@hour.test'))
 on conflict (id) do update set name = excluded.name, status = excluded.status, updated_at = now(), deleted_at = null;
 
-insert into public.project_membership (project_id, user_id, roles, permission_grants, permission_revokes)
+-- limited: intérprete en zzz-e2e-collab, ve la producción y nada más (lo
+-- mismo que el rol performer daba antes de la fase 3).
+insert into public.membership (workspace_id, level, project_id, user_id, roles, container_verb, accepted_at)
 select
+  '20000000-0000-4000-8000-000000000001',
+  'project',
   '30000000-0000-4000-8000-000000000001',
   id,
   array['performer']::text[],
-  '{}'::text[],
-  '{}'::text[]
+  'view',
+  '2026-01-04T00:00:00Z'
 from auth.users
 where email = 'limited@hour.test'
-on conflict (project_id, user_id) do update
+on conflict (project_id, user_id) where level = 'project' do update
 set roles = excluded.roles,
-    permission_grants = excluded.permission_grants,
-    permission_revokes = excluded.permission_revokes,
-    updated_at = now();
+    container_verb = excluded.container_verb,
+    can_edit_meta = false,
+    can_manage_members = false,
+    preset = null,
+    accepted_at = excluded.accepted_at;
+
+delete from public.membership_facet mf
+using public.membership m, auth.users u
+where m.id = mf.membership_id
+  and u.id = m.user_id
+  and u.email = 'limited@hour.test'
+  and m.level = 'project'
+  and m.project_id = '30000000-0000-4000-8000-000000000001';
 
 insert into public.line (id, workspace_id, project_id, name, kind, slug, modules, created_by)
 values
