@@ -1523,6 +1523,7 @@ entre empresas sin construirlo.
 
 ## Deuda aceptada / observar en uso
 
+- [ ] **Los datos fiscales de una organización no se pueden retirar (visto el 2026-10-13, tests de la fase 4 de ADR-102).** Un borrado blando por PostgREST da 42501 (la fila borrada ya no pasa la policy de SELECT), `service_role` no tiene grant sobre `fiscal_identity` y no hay RPC para retirarla. La limpieza de `money-v3.test.ts` y de `money-payer-organization.test.ts` no borraba nada sin decirlo. Cuando haga falta: una RPC `retire_fiscal_identity` con `can_edit_workspace_money`. (chat 13-10, sin estimar)
 - [x] **El rojo del diario de `planner-laws`, RESUELTO (2026-10-10).** Causa: una
   espera fija más corta que la red y un tirón tragado por el cerrojo `probing`; el
   spec espera ahora a sus respuestas (`8e464b4`) y la config guarda traza si falla.
