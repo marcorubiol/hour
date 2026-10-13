@@ -1498,10 +1498,11 @@ entre empresas sin construirlo.
   `create_conversation` la recupera con UPDATE y el ajuste «nacen privadas» solo se aplica al INSERT; si era privada
   de otra persona, seguiría siendo suya. Lo destapó el test RLS de `mail-google.test.ts`.
 - [ ] **Suites inestables (2026-10-11):** `permissions-facets.test.ts` («el admin configura las facetas…») falla a
-  veces en la RLS completa y pasa solo (estado compartido entre ficheros en paralelo); y 4 leyes de
+  veces en la RLS completa y pasa solo. La hipótesis de ficheros en paralelo no vale: la suite RLS ya corre con
+  `fileParallelism: false`. Suelto pasa 3/3 (2026-10-13) y no quedó el mensaje del fallo: si vuelve, guardar la salida; y 4 leyes de
   `planner-laws.spec.ts` fallaron en una pasada E2E de 6,8 min con la red a tirones y pasaron 23/23 solas.
 - [ ] **Bug menor: algo pide `/h/<espacio>/sw.js` (ruta relativa del service worker) y el Worker registra un 404 en
-  cada carga de Ajustes** (visto en los registros el 2026-10-11). Ruido en los errores; buscar quién lo registra.
+  cada carga de Ajustes** (visto en los registros el 2026-10-11). **Arreglado en `claude/sw-scope` (`6892cb5`, 2026-10-13), sin integrar:** SvelteKit construye con base relativa (`./`) y `virtual:pwa-register` registraba `./sw.js` con scope `./`; `base: '/'` en `VitePWA` lo deja en `/sw.js` con scope `/`. Check 0/0, unit 843. Falta tu OK a la línea para integrarlo y que salga en el próximo deploy.
 - [ ] **Poll de fechas candidatas (à la Doodle/When2meet, integrado).** Al buscar
   fecha para una residencia, un ensayo o una reunión, proponer **varias `date`
   candidatas de golpe**; cada participante confirma las que puede; cuando todos
