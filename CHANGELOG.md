@@ -6,6 +6,7 @@ hasta entonces, sacado de esos documentos; lo anterior a julio de 2026 está sol
 
 ## Octubre 2026 (en curso)
 
+- Una conversación de difusión es siempre con una organización y sus personas son sus contactos, uno de ellos el principal: Hour ya no guarda una persona fija por conversación. Las salas que estaban dos veces en MüK Cia (la Feria de Teatro de Ciudad Rodrigo y Circuito Claps) son ahora una sola, con las dos personas como contactos. (2026-10-13, `70660bb`)
 - En Cuentas, quien paga una factura es la organización (la sala o quien programa), no una persona: el pagador se elige entre organizaciones, una factura hecha desde un bolo toma la de su conversación y sus datos fiscales, y un borrador avisa si a la organización le faltan datos fiscales antes de emitirla. Los datos fiscales de una organización se editan desde la conversación o desde el borrador. (2026-10-13, `816707f`)
 - Lo que Hour deduce sobre ti se puede contestar: en el rail, bajo lo siguiente, «voy · no voy»; en la ficha de un ensayo, viaje o residencia, y en la de una función sin reparto, «Quién va» con cada persona deducida en cursiva, para confirmarla, retirarla o añadir a alguien del equipo. Cada uno contesta lo suyo; quien edita el Planner, por cualquiera. Un «voy» cuenta para los conflictos: si esa persona tiene una ausencia ese día, o dijo «voy» a otra cosa a la vez, el Planner lo avisa. (2026-10-12, `9e3835b`)
 - En el historial de una conversación, lo que apuntas sale arriba al momento, aunque la lista aún estuviera cargando. (2026-10-12, `c5fdaac`)
