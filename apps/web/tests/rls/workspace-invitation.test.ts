@@ -1,4 +1,10 @@
-/** Full external-identity lifecycle: zero access → invite → accept → revoke. */
+/**
+ * Full external-identity lifecycle: zero access → invite → accept → revoke.
+ *
+ * Since phase 3 of the facet model (20261013200000) the invitation carries a
+ * preset for its project (Mínim by default, ADR-085 §11), acceptance writes
+ * `membership`, and every member id travels as a `membership` id.
+ */
 
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import {
@@ -31,9 +37,10 @@ describe.skipIf(!envReady() || !externalEnvReady())(
 
     async function removeExternalMembership() {
       const rows = await pgGet<{ id: string }>(
-        'workspace_membership',
+        'membership',
         adminJwt,
         new URLSearchParams({
+          level: 'eq.workspace',
           workspace_id: `eq.${workspaceId}`,
           user_id: `eq.${externalUserId}`,
           select: 'id',
@@ -100,6 +107,7 @@ describe.skipIf(!envReady() || !externalEnvReady())(
         p_project_id: projectId,
         p_project_role_code: 'performer',
         p_expires_days: 7,
+        p_project_preset: 'equip',
       });
       expect(created.status).toBe(200);
       expect(created.data).toHaveLength(1);
@@ -143,6 +151,37 @@ describe.skipIf(!envReady() || !externalEnvReady())(
       expect(performance.rows).toHaveLength(1);
       expect(directory.rows).toHaveLength(0);
 
+      // El proyecto llega con su paquete (Equip) y la etiqueta del rol.
+      const projectMembership = await pgGet<{ id: string; preset: string; roles: string[]; container_verb: string }>(
+        'membership',
+        externalJwt,
+        new URLSearchParams({ level: 'eq.project', project_id: `eq.${projectId}`, select: 'id,preset,roles,container_verb' }),
+      );
+      expect(projectMembership.rows).toEqual([
+        expect.objectContaining({ preset: 'equip', roles: ['performer'], container_verb: 'view' }),
+      ]);
+      const facets = await pgGet<{ facet_id: string; verb: string; source: string }>(
+        'membership_facet',
+        externalJwt,
+        new URLSearchParams({ membership_id: `eq.${projectMembership.rows[0].id}`, select: 'facet_id,verb,source' }),
+      );
+      expect(facets.rows.map((row) => `${row.verb}:${row.source}`)).toEqual(['view:preset', 'view:preset']);
+
+      // El admin lista a la persona con el id de su membresía de espacio.
+      const listed = await pgRpc<{ access_kind: string; id: string; user_id: string }[]>(
+        'list_workspace_access',
+        adminJwt,
+        { p_workspace_id: workspaceId },
+      );
+      const ownRow = await pgGet<{ id: string }>(
+        'membership',
+        externalJwt,
+        new URLSearchParams({ level: 'eq.workspace', workspace_id: `eq.${workspaceId}`, select: 'id' }),
+      );
+      expect(
+        listed.data?.find((row) => row.access_kind === 'member' && row.user_id === externalUserId)?.id,
+      ).toBe(ownRow.rows[0]?.id);
+
       const ownMembership = await pgGet<{ id: string }>(
         'workspace_membership',
         externalJwt,
@@ -156,6 +195,13 @@ describe.skipIf(!envReady() || !externalEnvReady())(
         new URLSearchParams({ id: `eq.${ownMembership.rows[0].id}` }),
       );
       expect(selfPromotion.status).toBeGreaterThanOrEqual(400);
+      const selfPromotionModel = await pgPatch(
+        'membership',
+        externalJwt,
+        { workspace_role: 'admin' },
+        new URLSearchParams({ id: `eq.${ownRow.rows[0].id}` }),
+      );
+      expect(selfPromotionModel.status).toBeGreaterThanOrEqual(400);
 
       await removeExternalMembership();
 

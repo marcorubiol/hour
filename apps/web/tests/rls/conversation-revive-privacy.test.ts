@@ -7,8 +7,11 @@ import {
   pgGet,
   pgPatch,
   pgRpc,
+  projectAccess,
   requireEnv,
   requireLimitedEnv,
+  restoreProjectAccess,
+  setFacets,
 } from './_helpers';
 
 /**
@@ -32,13 +35,6 @@ const SETTING_EMAIL = 'zzz-rls-revive-setting@hour.test';
 interface ConversationRow {
   id: string;
   private_to: string | null;
-}
-
-interface ProjectMembershipRow {
-  id: string;
-  roles: string[];
-  permission_grants: string[];
-  permission_revokes: string[];
 }
 
 const one = <T>(data: T | T[] | null): T | undefined =>
@@ -137,32 +133,9 @@ describe.skipIf(!envReady())('reviving a deleted conversation keeps privacy (ADR
       const limited = requireLimitedEnv();
       const other = await login(limited.email, limited.password);
       const otherSub = String(decodeJwt(other).sub);
-      const m = await pgGet<ProjectMembershipRow>(
-        'project_membership',
-        jwt,
-        new URLSearchParams({
-          project_id: `eq.${projectId}`,
-          user_id: `eq.${otherSub}`,
-          select: 'id,roles,permission_grants,permission_revokes',
-        }),
-      );
-      expect(m.rows).toHaveLength(1);
-      const membership = m.rows[0]!;
+      const membership = await projectAccess(jwt, projectId, otherSub);
       try {
-        const granted = await pgPatch(
-          'project_membership',
-          jwt,
-          {
-            permission_grants: [
-              ...new Set([...membership.permission_grants, 'read:conversation', 'edit:conversation']),
-            ],
-            permission_revokes: membership.permission_revokes.filter(
-              (p) => p !== 'read:conversation' && p !== 'edit:conversation',
-            ),
-          },
-          new URLSearchParams({ id: `eq.${membership.id}` }),
-        );
-        expect(granted.rows).toHaveLength(1);
+        await setFacets(jwt, membership.membershipId, { converses: 'edit' });
 
         await setSetting(true);
         const mine = await create(jwt, 'ZZZ RLS Revive Other', OTHER_EMAIL);
@@ -194,16 +167,7 @@ describe.skipIf(!envReady())('reviving a deleted conversation keeps privacy (ADR
         // Se borra privada suya: la próxima pasada, cada uno recupera la suya.
         await remove(other, back.id);
       } finally {
-        await pgPatch(
-          'project_membership',
-          jwt,
-          {
-            roles: membership.roles,
-            permission_grants: membership.permission_grants,
-            permission_revokes: membership.permission_revokes,
-          },
-          new URLSearchParams({ id: `eq.${membership.id}` }),
-        );
+        await restoreProjectAccess(jwt, projectId, otherSub, membership);
       }
     },
   );

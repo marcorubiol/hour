@@ -7,8 +7,12 @@ import {
   pgGet,
   pgPatch,
   pgRpc,
+  projectAccess,
   requireEnv,
   requireLimitedEnv,
+  restoreProjectAccess,
+  setFacets,
+  type ProjectAccess,
 } from './_helpers';
 
 /**
@@ -50,13 +54,6 @@ interface InvoiceRow {
   payer_organization_id: string | null;
 }
 
-interface ProjectMembershipRow {
-  id: string;
-  roles: string[];
-  permission_grants: string[];
-  permission_revokes: string[];
-}
-
 const one = <T>(data: T | T[] | null): T | undefined =>
   Array.isArray(data) ? data[0] : (data ?? undefined);
 
@@ -69,7 +66,8 @@ describe.skipIf(!envReady() || !limitedEnvReady())(
     let workspaceId: string;
     let projectId: string;
     let originalSetting: boolean | undefined;
-    let membership: ProjectMembershipRow | undefined;
+    let membership: ProjectAccess | undefined;
+    let otherSub: string;
     let conversation: ConversationRow | undefined;
     let boloId: string | undefined;
     const invoices: string[] = [];
@@ -104,7 +102,7 @@ describe.skipIf(!envReady() || !limitedEnvReady())(
       jwt = await login(env.email, env.password);
       other = await login(limited.email, limited.password);
       me = String(decodeJwt(jwt).sub);
-      const otherSub = String(decodeJwt(other).sub);
+      otherSub = String(decodeJwt(other).sub);
 
       const p = await pgGet<{ id: string; workspace_id: string }>(
         'project',
@@ -130,31 +128,8 @@ describe.skipIf(!envReady() || !limitedEnvReady())(
 
       // La otra persona edita dinero en el proyecto (y no ve conversaciones
       // privadas ajenas, como nadie).
-      const m = await pgGet<ProjectMembershipRow>(
-        'project_membership',
-        jwt,
-        new URLSearchParams({
-          project_id: `eq.${projectId}`,
-          user_id: `eq.${otherSub}`,
-          select: 'id,roles,permission_grants,permission_revokes',
-        }),
-      );
-      expect(m.rows).toHaveLength(1);
-      membership = m.rows[0]!;
-      const granted = await pgPatch(
-        'project_membership',
-        jwt,
-        {
-          permission_grants: [
-            ...new Set([...membership.permission_grants, 'read:money', 'edit:money']),
-          ],
-          permission_revokes: membership.permission_revokes.filter(
-            (perm) => perm !== 'read:money' && perm !== 'edit:money',
-          ),
-        },
-        new URLSearchParams({ id: `eq.${membership.id}` }),
-      );
-      expect(granted.rows).toHaveLength(1);
+      membership = await projectAccess(jwt, projectId, otherSub);
+      await setFacets(jwt, membership.membershipId, { diners: 'edit' });
 
       await setSetting(true);
       const c = await pgRpc<ConversationRow>('create_conversation', jwt, {
@@ -188,18 +163,7 @@ describe.skipIf(!envReady() || !limitedEnvReady())(
         );
       }
       if (originalSetting !== undefined) await setSetting(originalSetting);
-      if (membership) {
-        await pgPatch(
-          'project_membership',
-          jwt,
-          {
-            roles: membership.roles,
-            permission_grants: membership.permission_grants,
-            permission_revokes: membership.permission_revokes,
-          },
-          new URLSearchParams({ id: `eq.${membership.id}` }),
-        );
-      }
+      if (membership) await restoreProjectAccess(jwt, projectId, otherSub, membership);
     });
 
     test('list_money_payer_organizations: the owner sees the organization, another money editor does not', async () => {

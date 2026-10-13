@@ -250,3 +250,130 @@ export function decodeJwt(jwt: string): Record<string, unknown> {
     unknown
   >;
 }
+
+// ── Acceso por facetas (fase 3: `membership` es la única fuente) ──────────
+// Desde 20261013200000 las tablas viejas son una proyección y no se escriben
+// por la API: los tests dan y quitan acceso con las RPC del modelo nuevo.
+
+export type FacetVerb = 'view' | 'edit';
+export type Preset = 'minim' | 'equip' | 'coordinacio' | 'direccio';
+
+/** Facetas estándar que existen en el nivel proyecto (tabla de niveles, ADR-100). */
+export const PROJECT_FACETS = ['converses', 'materials', 'tecnica', 'diners'] as const;
+
+export interface ProjectAccess {
+  membershipId: string;
+  preset: string | null;
+  containerVerb: FacetVerb | null;
+  facets: Record<string, FacetVerb>;
+}
+
+/** Ids de las facetas estándar, por clave. */
+export async function standardFacetIds(jwt: string): Promise<Record<string, string>> {
+  const res = await pgGet<{ id: string; key: string }>(
+    'facet',
+    jwt,
+    new URLSearchParams({ workspace_id: 'is.null', select: 'id,key' }),
+  );
+  return Object.fromEntries(res.rows.map((row) => [row.key, row.id]));
+}
+
+/** La membresía de proyecto de una persona, con su paquete y sus facetas estándar. */
+export async function projectAccess(
+  jwt: string,
+  projectId: string,
+  userId: string,
+): Promise<ProjectAccess> {
+  const m = await pgGet<{ id: string; preset: string | null; container_verb: FacetVerb | null }>(
+    'membership',
+    jwt,
+    new URLSearchParams({
+      level: 'eq.project',
+      project_id: `eq.${projectId}`,
+      user_id: `eq.${userId}`,
+      select: 'id,preset,container_verb',
+    }),
+  );
+  if (m.rows.length !== 1) {
+    throw new Error(`expected one project membership, got ${m.rows.length} (status ${m.status})`);
+  }
+  const ids = await standardFacetIds(jwt);
+  const keyOf = Object.fromEntries(Object.entries(ids).map(([key, id]) => [id, key]));
+  const f = await pgGet<{ facet_id: string; verb: FacetVerb }>(
+    'membership_facet',
+    jwt,
+    new URLSearchParams({ membership_id: `eq.${m.rows[0].id}`, select: 'facet_id,verb' }),
+  );
+  return {
+    membershipId: m.rows[0].id,
+    preset: m.rows[0].preset,
+    containerVerb: m.rows[0].container_verb,
+    facets: Object.fromEntries(
+      f.rows.filter((row) => keyOf[row.facet_id]).map((row) => [keyOf[row.facet_id], row.verb]),
+    ),
+  };
+}
+
+/** Pone (o quita, con null) facetas estándar en una membresía; falla si la RPC falla. */
+export async function setFacets(
+  jwt: string,
+  membershipId: string,
+  facets: Record<string, FacetVerb | null>,
+): Promise<void> {
+  const ids = await standardFacetIds(jwt);
+  for (const [key, verb] of Object.entries(facets)) {
+    const res = await pgRpc('set_membership_facet', jwt, {
+      p_membership_id: membershipId,
+      p_facet_id: ids[key],
+      p_verb: verb,
+    });
+    if (res.status >= 300) {
+      throw new Error(`set_membership_facet ${key}=${verb}: ${res.status} ${res.error}`);
+    }
+  }
+}
+
+/** Da un paquete a una persona en un contenedor; falla si la RPC falla. */
+export async function grantPreset(
+  jwt: string,
+  level: 'workspace' | 'project' | 'line' | 'bolo' | 'performance',
+  containerId: string,
+  userId: string,
+  preset: Preset,
+): Promise<string> {
+  const res = await pgRpc<string>('grant_container_preset', jwt, {
+    p_level: level,
+    p_container_id: containerId,
+    p_user_id: userId,
+    p_preset: preset,
+  });
+  if (res.status >= 300 || !res.data) {
+    throw new Error(`grant_container_preset ${preset}: ${res.status} ${res.error}`);
+  }
+  return res.data;
+}
+
+/**
+ * Deja una membresía de proyecto como la foto: el paquete (o, si era una fila
+ * de antes de la fase 3 sin paquete, Mínim o Coordinació según su acceso al
+ * contenedor) y después, con override, solo las facetas que el paquete no deja
+ * como estaban (un override igual al paquete lo fijaría para siempre). Los
+ * metadatos siguen al paquete.
+ */
+export async function restoreProjectAccess(
+  jwt: string,
+  projectId: string,
+  userId: string,
+  snapshot: ProjectAccess,
+): Promise<void> {
+  const preset = (snapshot.preset ??
+    (snapshot.containerVerb === 'edit' ? 'coordinacio' : 'minim')) as Preset;
+  await grantPreset(jwt, 'project', projectId, userId, preset);
+  const now = await projectAccess(jwt, projectId, userId);
+  const diff = PROJECT_FACETS.filter((key) => (now.facets[key] ?? null) !== (snapshot.facets[key] ?? null));
+  await setFacets(
+    jwt,
+    snapshot.membershipId,
+    Object.fromEntries(diff.map((key) => [key, snapshot.facets[key] ?? null])),
+  );
+}

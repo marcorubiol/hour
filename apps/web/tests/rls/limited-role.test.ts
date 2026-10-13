@@ -5,27 +5,28 @@
  * `performer` in `zzz-e2e-collab`. The JWT is issued once, before any mutation,
  * so the grant/revoke test also proves that effective project permissions are
  * evaluated from current database state rather than cached in the token.
+ *
+ * Since phase 3 of the facet model (20261013200000) access is written only
+ * through the new model's RPCs (`set_membership_facet`, `grant_container_preset`,
+ * `revoke_membership`); the old tables are a projection, closed to the API.
  */
 
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import {
   decodeJwt,
   envReady,
+  grantPreset,
   limitedEnvReady,
   login,
   pgGet,
-  pgPatch,
   pgRpc,
+  projectAccess,
   requireEnv,
   requireLimitedEnv,
+  restoreProjectAccess,
+  setFacets,
+  type ProjectAccess,
 } from './_helpers';
-
-interface ProjectMembershipRow {
-  id: string;
-  roles: string[];
-  permission_grants: string[];
-  permission_revokes: string[];
-}
 
 interface BoloRow {
   id: string;
@@ -35,7 +36,7 @@ interface BoloRow {
 
 interface WorkspaceMembershipRow {
   id: string;
-  role: 'owner' | 'admin' | 'member' | 'viewer' | 'guest';
+  workspace_role: 'owner' | 'admin' | 'member' | 'viewer' | 'guest';
 }
 
 interface NoteRow {
@@ -49,7 +50,9 @@ describe.skipIf(!envReady() || !limitedEnvReady())('RLS — limited performer fi
   let limitedJwt: string;
   let workspaceId: string;
   let projectId: string;
-  let membership: ProjectMembershipRow;
+  let foreignProjectId: string;
+  let limitedUserId: string;
+  let membership: ProjectAccess;
   let workspaceMembership: WorkspaceMembershipRow;
   let bolo: BoloRow;
   let performanceId: string;
@@ -58,16 +61,25 @@ describe.skipIf(!envReady() || !limitedEnvReady())('RLS — limited performer fi
 
   async function restoreMembership() {
     if (!membership) return;
-    await pgPatch(
-      'project_membership',
+    await restoreProjectAccess(adminJwt, projectId, limitedUserId, membership);
+  }
+
+  /** Quita la membresía de la fixture en el proyecto ajeno, si la hay. */
+  async function revokeForeignMembership() {
+    if (!foreignProjectId) return;
+    const rows = await pgGet<{ id: string }>(
+      'membership',
       adminJwt,
-      {
-        roles: membership.roles,
-        permission_grants: membership.permission_grants,
-        permission_revokes: membership.permission_revokes,
-      },
-      new URLSearchParams({ id: `eq.${membership.id}` }),
+      new URLSearchParams({
+        level: 'eq.project',
+        project_id: `eq.${foreignProjectId}`,
+        user_id: `eq.${limitedUserId}`,
+        select: 'id',
+      }),
     );
+    for (const row of rows.rows) {
+      await pgRpc('revoke_membership', adminJwt, { p_membership_id: row.id });
+    }
   }
 
   async function restoreBoloFee() {
@@ -87,7 +99,7 @@ describe.skipIf(!envReady() || !limitedEnvReady())('RLS — limited performer fi
     if (!workspaceMembership) return;
     await pgRpc('update_workspace_member_role', adminJwt, {
       p_membership_id: workspaceMembership.id,
-      p_role: workspaceMembership.role,
+      p_role: workspaceMembership.workspace_role,
     });
   }
 
@@ -102,8 +114,9 @@ describe.skipIf(!envReady() || !limitedEnvReady())('RLS — limited performer fi
     const limited = requireLimitedEnv();
     adminJwt = await login(admin.email, admin.password);
     limitedJwt = await login(limited.email, limited.password);
-    const limitedUserId = decodeJwt(limitedJwt).sub;
-    if (typeof limitedUserId !== 'string') throw new Error('Limited JWT has no subject');
+    const sub = decodeJwt(limitedJwt).sub;
+    if (typeof sub !== 'string') throw new Error('Limited JWT has no subject');
+    limitedUserId = sub;
 
     const workspaces = await pgGet<{ id: string }>(
       'workspace',
@@ -114,12 +127,13 @@ describe.skipIf(!envReady() || !limitedEnvReady())('RLS — limited performer fi
     workspaceId = workspaces.rows[0].id;
 
     const workspaceMemberships = await pgGet<WorkspaceMembershipRow>(
-      'workspace_membership',
+      'membership',
       adminJwt,
       new URLSearchParams({
+        level: 'eq.workspace',
         workspace_id: `eq.${workspaceId}`,
         user_id: `eq.${limitedUserId}`,
-        select: 'id,role',
+        select: 'id,workspace_role',
       }),
     );
     expect(workspaceMemberships.rows).toHaveLength(1);
@@ -138,17 +152,20 @@ describe.skipIf(!envReady() || !limitedEnvReady())('RLS — limited performer fi
     expect(projects.rows).toHaveLength(1);
     projectId = projects.rows[0].id;
 
-    const memberships = await pgGet<ProjectMembershipRow>(
-      'project_membership',
+    membership = await projectAccess(adminJwt, projectId, limitedUserId);
+
+    const foreign = await pgGet<{ id: string }>(
+      'project',
       adminJwt,
       new URLSearchParams({
-        project_id: `eq.${projectId}`,
-        user_id: `eq.${limitedUserId}`,
-        select: 'id,roles,permission_grants,permission_revokes',
+        workspace_id: `eq.${workspaceId}`,
+        slug: 'eq.zzz-rls-foreign-project',
+        deleted_at: 'is.null',
+        select: 'id',
       }),
     );
-    expect(memberships.rows).toHaveLength(1);
-    membership = memberships.rows[0];
+    expect(foreign.rows).toHaveLength(1);
+    foreignProjectId = foreign.rows[0].id;
 
     const performances = await pgGet<{ id: string }>(
       'performance',
@@ -185,20 +202,15 @@ describe.skipIf(!envReady() || !limitedEnvReady())('RLS — limited performer fi
 
   afterAll(async () => {
     await deleteFixtureNote();
+    await revokeForeignMembership();
     await restoreMembership();
     await restoreWorkspaceMembership();
     await restoreBoloFee();
   });
 
-  test('explicit grants apply immediately and explicit revokes win', async () => {
+  test('a facet override applies immediately and removing it wins', async () => {
     try {
-      const granted = await pgPatch<ProjectMembershipRow>(
-        'project_membership',
-        adminJwt,
-        { permission_grants: ['read:money'], permission_revokes: [] },
-        new URLSearchParams({ id: `eq.${membership.id}` }),
-      );
-      expect(granted.rows).toHaveLength(1);
+      await setFacets(adminJwt, membership.membershipId, { diners: 'view' });
       expect(
         await pgRpc<boolean>('has_permission', limitedJwt, {
           p_project_id: projectId,
@@ -206,13 +218,7 @@ describe.skipIf(!envReady() || !limitedEnvReady())('RLS — limited performer fi
         }),
       ).toMatchObject({ status: 200, data: true });
 
-      const revoked = await pgPatch<ProjectMembershipRow>(
-        'project_membership',
-        adminJwt,
-        { permission_revokes: ['read:money'] },
-        new URLSearchParams({ id: `eq.${membership.id}` }),
-      );
-      expect(revoked.rows).toHaveLength(1);
+      await setFacets(adminJwt, membership.membershipId, { diners: null });
       expect(
         await pgRpc<boolean>('has_permission', limitedJwt, {
           p_project_id: projectId,
@@ -279,24 +285,25 @@ describe.skipIf(!envReady() || !limitedEnvReady())('RLS — limited performer fi
     expect(rows.map((row) => row.slug)).not.toContain('zzz-rls-foreign-project');
   });
 
-  test('an already-issued JWT loses production access after a live revoke', async () => {
-    try {
-      const revoked = await pgPatch<ProjectMembershipRow>(
-        'project_membership',
-        adminJwt,
-        { permission_revokes: ['read:performance'] },
-        new URLSearchParams({ id: `eq.${membership.id}` }),
-      );
-      expect(revoked.rows).toHaveLength(1);
-
-      const afterRevoke = await pgGet<{ id: string }>(
-        'performance',
+  // Fase 3: no hay miembro sin acceso al contenedor (ADR-100 §2); perder la
+  // producción es perder la membresía. Se prueba en el proyecto ajeno para no
+  // tocar la fila de la fixture (su etiqueta performer no se puede reponer).
+  test('an already-issued JWT loses project access after a live revoke', async () => {
+    const visible = () =>
+      pgGet<{ id: string }>(
+        'project',
         limitedJwt,
-        new URLSearchParams({ id: `eq.${performanceId}`, select: 'id' }),
+        new URLSearchParams({ id: `eq.${foreignProjectId}`, select: 'id' }),
       );
-      expect(afterRevoke).toMatchObject({ status: 200, rows: [] });
+    try {
+      const granted = await grantPreset(adminJwt, 'project', foreignProjectId, limitedUserId, 'minim');
+      expect((await visible()).rows).toHaveLength(1);
+
+      const revoked = await pgRpc('revoke_membership', adminJwt, { p_membership_id: granted });
+      expect(revoked.status, revoked.error).toBe(204);
+      expect(await visible()).toMatchObject({ status: 200, rows: [] });
     } finally {
-      await restoreMembership();
+      await revokeForeignMembership();
     }
   });
 

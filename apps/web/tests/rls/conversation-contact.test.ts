@@ -8,8 +8,11 @@ import {
   pgPatch,
   pgPost,
   pgRpc,
+  projectAccess,
   requireEnv,
   requireLimitedEnv,
+  restoreProjectAccess,
+  setFacets,
 } from './_helpers';
 
 /**
@@ -59,13 +62,6 @@ interface ContactRow {
   since: string | null;
   until: string | null;
   is_primary: boolean;
-}
-
-interface ProjectMembershipRow {
-  id: string;
-  roles: string[];
-  permission_grants: string[];
-  permission_revokes: string[];
 }
 
 const one = <T>(data: T | T[] | null): T | undefined =>
@@ -356,28 +352,8 @@ describe.skipIf(!envReady())('conversation_contact (ADR-102, fase 1)', () => {
       const otherSub = String(decodeJwt(other).sub);
 
       // Sin permiso (lo que trae el fixture): nada.
-      const m = await pgGet<ProjectMembershipRow>(
-        'project_membership',
-        jwt,
-        new URLSearchParams({
-          project_id: `eq.${projectId}`,
-          user_id: `eq.${otherSub}`,
-          select: 'id,roles,permission_grants,permission_revokes',
-        }),
-      );
-      expect(m.rows).toHaveLength(1);
-      const membership = m.rows[0]!;
-      const restore = () =>
-        pgPatch(
-          'project_membership',
-          jwt,
-          {
-            roles: membership.roles,
-            permission_grants: membership.permission_grants,
-            permission_revokes: membership.permission_revokes,
-          },
-          new URLSearchParams({ id: `eq.${membership.id}` }),
-        );
+      const membership = await projectAccess(jwt, projectId, otherSub);
+      const restore = () => restoreProjectAccess(jwt, projectId, otherSub, membership);
       const setPrivate = (value: string | null) =>
         pgPatch(
           'conversation',
@@ -387,40 +363,14 @@ describe.skipIf(!envReady())('conversation_contact (ADR-102, fase 1)', () => {
         );
 
       try {
-        const revoked = await pgPatch(
-          'project_membership',
-          jwt,
-          {
-            permission_grants: membership.permission_grants.filter(
-              (p) => p !== 'read:conversation' && p !== 'edit:conversation',
-            ),
-            permission_revokes: [
-              ...new Set([...membership.permission_revokes, 'read:conversation', 'edit:conversation']),
-            ],
-          },
-          new URLSearchParams({ id: `eq.${membership.id}` }),
-        );
-        expect(revoked.rows).toHaveLength(1);
+        await setFacets(jwt, membership.membershipId, { converses: null });
         expect((await setPrivate(null)).rows).toHaveLength(1);
         expect(await contacts(other)).toHaveLength(0);
         const denied = await setContact({ p_person_id: secondPerson }, other);
         expect(denied.status).toBe(403);
 
         // Con permiso y compartida: la ve y la edita.
-        const granted = await pgPatch(
-          'project_membership',
-          jwt,
-          {
-            permission_grants: [
-              ...new Set([...membership.permission_grants, 'read:conversation', 'edit:conversation']),
-            ],
-            permission_revokes: membership.permission_revokes.filter(
-              (p) => p !== 'read:conversation' && p !== 'edit:conversation',
-            ),
-          },
-          new URLSearchParams({ id: `eq.${membership.id}` }),
-        );
-        expect(granted.rows).toHaveLength(1);
+        await setFacets(jwt, membership.membershipId, { converses: 'edit' });
         expect((await contacts(other)).length).toBeGreaterThan(0);
         const allowed = await setContact({ p_person_id: secondPerson, p_role: 'técnica' }, other);
         expect(allowed.status, allowed.error).toBe(200);
