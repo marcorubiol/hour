@@ -1,7 +1,7 @@
 /**
  * PATCH  /api/invoices/:id — lifecycle + metadata edits (ADR-050):
  *        status (draft/cancelled), due_on, expected_on, payment_condition,
- *        payer_person_id, notes. Amounts are NOT editable — an invoice's
+ *        payer_organization_id (draft only), notes. Amounts are NOT editable — an invoice's
  *        numbers are a snapshot; wrong amounts mean delete the draft (or
  *        cancel) and re-create.
  *
@@ -30,7 +30,7 @@ const PatchSchema = v.object({
   due_on: v.optional(v.nullable(v.pipe(v.string(), v.isoDate()))),
   expected_on: v.optional(v.nullable(v.pipe(v.string(), v.isoDate()))),
   payment_condition: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(2000)))),
-  payer_person_id: v.optional(v.nullable(v.pipe(v.string(), v.uuid()))),
+  payer_organization_id: v.optional(v.nullable(v.pipe(v.string(), v.uuid()))),
   notes: v.optional(v.nullable(v.pipe(v.string(), v.trim(), v.maxLength(2000)))),
 });
 

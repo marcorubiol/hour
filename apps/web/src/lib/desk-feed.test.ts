@@ -81,7 +81,7 @@ function invoice(id: string, o: Partial<DeskInvoiceInput> = {}): DeskInvoiceInpu
     due_on: actionAt(-3),
     total: 1800,
     currency: 'EUR',
-    payer: { full_name: 'Festival Grec', organization_name: null },
+    payer: { name: 'Festival Grec' },
     project: { id: 'p1', slug: 'mamemi', name: 'MaMeMi' },
     ...o,
   };

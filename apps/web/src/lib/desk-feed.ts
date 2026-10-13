@@ -91,7 +91,7 @@ export interface DeskInvoiceInput {
   due_on: string | null;
   total: number;
   currency: string;
-  payer: { full_name: string | null; organization_name: string | null } | null;
+  payer: { name: string | null } | null;
   project: { id: string; slug: string | null; name: string } | null;
 }
 
@@ -276,7 +276,7 @@ function convSubject(e: DeskConvInput, locale: Locale): string {
   );
 }
 function payerName(i: DeskInvoiceInput, locale: Locale): string {
-  return i.payer?.full_name || i.payer?.organization_name || i.number || t('desk.fallback_invoice', locale);
+  return i.payer?.name || i.number || t('desk.fallback_invoice', locale);
 }
 /** A date with no title says its kind, in words; an unknown kind stays raw. */
 function dateKindWord(kind: string, locale: Locale): string {

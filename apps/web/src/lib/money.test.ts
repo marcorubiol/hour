@@ -6,17 +6,38 @@ import {
 	esTaxLines,
 	invoiceStatusLabel,
 	observedPayerTermsDays,
+	payerFiscalState,
 	paymentMethodLabel,
 	type TermsPayment,
 } from './money';
 
+describe('payerFiscalState', () => {
+	const payer = { id: 'o', slug: 'sala', name: 'Sala', fiscal_identity_id: null };
+
+	it('is ready when the draft carries a receiver identity, whatever the organization has', () => {
+		expect(payerFiscalState({ payer_fiscal_identity_id: 'fi', payer })).toBe('ready');
+		expect(payerFiscalState({ payer_fiscal_identity_id: 'fi', payer: null })).toBe('ready');
+	});
+
+	it('is stale when only the organization has fiscal data', () => {
+		expect(
+			payerFiscalState({ payer_fiscal_identity_id: null, payer: { ...payer, fiscal_identity_id: 'fi' } }),
+		).toBe('stale');
+	});
+
+	it('is missing when the organization has none, no_payer without organization', () => {
+		expect(payerFiscalState({ payer_fiscal_identity_id: null, payer })).toBe('missing');
+		expect(payerFiscalState({ payer_fiscal_identity_id: null, payer: null })).toBe('no_payer');
+	});
+});
+
 describe('observedPayerTermsDays', () => {
 	it('returns the median only after two fully paid samples', () => {
 		const invoices = [
-			{ id: 'i-30', payer_person_id: 'payer-a', issued_on: '2026-01-01', total: 100 },
-			{ id: 'i-60', payer_person_id: 'payer-a', issued_on: '2026-02-01', total: 200 },
-			{ id: 'i-one', payer_person_id: 'payer-b', issued_on: '2026-01-01', total: 100 },
-			{ id: 'i-partial', payer_person_id: 'payer-a', issued_on: '2026-03-01', total: 500 },
+			{ id: 'i-30', payer_organization_id: 'payer-a', issued_on: '2026-01-01', total: 100 },
+			{ id: 'i-60', payer_organization_id: 'payer-a', issued_on: '2026-02-01', total: 200 },
+			{ id: 'i-one', payer_organization_id: 'payer-b', issued_on: '2026-01-01', total: 100 },
+			{ id: 'i-partial', payer_organization_id: 'payer-a', issued_on: '2026-03-01', total: 500 },
 		];
 		const payments: TermsPayment[] = [
 			{ invoice_id: 'i-30', amount: 100, received_on: '2026-01-31' },
@@ -35,8 +56,8 @@ describe('observedPayerTermsDays', () => {
 	it('ignores soft-deleted payments', () => {
 		const result = observedPayerTermsDays(
 			[
-				{ id: 'one', payer_person_id: 'payer', issued_on: '2026-01-01', total: 10 },
-				{ id: 'two', payer_person_id: 'payer', issued_on: '2026-02-01', total: 10 },
+				{ id: 'one', payer_organization_id: 'payer', issued_on: '2026-01-01', total: 10 },
+				{ id: 'two', payer_organization_id: 'payer', issued_on: '2026-02-01', total: 10 },
 			],
 			[
 				{ invoice_id: 'one', amount: 10, received_on: '2026-01-10', deleted_at: null },
@@ -51,7 +72,7 @@ describe('observedPayerTermsDays', () => {
 describe('agingState', () => {
 	const base = {
 		id: 'invoice',
-		payer_person_id: 'payer',
+		payer_organization_id: 'payer',
 		issued_on: '2026-01-01',
 		due_on: '2026-02-15',
 		expected_on: null,

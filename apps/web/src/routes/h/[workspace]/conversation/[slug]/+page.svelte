@@ -25,6 +25,7 @@
   import { appLocale, t } from '$lib/i18n';
   import Button from '$lib/components/Button.svelte';
   import ConversationHistory from '$lib/components/ConversationHistory.svelte';
+  import OrganizationFiscal from '$lib/components/OrganizationFiscal.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
   import {
     eventDirectionLabel,
@@ -276,6 +277,10 @@
             </div>
           {/if}
         </dl>
+
+        {#if conv.organization}
+          <OrganizationFiscal organizationId={conv.organization.id} />
+        {/if}
 
         <div class="privacy">
           <div class="privacy__row">

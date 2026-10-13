@@ -8,8 +8,10 @@
     invoiceStatusLabel,
     invoiceTone,
     observedPayerTermsDays,
+    payerFiscalState,
     paymentMethodLabel,
     type MoneyInvoiceItem,
+    type MoneyPayer,
     type PaymentMethod,
   } from '$lib/money';
   import { dayLabel } from '$lib/datetime';
@@ -18,15 +20,18 @@
   import Dialog from './Dialog.svelte';
   import Input from './Input.svelte';
   import Menu from './Menu.svelte';
+  import OrganizationFiscal from './OrganizationFiscal.svelte';
   import Select from './Select.svelte';
   import StateBadge from './StateBadge.svelte';
   import { addToast } from './Toast.svelte';
 
   interface Props {
     invoices: MoneyInvoiceItem[];
+    /** Organizations a draft can be addressed to (ADR-102 decision 5). */
+    payers?: MoneyPayer[];
   }
 
-  let { invoices }: Props = $props();
+  let { invoices, payers = [] }: Props = $props();
 
   const queryClient = useQueryClient();
   const today = new Date();
@@ -41,8 +46,8 @@
     return agingState(
       {
         ...invoice,
-        observed_terms_days: invoice.payer_person_id
-          ? termsByPayer.get(invoice.payer_person_id)?.days ?? null
+        observed_terms_days: invoice.payer_organization_id
+          ? termsByPayer.get(invoice.payer_organization_id)?.days ?? null
           : null,
       },
       invoice.payments,
@@ -51,7 +56,21 @@
   }
 
   function payerName(invoice: MoneyInvoiceItem): string {
-    return invoice.payer?.organization_name ?? invoice.payer?.full_name ?? t('books.payer_fallback', locale);
+    return invoice.payer?.name ?? t('books.payer_fallback', locale);
+  }
+
+  /** A factura draft that issue_invoice would refuse for want of payer data. */
+  function needsPayerFiscal(invoice: MoneyInvoiceItem): boolean {
+    return invoice.status === 'draft' && invoice.doc_type === 'factura' && payerFiscalState(invoice) !== 'ready';
+  }
+
+  function payersFor(invoice: MoneyInvoiceItem): MoneyPayer[] {
+    return payers.filter((payer) => payer.workspace_id === invoice.workspace_id);
+  }
+
+  /** Setting the payer of a draft also takes its fiscal data (update_invoice). */
+  function setPayer(invoice: MoneyInvoiceItem, organizationId: string | null) {
+    $invoicePatch.mutate({ id: invoice.id, patch: { payer_organization_id: organizationId } });
   }
 
   function agingCopy(invoice: MoneyInvoiceItem): string {
@@ -222,13 +241,14 @@
   <ul class="mny__invoices" role="list">
     {#each invoices as invoice (invoice.id)}
       {@const aging = agingFor(invoice)}
-      {@const observed = invoice.payer_person_id ? termsByPayer.get(invoice.payer_person_id) : null}
+      {@const observed = invoice.payer_organization_id ? termsByPayer.get(invoice.payer_organization_id) : null}
       <li class:expanded={expandedId === invoice.id}>
         <div class="mny-inv__row">
           <span class="mny-inv__number">{invoice.number ?? t('books.no_number', locale)}</span>
           <span class="mny-inv__main">
-            {invoice.payer?.organization_name ?? invoice.payer?.full_name ?? '—'}
+            {invoice.payer?.name ?? '—'}
             {#if invoice.project}<span class="mny-inv__muted"> · {invoice.project.name}</span>{/if}
+            {#if needsPayerFiscal(invoice)}<span class="mny-inv__warn"> · {t('books.payer_no_fiscal', locale)}</span>{/if}
           </span>
           <span class="mny-inv__age mny-inv__age--{aging.state}">{agingCopy(invoice)}</span>
           <span class="mny-inv__total">{fmtMoney(invoice.total)} {invoice.currency}</span>
@@ -280,6 +300,40 @@
 
         {#if expandedId === invoice.id}
           <div class="mny-inv__detail">
+            {#if invoice.status === 'draft'}
+              {@const fiscalState = payerFiscalState(invoice)}
+              <div class="mny-inv__payer">
+                {#if payersFor(invoice).length > 0}
+                  <Select
+                    label={t('books.payer', locale)}
+                    value={invoice.payer_organization_id ?? ''}
+                    onchange={(event) => setPayer(invoice, (event.currentTarget as HTMLSelectElement).value || null)}
+                  >
+                    <option value="">{t('books.payer_none_option', locale)}</option>
+                    {#each payersFor(invoice) as payer (payer.id)}
+                      <option value={payer.id}>{payer.name}{payer.has_fiscal_identity ? '' : ` · ${t('books.payer_no_fiscal', locale)}`}</option>
+                    {/each}
+                  </Select>
+                {/if}
+                {#if invoice.doc_type === 'factura' && fiscalState === 'no_payer'}
+                  <p class="mny-inv__warn">{t('books.payer_none', locale)}</p>
+                {:else if invoice.doc_type === 'factura' && fiscalState === 'stale'}
+                  <p class="mny-inv__warn">
+                    {t('books.payer_fiscal_stale', locale, { payer: payerName(invoice) })}
+                    <Button size="xs" variant="outline" loading={$invoicePatch.isPending} onclick={() => setPayer(invoice, invoice.payer_organization_id)}>
+                      {t('books.payer_fiscal_use', locale)}
+                    </Button>
+                  </p>
+                {:else if invoice.doc_type === 'factura' && fiscalState === 'missing' && invoice.payer}
+                  <p class="mny-inv__warn">{t('books.payer_fiscal_missing', locale, { payer: payerName(invoice) })}</p>
+                  <OrganizationFiscal
+                    organizationId={invoice.payer.id}
+                    startEditing
+                    onsaved={() => setPayer(invoice, invoice.payer_organization_id)}
+                  />
+                {/if}
+              </div>
+            {/if}
             <div class="mny-inv__dates">
               <div>
                 <span class="mny-inv__label">{t('books.issued', locale)}</span>
@@ -457,6 +511,22 @@
     .mny-inv__age--approaching { color: var(--warning); }
     .mny-inv__age--past-expected { color: var(--danger); }
     .mny-inv__age--paid { color: var(--success); }
+    .mny-inv__warn {
+      color: var(--warning);
+      font-size: var(--text-xs);
+    }
+    p.mny-inv__warn {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: var(--space-s);
+    }
+    .mny-inv__payer {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-s);
+      max-inline-size: 32rem;
+    }
     .mny-inv__actions {
       display: flex;
       gap: var(--space-xs);

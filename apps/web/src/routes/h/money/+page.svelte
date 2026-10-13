@@ -373,8 +373,8 @@
         const aging = agingState(
           {
             ...issuedDoc,
-            observed_terms_days: issuedDoc.payer_person_id
-              ? termsByPayer.get(issuedDoc.payer_person_id)?.days ?? null
+            observed_terms_days: issuedDoc.payer_organization_id
+              ? termsByPayer.get(issuedDoc.payer_organization_id)?.days ?? null
               : null,
           },
           issuedDoc.payments,
@@ -492,6 +492,8 @@
   let availablePayers = $derived(
     invBolo?.project ? payers.filter((payer) => payer.workspace_id === invBolo?.project?.workspace_id) : [],
   );
+  /** A chosen payer without fiscal data: a factura from it cannot be issued yet. */
+  let invPayerNoFiscal = $derived(availablePayers.find((payer) => payer.id === iPayerId)?.has_fiscal_identity === false);
   let invDocType = $derived(invBolo ? (boloMode(invBolo) === 'interno' ? 'proforma' : 'factura') : 'factura');
   function openInvoice(b: MoneyBolo) {
     invBolo = b;
@@ -521,7 +523,7 @@
         due_on: iDueOn || null,
         expected_on: iExpectedOn || null,
         payment_condition: iPaymentCondition.trim() || null,
-        payer_person_id: iPayerId || null,
+        payer_organization_id: iPayerId || null,
         doc_type: invDocType,
       });
       if (!body?.invoice) throw new Error(t('books.unexpected_response', locale));
@@ -796,7 +798,7 @@
     {#if anyDocMode}
       <section class="mny__section" id="mny-documents" aria-label={t('books.documents', locale)}>
         <p class="eyebrow">{t('books.documents', locale)}</p>
-        <MoneyInvoices {invoices} />
+        <MoneyInvoices {invoices} {payers} />
       </section>
     {/if}
 
@@ -872,10 +874,14 @@
       <Input label={t('books.irpf_pct', locale)} type="number" bind:value={iIrpf} placeholder={t('books.ph_irpf', locale)} />
       <Input label={t('books.due_on', locale)} type="date" bind:value={iDueOn} />
       <Input label={t('books.expected_collection', locale)} type="date" bind:value={iExpectedOn} />
-      <Select label={t('books.payer', locale)} bind:value={iPayerId}>
+      <Select
+        label={t('books.payer', locale)}
+        bind:value={iPayerId}
+        helper={invDocType === 'factura' && invPayerNoFiscal ? t('books.payer_fiscal_later', locale) : undefined}
+      >
         <option value="">{t('books.payer_linked', locale)}</option>
         {#each availablePayers as payer (payer.id)}
-          <option value={payer.id}>{payer.organization_name ? `${payer.organization_name} · ${payer.full_name}` : payer.full_name}</option>
+          <option value={payer.id}>{payer.name}{payer.has_fiscal_identity ? '' : ` · ${t('books.payer_no_fiscal', locale)}`}</option>
         {/each}
       </Select>
     </div>
