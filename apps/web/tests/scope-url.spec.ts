@@ -111,7 +111,8 @@ test('a scope change on a person opened from Conversations lands back on Convers
   await waitForLoaded(page);
   await expect(page.locator('tbody tr').first()).toBeVisible();
 
-  await page.locator('tbody tr').first().getByRole('link').first().click();
+  // The contact's link (ADR-102: the first link of a row is the organization).
+  await page.locator('tbody tr').first().locator('td').nth(1).getByRole('link').click();
   await page.waitForURL(/\/h\/[^/]+\/person\//);
   await waitForLoaded(page);
 

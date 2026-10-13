@@ -44,8 +44,8 @@ de Phase 0.9 en `_tasks.md`. Pricing orientativo, no decidido.
   `conversation_contact`. El directorio tiene 6.802 salas. Las migraciones van por `production-migrate.yml`: backup, plan, apply (`_tasks.md § 34`).
 - `hour-staging` (ref `slccyknqpgmzhyiyclsq`, `eu-west-1`): despierto el 2026-10-13 y reconstruido con todas las
   migraciones (run 38353192779, RLS y smoke en verde). Se volverá a pausar sin uso.
-- Últimas suites (2026-10-13): RLS 304/312 (8 saltados) contra `70660bb`; E2E sin pasar tras la fase 4 (último: 66/66
-  contra `816707f`).
+- Últimas suites (2026-10-13): RLS 304/312 (8 saltados) y E2E 64/66 contra `70660bb`; los dos rojos eran specs que
+  pinchaban el primer enlace de la fila esperando la persona (ahora es la organización), corregidos y en verde (7/7).
 - Desde el checkout principal (`~/Developer/hour`), nunca desde un worktree: los worktrees no llevan `.env` ni
   `.env.test` (RLS sale saltado, el login del E2E falla).
 - `pnpm --filter web test:rls`: siempre contra producción; carga `.env` + `.env.test` y no mira `.env.local`.
