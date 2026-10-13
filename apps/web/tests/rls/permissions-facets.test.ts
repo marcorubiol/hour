@@ -555,30 +555,35 @@ describe.skipIf(!envReady())('RLS: permisos por facetas', () => {
       });
       expect(granted.status).toBe(200);
 
-      const rows = await pgGet<MembershipFacetRow>(
-        'membership_facet',
-        limitedJwt,
-        new URLSearchParams({ membership_id: `eq.${granted.data}`, select: 'membership_id,facet_id,verb,source' }),
-      );
-      const keyOf = Object.fromEntries(Object.entries(standard).map(([key, id]) => [id, key]));
-      expect(rows.rows.map((row) => `${keyOf[row.facet_id]}:${row.verb}:${row.source}`).sort()).toEqual([
-        'comidas:view:preset',
-        'full_de_ruta:view:preset',
-        'logistica:view:preset',
-        'materials:view:preset',
-        'tecnica:view:preset',
-      ]);
+      try {
+        const rows = await pgGet<MembershipFacetRow>(
+          'membership_facet',
+          limitedJwt,
+          new URLSearchParams({ membership_id: `eq.${granted.data}`, select: 'membership_id,facet_id,verb,source' }),
+        );
+        const keyOf = Object.fromEntries(Object.entries(standard).map(([key, id]) => [id, key]));
+        expect(rows.rows.map((row) => `${keyOf[row.facet_id]}:${row.verb}:${row.source}`).sort()).toEqual([
+          'comidas:view:preset',
+          'full_de_ruta:view:preset',
+          'logistica:view:preset',
+          'materials:view:preset',
+          'tecnica:view:preset',
+        ]);
 
-      const ceiling = await pgRpc('grant_container_preset', limitedJwt, {
-        p_level: 'bolo',
-        p_container_id: boloId,
-        p_user_id: adminUserId,
-        p_preset: 'coordinacio',
-      });
-      expect(ceiling.status).toBeGreaterThanOrEqual(400);
+        const ceiling = await pgRpc('grant_container_preset', limitedJwt, {
+          p_level: 'bolo',
+          p_container_id: boloId,
+          p_user_id: adminUserId,
+          p_preset: 'coordinacio',
+        });
+        expect(ceiling.status).toBeGreaterThanOrEqual(400);
 
-      // Un paquete en el bolo no cambia el acceso de proyecto.
-      expect(await perms(limitedJwt, projectId)).toEqual(before);
+        // Un paquete en el bolo no cambia el acceso de proyecto.
+        expect(await perms(limitedJwt, projectId)).toEqual(before);
+      } finally {
+        // La fixture no tenía esta membresía de bolo: fuera, para no dejar estado.
+        await pgRpc('revoke_membership', adminJwt, { p_membership_id: granted.data });
+      }
     });
   });
 });
