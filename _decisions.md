@@ -3490,3 +3490,13 @@ recomendadas.
   aplicado también a quitar) o el admin del espacio. Cierra ADR-085, Abierto 1, salvo la pantalla.
 - **Invitar a un proyecto:** la invitación lleva paquete (Mínim por defecto, ADR-085 §11) y el rol queda como
   etiqueta. Las invitaciones pendientes de antes de la fase 3 dan Mínim al aceptarse.
+
+## [2026-10-13] ADR-105 · Contract de permisos: fuera `project.owner_id`, las facetas del espejo son «a mano»
+
+Marco, sobre las dos dudas del contract (`build/permissions-facets-plan.md § 9.6`); acepta las recomendadas.
+- **`project.owner_id` se borra.** Sin ADR, sin lector ni escritor y vacío en producción (SELECT 2026-10-13). Si
+  algún día hace falta un responsable de proyecto, se decide entonces qué es.
+- **Las facetas que dejó el espejo (`source = legacy`) pasan a `override`**: eran acceso dado a mano en el modelo
+  viejo. `legacy` deja de ser un valor.
+- Marco, el mismo día: no hay nadie en producción ni en beta, así que el contract borra lo viejo sin capas de
+  compatibilidad ni rollback SQL; se vuelve con el backup.
