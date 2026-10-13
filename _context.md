@@ -45,8 +45,7 @@ de Phase 0.9 en `_tasks.md`. Pricing orientativo, no decidido.
   ADR-102 fase 4 (`20261013100000`), las personas de una conversación son `conversation_contact`. El directorio tiene 6.802 salas. Las migraciones van por `production-migrate.yml`: backup, plan, apply (`_tasks.md § 34`).
 - `hour-staging` (ref `slccyknqpgmzhyiyclsq`, `eu-west-1`): reconstruido el 2026-10-13 con la fase 3 de permisos
   (run 38378601525: RLS 311/315, smoke 2/2). Se volverá a pausar sin uso.
-- Últimas suites contra producción: pendientes contra `05f1c96`. Antes (2026-10-13, `70660bb`): RLS 304/312 y E2E
-  66/66 tras corregir dos specs.
+- Últimas suites contra producción (2026-10-13, `05f1c96`): RLS 307/315 (8 saltados) y E2E 66/66.
 - Desde el checkout principal (`~/Developer/hour`), nunca desde un worktree: los worktrees no llevan `.env` ni
   `.env.test` (RLS sale saltado, el login del E2E falla).
 - `pnpm --filter web test:rls`: siempre contra producción; carga `.env` + `.env.test` y no mira `.env.local`.
