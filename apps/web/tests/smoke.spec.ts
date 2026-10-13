@@ -7,7 +7,7 @@ const PASSWORD = process.env.PW_TEST_PASSWORD;
 test.describe('smoke', () => {
   test.skip(
     !EMAIL || !PASSWORD,
-    'Set PW_TEST_EMAIL and PW_TEST_PASSWORD (test user with workspace_membership in hour-phase0).',
+    'Set PW_TEST_EMAIL and PW_TEST_PASSWORD (test user with a workspace membership in hour-phase0).',
   );
 
   /**

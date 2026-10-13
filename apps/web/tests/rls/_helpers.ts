@@ -264,7 +264,7 @@ export const PROJECT_FACETS = ['converses', 'materials', 'tecnica', 'diners'] as
 export interface ProjectAccess {
   membershipId: string;
   preset: string | null;
-  containerVerb: FacetVerb | null;
+  containerVerb: FacetVerb;
   facets: Record<string, FacetVerb>;
 }
 
@@ -284,7 +284,7 @@ export async function projectAccess(
   projectId: string,
   userId: string,
 ): Promise<ProjectAccess> {
-  const m = await pgGet<{ id: string; preset: string | null; container_verb: FacetVerb | null }>(
+  const m = await pgGet<{ id: string; preset: string | null; container_verb: FacetVerb }>(
     'membership',
     jwt,
     new URLSearchParams({

@@ -27,7 +27,9 @@
 --      las cadenas muertas: has_permission conoce siete y una desconocida es
 --      un error 22023.
 --   7. `container_verb` obligatorio en toda membresía de contenedor (ADR-100
---      §2); la de espacio sigue con su rol y sin verbo (ADR-100 §4). Las
+--      §2); la de espacio sigue con su rol y sin verbo (ADR-100 §4).
+--      grant_container_preset y accept_workspace_invitation insertan la fila
+--      con el verbo del paquete (antes lo ponía expand_preset después). Las
 --      facetas `source = legacy` pasan a `override`.
 --   8. `membership` se audita con write_audit (antes lo hacían, de rebote, las
 --      tablas viejas).
@@ -422,6 +424,191 @@ ALTER TABLE public.membership DROP COLUMN can_manage_members;
 ALTER TABLE public.access_preset DROP COLUMN can_manage_members;
 
 -- ── 7 · container_verb obligatorio; las facetas del espejo, override ──────
+-- Las dos RPC que crean membresías de contenedor las insertaban sin verbo y
+-- dejaban que expand_preset lo pusiera después; con container_verb
+-- obligatorio, la fila nace con el verbo del paquete. Mismo cuerpo que la
+-- fase 3 salvo ese INSERT.
+-- · grant_container_preset
+CREATE OR REPLACE FUNCTION public.grant_container_preset(
+  p_level public.container_level, p_container_id uuid, p_user_id uuid, p_preset text
+) RETURNS uuid
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public', 'pg_temp'
+AS $$
+DECLARE
+  v_caller uuid := auth.uid();
+  v_ws     uuid;
+  v_id     uuid;
+  v_role   public.membership_role;
+BEGIN
+  IF v_caller IS NULL THEN
+    RAISE EXCEPTION 'authentication required' USING ERRCODE = '42501';
+  END IF;
+
+  SELECT c.workspace_id INTO v_ws
+  FROM private.container_chain(p_level, p_container_id) c
+  WHERE c.level = p_level;
+  IF v_ws IS NULL THEN
+    RAISE EXCEPTION 'container not found' USING ERRCODE = '42501';
+  END IF;
+
+  IF NOT private.can_grant_preset(p_level, p_container_id, p_preset, v_caller) THEN
+    RAISE EXCEPTION 'you can only grant what you hold' USING ERRCODE = '42501';
+  END IF;
+  IF NOT private.model_has_workspace_role(v_ws, p_user_id) THEN
+    RAISE EXCEPTION 'grantee is not a member of this workspace' USING ERRCODE = '42501';
+  END IF;
+
+  -- En el espacio el paquete se traduce al rol (plan § 8.5): Direcció es admin
+  -- (ADR-100 §4); cualquier otro quita admin. Sin facetas de espacio.
+  IF p_level = 'workspace' THEN
+    SELECT m.id, m.workspace_role INTO v_id, v_role
+    FROM public.membership m
+    WHERE m.level = 'workspace' AND m.workspace_id = v_ws AND m.user_id = p_user_id;
+    IF v_role = 'owner' THEN
+      RAISE EXCEPTION 'owner transfer is a separate operation' USING ERRCODE = '42501';
+    END IF;
+    UPDATE public.membership
+    SET workspace_role = CASE
+          WHEN p_preset = 'direccio' THEN 'admin'::public.membership_role
+          WHEN workspace_role = 'admin' THEN 'member'::public.membership_role
+          ELSE workspace_role
+        END
+    WHERE id = v_id;
+    RETURN v_id;
+  END IF;
+
+  SELECT m.id INTO v_id FROM public.membership m
+  WHERE m.level = p_level AND m.user_id = p_user_id
+    AND private.membership_container_id(m) = p_container_id;
+
+  IF v_id IS NULL THEN
+    INSERT INTO public.membership (workspace_id, level, project_id, line_id, bolo_id, performance_id,
+                                   user_id, container_verb, accepted_at, invited_by)
+    VALUES (v_ws, p_level,
+            CASE WHEN p_level = 'project' THEN p_container_id END,
+            CASE WHEN p_level = 'line' THEN p_container_id END,
+            CASE WHEN p_level = 'bolo' THEN p_container_id END,
+            CASE WHEN p_level = 'performance' THEN p_container_id END,
+            p_user_id,
+            (SELECT ap.container_verb FROM public.access_preset ap WHERE ap.key = p_preset),
+            now(), v_caller)
+    RETURNING id INTO v_id;
+  ELSIF NOT private.can_manage_membership(v_id, v_caller) THEN
+    RAISE EXCEPTION 'you can only change what you could have granted' USING ERRCODE = '42501';
+  END IF;
+
+  PERFORM private.expand_preset(v_id, p_preset, v_caller);
+  RETURN v_id;
+END;
+$$;
+
+-- · accept_workspace_invitation
+CREATE OR REPLACE FUNCTION public.accept_workspace_invitation(p_token text)
+ RETURNS TABLE(workspace_id uuid, workspace_slug text, workspace_name text, role membership_role)
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'extensions', 'pg_temp'
+AS $function$
+#variable_conflict use_column
+DECLARE
+  v_caller uuid := (SELECT auth.uid());
+  v_invitation public.workspace_invitation%ROWTYPE;
+  v_workspace public.workspace%ROWTYPE;
+  v_accepted timestamptz;
+  v_project_membership uuid;
+BEGIN
+  SELECT wi.* INTO v_invitation
+  FROM public.workspace_invitation wi
+  JOIN auth.users au
+    ON au.id = v_caller
+   AND au.email_confirmed_at IS NOT NULL
+   AND lower(au.email::text) = lower(wi.email::text)
+  WHERE wi.token_hash = encode(digest(p_token, 'sha256'), 'hex')
+    AND wi.accepted_at IS NULL
+    AND wi.revoked_at IS NULL
+    AND wi.expires_at > now()
+  FOR UPDATE;
+
+  IF v_invitation.id IS NULL THEN
+    RAISE EXCEPTION 'invitation unavailable' USING ERRCODE = '42501';
+  END IF;
+
+  SELECT * INTO v_workspace
+  FROM public.workspace w
+  WHERE w.id = v_invitation.workspace_id AND w.deleted_at IS NULL;
+  IF v_workspace.id IS NULL THEN
+    RAISE EXCEPTION 'invitation unavailable' USING ERRCODE = '42501';
+  END IF;
+
+  INSERT INTO public.membership AS m (
+    workspace_id, level, user_id, workspace_role, accepted_at, invited_by
+  ) VALUES (
+    v_invitation.workspace_id, 'workspace', v_caller, v_invitation.role, now(),
+    v_invitation.invited_by
+  )
+  ON CONFLICT (workspace_id, user_id) WHERE level = 'workspace' DO UPDATE
+  SET workspace_role = CASE
+        WHEN m.accepted_at IS NULL THEN EXCLUDED.workspace_role
+        ELSE m.workspace_role
+      END,
+      accepted_at = coalesce(m.accepted_at, EXCLUDED.accepted_at),
+      invited_by = coalesce(m.invited_by, EXCLUDED.invited_by)
+  RETURNING m.accepted_at INTO v_accepted;
+
+  UPDATE public.membership m
+  SET accepted_at = v_accepted
+  WHERE m.workspace_id = v_invitation.workspace_id
+    AND m.user_id = v_caller
+    AND m.level <> 'workspace'
+    AND m.accepted_at IS NULL;
+
+  IF v_invitation.project_id IS NOT NULL THEN
+    SELECT m.id INTO v_project_membership
+    FROM public.membership m
+    WHERE m.level = 'project' AND m.project_id = v_invitation.project_id AND m.user_id = v_caller;
+
+    IF v_project_membership IS NULL THEN
+      INSERT INTO public.membership (
+        workspace_id, level, project_id, user_id, roles, container_verb, accepted_at, invited_by
+      ) VALUES (
+        v_invitation.workspace_id, 'project', v_invitation.project_id, v_caller,
+        ARRAY[v_invitation.project_role_code]::text[],
+        (SELECT ap.container_verb FROM public.access_preset ap
+         WHERE ap.key = coalesce(v_invitation.project_preset, 'minim')),
+        v_accepted, v_invitation.invited_by
+      )
+      RETURNING id INTO v_project_membership;
+      PERFORM private.expand_preset(v_project_membership,
+                                    coalesce(v_invitation.project_preset, 'minim'),
+                                    v_invitation.invited_by);
+    ELSE
+      UPDATE public.membership m
+      SET roles = (
+            SELECT array_agg(DISTINCT role_code ORDER BY role_code)
+            FROM unnest(m.roles || ARRAY[v_invitation.project_role_code]::text[]) AS role_code
+          )
+      WHERE m.id = v_project_membership;
+    END IF;
+  END IF;
+
+  UPDATE public.workspace_invitation
+  SET accepted_at = now(), accepted_by = v_caller
+  WHERE id = v_invitation.id;
+
+  RETURN QUERY SELECT
+    v_workspace.id,
+    v_workspace.slug,
+    v_workspace.name,
+    (
+      SELECT m.workspace_role
+      FROM public.membership m
+      WHERE m.level = 'workspace' AND m.workspace_id = v_workspace.id AND m.user_id = v_caller
+    );
+END;
+$function$;
+
 ALTER TABLE public.membership DROP CONSTRAINT membership_level_shape;
 ALTER TABLE public.membership ADD CONSTRAINT membership_level_shape CHECK (
      (level = 'workspace'   AND num_nonnulls(project_id, line_id, bolo_id, performance_id) = 0

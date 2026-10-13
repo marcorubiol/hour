@@ -9,7 +9,7 @@
  *
  * Fixtures used (no test data created):
  *   - User `playwright@hour.test`:
- *     - workspace_membership: owner of `playwright` ONLY. Until § 31
+ *     - membership (workspace level): owner of `playwright` ONLY. Until § 31
  *       (2026-10) it was also admin of `muk-cia` and `marco-rubiol`, which
  *       hold real data; its difusión set now lives in `playwright`
  *       (`supabase/fixtures/playwright-difusion.sql`).
@@ -98,9 +98,9 @@ describe.skipIf(!envReady())('RLS — cross-tenant isolation', () => {
     // `playwright` workspace — that was an artifact of the data, not the
     // leak canary itself.)
     const memberships = await pgGet<{ workspace_id: string }>(
-      'workspace_membership',
+      'membership',
       playwrightJwt,
-      new URLSearchParams({ select: 'workspace_id' }),
+      new URLSearchParams({ level: 'eq.workspace', select: 'workspace_id' }),
     );
     const allowed = new Set(memberships.rows.map((m) => m.workspace_id));
     expect(allowed.size).toBeGreaterThanOrEqual(1);

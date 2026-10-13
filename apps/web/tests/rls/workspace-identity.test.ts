@@ -53,9 +53,9 @@ describe.skipIf(!envReady())('RLS — workspace identity boundary', () => {
         new URLSearchParams({ select: 'workspace_id,person_id,full_name,profile_sync_enabled' }),
       ),
       pgGet<{ workspace_id: string }>(
-        'workspace_membership',
+        'membership',
         jwt,
-        new URLSearchParams({ select: 'workspace_id', accepted_at: 'not.is.null' }),
+        new URLSearchParams({ level: 'eq.workspace', select: 'workspace_id', accepted_at: 'not.is.null' }),
       ),
     ]);
     expect(people.status).toBe(200);

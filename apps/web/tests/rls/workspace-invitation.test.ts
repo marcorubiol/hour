@@ -182,26 +182,14 @@ describe.skipIf(!envReady() || !externalEnvReady())(
         listed.data?.find((row) => row.access_kind === 'member' && row.user_id === externalUserId)?.id,
       ).toBe(ownRow.rows[0]?.id);
 
-      const ownMembership = await pgGet<{ id: string }>(
-        'workspace_membership',
-        externalJwt,
-        new URLSearchParams({ workspace_id: `eq.${workspaceId}`, select: 'id' }),
-      );
-      expect(ownMembership.rows).toHaveLength(1);
+      expect(ownRow.rows).toHaveLength(1);
       const selfPromotion = await pgPatch(
-        'workspace_membership',
-        externalJwt,
-        { role: 'admin' },
-        new URLSearchParams({ id: `eq.${ownMembership.rows[0].id}` }),
-      );
-      expect(selfPromotion.status).toBeGreaterThanOrEqual(400);
-      const selfPromotionModel = await pgPatch(
         'membership',
         externalJwt,
         { workspace_role: 'admin' },
         new URLSearchParams({ id: `eq.${ownRow.rows[0].id}` }),
       );
-      expect(selfPromotionModel.status).toBeGreaterThanOrEqual(400);
+      expect(selfPromotion.status).toBeGreaterThanOrEqual(400);
 
       await removeExternalMembership();
 

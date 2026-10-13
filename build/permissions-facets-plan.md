@@ -331,6 +331,9 @@ contract viene a quitar. La firma es un atributo de esa pareja, y la pareja es l
   `container_verb`. No se rellena el espacio con `view`: `model_container_verb_at` lo leería y cualquier miembro podría
   dar Mínim en cualquier línea, que es cambiar el acceso. Con esto, estar en un proyecto es ver el proyecto:
   `can_access_project` y `read:performance` dicen lo mismo.
+- `grant_container_preset` y `accept_workspace_invitation` insertaban la membresía sin verbo y `expand_preset` lo ponía
+  después; con el CHECK, la fila nace con el verbo del paquete. El resto de su cuerpo es el de la fase 3 (lo cazó la
+  suite RLS en local: sin este cambio, invitar a un proyecto y dar un paquete devolvían `23514`).
 - `has_permission_for_user` deja de tener rama vieja: todo lo contesta `model_has_permission`.
 - `seed_system_roles_on_workspace` siembra los 16 roles como etiquetas (código, nombre, sistema), sin permisos.
 - **Auditoría.** Hasta hoy los cambios de acceso de espacio y de proyecto se auditaban de rebote por los triggers

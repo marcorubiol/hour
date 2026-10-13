@@ -2,7 +2,8 @@
  * RLS regression — custom_access_token_hook correctness.
  *
  * The hook lives in Supabase Auth and runs at sign-in / refresh. It picks
- * the user's first accepted workspace_membership and writes its
+ * the user's first accepted workspace membership (`membership`, level
+ * `workspace`) and writes its
  * `workspace_id` into the JWT as `current_workspace_id`. Without that
  * claim, the SQL helper `current_workspace_id()` returns NULL and a few
  * write paths that use it (conversation insert, expense insert, section
