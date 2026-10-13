@@ -3479,3 +3479,14 @@ deducción no se puede confirmar ni quitar.
 - **«Voy» entra en el detector de conflictos (Marco, 2026-10-12, opción a).** Quien dijo «voy» está en el compromiso
   para el motor: choca con su ausencia, y dos compromisos con el mismo «voy» son un choque de personas. No es un
   reparto completo, así que nunca demuestra que dos compromisos no comparten a nadie.
+
+## [2026-10-13] ADR-104 · Fase 3 de permisos: paquete en el espacio, quién quita y la invitación con paquete
+
+Marco, sobre las tres dudas que dejó abiertas la fase 3 (`build/permissions-facets-plan.md § 8.6`); acepta las
+recomendadas.
+- **Paquete en el espacio:** solo Direcció tiene traducción (admin, ADR-100 §4). Otro paquete quita el admin y no da
+  facetas de espacio: Converses o Diners en el espacio valdrían en todos los proyectos, y eso no está decidido.
+- **Quién quita o rebaja una membresía ajena:** quien podría haberla dado (el techo del delegante, ADR-085 §10,
+  aplicado también a quitar) o el admin del espacio. Cierra ADR-085, Abierto 1, salvo la pantalla.
+- **Invitar a un proyecto:** la invitación lleva paquete (Mínim por defecto, ADR-085 §11) y el rol queda como
+  etiqueta. Las invitaciones pendientes de antes de la fase 3 dan Mínim al aceptarse.
