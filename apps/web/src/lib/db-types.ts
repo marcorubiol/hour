@@ -37,21 +37,18 @@ export type Database = {
       access_preset: {
         Row: {
           can_edit_meta: boolean
-          can_manage_members: boolean
           container_verb: Database["public"]["Enums"]["access_verb"]
           key: string
           sort: number
         }
         Insert: {
           can_edit_meta?: boolean
-          can_manage_members?: boolean
           container_verb: Database["public"]["Enums"]["access_verb"]
           key: string
           sort?: number
         }
         Update: {
           can_edit_meta?: boolean
-          can_manage_members?: boolean
           container_verb?: Database["public"]["Enums"]["access_verb"]
           key?: string
           sort?: number
@@ -1973,13 +1970,13 @@ export type Database = {
           accepted_at: string | null
           bolo_id: string | null
           can_edit_meta: boolean
-          can_manage_members: boolean
           container_verb: Database["public"]["Enums"]["access_verb"] | null
           created_at: string
           id: string
           invited_by: string | null
           level: Database["public"]["Enums"]["container_level"]
           line_id: string | null
+          mail_signature: string | null
           performance_id: string | null
           preset: string | null
           project_id: string | null
@@ -1993,13 +1990,13 @@ export type Database = {
           accepted_at?: string | null
           bolo_id?: string | null
           can_edit_meta?: boolean
-          can_manage_members?: boolean
           container_verb?: Database["public"]["Enums"]["access_verb"] | null
           created_at?: string
           id?: string
           invited_by?: string | null
           level: Database["public"]["Enums"]["container_level"]
           line_id?: string | null
+          mail_signature?: string | null
           performance_id?: string | null
           preset?: string | null
           project_id?: string | null
@@ -2013,13 +2010,13 @@ export type Database = {
           accepted_at?: string | null
           bolo_id?: string | null
           can_edit_meta?: boolean
-          can_manage_members?: boolean
           container_verb?: Database["public"]["Enums"]["access_verb"] | null
           created_at?: string
           id?: string
           invited_by?: string | null
           level?: Database["public"]["Enums"]["container_level"]
           line_id?: string | null
+          mail_signature?: string | null
           performance_id?: string | null
           preset?: string | null
           project_id?: string | null
@@ -2519,7 +2516,6 @@ export type Database = {
           initials: string | null
           name: string
           notes: string | null
-          owner_id: string | null
           poster_url: string | null
           previous_slugs: string[]
           slug: string
@@ -2541,7 +2537,6 @@ export type Database = {
           initials?: string | null
           name: string
           notes?: string | null
-          owner_id?: string | null
           poster_url?: string | null
           previous_slugs?: string[]
           slug: string
@@ -2563,7 +2558,6 @@ export type Database = {
           initials?: string | null
           name?: string
           notes?: string | null
-          owner_id?: string | null
           poster_url?: string | null
           previous_slugs?: string[]
           slug?: string
@@ -2574,61 +2568,10 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "project_owner_id_fkey"
-            columns: ["owner_id"]
-            isOneToOne: false
-            referencedRelation: "workspace_membership"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "project_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspace"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      project_membership: {
-        Row: {
-          created_at: string
-          id: string
-          invited_by: string | null
-          permission_grants: string[]
-          permission_revokes: string[]
-          project_id: string
-          roles: string[]
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          invited_by?: string | null
-          permission_grants?: string[]
-          permission_revokes?: string[]
-          project_id: string
-          roles?: string[]
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          invited_by?: string | null
-          permission_grants?: string[]
-          permission_revokes?: string[]
-          project_id?: string
-          roles?: string[]
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "project_membership_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "project"
             referencedColumns: ["id"]
           },
         ]
@@ -3512,50 +3455,6 @@ export type Database = {
           },
         ]
       }
-      workspace_membership: {
-        Row: {
-          accepted_at: string | null
-          created_at: string
-          id: string
-          invited_by: string | null
-          mail_signature: string | null
-          role: Database["public"]["Enums"]["membership_role"]
-          updated_at: string
-          user_id: string
-          workspace_id: string
-        }
-        Insert: {
-          accepted_at?: string | null
-          created_at?: string
-          id?: string
-          invited_by?: string | null
-          mail_signature?: string | null
-          role?: Database["public"]["Enums"]["membership_role"]
-          updated_at?: string
-          user_id: string
-          workspace_id: string
-        }
-        Update: {
-          accepted_at?: string | null
-          created_at?: string
-          id?: string
-          invited_by?: string | null
-          mail_signature?: string | null
-          role?: Database["public"]["Enums"]["membership_role"]
-          updated_at?: string
-          user_id?: string
-          workspace_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "workspace_membership_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: false
-            referencedRelation: "workspace"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       workspace_organization: {
         Row: {
           address: string | null
@@ -3736,38 +3635,32 @@ export type Database = {
       }
       workspace_role: {
         Row: {
-          access_level: Database["public"]["Enums"]["workspace_role_access_level"]
           archived_at: string | null
           code: string
           created_at: string
           id: string
           is_system: boolean
           label: string
-          permissions: string[]
           updated_at: string
           workspace_id: string
         }
         Insert: {
-          access_level: Database["public"]["Enums"]["workspace_role_access_level"]
           archived_at?: string | null
           code: string
           created_at?: string
           id?: string
           is_system?: boolean
           label: string
-          permissions?: string[]
           updated_at?: string
           workspace_id: string
         }
         Update: {
-          access_level?: Database["public"]["Enums"]["workspace_role_access_level"]
           archived_at?: string | null
           code?: string
           created_at?: string
           id?: string
           is_system?: boolean
           label?: string
-          permissions?: string[]
           updated_at?: string
           workspace_id?: string
         }
@@ -3793,17 +3686,6 @@ export type Database = {
           workspace_id: string
           workspace_name: string
           workspace_slug: string
-        }[]
-      }
-      access_parity_report: {
-        Args: never
-        Returns: {
-          legacy: boolean
-          model: boolean
-          probe: string
-          project_id: string
-          user_id: string
-          workspace_id: string
         }[]
       }
       accessible_project_ids: { Args: { p_perm: string }; Returns: string[] }
@@ -4575,7 +4457,6 @@ export type Database = {
           initials: string | null
           name: string
           notes: string | null
-          owner_id: string | null
           poster_url: string | null
           previous_slugs: string[]
           slug: string
@@ -4904,10 +4785,6 @@ export type Database = {
         Returns: string
       }
       has_permission: {
-        Args: { p_perm: string; p_project_id: string }
-        Returns: boolean
-      }
-      has_permission_by_facets: {
         Args: { p_perm: string; p_project_id: string }
         Returns: boolean
       }
@@ -5710,7 +5587,6 @@ export type Database = {
           initials: string | null
           name: string
           notes: string | null
-          owner_id: string | null
           poster_url: string | null
           previous_slugs: string[]
           slug: string
@@ -5953,12 +5829,6 @@ export type Database = {
         | "mixed"
         | "other"
       workspace_kind: "personal" | "team"
-      workspace_role_access_level:
-        | "owner"
-        | "admin"
-        | "producer"
-        | "member"
-        | "viewer"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -6197,13 +6067,6 @@ export const Constants = {
         "other",
       ],
       workspace_kind: ["personal", "team"],
-      workspace_role_access_level: [
-        "owner",
-        "admin",
-        "producer",
-        "member",
-        "viewer",
-      ],
     },
   },
 } as const

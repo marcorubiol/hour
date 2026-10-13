@@ -5,9 +5,9 @@
 > recomendaciones de la primera versión de este plan, aceptadas por Marco). Canon: ADR-082, ADR-083, ADR-085,
 > `build/structure-model.md § Facet`.
 >
-> Estado: **expand y fase 2 en producción** (2026-10-11, `20261011100000` y `20261011300000`). **Fase 3 escrita y
-> probada en la Supabase local** (rama `claude/permissions-facets-f3`, § 8), sin aplicar en staging ni en producción.
-> El contract no está escrito.
+> Estado: **expand, fase 2 y fase 3 en producción** (`20261011100000`, `20261011300000`, `20261013200000`).
+> **Contract escrito y probado en la Supabase local** (rama `claude/permissions-facets-contract`, § 9), sin aplicar
+> en staging ni en producción.
 
 ## 1. Qué cambia y qué no
 
@@ -285,3 +285,124 @@ cuerpos de la fase 2, borra las RPC y triggers nuevos, restaura los triggers del
 Acaba exigiendo paridad cero. **Se pierde**: las facetas de proyecto que el modelo viejo no expresa (Materials y Tècnica
 dadas por paquete u override), el nombre del paquete de las membresías de proyecto y `project_preset` de las
 invitaciones pendientes. Las membresías de línea, bolo y función se quedan como estaban.
+
+## 9. Contract (`20261013300000_permissions_facets_contract.sql`)
+
+Criterio de Marco (2026-10-13): no hay nadie en producción ni en beta, lo pasado se puede destruir. Sin capas de
+compatibilidad ni ventanas de transición. Lo único que no puede cambiar es el **acceso efectivo de cada persona a cada
+contenedor** con los datos reales de `muk-cia`.
+
+### 9.1 Qué se borra
+
+| Objeto | Por qué muere |
+|---|---|
+| `project_membership` (tabla, políticas, triggers) | Proyección de `membership` de proyecto desde la fase 3; nadie la lee. |
+| `workspace_membership` (tabla, políticas, triggers) | Proyección de `membership` de espacio. Lo que sujetaba y no era acceso se mueve (§ 9.2). |
+| `workspace_role.permissions`, `workspace_role.access_level` y el tipo `workspace_role_access_level` | El rol es etiqueta (ADR-082); los permisos del rol no cambian el acceso de nadie desde la fase 3. `access_level` era el nivel de permiso del paquete del rol: nadie lo lee. |
+| `membership.can_manage_members`, `access_preset.can_manage_members` | ADR-100 §3: invitar no es una capacidad, manda el techo; desde la fase 3 no gatea nada. Direcció = Coordinació + Diners edit. |
+| La proyección inversa: `private.legacy_project_grants`, `project_legacy_workspace`, `project_legacy_project`, `project_legacy_pair`, `membership_to_legacy`, `membership_facet_to_legacy` y sus dos triggers | No queda tabla vieja que proyectar. |
+| El espejo: `private.sync_project_access`, `sync_workspace_access`, `mirror_*` y `standard_facet_id` (solo lo usaba el espejo) | Sin trigger desde la fase 3; se quedaban para el rollback. |
+| Los lectores congelados `private.legacy_*` y la paridad `private.access_parity_mismatches` | Comparaban lo viejo con lo nuevo; no queda lo viejo. |
+| `public.has_permission_by_facets`, `public.access_parity_report` | RPC de comprobación de la transición. |
+| `public.validate_project_membership_roles` | Validaba `project_membership`; lo sustituye `private.validate_membership_roles` (fase 3). |
+| `project.owner_id` | Columna sin escritor ni lector desde el checkpoint de julio (ni RPC, ni app, ni fixtures), con FK a `workspace_membership.id`. **Pendiente de Marco**, § 9.6. |
+| Las cadenas `edit:membership`, `read:internal_notes`, `admin:project` | Sin lector. `has_permission` conoce siete cadenas y **una cadena desconocida es un error** (`22023`), no un `false` callado: una errata en una política falla en el primer test en vez de denegar sin avisar. |
+| El valor `legacy` de `membership_facet.source` | Las filas que el espejo escribió pasan a `override` (dadas a mano, fuera de un paquete). **Pendiente de Marco**, § 9.6. |
+
+### 9.2 Qué se mueve
+
+**`workspace_membership` desaparece entera**; `membership` de nivel espacio es la misma pareja (espacio, persona) con
+el mismo rol, aceptación e invitador. De las dos cosas que sujetaba sin ser acceso:
+
+- **`mail_signature` pasa a `membership.mail_signature`**, con un CHECK que solo la admite en la fila de espacio (y el
+  mismo límite de 2.000 caracteres). `my_mail_signature` y `set_my_mail_signature` leen y escriben ahí, con la misma
+  firma. La exposición no cambia: `membership_select` deja ver la fila propia o todas si administras el espacio, igual
+  que `workspace_membership_select`, y nadie escribe `membership` por la API.
+- **`project.owner_id` se borra** (provisional, § 9.6).
+
+Por qué así y no reducir `workspace_membership` a una tabla de firma: dejarla viva por una columna obligaría a mantener
+dos filas por persona y espacio, nacidas y muertas a la vez, con un trigger que las sincronice: es la proyección que el
+contract viene a quitar. La firma es un atributo de esa pareja, y la pareja es la fila de espacio de `membership`.
+
+### 9.3 Qué cambia en las reglas
+
+- **`container_verb` obligatorio (ADR-100 §2)**, como forma de la fila: `level = 'workspace'` lleva `workspace_role` y
+  `container_verb` NULL (el espacio tiene su propia dimensión, ADR-100 §4); cualquier otro nivel lleva
+  `container_verb`. No se rellena el espacio con `view`: `model_container_verb_at` lo leería y cualquier miembro podría
+  dar Mínim en cualquier línea, que es cambiar el acceso. Con esto, estar en un proyecto es ver el proyecto:
+  `can_access_project` y `read:performance` dicen lo mismo.
+- `has_permission_for_user` deja de tener rama vieja: todo lo contesta `model_has_permission`.
+- `seed_system_roles_on_workspace` siembra los 16 roles como etiquetas (código, nombre, sistema), sin permisos.
+- **Auditoría.** Hasta hoy los cambios de acceso de espacio y de proyecto se auditaban de rebote por los triggers
+  `write_audit` de las tablas viejas. `membership` gana su propio `membership_audit`, para todos los niveles.
+  `membership_facet` no (no tiene `id` y `audit_log.entity_id` es obligatorio): un override de faceta deja de dejar
+  rastro en `audit_log`, igual que ya no lo dejaba en línea, bolo y función.
+
+### 9.4 Comprobaciones de la migración (todas abortan sin aplicar nada)
+
+1. **Antes de tocar nada, paridad cero** (`access_parity_mismatches()`, la última vez que existe): las tablas viejas no
+   llevan ningún acceso que el modelo no tenga.
+2. Ninguna membresía de contenedor sin `container_verb` (hoy lo dan todos los paquetes; solo una fila del espejo con
+   `read:performance` revocado lo tendría NULL, y darle `view` o borrarla cambiaría su acceso: decide Marco con la
+   lista que imprime el error).
+3. Toda `mail_signature` tiene una fila de espacio en `membership` donde caer.
+4. **Foto del acceso efectivo antes y después**, comparada: para cada persona con membresía de espacio o proyecto y
+   cada proyecto de esos espacios, el rol del espacio, `can_read_workspace_money`, `can_access_project` y los siete
+   permisos vivos; y para cada membresía, su contenedor, verbo, metadatos y facetas. Una sola diferencia aborta.
+5. Ninguna función de `public` o `private` nombra todavía `workspace_membership`, `project_membership`,
+   `can_manage_members` o `legacy_*` (un cuerpo plpgsql no se valida al crearlo: sin esto, una función olvidada
+   fallaría la primera vez que alguien la llamara).
+
+`project.owner_id` no aborta: la migración dice cuántos proyectos lo tenían (`NOTICE`) antes de borrarlo, y el `inspect`
+de producción debe mirarlo antes del apply (`select count(owner_id) from project`).
+
+### 9.5 Qué cambia en la app
+
+- `db-types.ts` regenerado: sin las dos tablas, sin `permissions`, `access_level`, `can_manage_members` ni `owner_id`,
+  con `membership.mail_signature`, sin las dos RPC de comprobación.
+- Código de `apps/web/src`: ninguna línea lee lo que se borra (las firmas se leen por RPC; el Worker pregunta
+  `has_permission` con `edit:performance` y `edit:project_meta`). Solo cambian comentarios.
+- Tests RLS: fuera la paridad, `has_permission_by_facets` y las escrituras a tablas viejas; dentro, que lo borrado ya no
+  existe (las dos tablas, las dos RPC, la columna de permisos, la cadena muerta) y el acceso esperado de cada fixture
+  por permiso.
+- `supabase/fixtures/staging.sql` sin `workspace_membership` ni `can_manage_members`.
+- Retirados: `build/runbooks/permissions-facets-rehearsal.sql` (movía el modelo viejo y exigía paridad, no queda
+  ninguna de las dos cosas; lo que probaba de paquetes, overrides, techo y bajas lo prueba `permissions-facets.test.ts`
+  contra la base de verdad) y los tres rollbacks de expand, fase 2 y fase 3 (después del contract no hay tablas viejas
+  a las que volver).
+
+### 9.6 Pendiente de Marco
+
+1. **`project.owner_id`** (el responsable de un proyecto, sin ADR y sin uso).
+   - a) **(implementada)** Borrarla. No la escribe ni la lee nadie; si un día hace falta un responsable, se decide qué
+     es (¿una persona con login, un dossier, un rol?) y se crea con ese sentido.
+   - b) Repuntarla a `membership.id`. Conserva el dato, pero una FK a `membership` admite una membresía de bolo como
+     responsable de un proyecto.
+   - c) Repuntarla a `auth.users.id`: el responsable sería un login, no una membresía.
+2. **Las facetas que dejó el espejo** (`source = legacy`: Diners y Converses de las membresías de proyecto de antes de
+   la fase 3).
+   - a) **(implementada)** `override`: se dieron a mano, fuera de un paquete, que es lo que `override` significa en la
+     vista «de dónde sale cada permiso» (ADR-082 §4).
+   - b) Dejar `legacy` como valor permanente: dice de dónde vinieron, pero es un valor que ya nada escribe.
+   - c) Un valor nuevo, `import`: lo mismo que b con otro nombre.
+
+### 9.7 Riesgos
+
+- **Destructiva** para `_tasks.md § 34`: borra tablas, columnas, un tipo y funciones, y reescribe filas
+  (`membership_facet.source`). `inspect` + staging + plan + apply. El `inspect` debe confirmar que ningún objeto fuera
+  de las migraciones sujeta lo que se borra (una vista, una función a mano, una publicación de Realtime: en la local no
+  hay ninguna).
+- **Una sola transacción.** Si cualquier comprobación de § 9.4 falla, no se aplica nada.
+- **Worker y migración van juntos.** El Worker desplegado (`05f1c96`) no lee nada de lo que se borra (las firmas van
+  por RPC con la misma firma), así que apply y deploy pueden ir en cualquier orden; pero los tests RLS de esta rama
+  fallan contra una base sin el contract, y los de `main` contra una base con él.
+- **`has_permission` con una cadena desconocida** ahora es error, no `false`. Ninguna política ni función usa otra
+  cadena que las siete (comprobado en el catálogo local); un cliente que preguntara `edit:membership` por RPC recibe
+  400.
+
+### 9.8 Vuelta atrás
+
+**Restaurar el backup** que `production-migrate.yml` hace antes del apply. Un rollback SQL fiel no merece la pena:
+tendría que recrear dos tablas y su proyección desde un modelo que ya no la necesita, para volver a un estado que nadie
+usa. Lo que se perdería entre el apply y una restauración son las escrituras de ese intervalo (con una sola compañía
+real, se apuntan y se rehacen a mano). Si la migración aborta, no hay nada que deshacer.
