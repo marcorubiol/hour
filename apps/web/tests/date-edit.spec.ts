@@ -69,11 +69,11 @@ const FIXTURE_PROJECT_ID = '019f21d2-7482-77e6-9ad9-27d881cff305';
  * every 30 — visible in one drawing, behind the fold in the other. The app
  * is right (a diary starts where you are); the day was wrong.
  */
+// Today in the browser's zone (playwright.config `timezoneId`), not in UTC: from
+// 00:00 to 02:00 in Madrid the two are different days, and the diary opens on
+// Madrid's (seen 2026-10-14 at 00:34).
 function runDay(): string {
-  const now = new Date();
-  return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}-${String(
-    now.getUTCDate(),
-  ).padStart(2, '0')}`;
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Madrid' });
 }
 
 type CreatedDate = { id: string; starts_at: string };

@@ -567,7 +567,8 @@ test.describe('the diary', () => {
     const measure = () =>
       page.evaluate(() => {
         const el = document.querySelector('[data-day].is-today, [data-day]');
-        const today = new Date().toISOString().slice(0, 10);
+        // The browser's local day (its zone is Madrid), not UTC's.
+        const today = new Date().toLocaleDateString('en-CA');
         const t = document.querySelector(`[data-day="${today}"]`);
         return t ? Math.round(t.getBoundingClientRect().top) : el ? 9999 : null;
       });
@@ -612,7 +613,7 @@ test.describe('the diary', () => {
     // today's own top edge must belong to today; if the furniture pinned over
     // the page owns it, today is buried.
     const occluded = await page.evaluate(() => {
-      const key = new Date().toISOString().slice(0, 10);
+      const key = new Date().toLocaleDateString('en-CA');
       const el = document.querySelector(`[data-day="${key}"]`);
       if (!el) return true;
       const r = el.getBoundingClientRect();
