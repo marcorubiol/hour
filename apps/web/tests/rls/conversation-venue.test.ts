@@ -7,8 +7,12 @@ import {
   pgGet,
   pgPatch,
   pgRpc,
+  projectAccess,
   requireEnv,
   requireLimitedEnv,
+  restoreProjectAccess,
+  setFacets,
+  type ProjectAccess,
 } from './_helpers';
 
 /**
@@ -62,13 +66,6 @@ interface ConversationRow {
   organization_id: string;
   private_to: string | null;
   previous_slugs: string[];
-}
-
-interface ProjectMembershipRow {
-  id: string;
-  roles: string[];
-  permission_grants: string[];
-  permission_revokes: string[];
 }
 
 const one = <T>(data: T | T[] | null): T | undefined =>
@@ -369,32 +366,15 @@ describe.skipIf(!envReady())('conversation with the venue (ADR-102, fase 2)', ()
   describe.skipIf(!limitedEnvReady())('with a second member', () => {
     let other: string;
     let otherSub: string;
-    let membership: ProjectMembershipRow;
+    let membership: ProjectAccess;
     let theirs: string | undefined;
 
     beforeAll(async () => {
       const limited = requireLimitedEnv();
       other = await login(limited.email, limited.password);
       otherSub = String(decodeJwt(other).sub);
-      const m = await pgGet<ProjectMembershipRow>(
-        'project_membership',
-        jwt,
-        new URLSearchParams({
-          project_id: `eq.${projectId}`,
-          user_id: `eq.${otherSub}`,
-          select: 'id,roles,permission_grants,permission_revokes',
-        }),
-      );
-      membership = m.rows[0]!;
-      await pgPatch(
-        'project_membership',
-        jwt,
-        {
-          permission_grants: [...new Set([...membership.permission_grants, 'read:conversation', 'edit:conversation'])],
-          permission_revokes: membership.permission_revokes.filter((x) => x !== 'read:conversation' && x !== 'edit:conversation'),
-        },
-        new URLSearchParams({ id: `eq.${membership.id}` }),
-      );
+      membership = await projectAccess(jwt, projectId, otherSub);
+      await setFacets(jwt, membership.membershipId, { converses: 'edit' });
     });
 
     afterAll(async () => {
@@ -402,16 +382,7 @@ describe.skipIf(!envReady())('conversation with the venue (ADR-102, fase 2)', ()
         await pgPatch('conversation', other, { private_to: null }, new URLSearchParams({ id: `eq.${theirs}` }));
         await pgRpc('delete_conversation', other, { p_conversation_id: theirs });
       }
-      await pgPatch(
-        'project_membership',
-        jwt,
-        {
-          roles: membership.roles,
-          permission_grants: membership.permission_grants,
-          permission_revokes: membership.permission_revokes,
-        },
-        new URLSearchParams({ id: `eq.${membership.id}` }),
-      );
+      if (membership) await restoreProjectAccess(jwt, projectId, otherSub, membership);
     });
 
     test('a private one of someone else does not count: each gets theirs, and two shared cannot coexist', async () => {

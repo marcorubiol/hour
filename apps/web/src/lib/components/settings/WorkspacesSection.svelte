@@ -84,6 +84,8 @@
   let inviteRole = $state<'admin' | 'member' | 'viewer' | 'guest'>('guest');
   let inviteProjectId = $state('');
   let inviteProjectRole = $state('performer');
+  // El acceso lo da el paquete; el rol es etiqueta. Por defecto, Mínim (ADR-085 §11).
+  let inviteProjectPreset = $state<'minim' | 'equip' | 'coordinacio' | 'direccio'>('minim');
   let latestInviteUrl = $state('');
 
   const inviteMember = createMutation({
@@ -96,6 +98,7 @@
         role: inviteRole,
         project_id: inviteProjectId || null,
         project_role_code: inviteProjectId ? inviteProjectRole : null,
+        project_preset: inviteProjectId ? inviteProjectPreset : null,
       });
       if (!response?.invitation) throw new Error(t('settings.access_invite_no_link', locale));
       return response.invitation;
@@ -341,6 +344,15 @@
           <option value="director">{t('settings.prole_director', locale)}</option>
           <option value="production_manager">{t('settings.prole_production_manager', locale)}</option>
           <option value="distribution">{t('settings.prole_distribution', locale)}</option>
+        </select>
+      </label>
+      <label>
+        <span class="eyebrow">{t('settings.access_project_preset', locale)}</span>
+        <select bind:value={inviteProjectPreset} disabled={!inviteProjectId}>
+          <option value="minim">{t('preset.minim', locale)}</option>
+          <option value="equip">{t('preset.equip', locale)}</option>
+          <option value="coordinacio">{t('preset.coordinacio', locale)}</option>
+          <option value="direccio">{t('preset.direccio', locale)}</option>
         </select>
       </label>
       <button
@@ -689,7 +701,7 @@
   }
   .set-access__invite {
     display: grid;
-    grid-template-columns: minmax(12rem, 1.4fr) repeat(3, minmax(9rem, 1fr)) auto;
+    grid-template-columns: minmax(12rem, 1.4fr) repeat(4, minmax(9rem, 1fr)) auto;
     gap: var(--space-s);
     align-items: end;
     padding: var(--space-m);

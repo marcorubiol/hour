@@ -3449,6 +3449,7 @@ export type Database = {
           id: string
           invited_by: string
           project_id: string | null
+          project_preset: string | null
           project_role_code: string | null
           revoked_at: string | null
           role: Database["public"]["Enums"]["membership_role"]
@@ -3464,6 +3465,7 @@ export type Database = {
           id?: string
           invited_by: string
           project_id?: string | null
+          project_preset?: string | null
           project_role_code?: string | null
           revoked_at?: string | null
           role: Database["public"]["Enums"]["membership_role"]
@@ -3479,6 +3481,7 @@ export type Database = {
           id?: string
           invited_by?: string
           project_id?: string | null
+          project_preset?: string | null
           project_role_code?: string | null
           revoked_at?: string | null
           role?: Database["public"]["Enums"]["membership_role"]
@@ -3492,6 +3495,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "project"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workspace_invitation_project_preset_fkey"
+            columns: ["project_preset"]
+            isOneToOne: false
+            referencedRelation: "access_preset"
+            referencedColumns: ["key"]
           },
           {
             foreignKeyName: "workspace_invitation_workspace_id_fkey"
@@ -4806,6 +4816,7 @@ export type Database = {
           p_email: string
           p_expires_days?: number
           p_project_id?: string
+          p_project_preset?: string
           p_project_role_code?: string
           p_role?: Database["public"]["Enums"]["membership_role"]
           p_workspace_id: string
@@ -5461,6 +5472,10 @@ export type Database = {
         Args: { p_share_id: string }
         Returns: undefined
       }
+      revoke_membership: {
+        Args: { p_membership_id: string }
+        Returns: undefined
+      }
       revoke_roadsheet_share: {
         Args: { p_share_id: string }
         Returns: undefined
@@ -5529,6 +5544,14 @@ export type Database = {
       }
       set_mail_signature: {
         Args: { p_account_id: string; p_signature: string }
+        Returns: undefined
+      }
+      set_membership_facet: {
+        Args: {
+          p_facet_id: string
+          p_membership_id: string
+          p_verb?: Database["public"]["Enums"]["access_verb"]
+        }
         Returns: undefined
       }
       set_my_mail_signature: {

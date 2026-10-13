@@ -260,13 +260,19 @@ no puede proyectar. `set_membership_facet` rechaza el nivel espacio por lo mismo
   fila cambiada. Clase destructiva para `_tasks.md § 34`: `inspect` + staging + plan + apply. El acceso no cambia: la
   migración aborta si la paridad no es cero después.
 - **Firma de `create_workspace_invitation`.** Se borra la de 6 parámetros y se crea la de 7 con defecto. Entre el apply
-  y el deploy el Worker viejo sigue llamando con nombres y funciona.
+  y el deploy el Worker viejo sigue llamando con nombres y funciona (probado en local por PostgREST con los seis
+  argumentos: 200 y `project_preset = minim`).
 - **Ids de membresía.** `list_workspace_access` devuelve otros ids. Un cliente con la lista cacheada de antes del
   apply recibiría `membership not found` al cambiar un rol; recargar lo arregla.
 - **Editar `workspace_role.permissions` deja de cambiar accesos.** Es lo que pide el modelo, pero hoy es un efecto
   visible para quien lo hiciera por la API (la app no lo hace).
-- **Tests que escribían `project_membership` por la API** (siete ficheros RLS) pasan a `set_membership_facet` y
-  `grant_container_preset` con un ayudante común; contra producción fallan hasta que la fase 3 esté aplicada.
+- **Tests que escribían `project_membership` por la API** (ocho ficheros RLS) pasan a `set_membership_facet` y
+  `grant_container_preset` con ayudantes comunes (`_helpers.ts`), y `workspace-invitation.test.ts` y
+  `limited-role.test.ts` leen los ids de `membership`. Contra producción fallan hasta que la fase 3 esté aplicada; y
+  al revés, la suite de `main` falla contra una base con la fase 3. Los tests dejan la membresía de la fixture limitada
+  con `preset = minim` (antes NULL): mismo acceso.
+- **`staging.sql`** siembra las membresías en `membership` (la proyección escribe las viejas): solo vale con la fase 3
+  aplicada.
 
 ### 8.8 Rollback
 

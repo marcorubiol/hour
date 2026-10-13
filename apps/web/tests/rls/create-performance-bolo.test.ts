@@ -21,13 +21,17 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   decodeJwt,
   envReady,
+  grantPreset,
   limitedEnvReady,
   login,
   pgGet,
-  pgPatch,
   pgRpc,
+  projectAccess,
   requireEnv,
   requireLimitedEnv,
+  restoreProjectAccess,
+  setFacets,
+  type ProjectAccess,
 } from './_helpers';
 
 const RUN = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -37,11 +41,6 @@ interface Row {
   id: string;
 }
 
-interface MembershipRow {
-  id: string;
-  permission_grants: string[];
-  permission_revokes: string[];
-}
 
 describe.skipIf(!envReady())('create_performance with p_bolo_id (ADR-087, § 37)', () => {
   let jwt: string;
@@ -166,35 +165,19 @@ describe.skipIf(!envReady())('create_performance with p_bolo_id (ADR-087, § 37)
 
   describe.skipIf(!limitedEnvReady())('the gate is edit:performance, as in the PATCH', () => {
     let limitedJwt: string;
-    let membership: MembershipRow;
+    let limitedUserId: string;
+    let membership: ProjectAccess;
 
     beforeAll(async () => {
       const limited = requireLimitedEnv();
       limitedJwt = await login(limited.email, limited.password);
-      const rows = await pgGet<MembershipRow>(
-        'project_membership',
-        jwt,
-        new URLSearchParams({
-          project_id: `eq.${homeProjectId}`,
-          user_id: `eq.${String(decodeJwt(limitedJwt).sub)}`,
-          select: 'id,permission_grants,permission_revokes',
-        }),
-      );
-      expect(rows.rows).toHaveLength(1);
-      membership = rows.rows[0];
+      limitedUserId = String(decodeJwt(limitedJwt).sub);
+      membership = await projectAccess(jwt, homeProjectId, limitedUserId);
     });
 
     afterAll(async () => {
       if (!membership) return;
-      await pgPatch(
-        'project_membership',
-        jwt,
-        {
-          permission_grants: membership.permission_grants,
-          permission_revokes: membership.permission_revokes,
-        },
-        new URLSearchParams({ id: `eq.${membership.id}` }),
-      );
+      await restoreProjectAccess(jwt, homeProjectId, limitedUserId, membership);
     });
 
     it('a performer without edit:performance is refused, bolo or not', async () => {
@@ -204,13 +187,9 @@ describe.skipIf(!envReady())('create_performance with p_bolo_id (ADR-087, § 37)
     });
 
     it('edit:performance alone is enough: no money permission is asked', async () => {
-      const granted = await pgPatch(
-        'project_membership',
-        jwt,
-        { permission_grants: ['edit:performance'], permission_revokes: [] },
-        new URLSearchParams({ id: `eq.${membership.id}` }),
-      );
-      expect(granted.status).toBe(200);
+      // Editar el contenedor sin Diners: Coordinació menos su faceta de dinero.
+      await grantPreset(jwt, 'project', homeProjectId, limitedUserId, 'coordinacio');
+      await setFacets(jwt, membership.membershipId, { diners: null });
       const money = await pgRpc<boolean>('has_permission', limitedJwt, {
         p_project_id: homeProjectId,
         p_perm: 'read:money',

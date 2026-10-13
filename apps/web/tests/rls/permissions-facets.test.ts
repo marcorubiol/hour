@@ -1,37 +1,43 @@
 /**
- * RLS regression: permisos al modelo de facetas (expand 20261011100000 y fase 2
- * 20261011300000; build/permissions-facets-plan.md, ADR-099 §8, ADR-100).
+ * RLS regression: permisos al modelo de facetas (expand 20261011100000, fase 2
+ * 20261011300000 y fase 3 20261013200000; build/permissions-facets-plan.md,
+ * ADR-099 §8, ADR-100).
  *
- * El expand crea `membership` + `membership_facet` como espejo de
- * workspace_membership / project_membership / workspace_role; la fase 2 hace
- * que los lectores de hoy (has_permission, is_workspace_*, ...) lean el modelo
- * nuevo. Estos tests prueban:
+ * La fase 2 hace que los lectores (has_permission, is_workspace_*, ...) lean
+ * `membership` + `membership_facet`; la fase 3 hace que las escrituras vayan
+ * solo ahí, y las tablas viejas pasan a ser su proyección. Estos tests prueban:
  *   1. Paridad global (con SUPABASE_SERVICE_ROLE_KEY): las copias congeladas de
  *      los lectores viejos y el modelo nuevo contestan igual para todo el
- *      sistema. Es la prueba fuerte de equivalencia.
+ *      sistema. Es la prueba fuerte de equivalencia (y de la proyección).
  *   2. Equivalencia por fixture: has_permission y el modelo nuevo contestan
  *      igual en cada proyecto, en los ocho permisos vivos.
- *   3. Espejo en vivo: un grant o revoke en project_membership se ve al
- *      instante en las filas de faceta y en el acceso real.
- *   4. Facetas: vocabulario estándar y tabla de niveles decididos (ADR-100),
+ *   3. Overrides y paquetes en el proyecto: se ven al instante en el acceso
+ *      real y en la tabla vieja proyectada.
+ *   4. Techo del delegante: con Mínim no se da ni se toma más; en el espacio,
+ *      Direcció es admin y las facetas de espacio esperan decisión.
+ *   5. Facetas: vocabulario estándar y tabla de niveles decididos (ADR-100),
  *      configuración por espacio solo del admin, nadie escribe membresías por
- *      la API, cada uno ve solo lo suyo salvo el admin.
- *   5. Paquetes: grant_container_preset expande Equip en un bolo, respeta el
- *      techo del delegante y no acepta proyecto ni espacio en la fase 2.
+ *      la API (ni las tablas viejas), cada uno ve solo lo suyo salvo el admin.
+ *   6. Paquetes en un bolo: Equip se expande y el techo se respeta.
  */
 
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import {
   decodeJwt,
   envReady,
+  grantPreset,
   limitedEnvReady,
   login,
   pgGet,
   pgPatch,
   pgPost,
   pgRpc,
+  projectAccess,
   requireEnv,
   requireLimitedEnv,
+  restoreProjectAccess,
+  setFacets,
+  type ProjectAccess,
 } from './_helpers';
 
 const LIVE_PERMS = [
@@ -56,7 +62,6 @@ const DECIDED_LEVELS: Record<string, string[]> = {
 };
 
 interface ProjectMembershipRow {
-  id: string;
   roles: string[];
   permission_grants: string[];
   permission_revokes: string[];
@@ -300,20 +305,12 @@ describe.skipIf(!envReady())('RLS: permisos por facetas', () => {
     let limitedUserId: string;
     let projectId: string;
     let boloId: string | null = null;
-    let membership: ProjectMembershipRow;
+    let membership: ProjectAccess;
+    let workspaceMembership: { id: string; workspace_role: string };
 
     async function restoreMembership() {
       if (!membership) return;
-      await pgPatch(
-        'project_membership',
-        adminJwt,
-        {
-          roles: membership.roles,
-          permission_grants: membership.permission_grants,
-          permission_revokes: membership.permission_revokes,
-        },
-        new URLSearchParams({ id: `eq.${membership.id}` }),
-      );
+      await restoreProjectAccess(adminJwt, projectId, limitedUserId, membership);
     }
 
     async function ownProjectFacets(): Promise<MembershipFacetRow[]> {
@@ -351,17 +348,20 @@ describe.skipIf(!envReady())('RLS: permisos por facetas', () => {
       expect(projects.rows).toHaveLength(1);
       projectId = projects.rows[0].id;
 
-      const memberships = await pgGet<ProjectMembershipRow>(
-        'project_membership',
+      membership = await projectAccess(adminJwt, projectId, limitedUserId);
+
+      const ws = await pgGet<{ id: string; workspace_role: string }>(
+        'membership',
         adminJwt,
         new URLSearchParams({
-          project_id: `eq.${projectId}`,
+          level: 'eq.workspace',
+          workspace_id: `eq.${workspaceId}`,
           user_id: `eq.${limitedUserId}`,
-          select: 'id,roles,permission_grants,permission_revokes',
+          select: 'id,workspace_role',
         }),
       );
-      expect(memberships.rows).toHaveLength(1);
-      membership = memberships.rows[0];
+      expect(ws.rows).toHaveLength(1);
+      workspaceMembership = ws.rows[0];
 
       const bolos = await pgGet<{ id: string }>(
         'bolo',
@@ -373,6 +373,12 @@ describe.skipIf(!envReady())('RLS: permisos por facetas', () => {
 
     afterAll(async () => {
       await restoreMembership();
+      if (workspaceMembership) {
+        await pgRpc('update_workspace_member_role', adminJwt, {
+          p_membership_id: workspaceMembership.id,
+          p_role: workspaceMembership.workspace_role,
+        });
+      }
     });
 
     test('performer: has_permission y el modelo nuevo contestan igual en cada proyecto', async () => {
@@ -421,33 +427,35 @@ describe.skipIf(!envReady())('RLS: permisos por facetas', () => {
       expect(setting.status).toBeGreaterThanOrEqual(400);
     });
 
-    test('un grant y un revoke se reflejan al instante en Diners y en el bolo', async () => {
+    test('un override de Diners se refleja al instante en el acceso, en el bolo y en la tabla vieja', async () => {
       const diners = () => ownProjectFacets().then((rows) => rows.find((row) => row.facet_id === standard.diners));
+      const legacy = async () => {
+        const rows = await pgGet<ProjectMembershipRow>(
+          'project_membership',
+          adminJwt,
+          new URLSearchParams({
+            project_id: `eq.${projectId}`,
+            user_id: `eq.${limitedUserId}`,
+            select: 'roles,permission_grants,permission_revokes',
+          }),
+        );
+        return rows.rows[0];
+      };
       try {
         expect(await diners()).toBeUndefined();
 
-        const granted = await pgPatch<ProjectMembershipRow>(
-          'project_membership',
-          adminJwt,
-          { permission_grants: ['read:money'], permission_revokes: [] },
-          new URLSearchParams({ id: `eq.${membership.id}` }),
-        );
-        expect(granted.rows).toHaveLength(1);
-        expect(await diners()).toMatchObject({ verb: 'view', source: 'legacy' });
+        await setFacets(adminJwt, membership.membershipId, { diners: 'view' });
+        expect(await diners()).toMatchObject({ verb: 'view', source: 'override' });
+        expect((await legacy()).permission_grants).toContain('read:money');
         await assertEquivalent(limitedJwt, [projectId]);
         if (boloId) {
           const bolo = await pgGet('bolo', limitedJwt, new URLSearchParams({ id: `eq.${boloId}`, select: 'id' }));
           expect(bolo.rows).toHaveLength(1);
         }
 
-        const revoked = await pgPatch<ProjectMembershipRow>(
-          'project_membership',
-          adminJwt,
-          { permission_revokes: ['read:money'] },
-          new URLSearchParams({ id: `eq.${membership.id}` }),
-        );
-        expect(revoked.rows).toHaveLength(1);
+        await setFacets(adminJwt, membership.membershipId, { diners: null });
         expect(await diners()).toBeUndefined();
+        expect((await legacy()).permission_revokes).toContain('read:money');
         await assertEquivalent(limitedJwt, [projectId]);
         if (boloId) {
           const bolo = await pgGet('bolo', limitedJwt, new URLSearchParams({ id: `eq.${boloId}`, select: 'id' }));
@@ -458,28 +466,116 @@ describe.skipIf(!envReady())('RLS: permisos por facetas', () => {
       }
     });
 
-    test('revocar read:performance deja la membresía sin acceso al contenedor', async () => {
+    test('paquete en el proyecto: Coordinació da editar y Diners en lectura, y la paridad aguanta', async () => {
       try {
-        const revoked = await pgPatch<ProjectMembershipRow>(
-          'project_membership',
-          adminJwt,
-          { permission_revokes: ['read:performance'] },
-          new URLSearchParams({ id: `eq.${membership.id}` }),
+        await grantPreset(adminJwt, 'project', projectId, limitedUserId, 'coordinacio');
+        const keyOf = Object.fromEntries(Object.entries(standard).map(([key, id]) => [id, key]));
+        expect((await ownProjectFacets()).map((row) => `${keyOf[row.facet_id]}:${row.verb}`).sort()).toEqual([
+          'converses:edit',
+          'diners:view',
+          'materials:edit',
+          'tecnica:edit',
+        ]);
+        const perms = Object.fromEntries(
+          await Promise.all(
+            LIVE_PERMS.map(async (perm) => {
+              const res = await pgRpc<boolean>('has_permission', limitedJwt, { p_project_id: projectId, p_perm: perm });
+              return [perm, res.data] as const;
+            }),
+          ),
         );
-        expect(revoked.rows).toHaveLength(1);
-        const own = await pgGet<MembershipRow>(
-          'membership',
-          limitedJwt,
-          new URLSearchParams({ project_id: `eq.${projectId}`, select: 'id,container_verb' }),
-        );
-        expect(own.rows).toEqual([expect.objectContaining({ container_verb: null })]);
+        expect(perms).toEqual({
+          'read:performance': true,
+          'edit:performance': true,
+          'read:money': true,
+          'edit:money': false,
+          'read:conversation': true,
+          'edit:conversation': true,
+          'edit:project_meta': true,
+          'edit:membership': false,
+        });
         await assertEquivalent(limitedJwt, [projectId]);
       } finally {
         await restoreMembership();
       }
     });
 
-    test('paquetes: Equip en un bolo, techo del delegante y nada en proyecto', async () => {
+    test('techo: con Mínim no se da ni se toma más de lo que se tiene', async () => {
+      const self = await pgRpc('grant_container_preset', limitedJwt, {
+        p_level: 'project',
+        p_container_id: projectId,
+        p_user_id: limitedUserId,
+        p_preset: 'equip',
+      });
+      expect(self.status).toBe(403);
+      const facet = await pgRpc('set_membership_facet', limitedJwt, {
+        p_membership_id: membership.membershipId,
+        p_facet_id: standard.diners,
+        p_verb: 'view',
+      });
+      expect(facet.status).toBe(403);
+      const workspace = await pgRpc('grant_container_preset', limitedJwt, {
+        p_level: 'workspace',
+        p_container_id: workspaceId,
+        p_user_id: limitedUserId,
+        p_preset: 'direccio',
+      });
+      expect(workspace.status).toBe(403);
+      expect(await projectAccess(adminJwt, projectId, limitedUserId)).toMatchObject({
+        containerVerb: 'view',
+        facets: membership.facets,
+      });
+    });
+
+    test('paquete en el espacio: Direcció es admin, y otro paquete lo quita', async () => {
+      const role = async () => {
+        const rows = await pgGet<{ workspace_role: string }>(
+          'membership',
+          adminJwt,
+          new URLSearchParams({ id: `eq.${workspaceMembership.id}`, select: 'workspace_role' }),
+        );
+        return rows.rows[0]?.workspace_role;
+      };
+      try {
+        await grantPreset(adminJwt, 'workspace', workspaceId, limitedUserId, 'direccio');
+        expect(await role()).toBe('admin');
+        await grantPreset(adminJwt, 'workspace', workspaceId, limitedUserId, 'minim');
+        expect(await role()).toBe('member');
+
+        const facet = await pgRpc('set_membership_facet', adminJwt, {
+          p_membership_id: workspaceMembership.id,
+          p_facet_id: standard.diners,
+          p_verb: 'view',
+        });
+        expect(facet.status, 'las facetas de espacio esperan decisión').toBeGreaterThanOrEqual(400);
+        const revoke = await pgRpc('revoke_membership', adminJwt, { p_membership_id: workspaceMembership.id });
+        expect(revoke.status, 'la baja del espacio es revoke_workspace_member').toBe(400);
+      } finally {
+        await pgRpc('update_workspace_member_role', adminJwt, {
+          p_membership_id: workspaceMembership.id,
+          p_role: workspaceMembership.workspace_role,
+        });
+      }
+    });
+
+    test('las tablas viejas no se escriben por la API, ni el owner', async () => {
+      const patched = await pgPatch(
+        'project_membership',
+        adminJwt,
+        { permission_grants: ['read:money'] },
+        new URLSearchParams({ project_id: `eq.${projectId}`, user_id: `eq.${limitedUserId}` }),
+      );
+      expect(patched.status).toBeGreaterThanOrEqual(400);
+      const inserted = await pgPost('project_membership', adminJwt, {
+        project_id: projectId,
+        user_id: adminUserId,
+        roles: [],
+      });
+      expect(inserted.status).toBeGreaterThanOrEqual(400);
+      await assertEquivalent(limitedJwt, [projectId]);
+    });
+
+    test('paquetes: Equip en un bolo y techo del delegante', async () => {
       if (!boloId) return;
       const granted = await pgRpc<string>('grant_container_preset', adminJwt, {
         p_level: 'bolo',
@@ -511,15 +607,7 @@ describe.skipIf(!envReady())('RLS: permisos por facetas', () => {
       });
       expect(ceiling.status).toBeGreaterThanOrEqual(400);
 
-      const projectLevel = await pgRpc('grant_container_preset', adminJwt, {
-        p_level: 'project',
-        p_container_id: projectId,
-        p_user_id: limitedUserId,
-        p_preset: 'equip',
-      });
-      expect(projectLevel.status).toBeGreaterThanOrEqual(400);
-
-      // Un paquete en el bolo no cambia el acceso de proyecto (fase 2).
+      // Un paquete en el bolo no cambia el acceso de proyecto.
       await assertEquivalent(limitedJwt, [projectId]);
     });
   });

@@ -8,6 +8,8 @@ import { pgErrorResponse } from '$lib/server/errors';
 
 const UUID = v.pipe(v.string(), v.uuid());
 const Role = v.picklist(['admin', 'member', 'viewer', 'guest']);
+/** Paquete de acceso en el proyecto (ADR-100 §6); sin él, la RPC da Mínim. */
+const Preset = v.picklist(['minim', 'equip', 'coordinacio', 'direccio']);
 const InviteBody = v.object({
   email: v.pipe(v.string(), v.trim(), v.email(), v.maxLength(320)),
   role: Role,
@@ -15,6 +17,7 @@ const InviteBody = v.object({
   project_role_code: v.optional(
     v.nullable(v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(64))),
   ),
+  project_preset: v.optional(v.nullable(Preset)),
 });
 const PatchBody = v.object({
   membership_id: UUID,
@@ -128,6 +131,7 @@ export const POST: RequestHandler = async ({ request, params, platform, locals, 
         p_project_id: parsed.output.project_id ?? null,
         p_project_role_code: parsed.output.project_role_code ?? null,
         p_expires_days: 7,
+        p_project_preset: parsed.output.project_id ? (parsed.output.project_preset ?? null) : null,
       },
     );
     const invitation = data[0];
