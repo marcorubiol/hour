@@ -1,0 +1,26 @@
+-- Fuera el esquema de archivo `hour_backup_20260720` (Marco, 2026-10-13, opción a).
+--
+-- WHAT THIS DOES:
+--   Borra el esquema `hour_backup_20260720` y todo lo que contiene: una copia
+--   de 22 tablas (unas 2.000 filas, 1,5 MB) que se hizo dentro de la base el
+--   2026-07-20, antes del cambio de modelo. Solo existe en producción: ninguna
+--   migración lo crea, así que staging y la base local no lo tienen.
+--
+-- POR QUÉ: su `workspace_role.access_level` usa el tipo
+--   `public.workspace_role_access_level`, y el contract de permisos
+--   (`20261013300000`) no pudo borrar ese tipo (run 38471454184, 2BP01; la
+--   transacción se deshizo entera). Es deriva que solo tiene producción, la
+--   misma que tumbó los dos applies del 2026-08-10 (`_tasks.md § 34`). No hay
+--   nadie en producción ni en beta y el archivo no lo lee nada.
+--
+-- COMPROBADO EN PRODUCCIÓN (2026-10-13, catálogo):
+--   - Ningún objeto de fuera del esquema depende de sus tablas (FK, vista,
+--     regla): CASCADE solo alcanza lo que hay dentro.
+--   - Es el único esquema de usuario que no viene de las migraciones.
+--   - El dump de esquema del backup de hoy (run 38470631048) lo contiene; sus
+--     filas van en el dump de datos del mismo backup, en R2.
+--
+-- DESTRUCTIVA según § 34. En staging y en la local no hace nada (IF EXISTS).
+-- Vuelta atrás: restaurar el esquema desde el backup 2026-10-13T21-26-42Z.
+
+DROP SCHEMA IF EXISTS hour_backup_20260720 CASCADE;
