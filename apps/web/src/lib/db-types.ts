@@ -781,12 +781,10 @@ export type Database = {
           line_id: string | null
           next_action_at: string | null
           next_action_note: string | null
-          organization_id: string | null
-          person_id: string | null
+          organization_id: string
           previous_slugs: string[]
           private_to: string | null
           project_id: string
-          role: string | null
           slug: string
           status: Database["public"]["Enums"]["conversation_status"]
           updated_at: string
@@ -803,12 +801,10 @@ export type Database = {
           line_id?: string | null
           next_action_at?: string | null
           next_action_note?: string | null
-          organization_id?: string | null
-          person_id?: string | null
+          organization_id: string
           previous_slugs?: string[]
           private_to?: string | null
           project_id: string
-          role?: string | null
           slug: string
           status?: Database["public"]["Enums"]["conversation_status"]
           updated_at?: string
@@ -825,12 +821,10 @@ export type Database = {
           line_id?: string | null
           next_action_at?: string | null
           next_action_note?: string | null
-          organization_id?: string | null
-          person_id?: string | null
+          organization_id?: string
           previous_slugs?: string[]
           private_to?: string | null
           project_id?: string
-          role?: string | null
           slug?: string
           status?: Database["public"]["Enums"]["conversation_status"]
           updated_at?: string
@@ -842,13 +836,6 @@ export type Database = {
             columns: ["line_id"]
             isOneToOne: false
             referencedRelation: "line"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "conversation_person_id_fkey"
-            columns: ["person_id"]
-            isOneToOne: false
-            referencedRelation: "person"
             referencedColumns: ["id"]
           },
           {
@@ -871,13 +858,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "workspace_organization"
             referencedColumns: ["workspace_id", "id"]
-          },
-          {
-            foreignKeyName: "conversation_workspace_person_fkey"
-            columns: ["workspace_id", "person_id"]
-            isOneToOne: false
-            referencedRelation: "workspace_person"
-            referencedColumns: ["workspace_id", "person_id"]
           },
         ]
       }
@@ -1487,7 +1467,6 @@ export type Database = {
           number: string | null
           payer_fiscal_identity_id: string | null
           payer_organization_id: string | null
-          payer_person_id: string | null
           payer_snapshot: Json | null
           payment_condition: string | null
           project_id: string | null
@@ -1515,7 +1494,6 @@ export type Database = {
           number?: string | null
           payer_fiscal_identity_id?: string | null
           payer_organization_id?: string | null
-          payer_person_id?: string | null
           payer_snapshot?: Json | null
           payment_condition?: string | null
           project_id?: string | null
@@ -1543,7 +1521,6 @@ export type Database = {
           number?: string | null
           payer_fiscal_identity_id?: string | null
           payer_organization_id?: string | null
-          payer_person_id?: string | null
           payer_snapshot?: Json | null
           payment_condition?: string | null
           project_id?: string | null
@@ -1569,13 +1546,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "invoice_payer_person_id_fkey"
-            columns: ["payer_person_id"]
-            isOneToOne: false
-            referencedRelation: "person"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "invoice_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
@@ -1595,13 +1565,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "workspace_organization"
             referencedColumns: ["workspace_id", "id"]
-          },
-          {
-            foreignKeyName: "invoice_workspace_payer_person_fkey"
-            columns: ["workspace_id", "payer_person_id"]
-            isOneToOne: false
-            referencedRelation: "workspace_person"
-            referencedColumns: ["workspace_id", "person_id"]
           },
         ]
       }
@@ -3965,12 +3928,10 @@ export type Database = {
           line_id: string | null
           next_action_at: string | null
           next_action_note: string | null
-          organization_id: string | null
-          person_id: string | null
+          organization_id: string
           previous_slugs: string[]
           private_to: string | null
           project_id: string
-          role: string | null
           slug: string
           status: Database["public"]["Enums"]["conversation_status"]
           updated_at: string
@@ -4000,12 +3961,10 @@ export type Database = {
           line_id: string | null
           next_action_at: string | null
           next_action_note: string | null
-          organization_id: string | null
-          person_id: string | null
+          organization_id: string
           previous_slugs: string[]
           private_to: string | null
           project_id: string
-          role: string | null
           slug: string
           status: Database["public"]["Enums"]["conversation_status"]
           updated_at: string
@@ -4161,12 +4120,10 @@ export type Database = {
           line_id: string | null
           next_action_at: string | null
           next_action_note: string | null
-          organization_id: string | null
-          person_id: string | null
+          organization_id: string
           previous_slugs: string[]
           private_to: string | null
           project_id: string
-          role: string | null
           slug: string
           status: Database["public"]["Enums"]["conversation_status"]
           updated_at: string
@@ -4340,7 +4297,6 @@ export type Database = {
           p_number?: string
           p_payer_fiscal_identity_id?: string
           p_payer_organization_id?: string
-          p_payer_person_id?: string
           p_payment_condition?: string
           p_tax_lines?: Json
         }
@@ -4362,7 +4318,6 @@ export type Database = {
           number: string | null
           payer_fiscal_identity_id: string | null
           payer_organization_id: string | null
-          payer_person_id: string | null
           payer_snapshot: Json | null
           payment_condition: string | null
           project_id: string | null
@@ -4979,7 +4934,6 @@ export type Database = {
           number: string | null
           payer_fiscal_identity_id: string | null
           payer_organization_id: string | null
-          payer_person_id: string | null
           payer_snapshot: Json | null
           payment_condition: string | null
           project_id: string | null
@@ -5086,20 +5040,6 @@ export type Database = {
           has_fiscal_identity: boolean
           id: string
           name: string
-          slug: string
-          workspace_id: string
-        }[]
-      }
-      list_money_payers: {
-        Args: {
-          p_limit?: number
-          p_project_ids?: string[]
-          p_workspace_ids?: string[]
-        }
-        Returns: {
-          full_name: string
-          id: string
-          organization_name: string
           slug: string
           workspace_id: string
         }[]
@@ -5716,7 +5656,6 @@ export type Database = {
           number: string | null
           payer_fiscal_identity_id: string | null
           payer_organization_id: string | null
-          payer_person_id: string | null
           payer_snapshot: Json | null
           payment_condition: string | null
           project_id: string | null

@@ -314,14 +314,31 @@ export interface ConversationContact extends ContactRowLite {
   person: { slug: string; full_name: string; email: string | null; phone: string | null } | null;
 }
 
+/** The contacts embed as PostgREST returns it: the dossier carries what `person` needs. */
+type ContactDbEmbed = ContactRowLite & {
+  person:
+    | (ConversationContact['person'] & Omit<WorkspacePersonEmbed, 'slug' | 'full_name' | 'email'>)
+    | null;
+};
+
 export interface ConversationItem extends Tables<'conversation'> {
-  /** The primary contact, kept for consumers that predate ADR-102. */
+  /** The primary contact's person (from `contacts`), for the views that name one. */
   person: PersonLite | null;
   project: ProjectLite | null;
   /** Who the conversation is with (ADR-102). Null only for pre-phase-1 rows. */
   organization: OrganizationLite | null;
   /** Primary first, then current, then closed; empty if none is readable. */
   contacts: ConversationContact[];
+}
+
+/**
+ * The primary contact's person out of a contacts embed. ADR-102 phase 4: the
+ * conversation has no person of its own, only contacts (`conversation_contact`).
+ */
+export function primaryContactPerson<P>(
+  contacts: readonly { is_primary: boolean; person: P | null }[] | null | undefined,
+): P | null {
+  return contacts?.find((c) => c.is_primary)?.person ?? null;
 }
 
 /** The title of a conversation: its organization, or its person before ADR-102. */
@@ -421,28 +438,36 @@ type WorkspacePersonEmbed = Omit<PersonLite, 'id' | 'organization_name'> & {
 };
 
 export interface ConversationDbItem extends Tables<'conversation'> {
-  person: WorkspacePersonEmbed | null;
   project: ProjectLite | null;
   organization?: OrganizationLite | null;
-  contacts?: ConversationContact[] | null;
+  contacts?: ContactDbEmbed[] | null;
 }
 
-/** Keep the public API stable while contact data moves to workspace_person. */
+/** `person` is the primary contact's dossier; `contacts` keep the four fields they show. */
 export function normalizeConversationItem(item: ConversationDbItem): ConversationItem {
+  const contacts = item.contacts ?? [];
+  const primary = primaryContactPerson(contacts);
   return {
     ...item,
     organization: item.organization ?? null,
-    contacts: sortContacts(item.contacts ?? []),
-    person: item.person
+    contacts: sortContacts(
+      contacts.map(({ person, ...row }) => ({
+        ...row,
+        person: person
+          ? { slug: person.slug, full_name: person.full_name, email: person.email, phone: person.phone }
+          : null,
+      })),
+    ),
+    person: primary
       ? {
-          id: item.person.person_id,
-          slug: item.person.slug,
-          full_name: item.person.full_name,
-          email: item.person.email,
-          organization_name: item.person.organization?.name ?? null,
-          country: item.person.country,
-          city: item.person.city,
-          website: item.person.website,
+          id: primary.person_id,
+          slug: primary.slug,
+          full_name: primary.full_name,
+          email: primary.email,
+          organization_name: primary.organization?.name ?? null,
+          country: primary.country,
+          city: primary.city,
+          website: primary.website,
         }
       : null,
   };
@@ -451,8 +476,7 @@ export function normalizeConversationItem(item: ConversationDbItem): Conversatio
 /** PostgREST embed clause matching `ConversationItem` — shared by GET + PATCH. */
 export const CONVERSATION_SELECT = [
   '*',
-  'person:workspace_person!conversation_workspace_person_fkey(person_id,slug,full_name,email,country,city,website,organization:workspace_organization!workspace_person_organization_fkey(name))',
   'project:project_id(id,slug,name,status)',
   'organization:workspace_organization!conversation_workspace_organization_fkey(id,slug,name,kind,city)',
-  'contacts:conversation_contact(person_id,role,since,until,is_primary,person:workspace_person!conversation_contact_workspace_person_fkey(slug,full_name,email,phone))',
+  'contacts:conversation_contact(person_id,role,since,until,is_primary,person:workspace_person!conversation_contact_workspace_person_fkey(person_id,slug,full_name,email,phone,country,city,website,organization:workspace_organization!workspace_person_organization_fkey(name)))',
 ].join(',');

@@ -190,15 +190,33 @@ from generate_series(1, 154) as n
 on conflict (workspace_id, person_id) do update
 set full_name = excluded.full_name, email = excluded.email, updated_at = now(), deleted_at = null;
 
+-- ADR-102: the conversation is with an organization and the person is its
+-- primary contact. One organization per contact.
+insert into public.workspace_organization (id, workspace_id, slug, name, created_by)
+select
+  md5('hour-staging-organization-' || n)::uuid,
+  '20000000-0000-4000-8000-000000000002',
+  'synthetic-venue-' || lpad(n::text, 3, '0'),
+  'Synthetic Venue ' || lpad(n::text, 3, '0'),
+  (select id from auth.users where email = 'playwright@hour.test')
+from generate_series(1, 154) as n
+on conflict (id) do update set name = excluded.name, updated_at = now(), deleted_at = null;
+
+update public.workspace_person wp
+set organization_id = md5('hour-staging-organization-' || n)::uuid
+from generate_series(1, 154) as n
+where wp.workspace_id = '20000000-0000-4000-8000-000000000002'
+  and wp.person_id = md5('hour-staging-person-' || n)::uuid;
+
 insert into public.conversation (
-  id, workspace_id, project_id, person_id, status, next_action_note,
+  id, workspace_id, project_id, organization_id, status, next_action_note,
   created_by, slug, line_id
 )
 select
   md5('hour-staging-conversation-' || n)::uuid,
   '20000000-0000-4000-8000-000000000002',
   '30000000-0000-4000-8000-000000000003',
-  md5('hour-staging-person-' || n)::uuid,
+  md5('hour-staging-organization-' || n)::uuid,
   'contacted',
   'Synthetic staging fixture',
   (select id from auth.users where email = 'playwright@hour.test'),
@@ -206,7 +224,19 @@ select
   '40000000-0000-4000-8000-000000000003'
 from generate_series(1, 154) as n
 on conflict (id) do update
-set status = excluded.status, line_id = excluded.line_id, updated_at = now(), deleted_at = null;
+set status = excluded.status, organization_id = excluded.organization_id,
+    line_id = excluded.line_id, updated_at = now(), deleted_at = null;
+
+insert into public.conversation_contact (workspace_id, conversation_id, person_id, is_primary, created_by)
+select
+  '20000000-0000-4000-8000-000000000002',
+  md5('hour-staging-conversation-' || n)::uuid,
+  md5('hour-staging-person-' || n)::uuid,
+  true,
+  (select id from auth.users where email = 'playwright@hour.test')
+from generate_series(1, 154) as n
+on conflict (conversation_id, person_id) do update
+set is_primary = true, until = null, updated_at = now();
 
 -- ADR-087: the fee lives on the bolo (the deal). The performance (the function)
 -- links to it via bolo_id and carries no fee.

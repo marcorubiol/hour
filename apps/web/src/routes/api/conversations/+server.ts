@@ -230,8 +230,18 @@ export const POST: RequestHandler = async ({ request, platform, locals }) => {
       p_next_action_note: input.next_action_note ?? null,
       p_line_id: input.line_id ?? null,
     });
-    if (data.length === 0 || !data[0]) return json({ error: 'create_failed' }, 502);
-    return json({ conversation: data[0] }, 201);
+    const conversation = data[0];
+    if (!conversation) return json({ error: 'create_failed' }, 502);
+    // ADR-102 phase 4: the row no longer names a person. The primary
+    // contact's id lets a multi-project capture link the same person again.
+    let primaryPersonId: string | null = null;
+    if (input.person_id || input.person) {
+      const { data: primary } = await pgGet<{ person_id: string }>(env, 'conversation_contact', jwt, {
+        search: { select: 'person_id', conversation_id: `eq.${conversation.id}`, is_primary: 'eq.true' },
+      });
+      primaryPersonId = primary[0]?.person_id ?? null;
+    }
+    return json({ conversation, primary_person_id: primaryPersonId }, 201);
   } catch (err) {
     const existing = err instanceof PostgrestError && err.code === '23505' ? existingConversationId(err.body) : null;
     if (existing) {

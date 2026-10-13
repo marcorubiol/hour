@@ -367,6 +367,26 @@ fue), repone FKs, índices y trigger, y deja `NOT NULL` si no quedan nulos. Lo q
 si se editó en el contacto (vuelve el del principal), y las conversaciones creadas sin persona (quedan con `person_id`
 nulo hasta asignarles uno).
 
+**Construida (2026-10-13, rama `claude/adr-102-f4`, aplicada solo en la Supabase local).** Migración
+`20261013100000_conversation_with_organization_contract`, rollback en `build/runbooks/` (probado en local: bajada y
+subida). En local: `check` 0/0, unit 843/843, RLS contra la base local 308/312 (4 saltados), y la app en `vite dev`
+contra ella (Conversations, Desk, Cuentas, `/api/money/payers` y `/api/tasks` sin errores).
+Desviaciones del plan:
+1. **`person` se queda en la API**, derivado del contacto principal (`contacts`), no del FK: lo leen la tabla, Desk,
+   Hall, tareas y el bundle de función. Lo que se borra es todo `select` que nombra `person_id` o el embed por
+   `conversation_workspace_person_fkey` (tres: `CONVERSATION_SELECT`, `TASK_SELECT`, el bundle).
+2. **La misma persona sin organización sigue dando 409** si ya es la principal de una viva del proyecto. Sin esta regla
+   el alta abría una segunda conversación con la organización del dossier; antes la paraba la unicidad por persona.
+3. `POST /api/conversations` devuelve `primary_person_id`: el alta en varios proyectos lo usaba de `conversation.person_id`.
+4. El relleno no aborta por facturas con `payer_person_id` y sin organización: avisa con un NOTICE (las escribía
+   `create_invoice_from_bolo` hasta hoy).
+5. `staging.sql`, `playwright-difusion.sql` y `seed-season-local.sql` crean organización y contacto principal.
+
+Orden en producción: primero el Worker (no necesita la migración: usa `contacts`, que existe desde la fase 1, y llama a
+`create_invoice_from_bolo` sin `p_payer_person_id`, que la firma de 12 acepta), después el gate de § 34 completo para
+la migración. Antes, revisar a mano los posibles duplicados de organización (punto 6 de las decisiones) y cuántas
+conversaciones de producción quedarían sin organización (el relleno crea una con el nombre de la persona).
+
 ### Riesgos
 
 | Riesgo | Cómo se cubre |

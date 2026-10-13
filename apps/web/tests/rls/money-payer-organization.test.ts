@@ -13,15 +13,18 @@ import {
 
 /**
  * ADR-102 fase 2b · el pagador es la organización
- * (20261012200000_invoice_payer_organization).
+ * (20261012200000_invoice_payer_organization), puesto al día con la fase 4
+ * (20261013100000_conversation_with_organization_contract), que retira el
+ * pagador persona.
  *
  * Lo que fija este fichero:
  * - `list_money_payer_organizations` lista la organización de una conversación
  *   compartida a otro editor de dinero, pero no la de mi conversación privada;
  *   a mí, las dos;
  * - `create_invoice_from_bolo` infiere `payer_organization_id` de la
- *   conversación del bolo (no de una privada ajena), y la llamada del Worker
- *   anterior (11 parámetros con `p_payer_person_id`) sigue resolviendo;
+ *   conversación del bolo (no de una privada ajena); desde la fase 4,
+ *   `p_payer_person_id` ya no existe: la llamada que lo nombra no resuelve
+ *   (PGRST202);
  * - `set_organization_fiscal_identity` la escribe quien edita dinero, sin ser
  *   admin; la factura nueva la toma por defecto e `issue_invoice` la congela;
  * - `update_invoice` con `payer_organization_id`: la vuelve a tomar en un
@@ -33,9 +36,9 @@ import {
  *
  * Fixture: `playwright`, proyecto `zzz-e2e-collab`, organizaciones
  * `ZZZ 2B Payer …` propias (se quedan; sus conversaciones se borran y la pasada
- * siguiente las revive). La identidad fiscal creada se borra (soft) al final:
- * la siguiente pasada crea otra. Nunca toca `muk-cia`. Va rojo contra un
- * origen sin `20261012200000`.
+ * siguiente las revive). La identidad fiscal de `ZZZ 2B Payer Shared` se queda
+ * (no hay camino para retirarla); la pasada siguiente la reutiliza. Nunca toca
+ * `muk-cia`. Va rojo contra un origen sin `20261013100000`.
  */
 const ORG_SHARED = 'ZZZ 2B Payer Shared';
 const ORG_PRIVATE = 'ZZZ 2B Payer Private';
@@ -92,7 +95,6 @@ describe.skipIf(!envReady() || !limitedEnvReady())('the payer is the organizatio
   let sharedBolo: string | undefined;
   let privateBolo: string | undefined;
   const invoices: string[] = [];
-  const fiscalIds = new Set<string>();
 
   async function setSetting(value: boolean) {
     const r = await pgPatch<{ new_conversations_private: boolean }>(
@@ -220,9 +222,11 @@ describe.skipIf(!envReady() || !limitedEnvReady())('the payer is the organizatio
     for (const c of [shared, mine]) {
       if (c) await pgRpc('delete_conversation', jwt, { p_conversation_id: c.id }).catch(() => undefined);
     }
-    for (const id of fiscalIds) {
-      await pgPatch('fiscal_identity', jwt, { deleted_at: new Date().toISOString() }, new URLSearchParams({ id: `eq.${id}` }));
-    }
+    // La identidad fiscal de la organización compartida se queda: un miembro
+    // no tiene camino para retirarla (el soft delete por PostgREST da 42501:
+    // la fila borrada ya no pasa la política de lectura) y la clave de
+    // servicio no tiene grant en `fiscal_identity`. La pasada siguiente la
+    // reutiliza y la reescribe.
     if (originalSetting !== undefined) await setSetting(originalSetting);
     if (membership) {
       await pgPatch(
@@ -252,8 +256,10 @@ describe.skipIf(!envReady() || !limitedEnvReady())('the payer is the organizatio
     expect((await invoice(jwt, privateBolo!)).payer_organization_id).toBe(mine!.organization_id);
   });
 
-  test('the deployed Worker\'s call (11 named parameters) still resolves', async () => {
-    const row = await invoice(other, sharedBolo!, {
+  test('the old call naming p_payer_person_id no longer resolves (fase 4)', async () => {
+    const r = await pgRpc('create_invoice_from_bolo', other, {
+      p_bolo_id: sharedBolo,
+      p_doc_type: 'proforma',
       p_tax_lines: [],
       p_number: null,
       p_due_on: null,
@@ -264,11 +270,32 @@ describe.skipIf(!envReady() || !limitedEnvReady())('the payer is the organizatio
       p_payer_fiscal_identity_id: null,
       p_country: null,
     });
+    expect(r.status).toBe(404);
+    expect(JSON.parse(r.error!).code).toBe('PGRST202');
+    // La de hoy, con los mismos parámetros menos ese, sí.
+    const row = await invoice(other, sharedBolo!, {
+      p_tax_lines: [],
+      p_number: null,
+      p_due_on: null,
+      p_notes: null,
+      p_expected_on: null,
+      p_payment_condition: null,
+      p_payer_fiscal_identity_id: null,
+      p_country: null,
+    });
     expect(row.payer_organization_id).toBe(shared!.organization_id);
   });
 
   test('fiscal data: a money editor sets them; a new draft takes them; a stale draft picks them up; issue freezes them', async () => {
+    // Un borrador sin datos fiscales: quitarle el pagador quita también la
+    // receptora (una pasada anterior deja la organización con los suyos).
     const before = await invoice(other, sharedBolo!);
+    const cleared = await pgRpc<InvoiceRow>('update_invoice', other, {
+      p_invoice_id: before.id,
+      p_patch: { payer_organization_id: null },
+    });
+    expect(cleared.status, cleared.error).toBe(200);
+    expect(one(cleared.data)).toMatchObject({ payer_organization_id: null, payer_fiscal_identity_id: null });
 
     const legal = `ZZZ 2B Sala SL ${RUN}`;
     const set = await pgRpc<FiscalRow>('set_organization_fiscal_identity', other, {
@@ -277,7 +304,6 @@ describe.skipIf(!envReady() || !limitedEnvReady())('the payer is the organizatio
     });
     expect(set.status, set.error).toBe(200);
     const fiscal = one(set.data)!;
-    fiscalIds.add(fiscal.id);
     expect(fiscal.kind).toBe('receiver');
     expect(fiscal.workspace_id).toBe(workspaceId);
 
@@ -293,7 +319,6 @@ describe.skipIf(!envReady() || !limitedEnvReady())('the payer is the organizatio
     expect(listed?.has_fiscal_identity).toBe(true);
 
     // The draft made before has none; setting its payer again picks them up.
-    expect(before.payer_fiscal_identity_id).toBeNull();
     const synced = await pgRpc<InvoiceRow>('update_invoice', other, {
       p_invoice_id: before.id,
       p_patch: { payer_organization_id: shared!.organization_id },

@@ -77,17 +77,38 @@ where w.slug = 'playwright' and w.deleted_at is null
 on conflict (workspace_id, person_id) do update
 set full_name = excluded.full_name, email = excluded.email, updated_at = now(), deleted_at = null;
 
+-- ADR-102: the conversation is with an organization and the person is its
+-- primary contact. One organization per contact.
+insert into public.workspace_organization (id, workspace_id, slug, name, created_by)
+select
+  md5('hour-playwright-difusion-organization-' || n)::uuid,
+  w.id,
+  'zzz-difusion-venue-' || lpad(n::text, 3, '0'),
+  'ZZZ Difusión Venue ' || lpad(n::text, 3, '0'),
+  (select id from auth.users where email = 'playwright@hour.test')
+from generate_series(1, 24) as n
+cross join public.workspace w
+where w.slug = 'playwright' and w.deleted_at is null
+on conflict (id) do update set name = excluded.name, updated_at = now(), deleted_at = null;
+
+update public.workspace_person wp
+set organization_id = md5('hour-playwright-difusion-organization-' || n)::uuid
+from generate_series(1, 24) as n, public.workspace w
+where w.slug = 'playwright' and w.deleted_at is null
+  and wp.workspace_id = w.id
+  and wp.person_id = md5('hour-playwright-difusion-person-' || n)::uuid;
+
 -- Statuses cycle so the lens shows more than one state; values are reset on
 -- every load, so a spec that writes one of these rows is undone here.
 insert into public.conversation (
-  id, workspace_id, project_id, person_id, status, next_action_note,
+  id, workspace_id, project_id, organization_id, status, next_action_note,
   custom_fields, created_by, slug, line_id
 )
 select
   md5('hour-playwright-difusion-conversation-' || n)::uuid,
   w.id,
   md5('hour-playwright-difusion-project')::uuid,
-  md5('hour-playwright-difusion-person-' || n)::uuid,
+  md5('hour-playwright-difusion-organization-' || n)::uuid,
   (array['contacted', 'in_conversation', 'hold', 'confirmed', 'declined', 'dormant'])[1 + (n - 1) % 6]::public.conversation_status,
   'Synthetic difusión fixture',
   '{"season": "2026-27"}'::jsonb,
@@ -99,7 +120,29 @@ cross join public.workspace w
 where w.slug = 'playwright' and w.deleted_at is null
 on conflict (id) do update
 set status = excluded.status, next_action_note = excluded.next_action_note,
+    organization_id = excluded.organization_id,
     custom_fields = excluded.custom_fields, line_id = excluded.line_id,
     updated_at = now(), deleted_at = null;
+
+-- A spec may have named another primary: the load puts this one back.
+update public.conversation_contact cc
+set is_primary = false
+from generate_series(1, 24) as n
+where cc.conversation_id = md5('hour-playwright-difusion-conversation-' || n)::uuid
+  and cc.person_id <> md5('hour-playwright-difusion-person-' || n)::uuid
+  and cc.is_primary;
+
+insert into public.conversation_contact (workspace_id, conversation_id, person_id, is_primary, created_by)
+select
+  w.id,
+  md5('hour-playwright-difusion-conversation-' || n)::uuid,
+  md5('hour-playwright-difusion-person-' || n)::uuid,
+  true,
+  (select id from auth.users where email = 'playwright@hour.test')
+from generate_series(1, 24) as n
+cross join public.workspace w
+where w.slug = 'playwright' and w.deleted_at is null
+on conflict (conversation_id, person_id) do update
+set is_primary = true, until = null, updated_at = now();
 
 commit;

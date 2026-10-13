@@ -97,7 +97,7 @@ describe.skipIf(!envReady())('payment RLS + derived invoice status', () => {
         p_notes: null,
         p_expected_on: null,
         p_payment_condition: null,
-        p_payer_person_id: null,
+        // Sin `p_payer_person_id`: ADR-102 fase 4 (20261013100000) lo retiró.
       });
       expect(createdInvoice.status).toBe(200);
       invoice = createdInvoice.data;

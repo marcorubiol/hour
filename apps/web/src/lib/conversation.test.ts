@@ -19,16 +19,26 @@ import {
 describe('workspace dossier projection', () => {
   it('keeps the API contract while deriving organization_name locally', () => {
     const item = normalizeConversationItem({
-      person: {
-        person_id: '22222222-2222-4222-8222-222222222222',
-        slug: 'jordi',
-        full_name: 'Jordi',
-        email: 'jordi@example.test',
-        country: 'ES',
-        city: 'Girona',
-        website: null,
-        organization: { name: 'Teatre X' },
-      },
+      contacts: [
+        {
+          person_id: '22222222-2222-4222-8222-222222222222',
+          role: null,
+          since: null,
+          until: null,
+          is_primary: true,
+          person: {
+            person_id: '22222222-2222-4222-8222-222222222222',
+            slug: 'jordi',
+            full_name: 'Jordi',
+            email: 'jordi@example.test',
+            phone: null,
+            country: 'ES',
+            city: 'Girona',
+            website: null,
+            organization: { name: 'Teatre X' },
+          },
+        },
+      ],
       project: null,
     } as unknown as ConversationDbItem);
 
@@ -38,6 +48,7 @@ describe('workspace dossier projection', () => {
       organization_name: 'Teatre X',
     });
     expect('organization' in (item.person ?? {})).toBe(false);
+    expect(item.contacts[0]?.person).toEqual({ slug: 'jordi', full_name: 'Jordi', email: 'jordi@example.test', phone: null });
   });
 });
 
