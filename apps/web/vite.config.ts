@@ -84,6 +84,10 @@ export default defineConfig(({ mode }) => {
         VitePWA({
           registerType: 'prompt',
           injectRegister: false,
+          // SvelteKit builds with a relative Vite base ('./'), so without this
+          // the client registers './sw.js' with scope './': on /h/<space>/…
+          // that asks for /h/<space>/sw.js and the Worker logs a 404.
+          base: '/',
           // SW disabled in `pnpm dev`: an active dev SW precaches the
           // /offline page and serves it stuck whenever the dev server
           // hiccups/restarts (the "You're back online" trap). Test PWA /
