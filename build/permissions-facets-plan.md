@@ -213,7 +213,7 @@ rol archivado después bloquearía la proyección) y su papel pasa a `membership
 **Quién gestiona una membresía ajena** (`private.can_manage_membership`): el admin del espacio, o quien podría haberla
 dado: su `container_verb`, sus metadatos y cada una de sus facetas caben en el techo de quien llama en ese contenedor.
 Es la regla del techo (ADR-085 §10) aplicada también a quitar: una road manager con Equip puede dar y quitar Mínim o
-Equip, no tocar a quien tiene Coordinació. Provisional (§ 8.6, punto 2).
+Equip, no tocar a quien tiene Coordinació. Decidido (§ 8.6, punto 2; ADR-104).
 
 ### 8.4 Qué hace la app distinto
 
@@ -225,14 +225,16 @@ Equip, no tocar a quien tiene Coordinació. Provisional (§ 8.6, punto 2).
 
 ### 8.5 El paquete en el espacio
 
-ADR-100 §4 solo fija que Direcció en el espacio equivale a admin. Provisional (§ 8.6, punto 1):
+ADR-100 §4 solo fija que Direcció en el espacio equivale a admin. Decidido (§ 8.6, punto 1; ADR-104):
 `grant_container_preset('workspace', …)` traduce el paquete al rol del espacio: Direcció = admin; cualquier otro quita
 admin (admin pasa a member) y deja como está a member, viewer o guest. Solo lo hace un admin (el techo lo garantiza), al
 owner no se le toca, y **no escribe facetas de espacio**: Converses y Diners en el espacio darían esas facetas en todos
 los proyectos (`model_has_facet` une hacia abajo), algo que ningún ADR ha decidido para un member y que el modelo viejo
 no puede proyectar. `set_membership_facet` rechaza el nivel espacio por lo mismo.
 
-### 8.6 Pendiente de Marco (elegida la primera, provisional)
+### 8.6 Decidido (Marco, 2026-10-13, ADR-104): la primera de cada una
+
+Queda como estaba implementado. Lo que sigue es el registro de las opciones.
 
 1. **Qué es un paquete en el espacio.**
    - a) **(implementada)** Solo Direcció tiene traducción (admin, ADR-100 §4); el resto quita admin y no da facetas de
