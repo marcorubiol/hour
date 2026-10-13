@@ -33,19 +33,20 @@ de Phase 0.9 en `_tasks.md`. Pricing orientativo, no decidido.
 
 ## Producción (verificado 2026-10-13)
 
-- Web `https://hour.zerosense.studio`, Worker `hour-web`. `/health/live`: SHA **`70660bb`**, `dirty:false`, builtAt
-  2026-10-13T05:45Z (ADR-102 fase 4: contract, la conversación ya no tiene persona). `main` == prod salvo documentos.
+- Web `https://hour.zerosense.studio`, Worker `hour-web`. `/health/live`: SHA **`05f1c96`**, `dirty:false`, builtAt
+  2026-10-13T10:15Z (permisos por facetas fase 3: las escrituras van al modelo nuevo, ADR-104). `main` == prod salvo documentos.
 - Despliegue: `pnpm --filter web run deploy` (no `pnpm deploy` desde la raíz). Exige árbol limpio.
 - Supabase `hour-phase0` · ref `lqlyorlccnniybezugme` · `eu-central-1`. Plan Free, con keepalive diario
   (`.github/workflows/keepalive.yml`) contra la pausa por inactividad. Pasar a Pro antes de la beta, aún no
   (`_tasks.md § 9`). Si algo de Supabase falla tras días sin uso, lo primero es `dig <ref>.supabase.co`.
-- **Última migración aplicada: `20261013100000_conversation_with_organization_contract`** (2026-10-13, run
-  38354412402), ADR-102 fase 4: fuera `conversation.person_id`/`role` e `invoice.payer_person_id`; las personas son
-  `conversation_contact`. El directorio tiene 6.802 salas. Las migraciones van por `production-migrate.yml`: backup, plan, apply (`_tasks.md § 34`).
-- `hour-staging` (ref `slccyknqpgmzhyiyclsq`, `eu-west-1`): despierto el 2026-10-13 y reconstruido con todas las
-  migraciones (run 38353192779, RLS y smoke en verde). Se volverá a pausar sin uso.
-- Últimas suites (2026-10-13): RLS 304/312 (8 saltados) y E2E 64/66 contra `70660bb`; los dos rojos eran specs que
-  pinchaban el primer enlace de la fila esperando la persona (ahora es la organización), corregidos y en verde (7/7).
+- **Última migración aplicada: `20261013200000_permissions_facets_writes`** (2026-10-13, run 38381374556; backup
+  38379856540, inspect y plan limpios): `membership` es la única fuente de acceso, `workspace_membership` y
+  `project_membership` son su proyección y no se escriben por la API; el espejo está apagado. Paridad 0. Antes:
+  ADR-102 fase 4 (`20261013100000`), las personas de una conversación son `conversation_contact`. El directorio tiene 6.802 salas. Las migraciones van por `production-migrate.yml`: backup, plan, apply (`_tasks.md § 34`).
+- `hour-staging` (ref `slccyknqpgmzhyiyclsq`, `eu-west-1`): reconstruido el 2026-10-13 con la fase 3 de permisos
+  (run 38378601525: RLS 311/315, smoke 2/2). Se volverá a pausar sin uso.
+- Últimas suites contra producción: pendientes contra `05f1c96`. Antes (2026-10-13, `70660bb`): RLS 304/312 y E2E
+  66/66 tras corregir dos specs.
 - Desde el checkout principal (`~/Developer/hour`), nunca desde un worktree: los worktrees no llevan `.env` ni
   `.env.test` (RLS sale saltado, el login del E2E falla).
 - `pnpm --filter web test:rls`: siempre contra producción; carga `.env` + `.env.test` y no mira `.env.local`.
