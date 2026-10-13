@@ -699,9 +699,11 @@
     letter-spacing: 0.08em;
     color: var(--text-faint);
   }
+  /* Wraps by its own width, not the viewport's: it lives in a settings pane
+     whose width the rail and the nav decide. */
   .set-access__invite {
-    display: grid;
-    grid-template-columns: minmax(12rem, 1.4fr) repeat(4, minmax(9rem, 1fr)) auto;
+    display: flex;
+    flex-wrap: wrap;
     gap: var(--space-s);
     align-items: end;
     padding: var(--space-m);
@@ -710,7 +712,9 @@
   .set-access__invite label {
     display: grid;
     gap: var(--space-xs);
+    flex: 1 1 9rem;
   }
+  .set-access__invite label:first-child { flex: 1.4 1 14rem; }
   .set-access__invite-button { white-space: nowrap; }
   .set-access__link {
     display: flex;
@@ -765,10 +769,6 @@
   }
   .set-access__role-select select { min-inline-size: 8rem; }
 
-  @media (max-width: 72rem) {
-    .set-access__invite { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .set-access__invite-button { grid-column: 1 / -1; }
-  }
   /* On a phone a space's row reads down instead of across: the name, its
      counts under it, then the two buttons, all beside the one colour rail
      that now runs the row's whole height. The empty roles cell takes no
@@ -795,7 +795,6 @@
     }
   }
   @media (max-width: 44rem) {
-    .set-access__invite { grid-template-columns: 1fr; }
     .set-access__row {
       grid-template-columns: 8px 1fr auto;
       gap: var(--space-s);
