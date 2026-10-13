@@ -3450,6 +3450,12 @@ Marco, tras el repaso del panel «Conversación» de la maqueta de comms
 6. Los posibles duplicados se revisan a mano antes de la fase 4, sin fusión automática.
 7. El slug de la conversación pasa al de la organización; el antiguo sigue funcionando (`previous_slugs`).
 
+**Añadido el 2026-10-13, fase 2b (Marco, opciones a):** edita los datos fiscales de una organización quien edita
+Cuentas en algún proyecto del espacio (`can_edit_workspace_money`), no solo owner o admin. Se editan desde la ficha de
+conversación y el borrador de Cuentas hasta que exista la ficha de organización (fase 3), adonde se mueve el mismo
+componente. `create_invoice_from_bolo` sigue escribiendo `payer_person_id` hasta que la fase 4 lo borre. Migración
+`20261012200000_invoice_payer_organization`.
+
 ## [2026-10-11] ADR-103 · Un `date` puede tener «quién va»; lo deducido se aprueba o se retira
 
 Marco, a raíz del rail (una residencia salía entera en cursiva sin forma de resolverlo). Hoy un `date` (ensayo,
