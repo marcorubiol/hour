@@ -50,11 +50,10 @@ describe('workspace dossier projection', () => {
       conversation: {
         id: PARENT,
         project_id: PARENT,
-        person: {
-          slug: 'jordi',
-          full_name: 'Jordi',
-          organization: { name: 'Teatre X' },
-        },
+        contacts: [
+          { is_primary: false, person: { slug: 'ana', full_name: 'Ana', organization: null } },
+          { is_primary: true, person: { slug: 'jordi', full_name: 'Jordi', organization: { name: 'Teatre X' } } },
+        ],
       },
     } as unknown as TaskDbItem);
 

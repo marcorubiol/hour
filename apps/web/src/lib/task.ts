@@ -12,6 +12,7 @@
 import * as v from 'valibot';
 import { Constants, type Enums, type Tables } from './db-types';
 import { localDayISO, realIsoDate } from './datetime';
+import { primaryContactPerson } from './conversation';
 import { t, type Locale } from './i18n';
 
 export type TaskStatus = Enums<'task_status'>;
@@ -102,27 +103,33 @@ export interface TaskDbItem extends Omit<TaskItem, 'conversation'> {
   conversation: {
     id: string;
     project_id: string;
-    person: {
-      slug: string | null;
-      full_name: string | null;
-      organization: { name: string } | null;
-    } | null;
+    contacts: Array<{
+      is_primary: boolean;
+      person: {
+        slug: string | null;
+        full_name: string | null;
+        organization: { name: string } | null;
+      } | null;
+    }>;
     organization?: { name: string } | null;
   } | null;
 }
 
 export function normalizeTaskItem(item: TaskDbItem): TaskItem {
+  const conv = item.conversation;
+  const person = conv ? primaryContactPerson(conv.contacts) : null;
   return {
     ...item,
-    conversation: item.conversation
+    conversation: conv
       ? {
-          ...item.conversation,
-          organization: item.conversation.organization ?? null,
-          person: item.conversation.person
+          id: conv.id,
+          project_id: conv.project_id,
+          organization: conv.organization ?? null,
+          person: person
             ? {
-                slug: item.conversation.person.slug,
-                full_name: item.conversation.person.full_name,
-                organization_name: item.conversation.person.organization?.name ?? null,
+                slug: person.slug,
+                full_name: person.full_name,
+                organization_name: person.organization?.name ?? null,
               }
             : null,
         }
@@ -136,7 +143,7 @@ export const TASK_SELECT = [
   'project:project_id(id,slug,name)',
   'line:line_id(id,slug,name,project_id)',
   'performance:performance_id(id,slug,project_id,venue_name,city)',
-  'conversation:conversation_id(id,project_id,person:workspace_person!conversation_workspace_person_fkey(slug,full_name,organization:workspace_organization!workspace_person_organization_fkey(name)),organization:workspace_organization!conversation_workspace_organization_fkey(name))',
+  'conversation:conversation_id(id,project_id,contacts:conversation_contact(is_primary,person:workspace_person!conversation_contact_workspace_person_fkey(slug,full_name,organization:workspace_organization!workspace_person_organization_fkey(name))),organization:workspace_organization!conversation_workspace_organization_fkey(name))',
 ].join(',');
 
 // ── Surfacing (ADR-070) ─────────────────────────────────────────────────

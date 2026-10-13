@@ -13,12 +13,16 @@ import {
 
 /**
  * ADR-102, fase 2 · la conversación se crea, se lee y empareja el correo por
- * su organización y sus contactos (20261011800000_conversation_with_organization_reads).
+ * su organización y sus contactos (20261011800000_conversation_with_organization_reads),
+ * puesto al día con la fase 4 (20261013100000_conversation_with_organization_contract):
+ * la conversación ya no tiene `person_id`; la persona del alta es su contacto
+ * principal en `conversation_contact`.
  *
  * Lo que fija este fichero:
  * - alta por organización, sin persona; con solo una persona, la organización
- *   es la suya o una con su nombre; 409 por organización con el id de la que
- *   ya existe; revivir por organización;
+ *   es la suya o una con su nombre y esa persona es el contacto principal; 409
+ *   por organización con el id de la que ya existe; la misma persona otra vez
+ *   sin organización, 409 sin id; revivir por organización;
  * - `organization_id` no se escribe por PostgREST (grant por columnas);
  * - unicidad por organización: dos compartidas no; una privada ajena no cuenta
  *   y convive;
@@ -30,8 +34,11 @@ import {
  *
  * Fixture: `playwright`, proyecto `zzz-e2e-collab`, organizaciones y personas
  * `ZZZ F2 …` propias. Las conversaciones quedan borradas al final y la pasada
- * siguiente las revive. Nunca toca `muk-cia`. Va rojo contra un origen sin
- * `20261011800000`.
+ * siguiente las revive. Revivir conserva los contactos y el principal, y la API
+ * no deja quitar un principal sin nombrar otro: la limpieza lo desmarca con la
+ * clave de servicio (sin ella, la primera prueba no puede fijar «sin
+ * principal» en una revivida). Nunca toca `muk-cia`. Va rojo contra un origen
+ * sin `20261013100000`.
  */
 const ORG_A = 'ZZZ F2 Venue A';
 const ORG_B = 'ZZZ F2 Venue B';
@@ -52,8 +59,7 @@ const RUN = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}
 interface ConversationRow {
   id: string;
   slug: string;
-  person_id: string | null;
-  organization_id: string | null;
+  organization_id: string;
   private_to: string | null;
   previous_slugs: string[];
 }
@@ -93,6 +99,23 @@ async function serviceRpc<T>(name: string, args: Record<string, unknown>): Promi
     : { status: res.status, data: null, error: text };
 }
 
+/** service_role, solo para la limpieza: desmarca el principal de una conversación. */
+async function serviceClearPrimary(conversationId: string): Promise<boolean> {
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!key) return false;
+  const { url, anon } = requireEnv();
+  const res = await fetch(new URL(`/rest/v1/conversation_contact?conversation_id=eq.${conversationId}&is_primary=is.true`, url), {
+    method: 'PATCH',
+    headers: {
+      apikey: key.startsWith('eyJ') ? anon : key,
+      Authorization: `Bearer ${key}`,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({ is_primary: false }),
+  });
+  return res.ok;
+}
+
 describe.skipIf(!envReady())('conversation with the venue (ADR-102, fase 2)', () => {
   let jwt: string;
   let me: string;
@@ -113,6 +136,23 @@ describe.skipIf(!envReady())('conversation with the venue (ADR-102, fase 2)', ()
     return r.rows[0]?.id;
   };
 
+  /** El contacto principal de una conversación (fase 4: la persona del alta). */
+  const primaryOf = async (conversationId: string): Promise<string | undefined> => {
+    const r = await pgGet<{ person_id: string }>(
+      'conversation_contact',
+      jwt,
+      new URLSearchParams({ select: 'person_id', conversation_id: `eq.${conversationId}`, is_primary: 'is.true' }),
+    );
+    return r.rows[0]?.person_id;
+  };
+
+  /** Deja una conversación como nace sin persona (compartida, sin principal) y la borra. */
+  const bury = async (conversationId: string) => {
+    await pgPatch('conversation', jwt, { private_to: null }, new URLSearchParams({ id: `eq.${conversationId}` }));
+    await serviceClearPrimary(conversationId);
+    await pgRpc('delete_conversation', jwt, { p_conversation_id: conversationId });
+  };
+
   /** El dossier de una persona de prueba; si no existe, nace con una conversación propia que se borra. */
   const ensurePerson = async (p: { name: string; email: string }): Promise<string> => {
     const r = await pgGet<{ person_id: string }>(
@@ -123,8 +163,10 @@ describe.skipIf(!envReady())('conversation with the venue (ADR-102, fase 2)', ()
     if (r.rows[0]) return r.rows[0].person_id;
     const c = await create({ p_organization_name: `${p.name} Org`, p_full_name: p.name, p_email: p.email });
     expect(c.status, c.error).toBe(200);
+    const person = await primaryOf(one(c.data)!.id);
     await pgRpc('delete_conversation', jwt, { p_conversation_id: one(c.data)!.id });
-    return one(c.data)!.person_id!;
+    expect(person).toBeTruthy();
+    return person!;
   };
 
   const sweep = async () => {
@@ -137,11 +179,8 @@ describe.skipIf(!envReady())('conversation with the venue (ADR-102, fase 2)', ()
         jwt,
         new URLSearchParams({ select: 'id', organization_id: `eq.${id}`, project_id: `eq.${projectId}` }),
       );
-      for (const row of r.rows) {
-        // Sin principal: la pasada siguiente las revive como nacen, sin persona.
-        await pgPatch('conversation', jwt, { private_to: null, person_id: null }, new URLSearchParams({ id: `eq.${row.id}` }));
-        await pgRpc('delete_conversation', jwt, { p_conversation_id: row.id });
-      }
+      // Sin principal: la pasada siguiente las revive como nacen, sin persona.
+      for (const row of r.rows) await bury(row.id);
     }
   };
 
@@ -176,10 +215,7 @@ describe.skipIf(!envReady())('conversation with the venue (ADR-102, fase 2)', ()
   });
 
   afterAll(async () => {
-    for (const id of made) {
-      await pgPatch('conversation', jwt, { private_to: null, person_id: null }, new URLSearchParams({ id: `eq.${id}` }));
-      await pgRpc('delete_conversation', jwt, { p_conversation_id: id });
-    }
+    for (const id of made) await bury(id);
     if (originalSetting !== undefined) {
       await pgPatch('workspace', jwt, { new_conversations_private: originalSetting }, new URLSearchParams({ id: `eq.${workspaceId}` }));
     }
@@ -190,17 +226,14 @@ describe.skipIf(!envReady())('conversation with the venue (ADR-102, fase 2)', ()
     expect(r.status, r.error).toBe(200);
     const conv = one(r.data)!;
     made.add(conv.id);
-    expect(conv.person_id).toBeNull();
+    // Fase 4: la conversación ya no tiene columna de persona.
+    expect(conv).not.toHaveProperty('person_id');
     expect(conv.organization_id).toBe(await orgId(ORG_A));
     expect(conv.slug).toMatch(/^zzz-f2-venue-a/);
 
-    // Sin persona no hay principal (una pasada anterior deja contactos sin la marca).
-    const contacts = await pgGet<{ is_primary: boolean }>(
-      'conversation_contact',
-      jwt,
-      new URLSearchParams({ select: 'is_primary', conversation_id: `eq.${conv.id}` }),
-    );
-    expect(contacts.rows.filter((c) => c.is_primary)).toHaveLength(0);
+    // Sin persona no hay principal (una pasada anterior deja contactos sin la
+    // marca; sin la clave de servicio, la limpieza no puede quitarla).
+    if (process.env.SUPABASE_SERVICE_ROLE_KEY) expect(await primaryOf(conv.id)).toBeUndefined();
   });
 
   test('a second one with the same organization is a 409 that names the first', async () => {
@@ -221,12 +254,14 @@ describe.skipIf(!envReady())('conversation with the venue (ADR-102, fase 2)', ()
     const org = await orgId(SOLO_NAME);
     expect(org).toBeTruthy();
     expect(conv.organization_id).toBe(org);
-    const dossier = await pgGet<{ organization_id: string }>(
+    const dossier = await pgGet<{ person_id: string; organization_id: string }>(
       'workspace_person',
       jwt,
-      new URLSearchParams({ select: 'organization_id', workspace_id: `eq.${workspaceId}`, person_id: `eq.${conv.person_id}` }),
+      new URLSearchParams({ select: 'person_id,organization_id', workspace_id: `eq.${workspaceId}`, email: `eq.${SOLO_EMAIL}` }),
     );
     expect(dossier.rows[0]?.organization_id).toBe(org);
+    // Y esa persona es su contacto principal.
+    expect(await primaryOf(conv.id)).toBe(dossier.rows[0]?.person_id);
   });
 
   test('nothing to talk to is a 400; an organization of nowhere is a 403', async () => {
@@ -257,9 +292,11 @@ describe.skipIf(!envReady())('conversation with the venue (ADR-102, fase 2)', ()
     const p = await create({ p_organization_name: ORG_B, p_full_name: P1.name, p_email: P1.email });
     expect(p.status, p.error).toBe(200);
     made.add(one(p.data)!.id);
+    const p1 = await primaryOf(one(p.data)!.id);
+    expect(p1).toBeTruthy();
     const s = await pgRpc('set_conversation_contact', jwt, {
       p_conversation_id: conv,
-      p_person_id: one(p.data)!.person_id,
+      p_person_id: p1,
       p_role: long,
     });
     expect(s.status).toBe(400);
@@ -290,8 +327,11 @@ describe.skipIf(!envReady())('conversation with the venue (ADR-102, fase 2)', ()
     made.add(one(again.data)!.id);
     expect(one(again.data)!.id).toBe(theirs.id);
     expect(one(again.data)!.organization_id).toBe(await orgId(ORG_E2));
-    // Y viva, otra vez la misma persona sin organización: 409, como siempre.
-    expect((await create({ p_full_name: P5.name, p_email: P5.email })).status).toBe(409);
+    // Y viva, otra vez la misma persona sin organización: 409, como siempre;
+    // ahora porque es la principal de una viva, y sin id que abrir.
+    const dup = await create({ p_full_name: P5.name, p_email: P5.email });
+    expect(dup.status).toBe(409);
+    expect(JSON.parse(dup.error!)).toMatchObject({ code: '23505', details: null });
   });
 
   test('add_conversation_contact: a person without a dossier joins as a contact (primary if none)', async () => {
@@ -470,7 +510,7 @@ describe.skipIf(!envReady())('conversation with the venue (ADR-102, fase 2)', ()
         pgRpc('set_conversation_contact', jwt, { p_conversation_id: conv, p_person_id: person[email], ...args });
       // A: P1 vigente; P2 se fue hace 60 días (estuvo desde hace 200); P3 se fue hace 400.
       expect((await set(convA, P1.email, { p_since: day(-300) })).status).toBe(200);
-      // El principal de A (P1 ya es el de B, y la unicidad vieja por persona sigue viva).
+      // El principal de A es P4 (P1 es el de B); A no tenía, así que nadie se degrada.
       expect((await set(convA, P4.email, { p_is_primary: true })).status).toBe(200);
       expect((await set(convA, P2.email, { p_since: day(-200) })).status).toBe(200);
       expect((await set(convA, P3.email)).status).toBe(200);

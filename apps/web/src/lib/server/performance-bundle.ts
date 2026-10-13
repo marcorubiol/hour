@@ -15,6 +15,7 @@
 
 import { pgGet, PostgrestError, type SupabaseEnv } from '$lib/supabase';
 import type { Json, Tables } from '$lib/db-types';
+import { primaryContactPerson } from '$lib/conversation';
 import { COMMITMENTS_EMBED, type Commitment } from '$lib/people';
 import {
   SCHEDULE_SLOT_EMBED,
@@ -122,7 +123,7 @@ type PerformanceDbDetail = Omit<
 > & {
   schedule_slot: ScheduleSlotRow[];
   conversation: (Omit<NonNullable<PerformanceDetail['conversation']>, 'person'> & {
-    person: PersonDbEmbed | null;
+    contacts: Array<{ is_primary: boolean; person: PersonDbEmbed | null }>;
   }) | null;
   crew_assignment: Array<
     Omit<PerformanceDetail['crew_assignment'][number], 'person'> & {
@@ -164,7 +165,9 @@ function normalizePerformance({ schedule_slot, ...row }: PerformanceDbDetail): P
     ...timeslotsFromSlots(schedule_slot),
     schedule: scheduleOf(schedule_slot),
     conversation: row.conversation
-      ? { ...row.conversation, person: normalizePerson(row.conversation.person) }
+      ? (({ contacts, ...conv }) => ({ ...conv, person: normalizePerson(primaryContactPerson(contacts)) }))(
+          row.conversation,
+        )
       : null,
     crew_assignment: row.crew_assignment.map((member) => ({
       ...member,
@@ -248,7 +251,7 @@ function detailSelect(withNotice: boolean): string {
     'venue:venue_id(id,slug,name,city,country,address,capacity,timezone,contacts)',
     'line:line_id(id,slug,name,kind)',
     'project:project_id(id,slug,name,accent)',
-    `conversation:conversation_id(id,slug,status,person:workspace_person!conversation_workspace_person_fkey(${PERSON_COLS}),organization:workspace_organization!conversation_workspace_organization_fkey(name))`,
+    `conversation:conversation_id(id,slug,status,contacts:conversation_contact(is_primary,person:workspace_person!conversation_contact_workspace_person_fkey(${PERSON_COLS})),organization:workspace_organization!conversation_workspace_organization_fkey(name))`,
     `crew_assignment(id,role,notes,contact_override,person:workspace_person!crew_assignment_workspace_person_fkey(${PERSON_COLS}))`,
     `cast_override(id,role,reason,person:workspace_person!cast_override_workspace_person_fkey(${PERSON_COLS}),replaces_person:workspace_person!cast_override_workspace_replaces_person_fkey(id:person_id,full_name))`,
     'date(id,kind,status,title,starts_at,ends_at,all_day,venue_name,city,venue:venue_id(timezone))',

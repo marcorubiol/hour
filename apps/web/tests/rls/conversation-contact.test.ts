@@ -14,7 +14,9 @@ import {
 
 /**
  * ADR-102, fase 1 · `conversation_contact` y `conversation.organization_id`
- * (20261011600000_conversation_organization_expand).
+ * (20261011600000_conversation_organization_expand), puesto al día con la
+ * fase 4 (20261013100000_conversation_with_organization_contract): la
+ * conversación ya no tiene `person_id` ni `role`; sus personas son contactos.
  *
  * Lo que fija este fichero:
  * - la lectura hereda la frontera de la conversación: sin `read:conversation`
@@ -22,18 +24,19 @@ import {
  * - se escribe solo por `set_conversation_contact` / `end_conversation_contact`
  *   con `edit:conversation`, y «no existe» y «no es tuyo» dan el mismo 403;
  * - un principal como mucho y siempre vigente; `until >= since`;
- * - mientras conviven los modelos, el principal es `conversation.person_id`:
- *   el alta crea el contacto y la organización del dossier llega a la
- *   conversación; nombrar principal a otra persona mueve `person_id`;
- * - el relleno: toda conversación visible tiene exactamente un principal, el
- *   de su `person_id`.
+ * - el alta con persona escribe a esa persona de contacto principal, con su
+ *   papel, y la organización del dossier llega a la conversación; nombrar
+ *   principal a otra persona degrada al anterior, que sigue de contacto
+ *   vigente, sin tocar la organización;
+ * - toda conversación visible tiene como mucho un principal (ninguno si nació
+ *   solo con su organización).
  *
  * Fixture: `playwright`, proyecto `zzz-e2e-collab`, persona
  * `zzz-rls-contact@hour.test` (con su organización) y el dossier
  * `zzz-difusion-contact-024` de `playwright-difusion.sql` como segundo
  * contacto. Se deja la conversación borrada con su persona de principal, así
  * que la siguiente pasada la recupera. Nunca toca `muk-cia`. Va rojo contra un
- * origen sin `20261011600000`.
+ * origen sin `20261013100000`.
  */
 const NOWHERE = '00000000-0000-4000-8000-000000000000';
 const FIXTURE_EMAIL = 'zzz-rls-contact@hour.test';
@@ -43,9 +46,7 @@ const SECOND_SLUG = 'zzz-difusion-contact-024';
 
 interface ConversationRow {
   id: string;
-  person_id: string;
-  organization_id: string | null;
-  role: string | null;
+  organization_id: string;
   private_to: string | null;
 }
 
@@ -98,13 +99,17 @@ describe.skipIf(!envReady())('conversation_contact (ADR-102, fase 1)', () => {
       'conversation',
       jwt,
       new URLSearchParams({
-        select: 'id,person_id,organization_id,role,private_to',
+        select: 'id,organization_id,private_to',
         id: `eq.${conversation.id}`,
       }),
     );
     expect(r.rows).toHaveLength(1);
     return r.rows[0]!;
   };
+
+  // El principal vigente (desde la fase 4, la única persona «de» la conversación).
+  const primary = async (): Promise<ContactRow | undefined> =>
+    (await contacts()).find((r) => r.is_primary);
 
   const setContact = (args: Record<string, unknown>, as: string | null = jwt) =>
     pgRpc<ContactRow>('set_conversation_contact', as, {
@@ -153,11 +158,11 @@ describe.skipIf(!envReady())('conversation_contact (ADR-102, fase 1)', () => {
 
     // Una pasada muerta a medias deja la conversación viva: se recoge, con
     // su persona de principal otra vez para que la próxima la recupere.
-    const stale = await pgGet<{ id: string; person_id: string }>(
+    const stale = await pgGet<{ id: string }>(
       'conversation',
       jwt,
       new URLSearchParams({
-        select: 'id,person_id,contact:conversation_contact!inner(person:workspace_person!conversation_contact_workspace_person_fkey!inner(email))',
+        select: 'id,contact:conversation_contact!inner(person:workspace_person!conversation_contact_workspace_person_fkey!inner(email))',
         'contact.person.email': `eq.${FIXTURE_EMAIL}`,
         project_id: `eq.${projectId}`,
         deleted_at: 'is.null',
@@ -176,12 +181,14 @@ describe.skipIf(!envReady())('conversation_contact (ADR-102, fase 1)', () => {
     });
     expect(created.status, created.error).toBe(200);
     conversation = one(created.data)!;
-    firstPerson = conversation.person_id;
+    const first = await primary();
+    if (!first) throw new Error('create_conversation wrote no primary contact');
+    firstPerson = first.person_id;
   });
 
   afterAll(async () => {
     if (!conversation) return;
-    const now = await readConversation().catch(() => undefined);
+    const now = await primary().catch(() => undefined);
     if (now && now.person_id !== firstPerson) {
       await setContact({ p_person_id: firstPerson, p_is_primary: true });
     }
@@ -209,31 +216,35 @@ describe.skipIf(!envReady())('conversation_contact (ADR-102, fase 1)', () => {
     });
   });
 
-  test('every conversation I see has exactly one primary contact: its person (none without one)', async () => {
+  test('every conversation I see has an organization and at most one primary contact, current', async () => {
     const r = await pgGet<{
       id: string;
-      person_id: string | null;
-      contacts: { person_id: string; is_primary: boolean }[];
+      organization_id: string | null;
+      contacts: { person_id: string; is_primary: boolean; until: string | null }[];
     }>(
       'conversation',
       jwt,
       new URLSearchParams({
-        select: 'id,person_id,contacts:conversation_contact(person_id,is_primary)',
+        select: 'id,organization_id,contacts:conversation_contact(person_id,is_primary,until)',
         workspace_id: `eq.${workspaceId}`,
       }),
     );
     expect(r.status).toBe(200);
     expect(r.rows.length).toBeGreaterThan(0);
+    let withPrimary = 0;
     for (const c of r.rows) {
-      const primaries = c.contacts.filter((x) => x.is_primary);
+      // Fase 4: `organization_id` es NOT NULL.
+      expect(c.organization_id, c.id).not.toBeNull();
       // ADR-102, fase 2: una conversación puede nacer solo con su organización.
-      if (c.person_id === null) {
-        expect(primaries, c.id).toHaveLength(0);
-        continue;
+      const primaries = c.contacts.filter((x) => x.is_primary);
+      expect(primaries.length, c.id).toBeLessThanOrEqual(1);
+      if (primaries.length === 1) {
+        expect(primaries[0]!.until, c.id).toBeNull();
+        withPrimary += 1;
       }
-      expect(primaries, c.id).toHaveLength(1);
-      expect(primaries[0]!.person_id, c.id).toBe(c.person_id);
     }
+    // Al menos la de este fichero lo tiene.
+    expect(withPrimary).toBeGreaterThan(0);
   });
 
   test('anon reads nothing and cannot write', async () => {
@@ -306,13 +317,11 @@ describe.skipIf(!envReady())('conversation_contact (ADR-102, fase 1)', () => {
     expect(rows.find((r) => r.person_id === firstPerson)).toMatchObject({ is_primary: true, until: null });
   });
 
-  test('naming another primary moves conversation.person_id; one primary at a time', async () => {
+  test('naming another primary demotes the previous one; one primary at a time', async () => {
     const r = await setContact({ p_person_id: secondPerson, p_role: 'dirección', p_is_primary: true });
     expect(r.status, r.error).toBe(200);
-    const conv = await readConversation();
-    expect(conv.person_id).toBe(secondPerson);
-    expect(conv.role).toBe('dirección');
-    expect(conv.organization_id).toBe(conversation.organization_id);
+    expect(await primary()).toMatchObject({ person_id: secondPerson, role: 'dirección' });
+    expect((await readConversation()).organization_id).toBe(conversation.organization_id);
 
     const rows = await contacts();
     expect(rows.filter((x) => x.is_primary).map((x) => x.person_id)).toEqual([secondPerson]);
@@ -321,7 +330,7 @@ describe.skipIf(!envReady())('conversation_contact (ADR-102, fase 1)', () => {
 
     const backR = await setContact({ p_person_id: firstPerson, p_role: 'programación', p_is_primary: true });
     expect(backR.status, backR.error).toBe(200);
-    expect((await readConversation()).person_id).toBe(firstPerson);
+    expect((await primary())?.person_id).toBe(firstPerson);
   });
 
   test('a dossier from nowhere and a conversation from nowhere give the same 403', async () => {

@@ -1,8 +1,6 @@
 /**
  * GET /api/money/payers — the organizations the caller may invoice: those of
  * conversations it sees in projects where it edits money (ADR-102 decision 5).
- * `list_money_payers` (persons) stays for the Worker before phase 2b; phase 4
- * drops it.
  */
 
 import type { RequestHandler } from './$types';

@@ -247,13 +247,13 @@
           ? { project_id: projectId, person_id: personId, line_id, ...base }
           : { project_id: projectId, ...who, line_id, ...base };
         try {
-          const data = await mutateJSON<{ conversation?: { person_id?: string } }>(
+          const data = await mutateJSON<{ primary_person_id?: string | null }>(
             'POST',
             '/api/conversations',
             body,
           );
           out.created += 1;
-          if (!personId && data?.conversation?.person_id) personId = data.conversation.person_id;
+          if (!personId && data?.primary_person_id) personId = data.primary_person_id;
         } catch (e) {
           const clash = e instanceof ApiError && e.status === 409 ? e.body?.conversation_id : null;
           if (typeof clash === 'string' && ('person' in who || Boolean(personId))) {

@@ -13,34 +13,41 @@ import {
 
 /**
  * ADR-099 §4 · el pagador no sale de una conversación privada ajena
- * (20261011700000_money_payers_private).
+ * (20261011700000_money_payers_private), puesto al día con ADR-102 fase 4
+ * (20261013100000_conversation_with_organization_contract): ya no hay pagador
+ * persona (`list_money_payers` e `invoice.payer_person_id` fuera); el pagador
+ * es la organización.
  *
- * Lo que fija este fichero:
- * - `list_money_payers` no lista a otro editor de dinero la persona que solo
- *   sale de mi conversación privada; a mí sí;
- * - `create_invoice_from_bolo` no infiere esa persona como pagador cuando
- *   factura otro; cuando facturo yo, sí.
+ * El caso general (organización de una privada mía: la lista y la inferencia
+ * son solo mías) lo fija `money-payer-organization.test.ts`. Aquí queda lo que
+ * aquel no cubre:
+ * - la conversación privada nacida solo con una persona: su organización (la
+ *   del dossier o una con el nombre de la persona, que la delata) no sale en
+ *   `list_money_payer_organizations` de otro editor de dinero ni se infiere
+ *   como pagadora cuando factura otro; a mí, las dos cosas;
+ * - lo retirado no vuelve: `list_money_payers` no existe (PGRST202) y la
+ *   factura no tiene `payer_person_id`.
  *
  * Fixture: `playwright`, proyecto `zzz-e2e-collab`, persona `zzz-rls-payer-*`.
  * Deja las filas como las encontró. Va rojo contra un origen sin
- * `20261011700000`.
+ * `20261013100000`.
  */
 const PAYER_EMAIL = 'zzz-rls-payer-private@hour.test';
 const PAYER_NAME = 'ZZZ RLS Payer Private';
 
 interface ConversationRow {
   id: string;
-  person_id: string;
+  organization_id: string;
   private_to: string | null;
 }
 
-interface PayerRow {
+interface PayerOrgRow {
   id: string;
 }
 
 interface InvoiceRow {
   id: string;
-  payer_person_id: string | null;
+  payer_organization_id: string | null;
 }
 
 interface ProjectMembershipRow {
@@ -54,7 +61,7 @@ const one = <T>(data: T | T[] | null): T | undefined =>
   Array.isArray(data) ? data[0] : (data ?? undefined);
 
 describe.skipIf(!envReady() || !limitedEnvReady())(
-  "a private conversation's person is not someone else's payer (ADR-099 §4)",
+  "a private conversation's organization is not someone else's payer (ADR-099 §4)",
   () => {
     let jwt: string;
     let other: string;
@@ -78,7 +85,7 @@ describe.skipIf(!envReady() || !limitedEnvReady())(
     }
 
     async function payers(as: string): Promise<string[]> {
-      const r = await pgRpc<PayerRow[]>('list_money_payers', as, { p_project_ids: [projectId] });
+      const r = await pgRpc<PayerOrgRow[]>('list_money_payer_organizations', as, { p_project_ids: [projectId] });
       expect(r.status, r.error).toBe(200);
       return (r.data ?? []).map((p) => p.id);
     }
@@ -158,6 +165,7 @@ describe.skipIf(!envReady() || !limitedEnvReady())(
       expect(c.status, c.error).toBe(200);
       conversation = one(c.data)!;
       expect(conversation.private_to).toBe(me);
+      expect(conversation.organization_id).toBeTruthy();
 
       const b = await pgRpc<{ id: string }>('create_bolo', jwt, {
         p_project_id: projectId,
@@ -194,16 +202,24 @@ describe.skipIf(!envReady() || !limitedEnvReady())(
       }
     });
 
-    test('list_money_payers: the owner sees the person, another money editor does not', async () => {
-      expect(await payers(jwt)).toContain(conversation!.person_id);
-      expect(await payers(other)).not.toContain(conversation!.person_id);
+    test('list_money_payer_organizations: the owner sees the organization, another money editor does not', async () => {
+      expect(await payers(jwt)).toContain(conversation!.organization_id);
+      expect(await payers(other)).not.toContain(conversation!.organization_id);
     });
 
-    test('create_invoice_from_bolo: the payer is inferred for the owner only', async () => {
+    test('create_invoice_from_bolo: the payer organization is inferred for the owner only', async () => {
       const theirs = await invoice(other);
-      expect(theirs.payer_person_id).toBeNull();
+      expect(theirs.payer_organization_id).toBeNull();
       const mine = await invoice(jwt);
-      expect(mine.payer_person_id).toBe(conversation!.person_id);
+      expect(mine.payer_organization_id).toBe(conversation!.organization_id);
+      // Ya no hay pagador persona.
+      expect(mine).not.toHaveProperty('payer_person_id');
+    });
+
+    test('list_money_payers (persons) is gone', async () => {
+      const r = await pgRpc('list_money_payers', jwt, { p_project_ids: [projectId] });
+      expect(r.status).toBe(404);
+      expect(JSON.parse(r.error!).code).toBe('PGRST202');
     });
   },
 );

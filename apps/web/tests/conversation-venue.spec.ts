@@ -91,7 +91,6 @@ test.describe('conversation with the venue', () => {
               id: string;
               project_id: string;
               workspace_id: string;
-              person_id: string | null;
               organization: { name: string } | null;
               contacts: Array<{ person_id: string; since: string | null; until: string | null; role: string | null }>;
             }>;
@@ -144,7 +143,6 @@ test.describe('conversation with the venue', () => {
           found: true as const,
           id: conv.id,
           joined,
-          personNull: conv.person_id === null,
           dupStatus: dup.status,
           dupId: dupBody.conversation_id ?? null,
           addStatus: add.status,

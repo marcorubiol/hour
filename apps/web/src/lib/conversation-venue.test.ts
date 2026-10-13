@@ -136,25 +136,26 @@ describe('contacts and title', () => {
     ).toBe('Inés');
   });
 
-  it('normalizes the embeds: organization and sorted contacts, person kept', () => {
+  it('normalizes the embeds: organization, sorted contacts, person from the primary', () => {
     const item = normalizeConversationItem({
-      person: null,
       project: null,
       organization: { id: ORG, slug: 'pradillo', name: 'Pradillo', kind: 'theatre', city: 'Madrid' },
       contacts: [contact({ person_id: 'b' }), contact({ person_id: 'a', is_primary: true })],
     } as unknown as ConversationDbItem);
     expect(item.organization?.name).toBe('Pradillo');
     expect(item.contacts.map((c) => c.person_id)).toEqual(['a', 'b']);
-    expect(item.person).toBeNull();
+    expect(item.person).toMatchObject({ slug: 'x', full_name: 'X' });
 
-    const old = normalizeConversationItem({ person: null, project: null } as unknown as ConversationDbItem);
-    expect(old.organization).toBeNull();
-    expect(old.contacts).toEqual([]);
+    const bare = normalizeConversationItem({ project: null } as unknown as ConversationDbItem);
+    expect(bare.organization).toBeNull();
+    expect(bare.contacts).toEqual([]);
+    expect(bare.person).toBeNull();
   });
 
   it('the select embeds the organization by the FK the contract keeps', () => {
     expect(CONVERSATION_SELECT).toContain('workspace_organization!conversation_workspace_organization_fkey');
     expect(CONVERSATION_SELECT).toContain('contacts:conversation_contact(');
+    expect(CONVERSATION_SELECT).not.toContain('conversation_workspace_person_fkey');
   });
 });
 
