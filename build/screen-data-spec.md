@@ -218,7 +218,7 @@ by activity with per-line rows, + New project / + New line.
 - Stats bar [now]; add **season framing** ("2026-27: N confirmed · N in play") once seasons
   are real — `date.season` exists but nothing writes it [db, low priority].
 - Projects grid [now]. Per-card: add next upcoming performance date [db — cheap, high value].
-- **People block**: workspace members (`workspace_membership` + `user_profile`) — who's in
+- **People block**: workspace members (`membership` de espacio + `user_profile`) — who's in
   this space, role. Today invisible everywhere except vapor-Settings [db].
 - **Fiscal identity** (for invoicing): legal name, VAT id, address, IBAN — ADR-062 said
   "fiscal fields later"; `account` has only `billing_email`/`country` [gap — § Schema gaps #3].

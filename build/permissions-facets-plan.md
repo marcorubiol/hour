@@ -96,7 +96,8 @@ Código de la app: ningún cambio. Pregunta `has_permission` por RPC en cinco si
 
 ## 5. Orden
 
-1. **Expand** (aditiva). Rollback `build/runbooks/rollback-20261011-permissions-facets-expand.sql`.
+1. **Expand** (aditiva). Rollback `build/runbooks/rollback-20261011-permissions-facets-expand.sql` (retirado en el
+   contract, § 9.5).
 2. **Fase 2** (reescribe funciones SECURITY DEFINER: `inspect` + staging + plan + apply). Rollback
    `build/runbooks/rollback-20261011-permissions-facets-reads.sql`, que va antes que el del expand.
 3. **Fase 3**: las escrituras pasan al modelo nuevo (invitaciones, cambio de rol, baja, alta de espacio y la RPC de
@@ -106,7 +107,7 @@ Código de la app: ningún cambio. Pregunta `has_permission` por RPC en cinco si
    `has_permission_by_facets`, `access_parity_report`, las cadenas muertas; `container_verb` obligatorio (ADR-100 §2);
    decidir qué queda de `workspace_membership`.
 
-Ensayo: `build/runbooks/permissions-facets-rehearsal.sql` mueve el modelo viejo por 23 caminos (alta, aceptación,
+Ensayo (retirado en el contract, § 9.5): `build/runbooks/permissions-facets-rehearsal.sql` movía el modelo viejo por 23 caminos (alta, aceptación,
 roles, grants, revokes, roles custom renombrados y borrados, guest, admin, baja, borrados en cascada), prueba los
 paquetes en un bolo en 5 pasos más, y exige paridad cero tras cada uno. Corre igual con solo el expand y con la fase 2.
 
@@ -276,7 +277,7 @@ Queda como estaba implementado. Lo que sigue es el registro de las opciones.
 - **`staging.sql`** siembra las membresías en `membership` (la proyección escribe las viejas): solo vale con la fase 3
   aplicada.
 
-### 8.8 Rollback
+### 8.8 Rollback (retirado en el contract, § 9.5)
 
 `build/runbooks/rollback-20261013-permissions-facets-writes.sql`, antes que los de la fase 2 y el expand. Vuelve a los
 cuerpos de la fase 2, borra las RPC y triggers nuevos, restaura los triggers del espejo y de validación y los grants de
@@ -371,8 +372,9 @@ de producción debe mirarlo antes del apply (`select count(owner_id) from projec
 - `supabase/fixtures/staging.sql` sin `workspace_membership` ni `can_manage_members`.
 - Retirados: `build/runbooks/permissions-facets-rehearsal.sql` (movía el modelo viejo y exigía paridad, no queda
   ninguna de las dos cosas; lo que probaba de paquetes, overrides, techo y bajas lo prueba `permissions-facets.test.ts`
-  contra la base de verdad) y los tres rollbacks de expand, fase 2 y fase 3 (después del contract no hay tablas viejas
-  a las que volver).
+  contra la base de verdad) y los tres rollbacks de expand, fase 2 y fase 3, más el de la firma por persona
+  (`rollback-20261011-mail-signature-person.sql`, que devolvía la firma a `workspace_membership`): después del
+  contract no hay tablas viejas a las que volver.
 
 ### 9.6 Pendiente de Marco
 

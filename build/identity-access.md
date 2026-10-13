@@ -50,8 +50,8 @@ su dossier privado. Compartir identidad no compartirá automáticamente informac
 
 - Una misma cuenta puede pertenecer a varias compañías y tener roles distintos en
   cada workspace y proyecto.
-- La identidad nunca concede acceso. Una `workspace_membership` aceptada y vigente
-  es siempre el perímetro exterior; los permisos de proyecto solo especializan el
+- La identidad nunca concede acceso. Una membresía de espacio (`membership`, nivel
+  `workspace`) aceptada y vigente es siempre el perímetro exterior; los permisos de proyecto solo especializan el
   acceso dentro de ese perímetro.
 - Una compañía no puede leer ni modificar el dossier, las notas, las conversaciones,
   los campos propios ni las relaciones de otra compañía.
@@ -100,8 +100,8 @@ saliente, una llamada o un evento de WhatsApp usan el mismo contrato de evento c
 | Eje | Responde a | Ejemplo |
 |---|---|---|
 | Identidad (`user_id` / `person_id`) | ¿Quién es? | La misma persona en Hour. |
-| `workspace_membership` | ¿Puede entrar aquí? | Admin en compañía A; miembro en B. |
-| `project_membership` | ¿Qué puede hacer en este proyecto? | Regiduría en A1; técnico en A2. |
+| `membership` de espacio | ¿Puede entrar aquí? | Admin en compañía A; miembro en B. |
+| `membership` de contenedor + `membership_facet` | ¿Qué puede hacer en este proyecto, línea, bolo o función? | Coordinació en A1; Equip en un bolo de A2. |
 | Asignación operativa | ¿Qué trabajo realiza? | Reparto en una producción; crew en un bolo. |
 
 `cast_member` y `crew_assignment` describen realidad operativa, no deben conceder por
@@ -134,7 +134,7 @@ ve ambas participaciones; cada compañía conserva exclusivamente su dossier y a
 
 ### Revocación
 
-- Revocar `workspace_membership` corta acceso aunque el JWT siga vivo y fuerza el
+- Revocar la membresía de espacio corta acceso aunque el JWT siga vivo y fuerza el
   cierre o la reautorización de sockets colaborativos que ya estaban abiertos.
 - Revocar un share deja de proyectar los campos portátiles, pero no borra en silencio
   el dato local que la compañía deba conservar. La UI distingue dato local de dato
