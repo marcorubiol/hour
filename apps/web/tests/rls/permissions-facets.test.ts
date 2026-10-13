@@ -1,24 +1,24 @@
 /**
  * RLS regression: permisos al modelo de facetas (expand 20261011100000, fase 2
- * 20261011300000 y fase 3 20261013200000; build/permissions-facets-plan.md,
- * ADR-099 §8, ADR-100).
+ * 20261011300000, fase 3 20261013200000 y contract 20261013300000;
+ * build/permissions-facets-plan.md, ADR-099 §8, ADR-100, ADR-104).
  *
- * La fase 2 hace que los lectores (has_permission, is_workspace_*, ...) lean
- * `membership` + `membership_facet`; la fase 3 hace que las escrituras vayan
- * solo ahí, y las tablas viejas pasan a ser su proyección. Estos tests prueban:
- *   1. Paridad global (con SUPABASE_SERVICE_ROLE_KEY): las copias congeladas de
- *      los lectores viejos y el modelo nuevo contestan igual para todo el
- *      sistema. Es la prueba fuerte de equivalencia (y de la proyección).
- *   2. Equivalencia por fixture: has_permission y el modelo nuevo contestan
- *      igual en cada proyecto, en los ocho permisos vivos.
- *   3. Overrides y paquetes en el proyecto: se ven al instante en el acceso
- *      real y en la tabla vieja proyectada.
+ * Desde el contract `membership` + `membership_facet` son lo único que hay:
+ * las tablas viejas, la proyección y la paridad no existen. Estos tests prueban:
+ *   1. Lo borrado no existe: project_membership, workspace_membership,
+ *      workspace_role.permissions, can_manage_members, las RPC de paridad, y
+ *      las cadenas de permiso muertas son un error.
+ *   2. El acceso de cada fixture, permiso a permiso: el owner todo; la fixture
+ *      limitada ve la producción y nada más, y en todo proyecto estar es ver
+ *      (ADR-100 §2).
+ *   3. Overrides y paquetes en el proyecto: se ven al instante en el acceso.
  *   4. Techo del delegante: con Mínim no se da ni se toma más; en el espacio,
  *      Direcció es admin y las facetas de espacio esperan decisión.
  *   5. Facetas: vocabulario estándar y tabla de niveles decididos (ADR-100),
  *      configuración por espacio solo del admin, nadie escribe membresías por
- *      la API (ni las tablas viejas), cada uno ve solo lo suyo salvo el admin.
- *   6. Paquetes en un bolo: Equip se expande y el techo se respeta.
+ *      la API, cada uno ve solo lo suyo salvo el admin.
+ *   6. Paquetes en un bolo: Equip se expande, el techo se respeta y el acceso
+ *      de proyecto no cambia.
  */
 
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
@@ -48,8 +48,19 @@ const LIVE_PERMS = [
   'read:conversation',
   'edit:conversation',
   'edit:project_meta',
-  'edit:membership',
 ] as const;
+
+type Perms = Record<(typeof LIVE_PERMS)[number], boolean | null>;
+
+const ONLY_SEES: Perms = {
+  'read:performance': true,
+  'edit:performance': false,
+  'read:money': false,
+  'edit:money': false,
+  'read:conversation': false,
+  'edit:conversation': false,
+  'edit:project_meta': false,
+};
 
 const DECIDED_LEVELS: Record<string, string[]> = {
   converses: ['workspace', 'project', 'line'],
@@ -60,12 +71,6 @@ const DECIDED_LEVELS: Record<string, string[]> = {
   comidas: ['bolo', 'performance'],
   diners: ['workspace', 'project', 'line', 'bolo'],
 };
-
-interface ProjectMembershipRow {
-  roles: string[];
-  permission_grants: string[];
-  permission_revokes: string[];
-}
 
 interface MembershipRow {
   id: string;
@@ -89,23 +94,16 @@ interface MembershipFacetRow {
   source: string;
 }
 
-async function assertEquivalent(jwt: string, projectIds: string[]): Promise<void> {
-  const diffs: string[] = [];
-  for (const projectId of projectIds) {
-    for (const perm of LIVE_PERMS) {
-      const args = { p_project_id: projectId, p_perm: perm };
-      const [legacy, model] = await Promise.all([
-        pgRpc<boolean>('has_permission', jwt, args),
-        pgRpc<boolean>('has_permission_by_facets', jwt, args),
-      ]);
-      expect(legacy.status).toBe(200);
-      expect(model.status).toBe(200);
-      if (legacy.data !== model.data) {
-        diffs.push(`${projectId} ${perm} legacy=${legacy.data} model=${model.data}`);
-      }
-    }
-  }
-  expect(diffs).toEqual([]);
+/** Los siete permisos vivos de quien llama en un proyecto, por has_permission. */
+async function perms(jwt: string, projectId: string): Promise<Perms> {
+  const entries = await Promise.all(
+    LIVE_PERMS.map(async (perm) => {
+      const res = await pgRpc<boolean>('has_permission', jwt, { p_project_id: projectId, p_perm: perm });
+      expect(res.status, perm).toBe(200);
+      return [perm, res.data] as const;
+    }),
+  );
+  return Object.fromEntries(entries) as Perms;
 }
 
 describe.skipIf(!envReady())('RLS: permisos por facetas', () => {
@@ -144,8 +142,41 @@ describe.skipIf(!envReady())('RLS: permisos por facetas', () => {
     standard = Object.fromEntries(facets.rows.map((row) => [row.key, row.id]));
   });
 
-  test('owner: has_permission y el modelo nuevo contestan igual en cada proyecto', async () => {
-    await assertEquivalent(adminJwt, projectIds);
+  test('owner: los siete permisos en cada proyecto de su espacio', async () => {
+    for (const projectId of projectIds) {
+      expect(Object.values(await perms(adminJwt, projectId)).every(Boolean), projectId).toBe(true);
+    }
+  });
+
+  test('contract: las tablas viejas, la paridad y can_manage_members no existen', async () => {
+    for (const table of ['project_membership', 'workspace_membership']) {
+      const res = await pgGet(table, adminJwt, new URLSearchParams({ select: '*', limit: '1' }));
+      expect(res.status, table).toBeGreaterThanOrEqual(400);
+    }
+    for (const rpc of ['has_permission_by_facets', 'access_parity_report']) {
+      const res = await pgRpc(rpc, adminJwt, { p_project_id: projectIds[0], p_perm: 'read:performance' });
+      expect(res.status, rpc).toBeGreaterThanOrEqual(400);
+    }
+    const columns: [string, string][] = [
+      ['workspace_role', 'permissions'],
+      ['workspace_role', 'access_level'],
+      ['membership', 'can_manage_members'],
+      ['access_preset', 'can_manage_members'],
+      ['project', 'owner_id'],
+    ];
+    for (const [table, column] of columns) {
+      const res = await pgGet(table, adminJwt, new URLSearchParams({ select: column, limit: '1' }));
+      expect(res.status, `${table}.${column}`).toBeGreaterThanOrEqual(400);
+    }
+    const dead = await pgRpc('has_permission', adminJwt, { p_project_id: projectIds[0], p_perm: 'edit:membership' });
+    expect(dead.status, 'una cadena muerta es un error, no un false').toBe(400);
+
+    const sources = await pgGet<{ source: string }>(
+      'membership_facet',
+      adminJwt,
+      new URLSearchParams({ select: 'source', source: 'not.in.(preset,override)' }),
+    );
+    expect(sources).toMatchObject({ status: 200, rows: [] });
   });
 
   test('vocabulario: las siete facetas estándar y la tabla de niveles decidida', async () => {
@@ -194,11 +225,6 @@ describe.skipIf(!envReady())('RLS: permisos por facetas', () => {
       const res = await pgGet(table, null, new URLSearchParams({ select: '*' }));
       expect(res.rows).toHaveLength(0);
     }
-    const rpc = await pgRpc('has_permission_by_facets', null, {
-      p_project_id: projectIds[0],
-      p_perm: 'read:performance',
-    });
-    expect(rpc.status).toBeGreaterThanOrEqual(400);
   });
 
   test('nadie escribe membresías ni facetas estándar por la API, ni el owner', async () => {
@@ -275,30 +301,6 @@ describe.skipIf(!envReady())('RLS: permisos por facetas', () => {
       expect(inserted.status).toBe(201);
     }
   });
-
-  test('la paridad global no está abierta a un usuario autenticado', async () => {
-    const res = await pgRpc('access_parity_report', adminJwt);
-    expect(res.status).toBeGreaterThanOrEqual(400);
-  });
-
-  test.skipIf(!process.env.SUPABASE_SERVICE_ROLE_KEY)(
-    'paridad global: ninguna diferencia en todo el sistema',
-    async () => {
-      const { url, anon } = requireEnv();
-      const key = process.env.SUPABASE_SERVICE_ROLE_KEY as string;
-      const res = await fetch(new URL('/rest/v1/rpc/access_parity_report', url), {
-        method: 'POST',
-        headers: {
-          apikey: anon,
-          Authorization: `Bearer ${key}`,
-          'content-type': 'application/json',
-        },
-        body: '{}',
-      });
-      expect(res.status).toBe(200);
-      expect(await res.json()).toEqual([]);
-    },
-  );
 
   describe.skipIf(!limitedEnvReady())('fixture limitada', () => {
     let limitedJwt: string;
@@ -381,8 +383,16 @@ describe.skipIf(!envReady())('RLS: permisos por facetas', () => {
       }
     });
 
-    test('performer: has_permission y el modelo nuevo contestan igual en cada proyecto', async () => {
-      await assertEquivalent(limitedJwt, projectIds);
+    test('ve la producción de su proyecto y nada más; en todo proyecto, estar es ver', async () => {
+      expect(await perms(limitedJwt, projectId)).toEqual(ONLY_SEES);
+      for (const id of projectIds) {
+        const p = await perms(limitedJwt, id);
+        const visible = await pgGet('project', limitedJwt, new URLSearchParams({ id: `eq.${id}`, select: 'id' }));
+        expect(p['read:performance'], `${id}: estar es ver (ADR-100 §2)`).toBe(visible.rows.length === 1);
+        for (const noun of ['performance', 'money', 'conversation'] as const) {
+          if (p[`edit:${noun}`]) expect(p[`read:${noun}`], `${id}: edit:${noun} implica leer`).toBe(true);
+        }
+      }
     });
 
     test('ve solo sus membresías; el admin ve las del espacio', async () => {
@@ -427,27 +437,14 @@ describe.skipIf(!envReady())('RLS: permisos por facetas', () => {
       expect(setting.status).toBeGreaterThanOrEqual(400);
     });
 
-    test('un override de Diners se refleja al instante en el acceso, en el bolo y en la tabla vieja', async () => {
+    test('un override de Diners se refleja al instante en el acceso y en el bolo', async () => {
       const diners = () => ownProjectFacets().then((rows) => rows.find((row) => row.facet_id === standard.diners));
-      const legacy = async () => {
-        const rows = await pgGet<ProjectMembershipRow>(
-          'project_membership',
-          adminJwt,
-          new URLSearchParams({
-            project_id: `eq.${projectId}`,
-            user_id: `eq.${limitedUserId}`,
-            select: 'roles,permission_grants,permission_revokes',
-          }),
-        );
-        return rows.rows[0];
-      };
       try {
         expect(await diners()).toBeUndefined();
 
         await setFacets(adminJwt, membership.membershipId, { diners: 'view' });
         expect(await diners()).toMatchObject({ verb: 'view', source: 'override' });
-        expect((await legacy()).permission_grants).toContain('read:money');
-        await assertEquivalent(limitedJwt, [projectId]);
+        expect(await perms(limitedJwt, projectId)).toEqual({ ...ONLY_SEES, 'read:money': true });
         if (boloId) {
           const bolo = await pgGet('bolo', limitedJwt, new URLSearchParams({ id: `eq.${boloId}`, select: 'id' }));
           expect(bolo.rows).toHaveLength(1);
@@ -455,8 +452,7 @@ describe.skipIf(!envReady())('RLS: permisos por facetas', () => {
 
         await setFacets(adminJwt, membership.membershipId, { diners: null });
         expect(await diners()).toBeUndefined();
-        expect((await legacy()).permission_revokes).toContain('read:money');
-        await assertEquivalent(limitedJwt, [projectId]);
+        expect(await perms(limitedJwt, projectId)).toEqual(ONLY_SEES);
         if (boloId) {
           const bolo = await pgGet('bolo', limitedJwt, new URLSearchParams({ id: `eq.${boloId}`, select: 'id' }));
           expect(bolo.rows).toHaveLength(0);
@@ -466,7 +462,7 @@ describe.skipIf(!envReady())('RLS: permisos por facetas', () => {
       }
     });
 
-    test('paquete en el proyecto: Coordinació da editar y Diners en lectura, y la paridad aguanta', async () => {
+    test('paquete en el proyecto: Coordinació da editar y Diners en lectura', async () => {
       try {
         await grantPreset(adminJwt, 'project', projectId, limitedUserId, 'coordinacio');
         const keyOf = Object.fromEntries(Object.entries(standard).map(([key, id]) => [id, key]));
@@ -476,15 +472,7 @@ describe.skipIf(!envReady())('RLS: permisos por facetas', () => {
           'materials:edit',
           'tecnica:edit',
         ]);
-        const perms = Object.fromEntries(
-          await Promise.all(
-            LIVE_PERMS.map(async (perm) => {
-              const res = await pgRpc<boolean>('has_permission', limitedJwt, { p_project_id: projectId, p_perm: perm });
-              return [perm, res.data] as const;
-            }),
-          ),
-        );
-        expect(perms).toEqual({
+        expect(await perms(limitedJwt, projectId)).toEqual({
           'read:performance': true,
           'edit:performance': true,
           'read:money': true,
@@ -492,9 +480,7 @@ describe.skipIf(!envReady())('RLS: permisos por facetas', () => {
           'read:conversation': true,
           'edit:conversation': true,
           'edit:project_meta': true,
-          'edit:membership': false,
         });
-        await assertEquivalent(limitedJwt, [projectId]);
       } finally {
         await restoreMembership();
       }
@@ -558,25 +544,9 @@ describe.skipIf(!envReady())('RLS: permisos por facetas', () => {
       }
     });
 
-    test('las tablas viejas no se escriben por la API, ni el owner', async () => {
-      const patched = await pgPatch(
-        'project_membership',
-        adminJwt,
-        { permission_grants: ['read:money'] },
-        new URLSearchParams({ project_id: `eq.${projectId}`, user_id: `eq.${limitedUserId}` }),
-      );
-      expect(patched.status).toBeGreaterThanOrEqual(400);
-      const inserted = await pgPost('project_membership', adminJwt, {
-        project_id: projectId,
-        user_id: adminUserId,
-        roles: [],
-      });
-      expect(inserted.status).toBeGreaterThanOrEqual(400);
-      await assertEquivalent(limitedJwt, [projectId]);
-    });
-
     test('paquetes: Equip en un bolo y techo del delegante', async () => {
       if (!boloId) return;
+      const before = await perms(limitedJwt, projectId);
       const granted = await pgRpc<string>('grant_container_preset', adminJwt, {
         p_level: 'bolo',
         p_container_id: boloId,
@@ -585,30 +555,35 @@ describe.skipIf(!envReady())('RLS: permisos por facetas', () => {
       });
       expect(granted.status).toBe(200);
 
-      const rows = await pgGet<MembershipFacetRow>(
-        'membership_facet',
-        limitedJwt,
-        new URLSearchParams({ membership_id: `eq.${granted.data}`, select: 'membership_id,facet_id,verb,source' }),
-      );
-      const keyOf = Object.fromEntries(Object.entries(standard).map(([key, id]) => [id, key]));
-      expect(rows.rows.map((row) => `${keyOf[row.facet_id]}:${row.verb}:${row.source}`).sort()).toEqual([
-        'comidas:view:preset',
-        'full_de_ruta:view:preset',
-        'logistica:view:preset',
-        'materials:view:preset',
-        'tecnica:view:preset',
-      ]);
+      try {
+        const rows = await pgGet<MembershipFacetRow>(
+          'membership_facet',
+          limitedJwt,
+          new URLSearchParams({ membership_id: `eq.${granted.data}`, select: 'membership_id,facet_id,verb,source' }),
+        );
+        const keyOf = Object.fromEntries(Object.entries(standard).map(([key, id]) => [id, key]));
+        expect(rows.rows.map((row) => `${keyOf[row.facet_id]}:${row.verb}:${row.source}`).sort()).toEqual([
+          'comidas:view:preset',
+          'full_de_ruta:view:preset',
+          'logistica:view:preset',
+          'materials:view:preset',
+          'tecnica:view:preset',
+        ]);
 
-      const ceiling = await pgRpc('grant_container_preset', limitedJwt, {
-        p_level: 'bolo',
-        p_container_id: boloId,
-        p_user_id: adminUserId,
-        p_preset: 'coordinacio',
-      });
-      expect(ceiling.status).toBeGreaterThanOrEqual(400);
+        const ceiling = await pgRpc('grant_container_preset', limitedJwt, {
+          p_level: 'bolo',
+          p_container_id: boloId,
+          p_user_id: adminUserId,
+          p_preset: 'coordinacio',
+        });
+        expect(ceiling.status).toBeGreaterThanOrEqual(400);
 
-      // Un paquete en el bolo no cambia el acceso de proyecto.
-      await assertEquivalent(limitedJwt, [projectId]);
+        // Un paquete en el bolo no cambia el acceso de proyecto.
+        expect(await perms(limitedJwt, projectId)).toEqual(before);
+      } finally {
+        // La fixture no tenía esta membresía de bolo: fuera, para no dejar estado.
+        await pgRpc('revoke_membership', adminJwt, { p_membership_id: granted.data });
+      }
     });
   });
 });

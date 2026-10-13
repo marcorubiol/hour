@@ -18,8 +18,9 @@ import {
  * - `my_mail_signature` devuelve solo lo de quien llama, y solo si es
  *   miembro; `set_my_mail_signature` escribe solo la propia, y vacía vuelve
  *   a la propuesta (NULL);
- * - `workspace_membership.mail_signature` no se escribe por PostgREST, y otro
- *   miembro no lee la tuya;
+ * - `membership.mail_signature` (la fila de espacio, desde el contract de
+ *   permisos 20261013300000) no se escribe por PostgREST, y otro miembro no
+ *   lee la tuya;
  * - la firma, la web y el teléfono de la compañía: los lee cualquier miembro y
  *   los escribe solo un admin.
  *
@@ -96,10 +97,10 @@ describe.skipIf(!envReady())('mail signature per person and company (ADR-099)', 
 
   test('the membership column is not writable through PostgREST', async () => {
     const upd = await pgPatch(
-      'workspace_membership',
+      'membership',
       jwt,
       { mail_signature: 'ZZZ direct' },
-      new URLSearchParams({ workspace_id: `eq.${workspaceId}` }),
+      new URLSearchParams({ level: 'eq.workspace', workspace_id: `eq.${workspaceId}` }),
     );
     expect(upd.status === 401 || upd.status === 403 || upd.rows.length === 0).toBe(true);
   });
@@ -131,9 +132,14 @@ describe.skipIf(!envReady())('mail signature per person and company (ADR-099)', 
       const theirs = await pgRpc<Parts[]>('my_mail_signature', other, { p_workspace_id: workspaceId });
       expect(theirs.data?.[0]?.signature ?? null).not.toBe('ZZZ solo mía');
       const rows = await pgGet<{ mail_signature: string | null }>(
-        'workspace_membership',
+        'membership',
         other,
-        new URLSearchParams({ select: 'mail_signature', workspace_id: `eq.${workspaceId}`, mail_signature: 'eq.ZZZ solo mía' }),
+        new URLSearchParams({
+          select: 'mail_signature',
+          level: 'eq.workspace',
+          workspace_id: `eq.${workspaceId}`,
+          mail_signature: 'eq.ZZZ solo mía',
+        }),
       );
       expect(rows.rows).toHaveLength(0);
     },

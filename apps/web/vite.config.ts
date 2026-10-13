@@ -197,6 +197,11 @@ export default defineConfig(({ mode }) => {
             setupFiles: ['./tests/rls/_setup.ts'],
             // 30s per test — login + a few PostgREST hits over the network.
             testTimeout: 30_000,
+            // Hooks do more round trips than a test (two logins, fixtures,
+            // grants). At vitest's 10s default, a slow remote (staging, run
+            // 38456825114) cut a beforeAll after its grant and the afterAll
+            // before its restore, and the next files inherited the grant.
+            hookTimeout: 60_000,
           },
         },
       ],

@@ -29,9 +29,10 @@ where w.id not in (
   )
   and exists (
     select 1
-    from public.workspace_membership m
+    from public.membership m
     join auth.users u on u.id = m.user_id
-    where m.workspace_id = w.id
+    where m.level = 'workspace'
+      and m.workspace_id = w.id
       and u.email in ('playwright@hour.test', 'limited@hour.test', 'external@hour.test')
   );
 
@@ -81,8 +82,8 @@ set name = excluded.name, domain = excluded.domain, city = excluded.city, update
 -- synthetic `muk-cia` and `marco-rubiol` stand in for real tenants it must
 -- never see; its difusión set lives in `playwright-difusion.sql`. The delete
 -- drops the admin rows an older version of this file wrote.
--- Desde la fase 3 de facetas el acceso se escribe en `membership`; las tablas
--- viejas (workspace_membership, project_membership) son su proyección.
+-- El acceso vive en `membership` (y `membership_facet`), la única fuente desde
+-- el contract de permisos (20261013300000).
 delete from public.membership m
 using auth.users u
 where u.id = m.user_id
@@ -107,8 +108,8 @@ values
   ('30000000-0000-4000-8000-000000000003', '20000000-0000-4000-8000-000000000002', 'mamemi', 'Synthetic MaMeMi Project', 'active', (select id from auth.users where email = 'playwright@hour.test'))
 on conflict (id) do update set name = excluded.name, status = excluded.status, updated_at = now(), deleted_at = null;
 
--- limited: intérprete en zzz-e2e-collab, ve la producción y nada más (lo
--- mismo que el rol performer daba antes de la fase 3).
+-- limited: intérprete en zzz-e2e-collab (la etiqueta), ve la producción y nada
+-- más (Mínim sin paquete: lo que daba el rol performer antes de la fase 3).
 insert into public.membership (workspace_id, level, project_id, user_id, roles, container_verb, accepted_at)
 select
   '20000000-0000-4000-8000-000000000001',
@@ -124,7 +125,6 @@ on conflict (project_id, user_id) where level = 'project' do update
 set roles = excluded.roles,
     container_verb = excluded.container_verb,
     can_edit_meta = false,
-    can_manage_members = false,
     preset = null,
     accepted_at = excluded.accepted_at;
 

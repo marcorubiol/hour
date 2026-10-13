@@ -171,24 +171,18 @@ describe.skipIf(!envReady())('RLS — update_workspace (ADR-062)', () => {
   );
 
   test.runIf(limitedEnvReady())(
-    'the performer role grants only its declared project capability',
+    'the limited fixture sees the production and nothing else; dead permission strings are an error',
     async () => {
-      const internalNotes = await pgRpc<boolean>('has_permission', limitedJwt, {
-        p_project_id: projectId,
-        p_perm: 'read:internal_notes',
-      });
-      const money = await pgRpc<boolean>('has_permission', limitedJwt, {
-        p_project_id: projectId,
-        p_perm: 'read:money',
-      });
-      const membership = await pgRpc<boolean>('has_permission', limitedJwt, {
-        p_project_id: projectId,
-        p_perm: 'edit:membership',
-      });
+      const ask = (perm: string) =>
+        pgRpc<boolean>('has_permission', limitedJwt, { p_project_id: projectId, p_perm: perm });
 
-      expect(internalNotes).toMatchObject({ status: 200, data: true });
-      expect(money).toMatchObject({ status: 200, data: false });
-      expect(membership).toMatchObject({ status: 200, data: false });
+      expect(await ask('read:performance')).toMatchObject({ status: 200, data: true });
+      expect(await ask('read:money')).toMatchObject({ status: 200, data: false });
+      // The permissions contract (20261013300000) retired these strings: an
+      // unknown permission raises 22023 instead of a silent false.
+      for (const dead of ['read:internal_notes', 'edit:membership', 'admin:project']) {
+        expect((await ask(dead)).status, dead).toBe(400);
+      }
     },
   );
 

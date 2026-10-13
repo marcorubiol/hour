@@ -82,39 +82,31 @@ datos de producción. El restore drill desde R2 también está automatizado.
 - `account` representa quien paga; puede contener varios workspaces.
 - `account_membership` controla ownership/facturación.
 - `workspace` es el tenant y el límite de RLS.
-- `workspace_membership` dice si un usuario pertenece y su nivel
-  `owner|admin|member|viewer|guest`.
-- `project_membership` contiene `roles[]`, `permission_grants[]` y
-  `permission_revokes[]` por proyecto.
-- `workspace_role` es el catálogo editable de roles del workspace.
+- `membership` es el acceso, una fila por persona con login y contenedor
+  (espacio, proyecto, línea, bolo, función; ADR-082, ADR-100). La de espacio
+  lleva el rol `owner|admin|member|viewer|guest` y la firma de correo de la
+  persona en ese espacio; las demás, `container_verb` (`view|edit`), que es
+  obligatorio: estar es ver.
+- `membership_facet` da facetas (`view|edit`) por membresía: Converses,
+  Materials, Tècnica, Logística, Full de ruta, Comidas, Diners y las propias
+  del espacio. Las escriben los paquetes (Mínim, Equip, Coordinació, Direcció)
+  y los overrides, siempre por RPC y con el techo del delegante (ADR-085 §10).
+- `workspace_role` es el catálogo editable de roles del workspace, como
+  etiquetas (`membership.roles`): no dan acceso.
 
-Permiso efectivo:
+Las políticas y las RPC preguntan `has_permission(project, permiso)`, con siete
+permisos:
 
 ```text
-union(permisos de roles) + grants explícitos - revokes explícitos
+read:performance   edit:performance    container_verb del proyecto
+read:money         edit:money          faceta Diners
+read:conversation  edit:conversation   faceta Converses
+edit:project_meta                      can_edit_meta
 ```
 
-Owner/admin del workspace tienen bypass por proyecto. El vocabulario cerrado
-actual es:
-
-```text
-read:money
-read:performance
-read:conversation
-read:person_note_private
-read:internal_notes
-edit:performance
-edit:conversation
-edit:money
-edit:project_meta
-edit:membership
-admin:project
-```
-
-`read:performance` separa lectura y escritura. `edit:performance` implica lectura
-para conservar compatibilidad, pero un performer/guest asignado puede leer su
-producción sin obtener escritura. Owner/admin acceden a todos los proyectos del
-workspace; el resto solo a proyectos con `project_membership` explícita.
+Una cadena desconocida es un error. Owner/admin del workspace tienen bypass y
+acceden a todos los proyectos; el resto, solo a los proyectos donde tiene
+membresía. Modelo completo y transición: `build/permissions-facets-plan.md`.
 
 ### Persona portable sin expediente global compartido
 

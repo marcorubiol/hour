@@ -102,19 +102,18 @@ BEGIN
 
   -- Its own space only (§ 31). It is the workspace owner there; the
   -- membership row is kept accepted so the auth hook issues the claim.
-  UPDATE workspace_membership
-     SET accepted_at = COALESCE(accepted_at, now()), updated_at = now()
-   WHERE workspace_id = v_workspace_id AND user_id = v_admin_id;
+  UPDATE membership
+     SET accepted_at = COALESCE(accepted_at, now())
+   WHERE level = 'workspace' AND workspace_id = v_workspace_id AND user_id = v_admin_id;
   IF NOT FOUND THEN
     RAISE EXCEPTION 'playwright@hour.test has no membership in its own workspace.';
   END IF;
 
-  INSERT INTO workspace_membership (workspace_id, user_id, role, accepted_at)
-  VALUES (v_workspace_id, v_limited_id, 'member', now())
-  ON CONFLICT (workspace_id, user_id) DO UPDATE
-    SET role = EXCLUDED.role,
-        accepted_at = COALESCE(workspace_membership.accepted_at, now()),
-        updated_at = now();
+  INSERT INTO membership (workspace_id, level, user_id, workspace_role, accepted_at)
+  VALUES (v_workspace_id, 'workspace', v_limited_id, 'member', now())
+  ON CONFLICT (workspace_id, user_id) WHERE level = 'workspace' DO UPDATE
+    SET workspace_role = EXCLUDED.workspace_role,
+        accepted_at = COALESCE(membership.accepted_at, now());
 
   SELECT id INTO v_project_id
   FROM project
@@ -123,16 +122,18 @@ BEGIN
     RAISE EXCEPTION 'zzz-e2e-collab project fixture is missing.';
   END IF;
 
-  INSERT INTO project_membership (
-    project_id, user_id, roles, permission_grants, permission_revokes
-  ) VALUES (
-    v_project_id, v_limited_id, ARRAY['performer'], '{}', '{}'
-  )
-  ON CONFLICT (project_id, user_id) DO UPDATE
+  -- Performer as a label; sees the production and nothing else (no facets).
+  INSERT INTO membership (workspace_id, level, project_id, user_id, roles, container_verb, accepted_at)
+  VALUES (v_workspace_id, 'project', v_project_id, v_limited_id, ARRAY['performer'], 'view', now())
+  ON CONFLICT (project_id, user_id) WHERE level = 'project' DO UPDATE
     SET roles = EXCLUDED.roles,
-        permission_grants = EXCLUDED.permission_grants,
-        permission_revokes = EXCLUDED.permission_revokes,
-        updated_at = now();
+        container_verb = EXCLUDED.container_verb,
+        can_edit_meta = false,
+        preset = NULL;
+  DELETE FROM membership_facet mf
+  USING membership m
+  WHERE mf.membership_id = m.id AND m.level = 'project'
+    AND m.project_id = v_project_id AND m.user_id = v_limited_id;
 
   RAISE NOTICE 'Admin and limited fixtures wired';
 END $$;

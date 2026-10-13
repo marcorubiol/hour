@@ -188,6 +188,10 @@ describe.skipIf(!envReady() || !limitedEnvReady())('the payer is the organizatio
   });
 
   afterAll(async () => {
+    // El acceso de la fixture compartida se devuelve lo primero: si el resto de
+    // la limpieza se queda sin tiempo, los ficheros siguientes no deben
+    // heredar a la limitada editando dinero (staging, run 38456825114).
+    if (membership) await restoreProjectAccess(jwt, projectId, otherSub, membership);
     for (const id of invoices) {
       // Issued ones go back to draft first: delete_invoice only takes drafts.
       await pgRpc('update_invoice', jwt, { p_invoice_id: id, p_patch: { status: 'draft' } }).catch(() => undefined);
@@ -205,7 +209,6 @@ describe.skipIf(!envReady() || !limitedEnvReady())('the payer is the organizatio
     // servicio no tiene grant en `fiscal_identity`. La pasada siguiente la
     // reutiliza y la reescribe.
     if (originalSetting !== undefined) await setSetting(originalSetting);
-    if (membership) await restoreProjectAccess(jwt, projectId, otherSub, membership);
   });
 
   test('list_money_payer_organizations: a private conversation\'s organization is only its owner\'s', async () => {

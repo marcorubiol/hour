@@ -153,6 +153,8 @@ describe.skipIf(!envReady() || !limitedEnvReady())(
     });
 
     afterAll(async () => {
+      // El acceso de la fixture compartida, lo primero (ver money-payer-organization).
+      if (membership) await restoreProjectAccess(jwt, projectId, otherSub, membership);
       for (const id of invoices) {
         await pgRpc('delete_invoice', jwt, { p_invoice_id: id }).catch(() => undefined);
       }
@@ -163,7 +165,6 @@ describe.skipIf(!envReady() || !limitedEnvReady())(
         );
       }
       if (originalSetting !== undefined) await setSetting(originalSetting);
-      if (membership) await restoreProjectAccess(jwt, projectId, otherSub, membership);
     });
 
     test('list_money_payer_organizations: the owner sees the organization, another money editor does not', async () => {

@@ -2,7 +2,8 @@
  * GET /api/workspaces
  *
  * Lists workspaces visible to the caller. RLS gates this to workspaces the
- * user has an accepted membership in (workspace_membership.accepted_at).
+ * user has an accepted membership in (the workspace row of
+ * `membership`, `accepted_at` set).
  * Cross-account memberships supported (ADR-029): one user crosses N
  * workspaces belonging to N accounts.
  *

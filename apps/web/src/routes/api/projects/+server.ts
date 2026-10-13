@@ -2,8 +2,9 @@
  * GET /api/projects
  *
  * Lists projects (productions) the caller has membership-based access to.
- * RLS scopes by workspace_membership (ADR-029) — user sees projects of any
- * workspace they belong to, not just `current_workspace_id`. The same
+ * RLS scopes by `can_access_project` over `membership` (ADR-029, ADR-082):
+ * owner/admin of the workspace, or a project membership, in any workspace
+ * the user belongs to, not just `current_workspace_id`. The same
  * cache (`['projects', { status: 'active' }]`) is consumed by Plaza,
  * LineList, the project detail page, and Today widgets.
  *
