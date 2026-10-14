@@ -421,16 +421,12 @@
   1. Google Workspace / Microsoft 365 por OAuth (el carril 1; con dominio propio funciona igual).
   2. **IMAP/SMTP** para el resto (hosting propio, IONOS, cPanel…): lee por IMAP y envía por su SMTP, con contraseña
      de aplicación cifrada en Hour. Siguiente conector tras Google. Riesgo a probar: IMAP desde Cloudflare Workers.
-  3. **Envío propio de Hour en bloque** (Postmark, SES o Resend) con el dominio de la compañía verificado por SPF/DKIM,
+  3. **Envío propio de Hour en bloque** (Amazon SES, un tenant por compañía; ADR-109) con el dominio de la compañía verificado por SPF/DKIM,
      para campañas. **Llega pronto, Marco lo quiere en breve.** Antes: entregabilidad, cómo vuelven las respuestas a
      Hour y al buzón de la compañía, bajas, y la LSSI (consentimiento previo también entre empresas; pregunta abierta al
      abogado).
-     - [ ] **Editor de mailing visual para las campañas, del nivel de Brevo** (drop 11-10): bloques arrastrables (texto, imagen, botón, dossier o vídeo de la obra), plantillas por compañía con su marca, vista previa en móvil y escritorio, y personalización con los datos del contacto y de la sala. Espera al proveedor del envío en bloque.
-  - Marco: decidir — **Proveedor y cuenta del envío en bloque** (informe `research/infra/2026-10-11-envio-en-bloque.md`).
-    Proveedor: a) Amazon SES con un tenant por compañía (recomendada: UE, aislamiento y coste); b) Emailit (cuenta de
-    Marco); c) Mailgun. Cuenta: a) las dos vías, por defecto la de Hour con cada compañía aislada y, si quiere, la suya
-    propia con su clave (recomendada); b) solo la de Hour; c) solo la de cada compañía. Ante la LSSI responde la
-    compañía, en cuyo nombre se envía (art. 20); ante el proveedor, el titular de la cuenta.
+     - [ ] **Editor de mailing visual para las campañas, del nivel de Brevo** (drop 11-10): bloques arrastrables (texto, imagen, botón, dossier o vídeo de la obra), plantillas por compañía con su marca, vista previa en móvil y escritorio, y personalización con los datos del contacto y de la sala. Proveedor decidido (ADR-109): va después del envío.
+  - [ ] **Envío en bloque: plan escrito antes de código** (Marco, 2026-10-14, ADR-109): SES en la UE con un tenant por compañía; por defecto la cuenta de Hour, y la compañía que quiera, la suya propia con su clave. Cubre DNS de cada compañía (DKIM, return-path, DMARC), baja en un clic (RFC 8058), cómo vuelven las respuestas y los eventos (SNS/EventBridge). Informe: `research/infra/2026-10-11-envio-en-bloque.md`.
 ## Después de money v3 — contenedores (bloque 5)
 
 12. [ ] **Revisión diseño+datos — contenedores.** Portada de workspace, project

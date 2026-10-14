@@ -3600,3 +3600,19 @@ quedan para cuando haga falta.
 
 **Cuidado.** Que Hour invite por email a una persona que no lo pidió puede ser comunicación comercial de Hour: se
 invita por el email genérico de la sala o a través de la compañía que ya trata con ella.
+
+## [2026-10-14] ADR-109 · Envío en bloque: Amazon SES con un tenant por compañía, cuenta de Hour o la propia
+
+**Contexto.** El tercer conector de correo (`_tasks.md`, «Correo con el dominio propio de cada compañía») envía
+campañas con el dominio de cada compañía. Informe: `research/infra/2026-10-11-envio-en-bloque.md`.
+
+**Decisión (Marco, 2026-10-14).**
+1. **Proveedor: Amazon SES**, en una región de la UE, con un tenant por compañía: reputación y pausa propias, de modo
+   que una compañía con quejas no arrastra a las demás. Por coste (unos 55 $ al mes a 500.000 envíos, según el
+   informe), datos en la UE y aislamiento. Descartados Emailit y Mailgun.
+2. **Cuenta: las dos vías.** Por defecto envía la cuenta de Hour, con cada compañía aislada en su tenant; la compañía
+   que quiera puede conectar su propia cuenta con su clave. Ante la LSSI responde la compañía, en cuyo nombre se envía
+   (art. 20); ante el proveedor, el titular de la cuenta.
+
+**Pendiente.** Plan escrito antes de código (DNS de cada compañía, baja en un clic, respuestas y eventos). La pregunta
+de la LSSI entre empresas sigue abierta para el abogado.
