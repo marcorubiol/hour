@@ -44,7 +44,7 @@ de Phase 0.9 en `_tasks.md`. Pricing orientativo, no decidido.
   es solo `membership` + `membership_facet`; fuera `workspace_membership`, `project_membership`, el espejo, la
   paridad y `workspace_role.permissions`; la firma vive en `membership.mail_signature`. El primer apply (run
   38471454184) abortó sin cambios: el esquema de archivo `hour_backup_20260720`, solo de producción, sujetaba un
-  tipo; borrado (estaba en el backup). Producción ya no tiene esquemas que no vengan de las migraciones. El directorio tiene 6.802 salas. Las migraciones van por `production-migrate.yml`: backup, plan, apply (`_tasks.md § 34`).
+  tipo; borrado (estaba en el backup). Producción ya no tiene esquemas que no vengan de las migraciones. El directorio tiene 6.802 salas. Las migraciones van por `production-migrate.yml`: backup, plan, apply (`_notes/tasks-archive.md § 34`).
 - `hour-staging` (ref `slccyknqpgmzhyiyclsq`, `eu-west-1`): reconstruido el 2026-10-13 con el contract de permisos
   (run 38469017859: RLS 309/313, smoke 2/2). Se volverá a pausar sin uso.
 - Últimas suites contra producción (2026-10-14, `8884feb`): RLS 306/313 (7 saltados) y E2E 63/66; los dos rojos

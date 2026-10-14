@@ -40,4 +40,5 @@ Ficha del proyecto:
   `idea` · Mesa: proyectos/hour (https://claude.ai/artifact/NsscS7X5U6ixvvFB8Fmnmj)
 - Diferencias: no hay `ROADMAP.md` (Marco, 2026-10-09): el roadmap y la lista de tareas son el mismo `_tasks.md`, que
   el Drop publica como `roadmap.md`; lo aparcado vive en sus secciones de después, no en «Sin versión». Un commit que
-  solo toca la cola o el CHANGELOG va directo a `main` con push en el mismo paso.
+  solo toca la cola o el CHANGELOG va directo a `main` con push en el mismo paso. Lo cerrado de la cola está en
+  `_notes/tasks-archive.md` (2026-10-14): antes de proponer algo, buscarlo ahí y en `CHANGELOG.md`.
