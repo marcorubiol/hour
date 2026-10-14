@@ -12,7 +12,12 @@
  */
 
 import { pgGet, type SupabaseEnv } from '$lib/supabase';
-import { BOARD_MESSAGE_LIMIT, type ThreadMessage } from '$lib/threads';
+import {
+  BOARD_MESSAGE_LIMIT,
+  conversationThread,
+  type ConversationThreadView,
+  type ThreadMessage,
+} from '$lib/threads';
 
 const MESSAGE_SELECT = 'id,thread_id,author_id,performance_id,body,created_at,edited_at';
 
@@ -67,5 +72,42 @@ export async function loadThreadMessages(
     authors,
     reads: Object.fromEntries(reads.data.map((r) => [r.thread_id, r.last_read_at])),
     truncated,
+  };
+}
+
+/**
+ * El hilo del equipo de una conversación, con sus mensajes. `null` si quien
+ * llama no lee la conversación (no existe, borrada, sin Converses o privada de
+ * otro): un hilo de conversación se lee exactamente cuando se lee ella
+ * (`private.can_read_conversation`), y aquí no se anuncia ni vacío.
+ *
+ * La conversación y el hilo, por la RLS del que llama y a la vez: si se ve la
+ * conversación, se ve su hilo (la misma regla en las dos políticas).
+ */
+export async function loadConversationThread(
+  env: SupabaseEnv,
+  jwt: string,
+  me: string,
+  conversationId: string,
+): Promise<ConversationThreadView | null> {
+  const [conv, threads] = await Promise.all([
+    pgGet<{ id: string }>(env, 'conversation', jwt, {
+      search: { select: 'id', id: `eq.${conversationId}`, deleted_at: 'is.null' },
+    }),
+    pgGet<{ id: string; last_message_at: string | null }>(env, 'thread', jwt, {
+      search: { select: 'id,last_message_at', conversation_id: `eq.${conversationId}` },
+    }),
+  ]);
+  if (conv.data.length === 0) return null;
+
+  const row = threads.data[0] ?? null;
+  const loaded = await loadThreadMessages(env, jwt, row ? [row.id] : []);
+  // Del más antiguo al más nuevo, como se lee.
+  const messages = [...loaded.messages].reverse();
+  return {
+    me,
+    thread: conversationThread(row, messages, me, row ? loaded.reads[row.id] : null),
+    ...loaded,
+    messages,
   };
 }

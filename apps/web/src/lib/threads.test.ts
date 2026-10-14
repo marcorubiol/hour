@@ -6,6 +6,7 @@ import {
   audienceLine,
   boardLayout,
   boloPlace,
+  conversationThread,
   facetName,
   firstUnreadId,
   isUnread,
@@ -13,6 +14,7 @@ import {
   messagesByThread,
   performanceOptions,
   performanceTag,
+  teamTimeline,
   threadKey,
   type BoardPerformance,
   type ThreadMessage,
@@ -190,6 +192,56 @@ describe('forma', () => {
     expect(boloPlace({ venue_name: 'Cuarta Pared', city: 'Madrid' })).toBe('Cuarta Pared · Madrid');
     expect(boloPlace({ venue_name: null, city: 'Madrid' })).toBe('Madrid');
     expect(boloPlace({ venue_name: null, city: null })).toBe('');
+  });
+});
+
+describe('el hilo del equipo de una conversación', () => {
+  test('sin hilo todavía: General de la conversación, vacío y sin id', () => {
+    expect(conversationThread(null, [], ME, null)).toEqual({
+      thread_id: null,
+      facet_id: null,
+      facet_key: null,
+      label: null,
+      labels: {},
+      message_count: 0,
+      unread_count: 0,
+      last_message_at: null,
+    });
+  });
+  test('cuenta como bolo_board: lo ajeno posterior a la lectura, nunca lo propio', () => {
+    const list = [
+      msg('a', '2026-10-14T08:00:00Z'),
+      msg('b', '2026-10-14T09:00:00Z', ME),
+      msg('c', '2026-10-14T10:00:00Z'),
+    ];
+    const th = conversationThread({ id: 't1', last_message_at: '2026-10-14T10:00:00Z' }, list, ME, '2026-10-14T08:30:00Z');
+    expect(th).toMatchObject({ thread_id: 't1', facet_id: null, message_count: 3, unread_count: 1 });
+    expect(conversationThread({ id: 't1', last_message_at: null }, list, ME, null).unread_count).toBe(2);
+  });
+});
+
+describe('la vista «hilo»: registro y equipo en una línea', () => {
+  const ev = (id: string, at: string) => ({ id, occurred_at: at });
+  test('del más antiguo al más nuevo, cada cosa con lo que es', () => {
+    const line = teamTimeline(
+      [ev('e2', '2026-10-14T12:00:00Z'), ev('e1', '2026-10-14T08:00:00Z')],
+      [msg('m1', '2026-10-14T09:00:00Z'), msg('m2', '2026-10-14T13:00:00Z')],
+    );
+    expect(line.map((x) => (x.kind === 'event' ? `e:${x.event.id}` : `m:${x.message.id}`))).toEqual([
+      'e:e1',
+      'm:m1',
+      'e:e2',
+      'm:m2',
+    ]);
+  });
+  test('a la misma hora, lo de fuera primero: el equipo comenta lo que llegó', () => {
+    const at = '2026-10-14T10:00:00Z';
+    const line = teamTimeline([ev('e1', at)], [msg('m1', at)]);
+    expect(line.map((x) => x.kind)).toEqual(['event', 'message']);
+  });
+  test('sin equipo, el registro tal cual; sin registro, el equipo tal cual', () => {
+    expect(teamTimeline([ev('e1', '2026-10-14T10:00:00Z')], []).map((x) => x.kind)).toEqual(['event']);
+    expect(teamTimeline([], [msg('m1', '2026-10-14T10:00:00Z')]).map((x) => x.kind)).toEqual(['message']);
   });
 });
 

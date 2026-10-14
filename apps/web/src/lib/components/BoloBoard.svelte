@@ -9,15 +9,18 @@
    * Sin dinero: la cabecera es sala, ciudad y funciones (`bolo_board`).
    * Sin realtime (ADR-083 §2): se recarga al volver a la pestaña y cada 30 s
    * mientras se ve. Lo nuevo se marca leído cuando el tablón está a la vista;
-   * la raya de «nuevos» se queda donde estaba al abrir la ficha.
+   * la raya de «nuevos» se queda donde estaba al abrir la ficha
+   * (`thread-reading.svelte.ts`, lo mismo que el hilo de una conversación).
    */
 
   import { createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
-  import { fetchJSON, mutateJSON } from '$lib/api';
+  import { fetchJSON } from '$lib/api';
   import ThreadBlock from '$lib/components/ThreadBlock.svelte';
   import { t, type Locale } from '$lib/i18n';
+  import { markReadWhenSeen, readAtOpen } from '$lib/thread-reading.svelte';
   import {
+    THREAD_REFRESH_MS,
     boardLayout,
     boloPlace,
     facetName,
@@ -39,9 +42,6 @@
 
   let { performanceId, workspaceSlug, tz, locale }: Props = $props();
 
-  /** ADR-083 §2: sin realtime; la cifra es la del plan, sin medir. */
-  const REFRESH_MS = 30_000;
-
   const queryClient = useQueryClient();
   let queryKey = $derived(['bolo-board', performanceId] as const);
 
@@ -51,7 +51,7 @@
       enabled: Boolean(performanceId),
       // Siempre viejo: volver a la pestaña recarga (refetchOnWindowFocus).
       staleTime: 0,
-      refetchInterval: REFRESH_MS,
+      refetchInterval: THREAD_REFRESH_MS,
       queryFn: ({ signal }: { signal: AbortSignal }) =>
         fetchJSON<BoardView>(`/api/boards/${performanceId}`, signal),
     })),
@@ -60,16 +60,9 @@
   let board = $derived($boardQuery.data ?? null);
   let byThread = $derived(messagesByThread(board?.messages ?? []));
 
-  /**
-   * Hasta dónde había leído cada hilo AL ABRIR la ficha. Se apunta la primera
-   * vez que se ve el hilo y no cambia al marcarlo leído: si cambiase, la raya
-   * de «nuevos» desaparecería a los 30 s, mientras se lee. Un Map sin estado a
-   * propósito: es memoria de esta visita, no algo que repinte.
-   */
-  const openedAt = new Map<string, string | null>();
+  const readAt = readAtOpen();
   function newSince(view: BoardView, key: string, threadId: string | null): string | null {
-    if (!openedAt.has(key)) openedAt.set(key, (threadId && view.reads[threadId]) || null);
-    return openedAt.get(key) ?? null;
+    return readAt(key, threadId, view.reads);
   }
 
   // ── plegar ─────────────────────────────────────────────────────────────
@@ -100,28 +93,10 @@
 
   // ── leído ──────────────────────────────────────────────────────────────
   let sectionEl = $state<HTMLElement>();
-  let inView = $state(false);
-
-  $effect(() => {
-    if (!sectionEl) return;
-    const io = new IntersectionObserver(([entry]) => (inView = entry.isIntersecting), { threshold: 0.15 });
-    io.observe(sectionEl);
-    return () => io.disconnect();
-  });
-
-  /** Lo ya pedido por hilo y último mensaje: una marca por novedad, no una por recarga. */
-  const marked = new Set<string>();
-
-  $effect(() => {
-    if (!board || !inView || document.visibilityState !== 'visible') return;
-    const pending = board.threads.filter(
-      (th) => th.thread_id && th.unread_count > 0 && !marked.has(`${th.thread_id}@${th.last_message_at}`),
-    );
-    if (pending.length === 0) return;
-    for (const th of pending) marked.add(`${th.thread_id}@${th.last_message_at}`);
-    void Promise.allSettled(
-      pending.map((th) => mutateJSON('POST', `/api/threads/${th.thread_id}/read`)),
-    ).then(() => queryClient.invalidateQueries({ queryKey }));
+  markReadWhenSeen({
+    target: () => sectionEl,
+    threads: () => board?.threads ?? [],
+    onmarked: refresh,
   });
 
   function refresh() {
