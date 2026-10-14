@@ -30,7 +30,7 @@ Ficha del proyecto:
 - **Repo público:** sí. No escribas en git nada que no pueda ser público (claves, estado interno de carriles).
 
 ## Producto
-- Skill: producto al día con: 2026-10-14.3. Coordinación: skill coordinador sólo con carriles.
+- Skill: producto al día con: 2026-10-14.4. Coordinación: skill coordinador sólo con carriles.
 - Checkout principal: `/Users/marcorubiol/Developer/hour`
 - Estado: `/Users/marcorubiol/Developer/hour/build/coordination/STATUS.md`
 - Roadmap: `_tasks.md` · CHANGELOG: `CHANGELOG.md` (raíz, por meses) · Tareas: `_tasks.md`
