@@ -1579,9 +1579,6 @@
   "mail.thread": "Fil",
   "mail.write": "Écrire un e-mail",
   "mail.log_other": "Noter un appel, une réunion ou une note",
-  "mail.team_later_thread": "Ce que l'équipe dit en interne apparaîtra dans ce fil quand les fils d'équipe arriveront.",
-  "mail.inside_team": "En interne · équipe",
-  "mail.team_later": "Le fil d'équipe arrive avec les fils. Ce qui s'y dit ne sort pas de Hour.",
   "mail.last_contact": "Dernier contact",
   "mail.next_step": "Prochaine étape",
   "mail.private_label": "Conversation privée",
@@ -1666,5 +1663,8 @@
   "threads.board_error": "Impossible de charger le tableau.",
   "threads.truncated": "Seuls les messages les plus récents sont affichés.",
   "threads.no_messages": "aucun message",
-  "threads.write": "Écrire"
+  "threads.write": "Écrire",
+  "threads.team": "Équipe",
+  "threads.team_only": "Équipe seulement",
+  "threads.team_error": "Impossible de charger le fil de l'équipe."
 }

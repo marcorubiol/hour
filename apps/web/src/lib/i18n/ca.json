@@ -1579,9 +1579,6 @@
   "mail.thread": "Fil",
   "mail.write": "Escriure correu",
   "mail.log_other": "Apuntar una trucada, una reunió o una nota",
-  "mail.team_later_thread": "El que l'equip parli per dins apareixerà en aquest fil quan arribin els fils de l'equip.",
-  "mail.inside_team": "Per dins · equip",
-  "mail.team_later": "El fil de l'equip arriba amb els fils. El que es parli aquí no surt de Hour.",
   "mail.last_contact": "Darrer contacte",
   "mail.next_step": "Següent pas",
   "mail.private_label": "Conversa privada",
@@ -1666,5 +1663,8 @@
   "threads.board_error": "No s’ha pogut carregar el tauler.",
   "threads.truncated": "Només es mostren els missatges més recents.",
   "threads.no_messages": "sense missatges",
-  "threads.write": "Escriure"
+  "threads.write": "Escriure",
+  "threads.team": "Equip",
+  "threads.team_only": "Només l'equip",
+  "threads.team_error": "No s'ha pogut carregar el fil de l'equip."
 }

@@ -4,7 +4,8 @@
  * por eso con sus tests.
  *
  * El tablón del bolo (fase 2) lee por `bolo_board` y los mensajes de sus hilos
- * de una vez; escribe por las RPC (`post_message`, `edit_message`,
+ * de una vez; el hilo del equipo de una conversación (fase 3) lee su único
+ * hilo por la RLS de `thread`. Los dos escriben por las RPC (`post_message`, `edit_message`,
  * `delete_message`, `mark_thread_read`). La línea de audiencia la da
  * `thread_audience`, y no se pliega nunca (ADR-083, enmienda §6).
  */
@@ -18,6 +19,9 @@ export const MESSAGE_MAX = 10_000;
 
 /** Cuántos mensajes trae el tablón como mucho (los más recientes). */
 export const BOARD_MESSAGE_LIMIT = 500;
+
+/** Sin realtime (ADR-083 §2): una pantalla abierta recarga sus hilos cada tanto. La cifra es la del plan, sin medir. */
+export const THREAD_REFRESH_MS = 30_000;
 
 export type AnchorKind = 'bolo' | 'conversation';
 
@@ -80,6 +84,20 @@ export interface BoardView extends BoloBoard {
   /** thread_id → hasta dónde había leído el que mira. */
   reads: Record<string, string>;
   /** Hay más mensajes de los que se trajeron (`BOARD_MESSAGE_LIMIT`). */
+  truncated: boolean;
+}
+
+/**
+ * Lo que devuelve `GET /api/conversations/:id/thread`: el hilo del equipo de
+ * una conversación (sin faceta: lo lee quien lee la conversación, privacidad
+ * incluida) con sus mensajes. `thread.thread_id` null: nadie ha escrito aún.
+ */
+export interface ConversationThreadView {
+  me: string;
+  thread: BoardThread;
+  messages: ThreadMessage[];
+  authors: Record<string, string>;
+  reads: Record<string, string>;
   truncated: boolean;
 }
 
@@ -249,6 +267,56 @@ export function boardLayout<T extends Pick<BoardThread, 'facet_id' | 'message_co
     else folded.push(th);
   }
   return { open: [...fresh, ...talked, ...unfolded], folded };
+}
+
+/**
+ * El hilo del equipo de una conversación con la forma de un hilo del tablón:
+ * General de su ancla, con recuento y no leídos contados como `bolo_board`
+ * (lo ajeno posterior a la lectura). Los mensajes, los que se trajeron.
+ */
+export function conversationThread(
+  thread: { id: string; last_message_at: string | null } | null,
+  messages: ThreadMessage[],
+  me: string,
+  lastReadAt: string | null | undefined,
+): BoardThread {
+  return {
+    thread_id: thread?.id ?? null,
+    facet_id: null,
+    facet_key: null,
+    label: null,
+    labels: {},
+    message_count: messages.length,
+    unread_count: messages.filter((m) => isUnread(m, me, lastReadAt)).length,
+    last_message_at: thread?.last_message_at ?? null,
+  };
+}
+
+/** Un paso de la vista «hilo» de una conversación: lo hablado con fuera o un mensaje del equipo. */
+export type TimelineEntry<E> =
+  | { kind: 'event'; at: string; event: E }
+  | { kind: 'message'; at: string; message: ThreadMessage };
+
+/**
+ * La vista «hilo» (ADR-099 §5): el registro con fuera y el hilo del equipo en
+ * una sola línea, del más antiguo al más nuevo. Presentación, no un modelo:
+ * cada cosa sigue siendo lo que es. A la misma hora, lo de fuera primero (el
+ * equipo suele comentar lo que llegó).
+ */
+export function teamTimeline<E extends { id: string; occurred_at: string }>(
+  events: E[],
+  messages: ThreadMessage[],
+): TimelineEntry<E>[] {
+  const out: TimelineEntry<E>[] = [
+    ...events.map((event) => ({ kind: 'event' as const, at: event.occurred_at, event })),
+    ...messages.map((message) => ({ kind: 'message' as const, at: message.created_at, message })),
+  ];
+  const id = (x: TimelineEntry<E>) => (x.kind === 'event' ? x.event.id : x.message.id);
+  return out.sort(
+    (a, b) =>
+      Date.parse(a.at) - Date.parse(b.at) ||
+      (a.kind === b.kind ? id(a).localeCompare(id(b)) : a.kind === 'event' ? -1 : 1),
+  );
 }
 
 /** El nombre del bolo sin título propio (no lo tiene): sala y ciudad. */

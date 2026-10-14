@@ -6,9 +6,12 @@
    * conmutables que son presentación, no dos modelos:
    *  - «registro»: lo hablado con fuera a la izquierda, el hilo del equipo al
    *    lado;
-   *  - «hilo»: todo junto en una sola línea, de lo más antiguo a lo más nuevo.
-   * El hilo del equipo llega con el carril 2 (hilos con facetas); hasta
-   * entonces su sitio dice que todavía no existe, sin inventar mensajes.
+   *  - «hilo»: todo junto en una sola línea, de lo más antiguo a lo más nuevo,
+   *    cada mensaje del equipo con su marca «Solo el equipo».
+   * El hilo del equipo (ADR-106) lo lee quien lee la conversación, privacidad
+   * incluida. Como el tablón: sin realtime, se recarga al volver a la pestaña
+   * y cada 30 s; lo nuevo se marca leído a la vista y la raya de «nuevos» se
+   * queda donde estaba al abrir.
    *
    * Los correos los trae el buzón sincronizado; «Responder» y «Escribir correo»
    * envían por un buzón conectado y lo enviado vuelve al registro. La marca de
@@ -25,6 +28,8 @@
   import { appLocale, t } from '$lib/i18n';
   import Button from '$lib/components/Button.svelte';
   import ConversationHistory from '$lib/components/ConversationHistory.svelte';
+  import MessageItem from '$lib/components/MessageItem.svelte';
+  import ThreadBlock from '$lib/components/ThreadBlock.svelte';
   import OrganizationFiscal from '$lib/components/OrganizationFiscal.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
   import {
@@ -38,6 +43,8 @@
     type ConversationItem,
   } from '$lib/conversation';
   import { firstLine, replySubject, type MailAccountsResponse } from '$lib/mail';
+  import { markReadWhenSeen, readAtOpen } from '$lib/thread-reading.svelte';
+  import { THREAD_REFRESH_MS, firstUnreadId, teamTimeline, type ConversationThreadView } from '$lib/threads';
 
   const locale = appLocale();
   const queryClient = useQueryClient();
@@ -89,6 +96,35 @@
         fetchJSON<MailAccountsResponse>(`/api/mail/accounts?workspace_id=${conv!.workspace_id}`, signal),
     })),
   );
+  // ── El hilo del equipo ──
+  let teamKey = $derived(['conversation-thread', conv?.id ?? ''] as const);
+  const teamQuery = createQuery(
+    toStore(() => ({
+      queryKey: teamKey,
+      enabled: Boolean(conv?.id),
+      // Siempre viejo: volver a la pestaña recarga (refetchOnWindowFocus).
+      staleTime: 0,
+      refetchInterval: THREAD_REFRESH_MS,
+      queryFn: ({ signal }: { signal: AbortSignal }) =>
+        fetchJSON<ConversationThreadView>(`/api/conversations/${conv!.id}/thread`, signal),
+    })),
+  );
+  let team = $derived($teamQuery.data ?? null);
+  const readAt = readAtOpen();
+  let teamSince = $derived(team ? readAt('', team.thread.thread_id, team.reads) : null);
+  let teamDivider = $derived(team ? firstUnreadId(team.messages, team.me, teamSince) : null);
+  let timeline = $derived(teamTimeline(oldestFirst, team?.messages ?? []));
+  function refreshTeam() {
+    void queryClient.invalidateQueries({ queryKey: teamKey });
+  }
+  /** Lo que se mira del hilo: su bloque en «registro», la línea entera en «hilo». */
+  let teamEl = $state<HTMLElement>();
+  markReadWhenSeen({
+    target: () => teamEl,
+    threads: () => (team ? [team.thread] : []),
+    onmarked: refreshTeam,
+  });
+
   let sendable = $derived(($mailQuery.data?.items ?? []).filter((a) => a.status === 'active'));
   let mailboxes = $derived(
     [...new Map(events.filter((e) => e.mailbox_address).map((e) => [e.mailbox_address!, e.mailbox_scope])).entries()],
@@ -153,6 +189,8 @@
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: ['conversation'] });
       void queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      // Quién lee el hilo del equipo cambia con la privacidad.
+      void queryClient.invalidateQueries({ queryKey: ['thread-audience', 'conversation', conv?.id ?? ''] });
     },
   });
 
@@ -252,13 +290,25 @@
               {t('mail.write', locale)}
             </Button>
           </div>
-          <ol class="flow" aria-label={t('mail.thread', locale)}>
-            {#each oldestFirst as e (e.id)}
-              <li>{@render card(e)}</li>
+          <ol class="flow" aria-label={t('mail.thread', locale)} bind:this={teamEl}>
+            {#each timeline as x (x.kind === 'event' ? x.event.id : x.message.id)}
+              {#if x.kind === 'event'}
+                <li>{@render card(x.event)}</li>
+              {:else if team}
+                <MessageItem
+                  message={x.message}
+                  author={(x.message.author_id && team.authors[x.message.author_id]) || ''}
+                  mine={x.message.author_id === team.me}
+                  mark={t('threads.team_only', locale)}
+                  newBefore={x.message.id === teamDivider}
+                  {locale}
+                  onchange={refreshTeam}
+                />
+              {/if}
             {/each}
           </ol>
           {#if composing === 'new'}{@render composer()}{/if}
-          <p class="conv__msg">{t('mail.team_later_thread', locale)}</p>
+          {@render teamThread(false)}
         {/if}
       </div>
 
@@ -318,17 +368,35 @@
         </div>
 
         {#if reading === 'registro'}
-          <div class="inside">
-            <div class="block-head">
-              <h2 class="eyebrow eyebrow--sub">{t('mail.inside_team', locale)}</h2>
-            </div>
-            <p class="muted">{t('mail.team_later', locale)}</p>
+          <div class="inside" bind:this={teamEl}>
+            {@render teamThread(true)}
           </div>
         {/if}
       </aside>
     </div>
   </section>
 {/if}
+
+{#snippet teamThread(list: boolean)}
+  {#if team && conv}
+    <ThreadBlock
+      thread={team.thread}
+      anchorKind="conversation"
+      anchorId={conv.id}
+      title={t('threads.team', locale)}
+      messages={team.messages}
+      authors={team.authors}
+      me={team.me}
+      newSince={teamSince}
+      tz={Intl.DateTimeFormat().resolvedOptions().timeZone}
+      {list}
+      {locale}
+      onchange={refreshTeam}
+    />
+  {:else if $teamQuery.isError}
+    <p class="muted">{t('threads.team_error', locale)}</p>
+  {/if}
+{/snippet}
 
 {#snippet via(e: ConversationEventItem)}
   {#if viaLabel(e)}

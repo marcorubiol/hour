@@ -1579,9 +1579,6 @@
   "mail.thread": "Hilo",
   "mail.write": "Escribir correo",
   "mail.log_other": "Apuntar una llamada, una reunión o una nota",
-  "mail.team_later_thread": "Lo que el equipo hable por dentro aparecerá en este hilo cuando lleguen los hilos del equipo.",
-  "mail.inside_team": "Por dentro · equipo",
-  "mail.team_later": "El hilo del equipo llega con los hilos. Lo hablado aquí no sale de Hour.",
   "mail.last_contact": "Último contacto",
   "mail.next_step": "Siguiente paso",
   "mail.private_label": "Conversación privada",
@@ -1666,5 +1663,8 @@
   "threads.board_error": "No se ha podido cargar el tablón.",
   "threads.truncated": "Solo se muestran los mensajes más recientes.",
   "threads.no_messages": "sin mensajes",
-  "threads.write": "Escribir"
+  "threads.write": "Escribir",
+  "threads.team": "Equipo",
+  "threads.team_only": "Solo el equipo",
+  "threads.team_error": "No se ha podido cargar el hilo del equipo."
 }

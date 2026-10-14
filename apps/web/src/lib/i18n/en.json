@@ -1588,9 +1588,6 @@
   "mail.thread": "Thread",
   "mail.write": "Write email",
   "mail.log_other": "Log a call, a meeting or a note",
-  "mail.team_later_thread": "What the team says internally will appear in this thread once team threads arrive.",
-  "mail.inside_team": "Inside · team",
-  "mail.team_later": "The team thread comes with threads. What is said here never leaves Hour.",
   "mail.last_contact": "Last contact",
   "mail.next_step": "Next step",
   "mail.private_label": "Private conversation",
@@ -1675,5 +1672,8 @@
   "threads.board_error": "Could not load the board.",
   "threads.truncated": "Only the most recent messages are shown.",
   "threads.no_messages": "no messages",
-  "threads.write": "Write"
+  "threads.write": "Write",
+  "threads.team": "Team",
+  "threads.team_only": "Team only",
+  "threads.team_error": "Couldn't load the team thread."
 }
