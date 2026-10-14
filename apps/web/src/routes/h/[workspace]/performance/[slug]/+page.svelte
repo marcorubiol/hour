@@ -41,6 +41,7 @@
   import type { VenueContact } from '$lib/venue';
   import DirectoryPicker from '$lib/components/DirectoryPicker.svelte';
   import WhoGoes from '$lib/components/planner/WhoGoes.svelte';
+  import BoloBoard from '$lib/components/BoloBoard.svelte';
   import type { Commitment } from '$lib/people';
   import { performanceRoster } from '$lib/planner';
   import Select from '$lib/components/Select.svelte';
@@ -782,6 +783,15 @@
         {locale}
       />
     </section>
+
+    <!-- ADR-106: el tablón del bolo. Sin bolo dice que no hay; sin dinero
+         siempre (la puerta es la función, no Cuentas). -->
+    <BoloBoard
+      performanceId={perf.id}
+      {workspaceSlug}
+      tz={perf.venue?.timezone ?? workspaceTz ?? viewerTz}
+      {locale}
+    />
 
     {#if perf.date.length > 0}
       <section class="perf__section" aria-label={t('perf.related_dates', locale)}>

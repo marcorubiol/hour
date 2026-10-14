@@ -1653,6 +1653,35 @@
     --state-border: var(--border-color-light);
   }
 
+  /* Kebab: the quiet round trigger of a row's own menu (the account row,
+     a message's edit/delete). Transparent until hovered or open; what it
+     holds (a glyph, an avatar) is the caller's. Menu passes it through
+     `triggerClass="kebab"`. */
+  .kebab {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    inline-size: var(--control-size-s);
+    block-size: var(--control-size-s);
+    padding: 0;
+    background: transparent;
+    border: 0;
+    border-radius: var(--radius-circle);
+    color: var(--text-faint);
+    cursor: pointer;
+    transition: background var(--transition), color var(--transition);
+  }
+  .kebab:hover,
+  .kebab[aria-expanded='true'] {
+    background: var(--bg-light);
+    color: var(--text-color);
+  }
+  .kebab:focus-visible {
+    outline: var(--focus-width) solid var(--focus-color);
+    outline-offset: -1px;
+  }
+
   /* Kbd — keyboard hint. `<kbd>` semantic element styled with a subtle
      bottom-bevel border so it reads as a key cap. */
   .kbd {
