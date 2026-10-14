@@ -165,7 +165,8 @@ describe.skipIf(!envReady() || !externalEnvReady())(
         externalJwt,
         new URLSearchParams({ membership_id: `eq.${projectMembership.rows[0].id}`, select: 'facet_id,verb,source' }),
       );
-      expect(facets.rows.map((row) => `${row.verb}:${row.source}`)).toEqual(['view:preset', 'view:preset']);
+      // Equip en el proyecto: Materials, Tècnica y, desde ADR-106, Logística, Full de ruta y Comidas.
+      expect(facets.rows.map((row) => `${row.verb}:${row.source}`)).toEqual(Array(5).fill('view:preset'));
 
       // El admin lista a la persona con el id de su membresía de espacio.
       const listed = await pgRpc<{ access_kind: string; id: string; user_id: string }[]>(

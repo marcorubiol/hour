@@ -258,8 +258,16 @@ export function decodeJwt(jwt: string): Record<string, unknown> {
 export type FacetVerb = 'view' | 'edit';
 export type Preset = 'minim' | 'equip' | 'coordinacio' | 'direccio';
 
-/** Facetas estándar que existen en el nivel proyecto (tabla de niveles, ADR-100). */
-export const PROJECT_FACETS = ['converses', 'materials', 'tecnica', 'diners'] as const;
+/** Facetas estándar que existen en el nivel proyecto (tabla de niveles, ADR-100 y ADR-106). */
+export const PROJECT_FACETS = [
+  'converses',
+  'materials',
+  'tecnica',
+  'logistica',
+  'full_de_ruta',
+  'comidas',
+  'diners',
+] as const;
 
 export interface ProjectAccess {
   membershipId: string;
