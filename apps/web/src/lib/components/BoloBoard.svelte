@@ -17,7 +17,17 @@
   import { fetchJSON, mutateJSON } from '$lib/api';
   import ThreadBlock from '$lib/components/ThreadBlock.svelte';
   import { t, type Locale } from '$lib/i18n';
-  import { boloPlace, messagesByThread, performanceTag, threadKey, type BoardView } from '$lib/threads';
+  import {
+    boardLayout,
+    boloPlace,
+    facetName,
+    firstUnreadId,
+    messagesByThread,
+    performanceTag,
+    threadKey,
+    type BoardThread,
+    type BoardView,
+  } from '$lib/threads';
 
   interface Props {
     performanceId: string;
@@ -60,6 +70,32 @@
   function newSince(view: BoardView, key: string, threadId: string | null): string | null {
     if (!openedAt.has(key)) openedAt.set(key, (threadId && view.reads[threadId]) || null);
     return openedAt.get(key) ?? null;
+  }
+
+  // ── plegar ─────────────────────────────────────────────────────────────
+  // Un hilo vacío es una línea; al pulsarla se abre con el compositor enfocado
+  // y sigue abierto mientras dure la visita.
+  let opened = $state<string[]>([]);
+  let focusKey = $state<string | null>(null);
+
+  function messagesOf(th: BoardThread) {
+    return (th.thread_id && byThread.get(th.thread_id)) || [];
+  }
+
+  let layout = $derived(
+    board
+      ? boardLayout(
+          board.threads,
+          (th) => firstUnreadId(messagesOf(th), board!.me, newSince(board!, threadKey(th), th.thread_id)) !== null,
+          new Set(opened),
+        )
+      : { open: [], folded: [] },
+  );
+
+  function unfold(th: BoardThread) {
+    const key = threadKey(th);
+    if (!opened.includes(key)) opened = [...opened, key];
+    focusKey = key;
   }
 
   // ── leído ──────────────────────────────────────────────────────────────
@@ -131,21 +167,36 @@
     {#if board.truncated}
       <p class="board__state">{t('threads.truncated', locale)}</p>
     {/if}
-    {#each board.threads as th (threadKey(th))}
+    {#each layout.open as th (threadKey(th))}
       <ThreadBlock
         thread={th}
         anchorKind="bolo"
         anchorId={board.bolo.id}
-        messages={(th.thread_id && byThread.get(th.thread_id)) || []}
+        messages={messagesOf(th)}
         authors={board.authors}
         me={board.me}
         newSince={newSince(board, threadKey(th), th.thread_id)}
         performances={board.performances}
+        autofocus={focusKey === threadKey(th)}
         {tz}
         {locale}
         onchange={refresh}
       />
     {/each}
+    {#if layout.folded.length > 0}
+      <!-- Los hilos sin mensajes, plegados: una línea cada uno. -->
+      <ul class="board__folded" role="list">
+        {#each layout.folded as th (threadKey(th))}
+          <li data-facet={th.facet_key ?? 'general'}>
+            <button type="button" class="board__fold" onclick={() => unfold(th)}>
+              <span class="board__fold-name">{facetName(th, locale)}</span>
+              <span>{t('threads.no_messages', locale)}</span>
+              <span class="board__fold-write">{t('threads.write', locale)}</span>
+            </button>
+          </li>
+        {/each}
+      </ul>
+    {/if}
   {/if}
 </section>
 
@@ -186,6 +237,49 @@
     .board__perfs .link-arrow {
       font-family: var(--font-mono);
       font-size: var(--text-xs);
+    }
+    .board__folded {
+      display: flex;
+      flex-direction: column;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      border-block-start: var(--divider-light);
+    }
+    .board__fold {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: var(--space-xs);
+      inline-size: 100%;
+      padding-block: var(--space-xs);
+      color: var(--text-faint);
+      font-size: var(--text-xs);
+      text-align: start;
+    }
+    .board__fold > * + *::before {
+      content: '·';
+      margin-inline-end: var(--space-xs);
+      color: var(--text-faint);
+    }
+    .board__fold-name {
+      color: var(--heading-color);
+      font-size: var(--text-s);
+      font-weight: 500;
+    }
+    .board__fold-write {
+      color: var(--text-muted);
+      transition: color var(--transition);
+    }
+    @media (hover: hover) and (pointer: fine) {
+      .board__fold:hover .board__fold-write {
+        color: var(--text-color);
+        text-decoration: underline;
+      }
+    }
+    .board__fold:focus-visible {
+      outline: var(--focus-width) solid var(--focus-color);
+      outline-offset: 2px;
     }
     .board__state {
       margin: 0;

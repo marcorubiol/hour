@@ -51,6 +51,8 @@
     performances?: BoardPerformance[];
     /** La zona de la sala: la hora de una función se dice donde ocurre. */
     tz: string;
+    /** Abierto desde su línea plegada: el compositor llega con el foco. */
+    autofocus?: boolean;
     locale: Locale;
     onchange: () => void;
   }
@@ -65,6 +67,7 @@
     newSince,
     performances = [],
     tz,
+    autofocus = false,
     locale,
     onchange,
   }: Props = $props();
@@ -105,6 +108,10 @@
 
   // ── escribir ───────────────────────────────────────────────────────────
   let body = $state('');
+  let composer = $state<HTMLTextAreaElement>();
+  $effect(() => {
+    if (autofocus) composer?.focus();
+  });
   let aboutPerf = $state('');
   let perfOptions = $derived(performanceOptions(performances, locale, tz));
 
@@ -286,6 +293,7 @@
       placeholder={t('threads.write_in', locale, { name })}
       aria-label={t('threads.write_in', locale, { name })}
       bind:value={body}
+      bind:this={composer}
       onkeydown={(e) => sendOnModEnter(e, () => send())}
     ></textarea>
     <div class="thread__compose-row">

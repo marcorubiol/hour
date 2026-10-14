@@ -118,11 +118,18 @@ test.describe('el tablón del bolo (ADR-106)', () => {
     const board = page.locator('section.board');
     await expect(board).toBeVisible();
 
-    await expect(board.locator('article[data-facet="general"]')).toBeVisible();
+    // Un bolo recién creado no tiene mensajes: todos sus hilos van plegados,
+    // una línea cada uno. Diners ni plegado: ausente, no bloqueado.
+    await expect(board.locator('.board__folded [data-facet="general"]')).toBeVisible();
+    const foldedTecnica = board.locator('.board__folded [data-facet="tecnica"]');
+    await expect(foldedTecnica).toBeVisible();
+    await expect(board.locator('[data-facet="diners"]'), 'Diners: ausente, no bloqueado').toHaveCount(0);
+
+    // Al pulsar la línea, el hilo se abre con el compositor ya enfocado.
+    await foldedTecnica.getByRole('button').click();
     const tecnica = board.locator('article[data-facet="tecnica"]');
-    await expect(tecnica).toBeVisible();
-    await expect(board.locator('article[data-facet="diners"]'), 'Diners: ausente, no bloqueado').toHaveCount(0);
-    // La línea de audiencia no se pliega nunca.
+    await expect(tecnica.locator('.thread__compose textarea')).toBeFocused();
+    // La línea de audiencia va en el hilo abierto, sin plegar.
     await expect(tecnica.locator('.thread__audience')).toContainText(/\d/);
 
     await tecnica.locator('.thread__compose textarea').fill(BODY);
@@ -158,6 +165,8 @@ test.describe('el tablón del bolo (ADR-106)', () => {
     const tecnica = board.locator('article[data-facet="tecnica"]');
     await expect(tecnica.locator('.msg', { hasText: BODY })).toBeVisible();
     await expect(tecnica.locator('.thread__new')).toBeVisible();
-    await expect(board.locator('article[data-facet="diners"]')).toBeVisible();
+    // Con nuevos, arriba del todo; Diners, vacío, plegado al final.
+    await expect(board.locator('article').first()).toHaveAttribute('data-facet', 'tecnica');
+    await expect(board.locator('.board__folded [data-facet="diners"]')).toBeVisible();
   });
 });

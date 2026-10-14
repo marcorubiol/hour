@@ -1664,5 +1664,7 @@
   "threads.performances": "{n} funciones",
   "threads.no_bolo": "Sin bolo, sin tablón: esta función no cuelga de ningún trato.",
   "threads.board_error": "No se ha podido cargar el tablón.",
-  "threads.truncated": "Solo se muestran los mensajes más recientes."
+  "threads.truncated": "Solo se muestran los mensajes más recientes.",
+  "threads.no_messages": "sin mensajes",
+  "threads.write": "Escribir"
 }

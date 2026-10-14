@@ -1673,5 +1673,7 @@
   "threads.performances": "{n} performances",
   "threads.no_bolo": "No deal, no board: this performance is not part of any deal.",
   "threads.board_error": "Could not load the board.",
-  "threads.truncated": "Only the most recent messages are shown."
+  "threads.truncated": "Only the most recent messages are shown.",
+  "threads.no_messages": "no messages",
+  "threads.write": "Write"
 }

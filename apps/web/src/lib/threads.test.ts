@@ -4,6 +4,7 @@ import {
   AudienceQuerySchema,
   MessageCreateSchema,
   audienceLine,
+  boardLayout,
   boloPlace,
   facetName,
   firstUnreadId,
@@ -146,6 +147,37 @@ describe('performanceOptions', () => {
       { value: 'p1', label: 'vie 12' },
       { value: 'p2', label: 'sáb 13 · 11h' },
     ]);
+  });
+});
+
+describe('boardLayout', () => {
+  const th = (facet_id: string | null, message_count: number) => ({ facet_id, message_count });
+  const general = th(null, 2);
+  const tecnica = th('tecnica', 3);
+  const logistica = th('logistica', 1);
+  const materials = th('materials', 0);
+  const diners = th('diners', 0);
+  const all = [general, materials, tecnica, logistica, diners];
+
+  test('nuevos arriba, luego con mensajes, y los vacíos plegados al final, cada grupo en su orden', () => {
+    const { open, folded } = boardLayout(all, (t) => t === logistica);
+    expect(open).toEqual([logistica, general, tecnica]);
+    expect(folded).toEqual([materials, diners]);
+  });
+  test('General sin mensajes también se pliega', () => {
+    const emptyGeneral = th(null, 0);
+    const { open, folded } = boardLayout([emptyGeneral, tecnica], () => false);
+    expect(open).toEqual([tecnica]);
+    expect(folded).toEqual([emptyGeneral]);
+  });
+  test('un vacío que se abrió para escribir se despliega, detrás de los que tienen mensajes', () => {
+    const { open, folded } = boardLayout(all, () => false, new Set(['diners']));
+    expect(open).toEqual([general, tecnica, logistica, diners]);
+    expect(folded).toEqual([materials]);
+  });
+  test('«nuevo» sin mensajes no existe: un vacío nunca sube', () => {
+    const { open } = boardLayout([materials], () => true);
+    expect(open).toEqual([]);
   });
 });
 

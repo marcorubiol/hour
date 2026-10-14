@@ -1664,5 +1664,7 @@
   "threads.performances": "{n} funcions",
   "threads.no_bolo": "Sense bolo, sense tauler: aquesta funció no penja de cap tracte.",
   "threads.board_error": "No s’ha pogut carregar el tauler.",
-  "threads.truncated": "Només es mostren els missatges més recents."
+  "threads.truncated": "Només es mostren els missatges més recents.",
+  "threads.no_messages": "sense missatges",
+  "threads.write": "Escriure"
 }

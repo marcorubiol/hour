@@ -224,6 +224,33 @@ export function performanceOptions(
   ];
 }
 
+/**
+ * El orden del tablón: desplegados primero los que tienen nuevos, después los
+ * que tienen mensajes, después los vacíos que quien mira abrió para escribir;
+ * plegados, en una fila al final, los vacíos sin abrir. Dentro de cada grupo,
+ * el orden de `bolo_board` (General primero, luego las facetas por su orden).
+ *
+ * «Tiene nuevos» lo decide quien llama (contra la lectura AL ABRIR la ficha):
+ * así un hilo no baja de golpe en mitad de la lectura cuando se marca leído.
+ */
+export function boardLayout<T extends Pick<BoardThread, 'facet_id' | 'message_count'>>(
+  threads: T[],
+  hasNew: (thread: T) => boolean,
+  opened: ReadonlySet<string> = new Set(),
+): { open: T[]; folded: T[] } {
+  const fresh: T[] = [];
+  const talked: T[] = [];
+  const unfolded: T[] = [];
+  const folded: T[] = [];
+  for (const th of threads) {
+    if (th.message_count > 0 && hasNew(th)) fresh.push(th);
+    else if (th.message_count > 0) talked.push(th);
+    else if (opened.has(threadKey(th))) unfolded.push(th);
+    else folded.push(th);
+  }
+  return { open: [...fresh, ...talked, ...unfolded], folded };
+}
+
 /** El nombre del bolo sin título propio (no lo tiene): sala y ciudad. */
 export function boloPlace(bolo: Pick<BoardBolo, 'venue_name' | 'city'>): string {
   return [bolo.venue_name, bolo.city].filter(Boolean).join(' · ');

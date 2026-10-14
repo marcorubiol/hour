@@ -1664,5 +1664,7 @@
   "threads.performances": "{n} représentations",
   "threads.no_bolo": "Pas de cession, pas de tableau : cette représentation ne dépend d’aucun contrat.",
   "threads.board_error": "Impossible de charger le tableau.",
-  "threads.truncated": "Seuls les messages les plus récents sont affichés."
+  "threads.truncated": "Seuls les messages les plus récents sont affichés.",
+  "threads.no_messages": "aucun message",
+  "threads.write": "Écrire"
 }
