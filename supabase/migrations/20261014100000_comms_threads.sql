@@ -7,7 +7,12 @@
 --      proyecto (pregunta 2), y los paquetes de las membresías de proyecto se
 --      re-expanden: solo se AÑADEN filas `preset` de esas tres facetas; las
 --      `override` y todo lo demás no se tocan. Foto antes y después: si cambia
---      algo fuera de eso, la migración aborta.
+--      algo fuera de eso, la migración aborta. Efecto en la delegación: con las
+--      tres facetas en proyecto, can_grant_preset y can_manage_membership las
+--      piden para delegar Equip, Coordinació o Direcció en un proyecto; una
+--      membresía de proyecto sin paquete y solo con overrides perdería delegar,
+--      así que la migración ABORTA si existe alguna (en producción, 0 el
+--      2026-10-14, según la revisión del coordinador).
 --   2. `thread`: un ancla (proyecto, línea, bolo o conversación, exactamente
 --      una) y una faceta opcional (NULL = General). Un General y un hilo por
 --      faceta en cada contenedor. Nace perezoso: lo crea el primer mensaje.
@@ -39,38 +44,53 @@
 -- Rollback: build/runbooks/rollback-20261014-comms-threads.sql.
 
 -- ── 1 · Logística, Full de ruta y Comidas en el proyecto (pregunta 2) ─────
-CREATE TEMP TABLE comms_access_before AS
-SELECT mf.membership_id, mf.facet_id, mf.verb, mf.source
-FROM public.membership_facet mf;
-
-INSERT INTO public.facet_level (facet_id, level)
-SELECT f.id, 'project'::public.container_level
-FROM public.facet f
-WHERE f.workspace_id IS NULL
-  AND f.key IN ('logistica', 'full_de_ruta', 'comidas')
-ON CONFLICT DO NOTHING;
-
--- Re-expansión: lo mismo que private.expand_preset haría hoy con cada paquete
--- de proyecto, limitado a las tres facetas que acaban de existir ahí.
-INSERT INTO public.membership_facet (membership_id, facet_id, verb, source, granted_by)
-SELECT m.id, f.id, pf.verb, 'preset', NULL
-FROM public.membership m
-JOIN public.access_preset_facet pf ON pf.preset_key = m.preset
-JOIN public.facet f ON f.key = pf.facet_key AND f.workspace_id IS NULL
-WHERE m.level = 'project'
-  AND m.preset IS NOT NULL
-  AND f.key IN ('logistica', 'full_de_ruta', 'comidas')
-  AND NOT EXISTS (
-    SELECT 1 FROM public.membership_facet o
-    WHERE o.membership_id = m.id AND o.facet_id = f.id
-  );
-
+-- Todo el paso en UNA sentencia: el CLI no envuelve la migración en una
+-- transacción explícita, y así el bloqueo, la foto, la re-expansión y la
+-- comprobación son atómicos. Nadie concede ni quita facetas entre la foto y
+-- la comprobación.
 DO $$
 DECLARE
   v_lost    bigint;
   v_foreign bigint;
   v_added   bigint;
 BEGIN
+  LOCK TABLE public.membership_facet IN SHARE ROW EXCLUSIVE MODE;
+
+  IF EXISTS (
+    SELECT 1
+    FROM public.membership m
+    JOIN public.membership_facet mf ON mf.membership_id = m.id
+    WHERE m.level = 'project' AND m.preset IS NULL
+  ) THEN
+    RAISE EXCEPTION 'comms threads: project memberships without a package but with facets would lose delegation; resolve them first';
+  END IF;
+
+  CREATE TEMP TABLE comms_access_before ON COMMIT DROP AS
+  SELECT mf.membership_id, mf.facet_id, mf.verb, mf.source
+  FROM public.membership_facet mf;
+
+  INSERT INTO public.facet_level (facet_id, level)
+  SELECT f.id, 'project'::public.container_level
+  FROM public.facet f
+  WHERE f.workspace_id IS NULL
+    AND f.key IN ('logistica', 'full_de_ruta', 'comidas')
+  ON CONFLICT DO NOTHING;
+
+  -- Re-expansión: lo mismo que private.expand_preset haría hoy con cada
+  -- paquete de proyecto, limitado a las tres facetas que acaban de existir ahí.
+  INSERT INTO public.membership_facet (membership_id, facet_id, verb, source, granted_by)
+  SELECT m.id, f.id, pf.verb, 'preset', NULL
+  FROM public.membership m
+  JOIN public.access_preset_facet pf ON pf.preset_key = m.preset
+  JOIN public.facet f ON f.key = pf.facet_key AND f.workspace_id IS NULL
+  WHERE m.level = 'project'
+    AND m.preset IS NOT NULL
+    AND f.key IN ('logistica', 'full_de_ruta', 'comidas')
+    AND NOT EXISTS (
+      SELECT 1 FROM public.membership_facet o
+      WHERE o.membership_id = m.id AND o.facet_id = f.id
+    );
+
   SELECT count(*) INTO v_lost
   FROM (
     SELECT * FROM comms_access_before
@@ -105,10 +125,10 @@ BEGIN
     RAISE EXCEPTION 'comms threads: access changed outside the re-expansion (lost %, foreign %)', v_lost, v_foreign;
   END IF;
   RAISE NOTICE 'comms threads: re-expansion added % facet rows to project memberships', v_added;
+
+  DROP TABLE comms_access_before;
 END;
 $$;
-
-DROP TABLE comms_access_before;
 
 -- ── 2 · ayudantes de lectura ──────────────────────────────────────────────
 -- El espacio de un contenedor de hilo vivo (proyecto, línea o bolo, con su
@@ -217,16 +237,28 @@ AS $$
   END;
 $$;
 
+-- La misma regla para el que llama; es lo único que la política puede invocar.
+CREATE FUNCTION private.thread_readable_by_caller(
+  p_conversation_id uuid, p_project_id uuid, p_line_id uuid, p_bolo_id uuid, p_facet_id uuid
+) RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path TO 'public', 'pg_temp'
+AS $$
+  SELECT private.thread_readable(p_conversation_id, p_project_id, p_line_id, p_bolo_id, p_facet_id,
+                                 (SELECT auth.uid()));
+$$;
+
 
 REVOKE ALL ON FUNCTION private.thread_container_workspace(public.container_level, uuid) FROM PUBLIC;
 REVOKE ALL ON FUNCTION private.facet_active_at(public.container_level, uuid, uuid) FROM PUBLIC;
 REVOKE ALL ON FUNCTION private.can_read_conversation(uuid, uuid) FROM PUBLIC;
 REVOKE ALL ON FUNCTION private.can_read_container_thread(public.container_level, uuid, uuid, uuid) FROM PUBLIC;
 REVOKE ALL ON FUNCTION private.thread_readable(uuid, uuid, uuid, uuid, uuid, uuid) FROM PUBLIC;
--- Las políticas corren con los privilegios del que llama: la que nombra
--- la política de thread necesita EXECUTE (mismo patrón que private.has_workspace_role).
--- `private` no está expuesto por PostgREST.
-GRANT EXECUTE ON FUNCTION private.thread_readable(uuid, uuid, uuid, uuid, uuid, uuid) TO authenticated;
+REVOKE ALL ON FUNCTION private.thread_readable_by_caller(uuid, uuid, uuid, uuid, uuid) FROM PUBLIC;
+-- Las políticas corren con los privilegios del que llama: solo el envoltorio
+-- que nombra la política de thread tiene EXECUTE, y lee auth.uid() dentro
+-- (mismo patrón que private.has_workspace_role): nadie pregunta por otro.
+GRANT EXECUTE ON FUNCTION private.thread_readable_by_caller(uuid, uuid, uuid, uuid, uuid) TO authenticated;
 
 -- ── 3 · thread ────────────────────────────────────────────────────────────
 CREATE TABLE public.thread (
@@ -449,7 +481,9 @@ ALTER TABLE public.thread      OWNER TO postgres;
 ALTER TABLE public.message     OWNER TO postgres;
 ALTER TABLE public.thread_read OWNER TO postgres;
 
-REVOKE ALL ON TABLE public.thread, public.message, public.thread_read FROM PUBLIC, anon;
+-- authenticated incluido: el checkpoint le da ALL por defecto (patrón de
+-- mail_account, 20261011200000_mail_google).
+REVOKE ALL ON TABLE public.thread, public.message, public.thread_read FROM PUBLIC, anon, authenticated;
 -- Solo lectura, a TABLA entera: sin grant por columnas no hay columna que se
 -- quede fuera de un `select` (la rotura de `performance` del 2026-08-29).
 GRANT SELECT ON TABLE public.thread, public.message, public.thread_read TO authenticated;
@@ -457,7 +491,7 @@ GRANT ALL ON TABLE public.thread, public.message, public.thread_read TO service_
 
 CREATE POLICY thread_select ON public.thread
   FOR SELECT TO authenticated
-  USING (private.thread_readable(conversation_id, project_id, line_id, bolo_id, facet_id, (SELECT auth.uid())));
+  USING (private.thread_readable_by_caller(conversation_id, project_id, line_id, bolo_id, facet_id));
 
 -- Hereda la frontera del hilo con la RLS del que llama (patrón de
 -- conversation_event_select, ADR-098): un mensaje no se ve si su hilo no se ve.
@@ -596,7 +630,8 @@ BEGIN
 END;
 $$;
 
--- delete_message: borrado blando, solo el autor.
+-- delete_message: borrado blando, solo el autor y mientras siga leyendo el
+-- hilo. Revocar no es borrar (ADR-085 §7): sin acceso, lo escrito se queda.
 CREATE FUNCTION public.delete_message(p_message_id uuid)
 RETURNS void
 LANGUAGE plpgsql
@@ -614,7 +649,8 @@ BEGIN
   SET deleted_at = now()
   WHERE id = p_message_id
     AND deleted_at IS NULL
-    AND author_id = v_caller;
+    AND author_id = v_caller
+    AND private.can_read_thread(thread_id, v_caller);
 
   IF NOT FOUND THEN
     RAISE EXCEPTION 'message % not found', p_message_id USING ERRCODE = '42501';

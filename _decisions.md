@@ -3532,6 +3532,9 @@ Hilo (N a N, sin estado) y conversación de difusión (1 a 1, con estado) no se 
 2. **Logística, Comidas y Full de ruta existen también en el proyecto** (filas nuevas de `facet_level`), y los paquetes
    de las membresías de proyecto se re-expanden: solo se añaden filas `preset`; las `override` no se tocan. El Equip de
    un proyecto las ve en sus bolos.
+   Consecuencia: `can_grant_preset` y `can_manage_membership` piden esas tres facetas para delegar Equip, Coordinació o
+   Direcció en un proyecto, así que una membresía de proyecto solo con overrides perdería delegar; la migración aborta
+   si existe alguna (en producción, 0 el 2026-10-14, según la revisión del coordinador).
 3. **Ver una faceta deja leer y escribir en su hilo**; editar gatea los datos de la faceta, no la palabra.
 4. **`message` es tabla propia**; `note` sigue siendo el post-it privado (ADR-093) y no se toca.
 5. **Primer corte de pantallas:** tablón del bolo en la ficha de la función, hilo del equipo de la conversación y

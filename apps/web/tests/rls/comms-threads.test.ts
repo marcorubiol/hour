@@ -328,10 +328,12 @@ describe.skipIf(!envReady())('RLS: hilos con facetas (ADR-106)', () => {
     }
   });
 
-  test('6 · una faceta desactivada en el espacio no se lista ni se escribe', async () => {
+  test('6 · una faceta desactivada en el espacio no se lista, no se escribe y lo escrito deja de leerse', async () => {
     const key = { workspace_id: `eq.${workspaceId}`, facet_id: `eq.${facets.materials}` };
     const before = await pgGet<{ active: boolean }>('workspace_facet_setting', adminJwt, new URLSearchParams({ ...key, select: 'active' }));
     const had = before.rows[0];
+    const written = await post(adminJwt, { anchor: boloId, facet: facets.materials, body: `antes de desactivar ${RUN}` });
+    if (!had || had.active) expect(written.status, written.error).toBe(200);
     try {
       if (had) {
         await pgPatch('workspace_facet_setting', adminJwt, { active: false }, new URLSearchParams(key));
@@ -346,10 +348,68 @@ describe.skipIf(!envReady())('RLS: hilos con facetas (ADR-106)', () => {
       const b = await board(adminJwt, perfA);
       expect(b.data!.threads.map((t) => t.facet_key)).not.toContain('materials');
       expect((await post(adminJwt, { anchor: boloId, facet: facets.materials })).status).toBe(403);
+      if (written.row) {
+        expect(await messagesOf(adminJwt, written.row.thread_id), 'GET /message').toHaveLength(0);
+        expect(await threadsOf(adminJwt, 'bolo_id', boloId)).not.toContainEqual(
+          expect.objectContaining({ facet_id: facets.materials }),
+        );
+      }
     } finally {
-      await pgPatch('workspace_facet_setting', adminJwt, { active: had ? had.active : true }, new URLSearchParams(key));
+      // Materials vuelve como estaba (activa si no había ajuste).
+      const restored = await pgPatch(
+        'workspace_facet_setting',
+        adminJwt,
+        { active: had ? had.active : true },
+        new URLSearchParams(key),
+      );
+      expect(restored.status).toBe(200);
     }
-    expect((await post(adminJwt, { anchor: boloId, facet: facets.materials })).status).toBe(200);
+    if (!had || had.active) {
+      expect((await post(adminJwt, { anchor: boloId, facet: facets.materials })).status).toBe(200);
+      if (written.row) expect(await messagesOf(adminJwt, written.row.thread_id)).not.toHaveLength(0);
+    }
+  });
+
+  test('anclas borradas en blando: el hilo y sus mensajes desaparecen y no se escribe', async () => {
+    const res = await pgRpc<{ id: string }>('create_bolo', adminJwt, {
+      p_project_id: homeProjectId,
+      p_venue_name: `RLS hilos borrado ${RUN}`,
+      p_status: 'proposed',
+    });
+    expect(res.status, res.error).toBe(200);
+    const doomed = one(res.data)!.id;
+    const msg = await post(adminJwt, { anchor: doomed, body: `antes de borrar ${RUN}` });
+    expect(msg.status).toBe(200);
+    expect(await threadsOf(adminJwt, 'bolo_id', doomed)).toHaveLength(1);
+
+    expect((await pgRpc('delete_bolo', adminJwt, { p_bolo_id: doomed })).status).toBe(204);
+    expect(await threadsOf(adminJwt, 'bolo_id', doomed)).toHaveLength(0);
+    expect(await messagesOf(adminJwt, msg.row!.thread_id)).toHaveLength(0);
+    expect((await post(adminJwt, { anchor: doomed })).status).toBe(403);
+  });
+
+  test('9b · authenticated no tiene privilegio de escritura en las tres tablas', async () => {
+    // Sin grant, PostgREST responde «permission denied for table», no una
+    // violación de política: el privilegio no existe (TRUNCATE, en el SQL local).
+    const env = requireEnv();
+    for (const table of ['thread', 'message', 'thread_read']) {
+      const ins = await fetch(`${env.url}/rest/v1/${table}`, {
+        method: 'POST',
+        headers: { apikey: env.anon, Authorization: `Bearer ${adminJwt}`, 'content-type': 'application/json', Prefer: 'return=minimal' },
+        body: JSON.stringify({}),
+      });
+      expect(ins.status, `INSERT ${table}`).toBe(403);
+      expect(await ins.text(), `INSERT ${table}`).toContain('permission denied for table');
+      for (const method of ['PATCH', 'DELETE']) {
+        const res = await fetch(`${env.url}/rest/v1/${table}?${table === 'thread_read' ? 'thread_id' : 'id'}=eq.${NOWHERE}`, {
+          method,
+          headers: { apikey: env.anon, Authorization: `Bearer ${adminJwt}`, 'content-type': 'application/json', Prefer: 'return=minimal' },
+          body: method === 'PATCH' ? JSON.stringify({ [table === 'thread_read' ? 'last_read_at' : 'updated_at']: new Date().toISOString() }) : undefined,
+        });
+        expect(res.status, `${method} ${table}`).toBe(403);
+        expect(await res.text(), `${method} ${table}`).toContain('permission denied for table');
+      }
+    }
   });
 
   test('16 · anon no lee ni llama a nada', async () => {
@@ -563,6 +623,78 @@ describe.skipIf(!envReady())('RLS: hilos con facetas (ADR-106)', () => {
       // Un hilo que ya no lee no se marca.
       const tecnica = await post(adminJwt, { anchor: boloId, facet: facets.tecnica });
       expect((await pgRpc('mark_thread_read', limitedJwt, { p_thread_id: tecnica.row!.thread_id })).status).toBe(403);
+    });
+
+    test('17b · nadie escribe thread_read por la API, ni la fila propia ni la ajena', async () => {
+      const general = await post(limitedJwt, { anchor: boloId, body: `leído ${RUN}` });
+      expect(general.status).toBe(200);
+      const threadId = general.row!.thread_id;
+      for (const user of [limitedUserId, adminUserId]) {
+        const ins = await pgPost('thread_read', limitedJwt, { thread_id: threadId, user_id: user, last_read_at: '2030-01-01T00:00:00Z' });
+        expect(ins.status, user).toBeGreaterThanOrEqual(400);
+      }
+      const patch = await pgPatch(
+        'thread_read',
+        limitedJwt,
+        { last_read_at: '2030-01-01T00:00:00Z' },
+        new URLSearchParams({ thread_id: `eq.${threadId}`, user_id: `eq.${limitedUserId}` }),
+      );
+      expect(patch.status === 200 ? patch.rows.length : 0).toBe(0);
+    });
+
+    test('perder el acceso: lo escrito no se lee y no se borra (rebaja de paquete)', async () => {
+      await grantPreset(adminJwt, 'project', homeProjectId, limitedUserId, 'equip');
+      const mine = await post(limitedJwt, { anchor: boloId, facet: facets.tecnica, body: `de Equip ${RUN}` });
+      expect(mine.status).toBe(200);
+      await grantPreset(adminJwt, 'project', homeProjectId, limitedUserId, 'minim');
+      expect(await messagesOf(limitedJwt, mine.row!.thread_id)).toHaveLength(0);
+      expect((await pgRpc('delete_message', limitedJwt, { p_message_id: mine.row!.id })).status).toBe(403);
+      expect((await pgRpc('edit_message', limitedJwt, { p_message_id: mine.row!.id, p_body: 'no' })).status).toBe(403);
+      // Revocar no es borrar (ADR-085 §7): el mensaje sigue ahí para quien lee el hilo.
+      expect((await messagesOf(adminJwt, mine.row!.thread_id)).map((m) => m.id)).toContain(mine.row!.id);
+    });
+
+    test('perder el acceso: revoke_membership de una membresía de bolo', async () => {
+      // El bolo ajeno: sin membresía de proyecto, solo la de bolo da el acceso.
+      const granted = await pgRpc<string>('grant_container_preset', adminJwt, {
+        p_level: 'bolo',
+        p_container_id: foreignBoloId,
+        p_user_id: limitedUserId,
+        p_preset: 'equip',
+      });
+      expect(granted.status, granted.error).toBe(200);
+      let revoked = false;
+      try {
+        const mine = await post(limitedJwt, { anchor: foreignBoloId, facet: facets.tecnica, body: `de bolo ${RUN}` });
+        expect(mine.status, mine.error).toBe(200);
+        expect(await messagesOf(limitedJwt, mine.row!.thread_id)).toHaveLength(1);
+
+        expect((await pgRpc('revoke_membership', adminJwt, { p_membership_id: granted.data })).status).toBeLessThan(300);
+        revoked = true;
+        expect(await messagesOf(limitedJwt, mine.row!.thread_id)).toHaveLength(0);
+        expect(await threadsOf(limitedJwt, 'bolo_id', foreignBoloId)).toHaveLength(0);
+        expect((await pgRpc('delete_message', limitedJwt, { p_message_id: mine.row!.id })).status).toBe(403);
+      } finally {
+        if (!revoked) await pgRpc('revoke_membership', adminJwt, { p_membership_id: granted.data });
+      }
+    });
+
+    test('14b · thread_audience de una conversación privada solo cuenta al dueño', async () => {
+      await grantPreset(adminJwt, 'project', homeProjectId, limitedUserId, 'coordinacio');
+      const args = { p_anchor_kind: 'conversation', p_anchor_id: conversationId };
+      const shared = await pgRpc<Audience>('thread_audience', adminJwt, args);
+      expect(shared.status, shared.error).toBe(200);
+      expect(shared.data!.people.map((p) => p.user_id)).toEqual(expect.arrayContaining([adminUserId, limitedUserId]));
+      try {
+        await pgPatch('conversation', adminJwt, { private_to: adminUserId }, new URLSearchParams({ id: `eq.${conversationId}` }));
+        const privateOne = await pgRpc<Audience>('thread_audience', adminJwt, args);
+        expect(privateOne.status).toBe(200);
+        expect(privateOne.data).toMatchObject({ count: 1, reason: { kind: 'conversation' } });
+        expect(privateOne.data!.people.map((p) => p.user_id)).toEqual([adminUserId]);
+        expect((await pgRpc('thread_audience', limitedJwt, args)).status).toBe(403);
+      } finally {
+        await pgPatch('conversation', adminJwt, { private_to: null }, new URLSearchParams({ id: `eq.${conversationId}` }));
+      }
     });
   });
 });

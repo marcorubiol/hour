@@ -32,6 +32,7 @@ DROP FUNCTION IF EXISTS private.guard_message();
 DROP FUNCTION IF EXISTS private.guard_thread_immutable();
 DROP FUNCTION IF EXISTS private.guard_thread();
 DROP FUNCTION IF EXISTS private.can_read_thread(uuid, uuid);
+DROP FUNCTION IF EXISTS private.thread_readable_by_caller(uuid, uuid, uuid, uuid, uuid);
 DROP FUNCTION IF EXISTS private.thread_readable(uuid, uuid, uuid, uuid, uuid, uuid);
 DROP FUNCTION IF EXISTS private.can_read_container_thread(public.container_level, uuid, uuid, uuid);
 DROP FUNCTION IF EXISTS private.can_read_conversation(uuid, uuid);
