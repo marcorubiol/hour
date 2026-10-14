@@ -6,6 +6,7 @@ hasta entonces, sacado de esos documentos; lo anterior a julio de 2026 está sol
 
 ## Octubre 2026 (en curso)
 
+- Por dentro, el acceso de cada persona vive solo en el modelo de facetas: fuera las tablas de membresía antiguas y los permisos de los roles, que ahora son solo etiquetas. Nada cambia para nadie. (2026-10-14, `8884feb`)
 - Invitar a alguien a un proyecto le da un paquete de acceso (Mínim, Equip, Coordinació o Direcció; Mínim por defecto), no los permisos de su rol: el rol queda como etiqueta. Por dentro, el acceso de todo el mundo vive ya en un solo sitio, el modelo de facetas, y no cambia para nadie. Y la fila de invitar en Ajustes ya no se corta. (2026-10-13, `05f1c96`)
 - Ajustes ya no pide un `sw.js` que no existe en cada carga. (2026-10-13, `071208a`)
 - Una conversación de difusión es siempre con una organización y sus personas son sus contactos, uno de ellos el principal: Hour ya no guarda una persona fija por conversación. Las salas que estaban dos veces en MüK Cia (la Feria de Teatro de Ciudad Rodrigo y Circuito Claps) son ahora una sola, con las dos personas como contactos. (2026-10-13, `70660bb`)

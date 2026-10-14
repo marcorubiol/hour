@@ -33,19 +33,22 @@ de Phase 0.9 en `_tasks.md`. Pricing orientativo, no decidido.
 
 ## Producción (verificado 2026-10-13)
 
-- Web `https://hour.zerosense.studio`, Worker `hour-web`. `/health/live`: SHA **`05f1c96`**, `dirty:false`, builtAt
-  2026-10-13T10:15Z (permisos por facetas fase 3: las escrituras van al modelo nuevo, ADR-104). `main` == prod salvo documentos.
+- Web `https://hour.zerosense.studio`, Worker `hour-web`. `/health/live`: SHA **`8884feb`**, `dirty:false`, builtAt
+  2026-10-13T22:13Z (contract de permisos por facetas, ADR-105). `main` == prod salvo documentos.
 - Despliegue: `pnpm --filter web run deploy` (no `pnpm deploy` desde la raíz). Exige árbol limpio.
 - Supabase `hour-phase0` · ref `lqlyorlccnniybezugme` · `eu-central-1`. Plan Free, con keepalive diario
   (`.github/workflows/keepalive.yml`) contra la pausa por inactividad. Pasar a Pro antes de la beta, aún no
   (`_tasks.md § 9`). Si algo de Supabase falla tras días sin uso, lo primero es `dig <ref>.supabase.co`.
-- **Última migración aplicada: `20261013200000_permissions_facets_writes`** (2026-10-13, run 38381374556; backup
-  38379856540, inspect y plan limpios): `membership` es la única fuente de acceso, `workspace_membership` y
-  `project_membership` son su proyección y no se escriben por la API; el espejo está apagado. Paridad 0. Antes:
-  ADR-102 fase 4 (`20261013100000`), las personas de una conversación son `conversation_contact`. El directorio tiene 6.802 salas. Las migraciones van por `production-migrate.yml`: backup, plan, apply (`_tasks.md § 34`).
-- `hour-staging` (ref `slccyknqpgmzhyiyclsq`, `eu-west-1`): reconstruido el 2026-10-13 con la fase 3 de permisos
-  (run 38378601525: RLS 311/315, smoke 2/2). Se volverá a pausar sin uso.
-- Últimas suites contra producción (2026-10-13, `05f1c96`): RLS 307/315 (8 saltados) y E2E 66/66.
+- **Última migración aplicada: `20261013300000_permissions_facets_contract`** (2026-10-13, run 38475928369, con
+  `20261013250000_drop_archive_hour_backup_20260720` delante; backup 38470631048, inspect y plan limpios): el acceso
+  es solo `membership` + `membership_facet`; fuera `workspace_membership`, `project_membership`, el espejo, la
+  paridad y `workspace_role.permissions`; la firma vive en `membership.mail_signature`. El primer apply (run
+  38471454184) abortó sin cambios: el esquema de archivo `hour_backup_20260720`, solo de producción, sujetaba un
+  tipo; borrado (estaba en el backup). Producción ya no tiene esquemas que no vengan de las migraciones. El directorio tiene 6.802 salas. Las migraciones van por `production-migrate.yml`: backup, plan, apply (`_tasks.md § 34`).
+- `hour-staging` (ref `slccyknqpgmzhyiyclsq`, `eu-west-1`): reconstruido el 2026-10-13 con el contract de permisos
+  (run 38469017859: RLS 309/313, smoke 2/2). Se volverá a pausar sin uso.
+- Últimas suites contra producción (2026-10-14, `8884feb`): RLS 306/313 (7 saltados) y E2E 63/66; los dos rojos
+  tomaban «hoy» en UTC y el navegador va en Madrid (fallan de 00:00 a 02:00), corregidos en `5618eb9` y 26/26.
 - Desde el checkout principal (`~/Developer/hour`), nunca desde un worktree: los worktrees no llevan `.env` ni
   `.env.test` (RLS sale saltado, el login del E2E falla).
 - `pnpm --filter web test:rls`: siempre contra producción; carga `.env` + `.env.test` y no mira `.env.local`.
