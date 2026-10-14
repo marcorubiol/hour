@@ -6,6 +6,7 @@ hasta entonces, sacado de esos documentos; lo anterior a julio de 2026 está sol
 
 ## Octubre 2026 (en curso)
 
+- La ficha de una función tiene el tablón de su bolo: las funciones del trato y un hilo General más uno por cada faceta que puedes ver (Técnica, Logística, Comidas…), donde el equipo escribe y puede marcar a qué función se refiere. Lo nuevo desde tu última visita se marca, y los hilos sin mensajes quedan plegados al final. Quien no ve el dinero no ve su hilo. (2026-10-14, `ef53fcc`)
 - Por dentro, Hour ya guarda hilos de conversación interna del equipo, por bolo, conversación, proyecto o línea y por faceta, y quién los ha leído; Logística, Comidas y Hoja de ruta existen también a nivel de proyecto. Aún sin pantalla: nada cambia para nadie. (2026-10-14, `b2b410b`)
 - Por dentro, el acceso de cada persona vive solo en el modelo de facetas: fuera las tablas de membresía antiguas y los permisos de los roles, que ahora son solo etiquetas. Nada cambia para nadie. (2026-10-14, `8884feb`)
 - Invitar a alguien a un proyecto le da un paquete de acceso (Mínim, Equip, Coordinació o Direcció; Mínim por defecto), no los permisos de su rol: el rol queda como etiqueta. Por dentro, el acceso de todo el mundo vive ya en un solo sitio, el modelo de facetas, y no cambia para nadie. Y la fila de invitar en Ajustes ya no se corta. (2026-10-13, `05f1c96`)
