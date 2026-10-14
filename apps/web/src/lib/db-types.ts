@@ -2113,6 +2113,60 @@ export type Database = {
           },
         ]
       }
+      message: {
+        Row: {
+          author_id: string | null
+          body: string
+          created_at: string
+          deleted_at: string | null
+          edited_at: string | null
+          id: string
+          performance_id: string | null
+          thread_id: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          author_id?: string | null
+          body: string
+          created_at?: string
+          deleted_at?: string | null
+          edited_at?: string | null
+          id?: string
+          performance_id?: string | null
+          thread_id: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          author_id?: string | null
+          body?: string
+          created_at?: string
+          deleted_at?: string | null
+          edited_at?: string | null
+          id?: string
+          performance_id?: string | null
+          thread_id?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "message_performance_id_fkey"
+            columns: ["performance_id"]
+            isOneToOne: false
+            referencedRelation: "performance"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_thread_fk"
+            columns: ["thread_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "thread"
+            referencedColumns: ["id", "workspace_id"]
+          },
+        ]
+      }
       note: {
         Row: {
           author_id: string
@@ -2799,6 +2853,117 @@ export type Database = {
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspace"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      thread: {
+        Row: {
+          bolo_id: string | null
+          conversation_id: string | null
+          created_at: string
+          created_by: string | null
+          facet_id: string | null
+          id: string
+          last_message_at: string | null
+          line_id: string | null
+          project_id: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          bolo_id?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          facet_id?: string | null
+          id?: string
+          last_message_at?: string | null
+          line_id?: string | null
+          project_id?: string | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          bolo_id?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          facet_id?: string | null
+          id?: string
+          last_message_at?: string | null
+          line_id?: string | null
+          project_id?: string | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "thread_bolo_id_fkey"
+            columns: ["bolo_id"]
+            isOneToOne: false
+            referencedRelation: "bolo"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "thread_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversation"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "thread_facet_id_fkey"
+            columns: ["facet_id"]
+            isOneToOne: false
+            referencedRelation: "facet"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "thread_line_id_fkey"
+            columns: ["line_id"]
+            isOneToOne: false
+            referencedRelation: "line"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "thread_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "project"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "thread_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspace"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      thread_read: {
+        Row: {
+          last_read_at: string
+          thread_id: string
+          user_id: string
+        }
+        Insert: {
+          last_read_at?: string
+          thread_id: string
+          user_id: string
+        }
+        Update: {
+          last_read_at?: string
+          thread_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "thread_read_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "thread"
             referencedColumns: ["id"]
           },
         ]
@@ -3769,6 +3934,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      bolo_board: { Args: { p_performance_id: string }; Returns: Json }
       bolo_status_can_move: {
         Args: { p_status: Database["public"]["Enums"]["performance_status"] }
         Returns: boolean
@@ -4732,6 +4898,7 @@ export type Database = {
       delete_date: { Args: { p_date_id: string }; Returns: undefined }
       delete_expense: { Args: { p_expense_id: string }; Returns: undefined }
       delete_invoice: { Args: { p_invoice_id: string }; Returns: undefined }
+      delete_message: { Args: { p_message_id: string }; Returns: undefined }
       delete_note: { Args: { p_note_id: string }; Returns: undefined }
       delete_payment: { Args: { p_payment_id: string }; Returns: undefined }
       delete_performance: {
@@ -4744,6 +4911,27 @@ export type Database = {
       disconnect_mail_account: {
         Args: { p_account_id: string }
         Returns: undefined
+      }
+      edit_message: {
+        Args: { p_body: string; p_message_id: string }
+        Returns: {
+          author_id: string | null
+          body: string
+          created_at: string
+          deleted_at: string | null
+          edited_at: string | null
+          id: string
+          performance_id: string | null
+          thread_id: string
+          updated_at: string
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "message"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       end_conversation_contact: {
         Args: {
@@ -5089,6 +5277,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      mark_thread_read: { Args: { p_thread_id: string }; Returns: string }
       my_mail_signature: {
         Args: { p_workspace_id: string }
         Returns: {
@@ -5109,6 +5298,33 @@ export type Database = {
           p_year: number
         }
         Returns: string
+      }
+      post_message: {
+        Args: {
+          p_anchor_id: string
+          p_anchor_kind: string
+          p_body: string
+          p_facet_id?: string
+          p_performance_id?: string
+        }
+        Returns: {
+          author_id: string | null
+          body: string
+          created_at: string
+          deleted_at: string | null
+          edited_at: string | null
+          id: string
+          performance_id: string | null
+          thread_id: string
+          updated_at: string
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "message"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       preview_workspace_invitation: {
         Args: { p_token: string }
@@ -5507,6 +5723,14 @@ export type Database = {
       stop_sharing_my_profile_with_workspace: {
         Args: { p_workspace_id: string }
         Returns: undefined
+      }
+      thread_audience: {
+        Args: {
+          p_anchor_id: string
+          p_anchor_kind: string
+          p_facet_id?: string
+        }
+        Returns: Json
       }
       touch_line_visit: { Args: { p_line_id: string }; Returns: undefined }
       travel_stage_venue: {

@@ -66,9 +66,10 @@ const DECIDED_LEVELS: Record<string, string[]> = {
   converses: ['workspace', 'project', 'line'],
   materials: ['project', 'line', 'bolo'],
   tecnica: ['project', 'line', 'bolo'],
-  logistica: ['line', 'bolo'],
-  full_de_ruta: ['bolo', 'performance'],
-  comidas: ['bolo', 'performance'],
+  // ADR-106, pregunta 2: Logística, Full de ruta y Comidas, también en el proyecto.
+  logistica: ['project', 'line', 'bolo'],
+  full_de_ruta: ['project', 'bolo', 'performance'],
+  comidas: ['project', 'bolo', 'performance'],
   diners: ['workspace', 'project', 'line', 'bolo'],
 };
 
@@ -467,8 +468,11 @@ describe.skipIf(!envReady())('RLS: permisos por facetas', () => {
         await grantPreset(adminJwt, 'project', projectId, limitedUserId, 'coordinacio');
         const keyOf = Object.fromEntries(Object.entries(standard).map(([key, id]) => [id, key]));
         expect((await ownProjectFacets()).map((row) => `${keyOf[row.facet_id]}:${row.verb}`).sort()).toEqual([
+          'comidas:edit',
           'converses:edit',
           'diners:view',
+          'full_de_ruta:edit',
+          'logistica:edit',
           'materials:edit',
           'tecnica:edit',
         ]);

@@ -3500,3 +3500,47 @@ Marco, sobre las dos dudas del contract (`build/permissions-facets-plan.md § 9.
   viejo. `legacy` deja de ser un valor.
 - Marco, el mismo día: no hay nadie en producción ni en beta, así que el contract borra lo viejo sin capas de
   compatibilidad ni rollback SQL; se vuelve con el backup.
+
+## [2026-10-14] ADR-106 · Comms sube a Conversations, y los hilos internos con facetas: modelo y primer corte
+
+**Contexto.** Plan del carril 2 de comms, `build/plans/2026-10-14-comms-threads.md` (rama
+`claude/comms-threads-plan`, `601efdf`), sobre el modelo de facetas en producción desde el contract (ADR-105). Cierra
+la entrada «ADR pendiente: comms sube a la lente Conversations» de `_tasks.md`. Marco acepta las seis recomendadas del
+§ 5 del plan (2026-10-14).
+
+**La lente.** Comms vive en Conversations, con dos proyecciones que no son secundarias una de la otra (patrón
+ADR-076): «con quién hablas» (la difusión, la lista de hoy) y «de qué se habla» (los hilos internos por contenedor).
+Hilo (N a N, sin estado) y conversación de difusión (1 a 1, con estado) no se fusionan: los une la lente.
+
+**El modelo.**
+- `thread`: un ancla (proyecto, línea, bolo o conversación, exactamente una) y una faceta opcional. Sin faceta es el
+  General del contenedor (estar en el contenedor, enmienda de ADR-082); un hilo de conversación nunca lleva faceta.
+  Un General y un hilo por faceta en cada contenedor. Nace perezoso: lo crea el primer mensaje.
+- `message`: autor siempre un login (`auth.uid()` dentro de la RPC; sin invitados, ADR-099 §7), de qué función habla
+  en un hilo de bolo (variante «a» de la maqueta, ADR-099 §6), borrado blando, sin copia a `audit_log`.
+- `thread_read`: hasta dónde ha leído cada persona cada hilo.
+- Lectura: hilo de conversación, quien lee la conversación (viva, Converses y su privacidad); General, quien tiene
+  acceso al contenedor por la cadena; faceta, quien ve esa faceta por la cadena, con la faceta existente en el nivel y
+  activa en el espacio. Los mensajes heredan la frontera del hilo.
+- Escritura solo por RPC (`post_message`, `edit_message`, `delete_message`, `mark_thread_read`); la línea de
+  audiencia la da `thread_audience`, y solo a quien ya lee el hilo. Sin realtime (ADR-083 §2).
+
+**Las seis respuestas (la opción recomendada en todas):**
+1. **El tablón y el dinero:** una RPC (`bolo_board`) da, desde una función, su tablón y las funciones hermanas del
+   bolo (día, hora, sala) a quien tiene acceso a la función, sin caché, estado del trato ni pagador.
+   `performance.bolo_id` sigue fuera del grant por columnas.
+2. **Logística, Comidas y Full de ruta existen también en el proyecto** (filas nuevas de `facet_level`), y los paquetes
+   de las membresías de proyecto se re-expanden: solo se añaden filas `preset`; las `override` no se tocan. El Equip de
+   un proyecto las ve en sus bolos.
+   Consecuencia: `can_grant_preset` y `can_manage_membership` piden esas tres facetas para delegar Equip, Coordinació o
+   Direcció en un proyecto, así que una membresía de proyecto solo con overrides perdería delegar; la migración aborta
+   si existe alguna (en producción, 0 el 2026-10-14, según la revisión del coordinador).
+3. **Ver una faceta deja leer y escribir en su hilo**; editar gatea los datos de la faceta, no la palabra.
+4. **`message` es tabla propia**; `note` sigue siendo el post-it privado (ADR-093) y no se toca.
+5. **Primer corte de pantallas:** tablón del bolo en la ficha de la función, hilo del equipo de la conversación y
+   «de qué se habla» en Conversations. El esquema admite hilos de proyecto y de línea sin migrar; la RPC solo abre
+   bolo y conversación.
+6. **No leídos por hilo y persona**, en el tablón y en Conversations; sin Desk, avisos ni correo.
+
+**Fuera de este corte:** invitados y link firmado, hilos libres con lista de gente, hubs de espacio, proyecto y
+línea, notificaciones, adjuntos y menciones, y las pantallas de membresías finas y de facetas por espacio.
