@@ -42,7 +42,7 @@ de Phase 0.9 en `_tasks.md`. Pricing orientativo, no decidido.
 - **Última migración aplicada: `20261014200000_create_workspace_person`** (2026-10-14, run 38597605297; backup 38596584394, plan 38596992986): alta de persona del equipo sin conversación e invitación que enlaza el dossier (ADR-107). Antes, `20261014100000_comms_threads` (hilos, ADR-106). El acceso es solo `membership` + `membership_facet` (ADR-105). El directorio tiene 6.802 salas. Las migraciones van por `production-migrate.yml`: backup, plan, apply (`_notes/tasks-archive.md § 34`).
 - `hour-staging` (ref `slccyknqpgmzhyiyclsq`, `eu-west-1`): reconstruido el 2026-10-13 con el contract de permisos
   (run 38469017859: RLS 309/313, smoke 2/2). Se volverá a pausar sin uso.
-- Últimas suites contra producción (2026-10-14): RLS 338/347 (9 saltados) tras la migración de alta de persona; en paralelo da `ECONNRESET` sueltos, en serie (`--no-file-parallelism`) sale verde. E2E contra `0e6f3ef`: pendiente.
+- Últimas suites contra producción (2026-10-14): RLS 338/347 (9 saltados) tras la migración de alta de persona; en paralelo da `ECONNRESET` sueltos, en serie (`--no-file-parallelism`) sale verde. E2E 71/71 contra `0e6f3ef`.
 - Desde el checkout principal (`~/Developer/hour`), nunca desde un worktree: los worktrees no llevan `.env` ni
   `.env.test` (RLS sale saltado, el login del E2E falla).
 - `pnpm --filter web test:rls`: siempre contra producción; carga `.env` + `.env.test` y no mira `.env.local`.
