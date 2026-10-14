@@ -18,7 +18,7 @@
   import { toStore } from 'svelte/store';
   import { fetchJSON, mutateJSON } from '$lib/api';
   import Button from '$lib/components/Button.svelte';
-  import Select from '$lib/components/Select.svelte';
+  import PersonPicker from '$lib/components/PersonPicker.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
   import { appLocale, t } from '$lib/i18n';
 
@@ -36,7 +36,7 @@
     person: { id: string; slug: string | null; full_name: string; email: string | null } | null;
   };
   type Candidate = { person_id: string; slug: string | null; full_name: string };
-  type CastResponse = { cast: CastMember[]; people: Candidate[] };
+  type CastResponse = { workspace_id: string; cast: CastMember[]; people: Candidate[] };
 
   const queryClient = useQueryClient();
 
@@ -57,12 +57,14 @@
   let cast = $derived($castQuery.data?.cast ?? []);
   let people = $derived($castQuery.data?.people ?? []);
 
-  let personId = $state('');
-  let role = $state('');
+  let workspaceId = $derived($castQuery.data?.workspace_id ?? '');
 
-  let personOptions = $derived(
-    people.map((p) => ({ value: p.person_id, label: p.full_name })),
-  );
+  /** What the picker shows, and who it last handed over: typing again
+      forgets the pick. */
+  let personText = $state('');
+  let picked = $state<{ id: string; name: string } | null>(null);
+  let personId = $derived(picked && picked.name === personText ? picked.id : '');
+  let role = $state('');
 
   /** Both fields are required — `role` is NOT NULL with a non-empty CHECK. */
   let canAdd = $derived(personId !== '' && role.trim() !== '');
@@ -78,12 +80,13 @@
       return body.member;
     },
     onSuccess: () => {
-      personId = '';
+      picked = null;
+      personText = '';
       role = '';
       void queryClient.invalidateQueries({ queryKey: ['project-cast', projectId] });
       // The team feed is cast ∪ crew, so a new cast row changes who exists
       // for ⌘K, the pins and the Planner's person axis.
-      void queryClient.invalidateQueries({ queryKey: ['team'] });
+      void queryClient.invalidateQueries({ queryKey: ['planner-team'] });
     },
     onError: (err) => {
       addToast({
@@ -101,7 +104,7 @@
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['project-cast', projectId] });
-      void queryClient.invalidateQueries({ queryKey: ['team'] });
+      void queryClient.invalidateQueries({ queryKey: ['planner-team'] });
     },
     onError: (err) => {
       addToast({
@@ -148,33 +151,33 @@
       <p class="cast__quiet">{t('perf.cast_empty', locale)}</p>
     {/if}
 
-    {#if people.length === 0}
-      <!-- Casting requires a local dossier (cast_member_workspace_person_fkey),
-           so with no dossiers there is nobody to offer. Say which of the two
-           empty states this is instead of showing a dead picker. -->
-      <p class="cast__quiet">{t('perf.cast_no_people', locale)}</p>
-    {:else}
-      <form class="cast__add" onsubmit={add}>
-        <Select
-          label={t('blackout.person', locale)}
-          bind:value={personId}
-          options={personOptions}
-          placeholder={t('perf.cast_choose', locale)}
-        />
-        <label class="cast__field">
-          <span class="cast__label">{t('perf.cast_role', locale)}</span>
+    <!-- Casting requires a local dossier (cast_member_workspace_person_fkey);
+         a name that is nobody yet is created right here (ADR-107). -->
+    <form class="cast__add" onsubmit={add}>
+      <PersonPicker
+        options={people}
+        {workspaceId}
+        label={t('blackout.person', locale)}
+        placeholder={t('people.search', locale)}
+        {locale}
+        bind:text={personText}
+        onpick={(p) => (picked = { id: p.person_id, name: p.full_name })}
+      />
+      <div class="field cast__field">
+        <label for={`cast-role-${projectId}`}>{t('perf.cast_role', locale)}</label>
+        <div class="field__control">
           <input
-            class="cast__input"
+            id={`cast-role-${projectId}`}
             bind:value={role}
             placeholder={t('perf.cast_role_placeholder', locale)}
             maxlength="120"
           />
-        </label>
-        <Button type="submit" size="s" disabled={!canAdd} loading={$addMutation.isPending}>
-          {t('composer.add', locale)}
-        </Button>
-      </form>
-    {/if}
+        </div>
+      </div>
+      <Button type="submit" size="s" disabled={!canAdd} loading={$addMutation.isPending}>
+        {t('composer.add', locale)}
+      </Button>
+    </form>
   {/if}
 </div>
 
@@ -228,27 +231,10 @@
     border-block-start: 1px solid var(--border-color-light);
   }
 
-  .cast__field {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-3xs);
+  /* Both fields are `.field` (base.css), so the person and the role read
+     as one form; here only how they share the row. */
+  .cast__add > :global(*:not(button)) {
     flex: 1;
     min-inline-size: 8rem;
-  }
-
-  .cast__label {
-    font-size: var(--text-xs);
-    color: var(--text-muted);
-  }
-
-  .cast__input {
-    inline-size: 100%;
-    padding: var(--space-2xs) var(--space-xs);
-    font: inherit;
-    font-size: var(--text-s);
-    color: var(--text-color);
-    background: var(--bg-color);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-s);
   }
 </style>

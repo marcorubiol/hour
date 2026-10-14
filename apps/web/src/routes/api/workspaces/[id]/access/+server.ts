@@ -18,6 +18,8 @@ const InviteBody = v.object({
     v.nullable(v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(64))),
   ),
   project_preset: v.optional(v.nullable(Preset)),
+  /** ADR-107: invited from this dossier's file; acceptance links it. */
+  person_id: v.optional(v.nullable(UUID)),
 });
 const PatchBody = v.object({
   membership_id: UUID,
@@ -91,6 +93,7 @@ function rpcError(err: unknown, route: string, requestId: string | undefined): R
     {
       codes: {
         '22023': { status: 400, error: 'invalid_input' },
+        '23505': { status: 409, error: 'email_taken' },
         '42501': { status: 403, error: 'forbidden' },
       },
       passUpstream: [401, 403],
@@ -120,20 +123,28 @@ export const POST: RequestHandler = async ({ request, params, platform, locals, 
     return json({ error: 'project_and_role_required_together' }, 400);
   }
   try {
-    const { data } = await pgPostRpc<InvitationResult>(
-      ctx.env,
-      'create_workspace_invitation',
-      ctx.jwt,
-      {
-        p_workspace_id: ctx.workspaceId,
-        p_email: parsed.output.email,
-        p_role: parsed.output.role,
-        p_project_id: parsed.output.project_id ?? null,
-        p_project_role_code: parsed.output.project_role_code ?? null,
-        p_expires_days: 7,
-        p_project_preset: parsed.output.project_id ? (parsed.output.project_preset ?? null) : null,
-      },
-    );
+    const { data } = parsed.output.person_id
+      ? // From a person's file (ADR-107): no project, the dossier rides along.
+        await pgPostRpc<InvitationResult>(ctx.env, 'invite_workspace_person', ctx.jwt, {
+          p_workspace_id: ctx.workspaceId,
+          p_person_id: parsed.output.person_id,
+          p_email: parsed.output.email,
+          p_role: parsed.output.role,
+        })
+      : await pgPostRpc<InvitationResult>(
+          ctx.env,
+          'create_workspace_invitation',
+          ctx.jwt,
+          {
+            p_workspace_id: ctx.workspaceId,
+            p_email: parsed.output.email,
+            p_role: parsed.output.role,
+            p_project_id: parsed.output.project_id ?? null,
+            p_project_role_code: parsed.output.project_role_code ?? null,
+            p_expires_days: 7,
+            p_project_preset: parsed.output.project_id ? (parsed.output.project_preset ?? null) : null,
+          },
+        );
     const invitation = data[0];
     if (!invitation) return json({ error: 'rpc_empty_result' }, 502);
     return json(

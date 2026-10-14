@@ -118,7 +118,8 @@ export const GET: RequestHandler = async ({ request, params, platform, locals })
       pgGet<CandidateRow>(env, 'workspace_person', jwt, { search: peopleSearch }),
     ]);
 
-    return json({ cast: cast.data, people: people.data });
+    // The space travels too: the picker creates a missing person in it (ADR-107).
+    return json({ workspace_id: project.workspace_id, cast: cast.data, people: people.data });
   } catch (err) {
     return pgErrorResponse(
       err,

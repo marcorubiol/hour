@@ -2,7 +2,8 @@
  * GET /api/team?workspace_ids=uuid,uuid,...
  *
  * The workspaces' active TEAM: distinct persons appearing in
- * `cast_member` ∪ `crew_assignment` (deduped per workspace), with the
+ * `cast_member` ∪ `crew_assignment` ∪ a «voy» in `commitment_person`
+ * (ADR-107; deduped per workspace), with the
  * person's name for the select label. Feeds the blackout dialog's person
  * picker (ADR-078 §5): the team, NOT the contact book — a workspace's
  * person table can hold hundreds of programmers who are not "us".
@@ -106,9 +107,22 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
   };
 
   try {
-    const [cast, crew] = await Promise.all([
+    // ADR-107: whoever said «voy» to a performance or a date is on the team
+    // too (somebody added from «quién va» has no cast row). The word adds
+    // the person, never a project: `project_ids` is the pool inferences
+    // draw from, and a «voy» to one rehearsal is not the cast.
+    const goingSearch = new URLSearchParams({
+      select: 'workspace_id,person_id',
+      workspace_id: `in.(${workspaceIds.join(',')})`,
+      state: 'eq.going',
+      limit: BATCH_LIMIT,
+    });
+    const [cast, crew, going] = await Promise.all([
       pgGet<TeamSourceRow>(env, 'cast_member', jwt, { search: makeSearch('cast') }),
       pgGet<TeamSourceRow>(env, 'crew_assignment', jwt, { search: makeSearch('crew') }),
+      pgGet<{ workspace_id: string; person_id: string }>(env, 'commitment_person', jwt, {
+        search: goingSearch,
+      }),
     ]);
 
     const seen = new Map<string, TeamItem>();
@@ -131,6 +145,35 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
       // identity dedupes; the projects accumulate.
       const projectId = row.project_id ?? row.performance?.project_id ?? null;
       if (projectId) projects.get(key)!.add(projectId);
+    }
+    const missing = going.data.filter((g) => !seen.has(`${g.workspace_id}:${g.person_id}`));
+    if (missing.length > 0) {
+      const ids = [...new Set(missing.map((g) => g.person_id))];
+      const dossiers = await pgGet<{ workspace_id: string; person_id: string; slug: string; full_name: string }>(
+        env,
+        'workspace_person',
+        jwt,
+        {
+          search: new URLSearchParams({
+            select: 'workspace_id,person_id,slug,full_name',
+            workspace_id: `in.(${workspaceIds.join(',')})`,
+            person_id: `in.(${ids.join(',')})`,
+            deleted_at: 'is.null',
+            limit: BATCH_LIMIT,
+          }),
+        },
+      );
+      for (const d of dossiers.data) {
+        const key = `${d.workspace_id}:${d.person_id}`;
+        if (seen.has(key) || !missing.some((g) => `${g.workspace_id}:${g.person_id}` === key)) continue;
+        seen.set(key, {
+          person_id: d.person_id,
+          workspace_id: d.workspace_id,
+          slug: d.slug,
+          full_name: d.full_name,
+          project_ids: [],
+        });
+      }
     }
     for (const [key, item] of seen) {
       item.project_ids = [...(projects.get(key) ?? [])].sort();

@@ -1,0 +1,40 @@
+/*
+  THE LISTBOX: the floating list under a combobox (ARIA pattern), defined
+  once. It lived inside PlaceField (a city and the place picked for it) until
+  the person pickers (ADR-107) needed the same list; two copies would drift.
+
+  The host is `position: relative` and owns the input; this is only the
+  paper the options sit on, the option row and the current one. What an
+  option says (a place and its zone, a person, «Añadir "nombre"») is the
+  host's.
+*/
+
+@layer components {
+  .listbox {
+    position: absolute;
+    z-index: 20;
+    inset-block-start: calc(100% + 2px);
+    inset-inline-start: 0;
+    display: flex;
+    flex-direction: column;
+    min-inline-size: max(100%, 16rem);
+    padding-block: var(--space-2xs);
+    background: var(--bg-ultra-light);
+    border: 1px solid var(--border-color-light);
+    border-radius: var(--radius-m);
+    box-shadow: var(--box-shadow-2);
+  }
+  .listbox__opt {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-s);
+    padding: var(--space-2xs) var(--space-xs);
+    cursor: pointer;
+    font-size: var(--text-s);
+    color: var(--text-color);
+  }
+  .listbox__opt--cur {
+    background: var(--bg-hover);
+  }
+}

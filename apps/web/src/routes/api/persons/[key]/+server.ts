@@ -7,14 +7,19 @@
  * one company leaking into another company that happens to know the same
  * human.
  *
- * Auth: Bearer JWT required. RLS (`can_see_person`) decides visibility.
+ * PATCH /api/persons/:person_id — { workspace_id, full_name, email, phone,
+ * title } via `update_workspace_person` (ADR-107): what the quick add left
+ * for later. Every field travels; an empty one clears it (not the name).
+ *
+ * Auth: Bearer JWT required. RLS (`can_see_person`) decides visibility; the
+ * RPC gates the write.
  */
 
 import type { RequestHandler } from './$types';
 import * as v from 'valibot';
 import { extractAccessToken } from '$lib/auth';
 import { isUuid } from '$lib/server/performance-bundle';
-import { pgGet, type SupabaseEnv } from '$lib/supabase';
+import { pgGet, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
 
 function json(body: unknown, status = 200): Response {
@@ -114,11 +119,14 @@ export const GET: RequestHandler = async ({ request, params, url, platform, loca
       deleted_at: 'is.null',
     });
 
-    const [conversations, notes, crew, cast] = await Promise.all([
+    const [conversations, notes, crew, cast, admin] = await Promise.all([
       pgGet(env, 'conversation', jwt, { search: engSearch }),
       pgGet(env, 'note', jwt, { search: notesSearch }),
       pgGet(env, 'crew_assignment', jwt, { search: crewSearch }),
       pgGet(env, 'cast_member', jwt, { search: castSearch }),
+      // «Invitar a X» (ADR-107) is an admin's verb: the file only offers it
+      // to whoever `invite_workspace_person` would let through.
+      pgPostRpc<boolean>(env, 'is_workspace_admin', jwt, { ws_id: workspaceId }),
     ]);
 
     return json({
@@ -131,12 +139,59 @@ export const GET: RequestHandler = async ({ request, params, url, platform, loca
       notes: notes.data,
       crew: crew.data,
       cast: cast.data,
+      can_invite: admin.data[0] === true,
     });
   } catch (err) {
     return pgErrorResponse(
       err,
       { route: 'GET /api/persons/[key]', requestId: locals.requestId },
       { passUpstream: [401, 403] },
+    );
+  }
+};
+
+const PatchSchema = v.object({
+  workspace_id: v.pipe(v.string(), v.uuid()),
+  full_name: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(200)),
+  email: v.nullish(v.union([v.literal(''), v.pipe(v.string(), v.trim(), v.email(), v.maxLength(320))])),
+  phone: v.nullish(v.pipe(v.string(), v.trim(), v.maxLength(60))),
+  title: v.nullish(v.pipe(v.string(), v.trim(), v.maxLength(200))),
+});
+
+export const PATCH: RequestHandler = async ({ request, params, platform, locals }) => {
+  if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);
+  const env = platform.env as unknown as SupabaseEnv;
+
+  const jwt = extractAccessToken(request);
+  if (!jwt) return json({ error: 'missing_authorization' }, 401);
+  if (!isUuid(params.key)) return json({ error: 'invalid_id' }, 400);
+
+  const parsed = v.safeParse(PatchSchema, await request.json().catch(() => null));
+  if (!parsed.success) return json({ error: 'invalid_body' }, 400);
+  const b = parsed.output;
+
+  try {
+    const { data } = await pgPostRpc<WorkspacePersonRow>(env, 'update_workspace_person', jwt, {
+      p_workspace_id: b.workspace_id,
+      p_person_id: params.key,
+      p_full_name: b.full_name,
+      p_email: b.email || null,
+      p_phone: b.phone || null,
+      p_title: b.title || null,
+    });
+    if (data.length === 0) return json({ error: 'update_failed' }, 502);
+    return json({ person: data[0] });
+  } catch (err) {
+    return pgErrorResponse(
+      err,
+      { route: 'PATCH /api/persons/[key]', requestId: locals.requestId },
+      {
+        codes: {
+          '22023': { status: 400, error: 'invalid_input' },
+          '23505': { status: 409, error: 'email_taken' },
+          '42501': { status: 403, error: 'forbidden' },
+        },
+      },
     );
   }
 };

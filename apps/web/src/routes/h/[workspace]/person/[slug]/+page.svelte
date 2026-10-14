@@ -11,6 +11,9 @@
   import { fetchJSON, mutateJSON } from '$lib/api';
   import Button from '$lib/components/Button.svelte';
   import Dialog from '$lib/components/Dialog.svelte';
+  import Input from '$lib/components/Input.svelte';
+  import { ApiError } from '$lib/api';
+  import { copyText } from '$lib/clipboard';
   import Select from '$lib/components/Select.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
   import { session } from '$lib/session.svelte';
@@ -79,6 +82,8 @@
       role: string;
       project: { id: string; slug: string; name: string } | null;
     }>;
+    /** Only an admin of the space invites (ADR-107). */
+    can_invite?: boolean;
   };
 
   const locale = appLocale();
@@ -271,6 +276,108 @@
     $addConversation.mutate();
   }
 
+  // ── Details (ADR-107): what the quick add left for later ───────────
+  let editOpen = $state(false);
+  let eName = $state('');
+  let eEmail = $state('');
+  let ePhone = $state('');
+  let eTitle = $state('');
+
+  function openEdit() {
+    if (!file) return;
+    eName = file.person.full_name;
+    eEmail = file.person.email ?? '';
+    ePhone = file.person.phone ?? '';
+    eTitle = file.person.title ?? '';
+    editOpen = true;
+  }
+
+  const saveDetails = createMutation({
+    mutationFn: () =>
+      mutateJSON('PATCH', `/api/persons/${file!.person.id}`, {
+        workspace_id: contextWorkspaceId,
+        full_name: eName,
+        email: eEmail.trim() || null,
+        phone: ePhone.trim() || null,
+        title: eTitle.trim() || null,
+      }),
+    onSuccess: () => {
+      editOpen = false;
+      void queryClient.invalidateQueries({ queryKey: ['person', contextWorkspaceId, slug] });
+      void queryClient.invalidateQueries({ queryKey: ['planner-team'] });
+      addToast({ tone: 'success', message: t('person.saved', locale) });
+    },
+    onError: (err) => {
+      addToast({
+        tone: 'danger',
+        title: t('person.not_saved', locale),
+        message:
+          err instanceof ApiError && err.status === 409
+            ? t('person.email_taken', locale)
+            : err instanceof Error
+              ? err.message
+              : t('perf.unexpected', locale),
+      });
+    },
+  });
+
+  // ── Invite to Hour from the file (ADR-107) ──────────────────────────
+  // The invitation names this dossier: accepting it joins the account to
+  // it, so the cast, the notes and the rest stay where they are.
+  let inviteOpen = $state(false);
+  let iEmail = $state('');
+  let iRole = $state('member');
+  let inviteUrl = $state('');
+  const inviteRoles = (['member', 'viewer', 'guest', 'admin'] as const).map((r) => ({
+    value: r,
+    label: t(`settings.role_${r}`, locale),
+  }));
+
+  function openInvite() {
+    iEmail = file?.person.email ?? '';
+    iRole = 'member';
+    inviteUrl = '';
+    inviteOpen = true;
+  }
+
+  const invite = createMutation({
+    mutationFn: async () => {
+      const body = await mutateJSON<{ invitation?: { invite_url: string } }>(
+        'POST',
+        `/api/workspaces/${contextWorkspaceId}/access`,
+        { email: iEmail.trim(), role: iRole, person_id: file!.person.id },
+      );
+      if (!body?.invitation) throw new Error(t('settings.access_invite_no_link', locale));
+      return body.invitation;
+    },
+    onSuccess: (invitation) => {
+      inviteUrl = invitation.invite_url;
+      void queryClient.invalidateQueries({ queryKey: ['person', contextWorkspaceId, slug] });
+    },
+    onError: (err) => {
+      addToast({
+        tone: 'danger',
+        title: t('person.invite_failed', locale),
+        message:
+          err instanceof ApiError && err.status === 409
+            ? t('person.email_taken', locale)
+            : err instanceof ApiError && err.status === 400
+              ? t('person.invite_has_account', locale)
+              : err instanceof Error
+                ? err.message
+                : t('perf.unexpected', locale),
+      });
+    },
+  });
+
+  async function copyInvite() {
+    addToast(
+      (await copyText(inviteUrl))
+        ? { tone: 'success', message: t('settings.access_link_copied', locale) }
+        : { tone: 'danger', message: t('settings.access_link_copy_failed', locale) },
+    );
+  }
+
   let placeLine = $derived(
     file ? [file.person.city, file.person.country].filter(Boolean).join(', ') : '',
   );
@@ -299,7 +406,17 @@
     </header>
 
     <section class="person__section" aria-label={t('conversations.col_contact', locale)}>
-      <p class="eyebrow">{t('conversations.col_contact', locale)}</p>
+      <div class="person__section-head">
+        <p class="eyebrow">{t('conversations.col_contact', locale)}</p>
+        <span class="person__verbs">
+          <Button variant="outline" size="xs" onclick={openEdit}>{t('person.edit', locale)}</Button>
+          {#if file.can_invite}
+            <Button variant="outline" size="xs" onclick={openInvite}>
+              {t('person.invite', locale, { name: file.person.full_name })}
+            </Button>
+          {/if}
+        </span>
+      </div>
       <ul class="person__contact" role="list">
         {#if file.person.email}
           <li><a href={`mailto:${file.person.email}`}>{file.person.email}</a></li>
@@ -440,6 +557,58 @@
   {/snippet}
 </Dialog>
 
+<Dialog bind:open={editOpen} title={t('person.edit_title', locale, { name: file?.person.full_name ?? '' })} size="s">
+  <div class="person__add-grid">
+    <Input label={t('person.field_name', locale)} bind:value={eName} required />
+    <Input label={t('person.field_title', locale)} bind:value={eTitle} />
+    <Input label={t('person.field_email', locale)} type="email" bind:value={eEmail} />
+    <Input label={t('person.field_phone', locale)} type="tel" bind:value={ePhone} />
+  </div>
+  {#snippet actions()}
+    <Button variant="outline" onclick={() => (editOpen = false)}>{t('create.cancel', locale)}</Button>
+    <Button
+      onclick={() => $saveDetails.mutate()}
+      loading={$saveDetails.isPending}
+      disabled={!eName.trim()}
+    >
+      {t('edit.save', locale)}
+    </Button>
+  {/snippet}
+</Dialog>
+
+<Dialog
+  bind:open={inviteOpen}
+  title={t('person.invite', locale, { name: file?.person.full_name ?? '' })}
+  size="s"
+>
+  <p class="person__hint">{t('person.invite_hint', locale)}</p>
+  {#if inviteUrl}
+    <div class="person__add-grid">
+      <Input label={t('person.invite_link', locale)} value={inviteUrl} />
+    </div>
+    <p class="person__hint">{t('settings.access_link_expiry', locale)}</p>
+  {:else}
+    <div class="person__add-grid">
+      <Input label={t('person.field_email', locale)} type="email" bind:value={iEmail} required />
+      <Select label={t('person.invite_role', locale)} options={inviteRoles} bind:value={iRole} />
+    </div>
+  {/if}
+  {#snippet actions()}
+    <Button variant="outline" onclick={() => (inviteOpen = false)}>{t('create.cancel', locale)}</Button>
+    {#if inviteUrl}
+      <Button onclick={copyInvite}>{t('person.invite_copy', locale)}</Button>
+    {:else}
+      <Button
+        onclick={() => $invite.mutate()}
+        loading={$invite.isPending}
+        disabled={!iEmail.trim()}
+      >
+        {t('person.invite_send', locale)}
+      </Button>
+    {/if}
+  {/snippet}
+</Dialog>
+
 <style>
   @layer components {
     .person {
@@ -500,6 +669,19 @@
       align-items: baseline;
       justify-content: space-between;
       gap: var(--space-m);
+    }
+
+    .person__verbs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-xs);
+    }
+
+    .person__hint {
+      margin: 0;
+      font-size: var(--text-s);
+      color: var(--text-muted);
+      line-height: 1.55;
     }
 
     .person__add-grid {
