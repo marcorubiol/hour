@@ -379,34 +379,6 @@
   `workspace_invitation` (token **hasheado** sha256 + `expires_at` + revocación),
   no el de los shares, que guardan el token **en claro y sin caducidad**.
 
-- [ ] **BLOQUEANTE 2 — RPC de expansión de presets, y la etapa 2 se ha
-  encarecido.** Sin ella no se escribe **ninguna** fila en `membership_facet`, así
-  que ningún hilo de faceta lo lee nadie salvo un owner/admin: la etapa 1 nace
-  muerta. Tiene que expandir preset→filas con `source='preset'`, aplicar
-  overrides con `source='override'` (la vista «de dónde sale cada permiso» de
-  ADR-082 §4 depende de esa columna) y hacer cumplir la delegación acotada
-  (faceta · verbo · nivel) en el servidor. **Además** el plan escrito en la
-  migración («apuntar `has_permission()` a `membership` y tirar las dos tablas
-  viejas») envejeció mal: `has_permission` se partió en
-  `has_permission_for_user` + wrapper, llegó `read:performance`, y hoy dependen
-  de ello 8 políticas SELECT reescritas más `list_money_performances` y
-  `update_performance_fee`.
-
-- [ ] **Migración `2026-07-20_comms_threads_and_membership.sql` — escrita,
-  SIN APLICAR, y ya no bloqueada por lo que decía.** 604 líneas: 2 enums, 7
-  tablas, 4 funciones, 9 políticas, triggers y rollback. Aditiva pura. **La
-  dependencia declarada ha muerto**: decía depender de
-  `2026-07-18_user_profile_person_id.sql`, pero `user_profile.person_id` **ya
-  existe y está vivo en producción** — `main` lo resolvió por su cuenta con la
-  tanda de identidad. Ninguna de sus 7 tablas existe todavía.
-
-- [ ] **Defecto NUEVO, no listado en el review de 32 hallazgos: todo backfill de
-  proyecto nace inerte.** El backfill de `project_membership` no escribe
-  `accepted_at`, pero el guard `accepted_at IS NOT NULL` que se añadió al cerrar
-  los hallazgos #10/#14/#18 rechaza exactamente esas filas. Resultado: tras
-  aplicar, **ninguna membresía de proyecto concede pertenencia ni acceso a
-  faceta a nadie**. La otra mitad del remedio del #18 no se aplicó.
-
 - [ ] **Hallazgos del review que siguen abiertos** —
   `_notes/review-comms-migration-2026-07-20.md`. Los 4 conocidos:
   `membership_select` publica la matriz de permisos entera del espacio · el
@@ -442,6 +414,7 @@
 - [ ] **Microsoft (Outlook) aparcado hasta que una compañía lo pida (Marco, 2026-10-11).** Una cuenta personal ya no puede registrar apps sin directorio: hará falta darse de alta en Azure (crea el directorio) y después registrar la app por Chrome. La capa de proveedor se construye para que sea solo otro adaptador.
 - [ ] **Google: verificación de la app y auditoría CASA antes de pasar de 100 usuarios** (permisos restringidos de Gmail; coste de cientos a miles de dólares al año según las fuentes, por confirmar). Mientras, modo prueba (Marco, 2026-10-11).
 - [ ] **Comms, carril 2: hilos con facetas (ADR-099).** Los permisos ya están en el modelo de facetas en producción (ADR-104/105, CHANGELOG 11-10 a 14-10); faltan los hilos: sin invitados, tablón del día colgado del bolo (la maqueta de `claude/comms-mock` enseña también la variante por faceta). **Primero un plan escrito en una rama, antes de tocar código (Marco, 2026-10-14, opción a):** esquema, permisos, pantalla y fases, partiendo de la maqueta y del material de `feat/comms-threads`; se le enseña a Marco antes de construir.
+  - [ ] Marco: decidir — **Las 6 preguntas del plan de los hilos** (`build/plans/2026-10-14-comms-threads.md` en `claude/comms-threads-plan`, `601efdf`, § Preguntas): el tablón y el dinero, las facetas sin nivel de proyecto, si ver deja escribir, `message` o `note`, el primer corte de pantallas y los no leídos. Cada una con su recomendada.
   - [ ] Facetas configurables por espacio (Marco, 2026-10-11): estándar sembradas (con Comidas) y traducidas por clave; renombrar, desactivar y crear propias, con nombre por idioma opcional. La tabla `workspace_facet_setting` existe desde la expand; sin comprobar si hay pantalla.
   - [ ] Deuda: un override de faceta no queda en `audit_log` (`membership_facet` no tiene `id`).
 - [ ] **Correo con el dominio propio de cada compañía (Marco, 2026-10-11), en tres conectores:**
