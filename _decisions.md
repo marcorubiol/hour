@@ -3544,3 +3544,39 @@ Hilo (N a N, sin estado) y conversación de difusión (1 a 1, con estado) no se 
 
 **Fuera de este corte:** invitados y link firmado, hilos libres con lista de gente, hubs de espacio, proyecto y
 línea, notificaciones, adjuntos y menciones, y las pantallas de membresías finas y de facetas por espacio.
+
+## [2026-10-14] ADR-107 · Alta de alguien del equipo sin conversación, y la invitación que enlaza su dossier
+
+**Contexto.** Una persona solo nacía de una conversación de difusión (`create_conversation`,
+`add_conversation_contact`) o al compartir el perfil (`share_my_profile_with_workspace`). `person` no tiene grant de
+INSERT y el reparto solo ofrecía dossiers existentes: Anouk, Anna, Manou, Adelie y Loïs se crearon por SQL. Marco
+decide (2026-10-14) las tres recomendadas.
+
+**Decisión.**
+1. **Desde cada selector de personas.** Escribir un nombre que no es nadie ofrece «Añadir "nombre"». Hoy hay dos
+   selectores: el reparto del proyecto (`CastPanel`) y «quién va» de una función o una fecha (`WhoGoes`). El equipo
+   técnico (`crew_assignment`) no tiene selector ni RPC de escritura; cuando lo tenga, usa el mismo componente
+   (`PersonPicker`). Quien dice «voy» entra en `/api/team` (sin proyecto: un «voy» no es el reparto ni alimenta la
+   deducción).
+2. **Solo el nombre.** `create_workspace_person(p_workspace_id, p_full_name, p_email, p_phone, p_title)`, con el patrón
+   de `add_conversation_contact`: persona global anónima (`person-<12 hex>`, `Person <8 hex>`, sin email) y dossier
+   local con el nombre real y slug único en el espacio. Mismo email en el espacio: devuelve ese dossier. Email,
+   teléfono y cargo se rellenan después en la ficha (`update_workspace_person`; el slug no cambia, es la URL).
+3. **La invitación sale de la ficha.** «Invitar a X» (solo admin del espacio, como `create_workspace_invitation`):
+   `invite_workspace_person` crea la invitación y la marca con el dossier (`workspace_invitation.person_id`); un
+   dossier sin email se queda el de la invitación. Al aceptarla, `accept_workspace_invitation` pone
+   `user_profile.person_id` = ese dossier si la cuenta aún no es ninguna persona y nadie más lo ha reclamado.
+   **Enlazar no es compartir:** no copia el perfil al dossier ni activa la sincronización; compartir sigue siendo el
+   acto aparte de `share_my_profile_with_workspace`, que desde entonces actualiza este mismo dossier.
+
+**Quién crea y edita un dossier** (`private.can_write_workspace_person`): owner, admin o member del espacio (lo mismo
+que ya decían las políticas `workspace_person_insert/update`), o quien tiene `edit:performance` en algún proyecto vivo
+del espacio. Es quien puede editar el reparto o el «quién va» de otros: el selector solo ofrece «Añadir» a quien
+podría usar a la persona creada. Viewer y guest sin edición no crean.
+
+**Sin reescribir historial.** Reparto, compromisos y notas cuelgan del `person_id` del dossier; el enlace solo escribe
+`user_profile.person_id`, así que nada se mueve.
+
+**Caso abierto (para Marco):** la cuenta que acepta ya es otra persona (compartió perfil en otro espacio, o ya tiene
+dossier en este). Hoy la invitación se acepta y el dossier queda sin enlazar: dos `person_id` para el mismo ser
+humano. Unirlos exige reescribir el `person_id` de filas existentes (fusión), y eso se decide aparte.

@@ -196,11 +196,11 @@
   />
   {#if status && !open}<span class="pf__s" class:pf__s--open={!picked || !picked.tz}>{status}</span>{/if}
   {#if open}
-    <span class="pf__list" role="listbox" id={listId} aria-label={label}>
+    <span class="listbox pf__list" role="listbox" id={listId} aria-label={label}>
       {#each candidates as c, i (`${c.kind}${c.venueId ?? ''}${c.code ?? ''}${c.country}${c.tz}${c.city}`)}
         <span
-          class="pf__opt"
-          class:pf__opt--cur={i === cur}
+          class="listbox__opt pf__opt"
+          class:listbox__opt--cur={i === cur}
           role="option"
           id={`${listId}-${i}`}
           aria-selected={i === cur}
@@ -250,33 +250,7 @@
     .pf__s--open {
       font-style: italic;
     }
-    .pf__list {
-      position: absolute;
-      z-index: 20;
-      inset-block-start: calc(100% + 2px);
-      inset-inline-start: 0;
-      display: flex;
-      flex-direction: column;
-      min-inline-size: max(100%, 16rem);
-      padding-block: var(--space-2xs);
-      background: var(--bg-ultra-light);
-      border: 1px solid var(--border-color-light);
-      border-radius: var(--radius-m);
-      box-shadow: var(--box-shadow-2);
-    }
-    .pf__opt {
-      display: flex;
-      align-items: baseline;
-      justify-content: space-between;
-      gap: var(--space-s);
-      padding: var(--space-2xs) var(--space-xs);
-      cursor: pointer;
-      font-size: var(--text-s);
-      color: var(--text-color);
-    }
-    .pf__opt--cur {
-      background: var(--bg-hover);
-    }
+    /* The list, its rows and the current row are `styles/listbox.css`. */
     .pf__name {
       min-inline-size: 0;
       overflow-wrap: anywhere;

@@ -20,6 +20,7 @@
   import { ApiError } from '$lib/api';
   import { setCommitment, type CommitmentTarget } from '$lib/commitments';
   import { t, type Locale } from '$lib/i18n';
+  import PersonPicker from '$lib/components/PersonPicker.svelte';
   import { teamQueryOptions } from '$lib/nav-queries';
   import type { Commitment, CommitmentState } from '$lib/people';
 
@@ -103,6 +104,7 @@
   );
 
   let busy = $state<string | null>(null);
+  let addText = $state('');
   let refused = $state(false);
 
   async function answer(personId: string, state: CommitmentState | null) {
@@ -125,8 +127,8 @@
   const nameOf = (personId: string) => names.get(personId) ?? '—';
 </script>
 
-<!-- Nobody on file and nobody to add: nothing to say, so no empty heading. -->
-{#if (showRoster && rosterIds.length > 0) || rows.length > 0 || addable.length > 0}
+<!-- Somebody can always be added (ADR-107), so the section is always there. -->
+{#if (showRoster && rosterIds.length > 0) || rows.length > 0 || workspaceId}
 <section class="who" aria-label={t('commitment.who_goes', locale)}>
   <h3 class="who__h">{t('commitment.who_goes', locale)}</h3>
   <ul class="who__list">
@@ -176,24 +178,29 @@
     {/each}
   </ul>
 
-  {#if addable.length > 0}
-    <select
-      class="who__add"
-      aria-label={t('commitment.going', locale)}
+  <!-- «+ Voy»: somebody of the team, or a name that is nobody yet, created
+       right here (ADR-107) and answered «voy». -->
+  <div class="who__add">
+    <PersonPicker
+      options={addable}
+      {workspaceId}
+      label={t('commitment.going', locale)}
+      placeholder={`+ ${t('commitment.going', locale)}…`}
+      showLabel={false}
       disabled={busy !== null}
-      onchange={(e) => {
-        const el = e.currentTarget;
-        const personId = el.value;
-        el.value = '';
-        if (personId) void answer(personId, 'going');
+      {locale}
+      bind:text={addText}
+      onpick={async (p) => {
+        addText = '';
+        await answer(p.person_id, 'going');
+        // A new person is on the team from their «voy» on: the feed that
+        // names them is refetched (GET /api/team counts going words).
+        if (!names.has(p.person_id)) {
+          void queryClient.invalidateQueries({ queryKey: ['planner-team'] });
+        }
       }}
-    >
-      <option value="">+ {t('commitment.going', locale)}…</option>
-      {#each addable as m (m.person_id)}
-        <option value={m.person_id}>{m.full_name}</option>
-      {/each}
-    </select>
-  {/if}
+    />
+  </div>
 
   {#if refused}
     <p class="who__err" role="alert">{t('commitment.refused', locale)}</p>
@@ -271,9 +278,8 @@
     }
     .who__add {
       align-self: start;
-      font: inherit;
+      inline-size: min(100%, 18rem);
       font-size: var(--text-xs);
-      color: var(--text-muted);
     }
     .who__err {
       font-size: var(--text-xs);
