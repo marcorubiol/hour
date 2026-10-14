@@ -3580,3 +3580,6 @@ podría usar a la persona creada. Viewer y guest sin edición no crean.
 **Caso abierto (para Marco):** la cuenta que acepta ya es otra persona (compartió perfil en otro espacio, o ya tiene
 dossier en este). Hoy la invitación se acepta y el dossier queda sin enlazar: dos `person_id` para el mismo ser
 humano. Unirlos exige reescribir el `person_id` de filas existentes (fusión), y eso se decide aparte.
+
+**Decidido (Marco, 2026-10-14):** el caso abierto se resuelve con una **fusión explícita que confirma un admin**: una
+sola persona en el eje. Se construye aparte (`_tasks.md`); hasta entonces vale lo de arriba.
