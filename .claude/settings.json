@@ -6,7 +6,8 @@
     "allow": [
       "Bash(gh workflow run staging.yml *)",
       "Bash(pnpm --filter web test:rls*)",
-      "Bash(PW_BASE_URL=https://hour.zerosense.studio npx playwright test*)"
+      "Bash(PW_BASE_URL=https://hour.zerosense.studio npx playwright test*)",
+      "Bash(gh workflow run backup.yml *)"
     ],
     "ask": [
       "Bash(gh workflow run production-migrate.yml * mode=apply *)",
