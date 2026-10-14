@@ -6,6 +6,7 @@ hasta entonces, sacado de esos documentos; lo anterior a julio de 2026 está sol
 
 ## Octubre 2026 (en curso)
 
+- Por dentro, Hour ya guarda hilos de conversación interna del equipo, por bolo, conversación, proyecto o línea y por faceta, y quién los ha leído; Logística, Comidas y Hoja de ruta existen también a nivel de proyecto. Aún sin pantalla: nada cambia para nadie. (2026-10-14, `b2b410b`)
 - Por dentro, el acceso de cada persona vive solo en el modelo de facetas: fuera las tablas de membresía antiguas y los permisos de los roles, que ahora son solo etiquetas. Nada cambia para nadie. (2026-10-14, `8884feb`)
 - Invitar a alguien a un proyecto le da un paquete de acceso (Mínim, Equip, Coordinació o Direcció; Mínim por defecto), no los permisos de su rol: el rol queda como etiqueta. Por dentro, el acceso de todo el mundo vive ya en un solo sitio, el modelo de facetas, y no cambia para nadie. Y la fila de invitar en Ajustes ya no se corta. (2026-10-13, `05f1c96`)
 - Ajustes ya no pide un `sw.js` que no existe en cada carga. (2026-10-13, `071208a`)
