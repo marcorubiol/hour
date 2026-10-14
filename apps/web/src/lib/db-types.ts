@@ -3556,6 +3556,7 @@ export type Database = {
           expires_at: string
           id: string
           invited_by: string
+          person_id: string | null
           project_id: string | null
           project_preset: string | null
           project_role_code: string | null
@@ -3572,6 +3573,7 @@ export type Database = {
           expires_at: string
           id?: string
           invited_by: string
+          person_id?: string | null
           project_id?: string | null
           project_preset?: string | null
           project_role_code?: string | null
@@ -3588,6 +3590,7 @@ export type Database = {
           expires_at?: string
           id?: string
           invited_by?: string
+          person_id?: string | null
           project_id?: string | null
           project_preset?: string | null
           project_role_code?: string | null
@@ -3617,6 +3620,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "workspace"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workspace_invitation_workspace_person_fkey"
+            columns: ["workspace_id", "person_id"]
+            isOneToOne: false
+            referencedRelation: "workspace_person"
+            referencedColumns: ["workspace_id", "person_id"]
           },
         ]
       }
@@ -4878,6 +4888,46 @@ export type Database = {
           token: string
         }[]
       }
+      create_workspace_person: {
+        Args: {
+          p_email?: string
+          p_full_name: string
+          p_phone?: string
+          p_title?: string
+          p_workspace_id: string
+        }
+        Returns: {
+          city: string | null
+          country: string | null
+          created_at: string
+          created_by: string | null
+          custom_fields: Json
+          deleted_at: string | null
+          email: string | null
+          first_name: string | null
+          full_name: string
+          languages: string[]
+          last_name: string | null
+          notes: string | null
+          organization_id: string | null
+          person_id: string
+          phone: string | null
+          profile_shared_at: string | null
+          profile_shared_fields: string[]
+          profile_sync_enabled: boolean
+          slug: string
+          title: string | null
+          updated_at: string
+          website: string | null
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "workspace_person"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       current_user_id: { Args: never; Returns: string }
       current_workspace_id: { Args: never; Returns: string }
       current_workspace_role: {
@@ -4979,6 +5029,23 @@ export type Database = {
       has_permission_for_user: {
         Args: { p_perm: string; p_project_id: string; p_user_id: string }
         Returns: boolean
+      }
+      invite_workspace_person: {
+        Args: {
+          p_email: string
+          p_person_id: string
+          p_role?: Database["public"]["Enums"]["membership_role"]
+          p_workspace_id: string
+        }
+        Returns: {
+          email: string
+          expires_at: string
+          id: string
+          project_id: string
+          project_role_code: string
+          role: Database["public"]["Enums"]["membership_role"]
+          token: string
+        }[]
       }
       is_account_admin: { Args: { acc_id: string }; Returns: boolean }
       is_account_member: { Args: { acc_id: string }; Returns: boolean }
@@ -5950,6 +6017,47 @@ export type Database = {
           p_role: Database["public"]["Enums"]["membership_role"]
         }
         Returns: undefined
+      }
+      update_workspace_person: {
+        Args: {
+          p_email?: string
+          p_full_name: string
+          p_person_id: string
+          p_phone?: string
+          p_title?: string
+          p_workspace_id: string
+        }
+        Returns: {
+          city: string | null
+          country: string | null
+          created_at: string
+          created_by: string | null
+          custom_fields: Json
+          deleted_at: string | null
+          email: string | null
+          first_name: string | null
+          full_name: string
+          languages: string[]
+          last_name: string | null
+          notes: string | null
+          organization_id: string | null
+          person_id: string
+          phone: string | null
+          profile_shared_at: string | null
+          profile_shared_fields: string[]
+          profile_sync_enabled: boolean
+          slug: string
+          title: string | null
+          updated_at: string
+          website: string | null
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "workspace_person"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       uuid_generate_v7: { Args: never; Returns: string }
     }
