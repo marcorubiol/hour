@@ -211,13 +211,37 @@ describe.skipIf(!envReady())('RLS — create_workspace_person (ADR-107)', () => 
   });
 });
 
-describe.skipIf(!envReady() || !externalEnvReady())(
+/**
+ * service_role, only to put the external fixture's identity link back:
+ * `user_profile.person_id` is never user-writable, and the suite runs against
+ * production, so the link test must leave the shared fixture as it found it.
+ * Without the key the link test does not run (it would change the fixture).
+ */
+async function serviceSetPersonId(userId: string, personId: string | null): Promise<boolean> {
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!key) return false;
+  const { url, anon } = requireEnv();
+  const res = await fetch(new URL(`/rest/v1/user_profile?user_id=eq.${userId}`, url), {
+    method: 'PATCH',
+    headers: {
+      apikey: key.startsWith('eyJ') ? anon : key,
+      Authorization: `Bearer ${key}`,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({ person_id: personId }),
+  });
+  return res.ok;
+}
+
+describe.skipIf(!envReady() || !externalEnvReady() || !process.env.SUPABASE_SERVICE_ROLE_KEY)(
   'RLS — invite_workspace_person links the dossier on acceptance (ADR-107)',
   () => {
     let adminJwt: string;
     let externalJwt: string;
     let externalUserId: string;
     let workspaceId: string;
+    /** The fixture's link before the run, put back in afterAll. */
+    let original: string | null = null;
     const pending: string[] = [];
 
     async function removeExternalMembership() {
@@ -258,10 +282,15 @@ describe.skipIf(!envReady() || !externalEnvReady())(
       );
       workspaceId = ws.rows[0].id;
       await removeExternalMembership();
+      original = await myPersonId();
+      // Start from an account that is nobody, so every run proves the link.
+      expect(await serviceSetPersonId(externalUserId, null)).toBe(true);
     });
 
     afterAll(async () => {
+      await serviceSetPersonId(externalUserId, original);
       await removeExternalMembership();
+      await freeExternalEmail();
       for (const id of pending) {
         await pgRpc('revoke_workspace_invitation', adminJwt, { p_invitation_id: id });
       }
@@ -338,7 +367,7 @@ describe.skipIf(!envReady() || !externalEnvReady())(
     }
 
     test('accepting links the account to that dossier, never rewriting a person', async () => {
-      const before = await myPersonId();
+      expect(await myPersonId()).toBeNull();
 
       const dossier = await pgRpc<Dossier>('create_workspace_person', adminJwt, {
         p_workspace_id: workspaceId,
@@ -359,10 +388,9 @@ describe.skipIf(!envReady() || !externalEnvReady())(
       );
       expect(filled.rows[0].email).toBe(requireExternalEnv().email);
 
-      // An account that is nobody yet becomes this dossier. One that already
-      // is somebody (a previous run against the same database) keeps it.
+      // An account that is nobody yet becomes this dossier.
       const after = await myPersonId();
-      expect(after).toBe(before ?? dossier.data!.person_id);
+      expect(after).toBe(dossier.data!.person_id);
 
       // The open case (ADR-107 §4): a second dossier invited to an account
       // that is already a person. Accepted, not linked, nothing rewritten.
