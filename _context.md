@@ -31,18 +31,18 @@ aprueba, el sistema ejecuta y deja auditoría. UI manual e IA leen y escriben lo
 fixtures. Sin billing ni self-service. Modelo ya multi-workspace y multi-account. La beta externa espera a cerrar lo
 de Phase 0.9 en `_tasks.md`. Pricing orientativo, no decidido.
 
-## Producción (verificado 2026-10-14)
+## Producción (verificado 2026-10-14, tarde)
 
-- Web `https://hour.zerosense.studio`, Worker `hour-web`. `/health/live`: SHA **`ef53fcc`**, `dirty:false`, builtAt
-  2026-10-14T14:40Z (tablón del bolo, hilos de comms fase 2, ADR-106). `main` == prod salvo documentos.
+- Web `https://hour.zerosense.studio`, Worker `hour-web`. `/health/live`: SHA **`0e6f3ef`**, `dirty:false`, builtAt
+  2026-10-14T17:55Z (hilo del equipo en la conversación, fase 3 de ADR-106; alta de persona, ADR-107). `main` == prod salvo documentos.
 - Despliegue: `pnpm --filter web run deploy` (no `pnpm deploy` desde la raíz). Exige árbol limpio.
 - Supabase `hour-phase0` · ref `lqlyorlccnniybezugme` · `eu-central-1`. Plan Free, con keepalive diario
   (`.github/workflows/keepalive.yml`) contra la pausa por inactividad. Pasar a Pro antes de la beta, aún no
   (`_tasks.md § 9`). Si algo de Supabase falla tras días sin uso, lo primero es `dig <ref>.supabase.co`.
-- **Última migración aplicada: `20261014100000_comms_threads`** (2026-10-14, run 38524414205; staging 38522562329, backup 38521520634, plan 38524192922): hilos internos (`thread`, `message`, `thread_read`) y nivel proyecto para Logística, Comidas y Hoja de ruta (ADR-106). El acceso es solo `membership` + `membership_facet` (ADR-105). El directorio tiene 6.802 salas. Las migraciones van por `production-migrate.yml`: backup, plan, apply (`_notes/tasks-archive.md § 34`).
+- **Última migración aplicada: `20261014200000_create_workspace_person`** (2026-10-14, run 38597605297; backup 38596584394, plan 38596992986): alta de persona del equipo sin conversación e invitación que enlaza el dossier (ADR-107). Antes, `20261014100000_comms_threads` (hilos, ADR-106). El acceso es solo `membership` + `membership_facet` (ADR-105). El directorio tiene 6.802 salas. Las migraciones van por `production-migrate.yml`: backup, plan, apply (`_notes/tasks-archive.md § 34`).
 - `hour-staging` (ref `slccyknqpgmzhyiyclsq`, `eu-west-1`): reconstruido el 2026-10-13 con el contract de permisos
   (run 38469017859: RLS 309/313, smoke 2/2). Se volverá a pausar sin uso.
-- Últimas suites contra producción (2026-10-14): RLS 330/337 (7 saltados) tras la migración de hilos; E2E 68/68 contra `ef53fcc`.
+- Últimas suites contra producción (2026-10-14): RLS 338/347 (9 saltados) tras la migración de alta de persona; en paralelo da `ECONNRESET` sueltos, en serie (`--no-file-parallelism`) sale verde. E2E contra `0e6f3ef`: pendiente.
 - Desde el checkout principal (`~/Developer/hour`), nunca desde un worktree: los worktrees no llevan `.env` ni
   `.env.test` (RLS sale saltado, el login del E2E falla).
 - `pnpm --filter web test:rls`: siempre contra producción; carga `.env` + `.env.test` y no mira `.env.local`.

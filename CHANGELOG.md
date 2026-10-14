@@ -6,6 +6,8 @@ hasta entonces, sacado de esos documentos; lo anterior a julio de 2026 está sol
 
 ## Octubre 2026 (en curso)
 
+- Alguien del equipo se da de alta desde el reparto o desde «quién va»: escribes su nombre y «Añadir». Su ficha se edita (email, teléfono, cargo) y desde ella un admin la invita a Hour; al aceptar, su cuenta queda enlazada con esa ficha. (2026-10-14, `0e6f3ef`)
+- La ficha de una conversación tiene el hilo del equipo, Equipo, en la columna lateral: lo que habláis entre vosotros sobre esa sala, aparte del registro con fuera, con lo nuevo marcado. «Todo en un hilo» lo junta todo por fecha. (2026-10-14, `0e6f3ef`)
 - La ficha de una función tiene el tablón de su bolo: las funciones del trato y un hilo General más uno por cada faceta que puedes ver (Técnica, Logística, Comidas…), donde el equipo escribe y puede marcar a qué función se refiere. Lo nuevo desde tu última visita se marca, y los hilos sin mensajes quedan plegados al final. Quien no ve el dinero no ve su hilo. (2026-10-14, `ef53fcc`)
 - Por dentro, Hour ya guarda hilos de conversación interna del equipo, por bolo, conversación, proyecto o línea y por faceta, y quién los ha leído; Logística, Comidas y Hoja de ruta existen también a nivel de proyecto. Aún sin pantalla: nada cambia para nadie. (2026-10-14, `b2b410b`)
 - Por dentro, el acceso de cada persona vive solo en el modelo de facetas: fuera las tablas de membresía antiguas y los permisos de los roles, que ahora son solo etiquetas. Nada cambia para nadie. (2026-10-14, `8884feb`)
