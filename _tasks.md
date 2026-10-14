@@ -467,12 +467,7 @@
   **Salas nuevas desde las compañías (chat 10-10):** una compañía puede proponer una sala que no está en el
   directorio (la que crea en su espacio) y entra en el directorio común cuando la validan 3 compañías, con el mismo
   mecanismo de propuesta, fuente e historial que las correcciones.
-- [ ] Marco: decidir — **Datos personales en el directorio: investigación hecha (2026-10-10, `research/product/22-venue-directory-personal-data-legal.md`, no es asesoramiento jurídico).** Recomienda: contactos genéricos para todas las salas y una persona solo si ella misma se da de alta o reclama su ficha aceptando propuestas (la LSSI pide consentimiento previo también entre empresas). Falta decidir el diseño y si se lleva a un abogado con las 9 preguntas del informe. Antes: **Consulta legal sobre datos personales en el directorio global (salas y
-  programadores)** (Marco, 10-10: de acuerdo, antes de construir esa parte). Nombres, emails y teléfonos de personas de otras entidades
-  en una base compartida necesitan base jurídica (interés legítimo para contacto
-  profesional, art. 19 LOPDGDD), informar a esas personas (art. 14 RGPD) y
-  atender su oposición. Antes de construir esa parte, una consulta legal.
-  Desbloquea: «Directorio global de salas».
+- [ ] **Datos personales en el directorio: diseño A (Marco, 2026-10-14, ADR-108).** La ficha global de una sala lleva solo contactos genéricos de la entidad; una persona aparece solo si ella misma se da de alta o reclama su ficha verificando con el email de su dominio, elige qué se ve y acepta recibir propuestas (y por qué canal). Sin abogado por ahora. Detalle y cuidados (invitar por el email genérico de la sala, no a la persona): `research/product/22-venue-directory-personal-data-legal.md § 9`. Desbloquea la parte de personas del «Directorio global de salas». Plan antes de código.
 - [ ] Marco: hacer — **Revisar y enviar los dos borradores de Mail (cuenta Google)** a la Red Española de Teatros (`redteatros@redescena.net`) y a DGArtes (`geral@dgartes.pt`, en portugués, pidiendo la Rede de Teatros e Cineteatros Portugueses). Creados el 2026-10-10. Antes: escribir a la Red Española de Teatros y a DGArtes
   para pedir sus listados como dato (Marco, 10-10: lo quiere pensar).
 

@@ -3583,3 +3583,20 @@ humano. Unirlos exige reescribir el `person_id` de filas existentes (fusión), y
 
 **Decidido (Marco, 2026-10-14):** el caso abierto se resuelve con una **fusión explícita que confirma un admin**: una
 sola persona en el eje. Se construye aparte (`_tasks.md`); hasta entonces vale lo de arriba.
+
+## [2026-10-14] ADR-108 · Datos personales en el directorio global: genérico para todos, persona solo si ella lo pide
+
+**Contexto.** El directorio global de salas (fase 1 en producción desde el 2026-10-10) puede llevar personas de otras
+entidades: programadores, técnicos. Tener sus datos en una base compartida pide base jurídica, informar y atender la
+oposición, y la LSSI española pide consentimiento previo también entre empresas. Investigación en
+`research/product/22-venue-directory-personal-data-legal.md` (no es asesoramiento jurídico).
+
+**Decisión (Marco, 2026-10-14): el diseño A del informe.** La ficha global de una sala lleva solo los contactos de la
+entidad (programación@, técnica@, teléfono de la sala). Una persona aparece solo si ella misma se da de alta o reclama
+su ficha verificando con el email de su dominio, elige qué se ve y marca que acepta recibir propuestas y por qué canal.
+El directorio de programadores es solo de quienes se dieron de alta. Las personas que cada compañía guarda en su
+espacio siguen siendo privadas de ese espacio. No se lleva a un abogado por ahora; las 9 preguntas del informe
+quedan para cuando haga falta.
+
+**Cuidado.** Que Hour invite por email a una persona que no lo pidió puede ser comunicación comercial de Hour: se
+invita por el email genérico de la sala o a través de la compañía que ya trata con ella.
