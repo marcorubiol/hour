@@ -88,7 +88,7 @@
   direction="down"
   align="end"
   label={t('shell.account_menu', locale)}
-  triggerClass="account-row__kebab"
+  triggerClass="kebab"
   onclose={() => (themeStyleExpanded = false)}
 >
   {#snippet trigger()}
@@ -203,30 +203,6 @@
 <style>
   /* ── account menu chrome (unchanged from the previous shell) ──
      :global because this markup renders inside <Menu>'s snippet. */
-
-  :global(.account-row__kebab) {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    inline-size: var(--control-size-s);
-    block-size: var(--control-size-s);
-    background: transparent;
-    border: 0;
-    border-radius: var(--radius-circle);
-    color: var(--text-faint);
-    cursor: pointer;
-    transition: background var(--transition), color var(--transition);
-  }
-  :global(.account-row__kebab:hover),
-  :global(.account-row__kebab[aria-expanded='true']) {
-    background: var(--bg-light);
-    color: var(--text-color);
-  }
-  :global(.account-row__kebab:focus-visible) {
-    outline: var(--focus-width) solid var(--focus-color);
-    outline-offset: -1px;
-  }
 
   :global(.menu-header) {
     display: flex;
