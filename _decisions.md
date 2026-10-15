@@ -3637,3 +3637,17 @@ seis preguntas (§ 12) el 2026-10-15: las recomendadas.
    Hour) y el primer envío real de cada compañía nueva lo revisa Marco.
 
 La frontera de `service_role` se amplía de las RPC `mail_*` a las `mailout_*`, como dice el plan § 4.
+
+## [2026-10-15] ADR-111 · Envío en bloque sin AWS por ahora: proveedor simulado
+
+**Contexto.** El plan del envío en bloque (ADR-109, ADR-110) pedía una cuenta de AWS antes de la fase 2. Marco
+(2026-10-15): no habrá cuenta de AWS por ahora; se sigue construyendo con el correo simulado.
+
+**Decisión.** El envío habla con el proveedor a través de un adaptador. Hasta que haya cuenta, el único adaptador
+activo es el **simulado**: misma interfaz que el de SES, no envía nada, da por verificado un dominio tras un paso
+simulado, devuelve un Message-ID y produce eventos de entrega, rebote y queja simulados. El proveedor queda guardado
+(`simulator` o `ses`) para que el cambio a SES sea de configuración y no de esquema. Las fases 2 y 3 se construyen y
+se despliegan contra el simulado; ningún correo real sale de Hour mientras sea así, y la pantalla lo dice.
+
+**Pendiente.** El adaptador de SES, la salida del sandbox (fase 4) y la cuenta propia (fase 5) esperan a la cuenta de
+AWS. Los pasos de Marco en AWS (plan § 5) pasan de «antes de la fase 2» a «antes del primer envío real».
