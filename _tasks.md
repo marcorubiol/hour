@@ -427,7 +427,6 @@
      abogado).
      - [ ] **Editor de mailing visual para las campañas, del nivel de Brevo** (drop 11-10): bloques arrastrables (texto, imagen, botón, dossier o vídeo de la obra), plantillas por compañía con su marca, vista previa en móvil y escritorio, y personalización con los datos del contacto y de la sala. Proveedor decidido (ADR-109): va después del envío.
   - [ ] **Envío en bloque, fase 1: esquema y RPC** (migración aditiva, plan § 11; ADR-110). Hecha en `claude/mailout-schema` (`07d5909`, migración `20261015100000_mailout` sin aplicar, ADR-112; RLS local 361/365, check 0/0, unit 878). Se integra con la fase 2.
-  - [ ] Marco: decidir — **Quién lee las bases de cada dirección (`mail_basis`)**: a) solo el admin (recomendada: no abre los contactos de conversaciones privadas, y quien envía ya ve la base de cada destinatario en la vista previa); b) cualquier miembro, como decía el plan; c) quien pueda leer alguna conversación de esa dirección.
   - [ ] **Envío en bloque, fase 2 (dominio de envío) y fase 3 (enviar) contra el proveedor simulado** (ADR-111): sin cuenta de AWS por ahora.
   - [ ] **Cuenta de AWS para el envío en bloque** (plan § 5, pasos 1 a 3): no por ahora (Marco, 2026-10-15, ADR-111). Hace falta antes del primer envío real.
 ## Después de money v3 — contenedores (bloque 5)

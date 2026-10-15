@@ -3651,3 +3651,12 @@ se despliegan contra el simulado; ningún correo real sale de Hour mientras sea 
 
 **Pendiente.** El adaptador de SES, la salida del sandbox (fase 4) y la cuenta propia (fase 5) esperan a la cuenta de
 AWS. Los pasos de Marco en AWS (plan § 5) pasan de «antes de la fase 2» a «antes del primer envío real».
+
+## [2026-10-15] ADR-113 · Las bases de cada dirección las lee solo el admin
+
+**Contexto.** El plan del envío en bloque decía que cualquier miembro lee `mail_basis`. Al construir la fase 1 (rama
+`claude/mailout-schema`) se vio que una base nombra la dirección de un contacto, y por ese camino se verían los de
+conversaciones privadas ajenas.
+
+**Decisión (Marco, 2026-10-15).** `mail_basis` la lee solo el admin del espacio, como la supresión. Quien envía ve la
+base de cada destinatario en la vista previa (`mailout_preview`), que ya respeta lo que puede leer.
