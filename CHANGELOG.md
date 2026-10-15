@@ -6,6 +6,7 @@ hasta entonces, sacado de esos documentos; lo anterior a julio de 2026 está sol
 
 ## Octubre 2026 (en curso)
 
+- En la ficha de una persona, cada conversación abre la conversación. Y la interfaz en inglés ya no habla de «pipeline» ni de «leads»: dice «in progress», «notice» y «Outreach tracking». (2026-10-15, `6248c06`)
 - Alguien del equipo se da de alta desde el reparto o desde «quién va»: escribes su nombre y «Añadir». Su ficha se edita (email, teléfono, cargo) y desde ella un admin la invita a Hour; al aceptar, su cuenta queda enlazada con esa ficha. (2026-10-14, `0e6f3ef`)
 - La ficha de una conversación tiene el hilo del equipo, Equipo, en la columna lateral: lo que habláis entre vosotros sobre esa sala, aparte del registro con fuera, con lo nuevo marcado. «Todo en un hilo» lo junta todo por fecha. (2026-10-14, `0e6f3ef`)
 - La ficha de una función tiene el tablón de su bolo: las funciones del trato y un hilo General más uno por cada faceta que puedes ver (Técnica, Logística, Comidas…), donde el equipo escribe y puede marcar a qué función se refiere. Lo nuevo desde tu última visita se marca, y los hilos sin mensajes quedan plegados al final. Quien no ve el dinero no ve su hilo. (2026-10-14, `ef53fcc`)

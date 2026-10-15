@@ -33,8 +33,8 @@ de Phase 0.9 en `_tasks.md`. Pricing orientativo, no decidido.
 
 ## Producción (verificado 2026-10-14, tarde)
 
-- Web `https://hour.zerosense.studio`, Worker `hour-web`. `/health/live`: SHA **`0e6f3ef`**, `dirty:false`, builtAt
-  2026-10-14T17:55Z (hilo del equipo en la conversación, fase 3 de ADR-106; alta de persona, ADR-107). `main` == prod salvo documentos.
+- Web `https://hour.zerosense.studio`, Worker `hour-web`. `/health/live`: SHA **`6248c06`**, `dirty:false`, builtAt
+  2026-10-15T04:27Z (sobre `0e6f3ef`: la ficha de persona enlaza sus conversaciones; fuera el vocabulario CRM de la interfaz). `main` == prod salvo documentos.
 - Despliegue: `pnpm --filter web run deploy` (no `pnpm deploy` desde la raíz). Exige árbol limpio.
 - Supabase `hour-phase0` · ref `lqlyorlccnniybezugme` · `eu-central-1`. Plan Free, con keepalive diario
   (`.github/workflows/keepalive.yml`) contra la pausa por inactividad. Pasar a Pro antes de la beta, aún no
@@ -42,7 +42,7 @@ de Phase 0.9 en `_tasks.md`. Pricing orientativo, no decidido.
 - **Última migración aplicada: `20261014200000_create_workspace_person`** (2026-10-14, run 38597605297; backup 38596584394, plan 38596992986): alta de persona del equipo sin conversación e invitación que enlaza el dossier (ADR-107). Antes, `20261014100000_comms_threads` (hilos, ADR-106). El acceso es solo `membership` + `membership_facet` (ADR-105). El directorio tiene 6.802 salas. Las migraciones van por `production-migrate.yml`: backup, plan, apply (`_notes/tasks-archive.md § 34`).
 - `hour-staging` (ref `slccyknqpgmzhyiyclsq`, `eu-west-1`): reconstruido el 2026-10-13 con el contract de permisos
   (run 38469017859: RLS 309/313, smoke 2/2). Se volverá a pausar sin uso.
-- Últimas suites contra producción (2026-10-14): RLS 338/347 (9 saltados) tras la migración de alta de persona; en paralelo da `ECONNRESET` sueltos, en serie (`--no-file-parallelism`) sale verde. E2E 71/71 contra `0e6f3ef`.
+- Últimas suites contra producción (2026-10-14): RLS 338/347 (9 saltados) tras la migración de alta de persona; en paralelo da `ECONNRESET` sueltos, en serie (`--no-file-parallelism`) sale verde. E2E 71/71 contra `6248c06`.
 - Desde el checkout principal (`~/Developer/hour`), nunca desde un worktree: los worktrees no llevan `.env` ni
   `.env.test` (RLS sale saltado, el login del E2E falla).
 - `pnpm --filter web test:rls`: siempre contra producción; carga `.env` + `.env.test` y no mira `.env.local`.
@@ -52,6 +52,7 @@ de Phase 0.9 en `_tasks.md`. Pricing orientativo, no decidido.
   `~/Library/Caches/ms-playwright/chromium-1228/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing`.
 - `.env.local` apunta `vite dev` a una Supabase local (`127.0.0.1:54321`) sin los usuarios fixture: ante un
   `invalid_credentials`, preguntar primero contra qué base se mira.
+- `testing` (owner Marco) tiene datos de prueba plantados el 2026-10-15: proyecto «Obra de prueba», 8 conversaciones con historial, hilos y un bolo.
 - El usuario del E2E no pertenece a `muk-cia` ni a `marco-rubiol`; las 154 conversaciones de `muk-cia` son reales.
 
 ## Modelo y vocabulario
