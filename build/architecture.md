@@ -205,11 +205,13 @@ No crear usuarios insertando en `auth.users`: usar Auth Admin API/Dashboard.
 - Soft-delete que deja la fila invisible al updater se hace por RPC, no por
   PATCH directo.
 - El Worker nunca sustituye RLS; valida forma/contrato y reenvía identidad.
-- Única excepción, acotada: la sincronización de buzones (ADR-099) corre sin
-  persona detrás (cron) con `SUPABASE_SERVICE_ROLE_KEY`. Solo la usa
-  `$lib/server/mail/db.ts` y solo para las RPC `mail_*` concedidas a
-  service_role; enviar, conectar y desconectar siguen pidiendo antes permiso a
-  la base con el JWT de la persona.
+- Única excepción, acotada: la sincronización de buzones (ADR-099) y el envío
+  en bloque (ADR-110: cola, eventos del proveedor, estado del dominio) corren
+  sin persona detrás (cron, webhook) con `SUPABASE_SERVICE_ROLE_KEY`. Solo la
+  usa `$lib/server/mail/` y solo para las RPC `mail_*` y `mailout_*` concedidas
+  a service_role; enviar, conectar, desconectar, crear un envío, ponerlo en
+  cola o dar de alta un dominio siguen pidiendo antes permiso a la base con el
+  JWT de la persona.
 
 ### Buzón sincronizado (ADR-099, carril 1)
 

@@ -1924,6 +1924,125 @@ export type Database = {
           },
         ]
       }
+      mail_basis: {
+        Row: {
+          address: string
+          evidence_event_id: string | null
+          kind: Database["public"]["Enums"]["mail_basis_kind"]
+          note: string | null
+          recorded_at: string
+          recorded_by: string | null
+          updated_at: string
+          withdrawn_at: string | null
+          workspace_id: string
+        }
+        Insert: {
+          address: string
+          evidence_event_id?: string | null
+          kind: Database["public"]["Enums"]["mail_basis_kind"]
+          note?: string | null
+          recorded_at?: string
+          recorded_by?: string | null
+          updated_at?: string
+          withdrawn_at?: string | null
+          workspace_id: string
+        }
+        Update: {
+          address?: string
+          evidence_event_id?: string | null
+          kind?: Database["public"]["Enums"]["mail_basis_kind"]
+          note?: string | null
+          recorded_at?: string
+          recorded_by?: string | null
+          updated_at?: string
+          withdrawn_at?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mail_basis_evidence_event_id_fkey"
+            columns: ["evidence_event_id"]
+            isOneToOne: false
+            referencedRelation: "conversation_event"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mail_basis_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspace"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mail_domain: {
+        Row: {
+          checked_at: string | null
+          configuration_set: string | null
+          created_at: string
+          created_by: string | null
+          dkim_status: string
+          dmarc_record: string | null
+          dns_records: Json
+          domain: string
+          id: string
+          last_error: string | null
+          mail_from_status: string
+          mail_from_subdomain: string
+          provider: Database["public"]["Enums"]["mail_sending_provider"]
+          tenant_name: string | null
+          updated_at: string
+          verified_at: string | null
+          workspace_id: string
+        }
+        Insert: {
+          checked_at?: string | null
+          configuration_set?: string | null
+          created_at?: string
+          created_by?: string | null
+          dkim_status?: string
+          dmarc_record?: string | null
+          dns_records?: Json
+          domain: string
+          id?: string
+          last_error?: string | null
+          mail_from_status?: string
+          mail_from_subdomain?: string
+          provider?: Database["public"]["Enums"]["mail_sending_provider"]
+          tenant_name?: string | null
+          updated_at?: string
+          verified_at?: string | null
+          workspace_id: string
+        }
+        Update: {
+          checked_at?: string | null
+          configuration_set?: string | null
+          created_at?: string
+          created_by?: string | null
+          dkim_status?: string
+          dmarc_record?: string | null
+          dns_records?: Json
+          domain?: string
+          id?: string
+          last_error?: string | null
+          mail_from_status?: string
+          mail_from_subdomain?: string
+          provider?: Database["public"]["Enums"]["mail_sending_provider"]
+          tenant_name?: string | null
+          updated_at?: string
+          verified_at?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mail_domain_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspace"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       mail_message: {
         Row: {
           deferred: boolean
@@ -1962,6 +2081,320 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "mail_account"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      mail_suppression: {
+        Row: {
+          address: string
+          created_at: string
+          created_by: string | null
+          mailout_recipient_id: string | null
+          reason: Database["public"]["Enums"]["mail_suppression_reason"]
+          workspace_id: string
+        }
+        Insert: {
+          address: string
+          created_at?: string
+          created_by?: string | null
+          mailout_recipient_id?: string | null
+          reason: Database["public"]["Enums"]["mail_suppression_reason"]
+          workspace_id: string
+        }
+        Update: {
+          address?: string
+          created_at?: string
+          created_by?: string | null
+          mailout_recipient_id?: string | null
+          reason?: Database["public"]["Enums"]["mail_suppression_reason"]
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mail_suppression_mailout_recipient_id_fkey"
+            columns: ["mailout_recipient_id"]
+            isOneToOne: false
+            referencedRelation: "mailout_recipient"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mail_suppression_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspace"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mailout: {
+        Row: {
+          body: string | null
+          created_at: string
+          created_by: string | null
+          finished_at: string | null
+          from_address: string | null
+          from_local_part: string
+          from_name: string | null
+          id: string
+          language: string
+          line_id: string | null
+          mail_domain_id: string | null
+          project_id: string
+          queued_at: string | null
+          queued_by: string | null
+          reply_to_address: string | null
+          reply_to_mail_account_id: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: Database["public"]["Enums"]["mailout_status"]
+          status_reason: string | null
+          subject: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          body?: string | null
+          created_at?: string
+          created_by?: string | null
+          finished_at?: string | null
+          from_address?: string | null
+          from_local_part?: string
+          from_name?: string | null
+          id?: string
+          language?: string
+          line_id?: string | null
+          mail_domain_id?: string | null
+          project_id: string
+          queued_at?: string | null
+          queued_by?: string | null
+          reply_to_address?: string | null
+          reply_to_mail_account_id?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: Database["public"]["Enums"]["mailout_status"]
+          status_reason?: string | null
+          subject?: string | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          body?: string | null
+          created_at?: string
+          created_by?: string | null
+          finished_at?: string | null
+          from_address?: string | null
+          from_local_part?: string
+          from_name?: string | null
+          id?: string
+          language?: string
+          line_id?: string | null
+          mail_domain_id?: string | null
+          project_id?: string
+          queued_at?: string | null
+          queued_by?: string | null
+          reply_to_address?: string | null
+          reply_to_mail_account_id?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: Database["public"]["Enums"]["mailout_status"]
+          status_reason?: string | null
+          subject?: string | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mailout_domain_fkey"
+            columns: ["mail_domain_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "mail_domain"
+            referencedColumns: ["id", "workspace_id"]
+          },
+          {
+            foreignKeyName: "mailout_line_id_fkey"
+            columns: ["line_id"]
+            isOneToOne: false
+            referencedRelation: "line"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mailout_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "project"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mailout_reply_to_mail_account_id_fkey"
+            columns: ["reply_to_mail_account_id"]
+            isOneToOne: false
+            referencedRelation: "mail_account"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mailout_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspace"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mailout_event: {
+        Row: {
+          bounce_type: string | null
+          created_at: string
+          detail: Json
+          id: string
+          occurred_at: string
+          provider_event_id: string
+          recipient_id: string
+          type: Database["public"]["Enums"]["mailout_event_type"]
+          workspace_id: string
+        }
+        Insert: {
+          bounce_type?: string | null
+          created_at?: string
+          detail?: Json
+          id?: string
+          occurred_at: string
+          provider_event_id: string
+          recipient_id: string
+          type: Database["public"]["Enums"]["mailout_event_type"]
+          workspace_id: string
+        }
+        Update: {
+          bounce_type?: string | null
+          created_at?: string
+          detail?: Json
+          id?: string
+          occurred_at?: string
+          provider_event_id?: string
+          recipient_id?: string
+          type?: Database["public"]["Enums"]["mailout_event_type"]
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mailout_event_recipient_fkey"
+            columns: ["recipient_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "mailout_recipient"
+            referencedColumns: ["id", "workspace_id"]
+          },
+        ]
+      }
+      mailout_recipient: {
+        Row: {
+          address: string | null
+          address_kind:
+            | Database["public"]["Enums"]["mailout_address_kind"]
+            | null
+          attempts: number
+          basis_kind: Database["public"]["Enums"]["mail_basis_kind"] | null
+          claimed_at: string | null
+          conversation_event_id: string | null
+          conversation_id: string
+          created_at: string
+          display_name: string | null
+          id: string
+          last_error: string | null
+          mailout_id: string
+          next_attempt_at: string | null
+          person_id: string | null
+          provider_message_id: string | null
+          rfc_message_id: string | null
+          sent_at: string | null
+          skip_reason: Database["public"]["Enums"]["mailout_skip_reason"] | null
+          status: Database["public"]["Enums"]["mailout_recipient_status"]
+          unsubscribe_token: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          address?: string | null
+          address_kind?:
+            | Database["public"]["Enums"]["mailout_address_kind"]
+            | null
+          attempts?: number
+          basis_kind?: Database["public"]["Enums"]["mail_basis_kind"] | null
+          claimed_at?: string | null
+          conversation_event_id?: string | null
+          conversation_id: string
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          last_error?: string | null
+          mailout_id: string
+          next_attempt_at?: string | null
+          person_id?: string | null
+          provider_message_id?: string | null
+          rfc_message_id?: string | null
+          sent_at?: string | null
+          skip_reason?:
+            | Database["public"]["Enums"]["mailout_skip_reason"]
+            | null
+          status?: Database["public"]["Enums"]["mailout_recipient_status"]
+          unsubscribe_token?: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          address?: string | null
+          address_kind?:
+            | Database["public"]["Enums"]["mailout_address_kind"]
+            | null
+          attempts?: number
+          basis_kind?: Database["public"]["Enums"]["mail_basis_kind"] | null
+          claimed_at?: string | null
+          conversation_event_id?: string | null
+          conversation_id?: string
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          last_error?: string | null
+          mailout_id?: string
+          next_attempt_at?: string | null
+          person_id?: string | null
+          provider_message_id?: string | null
+          rfc_message_id?: string | null
+          sent_at?: string | null
+          skip_reason?:
+            | Database["public"]["Enums"]["mailout_skip_reason"]
+            | null
+          status?: Database["public"]["Enums"]["mailout_recipient_status"]
+          unsubscribe_token?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mailout_recipient_conversation_event_id_fkey"
+            columns: ["conversation_event_id"]
+            isOneToOne: false
+            referencedRelation: "conversation_event"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mailout_recipient_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversation"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mailout_recipient_mailout_fkey"
+            columns: ["mailout_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "mailout"
+            referencedColumns: ["id", "workspace_id"]
+          },
+          {
+            foreignKeyName: "mailout_recipient_person_fkey"
+            columns: ["workspace_id", "person_id"]
+            isOneToOne: false
+            referencedRelation: "workspace_person"
+            referencedColumns: ["workspace_id", "person_id"]
           },
         ]
       }
@@ -3379,10 +3812,15 @@ export type Database = {
           kind: Database["public"]["Enums"]["workspace_kind"]
           logo_url: string | null
           mail_signature: string | null
+          mailout_daily_cap: number
+          mailout_reviewed_at: string | null
+          mailout_reviewed_by: string | null
+          mailout_simulator_only: boolean
           name: string
           new_conversations_private: boolean
           phone: string | null
           previous_slugs: string[]
+          privacy_url: string | null
           settings: Json
           slug: string
           timezone: string
@@ -3405,10 +3843,15 @@ export type Database = {
           kind?: Database["public"]["Enums"]["workspace_kind"]
           logo_url?: string | null
           mail_signature?: string | null
+          mailout_daily_cap?: number
+          mailout_reviewed_at?: string | null
+          mailout_reviewed_by?: string | null
+          mailout_simulator_only?: boolean
           name: string
           new_conversations_private?: boolean
           phone?: string | null
           previous_slugs?: string[]
+          privacy_url?: string | null
           settings?: Json
           slug: string
           timezone?: string
@@ -3431,10 +3874,15 @@ export type Database = {
           kind?: Database["public"]["Enums"]["workspace_kind"]
           logo_url?: string | null
           mail_signature?: string | null
+          mailout_daily_cap?: number
+          mailout_reviewed_at?: string | null
+          mailout_reviewed_by?: string | null
+          mailout_simulator_only?: boolean
           name?: string
           new_conversations_private?: boolean
           phone?: string | null
           previous_slugs?: string[]
+          privacy_url?: string | null
           settings?: Json
           slug?: string
           timezone?: string
@@ -3915,6 +4363,38 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      add_mail_domain: {
+        Args: {
+          p_domain: string
+          p_provider?: Database["public"]["Enums"]["mail_sending_provider"]
+          p_workspace_id: string
+        }
+        Returns: {
+          checked_at: string | null
+          configuration_set: string | null
+          created_at: string
+          created_by: string | null
+          dkim_status: string
+          dmarc_record: string | null
+          dns_records: Json
+          domain: string
+          id: string
+          last_error: string | null
+          mail_from_status: string
+          mail_from_subdomain: string
+          provider: Database["public"]["Enums"]["mail_sending_provider"]
+          tenant_name: string | null
+          updated_at: string
+          verified_at: string | null
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "mail_domain"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       adopt_directory_venue: {
         Args: { p_directory_id: string; p_workspace_id: string }
         Returns: {
@@ -3971,6 +4451,40 @@ export type Database = {
       can_user_write_collab: {
         Args: { p_target_id: string; p_target_table: string; p_user_id: string }
         Returns: boolean
+      }
+      cancel_mailout: {
+        Args: { p_id: string }
+        Returns: {
+          body: string | null
+          created_at: string
+          created_by: string | null
+          finished_at: string | null
+          from_address: string | null
+          from_local_part: string
+          from_name: string | null
+          id: string
+          language: string
+          line_id: string | null
+          mail_domain_id: string | null
+          project_id: string
+          queued_at: string | null
+          queued_by: string | null
+          reply_to_address: string | null
+          reply_to_mail_account_id: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: Database["public"]["Enums"]["mailout_status"]
+          status_reason: string | null
+          subject: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "mailout"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       connect_mail_account: {
         Args: {
@@ -4442,6 +4956,44 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      create_mailout: {
+        Args: {
+          p_line_id?: string
+          p_mail_domain_id?: string
+          p_project_id: string
+        }
+        Returns: {
+          body: string | null
+          created_at: string
+          created_by: string | null
+          finished_at: string | null
+          from_address: string | null
+          from_local_part: string
+          from_name: string | null
+          id: string
+          language: string
+          line_id: string | null
+          mail_domain_id: string | null
+          project_id: string
+          queued_at: string | null
+          queued_by: string | null
+          reply_to_address: string | null
+          reply_to_mail_account_id: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: Database["public"]["Enums"]["mailout_status"]
+          status_reason: string | null
+          subject: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "mailout"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       create_note: {
         Args: {
           p_body: string
@@ -4851,10 +5403,15 @@ export type Database = {
           kind: Database["public"]["Enums"]["workspace_kind"]
           logo_url: string | null
           mail_signature: string | null
+          mailout_daily_cap: number
+          mailout_reviewed_at: string | null
+          mailout_reviewed_by: string | null
+          mailout_simulator_only: boolean
           name: string
           new_conversations_private: boolean
           phone: string | null
           previous_slugs: string[]
+          privacy_url: string | null
           settings: Json
           slug: string
           timezone: string
@@ -5279,6 +5836,41 @@ export type Database = {
         Args: { p_account_id: string; p_limit?: number }
         Returns: string[]
       }
+      mail_domain_record_status: {
+        Args: {
+          p_dkim_status: string
+          p_dmarc_record?: string
+          p_dns_records?: Json
+          p_error?: string
+          p_id: string
+          p_mail_from_status: string
+        }
+        Returns: {
+          checked_at: string | null
+          configuration_set: string | null
+          created_at: string
+          created_by: string | null
+          dkim_status: string
+          dmarc_record: string | null
+          dns_records: Json
+          domain: string
+          id: string
+          last_error: string | null
+          mail_from_status: string
+          mail_from_subdomain: string
+          provider: Database["public"]["Enums"]["mail_sending_provider"]
+          tenant_name: string | null
+          updated_at: string
+          verified_at: string | null
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "mail_domain"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       mail_ingest_message: {
         Args: { p_account_id: string; p_created_by?: string; p_message: Json }
         Returns: number
@@ -5344,6 +5936,160 @@ export type Database = {
         }
         Returns: undefined
       }
+      mailout_approve_review: {
+        Args: { p_mailout_id: string; p_reviewed_by?: string }
+        Returns: {
+          body: string | null
+          created_at: string
+          created_by: string | null
+          finished_at: string | null
+          from_address: string | null
+          from_local_part: string
+          from_name: string | null
+          id: string
+          language: string
+          line_id: string | null
+          mail_domain_id: string | null
+          project_id: string
+          queued_at: string | null
+          queued_by: string | null
+          reply_to_address: string | null
+          reply_to_mail_account_id: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: Database["public"]["Enums"]["mailout_status"]
+          status_reason: string | null
+          subject: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "mailout"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      mailout_claim: {
+        Args: { p_limit?: number; p_mailout_id?: string }
+        Returns: {
+          address: string
+          address_kind: Database["public"]["Enums"]["mailout_address_kind"]
+          attempts: number
+          basis_kind: Database["public"]["Enums"]["mail_basis_kind"]
+          body: string
+          configuration_set: string
+          conversation_id: string
+          display_name: string
+          from_address: string
+          from_name: string
+          language: string
+          mailout_id: string
+          provider: Database["public"]["Enums"]["mail_sending_provider"]
+          recipient_id: string
+          reply_to_address: string
+          subject: string
+          tenant_name: string
+          unsubscribe_token: string
+          workspace_id: string
+        }[]
+      }
+      mailout_preview: {
+        Args: { p_id: string }
+        Returns: {
+          address: string
+          address_kind: Database["public"]["Enums"]["mailout_address_kind"]
+          basis_kind: Database["public"]["Enums"]["mail_basis_kind"]
+          basis_withdrawn_at: string
+          conversation_id: string
+          display_name: string
+          ready: boolean
+          recipient_id: string
+          skip_reason: Database["public"]["Enums"]["mailout_skip_reason"]
+          status: Database["public"]["Enums"]["mailout_recipient_status"]
+          suppressed_at: string
+          suppressed_reason: Database["public"]["Enums"]["mail_suppression_reason"]
+        }[]
+      }
+      mailout_record_event: { Args: { p_payload: Json }; Returns: boolean }
+      mailout_record_failure: {
+        Args: { p_error: string; p_recipient_id: string; p_retry_at?: string }
+        Returns: {
+          address: string | null
+          address_kind:
+            | Database["public"]["Enums"]["mailout_address_kind"]
+            | null
+          attempts: number
+          basis_kind: Database["public"]["Enums"]["mail_basis_kind"] | null
+          claimed_at: string | null
+          conversation_event_id: string | null
+          conversation_id: string
+          created_at: string
+          display_name: string | null
+          id: string
+          last_error: string | null
+          mailout_id: string
+          next_attempt_at: string | null
+          person_id: string | null
+          provider_message_id: string | null
+          rfc_message_id: string | null
+          sent_at: string | null
+          skip_reason: Database["public"]["Enums"]["mailout_skip_reason"] | null
+          status: Database["public"]["Enums"]["mailout_recipient_status"]
+          unsubscribe_token: string
+          updated_at: string
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "mailout_recipient"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      mailout_record_sent: {
+        Args: {
+          p_body: string
+          p_provider_message_id: string
+          p_recipient_id: string
+          p_rfc_message_id: string
+        }
+        Returns: {
+          address: string | null
+          address_kind:
+            | Database["public"]["Enums"]["mailout_address_kind"]
+            | null
+          attempts: number
+          basis_kind: Database["public"]["Enums"]["mail_basis_kind"] | null
+          claimed_at: string | null
+          conversation_event_id: string | null
+          conversation_id: string
+          created_at: string
+          display_name: string | null
+          id: string
+          last_error: string | null
+          mailout_id: string
+          next_attempt_at: string | null
+          person_id: string | null
+          provider_message_id: string | null
+          rfc_message_id: string | null
+          sent_at: string | null
+          skip_reason: Database["public"]["Enums"]["mailout_skip_reason"] | null
+          status: Database["public"]["Enums"]["mailout_recipient_status"]
+          unsubscribe_token: string
+          updated_at: string
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "mailout_recipient"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      mailout_resubscribe: { Args: { p_token: string }; Returns: undefined }
+      mailout_test_authorize: { Args: { p_id: string }; Returns: string }
+      mailout_unsubscribe: { Args: { p_token: string }; Returns: undefined }
       mark_thread_read: { Args: { p_thread_id: string }; Returns: string }
       my_mail_signature: {
         Args: { p_workspace_id: string }
@@ -5407,6 +6153,40 @@ export type Database = {
           workspace_slug: string
         }[]
       }
+      queue_mailout: {
+        Args: { p_id: string }
+        Returns: {
+          body: string | null
+          created_at: string
+          created_by: string | null
+          finished_at: string | null
+          from_address: string | null
+          from_local_part: string
+          from_name: string | null
+          id: string
+          language: string
+          line_id: string | null
+          mail_domain_id: string | null
+          project_id: string
+          queued_at: string | null
+          queued_by: string | null
+          reply_to_address: string | null
+          reply_to_mail_account_id: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: Database["public"]["Enums"]["mailout_status"]
+          status_reason: string | null
+          subject: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "mailout"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       record_conversation_event: {
         Args: {
           p_body?: string
@@ -5469,6 +6249,11 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      remove_mail_domain: { Args: { p_id: string }; Returns: undefined }
+      remove_mail_suppression: {
+        Args: { p_address: string; p_workspace_id: string }
+        Returns: undefined
       }
       reorder_schedule_slots: {
         Args: {
@@ -5702,9 +6487,70 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      set_mail_basis: {
+        Args: {
+          p_address: string
+          p_evidence_event_id?: string
+          p_kind: Database["public"]["Enums"]["mail_basis_kind"]
+          p_note?: string
+          p_workspace_id: string
+        }
+        Returns: {
+          address: string
+          evidence_event_id: string | null
+          kind: Database["public"]["Enums"]["mail_basis_kind"]
+          note: string | null
+          recorded_at: string
+          recorded_by: string | null
+          updated_at: string
+          withdrawn_at: string | null
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "mail_basis"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       set_mail_signature: {
         Args: { p_account_id: string; p_signature: string }
         Returns: undefined
+      }
+      set_mailout_recipients: {
+        Args: { p_conversation_ids: string[]; p_id: string }
+        Returns: {
+          address: string | null
+          address_kind:
+            | Database["public"]["Enums"]["mailout_address_kind"]
+            | null
+          attempts: number
+          basis_kind: Database["public"]["Enums"]["mail_basis_kind"] | null
+          claimed_at: string | null
+          conversation_event_id: string | null
+          conversation_id: string
+          created_at: string
+          display_name: string | null
+          id: string
+          last_error: string | null
+          mailout_id: string
+          next_attempt_at: string | null
+          person_id: string | null
+          provider_message_id: string | null
+          rfc_message_id: string | null
+          sent_at: string | null
+          skip_reason: Database["public"]["Enums"]["mailout_skip_reason"] | null
+          status: Database["public"]["Enums"]["mailout_recipient_status"]
+          unsubscribe_token: string
+          updated_at: string
+          workspace_id: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "mailout_recipient"
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
       set_membership_facet: {
         Args: {
@@ -5791,6 +6637,10 @@ export type Database = {
         Args: { p_workspace_id: string }
         Returns: undefined
       }
+      suppress_mail_address: {
+        Args: { p_address: string; p_workspace_id: string }
+        Returns: undefined
+      }
       thread_audience: {
         Args: {
           p_anchor_id: string
@@ -5859,6 +6709,49 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "invoice"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      update_mailout: {
+        Args: {
+          p_body: string
+          p_from_local_part?: string
+          p_from_name?: string
+          p_id: string
+          p_language?: string
+          p_mail_domain_id?: string
+          p_reply_to_mail_account_id?: string
+          p_subject: string
+        }
+        Returns: {
+          body: string | null
+          created_at: string
+          created_by: string | null
+          finished_at: string | null
+          from_address: string | null
+          from_local_part: string
+          from_name: string | null
+          id: string
+          language: string
+          line_id: string | null
+          mail_domain_id: string | null
+          project_id: string
+          queued_at: string | null
+          queued_by: string | null
+          reply_to_address: string | null
+          reply_to_mail_account_id: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: Database["public"]["Enums"]["mailout_status"]
+          status_reason: string | null
+          subject: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "mailout"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -5994,10 +6887,15 @@ export type Database = {
           kind: Database["public"]["Enums"]["workspace_kind"]
           logo_url: string | null
           mail_signature: string | null
+          mailout_daily_cap: number
+          mailout_reviewed_at: string | null
+          mailout_reviewed_by: string | null
+          mailout_simulator_only: boolean
           name: string
           new_conversations_private: boolean
           phone: string | null
           previous_slugs: string[]
+          privacy_url: string | null
           settings: Json
           slug: string
           timezone: string
@@ -6060,6 +6958,10 @@ export type Database = {
         }
       }
       uuid_generate_v7: { Args: never; Returns: string }
+      withdraw_mail_basis: {
+        Args: { p_address: string; p_workspace_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       access_verb: "view" | "edit"
@@ -6125,7 +7027,44 @@ export type Database = {
       line_status: "open" | "closed" | "archived"
       mail_account_scope: "personal" | "workspace"
       mail_account_status: "active" | "revoked" | "error"
+      mail_basis_kind: "consent" | "relationship" | "generic"
       mail_provider: "google"
+      mail_sending_provider: "simulator" | "ses"
+      mail_suppression_reason: "unsubscribe" | "bounce" | "complaint" | "manual"
+      mailout_address_kind: "contact" | "organization"
+      mailout_event_type:
+        | "send"
+        | "delivery"
+        | "bounce"
+        | "complaint"
+        | "reject"
+        | "delivery_delay"
+        | "rendering_failure"
+      mailout_recipient_status:
+        | "pending"
+        | "queued"
+        | "sending"
+        | "sent"
+        | "delivered"
+        | "bounced"
+        | "complained"
+        | "skipped"
+        | "failed"
+      mailout_skip_reason:
+        | "suppressed"
+        | "no_basis"
+        | "no_address"
+        | "duplicate"
+        | "cancelled"
+        | "unavailable"
+      mailout_status:
+        | "draft"
+        | "review"
+        | "queued"
+        | "sending"
+        | "paused"
+        | "done"
+        | "cancelled"
       membership_role: "owner" | "admin" | "member" | "viewer" | "guest"
       note_visibility: "private" | "workspace"
       payment_method: "transfer" | "card" | "cash" | "other"
@@ -6360,7 +7299,48 @@ export const Constants = {
       line_status: ["open", "closed", "archived"],
       mail_account_scope: ["personal", "workspace"],
       mail_account_status: ["active", "revoked", "error"],
+      mail_basis_kind: ["consent", "relationship", "generic"],
       mail_provider: ["google"],
+      mail_sending_provider: ["simulator", "ses"],
+      mail_suppression_reason: ["unsubscribe", "bounce", "complaint", "manual"],
+      mailout_address_kind: ["contact", "organization"],
+      mailout_event_type: [
+        "send",
+        "delivery",
+        "bounce",
+        "complaint",
+        "reject",
+        "delivery_delay",
+        "rendering_failure",
+      ],
+      mailout_recipient_status: [
+        "pending",
+        "queued",
+        "sending",
+        "sent",
+        "delivered",
+        "bounced",
+        "complained",
+        "skipped",
+        "failed",
+      ],
+      mailout_skip_reason: [
+        "suppressed",
+        "no_basis",
+        "no_address",
+        "duplicate",
+        "cancelled",
+        "unavailable",
+      ],
+      mailout_status: [
+        "draft",
+        "review",
+        "queued",
+        "sending",
+        "paused",
+        "done",
+        "cancelled",
+      ],
       membership_role: ["owner", "admin", "member", "viewer", "guest"],
       note_visibility: ["private", "workspace"],
       payment_method: ["transfer", "card", "cash", "other"],

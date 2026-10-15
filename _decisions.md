@@ -3637,3 +3637,39 @@ seis preguntas (§ 12) el 2026-10-15: las recomendadas.
    Hour) y el primer envío real de cada compañía nueva lo revisa Marco.
 
 La frontera de `service_role` se amplía de las RPC `mail_*` a las `mailout_*`, como dice el plan § 4.
+
+## [2026-10-15] ADR-112 · Envío en bloque, fase 1: lo que el esquema decide y el plan no decía
+
+**Contexto.** Migración `20261015100000_mailout` (plan `build/plans/2026-10-14-bulk-send.md` § 4 y § 11, ADR-110,
+y ADR-111: proveedor simulado mientras no haya cuenta de AWS). Al escribirla, el esquema real y el plan chocaban en
+algunos puntos; aquí queda qué se hizo.
+
+**Decisión.**
+1. **`workspace` pasa a UPDATE por columnas para `authenticated`.** Tenía UPDATE a tabla entera (la policy deja al
+   admin), así que `mailout_daily_cap`, `mailout_simulator_only` y la marca de revisión habrían sido escribibles por un
+   admin con un PATCH. Ahora el grant nombra las columnas de antes más `privacy_url`; las de envío solo las escribe
+   service_role. Una columna nueva de `workspace` que deba editar un admin hay que nombrarla en ese grant.
+2. **Revisión del primer envío real (ADR-110 § 6): estado `review`.** `queue_mailout` deja en `review` el envío de un
+   espacio sin `mailout_reviewed_at` cuando el dominio es de proveedor `ses` y el espacio no está en modo simulador; la
+   cola no lo toma. `mailout_approve_review` (solo service_role) lo pone en cola y marca el espacio como revisado. Con
+   el simulador no hay nada real que revisar.
+3. **Proveedor por dominio** (ADR-111): `mail_domain.provider` (`simulator` por defecto, `ses`). Los nombres no dicen
+   SES: `provider_message_id` en vez de `ses_message_id`. El estado del dominio lo escribe solo service_role también con
+   el simulador. Un dominio es único por espacio y, con `ses`, único en toda la cuenta de Hour.
+   `mail_domain.sending_account_id` llega con `mail_sending_account` en la fase 5.
+4. **`mail_basis` la lee solo el admin**, como la supresión (el plan decía «miembros»): una base nombra la dirección de
+   un contacto, y el contacto de una conversación privada no debe verse por otro camino. Quien envía ve la base de cada
+   destinatario en `mailout_preview`.
+5. **Tope diario:** ventana móvil de 24 horas, contando lo que está saliendo. Lo que pasa del tope se queda en cola.
+   `mailout_claim` admite `p_mailout_id` para la primera pasada justo después de poner en cola (plan § 6) y para los
+   tests, que así no tocan la cola de otros espacios.
+6. **Modo simulador:** una dirección fuera de `@simulator.amazonses.com` tumba la puesta en cola entera (no se salta
+   ese destinatario): es una barrera, no un filtro.
+7. **Una conversación que se borró, o la privada de otra persona, al poner en cola** queda `skipped (unavailable)` en
+   vez de bloquear el envío.
+8. **Baja y vuelta como nota sin texto:** `conversation_event` `note`, `source = integration`, sin cuerpo, con
+   `metadata.mailout` (`unsubscribed`, `resubscribed`, `complained`); la pantalla lo dice en su idioma.
+   `mailout_unsubscribe` no devuelve nada; lo que enseñe la página de baja se decide en la fase 3.
+9. **Exclusión a mano:** `suppress_mail_address` (admin) junto a `remove_mail_suppression`, que el plan ya tenía.
+10. El correo genérico de una organización (`workspace_organization.email`) no se escribe por la API (no hay grant de
+    UPDATE); los tests lo ponen con la clave de servicio. Cómo lo edita una compañía queda para la pantalla.
