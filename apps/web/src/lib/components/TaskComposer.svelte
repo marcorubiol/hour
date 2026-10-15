@@ -261,9 +261,9 @@
       </label>
       {#if due}
         <label class="tc__field tc__field--lead">
-          <span class="tc__label">{t('composer.lead', locale)}</span>
+          <span class="tc__label">{t('composer.notice', locale)}</span>
           <input type="number" min="0" max="365" inputmode="numeric" placeholder="—" bind:value={lead} />
-          <span class="tc__unit">{t('composer.lead_unit', locale)}</span>
+          <span class="tc__unit">{t('composer.notice_unit', locale)}</span>
         </label>
       {/if}
 

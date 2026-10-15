@@ -228,7 +228,7 @@
         href: '/h/conversations',
       });
     if (summary.pipeline != null && summary.pipeline > 0)
-      f.push({ text: t('desk.digest_pipeline', locale, { amount: money(summary.pipeline, summary.currency) }), href: '/h/money' });
+      f.push({ text: t('desk.digest_in_progress', locale, { amount: money(summary.pipeline, summary.currency) }), href: '/h/money' });
     if (summary.nextShowCity)
       f.push({ text: t('desk.digest_next_show', locale, { place: summary.nextShowCity }), href: '/h/planner' });
     return f;

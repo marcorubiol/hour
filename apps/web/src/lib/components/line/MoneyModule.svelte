@@ -269,7 +269,7 @@
       {:else}
         <div class="lmm__totals">
           <span class="lmm__total">
-            <span class="eyebrow eyebrow--sub lmm__total-label">{t('books.pipeline', locale)}</span>
+            <span class="eyebrow eyebrow--sub lmm__total-label">{t('books.in_progress', locale)}</span>
             {fmtMoney(totals.pipeline)}
           </span>
           <span class="lmm__total">

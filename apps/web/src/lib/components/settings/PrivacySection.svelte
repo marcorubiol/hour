@@ -95,8 +95,8 @@
 
     <div class="set-row">
       <div class="set-row__lead">
-        <div class="set-row__label">{t('settings.priv_distribution', locale)}</div>
-        <div class="set-row__hint">{t('settings.priv_distribution_hint', locale)}</div>
+        <div class="set-row__label">{t('settings.priv_outreach', locale)}</div>
+        <div class="set-row__hint">{t('settings.priv_outreach_hint', locale)}</div>
       </div>
       <div class="set-row__ctrl">
         <div class="set-seg">

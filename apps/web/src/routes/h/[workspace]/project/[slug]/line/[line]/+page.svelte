@@ -423,7 +423,7 @@
           <span class="line-detail__stat"><b>{st.holds}</b> {t('line.stat_holds', locale)}</span>
           {#if st.hasFees && st.pipeline > 0}
             <span class="line-detail__stat"
-              ><b>{fmtMoneyCompact(st.pipeline)}</b> {t('line.stat_pipeline', locale)}</span
+              ><b>{fmtMoneyCompact(st.pipeline)}</b> {t('line.stat_in_progress', locale)}</span
             >
           {/if}
         </p>

@@ -709,7 +709,7 @@
           <span class="mny__total mny__total--danger"><span class="mny__total-label">{t('books.overdue', locale)}</span>{fmtMoney(total.overdue)}</span>
         {/if}
         {#if total.pipeline > 0}
-          <span class="mny__total mny__total--soft"><span class="mny__total-label">{t('books.pipeline', locale)}</span>{fmtMoney(total.pipeline)}</span>
+          <span class="mny__total mny__total--soft"><span class="mny__total-label">{t('books.in_progress', locale)}</span>{fmtMoney(total.pipeline)}</span>
         {/if}
       </span>
     {/each}
