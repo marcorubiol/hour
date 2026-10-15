@@ -49,6 +49,8 @@ interface Mailout {
   status: string;
   from_address: string | null;
   reply_to_address: string | null;
+  from_local_part?: string;
+  from_name?: string | null;
 }
 
 interface Recipient {
@@ -276,6 +278,29 @@ describe.skipIf(!envReady() || !limitedEnvReady())('RLS: envío en bloque (ADR-1
     expect(seen.rows.length).toBe(1);
     const bad = await pgRpc('add_mail_domain', adminJwt, { p_workspace_id: workspaceId, p_domain: 'no es un dominio' });
     expect(bad.status).toBe(400);
+  });
+
+  test('remitente del dominio: lo pone el admin y un envío nuevo lo hereda', async () => {
+    const denied = await pgRpc('set_mail_domain_sender', limitedJwt, {
+      p_id: domainId,
+      p_from_local_part: 'gira',
+      p_from_name: 'Otro',
+    });
+    expect(denied.status).toBe(403);
+    const bad = await pgRpc('set_mail_domain_sender', adminJwt, { p_id: domainId, p_from_local_part: 'no vale' });
+    expect(bad.status).toBe(400);
+    const ok = await pgRpc<{ from_local_part: string; from_name: string | null }>('set_mail_domain_sender', adminJwt, {
+      p_id: domainId,
+      p_from_local_part: '  Gira ',
+      p_from_name: `MüK ${RUN}`,
+    });
+    expect(ok.status, ok.error).toBe(200);
+    expect(one(ok.data)).toMatchObject({ from_local_part: 'gira', from_name: `MüK ${RUN}` });
+    const m = await newMailout(adminJwt, homeProjectId, domainId);
+    expect(m.row).toMatchObject({ from_local_part: 'gira', from_name: `MüK ${RUN}` });
+    // Vuelta al remitente por defecto, el que esperan los demás tests.
+    const back = await pgRpc('set_mail_domain_sender', adminJwt, { p_id: domainId, p_from_local_part: null });
+    expect(back.status, back.error).toBe(200);
   });
 
   test('2 · con «ver» Converses se lee; sin «editar» no se crea, ni se escribe, ni se pone en cola', async () => {
@@ -799,6 +824,7 @@ describe.skipIf(!envReady() || !limitedEnvReady())('RLS: envío en bloque (ADR-1
         ['cancel_mailout', { p_id: target }],
         ['add_mail_domain', { p_workspace_id: workspaceId, p_domain: `ajeno-${RUN}.example.test` }],
         ['remove_mail_domain', { p_id: domainId }],
+        ['set_mail_domain_sender', { p_id: domainId, p_from_local_part: 'ajeno' }],
         ['set_mail_basis', { p_workspace_id: workspaceId, p_address: SIM('a'), p_kind: 'relationship' }],
         ['withdraw_mail_basis', { p_workspace_id: workspaceId, p_address: SIM('a') }],
         ['suppress_mail_address', { p_workspace_id: workspaceId, p_address: SIM('b') }],

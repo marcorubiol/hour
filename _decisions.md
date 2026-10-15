@@ -3673,3 +3673,25 @@ algunos puntos; aquí queda qué se hizo.
 9. **Exclusión a mano:** `suppress_mail_address` (admin) junto a `remove_mail_suppression`, que el plan ya tenía.
 10. El correo genérico de una organización (`workspace_organization.email`) no se escribe por la API (no hay grant de
     UPDATE); los tests lo ponen con la clave de servicio. Cómo lo edita una compañía queda para la pantalla.
+
+## [2026-10-15] ADR-114 · Envío en bloque, fase 2: dominio de envío con el adaptador simulado
+
+**Contexto.** Plan `build/plans/2026-10-14-bulk-send.md` § 5 y § 11 (fase 2), ADR-111 (no hay cuenta de AWS: se
+construye contra un proveedor simulado). Lo que el plan no fijaba:
+
+**Decisión.**
+1. **El remitente por defecto vive en el dominio** (`mail_domain.from_local_part`, `difusion` por defecto, y
+   `from_name`, NULL = el nombre del espacio). Lo escribe el admin con `set_mail_domain_sender`; `create_mailout` lo
+   copia al envío, que guarda el suyo. Va en la migración de la fase 1 (`20261015100000_mailout`), que aún no está
+   aplicada en ningún sitio.
+2. **Qué adaptador usa un dominio nuevo lo dice `MAILOUT_PROVIDER`** (var de Wrangler): `ses` solo cuando haya cuenta;
+   sin ella, o con cualquier otro valor, el simulador. Un dominio se comprueba siempre con el adaptador de su fila: el
+   que se dio de alta simulado sigue simulado cuando llegue la cuenta.
+3. **El simulador** devuelve los registros que pediría SES (3 CNAME de DKIM con tokens deterministas, MX y SPF de
+   `bounce.<dominio>`, DMARC sugerido) y da el dominio por verificado al pulsar «Comprobar», sin retardo ni DNS. El
+   estado lo escribe la base como service_role (`mail_domain_record_status`), igual que hará SES.
+4. **El adaptador de SES es un esqueleto**: sin `SES_ACCESS_KEY_ID`, `SES_SECRET_ACCESS_KEY` o `SES_REGION`, las rutas
+   responden 503 `mailout_not_configured`; con ellas, falla al usarse hasta que se escriba con la cuenta.
+5. **La pantalla dice que es simulado** («Modo de prueba: no sale ningún correo real») mientras el Worker esté en
+   simulador o el espacio tenga un dominio simulado. Los valores de los registros DNS nombran `amazonses.com` porque
+   son los registros reales; el texto de la pantalla nunca nombra el servicio.

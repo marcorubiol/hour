@@ -96,6 +96,10 @@ CREATE TABLE public.mail_domain (
   provider             public.mail_sending_provider NOT NULL DEFAULT 'simulator',
   domain               extensions.citext NOT NULL,
   mail_from_subdomain  text NOT NULL DEFAULT 'bounce',
+  -- El remitente por defecto de los envíos de este dominio (ADR-110 § 3):
+  -- `from_name <from_local_part@domain>`. NULL en el nombre = el del espacio.
+  from_local_part      text NOT NULL DEFAULT 'difusion',
+  from_name            text,
   tenant_name          text,
   configuration_set    text,
   dkim_status          text NOT NULL DEFAULT 'NOT_STARTED',
@@ -113,6 +117,9 @@ CREATE TABLE public.mail_domain (
     CHECK (domain ~ '^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$' AND length(domain) <= 253),
   CONSTRAINT mail_domain_mail_from_format
     CHECK (mail_from_subdomain ~ '^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$'),
+  CONSTRAINT mail_domain_from_local_part_format
+    CHECK (from_local_part ~ '^[a-z0-9]([a-z0-9._+-]{0,62}[a-z0-9])?$'),
+  CONSTRAINT mail_domain_from_name_length CHECK (from_name IS NULL OR length(from_name) BETWEEN 1 AND 100),
   CONSTRAINT mail_domain_dkim_status_check
     CHECK (dkim_status IN ('NOT_STARTED', 'PENDING', 'SUCCESS', 'FAILED', 'TEMPORARY_FAILURE')),
   CONSTRAINT mail_domain_mail_from_status_check
@@ -545,9 +552,11 @@ $$;
 -- Alta de un dominio: fila sin verificar. El Worker habla después con el
 -- proveedor y escribe el estado con mail_domain_record_status.
 CREATE FUNCTION public.add_mail_domain(
-  p_workspace_id uuid,
-  p_domain       text,
-  p_provider     public.mail_sending_provider DEFAULT 'simulator'
+  p_workspace_id    uuid,
+  p_domain          text,
+  p_provider        public.mail_sending_provider DEFAULT 'simulator',
+  p_from_local_part text DEFAULT 'difusion',
+  p_from_name       text DEFAULT NULL
 ) RETURNS public.mail_domain
 LANGUAGE plpgsql SECURITY DEFINER
 SET search_path TO 'public', 'extensions', 'pg_temp'
@@ -567,9 +576,40 @@ BEGIN
                AND (d.workspace_id = p_workspace_id OR (d.provider = 'ses' AND coalesce(p_provider, 'simulator') = 'ses'))) THEN
     RAISE EXCEPTION 'domain is not available' USING ERRCODE = '23505';
   END IF;
-  INSERT INTO public.mail_domain (workspace_id, provider, domain, tenant_name, configuration_set, created_by)
+  INSERT INTO public.mail_domain (
+    workspace_id, provider, domain, tenant_name, configuration_set, from_local_part, from_name, created_by
+  )
   VALUES (p_workspace_id, coalesce(p_provider, 'simulator'), v_domain,
-          'hour-' || p_workspace_id::text, 'hour-' || p_workspace_id::text, auth.uid())
+          'hour-' || p_workspace_id::text, 'hour-' || p_workspace_id::text,
+          lower(coalesce(nullif(btrim(p_from_local_part), ''), 'difusion')),
+          nullif(btrim(coalesce(p_from_name, '')), ''), auth.uid())
+  RETURNING * INTO v_row;
+  RETURN v_row;
+END;
+$$;
+
+-- El remitente por defecto de un dominio (admin). Los envíos ya creados
+-- guardan el suyo.
+CREATE FUNCTION public.set_mail_domain_sender(
+  p_id              uuid,
+  p_from_local_part text,
+  p_from_name       text DEFAULT NULL
+) RETURNS public.mail_domain
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path TO 'public', 'pg_temp'
+AS $$
+DECLARE
+  v_ws  uuid;
+  v_row public.mail_domain;
+BEGIN
+  SELECT workspace_id INTO v_ws FROM public.mail_domain WHERE id = p_id;
+  IF auth.uid() IS NULL OR v_ws IS NULL OR NOT public.is_workspace_admin(v_ws) THEN
+    RAISE EXCEPTION 'mail domain % not found', p_id USING ERRCODE = '42501';
+  END IF;
+  UPDATE public.mail_domain
+  SET from_local_part = lower(coalesce(nullif(btrim(p_from_local_part), ''), 'difusion')),
+      from_name = nullif(btrim(coalesce(p_from_name, '')), '')
+  WHERE id = p_id
   RETURNING * INTO v_row;
   RETURN v_row;
 END;
@@ -624,9 +664,15 @@ BEGIN
   ) THEN
     RAISE EXCEPTION 'mail domain % not found', p_mail_domain_id USING ERRCODE = '22023';
   END IF;
-  INSERT INTO public.mailout (workspace_id, project_id, line_id, mail_domain_id, from_name, created_by)
-  VALUES (v_ws, p_project_id, p_line_id, p_mail_domain_id,
-          (SELECT left(w.name, 100) FROM public.workspace w WHERE w.id = v_ws), auth.uid())
+  -- El remitente sale del dominio (o `difusion` y el nombre del espacio).
+  INSERT INTO public.mailout (workspace_id, project_id, line_id, mail_domain_id, from_local_part, from_name, created_by)
+  SELECT v_ws, p_project_id, p_line_id, p_mail_domain_id,
+         coalesce(d.from_local_part, 'difusion'),
+         coalesce(d.from_name, left(w.name, 100)),
+         auth.uid()
+  FROM public.workspace w
+  LEFT JOIN public.mail_domain d ON d.id = p_mail_domain_id
+  WHERE w.id = v_ws
   RETURNING * INTO v_row;
   RETURN v_row;
 END;
@@ -1442,7 +1488,8 @@ BEGIN
 
   -- De persona: authenticated.
   FOREACH f IN ARRAY ARRAY[
-    'public.add_mail_domain(uuid, text, public.mail_sending_provider)',
+    'public.add_mail_domain(uuid, text, public.mail_sending_provider, text, text)',
+    'public.set_mail_domain_sender(uuid, text, text)',
     'public.remove_mail_domain(uuid)',
     'public.create_mailout(uuid, uuid, uuid)',
     'public.update_mailout(uuid, text, text, text, text, text, uuid, uuid)',

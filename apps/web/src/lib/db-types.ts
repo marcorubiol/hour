@@ -1985,6 +1985,8 @@ export type Database = {
           dmarc_record: string | null
           dns_records: Json
           domain: string
+          from_local_part: string
+          from_name: string | null
           id: string
           last_error: string | null
           mail_from_status: string
@@ -2004,6 +2006,8 @@ export type Database = {
           dmarc_record?: string | null
           dns_records?: Json
           domain: string
+          from_local_part?: string
+          from_name?: string | null
           id?: string
           last_error?: string | null
           mail_from_status?: string
@@ -2023,6 +2027,8 @@ export type Database = {
           dmarc_record?: string | null
           dns_records?: Json
           domain?: string
+          from_local_part?: string
+          from_name?: string | null
           id?: string
           last_error?: string | null
           mail_from_status?: string
@@ -4366,6 +4372,8 @@ export type Database = {
       add_mail_domain: {
         Args: {
           p_domain: string
+          p_from_local_part?: string
+          p_from_name?: string
           p_provider?: Database["public"]["Enums"]["mail_sending_provider"]
           p_workspace_id: string
         }
@@ -4378,6 +4386,8 @@ export type Database = {
           dmarc_record: string | null
           dns_records: Json
           domain: string
+          from_local_part: string
+          from_name: string | null
           id: string
           last_error: string | null
           mail_from_status: string
@@ -5854,6 +5864,8 @@ export type Database = {
           dmarc_record: string | null
           dns_records: Json
           domain: string
+          from_local_part: string
+          from_name: string | null
           id: string
           last_error: string | null
           mail_from_status: string
@@ -6509,6 +6521,36 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "mail_basis"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      set_mail_domain_sender: {
+        Args: { p_from_local_part: string; p_from_name?: string; p_id: string }
+        Returns: {
+          checked_at: string | null
+          configuration_set: string | null
+          created_at: string
+          created_by: string | null
+          dkim_status: string
+          dmarc_record: string | null
+          dns_records: Json
+          domain: string
+          from_local_part: string
+          from_name: string | null
+          id: string
+          last_error: string | null
+          mail_from_status: string
+          mail_from_subdomain: string
+          provider: Database["public"]["Enums"]["mail_sending_provider"]
+          tenant_name: string | null
+          updated_at: string
+          verified_at: string | null
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "mail_domain"
           isOneToOne: true
           isSetofReturn: false
         }
