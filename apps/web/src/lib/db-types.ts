@@ -6006,6 +6006,25 @@ export type Database = {
           workspace_id: string
         }[]
       }
+      mailout_compose_preview: {
+        Args: { p_id: string }
+        Returns: {
+          address_kind: Database["public"]["Enums"]["mailout_address_kind"]
+          basis_kind: Database["public"]["Enums"]["mail_basis_kind"]
+          city: string
+          company_city: string
+          company_name: string
+          company_phone: string
+          company_signature: string
+          company_website: string
+          contact_first_name: string
+          contact_name: string
+          mailout_id: string
+          organization_name: string
+          privacy_url: string
+          recipient_id: string
+        }[]
+      }
       mailout_preview: {
         Args: { p_id: string }
         Returns: {
@@ -6065,6 +6084,7 @@ export type Database = {
           p_provider_message_id: string
           p_recipient_id: string
           p_rfc_message_id: string
+          p_subject?: string
         }
         Returns: {
           address: string | null
@@ -6100,8 +6120,35 @@ export type Database = {
         }
       }
       mailout_resubscribe: { Args: { p_token: string }; Returns: undefined }
+      mailout_send_context: {
+        Args: { p_recipient_ids: string[] }
+        Returns: {
+          address_kind: Database["public"]["Enums"]["mailout_address_kind"]
+          basis_kind: Database["public"]["Enums"]["mail_basis_kind"]
+          city: string
+          company_city: string
+          company_name: string
+          company_phone: string
+          company_signature: string
+          company_website: string
+          contact_first_name: string
+          contact_name: string
+          mailout_id: string
+          organization_name: string
+          privacy_url: string
+          recipient_id: string
+        }[]
+      }
       mailout_test_authorize: { Args: { p_id: string }; Returns: string }
       mailout_unsubscribe: { Args: { p_token: string }; Returns: undefined }
+      mailout_unsubscribe_info: {
+        Args: { p_token: string }
+        Returns: {
+          company_name: string
+          language: string
+          unsubscribed: boolean
+        }[]
+      }
       mark_thread_read: { Args: { p_thread_id: string }; Returns: string }
       my_mail_signature: {
         Args: { p_workspace_id: string }

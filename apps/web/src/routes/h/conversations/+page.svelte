@@ -10,9 +10,15 @@
    * POST /api/conversations with inline person fields — the RPC
    * find-or-creates the person on email, so re-typing a known email links
    * the existing file instead of duplicating it.
+   *
+   * Selection mode (envío en bloque, plan § 10): checkboxes over the filtered
+   * list and a bar «Escribir a N», which creates the draft (POST /api/mailout)
+   * and opens the mailout screen. A mailout belongs to one project, so the
+   * bar asks for conversations of a single project.
    */
 
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
+  import { goto } from '$app/navigation';
   import { fetchJSON, mutateJSON, ApiError } from '$lib/api';
   import Button from '$lib/components/Button.svelte';
   import LensHeader from '$lib/components/LensHeader.svelte';
@@ -342,6 +348,34 @@
     },
   });
 
+  // ── Selection → mailout (plan § 10) ───────────────────────────────────
+  let picking = $state(false);
+  let picked = $state<ConversationItem[]>([]);
+  let pickedProjects = $derived([...new Set(picked.map((c) => c.project_id))]);
+
+  function togglePicking() {
+    picking = !picking;
+    picked = [];
+  }
+
+  const writeMutation = createMutation({
+    mutationFn: () =>
+      mutateJSON<{ id: string; workspace_slug: string }>('POST', '/api/mailout', {
+        project_id: pickedProjects[0],
+        conversation_ids: picked.map((c) => c.id),
+      }),
+    onSuccess: (r) => {
+      if (r) void goto(`/h/${r.workspace_slug}/mailout/${r.id}`);
+    },
+    onError: (err) => {
+      addToast({
+        tone: 'danger',
+        title: t('mailout.not_created', locale),
+        message: err instanceof Error ? err.message : t('perf.unexpected', locale),
+      });
+    },
+  });
+
   function submitAdd() {
     if (aProjectIds.length === 0) {
       addToast({ tone: 'warning', message: t('conversations.pick_space', locale) });
@@ -377,9 +411,40 @@
     </div>
     <Select label={t('edit.status', locale)} options={statusOptions} bind:value={statusFilter} />
     <Button size="s" onclick={openAdd}>{t('conversations.add', locale)}</Button>
+    <Button size="s" variant="outline" onclick={togglePicking}>
+      {picking ? t('mailout.pick_done', locale) : t('mailout.pick', locale)}
+    </Button>
   </div>
 
-  <ConversationTable {filters} {personHref} {conversationHref} groupable importEmptyState />
+  <ConversationTable
+    {filters}
+    {personHref}
+    {conversationHref}
+    groupable
+    importEmptyState
+    selectable={picking}
+    bind:selected={picked}
+  />
+
+  {#if picking}
+    <div class="action-bar" role="region" aria-label={t('mailout.pick_bar', locale)}>
+      <p class="action-bar__note">
+        {#if pickedProjects.length > 1}
+          {t('mailout.one_project', locale)}
+        {:else}
+          {t(picked.length === 1 ? 'mailout.picked_one' : 'mailout.picked_other', locale, { n: picked.length })}
+        {/if}
+      </p>
+      <Button
+        size="s"
+        disabled={picked.length === 0 || pickedProjects.length !== 1}
+        loading={$writeMutation.isPending}
+        onclick={() => $writeMutation.mutate()}
+      >
+        {t('mailout.write_to', locale, { n: picked.length })}
+      </Button>
+    </div>
+  {/if}
 </section>
 
 <Dialog bind:open={addOpen} title={t('conversations.add', locale)} size="m">

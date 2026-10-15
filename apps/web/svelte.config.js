@@ -97,6 +97,18 @@ export default {
         'form-action': ['self'],
       },
     },
+    /**
+     * CSRF: SvelteKit rejects a form POST whose Origin is not ours, and that
+     * includes a POST with NO Origin. The one-click unsubscribe of RFC 8058
+     * (/u/<token>, ADR-115) is exactly that: Gmail and Yahoo POST
+     * `List-Unsubscribe=One-Click` from their servers, without Origin. Only
+     * in production builds, so `vite dev` never shows it. hooks.server.ts
+     * keeps the origin floor for every mutation (a browser always sends
+     * Origin cross-site, and a foreign one is refused); the session cookie is
+     * SameSite=Strict on top. `checkOrigin` is deprecated in favour of
+     * `trustedOrigins`, which cannot express «no Origin».
+     */
+    csrf: { checkOrigin: false },
     // Required by @sentry/sveltekit 10.8+ for proper Workers-runtime tracing.
     // Without these, the Cloudflare init handle can't hook server-side spans.
     experimental: {

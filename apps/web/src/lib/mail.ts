@@ -57,6 +57,10 @@ export const EVENT_MAIL_SELECT = [
   'mailbox_address:metadata->>mailbox_address',
   'mailbox_scope:metadata->>mailbox_scope',
   'mail_account_id:metadata->>mail_account_id',
+  // Envío en bloque (ADR-115): el correo que salió de un envío, y las notas
+  // de baja, vuelta o «spam» (ADR-112 § 8).
+  'mailout_id:metadata->>mailout_id',
+  'mailout_note:metadata->>mailout',
 ].join(',');
 
 export interface EventMailFields {
@@ -66,6 +70,8 @@ export interface EventMailFields {
   mailbox_address?: string | null;
   mailbox_scope?: MailAccountScope | null;
   mail_account_id?: string | null;
+  mailout_id?: string | null;
+  mailout_note?: 'unsubscribed' | 'resubscribed' | 'complained' | null;
 }
 
 /** El asunto de una respuesta: «Re: » una sola vez. */

@@ -404,6 +404,9 @@
       {t('mail.via', locale, { mailbox: viaLabel(e) ?? '' })}
     </span>
   {/if}
+  {#if e.mailout_id && e.kind === 'email'}
+    <a class="mb" href={`/h/${workspaceSlug}/mailout/${e.mailout_id}`} data-testid="event-mailout">{t('mailout.of_mailout', locale)}</a>
+  {/if}
 {/snippet}
 
 {#snippet recordItem(e: ConversationEventItem)}
@@ -417,9 +420,9 @@
           {#if !open.has(e.id)}<span class="rec__snippet">{firstLine(e.body)}</span>{/if}
         </button>
         {#if open.has(e.id)}
-          <div class="mail">
-            {#if e.mail_from}<p class="mail__meta"><span>{t('mail.from', locale)}</span> {e.mail_from}</p>{/if}
-            {#if e.mail_to?.length}<p class="mail__meta"><span>{t('mail.to', locale)}</span> {e.mail_to.join(', ')}</p>{/if}
+          <div class="mail mail-card">
+            {#if e.mail_from}<p class="mail-card__meta"><span>{t('mail.from', locale)}</span> {e.mail_from}</p>{/if}
+            {#if e.mail_to?.length}<p class="mail-card__meta"><span>{t('mail.to', locale)}</span> {e.mail_to.join(', ')}</p>{/if}
             {#if e.body}<p class="mail__text">{e.body}</p>{/if}
             {#if composing !== e.id}
               <div class="mail__actions">
@@ -434,6 +437,7 @@
         {/if}
       {:else}
         <span class="rec__what">{what(e)}</span>
+        {#if e.mailout_note}<p class="rec__note">{t(`mailout.note_${e.mailout_note}`, locale)}</p>{/if}
         {#if e.body}<p class="rec__note">{e.body}</p>{/if}
       {/if}
     </div>
@@ -447,6 +451,7 @@
       <time class="rec__when" datetime={e.occurred_at}>{dayMonthYearTs(e.occurred_at)}</time>
     </p>
     {#if e.subject}<p class="rec__subject">{e.subject}</p>{/if}
+    {#if e.mailout_note}<p class="card__text">{t(`mailout.note_${e.mailout_note}`, locale)}</p>{/if}
     {#if e.body}<p class="card__text">{e.body}</p>{/if}
     {#if e.kind === 'email' && e.source === 'email' && composing !== e.id}
       <div class="mail__actions">
@@ -584,18 +589,6 @@
       }
     }
 
-    .block-head {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: var(--space-s);
-      min-block-size: var(--control-size-s);
-      padding-block-end: var(--space-xs);
-      border-block-end: 1px solid var(--border-color-light);
-    }
-    .block-head h2 {
-      margin: 0;
-    }
 
     .rec {
       list-style: none;
@@ -680,22 +673,8 @@
     }
 
     .mail {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-2xs);
       margin-block-start: var(--space-xs);
-      padding: var(--space-s) var(--space-m);
-      background: var(--bg-ultra-light);
-      border: 1px solid var(--border-color-light);
-      border-radius: var(--radius);
     }
-    .mail__meta {
-      margin: 0;
-      color: var(--text-muted);
-      font-size: var(--text-xs);
-      overflow-wrap: anywhere;
-    }
-    .mail__meta span,
     .reply__field > span {
       display: inline-block;
       min-inline-size: 3.5rem;

@@ -7,20 +7,22 @@
  * el suyo.
  *
  * Frontera (ADR-110, architecture.md § seguridad): la clave de servicio solo
- * llama a la RPC `mail_domain_record_status`; el resto va con el JWT de la
- * persona.
+ * llama a las RPC de máquina de db.ts; el resto va con el JWT de la persona.
  */
 
 import type { MailSendingProvider } from '$lib/mailout';
 import { MailoutNotConfiguredError, type DomainStatus, type SendingProvider } from './provider';
 import { simulatorProvider } from './simulator';
 import { sesMissing, sesProvider, type SesEnv } from './ses';
+import { serviceRpc } from './db';
 
 export interface MailoutEnv extends SesEnv {
   PUBLIC_SUPABASE_URL: string;
   PUBLIC_SUPABASE_ANON_KEY: string;
   SUPABASE_SERVICE_ROLE_KEY?: string;
   MAILOUT_PROVIDER?: string;
+  /** Solo en local (`.dev.vars`): el origen de los enlaces de baja. */
+  MAILOUT_LINK_ORIGIN?: string;
 }
 
 export function defaultProviderKind(env: Partial<MailoutEnv> | null | undefined): MailSendingProvider {
@@ -37,15 +39,6 @@ export function mailoutMissing(kind: MailSendingProvider, env: Partial<MailoutEn
   return kind === 'ses' ? [...missing, ...sesMissing(env)] : missing;
 }
 
-export class MailoutDbError extends Error {
-  constructor(
-    public readonly status: number,
-    public readonly body: string,
-  ) {
-    super(`mailout db ${status}: ${body.slice(0, 200)}`);
-  }
-}
-
 /** Escribe el estado de un dominio como service_role. */
 export async function recordDomainStatus(
   env: Partial<MailoutEnv>,
@@ -53,28 +46,25 @@ export async function recordDomainStatus(
   s: DomainStatus,
   fetchFn: typeof fetch = fetch,
 ): Promise<void> {
-  const key = env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!key || !env.PUBLIC_SUPABASE_URL) throw new MailoutNotConfiguredError(['SUPABASE_SERVICE_ROLE_KEY']);
-  // Las claves nuevas (`sb_secret_…`) van solo en `apikey`; la legada es un JWT
-  // y va también como Bearer (como mail/db.ts).
-  const res = await fetchFn(new URL('/rest/v1/rpc/mail_domain_record_status', env.PUBLIC_SUPABASE_URL).toString(), {
-    method: 'POST',
-    headers: {
-      apikey: key,
-      'content-type': 'application/json',
-      accept: 'application/json',
-      ...(key.startsWith('eyJ') ? { authorization: `Bearer ${key}` } : {}),
-    },
-    body: JSON.stringify({
+  await serviceRpc(
+    env,
+    'mail_domain_record_status',
+    {
       p_id: domainId,
       p_dkim_status: s.dkimStatus,
       p_mail_from_status: s.mailFromStatus,
       p_dns_records: s.records,
       p_dmarc_record: s.dmarcRecord,
       p_error: s.error,
-    }),
-  });
-  if (!res.ok) throw new MailoutDbError(res.status, await res.text());
+    },
+    fetchFn,
+  );
+}
+
+/** El origen de los enlaces de baja: el de producción, salvo en local. */
+export function mailoutLinkOrigin(env: Partial<MailoutEnv> | null | undefined): string {
+  return env?.MAILOUT_LINK_ORIGIN || 'https://hour.zerosense.studio';
 }
 
 export { MailoutNotConfiguredError };
+export { MailoutDbError } from './db';

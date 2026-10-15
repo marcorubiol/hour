@@ -426,8 +426,8 @@
      Hour y al buzón de la compañía, bajas, y la LSSI (consentimiento previo también entre empresas; pregunta abierta al
      abogado).
      - [ ] **Editor de mailing visual para las campañas, del nivel de Brevo** (drop 11-10): bloques arrastrables (texto, imagen, botón, dossier o vídeo de la obra), plantillas por compañía con su marca, vista previa en móvil y escritorio, y personalización con los datos del contacto y de la sala. Proveedor decidido (ADR-109): va después del envío.
-  - [ ] Marco: decidir — **Fase 3 hecha en `claude/mailout-send` (`2a3efc0`, ADR-115): validar la pantalla del envío** (selección en Conversations, borrador, enviado, registro, baja; capturas en `build/coordination/shots/mailout-send/`, ya enviadas). Validada, se integra, se aplica `20261016100000_mailout_send` y se despliega con el cron de cada minuto.
-  - [ ] **Envío en bloque, fase 3 (enviar) contra el proveedor simulado** (ADR-111): sin cuenta de AWS por ahora.
+  - [ ] **Envío en bloque: lo que quedó fuera de la fase 3** (ADR-115): el modo selección en el módulo Conversations de un proyecto o línea (hoy solo en la lente); elegir el buzón de respuestas en la pantalla del envío (hoy se calcula como `queue_mailout`); `kit.csrf.checkOrigin` está deprecado: si SvelteKit lo quita, la baja de un clic pasa a `worker-entry.js`.
+  - [ ] **Envío en bloque, fase 4 (eventos reales y salida del sandbox)**: espera a la cuenta de AWS (ADR-111). Incluye la pausa por tenant (`paused`).
   - [ ] **Envío en bloque desde la cuenta de Google de la compañía, si lo prefiere** (chat 15-10): otro adaptador de envío junto al de Hour, por la API de Gmail con el buzón ya conectado. Uno a uno, con su firma y su baja; sale de su enviados y las respuestas vuelven por la sincronización. A decidir en el plan: tope diario (Gmail ~500, Workspace ~2.000), permiso `gmail.send` en la verificación de Google, y si convive con el dominio propio o lo sustituye. Sin estimar.
   - [ ] **Cuenta de AWS para el envío en bloque** (plan § 5, pasos 1 a 3): no por ahora (Marco, 2026-10-15, ADR-111). Hace falta antes del primer envío real.
 ## Después de money v3 — contenedores (bloque 5)

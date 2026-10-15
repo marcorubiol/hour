@@ -57,6 +57,10 @@
     groupable?: boolean;
     /** The global lens points an empty book at the existing import path. */
     importEmptyState?: boolean;
+    /** Selection mode (plan § 10, «Escribir a N»): a checkbox per row. */
+    selectable?: boolean;
+    /** The picked conversations, across pages and filters. */
+    selected?: ConversationItem[];
   }
 
   let {
@@ -66,6 +70,8 @@
     conversationHref,
     groupable = false,
     importEmptyState = false,
+    selectable = false,
+    selected = $bindable([]),
   }: Props = $props();
 
   type ConversationsResponse = {
@@ -314,6 +320,23 @@
     return person ? person.replace(/\/person\/[^/]+$/, `/conversation/${item.id}`) : null;
   }
 
+  // ── Selection (envío en bloque) ───────────────────────────────────────
+  let selectedIds = $derived(new Set(selected.map((s) => s.id)));
+  let pagePicked = $derived(visibleItems.filter((i) => selectedIds.has(i.id)).length);
+  let showContacts = $derived(view === 'contact' && groupable && !selectable);
+
+  function togglePick(item: ConversationItem) {
+    selected = selectedIds.has(item.id) ? selected.filter((s) => s.id !== item.id) : [...selected, item];
+  }
+
+  function togglePage() {
+    const page = new Set(visibleItems.map((i) => i.id));
+    selected =
+      pagePicked === visibleItems.length
+        ? selected.filter((s) => !page.has(s.id))
+        : [...selected, ...visibleItems.filter((i) => !selectedIds.has(i.id))];
+  }
+
   let showPagination = $derived(total > LIMIT);
   let rangeEnd = $derived(Math.min(offset + LIMIT, total));
 </script>
@@ -338,7 +361,7 @@
       {/if}
     {/if}
   </div>
-  {#if groupable}
+  {#if groupable && !selectable}
     <div class="view-toggle" role="group" aria-label={t('conversations.group_aria', locale)}>
       <button
         type="button"
@@ -357,7 +380,7 @@
 </div>
 
 <div class="table-wrap" aria-busy={busy}>
-  {#if view === 'contact' && groupable}
+  {#if showContacts}
     <table class="contact-table">
       <thead>
         <tr>
@@ -416,6 +439,18 @@
     <table class="conversation-table">
       <thead>
         <tr>
+          {#if selectable}
+            <th class="cell--pick">
+              <input
+                type="checkbox"
+                class="pick"
+                checked={visibleItems.length > 0 && pagePicked === visibleItems.length}
+                indeterminate={pagePicked > 0 && pagePicked < visibleItems.length}
+                aria-label={t('mailout.pick_page', locale)}
+                onchange={togglePage}
+              />
+            </th>
+          {/if}
           <th>{t('conversations.col_organization', locale)}</th>
           <th>{t('conversations.col_contact', locale)}</th>
           <th>{t('conversations.col_location', locale)}</th>
@@ -428,7 +463,18 @@
         {#each visibleItems as item, i (item.id)}
           {@const path = personPath(item)}
           {@const file = conversationPath(item)}
-          <tr>
+          <tr class:is-picked={selectable && selectedIds.has(item.id)}>
+            {#if selectable}
+              <td class="cell--pick">
+                <input
+                  type="checkbox"
+                  class="pick"
+                  checked={selectedIds.has(item.id)}
+                  aria-label={t('mailout.pick_one', locale, { name: organizationOf(item) ?? item.person?.full_name ?? '' })}
+                  onchange={() => togglePick(item)}
+                />
+              </td>
+            {/if}
             <!-- ADR-102: the conversation is with the organization; it titles the row and opens the file. -->
             <td class="cell--name" data-label={t('conversations.col_organization', locale)}>
               {#if file && organizationOf(item)}
@@ -539,7 +585,7 @@
   {/if}
 {/if}
 
-{#if view === 'contact' && showPagination}
+{#if showContacts && showPagination}
   <p class="grouping-note">
     {t('conversations.grouping_note', locale, { n: items.length, total })}
   </p>
@@ -761,6 +807,20 @@
       filter: brightness(0.97);
     }
 
+    .cell--pick {
+      inline-size: 2rem;
+      padding-inline-end: 0;
+    }
+    .pick {
+      inline-size: 1rem;
+      block-size: 1rem;
+      accent-color: var(--text-color);
+      cursor: pointer;
+    }
+    tbody tr.is-picked td {
+      background: var(--bg-ultra-light);
+    }
+
     .menu-separator {
       block-size: 1px;
       margin-block: var(--space-2xs);
@@ -838,8 +898,13 @@
         border-radius: var(--radius-s);
         background: var(--bg-light);
       }
-      tbody tr:hover td {
+      tbody tr:hover td,
+      tbody tr.is-picked td {
         background: transparent;
+      }
+      tbody tr.is-picked {
+        background: var(--bg-ultra-light);
+        border-color: var(--border-color-dark);
       }
       tbody td {
         display: grid;
@@ -919,6 +984,11 @@
       }
       :is(.conversation-table, .contact-table) tbody td::before {
         content: none;
+      }
+      .conversation-table .cell--pick {
+        order: 1;
+        inline-size: auto;
+        align-self: center;
       }
       :is(.conversation-table, .contact-table) .cell--name {
         order: 1;
