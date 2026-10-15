@@ -61,3 +61,20 @@ export function markReadWhenSeen(options: {
     );
   });
 }
+
+/**
+ * Una ficha abierta desde «de qué se habla» lleva el nombre de su hilo en la
+ * dirección (`#board`, `#team`, `feedHref`): cuando el hilo aparece, baja
+ * hasta él, una vez por visita. El navegador no puede hacerlo solo porque el
+ * hilo se pinta después de cargar. Al quedar a la vista, `markReadWhenSeen`
+ * lo marca leído, que es lo que se vino a hacer.
+ */
+export function scrollWhenNamed(hash: string, target: () => HTMLElement | undefined): void {
+  let done = false;
+  $effect(() => {
+    const el = target();
+    if (done || !el || location.hash !== hash) return;
+    done = true;
+    el.scrollIntoView({ block: 'start' });
+  });
+}

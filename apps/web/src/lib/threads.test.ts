@@ -5,9 +5,13 @@ import {
   MessageCreateSchema,
   audienceLine,
   boardLayout,
+  boloDays,
   boloPlace,
   conversationThread,
   facetName,
+  feedHref,
+  feedThreadName,
+  feedTitle,
   firstUnreadId,
   isUnread,
   messageWhen,
@@ -262,5 +266,61 @@ describe('esquemas', () => {
   test('la audiencia de General llega con facet_id vacío y sale null', () => {
     const r = v.safeParse(AudienceQuerySchema, { anchor_kind: 'bolo', anchor_id: UUID, facet_id: '' });
     expect(r.success && r.output.facet_id).toBeNull();
+  });
+});
+
+describe('«de qué se habla» (ADR-116)', () => {
+  const bolo = {
+    anchor_kind: 'bolo' as const,
+    anchor_id: 'b1',
+    facet_key: 'tecnica',
+    label: null,
+    labels: {},
+    conversation: null,
+    bolo: {
+      venue_name: 'Sala Beckett',
+      city: 'Barcelona',
+      first_day: '2026-11-14',
+      last_day: '2026-11-15',
+      performance_slug: 'beckett-14-nov',
+      performance_id: 'p1',
+    },
+  };
+  const conv = {
+    anchor_kind: 'conversation' as const,
+    anchor_id: 'c1',
+    facet_key: null,
+    label: null,
+    labels: {},
+    bolo: null,
+    conversation: { title: 'Teatre Lliure' },
+  };
+
+  test('un bolo abre el tablón de su función; una conversación, su hilo del equipo', () => {
+    expect(feedHref(bolo, 'muk')).toBe('/h/muk/performance/beckett-14-nov#board');
+    expect(feedHref(conv, 'muk')).toBe('/h/muk/conversation/c1#team');
+  });
+
+  test('sin espacio conocido, o un bolo sin funciones vivas, no hay enlace', () => {
+    expect(feedHref(bolo, undefined)).toBeNull();
+    expect(feedHref({ ...bolo, bolo: { ...bolo.bolo, performance_slug: null } }, 'muk')).toBeNull();
+  });
+
+  test('el nombre del hilo: la faceta en un bolo, «Equipo» en una conversación', () => {
+    expect(feedThreadName(bolo, 'es')).toBe('Técnica');
+    expect(feedThreadName({ ...bolo, facet_key: null }, 'es')).toBe('General');
+    expect(feedThreadName(conv, 'es')).toBe('Equipo');
+  });
+
+  test('de qué se habla: sala y ciudad del bolo, o el nombre de la conversación', () => {
+    expect(feedTitle(bolo)).toBe('Sala Beckett · Barcelona');
+    expect(feedTitle(conv)).toBe('Teatre Lliure');
+  });
+
+  test('los días de un bolo, sin repetir el mes', () => {
+    expect(boloDays('2026-11-14', '2026-11-14', 'es')).toBe('14 nov');
+    expect(boloDays('2026-11-14', '2026-11-15', 'es')).toBe('14 → 15 nov');
+    expect(boloDays('2026-04-30', '2026-05-02', 'es')).toBe('30 abr → 2 may');
+    expect(boloDays(null, null, 'es')).toBe('');
   });
 });

@@ -6738,6 +6738,14 @@ export type Database = {
         }
         Returns: Json
       }
+      thread_feed: {
+        Args: {
+          p_limit?: number
+          p_project_ids?: string[]
+          p_workspace_ids?: string[]
+        }
+        Returns: Json
+      }
       touch_line_visit: { Args: { p_line_id: string }; Returns: undefined }
       travel_stage_venue: {
         Args: { p_venue_id: string; p_workspace_id: string }

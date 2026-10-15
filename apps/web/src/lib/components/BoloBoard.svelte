@@ -18,7 +18,7 @@
   import { fetchJSON } from '$lib/api';
   import ThreadBlock from '$lib/components/ThreadBlock.svelte';
   import { t, type Locale } from '$lib/i18n';
-  import { markReadWhenSeen, readAtOpen } from '$lib/thread-reading.svelte';
+  import { markReadWhenSeen, readAtOpen, scrollWhenNamed } from '$lib/thread-reading.svelte';
   import {
     THREAD_REFRESH_MS,
     boardLayout,
@@ -98,6 +98,7 @@
     threads: () => board?.threads ?? [],
     onmarked: refresh,
   });
+  scrollWhenNamed('#board', () => (board ? sectionEl : undefined));
 
   function refresh() {
     void queryClient.invalidateQueries({ queryKey });
@@ -106,7 +107,7 @@
   let perfCount = $derived(board?.performances.length ?? 0);
 </script>
 
-<section class="board" aria-labelledby="board-title" aria-busy={$boardQuery.isLoading} bind:this={sectionEl}>
+<section id="board" class="board" aria-labelledby="board-title" aria-busy={$boardQuery.isLoading} bind:this={sectionEl}>
   <header class="board__head">
     <p class="eyebrow" id="board-title">{t('threads.board', locale)}</p>
     {#if board?.bolo}

@@ -3777,3 +3777,35 @@ algunos puntos; aquí queda qué se hizo. Migración `20261016100000_mailout_sen
     proyecto o línea no tiene todavía el modo selección.
 11. **Tres piezas visuales pasan a `base.css`** al reutilizarse: `.block-head`, `.mail-card` y `.action-bar`; y el
     aviso de modo de prueba es un componente (`MailoutTestMode`) que comparten Ajustes y el envío.
+
+## [2026-10-15] ADR-116 · Hilos, fase 4: «de qué se habla» lee por una RPC acotada al espacio
+
+**Contexto.** Fase 4 del plan de hilos (`build/plans/2026-10-14-comms-threads.md`): la segunda proyección de la lente
+Conversations (ADR-106). El plan la pintaba como lectura de `thread` por PostgREST, y su propio riesgo de coste ya
+estaba apuntado: la política `thread_select` llama a una función SECURITY DEFINER opaca, así que el planificador no
+puede acotar por espacio y evalúa la regla en cada hilo de la base antes de filtrar. Medido en local con 4.063 hilos
+(40 legibles): 147 ms por la política, con todos los hilos recorridos; 20.040 hilos, 479 ms.
+
+1. **Lectura por una RPC, `thread_feed(p_workspace_ids, p_project_ids, p_limit)`** (migración
+   `20261017100000_thread_feed`, aditiva; rollback en `build/runbooks/rollback-20261017-thread-feed.sql`). Primero el
+   corte, materializado: hilos con mensajes de los espacios donde quien llama es miembro aceptado, anclas de este
+   corte (bolo y conversación) vivas y dentro del alcance de la barra lateral. Después la misma regla
+   (`private.thread_readable`), no una copia. Medido: 14 ms con 0 hilos ajenos y 16 ms con 20.000; crece con los
+   hilos que la persona lee (~0,27 ms cada uno: 400 legibles, ~110 ms). Si una compañía llega a miles de hilos con
+   mensajes, el siguiente paso es acotar por fecha antes de evaluar la regla.
+2. **Orden:** los que tienen nuevos arriba; después, por el último mensaje. «Nuevo» es la misma regla que
+   `bolo_board`: ajeno y posterior a la lectura. Tope de 100 filas (máximo 200).
+3. **Qué abre cada fila:** un hilo de bolo abre la ficha de una función del bolo (la próxima; si ya pasaron todas, la
+   última) con `#board`; uno de conversación, la conversación con `#team`. La ficha baja sola hasta el hilo cuando se
+   pinta (`scrollWhenNamed`), y estar a la vista lo marca leído, como en las fases 2 y 3. Un bolo sin funciones vivas
+   no tiene ficha donde abrirse: sale sin enlace.
+4. **Sin dinero:** del bolo solo sala, ciudad, primer y último día y la función que abre; nunca caché, estado ni
+   pagador. El hilo Diners solo lo ve quien ve Diners (la regla es la de la política).
+5. **La conversación se nombra** como su ficha: la organización o, si no hay, el contacto principal (su dossier en el
+   espacio, si no la persona).
+6. **La proyección va en la URL** (`/h/conversations?view=threads`) y se cambia con dos fragmentos en la línea de la
+   cabecera de la lente, «Con quién hablas · De qué se habla», que sustituyen el marcador temporal «define esta
+   lente». El fragmento activo va en tinta (`.lenshead__frag[aria-current]`, en `base.css`). La búsqueda, el filtro
+   de estado, «Añadir» y el modo selección son de «con quién hablas»; «de qué se habla» es solo lectura: se escribe
+   en la ficha.
+7. Refresco al volver a la pestaña y cada 30 s, sin realtime (ADR-083 §2), como el tablón.
