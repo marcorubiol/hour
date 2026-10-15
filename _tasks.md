@@ -426,8 +426,8 @@
      Hour y al buzón de la compañía, bajas, y la LSSI (consentimiento previo también entre empresas; pregunta abierta al
      abogado).
      - [ ] **Editor de mailing visual para las campañas, del nivel de Brevo** (drop 11-10): bloques arrastrables (texto, imagen, botón, dossier o vídeo de la obra), plantillas por compañía con su marca, vista previa en móvil y escritorio, y personalización con los datos del contacto y de la sala. Proveedor decidido (ADR-109): va después del envío.
-  - [ ] **Envío en bloque: plan escrito antes de código** (Marco, 2026-10-14, ADR-109): SES en la UE con un tenant por compañía; por defecto la cuenta de Hour, y la compañía que quiera, la suya propia con su clave. Cubre DNS de cada compañía (DKIM, return-path, DMARC), baja en un clic (RFC 8058), cómo vuelven las respuestas y los eventos (SNS/EventBridge). Informe: `research/infra/2026-10-11-envio-en-bloque.md`.
-  - [ ] Marco: decidir — **Plan del envío en bloque escrito** en `claude/bulk-send-plan` (`047660f`, `build/plans/2026-10-14-bulk-send.md`): validar y contestar sus 6 preguntas (nombre «envío»/`mailout`, base por dirección, dirección de salida, sin buzón conectado, cuándo la cuenta propia, tope por compañía).
+  - [ ] **Envío en bloque, fase 1: esquema y RPC** (migración aditiva, plan § 11; ADR-110).
+  - [ ] Marco: hacer — **Cuenta de AWS para el envío en bloque** (plan § 5, «Marco: hacer», pasos 1 a 3): cuenta con MFA, comprobar «Tenants» en SES de `eu-central-1`, usuario IAM `hour-ses` y su clave a Wrangler. Hace falta antes de la fase 2.
 ## Después de money v3 — contenedores (bloque 5)
 
 12. [ ] **Revisión diseño+datos — contenedores.** Portada de workspace, project

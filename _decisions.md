@@ -3616,3 +3616,24 @@ campañas con el dominio de cada compañía. Informe: `research/infra/2026-10-11
 
 **Pendiente.** Plan escrito antes de código (DNS de cada compañía, baja en un clic, respuestas y eventos). La pregunta
 de la LSSI entre empresas sigue abierta para el abogado.
+
+## [2026-10-15] ADR-110 · Envío en bloque: palabras, base por dirección y protección de la cuenta
+
+**Contexto.** Plan `build/plans/2026-10-14-bulk-send.md` (ADR-109: SES con un tenant por compañía). Marco contesta sus
+seis preguntas (§ 12) el 2026-10-15: las recomendadas.
+
+**Decisión.**
+1. **Palabras.** La cosa entera es un **envío** (CA enviament, EN mailout, FR envoi), «envío de difusión» como título;
+   `mailout` en código. «Campaña» sigue siendo lo que ya es, un tipo de línea (`line_kind = 'campaign'`). Cada pieza
+   se nombra como dice el plan, § 3.3; «proveedor», «tenant» y «SES» no salen en la pantalla de una compañía.
+2. **Base por dirección.** Una dirección solo recibe un envío si tiene una base apuntada (lo pidió, trato previo,
+   genérico de la sala): Hour la propone cuando hay pruebas y quien envía la confirma. Sin base no sale. Nunca se
+   envía desde el directorio global (ADR-108).
+3. **Remitente** en el dominio principal de la compañía (`difusion@dominio`), con el MAIL FROM en `bounce.dominio`.
+4. **Sin buzón conectado se puede enviar**, con aviso: las respuestas van a la dirección del remitente y no entran en
+   Hour.
+5. **Cuenta SES propia en la fase 5**, cuando una compañía la pida; hasta entonces todas en la cuenta de Hour.
+6. **Protección de la cuenta de Hour:** tope diario por compañía (300 al principio, sin base medida, ajustable por
+   Hour) y el primer envío real de cada compañía nueva lo revisa Marco.
+
+La frontera de `service_role` se amplía de las RPC `mail_*` a las `mailout_*`, como dice el plan § 4.
