@@ -133,7 +133,10 @@ test.describe('mailout (simulated)', () => {
 
       // ── Enviar a 1, con confirmación ──
       await screen.getByRole('button', { name: /Send to 1|Enviar a 1|Envoyer à 1/ }).click();
+      // Recargar antes de la respuesta cancela la petición en el Worker y el envío no entra en cola.
+      const sent = page.waitForResponse((r) => r.request().method() === 'POST' && /\/api\/mailout\/[^/]+\/send$/.test(r.url()));
       await page.getByRole('dialog').getByRole('button', { name: /Send to 1|Enviar a 1|Envoyer à 1/ }).click();
+      expect((await sent).ok(), 'el envío entra en cola').toBe(true);
       await expect(async () => {
         await page.reload();
         await expect(page.getByTestId('mailout-status')).toHaveAttribute('data-status', 'done', { timeout: 3_000 });
