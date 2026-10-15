@@ -426,7 +426,8 @@
      Hour y al buzón de la compañía, bajas, y la LSSI (consentimiento previo también entre empresas; pregunta abierta al
      abogado).
      - [ ] **Editor de mailing visual para las campañas, del nivel de Brevo** (drop 11-10): bloques arrastrables (texto, imagen, botón, dossier o vídeo de la obra), plantillas por compañía con su marca, vista previa en móvil y escritorio, y personalización con los datos del contacto y de la sala. Proveedor decidido (ADR-109): va después del envío.
-  - [ ] **Envío en bloque, fases 1 y 2 en `main`, sin desplegar** (Marco validó la pantalla del dominio, 2026-10-15; ADR-112, ADR-114). Falta la migración `20261015100000_mailout` en producción (backup, plan, apply con OK), el deploy con OK, la RLS contra producción y el E2E del dominio. El alta y «Comprobar» necesitan `SUPABASE_SERVICE_ROLE_KEY` en el Worker.
+  - [ ] Marco: hacer — **Poner la clave de servicio buena en el Worker**: el alta de dominio da 500 (`permission denied for function mail_domain_record_status`, 401: PostgREST la trata como `anon`). La que hay en `SUPABASE_SERVICE_ROLE_KEY` no es de service_role, o es de otro proyecto o está revocada; la sincronización de buzones usa la misma (el buzón activo de producción no se ha sincronizado nunca). Hecho, se corre el E2E del dominio y entra al CHANGELOG.
+  - [ ] **Envío en bloque, fases 1 y 2 en producción** (`e706233`, migración `20261015100000_mailout` aplicada; ADR-112, ADR-114). Pendiente: la línea del CHANGELOG cuando el alta funcione, y la clave de servicio en `.env.test` para que la RLS pruebe el bloque de service_role contra producción.
   - [ ] **Envío en bloque, fase 3 (enviar) contra el proveedor simulado** (ADR-111): sin cuenta de AWS por ahora.
   - [ ] **Cuenta de AWS para el envío en bloque** (plan § 5, pasos 1 a 3): no por ahora (Marco, 2026-10-15, ADR-111). Hace falta antes del primer envío real.
 ## Después de money v3 — contenedores (bloque 5)

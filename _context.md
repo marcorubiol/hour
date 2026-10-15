@@ -33,16 +33,16 @@ de Phase 0.9 en `_tasks.md`. Pricing orientativo, no decidido.
 
 ## Producción (verificado 2026-10-14, tarde)
 
-- Web `https://hour.zerosense.studio`, Worker `hour-web`. `/health/live`: SHA **`6248c06`**, `dirty:false`, builtAt
-  2026-10-15T04:27Z (sobre `0e6f3ef`: la ficha de persona enlaza sus conversaciones; fuera el vocabulario CRM de la interfaz). `main` == prod salvo documentos.
+- Web `https://hour.zerosense.studio`, Worker `hour-web`. `/health/live`: SHA **`e706233`**, `dirty:false`, builtAt
+  2026-10-15T05:10Z (sobre `6248c06`: fases 1 y 2 del envío en bloque, dominio de envío simulado). `main` == prod salvo documentos.
 - Despliegue: `pnpm --filter web run deploy` (no `pnpm deploy` desde la raíz). Exige árbol limpio.
 - Supabase `hour-phase0` · ref `lqlyorlccnniybezugme` · `eu-central-1`. Plan Free, con keepalive diario
   (`.github/workflows/keepalive.yml`) contra la pausa por inactividad. Pasar a Pro antes de la beta, aún no
   (`_tasks.md § 9`). Si algo de Supabase falla tras días sin uso, lo primero es `dig <ref>.supabase.co`.
-- **Última migración aplicada: `20261014200000_create_workspace_person`** (2026-10-14, run 38597605297; backup 38596584394, plan 38596992986): alta de persona del equipo sin conversación e invitación que enlaza el dossier (ADR-107). Antes, `20261014100000_comms_threads` (hilos, ADR-106). El acceso es solo `membership` + `membership_facet` (ADR-105). El directorio tiene 6.802 salas. Las migraciones van por `production-migrate.yml`: backup, plan, apply (`_notes/tasks-archive.md § 34`).
+- **Última migración aplicada: `20261015100000_mailout`** (2026-10-15, run 38685024950; backup 38684626914, plan 38684854699): esquema y RPC del envío en bloque (ADR-112). Antes, `20261014200000_create_workspace_person` (ADR-107). El acceso es solo `membership` + `membership_facet` (ADR-105). El directorio tiene 6.802 salas. Las migraciones van por `production-migrate.yml`: backup, plan, apply (`_notes/tasks-archive.md § 34`).
 - `hour-staging` (ref `slccyknqpgmzhyiyclsq`, `eu-west-1`): reconstruido el 2026-10-13 con el contract de permisos
   (run 38469017859: RLS 309/313, smoke 2/2). Se volverá a pausar sin uso.
-- Últimas suites contra producción (2026-10-14): RLS 338/347 (9 saltados) tras la migración de alta de persona; en paralelo da `ECONNRESET` sueltos, en serie (`--no-file-parallelism`) sale verde. E2E 71/71 contra `6248c06`.
+- Últimas suites contra producción (2026-10-15, `e706233`): RLS 352/366 (14 saltados: los 5 de más son el bloque de `mailout` que pide `SUPABASE_SERVICE_ROLE_KEY`, que `.env.test` no lleva); en paralelo da `ECONNRESET` sueltos, en serie (`--no-file-parallelism`) sale verde. E2E 71/72: falla el alta de dominio porque la clave de servicio del Worker no autentica (`_tasks.md`).
 - Desde el checkout principal (`~/Developer/hour`), nunca desde un worktree: los worktrees no llevan `.env` ni
   `.env.test` (RLS sale saltado, el login del E2E falla).
 - `pnpm --filter web test:rls`: siempre contra producción; carga `.env` + `.env.test` y no mira `.env.local`.
