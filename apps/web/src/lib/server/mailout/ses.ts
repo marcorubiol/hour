@@ -6,7 +6,9 @@
  * `mailout_not_configured`. Configurado, sus métodos todavía no existen: se
  * escriben con la cuenta (plan § 5: CreateTenant, CreateConfigurationSet,
  * CreateEmailIdentity, PutEmailIdentityMailFromAttributes,
- * CreateTenantResourceAssociation, GetEmailIdentity; firma SigV4).
+ * CreateTenantResourceAssociation, GetEmailIdentity; firma SigV4; y en la
+ * fase 3, SendEmail con TenantName, ConfigurationSetName, las cabeceras de
+ * baja y la etiqueta `recipient`).
  */
 
 import { MailoutNotConfiguredError, type SendingProvider } from './provider';
@@ -33,5 +35,6 @@ export function sesProvider(env: SesEnv | null | undefined): SendingProvider {
     kind: 'ses',
     registerDomain: async () => notYet(),
     checkDomain: async () => notYet(),
+    sendEmail: async () => notYet(),
   };
 }

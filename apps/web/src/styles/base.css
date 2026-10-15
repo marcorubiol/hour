@@ -1722,6 +1722,68 @@
     --eyebrow-tracking: 0.08em;
   }
 
+  /* Block head — a sub-eyebrow over a hairline, with its actions at the end
+     (the conversation file, the mailout screen). */
+  .block-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-s);
+    min-block-size: var(--control-size-s);
+    padding-block-end: var(--space-xs);
+    border-block-end: 1px solid var(--border-color-light);
+  }
+  .block-head h2 {
+    margin: 0;
+  }
+
+  /* Mail card — one email as Hour shows it: a soft box with its From/To
+     lines (the conversation file's record, the mailout preview). */
+  .mail-card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2xs);
+    padding: var(--space-s) var(--space-m);
+    background: var(--bg-ultra-light);
+    border: 1px solid var(--border-color-light);
+    border-radius: var(--radius);
+  }
+  .mail-card__meta {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: var(--text-xs);
+    overflow-wrap: anywhere;
+  }
+  .mail-card__meta > span:first-child {
+    display: inline-block;
+    min-inline-size: 3.5rem;
+    color: var(--text-faint);
+  }
+
+  /* Action bar — the floating bar at the foot of a work surface while a
+     choice is open: «Escribir a N» over the selection in Conversations,
+     «Enviar a N» on the mailout screen. A note at the start, actions at the
+     end. */
+  .action-bar {
+    position: sticky;
+    inset-block-end: var(--space-s);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--space-s) var(--space-m);
+    padding: var(--space-s) var(--space-m);
+    background: var(--bg-light);
+    border: var(--border);
+    border-radius: var(--radius-s);
+    box-shadow: var(--box-shadow-2);
+  }
+  .action-bar__note {
+    margin: 0 auto 0 0;
+    color: var(--text-dark-muted);
+    font-size: var(--text-s);
+  }
+
   /* Lens header — the ONE shared top block for the four lenses (Desk ·
      Planner · Conversations · Money). Every lens renders it via LensHeader,
      so they share these exact classes and layout:

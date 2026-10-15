@@ -4,6 +4,7 @@
  */
 
 import * as v from 'valibot';
+import type { ComposeContext } from './mailout-compose';
 
 export type MailSendingProvider = 'simulator' | 'ses';
 export type MailDomainCheckStatus = 'NOT_STARTED' | 'PENDING' | 'SUCCESS' | 'FAILED' | 'TEMPORARY_FAILURE';
@@ -97,4 +98,141 @@ export const MailDomainCreateSchema = v.object({
 export const MailDomainSenderSchema = v.object({
   from_local_part: localPart,
   from_name: fromName,
+});
+
+// ── Fase 3: el envío (ADR-115) ────────────────────────────────────────────
+
+export type MailoutStatus = 'draft' | 'review' | 'queued' | 'sending' | 'paused' | 'done' | 'cancelled';
+export type MailoutRecipientStatus =
+  | 'pending'
+  | 'queued'
+  | 'sending'
+  | 'sent'
+  | 'delivered'
+  | 'bounced'
+  | 'complained'
+  | 'skipped'
+  | 'failed';
+export type MailoutSkipReason = 'suppressed' | 'no_basis' | 'no_address' | 'duplicate' | 'cancelled' | 'unavailable';
+
+export interface MailoutItem {
+  id: string;
+  workspace_id: string;
+  project_id: string;
+  line_id: string | null;
+  mail_domain_id: string | null;
+  from_local_part: string;
+  from_name: string | null;
+  from_address: string | null;
+  reply_to_address: string | null;
+  language: string;
+  subject: string | null;
+  body: string | null;
+  status: MailoutStatus;
+  status_reason: string | null;
+  queued_at: string | null;
+  finished_at: string | null;
+  created_at: string;
+}
+
+export const MAILOUT_SELECT =
+  'id,workspace_id,project_id,line_id,mail_domain_id,from_local_part,from_name,from_address,reply_to_address,language,subject,body,status,status_reason,queued_at,finished_at,created_at';
+
+/** Una fila de `mailout_preview`. */
+export interface MailoutRecipientRow {
+  recipient_id: string;
+  conversation_id: string;
+  address: string | null;
+  display_name: string | null;
+  address_kind: 'contact' | 'organization' | null;
+  status: MailoutRecipientStatus;
+  skip_reason: MailoutSkipReason | null;
+  basis_kind: 'consent' | 'relationship' | 'generic' | null;
+  basis_withdrawn_at: string | null;
+  suppressed_reason: 'unsubscribe' | 'bounce' | 'complaint' | 'manual' | null;
+  suppressed_at: string | null;
+  ready: boolean;
+}
+
+/** GET /api/mailout/[id]. */
+export interface MailoutDetail {
+  mailout: MailoutItem;
+  /** `edit:conversation` en el proyecto: redactar, enviar, cancelar. */
+  can_edit: boolean;
+  workspace: { id: string; slug: string; name: string };
+  project: { id: string; slug: string; name: string | null } | null;
+  /** Los dominios verificados del espacio: de dónde puede salir. */
+  domains: MailDomainItem[];
+  /** A dónde irán las respuestas si se envía ahora (buzón conectado) o null: aviso. */
+  reply_to: { address: string; scope: 'personal' | 'workspace' } | null;
+  recipients: MailoutRecipientRow[];
+  /** Lo que monta cada correo (mailout-compose.ts), por destinatario visible. */
+  compose: ComposeContext[];
+  /** Modo de prueba: no sale ningún correo real (ADR-111). */
+  simulated: boolean;
+}
+
+/** El estado de un destinatario en la pantalla, antes y después de enviar. */
+export type RecipientState =
+  | 'ready'
+  | 'no_address'
+  | 'suppressed'
+  | 'no_basis'
+  | 'duplicate'
+  | 'unavailable'
+  | 'cancelled'
+  | 'missing_fields'
+  | 'queued'
+  | 'sent'
+  | 'delivered'
+  | 'bounced'
+  | 'complained'
+  | 'failed';
+
+export function recipientState(r: MailoutRecipientRow, missing: boolean): RecipientState {
+  switch (r.status) {
+    case 'pending':
+      if (!r.address) return 'no_address';
+      if (r.suppressed_reason) return 'suppressed';
+      if (!r.basis_kind || r.basis_withdrawn_at) return 'no_basis';
+      return missing ? 'missing_fields' : 'ready';
+    case 'skipped':
+      return r.skip_reason ?? 'unavailable';
+    case 'queued':
+    case 'sending':
+      return 'queued';
+    default:
+      return r.status;
+  }
+}
+
+/** Recuentos de la pantalla de estado (plan § 10). */
+export function recipientCounts(states: RecipientState[]): Record<RecipientState, number> {
+  const out = {} as Record<RecipientState, number>;
+  for (const s of states) out[s] = (out[s] ?? 0) + 1;
+  return out;
+}
+
+export const MailoutCreateSchema = v.object({
+  project_id: v.pipe(v.string(), v.uuid()),
+  conversation_ids: v.pipe(v.array(v.pipe(v.string(), v.uuid())), v.minLength(1), v.maxLength(2000)),
+});
+
+export const MailoutUpdateSchema = v.object({
+  subject: v.pipe(v.string(), v.maxLength(200)),
+  body: v.pipe(v.string(), v.maxLength(20000)),
+  language: v.picklist(['es', 'ca', 'en', 'fr']),
+  mail_domain_id: v.nullable(v.pipe(v.string(), v.uuid())),
+  from_local_part: localPart,
+  from_name: fromName,
+});
+
+export const MailoutRecipientsSchema = v.object({
+  conversation_ids: v.pipe(v.array(v.pipe(v.string(), v.uuid())), v.maxLength(2000)),
+});
+
+export const MailBasisSchema = v.object({
+  recipient_id: v.pipe(v.string(), v.uuid()),
+  kind: v.picklist(['consent', 'relationship', 'generic']),
+  note: v.nullish(v.pipe(v.string(), v.trim(), v.maxLength(1000))),
 });

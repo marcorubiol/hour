@@ -7,7 +7,8 @@
  *     todos los dominios mientras no haya cuenta de AWS (ADR-111).
  *   · `ses` (ses.ts): esqueleto. Falla claro si falta su configuración y,
  *     configurado, todavía no está escrito (fase 2 con cuenta).
- * El envío de cada correo y sus eventos se añaden a esta interfaz en la fase 3.
+ * Desde la fase 3 la interfaz también envía un correo (`sendEmail`); el
+ * simulado no envía nada y devuelve los eventos que daría el servicio.
  *
  * Qué adaptador usa un dominio lo dice su fila (`mail_domain.provider`), no el
  * Worker: un dominio dado de alta en el simulador se comprueba en el simulador
@@ -33,12 +34,56 @@ export interface DomainStatus {
   error: string | null;
 }
 
+/** Un correo de un envío, ya montado (mailout-compose.ts). */
+export interface OutgoingEmail {
+  from: string;
+  fromName: string | null;
+  to: string;
+  toName: string | null;
+  replyTo: string | null;
+  subject: string;
+  text: string;
+  html: string;
+  /** List-Unsubscribe y List-Unsubscribe-Post (RFC 8058). */
+  headers: Record<string, string>;
+  tenantName: string | null;
+  configurationSet: string | null;
+  /** Etiquetas del mensaje: `recipient` cierra la fila aunque el registro no llegue (plan § 6). */
+  tags: Record<string, string>;
+}
+
+/** Lo que el servicio dice después de aceptar un correo. */
+export interface ProviderEvent {
+  type: 'delivery' | 'bounce' | 'complaint';
+  bounceType?: 'Permanent' | 'Transient';
+}
+
+export interface SentEmail {
+  providerMessageId: string;
+  /** El Message-ID de la cabecera: lo que citará una respuesta en In-Reply-To. */
+  rfcMessageId: string | null;
+  /** Solo el simulador: los eventos que llegarían después (con SES llegan por EventBridge, fase 4). */
+  events: ProviderEvent[];
+}
+
 export interface SendingProvider {
   readonly kind: MailSendingProvider;
   /** Da de alta la identidad del dominio y devuelve los registros que publicar. */
   registerDomain(identity: DomainIdentity): Promise<DomainStatus>;
   /** Lee el estado de la identidad («Comprobar», y el cron mientras esté pendiente). */
   checkDomain(identity: DomainIdentity): Promise<DomainStatus>;
+  /** Envía un correo. Falla con MailoutSendError (permanente o con reintento). */
+  sendEmail(email: OutgoingEmail): Promise<SentEmail>;
+}
+
+/** El servicio no aceptó un correo. `permanent`: no se reintenta (contenido rechazado, dominio caído). */
+export class MailoutSendError extends Error {
+  constructor(
+    message: string,
+    public readonly permanent: boolean,
+  ) {
+    super(message);
+  }
 }
 
 /** Falta configuración en el Worker para hablar con el servicio. */

@@ -17,6 +17,7 @@
   import { appLocale, t } from '$lib/i18n';
   import Button from '$lib/components/Button.svelte';
   import Badge from '$lib/components/Badge.svelte';
+  import MailoutTestMode from '$lib/components/MailoutTestMode.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
   import {
     domainState,
@@ -180,9 +181,8 @@
     <p class="md-intro">{t('mailout.domain_intro', locale)}</p>
 
     {#if simulated}
-      <div class="md-sim" role="note" data-testid="mailout-simulated">
-        <p class="md-sim__title">{t('mailout.simulated_title', locale)}</p>
-        <p>{t('mailout.simulated_body', locale)}</p>
+      <div class="md-sim">
+        <MailoutTestMode title={t('mailout.simulated_title', locale)} body={t('mailout.simulated_body', locale)} />
       </div>
     {/if}
     {#if data && !data.configured && canManage}
@@ -382,19 +382,6 @@
     }
     .md-sim {
       margin: 0 0 var(--space-m);
-      padding: var(--space-s) var(--space-m);
-      background: var(--bg-light);
-      border: 1px solid var(--border-color-light);
-      border-inline-start: 3px solid var(--warning, var(--border-color-dark));
-      border-radius: var(--radius);
-      font-size: var(--text-s);
-      line-height: 1.5;
-    }
-    .md-sim p {
-      margin: 0;
-    }
-    .md-sim__title {
-      font-weight: 500;
     }
     .md-off {
       margin: 0 0 var(--space-m);
