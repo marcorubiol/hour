@@ -450,7 +450,9 @@
             <li>
               <span class={statusBadgeClass(e.status)}>{statusLabel(e.status, locale)}</span>
               <span class="person__row-main">
-                {e.project?.name ?? '—'}{#if e.organization} · {e.organization.name}{/if}
+                <a class="person__row-link" href={`/h/${workspaceSlug}/conversation/${e.id}`}
+                  >{e.project?.name ?? '—'}{#if e.organization} · {e.organization.name}{/if}</a
+                >
                 {#if e.next_action_note}
                   <span class="person__row-note">{e.next_action_note}</span>
                 {/if}
@@ -723,6 +725,16 @@
       font-size: var(--text-s);
       color: var(--text-color);
       flex: 1;
+    }
+
+    .person__row-link {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    .person__row-link:hover,
+    .person__row-link:focus-visible {
+      text-decoration: underline;
     }
 
     .person__row-note {
