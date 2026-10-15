@@ -6,6 +6,7 @@ hasta entonces, sacado de esos documentos; lo anterior a julio de 2026 está sol
 
 ## Octubre 2026 (en curso)
 
+- En Ajustes, Correo, un admin da de alta el dominio de envío de la compañía: Hour enseña los registros DNS que hay que publicar, «Comprobar» dice si está verificado y el remitente (por defecto difusion@ y el nombre de la compañía) se cambia ahí. De momento en modo de prueba: no sale ningún correo real. (2026-10-15, `e706233`)
 - En la ficha de una persona, cada conversación abre la conversación. Y la interfaz en inglés ya no habla de «pipeline» ni de «leads»: dice «in progress», «notice» y «Outreach tracking». (2026-10-15, `6248c06`)
 - Alguien del equipo se da de alta desde el reparto o desde «quién va»: escribes su nombre y «Añadir». Su ficha se edita (email, teléfono, cargo) y desde ella un admin la invita a Hour; al aceptar, su cuenta queda enlazada con esa ficha. (2026-10-14, `0e6f3ef`)
 - La ficha de una conversación tiene el hilo del equipo, Equipo, en la columna lateral: lo que habláis entre vosotros sobre esa sala, aparte del registro con fuera, con lo nuevo marcado. «Todo en un hilo» lo junta todo por fecha. (2026-10-14, `0e6f3ef`)

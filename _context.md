@@ -42,7 +42,7 @@ de Phase 0.9 en `_tasks.md`. Pricing orientativo, no decidido.
 - **Última migración aplicada: `20261015100000_mailout`** (2026-10-15, run 38685024950; backup 38684626914, plan 38684854699): esquema y RPC del envío en bloque (ADR-112). Antes, `20261014200000_create_workspace_person` (ADR-107). El acceso es solo `membership` + `membership_facet` (ADR-105). El directorio tiene 6.802 salas. Las migraciones van por `production-migrate.yml`: backup, plan, apply (`_notes/tasks-archive.md § 34`).
 - `hour-staging` (ref `slccyknqpgmzhyiyclsq`, `eu-west-1`): reconstruido el 2026-10-13 con el contract de permisos
   (run 38469017859: RLS 309/313, smoke 2/2). Se volverá a pausar sin uso.
-- Últimas suites contra producción (2026-10-15, `e706233`): RLS 352/366 (14 saltados: los 5 de más son el bloque de `mailout` que pide `SUPABASE_SERVICE_ROLE_KEY`, que `.env.test` no lleva); en paralelo da `ECONNRESET` sueltos, en serie (`--no-file-parallelism`) sale verde. E2E 71/72: falla el alta de dominio porque la clave de servicio del Worker no autentica (`_tasks.md`).
+- Últimas suites contra producción (2026-10-15, `e706233`): RLS 352/366 en serie (`--no-file-parallelism`; en paralelo da `ECONNRESET` sueltos), y después, con `SUPABASE_SERVICE_ROLE_KEY` en `.env.test`, `mailout` 19/19 sin saltados. E2E 72/72 (el del dominio, tras poner la clave de servicio buena en el Worker el 2026-10-15; la anterior entraba como `anon`).
 - Desde el checkout principal (`~/Developer/hour`), nunca desde un worktree: los worktrees no llevan `.env` ni
   `.env.test` (RLS sale saltado, el login del E2E falla).
 - `pnpm --filter web test:rls`: siempre contra producción; carga `.env` + `.env.test` y no mira `.env.local`.
