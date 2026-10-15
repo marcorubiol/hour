@@ -3652,6 +3652,42 @@ se despliegan contra el simulado; ningún correo real sale de Hour mientras sea 
 **Pendiente.** El adaptador de SES, la salida del sandbox (fase 4) y la cuenta propia (fase 5) esperan a la cuenta de
 AWS. Los pasos de Marco en AWS (plan § 5) pasan de «antes de la fase 2» a «antes del primer envío real».
 
+## [2026-10-15] ADR-112 · Envío en bloque, fase 1: lo que el esquema decide y el plan no decía
+
+**Contexto.** Migración `20261015100000_mailout` (plan `build/plans/2026-10-14-bulk-send.md` § 4 y § 11, ADR-110,
+y ADR-111: proveedor simulado mientras no haya cuenta de AWS). Al escribirla, el esquema real y el plan chocaban en
+algunos puntos; aquí queda qué se hizo.
+
+**Decisión.**
+1. **`workspace` pasa a UPDATE por columnas para `authenticated`.** Tenía UPDATE a tabla entera (la policy deja al
+   admin), así que `mailout_daily_cap`, `mailout_simulator_only` y la marca de revisión habrían sido escribibles por un
+   admin con un PATCH. Ahora el grant nombra las columnas de antes más `privacy_url`; las de envío solo las escribe
+   service_role. Una columna nueva de `workspace` que deba editar un admin hay que nombrarla en ese grant.
+2. **Revisión del primer envío real (ADR-110 § 6): estado `review`.** `queue_mailout` deja en `review` el envío de un
+   espacio sin `mailout_reviewed_at` cuando el dominio es de proveedor `ses` y el espacio no está en modo simulador; la
+   cola no lo toma. `mailout_approve_review` (solo service_role) lo pone en cola y marca el espacio como revisado. Con
+   el simulador no hay nada real que revisar.
+3. **Proveedor por dominio** (ADR-111): `mail_domain.provider` (`simulator` por defecto, `ses`). Los nombres no dicen
+   SES: `provider_message_id` en vez de `ses_message_id`. El estado del dominio lo escribe solo service_role también con
+   el simulador. Un dominio es único por espacio y, con `ses`, único en toda la cuenta de Hour.
+   `mail_domain.sending_account_id` llega con `mail_sending_account` en la fase 5.
+4. **`mail_basis` la lee solo el admin**, como la supresión (el plan decía «miembros»): una base nombra la dirección de
+   un contacto, y el contacto de una conversación privada no debe verse por otro camino. Quien envía ve la base de cada
+   destinatario en `mailout_preview`.
+5. **Tope diario:** ventana móvil de 24 horas, contando lo que está saliendo. Lo que pasa del tope se queda en cola.
+   `mailout_claim` admite `p_mailout_id` para la primera pasada justo después de poner en cola (plan § 6) y para los
+   tests, que así no tocan la cola de otros espacios.
+6. **Modo simulador:** una dirección fuera de `@simulator.amazonses.com` tumba la puesta en cola entera (no se salta
+   ese destinatario): es una barrera, no un filtro.
+7. **Una conversación que se borró, o la privada de otra persona, al poner en cola** queda `skipped (unavailable)` en
+   vez de bloquear el envío.
+8. **Baja y vuelta como nota sin texto:** `conversation_event` `note`, `source = integration`, sin cuerpo, con
+   `metadata.mailout` (`unsubscribed`, `resubscribed`, `complained`); la pantalla lo dice en su idioma.
+   `mailout_unsubscribe` no devuelve nada; lo que enseñe la página de baja se decide en la fase 3.
+9. **Exclusión a mano:** `suppress_mail_address` (admin) junto a `remove_mail_suppression`, que el plan ya tenía.
+10. El correo genérico de una organización (`workspace_organization.email`) no se escribe por la API (no hay grant de
+    UPDATE); los tests lo ponen con la clave de servicio. Cómo lo edita una compañía queda para la pantalla.
+
 ## [2026-10-15] ADR-113 · Las bases de cada dirección las lee solo el admin
 
 **Contexto.** El plan del envío en bloque decía que cualquier miembro lee `mail_basis`. Al construir la fase 1 (rama
@@ -3660,3 +3696,25 @@ conversaciones privadas ajenas.
 
 **Decisión (Marco, 2026-10-15).** `mail_basis` la lee solo el admin del espacio, como la supresión. Quien envía ve la
 base de cada destinatario en la vista previa (`mailout_preview`), que ya respeta lo que puede leer.
+
+## [2026-10-15] ADR-114 · Envío en bloque, fase 2: dominio de envío con el adaptador simulado
+
+**Contexto.** Plan `build/plans/2026-10-14-bulk-send.md` § 5 y § 11 (fase 2), ADR-111 (no hay cuenta de AWS: se
+construye contra un proveedor simulado). Lo que el plan no fijaba:
+
+**Decisión.**
+1. **El remitente por defecto vive en el dominio** (`mail_domain.from_local_part`, `difusion` por defecto, y
+   `from_name`, NULL = el nombre del espacio). Lo escribe el admin con `set_mail_domain_sender`; `create_mailout` lo
+   copia al envío, que guarda el suyo. Va en la migración de la fase 1 (`20261015100000_mailout`), que aún no está
+   aplicada en ningún sitio.
+2. **Qué adaptador usa un dominio nuevo lo dice `MAILOUT_PROVIDER`** (var de Wrangler): `ses` solo cuando haya cuenta;
+   sin ella, o con cualquier otro valor, el simulador. Un dominio se comprueba siempre con el adaptador de su fila: el
+   que se dio de alta simulado sigue simulado cuando llegue la cuenta.
+3. **El simulador** devuelve los registros que pediría SES (3 CNAME de DKIM con tokens deterministas, MX y SPF de
+   `bounce.<dominio>`, DMARC sugerido) y da el dominio por verificado al pulsar «Comprobar», sin retardo ni DNS. El
+   estado lo escribe la base como service_role (`mail_domain_record_status`), igual que hará SES.
+4. **El adaptador de SES es un esqueleto**: sin `SES_ACCESS_KEY_ID`, `SES_SECRET_ACCESS_KEY` o `SES_REGION`, las rutas
+   responden 503 `mailout_not_configured`; con ellas, falla al usarse hasta que se escriba con la cuenta.
+5. **La pantalla dice que es simulado** («Modo de prueba: no sale ningún correo real») mientras el Worker esté en
+   simulador o el espacio tenga un dominio simulado. Los valores de los registros DNS nombran `amazonses.com` porque
+   son los registros reales; el texto de la pantalla nunca nombra el servicio.

@@ -296,4 +296,9 @@ on conflict (id) do update
 set venue_name = excluded.venue_name, status = excluded.status,
     bolo_id = excluded.bolo_id, updated_at = now(), deleted_at = null;
 
+-- Envío en bloque (plan § 11): el espacio de los tests solo envía al
+-- simulador de correo.
+update public.workspace set mailout_simulator_only = true
+where id = '20000000-0000-4000-8000-000000000001';
+
 commit;

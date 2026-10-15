@@ -14,6 +14,7 @@
   import { dayMonthYear, dayMonthYearTs } from '$lib/datetime';
   import { appLocale, t } from '$lib/i18n';
   import Button from '$lib/components/Button.svelte';
+  import MailDomainSection from './MailDomainSection.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
   import type { MailAccountItem, MailAccountsResponse, MailAccountScope } from '$lib/mail';
 
@@ -185,6 +186,8 @@
     </div>
   </div>
 </section>
+
+<MailDomainSection {workspaceId} />
 
 {#snippet connection(a: MailAccountItem, manage: boolean)}
   <div class="conn">
