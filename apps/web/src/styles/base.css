@@ -1846,6 +1846,11 @@
   a.lenshead__frag:hover {
     color: var(--text-color);
   }
+  /* the fragment that names where you are (a lens's projection, ADR-106):
+     ink, like hover, and it stays */
+  .lenshead__frag[aria-current] {
+    color: var(--text-color);
+  }
   /* uniform · between every sub item, whatever its class (links, figures,
      buttons) — one rhythm for all four lenses. */
   .lenshead__sub > * + *::before {

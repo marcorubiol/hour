@@ -9,13 +9,19 @@
  * pedir los mensajes hilo a hilo la pagaría tantas veces como hilos. Si esa
  * cuenta crece, el sitio para cambiarla es este fichero (una RPC de lectura
  * acotada), y nadie más lee `message` directamente.
+ *
+ * «De qué se habla» ya no pasa por esa política: `thread_feed` (ADR-116)
+ * prefiltra por los espacios del que llama antes de evaluar la regla, y su
+ * coste crece con los hilos que el que llama lee, no con los de la base.
  */
 
-import { pgGet, type SupabaseEnv } from '$lib/supabase';
+import { pgGet, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import {
   BOARD_MESSAGE_LIMIT,
   conversationThread,
   type ConversationThreadView,
+  type FeedThread,
+  type ThreadFeedView,
   type ThreadMessage,
 } from '$lib/threads';
 
@@ -56,23 +62,47 @@ export async function loadThreadMessages(
   const truncated = msgs.data.length > limit;
   const messages = truncated ? msgs.data.slice(0, limit) : msgs.data;
 
-  // El nombre sale del perfil, que se lee si compartes espacio con su dueño.
-  // Quien ya no comparte (o borró su login) queda sin nombre, no sin mensaje.
-  const authorIds = [...new Set(messages.map((m) => m.author_id).filter((id): id is string => Boolean(id)))];
-  const authors: Record<string, string> = {};
-  if (authorIds.length > 0) {
-    const profiles = await pgGet<{ user_id: string; full_name: string | null }>(env, 'user_profile', jwt, {
-      search: { select: 'user_id,full_name', user_id: `in.(${authorIds.join(',')})` },
-    });
-    for (const p of profiles.data) if (p.full_name) authors[p.user_id] = p.full_name;
-  }
-
   return {
     messages,
-    authors,
+    authors: await authorNames(env, jwt, messages.map((m) => m.author_id)),
     reads: Object.fromEntries(reads.data.map((r) => [r.thread_id, r.last_read_at])),
     truncated,
   };
+}
+
+/**
+ * El nombre de cada autor sale del perfil, que se lee si compartes espacio con
+ * su dueño. Quien ya no comparte (o borró su login) queda sin nombre, no sin
+ * mensaje.
+ */
+async function authorNames(env: SupabaseEnv, jwt: string, ids: (string | null)[]): Promise<Record<string, string>> {
+  const authorIds = [...new Set(ids.filter((id): id is string => Boolean(id)))];
+  const authors: Record<string, string> = {};
+  if (authorIds.length === 0) return authors;
+  const profiles = await pgGet<{ user_id: string; full_name: string | null }>(env, 'user_profile', jwt, {
+    search: { select: 'user_id,full_name', user_id: `in.(${authorIds.join(',')})` },
+  });
+  for (const p of profiles.data) if (p.full_name) authors[p.user_id] = p.full_name;
+  return authors;
+}
+
+/**
+ * «De qué se habla» (ADR-116): los hilos con mensajes que el que llama lee,
+ * los que tienen nuevos arriba, dentro del alcance de la barra lateral
+ * (proyectos ∪ espacios; vacío = todo), con el nombre de quien escribió el
+ * último mensaje de cada uno.
+ */
+export async function loadThreadFeed(
+  env: SupabaseEnv,
+  jwt: string,
+  me: string,
+  scope: { projectIds: string[]; workspaceIds: string[] },
+): Promise<ThreadFeedView> {
+  const { data } = await pgPostRpc<FeedThread>(env, 'thread_feed', jwt, {
+    p_project_ids: scope.projectIds.length > 0 ? scope.projectIds : null,
+    p_workspace_ids: scope.workspaceIds.length > 0 ? scope.workspaceIds : null,
+  });
+  return { me, threads: data, authors: await authorNames(env, jwt, data.map((th) => th.last_message.author_id)) };
 }
 
 /**

@@ -7,11 +7,13 @@
  * de una vez; el hilo del equipo de una conversación (fase 3) lee su único
  * hilo por la RLS de `thread`. Los dos escriben por las RPC (`post_message`, `edit_message`,
  * `delete_message`, `mark_thread_read`). La línea de audiencia la da
- * `thread_audience`, y no se pliega nunca (ADR-083, enmienda §6).
+ * `thread_audience`, y no se pliega nunca (ADR-083, enmienda §6). «De qué se
+ * habla» (fase 4, ADR-116) lee por `thread_feed` los hilos con mensajes que
+ * el que mira puede leer, y cada fila abre su ficha.
  */
 
 import * as v from 'valibot';
-import { hourMark, localeDayMonth, localeWeekdayShort, timeInTz } from './datetime';
+import { hourMark, localeDayMonth, localeMonthShort, localeWeekdayShort, timeInTz } from './datetime';
 import { LOCALE_TAG, t, type Locale } from './i18n';
 
 /** El tope de la base (`message_body_length`): de 1 a 10.000 tras recortar. */
@@ -322,4 +324,78 @@ export function teamTimeline<E extends { id: string; occurred_at: string }>(
 /** El nombre del bolo sin título propio (no lo tiene): sala y ciudad. */
 export function boloPlace(bolo: Pick<BoardBolo, 'venue_name' | 'city'>): string {
   return [bolo.venue_name, bolo.city].filter(Boolean).join(' · ');
+}
+
+// ── «de qué se habla» (ADR-116) ─────────────────────────────────────────
+
+/**
+ * Un hilo de «de qué se habla», tal como lo da `thread_feed`: con mensajes,
+ * legible por quien mira, y con lo justo para decir de qué va y abrir su
+ * ficha. Un hilo de bolo nunca trae dinero.
+ */
+export interface FeedThread {
+  thread_id: string;
+  workspace_id: string;
+  project_id: string;
+  anchor_kind: AnchorKind;
+  anchor_id: string;
+  /** null = General (en un bolo) o el hilo del equipo (en una conversación). */
+  facet_id: string | null;
+  facet_key: string | null;
+  label: string | null;
+  labels: Record<string, string>;
+  message_count: number;
+  unread_count: number;
+  last_message_at: string;
+  last_message: { author_id: string | null; body: string; created_at: string };
+  /** Sala, ciudad, días, y la función que abre el tablón (la próxima, o la última). */
+  bolo: {
+    venue_name: string | null;
+    city: string | null;
+    first_day: string | null;
+    last_day: string | null;
+    performance_slug: string | null;
+    performance_id: string | null;
+  } | null;
+  conversation: { title: string | null } | null;
+}
+
+/** Lo que devuelve `GET /api/threads`. */
+export interface ThreadFeedView {
+  me: string;
+  threads: FeedThread[];
+  /** user_id → nombre, de los autores que quien mira puede ver. */
+  authors: Record<string, string>;
+}
+
+/**
+ * La ficha que abre una fila: la función con su tablón (`#board`), o la
+ * conversación con su hilo del equipo (`#team`). Un bolo sin funciones vivas
+ * no tiene dónde abrirse: null, y la fila no es enlace.
+ */
+export function feedHref(row: Pick<FeedThread, 'anchor_kind' | 'anchor_id' | 'bolo'>, workspaceSlug: string | undefined): string | null {
+  if (!workspaceSlug) return null;
+  if (row.anchor_kind === 'conversation') return `/h/${workspaceSlug}/conversation/${row.anchor_id}#team`;
+  const slug = row.bolo?.performance_slug;
+  return slug ? `/h/${workspaceSlug}/performance/${slug}#board` : null;
+}
+
+/** El nombre del hilo dentro de su ancla: la faceta (o General) en un bolo, «Equipo» en una conversación. */
+export function feedThreadName(row: Pick<FeedThread, 'anchor_kind' | 'facet_key' | 'label' | 'labels'>, locale: Locale): string {
+  return row.anchor_kind === 'conversation' ? t('threads.team', locale) : facetName(row, locale);
+}
+
+/** De qué se habla: la conversación por su nombre; el bolo por sala y ciudad (no tiene título propio). */
+export function feedTitle(row: Pick<FeedThread, 'anchor_kind' | 'bolo' | 'conversation'>): string {
+  if (row.anchor_kind === 'conversation') return row.conversation?.title ?? '';
+  return row.bolo ? boloPlace(row.bolo) : '';
+}
+
+/** Los días de un bolo: «15 may», «15 → 16 may», «30 abr → 2 may». */
+export function boloDays(first: string | null, last: string | null, locale: Locale): string {
+  if (!first) return '';
+  const tag = LOCALE_TAG[locale];
+  if (!last || last === first) return localeDayMonth(first, tag);
+  const from = first.slice(0, 7) === last.slice(0, 7) ? String(Number(first.slice(8, 10))) : localeDayMonth(first, tag);
+  return `${from} → ${Number(last.slice(8, 10))} ${localeMonthShort(last, tag)}`;
 }

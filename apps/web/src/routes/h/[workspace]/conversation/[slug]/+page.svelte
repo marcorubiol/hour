@@ -43,7 +43,7 @@
     type ConversationItem,
   } from '$lib/conversation';
   import { firstLine, replySubject, type MailAccountsResponse } from '$lib/mail';
-  import { markReadWhenSeen, readAtOpen } from '$lib/thread-reading.svelte';
+  import { markReadWhenSeen, readAtOpen, scrollWhenNamed } from '$lib/thread-reading.svelte';
   import { THREAD_REFRESH_MS, firstUnreadId, teamTimeline, type ConversationThreadView } from '$lib/threads';
 
   const locale = appLocale();
@@ -124,6 +124,7 @@
     threads: () => (team ? [team.thread] : []),
     onmarked: refreshTeam,
   });
+  scrollWhenNamed('#team', () => (team ? teamEl : undefined));
 
   let sendable = $derived(($mailQuery.data?.items ?? []).filter((a) => a.status === 'active'));
   let mailboxes = $derived(

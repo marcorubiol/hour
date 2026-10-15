@@ -15,10 +15,15 @@
    * list and a bar «Escribir a N», which creates the draft (POST /api/mailout)
    * and opens the mailout screen. A mailout belongs to one project, so the
    * bar asks for conversations of a single project.
+   *
+   * Two projections (ADR-106, patrón ADR-076), neither secondary: «con quién
+   * hablas» (this list, difusión) and «de qué se habla» (`?view=threads`, the
+   * internal threads the viewer can read, ThreadFeed; ADR-116). Same scope.
    */
 
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { goto } from '$app/navigation';
+  import { page } from '$app/state';
   import { fetchJSON, mutateJSON, ApiError } from '$lib/api';
   import Button from '$lib/components/Button.svelte';
   import LensHeader from '$lib/components/LensHeader.svelte';
@@ -26,6 +31,7 @@
   import Checkbox from '$lib/components/Checkbox.svelte';
   import Dialog from '$lib/components/Dialog.svelte';
   import ConversationTable from '$lib/components/ConversationTable.svelte';
+  import ThreadFeed from '$lib/components/ThreadFeed.svelte';
   import Input from '$lib/components/Input.svelte';
   import Select from '$lib/components/Select.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
@@ -59,6 +65,12 @@
 
   let workspaces = $derived<NavWorkspace[]>($workspacesQuery.data?.items ?? []);
   let workspaceSlugById = $derived(new Map(workspaces.map((w) => [w.id, w.slug])));
+  let projectNameById = $derived(
+    new Map(($projectsQuery.data?.items ?? []).map((p) => [p.id, p.name ?? p.slug])),
+  );
+
+  /** The projection travels in the URL, so a link says which one it shows. */
+  let view = $derived<'people' | 'threads'>(page.url.searchParams.get('view') === 'threads' ? 'threads' : 'people');
 
   function personHref(item: ConversationItem): string | null {
     const workspaceSlug = workspaceSlugById.get(item.workspace_id);
@@ -396,54 +408,69 @@
 <section class="conversations" aria-busy={busy}>
   <LensHeader>
     {#snippet title()}<LensTitle text={t('lens.conversations', locale)} />{/snippet}
-    <!-- TEMP sub — placeholder until this lens's real subtitle is defined. -->
-    {#snippet sub()}<span class="lenshead__todo">temporal · define esta lente</span>{/snippet}
+    {#snippet sub()}
+      <a class="lenshead__frag" href="/h/conversations" aria-current={view === 'people' ? 'page' : undefined}
+        >{t('conversations.view_who', locale)}</a
+      >
+      <a class="lenshead__frag" href="/h/conversations?view=threads" aria-current={view === 'threads' ? 'page' : undefined}
+        >{t('conversations.view_what', locale)}</a
+      >
+    {/snippet}
   </LensHeader>
 
-  <div class="conversations__controls">
-    <div class="conversations__search">
-      <Input
-        label={t('conversations.search', locale)}
-        type="search"
-        placeholder={t('conversations.search_ph', locale)}
-        bind:value={qRaw}
-      />
-    </div>
-    <Select label={t('edit.status', locale)} options={statusOptions} bind:value={statusFilter} />
-    <Button size="s" onclick={openAdd}>{t('conversations.add', locale)}</Button>
-    <Button size="s" variant="outline" onclick={togglePicking}>
-      {picking ? t('mailout.pick_done', locale) : t('mailout.pick', locale)}
-    </Button>
-  </div>
-
-  <ConversationTable
-    {filters}
-    {personHref}
-    {conversationHref}
-    groupable
-    importEmptyState
-    selectable={picking}
-    bind:selected={picked}
-  />
-
-  {#if picking}
-    <div class="action-bar" role="region" aria-label={t('mailout.pick_bar', locale)}>
-      <p class="action-bar__note">
-        {#if pickedProjects.length > 1}
-          {t('mailout.one_project', locale)}
-        {:else}
-          {t(picked.length === 1 ? 'mailout.picked_one' : 'mailout.picked_other', locale, { n: picked.length })}
-        {/if}
-      </p>
-      <Button
-        size="s"
-        disabled={picked.length === 0 || pickedProjects.length !== 1}
-        loading={$writeMutation.isPending}
-        onclick={() => $writeMutation.mutate()}
-      >
-        {t('mailout.write_to', locale, { n: picked.length })}
+  {#if view === 'threads'}
+    <ThreadFeed
+      filters={{ projectIds: filterIds.projectIds, workspaceIds: filterIds.workspaceIds, enabled: !scopeUnresolved }}
+      {workspaceSlugById}
+      {projectNameById}
+      {locale}
+    />
+  {:else}
+    <div class="conversations__controls">
+      <div class="conversations__search">
+        <Input
+          label={t('conversations.search', locale)}
+          type="search"
+          placeholder={t('conversations.search_ph', locale)}
+          bind:value={qRaw}
+        />
+      </div>
+      <Select label={t('edit.status', locale)} options={statusOptions} bind:value={statusFilter} />
+      <Button size="s" onclick={openAdd}>{t('conversations.add', locale)}</Button>
+      <Button size="s" variant="outline" onclick={togglePicking}>
+        {picking ? t('mailout.pick_done', locale) : t('mailout.pick', locale)}
       </Button>
     </div>
+
+    <ConversationTable
+      {filters}
+      {personHref}
+      {conversationHref}
+      groupable
+      importEmptyState
+      selectable={picking}
+      bind:selected={picked}
+    />
+
+    {#if picking}
+      <div class="action-bar" role="region" aria-label={t('mailout.pick_bar', locale)}>
+        <p class="action-bar__note">
+          {#if pickedProjects.length > 1}
+            {t('mailout.one_project', locale)}
+          {:else}
+            {t(picked.length === 1 ? 'mailout.picked_one' : 'mailout.picked_other', locale, { n: picked.length })}
+          {/if}
+        </p>
+        <Button
+          size="s"
+          disabled={picked.length === 0 || pickedProjects.length !== 1}
+          loading={$writeMutation.isPending}
+          onclick={() => $writeMutation.mutate()}
+        >
+          {t('mailout.write_to', locale, { n: picked.length })}
+        </Button>
+      </div>
+    {/if}
   {/if}
 </section>
 
