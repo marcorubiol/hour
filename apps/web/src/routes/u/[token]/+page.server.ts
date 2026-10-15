@@ -9,7 +9,9 @@
  *     cookies, sin JavaScript y sin cabecera Origin (por eso
  *     `csrf.checkOrigin` está apagado en svelte.config.js: el token es el
  *     secreto, y hooks.server.ts sigue cortando cualquier Origin ajeno).
- *   · POST ?/resubscribe: «¿Ha sido un error? Volver a recibirlos».
+ *   · POST con `undo=1`: «¿Ha sido un error? Volver a recibirlos». Una sola
+ *     acción (SvelteKit no deja una por defecto junto a otras con nombre); el
+ *     POST de Gmail lleva `List-Unsubscribe=One-Click` y nunca `undo`.
  * Sin sesión: las RPC por token corren como anon. Un token que no existe no
  * hace nada y la página no lo distingue de uno caducado. En el idioma del
  * envío, no en el del navegador.
@@ -63,6 +65,8 @@ async function act(
 }
 
 export const actions: Actions = {
-  default: (event) => act('mailout_unsubscribe', event),
-  resubscribe: (event) => act('mailout_resubscribe', event),
+  default: async (event) => {
+    const form = await event.request.formData().catch(() => null);
+    return act(form?.get('undo') === '1' ? 'mailout_resubscribe' : 'mailout_unsubscribe', event);
+  },
 };

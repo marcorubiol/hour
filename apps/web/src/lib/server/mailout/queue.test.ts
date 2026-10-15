@@ -53,7 +53,7 @@ function context(id: string, over: Partial<ComposeContext> = {}): ComposeContext
 function memoryDb(rows: ClaimedRecipient[], ctx: ComposeContext[] = rows.map((r) => context(r.recipient_id))) {
   const calls = {
     claim: [] as [number, string | undefined][],
-    sent: [] as [string, string, string | null, string][],
+    sent: [] as [string, string, string | null, string, string][],
     failures: [] as [string, string, string | null][],
     events: [] as Record<string, unknown>[],
   };
@@ -87,7 +87,8 @@ describe('runMailoutQueue con el simulador', () => {
     expect(spy).not.toHaveBeenCalled();
     spy.mockRestore();
     expect(r).toMatchObject({ claimed: 1, sent: 1, failed: 0, retried: 0 });
-    const [id, providerId, rfc, body] = calls.sent[0];
+    const [id, providerId, rfc, body, subject] = calls.sent[0];
+    expect(subject).toBe('MaMeMi para Teatre de Salt');
     expect(id).toBe('r1');
     expect(providerId).toMatch(/^sim-/);
     expect(rfc).toMatch(/^<sim-.+@mailout\.simulator\.invalid>$/);

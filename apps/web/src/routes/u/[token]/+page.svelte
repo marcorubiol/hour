@@ -27,7 +27,8 @@
     <p class="unsub__lead">{t('unsub.busy', locale)}</p>
   {:else if unsubscribed}
     <p class="unsub__lead">{t('unsub.done', locale, { company })}</p>
-    <form method="POST" action="?/resubscribe">
+    <form method="POST">
+      <input type="hidden" name="undo" value="1" />
       <p class="unsub__aside">
         {t('unsub.mistake', locale)}
         <button type="submit" class="unsub__link">{t('unsub.undo', locale)}</button>

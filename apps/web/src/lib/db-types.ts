@@ -6084,6 +6084,7 @@ export type Database = {
           p_provider_message_id: string
           p_recipient_id: string
           p_rfc_message_id: string
+          p_subject?: string
         }
         Returns: {
           address: string | null

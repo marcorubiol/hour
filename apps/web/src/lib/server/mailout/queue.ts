@@ -7,7 +7,7 @@
  * devuelve lo que hace falta para enviar. Después, por cada uno:
  *   montar (mailout-compose.ts con `mailout_send_context`) → enviar con el
  *   adaptador de su dominio → `mailout_record_sent` (estado, evento en la
- *   conversación, last_contacted_at) → los eventos que devuelva el simulador
+ *   conversación con el asunto de ese destinatario, last_contacted_at) → los eventos que devuelva el simulador
  *   (`mailout_record_event`).
  * Si falla: `mailout_record_failure`, con reintento a 1, 5, 15 y 60 minutos
  * (la base lo pasa a `failed` en el quinto) o sin él si el fallo es
@@ -56,7 +56,13 @@ export interface ClaimedRecipient {
 export interface MailoutQueueDb {
   claim(limit: number, mailoutId?: string): Promise<ClaimedRecipient[]>;
   context(recipientIds: string[]): Promise<ComposeContext[]>;
-  recordSent(recipientId: string, providerMessageId: string, rfcMessageId: string | null, body: string): Promise<void>;
+  recordSent(
+    recipientId: string,
+    providerMessageId: string,
+    rfcMessageId: string | null,
+    body: string,
+    subject: string,
+  ): Promise<void>;
   recordFailure(recipientId: string, error: string, retryAt: string | null): Promise<void>;
   recordEvent(payload: Record<string, unknown>): Promise<void>;
 }
@@ -66,11 +72,11 @@ export function serviceQueueDb(env: Partial<MailoutEnv>, fetchFn: typeof fetch =
     claim: (limit, mailoutId) =>
       serviceRpc<ClaimedRecipient[]>(env, 'mailout_claim', { p_limit: limit, p_mailout_id: mailoutId ?? null }, fetchFn),
     context: (ids) => serviceRpc<ComposeContext[]>(env, 'mailout_send_context', { p_recipient_ids: ids }, fetchFn),
-    recordSent: async (id, providerMessageId, rfc, body) => {
+    recordSent: async (id, providerMessageId, rfc, body, subject) => {
       await serviceRpc(
         env,
         'mailout_record_sent',
-        { p_recipient_id: id, p_provider_message_id: providerMessageId, p_rfc_message_id: rfc, p_body: body },
+        { p_recipient_id: id, p_provider_message_id: providerMessageId, p_rfc_message_id: rfc, p_body: body, p_subject: subject },
         fetchFn,
       );
     },
@@ -160,7 +166,7 @@ export async function runMailoutQueue(env: Partial<MailoutEnv>, opts: QueueOptio
         tags: { recipient: r.recipient_id, mailout: r.mailout_id },
       });
       accepted = true;
-      await db.recordSent(r.recipient_id, sent.providerMessageId, sent.rfcMessageId, mail.recordBody);
+      await db.recordSent(r.recipient_id, sent.providerMessageId, sent.rfcMessageId, mail.recordBody, mail.subject);
       result.sent += 1;
       for (const e of sent.events) {
         await db.recordEvent({

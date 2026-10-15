@@ -223,20 +223,24 @@ describe.skipIf(!envReady() || !limitedEnvReady())('RLS: envío en bloque, fase 
       p_provider_message_id: `sim-${RUN}`,
       p_rfc_message_id: `<sim-${RUN}@mailout.simulator.invalid>`,
       p_body: 'Hola, Laia.',
+      p_subject: `Proposta per a RLS Sala a ${RUN}`,
     });
     expect(sent.status, sent.error).toBe(200);
 
     // El correo, en el registro de su conversación, con el envío enlazado.
-    const events = await pgGet<{ kind: string; direction: string; mailout_id: string; body: string }>(
+    const events = await pgGet<{ kind: string; direction: string; mailout_id: string; body: string; subject: string }>(
       'conversation_event',
       adminJwt,
       new URLSearchParams({
         conversation_id: `eq.${conv.a}`,
         kind: 'eq.email',
-        select: 'kind,direction,body,mailout_id:metadata->>mailout_id',
+        select: 'kind,direction,body,mailout_id:metadata->>mailout_id,subject:metadata->>subject',
       }),
     );
-    expect(events.rows).toEqual([{ kind: 'email', direction: 'outbound', body: 'Hola, Laia.', mailout_id: mailoutId }]);
+    // El asunto de ESTE destinatario, no la plantilla con `{sala}`.
+    expect(events.rows).toEqual([
+      { kind: 'email', direction: 'outbound', body: 'Hola, Laia.', mailout_id: mailoutId, subject: `Proposta per a RLS Sala a ${RUN}` },
+    ]);
 
     // La página de baja, por token y sin sesión.
     const info = await pgRpc<{ company_name: string; language: string; unsubscribed: boolean }[]>(
