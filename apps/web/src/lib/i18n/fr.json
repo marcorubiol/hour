@@ -1835,5 +1835,6 @@
   "unsub.undo": "Les recevoir à nouveau",
   "unsub.resubscribed": "Vous recevrez à nouveau les envois de {company}.",
   "unsub.invalid": "Ce lien de désinscription n'est pas valide ou n'existe plus.",
-  "unsub.busy": "Trop de tentatives. Réessayez dans quelques minutes."
+  "unsub.busy": "Trop de tentatives. Réessayez dans quelques minutes.",
+  "mailout.missing_one": "Il manque un champ à 1 destinataire. Retirez-le ou changez le texte."
 }

@@ -3718,3 +3718,62 @@ construye contra un proveedor simulado). Lo que el plan no fijaba:
 5. **La pantalla dice que es simulado** («Modo de prueba: no sale ningún correo real») mientras el Worker esté en
    simulador o el espacio tenga un dominio simulado. Los valores de los registros DNS nombran `amazonses.com` porque
    son los registros reales; el texto de la pantalla nunca nombra el servicio.
+
+## [2026-10-15] ADR-115 · Envío en bloque, fase 3: enviar contra el simulador
+
+**Contexto.** Plan `build/plans/2026-10-14-bulk-send.md` § 6, § 7.1, § 8, § 10 y § 11 (fase 3); ADR-110 a ADR-114.
+Se construye contra el proveedor simulado (ADR-111). Al escribirla, el esquema de la fase 1 y el plan no bastaban en
+algunos puntos; aquí queda qué se hizo. Migración `20261016100000_mailout_send` (rollback en
+`build/runbooks/rollback-20261016-mailout-send.sql`, probado ida y vuelta en local); no aplicada en producción.
+
+**Decisión.**
+1. **Los campos y el pie salen de la base por una sola función.** `mailout_claim` no devuelve el nombre del contacto,
+   la sala, la ciudad ni las piezas del pie. `private.mailout_compose_rows` las da por destinatario, y la usan
+   `mailout_send_context` (service_role, la cola) y `mailout_compose_preview` (quien lee el envío, solo los
+   destinatarios de conversaciones que ve). El montaje del correo es un módulo puro compartido
+   (`$lib/mailout-compose.ts`): la vista previa y la cola llaman a lo mismo.
+2. **Campos:** `{nombre}` es el nombre de pila del contacto (o la primera palabra de su nombre); en el correo genérico
+   de una organización, «equipo de {sala}» en el idioma del envío. `{sala}` es la organización; `{ciudad}`, la suya y
+   si no la del contacto. Los nombres de los campos no se traducen. Un campo sin valor marca al destinatario («Faltan
+   campos») y «Enviar» no se deja pulsar; si llega a la cola sin valor (el dato cambió después), falla sin reintento
+   (`missing_fields:…`). Nunca sale vacío.
+3. **Firma: la de la compañía** (el remitente es `difusion@` de la compañía, ADR-110 § 3): `workspace.mail_signature`
+   o la que propone Hour para el buzón común. El pie va en el idioma del envío: quién escribe (compañía, ciudad, web),
+   por qué le llega según la base congelada (sin base, sin frase), la baja en un clic y la política de privacidad si
+   la hay.
+4. **El registro de la conversación guarda el cuerpo con los campos y la firma, sin el pie**: el enlace de baja es de
+   la sala, no del equipo. `mailout_record_sent` gana `p_subject` (el asunto con los campos de ese destinatario; sin
+   él quedaba «Propuesta para {sala}» en el registro). Se rehízo la función: ningún Worker desplegado la llamaba. El
+   correo enviado lleva en la conversación un enlace «del envío» a su pantalla; la baja, la vuelta y el «spam» salen
+   como notas en el idioma de la pantalla.
+5. **La cola:** cron `* * * * *` aparte del de la sincronización, que solo vacía la cola; y una primera pasada del
+   envío recién puesto en cola con `ctx.waitUntil`. 10 correos por pasada (cada uno de 1 a 4 subpeticiones; con 10 la
+   pasada queda por debajo de las 50 del plan Free de Workers; **suposición**: no se ha mirado el plan de Hour).
+   Reintentos a 1, 5, 15 y 60 minutos (la base lo deja `failed` al quinto); contenido rechazado o campo sin valor, sin
+   reintento. La supresión y la base se vuelven a mirar en `mailout_claim`, justo antes de tomar cada lote. Si el
+   correo salió y lo que falla es apuntarlo, la fila no se toca (el arriendo caduca: el doble envío del plan § 6). La
+   pausa por tenant (`SendingPausedException` → `paused`) espera a la fase 4: no hay RPC de máquina para pausar un
+   envío y el simulador no pausa.
+6. **El simulador** no envía nada: devuelve un id `sim-…`, un Message-ID `<sim-…@mailout.simulator.invalid>` y los
+   eventos que daría el simulador de SES según la dirección (`bounce@` y `suppressionlist@` rebotan, `complaint@` se
+   entrega y se marca como spam, cualquier otra se entrega), que la cola apunta con `mailout_record_event`. Cualquier
+   otra dirección, también una real de una compañía con dominio simulado, solo queda como entregada.
+7. **«Enviarme una prueba»** sale por el adaptador del dominio, al email de quien la pide, con «[Prueba]» (en el idioma
+   del envío) y un enlace de baja de ejemplo; no deja registro. Con el simulador no sale nada y la pantalla lo dice.
+8. **Baja:** `/u/<token>`, página con SSR y formulario normal (sin JavaScript). El GET no da de baja. Una sola acción
+   POST: da de baja, salvo con `undo=1` (volver a recibirlos); SvelteKit no deja una acción por defecto junto a otras
+   con nombre. La página se pinta en el idioma del envío (`mailout_unsubscribe_info`, anon, por token). **CSRF:** en
+   un build de producción SvelteKit rechaza un formulario POST sin cabecera Origin, que es exactamente lo que manda
+   Gmail en la baja de un clic (en `vite dev` no se ve). `kit.csrf.checkOrigin = false` (deprecado en favor de
+   `trustedOrigins`, que no sabe decir «sin Origin»); el gancho de `hooks.server.ts` sigue cortando cualquier Origin
+   ajeno. Comprobado con `wrangler dev` sobre el build: sin Origin 200 y supresión, con Origin ajeno 403. Si una
+   versión de SvelteKit quita `checkOrigin`, la baja de un clic se resuelve en `worker-entry.js` antes de SvelteKit.
+9. **Los enlaces de baja** apuntan a `https://hour.zerosense.studio` salvo `MAILOUT_LINK_ORIGIN` (solo en local).
+10. **Pantalla:** Conversations tiene un modo selección («Seleccionar») con casillas sobre la lista filtrada y una
+    barra «Escribir a N»; un envío es de un proyecto, así que con conversaciones de dos proyectos la barra lo dice y no
+    deja seguir. Crea el borrador con el primer dominio verificado del espacio. La pantalla del envío guarda el
+    borrador sola; la base se apunta desde la lista de destinatarios. De dónde van las respuestas se calcula como
+    `queue_mailout` (buzón común, si no el personal); no se elige buzón en este corte. El módulo Conversations de un
+    proyecto o línea no tiene todavía el modo selección.
+11. **Tres piezas visuales pasan a `base.css`** al reutilizarse: `.block-head`, `.mail-card` y `.action-bar`; y el
+    aviso de modo de prueba es un componente (`MailoutTestMode`) que comparten Ajustes y el envío.

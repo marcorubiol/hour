@@ -51,7 +51,7 @@
     .unsub {
       max-inline-size: 32rem;
       margin: 0 auto;
-      padding: var(--space-2xl) var(--space-m);
+      padding: var(--space-xxl) var(--space-m);
       display: flex;
       flex-direction: column;
       gap: var(--space-m);

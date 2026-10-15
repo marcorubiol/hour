@@ -1844,5 +1844,6 @@
   "unsub.undo": "Receive them again",
   "unsub.resubscribed": "You will receive mailouts from {company} again.",
   "unsub.invalid": "This unsubscribe link is not valid or no longer exists.",
-  "unsub.busy": "Too many attempts. Try again in a few minutes."
+  "unsub.busy": "Too many attempts. Try again in a few minutes.",
+  "mailout.missing_one": "1 recipient is missing a field. Remove it or change the text."
 }

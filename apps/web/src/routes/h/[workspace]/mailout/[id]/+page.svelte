@@ -146,8 +146,14 @@
   let missingCount = $derived(rows.filter((x) => x.state === 'missing_fields').length);
   let counts = $derived(recipientCounts(rows.map((x) => x.state)));
 
-  // Vista previa: los que tienen dirección, el que se mira.
-  let previewable = $derived(rows.filter((x) => x.ctx && x.row.address));
+  // Vista previa: los que tienen dirección, el que se mira; primero los que
+  // salen (o salieron), después los que se quedan fuera.
+  const OUT_STATES: RecipientState[] = ['no_address', 'suppressed', 'no_basis', 'duplicate', 'unavailable', 'cancelled'];
+  let previewable = $derived(
+    rows
+      .filter((x) => x.ctx && x.row.address)
+      .sort((a, b) => Number(OUT_STATES.includes(a.state)) - Number(OUT_STATES.includes(b.state))),
+  );
   let previewIndex = $state(0);
   let current = $derived(previewable[Math.min(previewIndex, Math.max(previewable.length - 1, 0))] ?? null);
   let exampleLink = $derived(unsubscribeUrl(page.url.origin, '…'));
@@ -250,7 +256,7 @@
 
   // ── Palabras ──────────────────────────────────────────────────────────
   const languageOptions = MAILOUT_LANGUAGES.map((l) => ({ value: l, label: t(`mailout.lang_${l}`, locale) }));
-  let domainOptions = $derived((d?.domains ?? []).map((x) => ({ value: x.id, label: x.domain })));
+  let domainOptions = $derived((d?.domains ?? []).map((x) => ({ value: x.id, label: `@${x.domain}` })));
   let basisOptions = $derived(
     (['relationship', 'consent', ...(basisFor?.address_kind === 'organization' ? ['generic'] : [])] as MailBasisKind[]).map(
       (k) => ({ value: k, label: t(`mailout.basis_${k}`, locale) }),
@@ -283,9 +289,7 @@
   }
 
   const STATUS_COUNTS: RecipientState[] = ['queued', 'sent', 'delivered', 'bounced', 'complained', 'failed'];
-  let excludedCount = $derived(
-    rows.filter((x) => ['no_address', 'suppressed', 'no_basis', 'duplicate', 'unavailable', 'cancelled'].includes(x.state)).length,
-  );
+  let excludedCount = $derived(rows.filter((x) => OUT_STATES.includes(x.state)).length);
 </script>
 
 <svelte:head>
@@ -350,13 +354,13 @@
                 <a class="link-arrow" href={`/h/${workspaceSlug}/settings?section=mail`}>{t('mailout.to_settings', locale)}</a>
               </p>
             {:else}
-              <div class="mo__row">
+              <div class="mo__row mo__row--from">
                 <Input label={t('mailout.from_name', locale)} bind:value={fromName} oninput={touch} placeholder={d.workspace.name} />
-                <Input label={t('mailout.from_address', locale)} bind:value={localPart} oninput={touch}>
-                  {#snippet suffix()}@{domain?.domain ?? ''}{/snippet}
-                </Input>
+                <Input label={t('mailout.from_address', locale)} bind:value={localPart} oninput={touch} />
                 {#if domainOptions.length > 1}
                   <Select label={t('mailout.domain_label', locale)} options={domainOptions} bind:value={domainId} onchange={touch} />
+                {:else}
+                  <p class="mo__at">@{domain?.domain ?? ''}</p>
                 {/if}
               </div>
             {/if}
@@ -458,7 +462,7 @@
       <div class="action-bar">
         <p class="action-bar__note">
           {#if missingCount}
-            {t('mailout.missing_n', locale, { n: missingCount })}
+            {t(missingCount === 1 ? 'mailout.missing_one' : 'mailout.missing_n', locale, { n: missingCount })}
           {:else}
             {t(readyCount === 1 ? 'mailout.ready_one' : 'mailout.ready_other', locale, { n: readyCount })}
           {/if}
@@ -615,6 +619,21 @@
       grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
       gap: var(--space-s) var(--space-m);
     }
+    .mo__row--from {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      align-items: end;
+    }
+    .mo__at {
+      margin: 0;
+      padding-block-end: var(--space-xs);
+      color: var(--text-muted);
+      overflow-wrap: anywhere;
+    }
+    @media (max-width: 46rem) {
+      .mo__row--from {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
     .mo__form textarea {
       inline-size: 100%;
       resize: vertical;
@@ -687,6 +706,9 @@
     }
     .mail-preview__text {
       margin: var(--space-s) 0 0;
+      padding: 0;
+      background: none;
+      border: 0;
       font-family: inherit;
       font-size: var(--text-s);
       line-height: 1.5;

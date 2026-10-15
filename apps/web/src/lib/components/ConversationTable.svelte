@@ -898,8 +898,13 @@
         border-radius: var(--radius-s);
         background: var(--bg-light);
       }
-      tbody tr:hover td {
+      tbody tr:hover td,
+      tbody tr.is-picked td {
         background: transparent;
+      }
+      tbody tr.is-picked {
+        background: var(--bg-ultra-light);
+        border-color: var(--border-color-dark);
       }
       tbody td {
         display: grid;
