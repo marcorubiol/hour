@@ -207,7 +207,7 @@
     task: null,
     agenda: '/h/planner?view=agenda',
     conversation: '/h/conversations',
-    money: '/h/money',
+    money: '/h/books',
   };
   const runHref = (run: DeskRun) => run.items[0]?.href ?? LENS_HREF[run.concern];
   const concernLabel = (c: DeskConcern) => t(`desk.concern_${c}`, locale);
@@ -228,7 +228,7 @@
         href: '/h/conversations',
       });
     if (summary.pipeline != null && summary.pipeline > 0)
-      f.push({ text: t('desk.digest_in_progress', locale, { amount: money(summary.pipeline, summary.currency) }), href: '/h/money' });
+      f.push({ text: t('desk.digest_in_progress', locale, { amount: money(summary.pipeline, summary.currency) }), href: '/h/books' });
     if (summary.nextShowCity)
       f.push({ text: t('desk.digest_next_show', locale, { place: summary.nextShowCity }), href: '/h/planner' });
     return f;

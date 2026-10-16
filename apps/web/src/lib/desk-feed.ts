@@ -509,7 +509,7 @@ export function buildDeskFeed(input: DeskFeedInput, now: Date, locale: Locale = 
         projectId: inv.project?.id ?? null,
         verbKey: 'remind',
         overdue: true,
-        href: '/h/money',
+        href: '/h/books',
         amount: inv.total,
         currency: inv.currency,
       }),

@@ -29,9 +29,11 @@
     invoices: MoneyInvoiceItem[];
     /** Organizations a draft can be addressed to (ADR-102 decision 5). */
     payers?: MoneyPayer[];
+    /** A document to open and bring into view (Cuentas: «complete fiscal data»). */
+    focusId?: string | null;
   }
 
-  let { invoices, payers = [] }: Props = $props();
+  let { invoices, payers = [], focusId = null }: Props = $props();
 
   const queryClient = useQueryClient();
   const today = new Date();
@@ -41,6 +43,12 @@
   let allPayments = $derived(invoices.flatMap((invoice) => invoice.payments));
   let termsByPayer = $derived(observedPayerTermsDays(invoices, allPayments));
   let expandedId = $state<string | null>(null);
+  $effect(() => {
+    if (!focusId || !invoices.some((invoice) => invoice.id === focusId)) return;
+    expandedId = focusId;
+    const id = `inv-${focusId}`;
+    requestAnimationFrame(() => document.getElementById(id)?.scrollIntoView({ block: 'center' }));
+  });
 
   function agingFor(invoice: MoneyInvoiceItem) {
     return agingState(
@@ -242,7 +250,7 @@
     {#each invoices as invoice (invoice.id)}
       {@const aging = agingFor(invoice)}
       {@const observed = invoice.payer_organization_id ? termsByPayer.get(invoice.payer_organization_id) : null}
-      <li class:expanded={expandedId === invoice.id}>
+      <li id={`inv-${invoice.id}`} class:expanded={expandedId === invoice.id}>
         <div class="mny-inv__row">
           <span class="mny-inv__number">{invoice.number ?? t('books.no_number', locale)}</span>
           <span class="mny-inv__main">

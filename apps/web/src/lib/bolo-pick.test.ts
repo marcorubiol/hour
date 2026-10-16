@@ -105,13 +105,13 @@ describe('boloDefault', () => {
 
 describe('booksHref', () => {
   test('Cuentas con el proyecto en el ámbito', () => {
-    expect(booksHref('p1')).toBe('/h/money?scope=p:p1');
+    expect(booksHref('p1')).toBe('/h/books?scope=p:p1');
   });
   test('con el alta de bolo abierta', () => {
-    expect(booksHref('p1', { newBolo: true })).toBe('/h/money?scope=p:p1&new_bolo=p1');
+    expect(booksHref('p1', { newBolo: true })).toBe('/h/books?scope=p:p1&new_bolo=p1');
   });
   test('hasta la tarjeta de un bolo', () => {
-    expect(booksHref('p1', { boloId: 'b1' })).toBe('/h/money?scope=p:p1#bolo-b1');
+    expect(booksHref('p1', { boloId: 'b1' })).toBe('/h/books?scope=p:p1#bolo-b1');
   });
 });
 

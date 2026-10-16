@@ -3875,3 +3875,19 @@ Con las 154 de MüK Cia basta. **No escala**: la política `EXISTS` de `conversa
 evento. Siguiente paso, cuando haga falta: RPC `conversation_overview(p_workspace_ids, p_project_ids)` con
 `DISTINCT ON (conversation_id)` sobre el índice `(conversation_id, occurred_at desc)` tras acotar por las
 conversaciones legibles (el patrón de `thread_feed`, ADR-116). Aditiva, con tests RLS. No se hace en este carril.
+
+## [2026-10-16] ADR-119 · La ruta de Cuentas es `/h/books` (enmienda ADR-088)
+
+**Contexto.** ADR-088 B conservó la ruta física `/h/money` dando por hecho que nadie la ve. Se ve: en la barra del
+navegador, en los enlaces que se comparten y en el ancla `#bolo-<id>` a la que llevan el selector de bolo, la ficha de
+la función y Desk. Marco lo validó en el Drop (15-10): la ruta de Cuentas es `/h/books`, el nombre EN de la lente.
+
+**Decisión.**
+1. La lente vive en `/h/books`. `/h/money` responde 301 a `/h/books` con su query; el ancla no llega al servidor y el
+   navegador la conserva al seguir la redirección. `/h/<espacio>/money` (marcadores de antes de ADR-067) va a
+   `/h/books` directo.
+2. El identificador interno de la lente pasa de `money` a `books` (`Lens`, selector de lentes, el shell); el valor
+   `money` guardado en el navegador se migra en la primera lectura, como `contacts` y `calendar`.
+3. No cambian: las rutas de API (`/api/money/...`), el permiso `read:money`, el módulo `money` de las líneas, las
+   claves de diccionario `books.*` y `lens.money`, ni `lib/money.ts`. Son el dominio, no la ruta.
+4. `books` queda reservado como slug de espacio; `money` sigue reservado.

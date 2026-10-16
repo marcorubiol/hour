@@ -121,5 +121,5 @@ export function booksHref(
   opts: { newBolo?: boolean; boloId?: string } = {},
 ): string {
   const q = `scope=p:${projectId}${opts.newBolo ? `&new_bolo=${projectId}` : ''}`;
-  return `/h/money?${q}${opts.boloId ? `#bolo-${opts.boloId}` : ''}`;
+  return `/h/books?${q}${opts.boloId ? `#bolo-${opts.boloId}` : ''}`;
 }

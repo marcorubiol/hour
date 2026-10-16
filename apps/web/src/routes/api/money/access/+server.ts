@@ -1,6 +1,13 @@
 /**
  * GET /api/money/access?project_id=X — ¿lee dinero quien llama, en ese
  * proyecto? `{ read_money: boolean }`.
+ * GET /api/money/access (sin proyecto) — ¿lo lee en ALGUNO de los proyectos
+ * que ve? Es la puerta de la lente Cuentas (ADR-117): quien no lee dinero en
+ * ninguno no la ve en el selector de lentes, y si entra por URL se le dice que
+ * no tiene acceso, nunca «no hay bolos». Recorre los proyectos que RLS le deja
+ * ver y pregunta `has_permission` por cada uno, en paralelo y hasta el primer
+ * sí: en Phase 0 son pocos. Un RPC `money_access_any()` lo haría en una
+ * llamada; queda para cuando haya migración (propuesta de Cuentas § 4.9).
  *
  * Existe para una sola pregunta de pantalla (`_tasks.md § 36`): el feed de
  * bolos devuelve `[]` tanto a quien no lee dinero como a un proyecto sin
@@ -13,7 +20,7 @@
 
 import type { RequestHandler } from './$types';
 import { extractAccessToken } from '$lib/auth';
-import { pgPostRpc, type SupabaseEnv } from '$lib/supabase';
+import { pgGet, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -32,15 +39,28 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
   const jwt = extractAccessToken(request);
   if (!jwt) return json({ error: 'missing_authorization' }, 401);
 
-  const projectId = url.searchParams.get('project_id') ?? '';
-  if (!UUID.test(projectId)) return json({ error: 'invalid_query' }, 400);
+  const projectId = url.searchParams.get('project_id');
+  if (projectId !== null && !UUID.test(projectId)) return json({ error: 'invalid_query' }, 400);
 
-  try {
+  const readsMoney = async (id: string) => {
     const { data } = await pgPostRpc<boolean>(env, 'has_permission', jwt, {
-      p_project_id: projectId,
+      p_project_id: id,
       p_perm: 'read:money',
     });
-    return json({ read_money: data[0] === true });
+    return data[0] === true;
+  };
+
+  try {
+    if (projectId !== null) return json({ read_money: await readsMoney(projectId) });
+    const search = new URLSearchParams({ select: 'id', deleted_at: 'is.null', limit: '500' });
+    const { data: projects } = await pgGet<{ id: string }>(env, 'project', jwt, { search });
+    const any = await Promise.any(
+      projects.map(async (p) => {
+        if (await readsMoney(p.id)) return true;
+        throw new Error('no');
+      }),
+    ).catch(() => false);
+    return json({ read_money: any });
   } catch (err) {
     return pgErrorResponse(
       err,
