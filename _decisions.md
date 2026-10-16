@@ -3831,3 +3831,47 @@ recomendada de cada sección y se ajusta después de usarla.
 5. **Se enfría:** 21 días sin respuesta a nuestro correo; 30 sin actividad en una conversación abierta.
 6. «Por cobrar» en Cuentas es solo lo facturado y no cobrado; lo contratado sin facturar va a la barra de temporada.
 7. Primera versión sin migraciones donde se pueda; los valores de 3 a 5 son un punto de partida para ajustar con uso.
+
+## [2026-10-16] ADR-118 · Dashboard de Conversations: lo que ADR-117 no decía y lo que costó leerlo
+
+**Contexto.** Carril `claude/dash-conversations`: la propuesta A de Conversations (ADR-117) sin migración. Módulo puro
+`$lib/conversation-overview.ts`, lecturas en `$lib/server/conversation-overview.ts`, `GET /api/conversations/overview`
+y los filtros `?turno=`/`?temp=`/`?temporada=actual` en `GET /api/conversations`.
+
+**Decisión.**
+1. **Temporada de una conversación.** Es de la temporada de sus funciones (septiembre a agosto); sin funciones, de la
+   temporada en curso (está en difusión). La fecha sale de `performance.conversation_id`: la de su bolo no se puede
+   leer, porque `performance.bolo_id` sigue fuera del grant por columnas (ADR-106). Funciones canceladas fuera.
+2. **Solo «La temporada» va por temporada y línea fijada.** Te toca, caliente y se enfría miran todo el alcance de la
+   lista: una sala que escribe sobre la temporada siguiente también espera respuesta. Pulsar un tramo filtra la lista
+   por ese estado con `?temporada=actual` (y las líneas fijadas), así que la cifra del tramo y la lista coinciden.
+3. **Turno:** el último correo, mensaje o llamada con dirección; una nota no cuenta. Rechazada o en pausa no tienen
+   turno. «Te toca» suma las respuestas pendientes (por días de espera, la más vieja primero) y los seguimientos de
+   hoy o vencidos de las que no están cerradas.
+4. **Se enfría** solo en contactada, en conversación, hold o recurrente; si te toca a ti, no se enfría (es tuya). Una
+   contactada sin ningún evento (de antes del historial, ADR-098) cuenta su sello de contacto como nuestro último
+   correo. **Suposición**: que «contactada» significa que escribimos nosotros.
+5. **Último envío:** el más reciente en cola, saliendo, en pausa o hecho; respuestas = un correo de ellos posterior a
+   la salida del suyo; bajas = suprimidas por baja desde la puesta en cola (`mailout_preview`).
+6. **Del equipo** sale de `thread_feed` en la misma petición (los dos primeros con nuevos y cuántos son).
+7. **Los filtros derivados** se calculan en el Worker con las mismas funciones que los bloques y solo la página se lee
+   entera (`id=in.(…)`, como mucho 100): un bloque y su filtro no pueden contar distinto. Solo en la lente global; con
+   `project_slug`, `line_id` o `season`, 400.
+8. **«Escribir a estas»** pone el modo selección con las que se enfrían ya marcadas y filtra la lista por ellas; la
+   barra de siempre dice si son de varios proyectos.
+9. **Reloj:** los días se cuentan en la zona del Worker (UTC) en el servidor y en la del navegador en la columna
+   Turno. Cerca de medianoche puede haber un día de diferencia; se acepta en esta versión.
+
+**Medido (local, usuario owner, 6 eventos por conversación, páginas de 1.000, mediana de 5):**
+
+| conversaciones | sin embebidos de evento | con `last_turn` + `last_in` |
+|---|---|---|
+| 150 | 76 ms | ~550 ms |
+| 500 | 231 ms | 673 ms |
+| 1.000 | 827 ms | 9.023 ms |
+| 2.000 | 2.105 ms | corta por `statement_timeout` (8 s), también con páginas de 250 |
+
+Con las 154 de MüK Cia basta. **No escala**: la política `EXISTS` de `conversation_event` (ADR-098) se evalúa por
+evento. Siguiente paso, cuando haga falta: RPC `conversation_overview(p_workspace_ids, p_project_ids)` con
+`DISTINCT ON (conversation_id)` sobre el índice `(conversation_id, occurred_at desc)` tras acotar por las
+conversaciones legibles (el patrón de `thread_feed`, ADR-116). Aditiva, con tests RLS. No se hace en este carril.

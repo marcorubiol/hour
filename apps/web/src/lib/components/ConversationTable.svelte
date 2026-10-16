@@ -7,6 +7,12 @@
     season?: string;
     q?: string;
     status?: string;
+    /** The dashboard's derived filters (ADR-117): global lens only. */
+    turno?: 'nuestro' | 'suyo';
+    temp?: 'caliente' | 'fria';
+    /** Only the current season; `lineIds` (pinned lines) narrow it. */
+    temporada?: boolean;
+    lineIds?: string[];
     /** Hold the query (e.g. while a sidebar selection hasn't resolved). */
     enabled?: boolean;
   }
@@ -33,6 +39,7 @@
   import Input from '$lib/components/Input.svelte';
   import Menu from '$lib/components/Menu.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
+  import { followUpDue, turnOf } from '$lib/conversation-overview';
   import {
     CONVERSATION_STATUSES,
     groupConversationsByContact,
@@ -60,7 +67,9 @@
     /** Selection mode (plan § 10, «Escribir a N»): a checkbox per row. */
     selectable?: boolean;
     /** The picked conversations, across pages and filters. */
-    selected?: ConversationItem[];
+    selected?: Pick<ConversationItem, 'id' | 'project_id'>[];
+    /** Whose turn it is, from the last directional event (ADR-117). */
+    turnColumn?: boolean;
   }
 
   let {
@@ -72,6 +81,7 @@
     importEmptyState = false,
     selectable = false,
     selected = $bindable([]),
+    turnColumn = false,
   }: Props = $props();
 
   type ConversationsResponse = {
@@ -129,6 +139,12 @@
       p.set('workspace_ids', f.workspaceIds.join(','));
     if (f.season) p.set('season', f.season);
     if (f.q) p.set('q', f.q);
+    if (f.turno) p.set('turno', f.turno);
+    if (f.temp) p.set('temp', f.temp);
+    if (f.temporada) {
+      p.set('temporada', 'actual');
+      if (f.lineIds && f.lineIds.length > 0) p.set('line_ids', f.lineIds.join(','));
+    }
     p.set('limit', String(LIMIT));
     p.set('offset', String(o));
     return p.toString();
@@ -218,6 +234,7 @@
       void queryClient.invalidateQueries({ queryKey: ['conversations'] });
       // Line header funnel stats (ADR-056) read the same rows.
       void queryClient.invalidateQueries({ queryKey: ['line-eng-stats'] });
+      void queryClient.invalidateQueries({ queryKey: ['conversation-overview'] });
     },
   });
 
@@ -335,6 +352,20 @@
       pagePicked === visibleItems.length
         ? selected.filter((s) => !page.has(s.id))
         : [...selected, ...visibleItems.filter((i) => !selectedIds.has(i.id))];
+  }
+
+  /** The Turn cell: a reply owed, a follow-up due, or their turn (ADR-117). */
+  function turnCell(item: ConversationItem): { tone: 'ours' | 'theirs'; text: string } | null {
+    const now = new Date();
+    const turn = turnOf({ status: item.status, last: item.last_turn?.[0] ?? null }, now);
+    if (turn?.side === 'ours') {
+      return { tone: 'ours', text: `${t('overview.turn_ours_cap', locale)} · ${relativeContactDate(turn.since, locale)}` };
+    }
+    if (followUpDue(item, now)) {
+      return { tone: 'ours', text: `${t('overview.follow_up_cap', locale)} · ${formatDate(item.next_action_at)}` };
+    }
+    if (turn) return { tone: 'theirs', text: `${t('overview.turn_theirs_cap', locale)} · ${relativeContactDate(turn.since, locale)}` };
+    return null;
   }
 
   let showPagination = $derived(total > LIMIT);
@@ -455,6 +486,7 @@
           <th>{t('conversations.col_contact', locale)}</th>
           <th>{t('conversations.col_location', locale)}</th>
           <th>{t('edit.status', locale)}</th>
+          {#if turnColumn}<th>{t('overview.col_turn', locale)}</th>{/if}
           <th>{t('conversations.col_last_contact', locale)}</th>
           <th>{t('conversations.col_next_action', locale)}</th>
         </tr>
@@ -537,6 +569,12 @@
                 {/snippet}
               </Menu>
             </td>
+            {#if turnColumn}
+              {@const turn = turnCell(item)}
+              <td class="cell--turn" data-label={t('overview.col_turn', locale)} data-empty={!turn || undefined}>
+                {#if turn}<span class="turn turn--{turn.tone}">{turn.text}</span>{/if}
+              </td>
+            {/if}
             <td class="last-contact" data-label={t('conversations.col_last_contact', locale)} data-short={t('conversations.card_last', locale)}>
               <button
                 type="button"
@@ -575,7 +613,7 @@
 {#if errorMsg}
   <div class="msg msg--error">{errorMsg}</div>
 {:else if !loading && items.length === 0}
-  {#if importEmptyState && !filters.q && (!filters.status || filters.status === 'any')}
+  {#if importEmptyState && !filters.q && !filters.turno && !filters.temp && !filters.temporada && (!filters.status || filters.status === 'any')}
     <div class="empty-book">
       <p class="empty-book__title">{t('conversations.empty_title', locale)}</p>
       <p>{t('conversations.empty_body', locale)}</p>
@@ -766,6 +804,19 @@
     .cell--meta {
       color: var(--text-dark-muted);
       font-size: var(--text-s);
+    }
+
+    /* Turno (ADR-117): lo que te toca en tinta, lo suyo en voz baja. */
+    .turn {
+      font-size: var(--text-xs);
+      white-space: nowrap;
+    }
+    .turn--ours {
+      color: var(--text-color);
+      font-weight: 500;
+    }
+    .turn--theirs {
+      color: var(--text-muted);
     }
 
     .last-contact {
@@ -1027,6 +1078,12 @@
       }
       :is(.conversation-table, .contact-table) [data-empty] {
         display: none;
+      }
+      /* The turn closes the «Organization · City» line, on its own. */
+      .conversation-table .cell--turn {
+        order: 3;
+        flex-basis: 100%;
+        margin-block-start: var(--space-2xs);
       }
       :is(.conversation-table, .contact-table) .last-contact,
       :is(.conversation-table, .contact-table) .cell--next {

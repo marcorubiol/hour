@@ -329,6 +329,8 @@ export interface ConversationItem extends Tables<'conversation'> {
   organization: OrganizationLite | null;
   /** Primary first, then current, then closed; empty if none is readable. */
   contacts: ConversationContact[];
+  /** Its last directional email, message or call (GET /api/conversations, ADR-117): whose turn it is. */
+  last_turn?: { direction: 'inbound' | 'outbound'; occurred_at: string; kind?: string | null; subject?: string | null }[] | null;
 }
 
 /**
