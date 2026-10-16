@@ -444,6 +444,7 @@
 
 ## Producto — después
 
+- [ ] **La ruta de Cuentas pasa de `/h/money` a `/h/books`**, con redirección 301 desde la antigua (enlaces guardados, anclas `#bolo-…` del selector de bolo y de Desk). Se hace antes del carril del dashboard de Cuentas, que toca la misma página. Enmienda ADR-088, que conservó `/h/money` dando por hecho que nadie ve la ruta. (drop 15-10, sin estimar: medio carril)
 - [ ] **Cada espacio activa o desactiva las tres lentes (Planner, Conversations, Cuentas)**: un admin lo decide en Ajustes, y una lente apagada desaparece de la navegación, de ⌘K y de las puertas de Desk, sin borrar datos. Abierto: si además cada persona puede ocultarse una lente para sí. (drop 16-10, sin estimar)
 - [ ] **Alta de persona: la cuenta que acepta ya es otra persona → fusión explícita que confirma un admin** (Marco, 14-10, ADR-107). Hoy la invitación se acepta y el dossier queda sin enlazar; la fusión reescribe el `person_id` de reparto, compromisos y notas. Plan antes de código.
 
