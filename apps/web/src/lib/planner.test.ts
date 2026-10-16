@@ -35,6 +35,7 @@ describe('normalizePlannerView', () => {
     ['month', 'month'],
     ['agenda', 'agenda'],
     ['board', 'board'],
+    ['overview', 'overview'],
   ])('%s passes through', (raw, want) => {
     expect(normalizePlannerView(raw)).toBe(want);
   });
@@ -1097,25 +1098,18 @@ describe('awayBands', () => {
   });
 });
 
-describe('resolvePlannerView', () => {
-  it('explicit ?view= wins over everything', () => {
-    expect(resolvePlannerView('agenda', 'month', false)).toBe('agenda');
-    expect(resolvePlannerView('month', 'agenda', true)).toBe('month');
+describe('resolvePlannerView (ADR-117)', () => {
+  it('an explicit view wins', () => {
+    expect(resolvePlannerView('agenda')).toBe('agenda');
+    expect(resolvePlannerView('month')).toBe('month');
+    expect(resolvePlannerView('overview')).toBe('overview');
+    expect(resolvePlannerView('carrils')).toBe('board');
   });
 
-  it('stored preference wins over form factor', () => {
-    expect(resolvePlannerView(null, 'agenda', false)).toBe('agenda');
-    expect(resolvePlannerView(undefined, 'month', true)).toBe('month');
-  });
-
-  it('falls back to form factor: narrow = agenda, wide = month', () => {
-    expect(resolvePlannerView(null, null, true)).toBe('agenda');
-    expect(resolvePlannerView(null, null, false)).toBe('month');
-  });
-
-  it('garbage at either level falls through, never breaks', () => {
-    expect(resolvePlannerView('week', 'grid', false)).toBe('month');
-    expect(resolvePlannerView('week', 'agenda', false)).toBe('agenda');
+  it('no view, or an unknown one, opens the season overview', () => {
+    expect(resolvePlannerView(null)).toBe('overview');
+    expect(resolvePlannerView(undefined)).toBe('overview');
+    expect(resolvePlannerView('week')).toBe('overview');
   });
 });
 

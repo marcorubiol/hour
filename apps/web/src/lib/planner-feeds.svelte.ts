@@ -184,6 +184,15 @@ export interface PlannerFeedInputs {
   selectedDay: () => string;
   /** Viewer-tz day key for "today" — constant for the page's lifetime. */
   todayIso: string;
+  /** The season overview's strip (ADR-117): Monday of this week → twelve
+      weeks on. Constant for the page's lifetime, like today. */
+  seasonFrom: string;
+  seasonTo: string;
+}
+
+/** Views that read a window of their own instead of the month grid's. */
+function onOwnWindow(view: PlannerView): boolean {
+  return view === 'agenda' || view === 'board' || view === 'overview';
 }
 
 export function createPlannerFeeds(inputs: PlannerFeedInputs) {
@@ -203,7 +212,7 @@ export function createPlannerFeeds(inputs: PlannerFeedInputs) {
       queryKey: ['planner-performances', k] as const,
       // Agenda has its own multi-month feed (below); don't double-fetch the
       // grid window while it is showing.
-      enabled: inputs.view() !== 'agenda' && inputs.view() !== 'board' && !k.unresolved,
+      enabled: !onOwnWindow(inputs.view()) && !k.unresolved,
       queryFn: ({ signal }: { signal: AbortSignal }) =>
         fetchJSON<{ items: PerformanceEvent[] }>(
           `/api/performances?status=any&rosters=1&notice=1&${feedParams(k, k.from, k.to)}`,
@@ -219,7 +228,7 @@ export function createPlannerFeeds(inputs: PlannerFeedInputs) {
     const k = feedKey;
     return {
       queryKey: ['planner-dates', k] as const,
-      enabled: inputs.view() !== 'agenda' && inputs.view() !== 'board' && !k.unresolved,
+      enabled: !onOwnWindow(inputs.view()) && !k.unresolved,
       queryFn: ({ signal }: { signal: AbortSignal }) =>
         fetchJSON<{ items: DateEvent[] }>(
           `/api/dates?${feedParams(k, addDaysIso(k.from, -1), addDaysIso(k.to, 1))}`,
@@ -237,7 +246,7 @@ export function createPlannerFeeds(inputs: PlannerFeedInputs) {
     const k = feedKey;
     return {
       queryKey: ['planner-availability', { from: k.from, to: k.to }] as const,
-      enabled: inputs.view() !== 'agenda' && inputs.view() !== 'board' && !k.unresolved,
+      enabled: !onOwnWindow(inputs.view()) && !k.unresolved,
       queryFn: async ({ signal }: { signal: AbortSignal }) => {
         try {
           return await fetchJSON<{ items: AvailabilityItem[]; absent?: boolean }>(
@@ -430,7 +439,70 @@ export function createPlannerFeeds(inputs: PlannerFeedInputs) {
     };
   });
 
+  // ── Season feeds (ADR-117) — the overview's twelve weeks. Paged like the
+  // book (the window is wider than one page of 200 at a busy company). The
+  // performances join the `calendar-performances` family on purpose: the
+  // overview confirms a hold in place, and the decide mutation's optimistic
+  // write and invalidate reach every member of that family. ──────────────
+  const seasonKey = $derived({
+    from: inputs.seasonFrom,
+    to: inputs.seasonTo,
+    unresolved: inputs.scopeUnresolved(),
+    ...inputs.filterIds(),
+  });
+  const seasonPerfOptions = toStore(() => {
+    const k = seasonKey;
+    return {
+      queryKey: ['calendar-performances', { window: 'season', ...k }] as const,
+      enabled: inputs.view() === 'overview' && !k.unresolved,
+      queryFn: ({ signal }: { signal: AbortSignal }) =>
+        pagedFeed<PerformanceEvent>(
+          (from) => `/api/performances?status=any&rosters=1&notice=1&${feedParams(k, from, k.to)}`,
+          (p) => p.performed_at.slice(0, 10),
+          k.from,
+          signal,
+        ),
+    };
+  });
+  const seasonDatesOptions = toStore(() => {
+    const k = seasonKey;
+    return {
+      queryKey: ['planner-season-dates', k] as const,
+      enabled: inputs.view() === 'overview' && !k.unresolved,
+      queryFn: ({ signal }: { signal: AbortSignal }) =>
+        pagedFeed<DateEvent>(
+          // Same ±1-day pad as the other dates feeds (tz bucketing at edges).
+          (from) => `/api/dates?${feedParams(k, addDaysIso(from, -1), addDaysIso(k.to, 1))}`,
+          (d) => d.starts_at.slice(0, 10),
+          k.from,
+          signal,
+        ),
+    };
+  });
+  const seasonAvailabilityOptions = toStore(() => {
+    const k = seasonKey;
+    return {
+      queryKey: ['planner-season-availability', { from: k.from, to: k.to }] as const,
+      enabled: inputs.view() === 'overview' && !k.unresolved,
+      queryFn: async ({ signal }: { signal: AbortSignal }) => {
+        try {
+          return await fetchJSON<{ items: AvailabilityItem[]; absent?: boolean }>(
+            `/api/availability?from=${k.from}&to=${k.to}&limit=500`,
+            signal,
+          );
+        } catch (err) {
+          if (err instanceof Error && err.message === 'Unauthorized') throw err;
+          console.warn('[calendar] season availability feed absent:', err);
+          return { items: [] as AvailabilityItem[], absent: true };
+        }
+      },
+    };
+  });
+
   return {
+    seasonPerfQuery: createQuery(seasonPerfOptions),
+    seasonDatesQuery: createQuery(seasonDatesOptions),
+    seasonAvailabilityQuery: createQuery(seasonAvailabilityOptions),
     perfQuery: createQuery(perfOptions),
     datesQuery: createQuery(datesOptions),
     availabilityQuery: createQuery(availabilityOptions),

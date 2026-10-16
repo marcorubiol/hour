@@ -3831,3 +3831,31 @@ recomendada de cada sección y se ajusta después de usarla.
 5. **Se enfría:** 21 días sin respuesta a nuestro correo; 30 sin actividad en una conversación abierta.
 6. «Por cobrar» en Cuentas es solo lo facturado y no cobrado; lo contratado sin facturar va a la barra de temporada.
 7. Primera versión sin migraciones donde se pueda; los valores de 3 a 5 son un punto de partida para ajustar con uso.
+
+## [2026-10-16] ADR-119 · Planner: la Temporada como portada, lo que el código obligó a decidir
+
+**Contexto.** ADR-117 §2 manda la vista «Temporada» como portada del Planner, con horizonte de 12 semanas desde hoy y
+la nav abriendo siempre en ella. Al construirla (rama `claude/dash-planner`) salieron decisiones que la propuesta no
+cerraba.
+
+**Decisión.**
+1. **El motor sale de la página.** Conflictos, giras deducidas, censo y cola de decisiones viven en
+   `$lib/planner-engine.svelte.ts` con la ventana como entrada (el mes, o la temporada). Mismo comportamiento: los E2E
+   del Planner dan los mismos verdes y rojos con el código anterior y el nuevo contra la misma base.
+2. **La vista se resuelve solo por la URL.** `?view=` explícito gana; todo lo demás abre `overview`. Se quitan la vista
+   recordada en `localStorage` y el defecto por ancho (supera ADR-078 §10 en esa parte). Una URL sin `view` que llega
+   estando ya en el Planner (la nav) también vuelve a la Temporada.
+3. **La tira empieza el lunes de esta semana.** Los días ya pasados de la primera fila se dibujan atenuados y no
+   cuentan: el censo va de hoy al domingo de la fila 12.
+4. **Un choque «posible» (sin datos de equipo) no es un choque** en la portada: no lleva punto rojo, no se lista en
+   «Choques» ni cuenta en las cifras. Sigue en la cola de «Por decidir» cuando son dos opciones.
+5. **«¿Viaje?» se deduce comparando la ciudad de la función con `workspace.city`**, y se da por cubierto si cae en una
+   gira deducida o hay un `travel_day` del mismo proyecto a un día o menos. Va en voz de inferencia (`.guess`, borde
+   punteado) y nunca cuenta como «sin cerrar». Sin ciudad del espacio no se deduce nada.
+6. **El feed de funciones de la temporada pertenece a la familia `calendar-performances`**, para que confirmar una
+   opción desde la portada actualice la tira con el mismo optimista e invalidate que el cajón.
+7. **Sin flechas ni «Ahora» en la Temporada**: es un horizonte desde hoy, no una ventana que se mueve. El teclado sigue
+   el orden de las palabras: `1` es la Temporada.
+
+**Re-evaluar cuando** haya coordenadas en `place`/`venue` (el viaje deja de ser deducido) o cuando Marco la use una
+temporada real de difusión (umbral de huecos, 8 semanas de «sin cerrar»).
