@@ -444,6 +444,7 @@
 
 ## Producto — después
 
+- [ ] **Cada espacio activa o desactiva las tres lentes (Planner, Conversations, Cuentas)**: un admin lo decide en Ajustes, y una lente apagada desaparece de la navegación, de ⌘K y de las puertas de Desk, sin borrar datos. Abierto: si además cada persona puede ocultarse una lente para sí. (drop 16-10, sin estimar)
 - [ ] **Alta de persona: la cuenta que acepta ya es otra persona → fusión explícita que confirma un admin** (Marco, 14-10, ADR-107). Hoy la invitación se acepta y el dossier queda sin enlazar; la fusión reescribe el `person_id` de reparto, compromisos y notas. Plan antes de código.
 
 - [ ] **Directorio global de salas: lo que sigue a la fase 1** (la fase 1 está en producción desde el 2026-10-10, ver CHANGELOG; aquí quedan las decisiones para las fases siguientes). **Directorio global de salas desde bases públicas (Marco, 10-10).** Que una
