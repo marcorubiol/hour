@@ -8,6 +8,13 @@
  * Anti-CRM vocabulary (reset v2 enum, 2026-04-19): status defaults to
  * `contacted`. Pass `status=any` to disable status filtering.
  *
+ * Each row carries `last_turn` (its last directional email, message or call),
+ * so the list can say whose turn it is (ADR-117). The dashboard filters
+ * (`turno=nuestro|suyo`, `temp=caliente|fria`, `temporada=actual`, with
+ * `line_ids` for the season) are derived, not columns: the scope is read and
+ * filtered with `$lib/conversation-overview` (the same rules as the blocks),
+ * in the block's order, and only the page is read in full.
+ *
  * Auth: Bearer JWT required. RLS denies anon.
  */
 
@@ -25,6 +32,8 @@ import {
 } from '$lib/conversation';
 import { PostgrestError, pgGet, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
+import { LAST_TURN_EMBED, loadOverviewRows, setLastTurnEmbed, setScope } from '$lib/server/conversation-overview';
+import { applyListFilter, hasListFilter, type ListFilter } from '$lib/conversation-overview';
 
 const QuerySchema = v.object({
   status: v.optional(
@@ -37,6 +46,10 @@ const QuerySchema = v.object({
   line_id: v.optional(v.pipe(v.string(), v.uuid())),
   q: v.optional(v.pipe(v.string(), v.trim(), v.maxLength(120))),
   season: v.optional(v.string(), 'any'),
+  turno: v.optional(v.picklist(['nuestro', 'suyo'])),
+  temp: v.optional(v.picklist(['caliente', 'fria'])),
+  temporada: v.optional(v.literal('actual')),
+  line_ids: v.optional(v.string()),
   limit: v.optional(
     v.pipe(
       v.string(),
@@ -98,7 +111,7 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
       400,
     );
   }
-  const { status, project_slug, project_ids, workspace_ids, line_id, q, season, limit, offset } =
+  const { status, project_slug, project_ids, workspace_ids, line_id, q, season, limit, offset, turno, temp, temporada, line_ids } =
     parsed.output;
 
   const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -114,7 +127,7 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
   // runs over the organization and every contact (ADR-102) through the
   // `conversation_search` RPC, which returns conversation rows: the same
   // embeds, filters and order apply.
-  let select = CONVERSATION_SELECT;
+  let select = `${CONVERSATION_SELECT},${LAST_TURN_EMBED}`;
   if (project_slug) {
     select = select.replace('project:project_id(', 'project:project_id!inner(');
   }
@@ -138,6 +151,31 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
 
   if (status !== 'any') search.set('status', `eq.${status}`);
   if (season !== 'any') search.set('custom_fields->>season', `eq.${season}`);
+
+  setLastTurnEmbed(search);
+
+  const listFilter = { turno, temp, temporada: temporada === 'actual' || undefined };
+  if (hasListFilter(listFilter)) {
+    // The derived filters only exist for the global lens: project and line
+    // modules keep their own params (project_slug, line_id, season).
+    if (project_slug || line_id || season !== 'any') return json({ error: 'invalid_query', hint: 'turno/temp/temporada go with project_ids/workspace_ids only.' }, 400);
+    try {
+      return json(
+        await filteredPage(env, jwt, search, {
+          projectIds,
+          workspaceIds,
+          lineIds: parseIds(line_ids),
+          status: status === 'any' ? undefined : status,
+          q: qTrim,
+          filter: listFilter,
+          limit,
+          offset,
+        }),
+      );
+    } catch (err) {
+      return pgErrorResponse(err, { route: 'GET /api/conversations', requestId: locals.requestId }, { passUpstream: [401, 403] });
+    }
+  }
 
   search.set('order', 'next_action_at.asc.nullslast,updated_at.desc');
   search.set('limit', String(limit));
@@ -165,6 +203,55 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
     );
   }
 };
+
+/**
+ * A page of a derived filter: the scope's rows filtered and ordered by the
+ * dashboard rules, then the page's rows read in full (at most `limit` ids).
+ * A search narrows the set through the same RPC as the plain list.
+ */
+async function filteredPage(
+  env: SupabaseEnv,
+  jwt: string,
+  pageSearch: URLSearchParams,
+  o: {
+    projectIds: string[];
+    workspaceIds: string[];
+    lineIds: string[];
+    status?: (typeof CONVERSATION_STATUSES)[number];
+    q: string;
+    filter: ListFilter;
+    limit: number;
+    offset: number;
+  },
+) {
+  const rows = await loadOverviewRows(env, jwt, { projectIds: o.projectIds, workspaceIds: o.workspaceIds, status: o.status });
+  let matched = applyListFilter(rows, o.filter, new Date(), o.lineIds);
+  if (o.q) {
+    const search = new URLSearchParams({ select: 'id', p_q: o.q, deleted_at: 'is.null', limit: '5000' });
+    setScope(search, o.projectIds, o.workspaceIds);
+    const { data } = await pgGet<{ id: string }>(env, 'rpc/conversation_search', jwt, { search });
+    const hits = new Set(data.map((r) => r.id));
+    matched = matched.filter((r) => hits.has(r.id));
+  }
+  const ids = matched.slice(o.offset, o.offset + o.limit).map((r) => r.id);
+  let items: ConversationDbItem[] = [];
+  if (ids.length > 0) {
+    const search = new URLSearchParams({ select: pageSearch.get('select')!, id: `in.(${ids.join(',')})` });
+    setLastTurnEmbed(search);
+    const order = new Map(ids.map((id, i) => [id, i]));
+    items = (await pgGet<ConversationDbItem>(env, 'conversation', jwt, { search })).data.sort(
+      (a, b) => order.get(a.id)! - order.get(b.id)!,
+    );
+  }
+  return {
+    total: matched.length,
+    limit: o.limit,
+    offset: o.offset,
+    status: o.status ?? 'any',
+    season: 'any',
+    items: items.map(normalizeConversationItem),
+  };
+}
 
 /**
  * POST /api/conversations — capture a contact/conversation (ADR-051).

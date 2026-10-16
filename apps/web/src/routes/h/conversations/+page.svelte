@@ -19,6 +19,11 @@
    * Two projections (ADR-106, patrón ADR-076), neither secondary: «con quién
    * hablas» (this list, difusión) and «de qué se habla» (`?view=threads`, the
    * internal threads the viewer can read, ThreadFeed; ADR-116). Same scope.
+   *
+   * «Con quién hablas» opens on its dashboard (ADR-117, propuesta A): the
+   * ConversationOverview blocks above the list. Each block is a filter of the
+   * list, carried in the URL (`?turno=`, `?temp=`, `?temporada=actual`) and
+   * shown as a removable chip; «Escribir a estas» preloads the selection.
    */
 
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
@@ -31,11 +36,21 @@
   import Checkbox from '$lib/components/Checkbox.svelte';
   import Dialog from '$lib/components/Dialog.svelte';
   import ConversationTable from '$lib/components/ConversationTable.svelte';
+  import ConversationOverview from '$lib/components/ConversationOverview.svelte';
+  import Chip from '$lib/components/Chip.svelte';
+  import { tick } from 'svelte';
+  import { parseListFilter } from '$lib/conversation-overview';
   import ThreadFeed from '$lib/components/ThreadFeed.svelte';
   import Input from '$lib/components/Input.svelte';
   import Select from '$lib/components/Select.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
-  import { CONVERSATION_STATUSES, conversationWhoBody, statusLabel, type ConversationItem } from '$lib/conversation';
+  import {
+    CONVERSATION_STATUSES,
+    conversationWhoBody,
+    statusLabel,
+    type ConversationItem,
+    type ConversationStatus,
+  } from '$lib/conversation';
   import { appLocale, t } from '$lib/i18n';
   import { organizationNames, organizationsQueryOptions } from '$lib/organizations';
   import { usePins } from '$lib/stores/pins.svelte';
@@ -115,6 +130,50 @@
   });
 
   let statusFilter = $state('any');
+
+  // ── Dashboard filters (ADR-117): in the URL, so a block's link is the filter ──
+  let listFilter = $derived(parseListFilter(page.url.searchParams));
+  let lineIds = $derived(scope.lines.map((l) => l.id));
+  let filterChip = $derived(
+    listFilter.turno === 'nuestro'
+      ? t('overview.due', locale)
+      : listFilter.turno === 'suyo'
+        ? t('overview.turn_theirs_cap', locale)
+        : listFilter.temp === 'caliente'
+          ? t('overview.hot', locale)
+          : listFilter.temp === 'fria'
+            ? t('overview.cold', locale)
+            : listFilter.temporada
+              ? t('overview.this_season', locale)
+              : null,
+  );
+
+  function clearListFilter() {
+    const params = new URLSearchParams(page.url.searchParams);
+    for (const k of ['turno', 'temp', 'temporada']) params.delete(k);
+    const qs = params.toString();
+    void goto(`${page.url.pathname}${qs ? `?${qs}` : ''}`, { noScroll: true, keepFocus: true });
+  }
+
+  async function showList() {
+    await tick();
+    document.getElementById('lista')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  /** A season segment: that status, in the season (and the pinned lines). */
+  async function filterSeasonStatus(status: ConversationStatus) {
+    statusFilter = status;
+    await goto('?temporada=actual', { noScroll: true, keepFocus: true });
+    await showList();
+  }
+
+  /** «Escribir a estas»: the cooling list, already picked, ready for «Escribir a N». */
+  async function writeTo(picks: { id: string; project_id: string }[]) {
+    picking = true;
+    picked = picks;
+    await goto('?temp=fria', { noScroll: true, keepFocus: true });
+    await showList();
+  }
   let statusOptions = [
     { value: 'any', label: t('conversations.all_statuses', locale) },
     ...CONVERSATION_STATUSES.map((s) => ({ value: s, label: statusLabel(s, locale) })),
@@ -129,6 +188,8 @@
     workspaceIds: filterIds.workspaceIds,
     q: q || undefined,
     status: statusFilter,
+    ...listFilter,
+    lineIds,
     enabled: !scopeUnresolved,
   });
 
@@ -362,7 +423,7 @@
 
   // ── Selection → mailout (plan § 10) ───────────────────────────────────
   let picking = $state(false);
-  let picked = $state<ConversationItem[]>([]);
+  let picked = $state<Pick<ConversationItem, 'id' | 'project_id'>[]>([]);
   let pickedProjects = $derived([...new Set(picked.map((c) => c.project_id))]);
 
   function togglePicking() {
@@ -426,6 +487,17 @@
       {locale}
     />
   {:else}
+    <ConversationOverview
+      filters={{ projectIds: filterIds.projectIds, workspaceIds: filterIds.workspaceIds, lineIds, enabled: !scopeUnresolved }}
+      {workspaceSlugById}
+      {locale}
+      onstatus={filterSeasonStatus}
+      onwrite={writeTo}
+    />
+
+    <div class="conversations__list-head block-head" id="lista">
+      <h2 class="conversations__list-title">{t('overview.list', locale)}</h2>
+    </div>
     <div class="conversations__controls">
       <div class="conversations__search">
         <Input
@@ -436,6 +508,9 @@
         />
       </div>
       <Select label={t('edit.status', locale)} options={statusOptions} bind:value={statusFilter} />
+      {#if filterChip}
+        <Chip selected onRemove={clearListFilter} removeLabel={t('overview.clear_filter', locale)}>{filterChip}</Chip>
+      {/if}
       <Button size="s" onclick={openAdd}>{t('conversations.add', locale)}</Button>
       <Button size="s" variant="outline" onclick={togglePicking}>
         {picking ? t('mailout.pick_done', locale) : t('mailout.pick', locale)}
@@ -447,6 +522,7 @@
       {personHref}
       {conversationHref}
       groupable
+      turnColumn
       importEmptyState
       selectable={picking}
       bind:selected={picked}
@@ -565,6 +641,18 @@
       gap: var(--space-m);
       align-items: end;
       flex-wrap: wrap;
+    }
+
+    .conversations__list-head {
+      scroll-margin-block-start: var(--space-l);
+      margin-block-start: var(--space-m);
+    }
+    .conversations__list-title {
+      font-family: var(--font-display);
+      font-size: var(--text-l);
+      font-weight: 400;
+      font-style: italic;
+      color: var(--heading-color);
     }
 
     .conversations__search {
