@@ -7,21 +7,28 @@
    * read from the route so a direct URL visit highlights correctly; picking
    * one sets the lens store (instant feedback) and navigates.
    */
+  import { createQuery } from '@tanstack/svelte-query';
   import { page } from '$app/state';
   import { goto } from '$app/navigation';
   import { useLens, type Lens } from '$lib/stores/lens.svelte';
   import { detectLocale, t } from '$lib/i18n';
+  import { moneyAccessAnyQueryOptions } from '$lib/bolo-queries';
 
   const lens = useLens();
   const locale = detectLocale(navigator.language);
 
   // Desk is the home/digest, not a peer lens (grill 2026-07-23): it gets its own
   // pill; the segmented "view as" holds only the three concern lenses.
-  const VIEW_AS: { id: Lens; label: string }[] = [
+  // Cuentas only for whoever reads money in some project (ADR-117). Until the
+  // answer lands it shows, so the lens does not blink for those who have it.
+  const moneyAccess = createQuery(moneyAccessAnyQueryOptions());
+  let VIEW_AS = $derived<{ id: Lens; label: string }[]>([
     { id: 'planner', label: t('lens.planner', locale) },
     { id: 'conversations', label: t('lens.conversations', locale) },
-    { id: 'books', label: t('lens.money', locale) },
-  ];
+    ...($moneyAccess.data?.read_money === false && !$moneyAccess.isPending
+      ? []
+      : [{ id: 'books' as const, label: t('lens.money', locale) }]),
+  ]);
 
   let active = $derived((page.url.pathname.split('/')[2] ?? 'desk') as Lens);
 

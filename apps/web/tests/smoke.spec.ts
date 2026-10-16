@@ -62,9 +62,8 @@ test.describe('smoke', () => {
     // never in the path.
     await page.goto('/h/books');
     await waitForLoaded(page);
-    await expect(page.locator('.mny__totals')).toBeVisible();
-    // Books header leads with Vendido/sold now (grill ADR-088); pipeline is demoted.
-    await expect(page.locator('.mny__total').first()).toContainText(/sold/);
+    // Books opens on its collection radar (ADR-117): the ledger is always there.
+    await expect(page.locator('#mny-ledger')).toBeVisible();
 
     // Old space-scoped lens bookmarks 308 to the space-less lens.
     await page.goto('/h/playwright/desk');

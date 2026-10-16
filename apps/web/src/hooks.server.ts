@@ -150,6 +150,15 @@ const legacyVocabRedirects: Handle = async ({ event, resolve }) => {
     return Response.redirect(dest.toString(), 301);
   }
 
+  // Cuentas route (ADR-118): /h/money and /h/[ws]/money → /h/books, query kept.
+  // The #bolo-<id> anchor never reaches the server; the browser carries it
+  // across the 301. Client-side navigations land on routes/h/money/+page.ts.
+  if (/^\/h(\/[^/]+)?\/money\/?$/.test(path)) {
+    const dest = new URL('/h/books', event.url);
+    dest.search = event.url.search;
+    return Response.redirect(dest.toString(), 301);
+  }
+
   return resolve(event);
 };
 

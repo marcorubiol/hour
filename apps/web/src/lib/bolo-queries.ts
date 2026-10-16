@@ -42,6 +42,23 @@ export function moneyAccessQueryOptions(projectId: string, enabled = true) {
   };
 }
 
+/**
+ * ¿Lee dinero en ALGÚN proyecto? La puerta de la lente Cuentas (ADR-117): el
+ * selector de lentes la esconde y la lente dice «no tienes acceso» en vez de
+ * «no hay bolos». Solo un «no» explícito esconde: mientras no responde, o si
+ * falla, la lente se pinta (quien la tiene no la ve parpadear ni desaparecer
+ * por un fallo de red; los datos siguen gateados por las RPC).
+ */
+export function moneyAccessAnyQueryOptions() {
+  return {
+    queryKey: ['money-access', 'any'] as const,
+    retry: false,
+    staleTime: 5 * 60_000,
+    queryFn: ({ signal }: { signal: AbortSignal }) =>
+      fetchJSON<{ read_money: boolean }>('/api/money/access', signal),
+  };
+}
+
 export function performanceBoloQueryOptions(performanceId: string, enabled = true) {
   return {
     queryKey: ['money-bolos', 'performance', performanceId] as const,
