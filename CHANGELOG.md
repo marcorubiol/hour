@@ -6,6 +6,7 @@ hasta entonces, sacado de esos documentos; lo anterior a julio de 2026 está sol
 
 ## Octubre 2026 (en curso)
 
+- Conversations tiene una segunda vista, «De qué se habla»: los hilos del equipo que puedes leer (el tablón de cada bolo y el hilo de cada conversación), con los que tienen mensajes nuevos arriba. Cada fila abre la función con su tablón o la conversación con su hilo. (2026-10-15, `0181d26`)
 - En Conversations, «Seleccionar» marca varias salas de un proyecto y «Escribir a N» abre un envío de difusión: asunto y texto con {nombre}, {sala} y {ciudad}, vista previa sala a sala con la firma y el pie, «Enviarme una prueba» y «Enviar a N». Cada correo enviado queda en el registro de su conversación, y quien lo recibe puede darse de baja con un clic. De momento en modo de prueba: no sale ningún correo real. (2026-10-15, `123ca68`)
 - En Ajustes, Correo, un admin da de alta el dominio de envío de la compañía: Hour enseña los registros DNS que hay que publicar, «Comprobar» dice si está verificado y el remitente (por defecto difusion@ y el nombre de la compañía) se cambia ahí. De momento en modo de prueba: no sale ningún correo real. (2026-10-15, `e706233`)
 - En la ficha de una persona, cada conversación abre la conversación. Y la interfaz en inglés ya no habla de «pipeline» ni de «leads»: dice «in progress», «notice» y «Outreach tracking». (2026-10-15, `6248c06`)

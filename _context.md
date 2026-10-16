@@ -33,16 +33,16 @@ de Phase 0.9 en `_tasks.md`. Pricing orientativo, no decidido.
 
 ## Producción (verificado 2026-10-14, tarde)
 
-- Web `https://hour.zerosense.studio`, Worker `hour-web`. `/health/live`: SHA **`123ca68`**, `dirty:false`, builtAt
-  2026-10-15T07:53Z (fase 3 del envío en bloque, contra el simulado; crons `*/10` sincronización y `* * * * *` cola de envíos). `main` == prod salvo documentos y tests.
+- Web `https://hour.zerosense.studio`, Worker `hour-web`. `/health/live`: SHA **`0181d26`**, `dirty:false`, builtAt
+  2026-10-15T18:24Z (hilos fase 4, «de qué se habla» en Conversations, sobre el envío en bloque fase 3; crons `*/10` sincronización y `* * * * *` cola de envíos). `main` == prod salvo documentos y tests.
 - Despliegue: `pnpm --filter web run deploy` (no `pnpm deploy` desde la raíz). Exige árbol limpio.
 - Supabase `hour-phase0` · ref `lqlyorlccnniybezugme` · `eu-central-1`. Plan Free, con keepalive diario
   (`.github/workflows/keepalive.yml`) contra la pausa por inactividad. Pasar a Pro antes de la beta, aún no
   (`_tasks.md § 9`). Si algo de Supabase falla tras días sin uso, lo primero es `dig <ref>.supabase.co`.
-- **Última migración aplicada: `20261016100000_mailout_send`** (2026-10-15, run 38695438320; backup 38693552748, plan 38693809082): envío en bloque, fase 3 (ADR-115). Antes, `20261015100000_mailout` (ADR-112). El acceso es solo `membership` + `membership_facet` (ADR-105). Las migraciones van por `production-migrate.yml`: backup, plan, apply (`_notes/tasks-archive.md § 34`).
+- **Última migración aplicada: `20261017100000_thread_feed`** (2026-10-15, run 38785289613; backup 38784650789, plan 38785194853): RPC de lectura de hilos (ADR-116). Antes, `20261016100000_mailout_send` (ADR-115). El acceso es solo `membership` + `membership_facet` (ADR-105). Las migraciones van por `production-migrate.yml`: backup, plan, apply (`_notes/tasks-archive.md § 34`).
 - `hour-staging` (ref `slccyknqpgmzhyiyclsq`, `eu-west-1`): reconstruido el 2026-10-13 con el contract de permisos
   (run 38469017859: RLS 309/313, smoke 2/2). Se volverá a pausar sin uso.
-- Últimas suites contra producción (2026-10-15, `123ca68`): RLS 371/371 sin saltados (en serie, `--no-file-parallelism`); E2E 73/73. **Nunca la RLS y el E2E a la vez:** los dos cambian y restauran el acceso de `limited@hour.test` y uno fotografía el estado del otro (el 2026-10-15 la dejó en Coordinació y salieron 10 rojos; se devolvió a mano al estado del runbook `test-user-setup.md`).
+- Últimas suites contra producción (2026-10-16, `0181d26`): RLS 380/380 sin saltados (en serie, `--no-file-parallelism`); E2E 76/76. Una caída de DNS da rojos sueltos en ficheros sin relación: comprobar `host <ref>.supabase.co` y repetir. **Nunca la RLS y el E2E a la vez:** los dos cambian y restauran el acceso de `limited@hour.test` y uno fotografía el estado del otro (el 2026-10-15 la dejó en Coordinació y salieron 10 rojos; se devolvió a mano al estado del runbook `test-user-setup.md`).
 - Desde el checkout principal (`~/Developer/hour`), nunca desde un worktree: los worktrees no llevan `.env` ni
   `.env.test` (RLS sale saltado, el login del E2E falla).
 - `pnpm --filter web test:rls`: siempre contra producción; carga `.env` + `.env.test` y no mira `.env.local`.
