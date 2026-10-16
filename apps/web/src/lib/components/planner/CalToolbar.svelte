@@ -45,8 +45,9 @@
     onBlackout: () => void;
   }
 
-  /** The order the design fixes, and the order the keys follow. */
-  const VIEW_ORDER = ['day', 'agenda', 'month', 'board'] as const;
+  /** The order the design fixes, and the order the keys follow. The season
+      overview (ADR-117) is the portada, so it opens the row. */
+  const VIEW_ORDER = ['overview', 'day', 'agenda', 'month', 'board'] as const;
 
   let {
     view,
@@ -98,6 +99,9 @@
        acts wearing one label — the one defect in this band that can lose
        somebody their place without telling them why. `Now` moves the window;
        `Today` names a drawing, like Agenda, Month and Board do. -->
+  <!-- The season is a horizon from today: it has no window to step, so its
+       row opens with the view words. -->
+  {#if view !== 'overview'}
   <span class="cal__nav">
     <button
       type="button"
@@ -116,6 +120,7 @@
   </span>
   <button type="button" class="cal__now" onclick={onNow}>{t('planner.now', locale)}</button>
   <span class="cal__sep" aria-hidden="true"></span>
+  {/if}
   <div class="cal__views" role="group" aria-label={t('planner.view_label', locale)}>
     {#each VIEW_ORDER as v (v)}
       <button

@@ -109,28 +109,36 @@
   import {
     addDaysIso,
     addMonths,
-    awayBands,
-    conflictsFor,
+    daysCoveredBy,
     dayKeyInTz,
-    decisionsFor,
     monthGrid,
     resolvePlannerView,
-    type PlannerEvent,
     type PlannerView,
     type Conflict,
-    type DecisionPerformance,
     type DecisionSide,
     normalizePlannerView,
-    nightsFree,
-    daysCoveredBy,
     statusWord as statusWordIn,
   } from '$lib/planner';
   import { buildPersonScope } from '$lib/people';
   import { createPlannerFeeds, primeAgendaWindow } from '$lib/planner-feeds.svelte';
+  import { createPlannerEngine } from '$lib/planner-engine.svelte';
+  import SeasonOverview, {
+    type SeasonAwayVM,
+    type SeasonCellVM,
+    type SeasonGapVM,
+    type SeasonUnclosedVM,
+  } from '$lib/components/planner/SeasonOverview.svelte';
+  import {
+    UNCLOSED_WEEKS,
+    cellMark,
+    gapWindows,
+    seasonWindow,
+    unclosed as unclosedOf,
+    type SeasonCellIn,
+  } from '$lib/season';
   import { normalizeLaneAxis, resolveLaneAxis, type LaneAxis } from '$lib/carrils';
   import type { AvailabilityItem } from '$lib/availability';
-  import type { DateRow } from '$lib/date';
-  import { localeDayMonth, localeWeekdayShort, timeInTz, hourMark, dualTime } from '$lib/datetime';
+  import { localeDayMonth, localeWeekdayShort, dualTime } from '$lib/datetime';
   import {
     isHoldStatus,
     performanceStatusFamily,
@@ -240,22 +248,12 @@
   // died 2026-08-03: every way the window grows now goes through the
   // probes, so the book never mints a month the plan does not contain.
 
-  // ── Projection (ADR-076 + ADR-078 §10) ───────────────────────────────
-  // Resolution: explicit ?view= → localStorage (per device) → form factor.
-  const VIEW_STORAGE_KEY = 'hour:calendar:view';
-  function storedView(): string | null {
-    try {
-      return localStorage.getItem(VIEW_STORAGE_KEY);
-    } catch {
-      return null;
-    }
-  }
+  // ── Projection (ADR-117) ───────────────────────────────────────────────
+  // Explicit ?view= wins; anything else opens the season overview. The
+  // drawing you pick lives in the URL of that visit only: a portada that
+  // remembered the last drawing would stop being the portada on day two.
   let view = $state<PlannerView>(
-    resolvePlannerView(
-      new URL(location.href).searchParams.get('view'),
-      storedView(),
-      matchMedia('(max-width: 640px)').matches,
-    ),
+    resolvePlannerView(new URL(location.href).searchParams.get('view')),
   );
   // The Board's lane axis (ADR-094, ADR-095 §9) — same persistence chain
   // as the projection: ?lanes= → localStorage → 'scope'. The dial says
@@ -299,7 +297,7 @@
     if (view === 'board') url.searchParams.set('lanes', laneAxis);
     else url.searchParams.delete('lanes');
     // A horizon has no month: the two book-window drawings carry no ym.
-    if (view === 'agenda' || view === 'board') url.searchParams.delete('ym');
+    if (view === 'agenda' || view === 'board' || view === 'overview') url.searchParams.delete('ym');
     else url.searchParams.set('ym', `${ym.year}-${String(ym.month).padStart(2, '0')}`);
     if (view === 'day') url.searchParams.set('d', dayIso ?? todayIso);
     else url.searchParams.delete('d');
@@ -309,11 +307,6 @@
   function setView(v: PlannerView) {
     if (view === v) return;
     view = v;
-    try {
-      localStorage.setItem(VIEW_STORAGE_KEY, v);
-    } catch {
-      // Storage disabled — in-session state still works.
-    }
     // The address bar is the truth: replaceState (shallow routing) never
     // updates the reactive page.url (see tests/scope-url.spec.ts), so both
     // read and write go through location.href.
@@ -335,7 +328,9 @@
   $effect(() => {
     void page.url;
     const params = new URL(location.href).searchParams;
-    const nextView = normalizePlannerView(params.get('view'));
+    // No `view` at all is the nav's door (ADR-117): it always opens the
+    // season, even when you arrive from another drawing of this page.
+    const nextView = params.has('view') ? normalizePlannerView(params.get('view')) : 'overview';
     if (nextView && nextView !== untrack(() => view)) view = nextView;
 
     const nextLanes = normalizeLaneAxis(params.get('lanes') ?? params.get('group'));
@@ -475,7 +470,12 @@
   // (grid + team + decisions window + agenda book). Reactive inputs are
   // passed as getters so the option stores keep tracking this page's
   // state; called synchronously so the query-client context resolves. ──
+  /** The overview's horizon (ADR-117): twelve weeks from today. */
+  const season = seasonWindow(todayIso);
   const {
+    seasonPerfQuery,
+    seasonDatesQuery,
+    seasonAvailabilityQuery,
     perfQuery,
     datesQuery,
     availabilityQuery,
@@ -497,12 +497,16 @@
     teamWorkspaceIds: () => ($workspacesQuery.data?.items ?? []).map((w) => w.id),
     selectedDay: () => dayIso ?? todayIso,
     todayIso,
+    seasonFrom: season.weeks[0][0],
+    seasonTo: season.to,
   });
 
   // isLoading (isPending && isFetching) — a disabled query is pending but
   // not loading, so an unresolved selection reads as empty, not stuck.
   let loading = $derived(
-    view === 'agenda' || view === 'board'
+    view === 'overview'
+      ? $seasonPerfQuery.isLoading || $seasonDatesQuery.isLoading
+      : view === 'agenda' || view === 'board'
       ? $agendaPerfQuery.isLoading || $agendaDatesQuery.isLoading
       : $perfQuery.isLoading || $datesQuery.isLoading,
   );
@@ -525,10 +529,19 @@
         $agendaAvailabilityQuery,
         $agendaNotesQuery,
         $dayNotesQuery,
+        $seasonPerfQuery,
+        $seasonDatesQuery,
+        $seasonAvailabilityQuery,
       ].some((q) => q.isLoading),
   );
   let errorMsg = $derived(
-    view === 'agenda' || view === 'board'
+    view === 'overview'
+      ? $seasonPerfQuery.error instanceof Error
+        ? $seasonPerfQuery.error.message
+        : $seasonDatesQuery.error instanceof Error
+          ? $seasonDatesQuery.error.message
+          : ''
+      : view === 'agenda' || view === 'board'
       ? $agendaPerfQuery.error instanceof Error
         ? $agendaPerfQuery.error.message
         : $agendaDatesQuery.error instanceof Error
@@ -577,16 +590,28 @@
      honest end — so switching between the two drawings keeps the loaded
      stretch. Month/Carrils-era single-month feeds stay for Month alone. */
   let onBookWindow = $derived(view === 'agenda' || view === 'board');
+  // The overview reads its own twelve weeks (ADR-117) through the same switch.
+  let onSeason = $derived(view === 'overview');
   let activePerfRows = $derived(
-    onBookWindow ? ($agendaPerfQuery.data?.items ?? []) : ($perfQuery.data?.items ?? []),
+    onSeason
+      ? ($seasonPerfQuery.data?.items ?? [])
+      : onBookWindow
+        ? ($agendaPerfQuery.data?.items ?? [])
+        : ($perfQuery.data?.items ?? []),
   );
   let activeDateRows = $derived(
-    onBookWindow ? ($agendaDatesQuery.data?.items ?? []) : ($datesQuery.data?.items ?? []),
+    onSeason
+      ? ($seasonDatesQuery.data?.items ?? [])
+      : onBookWindow
+        ? ($agendaDatesQuery.data?.items ?? [])
+        : ($datesQuery.data?.items ?? []),
   );
   let activeBlackoutRows = $derived(
-    onBookWindow
-      ? ($agendaAvailabilityQuery.data?.items ?? [])
-      : ($availabilityQuery.data?.items ?? []),
+    onSeason
+      ? ($seasonAvailabilityQuery.data?.items ?? [])
+      : onBookWindow
+        ? ($agendaAvailabilityQuery.data?.items ?? [])
+        : ($availabilityQuery.data?.items ?? []),
   );
 
   // ── The person axis (scope, never a display filter) ───────────────────
@@ -655,77 +680,28 @@
   let shownPerfs = $derived(scopedPerfs.filter(perfDrawn));
   let shownDates = $derived(scopedDates.filter(dateDrawn));
 
-  // ── Conflict engine (ADR-072 §1) — over the UNFILTERED scoped rows:
-  // hiding chips behind the status filter never hides a real clash. ─────
-  let engineEvents = $derived.by(() => {
-    const out: PlannerEvent[] = [];
-    for (const p of scopedPerfs) {
-      if (p.status === 'cancelled' || !p.project) continue;
-      out.push({
-        id: p.id,
-        day: perfDayKey(p),
-        project_id: p.project.id,
-        workspace_id: p.project.workspace_id,
-      });
-    }
-    for (const d of scopedDates) {
-      if (d.status === 'cancelled' || !d.project) continue;
-      out.push({
-        id: d.id,
-        day: dateDayKey(d, viewerTz),
-        project_id: d.project.id,
-        workspace_id: d.project.workspace_id,
-      });
-    }
-    return out;
+  // ── The engine (conflicts, derived tours, census, decisions queue) lives
+  // in $lib/planner-engine so the season overview reads the same answers.
+  // Over the UNFILTERED scoped rows: calm never hides a real clash. ──────
+  const engine = createPlannerEngine({
+    scopedPerfs: () => scopedPerfs,
+    scopedDates: () => scopedDates,
+    rawPerfs: () => activePerfRows,
+    rawDates: () => activeDateRows,
+    allBlackouts: () => allBlackouts,
+    visibleBlackouts: () => visibleBlackouts,
+    // The census counts what the drawing draws: the month, or the season.
+    window: () =>
+      view === 'overview'
+        ? { first: season.from, last: season.to, days: season.days }
+        : { first: monthFirst, last: monthLast, days: monthDays },
+    decisionPerfs: () => decisionPerfs,
+    viewerTz,
+    todayIso,
   });
-  let rosters = $derived.by(() => {
-    const map: Record<string, string[]> = {};
-    for (const p of scopedPerfs) {
-      if (p.person_ids) map[p.id] = p.person_ids;
-    }
-    return map;
-  });
-  /** ADR-103 — whoever said «voy»: on the event for the engine, even on a
-      date, which has no roster of its own. */
-  let committed = $derived.by(() => {
-    const map: Record<string, string[]> = {};
-    for (const row of [...scopedPerfs, ...scopedDates]) {
-      const going = (row.commitments ?? [])
-        .filter((c) => c.state === 'going')
-        .map((c) => c.person_id);
-      if (going.length > 0) map[row.id] = going;
-    }
-    return map;
-  });
-  let conflicts = $derived(conflictsFor(engineEvents, rosters, allBlackouts, committed));
-  let eventDayById = $derived(new Map(engineEvents.map((e) => [e.id, e.day])));
-
-  // ── Derived away bands (ADR-078 §6) — display-only inference. ────────
-  let ownEventDays = $derived.by(() => {
-    const map: Record<string, string[]> = {};
-    for (const e of engineEvents) {
-      (map[e.project_id] ??= []).push(e.day);
-    }
-    return map;
-  });
-  let aways = $derived.by(() => {
-    const travels: Array<
-      Pick<DateRow, 'id' | 'project_id' | 'line_id' | 'kind' | 'travel_direction' | 'starts_at'>
-    > = [];
-    for (const d of scopedDates) {
-      if (d.kind !== 'travel_day' || d.status === 'cancelled' || !d.project) continue;
-      travels.push({
-        id: d.id,
-        project_id: d.project.id,
-        line_id: d.line_id ?? null,
-        kind: 'travel_day',
-        travel_direction: d.travel_direction ?? null,
-        starts_at: d.starts_at,
-      });
-    }
-    return awayBands(travels, ownEventDays);
-  });
+  let conflicts = $derived(engine.conflicts);
+  let eventDayById = $derived(engine.eventDayById);
+  let aways = $derived(engine.aways);
 
   // ── Names for labels/cards ────────────────────────────────────────────
   let personNames = $derived.by(() => {
@@ -1672,98 +1648,17 @@
     });
   }
 
-  // ── Masthead stats — counts of the visible month, every figure a real
-  // row (ADR-078 §12; no read:money gate — nothing monetary here). ──────
-  let stats = $derived.by(() => {
-    let confirmed = 0;
-    let holds = 0;
-    for (const p of scopedPerfs) {
-      const day = perfDayKey(p);
-      if (day < monthFirst || day > monthLast) continue;
-      const family = performanceStatusFamily(p.status);
-      if (family === 'confirmed') confirmed++;
-      else if (family === 'hold') holds++;
-    }
-    let conflictCount = 0;
-    for (const c of conflicts) {
-      const day = eventDayById.get(c.event_ids[0]);
-      if (day && day >= monthFirst && day <= monthLast) conflictCount++;
-    }
-    let blackoutCount = 0;
-    for (const b of visibleBlackouts) {
-      if (b.starts_on <= monthLast && b.ends_on >= monthFirst) blackoutCount++;
-    }
-
-    /* NIGHTS FREE — inventory unsold, and the only figure here that is about
-       the business rather than the calendar.
-       Two things it must get right, and both are easy to miss:
-       · Availability IGNORES the narrowing. Nobody is free because you hid the
-         project that is occupying them — so this walks `activePerfRows` and
-         `activeDateRows`, the rows as they arrive, not `scopedPerfs`.
-       · A NIGHT ON TOUR IS NOT A FREE NIGHT: between an outbound leg and its
-         return there is nothing of its own on the calendar and still nothing
-         to sell, because the company is 1.200km from home.
-       HONEST LIMIT, written where the cost goes: with project pins set, the
-       server already filtered the unpinned rows out before they reached the
-       browser (`/api/performances` narrows by project_ids ∪ workspace_ids), so
-       what arrives is the widest set this page CAN see, not the widest that
-       exists. The counter can therefore still read high under a project pin.
-       The fix is an unfiltered availability feed — the precedent is right here
-       in this file, where blackouts are already fetched without a workspace
-       filter for exactly this reason. */
-    const occupied = new Set<string>();
-    for (const p of activePerfRows) {
-      if (p.status === 'cancelled') continue;
-      occupied.add(perfDayKey(p));
-    }
-    for (const d of activeDateRows) {
-      if (d.status === 'cancelled') continue;
-      occupied.add(dateDayKey(d, viewerTz));
-    }
-    const free = nightsFree(monthDays, occupied, daysCoveredBy(aways));
-
-    return { confirmed, holds, conflicts: conflictCount, blackouts: blackoutCount, free };
-  });
+  // ── Masthead stats — counts of the visible month ($lib/planner-engine). ──
+  let stats = $derived(engine.stats);
 
   // ── Decisions queue (ADR-080 §1/§4) — derived, nothing stored. ───────
   let decisionsAbsent = $derived(Boolean($decisionsPerfQuery.data?.absent));
   let decisionPerfs = $derived(
     ($decisionsPerfQuery.data?.items ?? []).filter((p) => perfInScope(p)),
   );
-  let decisionPerfById = $derived(new Map(decisionPerfs.map((p) => [p.id, p])));
-  let decisionRosters = $derived.by(() => {
-    const map: Record<string, string[]> = {};
-    for (const p of decisionPerfs) {
-      if (p.person_ids) map[p.id] = p.person_ids;
-    }
-    return map;
-  });
-  let decisionInput = $derived.by((): DecisionPerformance[] => {
-    const rows: DecisionPerformance[] = [];
-    for (const p of decisionPerfs) {
-      if (!p.project) continue;
-      rows.push({
-        id: p.id,
-        day: perfDayKey(p),
-        project_id: p.project.id,
-        workspace_id: p.project.workspace_id,
-        status: p.status,
-        hold_notice_days: p.hold_notice_days ?? null,
-        project: p.project.name,
-        venue: p.venue?.name ?? p.venue_name,
-        city: p.venue?.city ?? p.city,
-        time: p.start_at ? hourMark(timeInTz(p.start_at, p.venue?.timezone || viewerTz)) : null,
-      });
-    }
-    return rows;
-  });
-  let decisionQueue = $derived(
-    decisionsFor({
-      performances: decisionInput,
-      rosters: decisionRosters,
-      today: todayIso,
-    }),
-  );
+  let decisionPerfById = $derived(engine.decisionPerfById);
+  let decisionRosters = $derived(engine.decisionRosters);
+  let decisionQueue = $derived(engine.decisionQueue);
 
   function decisionOptionVM(side: DecisionSide): DecisionOptionVM {
     const perf = decisionPerfById.get(side.id);
@@ -1819,6 +1714,233 @@
     }),
   );
   let urgentCount = $derived(decisionVMs.filter((d) => d.urgent).length);
+
+  /* ── THE SEASON (ADR-117) — the portada's view models. Every row here is
+     the engine's answer over the season window (the source-switch reads the
+     season feeds while view === 'overview'); this block only shapes it for
+     SeasonOverview and translates. Off the overview it computes nothing. ── */
+  let workspaceCityById = $derived(
+    new Map(
+      ($workspacesQuery.data?.items ?? []).map((w) => [w.id, (w as { city?: string | null }).city ?? null]),
+    ),
+  );
+  let seasonTourDays = $derived(view === 'overview' ? daysCoveredBy(aways) : new Set<string>());
+  let seasonBlockDays = $derived.by(() => {
+    const out = new Set<string>();
+    if (view !== 'overview') return out;
+    for (const b of visibleBlackouts) {
+      const from = b.starts_on < season.weeks[0][0] ? season.weeks[0][0] : b.starts_on;
+      const to = b.ends_on > season.to ? season.to : b.ends_on;
+      for (let d = from; d <= to; d = addDaysIso(d, 1)) out.add(d);
+    }
+    return out;
+  });
+  /** Days with a clash worth a red dot: the engine's own marks, plus the days
+      a decision is between two holds that collide (people or double). */
+  let seasonClashDays = $derived.by(() => {
+    const out = new Set<string>();
+    for (const [day, list] of clashesByDay) if (list.some((c) => c.severity !== 'possible')) out.add(day);
+    for (const d of decisionVMs) if (d.level !== 'possible') out.add(d.day);
+    return out;
+  });
+  const MONTH_SHORT = new Intl.DateTimeFormat(localeTag, { month: 'short', timeZone: 'UTC' });
+  let seasonWeeks = $derived.by((): SeasonCellVM[][] => {
+    const perfsByDay = new Map<string, PerformanceEvent[]>();
+    const datesByDay = new Map<string, DateEvent[]>();
+    if (view === 'overview') {
+      for (const p of shownPerfs) {
+        if (p.status === 'cancelled') continue;
+        const day = perfDayKey(p);
+        (perfsByDay.get(day) ?? perfsByDay.set(day, []).get(day)!).push(p);
+      }
+      for (const d of shownDates) {
+        if (d.status === 'cancelled') continue;
+        const day = dateDayKey(d, viewerTz);
+        (datesByDay.get(day) ?? datesByDay.set(day, []).get(day)!).push(d);
+      }
+    }
+    return season.weeks.map((week) =>
+      week.map((iso): SeasonCellVM => {
+        const perfs = perfsByDay.get(iso) ?? [];
+        const dates = datesByDay.get(iso) ?? [];
+        const rows: SeasonCellIn[] = [
+          ...perfs.map((p) => ({ day: iso, family: performanceStatusFamily(p.status), kind: 'perf' as const })),
+          ...dates.map((d) => ({
+            day: iso,
+            family: dateStatusFamily(d.status),
+            kind: d.kind === 'travel_day' ? ('travel' as const) : ('date' as const),
+          })),
+        ];
+        const gigs = perfs
+          .map((p) => ({ p, firm: performanceStatusFamily(p.status) === 'confirmed' }))
+          .filter(({ p, firm }) => firm || isHoldStatus(p.status))
+          .sort((a, b) => Number(b.firm) - Number(a.firm));
+        const travel = dates.find((d) => d.kind === 'travel_day');
+        const other = dates.find((d) => d.kind !== 'travel_day');
+        return {
+          iso,
+          past: iso < todayIso,
+          today: iso === todayIso,
+          monthWord: iso.endsWith('-01') ? MONTH_SHORT.format(new Date(`${iso}T00:00:00Z`)) : null,
+          mark: cellMark(rows),
+          slips: gigs.slice(0, 2).map(({ p, firm }) => ({
+            id: p.id,
+            firm,
+            accent: p.project ? accentVarFor(p.project) : 'var(--accent-1)',
+            initials: p.project?.initials ?? null,
+            project: p.project?.name ?? '',
+            place: p.venue?.city ?? p.city ?? p.venue?.name ?? p.venue_name ?? '—',
+          })),
+          more: Math.max(0, gigs.length - 2),
+          dateWord: other ? kindLabel(other.kind) : null,
+          travel: travel
+            ? travel.travel_direction === 'return'
+              ? 'back'
+              : 'out'
+            : null,
+          tour: seasonTourDays.has(iso),
+          away: seasonBlockDays.has(iso),
+          clash: seasonClashDays.has(iso),
+        };
+      }),
+    );
+  });
+
+  /** Confirmed gigs in the «sin cerrar» horizon, and what each is missing. */
+  let seasonFirmAhead = $derived.by(() => {
+    if (view !== 'overview') return [];
+    const until = addDaysIso(todayIso, UNCLOSED_WEEKS * 7 - 1);
+    return scopedPerfs
+      .filter((p) => {
+        const day = perfDayKey(p);
+        return performanceStatusFamily(p.status) === 'confirmed' && day >= todayIso && day <= until;
+      })
+      .sort((a, b) => (perfDayKey(a) < perfDayKey(b) ? -1 : 1));
+  });
+  let seasonUnclosed = $derived.by((): SeasonUnclosedVM[] => {
+    const out: SeasonUnclosedVM[] = [];
+    for (const p of seasonFirmAhead) {
+      const day = perfDayKey(p);
+      // A trip is «covered» when a tour band holds the day or a travel leg of
+      // the same project sits within a day of it.
+      const travelCovered =
+        seasonTourDays.has(day) ||
+        scopedDates.some((d) => {
+          if (d.kind !== 'travel_day' || d.status === 'cancelled') return false;
+          if (d.project?.id !== p.project?.id) return false;
+          const dd = dateDayKey(d, viewerTz);
+          return dd >= addDaysIso(day, -1) && dd <= addDaysIso(day, 1);
+        });
+      const v = unclosedOf(
+        {
+          start_at: p.start_at,
+          readiness: p.readiness,
+          person_ids: p.person_ids,
+          commitments: p.commitments,
+          city: p.venue?.city ?? p.city,
+        },
+        {
+          home: p.project ? (workspaceCityById.get(p.project.workspace_id) ?? null) : null,
+          travelCovered,
+        },
+      );
+      if (v.missing.length === 0 && !v.travelGuess) continue;
+      const ws = p.project ? workspaceSlugById.get(p.project.workspace_id) : null;
+      out.push({
+        id: p.id,
+        day,
+        venue: p.venue?.name ?? p.venue_name ?? p.city ?? '—',
+        city: p.venue?.city ?? p.city,
+        href: p.slug && ws ? `/h/${ws}/performance/${p.slug}` : null,
+        missing: v.missing.map((k) =>
+          k === 'time' ? 'planner.season_miss_time' : k === 'cast' ? 'planner.season_miss_cast' : readinessLabelKey(k),
+        ),
+        travelGuess: v.travelGuess,
+      });
+    }
+    return out;
+  });
+  let seasonGaps = $derived(
+    view === 'overview' ? gapWindows(season.days, engine.occupiedDays, seasonTourDays) : [],
+  );
+  let seasonAway = $derived.by((): SeasonAwayVM[] => {
+    if (view !== 'overview') return [];
+    const touches = (from: string, to: string) => to >= todayIso && from <= season.to;
+    const out: SeasonAwayVM[] = [];
+    for (const b of blackoutVMs) {
+      if (!touches(b.from, b.to)) continue;
+      out.push({
+        key: `b:${b.id}`,
+        from: b.from,
+        to: b.to,
+        who: b.subject ?? b.label,
+        what: b.note ?? null,
+        tentative: b.tentative,
+        guess: false,
+        legs: null,
+      });
+    }
+    for (const a of awayVMs) {
+      if (!touches(a.from, a.to)) continue;
+      out.push({
+        key: `t:${a.project_id}:${a.from}`,
+        from: a.from,
+        to: a.to,
+        who: a.label,
+        what: a.place,
+        tentative: false,
+        guess: true,
+        legs: `${a.deduced.word} · ${a.deduced.legs}`,
+      });
+    }
+    return out.sort((x, y) => (x.from < y.from ? -1 : x.from > y.from ? 1 : 0));
+  });
+  /** The clashes that are not a choice between two holds: an absence, or a
+      person in two places on a date. A pair the queue already holds is said
+      there, once. */
+  let seasonClashes = $derived.by(() => {
+    if (view !== 'overview') return [];
+    const decided = new Set(decisionVMs.flatMap((d) => [`${d.a.id}|${d.b.id}`, `${d.b.id}|${d.a.id}`]));
+    const out: Array<{ key: string; day: string; title: string; body: string }> = [];
+    for (const [day, list] of clashesByDay) {
+      if (day < todayIso || day > season.to) continue;
+      for (const [i, c] of list.entries()) {
+        // «Could clash, nobody entered the team» is a missing fact, not a
+        // clash: the queue already names it where it is a call to make.
+        if (c.severity === 'possible') continue;
+        if (c.event_ids.length === 2 && decided.has(`${c.event_ids[0]}|${c.event_ids[1]}`)) continue;
+        const what = c.rows.map((r) => r.label).join(' · ');
+        out.push({ key: `${day}:${i}`, day, title: c.title, body: what ? `${c.body} · ${what}` : c.body });
+      }
+    }
+    return out.sort((a, b) => (a.day < b.day ? -1 : 1));
+  });
+  let seasonFacts = $derived.by(() => {
+    let perfs = 0;
+    if (view === 'overview') {
+      for (const p of scopedPerfs) {
+        if (p.status === 'cancelled') continue;
+        const day = perfDayKey(p);
+        if (day >= todayIso && day <= season.to) perfs++;
+      }
+    }
+    return {
+      perfs,
+      confirmed: stats.confirmed,
+      holds: stats.holds,
+      // What the overview lists as a clash, counted once: not `possible`.
+      clashes: seasonClashes.length,
+      unclosed: seasonUnclosed.filter((u) => u.missing.length > 0).length,
+      free: stats.free,
+    };
+  });
+  let seasonWindowLabel = $derived(
+    t('planner.season_window', locale, {
+      from: localeDayMonth(season.from, localeTag),
+      to: localeDayMonth(season.to, localeTag),
+      n: season.weeks.length,
+    }),
+  );
 
   // ── Inline decision bands for the agenda book (ADR-080 §4 surfaced at
   // the day) — the SAME derived queue the DecisionBand renders, indexed by
@@ -2323,6 +2445,8 @@
    * line instead of minting empty months.
    */
   function stepBack(shift = false) {
+    // The season is a horizon from today: nothing to step.
+    if (view === 'overview') return;
     if (view === 'day') {
       if (shift) return stepDayByOne(-1);
       void stepDayToPlanned(-1);
@@ -2331,6 +2455,7 @@
     else prevMonth();
   }
   function stepNext(shift = false) {
+    if (view === 'overview') return;
     if (view === 'day') {
       if (shift) return stepDayByOne(1);
       void stepDayToPlanned(1);
@@ -2539,6 +2664,7 @@
   }
 
   function goToday() {
+    if (view === 'overview') return;
     if (view === 'agenda') scrollToToday();
     else if (view === 'day') {
       dayIso = todayIso;
@@ -2579,7 +2705,7 @@
       if (createOpen || editOpen || marksOpen) return;
 
       // The SAME order as the words on screen (CalToolbar's VIEW_ORDER).
-      const views: PlannerView[] = ['day', 'agenda', 'month', 'board'];
+      const views: PlannerView[] = ['overview', 'day', 'agenda', 'month', 'board'];
       const n = Number(e.key);
       if (n >= 1 && n <= views.length) {
         e.preventDefault();
@@ -2746,6 +2872,7 @@
             syncUrl();
           }}
         />
+      {:else if view === 'overview'}<LensTitle text={t('planner.view_overview', locale)} />
       {:else}<LensTitle text={monthLabel} />{/if}
     {/snippet}
   </LensHeader>
@@ -2786,7 +2913,7 @@
              on — which is why Marco never saw the drawer and reported it as
              unbuilt. Calm already removes the counters' noise; the call to
              make is not noise. -->
-        {#if !decisionsAbsent && decisionVMs.length > 0}
+        {#if !decisionsAbsent && decisionVMs.length > 0 && view !== 'overview'}
           <button
             type="button"
             class="cal__stat cal__stat--decide"
@@ -2845,6 +2972,11 @@
              grows, so neither prints one. -->
         <!-- Weeks range: BOUNDED drawings only — the board grew a horizon
              and what grows is never counted. -->
+        <!-- The season names its horizon; its census is the overview's own
+             first line, so it is not said twice. -->
+        {#if view === 'overview'}
+          <span class="cal__stat cal__stat--soft">{seasonWindowLabel}</span>
+        {/if}
         {#if view === 'agenda'}
           <span class="cal__stat cal__stat--soft"
             >{t('planner.agenda_from', locale, {
@@ -2947,7 +3079,7 @@
        above the controls. Not between them: the window line is a caption of
        the drawing, and a drawer opening through the middle of a caption
        would push half of it away from what it captions. -->
-  {#if !errorMsg && !decisionsAbsent}
+  {#if !errorMsg && !decisionsAbsent && view !== 'overview'}
     <DecisionBand
       decisions={decisionVMs}
       concurrences={concurrenceVMs}
@@ -2990,6 +3122,43 @@
 
   {#if errorMsg}
     <p class="cal__state cal__state--danger">{errorMsg}</p>
+  {:else if view === 'overview'}
+    <SeasonOverview
+      {locale}
+      {localeTag}
+      {loading}
+      facts={seasonFacts}
+      weeks={seasonWeeks}
+      decisions={decisionVMs}
+      concurrences={concurrenceVMs}
+      {decisionsAbsent}
+      clashes={seasonClashes}
+      unclosed={seasonUnclosed}
+      firmAhead={seasonFirmAhead.length}
+      gaps={seasonGaps}
+      away={seasonAway}
+      pendingId={decisionPendingId}
+      onConfirm={(id) => $decideMutation.mutate({ id, status: 'confirmed' })}
+      onDay={(iso) => {
+        dayIso = iso;
+        setView('day');
+      }}
+      onWeek={(monday) => {
+        // The week's Thursday names its month (ISO), so a week straddling
+        // two months opens the one that holds most of it.
+        const thu = addDaysIso(monday, 3);
+        ym = { year: Number(thu.slice(0, 4)), month: Number(thu.slice(5, 7)) };
+        setView('month');
+      }}
+      onGap={(iso) => {
+        agendaFromIso = iso;
+        if (iso.slice(0, 7) > agendaToIso.slice(0, 7)) {
+          agendaEnd = { year: Number(iso.slice(0, 4)), month: Number(iso.slice(5, 7)) };
+        }
+        setView('agenda');
+      }}
+      onCreate={() => openCreate()}
+    />
   {:else if view === 'day'}
     <!-- A CLASH IS ABOUT WHAT IS *IN* THE DAY, so it goes above the drawing:
          a rule on two rows says THAT they relate, never why — the why is a

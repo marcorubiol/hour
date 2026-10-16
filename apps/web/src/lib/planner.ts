@@ -694,7 +694,7 @@ function makeBand(
  * is a week · Board — a row is an entity, and its `lanes` dial only ever
  * relabels the entity.
  */
-export type PlannerView = 'day' | 'month' | 'agenda' | 'board';
+export type PlannerView = 'overview' | 'day' | 'month' | 'agenda' | 'board';
 
 /**
  * Legacy view tokens, translated ONCE on entry and never written back — a
@@ -708,7 +708,7 @@ const VIEW_ALIASES: Record<string, PlannerView> = {
 
 /** A token from a URL or from storage → a view, or null if it is neither. */
 export function normalizePlannerView(v: string | null | undefined): PlannerView | null {
-  if (v === 'day' || v === 'month' || v === 'agenda' || v === 'board') return v;
+  if (v === 'overview' || v === 'day' || v === 'month' || v === 'agenda' || v === 'board') return v;
   return (v && VIEW_ALIASES[v]) || null;
 }
 
@@ -723,22 +723,15 @@ export function plannerDayHref(view: 'day' | 'agenda', day: string): string {
 }
 
 /**
- * Projection resolution (ADR-078 §10): explicit `?view=` → the device's
- * stored preference (localStorage) → form-factor default (narrow reads as
- * agenda, wide as month — the board is never a default; ADR-080 §7 changed
- * the roster, not the form-factor rule). Unknown values at either level fall
- * through — a mistyped URL never breaks the page.
+ * Projection resolution (ADR-117, superseding ADR-078 §10's chain): an
+ * explicit `?view=` wins, and anything else opens the season overview — the
+ * Planner's portada. No stored preference and no form-factor default: a
+ * dashboard that remembered the last drawing would stop being the portada
+ * on the second visit. Unknown values fall through — a mistyped URL never
+ * breaks the page.
  */
-export function resolvePlannerView(
-  urlView: string | null | undefined,
-  stored: string | null | undefined,
-  narrowViewport: boolean,
-): PlannerView {
-  return (
-    normalizePlannerView(urlView) ??
-    normalizePlannerView(stored) ??
-    (narrowViewport ? 'agenda' : 'month')
-  );
+export function resolvePlannerView(urlView: string | null | undefined): PlannerView {
+  return normalizePlannerView(urlView) ?? 'overview';
 }
 
 /**

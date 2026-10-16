@@ -133,7 +133,9 @@ test.describe('planner laws (ADR-095)', () => {
     // `Day` names the DRAWING; `Now` (the window control beside it) names the
     // act of going to the present. Two words, two jobs — they used to be the
     // same word seventy pixels apart.
+    // The season (ADR-117) is the portada, so it opens the row.
     expect(words.map((w) => w.trim().toLowerCase())).toEqual([
+      'season',
       'day',
       'agenda',
       'month',
@@ -277,12 +279,12 @@ test.describe('planner laws (ADR-095)', () => {
       [...document.querySelectorAll<HTMLButtonElement>('.cal__view')].filter((b) => b.disabled).length,
     );
     expect(inert).toBe(0);
-    // All four projections are reachable.
-    await expect(page.locator('.cal__view')).toHaveCount(4);
+    // All five projections are reachable (the season joined, ADR-117).
+    await expect(page.locator('.cal__view')).toHaveCount(5);
   });
 
   test('THE FOUR VIEWS SURVIVE A RELOAD — the state is in the URL', async ({ page }) => {
-    for (const view of ['day', 'month', 'agenda', 'board']) {
+    for (const view of ['overview', 'day', 'month', 'agenda', 'board']) {
       await planner(page, view);
       await page.reload();
       // Asked once the reloaded lens has mounted and settled: anything that

@@ -9,14 +9,9 @@ import {
 import { resolvePlannerView } from './planner';
 
 describe('resolvePlannerView (board, ADR-080 §7)', () => {
-  it('accepts carrils from the URL and from storage', () => {
-    expect(resolvePlannerView('board', null, false)).toBe('board');
-    expect(resolvePlannerView(null, 'board', true)).toBe('board');
-  });
-
-  it('never defaults to carrils — form-factor rule unchanged', () => {
-    expect(resolvePlannerView(null, null, true)).toBe('agenda');
-    expect(resolvePlannerView(null, null, false)).toBe('month');
+  it('accepts the board from the URL, and never defaults to it', () => {
+    expect(resolvePlannerView('board')).toBe('board');
+    expect(resolvePlannerView(null)).toBe('overview');
   });
 });
 
