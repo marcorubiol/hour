@@ -109,28 +109,21 @@
   import {
     addDaysIso,
     addMonths,
-    awayBands,
-    conflictsFor,
     dayKeyInTz,
-    decisionsFor,
     monthGrid,
     resolvePlannerView,
-    type PlannerEvent,
     type PlannerView,
     type Conflict,
-    type DecisionPerformance,
     type DecisionSide,
     normalizePlannerView,
-    nightsFree,
-    daysCoveredBy,
     statusWord as statusWordIn,
   } from '$lib/planner';
   import { buildPersonScope } from '$lib/people';
   import { createPlannerFeeds, primeAgendaWindow } from '$lib/planner-feeds.svelte';
+  import { createPlannerEngine } from '$lib/planner-engine.svelte';
   import { normalizeLaneAxis, resolveLaneAxis, type LaneAxis } from '$lib/carrils';
   import type { AvailabilityItem } from '$lib/availability';
-  import type { DateRow } from '$lib/date';
-  import { localeDayMonth, localeWeekdayShort, timeInTz, hourMark, dualTime } from '$lib/datetime';
+  import { localeDayMonth, localeWeekdayShort, dualTime } from '$lib/datetime';
   import {
     isHoldStatus,
     performanceStatusFamily,
@@ -655,77 +648,24 @@
   let shownPerfs = $derived(scopedPerfs.filter(perfDrawn));
   let shownDates = $derived(scopedDates.filter(dateDrawn));
 
-  // ── Conflict engine (ADR-072 §1) — over the UNFILTERED scoped rows:
-  // hiding chips behind the status filter never hides a real clash. ─────
-  let engineEvents = $derived.by(() => {
-    const out: PlannerEvent[] = [];
-    for (const p of scopedPerfs) {
-      if (p.status === 'cancelled' || !p.project) continue;
-      out.push({
-        id: p.id,
-        day: perfDayKey(p),
-        project_id: p.project.id,
-        workspace_id: p.project.workspace_id,
-      });
-    }
-    for (const d of scopedDates) {
-      if (d.status === 'cancelled' || !d.project) continue;
-      out.push({
-        id: d.id,
-        day: dateDayKey(d, viewerTz),
-        project_id: d.project.id,
-        workspace_id: d.project.workspace_id,
-      });
-    }
-    return out;
+  // ── The engine (conflicts, derived tours, census, decisions queue) lives
+  // in $lib/planner-engine so the season overview reads the same answers.
+  // Over the UNFILTERED scoped rows: calm never hides a real clash. ──────
+  const engine = createPlannerEngine({
+    scopedPerfs: () => scopedPerfs,
+    scopedDates: () => scopedDates,
+    rawPerfs: () => activePerfRows,
+    rawDates: () => activeDateRows,
+    allBlackouts: () => allBlackouts,
+    visibleBlackouts: () => visibleBlackouts,
+    window: () => ({ first: monthFirst, last: monthLast, days: monthDays }),
+    decisionPerfs: () => decisionPerfs,
+    viewerTz,
+    todayIso,
   });
-  let rosters = $derived.by(() => {
-    const map: Record<string, string[]> = {};
-    for (const p of scopedPerfs) {
-      if (p.person_ids) map[p.id] = p.person_ids;
-    }
-    return map;
-  });
-  /** ADR-103 — whoever said «voy»: on the event for the engine, even on a
-      date, which has no roster of its own. */
-  let committed = $derived.by(() => {
-    const map: Record<string, string[]> = {};
-    for (const row of [...scopedPerfs, ...scopedDates]) {
-      const going = (row.commitments ?? [])
-        .filter((c) => c.state === 'going')
-        .map((c) => c.person_id);
-      if (going.length > 0) map[row.id] = going;
-    }
-    return map;
-  });
-  let conflicts = $derived(conflictsFor(engineEvents, rosters, allBlackouts, committed));
-  let eventDayById = $derived(new Map(engineEvents.map((e) => [e.id, e.day])));
-
-  // ── Derived away bands (ADR-078 §6) — display-only inference. ────────
-  let ownEventDays = $derived.by(() => {
-    const map: Record<string, string[]> = {};
-    for (const e of engineEvents) {
-      (map[e.project_id] ??= []).push(e.day);
-    }
-    return map;
-  });
-  let aways = $derived.by(() => {
-    const travels: Array<
-      Pick<DateRow, 'id' | 'project_id' | 'line_id' | 'kind' | 'travel_direction' | 'starts_at'>
-    > = [];
-    for (const d of scopedDates) {
-      if (d.kind !== 'travel_day' || d.status === 'cancelled' || !d.project) continue;
-      travels.push({
-        id: d.id,
-        project_id: d.project.id,
-        line_id: d.line_id ?? null,
-        kind: 'travel_day',
-        travel_direction: d.travel_direction ?? null,
-        starts_at: d.starts_at,
-      });
-    }
-    return awayBands(travels, ownEventDays);
-  });
+  let conflicts = $derived(engine.conflicts);
+  let eventDayById = $derived(engine.eventDayById);
+  let aways = $derived(engine.aways);
 
   // ── Names for labels/cards ────────────────────────────────────────────
   let personNames = $derived.by(() => {
@@ -1672,98 +1612,17 @@
     });
   }
 
-  // ── Masthead stats — counts of the visible month, every figure a real
-  // row (ADR-078 §12; no read:money gate — nothing monetary here). ──────
-  let stats = $derived.by(() => {
-    let confirmed = 0;
-    let holds = 0;
-    for (const p of scopedPerfs) {
-      const day = perfDayKey(p);
-      if (day < monthFirst || day > monthLast) continue;
-      const family = performanceStatusFamily(p.status);
-      if (family === 'confirmed') confirmed++;
-      else if (family === 'hold') holds++;
-    }
-    let conflictCount = 0;
-    for (const c of conflicts) {
-      const day = eventDayById.get(c.event_ids[0]);
-      if (day && day >= monthFirst && day <= monthLast) conflictCount++;
-    }
-    let blackoutCount = 0;
-    for (const b of visibleBlackouts) {
-      if (b.starts_on <= monthLast && b.ends_on >= monthFirst) blackoutCount++;
-    }
-
-    /* NIGHTS FREE — inventory unsold, and the only figure here that is about
-       the business rather than the calendar.
-       Two things it must get right, and both are easy to miss:
-       · Availability IGNORES the narrowing. Nobody is free because you hid the
-         project that is occupying them — so this walks `activePerfRows` and
-         `activeDateRows`, the rows as they arrive, not `scopedPerfs`.
-       · A NIGHT ON TOUR IS NOT A FREE NIGHT: between an outbound leg and its
-         return there is nothing of its own on the calendar and still nothing
-         to sell, because the company is 1.200km from home.
-       HONEST LIMIT, written where the cost goes: with project pins set, the
-       server already filtered the unpinned rows out before they reached the
-       browser (`/api/performances` narrows by project_ids ∪ workspace_ids), so
-       what arrives is the widest set this page CAN see, not the widest that
-       exists. The counter can therefore still read high under a project pin.
-       The fix is an unfiltered availability feed — the precedent is right here
-       in this file, where blackouts are already fetched without a workspace
-       filter for exactly this reason. */
-    const occupied = new Set<string>();
-    for (const p of activePerfRows) {
-      if (p.status === 'cancelled') continue;
-      occupied.add(perfDayKey(p));
-    }
-    for (const d of activeDateRows) {
-      if (d.status === 'cancelled') continue;
-      occupied.add(dateDayKey(d, viewerTz));
-    }
-    const free = nightsFree(monthDays, occupied, daysCoveredBy(aways));
-
-    return { confirmed, holds, conflicts: conflictCount, blackouts: blackoutCount, free };
-  });
+  // ── Masthead stats — counts of the visible month ($lib/planner-engine). ──
+  let stats = $derived(engine.stats);
 
   // ── Decisions queue (ADR-080 §1/§4) — derived, nothing stored. ───────
   let decisionsAbsent = $derived(Boolean($decisionsPerfQuery.data?.absent));
   let decisionPerfs = $derived(
     ($decisionsPerfQuery.data?.items ?? []).filter((p) => perfInScope(p)),
   );
-  let decisionPerfById = $derived(new Map(decisionPerfs.map((p) => [p.id, p])));
-  let decisionRosters = $derived.by(() => {
-    const map: Record<string, string[]> = {};
-    for (const p of decisionPerfs) {
-      if (p.person_ids) map[p.id] = p.person_ids;
-    }
-    return map;
-  });
-  let decisionInput = $derived.by((): DecisionPerformance[] => {
-    const rows: DecisionPerformance[] = [];
-    for (const p of decisionPerfs) {
-      if (!p.project) continue;
-      rows.push({
-        id: p.id,
-        day: perfDayKey(p),
-        project_id: p.project.id,
-        workspace_id: p.project.workspace_id,
-        status: p.status,
-        hold_notice_days: p.hold_notice_days ?? null,
-        project: p.project.name,
-        venue: p.venue?.name ?? p.venue_name,
-        city: p.venue?.city ?? p.city,
-        time: p.start_at ? hourMark(timeInTz(p.start_at, p.venue?.timezone || viewerTz)) : null,
-      });
-    }
-    return rows;
-  });
-  let decisionQueue = $derived(
-    decisionsFor({
-      performances: decisionInput,
-      rosters: decisionRosters,
-      today: todayIso,
-    }),
-  );
+  let decisionPerfById = $derived(engine.decisionPerfById);
+  let decisionRosters = $derived(engine.decisionRosters);
+  let decisionQueue = $derived(engine.decisionQueue);
 
   function decisionOptionVM(side: DecisionSide): DecisionOptionVM {
     const perf = decisionPerfById.get(side.id);
