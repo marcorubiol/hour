@@ -301,7 +301,7 @@
   });
 
   // The logo IS the home: /h, the cross-space Desk digest (ADR-065/066) —
-  // not any one workspace's page. Calendar/Contacts/Money live at /h/<lens>.
+  // not any one workspace's page. Planner/Conversations/Books live at /h/<lens>.
   const homeHref = '/h';
 
   let inSettings = $derived(/^\/h\/[^/]+\/settings(\b|\/|$)/.test(page.url.pathname));
@@ -309,7 +309,7 @@
   // Which routed lens (if any) the current URL is showing. ADR-067: lens
   // routes are space-less — the space segment appears only on entity URLs.
   let routedLens = $derived.by<Lens | null>(() => {
-    const m = page.url.pathname.match(/^\/h\/(desk|planner|conversations|money)\/?$/);
+    const m = page.url.pathname.match(/^\/h\/(desk|planner|conversations|books)\/?$/);
     return (m?.[1] as Lens | undefined) ?? null;
   });
   let atHome = $derived(/^\/h\/?$/.test(page.url.pathname));

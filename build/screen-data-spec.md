@@ -327,7 +327,7 @@ de agrupación persiste; en móvil las filas se convierten en tarjetas.
 (`conversation-event-contract.md`): org rows, timeline, provenance and fair mode follow
 the later S2 shapes and are not represented as live UI.
 
-### `/h/money` — Money lens
+### `/h/books` — Money lens (ruta `/h/money` hasta ADR-118)
 
 **Is**: concern-lens over money; gated by `read:money` (RLS-enforced via `performance_redacted`).
 **Today**: per-currency pipeline/invoiced/collected, by-line fees−expenses net,

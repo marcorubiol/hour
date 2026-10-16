@@ -22,7 +22,7 @@ test.describe('books lens', () => {
 
   test('fee set → persists in totals → clear', async ({ page }) => {
     test.setTimeout(60_000);
-    await page.goto('/h/money'); // ADR-067: lens is space-less + cross-space
+    await page.goto('/h/books'); // ADR-067: lens is space-less + cross-space
     await waitForLoaded(page);
     await expect(page.locator('.mny__totals')).toBeVisible();
 

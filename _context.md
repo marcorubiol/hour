@@ -64,7 +64,7 @@ de Phase 0.9 en `_tasks.md`. Pricing orientativo, no decidido.
 - `bolo` = unidad de dinero: el trato con una sala, agrupa 1..N funciones; caché, cobro y factura cuelgan del bolo.
 - `date` = ensayo, viaje, prensa, day off u otro evento que no es función.
 - Lentes (ADR-088): Desk es el digest; las tres lentes son Planner · Conversations · Books (ES `Cuentas`, ruta
-  `/h/money`). Road sheet es una proyección de performance.
+  `/h/books`, ADR-118). Road sheet es una proyección de performance.
 - Sin vocabulario CRM (`lead`, `pipeline`, `prospect`) salvo investigación o interoperabilidad.
 
 ## Arquitectura

@@ -60,7 +60,7 @@ test.describe('smoke', () => {
 
     // ADR-067: lens routes are SPACE-LESS — scope rides in pins / ?scope=,
     // never in the path.
-    await page.goto('/h/money');
+    await page.goto('/h/books');
     await waitForLoaded(page);
     await expect(page.locator('.mny__totals')).toBeVisible();
     // Books header leads with Vendido/sold now (grill ADR-088); pipeline is demoted.

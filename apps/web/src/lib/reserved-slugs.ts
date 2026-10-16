@@ -38,7 +38,7 @@ export const RESERVED_WORKSPACE_SLUGS = [
   // can never be taken from under a revisit.
   'house', 'room', 'run', 'gig', 'desk', 'plaza',
   'roadsheet', 'conversation', 'conversations', 'person', 'venue', 'asset',
-  'invoice', 'calendar', 'planner', 'agenda', 'money', 'comms', 'archive', 'people',
+  'invoice', 'calendar', 'planner', 'agenda', 'money', 'books', 'comms', 'archive', 'people',
 
   // Operational
   'staging', 'dev', 'playground', 'booking',

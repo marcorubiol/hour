@@ -20,7 +20,7 @@
   const VIEW_AS: { id: Lens; label: string }[] = [
     { id: 'planner', label: t('lens.planner', locale) },
     { id: 'conversations', label: t('lens.conversations', locale) },
-    { id: 'money', label: t('lens.money', locale) },
+    { id: 'books', label: t('lens.money', locale) },
   ];
 
   let active = $derived((page.url.pathname.split('/')[2] ?? 'desk') as Lens);

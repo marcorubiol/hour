@@ -3831,3 +3831,19 @@ recomendada de cada sección y se ajusta después de usarla.
 5. **Se enfría:** 21 días sin respuesta a nuestro correo; 30 sin actividad en una conversación abierta.
 6. «Por cobrar» en Cuentas es solo lo facturado y no cobrado; lo contratado sin facturar va a la barra de temporada.
 7. Primera versión sin migraciones donde se pueda; los valores de 3 a 5 son un punto de partida para ajustar con uso.
+
+## [2026-10-16] ADR-118 · La ruta de Cuentas es `/h/books` (enmienda ADR-088)
+
+**Contexto.** ADR-088 B conservó la ruta física `/h/money` dando por hecho que nadie la ve. Se ve: en la barra del
+navegador, en los enlaces que se comparten y en el ancla `#bolo-<id>` a la que llevan el selector de bolo, la ficha de
+la función y Desk. Marco lo validó en el Drop (15-10): la ruta de Cuentas es `/h/books`, el nombre EN de la lente.
+
+**Decisión.**
+1. La lente vive en `/h/books`. `/h/money` responde 301 a `/h/books` con su query; el ancla no llega al servidor y el
+   navegador la conserva al seguir la redirección. `/h/<espacio>/money` (marcadores de antes de ADR-067) va a
+   `/h/books` directo.
+2. El identificador interno de la lente pasa de `money` a `books` (`Lens`, selector de lentes, el shell); el valor
+   `money` guardado en el navegador se migra en la primera lectura, como `contacts` y `calendar`.
+3. No cambian: las rutas de API (`/api/money/...`), el permiso `read:money`, el módulo `money` de las líneas, las
+   claves de diccionario `books.*` y `lens.money`, ni `lib/money.ts`. Son el dominio, no la ruta.
+4. `books` queda reservado como slug de espacio; `money` sigue reservado.
