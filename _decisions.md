@@ -3809,3 +3809,25 @@ puede acotar por espacio y evalúa la regla en cada hilo de la base antes de fil
    de estado, «Añadir» y el modo selección son de «con quién hablas»; «de qué se habla» es solo lectura: se escribe
    en la ficha.
 7. Refresco al volver a la pestaña y cada 30 s, sin realtime (ADR-083 §2), como el tablón.
+
+## [2026-10-16] ADR-117 · La pantalla principal de cada sección es un dashboard
+
+**Contexto.** Marco (2026-10-15): la pantalla principal de cada sección tiene que funcionar como dashboard; Conversations
+no lo parecía. Cuatro propuestas en `build/coordination/dashboards/` (fuera de git) y la página
+https://claude.ai/artifact/LnpXVKt6g76PffrrR4uhVj. Marco (2026-10-16): el concepto funciona; se implementa la
+recomendada de cada sección y se ajusta después de usarla.
+
+**Decisión.**
+1. Desk responde «qué pide atención hoy, de todo»; cada lente responde «cómo está su dominio». Bloques del dominio
+   encima de la vista de trabajo, y cada bloque filtra la lista de debajo. Un bloque vacío se queda en una línea.
+2. Conversations: turno y temperatura sobre la lista (te toca, la temporada, caliente, se enfría, último envío, del
+   equipo). Planner: vista «Temporada» como portada (cifras, tira de 12 semanas, por decidir, sin cerrar, huecos,
+   fuera); la nav abre siempre en ella. Cuentas: radar de cobro arriba y libro debajo (cuatro cifras, pide atención,
+   lo que entra, libro con la ficha del bolo desplegable en sitio). Desk: cuatro bandas (lo siguiente, te espera, ha
+   cambiado, la temporada), sin la agenda de 7 días.
+3. **Temporada:** de septiembre a agosto por fecha de función, igual en toda la app; Conversations la acota además por
+   la línea de difusión fijada. El Planner no usa temporada: su tira es un horizonte de 12 semanas desde hoy.
+4. **Vencido:** contra la fecha esperada de cobro (el aging de Cuentas); Desk se alinea.
+5. **Se enfría:** 21 días sin respuesta a nuestro correo; 30 sin actividad en una conversación abierta.
+6. «Por cobrar» en Cuentas es solo lo facturado y no cobrado; lo contratado sin facturar va a la barra de temporada.
+7. Primera versión sin migraciones donde se pueda; los valores de 3 a 5 son un punto de partida para ajustar con uso.
