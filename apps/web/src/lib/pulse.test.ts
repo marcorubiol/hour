@@ -10,8 +10,8 @@
  * Madrid in August is UTC+2, so 15h30 local is 13:30Z throughout.
  */
 
-import { describe, expect, test } from 'vitest';
-import { computePulse } from './pulse';
+import { describe, expect, it, test } from 'vitest';
+import { computePulse, performanceAttribution } from './pulse';
 import { buildPersonAttribution } from './people';
 import type { DateEvent, PerformanceEvent } from './month-events';
 
@@ -266,5 +266,16 @@ describe('whose day it is', () => {
     // Not inferred onto a day you are away — and not dropped either: with
     // nobody left to guess from the row is unattributed, which is the truth.
     expect(next?.ref.attribution).toBe('unattributed');
+  });
+});
+
+describe('performanceAttribution (the Hall reads the rail rule)', () => {
+  const row = { project: null, performed_at: '2026-10-17', person_ids: [], commitments: null };
+  it('speaks for everyone without an active axis', () => {
+    expect(performanceAttribution(row, null)).toBe('explicit');
+    expect(performanceAttribution(row, { active: false, attribute: () => 'no' })).toBe('explicit');
+  });
+  it('asks the axis when it is active', () => {
+    expect(performanceAttribution(row, { active: true, attribute: () => 'no' })).toBe('no');
   });
 });

@@ -294,6 +294,22 @@ function dateEntry(d: DateEvent, viewerTz: string, attribution: PersonAttributio
  * is why a gig you are already loading in for stays NEXT until its own hour
  * passes — the sheet's next moment IS what comes next.
  */
+/** Whose function this is, by the pulse's rule: with an active person axis
+    it asks the axis; without one every function speaks. The Hall reads the
+    same rule, so its greeting and the rail never name different shows. */
+export function performanceAttribution(
+  p: Pick<PerformanceEvent, 'project' | 'performed_at' | 'person_ids' | 'commitments'>,
+  axis: PersonAttributionScope | null | undefined,
+): PersonAttribution {
+  if (!axis?.active) return 'explicit';
+  return axis.attribute({
+    projectId: p.project?.id ?? null,
+    day: p.performed_at.slice(0, 10),
+    roster: p.person_ids,
+    commitments: p.commitments,
+  });
+}
+
 export function computePulse(input: PulseInput, now: Date): Pulse {
   const t = now.getTime();
   const viewerTz = input.viewerTz;
@@ -304,14 +320,7 @@ export function computePulse(input: PulseInput, now: Date): Pulse {
 
   for (const p of input.performances) {
     if (isCancelled(p.status)) continue;
-    const attribution = axis
-      ? axis.attribute({
-          projectId: p.project?.id ?? null,
-          day: p.performed_at.slice(0, 10),
-          roster: p.person_ids,
-          commitments: p.commitments,
-        })
-      : 'explicit';
+    const attribution = performanceAttribution(p, axis);
     if (attribution === 'no') continue;
     entries.push(performanceEntry(p, viewerTz, attribution));
   }

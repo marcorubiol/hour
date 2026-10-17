@@ -241,6 +241,7 @@
       void queryClient.invalidateQueries({ queryKey: ['line-money-fees'] });
       void queryClient.invalidateQueries({ queryKey: ['money-bolos'] });
       void queryClient.invalidateQueries({ queryKey: ['today-performances'] });
+      void queryClient.invalidateQueries({ queryKey: ['pulse-performances'] });
       onCreated?.(perf);
     },
     onError: (err) => {
@@ -297,6 +298,7 @@
       void queryClient.invalidateQueries({ queryKey: ['line-money-fees'] });
       void queryClient.invalidateQueries({ queryKey: ['money-bolos'] });
       void queryClient.invalidateQueries({ queryKey: ['today-performances'] });
+      void queryClient.invalidateQueries({ queryKey: ['pulse-performances'] });
       // El anfitrión cierra con la primera, que es la que abre la tanda.
       onCreated?.(rows[0]);
     },

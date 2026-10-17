@@ -8,6 +8,8 @@
 import { fetchJSON } from './api';
 import type { NavWorkspace, RawLine, RawProject } from './nav';
 import type { TeamItem } from './people';
+import type { PerformanceEvent } from './month-events';
+import type { AvailabilityItem } from './availability';
 
 /**
  * Nav data (workspaces/projects/lines) changes rarely and its create/edit
@@ -110,5 +112,47 @@ export function meQueryOptions() {
         signal,
       ),
     staleTime: NAV_STALE_TIME,
+  };
+}
+
+/**
+ * The person axis's feeds, shared by the rail pulse and the Hall so both name
+ * the same show (ADR-096: the pulse speaks for you). Today forward with
+ * rosters; the availability window reaches back two weeks, like the dates
+ * feed, so a block that began earlier still gates today.
+ */
+export function pulsePerformancesQueryOptions(today: string) {
+  return {
+    queryKey: ['pulse-performances', today] as const,
+    staleTime: 5 * 60_000,
+    queryFn: ({ signal }: { signal: AbortSignal }) =>
+      fetchJSON<{ items: PerformanceEvent[] }>(
+        `/api/performances?status=any&from=${today}&limit=200&rosters=1`,
+        signal,
+      ),
+  };
+}
+
+/** Two weeks before `today`: the window the pulse's dates and blocks read. */
+export function pulseWindowFrom(today: string): string {
+  return new Date(Date.parse(`${today}T00:00:00Z`) - 14 * 86_400_000).toISOString().slice(0, 10);
+}
+
+export function pulseAvailabilityQueryOptions(from: string, opts?: { enabled?: boolean }) {
+  return {
+    queryKey: ['pulse-availability', from] as const,
+    enabled: opts?.enabled ?? true,
+    staleTime: 5 * 60_000,
+    queryFn: async ({ signal }: { signal: AbortSignal }) => {
+      try {
+        return await fetchJSON<{ items: AvailabilityItem[] }>(
+          `/api/availability?from=${from}&limit=500`,
+          signal,
+        );
+      } catch (err) {
+        if (err instanceof Error && err.message === 'Unauthorized') throw err;
+        return { items: [] as AvailabilityItem[] };
+      }
+    },
   };
 }

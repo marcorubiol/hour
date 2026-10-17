@@ -6,6 +6,7 @@ hasta entonces, sacado de esos documentos; lo anterior a julio de 2026 está sol
 
 ## Octubre 2026 (en curso)
 
+- La portada habla de tus funciones con la misma regla que el rail: si no vas a una función, no te saluda con ella. Y fuera el espacio de pruebas «Demo (Hour)», que metía funciones inventadas en la portada y en los dashboards. (2026-10-17)
 - Conversations abre como un panel de la difusión: a quién te toca contestar, cómo va la temporada por estado, qué está caliente, qué se enfría (con «Escribir a estas»), el último envío y lo nuevo del equipo, con la lista debajo y una columna de turno. Cada bloque filtra la lista. (2026-10-17, `bf0c98f`)
 - El Planner abre en «Temporada»: las cifras de las próximas 12 semanas, una tira de semanas con funciones, opciones, viajes, giras, ausencias y choques, lo que está por decidir, las funciones a las que les falta algo, los huecos libres y quién está fuera. Día, agenda, mes y tablero siguen en la barra. (2026-10-17, `bf0c98f`)
 - Cuentas vive en `/h/books` (los enlaces viejos redirigen) y abre con el radar de cobro: por cobrar con lo vencido, por facturar, lo que entra en 30 días y la temporada; lo que pide atención con su acción; la previsión por mes; y el libro de bolos con la ficha desplegable. (2026-10-17, `bf0c98f`)

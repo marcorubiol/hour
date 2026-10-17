@@ -46,12 +46,18 @@
     type SlipContext,
     type SlipKind,
   } from '$lib/month-events';
-  import { meQueryOptions, teamQueryOptions, workspacesQueryOptions } from '$lib/nav-queries';
+  import {
+    meQueryOptions,
+    pulseAvailabilityQueryOptions,
+    pulsePerformancesQueryOptions,
+    pulseWindowFrom,
+    teamQueryOptions,
+    workspacesQueryOptions,
+  } from '$lib/nav-queries';
   import { buildPersonAttribution, type CommitmentState } from '$lib/people';
   import { setCommitment } from '$lib/commitments';
   import { dayKeyInTz, plannerDayHref } from '$lib/planner';
   import { computePulse, type PulseWord } from '$lib/pulse';
-  import type { AvailabilityItem } from '$lib/availability';
   import Slip from '$lib/components/planner/Slip.svelte';
 
   interface Props {
@@ -70,9 +76,7 @@
       `/api/dates` filters on the row's START — so the window reaches back.
       Two weeks covers a residency or a tour leg; a longer one would spend
       the row budget on the past. */
-  let datesFrom = $derived(
-    new Date(Date.parse(`${today}T00:00:00Z`) - 14 * 86_400_000).toISOString().slice(0, 10),
-  );
+  let datesFrom = $derived(pulseWindowFrom(today));
 
   const meQuery = createQuery(meQueryOptions());
   const workspacesQuery = createQuery(workspacesQueryOptions());
@@ -82,17 +86,7 @@
   // Today forward, ordered by the server. Its own key: the hall and the desk
   // share `['today-performances']` without rosters, and the person axis needs
   // them — widening their URL would make three surfaces pay for this one.
-  const perfQuery = createQuery(
-    toStore(() => ({
-      queryKey: ['pulse-performances', today] as const,
-      staleTime: 5 * 60_000,
-      queryFn: ({ signal }: { signal: AbortSignal }) =>
-        fetchJSON<{ items: PerformanceEvent[] }>(
-          `/api/performances?status=any&from=${today}&limit=200&rosters=1`,
-          signal,
-        ),
-    })),
-  );
+  const perfQuery = createQuery(toStore(() => pulsePerformancesQueryOptions(today)));
 
   const datesQuery = createQuery(
     toStore(() => ({
@@ -123,22 +117,7 @@
     ),
   );
   const blocksQuery = createQuery(
-    toStore(() => ({
-      queryKey: ['pulse-availability', datesFrom] as const,
-      enabled: Boolean(personId),
-      staleTime: 5 * 60_000,
-      queryFn: async ({ signal }: { signal: AbortSignal }) => {
-        try {
-          return await fetchJSON<{ items: AvailabilityItem[] }>(
-            `/api/availability?from=${datesFrom}&limit=500`,
-            signal,
-          );
-        } catch (err) {
-          if (err instanceof Error && err.message === 'Unauthorized') throw err;
-          return { items: [] as AvailabilityItem[] };
-        }
-      },
-    })),
+    toStore(() => pulseAvailabilityQueryOptions(datesFrom, { enabled: Boolean(personId) })),
   );
 
   let axis = $derived(

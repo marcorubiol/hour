@@ -168,6 +168,7 @@
       queryKey,
       ['planner-performances'],
       ['today-performances'],
+      ['pulse-performances'],
       ['planner-dates'],
       ['performance'],
     ]) {

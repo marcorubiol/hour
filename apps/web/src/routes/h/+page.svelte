@@ -24,7 +24,18 @@
   import { goto } from '$app/navigation';
   import { createQuery } from '@tanstack/svelte-query';
   import { fetchJSON } from '$lib/api';
-  import { meQueryOptions, workspacesQueryOptions } from '$lib/nav-queries';
+  import { toStore } from 'svelte/store';
+  import {
+    meQueryOptions,
+    pulseAvailabilityQueryOptions,
+    pulsePerformancesQueryOptions,
+    pulseWindowFrom,
+    teamQueryOptions,
+    workspacesQueryOptions,
+  } from '$lib/nav-queries';
+  import { buildPersonAttribution } from '$lib/people';
+  import { performanceAttribution } from '$lib/pulse';
+  import { dayKeyInTz } from '$lib/planner';
   import { userDisplayName } from '$lib/utils/identity';
   import { session } from '$lib/session.svelte';
   import { detectLocale, t } from '$lib/i18n';
@@ -102,14 +113,12 @@
     queryFn: ({ signal }: { signal: AbortSignal }) =>
       fetchJSON<{ items: HallConversation[] }>('/api/conversations?status=any&limit=100', signal),
   });
-  const performancesQuery = createQuery({
-    queryKey: ['today-performances'],
-    queryFn: ({ signal }: { signal: AbortSignal }) =>
-      fetchJSON<{ items: HallPerformance[] }>(
-        `/api/performances?status=any&from=${new Date().toISOString().slice(0, 10)}&limit=200`,
-        signal,
-      ),
-  });
+  // The greeting is personal, so it names YOUR shows by the rail's own rule
+  // (ADR-096, `performanceAttribution`): same feeds, same cache keys, so the
+  // Hall and the rail can never name different shows.
+  const viewerTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const pulseToday = dayKeyInTz(new Date().toISOString(), viewerTz);
+  const performancesQuery = createQuery(pulsePerformancesQueryOptions(pulseToday));
   const tasksQuery = createQuery({
     queryKey: ['tasks', 'open'],
     queryFn: ({ signal }: { signal: AbortSignal }) =>
@@ -127,11 +136,41 @@
     ),
   );
 
+  let personId = $derived($meQuery.data?.person_id ?? null);
+  const teamQuery = createQuery(
+    toStore(() =>
+      teamQueryOptions(
+        ($workspacesQuery.data?.items ?? []).map((w) => w.id),
+        { enabled: Boolean(personId) },
+      ),
+    ),
+  );
+  const blocksQuery = createQuery(
+    toStore(() =>
+      pulseAvailabilityQueryOptions(pulseWindowFrom(pulseToday), { enabled: Boolean(personId) }),
+    ),
+  );
+  let axis = $derived(
+    buildPersonAttribution({
+      pinnedPersonIds: personId ? [personId] : [],
+      team: $teamQuery.data?.items ?? [],
+      blocks: $blocksQuery.data?.items ?? [],
+    }),
+  );
+  // Until the axis has its inputs it is inactive and would let every show
+  // speak: hold the Hall quiet instead (silence over lies).
+  let axisReady = $derived(!personId || ($teamQuery.isSuccess && $blocksQuery.isSuccess));
+  let myPerformances = $derived<HallPerformance[]>(
+    ($performancesQuery.data?.items ?? [])
+      .filter((p) => performanceAttribution(p, axis) !== 'no')
+      .map((p) => ({ ...p, load_in_at: p.load_in_at ?? null })),
+  );
+
   // aria-busy: the hall stays quiet while it loads (silence over lies), so
   // the DOM says it instead. The workspaces cache only sharpens a fallback,
   // so it does not hold the hall busy.
   let busy = $derived(
-    $conversationsQuery.isPending || $performancesQuery.isPending || $tasksQuery.isPending,
+    $conversationsQuery.isPending || $performancesQuery.isPending || $tasksQuery.isPending || !axisReady,
   );
 
   // Truth rule: only settled data speaks. Pending or errored → null →
@@ -140,14 +179,15 @@
     if (
       !$conversationsQuery.isSuccess ||
       !$performancesQuery.isSuccess ||
-      !$tasksQuery.isSuccess
+      !$tasksQuery.isSuccess ||
+      !axisReady
     ) {
       return null;
     }
     return computeHallStatus(
       {
         conversations: $conversationsQuery.data.items,
-        performances: $performancesQuery.data.items,
+        performances: myPerformances,
         tasks: $tasksQuery.data.items,
         homeTzById,
       },
@@ -163,7 +203,7 @@
   // thing twice.
   const RELATION_HORIZON_MIN = 18 * 60;
   let nextMoment = $derived(
-    $performancesQuery.isSuccess ? nextTimedMoment($performancesQuery.data.items, clockNow) : null,
+    $performancesQuery.isSuccess && axisReady ? nextTimedMoment(myPerformances, clockNow) : null,
   );
   let relation = $derived.by(() => {
     if (!nextMoment) return null;
@@ -180,7 +220,7 @@
   // Today's timed moments + the open-notes count, from the same caches.
   // A quiet recap and a glance into the Desk — never a second agenda.
   let teaserTimes = $derived(
-    ($performancesQuery.isSuccess ? todayMoments($performancesQuery.data.items, clockNow) : []).map(
+    ($performancesQuery.isSuccess && axisReady ? todayMoments(myPerformances, clockNow) : []).map(
       (m) => ({ time: timeFmt.format(new Date(m.at)), place: m.place }),
     ),
   );

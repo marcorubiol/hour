@@ -443,8 +443,6 @@
 
 ## Producto — después
 
-- [ ] **Bug: la portada (Hall) dice «Today: Sala Beckett» y el rail «Next: Teatro Maria Matos»** (chat 17-10). El Hall cuenta cualquier función de cualquier espacio (`nextTimedMoment`/`todayMoments` sobre `/api/performances`); el rail es por persona (`computePulse`, ADR-096). El saludo es personal: el Hall usa la misma regla que el rail. La función era del espacio `demo` (ver la línea siguiente). Sin migración.
-- [ ] Marco: decidir — **Borrar el espacio «Demo (Hour)» (`demo`)**: de mayo, owner Marco, 9 proyectos, 14 funciones y 3 conversaciones inventadas, invisible en la barra pero dentro de «Everything» (Hall y dashboards). Irreversible; el backup diario lo cubre.
 - [ ] **Cada espacio activa o desactiva las tres lentes (Planner, Conversations, Cuentas)**: un admin lo decide en Ajustes, y una lente apagada desaparece de la navegación, de ⌘K y de las puertas de Desk, sin borrar datos. Abierto: si además cada persona puede ocultarse una lente para sí. (drop 16-10, sin estimar)
 - [ ] **Alta de persona: la cuenta que acepta ya es otra persona → fusión explícita que confirma un admin** (Marco, 14-10, ADR-107). Hoy la invitación se acepta y el dossier queda sin enlazar; la fusión reescribe el `person_id` de reparto, compromisos y notas. Plan antes de código.
 
