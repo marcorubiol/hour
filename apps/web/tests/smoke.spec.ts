@@ -81,8 +81,8 @@ test.describe('smoke', () => {
     await expect(countLabel).toContainText(/\d+\s+conversations?/);
     expect(await page.locator('.rel-stub__item').count()).toBeGreaterThan(0);
 
-    // Calendar month grid.
-    await page.goto('/h/planner');
+    // Calendar month grid (the bare /h/planner opens on the Temporada, ADR-117).
+    await page.goto('/h/planner?view=month');
     await waitForLoaded(page);
     await expect(page.locator('.cal__grid')).toBeVisible();
     expect(await page.locator('.cal__weekday').count()).toBe(7);
