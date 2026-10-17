@@ -2,13 +2,13 @@ import { describe, expect, it } from 'vitest';
 import {
   buildDeskFeed,
   dayBucket,
-  deskSummary,
+  goingItem,
+  invoiceHref,
   laterSummary,
-  type DeskConcern,
+  overdueInvoices,
+  rankWaiting,
   type DeskConvInput,
-  type DeskDateInput,
   type DeskInvoiceInput,
-  type DeskPerfInput,
 } from './desk-feed';
 import type { TaskItem } from './task';
 
@@ -25,10 +25,6 @@ function isoDay(offset: number): string {
 function actionAt(offset: number): string {
   return `${isoDay(offset)}T00:00:00+00:00`;
 }
-/** A wall-clock timestamp (start_at / starts_at), LOCAL like NOW. */
-function at(offset: number, hour = 0): string {
-  return new Date(2026, 6, 17 + offset, hour, 0, 0).toISOString();
-}
 
 function conv(id: string, o: Partial<DeskConvInput> = {}): DeskConvInput {
   return {
@@ -41,48 +37,32 @@ function conv(id: string, o: Partial<DeskConvInput> = {}): DeskConvInput {
     ...o,
   };
 }
-function perf(id: string, o: Partial<DeskPerfInput> = {}): DeskPerfInput {
-  return {
-    id,
-    slug: `perf-${id}`,
-    performed_at: isoDay(0),
-    status: 'confirmed',
-    venue_name: null,
-    city: null,
-    load_in_at: null,
-    soundcheck_at: null,
-    start_at: null,
-    loadout_at: null,
-    wrap_at: null,
-    venue: null,
-    project: { id: 'p1', slug: 'mamemi', name: 'MaMeMi', workspace_id: 'w1' },
-    ...o,
-  };
-}
-function dateEv(id: string, o: Partial<DeskDateInput> = {}): DeskDateInput {
-  return {
-    id,
-    kind: 'rehearsal',
-    status: 'confirmed',
-    title: null,
-    starts_at: at(0, 12),
-    all_day: false,
-    city: null,
-    performance_id: null,
-    project: { id: 'p1', slug: 'mamemi', name: 'MaMeMi' },
-    ...o,
-  };
-}
+/** Issued 30 days ago, due three days ago, no payments, on bolo b1. */
 function invoice(id: string, o: Partial<DeskInvoiceInput> = {}): DeskInvoiceInput {
   return {
     id,
+    workspace_id: 'w1',
+    project_id: 'p1',
+    payer_organization_id: null,
+    payer_fiscal_identity_id: null,
+    doc_type: 'factura',
     number: 'F-001',
     status: 'issued',
-    due_on: actionAt(-3),
+    issued_on: isoDay(-30),
+    due_on: isoDay(-3),
+    expected_on: null,
+    payment_condition: null,
+    subtotal: 1800,
     total: 1800,
     currency: 'EUR',
-    payer: { name: 'Festival Grec' },
-    project: { id: 'p1', slug: 'mamemi', name: 'MaMeMi' },
+    country: 'ES',
+    tax_lines: [],
+    notes: null,
+    paid_amount: 0,
+    payer: null,
+    project: { id: 'p1', slug: 'mamemi', name: 'MaMeMi', workspace_id: 'w1' },
+    lines: [{ bolo_id: 'b1' }],
+    payments: [],
     ...o,
   };
 }
@@ -104,7 +84,7 @@ function task(id: string, o: Partial<TaskItem> = {}): TaskItem {
   } as unknown as TaskItem;
 }
 
-const EMPTY = { conversations: [], tasks: [], performances: [], dates: [] };
+const EMPTY = { conversations: [], tasks: [] };
 
 describe('dayBucket', () => {
   it('keys overdue / today / tomorrow / weekday / anytime', () => {
@@ -116,76 +96,13 @@ describe('dayBucket', () => {
   });
 });
 
-describe('buildDeskFeed — banners', () => {
-  it("today's and tomorrow's gigs are bucket anchors, not rows", () => {
-    const feed = buildDeskFeed(
-      {
-        ...EMPTY,
-        performances: [
-          perf('today', { venue: { name: 'Kursaal' }, start_at: at(0, 20) }),
-          perf('tmrw', { performed_at: isoDay(1), venue: { name: 'Ateneu' }, start_at: at(1, 21) }),
-        ],
-      },
-      NOW,
-      'en',
-    );
-    expect(feed.find((b) => b.sortKey === 0)!.anchor).toMatchObject({ venue: 'Kursaal' });
-    expect(feed.find((b) => b.sortKey === 0)!.runs).toEqual([]);
-    expect(feed.find((b) => b.sortKey === 1)!.anchor).toMatchObject({ venue: 'Ateneu' });
-  });
-
-  it('a gig beyond tomorrow is an AGENDA row; past gigs drop', () => {
-    const feed = buildDeskFeed(
-      {
-        ...EMPTY,
-        performances: [
-          perf('far', { performed_at: isoDay(3), venue: { name: 'Sala' }, start_at: at(3, 20) }),
-          perf('past', { performed_at: isoDay(-2), venue: { name: 'Gone' } }),
-        ],
-      },
-      NOW,
-      'en',
-    );
-    expect(feed.map((b) => b.sortKey)).toEqual([3]);
-    expect(feed[0].runs[0]).toMatchObject({ concern: 'agenda' });
-    expect(feed[0].runs[0].items[0]).toMatchObject({ subject: 'Sala', atISO: at(3, 20) });
-  });
-});
-
-describe('buildDeskFeed — agenda dates', () => {
-  it('pure date events are agenda rows; a gig-slot date (performance_id) is dropped', () => {
-    const feed = buildDeskFeed(
-      {
-        ...EMPTY,
-        dates: [
-          dateEv('ev', { starts_at: at(2, 18), title: 'Assaig' }),
-          dateEv('slot', { starts_at: at(2, 20), performance_id: 'perf-x' }),
-        ],
-      },
-      NOW,
-      'en',
-    );
-    const rows = feed.flatMap((b) => b.runs).flatMap((r) => r.items);
-    expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ concern: 'agenda', subject: 'Assaig' });
-  });
-
-  it('an agenda row opens the Agenda at its own day', () => {
-    const feed = buildDeskFeed({ ...EMPTY, dates: [dateEv('ev', { starts_at: at(2, 18) })] }, NOW, 'en');
-    const row = feed.flatMap((b) => b.runs).flatMap((r) => r.items)[0];
-    expect(row.href).toBe(`/h/planner?view=agenda&d=${at(2, 18).slice(0, 10)}`);
-  });
-});
-
 describe('buildDeskFeed — fixed within-day order', () => {
   it('OVERDUE keeps task → conversation → money', () => {
     const feed = buildDeskFeed(
       {
         conversations: [conv('c', { next_action_at: actionAt(-1) })],
         tasks: [task('t', { due_at: actionAt(-1) })],
-        performances: [],
-        dates: [],
-        invoices: [invoice('i', { due_on: actionAt(-2) })],
+        invoices: [invoice('i', { due_on: isoDay(-2) })],
       },
       NOW,
       'en',
@@ -195,20 +112,18 @@ describe('buildDeskFeed — fixed within-day order', () => {
     expect(overdue.runs[2].items[0]).toMatchObject({ concern: 'money', verbKey: 'remind', amount: 1800 });
   });
 
-  it('a future bucket keeps task → agenda → conversation', () => {
+  it('a future bucket keeps task → conversation, and no agenda (ADR-117: that is the Planner)', () => {
     const feed = buildDeskFeed(
       {
         conversations: [conv('c', { status: 'hold', next_action_at: actionAt(3) })],
         tasks: [task('t', { due_at: actionAt(3) })],
-        performances: [perf('p', { performed_at: isoDay(3), venue: { name: 'Sala' }, start_at: at(3, 20) })],
-        dates: [],
       },
       NOW,
       'en',
     );
     const b = feed.find((x) => x.sortKey === 3)!;
-    expect(b.runs.map((r) => r.concern)).toEqual(['task', 'agenda', 'conversation']);
-    expect(b.runs[2].items[0]).toMatchObject({ verbKey: 'confirm', subject: 'Anna Prat' });
+    expect(b.runs.map((r) => r.concern)).toEqual(['task', 'conversation']);
+    expect(b.runs[1].items[0]).toMatchObject({ verbKey: 'confirm', subject: 'Anna Prat' });
   });
 
   it('ADR-102: a conversation is titled by its organization, also without a person', () => {
@@ -219,8 +134,6 @@ describe('buildDeskFeed — fixed within-day order', () => {
           conv('d', { status: 'hold', next_action_at: actionAt(3), person: null, organization: { name: 'Sala Beckett' } }),
         ],
         tasks: [],
-        performances: [],
-        dates: [],
       },
       NOW,
       'en',
@@ -249,18 +162,35 @@ describe('buildDeskFeed — tasks, AI, money', () => {
     expect(rows[0]).toMatchObject({ isProposal: true, reason: 'París en un mes · 20 contactes' });
   });
 
-  it('money: only issued invoices past due surface; paid ones ignored; no invoices → no money', () => {
+  it('money: only issued invoices past the date Cuentas expects surface; paid ones ignored; no invoices → no money', () => {
     const withMoney = buildDeskFeed(
-      { ...EMPTY, invoices: [invoice('overdue'), invoice('paid', { status: 'paid', due_on: actionAt(-9) })] },
+      { ...EMPTY, invoices: [invoice('overdue'), invoice('paid', { status: 'paid', due_on: isoDay(-9) })] },
       NOW,
       'en',
     );
     const money = withMoney.flatMap((b) => b.runs).filter((r) => r.concern === 'money');
     expect(money).toHaveLength(1);
     expect(money[0].items).toHaveLength(1);
+    expect(money[0].items[0]).toMatchObject({ href: '/h/books#bolo-b1', amount: 1800 });
 
     const noMoney = buildDeskFeed(EMPTY, NOW, 'en');
     expect(noMoney.flatMap((b) => b.runs).some((r) => r.concern === 'money')).toBe(false);
+  });
+
+  it('ADR-117 § 4: vencido is the aging, not due_on (an explicit expected date wins)', () => {
+    const late = invoice('a', { due_on: isoDay(10), expected_on: isoDay(-1) });
+    const notYet = invoice('b', { due_on: isoDay(-5), expected_on: isoDay(5) });
+    const partly = invoice('c', {
+      total: 1000,
+      payments: [{ id: 'pay', invoice_id: 'c', amount: 400, received_on: isoDay(-20) } as never],
+    });
+    const rows = overdueInvoices([late, notYet, partly], NOW);
+    expect(rows.map((r) => r.invoice.id).sort()).toEqual(['a', 'c']);
+    expect(rows.find((r) => r.invoice.id === 'c')!.owed).toBe(600);
+  });
+
+  it('an invoice with no bolo opens the lens', () => {
+    expect(invoiceHref({ lines: [{ bolo_id: null }] })).toBe('/h/books');
   });
 
   it('undated open task lands in the anytime tail', () => {
@@ -293,38 +223,6 @@ describe('buildDeskFeed — revive on quiet days', () => {
   });
 });
 
-describe('deskSummary', () => {
-  it('needYou counts dated items (anytime excluded); pipeline sums open invoices', () => {
-    const s = deskSummary(
-      {
-        conversations: [
-          conv('a', { next_action_at: actionAt(-2) }), // overdue
-          conv('b', { status: 'hold', next_action_at: actionAt(0) }), // today + hold
-          conv('c', { next_action_at: actionAt(5) }), // future
-        ],
-        tasks: [task('dated', { due_at: actionAt(0) }), task('anytime')],
-        performances: [perf('p', { performed_at: isoDay(2), city: 'Balsareny' })],
-        dates: [],
-        invoices: [invoice('open', { total: 1800, status: 'issued' }), invoice('paid', { total: 999, status: 'paid' })],
-      },
-      NOW,
-    );
-    expect(s).toMatchObject({
-      needYou: 5, // 3 convs + 1 dated task + 1 overdue invoice; anytime task excluded
-      overdue: 2, // 1 conv + 1 invoice
-      nextShowCity: 'Balsareny',
-      holds: 1,
-      live: 3,
-      pipeline: 1800,
-      currency: 'EUR',
-    });
-  });
-
-  it('pipeline is null when fees are not visible (no invoices passed)', () => {
-    expect(deskSummary({ ...EMPTY, conversations: [conv('a', { next_action_at: actionAt(0) })] }, NOW).pipeline).toBeNull();
-  });
-});
-
 describe('buildDeskFeed — horizon', () => {
   it('keeps a block per day up to the end of this week; everything past it is ONE later bucket', () => {
     const feed = buildDeskFeed(
@@ -349,7 +247,7 @@ describe('buildDeskFeed — horizon', () => {
       {
         ...EMPTY,
         conversations: [conv('a', { next_action_at: actionAt(40) }), conv('b', { next_action_at: actionAt(9) })],
-        dates: [dateEv('ev', { starts_at: `${isoDay(15)}T10:00:00Z`, title: 'Assaig' })],
+        tasks: [task('t', { due_at: isoDay(15) } as Partial<TaskItem>)],
       },
       NOW,
       'en',
@@ -363,60 +261,66 @@ describe('buildDeskFeed — horizon', () => {
   });
 });
 
-describe('buildDeskFeed — multi-day runs', () => {
-  const allRows = (feed: ReturnType<typeof buildDeskFeed>) => feed.flatMap((b) => b.runs).flatMap((r) => r.items);
 
-  it('a date series is ONE row on the day it starts, carrying its span', () => {
-    const days = [2, 3, 4, 5, 6, 9];
+describe('rankWaiting — «Te espera» by weight (ADR-117)', () => {
+  const ask = (id: string, offset: number) =>
+    goingItem({ of: 'performance', id, day: isoDay(offset), subject: id, projectId: 'p1', projectName: 'MaMeMi', href: null });
+
+  it('overdue first, then today, then the week; inside a tier money > call > voy > task > proposal', () => {
     const feed = buildDeskFeed(
       {
-        ...EMPTY,
-        dates: days.map((o) =>
-          dateEv(`r${o}`, { starts_at: `${isoDay(o)}T10:00:00Z`, title: 'Residència', series_id: 's1' }),
-        ),
-      },
-      NOW,
-      'en',
-    );
-    const rows = allRows(feed);
-    expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ id: 'date-r2', day: isoDay(2), runDays: 6 });
-    // its later days do not leak into the later line
-    expect(laterSummary(feed)).toBeNull();
-  });
-
-  it('a performance series is one row too; a lone series_id is not a run', () => {
-    const feed = buildDeskFeed(
-      {
-        ...EMPTY,
-        performances: [
-          perf('a', { performed_at: isoDay(3), series_id: 'f', venue: { name: 'Grec' } }),
-          perf('b', { performed_at: isoDay(4), series_id: 'f', venue: { name: 'Grec' } }),
-          perf('solo', { performed_at: isoDay(5), series_id: 'g', venue: { name: 'Sala' } }),
+        conversations: [conv('call-today', { next_action_at: actionAt(0) }), conv('call-late', { next_action_at: actionAt(-1) })],
+        tasks: [
+          task('t-today', { due_at: actionAt(0) }),
+          task('ai-today', { origin: 'ai', due_at: actionAt(0) }),
+          task('t-week', { due_at: actionAt(3) }),
+          task('t-late', { due_at: actionAt(-2) }),
         ],
+        invoices: [invoice('i')],
       },
       NOW,
       'en',
     );
-    expect(allRows(feed).map((r) => [r.id, r.runDays])).toEqual([
-      ['perf-a', 2],
-      ['perf-solo', null],
+    const w = rankWaiting(feed, [ask('voy-today', 0), ask('voy-far', 10)], NOW);
+    expect(w.rows.map((r) => r.id)).toEqual([
+      'inv-i',
+      'conv-call-late',
+      'task-t-late',
+      'conv-call-today',
+      'going-voy-today',
+      'task-t-today',
+      'task-ai-today',
     ]);
+    expect(w.total).toBe(9);
+    expect(w.overdue).toBe(3);
   });
 
-  it('a run starting today is the banner, with its span, and does not repeat tomorrow', () => {
+  it('the anytime tail and what lies past this week stay in the day list', () => {
     const feed = buildDeskFeed(
-      {
-        ...EMPTY,
-        performances: [0, 1, 2].map((o) =>
-          perf(`d${o}`, { performed_at: isoDay(o), series_id: 'fest', venue: { name: 'Kursaal' } }),
-        ),
-      },
+      { conversations: [conv('far', { next_action_at: actionAt(20) })], tasks: [task('loose')] },
       NOW,
       'en',
     );
-    expect(feed).toHaveLength(1);
-    expect(feed[0].anchor).toMatchObject({ venue: 'Kursaal', runDays: 3 });
-    expect(allRows(feed)).toEqual([]);
+    expect(rankWaiting(feed, [], NOW).total).toBe(0);
+  });
+
+  it('calm keeps overdue and today only', () => {
+    const feed = buildDeskFeed(
+      { conversations: [], tasks: [task('a', { due_at: actionAt(0) }), task('b', { due_at: actionAt(3) })] },
+      NOW,
+      'en',
+    );
+    expect(rankWaiting(feed, [ask('v', 4)], NOW, { calm: true }).rows.map((r) => r.id)).toEqual(['task-a']);
+  });
+
+  it('at most seven rows, the total says how many qualified', () => {
+    const feed = buildDeskFeed(
+      { conversations: [], tasks: Array.from({ length: 10 }, (_, i) => task(`t${i}`, { due_at: actionAt(0) })) },
+      NOW,
+      'en',
+    );
+    const w = rankWaiting(feed, [], NOW);
+    expect(w.rows).toHaveLength(7);
+    expect(w.total).toBe(10);
   });
 });

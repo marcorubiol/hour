@@ -1,238 +1,365 @@
 <script lang="ts">
   /**
-   * Desk (ADR-065/068/069/070 · converged design 2026-07-18) — the catch-up
-   * surface reached by the hall door. ONE ranked feed, FOUR concerns
-   * (tasks → agenda → conversations → money), grouped in day buckets, fixed
-   * within-day order mirroring the lens nav. Today's/tomorrow's gig is the
-   * bucket banner. The feed math is pure and tested in $lib/desk-feed; this
-   * file fetches, scopes by pins, and renders.
+   * Desk as a dashboard (ADR-117, proposal A; ADR-121). «What asks for my
+   * attention today, of everything», in four bands:
    *
-   * The gutter carries the type (a door to that lens); rows carry no marks.
-   * Only tasks are stored — every other row is a call derived from state
-   * (invoice overdue → "remind", conversation due → "reply") that vanishes
-   * when the state changes. AI-proposed tasks (origin='ai') are the consent
-   * inbox (ADR-069): real rows, accept/dismiss, never invented.
+   *   1 · Lo siguiente  — the rail's NEXT with room ($lib/pulse, same feeds)
+   *   2 · Te espera     — the short list by weight ($lib/desk-feed rankWaiting)
+   *   3 · Ha cambiado   — since your last visit ($lib/desk-bands changesSince)
+   *   4 · La temporada  — one door per lens, in the lens's own arithmetic
    *
-   * Query keys ['conversations','today'], ['today-performances'], ['tasks','open']
-   * are SHARED with the hall/HomeView — one cache. Chrome copy is i18n
-   * (locale-resolved), matching the Catalan hall.
+   * Desktop: two columns, what you act on (1, 2) on the left and what you
+   * look at (4, 3) on the right. Phone: one column, 1 → 4. Calm keeps 1 and 2.
+   * Each band loads and fails on its own; none of them is the page's error.
+   *
+   * Bands 2–4 follow the scope like every lens; band 1 does not, like the rail
+   * (ADR-096 § 5). The math is pure and tested in $lib; this file fetches,
+   * scopes and hands down. Queries share their keys with the lenses they
+   * summarise (Books, Conversations, the thread feed, the rail) — one cache.
    */
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
+  import { toStore } from 'svelte/store';
+  import { tick } from 'svelte';
   import { fetchJSON, mutateJSON, ApiError } from '$lib/api';
   import { addToast } from '$lib/components/Toast.svelte';
   import TaskComposer from '$lib/components/TaskComposer.svelte';
   import LensHeader from '$lib/components/LensHeader.svelte';
   import LensTitle from '$lib/components/LensTitle.svelte';
-  import { accentVar, accentVarFor } from '$lib/utils/accent';
+  import DeskNext from '$lib/components/desk/DeskNext.svelte';
+  import DeskWaiting from '$lib/components/desk/DeskWaiting.svelte';
+  import DeskChanged from '$lib/components/desk/DeskChanged.svelte';
+  import DeskSeason from '$lib/components/desk/DeskSeason.svelte';
+  import { accentVarFor } from '$lib/utils/accent';
   import { spaceName } from '$lib/utils/identity';
   import { detectLocale, LOCALE_TAG, t } from '$lib/i18n';
-  import { dayMonth } from '$lib/datetime';
-  import { plannerDayHref } from '$lib/planner';
+  import { localeDayMonth } from '$lib/datetime';
+  import { addDaysIso, dayKeyInTz, plannerDayHref } from '$lib/planner';
   import { usePins } from '$lib/stores/pins.svelte';
   import { useCalm } from '$lib/stores/calm.svelte';
-  import {
-    buildLineIndex,
-    buildProjectIndex,
-    resolveScope,
-    type NavWorkspace,
-    type RawLine,
-  } from '$lib/nav';
-  import {
-    workspacesQueryOptions,
-    activeProjectsQueryOptions,
-    allLinesQueryOptions,
-  } from '$lib/nav-queries';
+  import { buildLineIndex, buildProjectIndex, resolveScope, type NavWorkspace, type RawLine } from '$lib/nav';
+  import { workspacesQueryOptions, activeProjectsQueryOptions, allLinesQueryOptions } from '$lib/nav-queries';
+  import { moneyAccessAnyQueryOptions } from '$lib/bolo-queries';
   import type { DeskConversation } from '$lib/components/DeskBoard.svelte';
   import { taskProjectId, type TaskItem, type TasksCache, type TaskTarget } from '$lib/task';
   import {
     buildDeskFeed,
-    deskSummary,
+    goingItem,
     laterSummary,
-    type DeskConcern,
+    rankWaiting,
+    GOING_DAYS,
     type DeskConvInput,
-    type DeskDateInput,
-    type DeskInvoiceInput,
     type DeskItem,
-    type DeskPerfInput,
-    type DeskRun,
-    type ShowAnchor,
   } from '$lib/desk-feed';
+  import { changesSince, goingAsks, plannerDoor, sinceInstant } from '$lib/desk-bands';
+  import { computePulse } from '$lib/pulse';
+  import { createPulseFeeds, pulseSlipContext } from '$lib/pulse-feeds.svelte';
+  import { dateSlip, perfDayKey, performanceSlip, type DateEvent, type PerformanceEvent, type SlipKind } from '$lib/month-events';
+  import { seasonWindow } from '$lib/season';
+  import { currentSeason, type OverviewResponse } from '$lib/conversation-overview';
+  import type { ThreadFeedView } from '$lib/threads';
+  import { setCommitment } from '$lib/commitments';
+  import {
+    invoicesByBolo,
+    moneyPosition,
+    observedPayerTermsDays,
+    seasonOf as moneySeasonOf,
+    type InvoicingMode,
+    type MoneyBolo,
+    type MoneyInvoiceItem,
+  } from '$lib/money';
 
   type Conversation = DeskConversation & { workspace_id: string };
-  type DeskPerf = DeskPerfInput & {
-    project: { id: string; slug: string | null; name: string; workspace_id: string } | null;
-  };
-  type DeskDate = DeskDateInput & {
-    project: { id: string; slug: string | null; name: string; workspace_id: string } | null;
-  };
-  type DeskInvoice = DeskInvoiceInput & { project: { id: string; slug: string | null; name: string } | null };
 
   const pins = usePins();
   const calm = useCalm();
   const queryClient = useQueryClient();
   const locale = detectLocale(navigator.language);
-  const todayParam = new Date().toISOString().slice(0, 10);
+  const viewerTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
   // Tick on the minute so buckets roll over at midnight (shell-clock idiom).
   let clockNow = $state(new Date());
   $effect(() => {
     let timer: ReturnType<typeof setTimeout>;
-    const tick = () => {
+    const step = () => {
       timer = setTimeout(() => {
         clockNow = new Date();
-        tick();
+        step();
       }, 60_000 - (Date.now() % 60_000));
     };
-    tick();
+    step();
     return () => clearTimeout(timer);
   });
+  let today = $derived(dayKeyInTz(clockNow.toISOString(), viewerTz));
 
-  const timeFmt = new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
-  const fmtTime = (iso: string | null) => (iso ? timeFmt.format(new Date(iso)) : '');
   const money = (n: number, cur: string | null) =>
     new Intl.NumberFormat(LOCALE_TAG[locale], { style: 'currency', currency: cur || 'EUR', maximumFractionDigits: 0 }).format(n);
 
-  // ── Data ─────────────────────────────────────────────────────────────
+  // ── «Since your last visit»: per device, in this browser (Phase 0: one
+  //    device is enough). Read once on arrival; written on the way out, so a
+  //    reload does not wipe what you have not looked at yet. ──────────────
+  const VISIT_KEY = 'hour.desk.last-visit';
+  function readVisit(): string | null {
+    try {
+      return localStorage.getItem(VISIT_KEY);
+    } catch {
+      return null;
+    }
+  }
+  const since = sinceInstant(readVisit(), new Date());
+  $effect(() => {
+    const save = () => {
+      try {
+        localStorage.setItem(VISIT_KEY, new Date().toISOString());
+      } catch {
+        /* private window: «since» falls back to a week */
+      }
+    };
+    const onHide = () => {
+      if (document.visibilityState === 'hidden') save();
+    };
+    document.addEventListener('visibilitychange', onHide);
+    return () => {
+      document.removeEventListener('visibilitychange', onHide);
+      save();
+    };
+  });
+  const sinceLabel = new Intl.DateTimeFormat(LOCALE_TAG[locale], {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).format(new Date(since));
+
+  // ── Containers and scope ──────────────────────────────────────────────
   const workspacesQuery = createQuery(workspacesQueryOptions());
-  let workspaceSlug = $derived($workspacesQuery.data?.items[0]?.slug ?? '');
   const projectsQuery = createQuery(activeProjectsQueryOptions());
   const linesQuery = createQuery(allLinesQueryOptions());
+  let workspaces = $derived<NavWorkspace[]>($workspacesQuery.data?.items ?? []);
+  let workspaceSlug = $derived(workspaces[0]?.slug ?? '');
+  let workspaceSlugById = $derived(new Map(workspaces.map((w) => [w.id, w.slug])));
+  let projectIndex = $derived(buildProjectIndex(workspaces, $projectsQuery.data?.items ?? []));
+  let lineIndex = $derived(buildLineIndex(workspaces, ($linesQuery.data?.items as RawLine[]) ?? []));
+  let scope = $derived(resolveScope(pins.pins, workspaces, lineIndex, projectIndex));
+  let scopedProjectIds = $derived(new Set(scope.projectIds));
+  let scopeUnresolved = $derived(
+    (pins.lineIds().length > 0 && scope.lines.length !== pins.lineIds().length) ||
+      (pins.projectIds().length > 0 && scope.projects.length !== pins.projectIds().length),
+  );
+  let filterIds = $derived({ projectIds: scope.projectIds, workspaceIds: scope.workspaceIds });
+  let lineIds = $derived(scope.lines.map((l) => l.id));
+  const byProject = (pid: string | null | undefined, wsId?: string | null) => {
+    if (scope.isEmpty) return true;
+    if (wsId && scope.workspaceIds.includes(wsId)) return true;
+    return !!pid && scopedProjectIds.has(pid);
+  };
+  function feedParams(k: { projectIds: string[]; workspaceIds: string[] }, extra: Record<string, string> = {}): string {
+    const p = new URLSearchParams(extra);
+    if (k.projectIds.length > 0) p.set('project_ids', k.projectIds.join(','));
+    if (k.workspaceIds.length > 0) p.set('workspace_ids', k.workspaceIds.join(','));
+    return p.toString();
+  }
+
+  // ── Band 1 · Lo siguiente — the rail's feeds, the rail's answer ────────
+  const feeds = createPulseFeeds(() => today);
+  let pulse = $derived(
+    computePulse({ performances: feeds.performances, dates: feeds.dates, viewerTz, axis: feeds.axis }, clockNow),
+  );
+  /** A second thing within 48 h of the first: the same answer, the first removed. */
+  let then = $derived.by(() => {
+    const first = pulse.next;
+    if (!first) return null;
+    const second = computePulse(
+      {
+        performances: feeds.performances.filter((p) => p.id !== first.ref.id),
+        dates: feeds.dates.filter((d) => d.id !== first.ref.id),
+        viewerTz,
+        axis: feeds.axis,
+      },
+      clockNow,
+    ).next;
+    return second && second.day <= addDaysIso(first.day, 2) ? second : null;
+  });
+  const kindLabel = (kind: SlipKind) => t(`planner.kind_${kind}`, locale);
+  let slipCtx = $derived(pulseSlipContext(feeds.workspaces, viewerTz, kindLabel));
+
+  // ── Band 2 · Te espera ─────────────────────────────────────────────────
   const conversationsQuery = createQuery({
     queryKey: ['conversations', 'today'],
     queryFn: ({ signal }: { signal: AbortSignal }) =>
       fetchJSON<{ items: Conversation[] }>('/api/conversations?status=any&limit=100', signal),
-  });
-  const performancesQuery = createQuery({
-    queryKey: ['today-performances'],
-    queryFn: ({ signal }: { signal: AbortSignal }) =>
-      fetchJSON<{ items: DeskPerf[] }>(`/api/performances?status=any&from=${todayParam}&limit=200`, signal),
-  });
-  const datesQuery = createQuery({
-    queryKey: ['desk-dates', todayParam],
-    queryFn: ({ signal }: { signal: AbortSignal }) =>
-      fetchJSON<{ items: DeskDate[] }>(`/api/dates?from=${todayParam}&limit=200`, signal),
   });
   const tasksQuery = createQuery({
     queryKey: ['tasks', 'open'],
     queryFn: ({ signal }: { signal: AbortSignal }) =>
       fetchJSON<{ items: TaskItem[] }>('/api/tasks?status=open&limit=200', signal),
   });
-  // Money is fee-gated: a viewer without read:money gets 403 → isError → the
-  // whole money concern (rows + € digest) is suppressed silently (masked and
-  // unset are indistinguishable by design).
-  const invoicesQuery = createQuery({
-    queryKey: ['desk-invoices'],
-    retry: false,
-    queryFn: ({ signal }: { signal: AbortSignal }) =>
-      fetchJSON<{ items: DeskInvoice[] }>('/api/invoices?limit=200', signal),
-  });
 
-  let workspaces = $derived<NavWorkspace[]>($workspacesQuery.data?.items ?? []);
-  let projectIndex = $derived(buildProjectIndex(workspaces, $projectsQuery.data?.items ?? []));
-  let lineIndex = $derived(buildLineIndex(workspaces, ($linesQuery.data?.items as RawLine[]) ?? []));
+  // Money: the Books keys and URLs, so the Desk and Cuentas share one cache.
+  // Only an explicit «yes» to read:money opens it: without it, no trace.
+  const accessQuery = createQuery(moneyAccessAnyQueryOptions());
+  let readMoney = $derived($accessQuery.data?.read_money === true);
+  const invoicesQuery = createQuery(
+    toStore(() => ({
+      queryKey: ['invoices', { p: filterIds.projectIds, w: filterIds.workspaceIds }] as const,
+      enabled: readMoney && !scopeUnresolved,
+      retry: false,
+      queryFn: ({ signal }: { signal: AbortSignal }) =>
+        fetchJSON<{ items: MoneyInvoiceItem[] }>(`/api/invoices?${feedParams(filterIds)}`, signal),
+    })),
+  );
+  const bolosQuery = createQuery(
+    toStore(() => ({
+      queryKey: ['money-bolos', { p: filterIds.projectIds, w: filterIds.workspaceIds }] as const,
+      enabled: readMoney && !scopeUnresolved,
+      retry: false,
+      queryFn: ({ signal }: { signal: AbortSignal }) =>
+        fetchJSON<{ items: MoneyBolo[] }>(`/api/money/bolos?${feedParams(filterIds, { limit: '500' })}`, signal),
+    })),
+  );
+
   let conversations = $derived<Conversation[]>($conversationsQuery.data?.items ?? []);
-  let performances = $derived<DeskPerf[]>($performancesQuery.data?.items ?? []);
-  let dates = $derived<DeskDate[]>($datesQuery.data?.items ?? []);
   let tasks = $derived<TaskItem[]>($tasksQuery.data?.items ?? []);
-  let feeVisible = $derived($invoicesQuery.isSuccess);
-  let invoices = $derived<DeskInvoice[]>(feeVisible ? ($invoicesQuery.data?.items ?? []) : []);
-
-  // ── Scope by pins (empty = everything the user can see) ───────────────
-  let scope = $derived(resolveScope(pins.pins, workspaces, lineIndex, projectIndex));
-  let scopedProjectIds = $derived(new Set(scope.projectIds));
-  const byProject = (pid: string | null | undefined, wsId?: string | null) => {
-    if (scope.isEmpty) return true;
-    if (wsId && scope.workspaceIds.includes(wsId)) return true;
-    return !!pid && scopedProjectIds.has(pid);
-  };
-
-  let scopedConversations = $derived(
-    conversations.filter((e) => byProject(e.project?.id, e.workspace_id)),
-  );
+  let invoices = $derived<MoneyInvoiceItem[]>(readMoney ? ($invoicesQuery.data?.items ?? []) : []);
+  let scopedConversations = $derived(conversations.filter((e) => byProject(e.project?.id, e.workspace_id)));
   let scopedTasks = $derived(tasks.filter((tk) => byProject(taskProjectId(tk), tk.workspace_id)));
-  let scopedPerformances = $derived(performances.filter((p) => byProject(p.project?.id, p.project?.workspace_id)));
-  let scopedDates = $derived(dates.filter((d) => byProject(d.project?.id, d.project?.workspace_id)));
-  let scopedInvoices = $derived(invoices.filter((i) => byProject(i.project?.id)));
+  let scopedPerfs = $derived(feeds.performances.filter((p) => byProject(p.project?.id, p.project?.workspace_id)));
+  let scopedDates = $derived(feeds.dates.filter((d) => byProject(d.project?.id, d.project?.workspace_id)));
 
-  let feedInput = $derived({
-    conversations: scopedConversations as DeskConvInput[],
-    tasks: scopedTasks,
-    performances: scopedPerformances as DeskPerfInput[],
-    dates: scopedDates as DeskDateInput[],
-    invoices: feeVisible ? (scopedInvoices as DeskInvoiceInput[]) : undefined,
-  });
-  let feed = $derived(buildDeskFeed(feedInput, clockNow, locale));
-  let summary = $derived(deskSummary(feedInput, clockNow));
-  // Past this week the Desk stops itemising: one line, opening the Agenda on
-  // the first day of that stretch (scope rides in the pins store).
+  let feed = $derived(
+    buildDeskFeed(
+      {
+        conversations: scopedConversations as DeskConvInput[],
+        tasks: scopedTasks,
+        invoices: readMoney && $invoicesQuery.isSuccess ? invoices : undefined,
+        showToday: scopedPerfs.some((p) => p.status !== 'cancelled' && perfDayKey(p) === today),
+      },
+      clockNow,
+      locale,
+    ),
+  );
   let later = $derived(laterSummary(feed));
-  const laterText = (l: NonNullable<typeof later>) =>
-    t(l.count === 1 ? 'desk.later_one' : 'desk.later_many', locale, { n: l.count, day: dayMonth(l.until) });
-  const runDaysText = (n: number) => ` · ${n} ${t('block.days_unit', locale)}`;
 
-  let loading = $derived(
-    $conversationsQuery.isPending || $tasksQuery.isPending || $performancesQuery.isPending || $datesQuery.isPending,
-  );
-  let errored = $derived($conversationsQuery.isError || $tasksQuery.isError || $performancesQuery.isError);
-  // aria-busy: every feed the Desk folds, plus the indexes the pins resolve
-  // against and the fee-gated invoices (a 403 settles it too). Read by the
-  // E2E (`tests/lens.ts`) as «the lens has loaded».
-  let busy = $derived(
-    loading ||
-      $workspacesQuery.isPending ||
-      $projectsQuery.isPending ||
-      $linesQuery.isPending ||
-      $invoicesQuery.isPending,
-  );
-
-  // ── Calm mode — the toggle lives in the shell sidebar (by the clock); the
-  //    Desk only consumes the shared store to fold the feed. ──────────────
-  const bucketCount = (b: (typeof feed)[number]) => b.runs.reduce((n, r) => n + r.items.length, 0);
-  // Count shown on the right of each day header (the show banner counts as one).
-  const bucketTotal = (b: (typeof feed)[number]) => bucketCount(b) + (b.anchor ? 1 : 0);
-
-  let visibleBuckets = $derived(calm.on ? feed.filter((b) => b.sortKey === 0) : feed);
-  let foldedRest = $derived(
-    calm.on ? feed.filter((b) => b.sortKey > 0).reduce((n, b) => n + bucketCount(b), 0) : 0,
-  );
-  let calmFolded = $derived(calm.on ? summary.overdue + foldedRest : 0);
-  let headline = $derived(
-    calm.on ? visibleBuckets.reduce((n, b) => n + bucketCount(b), 0) : summary.needYou,
-  );
-
-  // ── Gutter labels are doors to the view they name (scope rides in the pins
-  //    store). A run that carries its own door (agenda → its day in the
-  //    Agenda) uses it; otherwise the lens. ──
-  const LENS_HREF: Record<DeskConcern, string | null> = {
-    task: null,
-    agenda: '/h/planner?view=agenda',
-    conversation: '/h/conversations',
-    money: '/h/books',
-  };
-  const runHref = (run: DeskRun) => run.items[0]?.href ?? LENS_HREF[run.concern];
-  const concernLabel = (c: DeskConcern) => t(`desk.concern_${c}`, locale);
-  const needYouText = (n: number) =>
-    n === 0 ? t('desk.need_you_zero', locale) : n === 1 ? t('desk.need_you_one', locale) : t('desk.need_you_many', locale, { n });
-  const personHref = (slug: string | null) => (slug && workspaceSlug ? `/h/${workspaceSlug}/person/${slug}` : null);
-
-  let digest = $derived.by(() => {
-    const f: { text: string; href: string }[] = [];
-    if (summary.live)
-      f.push({
-        text: summary.live === 1 ? t('desk.digest_live_one', locale) : t('desk.digest_live_many', locale, { n: summary.live }),
-        href: '/h/conversations',
+  /** «Voy · no voy» Hour has for you; band 1 already asks about its own row. */
+  let asks = $derived(
+    goingAsks(
+      { performances: scopedPerfs, dates: scopedDates, axis: feeds.axis, viewerTz },
+      today,
+      GOING_DAYS,
+      new Set(pulse.next ? [pulse.next.ref.id] : []),
+    ).map((a) => {
+      const slip =
+        a.of === 'performance'
+          ? performanceSlip(a.row as PerformanceEvent, slipCtx)
+          : dateSlip(a.row as DateEvent, slipCtx);
+      return goingItem({
+        of: a.of,
+        id: a.id,
+        day: a.day,
+        subject: [slip.name, slip.city].filter(Boolean).join(' · '),
+        projectId: a.row.project?.id ?? null,
+        projectName: a.row.project?.name ?? '',
+        href: slip.href ?? plannerDayHref('day', a.day),
       });
-    if (summary.holds)
-      f.push({
-        text: summary.holds === 1 ? t('desk.digest_holds_one', locale) : t('desk.digest_holds_many', locale, { n: summary.holds }),
-        href: '/h/conversations',
-      });
-    if (summary.pipeline != null && summary.pipeline > 0)
-      f.push({ text: t('desk.digest_in_progress', locale, { amount: money(summary.pipeline, summary.currency) }), href: '/h/books' });
-    if (summary.nextShowCity)
-      f.push({ text: t('desk.digest_next_show', locale, { place: summary.nextShowCity }), href: '/h/planner' });
-    return f;
+    }),
+  );
+  let waiting = $derived(rankWaiting(feed, asks, clockNow, { calm: calm.on }));
+
+  let waitingLoading = $derived(
+    $conversationsQuery.isPending || $tasksQuery.isPending || $workspacesQuery.isPending || $accessQuery.isPending,
+  );
+  let waitingErrored = $derived($conversationsQuery.isError || $tasksQuery.isError);
+
+  // ── Band 3 · Ha cambiado, and the Conversations door ───────────────────
+  const overviewQuery = createQuery(
+    toStore(() => ({
+      queryKey: ['conversation-overview', filterIds.projectIds, filterIds.workspaceIds, lineIds] as const,
+      enabled: !scopeUnresolved,
+      queryFn: ({ signal }: { signal: AbortSignal }) => {
+        const p = new URLSearchParams(feedParams(filterIds));
+        if (lineIds.length > 0) p.set('line_ids', lineIds.join(','));
+        return fetchJSON<OverviewResponse>(`/api/conversations/overview?${p}`, signal);
+      },
+    })),
+  );
+  const threadsQuery = createQuery(
+    toStore(() => ({
+      queryKey: ['thread-feed', filterIds.projectIds, filterIds.workspaceIds] as const,
+      enabled: !scopeUnresolved,
+      staleTime: 0,
+      queryFn: ({ signal }: { signal: AbortSignal }) =>
+        fetchJSON<ThreadFeedView>(`/api/threads?${feedParams(filterIds)}`, signal),
+    })),
+  );
+  let overview = $derived($overviewQuery.data ?? null);
+  let changes = $derived(
+    changesSince(
+      {
+        threads: $threadsQuery.data?.threads ?? [],
+        hot: overview?.hot.rows ?? [],
+        lastMailout: overview?.last_mailout ?? null,
+      },
+      since,
+      clockNow,
+    ),
+  );
+  let changedLoading = $derived($overviewQuery.isPending || $threadsQuery.isPending);
+
+  // ── Band 4 · La temporada ──────────────────────────────────────────────
+  let plannerFig = $derived(
+    feeds.settled
+      ? plannerDoor({ performances: scopedPerfs, dates: scopedDates, viewerTz }, seasonWindow(today))
+      : null,
+  );
+  let convFig = $derived(
+    overview ? { holds: overview.season.counts.hold, live: overview.total, due: overview.due.count } : null,
+  );
+  let moneyFig = $derived.by(() => {
+    if (!$bolosQuery.isSuccess || !$invoicesQuery.isSuccess) return null;
+    const bolos = ($bolosQuery.data?.items ?? []).filter(
+      (b) => byProject(b.project?.id, b.project?.workspace_id) || (!!b.line_id && scope.lineIds.includes(b.line_id)),
+    );
+    const modeById = new Map(
+      workspaces.map((w) => [w.id, ((w as NavWorkspace & { invoicing_mode?: string }).invoicing_mode ?? 'legal') as InvoicingMode]),
+    );
+    const positions = moneyPosition(
+      bolos,
+      {
+        invoicesByBolo: invoicesByBolo(invoices),
+        termsByPayer: observedPayerTermsDays(invoices, invoices.flatMap((i) => i.payments)),
+        modeOf: (b) => modeById.get(b.project?.workspace_id ?? '') ?? 'legal',
+        today: clockNow,
+      },
+      moneySeasonOf(clockNow.toISOString()),
+    );
+    const pos = positions.find((p) => p.currency === 'EUR') ?? positions[0];
+    return pos
+      ? { owed: money(pos.owed, pos.currency), overdue: money(pos.overdue, pos.currency), overdueCount: pos.overdueCount }
+      : { owed: money(0, 'EUR'), overdue: money(0, 'EUR'), overdueCount: 0 };
   });
+  let seasonLabel = $derived(t('overview.season_of', locale, { season: currentSeason(clockNow).label }));
+
+  // aria-busy: the containers the pins resolve against and the lists the
+  // Desk folds. Read by the E2E (`tests/loaded.ts`) as «the lens has loaded».
+  let busy = $derived(
+    waitingLoading || $projectsQuery.isPending || $linesQuery.isPending || !feeds.settled,
+  );
+
+  // ── Header: the overdue and what waits, in one sentence ────────────────
+  let titleRest = $derived(
+    waiting.total === 0
+      ? t('desk.title_waiting_zero', locale)
+      : t(waiting.total === 1 ? 'desk.title_waiting_one' : 'desk.title_waiting_many', locale, { n: waiting.total }),
+  );
+  let titleOver = $derived(
+    waiting.overdue > 0
+      ? t(waiting.overdue === 1 ? 'desk.title_overdue_one' : 'desk.title_overdue_many', locale, { n: waiting.overdue })
+      : null,
+  );
+  let dateWords = $derived(
+    `${new Intl.DateTimeFormat(LOCALE_TAG[locale], { weekday: 'long', timeZone: 'UTC' }).format(new Date(`${today}T12:00:00Z`))} · ${localeDayMonth(today, LOCALE_TAG[locale])}`,
+  );
 
   // ── Task + proposal mutations (TaskBoard contract; optimistic toggle). ──
   const toggleTask = createMutation({
@@ -269,22 +396,37 @@
     accepted.add(id);
     accepted = new Set(accepted);
   }
+  const isGhost = (i: DeskItem) => i.concern === 'task' && i.isProposal && i.taskId != null && !accepted.has(i.taskId);
 
-  // ── Composer — TaskComposer owns the POST + cache. The default target
-  //    follows the pins (a free space task, the parentless authoring home);
-  //    the picker attaches to any project / line / show / conversation. ─────
-  let defaultWsId = $derived(
-    scope.workspaceIds.length === 1 ? scope.workspaceIds[0] : (workspaces[0]?.id ?? ''),
-  );
+  async function answerGoing(g: NonNullable<DeskItem['going']>, state: 'going' | 'not_going') {
+    if (!feeds.personId) return;
+    try {
+      await setCommitment(queryClient, g.of, g.id, feeds.personId, state);
+    } catch (err) {
+      addToast({ tone: 'danger', title: t('desk.toast_change_failed', locale), message: err instanceof ApiError ? err.message : t('perf.unexpected', locale) });
+    }
+  }
+
+  // ── «+ Tarea»: the composer is an occasional gesture, so it waits behind
+  //    a button. TaskComposer owns the POST + cache; the default target
+  //    follows the pins; the picker attaches to a show or a conversation. ──
+  let composerOpen = $state(false);
+  let composerEl = $state<HTMLDivElement | null>(null);
+  async function openComposer() {
+    composerOpen = !composerOpen;
+    if (!composerOpen) return;
+    await tick();
+    composerEl?.querySelector<HTMLElement>('input, textarea')?.focus();
+  }
+  let defaultWsId = $derived(scope.workspaceIds.length === 1 ? scope.workspaceIds[0] : (workspaces[0]?.id ?? ''));
   let composerTarget = $derived.by<TaskTarget>(() => {
     const ws = workspaces.find((w) => w.id === defaultWsId) ?? workspaces[0];
     return ws
       ? { kind: 'space', id: ws.id, name: spaceName(ws.name), accent: accentVarFor(ws) }
       : { kind: 'space', id: '', name: '', accent: 'var(--text-faint)' };
   });
-  // Parents the Desk already has in cache — handed to the picker, no new fetch.
   let composerPerformances = $derived(
-    performances.map((p) => ({
+    feeds.performances.map((p) => ({
       id: p.id,
       name: [p.venue?.name || p.venue_name || p.project?.name || t('desk.fallback_show', locale), p.city]
         .filter(Boolean)
@@ -315,20 +457,13 @@
   }
 
   // On the cross-space (Everything) view, prepend the space so rows from
-  // different spaces don't blur; when scoped to one space it's redundant.
-  // Chokepoint: contextPath composes «space · project · line», so only the
-  // space segment may be lowercased — here, not on the row's class.
+  // different spaces don't blur. Only the space segment may be lowercased.
   let spaceNameByProjectId = $derived(new Map(projectIndex.map((p) => [p.id, spaceName(p.workspaceName)])));
   const contextPath = (i: DeskItem) => {
     const space = scope.isEmpty && i.projectId ? spaceNameByProjectId.get(i.projectId) : null;
-    return [space, i.projectName, i.lineName].filter(Boolean).join(' · ');
+    return [space, i.projectName, i.lineName].filter((x) => x && x !== '—').join(' · ');
   };
-  const isGhost = (i: DeskItem) => i.concern === 'task' && i.isProposal && i.taskId != null && !accepted.has(i.taskId);
-  // The show banner's road-sheet link: /h/<space>/performance/<slug>/roadsheet.
-  const roadsheetHref = (a: ShowAnchor) => {
-    const ws = workspaces.find((w) => w.id === a.workspaceId)?.slug;
-    return ws && a.performanceSlug ? `/h/${ws}/performance/${a.performanceSlug}/roadsheet` : null;
-  };
+  const personHref = (slug: string | null) => (slug && workspaceSlug ? `/h/${workspaceSlug}/person/${slug}` : null);
 </script>
 
 <svelte:head><title>{t('desk.title', locale)}</title></svelte:head>
@@ -336,190 +471,91 @@
 <div class="desk" aria-busy={busy}>
   <LensHeader>
     {#snippet title()}
-      <LensTitle text={needYouText(headline)} />{#if calm.on && calmFolded}<span class="desk__rest">{t('desk.rest_waits', locale)}</span>{/if}
+      <LensTitle
+        text={titleOver ? `${titleOver} · ${titleRest}` : titleRest}
+      />
     {/snippet}
     {#snippet sub()}
-      {#if !loading && !errored}
-        {#each digest as frag (frag.text)}<a class="lenshead__frag" href={frag.href}>{frag.text}</a>{/each}
-      {/if}
+      <span class="desk__date">{dateWords}</span>
+      <button
+        type="button"
+        class="desk__add"
+        aria-expanded={composerOpen}
+        onclick={openComposer}>{t('desk.add_task', locale)}</button
+      >
     {/snippet}
   </LensHeader>
 
-  <TaskComposer
-    {locale}
-    target={composerTarget}
-    performances={composerPerformances}
-    conversations={composerConversations}
-    onCreated={onTaskCreated}
-  />
-
-  {#if loading}
-    <p class="desk__empty">{t('desk.loading', locale)}</p>
-  {:else if errored}
-    <p class="desk__empty desk__empty--err">{t('desk.error', locale)}</p>
-  {:else if feed.length === 0}
-    <div class="desk__caughtup">
-      <p class="desk__caughtup-g" aria-hidden="true">·</p>
-      <p class="desk__caughtup-l">{t('desk.caughtup_l', locale)}</p>
-      <p class="desk__caughtup-s">{t('desk.caughtup_s', locale)}</p>
-    </div>
-  {:else}
-    <div class="timeline">
-      {#each visibleBuckets as bucket (bucket.sortKey)}
-        {#if bucket.labelKey === 'later'}
-          {#if later}
-            <section class="bucket">
-              <a class="bucket__head later" href={plannerDayHref('agenda', later.from)}>
-                <span class="bucket__label">{t('desk.bucket_later', locale)}</span>
-                <span class="bucket__date">{laterText(later)}</span>
-                <span class="bucket__count" aria-hidden="true">→</span>
-              </a>
-            </section>
-          {/if}
-        {:else}
-          <section class="bucket" class:bucket--today={bucket.sortKey === 0}>
-            <header class="bucket__head" class:bucket__head--overdue={bucket.overdue}>
-              <span class="bucket__label"
-                >{bucket.labelKey === 'weekday' ? bucket.weekday : t(`desk.bucket_${bucket.labelKey}`, locale)}</span
-              >
-              {#if bucket.dateLabel}<span class="bucket__date">{bucket.dateLabel}</span>{/if}
-              <span class="bucket__count">{bucketTotal(bucket)}</span>
-            </header>
-
-            {#if bucket.anchor}
-              {@const rsHref = roadsheetHref(bucket.anchor)}
-              <div class="anchor" style={`--c: ${accentVar(bucket.anchor.accentSlug)}`}>
-                <div class="anchor__eye">
-                  {t('desk.anchor_show_today', locale, { project: bucket.anchor.projectName })}{#if bucket.anchor.runDays}{runDaysText(bucket.anchor.runDays)}{/if}
-                </div>
-                <div class="anchor__venue">
-                  {bucket.anchor.venue}{bucket.anchor.city ? ` · ${bucket.anchor.city}` : ''}
-                </div>
-                <div class="anchor__foot">
-                  <div class="anchor__slots">
-                    {#if bucket.anchor.loadInAt}<span
-                        ><span class="anchor__k">{t('desk.anchor_loadin', locale)}</span> {fmtTime(bucket.anchor.loadInAt)}</span
-                      >{/if}
-                    {#if bucket.anchor.soundcheckAt}<span
-                        ><span class="anchor__k">{t('desk.anchor_soundcheck', locale)}</span>
-                        {fmtTime(bucket.anchor.soundcheckAt)}</span
-                      >{/if}
-                    {#if bucket.anchor.startAt}<span
-                        ><span class="anchor__k">{t('desk.anchor_show', locale)}</span> {fmtTime(bucket.anchor.startAt)}</span
-                      >{/if}
-                    {#if bucket.anchor.loadOutAt}<span
-                        ><span class="anchor__k">{t('desk.anchor_loadout', locale)}</span> {fmtTime(bucket.anchor.loadOutAt)}</span
-                      >{/if}
-                    {#if bucket.anchor.wrapAt}<span
-                        ><span class="anchor__k">{t('desk.anchor_wrap', locale)}</span> {fmtTime(bucket.anchor.wrapAt)}</span
-                      >{/if}
-                  </div>
-                  {#if rsHref}
-                    <a class="anchor__rs" href={rsHref}>{t('desk.roadsheet', locale)} ↗</a>
-                  {/if}
-                </div>
-              </div>
-            {/if}
-
-            {#each bucket.runs as run (run.concern + run.items[0].id)}
-              <div class="run run--{run.concern}">
-                {#if runHref(run)}
-                  <a class="run__label" href={runHref(run)}>{concernLabel(run.concern)}</a>
-                {:else}
-                  <span class="run__label">{concernLabel(run.concern)}</span>
-                {/if}
-                <div class="run__rows">
-                  {#each run.items as item (item.id)}
-                    {#if isGhost(item)}
-                      <div class="ghost">
-                        <div class="ghost__head">
-                          <span class="ghost__badge">{t('desk.proposed', locale)}</span>
-                          <span class="ghost__subject">{item.subject}</span>
-                        </div>
-                        {#if item.reason}<p class="ghost__reason">{item.reason}</p>{/if}
-                        <div class="ghost__actions">
-                          <button type="button" class="ghost__add" onclick={() => item.taskId && acceptProposal(item.taskId)}
-                            >{t('desk.proposal_add', locale)}</button
-                          >
-                          <button
-                            type="button"
-                            class="ghost__dismiss"
-                            onclick={() => item.taskId && $toggleTask.mutate({ id: item.taskId, status: 'done' })}
-                            >{t('desk.proposal_dismiss', locale)}</button
-                          >
-                        </div>
-                      </div>
-                    {:else if item.concern === 'task'}
-                      <div class="drow drow--task" class:drow--overdue={item.overdue}>
-                        <input
-                          type="checkbox"
-                          class="drow__check"
-                          aria-label={item.subject}
-                          checked={item.taskDone}
-                          onchange={(e) =>
-                            item.taskId && $toggleTask.mutate({ id: item.taskId, status: (e.currentTarget as HTMLInputElement).checked ? 'done' : 'open' })}
-                        />
-                        <span class="drow__subject">{item.subject}</span>
-                        <span class="drow__tail">
-                          {#if item.dueLabel}<span class="drow__due" class:drow__due--overdue={item.overdue}
-                              >{t(`desk.due_${item.dueLabel}`, locale)}</span
-                            >{:else if item.surfacesDay}<span class="drow__surfaces"
-                              >{t('desk.surfaces', locale, { day: dayMonth(item.surfacesDay) })}</span
-                            >{/if}
-                          {#if contextPath(item)}<span class="drow__ctx">{contextPath(item)}</span>{/if}
-                          <button
-                            type="button"
-                            class="drow__remove"
-                            aria-label={t('desk.remove_aria', locale, { subject: item.subject })}
-                            onclick={() => item.taskId && $removeTask.mutate(item.taskId)}>×</button
-                          >
-                        </span>
-                      </div>
-                    {:else}
-                      <div class="drow" class:drow--overdue={item.overdue} class:drow--proposal={item.isProposal}>
-                        <span class="drow__lead">
-                          {#if item.concern === 'agenda'}{item.allDay
-                              ? t('desk.all_day', locale)
-                              : item.atISO
-                                ? fmtTime(item.atISO)
-                                : '—'}{:else}{t(`desk.verb_${item.verbKey}`, locale)}{/if}
-                        </span>
-                        {#if personHref(item.personSlug)}
-                          <a class="drow__subject" href={personHref(item.personSlug)}>{item.subject}</a>
-                        {:else if item.href}
-                          <a class="drow__subject" href={item.href}
-                            >{item.subject}{#if item.runDays}<span class="drow__run">{runDaysText(item.runDays)}</span>{/if}</a
-                          >
-                        {:else}
-                          <span class="drow__subject">{item.subject}</span>
-                        {/if}
-                        <span class="drow__tail">
-                          {#if item.amount != null}<span class="drow__amount">{money(item.amount, item.currency)}</span>{/if}
-                          {#if contextPath(item)}<span class="drow__ctx">{contextPath(item)}</span>{/if}
-                        </span>
-                      </div>
-                    {/if}
-                  {/each}
-                </div>
-              </div>
-            {/each}
-          </section>
-        {/if}
-      {/each}
-
-      {#if calm.on && calmFolded}
-        <button type="button" class="calmfoot" onclick={() => calm.set(false)}>
-          <span
-            >{#if summary.overdue}<span class="calmfoot__over">{t('desk.calm_overdue', locale, { n: summary.overdue })}</span
-              >{/if}{#if summary.overdue && foldedRest}{' '}{t('desk.calm_and', locale)}{' '}{/if}{#if foldedRest}{t('desk.calm_more', locale, {
-                n: foldedRest,
-              })}{/if} {t('desk.calm_tail', locale)}</span
-          >
-          <span class="calmfoot__arrow" aria-hidden="true">→</span>
-        </button>
-      {/if}
+  {#if composerOpen}
+    <div class="desk__composer" bind:this={composerEl}>
+      <TaskComposer
+        {locale}
+        target={composerTarget}
+        performances={composerPerformances}
+        conversations={composerConversations}
+        onCreated={onTaskCreated}
+      />
     </div>
   {/if}
+
+  <div class="desk__grid">
+    <div class="desk__col">
+      <div class="slot slot--next">
+        <DeskNext
+          next={pulse.next}
+          {then}
+          settled={feeds.settled}
+          errored={feeds.errored}
+          {today}
+          {viewerTz}
+          personId={feeds.personId}
+          {slipCtx}
+          {locale}
+        />
+      </div>
+      <div class="slot slot--waits">
+        <DeskWaiting
+          {waiting}
+          {feed}
+          {later}
+          loading={waitingLoading}
+          errored={waitingErrored}
+          {locale}
+          {contextPath}
+          {personHref}
+          {money}
+          {isGhost}
+          ontoggle={(id, done) => $toggleTask.mutate({ id, status: done ? 'done' : 'open' })}
+          onremove={(id) => $removeTask.mutate(id)}
+          onaccept={acceptProposal}
+          onanswer={answerGoing}
+        />
+      </div>
+    </div>
+
+    {#if calm.on}
+      <div class="desk__col">
+        <button type="button" class="desk__calm" onclick={() => calm.set(false)}>
+          {t('desk.calm_folded', locale)} <span aria-hidden="true">→</span>
+        </button>
+      </div>
+    {:else}
+      <div class="desk__col">
+        <div class="slot slot--season">
+          <DeskSeason
+            planner={{ value: plannerFig, errored: feeds.errored }}
+            conversations={{ value: convFig, errored: $overviewQuery.isError }}
+            money={readMoney ? { value: moneyFig, errored: $invoicesQuery.isError || $bolosQuery.isError } : null}
+            {seasonLabel}
+            {locale}
+          />
+        </div>
+        <div class="slot slot--changed">
+          <DeskChanged {changes} loading={changedLoading} {sinceLabel} {workspaceSlugById} {locale} />
+        </div>
+      </div>
+    {/if}
+  </div>
 </div>
 
 <style>
@@ -528,423 +564,126 @@
       display: flex;
       flex-direction: column;
       gap: var(--space-l);
-      /* per-concern tints (subtle — identity is textual, this is a whisper) */
-      --c-task: var(--text-muted);
-      --c-agenda: color-mix(in oklch, var(--info) 60%, var(--text-muted));
-      --c-conversation: color-mix(in oklch, var(--primary) 60%, var(--text-muted));
-      --c-money: color-mix(in oklch, var(--success) 60%, var(--text-muted));
     }
-
-    /* ── Header ── */
-    /* The header is now the shared LensHeader (global .lenshead* classes).
-       Only Desk-specific bits stay here. */
-    .desk__rest {
-      color: var(--text-faint);
-      font-style: italic;
-    }
-    /* Calm's contrast remap now lives on .shell__content--calm in the /h
-       layout, so it quiets every lens from one place (Desk included). */
-
-    /* ── Timeline ── */
-    .timeline {
-      display: flex;
-      flex-direction: column;
-    }
-    .bucket {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-xs);
-      /* The rule reads as the HEADER's top edge, not the previous box's
-         bottom: generous space ABOVE the line, a thin gap to the title below
-         it. Every day gets one — OVERDUE included. */
-      margin-block-start: var(--space-l);
-      padding-block-start: var(--space-s);
-      border-block-start: 1px solid var(--border-color-light);
-    }
-    .bucket:first-child {
-      margin-block-start: 0;
-    }
-    .bucket__head {
-      display: flex;
-      align-items: baseline;
-      gap: var(--space-s);
-    }
-    .bucket__count {
-      margin-inline-start: auto;
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      color: var(--text-faint);
-    }
-    .bucket__label {
+    .desk__date {
       font-family: var(--font-mono);
       font-size: var(--text-xs);
       letter-spacing: 0.12em;
       text-transform: uppercase;
-      color: var(--text-faint);
-    }
-    .bucket--today .bucket__label {
       color: var(--primary);
     }
-    .bucket__head--overdue .bucket__label {
-      color: var(--danger);
-    }
-    .bucket__date {
-      font-family: var(--font-display);
-      font-style: italic;
-      font-size: var(--text-xs);
-      color: var(--text-faint);
-    }
-
-    /* ── Show anchor (banner) ── */
-    .anchor {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-2xs);
-      padding: var(--space-s) var(--space-m);
-      border: 1px solid color-mix(in oklch, var(--c) 30%, var(--border-color-light));
-      background: color-mix(in oklch, var(--c) 6%, var(--bg-ultra-light));
-      border-radius: var(--radius-l);
-    }
-    .anchor__eye {
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      letter-spacing: var(--mono-letter-spacing-loose);
-      text-transform: uppercase;
-      color: color-mix(in oklch, var(--c) 70%, var(--text-muted));
-    }
-    .anchor__venue {
-      font-family: var(--font-display);
-      font-size: var(--text-l);
-      color: var(--heading-color);
-    }
-    .anchor__slots {
-      display: flex;
-      flex-wrap: wrap;
-      gap: var(--space-s);
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      color: var(--text-muted);
-    }
-    .anchor__k {
-      color: var(--text-faint);
-      text-transform: uppercase;
-      letter-spacing: var(--mono-letter-spacing-loose);
-    }
-    .anchor__foot {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: var(--space-m);
-      margin-block-start: var(--space-2xs);
-    }
-    .anchor__rs {
-      flex: none;
-      display: inline-flex;
-      align-items: center;
-      padding-block: var(--space-2xs);
-      padding-inline: var(--space-s);
+    .desk__add {
+      float: inline-end;
+      padding: var(--space-2xs) var(--space-m);
       border: 1px solid var(--border-color-dark);
       border-radius: var(--radius);
       background: var(--bg-ultra-light);
+      font-family: var(--font-sans);
       font-size: var(--text-s);
       color: var(--text-muted);
-      text-decoration: none;
-      white-space: nowrap;
+      cursor: pointer;
       transition:
         color var(--transition),
         border-color var(--transition);
     }
-    .anchor__rs:hover {
+    .desk__add:hover,
+    .desk__add[aria-expanded='true'] {
       color: var(--text-color);
       border-color: var(--text-muted);
     }
+    .desk__composer {
+      margin-block-start: calc(-1 * var(--space-s));
+    }
 
-    /* ── Concern runs: the gutter carries the type (a door), hairline rail ── */
-    .run {
+    .desk__grid {
       display: grid;
-      grid-template-columns: 7rem 1fr;
+      grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
+      gap: var(--space-l) var(--space-xl);
       align-items: start;
-      --gut: var(--text-faint);
     }
-    .run--task {
-      --gut: var(--c-task);
-    }
-    .run--agenda {
-      --gut: var(--c-agenda);
-    }
-    .run--conversation {
-      --gut: var(--c-conversation);
-    }
-    .run--money {
-      --gut: var(--c-money);
-    }
-    .run__label {
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      letter-spacing: var(--mono-letter-spacing-loose);
-      text-transform: uppercase;
-      color: var(--gut);
-      text-decoration: none;
-      padding-block: var(--space-s) 0;
-      transition: color var(--transition);
-    }
-    a.run__label:hover {
-      color: var(--text-color);
-      text-decoration: underline;
-      text-underline-offset: 3px;
-    }
-    .run__rows {
-      border-inline-start: 1px solid color-mix(in oklch, var(--gut) 30%, var(--border-color-light));
-    }
-
-    /* ── Rows: no leading marks; one line; context is textual ── */
-    .drow {
-      display: grid;
-      grid-template-columns: 4.5rem 1fr auto;
-      align-items: baseline;
-      gap: var(--space-s);
-      padding-block: var(--space-xs);
-      padding-inline-start: var(--space-m);
-    }
-    .drow--task {
-      grid-template-columns: auto 1fr auto;
-    }
-    .drow--proposal {
-      font-style: italic;
-      color: var(--text-muted);
-    }
-    .drow__check {
-      inline-size: 0.95rem;
-      block-size: 0.95rem;
-      accent-color: var(--primary);
-      cursor: pointer;
-    }
-    .drow__lead {
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      color: var(--gut, var(--text-faint));
-      text-transform: lowercase;
-    }
-    .drow--overdue .drow__lead {
-      color: var(--danger);
-    }
-    .drow__subject {
-      font-size: var(--text-s);
-      color: var(--text-color);
-      text-decoration: none;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      min-inline-size: 0;
-    }
-    a.drow__subject:hover {
-      text-decoration: underline;
-      text-underline-offset: 3px;
-    }
-    /* A run's span reads as part of its name, one voice quieter. */
-    .drow__run {
-      color: var(--text-muted);
-    }
-
-    /* ── Later: the stretch past this week, folded into one line that opens
-       the Agenda. Drawn as a bucket head, so it aligns with the days above. */
-    .later {
-      color: inherit;
-      text-decoration: none;
-    }
-    .later:hover .bucket__date,
-    .later:hover .bucket__count {
-      color: var(--text-muted);
-    }
-    .drow__tail {
-      display: inline-flex;
-      align-items: baseline;
-      gap: var(--space-s);
-      min-inline-size: 0;
-    }
-    .drow__ctx {
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      letter-spacing: var(--mono-letter-spacing);
-      color: var(--text-faint);
-      white-space: nowrap;
-    }
-    .drow__due,
-    .drow__surfaces,
-    .drow__amount {
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      color: var(--text-muted);
-      white-space: nowrap;
-    }
-    .drow__due--overdue {
-      color: var(--danger);
-    }
-    /* Row actions on hover only — persistent in overdue (spec). */
-    .drow__remove {
-      border: 0;
-      padding: 0;
-      background: none;
-      color: var(--text-faint);
-      font-size: var(--text-m);
-      line-height: 1;
-      cursor: pointer;
-      opacity: 0;
-      transition: color var(--transition), opacity var(--transition);
-    }
-    .drow:hover .drow__remove,
-    .drow--overdue .drow__remove,
-    .drow__remove:focus-visible {
-      opacity: 1;
-    }
-    .drow__remove:hover {
-      color: var(--danger);
-    }
-
-    /* ── AI proposal ghost (consent inbox) ── */
-    .ghost {
-      margin-inline-start: var(--space-m);
-      margin-block: var(--space-xs);
-      padding: var(--space-s) var(--space-m);
-      border: 1px dashed color-mix(in oklch, var(--accent-7) 45%, var(--border-color-dark));
-      background: color-mix(in oklch, var(--accent-7) 5%, var(--bg-ultra-light));
-      border-radius: var(--radius-l);
+    .desk__col {
       display: flex;
       flex-direction: column;
-      gap: var(--space-2xs);
+      gap: var(--space-l);
+      min-inline-size: 0;
     }
-    .ghost__head {
-      display: flex;
-      align-items: baseline;
-      gap: var(--space-s);
-    }
-    .ghost__badge {
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      letter-spacing: var(--mono-letter-spacing-loose);
-      text-transform: uppercase;
-      color: var(--accent-7);
-    }
-    .ghost__subject {
-      font-size: var(--text-s);
-      color: var(--text-color);
-    }
-    .ghost__reason {
-      margin: 0;
-      font-family: var(--font-display);
-      font-style: italic;
-      font-size: var(--text-s);
-      color: var(--text-muted);
-    }
-    .ghost__actions {
-      display: flex;
-      gap: var(--space-s);
-      margin-block-start: var(--space-2xs);
-    }
-    .ghost__add,
-    .ghost__dismiss {
+    .desk__calm {
+      align-self: start;
+      padding: 0;
       border: 0;
       background: none;
-      padding: 0;
-      font-family: var(--font-sans);
-      font-size: var(--text-xs);
-      cursor: pointer;
-      transition: color var(--transition);
-    }
-    .ghost__add {
-      color: var(--accent-7);
-      font-weight: 500;
-    }
-    .ghost__dismiss {
-      color: var(--text-faint);
-    }
-    .ghost__dismiss:hover {
-      color: var(--text-muted);
-    }
-
-    /* ── Calm footer ── */
-    .calmfoot {
-      display: inline-flex;
-      align-items: center;
-      gap: var(--space-xs);
-      margin-block-start: var(--space-s);
-      padding-block: var(--space-s) 0;
-      border-block-start: 1px solid var(--border-color-light);
-      background: none;
-      border-inline: 0;
-      border-block-end: 0;
       font-family: var(--font-mono);
       font-size: var(--text-xs);
       letter-spacing: var(--mono-letter-spacing);
       color: var(--text-faint);
       cursor: pointer;
-      transition: color var(--transition);
+      text-align: start;
     }
-    .calmfoot:hover {
+    .desk__calm:hover {
       color: var(--text-muted);
-    }
-    .calmfoot__over {
-      color: var(--danger);
-    }
-    .calmfoot__arrow {
-      transition: transform var(--transition);
-    }
-    .calmfoot:hover .calmfoot__arrow {
-      transform: translateX(3px);
     }
 
-    /* ── Empty / caught-up ── */
-    .desk__empty {
-      margin: 0;
-      color: var(--text-muted);
-      font-style: italic;
-      font-family: var(--font-display);
-      padding-block: var(--space-m);
-      text-align: center;
-    }
-    .desk__empty--err {
-      color: var(--danger);
-    }
-    .desk__caughtup {
-      text-align: center;
-      padding-block: var(--space-xl);
+    /* The chrome every band shares: the eyebrow, its count or door, the
+       empty and error lines. One treatment, here. */
+    .desk :global(.dband__h) {
+      display: flex;
+      align-items: baseline;
+      gap: var(--space-s);
+      margin: 0 0 var(--space-s);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      font-weight: 400;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
       color: var(--text-faint);
     }
-    .desk__caughtup-g {
+    .desk :global(.dband__count),
+    .desk :global(.dband__more) {
+      margin-inline-start: auto;
+      letter-spacing: var(--mono-letter-spacing);
+      text-transform: none;
+      color: var(--text-faint);
+      text-decoration: none;
+    }
+    .desk :global(.dband__more:hover) {
+      color: var(--text-color);
+    }
+    .desk :global(.dband__empty),
+    .desk :global(.dband__err) {
       margin: 0;
       font-family: var(--font-display);
-      font-size: var(--text-xxl);
-    }
-    .desk__caughtup-l {
-      margin: var(--space-xs) 0 0;
-      font-family: var(--font-display);
       font-style: italic;
-      font-size: var(--text-l);
+      font-size: var(--text-s);
       color: var(--text-muted);
     }
-    .desk__caughtup-s {
-      margin: var(--space-2xs) 0 0;
-      font-size: var(--text-s);
+    .desk :global(.dband__empty a) {
+      color: inherit;
+    }
+    .desk :global(.dband__err) {
+      color: var(--danger);
     }
 
+    /* Phone: one column, in the order the questions are asked: 1, 2, 3, 4. */
     @media (max-width: 47.999rem) {
-      .run {
-        grid-template-columns: 1fr;
+      .desk__grid {
+        display: flex;
+        flex-direction: column;
       }
-      .run__label {
-        padding-block: var(--space-s) var(--space-2xs);
+      .desk__col {
+        display: contents;
       }
-      .run__rows {
-        border-inline-start: 0;
+      .slot--next {
+        order: 1;
       }
-      .drow {
-        grid-template-columns: 3.5rem 1fr;
-        padding-inline-start: 0;
+      .slot--waits {
+        order: 2;
       }
-      .drow--task {
-        grid-template-columns: auto 1fr;
+      .slot--changed {
+        order: 3;
       }
-      .drow__ctx {
-        display: none;
+      .slot--season,
+      .desk__calm {
+        order: 4;
       }
     }
   }

@@ -1,9 +1,12 @@
 /**
- * Desk feed (ADR-063/065/068/069/070 · converged design 2026-07-18) — the
- * pure builder behind /h/desk. ONE ranked feed, FOUR concerns, grouped in day
- * buckets, in a FIXED within-day type order that mirrors the lens nav:
+ * Desk feed (ADR-063/065/068/069/070 · converged design 2026-07-18; the
+ * dashboard of ADR-117) — the pure builder behind /h/desk's «Te espera».
+ * THREE concerns grouped in day buckets, in a FIXED within-day type order:
  *
- *     tasks → agenda → conversations → money
+ *     tasks → conversations → money
+ *
+ * The agenda is the Planner's (ADR-117 § 2): the Desk no longer draws the
+ * week's rehearsals and gigs; «Lo siguiente» carries the next one.
  *
  * The theorem (spec § /h/desk): only TASKS are stored; every other row is a
  * CALL computed from entity state — an overdue invoice → a "remind" call, a
@@ -17,18 +20,18 @@
  * the caller says fees are visible (masked === absent, suppressed silently).
  * Calendar-day arithmetic throughout (the date-only contract).
  *
- * Today's / tomorrow's gig is the bucket BANNER (anchor), outside the type
- * order. AI-proposed tasks (origin='ai') ride as ghost rows inside the task
- * block — real rows (the consent inbox, ADR-069), never invented.
+ * AI-proposed tasks (origin='ai') ride as ghost rows inside the task block —
+ * real rows (the consent inbox, ADR-069), never invented. «Vencido» on money
+ * is the aging of Cuentas (`invoiceAging`, ADR-117 § 4), not `due_on`.
  */
 
 import { localDayISO } from './datetime';
 import { taskSurfaceState, taskContextLabel, taskProjectId, type TaskItem } from './task';
 import { LOCALE_TAG, t, type Locale } from './i18n';
-import { plannerDayHref } from './planner';
-import { isMultiDayRun, seriesDayMap } from './month-events';
+import { invoiceAging, observedPayerTermsDays, type MoneyInvoiceItem } from './money';
 
-export type DeskConcern = 'task' | 'agenda' | 'conversation' | 'money';
+/** `going`: a «voy · no voy» Hour asks about you (ADR-103); only «Te espera» has it. */
+export type DeskConcern = 'task' | 'conversation' | 'money' | 'going';
 
 export type BucketLabelKey =
   | 'overdue'
@@ -50,60 +53,15 @@ export interface DeskConvInput {
   project: { id: string; slug: string; name: string } | null;
 }
 
-export interface DeskPerfInput {
-  id: string;
-  slug: string | null;
-  performed_at: string;
-  status: string;
-  venue_name: string | null;
-  city: string | null;
-  load_in_at: string | null;
-  soundcheck_at: string | null;
-  start_at: string | null;
-  loadout_at: string | null;
-  wrap_at: string | null;
-  /** ADR-084 §1 — rows sharing it are one multi-day run (see `seriesDayMap`). */
-  series_id?: string | null;
-  venue: { name: string | null } | null;
-  project: { id: string; slug: string | null; name: string; workspace_id: string } | null;
-}
-
-/** A pure calendar event (rehearsal / travel / press…) — NOT a performance
- *  (those come from DeskPerfInput; a `date` with a performance_id is that
- *  gig's own slot and is dropped here to avoid a double row). */
-export interface DeskDateInput {
-  id: string;
-  kind: string;
-  status: string;
-  title: string | null;
-  starts_at: string;
-  all_day: boolean;
-  city: string | null;
-  performance_id: string | null;
-  series_id?: string | null;
-  project: { id: string; slug: string | null; name: string } | null;
-}
-
-export interface DeskInvoiceInput {
-  id: string;
-  number: string | null;
-  status: string;
-  due_on: string | null;
-  total: number;
-  currency: string;
-  payer: { name: string | null } | null;
-  project: { id: string; slug: string | null; name: string } | null;
-}
+/** The invoice as Cuentas reads it: aging needs its payments and payer. */
+export type DeskInvoiceInput = MoneyInvoiceItem;
 
 /** One rendered row, normalised across the concerns. */
 export interface DeskItem {
   id: string;
   concern: DeskConcern;
-  /** Derived-call verb i18n key (conversation / money). null for task / agenda. */
+  /** Derived-call verb i18n key (conversation / money / going). null for a task. */
   verbKey: string | null;
-  /** Agenda rows: the ISO time to lead with (null when all-day). */
-  atISO: string | null;
-  allDay: boolean;
   subject: string;
   projectName: string;
   lineName: string | null;
@@ -113,7 +71,7 @@ export interface DeskItem {
   overdue: boolean;
   /** Conversation → person page (page builds the href with its ws slug). */
   personSlug: string | null;
-  /** A ready lens href (money → /h/money, agenda → its day in the Agenda) or null. */
+  /** A ready href (money → its bolo in Cuentas, a «voy» → its day) or null. */
   href: string | null;
   /** Task rows. */
   taskId: string | null;
@@ -123,30 +81,13 @@ export interface DeskItem {
   /** AI consent inbox (ADR-069): origin='ai' → a proposal ghost row. */
   isProposal: boolean;
   reason: string | null;
-  /** Money amount (remind / confirm rows only). */
+  /** Money amount still owed (remind rows only). */
   amount: number | null;
   currency: string | null;
   /** The calendar day it sits on (YYYY-MM-DD), null for the anytime tail. */
   day: string | null;
-  /** Agenda rows that head a multi-day run: how many days it spans. */
-  runDays: number | null;
-}
-
-export interface ShowAnchor {
-  venue: string;
-  city: string | null;
-  loadInAt: string | null;
-  soundcheckAt: string | null;
-  startAt: string | null;
-  loadOutAt: string | null;
-  wrapAt: string | null;
-  projectName: string;
-  accentSlug: string;
-  /** Performance slug + its workspace id → the road-sheet link. */
-  performanceSlug: string | null;
-  workspaceId: string;
-  /** The gig opens a multi-day run: how many days it spans. */
-  runDays: number | null;
+  /** A «voy · no voy» row: what the answer is written on. */
+  going: { of: 'performance' | 'date'; id: string } | null;
 }
 
 export interface DeskRun {
@@ -160,17 +101,16 @@ export interface DeskBucket {
   weekday: string;
   dateLabel: string;
   overdue: boolean;
-  anchor: ShowAnchor | null;
   runs: DeskRun[];
 }
 
 export interface DeskFeedInput {
   conversations: DeskConvInput[];
   tasks: TaskItem[];
-  performances: DeskPerfInput[];
-  dates: DeskDateInput[];
   /** Only pass when the viewer can see fees; omit/empty to suppress money. */
   invoices?: DeskInvoiceInput[];
+  /** A gig today keeps the quiet-day revive away (ADR-073). */
+  showToday?: boolean;
 }
 
 const VERB_KEYS: Record<string, { upcoming: string; overdue: string }> = {
@@ -188,17 +128,15 @@ export function conversationVerbKey(status: string, overdue: boolean): string {
   return VERB_KEYS[status]?.[overdue ? 'overdue' : 'upcoming'] ?? 'look';
 }
 
-// Fixed within-day order, mirroring the lens nav (Desk · Calendar · Contacts ·
-// Money). The show-day banner sits above this, outside the order.
+// Fixed within-day order of the day list, mirroring the lens nav.
 const CONCERN_RANK: Record<DeskConcern, number> = {
   task: 0,
-  agenda: 1,
+  going: 1,
   conversation: 2,
   money: 3,
 };
 
 const DAY = 86_400_000;
-const PAID_OR_DEAD = new Set(['paid', 'void', 'cancelled', 'draft']);
 
 export function dayBucket(
   dayISO: string | null,
@@ -249,27 +187,6 @@ export function laterSummary(feed: DeskBucket[]): { count: number; from: string;
   return { count: later.runs.reduce((n, r) => n + r.items.length, 0), from: days[0], until: days[days.length - 1] };
 }
 
-/**
- * Of each multi-day run, only the first row (by `order`) is drawn: it maps to
- * the run's day count, the run's other rows to 0 (skip). Rows outside a run
- * are absent from the map.
- */
-function runHeads<R extends { series_id?: string | null }>(
-  rows: R[],
-  order: (r: R) => string,
-  days: Map<string, Set<string>>,
-): Map<R, number> {
-  const out = new Map<R, number>();
-  const seen = new Set<string>();
-  for (const r of [...rows].sort((a, b) => (order(a) < order(b) ? -1 : order(a) > order(b) ? 1 : 0))) {
-    const sid = r.series_id;
-    if (!sid || !isMultiDayRun(days, sid)) continue;
-    out.set(r, seen.has(sid) ? 0 : days.get(sid)!.size);
-    seen.add(sid);
-  }
-  return out;
-}
-
 function convSubject(e: DeskConvInput, locale: Locale): string {
   return (
     e.organization?.name || e.person?.full_name || e.person?.organization_name || e.next_action_note || t('desk.untitled', locale)
@@ -278,13 +195,6 @@ function convSubject(e: DeskConvInput, locale: Locale): string {
 function payerName(i: DeskInvoiceInput, locale: Locale): string {
   return i.payer?.name || i.number || t('desk.fallback_invoice', locale);
 }
-/** A date with no title says its kind, in words; an unknown kind stays raw. */
-function dateKindWord(kind: string, locale: Locale): string {
-  const key = `planner.kind_${kind}`;
-  const word = t(key, locale);
-  return word === key ? kind : word;
-}
-
 type Entry = {
   sortKey: number;
   labelKey: BucketLabelKey;
@@ -298,8 +208,6 @@ type Entry = {
 function blankItem(over: Partial<DeskItem> & Pick<DeskItem, 'id' | 'concern' | 'subject'>): DeskItem {
   return {
     verbKey: null,
-    atISO: null,
-    allDay: false,
     projectName: '—',
     lineName: null,
     projectId: null,
@@ -315,16 +223,42 @@ function blankItem(over: Partial<DeskItem> & Pick<DeskItem, 'id' | 'concern' | '
     amount: null,
     currency: null,
     day: null,
-    runDays: null,
+    going: null,
     ...over,
   };
+}
+
+/**
+ * The overdue invoices, as Cuentas decides it: issued, something still owed,
+ * and past the date it was expected (`invoiceAging`, observed payer terms
+ * included). The terms are learnt from the invoices passed in.
+ */
+export function overdueInvoices(
+  invoices: readonly DeskInvoiceInput[],
+  now: Date,
+): { invoice: DeskInvoiceInput; owed: number; expectedOn: string }[] {
+  const terms = observedPayerTermsDays([...invoices], invoices.flatMap((i) => i.payments ?? []));
+  const out: { invoice: DeskInvoiceInput; owed: number; expectedOn: string }[] = [];
+  for (const inv of invoices) {
+    if (inv.status !== 'issued') continue;
+    const aging = invoiceAging({ ...inv, payments: inv.payments ?? [] }, terms, now);
+    const owed = Number(inv.total) - aging.paidAmount;
+    if (aging.state !== 'past-expected' || owed <= 0 || !aging.expectedOn) continue;
+    out.push({ invoice: inv, owed, expectedOn: aging.expectedOn });
+  }
+  return out;
+}
+
+/** Where an invoice opens: its bolo in Cuentas, or the lens. */
+export function invoiceHref(inv: Pick<DeskInvoiceInput, 'lines'>): string {
+  const bolo = inv.lines?.find((l) => l.bolo_id)?.bolo_id;
+  return bolo ? `/h/books#bolo-${bolo}` : '/h/books';
 }
 
 /** Build the full day-bucketed, fixed-order, concern-grouped Desk feed. */
 export function buildDeskFeed(input: DeskFeedInput, now: Date, locale: Locale = 'en'): DeskBucket[] {
   const todayISO = localDayISO(now);
   const entries: Entry[] = [];
-  const anchors = new Map<number, ShowAnchor>();
 
   const push = (dayISO: string | null, concern: DeskConcern, sub: number, item: DeskItem) => {
     const b = horizonBucket(dayBucket(dayISO, now, locale));
@@ -368,85 +302,8 @@ export function buildDeskFeed(input: DeskFeedInput, now: Date, locale: Locale = 
     );
   }
 
-  // ── Agenda: performances + pure date events, leading with their hour.
-  //    Today's / tomorrow's gig is the bucket BANNER (anchor), not a row.
-  //    A multi-day run (ADR-084 §1) is ONE row on the day it starts, with its
-  //    span; its other days are not repeated (`runHeads`).
-  const livePerfs = input.performances.filter(
-    (p) => p.status !== 'cancelled' && p.performed_at.slice(0, 10) >= todayISO,
-  );
-  const liveDates = input.dates.filter(
-    (d) => d.status !== 'cancelled' && !d.performance_id && d.starts_at.slice(0, 10) >= todayISO,
-  );
-  const runDays = seriesDayMap(liveDates, (d) => d.starts_at.slice(0, 10), livePerfs);
-  const perfRuns = runHeads(livePerfs, (p) => p.performed_at.slice(0, 10) + (p.start_at ?? p.load_in_at ?? ''), runDays);
-  const dateRuns = runHeads(liveDates, (d) => d.starts_at, runDays);
-  for (const p of livePerfs) {
-    const span = perfRuns.get(p);
-    if (span === 0) continue;
-    const day = p.performed_at.slice(0, 10);
-    const b = dayBucket(day, now, locale);
-    const place = p.venue?.name ?? p.venue_name ?? p.city ?? '—';
-    if ((b.sortKey === 0 || b.sortKey === 1) && !anchors.has(b.sortKey)) {
-      anchors.set(b.sortKey, {
-        venue: place,
-        city: p.city,
-        loadInAt: p.load_in_at,
-        soundcheckAt: p.soundcheck_at,
-        startAt: p.start_at,
-        loadOutAt: p.loadout_at,
-        wrapAt: p.wrap_at,
-        projectName: p.project?.name ?? '—',
-        accentSlug: p.project?.slug ?? '',
-        performanceSlug: p.slug,
-        workspaceId: p.project?.workspace_id ?? '',
-        runDays: span ?? null,
-      });
-      continue;
-    }
-    const at = p.start_at ?? p.load_in_at;
-    push(
-      day,
-      'agenda',
-      at ? Date.parse(at) : Date.parse(`${day}T23:59:00`),
-      blankItem({
-        id: `perf-${p.id}`,
-        concern: 'agenda',
-        subject: place,
-        projectName: p.project?.name ?? '—',
-        projectId: p.project?.id ?? null,
-        atISO: at,
-        href: plannerDayHref('agenda', day),
-        runDays: span ?? null,
-      }),
-    );
-  }
-  for (const d of liveDates) {
-    // (gig slots — a date with a performance_id — come from performances)
-    const span = dateRuns.get(d);
-    if (span === 0) continue;
-    const day = d.starts_at.slice(0, 10);
-    push(
-      day,
-      'agenda',
-      d.all_day ? Date.parse(`${day}T00:00:00`) : Date.parse(d.starts_at),
-      blankItem({
-        id: `date-${d.id}`,
-        concern: 'agenda',
-        subject: d.title ?? dateKindWord(d.kind, locale),
-        projectName: d.project?.name ?? d.city ?? '—',
-        projectId: d.project?.id ?? null,
-        atISO: d.all_day ? null : d.starts_at,
-        allDay: d.all_day,
-        href: plannerDayHref('agenda', day),
-        runDays: span ?? null,
-      }),
-    );
-  }
-
   // ── Conversations (derived calls): next action set, not declined/dormant.
   let hasOverdue = false;
-  let hasTodayShow = anchors.has(0);
   for (const e of input.conversations) {
     if (e.status === 'declined' || e.status === 'dormant' || !e.next_action_at) continue;
     const day = e.next_action_at.slice(0, 10);
@@ -472,7 +329,7 @@ export function buildDeskFeed(input: DeskFeedInput, now: Date, locale: Locale = 
 
   // ── Revive (quiet days only): no overdue and no show today → up to two
   //    dormant conversations offered as proposal-toned revive calls (ADR-073).
-  if (!hasOverdue && !hasTodayShow) {
+  if (!hasOverdue && !input.showToday) {
     const dormant = input.conversations.filter((e) => e.status === 'dormant').slice(0, 2);
     for (const e of dormant) {
       push(
@@ -494,13 +351,12 @@ export function buildDeskFeed(input: DeskFeedInput, now: Date, locale: Locale = 
   }
 
   // ── Money (derived, only when fees are visible): issued invoices past
-  //    due_on → "remind" calls, in the OVERDUE bucket, amount shown.
-  for (const inv of input.invoices ?? []) {
-    if (PAID_OR_DEAD.has(inv.status) || !inv.due_on || inv.due_on.slice(0, 10) >= todayISO) continue;
+  //    the date Cuentas expects them → "remind" calls, OVERDUE, owed shown.
+  for (const { invoice: inv, owed, expectedOn } of overdueInvoices(input.invoices ?? [], now)) {
     push(
-      inv.due_on,
+      expectedOn,
       'money',
-      Date.parse(`${inv.due_on.slice(0, 10)}T00:00:00Z`),
+      Date.parse(`${expectedOn}T00:00:00Z`),
       blankItem({
         id: `inv-${inv.id}`,
         concern: 'money',
@@ -509,8 +365,8 @@ export function buildDeskFeed(input: DeskFeedInput, now: Date, locale: Locale = 
         projectId: inv.project?.id ?? null,
         verbKey: 'remind',
         overdue: true,
-        href: '/h/books',
-        amount: inv.total,
+        href: invoiceHref(inv),
+        amount: owed,
         currency: inv.currency,
       }),
     );
@@ -536,78 +392,88 @@ export function buildDeskFeed(input: DeskFeedInput, now: Date, locale: Locale = 
         if (last && last.concern === item.concern) last.items.push(item);
         else runs.push({ concern: item.concern, items: [item] });
       }
-      return { sortKey, labelKey, weekday, dateLabel, overdue: sortKey === -1, anchor: anchors.get(sortKey) ?? null, runs };
+      return { sortKey, labelKey, weekday, dateLabel, overdue: sortKey === -1, runs };
     });
-
-  // A banner day with no rows still needs its bucket to host the anchor.
-  for (const [sortKey, anchor] of anchors) {
-    if (buckets.some((b) => b.sortKey === sortKey)) continue;
-    const b = dayBucket(sortKey === 0 ? todayISO : null, now, locale);
-    const label = sortKey === 0 ? b : dayBucket(localDayISO(new Date(now.getTime() + DAY)), now, locale);
-    buckets.push({ sortKey, labelKey: label.labelKey, weekday: label.weekday, dateLabel: label.dateLabel, overdue: false, anchor, runs: [] });
-  }
-  buckets.sort((a, b) => a.sortKey - b.sortKey);
   return buckets;
 }
 
-export interface DeskSummary {
-  /** DATED items that need you (every bucket except the anytime tail). */
-  needYou: number;
-  overdue: number;
-  nextShowCity: string | null;
-  holds: number;
-  live: number;
-  /** Sum of open (unpaid) invoice totals; null when fees are not visible. */
-  pipeline: number | null;
-  currency: string | null;
+// ── «Te espera»: the short list, by weight ─────────────────────────────
+
+/** How many rows «Te espera» draws; the rest waits behind «Ver todo». */
+export const WAITING_ROWS = 7;
+/** How far ahead a «voy · no voy» is worth asking. */
+export const GOING_DAYS = 14;
+
+/** Within one tier: money owed, then a call, then «voy», then a task, then a proposal. */
+function weightOf(i: DeskItem): number {
+  if (i.concern === 'money') return 0;
+  if (i.concern === 'conversation') return i.isProposal ? 4 : 1;
+  if (i.concern === 'going') return 2;
+  return i.isProposal ? 4 : 3;
 }
 
-export function deskSummary(input: DeskFeedInput, now: Date): DeskSummary {
-  const todayISO = localDayISO(now);
-  let needYou = 0;
-  let overdue = 0;
+export interface Waiting {
+  rows: DeskItem[];
+  /** Everything that qualified, before the cut. */
+  total: number;
+  overdue: number;
+}
 
-  for (const e of input.conversations) {
-    if (e.status === 'declined' || e.status === 'dormant' || !e.next_action_at) continue;
-    const day = e.next_action_at.slice(0, 10);
-    if (day < todayISO) {
-      overdue += 1;
-      needYou += 1;
-    } else needYou += 1; // every dated conversation call counts (anytime excluded — calls are always dated)
+/**
+ * «Te espera» (ADR-117): what to act on, by weight. Tiers by day — overdue,
+ * today, the rest of this week — and the «voy · no voy» of the next two weeks
+ * after them; inside a tier, by `weightOf`, then by day. The anytime tail and
+ * what lies past this week stay in the day list. Calm keeps overdue and today.
+ */
+export function rankWaiting(
+  feed: readonly DeskBucket[],
+  asks: readonly DeskItem[],
+  now: Date,
+  opts: { calm?: boolean; limit?: number } = {},
+): Waiting {
+  const tiered: { tier: number; item: DeskItem }[] = [];
+  for (const b of feed) {
+    const tier = b.sortKey === -1 ? 0 : b.sortKey === 0 ? 1 : b.sortKey < 98 ? 2 : null;
+    if (tier === null) continue;
+    for (const r of b.runs) for (const item of r.items) tiered.push({ tier, item });
   }
-  for (const t of input.tasks) {
-    const s = taskSurfaceState(t, now);
-    if (s.state === 'dormant' || s.state === 'done') continue;
-    const day = t.due_at?.slice(0, 10) ?? s.surfacesAt ?? null;
-    if (!day) continue; // anytime tail — excluded from the headline
-    if (s.state === 'overdue') overdue += 1;
-    needYou += 1;
+  for (const item of asks) {
+    const k = dayBucket(item.day, now, 'en').sortKey;
+    tiered.push({ tier: k === 0 ? 1 : k < 7 ? 2 : 3, item });
   }
-  for (const inv of input.invoices ?? []) {
-    if (PAID_OR_DEAD.has(inv.status) || !inv.due_on || inv.due_on.slice(0, 10) >= todayISO) continue;
-    overdue += 1;
-    needYou += 1;
-  }
-
-  const next = input.performances
-    .filter((p) => p.status !== 'cancelled' && p.performed_at.slice(0, 10) >= todayISO)
-    .sort((a, b) => (a.performed_at < b.performed_at ? -1 : 1))[0];
-  const live = input.conversations.filter(
-    (e) => e.status !== 'declined' && e.status !== 'dormant' && e.next_action_at,
-  ).length;
-  const holds = input.conversations.filter((e) => e.status === 'hold').length;
-
-  const open = (input.invoices ?? []).filter((i) => !PAID_OR_DEAD.has(i.status));
-  const pipeline = input.invoices ? open.reduce((a, i) => a + i.total, 0) : null;
-  const currency = open[0]?.currency ?? null;
-
+  const kept = opts.calm ? tiered.filter((x) => x.tier <= 1) : tiered;
+  kept.sort(
+    (a, b) =>
+      a.tier - b.tier ||
+      weightOf(a.item) - weightOf(b.item) ||
+      (a.item.day ?? '').localeCompare(b.item.day ?? ''),
+  );
   return {
-    needYou,
-    overdue,
-    nextShowCity: next ? (next.city ?? next.venue?.name ?? next.venue_name ?? null) : null,
-    holds,
-    live,
-    pipeline,
-    currency,
+    rows: kept.slice(0, opts.limit ?? WAITING_ROWS).map((x) => x.item),
+    total: kept.length,
+    overdue: kept.filter((x) => x.tier === 0).length,
   };
+}
+
+/** A «voy · no voy» row for «Te espera» (the page names it with its slip). */
+export function goingItem(row: {
+  of: 'performance' | 'date';
+  id: string;
+  day: string;
+  subject: string;
+  projectId: string | null;
+  projectName: string;
+  href: string | null;
+}): DeskItem {
+  return blankItem({
+    id: `going-${row.id}`,
+    concern: 'going',
+    subject: row.subject,
+    projectName: row.projectName,
+    projectId: row.projectId,
+    verbKey: 'going',
+    day: row.day,
+    href: row.href,
+    going: { of: row.of, id: row.id },
+  });
 }
