@@ -33,8 +33,8 @@ de Phase 0.9 en `_tasks.md`. Pricing orientativo, no decidido.
 
 ## Producción (verificado 2026-10-14, tarde)
 
-- Web `https://hour.zerosense.studio`, Worker `hour-web`. `/health/live`: SHA **`bf0c98f`**, `dirty:false`, builtAt
-  2026-10-17T15:07Z (dashboards de Conversations, Planner y Cuentas, ADR-117 a 120; Cuentas en `/h/books`). `main` == prod salvo documentos y tests.
+- Web `https://hour.zerosense.studio`, Worker `hour-web`. `/health/live`: SHA **`43b7cca`**, `dirty:false`, builtAt
+  2026-10-17T16:20Z (la portada nombra tus funciones con la regla del rail, sobre los dashboards de Conversations, Planner y Cuentas). El espacio `demo` se borró el 2026-10-17 (backup 39047328953). `main` == prod salvo documentos y tests.
 - Despliegue: `pnpm --filter web run deploy` (no `pnpm deploy` desde la raíz). Exige árbol limpio.
 - Supabase `hour-phase0` · ref `lqlyorlccnniybezugme` · `eu-central-1`. Plan Free, con keepalive diario
   (`.github/workflows/keepalive.yml`) contra la pausa por inactividad. Pasar a Pro antes de la beta, aún no
