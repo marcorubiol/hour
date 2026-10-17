@@ -33,31 +33,15 @@
    * Calm does not touch it (Marco, 2026-08-10): knowing what comes next is
    * the opposite of noise.
    */
-  import { createQuery, useQueryClient } from '@tanstack/svelte-query';
-  import { toStore } from 'svelte/store';
-  import { fetchJSON } from '$lib/api';
+  import { useQueryClient } from '@tanstack/svelte-query';
   import { dualTime, hourMark, localeDayMonth, localeWeekdayShort } from '$lib/datetime';
   import { t, type Locale } from '$lib/i18n';
-  import {
-    dateSlip,
-    performanceSlip,
-    type DateEvent,
-    type PerformanceEvent,
-    type SlipContext,
-    type SlipKind,
-  } from '$lib/month-events';
-  import {
-    meQueryOptions,
-    pulseAvailabilityQueryOptions,
-    pulsePerformancesQueryOptions,
-    pulseWindowFrom,
-    teamQueryOptions,
-    workspacesQueryOptions,
-  } from '$lib/nav-queries';
-  import { buildPersonAttribution, type CommitmentState } from '$lib/people';
+  import type { SlipKind } from '$lib/month-events';
+  import type { CommitmentState } from '$lib/people';
   import { setCommitment } from '$lib/commitments';
-  import { dayKeyInTz, plannerDayHref } from '$lib/planner';
+  import { dayKeyInTz } from '$lib/planner';
   import { computePulse, type PulseWord } from '$lib/pulse';
+  import { createPulseFeeds, pulseSlip, pulseSlipContext } from '$lib/pulse-feeds.svelte';
   import Slip from '$lib/components/planner/Slip.svelte';
 
   interface Props {
@@ -72,110 +56,27 @@
   const viewerTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
   let today = $derived(dayKeyInTz(now.toISOString(), viewerTz));
 
-  /** A multi-day row that began before today is still running today, and
-      `/api/dates` filters on the row's START — so the window reaches back.
-      Two weeks covers a residency or a tour leg; a longer one would spend
-      the row budget on the past. */
-  let datesFrom = $derived(pulseWindowFrom(today));
-
-  const meQuery = createQuery(meQueryOptions());
-  const workspacesQuery = createQuery(workspacesQueryOptions());
-  let personId = $derived($meQuery.data?.person_id ?? null);
-  let workspaces = $derived($workspacesQuery.data?.items ?? []);
-
-  // Today forward, ordered by the server. Its own key: the hall and the desk
-  // share `['today-performances']` without rosters, and the person axis needs
-  // them — widening their URL would make three surfaces pay for this one.
-  const perfQuery = createQuery(toStore(() => pulsePerformancesQueryOptions(today)));
-
-  const datesQuery = createQuery(
-    toStore(() => ({
-      queryKey: ['pulse-dates', datesFrom] as const,
-      staleTime: 5 * 60_000,
-      queryFn: async ({ signal }: { signal: AbortSignal }) => {
-        try {
-          return await fetchJSON<{ items: DateEvent[] }>(
-            `/api/dates?from=${datesFrom}&limit=200`,
-            signal,
-          );
-        } catch (err) {
-          if (err instanceof Error && err.message === 'Unauthorized') throw err;
-          return { items: [] as DateEvent[] };
-        }
-      },
-    })),
-  );
-
-  // The inference pool and the gate it stops at — fetched only for a login
-  // that IS a person, because without one the axis never narrows anything.
-  const teamQuery = createQuery(
-    toStore(() =>
-      teamQueryOptions(
-        workspaces.map((w) => w.id),
-        { enabled: Boolean(personId) },
-      ),
-    ),
-  );
-  const blocksQuery = createQuery(
-    toStore(() => pulseAvailabilityQueryOptions(datesFrom, { enabled: Boolean(personId) })),
-  );
-
-  let axis = $derived(
-    buildPersonAttribution({
-      pinnedPersonIds: personId ? [personId] : [],
-      team: $teamQuery.data?.items ?? [],
-      blocks: $blocksQuery.data?.items ?? [],
-    }),
-  );
+  // The feeds live in $lib/pulse-feeds so the Desk's «lo siguiente» reads
+  // the same rows from the same cache (ADR-117).
+  const feeds = createPulseFeeds(() => today);
+  let personId = $derived(feeds.personId);
 
   let pulse = $derived(
     computePulse(
-      {
-        performances: $perfQuery.data?.items ?? [],
-        dates: $datesQuery.data?.items ?? [],
-        viewerTz,
-        axis,
-      },
+      { performances: feeds.performances, dates: feeds.dates, viewerTz, axis: feeds.axis },
       now,
     ),
   );
 
   // Nothing has landed yet: draw the frame, claim nothing. «free» is a
   // statement about the day and an empty cache is not one.
-  let settled = $derived($perfQuery.isSuccess && $datesQuery.isSuccess);
+  let settled = $derived(feeds.settled);
 
   const kindLabel = (kind: SlipKind) => t(`planner.kind_${kind}`, locale);
 
-  let slipCtx = $derived<SlipContext>({
-    workspaceSlug: workspaces[0]?.slug ?? '',
-    workspaceSlugById: new Map(workspaces.map((w) => [w.id, w.slug])),
-    workspaceTzById: new Map(workspaces.map((w) => [w.id, w.timezone])),
-    workspaceModeById: new Map(workspaces.map((w) => [w.id, w.booking_mode ?? 'simple'])),
-    viewerTz,
-    kindLabel,
-    dualTime,
-  });
+  let slipCtx = $derived(pulseSlipContext(feeds.workspaces, viewerTz, kindLabel));
 
-  let nextSlip = $derived.by(() => {
-    const next = pulse.next;
-    if (!next) return null;
-    if (next.ref.of === 'performance') return performanceSlip(next.ref.row as PerformanceEvent, slipCtx);
-
-    /**
-     * A DATE HAS NO PAGE, BUT IT HAS A DAY — and the rail must not be the one
-     * dead end in the block.
-     *
-     * `dateSlip` returns `href: null` correctly: on the month and the diary a
-     * date opens its edit dialog, and those views own that dialog. The rail
-     * does not, and it cannot grow one — it is furniture in every lens,
-     * including the three that have nothing to do with the planner. So it
-     * sends you to the day that holds it, which is a real address the Planner
-     * already answers (`?view=day&d=`), and a link you can middle-click and
-     * copy rather than a button that only works from here.
-     */
-    const slip = dateSlip(next.ref.row as DateEvent, slipCtx);
-    return { ...slip, href: plannerDayHref('day', next.day) };
-  });
+  let nextSlip = $derived(pulse.next ? pulseSlip(pulse.next.ref, pulse.next.day, slipCtx) : null);
 
   /** A run-sheet key or a date kind → the words the app already owns.
       `start` has no anchor key of its own; the Desk calls that moment the

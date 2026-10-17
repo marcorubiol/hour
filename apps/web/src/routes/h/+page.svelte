@@ -24,17 +24,9 @@
   import { goto } from '$app/navigation';
   import { createQuery } from '@tanstack/svelte-query';
   import { fetchJSON } from '$lib/api';
-  import { toStore } from 'svelte/store';
-  import {
-    meQueryOptions,
-    pulseAvailabilityQueryOptions,
-    pulsePerformancesQueryOptions,
-    pulseWindowFrom,
-    teamQueryOptions,
-    workspacesQueryOptions,
-  } from '$lib/nav-queries';
-  import { buildPersonAttribution } from '$lib/people';
+  import { meQueryOptions, workspacesQueryOptions } from '$lib/nav-queries';
   import { performanceAttribution } from '$lib/pulse';
+  import { createPulseFeeds } from '$lib/pulse-feeds.svelte';
   import { dayKeyInTz } from '$lib/planner';
   import { userDisplayName } from '$lib/utils/identity';
   import { session } from '$lib/session.svelte';
@@ -118,7 +110,7 @@
   // Hall and the rail can never name different shows.
   const viewerTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const pulseToday = dayKeyInTz(new Date().toISOString(), viewerTz);
-  const performancesQuery = createQuery(pulsePerformancesQueryOptions(pulseToday));
+  const pulse = createPulseFeeds(() => pulseToday);
   const tasksQuery = createQuery({
     queryKey: ['tasks', 'open'],
     queryFn: ({ signal }: { signal: AbortSignal }) =>
@@ -136,33 +128,12 @@
     ),
   );
 
-  let personId = $derived($meQuery.data?.person_id ?? null);
-  const teamQuery = createQuery(
-    toStore(() =>
-      teamQueryOptions(
-        ($workspacesQuery.data?.items ?? []).map((w) => w.id),
-        { enabled: Boolean(personId) },
-      ),
-    ),
-  );
-  const blocksQuery = createQuery(
-    toStore(() =>
-      pulseAvailabilityQueryOptions(pulseWindowFrom(pulseToday), { enabled: Boolean(personId) }),
-    ),
-  );
-  let axis = $derived(
-    buildPersonAttribution({
-      pinnedPersonIds: personId ? [personId] : [],
-      team: $teamQuery.data?.items ?? [],
-      blocks: $blocksQuery.data?.items ?? [],
-    }),
-  );
   // Until the axis has its inputs it is inactive and would let every show
   // speak: hold the Hall quiet instead (silence over lies).
-  let axisReady = $derived(!personId || ($teamQuery.isSuccess && $blocksQuery.isSuccess));
+  let axisReady = $derived(pulse.axisSettled);
   let myPerformances = $derived<HallPerformance[]>(
-    ($performancesQuery.data?.items ?? [])
-      .filter((p) => performanceAttribution(p, axis) !== 'no')
+    pulse.performances
+      .filter((p) => performanceAttribution(p, pulse.axis) !== 'no')
       .map((p) => ({ ...p, load_in_at: p.load_in_at ?? null })),
   );
 
@@ -170,7 +141,7 @@
   // the DOM says it instead. The workspaces cache only sharpens a fallback,
   // so it does not hold the hall busy.
   let busy = $derived(
-    $conversationsQuery.isPending || $performancesQuery.isPending || $tasksQuery.isPending || !axisReady,
+    $conversationsQuery.isPending || !pulse.settled || $tasksQuery.isPending || !axisReady,
   );
 
   // Truth rule: only settled data speaks. Pending or errored → null →
@@ -178,7 +149,7 @@
   let status = $derived.by(() => {
     if (
       !$conversationsQuery.isSuccess ||
-      !$performancesQuery.isSuccess ||
+      !pulse.settled ||
       !$tasksQuery.isSuccess ||
       !axisReady
     ) {
@@ -203,7 +174,7 @@
   // thing twice.
   const RELATION_HORIZON_MIN = 18 * 60;
   let nextMoment = $derived(
-    $performancesQuery.isSuccess && axisReady ? nextTimedMoment(myPerformances, clockNow) : null,
+    pulse.settled && axisReady ? nextTimedMoment(myPerformances, clockNow) : null,
   );
   let relation = $derived.by(() => {
     if (!nextMoment) return null;
@@ -220,7 +191,7 @@
   // Today's timed moments + the open-notes count, from the same caches.
   // A quiet recap and a glance into the Desk — never a second agenda.
   let teaserTimes = $derived(
-    ($performancesQuery.isSuccess && axisReady ? todayMoments(myPerformances, clockNow) : []).map(
+    (pulse.settled && axisReady ? todayMoments(myPerformances, clockNow) : []).map(
       (m) => ({ time: timeFmt.format(new Date(m.at)), place: m.place }),
     ),
   );
