@@ -107,7 +107,7 @@
           · {next.ref.row.project.name}{/if}
       </div>
       <div class="card__slip">
-        <Slip {slip} {kindLabel} stateLabel={() => null} showCountry ground="bare" placing="row" {guess} />
+        <Slip {slip} {kindLabel} stateLabel={() => null} showCountry ground="bare" placing="cell" {guess} />
       </div>
       {#if moments.length > 0}
         <div class="card__slots">

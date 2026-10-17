@@ -1996,7 +1996,7 @@
   "desk.changed_kind_reply": "conversación",
   "desk.changed_kind_mailout": "envío en bloque",
   "desk.door_planner_n": "funciones confirmadas",
-  "desk.door_planner_sub": "{holds} holds · {travel} viajes · 12 semanas",
+  "desk.door_planner_sub": "{holds} en hold · {travel} viajes · 12 semanas",
   "desk.door_conv_n": "holds en la temporada",
   "desk.door_conv_sub": "{live} vivas",
   "desk.door_conv_due": "te toca en {n}",

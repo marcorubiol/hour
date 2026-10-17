@@ -2005,7 +2005,7 @@
   "desk.changed_kind_reply": "conversation",
   "desk.changed_kind_mailout": "bulk send",
   "desk.door_planner_n": "confirmed shows",
-  "desk.door_planner_sub": "{holds} holds · {travel} travel days · 12 weeks",
+  "desk.door_planner_sub": "{holds} on hold · {travel} travel days · 12 weeks",
   "desk.door_conv_n": "holds this season",
   "desk.door_conv_sub": "{live} live",
   "desk.door_conv_due": "your turn on {n}",

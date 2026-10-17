@@ -1996,7 +1996,7 @@
   "desk.changed_kind_reply": "conversa",
   "desk.changed_kind_mailout": "enviament en bloc",
   "desk.door_planner_n": "funcions confirmades",
-  "desk.door_planner_sub": "{holds} holds · {travel} viatges · 12 setmanes",
+  "desk.door_planner_sub": "{holds} en hold · {travel} viatges · 12 setmanes",
   "desk.door_conv_n": "holds a la temporada",
   "desk.door_conv_sub": "{live} vives",
   "desk.door_conv_due": "et toca a {n}",

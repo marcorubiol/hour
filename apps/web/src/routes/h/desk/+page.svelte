@@ -476,13 +476,13 @@
       />
     {/snippet}
     {#snippet sub()}
-      <span class="desk__date">{dateWords}</span>
-      <button
-        type="button"
-        class="desk__add"
-        aria-expanded={composerOpen}
-        onclick={openComposer}>{t('desk.add_task', locale)}</button
-      >
+      <!-- One child, so the sub line's «·» separators stay out of it. -->
+      <span class="desk__subrow">
+        <span class="desk__date">{dateWords}</span>
+        <button type="button" class="desk__add" aria-expanded={composerOpen} onclick={openComposer}
+          >{t('desk.add_task', locale)}</button
+        >
+      </span>
     {/snippet}
   </LensHeader>
 
@@ -572,8 +572,14 @@
       text-transform: uppercase;
       color: var(--primary);
     }
+    .desk__subrow {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-m);
+      inline-size: 100%;
+    }
     .desk__add {
-      float: inline-end;
       padding: var(--space-2xs) var(--space-m);
       border: 1px solid var(--border-color-dark);
       border-radius: var(--radius);
@@ -625,6 +631,12 @@
 
     /* The chrome every band shares: the eyebrow, its count or door, the
        empty and error lines. One treatment, here. */
+    /* A band is a section, and a top-level section carries page padding
+       and a flex gap in the defaults layer: a band is not a page. */
+    .desk :global(.dband) {
+      display: block;
+      padding: 0;
+    }
     .desk :global(.dband__h) {
       display: flex;
       align-items: baseline;
@@ -668,6 +680,7 @@
       .desk__grid {
         display: flex;
         flex-direction: column;
+        align-items: stretch;
       }
       .desk__col {
         display: contents;

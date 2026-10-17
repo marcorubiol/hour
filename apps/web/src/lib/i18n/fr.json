@@ -1996,7 +1996,7 @@
   "desk.changed_kind_reply": "conversation",
   "desk.changed_kind_mailout": "envoi groupé",
   "desk.door_planner_n": "dates confirmées",
-  "desk.door_planner_sub": "{holds} options · {travel} voyages · 12 semaines",
+  "desk.door_planner_sub": "{holds} en option · {travel} voyages · 12 semaines",
   "desk.door_conv_n": "options cette saison",
   "desk.door_conv_sub": "{live} actives",
   "desk.door_conv_due": "à vous pour {n}",

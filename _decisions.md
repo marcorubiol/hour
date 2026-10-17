@@ -3919,3 +3919,44 @@ cerraba.
 
 **Re-evaluar cuando** haya coordenadas en `place`/`venue` (el viaje deja de ser deducido) o cuando Marco la use una
 temporada real de difusión (umbral de huecos, 8 semanas de «sin cerrar»).
+
+## [2026-10-17] ADR-121 · Desk como dashboard: lo que el código obligó a decidir
+
+**Contexto.** Carril `claude/dash-desk`: la propuesta A de Desk (ADR-117) sin migración, con lo que dejaron en `main`
+Conversations, Planner y Cuentas. Cuatro bandas: lo siguiente, te espera, ha cambiado, la temporada.
+
+**Decisión.**
+1. **Una verdad de «lo siguiente», dos dibujos.** Los feeds del pulse salen del rail a `$lib/pulse-feeds.svelte.ts`
+   (mismas claves: `pulse-performances`, `pulse-dates`, equipo, disponibilidad) y la banda 1 es `computePulse` con el
+   `Slip` de siempre (ADR-095 § 0). No sigue el ámbito, como el rail (ADR-096 § 5). Lo de después va en una línea si
+   cae a dos días o menos de lo primero. Si lo siguiente está a más de 14 días, la banda dice «nada en las próximas dos
+   semanas». «Quién va» no entra en esta versión: `WhoGoes` es un editor con selector de personas, no una línea de
+   tarjeta; queda el «voy · no voy» del rail.
+2. **«Te espera»** es `rankWaiting` en `$lib/desk-feed`: tramos vencido, hoy y el resto de la semana; detrás, los
+   «voy · no voy» de 14 días (`goingAsks`: filas que te cuentan por inferencia y nadie ha contestado; la de la banda 1
+   no se repite). Dentro de un tramo: dinero, llamada, voy, tarea, propuesta. Máximo 7. Lo de «cuando sea» y lo de
+   más allá de la semana se queda en «Ver todo», que **sustituye** la lista corta por la lista por días (nunca las dos:
+   una tarea dibujada dos veces son dos casillas con un nombre). Calma deja vencido y hoy.
+3. **La agenda sale del Desk entera**, también el banner de función del día: `desk-feed` pierde funciones y fechas; la
+   función de hoy solo sirve ya para el «revivir» de días tranquilos (`showToday`).
+4. **Vencido** es `invoiceAging(...).state === 'past-expected'` (ADR-117 § 4) sobre facturas emitidas con algo por
+   cobrar; los plazos observados del pagador se aprenden de las facturas del mismo ámbito, como en Cuentas. La fila
+   enseña lo que falta por cobrar (no el total) y abre `/h/books#bolo-<id>`. Las facturas y los bolos se leen con las
+   claves y URLs de Cuentas (`['invoices', …]`, `['money-bolos', …]`): una caché.
+5. **«Ha cambiado» desde la última visita**, guardada en `localStorage` (`hour.desk.last-visit`) al salir del Desk o
+   al ocultar la pestaña, no al entrar: recargar no borra lo que aún no has mirado. Sin visita, una semana atrás. Tres
+   fuentes: hilos con nuevos cuyo último mensaje es posterior (`/api/threads`), salas cuyo último correo es suyo y
+   posterior (las filas «caliente» del overview de Conversations con turno nuestro; el overview da las 6 más recientes)
+   y el último envío mientras tiene 14 días o menos, se haya visto o no (sus respuestas siguen llegando). Máximo 5, la
+   más nueva primero. Sin nada, la banda no se dibuja. Cobros y cambios de estado fuera: no hay registro de cambios de
+   bolos ni de pagos que leer.
+6. **Las puertas dicen la cifra de su lente.** Planner: confirmadas y en hold en la ventana de su portada
+   (`seasonWindow`, 12 semanas desde hoy, ADR-120) y días de viaje; sin choques, que piden equipo y disponibilidad y el
+   motor del Planner. Conversations: holds de la temporada, vivas y «te toca» del overview. Cuentas: «por cobrar» y
+   «vencido» de `moneyPosition`, en EUR si lo hay; solo con `read:money` explícito.
+7. **Una banda es una sección y no una página:** `section` de primer nivel lleva padding y gap en la capa `defaults`;
+   las bandas lo anulan.
+
+**Re-evaluar cuando** Marco lo use con datos reales (el umbral de 14 días, los 7 de «te espera», si la banda 1 repite
+demasiado al rail en escritorio) o cuando exista la RPC `conversation_overview` (ADR-118), que haría barata la
+lectura que la banda 3 y la puerta de Conversations hacen en cada visita.

@@ -80,8 +80,9 @@ test.describe('tasks — Desk feed + line module', () => {
     expect(wsId, 'playwright workspace reachable').not.toBeNull();
     await sweepTasks(page, wsId!);
 
-    // The scoped URL makes the fixture workspace the composer's explicit
-    // default. Assert that visible contract before writing anything.
+    // The composer waits behind «+ Task» (ADR-117). The scoped URL makes the
+    // fixture workspace its explicit default: assert that before writing.
+    await page.getByRole('button', { name: '+ Task' }).click();
     const title = page.getByRole('textbox', { name: /add a loose end/i });
     const composer = page.locator('form').filter({ has: title });
     await title.fill(TASK_FREE);
@@ -94,6 +95,9 @@ test.describe('tasks — Desk feed + line module', () => {
     ]);
     expect(created.status()).toBe(201);
 
+    // An undated task is «anytime»: «Waiting for you» keeps to the week, the
+    // whole list by days has it.
+    await page.getByRole('button', { name: /^See all \(\d+\) by day/ }).click();
     const row = page.getByRole('checkbox', { name: TASK_FREE });
     await expect(row).toBeVisible({ timeout: 10_000 });
 
