@@ -472,7 +472,8 @@ export interface Waiting {
  * «Te espera» (ADR-117): what to act on, by weight. Tiers by day — overdue,
  * today, the rest of this week — and the «voy · no voy» of the next two weeks
  * after them; inside a tier, by `weightOf`, then by day. The anytime tail and
- * what lies past this week stay in the day list. Calm keeps overdue and today.
+ * what lies past this week stay in the day list, except a task already inside
+ * its warning, which joins the week. Calm keeps overdue and today.
  */
 export function rankWaiting(
   feed: readonly DeskBucket[],
@@ -483,8 +484,12 @@ export function rankWaiting(
   const tiered: { tier: number; item: DeskItem }[] = [];
   for (const b of feed) {
     const tier = b.sortKey === -1 ? 0 : b.sortKey === 0 ? 1 : b.sortKey < 98 ? 2 : null;
-    if (tier === null) continue;
-    for (const r of b.runs) for (const item of r.items) tiered.push({ tier, item });
+    for (const r of b.runs)
+      for (const item of r.items) {
+        // A task inside its warning (`lead_days`) is this week's, whatever its due day.
+        const t = tier ?? (item.concern === 'task' && item.dueLabel === 'due' ? 2 : null);
+        if (t !== null) tiered.push({ tier: t, item });
+      }
   }
   for (const item of asks) {
     const k = dayBucket(item.day, now, 'en').sortKey;

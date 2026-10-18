@@ -331,6 +331,15 @@ describe('rankWaiting — «Te espera» by weight (ADR-117)', () => {
     expect(rankWaiting(feed, [], NOW).total).toBe(0);
   });
 
+  it('a task inside its warning joins the week even when its due day is further', () => {
+    const feed = buildDeskFeed(
+      { conversations: [], tasks: [task('van', { due_at: actionAt(8), lead_days: 9 }), task('far', { due_at: actionAt(8) })] },
+      NOW,
+      'en',
+    );
+    expect(rankWaiting(feed, [], NOW).rows.map((r) => r.id)).toEqual(['task-van']);
+  });
+
   it('calm keeps overdue and today only', () => {
     const feed = buildDeskFeed(
       { conversations: [], tasks: [task('a', { due_at: actionAt(0) }), task('b', { due_at: actionAt(3) })] },
