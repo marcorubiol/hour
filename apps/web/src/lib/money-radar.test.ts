@@ -356,6 +356,14 @@ describe('expectedInflow', () => {
 		expect(eur!.undated).toBe(1);
 	});
 
+	it('a future function with only a draft still comes in as contracted', () => {
+		const [eur] = expectedInflow(
+			[bolo({ id: 'b', status: 'confirmed', next_performed_at: '2026-11-20', fee_amount: 1200 })],
+			ctx([invoice({ id: 'd', bolo: 'b', status: 'draft', total: 1272 })]),
+		);
+		expect(eur!.months[1]).toEqual({ month: '2026-11', expected: 0, contracted: 1200 });
+	});
+
 	it('leaves out a currency with nothing coming in, and puts the biggest first', () => {
 		const out = expectedInflow(
 			[

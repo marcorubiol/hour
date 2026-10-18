@@ -973,7 +973,8 @@ export function expectedInflow(
 				if (slot) slot.expected += m.owed;
 			}
 		}
-		if (m.contracted && m.doc === null && m.fee && b.next_performed_at) {
+		// A draft is not an invoice yet: the deal still comes in as «contracted».
+		if (m.contracted && (m.doc === null || m.doc.status === 'draft') && m.fee && b.next_performed_at) {
 			const day = b.next_performed_at.slice(0, 10);
 			if (day < today) continue;
 			const slot = ensure(m.currency).months.find((x) => x.month === monthKey(day));
