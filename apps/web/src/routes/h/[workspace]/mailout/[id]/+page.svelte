@@ -442,7 +442,7 @@
         {/if}
       </div>
 
-      <aside class="mo__aside">
+      <div class="mo__aside">
         <div class="block-head">
           <h2 class="eyebrow eyebrow--sub">{t('mailout.recipients', locale)} · {rows.length}</h2>
         </div>
@@ -476,7 +476,7 @@
             </li>
           {/each}
         </ul>
-      </aside>
+      </div>
     </div>
 
     {#if editable}

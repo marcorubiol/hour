@@ -360,7 +360,7 @@
         {/if}
       </div>
 
-      <aside class="conv__aside">
+      <div class="conv__aside">
         <dl class="facts">
           <div>
             <dt>{t('edit.status', locale)}</dt>
@@ -470,7 +470,7 @@
             {@render teamThread(true)}
           </div>
         {/if}
-      </aside>
+      </div>
     </div>
   </section>
 {/if}
