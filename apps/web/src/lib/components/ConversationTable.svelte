@@ -36,12 +36,11 @@
   import Button from '$lib/components/Button.svelte';
   import ConversationHistory from '$lib/components/ConversationHistory.svelte';
   import Dialog from '$lib/components/Dialog.svelte';
-  import Input from '$lib/components/Input.svelte';
-  import Menu from '$lib/components/Menu.svelte';
+  import ConversationStatusMenu from '$lib/components/ConversationStatusMenu.svelte';
+  import NextActionDialog from '$lib/components/NextActionDialog.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
   import { followUpDue, turnOf } from '$lib/conversation-overview';
   import {
-    CONVERSATION_STATUSES,
     groupConversationsByContact,
     relativeContactDate,
     statusBadgeClass,
@@ -264,31 +263,15 @@
   // ── Next action editor (dialog) ─────────────────────────────────────────
   let dialogOpen = $state(false);
   let editing = $state<ConversationItem | null>(null);
-  let formDate = $state('');
-  let formNote = $state('');
 
   function openNextAction(item: ConversationItem) {
     editing = item;
-    formDate = item.next_action_at ? item.next_action_at.slice(0, 10) : '';
-    formNote = item.next_action_note ?? '';
     dialogOpen = true;
   }
 
-  function closeNextAction() {
-    dialogOpen = false;
-    editing = null;
-  }
-
-  function saveNextAction() {
+  function saveNextAction(patch: Pick<ConversationPatch, 'next_action_at' | 'next_action_note'>) {
     if (!editing) return;
-    $patchMutation.mutate({
-      id: editing.id,
-      patch: {
-        next_action_at: formDate || null,
-        next_action_note: formNote.trim() || null,
-      },
-    });
-    closeNextAction();
+    $patchMutation.mutate({ id: editing.id, patch });
   }
 
   let total = $derived($query.data?.total ?? 0);
@@ -540,44 +523,13 @@
               {#if !editable}
                 <span class={`badge badge--xs ${statusBadgeClass(item.status)}`}>{statusLabel(item.status, locale)}</span>
               {:else}
-              <Menu
-                label={t('conversations.status_menu', locale, { status: statusLabel(item.status, locale) })}
-                triggerClass={statusBadgeClass(item.status)}
+              <ConversationStatusMenu
+                status={item.status}
+                {locale}
                 direction={i >= visibleItems.length - 2 && i > 2 ? 'up' : 'down'}
-              >
-                {#snippet trigger()}
-                  {statusLabel(item.status, locale)}<span class="status-caret" aria-hidden="true">▾</span>
-                {/snippet}
-                {#snippet children({ close })}
-                  {#each CONVERSATION_STATUSES as s (s)}
-                    <li role="none">
-                      <button
-                        type="button"
-                        role="menuitem"
-                        class="menu__item{s === item.status ? ' menu__item--active' : ''}"
-                        onclick={() => {
-                          close();
-                          changeStatus(item, s);
-                        }}
-                      >
-                        {statusLabel(s, locale)}
-                      </button>
-                    </li>
-                  {/each}
-                  <li class="menu-separator" role="separator"></li>
-                  <li role="none">
-                    <button
-                      type="button"
-                      role="menuitem"
-                      class="menu__item"
-                      onclick={() => {
-                        close();
-                        openHistory(item);
-                      }}
-                    >{t('conversations.log_contact', locale)}</button>
-                  </li>
-                {/snippet}
-              </Menu>
+                onchange={(next) => changeStatus(item, next)}
+                onlog={() => openHistory(item)}
+              />
               {/if}
             </td>
             {#if turnColumn}
@@ -677,28 +629,15 @@
   {/snippet}
 </Dialog>
 
-<Dialog bind:open={dialogOpen} title={t('conversations.col_next_action', locale)} size="s" onclose={() => (editing = null)}>
-  {#if editing}
-    <p class="next-action-who">
-      {whoLine(editing)}
-    </p>
-  {/if}
-  <Input label={t('perf.date', locale)} type="date" bind:value={formDate} />
-  <div class="field">
-    <label for="next-action-note">{t('blackout.note', locale)}</label>
-    <textarea
-      id="next-action-note"
-      rows="3"
-      maxlength="500"
-      bind:value={formNote}
-      placeholder={t('conversations.next_move_ph', locale)}
-    ></textarea>
-  </div>
-  {#snippet actions()}
-    <Button variant="outline" onclick={closeNextAction}>{t('create.cancel', locale)}</Button>
-    <Button onclick={saveNextAction}>{t('blackout.save', locale)}</Button>
-  {/snippet}
-</Dialog>
+<NextActionDialog
+  bind:open={dialogOpen}
+  who={editing ? whoLine(editing) : ''}
+  date={editing?.next_action_at ? editing.next_action_at.slice(0, 10) : ''}
+  note={editing?.next_action_note ?? ''}
+  {locale}
+  onsave={saveNextAction}
+  onclose={() => (editing = null)}
+/>
 
 <style>
   @layer components {
@@ -881,12 +820,6 @@
     }
     tbody tr.is-picked td {
       background: var(--bg-ultra-light);
-    }
-
-    .menu-separator {
-      block-size: 1px;
-      margin-block: var(--space-2xs);
-      background: var(--border-color);
     }
 
     .next-action {
