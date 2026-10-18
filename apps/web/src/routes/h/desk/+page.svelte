@@ -61,6 +61,7 @@
   import {
     invoicesByBolo,
     fmtCurrency,
+    isContracted,
     moneyPosition,
     observedPayerTermsDays,
     seasonOf as moneySeasonOf,
@@ -227,12 +228,21 @@
   let scopedPerfs = $derived(feeds.performances.filter((p) => byProject(p.project?.id, p.project?.workspace_id)));
   let scopedDates = $derived(feeds.dates.filter((d) => byProject(d.project?.id, d.project?.workspace_id)));
 
+  // A document of a deal not yet confirmed is a quote, not a debt (ADR-123):
+  // «te espera» leaves it out, as Cuentas and this page's own door do.
+  let debtInvoices = $derived.by(() => {
+    const statusById = new Map(($bolosQuery.data?.items ?? []).map((b) => [b.id, b.status]));
+    return invoices.filter((inv) =>
+      inv.lines.every((l) => !l.bolo_id || !statusById.has(l.bolo_id) || isContracted(statusById.get(l.bolo_id)!)),
+    );
+  });
+
   let feed = $derived(
     buildDeskFeed(
       {
         conversations: scopedConversations as DeskConvInput[],
         tasks: scopedTasks,
-        invoices: readMoney && $invoicesQuery.isSuccess ? invoices : undefined,
+        invoices: readMoney && $invoicesQuery.isSuccess && $bolosQuery.isSuccess ? debtInvoices : undefined,
         showToday: scopedPerfs.some((p) => p.status !== 'cancelled' && perfDayKey(p) === today),
       },
       clockNow,
