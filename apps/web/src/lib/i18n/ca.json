@@ -2071,6 +2071,7 @@
   "desk.changed_reply": "{name} t'ha contestat",
   "desk.changed_mailout": "Enviament «{subject}»",
   "desk.changed_kind_thread": "fil de l'equip",
+  "desk.changed_kind_bolo": "fil del bolo",
   "desk.changed_kind_reply": "conversa",
   "desk.changed_kind_mailout": "enviament en bloc",
   "desk.door_planner_n": "funcions confirmades",

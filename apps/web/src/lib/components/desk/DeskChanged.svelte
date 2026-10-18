@@ -32,7 +32,8 @@
       const where = [feedThreadName(th, locale), feedTitle(th)].filter(Boolean).join(' · ');
       return {
         text: t(n === 1 ? 'desk.changed_thread_one' : 'desk.changed_thread_many', locale, { n, thread: where }),
-        kind: t('desk.changed_kind_thread', locale),
+        // A bolo's facet thread («Técnica») is the bolo's, not «the team's».
+        kind: t(th.anchor_kind === 'bolo' ? 'desk.changed_kind_bolo' : 'desk.changed_kind_thread', locale),
         href: feedHref(th, workspaceSlugById.get(th.workspace_id)),
       };
     }

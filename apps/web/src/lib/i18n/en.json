@@ -2080,6 +2080,7 @@
   "desk.changed_reply": "{name} replied",
   "desk.changed_mailout": "Send «{subject}»",
   "desk.changed_kind_thread": "team thread",
+  "desk.changed_kind_bolo": "show thread",
   "desk.changed_kind_reply": "conversation",
   "desk.changed_kind_mailout": "bulk send",
   "desk.door_planner_n": "confirmed shows",

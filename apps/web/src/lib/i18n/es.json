@@ -2071,6 +2071,7 @@
   "desk.changed_reply": "{name} te ha contestado",
   "desk.changed_mailout": "Envío «{subject}»",
   "desk.changed_kind_thread": "hilo del equipo",
+  "desk.changed_kind_bolo": "hilo del bolo",
   "desk.changed_kind_reply": "conversación",
   "desk.changed_kind_mailout": "envío en bloque",
   "desk.door_planner_n": "funciones confirmadas",

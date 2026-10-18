@@ -2071,6 +2071,7 @@
   "desk.changed_reply": "{name} vous a répondu",
   "desk.changed_mailout": "Envoi «{subject}»",
   "desk.changed_kind_thread": "fil de l'équipe",
+  "desk.changed_kind_bolo": "fil de la date",
   "desk.changed_kind_reply": "conversation",
   "desk.changed_kind_mailout": "envoi groupé",
   "desk.door_planner_n": "dates confirmées",
