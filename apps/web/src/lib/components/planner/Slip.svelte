@@ -156,6 +156,10 @@
   }: Props = $props();
 
   let state = $derived(stateLabel(slip));
+  /* The grain is the doubt's MATERIAL, laid on paper: a bare slip has no
+     paper, so it keeps the doubt in its words (italic, «?») and leaves no
+     dotted patch that covers the name and stops short of the date beside it
+     (diseño B10, the rail's «next»). */
   let held = $derived(slip.cert === 'hold' || slip.cert === 'proposed');
   let nameIsKind = $derived(
     !slip.lead && slip.name.trim().toLowerCase() === kindLabel(slip.kind).trim().toLowerCase(),
@@ -256,7 +260,7 @@
 
 {#if slip.href}
   <a
-    class="slip" class:grain={held}
+    class="slip" class:grain={held && ground === 'card'}
     data-family={slip.cert}
     data-kind={slip.kind}
     data-placing={placing}
@@ -270,7 +274,7 @@
 {:else if onOpen}
   <button
     type="button"
-    class="slip" class:grain={held}
+    class="slip" class:grain={held && ground === 'card'}
     data-family={slip.cert}
     data-kind={slip.kind}
     data-placing={placing}
@@ -283,7 +287,7 @@
   >
 {:else}
   <span
-    class="slip" class:grain={held}
+    class="slip" class:grain={held && ground === 'card'}
     data-family={slip.cert}
     data-kind={slip.kind}
     data-placing={placing}
