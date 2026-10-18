@@ -89,11 +89,22 @@ export function sinceInstant(lastVisit: string | null, now: Date): string {
   return Number.isFinite(at) ? new Date(at).toISOString() : new Date(now.getTime() - FIRST_VISIT_DAYS * DAY_MS).toISOString();
 }
 
+/** How long ago the last visit was, in the unit that reads: minutes, hours, days. */
+export function elapsedSince(since: string, now: Date): { unit: 'min' | 'h' | 'd'; n: number } {
+  const ms = Math.max(0, now.getTime() - Date.parse(since));
+  const min = Math.floor(ms / 60_000);
+  if (min < 60) return { unit: 'min', n: Math.max(1, min) };
+  const h = Math.floor(min / 60);
+  if (h < 24) return { unit: 'h', n: h };
+  return { unit: 'd', n: Math.floor(h / 24) };
+}
+
 /**
  * What moved since the last visit (ADR-117): team threads with new messages
  * written after it, rooms whose latest word is theirs and came after it (the
- * «caliente» rows of the Conversations overview whose turn is ours), and the
- * last send while it is recent. Newest first, at most `CHANGED_ROWS`.
+ * «caliente» rows of the Conversations overview whose turn is ours, unless
+ * «Te espera» already holds them), and the last send while it is recent.
+ * Newest first, at most `CHANGED_ROWS`.
  *
  * Status changes and payments stay out: nothing records them yet for bolos
  * or payments (only `conversation_event` exists), and the Desk does not
@@ -107,6 +118,8 @@ export function changesSince(
   },
   since: string,
   now: Date,
+  /** Conversations «Te espera» already asks you to answer: not news twice. */
+  waiting: ReadonlySet<string> = new Set(),
 ): Change[] {
   const after = Date.parse(since);
   const out: Change[] = [];
@@ -116,10 +129,12 @@ export function changesSince(
     }
   }
   for (const row of input.hot) {
+    if (waiting.has(row.id)) continue;
     if (row.turn === 'ours' && row.at && Date.parse(row.at) > after) out.push({ kind: 'reply', at: row.at, row });
   }
   const m = input.lastMailout;
-  if (m?.queued_at && now.getTime() - Date.parse(m.queued_at) <= MAILOUT_NEWS_DAYS * DAY_MS) {
+  // A send that reached nobody is not news (a draft queued empty, a test).
+  if (m?.queued_at && m.figures.recipients > 0 && now.getTime() - Date.parse(m.queued_at) <= MAILOUT_NEWS_DAYS * DAY_MS) {
     out.push({ kind: 'mailout', at: m.queued_at, mailout: m });
   }
   return out.sort((a, b) => Date.parse(b.at) - Date.parse(a.at)).slice(0, CHANGED_ROWS);

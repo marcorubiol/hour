@@ -83,7 +83,7 @@ test.describe('tasks — Desk feed + line module', () => {
     // The composer waits behind «+ Task» (ADR-117). The scoped URL makes the
     // fixture workspace its explicit default: assert that before writing.
     await page.getByRole('button', { name: '+ Task' }).click();
-    const title = page.getByRole('textbox', { name: /add a loose end/i });
+    const title = page.getByRole('textbox', { name: /new task/i });
     const composer = page.locator('form').filter({ has: title });
     await title.fill(TASK_FREE);
     await expect(composer).toContainText(/playwright/i);
@@ -97,7 +97,7 @@ test.describe('tasks — Desk feed + line module', () => {
 
     // An undated task is «anytime»: «Waiting for you» keeps to the week, the
     // whole list by days has it.
-    await page.getByRole('button', { name: /^See all \(\d+\) by day/ }).click();
+    await page.getByRole('button', { name: /^See all by day/ }).click();
     const row = page.getByRole('checkbox', { name: TASK_FREE });
     await expect(row).toBeVisible({ timeout: 10_000 });
 
@@ -160,7 +160,7 @@ test.describe('tasks — Desk feed + line module', () => {
     await expect(mod).toBeVisible({ timeout: 10_000 });
 
     // Create a task in the module — line_id auto-assigned by context.
-    await mod.getByRole('textbox', { name: /add a loose end/i }).fill(TASK_LINE);
+    await mod.getByRole('textbox', { name: /new task/i }).fill(TASK_LINE);
     await mod.getByLabel(/due/i).fill('2030-01-15');
     const [created] = await Promise.all([
       page.waitForResponse(

@@ -255,6 +255,14 @@ describe('filtros de la lista', () => {
 });
 
 describe('buildOverview', () => {
+  it('«vivas» no cuenta las rechazadas ni las que están en pausa', () => {
+    const o = buildOverview(
+      [row('a'), row('no', { status: 'declined' }), row('pausa', { status: 'dormant' }), row('hold', { status: 'hold' })],
+      NOW,
+    );
+    expect(o).toMatchObject({ total: 4, live: 2 });
+  });
+
   it('cuenta todo y enseña solo las primeras filas de cada bloque', () => {
     const rows = [
       ...Array.from({ length: BLOCK_ROWS + 2 }, (_, i) => row(`due${i}`, inbound(i + 1, `Re: ${i}`))),
@@ -305,7 +313,7 @@ describe('buildOverview', () => {
   });
   it('sin conversaciones, todo a cero', () => {
     const o = buildOverview([], NOW);
-    expect(o).toMatchObject({ total: 0, due: { count: 0, rows: [] }, hot: { count: 0 }, cold: { count: 0, picks: [] } });
+    expect(o).toMatchObject({ total: 0, live: 0, due: { count: 0, rows: [] }, hot: { count: 0 }, cold: { count: 0, picks: [] } });
   });
 });
 

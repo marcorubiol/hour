@@ -502,6 +502,16 @@
       cursor: default;
     }
 
+    /* A finger's room (--touch-target is 0 for a mouse): padding, never type. */
+    @media (pointer: coarse) {
+      .tc__title,
+      .tc__target,
+      .tc__addnote,
+      .tc__add {
+        min-block-size: var(--touch-target);
+      }
+    }
+
     @media (max-width: 47.999rem) {
       .tc__hint {
         display: none;

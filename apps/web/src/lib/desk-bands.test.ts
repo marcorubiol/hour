@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { changesSince, goingAsks, plannerDoor, sinceInstant, CHANGED_ROWS } from './desk-bands';
+import { changesSince, elapsedSince, goingAsks, plannerDoor, sinceInstant, CHANGED_ROWS } from './desk-bands';
 import { buildPersonAttribution, type TeamItem } from './people';
 import type { DateEvent, PerformanceEvent } from './month-events';
 import type { HotRow, LastMailout } from './conversation-overview';
@@ -96,15 +96,35 @@ describe('changesSince — «Ha cambiado»', () => {
     ]);
   });
 
+  it('a reply «Te espera» already holds is not news twice', () => {
+    const out = changesSince(
+      { threads: [], hot: [hot('waiting', '2026-10-15T09:30:00Z', 'ours'), hot('other', '2026-10-15T09:40:00Z', 'ours')], lastMailout: null },
+      since,
+      NOW,
+      new Set(['waiting']),
+    );
+    expect(out.map((c) => (c.kind === 'reply' ? c.row.id : c.kind))).toEqual(['other']);
+  });
+
   it('the last send is news for two weeks, whatever the visit', () => {
-    const m = (queued: string) => ({ id: 'm', queued_at: queued }) as unknown as LastMailout;
+    const m = (queued: string, recipients = 40) => ({ id: 'm', queued_at: queued, figures: { recipients } }) as unknown as LastMailout;
     expect(changesSince({ threads: [], hot: [], lastMailout: m('2026-10-05T10:00:00Z') }, since, NOW)).toHaveLength(1);
     expect(changesSince({ threads: [], hot: [], lastMailout: m('2026-09-20T10:00:00Z') }, since, NOW)).toHaveLength(0);
+    // A send that reached nobody is not news.
+    expect(changesSince({ threads: [], hot: [], lastMailout: m('2026-10-05T10:00:00Z', 0) }, since, NOW)).toHaveLength(0);
   });
 
   it('at most five lines', () => {
     const threads = Array.from({ length: 8 }, (_, i) => thread(`t${i}`, `2026-10-15T0${i}:00:00Z`, 1));
     expect(changesSince({ threads, hot: [], lastMailout: null }, since, NOW)).toHaveLength(CHANGED_ROWS);
+  });
+
+  it('the last visit reads in minutes, then hours, then days', () => {
+    const at = (ms: number) => new Date(NOW.getTime() - ms).toISOString();
+    expect(elapsedSince(at(20_000), NOW)).toEqual({ unit: 'min', n: 1 });
+    expect(elapsedSince(at(42 * 60_000), NOW)).toEqual({ unit: 'min', n: 42 });
+    expect(elapsedSince(at(3 * 3_600_000 + 5 * 60_000), NOW)).toEqual({ unit: 'h', n: 3 });
+    expect(elapsedSince(at(50 * 3_600_000), NOW)).toEqual({ unit: 'd', n: 2 });
   });
 
   it('with no visit on file, since is a week back', () => {

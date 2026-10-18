@@ -193,6 +193,38 @@ describe('buildDeskFeed — tasks, AI, money', () => {
     expect(invoiceHref({ lines: [{ bolo_id: null }] })).toBe('/h/books');
   });
 
+  it('a task with only «desde» that has surfaced is today, never overdue, and has no when', () => {
+    const feed = buildDeskFeed({ ...EMPTY, tasks: [task('from', { from_at: actionAt(-6) })] }, NOW, 'en');
+    expect(feed.map((b) => b.sortKey)).toEqual([0]);
+    const row = feed[0].runs[0].items[0];
+    expect(row).toMatchObject({ overdue: false, dueDay: null, dueLabel: null });
+    expect(rankWaiting(feed, NOW).overdue).toBe(0);
+  });
+
+  it('a conversation call carries its conversation, so the row opens it (not the person)', () => {
+    const feed = buildDeskFeed({ ...EMPTY, conversations: [conv('c9', { workspace_id: 'w1', next_action_at: actionAt(1) })] }, NOW, 'en');
+    expect(feed[0].runs[0].items[0]).toMatchObject({ conversationId: 'c9', workspaceId: 'w1', href: null });
+  });
+
+  it('a reply waiting for us sits today, most recent first, and replaces its next-action call', () => {
+    const feed = buildDeskFeed(
+      {
+        conversations: [conv('c1', { next_action_at: actionAt(4) }), conv('c3', { next_action_at: actionAt(4) })],
+        tasks: [],
+        replies: [
+          { id: 'c1', title: 'Teatre de Salt', projectId: 'p1', projectName: 'MaMeMi', at: `${isoDay(-3)}T09:00:00Z`, href: '/h/w/conversation/c1' },
+          { id: 'c2', title: 'Teatro Central', projectId: 'p1', projectName: 'MaMeMi', at: `${isoDay(-1)}T09:00:00Z`, href: '/h/w/conversation/c2' },
+        ],
+      },
+      NOW,
+      'en',
+    );
+    const rows = feed.flatMap((b) => b.runs).flatMap((r) => r.items);
+    expect(rows.map((r) => r.id)).toEqual(['reply-c2', 'reply-c1', 'conv-c3']);
+    expect(rows[0]).toMatchObject({ verbKey: 'reply', href: '/h/w/conversation/c2', day: isoDay(0), overdue: false });
+    expect(rankWaiting(feed, NOW).rows.map((r) => r.id)).toEqual(['reply-c2', 'reply-c1', 'conv-c3']);
+  });
+
   it('undated open task lands in the anytime tail', () => {
     const feed = buildDeskFeed({ ...EMPTY, tasks: [task('t')] }, NOW, 'en');
     expect(feed.map((b) => b.sortKey)).toEqual([99]);
@@ -208,6 +240,8 @@ describe('buildDeskFeed — revive on quiet days', () => {
     );
     const revive = quiet.flatMap((b) => b.runs).flatMap((r) => r.items).filter((i) => i.verbKey === 'revive');
     expect(revive).toHaveLength(1);
+    // Hour's suggestion does not count as what waits for you.
+    expect(rankWaiting(quiet, NOW)).toMatchObject({ asking: 0 });
     expect(revive[0]).toMatchObject({ isProposal: true, subject: 'CC Brugge' });
 
     // With an overdue call present, no revive.
@@ -277,11 +311,12 @@ describe('rankWaiting — «Te espera» by weight (ADR-117)', () => {
           task('t-late', { due_at: actionAt(-2) }),
         ],
         invoices: [invoice('i')],
+        asks: [ask('voy-today', 0), ask('voy-far', 10)],
       },
       NOW,
       'en',
     );
-    const w = rankWaiting(feed, [ask('voy-today', 0), ask('voy-far', 10)], NOW);
+    const w = rankWaiting(feed, NOW);
     expect(w.rows.map((r) => r.id)).toEqual([
       'inv-i',
       'conv-call-late',
@@ -292,7 +327,15 @@ describe('rankWaiting — «Te espera» by weight (ADR-117)', () => {
       'task-ai-today',
     ]);
     expect(w.total).toBe(9);
+    expect(w.asking).toBe(8);
     expect(w.overdue).toBe(3);
+  });
+
+  it('a «voy» sits on its day in the list by days, so «Ver todo» keeps it', () => {
+    const feed = buildDeskFeed({ ...EMPTY, asks: [ask('voy-far', 10)] }, NOW, 'en');
+    expect(feed.map((b) => b.labelKey)).toEqual(['later']);
+    expect(feed[0].runs[0]).toMatchObject({ concern: 'going' });
+    expect(rankWaiting(feed, NOW).rows.map((r) => r.id)).toEqual(['going-voy-far']);
   });
 
   it('the anytime tail and what lies past this week stay in the day list', () => {
@@ -301,16 +344,25 @@ describe('rankWaiting — «Te espera» by weight (ADR-117)', () => {
       NOW,
       'en',
     );
-    expect(rankWaiting(feed, [], NOW).total).toBe(0);
+    expect(rankWaiting(feed, NOW).total).toBe(0);
+  });
+
+  it('a task inside its warning joins the week even when its due day is further', () => {
+    const feed = buildDeskFeed(
+      { conversations: [], tasks: [task('van', { due_at: actionAt(8), lead_days: 9 }), task('far', { due_at: actionAt(8) })] },
+      NOW,
+      'en',
+    );
+    expect(rankWaiting(feed, NOW).rows.map((r) => r.id)).toEqual(['task-van']);
   });
 
   it('calm keeps overdue and today only', () => {
     const feed = buildDeskFeed(
-      { conversations: [], tasks: [task('a', { due_at: actionAt(0) }), task('b', { due_at: actionAt(3) })] },
+      { conversations: [], tasks: [task('a', { due_at: actionAt(0) }), task('b', { due_at: actionAt(3) })], asks: [ask('v', 4)] },
       NOW,
       'en',
     );
-    expect(rankWaiting(feed, [ask('v', 4)], NOW, { calm: true }).rows.map((r) => r.id)).toEqual(['task-a']);
+    expect(rankWaiting(feed, NOW, { calm: true }).rows.map((r) => r.id)).toEqual(['task-a']);
   });
 
   it('at most seven rows, the total says how many qualified', () => {
@@ -319,7 +371,7 @@ describe('rankWaiting — «Te espera» by weight (ADR-117)', () => {
       NOW,
       'en',
     );
-    const w = rankWaiting(feed, [], NOW);
+    const w = rankWaiting(feed, NOW);
     expect(w.rows).toHaveLength(7);
     expect(w.total).toBe(10);
   });

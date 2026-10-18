@@ -128,6 +128,13 @@
         (`certainty.css` § INFERENCE). Only the name leans: the doubt is
         about whose it is, not about the hour or the place. */
     guess?: boolean;
+    /**
+     * HOW BIG — a third axis, because size is not placing nor ground: the
+     * Desk's «lo siguiente» is the rail's slip given room, the same words in
+     * the same order at a reading size (diseño M1). `s` is every drawing
+     * that existed before it; nobody rescales a slip from outside.
+     */
+    size?: 's' | 'l';
     /** The verbs — `confirm`, `let go`. Drawn in the row placing's third
         column, which is reserved for them and empty everywhere else. */
     actions?: import('svelte').Snippet;
@@ -150,6 +157,7 @@
     placing = 'cell',
     ground = 'card',
     guess = false,
+    size = 's',
     actions,
     cast = null,
     noCastWord = '',
@@ -270,6 +278,7 @@
     data-kind={slip.kind}
     data-placing={placing}
     data-ground={ground}
+    data-size={size === 'l' ? 'l' : undefined}
     data-clash={clash === 'none' ? undefined : clash}
     data-clash-people={clash !== 'none' && clashPeople ? '' : undefined}
     style={slip.project ? `--c: ${accentVarFor(slip.project)}` : undefined}
@@ -284,6 +293,7 @@
     data-kind={slip.kind}
     data-placing={placing}
     data-ground={ground}
+    data-size={size === 'l' ? 'l' : undefined}
     data-clash={clash === 'none' ? undefined : clash}
     data-clash-people={clash !== 'none' && clashPeople ? '' : undefined}
     style={slip.project ? `--c: ${accentVarFor(slip.project)}` : undefined}
@@ -297,6 +307,7 @@
     data-kind={slip.kind}
     data-placing={placing}
     data-ground={ground}
+    data-size={size === 'l' ? 'l' : undefined}
     data-clash={clash === 'none' ? undefined : clash}
     data-clash-people={clash !== 'none' && clashPeople ? '' : undefined}
     style={slip.project ? `--c: ${accentVarFor(slip.project)}` : undefined}
@@ -501,6 +512,20 @@
       color: var(--text-faint);
       font-variant-numeric: tabular-nums;
       white-space: nowrap;
+    }
+
+    /* ══ SIZE L · the Desk's card ══════════════════════════════════════
+       The same proportions one step up the type scale: the labels at the
+       eyebrow size, the name at card-title size, a show's name at display. */
+    .slip[data-size='l'] :is(.slip__kind, .slip__t, .slip__pre, .slip__state, .slip__c, .slip__tz) {
+      font-size: var(--text-xs);
+    }
+    .slip[data-size='l'] .slip__n {
+      font-size: var(--text-m);
+    }
+    .slip[data-size='l'][data-kind='show'] .slip__n {
+      font-size: var(--text-xl);
+      line-height: 1.15;
     }
 
     /* ══ THE ROW PLACING · the diary ═══════════════════════════════════

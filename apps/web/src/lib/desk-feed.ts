@@ -44,6 +44,7 @@ export type BucketLabelKey =
 
 export interface DeskConvInput {
   id: string;
+  workspace_id?: string;
   status: string;
   next_action_at: string | null;
   next_action_note: string | null;
@@ -69,14 +70,17 @@ export interface DeskItem {
    *  prepend `space ·` on the cross-space (Everything) view only. */
   projectId: string | null;
   overdue: boolean;
-  /** Conversation → person page (page builds the href with its ws slug). */
-  personSlug: string | null;
+  /** Conversation rows: where the call is resolved (page builds the href with its ws slug). */
+  conversationId: string | null;
+  workspaceId: string | null;
   /** A ready href (money → its bolo in Cuentas, a «voy» → its day) or null. */
   href: string | null;
   /** Task rows. */
   taskId: string | null;
   taskDone: boolean;
   surfacesDay: string | null;
+  /** A task's own due day; null when it has none (a «desde» is not a deadline). */
+  dueDay: string | null;
   dueLabel: 'overdue' | 'due' | null;
   /** AI consent inbox (ADR-069): origin='ai' → a proposal ghost row. */
   isProposal: boolean;
@@ -88,6 +92,8 @@ export interface DeskItem {
   day: string | null;
   /** A «voy · no voy» row: what the answer is written on. */
   going: { of: 'performance' | 'date'; id: string } | null;
+  /** A reply row: when they wrote (its «when» is how long ago). */
+  repliedAt: string | null;
 }
 
 export interface DeskRun {
@@ -111,6 +117,24 @@ export interface DeskFeedInput {
   invoices?: DeskInvoiceInput[];
   /** A gig today keeps the quiet-day revive away (ADR-073). */
   showToday?: boolean;
+  /**
+   * Rooms whose latest word is theirs and asks for an answer: the «te toca»
+   * rows of the Conversations overview with reason `reply` (ADR-126 § 1). They
+   * wait today until answered; their next-action call is not drawn twice.
+   */
+  replies?: DeskReplyInput[];
+  /** The «voy · no voy» Hour has for you (`goingItem`): each on its day, so «Ver todo» keeps them. */
+  asks?: DeskItem[];
+}
+
+export interface DeskReplyInput {
+  id: string;
+  title: string;
+  projectId: string | null;
+  projectName: string;
+  /** Their message: when they wrote. */
+  at: string;
+  href: string | null;
 }
 
 const VERB_KEYS: Record<string, { upcoming: string; overdue: string }> = {
@@ -169,7 +193,8 @@ export function dayBucket(
 /**
  * The Desk's horizon: detail stays near (today, tomorrow, the rest of the
  * week, a block per day); everything past it folds into ONE `later` bucket
- * the page draws as a single line (`laterSummary`) that opens the Agenda.
+ * the page draws as a single line (`laterSummary`) that unfolds in place (the
+ * Agenda has no tasks nor calls to show).
  * `dayBucket` itself keeps «next week» for the hall rail.
  */
 function horizonBucket(b: ReturnType<typeof dayBucket>): ReturnType<typeof dayBucket> {
@@ -212,11 +237,13 @@ function blankItem(over: Partial<DeskItem> & Pick<DeskItem, 'id' | 'concern' | '
     lineName: null,
     projectId: null,
     overdue: false,
-    personSlug: null,
+    conversationId: null,
+    workspaceId: null,
     href: null,
     taskId: null,
     taskDone: false,
     surfacesDay: null,
+    dueDay: null,
     dueLabel: null,
     isProposal: false,
     reason: null,
@@ -224,6 +251,7 @@ function blankItem(over: Partial<DeskItem> & Pick<DeskItem, 'id' | 'concern' | '
     currency: null,
     day: null,
     going: null,
+    repliedAt: null,
     ...over,
   };
 }
@@ -279,7 +307,10 @@ export function buildDeskFeed(input: DeskFeedInput, now: Date, locale: Locale = 
   for (const t of input.tasks) {
     const surface = taskSurfaceState(t, now);
     if (surface.state === 'dormant' || surface.state === 'done') continue;
-    const day = t.due_at?.slice(0, 10) ?? surface.surfacesAt ?? null;
+    // Only a due date can pass: a task with just «desde» that has surfaced is
+    // today's, never late (its «desde» is not a deadline).
+    const dueDay = t.due_at?.slice(0, 10) ?? null;
+    const day = dueDay ?? (surface.surfacesAt ? todayISO : null);
     const overdue = surface.state === 'overdue';
     push(
       day,
@@ -295,6 +326,7 @@ export function buildDeskFeed(input: DeskFeedInput, now: Date, locale: Locale = 
         overdue,
         taskId: t.id,
         surfacesDay: surface.surfacesAt,
+        dueDay,
         dueLabel: t.due_at ? (overdue ? 'overdue' : surface.state === 'urgent' ? 'due' : null) : null,
         isProposal: t.origin === 'ai',
         reason: t.origin === 'ai' ? (t.note ?? null) : null,
@@ -302,10 +334,33 @@ export function buildDeskFeed(input: DeskFeedInput, now: Date, locale: Locale = 
     );
   }
 
+  // ── Replies waiting for us (ADR-126 «te toca», reason reply): today, the
+  //    most recent first, opening the conversation. They are the call for
+  //    their conversation: its next action is not drawn again.
+  const replied = new Set<string>();
+  for (const r of input.replies ?? []) {
+    replied.add(r.id);
+    push(
+      todayISO,
+      'conversation',
+      -Date.parse(r.at),
+      blankItem({
+        id: `reply-${r.id}`,
+        concern: 'conversation',
+        subject: r.title,
+        projectName: r.projectName || '—',
+        projectId: r.projectId,
+        verbKey: 'reply',
+        href: r.href,
+        repliedAt: r.at,
+      }),
+    );
+  }
+
   // ── Conversations (derived calls): next action set, not declined/dormant.
   let hasOverdue = false;
   for (const e of input.conversations) {
-    if (e.status === 'declined' || e.status === 'dormant' || !e.next_action_at) continue;
+    if (e.status === 'declined' || e.status === 'dormant' || !e.next_action_at || replied.has(e.id)) continue;
     const day = e.next_action_at.slice(0, 10);
     const b = dayBucket(day, now, locale);
     const overdue = b.sortKey === -1;
@@ -322,7 +377,8 @@ export function buildDeskFeed(input: DeskFeedInput, now: Date, locale: Locale = 
         projectId: e.project?.id ?? null,
         verbKey: conversationVerbKey(e.status, overdue),
         overdue,
-        personSlug: e.person?.slug ?? null,
+        conversationId: e.id,
+        workspaceId: e.workspace_id ?? null,
       }),
     );
   }
@@ -343,7 +399,8 @@ export function buildDeskFeed(input: DeskFeedInput, now: Date, locale: Locale = 
           projectName: e.project?.name ?? '—',
           projectId: e.project?.id ?? null,
           verbKey: 'revive',
-          personSlug: e.person?.slug ?? null,
+          conversationId: e.id,
+          workspaceId: e.workspace_id ?? null,
           isProposal: true,
         }),
       );
@@ -370,6 +427,11 @@ export function buildDeskFeed(input: DeskFeedInput, now: Date, locale: Locale = 
         currency: inv.currency,
       }),
     );
+  }
+
+  // ── «Voy · no voy»: on their day, after the tasks.
+  for (const a of input.asks ?? []) {
+    if (a.day) push(a.day, 'going', Date.parse(`${a.day}T00:00:00Z`), a);
   }
 
   // ── Group into buckets, order by fixed concern rank then secondary sub,
@@ -416,6 +478,8 @@ export interface Waiting {
   rows: DeskItem[];
   /** Everything that qualified, before the cut. */
   total: number;
+  /** What waits for you: what qualified minus Hour's own proposals (the title's count). */
+  asking: number;
   overdue: number;
 }
 
@@ -423,23 +487,29 @@ export interface Waiting {
  * «Te espera» (ADR-117): what to act on, by weight. Tiers by day — overdue,
  * today, the rest of this week — and the «voy · no voy» of the next two weeks
  * after them; inside a tier, by `weightOf`, then by day. The anytime tail and
- * what lies past this week stay in the day list. Calm keeps overdue and today.
+ * what lies past this week stay in the day list, except a task already inside
+ * its warning, which joins the week. Calm keeps overdue and today.
  */
 export function rankWaiting(
   feed: readonly DeskBucket[],
-  asks: readonly DeskItem[],
   now: Date,
   opts: { calm?: boolean; limit?: number } = {},
 ): Waiting {
   const tiered: { tier: number; item: DeskItem }[] = [];
   for (const b of feed) {
     const tier = b.sortKey === -1 ? 0 : b.sortKey === 0 ? 1 : b.sortKey < 98 ? 2 : null;
-    if (tier === null) continue;
-    for (const r of b.runs) for (const item of r.items) tiered.push({ tier, item });
-  }
-  for (const item of asks) {
-    const k = dayBucket(item.day, now, 'en').sortKey;
-    tiered.push({ tier: k === 0 ? 1 : k < 7 ? 2 : 3, item });
+    for (const r of b.runs)
+      for (const item of r.items) {
+        if (item.concern === 'going') {
+          // A «voy» of the next two weeks rides behind the week, whatever its bucket.
+          const k = dayBucket(item.day, now, 'en').sortKey;
+          tiered.push({ tier: k === 0 ? 1 : k < 7 ? 2 : 3, item });
+          continue;
+        }
+        // A task inside its warning (`lead_days`) is this week's, whatever its due day.
+        const t = tier ?? (item.concern === 'task' && item.dueLabel === 'due' ? 2 : null);
+        if (t !== null) tiered.push({ tier: t, item });
+      }
   }
   const kept = opts.calm ? tiered.filter((x) => x.tier <= 1) : tiered;
   kept.sort(
@@ -451,7 +521,8 @@ export function rankWaiting(
   return {
     rows: kept.slice(0, opts.limit ?? WAITING_ROWS).map((x) => x.item),
     total: kept.length,
-    overdue: kept.filter((x) => x.tier === 0).length,
+    asking: kept.filter((x) => !x.item.isProposal).length,
+    overdue: kept.filter((x) => x.tier === 0 && !x.item.isProposal).length,
   };
 }
 

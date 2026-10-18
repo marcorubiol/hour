@@ -656,7 +656,9 @@ export type DayMoment = { key: RunSheetStepKey | null; label: string | null; at:
  * free moment has no word in its vocabulary.
  */
 export function dayMoments(e: PerformanceEvent | DateEvent): DayMoment[] {
-  if (e.schedule) {
+  // An empty array is truthy: only a schedule WITH moments wins over the five
+  // fields (the API derives those from the same rows, so both agree there).
+  if (e.schedule?.length) {
     return e.schedule.map((m) => ({
       key: m.kind && LEGACY_STEP_KEYS.has(m.kind) ? (m.kind as RunSheetStepKey) : null,
       label: m.label,

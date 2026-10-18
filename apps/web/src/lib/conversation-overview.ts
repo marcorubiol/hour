@@ -446,8 +446,10 @@ export interface Block<T> {
 }
 
 export interface ConversationOverview {
-  /** Conversaciones vivas en el alcance. */
+  /** Conversaciones del alcance (todas las no borradas). */
   total: number;
+  /** Las que siguen abiertas: sin las rechazadas ni las que están en pausa. */
+  live: number;
   season: {
     label: string;
     start: string;
@@ -494,6 +496,7 @@ export function buildOverview(
 
   return {
     total: rows.length,
+    live: rows.filter((r) => r.status !== 'declined' && r.status !== 'dormant').length,
     season: {
       ...season,
       total: inSeasonRows.length,

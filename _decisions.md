@@ -4188,3 +4188,60 @@ Que Safari con VoiceOver pierda la semántica de tabla en las tarjetas es una su
 **Re-evaluar cuando** Marco lleve una temporada de difusión con esto: si «No pide respuesta» se usa poco (y conviene
 inferirlo), si la confirmada debe volver a tener turno, y qué hacer con las «sin fecha de contacto» de `muk-cia`
 (fecharlas en bloque o dejarlas aparte).
+
+## [2026-10-18] ADR-127 · Revisión de Desk: lo que te contesta se queda hasta que respondes, la víspera es el día de la función y «Ha cambiado» no calla
+
+**Contexto.** Revisión de Desk del 2026-10-18 (uso, diseño y móvil y accesibilidad; `build/coordination/review-desk/`,
+fuera de git). Marco pidió aplicar todo lo recomendado, y validó en el Drop que «Ha cambiado» no desaparezca vacía y
+diga si falla, y que la puerta de Conversations no salga a quien no tiene acceso (ADR-124). Carril `claude/desk-fixes`,
+sobre `claude/conv-fixes` (reutiliza `MailoutFigures`, `.load-fail` y el toast con acción). Sin migración.
+
+**Decisión.**
+1. **Una sala que te contesta espera en «Te espera» hasta que respondes.** Las filas «te toca» del overview de
+   Conversations con motivo `reply` (ADR-126 § 1) entran en el tramo de hoy, la más reciente arriba, con su «cuándo» en
+   «ayer», «hace 3 días»; abren la conversación y sustituyen su llamada de próxima acción. «Ha cambiado» no repite una
+   respuesta que ya está en «Te espera». Límite: el overview da las 5 primeras de «te toca»; con más, el resto se ve en
+   la cifra de la puerta y en la lente.
+2. **La víspera es el día de la función** (enmienda ADR-121 § 1). Si lo siguiente y lo de después caen el mismo día y
+   lo segundo es una función, la tarjeta es la función (horas, hoja de ruta) y el viaje va encima, en una línea «Antes».
+   La línea de antes o después dice qué es y si es firme con la voz del `Slip` («VIAJE a Girona · desde Barcelona»,
+   «FUNCIÓN?» en cursiva para un hold). Lo siguiente a más de 14 días ya no es «nada»: la banda dice cuál y dónde.
+3. **Vencido es solo lo que tenía vencimiento.** Una tarea con solo «desde» que ya ha aflorado es de hoy, sin fecha;
+   una tarea dentro de su aviso entra en la semana con «vence 25 oct». Las propuestas de Hour (revivir, IA) no suman al
+   título ni llevan fecha. Mientras carga o si falla, el título pinta una raya (ADR-096 § 6).
+4. **«Ha cambiado» no desaparece** (enmienda ADR-121 § 5): sin nada, una línea («Nada nuevo desde tu última visita,
+   hace 3 h»; sin visita guardada, «en la última semana»); si una fuente falla, lo dice. Un envío sin destinatarios no
+   es novedad; el que lo es enseña las cifras de la lente (`MailoutFigures`) y abre el envío. Un hilo de bolo se llama
+   «hilo del bolo».
+5. **«Ver todo» no pierde nada** (enmienda ADR-121 § 2): los «¿vas?» viven en su día en la lista por días, el botón no
+   lleva cifra (la única es «7 de 16») y «Más adelante» se despliega en sitio en vez de abrir una Agenda que no tiene
+   tareas ni llamadas. En calma no se ofrece «Ver todo».
+6. **Una llamada abre la conversación**, no la ficha de la persona.
+7. **Las puertas hablan como su lente** (enmienda ADR-121 § 6). Sin rótulo común de temporada: cada puerta lleva su
+   ventana en su eyebrow (Planificador «próximas 12 semanas», Conversaciones «Temporada 26-27»). Planificador:
+   «funciones confirmadas · N por decidir · N días de viaje». Conversaciones: «conversaciones en hold · N vivas · te
+   toca en N»; «vivas» es un campo nuevo del overview (`live`, sin rechazadas ni en pausa; `total` sigue igual para la
+   lente); «te toca» sin rojo y sin «en 0». Sin `read` en conversaciones la puerta no existe y el Desk no pide el
+   overview (el flag de `LensSwitcher`).
+8. **Quitar una tarea** quita la fila al momento y da un toast con «Deshacer»; el DELETE sale a los 5 s, o al salir del
+   Desk. En táctil la × se ve siempre y tiene 44 px.
+9. **Sistema visual.** `Slip` gana un eje `size` (`s`/`l`) en vez de reescalarse desde fuera; la cifra de las puertas
+   baja a `--stat-lead`. Lo propuesto (tarjeta, «¿vas?», propuestas) usa tokens semánticos nuevos `--suggest-ink`,
+   `--suggest-edge`, `--suggest-wash` sobre `--info`, nunca un acento de identidad. Un solo esqueleto, `.ghost-line` en
+   `base.css` (el de Conversations, que pasa a consumirlo); fallos con `.load-fail`; botones con `btn--outline`. «Te
+   espera» y las puertas alinean sus columnas con `subgrid`.
+10. **Accesibilidad.** En el móvil el DOM es el orden que se ve (1, 2, 4, 3, sin `order`). El selector de lentes es un
+    `nav` con enlaces y `aria-current`, no pestañas. `--text-xs` no baja de 11 px con puntero táctil. «Ver todo» deja el
+    foco en la cabecera de su banda; las bandas se llaman solo por su nombre; el nombre de una tarea es la etiqueta de
+    su casilla; «voy · no voy» es el mismo botón en tarjeta y fila, con el sujeto en su nombre accesible; el botón de
+    calma se llama «calma» con `aria-keyshortcuts`. Escape cierra el compositor. Una palabra, «tarea», en botón,
+    compositor y grupo.
+
+**Fuera, y por qué.** La cabecera de bloque común de los cuatro dashboards (diseño M4, también el tracking escrito a
+mano) es de la pasada de coherencia. Que la banda 1 repita al rail en escritorio (uso #14) es decisión de Marco; con el
+punto 2 la tarjeta ya dice más que el rail la víspera de una función. Aceptar una propuesta de IA sigue sin persistir
+(hueco conocido de ADR-069). La caja de ámbito ya va en una línea en el teléfono (carril del Planner, 18-10); el resto del cromo es del
+shell.
+
+**Re-evaluar cuando** Marco use el Desk una temporada de gira: si las respuestas en «Te espera» deben llevar «tarde»
+como en Conversations, si 5 filas de «te toca» bastan, y si los 5 s de «Deshacer» son pocos.

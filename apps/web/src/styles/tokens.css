@@ -168,6 +168,14 @@
     --today-weight: 600;
     --today-wash: color-mix(in oklch, var(--text-color) 4%, transparent);
 
+    /* SUGGESTED — what Hour puts in front of you that is not yours yet: the
+       next thing's card, a proposal, a «¿vas?». A semantic tone on --info,
+       never an identity hue (--accent-*: a project with that hue would read
+       as «Hour proposes this»). Derived, so dark follows --info. */
+    --suggest-ink: var(--info-dark);
+    --suggest-edge: color-mix(in oklch, var(--info) 30%, var(--border-color-light));
+    --suggest-wash: color-mix(in oklab, var(--info) 6%, var(--bg-ultra-light));
+
     /* the kind word — AWAY / ON TOUR */
     --away-word: var(--text-muted);
     /* the subject, in the body voice a band gives it */
@@ -528,6 +536,9 @@
   @media (pointer: coarse) {
     :root {
       --touch-target: 44px;
+      /* A floor for the smallest step on a phone (móvil #10 of the Desk):
+         9.7px is an eyebrow on a desk, a squint in a hand. */
+      --text-xs: 0.6875rem;
     }
   }
 

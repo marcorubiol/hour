@@ -9,7 +9,8 @@
    *   4 · La temporada  — one door per lens, in the lens's own arithmetic
    *
    * Desktop: two columns, what you act on (1, 2) on the left and what you
-   * look at (4, 3) on the right. Phone: one column, 1 → 4. Calm keeps 1 and 2.
+   * look at (4, 3) on the right. Phone: one column in the same order as the
+   * DOM, 1, 2, 4, 3, so focus and reading follow what is seen. Calm keeps 1 and 2.
    * Each band loads and fails on its own; none of them is the page's error.
    *
    * Bands 2–4 follow the scope like every lens; band 1 does not, like the rail
@@ -39,6 +40,7 @@
   import { buildLineIndex, buildProjectIndex, resolveScope, type NavWorkspace, type RawLine } from '$lib/nav';
   import { workspacesQueryOptions, activeProjectsQueryOptions, allLinesQueryOptions } from '$lib/nav-queries';
   import { moneyAccessAnyQueryOptions } from '$lib/bolo-queries';
+  import { conversationAccessQueryOptions } from '$lib/conversation-access';
   import type { DeskConversation } from '$lib/components/DeskBoard.svelte';
   import { taskProjectId, type TaskItem, type TasksCache, type TaskTarget } from '$lib/task';
   import {
@@ -50,7 +52,8 @@
     type DeskConvInput,
     type DeskItem,
   } from '$lib/desk-feed';
-  import { changesSince, goingAsks, plannerDoor, sinceInstant } from '$lib/desk-bands';
+  import { changesSince, elapsedSince, goingAsks, plannerDoor, sinceInstant } from '$lib/desk-bands';
+  import { daysAgoLabel } from '$lib/conversation';
   import { computePulse } from '$lib/pulse';
   import { createPulseFeeds, pulseSlipContext } from '$lib/pulse-feeds.svelte';
   import { dateSlip, perfDayKey, performanceSlip, type DateEvent, type PerformanceEvent, type SlipKind } from '$lib/month-events';
@@ -106,7 +109,8 @@
       return null;
     }
   }
-  const since = sinceInstant(readVisit(), new Date());
+  const lastVisit = readVisit();
+  const since = sinceInstant(lastVisit, new Date());
   $effect(() => {
     const save = () => {
       try {
@@ -182,6 +186,18 @@
     ).next;
     return second && second.day <= addDaysIso(first.day, 2) ? second : null;
   });
+  /**
+   * The eve of a show that comes with a trip: the card is the show's day (its
+   * hours, its road sheet) and the trip that leads to it is the line before.
+   * Otherwise the card is the next thing and the line what follows.
+   */
+  let lead = $derived.by(() => {
+    const a = pulse.next;
+    const b = then;
+    if (a && b && a.day === b.day && a.ref.of !== 'performance' && b.ref.of === 'performance')
+      return { card: b, line: a, before: true };
+    return { card: a, line: b, before: false };
+  });
   const kindLabel = (kind: SlipKind) => t(`planner.kind_${kind}`, locale);
   let slipCtx = $derived(pulseSlipContext(feeds.workspaces, viewerTz, kindLabel));
 
@@ -225,9 +241,46 @@
   let tasks = $derived<TaskItem[]>($tasksQuery.data?.items ?? []);
   let invoices = $derived<MoneyInvoiceItem[]>(readMoney ? ($invoicesQuery.data?.items ?? []) : []);
   let scopedConversations = $derived(conversations.filter((e) => byProject(e.project?.id, e.workspace_id)));
-  let scopedTasks = $derived(tasks.filter((tk) => byProject(taskProjectId(tk), tk.workspace_id)));
+  let scopedTasks = $derived(
+    tasks.filter((tk) => !removing.has(tk.id) && byProject(taskProjectId(tk), tk.workspace_id)),
+  );
   let scopedPerfs = $derived(feeds.performances.filter((p) => byProject(p.project?.id, p.project?.workspace_id)));
   let scopedDates = $derived(feeds.dates.filter((d) => byProject(d.project?.id, d.project?.workspace_id)));
+
+  // The Conversations overview: its «te toca» replies wait in band 2, its
+  // «caliente» feeds band 3 and its figures the door (one cache with the lens).
+  // Conversations exists for whoever reads them somewhere (ADR-124), the
+  // LensSwitcher's own flag: only an explicit «no» hides the door.
+  const convAccessQuery = createQuery(conversationAccessQueryOptions());
+  let readConversations = $derived($convAccessQuery.data?.read !== false);
+  const overviewQuery = createQuery(
+    toStore(() => ({
+      queryKey: ['conversation-overview', filterIds.projectIds, filterIds.workspaceIds, lineIds] as const,
+      enabled: !scopeUnresolved && readConversations,
+      queryFn: ({ signal }: { signal: AbortSignal }) => {
+        const p = new URLSearchParams(feedParams(filterIds));
+        if (lineIds.length > 0) p.set('line_ids', lineIds.join(','));
+        return fetchJSON<OverviewResponse>(`/api/conversations/overview?${p}`, signal);
+      },
+    })),
+  );
+  let overview = $derived(readConversations ? ($overviewQuery.data ?? null) : null);
+  let projectNameById = $derived(new Map(projectIndex.map((p) => [p.id, p.name])));
+  let replies = $derived(
+    (overview?.due.rows ?? [])
+      .filter((r) => r.reason === 'reply')
+      .map((r) => {
+        const ws = workspaceSlugById.get(r.workspace_id);
+        return {
+          id: r.id,
+          title: r.title,
+          projectId: r.project_id,
+          projectName: projectNameById.get(r.project_id) ?? '',
+          at: r.at,
+          href: ws ? `/h/${ws}/conversation/${r.id}` : null,
+        };
+      }),
+  );
 
   // A document of a deal not yet confirmed is a quote, not a debt (ADR-123):
   // «te espera» leaves it out, as Cuentas and this page's own door do.
@@ -238,27 +291,13 @@
     );
   });
 
-  let feed = $derived(
-    buildDeskFeed(
-      {
-        conversations: scopedConversations as DeskConvInput[],
-        tasks: scopedTasks,
-        invoices: readMoney && $invoicesQuery.isSuccess && $bolosQuery.isSuccess ? debtInvoices : undefined,
-        showToday: scopedPerfs.some((p) => p.status !== 'cancelled' && perfDayKey(p) === today),
-      },
-      clockNow,
-      locale,
-    ),
-  );
-  let later = $derived(laterSummary(feed));
-
   /** «Voy · no voy» Hour has for you; band 1 already asks about its own row. */
   let asks = $derived(
     goingAsks(
       { performances: scopedPerfs, dates: scopedDates, axis: feeds.axis, viewerTz },
       today,
       GOING_DAYS,
-      new Set(pulse.next ? [pulse.next.ref.id] : []),
+      new Set(lead.card ? [lead.card.ref.id] : []),
     ).map((a) => {
       const slip =
         a.of === 'performance'
@@ -275,25 +314,34 @@
       });
     }),
   );
-  let waiting = $derived(rankWaiting(feed, asks, clockNow, { calm: calm.on }));
+  let feed = $derived(
+    buildDeskFeed(
+      {
+        conversations: scopedConversations as DeskConvInput[],
+        tasks: scopedTasks,
+        invoices: readMoney && $invoicesQuery.isSuccess && $bolosQuery.isSuccess ? debtInvoices : undefined,
+        showToday: scopedPerfs.some((p) => p.status !== 'cancelled' && perfDayKey(p) === today),
+        replies,
+        asks,
+      },
+      clockNow,
+      locale,
+    ),
+  );
+  let later = $derived(laterSummary(feed));
+
+  let waiting = $derived(rankWaiting(feed, clockNow, { calm: calm.on }));
 
   let waitingLoading = $derived(
-    $conversationsQuery.isPending || $tasksQuery.isPending || $workspacesQuery.isPending || $accessQuery.isPending,
+    $conversationsQuery.isPending ||
+      $tasksQuery.isPending ||
+      $workspacesQuery.isPending ||
+      $accessQuery.isPending ||
+      (readConversations && $overviewQuery.isPending),
   );
   let waitingErrored = $derived($conversationsQuery.isError || $tasksQuery.isError);
 
   // ── Band 3 · Ha cambiado, and the Conversations door ───────────────────
-  const overviewQuery = createQuery(
-    toStore(() => ({
-      queryKey: ['conversation-overview', filterIds.projectIds, filterIds.workspaceIds, lineIds] as const,
-      enabled: !scopeUnresolved,
-      queryFn: ({ signal }: { signal: AbortSignal }) => {
-        const p = new URLSearchParams(feedParams(filterIds));
-        if (lineIds.length > 0) p.set('line_ids', lineIds.join(','));
-        return fetchJSON<OverviewResponse>(`/api/conversations/overview?${p}`, signal);
-      },
-    })),
-  );
   const threadsQuery = createQuery(
     toStore(() => ({
       queryKey: ['thread-feed', filterIds.projectIds, filterIds.workspaceIds] as const,
@@ -303,7 +351,6 @@
         fetchJSON<ThreadFeedView>(`/api/threads?${feedParams(filterIds)}`, signal),
     })),
   );
-  let overview = $derived($overviewQuery.data ?? null);
   let changes = $derived(
     changesSince(
       {
@@ -313,9 +360,24 @@
       },
       since,
       clockNow,
+      new Set(replies.map((r) => r.id)),
     ),
   );
-  let changedLoading = $derived($overviewQuery.isPending || $threadsQuery.isPending);
+  let changedErrored = $derived((readConversations && $overviewQuery.isError) || $threadsQuery.isError);
+  let changedLoading = $derived(
+    !changedErrored && ((readConversations && $overviewQuery.isPending) || $threadsQuery.isPending),
+  );
+  let quietLabel = $derived.by(() => {
+    if (!lastVisit) return t('desk.changed_none_first', locale);
+    const e = elapsedSince(since, clockNow);
+    const ago =
+      e.unit === 'min'
+        ? t('desk.ago_min', locale, { n: e.n })
+        : e.unit === 'h'
+          ? t('desk.ago_hours', locale, { n: e.n })
+          : daysAgoLabel(e.n, locale);
+    return t('desk.changed_none', locale, { ago });
+  });
 
   // ── Band 4 · La temporada ──────────────────────────────────────────────
   let plannerFig = $derived(
@@ -324,7 +386,7 @@
       : null,
   );
   let convFig = $derived(
-    overview ? { holds: overview.season.counts.hold, live: overview.total, due: overview.due.count } : null,
+    overview ? { holds: overview.season.counts.hold, live: overview.live, due: overview.due.count } : null,
   );
   let moneyFig = $derived.by(() => {
     if (!$bolosQuery.isSuccess || !$invoicesQuery.isSuccess) return null;
@@ -365,13 +427,18 @@
   );
 
   // ── Header: the overdue and what waits, in one sentence ────────────────
+  // What has no truth draws a dash (ADR-096 § 6): loading or failed, the
+  // title claims nothing about what waits.
+  let titleKnown = $derived(!waitingLoading && !waitingErrored);
   let titleRest = $derived(
-    waiting.total === 0
+    !titleKnown
+      ? '—'
+      : waiting.total === 0
       ? t('desk.title_waiting_zero', locale)
       : t(waiting.total === 1 ? 'desk.title_waiting_one' : 'desk.title_waiting_many', locale, { n: waiting.total }),
   );
   let titleOver = $derived(
-    waiting.overdue > 0
+    titleKnown && waiting.overdue > 0
       ? t(waiting.overdue === 1 ? 'desk.title_overdue_one' : 'desk.title_overdue_many', locale, { n: waiting.overdue })
       : null,
   );
@@ -400,9 +467,51 @@
   });
   const removeTask = createMutation({
     mutationFn: (id: string) => mutateJSON('DELETE', `/api/tasks/${id}`),
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['tasks'] }),
+    onSettled: (_d, _e, id) => {
+      removing.delete(id);
+      removing = new Set(removing);
+      void queryClient.invalidateQueries({ queryKey: ['tasks'] });
+    },
     onError: (err) =>
       addToast({ tone: 'danger', title: t('desk.toast_remove_failed', locale), message: err instanceof ApiError ? err.message : t('perf.unexpected', locale) }),
+  });
+
+  // Removing a task is a toast with «Deshacer»: the row leaves at once and
+  // the DELETE waits out the toast. Leaving the Desk sends what is pending.
+  const UNDO_MS = 5000;
+  let removing = $state(new Set<string>());
+  const pendingRemovals = new Map<string, ReturnType<typeof setTimeout>>();
+  function removeWithUndo(id: string) {
+    const title = tasks.find((tk) => tk.id === id)?.title ?? '';
+    removing = new Set(removing).add(id);
+    pendingRemovals.set(
+      id,
+      setTimeout(() => {
+        pendingRemovals.delete(id);
+        $removeTask.mutate(id);
+      }, UNDO_MS),
+    );
+    addToast({
+      tone: 'info',
+      message: t('desk.toast_removed', locale, { title }),
+      duration: UNDO_MS,
+      action: {
+        label: t('desk.undo', locale),
+        run: () => {
+          clearTimeout(pendingRemovals.get(id));
+          pendingRemovals.delete(id);
+          removing.delete(id);
+          removing = new Set(removing);
+        },
+      },
+    });
+  }
+  $effect(() => () => {
+    for (const [id, timer] of pendingRemovals) {
+      clearTimeout(timer);
+      void mutateJSON('DELETE', `/api/tasks/${id}`).finally(() => queryClient.invalidateQueries({ queryKey: ['tasks'] }));
+    }
+    pendingRemovals.clear();
   });
 
   // AI consent inbox: dismiss = complete it (real PATCH). Accept = keep as a
@@ -430,6 +539,18 @@
   //    follows the pins; the picker attaches to a show or a conversation. ──
   let composerOpen = $state(false);
   let composerEl = $state<HTMLDivElement | null>(null);
+  let addBtn = $state<HTMLButtonElement | null>(null);
+  // Escape folds the composer back behind its button, focus included.
+  $effect(() => {
+    if (!composerOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || e.defaultPrevented) return;
+      composerOpen = false;
+      addBtn?.focus();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  });
   async function openComposer() {
     composerOpen = !composerOpen;
     if (!composerOpen) return;
@@ -481,7 +602,10 @@
     const space = scope.isEmpty && i.projectId ? spaceNameByProjectId.get(i.projectId) : null;
     return [space, i.projectName, i.lineName].filter((x) => x && x !== '—').join(' · ');
   };
-  const personHref = (slug: string | null) => (slug && workspaceSlug ? `/h/${workspaceSlug}/person/${slug}` : null);
+  const conversationHref = (i: DeskItem) => {
+    const ws = (i.workspaceId && workspaceSlugById.get(i.workspaceId)) || workspaceSlug;
+    return i.conversationId && ws ? `/h/${ws}/conversation/${i.conversationId}` : null;
+  };
 </script>
 
 <svelte:head><title>{t('desk.title', locale)}</title></svelte:head>
@@ -497,7 +621,7 @@
       <!-- One child, so the sub line's «·» separators stay out of it. -->
       <span class="desk__subrow">
         <span class="desk__date">{dateWords}</span>
-        <button type="button" class="desk__add" aria-expanded={composerOpen} onclick={openComposer}
+        <button type="button" class="desk__add btn--outline btn--s" bind:this={addBtn} aria-expanded={composerOpen} onclick={openComposer}
           >{t('desk.add_task', locale)}</button
         >
       </span>
@@ -520,8 +644,9 @@
     <div class="desk__col">
       <div class="slot slot--next">
         <DeskNext
-          next={pulse.next}
-          {then}
+          next={lead.card}
+          then={lead.line}
+          thenBefore={lead.before}
           settled={feeds.settled}
           errored={feeds.errored}
           {today}
@@ -534,17 +659,19 @@
       <div class="slot slot--waits">
         <DeskWaiting
           {waiting}
+          {today}
+          calm={calm.on}
           {feed}
           {later}
           loading={waitingLoading}
           errored={waitingErrored}
           {locale}
           {contextPath}
-          {personHref}
+          {conversationHref}
           {money}
           {isGhost}
           ontoggle={(id, done) => $toggleTask.mutate({ id, status: done ? 'done' : 'open' })}
-          onremove={(id) => $removeTask.mutate(id)}
+          onremove={removeWithUndo}
           onaccept={acceptProposal}
           onanswer={answerGoing}
         />
@@ -562,14 +689,22 @@
         <div class="slot slot--season">
           <DeskSeason
             planner={{ value: plannerFig, errored: feeds.errored }}
-            conversations={{ value: convFig, errored: $overviewQuery.isError }}
+            conversations={readConversations ? { value: convFig, errored: $overviewQuery.isError } : null}
             money={readMoney ? { value: moneyFig, errored: $invoicesQuery.isError || $bolosQuery.isError } : null}
             {seasonLabel}
             {locale}
           />
         </div>
         <div class="slot slot--changed">
-          <DeskChanged {changes} loading={changedLoading} {sinceLabel} {workspaceSlugById} {locale} />
+          <DeskChanged
+            {changes}
+            loading={changedLoading}
+            errored={changedErrored}
+            {quietLabel}
+            {sinceLabel}
+            {workspaceSlugById}
+            {locale}
+          />
         </div>
       </div>
     {/if}
@@ -588,7 +723,8 @@
       font-size: var(--text-xs);
       letter-spacing: 0.12em;
       text-transform: uppercase;
-      color: var(--primary);
+      /* The rail already says the day: here it whispers. */
+      color: var(--text-faint);
     }
     .desk__subrow {
       display: flex;
@@ -597,23 +733,13 @@
       gap: var(--space-m);
       inline-size: 100%;
     }
+    /* The system's outline button (base.css), a step tighter in the sub line. */
     .desk__add {
-      padding: var(--space-2xs) var(--space-m);
-      border: 1px solid var(--border-color-dark);
-      border-radius: var(--radius);
-      background: var(--bg-ultra-light);
-      font-family: var(--font-sans);
-      font-size: var(--text-s);
-      color: var(--text-muted);
-      cursor: pointer;
-      transition:
-        color var(--transition),
-        border-color var(--transition);
+      --btn-padding-block: var(--space-2xs);
     }
-    .desk__add:hover,
     .desk__add[aria-expanded='true'] {
-      color: var(--text-color);
-      border-color: var(--text-muted);
+      --btn-text-color: var(--heading-color);
+      --btn-border-color: var(--neutral-semi-light);
     }
     .desk__composer {
       margin-block-start: calc(-1 * var(--space-s));
@@ -655,6 +781,13 @@
       display: block;
       padding: 0;
     }
+    .desk :global(.dband__h:focus) {
+      outline: none;
+    }
+    .desk :global(.dband__h:focus-visible) {
+      outline: var(--focus-width) solid var(--focus-color);
+      outline-offset: var(--focus-offset);
+    }
     .desk :global(.dband__h) {
       display: flex;
       align-items: baseline;
@@ -678,8 +811,16 @@
     .desk :global(.dband__more:hover) {
       color: var(--text-color);
     }
-    .desk :global(.dband__empty),
-    .desk :global(.dband__err) {
+    @media (pointer: coarse) {
+      .desk :global(.dband__more) {
+        display: inline-flex;
+        align-items: center;
+        min-block-size: var(--touch-target);
+        margin-block: calc(-0.5 * var(--touch-target) + 0.5em);
+      }
+    }
+    /* A failure is base.css's `.load-fail`, the one voice of the dashboards. */
+    .desk :global(.dband__empty) {
       margin: 0;
       font-family: var(--font-display);
       font-style: italic;
@@ -689,11 +830,9 @@
     .desk :global(.dband__empty a) {
       color: inherit;
     }
-    .desk :global(.dband__err) {
-      color: var(--danger);
-    }
 
-    /* Phone: one column, in the order the questions are asked: 1, 2, 3, 4. */
+    /* Phone: one column, in DOM order (1, 2, 4, 3): no `order`, so the tab
+       and the screen reader go where the eye goes (móvil #2). */
     @media (max-width: 47.999rem) {
       .desk__grid {
         display: flex;
@@ -702,19 +841,6 @@
       }
       .desk__col {
         display: contents;
-      }
-      .slot--next {
-        order: 1;
-      }
-      .slot--waits {
-        order: 2;
-      }
-      .slot--changed {
-        order: 3;
-      }
-      .slot--season,
-      .desk__calm {
-        order: 4;
       }
     }
   }

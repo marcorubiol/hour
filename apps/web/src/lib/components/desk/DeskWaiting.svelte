@@ -8,20 +8,26 @@
    * One list at a time, never both: a task drawn twice is two checkboxes
    * with one name.
    */
-  import { dayMonth } from '$lib/datetime';
+  import { localeDayMonth } from '$lib/datetime';
+  import { relativeContactDate } from '$lib/conversation';
+  import { tick } from 'svelte';
   import { t, type Locale } from '$lib/i18n';
-  import { plannerDayHref } from '$lib/planner';
   import type { DeskBucket, DeskConcern, DeskItem, DeskRun, Waiting } from '$lib/desk-feed';
 
   interface Props {
     waiting: Waiting;
+    /** The viewer's day (YYYY-MM-DD). */
+    today: string;
+    /** Calm keeps overdue and today: what it folds is not offered back here. */
+    calm?: boolean;
     feed: DeskBucket[];
     later: { count: number; from: string; until: string } | null;
     loading: boolean;
     errored: boolean;
     locale: Locale;
     contextPath: (i: DeskItem) => string;
-    personHref: (slug: string | null) => string | null;
+    /** A conversation row opens its conversation, where the call is resolved. */
+    conversationHref: (i: DeskItem) => string | null;
     money: (n: number, cur: string | null) => string;
     /** Proposals accepted this session (the persistent «Añadir» is a known gap). */
     isGhost: (i: DeskItem) => boolean;
@@ -33,13 +39,15 @@
 
   let {
     waiting,
+    today,
+    calm = false,
     feed,
     later,
     loading,
     errored,
     locale,
     contextPath,
-    personHref,
+    conversationHref,
     money,
     isGhost,
     ontoggle,
@@ -49,6 +57,15 @@
   }: Props = $props();
 
   let all = $state(false);
+  let headEl = $state<HTMLElement | null>(null);
+  /** Swapping the lists removes the button that was pressed: the focus goes to
+      the band's heading instead of falling to <body> (móvil #9). */
+  async function showAll(on: boolean) {
+    all = on;
+    await tick();
+    headEl?.focus();
+  }
+  let laterOpen = $state(false);
   let feedCount = $derived(feed.reduce((n, b) => n + b.runs.reduce((m, r) => m + r.items.length, 0), 0));
 
   const LENS_HREF: Record<DeskConcern, string | null> = {
@@ -60,23 +77,33 @@
   const runHref = (run: DeskRun) => run.items[0]?.href ?? LENS_HREF[run.concern];
   const concernLabel = (c: DeskConcern) => t(`desk.concern_${c}`, locale);
   const laterText = (l: NonNullable<typeof later>) =>
-    t(l.count === 1 ? 'desk.later_one' : 'desk.later_many', locale, { n: l.count, day: dayMonth(l.until) });
+    t(l.count === 1 ? 'desk.later_one' : 'desk.later_many', locale, { n: l.count, day: day(l.until) });
+
+  /** «2 nov», never «02 nov»; today is «hoy». */
+  const day = (iso: string) => (iso === today ? t('desk.next_today', locale) : localeDayMonth(iso, locale));
 
   /** When, in words: the day label of the row's bucket, or the task's own due. */
   function whenOf(i: DeskItem): string {
-    if (i.concern === 'task' && i.dueLabel) return t(`desk.due_${i.dueLabel}`, locale);
+    if (i.concern === 'task') {
+      if (i.dueLabel === 'overdue') return t('desk.due_overdue', locale);
+      if (i.dueLabel === 'due' && i.dueDay) return `${t('desk.due_due', locale)} ${day(i.dueDay)}`;
+      return i.dueDay ? day(i.dueDay) : '';
+    }
+    if (i.repliedAt) return relativeContactDate(i.repliedAt, locale);
+    // A proposal (revive) is Hour's suggestion, not a deadline: no date.
+    if (i.isProposal) return '';
     if (!i.day) return '';
     if (i.overdue) return t('desk.due_overdue', locale);
-    return dayMonth(i.day);
+    return day(i.day);
   }
-  const subjectHref = (i: DeskItem) => (i.concern === 'conversation' ? personHref(i.personSlug) : null) ?? i.href;
+  const subjectHref = (i: DeskItem) => i.href ?? (i.concern === 'conversation' ? conversationHref(i) : null);
 </script>
 
 {#snippet task(item: DeskItem)}
   <input
     type="checkbox"
     class="row__check"
-    aria-label={item.subject}
+    id="desk-task-{item.taskId}"
     checked={item.taskDone}
     onchange={(e) => item.taskId && ontoggle(item.taskId, (e.currentTarget as HTMLInputElement).checked)}
   />
@@ -91,9 +118,9 @@
       >
       <span class="row__when">{whenOf(item)}</span>
       <span class="row__acts">
-        <button type="button" class="row__act" onclick={() => item.taskId && onaccept(item.taskId)}
+        <button type="button" class="row__act btn--outline btn--xs" onclick={() => item.taskId && onaccept(item.taskId)}
           >{t('desk.proposal_add', locale)}</button
-        ><button type="button" class="row__act row__act--quiet" onclick={() => item.taskId && ontoggle(item.taskId, true)}
+        ><button type="button" class="row__act row__act--quiet btn--outline btn--xs" onclick={() => item.taskId && ontoggle(item.taskId, true)}
           >{t('desk.proposal_dismiss', locale)}</button
         >
       </span>
@@ -107,7 +134,10 @@
         <span class="row__verb">{t(`desk.verb_${item.verbKey}`, locale)}</span>
       {/if}
       <span class="row__subject">
-        {#if href}<a href={href}>{item.subject}</a>{:else}{item.subject}{/if}
+        {#if href}<a href={href}>{item.subject}</a>{:else if item.concern === 'task'}<!-- The name is the checkbox's
+            label: tapping it ticks, a finger's target the size of the line. --><label for="desk-task-{item.taskId}"
+            >{item.subject}</label
+          >{:else}{item.subject}{/if}
         {#if contextPath(item) || item.amount != null}<span class="row__ctx"
             >{[contextPath(item), item.amount != null ? money(item.amount, item.currency) : null]
               .filter(Boolean)
@@ -118,8 +148,16 @@
       <span class="row__acts">
         {#if item.concern === 'going' && item.going}
           {@const g = item.going}
-          <button type="button" class="row__act" onclick={() => onanswer(g, 'going')}>{t('pulse.going', locale)}</button
-          ><button type="button" class="row__act row__act--quiet" onclick={() => onanswer(g, 'not_going')}
+          <button
+            type="button"
+            class="row__act btn--outline btn--xs"
+            aria-label={t('desk.going_aria', locale, { subject: item.subject })}
+            onclick={() => onanswer(g, 'going')}>{t('pulse.going', locale)}</button
+          ><button
+            type="button"
+            class="row__act row__act--quiet btn--outline btn--xs"
+            aria-label={t('desk.not_going_aria', locale, { subject: item.subject })}
+            onclick={() => onanswer(g, 'not_going')}
             >{t('pulse.not_going', locale)}</button
           >
         {:else if item.concern === 'task'}
@@ -135,9 +173,25 @@
   {/if}
 {/snippet}
 
+{#snippet runs(bucket: DeskBucket)}
+  {#each bucket.runs as run (run.concern + run.items[0].id)}
+    <div class="run run--{run.concern}">
+      {#if runHref(run)}
+        <a class="run__label" href={runHref(run)}>{concernLabel(run.concern)}</a>
+      {:else}
+        <span class="run__label">{concernLabel(run.concern)}</span>
+      {/if}
+      <ul class="list run__rows">
+        {#each run.items as item (item.id)}{@render row(item)}{/each}
+      </ul>
+    </div>
+  {/each}
+{/snippet}
+
 <section class="dband waits" aria-labelledby="desk-waits-h" aria-busy={loading}>
-  <h2 class="dband__h" id="desk-waits-h">
-    {t('desk.band_waiting', locale)}
+  <!-- The region is named by the words alone, not by the count beside them. -->
+  <h2 class="dband__h" tabindex="-1" bind:this={headEl}>
+    <span id="desk-waits-h">{t('desk.band_waiting', locale)}</span>
     {#if !loading && !errored && waiting.total > waiting.rows.length && !all}
       <span class="dband__count">{t('desk.waiting_count', locale, { shown: waiting.rows.length, total: waiting.total })}</span>
     {/if}
@@ -145,21 +199,28 @@
 
   {#if loading}
     <ul class="list" aria-hidden="true">
-      {#each [0, 1, 2] as i (i)}<li class="row row--wait"><span class="row__bar"></span></li>{/each}
+      {#each [0, 1, 2] as i (i)}<li class="row row--wait">
+          <span class="row__subject"
+            ><span class="ghost-line" style:inline-size="{60 - i * 8}%">&nbsp;</span><span class="row__ctx"
+              ><span class="ghost-line" style:inline-size="30%">&nbsp;</span></span
+            ></span
+          >
+        </li>{/each}
     </ul>
   {:else if errored}
-    <p class="dband__err">{t('desk.error', locale)}</p>
+    <p class="load-fail">{t('desk.error', locale)}</p>
   {:else if all}
     <div class="timeline">
       {#each feed as bucket (bucket.sortKey)}
         {#if bucket.labelKey === 'later'}
           {#if later}
             <section class="bucket">
-              <a class="bucket__head later" href={plannerDayHref('agenda', later.from)}>
+              <button type="button" class="bucket__head later" aria-expanded={laterOpen} onclick={() => (laterOpen = !laterOpen)}>
                 <span class="bucket__label">{t('desk.bucket_later', locale)}</span>
                 <span class="bucket__date">{laterText(later)}</span>
-                <span class="bucket__count" aria-hidden="true">→</span>
-              </a>
+                <span class="bucket__count" aria-hidden="true">{laterOpen ? '↑' : '↓'}</span>
+              </button>
+              {#if laterOpen}{@render runs(bucket)}{/if}
             </section>
           {/if}
         {:else}
@@ -171,44 +232,35 @@
               {#if bucket.dateLabel}<span class="bucket__date">{bucket.dateLabel}</span>{/if}
               <span class="bucket__count">{bucket.runs.reduce((n, r) => n + r.items.length, 0)}</span>
             </header>
-            {#each bucket.runs as run (run.concern + run.items[0].id)}
-              <div class="run run--{run.concern}">
-                {#if runHref(run)}
-                  <a class="run__label" href={runHref(run)}>{concernLabel(run.concern)}</a>
-                {:else}
-                  <span class="run__label">{concernLabel(run.concern)}</span>
-                {/if}
-                <ul class="list run__rows">
-                  {#each run.items as item (item.id)}{@render row(item)}{/each}
-                </ul>
-              </div>
-            {/each}
+            {@render runs(bucket)}
           </section>
         {/if}
       {/each}
     </div>
-    <button type="button" class="more" onclick={() => (all = false)}>{t('desk.see_less', locale)}</button>
+    <button type="button" class="more" onclick={() => showAll(false)}>{t('desk.see_less', locale)}</button>
   {:else if waiting.rows.length === 0}
-    <div class="caughtup">
-      <p class="caughtup__g" aria-hidden="true">·</p>
-      <p class="caughtup__l">{t('desk.caughtup_l', locale)}</p>
-      <p class="caughtup__s">{t('desk.caughtup_s', locale)}</p>
-    </div>
-    {#if feedCount > 0}
-      <button type="button" class="more" onclick={() => (all = true)}>{t('desk.see_all', locale, { n: feedCount })} →</button>
+    <!-- One voice for an empty band, the one «Lo siguiente» and «Ha cambiado» use. -->
+    <p class="dband__empty">{t('desk.caughtup_l', locale)} <span class="caughtup__s">{t('desk.caughtup_s', locale)}</span></p>
+    {#if feedCount > waiting.rows.length && !calm}
+      <button type="button" class="more" onclick={() => showAll(true)}>{t('desk.see_all', locale)} →</button>
     {/if}
   {:else}
     <ul class="list">
       {#each waiting.rows as item (item.id)}{@render row(item)}{/each}
     </ul>
-    {#if feedCount > 0}
-      <button type="button" class="more" onclick={() => (all = true)}>{t('desk.see_all', locale, { n: feedCount })} →</button>
+    {#if feedCount > waiting.rows.length && !calm}
+      <button type="button" class="more" onclick={() => showAll(true)}>{t('desk.see_all', locale)} →</button>
     {/if}
   {/if}
 </section>
 
 <style>
+  /* The columns belong to the list, not to each row: verb, subject, when
+     and actions fall in one vertical down the whole list (subgrid). */
   .list {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    column-gap: var(--space-s);
     list-style: none;
     margin: 0;
     padding: 0;
@@ -216,23 +268,15 @@
   }
   .row {
     display: grid;
-    grid-template-columns: 5.5rem minmax(0, 1fr) auto auto;
+    grid-column: 1 / -1;
+    grid-template-columns: subgrid;
     align-items: baseline;
-    gap: var(--space-s);
     padding-block: var(--space-xs);
     border-block-end: 1px solid var(--border-color-light);
   }
+  /* The wait row is a row's own lines in ghost: subject and context. */
   .row--wait {
-    grid-template-columns: 1fr;
-    block-size: 2.4rem;
-    align-items: center;
-  }
-  .row__bar {
     display: block;
-    block-size: 0.6rem;
-    inline-size: 60%;
-    border-radius: var(--radius);
-    background: var(--bg-hover);
   }
   .row__verb {
     font-family: var(--font-mono);
@@ -240,8 +284,7 @@
     color: var(--text-faint);
     text-transform: lowercase;
   }
-  .row--over .row__verb,
-  .row__when--over {
+  .row--over .row__verb {
     color: var(--danger);
   }
   .row--conversation .row__verb {
@@ -255,10 +298,12 @@
     color: var(--danger);
   }
   .row--going .row__verb,
-  .row--ai .row__verb {
-    color: var(--accent-7);
+  .row--ai .row__verb,
+  .row--proposal .row__verb {
+    color: var(--suggest-ink);
   }
-  .row--proposal,
+  /* A proposal leans in its subject only; verb and date keep their mono. */
+  .row--proposal .row__subject,
   .row--ai .row__subject {
     font-style: italic;
   }
@@ -266,6 +311,8 @@
     inline-size: 0.95rem;
     block-size: 0.95rem;
     margin: 0;
+    /* A checkbox's baseline is its bottom edge: down to the subject's line. */
+    translate: 0 0.15em;
     accent-color: var(--primary);
     cursor: pointer;
   }
@@ -281,6 +328,11 @@
     text-decoration: none;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+  .row__subject label {
+    font: inherit;
+    color: inherit;
+    cursor: pointer;
   }
   .row__subject a:hover {
     text-decoration: underline;
@@ -299,32 +351,24 @@
     color: var(--text-muted);
     white-space: nowrap;
   }
+  /* After the base rule, so the overdue date is red (it lost the cascade). */
+  .row__when--over {
+    color: var(--danger);
+  }
   .row__acts {
     display: inline-flex;
     gap: var(--space-xs);
     justify-self: end;
   }
+  /* The system's outline button (base.css); the quiet one drops its edge. */
   .row__act {
-    padding: var(--space-2xs) var(--space-s);
-    border: 1px solid var(--border-color-dark);
-    border-radius: var(--radius);
-    background: var(--bg-ultra-light);
-    font-family: var(--font-sans);
-    font-size: var(--text-xs);
-    color: var(--text-muted);
-    cursor: pointer;
-    transition:
-      color var(--transition),
-      border-color var(--transition);
-  }
-  .row__act:hover {
-    color: var(--text-color);
-    border-color: var(--text-muted);
+    --btn-padding-block: var(--space-2xs);
+    --btn-padding-inline: var(--space-s);
   }
   .row__act--quiet {
-    border-color: transparent;
-    background: none;
-    color: var(--text-faint);
+    --btn-border-color: transparent;
+    --btn-background-hover: transparent;
+    --btn-text-color: var(--text-faint);
   }
   .row__remove {
     border: 0;
@@ -340,9 +384,31 @@
       opacity var(--transition);
   }
   .row:hover .row__remove,
-  .row--over .row__remove,
   .row__remove:focus-visible {
     opacity: 1;
+  }
+  /* A finger's room without moving a pixel: the hit area grows, the line
+     does not (subject links, the box, the band's own buttons). */
+  @media (pointer: coarse) {
+    .row__check {
+      inline-size: 1.25rem;
+      block-size: 1.25rem;
+    }
+    .row__subject :is(a, label) {
+      padding-block: var(--space-xs);
+      margin-block: calc(-1 * var(--space-xs));
+    }
+    .more {
+      min-block-size: var(--touch-target);
+    }
+  }
+  /* No hover on a finger: the × is always there, with a finger's room. */
+  @media (hover: none) {
+    .row__remove {
+      opacity: 1;
+      min-inline-size: var(--touch-target);
+      min-block-size: var(--touch-target);
+    }
   }
   .row__remove:hover {
     color: var(--danger);
@@ -409,8 +475,13 @@
     color: var(--text-faint);
   }
   .later {
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
     color: inherit;
-    text-decoration: none;
+    text-align: start;
+    cursor: pointer;
   }
   .later:hover .bucket__date,
   .later:hover .bucket__count {
@@ -443,39 +514,31 @@
   }
 
   /* ── Caught up ── */
-  .caughtup {
-    text-align: center;
-    padding-block: var(--space-l);
-    color: var(--text-faint);
-  }
-  .caughtup__g {
-    margin: 0;
-    font-family: var(--font-display);
-    font-size: var(--text-xxl);
-  }
-  .caughtup__l {
-    margin: var(--space-xs) 0 0;
-    font-family: var(--font-display);
-    font-style: italic;
-    font-size: var(--text-l);
-    color: var(--text-muted);
-  }
   .caughtup__s {
-    margin: var(--space-2xs) 0 0;
-    font-size: var(--text-s);
+    color: var(--text-faint);
   }
 
   /* Phone: the action stays on the right, the context drops under the
      subject instead of disappearing. */
+  /* Phone: when on the subject's line, the context under the subject, and
+     the actions on a line of their own (room for a thumb, the name whole). */
   @media (max-width: 47.999rem) {
+    .list {
+      display: block;
+    }
     .row {
       grid-template-columns: 4.25rem minmax(0, 1fr) auto;
-      grid-template-areas: 'verb subject acts' 'verb when acts';
+      grid-template-areas: 'verb subject when' 'verb acts acts';
+      column-gap: var(--space-s);
       row-gap: 0;
     }
-    .row--wait {
-      grid-template-columns: 1fr;
-      grid-template-areas: none;
+    .row:not(:has(.row__acts > *)) {
+      grid-template-areas: 'verb subject when';
+    }
+    /* A task's only action is its ×: it stays at the end of the line. */
+    .row--task {
+      grid-template-columns: 4.25rem minmax(0, 1fr) auto auto;
+      grid-template-areas: 'verb subject when acts';
     }
     .row__verb {
       grid-area: verb;
@@ -488,7 +551,10 @@
     }
     .row__acts {
       grid-area: acts;
-      align-self: center;
+      justify-self: start;
+    }
+    .row__acts:not(:has(*)) {
+      display: none;
     }
     .run {
       grid-template-columns: 1fr;
