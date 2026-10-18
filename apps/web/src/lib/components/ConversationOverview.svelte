@@ -199,7 +199,7 @@
             {#each data.due.rows as row, i (row.id)}
               {@const firstFollowUp = data.due.rows.findIndex((r) => r.reason === 'follow_up')}
               {#if i === firstFollowUp}
-                <li class="rows__sep">{t('overview.follow_ups', locale)}</li>
+                <li class="rows__sep eyebrow eyebrow--sub">{t('overview.follow_ups', locale)}</li>
               {/if}
               <!-- On a phone the block keeps three: two replies and a follow-up when there are both. -->
               <li
@@ -337,7 +337,7 @@
           <ol class="rows">
             {#each data.cold.rows as row, i (row.id)}
               {#if i === 0 || data.cold.rows[i - 1].group !== row.group}
-                <li class="rows__sep">
+                <li class="rows__sep eyebrow eyebrow--sub">
                   {#if row.group === 'stalled'}
                     <a href="?temp=parada#lista">{t('overview.cold_stalled', locale, { n: data.cold.stalled })}</a>
                   {:else}
@@ -591,13 +591,10 @@
     .block--team .rows > li {
       border-block-end: 1px solid var(--border-color-light);
     }
+    /* The voice is the shared sub-eyebrow (diseño B5); only its place here. */
     .rows__sep {
+      display: block;
       padding-block: var(--space-xs) 0;
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      letter-spacing: var(--mono-letter-spacing-loose);
-      text-transform: uppercase;
-      color: var(--text-faint);
     }
     /* Carga: filas de la altura real, para que nada salte al llegar. */
     .g {
