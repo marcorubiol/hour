@@ -722,7 +722,10 @@ export interface MoneyPosition {
 	/** Expected in the next 30 days (issued, unpaid, expected date in [today, today+30]). */
 	inflow30: number;
 	inflow30Count: number;
-	/** Season figures: only bolos of the chosen season. */
+	/**
+	 * Season figures: only bolos of the chosen season. `sold` is the issued or
+	 * paid document's total (taxes in) where there is one, else the fee.
+	 */
 	sold: number;
 	collected: number;
 	/** Invoiced and not yet collected, inside the season. */
@@ -797,11 +800,16 @@ export function moneyPosition(
 		pos.seasonCount += 1;
 		if (m.fee === null) continue;
 		if (m.contracted) {
-			const collected = Math.min(m.collected, Math.max(m.fee, m.doc ? Number(m.doc.total) : 0));
-			pos.sold += m.fee;
+			// One base for the whole bar (ADR-123): what the invoice says, taxes
+			// included, where there is one; the fee where there is none yet. So
+			// a bolo collected in full is 100 %, never 121 % of its fee.
+			const invoiced = m.doc && m.doc.status !== 'draft' ? Number(m.doc.total) : null;
+			const value = invoiced ?? m.fee;
+			const collected = Math.min(m.collected, value);
+			pos.sold += value;
 			pos.collected += collected;
 			pos.invoicedOpen += m.owed;
-			pos.uninvoiced += Math.max(0, m.fee - collected - m.owed);
+			pos.uninvoiced += Math.max(0, value - collected - m.owed);
 		} else if (m.inProgress) {
 			pos.holds += m.fee;
 			pos.holdsCount += 1;

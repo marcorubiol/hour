@@ -230,6 +230,25 @@ describe('moneyPosition', () => {
 		}
 	});
 
+	it('measures the season in one base: the invoice total where there is one (ADR-123)', () => {
+		const season = [
+			// Palma: fee 4.000, invoiced 4.840 with IVA, collected in full
+			bolo({ id: 'palma', next_performed_at: '2026-09-12', fee_amount: 4000, collected: 4840 }),
+			// Vitoria: fee 3.500, invoiced 3.710, 2.000 collected
+			bolo({ id: 'vit', next_performed_at: '2026-09-20', fee_amount: 3500, collected: 2000 }),
+			// Beckett: fee 2.000, no document yet
+			bolo({ id: 'beckett', next_performed_at: '2026-10-24', status: 'confirmed', fee_amount: 2000 }),
+		];
+		const docs = [
+			invoice({ id: 'ip', bolo: 'palma', status: 'paid', subtotal: 4000, total: 4840 }),
+			invoice({ id: 'iv', bolo: 'vit', subtotal: 3500, total: 3710 }),
+		];
+		const [eur] = moneyPosition(season, ctx(docs), 2026);
+		expect(eur).toMatchObject({ sold: 4840 + 3710 + 2000, collected: 6840, invoicedOpen: 1710, uninvoiced: 2000 });
+		expect(eur!.collected).toBeLessThanOrEqual(eur!.sold);
+		expect(eur!.collected + eur!.invoicedOpen + eur!.uninvoiced).toBeCloseTo(eur!.sold);
+	});
+
 	it('a past season shows only its own bolos in the season figure', () => {
 		const eur = moneyPosition(bolos, ctx(invoices), 2025).find((p) => p.currency === 'EUR')!;
 		expect(eur.sold).toBe(500);
