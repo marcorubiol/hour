@@ -94,7 +94,7 @@
     {:else if !errored}
       <p class="dband__empty">{quietLabel}</p>
     {/if}
-    {#if errored}<p class="dband__err">{t('desk.changed_error', locale)}</p>{/if}
+    {#if errored}<p class="load-fail">{t('desk.changed_error', locale)}</p>{/if}
   {/if}
 </section>
 

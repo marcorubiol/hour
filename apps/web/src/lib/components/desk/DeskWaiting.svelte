@@ -202,7 +202,7 @@
       {#each [0, 1, 2] as i (i)}<li class="row row--wait"><span class="row__bar"></span></li>{/each}
     </ul>
   {:else if errored}
-    <p class="dband__err">{t('desk.error', locale)}</p>
+    <p class="load-fail">{t('desk.error', locale)}</p>
   {:else if all}
     <div class="timeline">
       {#each feed as bucket (bucket.sortKey)}

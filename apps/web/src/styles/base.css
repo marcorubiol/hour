@@ -1774,8 +1774,8 @@
   /* Load failure — what a block or a list says when its read fails: its own
      sentence (never the server's text) in the display italic, in danger, so
      it never reads as an empty state, and a way to try again beside it. The
-     treatment Desk (`.dband__err`) and Cuentas (`.mny__fail`) drew each on
-     their own; Conversations consumes it from here (diseño M2). */
+     treatment Desk and Cuentas (`.mny__fail`) drew each on their own;
+     Conversations and Desk consume it from here (diseño M2). */
   .load-fail {
     display: flex;
     flex-wrap: wrap;

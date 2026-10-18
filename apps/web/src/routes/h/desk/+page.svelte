@@ -819,8 +819,8 @@
         margin-block: calc(-0.5 * var(--touch-target) + 0.5em);
       }
     }
-    .desk :global(.dband__empty),
-    .desk :global(.dband__err) {
+    /* A failure is base.css's `.load-fail`, the one voice of the dashboards. */
+    .desk :global(.dband__empty) {
       margin: 0;
       font-family: var(--font-display);
       font-style: italic;
@@ -829,9 +829,6 @@
     }
     .desk :global(.dband__empty a) {
       color: inherit;
-    }
-    .desk :global(.dband__err) {
-      color: var(--danger);
     }
 
     /* Phone: one column, in DOM order (1, 2, 4, 3): no `order`, so the tab

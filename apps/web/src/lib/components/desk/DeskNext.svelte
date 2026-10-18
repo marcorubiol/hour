@@ -116,7 +116,7 @@
   </h2>
 
   {#if errored}
-    <p class="dband__err">{t('desk.next_error', locale)}</p>
+    <p class="load-fail">{t('desk.next_error', locale)}</p>
   {:else if !settled}
     <div class="card card--wait" aria-hidden="true">
       <span class="card__eye">—</span>
