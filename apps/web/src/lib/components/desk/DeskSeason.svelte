@@ -95,10 +95,11 @@
 <style>
   /* The figure column belongs to the doors, not to each door: the words
      start on one vertical whatever the widest figure is, and a reserved
-     minimum keeps them still while the figures land. */
+     minimum (room for «2.400 €» at --stat-lead) keeps them still while the
+     figures land. */
   .doors {
     display: grid;
-    grid-template-columns: minmax(4.5ch, max-content) minmax(0, 1fr) auto;
+    grid-template-columns: minmax(5.5rem, max-content) minmax(0, 1fr) auto;
     gap: var(--space-s) 0;
   }
   .door {
@@ -170,6 +171,9 @@
   /* Phone: tighter, the lens still named (it is the link's purpose, for the
      eye and for a screen reader). */
   @media (max-width: 47.999rem) {
+    .doors {
+      grid-template-columns: minmax(4.5rem, max-content) minmax(0, 1fr) auto;
+    }
     .door {
       padding: var(--space-xs) var(--space-s);
     }

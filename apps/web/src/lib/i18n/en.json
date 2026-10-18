@@ -304,7 +304,7 @@
   "desk.due_due": "due",
   "desk.calm_more": "{n} more",
   "desk.caughtup_l": "All caught up. Nothing needs you right now.",
-  "desk.caughtup_s": "the next thing surfaces when it's due",
+  "desk.caughtup_s": "The next thing surfaces when it's due.",
   "desk.loading": "Loading…",
   "desk.error": "Couldn't load what's waiting for you.",
   "desk.week_error": "Couldn't load your week.",
