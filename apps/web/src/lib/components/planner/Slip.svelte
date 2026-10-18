@@ -770,6 +770,19 @@
     /* ══ THE CELL DECIDES WHAT A SLIP CAN AFFORD ════════════════════════
        Measured, never declared. The host sets `container-type: inline-size`;
        these are the two steps the design measured on a real month cell. */
+    /* A PHONE'S MONTH CELL (≈48px) split a card one word per line and cut the
+       next one at the edge (móvil #2). Below this the card is its monogram:
+       whose, and that there is something; the day says the rest. */
+    @container (max-width: 72px) {
+      .slip[data-placing='cell'] {
+        padding: 2px;
+      }
+      .slip[data-placing='cell'] > :not(.slip__h),
+      .slip[data-placing='cell'] .slip__kind,
+      .slip[data-placing='cell'] .slip__t {
+        display: none;
+      }
+    }
     @container (max-width: 142px) {
       /* THE END HOUR GOES, THE START STAYS — the range is still in the title.
          Half a range is not an assertion, so it is dropped whole rather than
