@@ -59,7 +59,7 @@ describe('audienceLine', () => {
       ),
     ).toBe('Lo ven 3, por permiso de Técnica');
     expect(audienceLine({ count: 2, reason: { kind: 'conversation' } }, 'es')).toBe(
-      'Lo ven 2, quien ve esta conversación',
+      'Lo ven 2, por ver esta conversación',
     );
   });
   test('la razón de una faceta dice el nombre que le dio el espacio', () => {

@@ -143,7 +143,7 @@
     <h3 class="thread__name" id={headingId}>{name}</h3>
     <span class="thread__count">{thread.message_count}</span>
     {#if thread.unread_count > 0}
-      <Badge tone="info" size="xs">{t('threads.unread', locale, { n: thread.unread_count })}</Badge>
+      <Badge tone="info" size="xs">{t(thread.unread_count === 1 ? 'threads.unread_one' : 'threads.unread', locale, { n: thread.unread_count })}</Badge>
     {/if}
   </header>
   <!-- La línea de audiencia no se pliega nunca (ADR-083, enmienda §6). -->

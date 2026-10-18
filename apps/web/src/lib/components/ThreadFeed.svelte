@@ -88,7 +88,7 @@
               <span class="feed__name">{feedThreadName(th, locale)}</span>
               <span class="feed__title">{feedTitle(th)}</span>
               {#if th.unread_count > 0}
-                <Badge tone="info" size="xs">{t('threads.unread', locale, { n: th.unread_count })}</Badge>
+                <Badge tone="info" size="xs">{t(th.unread_count === 1 ? 'threads.unread_one' : 'threads.unread', locale, { n: th.unread_count })}</Badge>
               {/if}
             </span>
             <time class="feed__when" datetime={th.last_message_at}>{messageWhen(th.last_message_at, locale, tz)}</time>
