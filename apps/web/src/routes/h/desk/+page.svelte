@@ -9,7 +9,8 @@
    *   4 · La temporada  — one door per lens, in the lens's own arithmetic
    *
    * Desktop: two columns, what you act on (1, 2) on the left and what you
-   * look at (4, 3) on the right. Phone: one column, 1 → 4. Calm keeps 1 and 2.
+   * look at (4, 3) on the right. Phone: one column in the same order as the
+   * DOM, 1, 2, 4, 3, so focus and reading follow what is seen. Calm keeps 1 and 2.
    * Each band loads and fails on its own; none of them is the page's error.
    *
    * Bands 2–4 follow the scope like every lens; band 1 does not, like the rail
@@ -818,7 +819,8 @@
       color: var(--danger);
     }
 
-    /* Phone: one column, in the order the questions are asked: 1, 2, 3, 4. */
+    /* Phone: one column, in DOM order (1, 2, 4, 3): no `order`, so the tab
+       and the screen reader go where the eye goes (móvil #2). */
     @media (max-width: 47.999rem) {
       .desk__grid {
         display: flex;
@@ -827,19 +829,6 @@
       }
       .desk__col {
         display: contents;
-      }
-      .slot--next {
-        order: 1;
-      }
-      .slot--waits {
-        order: 2;
-      }
-      .slot--changed {
-        order: 3;
-      }
-      .slot--season,
-      .desk__calm {
-        order: 4;
       }
     }
   }

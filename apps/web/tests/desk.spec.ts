@@ -126,7 +126,7 @@ test.describe('Desk — the dashboard (ADR-117)', () => {
     expect(stored && Number.isFinite(Date.parse(stored))).toBe(true);
   });
 
-  test('phone: one column, in the order the questions are asked, no sideways scroll', async ({ page }) => {
+  test('phone: one column in DOM order (focus goes where the eye goes), no sideways scroll', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
     await page.goto(DESK);
     await waitForLoaded(page);
@@ -137,6 +137,8 @@ test.describe('Desk — the dashboard (ADR-117)', () => {
     expect(next).toBeGreaterThan(0);
     expect(waits).toBeGreaterThan(next);
     expect(season).toBeGreaterThan(waits);
+    const changed = await top('section.changed');
+    expect(changed).toBeGreaterThan(season);
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow).toBeLessThanOrEqual(0);
   });
