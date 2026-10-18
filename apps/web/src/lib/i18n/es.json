@@ -208,6 +208,7 @@
   "hall.home": "Recibidor",
   "shell.menu_open": "Abrir el menú",
   "shell.menu_close": "Cerrar el menú",
+  "shell.skip_to_main": "Saltar al contenido",
   "conversations.card_last": "último",
   "conversations.card_next": "siguiente",
   "hall.action_note": "Nueva nota",
