@@ -779,7 +779,8 @@
     <!-- ADR-103: «quién va». Next to a roster it only adds people; without
          one it answers the inference from the project cast. The roster is
          drawn above, so it is passed to be left out, not drawn twice. -->
-    <section class="perf__section">
+    <!-- `#who-goes`: the Day's clash line lands here (uso #12). -->
+    <section class="perf__section" id="who-goes">
       <WhoGoes
         target="performance"
         id={perf.id}

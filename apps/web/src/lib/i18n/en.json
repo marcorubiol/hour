@@ -98,6 +98,7 @@
   "planner.tour_legs": "out {out} · back {back}",
   "planner.clash_people_title": "People conflict",
   "planner.clash_people_body": "{people} on two bookings the same day.",
+  "planner.clash_fix": "who goes to {name}",
   "planner.clash_possible_title": "Possible conflict",
   "planner.clash_possible_body": "No team data — could clash.",
   "planner.clash_blackout_title": "Blackout conflict",

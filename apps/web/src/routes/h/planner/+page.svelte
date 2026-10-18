@@ -1590,13 +1590,26 @@
   });
   /** The reason no bar can say — the pair's sentence, pre-localized in the
       clash VM. One line per pair, above the drawing. */
+  /* AND THE WAY TO RESOLVE IT (uso #12): a clash about a person is fixed
+     by changing who goes, which lives on the gig's page. The line links to
+     that section of each gig it names. */
   let dayClashLines = $derived.by(() => {
     const seen = new Set<string>();
-    const out: Array<{ key: string; body: string }> = [];
+    const out: Array<{ key: string; body: string; fixes: Array<{ href: string; name: string }> }> = [];
     for (const c of clashesByDay?.get(selectedDay) ?? []) {
       if (seen.has(c.body)) continue; // one reason, said once
       seen.add(c.body);
-      out.push({ key: `c${out.length}`, body: c.body });
+      const fixes =
+        c.severity === 'possible'
+          ? []
+          : c.event_ids.flatMap((id) => {
+              const p = shownPerfs.find((x) => x.id === id);
+              const ws = p?.project ? workspaceSlugById.get(p.project.workspace_id) : undefined;
+              return p?.slug && ws
+                ? [{ href: `/h/${ws}/performance/${p.slug}#who-goes`, name: performanceSlip(p, slipCtxPage).name }]
+                : [];
+            });
+      out.push({ key: `c${out.length}`, body: c.body, fixes });
     }
     return out;
   });
@@ -3308,7 +3321,11 @@
     {#if dayClashLines.length > 0}
       <div class="cal__aways">
         {#each dayClashLines as c (c.key)}
-          <p class="cal__clashline">{c.body}</p>
+          <p class="cal__clashline">
+            {c.body}{#each c.fixes as f (f.href)}{' · '}<a class="cal__clashfix" href={f.href}
+                >{t('planner.clash_fix', locale, { name: f.name })} ›</a
+              >{/each}
+          </p>
         {/each}
       </div>
     {/if}
@@ -3799,6 +3816,10 @@
       color: var(--danger);
     }
 
+    .cal__clashfix {
+      color: inherit;
+      text-underline-offset: 2px;
+    }
     .cal__state {
       padding-block: var(--space-l);
       font-size: var(--text-s);

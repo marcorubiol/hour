@@ -97,6 +97,7 @@
   "planner.tour_legs": "anada {out} · tornada {back}",
   "planner.clash_people_title": "Conflicte de persones",
   "planner.clash_people_body": "{people} a dues reserves el mateix dia.",
+  "planner.clash_fix": "qui va a {name}",
   "planner.clash_possible_title": "Possible conflicte",
   "planner.clash_possible_body": "Sense dades d'equip — podria xocar.",
   "planner.clash_blackout_title": "Conflicte amb blackout",

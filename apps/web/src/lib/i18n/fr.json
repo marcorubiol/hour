@@ -66,6 +66,7 @@
   "planner.tour_legs": "aller {out} · retour {back}",
   "planner.clash_people_title": "Conflit de personnes",
   "planner.clash_people_body": "{people} sur deux dates le même jour.",
+  "planner.clash_fix": "qui va à {name}",
   "planner.clash_possible_title": "Conflit possible",
   "planner.clash_possible_body": "Pas de données d’équipe, risque de conflit.",
   "planner.clash_blackout_title": "Conflit d’indisponibilité",
