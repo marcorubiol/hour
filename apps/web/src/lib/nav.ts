@@ -41,6 +41,9 @@ export type NavWorkspace = {
    * otherwise is not running a priority queue.
    */
   booking_mode?: string | null;
+  /** ADR-128 — the trade whose words this workspace speaks (`stage` |
+      `music`); absent reads as stage. */
+  trade?: string | null;
   /** IANA home timezone — the timeslot-entry fallback when a gig has no
       linked venue (timezone rule, spec § Timezone rule). */
   timezone?: string;
@@ -278,4 +281,29 @@ export function projectsInScope<P extends { id: string; workspace_id: string }>(
   projects: P[],
 ): P[] {
   return projects.filter((p) => inScope(scope, { workspaceId: p.workspace_id, projectId: p.id }));
+}
+
+/**
+ * The workspaces a screen speaks for, which decide its trade (ADR-128): the
+ * one in the URL when there is one (slug or alias), else the ones the pinned
+ * containers live in, else every workspace (an empty scope is Everything).
+ */
+export function workspacesOnScreen(
+  routeSegment: string,
+  pins: string[],
+  workspaces: NavWorkspace[],
+  lineIndex: NavLine[],
+  projectIndex: NavProject[],
+): NavWorkspace[] {
+  if (routeSegment) {
+    return workspaces.filter((w) => w.slug === routeSegment || w.alias === routeSegment);
+  }
+  const scope = resolveScope(pins, workspaces, lineIndex, projectIndex);
+  if (scope.isEmpty) return workspaces;
+  const ids = new Set([
+    ...scope.workspaceIds,
+    ...scope.projects.map((p) => p.workspaceId),
+    ...scope.lines.map((l) => l.workspaceId),
+  ]);
+  return workspaces.filter((w) => ids.has(w.id));
 }

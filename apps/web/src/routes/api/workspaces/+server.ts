@@ -53,6 +53,7 @@ type WorkspaceItem = Pick<
   | 'accent'
   | 'description'
   | 'domain'
+  | 'trade'
   | 'city'
   | 'logo_url'
 >;
@@ -163,7 +164,7 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
   // workspace ever stores.
   search.set(
     'select',
-    'id,slug,alias,name,kind,timezone,country,accent,description,domain,city,logo_url,booking_mode:settings->>booking_mode,invoicing_mode:settings->>invoicing_mode',
+    'id,slug,alias,name,kind,timezone,country,accent,description,domain,city,logo_url,trade,booking_mode:settings->>booking_mode,invoicing_mode:settings->>invoicing_mode',
   );
   search.set('deleted_at', 'is.null');
   search.set('order', 'created_at.asc');

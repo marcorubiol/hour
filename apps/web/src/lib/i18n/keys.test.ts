@@ -23,6 +23,7 @@ import en from './en.json';
 import es from './es.json';
 import fr from './fr.json';
 import { LOCALES } from './index';
+import { TRADES } from './trade.svelte';
 
 const SRC = join(import.meta.dirname, '..', '..');
 
@@ -89,6 +90,30 @@ describe('i18n keys', () => {
     for (const [name, dict] of Object.entries(others)) {
       const orphans = Object.keys(dict).filter((k) => !(k in en));
       expect({ [name]: orphans }).toEqual({ [name]: [] });
+    }
+  });
+
+  /** ADR-128: `key@<trade>` is the trade's wording of `key`. A variant of a
+      key that does not exist, or of a trade the app does not know, is a typo
+      that would never render. */
+  test('every trade variant names a known trade and an existing key', () => {
+    const dict = en as Record<string, string>;
+    const bad = Object.keys(dict)
+      .filter((k) => k.includes('@'))
+      .filter((k) => {
+        const [base, trade] = k.split('@');
+        return !(base in dict) || !(TRADES as readonly string[]).includes(trade) || trade === TRADES[0];
+      });
+    expect(bad).toEqual([]);
+  });
+
+  test('a variant keeps the placeholders of its key', () => {
+    const holes = (s: string) => [...s.matchAll(/\{(\w+)\}/g)].map((m) => m[1]).sort();
+    for (const [name, dict] of Object.entries({ en, ...others }) as [string, Record<string, string>][]) {
+      const off = Object.keys(dict)
+        .filter((k) => k.includes('@'))
+        .filter((k) => holes(dict[k]).join() !== holes(dict[k.split('@')[0]]).join());
+      expect({ [name]: off }).toEqual({ [name]: [] });
     }
   });
 });

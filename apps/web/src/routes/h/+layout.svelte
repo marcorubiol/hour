@@ -34,7 +34,7 @@
   import ScopeRail from '$lib/components/shell/ScopeRail.svelte';
   import ShellBreadcrumb from '$lib/components/shell/ShellBreadcrumb.svelte';
   import { isReservedWorkspaceSlug } from '$lib/reserved-slugs';
-  import { detectLocale, t } from '$lib/i18n';
+  import { detectLocale, setTrade, t, tradeOf } from '$lib/i18n';
   import { provideLens, type Lens } from '$lib/stores/lens.svelte';
   import { provideCalm } from '$lib/stores/calm.svelte';
   import { providePins, parsePin, type PinKind } from '$lib/stores/pins.svelte';
@@ -47,6 +47,7 @@
   import {
     buildLineIndex,
     buildProjectIndex,
+    workspacesOnScreen,
     type NavWorkspace,
     type RawLine,
   } from '$lib/nav';
@@ -141,6 +142,12 @@
   let lineIndex = $derived(
     buildLineIndex(wsItems, ($linesQuery.data?.items as RawLine[]) ?? []),
   );
+
+  // ADR-128: the screen speaks the trade of the workspaces it shows. Set
+  // here, once, for every lens and dialog; `t()` reads it.
+  $effect(() => {
+    setTrade(tradeOf(workspacesOnScreen(workspaceSlug, pins.pins, wsItems, lineIndex, projectIndex)));
+  });
 
   // A person pin is the one token whose label lives outside the nav caches —
   // it is a roster row, not a container — so the team feed is fetched ONLY

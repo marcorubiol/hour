@@ -7,6 +7,7 @@ import {
   projectUrl,
   projectsInScope,
   resolveScope,
+  workspacesOnScreen,
   type NavWorkspace,
   type RawLine,
   type RawProject,
@@ -256,5 +257,29 @@ describe('lineUrl', () => {
   it('addresses lines inside their project', () => {
     const [line] = buildLineIndex(WS, LINES);
     expect(lineUrl(line)).toBe('/h/muk-cia/project/mamemi/line/difusion-2026-27');
+  });
+});
+
+describe('workspacesOnScreen (ADR-128: whose trade a screen speaks)', () => {
+  const projectIndex = buildProjectIndex(WS, PROJECTS);
+  const lineIndex = buildLineIndex(WS, LINES);
+  const ids = (route: string, pins: string[]) =>
+    workspacesOnScreen(route, pins, WS, lineIndex, projectIndex).map((w) => w.id);
+
+  it('the workspace in the URL wins, by slug or alias', () => {
+    expect(ids('demo', [projectPin('proj-mamemi')])).toEqual(['ws-demo']);
+    const aliased = [{ ...WS[0], alias: 'mocia' }, WS[1]];
+    expect(workspacesOnScreen('mocia', [], aliased, lineIndex, projectIndex).map((w) => w.id)).toEqual(['ws-muk']);
+  });
+
+  it('without one, the workspaces of the pinned containers', () => {
+    expect(ids('', [spacePin('demo')])).toEqual(['ws-demo']);
+    expect(ids('', [projectPin('proj-mamemi')])).toEqual(['ws-muk']);
+    expect(ids('', [linePin('line-difusion')])).toEqual(['ws-muk']);
+  });
+
+  it('an empty scope (or only people) is every workspace', () => {
+    expect(ids('', [])).toEqual(['ws-muk', 'ws-demo']);
+    expect(ids('', [personPin('person-laia')])).toEqual(['ws-muk', 'ws-demo']);
   });
 });
