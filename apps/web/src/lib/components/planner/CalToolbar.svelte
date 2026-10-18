@@ -65,6 +65,20 @@
     onReadMarks,
     onBlackout,
   }: Props = $props();
+
+  /* THE ARROWS SAY WHAT THEY DO IN THIS DRAWING (uso #15): in the Day they
+     travel to the next day that HOLDS something, not to tomorrow, and the
+     board pans a screen. «Next month» was the name on all of them. */
+  let stepKeys = $derived(
+    view === 'day'
+      ? { prev: 'planner.prev_planned', next: 'planner.next_planned' }
+      : view === 'board'
+        ? { prev: 'planner.pan_back', next: 'planner.pan_next' }
+        : { prev: 'planner.prev_month', next: 'planner.next_month' },
+  );
+  function stepTitle(key: string): string {
+    return view === 'day' ? `${t(key, locale)} · ${t('planner.step_hint', locale)}` : t(key, locale);
+  }
 </script>
 
 <!-- THE ROW OF VIEWS (ADR-095 § «El encabezado: el título es la fecha»).
@@ -114,15 +128,15 @@
     <button
       type="button"
       class="cal__arw"
-      aria-label={t('planner.prev_month', locale)}
-      title={t('planner.step_hint', locale)}
+      aria-label={t(stepKeys.prev, locale)}
+      title={stepTitle(stepKeys.prev)}
       onclick={(e) => onStepBack(e.shiftKey)}>‹</button
     >
     <button
       type="button"
       class="cal__arw"
-      aria-label={t('planner.next_month', locale)}
-      title={t('planner.step_hint', locale)}
+      aria-label={t(stepKeys.next, locale)}
+      title={stepTitle(stepKeys.next)}
       onclick={(e) => onStepNext(e.shiftKey)}>›</button
     >
   </span>
