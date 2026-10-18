@@ -93,7 +93,7 @@ test.describe('Desk — the dashboard (ADR-117)', () => {
     await expect(waits.getByRole('checkbox', { name: TASK_TODAY })).toBeVisible({ timeout: 10_000 });
 
     // One list at a time: the full list replaces the short one, never both.
-    await waits.getByRole('button', { name: /^See all \(\d+\) by day/ }).click();
+    await waits.getByRole('button', { name: /^See all by day/ }).click();
     await expect(waits.getByRole('checkbox', { name: TASK_TODAY })).toHaveCount(1);
     await expect(waits.locator('.bucket--today')).toBeVisible();
     await waits.getByRole('button', { name: 'See less' }).click();

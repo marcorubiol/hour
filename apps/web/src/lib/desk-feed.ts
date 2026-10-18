@@ -121,6 +121,8 @@ export interface DeskFeedInput {
    * wait today until answered; their next-action call is not drawn twice.
    */
   replies?: DeskReplyInput[];
+  /** The «voy · no voy» Hour has for you (`goingItem`): each on its day, so «Ver todo» keeps them. */
+  asks?: DeskItem[];
 }
 
 export interface DeskReplyInput {
@@ -189,7 +191,8 @@ export function dayBucket(
 /**
  * The Desk's horizon: detail stays near (today, tomorrow, the rest of the
  * week, a block per day); everything past it folds into ONE `later` bucket
- * the page draws as a single line (`laterSummary`) that opens the Agenda.
+ * the page draws as a single line (`laterSummary`) that unfolds in place (the
+ * Agenda has no tasks nor calls to show).
  * `dayBucket` itself keeps «next week» for the hall rail.
  */
 function horizonBucket(b: ReturnType<typeof dayBucket>): ReturnType<typeof dayBucket> {
@@ -421,6 +424,11 @@ export function buildDeskFeed(input: DeskFeedInput, now: Date, locale: Locale = 
     );
   }
 
+  // ── «Voy · no voy»: on their day, after the tasks.
+  for (const a of input.asks ?? []) {
+    if (a.day) push(a.day, 'going', Date.parse(`${a.day}T00:00:00Z`), a);
+  }
+
   // ── Group into buckets, order by fixed concern rank then secondary sub,
   //    collapse consecutive same-concern items into runs.
   const byKey = new Map<number, { labelKey: BucketLabelKey; weekday: string; dateLabel: string; entries: Entry[] }>();
@@ -479,7 +487,6 @@ export interface Waiting {
  */
 export function rankWaiting(
   feed: readonly DeskBucket[],
-  asks: readonly DeskItem[],
   now: Date,
   opts: { calm?: boolean; limit?: number } = {},
 ): Waiting {
@@ -488,14 +495,16 @@ export function rankWaiting(
     const tier = b.sortKey === -1 ? 0 : b.sortKey === 0 ? 1 : b.sortKey < 98 ? 2 : null;
     for (const r of b.runs)
       for (const item of r.items) {
+        if (item.concern === 'going') {
+          // A «voy» of the next two weeks rides behind the week, whatever its bucket.
+          const k = dayBucket(item.day, now, 'en').sortKey;
+          tiered.push({ tier: k === 0 ? 1 : k < 7 ? 2 : 3, item });
+          continue;
+        }
         // A task inside its warning (`lead_days`) is this week's, whatever its due day.
         const t = tier ?? (item.concern === 'task' && item.dueLabel === 'due' ? 2 : null);
         if (t !== null) tiered.push({ tier: t, item });
       }
-  }
-  for (const item of asks) {
-    const k = dayBucket(item.day, now, 'en').sortKey;
-    tiered.push({ tier: k === 0 ? 1 : k < 7 ? 2 : 3, item });
   }
   const kept = opts.calm ? tiered.filter((x) => x.tier <= 1) : tiered;
   kept.sort(

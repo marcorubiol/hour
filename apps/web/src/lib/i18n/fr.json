@@ -2061,7 +2061,7 @@
   "desk.next_ask": "Vous y allez ?",
   "desk.next_error": "Impossible de charger la suite.",
   "desk.waiting_count": "{shown} sur {total}",
-  "desk.see_all": "Tout voir ({n}) par jour",
+  "desk.see_all": "Tout voir par jour",
   "desk.see_less": "Voir moins",
   "desk.verb_going": "vous y allez ?",
   "desk.concern_going": "vous y allez ?",

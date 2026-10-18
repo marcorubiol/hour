@@ -290,21 +290,6 @@
     );
   });
 
-  let feed = $derived(
-    buildDeskFeed(
-      {
-        conversations: scopedConversations as DeskConvInput[],
-        tasks: scopedTasks,
-        invoices: readMoney && $invoicesQuery.isSuccess && $bolosQuery.isSuccess ? debtInvoices : undefined,
-        showToday: scopedPerfs.some((p) => p.status !== 'cancelled' && perfDayKey(p) === today),
-        replies,
-      },
-      clockNow,
-      locale,
-    ),
-  );
-  let later = $derived(laterSummary(feed));
-
   /** «Voy · no voy» Hour has for you; band 1 already asks about its own row. */
   let asks = $derived(
     goingAsks(
@@ -328,7 +313,23 @@
       });
     }),
   );
-  let waiting = $derived(rankWaiting(feed, asks, clockNow, { calm: calm.on }));
+  let feed = $derived(
+    buildDeskFeed(
+      {
+        conversations: scopedConversations as DeskConvInput[],
+        tasks: scopedTasks,
+        invoices: readMoney && $invoicesQuery.isSuccess && $bolosQuery.isSuccess ? debtInvoices : undefined,
+        showToday: scopedPerfs.some((p) => p.status !== 'cancelled' && perfDayKey(p) === today),
+        replies,
+        asks,
+      },
+      clockNow,
+      locale,
+    ),
+  );
+  let later = $derived(laterSummary(feed));
+
+  let waiting = $derived(rankWaiting(feed, clockNow, { calm: calm.on }));
 
   let waitingLoading = $derived(
     $conversationsQuery.isPending ||

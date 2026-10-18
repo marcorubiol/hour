@@ -11,7 +11,6 @@
   import { dayMonth } from '$lib/datetime';
   import { relativeContactDate } from '$lib/conversation';
   import { t, type Locale } from '$lib/i18n';
-  import { plannerDayHref } from '$lib/planner';
   import type { DeskBucket, DeskConcern, DeskItem, DeskRun, Waiting } from '$lib/desk-feed';
 
   interface Props {
@@ -50,6 +49,7 @@
   }: Props = $props();
 
   let all = $state(false);
+  let laterOpen = $state(false);
   let feedCount = $derived(feed.reduce((n, b) => n + b.runs.reduce((m, r) => m + r.items.length, 0), 0));
 
   const LENS_HREF: Record<DeskConcern, string | null> = {
@@ -143,6 +143,21 @@
   {/if}
 {/snippet}
 
+{#snippet runs(bucket: DeskBucket)}
+  {#each bucket.runs as run (run.concern + run.items[0].id)}
+    <div class="run run--{run.concern}">
+      {#if runHref(run)}
+        <a class="run__label" href={runHref(run)}>{concernLabel(run.concern)}</a>
+      {:else}
+        <span class="run__label">{concernLabel(run.concern)}</span>
+      {/if}
+      <ul class="list run__rows">
+        {#each run.items as item (item.id)}{@render row(item)}{/each}
+      </ul>
+    </div>
+  {/each}
+{/snippet}
+
 <section class="dband waits" aria-labelledby="desk-waits-h" aria-busy={loading}>
   <h2 class="dband__h" id="desk-waits-h">
     {t('desk.band_waiting', locale)}
@@ -163,11 +178,12 @@
         {#if bucket.labelKey === 'later'}
           {#if later}
             <section class="bucket">
-              <a class="bucket__head later" href={plannerDayHref('agenda', later.from)}>
+              <button type="button" class="bucket__head later" aria-expanded={laterOpen} onclick={() => (laterOpen = !laterOpen)}>
                 <span class="bucket__label">{t('desk.bucket_later', locale)}</span>
                 <span class="bucket__date">{laterText(later)}</span>
-                <span class="bucket__count" aria-hidden="true">→</span>
-              </a>
+                <span class="bucket__count" aria-hidden="true">{laterOpen ? '↑' : '↓'}</span>
+              </button>
+              {#if laterOpen}{@render runs(bucket)}{/if}
             </section>
           {/if}
         {:else}
@@ -179,18 +195,7 @@
               {#if bucket.dateLabel}<span class="bucket__date">{bucket.dateLabel}</span>{/if}
               <span class="bucket__count">{bucket.runs.reduce((n, r) => n + r.items.length, 0)}</span>
             </header>
-            {#each bucket.runs as run (run.concern + run.items[0].id)}
-              <div class="run run--{run.concern}">
-                {#if runHref(run)}
-                  <a class="run__label" href={runHref(run)}>{concernLabel(run.concern)}</a>
-                {:else}
-                  <span class="run__label">{concernLabel(run.concern)}</span>
-                {/if}
-                <ul class="list run__rows">
-                  {#each run.items as item (item.id)}{@render row(item)}{/each}
-                </ul>
-              </div>
-            {/each}
+            {@render runs(bucket)}
           </section>
         {/if}
       {/each}
@@ -202,15 +207,15 @@
       <p class="caughtup__l">{t('desk.caughtup_l', locale)}</p>
       <p class="caughtup__s">{t('desk.caughtup_s', locale)}</p>
     </div>
-    {#if feedCount > 0}
-      <button type="button" class="more" onclick={() => (all = true)}>{t('desk.see_all', locale, { n: feedCount })} →</button>
+    {#if feedCount > waiting.rows.length}
+      <button type="button" class="more" onclick={() => (all = true)}>{t('desk.see_all', locale)} →</button>
     {/if}
   {:else}
     <ul class="list">
       {#each waiting.rows as item (item.id)}{@render row(item)}{/each}
     </ul>
-    {#if feedCount > 0}
-      <button type="button" class="more" onclick={() => (all = true)}>{t('desk.see_all', locale, { n: feedCount })} →</button>
+    {#if feedCount > waiting.rows.length}
+      <button type="button" class="more" onclick={() => (all = true)}>{t('desk.see_all', locale)} →</button>
     {/if}
   {/if}
 </section>
@@ -429,8 +434,13 @@
     color: var(--text-faint);
   }
   .later {
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
     color: inherit;
-    text-decoration: none;
+    text-align: start;
+    cursor: pointer;
   }
   .later:hover .bucket__date,
   .later:hover .bucket__count {
