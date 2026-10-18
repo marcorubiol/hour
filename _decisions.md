@@ -3960,3 +3960,48 @@ Conversations, Planner y Cuentas. Cuatro bandas: lo siguiente, te espera, ha cam
 **Re-evaluar cuando** Marco lo use con datos reales (el umbral de 14 días, los 7 de «te espera», si la banda 1 repite
 demasiado al rail en escritorio) o cuando exista la RPC `conversation_overview` (ADR-118), que haría barata la
 lectura que la banda 3 y la puerta de Conversations hacen en cada visita.
+
+## [2026-10-18] ADR-123 · El directorio pide Converses y hereda la privacidad; una compartida la vuelve privada quien la creó
+
+**Contexto.** Revisión de permisos de Conversations del 2026-10-18 (`build/coordination/review-conversations/permisos.md`,
+hallazgos 1 y 2). `workspace_person` y `workspace_organization` se leían con `is_workspace_internal_member` (matriz RBAC
+del 2026-07-20, anterior a las privadas): cualquier miembro recibía el directorio de salas y contactos, con emails,
+también los de una conversación privada ajena, y un performer sin Converses la cartera entera de la compañía. Y
+`guard_conversation_private` dejaba a cualquiera que edita Converses volver privada una conversación compartida, que
+desaparecía para todos sin que nadie pudiera recuperarla (ADR-100). Marco decide (2026-10-18) cerrar el directorio con
+el permiso de conversaciones y herencia de privacidad. Migraciones `20261018100000_directory_privacy` y
+`20261018110000_conversation_private_guard` (rollback en `build/runbooks/rollback-20261018-*.sql`, probados ida y
+vuelta en local); no aplicadas en producción.
+
+**Decisión.**
+1. **Dos clases de dossier.** Es **del equipo** si está enlazado a una membresía aceptada (`user_profile.person_id`,
+   ADR-107), a una invitación viva, o está en el reparto, el equipo técnico, un cambio de reparto, una disponibilidad
+   o un compromiso; o si no es contacto de ninguna conversación (el alta sin conversación de ADR-107). Lo del equipo
+   lo ve cualquier miembro interno, como antes: el reparto, «quién va», la hoja de ruta y la ficha de persona no se
+   rompen para quien no lleva la difusión. El resto es **directorio**: lo ve quien tiene Converses (ver) en algún
+   proyecto vivo del espacio, o el admin.
+2. **Herencia de privacidad.** Un contacto que solo es contacto de conversaciones privadas de otra persona no lo ve
+   nadie más, tampoco el admin (ADR-100: la privada no la ve nadie más). Una sala, igual: se oculta si todas sus
+   referencias (conversaciones con ella y dossiers de ella) son privadas ajenas y no paga ninguna factura. Lo del equipo
+   gana: un actor del reparto que además es contacto de una privada ajena se sigue viendo.
+3. **Una conversación borrada sigue contando.** Borrar una privada no destapa su contacto ni su sala; un contacto de
+   una compartida borrada sigue siendo del directorio.
+4. **Las salas que no son directorio:** la organización de un dossier del equipo (la hoja de ruta nombra la empresa de
+   un técnico) y la pagadora de una factura que quien llama lee (Diners), aunque no tenga Converses.
+5. **La regla vive en la política**, por fila, en funciones `SECURITY DEFINER` que solo preguntan por quien llama
+   (`private.workspace_person_readable_by_caller`, `private.workspace_organization_readable_by_caller`). Las RPC que ya
+   leían el directorio por su cuenta (`mailout_preview`, `list_money_payer_organizations`, `thread_feed`, la creación
+   de conversaciones) no cambian. Coste medido en local (178 conversaciones con sala y contacto embebidos): de ~75 a
+   ~92 ms. Si una compañía llega a miles de contactos, el siguiente paso es una RPC del directorio con prefiltro, como
+   ADR-116.
+6. **Volver privada una compartida: solo quien la creó o el admin**, siempre para sí mismos. Revivir una borrada no
+   cuenta (renace con el valor del espacio, ADR-100). Desmarcar sigue siendo solo de quien la marcó.
+7. **Pantalla.** `conversation_access()` dice si quien llama lee o edita conversaciones en algún proyecto
+   (`GET /api/conversations/access`, como `/api/money/access`). Sin `read`, la lente sale del selector y dice que no
+   hay acceso; sin `edit`, no ofrece «Añadir», «Seleccionar», importar, «escribir a estas» ni el menú de estado, y no
+   pide `/api/organizations`. La ficha enseña el interruptor de privada solo a quien puede usarlo (`can_set_private`) y
+   pide confirmación al marcar.
+
+**Fuera.** `person` (la identidad global) sigue con `can_see_person`: la de un contacto es anónima (ADR-107), pero la
+regla no hereda la privacidad. El texto del interruptor («en este espacio», hallazgo 6) y «Último envío» (hallazgo 3)
+quedan para el carril de Conversations.
