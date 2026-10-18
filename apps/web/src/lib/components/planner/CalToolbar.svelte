@@ -99,9 +99,17 @@
        acts wearing one label — the one defect in this band that can lose
        somebody their place without telling them why. `Now` moves the window;
        `Today` names a drawing, like Agenda, Month and Board do. -->
-  <!-- The season is a horizon from today: it has no window to step, so its
-       row opens with the view words. -->
-  {#if view !== 'overview'}
+  <!-- The season is a horizon from today: it has no window to step. Its
+       controls are still LAID OUT, invisible and inert, so the view words sit
+       at the same x in all five drawings — the word you just pressed does not
+       jump 149px (revisión del Planner, 2026-10-18). Same markup, so the gap
+       is exact by construction, not a measured spacer. -->
+  <span
+    class="cal__window"
+    class:cal__window--none={view === 'overview'}
+    inert={view === 'overview'}
+    aria-hidden={view === 'overview' ? 'true' : undefined}
+  >
   <span class="cal__nav">
     <button
       type="button"
@@ -120,7 +128,7 @@
   </span>
   <button type="button" class="cal__now" onclick={onNow}>{t('planner.now', locale)}</button>
   <span class="cal__sep" aria-hidden="true"></span>
-  {/if}
+  </span>
   <div class="cal__views" role="group" aria-label={t('planner.view_label', locale)}>
     {#each VIEW_ORDER as v (v)}
       <button
@@ -189,6 +197,20 @@
        imported literal beside a token. The `VIEW` lead word that used to open
        this row went with them: the nav is what precedes the words in the
        design, and two labels in that slot is one too many. */
+    .cal__window {
+      display: contents;
+    }
+    .cal__window--none > :global(*) {
+      visibility: hidden;
+    }
+    /* On a phone the row wraps, and the reserve became a whole empty line
+       above the view words: there the Season simply has no controls. The
+       shell's own phone breakpoint. */
+    @media (max-width: 47.999rem) {
+      .cal__window--none > :global(*) {
+        display: none;
+      }
+    }
     .cal__nav {
       display: inline-flex;
       align-items: center;

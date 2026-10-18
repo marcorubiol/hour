@@ -73,8 +73,10 @@ test.describe('the season (ADR-117)', () => {
 
   test('THE SEASON HAS NO WINDOW TO STEP — no arrows, no «now»', async ({ page }) => {
     await open(page);
-    await expect(page.locator('.cal__arw')).toHaveCount(0);
-    await expect(page.locator('.cal__now')).toHaveCount(0);
+    // Their place is kept (so the view words do not move between drawings),
+    // but nothing there can be seen or pressed.
+    await expect(page.locator('.cal__arw:visible')).toHaveCount(0);
+    await expect(page.locator('.cal__now:visible')).toHaveCount(0);
   });
 
   test('ON A PHONE, WHAT TO DECIDE COMES BEFORE THE STRIP', async ({ page }) => {
