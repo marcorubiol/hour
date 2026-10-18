@@ -61,7 +61,7 @@
     void goto(url, { replaceState: true, noScroll: true, keepFocus: true });
   }
 
-  type Conversation = ConversationItem & { private: boolean };
+  type Conversation = ConversationItem & { private: boolean; can_edit: boolean; can_set_private: boolean };
 
   const convQuery = createQuery(
     toStore(() => ({
@@ -194,6 +194,14 @@
       void queryClient.invalidateQueries({ queryKey: ['thread-audience', 'conversation', conv?.id ?? ''] });
     },
   });
+
+  // ADR-123: marking a shared one private makes it vanish for the rest of the
+  // team, and only you can bring it back, so it asks first. Unmarking does not.
+  function togglePrivate() {
+    if (!conv) return;
+    if (!conv.private && !window.confirm(t('mail.private_confirm', locale))) return;
+    $setPrivate.mutate(!conv.private);
+  }
 
   function what(e: ConversationEventItem): string {
     return e.direction
@@ -333,6 +341,7 @@
           <OrganizationFiscal organizationId={conv.organization.id} />
         {/if}
 
+        {#if conv.can_set_private}
         <div class="privacy">
           <div class="privacy__row">
             <span class="privacy__label">{t('mail.private_label', locale)}</span>
@@ -344,13 +353,14 @@
               aria-checked={conv.private}
               aria-label={t('mail.private_label', locale)}
               disabled={$setPrivate.isPending}
-              onclick={() => $setPrivate.mutate(!conv!.private)}
+              onclick={togglePrivate}
             ><span class="toggle__dot"></span></button>
           </div>
           <p class="privacy__hint">
             {conv.private ? t('mail.private_on_hint', locale) : t('mail.private_off_hint', locale)}
           </p>
         </div>
+        {/if}
 
         <div class="legend">
           <p class="eyebrow eyebrow--sub">{t('mail.mailboxes_here', locale)}</p>

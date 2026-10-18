@@ -1573,6 +1573,7 @@
   "mail.log_other": "Apuntar una llamada, una reunión o una nota",
   "mail.last_contact": "Último contacto",
   "mail.next_step": "Siguiente paso",
+  "mail.private_confirm": "¿Volverla privada? Desaparece para el resto del equipo, con su historial, y solo tú podrás volver a compartirla.",
   "mail.private_label": "Conversación privada",
   "mail.private_on_hint": "Solo la ves tú. Para el resto del espacio no existe, tampoco en los recuentos.",
   "mail.private_off_hint": "La ve todo el que ve conversaciones en este espacio, con sus correos.",

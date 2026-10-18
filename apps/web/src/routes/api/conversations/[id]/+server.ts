@@ -30,6 +30,7 @@ import {
 } from '$lib/conversation';
 import { pgGet, pgPatch, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
+import { jwtSubject } from '$lib/server/mail/http';
 
 const IdSchema = v.pipe(v.string(), v.uuid());
 
@@ -44,6 +45,12 @@ function json(body: unknown, status = 200): Response {
  * GET /api/conversations/:id — una conversación, por id o por slug (la ficha
  * llega por `/h/[workspace]/conversation/[slug]`; con slug, `?workspace=` es el
  * slug del espacio). RLS decide: privada de otro o sin permiso = 404.
+ *
+ * Lleva lo que la ficha puede ofrecer (ADR-123, `permisos.md` § 2 y § 8):
+ * `can_edit` (`edit:conversation` en su proyecto) y `can_set_private` (quien
+ * edita y, si es compartida, la creó o es admin; si es privada, es suya). Las
+ * mismas reglas que la base; la pantalla solo deja de ofrecer lo que la base
+ * negaría.
  */
 export const GET: RequestHandler = async ({ request, params, url, platform, locals }) => {
   if (!platform?.env) return json({ error: 'platform_unavailable' }, 500);
@@ -80,7 +87,25 @@ export const GET: RequestHandler = async ({ request, params, url, platform, loca
     }
     const row = data[0];
     if (!row) return json({ error: 'not_found' }, 404);
-    return json({ item: { ...normalizeConversationItem(row), private: row.private_to !== null } });
+    const sub = jwtSubject(jwt);
+    const [edit, admin] = await Promise.all([
+      pgPostRpc<boolean>(env, 'has_permission', jwt, { p_project_id: row.project_id, p_perm: 'edit:conversation' }),
+      pgPostRpc<boolean>(env, 'is_workspace_admin', jwt, { ws_id: row.workspace_id }),
+    ]);
+    const canEdit = edit.data[0] === true;
+    const canSetPrivate =
+      canEdit &&
+      (row.private_to !== null
+        ? row.private_to === sub
+        : row.created_by === sub || admin.data[0] === true);
+    return json({
+      item: {
+        ...normalizeConversationItem(row),
+        private: row.private_to !== null,
+        can_edit: canEdit,
+        can_set_private: canSetPrivate,
+      },
+    });
   } catch (err) {
     return pgErrorResponse(err, { route: 'GET /api/conversations/[id]', requestId: locals.requestId });
   }

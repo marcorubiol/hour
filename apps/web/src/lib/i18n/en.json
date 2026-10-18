@@ -1582,6 +1582,7 @@
   "mail.log_other": "Log a call, a meeting or a note",
   "mail.last_contact": "Last contact",
   "mail.next_step": "Next step",
+  "mail.private_confirm": "Make it private? It disappears for the rest of the team, with its history, and only you can share it again.",
   "mail.private_label": "Private conversation",
   "mail.private_on_hint": "Only you see it. For the rest of the space it does not exist, counts included.",
   "mail.private_off_hint": "Everyone who sees conversations in this space sees it, with its emails.",

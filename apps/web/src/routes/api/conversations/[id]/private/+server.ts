@@ -4,7 +4,8 @@
  * Marca o desmarca una conversación como privada (ADR-099 punto 4): solo la
  * ve quien la marcó y desaparece para los demás, también de los recuentos.
  * La regla vive en la base (trigger `conversation_private_guard` y las
- * policies): solo te la marcas a ti y solo quien la marcó la desmarca.
+ * policies): solo te la marcas a ti, solo quien la marcó la desmarca y una
+ * compartida solo la vuelve privada quien la creó o el admin (ADR-123).
  */
 
 import type { RequestHandler } from './$types';
@@ -49,7 +50,8 @@ export const PUT: RequestHandler = async ({ request, params, platform, locals })
       { route: 'PUT /api/conversations/[id]/private', requestId: locals.requestId },
       {
         codes: {
-          '42501': { status: 404, error: 'not_found' },
+          // El guard: no te toca cambiarla (la fila sí la ves).
+          '42501': { status: 403, error: 'forbidden' },
           // 20261011500000: entre las vivas, una compartida por persona y
           // proyecto, y una privada por persona, proyecto y dueño. Las dos
           // filas que pueden chocar son visibles para quien llama.
