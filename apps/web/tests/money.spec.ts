@@ -195,6 +195,13 @@ test.describe('Cuentas without read:money', () => {
     await expect(page.getByTestId('conversations-no-access')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Add conversation' })).toHaveCount(0);
 
+    // The Desk follows the same flags: neither door is drawn (ADR-124, ADR-127 § 7).
+    await page.goto('/h/desk');
+    await waitForLoaded(page);
+    await expect(page.getByTestId('door-planner')).toBeVisible();
+    await expect(page.getByTestId('door-conversations')).toHaveCount(0);
+    await expect(page.getByTestId('door-books')).toHaveCount(0);
+
     await page.goto('/h/books');
     await waitForLoaded(page);
     await expect(page.getByTestId('money-no-access')).toBeVisible();
