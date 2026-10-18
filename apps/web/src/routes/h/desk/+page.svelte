@@ -60,6 +60,7 @@
   import { setCommitment } from '$lib/commitments';
   import {
     invoicesByBolo,
+    fmtCurrency,
     moneyPosition,
     observedPayerTermsDays,
     seasonOf as moneySeasonOf,
@@ -91,8 +92,7 @@
   });
   let today = $derived(dayKeyInTz(clockNow.toISOString(), viewerTz));
 
-  const money = (n: number, cur: string | null) =>
-    new Intl.NumberFormat(LOCALE_TAG[locale], { style: 'currency', currency: cur || 'EUR', maximumFractionDigits: 0 }).format(n);
+  const money = (n: number, cur: string | null) => fmtCurrency(n, cur, locale);
 
   // ── «Since your last visit»: per device, in this browser (Phase 0: one
   //    device is enough). Read once on arrival; written on the way out, so a

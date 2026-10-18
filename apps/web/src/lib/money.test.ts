@@ -4,6 +4,10 @@ import {
 	applyTaxLines,
 	boloStatusLabel,
 	esTaxLines,
+	fmtCurrency,
+	fmtFee,
+	fmtMoney,
+	fmtMoneyCompact,
 	invoiceStatusLabel,
 	observedPayerTermsDays,
 	payerFiscalState,
@@ -186,5 +190,19 @@ describe('money labels', () => {
 		expect(boloStatusLabel('on_tour', 'es')).toBe('on tour');
 		expect(invoiceStatusLabel('void', 'ca')).toBe('void');
 		expect(paymentMethodLabel('cheque', 'fr')).toBe('cheque');
+	});
+});
+
+describe('money formatting follows the language (one formatter for Cuentas and Desk)', () => {
+	it('groups thousands in Spanish, also four-digit amounts', () => {
+		expect(fmtMoney(1200, 'es')).toBe('1.200,00');
+		expect(fmtMoneyCompact(3710, 'es')).toBe('3.710');
+		expect(fmtMoneyCompact(14430, 'ca')).toBe('14.430');
+		expect(fmtMoney(1200, 'en')).toBe('1,200.00');
+	});
+
+	it('Desk and Cuentas write the same amount the same way', () => {
+		expect(fmtCurrency(8070, 'EUR', 'es').replace(/\s/g, ' ')).toBe('8.070 €');
+		expect(fmtFee(3500, 'CHF', 'es')).toBe('3.500,00 CHF');
 	});
 });

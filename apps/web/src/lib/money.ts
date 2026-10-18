@@ -8,7 +8,7 @@
 
 import * as v from 'valibot';
 import { Constants, type Enums } from './db-types';
-import { t, type Locale } from './i18n';
+import { appLocale, LOCALE_TAG, t, type Locale } from './i18n';
 
 export type PaymentMethod = Enums<'payment_method'>;
 export const PAYMENT_METHODS = Constants.public.Enums.payment_method;
@@ -349,30 +349,44 @@ export function totalsByCurrency<T>(
 	return [...map.entries()].sort(([a], [b]) => a.localeCompare(b));
 }
 
-const money = new Intl.NumberFormat('en-GB', {
-	minimumFractionDigits: 2,
-	maximumFractionDigits: 2,
-});
-
-const moneyCompact = new Intl.NumberFormat('en-GB', {
-	minimumFractionDigits: 0,
-	maximumFractionDigits: 0,
-});
-
-/** "22,900.00" — bare full-form number (caller renders the currency). */
-export function fmtMoney(amount: number): string {
-	return money.format(amount);
+// One formatter per language and precision, made once. Grouping is forced:
+// Spanish and Catalan leave four-digit numbers ungrouped by default («3710»),
+// and the same money must read the same in Desk and in Cuentas.
+const formatters = new Map<string, Intl.NumberFormat>();
+function numberFormat(locale: Locale, digits: 0 | 2, currency?: string): Intl.NumberFormat {
+	const key = `${locale}:${digits}:${currency ?? ''}`;
+	let found = formatters.get(key);
+	if (!found) {
+		found = new Intl.NumberFormat(LOCALE_TAG[locale], {
+			minimumFractionDigits: digits,
+			maximumFractionDigits: digits,
+			useGrouping: 'always',
+			...(currency ? { style: 'currency', currency } : {}),
+		});
+		formatters.set(key, found);
+	}
+	return found;
 }
 
-/** "3,200.00 EUR" — full form for tables and totals. */
-export function fmtFee(amount: number | null, currency: string | null): string {
+/** "22.900,00" in Spanish, "22,900.00" in English: bare full-form number (caller renders the currency). */
+export function fmtMoney(amount: number, locale: Locale = appLocale()): string {
+	return numberFormat(locale, 2).format(amount);
+}
+
+/** "3.200,00 EUR" — full form for tables and totals. */
+export function fmtFee(amount: number | null, currency: string | null, locale: Locale = appLocale()): string {
 	if (amount === null) return '—';
-	return `${money.format(amount)} ${currency ?? 'EUR'}`;
+	return `${fmtMoney(amount, locale)} ${currency ?? 'EUR'}`;
 }
 
-/** "22,900" — whole-number form for header stats where decimals are noise. */
-export function fmtMoneyCompact(amount: number): string {
-	return moneyCompact.format(amount);
+/** "22.900" — whole-number form for header stats where decimals are noise. */
+export function fmtMoneyCompact(amount: number, locale: Locale = appLocale()): string {
+	return numberFormat(locale, 0).format(amount);
+}
+
+/** "14.430 €" — whole amount with the currency's symbol, for prose and doors (Desk). */
+export function fmtCurrency(amount: number, currency: string | null, locale: Locale = appLocale()): string {
+	return numberFormat(locale, 0, currency || 'EUR').format(amount);
 }
 
 /** A dictionary word for `books.<prefix><value>`, or the raw value if none. */

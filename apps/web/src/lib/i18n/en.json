@@ -2019,7 +2019,7 @@
   "desk.door_conv_n": "holds this season",
   "desk.door_conv_sub": "{live} live",
   "desk.door_conv_due": "your turn on {n}",
-  "desk.door_money_n": "owed to you",
+  "desk.door_money_n": "to collect",
   "desk.door_money_sub": "{amount} overdue",
   "desk.door_error": "not available",
   "desk.calm_folded": "What changed and the season wait outside calm mode"

@@ -2010,7 +2010,7 @@
   "desk.door_conv_n": "holds a la temporada",
   "desk.door_conv_sub": "{live} vives",
   "desk.door_conv_due": "et toca a {n}",
-  "desk.door_money_n": "pendent de cobrar",
+  "desk.door_money_n": "per cobrar",
   "desk.door_money_sub": "{amount} vençut",
   "desk.door_error": "no disponible",
   "desk.calm_folded": "El que ha canviat i la temporada esperen fora del mode calma"
