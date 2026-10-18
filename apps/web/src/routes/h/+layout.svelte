@@ -596,6 +596,11 @@
           onclick={() => (railOpen ? closeRail() : openRail())}
         >
           <time class="clock-face" datetime={clockTime}>{clockTime}</time>
+          <!-- The clock is the door, and nothing said so (móvil #11): the
+               caret the app already uses for «this opens» (the status menu,
+               the decisions toggle), after the time so the time stays where
+               the drawer draws it. -->
+          <span class="shell__menu-caret" aria-hidden="true">{railOpen ? '▴' : '▾'}</span>
         </button>
       </div>
 
@@ -876,6 +881,12 @@
     }
     .shell__menu {
       display: flex;
+    }
+    .shell__menu-caret {
+      align-self: center;
+      margin-inline-start: 4px;
+      font-size: 9px;
+      color: var(--text-faint);
     }
     .shell__search {
       justify-self: stretch;
