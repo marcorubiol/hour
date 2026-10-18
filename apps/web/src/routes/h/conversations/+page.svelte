@@ -141,13 +141,29 @@
     return () => clearTimeout(timer);
   });
 
-  let statusFilter = $state('any');
+  // The status travels in the URL too (`?estado=`, ADR-126 § 4): a block's
+  // link carries only its own filter, so following one clears the status and
+  // the list counts what the block counts; a season segment carries both.
+  let statusFilter = $derived.by(() => {
+    const raw = page.url.searchParams.get('estado');
+    return raw && (CONVERSATION_STATUSES as readonly string[]).includes(raw) ? raw : 'any';
+  });
+
+  function setStatus(next: string) {
+    const params = new URLSearchParams(page.url.searchParams);
+    if (next === 'any') params.delete('estado');
+    else params.set('estado', next);
+    const qs = params.toString();
+    void goto(`${page.url.pathname}${qs ? `?${qs}` : ''}`, { noScroll: true, keepFocus: true, replaceState: true });
+  }
 
   // ── Dashboard filters (ADR-117): in the URL, so a block's link is the filter ──
   let listFilter = $derived(parseListFilter(page.url.searchParams));
   let lineIds = $derived(scope.lines.map((l) => l.id));
   let filterChip = $derived(
-    listFilter.turno === 'nuestro'
+    listFilter.temporada && statusFilter !== 'any'
+      ? `${statusLabel(statusFilter as ConversationStatus, locale)} · ${t('overview.this_season', locale).toLowerCase()}`
+      : listFilter.turno === 'nuestro'
       ? t('overview.due', locale)
       : listFilter.turno === 'suyo'
         ? t('overview.turn_theirs_cap', locale)
@@ -162,6 +178,8 @@
 
   function clearListFilter() {
     const params = new URLSearchParams(page.url.searchParams);
+    // A season segment is status + season: its chip names both, and goes as one.
+    if (listFilter.temporada) params.delete('estado');
     for (const k of ['turno', 'temp', 'temporada']) params.delete(k);
     const qs = params.toString();
     void goto(`${page.url.pathname}${qs ? `?${qs}` : ''}`, { noScroll: true, keepFocus: true });
@@ -174,8 +192,7 @@
 
   /** A season segment: that status, in the season (and the pinned lines). */
   async function filterSeasonStatus(status: ConversationStatus) {
-    statusFilter = status;
-    await goto('?temporada=actual', { noScroll: true, keepFocus: true });
+    await goto(`?temporada=actual&estado=${status}`, { noScroll: true, keepFocus: true });
     await showList();
   }
 
@@ -529,7 +546,7 @@
           bind:value={qRaw}
         />
       </div>
-      <Select label={t('edit.status', locale)} options={statusOptions} bind:value={statusFilter} />
+      <Select label={t('edit.status', locale)} options={statusOptions} bind:value={() => statusFilter, setStatus} />
       {#if filterChip}
         <Chip selected onRemove={clearListFilter} removeLabel={t('overview.clear_filter', locale)}>{filterChip}</Chip>
       {/if}
