@@ -98,9 +98,11 @@
       class:is-on={calm.on}
       aria-pressed={calm.on}
       title={t('desk.calm', locale)}
+      aria-keyshortcuts="C"
       onclick={() => calm.toggle()}
     >
-      <span>{t('desk.calm', locale)}</span><span class="side-calm__k">C</span>
+      <!-- The key is a hint for the eye; its name stays «calma», not «calmaC». -->
+      <span>{t('desk.calm', locale)}</span><span class="side-calm__k" aria-hidden="true">C</span>
     </button>
   </div>
   <!-- THE PULSE reads the clock's own tick: one timer in the rail, and the
