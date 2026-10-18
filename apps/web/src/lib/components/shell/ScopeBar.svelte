@@ -74,7 +74,9 @@
              the line has to earn its place in the sentence, and a person is
              now a fourth thing you can pin. A band that lists two of four
              teaches that the other two do not exist. -->
-        <span class="scopebar__all">{t('shell.everything_all', locale)}</span>
+        <span class="scopebar__all" title={t('shell.everything_all', locale)}
+          >{t('shell.everything_all', locale)}</span
+        >
       </span>
       <button type="button" class="scopebar__add" onclick={openPaletteAdd}>
         {t('shell.narrow', locale)}
@@ -185,6 +187,34 @@
     font-style: italic;
     font-size: var(--text-s);
     color: var(--text-muted);
+  }
+  /* ON A PHONE THE SCOPE IS ONE LINE (móvil #4): «Todo · todos los espacios,
+     proyectos, líneas y personas» wrapped to two lines and pushed «acotar»
+     and «copiar enlace» to a third, a hundred pixels before the lens began.
+     The sentence ellipsizes (the full one is the bar's title); the acts stay
+     on the same line. */
+  @media (max-width: 47.999rem) {
+    .scopebar:has(> .scopebar__scope) {
+      flex-wrap: nowrap;
+      min-block-size: 0;
+      padding-inline: var(--space-s);
+    }
+    .scopebar__scope {
+      flex: 1 1 auto;
+      min-inline-size: 0;
+      overflow: hidden;
+    }
+    .scopebar__all {
+      min-inline-size: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .scopebar__add,
+    .scopebar__save {
+      white-space: nowrap;
+      flex: none;
+    }
   }
   .tok {
     --glyph: 11px; /* compact glyph inside the scope-bar pills */
