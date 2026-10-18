@@ -1818,6 +1818,7 @@
   "mailout.err_empty": "L'objet ou le corps manque.",
   "mailout.err_mailout_not_configured": "L'envoi n'est pas configuré sur ce serveur.",
   "mailout.err_note_required": "Dites comment et quand il l'a demandé.",
+  "mailout.keep_project": "Garder {project} · {n}",
   "mailout.of_mailout": "d'un envoi",
   "mailout.note_unsubscribed": "S'est désinscrit des envois.",
   "mailout.note_resubscribed": "S'est réinscrit aux envois.",

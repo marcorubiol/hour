@@ -578,6 +578,15 @@
         <p class="action-bar__note">
           {#if pickedProjects.length > 1}
             {t('mailout.one_project', locale)}
+            <!-- The way out in one click (uso #6): keep one project's picks. -->
+            {#each pickedProjects as pid (pid)}
+              <button type="button" class="action-bar__keep" onclick={() => (picked = picked.filter((c) => c.project_id === pid))}
+                >{t('mailout.keep_project', locale, {
+                  project: projectNameById.get(pid) ?? '',
+                  n: picked.filter((c) => c.project_id === pid).length,
+                })}</button
+              >
+            {/each}
           {:else}
             {t(picked.length === 1 ? 'mailout.picked_one' : 'mailout.picked_other', locale, { n: picked.length })}
           {/if}
@@ -700,6 +709,22 @@
       color: var(--heading-color);
     }
 
+    .action-bar__keep {
+      margin-inline-start: var(--space-s);
+      padding: 0;
+      border: 0;
+      background: none;
+      color: inherit;
+      font: inherit;
+      text-decoration: underline;
+      text-underline-offset: 0.2em;
+      cursor: pointer;
+    }
+    @media (pointer: coarse) {
+      .action-bar__keep {
+        min-block-size: var(--touch-target);
+      }
+    }
     .conversations__state {
       font-size: var(--text-s);
       color: var(--text-muted);

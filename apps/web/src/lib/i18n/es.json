@@ -1818,6 +1818,7 @@
   "mailout.err_empty": "Faltan el asunto o el cuerpo.",
   "mailout.err_mailout_not_configured": "El envío no está configurado en este servidor.",
   "mailout.err_note_required": "Di cómo y cuándo lo pidió.",
+  "mailout.keep_project": "Quedarse con {project} · {n}",
   "mailout.of_mailout": "del envío",
   "mailout.note_unsubscribed": "Se dio de baja de los envíos.",
   "mailout.note_resubscribed": "Volvió a apuntarse a los envíos.",

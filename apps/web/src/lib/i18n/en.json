@@ -1827,6 +1827,7 @@
   "mailout.err_empty": "The subject or the body is missing.",
   "mailout.err_mailout_not_configured": "Sending is not set up on this server.",
   "mailout.err_note_required": "Say how and when they asked.",
+  "mailout.keep_project": "Keep {project} · {n}",
   "mailout.of_mailout": "from a mailout",
   "mailout.note_unsubscribed": "Unsubscribed from mailouts.",
   "mailout.note_resubscribed": "Signed up to mailouts again.",
