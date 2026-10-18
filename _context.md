@@ -33,8 +33,8 @@ de Phase 0.9 en `_tasks.md`. Pricing orientativo, no decidido.
 
 ## Producción (verificado 2026-10-14, tarde)
 
-- Web `https://hour.zerosense.studio`, Worker `hour-web`. `/health/live`: SHA **`3864239`**, `dirty:false`, builtAt
-  2026-10-17T16:25Z (los cuatro dashboards, ADR-117 a 121; la portada y Desk leen los feeds del pulso de `pulse-feeds.svelte.ts`). El espacio `demo` se borró el 2026-10-17 (backup 39047328953). `main` == prod salvo documentos y tests.
+- Web `https://hour.zerosense.studio`, Worker `hour-web`. `/health/live`: SHA **`c04b6c74`**, `dirty:false`, builtAt
+  2026-10-18T10:15Z (arreglos de la revisión del Planner, ADR-122 y 123, sobre los cuatro dashboards). El espacio `demo` se borró el 2026-10-17 (backup 39047328953). `main` == prod salvo documentos y tests.
 - Despliegue: `pnpm --filter web run deploy` (no `pnpm deploy` desde la raíz). Exige árbol limpio.
 - Supabase `hour-phase0` · ref `lqlyorlccnniybezugme` · `eu-central-1`. Plan Free, con keepalive diario
   (`.github/workflows/keepalive.yml`) contra la pausa por inactividad. Pasar a Pro antes de la beta, aún no
@@ -42,7 +42,7 @@ de Phase 0.9 en `_tasks.md`. Pricing orientativo, no decidido.
 - **Última migración aplicada: `20261017100000_thread_feed`** (2026-10-15, run 38785289613; backup 38784650789, plan 38785194853): RPC de lectura de hilos (ADR-116). Antes, `20261016100000_mailout_send` (ADR-115). El acceso es solo `membership` + `membership_facet` (ADR-105). Las migraciones van por `production-migrate.yml`: backup, plan, apply (`_notes/tasks-archive.md § 34`).
 - `hour-staging` (ref `slccyknqpgmzhyiyclsq`, `eu-west-1`): reconstruido el 2026-10-13 con el contract de permisos
   (run 38469017859: RLS 309/313, smoke 2/2). Se volverá a pausar sin uso.
-- Últimas suites contra producción (2026-10-17, `3864239`): RLS 380/380 (en serie); E2E 91/91 por `hour-web.marco-rubiol.workers.dev`. **Nunca la RLS y el E2E a la vez:** los dos cambian y restauran el acceso de `limited@hour.test`. Si el dominio no responde y `workers.dev` sí, es la red local: el 2026-10-17 el rango de Cloudflare `188.114.96.0/20` no respondía desde casa (suposición: bloqueo de LaLiga en día de partido).
+- Últimas suites contra producción: RLS 380/380 (2026-10-17, `3864239`, en serie); E2E 91/91 (2026-10-18, `c04b6c74`, por `hour-web.marco-rubiol.workers.dev`). **Nunca la RLS y el E2E a la vez:** los dos cambian y restauran el acceso de `limited@hour.test`. Si el dominio no responde y `workers.dev` sí, es la red local (rango de Cloudflare `188.114.96.0/20`, suposición: bloqueo de LaLiga en día de partido).
 - Desde el checkout principal (`~/Developer/hour`), nunca desde un worktree: los worktrees no llevan `.env` ni
   `.env.test` (RLS sale saltado, el login del E2E falla).
 - `pnpm --filter web test:rls`: siempre contra producción; carga `.env` + `.env.test` y no mira `.env.local`.
