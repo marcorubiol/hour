@@ -15,6 +15,7 @@
 import {
   awayBands,
   conflictsFor,
+  tourTrips,
   daysCoveredBy,
   decisionsFor,
   nightsFree,
@@ -111,7 +112,7 @@ export function createPlannerEngine(inputs: PlannerEngineInputs) {
     }
     return map;
   });
-  const aways = $derived.by(() => {
+  const travels = $derived.by(() => {
     const travels: Array<
       Pick<DateRow, 'id' | 'project_id' | 'line_id' | 'kind' | 'travel_direction' | 'starts_at'>
     > = [];
@@ -126,8 +127,11 @@ export function createPlannerEngine(inputs: PlannerEngineInputs) {
         starts_at: d.starts_at,
       });
     }
-    return awayBands(travels, ownEventDays);
+    return travels;
   });
+  const aways = $derived(awayBands(travels, ownEventDays));
+  /** Whole trips, gig days included — what the Season calls a tour. */
+  const trips = $derived(tourTrips(travels));
 
   /** Every day something of the company's own sits on — unnarrowed and
       uncancelled. Shared by nights free and the season's gaps. */
@@ -240,6 +244,9 @@ export function createPlannerEngine(inputs: PlannerEngineInputs) {
     },
     get aways() {
       return aways;
+    },
+    get trips() {
+      return trips;
     },
     get occupiedDays() {
       return occupiedDays;

@@ -5,6 +5,7 @@ import {
   agendaDayKeys,
   assignBandLanes,
   awayBands,
+  tourTrips,
   conflictsFor,
   daysCoveredBy,
   dayKeyInTz,
@@ -876,6 +877,20 @@ function travel(overrides: Partial<TravelInput> = {}): TravelInput {
     ...overrides,
   };
 }
+
+describe('tourTrips', () => {
+  it('a tour full of gigs is still a trip: the bracket ignores own events', () => {
+    const legs = [
+      travel({ travel_direction: 'outbound', starts_at: '2026-11-11T08:00:00Z' }),
+      travel({ travel_direction: 'return', starts_at: '2026-11-15T18:00:00Z' }),
+    ];
+    expect(tourTrips(legs)).toEqual([
+      { project_id: 'proj-a', line_id: null, out: '2026-11-11', back: '2026-11-15' },
+    ]);
+    // …where the band, which keeps only the nights with nothing of their own, is empty.
+    expect(awayBands(legs, { 'proj-a': ['2026-11-12', '2026-11-13', '2026-11-14'] })).toEqual([]);
+  });
+});
 
 describe('awayBands', () => {
   it('brackets one band between an outbound and the next return', () => {

@@ -778,7 +778,8 @@
       if (d.travel_direction !== 'outbound') continue;
       const day = d.starts_at.slice(0, 10);
       if (day > band.from) continue;
-      const place = d.city ?? d.venue_name ?? null;
+      // ADR-089: the written destination first; an old row's `city` meant it.
+      const place = d.destination_city ?? d.city ?? d.venue_name ?? null;
       if (!place) continue;
       if (!best || day > best.day) best = { day, place };
     }
@@ -1735,7 +1736,19 @@
       ($workspacesQuery.data?.items ?? []).map((w) => [w.id, (w as { city?: string | null }).city ?? null]),
     ),
   );
-  let seasonTourDays = $derived(view === 'overview' ? daysCoveredBy(aways) : new Set<string>());
+  /* A TOUR IS THE WHOLE STRETCH BETWEEN ITS TWO LEGS, gig days included
+     (revisión del Planner, 2026-10-18). The bands keep only the nights with
+     nothing of their own — right for the month, which draws the gig there —
+     so a tour of three gigs in a row had no mark, no line in «Fuera», and its
+     middle gig asked «¿viaje?». The Season reads the trips. */
+  let seasonTrips = $derived(view === 'overview' ? engine.trips : []);
+  let seasonTourDays = $derived(
+    daysCoveredBy(
+      seasonTrips
+        .filter((tr) => addDaysIso(tr.out, 1) <= addDaysIso(tr.back, -1))
+        .map((tr) => ({ from: addDaysIso(tr.out, 1), to: addDaysIso(tr.back, -1) })),
+    ),
+  );
   let seasonBlockDays = $derived.by(() => {
     const out = new Set<string>();
     if (view !== 'overview') return out;
@@ -1826,7 +1839,7 @@
       // A trip is «covered» when a tour band holds the day or a travel leg of
       // the same project sits within a day of it.
       const travelCovered =
-        seasonTourDays.has(day) ||
+        seasonTrips.some((tr) => tr.project_id === p.project?.id && day >= tr.out && day <= tr.back) ||
         scopedDates.some((d) => {
           if (d.kind !== 'travel_day' || d.status === 'cancelled') return false;
           if (d.project?.id !== p.project?.id) return false;
@@ -1882,17 +1895,24 @@
         legs: null,
       });
     }
-    for (const a of awayVMs) {
-      if (!touches(a.from, a.to)) continue;
+    for (const tr of seasonTrips) {
+      if (!touches(tr.out, tr.back)) continue;
+      const from = addDaysIso(tr.out, 1) <= addDaysIso(tr.back, -1) ? addDaysIso(tr.out, 1) : tr.out;
       out.push({
-        key: `t:${a.project_id}:${a.from}`,
-        from: a.from,
-        to: a.to,
-        who: a.label,
-        what: a.place,
+        key: `t:${tr.project_id}:${tr.out}`,
+        from,
+        to: from === tr.out ? tr.back : addDaysIso(tr.back, -1),
+        who: t('planner.away', locale, { project: projectNameById.get(tr.project_id) ?? '—' }),
+        what: tourPlaceFor({ from, project_id: tr.project_id }),
         tentative: false,
         guess: true,
-        legs: `${a.deduced.word} · ${a.deduced.legs}`,
+        legs: deducedPhrase({
+          word: t('planner.tour_inferred', locale),
+          legs: t('planner.tour_legs', locale, {
+            out: localeDayMonth(tr.out, localeTag),
+            back: localeDayMonth(tr.back, localeTag),
+          }),
+        }),
       });
     }
     return out.sort((x, y) => (x.from < y.from ? -1 : x.from > y.from ? 1 : 0));
