@@ -89,6 +89,16 @@ export function sinceInstant(lastVisit: string | null, now: Date): string {
   return Number.isFinite(at) ? new Date(at).toISOString() : new Date(now.getTime() - FIRST_VISIT_DAYS * DAY_MS).toISOString();
 }
 
+/** How long ago the last visit was, in the unit that reads: minutes, hours, days. */
+export function elapsedSince(since: string, now: Date): { unit: 'min' | 'h' | 'd'; n: number } {
+  const ms = Math.max(0, now.getTime() - Date.parse(since));
+  const min = Math.floor(ms / 60_000);
+  if (min < 60) return { unit: 'min', n: Math.max(1, min) };
+  const h = Math.floor(min / 60);
+  if (h < 24) return { unit: 'h', n: h };
+  return { unit: 'd', n: Math.floor(h / 24) };
+}
+
 /**
  * What moved since the last visit (ADR-117): team threads with new messages
  * written after it, rooms whose latest word is theirs and came after it (the

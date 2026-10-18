@@ -50,7 +50,8 @@
     type DeskConvInput,
     type DeskItem,
   } from '$lib/desk-feed';
-  import { changesSince, goingAsks, plannerDoor, sinceInstant } from '$lib/desk-bands';
+  import { changesSince, elapsedSince, goingAsks, plannerDoor, sinceInstant } from '$lib/desk-bands';
+  import { daysAgoLabel } from '$lib/conversation';
   import { computePulse } from '$lib/pulse';
   import { createPulseFeeds, pulseSlipContext } from '$lib/pulse-feeds.svelte';
   import { dateSlip, perfDayKey, performanceSlip, type DateEvent, type PerformanceEvent, type SlipKind } from '$lib/month-events';
@@ -106,7 +107,8 @@
       return null;
     }
   }
-  const since = sinceInstant(readVisit(), new Date());
+  const lastVisit = readVisit();
+  const since = sinceInstant(lastVisit, new Date());
   $effect(() => {
     const save = () => {
       try {
@@ -354,7 +356,21 @@
       new Set(replies.map((r) => r.id)),
     ),
   );
-  let changedLoading = $derived($overviewQuery.isPending || $threadsQuery.isPending);
+  let changedErrored = $derived($overviewQuery.isError || $threadsQuery.isError);
+  let changedLoading = $derived(
+    !changedErrored && ($overviewQuery.isPending || $threadsQuery.isPending),
+  );
+  let quietLabel = $derived.by(() => {
+    if (!lastVisit) return t('desk.changed_none_first', locale);
+    const e = elapsedSince(since, clockNow);
+    const ago =
+      e.unit === 'min'
+        ? t('desk.ago_min', locale, { n: e.n })
+        : e.unit === 'h'
+          ? t('desk.ago_hours', locale, { n: e.n })
+          : daysAgoLabel(e.n, locale);
+    return t('desk.changed_none', locale, { ago });
+  });
 
   // ── Band 4 · La temporada ──────────────────────────────────────────────
   let plannerFig = $derived(
@@ -656,7 +672,15 @@
           />
         </div>
         <div class="slot slot--changed">
-          <DeskChanged {changes} loading={changedLoading} {sinceLabel} {workspaceSlugById} {locale} />
+          <DeskChanged
+            {changes}
+            loading={changedLoading}
+            errored={changedErrored}
+            {quietLabel}
+            {sinceLabel}
+            {workspaceSlugById}
+            {locale}
+          />
         </div>
       </div>
     {/if}

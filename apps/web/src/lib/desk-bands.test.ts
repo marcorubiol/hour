@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { changesSince, goingAsks, plannerDoor, sinceInstant, CHANGED_ROWS } from './desk-bands';
+import { changesSince, elapsedSince, goingAsks, plannerDoor, sinceInstant, CHANGED_ROWS } from './desk-bands';
 import { buildPersonAttribution, type TeamItem } from './people';
 import type { DateEvent, PerformanceEvent } from './month-events';
 import type { HotRow, LastMailout } from './conversation-overview';
@@ -115,6 +115,14 @@ describe('changesSince — «Ha cambiado»', () => {
   it('at most five lines', () => {
     const threads = Array.from({ length: 8 }, (_, i) => thread(`t${i}`, `2026-10-15T0${i}:00:00Z`, 1));
     expect(changesSince({ threads, hot: [], lastMailout: null }, since, NOW)).toHaveLength(CHANGED_ROWS);
+  });
+
+  it('the last visit reads in minutes, then hours, then days', () => {
+    const at = (ms: number) => new Date(NOW.getTime() - ms).toISOString();
+    expect(elapsedSince(at(20_000), NOW)).toEqual({ unit: 'min', n: 1 });
+    expect(elapsedSince(at(42 * 60_000), NOW)).toEqual({ unit: 'min', n: 42 });
+    expect(elapsedSince(at(3 * 3_600_000 + 5 * 60_000), NOW)).toEqual({ unit: 'h', n: 3 });
+    expect(elapsedSince(at(50 * 3_600_000), NOW)).toEqual({ unit: 'd', n: 2 });
   });
 
   it('with no visit on file, since is a week back', () => {

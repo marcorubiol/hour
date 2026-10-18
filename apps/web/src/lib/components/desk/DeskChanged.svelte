@@ -2,8 +2,9 @@
   /**
    * «HA CAMBIADO» — band 3 of the Desk (ADR-117): what moved since your last
    * visit, nothing to act on. The rows are `changesSince` ($lib/desk-bands);
-   * each opens its own sheet. A band with nothing in it is not drawn: «no
-   * changes» is not news.
+   * each opens its own sheet. With nothing in it the band stays, as one line
+   * that says since when (amends ADR-121 § 5); if a source failed it says so,
+   * because a silent band would claim «nothing changed».
    */
   import { t, type Locale } from '$lib/i18n';
   import { feedHref, feedThreadName, feedTitle } from '$lib/threads';
@@ -12,13 +13,16 @@
   interface Props {
     changes: Change[];
     loading: boolean;
+    errored: boolean;
+    /** «Nada nuevo desde tu última visita, hace 3 h»: what an empty band says. */
+    quietLabel: string;
     /** The instant «since» means, already formatted for the eyebrow. */
     sinceLabel: string;
     workspaceSlugById: Map<string, string>;
     locale: Locale;
   }
 
-  let { changes, loading, sinceLabel, workspaceSlugById, locale }: Props = $props();
+  let { changes, loading, errored, quietLabel, sinceLabel, workspaceSlugById, locale }: Props = $props();
 
   function line(c: Change): { text: string; kind: string; href: string | null } {
     if (c.kind === 'thread') {
@@ -53,28 +57,30 @@
   }
 </script>
 
-{#if loading}
-  <section class="dband changed" aria-hidden="true">
-    <h2 class="dband__h">{t('desk.band_changed', locale)}</h2>
-    <ul class="feed">
+<section class="dband changed" aria-labelledby="desk-changed-h" aria-busy={loading} data-testid="desk-changed">
+  <h2 class="dband__h" id="desk-changed-h">{t('desk.changed_since', locale, { when: sinceLabel })}</h2>
+  {#if loading}
+    <ul class="feed" aria-hidden="true">
       <li class="feed__wait"></li>
       <li class="feed__wait"></li>
     </ul>
-  </section>
-{:else if changes.length > 0}
-  <section class="dband changed" aria-labelledby="desk-changed-h" data-testid="desk-changed">
-    <h2 class="dband__h" id="desk-changed-h">{t('desk.changed_since', locale, { when: sinceLabel })}</h2>
-    <ul class="feed">
-      {#each changes as c (c.kind + c.at)}
-        {@const l = line(c)}
-        <li>
-          <span class="feed__dot" class:feed__dot--quiet={c.kind === 'mailout'}></span>
-          {#if l.href}<a href={l.href}>{l.text}<small>{l.kind}</small></a>{:else}<span>{l.text}<small>{l.kind}</small></span>{/if}
-        </li>
-      {/each}
-    </ul>
-  </section>
-{/if}
+  {:else}
+    {#if changes.length > 0}
+      <ul class="feed">
+        {#each changes as c (c.kind + c.at)}
+          {@const l = line(c)}
+          <li>
+            <span class="feed__dot" class:feed__dot--quiet={c.kind === 'mailout'}></span>
+            {#if l.href}<a href={l.href}>{l.text}<small>{l.kind}</small></a>{:else}<span>{l.text}<small>{l.kind}</small></span>{/if}
+          </li>
+        {/each}
+      </ul>
+    {:else if !errored}
+      <p class="dband__empty">{quietLabel}</p>
+    {/if}
+    {#if errored}<p class="dband__err">{t('desk.changed_error', locale)}</p>{/if}
+  {/if}
+</section>
 
 <style>
   .feed {
