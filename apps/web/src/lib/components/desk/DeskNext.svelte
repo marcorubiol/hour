@@ -21,7 +21,8 @@
   import { setCommitment } from '$lib/commitments';
   import { plannerDayHref } from '$lib/planner';
   import { lensOn } from '$lib/lenses.svelte';
-  import type { CommitmentState } from '$lib/people';
+  import { castNames, type CommitmentState } from '$lib/people';
+  import type { PerformanceEvent } from '$lib/month-events';
   import type { PulseNext } from '$lib/pulse';
   import { pulseSlip } from '$lib/pulse-feeds.svelte';
   import Slip from '$lib/components/planner/Slip.svelte';
@@ -40,10 +41,13 @@
     viewerTz: string;
     personId: string | null;
     slipCtx: SlipContext;
+    /** The roster's names, as the Day draws them ($lib/people `castNames`);
+        null while the names are loading, so «sin reparto» never flashes. */
+    personNames: ReadonlyMap<string, string> | null;
     locale: Locale;
   }
 
-  let { next, then, thenBefore = false, settled, errored, onretry, today, viewerTz, personId, slipCtx, locale }: Props = $props();
+  let { next, then, thenBefore = false, settled, errored, onretry, today, viewerTz, personId, slipCtx, personNames, locale }: Props = $props();
 
   const kindLabel = (kind: SlipKind) => t(`planner.kind_${kind}`, locale);
   const queryClient = useQueryClient();
@@ -74,6 +78,15 @@
   );
 
   let roadsheet = $derived(slip && next?.ref.of === 'performance' && slip.href ? `${slip.href}/roadsheet` : null);
+  /* WHO GOES: a show has a cast, a trip or a press call does not (the Day's
+     law, Slip `cast`). The editor (`WhoGoes`) does not fit a card: the line
+     says who, and «Quién va» opens it in the sheet. */
+  let cast = $derived(
+    next?.ref.of === 'performance' && personNames
+      ? castNames((next.ref.row as PerformanceEvent).person_ids, personNames)
+      : null,
+  );
+  let whoHref = $derived(next?.ref.of === 'performance' && slip?.href ? `${slip.href}#who-goes` : null);
   let guess = $derived(next ? next.ref.attribution !== 'explicit' : false);
 
   // ADR-103: only an inferred row asks; an unattributed one is the company's day.
@@ -154,14 +167,25 @@
           >{/if}
       </div>
       <div class="card__slip">
-        <Slip {slip} {kindLabel} stateLabel={() => null} showCountry ground="bare" placing="cell" size="l" {guess} />
+        <Slip
+          {slip}
+          {kindLabel}
+          stateLabel={() => null}
+          showCountry
+          ground="bare"
+          placing="cell"
+          size="l"
+          {guess}
+          {cast}
+          noCastWord={t('planner.no_cast', locale)}
+        />
       </div>
       {#if moments.length > 0}
         <div class="card__slots">
           {#each moments as m, i (i)}<span><span class="card__k">{m.label}</span> {m.at}</span>{/each}
         </div>
       {/if}
-      {#if canAnswer || roadsheet}
+      {#if canAnswer || roadsheet || whoHref}
         <div class="card__foot">
           {#if canAnswer}
             <span class="card__ask">
@@ -180,7 +204,10 @@
               >
             </span>
           {/if}
-          {#if roadsheet}<a class="card__rs btn--outline btn--s" href={roadsheet}>{t('desk.roadsheet', locale)} ↗</a>{/if}
+          <span class="card__links">
+            {#if whoHref}<a class="block-head__act" href={whoHref}>{t('commitment.who_goes', locale)} →</a>{/if}
+            {#if roadsheet}<a class="card__rs btn--outline btn--s" href={roadsheet}>{t('desk.roadsheet', locale)} ↗</a>{/if}
+          </span>
         </div>
       {/if}
     </div>
@@ -267,6 +294,12 @@
     --btn-border-color: transparent;
     --btn-background-hover: transparent;
     --btn-text-color: var(--text-faint);
+  }
+  .card__links {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-m);
+    margin-inline-start: auto;
   }
   .card__rs {
     flex: none;

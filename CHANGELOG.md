@@ -6,6 +6,7 @@ hasta entonces, sacado de esos documentos; lo anterior a julio de 2026 está sol
 
 ## Octubre 2026 (en curso)
 
+- En Desk, la tarjeta de lo siguiente dice quién va; la puerta del Planner cuenta los choques como la Temporada; y «Ha cambiado» dice los cobros nuevos. (2026-10-19)
 - Cada espacio activa o desactiva sus lentes (Planner, Difusión o Contratación, Cuentas) en Ajustes: una lente apagada desaparece de la navegación, de ⌘K y de Desk, sin borrar datos. En Cuentas, un bolo de varias funciones pide factura tras la última, y en Desk aceptar una propuesta de la IA ya la guarda como tarea. (2026-10-18, `d244ecf4`)
 - Hour habla como el oficio: la lente de venta se llama Difusión (Contratación en música), «hold» pasa a «opción», fuera «caliente» y «se enfría» («sin noticias»), «rechazada» pasa a «no esta vez», y cada espacio elige en Ajustes si es de escena o de música en directo, que cambia unas pocas palabras (función o concierto, reparto o formación, plan de trabajo o escaleta). En francés, el bolo es *contrat* y lo que paga la sala, *prix de cession*. (2026-10-18, `a4db0711`)
 - Los cuatro dashboards se leen igual: los mismos títulos de bloque, una sola insignia de estado, el mismo aviso de error con «Reintentar» y la misma carga; y la pestaña del navegador dice dónde estás en vez de «Sign in». (2026-10-18, `b7faea88`)

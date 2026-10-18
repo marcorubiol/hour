@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cellMark, gapWindows, mondayOf, seasonWindow, unclosed } from './season';
+import { cellMark, clashesInSeason, gapWindows, mondayOf, seasonWindow, unclosed } from './season';
 
 describe('seasonWindow', () => {
   it('draws twelve Monday rows and counts from today', () => {
@@ -118,5 +118,51 @@ describe('cellMark', () => {
 
   it('travel is not a mark of its own', () => {
     expect(cellMark([{ day: 'd', family: 'confirmed', kind: 'travel' }])).toBeNull();
+  });
+});
+
+describe('clashesInSeason — what «Choques» counts', () => {
+  const dayOf = new Map([
+    ['a', '2026-10-20'],
+    ['b', '2026-10-20'],
+    ['c', '2026-10-22'],
+    ['d', '2026-10-22'],
+    ['e', '2026-10-25'],
+    ['old', '2026-10-01'],
+    ['far', '2027-02-01'],
+  ]);
+  const window = { from: '2026-10-19', to: '2027-01-10' };
+
+  it('keeps people and blackout clashes in the window, by day', () => {
+    const out = clashesInSeason(
+      [
+        { severity: 'blackout', event_ids: ['e'] },
+        { severity: 'people', event_ids: ['a', 'b'] },
+        { severity: 'blackout', event_ids: ['old'] },
+        { severity: 'blackout-tentative', event_ids: ['far'] },
+      ],
+      dayOf,
+      [],
+      window,
+    );
+    expect(out.map((c) => [c.day, c.conflict.severity])).toEqual([
+      ['2026-10-20', 'people'],
+      ['2026-10-25', 'blackout'],
+    ]);
+  });
+
+  it('leaves out a missing team, the queue severities and a pair the queue holds', () => {
+    const out = clashesInSeason(
+      [
+        { severity: 'possible', event_ids: ['a', 'b'] },
+        { severity: 'double', event_ids: ['a', 'b'] },
+        { severity: 'concurrence', event_ids: ['a', 'b'] },
+        { severity: 'people', event_ids: ['d', 'c'] },
+      ],
+      dayOf,
+      [{ a: { id: 'c' }, b: { id: 'd' } }],
+      window,
+    );
+    expect(out).toEqual([]);
   });
 });

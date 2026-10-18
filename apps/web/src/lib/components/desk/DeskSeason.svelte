@@ -2,7 +2,8 @@
   /**
    * «LA TEMPORADA» — band 4 of the Desk (ADR-117): one door per lens, a big
    * figure and two small ones. A door is a door: it says what its lens says,
-   * in the lens's own arithmetic (Planner: its twelve-week census; Conversations:
+   * in the lens's own arithmetic (Planner: its twelve-week census and its
+   * «Choques», in red as there; Conversations:
    * its overview; Cuentas: `moneyPosition`), and it opens the lens.
    *
    * Never empty — zero is a figure. While loading, a `·` holds the figure's
@@ -52,7 +53,10 @@
                   n: planner.value.travel,
                 }),
               })
-            : DASH}</span
+            : DASH}{#if planner.value && planner.value.clashes > 0}{' · '}<em class="door__hot"
+              >{planner.value.clashes}
+              {t(planner.value.clashes === 1 ? 'planner.season_clash_one' : 'planner.season_clashes', locale)}</em
+            >{/if}</span
         >
       {/if}
       <span class="door__arrow" aria-hidden="true">→</span>

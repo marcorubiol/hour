@@ -23,6 +23,30 @@ import type { TeamItem } from '$lib/people';
 export type { TeamItem };
 export type DecisionPerfItem = PerformanceEvent & { hold_notice_days?: number | null };
 
+/**
+ * The season's blocks (ADR-117): the Planner's Season and the Desk's Planner
+ * door read the same key, so the door's «choques» weigh the same absences.
+ * No workspace filter, graceful absence: the other blackout feeds' contract.
+ */
+export function seasonAvailabilityQueryOptions(from: string, to: string, enabled = true) {
+  return {
+    queryKey: ['planner-season-availability', { from, to }] as const,
+    enabled,
+    queryFn: async ({ signal }: { signal: AbortSignal }) => {
+      try {
+        return await fetchJSON<{ items: AvailabilityItem[]; absent?: boolean }>(
+          `/api/availability?from=${from}&to=${to}&limit=500`,
+          signal,
+        );
+      } catch (err) {
+        if (err instanceof Error && err.message === 'Unauthorized') throw err;
+        console.warn('[calendar] season availability feed absent:', err);
+        return { items: [] as AvailabilityItem[], absent: true };
+      }
+    },
+  };
+}
+
 // The API's hard cap on ?limit (maxValue in its QuerySchema) — one page.
 const FEED_LIMIT = 200;
 
@@ -481,22 +505,7 @@ export function createPlannerFeeds(inputs: PlannerFeedInputs) {
   });
   const seasonAvailabilityOptions = toStore(() => {
     const k = seasonKey;
-    return {
-      queryKey: ['planner-season-availability', { from: k.from, to: k.to }] as const,
-      enabled: inputs.view() === 'overview' && !k.unresolved,
-      queryFn: async ({ signal }: { signal: AbortSignal }) => {
-        try {
-          return await fetchJSON<{ items: AvailabilityItem[]; absent?: boolean }>(
-            `/api/availability?from=${k.from}&to=${k.to}&limit=500`,
-            signal,
-          );
-        } catch (err) {
-          if (err instanceof Error && err.message === 'Unauthorized') throw err;
-          console.warn('[calendar] season availability feed absent:', err);
-          return { items: [] as AvailabilityItem[], absent: true };
-        }
-      },
-    };
+    return seasonAvailabilityQueryOptions(k.from, k.to, inputs.view() === 'overview' && !k.unresolved);
   });
 
   return {

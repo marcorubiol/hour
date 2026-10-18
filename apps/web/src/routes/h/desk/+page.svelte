@@ -39,7 +39,7 @@
   import { usePins } from '$lib/stores/pins.svelte';
   import { useCalm } from '$lib/stores/calm.svelte';
   import { buildLineIndex, buildProjectIndex, resolveScope, type NavWorkspace, type RawLine } from '$lib/nav';
-  import { workspacesQueryOptions, activeProjectsQueryOptions, allLinesQueryOptions } from '$lib/nav-queries';
+  import { workspacesQueryOptions, activeProjectsQueryOptions, allLinesQueryOptions, teamQueryOptions } from '$lib/nav-queries';
   import { moneyAccessAnyQueryOptions } from '$lib/bolo-queries';
   import { conversationAccessQueryOptions } from '$lib/conversation-access';
   import { lensOn } from '$lib/lenses.svelte';
@@ -54,12 +54,14 @@
     type DeskConvInput,
     type DeskItem,
   } from '$lib/desk-feed';
-  import { changesSince, elapsedSince, goingAsks, plannerDoor, sinceInstant } from '$lib/desk-bands';
+  import { changesSince, elapsedSince, goingAsks, paymentNews, plannerDoor, sinceInstant, type RecordedPayment } from '$lib/desk-bands';
   import { daysAgoLabel } from '$lib/conversation';
   import { computePulse } from '$lib/pulse';
   import { createPulseFeeds, pulseSlipContext } from '$lib/pulse-feeds.svelte';
   import { dateSlip, perfDayKey, performanceSlip, type DateEvent, type PerformanceEvent, type SlipKind } from '$lib/month-events';
-  import { seasonWindow } from '$lib/season';
+  import { clashesInSeason, seasonWindow } from '$lib/season';
+  import { createPlannerEngine } from '$lib/planner-engine.svelte';
+  import { seasonAvailabilityQueryOptions } from '$lib/planner-feeds.svelte';
   import { currentSeason, type OverviewResponse } from '$lib/conversation-overview';
   import type { ThreadFeedView } from '$lib/threads';
   import { setCommitment } from '$lib/commitments';
@@ -204,6 +206,12 @@
   });
   const kindLabel = (kind: SlipKind) => t(`planner.kind_${kind}`, locale);
   let slipCtx = $derived(pulseSlipContext(feeds.workspaces, viewerTz, kindLabel));
+  // Who goes, by name: the Planner's team feed (same key, one cache). Null
+  // until it lands, so the card never says «sin reparto» while it loads.
+  const teamQuery = createQuery(toStore(() => teamQueryOptions(feeds.workspaces.map((w) => w.id))));
+  let personNames = $derived(
+    $teamQuery.isSuccess ? new Map(($teamQuery.data?.items ?? []).map((m) => [m.person_id, m.full_name])) : null,
+  );
 
   // ── Band 2 · Te espera ─────────────────────────────────────────────────
   const conversationsQuery = createQuery({
@@ -358,21 +366,49 @@
         fetchJSON<ThreadFeedView>(`/api/threads?${feedParams(filterIds)}`, signal),
     })),
   );
+  // «Cobrado»: payments someone else recorded since the last visit (ADR-133),
+  // named by the deal through the Books feeds already in cache. Scoped like
+  // them: a payment whose deal and invoice are both out of scope is not news here.
+  const paymentsQuery = createQuery(
+    toStore(() => ({
+      queryKey: ['desk-payments', since, workspaces.map((w) => w.id)] as const,
+      enabled: readMoney && workspaces.length > 0,
+      retry: false,
+      queryFn: ({ signal }: { signal: AbortSignal }) =>
+        fetchJSON<{ items: RecordedPayment[] }>(
+          `/api/payments?${new URLSearchParams({ workspace_ids: workspaces.map((w) => w.id).join(','), recorded_since: since, others: '1', limit: '50' })}`,
+          signal,
+        ),
+    })),
+  );
+  let boloById = $derived(new Map(($bolosQuery.data?.items ?? []).map((b) => [b.id, b])));
+  let paymentsNews = $derived.by(() => {
+    if (!readMoney || !$paymentsQuery.isSuccess || !$bolosQuery.isSuccess || !$invoicesQuery.isSuccess) return [];
+    const invoiceById = new Map(invoices.map((i) => [i.id, i]));
+    const scoped = ($paymentsQuery.data?.items ?? []).filter(
+      (p) => scope.isEmpty || (p.invoice_id && invoiceById.has(p.invoice_id)) || (p.bolo_id && boloById.has(p.bolo_id)),
+    );
+    return paymentNews(scoped, boloById, invoiceById);
+  });
   let changes = $derived(
     changesSince(
       {
         threads: $threadsQuery.data?.threads ?? [],
         hot: overview?.hot.rows ?? [],
         lastMailout: overview?.last_mailout ?? null,
+        payments: paymentsNews,
       },
       since,
       clockNow,
       new Set(replies.map((r) => r.id)),
     ),
   );
-  let changedErrored = $derived((readConversations && $overviewQuery.isError) || $threadsQuery.isError);
+  let changedErrored = $derived(
+    (readConversations && $overviewQuery.isError) || $threadsQuery.isError || (readMoney && $paymentsQuery.isError),
+  );
   let changedLoading = $derived(
-    !changedErrored && ((readConversations && $overviewQuery.isPending) || $threadsQuery.isPending),
+    !changedErrored &&
+      ((readConversations && $overviewQuery.isPending) || $threadsQuery.isPending || (readMoney && $paymentsQuery.isPending)),
   );
   let quietLabel = $derived.by(() => {
     if (!lastVisit) return t('desk.changed_none_first', locale);
@@ -387,9 +423,40 @@
   });
 
   // ── Band 4 · La temporada ──────────────────────────────────────────────
+  // The Planner's own engine over the pulse's rows: its census and its
+  // «Choques» (`clashesInSeason`), the Season's rule, never a second one.
+  // Its blocks are the Season's feed (same key): an absence clashes here
+  // as it does there. Like the Season, nothing before today counts.
+  let season = $derived(seasonWindow(today));
+  const seasonBlocksQuery = createQuery(
+    toStore(() => seasonAvailabilityQueryOptions(season.weeks[0][0], season.to, lensOn('planner'))),
+  );
+  let seasonBlocks = $derived($seasonBlocksQuery.data?.items ?? []);
+  const engine = createPlannerEngine({
+    scopedPerfs: () => scopedPerfs,
+    scopedDates: () => scopedDates,
+    rawPerfs: () => feeds.performances,
+    rawDates: () => feeds.dates,
+    allBlackouts: () => seasonBlocks,
+    visibleBlackouts: () => [],
+    window: () => ({ first: season.from, last: season.to, days: season.days }),
+    decisionPerfs: () => scopedPerfs,
+    viewerTz,
+    // The engine reads its day once, as on the Planner (a reload rolls it).
+    todayIso: dayKeyInTz(new Date().toISOString(), viewerTz),
+  });
   let plannerFig = $derived(
-    feeds.settled
-      ? plannerDoor({ performances: scopedPerfs, dates: scopedDates, viewerTz }, seasonWindow(today))
+    feeds.settled && !$seasonBlocksQuery.isPending
+      ? plannerDoor(
+          {
+            confirmed: engine.stats.confirmed,
+            holds: engine.stats.holds,
+            clashes: clashesInSeason(engine.conflicts, engine.eventDayById, engine.decisionQueue.decisions, season)
+              .length,
+          },
+          { dates: scopedDates, viewerTz },
+          season,
+        )
       : null,
   );
   let convFig = $derived(
@@ -655,6 +722,7 @@
           {viewerTz}
           personId={feeds.personId}
           {slipCtx}
+          {personNames}
           {locale}
         />
       </div>

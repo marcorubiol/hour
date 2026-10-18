@@ -517,7 +517,7 @@
     /* ══ SIZE L · the Desk's card ══════════════════════════════════════
        The same proportions one step up the type scale: the labels at the
        eyebrow size, the name at card-title size, a show's name at display. */
-    .slip[data-size='l'] :is(.slip__kind, .slip__t, .slip__pre, .slip__state, .slip__c, .slip__tz) {
+    .slip[data-size='l'] :is(.slip__kind, .slip__t, .slip__pre, .slip__state, .slip__c, .slip__tz, .slip__cast) {
       font-size: var(--text-xs);
     }
     .slip[data-size='l'] .slip__n {

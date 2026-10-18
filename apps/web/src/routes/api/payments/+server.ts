@@ -1,5 +1,7 @@
 /**
  * GET  /api/payments — active payment rows by invoice or workspace/date window.
+ *      `recorded_since` (an instant) + `others=1`: what was RECORDED after it
+ *      by anyone but the caller, newest first: the Desk's «cobrado» (ADR-133).
  * POST /api/payments — record an observed payment through the locking RPC.
  * Invoice paid/issued status is derived atomically by the database trigger.
  */
@@ -10,12 +12,15 @@ import { extractAccessToken } from '$lib/auth';
 import { PaymentCreateSchema, type PaymentItem } from '$lib/money';
 import { pgGet, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import { pgErrorResponse } from '$lib/server/errors';
+import { decodeJwtPayload } from '$lib/server/session';
 
 const QuerySchema = v.object({
   invoice_id: v.optional(v.pipe(v.string(), v.uuid())),
   workspace_ids: v.optional(v.string()),
   from: v.optional(v.pipe(v.string(), v.isoDate())),
   to: v.optional(v.pipe(v.string(), v.isoDate())),
+  recorded_since: v.optional(v.pipe(v.string(), v.isoTimestamp())),
+  others: v.optional(v.picklist(['1'])),
   limit: v.optional(
     v.pipe(
       v.string(),
@@ -50,22 +55,30 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
 
   const parsed = v.safeParse(QuerySchema, Object.fromEntries(url.searchParams.entries()));
   if (!parsed.success) return json({ error: 'invalid_query' }, 400);
-  const { invoice_id, workspace_ids, from, to, limit } = parsed.output;
+  const { invoice_id, workspace_ids, from, to, recorded_since, others, limit } = parsed.output;
   const workspaceIds = parseUuidList(workspace_ids);
   if (!invoice_id && workspaceIds.length === 0) {
     return json({ error: 'invalid_query', hint: 'Pass invoice_id or workspace_ids.' }, 400);
   }
 
   const search = new URLSearchParams({
-    select: 'id,workspace_id,invoice_id,amount,received_on,method,reference,notes,created_at',
+    select: 'id,workspace_id,invoice_id,bolo_id,amount,received_on,method,reference,notes,created_at',
     deleted_at: 'is.null',
-    order: 'received_on.desc,created_at.desc',
+    order: recorded_since ? 'created_at.desc' : 'received_on.desc,created_at.desc',
     limit: String(limit),
   });
   if (invoice_id) search.set('invoice_id', `eq.${invoice_id}`);
   if (workspaceIds.length > 0) search.set('workspace_id', `in.(${workspaceIds.join(',')})`);
   if (from) search.set('received_on', `gte.${from}`);
   if (to) search.append('received_on', `lte.${to}`);
+  if (recorded_since) search.set('created_at', `gt.${new Date(recorded_since).toISOString()}`);
+  if (others) {
+    // What I recorded myself is not news to me; a row nobody signed (an
+    // import) is.
+    const sub = decodeJwtPayload(jwt)?.sub;
+    if (typeof sub !== 'string') return json({ error: 'invalid_token' }, 401);
+    search.set('or', `(created_by.is.null,created_by.neq.${sub})`);
+  }
 
   try {
     const { data } = await pgGet<PaymentItem>(env, 'payment', jwt, { search });

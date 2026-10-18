@@ -5,15 +5,15 @@
  *
  *   «Lo siguiente»   → `computePulse` ($lib/pulse), the rail's own truth.
  *   «Voy · no voy»   → `goingAsks`: what Hour guesses you are on, unanswered.
- *   «Ha cambiado»    → `changesSince`: threads, replies, the last send.
- *   «La temporada»   → `plannerDoor`: the Planner's own census, same window.
+ *   «Ha cambiado»    → `changesSince`: threads, replies, the last send, payments.
+ *   «La temporada»   → `plannerDoor`: the Planner's own figures, same window.
  */
 import { addDaysIso } from './planner';
 import { dateDayKey, perfDayKey, type DateEvent, type PerformanceEvent } from './month-events';
-import { performanceStatusFamily } from './performance';
 import type { PersonAttributionScope } from './people';
 import type { HotRow, LastMailout } from './conversation-overview';
 import type { FeedThread } from './threads';
+import type { MoneyBolo, MoneyInvoiceItem } from './money';
 
 const DAY_MS = 86_400_000;
 
@@ -81,7 +81,59 @@ export const MAILOUT_NEWS_DAYS = 14;
 export type Change =
   | { kind: 'thread'; at: string; thread: FeedThread }
   | { kind: 'reply'; at: string; row: HotRow }
-  | { kind: 'mailout'; at: string; mailout: LastMailout };
+  | { kind: 'mailout'; at: string; mailout: LastMailout }
+  | { kind: 'payment'; at: string; payment: PaymentNews };
+
+/** A payment as `/api/payments?recorded_since=…&others=1` returns it. */
+export interface RecordedPayment {
+  id: string;
+  invoice_id: string | null;
+  bolo_id: string | null;
+  amount: number;
+  created_at: string;
+}
+
+/** «Cobrado X»: a payment someone else recorded, named by its deal. */
+export interface PaymentNews {
+  id: string;
+  at: string;
+  amount: number;
+  currency: string | null;
+  /** The deal it pays, straight or through its invoice; null when neither says. */
+  bolo: Pick<MoneyBolo, 'id' | 'venue_name' | 'city' | 'project'> | null;
+  /** The invoice's payer, when there is no deal to name it by. */
+  payer: string | null;
+}
+
+/**
+ * A payment recorded since the last visit is the one money event Hour can
+ * read as news without a history (ADR-133): the row is append-only, with its
+ * own `created_at`. It is named by its deal (the bolo it hangs from, or the
+ * one its invoice bills), in the deal's currency. A status change has no
+ * such trace, so it is not here.
+ */
+export function paymentNews(
+  payments: readonly RecordedPayment[],
+  bolos: ReadonlyMap<string, MoneyBolo>,
+  invoices: ReadonlyMap<string, Pick<MoneyInvoiceItem, 'currency' | 'lines' | 'payer'>>,
+): PaymentNews[] {
+  const out: PaymentNews[] = [];
+  for (const p of payments) {
+    if (!(Number(p.amount) > 0)) continue;
+    const inv = p.invoice_id ? invoices.get(p.invoice_id) : undefined;
+    const boloId = p.bolo_id ?? inv?.lines.find((l) => l.bolo_id)?.bolo_id ?? null;
+    const bolo = boloId ? (bolos.get(boloId) ?? null) : null;
+    out.push({
+      id: p.id,
+      at: p.created_at,
+      amount: Number(p.amount),
+      currency: inv?.currency ?? bolo?.fee_currency ?? null,
+      bolo,
+      payer: inv?.payer?.name ?? null,
+    });
+  }
+  return out;
+}
 
 /** The instant «since» means: the stored last visit, or a week back. */
 export function sinceInstant(lastVisit: string | null, now: Date): string {
@@ -106,15 +158,18 @@ export function elapsedSince(since: string, now: Date): { unit: 'min' | 'h' | 'd
  * «Te espera» already holds them), and the last send while it is recent.
  * Newest first, at most `CHANGED_ROWS`.
  *
- * Status changes and payments stay out: nothing records them yet for bolos
- * or payments (only `conversation_event` exists), and the Desk does not
- * invent a history it cannot read.
+ * Payments recorded by someone else after it (`paymentNews`, ADR-133) are
+ * news too. Status changes stay out: nothing records when a bolo or a
+ * performance changed status, or from what (`updated_at` moves on any
+ * edit), and the Desk does not invent a history it cannot read.
  */
 export function changesSince(
   input: {
     threads: readonly FeedThread[];
     hot: readonly HotRow[];
     lastMailout: LastMailout | null;
+    /** `paymentNews`, already read from `since` on. */
+    payments?: readonly PaymentNews[];
   },
   since: string,
   now: Date,
@@ -137,6 +192,9 @@ export function changesSince(
   if (m?.queued_at && m.figures.recipients > 0 && now.getTime() - Date.parse(m.queued_at) <= MAILOUT_NEWS_DAYS * DAY_MS) {
     out.push({ kind: 'mailout', at: m.queued_at, mailout: m });
   }
+  for (const p of input.payments ?? []) {
+    if (Date.parse(p.at) > after) out.push({ kind: 'payment', at: p.at, payment: p });
+  }
   return out.sort((a, b) => Date.parse(b.at) - Date.parse(a.at)).slice(0, CHANGED_ROWS);
 }
 
@@ -147,31 +205,28 @@ export interface PlannerDoor {
   holds: number;
   /** Travel days on the calendar in the window. */
   travel: number;
+  /** What the Season lists under «Choques» ($lib/season `clashesInSeason`). */
+  clashes: number;
 }
 
 /**
  * The Planner door says what the Planner's portada says (ADR-120): its
- * window is twelve weeks from today (`seasonWindow`), confirmed and holds
- * counted by status family on the performance's day. Travel days are dates
- * of kind `travel_day`. Cancelled rows count nowhere.
+ * window is twelve weeks from today (`seasonWindow`), and confirmed, holds
+ * and clashes are the Planner's own figures (`createPlannerEngine` census
+ * and `clashesInSeason`), handed in, never recounted here: a proposal is an
+ * option on paper there, so it is one here. Travel days, the door's own
+ * line, are dates of kind `travel_day`. Cancelled rows count nowhere.
  */
 export function plannerDoor(
-  input: { performances: readonly PerformanceEvent[]; dates: readonly DateEvent[]; viewerTz: string },
+  census: { confirmed: number; holds: number; clashes: number },
+  input: { dates: readonly DateEvent[]; viewerTz: string },
   window: { from: string; to: string },
 ): PlannerDoor {
-  const out: PlannerDoor = { confirmed: 0, holds: 0, travel: 0 };
-  for (const p of input.performances) {
-    if (p.status === 'cancelled') continue;
-    const day = perfDayKey(p);
-    if (day < window.from || day > window.to) continue;
-    const family = performanceStatusFamily(p.status);
-    if (family === 'confirmed') out.confirmed++;
-    else if (family === 'hold') out.holds++;
-  }
+  let travel = 0;
   for (const d of input.dates) {
     if (d.status === 'cancelled' || d.kind !== 'travel_day') continue;
     const day = dateDayKey(d, input.viewerTz);
-    if (day >= window.from && day <= window.to) out.travel++;
+    if (day >= window.from && day <= window.to) travel++;
   }
-  return out;
+  return { confirmed: census.confirmed, holds: census.holds, clashes: census.clashes, travel };
 }

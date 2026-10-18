@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { changesSince, elapsedSince, goingAsks, plannerDoor, sinceInstant, CHANGED_ROWS } from './desk-bands';
+import { changesSince, elapsedSince, goingAsks, paymentNews, plannerDoor, sinceInstant, CHANGED_ROWS } from './desk-bands';
+import type { MoneyBolo } from './money';
 import { buildPersonAttribution, type TeamItem } from './people';
 import type { DateEvent, PerformanceEvent } from './month-events';
 import type { HotRow, LastMailout } from './conversation-overview';
@@ -135,20 +136,76 @@ describe('changesSince — «Ha cambiado»', () => {
 });
 
 describe('plannerDoor — the Planner census, its window', () => {
-  it('counts confirmed and holds by status family, and travel days, inside the window', () => {
+  it('carries the Planner figures and counts travel days inside the window', () => {
     const fig = plannerDoor(
+      { confirmed: 3, holds: 2, clashes: 1 },
       {
-        performances: [
-          perf('a', '2026-10-17'),
-          perf('b', '2026-10-20', { status: 'hold_1' }),
-          perf('c', '2026-10-21', { status: 'cancelled' }),
-          perf('d', '2027-03-01'),
+        dates: [
+          date('t', '2026-10-16', { kind: 'travel_day' }),
+          date('x', '2026-10-18', { kind: 'travel_day', status: 'cancelled' }),
+          date('far', '2027-03-01', { kind: 'travel_day' }),
+          date('r', '2026-10-16'),
         ],
-        dates: [date('t', '2026-10-16', { kind: 'travel_day' }), date('r', '2026-10-16')],
         viewerTz: 'UTC',
       },
       { from: TODAY, to: '2027-01-03' },
     );
-    expect(fig).toEqual({ confirmed: 1, holds: 1, travel: 1 });
+    expect(fig).toEqual({ confirmed: 3, holds: 2, clashes: 1, travel: 1 });
+  });
+});
+
+describe('paymentNews — «cobrado», named by its deal', () => {
+  const bolo: MoneyBolo = {
+    id: 'b1',
+    project_id: 'p1',
+    line_id: null,
+    conversation_id: null,
+    venue_name: 'Kursaal',
+    city: 'Manresa',
+    country: 'ES',
+    fee_amount: 3000,
+    fee_currency: 'EUR',
+    status: 'confirmed',
+    collected: 0,
+    function_count: 1,
+    first_performed_at: null,
+    last_performed_at: null,
+    project: { ...project, accent: null },
+  };
+  const bolos = new Map([['b1', bolo]]);
+  const invoices = new Map([
+    ['i1', { currency: 'USD', lines: [{ bolo_id: 'b1' }], payer: { id: 'o', slug: 'o', name: 'Teatre', fiscal_identity_id: null } }],
+    ['i2', { currency: 'EUR', lines: [], payer: { id: 'o2', slug: 'o2', name: 'Festival', fiscal_identity_id: null } }],
+  ]);
+
+  it('names a payment by its bolo, straight or through its invoice, in the invoice currency first', () => {
+    const out = paymentNews(
+      [
+        { id: 'x', invoice_id: null, bolo_id: 'b1', amount: 500, created_at: '2026-10-15T09:00:00Z' },
+        { id: 'y', invoice_id: 'i1', bolo_id: null, amount: 200, created_at: '2026-10-15T09:30:00Z' },
+        { id: 'z', invoice_id: 'i2', bolo_id: null, amount: 80, created_at: '2026-10-15T09:40:00Z' },
+        { id: 'neg', invoice_id: null, bolo_id: 'b1', amount: 0, created_at: '2026-10-15T09:50:00Z' },
+      ],
+      bolos,
+      invoices,
+    );
+    expect(out.map((p) => [p.id, p.bolo?.id ?? null, p.currency, p.payer])).toEqual([
+      ['x', 'b1', 'EUR', null],
+      ['y', 'b1', 'USD', 'Teatre'],
+      ['z', null, 'EUR', 'Festival'],
+    ]);
+  });
+
+  it('enters «Ha cambiado» only after the last visit', () => {
+    const news = paymentNews(
+      [
+        { id: 'new', invoice_id: null, bolo_id: 'b1', amount: 500, created_at: '2026-10-15T09:00:00Z' },
+        { id: 'old', invoice_id: null, bolo_id: 'b1', amount: 500, created_at: '2026-10-14T09:00:00Z' },
+      ],
+      bolos,
+      invoices,
+    );
+    const out = changesSince({ threads: [], hot: [], lastMailout: null, payments: news }, '2026-10-15T08:00:00Z', NOW);
+    expect(out.map((c) => (c.kind === 'payment' ? c.payment.id : c.kind))).toEqual(['new']);
   });
 });

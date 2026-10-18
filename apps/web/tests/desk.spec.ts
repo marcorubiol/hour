@@ -190,6 +190,55 @@ test.describe('Desk — the dashboard (ADR-117)', () => {
     await sweep(page, wsId);
   });
 
+  // ADR-133: the Planner door counts the Season's «Clashes», by the same rule.
+  test('the Planner door says the clashes the Season counts', async ({ page }) => {
+    test.setTimeout(60_000);
+    await page.goto('/h/planner?scope=s:playwright&view=overview');
+    await waitForLoaded(page);
+    const stat = page.locator('.cal__stat', { hasText: /clash/ }).first();
+    await expect(stat.locator('b')).toHaveText(/^\d+$/, { timeout: 15_000 });
+    const n = Number(await stat.locator('b').innerText());
+
+    await page.goto(DESK);
+    await waitForLoaded(page);
+    const door = page.getByTestId('door-planner');
+    await expect(door.locator('.door__n')).toHaveText(/^\d+$/, { timeout: 15_000 });
+    if (n > 0) await expect(door).toContainText(`${n} ${n === 1 ? 'clash' : 'clashes'}`);
+    else await expect(door).not.toContainText('clash');
+  });
+
+  // ADR-133: a show on the card says who goes and opens the editor in its sheet.
+  test('«Next up» on a show: the cast line and «Who goes» to the sheet', async ({ page }) => {
+    await page.goto(DESK);
+    await waitForLoaded(page);
+    const card = page.getByTestId('desk-next');
+    test.skip((await card.count()) === 0, 'Nothing within two weeks to draw a card for.');
+    const who = card.getByRole('link', { name: /^Who goes/ });
+    if ((await who.count()) === 0) {
+      // Not a show (a trip, a press call): no cast, no link (the Day's law).
+      await expect(card.locator('.cast-line')).toHaveCount(0);
+      return;
+    }
+    await expect(who).toHaveAttribute('href', /\/performance\/[^/]+#who-goes$/);
+    await expect(card.locator('.cast-line')).toHaveCount(1);
+    await who.click();
+    await page.waitForURL(/#who-goes$/);
+    await expect(page.locator('#who-goes')).toBeVisible();
+  });
+
+  // ADR-133: «cobrado» reads payments recorded since the visit, by others only.
+  test('the payments feed answers «recorded since, by others»', async ({ page }) => {
+    await page.goto(DESK);
+    const wsId = await playwrightWsId(page);
+    const out = await page.evaluate(async ({ wsId }) => {
+      const since = new Date(Date.now() - 7 * 86_400_000).toISOString();
+      const ok = await fetch(`/api/payments?workspace_ids=${wsId}&recorded_since=${encodeURIComponent(since)}&others=1`);
+      const bad = await fetch(`/api/payments?workspace_ids=${wsId}&recorded_since=yesterday`);
+      return { ok: ok.status, items: Array.isArray(((await ok.json()) as { items: unknown }).items), bad: bad.status };
+    }, { wsId });
+    expect(out).toEqual({ ok: 200, items: true, bad: 400 });
+  });
+
   test('«+ Task» opens the composer in place', async ({ page }) => {
     await page.goto(DESK);
     await waitForLoaded(page);
