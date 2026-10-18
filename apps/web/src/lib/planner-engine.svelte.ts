@@ -155,7 +155,10 @@ export function createPlannerEngine(inputs: PlannerEngineInputs) {
       if (day < first || day > last) continue;
       const family = performanceStatusFamily(p.status);
       if (family === 'confirmed') confirmed++;
-      else if (family === 'hold') holds++;
+      // A PROPOSAL IS AN OPTION ON PAPER: every drawing gives it the grain and
+      // the `?` of a hold, and the agenda's week and the board already counted
+      // it so. The census was the one that left it out (revisión, 2026-10-18).
+      else if (family === 'hold' || family === 'proposed') holds++;
     }
     let conflictCount = 0;
     for (const c of conflicts) {

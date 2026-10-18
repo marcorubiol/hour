@@ -154,7 +154,8 @@ export function cellMark(rows: SeasonCellIn[]): CellMark {
   let mark: CellMark = null;
   for (const r of rows) {
     if (r.kind === 'perf' && r.family === 'confirmed') return 'firm';
-    if (r.kind === 'perf' && r.family === 'hold') mark = 'option';
+    // A proposal is drawn as an option everywhere else (grain, `?`): here too.
+    if (r.kind === 'perf' && (r.family === 'hold' || r.family === 'proposed')) mark = 'option';
     else if (r.kind === 'date' && mark === null) mark = 'date';
   }
   return mark;

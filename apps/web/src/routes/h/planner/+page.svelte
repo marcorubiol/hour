@@ -1767,7 +1767,9 @@
         ];
         const gigs = perfs
           .map((p) => ({ p, firm: performanceStatusFamily(p.status) === 'confirmed' }))
-          .filter(({ p, firm }) => firm || isHoldStatus(p.status))
+          // Released is gone from a horizon forward; everything else is drawn,
+          // proposals included, in the voice of an option.
+          .filter(({ p }) => performanceStatusFamily(p.status) !== 'released')
           .sort((a, b) => Number(b.firm) - Number(a.firm));
         const travel = dates.find((d) => d.kind === 'travel_day');
         const other = dates.find((d) => d.kind !== 'travel_day');
