@@ -17,6 +17,7 @@
   import { t, type Locale } from '$lib/i18n';
   import { dayMoments, type SlipContext, type SlipKind } from '$lib/month-events';
   import { setCommitment } from '$lib/commitments';
+  import { plannerDayHref } from '$lib/planner';
   import type { CommitmentState } from '$lib/people';
   import type { PulseNext } from '$lib/pulse';
   import { pulseSlip } from '$lib/pulse-feeds.svelte';
@@ -122,9 +123,14 @@
       <span class="card__dash">—</span>
       <span class="card__eye">—</span>
     </div>
-  {:else if !next || !slip || daysTo(next.day) > 14}
+  {:else if !next || !slip}
+    <p class="dband__empty">{t('desk.next_empty', locale)}</p>
+  {:else if daysTo(next.day) > 14}
+    <!-- Far away is still «the next thing»: the band says which, as the rail does. -->
     <p class="dband__empty">
-      {t('desk.next_empty', locale)} · <a href="/h/planner">{t('lens.planner', locale)} →</a>
+      <a href={slip.href ?? plannerDayHref('day', next.day)}
+        >{t('desk.next_far', locale, { day: localeDayMonth(next.day, locale), place: slip.city || slip.name })} →</a
+      >
     </p>
   {:else}
     {#if thenBefore}{@render thenLine()}{/if}

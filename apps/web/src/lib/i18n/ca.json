@@ -2056,6 +2056,7 @@
   "desk.next_tomorrow": "demà",
   "desk.next_in_days": "d'aquí a {n} dies",
   "desk.next_empty": "Res en les dues properes setmanes",
+  "desk.next_far": "Res en dues setmanes · el següent, {day} a {place}",
   "desk.next_then": "Després",
   "desk.next_before": "Abans",
   "desk.next_ask": "Hi vas?",
