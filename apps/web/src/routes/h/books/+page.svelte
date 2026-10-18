@@ -211,7 +211,9 @@
   function boloMode(b: MoneyBolo): InvoicingMode {
     return workspaceModeById.get(b.project?.workspace_id ?? '') ?? 'legal';
   }
-  let anyDocMode = $derived(bolos.some((b) => boloMode(b) !== 'off'));
+  // From the spaces, not the bolos: they answer first, so the Documentos tab
+  // is there from the start instead of appearing once the feed lands.
+  let anyDocMode = $derived(($workspacesQuery.data?.items ?? []).some((w) => (w.invoicing_mode ?? 'legal') !== 'off'));
 
   // Live "today" so aging re-derives across midnight on a dashboard left open.
   let nowMs = $state(Date.now());
@@ -903,7 +905,7 @@
           </div>
         </div>
       {:else}
-        <div class="radar">
+        <div class="radar" aria-busy={loading}>
           <!-- 2 · Pide atención -->
           <section class="att" aria-label={t('books.attention', locale)}>
             <header class="block-head">
@@ -1313,6 +1315,8 @@
     .fig__bar { display: flex; gap: 2px; block-size: 6px; border-radius: var(--radius-circle); background: var(--bg-light); overflow: hidden; margin-block: var(--space-2xs); }
 
     /* ── 2 + 3 · the radar ── */
+    /* While the feeds load the radar keeps roughly its height, so the ledger does not jump down. */
+    .radar[aria-busy='true'] { min-block-size: 14rem; }
     .radar { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: var(--space-l); align-items: start; }
     .radar .block-head { margin-block-end: var(--space-xs); }
     .radar__more { appearance: none; border: 0; background: none; padding: 0; font: inherit; font-size: var(--text-xs); color: var(--text-muted); cursor: pointer; }
