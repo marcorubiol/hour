@@ -797,9 +797,14 @@
                 <span class="fig__label">{t('books.fig_season', locale)} {seasonLabel(season)}</span>
                 <span class="fig__num">{fmtMoneyCompact(pos.collected)}<span class="fig__of">{t('books.fig_of_sold', locale, { amount: fmtMoneyCompact(pos.sold) })}</span></span>
                 <span class="fig__bar" role="img" aria-label={t('books.fig_bar_aria', locale, { collected: fmtMoney(pos.collected), invoiced: fmtMoney(pos.invoicedOpen), uninvoiced: fmtMoney(pos.uninvoiced) })}>
-                  <span class="fig__seg fig__seg--coll" style={`inline-size:${pct(pos.collected, pos.sold)}%`}></span>
-                  <span class="fig__seg fig__seg--inv" style={`inline-size:${pct(pos.invoicedOpen, pos.sold)}%`}></span>
-                  <span class="fig__seg fig__seg--un" style={`inline-size:${pct(pos.uninvoiced, pos.sold)}%`}></span>
+                  {#each [['collected', pos.collected], ['invoiced', pos.invoicedOpen], ['open', pos.uninvoiced]] as [tone, value] (tone)}
+                    {#if Number(value) > 0}<span class="mbar__seg" data-tone={tone} style={`inline-size:${pct(Number(value), pos.sold)}%`}></span>{/if}
+                  {/each}
+                </span>
+                <span class="mkeys" aria-hidden="true">
+                  <span><i class="mkey" data-tone="collected"></i>{t('books.key_collected', locale)}</span>
+                  <span><i class="mkey" data-tone="invoiced"></i>{t('books.key_invoiced', locale)}</span>
+                  <span><i class="mkey" data-tone="open"></i>{t('books.key_open', locale)}</span>
                 </span>
                 {#if pos.holds > 0}
                   <span class="fig__sub">{t('books.fig_holds', locale, { amount: fmtMoneyCompact(pos.holds), n: pos.holdsCount })}</span>
@@ -871,8 +876,8 @@
                     <li class="inflow__row">
                       <span class="inflow__month">{monthLabel(m.month)}</span>
                       <span class="inflow__bar" aria-hidden="true">
-                        <span class="inflow__seg inflow__seg--exp" style={`inline-size:${pct(m.expected, max)}%`}></span>
-                        <span class="inflow__seg inflow__seg--con" style={`inline-size:${pct(m.contracted, max)}%`}></span>
+                        {#if m.expected > 0}<span class="mbar__seg" data-tone="invoiced" style={`inline-size:${pct(m.expected, max)}%`}></span>{/if}
+                        {#if m.contracted > 0}<span class="mbar__seg" data-tone="open" style={`inline-size:${pct(m.contracted, max)}%`}></span>{/if}
                       </span>
                       <span class="inflow__amt">{fmtMoneyCompact(m.expected)}{#if m.contracted > 0}<span class="inflow__con">{` + ${fmtMoneyCompact(m.contracted)}`}</span>{/if}</span>
                     </li>
@@ -882,9 +887,9 @@
                   <p class="mny__note">{t(f.undated === 1 ? 'books.inflow_undated_one' : 'books.inflow_undated_many', locale, { n: f.undated })}</p>
                 {/if}
               {/each}
-              <p class="inflow__legend">
-                <span><i class="inflow__key inflow__key--exp"></i>{t('books.inflow_expected', locale)}</span>
-                <span><i class="inflow__key inflow__key--con"></i>{t('books.inflow_contracted', locale)}</span>
+              <p class="mkeys">
+                <span><i class="mkey" data-tone="invoiced"></i>{t('books.inflow_expected', locale)}</span>
+                <span><i class="mkey" data-tone="open"></i>{t('books.inflow_contracted', locale)}</span>
               </p>
             {/if}
           </section>
@@ -1146,7 +1151,25 @@
 
 <style>
   @layer components {
-    .mny { display: flex; flex-direction: column; gap: var(--space-l); }
+    /* The three states of the money, one grammar for both bars (season and
+       «lo que entra»): collected, invoiced and not collected, contracted and
+       not invoiced. Separated by lightness, not by a mix that fades into the
+       track: in light they step up from the green toward the track, in dark
+       they step down, because the mixes go toward --bg-light either way. */
+    .mny {
+      display: flex; flex-direction: column; gap: var(--space-l);
+      --money-collected: var(--success);
+      --money-invoiced: color-mix(in oklch, var(--success) 60%, var(--bg-light));
+      --money-open: color-mix(in oklch, var(--text-color) 16%, var(--bg-light));
+    }
+    .mbar__seg, .mkey { display: block; background: var(--mbar-tone); }
+    .mbar__seg { block-size: 100%; }
+    [data-tone='collected'] { --mbar-tone: var(--money-collected); }
+    [data-tone='invoiced'] { --mbar-tone: var(--money-invoiced); }
+    [data-tone='open'] { --mbar-tone: var(--money-open); }
+    .mkeys { display: flex; flex-wrap: wrap; gap: var(--space-2xs) var(--space-m); font-size: var(--text-xs); color: var(--text-muted); }
+    .mkeys span { display: inline-flex; align-items: center; gap: var(--space-2xs); }
+    .mkey { inline-size: 0.75rem; block-size: 0.5rem; border-radius: 2px; }
     .mny__actions { display: flex; justify-content: flex-end; margin-block-end: calc(-1 * var(--space-m)); }
     .mny__season { appearance: none; border: 0; background: none; padding: 0; font: inherit; cursor: pointer; }
     .mny__state { font-size: var(--text-s); color: var(--text-faint); }
@@ -1173,11 +1196,7 @@
     .fig__cur, .fig__of { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-muted); letter-spacing: 0.04em; }
     .fig__sub { font-size: var(--text-xs); color: var(--text-muted); }
     .fig__danger { color: var(--danger); }
-    .fig__bar { display: flex; block-size: 6px; border-radius: var(--radius-circle); background: var(--bg-light); overflow: hidden; margin-block: var(--space-2xs); }
-    .fig__seg { display: block; block-size: 100%; }
-    .fig__seg--coll { background: var(--success); }
-    .fig__seg--inv { background: color-mix(in oklch, var(--success) 45%, var(--bg-light)); }
-    .fig__seg--un { background: color-mix(in oklch, var(--text-faint) 35%, var(--bg-light)); }
+    .fig__bar { display: flex; gap: 2px; block-size: 6px; border-radius: var(--radius-circle); background: var(--bg-light); overflow: hidden; margin-block: var(--space-2xs); }
 
     /* ── 2 + 3 · the radar ── */
     .radar { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: var(--space-l); align-items: start; }
@@ -1197,15 +1216,9 @@
     .inflow__list { display: flex; flex-direction: column; gap: var(--space-xs); padding-block: var(--space-2xs); }
     .inflow__row { display: grid; grid-template-columns: 3.5ch minmax(0, 1fr) auto; gap: var(--space-s); align-items: center; }
     .inflow__month { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-muted); text-transform: lowercase; }
-    .inflow__bar { display: flex; block-size: 10px; border-radius: var(--radius-s); background: var(--bg-light); overflow: hidden; }
-    .inflow__seg { display: block; block-size: 100%; }
-    .inflow__seg--exp, .inflow__key--exp { background: var(--success); }
-    .inflow__seg--con, .inflow__key--con { background: color-mix(in oklch, var(--success) 30%, var(--bg-light)); }
+    .inflow__bar { display: flex; gap: 2px; block-size: 10px; border-radius: var(--radius-s); background: var(--bg-light); overflow: hidden; }
     .inflow__amt { font-family: var(--font-mono); font-size: var(--text-xs); font-variant-numeric: tabular-nums; color: var(--text-color); white-space: nowrap; }
     .inflow__con { color: var(--text-faint); }
-    .inflow__legend { display: flex; flex-wrap: wrap; gap: var(--space-m); font-size: var(--text-xs); color: var(--text-faint); margin-block-start: var(--space-xs); }
-    .inflow__legend span { display: inline-flex; align-items: center; gap: var(--space-2xs); }
-    .inflow__key { display: inline-block; inline-size: 0.75rem; block-size: 0.5rem; border-radius: 2px; }
 
     /* ── 4 · the ledger ── */
     .ledger { display: flex; flex-direction: column; gap: var(--space-s); scroll-margin-block-start: var(--space-l); }
