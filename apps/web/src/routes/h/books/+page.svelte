@@ -844,7 +844,8 @@
               </div>
               <button type="button" class="fig" data-fig="season" onclick={() => showLedger('all')}>
                 <span class="fig__label">{t('books.fig_season', locale)} {seasonLabel(season)}</span>
-                <span class="fig__num">{fmtMoneyCompact(pos.collected)}<span class="fig__of">{t('books.fig_of_sold', locale, { amount: fmtMoneyCompact(pos.sold) })}</span></span>
+                <span class="fig__num">{fmtMoneyCompact(pos.collected)}<span class="fig__cur">{pos.currency}</span></span>
+                <span class="fig__sub">{t('books.fig_collected_of_sold', locale, { amount: fmtMoneyCompact(pos.sold) })}</span>
                 <span class="fig__bar" role="img" aria-label={t('books.fig_bar_aria', locale, { collected: fmtMoney(pos.collected), invoiced: fmtMoney(pos.invoicedOpen), uninvoiced: fmtMoney(pos.uninvoiced) })}>
                   {#each [['collected', pos.collected], ['invoiced', pos.invoicedOpen], ['open', pos.uninvoiced]] as [tone, value] (tone)}
                     {#if Number(value) > 0}<span class="mbar__seg" data-tone={tone} style={`inline-size:${pct(Number(value), pos.sold)}%`}></span>{/if}
@@ -920,6 +921,9 @@
             {:else if loading}
               <p class="mny__state">{t('desk.loading', locale)}</p>
             {:else}
+              {#each position.filter((p) => p.overdue > 0) as p (p.currency)}
+                <p class="mny__note inflow__overdue">{t('books.inflow_plus_overdue', locale, { amount: fmtMoneyCompact(p.overdue), currency: p.currency })}</p>
+              {/each}
               {#each inflow as f (f.currency)}
                 {@const max = Math.max(1, ...f.months.map((m) => m.expected + m.contracted))}
                 {#if inflow.length > 1}<p class="inflow__cur">{f.currency}</p>{/if}
@@ -1266,7 +1270,7 @@
     .fig__label { font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-faint); }
     .fig__num { font-family: var(--font-display); font-size: var(--text-xl); line-height: 1.1; color: var(--text-color); font-variant-numeric: tabular-nums; display: flex; align-items: baseline; gap: var(--space-2xs); flex-wrap: wrap; }
     .fig__num--skel { color: transparent; background: var(--bg-light); border-radius: var(--radius-s); inline-size: 6ch; }
-    .fig__cur, .fig__of { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-muted); letter-spacing: 0.04em; }
+    .fig__cur { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-muted); letter-spacing: 0.04em; }
     .fig__sub { font-size: var(--text-xs); color: var(--text-muted); }
     .fig__danger { color: var(--danger); }
     .fig__bar { display: flex; gap: 2px; block-size: 6px; border-radius: var(--radius-circle); background: var(--bg-light); overflow: hidden; margin-block: var(--space-2xs); }
@@ -1288,6 +1292,7 @@
     .att__why { inline-size: 100%; font-size: var(--text-xs); color: var(--text-muted); }
     .att__row[data-kind='overdue'] .att__why { color: var(--danger); }
     .att__amt { font-family: var(--font-mono); font-size: var(--text-s); font-variant-numeric: tabular-nums; color: var(--text-color); white-space: nowrap; text-align: end; }
+    .inflow__overdue { color: var(--danger); }
     .inflow__cur { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-muted); }
     .inflow__list + .inflow__cur, .mny__note + .inflow__cur { margin-block-start: var(--space-s); padding-block-start: var(--space-xs); border-block-start: 1px solid var(--border-color-light); }
     /* One grid per currency, rows as subgrids: every bar has the same length,
