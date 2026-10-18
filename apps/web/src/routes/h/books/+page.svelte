@@ -791,24 +791,32 @@
     {#snippet title()}<LensTitle text={t('lens.money', locale)} />{/snippet}
     {#snippet sub()}
       {#if !noAccess}
-        {#if seasons.length > 1}
-          <!-- One way to write a season, the «26/27» of the figure: «sept 26» read as a day. -->
-          <span class="mny__seasons" role="group" aria-label={t('books.season_pick', locale)}>
-            {t('books.season_word', locale)}
-            {#each seasons as s (s)}
-              <button
-                type="button"
-                class="lenshead__frag mny__season"
-                aria-current={s === season ? 'true' : undefined}
-                title={seasonSpan(s)}
-                onclick={() => (pickedSeason = s === currentSeason ? null : s)}
-              >{seasonLabel(s)}</button>
-            {/each}
+        <!-- One child, so the sub line's «·» separators stay out of it (as Desk's «+ Tarea»). -->
+        <span class="mny__subrow">
+          <span class="mny__subleft">
+            {#if seasons.length > 1}
+              <!-- One way to write a season, the «26/27» of the figure: «sept 26» read as a day. -->
+              <span class="mny__seasons" role="group" aria-label={t('books.season_pick', locale)}>
+                {t('books.season_word', locale)}
+                {#each seasons as s (s)}
+                  <button
+                    type="button"
+                    class="lenshead__frag mny__season"
+                    aria-current={s === season ? 'true' : undefined}
+                    title={seasonSpan(s)}
+                    onclick={() => (pickedSeason = s === currentSeason ? null : s)}
+                  >{seasonLabel(s)}</button>
+                {/each}
+              </span>
+            {:else}
+              <span>{t('books.season_sub', locale, { season: seasonLabel(season) })}</span>
+            {/if}
+            {#if obraNames.length === 1}<span>· {obraNames[0]}</span>{/if}
           </span>
-        {:else}
-          <span>{t('books.season_sub', locale, { season: seasonLabel(season) })}</span>
-        {/if}
-        {#if obraNames.length === 1}<span>{obraNames[0]}</span>{/if}
+          {#if !seasonEmpty}
+            <Button size="xs" variant="outline" onclick={openDeal} disabled={projectIndex.length === 0}>{t('books.new_deal', locale)}</Button>
+          {/if}
+        </span>
       {/if}
     {/snippet}
   </LensHeader>
@@ -816,9 +824,6 @@
   {#if noAccess}
     <p class="mny__state" data-testid="money-no-access">{t('books.no_access', locale)}</p>
   {:else}
-    <div class="mny__actions">
-      <Button size="xs" variant="outline" onclick={openDeal} disabled={projectIndex.length === 0}>{t('books.new_deal', locale)}</Button>
-    </div>
 
     {#if bolosError}
       {@render failed('books.err_bolos', () => $bolosQuery.refetch())}
@@ -901,7 +906,7 @@
         <div class="radar">
           <!-- 2 · Pide atención -->
           <section class="att" aria-label={t('books.attention', locale)}>
-            <header class="radar__head">
+            <header class="block-head">
               <p class="eyebrow">{t('books.attention', locale)}{#if attention.length > 0}&nbsp;· {attention.length}{/if}</p>
               {#if attention.length > ATTENTION_VISIBLE}
                 <button type="button" class="radar__more" onclick={() => (attentionAll = !attentionAll)}>
@@ -936,7 +941,7 @@
 
           <!-- 3 · Lo que entra -->
           <section class="inflow" aria-label={t('books.inflow', locale)}>
-            <header class="radar__head"><p class="eyebrow">{t('books.inflow', locale)}</p></header>
+            <header class="block-head"><p class="eyebrow">{t('books.inflow', locale)}</p></header>
             {#if invoicesError}
               {@render failed('books.err_invoices', () => $invoicesQuery.refetch())}
             {:else if loading}
@@ -1000,7 +1005,9 @@
           {#if loading}
             <p class="mny__state">{t('desk.loading', locale)}</p>
           {:else if ledgerRows.length === 0}
-            <p class="mny__state">{t(filter === 'all' ? 'books.ledger_empty' : 'books.ledger_empty_filter', locale)}</p>
+            {#if !(seasonEmpty && filter === 'all')}
+              <p class="mny__state">{t(filter === 'all' ? 'books.ledger_empty' : 'books.ledger_empty_filter', locale)}</p>
+            {/if}
           {:else}
             <table class="book">
               <thead>
@@ -1267,7 +1274,8 @@
     .mkeys { display: flex; flex-wrap: wrap; gap: var(--space-2xs) var(--space-m); font-size: var(--text-xs); color: var(--text-muted); }
     .mkeys span { display: inline-flex; align-items: center; gap: var(--space-2xs); }
     .mkey { inline-size: 0.75rem; block-size: 0.5rem; border-radius: 2px; }
-    .mny__actions { display: flex; justify-content: flex-end; margin-block-end: calc(-1 * var(--space-m)); }
+    .mny__subrow { display: flex; align-items: center; justify-content: space-between; gap: var(--space-m); inline-size: 100%; }
+    .mny__subleft { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-xs) var(--space-s); }
     .mny__seasons { display: inline-flex; gap: var(--space-xs); align-items: baseline; }
     .mny__season { appearance: none; border: 0; background: none; padding: 0; font: inherit; cursor: pointer; text-underline-offset: 0.25em; }
     .mny__season:hover { color: var(--text-color); }
@@ -1302,7 +1310,7 @@
 
     /* ── 2 + 3 · the radar ── */
     .radar { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: var(--space-l); align-items: start; }
-    .radar__head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-m); padding-block-end: var(--space-xs); border-block-end: 1px solid var(--border-color-light); margin-block-end: var(--space-xs); }
+    .radar .block-head { margin-block-end: var(--space-xs); }
     .radar__more { appearance: none; border: 0; background: none; padding: 0; font: inherit; font-size: var(--text-xs); color: var(--text-muted); cursor: pointer; }
     .radar__more:hover { color: var(--text-color); }
     /* One grid for the whole list (rows are subgrids): amounts and buttons
