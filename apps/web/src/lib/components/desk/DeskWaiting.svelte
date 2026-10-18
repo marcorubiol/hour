@@ -17,6 +17,8 @@
     waiting: Waiting;
     /** The viewer's day (YYYY-MM-DD). */
     today: string;
+    /** Calm keeps overdue and today: what it folds is not offered back here. */
+    calm?: boolean;
     feed: DeskBucket[];
     later: { count: number; from: string; until: string } | null;
     loading: boolean;
@@ -37,6 +39,7 @@
   let {
     waiting,
     today,
+    calm = false,
     feed,
     later,
     loading,
@@ -168,7 +171,7 @@
 <section class="dband waits" aria-labelledby="desk-waits-h" aria-busy={loading}>
   <h2 class="dband__h" id="desk-waits-h">
     {t('desk.band_waiting', locale)}
-    {#if !loading && !errored && waiting.total > waiting.rows.length && !all}
+    {#if !loading && !errored && waiting.total > waiting.rows.length && !all && !calm}
       <span class="dband__count">{t('desk.waiting_count', locale, { shown: waiting.rows.length, total: waiting.total })}</span>
     {/if}
   </h2>
@@ -214,14 +217,14 @@
       <p class="caughtup__l">{t('desk.caughtup_l', locale)}</p>
       <p class="caughtup__s">{t('desk.caughtup_s', locale)}</p>
     </div>
-    {#if feedCount > waiting.rows.length}
+    {#if feedCount > waiting.rows.length && !calm}
       <button type="button" class="more" onclick={() => (all = true)}>{t('desk.see_all', locale)} →</button>
     {/if}
   {:else}
     <ul class="list">
       {#each waiting.rows as item (item.id)}{@render row(item)}{/each}
     </ul>
-    {#if feedCount > waiting.rows.length}
+    {#if feedCount > waiting.rows.length && !calm}
       <button type="button" class="more" onclick={() => (all = true)}>{t('desk.see_all', locale)} →</button>
     {/if}
   {/if}

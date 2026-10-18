@@ -659,6 +659,7 @@
         <DeskWaiting
           {waiting}
           {today}
+          calm={calm.on}
           {feed}
           {later}
           loading={waitingLoading}
