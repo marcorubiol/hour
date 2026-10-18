@@ -385,7 +385,7 @@
       : null,
   );
   let convFig = $derived(
-    overview ? { holds: overview.season.counts.hold, live: overview.total, due: overview.due.count } : null,
+    overview ? { holds: overview.season.counts.hold, live: overview.live, due: overview.due.count } : null,
   );
   let moneyFig = $derived.by(() => {
     if (!$bolosQuery.isSuccess || !$invoicesQuery.isSuccess) return null;
