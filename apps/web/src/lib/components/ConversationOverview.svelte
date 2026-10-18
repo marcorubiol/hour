@@ -579,8 +579,11 @@
       font-weight: 500;
       color: var(--text-color);
     }
+    /* «Tarde» (a week waiting): the warning ink, not -ultra-dark, which next
+       to the body ink read as the same near-black in light (diseño M4). The
+       same step the mailout figures use for a bounce. */
     .row--late .row__when strong {
-      color: var(--warning-ultra-dark);
+      color: var(--warning-dark);
     }
     .rows__sep {
       padding-block: var(--space-xs) 0;
