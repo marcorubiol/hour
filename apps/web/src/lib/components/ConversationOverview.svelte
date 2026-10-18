@@ -262,6 +262,30 @@
           </ol>
         {/if}
       </section>
+
+      {#if data.team.count > 0}
+        <section class="block block--team" aria-labelledby="ov-team" data-testid="block-team">
+          <div class="block-head">
+            <h2 class="eyebrow eyebrow--sub" id="ov-team">{t('overview.team', locale)}&nbsp;· {t('overview.team_new', locale, { n: data.team.count })}</h2>
+            <a class="block__more" href="/h/conversations?view=threads">{t('conversations.view_what', locale)}</a>
+          </div>
+          <ol class="rows">
+            {#each data.team.threads as th (th.thread_id)}
+              {@const id = th.last_message.author_id}
+              <li>
+                <ThreadFeedRow
+                  {th}
+                  href={feedHref(th, workspaceSlugById.get(th.workspace_id)) ?? null}
+                  author={id && id === data.team.me ? t('threads.you', locale) : (id && data.team.authors[id]) || t('threads.someone', locale)}
+                  dense
+                  {locale}
+                  {tz}
+                />
+              </li>
+            {/each}
+          </ol>
+        </section>
+      {/if}
     </div>
 
     <div class="board__col">
@@ -389,29 +413,6 @@
         </section>
       {/if}
 
-      {#if data.team.count > 0}
-        <section class="block block--team" aria-labelledby="ov-team" data-testid="block-team">
-          <div class="block-head">
-            <h2 class="eyebrow eyebrow--sub" id="ov-team">{t('overview.team', locale)}&nbsp;· {t('overview.team_new', locale, { n: data.team.count })}</h2>
-            <a class="block__more" href="/h/conversations?view=threads">{t('conversations.view_what', locale)}</a>
-          </div>
-          <ol class="rows">
-            {#each data.team.threads as th (th.thread_id)}
-              {@const id = th.last_message.author_id}
-              <li>
-                <ThreadFeedRow
-                  {th}
-                  href={feedHref(th, workspaceSlugById.get(th.workspace_id)) ?? null}
-                  author={id && id === data.team.me ? t('threads.you', locale) : (id && data.team.authors[id]) || t('threads.someone', locale)}
-                  dense
-                  {locale}
-                  {tz}
-                />
-              </li>
-            {/each}
-          </ol>
-        </section>
-      {/if}
     </div>
   </div>
 {/if}
