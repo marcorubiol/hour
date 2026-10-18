@@ -1915,6 +1915,7 @@
           k === 'time' ? 'planner.season_miss_time' : k === 'cast' ? 'planner.season_miss_cast' : readinessLabelKey(k),
         ),
         travelGuess: v.travelGuess,
+        soon: day <= addDaysIso(todayIso, 13),
       });
     }
     return out;

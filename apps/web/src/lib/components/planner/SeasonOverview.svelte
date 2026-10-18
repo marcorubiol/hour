@@ -52,6 +52,8 @@
     /** i18n keys of what is missing (facts). */
     missing: string[];
     travelGuess: boolean;
+    /** Within the next two weeks: the only rows whose gaps take the amber. */
+    soon: boolean;
   };
 
   export type SeasonGapVM = {
@@ -313,7 +315,7 @@
           <p class="blk__empty">{t('planner.season_none_unclosed', locale, { n: UNCLOSED_WEEKS })}</p>
         {:else}
           {#each unclosed as u (u.id)}
-            <a class="row" href={u.href ?? undefined} data-perf={u.id}>
+            <a class="row" class:row--soon={u.soon} href={u.href ?? undefined} data-perf={u.id}>
               <span class="row__when">{day(u.day)}</span>
               <span class="row__what">{u.venue}{#if u.city}<small>{u.city}</small>{/if}</span>
               <span class="row__miss">
@@ -729,14 +731,22 @@
       gap: 4px;
       flex-wrap: wrap;
     }
+    /* MUTED BY DEFAULT (diseño B8): «hotel», «técnica» on every row in
+       amber made the least urgent thing the loudest on the page. The amber is
+       kept for what falls in the next two weeks, where a missing hotel is a
+       call to make today. */
     .miss {
       font-family: var(--font-mono);
       font-size: 9px;
       letter-spacing: 0.04em;
-      color: var(--warning-dark);
-      border: 1px solid color-mix(in oklch, var(--warning) 45%, transparent);
+      color: var(--text-muted);
+      border: 1px solid color-mix(in oklch, var(--text-color) 18%, transparent);
       border-radius: 2px;
       padding: 0 4px;
+    }
+    .row--soon .miss:not(.miss--guess) {
+      color: var(--warning-dark);
+      border-color: color-mix(in oklch, var(--warning) 45%, transparent);
     }
     .miss--guess {
       color: var(--text-muted);
