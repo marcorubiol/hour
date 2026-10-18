@@ -49,6 +49,10 @@ export interface PlannerEngineInputs {
   visibleBlackouts: () => AvailabilityItem[];
   /** The window the census counts (the month, or the season horizon). */
   window: () => EngineWindow;
+  /** The company's own firm closures in scope (no person, not tentative):
+      a night the whole company is shut is not for sale. Not calm-filtered:
+      calm hides bands, it does not open the company. */
+  companyClosures?: () => AvailabilityItem[];
   /** Decisions-window rows, already scope-filtered. */
   decisionPerfs: () => DecisionPerfItem[];
   viewerTz: string;
@@ -148,7 +152,13 @@ export function createPlannerEngine(inputs: PlannerEngineInputs) {
     return occupied;
   });
 
-  const tourDays = $derived(daysCoveredBy(aways));
+  /** Nights nobody can sell: on tour, or the company closed for sure. */
+  const tourDays = $derived(
+    new Set([
+      ...daysCoveredBy(aways),
+      ...daysCoveredBy((inputs.companyClosures?.() ?? []).map((b) => ({ from: b.starts_on, to: b.ends_on }))),
+    ]),
+  );
   /** The census's rule for one night: from today, nothing of the company's
       own on it, not on tour. The agenda's weekly tally asks this too. */
   function isFreeNight(day: string): boolean {
@@ -266,6 +276,10 @@ export function createPlannerEngine(inputs: PlannerEngineInputs) {
     },
     get stats() {
       return stats;
+    },
+    /** Tour nights and firm company closures — what the gaps skip too. */
+    get unsellableDays() {
+      return tourDays;
     },
     isFreeNight,
     get decisionPerfById() {

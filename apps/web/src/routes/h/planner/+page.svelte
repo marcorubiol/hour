@@ -716,6 +716,13 @@
         ? { first: season.from, last: season.to, days: season.days }
         : { first: monthFirst, last: monthLast, days: monthDays },
     decisionPerfs: () => decisionPerfs,
+    companyClosures: () =>
+      allBlackouts.filter(
+        (b) =>
+          b.person_id === null &&
+          b.certainty !== 'tentative' &&
+          (scopeWorkspaceIds === null || scopeWorkspaceIds.has(b.workspace_id)),
+      ),
     viewerTz,
     todayIso,
   });
@@ -1900,7 +1907,10 @@
     return out;
   });
   let seasonGaps = $derived(
-    view === 'overview' ? gapWindows(season.days, engine.occupiedDays, seasonTourDays) : [],
+    // A hole to sell skips the company's firm closures as it skips a tour.
+    view === 'overview'
+      ? gapWindows(season.days, engine.occupiedDays, new Set([...seasonTourDays, ...engine.unsellableDays]))
+      : [],
   );
   let seasonAway = $derived.by((): SeasonAwayVM[] => {
     if (view !== 'overview') return [];
