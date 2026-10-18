@@ -182,6 +182,18 @@
     ).next;
     return second && second.day <= addDaysIso(first.day, 2) ? second : null;
   });
+  /**
+   * The eve of a show that comes with a trip: the card is the show's day (its
+   * hours, its road sheet) and the trip that leads to it is the line before.
+   * Otherwise the card is the next thing and the line what follows.
+   */
+  let lead = $derived.by(() => {
+    const a = pulse.next;
+    const b = then;
+    if (a && b && a.day === b.day && a.ref.of !== 'performance' && b.ref.of === 'performance')
+      return { card: b, line: a, before: true };
+    return { card: a, line: b, before: false };
+  });
   const kindLabel = (kind: SlipKind) => t(`planner.kind_${kind}`, locale);
   let slipCtx = $derived(pulseSlipContext(feeds.workspaces, viewerTz, kindLabel));
 
@@ -290,7 +302,7 @@
       { performances: scopedPerfs, dates: scopedDates, axis: feeds.axis, viewerTz },
       today,
       GOING_DAYS,
-      new Set(pulse.next ? [pulse.next.ref.id] : []),
+      new Set(lead.card ? [lead.card.ref.id] : []),
     ).map((a) => {
       const slip =
         a.of === 'performance'
@@ -545,8 +557,9 @@
     <div class="desk__col">
       <div class="slot slot--next">
         <DeskNext
-          next={pulse.next}
-          {then}
+          next={lead.card}
+          then={lead.line}
+          thenBefore={lead.before}
           settled={feeds.settled}
           errored={feeds.errored}
           {today}

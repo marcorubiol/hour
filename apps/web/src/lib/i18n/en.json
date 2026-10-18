@@ -2059,6 +2059,7 @@
   "desk.next_in_days": "in {n} days",
   "desk.next_empty": "Nothing in the next two weeks",
   "desk.next_then": "Then",
+  "desk.next_before": "Before",
   "desk.next_ask": "Going?",
   "desk.next_error": "Could not load what comes next.",
   "desk.waiting_count": "{shown} of {total}",

@@ -2050,6 +2050,7 @@
   "desk.next_in_days": "d'aquí a {n} dies",
   "desk.next_empty": "Res en les dues properes setmanes",
   "desk.next_then": "Després",
+  "desk.next_before": "Abans",
   "desk.next_ask": "Hi vas?",
   "desk.next_error": "No s'ha pogut carregar el següent.",
   "desk.waiting_count": "{shown} de {total}",

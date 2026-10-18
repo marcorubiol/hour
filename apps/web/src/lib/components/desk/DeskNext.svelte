@@ -26,6 +26,8 @@
     next: PulseNext | null;
     /** A second thing within 48 h of the first, as one line. */
     then: PulseNext | null;
+    /** The line comes before the card, the same day (the trip to the show). */
+    thenBefore?: boolean;
     settled: boolean;
     errored: boolean;
     today: string;
@@ -35,7 +37,7 @@
     locale: Locale;
   }
 
-  let { next, then, settled, errored, today, viewerTz, personId, slipCtx, locale }: Props = $props();
+  let { next, then, thenBefore = false, settled, errored, today, viewerTz, personId, slipCtx, locale }: Props = $props();
 
   const kindLabel = (kind: SlipKind) => t(`planner.kind_${kind}`, locale);
   const queryClient = useQueryClient();
@@ -82,6 +84,17 @@
   }
 </script>
 
+{#snippet thenLine()}
+  {#if then && thenSlip}
+    {@const when = thenBefore ? (then.at ? hour(then.at, then.ref.tz) : '') : dateWords(then.day)}
+    {@const what = [when, thenSlip.name, thenSlip.city].filter(Boolean).join(' · ')}
+    <p class="then">
+      <span class="then__k">{t(thenBefore ? 'desk.next_before' : 'desk.next_then', locale)}</span>
+      {#if thenSlip.href}<a href={thenSlip.href}>{what}</a>{:else}<span>{what}</span>{/if}
+    </p>
+  {/if}
+{/snippet}
+
 <section class="dband next" aria-labelledby="desk-next-h">
   <h2 class="dband__h" id="desk-next-h">
     {t('desk.band_next', locale)}
@@ -101,6 +114,7 @@
       {t('desk.next_empty', locale)} · <a href="/h/planner">{t('lens.planner', locale)} →</a>
     </p>
   {:else}
+    {#if thenBefore}{@render thenLine()}{/if}
     <div class="card" data-testid="desk-next">
       <div class="card__eye">
         <span class="card__when">{relDay(next.day)} · {dateWords(next.day)}</span>{#if next.ref.row.project?.name}
@@ -128,14 +142,7 @@
         </div>
       {/if}
     </div>
-    {#if then && thenSlip}
-      <p class="then">
-        <span class="then__k">{t('desk.next_then', locale)}</span>
-        {#if thenSlip.href}<a href={thenSlip.href}>{dateWords(then.day)} · {thenSlip.name}{thenSlip.city ? ` · ${thenSlip.city}` : ''}</a>{:else}<span
-            >{dateWords(then.day)} · {thenSlip.name}{thenSlip.city ? ` · ${thenSlip.city}` : ''}</span
-          >{/if}
-      </p>
-    {/if}
+    {#if !thenBefore}{@render thenLine()}{/if}
   {/if}
 </section>
 
@@ -244,6 +251,10 @@
     padding-inline: var(--space-l);
     font-size: var(--text-s);
     color: var(--text-muted);
+  }
+  /* The trip before the show sits above its card. */
+  .then:has(+ .card) {
+    margin: 0 0 var(--space-s);
   }
   .then a {
     color: inherit;
