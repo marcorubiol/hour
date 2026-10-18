@@ -23,7 +23,7 @@
   import { goto } from '$app/navigation';
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
-  import { fetchJSON, mutateJSON } from '$lib/api';
+  import { ApiError, fetchJSON, mutateJSON } from '$lib/api';
   import { dayMonthYear, dayMonthYearTs } from '$lib/datetime';
   import { appLocale, t } from '$lib/i18n';
   import Button from '$lib/components/Button.svelte';
@@ -66,6 +66,9 @@
   const convQuery = createQuery(
     toStore(() => ({
       queryKey: ['conversation', workspaceSlug, slug] as const,
+      // A 404 is the answer (someone else's private one, or no Converses):
+      // retrying only keeps «Loading…» on screen (`permisos.md` § 7).
+      retry: (count: number, err: unknown) => !(err instanceof ApiError && err.status === 404) && count < 3,
       queryFn: ({ signal }: { signal: AbortSignal }) =>
         fetchJSON<{ item: Conversation }>(
           UUID.test(slug)

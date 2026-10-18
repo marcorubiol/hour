@@ -103,6 +103,9 @@
     return {
       queryKey: ['person', workspaceId, personSlug] as const,
       enabled: Boolean(personSlug && workspaceId),
+      // A 404 is the answer (a dossier of someone else's private conversation,
+      // or the directory without Converses, ADR-123): no retries.
+      retry: (count: number, err: unknown) => !(err instanceof ApiError && err.status === 404) && count < 3,
       queryFn: ({ signal }: { signal: AbortSignal }) =>
         fetchJSON<PersonFile>(
           `/api/persons/${encodeURIComponent(personSlug)}?workspace_id=${encodeURIComponent(workspaceId)}`,
