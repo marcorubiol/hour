@@ -11,7 +11,7 @@
 import * as v from 'valibot';
 import { addDaysIso } from './planner';
 import { Constants, type Enums } from './db-types';
-import { realIsoDate } from './datetime';
+import { localeDayMonth, localeWeekdayShort, realIsoDate } from './datetime';
 import { t, type Locale } from './i18n';
 
 export type PerformanceStatus = Enums<'performance_status'>;
@@ -119,6 +119,50 @@ export function decideBy(
   const notice = holdNoticeDays ?? HOLD_NOTICE_DEFAULT;
   if (notice === 0) return null;
   return addDaysIso(startAtIso.slice(0, 10), -notice);
+}
+
+/** Whole days from `from` to `to` (ISO days), negative when `to` is earlier. */
+function daysBetween(from: string, to: string): number {
+  return Math.round(
+    (Date.UTC(+to.slice(0, 4), +to.slice(5, 7) - 1, +to.slice(8, 10)) -
+      Date.UTC(+from.slice(0, 4), +from.slice(5, 7) - 1, +from.slice(8, 10))) /
+      86_400_000,
+  );
+}
+
+/** How far a weekday still reads as «this one coming»: six days ahead. */
+export const DEADLINE_WEEKDAY_DAYS = 6;
+
+/**
+ * A hold's deadline, said so it cannot be misread (Marco, 2026-10-18).
+ *
+ * «vence mié» was printed for a deadline three weeks out AND for one that had
+ * passed eighteen days ago: a weekday is read as the coming one. So the
+ * weekday only inside the next six days; further out, the date; today, «hoy»;
+ * and a past deadline says that it passed and how long ago.
+ *
+ * `compact` is the slip's state line (month and board cells): the verb goes
+ * except where the time has run out, and a past deadline names its date
+ * instead of counting, which would not fit a 76px cell.
+ */
+export function holdDeadlineLabel(
+  expires: string,
+  today: string,
+  locale: Locale,
+  localeTag: string,
+  compact = false,
+): string {
+  const n = daysBetween(today, expires);
+  const date = () => localeDayMonth(expires, localeTag);
+  if (n < 0) {
+    if (compact) return t('planner.deadline_past_on', locale, { day: date() });
+    return n === -1
+      ? t('planner.deadline_past_one', locale)
+      : t('planner.deadline_past', locale, { n: -n });
+  }
+  if (n === 0) return t(compact ? 'planner.deadline_today_short' : 'planner.deadline_today', locale);
+  const day = n <= DEADLINE_WEEKDAY_DAYS ? localeWeekdayShort(expires, localeTag) : date();
+  return compact ? day : t('planner.dec_row_expires', locale, { day });
 }
 
 /**

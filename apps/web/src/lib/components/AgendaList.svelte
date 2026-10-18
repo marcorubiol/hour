@@ -67,7 +67,7 @@
   import IdentityMark from '$lib/components/IdentityMark.svelte';
   import Slip from '$lib/components/planner/Slip.svelte';
   import { performanceSlip, dateSlip } from '$lib/month-events';
-  import { performanceStatusFamily } from '$lib/performance';
+  import { holdDeadlineLabel, performanceStatusFamily } from '$lib/performance';
   import { appLocale, appLocaleTag, t } from '$lib/i18n';
   import { dateStatusFamily } from '$lib/date';
 
@@ -321,7 +321,9 @@
     if (sl.cert === 'released') return releasedWord;
     if (sl.cert === 'hold' && sl.hold) {
       const rank = sl.hold.rank ? statusLabel(`hold_${sl.hold.rank}`) : statusLabel('hold');
-      return sl.hold.expires ? `${rank} · ${localeWeekdayShort(sl.hold.expires, locale)}` : rank;
+      return sl.hold.expires
+        ? `${rank} · ${holdDeadlineLabel(sl.hold.expires, todayIso, L, locale, true)}`
+        : rank;
     }
     return null;
   }

@@ -140,6 +140,7 @@
   import type { AvailabilityItem } from '$lib/availability';
   import { localeDayMonth, localeWeekdayShort, dualTime } from '$lib/datetime';
   import {
+    holdDeadlineLabel,
     isHoldStatus,
     performanceStatusFamily,
     READINESS_KEYS,
@@ -1241,7 +1242,7 @@
       const key = statusFootKey(sl.hold.rank ? `hold_${sl.hold.rank}` : 'hold');
       const rank = key ? t(key, locale) : statusWord('hold');
       if (!sl.hold.expires) return rank;
-      return `${rank} · ${localeWeekdayShort(sl.hold.expires, localeTag)}`;
+      return `${rank} · ${holdDeadlineLabel(sl.hold.expires, todayIso, locale, localeTag, true)}`;
     }
     return null;
   }
@@ -3282,7 +3283,7 @@
       isoWeekLabel={(n) => `${t('planner.week_n', locale)} ${n}`}
       moreLabel={t('planner.more_n', locale)}
       releasedLabel={t('planner.released', locale)}
-      expiresLabel={(iso) => localeWeekdayShort(iso, localeTag)}
+      expiresLabel={(iso) => holdDeadlineLabel(iso, todayIso, locale, localeTag, true)}
       awayWord={t('planner.band_away', locale)}
       tourWord={t('planner.band_tour', locale)}
       untilLabel={(day) => t('planner.band_until', locale, { day })}
