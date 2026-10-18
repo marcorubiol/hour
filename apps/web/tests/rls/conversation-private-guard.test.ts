@@ -27,8 +27,11 @@ import {
  * Deja las conversaciones borradas y el acceso del limitado como estaba. Va
  * rojo contra un origen sin `20261018110000`.
  */
-const THEIRS = { name: 'ZZZ RLS Guard Theirs', email: 'zzz-rls-guard-theirs@hour.test', org: 'ZZZ RLS Guard Sala Theirs' };
-const MINE = { name: 'ZZZ RLS Guard Mine', email: 'zzz-rls-guard-mine@hour.test', org: 'ZZZ RLS Guard Sala Mine' };
+// Un sufijo por pasada, como en directory-privacy: nombres fijos chocan (409)
+// con lo que deja una pasada cortada.
+const RUN = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+const THEIRS = { name: `ZZZ RLS Guard Theirs ${RUN}`, email: `zzz-rls-guard-theirs-${RUN}@hour.test`, org: `ZZZ RLS Guard Sala Theirs ${RUN}` };
+const MINE = { name: `ZZZ RLS Guard Mine ${RUN}`, email: `zzz-rls-guard-mine-${RUN}@hour.test`, org: `ZZZ RLS Guard Sala Mine ${RUN}` };
 
 interface ConversationRow {
   id: string;
@@ -53,6 +56,7 @@ describe.skipIf(!envReady() || !limitedEnvReady())(
     let snapshot: ProjectAccess;
     let originalSetting: boolean | undefined;
     const live: { id: string; jwt: () => string }[] = [];
+    let created = 0;
 
     async function setSetting(value: boolean) {
       const r = await pgPatch<{ new_conversations_private: boolean }>(
@@ -68,11 +72,14 @@ describe.skipIf(!envReady() || !limitedEnvReady())(
       as: string,
       who: { name: string; email: string; org?: string },
     ): Promise<ConversationRow> {
+      // Cada alta, la suya: si un test se corta, el siguiente no choca con
+      // la conversación que dejó viva (afterAll la borra).
+      const n = ++created;
       const r = await pgRpc<ConversationRow>('create_conversation', as, {
         p_project_id: projectId,
-        p_full_name: who.name,
-        p_email: who.email,
-        p_organization_name: who.org ?? null,
+        p_full_name: `${who.name} ${n}`,
+        p_email: who.email.replace('@', `-${n}@`),
+        p_organization_name: who.org ? `${who.org} ${n}` : null,
       });
       expect(r.status, r.error).toBe(200);
       const row = one(r.data)!;

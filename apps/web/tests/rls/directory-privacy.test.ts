@@ -29,14 +29,21 @@ import {
  *   alta de ADR-107) y uno del reparto aunque también sea contacto de una
  *   privada ajena.
  *
- * Fixture: `playwright`, proyecto `zzz-e2e-collab`, personas `zzz-rls-dir-*`.
+ * No asume el espacio vacío: un dossier sin conversaciones es del equipo y lo ve
+ * cualquiera (§ 1), así que solo mira lo que crea cada pasada.
+ *
+ * Fixture: `playwright`, proyecto `zzz-e2e-collab`, personas `zzz-rls-dir-*-<pasada>`.
  * Deja las conversaciones borradas y el acceso del limitado como estaba. Va
  * rojo contra un origen sin `20261018100000`.
  */
-const SHARED = { name: 'ZZZ RLS Dir Shared', email: 'zzz-rls-dir-shared@hour.test', org: 'ZZZ RLS Dir Sala Shared' };
-const PRIVATE = { name: 'ZZZ RLS Dir Private', email: 'zzz-rls-dir-private@hour.test', org: 'ZZZ RLS Dir Sala Private' };
-const CAST = { name: 'ZZZ RLS Dir Cast', email: 'zzz-rls-dir-cast@hour.test' };
-const TEAM = { name: 'ZZZ RLS Dir Team', email: 'zzz-rls-dir-team@hour.test' };
+// Un sufijo por pasada: las conversaciones se borran en blando y una sala no
+// puede tener dos conversaciones vivas en el proyecto, así que nombres fijos
+// chocan (409) con lo que deja una pasada que se cortó a medias.
+const RUN = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+const SHARED = { name: `ZZZ RLS Dir Shared ${RUN}`, email: `zzz-rls-dir-shared-${RUN}@hour.test`, org: `ZZZ RLS Dir Sala Shared ${RUN}` };
+const PRIVATE = { name: `ZZZ RLS Dir Private ${RUN}`, email: `zzz-rls-dir-private-${RUN}@hour.test`, org: `ZZZ RLS Dir Sala Private ${RUN}` };
+const CAST = { name: `ZZZ RLS Dir Cast ${RUN}`, email: `zzz-rls-dir-cast-${RUN}@hour.test` };
+const TEAM = { name: `ZZZ RLS Dir Team ${RUN}`, email: `zzz-rls-dir-team-${RUN}@hour.test` };
 
 interface ConversationRow {
   id: string;
@@ -61,6 +68,7 @@ describe.skipIf(!envReady() || !limitedEnvReady())(
     let snapshot: ProjectAccess;
     let originalSetting: boolean | undefined;
     const live: { id: string; jwt: () => string }[] = [];
+    let created = 0;
     const casts: string[] = [];
 
     async function setSetting(value: boolean) {
@@ -77,11 +85,14 @@ describe.skipIf(!envReady() || !limitedEnvReady())(
       as: string,
       who: { name: string; email: string; org?: string },
     ): Promise<ConversationRow> {
+      // Cada alta, la suya: si un test se corta, el siguiente no choca con
+      // la conversación que dejó viva (afterAll la borra).
+      const n = ++created;
       const r = await pgRpc<ConversationRow>('create_conversation', as, {
         p_project_id: projectId,
-        p_full_name: who.name,
-        p_email: who.email,
-        p_organization_name: who.org ?? null,
+        p_full_name: `${who.name} ${n}`,
+        p_email: who.email.replace('@', `-${n}@`),
+        p_organization_name: who.org ? `${who.org} ${n}` : null,
       });
       expect(r.status, r.error).toBe(200);
       const row = one(r.data)!;
@@ -175,11 +186,6 @@ describe.skipIf(!envReady() || !limitedEnvReady())(
       expect(await seesPerson(limited, shared.person_id!)).toBe(false);
       expect(await seesOrg(limited, shared.organization_id!)).toBe(false);
 
-      const all = await pgGet('workspace_organization', limited, new URLSearchParams({
-        workspace_id: `eq.${workspaceId}`,
-        select: 'id',
-      }));
-      expect(all.rows).toHaveLength(0);
 
       expect(await access(limited)).toEqual({ read: false, edit: false });
       expect(await access(admin)).toEqual({ read: true, edit: true });
@@ -260,7 +266,7 @@ describe.skipIf(!envReady() || !limitedEnvReady())(
         id: `eq.${one(cast.data)!.id}`,
         select: 'id,person:workspace_person!cast_member_workspace_person_fkey(full_name)',
       }));
-      expect(castRead.rows[0]?.person?.full_name).toBe(CAST.name);
+      expect(castRead.rows[0]?.person?.full_name).toMatch(CAST.name);
 
       await pgRpc('remove_cast_member', admin, { p_cast_member_id: one(cast.data)!.id });
       casts.pop();
