@@ -11,7 +11,11 @@
  *   - ?from=YYYY-MM-DD&to=YYYY-MM-DD
  *
  * `to` is compared against the START of a date row — multi-day rows that
- * begin inside the window are included; Phase 0 keeps this simple.
+ * begin inside the window are included.
+ *   - ?spans=1 → also rows that began before `from` and are still running
+ *     on it (`ends_at >= from`). The Planner asks for it: a date of several
+ *     days occupies all of them (Marco, 2026-10-18), so a residency that
+ *     started on the 30th is in November's month too.
  *
  * NOTE (calendar v2): the GET select now ASKS for the ADR-078 columns
  * (line_id, travel_direction, label ← custom_fields->>label) but degrades
@@ -46,6 +50,7 @@ const QuerySchema = v.object({
   workspace_ids: v.optional(v.string()),
   from: v.optional(v.pipe(v.string(), v.isoDate())),
   to: v.optional(v.pipe(v.string(), v.isoDate())),
+  spans: v.optional(v.picklist(['1'])),
   limit: v.optional(
     v.pipe(
       v.string(),
@@ -140,7 +145,7 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
       400,
     );
   }
-  const { project_ids, workspace_ids, from, to, limit } = parsed.output;
+  const { project_ids, workspace_ids, from, to, spans, limit } = parsed.output;
 
   const projectIds = parseUuidList(project_ids);
   const workspaceIds = parseUuidList(workspace_ids);
@@ -186,7 +191,9 @@ export const GET: RequestHandler = async ({ request, url, platform, locals }) =>
   search.set('deleted_at', 'is.null');
   // Window on starts_at. `to` is a date — pad to end-of-day so timestamptz
   // rows on the last day are included regardless of time.
-  if (from) search.append('starts_at', `gte.${from}`);
+  // `and=(or(...))`, not a top-level `or`: the scope filter above may own it.
+  if (from && spans) search.append('and', `(or(starts_at.gte.${from},ends_at.gte.${from}))`);
+  else if (from) search.append('starts_at', `gte.${from}`);
   if (to) search.append('starts_at', `lte.${to}T23:59:59.999Z`);
   search.set('order', 'starts_at.asc');
   search.set('limit', String(limit));

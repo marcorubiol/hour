@@ -65,6 +65,20 @@
     onReadMarks,
     onBlackout,
   }: Props = $props();
+
+  /* THE ARROWS SAY WHAT THEY DO IN THIS DRAWING (uso #15): in the Day they
+     travel to the next day that HOLDS something, not to tomorrow, and the
+     board pans a screen. «Next month» was the name on all of them. */
+  let stepKeys = $derived(
+    view === 'day'
+      ? { prev: 'planner.prev_planned', next: 'planner.next_planned' }
+      : view === 'board'
+        ? { prev: 'planner.pan_back', next: 'planner.pan_next' }
+        : { prev: 'planner.prev_month', next: 'planner.next_month' },
+  );
+  function stepTitle(key: string): string {
+    return view === 'day' ? `${t(key, locale)} · ${t('planner.step_hint', locale)}` : t(key, locale);
+  }
 </script>
 
 <!-- THE ROW OF VIEWS (ADR-095 § «El encabezado: el título es la fecha»).
@@ -99,28 +113,36 @@
        acts wearing one label — the one defect in this band that can lose
        somebody their place without telling them why. `Now` moves the window;
        `Today` names a drawing, like Agenda, Month and Board do. -->
-  <!-- The season is a horizon from today: it has no window to step, so its
-       row opens with the view words. -->
-  {#if view !== 'overview'}
+  <!-- The season is a horizon from today: it has no window to step. Its
+       controls are still LAID OUT, invisible and inert, so the view words sit
+       at the same x in all five drawings — the word you just pressed does not
+       jump 149px (revisión del Planner, 2026-10-18). Same markup, so the gap
+       is exact by construction, not a measured spacer. -->
+  <span
+    class="cal__window"
+    class:cal__window--none={view === 'overview'}
+    inert={view === 'overview'}
+    aria-hidden={view === 'overview' ? 'true' : undefined}
+  >
   <span class="cal__nav">
     <button
       type="button"
       class="cal__arw"
-      aria-label={t('planner.prev_month', locale)}
-      title={t('planner.step_hint', locale)}
+      aria-label={t(stepKeys.prev, locale)}
+      title={stepTitle(stepKeys.prev)}
       onclick={(e) => onStepBack(e.shiftKey)}>‹</button
     >
     <button
       type="button"
       class="cal__arw"
-      aria-label={t('planner.next_month', locale)}
-      title={t('planner.step_hint', locale)}
+      aria-label={t(stepKeys.next, locale)}
+      title={stepTitle(stepKeys.next)}
       onclick={(e) => onStepNext(e.shiftKey)}>›</button
     >
   </span>
   <button type="button" class="cal__now" onclick={onNow}>{t('planner.now', locale)}</button>
   <span class="cal__sep" aria-hidden="true"></span>
-  {/if}
+  </span>
   <div class="cal__views" role="group" aria-label={t('planner.view_label', locale)}>
     {#each VIEW_ORDER as v (v)}
       <button
@@ -189,6 +211,44 @@
        imported literal beside a token. The `VIEW` lead word that used to open
        this row went with them: the nav is what precedes the words in the
        design, and two labels in that slot is one too many. */
+    .cal__window {
+      display: contents;
+    }
+    .cal__window--none > :global(*) {
+      visibility: hidden;
+    }
+    /* On a phone the row wraps, and the reserve became a whole empty line
+       above the view words: there the Season simply has no controls. The
+       shell's own phone breakpoint. */
+    /* A finger's target on touch (móvil #5): 28px squares and 17px words
+       were under half of it. */
+    .cal__arw,
+    .cal__now,
+    .cal__add,
+    .cal__view,
+    .cal__dial-v,
+    .cal__toolbar :global(.cal__kebab) {
+      min-block-size: var(--touch-target);
+    }
+    .cal__arw,
+    .cal__toolbar :global(.cal__kebab) {
+      min-inline-size: var(--touch-target);
+    }
+    @media (max-width: 47.999rem) {
+      .cal__window--none > :global(*) {
+        display: none;
+      }
+      /* TWO ROWS, NOT THREE (móvil #4): on a phone the content started at
+         y=380 of 812. The words that name the drawing take the first row;
+         the window's controls and the two acts share the second. */
+      .cal__views {
+        order: -1;
+        flex-basis: 100%;
+      }
+      .cal__sep {
+        display: none;
+      }
+    }
     .cal__nav {
       display: inline-flex;
       align-items: center;

@@ -70,6 +70,7 @@
     gap: var(--space-s);
   }
   .lensswitch__home {
+    min-block-size: var(--touch-target);
     appearance: none;
     border: 1px solid var(--border-color-dark);
     background: var(--bg-ultra-light);
@@ -100,6 +101,7 @@
     padding: 2px;
   }
   .lensswitch button {
+    min-block-size: var(--touch-target);
     appearance: none;
     border: 0;
     background: transparent;

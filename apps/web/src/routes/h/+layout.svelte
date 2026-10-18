@@ -571,6 +571,10 @@
 
 {#if authChecked && !blocked}
   <div class="shell" class:shell--settings={inSettings}>
+    <!-- THE FIRST STOP SKIPS THE CHROME (móvil #8, WCAG 2.4.1): twenty stops of
+         search, account, rail and scope stood before the first day. Unseen
+         until focused. -->
+    <a class="shell__skip" href="#main">{t('shell.skip_to_main', locale)}</a>
     <header class="shell__top">
       <!-- THE WORDMARK IS GONE FROM THE BAR (Marco, 2026-07-31). A product
            tells you its name on the way in — the login and the invitation
@@ -592,6 +596,11 @@
           onclick={() => (railOpen ? closeRail() : openRail())}
         >
           <time class="clock-face" datetime={clockTime}>{clockTime}</time>
+          <!-- The clock is the door, and nothing said so (móvil #11): the
+               caret the app already uses for «this opens» (the status menu,
+               the decisions toggle), after the time so the time stays where
+               the drawer draws it. -->
+          <span class="shell__menu-caret" aria-hidden="true">{railOpen ? '▴' : '▾'}</span>
         </button>
       </div>
 
@@ -632,7 +641,7 @@
       </aside>
     {/if}
 
-    <main class="shell__main">
+    <main class="shell__main" id="main" tabindex="-1">
       {#if routedLens}
         <ScopeBar
           {tokenLabel}
@@ -668,6 +677,24 @@
 {/if}
 
 <style>
+  .shell__skip {
+    position: absolute;
+    inset-block-start: var(--space-xs);
+    inset-inline-start: var(--space-xs);
+    z-index: calc(var(--z-sticky) + 10);
+    padding: var(--space-2xs) var(--space-s);
+    background: var(--bg);
+    color: var(--text-color);
+    border: 1px solid var(--text-color);
+    border-radius: var(--radius);
+    transform: translateY(-200%);
+  }
+  .shell__skip:focus-visible {
+    transform: none;
+  }
+  .shell__main:focus {
+    outline: none;
+  }
   .shell {
     /* Real top-bar height, true by construction (min-block-size below).
        Sticky offsets and anchor scroll-margins consume this instead of
@@ -854,6 +881,12 @@
     }
     .shell__menu {
       display: flex;
+    }
+    .shell__menu-caret {
+      align-self: center;
+      margin-inline-start: 4px;
+      font-size: 9px;
+      color: var(--text-faint);
     }
     .shell__search {
       justify-self: stretch;

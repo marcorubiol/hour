@@ -182,7 +182,7 @@
       numbers come from the engine, because the absence band has to know how
       much room a span is before it decides what it can say. */
   let gridTemplate = $derived(
-    `26px 168px ${columns.map((c) => `${c.kind === 'gap' ? COL_PX.gap : COL_PX.day}px`).join(' ')}`,
+    `26px var(--board-lab, 168px) ${columns.map((c) => `${c.kind === 'gap' ? COL_PX.gap : COL_PX.day}px`).join(' ')}`,
   );
 
   /* ── the engine's facts, worded below, never re-derived ───────────── */
@@ -751,6 +751,7 @@
   @layer components {
     /* ── the scrollport · sideways inside, never the page ────────────── */
     .board__wrap {
+      container-type: inline-size;
       overflow-x: auto;
       overflow-y: clip;
       /* The scrollbar used to sit ON the last row. */
@@ -814,7 +815,8 @@
     /* Today: ink in the number and the word — and NOTHING else. No fill,
        no width, never gray: the wash CSS simply is not written (ruling 3). */
     .board__head.today .board__num {
-      color: var(--text-color);
+      color: var(--today-ink);
+      font-weight: var(--today-weight);
     }
     .board__todayw {
       display: block;
@@ -1138,6 +1140,33 @@
     }
     .board__tally--q {
       opacity: 0.7;
+    }
+    /* ── ON A PHONE THE NAMES GIVE WAY TO THE DAYS (revisión del Planner,
+       2026-10-18). At 375px the frozen labels took 194 of 347px and no whole
+       day fitted beside them. Below a measured width (ADR-095 §8) the label
+       keeps the monogram and the name at a reading size and drops the tally,
+       so two days and more sit next to the names and the rest scroll. The
+       day columns keep their width: the away bands are measured on it. ── */
+    @container (max-width: 34rem) {
+      .board {
+        --board-lab: 96px;
+      }
+      .board__lab {
+        padding: 10px 6px 10px 8px;
+        gap: 4px;
+        min-block-size: 48px;
+      }
+      .board__name {
+        font-size: 12px;
+        line-height: 1.15;
+      }
+      .board__tally,
+      .board__badge {
+        display: none;
+      }
+      .board__corner {
+        padding-inline: 8px;
+      }
     }
     .board__badge {
       font-style: normal;

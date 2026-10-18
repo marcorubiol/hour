@@ -11,6 +11,7 @@ import {
   PerformancePatchSchema,
   PerformanceSeriesCreateSchema,
   decideBy,
+  holdDeadlineLabel,
   isHoldStatus,
   performanceStatusFamily,
   performanceStatusLabel,
@@ -212,5 +213,28 @@ describe('PERFORMANCE_CREATE_STATUSES', () => {
   });
   it('is a subset of the enum', () => {
     for (const s of PERFORMANCE_CREATE_STATUSES) expect(PERFORMANCE_STATUSES).toContain(s);
+  });
+});
+
+describe('holdDeadlineLabel (revisión del Planner, 2026-10-18)', () => {
+  const today = '2026-10-18'; // domingo
+  it('a weekday only inside the coming six days', () => {
+    expect(holdDeadlineLabel('2026-10-21', today, 'es', 'es-ES')).toBe('vence mié');
+    expect(holdDeadlineLabel('2026-10-24', today, 'es', 'es-ES')).toBe('vence sáb');
+  });
+  it('the date from the seventh day on, never a weekday three weeks out', () => {
+    expect(holdDeadlineLabel('2026-11-05', today, 'es', 'es-ES')).toBe('vence 5 nov');
+    expect(holdDeadlineLabel('2026-10-25', today, 'en', 'en-GB')).toBe('expires 25 Oct');
+  });
+  it('today, yesterday and how long ago', () => {
+    expect(holdDeadlineLabel(today, today, 'es', 'es-ES')).toBe('vence hoy');
+    expect(holdDeadlineLabel('2026-10-17', today, 'es', 'es-ES')).toBe('venció ayer');
+    expect(holdDeadlineLabel('2026-09-30', today, 'es', 'es-ES')).toBe('venció hace 18 días');
+  });
+  it('compact (the slip state line): no verb, a past deadline names its date', () => {
+    expect(holdDeadlineLabel('2026-10-21', today, 'es', 'es-ES', true)).toBe('mié');
+    expect(holdDeadlineLabel('2026-11-05', today, 'es', 'es-ES', true)).toBe('5 nov');
+    expect(holdDeadlineLabel(today, today, 'es', 'es-ES', true)).toBe('hoy');
+    expect(holdDeadlineLabel('2026-09-30', today, 'es', 'es-ES', true)).toBe('venció 30 sept');
   });
 });

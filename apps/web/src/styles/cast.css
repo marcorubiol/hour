@@ -1,0 +1,22 @@
+/*
+  Cast — WHO GOES, as one line under a card (revisión del Planner, 2026-10-18).
+
+  The Day drew it under its slips and the Agenda did not draw it at all, so
+  «who goes to Sabadell?» meant opening the day. One home, so every drawing
+  that names who goes says it the same way: data, or the honest word in the
+  quieter voice — never the inference from the project's team.
+*/
+
+@layer components {
+  .cast-line {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+  }
+  .cast-line--none {
+    color: var(--text-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+}

@@ -602,13 +602,26 @@ export interface AwayBand {
  * Day key = `starts_at.slice(0, 10)`: travel days are day-level facts
  * (all_day rows), and a string slice keeps the function timezone-free.
  */
-export function awayBands(
-  dates: Array<Pick<DateRow, 'id' | 'project_id' | 'line_id' | 'kind' | 'travel_direction' | 'starts_at'>>,
-  ownEventDays: Record<string, string[]> = {},
-): AwayBand[] {
-  type Travel = { day: string; direction: 'outbound' | 'return'; line_id: string | null };
+/** A trip deduced from its two legs: the outbound day and its return day. */
+export interface TourTrip {
+  project_id: string;
+  line_id: string | null;
+  out: string;
+  back: string;
+}
 
-  // Pairing scope: the line when the row has one, the project otherwise.
+/**
+ * The trips the travel legs bracket, by the pairing rules of `awayBands`
+ * (see its docblock: same line, else same project; a return closes the most
+ * recent outbound; unpaired legs make nothing). The whole stretch, gig days
+ * included: a tour of three gigs in a row is the tour the Season must see
+ * (revisión del Planner, 2026-10-18), and `awayBands` only keeps the nights
+ * with nothing of their own.
+ */
+export function tourTrips(
+  dates: Array<Pick<DateRow, 'id' | 'project_id' | 'line_id' | 'kind' | 'travel_direction' | 'starts_at'>>,
+): TourTrip[] {
+  type Travel = { day: string; direction: 'outbound' | 'return' };
   const groups = new Map<string, { project_id: string; line_id: string | null; travels: Travel[] }>();
   for (const d of dates) {
     if (d.kind !== 'travel_day') continue;
@@ -619,17 +632,11 @@ export function awayBands(
       group = { project_id: d.project_id, line_id: d.line_id, travels: [] };
       groups.set(key, group);
     }
-    group.travels.push({
-      day: d.starts_at.slice(0, 10),
-      direction: d.travel_direction,
-      line_id: d.line_id,
-    });
+    group.travels.push({ day: d.starts_at.slice(0, 10), direction: d.travel_direction });
   }
-
-  const bands: AwayBand[] = [];
+  const trips: TourTrip[] = [];
   for (const group of groups.values()) {
-    // Chronological; a same-day outbound sorts before its return (their
-    // strictly-between set is empty anyway, but the pairing must not skew).
+    // Chronological; a same-day outbound sorts before its return.
     const sorted = [...group.travels].sort((a, b) =>
       a.day === b.day
         ? (a.direction === 'outbound' ? -1 : 1) - (b.direction === 'outbound' ? -1 : 1)
@@ -637,38 +644,46 @@ export function awayBands(
           ? -1
           : 1,
     );
-
-    const eventDays = new Set(ownEventDays[group.project_id] ?? []);
     let openDay: string | null = null;
     for (const t of sorted) {
       if (t.direction === 'outbound') {
         // The LAST outbound before a return is the one that trip belongs to.
-        // Keeping the first instead let an outbound with no return of its own
-        // borrow the next trip's — see the bracket rule in the docblock.
         openDay = t.day;
         continue;
       }
-      if (openDay === null) continue; // unpaired return — no band
-      const trip = { out: openDay, back: t.day };
-      // Contiguous runs of in-between days that carry no own event.
-      let runStart: string | null = null;
-      let prev: string | null = null;
-      for (let day = addDaysIso(openDay, 1); day < t.day; day = addDaysIso(day, 1)) {
-        if (eventDays.has(day)) {
-          if (runStart !== null && prev !== null) {
-            bands.push(makeBand(runStart, prev, group.project_id, group.line_id, trip));
-          }
-          runStart = null;
-          prev = null;
-        } else {
-          if (runStart === null) runStart = day;
-          prev = day;
-        }
-      }
-      if (runStart !== null && prev !== null) {
-        bands.push(makeBand(runStart, prev, group.project_id, group.line_id, trip));
-      }
+      if (openDay === null) continue; // unpaired return — no trip
+      trips.push({ project_id: group.project_id, line_id: group.line_id, out: openDay, back: t.day });
       openDay = null;
+    }
+  }
+  return trips;
+}
+
+export function awayBands(
+  dates: Array<Pick<DateRow, 'id' | 'project_id' | 'line_id' | 'kind' | 'travel_direction' | 'starts_at'>>,
+  ownEventDays: Record<string, string[]> = {},
+): AwayBand[] {
+  const bands: AwayBand[] = [];
+  for (const trip of tourTrips(dates)) {
+    const eventDays = new Set(ownEventDays[trip.project_id] ?? []);
+    const pair = { out: trip.out, back: trip.back };
+    // Contiguous runs of in-between days that carry no own event.
+    let runStart: string | null = null;
+    let prev: string | null = null;
+    for (let day = addDaysIso(trip.out, 1); day < trip.back; day = addDaysIso(day, 1)) {
+      if (eventDays.has(day)) {
+        if (runStart !== null && prev !== null) {
+          bands.push(makeBand(runStart, prev, trip.project_id, trip.line_id, pair));
+        }
+        runStart = null;
+        prev = null;
+      } else {
+        if (runStart === null) runStart = day;
+        prev = day;
+      }
+    }
+    if (runStart !== null && prev !== null) {
+      bands.push(makeBand(runStart, prev, trip.project_id, trip.line_id, pair));
     }
   }
   return bands;

@@ -231,8 +231,16 @@
     $patchMutation.mutate({ readiness: { ...current, [key]: !current[key] } });
   }
 
+  /* CANCELAR SE CONFIRMA (Marco, 2026-10-18). Es la única puerta para
+     cancelar una función: la Agenda tenía un «soltado» de un clic que se
+     leía como estado y cancelaba un bolo firme. Aquí se pregunta antes. */
+  let confirmCancelOpen = $state(false);
   function changeStatus(status: PerformanceStatus) {
     if (!perf || perf.status === status) return;
+    if (status === 'cancelled') {
+      confirmCancelOpen = true;
+      return;
+    }
     $patchMutation.mutate({ status });
   }
 
@@ -771,7 +779,8 @@
     <!-- ADR-103: «quién va». Next to a roster it only adds people; without
          one it answers the inference from the project cast. The roster is
          drawn above, so it is passed to be left out, not drawn twice. -->
-    <section class="perf__section">
+    <!-- `#who-goes`: the Day's clash line lands here (uso #12). -->
+    <section class="perf__section" id="who-goes">
       <WhoGoes
         target="performance"
         id={perf.id}
@@ -1001,6 +1010,28 @@
   {#snippet actions()}
     <Button variant="outline" onclick={() => (venueEditOpen = false)}>{t('create.cancel', locale)}</Button>
     <Button onclick={saveVenue} loading={$venuePatch.isPending}>{t('venue.save', locale)}</Button>
+  {/snippet}
+</Dialog>
+
+<Dialog bind:open={confirmCancelOpen} title={t('perf.cancel_title', locale)} size="s">
+  <p>
+    {t('perf.cancel_body', locale, {
+      what: title,
+      when: perf ? dayLabel(perf.performed_at, 'short') : '',
+    })}
+  </p>
+  {#snippet actions()}
+    <Button variant="outline" onclick={() => (confirmCancelOpen = false)}>{t('perf.keep', locale)}</Button>
+    <Button
+      variant="danger"
+      onclick={() => {
+        confirmCancelOpen = false;
+        $patchMutation.mutate({ status: 'cancelled' });
+      }}
+      loading={$patchMutation.isPending}
+    >
+      {t('perf.cancel_confirm', locale)}
+    </Button>
   {/snippet}
 </Dialog>
 

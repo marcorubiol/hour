@@ -95,6 +95,8 @@
      *
      * `cell` (month, board): the clock sits BESIDE the pack, so the head
      * reads as a sentence — `MM SHOW? 18h30`.
+     * `compact` (the season's strip): one line, monogram and place, no
+     * clock at all — see THE COMPACT PLACING below.
      * `row` (the diary): the clock sits UNDER the pack in a fixed column, so
      * it aligns down the page and time can be scanned with the eye. That is
      * the one difference the design grants, and it is a difference of
@@ -105,7 +107,7 @@
      * not — and how the diary grew an `ag__row` that had drifted from this
      * one in five ways by the time anybody compared them.
      */
-    placing?: 'cell' | 'row';
+    placing?: 'cell' | 'row' | 'compact';
     /**
      * WHETHER THERE IS A CARD UNDER IT.
      *
@@ -129,6 +131,10 @@
     /** The verbs — `confirm`, `let go`. Drawn in the row placing's third
         column, which is reserved for them and empty everywhere else. */
     actions?: import('svelte').Snippet;
+    /** Who goes: names on file, [] for «nobody on file», absent for a thing
+        where a cast would be a lie (a trip, a press call). Styles.cast.css. */
+    cast?: string[] | null;
+    noCastWord?: string;
   }
 
   let {
@@ -145,10 +151,19 @@
     ground = 'card',
     guess = false,
     actions,
+    cast = null,
+    noCastWord = '',
   }: Props = $props();
 
   let state = $derived(stateLabel(slip));
+  /* The grain is the doubt's MATERIAL, laid on paper: a bare slip has no
+     paper, so it keeps the doubt in its words (italic, «?») and leaves no
+     dotted patch that covers the name and stops short of the date beside it
+     (diseño B10, the rail's «next»). */
   let held = $derived(slip.cert === 'hold' || slip.cert === 'proposed');
+  let nameIsKind = $derived(
+    !slip.lead && slip.name.trim().toLowerCase() === kindLabel(slip.kind).trim().toLowerCase(),
+  );
 </script>
 
 <!-- One body, two shells: a thing with a page of its own is a link, one
@@ -158,7 +173,12 @@
     <!-- The pack. Indivisible: `flex: none` on the whole thing. -->
     <span class="slip__pack">
       {#if slip.project}
-        {#if onMarkOpen}
+        <!-- A door inside a door is two controls in one place: Enter on the
+             card opened the date, Enter on the mark the monogram editor, and
+             a screen reader lost one of them (móvil #9, axe
+             nested-interactive). The mark is a control only on a card that is
+             not one itself; the monogram is edited from its project. -->
+        {#if onMarkOpen && !slip.href && !onOpen}
           <span
             class="slip__mark"
             role="button"
@@ -196,7 +216,7 @@
            container queries below). A start hour alone is a whole assertion;
            half a range is not, so nothing is ever cut mid-string. -->
       <span class="slip__t"
-        >{slip.time.primary}{#if slip.time.end}<i>–{slip.time.end}</i>{/if}</span
+        >{#if slip.time.loadIn}<span class="slip__pre">{t('planner.slip_loadin', L)}</span>{/if}{slip.time.primary}{#if slip.time.end}<i>–{slip.time.end}</i>{/if}</span
       >
     {/if}
   </span>
@@ -208,9 +228,14 @@
   <!-- A travel day's place is ambiguous on its own — «London» is a departure
        or an arrival depending on a column nobody can see — so the direction
        governs the name, in the margin voice. -->
+  <!-- A date with no title of its own falls back to its kind for a name, and
+       the kind word already said it: «DAY OFF / day off» (diseño B6). The
+       name is not printed twice; the title keeps it. -->
+  {#if !nameIsKind}
   <span class="slip__n" class:guess
     >{#if slip.lead}<i class="slip__pre">{slip.lead === 'to' ? t('planner.slip_to', L) : slip.lead}</i>{/if}{slip.name}</span
   >
+  {/if}
 
   <!-- WHERE THE LEG BEGAN, under where it goes — the shape the design draws
        for a travel day: `to Brussels` over `from Barcelona`. It is deduced
@@ -229,12 +254,18 @@
     <span class="slip__tz">{slip.time.secondary}</span>
   {/if}
 
+  {#if cast}
+    <span class="slip__cast cast-line" class:cast-line--none={cast.length === 0}
+      >{cast.length > 0 ? cast.join(' · ') : noCastWord}</span
+    >
+  {/if}
+
   {#if actions}<span class="slip__acts">{@render actions()}</span>{/if}
 {/snippet}
 
 {#if slip.href}
   <a
-    class="slip" class:grain={held}
+    class="slip" class:grain={held && ground === 'card'}
     data-family={slip.cert}
     data-kind={slip.kind}
     data-placing={placing}
@@ -248,7 +279,7 @@
 {:else if onOpen}
   <button
     type="button"
-    class="slip" class:grain={held}
+    class="slip" class:grain={held && ground === 'card'}
     data-family={slip.cert}
     data-kind={slip.kind}
     data-placing={placing}
@@ -261,7 +292,7 @@
   >
 {:else}
   <span
-    class="slip" class:grain={held}
+    class="slip" class:grain={held && ground === 'card'}
     data-family={slip.cert}
     data-kind={slip.kind}
     data-placing={placing}
@@ -527,6 +558,11 @@
       grid-column: 2;
       grid-row: 3;
     }
+    .slip[data-placing='row'] .slip__cast {
+      grid-column: 2;
+      grid-row: 4;
+      margin-block-start: 2px;
+    }
     .slip[data-placing='row'] .slip__acts {
       grid-column: 3;
       grid-row: 1 / -1;
@@ -544,6 +580,66 @@
       display: inline-flex;
       align-items: center;
       gap: var(--space-xs);
+    }
+
+    /* ══ THE COMPACT PLACING · the season's strip ══════════════════════
+       Twelve weeks on one screen give a day ~80px, and the strip answers
+       «whose, and where» (ADR-117): monogram + place, ONE line. It used to
+       draw its own box for this, with its own option voice and a ground
+       (`--bg-surface`) that existed nowhere, so the firm card was white on
+       the dark theme (revisión del Planner, 2026-10-18). Now it is this
+       card, placed small: the same paper, the same dashed edge and grain
+       for an option, the same leaning name. What it drops is what the cell
+       cannot say at that size (kind word, hour, state, gloss); the title
+       keeps all of it.
+       The place is the CITY when there is one (a tour reads by towns), the
+       name otherwise: `cityUnder` already keeps the two from repeating. */
+    .slip[data-placing='compact'] {
+      flex-direction: row;
+      align-items: center;
+      gap: 3px;
+      padding: 1px 3px;
+      white-space: nowrap;
+    }
+    .slip[data-placing='compact'] + :global(.slip) {
+      margin-block-start: 0;
+    }
+    .slip[data-placing='compact'] .slip__h {
+      width: auto;
+      flex: none;
+    }
+    .slip[data-placing='compact'] .slip__kind,
+    .slip[data-placing='compact'] .slip__t,
+    .slip[data-placing='compact'] .slip__state,
+    .slip[data-placing='compact'] .slip__tz,
+    .slip[data-placing='compact'] .slip__acts,
+    .slip[data-placing='compact']:has(.slip__c) .slip__n {
+      display: none;
+    }
+    .slip[data-placing='compact'] .slip__n,
+    .slip[data-placing='compact'] .slip__c {
+      display: block;
+      min-width: 0;
+      margin: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 10.5px;
+      line-height: 1.15;
+      color: var(--text-color);
+    }
+    .slip[data-placing='compact'][data-kind='show'] .slip__n,
+    .slip[data-placing='compact'][data-kind='show'] .slip__c {
+      font-family: var(--font-display);
+      font-size: 10.5px;
+    }
+    /* Too narrow for a place that can be read: the monogram alone, never
+       «Giro…». The title still says everything. */
+    @container (max-width: 60px) {
+      .slip[data-placing='compact'] .slip__n,
+      .slip[data-placing='compact'] .slip__c {
+        display: none;
+      }
     }
 
     /* ══ THE CERTAINTY VOCABULARY ═══════════════════════════════════════
@@ -577,11 +673,14 @@
        value for one state. And it leans — an option is written in italic
        wherever its name appears. */
     .slip[data-family='hold'] .slip__n,
-    .slip[data-family='proposed'] .slip__n {
+    .slip[data-family='proposed'] .slip__n,
+    .slip[data-placing='compact'][data-family='hold'] .slip__c,
+    .slip[data-placing='compact'][data-family='proposed'] .slip__c {
       color: var(--text-muted);
       font-style: italic;
     }
-    .slip[data-family='proposed'] .slip__n {
+    .slip[data-family='proposed'] .slip__n,
+    .slip[data-placing='compact'][data-family='proposed'] .slip__c {
       color: var(--text-faint);
     }
 
@@ -671,6 +770,19 @@
     /* ══ THE CELL DECIDES WHAT A SLIP CAN AFFORD ════════════════════════
        Measured, never declared. The host sets `container-type: inline-size`;
        these are the two steps the design measured on a real month cell. */
+    /* A PHONE'S MONTH CELL (≈48px) split a card one word per line and cut the
+       next one at the edge (móvil #2). Below this the card is its monogram:
+       whose, and that there is something; the day says the rest. */
+    @container (max-width: 72px) {
+      .slip[data-placing='cell'] {
+        padding: 2px;
+      }
+      .slip[data-placing='cell'] > :not(.slip__h),
+      .slip[data-placing='cell'] .slip__kind,
+      .slip[data-placing='cell'] .slip__t {
+        display: none;
+      }
+    }
     @container (max-width: 142px) {
       /* THE END HOUR GOES, THE START STAYS — the range is still in the title.
          Half a range is not an assertion, so it is dropped whole rather than

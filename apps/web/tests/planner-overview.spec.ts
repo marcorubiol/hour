@@ -59,7 +59,8 @@ test.describe('the season (ADR-117)', () => {
     // Strip + decide + clashes + unclosed + gaps + away.
     await expect(page.locator('.ov .blk__t')).toHaveCount(6);
     // Nothing is still waiting once the lens says it has loaded.
-    expect(await page.locator('.ov__facts').innerText()).not.toContain('–');
+    // The census lives in the head's window line, with every other drawing's.
+    expect(await page.locator('.cal__meta--window').innerText()).not.toContain('–');
   });
 
   test('A DAY OF THE STRIP OPENS THAT DAY', async ({ page }) => {
@@ -72,8 +73,10 @@ test.describe('the season (ADR-117)', () => {
 
   test('THE SEASON HAS NO WINDOW TO STEP — no arrows, no «now»', async ({ page }) => {
     await open(page);
-    await expect(page.locator('.cal__arw')).toHaveCount(0);
-    await expect(page.locator('.cal__now')).toHaveCount(0);
+    // Their place is kept (so the view words do not move between drawings),
+    // but nothing there can be seen or pressed.
+    await expect(page.locator('.cal__arw:visible')).toHaveCount(0);
+    await expect(page.locator('.cal__now:visible')).toHaveCount(0);
   });
 
   test('ON A PHONE, WHAT TO DECIDE COMES BEFORE THE STRIP', async ({ page }) => {

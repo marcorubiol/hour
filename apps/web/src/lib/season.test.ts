@@ -96,6 +96,9 @@ describe('unclosed', () => {
 });
 
 describe('cellMark', () => {
+  it('draws a proposal as an option, like every other drawing', () => {
+    expect(cellMark([{ day: 'd', family: 'proposed', kind: 'perf' }])).toBe('option');
+  });
   it('firm beats option beats any other date', () => {
     expect(cellMark([])).toBeNull();
     expect(cellMark([{ day: 'd', family: 'confirmed', kind: 'date' }])).toBe('date');

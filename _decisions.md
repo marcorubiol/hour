@@ -3960,3 +3960,81 @@ Conversations, Planner y Cuentas. Cuatro bandas: lo siguiente, te espera, ha cam
 **Re-evaluar cuando** Marco lo use con datos reales (el umbral de 14 días, los 7 de «te espera», si la banda 1 repite
 demasiado al rail en escritorio) o cuando exista la RPC `conversation_overview` (ADR-118), que haría barata la
 lectura que la banda 3 y la puerta de Conversations hacen en cada visita.
+
+## [2026-10-18] ADR-122 · Revisión del Planner: soltar va a la ficha, una fecha de varios días ocupa sus días, fuera el «Next» de la cabecera
+
+**Contexto.** Tres revisiones del Planner (uso real, diseño, móvil y accesibilidad) del 2026-10-18, en
+`build/coordination/review-planner/`. Marco tomó tres decisiones de producto; el carril `claude/planner-fixes` las
+construyó junto con los arreglos y el código obligó a cerrar algunas más.
+
+**Decisión (Marco).**
+1. **«Soltado» sale de la fila de la Agenda.** Era el nombre de un estado puesto en un botón que cancelaba una
+   función firme de un clic. Cancelar una función se hace en su ficha, desde el estado, y pide confirmación; la
+   función cancelada queda en el calendario como memoria y se recupera cambiando el estado.
+2. **Una fecha (`date`) cuyo `ends_at` cae en otro día ocupa todos sus días**: en `occupiedDays` (cifras y
+   huecos), en las colocaciones de `Slip` (mes, agenda, día, tablero) y en la Temporada, igual que una función de
+   varios días. Matiza ADR-084 §1: allí `ends_at` era la hora de fin dentro del día; una fila puede ahora durar
+   días, y el bloque por serie sigue siendo la forma de proponer días con estados distintos.
+3. **Fuera el «Next» de la cabecera del Planner.** Lo dice el rail (ADR-096); dos «next» con dos reglas en una
+   pantalla se leían como un error.
+
+**Decisión (lo que el código obligó a decidir).**
+4. **Cuándo una fecha dura días:** si es de día entero y su último día (`ends_at`, que el diálogo guarda como
+   `día T00:00Z`) es posterior al primero, o si es con hora, acaba otro día y dura 24 horas o más. Una noche que
+   pasa de las 0h no es un segundo día. Un viaje no se expande: sus días son sus tramos (ADR-089), y copiar una
+   ida emparejaría la gira consigo misma.
+5. **Cómo se dibuja:** la página expande cada fecha de varios días en una fila por día al entrar
+   (`expandDateSpans`), con ids `id#día` y una serie común (la suya o `span:id`), que el mes ya dibuja como banda.
+   Todo lo que habla con el servidor pasa por `spanSourceId`. `GET /api/dates?spans=1` devuelve también las filas
+   que empezaron antes de la ventana y siguen en ella; solo lo piden los feeds del Planner.
+6. **Una propuesta es una opción en papel:** la Temporada la dibuja con la voz de opción y las cifras de opciones
+   cuentan `hold` y `proposed`, como ya hacían la semana de la Agenda y el Tablero.
+7. **El punto rojo de la Temporada es lo que cuenta «Choques» y nada más.** Un día con una decisión lleva su
+   propia marca (anillo, «por decidir»). La frase de una decisión tiene un solo escritor (`DecisionBand`).
+8. **El plazo de una opción:** día de la semana solo dentro de los seis días siguientes; más lejos, la fecha;
+   vencido, «venció hace N días». En la línea de estado de una ficha estrecha, «venció 30 sept».
+9. **La Temporada dibuja con `Slip`** en una colocación `compact` (monograma y lugar, una línea): una carta, N
+   colocaciones (ADR-095 §0). Se fue su copia propia de firme, opción y ausencia.
+10. **Una gira es todo el tramo entre ida y vuelta**, días con bolo incluidos, para la marca de la Temporada,
+    «Fuera» y el «¿viaje?» (`tourTrips`). Las bandas de gira del mes siguen guardando solo las noches sin nada propio.
+11. **Una sola tira de cifras:** la Temporada cuenta en la línea de ventana de la cabecera, con el estilo y las
+    palabras del Mes («confirmados»). Las noches libres cuentan desde hoy y descuentan gira y cierres firmes de la
+    compañía, en todas las vistas y en la semana de la Agenda. Sin datos (cargando o error), raya.
+12. **La cabecera es mueble:** sus dos líneas se dibujan siempre (vacías si no hay nada que decir) y el hueco de
+    las flechas se guarda, invisible e inerte, en la Temporada, para que las pestañas no se muevan entre vistas.
+13. **Cambiar de vista añade entrada al historial** (`pushState` con el `search` como estado; dentro del Día, las
+    flechas siguen reemplazando).
+14. **En la Temporada se raya solo el cierre de la compañía**, y más tenue si es provisional; la ausencia de una
+    persona va en «Fuera» y, si cuesta un bolo, en «Choques». Una ausencia provisional pregunta («¿fuera?»).
+
+**Re-evaluar cuando** Marco lo use con datos reales: el umbral de 24 h para una fecha con hora, si el anillo de
+decisión se lee junto al punto rojo, y si el Tablero en el móvil necesita más que estrechar los nombres.
+
+## [2026-10-18] ADR-123 · Revisión del Planner, segunda tanda: el resto de uso, diseño, móvil y accesibilidad
+
+**Contexto.** Marco pidió todo lo recomendado en los tres informes de `build/coordination/review-planner/`, no solo
+lo grave (encargo del coordinador, 2026-10-18). Sigue a ADR-122.
+
+**Decisión.**
+1. **El título de un horizonte es su horizonte** (ADR-095 §9): la Temporada se titula «18 oct → 3 ene», la Agenda y
+   el Tablero «Desde 18 oct». Ninguno se titula con un mes en el que no acaba.
+2. **La Temporada no dibuja lo cancelado**: es un horizonte hacia delante. El Mes lo sigue guardando como memoria
+   («soltado», tachado). Decidido ahora por escrito (diseño M1).
+3. **La marca de proyecto no es un botón dentro de una carta que ya lo es** (accesibilidad, control anidado). El
+   monograma se edita desde su proyecto o desde una carta que no es enlace.
+4. **El grano es material de papel**: una carta sin papel (`ground: 'bare'`, el rail, el Desk) dice la duda con sus
+   palabras y no lleva grano.
+5. **Un token de objetivo táctil**, `--touch-target`: 0 con ratón, 44 px con puntero grueso, aplicado con relleno a
+   los controles que lo piden (botones, cabecera del Planner, ámbito, puertas de lente, la nota de la Agenda).
+6. **Hoy es un token** (`--today-ink`, `--today-weight`, `--today-wash`): tinta y peso en todas las rejillas; el
+   lavado donde hay celda, salvo el Tablero (decisión de Marco, sin lavado).
+7. **La línea de reparto tiene casa** (`styles/cast.css`): la dicen el Día y la Agenda.
+8. **Una ausencia en la Agenda se dice una vez por tramo**, en su primer día visible; el carril lateral la lleva.
+9. **El Mes deja de declararse `grid`**; dentro de los días de una vista, las flechas no mueven la ventana. La tira
+   de la Temporada es una sola parada de tabulación con flechas dentro.
+10. **Lo que no se hace, y por qué:** el país en el Mes y la Temporada sigue fuera (decisión escrita en `Slip`: la
+    celda no da el ancho); el Tablero no lleva señal de «hay más» en su borde derecho (ley del Tablero: sin
+    degradados); el umbral de distancia del «¿viaje?» espera a que haya coordenadas (ADR-120 §5).
+
+**Re-evaluar cuando** Marco lo use en el teléfono: si 44 px hace la cabecera demasiado alta, el token baja a 24 px
+(el mínimo AA) sin tocar ningún componente.

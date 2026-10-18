@@ -15,6 +15,7 @@
 import {
   awayBands,
   conflictsFor,
+  tourTrips,
   daysCoveredBy,
   decisionsFor,
   nightsFree,
@@ -48,6 +49,10 @@ export interface PlannerEngineInputs {
   visibleBlackouts: () => AvailabilityItem[];
   /** The window the census counts (the month, or the season horizon). */
   window: () => EngineWindow;
+  /** The company's own firm closures in scope (no person, not tentative):
+      a night the whole company is shut is not for sale. Not calm-filtered:
+      calm hides bands, it does not open the company. */
+  companyClosures?: () => AvailabilityItem[];
   /** Decisions-window rows, already scope-filtered. */
   decisionPerfs: () => DecisionPerfItem[];
   viewerTz: string;
@@ -111,7 +116,7 @@ export function createPlannerEngine(inputs: PlannerEngineInputs) {
     }
     return map;
   });
-  const aways = $derived.by(() => {
+  const travels = $derived.by(() => {
     const travels: Array<
       Pick<DateRow, 'id' | 'project_id' | 'line_id' | 'kind' | 'travel_direction' | 'starts_at'>
     > = [];
@@ -126,8 +131,11 @@ export function createPlannerEngine(inputs: PlannerEngineInputs) {
         starts_at: d.starts_at,
       });
     }
-    return awayBands(travels, ownEventDays);
+    return travels;
   });
+  const aways = $derived(awayBands(travels, ownEventDays));
+  /** Whole trips, gig days included — what the Season calls a tour. */
+  const trips = $derived(tourTrips(travels));
 
   /** Every day something of the company's own sits on — unnarrowed and
       uncancelled. Shared by nights free and the season's gaps. */
@@ -144,6 +152,19 @@ export function createPlannerEngine(inputs: PlannerEngineInputs) {
     return occupied;
   });
 
+  /** Nights nobody can sell: on tour, or the company closed for sure. */
+  const tourDays = $derived(
+    new Set([
+      ...daysCoveredBy(aways),
+      ...daysCoveredBy((inputs.companyClosures?.() ?? []).map((b) => ({ from: b.starts_on, to: b.ends_on }))),
+    ]),
+  );
+  /** The census's rule for one night: from today, nothing of the company's
+      own on it, not on tour. The agenda's weekly tally asks this too. */
+  function isFreeNight(day: string): boolean {
+    return day >= todayIso && !occupiedDays.has(day) && !tourDays.has(day);
+  }
+
   // ── Census — counts of the window, every figure a real row (ADR-078
   // §12; no read:money gate — nothing monetary here). ───────────────────
   const stats = $derived.by(() => {
@@ -155,7 +176,10 @@ export function createPlannerEngine(inputs: PlannerEngineInputs) {
       if (day < first || day > last) continue;
       const family = performanceStatusFamily(p.status);
       if (family === 'confirmed') confirmed++;
-      else if (family === 'hold') holds++;
+      // A PROPOSAL IS AN OPTION ON PAPER: every drawing gives it the grain and
+      // the `?` of a hold, and the agenda's week and the board already counted
+      // it so. The census was the one that left it out (revisión, 2026-10-18).
+      else if (family === 'hold' || family === 'proposed') holds++;
     }
     let conflictCount = 0;
     for (const c of conflicts) {
@@ -184,7 +208,13 @@ export function createPlannerEngine(inputs: PlannerEngineInputs) {
        The fix is an unfiltered availability feed — the precedent is the
        blackouts, already fetched without a workspace filter for exactly this
        reason. */
-    const free = nightsFree(days, occupiedDays, daysCoveredBy(aways));
+    // FROM TODAY: a night already lived is not for sale (revisión del
+    // Planner, 2026-10-18 — October said 27 with 18 days gone).
+    const free = nightsFree(
+      days.filter((d) => d >= todayIso),
+      occupiedDays,
+      tourDays,
+    );
 
     return { confirmed, holds, conflicts: conflictCount, blackouts: blackoutCount, free };
   });
@@ -238,12 +268,20 @@ export function createPlannerEngine(inputs: PlannerEngineInputs) {
     get aways() {
       return aways;
     },
+    get trips() {
+      return trips;
+    },
     get occupiedDays() {
       return occupiedDays;
     },
     get stats() {
       return stats;
     },
+    /** Tour nights and firm company closures — what the gaps skip too. */
+    get unsellableDays() {
+      return tourDays;
+    },
+    isFreeNight,
     get decisionPerfById() {
       return decisionPerfById;
     },

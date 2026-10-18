@@ -153,7 +153,8 @@ describe('CarrilsStrip — the board grid', () => {
     expect(container.querySelectorAll('.board__head')).toHaveLength(columns.length);
     const tpl = (container.querySelector('.board') as HTMLElement).style.gridTemplateColumns;
     // 26px of rail — the space's own strip — then the frozen labels.
-    expect(tpl.startsWith('26px 168px')).toBe(true);
+    // The label track is a variable: 168px, narrower on a phone (measured).
+    expect(tpl.startsWith('26px var(--board-lab, 168px)')).toBe(true);
     expect(tpl).toContain('118px');
     expect(tpl).toContain('58px');
   });

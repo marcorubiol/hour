@@ -67,7 +67,7 @@
   import IdentityMark from '$lib/components/IdentityMark.svelte';
   import Slip from '$lib/components/planner/Slip.svelte';
   import { performanceSlip, dateSlip } from '$lib/month-events';
-  import { performanceStatusFamily } from '$lib/performance';
+  import { holdDeadlineLabel, performanceStatusFamily } from '$lib/performance';
   import { appLocale, appLocaleTag, t } from '$lib/i18n';
   import { dateStatusFamily } from '$lib/date';
 
@@ -114,17 +114,22 @@
     weekLabel?: (n: number) => string;
     weekRange?: (from: string, to: string) => string;
     weekTally?: (firm: number, held: number, free: number) => string;
+    /** The census's rule for a free night (today on, not on tour, nothing of
+        the company's own). Without it a night is free when it has no rows. */
+    freeNight?: (day: string) => boolean;
+    /** Who goes to a gig — names on file, [] for nobody, null when the feed
+        did not say. The Day said it and the diary did not (uso #8). */
+    castOf?: (perf: PerformanceEvent) => string[] | null;
+    noCastWord?: string;
     /**
      * THE VERBS, on the row itself. A hold is a question the diary is asking
      * you; answering it belonged three clicks away in a drawer, so the row
      * that poses the question could not resolve it.
      */
     onConfirm?: (perfId: string) => void;
-    onRelease?: (perfId: string) => void;
     /** Performance id with a write in flight. */
     pendingId?: string | null;
     confirmLabel?: string;
-    releaseLabel?: string;
     /** «until», «5 days left», «back tomorrow» — the absence's own words. */
     awayUntilWord?: string;
     awayLeftWord?: string;
@@ -169,6 +174,10 @@
     /** «nothing more planned» — the book's honest end, printed only when
         the page's look-ahead came back empty. */
     endLabel?: string;
+    /** Beyond the book's horizon there is still something: its date and the
+        way there (uso #11 — «nothing more» was absolute while a gig sat in
+        2031). */
+    endBeyond?: { label: string; onGo: () => void };
     /** Jump to the DecisionBand (where the pick/release actions live). */
     onDecideJump?: () => void;
     /**
@@ -208,9 +217,12 @@
     allDayWord = t('planner.all_day', L),
     weekLabel = (n: number) => `${t('planner.week_n', L)} ${n}`,
     weekRange = (from: string, to: string) => `${from} → ${to}`,
+    freeNight,
+    castOf,
+    noCastWord = t('planner.no_cast', L),
     weekTally = (firm: number, held: number, free: number) =>
       [
-        firm ? `${firm} ${t('planner.week_confirmed', L)}` : '',
+        firm ? `${firm} ${t(firm === 1 ? 'planner.week_confirmed_one' : 'planner.week_confirmed', L)}` : '',
         held ? `${held} ${t(held === 1 ? 'planner.week_option_one' : 'planner.week_options', L)}` : '',
         free ? `${free} ${t(free === 1 ? 'planner.week_free_one' : 'planner.week_free', L)}` : '',
       ]
@@ -231,10 +243,8 @@
     noteAddLabel = t('planner.note_add', L),
     noteDeleteLabel = t('planner.note_delete', L),
     onConfirm,
-    onRelease,
     pendingId = null,
     confirmLabel = t('planner.dec_confirm_short', L),
-    releaseLabel = t('planner.released', L),
     onReachEnd,
     onReachStart,
     earlierLabel = t('planner.agenda_earlier', L),
@@ -242,6 +252,7 @@
     noEarlierLabel,
     onPlanEnds,
     endLabel,
+    endBeyond,
     onDecideJump,
     onDateOpen,
   }: Props = $props();
@@ -325,7 +336,9 @@
     if (sl.cert === 'released') return releasedWord;
     if (sl.cert === 'hold' && sl.hold) {
       const rank = sl.hold.rank ? statusLabel(`hold_${sl.hold.rank}`) : statusLabel('hold');
-      return sl.hold.expires ? `${rank} · ${localeWeekdayShort(sl.hold.expires, locale)}` : rank;
+      return sl.hold.expires
+        ? `${rank} · ${holdDeadlineLabel(sl.hold.expires, todayIso, L, locale, true)}`
+        : rank;
     }
     return null;
   }
@@ -390,6 +403,7 @@
     }
     return {
       free: rows.length === 0,
+      sellable: freeNight ? freeNight(day) : rows.length === 0,
       marked:
         Boolean(clashesByDay?.get(day)?.length) || Boolean(notesByDay?.get(day)?.length),
       firm,
@@ -709,6 +723,10 @@
     const out: Array<{ key: string; who: string; rest: string; tentative: boolean }> = [];
     railItems.forEach((item, i) => {
       if (!coversDay(day, item.from, item.to)) return;
+      // ONCE PER STRETCH (diseño M2): seven days of «away until 29 Nov · 6
+      // days left», «5 days left»… said one thing seven times. The sentence
+      // lands on the first shown day of the absence; the rail carries it on.
+      if (railLabelDay[i] !== day) return;
       out.push({
         key: `${i}:${day}`,
         // `label` and not `subject`: the naming that already carries the verb
@@ -1032,7 +1050,9 @@
                from annotating came and went. What had to go was the DECORATION
                it used to hold — a dot grid and the word NOTES over nothing —
                not the column. An empty margin is fine; a jumping one is not. -->
-          <aside class="ag__marg">
+          <!-- A div, not an <aside>: a complementary landmark inside <main> is
+               a landmark nobody can reach as one (axe, móvil #12). -->
+          <div class="ag__marg">
             {#each marginCards(day) as card (card.key)}
                 <div class="ag__card" data-severity={card.severity}>
                   <p class="ag__card-eyebrow">{decideCardLabel}</p>
@@ -1105,7 +1125,7 @@
                 >
               {/if}
             {/if}
-          </aside>
+          </div>
       </section>
       {/if}
     {/each}
@@ -1114,7 +1134,11 @@
          content in today's month the tail is never quiet, yet the plan can
          still be finished — the line must win over the sentinel then. -->
     {#if endLabel}
-      <p class="ag__end">{endLabel}</p>
+      <p class="ag__end">
+        {endLabel}{#if endBeyond}{' · '}<button type="button" class="ag__beyond" onclick={endBeyond.onGo}
+            >{endBeyond.label} ›</button
+          >{/if}
+      </p>
     {:else if onReachEnd && !endStop}
       <div class="ag__sentinel" bind:this={endSentinel} aria-hidden="true"></div>
     {/if}
@@ -1142,6 +1166,8 @@
     stateLabel={slipState}
     stateUrgent={false}
     showCountry={true}
+    cast={row.kind === 'perf' ? (castOf?.(row.perf) ?? null) : null}
+    {noCastWord}
     clash={flags.clash}
     clashPeople={flags.people}
     onOpen={row.kind === 'date' && onDateOpen ? () => onDateOpen?.(row.date) : undefined}
@@ -1159,17 +1185,6 @@
               e.stopPropagation();
               onConfirm?.(row.perf.id);
             }}>{confirmLabel}</button
-          >
-        {:else if fam === 'confirmed' && onRelease}
-          <button
-            type="button"
-            class="ag__do ag__do--quiet"
-            disabled={pendingId === row.perf.id}
-            onclick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              onRelease?.(row.perf.id);
-            }}>{releaseLabel}</button
           >
         {/if}
       {/if}
@@ -1261,6 +1276,18 @@
     }
     .ag__earlier:disabled {
       cursor: default;
+    }
+    .ag__beyond {
+      font: inherit;
+      letter-spacing: inherit;
+      text-transform: inherit;
+      color: var(--text-color);
+      background: none;
+      border: 0;
+      padding: 0;
+      cursor: pointer;
+      text-decoration: underline;
+      text-underline-offset: 2px;
     }
 /* The book's honest ends — «nothing more planned» · «nothing further
    back». Margin voice, centred on the text column like the door above. */
@@ -1445,7 +1472,8 @@
     }
 .ag__day--today .ag__wd,
     .ag__day--today .ag__num {
-      color: var(--ag-black-accent);
+      color: var(--today-ink);
+      font-weight: var(--today-weight);
     }
 .ag__rows {
       /* STRETCHED, so that «at the foot» has a floor to sit on. The day is a
@@ -1661,6 +1689,8 @@ button.ag__head:hover .ag__num {
 }
 /* `＋` waits to be needed, like the verbs on the rows. */
 .ag__note-add {
+  min-inline-size: var(--touch-target);
+  min-block-size: var(--touch-target);
   padding: 0;
   border: 0;
   background: none;

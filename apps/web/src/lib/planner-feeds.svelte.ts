@@ -118,7 +118,7 @@ export async function primeAgendaWindow(
       ),
       pagedFeed<DateEvent>(
         // Same ±1-day pad as the live feed (tz bucketing at the edges).
-        (from) => `/api/dates?${feedParams(filterIds, addDaysIso(from, -1), addDaysIso(t, 1))}`,
+        (from) => `/api/dates?spans=1&${feedParams(filterIds, addDaysIso(from, -1), addDaysIso(t, 1))}`,
         (r) => r.starts_at.slice(0, 10),
         f,
         signal,
@@ -231,7 +231,7 @@ export function createPlannerFeeds(inputs: PlannerFeedInputs) {
       enabled: !onOwnWindow(inputs.view()) && !k.unresolved,
       queryFn: ({ signal }: { signal: AbortSignal }) =>
         fetchJSON<{ items: DateEvent[] }>(
-          `/api/dates?${feedParams(k, addDaysIso(k.from, -1), addDaysIso(k.to, 1))}`,
+          `/api/dates?spans=1&${feedParams(k, addDaysIso(k.from, -1), addDaysIso(k.to, 1))}`,
           signal,
         ),
     };
@@ -364,7 +364,7 @@ export function createPlannerFeeds(inputs: PlannerFeedInputs) {
       queryFn: ({ signal }: { signal: AbortSignal }) =>
         pagedFeed<DateEvent>(
           // Same ±1-day pad as the grid dates feed (tz bucketing at edges).
-          (from) => `/api/dates?${feedParams(k, addDaysIso(from, -1), addDaysIso(k.to, 1))}`,
+          (from) => `/api/dates?spans=1&${feedParams(k, addDaysIso(from, -1), addDaysIso(k.to, 1))}`,
           (d) => d.starts_at.slice(0, 10),
           k.from,
           signal,
@@ -472,7 +472,7 @@ export function createPlannerFeeds(inputs: PlannerFeedInputs) {
       queryFn: ({ signal }: { signal: AbortSignal }) =>
         pagedFeed<DateEvent>(
           // Same ±1-day pad as the other dates feeds (tz bucketing at edges).
-          (from) => `/api/dates?${feedParams(k, addDaysIso(from, -1), addDaysIso(k.to, 1))}`,
+          (from) => `/api/dates?spans=1&${feedParams(k, addDaysIso(from, -1), addDaysIso(k.to, 1))}`,
           (d) => d.starts_at.slice(0, 10),
           k.from,
           signal,

@@ -21,7 +21,7 @@
    */
   import { createQuery } from '@tanstack/svelte-query';
   import { addDaysIso, dayKeyInTz, isoWeek, monthGrid, assignBandLanes } from '$lib/planner';
-  import { weekdayLabels, localeMonthShort } from '$lib/datetime';
+  import { weekdayLabels, localeMonthShort, localeDayMonth, localeWeekdayShort } from '$lib/datetime';
   import IdentityMark from '$lib/components/IdentityMark.svelte';
   import { accentVarFor } from '$lib/utils/accent';
   import { workspacesQueryOptions } from '$lib/nav-queries';
@@ -147,8 +147,8 @@
     clashesByDay,
     locale = appLocaleTag(),
     dateKindLabel = (kind: string) => kind.replace(/_/g, ' '),
-    createLabel = (iso: string) => t('planner.new_on', L, { day: iso }),
-    openDayLabel = (iso: string) => t('planner.open_day', L, { day: iso }),
+    createLabel = (iso: string) => t('planner.new_on', L, { day: `${localeWeekdayShort(iso, appLocaleTag())} ${localeDayMonth(iso, appLocaleTag())}` }),
+    openDayLabel = (iso: string) => t('planner.open_day', L, { day: `${localeWeekdayShort(iso, appLocaleTag())} ${localeDayMonth(iso, appLocaleTag())}` }),
     runUntilLabel = (iso: string, n: number) =>
       `${t('planner.band_until', L, { day: iso })} · ${n} ${t('block.days_unit', L)}`,
     runFromLabel = (iso: string, n: number) =>
@@ -981,7 +981,7 @@
 <div
   class="cal__grid"
   class:cal__grid--loading={loading}
-  role="grid"
+  role="group"
   tabindex="-1"
   aria-label={label}
   bind:this={gridEl}
@@ -1507,6 +1507,23 @@
     .cal__band--away {
       container: tourband / inline-size;
     }
+    /* AN ABSENCE'S BAND MEASURES ITSELF TOO (móvil: a two-day band on a phone
+       printed its span and arrow 90px past the screen and gave the page a
+       sideways scroll). Below what the word, the name and the span need, the
+       span goes; below the name's, the name. The title keeps all of it. */
+    .cal__band:not(.cal__band--away) {
+      container: absband / inline-size;
+    }
+    @container absband (max-width: 200px) {
+      .cal__band-s {
+        display: none;
+      }
+    }
+    @container absband (max-width: 110px) {
+      .cal__band-n {
+        display: none;
+      }
+    }
     @container tourband (max-width: 418px) {
       .cal__band-dl {
         display: none;
@@ -1869,12 +1886,21 @@
          quietest thing there even while it is the only one that moves. */
       color: var(--border-color-dark);
       cursor: pointer;
-      visibility: hidden;
+      /* Unseen, NOT unreachable (móvil #2): `visibility: hidden` also took it
+         out of the keyboard, so `:focus-visible` below could never fire. */
+      opacity: 0;
       transition: color 0.1s;
     }
     .cal__num[data-hover] .cal__new,
     .cal__new:focus-visible {
-      visibility: visible;
+      opacity: 1;
+    }
+    /* A finger has no hover: an invisible target is a tripwire there. On
+       touch a day is made from the Day view or «+ date». */
+    @media (pointer: coarse) {
+      .cal__new {
+        display: none;
+      }
     }
     .cal__new:hover {
       color: var(--text-color);
@@ -1939,12 +1965,12 @@
        the same law governs all four drawings: today is the cell's 4% wash and
        one step of weight on its number. */
     .cal__day--today {
-      background: color-mix(in oklch, var(--text-color) 4%, transparent);
+      background: var(--today-wash);
     }
     .cal__day--today .cal__day-num {
       font-size: 16px;
-      font-weight: 600;
-      color: var(--text-color);
+      font-weight: var(--today-weight);
+      color: var(--today-ink);
     }
 
     .cal__day-num {
@@ -1956,6 +1982,15 @@
       line-height: 1;
       color: var(--text-muted);
       font-variant-numeric: tabular-nums;
+    }
+    /* The door to the day was 9×15px under a finger (móvil #2, WCAG 2.5.8):
+       on touch it takes a 24px target, around the same number. */
+    @media (pointer: coarse) {
+      button.cal__day-num {
+        min-inline-size: 24px;
+        min-block-size: 24px;
+        text-align: start;
+      }
     }
     /* EL NÚMERO ES LA PUERTA AL DÍA, y hasta hoy no lo parecía.
        Solo se oscurecía al pasar, que es lo que hace la tinta cuando algo se

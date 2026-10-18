@@ -35,7 +35,7 @@
   import { toStore } from 'svelte/store';
   import { tick, untrack } from 'svelte';
   import { page } from '$app/state';
-  import { goto, replaceState } from '$app/navigation';
+  import { goto, pushState, replaceState } from '$app/navigation';
   import { fetchJSON, mutateJSON } from '$lib/api';
   import LensHeader from '$lib/components/LensHeader.svelte';
   import LensTitle from '$lib/components/LensTitle.svelte';
@@ -44,6 +44,8 @@
   import {
     dateDayKey,
     deducedPhrase,
+    expandDateSpans,
+    spanSourceId,
     monthName,
     perfDayKey,
     type AwayBandVM,
@@ -58,6 +60,7 @@
   } from '$lib/month-events';
   import AgendaList, { type AgendaDecision, type NoteDraft } from '$lib/components/AgendaList.svelte';
   import DecisionBand, {
+    decisionText,
     type ConcurrenceVM,
     type DecisionOptionVM,
     type DecisionVM,
@@ -138,8 +141,9 @@
   } from '$lib/season';
   import { normalizeLaneAxis, resolveLaneAxis, type LaneAxis } from '$lib/carrils';
   import type { AvailabilityItem } from '$lib/availability';
-  import { localeDayMonth, localeWeekdayShort, dualTime } from '$lib/datetime';
+  import { localeDayMonth, localeDayMonthNear, localeWeekdayShort, dualTime } from '$lib/datetime';
   import {
+    holdDeadlineLabel,
     isHoldStatus,
     performanceStatusFamily,
     READINESS_KEYS,
@@ -291,7 +295,13 @@
    * Legacy parameters are dropped here, never rewritten — they were already
    * translated on the way in.
    */
-  function syncUrl() {
+  /* A NEW VIEW IS A NEW PAGE OF HISTORY (revisión del Planner, 2026-10-18).
+     Everything used to replace the entry, so Season → a day → back left the
+     Planner altogether. Changing the drawing pushes; moving inside one (the
+     Day's arrows, the board's dial) still replaces. The entry's state carries
+     its own search so going back is a change `page.state` can see: shallow
+     routing never moves `page.url` (see tests/scope-url.spec.ts). */
+  function syncUrl(mode: 'push' | 'replace' = 'replace') {
     const url = new URL(location.href);
     url.searchParams.set('view', view);
     if (view === 'board') url.searchParams.set('lanes', laneAxis);
@@ -302,15 +312,16 @@
     if (view === 'day') url.searchParams.set('d', dayIso ?? todayIso);
     else url.searchParams.delete('d');
     url.searchParams.delete('group');
-    replaceState(url, {});
+    if (url.href === location.href) return;
+    (mode === 'push' ? pushState : replaceState)(url, { planner: url.search });
   }
   function setView(v: PlannerView) {
     if (view === v) return;
     view = v;
-    // The address bar is the truth: replaceState (shallow routing) never
-    // updates the reactive page.url (see tests/scope-url.spec.ts), so both
-    // read and write go through location.href.
-    syncUrl();
+    // The address bar is the truth: shallow routing never updates the
+    // reactive page.url (see tests/scope-url.spec.ts), so both read and
+    // write go through location.href.
+    syncUrl('push');
   }
   function setLaneAxis(g: LaneAxis) {
     if (laneAxis === g) return;
@@ -327,6 +338,8 @@
   // Every legacy generation is translated HERE, once, and never written back.
   $effect(() => {
     void page.url;
+    // Back/forward between the Planner's own entries moves page.state only.
+    void page.state;
     const params = new URL(location.href).searchParams;
     // No `view` at all is the nav's door (ADR-117): it always opens the
     // season, even when you arrive from another drawing of this page.
@@ -599,13 +612,20 @@
         ? ($agendaPerfQuery.data?.items ?? [])
         : ($perfQuery.data?.items ?? []),
   );
-  let activeDateRows = $derived(
+  /** The rows as the server sent them — the ones an edit opens. */
+  let sourceDateRows = $derived(
     onSeason
       ? ($seasonDatesQuery.data?.items ?? [])
       : onBookWindow
         ? ($agendaDatesQuery.data?.items ?? [])
         : ($datesQuery.data?.items ?? []),
   );
+  /* A DATE OF SEVERAL DAYS OCCUPIES ALL OF THEM (Marco, 2026-10-18): laid out
+     one row per day here, once, so every drawing, the census and the gaps
+     read it without a second rule. Ids of the extra days are `id#day`;
+     whatever talks to the server goes through `spanSourceId`. */
+  let activeDateRows = $derived(expandDateSpans(sourceDateRows, viewerTz));
+  let sourceDateById = $derived(new Map(sourceDateRows.map((d) => [d.id, d])));
   let activeBlackoutRows = $derived(
     onSeason
       ? ($seasonAvailabilityQuery.data?.items ?? [])
@@ -696,6 +716,13 @@
         ? { first: season.from, last: season.to, days: season.days }
         : { first: monthFirst, last: monthLast, days: monthDays },
     decisionPerfs: () => decisionPerfs,
+    companyClosures: () =>
+      allBlackouts.filter(
+        (b) =>
+          b.person_id === null &&
+          b.certainty !== 'tentative' &&
+          (scopeWorkspaceIds === null || scopeWorkspaceIds.has(b.workspace_id)),
+      ),
     viewerTz,
     todayIso,
   });
@@ -742,7 +769,10 @@
         // and the agenda's away line all read from here.
         label: company
           ? spaceName(workspaceNameById.get(b.workspace_id) ?? '—')
-          : t('planner.band_person', locale, { person: personName ?? '—' }),
+          : // A provisional absence asks, in every sentence that names it.
+            t(b.certainty === 'tentative' ? 'planner.band_person_t' : 'planner.band_person', locale, {
+              person: personName ?? '—',
+            }),
         subject: company
           ? spaceName(workspaceNameById.get(b.workspace_id) ?? '—')
           : (personName ?? '—'),
@@ -767,7 +797,8 @@
       if (d.travel_direction !== 'outbound') continue;
       const day = d.starts_at.slice(0, 10);
       if (day > band.from) continue;
-      const place = d.city ?? d.venue_name ?? null;
+      // ADR-089: the written destination first; an old row's `city` meant it.
+      const place = d.destination_city ?? d.city ?? d.venue_name ?? null;
       if (!place) continue;
       if (!best || day > best.day) best = { day, place };
     }
@@ -1198,14 +1229,18 @@
 
   /* ── the board's words (the component is t()-free) ─────────────────── */
   function boardTallyCounts(confirmed: number, options: number, notCast: number): string {
+    // A figure never parts from its word (diseño B11: «2 / OPTIONS»).
     const parts: string[] = [];
-    if (confirmed > 0) parts.push(`${confirmed} ${t('planner.week_confirmed', locale)}`);
+    if (confirmed > 0)
+      parts.push(
+        `${confirmed}\u00a0${t(confirmed === 1 ? 'planner.week_confirmed_one' : 'planner.week_confirmed', locale)}`,
+      );
     if (options > 0) {
       parts.push(
-        `${options} ${t(options === 1 ? 'planner.week_option_one' : 'planner.week_options', locale)}`,
+        `${options}\u00a0${t(options === 1 ? 'planner.week_option_one' : 'planner.week_options', locale)}`,
       );
     }
-    if (notCast > 0) parts.push(`${notCast} ${t('planner.no_cast', locale)}`);
+    if (notCast > 0) parts.push(`${notCast}\u00a0${t('planner.no_cast', locale)}`);
     return parts.join(' · ');
   }
   /** The three silences are three different facts (law 9), worded here. */
@@ -1230,7 +1265,7 @@
           ? 'planner.board_project_one'
           : 'planner.board_projects';
     const counts = boardTallyCounts(g.confirmed, g.options, g.notCast);
-    const head = `${g.units} ${t(unitKey, locale)}`;
+    const head = `${g.units}\u00a0${t(unitKey, locale)}`;
     return counts ? `${head} · ${counts}` : head;
   }
   /** The slip's state line — the month's own wording, said by this caller
@@ -1241,7 +1276,7 @@
       const key = statusFootKey(sl.hold.rank ? `hold_${sl.hold.rank}` : 'hold');
       const rank = key ? t(key, locale) : statusWord('hold');
       if (!sl.hold.expires) return rank;
-      return `${rank} · ${localeWeekdayShort(sl.hold.expires, localeTag)}`;
+      return `${rank} · ${holdDeadlineLabel(sl.hold.expires, todayIso, locale, localeTag, true)}`;
     }
     return null;
   }
@@ -1451,7 +1486,7 @@
       if (!ORDERED_DATE_KINDS.includes(d.kind)) continue;
       out.push({
         target: 'date',
-        id: d.id,
+        id: spanSourceId(d.id),
         name: dateSlip(d, slipCtxPage).name,
         tz: clockOf(d.venue?.timezone, d.project?.workspace_id),
         from: d.starts_at,
@@ -1556,13 +1591,26 @@
   });
   /** The reason no bar can say — the pair's sentence, pre-localized in the
       clash VM. One line per pair, above the drawing. */
+  /* AND THE WAY TO RESOLVE IT (uso #12): a clash about a person is fixed
+     by changing who goes, which lives on the gig's page. The line links to
+     that section of each gig it names. */
   let dayClashLines = $derived.by(() => {
     const seen = new Set<string>();
-    const out: Array<{ key: string; body: string }> = [];
+    const out: Array<{ key: string; body: string; fixes: Array<{ href: string; name: string }> }> = [];
     for (const c of clashesByDay?.get(selectedDay) ?? []) {
       if (seen.has(c.body)) continue; // one reason, said once
       seen.add(c.body);
-      out.push({ key: `c${out.length}`, body: c.body });
+      const fixes =
+        c.severity === 'possible'
+          ? []
+          : c.event_ids.flatMap((id) => {
+              const p = shownPerfs.find((x) => x.id === id);
+              const ws = p?.project ? workspaceSlugById.get(p.project.workspace_id) : undefined;
+              return p?.slug && ws
+                ? [{ href: `/h/${ws}/performance/${p.slug}#who-goes`, name: performanceSlip(p, slipCtxPage).name }]
+                : [];
+            });
+      out.push({ key: `c${out.length}`, body: c.body, fixes });
     }
     return out;
   });
@@ -1724,23 +1772,36 @@
       ($workspacesQuery.data?.items ?? []).map((w) => [w.id, (w as { city?: string | null }).city ?? null]),
     ),
   );
-  let seasonTourDays = $derived(view === 'overview' ? daysCoveredBy(aways) : new Set<string>());
+  /* A TOUR IS THE WHOLE STRETCH BETWEEN ITS TWO LEGS, gig days included
+     (revisión del Planner, 2026-10-18). The bands keep only the nights with
+     nothing of their own — right for the month, which draws the gig there —
+     so a tour of three gigs in a row had no mark, no line in «Fuera», and its
+     middle gig asked «¿viaje?». The Season reads the trips. */
+  let seasonTrips = $derived(view === 'overview' ? engine.trips : []);
+  let seasonTourDays = $derived(
+    daysCoveredBy(
+      seasonTrips
+        .filter((tr) => addDaysIso(tr.out, 1) <= addDaysIso(tr.back, -1))
+        .map((tr) => ({ from: addDaysIso(tr.out, 1), to: addDaysIso(tr.back, -1) })),
+    ),
+  );
+  /* THE STRIP HATCHES WHAT CLOSES THE COMPANY, and a maybe more faintly
+     (revisión del Planner, 2026-10-18). One person away hatched the whole
+     week as if the company were shut, and a provisional absence looked
+     settled. A person's absence is said in «Fuera», and in «Choques» when it
+     costs a gig. Firm wins when a firm and a provisional closure overlap. */
   let seasonBlockDays = $derived.by(() => {
-    const out = new Set<string>();
+    const out = new Map<string, 'firm' | 'tent'>();
     if (view !== 'overview') return out;
     for (const b of visibleBlackouts) {
+      if (b.person_id) continue;
       const from = b.starts_on < season.weeks[0][0] ? season.weeks[0][0] : b.starts_on;
       const to = b.ends_on > season.to ? season.to : b.ends_on;
-      for (let d = from; d <= to; d = addDaysIso(d, 1)) out.add(d);
+      const kind = b.certainty === 'tentative' ? 'tent' : 'firm';
+      for (let d = from; d <= to; d = addDaysIso(d, 1)) {
+        if (out.get(d) !== 'firm') out.set(d, kind);
+      }
     }
-    return out;
-  });
-  /** Days with a clash worth a red dot: the engine's own marks, plus the days
-      a decision is between two holds that collide (people or double). */
-  let seasonClashDays = $derived.by(() => {
-    const out = new Set<string>();
-    for (const [day, list] of clashesByDay) if (list.some((c) => c.severity !== 'possible')) out.add(day);
-    for (const d of decisionVMs) if (d.level !== 'possible') out.add(d.day);
     return out;
   });
   const MONTH_SHORT = new Intl.DateTimeFormat(localeTag, { month: 'short', timeZone: 'UTC' });
@@ -1773,7 +1834,9 @@
         ];
         const gigs = perfs
           .map((p) => ({ p, firm: performanceStatusFamily(p.status) === 'confirmed' }))
-          .filter(({ p, firm }) => firm || isHoldStatus(p.status))
+          // Released is gone from a horizon forward; everything else is drawn,
+          // proposals included, in the voice of an option.
+          .filter(({ p }) => performanceStatusFamily(p.status) !== 'released')
           .sort((a, b) => Number(b.firm) - Number(a.firm));
         const travel = dates.find((d) => d.kind === 'travel_day');
         const other = dates.find((d) => d.kind !== 'travel_day');
@@ -1783,14 +1846,10 @@
           today: iso === todayIso,
           monthWord: iso.endsWith('-01') ? MONTH_SHORT.format(new Date(`${iso}T00:00:00Z`)) : null,
           mark: cellMark(rows),
-          slips: gigs.slice(0, 2).map(({ p, firm }) => ({
-            id: p.id,
-            firm,
-            accent: p.project ? accentVarFor(p.project) : 'var(--accent-1)',
-            initials: p.project?.initials ?? null,
-            project: p.project?.name ?? '',
-            place: p.venue?.city ?? p.city ?? p.venue?.name ?? p.venue_name ?? '—',
-          })),
+          // THE APP'S ONE CARD, placed small (ADR-095 §0). No link: the whole
+          // cell is the door to its day, and a link inside a button is two
+          // doors in one place.
+          slips: gigs.slice(0, 2).map(({ p }) => ({ ...performanceSlip(p, slipCtxPage), href: null })),
           more: Math.max(0, gigs.length - 2),
           dateWord: other ? kindLabel(other.kind) : null,
           travel: travel
@@ -1799,8 +1858,9 @@
               : 'out'
             : null,
           tour: seasonTourDays.has(iso),
-          away: seasonBlockDays.has(iso),
+          away: seasonBlockDays.get(iso) ?? null,
           clash: seasonClashDays.has(iso),
+          decide: seasonDecideDays.has(iso),
         };
       }),
     );
@@ -1824,7 +1884,7 @@
       // A trip is «covered» when a tour band holds the day or a travel leg of
       // the same project sits within a day of it.
       const travelCovered =
-        seasonTourDays.has(day) ||
+        seasonTrips.some((tr) => tr.project_id === p.project?.id && day >= tr.out && day <= tr.back) ||
         scopedDates.some((d) => {
           if (d.kind !== 'travel_day' || d.status === 'cancelled') return false;
           if (d.project?.id !== p.project?.id) return false;
@@ -1856,13 +1916,33 @@
           k === 'time' ? 'planner.season_miss_time' : k === 'cast' ? 'planner.season_miss_cast' : readinessLabelKey(k),
         ),
         travelGuess: v.travelGuess,
+        soon: day <= addDaysIso(todayIso, 13),
       });
     }
     return out;
   });
-  let seasonGaps = $derived(
-    view === 'overview' ? gapWindows(season.days, engine.occupiedDays, seasonTourDays) : [],
-  );
+  let seasonGaps = $derived.by((): SeasonGapVM[] => {
+    if (view !== 'overview') return [];
+    // A hole to sell skips the company's firm closures as it skips a tour.
+    const windows = gapWindows(
+      season.days,
+      engine.occupiedDays,
+      new Set([...seasonTourDays, ...engine.unsellableDays]),
+    );
+    const people = blackoutVMs.filter((b) => !b.company);
+    return windows.map((g) => ({
+      ...g,
+      away: people
+        .filter((b) => b.from <= g.to && b.to >= g.from)
+        .map((b) => ({
+          key: b.id,
+          who: b.subject ?? b.label,
+          from: b.from < g.from ? g.from : b.from,
+          to: b.to > g.to ? g.to : b.to,
+          tentative: b.tentative,
+        })),
+    }));
+  });
   let seasonAway = $derived.by((): SeasonAwayVM[] => {
     if (view !== 'overview') return [];
     const touches = (from: string, to: string) => to >= todayIso && from <= season.to;
@@ -1880,17 +1960,24 @@
         legs: null,
       });
     }
-    for (const a of awayVMs) {
-      if (!touches(a.from, a.to)) continue;
+    for (const tr of seasonTrips) {
+      if (!touches(tr.out, tr.back)) continue;
+      const from = addDaysIso(tr.out, 1) <= addDaysIso(tr.back, -1) ? addDaysIso(tr.out, 1) : tr.out;
       out.push({
-        key: `t:${a.project_id}:${a.from}`,
-        from: a.from,
-        to: a.to,
-        who: a.label,
-        what: a.place,
+        key: `t:${tr.project_id}:${tr.out}`,
+        from,
+        to: from === tr.out ? tr.back : addDaysIso(tr.back, -1),
+        who: t('planner.away', locale, { project: projectNameById.get(tr.project_id) ?? '—' }),
+        what: tourPlaceFor({ from, project_id: tr.project_id }),
         tentative: false,
         guess: true,
-        legs: `${a.deduced.word} · ${a.deduced.legs}`,
+        legs: deducedPhrase({
+          word: t('planner.tour_inferred', locale),
+          legs: t('planner.tour_legs', locale, {
+            out: localeDayMonth(tr.out, localeTag),
+            back: localeDayMonth(tr.back, localeTag),
+          }),
+        }),
       });
     }
     return out.sort((x, y) => (x.from < y.from ? -1 : x.from > y.from ? 1 : 0));
@@ -1915,6 +2002,13 @@
     }
     return out.sort((a, b) => (a.day < b.day ? -1 : 1));
   });
+  /** THE RED DOT IS WHAT «CHOQUES» COUNTS, AND NOTHING ELSE (revisión del
+      Planner, 2026-10-18). It also lit the days of a decision between two
+      holds, which the census sends to «por decidir»: the eye counted three
+      clashes where the figure said one. Those days carry the decision's own
+      mark (`decide`), and a day can carry both. */
+  let seasonClashDays = $derived(new Set(seasonClashes.map((c) => c.day)));
+  let seasonDecideDays = $derived(new Set(decisionVMs.map((d) => d.day)));
   let seasonFacts = $derived.by(() => {
     let perfs = 0;
     if (view === 'overview') {
@@ -1934,13 +2028,18 @@
       free: stats.free,
     };
   });
-  let seasonWindowLabel = $derived(
-    t('planner.season_window', locale, {
-      from: localeDayMonth(season.from, localeTag),
-      to: localeDayMonth(season.to, localeTag),
-      n: season.weeks.length,
-    }),
+  /* A HORIZON'S TITLE IS ITS HORIZON (ADR-095 §9: the title is the date;
+     diseño B1, uso #15). The Season was titled «Temporada» over a tab that
+     said «Temporada», and the Agenda and the Board were titled with a month
+     they do not end at. The meta keeps what the title does not say. */
+  let seasonTitle = $derived(
+    `${localeDayMonth(season.from, localeTag)} → ${localeDayMonth(season.to, localeTag)}`,
   );
+  let seasonWindowLabel = $derived(t('planner.season_weeks', locale, { n: season.weeks.length }));
+  let horizonTitle = $derived.by(() => {
+    const s = t('planner.agenda_from', locale, { day: localeDayMonth(agendaFromIso, localeTag) });
+    return `${s.charAt(0).toUpperCase()}${s.slice(1)}`;
+  });
 
   // ── Inline decision bands for the agenda book (ADR-080 §4 surfaced at
   // the day) — the SAME derived queue the DecisionBand renders, indexed by
@@ -1950,14 +2049,10 @@
   let agendaDecisionsByDay = $derived.by(() => {
     const m = new Map<string, AgendaDecision[]>();
     for (const d of decisionVMs) {
-      const reason =
-        d.level === 'people'
-          ? t('planner.clash_people_body', locale, { people: d.people.join(', ') })
-          : d.level === 'double'
-            ? t('planner.dec_double_reason', locale)
-            : d.missingTeam
-              ? t('planner.dec_possible_reason', locale, { project: d.missingTeam })
-              : t('planner.dec_possible_reason_generic', locale);
+      // THE SAME SENTENCE AS THE DRAWER (DecisionBand is its one writer): the
+      // agenda said «on two bookings the same day» where the drawer said
+      // «is in both — only one can be confirmed», for one decision.
+      const reason = decisionText(d, locale);
       (m.get(d.day) ?? m.set(d.day, []).get(d.day)!).push({
         ids: [d.a.id, d.b.id],
         reason,
@@ -2056,6 +2151,27 @@
     void filterIds;
     agendaExhausted = false;
     pastExhausted = false;
+  });
+  /* PAST THE HORIZON, ONE MORE LOOK (uso #11). «Nothing more planned» was
+     absolute while a gig sat four years out; now the end names its horizon
+     and, if something lies beyond, says when and opens that day. */
+  let farNext = $state<string | null>(null);
+  $effect(() => {
+    if (!agendaExhausted) {
+      farNext = null;
+      return;
+    }
+    const from = addDaysIso(agendaHorizonIso, 1);
+    const to = `${Number(from.slice(0, 4)) + 20}${from.slice(4)}`;
+    let alive = true;
+    probePlan(from, to)
+      .then((d) => {
+        if (alive) farNext = d;
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
   });
   /** Earliest planned day in [from, to] under the current scope, or null.
       Both feeds return ascending, so `limit=1` IS the earliest. */
@@ -2209,7 +2325,7 @@
         body: draft.body,
         on_day: draft.on_day,
         ...(draft.performance_id ? { performance_id: draft.performance_id } : {}),
-        ...(draft.date_id ? { date_id: draft.date_id } : {}),
+        ...(draft.date_id ? { date_id: spanSourceId(draft.date_id) } : {}),
         ...(!anchored && noteFallback.project_id ? { project_id: noteFallback.project_id } : {}),
         ...(!anchored && noteFallback.line_id ? { line_id: noteFallback.line_id } : {}),
         ...(!anchored && !noteFallback.project_id && !noteFallback.line_id && noteFallback.workspace_id
@@ -2312,20 +2428,8 @@
   //    word now belongs to the shell rail's now/next block, ADR-096) —
   //    every figure maps to fetched rows;
   // segments whose feed is absent simply drop. ──────────────────────────
-  // Next confirmed gig from today — the decisions window rows (scope-
-  // filtered, [today, +90d]) already hold exactly that horizon.
-  let statNext = $derived.by(() => {
-    let best: { day: string; venue: string } | null = null;
-    for (const p of decisionPerfs) {
-      if (performanceStatusFamily(p.status) !== 'confirmed') continue;
-      const day = perfDayKey(p);
-      if (day < todayIso) continue;
-      if (best === null || day < best.day) {
-        best = { day, venue: p.venue?.name ?? p.venue_name ?? p.city ?? '—' };
-      }
-    }
-    return best;
-  });
+  // «Next» left the head (Marco, 2026-10-18): the rail says it, and two
+  // «next» on one screen with two rules read as an error (diseño M8).
   // Distinct persons with a blackout overlapping the visible month
   // (person-level blocks of the scope's workspaces — company closures are
   // not a person count).
@@ -2365,6 +2469,26 @@
     }
     return n;
   });
+
+  /* A FIGURE WITHOUT ITS ROWS IS A DASH, NEVER A ZERO (ADR-096 §6, and the
+     season already did it). «0 confirmed · 30 nights free» over a month whose
+     feed is still in flight, or failed, reads exactly as «nothing booked» —
+     the worst sentence this strip can say about the business. */
+  const DASH = '–';
+  let figuresKnown = $derived(!loading && !errorMsg);
+  function fig(v: number): string {
+    return figuresKnown ? String(v) : DASH;
+  }
+  /** The plural is the safe form for a dash: «– options», never «– option». */
+  function figOne(v: number): boolean {
+    return figuresKnown && v === 1;
+  }
+
+  /** A day as a screen reader should say it («jue 22 oct»), never the ISO
+      string it would spell out digit by digit (móvil #10). */
+  function spokenDay(iso: string): string {
+    return `${localeWeekdayShort(iso, localeTag)} ${localeDayMonth(iso, localeTag)}`;
+  }
 
   let monthTitle = $derived(monthName(ym.year, ym.month, localeTag));
   // Capitalized "Julio 2026" — LensTitle then keeps the month italic and the
@@ -2703,6 +2827,16 @@
       }
       // A dialog is open: it owns the keyboard until it closes.
       if (createOpen || editOpen || marksOpen) return;
+      // Inside a drawing's days the arrows are not «move the window»: on the
+      // month they changed the month under the focused day and dropped the
+      // focus on <body> (móvil #3). There they are the drawing's, or nothing.
+      if (
+        (e.key === 'ArrowLeft' || e.key === 'ArrowRight') &&
+        el instanceof HTMLElement &&
+        el.closest('.cal__grid, .strip, .board__wrap')
+      ) {
+        return;
+      }
 
       // The SAME order as the words on screen (CalToolbar's VIEW_ORDER).
       const views: PlannerView[] = ['overview', 'day', 'agenda', 'month', 'board'];
@@ -2750,6 +2884,10 @@
 
   // ── Creation — the unified dialog (ADR-078 §1) behind every "+". ─────
   const queryClient = useQueryClient();
+  /** Ask again for whatever failed — and only that. */
+  function retryFailed() {
+    void queryClient.refetchQueries({ predicate: (q) => q.state.status === 'error' });
+  }
 
   let createOpen = $state(false);
   let createDate = $state<string | null>(null);
@@ -2786,7 +2924,8 @@
   });
 
   function openDate(d: DateEvent) {
-    editDate = d;
+    // A drawn day of a date of several days opens the date itself.
+    editDate = sourceDateById.get(spanSourceId(d.id)) ?? d;
     editOpen = true;
   }
 
@@ -2872,7 +3011,8 @@
             syncUrl();
           }}
         />
-      {:else if view === 'overview'}<LensTitle text={t('planner.view_overview', locale)} />
+      {:else if view === 'overview'}<LensTitle text={seasonTitle} />
+      {:else if view === 'agenda' || view === 'board'}<LensTitle text={horizonTitle} />
       {:else}<LensTitle text={monthLabel} />{/if}
     {/snippet}
   </LensHeader>
@@ -2906,8 +3046,7 @@
            the rail block, ADR-096) — every figure maps to fetched rows; a
            segment whose feed is absent (or count is zero) drops instead of
            lying. The shared .lenshead__sub inserts the · between items. -->
-      {#if !errorMsg}
-        <!-- CALM QUIETS VOLUME, NOT OBLIGATIONS. This control was gated on
+      <!-- CALM QUIETS VOLUME, NOT OBLIGATIONS. This control was gated on
              `!calm.on`, so the one line on the page that says «you have to
              decide something» disappeared in the mode people leave switched
              on — which is why Marco never saw the drawer and reported it as
@@ -2929,19 +3068,19 @@
               aria-hidden="true">{decisionsOpen ? '▴' : '▾'}</i
             >
           </button>
+        {:else}
+          <!-- The line keeps its height with nothing to say: the same control,
+               unseen and unreachable, so the reserve is exact by construction
+               and the tabs sit at the same height in all five drawings. -->
+          <span class="cal__stat cal__stat--decide cal__strut" aria-hidden="true">&nbsp;</span>
         {/if}
-        {#if !decisionsAbsent && statNext}
-          <span class="cal__stat cal__stat--soft"
-            >{t('planner.stat_next', locale, {
-              day: localeDayMonth(statNext.day, localeTag),
-              venue: statNext.venue,
-            })}</span
-          >
-        {/if}
-      {/if}
     </p>
-  {#if !errorMsg && (calm.on || view !== 'day' || Boolean(daySpanLabel) || statInferred > 0)}
+  <!-- BOTH LINES ARE FURNITURE: always laid out, loading, empty or failed,
+       so nothing under them moves when the rows land (ADR-096 §6, diseño M4).
+       A line with nothing true to say is empty, never absent. -->
     <p class="cal__meta cal__meta--window">
+      <!-- One empty line box: the caption's own height, whatever it says. -->
+      <span class="cal__strut" aria-hidden="true">&#8203;</span>
         <!-- CALM IS A WORD, ON THE FACTS SIDE (ADR-095 §3). It lives in the
              Desk — global and non-destructive — and the Planner does not draw
              its switch: it draws what it DOES. An active filter you cannot see
@@ -2972,29 +3111,49 @@
              grows, so neither prints one. -->
         <!-- Weeks range: BOUNDED drawings only — the board grew a horizon
              and what grows is never counted. -->
-        <!-- The season names its horizon; its census is the overview's own
-             first line, so it is not said twice. -->
+        <!-- The season names its horizon AND counts it, here, in the strip
+             every other drawing counts in: one strip, one style, one word per
+             fact (revisión del Planner, 2026-10-18). It used to carry its own
+             census under the tabs, lowercase, with «firm» where this line
+             said «confirmed». -->
         {#if view === 'overview'}
           <span class="cal__stat cal__stat--soft">{seasonWindowLabel}</span>
-        {/if}
-        {#if view === 'agenda'}
-          <span class="cal__stat cal__stat--soft"
-            >{t('planner.agenda_from', locale, {
-              day: localeDayMonth(agendaFromIso, localeTag),
-            })}</span
+          <span class="cal__stat"
+            ><b>{fig(seasonFacts.perfs)}</b>
+            {t(figOne(seasonFacts.perfs) ? 'planner.season_perf_one' : 'planner.season_perfs', locale)}</span
+          >
+          <span class="cal__stat"
+            ><b>{fig(seasonFacts.confirmed)}</b>
+            {t(figOne(seasonFacts.confirmed) ? 'planner.stat_confirmed_one' : 'planner.stat_confirmed', locale)}</span
+          >
+          <span class="cal__stat"
+            ><b>{fig(seasonFacts.holds)}</b>
+            {t(figOne(seasonFacts.holds) ? 'planner.stat_holds_one' : 'planner.stat_holds', locale)}</span
+          >
+          {#if !decisionsAbsent}
+            <span class="cal__stat" class:cal__stat--red={figuresKnown && decisionVMs.length > 0}
+              ><b>{fig(decisionVMs.length)}</b> {t('planner.season_to_decide', locale)}</span
+            >
+          {/if}
+          <span class="cal__stat" class:cal__stat--red={figuresKnown && seasonFacts.clashes > 0}
+            ><b>{fig(seasonFacts.clashes)}</b>
+            {t(figOne(seasonFacts.clashes) ? 'planner.season_clash_one' : 'planner.season_clashes', locale)}</span
+          >
+          <span class="cal__stat"
+            ><b>{fig(seasonFacts.unclosed)}</b> {t('planner.season_unclosed', locale)}</span
+          >
+          <span class="cal__stat"
+            ><b>{fig(seasonFacts.free)}</b>
+            {t(figOne(seasonFacts.free) ? 'planner.stat_free_one' : 'planner.stat_free', locale)}</span
           >
         {/if}
+
         <!-- The board names its grain and its horizon: a window that grows
              names where it begins and says NO END — what grows is never
              counted (law: el horizonte del tablero). Lanes from the one
              writer (boardLaneCount); folding is furniture and the meta
              does not chase it. -->
         {#if view === 'board'}
-          <span class="cal__stat cal__stat--soft"
-            >{t('planner.agenda_from', locale, {
-              day: localeDayMonth(agendaFromIso, localeTag),
-            })}</span
-          >
           <span class="cal__stat cal__stat--soft">{t('planner.board_no_end', locale)}</span>
           <span class="cal__stat cal__stat--soft">{t('planner.board_grain', locale)}</span>
           <span class="cal__stat cal__stat--soft"
@@ -3027,18 +3186,21 @@
              have no last day, so they name where they begin and count
              nothing. -->
         {#if view === 'month'}
-        <span class="cal__stat"><b>{stats.confirmed}</b> {t('planner.stat_confirmed', locale)}</span>
+        <span class="cal__stat"
+          ><b>{fig(stats.confirmed)}</b>
+          {t(figOne(stats.confirmed) ? 'planner.stat_confirmed_one' : 'planner.stat_confirmed', locale)}</span
+        >
         <!-- `1 holds` was printing on every single-hold month. The design's own
              word for this counter is `option`, and it agrees in number. -->
         <span class="cal__stat"
-          ><b>{stats.holds}</b>
-          {t(stats.holds === 1 ? 'planner.stat_holds_one' : 'planner.stat_holds', locale)}</span
+          ><b>{fig(stats.holds)}</b>
+          {t(figOne(stats.holds) ? 'planner.stat_holds_one' : 'planner.stat_holds', locale)}</span
         >
         <!-- The number about the business, not the calendar. It counts the
              WINDOW and never the drawing, so calm does not move it. -->
         <span class="cal__stat"
-          ><b>{stats.free}</b>
-          {t(stats.free === 1 ? 'planner.stat_free_one' : 'planner.stat_free', locale)}</span
+          ><b>{fig(stats.free)}</b>
+          {t(figOne(stats.free) ? 'planner.stat_free_one' : 'planner.stat_free', locale)}</span
         >
         <!-- THESE TWO COUNT THE MONTH TOO, so they live inside the same gate
              and not after it. Outside, the agenda printed `3 people away · 2
@@ -3047,14 +3209,14 @@
              that are not a month. On the board the bands are ON the sheet
              anyway, so the counter was saying twice what one of the two
              sayings had wrong. -->
-        {#if statAwayPersons > 0}
+        {#if figuresKnown && statAwayPersons > 0}
           <span class="cal__stat cal__stat--soft"
             >{statAwayPersons === 1
               ? t('planner.stat_away_one', locale)
               : t('planner.stat_away', locale, { z: statAwayPersons })}</span
           >
         {/if}
-        {#if statTrips > 0}
+        {#if figuresKnown && statTrips > 0}
           <span class="cal__stat cal__stat--soft"
             >{statTrips === 1
               ? t('planner.stat_trips_one', locale)
@@ -3072,7 +3234,6 @@
           >
         {/if}
     </p>
-  {/if}
   </div>
   <!-- THE DRAWER OPENS UNDER THE STRIP THAT NAMES IT — the queue line says
        `3 to decide · 1 urgent`, and what it names unfolds beneath both lines,
@@ -3121,7 +3282,14 @@
 
 
   {#if errorMsg}
-    <p class="cal__state cal__state--danger">{errorMsg}</p>
+    <!-- A FAILURE SAYS WHAT FAILED, IN OUR WORDS, AND OFFERS THE WAY BACK
+         (diseño M11). It printed the server's text as it came («boom»). The
+         detail stays, quieter, for whoever has to report it. -->
+    <div class="cal__state cal__state--danger" role="alert">
+      <p class="cal__state-t">{t('planner.load_error', locale)}</p>
+      <p class="cal__state-d">{errorMsg}</p>
+      <Button variant="outline" size="s" onclick={retryFailed}>{t('planner.retry', locale)}</Button>
+    </div>
   {:else if view === 'overview'}
     <SeasonOverview
       {locale}
@@ -3166,7 +3334,11 @@
     {#if dayClashLines.length > 0}
       <div class="cal__aways">
         {#each dayClashLines as c (c.key)}
-          <p class="cal__clashline">{c.body}</p>
+          <p class="cal__clashline">
+            {c.body}{#each c.fixes as f (f.href)}{' · '}<a class="cal__clashfix" href={f.href}
+                >{t('planner.clash_fix', locale, { name: f.name })} ›</a
+              >{/each}
+          </p>
         {/each}
       </div>
     {/if}
@@ -3269,8 +3441,8 @@
       {clashesByDay}
       locale={localeTag}
       dateKindLabel={kindLabel}
-      createLabel={(iso) => t('planner.new_on', locale, { day: iso })}
-      openDayLabel={(iso) => t('planner.open_day', locale, { day: iso })}
+      createLabel={(iso) => t('planner.new_on', locale, { day: spokenDay(iso) })}
+      openDayLabel={(iso) => t('planner.open_day', locale, { day: spokenDay(iso) })}
       runUntilLabel={(iso, n) =>
         `${t('planner.band_until', locale, { day: localeDayMonth(iso, localeTag) })} · ${n} ${t('block.days_unit', locale)}`}
       runFromLabel={(iso, n) =>
@@ -3282,7 +3454,7 @@
       isoWeekLabel={(n) => `${t('planner.week_n', locale)} ${n}`}
       moreLabel={t('planner.more_n', locale)}
       releasedLabel={t('planner.released', locale)}
-      expiresLabel={(iso) => localeWeekdayShort(iso, localeTag)}
+      expiresLabel={(iso) => holdDeadlineLabel(iso, todayIso, locale, localeTag, true)}
       awayWord={t('planner.band_away', locale)}
       tourWord={t('planner.band_tour', locale)}
       untilLabel={(day) => t('planner.band_until', locale, { day })}
@@ -3324,19 +3496,45 @@
         ? t('planner.agenda_no_earlier', locale)
         : undefined}
       onPlanEnds={probePlanAhead}
-      endLabel={agendaExhausted ? t('planner.agenda_end', locale) : undefined}
+      endLabel={agendaExhausted ? t('planner.agenda_end_n', locale, { n: AGENDA_FLOOR }) : undefined}
+      endBeyond={agendaExhausted && farNext
+        ? {
+            label: t('planner.agenda_beyond', locale, { day: localeDayMonthNear(farNext, todayIso, localeTag) }),
+            onGo: () => {
+              dayIso = farNext;
+              setView('day');
+            },
+          }
+        : undefined}
       weekLabel={(n) => `${t('planner.week_n', locale)} ${n}`}
-      weekRange={(from, to) => `${localeDayMonth(from, localeTag)} → ${localeDayMonth(to, localeTag)}`}
+      weekRange={(from, to) =>
+        // One day is a day, not a range («18 oct → 18 oct», móvil #12).
+        from === to
+          ? localeDayMonth(from, localeTag)
+          : `${localeDayMonth(from, localeTag)} → ${localeDayMonth(to, localeTag)}`}
       weekTally={(firm, held, free) =>
-        [
-          firm ? `${firm} ${t('planner.week_confirmed', locale)}` : '',
-          // ONE IS NOT «1 OPTIONS». The month's gutter kept its counts in a
-          // tooltip, so nobody had ever read them as a sentence.
-          held ? `${held} ${t(held === 1 ? 'planner.week_option_one' : 'planner.week_options', locale)}` : '',
-          free ? `${free} ${t(free === 1 ? 'planner.week_free_one' : 'planner.week_free', locale)}` : '',
-        ]
-          .filter(Boolean)
-          .join(' · ') || t('planner.week_nothing', locale)}
+        // The week's tally is a census too: a dash until its rows are in.
+        !figuresKnown
+          ? DASH
+          : [
+              firm
+                ? `${firm} ${t(firm === 1 ? 'planner.week_confirmed_one' : 'planner.week_confirmed', locale)}`
+                : '',
+              // ONE IS NOT «1 OPTIONS». The month's gutter kept its counts in a
+              // tooltip, so nobody had ever read them as a sentence.
+              held
+                ? `${held} ${t(held === 1 ? 'planner.week_option_one' : 'planner.week_options', locale)}`
+                : '',
+              free ? `${free} ${t(free === 1 ? 'planner.week_free_one' : 'planner.week_free', locale)}` : '',
+            ]
+              .filter(Boolean)
+              .join(' · ') || t('planner.week_nothing', locale)}
+      freeNight={engine.isFreeNight}
+      castOf={(p) =>
+        p.person_ids
+          ? p.person_ids.map((id) => personNames.get(id)).filter((n): n is string => Boolean(n))
+          : null}
+      noCastWord={t('planner.no_cast', locale)}
       onDayOpen={(iso) => {
         dayIso = iso;
         setView('day');
@@ -3347,10 +3545,8 @@
       awayLeftOneWord={t('planner.away_left_one', locale)}
       awayBackWord={t('planner.away_back', locale)}
       onConfirm={(id) => $decideMutation.mutate({ id, status: 'confirmed' })}
-      onRelease={(id) => $decideMutation.mutate({ id, status: 'cancelled' })}
       pendingId={decisionPendingId}
       confirmLabel={t('planner.dec_confirm_short', locale)}
-      releaseLabel={t('planner.released', locale)}
       onDecideJump={jumpToDecisions}
       onDateOpen={openDate}
       {notesByDay}
@@ -3385,7 +3581,7 @@
       tourWord={t('planner.band_tour', locale)}
       untilLabel={(iso) => t('planner.band_until', locale, { day: localeDayMonth(iso, localeTag) })}
       emptyLabel={t('planner.empty_month', locale)}
-      createLabel={(iso) => t('planner.new_on', locale, { day: iso })}
+      createLabel={(iso) => t('planner.new_on', locale, { day: spokenDay(iso) })}
       clashDayLabel={(iso) => t('planner.conn_jump', locale, { day: Number(iso.slice(8, 10)) })}
       kindLabel={(k) => kindLabel(k)}
       stateLabel={boardSlipState}
@@ -3575,6 +3771,21 @@
       margin-inline-end: var(--space-2xs);
     }
     /* The stat "per decidir" — the one red figure; a jump, not a decoration. */
+    /* A line's height with nothing in it. Zero wide, and it gives back the
+       flex gap it would add before the first real stat. */
+    .cal__strut {
+      display: inline-block;
+      visibility: hidden;
+      inline-size: 0;
+      overflow: hidden;
+      margin-inline-end: calc(-1 * var(--space-s));
+      pointer-events: none;
+    }
+    /* A count that asks for a call takes the danger ink, digits and word. */
+    .cal__stat--red,
+    .cal__stat--red b {
+      color: var(--danger-semi-dark);
+    }
     .cal__stat-chev {
       font-style: normal;
       margin-inline-start: 5px;
@@ -3622,13 +3833,29 @@
       color: var(--danger);
     }
 
+    .cal__clashfix {
+      color: inherit;
+      text-underline-offset: 2px;
+    }
     .cal__state {
       padding-block: var(--space-l);
       font-size: var(--text-s);
       color: var(--text-faint);
     }
     .cal__state--danger {
+      display: grid;
+      justify-items: start;
+      gap: var(--space-xs);
+    }
+    .cal__state-t {
+      margin: 0;
       color: var(--danger);
+    }
+    .cal__state-d {
+      margin: 0;
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-faint);
     }
   }
 </style>

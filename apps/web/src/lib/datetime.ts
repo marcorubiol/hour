@@ -299,6 +299,19 @@ export function localeDayMonth(iso: string, locale: string): string {
 }
 
 /**
+ * "17 jul", and "15 ene 2031" when the day is not in the twelve months from
+ * `today` (nor this calendar year). Without the year a date three years out
+ * reads as three months out (revisión del Planner, 2026-10-18: the rail said
+ * «15 ene» for January 2031).
+ */
+export function localeDayMonthNear(iso: string, today: string, locale: string): string {
+  const y = Number(today.slice(0, 4));
+  const horizon = `${y + 1}${today.slice(4, 10)}`;
+  const near = iso.slice(0, 4) === today.slice(0, 4) || (iso >= today && iso.slice(0, 10) < horizon);
+  return near ? localeDayMonth(iso, locale) : `${localeDayMonth(iso, locale)} ${iso.slice(0, 4)}`;
+}
+
+/**
  * Monday-first short weekday labels in the given locale ("mon", "dl").
  *
  * Lives here rather than in the month grid because it is pure locale/date

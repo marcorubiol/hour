@@ -24,17 +24,24 @@
     /** Short month word when the day is the 1st — the strip's only month mark. */
     monthWord: string | null;
     mark: 'firm' | 'option' | 'date' | null;
-    /** Up to two gigs, firm first. */
-    slips: Array<{ id: string; firm: boolean; accent: string; initials: string | null; project: string; place: string }>;
+    /** Up to two gigs, firm first — the app's one card (`Slip`), placed compact. */
+    slips: SlipVM[];
     more: number;
     /** A non-gig date's word (rehearsal, residency…), when that is all there is. */
     dateWord: string | null;
     travel: 'out' | 'back' | null;
     /** On tour — always deduced from two travel legs. */
     tour: boolean;
-    away: boolean;
+    /** The company is closed: for sure, or maybe. A person's absence is not
+        drawn here (it is in «Fuera»). */
+    away: 'firm' | 'tent' | null;
+    /** Something «Choques» lists: the only red dot. */
     clash: boolean;
+    /** A call between two options that «Por decidir» holds. */
+    decide: boolean;
   };
+
+  import type { Slip as SlipVM } from '$lib/month-events';
 
   export type SeasonUnclosedVM = {
     id: string;
@@ -45,9 +52,18 @@
     /** i18n keys of what is missing (facts). */
     missing: string[];
     travelGuess: boolean;
+    /** Within the next two weeks: the only rows whose gaps take the amber. */
+    soon: boolean;
   };
 
-  export type SeasonGapVM = { from: string; to: string; nights: number };
+  export type SeasonGapVM = {
+    from: string;
+    to: string;
+    nights: number;
+    /** Who is out on some of these nights: a hole with a performer away is
+        not a hole you can sell as it is (uso #9). */
+    away: Array<{ key: string; who: string; from: string; to: string; tentative: boolean }>;
+  };
 
   export type SeasonAwayVM = {
     key: string;
@@ -75,10 +91,10 @@
 </script>
 
 <script lang="ts">
-  import { localeDayMonth, localeWeekdayShort } from '$lib/datetime';
+  import { localeDayMonth, localeWeekdayShort, weekdayLabels } from '$lib/datetime';
   import { t, type Locale } from '$lib/i18n';
   import { isoWeek } from '$lib/planner';
-  import IdentityMark from '$lib/components/IdentityMark.svelte';
+  import Slip from '$lib/components/planner/Slip.svelte';
   import DecisionBand, {
     type ConcurrenceVM,
     type DecisionVM,
@@ -133,12 +149,9 @@
   }: Props = $props();
 
   const DASH = '–';
-  /** Monday-first narrow weekday letters, in the reader's language. */
-  let dows = $derived.by(() => {
-    const fmt = new Intl.DateTimeFormat(localeTag, { weekday: 'narrow', timeZone: 'UTC' });
-    // 2026-10-12 is a Monday.
-    return Array.from({ length: 7 }, (_, i) => fmt.format(new Date(Date.UTC(2026, 9, 12 + i))));
-  });
+  /** Monday-first weekday words — the month's own (diseño B3: one shape
+      for a day's head in every drawing). */
+  let dows = $derived(weekdayLabels(localeTag));
 
   let empty = $derived(
     !loading && weeks.every((w) => w.every((c) => c.past || (c.mark === null && !c.travel))),
@@ -153,31 +166,55 @@
   function day(iso: string): string {
     return `${localeWeekdayShort(iso, localeTag)} ${localeDayMonth(iso, localeTag)}`;
   }
+  /** Rows that are on the list only for the trip guess: they do not count as
+      «sin cerrar», and the head says so instead of the list disagreeing with
+      it (uso #14: «2 de 6» over four rows). */
+  let travelOnly = $derived(unclosed.filter((u) => u.missing.length === 0 && u.travelGuess).length);
+  /** The strip's one tab stop: row:col, col 0 is the week's label. Starts on
+      today (or the first day when today is not drawn). */
+  let focusAt = $state('');
+  $effect(() => {
+    if (focusAt) return;
+    weeks.forEach((w, wi) =>
+      w.forEach((c, di) => {
+        if (c.today) focusAt = `${wi}:${di + 1}`;
+      }),
+    );
+    if (!focusAt) focusAt = '0:1';
+  });
+  function onStripKey(e: KeyboardEvent) {
+    const [r, c] = focusAt.split(':').map(Number);
+    let nr = r;
+    let nc = c;
+    if (e.key === 'ArrowRight') nc = c + 1;
+    else if (e.key === 'ArrowLeft') nc = c - 1;
+    else if (e.key === 'ArrowDown') nr = r + 1;
+    else if (e.key === 'ArrowUp') nr = r - 1;
+    else if (e.key === 'Home') nc = 0;
+    else if (e.key === 'End') nc = 7;
+    else return;
+    // Days run on across weeks: → from Sunday is next Monday.
+    if (nc > 7) {
+      nc = 1;
+      nr += 1;
+    } else if (nc < 0) {
+      nc = 7;
+      nr -= 1;
+    }
+    if (nr < 0 || nr >= weeks.length) return;
+    e.preventDefault();
+    e.stopPropagation();
+    focusAt = `${nr}:${nc}`;
+    (e.currentTarget as HTMLElement).querySelector<HTMLElement>(`[data-cell="${focusAt}"]`)?.focus();
+  }
   function n(v: number): string {
     return loading ? DASH : String(v);
   }
 </script>
 
 <div class="ov">
-  <!-- 1 · THE CENSUS, IN ONE LINE — every figure counts the twelve weeks,
-       never the drawing; a `–` until the feeds land, never a false zero. -->
-  <p class="ov__facts">
-    <span><b>{n(facts.perfs)}</b> {t(facts.perfs === 1 ? 'planner.season_perf_one' : 'planner.season_perfs', locale)}</span>
-    <span><b>{n(facts.confirmed)}</b> {t('planner.season_firm', locale)}</span>
-    <span><b>{n(facts.holds)}</b> {t(facts.holds === 1 ? 'planner.stat_holds_one' : 'planner.stat_holds', locale)}</span>
-    {#if !decisionsAbsent}
-      <span class:ov__red={decisions.length > 0}
-        ><b>{n(decisions.length)}</b> {t('planner.season_to_decide', locale)}</span
-      >
-    {/if}
-    <span class:ov__red={facts.clashes > 0}
-      ><b>{n(facts.clashes)}</b>
-      {t(facts.clashes === 1 ? 'planner.season_clash_one' : 'planner.season_clashes', locale)}</span
-    >
-    <span><b>{n(facts.unclosed)}</b> {t('planner.season_unclosed', locale)}</span>
-    <span><b>{n(facts.free)}</b> {t(facts.free === 1 ? 'planner.stat_free_one' : 'planner.stat_free', locale)}</span>
-  </p>
-
+  <!-- 1 · THE CENSUS lives in the head's window line (the page), in the one
+       strip and the one style every drawing counts in. -->
   <div class="ov__grid">
     <!-- 2 · THE STRIP. Drawn from the first frame, empty, so nothing below
          it moves when the rows arrive. -->
@@ -185,29 +222,45 @@
       <div class="blk__h">
         <h2 class="blk__t">{t('planner.season_strip', locale, { n: SEASON_WEEKS })}</h2>
       </div>
-      <div class="strip">
+      <!-- ONE TAB STOP, ARROWS INSIDE (móvil #8, WCAG 2.4.3): 84 days and 12
+           weeks were 96 stops between the head and «Por decidir». The strip
+           is one stop that lands on today; ← → walk days, ↑ ↓ weeks, Home
+           goes to the week's label, End to its Sunday. -->
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
+      <div class="strip" onkeydown={onStripKey}>
         <div class="strip__row strip__dow" aria-hidden="true">
           <span></span>
           {#each dows as d, i (i)}<span>{d}</span>{/each}
         </div>
-        {#each weeks as week (week[0].iso)}
+        {#each weeks as week, wi (week[0].iso)}
           <div class="strip__row">
             <button
               type="button"
               class="wk"
+              tabindex={focusAt === `${wi}:0` ? 0 : -1}
+              data-cell={`${wi}:0`}
+              onfocus={() => (focusAt = `${wi}:0`)}
               title={t('planner.season_open_month', locale)}
               onclick={() => onWeek(week[0].iso)}
-              >{t('planner.season_week_short', locale)}{isoWeek(week[0].iso)}<b
+              ><!-- One label for a week-row in every drawing: «semana 42»
+                   (diseño B2); the Season adds the Monday under it. --><span class="wk__w"
+                >{t('planner.week_n', locale)}</span
+              >
+              {isoWeek(week[0].iso)}<b
                 >{localeDayMonth(week[0].iso, localeTag)}</b
               ></button
             >
-            {#each week as c (c.iso)}
+            {#each week as c, di (c.iso)}
               <button
                 type="button"
+                tabindex={focusAt === `${wi}:${di + 1}` ? 0 : -1}
+                data-cell={`${wi}:${di + 1}`}
+                onfocus={() => (focusAt = `${wi}:${di + 1}`)}
                 class="d"
                 class:d--past={c.past}
                 class:d--today={c.today}
-                class:d--away={c.away}
+                class:d--away={c.away === 'firm'}
+                class:d--away-tent={c.away === 'tent'}
                 data-day={c.iso}
                 data-mark={c.mark ?? ''}
                 title={day(c.iso)}
@@ -215,16 +268,13 @@
               >
                 <span class="d__n">{Number(c.iso.slice(8))}{#if c.monthWord}<i>{c.monthWord}</i>{/if}</span>
                 {#each c.slips as sl (sl.id)}
-                  <span class="ev" class:ev--firm={sl.firm} class:ev--option={!sl.firm} class:grain={!sl.firm}
-                    ><IdentityMark mini accent={sl.accent} name={sl.project} initials={sl.initials} /><span
-                      class="ev__place">{sl.place}</span
-                    ></span
-                  >
+                  <Slip slip={sl} placing="compact" kindLabel={() => ''} stateLabel={() => null} />
                 {/each}
                 {#if c.more > 0}<span class="ev__more">+{c.more}</span>{/if}
                 {#if c.slips.length === 0 && c.dateWord}<span class="ev ev--date">{c.dateWord}</span>{/if}
                 {#if c.travel}<span class="d__travel" aria-hidden="true">{c.travel === 'out' ? '↗' : '↙'}</span>{/if}
                 {#if c.clash}<span class="d__clash" title={t('planner.season_key_clash', locale)}></span>{/if}
+                {#if c.decide}<span class="d__decide" class:d__decide--beside={c.clash} title={t('planner.season_key_decide', locale)}></span>{/if}
                 {#if c.tour}<span class="d__tour" title={t('planner.season_key_tour', locale)}></span>{/if}
               </button>
             {/each}
@@ -236,6 +286,7 @@
         <span><i class="k k--option grain"></i>{t('planner.season_key_option', locale)}</span>
         <span class="guess"><i class="k k--tour"></i>{t('planner.season_key_tour', locale)}</span>
         <span><i class="k k--away"></i>{t('planner.season_key_away', locale)}</span>
+        <span><i class="k k--decide"></i>{t('planner.season_key_decide', locale)}</span>
         <span><i class="k k--clash"></i>{t('planner.season_key_clash', locale)}</span>
       </p>
       {#if empty}
@@ -304,7 +355,7 @@
                   n: facts.unclosed,
                   m: firmAhead,
                   w: UNCLOSED_WEEKS,
-                })}</span
+                }) + (travelOnly > 0 ? ` · ${t('planner.season_unclosed_guess', locale, { n: travelOnly })}` : '')}</span
           >
         </div>
         {#if loading}
@@ -313,7 +364,7 @@
           <p class="blk__empty">{t('planner.season_none_unclosed', locale, { n: UNCLOSED_WEEKS })}</p>
         {:else}
           {#each unclosed as u (u.id)}
-            <a class="row" href={u.href ?? undefined} data-perf={u.id}>
+            <a class="row" class:row--soon={u.soon} href={u.href ?? undefined} data-perf={u.id}>
               <span class="row__when">{day(u.day)}</span>
               <span class="row__what">{u.venue}{#if u.city}<small>{u.city}</small>{/if}</span>
               <span class="row__miss">
@@ -340,6 +391,14 @@
             <button type="button" class="row" onclick={() => onGap(g.from)}>
               <span class="row__when">{range(g.from, g.to)}</span>
               <span class="row__what">{t('planner.season_nights', locale, { n: g.nights })}</span>
+              {#each g.away as a (a.key)}
+                <span class="row__note" class:guess={a.tentative}
+                  >{t(a.tentative ? 'planner.season_gap_away_t' : 'planner.season_gap_away', locale, {
+                    who: a.who,
+                    when: range(a.from, a.to),
+                  })}</span
+                >
+              {/each}
             </button>
           {/each}
         {/if}
@@ -359,7 +418,7 @@
             <button type="button" class="row" onclick={() => onDay(a.from)}>
               <span class="row__when">{range(a.from, a.to)}</span>
               <span class="row__what" class:row__what--tent={a.tentative}
-                >{a.who}{#if a.what}<small>{a.what}</small>{/if}{#if a.legs}<small class="guess"
+                >{a.who}{#if a.tentative}?{/if}{#if a.what}<small>{a.what}</small>{/if}{#if a.legs}<small class="guess row__legs"
                     >{a.legs}</small
                   >{/if}</span
               >
@@ -374,26 +433,14 @@
 <style>
   @layer components {
     .ov {
-      container-type: inline-size;
+      /* Named: the day cells are containers too (for the slip), and an
+         unnamed query below would measure the cell instead of the season. */
+      container: season / inline-size;
       display: grid;
       gap: var(--space-m);
       margin-block-start: var(--space-s);
     }
-    .ov__facts {
-      font-family: var(--font-mono);
-      font-size: 10px;
-      color: var(--text-muted);
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0 0.9em;
-      margin: 0;
-    }
-    .ov__facts b {
-      color: var(--text-color);
-      font-weight: 500;
-    }
-    .ov__red,
-    .ov__red b {
+    .ov__red {
       color: var(--danger-semi-dark);
     }
     .ov__grid {
@@ -482,16 +529,22 @@
       padding-inline-start: 4px;
     }
     .wk {
+      min-block-size: var(--touch-target);
       font-family: var(--font-mono);
-      font-size: 9px;
+      font-size: 11px;
       color: var(--text-muted);
       text-align: start;
       align-self: center;
       line-height: 1.2;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
       background: none;
       border: 0;
       padding: 0;
       cursor: pointer;
+    }
+    .wk__w {
+      font-size: 9px;
     }
     .wk b {
       color: var(--text-color);
@@ -499,6 +552,9 @@
       display: block;
     }
     .d {
+      /* The cell is the slip's size container: below a measured width the
+         compact card keeps only its monogram (ADR-095 §8, diseño M10). */
+      container-type: inline-size;
       position: relative;
       display: flex;
       flex-direction: column;
@@ -519,8 +575,11 @@
     .d:hover {
       background: color-mix(in oklch, var(--text-color) 7%, transparent);
     }
+    /* Past days stay doors (a day already lived is still worth opening), so
+       they keep their ink: 45% opacity put the number at 1.8:1 (móvil #7,
+       WCAG 1.4.3). They lose their GROUND instead — no cell, just the day. */
     .d--past {
-      opacity: 0.45;
+      background: none;
     }
     .d--away {
       background-image: repeating-linear-gradient(
@@ -529,9 +588,20 @@
         transparent 1px 5px
       );
     }
+    /* A maybe closes the company more faintly, and dashed: the geometry of
+       doubt, like the option's edge. */
+    .d--away-tent {
+      background-image: repeating-linear-gradient(
+        135deg,
+        color-mix(in oklch, var(--text-color) 7%, transparent) 0 1px,
+        transparent 1px 8px
+      );
+    }
+    /* What is READ takes an 11px floor (móvil #6): the day's number and the
+       week's. 9px stays for what is only a key. */
     .d__n {
       font-family: var(--font-mono);
-      font-size: 9px;
+      font-size: 11px;
       color: var(--text-muted);
     }
     .d__n i {
@@ -539,11 +609,12 @@
       margin-inline-start: 3px;
       color: var(--text-color);
     }
+    .d--today {
+      background-color: var(--today-wash);
+    }
     .d--today .d__n {
-      color: var(--text-color);
-      font-weight: 600;
-      text-decoration: underline;
-      text-underline-offset: 2px;
+      color: var(--today-ink);
+      font-weight: var(--today-weight);
     }
     .ev {
       display: flex;
@@ -555,19 +626,6 @@
       padding: 1px 3px;
       min-width: 0;
       white-space: nowrap;
-    }
-    .ev__place {
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    .ev--firm {
-      background: var(--bg-surface, var(--white));
-      border: 1px solid color-mix(in oklch, var(--text-color) 35%, transparent);
-      font-family: var(--font-display);
-    }
-    .ev--option {
-      border: 1px dashed color-mix(in oklch, var(--text-color) 35%, transparent);
-      color: var(--text-muted);
     }
     .ev--date {
       font-family: var(--font-mono);
@@ -598,6 +656,20 @@
       border-radius: 50%;
       background: var(--danger);
     }
+    /* A call to make, not a collision: the dot's outline, in ink. Red stays
+       for what «Choques» counts. */
+    .d__decide {
+      position: absolute;
+      inset-block-start: 4px;
+      inset-inline-end: 4px;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      border: 1px solid var(--text-muted);
+    }
+    .d__decide--beside {
+      inset-inline-end: 12px;
+    }
     .d__tour {
       position: absolute;
       inset-inline: 0;
@@ -627,11 +699,14 @@
       margin-inline-end: 4px;
       border-radius: 2px;
     }
+    /* The key draws the slip's own edges and paper (Slip.svelte § certainty). */
     .k--firm {
-      border: 1px solid color-mix(in oklch, var(--text-color) 35%, transparent);
+      background: var(--bg-ultra-light);
+      border: 1px solid color-mix(in oklch, var(--text-color) 15%, var(--border-color-light));
     }
     .k--option {
-      border: 1px dashed color-mix(in oklch, var(--text-color) 35%, transparent);
+      background: var(--bg-ultra-light);
+      border: 1px dashed color-mix(in oklch, var(--text-color) 13%, var(--border-color-light));
     }
     .k--tour {
       height: 3px;
@@ -649,6 +724,13 @@
         transparent 1px 4px
       );
     }
+    .k--decide {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      border: 1px solid var(--text-muted);
+      vertical-align: 1px;
+    }
     .k--clash {
       width: 6px;
       height: 6px;
@@ -660,7 +742,9 @@
     /* ── Lists ──────────────────────────────────────────────────────── */
     .row {
       display: grid;
-      grid-template-columns: 5.4rem minmax(0, 1fr);
+      /* Wide enough for the longest short range («24 oct → 25 oct»), and the
+         range never wraps: rows of one list keep one height (diseño B7). */
+      grid-template-columns: 6.8rem minmax(0, 1fr);
       gap: 2px var(--space-s);
       padding-block: 5px;
       text-decoration: none;
@@ -678,6 +762,7 @@
       text-underline-offset: 2px;
     }
     .row__when {
+      white-space: nowrap;
       font-family: var(--font-mono);
       font-size: 10px;
       color: var(--text-muted);
@@ -694,6 +779,7 @@
     }
     .row__what--tent {
       color: var(--text-muted);
+      font-style: italic;
     }
     .row__what small {
       font-family: var(--font-sans);
@@ -701,20 +787,41 @@
       color: var(--text-muted);
       margin-inline-start: 6px;
     }
+    /* Where a tour came from is its own line, so its «·» never hangs at the
+       end of the name's line. */
+    .row__what .row__legs {
+      display: block;
+      margin-inline-start: 0;
+    }
+    .row__note {
+      grid-column: 2;
+      font-family: var(--font-mono);
+      font-size: 9.5px;
+      letter-spacing: 0.04em;
+      color: var(--text-muted);
+    }
     .row__miss {
       grid-column: 2;
       display: flex;
       gap: 4px;
       flex-wrap: wrap;
     }
+    /* MUTED BY DEFAULT (diseño B8): «hotel», «técnica» on every row in
+       amber made the least urgent thing the loudest on the page. The amber is
+       kept for what falls in the next two weeks, where a missing hotel is a
+       call to make today. */
     .miss {
       font-family: var(--font-mono);
       font-size: 9px;
       letter-spacing: 0.04em;
-      color: var(--warning-dark);
-      border: 1px solid color-mix(in oklch, var(--warning) 45%, transparent);
+      color: var(--text-muted);
+      border: 1px solid color-mix(in oklch, var(--text-color) 18%, transparent);
       border-radius: 2px;
       padding: 0 4px;
+    }
+    .row--soon .miss:not(.miss--guess) {
+      color: var(--warning-dark);
+      border-color: color-mix(in oklch, var(--warning) 45%, transparent);
     }
     .miss--guess {
       color: var(--text-muted);
@@ -724,7 +831,7 @@
 
     /* ── Narrow: one column, the queue above the strip (the thumb's job),
        the strip as marks only. Measured on the ELEMENT (ADR-095 §8). ─── */
-    @container (max-width: 640px) {
+    @container season (max-width: 640px) {
       .ov__grid {
         grid-template-columns: minmax(0, 1fr);
         grid-template-areas: 'decide' 'strip' 'lists';
@@ -736,27 +843,26 @@
         grid-template-columns: 2.2rem repeat(7, minmax(0, 1fr));
         gap: 2px;
       }
-      .wk b {
+      .wk b,
+      .wk__w {
         display: none;
       }
       .d {
         min-height: 2.2rem;
         padding: 2px 2px 5px;
       }
-      .ev {
+      .d :global(.slip) {
         padding: 0;
         height: 8px;
-        font-size: 0;
       }
-      .ev :global(.mark),
-      .ev__place,
+      .d :global(.slip > *),
       .ev__more,
       .ev--date,
       .d__travel {
         display: none;
       }
     }
-    @container (min-width: 641px) and (max-width: 900px) {
+    @container season (min-width: 641px) and (max-width: 900px) {
       .ov__grid {
         grid-template-columns: minmax(0, 1fr);
         grid-template-areas: 'strip' 'decide' 'lists';

@@ -13,6 +13,9 @@ import {
   perfInstant,
   performanceSlip,
   dateSlip,
+  dateSpanDays,
+  expandDateSpans,
+  spanSourceId,
   type PerformanceEvent,
   type DateEvent,
 } from './month-events';
@@ -285,5 +288,34 @@ describe('dateSlip', () => {
     test('a trip with neither end nor direction has no lead', () => {
       expect(dateSlip(trip(), CTX).lead).toBeNull();
     });
+  });
+});
+
+describe('dates of several days (Marco, 2026-10-18)', () => {
+  const tz = 'Europe/Madrid';
+  test('an all-day row ending on another day occupies every day', () => {
+    const d = dateRow({ all_day: true, starts_at: '2026-11-16T00:00:00Z', ends_at: '2026-11-19T00:00:00Z' });
+    expect(dateSpanDays(d, tz)).toEqual(['2026-11-16', '2026-11-17', '2026-11-18', '2026-11-19']);
+  });
+  test('a late night is one day; a timed row of 24h or more spans', () => {
+    const night = dateRow({ all_day: false, starts_at: '2026-11-16T21:00:00Z', ends_at: '2026-11-17T01:00:00Z' });
+    expect(dateSpanDays(night, tz)).toEqual(['2026-11-16']);
+    const long = dateRow({ all_day: false, starts_at: '2026-11-16T09:00:00Z', ends_at: '2026-11-18T17:00:00Z' });
+    expect(dateSpanDays(long, tz)).toEqual(['2026-11-16', '2026-11-17', '2026-11-18']);
+  });
+  test('expanding lays one row per day, the first keeps its id and hour', () => {
+    const d = dateRow({ id: 'r1', kind: 'residency', all_day: false, starts_at: '2026-11-16T09:00:00Z', ends_at: '2026-11-18T17:00:00Z' });
+    const rows = expandDateSpans([d], tz);
+    expect(rows.map((r) => r.id)).toEqual(['r1', 'r1#2026-11-17', 'r1#2026-11-18']);
+    expect(rows[0].starts_at).toBe(d.starts_at);
+    expect(rows[0].ends_at).toBeNull();
+    expect(rows[2]).toMatchObject({ all_day: true, starts_at: '2026-11-18T00:00:00.000Z' });
+    expect(new Set(rows.map((r) => r.series_id))).toEqual(new Set(['span:r1']));
+    expect(rows.map((r) => spanSourceId(r.id))).toEqual(['r1', 'r1', 'r1']);
+  });
+  test('a trip and a one-day row are left alone', () => {
+    const trip = dateRow({ kind: 'travel_day', all_day: true, starts_at: '2026-11-16T00:00:00Z', ends_at: '2026-11-18T00:00:00Z' });
+    const one = dateRow({ id: 'o', all_day: true, starts_at: '2026-11-16T00:00:00Z', ends_at: null });
+    expect(expandDateSpans([trip, one], tz)).toEqual([trip, one]);
   });
 });
