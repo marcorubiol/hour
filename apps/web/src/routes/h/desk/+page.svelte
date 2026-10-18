@@ -357,10 +357,14 @@
   let waitingErrored = $derived($conversationsQuery.isError || $tasksQuery.isError);
 
   // ── Band 3 · Ha cambiado, and the Conversations door ───────────────────
+  // The team's threads are the Equipo view of Conversations (ADR-134): with
+  // the lens off, the Desk does not read them either (ADR-132 § 3). Not gated
+  // by Converses: a thread is read by its own rule (ADR-106).
+  let readTeam = $derived(lensOn('conversations'));
   const threadsQuery = createQuery(
     toStore(() => ({
       queryKey: ['thread-feed', filterIds.projectIds, filterIds.workspaceIds] as const,
-      enabled: !scopeUnresolved,
+      enabled: !scopeUnresolved && readTeam,
       staleTime: 0,
       queryFn: ({ signal }: { signal: AbortSignal }) =>
         fetchJSON<ThreadFeedView>(`/api/threads?${feedParams(filterIds)}`, signal),
@@ -393,7 +397,7 @@
   let changes = $derived(
     changesSince(
       {
-        threads: $threadsQuery.data?.threads ?? [],
+        threads: readTeam ? ($threadsQuery.data?.threads ?? []) : [],
         hot: overview?.hot.rows ?? [],
         lastMailout: overview?.last_mailout ?? null,
         payments: paymentsNews,
@@ -404,11 +408,15 @@
     ),
   );
   let changedErrored = $derived(
-    (readConversations && $overviewQuery.isError) || $threadsQuery.isError || (readMoney && $paymentsQuery.isError),
+    (readConversations && $overviewQuery.isError) ||
+      (readTeam && $threadsQuery.isError) ||
+      (readMoney && $paymentsQuery.isError),
   );
   let changedLoading = $derived(
     !changedErrored &&
-      ((readConversations && $overviewQuery.isPending) || $threadsQuery.isPending || (readMoney && $paymentsQuery.isPending)),
+      ((readConversations && $overviewQuery.isPending) ||
+        (readTeam && $threadsQuery.isPending) ||
+        (readMoney && $paymentsQuery.isPending)),
   );
   let quietLabel = $derived.by(() => {
     if (!lastVisit) return t('desk.changed_none_first', locale);

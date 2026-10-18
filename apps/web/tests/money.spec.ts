@@ -187,12 +187,14 @@ test.describe('Cuentas without read:money', () => {
     const tabs = page.locator('.lensswitch');
     await expect(tabs.getByRole('link', { name: 'Planner' })).toBeVisible();
     await expect(tabs.getByRole('link', { name: 'Books' })).toHaveCount(0);
-    // ADR-124: without Converses in any project, Conversations is not offered
-    // either, and its page says so instead of offering to add or import.
-    await expect(tabs.getByRole('link', { name: 'Booking' })).toHaveCount(0);
+    // ADR-124, ADR-134: without Converses in any project there is no Booking
+    // view, but the lens stays for its Team view: no add, no import.
+    await expect(tabs.getByRole('link', { name: 'Conversations' })).toBeVisible();
     await page.goto('/h/conversations');
     await waitForLoaded(page);
-    await expect(page.getByTestId('conversations-no-access')).toBeVisible();
+    const views = page.locator('.lenshead__sub');
+    await expect(views.getByRole('link', { name: 'Team' })).toHaveAttribute('aria-current', 'page');
+    await expect(views.getByRole('link', { name: 'Booking' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Add conversation' })).toHaveCount(0);
 
     // The Desk follows the same flags: neither door is drawn (ADR-124, ADR-127 § 7).

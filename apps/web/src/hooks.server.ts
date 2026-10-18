@@ -159,6 +159,14 @@ const legacyVocabRedirects: Handle = async ({ event, resolve }) => {
     return Response.redirect(dest.toString(), 301);
   }
 
+  // «De qué se habla» (?view=threads) is now the Equipo view (ADR-134).
+  if (/^\/h\/conversations\/?$/.test(path) && event.url.searchParams.get('view') === 'threads') {
+    const dest = new URL('/h/conversations', event.url);
+    dest.search = event.url.search;
+    dest.searchParams.set('view', 'team');
+    return Response.redirect(dest.toString(), 301);
+  }
+
   return resolve(event);
 };
 

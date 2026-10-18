@@ -16,11 +16,13 @@
    * and opens the mailout screen. A mailout belongs to one project, so the
    * bar asks for conversations of a single project.
    *
-   * Two projections (ADR-106, patrón ADR-076), neither secondary: «con quién
-   * hablas» (this list, difusión) and «de qué se habla» (`?view=threads`, the
-   * internal threads the viewer can read, ThreadFeed; ADR-116). Same scope.
+   * Two views in the lens header (ADR-134): Difusión (Contratación in music;
+   * the trade word names the view, not the lens) with the conversations with
+   * venues, and Equipo (`?view=team`), what the team says among itself: the
+   * threads the viewer can read (ThreadFeed, `thread_feed`, ADR-116). Same
+   * scope. `?view=threads`, the old «de qué se habla», redirects to Equipo.
    *
-   * «Con quién hablas» opens on its dashboard (ADR-117, propuesta A): the
+   * Difusión opens on its dashboard (ADR-117, propuesta A): the
    * ConversationOverview blocks above the list. Each block is a filter of the
    * list, carried in the URL (`?turno=`, `?temp=`, `?temporada=actual`) and
    * shown as a removable chip; «Escribir a estas» preloads the selection.
@@ -92,14 +94,15 @@
     toStore(() => organizationsQueryOptions($accessQuery.data?.edit === true)),
   );
 
+  /** The view travels in the URL, so a link says which one it shows. Without
+   *  Converses there is no Difusión to show: the lens is Equipo (ADR-134). */
+  let view = $derived<'sales' | 'team'>(page.url.searchParams.get('view') === 'team' || noAccess ? 'team' : 'sales');
+
   let workspaces = $derived<NavWorkspace[]>($workspacesQuery.data?.items ?? []);
   let workspaceSlugById = $derived(new Map(workspaces.map((w) => [w.id, w.slug])));
   let projectNameById = $derived(
     new Map(($projectsQuery.data?.items ?? []).map((p) => [p.id, p.name ?? p.slug])),
   );
-
-  /** The projection travels in the URL, so a link says which one it shows. */
-  let view = $derived<'people' | 'threads'>(page.url.searchParams.get('view') === 'threads' ? 'threads' : 'people');
 
   function personHref(item: ConversationItem): string | null {
     const workspaceSlug = workspaceSlugById.get(item.workspace_id);
@@ -527,28 +530,28 @@
   <LensHeader>
     {#snippet title()}<LensTitle text={t('lens.conversations', locale)} />{/snippet}
     {#snippet sub()}
-      <a class="lenshead__frag" href="/h/conversations" aria-current={view === 'people' ? 'page' : undefined}
-        >{t('conversations.view_who', locale)}</a
+      {#if !noAccess}
+        <a class="lenshead__frag" href="/h/conversations" aria-current={view === 'sales' ? 'page' : undefined}
+          >{t('conversations.view_sales', locale)}</a
+        >
+      {/if}
+      <a class="lenshead__frag" href="/h/conversations?view=team" aria-current={view === 'team' ? 'page' : undefined}
+        >{t('conversations.view_team', locale)}</a
       >
-      <a class="lenshead__frag" href="/h/conversations?view=threads" aria-current={view === 'threads' ? 'page' : undefined}
-        >{t('conversations.view_what', locale)}</a
-      >
-      {#if view === 'people'}
+      {#if view === 'sales'}
         <!-- On a phone the list starts a screen and a half down: a way straight to it (móvil #11). -->
         <a class="lenshead__frag conversations__skip" href="#lista">{t('overview.go_to_list', locale)}</a>
       {/if}
     {/snippet}
   </LensHeader>
 
-  {#if view === 'threads'}
+  {#if view === 'team'}
     <ThreadFeed
       filters={{ projectIds: filterIds.projectIds, workspaceIds: filterIds.workspaceIds, enabled: !scopeUnresolved }}
       {workspaceSlugById}
       {projectNameById}
       {locale}
     />
-  {:else if noAccess}
-    <p class="conversations__state" data-testid="conversations-no-access">{t('conversations.no_access', locale)}</p>
   {:else}
     <ConversationOverview
       filters={{ projectIds: filterIds.projectIds, workspaceIds: filterIds.workspaceIds, lineIds, enabled: !scopeUnresolved }}
@@ -757,11 +760,6 @@
       }
     }
 
-    .conversations__state {
-      font-size: var(--text-s);
-      color: var(--text-muted);
-    }
-
     .conversations__search {
       flex: 1;
       min-inline-size: 16rem;
@@ -841,7 +839,7 @@
         display: inline-flex;
       }
     }
-    /* Touch: the two projections at the finger's size (móvil #8). */
+    /* Touch: the two views and the skip link at the finger's size (móvil #8). */
     @media (pointer: coarse) {
       .conversations :global(.lenshead__frag) {
         display: inline-flex;

@@ -31,6 +31,10 @@
 
   let { changes, loading, errored, onretry, quietLabel, sinceLabel, workspaceSlugById, locale }: Props = $props();
 
+  // What the team said lives in the Equipo view of Conversations (ADR-134):
+  // with a thread in the band, the way to all of them.
+  let hasThreads = $derived(lensOn('conversations') && changes.some((c) => c.kind === 'thread'));
+
   function line(c: Change): { text: string; kind: string; href: string | null } {
     if (c.kind === 'thread') {
       const th = c.thread;
@@ -77,7 +81,9 @@
 </script>
 
 <section class="dband changed" aria-labelledby="desk-changed-h" aria-busy={loading} data-testid="desk-changed">
-  <BlockHead id="desk-changed-h" title={t('desk.changed_since', locale, { when: sinceLabel })} />
+  <BlockHead id="desk-changed-h" title={t('desk.changed_since', locale, { when: sinceLabel })}>
+    {#if hasThreads}<a class="block-head__act" href="/h/conversations?view=team" data-testid="desk-to-team">{t('conversations.view_team', locale)} →</a>{/if}
+  </BlockHead>
   {#if loading}
     <ul class="feed" aria-hidden="true">
       {#each [0, 1] as i (i)}
