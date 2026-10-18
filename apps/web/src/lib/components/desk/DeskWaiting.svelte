@@ -222,7 +222,12 @@
 </section>
 
 <style>
+  /* The columns belong to the list, not to each row: verb, subject, when
+     and actions fall in one vertical down the whole list (subgrid). */
   .list {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    column-gap: var(--space-s);
     list-style: none;
     margin: 0;
     padding: 0;
@@ -230,14 +235,14 @@
   }
   .row {
     display: grid;
-    grid-template-columns: 5.5rem minmax(0, 1fr) auto auto;
+    grid-column: 1 / -1;
+    grid-template-columns: subgrid;
     align-items: baseline;
-    gap: var(--space-s);
     padding-block: var(--space-xs);
     border-block-end: 1px solid var(--border-color-light);
   }
   .row--wait {
-    grid-template-columns: 1fr;
+    display: flex;
     block-size: 2.4rem;
     align-items: center;
   }
@@ -281,6 +286,8 @@
     inline-size: 0.95rem;
     block-size: 0.95rem;
     margin: 0;
+    /* A checkbox's baseline is its bottom edge: down to the subject's line. */
+    translate: 0 0.15em;
     accent-color: var(--primary);
     cursor: pointer;
   }
@@ -498,15 +505,25 @@
 
   /* Phone: the action stays on the right, the context drops under the
      subject instead of disappearing. */
+  /* Phone: when on the subject's line, the context under the subject, and
+     the actions on a line of their own (room for a thumb, the name whole). */
   @media (max-width: 47.999rem) {
+    .list {
+      display: block;
+    }
     .row {
       grid-template-columns: 4.25rem minmax(0, 1fr) auto;
-      grid-template-areas: 'verb subject acts' 'verb when acts';
+      grid-template-areas: 'verb subject when' 'verb acts acts';
+      column-gap: var(--space-s);
       row-gap: 0;
     }
-    .row--wait {
-      grid-template-columns: 1fr;
-      grid-template-areas: none;
+    .row:not(:has(.row__acts > *)) {
+      grid-template-areas: 'verb subject when';
+    }
+    /* A task's only action is its ×: it stays at the end of the line. */
+    .row--task {
+      grid-template-columns: 4.25rem minmax(0, 1fr) auto auto;
+      grid-template-areas: 'verb subject when acts';
     }
     .row__verb {
       grid-area: verb;
@@ -519,7 +536,10 @@
     }
     .row__acts {
       grid-area: acts;
-      align-self: center;
+      justify-self: start;
+    }
+    .row__acts:not(:has(*)) {
+      display: none;
     }
     .run {
       grid-template-columns: 1fr;
