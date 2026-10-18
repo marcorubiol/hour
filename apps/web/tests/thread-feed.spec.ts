@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs';
 import { loadEnvFile } from 'node:process';
 
 /**
- * ADR-106, fase 4 (ADR-116): «de qué se habla» en Conversations.
+ * ADR-106, fase 4 (ADR-116): «de qué se habla», hoy la vista Equipo de Conversaciones (ADR-134).
  *
  * Lo que fija, con dos logins de verdad:
  *   - el hilo con un mensaje nuevo sale arriba, aunque otro hilo tenga un
@@ -48,7 +48,7 @@ async function signIn(page: Page, email: string, password: string) {
   await page.waitForURL(/\/h\/?$/, { timeout: 60_000 });
 }
 
-test.describe('«de qué se habla» en Conversations (ADR-116)', () => {
+test.describe('Conversaciones › Equipo: los hilos del equipo (ADR-116, ADR-134)', () => {
   test.skip(
     !EMAIL || !PASSWORD || !LIMITED_EMAIL || !LIMITED_PASSWORD || !process.env.PUBLIC_SUPABASE_URL,
     'Set PW_TEST_*, PW_LIMITED_* and PUBLIC_SUPABASE_*.',
@@ -138,7 +138,22 @@ test.describe('«de qué se habla» en Conversations (ADR-116)', () => {
 
   test('lo nuevo arriba, y la fila del bolo abre la función con su tablón', async ({ page }) => {
     test.setTimeout(90_000);
+    // La URL vieja de «de qué se habla» lleva a la vista Equipo (ADR-134).
     await page.goto('/h/conversations?view=threads');
+    await page.waitForURL(/\/h\/conversations\?view=team$/);
+    await expect(page.getByRole('navigation', { name: 'Sections' }).getByRole('link', { name: 'Conversations' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    await expect(page.locator('.lenshead__sub').getByRole('link', { name: 'Team' })).toHaveAttribute('aria-current', 'page');
+
+    // Desk enseña lo nuevo del equipo y enlaza a la vista Equipo.
+    await page.goto('/h/desk?scope=s:playwright');
+    const changed = page.getByTestId('desk-changed');
+    await expect(changed).toContainText(VENUE, { timeout: 30_000 });
+    await changed.getByTestId('desk-to-team').click();
+    await page.waitForURL(/\/h\/conversations\?view=team/);
+
     const rows = page.getByTestId('feed-row');
     await expect(rows.first()).toBeVisible({ timeout: 30_000 });
 
@@ -165,7 +180,7 @@ test.describe('«de qué se habla» en Conversations (ADR-116)', () => {
 
     // De vuelta, la fila ya no dice «nuevos».
 
-    await page.goto('/h/conversations?view=threads');
+    await page.goto('/h/conversations?view=team&scope=s:playwright');
     const again = page.getByTestId('feed-row').filter({ hasText: VENUE }).filter({ hasText: NEW_BODY });
     await expect(again).toBeVisible({ timeout: 30_000 });
     await expect(again.locator('.badge--info')).toHaveCount(0);
@@ -173,7 +188,7 @@ test.describe('«de qué se habla» en Conversations (ADR-116)', () => {
 
   test('la fila de la conversación abre su hilo del equipo', async ({ page }) => {
     test.setTimeout(60_000);
-    await page.goto('/h/conversations?view=threads');
+    await page.goto('/h/conversations?view=team');
     const row = page.getByTestId('feed-row').filter({ hasText: CONV });
     await expect(row).toBeVisible({ timeout: 30_000 });
     await row.locator('a').click();
@@ -187,12 +202,15 @@ test.describe('«de qué se habla» en Conversations (ADR-116)', () => {
     try {
       const page = await context.newPage();
       await signIn(page, LIMITED_EMAIL!, LIMITED_PASSWORD!);
-      await page.goto('/h/conversations?view=threads');
+      await page.goto('/h/conversations?view=team');
       const rows = page.getByTestId('feed-row');
       await expect(rows.filter({ hasText: NEW_BODY })).toHaveCount(1, { timeout: 30_000 });
       await expect(page.getByText(DINERS_BODY)).toHaveCount(0);
       await expect(page.getByText(CONV)).toHaveCount(0);
       await expect(page.getByText(TEAM_BODY)).toHaveCount(0);
+      // Sin Converses no hay vista de venta, pero la lente sigue por Equipo: lee el General del bolo.
+      await expect(page.getByRole('navigation', { name: 'Sections' }).getByRole('link', { name: 'Conversations' })).toBeVisible();
+      await expect(page.locator('.lenshead__sub').getByRole('link', { name: 'Booking' })).toHaveCount(0);
     } finally {
       await context.close();
     }

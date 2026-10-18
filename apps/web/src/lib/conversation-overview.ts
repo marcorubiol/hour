@@ -25,7 +25,6 @@
  */
 
 import { CONVERSATION_STATUSES, type ConversationStatus } from './conversation';
-import type { FeedThread } from './threads';
 
 /** Caliente: actividad o un correo de ellos en estos días. */
 export const HOT_DAYS = 14;
@@ -621,6 +620,4 @@ export interface LastMailout {
 /** `GET /api/conversations/overview`. */
 export interface OverviewResponse extends ConversationOverview {
   last_mailout: LastMailout | null;
-  /** Hilos del equipo con mensajes nuevos («Del equipo»): los primeros y cuántos son. */
-  team: { count: number; me: string; threads: FeedThread[]; authors: Record<string, string> };
 }

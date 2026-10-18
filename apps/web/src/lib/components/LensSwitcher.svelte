@@ -17,7 +17,6 @@
   import { useLens, type Lens } from '$lib/stores/lens.svelte';
   import { detectLocale, t } from '$lib/i18n';
   import { moneyAccessAnyQueryOptions } from '$lib/bolo-queries';
-  import { conversationAccessQueryOptions } from '$lib/conversation-access';
   import { lensOn } from '$lib/lenses.svelte';
 
   const lens = useLens();
@@ -25,20 +24,18 @@
 
   // Desk is the home/digest, not a peer lens (grill 2026-07-23): it gets its own
   // pill; the segmented "view as" holds only the three concern lenses.
-  // Cuentas only for whoever reads money in some project (ADR-117), and
-  // Conversations for whoever reads conversations in some (ADR-124). Cuentas
+  // Cuentas only for whoever reads money in some project (ADR-117).
+  // Conversations for everyone: without Converses (ADR-124) its Difusión view
+  // is gone but its Equipo view stays, the team's threads (ADR-134). Cuentas
   // keeps its place but draws nothing until an explicit «yes»: it does not
   // blink in for those who have it, nor flash its name at those who do not.
   // And a lens shows only where the space uses it (ADR-132): on AND access.
   const moneyAccess = createQuery(moneyAccessAnyQueryOptions());
-  const conversationAccess = createQuery(conversationAccessQueryOptions());
   let moneyPending = $derived($moneyAccess.isPending);
   let VIEW_AS = $derived<{ id: Lens; label: string }[]>(
     [
       { id: 'planner' as const, label: t('lens.planner', locale) },
-      ...($conversationAccess.data?.read === false && !$conversationAccess.isPending
-        ? []
-        : [{ id: 'conversations' as const, label: t('lens.conversations', locale) }]),
+      { id: 'conversations' as const, label: t('lens.conversations', locale) },
       ...($moneyAccess.data?.read_money === true || moneyPending
         ? [{ id: 'books' as const, label: t('lens.money', locale) }]
         : []),

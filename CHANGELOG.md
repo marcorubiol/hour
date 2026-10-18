@@ -6,6 +6,7 @@ hasta entonces, sacado de esos documentos; lo anterior a julio de 2026 está sol
 
 ## Octubre 2026 (en curso)
 
+- Conversaciones vuelve a ser una sola lente, con dos vistas: **Difusión** (Contratación en música), con las salas, la lista, la ficha y el envío; y **Equipo**, con los hilos del equipo de cada bolo y sala, los nuevos arriba. La dirección vieja de «De qué se habla» lleva a Equipo. (2026-10-19)
 - En Desk, la tarjeta de lo siguiente dice quién va; la puerta del Planner cuenta los choques como la Temporada; y «Ha cambiado» dice los cobros nuevos. (2026-10-19)
 - Cada espacio activa o desactiva sus lentes (Planner, Difusión o Contratación, Cuentas) en Ajustes: una lente apagada desaparece de la navegación, de ⌘K y de Desk, sin borrar datos. En Cuentas, un bolo de varias funciones pide factura tras la última, y en Desk aceptar una propuesta de la IA ya la guarda como tarea. (2026-10-18, `d244ecf4`)
 - Hour habla como el oficio: la lente de venta se llama Difusión (Contratación en música), «hold» pasa a «opción», fuera «caliente» y «se enfría» («sin noticias»), «rechazada» pasa a «no esta vez», y cada espacio elige en Ajustes si es de escena o de música en directo, que cambia unas pocas palabras (función o concierto, reparto o formación, plan de trabajo o escaleta). En francés, el bolo es *contrat* y lo que paga la sala, *prix de cession*. (2026-10-18, `a4db0711`)

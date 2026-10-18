@@ -7,7 +7,8 @@
    * `#lista`) y «Se enfría» es una selección hecha para «Escribir a N».
    *
    * Un bloque sin filas se queda en una línea (el vacío también contesta);
-   * «Último envío» y «Del equipo» desaparecen si no hay nada. Sin
+   * «Último envío» desaparece si no hay nada (los hilos del equipo son la
+   * lente Equipo, ADR-133). Sin
    * conversaciones en el alcance no se pinta nada: la lista enseña su vacío.
    */
 
@@ -42,8 +43,6 @@
     type HotRow,
     type OverviewResponse,
   } from '$lib/conversation-overview';
-  import ThreadFeedRow from '$lib/components/ThreadFeedRow.svelte';
-  import { feedHref } from '$lib/threads';
 
   interface Props {
     filters: { projectIds: string[]; workspaceIds: string[]; lineIds: string[]; enabled: boolean };
@@ -67,7 +66,6 @@
     return [...by.entries()].map(([projectId, list]) => ({ projectId, picks: list })).sort((a, b) => b.picks.length - a.picks.length);
   }
 
-  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
   function params(f: Props['filters']): string {
     const p = new URLSearchParams();
@@ -293,28 +291,6 @@
         {/if}
       </section>
 
-      {#if data.team.count > 0}
-        <section class="block block--team" aria-labelledby="ov-team" data-testid="block-team">
-          <BlockHead id="ov-team" title={t('overview.team', locale)} count={t('overview.team_new', locale, { n: data.team.count })}>
-            <a class="block-head__act" href="/h/conversations?view=threads">{t('conversations.view_what', locale)}</a>
-          </BlockHead>
-          <ol class="rows">
-            {#each data.team.threads as th (th.thread_id)}
-              {@const id = th.last_message.author_id}
-              <li>
-                <ThreadFeedRow
-                  {th}
-                  href={feedHref(th, workspaceSlugById.get(th.workspace_id)) ?? null}
-                  author={id && id === data.team.me ? t('threads.you', locale) : (id && data.team.authors[id]) || t('threads.someone', locale)}
-                  dense
-                  {locale}
-                  {tz}
-                />
-              </li>
-            {/each}
-          </ol>
-        </section>
-      {/if}
     </div>
 
     <div class="board__col">
@@ -628,9 +604,6 @@
     .row--late .row__when strong {
       color: var(--warning-dark);
     }
-    .block--team .rows > li {
-      border-block-end: 1px solid var(--border-color-light);
-    }
     /* The voice is the shared sub-eyebrow (diseño B5); only its place here. */
     .rows__sep {
       display: block;
@@ -736,7 +709,7 @@
     }
     /* Móvil: una columna en el orden del documento, que es el que lee el
        teclado y el lector de pantalla: primero lo que pide acción (te toca,
-       caliente, del equipo), después el estado (temporada, se enfría, el
+       caliente), después el estado (temporada, se enfría, el
        envío). Sin `order`: lo que se ve y lo que se recorre no se separan
        (móvil #4). Tres filas por bloque y los botones a lo ancho. */
     @container (max-width: 44rem) {

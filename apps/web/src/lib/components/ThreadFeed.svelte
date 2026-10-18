@@ -1,8 +1,8 @@
 <script lang="ts">
   /**
-   * «De qué se habla», la segunda proyección de Conversations (ADR-106,
-   * ADR-116): los hilos con mensajes que quien mira puede leer, los que
-   * tienen nuevos arriba. Cada fila abre su ficha: la función con el tablón
+   * La vista Equipo de Conversaciones (ADR-134; antes «de qué se habla»,
+   * ADR-106 y 116): los hilos con mensajes que quien mira puede leer, los que tienen
+   * nuevos arriba. Cada fila abre su ficha: la función con el tablón
    * de su bolo, o la conversación con su hilo del equipo.
    *
    * Solo lectura: se escribe en la ficha. Sin realtime (ADR-083 §2): se
@@ -68,7 +68,7 @@
   }
 </script>
 
-<section class="feed" aria-busy={$feedQuery.isLoading} aria-label={t('conversations.view_what', locale)}>
+<section class="feed" aria-busy={$feedQuery.isLoading} aria-label={t('team.feed_aria', locale)}>
   {#if $feedQuery.isLoading}
     <p class="feed__msg">{t('conversations.loading', locale)}</p>
   {:else if $feedQuery.isError}

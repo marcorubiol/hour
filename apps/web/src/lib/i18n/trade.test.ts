@@ -5,8 +5,8 @@ afterEach(() => setTrade('stage'));
 
 describe('t() and the trade (ADR-128)', () => {
   test('stage reads the plain key; music reads its variant', () => {
-    expect(t('lens.conversations', 'es', undefined, 'stage')).toBe('Difusión');
-    expect(t('lens.conversations', 'es', undefined, 'music')).toBe('Contratación');
+    expect(t('conversations.view_sales', 'es', undefined, 'stage')).toBe('Difusión');
+    expect(t('conversations.view_sales', 'es', undefined, 'music')).toBe('Contratación');
     expect(t('perf.new_title', 'fr', undefined, 'music')).toBe('Nouveau concert');
   });
 
