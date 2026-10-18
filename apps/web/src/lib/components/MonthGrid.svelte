@@ -1939,12 +1939,12 @@
        the same law governs all four drawings: today is the cell's 4% wash and
        one step of weight on its number. */
     .cal__day--today {
-      background: color-mix(in oklch, var(--text-color) 4%, transparent);
+      background: var(--today-wash);
     }
     .cal__day--today .cal__day-num {
       font-size: 16px;
-      font-weight: 600;
-      color: var(--text-color);
+      font-weight: var(--today-weight);
+      color: var(--today-ink);
     }
 
     .cal__day-num {

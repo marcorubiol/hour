@@ -1470,7 +1470,8 @@
     }
 .ag__day--today .ag__wd,
     .ag__day--today .ag__num {
-      color: var(--ag-black-accent);
+      color: var(--today-ink);
+      font-weight: var(--today-weight);
     }
 .ag__rows {
       /* STRETCHED, so that «at the foot» has a floor to sit on. The day is a

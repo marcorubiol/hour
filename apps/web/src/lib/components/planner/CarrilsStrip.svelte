@@ -815,7 +815,8 @@
     /* Today: ink in the number and the word — and NOTHING else. No fill,
        no width, never gray: the wash CSS simply is not written (ruling 3). */
     .board__head.today .board__num {
-      color: var(--text-color);
+      color: var(--today-ink);
+      font-weight: var(--today-weight);
     }
     .board__todayw {
       display: block;

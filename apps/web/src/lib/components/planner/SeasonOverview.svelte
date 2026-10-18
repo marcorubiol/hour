@@ -544,11 +544,12 @@
       margin-inline-start: 3px;
       color: var(--text-color);
     }
+    .d--today {
+      background-color: var(--today-wash);
+    }
     .d--today .d__n {
-      color: var(--text-color);
-      font-weight: 600;
-      text-decoration: underline;
-      text-underline-offset: 2px;
+      color: var(--today-ink);
+      font-weight: var(--today-weight);
     }
     .ev {
       display: flex;

@@ -152,6 +152,17 @@
     /* than the subject. What must never differ is which view says it.*/
     /* ============================================================ */
 
+    /* ============================================================ */
+    /* TODAY — one mark in every drawing (diseño M7, 2026-10-18).    */
+    /* It was an underline in the Season, a wash in the Month, amber */
+    /* in the Agenda and ink on the Board. Today is INK and one step */
+    /* of WEIGHT on its number; a drawing with cells adds the WASH   */
+    /* (the Board does not: Marco's ruling 3). Never a colour.       */
+    /* ============================================================ */
+    --today-ink: var(--text-color);
+    --today-weight: 600;
+    --today-wash: color-mix(in oklch, var(--text-color) 4%, transparent);
+
     /* the kind word — AWAY / ON TOUR */
     --away-word: var(--text-muted);
     /* the subject, in the body voice a band gives it */
