@@ -460,8 +460,10 @@
     font-size: var(--text-xs);
     color: var(--text-faint);
   }
+  /* Today is the app's one «today» (tokens.css `--today-*`), never a colour. */
   .bucket--today .bucket__label {
-    --eyebrow-color: var(--primary);
+    --eyebrow-color: var(--today-ink);
+    font-weight: var(--today-weight);
   }
   .bucket__head--overdue .bucket__label {
     --eyebrow-color: var(--danger);
