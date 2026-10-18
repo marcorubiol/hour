@@ -255,7 +255,7 @@
     return whole > 0 ? Math.max(0, Math.min(100, (part / whole) * 100)) : 0;
   }
   function where(b: MoneyBolo): string {
-    return [b.venue_name, b.city].filter(Boolean).join(' · ') || b.project?.name || '—';
+    return [b.venue_name, b.city].filter(Boolean).join(' · ') || b.project?.name || DASH;
   }
 
   /** The why of an attention row, in words («68 days, usually pays at 45»). */
@@ -339,7 +339,7 @@
         map.get(key) ??
         {
           projectId: key,
-          name: b.project?.name ?? '—',
+          name: b.project?.name ?? DASH,
           accent: b.project?.accent ?? 'var(--text-faint)',
           slug: b.project?.slug ?? '',
           workspaceId: b.project?.workspace_id ?? '',
@@ -645,7 +645,7 @@
     ...scopedLines.map((l) => ({ value: `line:${l.id}`, label: t('books.anchor_line', locale, { name: l.name, project: l.projectName }) })),
     ...bolos.map((b) => ({
       value: `bolo:${b.id}`,
-      label: t('books.anchor_deal', locale, { where: [b.venue_name, b.city].filter(Boolean).join(', ') || b.project?.name || '—' }),
+      label: t('books.anchor_deal', locale, { where: [b.venue_name, b.city].filter(Boolean).join(', ') || b.project?.name || DASH }),
     })),
   ]);
   function openExpense(b?: MoneyBolo) {
@@ -900,12 +900,12 @@
                   <li class="att__row" data-kind={item.kind}>
                     <span class="att__what">
                       <a class="att__who" href={`#bolo-${item.bolo.id}`} onclick={(e) => { e.preventDefault(); focusBolo(item.bolo.id); }}>
-                        {item.doc?.payer?.name ?? item.bolo.venue_name ?? item.bolo.project?.name ?? '—'}
+                        {item.doc?.payer?.name ?? item.bolo.venue_name ?? item.bolo.project?.name ?? DASH}
                       </a>
                       <span class="att__ctx">{[item.doc?.number ?? item.bolo.city, item.kind === 'fiscal' || item.kind === 'draft' ? invoiceStatusLabel('draft', locale) : null].filter(Boolean).map((x) => ` · ${x}`).join('')}</span>
                       <span class="att__why">{attentionWhy(item)}</span>
                     </span>
-                    <span class="att__amt">{item.amount === null ? '·' : fmtMoney(item.amount)}{#if item.amount !== null && multiCurrency}&nbsp;{item.currency}{/if}</span>
+                    <span class="att__amt">{item.amount === null ? DASH : fmtMoney(item.amount)}{#if item.amount !== null && multiCurrency}&nbsp;{item.currency}{/if}</span>
                     <Button size="xs" variant="outline" onclick={() => act(item)}>{t(actionKey(item), locale)}</Button>
                   </li>
                 {/each}
@@ -987,7 +987,7 @@
                   <th scope="col" class="book__num">{t('books.fee', locale)}</th>
                   <th scope="col" class="book__num">{t('books.collected', locale)}</th>
                   <th scope="col" class="book__num book__owed">{t('books.col_owed', locale)}</th>
-                  <th scope="col">{t('books.col_collect', locale)}</th>
+                  <th scope="col" class="book__collect">{t('books.col_collect', locale)}</th>
                 </tr>
               </thead>
               {#each ledgerGroups as group (group.projectId)}
@@ -1009,13 +1009,13 @@
                       <td class="book__date">{b.next_performed_at ? dayLabel(b.next_performed_at) : t('books.no_date', locale)}{#if b.function_count > 1}<span class="book__fns">{` · ${t('books.fn_count', locale, { n: b.function_count })}`}</span>{/if}</td>
                       <td class="book__venue">
                         <button type="button" class="book__toggle" aria-expanded={open} aria-controls={`bolo-sheet-${b.id}`} onclick={() => toggleRow(b)}>
-                          {b.venue_name || '—'}{#if b.city}<span class="book__city">{` · ${b.city}`}</span>{/if}
+                          {b.venue_name || DASH}{#if b.city}<span class="book__city">{` · ${b.city}`}</span>{/if}
                         </button>
                       </td>
                       <td class="book__status"><StateBadge label={boloStatusLabel(b.status, locale)} tone={performanceStatusTone(b.status)} /></td>
-                      <td class="book__doc">{#if m.doc}<span class="book__chip">{m.doc.number ?? invoiceStatusLabel(m.doc.status, locale)}</span>{:else}<span class="book__faint">·</span>{/if}</td>
+                      <td class="book__doc">{#if m.doc}<span class="book__chip">{m.doc.number ?? invoiceStatusLabel(m.doc.status, locale)}</span>{:else}<span class="book__faint">{DASH}</span>{/if}</td>
                       <td class="book__num"><button type="button" class="book__fee" title={t('books.edit_fee', locale)} onclick={() => openFee(b)}>{b.fee_amount === null ? t('books.no_fee', locale) : fmtMoney(Number(b.fee_amount))}</button>{#if multiCurrency && b.fee_amount !== null}<span class="book__cur">{m.currency}</span>{/if}</td>
-                      <td class="book__num">{#if m.fee === null && !m.doc}·{:else}{fmtMoney(m.collected)}{#if multiCurrency}<span class="book__cur">{m.currency}</span>{/if}{/if}</td>
+                      <td class="book__num">{#if m.fee === null && !m.doc}<span class="book__faint">{DASH}</span>{:else}{fmtMoney(m.collected)}{#if multiCurrency}<span class="book__cur">{m.currency}</span>{/if}{/if}</td>
                       <td class="book__num book__owed">{#if m.owed > 0}{fmtMoney(m.owed)}{#if multiCurrency}<span class="book__cur">{m.currency}</span>{/if}{/if}</td>
                       <td class="book__collect">{#if pill}<span class="pill" data-tone={pill.tone}>{pill.label}</span>{/if}</td>
                     </tr>
@@ -1045,7 +1045,7 @@
                                 {#each docs as d (d.id)}
                                   <p>
                                     <button type="button" class="sheet__link" onclick={() => void showDocument(d.id)}>{d.number ?? invoiceStatusLabel(d.status, locale)}</button>
-                                    · {invoiceStatusLabel(d.status, locale)} · {fmtMoney(Number(d.total))} {d.currency}
+                                    · {invoiceStatusLabel(d.status, locale)} · <span class="sheet__num">{fmtMoney(Number(d.total))} {d.currency}</span>
                                   </p>
                                   {#if d.id === m.doc?.id && m.aging?.expectedOn && d.status === 'issued'}
                                     <p class="sheet__faint" class:sheet__danger={m.overdue}>{t('books.sheet_expected', locale, { date: dayLabel(m.aging.expectedOn) })}{#if d.payer}{` · ${d.payer.name}`}{/if}</p>
@@ -1055,7 +1055,7 @@
                             </div>
                             <div class="sheet__col">
                               <p class="sheet__h">{t('books.sheet_money', locale)}</p>
-                              <p>{t('books.collected_of', locale, { collected: fmtMoney(m.collected), fee: m.fee === null ? '·' : fmtMoney(m.fee) })}</p>
+                              <p class="sheet__num">{t('books.collected_of', locale, { collected: fmtMoney(m.collected), fee: m.fee === null ? DASH : fmtMoney(m.fee) })}</p>
                               {#if spent.length > 0}
                                 <p class="sheet__faint">{t('books.expenses', locale)}: {spent.map((e) => `${e.description} ${fmtMoney(Number(e.amount))}`).join(' · ')}</p>
                               {/if}
@@ -1101,7 +1101,7 @@
             <ul class="mny__expenses" role="list">
               {#each expenses as expense (expense.id)}
                 <li>
-                  <span class="mny__cell-date">{expense.incurred_on ? dayLabel(expense.incurred_on) : '—'}</span>
+                  <span class="mny__cell-date">{expense.incurred_on ? dayLabel(expense.incurred_on) : DASH}</span>
                   <span class="mny__expense-description"><b>{expense.description}</b>{#if expense.counterparty}<span class="mny__expense-counter"> · {expense.counterparty}</span>{/if}</span>
                   <span class="mny__expense-category">{categoryLabel(expense.category, locale)}</span>
                   <strong>− {fmtMoney(expense.amount)} {expense.currency}</strong>
@@ -1117,7 +1117,7 @@
 
 <Dialog bind:open={feeOpen} title={t('books.fee', locale)} size="s" onclose={() => (feeEditing = null)}>
   {#if feeEditing}
-    <p class="mny__dialog-who">{feeEditing.project?.name ?? ''} — {[feeEditing.venue_name, feeEditing.city].filter(Boolean).join(', ')}</p>
+    <p class="mny__dialog-who">{[feeEditing.project?.name, [feeEditing.venue_name, feeEditing.city].filter(Boolean).join(', ')].filter(Boolean).join(' · ')}</p>
   {/if}
   <div class="mny__fee-form">
     <Input label={t('books.amount', locale)} type="number" bind:value={fAmount} placeholder={t('books.ph_fee_clear', locale)} />
@@ -1150,7 +1150,7 @@
 
 <Dialog bind:open={invOpen} title={t(invDocType === 'proforma' ? 'books.new_proforma' : 'books.new_invoice', locale)} size="m" onclose={() => (invBolo = null)}>
   {#if invBolo}
-    <p class="mny__dialog-who">{invBolo.project?.name ?? ''} — {[invBolo.venue_name, invBolo.city].filter(Boolean).join(', ')}</p>
+    <p class="mny__dialog-who">{[invBolo.project?.name, [invBolo.venue_name, invBolo.city].filter(Boolean).join(', ')].filter(Boolean).join(' · ')}</p>
     <p class="mny__inv-fee-line">{t('books.fee_subtotal', locale)} <strong>{fmtFee(invBolo.fee_amount, invBolo.fee_currency)}</strong> {t('books.snapshot_note', locale)}</p>
     <div class="mny__inv-form">
       <Input label={t('books.vat_pct', locale)} type="number" bind:value={iVat} placeholder={t('books.ph_vat', locale)} />
@@ -1315,6 +1315,7 @@
     .book { inline-size: 100%; border-collapse: collapse; font-size: var(--text-s); }
     .book th { text-align: start; font-family: var(--font-mono); font-size: var(--text-xs); font-weight: 400; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-faint); padding: var(--space-2xs) var(--space-xs); border-block-end: 1px solid var(--border-color-light); }
     .book td { padding: var(--space-xs); border-block-end: 1px solid var(--border-color-light); vertical-align: baseline; }
+    .book .book__collect { padding-inline-start: var(--space-m); }
     .book__num { text-align: end !important; font-family: var(--font-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
     .book__row { scroll-margin-block: var(--space-xl); }
     .book__row:hover, .book__row.is-open { background: color-mix(in oklch, var(--bg-light) 55%, transparent); }
@@ -1335,6 +1336,7 @@
     .book__sheet td { background: color-mix(in oklch, var(--bg-light) 55%, transparent); padding: var(--space-s) var(--space-m) var(--space-m); }
     .sheet { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-m); font-size: var(--text-s); }
     .sheet p { margin: 0; }
+    .sheet__num { font-family: var(--font-mono); font-size: var(--text-xs); font-variant-numeric: tabular-nums; }
     .sheet__col { display: flex; flex-direction: column; gap: var(--space-2xs); min-inline-size: 0; }
     .sheet__h { font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-faint); }
     .sheet__faint { color: var(--text-muted); font-size: var(--text-xs); }
@@ -1386,6 +1388,7 @@
       .book__row .book__num:nth-of-type(5) { grid-column: 2; grid-row: 1; }
       .book__date { grid-column: 1; grid-row: 2; }
       .book__collect { grid-column: 2; grid-row: 2; justify-self: end; }
+      .book .book__collect { padding-inline-start: 0; }
       .book__status, .book__doc, .book__row .book__num:nth-of-type(6), .book__owed { display: none; }
       .book__group, .book__sheet { display: block; }
       .book__group th, .book__sheet td { display: block; }
