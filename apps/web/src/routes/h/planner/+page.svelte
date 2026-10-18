@@ -44,6 +44,8 @@
   import {
     dateDayKey,
     deducedPhrase,
+    expandDateSpans,
+    spanSourceId,
     monthName,
     perfDayKey,
     type AwayBandVM,
@@ -601,13 +603,20 @@
         ? ($agendaPerfQuery.data?.items ?? [])
         : ($perfQuery.data?.items ?? []),
   );
-  let activeDateRows = $derived(
+  /** The rows as the server sent them — the ones an edit opens. */
+  let sourceDateRows = $derived(
     onSeason
       ? ($seasonDatesQuery.data?.items ?? [])
       : onBookWindow
         ? ($agendaDatesQuery.data?.items ?? [])
         : ($datesQuery.data?.items ?? []),
   );
+  /* A DATE OF SEVERAL DAYS OCCUPIES ALL OF THEM (Marco, 2026-10-18): laid out
+     one row per day here, once, so every drawing, the census and the gaps
+     read it without a second rule. Ids of the extra days are `id#day`;
+     whatever talks to the server goes through `spanSourceId`. */
+  let activeDateRows = $derived(expandDateSpans(sourceDateRows, viewerTz));
+  let sourceDateById = $derived(new Map(sourceDateRows.map((d) => [d.id, d])));
   let activeBlackoutRows = $derived(
     onSeason
       ? ($seasonAvailabilityQuery.data?.items ?? [])
@@ -1453,7 +1462,7 @@
       if (!ORDERED_DATE_KINDS.includes(d.kind)) continue;
       out.push({
         target: 'date',
-        id: d.id,
+        id: spanSourceId(d.id),
         name: dateSlip(d, slipCtxPage).name,
         tz: clockOf(d.venue?.timezone, d.project?.workspace_id),
         from: d.starts_at,
@@ -2205,7 +2214,7 @@
         body: draft.body,
         on_day: draft.on_day,
         ...(draft.performance_id ? { performance_id: draft.performance_id } : {}),
-        ...(draft.date_id ? { date_id: draft.date_id } : {}),
+        ...(draft.date_id ? { date_id: spanSourceId(draft.date_id) } : {}),
         ...(!anchored && noteFallback.project_id ? { project_id: noteFallback.project_id } : {}),
         ...(!anchored && noteFallback.line_id ? { line_id: noteFallback.line_id } : {}),
         ...(!anchored && !noteFallback.project_id && !noteFallback.line_id && noteFallback.workspace_id
@@ -2796,7 +2805,8 @@
   });
 
   function openDate(d: DateEvent) {
-    editDate = d;
+    // A drawn day of a date of several days opens the date itself.
+    editDate = sourceDateById.get(spanSourceId(d.id)) ?? d;
     editOpen = true;
   }
 

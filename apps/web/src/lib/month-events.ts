@@ -214,6 +214,78 @@ export function dateDayKey(d: DateEvent, timeZone: string): string {
   return dayKeyInTz(d.starts_at, d.venue?.timezone || timeZone);
 }
 
+/** A day on the timed clock is not a second day of the thing: a rehearsal
+    from 22h to 2h is one evening. Past this length a timed date spans days. */
+const SPAN_MIN_MS = 24 * 3_600_000;
+/** A date row that spans days is never drawn past this many (a typo guard). */
+const SPAN_MAX_DAYS = 92;
+
+/**
+ * Every day a date row occupies, first to last (Marco, 2026-10-18).
+ *
+ * A row whose `ends_at` falls on another day occupies all of its days, the
+ * way a gig of several days already does. Before, everything bucketed by
+ * `dateDayKey` alone and a residency from the 16th to the 19th was drawn on
+ * the 16th, with the 17th to the 19th offered as a gap to sell.
+ *
+ * All-day rows store their last day as `ends_at`'s date (EditDateDialog
+ * writes `${day}T00:00:00Z`). A timed row only spans when it ends on another
+ * day AND lasts 24 hours or more: a late night is not a second day.
+ */
+export function dateSpanDays(d: DateEvent, timeZone: string): string[] {
+  const first = dateDayKey(d, timeZone);
+  if (!d.ends_at) return [first];
+  const last = d.all_day ? d.ends_at.slice(0, 10) : dayKeyInTz(d.ends_at, d.venue?.timezone || timeZone);
+  if (last <= first) return [first];
+  if (!d.all_day && Date.parse(d.ends_at) - Date.parse(d.starts_at) < SPAN_MIN_MS) return [first];
+  const out: string[] = [];
+  for (let day = first; day <= last && out.length < SPAN_MAX_DAYS; day = nextDay(day)) out.push(day);
+  return out;
+}
+
+function nextDay(iso: string): string {
+  const t = Date.UTC(+iso.slice(0, 4), +iso.slice(5, 7) - 1, +iso.slice(8, 10)) + 86_400_000;
+  return new Date(t).toISOString().slice(0, 10);
+}
+
+/** The id a drawn day of a spanning date stands for — what the server knows. */
+export function spanSourceId(id: string): string {
+  const i = id.indexOf('#');
+  return i === -1 ? id : id.slice(0, i);
+}
+
+/**
+ * The Planner's rows with every spanning date laid out one row per day, so
+ * every drawing (month, agenda, day, board, season) and the census place it
+ * on all of its days without learning a second rule.
+ *
+ * The first day is the row itself (its hour stays; the end hour, which
+ * belongs to another day, goes). Each further day is a copy for that day,
+ * all-day, with the id `${id}#${day}` so no two drawn rows share a key.
+ * They share a series (the row's own, else `span:${id}`), which is how the
+ * month already draws a run of days as one band (ADR-084 §1). Anything that
+ * talks to the server about a drawn row goes through `spanSourceId`.
+ *
+ * A trip is left alone: its days are its stages (ADR-089), and copying an
+ * outbound leg would pair the tour against itself.
+ */
+export function expandDateSpans<D extends DateEvent>(rows: readonly D[], timeZone: string): D[] {
+  const out: D[] = [];
+  for (const d of rows) {
+    const days = d.kind === 'travel_day' ? [] : dateSpanDays(d, timeZone);
+    if (days.length < 2) {
+      out.push(d);
+      continue;
+    }
+    const series_id = d.series_id ?? `span:${d.id}`;
+    out.push({ ...d, ends_at: null, series_id });
+    for (const day of days.slice(1)) {
+      out.push({ ...d, id: `${d.id}#${day}`, starts_at: `${day}T00:00:00.000Z`, ends_at: null, all_day: true, series_id });
+    }
+  }
+  return out;
+}
+
 /**
  * ADR-084 §1 — the days each series touches, across dates AND performances
  * (since `20260829100000` a gig can run several days too). A block is N rows
