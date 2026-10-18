@@ -58,6 +58,7 @@
   } from '$lib/month-events';
   import AgendaList, { type AgendaDecision, type NoteDraft } from '$lib/components/AgendaList.svelte';
   import DecisionBand, {
+    decisionText,
     type ConcurrenceVM,
     type DecisionOptionVM,
     type DecisionVM,
@@ -1736,14 +1737,6 @@
     }
     return out;
   });
-  /** Days with a clash worth a red dot: the engine's own marks, plus the days
-      a decision is between two holds that collide (people or double). */
-  let seasonClashDays = $derived.by(() => {
-    const out = new Set<string>();
-    for (const [day, list] of clashesByDay) if (list.some((c) => c.severity !== 'possible')) out.add(day);
-    for (const d of decisionVMs) if (d.level !== 'possible') out.add(d.day);
-    return out;
-  });
   const MONTH_SHORT = new Intl.DateTimeFormat(localeTag, { month: 'short', timeZone: 'UTC' });
   let seasonWeeks = $derived.by((): SeasonCellVM[][] => {
     const perfsByDay = new Map<string, PerformanceEvent[]>();
@@ -1802,6 +1795,7 @@
           tour: seasonTourDays.has(iso),
           away: seasonBlockDays.has(iso),
           clash: seasonClashDays.has(iso),
+          decide: seasonDecideDays.has(iso),
         };
       }),
     );
@@ -1916,6 +1910,13 @@
     }
     return out.sort((a, b) => (a.day < b.day ? -1 : 1));
   });
+  /** THE RED DOT IS WHAT «CHOQUES» COUNTS, AND NOTHING ELSE (revisión del
+      Planner, 2026-10-18). It also lit the days of a decision between two
+      holds, which the census sends to «por decidir»: the eye counted three
+      clashes where the figure said one. Those days carry the decision's own
+      mark (`decide`), and a day can carry both. */
+  let seasonClashDays = $derived(new Set(seasonClashes.map((c) => c.day)));
+  let seasonDecideDays = $derived(new Set(decisionVMs.map((d) => d.day)));
   let seasonFacts = $derived.by(() => {
     let perfs = 0;
     if (view === 'overview') {
@@ -1951,14 +1952,10 @@
   let agendaDecisionsByDay = $derived.by(() => {
     const m = new Map<string, AgendaDecision[]>();
     for (const d of decisionVMs) {
-      const reason =
-        d.level === 'people'
-          ? t('planner.clash_people_body', locale, { people: d.people.join(', ') })
-          : d.level === 'double'
-            ? t('planner.dec_double_reason', locale)
-            : d.missingTeam
-              ? t('planner.dec_possible_reason', locale, { project: d.missingTeam })
-              : t('planner.dec_possible_reason_generic', locale);
+      // THE SAME SENTENCE AS THE DRAWER (DecisionBand is its one writer): the
+      // agenda said «on two bookings the same day» where the drawer said
+      // «is in both — only one can be confirmed», for one decision.
+      const reason = decisionText(d, locale);
       (m.get(d.day) ?? m.set(d.day, []).get(d.day)!).push({
         ids: [d.a.id, d.b.id],
         reason,

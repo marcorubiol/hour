@@ -33,7 +33,10 @@
     /** On tour — always deduced from two travel legs. */
     tour: boolean;
     away: boolean;
+    /** Something «Choques» lists: the only red dot. */
     clash: boolean;
+    /** A call between two options that «Por decidir» holds. */
+    decide: boolean;
   };
 
   export type SeasonUnclosedVM = {
@@ -225,6 +228,7 @@
                 {#if c.slips.length === 0 && c.dateWord}<span class="ev ev--date">{c.dateWord}</span>{/if}
                 {#if c.travel}<span class="d__travel" aria-hidden="true">{c.travel === 'out' ? '↗' : '↙'}</span>{/if}
                 {#if c.clash}<span class="d__clash" title={t('planner.season_key_clash', locale)}></span>{/if}
+                {#if c.decide}<span class="d__decide" class:d__decide--beside={c.clash} title={t('planner.season_key_decide', locale)}></span>{/if}
                 {#if c.tour}<span class="d__tour" title={t('planner.season_key_tour', locale)}></span>{/if}
               </button>
             {/each}
@@ -236,6 +240,7 @@
         <span><i class="k k--option grain"></i>{t('planner.season_key_option', locale)}</span>
         <span class="guess"><i class="k k--tour"></i>{t('planner.season_key_tour', locale)}</span>
         <span><i class="k k--away"></i>{t('planner.season_key_away', locale)}</span>
+        <span><i class="k k--decide"></i>{t('planner.season_key_decide', locale)}</span>
         <span><i class="k k--clash"></i>{t('planner.season_key_clash', locale)}</span>
       </p>
       {#if empty}
@@ -598,6 +603,20 @@
       border-radius: 50%;
       background: var(--danger);
     }
+    /* A call to make, not a collision: the dot's outline, in ink. Red stays
+       for what «Choques» counts. */
+    .d__decide {
+      position: absolute;
+      inset-block-start: 4px;
+      inset-inline-end: 4px;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      border: 1px solid var(--text-muted);
+    }
+    .d__decide--beside {
+      inset-inline-end: 12px;
+    }
     .d__tour {
       position: absolute;
       inset-inline: 0;
@@ -648,6 +667,13 @@
         color-mix(in oklch, var(--text-color) 30%, transparent) 0 1px,
         transparent 1px 4px
       );
+    }
+    .k--decide {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      border: 1px solid var(--text-muted);
+      vertical-align: 1px;
     }
     .k--clash {
       width: 6px;
