@@ -135,7 +135,7 @@
           >{/if}
       </div>
       <div class="card__slip">
-        <Slip {slip} {kindLabel} stateLabel={() => null} showCountry ground="bare" placing="cell" {guess} />
+        <Slip {slip} {kindLabel} stateLabel={() => null} showCountry ground="bare" placing="cell" size="l" {guess} />
       </div>
       {#if moments.length > 0}
         <div class="card__slots">
@@ -195,10 +195,9 @@
     font-family: var(--font-display);
     font-size: var(--text-xl);
   }
-  /* The slip, with room: its name at display size. */
+  /* The slip, with room: `size="l"` sets its type (never rescaled here). */
   .card__slip {
     container-type: inline-size;
-    font-size: var(--text-l);
   }
   .card__slots {
     display: flex;
