@@ -86,11 +86,24 @@
 
 {#snippet thenLine()}
   {#if then && thenSlip}
+    {@const held = thenSlip.cert === 'hold' || thenSlip.cert === 'proposed'}
     {@const when = thenBefore ? (then.at ? hour(then.at, then.ref.tz) : '') : dateWords(then.day)}
-    {@const what = [when, thenSlip.name, thenSlip.city].filter(Boolean).join(' · ')}
+    {@const place = [
+      thenSlip.lead ? `${t('planner.slip_to', locale)} ${thenSlip.name}` : thenSlip.name,
+      thenSlip.origin ? `${t('planner.slip_from', locale)} ${thenSlip.origin}` : null,
+      thenSlip.city,
+    ]
+      .filter(Boolean)
+      .join(' · ')}
+    <!-- The slip's own grammar in one line: the kind word, «?» and a leaning
+         name while it is not firm (certainty.css § INFERENCE voice). -->
     <p class="then">
       <span class="then__k">{t(thenBefore ? 'desk.next_before' : 'desk.next_then', locale)}</span>
-      {#if thenSlip.href}<a href={thenSlip.href}>{what}</a>{:else}<span>{what}</span>{/if}
+      <svelte:element this={thenSlip.href ? 'a' : 'span'} href={thenSlip.href} class="then__what">
+        {#if when}<span class="then__when">{when}</span>{/if}
+        <span class="then__kind">{kindLabel(thenSlip.kind)}{held ? '?' : ''}</span>
+        <span class:guess={held}>{place}</span>
+      </svelte:element>
     </p>
   {/if}
 {/snippet}
@@ -256,13 +269,27 @@
   .then:has(+ .card) {
     margin: 0 0 var(--space-s);
   }
-  .then a {
+  .then__what {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0 var(--space-xs);
     color: inherit;
     text-decoration: none;
   }
-  .then a:hover {
+  a.then__what:hover {
     text-decoration: underline;
     text-underline-offset: 3px;
+  }
+  .then__when,
+  .then__kind {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    letter-spacing: var(--mono-letter-spacing);
+  }
+  .then__kind {
+    text-transform: uppercase;
+    color: var(--text-faint);
   }
   .then__k {
     font-family: var(--font-mono);
