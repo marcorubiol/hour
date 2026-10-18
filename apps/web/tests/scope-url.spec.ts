@@ -91,9 +91,9 @@ test('Conversations is a scoped lens and copies its canonical scoped URL', async
   await waitForLoaded(page);
 
   await expect(page.locator('.tok').first()).toBeVisible();
-  await expect(page.getByRole('tab', { name: 'Conversations' })).toHaveAttribute(
-    'aria-selected',
-    'true',
+  await expect(page.getByRole('link', { name: 'Conversations', exact: true })).toHaveAttribute(
+    'aria-current',
+    'page',
   );
   await expect(page).toHaveURL(/\/h\/conversations\?scope=s:playwright$/);
 
@@ -118,8 +118,8 @@ test('a scope change on a person opened from Conversations lands back on Convers
 
   await page.getByRole('button', { name: /Everything/ }).click();
   await page.waitForURL(/\/h\/conversations/, { timeout: 10000 });
-  await expect(page.getByRole('tab', { name: 'Conversations' })).toHaveAttribute(
-    'aria-selected',
-    'true',
+  await expect(page.getByRole('link', { name: 'Conversations', exact: true })).toHaveAttribute(
+    'aria-current',
+    'page',
   );
 });
