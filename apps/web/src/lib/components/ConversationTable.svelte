@@ -716,11 +716,17 @@
       border-block-end: var(--divider);
       color: var(--text-muted);
     }
+    /* The display italic of the lens titles (`--font-serif` does not exist,
+       so this fell back to a big sans, diseño B10). */
     .empty-book__title {
       margin-block-end: var(--space-xs);
-      font-family: var(--font-serif);
+      font-family: var(--font-display);
+      font-style: italic;
       font-size: var(--text-xl);
       color: var(--heading-color);
+    }
+    .empty-book p {
+      margin-block-start: 0;
     }
 
     .grouping-note {
