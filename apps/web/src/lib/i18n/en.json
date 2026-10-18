@@ -305,7 +305,7 @@
   "desk.caughtup_l": "All caught up. Nothing needs you right now.",
   "desk.caughtup_s": "the next thing surfaces when it's due",
   "desk.loading": "Loading…",
-  "desk.error": "Couldn't load your desk.",
+  "desk.error": "Couldn't load what's waiting for you.",
   "desk.week_error": "Couldn't load your week.",
   "desk.week_empty": "Nothing due in this scope. Set next actions on your conversations and they land here.",
   "desk.week_more": "+ {n} more · next 7 days",

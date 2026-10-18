@@ -296,7 +296,7 @@
   "desk.caughtup_l": "Todo al día. Nada te reclama ahora mismo.",
   "desk.caughtup_s": "lo próximo aflora cuando toca",
   "desk.loading": "Cargando…",
-  "desk.error": "No se pudo cargar el desk.",
+  "desk.error": "No se pudo cargar lo que te espera.",
   "desk.week_error": "No se pudo cargar tu semana.",
   "desk.week_empty": "Nada pendiente en este ámbito. Pon próximas acciones en tus conversaciones y caerán aquí.",
   "desk.week_more": "+ {n} más · próximos 7 días",

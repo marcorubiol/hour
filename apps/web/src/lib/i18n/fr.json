@@ -265,7 +265,7 @@
   "desk.caughtup_l": "Tout est à jour. Rien ne vous attend pour l’instant.",
   "desk.caughtup_s": "la suite remontera le moment venu",
   "desk.loading": "Chargement…",
-  "desk.error": "Impossible de charger le desk.",
+  "desk.error": "Impossible de charger ce qui vous attend.",
   "desk.week_error": "Impossible de charger votre semaine.",
   "desk.week_empty": "Rien à faire dans ce périmètre. Fixez les prochaines actions de vos conversations et elles arriveront ici.",
   "desk.week_more": "+ {n} de plus · 7 prochains jours",
