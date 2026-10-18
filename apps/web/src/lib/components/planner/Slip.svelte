@@ -131,6 +131,10 @@
     /** The verbs — `confirm`, `let go`. Drawn in the row placing's third
         column, which is reserved for them and empty everywhere else. */
     actions?: import('svelte').Snippet;
+    /** Who goes: names on file, [] for «nobody on file», absent for a thing
+        where a cast would be a lie (a trip, a press call). Styles.cast.css. */
+    cast?: string[] | null;
+    noCastWord?: string;
   }
 
   let {
@@ -147,6 +151,8 @@
     ground = 'card',
     guess = false,
     actions,
+    cast = null,
+    noCastWord = '',
   }: Props = $props();
 
   let state = $derived(stateLabel(slip));
@@ -229,6 +235,12 @@
        out of its box, and the first thing the cell drops when it runs short. -->
   {#if slip.time?.secondary}
     <span class="slip__tz">{slip.time.secondary}</span>
+  {/if}
+
+  {#if cast}
+    <span class="slip__cast cast-line" class:cast-line--none={cast.length === 0}
+      >{cast.length > 0 ? cast.join(' · ') : noCastWord}</span
+    >
   {/if}
 
   {#if actions}<span class="slip__acts">{@render actions()}</span>{/if}
@@ -528,6 +540,11 @@
     .slip[data-placing='row'] .slip__tz {
       grid-column: 2;
       grid-row: 3;
+    }
+    .slip[data-placing='row'] .slip__cast {
+      grid-column: 2;
+      grid-row: 4;
+      margin-block-start: 2px;
     }
     .slip[data-placing='row'] .slip__acts {
       grid-column: 3;

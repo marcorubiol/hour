@@ -3450,6 +3450,11 @@
               .filter(Boolean)
               .join(' · ') || t('planner.week_nothing', locale)}
       freeNight={engine.isFreeNight}
+      castOf={(p) =>
+        p.person_ids
+          ? p.person_ids.map((id) => personNames.get(id)).filter((n): n is string => Boolean(n))
+          : null}
+      noCastWord={t('planner.no_cast', locale)}
       onDayOpen={(iso) => {
         dayIso = iso;
         setView('day');

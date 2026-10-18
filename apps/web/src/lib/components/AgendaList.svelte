@@ -117,6 +117,10 @@
     /** The census's rule for a free night (today on, not on tour, nothing of
         the company's own). Without it a night is free when it has no rows. */
     freeNight?: (day: string) => boolean;
+    /** Who goes to a gig — names on file, [] for nobody, null when the feed
+        did not say. The Day said it and the diary did not (uso #8). */
+    castOf?: (perf: PerformanceEvent) => string[] | null;
+    noCastWord?: string;
     /**
      * THE VERBS, on the row itself. A hold is a question the diary is asking
      * you; answering it belonged three clicks away in a drawer, so the row
@@ -210,6 +214,8 @@
     weekLabel = (n: number) => `${t('planner.week_n', L)} ${n}`,
     weekRange = (from: string, to: string) => `${from} → ${to}`,
     freeNight,
+    castOf,
+    noCastWord = t('planner.no_cast', L),
     weekTally = (firm: number, held: number, free: number) =>
       [
         firm ? `${firm} ${t(firm === 1 ? 'planner.week_confirmed_one' : 'planner.week_confirmed', L)}` : '',
@@ -1145,6 +1151,8 @@
     stateLabel={slipState}
     stateUrgent={false}
     showCountry={true}
+    cast={row.kind === 'perf' ? (castOf?.(row.perf) ?? null) : null}
+    {noCastWord}
     clash={flags.clash}
     clashPeople={flags.people}
     onOpen={row.kind === 'date' && onDateOpen ? () => onDateOpen?.(row.date) : undefined}

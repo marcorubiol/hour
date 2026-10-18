@@ -193,7 +193,7 @@
             {#if t.cast !== null && t.cast !== undefined}
               <!-- Who is inside the thread — data or the honest word, never
                    the inference. -->
-              <span class="ds__cast" class:ds__cast--none={t.cast.length === 0}
+              <span class="ds__cast cast-line" class:cast-line--none={t.cast.length === 0}
                 >{t.cast.length > 0 ? t.cast.join(' · ') : noCastWord}</span
               >
             {/if}
@@ -286,7 +286,7 @@
                 <a class="ds__rs ds__rs--corner" href={t.roadSheetHref}>{roadSheetWord} ↗</a>
               {/if}
               {#if t.cast !== null && t.cast !== undefined}
-                <span class="ds__cast" class:ds__cast--none={t.cast.length === 0}
+                <span class="ds__cast cast-line" class:cast-line--none={t.cast.length === 0}
                   >{t.cast.length > 0 ? t.cast.join(' · ') : noCastWord}</span
                 >
               {/if}
@@ -360,17 +360,9 @@
       color: var(--text-color);
     }
     /* Who is on file. The honest absence is quieter than a name. */
+    /* The line's voice is `.cast-line` (styles/cast.css); here, its place. */
     .ds__cast {
       grid-column: 1 / -1;
-      font-family: var(--font-mono);
-      font-size: 8.5px;
-      letter-spacing: 0.08em;
-      color: var(--text-muted);
-    }
-    .ds__cast--none {
-      color: var(--text-faint);
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
     }
     /* The pair's rule now rides THE SLIP itself (same classes as the
        agenda's rows) — the label draws no second version of it. */
