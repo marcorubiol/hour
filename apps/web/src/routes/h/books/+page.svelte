@@ -795,7 +795,7 @@
         <span class="mny__subrow">
           <span class="mny__subleft">
             {#if seasons.length > 1}
-              <!-- One way to write a season, the «26/27» of the figure: «sept 26» read as a day. -->
+              <!-- One way to write a season, the «26-27» of the figure and of Desk: «sept 26» read as a day. -->
               <span class="mny__seasons" role="group" aria-label={t('books.season_pick', locale)}>
                 {t('books.season_word', locale)}
                 {#each seasons as s (s)}

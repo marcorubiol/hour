@@ -518,10 +518,13 @@ export function seasonRange(start: number): { from: string; to: string } {
 	return { from: `${start}-09-01`, to: `${start + 1}-08-31` };
 }
 
-/** "26/27". */
+/**
+ * "26-27": the one way the app writes a season, as Desk, Conversations
+ * (`currentSeason` in `conversation-overview.ts`) and the line names do.
+ */
 export function seasonLabel(start: number): string {
 	const two = (y: number) => String(y % 100).padStart(2, '0');
-	return `${two(start)}/${two(start + 1)}`;
+	return `${two(start)}-${two(start + 1)}`;
 }
 
 /**

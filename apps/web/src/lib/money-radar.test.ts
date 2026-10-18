@@ -89,8 +89,8 @@ describe('season (September to August, by function date)', () => {
 		expect(seasonOf('2026-08-31')).toBe(2025);
 		expect(seasonOf('2027-08-31T22:00:00Z')).toBe(2026);
 		expect(seasonRange(2026)).toEqual({ from: '2026-09-01', to: '2027-08-31' });
-		expect(seasonLabel(2026)).toBe('26/27');
-		expect(seasonLabel(2099)).toBe('99/00');
+		expect(seasonLabel(2026)).toBe('26-27');
+		expect(seasonLabel(2099)).toBe('99-00');
 	});
 
 	it('puts a bolo without functions in the season of today', () => {
