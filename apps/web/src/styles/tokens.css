@@ -355,6 +355,9 @@
        icon column inside menus and rows stays optically aligned across
        viewport sizes. */
     --control-size-s: 2rem; /* 32px — icon action default */
+    /* A filter bar's fields and buttons share one height, so their tops
+       line up (Conversations review, diseño M9; other bars, coherence pass). */
+    --control-size-m: 2.5rem; /* 40px */
 
     /* ============================================================ */
     /* RADIUS — semantic scale (no duplicate aliases)                 */

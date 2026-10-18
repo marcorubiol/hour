@@ -698,6 +698,12 @@
       flex-wrap: wrap;
     }
 
+    /* One height for the search, the status and the two buttons (diseño M9). */
+    .conversations__controls :global(.field__control),
+    .conversations__controls > :global(button) {
+      block-size: var(--control-size-m);
+    }
+
     .conversations__list-head {
       scroll-margin-block-start: var(--space-l);
       margin-block-start: var(--space-m);
