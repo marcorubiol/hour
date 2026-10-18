@@ -170,6 +170,43 @@
       «sin cerrar», and the head says so instead of the list disagreeing with
       it (uso #14: «2 de 6» over four rows). */
   let travelOnly = $derived(unclosed.filter((u) => u.missing.length === 0 && u.travelGuess).length);
+  /** The strip's one tab stop: row:col, col 0 is the week's label. Starts on
+      today (or the first day when today is not drawn). */
+  let focusAt = $state('');
+  $effect(() => {
+    if (focusAt) return;
+    weeks.forEach((w, wi) =>
+      w.forEach((c, di) => {
+        if (c.today) focusAt = `${wi}:${di + 1}`;
+      }),
+    );
+    if (!focusAt) focusAt = '0:1';
+  });
+  function onStripKey(e: KeyboardEvent) {
+    const [r, c] = focusAt.split(':').map(Number);
+    let nr = r;
+    let nc = c;
+    if (e.key === 'ArrowRight') nc = c + 1;
+    else if (e.key === 'ArrowLeft') nc = c - 1;
+    else if (e.key === 'ArrowDown') nr = r + 1;
+    else if (e.key === 'ArrowUp') nr = r - 1;
+    else if (e.key === 'Home') nc = 0;
+    else if (e.key === 'End') nc = 7;
+    else return;
+    // Days run on across weeks: → from Sunday is next Monday.
+    if (nc > 7) {
+      nc = 1;
+      nr += 1;
+    } else if (nc < 0) {
+      nc = 7;
+      nr -= 1;
+    }
+    if (nr < 0 || nr >= weeks.length) return;
+    e.preventDefault();
+    e.stopPropagation();
+    focusAt = `${nr}:${nc}`;
+    (e.currentTarget as HTMLElement).querySelector<HTMLElement>(`[data-cell="${focusAt}"]`)?.focus();
+  }
   function n(v: number): string {
     return loading ? DASH : String(v);
   }
@@ -185,16 +222,24 @@
       <div class="blk__h">
         <h2 class="blk__t">{t('planner.season_strip', locale, { n: SEASON_WEEKS })}</h2>
       </div>
-      <div class="strip">
+      <!-- ONE TAB STOP, ARROWS INSIDE (móvil #8, WCAG 2.4.3): 84 days and 12
+           weeks were 96 stops between the head and «Por decidir». The strip
+           is one stop that lands on today; ← → walk days, ↑ ↓ weeks, Home
+           goes to the week's label, End to its Sunday. -->
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
+      <div class="strip" onkeydown={onStripKey}>
         <div class="strip__row strip__dow" aria-hidden="true">
           <span></span>
           {#each dows as d, i (i)}<span>{d}</span>{/each}
         </div>
-        {#each weeks as week (week[0].iso)}
+        {#each weeks as week, wi (week[0].iso)}
           <div class="strip__row">
             <button
               type="button"
               class="wk"
+              tabindex={focusAt === `${wi}:0` ? 0 : -1}
+              data-cell={`${wi}:0`}
+              onfocus={() => (focusAt = `${wi}:0`)}
               title={t('planner.season_open_month', locale)}
               onclick={() => onWeek(week[0].iso)}
               ><!-- One label for a week-row in every drawing: «semana 42»
@@ -205,9 +250,12 @@
                 >{localeDayMonth(week[0].iso, localeTag)}</b
               ></button
             >
-            {#each week as c (c.iso)}
+            {#each week as c, di (c.iso)}
               <button
                 type="button"
+                tabindex={focusAt === `${wi}:${di + 1}` ? 0 : -1}
+                data-cell={`${wi}:${di + 1}`}
+                onfocus={() => (focusAt = `${wi}:${di + 1}`)}
                 class="d"
                 class:d--past={c.past}
                 class:d--today={c.today}
