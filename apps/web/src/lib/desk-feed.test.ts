@@ -235,6 +235,8 @@ describe('buildDeskFeed — revive on quiet days', () => {
     );
     const revive = quiet.flatMap((b) => b.runs).flatMap((r) => r.items).filter((i) => i.verbKey === 'revive');
     expect(revive).toHaveLength(1);
+    // Hour's suggestion does not count as what waits for you.
+    expect(rankWaiting(quiet, [], NOW)).toMatchObject({ asking: 0 });
     expect(revive[0]).toMatchObject({ isProposal: true, subject: 'CC Brugge' });
 
     // With an overdue call present, no revive.
@@ -319,6 +321,7 @@ describe('rankWaiting — «Te espera» by weight (ADR-117)', () => {
       'task-ai-today',
     ]);
     expect(w.total).toBe(9);
+    expect(w.asking).toBe(8);
     expect(w.overdue).toBe(3);
   });
 

@@ -71,6 +71,8 @@
       return i.dueDay ? dayMonth(i.dueDay) : '';
     }
     if (i.repliedAt) return relativeContactDate(i.repliedAt, locale);
+    // A proposal (revive) is Hour's suggestion, not a deadline: no date.
+    if (i.isProposal) return '';
     if (!i.day) return '';
     if (i.overdue) return t('desk.due_overdue', locale);
     return dayMonth(i.day);
@@ -260,10 +262,12 @@
     color: var(--danger);
   }
   .row--going .row__verb,
-  .row--ai .row__verb {
+  .row--ai .row__verb,
+  .row--proposal .row__verb {
     color: var(--accent-7);
   }
-  .row--proposal,
+  /* A proposal leans in its subject only; verb and date keep their mono. */
+  .row--proposal .row__subject,
   .row--ai .row__subject {
     font-style: italic;
   }

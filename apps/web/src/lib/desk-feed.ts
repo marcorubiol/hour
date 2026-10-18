@@ -465,6 +465,8 @@ export interface Waiting {
   rows: DeskItem[];
   /** Everything that qualified, before the cut. */
   total: number;
+  /** What waits for you: what qualified minus Hour's own proposals (the title's count). */
+  asking: number;
   overdue: number;
 }
 
@@ -505,7 +507,8 @@ export function rankWaiting(
   return {
     rows: kept.slice(0, opts.limit ?? WAITING_ROWS).map((x) => x.item),
     total: kept.length,
-    overdue: kept.filter((x) => x.tier === 0).length,
+    asking: kept.filter((x) => !x.item.isProposal).length,
+    overdue: kept.filter((x) => x.tier === 0 && !x.item.isProposal).length,
   };
 }
 
