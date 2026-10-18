@@ -4009,3 +4009,32 @@ construyó junto con los arreglos y el código obligó a cerrar algunas más.
 
 **Re-evaluar cuando** Marco lo use con datos reales: el umbral de 24 h para una fecha con hora, si el anillo de
 decisión se lee junto al punto rojo, y si el Tablero en el móvil necesita más que estrechar los nombres.
+
+## [2026-10-18] ADR-123 · Revisión del Planner, segunda tanda: el resto de uso, diseño, móvil y accesibilidad
+
+**Contexto.** Marco pidió todo lo recomendado en los tres informes de `build/coordination/review-planner/`, no solo
+lo grave (encargo del coordinador, 2026-10-18). Sigue a ADR-122.
+
+**Decisión.**
+1. **El título de un horizonte es su horizonte** (ADR-095 §9): la Temporada se titula «18 oct → 3 ene», la Agenda y
+   el Tablero «Desde 18 oct». Ninguno se titula con un mes en el que no acaba.
+2. **La Temporada no dibuja lo cancelado**: es un horizonte hacia delante. El Mes lo sigue guardando como memoria
+   («soltado», tachado). Decidido ahora por escrito (diseño M1).
+3. **La marca de proyecto no es un botón dentro de una carta que ya lo es** (accesibilidad, control anidado). El
+   monograma se edita desde su proyecto o desde una carta que no es enlace.
+4. **El grano es material de papel**: una carta sin papel (`ground: 'bare'`, el rail, el Desk) dice la duda con sus
+   palabras y no lleva grano.
+5. **Un token de objetivo táctil**, `--touch-target`: 0 con ratón, 44 px con puntero grueso, aplicado con relleno a
+   los controles que lo piden (botones, cabecera del Planner, ámbito, puertas de lente, la nota de la Agenda).
+6. **Hoy es un token** (`--today-ink`, `--today-weight`, `--today-wash`): tinta y peso en todas las rejillas; el
+   lavado donde hay celda, salvo el Tablero (decisión de Marco, sin lavado).
+7. **La línea de reparto tiene casa** (`styles/cast.css`): la dicen el Día y la Agenda.
+8. **Una ausencia en la Agenda se dice una vez por tramo**, en su primer día visible; el carril lateral la lleva.
+9. **El Mes deja de declararse `grid`**; dentro de los días de una vista, las flechas no mueven la ventana. La tira
+   de la Temporada es una sola parada de tabulación con flechas dentro.
+10. **Lo que no se hace, y por qué:** el país en el Mes y la Temporada sigue fuera (decisión escrita en `Slip`: la
+    celda no da el ancho); el Tablero no lleva señal de «hay más» en su borde derecho (ley del Tablero: sin
+    degradados); el umbral de distancia del «¿viaje?» espera a que haya coordenadas (ADR-120 §5).
+
+**Re-evaluar cuando** Marco lo use en el teléfono: si 44 px hace la cabecera demasiado alta, el token baja a 24 px
+(el mínimo AA) sin tocar ningún componente.
