@@ -34,7 +34,9 @@
     COLD_REPLY_DAYS,
     currentSeason,
     type BlockRow,
+    type ColdRow,
     type DueRow,
+    type HotRow,
     type OverviewResponse,
   } from '$lib/conversation-overview';
   import ThreadFeedRow from '$lib/components/ThreadFeedRow.svelte';
@@ -110,6 +112,32 @@
   function href(row: BlockRow): string | undefined {
     const ws = workspaceSlugById.get(row.workspace_id);
     return ws ? `/h/${ws}/conversation/${row.id}` : undefined;
+  }
+
+  // Short names for the row links (móvil #12): who first, then what and when,
+  // with pauses; never the kind twice nor the status glued to the name.
+  function name(row: BlockRow): string {
+    return row.title || t('conversations.conversation', locale);
+  }
+  function dueAria(row: DueRow): string {
+    if (row.reason === 'reply' && row.kind === 'call') {
+      return t('overview.aria_call', locale, { name: name(row), when: relativeContactDate(row.at, locale) });
+    }
+    return row.reason === 'reply'
+      ? t('overview.aria_reply', locale, { name: name(row), when: relativeContactDate(row.at, locale), what: row.subject || kindLabel(row.kind) })
+      : t('overview.aria_follow_up', locale, { name: name(row), when: dayMonth(row.at), what: row.note ?? '' });
+  }
+  function hotAria(row: HotRow): string {
+    const turn = row.turn === 'ours' ? t('overview.turn_ours', locale) : row.turn === 'theirs' ? t('overview.turn_theirs', locale) : '';
+    return [name(row), statusLabel(row.status, locale), relativeContactDate(row.at, locale), turn].filter(Boolean).join(', ');
+  }
+  /** «parada» for a stalled one that is not waiting on our email; «sin respuesta» otherwise. */
+  function coldWord(row: ColdRow): string {
+    return row.group === 'stalled' && row.reason !== 'no_reply' ? t('overview.idle', locale) : t('overview.no_reply', locale);
+  }
+  function coldAria(row: ColdRow): string {
+    const when = row.days === null ? t('overview.no_date', locale) : daysAgoLabel(row.days, locale);
+    return [name(row), when, coldWord(row)].join(', ');
   }
 
   function kindLabel(kind: string | null): string {
@@ -210,7 +238,7 @@
                     ? i >= Math.min(2, firstFollowUp)
                     : i > firstFollowUp}
               >
-                <a class="row" class:row--late={row.days >= 7} href={href(row)}>
+                <a class="row" class:row--late={row.days >= 7} href={href(row)} aria-label={dueAria(row)}>
                   {@render who(row)}
                   {#if row.reason === 'reply'}
                     <span class="row__what"><b>{row.subject || kindLabel(row.kind)}</b></span>
@@ -247,7 +275,7 @@
           <ol class="rows">
             {#each data.hot.rows as row (row.id)}
               <li>
-                <a class="row" href={href(row)}>
+                <a class="row" href={href(row)} aria-label={hotAria(row)}>
                   {@render who(row, true)}
                   <!-- Always two lines: a row without a contact keeps the block's rhythm (diseño M6). -->
                   <span class="row__what">{row.person ?? '\u00a0'}</span>
@@ -349,7 +377,7 @@
                 </li>
               {/if}
               <li>
-                <a class="row" href={href(row)}>
+                <a class="row" href={href(row)} aria-label={coldAria(row)}>
                   {@render who(row)}
                   <span class="row__what"
                     >{row.reason === 'no_history'
@@ -362,7 +390,7 @@
                   >
                   <span class="row__when"
                     ><strong>{row.days === null ? t('overview.no_date', locale) : daysAgoLabel(row.days, locale)}</strong
-                    >{row.group === 'stalled' && row.reason !== 'no_reply' ? t('overview.idle', locale) : t('overview.no_reply', locale)}</span
+                    >{coldWord(row)}</span
                   >
                 </a>
               </li>
