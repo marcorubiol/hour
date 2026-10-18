@@ -578,32 +578,36 @@
        hover borders and outline tones consume them as "lighter than ink",
        which stays true when ink is light. --text-faint does not: it is
        set above, toward the canvas. */
-    --neutral-ultra-light: color-mix(in oklch, var(--neutral), var(--base) 82%);
+    /* Fills mix in oklab, not oklch: --base carries a warm hue (85), and
+       oklch interpolates hue the short way, so every status fill drifted
+       to 50-120 (Declined ≈ In conversation, Contacted ≈ Confirmed).
+       oklab keeps the status hue (Conversations review, diseño A1). */
+    --neutral-ultra-light: color-mix(in oklab, var(--neutral), var(--base) 82%);
     --neutral-semi-dark: color-mix(in oklch, var(--neutral), white 40%);
     --neutral-dark: color-mix(in oklch, var(--neutral), white 45%);
     --neutral-ultra-dark: color-mix(in oklch, var(--neutral), white 55%);
 
-    --primary-ultra-light: color-mix(in oklch, var(--primary), var(--base) 78%);
+    --primary-ultra-light: color-mix(in oklab, var(--primary), var(--base) 78%);
     --primary-semi-dark: color-mix(in oklch, var(--primary), white 40%);
     --primary-dark: color-mix(in oklch, var(--primary), white 45%);
     --primary-ultra-dark: color-mix(in oklch, var(--primary), white 55%);
 
-    --info-ultra-light: color-mix(in oklch, var(--info), var(--base) 78%);
+    --info-ultra-light: color-mix(in oklab, var(--info), var(--base) 78%);
     --info-semi-dark: color-mix(in oklch, var(--info), white 40%);
     --info-dark: color-mix(in oklch, var(--info), white 45%);
     --info-ultra-dark: color-mix(in oklch, var(--info), white 55%);
 
-    --success-ultra-light: color-mix(in oklch, var(--success), var(--base) 78%);
+    --success-ultra-light: color-mix(in oklab, var(--success), var(--base) 78%);
     --success-semi-dark: color-mix(in oklch, var(--success), white 40%);
     --success-dark: color-mix(in oklch, var(--success), white 45%);
     --success-ultra-dark: color-mix(in oklch, var(--success), white 55%);
 
-    --warning-ultra-light: color-mix(in oklch, var(--warning), var(--base) 78%);
+    --warning-ultra-light: color-mix(in oklab, var(--warning), var(--base) 78%);
     --warning-semi-dark: color-mix(in oklch, var(--warning), white 40%);
     --warning-dark: color-mix(in oklch, var(--warning), white 45%);
     --warning-ultra-dark: color-mix(in oklch, var(--warning), white 55%);
 
-    --danger-ultra-light: color-mix(in oklch, var(--danger), var(--base) 78%);
+    --danger-ultra-light: color-mix(in oklab, var(--danger), var(--base) 78%);
     --danger-semi-dark: color-mix(in oklch, var(--danger), white 40%);
     --danger-dark: color-mix(in oklch, var(--danger), white 45%);
     --danger-ultra-dark: color-mix(in oklch, var(--danger), white 55%);
