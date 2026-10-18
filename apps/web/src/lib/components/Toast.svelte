@@ -7,6 +7,8 @@
     title?: string;
     message: string;
     duration?: number;
+    /** One way to take it back («Deshacer»): runs and closes the toast. */
+    action?: { label: string; run: () => void };
   }
 
   let stack = $state<ToastItem[]>([]);
@@ -48,6 +50,17 @@
       <div class="toast__body">
         {#if item.title}<h3 class="toast__title">{item.title}</h3>{/if}
         <p class="toast__message">{item.message}</p>
+        {#if item.action}
+          {@const action = item.action}
+          <button
+            type="button"
+            class="toast__action"
+            onclick={() => {
+              removeToast(item.id);
+              action.run();
+            }}>{action.label}</button
+          >
+        {/if}
       </div>
       <button
         type="button"

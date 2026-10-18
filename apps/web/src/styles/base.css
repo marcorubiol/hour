@@ -1264,6 +1264,26 @@
     color: inherit;
   }
 
+  /* The one action a toast may carry («Deshacer»): a link-like button. */
+  .toast__action {
+    align-self: flex-start;
+    margin-block-start: var(--space-2xs);
+    padding: 0;
+    background: none;
+    border: 0;
+    color: inherit;
+    font: inherit;
+    font-weight: 500;
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+    cursor: pointer;
+  }
+  @media (pointer: coarse) {
+    .toast__action {
+      min-block-size: var(--touch-target);
+    }
+  }
+
   .toast__dismiss {
     flex-shrink: 0;
     inline-size: 1.5em;

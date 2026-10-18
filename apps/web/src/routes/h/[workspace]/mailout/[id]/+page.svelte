@@ -175,16 +175,26 @@
     void queryClient.invalidateQueries({ queryKey: ['mailout', id] });
   }
 
-  const removeOne = createMutation({
-    mutationFn: (recipientId: string) =>
-      mutateJSON('PUT', `/api/mailout/${id}/recipients`, {
-        conversation_ids: (d?.recipients ?? [])
-          .filter((r) => r.recipient_id !== recipientId)
-          .map((r) => r.conversation_id),
-      }),
+  // Removing is immediate, so it says who and offers to undo (móvil #6): the
+  // undo puts the same set back, the one this removal started from.
+  const setRecipients = createMutation({
+    mutationFn: (conversationIds: string[]) =>
+      mutateJSON('PUT', `/api/mailout/${id}/recipients`, { conversation_ids: conversationIds }),
     onSuccess: refresh,
     onError: failed,
   });
+  function removeOne(r: MailoutRecipientRow, name: string) {
+    const before = (d?.recipients ?? []).map((x) => x.conversation_id);
+    $setRecipients.mutate(before.filter((cid) => cid !== r.conversation_id), {
+      onSuccess: () =>
+        addToast({
+          tone: 'info',
+          message: t('mailout.removed_one', locale, { name }),
+          duration: 8000,
+          action: { label: t('mailout.undo', locale), run: () => $setRecipients.mutate(before) },
+        }),
+    });
+  }
 
   let basisFor = $state<MailoutRecipientRow | null>(null);
   let basisOpen = $state(false);
@@ -447,9 +457,20 @@
               {#if editable}
                 <div class="rcp__acts">
                   {#if x.state === 'no_basis'}
-                    <button type="button" class="rcp__act" onclick={() => openBasis(x.row)}>{t('mailout.set_basis', locale)}</button>
+                    <button
+                      type="button"
+                      class="rcp__act"
+                      aria-label={t('mailout.set_basis_named', locale, { name: who(x) })}
+                      onclick={() => openBasis(x.row)}>{t('mailout.set_basis', locale)}</button
+                    >
                   {/if}
-                  <button type="button" class="rcp__act" onclick={() => $removeOne.mutate(x.row.recipient_id)}>{t('mailout.remove_one', locale)}</button>
+                  <button
+                    type="button"
+                    class="rcp__act"
+                    aria-label={t('mailout.remove_named', locale, { name: who(x) })}
+                    disabled={$setRecipients.isPending}
+                    onclick={() => removeOne(x.row, who(x))}>{t('mailout.remove_one', locale)}</button
+                  >
                 </div>
               {/if}
             </li>
@@ -764,6 +785,12 @@
     }
     .rcp__act:hover {
       color: var(--text-color);
+    }
+    @media (pointer: coarse) {
+      .rcp__act {
+        min-block-size: var(--touch-target);
+        padding-inline: var(--space-xs);
+      }
     }
 
   }
