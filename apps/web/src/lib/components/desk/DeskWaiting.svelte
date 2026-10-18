@@ -239,11 +239,8 @@
     </div>
     <button type="button" class="more" onclick={() => showAll(false)}>{t('desk.see_less', locale)}</button>
   {:else if waiting.rows.length === 0}
-    <div class="caughtup">
-      <p class="caughtup__g" aria-hidden="true">·</p>
-      <p class="caughtup__l">{t('desk.caughtup_l', locale)}</p>
-      <p class="caughtup__s">{t('desk.caughtup_s', locale)}</p>
-    </div>
+    <!-- One voice for an empty band, the one «Lo siguiente» and «Ha cambiado» use. -->
+    <p class="dband__empty">{t('desk.caughtup_l', locale)} <span class="caughtup__s">{t('desk.caughtup_s', locale)}</span></p>
     {#if feedCount > waiting.rows.length && !calm}
       <button type="button" class="more" onclick={() => showAll(true)}>{t('desk.see_all', locale)} →</button>
     {/if}
@@ -515,26 +512,8 @@
   }
 
   /* ── Caught up ── */
-  .caughtup {
-    text-align: center;
-    padding-block: var(--space-l);
-    color: var(--text-faint);
-  }
-  .caughtup__g {
-    margin: 0;
-    font-family: var(--font-display);
-    font-size: var(--text-xxl);
-  }
-  .caughtup__l {
-    margin: var(--space-xs) 0 0;
-    font-family: var(--font-display);
-    font-style: italic;
-    font-size: var(--text-l);
-    color: var(--text-muted);
-  }
   .caughtup__s {
-    margin: var(--space-2xs) 0 0;
-    font-size: var(--text-s);
+    color: var(--text-faint);
   }
 
   /* Phone: the action stays on the right, the context drops under the
