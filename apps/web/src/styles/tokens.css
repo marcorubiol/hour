@@ -536,13 +536,16 @@
        invisible on their light fills. */
     --heading-color: var(--neutral);
     --text-light: oklch(22% 0.008 85);
-    /* Faint sinks toward the canvas, below muted: on a dark canvas "lighter
-       than ink" is louder, not quieter, so -semi-light (L ~88%) put the
-       whispers above the text. 28% of --base keeps the light-mode order
-       text > muted > faint: 5.5:1 on the body, 4.4:1 on raised cards
-       (light: 4.9:1 on the body). Reviews of 2026-10-18 (Desk A2,
+    /* Muted and faint sink toward the canvas, in that order. On a dark
+       canvas "lighter than ink" is louder, not quieter, so -semi-light
+       (L ~88%) put the whispers above the text; and the light-mode muted
+       (ink at 70% alpha) drops to 4.8:1 on raised cards, which left no
+       room for a faint step above 4.5:1. Both opaque here, so the order
+       text > muted > faint holds on the body (10.1 / 7.5 / 5.7 :1) and on
+       raised cards (8.1 / 6.0 / 4.6 :1). Reviews of 2026-10-18 (Desk A2,
        Conversations A2, Cuentas M2). */
-    --text-faint: color-mix(in oklab, var(--neutral), var(--base) 28%);
+    --text-muted: color-mix(in oklab, var(--neutral), var(--base) 14%);
+    --text-faint: color-mix(in oklab, var(--neutral), var(--base) 26%);
 
     /* Derived-shade ladder re-anchored for dark (the fill/ink steps the
        pill family consumes — badges, chips, avatars, toasts, menu active).
