@@ -1828,6 +1828,12 @@
     border-radius: var(--radius-s);
     box-shadow: var(--box-shadow-2);
   }
+  /* While a sticky action bar is on the page, what gets scrolled into view
+     (a focused field, the line being typed) stops above it, not under it
+     (Conversations review, móvil #5: the mailout body under its bar). */
+  :root:has(.action-bar) {
+    scroll-padding-block-end: calc(var(--control-size-m) + 2 * var(--space-s) + var(--space-m));
+  }
   .action-bar__note {
     margin: 0 auto 0 0;
     color: var(--text-dark-muted);
