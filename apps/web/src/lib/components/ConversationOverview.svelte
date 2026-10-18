@@ -710,20 +710,14 @@
       font-size: var(--text-xs);
       color: var(--text-muted);
     }
-    /* Móvil: una columna en el orden de las preguntas (te toca, temporada,
-       caliente, se enfría…), tres filas por bloque y el botón a lo ancho. */
+    /* Móvil: una columna en el orden del documento, que es el que lee el
+       teclado y el lector de pantalla: primero lo que pide acción (te toca,
+       caliente, del equipo), después el estado (temporada, se enfría, el
+       envío). Sin `order`: lo que se ve y lo que se recorre no se separan
+       (móvil #4). Tres filas por bloque y los botones a lo ancho. */
     @container (max-width: 44rem) {
-      .board__col {
-        display: contents;
-      }
       .board {
         grid-template-columns: minmax(0, 1fr);
-      }
-      .block--due {
-        order: -2;
-      }
-      .block--season {
-        order: -1;
       }
       .block:not(.block--due) .rows > li:nth-child(n + 4),
       .rows__more {
