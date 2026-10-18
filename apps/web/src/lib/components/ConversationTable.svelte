@@ -568,6 +568,7 @@
                 class="next-action"
                 onclick={() => openNextAction(item)}
                 title={item.next_action_note ?? t('conversations.set_next_action', locale)}
+                aria-label={item.next_action_at || item.next_action_note ? undefined : t('conversations.set_next_action', locale)}
               >
                 <span class="next-action__date">{formatDate(item.next_action_at)}</span>
                 {#if item.next_action_note}
