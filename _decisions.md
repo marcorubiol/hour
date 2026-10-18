@@ -3960,3 +3960,40 @@ Conversations, Planner y Cuentas. Cuatro bandas: lo siguiente, te espera, ha cam
 **Re-evaluar cuando** Marco lo use con datos reales (el umbral de 14 días, los 7 de «te espera», si la banda 1 repite
 demasiado al rail en escritorio) o cuando exista la RPC `conversation_overview` (ADR-118), que haría barata la
 lectura que la banda 3 y la puerta de Conversations hacen en cada visita.
+
+## [2026-10-18] ADR-124 · Cuentas: a qué se ata un cobro y en qué base cuentan las cifras
+
+**Contexto.** Revisión de Cuentas del 2026-10-18 (uso, diseño, cifras y permisos; `build/coordination/review-books/`,
+fuera de git): las cifras no cuadraban entre Cuentas, Documentos y Desk. El cobro desde Cuentas iba siempre al bolo y
+nunca a la factura, el diálogo proponía el caché sin impuestos, y la base de «vendido» y «cobrado» no era la misma.
+Marco (2026-10-18) decidió los dos primeros puntos; el resto lo decide el carril `claude/books-fixes` por lo que
+recomendaron los informes, y Marco pidió aplicar todo lo recomendado. Sin migración.
+
+**Decisión.**
+1. **Un cobro va contra la factura emitida del bolo si la hay** (Marco). Así la factura pasa a cobrada, la pauta
+   observada del pagador aprende y Documentos, Desk y Cuentas ven el mismo pago. Sin documento emitido va contra el
+   bolo, como hasta ahora. El diálogo propone lo que le falta a esa factura **con impuestos** y pone de pagador el de
+   la factura, no la sala (`paymentProposal` en `$lib/money`). `list_money_bolos.collected` ya sumaba los pagos de las
+   facturas del bolo: no hace falta tocar la RPC.
+2. **Un documento de un trato sin confirmar no cuenta en «Por cobrar»** (Marco), proforma o factura, hasta que el trato
+   se confirma (`boloMoney.owed` exige `isContracted`). Desk lo deja fuera de «te espera» por la misma regla.
+3. **La cifra «Temporada» mide en una base:** el total de la factura emitida o cobrada donde la hay, el caché donde aún
+   no. Un bolo cobrado entero es el 100 %, nunca el 121 % de su caché.
+4. **Un borrador no es una factura.** Una función hecha con solo un borrador sigue «por facturar» y pide «Emitir»; un
+   bolo futuro con borrador sigue en «Lo que entra» como contratado.
+5. **Una factura sin ninguna fecha** (ni esperada, ni vencimiento, ni pauta del pagador) se espera a 60 días de la
+   emisión (`DEFAULT_TERMS_DAYS`), con su voz: puede vencer.
+6. **Dos documentos vivos en un bolo:** cada uno resta solo sus pagos. La RPC sigue sin impedir el segundo; impedirlo
+   sería una migración, y la pantalla no ofrece hacer otro mientras hay uno vivo.
+7. **Hoy es el día del reloj local**, no el de UTC.
+8. **Los pagos de facturas canceladas siguen contando en lo cobrado:** el dinero entró. Decidido a propósito.
+9. Un vencido con conversación se reclama desde la fila (abre la conversación); «Registrar pago» queda en la ficha.
+10. Un formateador de dinero por idioma, con miles siempre, para Cuentas y Desk (`fmtMoney`, `fmtCurrency`).
+
+**Queda fuera.** Los pagos que ya se registraron contra el bolo de un bolo con factura siguen fuera de la factura:
+Cuentas los cuenta, Documentos y Desk no. Reanclarlos es una migración de datos sobre producción, que pide su gate
+(`_notes/tasks-archive.md § 34`) y una consulta antes para saber si hay alguno. `list_money_bolos` sigue tomando la
+primera función sin mirar si está cancelada (RPC, migración).
+
+**Re-evaluar cuando** Marco cobre una temporada real con esto (los 60 días por defecto, si «Reclamar» es la acción
+que quiere en la fila) o cuando el modelo de facturación admita varias facturas por bolo a propósito.
