@@ -1019,5 +1019,21 @@
         grid-template-columns: minmax(0, 1fr);
       }
     }
+
+    /* Touch (móvil #8): the reading switch at the finger's size, and the
+       privacy switch with a hit area larger than its 36×20 drawing. */
+    @media (pointer: coarse) {
+      .seg button {
+        min-block-size: var(--touch-target);
+      }
+      .toggle {
+        position: relative;
+      }
+      .toggle::before {
+        content: '';
+        position: absolute;
+        inset: calc((20px - var(--touch-target)) / 2) calc((36px - var(--touch-target)) / 2);
+      }
+    }
   }
 </style>

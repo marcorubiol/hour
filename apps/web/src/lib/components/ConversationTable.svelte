@@ -1122,5 +1122,24 @@
         min-inline-size: 0;
       }
     }
+
+    /* Touch: every control of a row or card reaches the finger's size, the
+       empty «—» of the next step included (móvil #8). */
+    @media (pointer: coarse) {
+      .view-toggle button,
+      .last-contact__open,
+      .next-action {
+        min-block-size: var(--touch-target);
+      }
+      .next-action {
+        min-inline-size: var(--touch-target);
+        justify-content: center;
+      }
+      .cell--name-link {
+        display: inline-flex;
+        align-items: center;
+        min-block-size: var(--touch-target);
+      }
+    }
   }
 </style>

@@ -829,5 +829,14 @@
       gap: var(--space-s) var(--space-m);
       margin-block-start: var(--space-s);
     }
+
+    /* Touch: the two projections at the finger's size (móvil #8). */
+    @media (pointer: coarse) {
+      .conversations :global(.lenshead__frag) {
+        display: inline-flex;
+        align-items: center;
+        min-block-size: var(--touch-target);
+      }
+    }
   }
 </style>

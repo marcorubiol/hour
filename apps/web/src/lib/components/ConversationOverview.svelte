@@ -755,5 +755,17 @@
         inline-size: 100%;
       }
     }
+
+    /* Touch: the links and the legend reach the finger's size (móvil #8). */
+    @media (pointer: coarse) {
+      .block__more {
+        display: inline-flex;
+        align-items: center;
+        min-block-size: var(--touch-target);
+      }
+      .season__item {
+        min-block-size: var(--touch-target);
+      }
+    }
   }
 </style>
