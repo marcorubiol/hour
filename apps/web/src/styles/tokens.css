@@ -536,6 +536,9 @@
   @media (pointer: coarse) {
     :root {
       --touch-target: 44px;
+      /* A floor for the smallest step on a phone (móvil #10 of the Desk):
+         9.7px is an eyebrow on a desk, a squint in a hand. */
+      --text-xs: 0.6875rem;
     }
   }
 
