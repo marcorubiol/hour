@@ -2078,7 +2078,7 @@
   "desk.changed_thread_one": "1 new message in {thread}",
   "desk.changed_thread_many": "{n} new messages in {thread}",
   "desk.changed_reply": "{name} replied",
-  "desk.changed_mailout": "Send «{subject}»: {sent} sent, {replies} replies, {unsub} unsubscribed",
+  "desk.changed_mailout": "Send «{subject}»",
   "desk.changed_kind_thread": "team thread",
   "desk.changed_kind_reply": "conversation",
   "desk.changed_kind_mailout": "bulk send",

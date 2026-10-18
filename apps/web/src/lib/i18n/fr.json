@@ -2069,7 +2069,7 @@
   "desk.changed_thread_one": "1 nouveau message dans {thread}",
   "desk.changed_thread_many": "{n} nouveaux messages dans {thread}",
   "desk.changed_reply": "{name} vous a répondu",
-  "desk.changed_mailout": "Envoi «{subject}» : {sent} envoyés, {replies} réponses, {unsub} désinscriptions",
+  "desk.changed_mailout": "Envoi «{subject}»",
   "desk.changed_kind_thread": "fil de l'équipe",
   "desk.changed_kind_reply": "conversation",
   "desk.changed_kind_mailout": "envoi groupé",

@@ -107,9 +107,11 @@ describe('changesSince — «Ha cambiado»', () => {
   });
 
   it('the last send is news for two weeks, whatever the visit', () => {
-    const m = (queued: string) => ({ id: 'm', queued_at: queued }) as unknown as LastMailout;
+    const m = (queued: string, recipients = 40) => ({ id: 'm', queued_at: queued, figures: { recipients } }) as unknown as LastMailout;
     expect(changesSince({ threads: [], hot: [], lastMailout: m('2026-10-05T10:00:00Z') }, since, NOW)).toHaveLength(1);
     expect(changesSince({ threads: [], hot: [], lastMailout: m('2026-09-20T10:00:00Z') }, since, NOW)).toHaveLength(0);
+    // A send that reached nobody is not news.
+    expect(changesSince({ threads: [], hot: [], lastMailout: m('2026-10-05T10:00:00Z', 0) }, since, NOW)).toHaveLength(0);
   });
 
   it('at most five lines', () => {

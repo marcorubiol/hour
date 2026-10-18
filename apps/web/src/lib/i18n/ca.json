@@ -2069,7 +2069,7 @@
   "desk.changed_thread_one": "1 missatge nou a {thread}",
   "desk.changed_thread_many": "{n} missatges nous a {thread}",
   "desk.changed_reply": "{name} t'ha contestat",
-  "desk.changed_mailout": "Enviament «{subject}»: {sent} enviats, {replies} respostes, {unsub} baixes",
+  "desk.changed_mailout": "Enviament «{subject}»",
   "desk.changed_kind_thread": "fil de l'equip",
   "desk.changed_kind_reply": "conversa",
   "desk.changed_kind_mailout": "enviament en bloc",

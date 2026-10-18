@@ -9,6 +9,7 @@
   import { t, type Locale } from '$lib/i18n';
   import { feedHref, feedThreadName, feedTitle } from '$lib/threads';
   import type { Change } from '$lib/desk-bands';
+  import MailoutFigures from '$lib/components/MailoutFigures.svelte';
 
   interface Props {
     changes: Change[];
@@ -43,16 +44,12 @@
         href: ws ? `/h/${ws}/conversation/${c.row.id}` : null,
       };
     }
-    const f = c.mailout.figures;
+    const ws = workspaceSlugById.get(c.mailout.workspace_id);
     return {
-      text: t('desk.changed_mailout', locale, {
-        subject: c.mailout.subject ?? '—',
-        sent: f.sent,
-        replies: f.replies,
-        unsub: f.unsubscribed,
-      }),
+      text: t('desk.changed_mailout', locale, { subject: c.mailout.subject || t('overview.no_subject', locale) }),
       kind: t('desk.changed_kind_mailout', locale),
-      href: '/h/conversations',
+      // The send itself, as «Abrir el envío» in the lens.
+      href: ws ? `/h/${ws}/mailout/${c.mailout.id}` : '/h/conversations',
     };
   }
 </script>
@@ -71,7 +68,25 @@
           {@const l = line(c)}
           <li>
             <span class="feed__dot" class:feed__dot--quiet={c.kind === 'mailout'}></span>
-            {#if l.href}<a href={l.href}>{l.text}<small>{l.kind}</small></a>{:else}<span>{l.text}<small>{l.kind}</small></span>{/if}
+            <div class="feed__body">
+              {#if l.href}<a href={l.href}>{l.text}</a>{:else}<span>{l.text}</span>{/if}
+              {#if c.kind === 'mailout'}
+                {@const f = c.mailout.figures}
+                <!-- One voice for a send's figures, the lens's (ADR-126 § 9). -->
+                <MailoutFigures
+                  {locale}
+                  figures={[
+                    { key: 'delivered', n: f.delivered },
+                    { key: 'replies', n: f.replies },
+                    { key: 'bounced', n: f.bounced, warn: true },
+                    { key: 'unsubscribed', n: f.unsubscribed },
+                  ]}
+                />
+              {/if}
+              <small
+                >{l.kind}{#if c.kind === 'mailout' && c.mailout.simulated}{' · '}{t('mailout.simulated_mark', locale)}{/if}</small
+              >
+            </div>
           </li>
         {/each}
       </ul>
@@ -97,15 +112,18 @@
     align-items: baseline;
     font-size: var(--text-s);
   }
-  .feed a,
-  .feed span {
+  .feed__body {
     display: flex;
     flex-direction: column;
-    color: var(--text-color);
-    text-decoration: none;
+    gap: 2px;
     min-inline-size: 0;
+    color: var(--text-color);
   }
-  .feed a:hover {
+  .feed__body > a {
+    color: inherit;
+    text-decoration: none;
+  }
+  .feed__body > a:hover {
     text-decoration: underline;
     text-underline-offset: 3px;
   }

@@ -133,7 +133,8 @@ export function changesSince(
     if (row.turn === 'ours' && row.at && Date.parse(row.at) > after) out.push({ kind: 'reply', at: row.at, row });
   }
   const m = input.lastMailout;
-  if (m?.queued_at && now.getTime() - Date.parse(m.queued_at) <= MAILOUT_NEWS_DAYS * DAY_MS) {
+  // A send that reached nobody is not news (a draft queued empty, a test).
+  if (m?.queued_at && m.figures.recipients > 0 && now.getTime() - Date.parse(m.queued_at) <= MAILOUT_NEWS_DAYS * DAY_MS) {
     out.push({ kind: 'mailout', at: m.queued_at, mailout: m });
   }
   return out.sort((a, b) => Date.parse(b.at) - Date.parse(a.at)).slice(0, CHANGED_ROWS);
