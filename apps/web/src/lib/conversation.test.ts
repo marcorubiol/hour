@@ -210,6 +210,12 @@ describe('contact-book projection', () => {
     expect(relativeContactDate('2025-07-20T08:00:00Z', 'en', now)).toBe('12 months ago');
     expect(relativeContactDate('2026-06-29T08:00:00Z', 'es', now)).toBe('hace 3 semanas');
   });
+
+  it('counts calendar days, not 24-hour blocks (ADR-126 § 6)', () => {
+    const morning = new Date(2026, 9, 18, 6, 40).getTime();
+    expect(relativeContactDate(new Date(2026, 9, 17, 16, 0).toISOString(), 'en', morning)).toBe('yesterday');
+    expect(relativeContactDate(new Date(2026, 9, 13, 16, 0).toISOString(), 'es', morning)).toBe('hace 5 días');
+  });
 });
 
 describe('status vocabulary', () => {

@@ -421,7 +421,12 @@ export function groupConversationsByContact(
   return [...groups.values()];
 }
 
-/** Calm, coarse relative copy: informative without implying urgency. */
+/**
+ * Calm, coarse relative copy: informative without implying urgency. Counts
+ * calendar days in the viewer's zone, like the dashboard (`daysSince`): an
+ * email from yesterday at 16:00 is «yesterday» at 06:40 today, not «today»
+ * (ADR-126 § 6).
+ */
 export function relativeContactDate(
   iso: string | null,
   locale: Locale,
@@ -430,8 +435,15 @@ export function relativeContactDate(
   if (!iso) return '—';
   const atMs = Date.parse(iso);
   if (Number.isNaN(atMs)) return '—';
+  const midnight = (ms: number) => {
+    const d = new Date(ms);
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  };
+  return daysAgoLabel(Math.max(0, Math.round((midnight(nowMs) - midnight(atMs)) / 86_400_000)), locale);
+}
 
-  const days = Math.max(0, Math.floor((nowMs - atMs) / 86_400_000));
+/** «hoy», «ayer», «hace 4 días», «hace 3 semanas»: one scale for every «how long» of the lens. */
+export function daysAgoLabel(days: number, locale: Locale): string {
   if (days === 0) return t('conversations.rel_today', locale);
   if (days === 1) return t('conversations.rel_yesterday', locale);
   if (days < 14) return t('conversations.rel_days', locale, { n: days });
