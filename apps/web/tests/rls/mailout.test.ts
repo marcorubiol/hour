@@ -1,7 +1,7 @@
 /**
  * RLS regression: envío en bloque, fase 1 (ADR-109, ADR-110, ADR-112;
  * migración 20261015100000_mailout; plan build/plans/2026-10-14-bulk-send.md
- * § 11, tests 1 a 12).
+ * § 11, tests 1 a 12). El 2b fija ADR-124 § 8 (20261018120000_mailout_select_readable).
  *
  * Todo ocurre en el espacio `playwright` (nunca `muk-cia`), entre sus proyectos
  * `zzz-e2e-collab` (la fixture limitada tiene membresía) y
@@ -340,6 +340,31 @@ describe.skipIf(!envReady() || !limitedEnvReady())('RLS: envío en bloque (ADR-1
     const test = await pgRpc<string>('mailout_test_authorize', adminJwt, { p_id: m.row!.id });
     expect(test.status, test.error).toBe(200);
     expect(test.data).toBe(requireEnv().email);
+  });
+
+  test('2b · un envío cuyos destinatarios son todos privadas ajenas no lo lee nadie más que quien lo creó (ADR-124)', async () => {
+    const m = await newMailout();
+    expect(m.status, m.error).toBe(200);
+    const id = m.row!.id;
+    const read = async (jwt: string) =>
+      (await pgGet('mailout', jwt, new URLSearchParams({ id: `eq.${id}`, select: 'id,subject' }))).rows.length;
+
+    // Borrador vacío: el equipo lo ve, como antes.
+    expect(await read(limitedJwt)).toBe(1);
+
+    // Solo a una privada del admin: para el limitado no existe; el admin sí lo lee.
+    const onlyPrivate = await pgRpc('set_mailout_recipients', adminJwt, { p_id: id, p_conversation_ids: [conv.private] });
+    expect(onlyPrivate.status, onlyPrivate.error).toBe(200);
+    expect(await read(limitedJwt)).toBe(0);
+    expect(await read(adminJwt)).toBe(1);
+
+    // Con un destinatario que sí lee, vuelve.
+    const withShared = await pgRpc('set_mailout_recipients', adminJwt, {
+      p_id: id,
+      p_conversation_ids: [conv.private, conv.a],
+    });
+    expect(withShared.status, withShared.error).toBe(200);
+    expect(await read(limitedJwt)).toBe(1);
   });
 
   test('3 · set_mailout_recipients rechaza otro proyecto, una borrada o una privada ajena', async () => {
