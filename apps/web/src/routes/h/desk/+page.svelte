@@ -78,6 +78,8 @@
   const pins = usePins();
   const calm = useCalm();
   const queryClient = useQueryClient();
+  // «Reintentar» on any band: read again exactly what failed, nothing else.
+  const retryFailed = () => void queryClient.refetchQueries({ predicate: (q) => q.state.status === 'error' });
   const locale = detectLocale(navigator.language);
   const viewerTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
@@ -649,6 +651,7 @@
           thenBefore={lead.before}
           settled={feeds.settled}
           errored={feeds.errored}
+          onretry={retryFailed}
           {today}
           {viewerTz}
           personId={feeds.personId}
@@ -665,6 +668,7 @@
           {later}
           loading={waitingLoading}
           errored={waitingErrored}
+          onretry={retryFailed}
           {locale}
           {contextPath}
           {conversationHref}
@@ -700,6 +704,7 @@
             {changes}
             loading={changedLoading}
             errored={changedErrored}
+          onretry={retryFailed}
             {quietLabel}
             {sinceLabel}
             {workspaceSlugById}

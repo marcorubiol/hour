@@ -779,10 +779,17 @@
 </script>
 
 {#snippet failed(key: string, retry: () => unknown)}
-  <p class="mny__fail">
+  <p class="load-fail" role="alert">
     <span>{t(key, locale)}</span>
-    <Button size="xs" variant="outline" onclick={() => void retry()}>{t('books.retry', locale)}</Button>
+    <Button size="xs" variant="outline" onclick={() => void retry()}>{t('ui.retry', locale)}</Button>
   </p>
+{/snippet}
+
+<!-- The dashboards' one skeleton (base.css `.ghost-line`): lines a line high. -->
+{#snippet ghost(n: number)}
+  <div class="mny__ghost" aria-hidden="true">
+    {#each Array(n) as _, i (i)}<span class="ghost-line" style:inline-size="{70 - (i % 3) * 15}%">&nbsp;</span>{/each}
+  </div>
 {/snippet}
 
 <svelte:head>
@@ -836,7 +843,7 @@
         {#if loading}
           <div class="figs__row" aria-hidden="true">
             {#each ['books.fig_owed', 'books.fig_to_invoice', 'books.fig_inflow', 'books.fig_season'] as key (key)}
-              <div class="fig"><span class="fig__label">{t(key, locale)}</span><span class="fig__num fig__num--skel">0.000</span></div>
+              <div class="fig"><span class="fig__label">{t(key, locale)}</span><span class="fig__num">{DASH}</span></div>
             {/each}
           </div>
         {:else if !seasonEmpty}
@@ -919,7 +926,7 @@
             {#if invoicesError}
               {@render failed('books.err_invoices', () => $invoicesQuery.refetch())}
             {:else if loading}
-              <p class="mny__state">{t('desk.loading', locale)}</p>
+              {@render ghost(3)}
             {:else if attention.length === 0}
               <p class="mny__state">{t('books.attention_none', locale)}</p>
             {:else}
@@ -947,7 +954,7 @@
             {#if invoicesError}
               {@render failed('books.err_invoices', () => $invoicesQuery.refetch())}
             {:else if loading}
-              <p class="mny__state">{t('desk.loading', locale)}</p>
+              {@render ghost(3)}
             {:else}
               {#each position.filter((p) => p.overdue > 0) as p (p.currency)}
                 <p class="mny__note inflow__overdue">{t('books.inflow_plus_overdue', locale, { amount: fmtMoneyCompact(p.overdue), currency: p.currency })}</p>
@@ -1009,7 +1016,7 @@
           </div>
 
           {#if loading}
-            <p class="mny__state">{t('desk.loading', locale)}</p>
+            {@render ghost(4)}
           {:else if ledgerRows.length === 0}
             {#if !(seasonEmpty && filter === 'all')}
               <p class="mny__state">{t(filter === 'all' ? 'books.ledger_empty' : 'books.ledger_empty_filter', locale)}</p>
@@ -1287,8 +1294,7 @@
     .mny__season:hover { color: var(--text-color); }
     .mny__season[aria-current='true'] { text-decoration: underline; }
     .mny__state { font-size: var(--text-s); color: var(--text-faint); }
-    /* The system's voice for a failure, as Desk says it (dband__err). */
-    .mny__fail { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-s); margin: 0; font-family: var(--font-display); font-style: italic; font-size: var(--text-s); color: var(--danger); }
+    .mny__ghost { display: grid; gap: var(--space-xs); font-size: var(--text-s); }
     .mny__note { font-size: var(--text-xs); color: var(--text-faint); }
     .mny__empty { display: flex; flex-direction: column; gap: var(--space-s); align-items: flex-start; }
     .mny__empty-acts { display: flex; gap: var(--space-xs); flex-wrap: wrap; }
@@ -1308,7 +1314,6 @@
     button.fig:hover { border-color: var(--text-faint); }
     .fig__label { font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-faint); }
     .fig__num { font-family: var(--font-display); font-size: var(--text-xl); line-height: 1.1; color: var(--text-color); font-variant-numeric: tabular-nums; display: flex; align-items: baseline; gap: var(--space-2xs); flex-wrap: wrap; }
-    .fig__num--skel { color: transparent; background: var(--bg-light); border-radius: var(--radius-s); inline-size: 6ch; }
     .fig__cur { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-muted); letter-spacing: 0.04em; }
     .fig__sub { font-size: var(--text-xs); color: var(--text-muted); }
     .fig__danger { color: var(--danger); }

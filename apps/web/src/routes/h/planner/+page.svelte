@@ -3283,13 +3283,12 @@
 
   {#if errorMsg}
     <!-- A FAILURE SAYS WHAT FAILED, IN OUR WORDS, AND OFFERS THE WAY BACK
-         (diseño M11). It printed the server's text as it came («boom»). The
-         detail stays, quieter, for whoever has to report it. -->
-    <div class="cal__state cal__state--danger" role="alert">
-      <p class="cal__state-t">{t('planner.load_error', locale)}</p>
-      <p class="cal__state-d">{errorMsg}</p>
-      <Button variant="outline" size="s" onclick={retryFailed}>{t('planner.retry', locale)}</Button>
-    </div>
+         (diseño M11), in the dashboards' one voice (`.load-fail`, ADR-130 § 3).
+         The server's text is not copy: the detail stays in Sentry. -->
+    <p class="load-fail cal__fail" role="alert">
+      <span>{t('planner.load_error', locale)}</span>
+      <Button variant="outline" size="xs" onclick={retryFailed}>{t('ui.retry', locale)}</Button>
+    </p>
   {:else if view === 'overview'}
     <SeasonOverview
       {locale}
@@ -3837,25 +3836,8 @@
       color: inherit;
       text-underline-offset: 2px;
     }
-    .cal__state {
+    .cal__fail {
       padding-block: var(--space-l);
-      font-size: var(--text-s);
-      color: var(--text-faint);
-    }
-    .cal__state--danger {
-      display: grid;
-      justify-items: start;
-      gap: var(--space-xs);
-    }
-    .cal__state-t {
-      margin: 0;
-      color: var(--danger);
-    }
-    .cal__state-d {
-      margin: 0;
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      color: var(--text-faint);
     }
   }
 </style>

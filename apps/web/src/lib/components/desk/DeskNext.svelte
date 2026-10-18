@@ -10,6 +10,7 @@
    * happening to you, wherever you are looking. And it never changes height
    * while the answer lands: the card is drawn with dashes first.
    */
+  import Button from '$lib/components/Button.svelte';
   import BlockHead from '$lib/components/BlockHead.svelte';
   import { useQueryClient } from '@tanstack/svelte-query';
   import { addToast } from '$lib/components/Toast.svelte';
@@ -32,6 +33,8 @@
     thenBefore?: boolean;
     settled: boolean;
     errored: boolean;
+    /** «Reintentar»: read again what failed (the one voice of a failure). */
+    onretry: () => void;
     today: string;
     viewerTz: string;
     personId: string | null;
@@ -39,7 +42,7 @@
     locale: Locale;
   }
 
-  let { next, then, thenBefore = false, settled, errored, today, viewerTz, personId, slipCtx, locale }: Props = $props();
+  let { next, then, thenBefore = false, settled, errored, onretry, today, viewerTz, personId, slipCtx, locale }: Props = $props();
 
   const kindLabel = (kind: SlipKind) => t(`planner.kind_${kind}`, locale);
   const queryClient = useQueryClient();
@@ -116,7 +119,7 @@
   </BlockHead>
 
   {#if errored}
-    <p class="load-fail">{t('desk.next_error', locale)}</p>
+    <p class="load-fail" role="alert"><span>{t('desk.next_error', locale)}</span><Button size="xs" variant="outline" onclick={onretry}>{t('ui.retry', locale)}</Button></p>
   {:else if !settled}
     <!-- The wait holds the lines a card usually draws (eyebrow, the slip's
          head, its name, the running order, the foot) and the line under it,

@@ -6,6 +6,7 @@
    * that says since when (amends ADR-121 § 5); if a source failed it says so,
    * because a silent band would claim «nothing changed».
    */
+  import Button from '$lib/components/Button.svelte';
   import BlockHead from '$lib/components/BlockHead.svelte';
   import { t, type Locale } from '$lib/i18n';
   import { feedHref, feedThreadName, feedTitle } from '$lib/threads';
@@ -16,6 +17,8 @@
     changes: Change[];
     loading: boolean;
     errored: boolean;
+    /** «Reintentar»: read again what failed (the one voice of a failure). */
+    onretry: () => void;
     /** «Nada nuevo desde tu última visita, hace 3 h»: what an empty band says. */
     quietLabel: string;
     /** The instant «since» means, already formatted for the eyebrow. */
@@ -24,7 +27,7 @@
     locale: Locale;
   }
 
-  let { changes, loading, errored, quietLabel, sinceLabel, workspaceSlugById, locale }: Props = $props();
+  let { changes, loading, errored, onretry, quietLabel, sinceLabel, workspaceSlugById, locale }: Props = $props();
 
   function line(c: Change): { text: string; kind: string; href: string | null } {
     if (c.kind === 'thread') {
@@ -102,7 +105,7 @@
     {:else if !errored}
       <p class="dband__empty">{quietLabel}</p>
     {/if}
-    {#if errored}<p class="load-fail">{t('desk.changed_error', locale)}</p>{/if}
+    {#if errored}<p class="load-fail" role="alert"><span>{t('desk.changed_error', locale)}</span><Button size="xs" variant="outline" onclick={onretry}>{t('ui.retry', locale)}</Button></p>{/if}
   {/if}
 </section>
 

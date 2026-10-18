@@ -8,6 +8,7 @@
    * One list at a time, never both: a task drawn twice is two checkboxes
    * with one name.
    */
+  import Button from '$lib/components/Button.svelte';
   import BlockHead from '$lib/components/BlockHead.svelte';
   import { localeDayMonth } from '$lib/datetime';
   import { relativeContactDate } from '$lib/conversation';
@@ -25,6 +26,8 @@
     later: { count: number; from: string; until: string } | null;
     loading: boolean;
     errored: boolean;
+    /** «Reintentar»: read again what failed (the one voice of a failure). */
+    onretry: () => void;
     locale: Locale;
     contextPath: (i: DeskItem) => string;
     /** A conversation row opens its conversation, where the call is resolved. */
@@ -46,6 +49,7 @@
     later,
     loading,
     errored,
+    onretry,
     locale,
     contextPath,
     conversationHref,
@@ -212,7 +216,7 @@
         </li>{/each}
     </ul>
   {:else if errored}
-    <p class="load-fail">{t('desk.error', locale)}</p>
+    <p class="load-fail" role="alert"><span>{t('desk.error', locale)}</span><Button size="xs" variant="outline" onclick={onretry}>{t('ui.retry', locale)}</Button></p>
   {:else if all}
     <div class="timeline">
       {#each feed as bucket (bucket.sortKey)}

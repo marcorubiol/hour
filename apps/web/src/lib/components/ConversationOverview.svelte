@@ -192,7 +192,7 @@
         <div class="season__bar season__bar--ghost"></div>
         <div class="season__legend" aria-hidden="true">
           {#each Array(6) as _, i (i)}
-            <span class="season__item"><span class="season__n"><span class="ghost-line">&nbsp;</span></span><span class="season__k"><span class="ghost-line">&nbsp;</span></span></span>
+            <span class="season__item"><span class="season__n">{DASH}</span><span class="season__k"><span class="ghost-line">&nbsp;</span></span></span>
           {/each}
         </div>
         <p class="season__note" aria-hidden="true"><span class="ghost-line" style:inline-size="60%">&nbsp;</span></p>

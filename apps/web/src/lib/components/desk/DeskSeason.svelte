@@ -10,6 +10,7 @@
    * `read:money`: without it, no trace.
    */
   import BlockHead from '$lib/components/BlockHead.svelte';
+  import { DASH } from '$lib/glyphs';
   import { t, type Locale } from '$lib/i18n';
   import type { PlannerDoor } from '$lib/desk-bands';
 
@@ -26,7 +27,6 @@
   }
 
   let { planner, conversations, money, seasonLabel, locale }: Props = $props();
-  const DOT = '·';
 </script>
 
 <section class="dband season" aria-labelledby="desk-season-h">
@@ -38,9 +38,9 @@
     <a class="door" href="/h/planner" data-testid="door-planner">
       <span class="door__lens">{t('lens.planner', locale)}<i>{t('desk.door_planner_window', locale)}</i></span>
       {#if planner.errored}
-        <span class="door__n door__n--na">{DOT}</span><span class="door__txt">{t('desk.door_error', locale)}</span>
+        <span class="door__n door__n--na">{DASH}</span><span class="door__txt">{t('desk.door_error', locale)}</span>
       {:else}
-        <span class="door__n">{planner.value ? planner.value.confirmed : DOT}</span>
+        <span class="door__n">{planner.value ? planner.value.confirmed : DASH}</span>
         <span class="door__txt"
           >{t('desk.door_planner_n', locale)}<br />{planner.value
             ? t('desk.door_planner_sub', locale, {
@@ -49,7 +49,7 @@
                   n: planner.value.travel,
                 }),
               })
-            : DOT}</span
+            : DASH}</span
         >
       {/if}
       <span class="door__arrow" aria-hidden="true">→</span>
@@ -59,15 +59,15 @@
       <a class="door" href="/h/conversations" data-testid="door-conversations">
         <span class="door__lens">{t('lens.conversations', locale)}<i>{seasonLabel}</i></span>
         {#if conversations.errored}
-          <span class="door__n door__n--na">{DOT}</span><span class="door__txt">{t('desk.door_error', locale)}</span>
+          <span class="door__n door__n--na">{DASH}</span><span class="door__txt">{t('desk.door_error', locale)}</span>
         {:else}
-          <span class="door__n">{conversations.value ? conversations.value.holds : DOT}</span>
+          <span class="door__n">{conversations.value ? conversations.value.holds : DASH}</span>
           <span class="door__txt"
             >{t('desk.door_conv_n', locale)}<br />{#if conversations.value}{t('desk.door_conv_sub', locale, {
                 live: conversations.value.live,
               })}{#if conversations.value.due > 0}{' · '}{t('desk.door_conv_due', locale, {
                   n: conversations.value.due,
-                })}{/if}{:else}{DOT}{/if}</span
+                })}{/if}{:else}{DASH}{/if}</span
           >
         {/if}
         <span class="door__arrow" aria-hidden="true">→</span>
@@ -78,13 +78,13 @@
       <a class="door" href="/h/books" data-testid="door-books">
         <span class="door__lens">{t('lens.money', locale)}</span>
         {#if money.errored}
-          <span class="door__n door__n--na">{DOT}</span><span class="door__txt">{t('desk.door_error', locale)}</span>
+          <span class="door__n door__n--na">{DASH}</span><span class="door__txt">{t('desk.door_error', locale)}</span>
         {:else}
-          <span class="door__n">{money.value ? money.value.owed : DOT}</span>
+          <span class="door__n">{money.value ? money.value.owed : DASH}</span>
           <span class="door__txt"
             >{t('desk.door_money_n', locale)}<br />{#if money.value}{#if money.value.overdueCount > 0}<em class="door__hot"
                   >{t('desk.door_money_sub', locale, { amount: money.value.overdue })}</em
-                >{:else}{t('desk.door_money_none', locale)}{/if}{:else}{DOT}{/if}</span
+                >{:else}{t('desk.door_money_none', locale)}{/if}{:else}{DASH}{/if}</span
           >
         {/if}
         <span class="door__arrow" aria-hidden="true">→</span>

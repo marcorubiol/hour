@@ -11,8 +11,9 @@
    *
    * Two rules from ADR-096 §6 and the proposal:
    * · THE HEIGHT NEVER JUMPS. The strip's grid is drawn from the first frame,
-   *   and every block keeps its title and a `–` while the feeds load. A block
-   *   that appears late reads as «it didn't load».
+   *   and every block keeps its title, a `–` for its figure and the
+   *   dashboards' one skeleton (`.ghost-line`) for its rows while the feeds
+   *   load (ADR-130 § 3). A block that appears late reads as «it didn't load».
    * · AN EMPTY BLOCK STAYS, IN ONE LINE. A block that disappears reads the
    *   same as one that failed.
    */
@@ -303,7 +304,7 @@
       <section class="blk ov__decide">
         <BlockHead title={t('planner.season_b_decide', locale)} count={n(decisions.length)} alert={decisions.length > 0} />
         {#if loading}
-          <p class="blk__empty">{DASH}</p>
+          <p class="blk__empty" aria-hidden="true"><span class="ghost-line" style:inline-size="60%">&nbsp;</span></p>
         {:else if decisions.length === 0 && concurrences.length === 0}
           <p class="blk__empty">{t('planner.season_none_decide', locale)}</p>
         {:else}
@@ -321,7 +322,7 @@
         {/if}
         <BlockHead title={t('planner.season_b_clashes', locale)} count={n(clashes.length)} alert={clashes.length > 0} />
         {#if loading}
-          <p class="blk__empty">{DASH}</p>
+          <p class="blk__empty" aria-hidden="true"><span class="ghost-line" style:inline-size="60%">&nbsp;</span></p>
         {:else if clashes.length === 0}
           <p class="blk__empty">{t('planner.season_none_clashes', locale)}</p>
         {:else}
@@ -350,7 +351,7 @@
                 }) + (travelOnly > 0 ? ` · ${t('planner.season_unclosed_guess', locale, { n: travelOnly })}` : '')}
         />
         {#if loading}
-          <p class="blk__empty">{DASH}</p>
+          <p class="blk__empty" aria-hidden="true"><span class="ghost-line" style:inline-size="60%">&nbsp;</span></p>
         {:else if unclosed.length === 0}
           <p class="blk__empty">{t('planner.season_none_unclosed', locale, { n: UNCLOSED_WEEKS })}</p>
         {:else}
@@ -371,7 +372,7 @@
       <section class="blk">
         <BlockHead title={t('planner.season_b_gaps', locale)} count={t('planner.season_gaps_meta', locale, { n: GAP_MIN_NIGHTS })} />
         {#if loading}
-          <p class="blk__empty">{DASH}</p>
+          <p class="blk__empty" aria-hidden="true"><span class="ghost-line" style:inline-size="60%">&nbsp;</span></p>
         {:else if gaps.length === 0}
           <p class="blk__empty">{t('planner.season_none_gaps', locale, { n: GAP_MIN_NIGHTS })}</p>
         {:else}
@@ -396,7 +397,7 @@
       <section class="blk">
         <BlockHead title={t('planner.season_b_away', locale)} />
         {#if loading}
-          <p class="blk__empty">{DASH}</p>
+          <p class="blk__empty" aria-hidden="true"><span class="ghost-line" style:inline-size="60%">&nbsp;</span></p>
         {:else if away.length === 0}
           <p class="blk__empty">{t('planner.season_none_away', locale)}</p>
         {:else}
