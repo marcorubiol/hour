@@ -4240,7 +4240,7 @@ sobre `claude/conv-fixes` (reutiliza `MailoutFigures`, `.load-fail` y el toast c
 **Fuera, y por qué.** La cabecera de bloque común de los cuatro dashboards (diseño M4, también el tracking escrito a
 mano) es de la pasada de coherencia. Que la banda 1 repita al rail en escritorio (uso #14) es decisión de Marco; con el
 punto 2 la tarjeta ya dice más que el rail la víspera de una función. Aceptar una propuesta de IA sigue sin persistir
-(hueco conocido de ADR-069). La caja de ámbito ya va en una línea en el teléfono (ADR-123); el resto del cromo es del
+(hueco conocido de ADR-069). La caja de ámbito ya va en una línea en el teléfono (carril del Planner, 18-10); el resto del cromo es del
 shell.
 
 **Re-evaluar cuando** Marco use el Desk una temporada de gira: si las respuestas en «Te espera» deben llevar «tarde»
