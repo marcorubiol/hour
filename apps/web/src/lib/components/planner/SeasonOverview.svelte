@@ -523,8 +523,11 @@
     .d:hover {
       background: color-mix(in oklch, var(--text-color) 7%, transparent);
     }
+    /* Past days stay doors (a day already lived is still worth opening), so
+       they keep their ink: 45% opacity put the number at 1.8:1 (móvil #7,
+       WCAG 1.4.3). They lose their GROUND instead — no cell, just the day. */
     .d--past {
-      opacity: 0.45;
+      background: none;
     }
     .d--away {
       background-image: repeating-linear-gradient(
