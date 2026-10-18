@@ -731,9 +731,6 @@
       inline-size: 100%;
     }
     /* The system's outline button (base.css), a step tighter in the sub line. */
-    .desk__add {
-      --btn-padding-block: var(--space-2xs);
-    }
     .desk__add[aria-expanded='true'] {
       --btn-text-color: var(--heading-color);
       --btn-border-color: var(--neutral-semi-light);

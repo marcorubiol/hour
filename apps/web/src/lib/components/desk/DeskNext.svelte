@@ -265,7 +265,6 @@
   }
   .card__rs {
     flex: none;
-    --btn-padding-block: var(--space-2xs);
     white-space: nowrap;
   }
   .then {

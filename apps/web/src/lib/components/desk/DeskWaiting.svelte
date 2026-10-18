@@ -368,11 +368,8 @@
     gap: var(--space-xs);
     justify-self: end;
   }
-  /* The system's outline button (base.css); the quiet one drops its edge. */
-  .row__act {
-    --btn-padding-block: var(--space-2xs);
-    --btn-padding-inline: var(--space-s);
-  }
+  /* The system's outline button (base.css) at its own size, as Cuentas'
+     row actions; the quiet one drops its edge. */
   .row__act--quiet {
     --btn-border-color: transparent;
     --btn-background-hover: transparent;
