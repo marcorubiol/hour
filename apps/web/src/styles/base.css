@@ -994,6 +994,26 @@
      pattern (consumer parameterises, skeleton stays the same). Class
      names mirror the enum with underscores replaced by dashes
      (in_conversation → in-conversation). */
+  /* The tone of each conversation status, one source for the pill below and
+     for anything that draws a status without being one (the season bar of
+     Conversations). `--status` is the family; a drawing mixes it once, with
+     one recipe, so bar and pills move together (diseño B6). */
+  .badge--contacted,
+  [data-conv-status='contacted'] { --status: var(--info); }
+  .badge--in-conversation,
+  [data-conv-status='in_conversation'] { --status: var(--warning); }
+  .badge--hold,
+  [data-conv-status='hold'] { --status: var(--neutral); }
+  .badge--confirmed,
+  [data-conv-status='confirmed'] { --status: var(--success); }
+  .badge--declined,
+  [data-conv-status='declined'] { --status: var(--danger); }
+  /* Asleep: the neutral, faded, as the pill's opacity fades it. */
+  .badge--dormant,
+  [data-conv-status='dormant'] { --status: color-mix(in oklab, var(--neutral) 45%, transparent); }
+  .badge--recurring,
+  [data-conv-status='recurring'] { --status: var(--primary); }
+
   .badge--contacted {
     --badge-background: var(--info-ultra-light);
     --badge-color: var(--info-ultra-dark);

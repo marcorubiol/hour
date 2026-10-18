@@ -304,7 +304,7 @@
               <button
                 type="button"
                 class="season__seg"
-                data-status={s}
+                data-conv-status={s}
                 style:flex-grow={data.season.counts[s]}
                 title={`${statusLabel(s, locale)} · ${data.season.counts[s]}`}
                 aria-label={`${statusLabel(s, locale)} · ${data.season.counts[s]}`}
@@ -316,7 +316,7 @@
             {#each seasonStatuses as s (s)}
               <button type="button" class="season__item" onclick={() => onstatus(s)}>
                 <span class="season__n">{data.season.counts[s]}</span>
-                <span class="season__k"><i data-status={s}></i>{statusLabel(s, locale)}</span>
+                <span class="season__k"><i data-conv-status={s}></i>{statusLabel(s, locale)}</span>
               </button>
             {/each}
           </div>
@@ -608,15 +608,12 @@
       inline-size: 3.5rem;
     }
 
-    /* La temporada: una barra apilada con los tonos de los badges de estado
-       (`.badge--*` en base.css: la misma familia de color por estado). */
-    [data-status='contacted'] { --seg: color-mix(in oklch, var(--info) 55%, transparent); }
-    [data-status='in_conversation'] { --seg: color-mix(in oklch, var(--warning) 65%, transparent); }
-    [data-status='hold'] { --seg: color-mix(in oklch, var(--neutral) 45%, transparent); }
-    [data-status='confirmed'] { --seg: var(--success); }
-    [data-status='declined'] { --seg: color-mix(in oklch, var(--danger) 45%, transparent); }
-    [data-status='dormant'] { --seg: color-mix(in oklch, var(--neutral) 20%, transparent); }
-    [data-status='recurring'] { --seg: color-mix(in oklch, var(--primary) 55%, transparent); }
+    /* La temporada: una barra apilada en el tono de cada estado (`--status`,
+       base.css, el mismo que sus pastillas), con una sola receta. */
+    .season__seg,
+    .season__k i {
+      --seg: color-mix(in oklab, var(--status) 50%, transparent);
+    }
 
     .season__bar {
       display: flex;
