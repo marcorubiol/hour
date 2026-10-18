@@ -173,7 +173,12 @@
     <!-- The pack. Indivisible: `flex: none` on the whole thing. -->
     <span class="slip__pack">
       {#if slip.project}
-        {#if onMarkOpen}
+        <!-- A door inside a door is two controls in one place: Enter on the
+             card opened the date, Enter on the mark the monogram editor, and
+             a screen reader lost one of them (móvil #9, axe
+             nested-interactive). The mark is a control only on a card that is
+             not one itself; the monogram is edited from its project. -->
+        {#if onMarkOpen && !slip.href && !onOpen}
           <span
             class="slip__mark"
             role="button"
