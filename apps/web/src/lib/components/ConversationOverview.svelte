@@ -192,7 +192,7 @@
         <div class="season__bar season__bar--ghost"></div>
         <div class="season__legend" aria-hidden="true">
           {#each Array(6) as _, i (i)}
-            <span class="season__item"><span class="season__n">{DASH}</span><span class="season__k"><span class="ghost-line">&nbsp;</span></span></span>
+            <span class="season__item"><span class="season__n stat">{DASH}</span><span class="season__k"><span class="ghost-line">&nbsp;</span></span></span>
           {/each}
         </div>
         <p class="season__note" aria-hidden="true"><span class="ghost-line" style:inline-size="60%">&nbsp;</span></p>
@@ -344,7 +344,7 @@
           <div class="season__legend">
             {#each seasonStatuses as s (s)}
               <button type="button" class="season__item" onclick={() => onstatus(s)}>
-                <span class="season__n">{data.season.counts[s]}</span>
+                <span class="season__n stat">{data.season.counts[s]}</span>
                 <span class="season__k"><i data-conv-status={s}></i>{statusLabel(s, locale)}</span>
               </button>
             {/each}
@@ -687,12 +687,6 @@
       color: inherit;
       text-align: start;
       cursor: pointer;
-    }
-    .season__n {
-      font-family: var(--font-display);
-      font-size: var(--stat-lead);
-      line-height: 1.1;
-      font-variant-numeric: tabular-nums;
     }
     .season__k {
       display: flex;

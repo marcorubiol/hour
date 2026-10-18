@@ -36,11 +36,11 @@
 
   <div class="doors">
     <a class="door" href="/h/planner" data-testid="door-planner">
-      <span class="door__lens">{t('lens.planner', locale)}<i>{t('desk.door_planner_window', locale)}</i></span>
+      <span class="door__lens eyebrow eyebrow--sub">{t('lens.planner', locale)}<i>{t('desk.door_planner_window', locale)}</i></span>
       {#if planner.errored}
-        <span class="door__n door__n--na">{DASH}</span><span class="door__txt">{t('desk.door_error', locale)}</span>
+        <span class="door__n stat door__n--na">{DASH}</span><span class="door__txt">{t('desk.door_error', locale)}</span>
       {:else}
-        <span class="door__n">{planner.value ? planner.value.confirmed : DASH}</span>
+        <span class="door__n stat">{planner.value ? planner.value.confirmed : DASH}</span>
         <span class="door__txt"
           >{t('desk.door_planner_n', locale)}<br />{planner.value
             ? t('desk.door_planner_sub', locale, {
@@ -57,11 +57,11 @@
 
     {#if conversations}
       <a class="door" href="/h/conversations" data-testid="door-conversations">
-        <span class="door__lens">{t('lens.conversations', locale)}<i>{seasonLabel}</i></span>
+        <span class="door__lens eyebrow eyebrow--sub">{t('lens.conversations', locale)}<i>{seasonLabel}</i></span>
         {#if conversations.errored}
-          <span class="door__n door__n--na">{DASH}</span><span class="door__txt">{t('desk.door_error', locale)}</span>
+          <span class="door__n stat door__n--na">{DASH}</span><span class="door__txt">{t('desk.door_error', locale)}</span>
         {:else}
-          <span class="door__n">{conversations.value ? conversations.value.holds : DASH}</span>
+          <span class="door__n stat">{conversations.value ? conversations.value.holds : DASH}</span>
           <span class="door__txt"
             >{t('desk.door_conv_n', locale)}<br />{#if conversations.value}{t('desk.door_conv_sub', locale, {
                 live: conversations.value.live,
@@ -76,11 +76,11 @@
 
     {#if money}
       <a class="door" href="/h/books" data-testid="door-books">
-        <span class="door__lens">{t('lens.money', locale)}</span>
+        <span class="door__lens eyebrow eyebrow--sub">{t('lens.money', locale)}</span>
         {#if money.errored}
-          <span class="door__n door__n--na">{DASH}</span><span class="door__txt">{t('desk.door_error', locale)}</span>
+          <span class="door__n stat door__n--na">{DASH}</span><span class="door__txt">{t('desk.door_error', locale)}</span>
         {:else}
-          <span class="door__n">{money.value ? money.value.owed : DASH}</span>
+          <span class="door__n stat">{money.value ? money.value.owed : DASH}</span>
           <span class="door__txt"
             >{t('desk.door_money_n', locale)}<br />{#if money.value}{#if money.value.overdueCount > 0}<em class="door__hot"
                   >{t('desk.door_money_sub', locale, { amount: money.value.overdue })}</em
@@ -125,19 +125,9 @@
     grid-area: lens;
     display: flex;
     gap: var(--space-s);
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    letter-spacing: var(--mono-letter-spacing-loose);
-    text-transform: uppercase;
-    color: var(--text-faint);
   }
   .door__n {
     grid-area: n;
-    font-family: var(--font-display);
-    font-size: var(--stat-lead);
-    line-height: 1.1;
-    color: var(--heading-color);
-    font-variant-numeric: tabular-nums;
     white-space: nowrap;
   }
   .door__n--na {

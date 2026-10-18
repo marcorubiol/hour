@@ -1709,6 +1709,19 @@
     --eyebrow-tracking: 0.08em;
   }
 
+  /* Stat — the lead figure of a dashboard strip: Desk's doors, Cuentas' four
+     figures, Conversations' season. One body (the display face at
+     `--stat-lead`, tabular) under one label (`.eyebrow--sub`); its place in
+     the strip is the caller's (ADR-130 § 4). A figure said inline with its
+     word is `MailoutFigures`, at `--stat-inline`. */
+  .stat {
+    font-family: var(--font-display);
+    font-size: var(--stat-lead);
+    line-height: 1.1;
+    color: var(--heading-color);
+    font-variant-numeric: tabular-nums;
+  }
+
   /* Ghost line — the one skeleton of the dashboards: a bar exactly one line
      of the surrounding text high (give it `&nbsp;`), in the sunk surface.
      Width is the caller's. Conversations drew it first (`.g`); Desk reuses it. */

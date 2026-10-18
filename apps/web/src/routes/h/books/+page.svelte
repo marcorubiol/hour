@@ -843,7 +843,7 @@
         {#if loading}
           <div class="figs__row" aria-hidden="true">
             {#each ['books.fig_owed', 'books.fig_to_invoice', 'books.fig_inflow', 'books.fig_season'] as key (key)}
-              <div class="fig"><span class="fig__label">{t(key, locale)}</span><span class="fig__num">{DASH}</span></div>
+              <div class="fig"><span class="fig__label eyebrow eyebrow--sub">{t(key, locale)}</span><span class="fig__num stat">{DASH}</span></div>
             {/each}
           </div>
         {:else if !seasonEmpty}
@@ -855,8 +855,8 @@
             {:else}
             <div class="figs__row" data-currency={pos.currency}>
               <button type="button" class="fig" data-fig="owed" onclick={() => showLedger('owed')}>
-                <span class="fig__label">{t('books.fig_owed', locale)}</span>
-                <span class="fig__num">{fmtMoneyCompact(pos.owed)}<span class="fig__cur">{pos.currency}</span></span>
+                <span class="fig__label eyebrow eyebrow--sub">{t('books.fig_owed', locale)}</span>
+                <span class="fig__num stat">{fmtMoneyCompact(pos.owed)}<span class="fig__cur">{pos.currency}</span></span>
                 <span class="fig__sub">
                   {#if pos.overdue > 0}
                     <span class="fig__danger">{t('books.fig_overdue', locale, { amount: fmtMoneyCompact(pos.overdue) })}</span>
@@ -869,18 +869,18 @@
                 </span>
               </button>
               <button type="button" class="fig" data-fig="to_invoice" onclick={() => showLedger('to_invoice')}>
-                <span class="fig__label">{t('books.fig_to_invoice', locale)}</span>
-                <span class="fig__num">{fmtMoneyCompact(pos.toInvoice)}<span class="fig__cur">{pos.currency}</span></span>
+                <span class="fig__label eyebrow eyebrow--sub">{t('books.fig_to_invoice', locale)}</span>
+                <span class="fig__num stat">{fmtMoneyCompact(pos.toInvoice)}<span class="fig__cur">{pos.currency}</span></span>
                 <span class="fig__sub">{pos.toInvoiceCount === 0 ? t('books.fig_to_invoice_none', locale) : t(pos.toInvoiceCount === 1 ? 'books.fig_to_invoice_one' : 'books.fig_to_invoice_many', locale, { n: pos.toInvoiceCount })}</span>
               </button>
               <div class="fig" data-fig="inflow">
-                <span class="fig__label">{t('books.fig_inflow', locale)}</span>
-                <span class="fig__num">{fmtMoneyCompact(pos.inflow30)}<span class="fig__cur">{pos.currency}</span></span>
+                <span class="fig__label eyebrow eyebrow--sub">{t('books.fig_inflow', locale)}</span>
+                <span class="fig__num stat">{fmtMoneyCompact(pos.inflow30)}<span class="fig__cur">{pos.currency}</span></span>
                 <span class="fig__sub">{pos.inflow30Count === 0 ? t('books.fig_inflow_none', locale) : t(pos.inflow30Count === 1 ? 'books.fig_inflow_one' : 'books.fig_inflow_many', locale, { n: pos.inflow30Count })}</span>
               </div>
               <button type="button" class="fig" data-fig="season" onclick={() => showLedger('all')}>
-                <span class="fig__label">{t('books.fig_season', locale)} {seasonLabel(season)}</span>
-                <span class="fig__num">{fmtMoneyCompact(pos.collected)}<span class="fig__cur">{pos.currency}</span></span>
+                <span class="fig__label eyebrow eyebrow--sub">{t('books.fig_season', locale)} {seasonLabel(season)}</span>
+                <span class="fig__num stat">{fmtMoneyCompact(pos.collected)}<span class="fig__cur">{pos.currency}</span></span>
                 <span class="fig__sub">{t('books.fig_collected_of_sold', locale, { amount: fmtMoneyCompact(pos.sold) })}</span>
                 <span class="fig__bar" role="img" aria-label={t('books.fig_bar_aria', locale, { collected: fmtMoney(pos.collected), invoiced: fmtMoney(pos.invoicedOpen), uninvoiced: fmtMoney(pos.uninvoiced) })}>
                   {#each [['collected', pos.collected], ['invoiced', pos.invoicedOpen], ['open', pos.uninvoiced]] as [tone, value] (tone)}
@@ -1312,8 +1312,7 @@
     }
     button.fig { cursor: pointer; transition: border-color var(--transition); }
     button.fig:hover { border-color: var(--text-faint); }
-    .fig__label { font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-faint); }
-    .fig__num { font-family: var(--font-display); font-size: var(--text-xl); line-height: 1.1; color: var(--text-color); font-variant-numeric: tabular-nums; display: flex; align-items: baseline; gap: var(--space-2xs); flex-wrap: wrap; }
+    .fig__num { display: flex; align-items: baseline; gap: var(--space-2xs); flex-wrap: wrap; }
     .fig__cur { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-muted); letter-spacing: 0.04em; }
     .fig__sub { font-size: var(--text-xs); color: var(--text-muted); }
     .fig__danger { color: var(--danger); }
