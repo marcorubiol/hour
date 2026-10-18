@@ -133,6 +133,14 @@
 <!-- Loading: the same rows as the real ones (two lines and the time column,
      `&nbsp;` so each bar is exactly a line high) and the typical blocks, so
      the list below does not jump when the overview arrives (diseño A3). -->
+{#snippet fig(n: number, key: string, link: string | null, warn = false)}
+  {#if link}
+    <a class="fig" class:is-warn={warn} href={link}><b>{n}</b>{t(key, locale)}</a>
+  {:else}
+    <span class:is-warn={warn}><b>{n}</b>{t(key, locale)}</span>
+  {/if}
+{/snippet}
+
 {#snippet ghost(n: number)}
   <ol class="rows" aria-hidden="true">
     {#each Array(n) as _, i (i)}
@@ -368,8 +376,9 @@
           </p>
           <p class="mailout__figs">
             <span><b>{m.figures.delivered}</b>{t('overview.delivered', locale)}</span>
-            <span><b>{m.figures.replies}</b>{t('overview.replies', locale)}</span>
-            <span class:is-warn={m.figures.bounced > 0}><b>{m.figures.bounced}</b>{t('overview.bounced', locale)}</span>
+            <!-- The figures that name someone lead to them (uso #10). -->
+            {@render fig(m.figures.replies, 'overview.replies', m.figures.replies > 0 ? `?envio=${m.id}&r=respuestas#lista` : null)}
+            {@render fig(m.figures.bounced, 'overview.bounced', m.figures.bounced > 0 ? `?envio=${m.id}&r=rebotes#lista` : null, m.figures.bounced > 0)}
             <span><b>{m.figures.unsubscribed}</b>{t('overview.unsubscribed', locale)}</span>
             {#if m.figures.complained > 0}
               <span class="is-warn"><b>{m.figures.complained}</b>{t('overview.complained', locale)}</span>
@@ -708,6 +717,15 @@
       font-size: var(--text-l);
       font-weight: 400;
       font-variant-numeric: tabular-nums;
+    }
+    .mailout__figs .fig {
+      color: inherit;
+      text-decoration: underline;
+      text-decoration-color: var(--border-color-dark);
+      text-underline-offset: 0.25em;
+    }
+    .mailout__figs .fig:hover {
+      text-decoration-color: currentColor;
     }
     .mailout__figs .is-warn b {
       color: var(--warning-ultra-dark);

@@ -1871,6 +1871,8 @@
   "overview.last_mailout": "Últim enviament",
   "overview.list": "Amb qui parles",
   "overview.loading": "Carregant el resum…",
+  "overview.mailout_bounced_chip": "Van rebotar a l'últim enviament",
+  "overview.mailout_replies_chip": "Van contestar l'últim enviament",
   "overview.no_date": "sense data",
   "overview.no_reply": "sense resposta",
   "overview.no_subject": "(sense assumpte)",

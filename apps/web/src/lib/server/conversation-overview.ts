@@ -14,6 +14,8 @@ import { pgGet, pgPostRpc, type SupabaseEnv } from '$lib/supabase';
 import {
   TURN_KINDS,
   mailoutFigures,
+  mailoutReplied,
+  type MailoutPick,
   type LastMailout,
   type MailoutRecipientLite,
   type OverviewInput,
@@ -180,17 +182,48 @@ export async function loadLastMailout(
     }
   }
   if (!m) return null;
-  const sentAt = await pgGet<{ id: string; sent_at: string | null }>(env, 'mailout_recipient', jwt, {
-    search: { select: 'id,sent_at', mailout_id: `eq.${m.id}` },
-  });
-  const sentById = new Map(sentAt.data.map((r) => [r.id, r.sent_at]));
-  const lastIn = new Map(rows.filter((r) => r.last_in).map((r) => [r.id, r.last_in!.occurred_at]));
   return {
     ...m,
-    figures: mailoutFigures(
-      recipients.data.map((r) => ({ ...r, sent_at: sentById.get(r.recipient_id) ?? null })),
-      m.queued_at,
-      lastIn,
-    ),
+    figures: mailoutFigures(await withSentAt(env, jwt, m.id, recipients.data), m.queued_at, lastInMap(rows)),
   };
+}
+
+type PreviewRecipient = MailoutRecipientLite & { recipient_id: string };
+
+async function withSentAt(env: SupabaseEnv, jwt: string, mailoutId: string, recipients: PreviewRecipient[]) {
+  const sentAt = await pgGet<{ id: string; sent_at: string | null }>(env, 'mailout_recipient', jwt, {
+    search: { select: 'id,sent_at', mailout_id: `eq.${mailoutId}` },
+  });
+  const sentById = new Map(sentAt.data.map((r) => [r.id, r.sent_at]));
+  return recipients.map((r) => ({ ...r, sent_at: sentById.get(r.recipient_id) ?? null }));
+}
+
+function lastInMap(rows: readonly OverviewInput[]): Map<string, string> {
+  return new Map(rows.filter((r) => r.last_in).map((r) => [r.id, r.last_in!.occurred_at]));
+}
+
+/**
+ * The conversations behind a figure of a mailout (ADR-126 § 9): those that
+ * replied, or those that bounced. Same rule as the figure, so «22 replies»
+ * lists 22. Only recipients the caller can read (`mailout_preview`).
+ */
+export async function mailoutPickIds(
+  env: SupabaseEnv,
+  jwt: string,
+  mailoutId: string,
+  pick: MailoutPick,
+  rows: readonly OverviewInput[],
+): Promise<Set<string>> {
+  const [preview, mailout] = await Promise.all([
+    pgPostRpc<PreviewRecipient>(env, 'mailout_preview', jwt, { p_id: mailoutId }),
+    pgGet<{ queued_at: string | null }>(env, 'mailout', jwt, { search: { select: 'queued_at', id: `eq.${mailoutId}` } }),
+  ]);
+  const queuedAt = mailout.data[0]?.queued_at ?? null;
+  const recipients = await withSentAt(env, jwt, mailoutId, preview.data);
+  const lastIn = lastInMap(rows);
+  return new Set(
+    recipients
+      .filter((r) => (pick === 'rebotes' ? r.status === 'bounced' : mailoutReplied(r, queuedAt, lastIn)))
+      .map((r) => r.conversation_id),
+  );
 }

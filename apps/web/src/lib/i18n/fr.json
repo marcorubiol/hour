@@ -1871,6 +1871,8 @@
   "overview.last_mailout": "Dernier envoi",
   "overview.list": "Avec qui tu parles",
   "overview.loading": "Chargement du résumé…",
+  "overview.mailout_bounced_chip": "Rejetés au dernier envoi",
+  "overview.mailout_replies_chip": "Ont répondu au dernier envoi",
   "overview.no_date": "sans date",
   "overview.no_reply": "sans réponse",
   "overview.no_subject": "(sans objet)",

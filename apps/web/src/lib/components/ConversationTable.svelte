@@ -1,5 +1,5 @@
 <script module lang="ts">
-  import type { TempFilter } from '$lib/conversation-overview';
+  import type { MailoutPick, TempFilter } from '$lib/conversation-overview';
 
   export interface ConversationFilters {
     projectSlug?: string;
@@ -15,6 +15,9 @@
     /** Only the current season; `lineIds` (pinned lines) narrow it. */
     temporada?: boolean;
     lineIds?: string[];
+    /** A mailout's figure as a filter (ADR-126 § 9). */
+    envio?: string;
+    r?: MailoutPick;
     /** Hold the query (e.g. while a sidebar selection hasn't resolved). */
     enabled?: boolean;
   }
@@ -149,6 +152,10 @@
     if (f.q) p.set('q', f.q);
     if (f.turno) p.set('turno', f.turno);
     if (f.temp) p.set('temp', f.temp);
+    if (f.envio && f.r) {
+      p.set('envio', f.envio);
+      p.set('r', f.r);
+    }
     if (f.temporada) {
       p.set('temporada', 'actual');
       if (f.lineIds && f.lineIds.length > 0) p.set('line_ids', f.lineIds.join(','));
@@ -578,7 +585,7 @@
 {#if errorMsg}
   <div class="msg msg--error">{errorMsg}</div>
 {:else if !loading && items.length === 0}
-  {#if importEmptyState && !filters.q && !filters.turno && !filters.temp && !filters.temporada && (!filters.status || filters.status === 'any')}
+  {#if importEmptyState && !filters.q && !filters.turno && !filters.temp && !filters.temporada && !filters.envio && (!filters.status || filters.status === 'any')}
     <div class="empty-book">
       <p class="empty-book__title">{t('conversations.empty_title', locale)}</p>
       <p>{t('conversations.empty_body', locale)}</p>

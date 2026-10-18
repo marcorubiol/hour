@@ -1880,6 +1880,8 @@
   "overview.last_mailout": "Last mailout",
   "overview.list": "Who you talk to",
   "overview.loading": "Loading the overview…",
+  "overview.mailout_bounced_chip": "Bounced in the last mailout",
+  "overview.mailout_replies_chip": "Replied to the last mailout",
   "overview.no_date": "no date",
   "overview.no_reply": "no reply",
   "overview.no_subject": "(no subject)",

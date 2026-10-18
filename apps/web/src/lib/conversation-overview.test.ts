@@ -194,6 +194,10 @@ describe('filtros de la lista', () => {
       temp: 'fria',
       temporada: true,
     });
+    const id = '01a14f54-6096-7361-9932-a9e3837f466d';
+    expect(parseListFilter(new URLSearchParams(`envio=${id}&r=rebotes`))).toMatchObject({ envio: id, r: 'rebotes' });
+    expect(parseListFilter(new URLSearchParams('envio=nope&r=rebotes')).envio).toBeUndefined();
+    expect(parseListFilter(new URLSearchParams(`envio=${id}&r=todo`)).envio).toBeUndefined();
     expect(parseListFilter(new URLSearchParams('turno=x&temp=tibia'))).toEqual({
       turno: undefined,
       temp: undefined,

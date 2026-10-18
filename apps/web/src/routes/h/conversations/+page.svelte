@@ -174,6 +174,7 @@
     if (f.turno === 'nuestro') return t('overview.due', locale);
     if (f.turno === 'suyo') return t('overview.turn_theirs_cap', locale);
     if (f.temp) return t(TEMP_CHIP[f.temp], locale);
+    if (f.envio && f.r) return t(f.r === 'respuestas' ? 'overview.mailout_replies_chip' : 'overview.mailout_bounced_chip', locale);
     return f.temporada ? t('overview.this_season', locale) : null;
   }
   let filterChip = $derived(chipLabel(listFilter, statusFilter));
@@ -182,7 +183,7 @@
     const params = new URLSearchParams(page.url.searchParams);
     // A season segment is status + season: its chip names both, and goes as one.
     if (listFilter.temporada) params.delete('estado');
-    for (const k of ['turno', 'temp', 'temporada']) params.delete(k);
+    for (const k of ['turno', 'temp', 'temporada', 'envio', 'r']) params.delete(k);
     const qs = params.toString();
     void goto(`${page.url.pathname}${qs ? `?${qs}` : ''}`, { noScroll: true, keepFocus: true });
   }

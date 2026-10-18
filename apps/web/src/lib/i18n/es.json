@@ -1871,6 +1871,8 @@
   "overview.last_mailout": "Último envío",
   "overview.list": "Con quién hablas",
   "overview.loading": "Cargando el resumen…",
+  "overview.mailout_bounced_chip": "Rebotaron en el último envío",
+  "overview.mailout_replies_chip": "Contestaron al último envío",
   "overview.no_date": "sin fecha",
   "overview.no_reply": "sin respuesta",
   "overview.no_subject": "(sin asunto)",

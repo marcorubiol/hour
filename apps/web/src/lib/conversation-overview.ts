@@ -300,12 +300,20 @@ export type TurnFilter = 'nuestro' | 'suyo';
 export type TempFilter = 'caliente' | 'fria' | 'ronda' | 'parada';
 const TEMP_FILTERS: readonly string[] = ['caliente', 'fria', 'ronda', 'parada'];
 
+/** Las cifras del último envío que llevan a alguien (ADR-126 § 9). */
+export type MailoutPick = 'respuestas' | 'rebotes';
+
 export interface ListFilter {
   turno?: TurnFilter;
   temp?: TempFilter;
   /** Solo las de la temporada en curso (la barra de la temporada filtra con esto). */
   temporada?: boolean;
+  /** Un envío y cuáles de sus destinatarios: las que contestaron, o las que rebotaron. */
+  envio?: string;
+  r?: MailoutPick;
 }
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export function parseListFilter(params: URLSearchParams): ListFilter {
   const turno = params.get('turno');
@@ -314,11 +322,19 @@ export function parseListFilter(params: URLSearchParams): ListFilter {
     turno: turno === 'nuestro' || turno === 'suyo' ? turno : undefined,
     temp: temp && TEMP_FILTERS.includes(temp) ? (temp as TempFilter) : undefined,
     temporada: params.get('temporada') === 'actual' || undefined,
+    ...mailoutFilter(params),
   };
 }
 
+function mailoutFilter(params: URLSearchParams): Pick<ListFilter, 'envio' | 'r'> {
+  const envio = params.get('envio');
+  const r = params.get('r');
+  if (!envio || !UUID_RE.test(envio) || (r !== 'respuestas' && r !== 'rebotes')) return {};
+  return { envio, r };
+}
+
 export function hasListFilter(f: ListFilter): boolean {
-  return Boolean(f.turno || f.temp || f.temporada);
+  return Boolean(f.turno || f.temp || f.temporada || f.envio);
 }
 
 /**
@@ -536,6 +552,17 @@ export interface MailoutFigures {
 
 const LEFT = new Set(['sent', 'delivered', 'bounced', 'complained']);
 
+/** Contestó a este envío: salió, y su último correo de fuera es posterior. */
+export function mailoutReplied(
+  r: MailoutRecipientLite,
+  queuedAt: string | null,
+  lastInByConversation: ReadonlyMap<string, string>,
+): boolean {
+  const after = r.sent_at ?? queuedAt;
+  const lastIn = lastInByConversation.get(r.conversation_id);
+  return LEFT.has(r.status) && Boolean(after) && Boolean(lastIn) && Date.parse(lastIn!) > Date.parse(after!);
+}
+
 /**
  * Las cifras de un envío. Respuesta: la conversación tiene un correo de ellos
  * posterior a la salida del suyo (el último de fuera basta: si hay alguno
@@ -557,9 +584,7 @@ export function mailoutFigures(
     if (r.suppressed_reason === 'unsubscribe' && r.suppressed_at && (queued === null || Date.parse(r.suppressed_at) >= queued)) {
       out.unsubscribed += 1;
     }
-    const after = r.sent_at ?? queuedAt;
-    const lastIn = lastInByConversation.get(r.conversation_id);
-    if (LEFT.has(r.status) && after && lastIn && Date.parse(lastIn) > Date.parse(after)) out.replies += 1;
+    if (mailoutReplied(r, queuedAt, lastInByConversation)) out.replies += 1;
   }
   return out;
 }
