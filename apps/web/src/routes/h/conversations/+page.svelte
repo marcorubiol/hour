@@ -725,6 +725,23 @@
       scroll-margin-block-start: var(--space-l);
       margin-block-start: var(--space-m);
     }
+    .action-bar__keep {
+      margin-inline-start: var(--space-s);
+      padding: 0;
+      border: 0;
+      background: none;
+      color: inherit;
+      font: inherit;
+      text-decoration: underline;
+      text-underline-offset: 0.2em;
+      cursor: pointer;
+    }
+    @media (pointer: coarse) {
+      .action-bar__keep {
+        min-block-size: var(--touch-target);
+      }
+    }
+
     .conversations__state {
       font-size: var(--text-s);
       color: var(--text-muted);
