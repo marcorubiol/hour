@@ -96,6 +96,16 @@ describe('changesSince — «Ha cambiado»', () => {
     ]);
   });
 
+  it('a reply «Te espera» already holds is not news twice', () => {
+    const out = changesSince(
+      { threads: [], hot: [hot('waiting', '2026-10-15T09:30:00Z', 'ours'), hot('other', '2026-10-15T09:40:00Z', 'ours')], lastMailout: null },
+      since,
+      NOW,
+      new Set(['waiting']),
+    );
+    expect(out.map((c) => (c.kind === 'reply' ? c.row.id : c.kind))).toEqual(['other']);
+  });
+
   it('the last send is news for two weeks, whatever the visit', () => {
     const m = (queued: string) => ({ id: 'm', queued_at: queued }) as unknown as LastMailout;
     expect(changesSince({ threads: [], hot: [], lastMailout: m('2026-10-05T10:00:00Z') }, since, NOW)).toHaveLength(1);

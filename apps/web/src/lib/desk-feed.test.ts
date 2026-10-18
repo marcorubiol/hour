@@ -201,6 +201,25 @@ describe('buildDeskFeed — tasks, AI, money', () => {
     expect(rankWaiting(feed, [], NOW).overdue).toBe(0);
   });
 
+  it('a reply waiting for us sits today, most recent first, and replaces its next-action call', () => {
+    const feed = buildDeskFeed(
+      {
+        conversations: [conv('c1', { next_action_at: actionAt(4) }), conv('c3', { next_action_at: actionAt(4) })],
+        tasks: [],
+        replies: [
+          { id: 'c1', title: 'Teatre de Salt', projectId: 'p1', projectName: 'MaMeMi', at: `${isoDay(-3)}T09:00:00Z`, href: '/h/w/conversation/c1' },
+          { id: 'c2', title: 'Teatro Central', projectId: 'p1', projectName: 'MaMeMi', at: `${isoDay(-1)}T09:00:00Z`, href: '/h/w/conversation/c2' },
+        ],
+      },
+      NOW,
+      'en',
+    );
+    const rows = feed.flatMap((b) => b.runs).flatMap((r) => r.items);
+    expect(rows.map((r) => r.id)).toEqual(['reply-c2', 'reply-c1', 'conv-c3']);
+    expect(rows[0]).toMatchObject({ verbKey: 'reply', href: '/h/w/conversation/c2', day: isoDay(0), overdue: false });
+    expect(rankWaiting(feed, [], NOW).rows.map((r) => r.id)).toEqual(['reply-c2', 'reply-c1', 'conv-c3']);
+  });
+
   it('undated open task lands in the anytime tail', () => {
     const feed = buildDeskFeed({ ...EMPTY, tasks: [task('t')] }, NOW, 'en');
     expect(feed.map((b) => b.sortKey)).toEqual([99]);

@@ -92,8 +92,9 @@ export function sinceInstant(lastVisit: string | null, now: Date): string {
 /**
  * What moved since the last visit (ADR-117): team threads with new messages
  * written after it, rooms whose latest word is theirs and came after it (the
- * «caliente» rows of the Conversations overview whose turn is ours), and the
- * last send while it is recent. Newest first, at most `CHANGED_ROWS`.
+ * «caliente» rows of the Conversations overview whose turn is ours, unless
+ * «Te espera» already holds them), and the last send while it is recent.
+ * Newest first, at most `CHANGED_ROWS`.
  *
  * Status changes and payments stay out: nothing records them yet for bolos
  * or payments (only `conversation_event` exists), and the Desk does not
@@ -107,6 +108,8 @@ export function changesSince(
   },
   since: string,
   now: Date,
+  /** Conversations «Te espera» already asks you to answer: not news twice. */
+  waiting: ReadonlySet<string> = new Set(),
 ): Change[] {
   const after = Date.parse(since);
   const out: Change[] = [];
@@ -116,6 +119,7 @@ export function changesSince(
     }
   }
   for (const row of input.hot) {
+    if (waiting.has(row.id)) continue;
     if (row.turn === 'ours' && row.at && Date.parse(row.at) > after) out.push({ kind: 'reply', at: row.at, row });
   }
   const m = input.lastMailout;

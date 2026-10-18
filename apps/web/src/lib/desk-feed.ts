@@ -90,6 +90,8 @@ export interface DeskItem {
   day: string | null;
   /** A «voy · no voy» row: what the answer is written on. */
   going: { of: 'performance' | 'date'; id: string } | null;
+  /** A reply row: when they wrote (its «when» is how long ago). */
+  repliedAt: string | null;
 }
 
 export interface DeskRun {
@@ -113,6 +115,22 @@ export interface DeskFeedInput {
   invoices?: DeskInvoiceInput[];
   /** A gig today keeps the quiet-day revive away (ADR-073). */
   showToday?: boolean;
+  /**
+   * Rooms whose latest word is theirs and asks for an answer: the «te toca»
+   * rows of the Conversations overview with reason `reply` (ADR-126 § 1). They
+   * wait today until answered; their next-action call is not drawn twice.
+   */
+  replies?: DeskReplyInput[];
+}
+
+export interface DeskReplyInput {
+  id: string;
+  title: string;
+  projectId: string | null;
+  projectName: string;
+  /** Their message: when they wrote. */
+  at: string;
+  href: string | null;
 }
 
 const VERB_KEYS: Record<string, { upcoming: string; overdue: string }> = {
@@ -227,6 +245,7 @@ function blankItem(over: Partial<DeskItem> & Pick<DeskItem, 'id' | 'concern' | '
     currency: null,
     day: null,
     going: null,
+    repliedAt: null,
     ...over,
   };
 }
@@ -309,10 +328,33 @@ export function buildDeskFeed(input: DeskFeedInput, now: Date, locale: Locale = 
     );
   }
 
+  // ── Replies waiting for us (ADR-126 «te toca», reason reply): today, the
+  //    most recent first, opening the conversation. They are the call for
+  //    their conversation: its next action is not drawn again.
+  const replied = new Set<string>();
+  for (const r of input.replies ?? []) {
+    replied.add(r.id);
+    push(
+      todayISO,
+      'conversation',
+      -Date.parse(r.at),
+      blankItem({
+        id: `reply-${r.id}`,
+        concern: 'conversation',
+        subject: r.title,
+        projectName: r.projectName || '—',
+        projectId: r.projectId,
+        verbKey: 'reply',
+        href: r.href,
+        repliedAt: r.at,
+      }),
+    );
+  }
+
   // ── Conversations (derived calls): next action set, not declined/dormant.
   let hasOverdue = false;
   for (const e of input.conversations) {
-    if (e.status === 'declined' || e.status === 'dormant' || !e.next_action_at) continue;
+    if (e.status === 'declined' || e.status === 'dormant' || !e.next_action_at || replied.has(e.id)) continue;
     const day = e.next_action_at.slice(0, 10);
     const b = dayBucket(day, now, locale);
     const overdue = b.sortKey === -1;

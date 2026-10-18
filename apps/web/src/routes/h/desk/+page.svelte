@@ -229,6 +229,37 @@
   let scopedPerfs = $derived(feeds.performances.filter((p) => byProject(p.project?.id, p.project?.workspace_id)));
   let scopedDates = $derived(feeds.dates.filter((d) => byProject(d.project?.id, d.project?.workspace_id)));
 
+  // The Conversations overview: its «te toca» replies wait in band 2, its
+  // «caliente» feeds band 3 and its figures the door (one cache with the lens).
+  const overviewQuery = createQuery(
+    toStore(() => ({
+      queryKey: ['conversation-overview', filterIds.projectIds, filterIds.workspaceIds, lineIds] as const,
+      enabled: !scopeUnresolved,
+      queryFn: ({ signal }: { signal: AbortSignal }) => {
+        const p = new URLSearchParams(feedParams(filterIds));
+        if (lineIds.length > 0) p.set('line_ids', lineIds.join(','));
+        return fetchJSON<OverviewResponse>(`/api/conversations/overview?${p}`, signal);
+      },
+    })),
+  );
+  let overview = $derived($overviewQuery.data ?? null);
+  let projectNameById = $derived(new Map(projectIndex.map((p) => [p.id, p.name])));
+  let replies = $derived(
+    (overview?.due.rows ?? [])
+      .filter((r) => r.reason === 'reply')
+      .map((r) => {
+        const ws = workspaceSlugById.get(r.workspace_id);
+        return {
+          id: r.id,
+          title: r.title,
+          projectId: r.project_id,
+          projectName: projectNameById.get(r.project_id) ?? '',
+          at: r.at,
+          href: ws ? `/h/${ws}/conversation/${r.id}` : null,
+        };
+      }),
+  );
+
   // A document of a deal not yet confirmed is a quote, not a debt (ADR-123):
   // «te espera» leaves it out, as Cuentas and this page's own door do.
   let debtInvoices = $derived.by(() => {
@@ -245,6 +276,7 @@
         tasks: scopedTasks,
         invoices: readMoney && $invoicesQuery.isSuccess && $bolosQuery.isSuccess ? debtInvoices : undefined,
         showToday: scopedPerfs.some((p) => p.status !== 'cancelled' && perfDayKey(p) === today),
+        replies,
       },
       clockNow,
       locale,
@@ -278,22 +310,15 @@
   let waiting = $derived(rankWaiting(feed, asks, clockNow, { calm: calm.on }));
 
   let waitingLoading = $derived(
-    $conversationsQuery.isPending || $tasksQuery.isPending || $workspacesQuery.isPending || $accessQuery.isPending,
+    $conversationsQuery.isPending ||
+      $tasksQuery.isPending ||
+      $workspacesQuery.isPending ||
+      $accessQuery.isPending ||
+      $overviewQuery.isPending,
   );
   let waitingErrored = $derived($conversationsQuery.isError || $tasksQuery.isError);
 
   // ── Band 3 · Ha cambiado, and the Conversations door ───────────────────
-  const overviewQuery = createQuery(
-    toStore(() => ({
-      queryKey: ['conversation-overview', filterIds.projectIds, filterIds.workspaceIds, lineIds] as const,
-      enabled: !scopeUnresolved,
-      queryFn: ({ signal }: { signal: AbortSignal }) => {
-        const p = new URLSearchParams(feedParams(filterIds));
-        if (lineIds.length > 0) p.set('line_ids', lineIds.join(','));
-        return fetchJSON<OverviewResponse>(`/api/conversations/overview?${p}`, signal);
-      },
-    })),
-  );
   const threadsQuery = createQuery(
     toStore(() => ({
       queryKey: ['thread-feed', filterIds.projectIds, filterIds.workspaceIds] as const,
@@ -303,7 +328,6 @@
         fetchJSON<ThreadFeedView>(`/api/threads?${feedParams(filterIds)}`, signal),
     })),
   );
-  let overview = $derived($overviewQuery.data ?? null);
   let changes = $derived(
     changesSince(
       {
@@ -313,6 +337,7 @@
       },
       since,
       clockNow,
+      new Set(replies.map((r) => r.id)),
     ),
   );
   let changedLoading = $derived($overviewQuery.isPending || $threadsQuery.isPending);
