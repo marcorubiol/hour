@@ -30,6 +30,7 @@
   import {
     COLD_IDLE_DAYS,
     COLD_REPLY_DAYS,
+    currentSeason,
     type BlockRow,
     type DueRow,
     type OverviewResponse,
@@ -144,7 +145,7 @@
     </div>
     <div class="board__col">
       <section class="block block--season">
-        <div class="block-head"><h2 class="block__title">{t('overview.season', locale)}</h2></div>
+        <div class="block-head"><h2 class="block__title">{t('overview.season_of', locale, { season: currentSeason(new Date()).label })}</h2></div>
         <div class="season__bar season__bar--ghost"></div>
         <div class="season__legend" aria-hidden="true">
           {#each Array(6) as _, i (i)}
