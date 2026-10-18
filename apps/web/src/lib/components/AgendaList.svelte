@@ -120,11 +120,9 @@
      * that poses the question could not resolve it.
      */
     onConfirm?: (perfId: string) => void;
-    onRelease?: (perfId: string) => void;
     /** Performance id with a write in flight. */
     pendingId?: string | null;
     confirmLabel?: string;
-    releaseLabel?: string;
     /** «until», «5 days left», «back tomorrow» — the absence's own words. */
     awayUntilWord?: string;
     awayLeftWord?: string;
@@ -231,10 +229,8 @@
     noteAddLabel = t('planner.note_add', L),
     noteDeleteLabel = t('planner.note_delete', L),
     onConfirm,
-    onRelease,
     pendingId = null,
     confirmLabel = t('planner.dec_confirm_short', L),
-    releaseLabel = t('planner.released', L),
     onReachEnd,
     onReachStart,
     earlierLabel = t('planner.agenda_earlier', L),
@@ -1159,17 +1155,6 @@
               e.stopPropagation();
               onConfirm?.(row.perf.id);
             }}>{confirmLabel}</button
-          >
-        {:else if fam === 'confirmed' && onRelease}
-          <button
-            type="button"
-            class="ag__do ag__do--quiet"
-            disabled={pendingId === row.perf.id}
-            onclick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              onRelease?.(row.perf.id);
-            }}>{releaseLabel}</button
           >
         {/if}
       {/if}

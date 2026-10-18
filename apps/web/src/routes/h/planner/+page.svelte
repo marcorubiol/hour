@@ -3347,10 +3347,8 @@
       awayLeftOneWord={t('planner.away_left_one', locale)}
       awayBackWord={t('planner.away_back', locale)}
       onConfirm={(id) => $decideMutation.mutate({ id, status: 'confirmed' })}
-      onRelease={(id) => $decideMutation.mutate({ id, status: 'cancelled' })}
       pendingId={decisionPendingId}
       confirmLabel={t('planner.dec_confirm_short', locale)}
-      releaseLabel={t('planner.released', locale)}
       onDecideJump={jumpToDecisions}
       onDateOpen={openDate}
       {notesByDay}

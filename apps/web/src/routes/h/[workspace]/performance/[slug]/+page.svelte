@@ -231,8 +231,16 @@
     $patchMutation.mutate({ readiness: { ...current, [key]: !current[key] } });
   }
 
+  /* CANCELAR SE CONFIRMA (Marco, 2026-10-18). Es la única puerta para
+     cancelar una función: la Agenda tenía un «soltado» de un clic que se
+     leía como estado y cancelaba un bolo firme. Aquí se pregunta antes. */
+  let confirmCancelOpen = $state(false);
   function changeStatus(status: PerformanceStatus) {
     if (!perf || perf.status === status) return;
+    if (status === 'cancelled') {
+      confirmCancelOpen = true;
+      return;
+    }
     $patchMutation.mutate({ status });
   }
 
@@ -1001,6 +1009,28 @@
   {#snippet actions()}
     <Button variant="outline" onclick={() => (venueEditOpen = false)}>{t('create.cancel', locale)}</Button>
     <Button onclick={saveVenue} loading={$venuePatch.isPending}>{t('venue.save', locale)}</Button>
+  {/snippet}
+</Dialog>
+
+<Dialog bind:open={confirmCancelOpen} title={t('perf.cancel_title', locale)} size="s">
+  <p>
+    {t('perf.cancel_body', locale, {
+      what: title,
+      when: perf ? dayLabel(perf.performed_at, 'short') : '',
+    })}
+  </p>
+  {#snippet actions()}
+    <Button variant="outline" onclick={() => (confirmCancelOpen = false)}>{t('perf.keep', locale)}</Button>
+    <Button
+      variant="danger"
+      onclick={() => {
+        confirmCancelOpen = false;
+        $patchMutation.mutate({ status: 'cancelled' });
+      }}
+      loading={$patchMutation.isPending}
+    >
+      {t('perf.cancel_confirm', locale)}
+    </Button>
   {/snippet}
 </Dialog>
 
