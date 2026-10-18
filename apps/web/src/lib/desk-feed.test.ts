@@ -193,6 +193,14 @@ describe('buildDeskFeed — tasks, AI, money', () => {
     expect(invoiceHref({ lines: [{ bolo_id: null }] })).toBe('/h/books');
   });
 
+  it('a task with only «desde» that has surfaced is today, never overdue, and has no when', () => {
+    const feed = buildDeskFeed({ ...EMPTY, tasks: [task('from', { from_at: actionAt(-6) })] }, NOW, 'en');
+    expect(feed.map((b) => b.sortKey)).toEqual([0]);
+    const row = feed[0].runs[0].items[0];
+    expect(row).toMatchObject({ overdue: false, dueDay: null, dueLabel: null });
+    expect(rankWaiting(feed, [], NOW).overdue).toBe(0);
+  });
+
   it('undated open task lands in the anytime tail', () => {
     const feed = buildDeskFeed({ ...EMPTY, tasks: [task('t')] }, NOW, 'en');
     expect(feed.map((b) => b.sortKey)).toEqual([99]);

@@ -64,7 +64,7 @@
 
   /** When, in words: the day label of the row's bucket, or the task's own due. */
   function whenOf(i: DeskItem): string {
-    if (i.concern === 'task' && i.dueLabel) return t(`desk.due_${i.dueLabel}`, locale);
+    if (i.concern === 'task') return i.dueLabel ? t(`desk.due_${i.dueLabel}`, locale) : i.dueDay ? dayMonth(i.dueDay) : '';
     if (!i.day) return '';
     if (i.overdue) return t('desk.due_overdue', locale);
     return dayMonth(i.day);

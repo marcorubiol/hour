@@ -77,6 +77,8 @@ export interface DeskItem {
   taskId: string | null;
   taskDone: boolean;
   surfacesDay: string | null;
+  /** A task's own due day; null when it has none (a «desde» is not a deadline). */
+  dueDay: string | null;
   dueLabel: 'overdue' | 'due' | null;
   /** AI consent inbox (ADR-069): origin='ai' → a proposal ghost row. */
   isProposal: boolean;
@@ -217,6 +219,7 @@ function blankItem(over: Partial<DeskItem> & Pick<DeskItem, 'id' | 'concern' | '
     taskId: null,
     taskDone: false,
     surfacesDay: null,
+    dueDay: null,
     dueLabel: null,
     isProposal: false,
     reason: null,
@@ -279,7 +282,10 @@ export function buildDeskFeed(input: DeskFeedInput, now: Date, locale: Locale = 
   for (const t of input.tasks) {
     const surface = taskSurfaceState(t, now);
     if (surface.state === 'dormant' || surface.state === 'done') continue;
-    const day = t.due_at?.slice(0, 10) ?? surface.surfacesAt ?? null;
+    // Only a due date can pass: a task with just «desde» that has surfaced is
+    // today's, never late (its «desde» is not a deadline).
+    const dueDay = t.due_at?.slice(0, 10) ?? null;
+    const day = dueDay ?? (surface.surfacesAt ? todayISO : null);
     const overdue = surface.state === 'overdue';
     push(
       day,
@@ -295,6 +301,7 @@ export function buildDeskFeed(input: DeskFeedInput, now: Date, locale: Locale = 
         overdue,
         taskId: t.id,
         surfacesDay: surface.surfacesAt,
+        dueDay,
         dueLabel: t.due_at ? (overdue ? 'overdue' : surface.state === 'urgent' ? 'due' : null) : null,
         isProposal: t.origin === 'ai',
         reason: t.origin === 'ai' ? (t.note ?? null) : null,
