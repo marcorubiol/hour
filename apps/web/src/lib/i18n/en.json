@@ -128,6 +128,8 @@
   "planner.note_delete": "Delete note",
   "planner.day_next": "next",
   "planner.no_more_plan": "no more plan that way — Shift+← → moves a day at a time",
+  "planner.load_error": "The calendar could not be loaded.",
+  "planner.retry": "Retry",
   "planner.open_day": "Open {day}",
   "planner.pick_day": "Go to another day",
   "planner.run_from": "from {day}",

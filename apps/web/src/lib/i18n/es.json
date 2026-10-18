@@ -127,6 +127,8 @@
   "planner.note_delete": "Borra la nota",
   "planner.day_next": "después",
   "planner.no_more_plan": "no hay más plan por ahí — Mayús+← → para ir día a día",
+  "planner.load_error": "No se pudo cargar el calendario.",
+  "planner.retry": "Reintentar",
   "planner.open_day": "Abrir el día {day}",
   "planner.pick_day": "Ir a otro día",
   "planner.run_from": "desde {day}",

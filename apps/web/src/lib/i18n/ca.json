@@ -127,6 +127,8 @@
   "planner.note_delete": "Esborra la nota",
   "planner.day_next": "després",
   "planner.no_more_plan": "no hi ha més pla per aquí — Maj+← → per anar dia a dia",
+  "planner.load_error": "No s'ha pogut carregar el calendari.",
+  "planner.retry": "Torna-ho a provar",
   "planner.open_day": "Obre el dia {day}",
   "planner.pick_day": "Vés a un altre dia",
   "planner.run_from": "des de {day}",

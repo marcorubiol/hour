@@ -96,6 +96,8 @@
   "planner.note_delete": "Supprimer la note",
   "planner.day_next": "ensuite",
   "planner.no_more_plan": "plus rien de ce côté. Maj+← → avance jour par jour",
+  "planner.load_error": "Le calendrier n’a pas pu être chargé.",
+  "planner.retry": "Réessayer",
   "planner.open_day": "Ouvrir le {day}",
   "planner.pick_day": "Aller à un autre jour",
   "planner.run_from": "depuis le {day}",

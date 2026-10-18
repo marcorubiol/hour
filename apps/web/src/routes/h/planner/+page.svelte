@@ -2801,6 +2801,10 @@
 
   // ── Creation — the unified dialog (ADR-078 §1) behind every "+". ─────
   const queryClient = useQueryClient();
+  /** Ask again for whatever failed — and only that. */
+  function retryFailed() {
+    void queryClient.refetchQueries({ predicate: (q) => q.state.status === 'error' });
+  }
 
   let createOpen = $state(false);
   let createDate = $state<string | null>(null);
@@ -3205,7 +3209,14 @@
 
 
   {#if errorMsg}
-    <p class="cal__state cal__state--danger">{errorMsg}</p>
+    <!-- A FAILURE SAYS WHAT FAILED, IN OUR WORDS, AND OFFERS THE WAY BACK
+         (diseño M11). It printed the server's text as it came («boom»). The
+         detail stays, quieter, for whoever has to report it. -->
+    <div class="cal__state cal__state--danger" role="alert">
+      <p class="cal__state-t">{t('planner.load_error', locale)}</p>
+      <p class="cal__state-d">{errorMsg}</p>
+      <Button variant="outline" size="s" onclick={retryFailed}>{t('planner.retry', locale)}</Button>
+    </div>
   {:else if view === 'overview'}
     <SeasonOverview
       {locale}
@@ -3733,7 +3744,19 @@
       color: var(--text-faint);
     }
     .cal__state--danger {
+      display: grid;
+      justify-items: start;
+      gap: var(--space-xs);
+    }
+    .cal__state-t {
+      margin: 0;
       color: var(--danger);
+    }
+    .cal__state-d {
+      margin: 0;
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--text-faint);
     }
   }
 </style>
