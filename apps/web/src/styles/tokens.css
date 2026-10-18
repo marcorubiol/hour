@@ -277,6 +277,11 @@
     --text-m: clamp(0.875rem, 0.831rem + 0.188vw, 1rem); /* 14-16 — default body (anchor) */
     --text-l: clamp(1.05rem, 0.9796rem + 0.3vw, 1.25rem); /* 16.8-20 — card titles */
     --text-xl: clamp(1.26rem, 1.1535rem + 0.454vw, 1.5625rem); /* 20.2-25 — wordmark, clock, h4 */
+    /* A dashboard figure in the display face: the lead one of a block (the
+       season's counts) and one inline with its word (a mailout's figures).
+       Two named sizes, not a size per screen (Conversations review, B4). */
+    --stat-lead: var(--text-xl);
+    --stat-inline: var(--text-l);
     --text-xxl: clamp(1.512rem, 1.3567rem + 0.663vw, 1.9531rem); /* 24.2-31.3 — section title, h2 */
 
     --h1: clamp(1.8rem, 1.5rem + 1.5vw, 2.4rem); /* 29-38 — masthead. Retuned 2026-07-12 to the size mastheads actually render (person/performance canonical); the old 32-48 was never consumed — every page rolled its own clamp to undershoot it. */

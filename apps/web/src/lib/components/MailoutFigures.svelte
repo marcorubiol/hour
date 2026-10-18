@@ -67,7 +67,7 @@
       margin-inline-end: 0.25em;
       color: var(--heading-color);
       font-family: var(--font-display);
-      font-size: var(--text-l);
+      font-size: var(--stat-inline);
       font-weight: 400;
       font-variant-numeric: tabular-nums;
     }

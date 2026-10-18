@@ -657,7 +657,7 @@
     }
     .season__n {
       font-family: var(--font-display);
-      font-size: var(--text-xl);
+      font-size: var(--stat-lead);
       line-height: 1.1;
       font-variant-numeric: tabular-nums;
     }
@@ -686,7 +686,7 @@
 
     .mailout__ghost-figs {
       font-family: var(--font-display);
-      font-size: var(--text-l);
+      font-size: var(--stat-inline);
     }
     .mailout__ghost-figs .g {
       inline-size: 60%;
