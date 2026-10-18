@@ -55,7 +55,7 @@
 
   type FeeItem = {
     id: string;
-    next_performed_at: string | null;
+    first_performed_at: string | null;
     function_count: number;
     status: string;
     venue_name: string | null;
@@ -296,7 +296,7 @@
             {#each fees as f (f.id)}
               <tr>
                 <td class="lmm__cell-date">
-                  {f.next_performed_at ? dayLabel(f.next_performed_at) : '—'}
+                  {f.first_performed_at ? dayLabel(f.first_performed_at) : '—'}
                   {#if f.function_count > 1}<span class="lmm__fn-count"> · {t('books.fn_count', locale, { n: f.function_count })}</span>{/if}
                 </td>
                 <td>

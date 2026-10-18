@@ -20,7 +20,8 @@ interface Row {
 interface MoneyBoloRow {
   id: string;
   function_count: number;
-  next_performed_at: string | null;
+  first_performed_at: string | null;
+  last_performed_at: string | null;
 }
 
 describe.skipIf(!envReady())('list_money_bolos — cancelled functions do not count (ADR-125)', () => {
@@ -88,16 +89,16 @@ describe.skipIf(!envReady())('list_money_bolos — cancelled functions do not co
   });
 
   it('with both live, the first function is the date and both count', async () => {
-    expect(await row()).toMatchObject({ function_count: 2, next_performed_at: '2027-01-10' });
+    expect(await row()).toMatchObject({ function_count: 2, first_performed_at: '2027-01-10', last_performed_at: '2027-02-20' });
   });
 
   it('a cancelled first function leaves the date to the first live one', async () => {
     expect(await setStatus(perfIds[0]!, 'cancelled')).toBe(204);
-    expect(await row()).toMatchObject({ function_count: 1, next_performed_at: '2027-02-20' });
+    expect(await row()).toMatchObject({ function_count: 1, first_performed_at: '2027-02-20', last_performed_at: '2027-02-20' });
   });
 
   it('with all cancelled, the bolo keeps its first date and counts none', async () => {
     expect(await setStatus(perfIds[1]!, 'cancelled')).toBe(204);
-    expect(await row()).toMatchObject({ function_count: 0, next_performed_at: '2027-01-10' });
+    expect(await row()).toMatchObject({ function_count: 0, first_performed_at: '2027-01-10', last_performed_at: '2027-02-20' });
   });
 });

@@ -479,8 +479,10 @@ export interface MoneyBolo {
 	status: string;
 	collected: number;
 	function_count: number;
-	/** OJO: la PRIMERA función (`min(performed_at)`), no la próxima. */
-	next_performed_at: string | null;
+	/** La primera función viva: decide la temporada (ADR-117). */
+	first_performed_at: string | null;
+	/** La última función viva: el trato está hecho, y se puede facturar, cuando pasa (ADR-131). */
+	last_performed_at: string | null;
 	project: {
 		id: string;
 		slug: string;
@@ -531,12 +533,12 @@ export function seasonLabel(start: number): string {
  * Which season a bolo lives in: the season of its first function. A bolo with
  * no function yet is a live deal, so it lives in the season of today.
  */
-export function boloSeason(bolo: Pick<MoneyBolo, 'next_performed_at'>, today: Date): number {
-	return seasonOf(bolo.next_performed_at ?? localDayISO(today));
+export function boloSeason(bolo: Pick<MoneyBolo, 'first_performed_at'>, today: Date): number {
+	return seasonOf(bolo.first_performed_at ?? localDayISO(today));
 }
 
 /** The seasons there is anything to show for, newest first; today's always included. */
-export function seasonsOf(bolos: readonly Pick<MoneyBolo, 'next_performed_at'>[], today: Date): number[] {
+export function seasonsOf(bolos: readonly Pick<MoneyBolo, 'first_performed_at'>[], today: Date): number[] {
 	const set = new Set<number>([seasonOf(localDayISO(today))]);
 	for (const b of bolos) set.add(boloSeason(b, today));
 	return [...set].sort((a, b) => b - a);
@@ -664,7 +666,9 @@ export function boloMoney(b: MoneyBolo, ctx: MoneyContext): BoloMoney {
 	const overdue = owed > 0 && aging?.state === 'past-expected';
 	const daysLate =
 		overdue && aging?.expectedOn ? Math.max(0, daysBetween(aging.expectedOn, todayDay(ctx.today))) : 0;
-	const performed = b.next_performed_at ? b.next_performed_at.slice(0, 10) < todayDay(ctx.today) : false;
+	// Performed once the LAST function is past: a bolo of three is not
+	// «por facturar» after its first night (ADR-131).
+	const performed = b.last_performed_at ? b.last_performed_at.slice(0, 10) < todayDay(ctx.today) : false;
 	const toInvoice =
 		(b.status === 'confirmed' || b.status === 'done') &&
 		fee !== null &&
@@ -920,7 +924,7 @@ export function attentionItems(bolos: readonly MoneyBolo[], ctx: MoneyContext): 
 			KIND_ORDER[a.kind] - KIND_ORDER[b.kind] ||
 			doneFirst(a) - doneFirst(b) ||
 			b.daysLate - a.daysLate ||
-			(a.bolo.next_performed_at ?? '9999').localeCompare(b.bolo.next_performed_at ?? '9999'),
+			(a.bolo.first_performed_at ?? '9999').localeCompare(b.bolo.first_performed_at ?? '9999'),
 	);
 }
 
@@ -991,8 +995,9 @@ export function expectedInflow(
 			}
 		}
 		// A draft is not an invoice yet: the deal still comes in as «contracted».
-		if (m.contracted && (m.doc === null || m.doc.status === 'draft') && m.fee && b.next_performed_at) {
-			const day = b.next_performed_at.slice(0, 10);
+		// It comes in after the last function, when it can be invoiced (ADR-131).
+		if (m.contracted && (m.doc === null || m.doc.status === 'draft') && m.fee && b.last_performed_at) {
+			const day = b.last_performed_at.slice(0, 10);
 			if (day < today) continue;
 			const slot = ensure(m.currency).months.find((x) => x.month === monthKey(day));
 			if (slot) slot.contracted += Math.max(0, m.fee - m.collected);

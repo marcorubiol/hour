@@ -7,7 +7,7 @@
  * columnas de `performance` —no hay grant por columna— así que cualquiera con
  * `edit:performance` podía colgar su función de un bolo de otro proyecto, o de
  * otro ESPACIO con el UUID en la mano, y moverle a un tercero el
- * `function_count` y el `next_performed_at` sin tocar una fila suya.
+ * `function_count` y el `first_performed_at` sin tocar una fila suya.
  *
  * Lo sujeta ahora el trigger `performance_guard_bolo`
  * (`20260828100000_guard_performance_bolo_same_project`). Este fichero va ROJO
