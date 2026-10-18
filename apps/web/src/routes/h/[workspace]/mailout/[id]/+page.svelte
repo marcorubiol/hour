@@ -310,7 +310,7 @@
   <section class="mo" data-testid="mailout">
     <header class="mo__mast">
       <p class="eyebrow">
-        {t('mailout.title', locale)}{#if d.project?.name} · {d.project.name}{/if}
+        {t('mailout.title', locale)}{#if d.project?.name}&nbsp;· {d.project.name}{/if}
       </p>
       <h1 class="mo__title"><em>{m.subject || t('mailout.untitled', locale)}</em></h1>
       <p class="mo__sub">

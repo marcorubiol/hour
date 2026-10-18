@@ -283,7 +283,7 @@
   <section class="conv">
     <header class="conv__mast">
       <p class="eyebrow">
-        {t('conversations.conversation', locale)}{#if conv.project} · {conv.project.name}{/if}
+        {t('conversations.conversation', locale)}{#if conv.project}&nbsp;· {conv.project.name}{/if}
       </p>
       <h1 class="conv__title"><em>{title}</em></h1>
       <p class="conv__sub">
