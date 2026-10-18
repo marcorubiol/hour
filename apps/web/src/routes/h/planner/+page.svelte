@@ -2484,6 +2484,12 @@
     return figuresKnown && v === 1;
   }
 
+  /** A day as a screen reader should say it («jue 22 oct»), never the ISO
+      string it would spell out digit by digit (móvil #10). */
+  function spokenDay(iso: string): string {
+    return `${localeWeekdayShort(iso, localeTag)} ${localeDayMonth(iso, localeTag)}`;
+  }
+
   let monthTitle = $derived(monthName(ym.year, ym.month, localeTag));
   // Capitalized "Julio 2026" — LensTitle then keeps the month italic and the
   // year upright (the title rule). (Month names are lowercase in es/ca.)
@@ -3425,8 +3431,8 @@
       {clashesByDay}
       locale={localeTag}
       dateKindLabel={kindLabel}
-      createLabel={(iso) => t('planner.new_on', locale, { day: iso })}
-      openDayLabel={(iso) => t('planner.open_day', locale, { day: iso })}
+      createLabel={(iso) => t('planner.new_on', locale, { day: spokenDay(iso) })}
+      openDayLabel={(iso) => t('planner.open_day', locale, { day: spokenDay(iso) })}
       runUntilLabel={(iso, n) =>
         `${t('planner.band_until', locale, { day: localeDayMonth(iso, localeTag) })} · ${n} ${t('block.days_unit', locale)}`}
       runFromLabel={(iso, n) =>
@@ -3565,7 +3571,7 @@
       tourWord={t('planner.band_tour', locale)}
       untilLabel={(iso) => t('planner.band_until', locale, { day: localeDayMonth(iso, localeTag) })}
       emptyLabel={t('planner.empty_month', locale)}
-      createLabel={(iso) => t('planner.new_on', locale, { day: iso })}
+      createLabel={(iso) => t('planner.new_on', locale, { day: spokenDay(iso) })}
       clashDayLabel={(iso) => t('planner.conn_jump', locale, { day: Number(iso.slice(8, 10)) })}
       kindLabel={(k) => kindLabel(k)}
       stateLabel={boardSlipState}

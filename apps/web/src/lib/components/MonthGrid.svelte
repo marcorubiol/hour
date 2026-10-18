@@ -21,7 +21,7 @@
    */
   import { createQuery } from '@tanstack/svelte-query';
   import { addDaysIso, dayKeyInTz, isoWeek, monthGrid, assignBandLanes } from '$lib/planner';
-  import { weekdayLabels, localeMonthShort } from '$lib/datetime';
+  import { weekdayLabels, localeMonthShort, localeDayMonth, localeWeekdayShort } from '$lib/datetime';
   import IdentityMark from '$lib/components/IdentityMark.svelte';
   import { accentVarFor } from '$lib/utils/accent';
   import { workspacesQueryOptions } from '$lib/nav-queries';
@@ -147,8 +147,8 @@
     clashesByDay,
     locale = appLocaleTag(),
     dateKindLabel = (kind: string) => kind.replace(/_/g, ' '),
-    createLabel = (iso: string) => t('planner.new_on', L, { day: iso }),
-    openDayLabel = (iso: string) => t('planner.open_day', L, { day: iso }),
+    createLabel = (iso: string) => t('planner.new_on', L, { day: `${localeWeekdayShort(iso, appLocaleTag())} ${localeDayMonth(iso, appLocaleTag())}` }),
+    openDayLabel = (iso: string) => t('planner.open_day', L, { day: `${localeWeekdayShort(iso, appLocaleTag())} ${localeDayMonth(iso, appLocaleTag())}` }),
     runUntilLabel = (iso: string, n: number) =>
       `${t('planner.band_until', L, { day: iso })} · ${n} ${t('block.days_unit', L)}`,
     runFromLabel = (iso: string, n: number) =>
