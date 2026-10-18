@@ -23,7 +23,7 @@
   import { goto } from '$app/navigation';
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
-  import { fetchJSON, mutateJSON } from '$lib/api';
+  import { ApiError, fetchJSON, mutateJSON } from '$lib/api';
   import { dayMonthYear, dayMonthYearTs } from '$lib/datetime';
   import { appLocale, t } from '$lib/i18n';
   import Button from '$lib/components/Button.svelte';
@@ -61,11 +61,14 @@
     void goto(url, { replaceState: true, noScroll: true, keepFocus: true });
   }
 
-  type Conversation = ConversationItem & { private: boolean };
+  type Conversation = ConversationItem & { private: boolean; can_edit: boolean; can_set_private: boolean };
 
   const convQuery = createQuery(
     toStore(() => ({
       queryKey: ['conversation', workspaceSlug, slug] as const,
+      // A 404 is the answer (someone else's private one, or no Converses):
+      // retrying only keeps «Loading…» on screen (`permisos.md` § 7).
+      retry: (count: number, err: unknown) => !(err instanceof ApiError && err.status === 404) && count < 3,
       queryFn: ({ signal }: { signal: AbortSignal }) =>
         fetchJSON<{ item: Conversation }>(
           UUID.test(slug)
@@ -194,6 +197,14 @@
       void queryClient.invalidateQueries({ queryKey: ['thread-audience', 'conversation', conv?.id ?? ''] });
     },
   });
+
+  // ADR-124: marking a shared one private makes it vanish for the rest of the
+  // team, and only you can bring it back, so it asks first. Unmarking does not.
+  function togglePrivate() {
+    if (!conv) return;
+    if (!conv.private && !window.confirm(t('mail.private_confirm', locale))) return;
+    $setPrivate.mutate(!conv.private);
+  }
 
   function what(e: ConversationEventItem): string {
     return e.direction
@@ -333,6 +344,7 @@
           <OrganizationFiscal organizationId={conv.organization.id} />
         {/if}
 
+        {#if conv.can_set_private}
         <div class="privacy">
           <div class="privacy__row">
             <span class="privacy__label">{t('mail.private_label', locale)}</span>
@@ -344,13 +356,14 @@
               aria-checked={conv.private}
               aria-label={t('mail.private_label', locale)}
               disabled={$setPrivate.isPending}
-              onclick={() => $setPrivate.mutate(!conv!.private)}
+              onclick={togglePrivate}
             ><span class="toggle__dot"></span></button>
           </div>
           <p class="privacy__hint">
             {conv.private ? t('mail.private_on_hint', locale) : t('mail.private_off_hint', locale)}
           </p>
         </div>
+        {/if}
 
         <div class="legend">
           <p class="eyebrow eyebrow--sub">{t('mail.mailboxes_here', locale)}</p>

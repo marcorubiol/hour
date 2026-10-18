@@ -11,10 +11,15 @@ export interface OrganizationOption {
   name: string;
 }
 
-/** Una caché para toda la app: los diálogos de alta la comparten. */
-export function organizationsQueryOptions() {
+/**
+ * Una caché para toda la app: los diálogos de alta la comparten. `enabled`
+ * falso para quien no puede crear conversaciones: no la usaría, y el
+ * directorio pide Converses (ADR-124).
+ */
+export function organizationsQueryOptions(enabled = true) {
   return {
     queryKey: ['organizations'] as const,
+    enabled,
     queryFn: ({ signal }: { signal: AbortSignal }) =>
       fetchJSON<{ items: OrganizationOption[] }>('/api/organizations', signal),
     staleTime: 60_000,

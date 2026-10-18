@@ -23,6 +23,8 @@
   import { mutateJSON, ApiError } from '$lib/api';
   import { CONVERSATION_STATUSES, conversationWhoBody, statusLabel } from '$lib/conversation';
   import { organizationNames, organizationsQueryOptions } from '$lib/organizations';
+  import { conversationAccessQueryOptions } from '$lib/conversation-access';
+  import { toStore } from 'svelte/store';
   import { appLocale, t } from '$lib/i18n';
 
   interface Props {
@@ -42,7 +44,13 @@
   const queryClient = useQueryClient();
   const locale = appLocale();
 
-  const organizationsQuery = createQuery(organizationsQueryOptions());
+  // ADR-124: «Añadir» and its directory autocomplete only for whoever edits
+  // conversations somewhere (the API still decides per project).
+  const accessQuery = createQuery(conversationAccessQueryOptions());
+  let canEdit = $derived($accessQuery.data?.edit !== false);
+  const organizationsQuery = createQuery(
+    toStore(() => organizationsQueryOptions($accessQuery.data?.edit === true)),
+  );
   let orgSuggestions = $derived(organizationNames($organizationsQuery.data?.items ?? [], [line.workspace_id]));
   const orgListId = `lcm-org-list-${Math.random().toString(36).slice(2, 8)}`;
 
@@ -122,9 +130,11 @@
 
 <div class="lcm">
   <div class="lcm__bar">
-    <Button size="xs" variant="outline" onclick={openAdd}>{t('conversations.add', locale)}</Button>
+    {#if canEdit}
+      <Button size="xs" variant="outline" onclick={openAdd}>{t('conversations.add', locale)}</Button>
+    {/if}
   </div>
-  <ConversationTable {filters} personBase={`/h/${workspaceSlug}/person`} conversationHref={(item) => `/h/${workspaceSlug}/conversation/${item.id}`} />
+  <ConversationTable {filters} editable={canEdit} personBase={`/h/${workspaceSlug}/person`} conversationHref={(item) => `/h/${workspaceSlug}/conversation/${item.id}`} />
 </div>
 
 <Dialog bind:open={addOpen} title={t('conversations.add', locale)} size="s" onclose={() => (addOpen = false)}>

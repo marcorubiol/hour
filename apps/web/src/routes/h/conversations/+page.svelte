@@ -39,6 +39,7 @@
   import ConversationOverview from '$lib/components/ConversationOverview.svelte';
   import Chip from '$lib/components/Chip.svelte';
   import { tick } from 'svelte';
+  import { toStore } from 'svelte/store';
   import { parseListFilter } from '$lib/conversation-overview';
   import ThreadFeed from '$lib/components/ThreadFeed.svelte';
   import Input from '$lib/components/Input.svelte';
@@ -53,6 +54,7 @@
   } from '$lib/conversation';
   import { appLocale, t } from '$lib/i18n';
   import { organizationNames, organizationsQueryOptions } from '$lib/organizations';
+  import { conversationAccessQueryOptions } from '$lib/conversation-access';
   import { usePins } from '$lib/stores/pins.svelte';
   import { spaceName } from '$lib/utils/identity';
   import {
@@ -76,7 +78,17 @@
   const workspacesQuery = createQuery(workspacesQueryOptions());
   const linesQuery = createQuery(allLinesQueryOptions());
   const projectsQuery = createQuery(activeProjectsQueryOptions());
-  const organizationsQuery = createQuery(organizationsQueryOptions());
+  // ADR-124: without `read` in any project the lens says so; without `edit`
+  // it offers no add, select or import, and never asks for the directory (the
+  // autocomplete of «Añadir», which RLS no longer gives without Converses).
+  // Only an explicit «no» hides: while pending or on failure it shows.
+  const accessQuery = createQuery(conversationAccessQueryOptions());
+  let noAccess = $derived($accessQuery.data?.read === false);
+  let canEdit = $derived($accessQuery.data?.edit !== false);
+  // The directory, though, waits for an explicit yes.
+  const organizationsQuery = createQuery(
+    toStore(() => organizationsQueryOptions($accessQuery.data?.edit === true)),
+  );
 
   let workspaces = $derived<NavWorkspace[]>($workspacesQuery.data?.items ?? []);
   let workspaceSlugById = $derived(new Map(workspaces.map((w) => [w.id, w.slug])));
@@ -252,9 +264,15 @@
   }));
 
   function toggleProject(id: string) {
-    aProjectIds = aProjectIds.includes(id)
-      ? aProjectIds.filter((x) => x !== id)
-      : [...aProjectIds, id];
+    if (aProjectIds.includes(id)) {
+      aProjectIds = aProjectIds.filter((x) => x !== id);
+      return;
+    }
+    // The line Select binds `aLineByProject[id]`: binding `undefined` to a
+    // prop with a fallback throws (svelte props_invalid_value), so a checked
+    // project always has a key; '' is «No line».
+    aLineByProject = { ...aLineByProject, [id]: aLineByProject[id] ?? '' };
+    aProjectIds = [...aProjectIds, id];
   }
 
   // ADR-102: the organization completes from those of the chosen spaces (all
@@ -293,7 +311,9 @@
           ? [scopedProjects[0].id]
           : [];
     aLineByProject =
-      scope.lines.length === 1 ? { [scope.lines[0].projectId]: scope.lines[0].id } : {};
+      scope.lines.length === 1
+        ? { [scope.lines[0].projectId]: scope.lines[0].id }
+        : Object.fromEntries(aProjectIds.map((id) => [id, '']));
     addOpen = true;
   }
 
@@ -486,13 +506,15 @@
       {projectNameById}
       {locale}
     />
+  {:else if noAccess}
+    <p class="conversations__state" data-testid="conversations-no-access">{t('conversations.no_access', locale)}</p>
   {:else}
     <ConversationOverview
       filters={{ projectIds: filterIds.projectIds, workspaceIds: filterIds.workspaceIds, lineIds, enabled: !scopeUnresolved }}
       {workspaceSlugById}
       {locale}
       onstatus={filterSeasonStatus}
-      onwrite={writeTo}
+      onwrite={canEdit ? writeTo : undefined}
     />
 
     <div class="conversations__list-head block-head" id="lista">
@@ -511,10 +533,12 @@
       {#if filterChip}
         <Chip selected onRemove={clearListFilter} removeLabel={t('overview.clear_filter', locale)}>{filterChip}</Chip>
       {/if}
-      <Button size="s" onclick={openAdd}>{t('conversations.add', locale)}</Button>
-      <Button size="s" variant="outline" onclick={togglePicking}>
-        {picking ? t('mailout.pick_done', locale) : t('mailout.pick', locale)}
-      </Button>
+      {#if canEdit}
+        <Button size="s" onclick={openAdd}>{t('conversations.add', locale)}</Button>
+        <Button size="s" variant="outline" onclick={togglePicking}>
+          {picking ? t('mailout.pick_done', locale) : t('mailout.pick', locale)}
+        </Button>
+      {/if}
     </div>
 
     <ConversationTable
@@ -523,7 +547,8 @@
       {conversationHref}
       groupable
       turnColumn
-      importEmptyState
+      importEmptyState={canEdit}
+      editable={canEdit}
       selectable={picking}
       bind:selected={picked}
     />
@@ -653,6 +678,11 @@
       font-weight: 400;
       font-style: italic;
       color: var(--heading-color);
+    }
+
+    .conversations__state {
+      font-size: var(--text-s);
+      color: var(--text-muted);
     }
 
     .conversations__search {

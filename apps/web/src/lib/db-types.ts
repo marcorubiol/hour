@@ -4507,6 +4507,7 @@ export type Database = {
         }
         Returns: string
       }
+      conversation_access: { Args: never; Returns: Json }
       conversation_for_contact_write: {
         Args: { p_conversation_id: string }
         Returns: {

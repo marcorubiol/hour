@@ -70,6 +70,12 @@
     selected?: Pick<ConversationItem, 'id' | 'project_id'>[];
     /** Whose turn it is, from the last directional event (ADR-117). */
     turnColumn?: boolean;
+    /**
+     * Whether the status menu is offered (ADR-124, `permisos.md` § 8). The
+     * caller passes `edit:conversation` in some project; the PATCH still
+     * decides per project.
+     */
+    editable?: boolean;
   }
 
   let {
@@ -82,6 +88,7 @@
     selectable = false,
     selected = $bindable([]),
     turnColumn = false,
+    editable = true,
   }: Props = $props();
 
   type ConversationsResponse = {
@@ -530,6 +537,9 @@
               >{locationOf(item)}</td
             >
             <td class="cell--status" data-label={t('edit.status', locale)}>
+              {#if !editable}
+                <span class={`badge badge--xs ${statusBadgeClass(item.status)}`}>{statusLabel(item.status, locale)}</span>
+              {:else}
               <Menu
                 label={t('conversations.status_menu', locale)}
                 triggerClass={statusBadgeClass(item.status)}
@@ -568,6 +578,7 @@
                   </li>
                 {/snippet}
               </Menu>
+              {/if}
             </td>
             {#if turnColumn}
               {@const turn = turnCell(item)}

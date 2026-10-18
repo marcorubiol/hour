@@ -558,15 +558,26 @@
        invisible on their light fills. */
     --heading-color: var(--neutral);
     --text-light: oklch(22% 0.008 85);
+    /* Muted and faint sink toward the canvas, in that order. On a dark
+       canvas "lighter than ink" is louder, not quieter, so -semi-light
+       (L ~88%) put the whispers above the text; and the light-mode muted
+       (ink at 70% alpha) drops to 4.8:1 on raised cards, which left no
+       room for a faint step above 4.5:1. Both opaque here, so the order
+       text > muted > faint holds on the body (10.1 / 7.5 / 5.7 :1) and on
+       raised cards (8.1 / 6.0 / 4.6 :1). Reviews of 2026-10-18 (Desk A2,
+       Conversations A2, Cuentas M2). */
+    --text-muted: color-mix(in oklab, var(--neutral), var(--base) 14%);
+    --text-faint: color-mix(in oklab, var(--neutral), var(--base) 26%);
 
     /* Derived-shade ladder re-anchored for dark (the fill/ink steps the
        pill family consumes — badges, chips, avatars, toasts, menu active).
        Light mode mixes toward literal white/black; on a dark canvas that
        renders near-white pills. Here fills sink toward the dark base
        (tag-tone recipe, ~27-30% L) and inks lift toward white (~80% L).
-       The -light / -semi-light steps are NOT flipped on purpose:
-       --text-faint, button hover borders and outline tones consume them
-       as "lighter than ink", which stays true when ink is light. */
+       The -light / -semi-light steps are NOT flipped on purpose: button
+       hover borders and outline tones consume them as "lighter than ink",
+       which stays true when ink is light. --text-faint does not: it is
+       set above, toward the canvas. */
     --neutral-ultra-light: color-mix(in oklch, var(--neutral), var(--base) 82%);
     --neutral-semi-dark: color-mix(in oklch, var(--neutral), white 40%);
     --neutral-dark: color-mix(in oklch, var(--neutral), white 45%);
