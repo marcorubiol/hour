@@ -1000,7 +1000,7 @@
   "perf.label@music": "Concert",
   "perf.unexpected_response": "Resposta inesperada",
   "perf.malformed_response": "Resposta mal formada",
-  "perf.change_status": "Canviar l'estat",
+  "perf.status_menu": "{status}, canvia l'estat",
   "perf.edit_details": "Editar dades",
   "perf.readiness": "Preparació",
   "perf.team": "Equip",

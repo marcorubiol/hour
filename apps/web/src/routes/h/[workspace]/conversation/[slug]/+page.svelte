@@ -19,6 +19,7 @@
    *
    * El segmento [slug] admite también el id de la conversación.
    */
+  import StateBadge from '$lib/components/StateBadge.svelte';
   import { page } from '$app/state';
   import { goto } from '$app/navigation';
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
@@ -39,7 +40,7 @@
     eventKindLabel,
     conversationTitle,
     relativeContactDate,
-    statusBadgeClass,
+    statusTone,
     statusLabel,
     type ConversationEventItem,
     type ConversationItem,
@@ -373,7 +374,7 @@
                   onlog={openLog}
                 />
               {:else}
-                <span class={`badge badge--xs ${statusBadgeClass(conv.status)}`}>{statusLabel(conv.status, locale)}</span>
+                <StateBadge label={statusLabel(conv.status, locale)} tone={statusTone(conv.status)} />
               {/if}
             </dd>
           </div>

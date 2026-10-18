@@ -969,7 +969,7 @@
   "perf.label@music": "Concert",
   "perf.unexpected_response": "Réponse inattendue",
   "perf.malformed_response": "Réponse mal formée",
-  "perf.change_status": "Changer le statut",
+  "perf.status_menu": "{status}, changer le statut",
   "perf.edit_details": "Modifier les détails",
   "perf.readiness": "Préparation",
   "perf.team": "Équipe",

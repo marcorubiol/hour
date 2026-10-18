@@ -11,6 +11,7 @@ import { Constants, type Enums, type Tables } from './db-types';
 import { localDayISO, realIsoDate, realIsoInstant } from './datetime';
 import { appLocale, t, type Locale } from './i18n';
 import { EVENT_MAIL_SELECT, type EventMailFields } from './mail';
+import type { StatusTone } from './performance';
 
 export type ConversationStatus = Enums<'conversation_status'>;
 
@@ -35,9 +36,26 @@ export function statusLabel(status: string, locale: Locale = appLocale()): strin
   return key ? t(key, locale) : status;
 }
 
-/** Badge variants in base.css mirror the enum with underscores → dashes. */
+/** The tone of each status on the one status badge (`StateBadge`); the
+    season bar reads the same family through `[data-conv-status]`. */
+const STATUS_TONES: Record<ConversationStatus, StatusTone> = {
+  contacted: 'info',
+  in_conversation: 'warning',
+  hold: 'neutral',
+  confirmed: 'success',
+  declined: 'danger',
+  dormant: 'faint',
+  recurring: 'primary',
+};
+
+export function statusTone(status: string): StatusTone {
+  return STATUS_TONES[status as ConversationStatus] ?? 'neutral';
+}
+
+/** The badge's tone class, for a status drawn by something that is not a
+    `StateBadge` (the status menu's trigger, a contact's project chip). */
 export function statusBadgeClass(status: string): string {
-  return `badge--${status.replace(/_/g, '-')}`;
+  return `badge--${statusTone(status)}`;
 }
 
 /**

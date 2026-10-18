@@ -5,6 +5,7 @@
    * workspace in the URL; the global person id is only the identity bridge.
    */
 
+  import StateBadge from '$lib/components/StateBadge.svelte';
   import { page } from '$app/state';
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
@@ -17,7 +18,7 @@
   import Select from '$lib/components/Select.svelte';
   import { addToast } from '$lib/components/Toast.svelte';
   import { session } from '$lib/session.svelte';
-  import { CONVERSATION_STATUSES, statusBadgeClass, statusLabel } from '$lib/conversation';
+  import { CONVERSATION_STATUSES, statusLabel, statusTone } from '$lib/conversation';
   import { dayLabel, dayMonthYearTs } from '$lib/datetime';
   import { appLocale, t } from '$lib/i18n';
   import { useBreadcrumb } from '$lib/stores/breadcrumb.svelte';
@@ -451,7 +452,7 @@
         <ul class="person__rows" role="list">
           {#each file.conversations as e (e.id)}
             <li>
-              <span class={statusBadgeClass(e.status)}>{statusLabel(e.status, locale)}</span>
+              <StateBadge label={statusLabel(e.status, locale)} tone={statusTone(e.status)} />
               <span class="person__row-main">
                 <a class="person__row-link" href={`/h/${workspaceSlug}/conversation/${e.id}`}
                   >{e.project?.name ?? '—'}{#if e.organization} · {e.organization.name}{/if}</a

@@ -651,7 +651,7 @@
       </p>
       <h1 class="perf__title"><em>{title}</em></h1>
       <div class="perf__meta">
-        <Menu label={t('perf.change_status', locale)} triggerClass="state-badge" triggerAttrs={{ 'data-tone': performanceStatusTone(perf.status) }}>
+        <Menu label={t('perf.status_menu', locale, { status: performanceStatusLabel(perf.status, locale) })} triggerClass={`badge badge--xs badge--${performanceStatusTone(perf.status)}`}>
           {#snippet trigger()}{performanceStatusLabel(perf.status, locale)}<span class="status-caret" aria-hidden="true">▾</span>{/snippet}
           {#snippet children({ close })}
             {#each PERFORMANCE_STATUSES as s (s)}

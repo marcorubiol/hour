@@ -1009,7 +1009,7 @@
   "perf.label@music": "Show",
   "perf.unexpected_response": "Unexpected response",
   "perf.malformed_response": "Malformed response",
-  "perf.change_status": "Change status",
+  "perf.status_menu": "{status}, change status",
   "perf.edit_details": "Edit details",
   "perf.readiness": "Readiness",
   "perf.team": "Team",

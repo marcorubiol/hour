@@ -81,7 +81,7 @@ test.describe('performance write path', () => {
     // Status: proposed → confirmed via the status menu.
     await page.getByRole('button', { name: 'Change status' }).click();
     await page.getByRole('menuitem', { name: 'confirmed', exact: true }).click();
-    await expect(page.locator('.state-badge')).toContainText('confirmed', {
+    await expect(page.getByRole('button', { name: /change status/i })).toContainText('confirmed', {
       timeout: 10_000,
     });
 
@@ -104,7 +104,7 @@ test.describe('performance write path', () => {
     // Reload — everything survived the round-trip.
     await page.reload();
     await waitForLoaded(page);
-    await expect(page.locator('.state-badge')).toContainText('confirmed');
+    await expect(page.getByRole('button', { name: /change status/i })).toContainText('confirmed');
     await expect(page.locator('.hours')).toContainText('11h', { timeout: 10_000 });
 
     // The gig shows up on its calendar day.

@@ -987,62 +987,26 @@
     --badge-accent: var(--danger);
   }
 
-  /* Conversation status variants — one badge per conversation_status enum
-     value. Defined alongside the tone variants because they're consumed
-     across booking, room detail, and future conversations lens; keeping them
-     here prevents drift between consumers and keeps the variable-contract
-     pattern (consumer parameterises, skeleton stays the same). Class
-     names mirror the enum with underscores replaced by dashes
-     (in_conversation → in-conversation). */
-  /* The tone of each conversation status, one source for the pill below and
-     for anything that draws a status without being one (the season bar of
-     Conversations). `--status` is the family; a drawing mixes it once, with
-     one recipe, so bar and pills move together (diseño B6). */
-  .badge--contacted,
-  [data-conv-status='contacted'] { --status: var(--info); }
-  .badge--in-conversation,
-  [data-conv-status='in_conversation'] { --status: var(--warning); }
-  .badge--hold,
-  [data-conv-status='hold'] { --status: var(--neutral); }
-  .badge--confirmed,
-  [data-conv-status='confirmed'] { --status: var(--success); }
-  .badge--declined,
-  [data-conv-status='declined'] { --status: var(--danger); }
-  /* Asleep: the neutral, faded, as the pill's opacity fades it. */
-  .badge--dormant,
-  [data-conv-status='dormant'] { --status: color-mix(in oklab, var(--neutral) 45%, transparent); }
-  .badge--recurring,
-  [data-conv-status='recurring'] { --status: var(--primary); }
-
-  .badge--contacted {
-    --badge-background: var(--info-ultra-light);
-    --badge-color: var(--info-ultra-dark);
-  }
-  .badge--in-conversation {
-    --badge-background: var(--warning-ultra-light);
-    --badge-color: var(--warning-ultra-dark);
-  }
-  .badge--hold {
-    --badge-background: var(--neutral-ultra-light);
-    --badge-color: var(--neutral-ultra-dark);
-  }
-  .badge--confirmed {
-    --badge-background: var(--success-ultra-light);
-    --badge-color: var(--success-ultra-dark);
-  }
-  .badge--declined {
-    --badge-background: var(--danger-ultra-light);
-    --badge-color: var(--danger-ultra-dark);
-  }
-  .badge--dormant {
+  /* Faint — what is over (paid, done, asleep): the neutral, faded. */
+  .badge--faint {
     --badge-background: var(--neutral-ultra-light);
     --badge-color: var(--neutral-semi-dark);
+    --badge-accent: var(--neutral);
     --badge-opacity: 0.75;
   }
-  .badge--recurring {
-    --badge-background: var(--primary-ultra-light);
-    --badge-color: var(--primary-ultra-dark);
-  }
+
+  /* The tone of each conversation status for what draws a status without
+     being a pill (the season bar of Conversations): `--status` is the
+     family, mixed once with one recipe (diseño B6). The pill itself is the
+     one status badge, `StateBadge`, with the tone `statusTone()` gives. */
+  [data-conv-status='contacted'] { --status: var(--info); }
+  [data-conv-status='in_conversation'] { --status: var(--warning); }
+  [data-conv-status='hold'] { --status: var(--neutral); }
+  [data-conv-status='confirmed'] { --status: var(--success); }
+  [data-conv-status='declined'] { --status: var(--danger); }
+  /* Asleep: the neutral, faded, as the faint pill fades it. */
+  [data-conv-status='dormant'] { --status: color-mix(in oklab, var(--neutral) 45%, transparent); }
+  [data-conv-status='recurring'] { --status: var(--primary); }
 
   /* Sizes — only xs and m redeclare; s is default. */
   .badge--xs {
@@ -1641,31 +1605,6 @@
     background: var(--bg-light);
   }
 
-  /* State badge — show lifecycle. Border-only, tone-coloured. Lowercase
-     mono. Used in calendar dots, week items, room headers.
-     Defaults live at zero specificity (:where) so the data-tone contract
-     below — also zero specificity, later in source — actually wins. With
-     the defaults at class specificity every badge rendered neutral gray. */
-  :where(.state-badge) {
-    --state-color: var(--text-muted);
-    --state-border: var(--border-color-dark);
-  }
-
-  .state-badge {
-    display: inline-block;
-    padding-block: 2px;
-    padding-inline: var(--space-xs);
-    color: var(--state-color);
-    background: transparent;
-    border: 1px solid var(--state-border);
-    border-radius: var(--radius-s);
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    line-height: 1.4;
-    letter-spacing: var(--mono-letter-spacing-loose);
-    text-transform: lowercase;
-  }
-
   /* Caret for status badges that double as dropdown triggers (conversation
      table, performance header). One rule for both consumers. */
   .status-caret {
@@ -1675,8 +1614,7 @@
   }
 
   /* Tone contract — component-agnostic. Anything carrying data-tone gets
-     --state-color / --state-border to consume (state-badge text+border,
-     calendar dots, future week items). :where() keeps specificity at
+     --state-color / --state-border to consume (calendar dots, week items). :where() keeps specificity at
      zero so components can still override locally. */
   :where([data-tone="neutral"]) {
     --state-color: var(--text-muted);

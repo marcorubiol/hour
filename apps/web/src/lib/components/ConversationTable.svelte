@@ -1,4 +1,5 @@
 <script module lang="ts">
+  import StateBadge from '$lib/components/StateBadge.svelte';
   import type { MailoutPick, TempFilter } from '$lib/conversation-overview';
 
   export interface ConversationFilters {
@@ -49,6 +50,7 @@
     groupConversationsByContact,
     relativeContactDate,
     statusBadgeClass,
+    statusTone,
     statusLabel,
     conversationTitle,
     type ConversationItem,
@@ -534,7 +536,7 @@
             >
             <td class="cell--status" data-label={t('edit.status', locale)}>
               {#if !editable}
-                <span class={`badge badge--xs ${statusBadgeClass(item.status)}`}>{statusLabel(item.status, locale)}</span>
+                <StateBadge label={statusLabel(item.status, locale)} tone={statusTone(item.status)} />
               {:else}
               <ConversationStatusMenu
                 status={item.status}

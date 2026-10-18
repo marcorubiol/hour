@@ -29,7 +29,7 @@
 
 <Menu
   label={t('conversations.status_menu', locale, { status: statusLabel(status, locale) })}
-  triggerClass={statusBadgeClass(status)}
+  triggerClass={`badge badge--xs ${statusBadgeClass(status)}`}
   {direction}
 >
   {#snippet trigger()}

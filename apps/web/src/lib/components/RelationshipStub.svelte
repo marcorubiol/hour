@@ -13,12 +13,13 @@
    * "lead/pipeline/funnel/prospect" anywhere. Status labels are humane.
    */
 
+  import StateBadge from '$lib/components/StateBadge.svelte';
   import { createQuery } from '@tanstack/svelte-query';
   import { writable, derived } from 'svelte/store';
   import { fetchJSON } from '$lib/api';
   import { appLocale, t } from '$lib/i18n';
   import {
-    statusBadgeClass,
+    statusTone,
     statusLabel,
     type ConversationItem,
     type PersonLite,
@@ -105,9 +106,7 @@
               <span class="rel-stub__location">{locationStr(e.person)}</span>
             {/if}
           </div>
-          <span class={statusBadgeClass(e.status)}>
-            {statusLabel(e.status)}
-          </span>
+          <StateBadge label={statusLabel(e.status)} tone={statusTone(e.status)} />
         </li>
       {/each}
     </ul>

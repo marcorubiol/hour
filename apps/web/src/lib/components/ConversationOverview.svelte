@@ -11,6 +11,7 @@
    * conversaciones en el alcance no se pinta nada: la lista enseña su vacío.
    */
 
+  import StateBadge from '$lib/components/StateBadge.svelte';
   import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
   import { toStore } from 'svelte/store';
   import { fetchJSON, mutateJSON } from '$lib/api';
@@ -25,7 +26,7 @@
     daysAgoLabel,
     eventKindLabel,
     relativeContactDate,
-    statusBadgeClass,
+    statusTone,
     statusLabel,
     CONVERSATION_STATUSES,
     type ConversationEventKind,
@@ -154,7 +155,7 @@
   <span class="row__who">
     <span class="row__org">{row.title || t('conversations.conversation', locale)}</span>
     {#if badge}
-      <span class="badge badge--xs {statusBadgeClass(row.status)}">{statusLabel(row.status, locale)}</span>
+      <StateBadge label={statusLabel(row.status, locale)} tone={statusTone(row.status)} />
     {:else if row.person}
       <span class="row__person">{row.person}</span>
     {/if}

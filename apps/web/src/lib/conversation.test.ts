@@ -11,6 +11,7 @@ import {
   normalizeConversationItem,
   relativeContactDate,
   statusBadgeClass,
+  statusTone,
   statusLabel,
   type ConversationDbItem,
   type ConversationItem,
@@ -223,8 +224,15 @@ describe('status vocabulary', () => {
     for (const s of CONVERSATION_STATUSES) {
       expect(STATUS_KEYS[s]).toBeTruthy();
       expect(statusLabel(s, 'en')).not.toBe(STATUS_KEYS[s]);
-      expect(statusBadgeClass(s)).toBe(`badge--${s.replace(/_/g, '-')}`);
+      expect(statusBadgeClass(s)).toBe(`badge--${statusTone(s)}`);
     }
+  });
+
+  it('gives every status but hold a tone of its own, and an unknown one neutral', () => {
+    const tones = CONVERSATION_STATUSES.map(statusTone);
+    expect(new Set(tones).size).toBe(CONVERSATION_STATUSES.length);
+    expect(statusTone('hold')).toBe('neutral');
+    expect(statusTone('mystery')).toBe('neutral');
   });
 
   it('falls back to the raw value for unknown statuses', () => {
