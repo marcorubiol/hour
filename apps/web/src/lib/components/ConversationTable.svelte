@@ -583,7 +583,11 @@
 </div>
 
 {#if errorMsg}
-  <div class="msg msg--error">{errorMsg}</div>
+  <!-- Our sentence, not the server's text (diseño M2); the detail stays in Sentry. -->
+  <p class="load-fail" role="alert">
+    <span>{t('conversations.load_error', locale)}</span>
+    <Button size="xs" variant="outline" onclick={() => void $query.refetch()}>{t('ui.retry', locale)}</Button>
+  </p>
 {:else if !loading && items.length === 0}
   {#if importEmptyState && !filters.q && !filters.turno && !filters.temp && !filters.temporada && !filters.envio && (!filters.status || filters.status === 'any')}
     <div class="empty-book">
@@ -705,10 +709,6 @@
       padding-block: var(--space-xxl);
       color: var(--text-dark-muted);
     }
-    .msg--error {
-      color: var(--danger-dark);
-    }
-
     .empty-book {
       padding-block: clamp(var(--space-xl), 8vw, var(--space-3xl));
       padding-inline: var(--space-m);

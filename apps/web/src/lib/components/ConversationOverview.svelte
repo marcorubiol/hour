@@ -186,7 +186,10 @@
     </div>
   </div>
 {:else if $query.isError}
-  <p class="board__msg">{t('overview.error', locale)}</p>
+  <p class="load-fail" role="alert">
+    <span>{t('overview.error', locale)}</span>
+    <Button size="xs" variant="outline" onclick={() => void $query.refetch()}>{t('ui.retry', locale)}</Button>
+  </p>
 {:else if data && data.total > 0}
   <div class="board" data-testid="conversation-overview">
     <div class="board__col">
@@ -432,7 +435,6 @@
       gap: var(--space-l);
       min-inline-size: 0;
     }
-    .board__msg,
     .block__empty {
       font-size: var(--text-s);
       color: var(--text-faint);

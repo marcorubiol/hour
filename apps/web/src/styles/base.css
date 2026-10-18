@@ -1731,6 +1731,27 @@
     --eyebrow-tracking: 0.08em;
   }
 
+  /* Load failure — what a block or a list says when its read fails: its own
+     sentence (never the server's text) in the display italic, in danger, so
+     it never reads as an empty state, and a way to try again beside it. The
+     treatment Desk (`.dband__err`) and Cuentas (`.mny__fail`) drew each on
+     their own; Conversations consumes it from here (diseño M2). */
+  .load-fail {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--space-s);
+    margin: 0;
+    color: var(--danger);
+    font-family: var(--font-display);
+    font-size: var(--text-s);
+    font-style: italic;
+  }
+  .load-fail button {
+    font-family: var(--font-sans);
+    font-style: normal;
+  }
+
   /* Block head — a sub-eyebrow over a hairline, with its actions at the end
      (the conversation file, the mailout screen). */
   .block-head {
