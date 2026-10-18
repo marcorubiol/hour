@@ -413,6 +413,7 @@
     gap: var(--btn-gap);
     inline-size: var(--btn-width, auto);
     min-inline-size: var(--btn-min-width);
+    min-block-size: var(--touch-target);
     padding-block: var(--btn-padding-block);
     padding-inline: var(--btn-padding-inline);
     font-family: var(--btn-font-family);

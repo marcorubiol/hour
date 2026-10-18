@@ -220,6 +220,20 @@
     /* On a phone the row wraps, and the reserve became a whole empty line
        above the view words: there the Season simply has no controls. The
        shell's own phone breakpoint. */
+    /* A finger's target on touch (móvil #5): 28px squares and 17px words
+       were under half of it. */
+    .cal__arw,
+    .cal__now,
+    .cal__add,
+    .cal__view,
+    .cal__dial-v,
+    .cal__toolbar :global(.cal__kebab) {
+      min-block-size: var(--touch-target);
+    }
+    .cal__arw,
+    .cal__toolbar :global(.cal__kebab) {
+      min-inline-size: var(--touch-target);
+    }
     @media (max-width: 47.999rem) {
       .cal__window--none > :global(*) {
         display: none;

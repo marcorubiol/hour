@@ -214,6 +214,7 @@
     .scopebar__save {
       white-space: nowrap;
       flex: none;
+      min-block-size: var(--touch-target);
     }
   }
   .tok {

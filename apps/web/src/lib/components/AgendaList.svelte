@@ -1687,6 +1687,8 @@ button.ag__head:hover .ag__num {
 }
 /* `＋` waits to be needed, like the verbs on the rows. */
 .ag__note-add {
+  min-inline-size: var(--touch-target);
+  min-block-size: var(--touch-target);
   padding: 0;
   border: 0;
   background: none;

@@ -159,6 +159,11 @@
     /* of WEIGHT on its number; a drawing with cells adds the WASH   */
     /* (the Board does not: Marco's ruling 3). Never a colour.       */
     /* ============================================================ */
+    /* A FINGER'S TARGET (móvil #5, WCAG 2.5.8 / Apple's 44pt). Zero for a
+       mouse; on a coarse pointer the controls that opt in grow to it by
+       padding — never by type size. */
+    --touch-target: 0px;
+
     --today-ink: var(--text-color);
     --today-weight: 600;
     --today-wash: color-mix(in oklch, var(--text-color) 4%, transparent);
@@ -511,6 +516,12 @@
   /*   data-theme → default / presenter / ... (palette + fonts)      */
   /* Activate dark with `<html data-mode="dark">`. Combine with any  */
   /* theme: `<html data-theme="presenter" data-mode="dark">`.        */
+
+  @media (pointer: coarse) {
+    :root {
+      --touch-target: 44px;
+    }
+  }
 
   :root[data-mode="dark"] {
     color-scheme: dark;

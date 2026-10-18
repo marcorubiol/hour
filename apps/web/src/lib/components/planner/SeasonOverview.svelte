@@ -529,6 +529,7 @@
       padding-inline-start: 4px;
     }
     .wk {
+      min-block-size: var(--touch-target);
       font-family: var(--font-mono);
       font-size: 11px;
       color: var(--text-muted);
