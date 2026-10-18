@@ -270,7 +270,7 @@
   /** The why of an attention row, in words («68 days, usually pays at 45»). */
   function attentionWhy(item: AttentionItem): string {
     const b = item.bolo;
-    const day = b.next_performed_at ? dayLabel(b.next_performed_at) : null;
+    const day = b.first_performed_at ? dayLabel(b.first_performed_at) : null;
     switch (item.kind) {
       case 'overdue': {
         const late = t(item.daysLate === 1 ? 'books.att_late_one' : 'books.att_late_many', locale, { n: item.daysLate });
@@ -337,7 +337,7 @@
   let ledgerRows = $derived(
     ledgerSource(filter)
       .filter((b) => matchesLedgerFilter(moneyOf(b), filter))
-      .sort((a, c) => (a.next_performed_at ?? '9999').localeCompare(c.next_performed_at ?? '9999')),
+      .sort((a, c) => (a.first_performed_at ?? '9999').localeCompare(c.first_performed_at ?? '9999')),
   );
   type LedgerGroup = { projectId: string; name: string; accent: string; slug: string; workspaceId: string; rows: MoneyBolo[] };
   let ledgerGroups = $derived.by<LedgerGroup[]>(() => {
@@ -1052,7 +1052,7 @@
                     {@const pill = collectLabel(b, m)}
                     {@const open = expandedId === b.id}
                     <tr class="book__row" class:is-open={open} id={`bolo-${b.id}`} data-overdue={m.overdue || undefined}>
-                      <td class="book__date">{b.next_performed_at ? dayLabel(b.next_performed_at) : t('books.no_date', locale)}{#if b.function_count > 1}<span class="book__fns">{` · ${t('books.fn_count', locale, { n: b.function_count })}`}</span>{/if}</td>
+                      <td class="book__date">{b.first_performed_at ? dayLabel(b.first_performed_at) : t('books.no_date', locale)}{#if b.function_count > 1}<span class="book__fns">{` · ${t('books.fn_count', locale, { n: b.function_count })}`}</span>{/if}</td>
                       <td class="book__venue">
                         <button type="button" class="book__toggle" aria-expanded={open} aria-controls={`bolo-sheet-${b.id}`} onclick={() => toggleRow(b)}>
                           {b.venue_name || DASH}{#if b.city}<span class="book__city">{` · ${b.city}`}</span>{/if}
@@ -1075,7 +1075,7 @@
                             <div class="sheet__col">
                               <p class="sheet__h">{t('books.sheet_functions', locale)}</p>
                               <p>
-                                {#if b.next_performed_at}<a class="sheet__a" href={plannerDayHref('day', b.next_performed_at.slice(0, 10))}>{dayLabel(b.next_performed_at)}</a>{:else}{t('books.no_date', locale)}{/if}
+                                {#if b.first_performed_at}<a class="sheet__a" href={plannerDayHref('day', b.first_performed_at.slice(0, 10))}>{dayLabel(b.first_performed_at)}</a>{:else}{t('books.no_date', locale)}{/if}
                                 · {t(b.function_count === 1 ? 'books.sheet_fn_one' : 'books.sheet_fn_many', locale, { n: b.function_count })}
                               </p>
                               {#if b.project}<p class="sheet__faint">{b.project.name}</p>{/if}

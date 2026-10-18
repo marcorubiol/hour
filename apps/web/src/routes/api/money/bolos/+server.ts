@@ -8,7 +8,7 @@
  *      edit:money on the deal's project).
  *
  * One row per bolo (deal), with collected (payments-against-fee) and display
- * aids (function_count, next_performed_at). Union filters + optional performed
+ * aids (function_count, first_performed_at, last_performed_at). Union filters + optional performed
  * window, same contract as the other list endpoints.
  */
 
@@ -71,7 +71,8 @@ type MoneyBolo = {
   } | null;
   collected: number;
   function_count: number;
-  next_performed_at: string | null;
+  first_performed_at: string | null;
+  last_performed_at: string | null;
 };
 
 export const GET: RequestHandler = async ({ request, url, platform, locals }) => {

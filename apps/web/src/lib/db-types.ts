@@ -5741,10 +5741,11 @@ export type Database = {
           country: string
           fee_amount: number
           fee_currency: string
+          first_performed_at: string
           function_count: number
           id: string
+          last_performed_at: string
           line_id: string
-          next_performed_at: string
           project: Json
           project_id: string
           status: Database["public"]["Enums"]["performance_status"]

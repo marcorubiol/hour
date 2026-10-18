@@ -4365,3 +4365,28 @@ Marco. El estado de un envío (`.mo__status`) es texto, no píldora, y se queda.
 
 **Re-evaluar cuando** Marco use los cuatro una semana: si la cifra en la cabecera pesa poco en el Desk (antes iba a la
 derecha) y si `faint` distingue lo cobrado de lo dormido en oscuro.
+
+## [2026-10-18] ADR-131 · Un bolo se factura tras su última función; aceptar una propuesta de la IA se guarda
+
+**Contexto.** Dos deudas que dejó la revisión de las cuatro secciones. `list_money_bolos.next_performed_at` era la
+primera función viva (no la próxima) y Cuentas la usaba para decidir si el bolo estaba hecho: un bolo de tres
+funciones salía «por facturar» tras la primera. En Desk, «Añadir» en una propuesta de la IA (`origin = 'ai'`) solo
+recordaba la aceptación en la sesión, porque `origin` no estaba en el PATCH de tareas, y «Descartar» la marcaba
+hecha: una propuesta rechazada acababa en la lista de lo hecho.
+
+**Decisión.**
+1. `list_money_bolos` devuelve `first_performed_at` (se renombra `next_performed_at`, que engañaba) y
+   `last_performed_at`, las dos de funciones vivas; con todas canceladas, las de las canceladas, como hasta ahora
+   (ADR-125). Cambia el tipo de retorno: DROP + CREATE con los grants de siempre
+   (`20261018170000_money_bolos_last_function`). La migración y el deploy van seguidos: la app anterior lee el nombre
+   viejo.
+2. La primera función decide la temporada (ADR-117 § 3, sin cambio) y el orden; la última decide si el trato está
+   hecho: «por facturar» y el mes en que entra el cobro contratado en lo que entra.
+3. «Añadir» es `PATCH /api/tasks/:id { origin: 'manual' }`. El esquema del PATCH acepta `origin` solo hacia
+   `manual`: aceptar no puede convertir una tarea en propuesta de la IA ni de un protocolo, y un `origin` distinto ya
+   no se descarta en silencio, da 400. Sin migración: la política `task_update` ya deja editar la fila al miembro.
+4. «Descartar» borra la propuesta (borrado blando, `delete_task`) con el «Deshacer» de quitar una tarea.
+
+**Fuera.** Cualquier miembro puede crear por PostgREST directo una tarea con `origin = 'ai'` (la política de
+inserción no mira `origin`; `POST /api/tasks` sí lo quita). No es un hueco de datos, solo de procedencia; se cierra
+cuando exista la IA que propone, con su propia vía de escritura.

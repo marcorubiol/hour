@@ -14,6 +14,10 @@ const RUN_TAG = Date.now().toString(36);
 const TASK_TODAY = `ZZZ E2E Desk Today ${RUN_TAG}`;
 const TASK_LOOSE = `ZZZ E2E Desk Loose ${RUN_TAG}`;
 const DESK = '/h/desk?scope=s:playwright';
+const SB_URL = process.env.PUBLIC_SUPABASE_URL;
+const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const PROPOSAL_ADD = `ZZZ E2E Desk Proposal Add ${RUN_TAG}`;
+const PROPOSAL_DROP = `ZZZ E2E Desk Proposal Drop ${RUN_TAG}`;
 
 async function playwrightWsId(page: Page): Promise<string> {
   const id = await page.evaluate(async () => {
@@ -106,6 +110,82 @@ test.describe('Desk — the dashboard (ADR-117)', () => {
     await expect(waits.getByRole('heading', { name: /^Waiting for you/ })).toBeFocused();
     await waits.getByRole('button', { name: 'See less' }).click();
     await expect(waits.getByRole('checkbox', { name: TASK_TODAY })).toHaveCount(1);
+
+    await sweep(page, wsId);
+  });
+
+  // ADR-131: «Add» makes an AI proposal a normal task, and it stays one after
+  // a reload; «dismiss» removes it. Nothing writes origin='ai' through the API,
+  // so the spec turns its own tasks into proposals with the service key.
+  test('an AI proposal: «Add» keeps it as a task, «dismiss» removes it', async ({ page }) => {
+    test.skip(!SB_URL || !SERVICE_KEY, 'Set PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY.');
+    test.setTimeout(90_000);
+    await page.goto(DESK);
+    const wsId = await playwrightWsId(page);
+    await sweep(page, wsId);
+
+    const today = await page.evaluate(() => {
+      const d = new Date();
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    });
+    const ids = await page.evaluate(
+      async ({ wsId, titles, today }) => {
+        const out: string[] = [];
+        for (const title of titles) {
+          const res = await fetch('/api/tasks', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ title, workspace_id: wsId, due_at: today }),
+          });
+          out.push(((await res.json()) as { task: { id: string } }).task.id);
+        }
+        return out;
+      },
+      { wsId, titles: [PROPOSAL_ADD, PROPOSAL_DROP], today },
+    );
+    const res = await fetch(new URL(`/rest/v1/task?id=in.(${ids.join(',')})`, SB_URL), {
+      method: 'PATCH',
+      headers: {
+        apikey: SERVICE_KEY!,
+        Authorization: `Bearer ${SERVICE_KEY}`,
+        'content-type': 'application/json',
+        Prefer: 'return=minimal',
+      },
+      body: JSON.stringify({ origin: 'ai', note: 'ZZZ E2E reason' }),
+    });
+    expect(res.status).toBe(204);
+
+    await page.goto(DESK);
+    await waitForLoaded(page);
+    const waits = page.locator('section.waits');
+    const addRow = waits.locator('li.row--ai', { hasText: PROPOSAL_ADD });
+    const dropRow = waits.locator('li.row--ai', { hasText: PROPOSAL_DROP });
+    await expect(addRow).toBeVisible({ timeout: 10_000 });
+    await expect(dropRow).toBeVisible();
+
+    await addRow.getByRole('button', { name: 'Add' }).click();
+    await expect(waits.getByRole('checkbox', { name: PROPOSAL_ADD })).toBeVisible();
+    await dropRow.getByRole('button', { name: 'dismiss' }).click();
+    await expect(dropRow).toHaveCount(0);
+    await expect(waits.getByRole('checkbox', { name: PROPOSAL_DROP })).toHaveCount(0);
+
+    // Persisted: the accepted one is manual; the dismissed one is gone once
+    // its «Undo» runs out, and neither is marked done.
+    const read = () =>
+      page.evaluate(async ({ wsId }) => {
+        const r = await fetch(`/api/tasks?workspace_ids=${wsId}&status=any&limit=200`);
+        return ((await r.json()) as { items: { title: string; origin: string; status: string }[] }).items;
+      }, { wsId });
+    await expect
+      .poll(async () => (await read()).filter((t) => t.title === PROPOSAL_DROP).length, { timeout: 15_000 })
+      .toBe(0);
+    const accepted = (await read()).find((t) => t.title === PROPOSAL_ADD);
+    expect(accepted).toMatchObject({ origin: 'manual', status: 'open' });
+
+    await page.reload();
+    await waitForLoaded(page);
+    await expect(waits.getByRole('checkbox', { name: PROPOSAL_ADD })).toBeVisible({ timeout: 10_000 });
+    await expect(waits.locator('li.row--ai', { hasText: PROPOSAL_ADD })).toHaveCount(0);
 
     await sweep(page, wsId);
   });

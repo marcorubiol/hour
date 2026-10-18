@@ -175,10 +175,16 @@ describe('TaskPatchSchema', () => {
       status: 'done',
       workspace_id: WS,
       line_id: PARENT,
-      origin: 'protocol',
       deleted_at: '2026-01-01',
     } as Record<string, unknown>);
     expect(r).toEqual({ status: 'done' });
+  });
+
+  // ADR-131: «Añadir» on an AI proposal makes it a normal task, and only that.
+  it('accepts origin manual (accepting a proposal) and nothing else', () => {
+    expect(v.parse(TaskPatchSchema, { origin: 'manual' })).toEqual({ origin: 'manual' });
+    expect(v.safeParse(TaskPatchSchema, { origin: 'ai' }).success).toBe(false);
+    expect(v.safeParse(TaskPatchSchema, { origin: 'protocol' }).success).toBe(false);
   });
 
   it('accepts an empty object (endpoint rejects it separately as empty_patch)', () => {

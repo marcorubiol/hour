@@ -21,7 +21,9 @@ import {
 
 const TODAY = new Date('2026-10-15T10:00:00Z');
 
+/** A one-function bolo unless told otherwise: its last function is its first. */
 function bolo(over: Partial<MoneyBolo> & { id: string }): MoneyBolo {
+	const first = over.first_performed_at === undefined ? '2026-09-20T18:00:00Z' : over.first_performed_at;
 	return {
 		project_id: 'p',
 		line_id: null,
@@ -34,7 +36,8 @@ function bolo(over: Partial<MoneyBolo> & { id: string }): MoneyBolo {
 		status: 'done',
 		collected: 0,
 		function_count: 1,
-		next_performed_at: '2026-09-20T18:00:00Z',
+		first_performed_at: first,
+		last_performed_at: first,
 		project: { id: 'p', slug: 'obra', name: 'Obra', accent: null, workspace_id: 'w' },
 		...over,
 	};
@@ -94,12 +97,12 @@ describe('season (September to August, by function date)', () => {
 	});
 
 	it('puts a bolo without functions in the season of today', () => {
-		expect(boloSeason({ next_performed_at: null }, TODAY)).toBe(2026);
-		expect(boloSeason({ next_performed_at: '2026-07-10' }, TODAY)).toBe(2025);
+		expect(boloSeason({ first_performed_at: null }, TODAY)).toBe(2026);
+		expect(boloSeason({ first_performed_at: '2026-07-10' }, TODAY)).toBe(2025);
 	});
 
 	it('lists seasons newest first, today always there', () => {
-		expect(seasonsOf([{ next_performed_at: '2025-03-01' }], TODAY)).toEqual([2026, 2024]);
+		expect(seasonsOf([{ first_performed_at: '2025-03-01' }], TODAY)).toEqual([2026, 2024]);
 	});
 });
 
@@ -116,7 +119,7 @@ describe('invoicesByBolo', () => {
 
 describe('boloMoney', () => {
 	it('owes only what was invoiced: a contracted bolo without document owes nothing', () => {
-		const m = boloMoney(bolo({ id: 'b', next_performed_at: '2026-11-20' }), ctx());
+		const m = boloMoney(bolo({ id: 'b', first_performed_at: '2026-11-20' }), ctx());
 		expect(m.owed).toBe(0);
 		expect(m.toInvoice).toBe(false);
 	});
@@ -133,7 +136,7 @@ describe('boloMoney', () => {
 	it('a document of a deal not yet confirmed is not owed (ADR-123)', () => {
 		const pro = invoice({ id: 'p', bolo: 'b', doc_type: 'proforma', expected_on: '2026-10-01' });
 		for (const status of ['proposed', 'hold_1']) {
-			const m = boloMoney(bolo({ id: 'b', status, next_performed_at: '2031-05-01' }), ctx([pro]));
+			const m = boloMoney(bolo({ id: 'b', status, first_performed_at: '2031-05-01' }), ctx([pro]));
 			expect(m.owed).toBe(0);
 			expect(m.overdue).toBe(false);
 			expect(m.docOpen).toBe(1000);
@@ -187,7 +190,7 @@ describe('boloMoney', () => {
 	});
 
 	it('asks to invoice a past function with no live document, only when invoicing is on', () => {
-		const b = bolo({ id: 'b', next_performed_at: '2026-10-03T19:00:00Z' });
+		const b = bolo({ id: 'b', first_performed_at: '2026-10-03T19:00:00Z' });
 		expect(boloMoney(b, ctx()).toInvoice).toBe(true);
 		expect(boloMoney(b, ctx([], { modeOf: () => 'off' })).toInvoice).toBe(false);
 		// a draft nobody issued still has to be invoiced
@@ -198,26 +201,43 @@ describe('boloMoney', () => {
 		expect(boloMoney({ ...b, fee_amount: null }, ctx()).toInvoice).toBe(false);
 		expect(boloMoney({ ...b, status: 'hold_1' }, ctx()).toInvoice).toBe(false);
 		// tonight's function is not past yet
-		expect(boloMoney({ ...b, next_performed_at: '2026-10-15T20:00:00Z' }, ctx()).toInvoice).toBe(false);
+		expect(boloMoney({ ...b, last_performed_at: '2026-10-15T20:00:00Z' }, ctx()).toInvoice).toBe(false);
+	});
+
+	// ADR-131: a bolo is performed when its LAST live function is past.
+	it('waits for the last function of a bolo of several before asking to invoice', () => {
+		const one = bolo({ id: 'one', first_performed_at: '2026-10-03', last_performed_at: '2026-10-03' });
+		expect(boloMoney(one, ctx()).toInvoice).toBe(true);
+		// three functions, the last still ahead: not yet
+		const ahead = bolo({ id: 'ahead', function_count: 3, first_performed_at: '2026-10-01', last_performed_at: '2026-10-20' });
+		expect(boloMoney(ahead, ctx()).toInvoice).toBe(false);
+		// three functions, the last one cancelled: the RPC hands the last LIVE one, already past
+		const cancelledLast = bolo({ id: 'cl', function_count: 2, first_performed_at: '2026-10-01', last_performed_at: '2026-10-08' });
+		expect(boloMoney(cancelledLast, ctx()).toInvoice).toBe(true);
+	});
+
+	it('keeps the season on the first function, whatever the last', () => {
+		const b = bolo({ id: 'b', first_performed_at: '2026-08-28', last_performed_at: '2026-09-04' });
+		expect(boloSeason(b, TODAY)).toBe(2025);
 	});
 });
 
 describe('moneyPosition', () => {
 	const bolos = [
 		// last season, invoiced, unpaid, late: still owed this season
-		bolo({ id: 'old', next_performed_at: '2026-07-10', fee_amount: 500 }),
+		bolo({ id: 'old', first_performed_at: '2026-07-10', fee_amount: 500 }),
 		// this season, invoiced, expected in 10 days
-		bolo({ id: 'soon', next_performed_at: '2026-09-25', fee_amount: 1200 }),
+		bolo({ id: 'soon', first_performed_at: '2026-09-25', fee_amount: 1200 }),
 		// this season, done, no document → por facturar
-		bolo({ id: 'todo', next_performed_at: '2026-10-03', fee_amount: 2200 }),
+		bolo({ id: 'todo', first_performed_at: '2026-10-03', fee_amount: 2200 }),
 		// this season, collected in full
-		bolo({ id: 'paid', next_performed_at: '2026-09-12', fee_amount: 2400, collected: 2400 }),
+		bolo({ id: 'paid', first_performed_at: '2026-09-12', fee_amount: 2400, collected: 2400 }),
 		// this season, future, confirmed
-		bolo({ id: 'future', next_performed_at: '2027-02-14', status: 'confirmed', fee_amount: 3000 }),
+		bolo({ id: 'future', first_performed_at: '2027-02-14', status: 'confirmed', fee_amount: 3000 }),
 		// a hold
-		bolo({ id: 'hold', next_performed_at: '2027-03-07', status: 'hold_1', fee_amount: 3200 }),
+		bolo({ id: 'hold', first_performed_at: '2027-03-07', status: 'hold_1', fee_amount: 3200 }),
 		// another currency
-		bolo({ id: 'chf', next_performed_at: '2026-11-01', status: 'confirmed', fee_amount: 900, fee_currency: 'CHF' }),
+		bolo({ id: 'chf', first_performed_at: '2026-11-01', status: 'confirmed', fee_amount: 900, fee_currency: 'CHF' }),
 	];
 	const invoices = [
 		invoice({ id: 'i-old', bolo: 'old', total: 500, issued_on: '2026-07-15', expected_on: '2026-08-15' }),
@@ -264,11 +284,11 @@ describe('moneyPosition', () => {
 	it('measures the season in one base: the invoice total where there is one (ADR-123)', () => {
 		const season = [
 			// Palma: fee 4.000, invoiced 4.840 with IVA, collected in full
-			bolo({ id: 'palma', next_performed_at: '2026-09-12', fee_amount: 4000, collected: 4840 }),
+			bolo({ id: 'palma', first_performed_at: '2026-09-12', fee_amount: 4000, collected: 4840 }),
 			// Vitoria: fee 3.500, invoiced 3.710, 2.000 collected
-			bolo({ id: 'vit', next_performed_at: '2026-09-20', fee_amount: 3500, collected: 2000 }),
+			bolo({ id: 'vit', first_performed_at: '2026-09-20', fee_amount: 3500, collected: 2000 }),
 			// Beckett: fee 2.000, no document yet
-			bolo({ id: 'beckett', next_performed_at: '2026-10-24', status: 'confirmed', fee_amount: 2000 }),
+			bolo({ id: 'beckett', first_performed_at: '2026-10-24', status: 'confirmed', fee_amount: 2000 }),
 		];
 		const docs = [
 			invoice({ id: 'ip', bolo: 'palma', status: 'paid', subtotal: 4000, total: 4840 }),
@@ -290,11 +310,11 @@ describe('moneyPosition', () => {
 describe('attentionItems', () => {
 	it('orders by gravity, each problem once, overdue by days late', () => {
 		const bolos = [
-			bolo({ id: 'noFee', status: 'confirmed', fee_amount: null, next_performed_at: '2027-02-14' }),
-			bolo({ id: 'todo', next_performed_at: '2026-10-03' }),
-			bolo({ id: 'late23', next_performed_at: '2026-09-20' }),
-			bolo({ id: 'late68', next_performed_at: '2026-07-24' }),
-			bolo({ id: 'draft', status: 'confirmed', next_performed_at: '2026-10-25' }),
+			bolo({ id: 'noFee', status: 'confirmed', fee_amount: null, first_performed_at: '2027-02-14' }),
+			bolo({ id: 'todo', first_performed_at: '2026-10-03' }),
+			bolo({ id: 'late23', first_performed_at: '2026-09-20' }),
+			bolo({ id: 'late68', first_performed_at: '2026-07-24' }),
+			bolo({ id: 'draft', status: 'confirmed', first_performed_at: '2026-10-25' }),
 			bolo({ id: 'fine', collected: 1000 }),
 		];
 		const invoices = [
@@ -321,7 +341,7 @@ describe('attentionItems', () => {
 	});
 
 	it('a done function with a draft nobody issued asks to issue it, and counts as por facturar', () => {
-		const bolos = [bolo({ id: 'reus', next_performed_at: '2026-09-05' })];
+		const bolos = [bolo({ id: 'reus', first_performed_at: '2026-09-05' })];
 		const invoices = [invoice({ id: 'd', bolo: 'reus', status: 'draft', total: 1060 })];
 		const items = attentionItems(bolos, ctx(invoices));
 		expect(items.map((i) => [i.kind, i.doc?.id, i.amount])).toEqual([['draft', 'd', 1060]]);
@@ -340,8 +360,8 @@ describe('attentionItems', () => {
 
 	it('a function done without a fee asks for one, before the confirmed ones', () => {
 		const bolos = [
-			bolo({ id: 'future', status: 'confirmed', fee_amount: null, next_performed_at: '2026-11-01' }),
-			bolo({ id: 'granollers', status: 'done', fee_amount: null, next_performed_at: '2026-09-20' }),
+			bolo({ id: 'future', status: 'confirmed', fee_amount: null, first_performed_at: '2026-11-01' }),
+			bolo({ id: 'granollers', status: 'done', fee_amount: null, first_performed_at: '2026-09-20' }),
 		];
 		expect(attentionItems(bolos, ctx()).map((i) => [i.kind, i.bolo.id])).toEqual([
 			['no_fee', 'granollers'],
@@ -351,7 +371,7 @@ describe('attentionItems', () => {
 
 	it('a proforma draft is never blocked by fiscal data', () => {
 		const items = attentionItems(
-			[bolo({ id: 'b', status: 'confirmed', next_performed_at: '2026-11-01' })],
+			[bolo({ id: 'b', status: 'confirmed', first_performed_at: '2026-11-01' })],
 			ctx([invoice({ id: 'p', bolo: 'b', status: 'draft', doc_type: 'proforma', payer_fiscal_identity_id: null })]),
 		);
 		expect(items).toEqual([]);
@@ -361,12 +381,12 @@ describe('attentionItems', () => {
 describe('expectedInflow', () => {
 	it('places expected collections and uninvoiced future functions by month', () => {
 		const bolos = [
-			bolo({ id: 'a', next_performed_at: '2026-09-20' }),
-			bolo({ id: 'b', next_performed_at: '2026-11-08', status: 'confirmed', fee_amount: 2100 }),
-			bolo({ id: 'late', next_performed_at: '2026-09-01' }),
-			bolo({ id: 'nodate', next_performed_at: '2026-09-02' }),
-			bolo({ id: 'past', next_performed_at: '2026-10-03', fee_amount: 2200 }),
-			bolo({ id: 'far', next_performed_at: '2027-05-01', status: 'confirmed' }),
+			bolo({ id: 'a', first_performed_at: '2026-09-20' }),
+			bolo({ id: 'b', first_performed_at: '2026-11-08', status: 'confirmed', fee_amount: 2100 }),
+			bolo({ id: 'late', first_performed_at: '2026-09-01' }),
+			bolo({ id: 'nodate', first_performed_at: '2026-09-02' }),
+			bolo({ id: 'past', first_performed_at: '2026-10-03', fee_amount: 2200 }),
+			bolo({ id: 'far', first_performed_at: '2027-05-01', status: 'confirmed' }),
 		];
 		const invoices = [
 			invoice({ id: 'ia', bolo: 'a', total: 1590, expected_on: '2026-11-15' }),
@@ -386,7 +406,7 @@ describe('expectedInflow', () => {
 
 	it('a future function with only a draft still comes in as contracted', () => {
 		const [eur] = expectedInflow(
-			[bolo({ id: 'b', status: 'confirmed', next_performed_at: '2026-11-20', fee_amount: 1200 })],
+			[bolo({ id: 'b', status: 'confirmed', first_performed_at: '2026-11-20', fee_amount: 1200 })],
 			ctx([invoice({ id: 'd', bolo: 'b', status: 'draft', total: 1272 })]),
 		);
 		expect(eur!.months[1]).toEqual({ month: '2026-11', expected: 0, contracted: 1200 });
@@ -395,17 +415,26 @@ describe('expectedInflow', () => {
 	it('leaves out a currency with nothing coming in, and puts the biggest first', () => {
 		const out = expectedInflow(
 			[
-				bolo({ id: 'eur', status: 'confirmed', next_performed_at: '2026-11-08', fee_amount: 2100 }),
-				bolo({ id: 'chf', status: 'confirmed', next_performed_at: '2027-02-10', fee_currency: 'CHF', fee_amount: 4000 }),
+				bolo({ id: 'eur', status: 'confirmed', first_performed_at: '2026-11-08', fee_amount: 2100 }),
+				bolo({ id: 'chf', status: 'confirmed', first_performed_at: '2027-02-10', fee_currency: 'CHF', fee_amount: 4000 }),
 			],
 			ctx(),
 		);
 		expect(out.map((f) => f.currency)).toEqual(['EUR']);
 	});
 
+	// ADR-131: a bolo begun but not finished comes in after its last function.
+	it('a bolo whose first function is past and last ahead comes in at the last', () => {
+		const [eur] = expectedInflow(
+			[bolo({ id: 'b', status: 'confirmed', function_count: 3, first_performed_at: '2026-10-10', last_performed_at: '2026-11-04', fee_amount: 1500 })],
+			ctx(),
+		);
+		expect(eur!.months[1]).toEqual({ month: '2026-11', expected: 0, contracted: 1500 });
+	});
+
 	it('crosses the year end', () => {
 		const [f] = expectedInflow(
-			[bolo({ id: 'x', status: 'confirmed', next_performed_at: '2027-01-10' })],
+			[bolo({ id: 'x', status: 'confirmed', first_performed_at: '2027-01-10' })],
 			ctx([], { today: new Date('2026-12-20T09:00:00Z') }),
 		);
 		expect(f!.months.map((m) => m.month)).toEqual(['2026-12', '2027-01', '2027-02', '2027-03']);

@@ -33,7 +33,7 @@
     /** A conversation row opens its conversation, where the call is resolved. */
     conversationHref: (i: DeskItem) => string | null;
     money: (n: number, cur: string | null) => string;
-    /** Proposals accepted this session (the persistent «Añadir» is a known gap). */
+    /** An AI proposal still waiting for «Añadir» or «Descartar». */
     isGhost: (i: DeskItem) => boolean;
     ontoggle: (taskId: string, done: boolean) => void;
     onremove: (taskId: string) => void;
@@ -125,7 +125,7 @@
       <span class="row__acts">
         <button type="button" class="row__act btn--outline btn--xs" onclick={() => item.taskId && onaccept(item.taskId)}
           >{t('desk.proposal_add', locale)}</button
-        ><button type="button" class="row__act row__act--quiet btn--outline btn--xs" onclick={() => item.taskId && ontoggle(item.taskId, true)}
+        ><button type="button" class="row__act row__act--quiet btn--outline btn--xs" onclick={() => item.taskId && onremove(item.taskId)}
           >{t('desk.proposal_dismiss', locale)}</button
         >
       </span>

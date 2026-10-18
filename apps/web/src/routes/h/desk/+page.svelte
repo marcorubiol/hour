@@ -450,15 +450,16 @@
   );
 
   // ── Task + proposal mutations (TaskBoard contract; optimistic toggle). ──
-  const toggleTask = createMutation({
-    mutationFn: ({ id, status }: { id: string; status: 'open' | 'done' }) =>
-      mutateJSON<{ task: TaskItem }>('PATCH', `/api/tasks/${id}`, { status }),
-    onMutate: async ({ id, status }) => {
+  // One PATCH for the check (status) and for accepting a proposal (origin).
+  const patchTask = createMutation({
+    mutationFn: ({ id, patch }: { id: string; patch: Partial<Pick<TaskItem, 'status' | 'origin'>> }) =>
+      mutateJSON<{ task: TaskItem }>('PATCH', `/api/tasks/${id}`, patch),
+    onMutate: async ({ id, patch }) => {
       await queryClient.cancelQueries({ queryKey: ['tasks'] });
       const snapshots = queryClient.getQueriesData<TasksCache>({ queryKey: ['tasks'] });
       for (const [key, data] of snapshots) {
         if (!data) continue;
-        queryClient.setQueryData(key, { ...data, items: data.items.map((tk) => (tk.id === id ? { ...tk, status } : tk)) });
+        queryClient.setQueryData(key, { ...data, items: data.items.map((tk) => (tk.id === id ? { ...tk, ...patch } : tk)) });
       }
       return { snapshots };
     },
@@ -517,16 +518,9 @@
     pendingRemovals.clear();
   });
 
-  // AI consent inbox: dismiss = complete it (real PATCH). Accept = keep as a
-  // normal task; `origin` is not in the PATCH whitelist, so acceptance is a
-  // client acknowledgment for this session only — persistent accept needs an
-  // origin-edit path (whitelist or a dedicated endpoint). KNOWN GAP.
-  let accepted = $state(new Set<string>());
-  function acceptProposal(id: string) {
-    accepted.add(id);
-    accepted = new Set(accepted);
-  }
-  const isGhost = (i: DeskItem) => i.concern === 'task' && i.isProposal && i.taskId != null && !accepted.has(i.taskId);
+  // AI consent inbox (ADR-069, ADR-131): «Añadir» makes the proposal a normal
+  // task (origin → manual, persisted); «Descartar» removes it, with «Deshacer».
+  const isGhost = (i: DeskItem) => i.concern === 'task' && i.isProposal && i.taskId != null;
 
   async function answerGoing(g: NonNullable<DeskItem['going']>, state: 'going' | 'not_going') {
     if (!feeds.personId) return;
@@ -675,9 +669,9 @@
           {conversationHref}
           {money}
           {isGhost}
-          ontoggle={(id, done) => $toggleTask.mutate({ id, status: done ? 'done' : 'open' })}
+          ontoggle={(id, done) => $patchTask.mutate({ id, patch: { status: done ? 'done' : 'open' } })}
           onremove={removeWithUndo}
-          onaccept={acceptProposal}
+          onaccept={(id) => $patchTask.mutate({ id, patch: { origin: 'manual' } })}
           onanswer={answerGoing}
         />
       </div>
