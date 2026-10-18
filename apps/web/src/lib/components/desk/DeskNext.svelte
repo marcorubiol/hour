@@ -13,7 +13,7 @@
   import { useQueryClient } from '@tanstack/svelte-query';
   import { addToast } from '$lib/components/Toast.svelte';
   import { ApiError } from '$lib/api';
-  import { dualTime, hourMark, localeDayMonth, localeWeekdayShort } from '$lib/datetime';
+  import { dualTime, hourMark, localeDayMonth, localeDayMonthNear, localeWeekdayShort } from '$lib/datetime';
   import { t, type Locale } from '$lib/i18n';
   import { dayMoments, type SlipContext, type SlipKind } from '$lib/month-events';
   import { setCommitment } from '$lib/commitments';
@@ -129,7 +129,7 @@
     <!-- Far away is still «the next thing»: the band says which, as the rail does. -->
     <p class="dband__empty">
       <a href={slip.href ?? plannerDayHref('day', next.day)}
-        >{t('desk.next_far', locale, { day: localeDayMonth(next.day, locale), place: slip.city || slip.name })} →</a
+        >{t('desk.next_far', locale, { day: localeDayMonthNear(next.day, today, locale), place: slip.city || slip.name })} →</a
       >
     </p>
   {:else}

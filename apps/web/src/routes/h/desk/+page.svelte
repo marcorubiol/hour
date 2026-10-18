@@ -658,6 +658,7 @@
       <div class="slot slot--waits">
         <DeskWaiting
           {waiting}
+          {today}
           {feed}
           {later}
           loading={waitingLoading}

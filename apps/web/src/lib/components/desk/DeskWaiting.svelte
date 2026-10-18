@@ -8,13 +8,15 @@
    * One list at a time, never both: a task drawn twice is two checkboxes
    * with one name.
    */
-  import { dayMonth } from '$lib/datetime';
+  import { localeDayMonth } from '$lib/datetime';
   import { relativeContactDate } from '$lib/conversation';
   import { t, type Locale } from '$lib/i18n';
   import type { DeskBucket, DeskConcern, DeskItem, DeskRun, Waiting } from '$lib/desk-feed';
 
   interface Props {
     waiting: Waiting;
+    /** The viewer's day (YYYY-MM-DD). */
+    today: string;
     feed: DeskBucket[];
     later: { count: number; from: string; until: string } | null;
     loading: boolean;
@@ -34,6 +36,7 @@
 
   let {
     waiting,
+    today,
     feed,
     later,
     loading,
@@ -62,21 +65,24 @@
   const runHref = (run: DeskRun) => run.items[0]?.href ?? LENS_HREF[run.concern];
   const concernLabel = (c: DeskConcern) => t(`desk.concern_${c}`, locale);
   const laterText = (l: NonNullable<typeof later>) =>
-    t(l.count === 1 ? 'desk.later_one' : 'desk.later_many', locale, { n: l.count, day: dayMonth(l.until) });
+    t(l.count === 1 ? 'desk.later_one' : 'desk.later_many', locale, { n: l.count, day: day(l.until) });
+
+  /** «2 nov», never «02 nov»; today is «hoy». */
+  const day = (iso: string) => (iso === today ? t('desk.next_today', locale) : localeDayMonth(iso, locale));
 
   /** When, in words: the day label of the row's bucket, or the task's own due. */
   function whenOf(i: DeskItem): string {
     if (i.concern === 'task') {
       if (i.dueLabel === 'overdue') return t('desk.due_overdue', locale);
-      if (i.dueLabel === 'due' && i.dueDay) return `${t('desk.due_due', locale)} ${dayMonth(i.dueDay)}`;
-      return i.dueDay ? dayMonth(i.dueDay) : '';
+      if (i.dueLabel === 'due' && i.dueDay) return `${t('desk.due_due', locale)} ${day(i.dueDay)}`;
+      return i.dueDay ? day(i.dueDay) : '';
     }
     if (i.repliedAt) return relativeContactDate(i.repliedAt, locale);
     // A proposal (revive) is Hour's suggestion, not a deadline: no date.
     if (i.isProposal) return '';
     if (!i.day) return '';
     if (i.overdue) return t('desk.due_overdue', locale);
-    return dayMonth(i.day);
+    return day(i.day);
   }
   const subjectHref = (i: DeskItem) => i.href ?? (i.concern === 'conversation' ? conversationHref(i) : null);
 </script>
