@@ -57,6 +57,7 @@
     moneyPosition,
     observedPayerTermsDays,
     PAYMENT_METHODS,
+    paymentProposal,
     paymentMethodLabel,
     seasonLabel,
     seasonOf,
@@ -447,13 +448,17 @@
   // it (unique index + ON CONFLICT), preventing a duplicated, over-counted
   // payment. Fresh key each time openPay runs = each intended payment is new.
   let payIdempotencyKey = $state('');
+  // With an issued document the payment goes against it, for what it still
+  // lacks WITH taxes (ADR-123); without one, against the bolo's fee.
+  let payInvoiceId = $state<string | null>(null);
   function openPay(b: MoneyBolo) {
     payBolo = b;
-    const remaining = Math.max(0, Number(b.fee_amount ?? 0) - Number(b.collected ?? 0));
-    payAmount = remaining ? remaining.toFixed(2) : '';
+    const proposal = paymentProposal(b, moneyOf(b));
+    payInvoiceId = proposal.invoiceId;
+    payAmount = proposal.amount ? proposal.amount.toFixed(2) : '';
     payReceivedOn = localDayISO();
     payMethod = 'transfer';
-    payCounterparty = b.venue_name ?? '';
+    payCounterparty = proposal.counterparty;
     payCategory = '';
     payReference = '';
     payIdempotencyKey = crypto.randomUUID();
@@ -467,7 +472,7 @@
         amount,
         received_on: payReceivedOn || localDayISO(),
         method: payMethod,
-        bolo_id: payBolo!.id,
+        ...(payInvoiceId ? { invoice_id: payInvoiceId } : { bolo_id: payBolo!.id }),
         counterparty: payCounterparty.trim() || null,
         category: payCategory.trim() || null,
         reference: payReference.trim() || null,
@@ -480,7 +485,8 @@
       payOpen = false;
       payBolo = null;
       void queryClient.invalidateQueries({ queryKey: ['money-bolos'] });
-      addToast({ tone: 'success', message: t('books.payment_recorded_fee', locale) });
+      void queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      addToast({ tone: 'success', message: t(payInvoiceId ? 'books.payment_recorded_doc' : 'books.payment_recorded_fee', locale) });
     },
     onError: (err) => addToast({ tone: 'danger', title: t('books.payment_not_recorded', locale), message: err instanceof Error ? err.message : t('perf.unexpected', locale) }),
   });
@@ -1039,7 +1045,7 @@
     </div>
     <Input label={t('books.reference_opt', locale)} bind:value={payReference} placeholder={t('books.ph_reference', locale)} />
   </div>
-  <p class="mny__dialog-note">{t('books.pay_note', locale)}</p>
+  <p class="mny__dialog-note">{t(payInvoiceId ? 'books.pay_note_doc' : 'books.pay_note', locale)}</p>
   {#snippet actions()}
     <Button variant="outline" onclick={() => (payOpen = false)}>{t('create.cancel', locale)}</Button>
     <Button onclick={() => !$payMutation.isPending && $payMutation.mutate()} loading={$payMutation.isPending}>{t('books.record', locale)}</Button>

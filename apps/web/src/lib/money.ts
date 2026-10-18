@@ -580,6 +580,8 @@ export interface BoloMoney {
 	inProgress: boolean;
 	/** The live document: issued, else paid, else draft. Cancelled never. */
 	doc: MoneyInvoiceItem | null;
+	/** What the issued document still lacks: its total less what the bolo collected. */
+	docOpen: number;
 	/** Por cobrar: the issued document's total less what the bolo collected (ADR-117 § 6). */
 	owed: number;
 	/** The issued document's aging, when there is one. */
@@ -613,7 +615,8 @@ export function boloMoney(b: MoneyBolo, ctx: MoneyContext): BoloMoney {
 	const docs = ctx.invoicesByBolo.get(b.id) ?? [];
 	const doc = docs.find((d) => d.status !== 'cancelled') ?? null;
 	const issued = doc?.status === 'issued' ? doc : null;
-	const owed = issued ? Math.max(0, Number(issued.total) - collected) : 0;
+	const docOpen = issued ? Math.max(0, Number(issued.total) - collected) : 0;
+	const owed = docOpen;
 	const aging = issued ? invoiceAging(issued, ctx.termsByPayer, ctx.today) : null;
 	const overdue = owed > 0 && aging?.state === 'past-expected';
 	const daysLate =
@@ -642,6 +645,7 @@ export function boloMoney(b: MoneyBolo, ctx: MoneyContext): BoloMoney {
 		contracted,
 		inProgress: isInProgress(b.status),
 		doc,
+		docOpen,
 		owed,
 		aging,
 		overdue,
@@ -649,6 +653,38 @@ export function boloMoney(b: MoneyBolo, ctx: MoneyContext): BoloMoney {
 		toInvoice,
 		noFee: contracted && fee === null,
 		collect,
+	};
+}
+
+// ── Registrar un cobro (ADR-123) ──
+
+export interface PaymentProposal {
+	/** The issued document the payment goes against; null = anchored to the bolo. */
+	invoiceId: string | null;
+	/** What is still owed: the document's open amount WITH taxes, else the fee less collected. */
+	amount: number;
+	/** Who pays: the document's payer, else the venue. */
+	counterparty: string;
+}
+
+/**
+ * A payment recorded from Cuentas goes against the bolo's issued document
+ * when there is one (that is the path that marks the invoice paid, feeds the
+ * payer's observed terms and keeps Documentos and Desk in step); without a
+ * document it anchors to the bolo, against the fee.
+ */
+export function paymentProposal(b: MoneyBolo, m: BoloMoney): PaymentProposal {
+	if (m.doc?.status === 'issued') {
+		return {
+			invoiceId: m.doc.id,
+			amount: m.docOpen,
+			counterparty: m.doc.payer?.name ?? b.venue_name ?? '',
+		};
+	}
+	return {
+		invoiceId: null,
+		amount: Math.max(0, (m.fee ?? 0) - m.collected),
+		counterparty: b.venue_name ?? '',
 	};
 }
 

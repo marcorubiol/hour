@@ -7,6 +7,7 @@ import {
 	invoicesByBolo,
 	matchesLedgerFilter,
 	moneyPosition,
+	paymentProposal,
 	seasonLabel,
 	seasonOf,
 	seasonRange,
@@ -308,5 +309,37 @@ describe('matchesLedgerFilter', () => {
 		expect(matchesLedgerFilter(m, 'overdue')).toBe(true);
 		expect(matchesLedgerFilter(m, 'to_invoice')).toBe(false);
 		expect(matchesLedgerFilter(boloMoney(bolo({ id: 'h', status: 'hold' }), c), 'in_progress')).toBe(true);
+	});
+});
+
+describe('paymentProposal (ADR-123)', () => {
+	it('goes against the issued invoice for what it still lacks WITH taxes, from its payer', () => {
+		const b = bolo({ id: 'b', fee_amount: 3500, collected: 2000, venue_name: 'Teatro Principal' });
+		const inv = invoice({
+			id: 'i',
+			bolo: 'b',
+			subtotal: 3500,
+			total: 3710,
+			payer: { id: 'o', slug: 'o', name: 'Ayuntamiento de Vitoria-Gasteiz', fiscal_identity_id: 'f' },
+		});
+		const p = paymentProposal(b, boloMoney(b, ctx([inv])));
+		expect(p).toEqual({ invoiceId: 'i', amount: 1710, counterparty: 'Ayuntamiento de Vitoria-Gasteiz' });
+	});
+
+	it('without an issued document anchors to the bolo, against the fee', () => {
+		const b = bolo({ id: 'b', fee_amount: 1000, collected: 300 });
+		expect(paymentProposal(b, boloMoney(b, ctx()))).toEqual({ invoiceId: null, amount: 700, counterparty: 'Sala b' });
+		// a draft is not a document you can be paid against
+		const draft = invoice({ id: 'd', bolo: 'b', status: 'draft', total: 1060 });
+		expect(paymentProposal(b, boloMoney(b, ctx([draft]))).invoiceId).toBeNull();
+	});
+
+	it('accepting the proposal leaves nothing owed (no false overdue residue)', () => {
+		const inv = invoice({ id: 'i', bolo: 'b', total: 1060, expected_on: '2026-10-01' });
+		const before = bolo({ id: 'b', fee_amount: 1000 });
+		const p = paymentProposal(before, boloMoney(before, ctx([inv])));
+		const after = boloMoney({ ...before, collected: p.amount }, ctx([inv]));
+		expect(after.owed).toBe(0);
+		expect(after.overdue).toBe(false);
 	});
 });
