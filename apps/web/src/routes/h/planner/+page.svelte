@@ -2361,20 +2361,8 @@
   //    word now belongs to the shell rail's now/next block, ADR-096) —
   //    every figure maps to fetched rows;
   // segments whose feed is absent simply drop. ──────────────────────────
-  // Next confirmed gig from today — the decisions window rows (scope-
-  // filtered, [today, +90d]) already hold exactly that horizon.
-  let statNext = $derived.by(() => {
-    let best: { day: string; venue: string } | null = null;
-    for (const p of decisionPerfs) {
-      if (performanceStatusFamily(p.status) !== 'confirmed') continue;
-      const day = perfDayKey(p);
-      if (day < todayIso) continue;
-      if (best === null || day < best.day) {
-        best = { day, venue: p.venue?.name ?? p.venue_name ?? p.city ?? '—' };
-      }
-    }
-    return best;
-  });
+  // «Next» left the head (Marco, 2026-10-18): the rail says it, and two
+  // «next» on one screen with two rules read as an error (diseño M8).
   // Distinct persons with a blackout overlapping the visible month
   // (person-level blocks of the scope's workspaces — company closures are
   // not a person count).
@@ -2970,8 +2958,7 @@
            the rail block, ADR-096) — every figure maps to fetched rows; a
            segment whose feed is absent (or count is zero) drops instead of
            lying. The shared .lenshead__sub inserts the · between items. -->
-      {#if !errorMsg}
-        <!-- CALM QUIETS VOLUME, NOT OBLIGATIONS. This control was gated on
+      <!-- CALM QUIETS VOLUME, NOT OBLIGATIONS. This control was gated on
              `!calm.on`, so the one line on the page that says «you have to
              decide something» disappeared in the mode people leave switched
              on — which is why Marco never saw the drawer and reported it as
@@ -2993,19 +2980,19 @@
               aria-hidden="true">{decisionsOpen ? '▴' : '▾'}</i
             >
           </button>
+        {:else}
+          <!-- The line keeps its height with nothing to say: the same control,
+               unseen and unreachable, so the reserve is exact by construction
+               and the tabs sit at the same height in all five drawings. -->
+          <span class="cal__stat cal__stat--decide cal__strut" aria-hidden="true">&nbsp;</span>
         {/if}
-        {#if !decisionsAbsent && statNext}
-          <span class="cal__stat cal__stat--soft"
-            >{t('planner.stat_next', locale, {
-              day: localeDayMonth(statNext.day, localeTag),
-              venue: statNext.venue,
-            })}</span
-          >
-        {/if}
-      {/if}
     </p>
-  {#if !errorMsg && (calm.on || view !== 'day' || Boolean(daySpanLabel) || statInferred > 0)}
+  <!-- BOTH LINES ARE FURNITURE: always laid out, loading, empty or failed,
+       so nothing under them moves when the rows land (ADR-096 §6, diseño M4).
+       A line with nothing true to say is empty, never absent. -->
     <p class="cal__meta cal__meta--window">
+      <!-- One empty line box: the caption's own height, whatever it says. -->
+      <span class="cal__strut" aria-hidden="true">&#8203;</span>
         <!-- CALM IS A WORD, ON THE FACTS SIDE (ADR-095 §3). It lives in the
              Desk — global and non-destructive — and the Planner does not draw
              its switch: it draws what it DOES. An active filter you cannot see
@@ -3170,7 +3157,6 @@
           >
         {/if}
     </p>
-  {/if}
   </div>
   <!-- THE DRAWER OPENS UNDER THE STRIP THAT NAMES IT — the queue line says
        `3 to decide · 1 urgent`, and what it names unfolds beneath both lines,
@@ -3679,6 +3665,16 @@
       margin-inline-end: var(--space-2xs);
     }
     /* The stat "per decidir" — the one red figure; a jump, not a decoration. */
+    /* A line's height with nothing in it. Zero wide, and it gives back the
+       flex gap it would add before the first real stat. */
+    .cal__strut {
+      display: inline-block;
+      visibility: hidden;
+      inline-size: 0;
+      overflow: hidden;
+      margin-inline-end: calc(-1 * var(--space-s));
+      pointer-events: none;
+    }
     /* A count that asks for a call takes the danger ink, digits and word. */
     .cal__stat--red,
     .cal__stat--red b {

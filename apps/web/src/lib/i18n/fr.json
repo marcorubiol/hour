@@ -344,7 +344,6 @@
   "planner.stat_decide": "{n} à trancher",
   "planner.stat_urgent": "{m} urgentes",
   "planner.stat_urgent_one": "1 urgente",
-  "planner.stat_next": "prochaine : {day} {venue}",
   "planner.stat_away": "{z} personnes absentes",
   "planner.stat_away_one": "1 personne absente",
   "planner.stat_trips": "{w} voyages",

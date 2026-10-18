@@ -384,7 +384,6 @@
   "planner.stat_decide": "{n} to decide",
   "planner.stat_urgent": "{m} urgent",
   "planner.stat_urgent_one": "1 urgent",
-  "planner.stat_next": "next: {day} {venue}",
   "planner.stat_away": "{z} people away",
   "planner.stat_away_one": "1 person away",
   "planner.stat_trips": "{w} trips",

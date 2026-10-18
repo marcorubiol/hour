@@ -375,7 +375,6 @@
   "planner.stat_decide": "{n} per decidir",
   "planner.stat_urgent": "{m} urgents",
   "planner.stat_urgent_one": "1 urgent",
-  "planner.stat_next": "propera: {day} {venue}",
   "planner.stat_away": "{z} persones fora",
   "planner.stat_away_one": "1 persona fora",
   "planner.stat_trips": "{w} viatges",
