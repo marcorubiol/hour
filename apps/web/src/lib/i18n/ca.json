@@ -1949,6 +1949,7 @@
   "books.err_bolos": "No s'han pogut llegir els bolos.",
   "books.err_invoices": "No s'han pogut llegir els documents.",
   "books.err_expenses": "No s'han pogut llegir les despeses.",
+  "books.retry": "Tornar-ho a provar",
   "planner.view_overview": "Temporada",
   "planner.season_window": "{from} → {to} · {n} setmanes",
   "planner.season_perfs": "funcions",

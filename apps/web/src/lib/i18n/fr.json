@@ -1949,6 +1949,7 @@
   "books.err_bolos": "Impossible de lire les cessions.",
   "books.err_invoices": "Impossible de lire les documents.",
   "books.err_expenses": "Impossible de lire les dépenses.",
+  "books.retry": "Réessayer",
   "planner.view_overview": "Saison",
   "planner.season_window": "{from} → {to} · {n} semaines",
   "planner.season_perfs": "représentations",

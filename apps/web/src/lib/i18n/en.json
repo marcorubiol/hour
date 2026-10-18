@@ -1958,6 +1958,7 @@
   "books.err_bolos": "Could not read the deals.",
   "books.err_invoices": "Could not read the documents.",
   "books.err_expenses": "Could not read the expenses.",
+  "books.retry": "Try again",
   "planner.view_overview": "Season",
   "planner.season_window": "{from} → {to} · {n} weeks",
   "planner.season_perfs": "performances",

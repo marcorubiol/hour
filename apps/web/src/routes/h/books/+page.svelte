@@ -429,10 +429,11 @@
     !noAccess &&
       ($accessQuery.isPending || $workspacesQuery.isPending || $projectsQuery.isPending || $linesQuery.isPending || loading),
   );
-  const errText = (e: unknown) => (e instanceof Error ? e.message : '');
-  let bolosError = $derived(errText($bolosQuery.error));
-  let invoicesError = $derived(errText($invoicesQuery.error));
-  let expensesError = $derived(errText($expensesQuery.error));
+  // A failed feed says so in the page's own words, with a way to try again;
+  // the server's text is for the logs, not for the reader.
+  let bolosError = $derived($bolosQuery.isError);
+  let invoicesError = $derived($invoicesQuery.isError);
+  let expensesError = $derived($expensesQuery.isError);
   let currencies = $derived([...new Set(bolos.map((b) => b.fee_currency ?? 'EUR'))].sort());
   /** With more than one currency every amount carries its code: a column of numbers invites summing. */
   let multiCurrency = $derived(currencies.length > 1);
@@ -739,6 +740,13 @@
   });
 </script>
 
+{#snippet failed(key: string, retry: () => unknown)}
+  <p class="mny__fail">
+    <span>{t(key, locale)}</span>
+    <Button size="xs" variant="outline" onclick={() => void retry()}>{t('books.retry', locale)}</Button>
+  </p>
+{/snippet}
+
 <svelte:head>
   <title>{t('books.head_title', locale)}</title>
 </svelte:head>
@@ -778,7 +786,7 @@
     </div>
 
     {#if bolosError}
-      <p class="mny__state mny__state--danger">{t('books.err_bolos', locale)} {bolosError}</p>
+      {@render failed('books.err_bolos', () => $bolosQuery.refetch())}
     {:else}
       <!-- 1 · Las cuatro cifras, una fila por moneda -->
       <div class="figs" aria-label={t('books.figures', locale)}>
@@ -866,7 +874,7 @@
               {/if}
             </header>
             {#if invoicesError}
-              <p class="mny__state mny__state--danger">{t('books.err_invoices', locale)}</p>
+              {@render failed('books.err_invoices', () => $invoicesQuery.refetch())}
             {:else if loading}
               <p class="mny__state">{t('desk.loading', locale)}</p>
             {:else if attention.length === 0}
@@ -894,7 +902,7 @@
           <section class="inflow" aria-label={t('books.inflow', locale)}>
             <header class="radar__head"><p class="eyebrow">{t('books.inflow', locale)}</p></header>
             {#if invoicesError}
-              <p class="mny__state mny__state--danger">{t('books.err_invoices', locale)}</p>
+              {@render failed('books.err_invoices', () => $invoicesQuery.refetch())}
             {:else if loading}
               <p class="mny__state">{t('desk.loading', locale)}</p>
             {:else}
@@ -1054,7 +1062,7 @@
           {/if}
         {:else if tab === 'documents'}
           {#if invoicesError}
-            <p class="mny__state mny__state--danger">{t('books.err_invoices', locale)} {invoicesError}</p>
+            {@render failed('books.err_invoices', () => $invoicesQuery.refetch())}
           {:else}
             <MoneyInvoices {invoices} {payers} focusId={focusInvoiceId} />
           {/if}
@@ -1068,7 +1076,7 @@
             <Button size="xs" variant="outline" onclick={() => openExpense()} disabled={expenseAnchorOptions.length === 0}>{t('books.add_expense', locale)}</Button>
           </div>
           {#if expensesError}
-            <p class="mny__state mny__state--danger">{t('books.err_expenses', locale)} {expensesError}</p>
+            {@render failed('books.err_expenses', () => $expensesQuery.refetch())}
           {:else if expenses.length === 0}
             <p class="mny__state">{t('books.no_expenses_scope', locale)}</p>
           {:else}
@@ -1216,7 +1224,8 @@
     .mny__season:hover { color: var(--text-color); }
     .mny__season[aria-current='true'] { text-decoration: underline; }
     .mny__state { font-size: var(--text-s); color: var(--text-faint); }
-    .mny__state--danger { color: var(--danger); }
+    /* The system's voice for a failure, as Desk says it (dband__err). */
+    .mny__fail { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-s); margin: 0; font-family: var(--font-display); font-style: italic; font-size: var(--text-s); color: var(--danger); }
     .mny__note { font-size: var(--text-xs); color: var(--text-faint); }
     .mny__empty { display: flex; flex-direction: column; gap: var(--space-s); align-items: flex-start; }
     .mny__empty-acts { display: flex; gap: var(--space-xs); flex-wrap: wrap; }
