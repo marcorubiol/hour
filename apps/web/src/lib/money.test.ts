@@ -125,6 +125,17 @@ describe('agingState', () => {
 		});
 	});
 
+	it('without any date, expects the invoice 60 days after issue: it can fall due (ADR-123)', () => {
+		const undated = { ...base, due_on: null };
+		expect(agingState(undated, [], new Date('2026-02-10T12:00:00Z'))).toMatchObject({
+			expectedOn: '2026-03-02',
+			expectedDays: 60,
+			state: 'within',
+			source: 'default',
+		});
+		expect(agingState(undated, [], new Date('2027-08-01T12:00:00Z'))).toMatchObject({ state: 'past-expected' });
+	});
+
 	it('derives paid from active payment coverage', () => {
 		const state = agingState(
 			base,

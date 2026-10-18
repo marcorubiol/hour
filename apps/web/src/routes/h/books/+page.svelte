@@ -266,6 +266,7 @@
       case 'overdue': {
         const late = t(item.daysLate === 1 ? 'books.att_late_one' : 'books.att_late_many', locale, { n: item.daysLate });
         if (item.observedDays != null) return t('books.att_late_observed', locale, { late, days: Math.round(item.observedDays) });
+        if (item.aging?.source === 'default') return t('books.att_late_default', locale, { late });
         if (item.aging?.expectedOn) return t('books.att_late_expected', locale, { late, date: dayLabel(item.aging.expectedOn) });
         return late;
       }

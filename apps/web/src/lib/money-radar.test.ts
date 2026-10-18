@@ -347,7 +347,8 @@ describe('expectedInflow', () => {
 		];
 		const [eur] = expectedInflow(bolos, ctx(invoices));
 		expect(eur!.months).toEqual([
-			{ month: '2026-10', expected: 0, contracted: 0 },
+			// «nodate» has no date at all: expected 60 days after issue, 31 oct
+			{ month: '2026-10', expected: 1000, contracted: 0 },
 			{ month: '2026-11', expected: 1590, contracted: 2100 },
 			{ month: '2026-12', expected: 0, contracted: 0 },
 			{ month: '2027-01', expected: 0, contracted: 0 },

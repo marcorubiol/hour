@@ -254,7 +254,14 @@ export function payerFiscalState(
 }
 
 export type AgingStateName = 'within' | 'approaching' | 'past-expected' | 'paid';
-export type AgingSource = 'explicit' | 'observed' | 'due' | 'none';
+export type AgingSource = 'explicit' | 'observed' | 'due' | 'default';
+
+/**
+ * An issued invoice with no expected date, no due date and no observed terms
+ * of its payer is expected this many days after issue (ADR-123): without it,
+ * the debt most likely to be forgotten never fell due.
+ */
+export const DEFAULT_TERMS_DAYS = 60;
 
 export interface AgingInvoice extends TermsInvoice {
 	status: string;
@@ -290,14 +297,14 @@ export function agingState(
 		? invoice.expected_on.slice(0, 10)
 		: observedDays != null
 			? addDays(invoice.issued_on, Math.round(observedDays))
-			: invoice.due_on?.slice(0, 10) ?? null;
+			: invoice.due_on?.slice(0, 10) ?? addDays(invoice.issued_on, DEFAULT_TERMS_DAYS);
 	const source: AgingSource = invoice.expected_on
 		? 'explicit'
 		: observedDays != null
 			? 'observed'
 			: invoice.due_on
 				? 'due'
-				: 'none';
+				: 'default';
 	const todayDay = today.toISOString().slice(0, 10);
 	const daysRunning = Math.max(0, daysBetween(invoice.issued_on, todayDay));
 	const expectedDays = expectedOn
@@ -914,7 +921,7 @@ export interface InflowMonth {
 export interface InflowForecast {
 	currency: string;
 	months: InflowMonth[];
-	/** Issued and unpaid with no expected date, no due date and no observed terms. */
+	/** Issued and unpaid with no expected date, no due date and no observed terms: placed at DEFAULT_TERMS_DAYS. */
 	undated: number;
 }
 
@@ -960,8 +967,8 @@ export function expectedInflow(
 		if (m.owed > 0 && !m.overdue) {
 			const f = ensure(m.currency);
 			const on = m.aging?.expectedOn;
-			if (!on) f.undated += 1;
-			else if (on >= today) {
+			if (m.aging?.source === 'default') f.undated += 1;
+			if (on && on >= today) {
 				const slot = f.months.find((x) => x.month === monthKey(on));
 				if (slot) slot.expected += m.owed;
 			}
