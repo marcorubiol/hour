@@ -171,7 +171,7 @@
 <section class="dband waits" aria-labelledby="desk-waits-h" aria-busy={loading}>
   <h2 class="dband__h" id="desk-waits-h">
     {t('desk.band_waiting', locale)}
-    {#if !loading && !errored && waiting.total > waiting.rows.length && !all && !calm}
+    {#if !loading && !errored && waiting.total > waiting.rows.length && !all}
       <span class="dband__count">{t('desk.waiting_count', locale, { shown: waiting.rows.length, total: waiting.total })}</span>
     {/if}
   </h2>
