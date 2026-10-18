@@ -431,7 +431,7 @@
         {#if conv.can_set_private}
         <div class="privacy">
           <div class="privacy__row">
-            <span class="privacy__label">{t('mail.private_label', locale)}</span>
+            <span class="eyebrow eyebrow--sub">{t('mail.private_label', locale)}</span>
             <button
               type="button"
               class="toggle"
@@ -493,6 +493,7 @@
       anchorKind="conversation"
       anchorId={conv.id}
       title={t('threads.team', locale)}
+      heading="eyebrow"
       messages={team.messages}
       authors={team.authors}
       me={team.me}
@@ -925,10 +926,6 @@
       align-items: center;
       justify-content: space-between;
       gap: var(--space-s);
-    }
-    .privacy__label {
-      font-size: var(--text-s);
-      font-weight: 500;
     }
     .privacy__hint {
       margin: var(--space-xs) 0 0;

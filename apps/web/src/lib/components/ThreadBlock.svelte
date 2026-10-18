@@ -56,6 +56,12 @@
     title?: string;
     /** false: los mensajes se pintan fuera (la vista «hilo» los mezcla con el registro). */
     list?: boolean;
+    /**
+     * La voz de la cabecera: `name` (el tablón, un hilo entre hilos) o
+     * `eyebrow` (la ficha de una conversación, donde es una sección más del
+     * lateral, como Datos fiscales o Buzones; revisión de diseño B8).
+     */
+    heading?: 'name' | 'eyebrow';
     locale: Locale;
     onchange: () => void;
   }
@@ -73,6 +79,7 @@
     autofocus = false,
     title,
     list = true,
+    heading = 'name',
     locale,
     onchange,
   }: Props = $props();
@@ -140,8 +147,12 @@
 
 <article class="thread" aria-labelledby={headingId} data-facet={thread.facet_key ?? 'general'}>
   <header class="thread__head">
-    <h3 class="thread__name" id={headingId}>{name}</h3>
-    <span class="thread__count">{thread.message_count}</span>
+    {#if heading === 'eyebrow'}
+      <h3 class="eyebrow eyebrow--sub" id={headingId}>{name}&nbsp;· {thread.message_count}</h3>
+    {:else}
+      <h3 class="thread__name" id={headingId}>{name}</h3>
+      <span class="thread__count">{thread.message_count}</span>
+    {/if}
     {#if thread.unread_count > 0}
       <Badge tone="info" size="xs">{t(thread.unread_count === 1 ? 'threads.unread_one' : 'threads.unread', locale, { n: thread.unread_count })}</Badge>
     {/if}
@@ -218,8 +229,10 @@
       align-items: baseline;
       gap: var(--space-xs);
     }
-    .thread__name {
+    .thread__head h3 {
       margin: 0;
+    }
+    .thread__name {
       color: var(--heading-color);
       font-family: var(--font-sans);
       font-size: var(--text-s);
