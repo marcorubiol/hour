@@ -125,7 +125,7 @@
   <span class="row__who">
     <span class="row__org">{row.title || t('conversations.conversation', locale)}</span>
     {#if badge}
-      <span class={statusBadgeClass(row.status)}>{statusLabel(row.status, locale)}</span>
+      <span class="badge badge--xs {statusBadgeClass(row.status)}">{statusLabel(row.status, locale)}</span>
     {:else if row.person}
       <span class="row__person">{row.person}</span>
     {/if}
@@ -248,7 +248,8 @@
               <li>
                 <a class="row" href={href(row)}>
                   {@render who(row, true)}
-                  <span class="row__what">{row.person ?? ''}</span>
+                  <!-- Always two lines: a row without a contact keeps the block's rhythm (diseño M6). -->
+                  <span class="row__what">{row.person ?? '\u00a0'}</span>
                   <span class="row__when"
                     ><strong>{relativeContactDate(row.at, locale)}</strong>{row.turn === 'ours'
                       ? t('overview.turn_ours', locale)
