@@ -47,7 +47,7 @@ test.describe('person file', () => {
 
     // The conversation context renders (this person has at least the
     // fixture difusión conversation — that's why they were in the list).
-    const conversations = page.getByRole('region', { name: 'Conversations' });
+    const conversations = page.getByRole('region', { name: 'Booking' });
     await expect(conversations.getByRole('listitem').first()).toBeVisible();
 
     // Add a workspace note.
