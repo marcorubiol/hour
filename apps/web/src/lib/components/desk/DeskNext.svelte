@@ -130,8 +130,9 @@
     {#if thenBefore}{@render thenLine()}{/if}
     <div class="card" data-testid="desk-next">
       <div class="card__eye">
-        <span class="card__when">{relDay(next.day)} · {dateWords(next.day)}</span>{#if next.ref.row.project?.name}{' · '}{next
-            .ref.row.project.name}{/if}
+        <span class="card__when">{relDay(next.day)} · {dateWords(next.day)}</span>{#if next.ref.row.project?.name}{' · '}<span class="card__proj"
+            >{next.ref.row.project.name}</span
+          >{/if}
       </div>
       <div class="card__slip">
         <Slip {slip} {kindLabel} stateLabel={() => null} showCountry ground="bare" placing="cell" {guess} />
@@ -164,8 +165,8 @@
     display: grid;
     gap: var(--space-xs);
     padding: var(--space-m) var(--space-l);
-    border: 1px solid color-mix(in oklch, var(--accent-7) 30%, var(--border-color-light));
-    background: color-mix(in oklch, var(--accent-7) 6%, var(--bg-ultra-light));
+    border: 1px solid var(--suggest-edge);
+    background: var(--suggest-wash);
     border-radius: var(--radius-l);
     /* The answer's room is held before the answer lands. */
     min-block-size: 7.5rem;
@@ -179,10 +180,16 @@
     font-size: var(--text-xs);
     letter-spacing: var(--mono-letter-spacing-loose);
     text-transform: uppercase;
-    color: color-mix(in oklch, var(--accent-7) 70%, var(--text-muted));
+    color: var(--text-muted);
   }
   .card__when {
     color: var(--heading-color);
+  }
+  /* A project keeps its own name: neutral ink, its case, no tint (the slip
+     already carries its monogram). */
+  .card__proj {
+    text-transform: none;
+    letter-spacing: var(--mono-letter-spacing);
   }
   .card__dash {
     font-family: var(--font-display);

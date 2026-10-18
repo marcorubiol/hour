@@ -275,7 +275,7 @@
   .row--going .row__verb,
   .row--ai .row__verb,
   .row--proposal .row__verb {
-    color: var(--accent-7);
+    color: var(--suggest-ink);
   }
   /* A proposal leans in its subject only; verb and date keep their mono. */
   .row--proposal .row__subject,
