@@ -643,9 +643,10 @@
     .season__seg:focus-visible {
       filter: brightness(0.92);
     }
+    /* Four columns: seven statuses read 4 + 3, never one alone on its row (diseño B3). */
     .season__legend {
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: repeat(4, minmax(0, 1fr));
       gap: var(--space-xs) var(--space-m);
       margin-block-start: var(--space-s);
     }
