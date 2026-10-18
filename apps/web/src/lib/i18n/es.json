@@ -1914,6 +1914,7 @@
   "books.att_no_fee_done_nodate": "hecha, sin caché: no se puede facturar",
   "books.att_act_invoice": "Hacer factura",
   "books.att_act_issue": "Emitir",
+  "books.att_act_chase": "Reclamar",
   "books.att_act_fiscal": "Datos fiscales",
   "books.att_act_fee": "Poner caché",
   "books.inflow": "Lo que entra",

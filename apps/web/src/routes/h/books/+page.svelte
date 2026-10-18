@@ -288,8 +288,20 @@
     fiscal: 'books.att_act_fiscal',
     no_fee: 'books.att_act_fee',
   };
+  /** The bolo's conversation, where a late payment is chased. */
+  function conversationHref(b: MoneyBolo): string | null {
+    if (!b.conversation_id || !b.project) return null;
+    return `/h/${workspaceSlugById.get(b.project.workspace_id) ?? defaultWorkspaceSlug}/conversation/${b.conversation_id}`;
+  }
+  /** Late money is chased, not recorded: the row opens the conversation; «Registrar pago» stays in the sheet. */
+  function actionKey(item: AttentionItem): string {
+    if (item.kind === 'overdue' && conversationHref(item.bolo)) return 'books.att_act_chase';
+    return ATTENTION_ACTION[item.kind];
+  }
   function act(item: AttentionItem) {
-    if (item.kind === 'overdue') openPay(item.bolo);
+    const chase = item.kind === 'overdue' ? conversationHref(item.bolo) : null;
+    if (chase) void goto(chase);
+    else if (item.kind === 'overdue') openPay(item.bolo);
     else if (item.kind === 'to_invoice') openInvoice(item.bolo);
     else if (item.kind === 'no_fee') openFee(item.bolo);
     else if (item.doc) void showDocument(item.doc.id);
@@ -893,7 +905,7 @@
                       <span class="att__why">{attentionWhy(item)}</span>
                     </span>
                     <span class="att__amt">{item.amount === null ? '·' : fmtMoney(item.amount)}{#if item.amount !== null && multiCurrency}&nbsp;{item.currency}{/if}</span>
-                    <Button size="xs" variant="outline" onclick={() => act(item)}>{t(ATTENTION_ACTION[item.kind], locale)}</Button>
+                    <Button size="xs" variant="outline" onclick={() => act(item)}>{t(actionKey(item), locale)}</Button>
                   </li>
                 {/each}
               </ul>
@@ -1017,8 +1029,8 @@
                                 · {t(b.function_count === 1 ? 'books.sheet_fn_one' : 'books.sheet_fn_many', locale, { n: b.function_count })}
                               </p>
                               {#if b.project}<p class="sheet__faint">{b.project.name}</p>{/if}
-                              {#if b.conversation_id && b.project}
-                                <p><a class="sheet__a" href={`/h/${workspaceSlugById.get(b.project.workspace_id) ?? defaultWorkspaceSlug}/conversation/${b.conversation_id}`}>{t('books.sheet_conversation', locale)}</a></p>
+                              {#if conversationHref(b)}
+                                <p><a class="sheet__a" href={conversationHref(b)}>{t('books.sheet_conversation', locale)}</a></p>
                               {/if}
                             </div>
                             <div class="sheet__col">

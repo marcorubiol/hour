@@ -1914,6 +1914,7 @@
   "books.att_no_fee_done_nodate": "feta, sense caché: no es pot facturar",
   "books.att_act_invoice": "Fer factura",
   "books.att_act_issue": "Emetre",
+  "books.att_act_chase": "Reclamar",
   "books.att_act_fiscal": "Dades fiscals",
   "books.att_act_fee": "Posar caixet",
   "books.inflow": "El que entra",

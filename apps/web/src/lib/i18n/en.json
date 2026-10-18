@@ -1923,6 +1923,7 @@
   "books.att_no_fee_done_nodate": "done, no fee: it cannot be invoiced",
   "books.att_act_invoice": "Make invoice",
   "books.att_act_issue": "Issue",
+  "books.att_act_chase": "Chase",
   "books.att_act_fiscal": "Fiscal data",
   "books.att_act_fee": "Set fee",
   "books.inflow": "Coming in",

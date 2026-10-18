@@ -1914,6 +1914,7 @@
   "books.att_no_fee_done_nodate": "jouée, sans prix : impossible à facturer",
   "books.att_act_invoice": "Faire la facture",
   "books.att_act_issue": "Émettre",
+  "books.att_act_chase": "Relancer",
   "books.att_act_fiscal": "Données fiscales",
   "books.att_act_fee": "Saisir le cachet",
   "books.inflow": "Ce qui rentre",
