@@ -538,6 +538,18 @@
   //    follows the pins; the picker attaches to a show or a conversation. ──
   let composerOpen = $state(false);
   let composerEl = $state<HTMLDivElement | null>(null);
+  let addBtn = $state<HTMLButtonElement | null>(null);
+  // Escape folds the composer back behind its button, focus included.
+  $effect(() => {
+    if (!composerOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || e.defaultPrevented) return;
+      composerOpen = false;
+      addBtn?.focus();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  });
   async function openComposer() {
     composerOpen = !composerOpen;
     if (!composerOpen) return;
@@ -605,7 +617,7 @@
       <!-- One child, so the sub line's «·» separators stay out of it. -->
       <span class="desk__subrow">
         <span class="desk__date">{dateWords}</span>
-        <button type="button" class="desk__add" aria-expanded={composerOpen} onclick={openComposer}
+        <button type="button" class="desk__add" bind:this={addBtn} aria-expanded={composerOpen} onclick={openComposer}
           >{t('desk.add_task', locale)}</button
         >
       </span>

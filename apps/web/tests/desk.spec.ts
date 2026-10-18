@@ -59,7 +59,7 @@ test.describe('Desk — the dashboard (ADR-117)', () => {
     // The agenda is the Planner's now: no day banner, no agenda rows.
     await expect(main.locator('.run--agenda')).toHaveCount(0);
     // The composer waits behind its button.
-    await expect(page.getByRole('textbox', { name: /add a loose end/i })).toHaveCount(0);
+    await expect(page.getByRole('textbox', { name: /new task/i })).toHaveCount(0);
     // A key that does not exist renders itself: none may reach the screen.
     expect(await main.innerText()).not.toMatch(/\b(desk|pulse|overview|lens)\.[a-z_]+/);
   });
@@ -109,7 +109,11 @@ test.describe('Desk — the dashboard (ADR-117)', () => {
     await expect(add).toHaveAttribute('aria-expanded', 'false');
     await add.click();
     await expect(add).toHaveAttribute('aria-expanded', 'true');
-    await expect(page.getByRole('textbox', { name: /add a loose end/i })).toBeFocused();
+    await expect(page.getByRole('textbox', { name: /new task/i })).toBeFocused();
+    // Escape folds it back, and the focus returns to its button.
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('textbox', { name: /new task/i })).toHaveCount(0);
+    await expect(add).toBeFocused();
   });
 
   test('the visit is written on the way out, so «since» has a start next time', async ({ page }) => {
