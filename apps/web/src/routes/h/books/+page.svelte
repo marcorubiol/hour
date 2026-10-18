@@ -355,6 +355,36 @@
     await tick();
     document.getElementById('mny-ledger')?.scrollIntoView({ block: 'start', behavior: 'smooth' });
   }
+  /**
+   * Bring one bolo into view, unfolded: its season (a July overdue lives in
+   * last season's ledger), the filter in «all», the Bolos tab. The table waits
+   * for invoices and expenses too (`loading`), so the scroll waits for the row
+   * to exist, not for the bolos.
+   */
+  let pendingFocus = $state<string | null>(null);
+  function focusBolo(id: string) {
+    const target = bolos.find((b) => b.id === id);
+    if (!target) return;
+    const s = boloSeason(target, today);
+    pickedSeason = s === currentSeason ? null : s;
+    filter = 'all';
+    tab = 'bolos';
+    expandedId = id;
+    pendingFocus = id;
+    const url = new URL(location.href);
+    url.hash = `bolo-${id}`;
+    replaceState(url, {});
+  }
+  $effect(() => {
+    const id = pendingFocus;
+    if (!id || loading) return;
+    void tick().then(() => {
+      const row = document.getElementById(`bolo-${id}`);
+      if (!row) return;
+      row.scrollIntoView({ block: 'center' });
+      pendingFocus = null;
+    });
+  });
   function toggleRow(b: MoneyBolo) {
     expandedId = expandedId === b.id ? null : b.id;
     const url = new URL(location.href);
@@ -687,20 +717,12 @@
   });
   // `#bolo-<id>` es la ficha del bolo: la fila existe solo cuando el feed
   // llega, así que el navegador no puede desplazarse solo. Una vez, cuando
-  // aparece: su temporada, el filtro en «todos», la fila desplegada.
+  // llegan los bolos: `focusBolo`.
   let targetHandled = false;
   $effect(() => {
-    if (targetHandled || bolos.length === 0 || !location.hash.startsWith('#bolo-')) return;
-    const id = location.hash.slice('#bolo-'.length);
-    const target = bolos.find((b) => b.id === id);
+    if (targetHandled || !$bolosQuery.isSuccess || !location.hash.startsWith('#bolo-')) return;
     targetHandled = true;
-    if (!target) return;
-    const s = boloSeason(target, today);
-    pickedSeason = s === currentSeason ? null : s;
-    filter = 'all';
-    tab = 'bolos';
-    expandedId = id;
-    void tick().then(() => document.getElementById(`bolo-${id}`)?.scrollIntoView({ block: 'center' }));
+    focusBolo(location.hash.slice('#bolo-'.length));
   });
 </script>
 
@@ -821,7 +843,7 @@
                 {#each attentionShown as item (item.kind + item.bolo.id)}
                   <li class="att__row" data-kind={item.kind}>
                     <span class="att__what">
-                      <a class="att__who" href={`#bolo-${item.bolo.id}`} onclick={(e) => { e.preventDefault(); expandedId = item.bolo.id; void showLedger('all').then(() => document.getElementById(`bolo-${item.bolo.id}`)?.scrollIntoView({ block: 'center' })); }}>
+                      <a class="att__who" href={`#bolo-${item.bolo.id}`} onclick={(e) => { e.preventDefault(); focusBolo(item.bolo.id); }}>
                         {item.doc?.payer?.name ?? item.bolo.venue_name ?? item.bolo.project?.name ?? '—'}
                       </a>
                       <span class="att__ctx">{[item.doc?.number ?? item.bolo.city, item.kind === 'fiscal' || item.kind === 'draft' ? invoiceStatusLabel('draft', locale) : null].filter(Boolean).map((x) => ` · ${x}`).join('')}</span>
