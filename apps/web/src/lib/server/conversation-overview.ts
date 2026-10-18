@@ -48,6 +48,8 @@ export const LAST_TURN_EMBED = 'last_turn:conversation_event(direction,occurred_
 export function setLastTurnEmbed(search: URLSearchParams): void {
   search.set('last_turn.direction', 'not.is.null');
   search.set('last_turn.kind', `in.(${TURN_KINDS.join(',')})`);
+  // An automatic reply is not an answer (ADR-126 § 3): the sync marks it.
+  search.set('last_turn.metadata->>auto', 'is.null');
   search.set('last_turn.order', 'occurred_at.desc');
   search.set('last_turn.limit', '1');
 }
@@ -95,6 +97,7 @@ export async function loadOverviewRows(env: SupabaseEnv, jwt: string, scope: Ove
       setLastTurnEmbed(search);
       search.set('last_in.direction', 'eq.inbound');
       search.set('last_in.kind', `in.(${TURN_KINDS.join(',')})`);
+      search.set('last_in.metadata->>auto', 'is.null');
       search.set('last_in.order', 'occurred_at.desc');
       search.set('last_in.limit', '1');
       search.set('contacts.is_primary', 'eq.true');
