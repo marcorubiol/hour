@@ -77,6 +77,7 @@
   import { moneyAccessAnyQueryOptions } from '$lib/bolo-queries';
   import { detectLocale, LOCALE_TAG, t } from '$lib/i18n';
   import { performanceStatusTone } from '$lib/performance';
+  import { plannerDayHref } from '$lib/planner';
   import { usePins } from '$lib/stores/pins.svelte';
   import {
     buildLineIndex,
@@ -1000,8 +1001,14 @@
                           <div class="sheet">
                             <div class="sheet__col">
                               <p class="sheet__h">{t('books.sheet_functions', locale)}</p>
-                              <p>{b.next_performed_at ? dayLabel(b.next_performed_at) : t('books.no_date', locale)} · {t(b.function_count === 1 ? 'books.sheet_fn_one' : 'books.sheet_fn_many', locale, { n: b.function_count })}</p>
+                              <p>
+                                {#if b.next_performed_at}<a class="sheet__a" href={plannerDayHref('day', b.next_performed_at.slice(0, 10))}>{dayLabel(b.next_performed_at)}</a>{:else}{t('books.no_date', locale)}{/if}
+                                · {t(b.function_count === 1 ? 'books.sheet_fn_one' : 'books.sheet_fn_many', locale, { n: b.function_count })}
+                              </p>
                               {#if b.project}<p class="sheet__faint">{b.project.name}</p>{/if}
+                              {#if b.conversation_id && b.project}
+                                <p><a class="sheet__a" href={`/h/${workspaceSlugById.get(b.project.workspace_id) ?? defaultWorkspaceSlug}/conversation/${b.conversation_id}`}>{t('books.sheet_conversation', locale)}</a></p>
+                              {/if}
                             </div>
                             <div class="sheet__col">
                               <p class="sheet__h">{t('books.documents', locale)}</p>
@@ -1027,7 +1034,9 @@
                               {/if}
                             </div>
                             <div class="sheet__acts">
-                              <Button size="xs" variant="outline" onclick={() => openPay(b)}>{t('books.record_payment', locale)}</Button>
+                              {#if m.collect !== 'full'}
+                                <Button size="xs" variant="outline" onclick={() => openPay(b)}>{t('books.record_payment', locale)}</Button>
+                              {/if}
                               <Button size="xs" variant="outline" onclick={() => openExpense(b)}>{t('books.add_expense', locale)}</Button>
                               {#if mode !== 'off' && !m.doc}
                                 <Button size="xs" variant="outline" onclick={() => openInvoice(b)}>{t(mode === 'interno' ? 'books.create_proforma' : 'books.create_invoice', locale)}</Button>
@@ -1290,6 +1299,7 @@
     .sheet__h { font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-faint); }
     .sheet__faint { color: var(--text-muted); font-size: var(--text-xs); }
     .sheet__danger { color: var(--danger); }
+    .sheet__a { color: var(--text-color); text-underline-offset: 0.2em; }
     .sheet__link { appearance: none; border: 0; background: none; padding: 0; font: inherit; font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-color); text-decoration: underline; cursor: pointer; }
     .sheet__acts { grid-column: 1 / -1; display: flex; gap: var(--space-xs); flex-wrap: wrap; }
     .pill {

@@ -1941,6 +1941,7 @@
   "books.sheet_functions": "Funcions",
   "books.sheet_fn_one": "1 funció",
   "books.sheet_fn_many": "{n} funcions",
+  "books.sheet_conversation": "La conversa →",
   "books.sheet_no_doc": "sense document",
   "books.sheet_expected": "esperat el {date}",
   "books.sheet_money": "Cobraments i despeses",

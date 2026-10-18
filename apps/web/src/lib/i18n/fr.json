@@ -1941,6 +1941,7 @@
   "books.sheet_functions": "Représentations",
   "books.sheet_fn_one": "1 représentation",
   "books.sheet_fn_many": "{n} représentations",
+  "books.sheet_conversation": "La conversation →",
   "books.sheet_no_doc": "aucun document",
   "books.sheet_expected": "attendu le {date}",
   "books.sheet_money": "Encaissements et dépenses",

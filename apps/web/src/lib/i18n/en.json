@@ -1950,6 +1950,7 @@
   "books.sheet_functions": "Functions",
   "books.sheet_fn_one": "1 function",
   "books.sheet_fn_many": "{n} functions",
+  "books.sheet_conversation": "The conversation →",
   "books.sheet_no_doc": "no document",
   "books.sheet_expected": "expected {date}",
   "books.sheet_money": "Collections and expenses",

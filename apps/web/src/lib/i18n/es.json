@@ -1941,6 +1941,7 @@
   "books.sheet_functions": "Funciones",
   "books.sheet_fn_one": "1 función",
   "books.sheet_fn_many": "{n} funciones",
+  "books.sheet_conversation": "La conversación →",
   "books.sheet_no_doc": "sin documento",
   "books.sheet_expected": "esperado el {date}",
   "books.sheet_money": "Cobros y gastos",
