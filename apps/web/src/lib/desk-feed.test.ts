@@ -201,6 +201,11 @@ describe('buildDeskFeed — tasks, AI, money', () => {
     expect(rankWaiting(feed, NOW).overdue).toBe(0);
   });
 
+  it('a conversation call carries its conversation, so the row opens it (not the person)', () => {
+    const feed = buildDeskFeed({ ...EMPTY, conversations: [conv('c9', { workspace_id: 'w1', next_action_at: actionAt(1) })] }, NOW, 'en');
+    expect(feed[0].runs[0].items[0]).toMatchObject({ conversationId: 'c9', workspaceId: 'w1', href: null });
+  });
+
   it('a reply waiting for us sits today, most recent first, and replaces its next-action call', () => {
     const feed = buildDeskFeed(
       {

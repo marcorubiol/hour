@@ -601,7 +601,10 @@
     const space = scope.isEmpty && i.projectId ? spaceNameByProjectId.get(i.projectId) : null;
     return [space, i.projectName, i.lineName].filter((x) => x && x !== '—').join(' · ');
   };
-  const personHref = (slug: string | null) => (slug && workspaceSlug ? `/h/${workspaceSlug}/person/${slug}` : null);
+  const conversationHref = (i: DeskItem) => {
+    const ws = (i.workspaceId && workspaceSlugById.get(i.workspaceId)) || workspaceSlug;
+    return i.conversationId && ws ? `/h/${ws}/conversation/${i.conversationId}` : null;
+  };
 </script>
 
 <svelte:head><title>{t('desk.title', locale)}</title></svelte:head>
@@ -661,7 +664,7 @@
           errored={waitingErrored}
           {locale}
           {contextPath}
-          {personHref}
+          {conversationHref}
           {money}
           {isGhost}
           ontoggle={(id, done) => $toggleTask.mutate({ id, status: done ? 'done' : 'open' })}

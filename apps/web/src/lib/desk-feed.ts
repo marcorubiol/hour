@@ -44,6 +44,7 @@ export type BucketLabelKey =
 
 export interface DeskConvInput {
   id: string;
+  workspace_id?: string;
   status: string;
   next_action_at: string | null;
   next_action_note: string | null;
@@ -69,8 +70,9 @@ export interface DeskItem {
    *  prepend `space ·` on the cross-space (Everything) view only. */
   projectId: string | null;
   overdue: boolean;
-  /** Conversation → person page (page builds the href with its ws slug). */
-  personSlug: string | null;
+  /** Conversation rows: where the call is resolved (page builds the href with its ws slug). */
+  conversationId: string | null;
+  workspaceId: string | null;
   /** A ready href (money → its bolo in Cuentas, a «voy» → its day) or null. */
   href: string | null;
   /** Task rows. */
@@ -235,7 +237,8 @@ function blankItem(over: Partial<DeskItem> & Pick<DeskItem, 'id' | 'concern' | '
     lineName: null,
     projectId: null,
     overdue: false,
-    personSlug: null,
+    conversationId: null,
+    workspaceId: null,
     href: null,
     taskId: null,
     taskDone: false,
@@ -374,7 +377,8 @@ export function buildDeskFeed(input: DeskFeedInput, now: Date, locale: Locale = 
         projectId: e.project?.id ?? null,
         verbKey: conversationVerbKey(e.status, overdue),
         overdue,
-        personSlug: e.person?.slug ?? null,
+        conversationId: e.id,
+        workspaceId: e.workspace_id ?? null,
       }),
     );
   }
@@ -395,7 +399,8 @@ export function buildDeskFeed(input: DeskFeedInput, now: Date, locale: Locale = 
           projectName: e.project?.name ?? '—',
           projectId: e.project?.id ?? null,
           verbKey: 'revive',
-          personSlug: e.person?.slug ?? null,
+          conversationId: e.id,
+          workspaceId: e.workspace_id ?? null,
           isProposal: true,
         }),
       );

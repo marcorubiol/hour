@@ -21,7 +21,8 @@
     errored: boolean;
     locale: Locale;
     contextPath: (i: DeskItem) => string;
-    personHref: (slug: string | null) => string | null;
+    /** A conversation row opens its conversation, where the call is resolved. */
+    conversationHref: (i: DeskItem) => string | null;
     money: (n: number, cur: string | null) => string;
     /** Proposals accepted this session (the persistent «Añadir» is a known gap). */
     isGhost: (i: DeskItem) => boolean;
@@ -39,7 +40,7 @@
     errored,
     locale,
     contextPath,
-    personHref,
+    conversationHref,
     money,
     isGhost,
     ontoggle,
@@ -77,7 +78,7 @@
     if (i.overdue) return t('desk.due_overdue', locale);
     return dayMonth(i.day);
   }
-  const subjectHref = (i: DeskItem) => (i.concern === 'conversation' ? personHref(i.personSlug) : null) ?? i.href;
+  const subjectHref = (i: DeskItem) => i.href ?? (i.concern === 'conversation' ? conversationHref(i) : null);
 </script>
 
 {#snippet task(item: DeskItem)}
